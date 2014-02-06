@@ -1,87 +1,71 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Thu, 06 Feb 2014 16:55:46 +0530
-Subject: [PATCH 08/51] arm,
- hw-breakpoint: Fix CPU hotplug callback registration
-In-Reply-To: <20140206105718.GG26035@mudshark.cambridge.arm.com>
-References: <20140205220251.19080.92336.stgit@srivatsabhat.in.ibm.com>
- <20140205220603.19080.80971.stgit@srivatsabhat.in.ibm.com>
- <20140206105718.GG26035@mudshark.cambridge.arm.com>
-Message-ID: <52F3713A.3040407@linux.vnet.ibm.com>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Thu,  6 Feb 2014 17:01:32 +0530
+Subject: [PATCH v4 00/10] In-kernel PSCI v0.2 emulation for KVM ARM/ARM64
+Message-ID: <1391686302-19451-1-git-send-email-anup.patel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Currently, KVM ARM/ARM64 only provides in-kernel emulation of Power State
+and Coordination Interface (PSCI) v0.1.
 
-On 02/06/2014 04:27 PM, Will Deacon wrote:
-> Hi Srivatsa,
-> 
-> On Wed, Feb 05, 2014 at 10:06:04PM +0000, Srivatsa S. Bhat wrote:
->> Subsystems that want to register CPU hotplug callbacks, as well as perform
->> initialization for the CPUs that are already online, often do it as shown
->> below:
->>
->> 	get_online_cpus();
->>
->> 	for_each_online_cpu(cpu)
->> 		init_cpu(cpu);
->>
->> 	register_cpu_notifier(&foobar_cpu_notifier);
->>
->> 	put_online_cpus();
->>
->> This is wrong, since it is prone to ABBA deadlocks involving the
->> cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
->> with CPU hotplug operations).
-> 
-> Hmm, the code in question (for this patch) runs from an arch_initcall. How
-> can you generate CPU hotplug operations at that stage?
-> 
+This patchset aims at providing newer PSCI v0.2 for KVM ARM/ARM64 VCPUs
+such that it does not break current KVM ARM/ARM64 ABI. Also, the patchset
+provides emulation of only few PSCI v0.2 functions such as PSCI_VERSION,
+CPU_ON, and CPU_OFF. Emulation of other PSCI v0.2 functions will be added
+later.
 
-You are right - in today's design of the init sequence, CPU hotplug
-operations can't be triggered at that time during boot.
+The user space tools (i.e. QEMU or KVMTOOL) will have to explicitly enable
+KVM_ARM_VCPU_PSCI_0_2 feature using KVM_ARM_VCPU_INIT ioctl for providing
+PSCI v0.2 to VCPUs.
 
-However, there have been proposals to boot CPUs in parallel along with the
-rest of the kernel initialization [1] (and that would need full synchronization
-with CPU hotplug even at the initcall stage). Of course this needs a lot of
-auditing and modifications to the CPU hotplug notifiers of various subsystems
-to make them robust enough to handle the parallel boot; so its not going to
-happen very soon. But I felt that it would be a good idea to ensure that we
-get the locking/synchronization right, even if the registrations happen very
-early during boot today.. you know, just to be on the safer side and also to
-make the job easier for whoever that is, who tries to implement parallel
-CPU booting again in the future ;-)
+Changlog:
 
-[1]. http://thread.gmane.org/gmane.linux.kernel/1246209
+V4:
+ - Implement all mandatory functions required by PSCI v0.2
 
+V3:
+ - Make KVM_ARM_VCPU_PSCI_0_2 feature experiementatl for now so that
+   it fails for user space till all mandatory PSCI v0.2 functions are
+   emulated by KVM ARM/ARM64
+ - Have separate patch for making KVM_ARM_VCPU_PSCI_0_2 feature available
+   to user space. This patch can be defferred for now
 
->> Instead, the correct and race-free way of performing the callback
->> registration is:
->>
->> 	cpu_maps_update_begin();
->>
->> 	for_each_online_cpu(cpu)
->> 		init_cpu(cpu);
->>
->> 	/* Note the use of the double underscored version of the API */
->> 	__register_cpu_notifier(&foobar_cpu_notifier);
->>
->> 	cpu_maps_update_done();
->>
->>
->> Fix the hw-breakpoint code in arm by using this latter form of callback
->> registration.
-> 
-> I guess you introduce __register_cpu_notifier somewhere earlier in the
-> series,
+V2:
+ - Don't rename PSCI return values KVM_PSCI_RET_NI and KVM_PSCI_RET_INVAL
+ - Added kvm_psci_version() to get PSCI version available to VCPU
+ - Fixed grammer in Documentation/virtual/kvm/api.txt
 
-Yes, patch 1 adds that API..
+V1:
+ - Initial RFC PATCH
 
-> so it's best if you take this all via your tree.
->
+Anup Patel (10):
+  KVM: Add capability to advertise PSCI v0.2 support
+  ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
+  KVM: Documentation: Add info regarding KVM_ARM_VCPU_PSCI_0_2 feature
+  ARM/ARM64: KVM: Make kvm_psci_call() return convention more flexible
+  KVM: Add KVM_EXIT_SYSTEM_EVENT to user space API header
+  ARM/ARM64: KVM: Emulate PSCI v0.2 SYSTEM_OFF and SYSTEM_RESET
+  ARM/ARM64: KVM: Emulate PSCI v0.2 AFFINITY_INFO
+  ARM/ARM64: KVM: Emulate PSCI v0.2 MIGRATE_INFO_TYPE and related
+    functions
+  ARM/ARM64: KVM: Fix CPU_ON emulation for PSCI v0.2
+  ARM/ARM64: KVM: Emulate PSCI v0.2 CPU_SUSPEND
 
-Hmm.. I'm not a maintainer myself, so I'm hoping that either Oleg or Rusty
-or any of the other CPU hotplug maintainers (Thomas/Peter/Ingo) would be
-willing to take these patches through their tree.
+ Documentation/virtual/kvm/api.txt |   17 +++
+ arch/arm/include/asm/kvm_host.h   |    7 +-
+ arch/arm/include/asm/kvm_psci.h   |    7 +-
+ arch/arm/include/uapi/asm/kvm.h   |   35 ++++-
+ arch/arm/kvm/arm.c                |    1 +
+ arch/arm/kvm/handle_exit.c        |   10 +-
+ arch/arm/kvm/psci.c               |  270 ++++++++++++++++++++++++++++++++++---
+ arch/arm/kvm/reset.c              |    4 +
+ arch/arm64/include/asm/kvm_host.h |    7 +-
+ arch/arm64/include/asm/kvm_psci.h |    7 +-
+ arch/arm64/include/uapi/asm/kvm.h |   35 ++++-
+ arch/arm64/kvm/handle_exit.c      |   10 +-
+ arch/arm64/kvm/reset.c            |    4 +
+ include/uapi/linux/kvm.h          |    9 ++
+ 14 files changed, 395 insertions(+), 28 deletions(-)
 
-Regards,
-Srivatsa S. Bhat
+-- 
+1.7.9.5
