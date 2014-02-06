@@ -1,53 +1,56 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 06 Feb 2014 20:12:46 +0100
-Subject: [PATCH v2 01/12] ARM: EXYNOS: Do not resume l2x0 if not enabled before
- suspend
+Date: Thu, 06 Feb 2014 20:12:47 +0100
+Subject: [PATCH v2 02/12] ARM: SAMSUNG: Add soc_is_s3c2410() helper
 In-Reply-To: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
 References: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1391713977-22300-2-git-send-email-t.figa@samsung.com>
+Message-ID: <1391713977-22300-3-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Trying to resume l2x0 if it was not enabled before suspend leads to
-system crash. This patch prevents this by checking if l2x0_regs_phys is
-a valid pointer to l2x0 context data saved on initialization.
+Due to the S3C2410 SoC being quite different from other S3C24xx SoCs
+in some aspects, such as availability of DIVSLOT register in its UART
+blocks, there is a need sometimes to check whether we are running on
+this SoC, not just the S3C24xx series. This patch adds soc_is_s3c2410()
+helper function for this purpose.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/s5p-sleep.S | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/plat-samsung/include/plat/cpu.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/plat-samsung/s5p-sleep.S b/arch/arm/plat-samsung/s5p-sleep.S
-index a030e73..20764bd 100644
---- a/arch/arm/plat-samsung/s5p-sleep.S
-+++ b/arch/arm/plat-samsung/s5p-sleep.S
-@@ -59,13 +59,15 @@ ENTRY(s3c_cpu_resume)
- 	and	r0, r0, r1
- 	ldr	r1, =CPU_CORTEX_A9
- 	cmp	r0, r1
--	bne	resume_l2on
-+	bne	skip_l2_resume
- 	adr	r0, l2x0_regs_phys
- 	ldr	r0, [r0]
-+	cmp	r0, #0
-+	beq	skip_l2_resume
- 	ldr	r1, [r0, #L2X0_R_PHY_BASE]
- 	ldr	r2, [r1, #L2X0_CTRL]
- 	tst	r2, #0x1
--	bne	resume_l2on
-+	bne	skip_l2_resume
- 	ldr	r2, [r0, #L2X0_R_AUX_CTRL]
- 	str	r2, [r1, #L2X0_AUX_CTRL]
- 	ldr	r2, [r0, #L2X0_R_TAG_LATENCY]
-@@ -78,7 +80,7 @@ ENTRY(s3c_cpu_resume)
- 	str	r2, [r1, #L2X0_POWER_CTRL]
- 	mov	r2, #1
- 	str	r2, [r1, #L2X0_CTRL]
--resume_l2on:
-+skip_l2_resume:
+diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+index 335beb3..6bf86f6 100644
+--- a/arch/arm/plat-samsung/include/plat/cpu.h
++++ b/arch/arm/plat-samsung/include/plat/cpu.h
+@@ -20,6 +20,9 @@
+ 
+ extern unsigned long samsung_cpu_id;
+ 
++#define S3C2410_CPU_ID		0x32410000
++#define S3C2410_CPU_MASK	0xFFFFFFFF
++
+ #define S3C24XX_CPU_ID		0x32400000
+ #define S3C24XX_CPU_MASK	0xFFF00000
+ 
+@@ -56,6 +59,7 @@ static inline int is_samsung_##name(void)	\
+ 	return ((samsung_cpu_id & mask) == (id & mask));	\
+ }
+ 
++IS_SAMSUNG_CPU(s3c2410, S3C2410_CPU_ID, S3C2410_CPU_MASK)
+ IS_SAMSUNG_CPU(s3c24xx, S3C24XX_CPU_ID, S3C24XX_CPU_MASK)
+ IS_SAMSUNG_CPU(s3c2412, S3C2412_CPU_ID, S3C2412_CPU_MASK)
+ IS_SAMSUNG_CPU(s3c6400, S3C6400_CPU_ID, S3C64XX_CPU_MASK)
+@@ -76,8 +80,10 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+     defined(CONFIG_CPU_S3C2442) || defined(CONFIG_CPU_S3C244X) || \
+     defined(CONFIG_CPU_S3C2443)
+ # define soc_is_s3c24xx()	is_samsung_s3c24xx()
++# define soc_is_s3c2410()	is_samsung_s3c2410()
+ #else
+ # define soc_is_s3c24xx()	0
++# define soc_is_s3c2410()	0
  #endif
- 	b	cpu_resume
- ENDPROC(s3c_cpu_resume)
+ 
+ #if defined(CONFIG_CPU_S3C2412)
 -- 
 1.8.5.2
