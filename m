@@ -1,66 +1,78 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu,  6 Feb 2014 14:20:07 -0300
-Subject: [PATCH v6 00/19] Armada 370/XP watchdog
-Message-ID: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Thu,  6 Feb 2014 14:20:09 -0300
+Subject: [PATCH v6 02/19] watchdog: orion: Add clock error handling
+In-Reply-To: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1391707226-18258-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new round, adding all Tested,Acked-by's and fixing Russell's comment
-about the leaking clock.
+This commit adds a check for clk_prepare_enable success and introduces
+an error path to disable the clock properly.
 
-This series depends on Sebastian's irqchip fixes to clear bridge irqs cause,
-Jason has picked it here:
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Tested-by: Willy Tarreau <w@1wt.eu>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/watchdog/orion_wdt.c | 29 +++++++++++++++++++----------
+ 1 file changed, 19 insertions(+), 10 deletions(-)
 
-  http://git.infradead.org/linux-mvebu.git mvebu-next/irqchip-fixes
-
-The first patch (for clocksource) is independent of the others.
-Daniel: Will you take it?
-
-Wim: Can we take all the watchdog changes through mvebu, with your Ack?
-This way, we can sort out the irqchip dependency.
-
-I've pushed a branch, in case anybody feels like doing a test:
-
-  https://github.com/MISL-EBU-System-SW/mainline-public/tree/wdt_for_v3.14_v6
-
-Ezequiel Garcia (19):
-  clocksource: orion: Use atomic access for shared registers
-  watchdog: orion: Add clock error handling
-  watchdog: orion: Use atomic access for shared registers
-  watchdog: orion: Remove unused macros
-  watchdog: orion: Make sure the watchdog is initially stopped
-  watchdog: orion: Handle the interrupt so it's properly acked
-  watchdog: orion: Make RSTOUT register a separate resource
-  watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
-  watchdog: orion: Introduce an orion_watchdog device structure
-  watchdog: orion: Introduce per-compatible of_device_id data
-  watchdog: orion: Add per-compatible clock initialization
-  watchdog: orion: Add per-compatible watchdog start implementation
-  watchdog: orion: Add support for Armada 370 and Armada XP SoC
-  ARM: mvebu: Enable Armada 370/XP watchdog in the devicetree
-  ARM: kirkwood: Add RSTOUT 'reg' entry to devicetree
-  ARM: dove: Enable Dove watchdog in the devicetree
-  watchdog: orion: Enable the build on ARCH_MVEBU
-  ARM: mvebu: Enable watchdog support in defconfig
-  ARM: dove: Enable watchdog support in the defconfig
-
- .../devicetree/bindings/watchdog/marvel.txt        |  11 +-
- arch/arm/boot/dts/armada-370-xp.dtsi               |   4 +
- arch/arm/boot/dts/armada-370.dtsi                  |   5 +
- arch/arm/boot/dts/armada-xp.dtsi                   |   6 +
- arch/arm/boot/dts/dove.dtsi                        |   8 +
- arch/arm/boot/dts/kirkwood.dtsi                    |   2 +-
- arch/arm/configs/dove_defconfig                    |   2 +
- arch/arm/configs/mvebu_defconfig                   |   2 +
- arch/arm/mach-dove/include/mach/bridge-regs.h      |   1 +
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h  |   1 +
- arch/arm/mach-mv78xx0/include/mach/bridge-regs.h   |   1 +
- arch/arm/mach-orion5x/include/mach/bridge-regs.h   |   1 +
- arch/arm/plat-orion/common.c                       |  10 +-
- drivers/clocksource/time-orion.c                   |  28 +-
- drivers/watchdog/Kconfig                           |   2 +-
- drivers/watchdog/orion_wdt.c                       | 367 ++++++++++++++++-----
- 16 files changed, 345 insertions(+), 106 deletions(-)
-
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index f7722a4..7f19fa3 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -151,17 +151,24 @@ static int orion_wdt_probe(struct platform_device *pdev)
+ 	clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(clk)) {
+ 		dev_err(&pdev->dev, "Orion Watchdog missing clock\n");
+-		return -ENODEV;
++		return PTR_ERR(clk);
+ 	}
+-	clk_prepare_enable(clk);
++	ret = clk_prepare_enable(clk);
++	if (ret)
++		return ret;
+ 	wdt_tclk = clk_get_rate(clk);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res)
+-		return -ENODEV;
++	if (!res) {
++		ret = -ENODEV;
++		goto disable_clk;
++	}
++
+ 	wdt_reg = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+-	if (!wdt_reg)
+-		return -ENOMEM;
++	if (!wdt_reg) {
++		ret = -ENOMEM;
++		goto disable_clk;
++	}
+ 
+ 	wdt_max_duration = WDT_MAX_CYCLE_COUNT / wdt_tclk;
+ 
+@@ -171,14 +178,16 @@ static int orion_wdt_probe(struct platform_device *pdev)
+ 
+ 	watchdog_set_nowayout(&orion_wdt, nowayout);
+ 	ret = watchdog_register_device(&orion_wdt);
+-	if (ret) {
+-		clk_disable_unprepare(clk);
+-		return ret;
+-	}
++	if (ret)
++		goto disable_clk;
+ 
+ 	pr_info("Initial timeout %d sec%s\n",
+ 		orion_wdt.timeout, nowayout ? ", nowayout" : "");
+ 	return 0;
++
++disable_clk:
++	clk_disable_unprepare(clk);
++	return ret;
+ }
+ 
+ static int orion_wdt_remove(struct platform_device *pdev)
 -- 
 1.8.1.5
