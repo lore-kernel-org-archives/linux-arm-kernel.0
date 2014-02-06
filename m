@@ -1,43 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:20:46 +0900
-Subject: [PATCH 11/17] ARM: shmobile: r8a7791: Add SATA clocks to device tree
+Date: Thu,  6 Feb 2014 15:20:50 +0900
+Subject: [PATCH 15/17] ARM: shmobile: lager: Enable SATA1 in r8a7790-lager.dts
 In-Reply-To: <cover.1391665761.git.horms+renesas@verge.net.au>
 References: <cover.1391665761.git.horms+renesas@verge.net.au>
-Message-ID: <65f05c38749f393f775c360b9b247fa4d63b72de.1391665761.git.horms+renesas@verge.net.au>
+Message-ID: <c6181b9f06b0821e8d34e47174e044801f03edce.1391665761.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Valentine Barshak <valentine.barshak@cogentembedded.com>
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Tested-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
+This enables SATA1 in Lager device tree.
+SATA0 is not available on Lager since its
+pinmux is fixed to USB3.0.
+
+Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7790-lager.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 93c6f4d..94e3cc1 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -655,13 +655,15 @@
- 		mstp8_clks: mstp8_clks at e6150990 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
--			clocks = <&zg_clk>, <&zg_clk>, <&zg_clk>, <&p_clk>;
-+			clocks = <&zg_clk>, <&zg_clk>, <&zg_clk>, <&p_clk>, <&zs_clk>,
-+				 <&zs_clk>;
- 			#clock-cells = <1>;
- 			renesas,clock-indices = <
- 				R8A7791_CLK_VIN2 R8A7791_CLK_VIN1 R8A7791_CLK_VIN0
--				R8A7791_CLK_ETHER
-+				R8A7791_CLK_ETHER R8A7791_CLK_SATA1 R8A7791_CLK_SATA0
- 			>;
--			clock-output-names = "vin2", "vin1", "vin0", "ether";
-+			clock-output-names =
-+				"vin2", "vin1", "vin0", "ether", "sata1", "sata0";
- 		};
- 		mstp9_clks: mstp9_clks at e6150994 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 57569cb..1081c5e 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -91,3 +91,7 @@
+ 	non-removable;
+ 	status = "okay";
+ };
++
++&sata1 {
++	status = "okay";
++};
 -- 
 1.8.5.2
