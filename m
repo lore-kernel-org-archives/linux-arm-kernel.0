@@ -1,55 +1,89 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  6 Feb 2014 10:40:31 +0100
-Subject: [PATCH v2 1/2] clocksource: sunxi: Add new compatibles
+Date: Thu,  6 Feb 2014 10:40:32 +0100
+Subject: [PATCH v2 2/2] ARM: sunxi: dt: Convert to the new clocksource
+ compatible
 In-Reply-To: <1391679632-15139-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1391679632-15139-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1391679632-15139-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1391679632-15139-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A10 compatibles were following a slightly different compatible
-patterns than the rest of the SoCs for historical reasons. Add compatibles
-matching the other pattern to the timer driver for consistency, and keep the
-older one for backward compatibility.
+Switch the device tree to the new compatibles introduced in the timer driver
+to have a common pattern accross all Allwinner SoCs.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt | 4 ++--
- drivers/clocksource/sun4i_timer.c                                 | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sun4i-a10.dtsi  | 2 +-
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 2 +-
+ arch/arm/boot/dts/sun5i-a13.dtsi  | 2 +-
+ arch/arm/boot/dts/sun6i-a31.dtsi  | 2 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi  | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
-index 48aeb78..5c2e235 100644
---- a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
-@@ -2,7 +2,7 @@ Allwinner A1X SoCs Timer Controller
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 28273f9..d7cbc3a 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -409,7 +409,7 @@
+ 		};
  
- Required properties:
+ 		timer at 01c20c00 {
+-			compatible = "allwinner,sun4i-timer";
++			compatible = "allwinner,sun4i-a10-timer";
+ 			reg = <0x01c20c00 0x90>;
+ 			interrupts = <22>;
+ 			clocks = <&osc24M>;
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index 2318082..ecbf5e3 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -370,7 +370,7 @@
+ 		};
  
--- compatible : should be "allwinner,sun4i-timer"
-+- compatible : should be "allwinner,sun4i-a10-timer"
- - reg : Specifies base physical address and size of the registers.
- - interrupts : The interrupt of the first timer
- - clocks: phandle to the source clock (usually a 24 MHz fixed clock)
-@@ -10,7 +10,7 @@ Required properties:
- Example:
+ 		timer at 01c20c00 {
+-			compatible = "allwinner,sun4i-timer";
++			compatible = "allwinner,sun4i-a10-timer";
+ 			reg = <0x01c20c00 0x90>;
+ 			interrupts = <22>;
+ 			clocks = <&osc24M>;
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index 6de40b6..bed2479 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -334,7 +334,7 @@
+ 		};
  
- timer {
--	compatible = "allwinner,sun4i-timer";
-+	compatible = "allwinner,sun4i-a10-timer";
- 	reg = <0x01c20c00 0x400>;
- 	interrupts = <22>;
- 	clocks = <&osc>;
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index bf497af..efb17c3 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -196,5 +196,5 @@ static void __init sun4i_timer_init(struct device_node *node)
- 	clockevents_config_and_register(&sun4i_clockevent, rate,
- 					TIMER_SYNC_TICKS, 0xffffffff);
- }
--CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-timer",
-+CLOCKSOURCE_OF_DECLARE(sun4i, "allwinner,sun4i-a10-timer",
- 		       sun4i_timer_init);
+ 		timer at 01c20c00 {
+-			compatible = "allwinner,sun4i-timer";
++			compatible = "allwinner,sun4i-a10-timer";
+ 			reg = <0x01c20c00 0x90>;
+ 			interrupts = <22>;
+ 			clocks = <&osc24M>;
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 092bf97..de2aa91 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -241,7 +241,7 @@
+ 		};
+ 
+ 		timer at 01c20c00 {
+-			compatible = "allwinner,sun4i-timer";
++			compatible = "allwinner,sun4i-a10-timer";
+ 			reg = <0x01c20c00 0xa0>;
+ 			interrupts = <0 18 4>,
+ 				     <0 19 4>,
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index bfb2cf2..a725cee 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -450,7 +450,7 @@
+ 		};
+ 
+ 		timer at 01c20c00 {
+-			compatible = "allwinner,sun4i-timer";
++			compatible = "allwinner,sun4i-a10-timer";
+ 			reg = <0x01c20c00 0x90>;
+ 			interrupts = <0 22 4>,
+ 				     <0 23 4>,
 -- 
 1.8.4.2
