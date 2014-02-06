@@ -1,55 +1,57 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Feb 2014 13:05:06 -0500
-Subject: [PATCH 0/3] irqchip: orion: bridge irq fixes for v3.14-rc1
-In-Reply-To: <20140206171039.GC12542@localhost>
-References: <1390516686-2224-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140205045415.GN8533@titan.lakedaemon.net>
- <20140206171039.GC12542@localhost>
-Message-ID: <20140206180506.GJ8533@titan.lakedaemon.net>
+Date: Thu, 6 Feb 2014 13:08:52 -0500
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <20140206170838.GB12542@localhost>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140205183457.GW8533@titan.lakedaemon.net>
+ <20140206170838.GB12542@localhost>
+Message-ID: <20140206180852.GK8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 02:10:40PM -0300, Ezequiel Garcia wrote:
-> On Tue, Feb 04, 2014 at 11:54:15PM -0500, Jason Cooper wrote:
-> > On Thu, Jan 23, 2014 at 11:38:03PM +0100, Sebastian Hesselbarth wrote:
-> > > This is a small patch set to fix some shortcomings how Orion bridge
-> > > irqs are handled. The patches are based on v3.13-rc8 and should go
-> > > into v3.14. They can possibly also marked for -stable down to v3.10.
+On Thu, Feb 06, 2014 at 02:08:39PM -0300, Ezequiel Garcia wrote:
+> On Wed, Feb 05, 2014 at 01:34:57PM -0500, Jason Cooper wrote:
+> > On Sat, Jan 25, 2014 at 07:19:06PM +0100, Sebastian Hesselbarth wrote:
+> > > This patch set fixes clk init order that went upside-down with
+> > > v3.14. I haven't really investigated what caused this, but I assume
+> > > it is related with DT node reordering by addresses.
 > > > 
-> > > This patches are the result of a discussion about a stale watchdog irq,
-> > > that can accidentially trigger the watchdog's irq handler and cause a
-> > > reset [1].
+> > > Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
+> > > registered before core clocks driver. Unfortunately, we cannot
+> > > return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
+> > > init order for our drivers is always core clocks before clock gating,
+> > > we maintain init order ourselves by hooking CLK_OF_DECLARE to one
+> > > init function that will register core clocks before clock gating
+> > > driver.
 > > > 
-> > > The first patch will add a write to clear already pending interrupts
-> > > on init. The second patch replaces handle_level_irq with handle_edge_irq
-> > > which is more appropriate for bridge irqs which are edge-triggered.
-> > > The last patch finally, fixes stale interrupts by installing an
-> > > .irq_enable callback, that will clear a possible pending interrupt
-> > > before unmasking it.
+> > > This patch is based on pre-v3.14-rc1 mainline and should go in as
+> > > fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
+> > > I suggest Jason picks it up as a topic branch.
 > > > 
-> > > [1] http://www.spinics.net/lists/arm-kernel/msg302106.html
+> > > The patches have been boot tested on Dove and compile-tested only
+> > > for Kirkwood, Armada 370 and XP.
 > > > 
-> > > Sebastian Hesselbarth (3):
-> > >   irqchip: orion: clear bridge cause register on init
-> > >   irqchip: orion: use handle_edge_irq on bridge irqs
-> > >   irqchip: orion: clear stale interrupts in irq_enable
+> > > Sebastian Hesselbarth (4):
+> > >   clk: mvebu: armada-370: maintain clock init order
+> > >   clk: mvebu: armada-xp: maintain clock init order
+> > >   clk: mvebu: dove: maintain clock init order
+> > >   clk: mvebu: kirkwood: maintain clock init order
 > > > 
-> > >  drivers/irqchip/irq-orion.c | 18 ++++++++++++++++--
-> > >  1 file changed, 16 insertions(+), 2 deletions(-)
+> > >  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
+> > >  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
+> > >  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
+> > >  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
+> > >  4 files changed, 44 insertions(+), 50 deletions(-)
 > > 
-> > Whole series applied to mvebu-next/irqchip-fixes (v2 for 3/3).  Once I
-> > see that the outstanding pull requests for mvebu/irqchip have been
-> > merged into mainline, I'll be changing the name of this branch to
-> > mvebu/irqchip-fixes.  I just don't want to upset the applecart atm.
-> > 
-> > Oh yeah, Cc'd for stable back to v3.10.
+> > Whole series applied to mvebu/clk-fixes.
 > > 
 > 
-> If you want to pick this:
+> FWIW, Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > 
-> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Observed "division by zero" get fixed by this, on A370 Mirabox, Kirkwood
+> Topkick and Dove Cubox.
 
-Added, thanks for testing!
+Added for patches 1, 3, and 4 (all but armada-xp.c)  Thanks for testing.
 
 thx,
 
