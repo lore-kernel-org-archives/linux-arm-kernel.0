@@ -1,58 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Feb 2014 13:08:52 -0500
-Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-In-Reply-To: <20140206170838.GB12542@localhost>
-References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140205183457.GW8533@titan.lakedaemon.net>
- <20140206170838.GB12542@localhost>
-Message-ID: <20140206180852.GK8533@titan.lakedaemon.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  6 Feb 2014 18:09:33 +0000
+Subject: [PATCH 5/5] iommu/arm-smmu: fix compilation issue when
+ !CONFIG_ARM_AMBA
+In-Reply-To: <1391710173-4343-1-git-send-email-will.deacon@arm.com>
+References: <1391710173-4343-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1391710173-4343-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 02:08:39PM -0300, Ezequiel Garcia wrote:
-> On Wed, Feb 05, 2014 at 01:34:57PM -0500, Jason Cooper wrote:
-> > On Sat, Jan 25, 2014 at 07:19:06PM +0100, Sebastian Hesselbarth wrote:
-> > > This patch set fixes clk init order that went upside-down with
-> > > v3.14. I haven't really investigated what caused this, but I assume
-> > > it is related with DT node reordering by addresses.
-> > > 
-> > > Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
-> > > registered before core clocks driver. Unfortunately, we cannot
-> > > return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
-> > > init order for our drivers is always core clocks before clock gating,
-> > > we maintain init order ourselves by hooking CLK_OF_DECLARE to one
-> > > init function that will register core clocks before clock gating
-> > > driver.
-> > > 
-> > > This patch is based on pre-v3.14-rc1 mainline and should go in as
-> > > fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
-> > > I suggest Jason picks it up as a topic branch.
-> > > 
-> > > The patches have been boot tested on Dove and compile-tested only
-> > > for Kirkwood, Armada 370 and XP.
-> > > 
-> > > Sebastian Hesselbarth (4):
-> > >   clk: mvebu: armada-370: maintain clock init order
-> > >   clk: mvebu: armada-xp: maintain clock init order
-> > >   clk: mvebu: dove: maintain clock init order
-> > >   clk: mvebu: kirkwood: maintain clock init order
-> > > 
-> > >  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
-> > >  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
-> > >  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
-> > >  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
-> > >  4 files changed, 44 insertions(+), 50 deletions(-)
-> > 
-> > Whole series applied to mvebu/clk-fixes.
-> > 
-> 
-> FWIW, Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> 
-> Observed "division by zero" get fixed by this, on A370 Mirabox, Kirkwood
-> Topkick and Dove Cubox.
+If !CONFIG_ARM_AMBA, we shouldn't try to register ourselves with the
+amba_bustype.
 
-Added for patches 1, 3, and 4 (all but armada-xp.c)  Thanks for testing.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-thx,
-
-Jason.
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 0ae4dd39197f..6fe7922ecc1d 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -2004,8 +2004,10 @@ static int __init arm_smmu_init(void)
+ 	if (!iommu_present(&platform_bus_type))
+ 		bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
+ 
++#ifdef CONFIG_ARM_AMBA
+ 	if (!iommu_present(&amba_bustype))
+ 		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
++#endif
+ 
+ 	return 0;
+ }
+-- 
+1.8.2.2
