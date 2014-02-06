@@ -1,66 +1,40 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 6 Feb 2014 08:38:44 -0600
-Subject: [PATCH 2/3] ARM: OMAP2+: AM43x: Add ID for ES1.1
-In-Reply-To: <1391676348-32339-3-git-send-email-lokeshvutla@ti.com>
-References: <1391676348-32339-1-git-send-email-lokeshvutla@ti.com>
- <1391676348-32339-3-git-send-email-lokeshvutla@ti.com>
-Message-ID: <52F39E74.3030404@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 6 Feb 2014 22:51:02 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 3.14
+Message-ID: <20140206145058.GA6610@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2014 02:45 AM, Lokesh Vutla wrote:
-> Adding ID for AM437x ES1.1 silicon.
-> 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
->  arch/arm/mach-omap2/id.c  |   14 ++++++++++++--
->  arch/arm/mach-omap2/soc.h |    3 ++-
->  2 files changed, 14 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index 9428c5f..8a05eaf 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -465,8 +465,18 @@ void __init omap3xxx_check_revision(void)
->  		}
->  		break;
->  	case 0xb98c:
-> -		omap_revision = AM437X_REV_ES1_0;
-> -		cpu_rev = "1.0";
-> +		switch (rev) {
-> +		case 0:
-> +			omap_revision = AM437X_REV_ES1_0;
-> +			cpu_rev = "1.0";
-> +			break;
-> +		case 1:
-> +		/* FALLTHROUGH */
-> +		default:
-> +			omap_revision = AM437X_REV_ES1_1;
-> +			cpu_rev = "1.1";
-> +			break;
-> +		}
->  		break;
->  	case 0xb8f2:
->  		switch (rev) {
-> diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
-> index 076bd90..30abcc8 100644
-> --- a/arch/arm/mach-omap2/soc.h
-> +++ b/arch/arm/mach-omap2/soc.h
-> @@ -438,7 +438,8 @@ IS_OMAP_TYPE(3430, 0x3430)
->  #define AM335X_REV_ES2_1	(AM335X_CLASS | (0x2 << 8))
->  
->  #define AM437X_CLASS		0x43700000
-> -#define AM437X_REV_ES1_0	AM437X_CLASS
-> +#define AM437X_REV_ES1_0	(AM437X_CLASS | (0x10 << 8))
-> +#define AM437X_REV_ES1_1	(AM437X_CLASS | (0x11 << 8))
->  
->  #define OMAP443X_CLASS		0x44300044
->  #define OMAP4430_REV_ES1_0	(OMAP443X_CLASS | (0x10 << 8))
-> 
+Hi,
 
-can you also check if socbus shows proper results?
-I had http://slexy.org/view/s20e3OsIVx with v3.14-rc1
+The 3.13 stable tree will also need this fix.  But since it does not
+apply to 3.13 cleanly, we will need to send another one for 3.13
+stable kernel, after this one hits mainline.
 
--- 
-Regards,
-Nishanth Menon
+Shawn
+
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.14
+
+for you to fetch changes up to 5d0a87ba5875794ec3df14aa74ee8e18ef47d6b4:
+
+  ARM: imx6: Initialize low-power mode early again (2014-02-06 20:26:26 +0800)
+
+----------------------------------------------------------------
+i.MX fixes for 3.14:
+ - Fix a regression (system hang) when preemption is enabled
+   (CONFIG_PREEMPT=y).
+
+----------------------------------------------------------------
+Philipp Zabel (1):
+      ARM: imx6: Initialize low-power mode early again
+
+ arch/arm/mach-imx/clk-imx6q.c  |    3 +++
+ arch/arm/mach-imx/clk-imx6sl.c |    3 +++
+ arch/arm/mach-imx/pm-imx6q.c   |    2 --
+ 3 files changed, 6 insertions(+), 2 deletions(-)
