@@ -1,40 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:20:38 +0900
-Subject: [PATCH 03/17] ARM: shmobile: koelsch: (1+1)GiB memory in DT
+Date: Thu,  6 Feb 2014 15:20:39 +0900
+Subject: [PATCH 04/17] ARM: shmobile: r8a7791: Add thermal clock in device tree
 In-Reply-To: <cover.1391665761.git.horms+renesas@verge.net.au>
 References: <cover.1391665761.git.horms+renesas@verge.net.au>
-Message-ID: <4cd1bad45182c7f1426353d73a481e0260d236b1.1391665761.git.horms+renesas@verge.net.au>
+Message-ID: <563bc8eb0243783afd7a71204ad696e8bdf44391.1391665761.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Fix dts to have memory 1GiB @ 0_4000_0000 + 1GiB @ 2_0000_0000
-according to Koelsch's hardware manual.
+Add the missing thermal MSTP clock to the thermal device node.
 
-Signed-off-by: Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index c6f5de3..d30527d 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -23,7 +23,12 @@
- 
- 	memory at 40000000 {
- 		device_type = "memory";
--		reg = <0 0x40000000 0 0x80000000>;
-+		reg = <0 0x40000000 0 0x40000000>;
-+	};
-+
-+	memory at 200000000 {
-+		device_type = "memory";
-+		reg = <2 0x00000000 0 0x40000000>;
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 19c6550..34f5d39 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -151,6 +151,7 @@
+ 		reg = <0 0xe61f0000 0 0x14>, <0 0xe61f0100 0 0x38>;
+ 		interrupt-parent = <&gic>;
+ 		interrupts = <0 69 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp5_clks R8A7791_CLK_THERMAL>;
  	};
  
- 	lbsc {
+ 	timer {
 -- 
 1.8.5.2
