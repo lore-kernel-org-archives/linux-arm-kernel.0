@@ -1,139 +1,24 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 06 Feb 2014 16:23:48 +0900
-Subject: [PATCH] backlight: add PWM dependencies
-In-Reply-To: <000101cf2307$97a3c770$c6eb5650$%han@samsung.com>
-References: <1391518634-6472-1-git-send-email-linus.walleij@linaro.org>
- <000401cf222f$43263b20$c972b160$%han@samsung.com>
- <CACRpkdbB8LFM0Vu8VRo4niqxwxUdS-c5gmmWaxbUTbnLCLZbMA@mail.gmail.com>
- <000101cf2307$97a3c770$c6eb5650$%han@samsung.com>
-Message-ID: <000001cf230c$60ec1ca0$22c455e0$%han@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 6 Feb 2014 15:57:50 +0800
+Subject: emmc on imx6 sabresd
+In-Reply-To: <20140129100321.GA32101@frolo.macqel>
+References: <20140129100321.GA32101@frolo.macqel>
+Message-ID: <20140206075748.GC3708@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 06, 2014 3:50 PM, Jingoo Han wrote:
-> On Wednesday, February 05, 2014 5:58 PM, Linus Walleij wrote:
-> > On Wed, Feb 5, 2014 at 6:01 AM, Jingoo Han <jg1.han@samsung.com> wrote:
-> > > On Tuesday, February 04, 2014 9:57 PM, Linus Walleij wrote:
-> > >>
-> > >> In some compilations the LM3630A and LP855X backlight drivers
-> > >> fail like this:
-> > >>
-> > >> drivers/built-in.o: In function `lm3630a_pwm_ctrl':
-> > >> drivers/video/backlight/lm3630a_bl.c:168: undefined reference to `pwm_config'
-> > >> drivers/video/backlight/lm3630a_bl.c:172: undefined reference to `pwm_disable'
-> > >> drivers/video/backlight/lm3630a_bl.c:170: undefined reference to `pwm_enable'
-> > >> drivers/built-in.o: In function `lp855x_pwm_ctrl':
-> > >> drivers/video/backlight/lp855x_bl.c:249: undefined reference to `pwm_config'
-> > >> drivers/video/backlight/lp855x_bl.c:253: undefined reference to `pwm_disable'
-> > >> drivers/video/backlight/lp855x_bl.c:251: undefined reference to `pwm_enable'
-> > >>
-> > >> This is because both drivers depend on the PWM framework, so
-> > >> add this dependency to their Kconfig entries.
-> > >
-> > > However, even though, when CONFIG_PWM is not enabled, the problem
-> > > should not happen. pwm_config(),pwm_disable(), and pwm_enable()
-> > > are already defined for CONFIG_PWM=n case as below.
-> >
-> > So you may think but it does happen :-)
-> >
-> > I reproduced this with the defconfig for ARM pxa255-idp and enabling
-> > all boards for that platform, then enabling all available backlight drivers
-> > as compiled-in objects (y).
+On Wed, Jan 29, 2014 at 11:03:21AM +0100, Philippe De Muyter wrote:
+> Hi Shawn,
 > 
-> However, I cannot reproduce it with mainline kernel 3.14-rc1.
-> 
-> 1. make pxa255-idp_defconfig
-> 2. Enabling all boards
->    (System Type -> Intel PXA2xx/PXA3xx Implementations -> ...)
-> 3. Enabling all available backlight drivers as compiled-in objects (y)
-> 
-> In this case, the LM3630A and LP855X backlight drivers are compiled
-> properly as below:
-> 
->   drivers/video/backlight/lm3630a_bl.o
->   drivers/video/backlight/lp855x_bl.o
-> 
-> Would you check it with mainline kernel 3.14-rc1?
-> If the errors happen, please attach the .config file.
+> I try to use the emmc on my sabresd board and on a similar custom board
+> using 3.13, and I have just discovered by reading Internet that it was
+> not supported up to some weeks ago.  Is there a git tree somewhere that
+> has a branch containing 3.13 or linux-next and all the fixes for emmc on
+> sabresd ?
 
-(+cc Arnd Bergmann)
+I think it will just work if you apply the patch [1] on top of
+v3.14-rc1.
 
-Oh, sorry. There was my mistake.
-I tested this with linux-next tree.
+Shawn
 
-With linux 3.14-rc1, it makes the problem as below.
-
-drivers/built-in.o: In function `lm3630a_pwm_ctrl':
-drivers/video/backlight/lm3630a_bl.c:168: undefined reference to `pwm_config'
-drivers/video/backlight/lm3630a_bl.c:172: undefined reference to `pwm_disable'
-drivers/video/backlight/lm3630a_bl.c:170: undefined reference to `pwm_enable'
-drivers/built-in.o: In function `lp855x_pwm_ctrl':
-drivers/video/backlight/lp855x_bl.c:249: undefined reference to `pwm_config'
-drivers/video/backlight/lp855x_bl.c:253: undefined reference to `pwm_disable'
-drivers/video/backlight/lp855x_bl.c:251: undefined reference to `pwm_enable'
-
-> 
-> >
-> > > ./include/linux/pwm.h
-> > > #if IS_ENABLED(CONFIG_PWM) || IS_ENABLED(CONFIG_HAVE_PWM)
-> > >         .....
-> > > #else
-> >
-> > Hm PXA that I am using defines CONFIG_HAVE_PWM, but doesn't
-> > provide the required signatures (pwm_config/pwm_disable/pwm_enable).
-> >
-> > One of two things is wrong:
-> >
-> > - Either the PXA platform is breaking the CONFIG_HAVE_PWM
-> >   contract by not providing pwm_config/pwm_disable/pwm_enable
-> >   functions. Then HAVE_PWM should be removed from the PXA
-> >   Kconfig selects.
-> >
-> > Or:
-> >
-> > - There is no such contract that these functions must exist if
-> >   CONFIG_HAVE_PWM is defined, and the
-> >   #if IS_ENABLED(CONFIG_HAVE_PWM)
-> >   should be removed from <linux/pwm.h>
-> >
-> > Does anyone know which one it is?
-> >
-> > PWM subsystem maintainer? :-)
-
-Thierry Reding,
-Would you confirm this?
-
-In the case of "CONFIG_HAVE_PWM=y && CONFIG_PWM=n", it makes
-the problem.
-
-The HAVE_PWM symbol is only for legacy platforms that provide
-the PWM API without using the generic framework. PXA looks to
-use the generic PWM framework. Then, how about removing
-"select HAVE_PWM" from PXA as below?
-
---- a/arch/arm/mach-pxa/Kconfig
-+++ b/arch/arm/mach-pxa/Kconfig
-@@ -7,7 +7,6 @@ comment "Intel/Marvell Dev Platforms (sorted by hardware release time)"
- config MACH_PXA3XX_DT
-        bool "Support PXA3xx platforms from device tree"
-        select CPU_PXA300
--       select HAVE_PWM
-        select POWER_SUPPLY
-        select PXA3xx
-        select USE_OF
-@@ -23,12 +22,10 @@ config ARCH_LUBBOCK
-
- config MACH_MAINSTONE
-        bool "Intel HCDDBBVA0 Development Platform (aka Mainstone)"
--       select HAVE_PWM
-        select PXA27x
-
- config MACH_ZYLONITE
-        bool
--       select HAVE_PWM
-        select PXA3xx
-.....
-
-
-Best regards,
-Jingoo Han
+[1] http://www.spinics.net/lists/linux-mmc/msg23039.html
