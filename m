@@ -1,137 +1,79 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 6 Feb 2014 11:11:14 +0200
-Subject: [PATCH v3 3/6] misc: fuse: Add efuse driver for Tegra
-In-Reply-To: <52F28DE2.1040207@wwwdotorg.org>
-References: <1390952176-30402-1-git-send-email-pdeschrijver@nvidia.com>
- <1390952176-30402-4-git-send-email-pdeschrijver@nvidia.com>
- <52F28DE2.1040207@wwwdotorg.org>
-Message-ID: <20140206091114.GK19389@tbergstrom-lnx.Nvidia.com>
+From: christian.gmeiner@gmail.com (Christian Gmeiner)
+Date: Thu, 6 Feb 2014 10:42:00 +0100
+Subject: Freescale FEC packet loss
+In-Reply-To: <201401280201.39174.marex@denx.de>
+References: <201401222255.29467.marex@denx.de>
+ <201401262012.13051.marex@denx.de>
+ <1390772013.2735.47.camel@deadeye.wl.decadent.org.uk>
+ <201401280201.39174.marex@denx.de>
+Message-ID: <CAH9NwWeK17kfty-BAA9Y977BGTYBcJLRSRESrfbCvQ_BiVxa0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 08:15:46PM +0100, Stephen Warren wrote:
-> On 01/28/2014 04:36 PM, Peter De Schrijver wrote:
-> > Implement fuse driver for Tegra20, Tegra30, Tegra114 and Tegra124.
-> 
-> I assume most of this code is simply cut/paste from the existing code in
-> arch/arm/mach-tegra/? If so, "git format-patch -C" would have been
-> useful to highlight what changed when duplicating the files.
-> 
+2014-01-28 Marek Vasut <marex@denx.de>:
+> On Sunday, January 26, 2014 at 10:33:33 PM, Ben Hutchings wrote:
+>> On Sun, 2014-01-26 at 20:12 +0100, Marek Vasut wrote:
+>> > On Sunday, January 26, 2014 at 07:56:30 PM, Ben Hutchings wrote:
+>> > > On Wed, 2014-01-22 at 22:55 +0100, Marek Vasut wrote:
+>> > > > Hi guys,
+>> > > >
+>> > > > I am running stock Linux 3.13 on i.MX6Q SabreLite board. The CPU is
+>> > > > i.MX6Q TO 1.0 .
+>> > > >
+>> > > > I am hitting a WARNING when I use the FEC ethernet to transfer data,
+>> > > > thus I started investigating this problem. TL;DR I am not able to
+>> > > > figure this problem out, so I am not attaching a patch :-(
+>> > > >
+>> > > > Steps to reproduce:
+>> > > > -------------------
+>> > > > 1) Boot stock Linux 3.13 on i.MX6Q SabreLite board
+>> > > > 2) Plug in an SD card into one of the SD slots (I use the full-size
+>> > > > one) 3) Plug in an USB stick into one of the USB ports (I use the
+>> > > > upper one) 4) Plug in an ethernet cable into the board
+>> > > >
+>> > > >    -> Connect the other side into a gigabit-capable PC
+>> > >
+>> > > [...]
+>> > >
+>> > > I think there are known problems with 1000BASE-T on the Sabre Lite
+>> > > board.
+>> >
+>> > This is MX6-wide thing, not sabrelite specific actually.
+>> >
+>> > > Two possible workarounds are to limit the PHY to 100BASE-TX
+>> > > (should be doable with ethtool) or force it to be clock master for
+>> > > 1000BASE-T (requires a driver patch).
+>> >
+>> > Can you please elaborate on the later ? I don't quite understand that.
+>>
+>> 1000BASE-T uses all 4 pairs in both directions at the same time, which
+>> requires that both ends transmit symbols synchronously.  As part of the
+>> autonegotiation protocol, they decide which is the clock master (using a
+>> local clock generator) and which is the clock slave (generating a clock
+>> from the received signal).  A PHY can be configured to support only one
+>> of these roles.
+>
+> I checked the patch you pointed me to. The patch basically messes with the
+> CTL1000 (0x9) register of the PHY, right ? I did the adjustments to the PHY
+> register manually , but the result is still the same (backtrace).
+>
+> I did two different kinds of adjustment:
+> 1) reg 0x9 |= 0x1800;
+> 2) reg 0x9 |= 0x1000;
+> In both cases, the crash did happen. I verified the PHY register was configured
+> as necessary. The KSZ9021 PHY bit 12 configures the master/slave override, same
+> as the patch does. The bit 11 forces either master or slave mode for the PHY. In
+> both cases the crash was there.
+>
+> I think this patch won't help in this case, sorry.
+>
 
-It also has been rewritten slightly. Also the Tegra124 speedo file is new.
+Are there still problems with 3.13.1 kernel regarding FEC networking?
+Does this only
+affect the SabreLite?
 
-> > diff --git a/Documentation/ABI/testing/sysfs-driver-tegra-fuse b/Documentation/ABI/testing/sysfs-driver-tegra-fuse
-> > +What:		/sys/devices/*/<our-device>/fuse
-> > +Date:		December 2013
-> > +Contact:	Peter De Schrijver <pdeschrijver@nvidia.com>
-> > +Description:	read-only access to the efuses on Tegra20, Tegra30, Tegra114
-> > +		and Tegra124 SoC's from NVIDIA. The efuses contain write once
-> > +		data programmed at the factory.
-> > +Users:		any user space application which wants to read the efuses on
-> > +		Tegra SoC's
-> 
-> Surely this file should describe the format of the file, since that's
-> part of the ABI too, right?
-> 
+greets
+--
+Christian Gmeiner, MSc
 
-Part of the fuse data is ODM defined so possibly board specific.
-
-> > diff --git a/drivers/misc/fuse/tegra/fuse-tegra20.c b/drivers/misc/fuse/tegra/fuse-tegra20.c
-> 
-> > +static int tegra20_fuse_probe(struct platform_device *pdev)
-> ...
-> > +	sku_info.revision = tegra_revision;
-> > +	tegra20_init_speedo_data(&sku_info, &pdev->dev);
-> ...
-> > +}
-> > +
-> > +static struct platform_driver tegra20_fuse_driver = {
-> > +	.probe = tegra20_fuse_probe,
-> > +	.driver = {
-> > +		.name = "tegra20_fuse",
-> > +		.owner = THIS_MODULE,
-> > +		.of_match_table = tegra20_fuse_of_match,
-> > +	}
-> > +};
-> > +
-> > +static int __init tegra20_fuse_init(void)
-> > +{
-> > +	return platform_driver_register(&tegra20_fuse_driver);
-> > +}
-> > +postcore_initcall(tegra20_fuse_init);
-> 
-> That call to tegra20_init_speedo_data() now happens much later in boot.
-> Are you sure there's nothing that relies on data it sets up between when
-> tegra_fuse_init() is called (which is where it happens before this
-> series), and the somewhat arbitrary later time when this driver probes?
-> 
-
-Will check.
-
-> > diff --git a/drivers/misc/fuse/tegra/fuse-tegra30.c b/drivers/misc/fuse/tegra/fuse-tegra30.c
-> 
-> > +postcore_initcall(tegra30_fuse_init);
-> > +
-> 
-> There's a blank line at the end of the file. I thought checkpatch warned
-> about this? But actually it doesn't seem to at least in -f mode.
-> 
-> > diff --git a/drivers/misc/fuse/tegra/fuse.h b/drivers/misc/fuse/tegra/fuse.h
-> 
-> > +struct tegra_sku_info {
-> > +	int sku_id;
-> > +	int cpu_process_id;
-> > +	int cpu_speedo_id;
-> > +	int cpu_speedo_value;
-> > +	int cpu_iddq_value;
-> > +	int core_process_id;
-> > +	int soc_speedo_id;
-> > +	int gpu_speedo_id;
-> > +	int gpu_process_id;
-> > +	int gpu_speedo_value;
-> > +	enum tegra_revision revision;
-> > +};
-> 
-> The only use of this appears to be to pass to tegra_fuse_create_sysfs()
-> which prints out the fields. Will there be more users in the future?
-> Otherwise, I'd be tempted to just print it out outside/before-calling
-> tegra_fuse_create_sysfs().
-> 
-> That said, I wonder if these values could/should be exposed in the sysfs
-> file to make it easier to interpret the fuses?
-> 
-
-That could be done I think...
-
-> > diff --git a/drivers/misc/fuse/tegra/tegra114_speedo.c b/drivers/misc/fuse/tegra/tegra114_speedo.c
-> 
-> It might be nice to make these filenames consistent with the others,
-> e.g. fuse-speedo-tegraNNN.c/speedo-tegraNNN.c, or wrap them into
-> fuse-tegraNNN.c?
-> 
-
-I expect 1 speedo file per new SoC, but at least every SoC since Tegra30 has
-used the same way of reading the fuse data. Hence I think it's better to
-keep them separate.
-
-> > diff --git a/drivers/misc/fuse/tegra/tegra30_speedo.c b/drivers/misc/fuse/tegra/tegra30_speedo.c
-> 
-> > +#define FUSE_SPEEDO_CALIB_0	0x14
-> > +#define FUSE_PACKAGE_INFO	0XFC
-> > +#define FUSE_TEST_PROG_VER	0X28
-> 
-> In arch/arm/mach-tegra/tegra30_speedo.c, those values are different:
-> 
-> #define FUSE_SPEEDO_CALIB_0	0x114
-> #define FUSE_PACKAGE_INFO	0X1FC
-> #define FUSE_TEST_PROG_VER	0X128
-> 
-> Was this change intentional? Perhaps it should be in a separate patch to
-> highlight the change, if it's an intentional bug-fix?
-
-This is intentional. The old files used the offset from the fuse IP block base
-address. The new files use the offset in the fuse array.
-
-Cheers,
-
-Peter.
+https://soundcloud.com/christian-gmeiner
