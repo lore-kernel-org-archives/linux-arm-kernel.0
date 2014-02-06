@@ -1,57 +1,58 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 6 Feb 2014 14:15:48 +0530
-Subject: [PATCH 3/3] ARM: OMAP2+: AM43x: Use gptimer as clocksource
+Date: Thu, 6 Feb 2014 14:15:47 +0530
+Subject: [PATCH 2/3] ARM: OMAP2+: AM43x: Add ID for ES1.1
 In-Reply-To: <1391676348-32339-1-git-send-email-lokeshvutla@ti.com>
 References: <1391676348-32339-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1391676348-32339-4-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1391676348-32339-3-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajendra Nayak <rnayak@ti.com>
+Adding ID for AM437x ES1.1 silicon.
 
-The SyncTimer in AM43x is clocked using the following two sources:
-1) An inaccuarte 32k clock (CLK_32KHZ) derived from PER DPLL, causing system
-   time to go slowly (~10% deviation).
-2) external 32KHz RTC clock, which may not always be available on board like
-   in the case of ePOS EVM
-
-Use gptimer as clocksource instead, as is done in the case of AM335x
-(which does not have a SyncTimer). With this, system time keeping works
-accurately.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- arch/arm/mach-omap2/board-generic.c |    2 +-
- arch/arm/mach-omap2/timer.c         |    3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/id.c  |   14 ++++++++++++--
+ arch/arm/mach-omap2/soc.h |    3 ++-
+ 2 files changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 8e3daa1..5679464a 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -229,7 +229,7 @@ DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
- 	.init_late	= am43xx_init_late,
- 	.init_irq	= omap_gic_of_init,
- 	.init_machine	= omap_generic_init,
--	.init_time	= omap3_sync32k_timer_init,
-+	.init_time	= omap3_gptimer_timer_init,
- 	.dt_compat	= am43_boards_compat,
- MACHINE_END
- #endif
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 74044aa..b62de9f 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -604,7 +604,8 @@ OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
- 			2, "timer_sys_ck", NULL);
- #endif /* CONFIG_ARCH_OMAP3 */
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 9428c5f..8a05eaf 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -465,8 +465,18 @@ void __init omap3xxx_check_revision(void)
+ 		}
+ 		break;
+ 	case 0xb98c:
+-		omap_revision = AM437X_REV_ES1_0;
+-		cpu_rev = "1.0";
++		switch (rev) {
++		case 0:
++			omap_revision = AM437X_REV_ES1_0;
++			cpu_rev = "1.0";
++			break;
++		case 1:
++		/* FALLTHROUGH */
++		default:
++			omap_revision = AM437X_REV_ES1_1;
++			cpu_rev = "1.1";
++			break;
++		}
+ 		break;
+ 	case 0xb8f2:
+ 		switch (rev) {
+diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+index 076bd90..30abcc8 100644
+--- a/arch/arm/mach-omap2/soc.h
++++ b/arch/arm/mach-omap2/soc.h
+@@ -438,7 +438,8 @@ IS_OMAP_TYPE(3430, 0x3430)
+ #define AM335X_REV_ES2_1	(AM335X_CLASS | (0x2 << 8))
  
--#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
-+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX) || \
-+	defined(CONFIG_SOC_AM43XX)
- OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
- 		       1, "timer_sys_ck", "ti,timer-alwon");
- #endif
+ #define AM437X_CLASS		0x43700000
+-#define AM437X_REV_ES1_0	AM437X_CLASS
++#define AM437X_REV_ES1_0	(AM437X_CLASS | (0x10 << 8))
++#define AM437X_REV_ES1_1	(AM437X_CLASS | (0x11 << 8))
+ 
+ #define OMAP443X_CLASS		0x44300044
+ #define OMAP4430_REV_ES1_0	(OMAP443X_CLASS | (0x10 << 8))
 -- 
 1.7.9.5
