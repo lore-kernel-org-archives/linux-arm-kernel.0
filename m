@@ -1,72 +1,23 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 7 Feb 2014 01:14:26 +0300
-Subject: [PATCH 2/2] ARM: shmobile: koelsch: add Ether DT support
-In-Reply-To: <201402070110.18561.sergei.shtylyov@cogentembedded.com>
-References: <201402070110.18561.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201402070114.27279.sergei.shtylyov@cogentembedded.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 6 Feb 2014 22:14:40 +0100 (CET)
+Subject: [PATCH] irq: Add new flag to ack level-triggered interrupts
+ before unmasking
+In-Reply-To: <1391721117-27446-1-git-send-email-carlo@caione.org>
+References: <1391721117-27446-1-git-send-email-carlo@caione.org>
+Message-ID: <alpine.DEB.2.02.1402062213590.21991@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Koelsch board dependent part of the Ether device node. 
+On Thu, 6 Feb 2014, Carlo Caione wrote:
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Several irqchip drivers require the level-triggered interrupt to be
+> acked before unmasking to avoid that a second interrupt is immediately
+> triggered. This small patch introduces a new irqchip flags that is used
+> to ack the IRQ line before it is unmasked.
 
----
- arch/arm/boot/dts/r8a7791-koelsch.dts |   31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -2,7 +2,8 @@
-  * Device Tree Source for the Koelsch board
-  *
-  * Copyright (C) 2013 Renesas Electronics Corporation
-- * Copyright (C) 2013 Renesas Solutions Corp.
-+ * Copyright (C) 2013-2014 Renesas Solutions Corp.
-+ * Copyright (C) 2014 Cogent Embedded, Inc.
-  *
-  * This file is licensed under the terms of the GNU General Public License
-  * version 2.  This program is licensed "as is" without any warranty of any
-@@ -122,12 +123,40 @@
- 		renesas,function = "scif1";
- 	};
+And why are you not doing this in the unmask function of the affected
+chip in the first place?
  
-+	ether_pins: ether {
-+		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
-+		renesas,function = "eth";
-+	};
-+
-+	phy1_pins: phy1 {
-+		renesas,groups = "intc_irq0";
-+		renesas,function = "intc";
-+	};
-+
- 	qspi_pins: spi {
- 		renesas,groups = "qspi_ctrl", "qspi_data4";
- 		renesas,function = "qspi";
- 	};
- };
- 
-+&ether {
-+	pinctrl-0 = <&ether_pins>;
-+	pinctrl-names = "default";
-+
-+	phy-handle = <&phy1>;
-+	renesas,ether-link-active-low;
-+	status = "ok";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+		interrupt-parent = <&irqc0>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+
-+		pinctrl-0 = <&phy1_pins>;
-+		pinctrl-names = "default";
-+	};
-+};
-+
- &sata0 {
- 	status = "okay";
- };
+Thanks,
+
+	tglx
