@@ -1,38 +1,31 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu,  6 Feb 2014 14:20:23 -0300
-Subject: [PATCH v6 16/19] ARM: dove: Enable Dove watchdog in the devicetree
+Date: Thu,  6 Feb 2014 14:20:26 -0300
+Subject: [PATCH v6 19/19] ARM: dove: Enable watchdog support in the defconfig
 In-Reply-To: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1391707226-18258-17-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1391707226-18258-20-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the devicetree node to enable watchdog support available in Dove SoCs.
+Now that we have watchdog support, let's add it to the defconfig.
 
-Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/dove.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/configs/dove_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 2b76524..a88ed73 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -210,6 +210,14 @@
- 				clocks = <&core_clk 0>;
- 			};
- 
-+			watchdog at 20300 {
-+				compatible = "marvell,orion-wdt";
-+				reg = <0x20300 0x28>, <0x20108 0x4>;
-+				interrupt-parent = <&bridge_intc>;
-+				interrupts = <3>;
-+				clocks = <&core_clk 0>;
-+			};
-+
- 			crypto: crypto-engine at 30000 {
- 				compatible = "marvell,orion-crypto";
- 				reg = <0x30000 0x10000>,
+diff --git a/arch/arm/configs/dove_defconfig b/arch/arm/configs/dove_defconfig
+index 1101054..a330690 100644
+--- a/arch/arm/configs/dove_defconfig
++++ b/arch/arm/configs/dove_defconfig
+@@ -80,6 +80,8 @@ CONFIG_SPI_ORION=y
+ # CONFIG_HWMON is not set
+ CONFIG_THERMAL=y
+ CONFIG_DOVE_THERMAL=y
++CONFIG_WATCHDOG=y
++CONFIG_ORION_WATCHDOG=y
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_EHCI_HCD=y
 -- 
 1.8.1.5
