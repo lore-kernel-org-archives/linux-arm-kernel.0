@@ -1,35 +1,54 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 6 Feb 2014 18:03:33 +0100
-Subject: [PATCH 4/4] ARM: Kirkwood: Add support for many Synology NAS
- devices
-In-Reply-To: <107057891.kz6j7UkZNk@wuerfel>
-References: <1391634309-3123-1-git-send-email-andrew@lunn.ch>
- <20140206153939.GD8533@titan.lakedaemon.net>
- <20140206160126.GH29860@lunn.ch> <107057891.kz6j7UkZNk@wuerfel>
-Message-ID: <20140206170333.GK29860@lunn.ch>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 6 Feb 2014 14:08:39 -0300
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <20140205183457.GW8533@titan.lakedaemon.net>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140205183457.GW8533@titan.lakedaemon.net>
+Message-ID: <20140206170838.GB12542@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 05:38:28PM +0100, Arnd Bergmann wrote:
-> On Thursday 06 February 2014 17:01:26 Andrew Lunn wrote:
-> 
-> > , but this is, imho,
-> > > over-fragmenting.  I'm sure there's a reason you chose this path, but
-> > > you haven't explained why in your commit log. So I'm left guessing...
+On Wed, Feb 05, 2014 at 01:34:57PM -0500, Jason Cooper wrote:
+> On Sat, Jan 25, 2014 at 07:19:06PM +0100, Sebastian Hesselbarth wrote:
+> > This patch set fixes clk init order that went upside-down with
+> > v3.14. I haven't really investigated what caused this, but I assume
+> > it is related with DT node reordering by addresses.
 > > 
-> > Synology seem to build there devices like lego. They have two
-> > different RTC blocks. They have three different fan alarm blocks, four
-> > different led blocks, etc. And to build a product, the just select a
-> > group of blocks and put them together.
+> > Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
+> > registered before core clocks driver. Unfortunately, we cannot
+> > return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
+> > init order for our drivers is always core clocks before clock gating,
+> > we maintain init order ourselves by hooking CLK_OF_DECLARE to one
+> > init function that will register core clocks before clock gating
+> > driver.
+> > 
+> > This patch is based on pre-v3.14-rc1 mainline and should go in as
+> > fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
+> > I suggest Jason picks it up as a topic branch.
+> > 
+> > The patches have been boot tested on Dove and compile-tested only
+> > for Kirkwood, Armada 370 and XP.
+> > 
+> > Sebastian Hesselbarth (4):
+> >   clk: mvebu: armada-370: maintain clock init order
+> >   clk: mvebu: armada-xp: maintain clock init order
+> >   clk: mvebu: dove: maintain clock init order
+> >   clk: mvebu: kirkwood: maintain clock init order
+> > 
+> >  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
+> >  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
+> >  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
+> >  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
+> >  4 files changed, 44 insertions(+), 50 deletions(-)
 > 
-> I guess the Armada-370 and newer based ds213j and dsx14 will also be
-> able to reuse some of the blocks, right?
+> Whole series applied to mvebu/clk-fixes.
+> 
 
-Hi Arnd
+FWIW, Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-I've not looked at any sources for those yet. I guess the RTC .dtsi
-files should be reusable. The ethernet driver on 370 is different so
-no re-use there. Maybe the fan controller, but the rest will depend on
-what GPIO lines they have used, if they are compatible.
-
-     Andrew
+Observed "division by zero" get fixed by this, on A370 Mirabox, Kirkwood
+Topkick and Dove Cubox.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
