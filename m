@@ -1,77 +1,66 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Wed, 5 Feb 2014 18:35:26 -0600
-Subject: [PATCH v5 1/3] clocksource: timer-keystone: introduce
- clocksource driver for Keystone
-In-Reply-To: <1391608060-10760-2-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1391608060-10760-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1391608060-10760-2-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <20140206003526.GQ20228@joshc.qualcomm.com>
+From: kuninori.morimoto.gx@gmail.com (Kuninori Morimoto)
+Date: Wed, 05 Feb 2014 16:43:03 -0800 (PST)
+Subject: [PATCH 1/3] clk: rcar-h2: fix sd0/sd1 divisor table
+In-Reply-To: <2298259.CqC51XrMZM@avalon>
+References: <1391537858-28593-1-git-send-email-william.towle@codethink.co.uk>
+ <52F226A0.5070301@codethink.co.uk>
+ <52F23166.1030609@codethink.co.uk> <2298259.CqC51XrMZM@avalon>
+Message-ID: <87txcdul4b.wl%kuninori.morimoto.gx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Ivan-
 
-On Wed, Feb 05, 2014 at 03:47:38PM +0200, Ivan Khoronzhuk wrote:
-> Add broadcast clock-event device for the Keystone arch.
+Hi all
+
+> > >>> The clk_div_table for cpg_sd01_div_table[] concurs with the manual
+> > >>> but not with values found in the device itself (which are also the
+> > >>> same as the ones in arch/arm/mach-shmobile/clock-r8a7790.c).
+> > >>> 
+> > >>> Update the clk-rcar-gen2.c driver to have the same table as the one
+> > >>> used by the mach-shmobile driver which work once further issues are
+> > >>> fixed in the clk-rcar-gen2.c driver.
+> > >>> 
+> > >>> Part of the fix for the following error where the driver reports the
+> > >>> 
+> > >>> output as 1MHz but is really 97.5MHz:
+> > >>>      sh_mobile_sdhi ee100000.sd: mmc0 base at 0xee100000 clock rate 1
+> > >>> MHz
+> > >>> 
+> > >>> [ben.dooks at codethink.co.uk: updated patch description]
+> > >>> Signed-off-by: William Towle <william.towle@codethink.co.uk>
+> > >>> Reviewed-by: Ben Dooks <ben.dooks@codethink.co.uk>
+(snip)
+> > >>>   static const struct clk_div_table cpg_sd01_div_table[] = {
+> > >>> +    {  0,  2 }, {  1,  3 }, {  2,  4 }, {  3,  6 },
+> > >>> +    {  4,  8 },
+> > >>> 
+> > >>>       {  5, 12 }, {  6, 16 }, {  7, 18 }, {  8, 24 },
+> > >>>       { 10, 36 }, { 11, 48 }, { 12, 10 }, {  0,  0 },
+(snip)
+> > > I would like feedback from Renesas on this issue if possible. I can
+> > > have a quick try at setting the clock value to 10 in u-boot and scope
+> > > it out and see what happens.
+> > > 
+> > > Magnus or Morimoto-san, is there a chance this could be reviewed by
+> > > someone in Renesas who has knowledge of the hardware block?
+> > > 
+> > > [PS, added Kuninori Morimoto to this[
+> > 
+> > I got William to do a quick test with the following u-boot command
+> > 	mw.l 0xE6150074 0xCCC
+> > 
+> > sdhi0 showed 156MHz output, and it seemed to work. So there is a
+> > distinct possibility that the sdh clock also supports setting 12
+> > for a /10
 > 
-> The timer can be configured as a general-purpose 64-bit timer,
-> dual general-purpose 32-bit timers. When configured as dual 32-bit
-> timers, each half can operate in conjunction (chain mode) or
-> independently (unchained mode) of each other.
-> 
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-> Acked-by: Santosh shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> ---
->  drivers/clocksource/Makefile         |   1 +
->  drivers/clocksource/timer-keystone.c | 233 +++++++++++++++++++++++++++++++++++
->  2 files changed, 234 insertions(+)
->  create mode 100644 drivers/clocksource/timer-keystone.c
-> 
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index c7ca50a..4abe5aa 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -37,3 +37,4 @@ obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
->  obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
->  obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
->  obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
-> +obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
-> diff --git a/drivers/clocksource/timer-keystone.c b/drivers/clocksource/timer-keystone.c
-> new file mode 100644
-> index 0000000..2299666
-> --- /dev/null
-> +++ b/drivers/clocksource/timer-keystone.c
-> +static void __init keystone_timer_init(struct device_node *np)
-> +{
-> +	struct clock_event_device *event_dev = &timer.event_dev;
-> +	unsigned long rate;
-> +	struct clk *clk;
-> +	int irq, error;
-> +	u32 tgcr;
-> +
-> +	irq  = irq_of_parse_and_map(np, 0);
-> +	if (irq == NO_IRQ) {
-> +		pr_err("%s: failed to map interrupts\n", __func__);
-> +		return;
-> +	}
-> +
-> +	timer.base = of_iomap(np, 0);
-> +	if (!timer.base) {
-> +		pr_err("%s: failed to map registers\n", __func__);
-> +		return;
-> +	}
-> +
-> +	clk = of_clk_get(np, 0);
-> +	if (!clk) {
+> Thank you for trying it out. I'd like feedback from Renesas as well, assuming 
+> we don't get a "don't do that or it will cause the universe to collapse - 
+> woops, too late" nack, let's respin this patch and merge the two tables 
+> instead.
 
-This condition should be IS_ERR(clk).
+I ask it to Renesas HW team.
+Please wait
 
-> +		pr_err("%s: failed to get clock\n", __func__);
-> +		iounmap(timer.base);
-> +		return;
-> +	}
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Best regards
+---
+Kuninori Morimoto
