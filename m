@@ -1,53 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Feb 2014 15:21:06 +0900
-Subject: [PATCH 09/13] ARM: shmobile: r8a7790: Add SATA clocks
+Date: Thu,  6 Feb 2014 15:21:05 +0900
+Subject: [PATCH 08/13] ARM: shmobile: r8a7790: Add VIN clock support
 In-Reply-To: <cover.1391666228.git.horms+renesas@verge.net.au>
 References: <cover.1391666228.git.horms+renesas@verge.net.au>
-Message-ID: <64b7f9aca549db8a8bbcf68c911e9bd24efe76f7.1391666228.git.horms+renesas@verge.net.au>
+Message-ID: <b89dfdfad949798e1624dd2ff494bdb7ac943b04.1391666228.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Valentine Barshak <valentine.barshak@cogentembedded.com>
 
-This adds SATA[01] clock support to R8A7790 SoC.
+This adds VIN[0-3] clock support to R8A7790 SoC.
 
 Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
-[horms+renesas at verge.net.au: resolved trivial conflicts]
-Acked-by: Magnus Damm <damm@opensource.se>
+[horms+renesas at verge.net.au: manually applied]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7790.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7790.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index b2b2323..f25b43a 100644
+index 58f3dcf..b2b2323 100644
 --- a/arch/arm/mach-shmobile/clock-r8a7790.c
 +++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -196,6 +196,7 @@ enum {
- 	MSTP1009, MSTP1008, MSTP1007, MSTP1006, MSTP1005,
+@@ -197,6 +197,7 @@ enum {
  	MSTP931, MSTP930, MSTP929, MSTP928,
  	MSTP917,
-+	MSTP815, MSTP814,
  	MSTP813,
- 	MSTP811, MSTP810, MSTP809, MSTP808,
++	MSTP811, MSTP810, MSTP809, MSTP808,
  	MSTP726, MSTP725, MSTP724, MSTP723, MSTP722, MSTP721, MSTP720,
-@@ -226,6 +227,8 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP929] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 29, MSTPSR9, 0), /* I2C2 */
+ 	MSTP717, MSTP716,
+ 	MSTP704,
+@@ -226,6 +227,10 @@ static struct clk mstp_clks[MSTP_NR] = {
  	[MSTP928] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR9, 28, MSTPSR9, 0), /* I2C3 */
  	[MSTP917] = SH_CLK_MSTP32_STS(&qspi_clk, SMSTPCR9, 17, MSTPSR9, 0), /* QSPI */
-+	[MSTP815] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 15, MSTPSR8, 0), /* SATA0 */
-+	[MSTP814] = SH_CLK_MSTP32_STS(&zs_clk, SMSTPCR8, 14, MSTPSR8, 0), /* SATA1 */
  	[MSTP813] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR8, 13, MSTPSR8, 0), /* Ether */
- 	[MSTP811] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 11, MSTPSR8, 0), /* VIN0 */
- 	[MSTP810] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 10, MSTPSR8, 0), /* VIN1 */
-@@ -340,6 +343,8 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
- 	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
- 	CLKDEV_DEV_ID("renesas_usbhs", &mstp_clks[MSTP704]),
-+	CLKDEV_DEV_ID("sata-r8a7790.0", &mstp_clks[MSTP815]),
-+	CLKDEV_DEV_ID("sata-r8a7790.1", &mstp_clks[MSTP814]),
- 
- 	/* ICK */
- 	CLKDEV_ICK_ID("usbhs", "usb_phy_rcar_gen2", &mstp_clks[MSTP704]),
++	[MSTP811] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 11, MSTPSR8, 0), /* VIN0 */
++	[MSTP810] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8, 10, MSTPSR8, 0), /* VIN1 */
++	[MSTP809] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8,  9, MSTPSR8, 0), /* VIN2 */
++	[MSTP808] = SH_CLK_MSTP32_STS(&zg_clk, SMSTPCR8,  8, MSTPSR8, 0), /* VIN3 */
+ 	[MSTP726] = SH_CLK_MSTP32_STS(&zx_clk, SMSTPCR7, 26, MSTPSR7, 0), /* LVDS0 */
+ 	[MSTP725] = SH_CLK_MSTP32_STS(&zx_clk, SMSTPCR7, 25, MSTPSR7, 0), /* LVDS1 */
+ 	[MSTP724] = SH_CLK_MSTP32_STS(&zx_clk, SMSTPCR7, 24, MSTPSR7, 0), /* DU0 */
+@@ -312,6 +317,10 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP928]),
+ 	CLKDEV_DEV_ID("i2c-rcar_gen2.3", &mstp_clks[MSTP928]),
+ 	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
++	CLKDEV_DEV_ID("r8a7790-vin.0", &mstp_clks[MSTP811]),
++	CLKDEV_DEV_ID("r8a7790-vin.1", &mstp_clks[MSTP810]),
++	CLKDEV_DEV_ID("r8a7790-vin.2", &mstp_clks[MSTP809]),
++	CLKDEV_DEV_ID("r8a7790-vin.3", &mstp_clks[MSTP808]),
+ 	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP502]),
 -- 
 1.8.5.2
