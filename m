@@ -1,107 +1,77 @@
-From: kevin@bracey.fi (Kevin Bracey)
-Date: Thu, 06 Feb 2014 20:10:44 +0200
-Subject: [PATCH] ARM: enable IRQs in user undefined instruction vector
-In-Reply-To: <20140206112039.GA31054@arm.com>
-References: <1391545146-8320-1-git-send-email-kevin@bracey.fi>
- <20140206112039.GA31054@arm.com>
-Message-ID: <52F3D024.5020804@bracey.fi>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 06 Feb 2014 19:16:48 +0100
+Subject: [PATCH v2 1/9] clk: exynos4: Remove remnants of non-DT support
+In-Reply-To: <1391710616-14226-1-git-send-email-t.figa@samsung.com>
+References: <1391710616-14226-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1391710616-14226-2-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2014 13:20, Catalin Marinas wrote:
-> On Tue, Feb 04, 2014 at 10:19:06PM +0200, Kevin Bracey wrote:
->> See http://comments.gmane.org/gmane.linux.ports.arm.omap/59256 for
->> an earlier report of the observed might_sleep() warning.
-> There was a follow-up on this:
->
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/263765
+This patch simplifies a bit clock initialization code by removing
+remnants of non-DT clock initialization, such as reg_base and xom values
+passed in function parameters.
 
-Thanks for that pointer - we failed to find that thread. And from it I 
-see I totally missed the iwmmxt path. :(
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos4.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
->   __und_usr:
->   	usr_entry
-> +	enable_irq
-> The problem is that you can be preempted here and parts of the kernel
-> may not cope with this.
-
-A very close analogue to this code is vector_swi. As far as I can see, 
-having interrupts+preemption enabled in this __und_usr section should be 
-as safe as it is there, so I'm pretty confident there shouldn't be a 
-general kernel issue. But...
-
-> The reason I haven't pushed my patches to mainline is that I was worried
-> about such preemption cases. We enter iwmmxt_task_enable for example
-> with interrupts and preemption enabled, we disable preemption there but
-> is it too late? I don't have a way to test these and even for VFP I'm
-> not sure testing would guarantee it in all scenarios.
-
-The only concern I can see - and it's a big one - is that of how a HW 
-coprocessor responds. If the coprocessor bounces an instruction, and we 
-switch context before reaching the support code, will the hardware and 
-its support code cope - both with switching to another context in that 
-state, and handling the original bounce in this context when we get back?
-
-I know that because they're asynchronous, the FPA+VFP have always had to 
-cope with possible pre-emption in the window between them deciding they 
-need support and their next opportunity to bounce an instruction; but 
-what if they get pre-empted between a bounce being generated and the 
-support code processing it?
-
-The VFP code did take pains to increment the pre-emption count before 
-enabling interrupts, but it's not obvious whether it requires no 
-pre-emption between the bounce and handler, or just no pre-emption 
-during the handler.
-
-For the FPA, we only have FPA emulation, not FPA support code, so 
-nothing to worry about there.
-
-What about the iwmmxt and the crunchbits? They are only lazy-enable 
-routines, to activate an inactive coprocessor. Which I think makes them 
-safe. If we schedule before reaching the handler, when this context is 
-returned to, the coprocessor must still be disabled in our context - the 
-handler can proceed to enable it. And there can't be any other context 
-state to worry about, assuming the lazy enable scheme works.
-
-Personally, I've always wondered why ARM never implemented a CP15 
-register you could read to find out what instruction generated a SWI or 
-undefined instruction exception, to save all this hassle. It's always 
-seemed to me like an obvious addition, ever since the I+D caches were 
-split; why do I have to load my code into the data cache?
-
-> So it needs more thinking. Please have a look at my patches, if we get
-> to the conclusion there is no issue, I'll push them upstream.
->
-I think if there's a problem, it will be in the VFP code - the others 
-seem straightforward.  The interrupt enable has to be made safe - as 
-long as another core can age a page before the handler is reached, the 
-VFP support code will /have/ to be able to cope with pre-emption between 
-the fault and handler, if it doesn't already. We need a VFP expert to 
-figure it out properly.
-
-We will stress test your posted patch for our failure case, which is 
-Android skipping VFP instructions thanks to the extra irqs_disabled() 
-patch in do_page_fault().
-
-I think we should also include the fixup handler modification from my 
-patch -  I think __und_usr having a fixup handler that skips the 
-instruction if do_page_fault fails is just asking for trouble, so it 
-should be aligned with vector_swi so it retries.
-
-I share Alexey's Ignatov's concern that your patch ends up running the 
-support code with interrupts either on or off depending on whether you 
-came from user or supervisor mode, which feels a little odd. But then, 
-always enabling interrupts like the current code does, when they might 
-have been off in the SVC mode context, also seems wrong.
-
-I did ponder for my version whether the __und_svc path should restore 
-original IRQ status before going to call_fpe, to make the handler entry 
-environment more uniform -  IRQ status would always be as in original 
-context.
-
-Maybe it's a fine detail, as we don't really expect to be handling any 
-of these instructions from the kernel anyway, but if we are going to the 
-trouble to send __und_svc to handlers rather than going straight to 
-__und_svc_fault...
-
-Kevin
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 010f071..12a9f28 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -908,12 +908,13 @@ static unsigned long exynos4_get_xom(void)
+ 	return xom;
+ }
+ 
+-static void __init exynos4_clk_register_finpll(unsigned long xom)
++static void __init exynos4_clk_register_finpll(void)
+ {
+ 	struct samsung_fixed_rate_clock fclk;
+ 	struct clk *clk;
+ 	unsigned long finpll_f = 24000000;
+ 	char *parent_name;
++	unsigned int xom = exynos4_get_xom();
+ 
+ 	parent_name = xom & 1 ? "xusbxti" : "xxti";
+ 	clk = clk_get(NULL, parent_name);
+@@ -1038,9 +1039,10 @@ static struct samsung_pll_clock exynos4x12_plls[nr_plls] __initdata = {
+ 
+ /* register exynos4 clocks */
+ static void __init exynos4_clk_init(struct device_node *np,
+-				    enum exynos4_soc exynos4_soc,
+-				    void __iomem *reg_base, unsigned long xom)
++				    enum exynos4_soc exynos4_soc)
+ {
++	void __iomem *reg_base;
++
+ 	reg_base = of_iomap(np, 0);
+ 	if (!reg_base)
+ 		panic("%s: failed to map registers\n", __func__);
+@@ -1058,7 +1060,7 @@ static void __init exynos4_clk_init(struct device_node *np,
+ 			ARRAY_SIZE(exynos4_fixed_rate_ext_clks),
+ 			ext_clk_match);
+ 
+-	exynos4_clk_register_finpll(xom);
++	exynos4_clk_register_finpll();
+ 
+ 	if (exynos4_soc == EXYNOS4210) {
+ 		samsung_clk_register_mux(exynos4210_mux_early,
+@@ -1136,12 +1138,12 @@ static void __init exynos4_clk_init(struct device_node *np,
+ 
+ static void __init exynos4210_clk_init(struct device_node *np)
+ {
+-	exynos4_clk_init(np, EXYNOS4210, NULL, exynos4_get_xom());
++	exynos4_clk_init(np, EXYNOS4210);
+ }
+ CLK_OF_DECLARE(exynos4210_clk, "samsung,exynos4210-clock", exynos4210_clk_init);
+ 
+ static void __init exynos4412_clk_init(struct device_node *np)
+ {
+-	exynos4_clk_init(np, EXYNOS4X12, NULL, exynos4_get_xom());
++	exynos4_clk_init(np, EXYNOS4X12);
+ }
+ CLK_OF_DECLARE(exynos4412_clk, "samsung,exynos4412-clock", exynos4412_clk_init);
+-- 
+1.8.5.2
