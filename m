@@ -1,211 +1,44 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri,  7 Feb 2014 00:42:14 +0100
-Subject: [PATCH 18/21] ARM: config: Add a multi_v5_defconfig
+Date: Fri,  7 Feb 2014 00:42:16 +0100
+Subject: [PATCH 20/21] ARM: MVEBU: Remove unneeded headers
 In-Reply-To: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
 References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1391730137-14814-19-git-send-email-andrew@lunn.ch>
+Message-ID: <1391730137-14814-21-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow regression build testing of multi v5 systems, add a
-multi_v5_defconfig, similar to the multi_v7_defconfig. This is based
-on kirkwood_defconfig, but with a few other boards added which claim
-to be MULTI_v5.
+Remove headers which are no longer needed, and add a couple of missing
+onces.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/configs/multi_v5_defconfig | 183 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 183 insertions(+)
- create mode 100644 arch/arm/configs/multi_v5_defconfig
+ arch/arm/mach-mvebu/kirkwood.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-new file mode 100644
-index 000000000000..8282fab6b514
---- /dev/null
-+++ b/arch/arm/configs/multi_v5_defconfig
-@@ -0,0 +1,183 @@
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_LOG_BUF_SHIFT=19
-+CONFIG_PROFILING=y
-+CONFIG_OPROFILE=y
-+CONFIG_KPROBES=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_ARCH_MULTI_V7 is not set
-+CONFIG_ARCH_MVEBU=y
-+CONFIG_MACH_KIRKWOOD=y
-+CONFIG_ARCH_MXC=y
-+CONFIG_MACH_IMX25_DT=y
-+CONFIG_MACH_IMX27_DT=y
-+CONFIG_ARCH_U300=y
-+CONFIG_PCI_MVEBU=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_HIGHMEM=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_STAT_DETAILS=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_CPU_IDLE=y
-+CONFIG_ARM_KIRKWOOD_CPUIDLE=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_MULTICAST=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+# CONFIG_IPV6 is not set
-+CONFIG_NET_PKTGEN=m
-+CONFIG_CFG80211=y
-+CONFIG_MAC80211=y
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_JEDECPROBE=y
-+CONFIG_MTD_CFI_ADV_OPTIONS=y
-+CONFIG_MTD_CFI_GEOMETRY=y
-+# CONFIG_MTD_MAP_BANK_WIDTH_4 is not set
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_STAA=y
-+CONFIG_MTD_PHYSMAP=y
-+CONFIG_MTD_M25P80=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_ORION=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_EEPROM_AT24=y
-+# CONFIG_SCSI_PROC_FS is not set
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_BLK_DEV_SR=m
-+CONFIG_CHR_DEV_SG=m
-+CONFIG_ATA=y
-+CONFIG_SATA_AHCI=y
-+CONFIG_SATA_MV=y
-+CONFIG_NETDEVICES=y
-+CONFIG_NET_DSA_MV88E6123_61_65=y
-+CONFIG_MV643XX_ETH=y
-+CONFIG_R8169=y
-+CONFIG_MARVELL_PHY=y
-+CONFIG_LIBERTAS=y
-+CONFIG_LIBERTAS_SDIO=y
-+CONFIG_INPUT_EVDEV=y
-+CONFIG_KEYBOARD_GPIO=y
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_LEGACY_PTY_COUNT=16
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=2
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+# CONFIG_I2C_COMPAT is not set
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_MV64XXX=y
-+CONFIG_I2C_NOMADIK=y
-+CONFIG_SPI=y
-+CONFIG_SPI_ORION=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_POWER_RESET_QNAP=y
-+CONFIG_SENSORS_ADT7475=y
-+CONFIG_SENSORS_LM63=y
-+CONFIG_SENSORS_LM75=y
-+CONFIG_SENSORS_LM85=y
-+CONFIG_THERMAL=y
-+CONFIG_KIRKWOOD_THERMAL=y
-+CONFIG_WATCHDOG=y
-+# CONFIG_ABX500_CORE is not set
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_SOC=y
-+CONFIG_SND_KIRKWOOD_SOC=y
-+CONFIG_HID_DRAGONRISE=y
-+CONFIG_HID_GYRATION=y
-+CONFIG_HID_TWINHAN=y
-+CONFIG_HID_NTRIG=y
-+CONFIG_HID_PANTHERLORD=y
-+CONFIG_HID_PETALYNX=y
-+CONFIG_HID_SAMSUNG=y
-+CONFIG_HID_SONY=y
-+CONFIG_HID_SUNPLUS=y
-+CONFIG_HID_GREENASIA=y
-+CONFIG_HID_SMARTJOYPLUS=y
-+CONFIG_HID_TOPSEED=y
-+CONFIG_HID_THRUSTMASTER=y
-+CONFIG_HID_ZEROPLUS=y
-+CONFIG_USB=y
-+CONFIG_USB_XHCI_HCD=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_ROOT_HUB_TT=y
-+CONFIG_USB_PRINTER=m
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_STORAGE_DATAFAB=y
-+CONFIG_USB_STORAGE_FREECOM=y
-+CONFIG_USB_STORAGE_SDDR09=y
-+CONFIG_USB_STORAGE_SDDR55=y
-+CONFIG_USB_STORAGE_JUMPSHOT=y
-+CONFIG_MMC=y
-+CONFIG_SDIO_UART=y
-+CONFIG_MMC_MVSDIO=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_RS5C372=y
-+CONFIG_RTC_DRV_PCF8563=y
-+CONFIG_RTC_DRV_S35390A=y
-+CONFIG_RTC_DRV_MV=y
-+CONFIG_DMADEVICES=y
-+CONFIG_MV_XOR=y
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_FS_XATTR is not set
-+CONFIG_EXT4_FS=y
-+CONFIG_ISO9660_FS=m
-+CONFIG_JOLIET=y
-+CONFIG_UDF_FS=m
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_CRAMFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_CODEPAGE_850=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_ISO8859_2=y
-+CONFIG_NLS_UTF8=y
-+CONFIG_DEBUG_INFO=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_SCHED_DEBUG is not set
-+# CONFIG_DEBUG_PREEMPT is not set
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_DEBUG_MVEBU_UART_ALTERNATE=y
-+CONFIG_DEBUG_UART_VIRT=0xfed12000
-+CONFIG_EARLY_PRINTK=y
-+CONFIG_CRYPTO_CBC=m
-+CONFIG_CRYPTO_PCBC=m
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+CONFIG_CRYPTO_DEV_MV_CESA=y
-+CONFIG_CRC_CCITT=y
-+CONFIG_LIBCRC32C=y
+diff --git a/arch/arm/mach-mvebu/kirkwood.c b/arch/arm/mach-mvebu/kirkwood.c
+index 1df0c0b138d5..5d7fef04c36d 100644
+--- a/arch/arm/mach-mvebu/kirkwood.c
++++ b/arch/arm/mach-mvebu/kirkwood.c
+@@ -13,18 +13,15 @@
+ #include <linux/clk.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/mbus.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_net.h>
+ #include <linux/of_platform.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/irqchip.h>
+-#include <linux/kexec.h>
++#include <linux/slab.h>
+ #include <asm/hardware/cache-feroceon-l2.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+-#include <plat/common.h>
+-#include <plat/pcie.h>
+ #include "kirkwood.h"
+ #include "kirkwood-pm.h"
+ #include "common.h"
 -- 
 1.8.5.3
