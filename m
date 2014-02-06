@@ -1,168 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  6 Feb 2014 11:30:49 +0000
-Subject: [PATCH 2/6] arm64: barriers: make use of barrier options with
- explicit barriers
-In-Reply-To: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
-References: <1391686253-13436-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1391686253-13436-2-git-send-email-will.deacon@arm.com>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Thu, 06 Feb 2014 16:55:46 +0530
+Subject: [PATCH 08/51] arm,
+ hw-breakpoint: Fix CPU hotplug callback registration
+In-Reply-To: <20140206105718.GG26035@mudshark.cambridge.arm.com>
+References: <20140205220251.19080.92336.stgit@srivatsabhat.in.ibm.com>
+ <20140205220603.19080.80971.stgit@srivatsabhat.in.ibm.com>
+ <20140206105718.GG26035@mudshark.cambridge.arm.com>
+Message-ID: <52F3713A.3040407@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When calling our low-level barrier macros directly, we can often suffice
-with more relaxed behaviour than the default "all accesses, full system"
-option.
+Hi Will,
 
-This patch updates the users of dsb() to specify the option whith they
-actually require. The sev() macro is also updated so that a sevl can
-be emitted if necessary.
+On 02/06/2014 04:27 PM, Will Deacon wrote:
+> Hi Srivatsa,
+> 
+> On Wed, Feb 05, 2014 at 10:06:04PM +0000, Srivatsa S. Bhat wrote:
+>> Subsystems that want to register CPU hotplug callbacks, as well as perform
+>> initialization for the CPUs that are already online, often do it as shown
+>> below:
+>>
+>> 	get_online_cpus();
+>>
+>> 	for_each_online_cpu(cpu)
+>> 		init_cpu(cpu);
+>>
+>> 	register_cpu_notifier(&foobar_cpu_notifier);
+>>
+>> 	put_online_cpus();
+>>
+>> This is wrong, since it is prone to ABBA deadlocks involving the
+>> cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
+>> with CPU hotplug operations).
+> 
+> Hmm, the code in question (for this patch) runs from an arch_initcall. How
+> can you generate CPU hotplug operations at that stage?
+> 
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/barrier.h    |  4 ++--
- arch/arm64/include/asm/cacheflush.h |  2 +-
- arch/arm64/include/asm/pgtable.h    |  4 ++--
- arch/arm64/include/asm/tlbflush.h   | 14 +++++++-------
- arch/arm64/kernel/process.c         |  2 +-
- arch/arm64/kvm/sys_regs.c           |  4 ++--
- 6 files changed, 15 insertions(+), 15 deletions(-)
+You are right - in today's design of the init sequence, CPU hotplug
+operations can't be triggered at that time during boot.
 
-diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index 409ca370cfe2..09f4cb4b665e 100644
---- a/arch/arm64/include/asm/barrier.h
-+++ b/arch/arm64/include/asm/barrier.h
-@@ -20,14 +20,14 @@
- 
- #ifndef __ASSEMBLY__
- 
--#define sev()		asm volatile("sev" : : : "memory")
-+#define sev(l)		asm volatile("sev" #l : : : "memory")
- #define wfe()		asm volatile("wfe" : : : "memory")
- #define wfi()		asm volatile("wfi" : : : "memory")
- 
- #define isb()		asm volatile("isb" : : : "memory")
- #define dsb(opt)	asm volatile("dsb sy" : : : "memory")
- 
--#define mb()		dsb()
-+#define mb()		dsb(sy)
- #define rmb()		asm volatile("dsb ld" : : : "memory")
- #define wmb()		asm volatile("dsb st" : : : "memory")
- 
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index fea9ee327206..b9495549cb08 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -142,7 +142,7 @@ static inline void flush_cache_vmap(unsigned long start, unsigned long end)
- 	 * set_pte_at() called from vmap_pte_range() does not
- 	 * have a DSB after cleaning the cache line.
- 	 */
--	dsb();
-+	dsb(ishst);
- }
- 
- static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index b524dcd17243..54aa68f61008 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -310,7 +310,7 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
- {
- 	*pmdp = pmd;
--	dsb();
-+	dsb(ishst);
- }
- 
- static inline void pmd_clear(pmd_t *pmdp)
-@@ -340,7 +340,7 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- static inline void set_pud(pud_t *pudp, pud_t pud)
- {
- 	*pudp = pud;
--	dsb();
-+	dsb(ishst);
- }
- 
- static inline void pud_clear(pud_t *pudp)
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index 8b482035cfc2..3083a08f9622 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -72,9 +72,9 @@ extern struct cpu_tlb_fns cpu_tlb;
-  */
- static inline void flush_tlb_all(void)
- {
--	dsb();
-+	dsb(ishst);
- 	asm("tlbi	vmalle1is");
--	dsb();
-+	dsb(ish);
- 	isb();
- }
- 
-@@ -82,9 +82,9 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
- {
- 	unsigned long asid = (unsigned long)ASID(mm) << 48;
- 
--	dsb();
-+	dsb(ishst);
- 	asm("tlbi	aside1is, %0" : : "r" (asid));
--	dsb();
-+	dsb(ish);
- }
- 
- static inline void flush_tlb_page(struct vm_area_struct *vma,
-@@ -93,9 +93,9 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
- 	unsigned long addr = uaddr >> 12 |
- 		((unsigned long)ASID(vma->vm_mm) << 48);
- 
--	dsb();
-+	dsb(ishst);
- 	asm("tlbi	vae1is, %0" : : "r" (addr));
--	dsb();
-+	dsb(ish);
- }
- 
- /*
-@@ -114,7 +114,7 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
- 	 * set_pte() does not have a DSB, so make sure that the page table
- 	 * write is visible.
- 	 */
--	dsb();
-+	dsb(ishst);
- }
- 
- #define update_mmu_cache_pmd(vma, address, pmd) do { } while (0)
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 1c0a9be2ffa8..8e78cb238376 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -294,7 +294,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
- 	 * Complete any pending TLB or cache maintenance on this CPU in case
- 	 * the thread migrates to a different CPU.
- 	 */
--	dsb();
-+	dsb(ish);
- 
- 	/* the actual thread switch */
- 	last = cpu_switch_to(prev, next);
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 02e9d09e1d80..bbaaabe8e899 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -70,13 +70,13 @@ static u32 get_ccsidr(u32 csselr)
- static void do_dc_cisw(u32 val)
- {
- 	asm volatile("dc cisw, %x0" : : "r" (val));
--	dsb();
-+	dsb(ishst);
- }
- 
- static void do_dc_csw(u32 val)
- {
- 	asm volatile("dc csw, %x0" : : "r" (val));
--	dsb();
-+	dsb(ishst);
- }
- 
- /* See note@ARM ARM B1.14.4 */
--- 
-1.8.2.2
+However, there have been proposals to boot CPUs in parallel along with the
+rest of the kernel initialization [1] (and that would need full synchronization
+with CPU hotplug even at the initcall stage). Of course this needs a lot of
+auditing and modifications to the CPU hotplug notifiers of various subsystems
+to make them robust enough to handle the parallel boot; so its not going to
+happen very soon. But I felt that it would be a good idea to ensure that we
+get the locking/synchronization right, even if the registrations happen very
+early during boot today.. you know, just to be on the safer side and also to
+make the job easier for whoever that is, who tries to implement parallel
+CPU booting again in the future ;-)
+
+[1]. http://thread.gmane.org/gmane.linux.kernel/1246209
+
+
+>> Instead, the correct and race-free way of performing the callback
+>> registration is:
+>>
+>> 	cpu_maps_update_begin();
+>>
+>> 	for_each_online_cpu(cpu)
+>> 		init_cpu(cpu);
+>>
+>> 	/* Note the use of the double underscored version of the API */
+>> 	__register_cpu_notifier(&foobar_cpu_notifier);
+>>
+>> 	cpu_maps_update_done();
+>>
+>>
+>> Fix the hw-breakpoint code in arm by using this latter form of callback
+>> registration.
+> 
+> I guess you introduce __register_cpu_notifier somewhere earlier in the
+> series,
+
+Yes, patch 1 adds that API..
+
+> so it's best if you take this all via your tree.
+>
+
+Hmm.. I'm not a maintainer myself, so I'm hoping that either Oleg or Rusty
+or any of the other CPU hotplug maintainers (Thomas/Peter/Ingo) would be
+willing to take these patches through their tree.
+
+Regards,
+Srivatsa S. Bhat
