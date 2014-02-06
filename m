@@ -1,73 +1,125 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 06 Feb 2014 20:12:50 +0100
-Subject: [PATCH v2 05/12] ARM: SAMSUNG: pm: Consolidate PM debug functions
+Date: Thu, 06 Feb 2014 20:12:55 +0100
+Subject: [PATCH v2 10/12] ARM: EXYNOS: Remove PM initcalls and useless
+ indirection
 In-Reply-To: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
 References: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1391713977-22300-6-git-send-email-t.figa@samsung.com>
+Message-ID: <1391713977-22300-11-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes one-line functions that was used just to pass
-constant arguments to lower level functions. After previous patches the
-need for those constants has been eliminated, so the main functions can
-be called directly.
+This patch simplifies Exynos PM initialization and makes it
+multiplatform friendly by replacing initcalls used originally to invoke
+all the initialization code with explicit function calls.
+
+In addition, an useless subsys_interface is removed, as all its .add_dev
+callback did was setting two function pointers.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/pm.c | 20 ++++++--------------
- 1 file changed, 6 insertions(+), 14 deletions(-)
+ arch/arm/mach-exynos/common.c |  1 +
+ arch/arm/mach-exynos/common.h |  6 ++++++
+ arch/arm/mach-exynos/pm.c     | 50 +++++++++++--------------------------------
+ 3 files changed, 19 insertions(+), 38 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
-index 53b3d67..7c1d4385 100644
---- a/arch/arm/plat-samsung/pm.c
-+++ b/arch/arm/plat-samsung/pm.c
-@@ -85,9 +85,10 @@ static inline void __iomem *s3c_pm_uart_base(void)
- 	return (void __iomem *)vaddr;
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index f18be40..fb4e7dc 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -315,6 +315,7 @@ void __init exynos_init_late(void)
+ 		return;
+ 
+ 	pm_genpd_poweroff_unused();
++	exynos_pm_init();
  }
  
--static void s3c_pm_save_uart(unsigned int uart, struct pm_uart_save *save)
-+static void s3c_pm_save_uarts(void)
- {
- 	void __iomem *regs = s3c_pm_uart_base();
-+	struct pm_uart_save *save = &uart_save;
+ static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index f76967b..82e08fb 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -27,6 +27,12 @@ void exynos_init_late(void);
  
- 	save->ulcon = __raw_readl(regs + S3C2410_ULCON);
- 	save->ucon = __raw_readl(regs + S3C2410_UCON);
-@@ -98,18 +99,14 @@ static void s3c_pm_save_uart(unsigned int uart, struct pm_uart_save *save)
- 	if (!soc_is_s3c2410())
- 		save->udivslot = __raw_readl(regs + S3C2443_DIVSLOT);
+ void exynos_firmware_init(void);
  
--	S3C_PMDBG("UART[%d]: ULCON=%04x, UCON=%04x, UFCON=%04x, UBRDIV=%04x\n",
--		  uart, save->ulcon, save->ucon, save->ufcon, save->ubrdiv);
++#ifdef CONFIG_PM_SLEEP
++extern void __init exynos_pm_init(void);
++#else
++static inline void exynos_pm_init(void) {}
++#endif
++
+ extern struct smp_operations exynos_smp_ops;
+ 
+ extern void exynos_cpu_die(unsigned int cpu);
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index ba18214..596ed13 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -92,39 +92,6 @@ static void exynos_pm_prepare(void)
+ 	__raw_writel(virt_to_phys(s3c_cpu_resume), S5P_INFORM0);
+ }
+ 
+-static int exynos_pm_add(struct device *dev, struct subsys_interface *sif)
+-{
+-	pm_cpu_prep = exynos_pm_prepare;
+-	pm_cpu_sleep = exynos_cpu_suspend;
+-
+-	return 0;
 -}
 -
--static void s3c_pm_save_uarts(void)
--{
--	s3c_pm_save_uart(CONFIG_DEBUG_S3C_UART, &uart_save);
-+	S3C_PMDBG("UART[%p]: ULCON=%04x, UCON=%04x, UFCON=%04x, UBRDIV=%04x\n",
-+		  regs, save->ulcon, save->ucon, save->ufcon, save->ubrdiv);
- }
- 
--static void s3c_pm_restore_uart(unsigned int uart, struct pm_uart_save *save)
-+static void s3c_pm_restore_uarts(void)
- {
- 	void __iomem *regs = s3c_pm_uart_base();
-+	struct pm_uart_save *save = &uart_save;
- 
- 	s3c_pm_arch_update_uart(regs, save);
- 
-@@ -122,11 +119,6 @@ static void s3c_pm_restore_uart(unsigned int uart, struct pm_uart_save *save)
- 	if (!soc_is_s3c2410())
- 		__raw_writel(save->udivslot, regs + S3C2443_DIVSLOT);
- }
+-static struct subsys_interface exynos_pm_interface = {
+-	.name		= "exynos_pm",
+-	.subsys		= &exynos_subsys,
+-	.add_dev	= exynos_pm_add,
+-};
 -
--static void s3c_pm_restore_uarts(void)
+-static __init int exynos_pm_drvinit(void)
 -{
--	s3c_pm_restore_uart(CONFIG_DEBUG_S3C_UART, &uart_save);
+-	unsigned int tmp;
+-
+-	if (soc_is_exynos5440())
+-		return 0;
+-
+-	s3c_pm_init();
+-
+-	/* All wakeup disable */
+-
+-	tmp = __raw_readl(S5P_WAKEUP_MASK);
+-	tmp |= ((0xFF << 8) | (0x1F << 1));
+-	__raw_writel(tmp, S5P_WAKEUP_MASK);
+-
+-	return subsys_interface_register(&exynos_pm_interface);
 -}
- #else
- #define s3c_pm_debug_init() do { } while (0)
+-arch_initcall(exynos_pm_drvinit);
+-
+ static int exynos_pm_suspend(void)
+ {
+ 	unsigned long tmp;
+@@ -220,12 +187,19 @@ static struct syscore_ops exynos_pm_syscore_ops = {
+ 	.resume		= exynos_pm_resume,
+ };
  
+-static __init int exynos_pm_syscore_init(void)
++void __init exynos_pm_init(void)
+ {
+-	if (soc_is_exynos5440())
+-		return 0;
++	u32 tmp;
++
++	pm_cpu_prep = exynos_pm_prepare;
++	pm_cpu_sleep = exynos_cpu_suspend;
++
++	s3c_pm_init();
++
++	/* All wakeup disable */
++	tmp = __raw_readl(S5P_WAKEUP_MASK);
++	tmp |= ((0xFF << 8) | (0x1F << 1));
++	__raw_writel(tmp, S5P_WAKEUP_MASK);
+ 
+ 	register_syscore_ops(&exynos_pm_syscore_ops);
+-	return 0;
+ }
+-arch_initcall(exynos_pm_syscore_init);
 -- 
 1.8.5.2
