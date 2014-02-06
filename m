@@ -1,53 +1,71 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu,  6 Feb 2014 14:20:15 -0300
-Subject: [PATCH v6 08/19] watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
+Date: Thu,  6 Feb 2014 14:20:21 -0300
+Subject: [PATCH v6 14/19] ARM: mvebu: Enable Armada 370/XP watchdog in the
+ devicetree
 In-Reply-To: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1391707226-18258-9-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1391707226-18258-15-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After adding the IRQ request, the BRIDGE_CAUSE bit should be cleared by the
-bridge interrupt controller. There's no longer a need to do it in the watchdog
-driver, so we can simply remove it.
+Add the DT nodes to enable watchdog support available in Armada 370
+and Armada XP SoCs.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Tested-by: Willy Tarreau <w@1wt.eu>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/watchdog/orion_wdt.c | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/boot/dts/armada-370-xp.dtsi | 4 ++++
+ arch/arm/boot/dts/armada-370.dtsi    | 5 +++++
+ arch/arm/boot/dts/armada-xp.dtsi     | 6 ++++++
+ 3 files changed, 15 insertions(+)
 
-diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index ad141d5..d280b17 100644
---- a/drivers/watchdog/orion_wdt.c
-+++ b/drivers/watchdog/orion_wdt.c
-@@ -24,7 +24,6 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/of.h>
--#include <mach/bridge-regs.h>
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 74b5964..7bbc4ac 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -199,6 +199,10 @@
+ 				interrupts = <37>, <38>, <39>, <40>, <5>, <6>;
+ 			};
  
- /* RSTOUT mask register physical address for Orion5x, Kirkwood and Dove */
- #define ORION_RSTOUT_MASK_OFFSET	0x20108
-@@ -42,7 +41,6 @@
- #define WDT_MAX_CYCLE_COUNT	0xffffffff
++			watchdog at 20300 {
++				reg = <0x20300 0x34>, <0x20704 0x4>;
++			};
++
+ 			usb at 50000 {
+ 				compatible = "marvell,orion-ehci";
+ 				reg = <0x50000 0x500>;
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 0d8530c..b7759b2 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -196,6 +196,11 @@
+ 				clocks = <&coreclk 2>;
+ 			};
  
- #define WDT_RESET_OUT_EN	BIT(1)
--#define WDT_INT_REQ		BIT(3)
++			watchdog at 20300 {
++				compatible = "marvell,armada-370-wdt";
++				clocks = <&coreclk 2>;
++			};
++
+ 			usb at 50000 {
+ 				clocks = <&coreclk 0>;
+ 			};
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index b8b84a2..abb9f9d 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -111,6 +111,12 @@
+ 				clock-names = "nbclk", "fixed";
+ 			};
  
- static bool nowayout = WATCHDOG_NOWAYOUT;
- static int heartbeat = -1;		/* module parameter (seconds) */
-@@ -64,9 +62,6 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
- 	/* Set watchdog duration */
- 	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
- 
--	/* Clear watchdog timer interrupt */
--	writel(~WDT_INT_REQ, BRIDGE_CAUSE);
--
- 	/* Enable watchdog timer */
- 	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, WDT_EN);
- 
++			watchdog at 20300 {
++				compatible = "marvell,armada-xp-wdt";
++				clocks = <&coreclk 2>, <&refclk>;
++				clock-names = "nbclk", "fixed";
++			};
++
+ 			armada-370-xp-pmsu at 22000 {
+ 				compatible = "marvell,armada-370-xp-pmsu";
+ 				reg = <0x22100 0x400>, <0x20800 0x20>;
 -- 
 1.8.1.5
