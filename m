@@ -1,58 +1,35 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 06 Feb 2014 17:58:59 +0100
-Subject: [linux-sunxi] [PATCH v2 1/5] clk: sunxi: Add support for USB
- clock-register reset bits
-In-Reply-To: <52E80746.9020500@elopez.com.ar>
-References: <1390426587-16287-1-git-send-email-hdegoede@redhat.com>
- <1390426587-16287-2-git-send-email-hdegoede@redhat.com>
- <52E80746.9020500@elopez.com.ar>
-Message-ID: <52F3BF53.8000408@redhat.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 6 Feb 2014 18:03:33 +0100
+Subject: [PATCH 4/4] ARM: Kirkwood: Add support for many Synology NAS
+ devices
+In-Reply-To: <107057891.kz6j7UkZNk@wuerfel>
+References: <1391634309-3123-1-git-send-email-andrew@lunn.ch>
+ <20140206153939.GD8533@titan.lakedaemon.net>
+ <20140206160126.GH29860@lunn.ch> <107057891.kz6j7UkZNk@wuerfel>
+Message-ID: <20140206170333.GK29860@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 06, 2014 at 05:38:28PM +0100, Arnd Bergmann wrote:
+> On Thursday 06 February 2014 17:01:26 Andrew Lunn wrote:
+> 
+> > , but this is, imho,
+> > > over-fragmenting.  I'm sure there's a reason you chose this path, but
+> > > you haven't explained why in your commit log. So I'm left guessing...
+> > 
+> > Synology seem to build there devices like lego. They have two
+> > different RTC blocks. They have three different fan alarm blocks, four
+> > different led blocks, etc. And to build a product, the just select a
+> > group of blocks and put them together.
+> 
+> I guess the Armada-370 and newer based ds213j and dsx14 will also be
+> able to reuse some of the blocks, right?
 
-On 01/28/2014 08:38 PM, Emilio L?pez wrote:
-> Hi Hans,
->
-> El 22/01/14 18:36, Hans de Goede escribi?:
->> The usb-clk register is special in that it not only contains clk gate bits,
->> but also has a few reset bits. This commit adds support for this by allowing
->> gates type sunxi clks to also register a reset controller.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
-> (snip)
->>   static const struct gates_data sun4i_axi_gates_data __initconst = {
->> @@ -818,6 +873,7 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
->>                        struct gates_data *data)
->>   {
->>       struct clk_onecell_data *clk_data;
->> +    struct gates_reset_data *reset_data;
->>       const char *clk_parent;
->>       const char *clk_name;
->>       void *reg;
->> @@ -861,6 +917,21 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
->>       clk_data->clk_num = i;
->>
->>       of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
->> +
->> +    /* Register a reset controler for gates with reset bits */
->> +    if (data->reset_mask == 0)
->> +        return;
->> +
->> +    reset_data = kzalloc(sizeof(*reset_data), GFP_KERNEL);
->> +    if (!reset_data)
->> +        return;
->> +
->> +    reset_data->reg = reg;
->> +    reset_data->lock = &clk_lock;
->> +    reset_data->rcdev.nr_resets = hweight32(data->reset_mask);
->
-> I know I made you change this, but after having a second look into nr_resets, I think your original implementation makes more sense. This will break if you use a mask with holes on it. Sorry :(
+Hi Arnd
 
-No problem, just changed it back :)
+I've not looked at any sources for those yet. I guess the RTC .dtsi
+files should be reusable. The ethernet driver on 370 is different so
+no re-use there. Maybe the fan controller, but the rest will depend on
+what GPIO lines they have used, if they are compatible.
 
-Regards,
-
-Hans
+     Andrew
