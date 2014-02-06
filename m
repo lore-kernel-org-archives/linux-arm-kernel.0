@@ -1,89 +1,72 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Thu,  6 Feb 2014 22:11:57 +0100
-Subject: [PATCH] irq: Add new flag to ack level-triggered interrupts before
- unmasking
-Message-ID: <1391721117-27446-1-git-send-email-carlo@caione.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 7 Feb 2014 01:14:26 +0300
+Subject: [PATCH 2/2] ARM: shmobile: koelsch: add Ether DT support
+In-Reply-To: <201402070110.18561.sergei.shtylyov@cogentembedded.com>
+References: <201402070110.18561.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201402070114.27279.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several irqchip drivers require the level-triggered interrupt to be
-acked before unmasking to avoid that a second interrupt is immediately
-triggered. This small patch introduces a new irqchip flags that is used
-to ack the IRQ line before it is unmasked.
+Define the Koelsch board dependent part of the Ether device node. 
 
-Signed-off-by: Carlo Caione <carlo@caione.org>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
 ---
- include/linux/irq.h    |  2 ++
- kernel/irq/chip.c      | 10 ++++++++++
- kernel/irq/internals.h |  1 +
- kernel/irq/manage.c    |  2 +-
- 4 files changed, 14 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts |   31 ++++++++++++++++++++++++++++++-
+ 1 file changed, 30 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 7dc1003..2cbe8d1 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -349,6 +349,7 @@ struct irq_chip {
-  * IRQCHIP_ONOFFLINE_ENABLED:	Only call irq_on/off_line callbacks
-  *				when irq enabled
-  * IRQCHIP_SKIP_SET_WAKE:	Skip chip.irq_set_wake(), for this irq chip
-+ * IRQCHIP_ACK_ON_UNMASK:	Ack level interrupts right before unmask
-  */
- enum {
- 	IRQCHIP_SET_TYPE_MASKED		= (1 <<  0),
-@@ -357,6 +358,7 @@ enum {
- 	IRQCHIP_ONOFFLINE_ENABLED	= (1 <<  3),
- 	IRQCHIP_SKIP_SET_WAKE		= (1 <<  4),
- 	IRQCHIP_ONESHOT_SAFE		= (1 <<  5),
-+	IRQCHIP_ACK_ON_UNMASK		= (1 <<  6),
+Index: renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -2,7 +2,8 @@
+  * Device Tree Source for the Koelsch board
+  *
+  * Copyright (C) 2013 Renesas Electronics Corporation
+- * Copyright (C) 2013 Renesas Solutions Corp.
++ * Copyright (C) 2013-2014 Renesas Solutions Corp.
++ * Copyright (C) 2014 Cogent Embedded, Inc.
+  *
+  * This file is licensed under the terms of the GNU General Public License
+  * version 2.  This program is licensed "as is" without any warranty of any
+@@ -122,12 +123,40 @@
+ 		renesas,function = "scif1";
+ 	};
+ 
++	ether_pins: ether {
++		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
++		renesas,function = "eth";
++	};
++
++	phy1_pins: phy1 {
++		renesas,groups = "intc_irq0";
++		renesas,function = "intc";
++	};
++
+ 	qspi_pins: spi {
+ 		renesas,groups = "qspi_ctrl", "qspi_data4";
+ 		renesas,function = "qspi";
+ 	};
  };
  
- /* This include will go away once we isolated irq_desc usage to core code */
-diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index dc04c16..9d2d2e2 100644
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -265,6 +265,16 @@ static inline void mask_ack_irq(struct irq_desc *desc)
- 	irq_state_set_masked(desc);
- }
- 
-+void ack_unmask_irq(struct irq_desc *desc)
-+{
-+	if ((desc->irq_data.chip->flags & IRQCHIP_ACK_ON_UNMASK) &&
-+	    (irqd_get_trigger_type(&desc->irq_data) & IRQ_TYPE_LEVEL_MASK) &&
-+	    desc->irq_data.chip->irq_ack)
-+			desc->irq_data.chip->irq_ack(&desc->irq_data);
++&ether {
++	pinctrl-0 = <&ether_pins>;
++	pinctrl-names = "default";
 +
-+	unmask_irq(desc);
-+}
++	phy-handle = <&phy1>;
++	renesas,ether-link-active-low;
++	status = "ok";
 +
- void mask_irq(struct irq_desc *desc)
- {
- 	if (desc->irq_data.chip->irq_mask) {
-diff --git a/kernel/irq/internals.h b/kernel/irq/internals.h
-index 001fa5b..06ff850 100644
---- a/kernel/irq/internals.h
-+++ b/kernel/irq/internals.h
-@@ -73,6 +73,7 @@ extern void irq_percpu_enable(struct irq_desc *desc, unsigned int cpu);
- extern void irq_percpu_disable(struct irq_desc *desc, unsigned int cpu);
- extern void mask_irq(struct irq_desc *desc);
- extern void unmask_irq(struct irq_desc *desc);
-+extern void ack_unmask_irq(struct irq_desc *desc);
- 
- extern void init_kstat_irqs(struct irq_desc *desc, int node, int nr);
- 
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 481a13c..39505d8 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -718,7 +718,7 @@ again:
- 
- 	if (!desc->threads_oneshot && !irqd_irq_disabled(&desc->irq_data) &&
- 	    irqd_irq_masked(&desc->irq_data))
--		unmask_irq(desc);
-+		ack_unmask_irq(desc);
- 
- out_unlock:
- 	raw_spin_unlock_irq(&desc->lock);
--- 
-1.8.5.3
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++		interrupt-parent = <&irqc0>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++
++		pinctrl-0 = <&phy1_pins>;
++		pinctrl-names = "default";
++	};
++};
++
+ &sata0 {
+ 	status = "okay";
+ };
