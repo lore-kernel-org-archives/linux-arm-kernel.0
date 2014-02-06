@@ -1,91 +1,52 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Thu, 06 Feb 2014 22:19:02 +0530
-Subject: [PATCH 1/2] PPC: powernv: remove redundant cpuidle_idle_call()
-In-Reply-To: <CAKnoXLxCAqKaniGOwegNcOarS4FpoNKDY5PxOhe6j4wdtUAkLQ@mail.gmail.com>
-References: <1391696188-14540-1-git-send-email-nicolas.pitre@linaro.org>
- <CAKnoXLxCAqKaniGOwegNcOarS4FpoNKDY5PxOhe6j4wdtUAkLQ@mail.gmail.com>
-Message-ID: <52F3BCFE.3010703@linux.vnet.ibm.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 6 Feb 2014 13:57:41 -0300
+Subject: [PATCH v2 0/5] net: phy: Ethernet PHY powerdown optimization
+In-Reply-To: <52F141AE.8010402@gmail.com>
+References: <1386513631-11284-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1386926429-28818-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20131217.144313.1563516273987934449.davem@davemloft.net>
+ <52F141AE.8010402@gmail.com>
+Message-ID: <20140206165740.GA12542@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi Sebastian,
 
-On 02/06/2014 09:55 PM, Daniel Lezcano wrote:
-> Hi Nico,
+On Tue, Feb 04, 2014 at 08:38:22PM +0100, Sebastian Hesselbarth wrote:
+> On 12/17/2013 08:43 PM, David Miller wrote:
+> > From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > Date: Fri, 13 Dec 2013 10:20:24 +0100
+> >
+> >> This is v2 of the ethernet PHY power optimization patches to reduce
+> >> power consumption of network PHYs with link that are either unused or
+> >> the corresponding netdev is down.
+> >>
+> >> Compared to the last version, this patch set drops a patch to disable
+> >> unused PHYs after late initcall, as it is not compatible with a modular
+> >> mdio bus [1]. I'll investigate different ways to have a modular mdio bus
+> >> driver get notified when driver loading is done.
+> >>
+> >> Again, a branch with v2 applied to v3.13-rc2 can also be found at
+> >> https://github.com/shesselba/linux-dove.git topic/ethphy-power-v2
+> >>
+> >> [1] http://www.spinics.net/lists/arm-kernel/msg293028.html
+> >
+> > Series applied, thanks.
+> >
+[..]
 > 
+> as expected the above patches create a Linux to bootloader dependency
+> that surfaces dumb bootloaders not initializing PHYs correctly.
 > 
-> On 6 February 2014 14:16, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> Andrew has a Kirkwood based board that does not power-up and restart
+> auto-negotiation on the powered down PHY after a warm restart. While
+> this specific bootloader allows a soft-workaround by issuing the
+> required PHY writes before accessing the interface, others may not.
 > 
->> The core idle loop now takes care of it.
->>
->> Signed-off-by: Nicolas Pitre <nico@linaro.org>
->> ---
->>  arch/powerpc/platforms/powernv/setup.c | 13 +------------
->>  1 file changed, 1 insertion(+), 12 deletions(-)
->>
->> diff --git a/arch/powerpc/platforms/powernv/setup.c
->> b/arch/powerpc/platforms/powernv/setup.c
->> index 21166f65c9..a932feb290 100644
->> --- a/arch/powerpc/platforms/powernv/setup.c
->> +++ b/arch/powerpc/platforms/powernv/setup.c
->> @@ -26,7 +26,6 @@
->>  #include <linux/of_fdt.h>
->>  #include <linux/interrupt.h>
->>  #include <linux/bug.h>
->> -#include <linux/cpuidle.h>
->>
->>  #include <asm/machdep.h>
->>  #include <asm/firmware.h>
->> @@ -217,16 +216,6 @@ static int __init pnv_probe(void)
->>         return 1;
->>  }
->>
->> -void powernv_idle(void)
->> -{
->> -       /* Hook to cpuidle framework if available, else
->> -        * call on default platform idle code
->> -        */
->> -       if (cpuidle_idle_call()) {
->> -               power7_idle();
->> -       }
->>
-> 
-> The cpuidle_idle_call is called from arch_cpu_idle in
-> arch/powerpc/kernel/idle.c between a ppc64_runlatch_off|on section.
-> Shouldn't the cpuidle-powernv driver call these functions when entering
-> idle ?
 
-Yes they should, I will send out a patch that does that ontop of this.
-There have been cpuidle driver cleanups for powernv and pseries in this
-merge window. While no change would be required in the pseries cpuidle
-driver as a result of Nicolas's cleanup, we would need to add the
-ppc64_runlatch_on and off functions before and after the entry into the
-powernv idle states.
-
-Thanks
-
-Regards
-Preeti U Murthy
-> 
->   -- Daniel
-> 
-> 
->> -}
->> -
->>  define_machine(powernv) {
->>         .name                   = "PowerNV",
->>         .probe                  = pnv_probe,
->> @@ -236,7 +225,7 @@ define_machine(powernv) {
->>         .show_cpuinfo           = pnv_show_cpuinfo,
->>         .progress               = pnv_progress,
->>         .machine_shutdown       = pnv_shutdown,
->> -       .power_save             = powernv_idle,
->> +       .power_save             = power7_idle,
->>         .calibrate_decr         = generic_calibrate_decr,
->>  #ifdef CONFIG_KEXEC
->>         .kexec_cpu_down         = pnv_kexec_cpu_down,
->> --
->> 1.8.4.108.g55ea5f6
->>
->>
-> 
+I'm also having this same issue on Kirkwood USI Topkick, running
+v3.14-rc1.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
