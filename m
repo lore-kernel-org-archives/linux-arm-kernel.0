@@ -1,78 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 6 Feb 2014 11:00:16 +0000
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <20140206105442.GB4993@e106497-lin.cambridge.arm.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <1391532784-1953-3-git-send-email-will.deacon@arm.com>
- <CAAhSdy0X56UcMrp0bsH0na=GBkND=jqZVqbHxKsBampr8YM3cA@mail.gmail.com>
- <20140206105442.GB4993@e106497-lin.cambridge.arm.com>
-Message-ID: <20140206110016.GI26035@mudshark.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 06 Feb 2014 12:01:44 +0100
+Subject: [PATCH 02/03] pinctrl: sh-pfc: r8a7790: Break out USB0 OVC/VBUS
+In-Reply-To: <CANqRtoSubhvfgzn590k9oePLv04V00Z7aEuKw2Ofxi8FeCObbA@mail.gmail.com>
+References: <20140129230959.22655.55645.sendpatchset@w520>
+ <1397857.qyLQY9XTlp@avalon>
+ <CANqRtoSubhvfgzn590k9oePLv04V00Z7aEuKw2Ofxi8FeCObbA@mail.gmail.com>
+Message-ID: <4378236.uXc5XaI3pM@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 10:54:42AM +0000, Liviu Dudau wrote:
-> On Thu, Feb 06, 2014 at 08:54:03AM +0000, Anup Patel wrote:
-> > On Tue, Feb 4, 2014 at 10:23 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > This patch adds support for an extremely simple virtual PCI host
-> > > controller. The controller itself has no configuration registers, and
-> > > has its address spaces described entirely by the device-tree (using the
-> > > bindings described by ePAPR). This allows emulations, such as kvmtool,
-> > > to provide a simple means for a guest Linux instance to make use of
-> > > PCI devices.
-> > >
-> > > Corresponding documentation is added for the DT binding.
-> > >
-> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > > ---
-> > >  .../devicetree/bindings/pci/linux,pci-virt.txt     |  38 ++++
-> > >  drivers/pci/host/Kconfig                           |   7 +
-> > >  drivers/pci/host/Makefile                          |   1 +
-> > >  drivers/pci/host/pci-virt.c                        | 200 +++++++++++++++++++++
-> > >  4 files changed, 246 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/pci/linux,pci-virt.txt
-> > >  create mode 100644 drivers/pci/host/pci-virt.c
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/pci/linux,pci-virt.txt b/Documentation/devicetree/bindings/pci/linux,pci-virt.txt
-> > > new file mode 100644
-> > > index 000000000000..54668a283498
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/pci/linux,pci-virt.txt
-> > > @@ -0,0 +1,38 @@
-> > > +* ARM Basic Virtual PCI controller
-> > > +
-> > > +PCI emulations, such as the virtio-pci implementations found in kvmtool
-> > > +and other para-virtualised systems, do not require driver support for
-> > > +complexities such as regulator and clock management. In fact, the
-> > > +controller may not even have a control interface visible to the
-> > > +operating system, instead presenting a set of fixed windows describing a
-> > > +subset of IO, Memory and Configuration spaces.
-> > > +
-> > > +Such a controller can be described purely in terms of the standardized
-> > > +device tree bindings communicated in pci.txt:
-> > > +
-> > > +- compatible     : Must be "linux,pci-virt"
-> > > +
-> > > +- ranges         : As described in IEEE Std 1275-1994, but must provide
-> > > +                   at least a definition of the Configuration Space plus
-> > > +                   one or both of IO and Memory Space.
-> > > +
-> > > +- #address-cells : Must be 3
-> > > +
-> > > +- #size-cells    : Must be 2
-> > > +
-> > > +Configuration Space is assumed to be memory-mapped (as opposed to being
+Hi Magnus,
+
+On Friday 31 January 2014 12:10:05 Magnus Damm wrote:
+> On Fri, Jan 31, 2014 at 10:17 AM, Laurent Pinchart wrote:
+> > On Thursday 30 January 2014 08:10:19 Magnus Damm wrote:
+> >> From: Magnus Damm <damm@opensource.se>
+> >> 
+> >> Create a new group for the USB0 OVC/VBUS pin by itself. This
+> >> allows us to monitor PWEN as GPIO on the Lager board.
+> >> 
+> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >> ---
+> >> 
+> >>  drivers/pinctrl/sh-pfc/pfc-r8a7790.c |    9 +++++++++
+> >>  1 file changed, 9 insertions(+)
+> >> 
+> >> --- 0001/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
+> >> +++ work/drivers/pinctrl/sh-pfc/pfc-r8a7790.c 2014-01-24
+> > 10:23:32.000000000
+> >> +0900 @@ -3231,6 +3231,13 @@ static const unsigned int usb0_pins[] =
+> >>  static const unsigned int usb0_mux[] = {
+> >>       USB0_PWEN_MARK, USB0_OVC_VBUS_MARK,
+> >>  };
+> >> +static const unsigned int usb0_ovc_vbus_pins[] = {
+> >> +     /* OVC/VBUS */
+> >> +     RCAR_GP_PIN(5, 19),
+> >> +};
+> >> +static const unsigned int usb0_ovc_vbus_mux[] = {
+> >> +     USB0_OVC_VBUS_MARK,
+> >> +};
 > > 
-> > It would be great to have a flag to specify whether Configuration Space is over
-> > ioports or memory mapped.
+> > Another option would have been to split the existing usb0 group in
+> > usb0_pwen and usb0_ovc. I'm not sure which is better though, I'd just
+> > like to know if you had given it a thought.
 > 
-> This is another reason why I prefer the reg property for specifying the configuration
-> space address range. I don't see a straight way of making the distinction you
-> need using the ranges property.
+> I actually did just that in my first local attempt, but I decided not
+> to since it will only cause potential breakage.
 
-Well if we need to distinguish cam vs ecam, then adding ioport to the mix
-should be (conceptually) easy and I don't think it would involve the "reg"
-property.
+OK. I assume that using PWEN without OVC/VBUS doesn't make sense, right ?
 
-However, I'm not planning to add ioport support myself.
+> > Regardless, what about naming the new group usb0_ovc instead of
+> > usb0_ovc_bus to keep names short ?
+> 
+> Is there any particular reason why you want shorter names?
 
-Will
+When it doesn't reduce clarity I prefer to keep names short, as that makes the 
+code easier to read and write, and (slightly) lowers the memory footprint.
+
+> From my side, I prefer to keep the names in sync with the data sheet. In
+> this particular case it is a shared pin so OVC is used for Host while VBUS
+> is used for gadget, so if you're proposing to ditch VBUS then this feels
+> somewhat inconsistent with the current gadget use case. =)
+
+I thought the pin was used for over current detection only, but that doesn't 
+make sense for function mode, you're right. Let's keep the name as-is then.
+
+Provided PWEN without OVC/VBUS doesn't make sense and won't be needed,
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+-- 
+Regards,
+
+Laurent Pinchart
