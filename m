@@ -1,66 +1,53 @@
-From: kuninori.morimoto.gx@gmail.com (Kuninori Morimoto)
-Date: Wed, 05 Feb 2014 16:43:03 -0800 (PST)
-Subject: [PATCH 1/3] clk: rcar-h2: fix sd0/sd1 divisor table
-In-Reply-To: <2298259.CqC51XrMZM@avalon>
-References: <1391537858-28593-1-git-send-email-william.towle@codethink.co.uk>
- <52F226A0.5070301@codethink.co.uk>
- <52F23166.1030609@codethink.co.uk> <2298259.CqC51XrMZM@avalon>
-Message-ID: <87txcdul4b.wl%kuninori.morimoto.gx@gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 5 Feb 2014 19:50:55 -0500
+Subject: [PATCH] ARM: mm: Fix the memblock allocation for LPAE machines
+In-Reply-To: <20140205234815.GU26684@n2100.arm.linux.org.uk>
+References: <1391285687-20534-1-git-send-email-santosh.shilimkar@ti.com>
+ <52F2CBC0.3030305@ti.com> <20140205234815.GU26684@n2100.arm.linux.org.uk>
+Message-ID: <52F2DC6F.8070005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi all
-
-> > >>> The clk_div_table for cpg_sd01_div_table[] concurs with the manual
-> > >>> but not with values found in the device itself (which are also the
-> > >>> same as the ones in arch/arm/mach-shmobile/clock-r8a7790.c).
-> > >>> 
-> > >>> Update the clk-rcar-gen2.c driver to have the same table as the one
-> > >>> used by the mach-shmobile driver which work once further issues are
-> > >>> fixed in the clk-rcar-gen2.c driver.
-> > >>> 
-> > >>> Part of the fix for the following error where the driver reports the
-> > >>> 
-> > >>> output as 1MHz but is really 97.5MHz:
-> > >>>      sh_mobile_sdhi ee100000.sd: mmc0 base at 0xee100000 clock rate 1
-> > >>> MHz
-> > >>> 
-> > >>> [ben.dooks at codethink.co.uk: updated patch description]
-> > >>> Signed-off-by: William Towle <william.towle@codethink.co.uk>
-> > >>> Reviewed-by: Ben Dooks <ben.dooks@codethink.co.uk>
-(snip)
-> > >>>   static const struct clk_div_table cpg_sd01_div_table[] = {
-> > >>> +    {  0,  2 }, {  1,  3 }, {  2,  4 }, {  3,  6 },
-> > >>> +    {  4,  8 },
-> > >>> 
-> > >>>       {  5, 12 }, {  6, 16 }, {  7, 18 }, {  8, 24 },
-> > >>>       { 10, 36 }, { 11, 48 }, { 12, 10 }, {  0,  0 },
-(snip)
-> > > I would like feedback from Renesas on this issue if possible. I can
-> > > have a quick try at setting the clock value to 10 in u-boot and scope
-> > > it out and see what happens.
-> > > 
-> > > Magnus or Morimoto-san, is there a chance this could be reviewed by
-> > > someone in Renesas who has knowledge of the hardware block?
-> > > 
-> > > [PS, added Kuninori Morimoto to this[
-> > 
-> > I got William to do a quick test with the following u-boot command
-> > 	mw.l 0xE6150074 0xCCC
-> > 
-> > sdhi0 showed 156MHz output, and it seemed to work. So there is a
-> > distinct possibility that the sdh clock also supports setting 12
-> > for a /10
+On Wednesday 05 February 2014 06:48 PM, Russell King - ARM Linux wrote:
+> On Wed, Feb 05, 2014 at 06:39:44PM -0500, Santosh Shilimkar wrote:
+>> Russell,
+>>
+>> On Saturday 01 February 2014 03:14 PM, Santosh Shilimkar wrote:
+>>> Commit ad6492b8 added much needed memblock_virt_alloc_low() and further
+>>> commit 07bacb3 {memblock, bootmem: restore goal for alloc_low} fixed the
+>>> issue with low memory limit thansk to Yinghai. But even after all these fixes,
+>>> there is still one case where the limit check done with ARCH_LOW_ADDRESS_LIMIT
+>>> for low memory fails. Russell pointed out the issue with 32 bit LPAE machines
+>>> in below thread.
+>>> 	https://lkml.org/lkml/2014/1/28/364
+>>>
+>>> Since on some LPAE machines where memory start address is beyond 4GB,
+>>> the low memory marker in memblock will be set to default
+>>> ARCH_LOW_ADDRESS_LIMIT which is wrong. We can fix this by letting
+>>> architectures set the ARCH_LOW_ADDRESS_LIMIT using another export
+>>> similar to memblock_set_current_limit() but am not sure whether
+>>> its worth the trouble. Tell me if you think otherwise.
+>>>
+>>> Rather am just trying to fix that one broken case using memblock_virt_alloc()
+>>> in setup code since the memblock.current_limit is updated appropriately
+>>> makes it work on all ARM 32 bit machines.
+>>>
+>>> Cc: Yinghai Lu <yinghai@kernel.org>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Strashko, Grygorii <grygorii.strashko@ti.com>
+>>> Cc: Andrew Morton <akpm@linux-foundation.org>
+>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>> ---
+>> Whats you say here ? We should get the fix for the
+>> issue. If you are ok, I can drop the patch in patch system.
 > 
-> Thank you for trying it out. I'd like feedback from Renesas as well, assuming 
-> we don't get a "don't do that or it will cause the universe to collapse - 
-> woops, too late" nack, let's respin this patch and merge the two tables 
-> instead.
+> Is this still an issue, or has Tejun fixed it by some other means?  I've not
+> noticed anything being broken at the moment.
+> 
+> Can you confirm whether we still have an issue without this patch please?
+> 
+Fixes for all cases exist except 'LPAE + memory start beyond 4 GB'.
+This case is still broken and  hence I posted the $subject patch.
 
-I ask it to Renesas HW team.
-Please wait
-
-Best regards
----
-Kuninori Morimoto
+Regards,
+Santosh
