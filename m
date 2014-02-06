@@ -1,64 +1,67 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 06 Feb 2014 02:08:48 -0800
-Subject: [GIT PULL] clk: socfpga: Clock updates for v3.15
-In-Reply-To: <1391620344-16882-1-git-send-email-dinguyen@altera.com>
-References: <1391620344-16882-1-git-send-email-dinguyen@altera.com>
-Message-ID: <20140206100848.22158.15282@quantum>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Feb 2014 10:09:09 +0000
+Subject: [PATCH] arm64: Change misleading function names in dma-mapping
+In-Reply-To: <CAD15agZzJ4=RMbky+GymJbyktLz0PO+uZ-GOh1SbvH476k4hzA@mail.gmail.com>
+References: <CAD15agZzJ4=RMbky+GymJbyktLz0PO+uZ-GOh1SbvH476k4hzA@mail.gmail.com>
+Message-ID: <20140206100909.GC26035@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting dinguyen at altera.com (2014-02-05 09:12:24)
-> Hi Mike,
+On Thu, Feb 06, 2014 at 06:28:22AM +0000, Ritesh Harjani wrote:
 > 
-> Please consider pull these patch for v3.15.
+> From: Ritesh Harjani <ritesh.harjani at gmail.com<mailto:ritesh.harjani@gmail.com>>
+> 
+> arm64_swiotlb_alloc/free_coherent name can be misleading
+> somtimes with CMA support being enabled after this
+> patch (c2104debc235b745265b64d610237a6833fd53)
+> 
+> Change this name to be more generic:
+> arm64_dma_alloc/free_coherent
 
-Taken into clk-next.
+I'm fine with this cosmetic change, but the (pre-existing) arm64 prefix looks
+a little odd for a static function.
 
-Thanks!
-Mike
+Will
 
+> Signed-off-by: Ritesh Harjani <ritesh.harjani at gmail.com<mailto:ritesh.harjani@gmail.com>>
+> ---
+>  arch/arm64/mm/dma-mapping.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
-> Thanks,
-> Dinh
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index 45b5ab5..7517796 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -30,7 +30,7 @@
+>  struct dma_map_ops *dma_ops;
+>  EXPORT_SYMBOL(dma_ops);
 > 
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+> -static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
+> +static void *arm64_dma_alloc_coherent(struct device *dev, size_t size,
+>                                           dma_addr_t *dma_handle, gfp_t flags,
+>                                           struct dma_attrs *attrs)
+>  {
+> @@ -57,7 +57,7 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
+>         }
+>  }
 > 
->   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+> -static void arm64_swiotlb_free_coherent(struct device *dev, size_t size,
+> +static void arm64_dma_free_coherent(struct device *dev, size_t size,
+>                                         void *vaddr, dma_addr_t dma_handle,
+>                                         struct dma_attrs *attrs)
+>  {
+> @@ -78,8 +78,8 @@ static void arm64_swiotlb_free_coherent(struct device *dev, size_t size,
+>  }
 > 
-> are available in the git repository at:
+>  static struct dma_map_ops arm64_swiotlb_dma_ops = {
+> -       .alloc = arm64_swiotlb_alloc_coherent,
+> -       .free = arm64_swiotlb_free_coherent,
+> +       .alloc = arm64_dma_alloc_coherent,
+> +       .free = arm64_dma_free_coherent,
+>         .map_page = swiotlb_map_page,
+>         .unmap_page = swiotlb_unmap_page,
+>         .map_sg = swiotlb_map_sg_attrs,
+> --
+> 1.8.1.3
 > 
->   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-clk-for-3.15
 > 
-> for you to fetch changes up to 5d81b6fc5ee1d904f9e3faab3a80cee36d267136:
-> 
->   clk: socfpga: Add a clk-phase property to the "altr,socfpga-gate-clk" (2014-02-05 11:05:09 -0600)
-> 
-> ----------------------------------------------------------------
-> SOCFPGA clk updates for v3.15
-> 
-> ----------------------------------------------------------------
-> Dinh Nguyen (4):
->       clk: socfpga: Map the clk manager base address in the clock driver
->       clk: socfpga: Look for the GPIO_DB_CLK by its offset
->       clk: socfpga: Remove socfpga_init_clocks
->       clk: socfpga: Add a clk-phase property to the "altr,socfpga-gate-clk"
-> 
-> Steffen Trumtrar (3):
->       clk: socfpga: remove unused field
->       clk: socfpga: fix define typo
->       clk: socfpga: split clk code
-> 
->  .../devicetree/bindings/clock/altr_socfpga.txt     |    5 +
->  arch/arm/boot/dts/socfpga.dtsi                     |    1 +
->  arch/arm/mach-socfpga/socfpga.c                    |    5 -
->  drivers/clk/socfpga/Makefile                       |    3 +
->  drivers/clk/socfpga/clk-gate.c                     |  263 ++++++++++++++++
->  drivers/clk/socfpga/clk-periph.c                   |   94 ++++++
->  drivers/clk/socfpga/clk-pll.c                      |  111 +++++++
->  drivers/clk/socfpga/clk.c                          |  326 +-------------------
->  drivers/clk/socfpga/clk.h                          |   57 ++++
->  9 files changed, 546 insertions(+), 319 deletions(-)
->  create mode 100644 drivers/clk/socfpga/clk-gate.c
->  create mode 100644 drivers/clk/socfpga/clk-periph.c
->  create mode 100644 drivers/clk/socfpga/clk-pll.c
->  create mode 100644 drivers/clk/socfpga/clk.h
