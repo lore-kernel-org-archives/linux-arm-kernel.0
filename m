@@ -1,46 +1,59 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu,  6 Feb 2014 10:10:15 +0100
-Subject: [PATCH 0/3] ARM: dts: Fixes for Overo/Tobi against 3.14-rc1
-Message-ID: <1391677818-21154-1-git-send-email-florian.vaussard@epfl.ch>
+Date: Thu,  6 Feb 2014 10:10:16 +0100
+Subject: [PATCH 1/3] ARM: dts: omap3-tobi: Fix boot with OMAP36xx-based Overo
+In-Reply-To: <1391677818-21154-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1391677818-21154-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1391677818-21154-2-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP36xx-based Overo (Storm and alike) are now failing to boot with 3.14-rc1 [1].
-This series fixes this, by moving model-agnostic DT into a common dtsi file,
-and creating model-specific DT files:
+Tobi expansion board can be used with both OMAP35xx-based Overo,
+and OMAP36xx-based Overo. Currently the boot is broken with newer
+OMAP36xx-based Overo (Storm and alike). Fix include file and
+compatible string to be able to boot newer models.
 
-- omap3-overo-tobi.dts -> older OMAP35xx Overo
-- omap3-overo-storm-tobi.dts -> newer OMAP36xx/AM37xx/DM37xx Overo
+This will break older models. This will be addressed later.
 
-People will have to use the right Overo / expansion board combination.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+---
+ arch/arm/boot/dts/omap3-overo.dtsi | 3 ---
+ arch/arm/boot/dts/omap3-tobi.dts   | 5 ++++-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-(Patch 2 in an unrelated fix that was waiting in my queue.)
-
-omap3-overo-tobi.dts tested with Overo Sand (OMAP3503) and omap3-overo-storm-tobi.dts
-tested with Overo EarthStorm (AM3703). Both boot. With the Overo Sand, I cannot
-mount the ext3 rootfs, but this seems unrelated to the current topic, maybe
-a missing errata.
-
-Regards,
-Florian
-
-[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/110006
-
-
-Florian Vaussard (3):
-  ARM: dts: omap3-tobi: Fix boot with OMAP36xx-based Overo
-  ARM: dts: omap3-tobi: Use the correct vendor prefix
-  ARM: dts: Add support for both OMAP35xx and OMAP36xx Overo/Tobi
-
- arch/arm/boot/dts/Makefile                         |  3 ++-
- arch/arm/boot/dts/omap3-overo-storm-tobi.dts       | 22 ++++++++++++++++++++++
- ...omap3-tobi.dts => omap3-overo-tobi-common.dtsi} |  3 ---
- arch/arm/boot/dts/omap3-overo-tobi.dts             | 22 ++++++++++++++++++++++
- arch/arm/boot/dts/omap3-overo.dtsi                 |  3 ---
- 5 files changed, 46 insertions(+), 7 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-tobi.dts
- rename arch/arm/boot/dts/{omap3-tobi.dts => omap3-overo-tobi-common.dtsi} (94%)
- create mode 100644 arch/arm/boot/dts/omap3-overo-tobi.dts
-
+diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+index a461d2f..5970999 100644
+--- a/arch/arm/boot/dts/omap3-overo.dtsi
++++ b/arch/arm/boot/dts/omap3-overo.dtsi
+@@ -9,9 +9,6 @@
+ /*
+  * The Gumstix Overo must be combined with an expansion board.
+  */
+-/dts-v1/;
+-
+-#include "omap34xx.dtsi"
+ 
+ / {
+ 	pwmleds {
+diff --git a/arch/arm/boot/dts/omap3-tobi.dts b/arch/arm/boot/dts/omap3-tobi.dts
+index 7e4ad2a..0e3b8bf 100644
+--- a/arch/arm/boot/dts/omap3-tobi.dts
++++ b/arch/arm/boot/dts/omap3-tobi.dts
+@@ -10,11 +10,14 @@
+  * Tobi expansion board is manufactured by Gumstix Inc.
+  */
+ 
++/dts-v1/;
++
++#include "omap36xx.dtsi"
+ #include "omap3-overo.dtsi"
+ 
+ / {
+ 	model = "TI OMAP3 Gumstix Overo on Tobi";
+-	compatible = "ti,omap3-tobi", "ti,omap3-overo", "ti,omap3";
++	compatible = "ti,omap3-tobi", "ti,omap3-overo", "ti,omap36xx", "ti,omap3";
+ 
+ 	leds {
+ 		compatible = "gpio-leds";
 -- 
 1.8.1.2
