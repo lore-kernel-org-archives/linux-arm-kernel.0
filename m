@@ -1,32 +1,83 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 6 Feb 2014 13:56:26 +0530
-Subject: [PATCH 0/3] ARM: OMAP2+: AM43x: Enable in OMAP2PLUS and add ID for
- ES1.1
-Message-ID: <1391675189-10608-1-git-send-email-lokeshvutla@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 6 Feb 2014 09:28:52 +0100
+Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
+In-Reply-To: <20140205205319.GH25695@obsidianresearch.com>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <3724624.kd9jZNUiTF@wuerfel> <20140205205319.GH25695@obsidianresearch.com>
+Message-ID: <201402060928.53310.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enables AM43XX SOC in omap2plus_deconfig along with
-updating clocksource and adding support for ES1.1.
-With this series using omap2plus_defconfig alone boots on AM43XX.
+On Wednesday 05 February 2014, Jason Gunthorpe wrote:
+> On Wed, Feb 05, 2014 at 09:26:17PM +0100, Arnd Bergmann wrote:
+> > > > What you get out of "of_pci_range_to_resource(&range, np, &pci->io)"
+> > > > is not the resource you want to pass into pci_add_resource()
+> > > > later.
+> 
+> Right, of_pci_range_to_resource returns the CPU MMIO address. A big
+> problem here is that struct resource is being re-used for bus
+> physical, CPU MMIO, and Linux Driver addressing domains without any
+> helpful tagging.
+> 
+> typedef struct resource resource_bus;
+> typedef struct resource resource_cpu;
+> 
+> ?
 
-Tested on: AM4372 EPOS EVM
+I fear the resource management needs a bigger overhaul than than.
+Most importantly, 'struct resource' is not connected to 'struct device'
+at the moment, and it only deals with resource types that were around
+15 years ago.
 
-Afzal Mohammed (1):
-  ARM: OMAP2+: AM43x: enable in default config
+> > > Do I need to open-code the resource translation from phys -> logical?
+> > 
+> > I think we should have some common infrastructure that lets you
+> > get this right more easily.
+> 
+> The offset stuff seems to be very confusing to people, removing it
+> from the APIs and forcing drivers to talk about bus addresess, CPU
+> addresses and internal Linux addresses seems a bit more plain?
 
-Lokesh Vutla (1):
-  ARM: OMAP2+: AM43x: Add ID for ES1.1
+Interesting idea. I'm not sure how Bjorn will like that
+after he just did an overhaul of all users of the offset
+API some time ago, but let's see what he thinks.
 
-Rajendra Nayak (1):
-  ARM: OMAP2+: AM43x: Use gptimer as clocksource
+> What do you think about something like this:
+> 
+> int of_pci_alloc_io(.. resources,
+>                     struct of_pci_range *range,
+>                     struct device_node *np)
+> {
+>   struct resource bus_address, mmio_window, res;
+> 
+>   bus_address.start = range->pci_addr;
+>   bus_address.end = range->pci_addr + range->size - 1;
+> 
+>   mmio_window.start = range->cpu_addr;
+>   mmio_window.end = range->cpu_addr + range->size - 1;
+> 
+>   /* Input bus_address - addresses seen on the bus
+>            mmio_window - physical CPU address to create the bus
+> 	   	         addreses
+>      Output res - Address suitable for use in drivers
+>      This does the pci_ioremap_io too */
+>   pci_alloc_virtual_io_window(&bus_address, &mmio_window, &res);
+> 
+>   /* bus_address - addresses seen on the bus
+>      res - matching driver view for the bus addresses */
+>   pci_add_resource_bus(&resources, &bus_address, &res);
+> }
+> 
+> And a similar function for MMIO that just omits
+> pci_alloc_virtual_io_window.
 
- arch/arm/configs/omap2plus_defconfig |    1 +
- arch/arm/mach-omap2/board-generic.c  |    2 +-
- arch/arm/mach-omap2/id.c             |   14 ++++++++++++--
- arch/arm/mach-omap2/soc.h            |    3 ++-
- arch/arm/mach-omap2/timer.c          |    3 ++-
- 5 files changed, 18 insertions(+), 5 deletions(-)
+It certainly seems workable. OTOH if we just manage to do a
+helper that scans the OF ranges, allocates the I/O window,
+remaps it and calls the existing pci_add_resource_offset()
+helper, PCI host drivers don't need to worry about the
+io_offsets computation either and just need to pull out the
+correct window locations if they need to set up the hardware
+translation windows (which I'd hope we can often let the boot
+loader take care of).
 
--- 
-1.7.9.5
+	Arnd
