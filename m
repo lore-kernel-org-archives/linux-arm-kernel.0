@@ -1,56 +1,85 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 06 Feb 2014 20:12:47 +0100
-Subject: [PATCH v2 02/12] ARM: SAMSUNG: Add soc_is_s3c2410() helper
+Date: Thu, 06 Feb 2014 20:12:53 +0100
+Subject: [PATCH v2 08/12] ARM: SAMSUNG: pm: Move s3c_pm_check_* prototypes to
+ plat/pm-common.h
 In-Reply-To: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
 References: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1391713977-22300-3-git-send-email-t.figa@samsung.com>
+Message-ID: <1391713977-22300-9-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the S3C2410 SoC being quite different from other S3C24xx SoCs
-in some aspects, such as availability of DIVSLOT register in its UART
-blocks, there is a need sometimes to check whether we are running on
-this SoC, not just the S3C24xx series. This patch adds soc_is_s3c2410()
-helper function for this purpose.
+To allow using Samsung PM memory check helpers on platforms that do not
+use the legacy Samsung PM core, this patch moves prototypes of relevant
+functions to plat/pm-common.h header.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/cpu.h | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/plat-samsung/include/plat/pm-common.h | 14 ++++++++++++++
+ arch/arm/plat-samsung/include/plat/pm.h        | 14 --------------
+ arch/arm/plat-samsung/pm-check.c               |  2 +-
+ 3 files changed, 15 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
-index 335beb3..6bf86f6 100644
---- a/arch/arm/plat-samsung/include/plat/cpu.h
-+++ b/arch/arm/plat-samsung/include/plat/cpu.h
-@@ -20,6 +20,9 @@
- 
- extern unsigned long samsung_cpu_id;
- 
-+#define S3C2410_CPU_ID		0x32410000
-+#define S3C2410_CPU_MASK	0xFFFFFFFF
-+
- #define S3C24XX_CPU_ID		0x32400000
- #define S3C24XX_CPU_MASK	0xFFF00000
- 
-@@ -56,6 +59,7 @@ static inline int is_samsung_##name(void)	\
- 	return ((samsung_cpu_id & mask) == (id & mask));	\
- }
- 
-+IS_SAMSUNG_CPU(s3c2410, S3C2410_CPU_ID, S3C2410_CPU_MASK)
- IS_SAMSUNG_CPU(s3c24xx, S3C24XX_CPU_ID, S3C24XX_CPU_MASK)
- IS_SAMSUNG_CPU(s3c2412, S3C2412_CPU_ID, S3C2412_CPU_MASK)
- IS_SAMSUNG_CPU(s3c6400, S3C6400_CPU_ID, S3C64XX_CPU_MASK)
-@@ -76,8 +80,10 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
-     defined(CONFIG_CPU_S3C2442) || defined(CONFIG_CPU_S3C244X) || \
-     defined(CONFIG_CPU_S3C2443)
- # define soc_is_s3c24xx()	is_samsung_s3c24xx()
-+# define soc_is_s3c2410()	is_samsung_s3c2410()
- #else
- # define soc_is_s3c24xx()	0
-+# define soc_is_s3c2410()	0
+diff --git a/arch/arm/plat-samsung/include/plat/pm-common.h b/arch/arm/plat-samsung/include/plat/pm-common.h
+index 741723e..8705f9e 100644
+--- a/arch/arm/plat-samsung/include/plat/pm-common.h
++++ b/arch/arm/plat-samsung/include/plat/pm-common.h
+@@ -93,4 +93,18 @@ static inline void s3c_pm_save_uarts(void) { }
+ static inline void s3c_pm_restore_uarts(void) { }
  #endif
  
- #if defined(CONFIG_CPU_S3C2412)
++/* suspend memory checking */
++
++#ifdef CONFIG_SAMSUNG_PM_CHECK
++extern void s3c_pm_check_prepare(void);
++extern void s3c_pm_check_restore(void);
++extern void s3c_pm_check_cleanup(void);
++extern void s3c_pm_check_store(void);
++#else
++#define s3c_pm_check_prepare() do { } while (0)
++#define s3c_pm_check_restore() do { } while (0)
++#define s3c_pm_check_cleanup() do { } while (0)
++#define s3c_pm_check_store()   do { } while (0)
++#endif
++
+ #endif
+diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
+index 4099e8d..e17d871 100644
+--- a/arch/arm/plat-samsung/include/plat/pm.h
++++ b/arch/arm/plat-samsung/include/plat/pm.h
+@@ -80,20 +80,6 @@ extern void s3c_pm_debug_smdkled(u32 set, u32 clear);
+ static inline void s3c_pm_debug_smdkled(u32 set, u32 clear) { }
+ #endif /* CONFIG_S3C_PM_DEBUG_LED_SMDK */
+ 
+-/* suspend memory checking */
+-
+-#ifdef CONFIG_SAMSUNG_PM_CHECK
+-extern void s3c_pm_check_prepare(void);
+-extern void s3c_pm_check_restore(void);
+-extern void s3c_pm_check_cleanup(void);
+-extern void s3c_pm_check_store(void);
+-#else
+-#define s3c_pm_check_prepare() do { } while(0)
+-#define s3c_pm_check_restore() do { } while(0)
+-#define s3c_pm_check_cleanup() do { } while(0)
+-#define s3c_pm_check_store()   do { } while(0)
+-#endif
+-
+ /**
+  * s3c_pm_configure_extint() - ensure pins are correctly set for IRQ
+  *
+diff --git a/arch/arm/plat-samsung/pm-check.c b/arch/arm/plat-samsung/pm-check.c
+index 3cbd626..04aff2c 100644
+--- a/arch/arm/plat-samsung/pm-check.c
++++ b/arch/arm/plat-samsung/pm-check.c
+@@ -19,7 +19,7 @@
+ #include <linux/ioport.h>
+ #include <linux/slab.h>
+ 
+-#include <plat/pm.h>
++#include <plat/pm-common.h>
+ 
+ #if CONFIG_SAMSUNG_PM_CHECK_CHUNKSIZE < 1
+ #error CONFIG_SAMSUNG_PM_CHECK_CHUNKSIZE must be a positive non-zero value
 -- 
 1.8.5.2
