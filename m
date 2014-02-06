@@ -1,31 +1,31 @@
-From: colin.king@canonical.com (Colin King)
-Date: Thu,  6 Feb 2014 18:53:10 +0000
-Subject: [PATCH] clk: at91: remove redundant assignment
-Message-ID: <1391712790-13591-1-git-send-email-colin.king@canonical.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 6 Feb 2014 16:10:24 -0300
+Subject: [PATCH v6 18/19] ARM: mvebu: Enable watchdog support in defconfig
+In-Reply-To: <20140206175159.GI8533@titan.lakedaemon.net>
+References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1391707226-18258-19-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140206175159.GI8533@titan.lakedaemon.net>
+Message-ID: <20140206191023.GA19328@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On Thu, Feb 06, 2014 at 12:51:59PM -0500, Jason Cooper wrote:
+> On Thu, Feb 06, 2014 at 02:20:25PM -0300, Ezequiel Garcia wrote:
+> > Now that we have proper support for Armada 370/XP watchdog
+> > let's enable it in the defconfig.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  arch/arm/configs/mvebu_defconfig | 2 ++
+> >  1 file changed, 2 insertions(+)
+> 
+> If this ends up being the last version for this series, I'll add a patch
+> for multi_v7_defconfig.  Otherwise, please add for the next round.
+> 
 
-remove the redundant shift = shift assignment, it is extraneous.
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/clk/at91/clk-programmable.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
-index fd792b2..ff86efe 100644
---- a/drivers/clk/at91/clk-programmable.c
-+++ b/drivers/clk/at91/clk-programmable.c
-@@ -109,7 +109,7 @@ static long clk_programmable_round_rate(struct clk_hw *hw, unsigned long rate,
- 	unsigned long best_diff;
- 	unsigned long new_diff;
- 	unsigned long cur_rate;
--	int shift = shift;
-+	int shift;
- 
- 	if (rate > *parent_rate)
- 		return *parent_rate;
+Oh, yes, I forgot about your request on this. Let's hope I don't forget
+next time.
 -- 
-1.9.rc1
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
