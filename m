@@ -1,85 +1,65 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 06 Feb 2014 20:12:53 +0100
-Subject: [PATCH v2 08/12] ARM: SAMSUNG: pm: Move s3c_pm_check_* prototypes to
- plat/pm-common.h
+Date: Thu, 06 Feb 2014 20:12:49 +0100
+Subject: [PATCH v2 04/12] ARM: SAMSUNG: pm: Use debug_ll_addr() to get UART
+ base address
 In-Reply-To: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
 References: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1391713977-22300-9-git-send-email-t.figa@samsung.com>
+Message-ID: <1391713977-22300-5-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow using Samsung PM memory check helpers on platforms that do not
-use the legacy Samsung PM core, this patch moves prototypes of relevant
-functions to plat/pm-common.h header.
+This patch modifies Samsung PM debug helpers to use a multiplatform
+friendly way of getting base address of debug UART port, so instead
+of using a per-mach static macro, a generic debug_ll_addr() helper
+is used.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/include/plat/pm-common.h | 14 ++++++++++++++
- arch/arm/plat-samsung/include/plat/pm.h        | 14 --------------
- arch/arm/plat-samsung/pm-check.c               |  2 +-
- 3 files changed, 15 insertions(+), 15 deletions(-)
+ arch/arm/plat-samsung/pm.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/pm-common.h b/arch/arm/plat-samsung/include/plat/pm-common.h
-index 741723e..8705f9e 100644
---- a/arch/arm/plat-samsung/include/plat/pm-common.h
-+++ b/arch/arm/plat-samsung/include/plat/pm-common.h
-@@ -93,4 +93,18 @@ static inline void s3c_pm_save_uarts(void) { }
- static inline void s3c_pm_restore_uarts(void) { }
- #endif
+diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+index 5d9daf6..53b3d67 100644
+--- a/arch/arm/plat-samsung/pm.c
++++ b/arch/arm/plat-samsung/pm.c
+@@ -21,6 +21,7 @@
+ #include <linux/io.h>
  
-+/* suspend memory checking */
+ #include <asm/cacheflush.h>
++#include <asm/mach/map.h>
+ #include <asm/suspend.h>
+ 
+ #include <plat/cpu.h>
+@@ -74,9 +75,19 @@ static inline void s3c_pm_debug_init(void)
+ 
+ static struct pm_uart_save uart_save;
+ 
++static inline void __iomem *s3c_pm_uart_base(void)
++{
++	unsigned long paddr;
++	unsigned long vaddr;
 +
-+#ifdef CONFIG_SAMSUNG_PM_CHECK
-+extern void s3c_pm_check_prepare(void);
-+extern void s3c_pm_check_restore(void);
-+extern void s3c_pm_check_cleanup(void);
-+extern void s3c_pm_check_store(void);
-+#else
-+#define s3c_pm_check_prepare() do { } while (0)
-+#define s3c_pm_check_restore() do { } while (0)
-+#define s3c_pm_check_cleanup() do { } while (0)
-+#define s3c_pm_check_store()   do { } while (0)
-+#endif
++	debug_ll_addr(&paddr, &vaddr);
 +
- #endif
-diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
-index 4099e8d..e17d871 100644
---- a/arch/arm/plat-samsung/include/plat/pm.h
-+++ b/arch/arm/plat-samsung/include/plat/pm.h
-@@ -80,20 +80,6 @@ extern void s3c_pm_debug_smdkled(u32 set, u32 clear);
- static inline void s3c_pm_debug_smdkled(u32 set, u32 clear) { }
- #endif /* CONFIG_S3C_PM_DEBUG_LED_SMDK */
++	return (void __iomem *)vaddr;
++}
++
+ static void s3c_pm_save_uart(unsigned int uart, struct pm_uart_save *save)
+ {
+-	void __iomem *regs = S3C_VA_UARTx(uart);
++	void __iomem *regs = s3c_pm_uart_base();
  
--/* suspend memory checking */
--
--#ifdef CONFIG_SAMSUNG_PM_CHECK
--extern void s3c_pm_check_prepare(void);
--extern void s3c_pm_check_restore(void);
--extern void s3c_pm_check_cleanup(void);
--extern void s3c_pm_check_store(void);
--#else
--#define s3c_pm_check_prepare() do { } while(0)
--#define s3c_pm_check_restore() do { } while(0)
--#define s3c_pm_check_cleanup() do { } while(0)
--#define s3c_pm_check_store()   do { } while(0)
--#endif
--
- /**
-  * s3c_pm_configure_extint() - ensure pins are correctly set for IRQ
-  *
-diff --git a/arch/arm/plat-samsung/pm-check.c b/arch/arm/plat-samsung/pm-check.c
-index 3cbd626..04aff2c 100644
---- a/arch/arm/plat-samsung/pm-check.c
-+++ b/arch/arm/plat-samsung/pm-check.c
-@@ -19,7 +19,7 @@
- #include <linux/ioport.h>
- #include <linux/slab.h>
+ 	save->ulcon = __raw_readl(regs + S3C2410_ULCON);
+ 	save->ucon = __raw_readl(regs + S3C2410_UCON);
+@@ -98,7 +109,7 @@ static void s3c_pm_save_uarts(void)
  
--#include <plat/pm.h>
-+#include <plat/pm-common.h>
+ static void s3c_pm_restore_uart(unsigned int uart, struct pm_uart_save *save)
+ {
+-	void __iomem *regs = S3C_VA_UARTx(uart);
++	void __iomem *regs = s3c_pm_uart_base();
  
- #if CONFIG_SAMSUNG_PM_CHECK_CHUNKSIZE < 1
- #error CONFIG_SAMSUNG_PM_CHECK_CHUNKSIZE must be a positive non-zero value
+ 	s3c_pm_arch_update_uart(regs, save);
+ 
 -- 
 1.8.5.2
