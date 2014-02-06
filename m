@@ -1,69 +1,54 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri,  7 Feb 2014 00:42:02 +0100
-Subject: [PATCH 06/21] ARM: Kirkwood: ioremap the cpu_config register before
- using it.
-In-Reply-To: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1391730137-14814-7-git-send-email-andrew@lunn.ch>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 06 Feb 2014 23:47:33 +0000
+Subject: [PATCH v5 02/20] clocksource: orion: Use atomic access for shared
+ registers
+In-Reply-To: <20140205231903.GA30244@localhost>
+References: <1390836440-12744-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1390836440-12744-3-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140205191035.GZ8533@titan.lakedaemon.net>
+ <20140205231903.GA30244@localhost>
+Message-ID: <52F41F15.307@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the move to mach-mvebu and MULTI_V5, the global iomap for all
-registers will be going away. So explicitly map the CPU configuration
-register before using it.
+On 02/05/2014 11:19 PM, Ezequiel Garcia wrote:
+> On Wed, Feb 05, 2014 at 02:10:35PM -0500, Jason Cooper wrote:
+>> On Mon, Jan 27, 2014 at 12:27:02PM -0300, Ezequiel Garcia wrote:
+>>> Replace the driver-specific thread-safe shared register API
+>>> by the recently introduced atomic_io_clear_set().
+>>>
+>>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>>> ---
+>>>   drivers/clocksource/time-orion.c | 28 ++++++++++------------------
+>>>   1 file changed, 10 insertions(+), 18 deletions(-)
+>>
+>> The MMIO patch this depends on:
+>>
+>>    c5ca95b507c8 ARM: 7930/1: Introduce atomic MMIO modify
+>>
+>> made it in to v3.14-rc1.  It looks like this change is independent of
+>> the rest of the watchdog series, so:
+>>
+>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+>>
+>
+> Thanks, Jason.
+>
+> Daniel: If you can pick this I'll drop it from the next watchdog patchset
+> submission.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/mach-kirkwood/board-dt.c                 | 22 +++++++++++++++-------
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  1 +
- 2 files changed, 16 insertions(+), 7 deletions(-)
+Yep, ok. I am out of the office for the moment, I will take care of it 
+Monday.
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 64151a4a378f..91b61a971af2 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -191,15 +191,23 @@ eth_fixup_skip:
- 	}
- }
- 
-+/*
-+ * Disable propagation of mbus errors to the CPU local bus, as this
-+ * causes mbus errors (which can occur for example for PCI aborts) to
-+ * throw CPU aborts, which we're not set up to deal with.
-+ */
-+void kirkwood_disable_mbus_error_propagation(void)
-+{
-+	void __iomem *cpu_config;
-+
-+	cpu_config = ioremap(CPU_CONFIG_PHYS, 4);
-+	writel(readl(cpu_config) & ~CPU_CONFIG_ERROR_PROP, cpu_config);
-+}
-+
-+
- static void __init kirkwood_dt_init(void)
- {
--	/*
--	 * Disable propagation of mbus errors to the CPU local bus,
--	 * as this causes mbus errors (which can occur for example
--	 * for PCI aborts) to throw CPU aborts, which we're not set
--	 * up to deal with.
--	 */
--	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
-+	kirkwood_disable_mbus_error_propagation();
- 
- 	BUG_ON(mvebu_mbus_dt_init());
- 
-diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-index 8b9d1c9ff199..2bd12fde1781 100644
---- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-+++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-@@ -14,6 +14,7 @@
- #include <mach/kirkwood.h>
- 
- #define CPU_CONFIG		(BRIDGE_VIRT_BASE + 0x0100)
-+#define CPU_CONFIG_PHYS		(BRIDGE_PHYS_BASE + 0x0100)
- #define CPU_CONFIG_ERROR_PROP	0x00000004
- 
- #define CPU_CONTROL		(BRIDGE_VIRT_BASE + 0x0104)
+Thanks
+   -- Daniel
+
+
 -- 
-1.8.5.3
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
