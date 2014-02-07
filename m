@@ -1,79 +1,149 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 07 Feb 2014 11:58:09 +0100
-Subject: mv64xxx: I2C bus locked when scanning absent devices on Armada XP
-In-Reply-To: <52F35DE3.8060503@free-electrons.com>
-References: <52F35DE3.8060503@free-electrons.com>
-Message-ID: <52F4BC41.3030902@free-electrons.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Fri, 07 Feb 2014 11:59:20 +0100
+Subject: [PATCH 1/2] ALSA: hda/ca0132 - setup/cleanup streams
+In-Reply-To: <1391744130-15043-1-git-send-email-hychao@chromium.org>
+References: <1391744130-15043-1-git-send-email-hychao@chromium.org>
+Message-ID: <s5hvbwrtchj.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2014 11:03, Gregory CLEMENT wrote:
-> Hi,
+At Fri,  7 Feb 2014 11:35:29 +0800,
+Hsin-Yu Chao wrote:
 > 
-> I write this email mainly to let you know that there are some issues
-> on i2c on the Armada XP (rev A0 and B0) based boards.
+> When a HDMI stream is opened with the same stream tag
+> as a following opened stream to ca0132, audio will be
+> heard from two ports simultaneously.
+> Fix this issue by change to use snd_hda_codec_setup_stream
+> and snd_hda_codec_cleanup_stream instead, so that an
+> inactive stream can be marked as 'dirty' when found
+> with a conflict stream tag, and then get purified.
 > 
-> What we observed was that if the i2c driver try to access an address
-> where the device is absent, then the bus is locked. After the timeout
-> the driver give up, but if we have a lot of i2c client registered,
-> then the kernel spend a lot of time trying to scan all the
-> addresses. It is noticeable when using the multiv7_defconfig where
-> many i2c clients are registered, whereas with mvebu_defconfig we have
-> fewer i2c clients, and most of them are present on the boards.
-> 
-> Here is an extract of what you can see during a boot:
-> 
-> [    4.127648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [    4.137338] rtc-s35390a 1-0030: rtc core: registered rtc-s35390a as rtc0
-> [    6.137649] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [    8.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   10.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   12.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   14.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   16.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   18.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   20.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   22.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   24.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   26.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   28.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   30.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   32.137649] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   34.137648] i2c i2c-0: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   36.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   38.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   40.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   42.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   44.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   46.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   48.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   50.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   52.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   54.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   56.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   58.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   60.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   62.137648] i2c i2c-1: mv64xxx: I2C bus locked, block: 1, time_left: 0
-> [   62.144403] sdhci: Secure Digital Host Controller Interface driver
-> 
-> Then the kernel continue to boot. and except this very annoying delay,
-> everything else is working on i2c.
-> 
-> If anyone have an idea of the cause of this issue, I would be glad to
-> have any input.
-> 
-> I continue to investigate it, and for the record v3.12 was not
-> affected but v3.13 was. So now I am going to bisect.
+> Signed-off-by: Hsin-Yu Chao <hychao@chromium.org>
+> Reviewed-by: Chih-Chung Chang <chihchung@chromium.org>
 
-Hi all,
-
-I wanted to let you know that I have just found a fix for this issue.
-
-Gregory
+Thanks, applied this one.
 
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Takashi
+
+> ---
+>  sound/pci/hda/patch_ca0132.c | 68 ++++++--------------------------------------
+>  1 file changed, 9 insertions(+), 59 deletions(-)
+> 
+> diff --git a/sound/pci/hda/patch_ca0132.c b/sound/pci/hda/patch_ca0132.c
+> index 54d1479..59104dc 100644
+> --- a/sound/pci/hda/patch_ca0132.c
+> +++ b/sound/pci/hda/patch_ca0132.c
+> @@ -2662,60 +2662,6 @@ static bool dspload_wait_loaded(struct hda_codec *codec)
+>  }
+>  
+>  /*
+> - * PCM stuffs
+> - */
+> -static void ca0132_setup_stream(struct hda_codec *codec, hda_nid_t nid,
+> -				 u32 stream_tag,
+> -				 int channel_id, int format)
+> -{
+> -	unsigned int oldval, newval;
+> -
+> -	if (!nid)
+> -		return;
+> -
+> -	snd_printdd(
+> -		   "ca0132_setup_stream: NID=0x%x, stream=0x%x, "
+> -		   "channel=%d, format=0x%x\n",
+> -		   nid, stream_tag, channel_id, format);
+> -
+> -	/* update the format-id if changed */
+> -	oldval = snd_hda_codec_read(codec, nid, 0,
+> -				    AC_VERB_GET_STREAM_FORMAT,
+> -				    0);
+> -	if (oldval != format) {
+> -		msleep(20);
+> -		snd_hda_codec_write(codec, nid, 0,
+> -				    AC_VERB_SET_STREAM_FORMAT,
+> -				    format);
+> -	}
+> -
+> -	oldval = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_CONV, 0);
+> -	newval = (stream_tag << 4) | channel_id;
+> -	if (oldval != newval) {
+> -		snd_hda_codec_write(codec, nid, 0,
+> -				    AC_VERB_SET_CHANNEL_STREAMID,
+> -				    newval);
+> -	}
+> -}
+> -
+> -static void ca0132_cleanup_stream(struct hda_codec *codec, hda_nid_t nid)
+> -{
+> -	unsigned int val;
+> -
+> -	if (!nid)
+> -		return;
+> -
+> -	snd_printdd(KERN_INFO "ca0132_cleanup_stream: NID=0x%x\n", nid);
+> -
+> -	val = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_CONV, 0);
+> -	if (!val)
+> -		return;
+> -
+> -	snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_STREAM_FORMAT, 0);
+> -	snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0);
+> -}
+> -
+> -/*
+>   * PCM callbacks
+>   */
+>  static int ca0132_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
+> @@ -2726,7 +2672,9 @@ static int ca0132_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
+>  {
+>  	struct ca0132_spec *spec = codec->spec;
+>  
+> -	ca0132_setup_stream(codec, spec->dacs[0], stream_tag, 0, format);
+> +	ca0132_toggle_dac_format(codec);
+> +
+> +	snd_hda_codec_setup_stream(codec, spec->dacs[0], stream_tag, 0, format);
+>  
+>  	return 0;
+>  }
+> @@ -2745,7 +2693,7 @@ static int ca0132_playback_pcm_cleanup(struct hda_pcm_stream *hinfo,
+>  	if (spec->effects_switch[PLAY_ENHANCEMENT - EFFECT_START_NID])
+>  		msleep(50);
+>  
+> -	ca0132_cleanup_stream(codec, spec->dacs[0]);
+> +	snd_hda_codec_cleanup_stream(codec, spec->dacs[0]);
+>  
+>  	return 0;
+>  }
+> @@ -2824,8 +2772,8 @@ static int ca0132_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
+>  {
+>  	struct ca0132_spec *spec = codec->spec;
+>  
+> -	ca0132_setup_stream(codec, spec->adcs[substream->number],
+> -			    stream_tag, 0, format);
+> +	snd_hda_codec_setup_stream(codec, spec->adcs[substream->number],
+> +				   stream_tag, 0, format);
+>  
+>  	return 0;
+>  }
+> @@ -2839,7 +2787,7 @@ static int ca0132_capture_pcm_cleanup(struct hda_pcm_stream *hinfo,
+>  	if (spec->dsp_state == DSP_DOWNLOADING)
+>  		return 0;
+>  
+> -	ca0132_cleanup_stream(codec, hinfo->nid);
+> +	snd_hda_codec_cleanup_stream(codec, hinfo->nid);
+>  	return 0;
+>  }
+>  
+> @@ -4742,6 +4690,8 @@ static int patch_ca0132(struct hda_codec *codec)
+>  		return err;
+>  
+>  	codec->patch_ops = ca0132_patch_ops;
+> +	codec->pcm_format_first = 1;
+> +	codec->no_sticky_stream = 1;
+>  
+>  	return 0;
+>  }
+> -- 
+> 1.9.0.rc1.175.g0b1dcb5
+> 
