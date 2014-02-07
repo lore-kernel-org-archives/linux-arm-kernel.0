@@ -1,23 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 7 Feb 2014 12:14:40 +0000
-Subject: [PATCH] regulator: core: Allow regulator_set_voltage for fixed
- regulators
-In-Reply-To: <1391632226-10060-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1391493268-3242-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1391632226-10060-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <20140207121440.GY32298@sirena.org.uk>
+From: vinayakm.list@gmail.com (vinayak menon)
+Date: Fri, 7 Feb 2014 17:49:54 +0530
+Subject: [PATCH] ARM: enable IRQs in user undefined instruction vector
+In-Reply-To: <20140207100649.GZ26684@n2100.arm.linux.org.uk>
+References: <1391545146-8320-1-git-send-email-kevin@bracey.fi>
+ <20140206112039.GA31054@arm.com> <52F3D024.5020804@bracey.fi>
+ <20140206205447.GX26684@n2100.arm.linux.org.uk>
+ <CAOaiJ-kY_VwsY0iHSMVQZx=zvP5is1LRkir5_zP6Jnttv+O1VQ@mail.gmail.com>
+ <20140207100649.GZ26684@n2100.arm.linux.org.uk>
+Message-ID: <CAOaiJ-=ASevi8ex=M-SHZMCNZw+=78GbJr3aoyDCGO00S=94Sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 12:30:26PM -0800, Bjorn Andersson wrote:
-> Make it okay to call regulator_set_voltage on regulators with fixed
-> voltage if the requested range overlaps the current/configured voltage.
+> I don't see any point to this change - it does nothing to address the
+> point I raised.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140207/655ab5f2/attachment-0001.sig>
+I see.
+
+The issue that was observed can be summarized like this. There was a
+userspace crash which was because of an 8 byte offset to SP when
+returning from a function (strtoimax).
+Analysis showed that the vpush {d8}  instruction at the beginning of
+strtoimax failed to execute, but vpop {d8}  at the end did execute.
+This resulted in a 8 byte offset in SP and resulted in the crash.
+
+Further debugging showed that this was happening because, one of the
+ldrht instructions in __und_usr was hitting a page fault, and the
+fixup code was returning to the next instruction.
+
+Correction was added to PC in the fixup (str     r4, [sp, #S_PC] , in
+the patch above), to fix the problem. But we were left with the
+warning (might_sleep).
+
+Reading the discussions, I thought enabling irq is an issue, and felt
+that without enabling the interrupts, just disabling preemption before
+calling ldrht should stop the warnings. Because do_page_fault jumps to
+call fixup, if its an atomic context.
+
+Thanks
