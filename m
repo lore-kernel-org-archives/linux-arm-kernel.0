@@ -1,56 +1,35 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri,  7 Feb 2014 19:10:03 +0900
-Subject: [PATCH v4 3/3] arm64: audit: Add audit hook in ptrace/syscall_trace
-In-Reply-To: <1391767803-5350-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1391410590-4884-1-git-send-email-takahiro.akashi@linaro.org>
- <1391767803-5350-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1391767803-5350-4-git-send-email-takahiro.akashi@linaro.org>
+Date: Fri,  7 Feb 2014 19:11:30 +0900
+Subject: [PATCH 0/2] arm64: Add seccomp support
+Message-ID: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds auditing functions on entry to or exit from
-every system call invocation.
+This patch enables secure computing (system call filtering) on arm64.
+System calls can be allowed or denied by loaded bpf-style rules.
+Architecture specific part is to run secure_computing() on syscall entry
+and check the result. See [1/2]
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/kernel/ptrace.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+Prerequisites are:
+ * "arm64: Add audit support" patch
+ * "arm64: make a single hook to syscall_trace() for all syscall features" patch
 
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 64ce39f..8cdba09 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -19,6 +19,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/audit.h>
- #include <linux/kernel.h>
- #include <linux/sched.h>
- #include <linux/mm.h>
-@@ -38,6 +39,7 @@
- #include <asm/compat.h>
- #include <asm/debug-monitors.h>
- #include <asm/pgtable.h>
-+#include <asm/syscall.h>
- #include <asm/traps.h>
- #include <asm/system_misc.h>
- 
-@@ -1076,10 +1078,15 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
- 	}
- 
- 	if (dir) {
-+		audit_syscall_exit(regs);
- 		tracehook_report_syscall_exit(regs, 0);
- 	} else {
- 		if (tracehook_report_syscall_entry(regs))
- 			regs->syscallno = ~0UL;
-+		audit_syscall_entry(syscall_get_arch(current, regs),
-+			(int)regs->syscallno,
-+			regs->orig_x0, regs->regs[1],
-+			regs->regs[2], regs->regs[3]);
- 	}
- 
- 	if (is_compat_task())
+This code is tested on ARMv8 fast model using libseccomp v2.1.1 with
+modifications for arm64 and verified by its "live" tests, 20, 21 and 24.
+
+AKASHI Takahiro (2):
+  arm64: Add seccomp support
+  arm64: is_compat_task is defined both in asm/compat.h and
+    linux/compat.h
+
+ arch/arm64/Kconfig               |   17 +++++++++++++++++
+ arch/arm64/include/asm/compat.h  |    2 ++
+ arch/arm64/include/asm/seccomp.h |   28 ++++++++++++++++++++++++++++
+ arch/arm64/include/asm/unistd.h  |    3 +++
+ arch/arm64/kernel/entry.S        |    4 ++++
+ arch/arm64/kernel/ptrace.c       |    5 +++++
+ 6 files changed, 59 insertions(+)
+ create mode 100644 arch/arm64/include/asm/seccomp.h
+
 -- 
 1.7.9.5
