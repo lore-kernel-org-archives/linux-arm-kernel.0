@@ -1,99 +1,74 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Feb 2014 20:14:35 -0500
-Subject: [PATCH 00/21] Move DT kirkwood into mach-mvebu
-In-Reply-To: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20140207011435.GN8533@titan.lakedaemon.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 7 Feb 2014 01:17:57 +0000 (GMT)
+Subject: [PATCH 1/2] PPC: powernv: remove redundant cpuidle_idle_call()
+In-Reply-To: <52F3BCFE.3010703@linux.vnet.ibm.com>
+References: <1391696188-14540-1-git-send-email-nicolas.pitre@linaro.org>
+ <CAKnoXLxCAqKaniGOwegNcOarS4FpoNKDY5PxOhe6j4wdtUAkLQ@mail.gmail.com>
+ <52F3BCFE.3010703@linux.vnet.ibm.com>
+Message-ID: <alpine.LFD.2.11.1402070105170.1906@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 12:41:56AM +0100, Andrew Lunn wrote:
-> The process of making most kirkwood boards boot using DT is nearly
-> complete. We can now move these boards into mach-mvebu, freeing them
-> of the legacy code needed for none-DT systems. At the same time, they
-> can become part of ARCH_MULTI_V5.
-> 
-> Andrew Lunn (21):
->   ARM: Kirkwood: Give pm.c its own header file.
->   IRQ: Orion: Fix getting generic chip pointer.
->   ARM: Kirkwood: Convert mv88f6281gtw_ge switch setup to DT
->   ARM: Kirkwood: Drop printing the SoC type and revision
->   ARM: Kirkwood: Seperate board-dt from common and pcie code.
->   ARM: Kirkwood: ioremap the cpu_config register before using it.
->   ARM: Kirkwood: ioremap memory control register
->   ARM: MVEBU: Add ARCH_MULTI_V7 to SoCs
->   ARM: Orion: Move cache-feroceon-l2.h out of plat-orion
->   ARM: MM: Add DT binding for Feroceon L2 cache
->   ARM: Fix default CPU selection for ARCH_MULTI_V5
->   ARM: Fix MULTI_TLB for feroceon
->   ARM: MM Enable building Feroceon L2 cache controller with ARCH_MVEBU
->   ARM: Move kirkwood DT boards into mach-mvebu
->   ARM: MVEBU: Let kirkwood use the system controller for restart
->   drivers: Enable building of Kirkwood drivers for mach-mvebu
->   ARM: MVEBU: Enable mvebu-soc-id on Kirkwood
->   ARM: config: Add a multi_v5_defconfig
->   ARM: MVEBU: Simplifiy headers and make local
->   ARM: MVEBU: Remove unneeded headers
->   ARM: Kirkwood: Remove DT support
-> 
->  .../devicetree/bindings/arm/mrvl/forocean.txt      |  19 +++
+On Thu, 6 Feb 2014, Preeti U Murthy wrote:
 
-nit.  s/forocean/feroceon/
-
-thx,
-
-Jason.
-
->  arch/arm/Kconfig                                   |   2 +-
->  arch/arm/boot/dts/Makefile                         |  34 ++--
->  arch/arm/boot/dts/kirkwood.dtsi                    |  10 ++
->  arch/arm/configs/kirkwood_defconfig                |   6 -
->  arch/arm/configs/multi_v5_defconfig                | 183 ++++++++++++++++++++
->  arch/arm/include/asm/hardware/cache-feroceon-l2.h  |  13 ++
->  arch/arm/mach-kirkwood/Kconfig                     |  25 ---
->  arch/arm/mach-kirkwood/Makefile                    |   6 +-
->  arch/arm/mach-kirkwood/Module.symvers              |   0
->  arch/arm/mach-kirkwood/board-dt.c                  | 150 ----------------
->  arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c     |  50 ------
->  arch/arm/mach-kirkwood/common.c                    |   3 +-
->  arch/arm/mach-kirkwood/common.h                    |  13 --
->  arch/arm/mach-kirkwood/include/mach/bridge-regs.h  |   2 +
->  arch/arm/mach-kirkwood/pm.c                        |   9 +-
->  arch/arm/mach-kirkwood/pm.h                        |  26 +++
->  arch/arm/mach-mv78xx0/common.c                     |   2 +-
->  arch/arm/mach-mvebu/Kconfig                        |  28 ++-
->  arch/arm/mach-mvebu/Makefile                       |   1 +
->  arch/arm/mach-mvebu/kirkwood-pm.c                  |  76 +++++++++
->  arch/arm/mach-mvebu/kirkwood-pm.h                  |  26 +++
->  arch/arm/mach-mvebu/kirkwood.c                     | 189 +++++++++++++++++++++
->  arch/arm/mach-mvebu/kirkwood.h                     |  22 +++
->  arch/arm/mach-mvebu/mvebu-soc-id.c                 |   1 +
->  arch/arm/mm/Kconfig                                |   2 +-
->  arch/arm/mm/cache-feroceon-l2.c                    |  48 +++++-
->  arch/arm/mm/proc-feroceon.S                        |   2 +-
->  arch/arm/mm/tlb-v4wbi.S                            |   3 +
->  .../plat-orion/include/plat/cache-feroceon-l2.h    |  11 --
->  drivers/cpufreq/Kconfig.arm                        |   2 +-
->  drivers/cpuidle/Kconfig.arm                        |   2 +-
->  drivers/irqchip/irq-orion.c                        |   3 +-
->  drivers/leds/Kconfig                               |   4 +-
->  drivers/phy/Kconfig                                |   2 +-
->  drivers/thermal/Kconfig                            |   2 +-
->  sound/soc/kirkwood/Kconfig                         |   2 +-
->  37 files changed, 682 insertions(+), 297 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/mrvl/forocean.txt
->  create mode 100644 arch/arm/configs/multi_v5_defconfig
->  create mode 100644 arch/arm/include/asm/hardware/cache-feroceon-l2.h
->  create mode 100644 arch/arm/mach-kirkwood/Module.symvers
->  delete mode 100644 arch/arm/mach-kirkwood/board-dt.c
->  delete mode 100644 arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c
->  create mode 100644 arch/arm/mach-kirkwood/pm.h
->  create mode 100644 arch/arm/mach-mvebu/kirkwood-pm.c
->  create mode 100644 arch/arm/mach-mvebu/kirkwood-pm.h
->  create mode 100644 arch/arm/mach-mvebu/kirkwood.c
->  create mode 100644 arch/arm/mach-mvebu/kirkwood.h
->  delete mode 100644 arch/arm/plat-orion/include/plat/cache-feroceon-l2.h
+> Hi Daniel,
 > 
-> -- 
-> 1.8.5.3
+> On 02/06/2014 09:55 PM, Daniel Lezcano wrote:
+> > Hi Nico,
+> > 
+> > 
+> > On 6 February 2014 14:16, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > 
+> >> The core idle loop now takes care of it.
+> >>
+> >> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> >> ---
+> >>  arch/powerpc/platforms/powernv/setup.c | 13 +------------
+> >>  1 file changed, 1 insertion(+), 12 deletions(-)
+> >>
+> >> diff --git a/arch/powerpc/platforms/powernv/setup.c
+> >> b/arch/powerpc/platforms/powernv/setup.c
+> >> index 21166f65c9..a932feb290 100644
+> >> --- a/arch/powerpc/platforms/powernv/setup.c
+> >> +++ b/arch/powerpc/platforms/powernv/setup.c
+> >> @@ -26,7 +26,6 @@
+> >>  #include <linux/of_fdt.h>
+> >>  #include <linux/interrupt.h>
+> >>  #include <linux/bug.h>
+> >> -#include <linux/cpuidle.h>
+> >>
+> >>  #include <asm/machdep.h>
+> >>  #include <asm/firmware.h>
+> >> @@ -217,16 +216,6 @@ static int __init pnv_probe(void)
+> >>         return 1;
+> >>  }
+> >>
+> >> -void powernv_idle(void)
+> >> -{
+> >> -       /* Hook to cpuidle framework if available, else
+> >> -        * call on default platform idle code
+> >> -        */
+> >> -       if (cpuidle_idle_call()) {
+> >> -               power7_idle();
+> >> -       }
+> >>
+> > 
+> > The cpuidle_idle_call is called from arch_cpu_idle in
+> > arch/powerpc/kernel/idle.c between a ppc64_runlatch_off|on section.
+> > Shouldn't the cpuidle-powernv driver call these functions when entering
+> > idle ?
 > 
+> Yes they should, I will send out a patch that does that ontop of this.
+> There have been cpuidle driver cleanups for powernv and pseries in this
+> merge window. While no change would be required in the pseries cpuidle
+> driver as a result of Nicolas's cleanup, we would need to add the
+> ppc64_runlatch_on and off functions before and after the entry into the
+> powernv idle states.
+
+What about creating arch_cpu_idle_enter() and arch_cpu_idle_exit() in 
+arch/powerpc/kernel/idle.c and calling ppc64_runlatch_off() and 
+ppc64_runlatch_on() respectively from there instead?  Would that work?  
+That would make the idle consolidation much easier afterwards.
+
+
+Nicolas
