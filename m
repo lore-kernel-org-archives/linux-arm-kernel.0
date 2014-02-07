@@ -1,71 +1,29 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 7 Feb 2014 09:38:52 +0530
-Subject: [PATCH 2/3] ARM: OMAP2+: AM43x: Add ID for ES1.1
-In-Reply-To: <52F39E74.3030404@ti.com>
-References: <1391676348-32339-1-git-send-email-lokeshvutla@ti.com>
- <1391676348-32339-3-git-send-email-lokeshvutla@ti.com>
- <52F39E74.3030404@ti.com>
-Message-ID: <52F45C54.7020604@ti.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Thu, 06 Feb 2014 20:15:42 -0800
+Subject: [PATCH v5 00/14] Add support for MSM's mmio clock/reset controller
+In-Reply-To: <1389811654-21397-1-git-send-email-sboyd@codeaurora.org>
+References: <1389811654-21397-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <52F45DEE.8020400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
-On Thursday 06 February 2014 08:08 PM, Nishanth Menon wrote:
-> On 02/06/2014 02:45 AM, Lokesh Vutla wrote:
->> Adding ID for AM437x ES1.1 silicon.
->>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> ---
->>  arch/arm/mach-omap2/id.c  |   14 ++++++++++++--
->>  arch/arm/mach-omap2/soc.h |    3 ++-
->>  2 files changed, 14 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
->> index 9428c5f..8a05eaf 100644
->> --- a/arch/arm/mach-omap2/id.c
->> +++ b/arch/arm/mach-omap2/id.c
->> @@ -465,8 +465,18 @@ void __init omap3xxx_check_revision(void)
->>  		}
->>  		break;
->>  	case 0xb98c:
->> -		omap_revision = AM437X_REV_ES1_0;
->> -		cpu_rev = "1.0";
->> +		switch (rev) {
->> +		case 0:
->> +			omap_revision = AM437X_REV_ES1_0;
->> +			cpu_rev = "1.0";
->> +			break;
->> +		case 1:
->> +		/* FALLTHROUGH */
->> +		default:
->> +			omap_revision = AM437X_REV_ES1_1;
->> +			cpu_rev = "1.1";
->> +			break;
->> +		}
->>  		break;
->>  	case 0xb8f2:
->>  		switch (rev) {
->> diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
->> index 076bd90..30abcc8 100644
->> --- a/arch/arm/mach-omap2/soc.h
->> +++ b/arch/arm/mach-omap2/soc.h
->> @@ -438,7 +438,8 @@ IS_OMAP_TYPE(3430, 0x3430)
->>  #define AM335X_REV_ES2_1	(AM335X_CLASS | (0x2 << 8))
->>  
->>  #define AM437X_CLASS		0x43700000
->> -#define AM437X_REV_ES1_0	AM437X_CLASS
->> +#define AM437X_REV_ES1_0	(AM437X_CLASS | (0x10 << 8))
->> +#define AM437X_REV_ES1_1	(AM437X_CLASS | (0x11 << 8))
->>  
->>  #define OMAP443X_CLASS		0x44300044
->>  #define OMAP4430_REV_ES1_0	(OMAP443X_CLASS | (0x10 << 8))
->>
+On 1/15/2014 10:47 AM, Stephen Boyd wrote:
+> The first breaks a reset-controller include ordering requirement. It got
+> an ack so I think we're ok for it to go through the clock tree.
 > 
-> can you also check if socbus shows proper results?
-> I had http://slexy.org/view/s20e3OsIVx with v3.14-rc1
-Oops....missed out formating and sending "AM43x : determine features patch".
-Thanks for pointing it out. ll update and send a v2 for this series.
 
-Thanks and regards,
-Lokesh
-> 
+< snip >
+
+checkpatch is whining about patches
+
+  4
+  5
+  6
+  7
+  8
+
+(Just for completeness if someone thinks I did not check all the patches,
+it also whines about patch 11, but I think the whining should be ignored,
+and it whines about patch 1 but I think that might be a checkpatch bug.)
+
+-Frank
