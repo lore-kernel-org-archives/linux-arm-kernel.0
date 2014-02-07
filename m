@@ -1,38 +1,30 @@
-From: cooloney@gmail.com (Bryan Wu)
-Date: Fri,  7 Feb 2014 15:54:58 -0800
-Subject: [PATCH 2/2] ARM: tegra: enable PCA9546 on Cardhu
-In-Reply-To: <1391817298-10600-1-git-send-email-pengw@nvidia.com>
-References: <1391817298-10600-1-git-send-email-pengw@nvidia.com>
-Message-ID: <1391817298-10600-2-git-send-email-pengw@nvidia.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 08 Feb 2014 00:59:46 +0100
+Subject: [PATCH v2 00/12] Samsung PM consolidation part 2 (multiplatform)
+In-Reply-To: <20140207221537.GA12714@quad.lixom.net>
+References: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
+ <20140207221537.GA12714@quad.lixom.net>
+Message-ID: <52F57372.7010507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cardhu has a PCA9546 for I2C bus extension, which connects to 3
-cameras. It's required for Tegra V4L2 soc camera driver and camera
-sensor drivers.
 
-Signed-off-by: Bryan Wu <pengw@nvidia.com>
----
- arch/arm/boot/dts/tegra30-cardhu.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index 9104224..004002c 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -187,6 +187,13 @@
- 			interrupt-parent = <&gpio>;
- 			interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
- 		};
-+
-+		i2cmux at 70 {
-+			compatible = "nxp,pca9546";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x70>;
-+		};
- 	};
- 
- 	i2c at 7000c700 {
--- 
-1.8.3.2
+On 07.02.2014 23:15, Olof Johansson wrote:
+> On Thu, Feb 06, 2014 at 08:12:45PM +0100, Tomasz Figa wrote:
+>
+>> On Exynos4210-based Trats, Exynos4412-based Trats2 and Exynos5250-based
+>> Arndale boards (except suspend/resume, which is broken because of
+>> unrelated reasons):
+>
+> Has this been reported, and is it being worked on by anyone?
+
+Yes, reported quite a long time ago by Vikas Sajjan of Samsung/Linaro, 
+but I'm not sure if anybody is working to fix it.
+
+I've been looking into this for a while, but couldn't really find 
+anything except that it hangs when PMU starts power state transtion 
+after CPU executing WFI instruction.
+
+Best regards,
+Tomasz
