@@ -1,117 +1,75 @@
-From: carlo.caione@gmail.com (Carlo Caione)
-Date: Fri, 7 Feb 2014 11:08:46 +0100
-Subject: [linux-sunxi] Re: [PATCH] irq: Add new flag to ack
- level-triggered interrupts before unmasking
-In-Reply-To: <alpine.DEB.2.02.1402062229000.21991@ionos.tec.linutronix.de>
-References: <1391721117-27446-1-git-send-email-carlo@caione.org>
- <alpine.DEB.2.02.1402062213590.21991@ionos.tec.linutronix.de>
- <CAOQ7t2Z0agZdDZ_OQZPtXWXoi5NMTcOOZz04q6wEVNy0rxn4AA@mail.gmail.com>
- <alpine.DEB.2.02.1402062229000.21991@ionos.tec.linutronix.de>
-Message-ID: <CAOQ7t2bzz9vKh_5h2nF=m+JpeYVa=Ttd4XQgrAa6Lhdzjg_Qxw@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri,  7 Feb 2014 19:10:00 +0900
+Subject: [PATCH v4 0/3] arm64: Add audit support
+In-Reply-To: <1391410590-4884-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1391410590-4884-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1391767803-5350-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 6, 2014 at 10:54 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Thu, 6 Feb 2014, Carlo Caione wrote:
->> On Thu, Feb 6, 2014 at 10:14 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
->> > On Thu, 6 Feb 2014, Carlo Caione wrote:
->> >
->> >> Several irqchip drivers require the level-triggered interrupt to be
->> >> acked before unmasking to avoid that a second interrupt is immediately
->> >> triggered. This small patch introduces a new irqchip flags that is used
->> >> to ack the IRQ line before it is unmasked.
->> >
->> > And why are you not doing this in the unmask function of the affected
->> > chip in the first place?
->>
->> Because this is a common behavior of several irqchips (sunxi NMI
->> controller,  exynos, etc...) so I think it should be useful to have it
->> in the core instead of replicating the same code structure in all the
->> irqchip drivers.
->
-> I'm all for making stuff generic, but you introduce this gem
->
-> +void ack_unmask_irq(struct irq_desc *desc)
-> +{
-> +       if ((desc->irq_data.chip->flags & IRQCHIP_ACK_ON_UNMASK) &&
-> +           (irqd_get_trigger_type(&desc->irq_data) & IRQ_TYPE_LEVEL_MASK) &&
-> +           desc->irq_data.chip->irq_ack)
->
-> This is totally backwards.
->
-> 1) If level and edge are handled differently then you should provide
->    different chips.
+This patchset adds system call audit support on arm64.
+Both 32-bit (AUDIT_ARCH_ARM) and 64-bit tasks (AUDIT_ARCH_AARCH64)
+are supported. Since arm64 has the exact same set of system calls
+on LE and BE, we don't care about endianness (or more specifically
+__AUDIT_ARCH_64BIT bit in AUDIT_ARCH_*).
 
-Agree. I was trying to use the flag to trigger a different behavior
-since AFAIK the problem of the IRQ retrigger is specific for
-level-triggered interrupts.
+There are some prerequisites for this patch to work correctly:
+* "generic compat system call audit support" patch
+* "correct a type mismatch in audit_syscall_exit()" patch
+   (already accepted and queued in 3.14)
+* "Modify a set of system calls in audit class" patch
+   (already accepted and queued in 3.14)
+* "__NR_* definitions for compat syscalls" patch from Catalin
+* "make a single hook to syscall_trace() for all syscall features" patch
+* userspace audit tool (v2.3.2 + my patch for arm64)
 
-> 2) If a chip has IRQCHIP_ACK_ON_UNMASK set, then it better provides an
->    irq_ack callback.
+Please review them as well for better understandings.
 
-The check on irq_ack is done to be sure that the irq_ack callback is
-really defined by the irqchip driver before calling it.
+This code was tested on both 32-bit and 64-bit LE userland 
+in the following two ways:
+1) basic operations with auditctl/autrace
+  # auditctl -a exit,always -S openat -F path=/etc/inittab
+  # auditctl -a exit,always -F dir=/tmp -F perm=rw
+  # auditctl -a task,always
+  # autrace /bin/ls
+    by comparing output from autrace with one from strace
 
-> So why do you need this complex conditional?
+2) audit-test-code (+ my workarounds for arm/arm64)
+  by running "audit-tool", "filter" and "syscalls" test categories.
 
-I wanted to be sure to be in the right case: level-triggered interrupt
-with the flag defined in the driver (and the ack callback correctly
-defined).
-To the best of my knowledge this is the only case in which a flag like
- IRQCHIP_ACK_ON_UNMASK could make sense.
+Changes v1 -> v2:
+* Modified to utilize "generic compat system call audit" [3/6, 4/6, 5/6]
+  Please note that a required header, unistd_32.h, is automatically
+  generated from unistd32.h.
+* Refer to regs->orig_x0 instead of regs->x0 as the first argument of
+  system call in audit_syscall_entry() [6/6]
+* Include "Add regs_return_value() in syscall.h" patch [2/6],
+  which was not intentionally included in v1 because it could be added
+  by "kprobes support".
 
-> +                       desc->irq_data.chip->irq_ack(&desc->irq_data);
-> +
-> +       unmask_irq(desc);
-> +}
->
-> Now the even more confusing part is a single call site in
-> irq_finalize_oneshot()
->
->         if (!desc->threads_oneshot && !irqd_irq_disabled(&desc->irq_data) &&
->             irqd_irq_masked(&desc->irq_data))
-> -               unmask_irq(desc);
-> +               ack_unmask_irq(desc);
->
->
-> But you completely fail to explain the rationale.
+Changes v2 -> v3:
+* Remove asm/audit.h.
+  See "generic compat syscall audit support" patch v4
+* Remove endianness dependency, ie. AUDIT_ARCH_ARMEB/AARCH64EB.
+* Remove kernel/syscalls/Makefile which was used to create unistd32.h.
+  See Catalin's "Add __NR_* definitions for compat syscalls" patch
 
-You are right. I'll try to clarify it,
+Changes v3 -> v4:
+* Modified to sync with the patch, "make a single hook to syscall_trace()
+  for all syscall features"
 
-> - Why is this only an issue for the threaded irq case?
->
-> - Why are other sites where interrupts are masked/unmasked not
->   affected?
 
-<snip>
+AKASHI Takahiro (3):
+  arm64: Add regs_return_value() in syscall.h
+  arm64: Add audit support
+  arm64: audit: Add audit hook in ptrace/syscall_trace
 
-> Do you have any sensible explanation for that requirement to ack
-> before unmask while you already acked on mask? And why this is only an
-> issue in the threaded case?
->
-> What's the context of the problem you are trying to solve?
-
-The context and the rationale is fully explained in this thread
-http://www.spinics.net/lists/arm-kernel/msg299952.html and some
-answers are already given along the thread especially by Hans here
-http://www.spinics.net/lists/arm-kernel/msg303542.html
-Shortly, the double interrupt problem as seen on sunxi NMI controller
-(and other chips AFAIK) is specific for level-triggered interrupts
-when the hard interrupt handler is not able to ACK the interrupts on
-the originating device since this device can only be accessed via a
-bus (in our case it was a PMIC on I2C).
-This explains why my patch was specific for the threaded case and why
-the ACK on mask is not really effective in actually acking the IRQs
-(so that I need a second ACK before unmasking the line). In fact in
-our case (PMIC connected via I2C with an interrupt line on a special
-NMI controller) the implicit ACK done by the unmask is ignored if the
-NMI line is still high, and to have the line going down we have to ACK
-all the IRQs on the device accessing to it by I2C in the thread and
-then ACK the NMI controller with the second ACK before the unmasking
-callback.
-I hope this clarifies a bit.
-
-Thank you,
+ arch/arm64/Kconfig               |    1 +
+ arch/arm64/include/asm/ptrace.h  |    5 +++++
+ arch/arm64/include/asm/syscall.h |   15 +++++++++++++++
+ arch/arm64/kernel/ptrace.c       |    7 +++++++
+ include/uapi/linux/audit.h       |    1 +
+ 5 files changed, 29 insertions(+)
 
 -- 
-Carlo Caione
+1.7.9.5
