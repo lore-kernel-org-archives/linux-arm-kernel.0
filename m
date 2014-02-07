@@ -1,103 +1,78 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 07 Feb 2014 14:53:48 +0100
-Subject: [PATCH v2 2/5] clk: sunxi: Add USB clock register defintions
-In-Reply-To: <20140207134831.GJ3192@lukather>
-References: <1390426587-16287-1-git-send-email-hdegoede@redhat.com>
- <1390426587-16287-3-git-send-email-hdegoede@redhat.com>
- <20140127144349.GJ3867@lukather> <52E67316.5020906@redhat.com>
- <20140128094427.GZ3867@lukather> <52E77FCD.5050701@redhat.com>
- <20140204094051.GL25625@lukather> <52F0BD94.1060601@redhat.com>
- <20140207134831.GJ3192@lukather>
-Message-ID: <52F4E56C.4030500@redhat.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 7 Feb 2014 07:51:00 -0600
+Subject: [PATCHv5] omap3: Add basic support for 720MHz part
+In-Reply-To: <1623915.4eAJkBo57q@avalon>
+References: <1297239010-29683-1-git-send-email-premi@ti.com>
+ <87d3mzx2ib.fsf@ti.com> <1527616.Ycr1jOn0QT@avalon>
+ <1623915.4eAJkBo57q@avalon>
+Message-ID: <CAGo_u6r4Q0QyaZ9jPyiBNT-xBqxWA1MpESiyG7quzUn5kkoLhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Laurent,
 
-On 02/07/2014 02:48 PM, Maxime Ripard wrote:
-> On Tue, Feb 04, 2014 at 11:14:44AM +0100, Hans de Goede wrote:
->> -----BEGIN PGP SIGNED MESSAGE-----
->> Hash: SHA1
->>
->> Hi,
->>
->> On 02/04/2014 10:40 AM, Maxime Ripard wrote:
->>> Hi Hans,
->>>
->>> On Tue, Jan 28, 2014 at 11:00:45AM +0100, Hans de Goede wrote:
->>>> -----BEGIN PGP SIGNED MESSAGE----- Hash: SHA1
->>>>
->>>> Hi,
->>>>
->>>> On 01/28/2014 10:44 AM, Maxime Ripard wrote:
->>>>> On Mon, Jan 27, 2014 at 03:54:14PM +0100, Hans de Goede wrote:
->>>>>>>> "allwinner,sun5i-a13-usb-gates-clk" - for usb gates + resets on A13
->>>>>>>
->>>>>>> Maybe we can just remove the gates from there? Even though they are gates, they are also (a bit) more than that.
->>>>>>
->>>>>> To be clear you mean s/usb-gates-clk/usb-clk/ right ?
->>>>>
->>>>> Yep, exactly
->>>>>
->>>>>>> I guess that means that we will have the OHCI0 gate declared with <&...-gates-clk 6>, while it's actually the first gate for this clock?
->>>>>>
->>>>>> Correct.
->>>>>>
->>>>>>> Maybe introducing an offset field in the gates_data would be a good idea, so that we always start from indexing the gates from 0 in the DT?
->>>>>>
->>>>>> Well for the other "gates" type clks we also have holes in the range, and we always refer to the clk with the bit number in the reg as the clock-cell value.
->>>>>
->>>>> Yes, we have holes, but I see two majors differences here: - the other gates are just gates, while the usb clocks are a bit more than that.
->>>>
->>>> The usb-clk registers contain more then that, but the bits we are talking about now are gates.
->>>>
->>>>> - the other gates' gating bits thus all start at bit 0, while - here, since it's kind of a "mixed" clock, the gating bits start - at bit 6 (on the A20 at least)
->>>>
->>>> Right, still I believe that the consistent thing to do is keeping the bit-number for the bit in the register controlling the gate as the specifier.  When adding new dts entries / reviewing existing ones I'm used to matching the specifier to the bit-nr in the data-sheet, I think making things different just for this one register is counter productive.
->>>
->>> And if you turn it the other way around, it would be inconsistent that all gates indices start at 0, and we would start at 6 here :)
->>
->> I think the problem here is that you see the specifier part of the clk
->> phandle as an index, which it is not. All devicetree docs / code talks
->> about specifiers or arguments not indexes. Once you stop seeing this as
->> an index, you will hopefully also stop insisting this needs to
->> start at 0 :)
->>
->> Also note that it already is not an index for existing sunxi clks which have
->> cells != 0, as there are holes in the bits used in the gates registers and
->> calling the specifier an index suggest we're dealing with an array, and
->> arrays never have holes.
->>
->> The clk specifier as currently used in sunxi clks is a 1:1 mapping of the
->> gate register bit numbers, as is clearly documented in ie:
->> Documentation/devicetree/bindings/clock/sunxi/sun4i-a10-gates.txt
->> Where the datasheet is referenced as the source for (most) of the values
->> to put in the specifier.
->>
->> My biggest objection is that this would loose 1:1 mapping we currently
->> have between the specifier and bit-nr in the register, which really is
->> convenient when writing new dts bindings.
->>
->> When we add an offset users will need to first lookup which clk they need in
->> the datasheet and then look at both the dts bindings doc to find how this is
->> mapped to the specifier. In my experience such an extra level of indirection
->> in documentation is a PITA, and all that just so that some random number
->> (it is not an index!) can start at 0 ?
->>
->> To me adding an offset here and making the clk gates different form all
->> our other clock gates just feels wrong.
+On Thu, Feb 6, 2014 at 1:26 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi all,
 >
-> Emilio pretty much share your feeling. I won't get in the way then :)
+> On Friday 22 June 2012 11:33:51 Laurent Pinchart wrote:
+>> On Thursday 10 February 2011 08:45:00 Kevin Hilman wrote:
+>> > Sanjeev Premi <premi@ti.com> writes:
+>> > > This patch adds support for speed enhanced variant of OMAP35x
+>> > > processors. These parts allow ARM and IVA running at 720MHz
+>> > > and 520MHz respectively.
+>> > >
+>> > > These parts can be detected at runtime by reading contents of
+>> > > PRODID.SKUID[3:0] at 0x4830A20C [1].
+>> > >
+>> > > This patch specifically does following:
+>> > >  * Add new OPP to omap34xx_opp_def_list[] - disabled by default.
+>> > >  * Detect devices capable of running at new OPP.
+>> > >  * Enable new OPP only if device supports it.
+>> > >  * Check for presence of IVA before attempting to enable the
+>> > >
+>> > >    corresponding OPP.
+>> > >
+>> > >   [1] http://focus.ti.com/lit/ug/spruff1d/spruff1d.pdf
+>> > >
+>> > > It appears from discussions (on this patch) that a variant of
+>> > > OMAP3430 supports this OPP but lacks runtime detection. This
+>> > >
+>> > > OPP can be enabled for these device by either:
+>> > >  1) Setting the bit corresponding to OMAP3_HAS_720MHZ
+>> > >
+>> > >     in 'omap3_features'. (Refer changes to id.c)
+>> > >
+>> > >  2) Removing check for omap3_has_720mhz() before enabling
+>> > >
+>> > >     the OPP. (Refer changes to opp3xxx_data.c)
+>> > >
+>> > >  3) Calling opp_enable() for 720MHz/VDD1 and 520MHz/VDD2 in
+>> > >
+>> > >     the board file. (Refer changes to opp3xxx_data.c).
+>> > >     This should, ideally, be done before omap3_opp_init() is
+>> > >     called during device_initcall().
+>> > >
+>> > > CAUTION: This should be done for identified parts only.
+>> > >
+>> > >          Else, the device could be damaged permanently.
+>> > >
+>> > > Signed-off-by: Sanjeev Premi <premi@ti.com>
+>> > > Reviewed-by: G, Manjunath Kondaiah <manjugk@ti.com>
+>> >
+>> > Acked-by: Kevin Hilman <khilman@ti.com>
+>>
+>> This patch seems to never have made it upstream. Is there a reason for that
+>> ?
 >
-> I only had the compatible name comment left then.
+> Ping ?
 
-Yes I've already fixed that in my latest sunxi-devel tree:
-https://github.com/linux-sunxi/linux-sunxi/commits/sunxi-devel
 
-Which is also rebased to 3.14-rc1 for those interested, I'll resend
-the usb-clk patches with this + Emilio's reverted remark fixed soon-ish
-then.
+We'd have to figure out a proper opp modifier logic with device tree.
+considering that non-dt boot is slowly getting dismantled in
+mach-omap2, to add new capabilities in non-dt is not really a good
+idea at this point in time - Further, we do have equivalent
+requirements in other TI SoCs as well -
 
 Regards,
-
-Hans
+Nishanth Menon
