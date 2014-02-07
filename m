@@ -1,76 +1,42 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Fri, 07 Feb 2014 17:31:52 +0000
-Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
-References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>	<1391786342-11812-3-git-send-email-thomas.ab@samsung.com>	<52F50698.4060305@arm.com>	<52F509BD.70903@arm.com>
- <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
-Message-ID: <52F51888.5010608@arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 07 Feb 2014 18:31:46 +0100
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <20140207151522.GZ8533@titan.lakedaemon.net>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1391730137-14814-22-git-send-email-andrew@lunn.ch>
+ <20140207093313.1a979a8f@skate> <20140207150306.GX8533@titan.lakedaemon.net>
+ <20140207160954.69fbca38@skate> <20140207151522.GZ8533@titan.lakedaemon.net>
+Message-ID: <52F51882.8000008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/14 16:43, Nishanth Menon wrote:
-> On Fri, Feb 7, 2014 at 10:28 AM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
->> On 07/02/14 16:15, Sudeep Holla wrote:
->>> On 07/02/14 15:19, Thomas Abraham wrote:
->>>> From: Thomas Abraham <thomas.ab@samsung.com>
->>>>
->>>> Add a new optional boost-frequency binding for specifying the frequencies
->>>> usable in boost mode.
->>>>
->>>> Cc: Nishanth Menon <nm@ti.com>
->>>> Cc: Lukasz Majewski <l.majewski@samsung.com>
->>>> Cc: Rob Herring <robh+dt@kernel.org>
->>>> Cc: Pawel Moll <pawel.moll@arm.com>
->>>> Cc: Mark Rutland <mark.rutland@arm.com>
->>>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
->>>> Cc: Kumar Gala <galak@codeaurora.org>
->>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->>>> ---
->>>>  Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt |   11 +++++++++++
->>>>  1 file changed, 11 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->>>> new file mode 100644
->>>> index 0000000..d925e38
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->>>> @@ -0,0 +1,11 @@
->>>> +* Device tree binding for CPU boost frequency (aka over-clocking)
->>>> +
->>>> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
->>>> +overclocking) in which the CPU can operate in frequencies beyond the normal
->>>> +operating conditions.
->>>> +
->>>> +Optional Properties:
->>>> +- boost-frequency: list of frequencies in KHz to be used only in boost mode.
->>>> +  This list should be a subset of frequencies listed in "operating-points"
->>>> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
->>>> +  details about "operating-points" property.
->>>>
->>>
->>> Won't single entry for boost frequency suffice which would be the starting
->>> frequency in the boost range. IOW will there be OPP list with frequencies:
->>> A > B > C > D, but only B and C are boost frequency. That seems little odd,
->>> unless it's some configuration chosen purely on software basis rather than
->>> hardware. For me B marks the beginning of over-clocking.
->>>
->> Ah, I meant A < B < C < D in the above example.
+On 02/07/2014 04:15 PM, Jason Cooper wrote:
+> On Fri, Feb 07, 2014 at 04:09:54PM +0100, Thomas Petazzoni wrote:
+>> On Fri, 7 Feb 2014 10:03:06 -0500, Jason Cooper wrote:
+>>> If we want something leaner than multi_v7, how about
+>>> armada_370-xp_defconfig to replace the current mvebu_defconfig?
+>>
+>> Doesn't work for me: we're going to introduce soon the support for
+>> other mvebu ARMv7 SoC that are not Armada 370 nor XP, but that should
+>> be built as part of this.
+>>
+>> Why not mvebu_v7 and mvebu_v5 as I suggested? mvebu_v7 would build both
+>> Dove and Armada 370/XP (and the other ones we are going to introduce
+>> soon), mvebu_v5 would build Kirkwood (and possibly Orion5x once I find
+>> enough time to work on this platform).
 >
-> Should'nt we let the SoC dts define that - traditionally, yes, but
-> consider the following:
-> A, B, C uses clk_parent X which describes B, C as overclocked.
-> and say D uses clk_parent Y which is not "over clocked", then you have
-> the scenario that on the first look seems counter-intutive.
-> 
+> Yeah, I can go with that, as long as Sebastian doesn't see a need for a
+> separate dove_defconfig in the long term (DT only).  Sebastian?
 
-Yes I thought of exactly similar clock setup, but was not convinced that it
-should be part of OPP. In that case it looks like we are trying to represent
-clock internals through some OPP bindings.
+Nope, I have no plans to keep a special dove_defconfig for Dove in
+mach-mvebu.
 
-Yes I think its counter-intuitive as it's visible to the userspace(list of
-frequencies and the boost parameters are exposed through sysfs)
+>> This way, ultimately we can simply remove kirkwood_defconfig and
+>> dove_defconfig, as soon as all legacy platforms have been either
+>> converted to DT, or removed.
+>
+> Yep, the fewer builds I have to do per patch submission, the better.
 
-Regards,
-Sudeep
+Sounds good to me.
+
+Sebastian
