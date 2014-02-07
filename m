@@ -1,48 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  7 Feb 2014 21:57:51 +0100
-Subject: [PATCH 1/2] ethernet: sun4i: Drop the older compatibles
-Message-ID: <1391806672-27846-1-git-send-email-maxime.ripard@free-electrons.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri,  7 Feb 2014 13:01:20 -0800
+Subject: [PATCH v3 2/7] ARM: perf_event: Assign pdev pointer earlier for CPU
+ PMUs
+In-Reply-To: <1391806885-24210-1-git-send-email-sboyd@codeaurora.org>
+References: <1391806885-24210-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1391806885-24210-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DT maintainers said it was OK to remove the older compatible pattern, since
-we are still a moving target, users will have to update their DT either way.
+We want to inspect the of_node that the pdev is pointing to in
+the Krait CPU specific PMU initialization function. Assign it
+earlier so that we don't crash with a NULL pointer dereference.
 
-Drop the older ethernet compatibles, to avoid maintaining legacy compatibles.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- Documentation/devicetree/bindings/net/allwinner,sun4i-emac.txt | 3 +--
- drivers/net/ethernet/allwinner/sun4i-emac.c                    | 3 ---
- 2 files changed, 1 insertion(+), 5 deletions(-)
+ arch/arm/kernel/perf_event_cpu.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/net/allwinner,sun4i-emac.txt b/Documentation/devicetree/bindings/net/allwinner,sun4i-emac.txt
-index 863d5b81..82f1571 100644
---- a/Documentation/devicetree/bindings/net/allwinner,sun4i-emac.txt
-+++ b/Documentation/devicetree/bindings/net/allwinner,sun4i-emac.txt
-@@ -1,8 +1,7 @@
- * Allwinner EMAC ethernet controller
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index 6efd8aab15df..68d02ca0ca1b 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -311,6 +311,9 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
  
- Required properties:
--- compatible: should be "allwinner,sun4i-a10-emac" (Deprecated:
--              "allwinner,sun4i-emac")
-+- compatible: should be "allwinner,sun4i-a10-emac"
- - reg: address and length of the register set for the device.
- - interrupts: interrupt for the device
- - phy: A phandle to a phy node defining the PHY address (as the reg
-diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
-index 6673106..04a9699 100644
---- a/drivers/net/ethernet/allwinner/sun4i-emac.c
-+++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
-@@ -931,9 +931,6 @@ static int emac_resume(struct platform_device *dev)
++	cpu_pmu = pmu;
++	cpu_pmu->plat_device = pdev;
++
+ 	if (node && (of_id = of_match_node(cpu_pmu_of_device_ids, pdev->dev.of_node))) {
+ 		init_fn = of_id->data;
+ 		ret = init_fn(pmu);
+@@ -323,8 +326,6 @@ static int cpu_pmu_device_probe(struct platform_device *pdev)
+ 		goto out_free;
+ 	}
  
- static const struct of_device_id emac_of_match[] = {
- 	{.compatible = "allwinner,sun4i-a10-emac",},
--
--	/* Deprecated */
--	{.compatible = "allwinner,sun4i-emac",},
- 	{},
- };
+-	cpu_pmu = pmu;
+-	cpu_pmu->plat_device = pdev;
+ 	cpu_pmu_init(cpu_pmu);
+ 	ret = armpmu_register(cpu_pmu, PERF_TYPE_RAW);
  
 -- 
-1.8.4.2
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
