@@ -1,51 +1,215 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 07 Feb 2014 20:09:27 +0000
-Subject: [PATCH] drivers/base: fix devres handling for master device
-Message-ID: <E1WBrjr-0001Jr-Hc@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Feb 2014 20:23:51 +0000
+Subject: [PATCH RFC 0/2] drivers/base: simplify simple DT-based components
+In-Reply-To: <cover.1391793068.git.moinejf@free.fr>
+References: <cover.1391793068.git.moinejf@free.fr>
+Message-ID: <20140207202351.GH26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We weren't handling the devres issues for the master device failing a
-bind, or being unbound properly.  Add a devres group to contain these,
-and release the resources at the appropriate points.
+On Fri, Feb 07, 2014 at 06:11:08PM +0100, Jean-Francois Moine wrote:
+> This patch series tries to simplify the code of simple devices in case
+> they are part of componentised subsystems, are declared in a DT, and
+> are not using the component bin/unbind functions.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-Greg, if you'd be kind enough to queue this for an -rc release, it'd
-help plug a hole I discovered earlier this week in the component
-helper.  Thanks.
+Here's my changes to the TDA998x driver to add support for the component
+helper.  The TDA998x driver retains support for the old way so that
+drivers can be transitioned.  For any one DRM "card" the transition to
+using the component layer must be all-in or all-out - partial transitions
+are not permitted with the simple locking implementation currently in
+the component helper due to the possibility of deadlock.  (Master
+binds, holding the component lock, master declares i2c device, i2c
+device is bound to tda998x, which tries to register with the component
+layer, trying to take the held lock.)
 
- drivers/base/component.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+http://ftp.arm.linux.org.uk/cgit/linux-cubox.git/log/?h=unstable/tda998x-devel
 
-diff --git a/drivers/base/component.c b/drivers/base/component.c
-index c53efe6c6d8e..c4778995cd72 100644
---- a/drivers/base/component.c
-+++ b/drivers/base/component.c
-@@ -133,9 +133,16 @@ static int try_to_bring_up_master(struct master *master,
- 			goto out;
- 		}
+It's marked unstable because the two "drivers/base" commits in there are
+_not_ the upstream commits.  You'll notice that I just sent one of those
+to Gregkh in patch form.
+
+Now, the bits which aren't in that branch but which update the Armada
+driver is the below, which needs some clean up and removal of some local
+differences I have in my cubox tree, but nicely illustrates why /your/
+patches to the component stuff is the wrong approach.
+
+Not only does the patch below add support for using the componentised
+TDA998x driver in the above link, but it allows that componentised support
+to be specified not only via platform data but also via DT.  The DT
+stuff is untested, but it works exactly the same way as imx-drm does
+which has been tested.
+
+And yes, I'm thinking that maybe moving compare_of() into the component
+support so that drivers can share this generic function may be a good
+idea.
+
+So... as I've been saying, no changes to component.c are required here.
+
+diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
+index 6f6554bac93f..1f2b7c60bff9 100644
+--- a/drivers/gpu/drm/armada/armada_drv.c
++++ b/drivers/gpu/drm/armada/armada_drv.c
+@@ -6,7 +6,9 @@
+  * published by the Free Software Foundation.
+  */
+ #include <linux/clk.h>
++#include <linux/component.h>
+ #include <linux/module.h>
++#include <linux/platform_data/armada_drm.h>
+ #include <drm/drmP.h>
+ #include <drm/drm_crtc_helper.h>
+ #include "armada_crtc.h"
+@@ -53,6 +55,11 @@ static const struct armada_drm_slave_config tda19988_config = {
+ };
+ #endif
  
-+		if (!devres_open_group(master->dev, NULL, GFP_KERNEL)) {
-+			ret = -ENOMEM;
-+			goto out;
-+		}
++static bool is_componentized(struct device *dev)
++{
++	return dev->of_node || dev->platform_data;
++}
 +
- 		/* Found all components */
- 		ret = master->ops->bind(master->dev);
- 		if (ret < 0) {
-+			devres_release_group(master->dev, NULL);
-+			dev_info(master->dev, "master bind failed: %d\n", ret);
- 			master_remove_components(master);
- 			goto out;
- 		}
-@@ -166,6 +173,7 @@ static void take_down_master(struct master *master)
+ static void armada_drm_unref_work(struct work_struct *work)
  {
- 	if (master->bound) {
- 		master->ops->unbind(master->dev);
-+		devres_release_group(master->dev, NULL);
- 		master->bound = false;
+ 	struct armada_private *priv =
+@@ -171,16 +178,22 @@ static int armada_drm_load(struct drm_device *dev, unsigned long flags)
+ 			goto err_kms;
  	}
  
++	if (is_componentized(dev->dev)) {
++		ret = component_bind_all(dev->dev, dev);
++		if (ret)
++			goto err_kms;
++	} else {
+ #ifdef CONFIG_DRM_ARMADA_TDA1998X
+-	ret = armada_drm_connector_slave_create(dev, &tda19988_config);
+-	if (ret)
+-		goto err_kms;
++		ret = armada_drm_connector_slave_create(dev, &tda19988_config);
++		if (ret)
++			goto err_kms;
+ #endif
+ #ifdef CONFIG_DRM_ARMADA_TDA1998X_NXP
+-	ret = armada_drm_tda19988_nxp_create(dev);
+-	if (ret)
+-		goto err_kms;
++		ret = armada_drm_tda19988_nxp_create(dev);
++		if (ret)
++			goto err_kms;
+ #endif
++	}
+ 
+ 	ret = drm_vblank_init(dev, n);
+ 	if (ret)
+@@ -204,6 +217,10 @@ static int armada_drm_load(struct drm_device *dev, unsigned long flags)
+ 	drm_irq_uninstall(dev);
+  err_kms:
+ 	drm_mode_config_cleanup(dev);
++
++	if (is_componentized(dev->dev))
++		component_unbind_all(dev->dev, dev);
++
+ 	drm_mm_takedown(&priv->linear);
+ 	flush_work(&priv->fb_unref_work);
+ 
+@@ -218,6 +235,10 @@ static int armada_drm_unload(struct drm_device *dev)
+ 	armada_fbdev_fini(dev);
+ 	drm_irq_uninstall(dev);
+ 	drm_mode_config_cleanup(dev);
++
++	if (is_componentized(dev->dev))
++		component_unbind_all(dev->dev, dev);
++
+ 	drm_mm_takedown(&priv->linear);
+ 	flush_work(&priv->fb_unref_work);
+ 	dev->dev_private = NULL;
+@@ -380,14 +401,82 @@ static struct drm_driver armada_drm_driver = {
+ 	.fops			= &armada_drm_fops,
+ };
+ 
++static int armada_drm_bind(struct device *dev)
++{
++	return drm_platform_init(&armada_drm_driver, to_platform_device(dev));
++}
++
++static void armada_drm_unbind(struct device *dev)
++{
++	drm_platform_exit(&armada_drm_driver, to_platform_device(dev));
++}
++
++static int compare_of(struct device *dev, void *data)
++{
++	return dev->of_node == data;
++}
++
++static int armada_drm_compare_name(struct device *dev, void *data)
++{
++	const char *name = data;
++	return !strcmp(dev_name(dev), name);
++}
++
++static int armada_drm_add_components(struct device *dev, struct master *master)
++{
++	int i, ret = -ENXIO;
++
++	if (dev->of_node) {
++		struct device_node *np = dev->of_node;
++
++		for (i = 0; ; i++) {
++			struct device_node *node;
++
++			node = of_parse_phandle(np, "connectors", i);
++			if (!node)
++				break;
++
++			ret = component_master_add_child(master, compare_of,
++							 node);
++			of_node_put(node);
++			if (ret)
++				break;
++		}
++	} else if (dev->platform_data) {
++		struct armada_drm_platform_data *data = dev->platform_data;
++
++		for (i = 0; i < data->num_devices; i++) {
++			ret = component_master_add_child(master,
++					armada_drm_compare_name,
++					(void *)data->devices[i]);
++			if (ret)
++				break;
++		}
++	}
++
++	return ret;
++}
++
++static const struct component_master_ops armada_master_ops = {
++	.add_components = armada_drm_add_components,
++	.bind = armada_drm_bind,
++	.unbind = armada_drm_unbind,
++};
++
+ static int armada_drm_probe(struct platform_device *pdev)
+ {
+-	return drm_platform_init(&armada_drm_driver, pdev);
++	if (is_componentized(&pdev->dev))
++		return component_master_add(&pdev->dev, &armada_master_ops);
++	else
++		return drm_platform_init(&armada_drm_driver, pdev);
+ }
+ 
+ static int armada_drm_remove(struct platform_device *pdev)
+ {
+-	drm_platform_exit(&armada_drm_driver, pdev);
++	if (is_componentized(&pdev->dev))
++		component_master_del(&pdev->dev, &armada_master_ops);
++	else
++		drm_platform_exit(&armada_drm_driver, pdev);
+ 	return 0;
+ }
+ 
+
+
 -- 
-1.8.3.1
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
