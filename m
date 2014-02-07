@@ -1,41 +1,43 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 7 Feb 2014 11:09:23 +0000 (GMT)
-Subject: [PATCH v2 6/6] cpu/idle.c: move to sched/idle.c
-In-Reply-To: <20140206164336.GU2936@laptop.programming.kicks-ass.net>
-References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
- <1391017513-12995-7-git-send-email-nicolas.pitre@linaro.org>
- <20140130152500.GB5002@laptop.programming.kicks-ass.net>
- <alpine.LFD.2.11.1401301102210.1652@knanqh.ubzr>
- <20140130162753.GF5002@laptop.programming.kicks-ass.net>
- <alpine.LFD.2.11.1402061152550.1906@knanqh.ubzr>
- <20140206164336.GU2936@laptop.programming.kicks-ass.net>
-Message-ID: <alpine.LFD.2.11.1402071051140.1906@knanqh.ubzr>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Fri, 07 Feb 2014 12:12:30 +0100
+Subject: [PATCH 1/2] ALSA: hda/ca0132 - setup/cleanup streams
+In-Reply-To: <s5hvbwrtchj.wl%tiwai@suse.de>
+References: <1391744130-15043-1-git-send-email-hychao@chromium.org>
+ <s5hvbwrtchj.wl%tiwai@suse.de>
+Message-ID: <s5hppmztbvl.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Feb 2014, Peter Zijlstra wrote:
-
-> On Thu, Feb 06, 2014 at 02:09:59PM +0000, Nicolas Pitre wrote:
-> > Hi Peter,
-> > 
-> > Did you merge those patches in your tree? 
+At Fri, 07 Feb 2014 11:59:20 +0100,
+Takashi Iwai wrote:
 > 
-> tree, tree, what's in a word.
+> At Fri,  7 Feb 2014 11:35:29 +0800,
+> Hsin-Yu Chao wrote:
+> > 
+> > When a HDMI stream is opened with the same stream tag
+> > as a following opened stream to ca0132, audio will be
+> > heard from two ports simultaneously.
+> > Fix this issue by change to use snd_hda_codec_setup_stream
+> > and snd_hda_codec_cleanup_stream instead, so that an
+> > inactive stream can be marked as 'dirty' when found
+> > with a conflict stream tag, and then get purified.
+> > 
+> > Signed-off-by: Hsin-Yu Chao <hychao@chromium.org>
+> > Reviewed-by: Chih-Chung Chang <chihchung@chromium.org>
+> 
+> Thanks, applied this one.
 
-Something you may plant on a patch of grass?  "Merging" becomes a 
-strange concept in that context though.  :-)
+Hrm, not good.
 
-> Its in my patch stack yes. 
+sound/pci/hda/patch_ca0132.c: In function ?ca0132_playback_pcm_prepare?:
+sound/pci/hda/patch_ca0132.c:2675:2: error: implicit declaration of function ?ca0132_toggle_dac_format? [-Werror=implicit-function-declaration]
+  ca0132_toggle_dac_format(codec);
+  ^
 
-Quilt I suppose?? (yet another word.)
-
-> I should get some of that into tip I suppose, been side-tracked a bit 
-> this week. Sorry for the delay.
-
-If you prefer we pile those patches (and future ones after revew) 
-ourselves just let me know.  Future patches are likely to be more 
-intimate with the scheduler so I just need to know who to upstream them 
-through afterwards.
+Please give a patch that really builds and works cleanly with the
+upstream code!
 
 
-Nicolas
+thanks,
+
+Takashi
