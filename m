@@ -1,94 +1,33 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Fri, 7 Feb 2014 10:38:12 +0100
-Subject: [PATCH v3 04/15] ARM: at91: prepare common clk transition for
- sam9261 SoC
-In-Reply-To: <52F49AEB.6060307@overkiz.com>
-References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
- <1390492639-7299-5-git-send-email-jjhiblot@traphandler.com>
- <20140207082537.GU9558@ns203013.ovh.net>
- <52F49AEB.6060307@overkiz.com>
-Message-ID: <CACh+v5MN+K=QUdy6LKivu0nVgt-7WSB9uhDyjKaayGnUUEqRCw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Feb 2014 10:40:57 +0100
+Subject: [PATCH] backlight: add PWM dependencies
+In-Reply-To: <000d01cf23b1$7c1f8de0$745ea9a0$%han@samsung.com>
+References: <1391518634-6472-1-git-send-email-linus.walleij@linaro.org>
+ <201402061708.05845.arnd@arndb.de>
+ <000d01cf23b1$7c1f8de0$745ea9a0$%han@samsung.com>
+Message-ID: <201402071040.58087.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris is right, I shamelessly re-used his work with no thought for
-modification. BTW thank you Boris for the neat job
+On Friday 07 February 2014, Jingoo Han wrote:
+> How about the following?
+> 
+>   [PATCH 1/7] ARM: pxa: don't select HAVE_PWM
+>   [PATCH 2/7] ARM: lpc32xx: don't select HAVE_PWM
+>   [PATCH 3/7] ARM: remove HAVE_PWM config option
+>   [PATCH 4/7] MIPS: jz4740: don't select HAVE_PWM
+>   [PATCH 5/7] Input: max8997_haptic: remove HAVE_PWM dependencies
+>   [PATCH 6/7] Input: pwm-beepe: remove HAVE_PWM dependencies
+>   [PATCH 7/7] pwm: don't use IS_ENABLED(CONFIG_HAVE_PWM)
+> 
+> I would like to merge it through PWM tree.
+> After merging these patches, all HAVE_PWM will be removed from
+> the mainline kernel. Thank you. :-)
 
+Sounds godo to me, thanks a lot for taking care of this!
+I don't see any inter-dependencies between the various patches,
+so we could also take the first three through the arm-soc tree
+to avoid conflicts with other changes (or possibly the third
+one through rmk's ARM tree, if he prefers).
 
-2014-02-07 Boris BREZILLON <b.brezillon@overkiz.com>:
-> Hello Jean-Christophe,
->
->
-> On 07/02/2014 09:25, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>
->> On 16:57 Thu 23 Jan     , Jean-Jacques Hiblot wrote:
->>>
->>>   This patch encloses sam9261 old clk registration in
->>> "#if defined(CONFIG_OLD_CLK_AT91) #endif" sections.
->>>
->>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->>> ---
->>>   arch/arm/mach-at91/at91sam9261.c | 8 ++++++--
->>>   1 file changed, 6 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-at91/at91sam9261.c
->>> b/arch/arm/mach-at91/at91sam9261.c
->>> index 6a2c869..2c0e940 100644
->>> --- a/arch/arm/mach-at91/at91sam9261.c
->>> +++ b/arch/arm/mach-at91/at91sam9261.c
->>> @@ -25,10 +25,12 @@
->>>   #include "at91_rstc.h"
->>>   #include "soc.h"
->>>   #include "generic.h"
->>> -#include "clock.h"
->>>   #include "sam9_smc.h"
->>>   #include "pm.h"
->>>   +#if defined(CONFIG_OLD_CLK_AT91)
->>> +#include "clock.h"
->>> +
->>>   /* --------------------------------------------------------------------
->>>    *  Clocks
->>>    * --------------------------------------------------------------------
->>> */
->>> @@ -262,7 +264,7 @@ static void __init at91sam9261_register_clocks(void)
->>>         clk_register(&hck0);
->>>         clk_register(&hck1);
->>>   }
->>> -
->>
->> do this here
->>
->> #else
->> #define at91sam9261_register_clocks NULL
->>>
->>> +#endif
->>>   /* --------------------------------------------------------------------
->>>    *  GPIO
->>>    * --------------------------------------------------------------------
->>> */
->>> @@ -362,6 +364,8 @@ AT91_SOC_START(at91sam9261)
->>>         .extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 <<
->>> AT91SAM9261_ID_IRQ1)
->>>                     | (1 << AT91SAM9261_ID_IRQ2),
->>>         .ioremap_registers = at91sam9261_ioremap_registers,
->>> +#if defined(CONFIG_OLD_CLK_AT91)
->>>         .register_clocks = at91sam9261_register_clocks,
->>> +#endif
->>
->> so no ifdef here
->
->
-> I guess he did this based on what I did for the sama5 SoC, but you're right:
-> your proposal is cleaner.
->
-> Best Regards,
->
-> Boris
->
->
->>>         .init = at91sam9261_initialize,
->>>   AT91_SOC_END
->>> --
->>> 1.8.5.2
->>>
->
+	Arnd
