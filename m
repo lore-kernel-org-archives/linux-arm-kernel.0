@@ -1,83 +1,107 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 7 Feb 2014 10:16:44 -0600
-Subject: [PATCH v3 1/7] cpufreq: cpufreq-cpu0: allow use of optional boost
- mode frequencies
-In-Reply-To: <1391788548-13056-2-git-send-email-thomas.ab@samsung.com>
-References: <1391788548-13056-1-git-send-email-thomas.ab@samsung.com>
- <1391788548-13056-2-git-send-email-thomas.ab@samsung.com>
-Message-ID: <52F506EC.2070907@ti.com>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Fri, 07 Feb 2014 13:16:36 -0300
+Subject: [PATCH] clk: respect the clock dependencies in of_clk_init
+In-Reply-To: <52F4F7EF.7090900@free-electrons.com>
+References: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
+ <52F4DA40.4090804@elopez.com.ar> <20140207142430.GU8533@titan.lakedaemon.net>
+ <20140207144325.GA8218@localhost> <52F4F279.6010006@free-electrons.com>
+ <52F4F502.2010703@elopez.com.ar> <52F4F7EF.7090900@free-electrons.com>
+Message-ID: <52F506E4.8070900@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2014 09:55 AM, Thomas Abraham wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
-> 
-> Lookup for the optional boost-frequency property in cpu0 node and if
-> available, enable support for boost mode frequencies. The frequencies
-> usable in boost mode are determined while preparing the cpufreq table
-> from the list of operating points available.
-> 
-> In addition to this, enable the CPU_FREQ_BOOST_SW config option for
-> this driver by default. On platforms that do not support boost mode,
-> the boost mode frequencies will not be specified in cpu0 node and
-> hence the boost mode support will not be enabled. Since this driver
-> anyways depends on THERMAL config option, it is safe to enable
-> CPU_FREQ_BOOST_SW config option as default.
-> 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Lukasz Majewski <l.majewski@samsung.com>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
->  Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt |    2 ++
->  drivers/cpufreq/Kconfig                                    |    1 +
->  drivers/cpufreq/cpufreq-cpu0.c                             |    3 +++
->  3 files changed, 6 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> index f055515..60f321a 100644
-> --- a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
-> @@ -19,6 +19,8 @@ Optional properties:
->  - cooling-min-level:
->  - cooling-max-level:
->       Please refer to Documentation/devicetree/bindings/thermal/thermal.txt.
-> +- boost-frequency:
-> +     Please refer to Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->  
->  Examples:
->  
-> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
-> index 4b029c0..52cc704 100644
-> --- a/drivers/cpufreq/Kconfig
-> +++ b/drivers/cpufreq/Kconfig
-> @@ -187,6 +187,7 @@ config GENERIC_CPUFREQ_CPU0
->  	tristate "Generic CPU0 cpufreq driver"
->  	depends on HAVE_CLK && REGULATOR && OF && THERMAL && CPU_THERMAL
->  	select PM_OPP
-> +	select CPU_FREQ_BOOST_SW
->  	help
->  	  This adds a generic cpufreq driver for CPU0 frequency management.
->  	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
-> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
-> index 0c12ffc..06539eb 100644
-> --- a/drivers/cpufreq/cpufreq-cpu0.c
-> +++ b/drivers/cpufreq/cpufreq-cpu0.c
-> @@ -195,6 +195,9 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
->  			transition_latency += ret * 1000;
->  	}
->  
-> +	if (of_find_property(cpu_dev->of_node, "boost-frequency", NULL))
-> +		cpu0_cpufreq_driver.boost_supported = true;
-> +
->  	ret = cpufreq_register_driver(&cpu0_cpufreq_driver);
->  	if (ret) {
->  		pr_err("failed register driver: %d\n", ret);
-> 
+Hi Gregory,
 
-might as well hide that under the opp api which returns a bool that
-says if boost is supported or not. that allows the parse to be
-isolated to a single location.
+El 07/02/14 12:12, Gregory CLEMENT escribi?:
+> On 07/02/2014 16:00, Emilio L?pez wrote:
+>> El 07/02/14 11:49, Gregory CLEMENT escribi?:
+>>> On 07/02/2014 15:43, Ezequiel Garcia wrote:
+>>>> On Fri, Feb 07, 2014 at 09:24:30AM -0500, Jason Cooper wrote:
+>>>>> On Fri, Feb 07, 2014 at 10:06:08AM -0300, Emilio L?pez wrote:
+>>>>>
+>>>>> [snip a great explanation]
+>>>>>
+>>>>> Guys, can I get some Tested-by's on this?
+>>>>>
+>>>>
+>>>> In case someone missed Emilio's comment about it, I gave his oneliner
+>>>> a test on A370 Reference Design. It worked just as well as Sebastian's.
+>>>
+>>> Well ok it's working but this patch is not better than Sebastian, it is
+>>> even worth. I don't think it is a good idea at all to totally ignore the
+>>> information given by the device tree.
+>>
+>> With a bit more work, you can replace the clk_get magic with a call to
+>> of_clk_get_parent_name() or similar to be able to keep overriding stuff
+>> from DT. This way it would completely match the behaviour on
+>> mvebu_coreclk_setup (default to "tclk", allow overriding with DT).
+>>
+>
+> I think you didn't have a look on our implementation:
 
+I did, several times in fact.
+
+> the name of the clock
+> are created by the driver during the initialization.
+
+The name of the clock is always "tclk", as hardcoded on the driver, 
+unless overridden via clock-output-names from DT (see 
+mvebu_coreclk_setup). Currently none of your DT that I can see does 
+this, so in practice it's always "tclk".
+
+> That's why we need that
+> the parent clock are initialized before the gating clock.
+
+You don't really *need* that. The driver just does that because it may 
+have been convenient at the time and it worked. Defaulting to "tclk" on 
+mvebu_clk_gating_setup and overriding it if it turns out it has some 
+other name on the DT (just like on mvebu_coreclk_setup!) should work as 
+well, and doesn't require complex, bloaty, dependency management.
+
+Rough, untested patch below, so you get the idea.
+
+Cheers,
+
+Emilio
+
+
+
+---
+  drivers/clk/mvebu/common.c | 13 +++++++------
+  1 file changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
+index 25ceccf..730625b 100644
+--- a/drivers/clk/mvebu/common.c
++++ b/drivers/clk/mvebu/common.c
+@@ -119,19 +119,20 @@ void __init mvebu_clk_gating_setup(struct 
+device_node *np,
+  				   const struct clk_gating_soc_desc *desc)
+  {
+  	struct clk_gating_ctrl *ctrl;
+-	struct clk *clk;
+  	void __iomem *base;
+-	const char *default_parent = NULL;
++	struct of_phandle_args clkspec;
++	const char *default_parent = "tclk";
+  	int n;
+
+  	base = of_iomap(np, 0);
+  	if (WARN_ON(!base))
+  		return;
+
+-	clk = of_clk_get(np, 0);
+-	if (!IS_ERR(clk)) {
+-		default_parent = __clk_get_name(clk);
+-		clk_put(clk);
++	if (!of_parse_phandle_with_args(np, "clocks", "#clock-cells", 0, 
+&clkspec)) {
++		of_property_read_string_index(clkspec.np, "clock-output-names",
++					      clkspec.args_count ? clkspec.args[0] : 0,
++					      &default_parent);
++		of_node_put(clkspec.np);
+  	}
+
+  	ctrl = kzalloc(sizeof(*ctrl), GFP_KERNEL);
 -- 
-Regards,
-Nishanth Menon
+1.8.5.3
