@@ -1,114 +1,109 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 7 Feb 2014 08:55:22 -0800
-Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
- initially stopped
-In-Reply-To: <20140207154453.GA8533@titan.lakedaemon.net>
-References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <52F43ED0.4050808@roeck-us.net> <20140207104044.GA11063@localhost>
- <52F4E1C1.4010805@roeck-us.net> <20140207151727.GB8218@localhost>
- <20140207154453.GA8533@titan.lakedaemon.net>
-Message-ID: <20140207165522.GA9158@roeck-us.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 7 Feb 2014 17:09:03 +0000
+Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
+In-Reply-To: <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
+References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
+ <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20140207170903.GT5976@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 10:44:53AM -0500, Jason Cooper wrote:
-> On Fri, Feb 07, 2014 at 12:17:28PM -0300, Ezequiel Garcia wrote:
-> > On Fri, Feb 07, 2014 at 05:38:09AM -0800, Guenter Roeck wrote:
-> > > On 02/07/2014 02:40 AM, Ezequiel Garcia wrote:
-> > > > On Thu, Feb 06, 2014 at 06:02:56PM -0800, Guenter Roeck wrote:
-> > > >> On 02/06/2014 09:20 AM, Ezequiel Garcia wrote:
-> > > >>> Having the watchdog initially fully stopped is important to avoid
-> > > >>> any spurious watchdog triggers, in case the registers are not in
-> > > >>> its reset state.
-> > > >>>
-> > > >>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> > > >>> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > > >>> Tested-by: Willy Tarreau <w@1wt.eu>
-> > > >>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > >>> ---
-> > > >>>    drivers/watchdog/orion_wdt.c | 3 +++
-> > > >>>    1 file changed, 3 insertions(+)
-> > > >>>
-> > > >>> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-> > > >>> index 6746033..2dbeee9 100644
-> > > >>> --- a/drivers/watchdog/orion_wdt.c
-> > > >>> +++ b/drivers/watchdog/orion_wdt.c
-> > > >>> @@ -142,6 +142,9 @@ static int orion_wdt_probe(struct platform_device *pdev)
-> > > >>>    	orion_wdt.max_timeout = wdt_max_duration;
-> > > >>>    	watchdog_init_timeout(&orion_wdt, heartbeat, &pdev->dev);
-> > > >>>
-> > > >>> +	/* Let's make sure the watchdog is fully stopped */
-> > > >>> +	orion_wdt_stop(&orion_wdt);
-> > > >>> +
-> > > >>
-> > > >> Actually we just had that in another driver, and I stumbled over it there.
-> > > >>
-> > > >> Problem with stopping the watchdog in probe unconditionally is that you can
-> > > >> use it to defeat nowayout: unload the module, then load it again,
-> > > >> and the watchdog is stopped even if nowayout is true.
-> > > >>
+On Fri, Feb 07, 2014 at 04:19:15PM +0000, Fabrice GASNIER wrote:
+> This patch adds imprecise abort enable/disable macros.
+> It also enables imprecise aborts when starting kernel.
 > 
-> How often would a user legitimately want to unload/load the watchdog
-> module?
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>  arch/arm/include/asm/irqflags.h |   33 +++++++++++++++++++++++++++++++++
+>  arch/arm/kernel/smp.c           |    1 +
+>  arch/arm/kernel/traps.c         |    4 ++++
+>  3 files changed, 38 insertions(+)
 > 
-Not sure what you are saying here. If you don't think the nowayout option
-should be supported, drop it. Don't claim it is supported when it isn't.
+> diff --git a/arch/arm/include/asm/irqflags.h b/arch/arm/include/asm/irqflags.h
+> index 3b763d6..82e3834 100644
+> --- a/arch/arm/include/asm/irqflags.h
+> +++ b/arch/arm/include/asm/irqflags.h
+> @@ -51,6 +51,9 @@ static inline void arch_local_irq_disable(void)
+>  
+>  #define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
+>  #define local_fiq_disable() __asm__("cpsid f	@ __clf" : : : "memory", "cc")
+> +
+> +#define local_abt_enable()  __asm__("cpsie a	@ __sta" : : : "memory", "cc")
+> +#define local_abt_disable() __asm__("cpsid a	@ __cla" : : : "memory", "cc")
+>  #else
+>  
+>  /*
+> @@ -130,6 +133,36 @@ static inline void arch_local_irq_disable(void)
+>  	: "memory", "cc");					\
+>  	})
+>  
+> +/*
+> + * Enable Aborts
+> + */
+> +#define local_abt_enable()					\
+> +	({							\
+> +		unsigned long temp;				\
+> +	__asm__ __volatile__(					\
+> +	"mrs	%0, cpsr		@ sta\n"		\
+> +"	bic	%0, %0, %1\n"					\
+> +"	msr	cpsr_c, %0"					\
+> +	: "=r" (temp)						\
+> +	: "r" (PSR_A_BIT)					\
 
-> > > >
-> > > > Hm... I see.
-> > > >
-> > > >> Is this really what you want ? Or, in other words, what is the problem
-> > > >> you are trying to solve ?
-> > > >>
-> > > >
-> > > > Well, this is related to the discussion about the bootloader not
-> > > > reseting the watchdog properly, provoking spurious watchdog triggering.
-> > > >
-> > > > Jason Gunthorpe explained [1] that we needed a particular sequence:
-> > > >
-> > > >   1. Disable WDT
-> > > >   2. Clear bridge
-> > > >   3. Enable WDT
-> > > >
-> > > > We added the irq handling to satisfy (2), and the watchdog stop for (1).
-> > > >
-> > > > The watchdog stop was agreed specifically [2].
-> > > >
-> > > > Ideas?
-> > > >
-> > > 
-> > > Other drivers assume that if the watchdog is running, it is supposed
-> > > to be running. The more common approach in such cases is to ping the
-> > > watchdog once to give userspace more time to get ready, but leave
-> > > it enabled. So you could check if the watchdog is enabled, and if
-> > > it was enabled re-enable it after initialization is complete
-> > > (and maybe log a message stating that the watchdog is enabled).
-> > > 
-> > > If you don't want to do that, and if you are defeating nowayout
-> > > on purpose to fix a problem with a broken bootloader,
-> > > you should at least put in comment describing the problem you are
-> > > trying to solve, and that you accept breaking nowayout with your fix.
-> 
-> Yes, this should be commented.
-> 
-> > I'm not fond of not having "nowayout" option on our driver, given I'm sure
-> > it's a watchdog feature for a good reason.
-> > 
-> > On the other side, I can't see how can we distinguish a previously
-> > and explicitly enabled watchdog, from a spurious enable by broken bootloader.
-> 
-> How about we just don't define module_exit() and leave a comment as
-> such?  It's not unprecedented, a couple of the atm drivers are
-> explicitly setup like this (uPD98402.c, zatm.c, eni.c).
-> 
-Or don't support tristate in the first place. There was some argument from
-others earlier that a watchdog should never be optional. Or drop the nowayout
-option from the driver.
+Can you use "i" instead of a register for this constant?
 
-There is one problem, though, if you don't support a pre-enabled watchdog:
-If the system dies before the watchdog application starts running, it will
-hang. This is the reason why the watchdog is enabled on purpose by some
-boot loaders.
+> +	: "memory", "cc");					\
 
-Guenter
+You don't need the "cc" clobber.
+
+> +	})
+> +
+> +/*
+> + * Disable Aborts
+> + */
+> +#define local_abt_disable()					\
+> +	({							\
+> +		unsigned long temp;				\
+> +	__asm__ __volatile__(					\
+> +	"mrs	%0, cpsr		@ cla\n"		\
+> +"	orr	%0, %0, %1\n"					\
+> +"	msr	cpsr_c, %0"					\
+> +	: "=r" (temp)						\
+> +	: "r" (PSR_A_BIT)					\
+> +	: "memory", "cc");					\
+> +	})
+
+Same comments here.
+
+>  #endif
+>  
+>  /*
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index dc894ab..c2093cb 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -377,6 +377,7 @@ asmlinkage void secondary_start_kernel(void)
+>  
+>  	local_irq_enable();
+>  	local_fiq_enable();
+> +	local_abt_enable();
+>  
+>  	/*
+>  	 * OK, it's off to the idle thread for us
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index 4636d56..ef15709 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
+>  
+>  	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+>  	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+> +
+> +	/* Enable imprecise aborts */
+> +	local_abt_enable();
+
+Surely we want to enable this as early as possible? Now, putting this into
+head.S is ugly, as it duplicating it across all the proc*.S files, so why
+not setup_arch?
+
+Will
