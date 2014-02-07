@@ -1,76 +1,104 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri, 07 Feb 2014 09:35:55 +0100
-Subject: [PATCH v3 04/15] ARM: at91: prepare common clk transition for
- sam9261 SoC
-In-Reply-To: <20140207082537.GU9558@ns203013.ovh.net>
-References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
- <1390492639-7299-5-git-send-email-jjhiblot@traphandler.com>
- <20140207082537.GU9558@ns203013.ovh.net>
-Message-ID: <52F49AEB.6060307@overkiz.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 7 Feb 2014 09:37:19 +0100
+Subject: [PATCH 1/2] USB: at91: fix the number of endpoint parameter
+In-Reply-To: <52DE389B.3000702@atmel.com>
+References: <1389927565-22477-1-git-send-email-voice.shen@atmel.com>
+ <20140118052059.GL9558@ns203013.ovh.net>
+ <52DC9A66.6080009@atmel.com>
+ <20140121054932.GO9558@ns203013.ovh.net>
+ <52DE2C05.9060800@atmel.com> <52DE389B.3000702@atmel.com>
+Message-ID: <20140207083719.GY9558@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jean-Christophe,
+On 10:06 Tue 21 Jan     , Nicolas Ferre wrote:
+> On 21/01/2014 09:12, Bo Shen :
+> > Hi J,
+> > 
+> > On 01/21/2014 01:49 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >> On 11:39 Mon 20 Jan     , Bo Shen wrote:
+> >>> Hi J,
+> >>>
+> >>> On 01/18/2014 01:20 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>>> On 10:59 Fri 17 Jan     , Bo Shen wrote:
+> >>>>> In sama5d3 SoC, there are 16 endpoints. As the USBA_NR_ENDPOINTS
+> >>>>> is only 7. So, fix it for sama5d3 SoC using the udc->num_ep.
+> >>>>>
+> >>>>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> >>>>> ---
+> >>>>>
+> >>>>>   drivers/usb/gadget/atmel_usba_udc.c | 2 +-
+> >>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>>>
+> >>>>> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+> >>>>> index 2cb52e0..7e67a81 100644
+> >>>>> --- a/drivers/usb/gadget/atmel_usba_udc.c
+> >>>>> +++ b/drivers/usb/gadget/atmel_usba_udc.c
+> >>>>> @@ -1670,7 +1670,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+> >>>>>   	if (ep_status) {
+> >>>>>   		int i;
+> >>>>>
+> >>>>> -		for (i = 0; i < USBA_NR_ENDPOINTS; i++)
+> >>>>> +		for (i = 0; i < udc->num_ep; i++)
+> >>>>
+> >>>> no the limit need to specified in the driver as a checkpoint by the compatible
+> >>>> or platform driver id
+> >>>
+> >>> You mean, we should not trust the data passed from dt node or
+> >>> platform data? Or do you think we should do double confirm?
+> >>
+> >> no base on the driver name or the compatible you will known the MAX EP
+> >>
+> >> not based on the dt ep description
+> >>
+> >> as we do on pinctrl-at91
+> > 
+> > I am sorry, I am not fully get it after reading the code of 
+> > pinctrl-at91.c, can you give the example code in pinctrl-at91.c?
+> > 
+> > Btw, the udc->num_ep is get from the following code.
+> > for dt
+> > --->8---
+> > 	while ((pp = of_get_next_child(np, pp)))
+> > 		udc->num_ep++;
+> > ---<8---
+> > 
+> > for non-dt
+> > --->8---
+> > 	udc->num_ep = pdata->num_ep;
+> > ---8<---
+> 
+> It seems to me pretty valid to use num_ep in this driver and not have to
+> rely on another compatibility string just for this.
+> The information is here, it is retrieved pretty cleanly so I vote for a
+> simple use of it: if we introduce another information we will have to
+> double check the cross errors that would happen...
 
-On 07/02/2014 09:25, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 16:57 Thu 23 Jan     , Jean-Jacques Hiblot wrote:
->>   This patch encloses sam9261 old clk registration in
->> "#if defined(CONFIG_OLD_CLK_AT91) #endif" sections.
->>
->> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->> ---
->>   arch/arm/mach-at91/at91sam9261.c | 8 ++++++--
->>   1 file changed, 6 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
->> index 6a2c869..2c0e940 100644
->> --- a/arch/arm/mach-at91/at91sam9261.c
->> +++ b/arch/arm/mach-at91/at91sam9261.c
->> @@ -25,10 +25,12 @@
->>   #include "at91_rstc.h"
->>   #include "soc.h"
->>   #include "generic.h"
->> -#include "clock.h"
->>   #include "sam9_smc.h"
->>   #include "pm.h"
->>   
->> +#if defined(CONFIG_OLD_CLK_AT91)
->> +#include "clock.h"
->> +
->>   /* --------------------------------------------------------------------
->>    *  Clocks
->>    * -------------------------------------------------------------------- */
->> @@ -262,7 +264,7 @@ static void __init at91sam9261_register_clocks(void)
->>   	clk_register(&hck0);
->>   	clk_register(&hck1);
->>   }
->> -
-> do this here
->
-> #else
-> #define at91sam9261_register_clocks NULL
->> +#endif
->>   /* --------------------------------------------------------------------
->>    *  GPIO
->>    * -------------------------------------------------------------------- */
->> @@ -362,6 +364,8 @@ AT91_SOC_START(at91sam9261)
->>   	.extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 << AT91SAM9261_ID_IRQ1)
->>   		    | (1 << AT91SAM9261_ID_IRQ2),
->>   	.ioremap_registers = at91sam9261_ioremap_registers,
->> +#if defined(CONFIG_OLD_CLK_AT91)
->>   	.register_clocks = at91sam9261_register_clocks,
->> +#endif
-> so no ifdef here
+here is the key point you describe the HW
 
-I guess he did this based on what I did for the sama5 SoC, but you're right:
-your proposal is cleaner.
+so choose detect the IP version and then check we do not describe  too many EP
+or you prove the correct compatible so we known this not the same IP
+and we can check the DT information
 
 Best Regards,
-
-Boris
-
->>   	.init = at91sam9261_initialize,
->>   AT91_SOC_END
->> -- 
->> 1.8.5.2
->>
+J.
+> 
+> Bye,
+> 
+> >>>>>   			if (ep_status & (1 << i)) {
+> >>>>>   				if (ep_is_control(&udc->usba_ep[i]))
+> >>>>>   					usba_control_irq(udc, &udc->usba_ep[i]);
+> >>>>> --
+> >>>>> 1.8.5.2
+> >>>>>
+> >>>
+> >>> Best Regards,
+> >>> Bo Shen
+> > 
+> > Best Regards,
+> > Bo Shen
+> > 
+> 
+> 
+> -- 
+> Nicolas Ferre
