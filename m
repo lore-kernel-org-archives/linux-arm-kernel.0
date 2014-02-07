@@ -1,30 +1,105 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 07 Feb 2014 11:21:48 +0100
-Subject: [PATCH 1/2 v3] i2c: exynos5: add support for HSI2C on Exynos5260
- SoC
-In-Reply-To: <20140207101747.GA2621@katana>
-References: <1385100851-32254-1-git-send-email-ch.naveen@samsung.com>
- <1391688408-8077-1-git-send-email-ch.naveen@samsung.com>
- <52F38EA4.10805@samsung.com> <52F3933B.9090202@samsung.com>
- <20140207101747.GA2621@katana>
-Message-ID: <52F4B3BC.6080907@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 7 Feb 2014 11:22:31 +0100
+Subject: [PATCH v3 06/15] at91: dt: at91sam9261ek: Adds DT entries for
+ the 4 user buttons
+In-Reply-To: <CACh+v5O_CMcYKBKLzbcD2ypGLX_Pp+64fiqO4MWYw-J4h0KA7A@mail.gmail.com>
+References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>	<1390492639-7299-7-git-send-email-jjhiblot@traphandler.com>	<20140207082752.GV9558@ns203013.ovh.net>
+ <CACh+v5O_CMcYKBKLzbcD2ypGLX_Pp+64fiqO4MWYw-J4h0KA7A@mail.gmail.com>
+Message-ID: <52F4B3E7.2080000@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.02.2014 11:17, Wolfram Sang wrote:
-> On Thu, Feb 06, 2014 at 02:50:51PM +0100, Tomasz Figa wrote:
->> Also, please use correct addresses of DT ML and Wolfram's e-mail
->> (fixed in this message).
->
-> And please don't use In-Reply-To when sending new versions of patches.
-> The message threading became hard to read here...
->
+On 07/02/2014 10:30, Jean-Jacques Hiblot :
+> 2014-02-07 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+>> On 16:57 Thu 23 Jan     , Jean-Jacques Hiblot wrote:
+>>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+>>> ---
+>>>  arch/arm/boot/dts/at91sam9261ek.dts | 39 +++++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 39 insertions(+)
+>>
+>> do only one patch for the 9261ek support no nned to clean
+>>>
+>>> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+>>> index 8909217..5555e9f5 100644
+>>> --- a/arch/arm/boot/dts/at91sam9261ek.dts
+>>> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
+>>> @@ -83,6 +83,15 @@
+>>>                                               AT91_PIOA 23  AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
+>>>                                       };
+>>>                               };
+>>> +
+>>> +                             keys {
+>>> +                                     pinctrl_keys: keys-0 {
+>>> +                                             atmel,pins = <AT91_PIOA 27  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+>>> +                                             AT91_PIOA 26  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+>>> +                                             AT91_PIOA 25  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+>>> +                                             AT91_PIOA 24  AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
+>>> +                                     };
+>>> +                             };
+>>
+>> no need this you can drop it
+> ok. I thought that it would help the user to understand the GPIO usage.
+> I'll remove all pinmux for GPIO that don't require a special hardware
+> configuration
 
-+1
+Well, me also, I like to see what the board requires for functioning
+properly. It is convenient for:
+- understanding clearly what is used and what is not
+- doing a grep when searching where a particular GPIO is used
+- describing completely the hardware (which is the purpose of DT)
 
-It's hard to follow new versions of series that show up under the thread 
-of old version. If you want to keep reference to old versions, you can 
-add links to respective threads to change log entries in cover letter.
+So, I would like additional consideration by more AT91 users before
+following this rule... And maybe a note by Linus W.
 
-Best regards,
-Tomasz
+Bye,
+
+
+>>
+>> you just describe a gpio which we do not describe in pinctrl
+>>>                       };
+>>>
+>>>                       watchdog at fffffd40 {
+>>> @@ -109,4 +118,34 @@
+>>>                       linux,default-trigger = "heartbeat";
+>>>               };
+>>>       };
+>>> +
+>>> +     gpio_keys {
+>>> +             compatible = "gpio-keys";
+>>> +             pinctrl-0 = <&pinctrl_keys>;
+>>> +
+>>> +             button_0 {
+>>> +                     label = "button_0";
+>>> +                     gpios = <&pioA 27 GPIO_ACTIVE_LOW>;
+>>> +                     linux,code = <256>;
+>>> +                     gpio-key,wakeup;
+>>> +             };
+>>> +             button_1 {
+>>> +                     label = "button_1";
+>>> +                     gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
+>>> +                     linux,code = <257>;
+>>> +                     gpio-key,wakeup;
+>>> +             };
+>>> +             button_2 {
+>>> +                     label = "button_2";
+>>> +                     gpios = <&pioA 25 GPIO_ACTIVE_LOW>;
+>>> +                     linux,code = <258>;
+>>> +                     gpio-key,wakeup;
+>>> +             };
+>>> +             button_3 {
+>>> +                     label = "button_3";
+>>> +                     gpios = <&pioA 24 GPIO_ACTIVE_LOW>;
+>>> +                     linux,code = <259>;
+>>> +                     gpio-key,wakeup;
+>>> +             };
+>>> +     };
+>>>  };
+>>> --
+>>> 1.8.5.2
+>>>
+> 
+> 
+
+
+-- 
+Nicolas Ferre
