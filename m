@@ -1,43 +1,49 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 7 Feb 2014 10:12:40 +0100
-Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
-In-Reply-To: <20140207093313.1a979a8f@skate>
+Date: Fri, 7 Feb 2014 10:13:36 +0100
+Subject: [PATCH 16/21] drivers: Enable building of Kirkwood drivers for
+ mach-mvebu
+In-Reply-To: <20140207015915.GQ8533@titan.lakedaemon.net>
 References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-22-git-send-email-andrew@lunn.ch>
- <20140207093313.1a979a8f@skate>
-Message-ID: <20140207091240.GB17758@lunn.ch>
+ <1391730137-14814-17-git-send-email-andrew@lunn.ch>
+ <20140207015915.GQ8533@titan.lakedaemon.net>
+Message-ID: <20140207091336.GC17758@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 09:33:13AM +0100, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
-> 
-> On Fri,  7 Feb 2014 00:42:17 +0100, Andrew Lunn wrote:
-> > Now that all the device tree support is in mach-mvebu, remove it from
-> > mach-kirkwood.
-> > 
-> > Regenerate kirkwood_defconfig, removing all DT support, and a couple
-> > of other redundent options have been removed in the process.
+On Thu, Feb 06, 2014 at 08:59:15PM -0500, Jason Cooper wrote:
+> On Fri, Feb 07, 2014 at 12:42:12AM +0100, Andrew Lunn wrote:
+> > With the move to mach-mvebu, drivers Kconfig need tweeking to allow
+> > the kirkwood specific drivers to be built.
 > > 
 > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > > ---
-> >  arch/arm/configs/kirkwood_defconfig |   6 -
+> >  drivers/cpufreq/Kconfig.arm | 2 +-
+> >  drivers/cpuidle/Kconfig.arm | 2 +-
+> >  drivers/leds/Kconfig        | 4 ++--
+> >  drivers/phy/Kconfig         | 2 +-
+> >  drivers/thermal/Kconfig     | 2 +-
+> >  sound/soc/kirkwood/Kconfig  | 2 +-
+> >  6 files changed, 7 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> > index 31297499a60a..de931081fd01 100644
+> > --- a/drivers/cpufreq/Kconfig.arm
+> > +++ b/drivers/cpufreq/Kconfig.arm
+> > @@ -113,7 +113,7 @@ config ARM_INTEGRATOR
+> >  	  If in doubt, say Y.
+> >  
+> >  config ARM_KIRKWOOD_CPUFREQ
+> > -	def_bool ARCH_KIRKWOOD && OF
+> > +	def_bool (ARCH_KIRKWOOD || MACH_KIRKWOOD) && OF
 > 
-> So after this series we have a mvebu_defconfig that only builds the
-> ARMv7 platforms of mach-mvebu. I believe this may look strange to
-> people looking at the code, seeing that Kirkwood DT support is in
-> mach-mvebu, but that mvebu_defconfig doesn't work to build a Kirkwood
-> kernel.
+> I agree with creating MACH_KIRKWOOD underneath ARCH_MVEBU earlier in
+> this series, but the 'ARCH_KIRKWOOD || MACH_KIRKWOOD' just looks
+> confusing.  Also, MACH_KIRKWOOD implies OF so this particular one could
+> be reduced to
 > 
-> I don't really have a solution, except maybe having mvebu_v7_defconfig
-> and mvebu_v5_defconfig to build only the Marvell v7 and Marvell v5
-> platforms.
+> 	def_bool MACH_KIRKWOOD
 
-Hi Thomas
+Yes, will do.
 
-I also have no solution, other than what you suggested. I think it
-also goes against the rules for a platform to have multiple _defconfig
-files. We probably do have a good cause to go against the rules
-thought. Lets wait and see what ARM SOC maintainers suggest.
-
-	 Andrew
+Thanks
+	Andrew
