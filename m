@@ -1,39 +1,26 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri,  7 Feb 2014 19:11:32 +0900
-Subject: [PATCH 2/2] arm64: is_compat_task is defined both in asm/compat.h and
- linux/compat.h
-In-Reply-To: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1391767892-5395-3-git-send-email-takahiro.akashi@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 7 Feb 2014 11:17:47 +0100
+Subject: [PATCH 1/2 v3] i2c: exynos5: add support for HSI2C on Exynos5260
+ SoC
+In-Reply-To: <52F3933B.9090202@samsung.com>
+References: <1385100851-32254-1-git-send-email-ch.naveen@samsung.com>
+ <1391688408-8077-1-git-send-email-ch.naveen@samsung.com>
+ <52F38EA4.10805@samsung.com> <52F3933B.9090202@samsung.com>
+Message-ID: <20140207101747.GA2621@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel/seccomp.c includes linux/compat.h and, indicrectly, asm/compat.h
-via asm/syscall.h. Due to the duplicated definition of is_compat_task,
-compiling this file will fail in the case of !CONFIG_COMPAT.
-This patch makes the definition in asm/compat.h valid only if necessary.
+On Thu, Feb 06, 2014 at 02:50:51PM +0100, Tomasz Figa wrote:
+> Also, please use correct addresses of DT ML and Wolfram's e-mail
+> (fixed in this message).
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/include/asm/compat.h |    2 ++
- 1 file changed, 2 insertions(+)
+And please don't use In-Reply-To when sending new versions of patches.
+The message threading became hard to read here...
 
-diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index fda2704..72f3b18 100644
---- a/arch/arm64/include/asm/compat.h
-+++ b/arch/arm64/include/asm/compat.h
-@@ -305,10 +305,12 @@ static inline int is_compat_thread(struct thread_info *thread)
- 
- #else /* !CONFIG_COMPAT */
- 
-+#ifndef is_compat_task /* it's there in linux/compat.h */
- static inline int is_compat_task(void)
- {
- 	return 0;
- }
-+#endif
- 
- static inline int is_compat_thread(struct thread_info *thread)
- {
--- 
-1.7.9.5
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140207/5468795d/attachment.sig>
