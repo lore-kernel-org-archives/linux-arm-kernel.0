@@ -1,48 +1,50 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 07 Feb 2014 12:51:58 -0800
-Subject: [PATCH v5 00/14] Add support for MSM's mmio clock/reset controller
-In-Reply-To: <52F53642.3030606@gmail.com>
-References: <1389811654-21397-1-git-send-email-sboyd@codeaurora.org>
- <52F45DEE.8020400@gmail.com> <1391749891.15777.31.camel@joe-AO722>
- <52F53642.3030606@gmail.com>
-Message-ID: <1391806318.28199.6.camel@joe-AO722>
+From: cooloney@gmail.com (Bryan Wu)
+Date: Fri,  7 Feb 2014 12:53:32 -0800
+Subject: [PATCH] ARM: tegra: enable I2C MUX PCA954x
+Message-ID: <1391806412-8561-1-git-send-email-pengw@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-02-07 at 11:38 -0800, Frank Rowand wrote:
-> On 2/6/2014 9:11 PM, Joe Perches wrote:
-> > For patch 1, what checkpatch bug might that be?
-[]
-> Sorry, it is patch 2, not patch 1 ("[PATCH v5 02/14] clk: Add set_rate_and_parent() op"):
-> 
->    WARNING: Multiple spaces after return type
->    #188: FILE: include/linux/clk-provider.h:154:
->    +       int             (*set_rate_and_parent)(struct clk_hw *hw,
-> 
->    total: 0 errors, 1 warnings, 152 lines checked
+Cardhu has a PCA9546 for I2C bus extension, which connects to 3
+cameras. It's required for Tegra V4L2 soc camera driver and camera
+sensor drivers.
 
-Yup, that one might be a bit aggressive.
+Signed-off-by: Bryan Wu <pengw@nvidia.com>
+---
+ arch/arm/boot/dts/tegra30-cardhu.dtsi | 8 ++++++++
+ arch/arm/configs/tegra_defconfig      | 1 +
+ 2 files changed, 9 insertions(+)
 
-It's a complaint about function pointer declaration style.
-
-from checkpatch:
-------------------------------------------------------
-# unnecessary space "type  (*funcptr)(args...)"
-			elsif ($declare =~ /\s{2,}$/) {
-				WARN("SPACING",
-				     "Multiple spaces after return type\n" . $herecurr);
-			}
-------------------------------------------------------
-
-This is warning about style equivalent to declarations like:
-
-int		foo(int bar);
-
-checkpatch doesn't warn about declarations of that style,
-so likely checkpatch shouldn't warn about multiple spaces
-after a function pointer return type either.
-
-I don't have a strong opinion one way or another about it.
-
-If you think it should be silenced, it could be either
-downgraded to a CHK or removed altogether.
+diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+index 9104224..bfce643 100644
+--- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
++++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+@@ -187,6 +187,14 @@
+ 			interrupt-parent = <&gpio>;
+ 			interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
+ 		};
++
++		/* NXP PCA9546 I2C Mux */
++		pca9546 at 70 {
++			compatible = "nxp,pca9546";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x70>;
++		};
+ 	};
+ 
+ 	i2c at 7000c700 {
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index 995d434..efcf15f 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -125,6 +125,7 @@ CONFIG_SERIAL_TEGRA=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+ # CONFIG_HW_RANDOM is not set
+ # CONFIG_I2C_COMPAT is not set
++CONFIG_I2C_MUX_PCA954x=y
+ CONFIG_I2C_MUX_PINCTRL=y
+ CONFIG_I2C_TEGRA=y
+ CONFIG_SPI=y
+-- 
+1.8.3.2
