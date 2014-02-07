@@ -1,370 +1,340 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Fri, 7 Feb 2014 14:06:17 +0530
-Subject: [PATCH v4 02/10] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
-In-Reply-To: <003501cf23de$a4a878d0$edf96a70$@samsung.com>
-References: <1391686302-19451-1-git-send-email-anup.patel@linaro.org>
- <1391686302-19451-3-git-send-email-anup.patel@linaro.org>
- <003501cf23de$a4a878d0$edf96a70$@samsung.com>
-Message-ID: <CAAhSdy3Y3N7pSr3Y0rB7p340sX_kGPFT7mmBa2Rvf2pdSJYAfA@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 7 Feb 2014 09:41:28 +0100
+Subject: [PATCH] pinctrl:at91:add drive strength configuration
+In-Reply-To: <1390285991-1634-1-git-send-email-mark.roszko@gmail.com>
+References: <20140121060637.GP9558@ns203013.ovh.net>
+ <1390285991-1634-1-git-send-email-mark.roszko@gmail.com>
+Message-ID: <20140207084128.GZ9558@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 7, 2014 at 1:58 PM, Jungseok Lee <jays.lee@samsung.com> wrote:
-> On Thursday, February 06, 2014 8:32 PM, Anup Patel wrote:
->> Currently, the in-kernel PSCI emulation provides PSCI v0.1 interface to VCPUs. This patch extends
->> current in-kernel PSCI emulation to provide PSCI v0.2 interface to VCPUs.
->>
->> By default, ARM/ARM64 KVM will always provide PSCI v0.1 interface for keeping the ABI backward-
->> compatible.
->>
->> To select PSCI v0.2 interface for VCPUs, the user space (i.e. QEMU or
->> KVMTOOL) will have to set KVM_ARM_VCPU_PSCI_0_2 feature when doing VCPU init using KVM_ARM_VCPU_INIT
->> ioctl.
->>
->> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->> ---
->>  arch/arm/include/asm/kvm_host.h   |    2 +-
->>  arch/arm/include/asm/kvm_psci.h   |    4 ++
->>  arch/arm/include/uapi/asm/kvm.h   |   35 ++++++++++++++-
->>  arch/arm/kvm/arm.c                |    1 +
->>  arch/arm/kvm/psci.c               |   85 +++++++++++++++++++++++++++++++------
->>  arch/arm64/include/asm/kvm_host.h |    2 +-
->>  arch/arm64/include/asm/kvm_psci.h |    4 ++
->>  arch/arm64/include/uapi/asm/kvm.h |   35 ++++++++++++++-
->>  8 files changed, 152 insertions(+), 16 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h index 09af149..193ceaf
->> 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -36,7 +36,7 @@
->>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1  #define KVM_HAVE_ONE_REG
->>
->> -#define KVM_VCPU_MAX_FEATURES 1
->> +#define KVM_VCPU_MAX_FEATURES 2
->>
->>  #include <kvm/arm_vgic.h>
->>
->> diff --git a/arch/arm/include/asm/kvm_psci.h b/arch/arm/include/asm/kvm_psci.h index 9a83d98..4c0e3e1
->> 100644
->> --- a/arch/arm/include/asm/kvm_psci.h
->> +++ b/arch/arm/include/asm/kvm_psci.h
->> @@ -18,6 +18,10 @@
->>  #ifndef __ARM_KVM_PSCI_H__
->>  #define __ARM_KVM_PSCI_H__
->>
->> +#define KVM_ARM_PSCI_0_1     1
->> +#define KVM_ARM_PSCI_0_2     2
->> +
->> +int kvm_psci_version(struct kvm_vcpu *vcpu);
->>  bool kvm_psci_call(struct kvm_vcpu *vcpu);
->>
->>  #endif /* __ARM_KVM_PSCI_H__ */
->> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h index ef0c878..9c922d9
->> 100644
->> --- a/arch/arm/include/uapi/asm/kvm.h
->> +++ b/arch/arm/include/uapi/asm/kvm.h
->> @@ -83,6 +83,7 @@ struct kvm_regs {
->>  #define KVM_VGIC_V2_CPU_SIZE         0x2000
->>
->>  #define KVM_ARM_VCPU_POWER_OFF               0 /* CPU is started in OFF state */
->> +#define KVM_ARM_VCPU_PSCI_0_2                1 /* CPU uses PSCI v0.2 */
->>
->>  struct kvm_vcpu_init {
->>       __u32 target;
->> @@ -192,7 +193,7 @@ struct kvm_arch_memory_slot {
->>  /* Highest supported SPI, from VGIC_NR_IRQS */
->>  #define KVM_ARM_IRQ_GIC_MAX          127
->>
->> -/* PSCI interface */
->> +/* PSCI v0.1 interface */
->>  #define KVM_PSCI_FN_BASE             0x95c1ba5e
->>  #define KVM_PSCI_FN(n)                       (KVM_PSCI_FN_BASE + (n))
->>
->> @@ -201,9 +202,41 @@ struct kvm_arch_memory_slot {
->>  #define KVM_PSCI_FN_CPU_ON           KVM_PSCI_FN(2)
->>  #define KVM_PSCI_FN_MIGRATE          KVM_PSCI_FN(3)
->>
->> +/* PSCI v0.2 interface */
->> +#define KVM_PSCI_0_2_FN_BASE         0x84000000
->> +#define KVM_PSCI_0_2_FN(n)           (KVM_PSCI_0_2_FN_BASE + (n))
->> +#define KVM_PSCI_0_2_FN64_BASE               0xC4000000
->> +#define KVM_PSCI_0_2_FN64(n)         (KVM_PSCI_0_2_FN64_BASE + (n))
->> +
->> +#define KVM_PSCI_0_2_FN_PSCI_VERSION KVM_PSCI_0_2_FN(0)
->> +#define KVM_PSCI_0_2_FN_CPU_SUSPEND  KVM_PSCI_0_2_FN(1)
->> +#define KVM_PSCI_0_2_FN_CPU_OFF              KVM_PSCI_0_2_FN(2)
->> +#define KVM_PSCI_0_2_FN_CPU_ON               KVM_PSCI_0_2_FN(3)
->> +#define KVM_PSCI_0_2_FN_AFFINITY_INFO        KVM_PSCI_0_2_FN(4)
->> +#define KVM_PSCI_0_2_FN_MIGRATE              KVM_PSCI_0_2_FN(5)
->> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE \
->> +                                     KVM_PSCI_0_2_FN(6)
->> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU \
->> +                                     KVM_PSCI_0_2_FN(7)
->> +#define KVM_PSCI_0_2_FN_SYSTEM_OFF   KVM_PSCI_0_2_FN(8)
->> +#define KVM_PSCI_0_2_FN_SYSTEM_RESET KVM_PSCI_0_2_FN(9)
->> +
->> +#define KVM_PSCI_0_2_FN64_CPU_SUSPEND        KVM_PSCI_0_2_FN64(1)
->> +#define KVM_PSCI_0_2_FN64_CPU_ON     KVM_PSCI_0_2_FN64(3)
->> +#define KVM_PSCI_0_2_FN64_AFFINITY_INFO      KVM_PSCI_0_2_FN64(4)
->> +#define KVM_PSCI_0_2_FN64_MIGRATE    KVM_PSCI_0_2_FN64(5)
->> +#define KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU \
->> +                                     KVM_PSCI_0_2_FN64(7)
->> +
->
-> Hi
->
-> This patch describes PSCI v0.2 specification well. Instead,
-> I have a question on interface types, not implementation.
->
-> According to PSCI v0.2 document, it does not cover DVFS.
-> Could I get an idea why DVFS is not supported?
+On 01:33 Tue 21 Jan     , Marek Roszko wrote:
+> The SAMA5 and most SAM9xGs(baring a few exceptions like the SAM945G) have drive
+> control registers that allow configuring the output current of the gpio pins between
+> three predefined levels of low,medium and high drive.
+> 
+> This patch adds four new dt-bindings that allow setting the strength via the device tree.
+> Added set/get drive strength to pinctrl ops table.
+> A sama5d3-gpio of id entry was made to set the set/get drive strength function for the
+> sam5d3s which unforunately have different register addresses and strength-to-value
+> map than the sam9s.
+> Added PIO_DRIVER1/2 defines in at91_pio.h prefixed with the target SoC.
 
-PSCI v0.2 only describes few mandatory functions required for
-being PSCI v0.2 compliant. For rest of the stuff such as DVFS
-you will need to define your own platform specific PSCI function.
-(Marc/Mark correct me if I am wrong here?)
+missing the SoB so we can not apply it
 
-Mab be in future some PSCI vX.Y will define standardized PSCI
-function for DVFS too.
+otherwise
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Regards,
-Anup
+and please split the patch in 2 dt and driver
 
->
-> Best Regards
-> Jungseok Lee
->
->> +/* PSCI return values */
->>  #define KVM_PSCI_RET_SUCCESS         0
->>  #define KVM_PSCI_RET_NI                      ((unsigned long)-1)
->>  #define KVM_PSCI_RET_INVAL           ((unsigned long)-2)
->>  #define KVM_PSCI_RET_DENIED          ((unsigned long)-3)
->> +#define KVM_PSCI_RET_ALREADY_ON              ((unsigned long)-4)
->> +#define KVM_PSCI_RET_ON_PENDING              ((unsigned long)-5)
->> +#define KVM_PSCI_RET_INTERNAL_FAILURE        ((unsigned long)-6)
->> +#define KVM_PSCI_RET_NOT_PRESENT     ((unsigned long)-7)
->> +#define KVM_PSCI_RET_DISABLED                ((unsigned long)-8)
->>
->>  #endif /* __ARM_KVM_H__ */
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c index 1d8248e..c8a71df 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -197,6 +197,7 @@ int kvm_dev_ioctl_check_extension(long ext)
->>       case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
->>       case KVM_CAP_ONE_REG:
->>       case KVM_CAP_ARM_PSCI:
->> +     case KVM_CAP_ARM_PSCI_0_2:
->>               r = 1;
->>               break;
->>       case KVM_CAP_COALESCED_MMIO:
->> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c index 448f60e..e4ec4af 100644
->> --- a/arch/arm/kvm/psci.c
->> +++ b/arch/arm/kvm/psci.c
->> @@ -85,17 +85,57 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
->>       return KVM_PSCI_RET_SUCCESS;
->>  }
->>
->> -/**
->> - * kvm_psci_call - handle PSCI call if r0 value is in range
->> - * @vcpu: Pointer to the VCPU struct
->> - *
->> - * Handle PSCI calls from guests through traps from HVC instructions.
->> - * The calling convention is similar to SMC calls to the secure world where
->> - * the function number is placed in r0 and this function returns true if the
->> - * function number specified in r0 is withing the PSCI range, and false
->> - * otherwise.
->> - */
->> -bool kvm_psci_call(struct kvm_vcpu *vcpu)
->> +int kvm_psci_version(struct kvm_vcpu *vcpu) {
->> +     if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
->> +             return KVM_ARM_PSCI_0_2;
->> +
->> +     return KVM_ARM_PSCI_0_1;
->> +}
->> +
->> +static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu) {
->> +     unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
->> +     unsigned long val;
->> +
->> +     switch (psci_fn) {
->> +     case KVM_PSCI_0_2_FN_PSCI_VERSION:
->> +             /*
->> +              * Bits[31:16] = Major Version = 0
->> +              * Bits[15:0] = Minor Version = 2
->> +              */
->> +             val = 2;
->> +             break;
->> +     case KVM_PSCI_0_2_FN_CPU_OFF:
->> +             kvm_psci_vcpu_off(vcpu);
->> +             val = KVM_PSCI_RET_SUCCESS;
->> +             break;
->> +     case KVM_PSCI_0_2_FN_CPU_ON:
->> +     case KVM_PSCI_0_2_FN64_CPU_ON:
->> +             val = kvm_psci_vcpu_on(vcpu);
->> +             break;
->> +     case KVM_PSCI_0_2_FN_CPU_SUSPEND:
->> +     case KVM_PSCI_0_2_FN_AFFINITY_INFO:
->> +     case KVM_PSCI_0_2_FN_MIGRATE:
->> +     case KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE:
->> +     case KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
->> +     case KVM_PSCI_0_2_FN_SYSTEM_OFF:
->> +     case KVM_PSCI_0_2_FN_SYSTEM_RESET:
->> +     case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
->> +     case KVM_PSCI_0_2_FN64_AFFINITY_INFO:
->> +     case KVM_PSCI_0_2_FN64_MIGRATE:
->> +     case KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
->> +             val = KVM_PSCI_RET_NI;
->> +             break;
->> +     default:
->> +             return false;
->> +     }
->> +
->> +     *vcpu_reg(vcpu, 0) = val;
->> +     return true;
->> +}
->> +
->> +static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
->>  {
->>       unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
->>       unsigned long val;
->> @@ -112,7 +152,6 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
->>       case KVM_PSCI_FN_MIGRATE:
->>               val = KVM_PSCI_RET_NI;
->>               break;
->> -
->>       default:
->>               return false;
->>       }
->> @@ -120,3 +159,25 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
->>       *vcpu_reg(vcpu, 0) = val;
->>       return true;
->>  }
->> +
->> +/**
->> + * kvm_psci_call - handle PSCI call if r0 value is in range
->> + * @vcpu: Pointer to the VCPU struct
->> + *
->> + * Handle PSCI calls from guests through traps from HVC instructions.
->> + * The calling convention is similar to SMC calls to the secure world
->> +where
->> + * the function number is placed in r0 and this function returns true
->> +if the
->> + * function number specified in r0 is withing the PSCI range, and false
->> + * otherwise.
->> + */
->> +bool kvm_psci_call(struct kvm_vcpu *vcpu) {
->> +     switch (kvm_psci_version(vcpu)) {
->> +     case KVM_ARM_PSCI_0_2:
->> +             return kvm_psci_0_2_call(vcpu);
->> +     case KVM_ARM_PSCI_0_1:
->> +             return kvm_psci_0_1_call(vcpu);
->> +     default:
->> +             return false;
->> +     };
->> +}
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 0a1d697..92242ce 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -39,7 +39,7 @@
->>  #include <kvm/arm_vgic.h>
->>  #include <kvm/arm_arch_timer.h>
->>
->> -#define KVM_VCPU_MAX_FEATURES 2
->> +#define KVM_VCPU_MAX_FEATURES 3
->>
->>  struct kvm_vcpu;
->>  int kvm_target_cpu(void);
->> diff --git a/arch/arm64/include/asm/kvm_psci.h b/arch/arm64/include/asm/kvm_psci.h
->> index e301a48..e25c658 100644
->> --- a/arch/arm64/include/asm/kvm_psci.h
->> +++ b/arch/arm64/include/asm/kvm_psci.h
->> @@ -18,6 +18,10 @@
->>  #ifndef __ARM64_KVM_PSCI_H__
->>  #define __ARM64_KVM_PSCI_H__
->>
->> +#define KVM_ARM_PSCI_0_1     1
->> +#define KVM_ARM_PSCI_0_2     2
->> +
->> +int kvm_psci_version(struct kvm_vcpu *vcpu);
->>  bool kvm_psci_call(struct kvm_vcpu *vcpu);
->>
->>  #endif /* __ARM64_KVM_PSCI_H__ */
->> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->> index eaf54a3..cadc318 100644
->> --- a/arch/arm64/include/uapi/asm/kvm.h
->> +++ b/arch/arm64/include/uapi/asm/kvm.h
->> @@ -77,6 +77,7 @@ struct kvm_regs {
->>
->>  #define KVM_ARM_VCPU_POWER_OFF               0 /* CPU is started in OFF state */
->>  #define KVM_ARM_VCPU_EL1_32BIT               1 /* CPU running a 32bit VM */
->> +#define KVM_ARM_VCPU_PSCI_0_2                2 /* CPU uses PSCI v0.2 */
->>
->>  struct kvm_vcpu_init {
->>       __u32 target;
->> @@ -177,7 +178,7 @@ struct kvm_arch_memory_slot {
->>  /* Highest supported SPI, from VGIC_NR_IRQS */
->>  #define KVM_ARM_IRQ_GIC_MAX          127
->>
->> -/* PSCI interface */
->> +/* PSCI v0.1 interface */
->>  #define KVM_PSCI_FN_BASE             0x95c1ba5e
->>  #define KVM_PSCI_FN(n)                       (KVM_PSCI_FN_BASE + (n))
->>
->> @@ -186,10 +187,42 @@ struct kvm_arch_memory_slot {
->>  #define KVM_PSCI_FN_CPU_ON           KVM_PSCI_FN(2)
->>  #define KVM_PSCI_FN_MIGRATE          KVM_PSCI_FN(3)
->>
->> +/* PSCI v0.2 interface */
->> +#define KVM_PSCI_0_2_FN_BASE         0x84000000
->> +#define KVM_PSCI_0_2_FN(n)           (KVM_PSCI_0_2_FN_BASE + (n))
->> +#define KVM_PSCI_0_2_FN64_BASE               0xC4000000
->> +#define KVM_PSCI_0_2_FN64(n)         (KVM_PSCI_0_2_FN64_BASE + (n))
->> +
->> +#define KVM_PSCI_0_2_FN_PSCI_VERSION KVM_PSCI_0_2_FN(0)
->> +#define KVM_PSCI_0_2_FN_CPU_SUSPEND  KVM_PSCI_0_2_FN(1)
->> +#define KVM_PSCI_0_2_FN_CPU_OFF              KVM_PSCI_0_2_FN(2)
->> +#define KVM_PSCI_0_2_FN_CPU_ON               KVM_PSCI_0_2_FN(3)
->> +#define KVM_PSCI_0_2_FN_AFFINITY_INFO        KVM_PSCI_0_2_FN(4)
->> +#define KVM_PSCI_0_2_FN_MIGRATE              KVM_PSCI_0_2_FN(5)
->> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE \
->> +                                     KVM_PSCI_0_2_FN(6)
->> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU \
->> +                                     KVM_PSCI_0_2_FN(7)
->> +#define KVM_PSCI_0_2_FN_SYSTEM_OFF   KVM_PSCI_0_2_FN(8)
->> +#define KVM_PSCI_0_2_FN_SYSTEM_RESET KVM_PSCI_0_2_FN(9)
->> +
->> +#define KVM_PSCI_0_2_FN64_CPU_SUSPEND        KVM_PSCI_0_2_FN64(1)
->> +#define KVM_PSCI_0_2_FN64_CPU_ON     KVM_PSCI_0_2_FN64(3)
->> +#define KVM_PSCI_0_2_FN64_AFFINITY_INFO      KVM_PSCI_0_2_FN64(4)
->> +#define KVM_PSCI_0_2_FN64_MIGRATE    KVM_PSCI_0_2_FN64(5)
->> +#define KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU \
->> +                                     KVM_PSCI_0_2_FN64(7)
->> +
->> +/* PSCI return values */
->>  #define KVM_PSCI_RET_SUCCESS         0
->>  #define KVM_PSCI_RET_NI                      ((unsigned long)-1)
->>  #define KVM_PSCI_RET_INVAL           ((unsigned long)-2)
->>  #define KVM_PSCI_RET_DENIED          ((unsigned long)-3)
->> +#define KVM_PSCI_RET_ALREADY_ON              ((unsigned long)-4)
->> +#define KVM_PSCI_RET_ON_PENDING              ((unsigned long)-5)
->> +#define KVM_PSCI_RET_INTERNAL_FAILURE        ((unsigned long)-6)
->> +#define KVM_PSCI_RET_NOT_PRESENT     ((unsigned long)-7)
->> +#define KVM_PSCI_RET_DISABLED                ((unsigned long)-8)
->>
->>  #endif
->>
->> --
->> 1.7.9.5
->>
->> _______________________________________________
->> kvmarm mailing list
->> kvmarm at lists.cs.columbia.edu
->> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+Best Regards,
+J.
+> ---
+>  arch/arm/boot/dts/sama5d3.dtsi             |   10 +--
+>  arch/arm/mach-at91/include/mach/at91_pio.h |    7 ++
+>  drivers/pinctrl/pinctrl-at91.c             |  131 +++++++++++++++++++++++++++-
+>  include/dt-bindings/pinctrl/at91.h         |    5 ++
+>  4 files changed, 147 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index 5cdaba4..5576330 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -619,7 +619,7 @@
+>  
+>  
+>  				pioA: gpio at fffff200 {
+> -					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+> +					compatible = "atmel,sama5d3-gpio", "atmel,at91rm9200-gpio";
+>  					reg = <0xfffff200 0x100>;
+>  					interrupts = <6 IRQ_TYPE_LEVEL_HIGH 1>;
+>  					#gpio-cells = <2>;
+> @@ -629,7 +629,7 @@
+>  				};
+>  
+>  				pioB: gpio at fffff400 {
+> -					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+> +					compatible = "atmel,sama5d3-gpio", "atmel,at91rm9200-gpio";
+>  					reg = <0xfffff400 0x100>;
+>  					interrupts = <7 IRQ_TYPE_LEVEL_HIGH 1>;
+>  					#gpio-cells = <2>;
+> @@ -639,7 +639,7 @@
+>  				};
+>  
+>  				pioC: gpio at fffff600 {
+> -					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+> +					compatible = "atmel,sama5d3-gpio", "atmel,at91rm9200-gpio";
+>  					reg = <0xfffff600 0x100>;
+>  					interrupts = <8 IRQ_TYPE_LEVEL_HIGH 1>;
+>  					#gpio-cells = <2>;
+> @@ -649,7 +649,7 @@
+>  				};
+>  
+>  				pioD: gpio at fffff800 {
+> -					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+> +					compatible = "atmel,sama5d3-gpio", "atmel,at91rm9200-gpio";
+>  					reg = <0xfffff800 0x100>;
+>  					interrupts = <9 IRQ_TYPE_LEVEL_HIGH 1>;
+>  					#gpio-cells = <2>;
+> @@ -659,7 +659,7 @@
+>  				};
+>  
+>  				pioE: gpio at fffffa00 {
+> -					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+> +					compatible = "atmel,sama5d3-gpio", "atmel,at91rm9200-gpio";
+>  					reg = <0xfffffa00 0x100>;
+>  					interrupts = <10 IRQ_TYPE_LEVEL_HIGH 1>;
+>  					#gpio-cells = <2>;
+> diff --git a/arch/arm/mach-at91/include/mach/at91_pio.h b/arch/arm/mach-at91/include/mach/at91_pio.h
+> index 732b11c..b1e6380 100644
+> --- a/arch/arm/mach-at91/include/mach/at91_pio.h
+> +++ b/arch/arm/mach-at91/include/mach/at91_pio.h
+> @@ -66,6 +66,13 @@
+>  #define PIO_FRLHSR	0xd8	/* Fall/Rise - Low/High Status Register */
+>  #define PIO_SCHMITT	0x100	/* Schmitt Trigger Register */
+>  
+> +
+> +#define SAMA5D3_PIO_DRIVER1		0x118  /*PIO Driver 1 register offset*/
+> +#define SAMA5D3_PIO_DRIVER2		0x11C  /*PIO Driver 2 register offset*/
+> +
+> +#define AT91SAM9X5_PIO_DRIVER1	0x114  /*PIO Driver 1 register offset*/
+> +#define AT91SAM9X5_PIO_DRIVER2	0x118  /*PIO Driver 2 register offset*/
+> +
+>  #define ABCDSR_PERIPH_A	0x0
+>  #define ABCDSR_PERIPH_B	0x1
+>  #define ABCDSR_PERIPH_C	0x2
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index a7549c4..d79e085 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -62,10 +62,21 @@ static int gpio_banks;
+>  #define DEGLITCH	(1 << 2)
+>  #define PULL_DOWN	(1 << 3)
+>  #define DIS_SCHMIT	(1 << 4)
+> +#define DRIVE_STRENGTH_SHIFT    5
+> +#define DRIVE_STRENGTH   (0x3 << DRIVE_STRENGTH_SHIFT)
+>  #define DEBOUNCE	(1 << 16)
+>  #define DEBOUNCE_VAL_SHIFT	17
+>  #define DEBOUNCE_VAL	(0x3fff << DEBOUNCE_VAL_SHIFT)
+>  
+> +#define DRIVE_STRENGTH_DEFAULT	(0x0 << 5)
+> +#define DRIVE_STRENGTH_LOW		(0x1 << 5)
+> +#define DRIVE_STRENGTH_MED		(0x2 << 5)
+> +#define DRIVE_STRENGTH_HI		(0x3 << 5)
+> +
+> +
+> +#define DRIVE_STRENGTH_MASK  0x3
+> +#define NUM_PINS_PER_DIVIDED_REGS	16
+> +
+>  /**
+>   * struct at91_pmx_func - describes AT91 pinmux functions
+>   * @name: the name of this specific function
+> @@ -148,6 +159,8 @@ struct at91_pinctrl_mux_ops {
+>  	void (*set_deglitch)(void __iomem *pio, unsigned mask, bool is_on);
+>  	bool (*get_debounce)(void __iomem *pio, unsigned pin, u32 *div);
+>  	void (*set_debounce)(void __iomem *pio, unsigned mask, bool is_on, u32 div);
+> +	unsigned (*get_drivestrength)(void __iomem *pio, unsigned pin);
+> +	void (*set_drivestrength)(void __iomem *pio, unsigned pin, u32 strength);
+>  	bool (*get_pulldown)(void __iomem *pio, unsigned pin);
+>  	void (*set_pulldown)(void __iomem *pio, unsigned mask, bool is_on);
+>  	bool (*get_schmitt_trig)(void __iomem *pio, unsigned pin);
+> @@ -319,6 +332,24 @@ static unsigned pin_to_mask(unsigned int pin)
+>  	return 1 << pin;
+>  }
+>  
+> +static inline int two_bit_pin_value_shift(unsigned pin)
+> +{
+> +	return 2*((pin >= NUM_PINS_PER_DIVIDED_REGS) 
+> +			? pin - NUM_PINS_PER_DIVIDED_REGS : pin);
+> +}
+> +
+> +static unsigned sama5d3_get_drive_register(unsigned int pin)
+> +{
+> +	return (pin > NUM_PINS_PER_DIVIDED_REGS-1)
+> +			 ? SAMA5D3_PIO_DRIVER2: SAMA5D3_PIO_DRIVER1;
+> +}
+> +
+> +static unsigned at91sam9x5_get_drive_register(unsigned int pin)
+> +{
+> +	return (pin > NUM_PINS_PER_DIVIDED_REGS-1)
+> +			 ? AT91SAM9X5_PIO_DRIVER2: AT91SAM9X5_PIO_DRIVER1;
+> +}
+> +
+>  static void at91_mux_disable_interrupt(void __iomem *pio, unsigned mask)
+>  {
+>  	writel_relaxed(mask, pio + PIO_IDR);
+> @@ -462,6 +493,73 @@ static void at91_mux_pio3_set_pulldown(void __iomem *pio, unsigned mask, bool is
+>  	__raw_writel(mask, pio + (is_on ? PIO_PPDER : PIO_PPDDR));
+>  }
+>  
+> +static inline u32 read_drive_strength(void __iomem *reg, unsigned pin)
+> +{
+> +	unsigned tmp = __raw_readl(reg);
+> +	tmp = tmp >> two_bit_pin_value_shift(pin)
+> +
+> +	return tmp & DRIVE_STRENGTH_MASK;
+> +}
+> +
+> +static unsigned at91_mux_sama5d3_get_drivestrength(void __iomem *pio, unsigned pin)
+> +{
+> +	unsigned tmp = read_drive_strength(pio + sama5d3_get_drive_register(pin), pin);
+> +
+> +	/*value of 0 = low, all other values are 1 to 1*/
+> +	if (!tmp)
+> +		tmp = DRIVE_STRENGTH_LOW;
+> +
+> +	return tmp;
+> +}
+> +
+> +static unsigned at91_mux_sam9x5_get_drivestrength(void __iomem *pio, unsigned pin)
+> +{
+> +	unsigned tmp = read_drive_strength(pio + at91sam9x5_get_drive_register(pin), pin);
+> +
+> +	/*
+> +	 * inverse the setting for dt defines
+> +	 * 0 = hi, 1 = med, 2 = low, 3 = rsvd
+> +	 */
+> +	tmp = DRIVE_STRENGTH_HI - tmp;
+> +
+> +	return tmp;
+> +}
+> +
+> +static void set_drive_strength(void __iomem *reg, unsigned pin, u32 strength)
+> +{
+> +	unsigned tmp = __raw_readl(reg);
+> +
+> +	tmp &= ~(DRIVE_STRENGTH_MASK  <<  two_bit_pin_value_shift(pin));
+> +	tmp |= strength << two_bit_pin_value_shift(pin);
+> +
+> +    __raw_writel(tmp, reg);
+> +}
+> +
+> +static void at91_mux_sama5d3_set_drivestrength(void __iomem *pio, unsigned pin,
+> +											u32 setting)
+> +{
+> +	/* do nothing if setting is zero */
+> +	if (!setting)
+> +		return;
+> +
+> +	/* strength is 1 to 1 with setting for SAMA5 */
+> +	set_drive_strength(pio + sama5d3_get_drive_register(pin), pin, setting);
+> +}
+> +
+> +static void at91_mux_sam9x5_set_drivestrength(void __iomem *pio, unsigned pin,
+> +											u32 setting)
+> +{
+> +	/* do nothing if setting is zero */
+> +	if (!setting)
+> +		return;
+> +
+> +	/* strength is inverse on SAM9s, 0 = hi, 1 = med, 2 = low, 3 = rsvd */
+> +	setting = DRIVE_STRENGTH_HI - setting;
+> +
+> +	set_drive_strength(pio + at91sam9x5_get_drive_register(pin), pin, setting);
+> +}
+> +
+> +
+>  static void at91_mux_pio3_disable_schmitt_trig(void __iomem *pio, unsigned mask)
+>  {
+>  	__raw_writel(__raw_readl(pio + PIO_SCHMITT) | mask, pio + PIO_SCHMITT);
+> @@ -491,6 +589,27 @@ static struct at91_pinctrl_mux_ops at91sam9x5_ops = {
+>  	.set_deglitch	= at91_mux_pio3_set_deglitch,
+>  	.get_debounce	= at91_mux_pio3_get_debounce,
+>  	.set_debounce	= at91_mux_pio3_set_debounce,
+> +	.get_drivestrength = at91_mux_sam9x5_get_drivestrength,
+> +	.set_drivestrength = at91_mux_sam9x5_set_drivestrength,
+> +	.get_pulldown	= at91_mux_pio3_get_pulldown,
+> +	.set_pulldown	= at91_mux_pio3_set_pulldown,
+> +	.get_schmitt_trig = at91_mux_pio3_get_schmitt_trig,
+> +	.disable_schmitt_trig = at91_mux_pio3_disable_schmitt_trig,
+> +	.irq_type	= alt_gpio_irq_type,
+> +};
+> +
+> +static struct at91_pinctrl_mux_ops sama5d3_ops = {
+> +	.get_periph	= at91_mux_pio3_get_periph,
+> +	.mux_A_periph	= at91_mux_pio3_set_A_periph,
+> +	.mux_B_periph	= at91_mux_pio3_set_B_periph,
+> +	.mux_C_periph	= at91_mux_pio3_set_C_periph,
+> +	.mux_D_periph	= at91_mux_pio3_set_D_periph,
+> +	.get_deglitch	= at91_mux_pio3_get_deglitch,
+> +	.set_deglitch	= at91_mux_pio3_set_deglitch,
+> +	.get_debounce	= at91_mux_pio3_get_debounce,
+> +	.set_debounce	= at91_mux_pio3_set_debounce,
+> +	.get_drivestrength = at91_mux_sama5d3_get_drivestrength,
+> +	.set_drivestrength = at91_mux_sama5d3_set_drivestrength,
+>  	.get_pulldown	= at91_mux_pio3_get_pulldown,
+>  	.set_pulldown	= at91_mux_pio3_set_pulldown,
+>  	.get_schmitt_trig = at91_mux_pio3_get_schmitt_trig,
+> @@ -498,6 +617,7 @@ static struct at91_pinctrl_mux_ops at91sam9x5_ops = {
+>  	.irq_type	= alt_gpio_irq_type,
+>  };
+>  
+> +
+>  static void at91_pin_dbg(const struct device *dev, const struct at91_pmx_pin *pin)
+>  {
+>  	if (pin->mux) {
+> @@ -736,6 +856,9 @@ static int at91_pinconf_get(struct pinctrl_dev *pctldev,
+>  		*config |= DEGLITCH;
+>  	if (info->ops->get_debounce && info->ops->get_debounce(pio, pin, &div))
+>  		*config |= DEBOUNCE | (div << DEBOUNCE_VAL_SHIFT);
+> +	if (info->ops->get_drivestrength)
+> +		*config |= DRIVE_STRENGTH | (info->ops->get_drivestrength(pio, pin)
+> +										 << DRIVE_STRENGTH_SHIFT);
+>  	if (info->ops->get_pulldown && info->ops->get_pulldown(pio, pin))
+>  		*config |= PULL_DOWN;
+>  	if (info->ops->get_schmitt_trig && info->ops->get_schmitt_trig(pio, pin))
+> @@ -753,6 +876,7 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
+>  	void __iomem *pio;
+>  	int i;
+>  	unsigned long config;
+> +	unsigned pin;
+>  
+>  	for (i = 0; i < num_configs; i++) {
+>  		config = configs[i];
+> @@ -761,7 +885,8 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
+>  			"%s:%d, pin_id=%d, config=0x%lx",
+>  			__func__, __LINE__, pin_id, config);
+>  		pio = pin_to_controller(info, pin_to_bank(pin_id));
+> -		mask = pin_to_mask(pin_id % MAX_NB_GPIO_PER_BANK);
+> +		pin = pin_id % MAX_NB_GPIO_PER_BANK;
+> +		mask = pin_to_mask(pin);
+>  
+>  		if (config & PULL_UP && config & PULL_DOWN)
+>  			return -EINVAL;
+> @@ -773,6 +898,9 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
+>  		if (info->ops->set_debounce)
+>  			info->ops->set_debounce(pio, mask, config & DEBOUNCE,
+>  				(config & DEBOUNCE_VAL) >> DEBOUNCE_VAL_SHIFT);
+> +		if (info->ops->set_drivestrength)
+> +			info->ops->set_drivestrength(pio, pin,
+> +				(config & DRIVE_STRENGTH) >> DRIVE_STRENGTH_SHIFT);
+>  		if (info->ops->set_pulldown)
+>  			info->ops->set_pulldown(pio, mask, config & PULL_DOWN);
+>  		if (info->ops->disable_schmitt_trig && config & DIS_SCHMIT)
+> @@ -1551,6 +1679,7 @@ static void at91_gpio_probe_fixup(void)
+>  
+>  static struct of_device_id at91_gpio_of_match[] = {
+>  	{ .compatible = "atmel,at91sam9x5-gpio", .data = &at91sam9x5_ops, },
+> +	{ .compatible = "atmel,sama5d3-gpio", .data = &sama5d3_ops, },
+>  	{ .compatible = "atmel,at91rm9200-gpio", .data = &at91rm9200_ops },
+>  	{ /* sentinel */ }
+>  };
+> diff --git a/include/dt-bindings/pinctrl/at91.h b/include/dt-bindings/pinctrl/at91.h
+> index 0fee6ff..af71ebb 100644
+> --- a/include/dt-bindings/pinctrl/at91.h
+> +++ b/include/dt-bindings/pinctrl/at91.h
+> @@ -20,6 +20,11 @@
+>  
+>  #define AT91_PINCTRL_PULL_UP_DEGLITCH	(AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DEGLITCH)
+>  
+> +#define AT91_PINCTRL_DRIVE_STRENGTH_DEFAULT	(0x0 << 5)
+> +#define AT91_PINCTRL_DRIVE_STRENGTH_LOW		(0x1 << 5)
+> +#define AT91_PINCTRL_DRIVE_STRENGTH_MED		(0x2 << 5)
+> +#define AT91_PINCTRL_DRIVE_STRENGTH_HI		(0x3 << 5)
+> +
+>  #define AT91_PIOA	0
+>  #define AT91_PIOB	1
+>  #define AT91_PIOC	2
+> -- 
+> 1.7.10.4
+> 
