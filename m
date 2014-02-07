@@ -1,51 +1,78 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri, 07 Feb 2014 09:58:16 +0100
-Subject: [PATCH v3 05/15] ARM: at91: move sam9261 SoC to common clk
-In-Reply-To: <1390492639-7299-6-git-send-email-jjhiblot@traphandler.com>
-References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
- <1390492639-7299-6-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <52F4A028.2000604@overkiz.com>
+From: arnab.basu@freescale.com (Arnab Basu)
+Date: Fri, 7 Feb 2014 08:59:21 +0000 (UTC)
+Subject: [PATCH 01/18] arm64: initial support for GICv3
+References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
+ <1391607050-540-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <loom.20140207T065340-308@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello JJ,
+Hi Marc
 
-On 23/01/2014 16:57, Jean-Jacques Hiblot wrote:
-> This patch removes the selection of AT91_USE_OLD_CLK when selecting
-> sam9261 SoCs support. This will automatically enable COMMON_CLK_AT91 option
-> and add support for at91 common clk implementation.
->
-> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> ---
->   arch/arm/mach-at91/Kconfig | 1 -
->   1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index b4f7d6f..2214beb 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -120,7 +120,6 @@ config SOC_AT91SAM9261
->   	select HAVE_AT91_DBGU0
->   	select HAVE_FB_ATMEL
->   	select SOC_AT91SAM9
-> -	select AT91_USE_OLD_CLK
->   	select HAVE_AT91_USB_CLK
-add :
-                depends on COMMON_CLK
+Marc Zyngier <marc.zyngier <at> arm.com> writes:
 
-if you want to get rid of DT related clk_lookup definitions.
-You'll also have to remove all the AT91SAM9261 sections from Kconfig.non_dt,
-because this will conflict with the "depends on COMMON_CLK" line (the
-ARCH_AT91SAM9261 config selects AT91_USE_OLD_CLK which forbids the use
-of CCF).
+> +
+> +static inline void __iomem *gic_dist_base(struct irq_data *d)
 
-I'm not sure droping the clk_lookup definitions worth the trouble, but 
-I'll let at91
-maintainers decide.
+I would suggest that this function be renamed (something like
+gic_base_for_irq?) since it returns dist or redist sgi base address. The
+name suggests it always returns the dist base address.
 
-Best Regards,
+> +{
+> +	if (d->hwirq < 32)	/* SGI+PPI -> SGI_base for this CPU */
+> +		return gic_data_rdist_sgi_base();
+> +
+> +	if (d->hwirq <= 1023)	/* SPI -> dist_base */
+> +		return gic_data.dist_base;
+> +
+> +	if (d->hwirq >= 8192)
+> +		BUG();		/* LPI Detected!!! */
+> +
+> +	return NULL;
+> +}
+> +
+> +static inline unsigned int gic_irq(struct irq_data *d)
+> +{
+> +	return d->hwirq;
+> +}
+> +
+> +static void gic_do_wait_for_rwp(void __iomem *base)
+> +{
+> +	u32 val;
+> +
+> +	do {
+> +		val = readl_relaxed(base + GICD_CTLR);
 
-Boris
+Maybe rename GICD_CTLR to GICx_CTLR since it is being used for both the
+distributor and the redistributor.
 
->   	help
->   	  Select this if you are using one of Atmel's AT91SAM9261 or AT91SAM9G10 SoC.
+> +		cpu_relax();
+> +	} while (val & GICD_CTLR_RWP);
+
+Similar to above GICx_CTLR_RWP
+
+
+> +
+> +static int gic_irq_domain_xlate(struct irq_domain *d,
+> +				struct device_node *controller,
+> +				const u32 *intspec, unsigned int intsize,
+> +				unsigned long *out_hwirq, unsigned int *out_type)
+> +{
+> +	if (d->of_node != controller)
+> +		return -EINVAL;
+> +	if (intsize < 3)
+> +		return -EINVAL;
+> +
+> +	switch(intspec[0]) {
+> +	case 0:			/* SPI */
+> +		*out_hwirq = intspec[1] + 32;
+> +		break;
+> +	case 1:			/* PPI */
+> +		*out_hwirq = intspec[1] + 16;
+> +		break;
+
+I wonder if there is any value to syncing these with the defines in
+"include/dt-bindings/interrupt-controller/arm-gic.h" somehow.
+
+Thanks
+Arnab
