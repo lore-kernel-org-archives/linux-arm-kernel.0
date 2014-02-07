@@ -1,62 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Feb 2014 17:43:31 +0000
-Subject: [PATCH RFC 2/2] drivers/base: declare phandle DT nodes as
- components
-In-Reply-To: <9f8bbe28b00160cab2cedffa3f8fb42121035964.1391793068.git.moinejf@free.fr>
-References: <cover.1391793068.git.moinejf@free.fr>
- <9f8bbe28b00160cab2cedffa3f8fb42121035964.1391793068.git.moinejf@free.fr>
-Message-ID: <20140207174330.GF26684@n2100.arm.linux.org.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 7 Feb 2014 10:54:10 -0700
+Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
+In-Reply-To: <20140207114607.GE5976@mudshark.cambridge.arm.com>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <3460536.Sh23gjDa6X@wuerfel>
+ <20140205190947.GA22297@mudshark.cambridge.arm.com>
+ <3724624.kd9jZNUiTF@wuerfel>
+ <20140207114607.GE5976@mudshark.cambridge.arm.com>
+Message-ID: <20140207175410.GC16263@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 05:53:27PM +0100, Jean-Francois Moine wrote:
-> At system startup time, some devices depends on the availability of
-> some other devices before starting. The infrastructure for componentised
-> subsystems permits to handle this dependence, each driver defining
-> its own role.
+On Fri, Feb 07, 2014 at 11:46:07AM +0000, Will Deacon wrote:
+
+> > In practice, there can be various ways that a system requires something
+> > more complex:
+> > 
+> > * You can have a memory space range that puts PCI bus address zero
+> >   at the start of the pci->mem resource. In this case, you have
+> >   mem_offset = pci->mem.start. We should probably try not to do
+> >   this, but there is existing hardware doing it.
 > 
-> This patch does an automatic creation of the lowest components in
-> case of DT. This permits simple devices to be part of complex
-> componentised subsystems without any specific code.
+> If it's not the common case, then the generic driver might not need to care
+> (at least, initially).
 
-A component with no operations makes precisely no sense - with that,
-there's no way for the component to be a stand-alone driver.  Your
-approach forces your ideas onto every DT device that is referenced
-as a phandle.  That's extremely restrictive.
+Something to think about, other people are going to reference this
+driver when writing drivers for their own hardware, it would be nice
+to see it perfect..
 
-I don't want the component stuff knowing anything about OF.  I don't
-want it knowing about driver matching.  I don't want it knowing about
-ACPI either.  That's the whole point behind it - it is 100% agnostic
-about how that stuff works.
+AFAIK, the job is fairly simple, when you call pci_add_resource_offset
+for memory compute the offset from 
+  of_pci_range.pci_addr - of_pci_range.cpu_addr
 
-The model is quite simply this:
+(or is it the other way around ?)
 
-- a master device is the covering component for the "card"
-  - the master device knows what components to expect by some means.
-    In the case of DT, that's by phandle references to the components.
-  - the master device handles the component independent setup of the
-    "card", creating the common resources that are required.  When it's
-    ready, it asks for the components to be bound.
-  - upon removal of any component, the master component is unbound,
-    which triggers the removal of the "card" from the subsystem.
-  - as part of the removal, sub-components are unbound.
-  - the master device should have as /little/ knowledge about the
-    components as possible to permit component re-use.
+And when you do it for IO then you compute the offset between the
+requested io mapping base to the pci_addr.
 
-- a component driver should be independent of it's master.
-  - A component which is probed from the device model should simply
-    register itself using component_add() with an appropriate operations
-    structure, and a removal function which deletes itself.
-  - When the driver is ready to be initialised (when the "card" level
-    resources have been set in place) the "bind" method will be called.
-    At this point, the component does everything that a classical driver
-    model driver would do in it's probe callback.
-  - unbind is the same as remove in the classical driver model.
+> > * You might have multiple sections of the PCI bus space mapped
+> >   into CPU physical space. If you want to support legacy VGA
+> >   console, you probably want to map the first 16MB of the bus
+> >   space at an arbitrary location (with the mem_offset as above),
+> >   plus a second, larger section of the bus space with an identity
+> >   mapping (mem_offset_= 0) for all devices other than VGA.
+> >   You'd also need to copy some VGA specific code from arm32 to
+> >   arm64 to actually make this work.
+> 
+> Again, I'd rather cross that bridge (no pun intended) when we decide we want
+> legacy VGA.
 
-So, please, no DT stuff in the component support - it's simply not
-required.
+Fortuantely if you compute the offset directly from the DT then you
+don't need to do anything more. If someone wants to use this
+arrangement then they just have to setup the HW and write a proper DT
+with two ranges lines for memory and everything should just work.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+> Okey doke, is anybody working on that? (I see the follow up from
+> Jason, but it's not clear whether that's going to be merged).
+
+Nope, just a thought to stimulate discussion :)
+
+Regards,
+Jason
