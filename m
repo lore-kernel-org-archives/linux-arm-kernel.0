@@ -1,24 +1,113 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Feb 2014 10:06:49 +0000
-Subject: [PATCH] ARM: enable IRQs in user undefined instruction vector
-In-Reply-To: <CAOaiJ-kY_VwsY0iHSMVQZx=zvP5is1LRkir5_zP6Jnttv+O1VQ@mail.gmail.com>
-References: <1391545146-8320-1-git-send-email-kevin@bracey.fi>
- <20140206112039.GA31054@arm.com> <52F3D024.5020804@bracey.fi>
- <20140206205447.GX26684@n2100.arm.linux.org.uk>
- <CAOaiJ-kY_VwsY0iHSMVQZx=zvP5is1LRkir5_zP6Jnttv+O1VQ@mail.gmail.com>
-Message-ID: <20140207100649.GZ26684@n2100.arm.linux.org.uk>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri,  7 Feb 2014 19:07:31 +0900
+Subject: [PATCH] arm64: make a single hook to syscall_trace() for all syscall
+ features
+In-Reply-To: <52F199D3.2060409@linaro.org>
+References: <52F199D3.2060409@linaro.org>
+Message-ID: <1391767651-5296-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 03:30:13PM +0530, vinayak menon wrote:
-> Can we do something similar to what pagefault_disable does ? So that
-> we jump directly to fixup, after the in_atomic() check in
-> do_page_fault.
+Currently syscall_trace() is called only for ptrace.
+With additional TIF_xx flags introduced, it is now called in all the cases
+of audit, ftrace and seccomp in addition to ptrace.
+Those features will be implemented later, but it's safe to include them
+now because they can not be turned on anyway.
 
-I don't see any point to this change - it does nothing to address the
-point I raised.
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm64/include/asm/thread_info.h |   13 +++++++++++++
+ arch/arm64/kernel/entry.S            |    5 +++--
+ arch/arm64/kernel/ptrace.c           |   11 +++++------
+ 3 files changed, 21 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 720e70b..c3df797 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -91,6 +91,9 @@ static inline struct thread_info *current_thread_info(void)
+ /*
+  * thread information flags:
+  *  TIF_SYSCALL_TRACE	- syscall trace active
++ *  TIF_SYSCALL_TRACEPOINT - syscall tracepoint for ftrace
++ *  TIF_SYSCALL_AUDIT	- syscall auditing
++ *  TIF_SECOMP		- syscall secure computing
+  *  TIF_SIGPENDING	- signal pending
+  *  TIF_NEED_RESCHED	- rescheduling necessary
+  *  TIF_NOTIFY_RESUME	- callback before returning to user
+@@ -101,6 +104,9 @@ static inline struct thread_info *current_thread_info(void)
+ #define TIF_NEED_RESCHED	1
+ #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
+ #define TIF_SYSCALL_TRACE	8
++#define TIF_SYSCALL_AUDIT	9
++#define TIF_SYSCALL_TRACEPOINT	10
++#define TIF_SECCOMP		11
+ #define TIF_POLLING_NRFLAG	16
+ #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
+ #define TIF_FREEZE		19
+@@ -112,10 +118,17 @@ static inline struct thread_info *current_thread_info(void)
+ #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+ #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+ #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
++#define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
++#define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
++#define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
++#define _TIF_SECCOMP		(1 << TIF_SECCOMP)
+ #define _TIF_32BIT		(1 << TIF_32BIT)
+ 
+ #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
+ 				 _TIF_NOTIFY_RESUME)
+ 
++#define _TIF_WORK_SYSCALL	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
++				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP)
++
+ #endif /* __KERNEL__ */
+ #endif /* __ASM_THREAD_INFO_H */
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 39ac630..c94b2ab 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -631,8 +631,9 @@ el0_svc_naked:					// compat entry point
+ 	enable_irq
+ 
+ 	get_thread_info tsk
+-	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall tracing
+-	tbnz	x16, #TIF_SYSCALL_TRACE, __sys_trace // are we tracing syscalls?
++	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall hooks
++	tst	x16, #_TIF_WORK_SYSCALL
++	b.ne	__sys_trace
+ 	adr	lr, ret_fast_syscall		// return address
+ 	cmp     scno, sc_nr                     // check upper syscall limit
+ 	b.hs	ni_sys
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 6a8928b..64ce39f 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -1062,9 +1062,6 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+ {
+ 	unsigned long saved_reg;
+ 
+-	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+-		return regs->syscallno;
+-
+ 	if (is_compat_task()) {
+ 		/* AArch32 uses ip (r12) for scratch */
+ 		saved_reg = regs->regs[12];
+@@ -1078,10 +1075,12 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+ 		regs->regs[7] = dir;
+ 	}
+ 
+-	if (dir)
++	if (dir) {
+ 		tracehook_report_syscall_exit(regs, 0);
+-	else if (tracehook_report_syscall_entry(regs))
+-		regs->syscallno = ~0UL;
++	} else {
++		if (tracehook_report_syscall_entry(regs))
++			regs->syscallno = ~0UL;
++	}
+ 
+ 	if (is_compat_task())
+ 		regs->regs[12] = saved_reg;
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.7.9.5
