@@ -1,76 +1,131 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  7 Feb 2014 15:32:30 +0100
-Subject: [PATCH v3 2/5] clk: sunxi: Add USB clock register defintions
+Date: Fri,  7 Feb 2014 15:32:29 +0100
+Subject: [PATCH v3 1/5] clk: sunxi: Add support for USB clock-register reset
+ bits
 In-Reply-To: <1391783553-8096-1-git-send-email-hdegoede@redhat.com>
 References: <1391783553-8096-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1391783553-8096-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1391783553-8096-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roman Byshko <rbyshko@gmail.com>
+The usb-clk register is special in that it not only contains clk gate bits,
+but also has a few reset bits. This commit adds support for this by allowing
+gates type sunxi clks to also register a reset controller.
 
-Add register definitions for the usb-clk register found on sun4i, sun5i and
-sun7i SoCs.
-
-Signed-off-by: Roman Byshko <rbyshko@gmail.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt |  5 +++++
- drivers/clk/sunxi/clk-sunxi.c                     | 12 ++++++++++++
- 2 files changed, 17 insertions(+)
+ drivers/clk/sunxi/clk-sunxi.c | 71 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 27f19f1..e368a86c 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -38,6 +38,8 @@ Required properties:
- 	"allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
- 	"allwinner,sun7i-a20-out-clk" - for the external output clocks
- 	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
-+	"allwinner,sun4i-usb-clk" - for usb gates + resets on A10 / A20
-+	"allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
- 
- Required properties for all clocks:
- - reg : shall be the control register address for the clock.
-@@ -54,6 +56,9 @@ Required properties for all clocks:
- For "allwinner,sun7i-a20-gmac-clk", the parent clocks shall be fixed rate
- dummy clocks at 25 MHz and 125 MHz, respectively. See example.
- 
-+And "allwinner,*-usb-clk" clocks also require:
-+- reset-cells : shall be set to 1
-+
- Clock consumers should specify the desired clocks they use with a
- "clocks" phandle cell. Consumers that are using a gated clock should
- provide an additional ID in their clock property. This ID is the
 diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 1e15e4c..3ba1402 100644
+index 64bda21..1e15e4c 100644
 --- a/drivers/clk/sunxi/clk-sunxi.c
 +++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -910,6 +910,16 @@ static const struct gates_data sun4i_ahb_gates_data __initconst = {
- 	.mask = {0x7F77FFF, 0x14FB3F},
+@@ -18,6 +18,7 @@
+ #include <linux/clkdev.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/reset-controller.h>
+ 
+ #include "clk-factors.h"
+ 
+@@ -838,6 +839,59 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+ 
+ 
+ /**
++ * sunxi_gates_reset... - reset bits in leaf gate clk registers handling
++ */
++
++struct gates_reset_data {
++	void __iomem			*reg;
++	spinlock_t			*lock;
++	struct reset_controller_dev	rcdev;
++};
++
++static int sunxi_gates_reset_assert(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct gates_reset_data *data = container_of(rcdev,
++						     struct gates_reset_data,
++						     rcdev);
++	unsigned long flags;
++	u32 reg;
++
++	spin_lock_irqsave(data->lock, flags);
++
++	reg = readl(data->reg);
++	writel(reg & ~BIT(id), data->reg);
++
++	spin_unlock_irqrestore(data->lock, flags);
++
++	return 0;
++}
++
++static int sunxi_gates_reset_deassert(struct reset_controller_dev *rcdev,
++				unsigned long id)
++{
++	struct gates_reset_data *data = container_of(rcdev,
++						     struct gates_reset_data,
++						     rcdev);
++	unsigned long flags;
++	u32 reg;
++
++	spin_lock_irqsave(data->lock, flags);
++
++	reg = readl(data->reg);
++	writel(reg | BIT(id), data->reg);
++
++	spin_unlock_irqrestore(data->lock, flags);
++
++	return 0;
++}
++
++static struct reset_control_ops sunxi_gates_reset_ops = {
++	.assert		= sunxi_gates_reset_assert,
++	.deassert	= sunxi_gates_reset_deassert,
++};
++
++/**
+  * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
+  */
+ 
+@@ -845,6 +899,7 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+ 
+ struct gates_data {
+ 	DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
++	u32 reset_mask;
  };
  
-+static const struct gates_data sun4i_usb_gates_data __initconst = {
-+	.mask = {0x1C0},
-+	.reset_mask = 0x07,
-+};
+ static const struct gates_data sun4i_axi_gates_data __initconst = {
+@@ -915,6 +970,7 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
+ 					 struct gates_data *data)
+ {
+ 	struct clk_onecell_data *clk_data;
++	struct gates_reset_data *reset_data;
+ 	const char *clk_parent;
+ 	const char *clk_name;
+ 	void *reg;
+@@ -958,6 +1014,21 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
+ 	clk_data->clk_num = i;
+ 
+ 	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
 +
-+static const struct gates_data sun5i_a13_usb_gates_data __initconst = {
-+	.mask = {0x140},
-+	.reset_mask = 0x03,
-+};
++	/* Register a reset controler for gates with reset bits */
++	if (data->reset_mask == 0)
++		return;
 +
- static const struct gates_data sun5i_a10s_ahb_gates_data __initconst = {
- 	.mask = {0x147667e7, 0x185915},
- };
-@@ -1257,6 +1267,8 @@ static const struct of_device_id clk_gates_match[] __initconst = {
- 	{.compatible = "allwinner,sun6i-a31-apb1-gates-clk", .data = &sun6i_a31_apb1_gates_data,},
- 	{.compatible = "allwinner,sun7i-a20-apb1-gates-clk", .data = &sun7i_a20_apb1_gates_data,},
- 	{.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
-+	{.compatible = "allwinner,sun4i-usb-clk", .data = &sun4i_usb_gates_data,},
-+	{.compatible = "allwinner,sun5i-a13-usb-clk", .data = &sun5i_a13_usb_gates_data,},
- 	{}
- };
++	reset_data = kzalloc(sizeof(*reset_data), GFP_KERNEL);
++	if (!reset_data)
++		return;
++
++	reset_data->reg = reg;
++	reset_data->lock = &clk_lock;
++	reset_data->rcdev.nr_resets = __fls(data->reset_mask) + 1;
++	reset_data->rcdev.ops = &sunxi_gates_reset_ops;
++	reset_data->rcdev.of_node = node;
++	reset_controller_register(&reset_data->rcdev);
+ }
+ 
  
 -- 
 1.8.4.2
