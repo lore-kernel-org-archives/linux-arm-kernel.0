@@ -1,53 +1,37 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Feb 2014 21:02:10 -0500
-Subject: [PATCH 20/21] ARM: MVEBU: Remove unneeded headers
-In-Reply-To: <1391730137-14814-21-git-send-email-andrew@lunn.ch>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-21-git-send-email-andrew@lunn.ch>
-Message-ID: <20140207020210.GR8533@titan.lakedaemon.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 06 Feb 2014 18:07:08 -0800
+Subject: [PATCH v6 17/19] watchdog: orion: Enable the build on ARCH_MVEBU
+In-Reply-To: <1391707226-18258-18-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1391707226-18258-18-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <52F43FCC.5090109@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 12:42:16AM +0100, Andrew Lunn wrote:
-> Remove headers which are no longer needed, and add a couple of missing
-> onces.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+On 02/06/2014 09:20 AM, Ezequiel Garcia wrote:
+> After adding support for Armada 370/XP SoC let's enable the build on
+> these platforms.
+>
+> Tested-by: Willy Tarreau <w@1wt.eu>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+
 > ---
->  arch/arm/mach-mvebu/kirkwood.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
-
-You could probably collapse this into the previous patch.
-
-thx,
-
-Jason.
-
-> diff --git a/arch/arm/mach-mvebu/kirkwood.c b/arch/arm/mach-mvebu/kirkwood.c
-> index 1df0c0b138d5..5d7fef04c36d 100644
-> --- a/arch/arm/mach-mvebu/kirkwood.c
-> +++ b/arch/arm/mach-mvebu/kirkwood.c
-> @@ -13,18 +13,15 @@
->  #include <linux/clk.h>
->  #include <linux/kernel.h>
->  #include <linux/init.h>
-> +#include <linux/mbus.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_net.h>
->  #include <linux/of_platform.h>
-> -#include <linux/dma-mapping.h>
-> -#include <linux/irqchip.h>
-> -#include <linux/kexec.h>
-> +#include <linux/slab.h>
->  #include <asm/hardware/cache-feroceon-l2.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
-> -#include <plat/common.h>
-> -#include <plat/pcie.h>
->  #include "kirkwood.h"
->  #include "kirkwood-pm.h"
->  #include "common.h"
-> -- 
-> 1.8.5.3
-> 
+>   drivers/watchdog/Kconfig | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 4c4c566..2dda6c0 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -291,7 +291,7 @@ config DAVINCI_WATCHDOG
+>
+>   config ORION_WATCHDOG
+>   	tristate "Orion watchdog"
+> -	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE
+> +	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE || ARCH_MVEBU
+>   	select WATCHDOG_CORE
+>   	help
+>   	  Say Y here if to include support for the watchdog timer
+>
