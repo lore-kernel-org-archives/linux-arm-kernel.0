@@ -1,58 +1,73 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri, 07 Feb 2014 11:39:49 +0100
-Subject: [PATCH] clk: at91: remove redundant assignment
-In-Reply-To: <52F4AF3F.7040809@atmel.com>
-References: <1391712790-13591-1-git-send-email-colin.king@canonical.com>
- <52F4AF3F.7040809@atmel.com>
-Message-ID: <52F4B7F5.5020704@overkiz.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 7 Feb 2014 07:40:45 -0300
+Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
+ initially stopped
+In-Reply-To: <52F43ED0.4050808@roeck-us.net>
+References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <52F43ED0.4050808@roeck-us.net>
+Message-ID: <20140207104044.GA11063@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas, Colin,
+On Thu, Feb 06, 2014 at 06:02:56PM -0800, Guenter Roeck wrote:
+> On 02/06/2014 09:20 AM, Ezequiel Garcia wrote:
+> > Having the watchdog initially fully stopped is important to avoid
+> > any spurious watchdog triggers, in case the registers are not in
+> > its reset state.
+> >
+> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> > Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > Tested-by: Willy Tarreau <w@1wt.eu>
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >   drivers/watchdog/orion_wdt.c | 3 +++
+> >   1 file changed, 3 insertions(+)
+> >
+> > diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+> > index 6746033..2dbeee9 100644
+> > --- a/drivers/watchdog/orion_wdt.c
+> > +++ b/drivers/watchdog/orion_wdt.c
+> > @@ -142,6 +142,9 @@ static int orion_wdt_probe(struct platform_device *pdev)
+> >   	orion_wdt.max_timeout = wdt_max_duration;
+> >   	watchdog_init_timeout(&orion_wdt, heartbeat, &pdev->dev);
+> >
+> > +	/* Let's make sure the watchdog is fully stopped */
+> > +	orion_wdt_stop(&orion_wdt);
+> > +
+> 
+> Actually we just had that in another driver, and I stumbled over it there.
+> 
+> Problem with stopping the watchdog in probe unconditionally is that you can
+> use it to defeat nowayout: unload the module, then load it again,
+> and the watchdog is stopped even if nowayout is true.
+> 
 
-On 07/02/2014 11:02, Nicolas Ferre wrote:
-> On 06/02/2014 19:53, Colin King :
->> From: Colin Ian King <colin.king@canonical.com>
->>
->> remove the redundant shift = shift assignment, it is extraneous.
-Thanks for reporting and fixing this.
+Hm... I see.
 
->> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->
-> Thanks.
->
-> Boris, can you integrate this patch to the "fixes" series that will be
-> sent to Mike during the 3.14 development cycle?
+> Is this really what you want ? Or, in other words, what is the problem
+> you are trying to solve ?
+> 
 
-The round_rate function has been replaced by determine_rate and thus the 
-bug is not present anymore.
+Well, this is related to the discussion about the bootloader not
+reseting the watchdog properly, provoking spurious watchdog triggering.
 
-See JJ's series: 
-http://us.generation-nt.com/patch-v2-0-4-clk-at91-better-support-pcks-help-213900572.html
+Jason Gunthorpe explained [1] that we needed a particular sequence:
 
-Best Regards,
+ 1. Disable WDT
+ 2. Clear bridge
+ 3. Enable WDT
 
-Boris
+We added the irq handling to satisfy (2), and the watchdog stop for (1).
 
-> Bye,
->
->> ---
->>   drivers/clk/at91/clk-programmable.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
->> index fd792b2..ff86efe 100644
->> --- a/drivers/clk/at91/clk-programmable.c
->> +++ b/drivers/clk/at91/clk-programmable.c
->> @@ -109,7 +109,7 @@ static long clk_programmable_round_rate(struct clk_hw *hw, unsigned long rate,
->>   	unsigned long best_diff;
->>   	unsigned long new_diff;
->>   	unsigned long cur_rate;
->> -	int shift = shift;
->> +	int shift;
->>   
->>   	if (rate > *parent_rate)
->>   		return *parent_rate;
->>
->
+The watchdog stop was agreed specifically [2].
+
+Ideas?
+
+[1] http://www.spinics.net/lists/arm-kernel/msg302340.html
+[2] http://www.spinics.net/lists/arm-kernel/msg302507.html
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
