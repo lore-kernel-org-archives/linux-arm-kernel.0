@@ -1,53 +1,49 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 06 Feb 2014 18:02:56 -0800
-Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
- initially stopped
-In-Reply-To: <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <52F43ED0.4050808@roeck-us.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 7 Feb 2014 10:30:16 +0800
+Subject: [PATCH v2] pwm: add CSR SiRFSoC PWM driver
+In-Reply-To: <201402061627.17086.arnd@arndb.de>
+References: <1391061145-2078-1-git-send-email-21cnbao@gmail.com>
+ <201401311623.56902.arnd@arndb.de>
+ <CAGsJ_4xmtt2Pg_mHJmvt9uc3Y4gN7KUT1UOJhbr6FQYdiAH3qw@mail.gmail.com>
+ <201402061627.17086.arnd@arndb.de>
+Message-ID: <CAGsJ_4z8nKUF7+quo6VRyHqr9Z_MiM9TnQt4Vz0Xhh+qWQoupA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2014 09:20 AM, Ezequiel Garcia wrote:
-> Having the watchdog initially fully stopped is important to avoid
-> any spurious watchdog triggers, in case the registers are not in
-> its reset state.
+2014-02-06 23:27 GMT+08:00 Arnd Bergmann <arnd@arndb.de>:
+> On Thursday 06 February 2014, Barry Song wrote:
+>> > How about modeling  that other source as a fixed-rate clock in DT
+>> > then?
+>>
+>> sirfsoc clock drivers have a clock node for OSC whose index is "1".
+>> do you think the following is the right way to handle?
+>>
+>> in dts, put both pwm controller clock and OSC
+>> 672                         pwm: pwm at b0130000 {
+>> 673                                 compatible = "sirf,prima2-pwm";
+>> 674                                 #pwm-cells = <2>;
+>> 675                                 reg = <0xb0130000 0x10000>;
+>> 676                                 clocks = <&clks 21>,  <&clks 1>;
+>> 677                                 clock-names = "pwmc", "osc";
+>> 678                         };
+>>
+>> and in pwm-sirf.c driver, use
+>> clk = clk_get(dev, "osc");
+>> clk_get_rate(clk);
+>>
+>> to get the rate in probe()?
 >
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Tested-by: Willy Tarreau <w@1wt.eu>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->   drivers/watchdog/orion_wdt.c | 3 +++
->   1 file changed, 3 insertions(+)
+> Ah, if that's the right clock, it sounds great, yes.
 >
-> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-> index 6746033..2dbeee9 100644
-> --- a/drivers/watchdog/orion_wdt.c
-> +++ b/drivers/watchdog/orion_wdt.c
-> @@ -142,6 +142,9 @@ static int orion_wdt_probe(struct platform_device *pdev)
->   	orion_wdt.max_timeout = wdt_max_duration;
->   	watchdog_init_timeout(&orion_wdt, heartbeat, &pdev->dev);
+> Just make sure that the clock-names values make sense from the
+> point of view of the pwm node, rather than referring to the
+> name given in the clock provider.
+
+from the point of clock provider, it is "osc", from the view of pwm,
+it is the clock source of PWM waves.
+so i guess "clk_pwm_source" is preferred?
+
 >
-> +	/* Let's make sure the watchdog is fully stopped */
-> +	orion_wdt_stop(&orion_wdt);
-> +
+>         Arnd
 
-Actually we just had that in another driver, and I stumbled over it there.
-
-Problem with stopping the watchdog in probe unconditionally is that you can
-use it to defeat nowayout: unload the module, then load it again,
-and the watchdog is stopped even if nowayout is true.
-
-Is this really what you want ? Or, in other words, what is the problem
-you are trying to solve ?
-
-Thanks,
-Guenter
-
-
->   	watchdog_set_nowayout(&orion_wdt, nowayout);
->   	ret = watchdog_register_device(&orion_wdt);
->   	if (ret)
->
+-barry
