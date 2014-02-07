@@ -1,43 +1,59 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Fri, 07 Feb 2014 12:12:30 +0100
-Subject: [PATCH 1/2] ALSA: hda/ca0132 - setup/cleanup streams
-In-Reply-To: <s5hvbwrtchj.wl%tiwai@suse.de>
-References: <1391744130-15043-1-git-send-email-hychao@chromium.org>
- <s5hvbwrtchj.wl%tiwai@suse.de>
-Message-ID: <s5hppmztbvl.wl%tiwai@suse.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 7 Feb 2014 11:23:38 +0000
+Subject: [PATCH 3/6] irqchip: gic: use writel instead of dsb +
+ writel_relaxed
+In-Reply-To: <20140206152048.GD32520@arm.com>
+References: <1391686253-13436-3-git-send-email-will.deacon@arm.com>
+ <20140206114559.GK29446@arm.com>
+ <20140206115121.GN26035@mudshark.cambridge.arm.com>
+ <20140206115430.GN29446@arm.com>
+ <20140206115739.GP26035@mudshark.cambridge.arm.com>
+ <20140206120035.GQ29446@arm.com>
+ <20140206121350.GQ26035@mudshark.cambridge.arm.com>
+ <20140206122340.GC32520@arm.com>
+ <20140206132643.GS26035@mudshark.cambridge.arm.com>
+ <20140206152048.GD32520@arm.com>
+Message-ID: <20140207112337.GC5976@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Fri, 07 Feb 2014 11:59:20 +0100,
-Takashi Iwai wrote:
-> 
-> At Fri,  7 Feb 2014 11:35:29 +0800,
-> Hsin-Yu Chao wrote:
+On Thu, Feb 06, 2014 at 03:20:48PM +0000, Catalin Marinas wrote:
+> On Thu, Feb 06, 2014 at 01:26:44PM +0000, Will Deacon wrote:
+> > On Thu, Feb 06, 2014 at 12:23:40PM +0000, Catalin Marinas wrote:
+> > > On Thu, Feb 06, 2014 at 12:13:50PM +0000, Will Deacon wrote:
+> > > > Ok, so if we assume that a dsb(ishst) is sufficient because the CPU we're
+> > > > talking to is either (a) coherent in the inner-shareable domain or (b)
+> > > > incoherent, and we flushed everything to PoC, then why wouldn't a dmb(ishst)
+> > > > work?
+> > > 
+> > > Because you want to guarantee the ordering between a store to Normal
+> > > Cacheable memory vs store to Device for the IPI (see the mailbox example
+> > > in the Barrier Litmus section ;)). The second is just a slave access, DMB
+> > > guarantees observability from the master access perspective.
 > > 
-> > When a HDMI stream is opened with the same stream tag
-> > as a following opened stream to ca0132, audio will be
-> > heard from two ports simultaneously.
-> > Fix this issue by change to use snd_hda_codec_setup_stream
-> > and snd_hda_codec_cleanup_stream instead, so that an
-> > inactive stream can be marked as 'dirty' when found
-> > with a conflict stream tag, and then get purified.
+> > Ok, my reasoning is as follows:
 > > 
-> > Signed-off-by: Hsin-Yu Chao <hychao@chromium.org>
-> > Reviewed-by: Chih-Chung Chang <chihchung@chromium.org>
+> >   - CPU0 tries to message CPU1. It writes to a location in normal memory,
+> >     then writes to the GICD to send the SGI
+> > 
+> >   - We need to ensure that CPU1 observes the write to normal memory before
+> >     the write to GICD reaches the distributor. This is *not* about end-point
+> >     ordering (the usual non-coherent DMA example).
+> > 
+> >   - A dmb ishst ensures that the two writes are observed in order by CPU1
+> >     (and, in fact, the inner-shareable domain containing CPU0).
 > 
-> Thanks, applied this one.
+> The last bullet point is not correct. DMB would only guarantee that the
+> two writes (memory and GICD) are observed by CPU1 if CPU1 actually read
+> the GICD (observability is defined for master accesses).
 
-Hrm, not good.
+No, that's not how observability is defined, unfortunately.
 
-sound/pci/hda/patch_ca0132.c: In function ?ca0132_playback_pcm_prepare?:
-sound/pci/hda/patch_ca0132.c:2675:2: error: implicit declaration of function ?ca0132_toggle_dac_format? [-Werror=implicit-function-declaration]
-  ca0132_toggle_dac_format(codec);
-  ^
+Rather than attempt to solve this via email (your examples below are already
+getting hard to follow :), how about we sit down with $drink_of_choice and
+post back here with our conclusions?
 
-Please give a patch that really builds and works cleanly with the
-upstream code!
+In the meantime, I'll use dsb(ishst) because I think we now agree that
+works. The question is whether it can be relaxed further to a dmb.
 
-
-thanks,
-
-Takashi
+Will
