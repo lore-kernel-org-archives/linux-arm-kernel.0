@@ -1,59 +1,94 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 7 Feb 2014 10:15:22 -0500
-Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
-In-Reply-To: <20140207160954.69fbca38@skate>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-22-git-send-email-andrew@lunn.ch>
- <20140207093313.1a979a8f@skate>
- <20140207150306.GX8533@titan.lakedaemon.net>
- <20140207160954.69fbca38@skate>
-Message-ID: <20140207151522.GZ8533@titan.lakedaemon.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 7 Feb 2014 12:17:28 -0300
+Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
+ initially stopped
+In-Reply-To: <52F4E1C1.4010805@roeck-us.net>
+References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <52F43ED0.4050808@roeck-us.net> <20140207104044.GA11063@localhost>
+ <52F4E1C1.4010805@roeck-us.net>
+Message-ID: <20140207151727.GB8218@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 04:09:54PM +0100, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
+On Fri, Feb 07, 2014 at 05:38:09AM -0800, Guenter Roeck wrote:
+> On 02/07/2014 02:40 AM, Ezequiel Garcia wrote:
+> > On Thu, Feb 06, 2014 at 06:02:56PM -0800, Guenter Roeck wrote:
+> >> On 02/06/2014 09:20 AM, Ezequiel Garcia wrote:
+> >>> Having the watchdog initially fully stopped is important to avoid
+> >>> any spurious watchdog triggers, in case the registers are not in
+> >>> its reset state.
+> >>>
+> >>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> >>> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> >>> Tested-by: Willy Tarreau <w@1wt.eu>
+> >>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> >>> ---
+> >>>    drivers/watchdog/orion_wdt.c | 3 +++
+> >>>    1 file changed, 3 insertions(+)
+> >>>
+> >>> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+> >>> index 6746033..2dbeee9 100644
+> >>> --- a/drivers/watchdog/orion_wdt.c
+> >>> +++ b/drivers/watchdog/orion_wdt.c
+> >>> @@ -142,6 +142,9 @@ static int orion_wdt_probe(struct platform_device *pdev)
+> >>>    	orion_wdt.max_timeout = wdt_max_duration;
+> >>>    	watchdog_init_timeout(&orion_wdt, heartbeat, &pdev->dev);
+> >>>
+> >>> +	/* Let's make sure the watchdog is fully stopped */
+> >>> +	orion_wdt_stop(&orion_wdt);
+> >>> +
+> >>
+> >> Actually we just had that in another driver, and I stumbled over it there.
+> >>
+> >> Problem with stopping the watchdog in probe unconditionally is that you can
+> >> use it to defeat nowayout: unload the module, then load it again,
+> >> and the watchdog is stopped even if nowayout is true.
+> >>
+> >
+> > Hm... I see.
+> >
+> >> Is this really what you want ? Or, in other words, what is the problem
+> >> you are trying to solve ?
+> >>
+> >
+> > Well, this is related to the discussion about the bootloader not
+> > reseting the watchdog properly, provoking spurious watchdog triggering.
+> >
+> > Jason Gunthorpe explained [1] that we needed a particular sequence:
+> >
+> >   1. Disable WDT
+> >   2. Clear bridge
+> >   3. Enable WDT
+> >
+> > We added the irq handling to satisfy (2), and the watchdog stop for (1).
+> >
+> > The watchdog stop was agreed specifically [2].
+> >
+> > Ideas?
+> >
 > 
-> On Fri, 7 Feb 2014 10:03:06 -0500, Jason Cooper wrote:
+> Other drivers assume that if the watchdog is running, it is supposed
+> to be running. The more common approach in such cases is to ping the
+> watchdog once to give userspace more time to get ready, but leave
+> it enabled. So you could check if the watchdog is enabled, and if
+> it was enabled re-enable it after initialization is complete
+> (and maybe log a message stating that the watchdog is enabled).
 > 
-> > Ideally, I'd prefer multi_v7 and multi_v5 for DT, and
-> > {kirkwood,dove,orion5x,mv78xx0}_defconfig for non-DT legacy building.
-> > The latter going away once we deprecate non-DT booting.  There is a case
-> > to be made for the arch-specific defconfigs, though.
-> > 
-> > Currently (includes modules if configured, and dtbs);
-> > 
-> >   mvebu_defconfig	00:02:56
-> >   x86_64_defconfig	00:04:24
-> >   multi_v7_defconfig	00:04:05
-> > 
-> > 1 minute and 9 seconds doesn't drastically change a bathroom break or
-> > tea time ;-)  But it is a 33% increase.
+> If you don't want to do that, and if you are defeating nowayout
+> on purpose to fix a problem with a broken bootloader,
+> you should at least put in comment describing the problem you are
+> trying to solve, and that you accept breaking nowayout with your fix.
 > 
-> I also like to have a more focused defconfig than multi_v7 for
-> development.
-> 
-> > If we want something leaner than multi_v7, how about
-> > armada_370-xp_defconfig to replace the current mvebu_defconfig?
-> 
-> Doesn't work for me: we're going to introduce soon the support for
-> other mvebu ARMv7 SoC that are not Armada 370 nor XP, but that should
-> be built as part of this.
-> 
-> Why not mvebu_v7 and mvebu_v5 as I suggested? mvebu_v7 would build both
-> Dove and Armada 370/XP (and the other ones we are going to introduce
-> soon), mvebu_v5 would build Kirkwood (and possibly Orion5x once I find
-> enough time to work on this platform).
 
-Yeah, I can go with that, as long as Sebastian doesn't see a need for a
-separate dove_defconfig in the long term (DT only).  Sebastian?
+I'm not fond of not having "nowayout" option on our driver, given I'm sure
+it's a watchdog feature for a good reason.
 
-> This way, ultimately we can simply remove kirkwood_defconfig and
-> dove_defconfig, as soon as all legacy platforms have been either
-> converted to DT, or removed.
+On the other side, I can't see how can we distinguish a previously
+and explicitly enabled watchdog, from a spurious enable by broken bootloader.
 
-Yep, the fewer builds I have to do per patch submission, the better.
-
-thx,
-
-Jason.
+Jason, what do you say?
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
