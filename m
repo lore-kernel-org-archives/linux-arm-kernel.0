@@ -1,90 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 07 Feb 2014 16:18:00 +0100
-Subject: [PATCH] i2c: mv64xxx: Fix locked bus when offload is selected
- but not used on a message
-In-Reply-To: <20140207150958.GY8533@titan.lakedaemon.net>
-References: <1391770588-1344-1-git-send-email-gregory.clement@free-electrons.com>
- <20140207150958.GY8533@titan.lakedaemon.net>
-Message-ID: <52F4F928.40100@free-electrons.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Fri,  7 Feb 2014 20:49:00 +0530
+Subject: [PATCH v2 0/2] Add device tree based lookup of boost mode frequency
+Message-ID: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2014 16:09, Jason Cooper wrote:
-> On Fri, Feb 07, 2014 at 11:55:54AM +0100, Gregory CLEMENT wrote:
->> Offload can be used only on regular transactions and for 1 to byte
->> transfers. In the other cases we switch back to usual work flow.
->>
->> In this case we need to call mv64xxx_i2c_prepare_for_io() as this
->> function is not used when we try to use offloading.
->>
->> This commit adds this missing call when offloading have failed in the
->> MV64XXX_I2C_ACTION_OFFLOAD_SEND_START case.
->>
->> This fix the timeout seen when the the i2c driver try to access an
->> address where the device is absent on the Armada XP bases board.
->>
->> Cc: stable at vger.kernel.org # v3.12+
->> Fixes: 930ab3d403ae (i2c: mv64xxx: Add I2C Transaction Generator support)
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  drivers/i2c/busses/i2c-mv64xxx.c | 9 ++++++++-
->>  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> I'd like to get a few tested-by's on this before this is pushed.  We've
-> had quite a bit of fixes this round :(  Please test both multi_v7 and
-> mvebu defconfigs.
+Changes since v1:
+- Boost mode frequencies are specfied as a set of frequencies instead of
+  specifying them as OPPs. Thanks to Nishanth, Lukasz and Rob for the
+  feedback.
 
-Well of course I have tested with multi_v7 and mvebu defconfigs, but I
-think it is not my tested-by that you want! :)
+Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
+support for CPU boost mode for CPUfreq drivers. To use the new boost
+mode, CPUfreq drivers have to specify the boost mode frequency and
+voltage within the CPUfreq driver, which is the case for Exynos4x12
+CPUfreq driver.
 
-An for the test we only have to test the Armada XP B0 based board, because
-in the other case the offload is disable, so the code I modified never
-doesn't run.
+But for CPUfreq drivers which obtain the OPPs from cpus node, this
+patch series adds support to specify boost mode frequencies in the
+cpu device tree node. This requirement came up when Lukasz pointed
+out the regression caused by the Exynos CPUfreq driver consolidation
+patches.
 
+Thomas Abraham (2):
+  PM / OPP: Allow boost frequency to be looked up from device tree
+  Documentation: devicetree: Add boost-frequency binding to list boost mode frequency
 
-Thanks,
-
-Gregory
-
-
-> 
-> Kevin, I know you're busy with a lot more than us, but if you could
-> confirm that this fixes the bus hangs you reported, that would be great.
-> 
-> thx,
-> 
-> Jason.
-> 
->>
->> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
->> index b8c5187b9ee0..a1700c62d955 100644
->> --- a/drivers/i2c/busses/i2c-mv64xxx.c
->> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
->> @@ -461,8 +461,15 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
->>  	case MV64XXX_I2C_ACTION_OFFLOAD_SEND_START:
->>  		if (!mv64xxx_i2c_offload_msg(drv_data))
->>  			break;
->> -		else
->> +		else {
->>  			drv_data->action = MV64XXX_I2C_ACTION_SEND_START;
->> +			/*
->> +			 * Switch to the standard path, so we finally need to
->> +			 * prepare the io that have not been done in
->> +			 * mv64xxx_i2c_execute_msg
->> +			 */
->> +			mv64xxx_i2c_prepare_for_io(drv_data, drv_data->msgs);
->> +		}
->>  		/* FALLTHRU */
->>  	case MV64XXX_I2C_ACTION_SEND_START:
->>  		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_START,
->> -- 
->> 1.8.1.2
->>
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+ .../devicetree/bindings/cpufreq/cpufreq-boost.txt  |   11 +++++++
+ drivers/base/power/opp.c                           |   34 +++++++++++++++++++-
+ 2 files changed, 44 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
