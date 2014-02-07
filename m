@@ -1,77 +1,134 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 7 Feb 2014 16:25:08 +0000
-Subject: [PATCH] ARM: enable IRQs in user undefined instruction vector
-In-Reply-To: <20140206205447.GX26684@n2100.arm.linux.org.uk>
-References: <1391545146-8320-1-git-send-email-kevin@bracey.fi>
- <20140206112039.GA31054@arm.com> <52F3D024.5020804@bracey.fi>
- <20140206205447.GX26684@n2100.arm.linux.org.uk>
-Message-ID: <20140207162508.GA7048@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 07 Feb 2014 17:27:32 +0100
+Subject: [PATCH v4 1/5] clk: sunxi: Add support for USB clock-register
+ reset bits
+In-Reply-To: <1391786513-20780-2-git-send-email-hdegoede@redhat.com>
+References: <1391786513-20780-1-git-send-email-hdegoede@redhat.com>
+ <1391786513-20780-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1391790452.5442.0.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 08:54:48PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Feb 06, 2014 at 08:10:44PM +0200, Kevin Bracey wrote:
-> > The VFP code did take pains to increment the pre-emption count before  
-> > enabling interrupts, but it's not obvious whether it requires no  
-> > pre-emption between the bounce and handler, or just no pre-emption  
-> > during the handler.
+Am Freitag, den 07.02.2014, 16:21 +0100 schrieb Hans de Goede:
+> The usb-clk register is special in that it not only contains clk gate bits,
+> but also has a few reset bits. This commit adds support for this by allowing
+> gates type sunxi clks to also register a reset controller.
 > 
-> Just take a moment to think about this.
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+> ---
+>  drivers/clk/sunxi/clk-sunxi.c | 71 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 71 insertions(+)
 > 
-> - Userspace raises an undefined instruction exception, running on CPU 0.
-> - The kernel starts to handle the exception by saving the ARM state.
-> - Enables interrupts.
-> - Context switch occurs.
-> - VFP state is saved and the VFP is disabled.
-
-There is one case when it isn't saved because of FPEXC_EN being cleared
-but we don't care since the VFP registers haven't been touched.
-
-> Now, on CPU1...
-> - Context switch occurs to the above thread (due to thread migration).
-> - VFP will be in a disabled state.
-> - We read FPEXC, find that the VFP is disabled
-> - Load saved state into the VFP
-> - Check for an exception recorded in the VFP state, and handle it.
-
-This should work since we check the restored registers.
-
-> > What about the iwmmxt and the crunchbits? They are only lazy-enable  
-> > routines, to activate an inactive coprocessor. Which I think makes them  
-> > safe. If we schedule before reaching the handler, when this context is  
-> > returned to, the coprocessor must still be disabled in our context - the  
-> > handler can proceed to enable it. And there can't be any other context  
-> > state to worry about, assuming the lazy enable scheme works.
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 64bda21..1e15e4c 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/clkdev.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <linux/reset-controller.h>
+>  
+>  #include "clk-factors.h"
+>  
+> @@ -838,6 +839,59 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+>  
 > 
-> Again, the restore needs to happen with preemption disabled so that
-> you don't end up with the state half-restored, and then when you
-> resume the thread, you restore the other half.
+>  /**
+> + * sunxi_gates_reset... - reset bits in leaf gate clk registers handling
+> + */
+> +
+> +struct gates_reset_data {
+> +	void __iomem			*reg;
+> +	spinlock_t			*lock;
+> +	struct reset_controller_dev	rcdev;
+> +};
+> +
+> +static int sunxi_gates_reset_assert(struct reset_controller_dev *rcdev,
+> +			      unsigned long id)
+> +{
+> +	struct gates_reset_data *data = container_of(rcdev,
+> +						     struct gates_reset_data,
+> +						     rcdev);
+> +	unsigned long flags;
+> +	u32 reg;
+> +
+> +	spin_lock_irqsave(data->lock, flags);
+> +
+> +	reg = readl(data->reg);
+> +	writel(reg & ~BIT(id), data->reg);
+> +
+> +	spin_unlock_irqrestore(data->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int sunxi_gates_reset_deassert(struct reset_controller_dev *rcdev,
+> +				unsigned long id)
+> +{
+> +	struct gates_reset_data *data = container_of(rcdev,
+> +						     struct gates_reset_data,
+> +						     rcdev);
+> +	unsigned long flags;
+> +	u32 reg;
+> +
+> +	spin_lock_irqsave(data->lock, flags);
+> +
+> +	reg = readl(data->reg);
+> +	writel(reg | BIT(id), data->reg);
+> +
+> +	spin_unlock_irqrestore(data->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct reset_control_ops sunxi_gates_reset_ops = {
+> +	.assert		= sunxi_gates_reset_assert,
+> +	.deassert	= sunxi_gates_reset_deassert,
+> +};
+> +
+> +/**
+>   * sunxi_gates_clk_setup() - Setup function for leaf gates on clocks
+>   */
+>  
+> @@ -845,6 +899,7 @@ static void __init sunxi_divider_clk_setup(struct device_node *node,
+>  
+>  struct gates_data {
+>  	DECLARE_BITMAP(mask, SUNXI_GATES_MAX_SIZE);
+> +	u32 reset_mask;
+>  };
+>  
+>  static const struct gates_data sun4i_axi_gates_data __initconst = {
+> @@ -915,6 +970,7 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
+>  					 struct gates_data *data)
+>  {
+>  	struct clk_onecell_data *clk_data;
+> +	struct gates_reset_data *reset_data;
+>  	const char *clk_parent;
+>  	const char *clk_name;
+>  	void *reg;
+> @@ -958,6 +1014,21 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
+>  	clk_data->clk_num = i;
+>  
+>  	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> +
+> +	/* Register a reset controler for gates with reset bits */
+> +	if (data->reset_mask == 0)
+> +		return;
+> +
+> +	reset_data = kzalloc(sizeof(*reset_data), GFP_KERNEL);
+> +	if (!reset_data)
+> +		return;
+> +
+> +	reset_data->reg = reg;
+> +	reset_data->lock = &clk_lock;
+> +	reset_data->rcdev.nr_resets = __fls(data->reset_mask) + 1;
+> +	reset_data->rcdev.ops = &sunxi_gates_reset_ops;
+> +	reset_data->rcdev.of_node = node;
+> +	reset_controller_register(&reset_data->rcdev);
+>  }
+>  
 > 
-> This is actually the case I'm more worried about - whether all the
-> various handlers are safe being entered with preemption enabled.
-> They weren't written for it so the current answer is that they
-> aren't safe.
-
-My patchset disables preemption on entering those handlers via
-__und_usr, so they don't touch their state with preemption enabled
-(well, review is still needed, I can repost them).
-
-> > I share Alexey's Ignatov's concern that your patch ends up running the  
-> > support code with interrupts either on or off depending on whether you  
-> > came from user or supervisor mode, which feels a little odd. But then,  
-> > always enabling interrupts like the current code does, when they might  
-> > have been off in the SVC mode context, also seems wrong.
-> 
-> That is indeed wrong, but then we /used/ to have the requirement that
-> the kernel will _never_ execute VFP instructions.  That's changed
-> recently since we now permit neon instructions to be executed.
-
-Even if we would take VFP faults from the kernel, I think they are fine
-to be executed with interrupts disabled. The problem is when we get page
-faults and these may sleep but that's not the case with kernel mappings.
-
-An alternative would be to only enable interrupts around user access in
-__und_usr and disable them again afterwards.
-
--- 
-Catalin
