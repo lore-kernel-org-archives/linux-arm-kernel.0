@@ -1,73 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 07 Feb 2014 15:49:29 +0100
-Subject: [PATCH] clk: respect the clock dependencies in of_clk_init
-In-Reply-To: <20140207144325.GA8218@localhost>
-References: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
- <52F4DA40.4090804@elopez.com.ar> <20140207142430.GU8533@titan.lakedaemon.net>
- <20140207144325.GA8218@localhost>
-Message-ID: <52F4F279.6010006@free-electrons.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri,  7 Feb 2014 15:59:08 +0100
+Subject: [PATCH 1/8] tty/serial: at91: use dev_err instead of printk
+In-Reply-To: <1391785155-18525-1-git-send-email-richard.genoud@gmail.com>
+References: <1391785155-18525-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1391785155-18525-2-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2014 15:43, Ezequiel Garcia wrote:
-> On Fri, Feb 07, 2014 at 09:24:30AM -0500, Jason Cooper wrote:
->> On Fri, Feb 07, 2014 at 10:06:08AM -0300, Emilio L?pez wrote:
->>
->> [snip a great explanation]
->>
->> Guys, can I get some Tested-by's on this?
->>
-> 
-> In case someone missed Emilio's comment about it, I gave his oneliner
-> a test on A370 Reference Design. It worked just as well as Sebastian's.
+For better consistency.
 
-Well ok it's working but this patch is not better than Sebastian, it is
-even worth. I don't think it is a good idea at all to totally ignore the
-information given by the device tree.
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+ drivers/tty/serial/atmel_serial.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> 
-> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> 
->>> -----8<------
->>>
->>> From ffdb49506e3ce92090c15e1f9b37f4d465097ac1 Mon Sep 17 00:00:00 2001
->>> From: =?UTF-8?q?Emilio=20L=C3=B3pez?= <emilio@elopez.com.ar>
->>> Date: Thu, 6 Feb 2014 18:07:07 -0300
->>> Subject: [PATCH] clk: mvebu: fix name dependency during registration time
->>>
->>> Currently, mvebu_clk_gating_setup has a silly dependency on clock
->>> registration order just to gather the parent clock name. This is
->>> completely unnecesary, as it supports using an already provided name
->>> via the clk_gating_soc_desc structs, and we can therefore solve this
->>> issue with a 69+/- line patch. But, given that the parent name is
->>> always "tclk" as default-hardcoded on mvebu_coreclk_setup(), we can
->>> just default-hardcode it here too and get away with solving this
->>> problem with a one-liner.
->>> ---
->>>  drivers/clk/mvebu/common.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
->>> index 25ceccf..6c63b43 100644
->>> --- a/drivers/clk/mvebu/common.c
->>> +++ b/drivers/clk/mvebu/common.c
->>> @@ -121,7 +121,7 @@ void __init mvebu_clk_gating_setup(struct
->>> device_node *np,
->>>  	struct clk_gating_ctrl *ctrl;
->>>  	struct clk *clk;
->>>  	void __iomem *base;
->>> -	const char *default_parent = NULL;
->>> +	const char *default_parent = "tclk";
->>>  	int n;
->>>
->>>  	base = of_iomap(np, 0);
->>> -- 
->>> 1.8.5.3
-> 
-
-
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 91c0d8839570..ed9621a21d67 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1549,7 +1549,7 @@ static int atmel_startup(struct uart_port *port)
+ 	retval = request_irq(port->irq, atmel_interrupt, IRQF_SHARED,
+ 			tty ? tty->name : "atmel_serial", port);
+ 	if (retval) {
+-		printk("atmel_serial: atmel_startup - Can't get irq\n");
++		dev_err(port->dev, "atmel_startup - Can't get irq\n");
+ 		return retval;
+ 	}
+ 
+@@ -1732,7 +1732,7 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
+ 		clk_disable_unprepare(atmel_port->clk);
+ 		break;
+ 	default:
+-		printk(KERN_ERR "atmel_serial: unknown pm %d\n", state);
++		dev_err(port->dev, "atmel_serial: unknown pm %d\n", state);
+ 	}
+ }
+ 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.5
