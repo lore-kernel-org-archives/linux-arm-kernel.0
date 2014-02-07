@@ -1,43 +1,57 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Fri, 7 Feb 2014 13:35:00 +0900
-Subject: [PATCH v2 0/6] ARM: firmware: improvements to Trusted Foundations
- support
-Message-ID: <1391747706-1847-1-git-send-email-acourbot@nvidia.com>
+Date: Fri, 7 Feb 2014 13:35:02 +0900
+Subject: [PATCH v2 2/6] ARM: trusted_foundations: fallback when TF support is
+ missing
+In-Reply-To: <1391747706-1847-1-git-send-email-acourbot@nvidia.com>
+References: <1391747706-1847-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <1391747706-1847-3-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These (mostly minor) patches fix a few typos, improve points that
-were agreed upon when the Trusted Foundation series was initially
-submitted, and more importantly add support for a prepare_idle()
-firmware operation that informs the firmware a CPU is doing idle.
-Tegra's cpuidle driver is then also updated accordingly.
+When Trusted Foundations is detected as present on the system, but
+Trusted Foundations support is not built into the kernel, the kernel
+used to issue a panic very early during boot, leaving little clue to the
+user as to what is going wrong.
 
-These patches should be the last step before device trees for NVIDIA
-SHIELD and Tegra Note 7 can be submitted.
+It turns out that even without TF support built-in, the kernel can boot
+on a TF-enabled system provided that SMP and cpuidle are disabled. This
+patch does this and continue booting on one CPU, leaving the user with a
+usable (however degraded) system.
 
-Changes since v1:
-- Do not remove TF support from tegra_defconfig (will automatically be taken
-  care of during next configuration update)
-- Add a new prepare_idle() operation to firmware_ops that informs the firmware
-  a CPU is going idle (vs. asking the firmware to do it itself as do_idle()
-  does)
-- Fix idle states names in TF implementation of prepare_idle to sound less
-  Tegra-specific
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+ arch/arm/include/asm/trusted_foundations.h | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-Alexandre Courbot (6):
-  ARM: trusted_foundations: fix vendor prefix typos
-  ARM: trusted_foundations: fallback when TF support is missing
-  ARM: firmware: enable Trusted Foundations by default
-  ARM: firmware: add prepare_idle() operation
-  ARM: trusted_foundations: implement prepare_idle()
-  ARM: tegra: cpuidle: use firmware for power down
-
- arch/arm/firmware/Kconfig                  |  3 ++-
- arch/arm/firmware/trusted_foundations.c    | 20 +++++++++++++++++++-
- arch/arm/include/asm/firmware.h            |  4 ++++
- arch/arm/include/asm/trusted_foundations.h | 13 +++++++++----
- arch/arm/mach-tegra/cpuidle-tegra114.c     | 11 ++++++++++-
- 5 files changed, 44 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
+index 997862fd5d77..b5f7705abcb0 100644
+--- a/arch/arm/include/asm/trusted_foundations.h
++++ b/arch/arm/include/asm/trusted_foundations.h
+@@ -30,6 +30,8 @@
+ #include <linux/printk.h>
+ #include <linux/bug.h>
+ #include <linux/of.h>
++#include <linux/cpu.h>
++#include <linux/smp.h>
+ 
+ struct trusted_foundations_platform_data {
+ 	unsigned int version_major;
+@@ -47,10 +49,13 @@ static inline void register_trusted_foundations(
+ 				   struct trusted_foundations_platform_data *pd)
+ {
+ 	/*
+-	 * If we try to register TF, this means the system needs it to continue.
+-	 * Its absence if thus a fatal error.
++	 * If the system requires TF and we cannot provide it, continue booting
++	 * but disable features that cannot be provided.
+ 	 */
+-	panic("No support for Trusted Foundations, stopping...\n");
++	pr_err("No support for Trusted Foundations, continuing in degraded mode.\n");
++	pr_err("Secondary processors as well as CPU PM will be disabled.\n");
++	setup_max_cpus = 0;
++	cpu_idle_poll_ctrl(true);
+ }
+ 
+ static inline void of_register_trusted_foundations(void)
 -- 
 1.8.5.3
