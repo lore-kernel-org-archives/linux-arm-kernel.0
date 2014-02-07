@@ -1,34 +1,49 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri,  7 Feb 2014 19:18:56 +0900
-Subject: [PATCH v3 6/6] arm64: Add 'notrace' attribute to unwind_frame() for
- ftrace
-In-Reply-To: <1391768336-5642-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1382598488-13511-1-git-send-email-takahiro.akashi@linaro.org>
- <1391768336-5642-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1391768336-5642-7-git-send-email-takahiro.akashi@linaro.org>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Fri, 7 Feb 2014 15:51:25 +0530
+Subject: [PATCH V2 3/4] ARM: OMAP2+: AM43x: determine features
+In-Reply-To: <1391768486-2134-1-git-send-email-lokeshvutla@ti.com>
+References: <1391768486-2134-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1391768486-2134-4-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-walk_stackframe() calls unwind_frame(), and if walk_stackframe() is
-"notrace", unwind_frame() should be also "notrace".
+From: Afzal Mohammed <afzal@ti.com>
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Determine AM43x device features by reusing AM335x helper as feature
+register layout is similar.
+And also exporting AM43xx family name.
+
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- arch/arm64/kernel/stacktrace.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-omap2/id.c |    2 ++
+ arch/arm/mach-omap2/io.c |    1 +
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index c3b6c63..54122c4 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -35,7 +35,7 @@
-  *	ldp	x29, x30, [sp]
-  *	add	sp, sp, #0x10
-  */
--int unwind_frame(struct stackframe *frame)
-+int notrace unwind_frame(struct stackframe *frame)
- {
- 	unsigned long high, low;
- 	unsigned long fp = frame->fp;
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 8a05eaf..157412e 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -667,6 +667,8 @@ static const char * __init omap_get_family(void)
+ 		return kasprintf(GFP_KERNEL, "OMAP4");
+ 	else if (soc_is_omap54xx())
+ 		return kasprintf(GFP_KERNEL, "OMAP5");
++	else if (soc_is_am43xx())
++		return kasprintf(GFP_KERNEL, "AM43xx");
+ 	else
+ 		return kasprintf(GFP_KERNEL, "Unknown");
+ }
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index d408b15..d971411 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -613,6 +613,7 @@ void __init am43xx_init_early(void)
+ 	omap_prm_base_init();
+ 	omap_cm_base_init();
+ 	omap3xxx_check_revision();
++	am33xx_check_features();
+ 	am43xx_powerdomains_init();
+ 	am43xx_clockdomains_init();
+ 	am43xx_hwmod_init();
 -- 
 1.7.9.5
