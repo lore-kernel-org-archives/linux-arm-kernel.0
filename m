@@ -1,176 +1,189 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Fri, 7 Feb 2014 10:33:45 +0100
-Subject: [PATCH v3 03/15] at91: dt: sam9261: Basic Device Tree support for
- the at91sam9261ek
-In-Reply-To: <20140207083007.GW9558@ns203013.ovh.net>
-References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
- <1390492639-7299-4-git-send-email-jjhiblot@traphandler.com>
- <20140207083007.GW9558@ns203013.ovh.net>
-Message-ID: <CACh+v5PMrC2UjRToNoABcSR4uYh7KtwSP003QqPKq4Rd33tFtQ@mail.gmail.com>
+From: vinayakm.list@gmail.com (vinayak menon)
+Date: Fri, 7 Feb 2014 15:30:13 +0530
+Subject: [PATCH] ARM: enable IRQs in user undefined instruction vector
+In-Reply-To: <20140206205447.GX26684@n2100.arm.linux.org.uk>
+References: <1391545146-8320-1-git-send-email-kevin@bracey.fi>
+ <20140206112039.GA31054@arm.com> <52F3D024.5020804@bracey.fi>
+ <20140206205447.GX26684@n2100.arm.linux.org.uk>
+Message-ID: <CAOaiJ-kY_VwsY0iHSMVQZx=zvP5is1LRkir5_zP6Jnttv+O1VQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-02-07 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
-> On 16:57 Thu 23 Jan     , Jean-Jacques Hiblot wrote:
->> This patch implements a simple DTS to boot a at91sam9261ek with a dt-enabled
->> kernel (at91_dt_defconfig).
->> Only dbgu, nand and watchdog are described in the DT.
->>
->> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->> ---
->>  arch/arm/boot/dts/Makefile          |   2 +
->>  arch/arm/boot/dts/at91sam9261ek.dts | 112 ++++++++++++++++++++++++++++++++++++
->>  2 files changed, 114 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/at91sam9261ek.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 772a30e..ece523d 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -11,6 +11,8 @@ dtb-$(CONFIG_ARCH_AT91) += ethernut5.dtb
->>  dtb-$(CONFIG_ARCH_AT91) += evk-pro3.dtb
->>  dtb-$(CONFIG_ARCH_AT91) += tny_a9260.dtb
->>  dtb-$(CONFIG_ARCH_AT91) += usb_a9260.dtb
->> +# sam9261
->> +dtb-$(CONFIG_ARCH_AT91) += at91sam9261ek.dtb
->>  # sam9263
->>  dtb-$(CONFIG_ARCH_AT91) += at91sam9263ek.dtb
->>  dtb-$(CONFIG_ARCH_AT91) += tny_a9263.dtb
->> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
->> new file mode 100644
->> index 0000000..8909217
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
->> @@ -0,0 +1,112 @@
->> +/*
->> + * at91sam9261ek.dts - Device Tree file for Atmel at91sam9261 reference board
->> + *
->> + *  Copyright (C) 2013 Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->> + *
->> + * Licensed under GPLv2 only.
->> + */
->> +/dts-v1/;
->> +#include "at91sam9261.dtsi"
->> +
->> +/ {
->> +     model = "Atmel at91sam9261ek";
->> +     compatible = "atmel,at91sam9261ek", "atmel,at91sam9261", "atmel,at91sam9";
->> +
->> +     chosen {
->> +             bootargs = "mem=64M console=ttyS0,115200";
-> drop the mem=64M
-my bad. It should indeed have been removed already.
+Can we do something similar to what pagefault_disable does ? So that
+we jump directly to fixup, after the in_atomic() check in
+do_page_fault.
+
+-------------------- >8 ----------------------------------------
+Disable pagefault (preemption) before executing ldrt/ldrht
+instructions in __und_usr, to tell the page fault
+handler that we are in atomic context and need to
+jump directly to the fixup.
+
+In the fixup, correct the PC to re-execute the
+faulted instruction (from Kevein Bracey's patch).
+
+Signed-off-by: Vinayak Menon <vinayakm.list@gmail.com>
+Signed-off-by: Kevin Bracey <kevin@bracey.fi>
+---
+ arch/arm/include/asm/assembler.h |   26 ++++++++++++++++++++++++++
+ arch/arm/kernel/entry-armv.S     |    8 ++++++++
+ 2 files changed, 34 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 5c22851..cba5f2c 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -23,6 +23,7 @@
+ #include <asm/ptrace.h>
+ #include <asm/domain.h>
+ #include <asm/opcodes-virt.h>
++#include <asm/asm-offsets.h>
+
+ #define IOMEM(x)       (x)
+
+@@ -85,6 +86,31 @@
+ #endif
+
+ /*
++ * Enable/Disable page fault
++ */
++#ifdef CONFIG_PREEMPT_COUNT
++       .macro  pgflt_disable, ti, tmp
++       get_thread_info \ti
++       ldr     \tmp, [\ti, #TI_PREEMPT]
++       add     \tmp, \tmp, #1
++       str     \tmp, [\ti, #TI_PREEMPT]
++       .endm
++
++       .macro  pgflt_enable, ti, tmp
++       get_thread_info \ti
++       ldr     \tmp, [\ti, #TI_PREEMPT]
++       sub     \tmp, \tmp, #1
++       str     \tmp, [\ti, #TI_PREEMPT]
++       .endm
++#else
++       .macro  pgflt_disable, ti, tmp
++       .endm
++
++       .macro  pgflt_enable, ti, tmp
++       .endm
++#endif
++
++/*
+  * Enable and disable interrupts
+  */
+ #if __LINUX_ARM_ARCH__ >= 6
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 1879e8d..5ed57d8 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -416,7 +416,9 @@ __und_usr:
+        tst     r3, #PSR_T_BIT                  @ Thumb mode?
+        bne     __und_usr_thumb
+        sub     r4, r2, #4                      @ ARM instr at LR - 4
++       pgflt_disable r10, r3
+ 1:     ldrt    r0, [r4]
++       pgflt_enable r10, r3
+  ARM_BE8(rev   r0, r0)                         @ little endian instruction
+
+        @ r0 = 32-bit ARM instruction which caused the exception
+@@ -450,11 +452,15 @@ __und_usr_thumb:
+  */
+        .arch   armv6t2
+ #endif
++       pgflt_disable r10, r3
+ 2:     ldrht   r5, [r4]
++       pgflt_enable r10, r3
+ ARM_BE8(rev16  r5, r5)                         @ little endian instruction
+        cmp     r5, #0xe800                     @ 32bit instruction if xx != 0
+        blo     __und_usr_fault_16              @ 16bit undefined instruction
++       pgflt_disable r10, r3
+ 3:     ldrht   r0, [r2]
++       pgflt_enable r10, r3
+ ARM_BE8(rev16  r0, r0)                         @ little endian instruction
+        add     r2, r2, #2                      @ r2 is PC + 2, make it PC + 4
+        str     r2, [sp, #S_PC]                 @ it's a 2x16bit instr, update
+@@ -484,6 +490,8 @@ ENDPROC(__und_usr)
+  */
+        .pushsection .fixup, "ax"
+        .align  2
++       str     r4, [sp, #S_PC]
++       pgflt_enable r10, r3
+ 4:     mov     pc, r9
+        .popsection
+        .pushsection __ex_table,"a"
+--
+
+On Fri, Feb 7, 2014 at 2:24 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Feb 06, 2014 at 08:10:44PM +0200, Kevin Bracey wrote:
+>> The VFP code did take pains to increment the pre-emption count before
+>> enabling interrupts, but it's not obvious whether it requires no
+>> pre-emption between the bounce and handler, or just no pre-emption
+>> during the handler.
 >
-> and use linux,stdout for the console
->> +     };
->> +
->> +     memory {
->> +             reg = <0x20000000 0x4000000>;
->> +     };
->> +
->> +     clocks {
->> +             #address-cells = <1>;
->> +             #size-cells = <1>;
->> +             ranges;
->> +
->> +             main_clock: clock at 0 {
->> +                     compatible = "atmel,osc", "fixed-clock";
->> +                     clock-frequency = <18432000>;
->> +             };
->> +     };
->> +
->> +     ahb {
->> +
->> +             nand0: nand at 40000000 {
->> +                     nand-bus-width = <8>;
->> +                     nand-ecc-mode = "soft";
->> +                     nand-on-flash-bbt = <1>;
-> it's a boolean just
-copy paste from 9263ek DT.
-I'll fix it there too.
->                         nand-on-flash-bbt;
->> +                     status = "okay";
->> +
->> +                     at91bootstrap at 0 {
->> +                             label = "at91bootstrap";
->> +                             reg = <0x0 0x40000>;
->> +                     };
->> +
->> +                     bootloader at 40000 {
->> +                             label = "bootloader";
->> +                             reg = <0x40000 0x80000>;
->> +                     };
->> +
->> +                     bootloaderenv at c0000 {
->> +                             label = "bootloader env";
->> +                             reg = <0xc0000 0xc0000>;
->> +                     };
->> +
->> +                     dtb at 180000 {
->> +                             label = "device tree";
->> +                             reg = <0x180000 0x80000>;
->> +                     };
->> +
->> +                     kernel at 200000 {
->> +                             label = "kernel";
->> +                             reg = <0x200000 0x600000>;
->> +                     };
->> +
->> +                     rootfs at 800000 {
->> +                             label = "rootfs";
->> +                             reg = <0x800000 0x0f800000>;
->> +                     };
+> Just take a moment to think about this.
 >
-> we really need to switch to UBI
-This mapping is fine for UBI (in terms of alignment).
-I could add UBI in the default bootargs
->> +             };
->> +
->> +             apb {
->> +                     dbgu: serial at fffff200 {
->> +                             status = "okay";
->> +                     };
->> +
->> +                     pinctrl at fffff400 {
->> +                             leds {
->> +                                     pinctrl_leds: leds-0 {
->> +                                             atmel,pins = <AT91_PIOA 13  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
->> +                                             AT91_PIOA 14  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
->> +                                             AT91_PIOA 23  AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
->> +                                     };
->> +                             };
->> +                     };
+> - Userspace raises an undefined instruction exception, running on CPU 0.
+> - The kernel starts to handle the exception by saving the ARM state.
+> - Enables interrupts.
+> - Context switch occurs.
+> - VFP state is saved and the VFP is disabled.
 >
-> no need this drop it
+> Now, on CPU1...
+> - Context switch occurs to the above thread (due to thread migration).
+> - VFP will be in a disabled state.
+> - We read FPEXC, find that the VFP is disabled
+> - Load saved state into the VFP
+> - Check for an exception recorded in the VFP state, and handle it.
 >
-> you need to only describe the GPIO if you have specific pinctrl property such
-> as pull up & co
->> +
->> +                     watchdog at fffffd40 {
->> +                             status = "okay";
->> +                     };
->> +             };
->> +     };
->> +
->> +     leds {
->> +             compatible = "gpio-leds";
->> +             ds8 {
->> +                     label = "ds8";
->> +                     gpios = <&pioA 13 GPIO_ACTIVE_LOW>;
->> +                     linux,default-trigger = "none";
->> +             };
->> +             ds7 {
->> +                     label = "ds7";
->> +                     gpios = <&pioA 14 GPIO_ACTIVE_LOW>;
->> +                     linux,default-trigger = "nand-disk";
->> +             };
->> +             ds1 {
->> +                     label = "ds1";
->> +                     gpios = <&pioA 23 GPIO_ACTIVE_LOW>;
->> +                     linux,default-trigger = "heartbeat";
->> +             };
->> +     };
->> +};
->> --
->> 1.8.5.2
->>
+> So, that seems to work.  I suspect most things will work just fine in
+> this case.  What /can't/ be allowed to happen is we can't start
+> reading state from the hardware to handle the exception (or even be
+> mid-restoring the state) and be preempted - if we do, we'll end up
+> in a right mess because we'll end up with inconsistent state.
+>
+>> What about the iwmmxt and the crunchbits? They are only lazy-enable
+>> routines, to activate an inactive coprocessor. Which I think makes them
+>> safe. If we schedule before reaching the handler, when this context is
+>> returned to, the coprocessor must still be disabled in our context - the
+>> handler can proceed to enable it. And there can't be any other context
+>> state to worry about, assuming the lazy enable scheme works.
+>
+> Again, the restore needs to happen with preemption disabled so that
+> you don't end up with the state half-restored, and then when you
+> resume the thread, you restore the other half.
+>
+> This is actually the case I'm more worried about - whether all the
+> various handlers are safe being entered with preemption enabled.
+> They weren't written for it so the current answer is that they
+> aren't safe.
+>
+>> I share Alexey's Ignatov's concern that your patch ends up running the
+>> support code with interrupts either on or off depending on whether you
+>> came from user or supervisor mode, which feels a little odd. But then,
+>> always enabling interrupts like the current code does, when they might
+>> have been off in the SVC mode context, also seems wrong.
+>
+> That is indeed wrong, but then we /used/ to have the requirement that
+> the kernel will _never_ execute VFP instructions.  That's changed
+> recently since we now permit neon instructions to be executed.
+>
+> However, the requirements to execute these instructions is very strict:
+> preemption disabled, it must not fault.  If you do fault, none of the
+> standard handlers get invoked, instead you get a critical kernel message.
+> So, if it does happen, then it's quite a bug already.
+>
+> The only case where the kernel intentionally provokes such a fault
+> (which won't even reach the normal VFP handler) is when testing for the
+> presence of VFP and there is no hardware fitted.
+>
+> --
+> FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+> in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+> Estimate before purchase was "up to 13.2Mbit".
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
