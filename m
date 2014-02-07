@@ -1,40 +1,30 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 7 Feb 2014 13:19:07 -0800
-Subject: [PATCH v2 1/5] ARM: msm: kill off hotplug.c
-In-Reply-To: <CE29C478-50CA-4CC8-9E80-AA9C22D9B17F@codeaurora.org>
-References: <1391553532-27001-1-git-send-email-galak@codeaurora.org>
- <1391553532-27001-2-git-send-email-galak@codeaurora.org>
- <20140204230707.GD20528@codeaurora.org>
- <CE29C478-50CA-4CC8-9E80-AA9C22D9B17F@codeaurora.org>
-Message-ID: <20140207211907.GE12815@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri,  7 Feb 2014 22:20:38 +0100
+Subject: [PATCH v2 0/2] misc: eeprom: sunxi: Change compatible pattern
+Message-ID: <1391808040-29814-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04, Kumar Gala wrote:
-> 
-> On Feb 4, 2014, at 5:07 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
-> > On 02/04, Kumar Gala wrote:
-> >> diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-> >> index 3721b31..251a91e 100644
-> >> --- a/arch/arm/mach-msm/platsmp.c
-> >> +++ b/arch/arm/mach-msm/platsmp.c
-> >> @@ -29,6 +29,13 @@ extern void secondary_startup(void);
-> >> 
-> >> static DEFINE_SPINLOCK(boot_lock);
-> >> 
-> >> +#ifdef CONFIG_HOTPLUG_CPU
-> >> +static void __ref msm_cpu_die(unsigned int cpu)
-> > 
-> > We shouldn't need __ref anymore either right?
-> 
-> I think we might as cpu_die is still marked __ref so I think we need it.
-> 
+Hi,
 
-Someone should remove __ref from cpu_die() as well. It was only
-ever there for __cpuinit but now that __cpuinit is gone it's
-useless.
+This is the second version of the A10 SID compatible changes.
+The only difference with the v1 being that we're now droping the old
+compatibles, instead of keeping them, since the DT maintainers said it was
+fine.
+
+Thanks,
+Maxime
+
+Maxime Ripard (2):
+  misc: eeprom: sunxi: Change compatibles
+  ARM: sunxi: dt: Convert to the new SID compatibles
+
+ Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt | 4 ++--
+ arch/arm/boot/dts/sun4i-a10.dtsi                               | 2 +-
+ arch/arm/boot/dts/sun5i-a10s.dtsi                              | 2 +-
+ arch/arm/boot/dts/sun5i-a13.dtsi                               | 2 +-
+ drivers/misc/eeprom/sunxi_sid.c                                | 2 +-
+ 5 files changed, 6 insertions(+), 6 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.4.2
