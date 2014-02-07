@@ -1,5 +1,5 @@
 From: jays.lee@samsung.com (Jungseok Lee)
-Date: Sat, 08 Feb 2014 08:37:20 +0900
+Date: Sat, 08 Feb 2014 08:42:09 +0900
 Subject: [PATCH v4 02/10] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
 In-Reply-To: <CAAhSdy2p5rfBR59sGbs_mZvh3WmnPAJA2=OwEmdN2xrxp7R2Ug@mail.gmail.com>
 References: <1391686302-19451-1-git-send-email-anup.patel@linaro.org>
@@ -8,20 +8,11 @@ References: <1391686302-19451-1-git-send-email-anup.patel@linaro.org>
  <CAAhSdy3Y3N7pSr3Y0rB7p340sX_kGPFT7mmBa2Rvf2pdSJYAfA@mail.gmail.com>
  <003a01cf23e4$07f07af0$17d170d0$@samsung.com>
  <CAAhSdy2p5rfBR59sGbs_mZvh3WmnPAJA2=OwEmdN2xrxp7R2Ug@mail.gmail.com>
-Message-ID: <001101cf245d$8de81770$a9b84650$@samsung.com>
+Message-ID: <001201cf245e$37a37a20$a6ea6e60$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
->-----Original Message-----
->From: Anup Patel [mailto:anup at brainfault.org]
->Sent: Friday, February 07, 2014 6:26 PM
->To: Jungseok Lee
->Cc: Anup Patel; kvmarm at lists.cs.columbia.edu; Mark Rutland; linaro-kernel at lists.linaro.org;
->patches at linaro.org; Marc Zyngier; patches; linux-arm-kernel
->Subject: Re: [PATCH v4 02/10] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
->
+On Friday, February 07, 2014 6:26 PM, Anup Patel wrote:
 >On Fri, Feb 7, 2014 at 2:37 PM, Jungseok Lee <jays.lee@samsung.com> wrote:
 >> On Friday, February 07, 2014 5:36 PM, Anup Patel wrote:
 >>> On Fri, Feb 7, 2014 at 1:58 PM, Jungseok Lee <jays.lee@samsung.com> wrote:
@@ -156,9 +147,11 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >
 >Are you trying to emulate your platform specific DVFS PSCI function for a VM using KVM ARM/ARM64??
 
+[Sorry for noise to mailing-list as violating mailing rule]
+
 No, I am not.
 My original intention is to clarify the interface between KVM and VM if
-DVFS scheme is applied to VM. Currently, PSIC v0.2 does not define it.
+DVFS scheme is applied to VM. Currently, PSCI v0.2 does not define it.
 Thus, I wonder why this interface is not covered.
 
 >If so then arch/arm/kvm/psci.c is not the place for it. All platform specific PSCI function are to be
