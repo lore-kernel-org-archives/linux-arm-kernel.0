@@ -1,68 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  7 Feb 2014 12:21:37 +0000
-Subject: [PATCH] ARM: mm: implement pte_accessible for faulting mappings
-Message-ID: <1391775697-9545-1-git-send-email-will.deacon@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Feb 2014 12:28:32 +0000
+Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
+ componentised subsystems
+In-Reply-To: <20140207125721.2d925387@armhf>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
+ <CAKMK7uFYhz8Pmv5E7aKY7yzZGDe_m8a0382Njv7tZRoBSfmRpw@mail.gmail.com>
+ <20140207094656.GY26684@n2100.arm.linux.org.uk>
+ <20140207125721.2d925387@armhf>
+Message-ID: <20140207122832.GA26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pte_accessible macro can be used to identify page table entries
-capable of being cached by a TLB. In principle, this differs from
-pte_present, since PROT_NONE mappings are mapped using invalid entries
-identified as present and ptes designated as `old' can use either
-invalid entries or those with the access flag cleared (guaranteed not to
-be in the TLB). However, there is a race to take care of, as described
-in 20841405940e ("mm: fix TLB flush race between migration, and
-change_protection_range"), between a page being migrated and mprotected
-at the same time. In this case, we can check whether a TLB invalidation
-is pending for the mm and if so, temporarily consider PROT_NONE mappings
-as valid.
+On Fri, Feb 07, 2014 at 12:57:21PM +0100, Jean-Francois Moine wrote:
+> I started to use your code (which works fine, thanks), and it avoids a
+> lot of problems, especially, about probe_defer in a DT context.
+> 
+> I was wondering if your componentised mechanism could be extended to the
+> devices defined by DT.
 
-This patch implements a quick pte_accessible macro for ARM by simply
-checking if the pte is valid/present depending on the mm. For classic
-MMU, these checks are identical and will generate some false positives
-for PROT_NONE mappings, but this is better than the current asm-generic
-definition of ((void)(pte),1).
+It was developed against imx-drm, which is purely DT based.  I already
+have a solution for the cubox armada DRM.
 
-Finally, pte_present_user is moved to use pte_valid (and renamed
-appropriately) since we don't care about cache flushing for faulting
-mappings.
-
-Acked-by: Steve Capper <steve.capper@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/pgtable.h | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 7d59b524f2af..5478e5d6ad89 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -216,13 +216,16 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- 
- #define pte_none(pte)		(!pte_val(pte))
- #define pte_present(pte)	(pte_val(pte) & L_PTE_PRESENT)
-+#define pte_valid(pte)		(pte_val(pte) & L_PTE_VALID)
-+#define pte_accessible(mm, pte)	(mm_tlb_flush_pending(mm) ? pte_present(pte) : pte_valid(pte))
- #define pte_write(pte)		(!(pte_val(pte) & L_PTE_RDONLY))
- #define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
- #define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
- #define pte_exec(pte)		(!(pte_val(pte) & L_PTE_XN))
- #define pte_special(pte)	(0)
- 
--#define pte_present_user(pte)  (pte_present(pte) && (pte_val(pte) & L_PTE_USER))
-+#define pte_valid_user(pte)	\
-+	(pte_valid(pte) && (pte_val(pte) & L_PTE_USER) && pte_young(pte))
- 
- #if __LINUX_ARM_ARCH__ < 6
- static inline void __sync_icache_dcache(pte_t pteval)
-@@ -237,7 +240,7 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
- {
- 	unsigned long ext = 0;
- 
--	if (addr < TASK_SIZE && pte_present_user(pteval)) {
-+	if (addr < TASK_SIZE && pte_valid_user(pteval)) {
- 		__sync_icache_dcache(pteval);
- 		ext |= PTE_EXT_NG;
- 	}
 -- 
-1.8.2.2
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
