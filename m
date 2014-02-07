@@ -1,153 +1,111 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 7 Feb 2014 17:53:27 +0100
-Subject: [PATCH v3 2/2] drivers/base: declare phandle DT nodes as components
-In-Reply-To: <cover.1391792986.git.moinejf@free.fr>
-References: <cover.1391792986.git.moinejf@free.fr>
-Message-ID: <9f8bbe28b00160cab2cedffa3f8fb42121035964.1391792986.git.moinejf@free.fr>
+From: ccross@android.com (Colin Cross)
+Date: Fri, 7 Feb 2014 09:22:37 -0800
+Subject: [PATCH] dma-buf: avoid using IS_ERR_OR_NULL
+In-Reply-To: <20140207164313.GA32655@kroah.com>
+References: <1387586630-1954-1-git-send-email-ccross@android.com>
+ <CAF6AEGuQSWOw6KWVo-uorJ+8M3-kLzYHdOOfdHWUDi=SkzUUVA@mail.gmail.com>
+ <20140207164313.GA32655@kroah.com>
+Message-ID: <CAMbhsRQXUZH_n13X78HEvXuF58T-ubAXnEXXPa7Za9L-KEduMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At system startup time, some devices depends on the availability of
-some other devices before starting. The infrastructure for componentised
-subsystems permits to handle this dependence, each driver defining
-its own role.
+On Fri, Feb 7, 2014 at 8:43 AM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Sat, Dec 21, 2013 at 07:42:17AM -0500, Rob Clark wrote:
+>> On Fri, Dec 20, 2013 at 7:43 PM, Colin Cross <ccross@android.com> wrote:
+>> > dma_buf_map_attachment and dma_buf_vmap can return NULL or
+>> > ERR_PTR on a error.  This encourages a common buggy pattern in
+>> > callers:
+>> >         sgt = dma_buf_map_attachment(attach, DMA_BIDIRECTIONAL);
+>> >         if (IS_ERR_OR_NULL(sgt))
+>> >                 return PTR_ERR(sgt);
+>> >
+>> > This causes the caller to return 0 on an error.  IS_ERR_OR_NULL
+>> > is almost always a sign of poorly-defined error handling.
+>> >
+>> > This patch converts dma_buf_map_attachment to always return
+>> > ERR_PTR, and fixes the callers that incorrectly handled NULL.
+>> > There are a few more callers that were not checking for NULL
+>> > at all, which would have dereferenced a NULL pointer later.
+>> > There are also a few more callers that correctly handled NULL
+>> > and ERR_PTR differently, I left those alone but they could also
+>> > be modified to delete the NULL check.
+>> >
+>> > This patch also converts dma_buf_vmap to always return NULL.
+>> > All the callers to dma_buf_vmap only check for NULL, and would
+>> > have dereferenced an ERR_PTR and panic'd if one was ever
+>> > returned. This is not consistent with the rest of the dma buf
+>> > APIs, but matches the expectations of all of the callers.
+>> >
+>> > Signed-off-by: Colin Cross <ccross@android.com>
+>> > ---
+>> >  drivers/base/dma-buf.c                         | 18 +++++++++++-------
+>> >  drivers/gpu/drm/drm_prime.c                    |  2 +-
+>> >  drivers/gpu/drm/exynos/exynos_drm_dmabuf.c     |  2 +-
+>> >  drivers/media/v4l2-core/videobuf2-dma-contig.c |  2 +-
+>> >  4 files changed, 14 insertions(+), 10 deletions(-)
+>> >
+>> > diff --git a/drivers/base/dma-buf.c b/drivers/base/dma-buf.c
+>> > index 1e16cbd61da2..cfe1d8bc7bb8 100644
+>> > --- a/drivers/base/dma-buf.c
+>> > +++ b/drivers/base/dma-buf.c
+>> > @@ -251,9 +251,8 @@ EXPORT_SYMBOL_GPL(dma_buf_put);
+>> >   * @dmabuf:    [in]    buffer to attach device to.
+>> >   * @dev:       [in]    device to be attached.
+>> >   *
+>> > - * Returns struct dma_buf_attachment * for this attachment; may return negative
+>> > - * error codes.
+>> > - *
+>> > + * Returns struct dma_buf_attachment * for this attachment; returns ERR_PTR on
+>> > + * error.
+>> >   */
+>> >  struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+>> >                                           struct device *dev)
+>> > @@ -319,9 +318,8 @@ EXPORT_SYMBOL_GPL(dma_buf_detach);
+>> >   * @attach:    [in]    attachment whose scatterlist is to be returned
+>> >   * @direction: [in]    direction of DMA transfer
+>> >   *
+>> > - * Returns sg_table containing the scatterlist to be returned; may return NULL
+>> > - * or ERR_PTR.
+>> > - *
+>> > + * Returns sg_table containing the scatterlist to be returned; returns ERR_PTR
+>> > + * on error.
+>> >   */
+>> >  struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *attach,
+>> >                                         enum dma_data_direction direction)
+>> > @@ -334,6 +332,8 @@ struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *attach,
+>> >                 return ERR_PTR(-EINVAL);
+>> >
+>> >         sg_table = attach->dmabuf->ops->map_dma_buf(attach, direction);
+>> > +       if (!sg_table)
+>> > +               sg_table = ERR_PTR(-ENOMEM);
+>> >
+>> >         return sg_table;
+>> >  }
+>> > @@ -544,6 +544,8 @@ EXPORT_SYMBOL_GPL(dma_buf_mmap);
+>> >   * These calls are optional in drivers. The intended use for them
+>> >   * is for mapping objects linear in kernel space for high use objects.
+>> >   * Please attempt to use kmap/kunmap before thinking about these interfaces.
+>> > + *
+>> > + * Returns NULL on error.
+>> >   */
+>> >  void *dma_buf_vmap(struct dma_buf *dmabuf)
+>> >  {
+>> > @@ -566,7 +568,9 @@ void *dma_buf_vmap(struct dma_buf *dmabuf)
+>> >         BUG_ON(dmabuf->vmap_ptr);
+>> >
+>> >         ptr = dmabuf->ops->vmap(dmabuf);
+>> > -       if (IS_ERR_OR_NULL(ptr))
+>> > +       if (WARN_ON_ONCE(IS_ERR(ptr)))
+>>
+>> since vmap is optional, the WARN_ON might be a bit strong..  although
+>> it would be a bit strange for an exporter to supply a vmap fxn which
+>> always returned NULL, not sure about that.  Just thought I'd mention
+>> it in case anyone else had an opinion about that.
+>
+> Yeah, I don't like this, it could cause unnecessary reports of problems.
 
-This patch does an automatic creation of the lowest components in
-case of DT. This permits simple devices to be part of complex
-componentised subsystems without any specific code.
-
-When created from DT, the device dependence is generally indicated by
-phandle: a device which is pointed to by a phandle must be started
-before the pointing device(s).
-
-So, at device register time, the devices which are pointed to by a
-phandle are declared as components, except when they declared
-themselves as such in their probe function.
-
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- drivers/base/component.c | 12 ++++++++++++
- drivers/base/core.c      | 18 ++++++++++++++++++
- include/linux/of.h       |  2 ++
- 3 files changed, 32 insertions(+)
-
-diff --git a/drivers/base/component.c b/drivers/base/component.c
-index 0a39d7a..3cab26b 100644
---- a/drivers/base/component.c
-+++ b/drivers/base/component.c
-@@ -17,6 +17,7 @@
- #include <linux/module.h>
- #include <linux/mutex.h>
- #include <linux/slab.h>
-+#include <linux/of.h>
- 
- struct master {
- 	struct list_head node;
-@@ -336,6 +337,7 @@ EXPORT_SYMBOL_GPL(component_bind_all);
- int component_add(struct device *dev, const struct component_ops *ops)
- {
- 	struct component *component;
-+	struct device_node *np;
- 	int ret;
- 
- 	component = kzalloc(sizeof(*component), GFP_KERNEL);
-@@ -356,6 +358,11 @@ int component_add(struct device *dev, const struct component_ops *ops)
- 
- 		kfree(component);
- 	}
-+
-+	np = dev->of_node;
-+	if (np)
-+		np->_flags |= OF_DEV_COMPONENT;
-+
- 	mutex_unlock(&component_mutex);
- 
- 	return ret < 0 ? ret : 0;
-@@ -365,6 +372,7 @@ EXPORT_SYMBOL_GPL(component_add);
- void component_del(struct device *dev, const struct component_ops *ops)
- {
- 	struct component *c, *component = NULL;
-+	struct device_node *np;
- 
- 	mutex_lock(&component_mutex);
- 	list_for_each_entry(c, &component_list, node)
-@@ -377,6 +385,10 @@ void component_del(struct device *dev, const struct component_ops *ops)
- 	if (component && component->master)
- 		take_down_master(component->master);
- 
-+	np = dev->of_node;
-+	if (np)
-+		np->_flags &= ~OF_DEV_COMPONENT;
-+
- 	mutex_unlock(&component_mutex);
- 
- 	WARN_ON(!component);
-diff --git a/drivers/base/core.c b/drivers/base/core.c
-index 2b56717..0517b91 100644
---- a/drivers/base/core.c
-+++ b/drivers/base/core.c
-@@ -27,6 +27,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/netdevice.h>
- #include <linux/sysfs.h>
-+#include <linux/component.h>
- 
- #include "base.h"
- #include "power/power.h"
-@@ -980,6 +981,7 @@ int device_add(struct device *dev)
- 	struct device *parent = NULL;
- 	struct kobject *kobj;
- 	struct class_interface *class_intf;
-+	struct device_node *np;
- 	int error = -EINVAL;
- 
- 	dev = get_device(dev);
-@@ -1088,6 +1090,15 @@ int device_add(struct device *dev)
- 				class_intf->add_dev(dev, class_intf);
- 		mutex_unlock(&dev->class->p->mutex);
- 	}
-+
-+	/* if DT-created device referenced by phandle, create a component */
-+	np = dev->of_node;
-+	if (np && np->phandle &&
-+	    !(np->_flags & OF_DEV_COMPONENT)) {
-+		component_add(dev, NULL);
-+		np->_flags |= OF_DEV_IMPLICIT_COMPONENT;
-+	}
-+
- done:
- 	put_device(dev);
- 	return error;
-@@ -1189,10 +1200,17 @@ void device_del(struct device *dev)
- {
- 	struct device *parent = dev->parent;
- 	struct class_interface *class_intf;
-+	struct device_node *np;
- 
- 	/* Notify clients of device removal.  This call must come
- 	 * before dpm_sysfs_remove().
- 	 */
-+	np = dev->of_node;
-+	if (np && (np->_flags & OF_DEV_COMPONENT)) {
-+		component_del(dev, NULL);
-+		np->_flags &= ~OF_DEV_IMPLICIT_COMPONENT;
-+	}
-+
- 	if (dev->bus)
- 		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
- 					     BUS_NOTIFY_DEL_DEVICE, dev);
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 70c64ba..40f1c34 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -59,6 +59,8 @@ struct device_node {
- 	struct	proc_dir_entry *pde;	/* this node's proc directory */
- 	struct	kref kref;
- 	unsigned long _flags;
-+#define OF_DEV_COMPONENT 1
-+#define OF_DEV_IMPLICIT_COMPONENT 2
- 	void	*data;
- #if defined(CONFIG_SPARC)
- 	const char *path_component_name;
--- 
-1.9.rc1
+The WARN_ON_ONCE is only if the vmap op returns ERR_PTR, not if it
+returns NULL.  This is designed to catch vmap ops that don't follow
+the spec, so I would call them necessary reports, but I can take it
+out if you still disagree.
