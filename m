@@ -1,66 +1,109 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 7 Feb 2014 17:36:26 +0100
-Subject: [GIT PULL] at91: fixes for 3.14 #1
-Message-ID: <1391790986-31936-1-git-send-email-nicolas.ferre@atmel.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Fri, 7 Feb 2014 08:43:13 -0800
+Subject: [PATCH] dma-buf: avoid using IS_ERR_OR_NULL
+In-Reply-To: <CAF6AEGuQSWOw6KWVo-uorJ+8M3-kLzYHdOOfdHWUDi=SkzUUVA@mail.gmail.com>
+References: <1387586630-1954-1-git-send-email-ccross@android.com>
+ <CAF6AEGuQSWOw6KWVo-uorJ+8M3-kLzYHdOOfdHWUDi=SkzUUVA@mail.gmail.com>
+Message-ID: <20140207164313.GA32655@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Sat, Dec 21, 2013 at 07:42:17AM -0500, Rob Clark wrote:
+> On Fri, Dec 20, 2013 at 7:43 PM, Colin Cross <ccross@android.com> wrote:
+> > dma_buf_map_attachment and dma_buf_vmap can return NULL or
+> > ERR_PTR on a error.  This encourages a common buggy pattern in
+> > callers:
+> >         sgt = dma_buf_map_attachment(attach, DMA_BIDIRECTIONAL);
+> >         if (IS_ERR_OR_NULL(sgt))
+> >                 return PTR_ERR(sgt);
+> >
+> > This causes the caller to return 0 on an error.  IS_ERR_OR_NULL
+> > is almost always a sign of poorly-defined error handling.
+> >
+> > This patch converts dma_buf_map_attachment to always return
+> > ERR_PTR, and fixes the callers that incorrectly handled NULL.
+> > There are a few more callers that were not checking for NULL
+> > at all, which would have dereferenced a NULL pointer later.
+> > There are also a few more callers that correctly handled NULL
+> > and ERR_PTR differently, I left those alone but they could also
+> > be modified to delete the NULL check.
+> >
+> > This patch also converts dma_buf_vmap to always return NULL.
+> > All the callers to dma_buf_vmap only check for NULL, and would
+> > have dereferenced an ERR_PTR and panic'd if one was ever
+> > returned. This is not consistent with the rest of the dma buf
+> > APIs, but matches the expectations of all of the callers.
+> >
+> > Signed-off-by: Colin Cross <ccross@android.com>
+> > ---
+> >  drivers/base/dma-buf.c                         | 18 +++++++++++-------
+> >  drivers/gpu/drm/drm_prime.c                    |  2 +-
+> >  drivers/gpu/drm/exynos/exynos_drm_dmabuf.c     |  2 +-
+> >  drivers/media/v4l2-core/videobuf2-dma-contig.c |  2 +-
+> >  4 files changed, 14 insertions(+), 10 deletions(-)
+> >
+> > diff --git a/drivers/base/dma-buf.c b/drivers/base/dma-buf.c
+> > index 1e16cbd61da2..cfe1d8bc7bb8 100644
+> > --- a/drivers/base/dma-buf.c
+> > +++ b/drivers/base/dma-buf.c
+> > @@ -251,9 +251,8 @@ EXPORT_SYMBOL_GPL(dma_buf_put);
+> >   * @dmabuf:    [in]    buffer to attach device to.
+> >   * @dev:       [in]    device to be attached.
+> >   *
+> > - * Returns struct dma_buf_attachment * for this attachment; may return negative
+> > - * error codes.
+> > - *
+> > + * Returns struct dma_buf_attachment * for this attachment; returns ERR_PTR on
+> > + * error.
+> >   */
+> >  struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
+> >                                           struct device *dev)
+> > @@ -319,9 +318,8 @@ EXPORT_SYMBOL_GPL(dma_buf_detach);
+> >   * @attach:    [in]    attachment whose scatterlist is to be returned
+> >   * @direction: [in]    direction of DMA transfer
+> >   *
+> > - * Returns sg_table containing the scatterlist to be returned; may return NULL
+> > - * or ERR_PTR.
+> > - *
+> > + * Returns sg_table containing the scatterlist to be returned; returns ERR_PTR
+> > + * on error.
+> >   */
+> >  struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *attach,
+> >                                         enum dma_data_direction direction)
+> > @@ -334,6 +332,8 @@ struct sg_table *dma_buf_map_attachment(struct dma_buf_attachment *attach,
+> >                 return ERR_PTR(-EINVAL);
+> >
+> >         sg_table = attach->dmabuf->ops->map_dma_buf(attach, direction);
+> > +       if (!sg_table)
+> > +               sg_table = ERR_PTR(-ENOMEM);
+> >
+> >         return sg_table;
+> >  }
+> > @@ -544,6 +544,8 @@ EXPORT_SYMBOL_GPL(dma_buf_mmap);
+> >   * These calls are optional in drivers. The intended use for them
+> >   * is for mapping objects linear in kernel space for high use objects.
+> >   * Please attempt to use kmap/kunmap before thinking about these interfaces.
+> > + *
+> > + * Returns NULL on error.
+> >   */
+> >  void *dma_buf_vmap(struct dma_buf *dmabuf)
+> >  {
+> > @@ -566,7 +568,9 @@ void *dma_buf_vmap(struct dma_buf *dmabuf)
+> >         BUG_ON(dmabuf->vmap_ptr);
+> >
+> >         ptr = dmabuf->ops->vmap(dmabuf);
+> > -       if (IS_ERR_OR_NULL(ptr))
+> > +       if (WARN_ON_ONCE(IS_ERR(ptr)))
+> 
+> since vmap is optional, the WARN_ON might be a bit strong..  although
+> it would be a bit strange for an exporter to supply a vmap fxn which
+> always returned NULL, not sure about that.  Just thought I'd mention
+> it in case anyone else had an opinion about that.
 
-This is a first "fixes" series for AT91 on 3.14.
-The content is only DT-related and quite boring.
-I took the opportunity of this early "fixes" pull-request to collect
-some Documentation patches that were lying around and I guess that
-they can be merged by arm-soc nicely (addition of CCF to 2 drivers).
-A new board is added to the lot because it is dead simple and integrates
-well with the new sama5d36 SoC that we added earlier in this development cycle.
+Yeah, I don't like this, it could cause unnecessary reports of problems.
 
-Thanks, best regards,
+Care to fix it up?
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+thanks,
 
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
-
-for you to fetch changes up to b7c2b6157079811586180d13c44a1095b57c2d47:
-
-  ARM: at91: add Atmel's SAMA5D3 Xplained board (2014-02-07 17:20:39 +0100)
-
-----------------------------------------------------------------
-First series of AT91 fixes for 3.14.
-All of them are DT-related.
-- fixes for typos in i2c and ohci clocks
-- addition of a USB host node for at91sam9n12ek
-- 2 DT documentation updates that have been sent a long time ago
-- a new board based on the sama5d36 SoC
-
-----------------------------------------------------------------
-Bo Shen (1):
-      ARM: at91: enable USB host on at91sam9n12ek board
-
-Boris BREZILLON (3):
-      ARM: at91/dt: fix sama5d3 ohci hclk clock reference
-      mmc: atmel-mci: document clock properties
-      spi/atmel: document clock properties
-
-Jean-Jacques Hiblot (1):
-      ARM: at91/dt: sam9263: fix compatibility string for the I2C
-
-Nicolas Ferre (1):
-      ARM: at91: add Atmel's SAMA5D3 Xplained board
-
- .../devicetree/bindings/mmc/atmel-hsmci.txt        |   5 +
- .../devicetree/bindings/spi/spi_atmel.txt          |   5 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/at91-sama5d3_xplained.dts        | 229 +++++++++++++++++++++
- arch/arm/boot/dts/at91sam9263.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9n12ek.dts                |   4 +
- arch/arm/boot/dts/sama5d3.dtsi                     |   2 +-
- 7 files changed, 246 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-sama5d3_xplained.dts
-
--- 
-Nicolas Ferre
+greg k-h
