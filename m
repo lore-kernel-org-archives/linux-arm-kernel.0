@@ -1,45 +1,37 @@
-From: pratyush.anand@st.com (Pratyush Anand)
-Date: Fri, 7 Feb 2014 12:13:12 +0530
-Subject: [PATCH V4 6/8] phy: st-miphy-40lp: Add SPEAr1310 and SPEAr1340
- PCIe phy support
-In-Reply-To: <20140207035429.GB2414@pratyush-vbox>
-References: <cover.1391661589.git.pratyush.anand@st.com>
- <dca9c501de8386003142b463469c3d267a049eeb.1391661589.git.pratyush.anand@st.com>
- <201402061637.05414.arnd@arndb.de>
- <20140207035429.GB2414@pratyush-vbox>
-Message-ID: <20140207064312.GC2414@pratyush-vbox>
+From: kuninori.morimoto.gx@gmail.com (Kuninori Morimoto)
+Date: Thu, 06 Feb 2014 22:43:37 -0800 (PST)
+Subject: [PATCH 1/3] clk: rcar-h2: fix sd0/sd1 divisor table
+In-Reply-To: <87txcdul4b.wl%kuninori.morimoto.gx@gmail.com>
+References: <1391537858-28593-1-git-send-email-william.towle@codethink.co.uk>
+ <52F226A0.5070301@codethink.co.uk>
+ <52F23166.1030609@codethink.co.uk> <2298259.CqC51XrMZM@avalon>
+ <87txcdul4b.wl%kuninori.morimoto.gx@gmail.com>
+Message-ID: <87y51nbey3.wl%kuninori.morimoto.gx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi William, Ben, Laurent
 
-On Fri, Feb 07, 2014 at 11:54:30AM +0800, Pratyush ANAND wrote:
-> Hi Arnd,
-> 
-> On Thu, Feb 06, 2014 at 11:37:05PM +0800, Arnd Bergmann wrote:
-> > On Thursday 06 February 2014, Pratyush Anand wrote:
-> > 
+> > > >>>   static const struct clk_div_table cpg_sd01_div_table[] = {
+> > > >>> +    {  0,  2 }, {  1,  3 }, {  2,  4 }, {  3,  6 },
+> > > >>> +    {  4,  8 },
+> > > >>> 
+> > > >>>       {  5, 12 }, {  6, 16 }, {  7, 18 }, {  8, 24 },
+> > > >>>       { 10, 36 }, { 11, 48 }, { 12, 10 }, {  0,  0 },
 
-[...]
+According to HW team, datasheet is correct.
+Some HW has above un-documented implementation indeed,
+but these are not supported.
+But, 0x0100 (x1/8) on SD0FC/SD1FC is now supported and documented in
+latest datasheet.
 
-> > I think it's better to make this code table-driven. Rather than checking
-> > 'of_device_is_compatible()', it's much easier to add a .data field to
-> > the of_device_id array that describes the PHY. You can use .data to
-> > point to a structure containing per-device function pointers or
-> > (better) values and offsets to be used.
+> > > sdhi0 showed 156MHz output, and it seemed to work. So there is a
+> > > distinct possibility that the sdh clock also supports setting 12
+> > > for a /10
 
-values and offset would be good as long as we do not need to write on
-conditional read status. In our case its OK, as we do not need to
-write conditionally. But, would it be a good idea to go that way?
+According to HW there,
+SDHFC will be stopped if you set 0xC.
 
-Regards
-Pratyush
-
-> 
-> Sounds a better idea. will reduce code size a lot. Thanks.
-> 
-> Regards
-> Pratyush
-> 
-> > 
-> > 	Arnd
+Best regards
+---
+Kuninori Morimoto
