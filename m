@@ -1,501 +1,392 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 7 Feb 2014 10:04:30 +0100
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAKMK7uFYhz8Pmv5E7aKY7yzZGDe_m8a0382Njv7tZRoBSfmRpw@mail.gmail.com>
+From: jays.lee@samsung.com (Jungseok Lee)
+Date: Fri, 07 Feb 2014 18:07:30 +0900
+Subject: [PATCH v4 02/10] ARM/ARM64: KVM: Add base for PSCI v0.2 emulation
+In-Reply-To: <CAAhSdy3Y3N7pSr3Y0rB7p340sX_kGPFT7mmBa2Rvf2pdSJYAfA@mail.gmail.com>
+References: <1391686302-19451-1-git-send-email-anup.patel@linaro.org>
+ <1391686302-19451-3-git-send-email-anup.patel@linaro.org>
+ <003501cf23de$a4a878d0$edf96a70$@samsung.com>
+ <CAAhSdy3Y3N7pSr3Y0rB7p340sX_kGPFT7mmBa2Rvf2pdSJYAfA@mail.gmail.com>
+Message-ID: <003a01cf23e4$07f07af0$17d170d0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've chatted a bit with Hans Verkuil about this topic at fosdem and
-apparently both v4l and alsa have something like this already in their
-helper libraries. Adding more people as fyi in case they want to
-switch to the new driver core stuff from Russell.
--Daniel
+On Friday, February 07, 2014 5:36 PM, Anup Patel wrote:
+> On Fri, Feb 7, 2014 at 1:58 PM, Jungseok Lee <jays.lee@samsung.com> wrote:
+> > On Thursday, February 06, 2014 8:32 PM, Anup Patel wrote:
+> >> Currently, the in-kernel PSCI emulation provides PSCI v0.1 interface
+> >> to VCPUs. This patch extends current in-kernel PSCI emulation to provide PSCI v0.2 interface to
+> VCPUs.
+> >>
+> >> By default, ARM/ARM64 KVM will always provide PSCI v0.1 interface for
+> >> keeping the ABI backward- compatible.
+> >>
+> >> To select PSCI v0.2 interface for VCPUs, the user space (i.e. QEMU or
+> >> KVMTOOL) will have to set KVM_ARM_VCPU_PSCI_0_2 feature when doing
+> >> VCPU init using KVM_ARM_VCPU_INIT ioctl.
+> >>
+> >> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> >> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> >> ---
+> >>  arch/arm/include/asm/kvm_host.h   |    2 +-
+> >>  arch/arm/include/asm/kvm_psci.h   |    4 ++
+> >>  arch/arm/include/uapi/asm/kvm.h   |   35 ++++++++++++++-
+> >>  arch/arm/kvm/arm.c                |    1 +
+> >>  arch/arm/kvm/psci.c               |   85 +++++++++++++++++++++++++++++++------
+> >>  arch/arm64/include/asm/kvm_host.h |    2 +-
+> >>  arch/arm64/include/asm/kvm_psci.h |    4 ++
+> >>  arch/arm64/include/uapi/asm/kvm.h |   35 ++++++++++++++-
+> >>  8 files changed, 152 insertions(+), 16 deletions(-)
+> >>
+> >> diff --git a/arch/arm/include/asm/kvm_host.h
+> >> b/arch/arm/include/asm/kvm_host.h index 09af149..193ceaf
+> >> 100644
+> >> --- a/arch/arm/include/asm/kvm_host.h
+> >> +++ b/arch/arm/include/asm/kvm_host.h
+> >> @@ -36,7 +36,7 @@
+> >>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1  #define KVM_HAVE_ONE_REG
+> >>
+> >> -#define KVM_VCPU_MAX_FEATURES 1
+> >> +#define KVM_VCPU_MAX_FEATURES 2
+> >>
+> >>  #include <kvm/arm_vgic.h>
+> >>
+> >> diff --git a/arch/arm/include/asm/kvm_psci.h
+> >> b/arch/arm/include/asm/kvm_psci.h index 9a83d98..4c0e3e1
+> >> 100644
+> >> --- a/arch/arm/include/asm/kvm_psci.h
+> >> +++ b/arch/arm/include/asm/kvm_psci.h
+> >> @@ -18,6 +18,10 @@
+> >>  #ifndef __ARM_KVM_PSCI_H__
+> >>  #define __ARM_KVM_PSCI_H__
+> >>
+> >> +#define KVM_ARM_PSCI_0_1     1
+> >> +#define KVM_ARM_PSCI_0_2     2
+> >> +
+> >> +int kvm_psci_version(struct kvm_vcpu *vcpu);
+> >>  bool kvm_psci_call(struct kvm_vcpu *vcpu);
+> >>
+> >>  #endif /* __ARM_KVM_PSCI_H__ */
+> >> diff --git a/arch/arm/include/uapi/asm/kvm.h
+> >> b/arch/arm/include/uapi/asm/kvm.h index ef0c878..9c922d9
+> >> 100644
+> >> --- a/arch/arm/include/uapi/asm/kvm.h
+> >> +++ b/arch/arm/include/uapi/asm/kvm.h
+> >> @@ -83,6 +83,7 @@ struct kvm_regs {
+> >>  #define KVM_VGIC_V2_CPU_SIZE         0x2000
+> >>
+> >>  #define KVM_ARM_VCPU_POWER_OFF               0 /* CPU is started in OFF state */
+> >> +#define KVM_ARM_VCPU_PSCI_0_2                1 /* CPU uses PSCI v0.2 */
+> >>
+> >>  struct kvm_vcpu_init {
+> >>       __u32 target;
+> >> @@ -192,7 +193,7 @@ struct kvm_arch_memory_slot {
+> >>  /* Highest supported SPI, from VGIC_NR_IRQS */
+> >>  #define KVM_ARM_IRQ_GIC_MAX          127
+> >>
+> >> -/* PSCI interface */
+> >> +/* PSCI v0.1 interface */
+> >>  #define KVM_PSCI_FN_BASE             0x95c1ba5e
+> >>  #define KVM_PSCI_FN(n)                       (KVM_PSCI_FN_BASE + (n))
+> >>
+> >> @@ -201,9 +202,41 @@ struct kvm_arch_memory_slot {
+> >>  #define KVM_PSCI_FN_CPU_ON           KVM_PSCI_FN(2)
+> >>  #define KVM_PSCI_FN_MIGRATE          KVM_PSCI_FN(3)
+> >>
+> >> +/* PSCI v0.2 interface */
+> >> +#define KVM_PSCI_0_2_FN_BASE         0x84000000
+> >> +#define KVM_PSCI_0_2_FN(n)           (KVM_PSCI_0_2_FN_BASE + (n))
+> >> +#define KVM_PSCI_0_2_FN64_BASE               0xC4000000
+> >> +#define KVM_PSCI_0_2_FN64(n)         (KVM_PSCI_0_2_FN64_BASE + (n))
+> >> +
+> >> +#define KVM_PSCI_0_2_FN_PSCI_VERSION KVM_PSCI_0_2_FN(0) #define
+> >> +KVM_PSCI_0_2_FN_CPU_SUSPEND  KVM_PSCI_0_2_FN(1)
+> >> +#define KVM_PSCI_0_2_FN_CPU_OFF              KVM_PSCI_0_2_FN(2)
+> >> +#define KVM_PSCI_0_2_FN_CPU_ON               KVM_PSCI_0_2_FN(3)
+> >> +#define KVM_PSCI_0_2_FN_AFFINITY_INFO        KVM_PSCI_0_2_FN(4)
+> >> +#define KVM_PSCI_0_2_FN_MIGRATE              KVM_PSCI_0_2_FN(5)
+> >> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE \
+> >> +                                     KVM_PSCI_0_2_FN(6) #define
+> >> +KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU \
+> >> +                                     KVM_PSCI_0_2_FN(7)
+> >> +#define KVM_PSCI_0_2_FN_SYSTEM_OFF   KVM_PSCI_0_2_FN(8)
+> >> +#define KVM_PSCI_0_2_FN_SYSTEM_RESET KVM_PSCI_0_2_FN(9)
+> >> +
+> >> +#define KVM_PSCI_0_2_FN64_CPU_SUSPEND        KVM_PSCI_0_2_FN64(1)
+> >> +#define KVM_PSCI_0_2_FN64_CPU_ON     KVM_PSCI_0_2_FN64(3)
+> >> +#define KVM_PSCI_0_2_FN64_AFFINITY_INFO      KVM_PSCI_0_2_FN64(4)
+> >> +#define KVM_PSCI_0_2_FN64_MIGRATE    KVM_PSCI_0_2_FN64(5)
+> >> +#define KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU \
+> >> +                                     KVM_PSCI_0_2_FN64(7)
+> >> +
+> >
+> > Hi
+> >
+> > This patch describes PSCI v0.2 specification well. Instead, I have a
+> > question on interface types, not implementation.
+> >
+> > According to PSCI v0.2 document, it does not cover DVFS.
+> > Could I get an idea why DVFS is not supported?
+> 
+> PSCI v0.2 only describes few mandatory functions required for being PSCI v0.2 compliant. For rest of
+> the stuff such as DVFS you will need to define your own platform specific PSCI function.
+> (Marc/Mark correct me if I am wrong here?)
 
-On Thu, Jan 2, 2014 at 10:27 PM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> Subsystems such as ALSA, DRM and others require a single card-level
-> device structure to represent a subsystem.  However, firmware tends to
-> describe the individual devices and the connections between them.
->
-> Therefore, we need a way to gather up the individual component devices
-> together, and indicate when we have all the component devices.
->
-> We do this in DT by providing a "superdevice" node which specifies
-> the components, eg:
->
->         imx-drm {
->                 compatible = "fsl,drm";
->                 crtcs = <&ipu1>;
->                 connectors = <&hdmi>;
->         };
->
-> The superdevice is declared into the component support, along with the
-> subcomponents.  The superdevice receives callbacks to locate the
-> subcomponents, and identify when all components are present.  At this
-> point, we bind the superdevice, which causes the appropriate subsystem
-> to be initialised in the conventional way.
->
-> When any of the components or superdevice are removed from the system,
-> we unbind the superdevice, thereby taking the subsystem down.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/base/Makefile     |    2 +-
->  drivers/base/component.c  |  379 +++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/component.h |   31 ++++
->  3 files changed, 411 insertions(+), 1 deletions(-)
->  create mode 100644 drivers/base/component.c
->  create mode 100644 include/linux/component.h
->
-> diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-> index 94e8a80e87f8..870ecfd503af 100644
-> --- a/drivers/base/Makefile
-> +++ b/drivers/base/Makefile
-> @@ -1,6 +1,6 @@
->  # Makefile for the Linux device tree
->
-> -obj-y                  := core.o bus.o dd.o syscore.o \
-> +obj-y                  := component.o core.o bus.o dd.o syscore.o \
->                            driver.o class.o platform.o \
->                            cpu.o firmware.o init.o map.o devres.o \
->                            attribute_container.o transport_class.o \
-> diff --git a/drivers/base/component.c b/drivers/base/component.c
-> new file mode 100644
-> index 000000000000..5492cd8d2247
-> --- /dev/null
-> +++ b/drivers/base/component.c
-> @@ -0,0 +1,379 @@
-> +/*
-> + * Componentized device handling.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This is work in progress.  We gather up the component devices into a list,
-> + * and bind them when instructed.  At the moment, we're specific to the DRM
-> + * subsystem, and only handles one master device, but this doesn't have to be
-> + * the case.
-> + */
-> +#include <linux/component.h>
-> +#include <linux/device.h>
-> +#include <linux/kref.h>
-> +#include <linux/list.h>
-> +#include <linux/module.h>
-> +#include <linux/mutex.h>
-> +#include <linux/slab.h>
-> +
-> +struct master {
-> +       struct list_head node;
-> +       struct list_head components;
-> +       bool bound;
-> +
-> +       const struct component_master_ops *ops;
-> +       struct device *dev;
-> +};
-> +
-> +struct component {
-> +       struct list_head node;
-> +       struct list_head master_node;
-> +       struct master *master;
-> +       bool bound;
-> +
-> +       const struct component_ops *ops;
-> +       struct device *dev;
-> +};
-> +
-> +static DEFINE_MUTEX(component_mutex);
-> +static LIST_HEAD(component_list);
-> +static LIST_HEAD(masters);
-> +
-> +static struct master *__master_find(struct device *dev, const struct component_master_ops *ops)
-> +{
-> +       struct master *m;
-> +
-> +       list_for_each_entry(m, &masters, node)
-> +               if (m->dev == dev && (!ops || m->ops == ops))
-> +                       return m;
-> +
-> +       return NULL;
-> +}
-> +
-> +/* Attach an unattached component to a master. */
-> +static void component_attach_master(struct master *master, struct component *c)
-> +{
-> +       c->master = master;
-> +
-> +       list_add_tail(&c->master_node, &master->components);
-> +}
-> +
-> +/* Detach a component from a master. */
-> +static void component_detach_master(struct master *master, struct component *c)
-> +{
-> +       list_del(&c->master_node);
-> +
-> +       c->master = NULL;
-> +}
-> +
-> +int component_master_add_child(struct master *master,
-> +       int (*compare)(struct device *, void *), void *compare_data)
-> +{
-> +       struct component *c;
-> +       int ret = -ENXIO;
-> +
-> +       list_for_each_entry(c, &component_list, node) {
-> +               if (c->master)
-> +                       continue;
-> +
-> +               if (compare(c->dev, compare_data)) {
-> +                       component_attach_master(master, c);
-> +                       ret = 0;
-> +                       break;
-> +               }
-> +       }
-> +
-> +       return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(component_master_add_child);
-> +
-> +/* Detach all attached components from this master */
-> +static void master_remove_components(struct master *master)
-> +{
-> +       while (!list_empty(&master->components)) {
-> +               struct component *c = list_first_entry(&master->components,
-> +                                       struct component, master_node);
-> +
-> +               WARN_ON(c->master != master);
-> +
-> +               component_detach_master(master, c);
-> +       }
-> +}
-> +
-> +/*
-> + * Try to bring up a master.  If component is NULL, we're interested in
-> + * this master, otherwise it's a component which must be present to try
-> + * and bring up the master.
-> + *
-> + * Returns 1 for successful bringup, 0 if not ready, or -ve errno.
-> + */
-> +static int try_to_bring_up_master(struct master *master,
-> +       struct component *component)
-> +{
-> +       int ret = 0;
-> +
-> +       if (!master->bound) {
-> +               /*
-> +                * Search the list of components, looking for components that
-> +                * belong to this master, and attach them to the master.
-> +                */
-> +               if (master->ops->add_components(master->dev, master)) {
-> +                       /* Failed to find all components */
-> +                       master_remove_components(master);
-> +                       ret = 0;
-> +                       goto out;
-> +               }
-> +
-> +               if (component && component->master != master) {
-> +                       master_remove_components(master);
-> +                       ret = 0;
-> +                       goto out;
-> +               }
-> +
-> +               /* Found all components */
-> +               ret = master->ops->bind(master->dev);
-> +               if (ret < 0) {
-> +                       master_remove_components(master);
-> +                       goto out;
-> +               }
-> +
-> +               master->bound = true;
-> +               ret = 1;
-> +       }
-> +out:
-> +
-> +       return ret;
-> +}
-> +
-> +static int try_to_bring_up_masters(struct component *component)
-> +{
-> +       struct master *m;
-> +       int ret = 0;
-> +
-> +       list_for_each_entry(m, &masters, node) {
-> +               ret = try_to_bring_up_master(m, component);
-> +               if (ret != 0)
-> +                       break;
-> +       }
-> +
-> +       return ret;
-> +}
-> +
-> +static void take_down_master(struct master *master)
-> +{
-> +       if (master->bound) {
-> +               master->ops->unbind(master->dev);
-> +               master->bound = false;
-> +       }
-> +
-> +       master_remove_components(master);
-> +}
-> +
-> +int component_master_add(struct device *dev, const struct component_master_ops *ops)
-> +{
-> +       struct master *master;
-> +       int ret;
-> +
-> +       master = kzalloc(sizeof(*master), GFP_KERNEL);
-> +       if (!master)
-> +               return -ENOMEM;
-> +
-> +       master->dev = dev;
-> +       master->ops = ops;
-> +       INIT_LIST_HEAD(&master->components);
-> +
-> +       /* Add to the list of available masters. */
-> +       mutex_lock(&component_mutex);
-> +       list_add(&master->node, &masters);
-> +
-> +       ret = try_to_bring_up_master(master, NULL);
-> +
-> +       if (ret < 0) {
-> +               /* Delete off the list if we weren't successful */
-> +               list_del(&master->node);
-> +               kfree(master);
-> +       }
-> +       mutex_unlock(&component_mutex);
-> +
-> +       return ret < 0 ? ret : 0;
-> +}
-> +EXPORT_SYMBOL_GPL(component_master_add);
-> +
-> +void component_master_del(struct device *dev, const struct component_master_ops *ops)
-> +{
-> +       struct master *master;
-> +
-> +       mutex_lock(&component_mutex);
-> +       master = __master_find(dev, ops);
-> +       if (master) {
-> +               take_down_master(master);
-> +
-> +               list_del(&master->node);
-> +               kfree(master);
-> +       }
-> +       mutex_unlock(&component_mutex);
-> +}
-> +EXPORT_SYMBOL_GPL(component_master_del);
-> +
-> +static void component_unbind(struct component *component,
-> +       struct master *master, void *data)
-> +{
-> +       WARN_ON(!component->bound);
-> +
-> +       component->ops->unbind(component->dev, master->dev, data);
-> +       component->bound = false;
-> +
-> +       /* Release all resources claimed in the binding of this component */
-> +       devres_release_group(component->dev, component);
-> +}
-> +
-> +void component_unbind_all(struct device *master_dev, void *data)
-> +{
-> +       struct master *master;
-> +       struct component *c;
-> +
-> +       WARN_ON(!mutex_is_locked(&component_mutex));
-> +
-> +       master = __master_find(master_dev, NULL);
-> +       if (!master)
-> +               return;
-> +
-> +       list_for_each_entry_reverse(c, &master->components, master_node)
-> +               component_unbind(c, master, data);
-> +}
-> +EXPORT_SYMBOL_GPL(component_unbind_all);
-> +
-> +static int component_bind(struct component *component, struct master *master,
-> +       void *data)
-> +{
-> +       int ret;
-> +
-> +       /*
-> +        * Each component initialises inside its own devres group.
-> +        * This allows us to roll-back a failed component without
-> +        * affecting anything else.
-> +        */
-> +       if (!devres_open_group(master->dev, NULL, GFP_KERNEL))
-> +               return -ENOMEM;
-> +
-> +       /*
-> +        * Also open a group for the device itself: this allows us
-> +        * to release the resources claimed against the sub-device
-> +        * at the appropriate moment.
-> +        */
-> +       if (!devres_open_group(component->dev, component, GFP_KERNEL)) {
-> +               devres_release_group(master->dev, NULL);
-> +               return -ENOMEM;
-> +       }
-> +
-> +       dev_dbg(master->dev, "binding %s (ops %ps)\n",
-> +               dev_name(component->dev), component->ops);
-> +
-> +       ret = component->ops->bind(component->dev, master->dev, data);
-> +       if (!ret) {
-> +               component->bound = true;
-> +
-> +               /*
-> +                * Close the component device's group so that resources
-> +                * allocated in the binding are encapsulated for removal
-> +                * at unbind.  Remove the group on the DRM device as we
-> +                * can clean those resources up independently.
-> +                */
-> +               devres_close_group(component->dev, NULL);
-> +               devres_remove_group(master->dev, NULL);
-> +
-> +               dev_info(master->dev, "bound %s (ops %ps)\n",
-> +                        dev_name(component->dev), component->ops);
-> +       } else {
-> +               devres_release_group(component->dev, NULL);
-> +               devres_release_group(master->dev, NULL);
-> +
-> +               dev_err(master->dev, "failed to bind %s (ops %ps): %d\n",
-> +                       dev_name(component->dev), component->ops, ret);
-> +       }
-> +
-> +       return ret;
-> +}
-> +
-> +int component_bind_all(struct device *master_dev, void *data)
-> +{
-> +       struct master *master;
-> +       struct component *c;
-> +       int ret = 0;
-> +
-> +       WARN_ON(!mutex_is_locked(&component_mutex));
-> +
-> +       master = __master_find(master_dev, NULL);
-> +       if (!master)
-> +               return -EINVAL;
-> +
-> +       list_for_each_entry(c, &master->components, master_node) {
-> +               ret = component_bind(c, master, data);
-> +               if (ret)
-> +                       break;
-> +       }
-> +
-> +       if (ret != 0) {
-> +               list_for_each_entry_continue_reverse(c, &master->components,
-> +                                                    master_node)
-> +                       component_unbind(c, master, data);
-> +       }
-> +
-> +       return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(component_bind_all);
-> +
-> +int component_add(struct device *dev, const struct component_ops *ops)
-> +{
-> +       struct component *component;
-> +       int ret;
-> +
-> +       component = kzalloc(sizeof(*component), GFP_KERNEL);
-> +       if (!component)
-> +               return -ENOMEM;
-> +
-> +       component->ops = ops;
-> +       component->dev = dev;
-> +
-> +       dev_dbg(dev, "adding component (ops %ps)\n", ops);
-> +
-> +       mutex_lock(&component_mutex);
-> +       list_add_tail(&component->node, &component_list);
-> +
-> +       ret = try_to_bring_up_masters(component);
-> +       if (ret < 0) {
-> +               list_del(&component->node);
-> +
-> +               kfree(component);
-> +       }
-> +       mutex_unlock(&component_mutex);
-> +
-> +       return ret < 0 ? ret : 0;
-> +}
-> +EXPORT_SYMBOL_GPL(component_add);
-> +
-> +void component_del(struct device *dev, const struct component_ops *ops)
-> +{
-> +       struct component *c, *component = NULL;
-> +
-> +       mutex_lock(&component_mutex);
-> +       list_for_each_entry(c, &component_list, node)
-> +               if (c->dev == dev && c->ops == ops) {
-> +                       list_del(&c->node);
-> +                       component = c;
-> +                       break;
-> +               }
-> +
-> +       if (component && component->master)
-> +               take_down_master(component->master);
-> +
-> +       mutex_unlock(&component_mutex);
-> +
-> +       WARN_ON(!component);
-> +       kfree(component);
-> +}
-> +EXPORT_SYMBOL_GPL(component_del);
-> +
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/include/linux/component.h b/include/linux/component.h
-> new file mode 100644
-> index 000000000000..73657636db0b
-> --- /dev/null
-> +++ b/include/linux/component.h
-> @@ -0,0 +1,31 @@
-> +#ifndef COMPONENT_H
-> +#define COMPONENT_H
-> +
-> +struct device;
-> +
-> +struct component_ops {
-> +       int (*bind)(struct device *, struct device *, void *);
-> +       void (*unbind)(struct device *, struct device *, void *);
-> +};
-> +
-> +int component_add(struct device *, const struct component_ops *);
-> +void component_del(struct device *, const struct component_ops *);
-> +
-> +int component_bind_all(struct device *, void *);
-> +void component_unbind_all(struct device *, void *);
-> +
-> +struct master;
-> +
-> +struct component_master_ops {
-> +       int (*add_components)(struct device *, struct master *);
-> +       int (*bind)(struct device *);
-> +       void (*unbind)(struct device *);
-> +};
-> +
-> +int component_master_add(struct device *, const struct component_master_ops *);
-> +void component_master_del(struct device *, const struct component_master_ops *);
-> +
-> +int component_master_add_child(struct master *master,
-> +       int (*compare)(struct device *, void *), void *compare_data);
-> +
-> +#endif
-> --
-> 1.7.4.4
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+It seems that I should change architecture codes if I need other interfaces.
+Under this implementation, I should add my own interface to generic codes,
+such as, arch/arm/include/asm/kvm_psci.h. However, I think that it is not
+acceptable to upstream. If so, is there any place to define a platform
+specific PSCI functions?
 
+Best Regards
+Jungseok Lee
 
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+> Mab be in future some PSCI vX.Y will define standardized PSCI function for DVFS too.
+> 
+> Regards,
+> Anup
+> 
+> >
+> > Best Regards
+> > Jungseok Lee
+> >
+> >> +/* PSCI return values */
+> >>  #define KVM_PSCI_RET_SUCCESS         0
+> >>  #define KVM_PSCI_RET_NI                      ((unsigned long)-1)
+> >>  #define KVM_PSCI_RET_INVAL           ((unsigned long)-2)
+> >>  #define KVM_PSCI_RET_DENIED          ((unsigned long)-3)
+> >> +#define KVM_PSCI_RET_ALREADY_ON              ((unsigned long)-4)
+> >> +#define KVM_PSCI_RET_ON_PENDING              ((unsigned long)-5)
+> >> +#define KVM_PSCI_RET_INTERNAL_FAILURE        ((unsigned long)-6)
+> >> +#define KVM_PSCI_RET_NOT_PRESENT     ((unsigned long)-7)
+> >> +#define KVM_PSCI_RET_DISABLED                ((unsigned long)-8)
+> >>
+> >>  #endif /* __ARM_KVM_H__ */
+> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c index
+> >> 1d8248e..c8a71df 100644
+> >> --- a/arch/arm/kvm/arm.c
+> >> +++ b/arch/arm/kvm/arm.c
+> >> @@ -197,6 +197,7 @@ int kvm_dev_ioctl_check_extension(long ext)
+> >>       case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
+> >>       case KVM_CAP_ONE_REG:
+> >>       case KVM_CAP_ARM_PSCI:
+> >> +     case KVM_CAP_ARM_PSCI_0_2:
+> >>               r = 1;
+> >>               break;
+> >>       case KVM_CAP_COALESCED_MMIO:
+> >> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c index
+> >> 448f60e..e4ec4af 100644
+> >> --- a/arch/arm/kvm/psci.c
+> >> +++ b/arch/arm/kvm/psci.c
+> >> @@ -85,17 +85,57 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+> >>       return KVM_PSCI_RET_SUCCESS;
+> >>  }
+> >>
+> >> -/**
+> >> - * kvm_psci_call - handle PSCI call if r0 value is in range
+> >> - * @vcpu: Pointer to the VCPU struct
+> >> - *
+> >> - * Handle PSCI calls from guests through traps from HVC instructions.
+> >> - * The calling convention is similar to SMC calls to the secure
+> >> world where
+> >> - * the function number is placed in r0 and this function returns
+> >> true if the
+> >> - * function number specified in r0 is withing the PSCI range, and
+> >> false
+> >> - * otherwise.
+> >> - */
+> >> -bool kvm_psci_call(struct kvm_vcpu *vcpu)
+> >> +int kvm_psci_version(struct kvm_vcpu *vcpu) {
+> >> +     if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
+> >> +             return KVM_ARM_PSCI_0_2;
+> >> +
+> >> +     return KVM_ARM_PSCI_0_1;
+> >> +}
+> >> +
+> >> +static bool kvm_psci_0_2_call(struct kvm_vcpu *vcpu) {
+> >> +     unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+> >> +     unsigned long val;
+> >> +
+> >> +     switch (psci_fn) {
+> >> +     case KVM_PSCI_0_2_FN_PSCI_VERSION:
+> >> +             /*
+> >> +              * Bits[31:16] = Major Version = 0
+> >> +              * Bits[15:0] = Minor Version = 2
+> >> +              */
+> >> +             val = 2;
+> >> +             break;
+> >> +     case KVM_PSCI_0_2_FN_CPU_OFF:
+> >> +             kvm_psci_vcpu_off(vcpu);
+> >> +             val = KVM_PSCI_RET_SUCCESS;
+> >> +             break;
+> >> +     case KVM_PSCI_0_2_FN_CPU_ON:
+> >> +     case KVM_PSCI_0_2_FN64_CPU_ON:
+> >> +             val = kvm_psci_vcpu_on(vcpu);
+> >> +             break;
+> >> +     case KVM_PSCI_0_2_FN_CPU_SUSPEND:
+> >> +     case KVM_PSCI_0_2_FN_AFFINITY_INFO:
+> >> +     case KVM_PSCI_0_2_FN_MIGRATE:
+> >> +     case KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE:
+> >> +     case KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU:
+> >> +     case KVM_PSCI_0_2_FN_SYSTEM_OFF:
+> >> +     case KVM_PSCI_0_2_FN_SYSTEM_RESET:
+> >> +     case KVM_PSCI_0_2_FN64_CPU_SUSPEND:
+> >> +     case KVM_PSCI_0_2_FN64_AFFINITY_INFO:
+> >> +     case KVM_PSCI_0_2_FN64_MIGRATE:
+> >> +     case KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU:
+> >> +             val = KVM_PSCI_RET_NI;
+> >> +             break;
+> >> +     default:
+> >> +             return false;
+> >> +     }
+> >> +
+> >> +     *vcpu_reg(vcpu, 0) = val;
+> >> +     return true;
+> >> +}
+> >> +
+> >> +static bool kvm_psci_0_1_call(struct kvm_vcpu *vcpu)
+> >>  {
+> >>       unsigned long psci_fn = *vcpu_reg(vcpu, 0) & ~((u32) 0);
+> >>       unsigned long val;
+> >> @@ -112,7 +152,6 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
+> >>       case KVM_PSCI_FN_MIGRATE:
+> >>               val = KVM_PSCI_RET_NI;
+> >>               break;
+> >> -
+> >>       default:
+> >>               return false;
+> >>       }
+> >> @@ -120,3 +159,25 @@ bool kvm_psci_call(struct kvm_vcpu *vcpu)
+> >>       *vcpu_reg(vcpu, 0) = val;
+> >>       return true;
+> >>  }
+> >> +
+> >> +/**
+> >> + * kvm_psci_call - handle PSCI call if r0 value is in range
+> >> + * @vcpu: Pointer to the VCPU struct
+> >> + *
+> >> + * Handle PSCI calls from guests through traps from HVC instructions.
+> >> + * The calling convention is similar to SMC calls to the secure
+> >> +world where
+> >> + * the function number is placed in r0 and this function returns
+> >> +true if the
+> >> + * function number specified in r0 is withing the PSCI range, and
+> >> +false
+> >> + * otherwise.
+> >> + */
+> >> +bool kvm_psci_call(struct kvm_vcpu *vcpu) {
+> >> +     switch (kvm_psci_version(vcpu)) {
+> >> +     case KVM_ARM_PSCI_0_2:
+> >> +             return kvm_psci_0_2_call(vcpu);
+> >> +     case KVM_ARM_PSCI_0_1:
+> >> +             return kvm_psci_0_1_call(vcpu);
+> >> +     default:
+> >> +             return false;
+> >> +     };
+> >> +}
+> >> diff --git a/arch/arm64/include/asm/kvm_host.h
+> >> b/arch/arm64/include/asm/kvm_host.h
+> >> index 0a1d697..92242ce 100644
+> >> --- a/arch/arm64/include/asm/kvm_host.h
+> >> +++ b/arch/arm64/include/asm/kvm_host.h
+> >> @@ -39,7 +39,7 @@
+> >>  #include <kvm/arm_vgic.h>
+> >>  #include <kvm/arm_arch_timer.h>
+> >>
+> >> -#define KVM_VCPU_MAX_FEATURES 2
+> >> +#define KVM_VCPU_MAX_FEATURES 3
+> >>
+> >>  struct kvm_vcpu;
+> >>  int kvm_target_cpu(void);
+> >> diff --git a/arch/arm64/include/asm/kvm_psci.h
+> >> b/arch/arm64/include/asm/kvm_psci.h
+> >> index e301a48..e25c658 100644
+> >> --- a/arch/arm64/include/asm/kvm_psci.h
+> >> +++ b/arch/arm64/include/asm/kvm_psci.h
+> >> @@ -18,6 +18,10 @@
+> >>  #ifndef __ARM64_KVM_PSCI_H__
+> >>  #define __ARM64_KVM_PSCI_H__
+> >>
+> >> +#define KVM_ARM_PSCI_0_1     1
+> >> +#define KVM_ARM_PSCI_0_2     2
+> >> +
+> >> +int kvm_psci_version(struct kvm_vcpu *vcpu);
+> >>  bool kvm_psci_call(struct kvm_vcpu *vcpu);
+> >>
+> >>  #endif /* __ARM64_KVM_PSCI_H__ */
+> >> diff --git a/arch/arm64/include/uapi/asm/kvm.h
+> >> b/arch/arm64/include/uapi/asm/kvm.h
+> >> index eaf54a3..cadc318 100644
+> >> --- a/arch/arm64/include/uapi/asm/kvm.h
+> >> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> >> @@ -77,6 +77,7 @@ struct kvm_regs {
+> >>
+> >>  #define KVM_ARM_VCPU_POWER_OFF               0 /* CPU is started in OFF state */
+> >>  #define KVM_ARM_VCPU_EL1_32BIT               1 /* CPU running a 32bit VM */
+> >> +#define KVM_ARM_VCPU_PSCI_0_2                2 /* CPU uses PSCI v0.2 */
+> >>
+> >>  struct kvm_vcpu_init {
+> >>       __u32 target;
+> >> @@ -177,7 +178,7 @@ struct kvm_arch_memory_slot {
+> >>  /* Highest supported SPI, from VGIC_NR_IRQS */
+> >>  #define KVM_ARM_IRQ_GIC_MAX          127
+> >>
+> >> -/* PSCI interface */
+> >> +/* PSCI v0.1 interface */
+> >>  #define KVM_PSCI_FN_BASE             0x95c1ba5e
+> >>  #define KVM_PSCI_FN(n)                       (KVM_PSCI_FN_BASE + (n))
+> >>
+> >> @@ -186,10 +187,42 @@ struct kvm_arch_memory_slot {
+> >>  #define KVM_PSCI_FN_CPU_ON           KVM_PSCI_FN(2)
+> >>  #define KVM_PSCI_FN_MIGRATE          KVM_PSCI_FN(3)
+> >>
+> >> +/* PSCI v0.2 interface */
+> >> +#define KVM_PSCI_0_2_FN_BASE         0x84000000
+> >> +#define KVM_PSCI_0_2_FN(n)           (KVM_PSCI_0_2_FN_BASE + (n))
+> >> +#define KVM_PSCI_0_2_FN64_BASE               0xC4000000
+> >> +#define KVM_PSCI_0_2_FN64(n)         (KVM_PSCI_0_2_FN64_BASE + (n))
+> >> +
+> >> +#define KVM_PSCI_0_2_FN_PSCI_VERSION KVM_PSCI_0_2_FN(0) #define
+> >> +KVM_PSCI_0_2_FN_CPU_SUSPEND  KVM_PSCI_0_2_FN(1)
+> >> +#define KVM_PSCI_0_2_FN_CPU_OFF              KVM_PSCI_0_2_FN(2)
+> >> +#define KVM_PSCI_0_2_FN_CPU_ON               KVM_PSCI_0_2_FN(3)
+> >> +#define KVM_PSCI_0_2_FN_AFFINITY_INFO        KVM_PSCI_0_2_FN(4)
+> >> +#define KVM_PSCI_0_2_FN_MIGRATE              KVM_PSCI_0_2_FN(5)
+> >> +#define KVM_PSCI_0_2_FN_MIGRATE_INFO_TYPE \
+> >> +                                     KVM_PSCI_0_2_FN(6) #define
+> >> +KVM_PSCI_0_2_FN_MIGRATE_INFO_UP_CPU \
+> >> +                                     KVM_PSCI_0_2_FN(7)
+> >> +#define KVM_PSCI_0_2_FN_SYSTEM_OFF   KVM_PSCI_0_2_FN(8)
+> >> +#define KVM_PSCI_0_2_FN_SYSTEM_RESET KVM_PSCI_0_2_FN(9)
+> >> +
+> >> +#define KVM_PSCI_0_2_FN64_CPU_SUSPEND        KVM_PSCI_0_2_FN64(1)
+> >> +#define KVM_PSCI_0_2_FN64_CPU_ON     KVM_PSCI_0_2_FN64(3)
+> >> +#define KVM_PSCI_0_2_FN64_AFFINITY_INFO      KVM_PSCI_0_2_FN64(4)
+> >> +#define KVM_PSCI_0_2_FN64_MIGRATE    KVM_PSCI_0_2_FN64(5)
+> >> +#define KVM_PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU \
+> >> +                                     KVM_PSCI_0_2_FN64(7)
+> >> +
+> >> +/* PSCI return values */
+> >>  #define KVM_PSCI_RET_SUCCESS         0
+> >>  #define KVM_PSCI_RET_NI                      ((unsigned long)-1)
+> >>  #define KVM_PSCI_RET_INVAL           ((unsigned long)-2)
+> >>  #define KVM_PSCI_RET_DENIED          ((unsigned long)-3)
+> >> +#define KVM_PSCI_RET_ALREADY_ON              ((unsigned long)-4)
+> >> +#define KVM_PSCI_RET_ON_PENDING              ((unsigned long)-5)
+> >> +#define KVM_PSCI_RET_INTERNAL_FAILURE        ((unsigned long)-6)
+> >> +#define KVM_PSCI_RET_NOT_PRESENT     ((unsigned long)-7)
+> >> +#define KVM_PSCI_RET_DISABLED                ((unsigned long)-8)
+> >>
+> >>  #endif
+> >>
+> >> --
+> >> 1.7.9.5
+> >>
+> >> _______________________________________________
+> >> kvmarm mailing list
+> >> kvmarm at lists.cs.columbia.edu
+> >> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+> >
+> > _______________________________________________
+> > kvmarm mailing list
+> > kvmarm at lists.cs.columbia.edu
+> > https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
