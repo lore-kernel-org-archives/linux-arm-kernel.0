@@ -1,13 +1,76 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 7 Feb 2014 09:30:46 -0800
-Subject: [PATCH v3 0/2] *** SUBJECT HERE ***
-In-Reply-To: <cover.1391792986.git.moinejf@free.fr>
-References: <cover.1391792986.git.moinejf@free.fr>
-Message-ID: <20140207173046.GA4983@kroah.com>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Fri, 07 Feb 2014 17:31:52 +0000
+Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
+ binding to list boost mode frequency
+In-Reply-To: <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
+References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>	<1391786342-11812-3-git-send-email-thomas.ab@samsung.com>	<52F50698.4060305@arm.com>	<52F509BD.70903@arm.com>
+ <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
+Message-ID: <52F51888.5010608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 06:09:46PM +0100, Jean-Francois Moine wrote:
-> *** BLURB HERE ***
+On 07/02/14 16:43, Nishanth Menon wrote:
+> On Fri, Feb 7, 2014 at 10:28 AM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
+>> On 07/02/14 16:15, Sudeep Holla wrote:
+>>> On 07/02/14 15:19, Thomas Abraham wrote:
+>>>> From: Thomas Abraham <thomas.ab@samsung.com>
+>>>>
+>>>> Add a new optional boost-frequency binding for specifying the frequencies
+>>>> usable in boost mode.
+>>>>
+>>>> Cc: Nishanth Menon <nm@ti.com>
+>>>> Cc: Lukasz Majewski <l.majewski@samsung.com>
+>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>> Cc: Pawel Moll <pawel.moll@arm.com>
+>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+>>>> Cc: Kumar Gala <galak@codeaurora.org>
+>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt |   11 +++++++++++
+>>>>  1 file changed, 11 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>>>> new file mode 100644
+>>>> index 0000000..d925e38
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>>>> @@ -0,0 +1,11 @@
+>>>> +* Device tree binding for CPU boost frequency (aka over-clocking)
+>>>> +
+>>>> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
+>>>> +overclocking) in which the CPU can operate in frequencies beyond the normal
+>>>> +operating conditions.
+>>>> +
+>>>> +Optional Properties:
+>>>> +- boost-frequency: list of frequencies in KHz to be used only in boost mode.
+>>>> +  This list should be a subset of frequencies listed in "operating-points"
+>>>> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
+>>>> +  details about "operating-points" property.
+>>>>
+>>>
+>>> Won't single entry for boost frequency suffice which would be the starting
+>>> frequency in the boost range. IOW will there be OPP list with frequencies:
+>>> A > B > C > D, but only B and C are boost frequency. That seems little odd,
+>>> unless it's some configuration chosen purely on software basis rather than
+>>> hardware. For me B marks the beginning of over-clocking.
+>>>
+>> Ah, I meant A < B < C < D in the above example.
+>
+> Should'nt we let the SoC dts define that - traditionally, yes, but
+> consider the following:
+> A, B, C uses clk_parent X which describes B, C as overclocked.
+> and say D uses clk_parent Y which is not "over clocked", then you have
+> the scenario that on the first look seems counter-intutive.
+> 
 
-Subject and BLURB forgotten?
+Yes I thought of exactly similar clock setup, but was not convinced that it
+should be part of OPP. In that case it looks like we are trying to represent
+clock internals through some OPP bindings.
+
+Yes I think its counter-intuitive as it's visible to the userspace(list of
+frequencies and the boost parameters are exposed through sysfs)
+
+Regards,
+Sudeep
