@@ -1,47 +1,34 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 07 Feb 2014 16:06:37 +0100
-Subject: [PATCH v3 2/5] clk: sunxi: Add USB clock register defintions
-In-Reply-To: <20140207144441.GK3192@lukather>
-References: <1391783553-8096-1-git-send-email-hdegoede@redhat.com>
- <1391783553-8096-3-git-send-email-hdegoede@redhat.com>
- <20140207144441.GK3192@lukather>
-Message-ID: <52F4F67D.7080407@redhat.com>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Fri, 07 Feb 2014 12:00:18 -0300
+Subject: [PATCH] clk: respect the clock dependencies in of_clk_init
+In-Reply-To: <52F4F279.6010006@free-electrons.com>
+References: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
+ <52F4DA40.4090804@elopez.com.ar> <20140207142430.GU8533@titan.lakedaemon.net>
+ <20140207144325.GA8218@localhost> <52F4F279.6010006@free-electrons.com>
+Message-ID: <52F4F502.2010703@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 02/07/2014 03:44 PM, Maxime Ripard wrote:
-> Hi,
+El 07/02/14 11:49, Gregory CLEMENT escribi?:
+> On 07/02/2014 15:43, Ezequiel Garcia wrote:
+>> On Fri, Feb 07, 2014 at 09:24:30AM -0500, Jason Cooper wrote:
+>>> On Fri, Feb 07, 2014 at 10:06:08AM -0300, Emilio L?pez wrote:
+>>>
+>>> [snip a great explanation]
+>>>
+>>> Guys, can I get some Tested-by's on this?
+>>>
+>>
+>> In case someone missed Emilio's comment about it, I gave his oneliner
+>> a test on A370 Reference Design. It worked just as well as Sebastian's.
 >
-> On Fri, Feb 07, 2014 at 03:32:30PM +0100, Hans de Goede wrote:
->> From: Roman Byshko <rbyshko@gmail.com>
->>
->> Add register definitions for the usb-clk register found on sun4i, sun5i and
->> sun7i SoCs.
->>
->> Signed-off-by: Roman Byshko <rbyshko@gmail.com>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   Documentation/devicetree/bindings/clock/sunxi.txt |  5 +++++
->>   drivers/clk/sunxi/clk-sunxi.c                     | 12 ++++++++++++
->>   2 files changed, 17 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
->> index 27f19f1..e368a86c 100644
->> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
->> @@ -38,6 +38,8 @@ Required properties:
->>   	"allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
->>   	"allwinner,sun7i-a20-out-clk" - for the external output clocks
->>   	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
->> +	"allwinner,sun4i-usb-clk" - for usb gates + resets on A10 / A20
->
-> I know I asked you otherwise, but since we're moving to sun4i-a10-*
-> compatibles, can you do it here too ? :)
+> Well ok it's working but this patch is not better than Sebastian, it is
+> even worth. I don't think it is a good idea at all to totally ignore the
+> information given by the device tree.
 
-Sure can do, v4 coming up.
+With a bit more work, you can replace the clk_get magic with a call to 
+of_clk_get_parent_name() or similar to be able to keep overriding stuff 
+from DT. This way it would completely match the behaviour on 
+mvebu_coreclk_setup (default to "tclk", allow overriding with DT).
 
-Regards,
-
-Hans
+Emilio
