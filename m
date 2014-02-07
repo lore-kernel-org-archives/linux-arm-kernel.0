@@ -1,1556 +1,708 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Fri, 7 Feb 2014 08:42:00 +0000
-Subject: [PATCH] can: xilinx CAN controller support.
-In-Reply-To: <52F382D5.6090706@pengutronix.de>
-References: <6c2bcce0-9897-4d1d-a8b9-47924e40f73c@VA3EHSMHS008.ehs.local>
- <52F382D5.6090706@pengutronix.de>
-Message-ID: <8b4dad82-c72a-4e1f-b1af-b8c7964bbf24@TX2EHSMHS043.ehs.local>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri, 07 Feb 2014 09:43:42 +0100
+Subject: [PATCH v3 01/15] at91: dt: Add at91sam9261 dt SoC support
+In-Reply-To: <20140207082350.GT9558@ns203013.ovh.net>
+References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
+ <1390492639-7299-2-git-send-email-jjhiblot@traphandler.com>
+ <20140207082350.GT9558@ns203013.ovh.net>
+Message-ID: <52F49CBE.4030508@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-
-> -----Original Message-----
-> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
-> Sent: Thursday, February 06, 2014 6:11 PM
-> To: Appana Durga Kedareswara Rao; wg at grandegger.com; Michal Simek;
-> grant.likely at linaro.org; robh+dt at kernel.org; linux-can at vger.kernel.org
-> Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; devicetree at vger.kernel.org; Appana Durga
-> Kedareswara Rao
-> Subject: Re: [PATCH] can: xilinx CAN controller support.
->
-> On 02/06/2014 11:19 AM, Kedareswara rao Appana wrote:
-> > This patch adds xilinx CAN controller support.
-> > This driver supports both ZYNQ CANPS IP and Soft IP AXI CAN
-> > controller.
-> >
-> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
->
-> First review, see comments inline.
->
-> Marc
->
-> > ---
-> > This patch is rebased on the 3.14 rc1 kernel.
-> > ---
-> >  .../devicetree/bindings/net/can/xilinx_can.txt     |   43 +
-> >  drivers/net/can/Kconfig                            |    8 +
-> >  drivers/net/can/Makefile                           |    1 +
-> >  drivers/net/can/xilinx_can.c                       | 1150 ++++++++++++++++++++
-> >  4 files changed, 1202 insertions(+), 0 deletions(-)  create mode
-> > 100644 Documentation/devicetree/bindings/net/can/xilinx_can.txt
-> >  create mode 100644 drivers/net/can/xilinx_can.c
-> >
-> > diff --git a/Documentation/devicetree/bindings/net/can/xilinx_can.txt
-> > b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
-> > new file mode 100644
-> > index 0000000..34f9643
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
-> > @@ -0,0 +1,43 @@
-> > +Xilinx Axi CAN/Zynq CANPS controller Device Tree Bindings
-> > +---------------------------------------------------------
-> > +
-> > +Required properties:
-> > +- compatible               : Should be "xlnx,zynq-can-1.00.a" for Zynq
-> CAN
-> > +                     controllers and "xlnx,axi-can-1.00.a" for Axi CAN
-> > +                     controllers.
-> > +- reg                      : Physical base address and size of the Axi CAN/Zynq
-> > +                     CANPS registers map.
-> > +- interrupts               : Property with a value describing the interrupt
-> > +                     number.
-> > +- interrupt-parent : Must be core interrupt controller
-> > +- clock-names              : List of input clock names - "ref_clk",
-> "aper_clk"
-> > +                     (See clock bindings for details. Two clocks are
-> > +                      required for Zynq CAN. For Axi CAN
-> > +                      case it is one(ref_clk)).
-> > +- clocks           : Clock phandles (see clock bindings for details).
-> > +- xlnx,can-tx-dpth : Can Tx fifo depth (Required for Axi CAN).
-> > +- xlnx,can-rx-dpth : Can Rx fifo depth (Required for Axi CAN).
-> > +
-> > +
-> > +Example:
-> > +
-> > +For Zynq CANPS Dts file:
-> > +   zynq_can_0: zynq-can at e0008000 {
-> > +                   compatible = "xlnx,zynq-can-1.00.a";
-> > +                   clocks = <&clkc 19>, <&clkc 36>;
-> > +                   clock-names = "ref_clk", "aper_clk";
-> > +                   reg = <0xe0008000 0x1000>;
-> > +                   interrupts = <0 28 4>;
-> > +                   interrupt-parent = <&intc>;
->
-> Above xlnx,can-{rx,tx}-dpth is mentioned as required, but it's not in the
-> Zynq example.
-
-One of the Difference b/w the AXI CAN and zynq CAN is in AXI CAN the fifo depth(tx,rx)
-Is user configurable. But in case of ZYNQ CAN  the fifo depth  is fixed for tx and rx fifo's(64)
-Xlnx,can-{rx,tx}-dpth is required only for AXI CAN case it is not required for zynq CAN.
-That's why didn't putted that property in device tree.
-
->
-> > +           };
-> > +For Axi CAN Dts file:
-> > +   axi_can_0: axi-can at 40000000 {
-> > +                   compatible = "xlnx,axi-can-1.00.a";
-> > +                   clocks = <&clkc 0>;
-> > +                   clock-names = "ref_clk" ;
-> > +                   reg = <0x40000000 0x10000>;
-> > +                   interrupt-parent = <&intc>;
-> > +                   interrupts = <0 59 1>;
-> > +                   xlnx,can-tx-dpth = <0x40>;
-> > +                   xlnx,can-rx-dpth = <0x40>;
-> > +           };
-> > diff --git a/drivers/net/can/Kconfig b/drivers/net/can/Kconfig index
-> > d447b88..2344fb5 100644
-> > --- a/drivers/net/can/Kconfig
-> > +++ b/drivers/net/can/Kconfig
-> > @@ -125,6 +125,14 @@ config CAN_GRCAN
-> >       endian syntheses of the cores would need some modifications on
-> >       the hardware level to work.
-> >
-> > +config CAN_XILINXCAN
-> > +   tristate "Xilinx CAN"
-> > +   depends on ARCH_ZYNQ || MICROBLAZE
-> > +   default n
->
-> "default n" is default, please remove.
->
-
-Ok
-
-> > +   ---help---
-> > +     Xilinx CAN driver. This driver supports both soft AXI CAN IP and
-> > +     Zynq CANPS IP.
-> > +
-> >  source "drivers/net/can/mscan/Kconfig"
-> >
-> >  source "drivers/net/can/sja1000/Kconfig"
-> > diff --git a/drivers/net/can/Makefile b/drivers/net/can/Makefile index
-> > c744039..0b8e11e 100644
-> > --- a/drivers/net/can/Makefile
-> > +++ b/drivers/net/can/Makefile
-> > @@ -25,5 +25,6 @@ obj-$(CONFIG_CAN_JANZ_ICAN3)      += janz-
-> ican3.o
-> >  obj-$(CONFIG_CAN_FLEXCAN)  += flexcan.o
-> >  obj-$(CONFIG_PCH_CAN)              += pch_can.o
-> >  obj-$(CONFIG_CAN_GRCAN)            += grcan.o
-> > +obj-$(CONFIG_CAN_XILINXCAN)        += xilinx_can.o
-> >
-> >  ccflags-$(CONFIG_CAN_DEBUG_DEVICES) := -DDEBUG diff --git
-> > a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c new file
-> > mode 100644 index 0000000..c1b2b9d
-> > --- /dev/null
-> > +++ b/drivers/net/can/xilinx_can.c
-> > @@ -0,0 +1,1150 @@
-> > +/* Xilinx CAN device driver
-> > + *
-> > + * Copyright (C) 2012 - 2014 Xilinx, Inc.
-> > + * Copyright (C) 2009 PetaLogix. All rights reserved.
-> > + *
-> > + * Description:
-> > + * This driver is developed for Axi CAN IP and for Zynq CANPS Controller.
-> > + * This program is free software: you can redistribute it and/or
-> > +modify
-> > + * it under the terms of the GNU General Public License as published
-> > +by
-> > + * the Free Software Foundation, either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/errno.h>
-> > +#include <linux/init.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/io.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/module.h>
-> > +#include <linux/netdevice.h>
-> > +#include <linux/of.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/skbuff.h>
-> > +#include <linux/string.h>
-> > +#include <linux/types.h>
-> > +#include <linux/can/dev.h>
-> > +#include <linux/can/error.h>
-> > +#include <linux/can/led.h>
-> > +
-> > +#define DRIVER_NAME        "XILINX_CAN"
-> > +
-> > +/* CAN registers set */
-> > +#define XCAN_SRR_OFFSET                    0x00 /* Software reset */
-> > +#define XCAN_MSR_OFFSET                    0x04 /* Mode select */
-> > +#define XCAN_BRPR_OFFSET           0x08 /* Baud rate prescaler */
-> > +#define XCAN_BTR_OFFSET                    0x0C /* Bit timing */
-> > +#define XCAN_ECR_OFFSET                    0x10 /* Error counter */
-> > +#define XCAN_ESR_OFFSET                    0x14 /* Error status */
-> > +#define XCAN_SR_OFFSET                     0x18 /* Status */
-> > +#define XCAN_ISR_OFFSET                    0x1C /* Interrupt status */
-> > +#define XCAN_IER_OFFSET                    0x20 /* Interrupt enable */
-> > +#define XCAN_ICR_OFFSET                    0x24 /* Interrupt clear */
-> > +#define XCAN_TXFIFO_ID_OFFSET              0x30 /* TX FIFO ID */
-> > +#define XCAN_TXFIFO_DLC_OFFSET             0x34 /* TX FIFO DLC */
-> > +#define XCAN_TXFIFO_DW1_OFFSET             0x38 /* TX FIFO Data
-> Word 1 */
-> > +#define XCAN_TXFIFO_DW2_OFFSET             0x3C /* TX FIFO Data
-> Word 2 */
-> > +#define XCAN_RXFIFO_ID_OFFSET              0x50 /* RX FIFO ID */
-> > +#define XCAN_RXFIFO_DLC_OFFSET             0x54 /* RX FIFO DLC */
-> > +#define XCAN_RXFIFO_DW1_OFFSET             0x58 /* RX FIFO Data
-> Word 1 */
-> > +#define XCAN_RXFIFO_DW2_OFFSET             0x5C /* RX FIFO Data
-> Word 2 */
-> > +
-> > +/* CAN register bit masks - XCAN_<REG>_<BIT>_MASK */
-> > +#define XCAN_SRR_CEN_MASK          0x00000002 /* CAN enable */
-> > +#define XCAN_SRR_RESET_MASK                0x00000001 /* Soft Reset the
-> CAN core */
-> > +#define XCAN_MSR_LBACK_MASK                0x00000002 /* Loop back
-> mode select */
-> > +#define XCAN_MSR_SLEEP_MASK                0x00000001 /* Sleep mode
-> select */
-> > +#define XCAN_BRPR_BRP_MASK         0x000000FF /* Baud rate
-> prescaler */
-> > +#define XCAN_BTR_SJW_MASK          0x00000180 /* Synchronous
-> jump width */
-> > +#define XCAN_BTR_TS2_MASK          0x00000070 /* Time segment
-> 2 */
-> > +#define XCAN_BTR_TS1_MASK          0x0000000F /* Time segment
-> 1 */
-> > +#define XCAN_ECR_REC_MASK          0x0000FF00 /* Receive error
-> counter */
-> > +#define XCAN_ECR_TEC_MASK          0x000000FF /* Transmit error
-> counter */
-> > +#define XCAN_ESR_ACKER_MASK                0x00000010 /* ACK error */
-> > +#define XCAN_ESR_BERR_MASK         0x00000008 /* Bit error */
-> > +#define XCAN_ESR_STER_MASK         0x00000004 /* Stuff error */
-> > +#define XCAN_ESR_FMER_MASK         0x00000002 /* Form error */
-> > +#define XCAN_ESR_CRCER_MASK                0x00000001 /* CRC error */
-> > +#define XCAN_SR_TXFLL_MASK         0x00000400 /* TX FIFO is full
-> */
-> > +#define XCAN_SR_ESTAT_MASK         0x00000180 /* Error status */
-> > +#define XCAN_SR_ERRWRN_MASK                0x00000040 /* Error warning
-> */
-> > +#define XCAN_SR_NORMAL_MASK                0x00000008 /* Normal mode
-> */
-> > +#define XCAN_SR_LBACK_MASK         0x00000002 /* Loop back
-> mode */
-> > +#define XCAN_SR_CONFIG_MASK                0x00000001 /* Configuration
-> mode */
-> > +#define XCAN_IXR_TXFEMP_MASK               0x00004000 /* TX FIFO Empty
-> */
-> > +#define XCAN_IXR_WKUP_MASK         0x00000800 /* Wake up
-> interrupt */
-> > +#define XCAN_IXR_SLP_MASK          0x00000400 /* Sleep
-> interrupt */
-> > +#define XCAN_IXR_BSOFF_MASK                0x00000200 /* Bus off
-> interrupt */
-> > +#define XCAN_IXR_ERROR_MASK                0x00000100 /* Error interrupt
-> */
-> > +#define XCAN_IXR_RXNEMP_MASK               0x00000080 /* RX FIFO
-> NotEmpty intr */
-> > +#define XCAN_IXR_RXOFLW_MASK               0x00000040 /* RX FIFO
-> Overflow intr */
-> > +#define XCAN_IXR_RXOK_MASK         0x00000010 /* Message
-> received intr */
-> > +#define XCAN_IXR_TXOK_MASK         0x00000002 /* TX successful
-> intr */
-> > +#define XCAN_IXR_ARBLST_MASK               0x00000001 /* Arbitration
-> lost intr */
-> > +#define XCAN_IDR_ID1_MASK          0xFFE00000 /* Standard msg
-> identifier */
-> > +#define XCAN_IDR_SRR_MASK          0x00100000 /* Substitute
-> remote TXreq */
-> > +#define XCAN_IDR_IDE_MASK          0x00080000 /* Identifier
-> extension */
-> > +#define XCAN_IDR_ID2_MASK          0x0007FFFE /* Extended
-> message ident */
-> > +#define XCAN_IDR_RTR_MASK          0x00000001 /* Remote TX
-> request */
-> > +#define XCAN_DLCR_DLC_MASK         0xF0000000 /* Data length
-> code */
-> > +
-> > +#define XCAN_INTR_ALL              (XCAN_IXR_TXOK_MASK |
-> XCAN_IXR_BSOFF_MASK |\
-> > +                            XCAN_IXR_WKUP_MASK |
-> XCAN_IXR_SLP_MASK | \
-> > +                            XCAN_IXR_RXNEMP_MASK |
-> XCAN_IXR_ERROR_MASK | \
-> > +                            XCAN_IXR_ARBLST_MASK |
-> XCAN_IXR_RXOK_MASK)
-> > +
-> > +/* CAN register bit shift - XCAN_<REG>_<BIT>_SHIFT */
-> > +#define XCAN_BTR_SJW_SHIFT         7  /* Synchronous jump width
-> */
-> > +#define XCAN_BTR_TS2_SHIFT         4  /* Time segment 2 */
-> > +#define XCAN_IDR_ID1_SHIFT         21 /* Standard Messg
-> Identifier */
-> > +#define XCAN_IDR_ID2_SHIFT         1  /* Extended Message
-> Identifier */
-> > +#define XCAN_DLCR_DLC_SHIFT                28 /* Data length code */
-> > +#define XCAN_ESR_REC_SHIFT         8  /* Rx Error Count */
-> > +
-> > +/* CAN frame length constants */
-> > +#define XCAN_ECHO_SKB_MAX          64
-> > +#define XCAN_NAPI_WEIGHT           64
-> > +#define XCAN_FRAME_MAX_DATA_LEN            8
-> > +#define XCAN_TIMEOUT                       (50 * HZ)
-> > +
-> > +/**
-> > + * struct xcan_priv - This definition define CAN driver instance
-> > + * @can:                   CAN private data structure.
-> > + * @open_time:                     For holding timeout values
-> > + * @waiting_ech_skb_index: Pointer for skb
-> > + * @ech_skb_next:          This tell the next packet in the queue
-> > + * @waiting_ech_skb_num:   Gives the number of packets waiting
-> > + * @xcan_echo_skb_max_tx:  Maximum number packets the driver
-> can send
-> > + * @xcan_echo_skb_max_rx:  Maximum number packets the driver
-> can receive
-> > + * @napi:                  NAPI structure
-> > + * @ech_skb_lock:          For spinlock purpose
-> > + * @read_reg:                      For reading data from CAN registers
-> > + * @write_reg:                     For writing data to CAN registers
-> > + * @dev:                   Network device data structure
-> > + * @reg_base:                      Ioremapped address to registers
-> > + * @irq_flags:                     For request_irq()
-> > + * @aperclk:                       Pointer to struct clk
-> > + * @devclk:                        Pointer to struct clk
-> > + */
-> > +struct xcan_priv {
-> > +   struct can_priv can;
-> > +   int open_time;
-> > +   int waiting_ech_skb_index;
-> > +   int ech_skb_next;
-> > +   int waiting_ech_skb_num;
-> > +   int xcan_echo_skb_max_tx;
-> > +   int xcan_echo_skb_max_rx;
-> > +   struct napi_struct napi;
-> > +   spinlock_t ech_skb_lock;
-> > +   u32 (*read_reg)(const struct xcan_priv *priv, int reg);
-> > +   void (*write_reg)(const struct xcan_priv *priv, int reg, u32 val);
->
-> Why do you have {read,write}_reg function here?
-
-xcan_write_reg/xcan_read_reg is used because this IP is also in big endian version.
-We won't support It but if someone else want to support that's why putted these function's here.
-
-If you are not ok with this will remove.
-
->
-> > +   struct net_device *dev;
-> > +   void __iomem *reg_base;
-> > +   unsigned long irq_flags;
-> > +   struct clk *aperclk;
-> > +   struct clk *devclk;
-> > +};
-> > +
-> > +/* CAN Bittiming constants as per Xilinx CAN specs */ static struct
-> > +can_bittiming_const xcan_bittiming_const = {
-> > +   .name = DRIVER_NAME,
-> > +   .tseg1_min = 1,
-> > +   .tseg1_max = 16,
-> > +   .tseg2_min = 1,
-> > +   .tseg2_max = 8,
-> > +   .sjw_max = 4,
-> > +   .brp_min = 1,
-> > +   .brp_max = 256,
-> > +   .brp_inc = 1,
-> > +};
-> > +
-> > +/**
-> > + * xcan_write_reg - Write a value to the device register
-> > + * @priv:  Driver private data structure
-> > + * @reg:   Register offset
-> > + * @val:   Value to write at the Register offset
-> > + *
-> > + * Write data to the paricular CAN register  */ static void
-> > +xcan_write_reg(const struct xcan_priv *priv, int reg, u32 val) {
-> > +   writel(val, priv->reg_base + reg);
-> > +}
-> > +
-> > +/**
-> > + * xcan_read_reg - Read a value from the device register
-> > + * @priv:  Driver private data structure
-> > + * @reg:   Register offset
-> > + *
-> > + * Read data from the particular CAN register
-> > + * Return: value read from the CAN register  */ static u32
-> > +xcan_read_reg(const struct xcan_priv *priv, int reg) {
-> > +   return readl(priv->reg_base + reg);
-> > +}
-> > +
-> > +/**
-> > + * set_reset_mode - Resets the CAN device mode
-> > + * @ndev:  Pointer to net_device structure
-> > + *
-> > + * This is the driver reset mode routine.The driver
-> > + * enters into configuration mode.
-> > + *
-> > + * Return: 0 on success and failure value on error  */ static int
-> > +set_reset_mode(struct net_device *ndev) {
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +   unsigned long timeout;
-> > +
-> > +   priv->can.state = CAN_STATE_STOPPED;
-> > +   priv->write_reg(priv, XCAN_SRR_OFFSET, XCAN_SRR_OFFSET);
-> > +
-> > +   timeout = jiffies + XCAN_TIMEOUT;
-> > +   while (!(priv->read_reg(priv, XCAN_SR_OFFSET) &
-> XCAN_SR_CONFIG_MASK)) {
-> > +           if (time_after(jiffies, timeout)) {
-> > +                   netdev_warn(ndev, "timedout waiting for config
-> mode\n");
-> > +                   return -ETIMEDOUT;
-> > +           }
-> > +           schedule_timeout(1);
->
-> better use usleep_range()
->
-
-Ok
-> > +   }
-> > +
-> > +   return 0;
-> > +}
-> > +
-> > +/**
-> > + * xcan_set_bittiming - CAN set bit timing routine
-> > + * @ndev:  Pointer to net_device structure
-> > + *
-> > + * This is the driver set bittiming  routine.
-> > + * Return: 0 on success and failure value on error  */ static int
-> > +xcan_set_bittiming(struct net_device *ndev) {
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +   struct can_bittiming *bt = &priv->can.bittiming;
-> > +   u32 btr0, btr1;
-> > +   u32 is_config_mode;
-> > +
-> > +   /* Check whether Xilinx CAN is in configuration mode.
-> > +    * It cannot set bit timing if Xilinx CAN is not in configuration mode.
-> > +    */
-> > +   is_config_mode = priv->read_reg(priv, XCAN_SR_OFFSET) &
-> > +                           XCAN_SR_CONFIG_MASK;
-> > +   if (!is_config_mode) {
-> > +           netdev_alert(ndev,
-> > +                   "Cannot set bittiming can is not in config mode\n");
-> > +           return -EPERM;
-> > +   }
-> > +
-> > +   netdev_dbg(ndev,
-> "brp=%d,prop=%d,phase_seg1:%d,phase_reg2=%d,sjw=%d\n",
-> > +                   bt->brp, bt->prop_seg, bt->phase_seg1, bt-
-> >phase_seg2,
-> > +                   bt->sjw);
->
-> I think this dbg can be removed, as it just prints the userspace values.
->
-Ok
-
-> > +
-> > +   /* Setting Baud Rate prescalar value in BRPR Register */
-> > +   btr0 = (bt->brp - 1) & XCAN_BRPR_BRP_MASK;
-> > +
-> > +   /* Setting Time Segment 1 in BTR Register */
-> > +   btr1 = (bt->prop_seg + bt->phase_seg1 - 1) & XCAN_BTR_TS1_MASK;
-> > +
-> > +   /* Setting Time Segment 2 in BTR Register */
-> > +   btr1 |= ((bt->phase_seg2 - 1) << XCAN_BTR_TS2_SHIFT) &
-> > +           XCAN_BTR_TS2_MASK;
-> > +
-> > +   /* Setting Synchronous jump width in BTR Register */
-> > +   btr1 |= ((bt->sjw - 1) << XCAN_BTR_SJW_SHIFT) &
-> XCAN_BTR_SJW_MASK;
-> > +
-> > +   if (priv->can.ctrlmode & CAN_CTRLMODE_3_SAMPLES)
-> > +           netdev_info(ndev, "Doesn't support Triple Sampling\n");
->
-> no need to check, it's not passed to the driver until you advertise you
-> support it (see priv->can.ctrlmode_supported).
-
-
-Ok
-
->
-> > +   netdev_dbg(ndev, "Setting BTR0=0x%02x BTR1=0x%02x\n", btr0,
-> btr1);
-> > +
-> > +   priv->write_reg(priv, XCAN_BRPR_OFFSET, btr0);
-> > +   priv->write_reg(priv, XCAN_BTR_OFFSET, btr1);
-> > +
-> > +   netdev_dbg(ndev, "BRPR=0x%08x, BTR=0x%08x\n",
-> > +                   priv->read_reg(priv, XCAN_BRPR_OFFSET),
-> > +                   priv->read_reg(priv, XCAN_BTR_OFFSET));
->
-> One of the dbg should be enough.
->
-
-
-Ok
-> > +
-> > +   return 0;
-> > +}
-> > +
-> > +/**
-> > + * xcan_start - This the drivers start routine
-> > + * @ndev:  Pointer to net_device structure
-> > + *
-> > + * This is the drivers start routine.
-> > + * Based on the State of the CAN device it puts
-> > + * the CAN device into a proper mode.
-> > + *
-> > + * Return: 0 always
-> > + */
-> > +static int xcan_start(struct net_device *ndev) {
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +
-> > +   /* Check if it is in reset mode */
-> > +   if (priv->can.state != CAN_STATE_STOPPED)
-> > +           set_reset_mode(ndev);
->
-> Please check return value of set_reset_mode
-
-Ok
-
-
->
-> > +
-> > +   /* Enable interrupts */
-> > +   priv->write_reg(priv, XCAN_IER_OFFSET, XCAN_INTR_ALL);
-> > +
-> > +   /* Check whether it is loopback mode or normal mode  */
-> > +   if (priv->can.ctrlmode & CAN_CTRLMODE_LOOPBACK)
-> > +           /* Put device into loopback mode */
-> > +           priv->write_reg(priv, XCAN_MSR_OFFSET,
-> XCAN_MSR_LBACK_MASK);
-> > +   else
-> > +           /* The device is in normal mode */
-> > +           priv->write_reg(priv, XCAN_MSR_OFFSET, 0);
-> > +
-> > +   if (priv->can.state == CAN_STATE_STOPPED) {
->
-> I think your driver is always in CAN_STATE_STOPPED, right?
-
-Usually it in stopped state only(configuration mode) during initialization.
-
->
-> > +           /* Enable Xilinx CAN */
-> > +           priv->write_reg(priv, XCAN_SRR_OFFSET,
-> XCAN_SRR_CEN_MASK);
-> > +           priv->can.state = CAN_STATE_ERROR_ACTIVE;
-> > +           if (priv->can.ctrlmode & CAN_CTRLMODE_LOOPBACK) {
-> > +                   while ((priv->read_reg(priv, XCAN_SR_OFFSET) &
-> > +                                   XCAN_SR_LBACK_MASK) == 0)
-> > +                                   ;
-> > +           } else {
-> > +                   while ((priv->read_reg(priv, XCAN_SR_OFFSET)
-> > +                                   & XCAN_SR_NORMAL_MASK) == 0)
-> > +                                   ;
->
-> Please add a timeout to the loops.
-
-Ok
->
-> > +           }
-> > +           netdev_dbg(ndev, "status:#x%08x\n",
-> > +                           priv->read_reg(priv, XCAN_SR_OFFSET));
-> > +   }
-> > +   priv->can.state = CAN_STATE_ERROR_ACTIVE;
-> > +   return 0;
-> > +}
-> > +
-> > +/**
-> > + * xcan_do_set_mode - This sets the mode of the driver
-> > + * @ndev:  Pointer to net_device structure
-> > + * @mode:  Tells the mode of the driver
-> > + *
-> > + * This check the drivers state and calls the
-> > + * the corresponding modes to set.
-> > + *
-> > + * Return: 0 on success and failure value on error  */ static int
-> > +xcan_do_set_mode(struct net_device *ndev, enum can_mode mode) {
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +   int ret;
-> > +
-> > +   netdev_dbg(ndev, "Setting the mode of the driver%s\n", __func__);
->
-> please remove dbg
-
-Ok
->
-> > +
-> > +   if (!priv->open_time)
-> > +           return -EINVAL;
->
-> please remove open_time completely.
-
-Ok
-
-
-
->
-> > +
-> > +   switch (mode) {
-> > +   case CAN_MODE_START:
-> > +           ret = xcan_start(ndev);
-> > +           if (ret < 0)
-> > +                   netdev_err(ndev, "xcan_start failed!\n");
-> > +
-> > +           if (netif_queue_stopped(ndev))
-> > +                   netif_wake_queue(ndev);
->
-> just call wake_queue
-
-Ok. But existing drivers are using netif_wake_queue right?
-
-
-> > +           break;
-> > +   default:
-> > +           ret = -EOPNOTSUPP;
-> > +           break;
-> > +   }
-> > +
-> > +   return ret;
-> > +}
-> > +
-> > +/**
-> > + * xcan_start_xmit - Starts the transmission
-> > + * @skb:   sk_buff pointer that contains data to be Txed
-> > + * @ndev:  Pointer to net_device structure
-> > + *
-> > + * This function is invoked from upper layers to initiate
-> > +transmission. This
-> > + * function uses the next available free txbuff and populates their
-> > +fields to
-> > + * start the transmission.
-> > + *
-> > + * Return: 0 on success and failure value on error  */ static int
-> > +xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev) {
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +   struct net_device_stats *stats = &ndev->stats;
-> > +   struct can_frame *cf = (struct can_frame *)skb->data;
-> > +   u32 id, dlc, tmp_dw1, tmp_dw2 = 0, data1, data2 = 0;
-> > +   unsigned long flags;
-> > +
->
-> Please add here:
->
->       if (can_dropped_invalid_skb(dev, skb))
->               return NETDEV_TX_OK;
-
-Ok
-
-
-
->
-> > +   /* Check if the TX buffer is full */
-> > +   if (priv->read_reg(priv, XCAN_SR_OFFSET) & XCAN_SR_TXFLL_MASK)
-> {
-> > +           netif_stop_queue(ndev);
-> > +           netdev_err(ndev, "TX register is still full!\n");
-> > +           return NETDEV_TX_BUSY;
-> > +   } else if (priv->waiting_ech_skb_num == priv-
-> >xcan_echo_skb_max_tx) {
-> > +           netif_stop_queue(ndev);
-> > +           netdev_err(ndev, "waiting:0x%08x, max:0x%08x\n",
-> > +                   priv->waiting_ech_skb_num, priv-
-> >xcan_echo_skb_max_tx);
-> > +           return NETDEV_TX_BUSY;
-> > +   }
->
-> You should handle flow control after you put the CAN frame into the
-> hardware, but before activating the TX complete interrutp.
->
-
-Ok
-
-
-> > +   /* Watch carefully on the bit sequence */
-> > +   if ((cf->can_id & CAN_EFF_FLAG) == 0) {
->
-> Nitpick easier to read is:
->
->
->       if (cf->can_id & CAN_EFF_FLAG) {
->               /* EFF handling */
->       } else {
->               /* STD handling */
->       }
->
-Ok
-
-
-> > +           /* Standard CAN ID format */
-> > +           id = ((cf->can_id & CAN_SFF_MASK) << XCAN_IDR_ID1_SHIFT)
-> &
-> > +                   XCAN_IDR_ID1_MASK;
-> > +
-> > +           if (cf->can_id & CAN_RTR_FLAG)
-> > +                   /* Extended frames remote TX request */
-> > +                   id |= XCAN_IDR_SRR_MASK;
-> > +   } else {
-> > +           /* Extended CAN ID format */
-> > +           id = ((cf->can_id & CAN_EFF_MASK) << XCAN_IDR_ID2_SHIFT)
-> &
-> > +                   XCAN_IDR_ID2_MASK;
-> > +           id |= (((cf->can_id & CAN_EFF_MASK) >>
-> > +                   (CAN_EFF_ID_BITS-CAN_SFF_ID_BITS)) <<
-> > +                   XCAN_IDR_ID1_SHIFT) & XCAN_IDR_ID1_MASK;
-> > +
-> > +           /* The substibute remote TX request bit should be "1"
-> > +            * for extended frames as in the Xilinx CAN datasheet
-> > +            */
-> > +           id |= XCAN_IDR_IDE_MASK | XCAN_IDR_SRR_MASK;
-> > +
-> > +           if (cf->can_id & CAN_RTR_FLAG)
-> > +                   /* Extended frames remote TX request */
-> > +                   id |= XCAN_IDR_RTR_MASK;
-> > +   }
-> > +
-> > +   dlc = (cf->can_dlc & 0xf) << XCAN_DLCR_DLC_SHIFT;
->
->       With the above check can_dlc is valid.
->
-> > +
-> > +   tmp_dw1 = le32_to_cpup((u32 *)(cf->data));
-> > +   data1 = htonl(tmp_dw1);
->
-> This looks broken. cf->data is in big endian, what is the endianess of your
-> registers?
->
-
-Endianess of  our registers is little endian that's why need to do like this.
-
-> > +   if (dlc > 4) {
-> > +           tmp_dw2 = le32_to_cpup((u32 *)(cf->data + 4));
-> > +           data2 = htonl(tmp_dw2);
-> > +   }
-> > +
-> > +   netdev_dbg(ndev,
-> "tx:id=0x%08x,dlc=0x%08x,d1=0x%08x,d2=0x%08x\n",
-> > +                   id, dlc, data1, data2);
->
-> please remove the dbg
->
-
-Ok
-
-> > +   /* Write the Frame to Xilinx CAN TX FIFO */
-> > +   priv->write_reg(priv, XCAN_TXFIFO_ID_OFFSET, id);
-> > +   priv->write_reg(priv, XCAN_TXFIFO_DLC_OFFSET, dlc);
-> > +   priv->write_reg(priv, XCAN_TXFIFO_DW1_OFFSET, data1);
-> > +   priv->write_reg(priv, XCAN_TXFIFO_DW2_OFFSET, data2);
->
-> Which write triggers the transmission?
->
-
-The last write triggers the transmission.
-If we are sending data less than 4 bytes in that case also we need to
-Fill this( XCAN_TXFIFO_DW2_OFFSET) with default value .
-
-> > +   stats->tx_bytes += cf->can_dlc;
->
-> Can you move the tx_bytes += to your tx-complete routine?
-
-Ok
->
-> > +   ndev->trans_start = jiffies;
->
-> Please remove
-
-Ok
-
-
-> > +
-> > +   can_put_echo_skb(skb, ndev, priv->ech_skb_next);
->
-> This looks racy, first fill the echo_skb, then start the transmission.
-
-Ok But I didn't understand it clearly.
-Will you please explain a little clear.
-
-
-> > +
-> > +   priv->ech_skb_next = (priv->ech_skb_next + 1) %
-> > +                                   priv->xcan_echo_skb_max_tx;
-> > +
-> > +   spin_lock_irqsave(&priv->ech_skb_lock, flags);
-> > +   priv->waiting_ech_skb_num++;
-> > +   spin_unlock_irqrestore(&priv->ech_skb_lock, flags);
-> > +
->
-> Please move the flow controll handling here.
->
-
-Ok
-
-> > +   return NETDEV_TX_OK;
-> > +}
-> > +
-> > +/**
-> > + * xcan_rx -  Is called from CAN isr to complete the received
-> > + *         frame  processing
-> > + * @ndev:  Pointer to net_device structure
-> > + *
-> > + * This function is invoked from the CAN isr(poll) to process the Rx
-> > +frames. It
-> > + * does minimal processing and invokes "netif_receive_skb" to
-> > +complete further
-> > + * processing.
-> > + * Return: 0 on success and negative error value on error  */ static
-> > +int xcan_rx(struct net_device *ndev) {
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +   struct net_device_stats *stats = &ndev->stats;
-> > +   struct can_frame *cf;
-> > +   struct sk_buff *skb;
-> > +   u32 id_xcan, dlc, data1, data2;
-> > +
-> > +   skb = alloc_can_skb(ndev, &cf);
-> > +   if (!skb)
-> > +           return -ENOMEM;
-> > +
-> > +   /* Read a frame from Xilinx zynq CANPS */
-> > +   id_xcan = priv->read_reg(priv, XCAN_RXFIFO_ID_OFFSET);
-> > +   dlc = priv->read_reg(priv, XCAN_RXFIFO_DLC_OFFSET) &
-> XCAN_DLCR_DLC_MASK;
-> > +   data1 = priv->read_reg(priv, XCAN_RXFIFO_DW1_OFFSET);
-> > +   data2 = priv->read_reg(priv, XCAN_RXFIFO_DW2_OFFSET);
->
-> If you don't use data? below, don't read them in the first place. Better move
-> the read below, where you fill the data of the can_frame.
->
-
-Ok
-
-> +     netdev_dbg(ndev,
-> "rx:id=0x%08x,dlc=0x%08x,d1=0x%08x,d2=0x%08x\n",
-> > +           id_xcan, dlc, data1, data2);
-> >
-> please remove dbg
-
-Ok
-
->
->  +
-> > +   /* Change Xilinx CAN data length format to socketCAN data format
-> */
-> > +   cf->can_dlc = get_can_dlc((dlc & XCAN_DLCR_DLC_MASK) >>
-> > +                           XCAN_DLCR_DLC_SHIFT);
-> > +
-> > +   /* Change Xilinx CAN ID format to socketCAN ID format */
-> > +   if (id_xcan & XCAN_IDR_IDE_MASK) {
-> > +           /* The received frame is an Extended format frame */
-> > +           cf->can_id = (id_xcan & XCAN_IDR_ID1_MASK) >> 3;
-> > +           cf->can_id |= (id_xcan & XCAN_IDR_ID2_MASK) >>
-> > +                           XCAN_IDR_ID2_SHIFT;
-> > +           cf->can_id |= CAN_EFF_FLAG;
-> > +           if (id_xcan & XCAN_IDR_RTR_MASK)
-> > +                   cf->can_id |= CAN_RTR_FLAG;
-> > +   } else {
-> > +           /* The received frame is a standard format frame */
-> > +           cf->can_id = (id_xcan & XCAN_IDR_ID1_MASK) >>
-> > +                           XCAN_IDR_ID1_SHIFT;
-> > +           if (id_xcan & XCAN_IDR_RTR_MASK)
-> > +                   cf->can_id |= CAN_RTR_FLAG;
-> > +   }
-> > +
-> > +   /* Change Xilinx CAN data format to socketCAN data format */
->
-> Don't fill cf->data if RTR is set. The endianess handling looks weird here,
-> too.
->
-OK
-
-> > +   *(u32 *)(cf->data) = ntohl(data1);
-> > +   if (cf->can_dlc > 4)
-> > +           *(u32 *)(cf->data + 4) = ntohl(data2);
-> > +   else
-> > +           *(u32 *)(cf->data + 4) = 0;
->
-> no need to set to zero
->
-Ok
-> > +   stats->rx_bytes += cf->can_dlc;
->
-> please group rx_bytes and rx_packets handling
-> > +
-
-Ok
-> > +   can_led_event(ndev, CAN_LED_EVENT_RX);
-> > +
-> > +   netif_receive_skb(skb);
-> > +
-> > +   stats->rx_packets++;
-> > +   return 0;
-> > +}
-> > +
-> > +/**
-> > + * xcan_err_interrupt - error frame Isr
-> > + * @ndev:  net_device pointer
-> > + * @isr:   interrupt status register value
-> > + *
-> > + * This is the CAN error interrupt and it will
-> > + * check the the type of error and forward the error
-> > + * frame to upper layers.
-> > + */
-> > +static void xcan_err_interrupt(struct net_device *ndev, u32 isr) {
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +   struct net_device_stats *stats = &ndev->stats;
-> > +   struct can_frame *cf;
-> > +   struct sk_buff *skb;
-> > +   u32 err_status, status;
-> > +
-> > +   skb = alloc_can_err_skb(ndev, &cf);
-> > +   if (!skb) {
-> > +           netdev_err(ndev, "alloc_can_err_skb() failed!\n");
-> > +           return;
-> > +   }
-> > +
-> > +   err_status = priv->read_reg(priv, XCAN_ESR_OFFSET);
-> > +   priv->write_reg(priv, XCAN_ESR_OFFSET, err_status);
-> > +   status = priv->read_reg(priv, XCAN_SR_OFFSET);
-> > +
-> > +   if (isr & XCAN_IXR_BSOFF_MASK) {
-> > +           priv->can.state = CAN_STATE_BUS_OFF;
-> > +           cf->can_id |= CAN_ERR_BUSOFF;
-> > +           priv->can.can_stats.bus_off++;
-> > +           /* Leave device in Config Mode in bus-off state */
-> > +           priv->write_reg(priv, XCAN_SRR_OFFSET,
-> XCAN_SRR_RESET_MASK);
-> > +           can_bus_off(ndev);
-> > +   } else if ((status & XCAN_SR_ESTAT_MASK) ==
-> XCAN_SR_ESTAT_MASK) {
-> > +           cf->can_id |= CAN_ERR_CRTL;
-> > +           priv->can.state = CAN_STATE_ERROR_PASSIVE;
-> > +           priv->can.can_stats.error_passive++;
-> > +           cf->data[1] |= CAN_ERR_CRTL_RX_PASSIVE |
-> > +                                   CAN_ERR_CRTL_TX_PASSIVE;
-> > +   } else if (status & XCAN_SR_ERRWRN_MASK) {
-> > +           cf->can_id |= CAN_ERR_CRTL;
-> > +           priv->can.state = CAN_STATE_ERROR_WARNING;
-> > +           priv->can.can_stats.error_warning++;
-> > +           cf->data[1] |= CAN_ERR_CRTL_RX_WARNING |
-> > +                                   CAN_ERR_CRTL_TX_WARNING;
-> > +   }
-> > +
-> > +   /* Check for Arbitration lost interrupt */
-> > +   if (isr & XCAN_IXR_ARBLST_MASK) {
-> > +           cf->can_id |= CAN_ERR_LOSTARB;
-> > +           cf->data[0] = CAN_ERR_LOSTARB_UNSPEC;
-> > +           priv->can.can_stats.arbitration_lost++;
-> > +   }
-> > +
-> > +   /* Check for RX FIFO Overflow interrupt */
-> > +   if (isr & XCAN_IXR_RXOFLW_MASK) {
-> > +           cf->can_id |= CAN_ERR_CRTL;
-> > +           cf->data[1] |= CAN_ERR_CRTL_RX_OVERFLOW;
-> > +           stats->rx_over_errors++;
-> > +           stats->rx_errors++;
-> > +           priv->write_reg(priv, XCAN_SRR_OFFSET,
-> XCAN_SRR_RESET_MASK);
-> > +   }
-> > +
-> > +   /* Check for error interrupt */
-> > +   if (isr & XCAN_IXR_ERROR_MASK) {
-> > +           cf->can_id |= CAN_ERR_PROT | CAN_ERR_BUSERROR;
-> > +           cf->data[2] |= CAN_ERR_PROT_UNSPEC;
-> > +
-> > +           /* Check for Ack error interrupt */
-> > +           if (err_status & XCAN_ESR_ACKER_MASK) {
-> > +                   cf->can_id |= CAN_ERR_ACK;
-> > +                   cf->data[3] |= CAN_ERR_PROT_LOC_ACK;
-> > +                   stats->tx_errors++;
-> > +           }
-> > +
-> > +           /* Check for Bit error interrupt */
-> > +           if (err_status & XCAN_ESR_BERR_MASK) {
-> > +                   cf->can_id |= CAN_ERR_PROT;
-> > +                   cf->data[2] = CAN_ERR_PROT_BIT;
-> > +                   stats->tx_errors++;
-> > +           }
-> > +
-> > +           /* Check for Stuff error interrupt */
-> > +           if (err_status & XCAN_ESR_STER_MASK) {
-> > +                   cf->can_id |= CAN_ERR_PROT;
-> > +                   cf->data[2] = CAN_ERR_PROT_STUFF;
-> > +                   stats->rx_errors++;
-> > +           }
-> > +
-> > +           /* Check for Form error interrupt */
-> > +           if (err_status & XCAN_ESR_FMER_MASK) {
-> > +                   cf->can_id |= CAN_ERR_PROT;
-> > +                   cf->data[2] = CAN_ERR_PROT_FORM;
-> > +                   stats->rx_errors++;
-> > +           }
-> > +
-> > +           /* Check for CRC error interrupt */
-> > +           if (err_status & XCAN_ESR_CRCER_MASK) {
-> > +                   cf->can_id |= CAN_ERR_PROT;
-> > +                   cf->data[3] = CAN_ERR_PROT_LOC_CRC_SEQ |
-> > +                                   CAN_ERR_PROT_LOC_CRC_DEL;
-> > +                   stats->rx_errors++;
-> > +           }
-> > +                   priv->can.can_stats.bus_error++;
-> > +   }
-> > +
-> > +   netif_rx(skb);
-> > +   stats->rx_packets++;
-> > +   stats->rx_bytes += cf->can_dlc;
-> > +
-> > +   netdev_dbg(ndev, "%s: error status register:0x%x\n",
-> > +                   __func__, priv->read_reg(priv, XCAN_ESR_OFFSET));
-> }
-> > +
-> > +/**
-> > + * xcan_state_interrupt - It will check the state of the CAN device
-> > + * @ndev:  net_device pointer
-> > + * @isr:   interrupt status register value
-> > + *
-> > + * This will checks the state of the CAN device
-> > + * and puts the device into appropriate state.
-> > + */
-> > +static void xcan_state_interrupt(struct net_device *ndev, u32 isr) {
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +
-> > +   /* Check for Sleep interrupt if set put CAN device in sleep state */
-> > +   if (isr & XCAN_IXR_SLP_MASK)
-> > +           priv->can.state = CAN_STATE_SLEEPING;
-> > +
-> > +   /* Check for Wake up interrupt if set put CAN device in Active state
-> */
-> > +   if (isr & XCAN_IXR_WKUP_MASK)
-> > +           priv->can.state = CAN_STATE_ERROR_ACTIVE; }
-> > +
-> > +/**
-> > + * xcan_rx_poll - Poll routine for rx packets (NAPI)
-> > + * @napi:  napi structure pointer
-> > + * @quota: Max number of rx packets to be processed.
-> > + *
-> > + * This is the poll routine for rx part.
-> > + * It will process the packets maximux quota value.
-> > + *
-> > + * Return: number of packets received  */ static int
-> > +xcan_rx_poll(struct napi_struct *napi, int quota) {
-> > +   struct net_device *ndev = napi->dev;
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +   u32 isr, ier;
-> > +   int work_done = 0;
-> > +
-> > +   isr = priv->read_reg(priv, XCAN_ISR_OFFSET);
-> > +   while ((isr & XCAN_IXR_RXNEMP_MASK) && (work_done < quota)) {
-> > +           if (isr & XCAN_IXR_RXOK_MASK) {
-> > +                   priv->write_reg(priv, XCAN_ICR_OFFSET,
-> > +                           XCAN_IXR_RXOK_MASK);
-> > +                   if (xcan_rx(ndev) < 0)
-> > +                           return work_done;
-> > +                   work_done++;
-> > +           } else {
-> > +                   priv->write_reg(priv, XCAN_ICR_OFFSET,
-> > +                           XCAN_IXR_RXNEMP_MASK);
-> > +                   break;
-> > +           }
-> > +           priv->write_reg(priv, XCAN_ICR_OFFSET,
-> XCAN_IXR_RXNEMP_MASK);
-> > +           isr = priv->read_reg(priv, XCAN_ISR_OFFSET);
-> > +   }
-> > +
-> > +   if (work_done < quota) {
-> > +           napi_complete(napi);
-> > +           ier = priv->read_reg(priv, XCAN_IER_OFFSET);
-> > +           ier |= (XCAN_IXR_RXOK_MASK |
-> XCAN_IXR_RXNEMP_MASK);
-> > +           priv->write_reg(priv, XCAN_IER_OFFSET, ier);
-> > +   }
-> > +   return work_done;
-> > +}
-> > +
-> > +/**
-> > + * xcan_tx_interrupt - Tx Done Isr
-> > + * @ndev:  net_device pointer
-> > + */
-> > +static void xcan_tx_interrupt(struct net_device *ndev) {
-> > +   unsigned long flags;
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +   struct net_device_stats *stats = &ndev->stats;
-> > +   u32 processed = 0, txpackets;
-> > +
-> > +   stats->tx_packets++;
-> > +   netdev_dbg(ndev, "%s: waiting total:%d,current:%d\n", __func__,
-> > +                   priv->waiting_ech_skb_num, priv-
-> >waiting_ech_skb_index);
-> > +
-> > +   txpackets = priv->waiting_ech_skb_num;
-> > +
-> > +   if (txpackets) {
-> > +           can_get_echo_skb(ndev, priv->waiting_ech_skb_index);
-> > +           priv->waiting_ech_skb_index =
-> > +                   (priv->waiting_ech_skb_index + 1) %
-> > +                   priv->xcan_echo_skb_max_tx;
-> > +           processed++;
-> > +           txpackets--;
-> > +   }
-> > +
-> > +   spin_lock_irqsave(&priv->ech_skb_lock, flags);
-> > +   priv->waiting_ech_skb_num -= processed;
-> > +   spin_unlock_irqrestore(&priv->ech_skb_lock, flags);
-> > +
-> > +   netdev_dbg(ndev, "%s: waiting total:%d,current:%d\n", __func__,
-> > +                   priv->waiting_ech_skb_num, priv-
-> >waiting_ech_skb_index);
-> > +
-> > +   netif_wake_queue(ndev);
-> > +
-> > +   can_led_event(ndev, CAN_LED_EVENT_TX); }
-> > +
-> > +/**
-> > + * xcan_interrupt - CAN Isr
-> > + * @irq:   irq number
-> > + * @dev_id:        device id poniter
-> > + *
-> > + * This is the xilinx CAN Isr. It checks for the type of interrupt
-> > + * and invokes the corresponding ISR.
-> > + *
-> > + * Return:
-> > + * IRQ_NONE - If CAN device is in sleep mode, IRQ_HANDLED otherwise
-> > +*/ static irqreturn_t xcan_interrupt(int irq, void *dev_id) {
-> > +   struct net_device *ndev = (struct net_device *)dev_id;
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +   u32 isr, ier;
-> > +
-> > +   if (priv->can.state == CAN_STATE_STOPPED)
->
-> This should not happen, please remove.
-
-Ok
->
-> > +           return IRQ_NONE;
-> > +
-> > +   /* Get the interrupt status from Xilinx CAN */
-> > +   isr = priv->read_reg(priv, XCAN_ISR_OFFSET);
-> > +   if (!isr)
-> > +           return IRQ_NONE;
-> > +
-> > +   netdev_dbg(ndev, "%s: isr:#x%08x, err:#x%08x\n", __func__,
-> > +                   isr, priv->read_reg(priv, XCAN_ESR_OFFSET));
-> > +
-> > +   /* Check for the type of interrupt and Processing it */
-> > +   if (isr & (XCAN_IXR_SLP_MASK | XCAN_IXR_WKUP_MASK)) {
-> > +           priv->write_reg(priv, XCAN_ICR_OFFSET,
-> (XCAN_IXR_SLP_MASK |
-> > +                           XCAN_IXR_WKUP_MASK));
-> > +           xcan_state_interrupt(ndev, isr);
-> > +   }
-> > +
-> > +   /* Check for Tx interrupt and Processing it */
-> > +   if (isr & XCAN_IXR_TXOK_MASK) {
-> > +           priv->write_reg(priv, XCAN_ICR_OFFSET,
-> XCAN_IXR_TXOK_MASK);
-> > +           xcan_tx_interrupt(ndev);
-> > +   }
-> > +
-> > +   /* Check for the type of error interrupt and Processing it */
-> > +   if (isr & (XCAN_IXR_ERROR_MASK | XCAN_IXR_RXOFLW_MASK |
-> > +                   XCAN_IXR_BSOFF_MASK |
-> XCAN_IXR_ARBLST_MASK)) {
-> > +           priv->write_reg(priv, XCAN_ICR_OFFSET,
-> (XCAN_IXR_ERROR_MASK |
-> > +                           XCAN_IXR_RXOFLW_MASK |
-> XCAN_IXR_BSOFF_MASK |
-> > +                           XCAN_IXR_ARBLST_MASK));
-> > +           xcan_err_interrupt(ndev, isr);
-> > +   }
-> > +
-> > +   /* Check for the type of receive interrupt and Processing it */
-> > +   if (isr & (XCAN_IXR_RXNEMP_MASK | XCAN_IXR_RXOK_MASK)) {
-> > +           ier = priv->read_reg(priv, XCAN_IER_OFFSET);
-> > +           ier &= ~(XCAN_IXR_RXNEMP_MASK |
-> XCAN_IXR_RXOK_MASK);
-> > +           priv->write_reg(priv, XCAN_IER_OFFSET, ier);
-> > +           napi_schedule(&priv->napi);
-> > +   }
-> > +   return IRQ_HANDLED;
-> > +}
-> > +
-> > +/**
-> > + * xcan_stop - Driver stop routine
-> > + * @ndev:  Pointer to net_device structure
-> > + *
-> > + * This is the drivers stop routine. It will disable the
-> > + * interrupts and put the device into configuration mode.
-> > + */
-> > +static void xcan_stop(struct net_device *ndev) {
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +   u32 ier;
-> > +
-> > +   /* Disable interrupts and leave the can in configuration mode */
-> > +   ier = priv->read_reg(priv, XCAN_IER_OFFSET);
-> > +   ier &= ~XCAN_INTR_ALL;
-> > +   priv->write_reg(priv, XCAN_IER_OFFSET, ier);
-> > +   priv->write_reg(priv, XCAN_SRR_OFFSET, XCAN_SRR_RESET_MASK);
-> > +   priv->can.state = CAN_STATE_STOPPED; }
-> > +
-> > +/**
-> > + * xcan_open - Driver open routine
-> > + * @ndev:  Pointer to net_device structure
-> > + *
-> > + * This is the driver open routine.
-> > + * Return: 0 on success and failure value on error  */ static int
-> > +xcan_open(struct net_device *ndev) {
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +   int err;
-> > +
-> > +   /* Set chip into reset mode */
-> > +   err = set_reset_mode(ndev);
-> > +   if (err < 0)
-> > +           netdev_err(ndev, "mode resetting failed failed!\n");
-> > +
-> > +   /* Common open */
-> > +   err = open_candev(ndev);
-> > +   if (err)
-> > +           return err;
-> > +
-> > +   err = xcan_start(ndev);
-> > +   if (err < 0)
-> > +           netdev_err(ndev, "xcan_start failed!\n");
-> > +
-> > +
-> > +   can_led_event(ndev, CAN_LED_EVENT_OPEN);
-> > +   napi_enable(&priv->napi);
-> > +   netif_start_queue(ndev);
-> > +
-> > +   return 0;
-> > +}
-> > +
-> > +/**
-> > + * xcan_close - Driver close routine
-> > + * @ndev:  Pointer to net_device structure
-> > + *
-> > + * Return: 0 always
-> > + */
-> > +static int xcan_close(struct net_device *ndev) {
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +
-> > +   netif_stop_queue(ndev);
-> > +   napi_disable(&priv->napi);
-> > +   xcan_stop(ndev);
-> > +   close_candev(ndev);
-> > +
-> > +   can_led_event(ndev, CAN_LED_EVENT_STOP);
-> > +
-> > +   return 0;
-> > +}
-> > +
-> > +/**
-> > + * xcan_get_berr_counter - error counter routine
-> > + * @ndev:  Pointer to net_device structure
-> > + * @bec:   Pointer to can_berr_counter structure
-> > + *
-> > + * This is the driver error counter routine.
-> > + * Return: 0 always
-> > + */
-> > +static int xcan_get_berr_counter(const struct net_device *ndev,
-> > +                                   struct can_berr_counter *bec)
-> > +{
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +
-> > +   bec->txerr = priv->read_reg(priv, XCAN_ECR_OFFSET) &
-> XCAN_ECR_TEC_MASK;
-> > +   bec->rxerr = ((priv->read_reg(priv, XCAN_ECR_OFFSET) &
-> > +                   XCAN_ECR_REC_MASK) >> XCAN_ESR_REC_SHIFT);
-> > +   return 0;
-> > +}
-> > +
-> > +static const struct net_device_ops xcan_netdev_ops = {
-> > +   .ndo_open       = xcan_open,
-> > +   .ndo_stop       = xcan_close,
-> > +   .ndo_start_xmit = xcan_start_xmit,
-> > +};
-> > +
-> > +#ifdef CONFIG_PM_SLEEP
-> > +/**
-> > + * xcan_suspend - Suspend method for the driver
-> > + * @_dev:  Address of the platform_device structure
-> > + *
-> > + * Put the driver into low power mode.
-> > + * Return: 0 always
-> > + */
-> > +static int xcan_suspend(struct device *_dev) {
-> > +   struct platform_device *pdev = container_of(_dev,
-> > +                   struct platform_device, dev);
-> > +   struct net_device *ndev = platform_get_drvdata(pdev);
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +
-> > +   if (netif_running(ndev)) {
-> > +           netif_stop_queue(ndev);
-> > +           netif_device_detach(ndev);
-> > +   }
-> > +
-> > +   priv->write_reg(priv, XCAN_MSR_OFFSET,
-> XCAN_MSR_SLEEP_MASK);
-> > +   priv->can.state = CAN_STATE_SLEEPING;
-> > +
-> > +   clk_disable(priv->aperclk);
-> > +   clk_disable(priv->devclk);
-> > +
-> > +   return 0;
-> > +}
-> > +
-> > +/**
-> > + * xcan_resume - Resume from suspend
-> > + * @dev:   Address of the platformdevice structure
-> > + *
-> > + * Resume operation after suspend.
-> > + * Return: 0 on success and failure value on error  */ static int
-> > +xcan_resume(struct device *dev) {
-> > +   struct platform_device *pdev = container_of(dev,
-> > +                   struct platform_device, dev);
-> > +   struct net_device *ndev = platform_get_drvdata(pdev);
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +   int ret;
-> > +
-> > +   ret = clk_enable(priv->aperclk);
-> > +   if (ret) {
-> > +           dev_err(dev, "Cannot enable clock.\n");
-> > +           return ret;
-> > +   }
-> > +   ret = clk_enable(priv->devclk);
-> > +   if (ret) {
-> > +           dev_err(dev, "Cannot enable clock.\n");
-> > +           return ret;
-> > +   }
-> > +
-> > +   priv->write_reg(priv, XCAN_MSR_OFFSET, 0);
-> > +   priv->write_reg(priv, XCAN_SRR_OFFSET, XCAN_SRR_CEN_MASK);
-> > +   priv->can.state = CAN_STATE_ERROR_ACTIVE;
-> > +
-> > +   if (netif_running(ndev)) {
-> > +           netif_device_attach(ndev);
-> > +           netif_start_queue(ndev);
-> > +   }
-> > +
-> > +   return 0;
-> > +}
-> > +#endif
-> > +
-> > +static SIMPLE_DEV_PM_OPS(xcan_dev_pm_ops, xcan_suspend,
-> xcan_resume);
-> > +
-> > +/**
-> > + * xcan_probe - Platform registration call
-> > + * @pdev:  Handle to the platform device structure
-> > + *
-> > + * This function does all the memory allocation and registration for
-> > +the CAN
-> > + * device.
-> > + *
-> > + * Return: 0 on success and failure value on error  */ static int
-> > +xcan_probe(struct platform_device *pdev) {
-> > +   struct resource *res; /* IO mem resources */
-> > +   struct net_device *ndev;
-> > +   struct xcan_priv *priv;
-> > +   int ret, fifodep;
-> > +
-> > +   /* Create a CAN device instance */
-> > +   ndev = alloc_candev(sizeof(struct xcan_priv),
-> XCAN_ECHO_SKB_MAX);
-> > +   if (!ndev)
-> > +           return -ENOMEM;
-> > +
-> > +   priv = netdev_priv(ndev);
-> > +   priv->dev = ndev;
-> > +   priv->can.bittiming_const = &xcan_bittiming_const;
-> > +   priv->can.do_set_bittiming = xcan_set_bittiming;
-> > +   priv->can.do_set_mode = xcan_do_set_mode;
-> > +   priv->can.do_get_berr_counter = xcan_get_berr_counter;
-> > +   priv->can.ctrlmode_supported = CAN_CTRLMODE_LOOPBACK |
-> > +                                   CAN_CTRLMODE_BERR_REPORTING;
-> > +   priv->xcan_echo_skb_max_tx = XCAN_ECHO_SKB_MAX;
-> > +   priv->xcan_echo_skb_max_rx = XCAN_NAPI_WEIGHT;
-> > +
-> > +   /* Get IRQ for the device */
-> > +   ndev->irq = platform_get_irq(pdev, 0);
-> > +   ret = devm_request_irq(&pdev->dev, ndev->irq, &xcan_interrupt,
-> > +                           priv->irq_flags, dev_name(&pdev->dev),
-> > +                           (void *)ndev);
->
-> We usually request the interrupt on in the open() function
->
-
-
-Ok Will Move into open routine
-
-
-
-Regards,
-Kedar.
-
-> > +   if (ret < 0) {
-> > +           dev_err(&pdev->dev, "Irq allocation for CAN failed\n");
-> > +           goto err_free;
-> > +   }
-> > +
-> > +   spin_lock_init(&priv->ech_skb_lock);
-> > +   ndev->flags |= IFF_ECHO;        /* We support local echo */
-> > +
-> > +   platform_set_drvdata(pdev, ndev);
-> > +   SET_NETDEV_DEV(ndev, &pdev->dev);
-> > +   ndev->netdev_ops = &xcan_netdev_ops;
-> > +
-> > +   /* Get the virtual base address for the device */
-> > +   res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +   priv->reg_base = devm_ioremap_resource(&pdev->dev, res);
-> > +   if (IS_ERR(priv->reg_base)) {
-> > +           ret = PTR_ERR(priv->reg_base);
-> > +           goto err_free;
-> > +   }
-> > +   ndev->mem_start = res->start;
-> > +   ndev->mem_end = res->end;
-> > +
-> > +   priv->write_reg = xcan_write_reg;
-> > +   priv->read_reg = xcan_read_reg;
-> > +
-> > +   /* Getting the CAN devclk info */
-> > +   priv->devclk = devm_clk_get(&pdev->dev, "ref_clk");
-> > +   if (IS_ERR(priv->devclk)) {
-> > +           dev_err(&pdev->dev, "Device clock not found.\n");
-> > +           ret = PTR_ERR(priv->devclk);
-> > +           goto err_free;
-> > +   }
-> > +
-> > +   /* Check for type of CAN device */
-> > +   if (of_device_is_compatible(pdev->dev.of_node,
-> > +                               "xlnx,zynq-can-1.00.a")) {
-> > +           priv->aperclk = devm_clk_get(&pdev->dev, "aper_clk");
-> > +           if (IS_ERR(priv->aperclk)) {
-> > +                   dev_err(&pdev->dev, "aper clock not found\n");
-> > +                   ret = PTR_ERR(priv->aperclk);
-> > +                   goto err_free;
-> > +           }
-> > +   } else {
-> > +           priv->aperclk = priv->devclk;
-> > +           ret = of_property_read_u32(pdev->dev.of_node,
-> > +                           "xlnx,can-tx-dpth", &fifodep);
-> > +           if (ret < 0)
-> > +                   goto err_free;
-> > +           priv->xcan_echo_skb_max_tx = fifodep;
-> > +           ret = of_property_read_u32(pdev->dev.of_node,
-> > +                           "xlnx,can-rx-dpth", &fifodep);
-> > +           if (ret < 0)
-> > +                   goto err_free;
-> > +           priv->xcan_echo_skb_max_rx = fifodep;
-> > +   }
-> > +
-> > +   ret = clk_prepare_enable(priv->devclk);
-> > +   if (ret) {
-> > +           dev_err(&pdev->dev, "unable to enable device clock\n");
-> > +           goto err_free;
-> > +   }
-> > +
-> > +   ret = clk_prepare_enable(priv->aperclk);
-> > +   if (ret) {
-> > +           dev_err(&pdev->dev, "unable to enable aper clock\n");
-> > +           goto err_unprepar_disabledev;
-> > +   }
-> > +
-> > +   priv->can.clock.freq = clk_get_rate(priv->devclk);
-> > +
-> > +   netif_napi_add(ndev, &priv->napi, xcan_rx_poll,
-> > +                           priv->xcan_echo_skb_max_rx);
-> > +   ret = register_candev(ndev);
-> > +   if (ret) {
-> > +           dev_err(&pdev->dev, "fail to register failed (err=%d)\n",
-> ret);
-> > +           goto err_unprepar_disableaper;
-> > +   }
-> > +
-> > +   devm_can_led_init(ndev);
-> > +   dev_info(&pdev->dev,
-> > +                   "reg_base=0x%p irq=%d clock=%d, tx fifo
-> depth:%d\n",
-> > +                   priv->reg_base, ndev->irq, priv->can.clock.freq,
-> > +                   priv->xcan_echo_skb_max_tx);
-> > +
-> > +   return 0;
-> > +
-> > +err_unprepar_disableaper:
-> > +   clk_disable_unprepare(priv->aperclk);
-> > +err_unprepar_disabledev:
-> > +   clk_disable_unprepare(priv->devclk);
-> > +err_free:
-> > +   free_candev(ndev);
-> > +
-> > +   return ret;
-> > +}
-> > +
-> > +/**
-> > + * xcan_remove - Unregister the device after releasing the resources
-> > + * @pdev:  Handle to the platform device structure
-> > + *
-> > + * This function frees all the resources allocated to the device.
-> > + * Return: 0 always
-> > + */
-> > +static int xcan_remove(struct platform_device *pdev) {
-> > +   struct net_device *ndev = platform_get_drvdata(pdev);
-> > +   struct xcan_priv *priv = netdev_priv(ndev);
-> > +
-> > +   if (set_reset_mode(ndev) < 0)
-> > +           netdev_err(ndev, "mode resetting failed!\n");
-> > +
-> > +   unregister_candev(ndev);
-> > +   netif_napi_del(&priv->napi);
-> > +   clk_disable_unprepare(priv->aperclk);
-> > +   clk_disable_unprepare(priv->devclk);
-> > +
-> > +   free_candev(ndev);
-> > +
-> > +   return 0;
-> > +}
-> > +
-> > +/* Match table for OF platform binding */ static struct of_device_id
-> > +xcan_of_match[] = {
-> > +   { .compatible = "xlnx,zynq-can-1.00.a", },
-> > +   { .compatible = "xlnx,axi-can-1.00.a", },
-> > +   { /* end of list */ },
-> > +};
-> > +MODULE_DEVICE_TABLE(of, xcan_of_match);
-> > +
-> > +static struct platform_driver xcan_driver = {
-> > +   .probe = xcan_probe,
-> > +   .remove = xcan_remove,
-> > +   .driver = {
-> > +           .owner = THIS_MODULE,
-> > +           .name = DRIVER_NAME,
-> > +           .pm = &xcan_dev_pm_ops,
-> > +           .of_match_table = xcan_of_match,
-> > +   },
-> > +};
-> > +
-> > +module_platform_driver(xcan_driver);
-> > +
-> > +MODULE_LICENSE("GPL");
-> > +MODULE_AUTHOR("Xilinx Inc");
-> > +MODULE_DESCRIPTION("Xilinx CAN interface");
-> >
->
->
-> --
-> Pengutronix e.K.                  | Marc Kleine-Budde           |
-> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Hello Jean-Christophe,
+
+On 07/02/2014 09:23, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 16:57 Thu 23 Jan     , Jean-Jacques Hiblot wrote:
+>> This patch adds the basics to support the Device Tree on a sam9261-based platform
+>>
+>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+>> ---
+>>   arch/arm/boot/dts/at91sam9261.dtsi | 627 +++++++++++++++++++++++++++++++++++++
+>>   arch/arm/mach-at91/at91sam9261.c   |  15 +
+>>   2 files changed, 642 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/at91sam9261.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+>> new file mode 100644
+>> index 0000000..2730611
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/at91sam9261.dtsi
+>> @@ -0,0 +1,627 @@
+>> +/*
+>> + * at91sam9261.dtsi - Device Tree Include file for AT91SAM9261 SoC
+>> + *
+>> + *  Copyright (C) 2013 Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+>> + *
+>> + * Licensed under GPLv2 only.
+>> + */
+>> +
+>> +#include "skeleton.dtsi"
+>> +#include <dt-bindings/pinctrl/at91.h>
+>> +#include <dt-bindings/interrupt-controller/irq.h>
+>> +#include <dt-bindings/gpio/gpio.h>
+>> +#include <dt-bindings/clk/at91.h>
+>> +
+>> +/ {
+>> +	model = "Atmel AT91SAM9261 family SoC";
+>> +	compatible = "atmel,at91sam9261";
+>> +	interrupt-parent = <&aic>;
+>> +
+>> +	aliases {
+>> +		serial0 = &dbgu;
+>> +		serial1 = &usart0;
+>> +		serial2 = &usart1;
+>> +		serial3 = &usart2;
+>> +		gpio0 = &pioA;
+>> +		gpio1 = &pioB;
+>> +		gpio2 = &pioC;
+>> +		tcb0 = &tcb0;
+>> +		i2c0 = &i2c0;
+>> +		ssc0 = &ssc0;
+>> +		ssc1 = &ssc1;
+>> +	};
+>> +	cpus {
+>> +		#address-cells = <0>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu {
+>> +			compatible = "arm,arm926ej-s";
+>> +			device_type = "cpu";
+>> +		};
+>> +	};
+>> +
+>> +	memory {
+>> +		reg = <0x20000000 0x08000000>;
+>> +	};
+>> +
+>> +	ahb {
+>> +		compatible = "simple-bus";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		ranges;
+>> +
+>> +		usb0: ohci at 00500000 {
+>> +			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+>> +			reg = <0x00500000 0x100000>;
+>> +			interrupts = <20 IRQ_TYPE_LEVEL_HIGH 2>;
+> as requested before use the new interrupt property
+> interrupts-extended (mandatory)
+>
+> there is missing
+> 			pinctrl-names = "default";
+>
+> on mmc & co
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		nand0: nand at 40000000 {
+>> +			compatible = "atmel,at91rm9200-nand";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			reg = <0x40000000 0x10000000>;
+>> +			atmel,nand-addr-offset = <22>;
+>> +			atmel,nand-cmd-offset = <21>;
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&pinctrl_nand>;
+>> +
+>> +			gpios = <&pioC 15 GPIO_ACTIVE_HIGH
+>> +				&pioC 14 GPIO_ACTIVE_HIGH
+>> +				0
+>> +				>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		apb {
+>> +			compatible = "simple-bus";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			ranges;
+>> +
+>> +			tcb0: timer at fffa0000 {
+>> +				compatible = "atmel,at91rm9200-tcb";
+>> +				reg = <0xfffa0000 0x100>;
+>> +				interrupts = < 17 IRQ_TYPE_LEVEL_HIGH 0
+>> +					18 IRQ_TYPE_LEVEL_HIGH 0
+>> +					19 IRQ_TYPE_LEVEL_HIGH 0
+>> +					>;
+>> +				clocks = <&tcb0_clk>;
+>> +				clock-names = "t0_clk";
+>> +				status = "disabled";
+> we use the tcb as shedule clock this should be on by default
+>> +			};
+>> +
+>> +			usb1: gadget at fffa4000 {
+>> +				compatible = "atmel,at91rm9200-udc";
+>> +				reg = <0xfffa4000 0x4000>;
+>> +				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 2>;
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			mmc0: mmc at fffa8000 {
+>> +				compatible = "atmel,hsmci";
+>> +				reg = <0xfffa8000 0x600>;
+>> +				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +				clocks = <&mci0_clk>;
+>> +				clock-names = "mci_clk";
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			i2c0: i2c at fffac000 {
+>> +				compatible = "atmel,at91sam9261-i2c";
+>> +				pinctrl-0 = <&pinctrl_i2c_twi>;
+>> +				reg = <0xfffac000 0x100>;
+>> +				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 6>;
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +				clocks = <&twi0_clk>;
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			usart0: serial at fffb0000 {
+>> +				compatible = "atmel,at91sam9260-usart";
+>> +				reg = <0xfffb0000 0x200>;
+>> +				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
+>> +				atmel,use-dma-rx;
+>> +				atmel,use-dma-tx;
+>> +				pinctrl-names = "default";
+>> +				pinctrl-0 = <&pinctrl_usart0>;
+>> +				clocks = <&usart0_clk>;
+>> +				clock-names = "usart";
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			usart1: serial at fffb4000 {
+>> +				compatible = "atmel,at91sam9260-usart";
+>> +				reg = <0xfffb4000 0x200>;
+>> +				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+>> +				atmel,use-dma-rx;
+>> +				atmel,use-dma-tx;
+>> +				pinctrl-names = "default";
+>> +				pinctrl-0 = <&pinctrl_usart1>;
+>> +				clocks = <&usart1_clk>;
+>> +				clock-names = "usart";
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			usart2: serial at fffb8000{
+>> +				compatible = "atmel,at91sam9260-usart";
+>> +				reg = <0xfffb8000 0x200>;
+>> +				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
+>> +				atmel,use-dma-rx;
+>> +				atmel,use-dma-tx;
+>> +				pinctrl-names = "default";
+>> +				pinctrl-0 = <&pinctrl_usart2>;
+>> +				clocks = <&usart2_clk>;
+>> +				clock-names = "usart";
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			ssc0: ssc at fffbc000 {
+>> +				compatible = "atmel,at91rm9200-ssc";
+>> +				reg = <0xfffbc000 0x4000>;
+>> +				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
+>> +				pinctrl-names = "default";
+>> +				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			ssc1: ssc at fffc0000 {
+>> +				compatible = "atmel,at91rm9200-ssc";
+>> +				reg = <0xfffc0000 0x4000>;
+>> +				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
+>> +				pinctrl-names = "default";
+>> +				pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			spi0: spi at fffc8000 {
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +				compatible = "atmel,at91rm9200-spi";
+>> +				reg = <0xfffc8000 0x200>;
+>> +				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 3>;
+>> +				pinctrl-names = "default";
+>> +				pinctrl-0 = <&pinctrl_spi0>;
+>> +				clocks = <&spi0_clk>;
+>> +				clock-names = "spi_clk";
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			spi1: spi at fffcc000 {
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +				compatible = "atmel,at91rm9200-spi";
+>> +				reg = <0xfffcc000 0x200>;
+>> +				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
+>> +				pinctrl-names = "default";
+>> +				pinctrl-0 = <&pinctrl_spi1>;
+>> +				clocks = <&spi1_clk>;
+>> +				clock-names = "spi_clk";
+>> +				status = "disabled";
+>> +			};
+> as said for sama5d3 we need to have macro for the hw CS as GPIO to make it
+> more clear to use and read
+>> +
+>> +			ramc: ramc at ffffea00 {
+>> +				compatible = "atmel,at91sam9260-sdramc";
+>> +				reg = <0xffffea00 0x200>;
+>> +			};
+>> +
+>> +			aic: interrupt-controller at fffff000 {
+>> +				#interrupt-cells = <3>;
+>> +				compatible = "atmel,at91rm9200-aic";
+>> +				interrupt-controller;
+>> +				reg = <0xfffff000 0x200>;
+>> +				atmel,external-irqs = <29 30 31>;
+>> +			};
+> one missing empty line
+>> +			dbgu: serial at fffff200 {
+>> +				compatible = "atmel,at91sam9260-usart";
+>> +				reg = <0xfffff200 0x200>;
+>> +				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+>> +				pinctrl-names = "default";
+>> +				pinctrl-0 = <&pinctrl_dbgu>;
+>> +				clocks = <&mck>;
+>> +				clock-names = "usart";
+>> +				status = "disabled";
+>> +			};
+>> +
+>> +			pinctrl at fffff400 {
+>> +				#address-cells = <1>;
+>> +				#size-cells = <1>;
+>> +				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
+>> +				ranges = <0xfffff400 0xfffff400 0xa00>;
+>> +
+>> +				atmel,mux-mask = <
+>> +				      /*    A         B     */
+>> +				       0xffffffff 0xfffffff7  /* pioA */
+>> +				       0xffffffff 0xfffffff4  /* pioB */
+>> +				       0xffffffff 0xffffff07  /* pioC */
+>> +				      >;
+>> +
+>> +				/* shared pinctrl settings */
+>> +				dbgu {
+>> +					pinctrl_dbgu: dbgu-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 9  AT91_PERIPH_A AT91_PINCTRL_NONE
+>> +							 AT91_PIOA 10 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;
+>> +					};
+>> +				};
+>> +
+>> +				usart0 {
+>> +					pinctrl_usart0: usart0-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOC 8 AT91_PERIPH_A AT91_PINCTRL_PULL_UP
+>> +							 AT91_PIOC 9 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_usart0_rts: usart0_rts-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOC 10 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_usart0_cts: usart0_cts-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOC 11 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+>> +					};
+>> +				};
+>> +
+>> +				usart1 {
+>> +					pinctrl_usart1: usart1-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOC 12 AT91_PERIPH_A AT91_PINCTRL_PULL_UP
+>> +							 AT91_PIOC 13 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_usart1_rts: usart1_rts-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 12 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_usart1_cts: usart1_cts-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 13 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +				};
+>> +
+>> +				usart2 {
+>> +					pinctrl_usart2: usart2-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOC 14 AT91_PERIPH_A AT91_PINCTRL_PULL_UP
+>> +							 AT91_PIOC 15 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_usart2_rts: usart2_rts-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 15 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_usart2_cts: usart2_cts-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 16 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +				};
+>> +
+>> +				nand {
+>> +					pinctrl_nand: nand-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOC 15 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP
+>> +							 AT91_PIOC 14 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;
+>> +					};
+>> +				};
+>> +
+>> +				mmc0 {
+>> +					pinctrl_mmc0_clk: mmc0_clk-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 2 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_mmc0_slot0_cmd_dat0: mmc0_slot0_cmd_dat0-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 1 AT91_PERIPH_B AT91_PINCTRL_PULL_UP
+>> +							 AT91_PIOA 0 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;
+>> +					};
+>> +
+>> +					pinctrl_mmc0_slot0_dat1_3: mmc0_slot0_dat1_3-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 4 AT91_PERIPH_B AT91_PINCTRL_PULL_UP
+>> +							 AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_PULL_UP
+>> +							 AT91_PIOA 6 AT91_PERIPH_B AT91_PINCTRL_PULL_UP>;
+>> +					};
+>> +					};
+>> +
+>> +				ssc0 {
+>> +					pinctrl_ssc0_tx: ssc0_tx-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOB 21 AT91_PERIPH_A AT91_PINCTRL_NONE
+>> +							 AT91_PIOB 22 AT91_PERIPH_A AT91_PINCTRL_NONE
+>> +							 AT91_PIOB 23 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_ssc0_rx: ssc0_rx-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOB 24 AT91_PERIPH_A AT91_PINCTRL_NONE
+>> +							 AT91_PIOB 25 AT91_PERIPH_A AT91_PINCTRL_NONE
+>> +							 AT91_PIOB 26 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+>> +					};
+>> +				};
+>> +
+>> +				ssc1 {
+>> +					pinctrl_ssc1_tx: ssc1_tx-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 17 AT91_PERIPH_B AT91_PINCTRL_NONE
+>> +							 AT91_PIOA 18 AT91_PERIPH_B AT91_PINCTRL_NONE
+>> +							 AT91_PIOA 19 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_ssc1_rx: ssc1_rx-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 20 AT91_PERIPH_B AT91_PINCTRL_NONE
+>> +							 AT91_PIOA 21 AT91_PERIPH_B AT91_PINCTRL_NONE
+>> +							 AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +				};
+>> +
+>> +				spi0 {
+>> +					pinctrl_spi0: spi0-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 0 AT91_PERIPH_A AT91_PINCTRL_NONE
+>> +							 AT91_PIOA 1 AT91_PERIPH_A AT91_PINCTRL_NONE
+>> +							 AT91_PIOA 2 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+>> +					};
+>> +					};
+>> +
+>> +				spi1 {
+>> +					pinctrl_spi1: spi1-0 {
+>> +						atmel,pins =
+>> +							<AT91_PIOB 30 AT91_PERIPH_A AT91_PINCTRL_NONE
+>> +							 AT91_PIOB 31 AT91_PERIPH_A AT91_PINCTRL_NONE
+>> +							 AT91_PIOB 29 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+>> +					};
+>> +				};
+>> +
+>> +				tcb0 {
+>> +					pinctrl_tcb0_tclk0: tcb0_tclk0-0 {
+>> +						atmel,pins = <AT91_PIOC 16 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_tcb0_tclk1: tcb0_tclk1-0 {
+>> +						atmel,pins = <AT91_PIOC 17 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_tcb0_tclk2: tcb0_tclk2-0 {
+>> +						atmel,pins = <AT91_PIOC 18 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_tcb0_tioa0: tcb0_tioa0-0 {
+>> +						atmel,pins = <AT91_PIOC 19 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_tcb0_tioa1: tcb0_tioa1-0 {
+>> +						atmel,pins = <AT91_PIOC 21 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_tcb0_tioa2: tcb0_tioa2-0 {
+>> +						atmel,pins = <AT91_PIOC 23 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_tcb0_tiob0: tcb0_tiob0-0 {
+>> +						atmel,pins = <AT91_PIOC 20 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_tcb0_tiob1: tcb0_tiob1-0 {
+>> +						atmel,pins = <AT91_PIOC 22 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +
+>> +					pinctrl_tcb0_tiob2: tcb0_tiob2-0 {
+>> +						atmel,pins = <AT91_PIOC 24 AT91_PERIPH_B AT91_PINCTRL_NONE>;
+>> +					};
+>> +				};
+>> +
+>> +				i2c0 {
+>> +					pinctrl_i2c_bitbang: i2c-0-bitbang {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 7 AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+>> +							AT91_PIOA 8 AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
+>> +					};
+>> +					pinctrl_i2c_twi: i2c-0-twi {
+>> +						atmel,pins =
+>> +							<AT91_PIOA 7 AT91_PERIPH_A AT91_PINCTRL_NONE
+>> +							AT91_PIOA 8 AT91_PERIPH_A AT91_PINCTRL_NONE>;
+>> +					};
+>> +				};
+>> +
+>> +				pioA: gpio at fffff400 {
+>> +					compatible = "atmel,at91rm9200-gpio";
+>> +					reg = <0xfffff400 0x200>;
+>> +					interrupts = <2 IRQ_TYPE_LEVEL_HIGH 1>;
+>> +					#gpio-cells = <2>;
+>> +					gpio-controller;
+>> +					interrupt-controller;
+>> +					#interrupt-cells = <2>;
+>> +					clocks = <&pioA_clk>;
+>> +				};
+>> +
+>> +				pioB: gpio at fffff600 {
+>> +					compatible = "atmel,at91rm9200-gpio";
+>> +					reg = <0xfffff600 0x200>;
+>> +					interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
+>> +					#gpio-cells = <2>;
+>> +					gpio-controller;
+>> +					interrupt-controller;
+>> +					#interrupt-cells = <2>;
+>> +					clocks = <&pioB_clk>;
+>> +				};
+>> +
+>> +				pioC: gpio at fffff800 {
+>> +					compatible = "atmel,at91rm9200-gpio";
+>> +					reg = <0xfffff800 0x200>;
+>> +					interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
+>> +					#gpio-cells = <2>;
+>> +					gpio-controller;
+>> +					interrupt-controller;
+>> +					#interrupt-cells = <2>;
+>> +					clocks = <&pioC_clk>;
+>> +				};
+>> +			};
+>> +
+>> +			pmc: pmc at fffffc00 {
+>> +				compatible = "atmel,at91rm9200-pmc";
+>> +				reg = <0xfffffc00 0x100>;
+>> +				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+>> +				interrupt-controller;
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +				#interrupt-cells = <1>;
+>> +
+>> +				clk32k: slck {
+>> +					compatible = "fixed-clock";
+>> +					#clock-cells = <0>;
+>> +					clock-frequency = <32768>;
+>> +				};
+>> +
+>> +				main: mainck {
+>> +					compatible = "atmel,at91rm9200-clk-main";
+>> +					#clock-cells = <0>;
+>> +					interrupts-extended = <&pmc AT91_PMC_MOSCS>;
+>> +					clocks = <&clk32k>;
+>> +				};
+>> +
+>> +				plla: pllack {
+>> +					compatible = "atmel,at91rm9200-clk-pll";
+>> +					#clock-cells = <0>;
+>> +					interrupts-extended = <&pmc AT91_PMC_LOCKA>;
+>> +					clocks = <&main>;
+>> +					reg = <0>;
+>> +					atmel,clk-input-range = <1000000 32000000>;
+>> +					#atmel,pll-clk-output-range-cells = <4>;
+>> +					atmel,pll-clk-output-ranges = <80000000 200000000 190000000 240000000>;
+>> +				};
+>> +
+>> +				pllb: pllbck {
+>> +					compatible = "atmel,at91rm9200-clk-pll";
+>> +					#clock-cells = <0>;
+>> +					interrupts-extended = <&pmc AT91_PMC_LOCKB>;
+>> +					clocks = <&main>;
+>> +					reg = <1>;
+>> +					atmel,clk-input-range = <1000000 32000000>;
+>> +					#atmel,pll-clk-output-range-cells = <4>;
+>> +					atmel,pll-clk-output-ranges = <80000000 200000000 190000000 240000000>;
+>> +				};
+>> +
+>> +				mck: masterck {
+>> +					compatible = "atmel,at91rm9200-clk-master";
+>> +					#clock-cells = <0>;
+>> +					interrupts-extended = <&pmc AT91_PMC_MCKRDY>;
+>> +					clocks = <&clk32k>, <&main>, <&plla>, <&pllb>;
+>> +					atmel,clk-output-range = <0 94000000>;
+>> +					atmel,clk-divisors = <1 2 4 3>;
+>> +				};
+>> +				periphck {
+>> +					compatible = "atmel,at91rm9200-clk-peripheral";
+>> +					#address-cells = <1>;
+>> +					#size-cells = <0>;
+>> +					clocks = <&mck>;
+>> +
+>> +					pioA_clk: pioA_clk {
+>> +						#clock-cells = <0>;
+>> +						reg = <2>;
+>> +					};
+>> +
+>> +					pioB_clk: pioB_clk {
+>> +						#clock-cells = <0>;
+>> +						reg = <3>;
+>> +					};
+>> +
+>> +					pioC_clk: pioC_clk {
+>> +						#clock-cells = <0>;
+>> +						reg = <4>;
+>> +					};
+>> +
+>> +					usart0_clk: usart0_clk {
+>> +						#clock-cells = <0>;
+>> +						reg = <6>;
+>> +					};
+>> +
+>> +					usart1_clk: usart1_clk {
+>> +						#clock-cells = <0>;
+>> +						reg = <7>;
+>> +					};
+>> +
+>> +					usart2_clk: usart2_clk {
+>> +						#clock-cells = <0>;
+>> +						reg = <8>;
+>> +					};
+>> +
+>> +					mci0_clk: mci0_clk {
+>> +						#clock-cells = <0>;
+>> +						reg = <9>;
+>> +					};
+>> +
+>> +					twi0_clk: twi0_clk {
+>> +						reg = <11>;
+>> +						#clock-cells = <0>;
+>> +					};
+>> +
+>> +					spi0_clk: spi0_clk {
+>> +						#clock-cells = <0>;
+>> +						reg = <12>;
+>> +					};
+>> +
+>> +					spi1_clk: spi1_clk {
+>> +						#clock-cells = <0>;
+>> +						reg = <13>;
+>> +					};
+>> +
+>> +					tcb0_clk: tcb0_clk {
+>> +						#clock-cells = <0>;
+>> +						reg = <17>;
+>> +					};
+>> +
+>> +					lcd_clk: lcd_clk {
+>> +						#clock-cells = <0>;
+>> +						reg = <21>;
+>> +					};
+>> +				};
+>> +			};
+>> +
+>> +			rstc at fffffd00 {
+>> +				compatible = "atmel,at91sam9260-rstc";
+>> +				reg = <0xfffffd00 0x10>;
+>> +			};
+>> +
+>> +			shdwc at fffffd10 {
+>> +				compatible = "atmel,at91sam9260-shdwc";
+>> +				reg = <0xfffffd10 0x10>;
+>> +			};
+>> +
+>> +			pit: timer at fffffd30 {
+>> +				compatible = "atmel,at91sam9260-pit";
+>> +				reg = <0xfffffd30 0xf>;
+>> +				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+>> +				clocks = <&mck>;
+>> +			};
+>> +
+>> +			watchdog at fffffd40 {
+>> +				compatible = "atmel,at91sam9260-wdt";
+>> +				reg = <0xfffffd40 0x10>;
+>> +				status = "disabled";
+>> +			};
+>> +		};
+>> +	};
+>> +
+>> +	i2c at 0 {
+>> +		compatible = "i2c-gpio";
+>> +		pinctrl-0 = <&pinctrl_i2c_bitbang>;
+>> +		gpios = <&pioA 7 GPIO_ACTIVE_HIGH /* sda */
+>> +			 &pioA 8 GPIO_ACTIVE_HIGH /* scl */
+>> +			>;
+>> +		i2c-gpio,sda-open-drain;
+>> +		i2c-gpio,scl-open-drain;
+>> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		status = "disabled";
+>> +	};
+>> +};
+>> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+>> index 6276b4c..6a2c869 100644
+>> --- a/arch/arm/mach-at91/at91sam9261.c
+>> +++ b/arch/arm/mach-at91/at91sam9261.c
+>> @@ -189,6 +189,21 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>>   	CLKDEV_CON_ID("pioA", &pioA_clk),
+>>   	CLKDEV_CON_ID("pioB", &pioB_clk),
+>>   	CLKDEV_CON_ID("pioC", &pioC_clk),
+>> +	/* more usart lookup table for DT entries */
+>> +	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
+>> +	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
+>> +	CLKDEV_CON_DEV_ID("usart", "ffffb400.serial", &usart1_clk),
+>> +	CLKDEV_CON_DEV_ID("usart", "fff94000.serial", &usart2_clk),
+>> +	/* more tc lookup table for DT entries */
+>> +	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
+>> +	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &hck0),
+>> +	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
+>> +	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
+>> +	CLKDEV_CON_DEV_ID("mci_clk", "fffa8000.mmc", &mmc_clk),
+>> +	CLKDEV_CON_DEV_ID(NULL, "fffac000.i2c", &twi_clk),
+>> +	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioA_clk),
+>> +	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
+>> +	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
+> do we really need this with ccf?
+
+We need this in case we want to support multi-board kernel with some boards
+that do not support CCF.
+
+If you want to drop these clk lookup defintions you'll have to add the
+"depends on COMMON_CLK" line in the "config SOC_AT91SAM9261" section.
+
+Best Regards,
+
+Boris
+>>   };
+>>   
+>>   static struct clk_lookup usart_clocks_lookups[] = {
+>> -- 
+>> 1.8.5.2
+>>
