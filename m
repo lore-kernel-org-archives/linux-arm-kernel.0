@@ -1,36 +1,63 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Fri, 7 Feb 2014 13:35:04 +0900
-Subject: [PATCH v2 4/6] ARM: firmware: add prepare_idle() operation
+Date: Fri, 7 Feb 2014 13:35:05 +0900
+Subject: [PATCH v2 5/6] ARM: trusted_foundations: implement prepare_idle()
 In-Reply-To: <1391747706-1847-1-git-send-email-acourbot@nvidia.com>
 References: <1391747706-1847-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1391747706-1847-5-git-send-email-acourbot@nvidia.com>
+Message-ID: <1391747706-1847-6-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some firmwares do not put the CPU into idle mode themselves, but still
-need to be informed that the CPU is about to enter idle mode before this
-happens. Add a prepare_idle() operation to the firmware_ops structure to
-handle such cases.
+Support the prepare_idle() firmware call, which is necessary to properly
+support CPU idling.
 
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- arch/arm/include/asm/firmware.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/firmware/trusted_foundations.c | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
-index 15631300c238..2c9f10df7568 100644
---- a/arch/arm/include/asm/firmware.h
-+++ b/arch/arm/include/asm/firmware.h
-@@ -22,6 +22,10 @@
-  */
- struct firmware_ops {
- 	/*
-+	 * Inform the firmware we intend to enter CPU idle mode
-+	 */
-+	int (*prepare_idle)(void);
-+	/*
- 	 * Enters CPU idle mode
- 	 */
- 	int (*do_idle)(void);
+diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+index ef1e3d8f4af0..3fb1b5a1dce9 100644
+--- a/arch/arm/firmware/trusted_foundations.c
++++ b/arch/arm/firmware/trusted_foundations.c
+@@ -22,6 +22,15 @@
+ 
+ #define TF_SET_CPU_BOOT_ADDR_SMC 0xfffff200
+ 
++#define TF_CPU_PM		0xfffffffc
++#define TF_CPU_PM_S3		0xffffffe3
++#define TF_CPU_PM_S2		0xffffffe6
++#define TF_CPU_PM_S2_NO_MC_CLK	0xffffffe5
++#define TF_CPU_PM_S1		0xffffffe4
++#define TF_CPU_PM_S1_NOFLUSH_L2	0xffffffe7
++
++static unsigned long cpu_boot_addr;
++
+ static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+ {
+ 	asm volatile(
+@@ -41,13 +50,22 @@ static void __naked tf_generic_smc(u32 type, u32 arg1, u32 arg2)
+ 
+ static int tf_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+ {
+-	tf_generic_smc(TF_SET_CPU_BOOT_ADDR_SMC, boot_addr, 0);
++	cpu_boot_addr = boot_addr;
++	tf_generic_smc(TF_SET_CPU_BOOT_ADDR_SMC, cpu_boot_addr, 0);
++
++	return 0;
++}
++
++static int tf_prepare_idle(void)
++{
++	tf_generic_smc(TF_CPU_PM, TF_CPU_PM_S1_NOFLUSH_L2, cpu_boot_addr);
+ 
+ 	return 0;
+ }
+ 
+ static const struct firmware_ops trusted_foundations_ops = {
+ 	.set_cpu_boot_addr = tf_set_cpu_boot_addr,
++	.prepare_idle = tf_prepare_idle,
+ };
+ 
+ void register_trusted_foundations(struct trusted_foundations_platform_data *pd)
 -- 
 1.8.5.3
