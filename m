@@ -1,34 +1,80 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Fri,  7 Feb 2014 11:23:07 +0200
-Subject: [PATCH] ARM: dts: qcom: Add RNG device tree node
-Message-ID: <1391764987-17138-1-git-send-email-svarbanov@mm-sol.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 7 Feb 2014 10:32:06 +0100
+Subject: [PATCH 10/21] ARM: MM: Add DT binding for Feroceon L2 cache
+In-Reply-To: <20140207012752.GO8533@titan.lakedaemon.net>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1391730137-14814-11-git-send-email-andrew@lunn.ch>
+ <20140207012752.GO8533@titan.lakedaemon.net>
+Message-ID: <20140207093206.GE17758@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary DT node to probe the rng driver on
-msm8974 platforms.
+On Thu, Feb 06, 2014 at 08:27:52PM -0500, Jason Cooper wrote:
+> On Fri, Feb 07, 2014 at 12:42:06AM +0100, Andrew Lunn wrote:
+> > Instantiate the L2 cache from DT. Indicate in DT where the cache
+> > control register is and if write through should be made.
+> > 
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > ---
+> >  .../devicetree/bindings/arm/mrvl/foroceon.txt      | 19 +++++++++
+> >  arch/arm/boot/dts/kirkwood.dtsi                    |  5 +++
+> >  arch/arm/include/asm/hardware/cache-feroceon-l2.h  |  2 +
+> >  arch/arm/mach-kirkwood/board-dt.c                  | 15 +------
+> >  arch/arm/mm/cache-feroceon-l2.c                    | 46 ++++++++++++++++++++++
+> >  5 files changed, 73 insertions(+), 14 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/mrvl/foroceon.txt
+> 
+> for the next revision, please split out the dtsi changes into a separate
+> patch.
+> 
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/mrvl/foroceon.txt b/Documentation/devicetree/bindings/arm/mrvl/foroceon.txt
+> > new file mode 100644
+> > index 000000000000..8058676d1476
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/mrvl/foroceon.txt
+> 
+> name typo.
+> 
+> > @@ -0,0 +1,19 @@
+> > +* Marvell Feroceon Cache
+> > +
+> > +Required properties:
+> > +- compatible : Should be "marvell,feroceon-kirkwood".
+> 
+> This is a little ambiguous, I'd like to see 'l2' in the compatible string.
 
-Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
----
- arch/arm/boot/dts/qcom-msm8974.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+I will take Jason's advice on naming and change this..
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 9e5dadb101eb..ada0e8216c22 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -117,5 +117,12 @@
- 			clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
- 			clock-names = "core", "iface";
- 		};
-+
-+		rng at f9bff000 {
-+			compatible = "qcom,prng";
-+			reg = <0xf9bff000 0x200>;
-+			clocks = <&gcc GCC_PRNG_AHB_CLK>;
-+			clock-names = "core";
-+		};
- 	};
- };
--- 
-1.8.4.4
+> > +#ifdef CONFIG_OF
+> > +static const struct of_device_id feroceon_ids[] __initconst = {
+> > +	{ .compatible = "marvell,feroceon-kirkwood"},
+> > +	{}
+> > +};
+> > +
+> > +int __init feroceon_of_init(void)
+> > +{
+> > +	struct device_node *node;
+> > +	void __iomem *base;
+> > +	bool writethrough = false;
+> > +	struct resource res;
+> > +
+> > +	node = of_find_matching_node(NULL, feroceon_ids);
+> > +	if (!node) {
+> > +		pr_info("Didn't find marvell,feroceon-*, not enabling it\n");
+> > +		return -ENODEV;
+> > +	}
+> 
+> I'd prefer to fallback to hardcoded register address here.  We know
+> we're on kirkwood at this point.
+
+We could also be on mv78xx0, sometime in the future. So we need to at
+least look at the compatible string to see what SoC we are. It is also
+rather ugly having hard coded addresses. We might as well go back to
+platform devices.
+
+I would prefer upping this to pr_err(FW_INFO, and not falling back to
+hard coded values. This is not a fatal error, the machine continues to
+run, just a bit slower.
+
+     Andrew
