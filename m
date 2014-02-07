@@ -1,59 +1,45 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Fri, 07 Feb 2014 11:38:42 -0800
-Subject: [PATCH v5 00/14] Add support for MSM's mmio clock/reset controller
-In-Reply-To: <1391749891.15777.31.camel@joe-AO722>
-References: <1389811654-21397-1-git-send-email-sboyd@codeaurora.org>
- <52F45DEE.8020400@gmail.com> <1391749891.15777.31.camel@joe-AO722>
-Message-ID: <52F53642.3030606@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 7 Feb 2014 13:41:04 -0600
+Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
+ binding to list boost mode frequency
+In-Reply-To: <52F51FCD.5000009@arm.com>
+References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
+ <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
+ <52F50698.4060305@arm.com> <52F509BD.70903@arm.com>
+ <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
+ <52F51888.5010608@arm.com>
+ <CAGo_u6ofC4NNPiTNcSnXUvT3RZJo54=XyjetR-ok5hCBrVZkKg@mail.gmail.com>
+ <52F51FCD.5000009@arm.com>
+Message-ID: <CAGo_u6quxExJOyY8mvCw5sDSuz=_j0YqJ6FJW+FAdaxUeqzN9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/6/2014 9:11 PM, Joe Perches wrote:
-> On Thu, 2014-02-06 at 20:15 -0800, Frank Rowand wrote:
->> On 1/15/2014 10:47 AM, Stephen Boyd wrote:
->>> The first breaks a reset-controller include ordering requirement. It got
->>> an ack so I think we're ok for it to go through the clock tree.
->>>
+On Fri, Feb 7, 2014 at 12:02 PM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
+> On 07/02/14 17:37, Nishanth Menon wrote:
+>> On Fri, Feb 7, 2014 at 11:31 AM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
+>
+> [...]
+>
+>>> Yes I think its counter-intuitive as it's visible to the userspace(list of
+>>> frequencies and the boost parameters are exposed through sysfs)
 >>
->> < snip >
+>> That will be a different problem -> as currently every single
+>> frequency in the cpufreq list has ability to be marked as boost
+>> frequency - if userspace does not maintain that, then, IMHO, fix the
+>> userspace :D
 >>
->> checkpatch is whining about patches
->>
->>   4
->>   5
->>   6
->>   7
->>   8
->>
->> (Just for completeness if someone thinks I did not check all the patches,
->> it also whines about patch 11, but I think the whining should be ignored,
->> and it whines about patch 1 but I think that might be a checkpatch bug.)
-> 
-> Hi Frank.
-> 
-> For patch 1, what checkpatch bug might that be?
+>
+> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies gives
+> the list of frequencies based on the state of the boost feature at anytime.
+>
+> Intuitively the list without boost shouldn't have any frequency above the range
+> when it's enabled :), that's what I was referring to. So I am not talking about
+> any issue with user-space maintenance.
+Fair enough - but i still think it has nothing to do with dt binding
+itself -> and i think the discussion we've had should be good for the
+binding provided in this patch.. I hope.. if documentation needs a bit
+of better explanation to prevent a repeat of the same discussion at a
+later point of time, now might be a good time to add it in.
 
-see below
-
-> 
-> I think all the checkpatch whinges in patch 11 are correct.
-
-Agreed on patch 11, judgement call on whether to ignore the warnings.
-
-> 
-> I didn't check any of 4-8.
-
-Hi Joe,
-
-Thanks for jumping in.  I did not want to bother you until I dug a little
-deeper into the warning to see if I was just misunderstanding something.
-
-Sorry, it is patch 2, not patch 1 ("[PATCH v5 02/14] clk: Add set_rate_and_parent() op"):
-
-   WARNING: Multiple spaces after return type
-   #188: FILE: include/linux/clk-provider.h:154:
-   +       int             (*set_rate_and_parent)(struct clk_hw *hw,
-
-   total: 0 errors, 1 warnings, 152 lines checked
-
--Frank
+Regards,
+Nishanth Menon
