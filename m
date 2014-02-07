@@ -1,52 +1,102 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 07 Feb 2014 14:49:53 +0100
-Subject: [PATCH] iommu/exynos: Remove driver
-In-Reply-To: <CAH9JG2Xoz1_Y7CV6FUiGAO9o5T7jtFUYqJpcAysLttwu4527zQ@mail.gmail.com>
-References: <1391716317-20300-1-git-send-email-olof@lixom.net>
- <CAAQKjZMo6=dtur6NfvDY9=jVF=7VxHub=isnEwPw0+RKCq6xAg@mail.gmail.com>
- <CAH9JG2Xoz1_Y7CV6FUiGAO9o5T7jtFUYqJpcAysLttwu4527zQ@mail.gmail.com>
-Message-ID: <52F4E481.3050902@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 7 Feb 2014 14:48:31 +0100
+Subject: [PATCH v2 2/5] clk: sunxi: Add USB clock register defintions
+In-Reply-To: <52F0BD94.1060601@redhat.com>
+References: <1390426587-16287-1-git-send-email-hdegoede@redhat.com>
+ <1390426587-16287-3-git-send-email-hdegoede@redhat.com>
+ <20140127144349.GJ3867@lukather> <52E67316.5020906@redhat.com>
+ <20140128094427.GZ3867@lukather> <52E77FCD.5050701@redhat.com>
+ <20140204094051.GL25625@lukather> <52F0BD94.1060601@redhat.com>
+Message-ID: <20140207134831.GJ3192@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Feb 04, 2014 at 11:14:44AM +0100, Hans de Goede wrote:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
+> 
+> Hi,
+> 
+> On 02/04/2014 10:40 AM, Maxime Ripard wrote:
+> > Hi Hans,
+> > 
+> > On Tue, Jan 28, 2014 at 11:00:45AM +0100, Hans de Goede wrote:
+> >> -----BEGIN PGP SIGNED MESSAGE----- Hash: SHA1
+> >> 
+> >> Hi,
+> >> 
+> >> On 01/28/2014 10:44 AM, Maxime Ripard wrote:
+> >>> On Mon, Jan 27, 2014 at 03:54:14PM +0100, Hans de Goede wrote:
+> >>>>>> "allwinner,sun5i-a13-usb-gates-clk" - for usb gates + resets on A13
+> >>>>> 
+> >>>>> Maybe we can just remove the gates from there? Even though they are gates, they are also (a bit) more than that.
+> >>>> 
+> >>>> To be clear you mean s/usb-gates-clk/usb-clk/ right ?
+> >>> 
+> >>> Yep, exactly
+> >>> 
+> >>>>> I guess that means that we will have the OHCI0 gate declared with <&...-gates-clk 6>, while it's actually the first gate for this clock?
+> >>>> 
+> >>>> Correct.
+> >>>> 
+> >>>>> Maybe introducing an offset field in the gates_data would be a good idea, so that we always start from indexing the gates from 0 in the DT?
+> >>>> 
+> >>>> Well for the other "gates" type clks we also have holes in the range, and we always refer to the clk with the bit number in the reg as the clock-cell value.
+> >>> 
+> >>> Yes, we have holes, but I see two majors differences here: - the other gates are just gates, while the usb clocks are a bit more than that.
+> >> 
+> >> The usb-clk registers contain more then that, but the bits we are talking about now are gates.
+> >> 
+> >>> - the other gates' gating bits thus all start at bit 0, while - here, since it's kind of a "mixed" clock, the gating bits start - at bit 6 (on the A20 at least)
+> >> 
+> >> Right, still I believe that the consistent thing to do is keeping the bit-number for the bit in the register controlling the gate as the specifier.  When adding new dts entries / reviewing existing ones I'm used to matching the specifier to the bit-nr in the data-sheet, I think making things different just for this one register is counter productive.
+> > 
+> > And if you turn it the other way around, it would be inconsistent that all gates indices start at 0, and we would start at 6 here :)
+> 
+> I think the problem here is that you see the specifier part of the clk
+> phandle as an index, which it is not. All devicetree docs / code talks
+> about specifiers or arguments not indexes. Once you stop seeing this as
+> an index, you will hopefully also stop insisting this needs to
+> start at 0 :)
+> 
+> Also note that it already is not an index for existing sunxi clks which have
+> cells != 0, as there are holes in the bits used in the gates registers and
+> calling the specifier an index suggest we're dealing with an array, and
+> arrays never have holes.
+> 
+> The clk specifier as currently used in sunxi clks is a 1:1 mapping of the
+> gate register bit numbers, as is clearly documented in ie:
+> Documentation/devicetree/bindings/clock/sunxi/sun4i-a10-gates.txt
+> Where the datasheet is referenced as the source for (most) of the values
+> to put in the specifier.
+> 
+> My biggest objection is that this would loose 1:1 mapping we currently
+> have between the specifier and bit-nr in the register, which really is
+> convenient when writing new dts bindings.
+> 
+> When we add an offset users will need to first lookup which clk they need in
+> the datasheet and then look at both the dts bindings doc to find how this is
+> mapped to the specifier. In my experience such an extra level of indirection
+> in documentation is a PITA, and all that just so that some random number
+> (it is not an index!) can start at 0 ?
+> 
+> To me adding an offset here and making the clk gates different form all
+> our other clock gates just feels wrong.
 
-On 2014-02-07 13:44, Kyungmin Park wrote:
->
-> On Friday, February 7, 2014, Inki Dae <inki.dae@samsung.com 
-> <mailto:inki.dae@samsung.com>> wrote:
->
->     2014-02-07 Olof Johansson <olof@lixom.net <javascript:;>>:
->     > The driver has been unbuildable due to unfulfilled dependencies
->     since
->     > 3.11, and even if enabled it won't build due to build breakage.
->     Emails
->     > about status on this have gone unanswered, and fixes seem to
->     have been
->     > abandoned.
->     >
->     > It's obvious that nobody cares about it, so let's remove it.
->
->     Wait, we are going to fix up this module. It seems that KyoungHo,
->     original author, is busy with some works related to product.
->
->     we can care about it if KyoungHo cannot afford to care for the
->     time being.
->
-> Any volunteers?
-> Marek or Bartek, how do you think?
->
-> Before that it makes orphan or unsupported at maintainer file first and
-> change it to new volunteers.
+Emilio pretty much share your feeling. I won't get in the way then :)
 
-I think that it might be easier to remove the existing non-functional driver
-now and add it again once the driver is ready. I have it on my TODO 
-list, but
-doubt I will manage to finish it for v3.15.
+I only had the compatible name comment left then.
 
-Discussing the DT bindings might take some time.
+Maxime
 
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140207/8b67746f/attachment-0001.sig>
