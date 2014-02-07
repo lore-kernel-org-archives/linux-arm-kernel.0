@@ -1,50 +1,30 @@
-From: cooloney@gmail.com (Bryan Wu)
-Date: Fri,  7 Feb 2014 12:53:32 -0800
-Subject: [PATCH] ARM: tegra: enable I2C MUX PCA954x
-Message-ID: <1391806412-8561-1-git-send-email-pengw@nvidia.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri,  7 Feb 2014 21:50:24 +0100
+Subject: [PATCH v2 0/2] irqchip: sun4i: Introduce a new compatible
+Message-ID: <1391806226-27480-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cardhu has a PCA9546 for I2C bus extension, which connects to 3
-cameras. It's required for Tegra V4L2 soc camera driver and camera
-sensor drivers.
+Hi,
 
-Signed-off-by: Bryan Wu <pengw@nvidia.com>
----
- arch/arm/boot/dts/tegra30-cardhu.dtsi | 8 ++++++++
- arch/arm/configs/tegra_defconfig      | 1 +
- 2 files changed, 9 insertions(+)
+This is the second version of the A10 irqchip compatible changes.
+The only difference with the v1 being that we're now droping the old
+compatibles, instead of keeping them, since the DT maintainers said it was
+fine.
 
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index 9104224..bfce643 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -187,6 +187,14 @@
- 			interrupt-parent = <&gpio>;
- 			interrupts = <TEGRA_GPIO(L, 0) IRQ_TYPE_LEVEL_HIGH>;
- 		};
-+
-+		/* NXP PCA9546 I2C Mux */
-+		pca9546 at 70 {
-+			compatible = "nxp,pca9546";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x70>;
-+		};
- 	};
- 
- 	i2c at 7000c700 {
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 995d434..efcf15f 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -125,6 +125,7 @@ CONFIG_SERIAL_TEGRA=y
- CONFIG_SERIAL_OF_PLATFORM=y
- # CONFIG_HW_RANDOM is not set
- # CONFIG_I2C_COMPAT is not set
-+CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_MUX_PINCTRL=y
- CONFIG_I2C_TEGRA=y
- CONFIG_SPI=y
+Thanks,
+Maxime
+
+Maxime Ripard (2):
+  irqchip: sunxi: Change compatibles
+  ARM: sunxi: dt: Convert to the new irq controller compatibles
+
+ .../devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt   | 4 ++--
+ arch/arm/boot/dts/sun4i-a10.dtsi                                      | 2 +-
+ arch/arm/boot/dts/sun5i-a10s.dtsi                                     | 2 +-
+ arch/arm/boot/dts/sun5i-a13.dtsi                                      | 2 +-
+ drivers/irqchip/irq-sun4i.c                                           | 2 +-
+ 5 files changed, 6 insertions(+), 6 deletions(-)
+
 -- 
-1.8.3.2
+1.8.4.2
