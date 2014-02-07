@@ -1,25 +1,36 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 07 Feb 2014 18:34:26 +0100
-Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
-In-Reply-To: <1391730137-14814-22-git-send-email-andrew@lunn.ch>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-22-git-send-email-andrew@lunn.ch>
-Message-ID: <52F51922.6030502@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 7 Feb 2014 11:37:11 -0600
+Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
+ binding to list boost mode frequency
+In-Reply-To: <52F51888.5010608@arm.com>
+References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
+ <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
+ <52F50698.4060305@arm.com> <52F509BD.70903@arm.com>
+ <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
+ <52F51888.5010608@arm.com>
+Message-ID: <CAGo_u6ofC4NNPiTNcSnXUvT3RZJo54=XyjetR-ok5hCBrVZkKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2014 12:42 AM, Andrew Lunn wrote:
-> Now that all the device tree support is in mach-mvebu, remove it from
-> mach-kirkwood.
+On Fri, Feb 7, 2014 at 11:31 AM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
 >
-> Regenerate kirkwood_defconfig, removing all DT support, and a couple
-> of other redundent options have been removed in the process.
->
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
+> Yes I thought of exactly similar clock setup, but was not convinced that it
+> should be part of OPP. In that case it looks like we are trying to represent
+> clock internals through some OPP bindings.
 
-Hmm, I wonder what Ian thinks of removing this so quickly again...
+And this series (rightly) does not make it an OPP behavior. instead
+all it does is to list the boost-frequencies and mark those in cpufreq
+table. the description is left to the dts and implementation to the
+clock drivers involved.
 
-Maybe let it rot for 1-2 kernel versions?
 
-Sebastian
+> Yes I think its counter-intuitive as it's visible to the userspace(list of
+> frequencies and the boost parameters are exposed through sysfs)
+
+That will be a different problem -> as currently every single
+frequency in the cpufreq list has ability to be marked as boost
+frequency - if userspace does not maintain that, then, IMHO, fix the
+userspace :D
+
+Regards,
+Nishanth Menon
