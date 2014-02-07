@@ -1,23 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 7 Feb 2014 16:34:06 +0000
-Subject: [PATCH v2 13/15] regulator/mfd: max14577: Export symbols for
- calculating charger current
-In-Reply-To: <1391767487-10017-14-git-send-email-k.kozlowski@samsung.com>
-References: <1391767487-10017-1-git-send-email-k.kozlowski@samsung.com>
- <1391767487-10017-14-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20140207163406.GC1757@sirena.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 7 Feb 2014 17:36:26 +0100
+Subject: [GIT PULL] at91: fixes for 3.14 #1
+Message-ID: <1391790986-31936-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 11:04:45AM +0100, Krzysztof Kozlowski wrote:
-> This patch prepares for changing the max14577 charger driver to allow
-> configuring battery-dependent settings from DTS.
+Arnd, Olof, Kevin,
 
-Acked-by: Mark Brown <broonie@linaro.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140207/a6e45ebf/attachment.sig>
+This is a first "fixes" series for AT91 on 3.14.
+The content is only DT-related and quite boring.
+I took the opportunity of this early "fixes" pull-request to collect
+some Documentation patches that were lying around and I guess that
+they can be merged by arm-soc nicely (addition of CCF to 2 drivers).
+A new board is added to the lot because it is dead simple and integrates
+well with the new sama5d36 SoC that we added earlier in this development cycle.
+
+Thanks, best regards,
+
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-fixes
+
+for you to fetch changes up to b7c2b6157079811586180d13c44a1095b57c2d47:
+
+  ARM: at91: add Atmel's SAMA5D3 Xplained board (2014-02-07 17:20:39 +0100)
+
+----------------------------------------------------------------
+First series of AT91 fixes for 3.14.
+All of them are DT-related.
+- fixes for typos in i2c and ohci clocks
+- addition of a USB host node for at91sam9n12ek
+- 2 DT documentation updates that have been sent a long time ago
+- a new board based on the sama5d36 SoC
+
+----------------------------------------------------------------
+Bo Shen (1):
+      ARM: at91: enable USB host on at91sam9n12ek board
+
+Boris BREZILLON (3):
+      ARM: at91/dt: fix sama5d3 ohci hclk clock reference
+      mmc: atmel-mci: document clock properties
+      spi/atmel: document clock properties
+
+Jean-Jacques Hiblot (1):
+      ARM: at91/dt: sam9263: fix compatibility string for the I2C
+
+Nicolas Ferre (1):
+      ARM: at91: add Atmel's SAMA5D3 Xplained board
+
+ .../devicetree/bindings/mmc/atmel-hsmci.txt        |   5 +
+ .../devicetree/bindings/spi/spi_atmel.txt          |   5 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts        | 229 +++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi                 |   2 +-
+ arch/arm/boot/dts/at91sam9n12ek.dts                |   4 +
+ arch/arm/boot/dts/sama5d3.dtsi                     |   2 +-
+ 7 files changed, 246 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d3_xplained.dts
+
+-- 
+Nicolas Ferre
