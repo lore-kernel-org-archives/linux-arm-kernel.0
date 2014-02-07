@@ -1,33 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Feb 2014 10:40:57 +0100
-Subject: [PATCH] backlight: add PWM dependencies
-In-Reply-To: <000d01cf23b1$7c1f8de0$745ea9a0$%han@samsung.com>
-References: <1391518634-6472-1-git-send-email-linus.walleij@linaro.org>
- <201402061708.05845.arnd@arndb.de>
- <000d01cf23b1$7c1f8de0$745ea9a0$%han@samsung.com>
-Message-ID: <201402071040.58087.arnd@arndb.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 7 Feb 2014 10:45:04 +0100
+Subject: [PATCH 19/21] ARM: MVEBU: Simplifiy headers and make local
+In-Reply-To: <20140207103631.44789e1d@skate>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1391730137-14814-20-git-send-email-andrew@lunn.ch>
+ <20140207093104.7197224d@skate> <20140207092047.GD17758@lunn.ch>
+ <20140207103631.44789e1d@skate>
+Message-ID: <20140207094504.GF17758@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 February 2014, Jingoo Han wrote:
-> How about the following?
+On Fri, Feb 07, 2014 at 10:36:31AM +0100, Thomas Petazzoni wrote:
+> Dear Andrew Lunn,
 > 
->   [PATCH 1/7] ARM: pxa: don't select HAVE_PWM
->   [PATCH 2/7] ARM: lpc32xx: don't select HAVE_PWM
->   [PATCH 3/7] ARM: remove HAVE_PWM config option
->   [PATCH 4/7] MIPS: jz4740: don't select HAVE_PWM
->   [PATCH 5/7] Input: max8997_haptic: remove HAVE_PWM dependencies
->   [PATCH 6/7] Input: pwm-beepe: remove HAVE_PWM dependencies
->   [PATCH 7/7] pwm: don't use IS_ENABLED(CONFIG_HAVE_PWM)
+> On Fri, 7 Feb 2014 10:20:47 +0100, Andrew Lunn wrote:
 > 
-> I would like to merge it through PWM tree.
-> After merging these patches, all HAVE_PWM will be removed from
-> the mainline kernel. Thank you. :-)
+> > I wanted to keep 14/21 as a simple move of files, doing the minimal
+> > needed to make it boot. The patches that follow then clean up. I found
+> > that simpler to follow what was going on, since there is nothing
+> > hidden in the move patch.
+> > 
+> > I can however squash these together if that is what people want to
+> > see.
+> 
+> Ok. Then maybe the commit log should indicate this (that the commit is
+> only a move and that followup commits clean things up).
 
-Sounds godo to me, thanks a lot for taking care of this!
-I don't see any inter-dependencies between the various patches,
-so we could also take the first three through the arm-soc tree
-to avoid conflicts with other changes (or possibly the third
-one through rmk's ARM tree, if he prefers).
+Hi Thomas
 
-	Arnd
+The commit log for 14/21 currently is:
+
+Move the kirkwood DT support into mach-mvebu, and make them part of                                              
+ARCH_MULTI_V5. Minimal changes have been made in order to make it                                                
+boot. More integration will take place in following patches. 
+
+I could change "integration" to "integration and cleanup".
+
+  Andrew
