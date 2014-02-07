@@ -1,57 +1,59 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 07 Feb 2014 16:12:47 +0100
-Subject: [PATCH] clk: respect the clock dependencies in of_clk_init
-In-Reply-To: <52F4F502.2010703@elopez.com.ar>
-References: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
- <52F4DA40.4090804@elopez.com.ar> <20140207142430.GU8533@titan.lakedaemon.net>
- <20140207144325.GA8218@localhost> <52F4F279.6010006@free-electrons.com>
- <52F4F502.2010703@elopez.com.ar>
-Message-ID: <52F4F7EF.7090900@free-electrons.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 7 Feb 2014 10:15:22 -0500
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <20140207160954.69fbca38@skate>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1391730137-14814-22-git-send-email-andrew@lunn.ch>
+ <20140207093313.1a979a8f@skate>
+ <20140207150306.GX8533@titan.lakedaemon.net>
+ <20140207160954.69fbca38@skate>
+Message-ID: <20140207151522.GZ8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2014 16:00, Emilio L?pez wrote:
-> El 07/02/14 11:49, Gregory CLEMENT escribi?:
->> On 07/02/2014 15:43, Ezequiel Garcia wrote:
->>> On Fri, Feb 07, 2014 at 09:24:30AM -0500, Jason Cooper wrote:
->>>> On Fri, Feb 07, 2014 at 10:06:08AM -0300, Emilio L?pez wrote:
->>>>
->>>> [snip a great explanation]
->>>>
->>>> Guys, can I get some Tested-by's on this?
->>>>
->>>
->>> In case someone missed Emilio's comment about it, I gave his oneliner
->>> a test on A370 Reference Design. It worked just as well as Sebastian's.
->>
->> Well ok it's working but this patch is not better than Sebastian, it is
->> even worth. I don't think it is a good idea at all to totally ignore the
->> information given by the device tree.
+On Fri, Feb 07, 2014 at 04:09:54PM +0100, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
 > 
-> With a bit more work, you can replace the clk_get magic with a call to 
-> of_clk_get_parent_name() or similar to be able to keep overriding stuff 
-> from DT. This way it would completely match the behaviour on 
-> mvebu_coreclk_setup (default to "tclk", allow overriding with DT).
+> On Fri, 7 Feb 2014 10:03:06 -0500, Jason Cooper wrote:
 > 
-
-I think you didn't have a look on our implementation: the name of the clock
-are created by the driver during the initialization. That's why we need that
-the parent clock are initialized before the gating clock. I know that for the
-sunxi clock you choose to list all your clock name in the device tree, but we
-didn't make this choice on purpose. It is not as trivial as you suggested.
-
-I didn't have a look on the atmel clocks, and I don't know if they have this
-kind of issue, as they also have to deal with multiple parents, they may
-have different issues.
-
-Gregory
-
-> Emilio
+> > Ideally, I'd prefer multi_v7 and multi_v5 for DT, and
+> > {kirkwood,dove,orion5x,mv78xx0}_defconfig for non-DT legacy building.
+> > The latter going away once we deprecate non-DT booting.  There is a case
+> > to be made for the arch-specific defconfigs, though.
+> > 
+> > Currently (includes modules if configured, and dtbs);
+> > 
+> >   mvebu_defconfig	00:02:56
+> >   x86_64_defconfig	00:04:24
+> >   multi_v7_defconfig	00:04:05
+> > 
+> > 1 minute and 9 seconds doesn't drastically change a bathroom break or
+> > tea time ;-)  But it is a 33% increase.
 > 
+> I also like to have a more focused defconfig than multi_v7 for
+> development.
+> 
+> > If we want something leaner than multi_v7, how about
+> > armada_370-xp_defconfig to replace the current mvebu_defconfig?
+> 
+> Doesn't work for me: we're going to introduce soon the support for
+> other mvebu ARMv7 SoC that are not Armada 370 nor XP, but that should
+> be built as part of this.
+> 
+> Why not mvebu_v7 and mvebu_v5 as I suggested? mvebu_v7 would build both
+> Dove and Armada 370/XP (and the other ones we are going to introduce
+> soon), mvebu_v5 would build Kirkwood (and possibly Orion5x once I find
+> enough time to work on this platform).
 
+Yeah, I can go with that, as long as Sebastian doesn't see a need for a
+separate dove_defconfig in the long term (DT only).  Sebastian?
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> This way, ultimately we can simply remove kirkwood_defconfig and
+> dove_defconfig, as soon as all legacy platforms have been either
+> converted to DT, or removed.
+
+Yep, the fewer builds I have to do per patch submission, the better.
+
+thx,
+
+Jason.
