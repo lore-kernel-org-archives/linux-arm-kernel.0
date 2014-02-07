@@ -1,118 +1,94 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Feb 2014 11:46:07 +0000
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <3724624.kd9jZNUiTF@wuerfel>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <3460536.Sh23gjDa6X@wuerfel>
- <20140205190947.GA22297@mudshark.cambridge.arm.com>
- <3724624.kd9jZNUiTF@wuerfel>
-Message-ID: <20140207114607.GE5976@mudshark.cambridge.arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 7 Feb 2014 12:51:12 +0100 (CET)
+Subject: [linux-sunxi] Re: [PATCH] irq: Add new flag to ack level-triggered
+ interrupts before unmasking
+In-Reply-To: <CAOQ7t2bzz9vKh_5h2nF=m+JpeYVa=Ttd4XQgrAa6Lhdzjg_Qxw@mail.gmail.com>
+References: <1391721117-27446-1-git-send-email-carlo@caione.org>
+ <alpine.DEB.2.02.1402062213590.21991@ionos.tec.linutronix.de>
+ <CAOQ7t2Z0agZdDZ_OQZPtXWXoi5NMTcOOZz04q6wEVNy0rxn4AA@mail.gmail.com>
+ <alpine.DEB.2.02.1402062229000.21991@ionos.tec.linutronix.de>
+ <CAOQ7t2bzz9vKh_5h2nF=m+JpeYVa=Ttd4XQgrAa6Lhdzjg_Qxw@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1402071121310.21991@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Jason,
+On Fri, 7 Feb 2014, Carlo Caione wrote:
+> The context and the rationale is fully explained in this thread
+> http://www.spinics.net/lists/arm-kernel/msg299952.html and some
+> answers are already given along the thread especially by Hans here
+> http://www.spinics.net/lists/arm-kernel/msg303542.html
+> Shortly, the double interrupt problem as seen on sunxi NMI controller
+> (and other chips AFAIK) is specific for level-triggered interrupts
+> when the hard interrupt handler is not able to ACK the interrupts on
+> the originating device since this device can only be accessed via a
+> bus (in our case it was a PMIC on I2C).
+> This explains why my patch was specific for the threaded case and why
+> the ACK on mask is not really effective in actually acking the IRQs
+> (so that I need a second ACK before unmasking the line). In fact in
+> our case (PMIC connected via I2C with an interrupt line on a special
+> NMI controller) the implicit ACK done by the unmask is ignored if the
+> NMI line is still high, and to have the line going down we have to ACK
+> all the IRQs on the device accessing to it by I2C in the thread and
+> then ACK the NMI controller with the second ACK before the unmasking
+> callback.
 
-First of all, thanks for the really helpful feedback. I'll take it on-board
-for v2.
+I can't see why it would be specific for the threaded case.
 
-On Wed, Feb 05, 2014 at 08:26:17PM +0000, Arnd Bergmann wrote:
-> On Wednesday 05 February 2014 19:09:47 Will Deacon wrote:
-> > On Tue, Feb 04, 2014 at 07:13:49PM +0000, Arnd Bergmann wrote:
-> > > This should really compute an io_offset.
-> > > 
-> > > > +	if (resource_type(&pci->mem))
-> > > > +		pci_add_resource(&sys->resources, &pci->mem);
-> > > 
-> > > and also a mem_offset, which is something different.
-> > 
-> > As somebody new to PCI, I'm afraid you've lost me here. Are you referring to
-> > using pci_add_resource_offset instead, then removing my restriction on
-> > having a single resource from the parsing code?
-> 
-> I mean pci_add_resource_offset, but I don't understand what the
-> restriction is that you are talking about. To elaborate on the offsets,
-> the common case is that the PCI memory space is the same as the
-> host physical address space for both MMIO and DMA, while you have
-> only one PCI host with a single I/O space range from port 0 to 65536.
-> 
-> If you mandate that, your code is actually correct and you do not
-> require an io_offset or mem_offset.
+The explanation says that the NMI chip is ignoring the ack on mask,
+which is basically the entry of the interrupt handler. Now it does not
+matter whether you are threaded or not. The interrupt line at the NMI
+controller is asserted in both cases. So the same issue should be
+visible for a non threaded interrupt, if the NMI controller really
+needs an ack on unmask. But there is another detail:
 
-Right, so that's what I've currently been relying on. If I mandate that,
-will I be making this driver significantly less useful?
+	sunxi_sc_nmi_handle_irq()
+	chained_irq_enter()
+		NOP, because GIC uses EOI
 
-> In practice, there can be various ways that a system requires something
-> more complex:
-> 
-> * You can have a memory space range that puts PCI bus address zero
->   at the start of the pci->mem resource. In this case, you have
->   mem_offset = pci->mem.start. We should probably try not to do
->   this, but there is existing hardware doing it.
+	generic_handle_irq();
+		nmi->mask();		      
+		dev_handler();
+		nmi->unmask();
 
-If it's not the common case, then the generic driver might not need to care
-(at least, initially).
+	chained_irq_exit()
+		gic->eoi();
 
-> * You might have multiple sections of the PCI bus space mapped
->   into CPU physical space. If you want to support legacy VGA
->   console, you probably want to map the first 16MB of the bus
->   space at an arbitrary location (with the mem_offset as above),
->   plus a second, larger section of the bus space with an identity
->   mapping (mem_offset_= 0) for all devices other than VGA.
->   You'd also need to copy some VGA specific code from arm32 to
->   arm64 to actually make this work.
+In the threaded case this looks like:
 
-Again, I'd rather cross that bridge (no pun intended) when we decide we want
-legacy VGA.
+	sunxi_sc_nmi_handle_irq()
+	chained_irq_enter()
+		NOP, because GIC uses EOI
 
-> * If you have two PCI host bridges and each of them comes with
->   its own I/O space range starting between 0x0-0xffff, you have
->   to map one of them into logical I/O space address 0x10000-0x1ffff
->   and set io_offset = 0x10000 for that bus.
+	generic_handle_irq();
+		nmi->mask();
+		wake_thread();
 
-Right, this sounds a lot more plausible from the perspective of a generic
-driver. Since the current code only allows exactly one I/O space region, we
-avoid the issue but I can remove that restriction (that I mentioned earlier)
-and offset the region based on the bridge.
+	chained_irq_exit()
+		gic->eoi();
 
-> > > This shows once more that the range parser code is suboptimal. So far
-> > > every single driver got the I/O space wrong here, because the obvious
-> > > way to write this function is also completely wrong.
-> > 
-> > I see you mentioned to Liviu that you should register a logical resource,
-> > rather than physical resource returned from the parser. It seems odd that
-> > I/O space appears to work with this code as-is (I've tested it on arm using
-> > kvmtool by removing the memory bars).
-> 
-> what do you see in /proc/ioports and /proc/iomem then?
+	run_thread()
+		dev_handler();
+		nmi->unmask();
 
-bash-4.2# cat /proc/ioports
-00006200-000065ff : virtio-pci
-00006600-000069ff : virtio-pci
-00006a00-00006dff : virtio-pci
-00006e00-000071ff : virtio-pci
+So the difference is that in the non threaded case the gic->eoi is
+called after the device interrupt has been cleared and the
+nmi->interrupt has been unmasked. And in the threaded case its the
+other way round. I have no idea how that stuff is connected internaly,
+but I suspect that the gic->eoi is related to this as it might
+actually ack the NMI chip, which of course only works in the non
+threaded case.
 
-bash-4.2# cat /proc/iomem
-40000000-40ffffff : /pci
-41000400-410005ff : virtio-pci
-41000c00-41000dff : virtio-pci
-41001400-410015ff : virtio-pci
-41001c00-41001dff : virtio-pci
-80000000-93ffffff : System RAM
-  80008000-8053df0b : Kernel code
-  80570000-805c07fb : Kernel data
+Now back to your patch.
 
-> > > What you get out of "of_pci_range_to_resource(&range, np, &pci->io)"
-> > > is not the resource you want to pass into pci_add_resource()
-> > > later.
-> > 
-> > Do I need to open-code the resource translation from phys -> logical?
-> 
-> I think we should have some common infrastructure that lets you
-> get this right more easily.
+I'm not against having a flag, but this should be done less convoluted
+and have proper names which make the use case clear along with a good
+technical explanation of the flag in the comment.
 
-Okey doke, is anybody working on that? (I see the follow up from Jason, but
-it's not clear whether that's going to be merged).
+unmask_and_ack() plus IRQCHIP_ACK_ON_UNMASK are not really telling
+what the heck is going on. You can restrict it to level irqs in the
+core, but please use the proper functions and not some opencoded
+hackery.
 
-Cheers,
+Thanks,
 
-Will
+	tglx
