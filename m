@@ -1,73 +1,45 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 7 Feb 2014 07:40:45 -0300
-Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
- initially stopped
-In-Reply-To: <52F43ED0.4050808@roeck-us.net>
-References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <52F43ED0.4050808@roeck-us.net>
-Message-ID: <20140207104044.GA11063@localhost>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 7 Feb 2014 10:42:38 +0000
+Subject: [PATCH v2 14/15] charger: max14577: Configure battery-dependent
+ settings from DTS
+In-Reply-To: <1391767487-10017-15-git-send-email-k.kozlowski@samsung.com>
+References: <1391767487-10017-1-git-send-email-k.kozlowski@samsung.com>
+ <1391767487-10017-15-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20140207104238.GH14727@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 06:02:56PM -0800, Guenter Roeck wrote:
-> On 02/06/2014 09:20 AM, Ezequiel Garcia wrote:
-> > Having the watchdog initially fully stopped is important to avoid
-> > any spurious watchdog triggers, in case the registers are not in
-> > its reset state.
-> >
-> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> > Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > Tested-by: Willy Tarreau <w@1wt.eu>
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >   drivers/watchdog/orion_wdt.c | 3 +++
-> >   1 file changed, 3 insertions(+)
-> >
-> > diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-> > index 6746033..2dbeee9 100644
-> > --- a/drivers/watchdog/orion_wdt.c
-> > +++ b/drivers/watchdog/orion_wdt.c
-> > @@ -142,6 +142,9 @@ static int orion_wdt_probe(struct platform_device *pdev)
-> >   	orion_wdt.max_timeout = wdt_max_duration;
-> >   	watchdog_init_timeout(&orion_wdt, heartbeat, &pdev->dev);
-> >
-> > +	/* Let's make sure the watchdog is fully stopped */
-> > +	orion_wdt_stop(&orion_wdt);
-> > +
+> Remove hard-coded values for:
+>  - Fast Charge current,
+>  - End Of Charge current,
+>  - Fast Charge timer,
+>  - Overvoltage Protection Threshold,
+>  - Battery Constant Voltage,
+> and use DTS to configure them. This allows using the max14577 charger
+> driver with different batteries.
 > 
-> Actually we just had that in another driver, and I stumbled over it there.
+> Now the charger driver requires valid configuration data from DTS. In
+> case of wrong configuration data it fails during probe. Patch adds
+> of_compatible to the charger mfd cell in MFD driver core.
 > 
-> Problem with stopping the watchdog in probe unconditionally is that you can
-> use it to defeat nowayout: unload the module, then load it again,
-> and the watchdog is stopped even if nowayout is true.
-> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Hm... I see.
+I already acked the MFD parts of this. Or has the patch changed?
 
-> Is this really what you want ? Or, in other words, what is the problem
-> you are trying to solve ?
-> 
-
-Well, this is related to the discussion about the bootloader not
-reseting the watchdog properly, provoking spurious watchdog triggering.
-
-Jason Gunthorpe explained [1] that we needed a particular sequence:
-
- 1. Disable WDT
- 2. Clear bridge
- 3. Enable WDT
-
-We added the irq handling to satisfy (2), and the watchdog stop for (1).
-
-The watchdog stop was agreed specifically [2].
-
-Ideas?
-
-[1] http://www.spinics.net/lists/arm-kernel/msg302340.html
-[2] http://www.spinics.net/lists/arm-kernel/msg302507.html
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Jenny Tc <jenny.tc@intel.com>
+> ---
+>  drivers/mfd/max14577.c               |    5 +-
+>  drivers/power/max14577_charger.c     |  234 +++++++++++++++++++++++++++++-----
+>  include/linux/mfd/max14577-private.h |   10 ++
+>  include/linux/mfd/max14577.h         |    8 ++
+>  4 files changed, 227 insertions(+), 30 deletions(-)
 
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
