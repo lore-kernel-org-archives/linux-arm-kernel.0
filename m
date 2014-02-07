@@ -1,67 +1,102 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 7 Feb 2014 15:44:01 +0000
-Subject: [PATCH v3 05/11] ARM: LPAE: provide an IPA capable pmd_addr_end
-In-Reply-To: <20140207040456.GN9157@cbox>
-References: <1391630151-7875-1-git-send-email-marc.zyngier@arm.com>
- <1391630151-7875-6-git-send-email-marc.zyngier@arm.com>
- <20140206104328.GB29446@arm.com> <20140207040456.GN9157@cbox>
-Message-ID: <20140207154401.GC5925@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 7 Feb 2014 10:44:53 -0500
+Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
+ initially stopped
+In-Reply-To: <20140207151727.GB8218@localhost>
+References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <52F43ED0.4050808@roeck-us.net> <20140207104044.GA11063@localhost>
+ <52F4E1C1.4010805@roeck-us.net> <20140207151727.GB8218@localhost>
+Message-ID: <20140207154453.GA8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 04:04:56AM +0000, Christoffer Dall wrote:
-> On Thu, Feb 06, 2014 at 10:43:28AM +0000, Catalin Marinas wrote:
-> > On Wed, Feb 05, 2014 at 07:55:45PM +0000, Marc Zyngier wrote:
-> > > The default pmd_addr_end macro uses an unsigned long to represent
-> > > the VA. When used with KVM and stage-2 translation, the VA is
-> > > actually an IPA, which is up to 40 bits. This also affect the
-> > > SMMU driver, which also deals with stage-2 translation.
-> > > 
-> > > Instead, provide an implementation that can cope with larger VAs
-> > > by using a u64 instead. This version will overload the default
-> > > one provided in include/asm-generic/pgtable.h.
-> > > 
-> > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > > ---
-> > >  arch/arm/include/asm/pgtable-3level.h | 5 +++++
-> > >  1 file changed, 5 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-> > > index 03243f7..594867b 100644
-> > > --- a/arch/arm/include/asm/pgtable-3level.h
-> > > +++ b/arch/arm/include/asm/pgtable-3level.h
-> > > @@ -262,6 +262,11 @@ static inline int has_transparent_hugepage(void)
-> > >  	return 1;
-> > >  }
-> > >  
-> > > +#define pmd_addr_end(addr, end)						\
-> > > +({	u64 __boundary = ((addr) + PMD_SIZE) & PMD_MASK;		\
-> > > +	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
-> > > +})
-> > 
-> > I see why you need this but it affects all the other uses of
-> > pmd_addr_end() with 32-bit VA. It would be slight performance, I don't
-> > think it's noticeable.
-> > 
-> > A different approach could be something like (untested):
-> > 
-> > #define pmd_addr_end(addr, end)					\
-> > ({	__typeof__(addr) __boundary = ...
-> > 	...
-> > })
-> > 
-> > What about the pgd_addr_end(), do we need this or it's not used by KVM?
-> > 
-> 
-> What about pud_addr_end(), is that defined as a noop on LPAE, or?
-> 
-> I would be in favor of introducing them all using your approach to avoid
-> somebody being inspired by the KVM code when dealing with IPAs and
-> breaking things unknowingly.
+On Fri, Feb 07, 2014 at 12:17:28PM -0300, Ezequiel Garcia wrote:
+> On Fri, Feb 07, 2014 at 05:38:09AM -0800, Guenter Roeck wrote:
+> > On 02/07/2014 02:40 AM, Ezequiel Garcia wrote:
+> > > On Thu, Feb 06, 2014 at 06:02:56PM -0800, Guenter Roeck wrote:
+> > >> On 02/06/2014 09:20 AM, Ezequiel Garcia wrote:
+> > >>> Having the watchdog initially fully stopped is important to avoid
+> > >>> any spurious watchdog triggers, in case the registers are not in
+> > >>> its reset state.
+> > >>>
+> > >>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> > >>> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > >>> Tested-by: Willy Tarreau <w@1wt.eu>
+> > >>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > >>> ---
+> > >>>    drivers/watchdog/orion_wdt.c | 3 +++
+> > >>>    1 file changed, 3 insertions(+)
+> > >>>
+> > >>> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+> > >>> index 6746033..2dbeee9 100644
+> > >>> --- a/drivers/watchdog/orion_wdt.c
+> > >>> +++ b/drivers/watchdog/orion_wdt.c
+> > >>> @@ -142,6 +142,9 @@ static int orion_wdt_probe(struct platform_device *pdev)
+> > >>>    	orion_wdt.max_timeout = wdt_max_duration;
+> > >>>    	watchdog_init_timeout(&orion_wdt, heartbeat, &pdev->dev);
+> > >>>
+> > >>> +	/* Let's make sure the watchdog is fully stopped */
+> > >>> +	orion_wdt_stop(&orion_wdt);
+> > >>> +
+> > >>
+> > >> Actually we just had that in another driver, and I stumbled over it there.
+> > >>
+> > >> Problem with stopping the watchdog in probe unconditionally is that you can
+> > >> use it to defeat nowayout: unload the module, then load it again,
+> > >> and the watchdog is stopped even if nowayout is true.
+> > >>
 
-I had a brief chat with Marc yesterday around this and it may be safer
-to simply introduce kvm_p*d_addr_end() macros. You already do this for
-pgd_addr_end() since it cannot be overridden in the generic headers.
+How often would a user legitimately want to unload/load the watchdog
+module?
 
--- 
-Catalin
+> > >
+> > > Hm... I see.
+> > >
+> > >> Is this really what you want ? Or, in other words, what is the problem
+> > >> you are trying to solve ?
+> > >>
+> > >
+> > > Well, this is related to the discussion about the bootloader not
+> > > reseting the watchdog properly, provoking spurious watchdog triggering.
+> > >
+> > > Jason Gunthorpe explained [1] that we needed a particular sequence:
+> > >
+> > >   1. Disable WDT
+> > >   2. Clear bridge
+> > >   3. Enable WDT
+> > >
+> > > We added the irq handling to satisfy (2), and the watchdog stop for (1).
+> > >
+> > > The watchdog stop was agreed specifically [2].
+> > >
+> > > Ideas?
+> > >
+> > 
+> > Other drivers assume that if the watchdog is running, it is supposed
+> > to be running. The more common approach in such cases is to ping the
+> > watchdog once to give userspace more time to get ready, but leave
+> > it enabled. So you could check if the watchdog is enabled, and if
+> > it was enabled re-enable it after initialization is complete
+> > (and maybe log a message stating that the watchdog is enabled).
+> > 
+> > If you don't want to do that, and if you are defeating nowayout
+> > on purpose to fix a problem with a broken bootloader,
+> > you should at least put in comment describing the problem you are
+> > trying to solve, and that you accept breaking nowayout with your fix.
+
+Yes, this should be commented.
+
+> I'm not fond of not having "nowayout" option on our driver, given I'm sure
+> it's a watchdog feature for a good reason.
+> 
+> On the other side, I can't see how can we distinguish a previously
+> and explicitly enabled watchdog, from a spurious enable by broken bootloader.
+
+How about we just don't define module_exit() and leave a comment as
+such?  It's not unprecedented, a couple of the atm drivers are
+explicitly setup like this (uPD98402.c, zatm.c, eni.c).
+
+thx,
+
+Jason.
