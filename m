@@ -1,94 +1,90 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 7 Feb 2014 12:17:28 -0300
-Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
- initially stopped
-In-Reply-To: <52F4E1C1.4010805@roeck-us.net>
-References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <52F43ED0.4050808@roeck-us.net> <20140207104044.GA11063@localhost>
- <52F4E1C1.4010805@roeck-us.net>
-Message-ID: <20140207151727.GB8218@localhost>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 07 Feb 2014 16:18:00 +0100
+Subject: [PATCH] i2c: mv64xxx: Fix locked bus when offload is selected
+ but not used on a message
+In-Reply-To: <20140207150958.GY8533@titan.lakedaemon.net>
+References: <1391770588-1344-1-git-send-email-gregory.clement@free-electrons.com>
+ <20140207150958.GY8533@titan.lakedaemon.net>
+Message-ID: <52F4F928.40100@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 05:38:09AM -0800, Guenter Roeck wrote:
-> On 02/07/2014 02:40 AM, Ezequiel Garcia wrote:
-> > On Thu, Feb 06, 2014 at 06:02:56PM -0800, Guenter Roeck wrote:
-> >> On 02/06/2014 09:20 AM, Ezequiel Garcia wrote:
-> >>> Having the watchdog initially fully stopped is important to avoid
-> >>> any spurious watchdog triggers, in case the registers are not in
-> >>> its reset state.
-> >>>
-> >>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> >>> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> >>> Tested-by: Willy Tarreau <w@1wt.eu>
-> >>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> >>> ---
-> >>>    drivers/watchdog/orion_wdt.c | 3 +++
-> >>>    1 file changed, 3 insertions(+)
-> >>>
-> >>> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-> >>> index 6746033..2dbeee9 100644
-> >>> --- a/drivers/watchdog/orion_wdt.c
-> >>> +++ b/drivers/watchdog/orion_wdt.c
-> >>> @@ -142,6 +142,9 @@ static int orion_wdt_probe(struct platform_device *pdev)
-> >>>    	orion_wdt.max_timeout = wdt_max_duration;
-> >>>    	watchdog_init_timeout(&orion_wdt, heartbeat, &pdev->dev);
-> >>>
-> >>> +	/* Let's make sure the watchdog is fully stopped */
-> >>> +	orion_wdt_stop(&orion_wdt);
-> >>> +
-> >>
-> >> Actually we just had that in another driver, and I stumbled over it there.
-> >>
-> >> Problem with stopping the watchdog in probe unconditionally is that you can
-> >> use it to defeat nowayout: unload the module, then load it again,
-> >> and the watchdog is stopped even if nowayout is true.
-> >>
-> >
-> > Hm... I see.
-> >
-> >> Is this really what you want ? Or, in other words, what is the problem
-> >> you are trying to solve ?
-> >>
-> >
-> > Well, this is related to the discussion about the bootloader not
-> > reseting the watchdog properly, provoking spurious watchdog triggering.
-> >
-> > Jason Gunthorpe explained [1] that we needed a particular sequence:
-> >
-> >   1. Disable WDT
-> >   2. Clear bridge
-> >   3. Enable WDT
-> >
-> > We added the irq handling to satisfy (2), and the watchdog stop for (1).
-> >
-> > The watchdog stop was agreed specifically [2].
-> >
-> > Ideas?
-> >
+On 07/02/2014 16:09, Jason Cooper wrote:
+> On Fri, Feb 07, 2014 at 11:55:54AM +0100, Gregory CLEMENT wrote:
+>> Offload can be used only on regular transactions and for 1 to byte
+>> transfers. In the other cases we switch back to usual work flow.
+>>
+>> In this case we need to call mv64xxx_i2c_prepare_for_io() as this
+>> function is not used when we try to use offloading.
+>>
+>> This commit adds this missing call when offloading have failed in the
+>> MV64XXX_I2C_ACTION_OFFLOAD_SEND_START case.
+>>
+>> This fix the timeout seen when the the i2c driver try to access an
+>> address where the device is absent on the Armada XP bases board.
+>>
+>> Cc: stable at vger.kernel.org # v3.12+
+>> Fixes: 930ab3d403ae (i2c: mv64xxx: Add I2C Transaction Generator support)
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  drivers/i2c/busses/i2c-mv64xxx.c | 9 ++++++++-
+>>  1 file changed, 8 insertions(+), 1 deletion(-)
 > 
-> Other drivers assume that if the watchdog is running, it is supposed
-> to be running. The more common approach in such cases is to ping the
-> watchdog once to give userspace more time to get ready, but leave
-> it enabled. So you could check if the watchdog is enabled, and if
-> it was enabled re-enable it after initialization is complete
-> (and maybe log a message stating that the watchdog is enabled).
+> I'd like to get a few tested-by's on this before this is pushed.  We've
+> had quite a bit of fixes this round :(  Please test both multi_v7 and
+> mvebu defconfigs.
+
+Well of course I have tested with multi_v7 and mvebu defconfigs, but I
+think it is not my tested-by that you want! :)
+
+An for the test we only have to test the Armada XP B0 based board, because
+in the other case the offload is disable, so the code I modified never
+doesn't run.
+
+
+Thanks,
+
+Gregory
+
+
 > 
-> If you don't want to do that, and if you are defeating nowayout
-> on purpose to fix a problem with a broken bootloader,
-> you should at least put in comment describing the problem you are
-> trying to solve, and that you accept breaking nowayout with your fix.
+> Kevin, I know you're busy with a lot more than us, but if you could
+> confirm that this fixes the bus hangs you reported, that would be great.
 > 
+> thx,
+> 
+> Jason.
+> 
+>>
+>> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+>> index b8c5187b9ee0..a1700c62d955 100644
+>> --- a/drivers/i2c/busses/i2c-mv64xxx.c
+>> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+>> @@ -461,8 +461,15 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
+>>  	case MV64XXX_I2C_ACTION_OFFLOAD_SEND_START:
+>>  		if (!mv64xxx_i2c_offload_msg(drv_data))
+>>  			break;
+>> -		else
+>> +		else {
+>>  			drv_data->action = MV64XXX_I2C_ACTION_SEND_START;
+>> +			/*
+>> +			 * Switch to the standard path, so we finally need to
+>> +			 * prepare the io that have not been done in
+>> +			 * mv64xxx_i2c_execute_msg
+>> +			 */
+>> +			mv64xxx_i2c_prepare_for_io(drv_data, drv_data->msgs);
+>> +		}
+>>  		/* FALLTHRU */
+>>  	case MV64XXX_I2C_ACTION_SEND_START:
+>>  		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_START,
+>> -- 
+>> 1.8.1.2
+>>
 
-I'm not fond of not having "nowayout" option on our driver, given I'm sure
-it's a watchdog feature for a good reason.
 
-On the other side, I can't see how can we distinguish a previously
-and explicitly enabled watchdog, from a spurious enable by broken bootloader.
-
-Jason, what do you say?
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
