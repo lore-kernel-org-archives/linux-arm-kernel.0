@@ -1,72 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri,  7 Feb 2014 12:29:19 +0100
-Subject: [PATCH] gpio: mvebu: use chained_irq_{enter,
- exit} for GIC compatibility
-Message-ID: <1391772559-28357-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 7 Feb 2014 11:30:46 +0000
+Subject: [PATCH v2 1/7] ARM: perf_event: Support percpu irqs for the CPU
+ PMU
+In-Reply-To: <52D96E5C.4040506@codeaurora.org>
+References: <1389808535-23852-1-git-send-email-sboyd@codeaurora.org>
+ <1389808535-23852-2-git-send-email-sboyd@codeaurora.org>
+ <20140115205427.GB26193@codeaurora.org>
+ <20140117150411.GI16003@mudshark.cambridge.arm.com>
+ <52D96E5C.4040506@codeaurora.org>
+Message-ID: <20140207113046.GD5976@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On currently supported SoCs, the GPIO block used on Marvell EBU SoCs
-is always connected to the Marvell MPIC. However, we are going to
-introduce the support for newer Marvell EBU SoCs that use the
-Cortex-A9 core, and therefore use the GIC as their main interrupt
-controller, to which the GPIO block controlled by the gpio-mvebu
-driver is connected.
+Hi Stephen,
 
-The GIC interrupt controller driver uses the fasteoi flow handler. In
-order to ensure that the eoi hook of the GIC driver gets called, the
-GPIO driver should call chained_irq_enter() and chained_irq_exit() in
-its handler. Without this, the first GPIO interrupt locks up the
-system because it doesn't get acked at the GIC level.
+I just remembered about this series.
 
-This change is similar to for example commit
-0d978eb7349941139241a99acf05de6dd49b78d1 ("gpio: davinci: use
-chained_irq_enter/chained_irq_exit API").
+On Fri, Jan 17, 2014 at 05:54:36PM +0000, Stephen Boyd wrote:
+> On 01/17/14 07:04, Will Deacon wrote:
+> > Hi Stephen,
+> >
+> > On Wed, Jan 15, 2014 at 08:54:27PM +0000, Stephen Boyd wrote:
+> >> On 01/15, Stephen Boyd wrote:
+> >>> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+> >>> index 789d846a9184..e76750980b38 100644
+> >>> --- a/arch/arm/kernel/perf_event.c
+> >>> +++ b/arch/arm/kernel/perf_event.c
+> >>> @@ -295,9 +297,15 @@ validate_group(struct perf_event *event)
+> >>>  
+> >>>  static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+> >>>  {
+> >>> -	struct arm_pmu *armpmu = (struct arm_pmu *) dev;
+> >>> -	struct platform_device *plat_device = armpmu->plat_device;
+> >>> -	struct arm_pmu_platdata *plat = dev_get_platdata(&plat_device->dev);
+> >>> +	struct arm_pmu *armpmu;
+> >>> +	struct platform_device *plat_device;
+> >>> +	struct arm_pmu_platdata *plat;
+> >>> +
+> >>> +	if (irq_is_percpu(irq))
+> >>> +		dev = *(struct arm_pmu_cpu **)dev;
+> >> Oh. I just realized that struct arm_pmu_cpu doesn't even exist. This
+> >> still compiles though because we're dealing with a void pointer.
+> >>
+> >> Perhaps its better to just do
+> >>
+> >> 	dev = *(void **)dev;
+> >>
+> >> here. Can you fix that up when applying? Otherwise I'll do it on
+> >> the next send if there are more comments.
+> > Shouldn't that actually be some per_cpu accessor like this_cpu_ptr?
+> >
+> 
+> Nope. The genirq layer unwraps the per_cpu pointer and passes it to the
+> handler.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/gpio/gpio-mvebu.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+I think we resolved all the questions/issues that came up during review.
+Please can you send a new version that I can take into my tree for 3.15?
 
-diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-index 3b1fd1c..d425094 100644
---- a/drivers/gpio/gpio-mvebu.c
-+++ b/drivers/gpio/gpio-mvebu.c
-@@ -44,6 +44,7 @@
- #include <linux/of_device.h>
- #include <linux/clk.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/irqchip/chained_irq.h>
- 
- /*
-  * GPIO unit register offsets.
-@@ -438,12 +439,15 @@ static int mvebu_gpio_irq_set_type(struct irq_data *d, unsigned int type)
- static void mvebu_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- {
- 	struct mvebu_gpio_chip *mvchip = irq_get_handler_data(irq);
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
- 	u32 cause, type;
- 	int i;
- 
- 	if (mvchip == NULL)
- 		return;
- 
-+	chained_irq_enter(chip, desc);
-+
- 	cause = readl_relaxed(mvebu_gpioreg_data_in(mvchip)) &
- 		readl_relaxed(mvebu_gpioreg_level_mask(mvchip));
- 	cause |= readl_relaxed(mvebu_gpioreg_edge_cause(mvchip)) &
-@@ -466,8 +470,11 @@ static void mvebu_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 			polarity ^= 1 << i;
- 			writel_relaxed(polarity, mvebu_gpioreg_in_pol(mvchip));
- 		}
-+
- 		generic_handle_irq(irq);
- 	}
-+
-+	chained_irq_exit(chip, desc);
- }
- 
- #ifdef CONFIG_DEBUG_FS
--- 
-1.8.3.2
+Cheers,
+
+Will
