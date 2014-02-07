@@ -1,15 +1,13 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 7 Feb 2014 10:48:00 +0000
+Date: Fri, 7 Feb 2014 10:49:12 +0000
 Subject: [PATCH v2 08/15] mfd: max77836: Add max77836 support to max14577
  driver
 In-Reply-To: <1391767487-10017-9-git-send-email-k.kozlowski@samsung.com>
 References: <1391767487-10017-1-git-send-email-k.kozlowski@samsung.com>
  <1391767487-10017-9-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20140207104800.GI14727@lee--X1>
+Message-ID: <20140207104912.GJ14727@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-On Fri, 07 Feb 2014, Krzysztof Kozlowski wrote:
 
 > Add Maxim 77836 support to max14577 driver. The chipsets have same MUIC
 > component so the extcon, charger and regulators are almost the same. The
@@ -32,7 +30,10 @@ On Fri, 07 Feb 2014, Krzysztof Kozlowski wrote:
 > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-This should be a Mainatiner's Ack.
+My Ack is missing from this patch too.
+
+... and probably all the others? How will I know which ones I've
+already Acked without reviewing them all again?
 
 -- 
 Lee Jones
