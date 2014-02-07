@@ -1,31 +1,19 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 7 Feb 2014 14:22:37 -0800
-Subject: [PATCH] sched_clock: Prevent callers from seeing half-updated data
-In-Reply-To: <1391806139-20116-1-git-send-email-sboyd@codeaurora.org>
-References: <52F524A3.3070400@linaro.org>
- <1391806139-20116-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140207222237.GF12815@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 7 Feb 2014 14:15:37 -0800
+Subject: [PATCH v2 00/12] Samsung PM consolidation part 2 (multiplatform)
+In-Reply-To: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
+References: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
+Message-ID: <20140207221537.GA12714@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07, Stephen Boyd wrote:
-> If two sched_clock sources are registered we may end up in a
-> situation where a call to sched_clock() may be accessing the
-> epoch cycle count for the old counter and the cycle count for the
-> new counter. This can lead to confusing results where
-> sched_clock() values jump and then are reset to 0 (due to the way
-> the registration function forces the epoch_ns to be 0). Fix this
-> by reorganizing the registration function to hold the seqlock for
-> as short a time as possible while we update the clock_data
-> structure for a new counter and stop resetting the epoch_ns count
-> to 0.
+On Thu, Feb 06, 2014 at 08:12:45PM +0100, Tomasz Figa wrote:
 
-Hmm.. This won't properly accumulate time. We need to put
-whatever time has elapsed into epoch_ns when we register the new
-counter for this to work. I don't have a board with this
-configuration but I'll send a v2 that should fix this. Hopefully
-Will can test it.
+> On Exynos4210-based Trats, Exynos4412-based Trats2 and Exynos5250-based
+> Arndale boards (except suspend/resume, which is broken because of
+> unrelated reasons):
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Has this been reported, and is it being worked on by anyone?
+
+
+-Olof
