@@ -1,62 +1,19 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Feb 2014 11:30:46 +0000
-Subject: [PATCH v2 1/7] ARM: perf_event: Support percpu irqs for the CPU
- PMU
-In-Reply-To: <52D96E5C.4040506@codeaurora.org>
-References: <1389808535-23852-1-git-send-email-sboyd@codeaurora.org>
- <1389808535-23852-2-git-send-email-sboyd@codeaurora.org>
- <20140115205427.GB26193@codeaurora.org>
- <20140117150411.GI16003@mudshark.cambridge.arm.com>
- <52D96E5C.4040506@codeaurora.org>
-Message-ID: <20140207113046.GD5976@mudshark.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 07 Feb 2014 12:32:48 +0100
+Subject: [PATCH v2 1/9] clk: exynos4: Remove remnants of non-DT support
+In-Reply-To: <1391710616-14226-2-git-send-email-t.figa@samsung.com>
+References: <1391710616-14226-1-git-send-email-t.figa@samsung.com>
+ <1391710616-14226-2-git-send-email-t.figa@samsung.com>
+Message-ID: <52F4C460.1050306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-I just remembered about this series.
-
-On Fri, Jan 17, 2014 at 05:54:36PM +0000, Stephen Boyd wrote:
-> On 01/17/14 07:04, Will Deacon wrote:
-> > Hi Stephen,
-> >
-> > On Wed, Jan 15, 2014 at 08:54:27PM +0000, Stephen Boyd wrote:
-> >> On 01/15, Stephen Boyd wrote:
-> >>> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-> >>> index 789d846a9184..e76750980b38 100644
-> >>> --- a/arch/arm/kernel/perf_event.c
-> >>> +++ b/arch/arm/kernel/perf_event.c
-> >>> @@ -295,9 +297,15 @@ validate_group(struct perf_event *event)
-> >>>  
-> >>>  static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
-> >>>  {
-> >>> -	struct arm_pmu *armpmu = (struct arm_pmu *) dev;
-> >>> -	struct platform_device *plat_device = armpmu->plat_device;
-> >>> -	struct arm_pmu_platdata *plat = dev_get_platdata(&plat_device->dev);
-> >>> +	struct arm_pmu *armpmu;
-> >>> +	struct platform_device *plat_device;
-> >>> +	struct arm_pmu_platdata *plat;
-> >>> +
-> >>> +	if (irq_is_percpu(irq))
-> >>> +		dev = *(struct arm_pmu_cpu **)dev;
-> >> Oh. I just realized that struct arm_pmu_cpu doesn't even exist. This
-> >> still compiles though because we're dealing with a void pointer.
-> >>
-> >> Perhaps its better to just do
-> >>
-> >> 	dev = *(void **)dev;
-> >>
-> >> here. Can you fix that up when applying? Otherwise I'll do it on
-> >> the next send if there are more comments.
-> > Shouldn't that actually be some per_cpu accessor like this_cpu_ptr?
-> >
+On 06/02/14 19:16, Tomasz Figa wrote:
+> This patch simplifies a bit clock initialization code by removing
+> remnants of non-DT clock initialization, such as reg_base and xom values
+> passed in function parameters.
 > 
-> Nope. The genirq layer unwraps the per_cpu pointer and passes it to the
-> handler.
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-I think we resolved all the questions/issues that came up during review.
-Please can you send a new version that I can take into my tree for 3.15?
-
-Cheers,
-
-Will
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
