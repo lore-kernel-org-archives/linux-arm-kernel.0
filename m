@@ -1,130 +1,32 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri,  7 Feb 2014 19:18:53 +0900
-Subject: [PATCH v3 3/6] arm64: ftrace: Add CALLER_ADDRx macros
-In-Reply-To: <1391768336-5642-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1382598488-13511-1-git-send-email-takahiro.akashi@linaro.org>
- <1391768336-5642-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1391768336-5642-4-git-send-email-takahiro.akashi@linaro.org>
+From: chf.fritz@googlemail.com (Christoph Fritz)
+Date: Fri, 07 Feb 2014 11:19:43 +0100
+Subject: [PATCH v3 0/4] ARM: add omap3 INCOstartec board support
+In-Reply-To: <1390782797-24105-1-git-send-email-chf.fritz@googlemail.com>
+References: <1390782797-24105-1-git-send-email-chf.fritz@googlemail.com>
+Message-ID: <1391768383.4937.112.camel@mars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CALLER_ADDRx returns caller's address at specified level in call stacks.
-They are used for several tracers like irqsoff and preemptoff.
-Strange to say, however, they are refered even without FTRACE.
+On Mon, 2014-01-27 at 01:33 +0100, Christoph Fritz wrote:
+> This set of patches adds board support for an omap3 system from INCOstartec.
+> It's based on next-20140124.
+> 
+> Due to a regression since next-20140115 the following errors are present:
+> 
+>  - pin sys_clkout2, which gets configured to 24 Mhz by the fourth patch
+>    in this set, erroneously outputs only 12 Mhz.
+>    Just out of curiosity, configuring it to 48 Mhz puts out desired 24 Mhz.
+> 
+>  - omap_dss, which gets configured by the third patch in this set, fails
+>    to do 'dss_set_fck_rate(fck);' in
+>    drivers/video/omap2/dss/dss.c:dss_setup_default_clock() which leads to:
+> 
+>     | omapdss_dss: probe of omapdss_dss failed with error -22
+>     | omapdss CORE error: Failed to initialize DSS platform driver
+>     | panel-dpi panel-dpi.0: failed to find video source 'dpi.0
+> 
+>   Both regressions seem to have something to do with the clock framework. 
+>   Could this be related to the DT clock conversion patches?
 
-Please note that this implementation assumes that we have frame pointers.
-(which means kernel should be compiled with -fno-omit-frame-pointer.)
-
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/include/asm/ftrace.h    |   14 +++++++++
- arch/arm64/kernel/Makefile         |    3 +-
- arch/arm64/kernel/return_address.c |   55 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 71 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/kernel/return_address.c
-
-diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-index 37a379d..4c6ac03 100644
---- a/arch/arm64/include/asm/ftrace.h
-+++ b/arch/arm64/include/asm/ftrace.h
-@@ -37,4 +37,18 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
- #endif /* __ASSEMBLY__ */
- #endif /* CONFIG_FUNCTION_TRACER */
- 
-+#ifndef __ASSEMBLY__
-+#define HAVE_ARCH_CALLER_ADDR
-+
-+extern void *return_address(unsigned int);
-+
-+#define CALLER_ADDR0 ((unsigned long)__builtin_return_address(0))
-+#define CALLER_ADDR1 ((unsigned long)return_address(1))
-+#define CALLER_ADDR2 ((unsigned long)return_address(2))
-+#define CALLER_ADDR3 ((unsigned long)return_address(3))
-+#define CALLER_ADDR4 ((unsigned long)return_address(4))
-+#define CALLER_ADDR5 ((unsigned long)return_address(5))
-+#define CALLER_ADDR6 ((unsigned long)return_address(6))
-+#endif /* ifndef __ASSEMBLY__ */
-+
- #endif /* __ASM_FTRACE_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index ca921fb..55e0b6e 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -9,12 +9,13 @@ ifdef CONFIG_FUNCTION_TRACER
- CFLAGS_REMOVE_ftrace.o = -pg
- CFLAGS_REMOVE_insn.o = -pg
- endif
-+CFLAGS_REMOVE_return_address.o = -pg
- 
- # Object file lists.
- arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
- 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
- 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
--			   hyp-stub.o psci.o cpu_ops.o insn.o
-+			   hyp-stub.o psci.o cpu_ops.o insn.o return_address.o
- 
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o
-diff --git a/arch/arm64/kernel/return_address.c b/arch/arm64/kernel/return_address.c
-new file mode 100644
-index 0000000..89102a6
---- /dev/null
-+++ b/arch/arm64/kernel/return_address.c
-@@ -0,0 +1,55 @@
-+/*
-+ * arch/arm64/kernel/return_address.c
-+ *
-+ * Copyright (C) 2013 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/export.h>
-+#include <linux/ftrace.h>
-+
-+#include <asm/stacktrace.h>
-+
-+struct return_address_data {
-+	unsigned int level;
-+	void *addr;
-+};
-+
-+static int save_return_addr(struct stackframe *frame, void *d)
-+{
-+	struct return_address_data *data = d;
-+
-+	if (!data->level) {
-+		data->addr = (void *)frame->pc;
-+		return 1;
-+	} else {
-+		--data->level;
-+		return 0;
-+	}
-+}
-+
-+void *return_address(unsigned int level)
-+{
-+	struct return_address_data data;
-+	struct stackframe frame;
-+	register unsigned long current_sp asm ("sp");
-+
-+	data.level = level + 2;
-+	data.addr = NULL;
-+
-+	frame.fp = (unsigned long)__builtin_frame_address(0);
-+	frame.sp = current_sp;
-+	frame.pc = (unsigned long)return_address; /* dummy */
-+
-+	walk_stackframe(&frame, save_return_addr, &data);
-+
-+	if (!data.level)
-+		return data.addr;
-+	else
-+		return NULL;
-+}
-+EXPORT_SYMBOL_GPL(return_address);
--- 
-1.7.9.5
+Now with dt clock conversion fixes on its way, any chance to get this
+upstream?
