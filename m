@@ -1,39 +1,45 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 7 Feb 2014 13:48:44 +0800
-Subject: [PATCH v9 00/12] Add power management support for mxs phy
-In-Reply-To: <e3a207a65094481e9a3e149ac89e6505@BL2PR03MB226.namprd03.prod.outlook.com>
-References: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
- <e3a207a65094481e9a3e149ac89e6505@BL2PR03MB226.namprd03.prod.outlook.com>
-Message-ID: <CAL411-pR5BsNLP8cQYv=o_LsnWYnWD6qEYvWFHZz2f-zvxVJLw@mail.gmail.com>
+From: pratyush.anand@st.com (Pratyush Anand)
+Date: Fri, 7 Feb 2014 12:13:12 +0530
+Subject: [PATCH V4 6/8] phy: st-miphy-40lp: Add SPEAr1310 and SPEAr1340
+ PCIe phy support
+In-Reply-To: <20140207035429.GB2414@pratyush-vbox>
+References: <cover.1391661589.git.pratyush.anand@st.com>
+ <dca9c501de8386003142b463469c3d267a049eeb.1391661589.git.pratyush.anand@st.com>
+ <201402061637.05414.arnd@arndb.de>
+ <20140207035429.GB2414@pratyush-vbox>
+Message-ID: <20140207064312.GC2414@pratyush-vbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 20, 2014 at 2:48 PM, Peter Chen <Peter.Chen@freescale.com> wrote:
->
->
->
->>
->> Hi Felipe & Shawn,
->>
->> The serial adds power management support for MXS PHY, it includes:
->>
->> - Add one PHY API .set_wakeup, and related API implementation at mxs phy
->> driver
->> - misc changes and bug fixes for mxs phy to support low power mode and
->> wakeup.
->>
->> It is based on the lastest Greg's usb-next, 3.13-rc5.
->>
->
-> Hi Felipe,
->
-> I would like to confirm if this patchset is ok, and will be in
-> your 3.15 tree?
->
+Hi Arnd,
 
-ping...
+On Fri, Feb 07, 2014 at 11:54:30AM +0800, Pratyush ANAND wrote:
+> Hi Arnd,
+> 
+> On Thu, Feb 06, 2014 at 11:37:05PM +0800, Arnd Bergmann wrote:
+> > On Thursday 06 February 2014, Pratyush Anand wrote:
+> > 
 
+[...]
 
--- 
-BR,
-Peter Chen
+> > I think it's better to make this code table-driven. Rather than checking
+> > 'of_device_is_compatible()', it's much easier to add a .data field to
+> > the of_device_id array that describes the PHY. You can use .data to
+> > point to a structure containing per-device function pointers or
+> > (better) values and offsets to be used.
+
+values and offset would be good as long as we do not need to write on
+conditional read status. In our case its OK, as we do not need to
+write conditionally. But, would it be a good idea to go that way?
+
+Regards
+Pratyush
+
+> 
+> Sounds a better idea. will reduce code size a lot. Thanks.
+> 
+> Regards
+> Pratyush
+> 
+> > 
+> > 	Arnd
