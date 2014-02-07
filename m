@@ -1,20 +1,25 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 7 Feb 2014 22:33:00 +0100
-Subject: [PATCH] ARM: sunxi: dt: Change the touchscreen compatibles
-In-Reply-To: <1391349160-10951-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1391349160-10951-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140207213300.GS3192@lukather>
+Date: Fri, 7 Feb 2014 22:32:31 +0100
+Subject: [PATCH] ARM: sun7i: dt: Fix interrupt trigger types
+In-Reply-To: <1391269576-13274-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1391269576-13274-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140207213231.GR3192@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 02, 2014 at 02:52:40PM +0100, Maxime Ripard wrote:
-> Switch the device tree touchscreen compatibles to have a common pattern accross
-> all Allwinner SoCs. Since the touchscreen driver has not been merged yet, it
-> has no side effect.
+On Sat, Feb 01, 2014 at 04:46:16PM +0100, Maxime Ripard wrote:
+> The Allwinner A20 uses the ARM GIC as its internal interrupts controller. The
+> GIC can work on several interrupt triggers, and the A20 was actually setting it
+> up to use a rising edge as a trigger, while it was actually a level high
+> trigger, leading to some interrupts that would be completely ignored if the
+> edge was missed.
+> 
+> Fix this for the remaining DT nodes that slipped through.
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: stable at vger.kernel.org
 
-Applied for sunxi/fixes-for-3.14.
+Merged in sunxi/fixes-for-3.14.
 
 Maxime
 
@@ -28,4 +33,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140207/0df69050/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140207/9f4f7b8f/attachment-0001.sig>
