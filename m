@@ -1,82 +1,52 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 07 Feb 2014 05:38:09 -0800
-Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
- initially stopped
-In-Reply-To: <20140207104044.GA11063@localhost>
-References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <52F43ED0.4050808@roeck-us.net> <20140207104044.GA11063@localhost>
-Message-ID: <52F4E1C1.4010805@roeck-us.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 07 Feb 2014 14:49:53 +0100
+Subject: [PATCH] iommu/exynos: Remove driver
+In-Reply-To: <CAH9JG2Xoz1_Y7CV6FUiGAO9o5T7jtFUYqJpcAysLttwu4527zQ@mail.gmail.com>
+References: <1391716317-20300-1-git-send-email-olof@lixom.net>
+ <CAAQKjZMo6=dtur6NfvDY9=jVF=7VxHub=isnEwPw0+RKCq6xAg@mail.gmail.com>
+ <CAH9JG2Xoz1_Y7CV6FUiGAO9o5T7jtFUYqJpcAysLttwu4527zQ@mail.gmail.com>
+Message-ID: <52F4E481.3050902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2014 02:40 AM, Ezequiel Garcia wrote:
-> On Thu, Feb 06, 2014 at 06:02:56PM -0800, Guenter Roeck wrote:
->> On 02/06/2014 09:20 AM, Ezequiel Garcia wrote:
->>> Having the watchdog initially fully stopped is important to avoid
->>> any spurious watchdog triggers, in case the registers are not in
->>> its reset state.
->>>
->>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->>> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>> Tested-by: Willy Tarreau <w@1wt.eu>
->>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->>> ---
->>>    drivers/watchdog/orion_wdt.c | 3 +++
->>>    1 file changed, 3 insertions(+)
->>>
->>> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
->>> index 6746033..2dbeee9 100644
->>> --- a/drivers/watchdog/orion_wdt.c
->>> +++ b/drivers/watchdog/orion_wdt.c
->>> @@ -142,6 +142,9 @@ static int orion_wdt_probe(struct platform_device *pdev)
->>>    	orion_wdt.max_timeout = wdt_max_duration;
->>>    	watchdog_init_timeout(&orion_wdt, heartbeat, &pdev->dev);
->>>
->>> +	/* Let's make sure the watchdog is fully stopped */
->>> +	orion_wdt_stop(&orion_wdt);
->>> +
->>
->> Actually we just had that in another driver, and I stumbled over it there.
->>
->> Problem with stopping the watchdog in probe unconditionally is that you can
->> use it to defeat nowayout: unload the module, then load it again,
->> and the watchdog is stopped even if nowayout is true.
->>
->
-> Hm... I see.
->
->> Is this really what you want ? Or, in other words, what is the problem
->> you are trying to solve ?
->>
->
-> Well, this is related to the discussion about the bootloader not
-> reseting the watchdog properly, provoking spurious watchdog triggering.
->
-> Jason Gunthorpe explained [1] that we needed a particular sequence:
->
->   1. Disable WDT
->   2. Clear bridge
->   3. Enable WDT
->
-> We added the irq handling to satisfy (2), and the watchdog stop for (1).
->
-> The watchdog stop was agreed specifically [2].
->
-> Ideas?
->
+Hello,
 
-Other drivers assume that if the watchdog is running, it is supposed
-to be running. The more common approach in such cases is to ping the
-watchdog once to give userspace more time to get ready, but leave
-it enabled. So you could check if the watchdog is enabled, and if
-it was enabled re-enable it after initialization is complete
-(and maybe log a message stating that the watchdog is enabled).
+On 2014-02-07 13:44, Kyungmin Park wrote:
+>
+> On Friday, February 7, 2014, Inki Dae <inki.dae@samsung.com 
+> <mailto:inki.dae@samsung.com>> wrote:
+>
+>     2014-02-07 Olof Johansson <olof@lixom.net <javascript:;>>:
+>     > The driver has been unbuildable due to unfulfilled dependencies
+>     since
+>     > 3.11, and even if enabled it won't build due to build breakage.
+>     Emails
+>     > about status on this have gone unanswered, and fixes seem to
+>     have been
+>     > abandoned.
+>     >
+>     > It's obvious that nobody cares about it, so let's remove it.
+>
+>     Wait, we are going to fix up this module. It seems that KyoungHo,
+>     original author, is busy with some works related to product.
+>
+>     we can care about it if KyoungHo cannot afford to care for the
+>     time being.
+>
+> Any volunteers?
+> Marek or Bartek, how do you think?
+>
+> Before that it makes orphan or unsupported at maintainer file first and
+> change it to new volunteers.
 
-If you don't want to do that, and if you are defeating nowayout
-on purpose to fix a problem with a broken bootloader,
-you should at least put in comment describing the problem you are
-trying to solve, and that you accept breaking nowayout with your fix.
+I think that it might be easier to remove the existing non-functional driver
+now and add it again once the driver is ready. I have it on my TODO 
+list, but
+doubt I will manage to finish it for v3.15.
 
-Thanks,
-Guenter
+Discussing the DT bindings might take some time.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
