@@ -1,77 +1,62 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 7 Feb 2014 10:43:14 -0700
-Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
- initially stopped
-In-Reply-To: <20140207104044.GA11063@localhost>
-References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <52F43ED0.4050808@roeck-us.net> <20140207104044.GA11063@localhost>
-Message-ID: <20140207174314.GB16263@obsidianresearch.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Feb 2014 17:43:31 +0000
+Subject: [PATCH RFC 2/2] drivers/base: declare phandle DT nodes as
+ components
+In-Reply-To: <9f8bbe28b00160cab2cedffa3f8fb42121035964.1391793068.git.moinejf@free.fr>
+References: <cover.1391793068.git.moinejf@free.fr>
+ <9f8bbe28b00160cab2cedffa3f8fb42121035964.1391793068.git.moinejf@free.fr>
+Message-ID: <20140207174330.GF26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 07:40:45AM -0300, Ezequiel Garcia wrote:
-
-> Well, this is related to the discussion about the bootloader not
-> reseting the watchdog properly, provoking spurious watchdog triggering.
+On Fri, Feb 07, 2014 at 05:53:27PM +0100, Jean-Francois Moine wrote:
+> At system startup time, some devices depends on the availability of
+> some other devices before starting. The infrastructure for componentised
+> subsystems permits to handle this dependence, each driver defining
+> its own role.
 > 
-> Jason Gunthorpe explained [1] that we needed a particular sequence:
-> 
->  1. Disable WDT
->  2. Clear bridge
->  3. Enable WDT
-> 
-> We added the irq handling to satisfy (2), and the watchdog stop for (1).
+> This patch does an automatic creation of the lowest components in
+> case of DT. This permits simple devices to be part of complex
+> componentised subsystems without any specific code.
 
-The issue here is the driver configures two 'machine kill' elements:
-the PANIC IRQ and the RstOut setup.
+A component with no operations makes precisely no sense - with that,
+there's no way for the component to be a stand-alone driver.  Your
+approach forces your ideas onto every DT device that is referenced
+as a phandle.  That's extremely restrictive.
 
-Before configuring either of those the driver needs to ensure that any
-old watchdog events are cleared out of the HW. We must not get a
-spurious event. 
+I don't want the component stuff knowing anything about OF.  I don't
+want it knowing about driver matching.  I don't want it knowing about
+ACPI either.  That's the whole point behind it - it is 100% agnostic
+about how that stuff works.
 
-I agree not disabling an already functional and properly configured
-counter from the bootloader is desirable.
+The model is quite simply this:
 
-So lets break it down a bit..
+- a master device is the covering component for the "card"
+  - the master device knows what components to expect by some means.
+    In the case of DT, that's by phandle references to the components.
+  - the master device handles the component independent setup of the
+    "card", creating the common resources that are required.  When it's
+    ready, it asks for the components to be bound.
+  - upon removal of any component, the master component is unbound,
+    which triggers the removal of the "card" from the subsystem.
+  - as part of the removal, sub-components are unbound.
+  - the master device should have as /little/ knowledge about the
+    components as possible to permit component re-use.
 
-1) The IRQ:
-  It looks like the cause bit latches high on watchdog timer
-  expiration but has no side effect unless it is unmasked.
+- a component driver should be independent of it's master.
+  - A component which is probed from the device model should simply
+    register itself using component_add() with an appropriate operations
+    structure, and a removal function which deletes itself.
+  - When the driver is ready to be initialised (when the "card" level
+    resources have been set in place) the "bind" method will be called.
+    At this point, the component does everything that a classical driver
+    model driver would do in it's probe callback.
+  - unbind is the same as remove in the classical driver model.
 
-  The new IRQ flow code ensures the bit is cleared during request_irq
-  so no old events can trigger the IRQ. Thus it is solved now.
+So, please, no DT stuff in the component support - it's simply not
+required.
 
-2) The RstOut:
-  It is a bit unspecific, but I think this signal latches high when
-  any unmasked rst event occurs and stays high until the RstIn pin
-  is asserted.
-
-  So we don't need to worry about clearing old events from here
-
-  Alternatively the WDRstOutEn routes the Cause bit into the RstOut
-  pin.
-
-3) The timer itself:
-  The WDT is just a general timer with an optional hookup to the
-  rst control. If it is harmlessly counting but not resetting we need
-  to stop that before enabling rst out.
-
-So, how about this for psuedo-code in probe:
-
-if (readl(RSTOUTn) & WDRstOutEn)
-{
-    /* Watchdog is configured and may be down counting,
-       don't touch it */
-    request_irq(..);
-}
-else
-{
-    /* Watchdog is not configured, fully disable the timer
-       and configure for watchdog operation. */
-    disable_watchdog();
-    request_irq();
-    writel(RSTOUTn), .. WDRstOutEn);
-}
-
-Jason
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
