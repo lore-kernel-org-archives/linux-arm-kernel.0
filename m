@@ -1,37 +1,47 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 06 Feb 2014 18:07:08 -0800
-Subject: [PATCH v6 17/19] watchdog: orion: Enable the build on ARCH_MVEBU
-In-Reply-To: <1391707226-18258-18-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1391707226-18258-18-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <52F43FCC.5090109@roeck-us.net>
+From: courtney.cavin@sonymobile.com (Courtney Cavin)
+Date: Thu, 6 Feb 2014 18:09:50 -0800
+Subject: [PATCHv2 2/2] arm: Get rid of meminfo
+In-Reply-To: <1391558551-31395-3-git-send-email-lauraa@codeaurora.org>
+References: <1391558551-31395-1-git-send-email-lauraa@codeaurora.org>
+ <1391558551-31395-3-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20140207020949.GQ1706@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/2014 09:20 AM, Ezequiel Garcia wrote:
-> After adding support for Armada 370/XP SoC let's enable the build on
-> these platforms.
->
-> Tested-by: Willy Tarreau <w@1wt.eu>
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+On Wed, Feb 05, 2014 at 01:02:31AM +0100, Laura Abbott wrote:
+> memblock is now fully integrated into the kernel and is the prefered
+> method for tracking memory. Rather than reinvent the wheel with
+> meminfo, migrate to using memblock directly instead of meminfo as
+> an intermediate.
+> 
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+[...]
+> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+> index 0b11c1a..51d814e 100644
+> --- a/arch/arm/mach-pxa/spitz.c
+> +++ b/arch/arm/mach-pxa/spitz.c
+> @@ -32,6 +32,7 @@
+>  #include <linux/io.h>
+>  #include <linux/module.h>
+>  #include <linux/reboot.h>
+> +#include <linux/memblock.h>
+> 
+>  #include <asm/setup.h>
+>  #include <asm/mach-types.h>
+> @@ -971,13 +972,9 @@ static void __init spitz_init(void)
+>         spitz_i2c_init();
+>  }
+> 
+> -static void __init spitz_fixup(struct tag *tags, char **cmdline,
+> -                              struct meminfo *mi)
+> +static void __init spitz_fixup(struct tag *tags, char **cmdline)
+>  {
+> -       sharpsl_save_param();
+> -       mi->nr_banks = 1;
+> -       mi->bank[0].start = 0xa0000000;
+> -       mi->bank[0].size = (64*1024*1024);
+> +       memblock_addr(0xa0000000, SZ_64M);
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+memblock_add() ?
 
-> ---
->   drivers/watchdog/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 4c4c566..2dda6c0 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -291,7 +291,7 @@ config DAVINCI_WATCHDOG
->
->   config ORION_WATCHDOG
->   	tristate "Orion watchdog"
-> -	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE
-> +	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE || ARCH_MVEBU
->   	select WATCHDOG_CORE
->   	help
->   	  Say Y here if to include support for the watchdog timer
->
+-Courtney
