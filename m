@@ -1,67 +1,56 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 7 Feb 2014 10:09:58 -0500
-Subject: [PATCH] i2c: mv64xxx: Fix locked bus when offload is selected
- but not used on a message
-In-Reply-To: <1391770588-1344-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1391770588-1344-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140207150958.GY8533@titan.lakedaemon.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 7 Feb 2014 16:09:54 +0100
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <20140207150306.GX8533@titan.lakedaemon.net>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1391730137-14814-22-git-send-email-andrew@lunn.ch>
+ <20140207093313.1a979a8f@skate>
+ <20140207150306.GX8533@titan.lakedaemon.net>
+Message-ID: <20140207160954.69fbca38@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 11:55:54AM +0100, Gregory CLEMENT wrote:
-> Offload can be used only on regular transactions and for 1 to byte
-> transfers. In the other cases we switch back to usual work flow.
-> 
-> In this case we need to call mv64xxx_i2c_prepare_for_io() as this
-> function is not used when we try to use offloading.
-> 
-> This commit adds this missing call when offloading have failed in the
-> MV64XXX_I2C_ACTION_OFFLOAD_SEND_START case.
-> 
-> This fix the timeout seen when the the i2c driver try to access an
-> address where the device is absent on the Armada XP bases board.
-> 
-> Cc: stable at vger.kernel.org # v3.12+
-> Fixes: 930ab3d403ae (i2c: mv64xxx: Add I2C Transaction Generator support)
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/i2c/busses/i2c-mv64xxx.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
+Dear Jason Cooper,
 
-I'd like to get a few tested-by's on this before this is pushed.  We've
-had quite a bit of fixes this round :(  Please test both multi_v7 and
-mvebu defconfigs.
+On Fri, 7 Feb 2014 10:03:06 -0500, Jason Cooper wrote:
 
-Kevin, I know you're busy with a lot more than us, but if you could
-confirm that this fixes the bus hangs you reported, that would be great.
-
-thx,
-
-Jason.
-
+> Ideally, I'd prefer multi_v7 and multi_v5 for DT, and
+> {kirkwood,dove,orion5x,mv78xx0}_defconfig for non-DT legacy building.
+> The latter going away once we deprecate non-DT booting.  There is a case
+> to be made for the arch-specific defconfigs, though.
 > 
-> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-> index b8c5187b9ee0..a1700c62d955 100644
-> --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> @@ -461,8 +461,15 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
->  	case MV64XXX_I2C_ACTION_OFFLOAD_SEND_START:
->  		if (!mv64xxx_i2c_offload_msg(drv_data))
->  			break;
-> -		else
-> +		else {
->  			drv_data->action = MV64XXX_I2C_ACTION_SEND_START;
-> +			/*
-> +			 * Switch to the standard path, so we finally need to
-> +			 * prepare the io that have not been done in
-> +			 * mv64xxx_i2c_execute_msg
-> +			 */
-> +			mv64xxx_i2c_prepare_for_io(drv_data, drv_data->msgs);
-> +		}
->  		/* FALLTHRU */
->  	case MV64XXX_I2C_ACTION_SEND_START:
->  		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_START,
-> -- 
-> 1.8.1.2
+> Currently (includes modules if configured, and dtbs);
 > 
+>   mvebu_defconfig	00:02:56
+>   x86_64_defconfig	00:04:24
+>   multi_v7_defconfig	00:04:05
+> 
+> 1 minute and 9 seconds doesn't drastically change a bathroom break or
+> tea time ;-)  But it is a 33% increase.
+
+I also like to have a more focused defconfig than multi_v7 for
+development.
+
+> If we want something leaner than multi_v7, how about
+> armada_370-xp_defconfig to replace the current mvebu_defconfig?
+
+Doesn't work for me: we're going to introduce soon the support for
+other mvebu ARMv7 SoC that are not Armada 370 nor XP, but that should
+be built as part of this.
+
+Why not mvebu_v7 and mvebu_v5 as I suggested? mvebu_v7 would build both
+Dove and Armada 370/XP (and the other ones we are going to introduce
+soon), mvebu_v5 would build Kirkwood (and possibly Orion5x once I find
+enough time to work on this platform).
+
+This way, ultimately we can simply remove kirkwood_defconfig and
+dove_defconfig, as soon as all legacy platforms have been either
+converted to DT, or removed.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
