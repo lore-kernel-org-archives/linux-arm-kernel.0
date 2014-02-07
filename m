@@ -1,73 +1,88 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 7 Feb 2014 09:52:07 -0600
-Subject: [PATCH v2 1/2] PM / OPP: Allow boost frequency to be looked up
- from device tree
-In-Reply-To: <CAJuA9aiEDXyK8ABNznbzjk7s2uMfwo_diRpmLNsKBFd+pH=ffQ@mail.gmail.com>
-References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>	<1391786342-11812-2-git-send-email-thomas.ab@samsung.com>	<CAGo_u6qsh0wVLGjvqKmaXjDGVyy2tKgSzkh-t9RZCQS-JJND8g@mail.gmail.com>
- <CAJuA9aiEDXyK8ABNznbzjk7s2uMfwo_diRpmLNsKBFd+pH=ffQ@mail.gmail.com>
-Message-ID: <52F50127.606@ti.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Fri,  7 Feb 2014 21:25:41 +0530
+Subject: [PATCH v3 0/7] cpufreq: use cpufreq-cpu0 driver for exynos based
+ platforms
+Message-ID: <1391788548-13056-1-git-send-email-thomas.ab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2014 09:38 AM, Thomas Abraham wrote:
-[...]
->>> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
->>> index fa41874..b636826 100644
->>> --- a/drivers/base/power/opp.c
->>> +++ b/drivers/base/power/opp.c
->>> @@ -628,7 +628,8 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
->>>         struct device_opp *dev_opp;
->>>         struct dev_pm_opp *opp;
->>>         struct cpufreq_frequency_table *freq_table;
->>> -       int i = 0;
->>> +       int i = 0, j, len, ret;
->>> +       u32 *boost_freqs = NULL;
->>>
->>>         /* Pretend as if I am an updater */
->>>         mutex_lock(&dev_opp_list_lock);
->>> @@ -650,10 +651,35 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
->>>                 return -ENOMEM;
->>>         }
->>>
->>> +       if (of_find_property(dev->of_node, "boost-frequency", &len)) {
->>> +               if (len == 0 || (len & (sizeof(u32) - 1)) != 0) {
->>> +                       dev_err(dev, "%s: invalid boost frequency\n", __func__);
->>> +                       ret = -EINVAL;
->>> +                       goto err_boost;
->>> +               }
->>> +
->>> +               boost_freqs = kzalloc(len, GFP_KERNEL);
->>> +               if (!boost_freqs) {
->>> +                       dev_warn(dev, "%s: no memory for boost freq table\n",
->>> +                                       __func__);
->>> +                       ret = -ENOMEM;
->>> +                       goto err_boost;
->>> +               }
->>> +               of_property_read_u32_array(dev->of_node, "boost-frequency",
->>> +                       boost_freqs, len / sizeof(u32));
->>> +       }
->>> +
->>>         list_for_each_entry(opp, &dev_opp->opp_list, node) {
->>>                 if (opp->available) {
->>>                         freq_table[i].driver_data = i;
->>>                         freq_table[i].frequency = opp->rate / 1000;
->>> +                       for (j = 0; j < len / sizeof(u32) && boost_freqs; j++) {
->>> +                               if (boost_freqs[j] == freq_table[i].frequency) {
->>> +                                       freq_table[i].driver_data =
->>> +                                                       CPUFREQ_BOOST_FREQ;
->>> +                                       break;
->>> +                               }
->>> +                       }
->>
->> What if any one of the boost_freqs are not contained in the enabled frequencies?
-> 
-> It is not used as a boost frequency because its corresponding voltage
-> is not known. If required a warning can be printed out for the same.
+Changes since v2:
+- Safe operating voltage is not required while switching APLL frequency
+  since the temporary parent's clock is divided down to keep armclk within
+  permissible limits. Thanks to Heiko St?bner <heiko@sntech.de> for this
+  suggesting this.
+- Rob had suggested to use max frequency for each of the divider clock
+  outputs instead of divider values. But due to certain SoC specific
+  characteristics, the divider values corresponding to the input clock
+  frequency for the CMU_CPU clock blocks have to be used.
 
-yes - that would be good, as it helps debug if there are developer
-errors in dts.
+Changes since v1:
+- Removes Exynos4x12 and Exynos5250 cpufreq driver also.
+- Device tree based clock configuration lookup as suggested by Lukasz
+  Majewski and Tomasz Figa.
+- safe operating point binding reworked as suggested by Shawn Guo.
 
+The patch series removes the use of Exynos specific cpufreq driver and enables
+the use of cpufreq-cpu0 driver for Exynos4210, Exynos4x12 and Exynos5250 based
+platforms. This is being done for few reasons.
 
--- 
-Regards,
-Nishanth Menon
+(a) The Exynos cpufreq driver reads/writes clock controller registers
+    bypassing the Exynos CCF driver which is sort of problematic.
+(b) Removes the need for having clock controller register definitions
+    in the cpufreq driver and also removes the need for statically
+    io-remapping clock controller address space (helps in moving towards
+    multiplatform kernel).
+
+Thomas Abraham (7):
+  cpufreq: cpufreq-cpu0: allow use of optional boost mode frequencies
+  clk: samsung: add infrastructure to register cpu clocks
+  Documentation: devicetree: add cpu clock configuration data binding for Exynos4/5
+  clk: exynos: use cpu-clock provider type to represent arm clock
+  ARM: dts: Exynos: add cpu nodes, opp and cpu clock configuration data
+  ARM: Exynos: switch to using generic cpufreq-cpu0 driver
+  cpufreq: exynos: remove all exynos specific cpufreq driver support
+
+ .../devicetree/bindings/clock/exynos4-clock.txt    |   37 ++
+ .../devicetree/bindings/clock/exynos5250-clock.txt |   39 ++
+ .../devicetree/bindings/cpufreq/cpufreq-cpu0.txt   |    2 +
+ arch/arm/boot/dts/exynos4210-origen.dts            |    6 +
+ arch/arm/boot/dts/exynos4210-trats.dts             |    6 +
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |    6 +
+ arch/arm/boot/dts/exynos4210.dtsi                  |   35 ++
+ arch/arm/boot/dts/exynos4212.dtsi                  |   18 +
+ arch/arm/boot/dts/exynos4412-odroidx.dts           |    6 +
+ arch/arm/boot/dts/exynos4412-origen.dts            |    6 +
+ arch/arm/boot/dts/exynos4412-trats2.dts            |    6 +
+ arch/arm/boot/dts/exynos4412.dtsi                  |   31 ++
+ arch/arm/boot/dts/exynos4x12.dtsi                  |   36 ++
+ arch/arm/boot/dts/exynos5250-arndale.dts           |    6 +
+ arch/arm/boot/dts/exynos5250-cros-common.dtsi      |    6 +
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    6 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |   41 ++
+ arch/arm/mach-exynos/common.c                      |    5 -
+ arch/arm/mach-exynos/common.h                      |    1 -
+ arch/arm/mach-exynos/mach-exynos4-dt.c             |    2 +-
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +-
+ drivers/clk/samsung/Makefile                       |    2 +-
+ drivers/clk/samsung/clk-cpu.c                      |  409 ++++++++++++++++++++
+ drivers/clk/samsung/clk-exynos4.c                  |   23 +-
+ drivers/clk/samsung/clk-exynos5250.c               |   10 +-
+ drivers/clk/samsung/clk.h                          |    5 +
+ drivers/cpufreq/Kconfig                            |    1 +
+ drivers/cpufreq/Kconfig.arm                        |   51 ---
+ drivers/cpufreq/Makefile                           |    4 -
+ drivers/cpufreq/cpufreq-cpu0.c                     |    3 +
+ drivers/cpufreq/exynos-cpufreq.c                   |  292 --------------
+ drivers/cpufreq/exynos-cpufreq.h                   |   91 -----
+ drivers/cpufreq/exynos4210-cpufreq.c               |  157 --------
+ drivers/cpufreq/exynos4x12-cpufreq.c               |  211 ----------
+ drivers/cpufreq/exynos5250-cpufreq.c               |  183 ---------
+ include/dt-bindings/clock/exynos5250.h             |    1 +
+ 36 files changed, 727 insertions(+), 1019 deletions(-)
+ create mode 100644 drivers/clk/samsung/clk-cpu.c
+ delete mode 100644 drivers/cpufreq/exynos-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos-cpufreq.h
+ delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos4x12-cpufreq.c
+ delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
