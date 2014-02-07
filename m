@@ -1,161 +1,51 @@
-From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
-Date: Fri, 7 Feb 2014 14:20:07 +0530
-Subject: [PATCH 1/2] i2c-s3c2410: Leave the bus disabled unless it is in
- use
-In-Reply-To: <20130124122036.GF12933@pengutronix.de>
-References: <1354165536-18529-1-git-send-email-ch.naveen@samsung.com>
- <1354165536-18529-2-git-send-email-ch.naveen@samsung.com>
- <20130124122036.GF12933@pengutronix.de>
-Message-ID: <CAHfPSqDkRy2y_FKVKrvPjWjbYfRQPmDYgtgfWsT8LJDuMD9i7Q@mail.gmail.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri, 07 Feb 2014 09:58:16 +0100
+Subject: [PATCH v3 05/15] ARM: at91: move sam9261 SoC to common clk
+In-Reply-To: <1390492639-7299-6-git-send-email-jjhiblot@traphandler.com>
+References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
+ <1390492639-7299-6-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <52F4A028.2000604@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wolfram,
+Hello JJ,
 
-Sorry for a replying after really long time.
+On 23/01/2014 16:57, Jean-Jacques Hiblot wrote:
+> This patch removes the selection of AT91_USE_OLD_CLK when selecting
+> sam9261 SoCs support. This will automatically enable COMMON_CLK_AT91 option
+> and add support for at91 common clk implementation.
+>
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> ---
+>   arch/arm/mach-at91/Kconfig | 1 -
+>   1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index b4f7d6f..2214beb 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -120,7 +120,6 @@ config SOC_AT91SAM9261
+>   	select HAVE_AT91_DBGU0
+>   	select HAVE_FB_ATMEL
+>   	select SOC_AT91SAM9
+> -	select AT91_USE_OLD_CLK
+>   	select HAVE_AT91_USB_CLK
+add :
+                depends on COMMON_CLK
 
-On 24 January 2013 17:50, Wolfram Sang <w.sang@pengutronix.de> wrote:
-> On Thu, Nov 29, 2012 at 10:35:34AM +0530, Naveen Krishna Chatradhi wrote:
->> From: Simon Glass <sjg@chromium.org>
->>
->> There is a rather odd feature of the exynos i2c controller that if it
->> is left enabled, it can lock itself up with the clk line held low.
->> This makes the bus unusable.
->>
->> Unfortunately, the s3c24xx_i2c_set_master() function does not notice
->> this, and reports a timeout. From then on the bus cannot be used until
->> the AP is rebooted.
->>
->> The problem happens when any sort of interrupt occurs (e.g. due to a
->> bus transition) when we are not in the middle of a transaction. We
->> have seen many instances of this when U-Boot leaves the bus apparently
->> happy, but Linux cannot access it.
->>
->> The current code is therefore pretty fragile.
->>
->> This fixes things by leaving the bus disabled unless we are actually
->> in a transaction. We enable the bus at the start of the transaction and
->> disable it at the end. That way we won't get interrupts and will not
->> lock up the bus.
->>
->> It might be possible to clear pending interrupts on start-up, but this
->> seems to be a more robust solution. We can't service interrupts when
->> we are not in a transaction, and anyway would rather not lock up the
->> bus while we try.
->>
->> Signed-off-by: Simon Glass <sjg@chromium.org>
->> Cc: Grant Grundler <grundler@chromium.org>
->> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->
-> So, I assume this patch is still needed despite the ongoing discussion
-> about arbitration?
-Yes, this is an i2c crontroller fix.
->
->> ---
->>  drivers/i2c/busses/i2c-s3c2410.c |   37 +++++++++++++++++++++++++++++++++----
->>  1 file changed, 33 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
->> index e93e7d6..2fd346d 100644
->> --- a/drivers/i2c/busses/i2c-s3c2410.c
->> +++ b/drivers/i2c/busses/i2c-s3c2410.c
->> @@ -186,6 +186,31 @@ static inline void s3c24xx_i2c_enable_irq(struct s3c24xx_i2c *i2c)
->>       writel(tmp | S3C2410_IICCON_IRQEN, i2c->regs + S3C2410_IICCON);
->>  }
->>
->> +/*
->> + * Disable the bus so that we won't get any interrupts from now on, or try
->> + * to drive any lines. This is the default state when we don't have
->> + * anything to send/receive.
->> + *
->> + * If there is an event on the bus, or we have a pre-existing event at
->
-> Otherwise, if...
->
->> + * kernel boot time, we may not notice the event and the I2C controller
->> + * will lock the bus with the I2C clock line low indefinitely.
->> + */
->> +static inline void s3c24xx_i2c_disable_bus(struct s3c24xx_i2c *i2c)
->> +{
->> +     unsigned long tmp;
->> +
->> +     /* Stop driving the I2C pins */
->> +     tmp = readl(i2c->regs + S3C2410_IICSTAT);
->> +     tmp &= ~S3C2410_IICSTAT_TXRXEN;
->> +     writel(tmp, i2c->regs + S3C2410_IICSTAT);
->> +
->> +     /* We don't expect any interrupts now, and don't want send acks */
->> +     tmp = readl(i2c->regs + S3C2410_IICCON);
->> +     tmp &= ~(S3C2410_IICCON_IRQEN | S3C2410_IICCON_IRQPEND |
->> +             S3C2410_IICCON_ACKEN);
->> +     writel(tmp, i2c->regs + S3C2410_IICCON);
->> +}
->> +
->>
->>  /* s3c24xx_i2c_message_start
->>   *
->> @@ -646,7 +671,11 @@ static int s3c24xx_i2c_doxfer(struct s3c24xx_i2c *i2c,
->>
->>       s3c24xx_i2c_wait_idle(i2c);
->>
->> +     s3c24xx_i2c_disable_bus(i2c);
->> +
->>   out:
->> +     i2c->state = STATE_IDLE;
->> +
->
-> Why is the state change after the label?
-As the interrupts are enabled in the beginning of this function.
-and interrupts in STATE_IDLE needs handling in a different way.
+if you want to get rid of DT related clk_lookup definitions.
+You'll also have to remove all the AT91SAM9261 sections from Kconfig.non_dt,
+because this will conflict with the "depends on COMMON_CLK" line (the
+ARCH_AT91SAM9261 config selects AT91_USE_OLD_CLK which forbids the use
+of CCF).
 
-This was added with the intention the irq routine will handle the cases
->
->>       return ret;
->>  }
->>
->> @@ -912,7 +941,6 @@ static void s3c24xx_i2c_dt_gpio_free(struct s3c24xx_i2c *i2c)
->>
->>  static int s3c24xx_i2c_init(struct s3c24xx_i2c *i2c)
->>  {
->> -     unsigned long iicon = S3C2410_IICCON_IRQEN | S3C2410_IICCON_ACKEN;
->>       struct s3c2410_platform_i2c *pdata;
->>       unsigned int freq;
->>
->> @@ -926,12 +954,12 @@ static int s3c24xx_i2c_init(struct s3c24xx_i2c *i2c)
->>
->>       dev_info(i2c->dev, "slave address 0x%02x\n", pdata->slave_addr);
->>
->> -     writel(iicon, i2c->regs + S3C2410_IICCON);
->> +     writel(0, i2c->regs + S3C2410_IICCON);
->> +     writel(0, i2c->regs + S3C2410_IICSTAT);
->>
->>       /* we need to work out the divisors for the clock... */
->>
->>       if (s3c24xx_i2c_clockrate(i2c, &freq) != 0) {
->> -             writel(0, i2c->regs + S3C2410_IICCON);
->>               dev_err(i2c->dev, "cannot meet bus frequency required\n");
->>               return -EINVAL;
->>       }
->> @@ -939,7 +967,8 @@ static int s3c24xx_i2c_init(struct s3c24xx_i2c *i2c)
->>       /* todo - check that the i2c lines aren't being dragged anywhere */
->>
->>       dev_info(i2c->dev, "bus frequency set to %d KHz\n", freq);
->> -     dev_dbg(i2c->dev, "S3C2410_IICCON=0x%02lx\n", iicon);
->> +     dev_dbg(i2c->dev, "S3C2410_IICCON=0x%02x\n",
->> +             readl(i2c->regs + S3C2410_IICCON));
->>
->
-> Regards,
->
->    Wolfram
-Will re-base and post the patch..
->
-> --
-> Pengutronix e.K.                           | Wolfram Sang                |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I'm not sure droping the clk_lookup definitions worth the trouble, but 
+I'll let at91
+maintainers decide.
 
+Best Regards,
 
+Boris
 
--- 
-Shine bright,
-(: Nav :)
+>   	help
+>   	  Select this if you are using one of Atmel's AT91SAM9261 or AT91SAM9G10 SoC.
