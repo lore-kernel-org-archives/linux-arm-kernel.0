@@ -1,54 +1,100 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 07 Feb 2014 15:44:15 +0100
-Subject: [PATCH 1/2] arm64: Add seccomp support
-In-Reply-To: <1391767892-5395-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
- <1391767892-5395-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <2659759.AA5HtBcWYl@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 7 Feb 2014 15:44:41 +0100
+Subject: [PATCH v3 2/5] clk: sunxi: Add USB clock register defintions
+In-Reply-To: <1391783553-8096-3-git-send-email-hdegoede@redhat.com>
+References: <1391783553-8096-1-git-send-email-hdegoede@redhat.com>
+ <1391783553-8096-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140207144441.GK3192@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 February 2014 19:11:31 AKASHI Takahiro wrote:
-> diff --git a/arch/arm64/include/asm/seccomp.h b/arch/arm64/include/asm/seccomp.h
-> new file mode 100644
-> index 0000000..3482155
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/seccomp.h
-> @@ -0,0 +1,28 @@
-> +/*
-> + * arch/arm64/include/asm/seccomp.h
-> + *
-> + * Copyright (C) 2014 Linaro Limited
-> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#ifndef _ASM_SECCOMP_H
-> +#define _ASM_SECCOMP_H
+Hi,
+
+On Fri, Feb 07, 2014 at 03:32:30PM +0100, Hans de Goede wrote:
+> From: Roman Byshko <rbyshko@gmail.com>
+> 
+> Add register definitions for the usb-clk register found on sun4i, sun5i and
+> sun7i SoCs.
+> 
+> Signed-off-by: Roman Byshko <rbyshko@gmail.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi.txt |  5 +++++
+>  drivers/clk/sunxi/clk-sunxi.c                     | 12 ++++++++++++
+>  2 files changed, 17 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+> index 27f19f1..e368a86c 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+> @@ -38,6 +38,8 @@ Required properties:
+>  	"allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
+>  	"allwinner,sun7i-a20-out-clk" - for the external output clocks
+>  	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
+> +	"allwinner,sun4i-usb-clk" - for usb gates + resets on A10 / A20
+
+I know I asked you otherwise, but since we're moving to sun4i-a10-*
+compatibles, can you do it here too ? :)
+
+Thanks!
+Maxime
+
+> +	"allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
+>  
+>  Required properties for all clocks:
+>  - reg : shall be the control register address for the clock.
+> @@ -54,6 +56,9 @@ Required properties for all clocks:
+>  For "allwinner,sun7i-a20-gmac-clk", the parent clocks shall be fixed rate
+>  dummy clocks at 25 MHz and 125 MHz, respectively. See example.
+>  
+> +And "allwinner,*-usb-clk" clocks also require:
+> +- reset-cells : shall be set to 1
 > +
-> +#include <asm/unistd.h>
+>  Clock consumers should specify the desired clocks they use with a
+>  "clocks" phandle cell. Consumers that are using a gated clock should
+>  provide an additional ID in their clock property. This ID is the
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 1e15e4c..3ba1402 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -910,6 +910,16 @@ static const struct gates_data sun4i_ahb_gates_data __initconst = {
+>  	.mask = {0x7F77FFF, 0x14FB3F},
+>  };
+>  
+> +static const struct gates_data sun4i_usb_gates_data __initconst = {
+> +	.mask = {0x1C0},
+> +	.reset_mask = 0x07,
+> +};
 > +
-> +#ifdef CONFIG_COMPAT
-> +#define __NR_seccomp_read_32           __NR_compat_read
-> +#define __NR_seccomp_write_32          __NR_compat_write
-> +#define __NR_seccomp_exit_32           __NR_compat_exit
-> +#define __NR_seccomp_sigreturn_32      __NR_compat_sigreturn
-> +#endif /* CONFIG_COMPAT */
+> +static const struct gates_data sun5i_a13_usb_gates_data __initconst = {
+> +	.mask = {0x140},
+> +	.reset_mask = 0x03,
+> +};
 > +
-> +#define __NR_seccomp_read              __NR_read
-> +#define __NR_seccomp_write             __NR_write
-> +#define __NR_seccomp_exit              __NR_exit
-> +#define __NR_seccomp_sigreturn         __NR_rt_sigreturn
-> +
-> +#endif /* _ASM_SECCOMP_H */
+>  static const struct gates_data sun5i_a10s_ahb_gates_data __initconst = {
+>  	.mask = {0x147667e7, 0x185915},
+>  };
+> @@ -1257,6 +1267,8 @@ static const struct of_device_id clk_gates_match[] __initconst = {
+>  	{.compatible = "allwinner,sun6i-a31-apb1-gates-clk", .data = &sun6i_a31_apb1_gates_data,},
+>  	{.compatible = "allwinner,sun7i-a20-apb1-gates-clk", .data = &sun7i_a20_apb1_gates_data,},
+>  	{.compatible = "allwinner,sun6i-a31-apb2-gates-clk", .data = &sun6i_a31_apb2_gates_data,},
+> +	{.compatible = "allwinner,sun4i-usb-clk", .data = &sun4i_usb_gates_data,},
+> +	{.compatible = "allwinner,sun5i-a13-usb-clk", .data = &sun5i_a13_usb_gates_data,},
+>  	{}
+>  };
+>  
+> -- 
+> 1.8.4.2
 > 
 
-This file looks extremely generic and can be shared by every
-architecture other than MIPS for all I can tell.
-
-Please add it to include/asm-generic instead of arch/arm64,
-and add a line to arch/arm64/include/asm/Kbuild.
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140207/370f530c/attachment-0001.sig>
