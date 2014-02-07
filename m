@@ -1,22 +1,71 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 6 Feb 2014 20:08:51 -0800
-Subject: [PATCH v3 11/11] ARM: KVM: trap VM system registers until MMU
- and caches are ON
-In-Reply-To: <1391630151-7875-12-git-send-email-marc.zyngier@arm.com>
-References: <1391630151-7875-1-git-send-email-marc.zyngier@arm.com>
- <1391630151-7875-12-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140207040851.GP9157@cbox>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Fri, 7 Feb 2014 09:38:52 +0530
+Subject: [PATCH 2/3] ARM: OMAP2+: AM43x: Add ID for ES1.1
+In-Reply-To: <52F39E74.3030404@ti.com>
+References: <1391676348-32339-1-git-send-email-lokeshvutla@ti.com>
+ <1391676348-32339-3-git-send-email-lokeshvutla@ti.com>
+ <52F39E74.3030404@ti.com>
+Message-ID: <52F45C54.7020604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 07:55:51PM +0000, Marc Zyngier wrote:
-> In order to be able to detect the point where the guest enables
-> its MMU and caches, trap all the VM related system registers.
+Hi Nishanth,
+On Thursday 06 February 2014 08:08 PM, Nishanth Menon wrote:
+> On 02/06/2014 02:45 AM, Lokesh Vutla wrote:
+>> Adding ID for AM437x ES1.1 silicon.
+>>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/id.c  |   14 ++++++++++++--
+>>  arch/arm/mach-omap2/soc.h |    3 ++-
+>>  2 files changed, 14 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+>> index 9428c5f..8a05eaf 100644
+>> --- a/arch/arm/mach-omap2/id.c
+>> +++ b/arch/arm/mach-omap2/id.c
+>> @@ -465,8 +465,18 @@ void __init omap3xxx_check_revision(void)
+>>  		}
+>>  		break;
+>>  	case 0xb98c:
+>> -		omap_revision = AM437X_REV_ES1_0;
+>> -		cpu_rev = "1.0";
+>> +		switch (rev) {
+>> +		case 0:
+>> +			omap_revision = AM437X_REV_ES1_0;
+>> +			cpu_rev = "1.0";
+>> +			break;
+>> +		case 1:
+>> +		/* FALLTHROUGH */
+>> +		default:
+>> +			omap_revision = AM437X_REV_ES1_1;
+>> +			cpu_rev = "1.1";
+>> +			break;
+>> +		}
+>>  		break;
+>>  	case 0xb8f2:
+>>  		switch (rev) {
+>> diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+>> index 076bd90..30abcc8 100644
+>> --- a/arch/arm/mach-omap2/soc.h
+>> +++ b/arch/arm/mach-omap2/soc.h
+>> @@ -438,7 +438,8 @@ IS_OMAP_TYPE(3430, 0x3430)
+>>  #define AM335X_REV_ES2_1	(AM335X_CLASS | (0x2 << 8))
+>>  
+>>  #define AM437X_CLASS		0x43700000
+>> -#define AM437X_REV_ES1_0	AM437X_CLASS
+>> +#define AM437X_REV_ES1_0	(AM437X_CLASS | (0x10 << 8))
+>> +#define AM437X_REV_ES1_1	(AM437X_CLASS | (0x11 << 8))
+>>  
+>>  #define OMAP443X_CLASS		0x44300044
+>>  #define OMAP4430_REV_ES1_0	(OMAP443X_CLASS | (0x10 << 8))
+>>
 > 
-> Once we see the guest enabling both the MMU and the caches, we
-> can go back to a saner mode of operation, which is to leave these
-> registers in complete control of the guest.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> can you also check if socbus shows proper results?
+> I had http://slexy.org/view/s20e3OsIVx with v3.14-rc1
+Oops....missed out formating and sending "AM43x : determine features patch".
+Thanks for pointing it out. ll update and send a v2 for this series.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Thanks and regards,
+Lokesh
+> 
