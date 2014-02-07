@@ -1,56 +1,21 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Fri, 7 Feb 2014 09:15:39 +0530
-Subject: [PATCH v2 0/9] Samsung PM consolidation part 1 (clocks)
-In-Reply-To: <1391710616-14226-1-git-send-email-t.figa@samsung.com>
-References: <1391710616-14226-1-git-send-email-t.figa@samsung.com>
-Message-ID: <CAJuA9ah97MQKrNeKG2vijFCr8b7T4r2Zr9gsGtETwtBLmKBrXg@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 06 Feb 2014 19:47:23 -0800 (PST)
+Subject: [PATCH 2/3] net: phy: sunxi: Add new compatibles
+In-Reply-To: <1391348953-10662-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1391348953-10662-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1391348953-10662-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140206.194723.1272161937664295404.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 6, 2014 at 11:46 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> This series reworks suspend/resume handling of Samsung clock drivers
-> to cover more SoC specific aspects that are beyond simple register
-> save and restore. The goal is to have all the suspend/resume code
-> that touches the clock controller in single place, which is the
-> clock driver.
->
-> On Exynos4210-based Trats, Exynos4412-based Trats2 and Exynos5250-based
-> Arndale boards (except suspend/resume, which is broken because of
-> unrelated reasons):
->
-> Tested-by: Tomasz Figa <t.figa@samsung.com>
->
-> Tomasz Figa (9):
->   clk: exynos4: Remove remnants of non-DT support
->   clk: samsung: Provide common helpers for register save/restore
->   clk: samsung: exynos4: Move suspend/resume handling to SoC driver
->   clk: samsung: exynos5250: Move suspend/resume handling to SoC driver
->   clk: samsung: exynos5420: Move suspend/resume handling to SoC driver
->   clk: samsung: s3c64xx: Move suspend/resume handling to SoC driver
->   clk: samsung: Drop old suspend/resume code
->   clk: samsung: exynos4: Add remaining suspend/resume handling
->   ARM: EXYNOS: pm: Drop legacy Exynos4 clock suspend/resume code
->
->  arch/arm/mach-exynos/pm.c            | 148 +-----------------------------
->  drivers/clk/samsung/clk-exynos4.c    | 172 +++++++++++++++++++++++++++++++----
->  drivers/clk/samsung/clk-exynos5250.c |  49 +++++++++-
->  drivers/clk/samsung/clk-exynos5420.c |  49 +++++++++-
->  drivers/clk/samsung/clk-exynos5440.c |   2 +-
->  drivers/clk/samsung/clk-s3c64xx.c    |  79 +++++++++++++---
->  drivers/clk/samsung/clk.c            |  71 ++++++---------
->  drivers/clk/samsung/clk.h            |  14 ++-
->  8 files changed, 348 insertions(+), 236 deletions(-)
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
+Date: Sun,  2 Feb 2014 14:49:12 +0100
 
-Nice series!
-Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
+> The Allwinner A10 compatibles were following a slightly different compatible
+> patterns than the rest of the SoCs for historical reasons. Add compatibles
+> matching the other pattern to the mdio driver for consistency, and keep the
+> older one for backward compatibility.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-
->
-> --
-> 1.8.5.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Applied.
