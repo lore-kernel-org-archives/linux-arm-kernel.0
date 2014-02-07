@@ -1,42 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 7 Feb 2014 10:49:12 +0000
-Subject: [PATCH v2 08/15] mfd: max77836: Add max77836 support to max14577
- driver
-In-Reply-To: <1391767487-10017-9-git-send-email-k.kozlowski@samsung.com>
-References: <1391767487-10017-1-git-send-email-k.kozlowski@samsung.com>
- <1391767487-10017-9-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20140207104912.GJ14727@lee--X1>
+From: phdm@macq.eu (Philippe De Muyter)
+Date: Fri, 7 Feb 2014 11:51:06 +0100
+Subject: emmc on imx6 sabresd
+In-Reply-To: <20140206075748.GC3708@S2101-09.ap.freescale.net>
+References: <20140129100321.GA32101@frolo.macqel>
+ <20140206075748.GC3708@S2101-09.ap.freescale.net>
+Message-ID: <20140207105106.GB7085@frolo.macqel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Add Maxim 77836 support to max14577 driver. The chipsets have same MUIC
-> component so the extcon, charger and regulators are almost the same. The
-> max77836 however has also PMIC and Fuel Gauge.
-> 
-> The MAX77836 uses three I2C slave addresses and has additional interrupts
-> (related to PMIC and Fuel Gauge). It has also Interrupt Source register,
-> just like MAX77686 and MAX77693.
-> 
-> The MAX77836 PMIC's TOPSYS and INTSRC interrupts are reported in the
-> PMIC block. The PMIC block has different I2C slave address and uses own
-> regmap so another regmap_irq_chip is needed.
-> 
-> Since we have two regmap_irq_chip, use shared interrupts on MAX77836.
-> 
-> This patch adds additional defines and functions to the max14577 MFD core
-> driver so the driver will handle both chipsets. Also this patch replaces
-> "0x1 << N" with BIT(N) in defines for register masks.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Thanks Shawn,
 
-My Ack is missing from this patch too.
+On Thu, Feb 06, 2014 at 03:57:50PM +0800, Shawn Guo wrote:
+> On Wed, Jan 29, 2014 at 11:03:21AM +0100, Philippe De Muyter wrote:
+> > Hi Shawn,
+> > 
+> > I try to use the emmc on my sabresd board and on a similar custom board
+> > using 3.13, and I have just discovered by reading Internet that it was
+> > not supported up to some weeks ago.  Is there a git tree somewhere that
+> > has a branch containing 3.13 or linux-next and all the fixes for emmc on
+> > sabresd ?
+> 
+> I think it will just work if you apply the patch [1] on top of
+> v3.14-rc1.
+> 
+> Shawn
+> 
+> [1] http://www.spinics.net/lists/linux-mmc/msg23039.html
 
-... and probably all the others? How will I know which ones I've
-already Acked without reviewing them all again?
+As I could not wait till then, I cloned the cjb's mmc tree, extracted the needed
+patches using 'git format-patch', and applied them to my (then) v3.13-rc8 tree
+using 'git am'.  I can confirm that that works perfectly.
+
+Philippe
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
