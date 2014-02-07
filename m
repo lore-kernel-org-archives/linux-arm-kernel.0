@@ -1,52 +1,37 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 7 Feb 2014 09:31:04 +0100
-Subject: [PATCH 19/21] ARM: MVEBU: Simplifiy headers and make local
-In-Reply-To: <1391730137-14814-20-git-send-email-andrew@lunn.ch>
+Date: Fri, 7 Feb 2014 09:33:13 +0100
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <1391730137-14814-22-git-send-email-andrew@lunn.ch>
 References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-20-git-send-email-andrew@lunn.ch>
-Message-ID: <20140207093104.7197224d@skate>
+ <1391730137-14814-22-git-send-email-andrew@lunn.ch>
+Message-ID: <20140207093313.1a979a8f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Andrew Lunn,
 
-On Fri,  7 Feb 2014 00:42:15 +0100, Andrew Lunn wrote:
-> kirkwood is very nearly fully DT. Remove most of the address
-> definitions from the header files and make it a local header file.
+On Fri,  7 Feb 2014 00:42:17 +0100, Andrew Lunn wrote:
+> Now that all the device tree support is in mach-mvebu, remove it from
+> mach-kirkwood.
+> 
+> Regenerate kirkwood_defconfig, removing all DT support, and a couple
+> of other redundent options have been removed in the process.
 > 
 > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
->  arch/arm/mach-mvebu/include/mach/bridge-regs.h |  85 ---------------
->  arch/arm/mach-mvebu/include/mach/kirkwood.h    | 142 -------------------------
->  arch/arm/mach-mvebu/kirkwood-pm.c              |   2 +-
->  arch/arm/mach-mvebu/kirkwood.c                 |   2 +-
->  arch/arm/mach-mvebu/kirkwood.h                 |  22 ++++
->  5 files changed, 24 insertions(+), 229 deletions(-)
->  delete mode 100644 arch/arm/mach-mvebu/include/mach/bridge-regs.h
->  delete mode 100644 arch/arm/mach-mvebu/include/mach/kirkwood.h
->  create mode 100644 arch/arm/mach-mvebu/kirkwood.h
+>  arch/arm/configs/kirkwood_defconfig |   6 -
 
-Is there any particular reason why this isn't part of PATCH 14/21. I
-was very surprised when reading PATCH 14/21 to see a file named
-"bridge-regs.h" containing Kirkwood-specific definitions added to
-mach-mvebu, and so many address constants being defined, while we are
-DT-based only in mach-mvebu.
+So after this series we have a mvebu_defconfig that only builds the
+ARMv7 platforms of mach-mvebu. I believe this may look strange to
+people looking at the code, seeing that Kirkwood DT support is in
+mach-mvebu, but that mvebu_defconfig doesn't work to build a Kirkwood
+kernel.
 
-> +#define KIRKWOOD_REGS_PHYS_BASE	0xf1000000
-> +#define DDR_PHYS_BASE           (KIRKWOOD_REGS_PHYS_BASE + 0x00000)
-> +#define BRIDGE_PHYS_BASE	(KIRKWOOD_REGS_PHYS_BASE + 0x20000)
-> +
-> +#define DDR_OPERATION_BASE	(DDR_PHYS_BASE + 0x1418)
-> +
-> +#define CPU_CONFIG_PHYS		(BRIDGE_PHYS_BASE + 0x0100)
-> +#define CPU_CONFIG_ERROR_PROP	0x00000004
-> +
-> +#define CPU_CONTROL_PHYS	(BRIDGE_PHYS_BASE + 0x0104)
-> +#define MEMORY_PM_CTRL_PHYS	(BRIDGE_PHYS_BASE + 0x0118)
+I don't really have a solution, except maybe having mvebu_v7_defconfig
+and mvebu_v5_defconfig to build only the Marvell v7 and Marvell v5
+platforms.
 
-Are there plans to also get rid of those constants at some point?
-
-Thanks!
+Best regards,
 
 Thomas
 -- 
