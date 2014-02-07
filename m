@@ -1,1082 +1,456 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Fri,  7 Feb 2014 21:25:48 +0530
-Subject: [PATCH v3 7/7] cpufreq: exynos: remove all exynos specific cpufreq
- driver support
-In-Reply-To: <1391788548-13056-1-git-send-email-thomas.ab@samsung.com>
-References: <1391788548-13056-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <1391788548-13056-8-git-send-email-thomas.ab@samsung.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 07 Feb 2014 16:57:47 +0100
+Subject: [PATCH] ARM: sunxi: Add driver for sunxi usb phy
+In-Reply-To: <52D6A27A.4090600@ti.com>
+References: <1389740305-6993-1-git-send-email-hdegoede@redhat.com>
+ <52D6A27A.4090600@ti.com>
+Message-ID: <52F5027B.5060801@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Abraham <thomas.ab@samsung.com>
+Hi,
 
-Exynos4210, Exynos4x12 and Exynos5250 based platforms have switched over
-to use cpufreq-cpu0 driver for cpufreq functionality. So the Exynos
-specific cpufreq drivers for these platforms can be removed.
+On 01/15/2014 04:00 PM, Kishon Vijay Abraham I wrote:
+> On Wednesday 15 January 2014 04:28 AM, Hans de Goede wrote:
+>> The Allwinner A1x / A2x SoCs have 2 or 3 usb phys which are all accessed
+>> through a single set of registers. Besides this there are also some other
+>> phy related bits which need poking, which are per phy, but shared between the
+>> ohci and ehci controllers, so these are also controlled from this new phy
+>> driver.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  26 ++
+>>   drivers/phy/Kconfig                                |  11 +
+>>   drivers/phy/Makefile                               |   1 +
+>>   drivers/phy/phy-sun4i-usb.c                        | 318 +++++++++++++++++++++
+>>   4 files changed, 356 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>>   create mode 100644 drivers/phy/phy-sun4i-usb.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>> new file mode 100644
+>> index 0000000..6c54b3b
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+>> @@ -0,0 +1,26 @@
+>> +Allwinner sun4i USB PHY
+>> +-----------------------
+>> +
+>> +Required properties:
+>> +- compatible : should be one of "allwinner,sun4i-a10-usb-phy",
+>> +  "allwinner,sun5i-a13-usb-phy" or "allwinner,sun7i-a20-usb-phy"
+>> +- reg : 2 or 3 register offset + length pairs, 1 phy base reg pair +
+>> +  1 pair for the pmu-irq register of each hcd
+>> +- #phy-cells : from the generic phy bindings, must be 1
+>> +
+>> +Optional properties:
+>> +- clocks : phandle + clock specifier for the phy clock
+>> +- clock-names : "usb_phy"
+>> +- resets : a list of phandle + reset specifier pairs
+>> +- reset-names : "usb0_reset", "usb1_reset", and / or "usb2_reset"
+>> +
+>> +Example:
+>> +	usbphy: phy at 0x01c13400 {
+>> +		#phy-cells = <1>;
+>> +		compatible = "allwinner,sun4i-a10-usb-phy";
+>> +		reg = <0x01c13400 0x10 0x01c14800 0x4 0x01c1c800 0x4>;
+>> +		clocks = <&usb_clk 8>;
+>> +		clock-names = "usb_phy";
+>> +		resets = <&usb_clk 1>, <&usb_clk 2>;
+>> +		reset-names = "usb1_reset", "usb2_reset";
+>> +	};
+>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>> index 330ef2d..dcce4cf 100644
+>> --- a/drivers/phy/Kconfig
+>> +++ b/drivers/phy/Kconfig
+>> @@ -51,4 +51,15 @@ config PHY_EXYNOS_DP_VIDEO
+>>   	help
+>>   	  Support for Display Port PHY found on Samsung EXYNOS SoCs.
+>>
+>> +config PHY_SUN4I_USB
+>> +	tristate "Allwinner sunxi SoC USB PHY driver"
+>> +	depends on ARCH_SUNXI
+>> +	select GENERIC_PHY
+>> +	help
+>> +	  Enable this to support the transceiver that is part of Allwinner
+>> +	  sunxi SoCs.
+>> +
+>> +	  This driver controls the entire USB PHY block, both the USB OTG
+>> +	  parts, as well as the 2 regular USB 2 host PHYs.
+>> +
+>>   endmenu
+>> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+>> index d0caae9..e9e82f0 100644
+>> --- a/drivers/phy/Makefile
+>> +++ b/drivers/phy/Makefile
+>> @@ -7,3 +7,4 @@ obj-$(CONFIG_PHY_EXYNOS_DP_VIDEO)	+= phy-exynos-dp-video.o
+>>   obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
+>>   obj-$(CONFIG_OMAP_USB2)			+= phy-omap-usb2.o
+>>   obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
+>> +obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
+>> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+>> new file mode 100644
+>> index 0000000..a15ecc1
+>> --- /dev/null
+>> +++ b/drivers/phy/phy-sun4i-usb.c
+>> @@ -0,0 +1,318 @@
+>> +/*
+>> + * Allwinner sun4i USB phy driver
+>> + *
+>> + * Copyright (C) 2014 Hans de Goede <hdegoede@redhat.com>
+>> + *
+>> + * Based on code from
+>> + * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
+>> + *
+>> + * Modelled after: Samsung S5P/EXYNOS SoC series MIPI CSIS/DSIM DPHY driver
+>> + * Copyright (C) 2013 Samsung Electronics Co., Ltd.
+>> + * Author: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/io.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/mutex.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/phy/phy.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/regulator/consumer.h>
+>> +#include <linux/reset.h>
+>> +
+>> +#define REG_ISCR			0x00
+>> +#define REG_PHYCTL			0x04
+>> +#define REG_PHYBIST			0x08
+>> +#define REG_PHYTUNE			0x0c
+>> +
+>> +#define SUNXI_AHB_ICHR8_EN		BIT(10)
+>> +#define SUNXI_AHB_INCR4_BURST_EN	BIT(9)
+>> +#define SUNXI_AHB_INCRX_ALIGN_EN	BIT(8)
+>> +#define SUNXI_ULPI_BYPASS_EN		BIT(0)
+>> +
+>> +#define MAX_PHYS			3
+>> +
+>> +struct sun4i_usb_phy_data {
+>> +	struct clk *clk;
+>> +	void __iomem *base;
+>> +	struct mutex mutex;
+>> +	int num_phys;
+>> +	u32 disc_thresh;
+>> +	struct sun4i_usb_phy {
+>> +		struct phy *phy;
+>> +		void __iomem *pmu_irq;
+>
+> 'pmu_irq' is misleading. Can you think of a better name?
 
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
----
- drivers/cpufreq/Kconfig.arm          |   51 ------
- drivers/cpufreq/Makefile             |    4 -
- drivers/cpufreq/exynos-cpufreq.c     |  292 ----------------------------------
- drivers/cpufreq/exynos-cpufreq.h     |   91 -----------
- drivers/cpufreq/exynos4210-cpufreq.c |  157 ------------------
- drivers/cpufreq/exynos4x12-cpufreq.c |  211 ------------------------
- drivers/cpufreq/exynos5250-cpufreq.c |  183 ---------------------
- 7 files changed, 989 deletions(-)
- delete mode 100644 drivers/cpufreq/exynos-cpufreq.c
- delete mode 100644 drivers/cpufreq/exynos-cpufreq.h
- delete mode 100644 drivers/cpufreq/exynos4210-cpufreq.c
- delete mode 100644 drivers/cpufreq/exynos4x12-cpufreq.c
- delete mode 100644 drivers/cpufreq/exynos5250-cpufreq.c
+Changed this to pmu in my local tree, I'll send a v2 after some testing.
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 3129749..38f691a 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -16,42 +16,6 @@ config ARM_DT_BL_CPUFREQ
- 	  This enables probing via DT for Generic CPUfreq driver for ARM
- 	  big.LITTLE platform. This gets frequency tables from DT.
- 
--config ARM_EXYNOS_CPUFREQ
--	bool
--
--config ARM_EXYNOS4210_CPUFREQ
--	bool "SAMSUNG EXYNOS4210"
--	depends on CPU_EXYNOS4210
--	default y
--	select ARM_EXYNOS_CPUFREQ
--	help
--	  This adds the CPUFreq driver for Samsung EXYNOS4210
--	  SoC (S5PV310 or S5PC210).
--
--	  If in doubt, say N.
--
--config ARM_EXYNOS4X12_CPUFREQ
--	bool "SAMSUNG EXYNOS4x12"
--	depends on (SOC_EXYNOS4212 || SOC_EXYNOS4412)
--	default y
--	select ARM_EXYNOS_CPUFREQ
--	help
--	  This adds the CPUFreq driver for Samsung EXYNOS4X12
--	  SoC (EXYNOS4212 or EXYNOS4412).
--
--	  If in doubt, say N.
--
--config ARM_EXYNOS5250_CPUFREQ
--	bool "SAMSUNG EXYNOS5250"
--	depends on SOC_EXYNOS5250
--	default y
--	select ARM_EXYNOS_CPUFREQ
--	help
--	  This adds the CPUFreq driver for Samsung EXYNOS5250
--	  SoC.
--
--	  If in doubt, say N.
--
- config ARM_EXYNOS5440_CPUFREQ
- 	bool "SAMSUNG EXYNOS5440"
- 	depends on SOC_EXYNOS5440
-@@ -66,21 +30,6 @@ config ARM_EXYNOS5440_CPUFREQ
- 
- 	  If in doubt, say N.
- 
--config ARM_EXYNOS_CPU_FREQ_BOOST_SW
--	bool "EXYNOS Frequency Overclocking - Software"
--	depends on ARM_EXYNOS_CPUFREQ
--	select CPU_FREQ_BOOST_SW
--	select EXYNOS_THERMAL
--	help
--	  This driver supports software managed overclocking (BOOST).
--	  It allows usage of special frequencies for Samsung Exynos
--	  processors if thermal conditions are appropriate.
--
--	  It reguires, for safe operation, thermal framework with properly
--	  defined trip points.
--
--	  If in doubt, say N.
--
- config ARM_HIGHBANK_CPUFREQ
- 	tristate "Calxeda Highbank-based"
- 	depends on ARCH_HIGHBANK
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 7494565..3abfe05 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -49,10 +49,6 @@ obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
- 
- obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= davinci-cpufreq.o
- obj-$(CONFIG_UX500_SOC_DB8500)		+= dbx500-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS_CPUFREQ)	+= exynos-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS4X12_CPUFREQ)	+= exynos4x12-cpufreq.o
--obj-$(CONFIG_ARM_EXYNOS5250_CPUFREQ)	+= exynos5250-cpufreq.o
- obj-$(CONFIG_ARM_EXYNOS5440_CPUFREQ)	+= exynos5440-cpufreq.o
- obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
- obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
-diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
-deleted file mode 100644
-index fcd2914..0000000
---- a/drivers/cpufreq/exynos-cpufreq.c
-+++ /dev/null
-@@ -1,292 +0,0 @@
--/*
-- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * EXYNOS - CPU frequency scaling support for EXYNOS series
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#include <linux/kernel.h>
--#include <linux/err.h>
--#include <linux/clk.h>
--#include <linux/io.h>
--#include <linux/slab.h>
--#include <linux/regulator/consumer.h>
--#include <linux/cpufreq.h>
--#include <linux/suspend.h>
--#include <linux/platform_device.h>
--
--#include <plat/cpu.h>
--
--#include "exynos-cpufreq.h"
--
--static struct exynos_dvfs_info *exynos_info;
--
--static struct regulator *arm_regulator;
--
--static unsigned int locking_frequency;
--static bool frequency_locked;
--static DEFINE_MUTEX(cpufreq_lock);
--
--static int exynos_cpufreq_get_index(unsigned int freq)
--{
--	struct cpufreq_frequency_table *freq_table = exynos_info->freq_table;
--	int index;
--
--	for (index = 0;
--		freq_table[index].frequency != CPUFREQ_TABLE_END; index++)
--		if (freq_table[index].frequency == freq)
--			break;
--
--	if (freq_table[index].frequency == CPUFREQ_TABLE_END)
--		return -EINVAL;
--
--	return index;
--}
--
--static int exynos_cpufreq_scale(unsigned int target_freq)
--{
--	struct cpufreq_frequency_table *freq_table = exynos_info->freq_table;
--	unsigned int *volt_table = exynos_info->volt_table;
--	struct cpufreq_policy *policy = cpufreq_cpu_get(0);
--	unsigned int arm_volt, safe_arm_volt = 0;
--	unsigned int mpll_freq_khz = exynos_info->mpll_freq_khz;
--	unsigned int old_freq;
--	int index, old_index;
--	int ret = 0;
--
--	old_freq = policy->cur;
--
--	/*
--	 * The policy max have been changed so that we cannot get proper
--	 * old_index with cpufreq_frequency_table_target(). Thus, ignore
--	 * policy and get the index from the raw frequency table.
--	 */
--	old_index = exynos_cpufreq_get_index(old_freq);
--	if (old_index < 0) {
--		ret = old_index;
--		goto out;
--	}
--
--	index = exynos_cpufreq_get_index(target_freq);
--	if (index < 0) {
--		ret = index;
--		goto out;
--	}
--
--	/*
--	 * ARM clock source will be changed APLL to MPLL temporary
--	 * To support this level, need to control regulator for
--	 * required voltage level
--	 */
--	if (exynos_info->need_apll_change != NULL) {
--		if (exynos_info->need_apll_change(old_index, index) &&
--		   (freq_table[index].frequency < mpll_freq_khz) &&
--		   (freq_table[old_index].frequency < mpll_freq_khz))
--			safe_arm_volt = volt_table[exynos_info->pll_safe_idx];
--	}
--	arm_volt = volt_table[index];
--
--	/* When the new frequency is higher than current frequency */
--	if ((target_freq > old_freq) && !safe_arm_volt) {
--		/* Firstly, voltage up to increase frequency */
--		ret = regulator_set_voltage(arm_regulator, arm_volt, arm_volt);
--		if (ret) {
--			pr_err("%s: failed to set cpu voltage to %d\n",
--				__func__, arm_volt);
--			return ret;
--		}
--	}
--
--	if (safe_arm_volt) {
--		ret = regulator_set_voltage(arm_regulator, safe_arm_volt,
--				      safe_arm_volt);
--		if (ret) {
--			pr_err("%s: failed to set cpu voltage to %d\n",
--				__func__, safe_arm_volt);
--			return ret;
--		}
--	}
--
--	exynos_info->set_freq(old_index, index);
--
--	/* When the new frequency is lower than current frequency */
--	if ((target_freq < old_freq) ||
--	   ((target_freq > old_freq) && safe_arm_volt)) {
--		/* down the voltage after frequency change */
--		ret = regulator_set_voltage(arm_regulator, arm_volt,
--				arm_volt);
--		if (ret) {
--			pr_err("%s: failed to set cpu voltage to %d\n",
--				__func__, arm_volt);
--			goto out;
--		}
--	}
--
--out:
--	cpufreq_cpu_put(policy);
--
--	return ret;
--}
--
--static int exynos_target(struct cpufreq_policy *policy, unsigned int index)
--{
--	struct cpufreq_frequency_table *freq_table = exynos_info->freq_table;
--	int ret = 0;
--
--	mutex_lock(&cpufreq_lock);
--
--	if (frequency_locked)
--		goto out;
--
--	ret = exynos_cpufreq_scale(freq_table[index].frequency);
--
--out:
--	mutex_unlock(&cpufreq_lock);
--
--	return ret;
--}
--
--#ifdef CONFIG_PM
--static int exynos_cpufreq_suspend(struct cpufreq_policy *policy)
--{
--	return 0;
--}
--
--static int exynos_cpufreq_resume(struct cpufreq_policy *policy)
--{
--	return 0;
--}
--#endif
--
--/**
-- * exynos_cpufreq_pm_notifier - block CPUFREQ's activities in suspend-resume
-- *			context
-- * @notifier
-- * @pm_event
-- * @v
-- *
-- * While frequency_locked == true, target() ignores every frequency but
-- * locking_frequency. The locking_frequency value is the initial frequency,
-- * which is set by the bootloader. In order to eliminate possible
-- * inconsistency in clock values, we save and restore frequencies during
-- * suspend and resume and block CPUFREQ activities. Note that the standard
-- * suspend/resume cannot be used as they are too deep (syscore_ops) for
-- * regulator actions.
-- */
--static int exynos_cpufreq_pm_notifier(struct notifier_block *notifier,
--				       unsigned long pm_event, void *v)
--{
--	int ret;
--
--	switch (pm_event) {
--	case PM_SUSPEND_PREPARE:
--		mutex_lock(&cpufreq_lock);
--		frequency_locked = true;
--		mutex_unlock(&cpufreq_lock);
--
--		ret = exynos_cpufreq_scale(locking_frequency);
--		if (ret < 0)
--			return NOTIFY_BAD;
--
--		break;
--
--	case PM_POST_SUSPEND:
--		mutex_lock(&cpufreq_lock);
--		frequency_locked = false;
--		mutex_unlock(&cpufreq_lock);
--		break;
--	}
--
--	return NOTIFY_OK;
--}
--
--static struct notifier_block exynos_cpufreq_nb = {
--	.notifier_call = exynos_cpufreq_pm_notifier,
--};
--
--static int exynos_cpufreq_cpu_init(struct cpufreq_policy *policy)
--{
--	policy->clk = exynos_info->cpu_clk;
--	return cpufreq_generic_init(policy, exynos_info->freq_table, 100000);
--}
--
--static struct cpufreq_driver exynos_driver = {
--	.flags		= CPUFREQ_STICKY | CPUFREQ_NEED_INITIAL_FREQ_CHECK,
--	.verify		= cpufreq_generic_frequency_table_verify,
--	.target_index	= exynos_target,
--	.get		= cpufreq_generic_get,
--	.init		= exynos_cpufreq_cpu_init,
--	.exit		= cpufreq_generic_exit,
--	.name		= "exynos_cpufreq",
--	.attr		= cpufreq_generic_attr,
--#ifdef CONFIG_ARM_EXYNOS_CPU_FREQ_BOOST_SW
--	.boost_supported = true,
--#endif
--#ifdef CONFIG_PM
--	.suspend	= exynos_cpufreq_suspend,
--	.resume		= exynos_cpufreq_resume,
--#endif
--};
--
--static int exynos_cpufreq_probe(struct platform_device *pdev)
--{
--	int ret = -EINVAL;
--
--	exynos_info = kzalloc(sizeof(*exynos_info), GFP_KERNEL);
--	if (!exynos_info)
--		return -ENOMEM;
--
--	if (soc_is_exynos4210())
--		ret = exynos4210_cpufreq_init(exynos_info);
--	else if (soc_is_exynos4212() || soc_is_exynos4412())
--		ret = exynos4x12_cpufreq_init(exynos_info);
--	else if (soc_is_exynos5250())
--		ret = exynos5250_cpufreq_init(exynos_info);
--	else
--		return 0;
--
--	if (ret)
--		goto err_vdd_arm;
--
--	if (exynos_info->set_freq == NULL) {
--		pr_err("%s: No set_freq function (ERR)\n", __func__);
--		goto err_vdd_arm;
--	}
--
--	arm_regulator = regulator_get(NULL, "vdd_arm");
--	if (IS_ERR(arm_regulator)) {
--		pr_err("%s: failed to get resource vdd_arm\n", __func__);
--		goto err_vdd_arm;
--	}
--
--	locking_frequency = clk_get_rate(exynos_info->cpu_clk) / 1000;
--
--	register_pm_notifier(&exynos_cpufreq_nb);
--
--	if (cpufreq_register_driver(&exynos_driver)) {
--		pr_err("%s: failed to register cpufreq driver\n", __func__);
--		goto err_cpufreq;
--	}
--
--	return 0;
--err_cpufreq:
--	unregister_pm_notifier(&exynos_cpufreq_nb);
--
--	regulator_put(arm_regulator);
--err_vdd_arm:
--	kfree(exynos_info);
--	return -EINVAL;
--}
--
--static struct platform_driver exynos_cpufreq_platdrv = {
--	.driver = {
--		.name	= "exynos-cpufreq",
--		.owner	= THIS_MODULE,
--	},
--	.probe = exynos_cpufreq_probe,
--};
--module_platform_driver(exynos_cpufreq_platdrv);
-diff --git a/drivers/cpufreq/exynos-cpufreq.h b/drivers/cpufreq/exynos-cpufreq.h
-deleted file mode 100644
-index 3ddade8..0000000
---- a/drivers/cpufreq/exynos-cpufreq.h
-+++ /dev/null
-@@ -1,91 +0,0 @@
--/*
-- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * EXYNOS - CPUFreq support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--enum cpufreq_level_index {
--	L0, L1, L2, L3, L4,
--	L5, L6, L7, L8, L9,
--	L10, L11, L12, L13, L14,
--	L15, L16, L17, L18, L19,
--	L20,
--};
--
--#define APLL_FREQ(f, a0, a1, a2, a3, a4, a5, a6, a7, b0, b1, b2, m, p, s) \
--	{ \
--		.freq = (f) * 1000, \
--		.clk_div_cpu0 = ((a0) | (a1) << 4 | (a2) << 8 | (a3) << 12 | \
--			(a4) << 16 | (a5) << 20 | (a6) << 24 | (a7) << 28), \
--		.clk_div_cpu1 = (b0 << 0 | b1 << 4 | b2 << 8), \
--		.mps = ((m) << 16 | (p) << 8 | (s)), \
--	}
--
--struct apll_freq {
--	unsigned int freq;
--	u32 clk_div_cpu0;
--	u32 clk_div_cpu1;
--	u32 mps;
--};
--
--struct exynos_dvfs_info {
--	unsigned long	mpll_freq_khz;
--	unsigned int	pll_safe_idx;
--	struct clk	*cpu_clk;
--	unsigned int	*volt_table;
--	struct cpufreq_frequency_table	*freq_table;
--	void (*set_freq)(unsigned int, unsigned int);
--	bool (*need_apll_change)(unsigned int, unsigned int);
--};
--
--#ifdef CONFIG_ARM_EXYNOS4210_CPUFREQ
--extern int exynos4210_cpufreq_init(struct exynos_dvfs_info *);
--#else
--static inline int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
--{
--	return -EOPNOTSUPP;
--}
--#endif
--#ifdef CONFIG_ARM_EXYNOS4X12_CPUFREQ
--extern int exynos4x12_cpufreq_init(struct exynos_dvfs_info *);
--#else
--static inline int exynos4x12_cpufreq_init(struct exynos_dvfs_info *info)
--{
--	return -EOPNOTSUPP;
--}
--#endif
--#ifdef CONFIG_ARM_EXYNOS5250_CPUFREQ
--extern int exynos5250_cpufreq_init(struct exynos_dvfs_info *);
--#else
--static inline int exynos5250_cpufreq_init(struct exynos_dvfs_info *info)
--{
--	return -EOPNOTSUPP;
--}
--#endif
--
--#include <plat/cpu.h>
--#include <mach/map.h>
--
--#define EXYNOS4_CLKSRC_CPU			(S5P_VA_CMU + 0x14200)
--#define EXYNOS4_CLKMUX_STATCPU			(S5P_VA_CMU + 0x14400)
--
--#define EXYNOS4_CLKDIV_CPU			(S5P_VA_CMU + 0x14500)
--#define EXYNOS4_CLKDIV_CPU1			(S5P_VA_CMU + 0x14504)
--#define EXYNOS4_CLKDIV_STATCPU			(S5P_VA_CMU + 0x14600)
--#define EXYNOS4_CLKDIV_STATCPU1			(S5P_VA_CMU + 0x14604)
--
--#define EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT	(16)
--#define EXYNOS4_CLKMUX_STATCPU_MUXCORE_MASK	(0x7 << EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT)
--
--#define EXYNOS5_APLL_LOCK			(S5P_VA_CMU + 0x00000)
--#define EXYNOS5_APLL_CON0			(S5P_VA_CMU + 0x00100)
--#define EXYNOS5_CLKMUX_STATCPU			(S5P_VA_CMU + 0x00400)
--#define EXYNOS5_CLKDIV_CPU0			(S5P_VA_CMU + 0x00500)
--#define EXYNOS5_CLKDIV_CPU1			(S5P_VA_CMU + 0x00504)
--#define EXYNOS5_CLKDIV_STATCPU0			(S5P_VA_CMU + 0x00600)
--#define EXYNOS5_CLKDIV_STATCPU1			(S5P_VA_CMU + 0x00604)
-diff --git a/drivers/cpufreq/exynos4210-cpufreq.c b/drivers/cpufreq/exynos4210-cpufreq.c
-deleted file mode 100644
-index 40d84c4..0000000
---- a/drivers/cpufreq/exynos4210-cpufreq.c
-+++ /dev/null
-@@ -1,157 +0,0 @@
--/*
-- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * EXYNOS4210 - CPU frequency scaling support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/err.h>
--#include <linux/clk.h>
--#include <linux/io.h>
--#include <linux/slab.h>
--#include <linux/cpufreq.h>
--
--#include "exynos-cpufreq.h"
--
--static struct clk *cpu_clk;
--static struct clk *moutcore;
--static struct clk *mout_mpll;
--static struct clk *mout_apll;
--
--static unsigned int exynos4210_volt_table[] = {
--	1250000, 1150000, 1050000, 975000, 950000,
--};
--
--static struct cpufreq_frequency_table exynos4210_freq_table[] = {
--	{L0, 1200 * 1000},
--	{L1, 1000 * 1000},
--	{L2,  800 * 1000},
--	{L3,  500 * 1000},
--	{L4,  200 * 1000},
--	{0, CPUFREQ_TABLE_END},
--};
--
--static struct apll_freq apll_freq_4210[] = {
--	/*
--	 * values:
--	 * freq
--	 * clock divider for CORE, COREM0, COREM1, PERIPH, ATB, PCLK_DBG, APLL, RESERVED
--	 * clock divider for COPY, HPM, RESERVED
--	 * PLL M, P, S
--	 */
--	APLL_FREQ(1200, 0, 3, 7, 3, 4, 1, 7, 0, 5, 0, 0, 150, 3, 1),
--	APLL_FREQ(1000, 0, 3, 7, 3, 4, 1, 7, 0, 4, 0, 0, 250, 6, 1),
--	APLL_FREQ(800,  0, 3, 7, 3, 3, 1, 7, 0, 3, 0, 0, 200, 6, 1),
--	APLL_FREQ(500,  0, 3, 7, 3, 3, 1, 7, 0, 3, 0, 0, 250, 6, 2),
--	APLL_FREQ(200,  0, 1, 3, 1, 3, 1, 0, 0, 3, 0, 0, 200, 6, 3),
--};
--
--static void exynos4210_set_clkdiv(unsigned int div_index)
--{
--	unsigned int tmp;
--
--	/* Change Divider - CPU0 */
--
--	tmp = apll_freq_4210[div_index].clk_div_cpu0;
--
--	__raw_writel(tmp, EXYNOS4_CLKDIV_CPU);
--
--	do {
--		tmp = __raw_readl(EXYNOS4_CLKDIV_STATCPU);
--	} while (tmp & 0x1111111);
--
--	/* Change Divider - CPU1 */
--
--	tmp = apll_freq_4210[div_index].clk_div_cpu1;
--
--	__raw_writel(tmp, EXYNOS4_CLKDIV_CPU1);
--
--	do {
--		tmp = __raw_readl(EXYNOS4_CLKDIV_STATCPU1);
--	} while (tmp & 0x11);
--}
--
--static void exynos4210_set_apll(unsigned int index)
--{
--	unsigned int tmp, freq = apll_freq_4210[index].freq;
--
--	/* MUX_CORE_SEL = MPLL, ARMCLK uses MPLL for lock time */
--	clk_set_parent(moutcore, mout_mpll);
--
--	do {
--		tmp = (__raw_readl(EXYNOS4_CLKMUX_STATCPU)
--			>> EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT);
--		tmp &= 0x7;
--	} while (tmp != 0x2);
--
--	clk_set_rate(mout_apll, freq * 1000);
--
--	/* MUX_CORE_SEL = APLL */
--	clk_set_parent(moutcore, mout_apll);
--
--	do {
--		tmp = __raw_readl(EXYNOS4_CLKMUX_STATCPU);
--		tmp &= EXYNOS4_CLKMUX_STATCPU_MUXCORE_MASK;
--	} while (tmp != (0x1 << EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT));
--}
--
--static void exynos4210_set_frequency(unsigned int old_index,
--				     unsigned int new_index)
--{
--	if (old_index > new_index) {
--		exynos4210_set_clkdiv(new_index);
--		exynos4210_set_apll(new_index);
--	} else if (old_index < new_index) {
--		exynos4210_set_apll(new_index);
--		exynos4210_set_clkdiv(new_index);
--	}
--}
--
--int exynos4210_cpufreq_init(struct exynos_dvfs_info *info)
--{
--	unsigned long rate;
--
--	cpu_clk = clk_get(NULL, "armclk");
--	if (IS_ERR(cpu_clk))
--		return PTR_ERR(cpu_clk);
--
--	moutcore = clk_get(NULL, "moutcore");
--	if (IS_ERR(moutcore))
--		goto err_moutcore;
--
--	mout_mpll = clk_get(NULL, "mout_mpll");
--	if (IS_ERR(mout_mpll))
--		goto err_mout_mpll;
--
--	rate = clk_get_rate(mout_mpll) / 1000;
--
--	mout_apll = clk_get(NULL, "mout_apll");
--	if (IS_ERR(mout_apll))
--		goto err_mout_apll;
--
--	info->mpll_freq_khz = rate;
--	/* 800Mhz */
--	info->pll_safe_idx = L2;
--	info->cpu_clk = cpu_clk;
--	info->volt_table = exynos4210_volt_table;
--	info->freq_table = exynos4210_freq_table;
--	info->set_freq = exynos4210_set_frequency;
--
--	return 0;
--
--err_mout_apll:
--	clk_put(mout_mpll);
--err_mout_mpll:
--	clk_put(moutcore);
--err_moutcore:
--	clk_put(cpu_clk);
--
--	pr_debug("%s: failed initialization\n", __func__);
--	return -EINVAL;
--}
-diff --git a/drivers/cpufreq/exynos4x12-cpufreq.c b/drivers/cpufreq/exynos4x12-cpufreq.c
-deleted file mode 100644
-index 7c11ace..0000000
---- a/drivers/cpufreq/exynos4x12-cpufreq.c
-+++ /dev/null
-@@ -1,211 +0,0 @@
--/*
-- * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * EXYNOS4X12 - CPU frequency scaling support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/err.h>
--#include <linux/clk.h>
--#include <linux/io.h>
--#include <linux/slab.h>
--#include <linux/cpufreq.h>
--
--#include "exynos-cpufreq.h"
--
--static struct clk *cpu_clk;
--static struct clk *moutcore;
--static struct clk *mout_mpll;
--static struct clk *mout_apll;
--
--static unsigned int exynos4x12_volt_table[] = {
--	1350000, 1287500, 1250000, 1187500, 1137500, 1087500, 1037500,
--	1000000,  987500,  975000,  950000,  925000,  900000,  900000
--};
--
--static struct cpufreq_frequency_table exynos4x12_freq_table[] = {
--	{CPUFREQ_BOOST_FREQ, 1500 * 1000},
--	{L1, 1400 * 1000},
--	{L2, 1300 * 1000},
--	{L3, 1200 * 1000},
--	{L4, 1100 * 1000},
--	{L5, 1000 * 1000},
--	{L6,  900 * 1000},
--	{L7,  800 * 1000},
--	{L8,  700 * 1000},
--	{L9,  600 * 1000},
--	{L10, 500 * 1000},
--	{L11, 400 * 1000},
--	{L12, 300 * 1000},
--	{L13, 200 * 1000},
--	{0, CPUFREQ_TABLE_END},
--};
--
--static struct apll_freq *apll_freq_4x12;
--
--static struct apll_freq apll_freq_4212[] = {
--	/*
--	 * values:
--	 * freq
--	 * clock divider for CORE, COREM0, COREM1, PERIPH, ATB, PCLK_DBG, APLL, CORE2
--	 * clock divider for COPY, HPM, RESERVED
--	 * PLL M, P, S
--	 */
--	APLL_FREQ(1500, 0, 3, 7, 0, 6, 1, 2, 0, 6, 2, 0, 250, 4, 0),
--	APLL_FREQ(1400, 0, 3, 7, 0, 6, 1, 2, 0, 6, 2, 0, 175, 3, 0),
--	APLL_FREQ(1300, 0, 3, 7, 0, 5, 1, 2, 0, 5, 2, 0, 325, 6, 0),
--	APLL_FREQ(1200, 0, 3, 7, 0, 5, 1, 2, 0, 5, 2, 0, 200, 4, 0),
--	APLL_FREQ(1100, 0, 3, 6, 0, 4, 1, 2, 0, 4, 2, 0, 275, 6, 0),
--	APLL_FREQ(1000, 0, 2, 5, 0, 4, 1, 1, 0, 4, 2, 0, 125, 3, 0),
--	APLL_FREQ(900,  0, 2, 5, 0, 3, 1, 1, 0, 3, 2, 0, 150, 4, 0),
--	APLL_FREQ(800,  0, 2, 5, 0, 3, 1, 1, 0, 3, 2, 0, 100, 3, 0),
--	APLL_FREQ(700,  0, 2, 4, 0, 3, 1, 1, 0, 3, 2, 0, 175, 3, 1),
--	APLL_FREQ(600,  0, 2, 4, 0, 3, 1, 1, 0, 3, 2, 0, 200, 4, 1),
--	APLL_FREQ(500,  0, 2, 4, 0, 3, 1, 1, 0, 3, 2, 0, 125, 3, 1),
--	APLL_FREQ(400,  0, 2, 4, 0, 3, 1, 1, 0, 3, 2, 0, 100, 3, 1),
--	APLL_FREQ(300,  0, 2, 4, 0, 2, 1, 1, 0, 3, 2, 0, 200, 4, 2),
--	APLL_FREQ(200,  0, 1, 3, 0, 1, 1, 1, 0, 3, 2, 0, 100, 3, 2),
--};
--
--static struct apll_freq apll_freq_4412[] = {
--	/*
--	 * values:
--	 * freq
--	 * clock divider for CORE, COREM0, COREM1, PERIPH, ATB, PCLK_DBG, APLL, CORE2
--	 * clock divider for COPY, HPM, CORES
--	 * PLL M, P, S
--	 */
--	APLL_FREQ(1500, 0, 3, 7, 0, 6, 1, 2, 0, 6, 0, 7, 250, 4, 0),
--	APLL_FREQ(1400, 0, 3, 7, 0, 6, 1, 2, 0, 6, 0, 6, 175, 3, 0),
--	APLL_FREQ(1300, 0, 3, 7, 0, 5, 1, 2, 0, 5, 0, 6, 325, 6, 0),
--	APLL_FREQ(1200, 0, 3, 7, 0, 5, 1, 2, 0, 5, 0, 5, 200, 4, 0),
--	APLL_FREQ(1100, 0, 3, 6, 0, 4, 1, 2, 0, 4, 0, 5, 275, 6, 0),
--	APLL_FREQ(1000, 0, 2, 5, 0, 4, 1, 1, 0, 4, 0, 4, 125, 3, 0),
--	APLL_FREQ(900,  0, 2, 5, 0, 3, 1, 1, 0, 3, 0, 4, 150, 4, 0),
--	APLL_FREQ(800,  0, 2, 5, 0, 3, 1, 1, 0, 3, 0, 3, 100, 3, 0),
--	APLL_FREQ(700,  0, 2, 4, 0, 3, 1, 1, 0, 3, 0, 3, 175, 3, 1),
--	APLL_FREQ(600,  0, 2, 4, 0, 3, 1, 1, 0, 3, 0, 2, 200, 4, 1),
--	APLL_FREQ(500,  0, 2, 4, 0, 3, 1, 1, 0, 3, 0, 2, 125, 3, 1),
--	APLL_FREQ(400,  0, 2, 4, 0, 3, 1, 1, 0, 3, 0, 1, 100, 3, 1),
--	APLL_FREQ(300,  0, 2, 4, 0, 2, 1, 1, 0, 3, 0, 1, 200, 4, 2),
--	APLL_FREQ(200,  0, 1, 3, 0, 1, 1, 1, 0, 3, 0, 0, 100, 3, 2),
--};
--
--static void exynos4x12_set_clkdiv(unsigned int div_index)
--{
--	unsigned int tmp;
--	unsigned int stat_cpu1;
--
--	/* Change Divider - CPU0 */
--
--	tmp = apll_freq_4x12[div_index].clk_div_cpu0;
--
--	__raw_writel(tmp, EXYNOS4_CLKDIV_CPU);
--
--	while (__raw_readl(EXYNOS4_CLKDIV_STATCPU) & 0x11111111)
--		cpu_relax();
--
--	/* Change Divider - CPU1 */
--	tmp = apll_freq_4x12[div_index].clk_div_cpu1;
--
--	__raw_writel(tmp, EXYNOS4_CLKDIV_CPU1);
--	if (soc_is_exynos4212())
--		stat_cpu1 = 0x11;
--	else
--		stat_cpu1 = 0x111;
--
--	while (__raw_readl(EXYNOS4_CLKDIV_STATCPU1) & stat_cpu1)
--		cpu_relax();
--}
--
--static void exynos4x12_set_apll(unsigned int index)
--{
--	unsigned int tmp, freq = apll_freq_4x12[index].freq;
--
--	/* MUX_CORE_SEL = MPLL, ARMCLK uses MPLL for lock time */
--	clk_set_parent(moutcore, mout_mpll);
--
--	do {
--		cpu_relax();
--		tmp = (__raw_readl(EXYNOS4_CLKMUX_STATCPU)
--			>> EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT);
--		tmp &= 0x7;
--	} while (tmp != 0x2);
--
--	clk_set_rate(mout_apll, freq * 1000);
--
--	/* MUX_CORE_SEL = APLL */
--	clk_set_parent(moutcore, mout_apll);
--
--	do {
--		cpu_relax();
--		tmp = __raw_readl(EXYNOS4_CLKMUX_STATCPU);
--		tmp &= EXYNOS4_CLKMUX_STATCPU_MUXCORE_MASK;
--	} while (tmp != (0x1 << EXYNOS4_CLKSRC_CPU_MUXCORE_SHIFT));
--}
--
--static void exynos4x12_set_frequency(unsigned int old_index,
--				  unsigned int new_index)
--{
--	if (old_index > new_index) {
--		exynos4x12_set_clkdiv(new_index);
--		exynos4x12_set_apll(new_index);
--	} else if (old_index < new_index) {
--		exynos4x12_set_apll(new_index);
--		exynos4x12_set_clkdiv(new_index);
--	}
--}
--
--int exynos4x12_cpufreq_init(struct exynos_dvfs_info *info)
--{
--	unsigned long rate;
--
--	cpu_clk = clk_get(NULL, "armclk");
--	if (IS_ERR(cpu_clk))
--		return PTR_ERR(cpu_clk);
--
--	moutcore = clk_get(NULL, "moutcore");
--	if (IS_ERR(moutcore))
--		goto err_moutcore;
--
--	mout_mpll = clk_get(NULL, "mout_mpll");
--	if (IS_ERR(mout_mpll))
--		goto err_mout_mpll;
--
--	rate = clk_get_rate(mout_mpll) / 1000;
--
--	mout_apll = clk_get(NULL, "mout_apll");
--	if (IS_ERR(mout_apll))
--		goto err_mout_apll;
--
--	if (soc_is_exynos4212())
--		apll_freq_4x12 = apll_freq_4212;
--	else
--		apll_freq_4x12 = apll_freq_4412;
--
--	info->mpll_freq_khz = rate;
--	/* 800Mhz */
--	info->pll_safe_idx = L7;
--	info->cpu_clk = cpu_clk;
--	info->volt_table = exynos4x12_volt_table;
--	info->freq_table = exynos4x12_freq_table;
--	info->set_freq = exynos4x12_set_frequency;
--
--	return 0;
--
--err_mout_apll:
--	clk_put(mout_mpll);
--err_mout_mpll:
--	clk_put(moutcore);
--err_moutcore:
--	clk_put(cpu_clk);
--
--	pr_debug("%s: failed initialization\n", __func__);
--	return -EINVAL;
--}
-diff --git a/drivers/cpufreq/exynos5250-cpufreq.c b/drivers/cpufreq/exynos5250-cpufreq.c
-deleted file mode 100644
-index 5f90b82..0000000
---- a/drivers/cpufreq/exynos5250-cpufreq.c
-+++ /dev/null
-@@ -1,183 +0,0 @@
--/*
-- * Copyright (c) 2010-20122Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * EXYNOS5250 - CPU frequency scaling support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/err.h>
--#include <linux/clk.h>
--#include <linux/io.h>
--#include <linux/slab.h>
--#include <linux/cpufreq.h>
--
--#include <mach/map.h>
--
--#include "exynos-cpufreq.h"
--
--static struct clk *cpu_clk;
--static struct clk *moutcore;
--static struct clk *mout_mpll;
--static struct clk *mout_apll;
--
--static unsigned int exynos5250_volt_table[] = {
--	1300000, 1250000, 1225000, 1200000, 1150000,
--	1125000, 1100000, 1075000, 1050000, 1025000,
--	1012500, 1000000,  975000,  950000,  937500,
--	925000
--};
--
--static struct cpufreq_frequency_table exynos5250_freq_table[] = {
--	{L0, 1700 * 1000},
--	{L1, 1600 * 1000},
--	{L2, 1500 * 1000},
--	{L3, 1400 * 1000},
--	{L4, 1300 * 1000},
--	{L5, 1200 * 1000},
--	{L6, 1100 * 1000},
--	{L7, 1000 * 1000},
--	{L8,  900 * 1000},
--	{L9,  800 * 1000},
--	{L10, 700 * 1000},
--	{L11, 600 * 1000},
--	{L12, 500 * 1000},
--	{L13, 400 * 1000},
--	{L14, 300 * 1000},
--	{L15, 200 * 1000},
--	{0, CPUFREQ_TABLE_END},
--};
--
--static struct apll_freq apll_freq_5250[] = {
--	/*
--	 * values:
--	 * freq
--	 * clock divider for ARM, CPUD, ACP, PERIPH, ATB, PCLK_DBG, APLL, ARM2
--	 * clock divider for COPY, HPM, RESERVED
--	 * PLL M, P, S
--	 */
--	APLL_FREQ(1700, 0, 3, 7, 7, 7, 3, 5, 0, 0, 2, 0, 425, 6, 0),
--	APLL_FREQ(1600, 0, 3, 7, 7, 7, 1, 4, 0, 0, 2, 0, 200, 3, 0),
--	APLL_FREQ(1500, 0, 2, 7, 7, 7, 1, 4, 0, 0, 2, 0, 250, 4, 0),
--	APLL_FREQ(1400, 0, 2, 7, 7, 6, 1, 4, 0, 0, 2, 0, 175, 3, 0),
--	APLL_FREQ(1300, 0, 2, 7, 7, 6, 1, 3, 0, 0, 2, 0, 325, 6, 0),
--	APLL_FREQ(1200, 0, 2, 7, 7, 5, 1, 3, 0, 0, 2, 0, 200, 4, 0),
--	APLL_FREQ(1100, 0, 3, 7, 7, 5, 1, 3, 0, 0, 2, 0, 275, 6, 0),
--	APLL_FREQ(1000, 0, 1, 7, 7, 4, 1, 2, 0, 0, 2, 0, 125, 3, 0),
--	APLL_FREQ(900,  0, 1, 7, 7, 4, 1, 2, 0, 0, 2, 0, 150, 4, 0),
--	APLL_FREQ(800,  0, 1, 7, 7, 4, 1, 2, 0, 0, 2, 0, 100, 3, 0),
--	APLL_FREQ(700,  0, 1, 7, 7, 3, 1, 1, 0, 0, 2, 0, 175, 3, 1),
--	APLL_FREQ(600,  0, 1, 7, 7, 3, 1, 1, 0, 0, 2, 0, 200, 4, 1),
--	APLL_FREQ(500,  0, 1, 7, 7, 2, 1, 1, 0, 0, 2, 0, 125, 3, 1),
--	APLL_FREQ(400,  0, 1, 7, 7, 2, 1, 1, 0, 0, 2, 0, 100, 3, 1),
--	APLL_FREQ(300,  0, 1, 7, 7, 1, 1, 1, 0, 0, 2, 0, 200, 4, 2),
--	APLL_FREQ(200,  0, 1, 7, 7, 1, 1, 1, 0, 0, 2, 0, 100, 3, 2),
--};
--
--static void set_clkdiv(unsigned int div_index)
--{
--	unsigned int tmp;
--
--	/* Change Divider - CPU0 */
--
--	tmp = apll_freq_5250[div_index].clk_div_cpu0;
--
--	__raw_writel(tmp, EXYNOS5_CLKDIV_CPU0);
--
--	while (__raw_readl(EXYNOS5_CLKDIV_STATCPU0) & 0x11111111)
--		cpu_relax();
--
--	/* Change Divider - CPU1 */
--	tmp = apll_freq_5250[div_index].clk_div_cpu1;
--
--	__raw_writel(tmp, EXYNOS5_CLKDIV_CPU1);
--
--	while (__raw_readl(EXYNOS5_CLKDIV_STATCPU1) & 0x11)
--		cpu_relax();
--}
--
--static void set_apll(unsigned int index)
--{
--	unsigned int tmp;
--	unsigned int freq = apll_freq_5250[index].freq;
--
--	/* MUX_CORE_SEL = MPLL, ARMCLK uses MPLL for lock time */
--	clk_set_parent(moutcore, mout_mpll);
--
--	do {
--		cpu_relax();
--		tmp = (__raw_readl(EXYNOS5_CLKMUX_STATCPU) >> 16);
--		tmp &= 0x7;
--	} while (tmp != 0x2);
--
--	clk_set_rate(mout_apll, freq * 1000);
--
--	/* MUX_CORE_SEL = APLL */
--	clk_set_parent(moutcore, mout_apll);
--
--	do {
--		cpu_relax();
--		tmp = __raw_readl(EXYNOS5_CLKMUX_STATCPU);
--		tmp &= (0x7 << 16);
--	} while (tmp != (0x1 << 16));
--}
--
--static void exynos5250_set_frequency(unsigned int old_index,
--				  unsigned int new_index)
--{
--	if (old_index > new_index) {
--		set_clkdiv(new_index);
--		set_apll(new_index);
--	} else if (old_index < new_index) {
--		set_apll(new_index);
--		set_clkdiv(new_index);
--	}
--}
--
--int exynos5250_cpufreq_init(struct exynos_dvfs_info *info)
--{
--	unsigned long rate;
--
--	cpu_clk = clk_get(NULL, "armclk");
--	if (IS_ERR(cpu_clk))
--		return PTR_ERR(cpu_clk);
--
--	moutcore = clk_get(NULL, "mout_cpu");
--	if (IS_ERR(moutcore))
--		goto err_moutcore;
--
--	mout_mpll = clk_get(NULL, "mout_mpll");
--	if (IS_ERR(mout_mpll))
--		goto err_mout_mpll;
--
--	rate = clk_get_rate(mout_mpll) / 1000;
--
--	mout_apll = clk_get(NULL, "mout_apll");
--	if (IS_ERR(mout_apll))
--		goto err_mout_apll;
--
--	info->mpll_freq_khz = rate;
--	/* 800Mhz */
--	info->pll_safe_idx = L9;
--	info->cpu_clk = cpu_clk;
--	info->volt_table = exynos5250_volt_table;
--	info->freq_table = exynos5250_freq_table;
--	info->set_freq = exynos5250_set_frequency;
--
--	return 0;
--
--err_mout_apll:
--	clk_put(mout_mpll);
--err_mout_mpll:
--	clk_put(moutcore);
--err_moutcore:
--	clk_put(cpu_clk);
--
--	pr_err("%s: failed initialization\n", __func__);
--	return -EINVAL;
--}
--- 
-1.7.10.4
+>
+> Btw Kamil uses syscon interface to set pmu bits. Is it applicable here also?
+
+The syscon interface is useful only for shared registers, this register is only
+used by the phy driver, so I see no value in using the syscon interface.
+
+>> +		struct regulator *vbus;
+>> +		struct reset_control *reset;
+>> +		int index;
+>> +	} phys[MAX_PHYS];
+>> +};
+>> +
+>> +#define to_sun4i_usb_phy_data(phy) \
+>> +	container_of((phy), struct sun4i_usb_phy_data, phys[(phy)->index])
+>> +
+>> +static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
+>> +				int len)
+>> +{
+>> +	struct sun4i_usb_phy_data *phy_data = to_sun4i_usb_phy_data(phy);
+>> +	u32 temp, usbc_bit = BIT(phy->index * 2);
+>> +	int i;
+>> +
+>> +	mutex_lock(&phy_data->mutex);
+>> +
+>> +	for (i = 0; i < len; i++) {
+>> +		temp = readl(phy_data->base + REG_PHYCTL);
+>> +
+>> +		/* clear the address portion */
+>> +		temp &= ~(0xff << 8);
+>> +
+>> +		/* set the address */
+>> +		temp |= ((addr + i) << 8);
+>> +		writel(temp, phy_data->base + REG_PHYCTL);
+>> +
+>> +		/* set the data bit and clear usbc bit*/
+>> +		temp = readb(phy_data->base + REG_PHYCTL);
+>> +		if (data & 0x1)
+>> +			temp |= BIT(7);
+>> +		else
+>> +			temp &= ~BIT(7);
+>> +		temp &= ~usbc_bit;
+>> +		writeb(temp, phy_data->base + REG_PHYCTL);
+>> +
+>> +		/* pulse usbc_bit */
+>> +		temp = readb(phy_data->base + REG_PHYCTL);
+>> +		temp |= usbc_bit;
+>> +		writeb(temp, phy_data->base + REG_PHYCTL);
+>> +
+>> +		temp = readb(phy_data->base + REG_PHYCTL);
+>> +		temp &= ~usbc_bit;
+>> +		writeb(temp, phy_data->base + REG_PHYCTL);
+>> +
+>> +		data >>= 1;
+>> +	}
+>> +	mutex_unlock(&phy_data->mutex);
+>> +}
+>> +
+>> +static void sun4i_usb_phy_passby(struct sun4i_usb_phy *phy, int enable)
+>> +{
+>> +	u32 bits, reg_value;
+>> +
+>> +	if (!phy->pmu_irq)
+>> +		return;
+>> +
+>> +	bits = SUNXI_AHB_ICHR8_EN | SUNXI_AHB_INCR4_BURST_EN |
+>> +		SUNXI_AHB_INCRX_ALIGN_EN | SUNXI_ULPI_BYPASS_EN;
+>> +
+>> +	reg_value = readl(phy->pmu_irq);
+>> +
+>> +	if (enable)
+>> +		reg_value |= bits;
+>> +	else
+>> +		reg_value &= ~bits;
+>> +
+>> +	writel(reg_value, phy->pmu_irq);
+>> +}
+>> +
+>> +static int sun4i_usb_phy_init(struct phy *_phy)
+>> +{
+>> +	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>> +	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>> +	int ret;
+>> +
+>> +	ret = clk_prepare_enable(data->clk);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	ret = reset_control_deassert(phy->reset);
+>> +	if (ret) {
+>> +		clk_disable_unprepare(data->clk);
+>> +		return ret;
+>> +	}
+>> +
+>> +	/* Adjust PHY's magnitude and rate */
+>> +	sun4i_usb_phy_write(phy, 0x20, 0x14, 5);
+>
+> No magic values. Use macros instead.
+
+Fixed for the addresses, the 0x14 will stay magic though, as we've no
+idea what it actually does.
+
+>> +
+>> +	/* Disconnect threshold adjustment */
+>> +	sun4i_usb_phy_write(phy, 0x2a, data->disc_thresh, 2);
+>> +
+>> +	sun4i_usb_phy_passby(phy, 1);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int sun4i_usb_phy_exit(struct phy *_phy)
+>> +{
+>> +	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>> +	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>> +
+>> +	sun4i_usb_phy_passby(phy, 0);
+>> +	reset_control_assert(phy->reset);
+>> +	clk_disable_unprepare(data->clk);
+>
+> Actually PHY API's can be called in interrupt context, in that case
+> clk_disable_unprepare can't be used.
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int sun4i_usb_phy_power_on(struct phy *_phy)
+>> +{
+>> +	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>> +	int ret;
+>> +
+>> +	if (phy->vbus) {
+>> +		ret = regulator_enable(phy->vbus);
+>> +		if (ret)
+>> +			return ret;
+>> +
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>
+> This can simply be
+> int ret = 0;
+> if (phy->vbus)
+> 	ret = regulator_enable(phy->vbus);
+> return ret;
+
+Fixed.
+
+>> +
+>> +static int sun4i_usb_phy_power_off(struct phy *_phy)
+>> +{
+>> +	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>> +
+>> +	if (phy->vbus)
+>> +		regulator_disable(phy->vbus);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static struct phy_ops sun4i_usb_phy_ops = {
+>> +	.init		= sun4i_usb_phy_init,
+>> +	.exit		= sun4i_usb_phy_exit,
+>> +	.power_on	= sun4i_usb_phy_power_on,
+>> +	.power_off	= sun4i_usb_phy_power_off,
+>> +	.owner		= THIS_MODULE,
+>> +};
+>> +
+>> +static struct phy *sun4i_usb_phy_xlate(struct device *dev,
+>> +					struct of_phandle_args *args)
+>> +{
+>> +	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
+>> +
+>> +	if (WARN_ON(args->args[0] == 0 || args->args[0] >= data->num_phys))
+>> +		return ERR_PTR(-ENODEV);
+>> +
+>> +	return data->phys[args->args[0]].phy;
+>> +}
+>> +
+>> +static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>> +{
+>> +	struct sun4i_usb_phy_data *data;
+>> +	struct device *dev = &pdev->dev;
+>> +	struct device_node *np = dev->of_node;
+>> +	void __iomem *pmu_irq = NULL;
+>> +	struct phy_provider *phy_provider;
+>> +	struct reset_control *reset;
+>> +	struct regulator *vbus;
+>> +	struct phy *phy;
+>> +	char name[16];
+>> +	int i;
+>> +
+>> +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+>> +	if (!data)
+>> +		return -ENOMEM;
+>> +
+>> +	mutex_init(&data->mutex);
+>> +	if (of_device_is_compatible(np, "allwinner,sun4i-a10-usb-phy")) {
+>> +		data->num_phys = 3;
+>> +		data->disc_thresh = 3;
+>> +	} else if (of_device_is_compatible(np,
+>> +					"allwinner,sun5i-a13-usb-phy")) {
+>> +		data->num_phys = 2;
+>> +		data->disc_thresh = 2;
+>> +	} else { /* allwinner,sun7i-a20-usb-phy */
+>> +		data->num_phys = 3;
+>> +		data->disc_thresh = 2;
+>> +	}
+>> +
+>> +	data->clk = devm_clk_get(dev, "usb_phy");
+>> +	if (IS_ERR(data->clk)) {
+>> +		dev_err(dev, "could not get usb_phy clock\n");
+>> +		return PTR_ERR(data->clk);
+>> +	}
+>> +
+>> +	/* Skip 0, 0 is the phy for otg which is not yet supported. */
+>> +	for (i = 1; i < data->num_phys; i++) {
+>> +		snprintf(name, sizeof(name), "usb%d_vbus", i);
+>> +		vbus = devm_regulator_get_optional(dev, name);
+>> +		if (IS_ERR(vbus)) {
+>> +			if (PTR_ERR(vbus) == -EPROBE_DEFER)
+>> +				return -EPROBE_DEFER;
+>> +			vbus = NULL;
+>> +		}
+>> +
+>> +		snprintf(name, sizeof(name), "usb%d_reset", i);
+>> +		reset = devm_reset_control_get(dev, name);
+>> +		if (IS_ERR(phy)) {
+>> +			dev_err(dev, "failed to get reset %s\n", name);
+>> +			return PTR_ERR(phy);
+>> +		}
+>> +
+>> +		if (i) { /* No pmu_irq for usbc0 */
+>> +			pmu_irq = devm_ioremap_resource(dev,
+>> +			      platform_get_resource(pdev, IORESOURCE_MEM, i));
+>> +			if (IS_ERR(pmu_irq))
+>> +				return PTR_ERR(pmu_irq);
+>> +		}
+>> +
+>> +		phy = devm_phy_create(dev, &sun4i_usb_phy_ops, NULL);
+>> +		if (IS_ERR(phy)) {
+>> +			dev_err(dev, "failed to create PHY %d\n", i);
+>> +			return PTR_ERR(phy);
+>> +		}
+>> +
+>> +		data->phys[i].phy = phy;
+>> +		data->phys[i].pmu_irq = pmu_irq;
+>> +		data->phys[i].vbus = vbus;
+>> +		data->phys[i].reset = reset;
+>> +		data->phys[i].index = i;
+>> +		phy_set_drvdata(phy, &data->phys[i]);
+>> +	}
+>> +
+>> +	data->base = devm_ioremap_resource(dev,
+>> +			platform_get_resource(pdev, IORESOURCE_MEM, 0));
+>> +	if (IS_ERR(data->base))
+>> +		return PTR_ERR(data->base);
+>> +
+>> +	dev_set_drvdata(dev, data);
+>> +	phy_provider = devm_of_phy_provider_register(dev, sun4i_usb_phy_xlate);
+>> +	if (IS_ERR(phy_provider))
+>> +		return PTR_ERR(phy_provider);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct of_device_id sun4i_usb_phy_of_match[] = {
+>> +	{ .compatible = "allwinner,sun4i-a10-usb-phy" },
+>> +	{ .compatible = "allwinner,sun5i-a13-usb-phy" },
+>> +	{ .compatible = "allwinner,sun7i-a20-usb-phy" },
+>> +	{ },
+>> +};
+>> +MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
+>> +
+>> +static struct platform_driver sun4i_usb_phy_driver = {
+>> +	.probe	= sun4i_usb_phy_probe,
+>> +	.driver = {
+>> +		.of_match_table	= sun4i_usb_phy_of_match,
+>> +		.name  = "sun4i-usb-phy",
+>> +		.owner = THIS_MODULE,
+>> +	}
+>> +};
+>> +module_platform_driver(sun4i_usb_phy_driver);
+>> +
+>> +MODULE_DESCRIPTION("Allwinner sun4i USB phy driver");
+>> +MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
+>> +MODULE_LICENSE("GPL");
+>
+> GPL v2?
+
+Fixed.
+
+> This patch looks good apart from those minor comments.
+
+Ok v2 is on its way.
+
+Regards,
+
+Hans
