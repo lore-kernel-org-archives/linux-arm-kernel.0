@@ -1,182 +1,289 @@
-From: klightspeed@killerwolves.net (Ben Peddell)
-Date: Fri, 07 Feb 2014 17:44:08 +1000
-Subject: [PATCH 4/4] ARM: Kirkwood: Add support for many Synology NAS
- devices
-In-Reply-To: <20140206160126.GH29860@lunn.ch>
-References: <1391634309-3123-1-git-send-email-andrew@lunn.ch>
- <1391634309-3123-5-git-send-email-andrew@lunn.ch>
- <20140206153939.GD8533@titan.lakedaemon.net> <20140206160126.GH29860@lunn.ch>
-Message-ID: <52F48EC8.9020306@killerwolves.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 7 Feb 2014 09:01:42 +0100
+Subject: [PATCH v2] ARM: at91: add Atmel's SAMA5D3 Xplained board
+In-Reply-To: <1391589347-26019-1-git-send-email-nicolas.ferre@atmel.com>
+References: <20140204203054.GA21958@ldesroches-Latitude-E6320>
+ <1391589347-26019-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20140207080142.GR9558@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/02/2014 2:01 AM, Andrew Lunn wrote:
-> On Thu, Feb 06, 2014 at 10:39:39AM -0500, Jason Cooper wrote:
->>
->> + devicetree ML, DT maintainers
->>
->> On Wed, Feb 05, 2014 at 10:05:09PM +0100, Andrew Lunn wrote:
->>> Add device tree fragments and files to support many of the kirkwood
->>> based Synology NAS devices. This is a translation of the board setup
->>> file maintained by Ben Peddell <klightspeed@killerwolves.net>
->>>
->>> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
->>> Tested by Ben Peddell <klightspeed@killerwolves.net>
->>> cc: Ben Peddell <klightspeed@killerwolves.net>
->>> ---
->>>
->>> v2:
->>> Fix gpio's which should be gpo.
->>> Rebase onto v3-14-rc1
->>> Update RTC nodes with vendor name.
->>> Update SPI flash node with vendor name.
->>> ---
->>>  arch/arm/boot/dts/Makefile                     |   15 ++++
->>>  arch/arm/boot/dts/kirkwood-ds109.dts           |   33 +++++++
->>>  arch/arm/boot/dts/kirkwood-ds110jv10.dts       |   33 +++++++
->>>  arch/arm/boot/dts/kirkwood-ds111.dts           |   33 +++++++
->>>  arch/arm/boot/dts/kirkwood-ds112.dts           |   34 +++++++
->>>  arch/arm/boot/dts/kirkwood-ds209.dts           |   33 +++++++
->>>  arch/arm/boot/dts/kirkwood-ds210.dts           |   35 ++++++++
->>>  arch/arm/boot/dts/kirkwood-ds212.dts           |   37 ++++++++
->>>  arch/arm/boot/dts/kirkwood-ds212j.dts          |   34 +++++++
->>>  arch/arm/boot/dts/kirkwood-ds409.dts           |   34 +++++++
->>>  arch/arm/boot/dts/kirkwood-ds409slim.dts       |   32 +++++++
->>>  arch/arm/boot/dts/kirkwood-ds411.dts           |   35 ++++++++
->>>  arch/arm/boot/dts/kirkwood-ds411j.dts          |   34 +++++++
->>>  arch/arm/boot/dts/kirkwood-ds411slim.dts       |   34 +++++++
->>>  arch/arm/boot/dts/kirkwood-rs212.dts           |   34 +++++++
->>>  arch/arm/boot/dts/kirkwood-rs409.dts           |   33 +++++++
->>>  arch/arm/boot/dts/kirkwood-rs411.dts           |   34 +++++++
->>>  arch/arm/boot/dts/synology/alarm-led-12.dtsi   |   28 ++++++
->>>  arch/arm/boot/dts/synology/common.dtsi         |  112 ++++++++++++++++++++++++
->>>  arch/arm/boot/dts/synology/ethernet-1.dtsi     |   15 ++++
->>>  arch/arm/boot/dts/synology/fan-alarm-18.dtsi   |   22 +++++
->>>  arch/arm/boot/dts/synology/fan-alarm-35-1.dtsi |   22 +++++
->>>  arch/arm/boot/dts/synology/fan-alarm-35-3.dtsi |   32 +++++++
->>>  arch/arm/boot/dts/synology/fan-gpios-15.dtsi   |   34 +++++++
->>>  arch/arm/boot/dts/synology/fan-gpios-32.dtsi   |   34 +++++++
->>>  arch/arm/boot/dts/synology/fan-speed-100.dtsi  |   20 +++++
->>>  arch/arm/boot/dts/synology/fan-speed-120.dtsi  |   20 +++++
->>>  arch/arm/boot/dts/synology/fan-speed-150.dtsi  |   20 +++++
->>>  arch/arm/boot/dts/synology/hdd-leds-20.dtsi    |   90 +++++++++++++++++++
->>>  arch/arm/boot/dts/synology/hdd-leds-21-1.dtsi  |   36 ++++++++
->>>  arch/arm/boot/dts/synology/hdd-leds-21-2.dtsi  |   52 +++++++++++
->>>  arch/arm/boot/dts/synology/hdd-leds-36.dtsi    |  103 ++++++++++++++++++++++
->>>  arch/arm/boot/dts/synology/hdd-leds-38.dtsi    |   52 +++++++++++
->>>  arch/arm/boot/dts/synology/hdd-power-29.dtsi   |   56 ++++++++++++
->>>  arch/arm/boot/dts/synology/hdd-power-30-1.dtsi |   40 +++++++++
->>>  arch/arm/boot/dts/synology/hdd-power-30-2.dtsi |   56 ++++++++++++
->>>  arch/arm/boot/dts/synology/hdd-power-30-4.dtsi |   89 +++++++++++++++++++
->>>  arch/arm/boot/dts/synology/hdd-power-31.dtsi   |   40 +++++++++
->>>  arch/arm/boot/dts/synology/hdd-power-34.dtsi   |   73 +++++++++++++++
->>>  arch/arm/boot/dts/synology/i2c-rtc-ricoh.dtsi  |   18 ++++
->>>  arch/arm/boot/dts/synology/i2c-rtc-seiko.dtsi  |   18 ++++
->>>  arch/arm/boot/dts/synology/pcie-2.dtsi         |   19 ++++
->>>  42 files changed, 1658 insertions(+)
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-ds109.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-ds110jv10.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-ds111.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-ds112.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-ds209.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-ds210.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-ds212.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-ds212j.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-ds409.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-ds409slim.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-ds411.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-ds411j.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-ds411slim.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-rs212.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-rs409.dts
->>>  create mode 100644 arch/arm/boot/dts/kirkwood-rs411.dts
->>>  create mode 100644 arch/arm/boot/dts/synology/alarm-led-12.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/common.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/ethernet-1.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/fan-alarm-18.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/fan-alarm-35-1.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/fan-alarm-35-3.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/fan-gpios-15.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/fan-gpios-32.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/fan-speed-100.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/fan-speed-120.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/fan-speed-150.dtsi
-
-If we're not worried about the non-linearity of the 150R+120R+100R and
-182R+150R+100R fan controllers (vs the 150R/100R/33R ones), these fan
-speed blocks could be collapsed into common.dtsi.
-
->>>  create mode 100644 arch/arm/boot/dts/synology/hdd-leds-20.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/hdd-leds-21-1.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/hdd-leds-21-2.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/hdd-leds-36.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/hdd-leds-38.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/hdd-power-29.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/hdd-power-30-1.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/hdd-power-30-2.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/hdd-power-30-4.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/hdd-power-31.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/hdd-power-34.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/i2c-rtc-ricoh.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/i2c-rtc-seiko.dtsi
->>>  create mode 100644 arch/arm/boot/dts/synology/pcie-2.dtsi
->>
->> Holy sh*t!  I know we're adding 15 boards
+On 09:35 Wed 05 Feb     , Nicolas Ferre wrote:
+> Add DT file for new SAMA5D3 Xpained board.
+> This board is based on Atmel's SAMA5D36 Cortex-A5 SoC.
 > 
-> More than 15 actually. Most .dts files support multiple devices. So
-> there should be about 30 devices supported by these .dts files.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/boot/dts/Makefile                  |   1 +
+>  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 233 ++++++++++++++++++++++++++++
+>  2 files changed, 234 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91-sama5d3_xplained.dts
 > 
->> , but this is, imho,
->> over-fragmenting.  I'm sure there's a reason you chose this path, but
->> you haven't explained why in your commit log. So I'm left guessing...
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index b9d6a8b485e0..6d1e43d46187 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -38,6 +38,7 @@ dtb-$(CONFIG_ARCH_AT91) += at91sam9g35ek.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += at91sam9x25ek.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += at91sam9x35ek.dtb
+>  # sama5d3
+> +dtb-$(CONFIG_ARCH_AT91)	+= at91-sama5d3_xplained.dtb
+>  dtb-$(CONFIG_ARCH_AT91)	+= sama5d31ek.dtb
+>  dtb-$(CONFIG_ARCH_AT91)	+= sama5d33ek.dtb
+>  dtb-$(CONFIG_ARCH_AT91)	+= sama5d34ek.dtb
+> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> new file mode 100644
+> index 000000000000..fb1349ca60a4
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> @@ -0,0 +1,233 @@
+> +/*
+> + * at91-sama5d3_xplained.dts - Device Tree file for the SAMA5D3 Xplained board
+> + *
+> + *  Copyright (C) 2014 Atmel,
+> + *		  2014 Nicolas Ferre <nicolas.ferre@atmel.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +/dts-v1/;
+> +#include "sama5d36.dtsi"
+> +
+> +/ {
+> +	model = "SAMA5D3 Xplained";
+> +	compatible = "atmel,sama5d3-xplained", "atmel,sama5d3", "atmel,sama5";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200";
+can you describe it via linux,stdout
+> +	};
+> +
+> +	memory {
+> +		reg = <0x20000000 0x10000000>;
+> +	};
+> +
+> +	ahb {
+> +		apb {
+> +			mmc0: mmc at f0000000 {
+> +				pinc?trl-names = "default";
+?? this is SoC should never been seen here
+> +				pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3 &pinctrl_mmc0_dat4_7 &pinctrl_mmc0_cd>;
+> +				status = "okay";
+> +				slot at 0 {
+> +					reg = <0>;
+> +					bus-width = <8>;
+> +					cd-gpios = <&pioE 0 GPIO_ACTIVE_LOW>;
+> +				};
+> +			};
+> +
+> +			spi0: spi at f0004000 {
+> +				cs-gpios = <&pioD 13 0>, <0>, <0>, <0>;
+if you use only one CS no need to specified all
+
+we need to add macro per SoC for the hw CS used as GPIO so it's more clear
+> +				status = "okay";
+> +			};
+> +
+> +			can0: can at f000c000 {
+> +				status = "okay";
+> +			};
+> +
+> +			i2c0: i2c at f0014000 {
+> +				status = "okay";
+> +			};
+> +
+> +			i2c1: i2c at f0018000 {
+> +				status = "okay";
+> +			};
+> +
+> +			macb0: ethernet at f0028000 {
+> +				phy-mode = "rgmii";
+> +				status = "okay";
+> +			};
+> +
+> +			usart0: serial at f001c000 {
+> +				status = "okay";
+> +			};
+> +
+> +			usart1: serial at f0020000 {
+> +				pinctrl-names = "default";
+same as mmc
+> +				pinctrl-0 = <&pinctrl_usart1 &pinctrl_usart1_rts_cts>;
+> +				status = "okay";
+> +			};
+> +
+> +			uart0: serial at f0024000 {
+> +				status = "okay";
+> +			};
+> +
+> +			mmc1: mmc at f8000000 {
+> +				pinctrl-names = "default";
+ditto
+> +				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3 &pinctrl_mmc1_cd>;
+> +				status = "okay";
+> +				slot at 0 {
+> +					reg = <0>;
+> +					bus-width = <4>;
+> +					cd-gpios = <&pioE 1 GPIO_ACTIVE_HIGH>;
+> +				};
+> +			};
+> +
+> +			spi1: spi at f8008000 {
+> +				cs-gpios = <&pioC 25 0>, <0>, <0>, <&pioD 16 0>;
+> +				status = "okay";
+> +			};
+> +
+> +			adc0: adc at f8018000 {
+> +				pinctrl-names = "default";
+ditto
+> +				pinctrl-0 = <
+> +					&pinctrl_adc0_adtrg
+> +					&pinctrl_adc0_ad0
+> +					&pinctrl_adc0_ad1
+> +					&pinctrl_adc0_ad2
+> +					&pinctrl_adc0_ad3
+> +					&pinctrl_adc0_ad4
+> +					&pinctrl_adc0_ad5
+> +					&pinctrl_adc0_ad6
+> +					&pinctrl_adc0_ad7
+> +					&pinctrl_adc0_ad8
+> +					&pinctrl_adc0_ad9
+> +					>;
+> +				status = "okay";
+> +			};
+> +
+> +			i2c2: i2c at f801c000 {
+> +				dmas = <0>, <0>;	/* Do not use DMA for i2c2 */
+why?
+> +				status = "okay";
+> +			};
+> +
+> +			macb1: ethernet at f802c000 {
+> +				phy-mode = "rmii";
+> +				status = "okay";
+> +			};
+> +
+> +			dbgu: serial at ffffee00 {
+> +				status = "okay";
+> +			};
+> +
+> +			pinctrl at fffff200 {
+> +				board {
+> +					pinctrl_mmc0_cd: mmc0_cd {
+> +						atmel,pins =
+> +							<AT91_PIOE 0 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
+> +					};
+> +
+> +					pinctrl_mmc1_cd: mmc1_cd {
+> +						atmel,pins =
+> +							<AT91_PIOE 1 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
+> +					};
+> +
+> +					pinctrl_usba_vbus: usba_vbus {
+> +						atmel,pins =
+> +							<AT91_PIOE 9 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;	/* PE9, conflicts with A9 */
+in this case we should have ifdef so we could choose what we want via make
+file
+> +					};
+> +				};
+> +			};
+> +
+> +			pmc: pmc at fffffc00 {
+> +				main: mainck {
+> +					clock-frequency = <12000000>;
+> +				};
+> +			};
+> +		};
+> +
+> +		nand0: nand at 60000000 {
+> +			nand-bus-width = <8>;
+> +			nand-ecc-mode = "hw";
+> +			atmel,has-pmecc;
+> +			atmel,pmecc-cap = <4>;
+> +			atmel,pmecc-sector-size = <512>;
+> +			nand-on-flash-bbt;
+> +			status = "okay";
+> +
+> +			at91bootstrap at 0 {
+> +				label = "at91bootstrap";
+> +				reg = <0x0 0x40000>;
+> +			};
+> +
+> +			bootloader at 40000 {
+> +				label = "bootloader";
+> +				reg = <0x40000 0x80000>;
+> +			};
+> +
+> +			bootloaderenv at c0000 {
+> +				label = "bootloader env";
+> +				reg = <0xc0000 0xc0000>;
+> +			};
+> +
+> +			dtb at 180000 {
+> +				label = "device tree";
+> +				reg = <0x180000 0x80000>;
+> +			};
+> +
+> +			kernel at 200000 {
+> +				label = "kernel";
+> +				reg = <0x200000 0x600000>;
+> +			};
+> +
+> +			rootfs at 800000 {
+> +				label = "rootfs";
+> +				reg = <0x800000 0x0f800000>;
+> +			};
+more I read this partition more it's seems wrong those days
+
+we really need to switch to UBI
+> +		};
+> +
+> +		usb0: gadget at 00500000 {
+> +			atmel,vbus-gpio = <&pioE 9 GPIO_ACTIVE_HIGH>;	/* PE9, conflicts with A9 */
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_usba_vbus>;
+> +			status = "okay";
+> +		};
+> +
+> +		usb1: ohci at 00600000 {
+> +			num-ports = <3>;
+> +			atmel,vbus-gpio = <0
+> +					   &pioE 3 GPIO_ACTIVE_LOW
+> +					   &pioE 4 GPIO_ACTIVE_LOW
+> +					  >;
+> +			status = "okay";
+> +		};
+> +
+> +		usb2: ehci at 00700000 {
+> +			status = "okay";
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +
+> +		bp3 {
+> +			label = "PB_USER";
+> +			gpios = <&pioE 29 GPIO_ACTIVE_LOW>;
+> +			linux,code = <0x104>;
+> +			gpio-key,wakeup;
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		d2 {
+> +			label = "d2";
+> +			gpios = <&pioE 23 GPIO_ACTIVE_LOW>;	/* PE23, conflicts with A23, CTS2 */
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +
+> +		d3 {
+> +			label = "d3";
+> +			gpios = <&pioE 24 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.8.2.2
 > 
-> Synology seem to build there devices like lego. They have two
-> different RTC blocks. They have three different fan alarm blocks, four
-> different led blocks, etc. And to build a product, the just select a
-> group of blocks and put them together.
-
-The Ricoh RTC seems to be only used in the pre-2010 units.  Everything
-else uses the Seiko RTC.
-
-Most of the 1-bay and 2-bay units use the GPIOs that are multiplexed
-with the built-in SATA interface activity/presence pins on mpp 20-23,
-while the 4-bay units use ge01 and a PCIe SATA controller, and put the
-software controlled HDD leds on mpp 36-43.
-
-Most of the 6281 units with HDD power controls use mpp 29 and 31, while
-most of the 6282 units with HDD power controls use mpp 30, 34, 44 and 45
-and provide a model ID on mpp 28, 29, 46 and 47.  Pre-2012 units and
-4-bay units didn't have a separate power control for HDD1.  These power
-controls are presumably to limit startup current from the 12V brick
-power supply.
-
-From
-http://forum.synology.com/wiki/index.php/What_kind_of_CPU_does_my_NAS_have,
-it doesn't look like there are any new 6281 or 6282 models for 2014.
-
-> 
-> The board setup code which Ben Peddell wrote has a somewhat similar
-> structure:
-> 
-> http://klightspeed.killerwolves.net/synology/linux-3.4-synology-0.1.patch
-
-A more up-to-date version is at:
-http://klightspeed.killerwolves.net/synology/linux-3.7-synology-0.2.patch
-
-> 
-> It has a set of functions which add platform devices. And a table
-> driven piece of code which based on the product name calls these
-> functions to add the needed platform devices. Take a look at the table
-> to get a better idea of the re-use factor of the blocks.
-> 
-> In this DT version, i have a dtsi file for each function, and a dti
-> file for each table entry.
-> 
-> I will add to the changelog in the next version.
-
-
-
--- 
-Ben Peddell
-IT Support Bowen, Collinsville and Proserpine Catholic schools
-http://klightspeed.killerwolves.net/
