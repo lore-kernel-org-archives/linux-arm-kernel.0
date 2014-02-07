@@ -1,47 +1,53 @@
-From: courtney.cavin@sonymobile.com (Courtney Cavin)
-Date: Thu, 6 Feb 2014 18:09:50 -0800
-Subject: [PATCHv2 2/2] arm: Get rid of meminfo
-In-Reply-To: <1391558551-31395-3-git-send-email-lauraa@codeaurora.org>
-References: <1391558551-31395-1-git-send-email-lauraa@codeaurora.org>
- <1391558551-31395-3-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140207020949.GQ1706@sonymobile.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 06 Feb 2014 18:02:56 -0800
+Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
+ initially stopped
+In-Reply-To: <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <52F43ED0.4050808@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 01:02:31AM +0100, Laura Abbott wrote:
-> memblock is now fully integrated into the kernel and is the prefered
-> method for tracking memory. Rather than reinvent the wheel with
-> meminfo, migrate to using memblock directly instead of meminfo as
-> an intermediate.
-> 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-[...]
-> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-> index 0b11c1a..51d814e 100644
-> --- a/arch/arm/mach-pxa/spitz.c
-> +++ b/arch/arm/mach-pxa/spitz.c
-> @@ -32,6 +32,7 @@
->  #include <linux/io.h>
->  #include <linux/module.h>
->  #include <linux/reboot.h>
-> +#include <linux/memblock.h>
-> 
->  #include <asm/setup.h>
->  #include <asm/mach-types.h>
-> @@ -971,13 +972,9 @@ static void __init spitz_init(void)
->         spitz_i2c_init();
->  }
-> 
-> -static void __init spitz_fixup(struct tag *tags, char **cmdline,
-> -                              struct meminfo *mi)
-> +static void __init spitz_fixup(struct tag *tags, char **cmdline)
->  {
-> -       sharpsl_save_param();
-> -       mi->nr_banks = 1;
-> -       mi->bank[0].start = 0xa0000000;
-> -       mi->bank[0].size = (64*1024*1024);
-> +       memblock_addr(0xa0000000, SZ_64M);
+On 02/06/2014 09:20 AM, Ezequiel Garcia wrote:
+> Having the watchdog initially fully stopped is important to avoid
+> any spurious watchdog triggers, in case the registers are not in
+> its reset state.
+>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Tested-by: Willy Tarreau <w@1wt.eu>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>   drivers/watchdog/orion_wdt.c | 3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+> index 6746033..2dbeee9 100644
+> --- a/drivers/watchdog/orion_wdt.c
+> +++ b/drivers/watchdog/orion_wdt.c
+> @@ -142,6 +142,9 @@ static int orion_wdt_probe(struct platform_device *pdev)
+>   	orion_wdt.max_timeout = wdt_max_duration;
+>   	watchdog_init_timeout(&orion_wdt, heartbeat, &pdev->dev);
+>
+> +	/* Let's make sure the watchdog is fully stopped */
+> +	orion_wdt_stop(&orion_wdt);
+> +
 
-memblock_add() ?
+Actually we just had that in another driver, and I stumbled over it there.
 
--Courtney
+Problem with stopping the watchdog in probe unconditionally is that you can
+use it to defeat nowayout: unload the module, then load it again,
+and the watchdog is stopped even if nowayout is true.
+
+Is this really what you want ? Or, in other words, what is the problem
+you are trying to solve ?
+
+Thanks,
+Guenter
+
+
+>   	watchdog_set_nowayout(&orion_wdt, nowayout);
+>   	ret = watchdog_register_device(&orion_wdt);
+>   	if (ret)
+>
