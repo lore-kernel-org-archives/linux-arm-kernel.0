@@ -1,61 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  7 Feb 2014 21:50:26 +0100
-Subject: [PATCH v2 2/2] ARM: sunxi: dt: Convert to the new irq controller
- compatibles
-In-Reply-To: <1391806226-27480-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1391806226-27480-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1391806226-27480-3-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri,  7 Feb 2014 21:57:52 +0100
+Subject: [PATCH 2/2] mdio: sun4i: Drop the older compatibles
+In-Reply-To: <1391806672-27846-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1391806672-27846-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1391806672-27846-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch the device tree to the new compatibles introduced in the irqchip drivers
-to have a common pattern accross all Allwinner SoCs.
+The DT maintainers said it was OK to remove the older compatible pattern, since
+we are still a moving target, users will have to update their DT either way.
+
+Drop the older mdio compatibles, to avoid maintaining legacy compatibles.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi  | 2 +-
- arch/arm/boot/dts/sun5i-a10s.dtsi | 2 +-
- arch/arm/boot/dts/sun5i-a13.dtsi  | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt | 1 -
+ drivers/net/phy/mdio-sun4i.c                                   | 3 ---
+ 2 files changed, 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 26cf191..f9d902f 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -347,7 +347,7 @@
- 		};
+diff --git a/Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt b/Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt
+index 4ec5641..dc49966 100644
+--- a/Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt
++++ b/Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt
+@@ -2,7 +2,6 @@
  
- 		intc: interrupt-controller at 01c20400 {
--			compatible = "allwinner,sun4i-ic";
-+			compatible = "allwinner,sun4i-a10-ic";
- 			reg = <0x01c20400 0x400>;
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index b114be7..e65fbf26 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -308,7 +308,7 @@
- 		};
+ Required properties:
+ - compatible: should be "allwinner,sun4i-a10-mdio"
+-              (Deprecated: "allwinner,sun4i-mdio").
+ - reg: address and length of the register set for the device.
  
- 		intc: interrupt-controller at 01c20400 {
--			compatible = "allwinner,sun4i-ic";
-+			compatible = "allwinner,sun4i-a10-ic";
- 			reg = <0x01c20400 0x400>;
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 5c121fc..d209179 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -290,7 +290,7 @@
- 		ranges;
+ Optional properties:
+diff --git a/drivers/net/phy/mdio-sun4i.c b/drivers/net/phy/mdio-sun4i.c
+index 7f4a66d..56806ae 100644
+--- a/drivers/net/phy/mdio-sun4i.c
++++ b/drivers/net/phy/mdio-sun4i.c
+@@ -172,9 +172,6 @@ static int sun4i_mdio_remove(struct platform_device *pdev)
  
- 		intc: interrupt-controller at 01c20400 {
--			compatible = "allwinner,sun4i-ic";
-+			compatible = "allwinner,sun4i-a10-ic";
- 			reg = <0x01c20400 0x400>;
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
+ static const struct of_device_id sun4i_mdio_dt_ids[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-mdio" },
+-
+-	/* Deprecated */
+-	{ .compatible = "allwinner,sun4i-mdio" },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, sun4i_mdio_dt_ids);
 -- 
 1.8.4.2
