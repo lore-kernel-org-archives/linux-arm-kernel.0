@@ -1,55 +1,41 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Fri, 07 Feb 2014 12:05:38 +0100
-Subject: [PATCH 2/2] ALSA: hda/ca0132 - Fix recording from mode id 0x8
-In-Reply-To: <1391744130-15043-2-git-send-email-hychao@chromium.org>
-References: <1391744130-15043-1-git-send-email-hychao@chromium.org>
- <1391744130-15043-2-git-send-email-hychao@chromium.org>
-Message-ID: <s5htxcbtc71.wl%tiwai@suse.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 7 Feb 2014 11:09:23 +0000 (GMT)
+Subject: [PATCH v2 6/6] cpu/idle.c: move to sched/idle.c
+In-Reply-To: <20140206164336.GU2936@laptop.programming.kicks-ass.net>
+References: <1391017513-12995-1-git-send-email-nicolas.pitre@linaro.org>
+ <1391017513-12995-7-git-send-email-nicolas.pitre@linaro.org>
+ <20140130152500.GB5002@laptop.programming.kicks-ass.net>
+ <alpine.LFD.2.11.1401301102210.1652@knanqh.ubzr>
+ <20140130162753.GF5002@laptop.programming.kicks-ass.net>
+ <alpine.LFD.2.11.1402061152550.1906@knanqh.ubzr>
+ <20140206164336.GU2936@laptop.programming.kicks-ass.net>
+Message-ID: <alpine.LFD.2.11.1402071051140.1906@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Fri,  7 Feb 2014 11:35:30 +0800,
-Hsin-Yu Chao wrote:
+On Thu, 6 Feb 2014, Peter Zijlstra wrote:
+
+> On Thu, Feb 06, 2014 at 02:09:59PM +0000, Nicolas Pitre wrote:
+> > Hi Peter,
+> > 
+> > Did you merge those patches in your tree? 
 > 
-> The Chromebook Pixel has a microphone under the keyboard that
-> is attached to node id 0x8. Before this fix, recording would
-> always go to the main internal mic (node id 0x7).
-> 
-> Signed-off-by: Hsin-Yu Chao <hychao@chromium.org>
-> Reviewed-by: Dylan Reid <dgreid@chromium.org>
+> tree, tree, what's in a word.
 
-The description doesn't state why it fixes what: the patch is actually
-a fix for the wrong ADC pickup in ca0132_capture_pcm_prepare() where
-it assumes wrongly the multiple streams although the driver implements 
-one stream per ADC.  (And, ca0132_capture_pcm_cleanup() already does
-the right thing.)
+Something you may plant on a patch of grass?  "Merging" becomes a 
+strange concept in that context though.  :-)
 
-Could you rephrase the patch description and resend?
+> Its in my patch stack yes. 
+
+Quilt I suppose?? (yet another word.)
+
+> I should get some of that into tip I suppose, been side-tracked a bit 
+> this week. Sorry for the delay.
+
+If you prefer we pile those patches (and future ones after revew) 
+ourselves just let me know.  Future patches are likely to be more 
+intimate with the scheduler so I just need to know who to upstream them 
+through afterwards.
 
 
-thanks,
-
-Takashi
-
-> ---
->  sound/pci/hda/patch_ca0132.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/sound/pci/hda/patch_ca0132.c b/sound/pci/hda/patch_ca0132.c
-> index 59104dc..d5aabce 100644
-> --- a/sound/pci/hda/patch_ca0132.c
-> +++ b/sound/pci/hda/patch_ca0132.c
-> @@ -2770,9 +2770,7 @@ static int ca0132_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
->  					unsigned int format,
->  					struct snd_pcm_substream *substream)
->  {
-> -	struct ca0132_spec *spec = codec->spec;
-> -
-> -	snd_hda_codec_setup_stream(codec, spec->adcs[substream->number],
-> +	snd_hda_codec_setup_stream(codec, hinfo->nid,
->  				   stream_tag, 0, format);
->  
->  	return 0;
-> -- 
-> 1.9.0.rc1.175.g0b1dcb5
-> 
+Nicolas
