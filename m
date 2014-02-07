@@ -1,49 +1,47 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 7 Feb 2014 10:13:36 +0100
-Subject: [PATCH 16/21] drivers: Enable building of Kirkwood drivers for
- mach-mvebu
-In-Reply-To: <20140207015915.GQ8533@titan.lakedaemon.net>
+Date: Fri, 7 Feb 2014 10:20:47 +0100
+Subject: [PATCH 19/21] ARM: MVEBU: Simplifiy headers and make local
+In-Reply-To: <20140207093104.7197224d@skate>
 References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-17-git-send-email-andrew@lunn.ch>
- <20140207015915.GQ8533@titan.lakedaemon.net>
-Message-ID: <20140207091336.GC17758@lunn.ch>
+ <1391730137-14814-20-git-send-email-andrew@lunn.ch>
+ <20140207093104.7197224d@skate>
+Message-ID: <20140207092047.GD17758@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 08:59:15PM -0500, Jason Cooper wrote:
-> On Fri, Feb 07, 2014 at 12:42:12AM +0100, Andrew Lunn wrote:
-> > With the move to mach-mvebu, drivers Kconfig need tweeking to allow
-> > the kirkwood specific drivers to be built.
+On Fri, Feb 07, 2014 at 09:31:04AM +0100, Thomas Petazzoni wrote:
+> Dear Andrew Lunn,
+> 
+> On Fri,  7 Feb 2014 00:42:15 +0100, Andrew Lunn wrote:
+> > kirkwood is very nearly fully DT. Remove most of the address
+> > definitions from the header files and make it a local header file.
 > > 
 > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > > ---
-> >  drivers/cpufreq/Kconfig.arm | 2 +-
-> >  drivers/cpuidle/Kconfig.arm | 2 +-
-> >  drivers/leds/Kconfig        | 4 ++--
-> >  drivers/phy/Kconfig         | 2 +-
-> >  drivers/thermal/Kconfig     | 2 +-
-> >  sound/soc/kirkwood/Kconfig  | 2 +-
-> >  6 files changed, 7 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> > index 31297499a60a..de931081fd01 100644
-> > --- a/drivers/cpufreq/Kconfig.arm
-> > +++ b/drivers/cpufreq/Kconfig.arm
-> > @@ -113,7 +113,7 @@ config ARM_INTEGRATOR
-> >  	  If in doubt, say Y.
-> >  
-> >  config ARM_KIRKWOOD_CPUFREQ
-> > -	def_bool ARCH_KIRKWOOD && OF
-> > +	def_bool (ARCH_KIRKWOOD || MACH_KIRKWOOD) && OF
+> >  arch/arm/mach-mvebu/include/mach/bridge-regs.h |  85 ---------------
+> >  arch/arm/mach-mvebu/include/mach/kirkwood.h    | 142 -------------------------
+> >  arch/arm/mach-mvebu/kirkwood-pm.c              |   2 +-
+> >  arch/arm/mach-mvebu/kirkwood.c                 |   2 +-
+> >  arch/arm/mach-mvebu/kirkwood.h                 |  22 ++++
+> >  5 files changed, 24 insertions(+), 229 deletions(-)
+> >  delete mode 100644 arch/arm/mach-mvebu/include/mach/bridge-regs.h
+> >  delete mode 100644 arch/arm/mach-mvebu/include/mach/kirkwood.h
+> >  create mode 100644 arch/arm/mach-mvebu/kirkwood.h
 > 
-> I agree with creating MACH_KIRKWOOD underneath ARCH_MVEBU earlier in
-> this series, but the 'ARCH_KIRKWOOD || MACH_KIRKWOOD' just looks
-> confusing.  Also, MACH_KIRKWOOD implies OF so this particular one could
-> be reduced to
-> 
-> 	def_bool MACH_KIRKWOOD
+> Is there any particular reason why this isn't part of PATCH 14/21. I
+> was very surprised when reading PATCH 14/21 to see a file named
+> "bridge-regs.h" containing Kirkwood-specific definitions added to
+> mach-mvebu, and so many address constants being defined, while we are
+> DT-based only in mach-mvebu.
 
-Yes, will do.
+Hi Thomas
 
-Thanks
+I wanted to keep 14/21 as a simple move of files, doing the minimal
+needed to make it boot. The patches that follow then clean up. I found
+that simpler to follow what was going on, since there is nothing
+hidden in the move patch.
+
+I can however squash these together if that is what people want to
+see.
+
 	Andrew
