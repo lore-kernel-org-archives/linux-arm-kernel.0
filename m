@@ -1,149 +1,62 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Fri, 07 Feb 2014 11:59:20 +0100
-Subject: [PATCH 1/2] ALSA: hda/ca0132 - setup/cleanup streams
-In-Reply-To: <1391744130-15043-1-git-send-email-hychao@chromium.org>
-References: <1391744130-15043-1-git-send-email-hychao@chromium.org>
-Message-ID: <s5hvbwrtchj.wl%tiwai@suse.de>
+From: srinivas.kandagatla@st.com (srinivas.kandagatla at st.com)
+Date: Fri, 7 Feb 2014 10:54:15 +0000
+Subject: [PATCH v2 0/3] net: stmmac: Add STi GMAC ethernet
+In-Reply-To: <1391428787-27143-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1391428787-27143-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <1391770455-24291-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Fri,  7 Feb 2014 11:35:29 +0800,
-Hsin-Yu Chao wrote:
-> 
-> When a HDMI stream is opened with the same stream tag
-> as a following opened stream to ca0132, audio will be
-> heard from two ports simultaneously.
-> Fix this issue by change to use snd_hda_codec_setup_stream
-> and snd_hda_codec_cleanup_stream instead, so that an
-> inactive stream can be marked as 'dirty' when found
-> with a conflict stream tag, and then get purified.
-> 
-> Signed-off-by: Hsin-Yu Chao <hychao@chromium.org>
-> Reviewed-by: Chih-Chung Chang <chihchung@chromium.org>
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-Thanks, applied this one.
+Hi All,
 
+This patch series adds Ethernet support to STi series SOCs STiH415 and STiH416.
+STi SOC series integrates dwmac IP from synopsis, however there is a hardware
+glue on top of this standard IP, this glue needs to configured before the
+actual dwmac can be used.  Also the glue logic needs re-configuring when the
+link speed changes, This is because the clk source can change as the link
+speed changes.
 
-Takashi
+This patch just adds STi specific callbacks into of_data for configuring the
+glue layer.
 
-> ---
->  sound/pci/hda/patch_ca0132.c | 68 ++++++--------------------------------------
->  1 file changed, 9 insertions(+), 59 deletions(-)
-> 
-> diff --git a/sound/pci/hda/patch_ca0132.c b/sound/pci/hda/patch_ca0132.c
-> index 54d1479..59104dc 100644
-> --- a/sound/pci/hda/patch_ca0132.c
-> +++ b/sound/pci/hda/patch_ca0132.c
-> @@ -2662,60 +2662,6 @@ static bool dspload_wait_loaded(struct hda_codec *codec)
->  }
->  
->  /*
-> - * PCM stuffs
-> - */
-> -static void ca0132_setup_stream(struct hda_codec *codec, hda_nid_t nid,
-> -				 u32 stream_tag,
-> -				 int channel_id, int format)
-> -{
-> -	unsigned int oldval, newval;
-> -
-> -	if (!nid)
-> -		return;
-> -
-> -	snd_printdd(
-> -		   "ca0132_setup_stream: NID=0x%x, stream=0x%x, "
-> -		   "channel=%d, format=0x%x\n",
-> -		   nid, stream_tag, channel_id, format);
-> -
-> -	/* update the format-id if changed */
-> -	oldval = snd_hda_codec_read(codec, nid, 0,
-> -				    AC_VERB_GET_STREAM_FORMAT,
-> -				    0);
-> -	if (oldval != format) {
-> -		msleep(20);
-> -		snd_hda_codec_write(codec, nid, 0,
-> -				    AC_VERB_SET_STREAM_FORMAT,
-> -				    format);
-> -	}
-> -
-> -	oldval = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_CONV, 0);
-> -	newval = (stream_tag << 4) | channel_id;
-> -	if (oldval != newval) {
-> -		snd_hda_codec_write(codec, nid, 0,
-> -				    AC_VERB_SET_CHANNEL_STREAMID,
-> -				    newval);
-> -	}
-> -}
-> -
-> -static void ca0132_cleanup_stream(struct hda_codec *codec, hda_nid_t nid)
-> -{
-> -	unsigned int val;
-> -
-> -	if (!nid)
-> -		return;
-> -
-> -	snd_printdd(KERN_INFO "ca0132_cleanup_stream: NID=0x%x\n", nid);
-> -
-> -	val = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_CONV, 0);
-> -	if (!val)
-> -		return;
-> -
-> -	snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_STREAM_FORMAT, 0);
-> -	snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0);
-> -}
-> -
-> -/*
->   * PCM callbacks
->   */
->  static int ca0132_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
-> @@ -2726,7 +2672,9 @@ static int ca0132_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
->  {
->  	struct ca0132_spec *spec = codec->spec;
->  
-> -	ca0132_setup_stream(codec, spec->dacs[0], stream_tag, 0, format);
-> +	ca0132_toggle_dac_format(codec);
-> +
-> +	snd_hda_codec_setup_stream(codec, spec->dacs[0], stream_tag, 0, format);
->  
->  	return 0;
->  }
-> @@ -2745,7 +2693,7 @@ static int ca0132_playback_pcm_cleanup(struct hda_pcm_stream *hinfo,
->  	if (spec->effects_switch[PLAY_ENHANCEMENT - EFFECT_START_NID])
->  		msleep(50);
->  
-> -	ca0132_cleanup_stream(codec, spec->dacs[0]);
-> +	snd_hda_codec_cleanup_stream(codec, spec->dacs[0]);
->  
->  	return 0;
->  }
-> @@ -2824,8 +2772,8 @@ static int ca0132_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
->  {
->  	struct ca0132_spec *spec = codec->spec;
->  
-> -	ca0132_setup_stream(codec, spec->adcs[substream->number],
-> -			    stream_tag, 0, format);
-> +	snd_hda_codec_setup_stream(codec, spec->adcs[substream->number],
-> +				   stream_tag, 0, format);
->  
->  	return 0;
->  }
-> @@ -2839,7 +2787,7 @@ static int ca0132_capture_pcm_cleanup(struct hda_pcm_stream *hinfo,
->  	if (spec->dsp_state == DSP_DOWNLOADING)
->  		return 0;
->  
-> -	ca0132_cleanup_stream(codec, hinfo->nid);
-> +	snd_hda_codec_cleanup_stream(codec, hinfo->nid);
->  	return 0;
->  }
->  
-> @@ -4742,6 +4690,8 @@ static int patch_ca0132(struct hda_codec *codec)
->  		return err;
->  
->  	codec->patch_ops = ca0132_patch_ops;
-> +	codec->pcm_format_first = 1;
-> +	codec->no_sticky_stream = 1;
->  
->  	return 0;
->  }
-> -- 
-> 1.9.0.rc1.175.g0b1dcb5
-> 
+I have rebased my original patches (http://lkml.org/lkml/2013/11/12/243)
+to latest stmmac which updates callbacks to suit glue drivers like this.
+
+These patches are tested on b2000 and B2020 with STiH415 and STiH416.
+
+Changes since v1:
+	- fixed multi-line function call format as suggested by David Miller.
+
+Dave, Can I request you to take the first patch via net tree for v3.15, I can
+request Arnd or Olof to take the DT patches via the arm-soc tree for v3.15.
+
+Thanks,
+srini
+
+Srinivas Kandagatla (3):
+  net: stmmac:sti: Add STi SOC glue driver.
+  ARM: STi: Add STiH415 ethernet support.
+  ARM: STi: Add STiH416 ethernet support.
+
+ .../devicetree/bindings/net/sti-dwmac.txt          |   58 ++++
+ arch/arm/boot/dts/stih415-clock.dtsi               |   14 +
+ arch/arm/boot/dts/stih415-pinctrl.dtsi             |  121 +++++++
+ arch/arm/boot/dts/stih415.dtsi                     |   48 +++
+ arch/arm/boot/dts/stih416-clock.dtsi               |   14 +
+ arch/arm/boot/dts/stih416-pinctrl.dtsi             |  109 +++++++
+ arch/arm/boot/dts/stih416.dtsi                     |   44 +++
+ arch/arm/boot/dts/stih41x-b2000.dtsi               |   22 ++
+ arch/arm/boot/dts/stih41x-b2020.dtsi               |   26 ++
+ drivers/net/ethernet/stmicro/stmmac/Kconfig        |   11 +
+ drivers/net/ethernet/stmicro/stmmac/Makefile       |    1 +
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    |  331 ++++++++++++++++++++
+ drivers/net/ethernet/stmicro/stmmac/stmmac.h       |    3 +
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |    5 +
+ 14 files changed, 807 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/sti-dwmac.txt
+ create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c
+
+-- 
+1.7.9.5
