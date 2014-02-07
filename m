@@ -1,109 +1,67 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Fri, 7 Feb 2014 21:08:03 +0530
-Subject: [PATCH v2 1/2] PM / OPP: Allow boost frequency to be looked up
- from device tree
-In-Reply-To: <CAGo_u6qsh0wVLGjvqKmaXjDGVyy2tKgSzkh-t9RZCQS-JJND8g@mail.gmail.com>
-References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
- <1391786342-11812-2-git-send-email-thomas.ab@samsung.com>
- <CAGo_u6qsh0wVLGjvqKmaXjDGVyy2tKgSzkh-t9RZCQS-JJND8g@mail.gmail.com>
-Message-ID: <CAJuA9aiEDXyK8ABNznbzjk7s2uMfwo_diRpmLNsKBFd+pH=ffQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 7 Feb 2014 15:44:01 +0000
+Subject: [PATCH v3 05/11] ARM: LPAE: provide an IPA capable pmd_addr_end
+In-Reply-To: <20140207040456.GN9157@cbox>
+References: <1391630151-7875-1-git-send-email-marc.zyngier@arm.com>
+ <1391630151-7875-6-git-send-email-marc.zyngier@arm.com>
+ <20140206104328.GB29446@arm.com> <20140207040456.GN9157@cbox>
+Message-ID: <20140207154401.GC5925@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 7, 2014 at 8:59 PM, Nishanth Menon <nm@ti.com> wrote:
-> On Fri, Feb 7, 2014 at 9:19 AM, Thomas Abraham <ta.omasab@gmail.com> wrote:
->> From: Thomas Abraham <thomas.ab@samsung.com>
->>
->> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
->> support for CPU boost mode. This patch adds support for finding available
->> boost frequencies from device tree and marking them as usable in boost mode.
->>
->> Cc: Nishanth Menon <nm@ti.com>
->> Cc: Lukasz Majewski <l.majewski@samsung.com>
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> ---
->>  drivers/base/power/opp.c |   34 +++++++++++++++++++++++++++++++++-
->>  1 file changed, 33 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
->> index fa41874..b636826 100644
->> --- a/drivers/base/power/opp.c
->> +++ b/drivers/base/power/opp.c
->> @@ -628,7 +628,8 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
->>         struct device_opp *dev_opp;
->>         struct dev_pm_opp *opp;
->>         struct cpufreq_frequency_table *freq_table;
->> -       int i = 0;
->> +       int i = 0, j, len, ret;
->> +       u32 *boost_freqs = NULL;
->>
->>         /* Pretend as if I am an updater */
->>         mutex_lock(&dev_opp_list_lock);
->> @@ -650,10 +651,35 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
->>                 return -ENOMEM;
->>         }
->>
->> +       if (of_find_property(dev->of_node, "boost-frequency", &len)) {
->> +               if (len == 0 || (len & (sizeof(u32) - 1)) != 0) {
->> +                       dev_err(dev, "%s: invalid boost frequency\n", __func__);
->> +                       ret = -EINVAL;
->> +                       goto err_boost;
->> +               }
->> +
->> +               boost_freqs = kzalloc(len, GFP_KERNEL);
->> +               if (!boost_freqs) {
->> +                       dev_warn(dev, "%s: no memory for boost freq table\n",
->> +                                       __func__);
->> +                       ret = -ENOMEM;
->> +                       goto err_boost;
->> +               }
->> +               of_property_read_u32_array(dev->of_node, "boost-frequency",
->> +                       boost_freqs, len / sizeof(u32));
->> +       }
->> +
->>         list_for_each_entry(opp, &dev_opp->opp_list, node) {
->>                 if (opp->available) {
->>                         freq_table[i].driver_data = i;
->>                         freq_table[i].frequency = opp->rate / 1000;
->> +                       for (j = 0; j < len / sizeof(u32) && boost_freqs; j++) {
->> +                               if (boost_freqs[j] == freq_table[i].frequency) {
->> +                                       freq_table[i].driver_data =
->> +                                                       CPUFREQ_BOOST_FREQ;
->> +                                       break;
->> +                               }
->> +                       }
->
-> What if any one of the boost_freqs are not contained in the enabled frequencies?
+On Fri, Feb 07, 2014 at 04:04:56AM +0000, Christoffer Dall wrote:
+> On Thu, Feb 06, 2014 at 10:43:28AM +0000, Catalin Marinas wrote:
+> > On Wed, Feb 05, 2014 at 07:55:45PM +0000, Marc Zyngier wrote:
+> > > The default pmd_addr_end macro uses an unsigned long to represent
+> > > the VA. When used with KVM and stage-2 translation, the VA is
+> > > actually an IPA, which is up to 40 bits. This also affect the
+> > > SMMU driver, which also deals with stage-2 translation.
+> > > 
+> > > Instead, provide an implementation that can cope with larger VAs
+> > > by using a u64 instead. This version will overload the default
+> > > one provided in include/asm-generic/pgtable.h.
+> > > 
+> > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > > ---
+> > >  arch/arm/include/asm/pgtable-3level.h | 5 +++++
+> > >  1 file changed, 5 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> > > index 03243f7..594867b 100644
+> > > --- a/arch/arm/include/asm/pgtable-3level.h
+> > > +++ b/arch/arm/include/asm/pgtable-3level.h
+> > > @@ -262,6 +262,11 @@ static inline int has_transparent_hugepage(void)
+> > >  	return 1;
+> > >  }
+> > >  
+> > > +#define pmd_addr_end(addr, end)						\
+> > > +({	u64 __boundary = ((addr) + PMD_SIZE) & PMD_MASK;		\
+> > > +	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
+> > > +})
+> > 
+> > I see why you need this but it affects all the other uses of
+> > pmd_addr_end() with 32-bit VA. It would be slight performance, I don't
+> > think it's noticeable.
+> > 
+> > A different approach could be something like (untested):
+> > 
+> > #define pmd_addr_end(addr, end)					\
+> > ({	__typeof__(addr) __boundary = ...
+> > 	...
+> > })
+> > 
+> > What about the pgd_addr_end(), do we need this or it's not used by KVM?
+> > 
+> 
+> What about pud_addr_end(), is that defined as a noop on LPAE, or?
+> 
+> I would be in favor of introducing them all using your approach to avoid
+> somebody being inspired by the KVM code when dealing with IPAs and
+> breaking things unknowingly.
 
-It is not used as a boost frequency because its corresponding voltage
-is not known. If required a warning can be printed out for the same.
+I had a brief chat with Marc yesterday around this and it may be safer
+to simply introduce kvm_p*d_addr_end() macros. You already do this for
+pgd_addr_end() since it cannot be overridden in the generic headers.
 
-Thanks,
-Thomas.
-
->
->>                         i++;
->>                 }
->>         }
->> @@ -663,8 +689,14 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
->>         freq_table[i].frequency = CPUFREQ_TABLE_END;
->>
->>         *table = &freq_table[0];
->> +       kfree(boost_freqs);
->>
->>         return 0;
->> +
->> +err_boost:
->> +       kfree(freq_table);
->> +       mutex_unlock(&dev_opp_list_lock);
->> +       return ret;
->>  }
->>  EXPORT_SYMBOL_GPL(dev_pm_opp_init_cpufreq_table);
->>
->> --
->> 1.7.10.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Catalin
