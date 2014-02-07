@@ -1,34 +1,78 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  7 Feb 2014 22:29:23 +0100
-Subject: [PATCH v2 0/3] watchdog: sunxi: Change compatible patterns
-Message-ID: <1391808566-31008-1-git-send-email-maxime.ripard@free-electrons.com>
+From: david.lanzendoerfer@o2s.ch (David =?utf-8?q?Lanzend=C3=B6rfer?=)
+Date: Fri, 07 Feb 2014 22:32:24 +0100
+Subject: [PATCH v4 0/7] ARM: sunxi: Add driver for SD/MMC hosts found on
+ allwinner sunxi SOCs
+Message-ID: <20140207212709.24624.58619.stgit@dizzy-6.o2s.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello
+The following patchset adds support for the SD/MMC host found in the Allwinner SoCs.
+It contains all the necessary modifications for clock environment and also the device
+tree script modification which add it to all the boards using it.
+The clock environment function needed for phase offset configuration has
+been proposed and implemented by Emilio.
+A lot of work and cleanup has been done by Hans de Goede. Special thanks to him!
+This patchset is the 4th attempt to send this driver upstream.
 
-This is the second version of the A10 watchdog compatible changes.
-The only difference with the v1 being that we're now droping the old
-compatibles, instead of keeping them, since the DT maintainers said it was
-fine.
+Changes since v1:
+-Using mmc_of_parse instead of diy dt parsing
+-Adding nodes for all mmc controller to the dtsi files,
+ including sofar unused controllers
+-Using generic GPIO slot library for WP/CD
+-Adding additional MMC device nodes into DTSI files
 
-Thanks,
-Maxime
+Changes since v2:
+-Add missing Signed-off-by tags
+-Stop using __raw_readl / __raw_writel so that barriers are properly used
+-Adding missing new lines
+-Adding missing patch for automatic reparenting of clocks
 
-Maxime Ripard (3):
-  watchdog: sunxi: Change compatibles
-  ARM: sunxi: Add the new watchog compatibles to the reboot code
-  ARM: sunxi: dt: Update the watchdog compatibles
+Changes since v3:
+-Move clk_enable / disable into host_init / exit (Hans)
+-Fix hang on boot caused by irq storm (Hans)
 
- Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt | 6 +++---
- arch/arm/boot/dts/sun4i-a10.dtsi                         | 2 +-
- arch/arm/boot/dts/sun5i-a10s.dtsi                        | 2 +-
- arch/arm/boot/dts/sun5i-a13.dtsi                         | 2 +-
- arch/arm/boot/dts/sun6i-a31.dtsi                         | 2 +-
- arch/arm/boot/dts/sun7i-a20.dtsi                         | 2 +-
- arch/arm/mach-sunxi/sunxi.c                              | 4 ++--
- drivers/watchdog/sunxi_wdt.c                             | 2 +-
- 8 files changed, 11 insertions(+), 11 deletions(-)
+regards
+David
+---
+
+David Lanzend?rfer (4):
+      ARM: sunxi: Add driver for SD/MMC hosts found on Allwinner sunxi SoCs
+      ARM: dts: sun7i: Add support for mmc
+      ARM: dts: sun4i: Add support for mmc
+      ARM: dts: sun5i: Add support for mmc
+
+Emilio L?pez (2):
+      clk: sunxi: factors: automatic reparenting support
+      clk: sunxi: Implement MMC phase control
+
+Hans de Goede (1):
+      ARM: sunxi: clk: export clk_sunxi_mmc_phase_control
+
+
+ arch/arm/boot/dts/sun4i-a10-a1000.dts            |    8 
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts       |    8 
+ arch/arm/boot/dts/sun4i-a10.dtsi                 |   54 +
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |   30 +
+ arch/arm/boot/dts/sun5i-a10s.dtsi                |   44 +
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts  |   15 
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts        |   15 
+ arch/arm/boot/dts/sun5i-a13.dtsi                 |   37 +
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts      |    8 
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts       |    8 
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts  |   23 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                 |   61 ++
+ drivers/clk/sunxi/clk-factors.c                  |   36 +
+ drivers/clk/sunxi/clk-sunxi.c                    |   35 +
+ drivers/mmc/host/Kconfig                         |    7 
+ drivers/mmc/host/Makefile                        |    2 
+ drivers/mmc/host/sunxi-mci.c                     |  871 ++++++++++++++++++++++
+ drivers/mmc/host/sunxi-mci.h                     |  239 ++++++
+ include/linux/clk/sunxi.h                        |   22 +
+ 19 files changed, 1523 insertions(+)
+ create mode 100644 drivers/mmc/host/sunxi-mci.c
+ create mode 100644 drivers/mmc/host/sunxi-mci.h
+ create mode 100644 include/linux/clk/sunxi.h
 
 -- 
-1.8.4.2
+Signature
