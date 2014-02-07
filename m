@@ -1,123 +1,25 @@
-From: deepthi@linux.vnet.ibm.com (Deepthi Dharwar)
-Date: Fri, 07 Feb 2014 15:15:56 +0530
-Subject: [PATCH 1/2] PPC: powernv: remove redundant cpuidle_idle_call()
-In-Reply-To: <52F484D9.6020604@linux.vnet.ibm.com>
-References: <1391696188-14540-1-git-send-email-nicolas.pitre@linaro.org>
- <CAKnoXLxCAqKaniGOwegNcOarS4FpoNKDY5PxOhe6j4wdtUAkLQ@mail.gmail.com>
- <52F3BCFE.3010703@linux.vnet.ibm.com>
- <alpine.LFD.2.11.1402070105170.1906@knanqh.ubzr>
- <52F484D9.6020604@linux.vnet.ibm.com>
-Message-ID: <52F4AB54.801@linux.vnet.ibm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Feb 2014 09:46:56 +0000
+Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
+ componentised subsystems
+In-Reply-To: <CAKMK7uFYhz8Pmv5E7aKY7yzZGDe_m8a0382Njv7tZRoBSfmRpw@mail.gmail.com>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
+ <CAKMK7uFYhz8Pmv5E7aKY7yzZGDe_m8a0382Njv7tZRoBSfmRpw@mail.gmail.com>
+Message-ID: <20140207094656.GY26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Preeti,
+On Fri, Feb 07, 2014 at 10:04:30AM +0100, Daniel Vetter wrote:
+> I've chatted a bit with Hans Verkuil about this topic at fosdem and
+> apparently both v4l and alsa have something like this already in their
+> helper libraries. Adding more people as fyi in case they want to
+> switch to the new driver core stuff from Russell.
 
-Thanks for the patch.
+It's not ALSA, but ASoC which has this.  Mark is already aware of this
+and will be looking at it from an ASoC perspective.
 
-On 02/07/2014 12:31 PM, Preeti U Murthy wrote:
-> Hi Nicolas,
-> 
-> Find below the patch that will need to be squashed with this one.
-> This patch is based on the mainline.Adding Deepthi, the author of
-> the patch which introduced the powernv cpuidle driver. Deepthi,
-> do you think the below patch looks right? We do not need to do an
-> explicit local_irq_enable() since we are in the call path of
-> cpuidle driver and that explicitly enables irqs on exit from
-> idle states.
-
-Yes, We enable irqs explicitly while entering snooze loop and we always
-have interrupts enabled in the snooze state.
-For NAP state, we exit out of this state with interrupts enabled so we
-do not need an explicit enable of irqs.
-
-> On 02/07/2014 06:47 AM, Nicolas Pitre wrote:
->> On Thu, 6 Feb 2014, Preeti U Murthy wrote:
->>
->>> Hi Daniel,
->>>
->>> On 02/06/2014 09:55 PM, Daniel Lezcano wrote:
->>>> Hi Nico,
->>>>
->>>>
->>>> On 6 February 2014 14:16, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->>>>
->>>>> The core idle loop now takes care of it.
->>>>>
->>>>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
->>>>> ---
->>>>>  arch/powerpc/platforms/powernv/setup.c | 13 +------------
->>>>>  1 file changed, 1 insertion(+), 12 deletions(-)
->>>>>
->>>>> diff --git a/arch/powerpc/platforms/powernv/setup.c
->>>>> b/arch/powerpc/platforms/powernv/setup.c
->>>>> index 21166f65c9..a932feb290 100644
->>>>> --- a/arch/powerpc/platforms/powernv/setup.c
->>>>> +++ b/arch/powerpc/platforms/powernv/setup.c
->>>>> @@ -26,7 +26,6 @@
->>>>>  #include <linux/of_fdt.h>
->>>>>  #include <linux/interrupt.h>
->>>>>  #include <linux/bug.h>
->>>>> -#include <linux/cpuidle.h>
->>>>>
->>>>>  #include <asm/machdep.h>
->>>>>  #include <asm/firmware.h>
->>>>> @@ -217,16 +216,6 @@ static int __init pnv_probe(void)
->>>>>         return 1;
->>>>>  }
->>>>>
->>>>> -void powernv_idle(void)
->>>>> -{
->>>>> -       /* Hook to cpuidle framework if available, else
->>>>> -        * call on default platform idle code
->>>>> -        */
->>>>> -       if (cpuidle_idle_call()) {
->>>>> -               power7_idle();
->>>>> -       }
->>>>>
-> 
->  drivers/cpuidle/cpuidle-powernv.c |    4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-powernv.c b/drivers/cpuidle/cpuidle-powernv.c
-> index 78fd174..130f081 100644
-> --- a/drivers/cpuidle/cpuidle-powernv.c
-> +++ b/drivers/cpuidle/cpuidle-powernv.c
-> @@ -31,11 +31,13 @@ static int snooze_loop(struct cpuidle_device *dev,
->  	set_thread_flag(TIF_POLLING_NRFLAG);
-> 
->  	while (!need_resched()) {
-> +		ppc64_runlatch_off();
-                ^^^^^^^^^^^^^^^
-We could move this before the while() loop.
-It would ideal to turn off latch when we enter snooze and
-turn it on when we are about to exit, rather than doing
-it over and over in the while loop.
-
->  		HMT_low();
->  		HMT_very_low();
->  	}
-> 
->  	HMT_medium();
-> +	ppc64_runlatch_on();
->  	clear_thread_flag(TIF_POLLING_NRFLAG);
->  	smp_mb();
->  	return index;
-> @@ -45,7 +47,9 @@ static int nap_loop(struct cpuidle_device *dev,
->  			struct cpuidle_driver *drv,
->  			int index)
->  {
-> +	ppc64_runlatch_off();
->  	power7_idle();
-> +	ppc64_runlatch_on();
->  	return index;
->  }
-> 
-> Thanks
-> 
-> Regards
-> Preeti U Murthy
-> 
-
-Regards,
-Deepthi
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
