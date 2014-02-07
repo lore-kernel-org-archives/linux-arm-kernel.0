@@ -1,64 +1,31 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Fri, 07 Feb 2014 16:20:27 +0000
-Subject: [PATCH v3 5/7] ARM: dts: Exynos: add cpu nodes, opp and cpu clock
- configuration data
-In-Reply-To: <1391788548-13056-6-git-send-email-thomas.ab@samsung.com>
-References: <1391788548-13056-1-git-send-email-thomas.ab@samsung.com>
- <1391788548-13056-6-git-send-email-thomas.ab@samsung.com>
-Message-ID: <52F507CB.6090300@arm.com>
+From: fabrice.gasnier@st.com (Fabrice GASNIER)
+Date: Fri,  7 Feb 2014 17:19:14 +0100
+Subject: [RFC PATCH]  ARM: Enable imprecise external aborts earlier
+Message-ID: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/14 15:55, Thomas Abraham wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
-> 
-> For all Exynos based platforms, add CPU nodes, operating points and cpu
-> clock data for migrating from Exynos specific cpufreq driver to using
-> generic cpufreq-cpu0 driver.
-> 
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+Some HW / drivers like PCIe use imprecise aborts on ARM to detect ports
+that are behind a switch, by using: hook_fault_code(16+6, ...);
 
-[...]
+At PCIe bus enumeration, imprecise aborts are not enabled. Imprecise
+aborts are enabled late during bootup process, when userland
+init starts. It seems unmasked later when starting userland init
+process (e.g. when CPSR.A bit on arm is cleared). Aborts are deferred
+until then.
 
-> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-> index 5c412aa..c613fc2 100644
-> --- a/arch/arm/boot/dts/exynos4x12.dtsi
-> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-> @@ -31,6 +31,42 @@
->                 mshc0 = &mshc_0;
->         };
-> 
-> +       cpus {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               cpu at 0 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a9";
-> +                       reg = <0>;
-> +                       clocks = <&clock 12>;
-> +                       clock-names = "cpu";
-> +
-> +                       operating-points = <
-> +                               1500000 1350000
-> +                               1400000 1287500
-> +                               1300000 1250000
-> +                               1200000 1187500
-> +                               1100000 1137500
-> +                               1000000 1087500
-> +                                900000 1037500
-> +                                800000 1000000
-> +                                700000  987500
-> +                                600000  975000
-> +                                500000  950000
-> +                                400000  925000
-> +                                300000  900000
-> +                                200000  900000
-> +                       >;
-> +                       clock-latency = <200000>;
-> +                       boost-frequency = <1500000 1350000>;
+Enable imprecise external aborts earlier during bootup.
 
-This is confusing, 1350000 is not in the OPP frequency list or this is still
-following old binding with voltage. Either case this needs to be fixed.
+Reference :
+http://marc.info/?l=linux-arm-kernel&m=139118404708291&w=2
 
-Regards,
-Sudeep
+Fabrice Gasnier (1):
+  ARM: Add imprecise abort enable/disable macro
+
+ arch/arm/include/asm/irqflags.h |   33 +++++++++++++++++++++++++++++++++
+ arch/arm/kernel/smp.c           |    1 +
+ arch/arm/kernel/traps.c         |    4 ++++
+ 3 files changed, 38 insertions(+)
+
+-- 
+1.7.9.5
