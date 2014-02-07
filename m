@@ -1,38 +1,77 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 7 Feb 2014 11:40:37 -0600
-Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <CAGo_u6ofC4NNPiTNcSnXUvT3RZJo54=XyjetR-ok5hCBrVZkKg@mail.gmail.com>
-References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
- <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
- <52F50698.4060305@arm.com> <52F509BD.70903@arm.com>
- <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
- <52F51888.5010608@arm.com>
- <CAGo_u6ofC4NNPiTNcSnXUvT3RZJo54=XyjetR-ok5hCBrVZkKg@mail.gmail.com>
-Message-ID: <CAGo_u6pJtCe_j-xfO4wNHRHqdg4kC_1bsyfiFbHS2fuMiiY+2w@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 7 Feb 2014 10:43:14 -0700
+Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
+ initially stopped
+In-Reply-To: <20140207104044.GA11063@localhost>
+References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <52F43ED0.4050808@roeck-us.net> <20140207104044.GA11063@localhost>
+Message-ID: <20140207174314.GB16263@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 7, 2014 at 11:37 AM, Nishanth Menon <nm@ti.com> wrote:
-> On Fri, Feb 7, 2014 at 11:31 AM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
->>
->> Yes I thought of exactly similar clock setup, but was not convinced that it
->> should be part of OPP. In that case it looks like we are trying to represent
->> clock internals through some OPP bindings.
->
-> And this series (rightly) does not make it an OPP behavior. instead
-> all it does is to list the boost-frequencies and mark those in cpufreq
-> table. the description is left to the dts and implementation to the
-> clock drivers involved.
+On Fri, Feb 07, 2014 at 07:40:45AM -0300, Ezequiel Garcia wrote:
 
+> Well, this is related to the discussion about the bootloader not
+> reseting the watchdog properly, provoking spurious watchdog triggering.
+> 
+> Jason Gunthorpe explained [1] that we needed a particular sequence:
+> 
+>  1. Disable WDT
+>  2. Clear bridge
+>  3. Enable WDT
+> 
+> We added the irq handling to satisfy (2), and the watchdog stop for (1).
 
-One more thing, before I forget -> currently
-dev_pm_opp_[init|free]_cpufreq_table is in drivers/base/power/opp.c ->
-this probably should go away to drivers/cpufreq to keep opp.c
-independent of frameworks using it. i dont see any code that is
-introduced in the mentioned functions as being OPP behavior specific,
-instead, I consider them as cpufreq+opp behaviors, which this change
-fits into.
+The issue here is the driver configures two 'machine kill' elements:
+the PANIC IRQ and the RstOut setup.
 
-Regards,
-Nishanth Menon
+Before configuring either of those the driver needs to ensure that any
+old watchdog events are cleared out of the HW. We must not get a
+spurious event. 
+
+I agree not disabling an already functional and properly configured
+counter from the bootloader is desirable.
+
+So lets break it down a bit..
+
+1) The IRQ:
+  It looks like the cause bit latches high on watchdog timer
+  expiration but has no side effect unless it is unmasked.
+
+  The new IRQ flow code ensures the bit is cleared during request_irq
+  so no old events can trigger the IRQ. Thus it is solved now.
+
+2) The RstOut:
+  It is a bit unspecific, but I think this signal latches high when
+  any unmasked rst event occurs and stays high until the RstIn pin
+  is asserted.
+
+  So we don't need to worry about clearing old events from here
+
+  Alternatively the WDRstOutEn routes the Cause bit into the RstOut
+  pin.
+
+3) The timer itself:
+  The WDT is just a general timer with an optional hookup to the
+  rst control. If it is harmlessly counting but not resetting we need
+  to stop that before enabling rst out.
+
+So, how about this for psuedo-code in probe:
+
+if (readl(RSTOUTn) & WDRstOutEn)
+{
+    /* Watchdog is configured and may be down counting,
+       don't touch it */
+    request_irq(..);
+}
+else
+{
+    /* Watchdog is not configured, fully disable the timer
+       and configure for watchdog operation. */
+    disable_watchdog();
+    request_irq();
+    writel(RSTOUTn), .. WDRstOutEn);
+}
+
+Jason
