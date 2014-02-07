@@ -1,48 +1,73 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Fri, 07 Feb 2014 14:48:26 +0000
-Subject: [PATCH 10/21] ARM: MM: Add DT binding for Feroceon L2 cache
-In-Reply-To: <1391730137-14814-11-git-send-email-andrew@lunn.ch>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-11-git-send-email-andrew@lunn.ch>
-Message-ID: <52F4F23A.3030405@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 07 Feb 2014 15:49:29 +0100
+Subject: [PATCH] clk: respect the clock dependencies in of_clk_init
+In-Reply-To: <20140207144325.GA8218@localhost>
+References: <1391554766-11285-1-git-send-email-gregory.clement@free-electrons.com>
+ <52F4DA40.4090804@elopez.com.ar> <20140207142430.GU8533@titan.lakedaemon.net>
+ <20140207144325.GA8218@localhost>
+Message-ID: <52F4F279.6010006@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/14 23:42, Andrew Lunn wrote:
-> Instantiate the L2 cache from DT. Indicate in DT where the cache
-> control register is and if write through should be made.
+On 07/02/2014 15:43, Ezequiel Garcia wrote:
+> On Fri, Feb 07, 2014 at 09:24:30AM -0500, Jason Cooper wrote:
+>> On Fri, Feb 07, 2014 at 10:06:08AM -0300, Emilio L?pez wrote:
+>>
+>> [snip a great explanation]
+>>
+>> Guys, can I get some Tested-by's on this?
+>>
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  .../devicetree/bindings/arm/mrvl/foroceon.txt      | 19 +++++++++
->  arch/arm/boot/dts/kirkwood.dtsi                    |  5 +++
->  arch/arm/include/asm/hardware/cache-feroceon-l2.h  |  2 +
->  arch/arm/mach-kirkwood/board-dt.c                  | 15 +------
->  arch/arm/mm/cache-feroceon-l2.c                    | 46 ++++++++++++++++++++++
->  5 files changed, 73 insertions(+), 14 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/mrvl/foroceon.txt
+> In case someone missed Emilio's comment about it, I gave his oneliner
+> a test on A370 Reference Design. It worked just as well as Sebastian's.
+
+Well ok it's working but this patch is not better than Sebastian, it is
+even worth. I don't think it is a good idea at all to totally ignore the
+information given by the device tree.
+
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/mrvl/foroceon.txt b/Documentation/devicetree/bindings/arm/mrvl/foroceon.txt
-> new file mode 100644
-> index 000000000000..8058676d1476
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mrvl/foroceon.txt
-> @@ -0,0 +1,19 @@
-> +* Marvell Feroceon Cache
-> +
-> +Required properties:
-> +- compatible : Should be "marvell,feroceon-kirkwood".
-> +- reg        : Address of the L2 cache control register
-> +
-> +Optional properties:
-> +- writethrough : only if present, the cache will be used in write through mode.
-> +
+> Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> 
+>>> -----8<------
+>>>
+>>> From ffdb49506e3ce92090c15e1f9b37f4d465097ac1 Mon Sep 17 00:00:00 2001
+>>> From: =?UTF-8?q?Emilio=20L=C3=B3pez?= <emilio@elopez.com.ar>
+>>> Date: Thu, 6 Feb 2014 18:07:07 -0300
+>>> Subject: [PATCH] clk: mvebu: fix name dependency during registration time
+>>>
+>>> Currently, mvebu_clk_gating_setup has a silly dependency on clock
+>>> registration order just to gather the parent clock name. This is
+>>> completely unnecesary, as it supports using an already provided name
+>>> via the clk_gating_soc_desc structs, and we can therefore solve this
+>>> issue with a 69+/- line patch. But, given that the parent name is
+>>> always "tclk" as default-hardcoded on mvebu_coreclk_setup(), we can
+>>> just default-hardcode it here too and get away with solving this
+>>> problem with a one-liner.
+>>> ---
+>>>  drivers/clk/mvebu/common.c | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/clk/mvebu/common.c b/drivers/clk/mvebu/common.c
+>>> index 25ceccf..6c63b43 100644
+>>> --- a/drivers/clk/mvebu/common.c
+>>> +++ b/drivers/clk/mvebu/common.c
+>>> @@ -121,7 +121,7 @@ void __init mvebu_clk_gating_setup(struct
+>>> device_node *np,
+>>>  	struct clk_gating_ctrl *ctrl;
+>>>  	struct clk *clk;
+>>>  	void __iomem *base;
+>>> -	const char *default_parent = NULL;
+>>> +	const char *default_parent = "tclk";
+>>>  	int n;
+>>>
+>>>  	base = of_iomap(np, 0);
+>>> -- 
+>>> 1.8.5.3
+> 
 
-Looks more like a software configuration for me unless I am missing something.
-It should not be here IMO if its pure software construct, may be you can use
-already existing cachepolicy kernel parameter instead.
 
-Also its better to Cc DT mailing list for any binding updates.
-
-Regards,
-Sudeep
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
