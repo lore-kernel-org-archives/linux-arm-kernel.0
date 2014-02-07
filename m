@@ -1,32 +1,36 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Fri, 7 Feb 2014 13:35:03 +0900
-Subject: [PATCH v2 3/6] ARM: firmware: enable Trusted Foundations by default
+Date: Fri, 7 Feb 2014 13:35:04 +0900
+Subject: [PATCH v2 4/6] ARM: firmware: add prepare_idle() operation
 In-Reply-To: <1391747706-1847-1-git-send-email-acourbot@nvidia.com>
 References: <1391747706-1847-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1391747706-1847-4-git-send-email-acourbot@nvidia.com>
+Message-ID: <1391747706-1847-5-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As discussed previously (https://lkml.org/lkml/2013/11/26/289), enable
-Trusted Foundation support by default since it already depends on a
-supporting architecture being selected.
+Some firmwares do not put the CPU into idle mode themselves, but still
+need to be informed that the CPU is about to enter idle mode before this
+happens. Add a prepare_idle() operation to the firmware_ops structure to
+handle such cases.
 
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- arch/arm/firmware/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/include/asm/firmware.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/firmware/Kconfig b/arch/arm/firmware/Kconfig
-index bb126594995e..ad396af68e47 100644
---- a/arch/arm/firmware/Kconfig
-+++ b/arch/arm/firmware/Kconfig
-@@ -11,6 +11,7 @@ menu "Firmware options"
- config TRUSTED_FOUNDATIONS
- 	bool "Trusted Foundations secure monitor support"
- 	depends on ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
-+	default y
- 	help
- 	  Some devices (including most Tegra-based consumer devices on the
- 	  market) are booted with the Trusted Foundations secure monitor
+diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+index 15631300c238..2c9f10df7568 100644
+--- a/arch/arm/include/asm/firmware.h
++++ b/arch/arm/include/asm/firmware.h
+@@ -22,6 +22,10 @@
+  */
+ struct firmware_ops {
+ 	/*
++	 * Inform the firmware we intend to enter CPU idle mode
++	 */
++	int (*prepare_idle)(void);
++	/*
+ 	 * Enters CPU idle mode
+ 	 */
+ 	int (*do_idle)(void);
 -- 
 1.8.5.3
