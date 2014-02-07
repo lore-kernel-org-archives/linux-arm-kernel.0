@@ -1,48 +1,51 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 07 Feb 2014 11:54:02 +0100
-Subject: [PATCH v2 08/15] mfd: max77836: Add max77836 support to max14577
- driver
-In-Reply-To: <20140207104912.GJ14727@lee--X1>
-References: <1391767487-10017-1-git-send-email-k.kozlowski@samsung.com>
- <1391767487-10017-9-git-send-email-k.kozlowski@samsung.com>
- <20140207104912.GJ14727@lee--X1>
-Message-ID: <1391770442.12119.4.camel@AMDC1943>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri,  7 Feb 2014 11:55:54 +0100
+Subject: [PATCH] i2c: mv64xxx: Fix locked bus when offload is selected but not
+ used on a message
+Message-ID: <1391770588-1344-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-02-07 at 10:49 +0000, Lee Jones wrote:
-> > Add Maxim 77836 support to max14577 driver. The chipsets have same MUIC
-> > component so the extcon, charger and regulators are almost the same. The
-> > max77836 however has also PMIC and Fuel Gauge.
-> > 
-> > The MAX77836 uses three I2C slave addresses and has additional interrupts
-> > (related to PMIC and Fuel Gauge). It has also Interrupt Source register,
-> > just like MAX77686 and MAX77693.
-> > 
-> > The MAX77836 PMIC's TOPSYS and INTSRC interrupts are reported in the
-> > PMIC block. The PMIC block has different I2C slave address and uses own
-> > regmap so another regmap_irq_chip is needed.
-> > 
-> > Since we have two regmap_irq_chip, use shared interrupts on MAX77836.
-> > 
-> > This patch adds additional defines and functions to the max14577 MFD core
-> > driver so the driver will handle both chipsets. Also this patch replaces
-> > "0x1 << N" with BIT(N) in defines for register masks.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> 
-> My Ack is missing from this patch too.
-> 
-> ... and probably all the others? How will I know which ones I've
-> already Acked without reviewing them all again?
+Offload can be used only on regular transactions and for 1 to byte
+transfers. In the other cases we switch back to usual work flow.
 
-I already added your ACK-s to patches which got them. Unfortunately the
-numbering of patches changed because 4 of them were applied and 1 was
-dropped.
+In this case we need to call mv64xxx_i2c_prepare_for_io() as this
+function is not used when we try to use offloading.
 
-This particular patch (previously: 13/18) haven't got you ACK because
-you've pointed some issues to fix.
+This commit adds this missing call when offloading have failed in the
+MV64XXX_I2C_ACTION_OFFLOAD_SEND_START case.
 
-Best regards,
-Krzysztof
+This fix the timeout seen when the the i2c driver try to access an
+address where the device is absent on the Armada XP bases board.
+
+Cc: stable at vger.kernel.org # v3.12+
+Fixes: 930ab3d403ae (i2c: mv64xxx: Add I2C Transaction Generator support)
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/i2c/busses/i2c-mv64xxx.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+index b8c5187b9ee0..a1700c62d955 100644
+--- a/drivers/i2c/busses/i2c-mv64xxx.c
++++ b/drivers/i2c/busses/i2c-mv64xxx.c
+@@ -461,8 +461,15 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
+ 	case MV64XXX_I2C_ACTION_OFFLOAD_SEND_START:
+ 		if (!mv64xxx_i2c_offload_msg(drv_data))
+ 			break;
+-		else
++		else {
+ 			drv_data->action = MV64XXX_I2C_ACTION_SEND_START;
++			/*
++			 * Switch to the standard path, so we finally need to
++			 * prepare the io that have not been done in
++			 * mv64xxx_i2c_execute_msg
++			 */
++			mv64xxx_i2c_prepare_for_io(drv_data, drv_data->msgs);
++		}
+ 		/* FALLTHRU */
+ 	case MV64XXX_I2C_ACTION_SEND_START:
+ 		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_START,
+-- 
+1.8.1.2
