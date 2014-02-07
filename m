@@ -1,30 +1,42 @@
-From: carlo.caione@gmail.com (Carlo Caione)
-Date: Fri, 7 Feb 2014 23:31:43 +0100
-Subject: [linux-sunxi] Re: [PATCH] irq: Add new flag to ack
- level-triggered interrupts before unmasking
-In-Reply-To: <alpine.DEB.2.02.1402071721350.21991@ionos.tec.linutronix.de>
-References: <1391721117-27446-1-git-send-email-carlo@caione.org>
- <alpine.DEB.2.02.1402062213590.21991@ionos.tec.linutronix.de>
- <CAOQ7t2Z0agZdDZ_OQZPtXWXoi5NMTcOOZz04q6wEVNy0rxn4AA@mail.gmail.com>
- <alpine.DEB.2.02.1402062229000.21991@ionos.tec.linutronix.de>
- <CAOQ7t2bzz9vKh_5h2nF=m+JpeYVa=Ttd4XQgrAa6Lhdzjg_Qxw@mail.gmail.com>
- <alpine.DEB.2.02.1402071121310.21991@ionos.tec.linutronix.de>
- <CAOQ7t2b5qVTUXOB4iWAOoTehm=u6zxP0-zQmirSF0DvEk8KddQ@mail.gmail.com>
- <alpine.DEB.2.02.1402071721350.21991@ionos.tec.linutronix.de>
-Message-ID: <CAOQ7t2ZfdjuDhtFVz-JvVA_UkGSPzpPAAv9ExZo6UGeshNBwfA@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 07 Feb 2014 23:32:57 +0100
+Subject: [PATCH 02/21] IRQ: Orion: Fix getting generic chip pointer.
+In-Reply-To: <1391730137-14814-3-git-send-email-andrew@lunn.ch>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1391730137-14814-3-git-send-email-andrew@lunn.ch>
+Message-ID: <52F55F19.3060800@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 7, 2014 at 6:24 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> Not sure, really, but I tend to a core patch. Though we really want to
-> know whether the issue is threaded only or not. If it's a general
-> issue then this wants to go into unmask_irq() itself and not into an
-> extra unmask_threaded_irq() function.
+On 02/07/2014 12:41 AM, Andrew Lunn wrote:
+> Enabling SPARSE_IRQ shows up a bug in the irq-orion bridge interrupt
+> handler. The bridge interrupt is implemented using a single generic
+> chip. Thus the parameter passed to irq_get_domain_generic_chip()
+> should always be zero.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-Unfortunately I cannot be sure whether the problem is still present
-for the non threaded case since in the hardware I have the NMI
-controller is only connected to the PMIC.
-Considering that I have no way of checking what do you suggest?
+Indeed, I remember we talked about it: irq_get_domain_generic_chip takes
+hwirqs, so passing 0 is sane here.
 
--- 
-Carlo Caione
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+> ---
+>   drivers/irqchip/irq-orion.c | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/irqchip/irq-orion.c b/drivers/irqchip/irq-orion.c
+> index e51d40031884..7d4e189ab4ec 100644
+> --- a/drivers/irqchip/irq-orion.c
+> +++ b/drivers/irqchip/irq-orion.c
+> @@ -111,7 +111,8 @@ IRQCHIP_DECLARE(orion_intc, "marvell,orion-intc", orion_irq_init);
+>   static void orion_bridge_irq_handler(unsigned int irq, struct irq_desc *desc)
+>   {
+>   	struct irq_domain *d = irq_get_handler_data(irq);
+> -	struct irq_chip_generic *gc = irq_get_domain_generic_chip(d, irq);
+> +
+> +	struct irq_chip_generic *gc = irq_get_domain_generic_chip(d, 0);
+>   	u32 stat = readl_relaxed(gc->reg_base + ORION_BRIDGE_IRQ_CAUSE) &
+>   		   gc->mask_cache;
+>
+>
