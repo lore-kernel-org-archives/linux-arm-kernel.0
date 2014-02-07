@@ -1,45 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 7 Feb 2014 10:42:38 +0000
-Subject: [PATCH v2 14/15] charger: max14577: Configure battery-dependent
- settings from DTS
-In-Reply-To: <1391767487-10017-15-git-send-email-k.kozlowski@samsung.com>
-References: <1391767487-10017-1-git-send-email-k.kozlowski@samsung.com>
- <1391767487-10017-15-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20140207104238.GH14727@lee--X1>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 7 Feb 2014 12:44:13 +0200
+Subject: [RFC PATCH 08/15] ata: ahci_platform: Manage SATA PHY
+In-Reply-To: <463926864.ALblgUKdgH@wuerfel>
+References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
+ <5240492D.6060204@ti.com> <52F4B682.2000201@ti.com>
+ <463926864.ALblgUKdgH@wuerfel>
+Message-ID: <52F4B8FD.1030106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Remove hard-coded values for:
->  - Fast Charge current,
->  - End Of Charge current,
->  - Fast Charge timer,
->  - Overvoltage Protection Threshold,
->  - Battery Constant Voltage,
-> and use DTS to configure them. This allows using the max14577 charger
-> driver with different batteries.
+On 02/07/2014 12:39 PM, Arnd Bergmann wrote:
+> On Friday 07 February 2014 12:33:38 Roger Quadros wrote:
+>>
+>> This means we need to make CONFIG_SATA_AHCI_PLATFORM depend on CONFIG_GENERIC_PHY or
+>> select it.
+>>
+>> OR
+>>
+>> Generic PHY layer must be fixed so that the API's are always built in.
+>>
+>> What is the better option? I believe making the PHY API's always built in is the better option.
+>>
 > 
-> Now the charger driver requires valid configuration data from DTS. In
-> case of wrong configuration data it fails during probe. Patch adds
-> of_compatible to the charger mfd cell in MFD driver core.
+> CONFIG_SATA_AHCI_PLATFORM should do
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 	"depends on CONFIG_GENERIC_PHY || !CONFIG_GENERIC_PHY"
+> 
+> which is the Kconfig way of saying that if CONFIG_GENERIC_PHY is a module,
+> CONFIG_SATA_AHCI_PLATFORM needs to be a module as well.
+> 
 
-I already acked the MFD parts of this. Or has the patch changed?
+Ah, that's neat. Thanks :).
 
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Jenny Tc <jenny.tc@intel.com>
-> ---
->  drivers/mfd/max14577.c               |    5 +-
->  drivers/power/max14577_charger.c     |  234 +++++++++++++++++++++++++++++-----
->  include/linux/mfd/max14577-private.h |   10 ++
->  include/linux/mfd/max14577.h         |    8 ++
->  4 files changed, 227 insertions(+), 30 deletions(-)
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+cheers,
+-roger
