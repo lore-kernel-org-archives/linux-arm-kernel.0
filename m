@@ -1,16 +1,16 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri,  7 Feb 2014 15:59:13 +0100
-Subject: [PATCH 6/8] tty/serial: at91: add dsr control via gpio
+Date: Fri,  7 Feb 2014 15:59:15 +0100
+Subject: [PATCH 8/8] tty/serial: at91: add dcd control via gpio
 In-Reply-To: <1391785155-18525-1-git-send-email-richard.genoud@gmail.com>
 References: <1391785155-18525-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1391785155-18525-7-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1391785155-18525-9-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On sam9x5, the USART controller doesn't handle DTR/DSR/DCD/RI signals,
 so we have to control them via GPIO.
 
-This patch permits to use a GPIO to control the DSR signal.
+This patch permits to use a GPIO to control the DCD signal.
 
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 ---
@@ -21,425 +21,440 @@ Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
  arch/arm/mach-at91/at91sam9263_devices.c           |  4 +++
  arch/arm/mach-at91/at91sam9g45_devices.c           |  5 +++
  arch/arm/mach-at91/at91sam9rl_devices.c            |  5 +++
- drivers/tty/serial/atmel_serial.c                  | 37 +++++++++++++++++++++-
+ drivers/tty/serial/atmel_serial.c                  | 38 ++++++++++++++++++++--
  include/linux/platform_data/atmel.h                |  1 +
- 9 files changed, 70 insertions(+), 1 deletion(-)
+ 9 files changed, 69 insertions(+), 3 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-index 77d45c88b494..3b90795ee641 100644
+index 11d033649b19..4ff660e1487f 100644
 --- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
 +++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
-@@ -19,6 +19,8 @@ Optional properties:
-   function pin for the USART CTS feature. If unsure, don't specify this property.
- - dtr-gpios: specify a GPIO for DTR line. It will use specified PIO instead of the peripheral
-   function pin for the USART DTR feature. If unsure, don't specify this property.
-+- dsr-gpios: specify a GPIO for DSR line. It will use specified PIO instead of the peripheral
-+  function pin for the USART DSR feature. If unsure, don't specify this property.
+@@ -23,6 +23,8 @@ Optional properties:
+   function pin for the USART DSR feature. If unsure, don't specify this property.
+ - ri-gpios: specify a GPIO for Ring line. It will use specified PIO instead of the peripheral
+   function pin for the USART Ring feature. If unsure, don't specify this property.
++- dcd-gpios: specify a GPIO for DCD line. It will use specified PIO instead of the peripheral
++  function pin for the USART DCD feature. If unsure, don't specify this property.
  - add dma bindings for dma transfer:
  	- dmas: DMA specifier, consisting of a phandle to DMA controller node,
  		memory peripheral interface and USART DMA channel ID, FIFO configuration.
-@@ -42,6 +44,7 @@ Example:
- 		rts-gpios = <&pioD 15 0>;
- 		cts-gpios = <&pioD 16 0>;
+@@ -48,6 +50,7 @@ Example:
  		dtr-gpios = <&pioD 17 0>;
-+		dsr-gpios = <&pioD 18 0>;
+ 		dsr-gpios = <&pioD 18 0>;
+ 		ri-gpios = <&pioD 19 0>;
++		dcd-gpios = <&pioD 20 0>;
  	};
  
  - use DMA:
 diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index d8523cc05157..980ea65142b4 100644
+index 11c5c7f5b067..288421f38b42 100644
 --- a/arch/arm/mach-at91/at91rm9200_devices.c
 +++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -925,6 +925,7 @@ static struct atmel_uart_data dbgu_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -927,6 +927,7 @@ static struct atmel_uart_data dbgu_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 dbgu_dmamask = DMA_BIT_MASK(32);
-@@ -966,6 +967,7 @@ static struct atmel_uart_data uart0_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -970,6 +971,7 @@ static struct atmel_uart_data uart0_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart0_dmamask = DMA_BIT_MASK(32);
-@@ -1019,6 +1021,7 @@ static struct atmel_uart_data uart1_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1025,6 +1027,7 @@ static struct atmel_uart_data uart1_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart1_dmamask = DMA_BIT_MASK(32);
-@@ -1073,6 +1076,7 @@ static struct atmel_uart_data uart2_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1081,6 +1084,7 @@ static struct atmel_uart_data uart2_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart2_dmamask = DMA_BIT_MASK(32);
-@@ -1119,6 +1123,7 @@ static struct atmel_uart_data uart3_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1129,6 +1133,7 @@ static struct atmel_uart_data uart3_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart3_dmamask = DMA_BIT_MASK(32);
 diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index b8e325b00e1a..c11d1225a75c 100644
+index f8ccdbe2bcbc..0e20ba04d43f 100644
 --- a/arch/arm/mach-at91/at91sam9260_devices.c
 +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -822,6 +822,7 @@ static struct atmel_uart_data dbgu_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -824,6 +824,7 @@ static struct atmel_uart_data dbgu_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 dbgu_dmamask = DMA_BIT_MASK(32);
-@@ -863,6 +864,7 @@ static struct atmel_uart_data uart0_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -867,6 +868,7 @@ static struct atmel_uart_data uart0_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart0_dmamask = DMA_BIT_MASK(32);
-@@ -917,6 +919,7 @@ static struct atmel_uart_data uart1_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -923,6 +925,7 @@ static struct atmel_uart_data uart1_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart1_dmamask = DMA_BIT_MASK(32);
-@@ -963,6 +966,7 @@ static struct atmel_uart_data uart2_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -971,6 +974,7 @@ static struct atmel_uart_data uart2_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart2_dmamask = DMA_BIT_MASK(32);
-@@ -1009,6 +1013,7 @@ static struct atmel_uart_data uart3_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1019,6 +1023,7 @@ static struct atmel_uart_data uart3_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart3_dmamask = DMA_BIT_MASK(32);
-@@ -1055,6 +1060,7 @@ static struct atmel_uart_data uart4_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1067,6 +1072,7 @@ static struct atmel_uart_data uart4_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart4_dmamask = DMA_BIT_MASK(32);
-@@ -1096,6 +1102,7 @@ static struct atmel_uart_data uart5_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1110,6 +1116,7 @@ static struct atmel_uart_data uart5_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart5_dmamask = DMA_BIT_MASK(32);
 diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-index 3a05d9f09b0d..ea35af48a2e2 100644
+index c40aa819cfac..d3d7a546db9b 100644
 --- a/arch/arm/mach-at91/at91sam9261_devices.c
 +++ b/arch/arm/mach-at91/at91sam9261_devices.c
-@@ -883,6 +883,7 @@ static struct atmel_uart_data dbgu_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -885,6 +885,7 @@ static struct atmel_uart_data dbgu_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 dbgu_dmamask = DMA_BIT_MASK(32);
-@@ -924,6 +925,7 @@ static struct atmel_uart_data uart0_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -928,6 +929,7 @@ static struct atmel_uart_data uart0_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart0_dmamask = DMA_BIT_MASK(32);
-@@ -970,6 +972,7 @@ static struct atmel_uart_data uart1_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -976,6 +978,7 @@ static struct atmel_uart_data uart1_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart1_dmamask = DMA_BIT_MASK(32);
-@@ -1016,6 +1019,7 @@ static struct atmel_uart_data uart2_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1024,6 +1027,7 @@ static struct atmel_uart_data uart2_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart2_dmamask = DMA_BIT_MASK(32);
 diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index d26255ba3907..c8833ebd4fcb 100644
+index 1da08465d952..5fcb2a0383d1 100644
 --- a/arch/arm/mach-at91/at91sam9263_devices.c
 +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -1327,6 +1327,7 @@ static struct atmel_uart_data dbgu_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1329,6 +1329,7 @@ static struct atmel_uart_data dbgu_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 dbgu_dmamask = DMA_BIT_MASK(32);
-@@ -1368,6 +1369,7 @@ static struct atmel_uart_data uart0_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1372,6 +1373,7 @@ static struct atmel_uart_data uart0_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart0_dmamask = DMA_BIT_MASK(32);
-@@ -1414,6 +1416,7 @@ static struct atmel_uart_data uart1_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1420,6 +1422,7 @@ static struct atmel_uart_data uart1_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart1_dmamask = DMA_BIT_MASK(32);
-@@ -1460,6 +1463,7 @@ static struct atmel_uart_data uart2_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1468,6 +1471,7 @@ static struct atmel_uart_data uart2_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart2_dmamask = DMA_BIT_MASK(32);
 diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index 67e9f7f259e1..76772d12acfd 100644
+index 4520d8f70cff..bd44970403e5 100644
 --- a/arch/arm/mach-at91/at91sam9g45_devices.c
 +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -1590,6 +1590,7 @@ static struct atmel_uart_data dbgu_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1592,6 +1592,7 @@ static struct atmel_uart_data dbgu_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 dbgu_dmamask = DMA_BIT_MASK(32);
-@@ -1631,6 +1632,7 @@ static struct atmel_uart_data uart0_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1635,6 +1636,7 @@ static struct atmel_uart_data uart0_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart0_dmamask = DMA_BIT_MASK(32);
-@@ -1677,6 +1679,7 @@ static struct atmel_uart_data uart1_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1683,6 +1685,7 @@ static struct atmel_uart_data uart1_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart1_dmamask = DMA_BIT_MASK(32);
-@@ -1723,6 +1726,7 @@ static struct atmel_uart_data uart2_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1731,6 +1734,7 @@ static struct atmel_uart_data uart2_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart2_dmamask = DMA_BIT_MASK(32);
-@@ -1769,6 +1773,7 @@ static struct atmel_uart_data uart3_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1779,6 +1783,7 @@ static struct atmel_uart_data uart3_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart3_dmamask = DMA_BIT_MASK(32);
 diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index 94fecc40dbba..2aa6f8ddcd53 100644
+index 5916d65b6362..e43623dc1c9e 100644
 --- a/arch/arm/mach-at91/at91sam9rl_devices.c
 +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -959,6 +959,7 @@ static struct atmel_uart_data dbgu_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -961,6 +961,7 @@ static struct atmel_uart_data dbgu_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 dbgu_dmamask = DMA_BIT_MASK(32);
-@@ -1000,6 +1001,7 @@ static struct atmel_uart_data uart0_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1004,6 +1005,7 @@ static struct atmel_uart_data uart0_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart0_dmamask = DMA_BIT_MASK(32);
-@@ -1054,6 +1056,7 @@ static struct atmel_uart_data uart1_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1060,6 +1062,7 @@ static struct atmel_uart_data uart1_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart1_dmamask = DMA_BIT_MASK(32);
-@@ -1100,6 +1103,7 @@ static struct atmel_uart_data uart2_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1108,6 +1111,7 @@ static struct atmel_uart_data uart2_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart2_dmamask = DMA_BIT_MASK(32);
-@@ -1146,6 +1150,7 @@ static struct atmel_uart_data uart3_data = {
- 	.rts_gpio	= -EINVAL,
- 	.cts_gpio	= -EINVAL,
+@@ -1156,6 +1160,7 @@ static struct atmel_uart_data uart3_data = {
  	.dtr_gpio	= -EINVAL,
-+	.dsr_gpio	= -EINVAL,
+ 	.dsr_gpio	= -EINVAL,
+ 	.ri_gpio	= -EINVAL,
++	.dcd_gpio	= -EINVAL,
  };
  
  static u64 uart3_dmamask = DMA_BIT_MASK(32);
 diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index f5bdb84aed53..28b3636135cd 100644
+index 9d47497713ab..926f77e6bde5 100644
 --- a/drivers/tty/serial/atmel_serial.c
 +++ b/drivers/tty/serial/atmel_serial.c
-@@ -134,6 +134,8 @@ struct gpio_lines {
- 	int cts;	/* optional CTS GPIO */
- 	int cts_irq;
- 	int dtr;	/* optional DTR GPIO */
-+	int dsr;	/* optional DSR GPIO */
-+	int dsr_irq;
+@@ -138,6 +138,8 @@ struct gpio_lines {
+ 	int dsr_irq;
+ 	int ri;		/* optional Ring GPIO */
+ 	int ri_irq;
++	int dcd;	/* optional DCD GPIO */
++	int dcd_irq;
  };
  
  /*
-@@ -262,6 +264,13 @@ static unsigned int atmel_get_lines_status(struct uart_port *port)
- 			status &= ~ATMEL_US_CTS;
+@@ -280,6 +282,13 @@ static unsigned int atmel_get_lines_status(struct uart_port *port)
+ 			status &= ~ATMEL_US_RI;
  	}
  
-+	if (gpio_is_valid(atmel_port->gpio.dsr)) {
-+		if (gpio_get_value(atmel_port->gpio.dsr))
-+			status |= ATMEL_US_DSR;
++	if (gpio_is_valid(atmel_port->gpio.dcd)) {
++		if (gpio_get_value(atmel_port->gpio.dcd))
++			status |= ATMEL_US_DCD;
 +		else
-+			status &= ~ATMEL_US_DSR;
++			status &= ~ATMEL_US_DCD;
 +	}
 +
  	return status;
  }
  
-@@ -495,13 +504,18 @@ static void atmel_enable_ms(struct uart_port *port)
+@@ -503,7 +512,7 @@ static void atmel_stop_rx(struct uart_port *port)
+ static void atmel_enable_ms(struct uart_port *port)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+-	uint32_t ier;
++	uint32_t ier = 0;
+ 
+ 	/*
+ 	 * Interrupt should not be enabled twice
+@@ -513,8 +522,6 @@ static void atmel_enable_ms(struct uart_port *port)
  
  	atmel_port->ms_irq_enabled = true;
  
--	ier = ATMEL_US_RIIC | ATMEL_US_DSRIC | ATMEL_US_DCDIC;
-+	ier = ATMEL_US_RIIC | ATMEL_US_DCDIC;
- 
+-	ier = ATMEL_US_DCDIC;
+-
  	if (atmel_port->gpio.cts_irq != INVALID_IRQ)
  		enable_irq(atmel_port->gpio.cts_irq);
  	else
- 		ier |= ATMEL_US_CTSIC;
+@@ -530,6 +537,11 @@ static void atmel_enable_ms(struct uart_port *port)
+ 	else
+ 		ier |= ATMEL_US_RIIC;
  
-+	if (atmel_port->gpio.dsr_irq != INVALID_IRQ)
-+		enable_irq(atmel_port->gpio.dsr_irq);
++	if (atmel_port->gpio.dcd_irq != INVALID_IRQ)
++		enable_irq(atmel_port->gpio.dcd_irq);
 +	else
-+		ier |= ATMEL_US_DSRIC;
++		ier |= ATMEL_US_DCDIC;
 +
  	UART_PUT_IER(port, ier);
  }
  
-@@ -1105,6 +1119,11 @@ static irqreturn_t atmel_interrupt(int irq, void *dev_id)
- 			if ((irq !=  INVALID_IRQ) &&
- 			    (irq == atmel_port->gpio.cts_irq))
- 				pending |= ATMEL_US_CTSIC;
-+
+@@ -1142,6 +1154,10 @@ static irqreturn_t atmel_interrupt(int irq, void *dev_id)
+ 			    (irq == atmel_port->gpio.ri_irq))
+ 				pending |= ATMEL_US_RIIC;
+ 
 +			if ((irq !=  INVALID_IRQ) &&
-+			    (irq == atmel_port->gpio.dsr_irq))
-+				pending |= ATMEL_US_DSRIC;
++			    (irq == atmel_port->gpio.dcd_irq))
++				pending |= ATMEL_US_DCDIC;
 +
  			gpio_handled = true;
  		}
  		if (!pending)
-@@ -1638,6 +1657,11 @@ static int atmel_startup(struct uart_port *port)
+@@ -1685,6 +1701,11 @@ static int atmel_startup(struct uart_port *port)
  	if (retval)
- 		goto free_ctrl_irq;
+ 		goto free_dsr_irq;
  
-+	retval = atmel_request_gpio_irq(port, atmel_port->gpio.dsr_irq,
-+					"atmel_dsr_irq");
++	retval = atmel_request_gpio_irq(port, atmel_port->gpio.dcd_irq,
++					"atmel_dcd_irq");
 +	if (retval)
-+		goto free_cts_irq;
++		goto free_ri_irq;
 +
  	/*
  	 * Initialize DMA (if necessary)
  	 */
-@@ -1703,6 +1727,9 @@ static int atmel_startup(struct uart_port *port)
+@@ -1750,6 +1771,9 @@ static int atmel_startup(struct uart_port *port)
  
  	return 0;
  
-+free_cts_irq:
-+	free_irq(atmel_port->gpio.cts_irq, port);
++free_ri_irq:
++	free_irq(atmel_port->gpio.ri_irq, port);
 +
- free_ctrl_irq:
- 	free_irq(port->irq, port);
+ free_dsr_irq:
+ 	free_irq(atmel_port->gpio.dsr_irq, port);
  
-@@ -1759,6 +1786,8 @@ static void atmel_shutdown(struct uart_port *port)
- 	free_irq(port->irq, port);
- 	if (atmel_port->gpio.cts_irq != INVALID_IRQ)
- 		free_irq(atmel_port->gpio.cts_irq, port);
-+	if (atmel_port->gpio.dsr_irq != INVALID_IRQ)
-+		free_irq(atmel_port->gpio.dsr_irq, port);
+@@ -1816,6 +1840,8 @@ static void atmel_shutdown(struct uart_port *port)
+ 		free_irq(atmel_port->gpio.dsr_irq, port);
+ 	if (atmel_port->gpio.ri_irq != INVALID_IRQ)
+ 		free_irq(atmel_port->gpio.ri_irq, port);
++	if (atmel_port->gpio.dcd_irq != INVALID_IRQ)
++		free_irq(atmel_port->gpio.dcd_irq, port);
  
  	atmel_port->ms_irq_enabled = false;
  }
-@@ -2464,6 +2493,8 @@ static int atmel_init_gpios(struct atmel_uart_port *atmel_port,
- 				  "CTS", &atmel_port->gpio.cts_irq);
- 	ret += atmel_request_gpio(&pdev->dev, atmel_port->gpio.dtr,
- 				  "DTR", NULL);
-+	ret += atmel_request_gpio(&pdev->dev, atmel_port->gpio.dsr,
-+				  "DSR", &atmel_port->gpio.dsr_irq);
+@@ -2525,6 +2551,8 @@ static int atmel_init_gpios(struct atmel_uart_port *atmel_port,
+ 				  "DSR", &atmel_port->gpio.dsr_irq);
+ 	ret += atmel_request_gpio(&pdev->dev, atmel_port->gpio.ri,
+ 				  "RI", &atmel_port->gpio.ri_irq);
++	ret += atmel_request_gpio(&pdev->dev, atmel_port->gpio.dcd,
++				  "DCD", &atmel_port->gpio.dcd_irq);
  	return ret;
  }
  
-@@ -2505,15 +2536,19 @@ static int atmel_serial_probe(struct platform_device *pdev)
- 	port->gpio.rts = -EINVAL; /* Invalid, zero could be valid */
- 	port->gpio.cts = -EINVAL;
+@@ -2568,21 +2596,25 @@ static int atmel_serial_probe(struct platform_device *pdev)
  	port->gpio.dtr = -EINVAL;
-+	port->gpio.dsr = -EINVAL;
+ 	port->gpio.dsr = -EINVAL;
+ 	port->gpio.ri = -EINVAL;
++	port->gpio.dcd = -EINVAL;
  	port->gpio.cts_irq = INVALID_IRQ;
-+	port->gpio.dsr_irq = INVALID_IRQ;
+ 	port->gpio.dsr_irq = INVALID_IRQ;
+ 	port->gpio.ri_irq = INVALID_IRQ;
++	port->gpio.dcd_irq = INVALID_IRQ;
  	if (pdata) {
  		port->gpio.rts = pdata->rts_gpio;
  		port->gpio.cts = pdata->cts_gpio;
  		port->gpio.dtr = pdata->dtr_gpio;
-+		port->gpio.dsr = pdata->dsr_gpio;
+ 		port->gpio.dsr = pdata->dsr_gpio;
+ 		port->gpio.ri = pdata->ri_gpio;
++		port->gpio.dcd = pdata->dcd_gpio;
  	} else if (np) {
  		port->gpio.rts = of_get_named_gpio(np, "rts-gpios", 0);
  		port->gpio.cts = of_get_named_gpio(np, "cts-gpios", 0);
  		port->gpio.dtr = of_get_named_gpio(np, "dtr-gpios", 0);
-+		port->gpio.dsr = of_get_named_gpio(np, "dsr-gpios", 0);
+ 		port->gpio.dsr = of_get_named_gpio(np, "dsr-gpios", 0);
+ 		port->gpio.ri = of_get_named_gpio(np, "ri-gpios", 0);
++		port->gpio.dcd = of_get_named_gpio(np, "dcd-gpios", 0);
  	}
  
  	ret = atmel_init_gpios(port, pdev);
 diff --git a/include/linux/platform_data/atmel.h b/include/linux/platform_data/atmel.h
-index 8472b6f3c618..81f2c658c996 100644
+index ce6ca1b8aef3..565c5c693c7f 100644
 --- a/include/linux/platform_data/atmel.h
 +++ b/include/linux/platform_data/atmel.h
-@@ -87,6 +87,7 @@ struct atmel_uart_data {
- 	int			rts_gpio;	/* optional RTS GPIO */
+@@ -88,6 +88,7 @@ struct atmel_uart_data {
  	int			cts_gpio;	/* optional CTS GPIO */
  	int			dtr_gpio;	/* optional DTR GPIO */
-+	int			dsr_gpio;	/* optional DSR GPIO */
+ 	int			dsr_gpio;	/* optional DSR GPIO */
++	int			dcd_gpio;	/* optional DCD GPIO */
+ 	int			ri_gpio;	/* optional Ring GPIO */
  };
  
-  /* Touchscreen Controller */
 -- 
 1.8.5
