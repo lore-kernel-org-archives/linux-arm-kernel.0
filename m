@@ -1,32 +1,81 @@
-From: chf.fritz@googlemail.com (Christoph Fritz)
-Date: Fri, 07 Feb 2014 11:19:43 +0100
-Subject: [PATCH v3 0/4] ARM: add omap3 INCOstartec board support
-In-Reply-To: <1390782797-24105-1-git-send-email-chf.fritz@googlemail.com>
-References: <1390782797-24105-1-git-send-email-chf.fritz@googlemail.com>
-Message-ID: <1391768383.4937.112.camel@mars>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri,  7 Feb 2014 19:18:54 +0900
+Subject: [PATCH v3 4/6] ftrace: Add arm64 support to recordmcount
+In-Reply-To: <1391768336-5642-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1382598488-13511-1-git-send-email-takahiro.akashi@linaro.org>
+ <1391768336-5642-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1391768336-5642-5-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-01-27 at 01:33 +0100, Christoph Fritz wrote:
-> This set of patches adds board support for an omap3 system from INCOstartec.
-> It's based on next-20140124.
-> 
-> Due to a regression since next-20140115 the following errors are present:
-> 
->  - pin sys_clkout2, which gets configured to 24 Mhz by the fourth patch
->    in this set, erroneously outputs only 12 Mhz.
->    Just out of curiosity, configuring it to 48 Mhz puts out desired 24 Mhz.
-> 
->  - omap_dss, which gets configured by the third patch in this set, fails
->    to do 'dss_set_fck_rate(fck);' in
->    drivers/video/omap2/dss/dss.c:dss_setup_default_clock() which leads to:
-> 
->     | omapdss_dss: probe of omapdss_dss failed with error -22
->     | omapdss CORE error: Failed to initialize DSS platform driver
->     | panel-dpi panel-dpi.0: failed to find video source 'dpi.0
-> 
->   Both regressions seem to have something to do with the clock framework. 
->   Could this be related to the DT clock conversion patches?
+Recordmcount utility under scripts is run, after compiling each object,
+to find out all the locations of calling _mcount() and put them into
+specific seciton named __mcount_loc.
+Then linker collects all such information into a table in the kernel image
+(between __start_mcount_loc and __stop_mcount_loc) for later use by ftrace.
 
-Now with dt clock conversion fixes on its way, any chance to get this
-upstream?
+This patch adds arm64 specific definitions to identify such locations.
+There are two types of implementation, C and Perl. On arm64, only C version
+is used to build the kernel now that CONFIG_HAVE_C_RECORDMCOUNT is on.
+But Perl version is also maintained.
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm64/Kconfig      |    2 ++
+ scripts/recordmcount.c  |    4 ++++
+ scripts/recordmcount.pl |    5 +++++
+ 3 files changed, 11 insertions(+)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 4d81791..43fce76 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -27,6 +27,7 @@ config ARM64
+ 	select HARDIRQS_SW_RESEND
+ 	select HAVE_ARCH_JUMP_LABEL
+ 	select HAVE_ARCH_TRACEHOOK
++	select HAVE_C_RECORDMCOUNT
+ 	select HAVE_DEBUG_BUGVERBOSE
+ 	select HAVE_DEBUG_KMEMLEAK
+ 	select HAVE_DMA_API_DEBUG
+@@ -34,6 +35,7 @@ config ARM64
+ 	select HAVE_DMA_CONTIGUOUS
+ 	select HAVE_DYNAMIC_FTRACE
+ 	select HAVE_EFFICIENT_UNALIGNED_ACCESS
++	select HAVE_FTRACE_MCOUNT_RECORD
+ 	select HAVE_FUNCTION_TRACER
+ 	select HAVE_FUNCTION_GRAPH_TRACER
+ 	select HAVE_GENERIC_DMA_COHERENT
+diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
+index 9c22317..b92d9f7 100644
+--- a/scripts/recordmcount.c
++++ b/scripts/recordmcount.c
+@@ -347,6 +347,10 @@ do_file(char const *const fname)
+ 	case EM_ARM:	 reltype = R_ARM_ABS32;
+ 			 altmcount = "__gnu_mcount_nc";
+ 			 break;
++	case EM_AARCH64:
++			 reltype = R_AARCH64_ABS64;
++			 altmcount = "_mcount";
++			 break;
+ 	case EM_IA_64:	 reltype = R_IA64_IMM64;   gpfx = '_'; break;
+ 	case EM_METAG:	 reltype = R_METAG_ADDR32;
+ 			 altmcount = "_mcount_wrapper";
+diff --git a/scripts/recordmcount.pl b/scripts/recordmcount.pl
+index 91280b8..397b6b8 100755
+--- a/scripts/recordmcount.pl
++++ b/scripts/recordmcount.pl
+@@ -279,6 +279,11 @@ if ($arch eq "x86_64") {
+     $mcount_regex = "^\\s*([0-9a-fA-F]+):\\s*R_ARM_(CALL|PC24|THM_CALL)" .
+ 			"\\s+(__gnu_mcount_nc|mcount)\$";
+ 
++} elsif ($arch eq "arm64") {
++    $alignment = 3;
++    $section_type = '%progbits';
++    $mcount_regex = "^\\s*([0-9a-fA-F]+):\\s*R_AARCH64_CALL26\\s+_mcount\$";
++    $type = ".quad";
+ } elsif ($arch eq "ia64") {
+     $mcount_regex = "^\\s*([0-9a-fA-F]+):.*\\s_mcount\$";
+     $type = "data8";
+-- 
+1.7.9.5
