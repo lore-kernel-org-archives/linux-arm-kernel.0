@@ -1,105 +1,71 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Fri, 07 Feb 2014 10:57:15 +0530
-Subject: [PATCH 1/2] PPC: powernv: remove redundant cpuidle_idle_call()
-In-Reply-To: <alpine.LFD.2.11.1402070105170.1906@knanqh.ubzr>
-References: <1391696188-14540-1-git-send-email-nicolas.pitre@linaro.org>
- <CAKnoXLxCAqKaniGOwegNcOarS4FpoNKDY5PxOhe6j4wdtUAkLQ@mail.gmail.com>
- <52F3BCFE.3010703@linux.vnet.ibm.com>
- <alpine.LFD.2.11.1402070105170.1906@knanqh.ubzr>
-Message-ID: <52F46EB3.5080403@linux.vnet.ibm.com>
+From: arnab.basu@freescale.com (Arnab Basu)
+Date: Fri, 7 Feb 2014 05:41:08 +0000 (UTC)
+Subject: [PATCH 02/18] arm64: GICv3 device tree binding documentation
+References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
+ <1391607050-540-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <loom.20140207T062553-254@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Marc
 
-On 02/07/2014 06:47 AM, Nicolas Pitre wrote:
-> On Thu, 6 Feb 2014, Preeti U Murthy wrote:
-> 
->> Hi Daniel,
->>
->> On 02/06/2014 09:55 PM, Daniel Lezcano wrote:
->>> Hi Nico,
->>>
->>>
->>> On 6 February 2014 14:16, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->>>
->>>> The core idle loop now takes care of it.
->>>>
->>>> Signed-off-by: Nicolas Pitre <nico@linaro.org>
->>>> ---
->>>>  arch/powerpc/platforms/powernv/setup.c | 13 +------------
->>>>  1 file changed, 1 insertion(+), 12 deletions(-)
->>>>
->>>> diff --git a/arch/powerpc/platforms/powernv/setup.c
->>>> b/arch/powerpc/platforms/powernv/setup.c
->>>> index 21166f65c9..a932feb290 100644
->>>> --- a/arch/powerpc/platforms/powernv/setup.c
->>>> +++ b/arch/powerpc/platforms/powernv/setup.c
->>>> @@ -26,7 +26,6 @@
->>>>  #include <linux/of_fdt.h>
->>>>  #include <linux/interrupt.h>
->>>>  #include <linux/bug.h>
->>>> -#include <linux/cpuidle.h>
->>>>
->>>>  #include <asm/machdep.h>
->>>>  #include <asm/firmware.h>
->>>> @@ -217,16 +216,6 @@ static int __init pnv_probe(void)
->>>>         return 1;
->>>>  }
->>>>
->>>> -void powernv_idle(void)
->>>> -{
->>>> -       /* Hook to cpuidle framework if available, else
->>>> -        * call on default platform idle code
->>>> -        */
->>>> -       if (cpuidle_idle_call()) {
->>>> -               power7_idle();
->>>> -       }
->>>>
->>>
->>> The cpuidle_idle_call is called from arch_cpu_idle in
->>> arch/powerpc/kernel/idle.c between a ppc64_runlatch_off|on section.
->>> Shouldn't the cpuidle-powernv driver call these functions when entering
->>> idle ?
->>
->> Yes they should, I will send out a patch that does that ontop of this.
->> There have been cpuidle driver cleanups for powernv and pseries in this
->> merge window. While no change would be required in the pseries cpuidle
->> driver as a result of Nicolas's cleanup, we would need to add the
->> ppc64_runlatch_on and off functions before and after the entry into the
->> powernv idle states.
-> 
-> What about creating arch_cpu_idle_enter() and arch_cpu_idle_exit() in 
-> arch/powerpc/kernel/idle.c and calling ppc64_runlatch_off() and 
-> ppc64_runlatch_on() respectively from there instead?  Would that work?  
-> That would make the idle consolidation much easier afterwards.
+Marc Zyngier <marc.zyngier <at> arm.com> writes:
 
-I would not suggest doing this. The ppc64_runlatch_*() routines need to
-be called when we are sure that the cpu is about to enter or has exit an
-idle state. Moving the ppc64_runlatch_on() routine to
-arch_cpu_idle_enter() for instance is not a good idea because there are
-places where the cpu can decide not to enter any idle state before the
-call to cpuidle_idle_call() itself. In that case communicating
-prematurely that we are in an idle state would not be a good idea.
+> +
+> +AArch64 SMP cores are often associated with a GICv3, providing private
+> +peripheral interrupts (PPI), shared peripheral interrupts (SPI),
+> +software generated interrupts (SGI), and locality-specific peripheral
+> +Interrupts (LPI).
+> +
+> +Main node required properties:
+> +
+> +- compatible : should at least contain  "arm,gic-v3".
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. Must be a single cell with a value of at least 3.
+> +
+> +  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
+> +  interrupts. Other values are reserved for future use.
 
-So its best to add the ppc64_runlatch_* calls in the powernv cpuidle
-driver IMO. We could however create idle_loop_prologue/epilogue()
-variants inside it so that in addition to the runlatch routines we could
-potentially add more such similar routines that are powernv specific.
-  If there are cases where there is work to be done prior to and post an
-entry into an idle state common to both pseries and powernv, we will
-probably put them in arch_cpu_idle_enter/exit(). But the runlatch
-routines are not suitable to be moved there as far as I can see.
+These values are defined in
+"include/dt-bindings/interrupt-controller/arm-gic.h" maybe we should start
+mentioning that here and encourage future device treese to use those defines
+to improve readability.
 
-Thank you
+> +
+> +  The 2nd cell contains the interrupt number for the interrupt type.
+> +  SPI interrupts are in the range [0-987]. PPI interrupts are in the
+> +  range [0-15].
+> +
+> +  The 3rd cell is the flags, encoded as follows:
+> +	bits[3:0] trigger type and level flags.
+> +		1 = edge triggered
+> +		2 = edge triggered (deprecated, for compatibility with GICv2)
+> +		4 = level triggered
+> +		8 = level triggered (deprecated, for compatibility with GICv2)
 
-Regards
-Preeti U Murthy
-> 
-> 
-> Nicolas
-> _______________________________________________
-> Linuxppc-dev mailing list
-> Linuxppc-dev at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/linuxppc-dev
-> 
+Similar to the above comment
+"include/dt-bindings/interrupt-controller/irq.h" defines the trigger type
+and level flags. Although this file currently contains the GICv2 bindings,
+we could update them.
+
+Thanks
+Arnab
+
+> +
+> +  Cells 4 and beyond are reserved for future use. Where the 1st cell
+> +  has a value of 0 or 1, cells 4 and beyond act as padding, and may be
+> +  ignored. It is recommended that padding cells have a value of 0.
+> +
+> +- reg : Specifies base physical address(s) and size of the GIC
+> +  registers, in the following order:
+> +  - GIC Distributor interface (GICD)
+> +  - GIC Redistributors (GICR), one range per redistributor region
+> +  - GIC CPU interface (GICC)
+> +  - GIC Hypervisor interface (GICH)
+> +  - GIC Virtual CPU interface (GICV)
+> +
+> +  GICC, GICH and GICV are optional.
+> +
+> +- interrupts : Interrupt source of the VGIC maintenance interrupt.
+> +
