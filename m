@@ -1,31 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 07 Feb 2014 16:34:45 -0700
-Subject: [PATCH] ARM: tegra: enable I2C MUX PCA954x
-In-Reply-To: <1391806412-8561-1-git-send-email-pengw@nvidia.com>
-References: <1391806412-8561-1-git-send-email-pengw@nvidia.com>
-Message-ID: <52F56D95.50707@wwwdotorg.org>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Fri, 07 Feb 2014 15:36:35 -0800
+Subject: [PATCH v5 00/14] Add support for MSM's mmio clock/reset controller
+In-Reply-To: <1391806318.28199.6.camel@joe-AO722>
+References: <1389811654-21397-1-git-send-email-sboyd@codeaurora.org>
+ <52F45DEE.8020400@gmail.com> <1391749891.15777.31.camel@joe-AO722>
+ <52F53642.3030606@gmail.com> <1391806318.28199.6.camel@joe-AO722>
+Message-ID: <52F56E03.7010805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2014 01:53 PM, Bryan Wu wrote:
-> Cardhu has a PCA9546 for I2C bus extension, which connects to 3
-> cameras. It's required for Tegra V4L2 soc camera driver and camera
-> sensor drivers.
+On 2/7/2014 12:51 PM, Joe Perches wrote:
+> On Fri, 2014-02-07 at 11:38 -0800, Frank Rowand wrote:
+>> On 2/6/2014 9:11 PM, Joe Perches wrote:
+>>> For patch 1, what checkpatch bug might that be?
+> []
+>> Sorry, it is patch 2, not patch 1 ("[PATCH v5 02/14] clk: Add set_rate_and_parent() op"):
+>>
+>>    WARNING: Multiple spaces after return type
+>>    #188: FILE: include/linux/clk-provider.h:154:
+>>    +       int             (*set_rate_and_parent)(struct clk_hw *hw,
+>>
+>>    total: 0 errors, 1 warnings, 152 lines checked
+> 
+> Yup, that one might be a bit aggressive.
+> 
+> It's a complaint about function pointer declaration style.
+> 
+> from checkpatch:
+> ------------------------------------------------------
+> # unnecessary space "type  (*funcptr)(args...)"
+> 			elsif ($declare =~ /\s{2,}$/) {
+> 				WARN("SPACING",
+> 				     "Multiple spaces after return type\n" . $herecurr);
+> 			}
+> ------------------------------------------------------
+> 
+> This is warning about style equivalent to declarations like:
+> 
+> int		foo(int bar);
+> 
+> checkpatch doesn't warn about declarations of that style,
+> so likely checkpatch shouldn't warn about multiple spaces
+> after a function pointer return type either.
+> 
+> I don't have a strong opinion one way or another about it.
+> 
+> If you think it should be silenced, it could be either
+> downgraded to a CHK or removed altogether.
 
->  arch/arm/boot/dts/tegra30-cardhu.dtsi | 8 ++++++++
->  arch/arm/configs/tegra_defconfig      | 1 +
+OK, now the warning makes sense.  I was reading "spaces" to mean
+the space character instead of white space.
 
-DT and defconfig changes go into separate branches. Could I get this
-split into two patches please?
+I don't have a strong opinion either, but downgrading to a CHK
+would be nice.
 
-> diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+It would be less confusing to me (though awkward sounding) to
+change the message to "Multiple whitespaces after return type".
 
-> +		/* NXP PCA9546 I2C Mux */
-
-That comment isn't useful, since the compatible value below spells out
-what the device is.
-
-> +		pca9546 at 70 {
-
-DT nodes should be named after the class/type of device, not the
-identify. As such, use "i2cmux at 70".
+-Frank
