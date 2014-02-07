@@ -1,42 +1,72 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 07 Feb 2014 09:55:53 +0000
-Subject: [PATCH 1/3] clk: rcar-h2: fix sd0/sd1 divisor table
-In-Reply-To: <87y51nbey3.wl%kuninori.morimoto.gx@gmail.com>
-References: <1391537858-28593-1-git-send-email-william.towle@codethink.co.uk>
- <52F226A0.5070301@codethink.co.uk> <52F23166.1030609@codethink.co.uk>
- <2298259.CqC51XrMZM@avalon> <87txcdul4b.wl%kuninori.morimoto.gx@gmail.com>
- <87y51nbey3.wl%kuninori.morimoto.gx@gmail.com>
-Message-ID: <52F4ADA9.7020600@codethink.co.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 07 Feb 2014 10:58:24 +0100
+Subject: [PATCH 0/6] mmc: sdhci-s3c: Fix base clock source management
+In-Reply-To: <1389476346-20396-1-git-send-email-tomasz.figa@gmail.com>
+References: <1389476346-20396-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <52F4AE40.9050907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/14 06:43, Kuninori Morimoto wrote:
-> Hi William, Ben, Laurent
+Hi Chris,
+
+On 11.01.2014 22:39, Tomasz Figa wrote:
+> On platforms prior to Exynos the SDHCI block used internal clock
+> divider controlled by SELFREQ field of CLKCON register to divide base
+> clock selected from several external clocks fed to the block by
+> SELBASECLK bitfield of CONTROL2 register. Depending on wanted clock
+> frequency, different external clock may be the best choice and so
+> the driver needs to switch the SELBASECLK mux on the fly.
 >
->>>>>>>    static const struct clk_div_table cpg_sd01_div_table[] = {
->>>>>>> +    {  0,  2 }, {  1,  3 }, {  2,  4 }, {  3,  6 },
->>>>>>> +    {  4,  8 },
->>>>>>>
->>>>>>>        {  5, 12 }, {  6, 16 }, {  7, 18 }, {  8, 24 },
->>>>>>>        { 10, 36 }, { 11, 48 }, { 12, 10 }, {  0,  0 },
+> However the selection logic has been broken for quite some time leaving
+> the controller using always clock 0, which is not always the right
+> source and leading to suboptimal performance of the SDHCI block on
+> affected platforms.
 >
-> According to HW team, datasheet is correct.
-> Some HW has above un-documented implementation indeed,
-> but these are not supported.
-> But, 0x0100 (x1/8) on SD0FC/SD1FC is now supported and documented in
-> latest datasheet.
-
-Thanks, we do not have a copy of that so cannot comment.
-
->>>> sdhi0 showed 156MHz output, and it seemed to work. So there is a
->>>> distinct possibility that the sdh clock also supports setting 12
->>>> for a /10
+> This series intends to fix the problems mentioned above and also clean-up
+> clock management code slightly.
 >
-> According to HW there,
-> SDHFC will be stopped if you set 0xC.
+> Tested on S3C6410-based Mini6410 board, with following performance
+> figures:
+>
+> * Before this series (133 MHz HCLK always selected, leading to at most
+>    33 MHz card clock):
+>
+> root at tiny6410:~# hdparm -t /dev/mmcblk0
+>
+> /dev/mmcblk0:
+>   Timing buffered disk reads:  42 MB in  3.10 seconds =  13.54 MB/sec
+> root at tiny6410:~# hdparm -t /dev/mmcblk0
+>
+> /dev/mmcblk0:
+>   Timing buffered disk reads:  44 MB in  3.11 seconds =  14.14 MB/sec
+> root at tiny6410:~#
+>
+> * After this series (48 MHz EPLL clock selected, leading to 48 MHz card
+>    clock):
+>
+> root at tiny6410:~# hdparm -t /dev/mmcblk0
+>
+> /dev/mmcblk0:
+>   Timing buffered disk reads:  56 MB in  3.04 seconds =  18.41 MB/sec
+> root at tiny6410:~# hdparm -t /dev/mmcblk0
+>
+> /dev/mmcblk0:
+>   Timing buffered disk reads:  60 MB in  3.06 seconds =  19.63 MB/sec
+> root at tiny6410:~#
+>
+> Tomasz Figa (6):
+>    mmc: sdhci-s3c: Use shifts to divide by powers of two
+>    mmc: sdhci-s3c: Cache bus clock rates
+>    mmc: sdhci-s3c: Use correct condition to check for clock presence
+>    mmc: sdhci-s3c: Simplify min/max clock calculation
+>    mmc: sdhci-s3c: Fix handling of bus clock switching
+>    mmc: sdhci-s3c: Do not allow frequencies higher than requested
+>
+>   drivers/mmc/host/sdhci-s3c.c | 170 ++++++++++++++++++++-----------------------
+>   1 file changed, 77 insertions(+), 93 deletions(-)
+>
 
-We'll look at re-working this patch and getting it re-sent.
+What do you think about this series?
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Best regards,
+Tomasz
