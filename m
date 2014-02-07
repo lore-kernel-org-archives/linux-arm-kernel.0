@@ -1,49 +1,64 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 7 Feb 2014 09:07:49 +0100
-Subject: [PATCH v2 1/2] at91: gpio: use gpiolib API to mark a GPIO used
- as an IRQ
-In-Reply-To: <52EB657A.4040601@atmel.com>
-References: <1390473478-5591-1-git-send-email-jjhiblot@traphandler.com>
- <1390473478-5591-2-git-send-email-jjhiblot@traphandler.com>
- <CACRpkdZ4LxkRERfD-prZvJSOZyomgf8v8P+vLhb_+hrSkL8rzg@mail.gmail.com>
- <52EB657A.4040601@atmel.com>
-Message-ID: <20140207080749.GS9558@ns203013.ovh.net>
+From: srinivas.kandagatla@st.com (srinivas kandagatla)
+Date: Fri, 7 Feb 2014 08:08:01 +0000
+Subject: [PATCH 1/4] ARM: STi: add stid127 soc support
+In-Reply-To: <201402061746.30248.arnd@arndb.de>
+References: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
+ <201401312115.33731.arnd@arndb.de> <52F22508.7080706@st.com>
+ <201402061746.30248.arnd@arndb.de>
+Message-ID: <52F49461.2020008@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:57 Fri 31 Jan     , Nicolas Ferre wrote:
-> On 31/01/2014 08:55, Linus Walleij :
-> > On Thu, Jan 23, 2014 at 11:37 AM, Jean-Jacques Hiblot
-> > <jjhiblot@traphandler.com> wrote:
-> > 
-> >> When an IRQ is started on a GPIO line, mark this GPIO as IRQ in
-> >> the gpiolib so we can keep track of the usage centrally.
-> >>
-> >> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> > 
-> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > 
-> > Nicolas, are you queueing this patch?
+On 06/02/14 16:46, Arnd Bergmann wrote:
+> On Wednesday 05 February 2014, srinivas kandagatla wrote:
+>> Currently l2cc bindings has few optional properties like.
+>>
+>> - arm,data-latency
+>> - arm,tag-latency
+>> - arm,dirty-latency
+>> - arm,filter-ranges
+>> - interrupts :
+>> - cache-id-part:
+>> - wt-override:
+>>
+>> These does not include properties to set "way-size", "associativity",
+>> "enabling prefetching", "Prefetch drop enable", "prefetch offset",
+>> "Double linefill" and few more in prefect control register and
+>> aux-control register.
+>>
+>> This is not just a issue with STi SOCs, having a quick look, I can see
+>> that few more SOCs have similar requirements to set these properties.
+>>
+>> We could do two things to get l2 setup automatically on STi SOCS.
+>>
+>> 1> Either define these properties case-by-case basic, which might be
+>> useful for other SOCs too.
+>>
+>> 2> Or Add new compatible string for STi SoCs so that they can
+>> automatically setup these values in cache-l2x0.c
+>>
+>> Am Ok with either approaches.
+>>
 > 
-> Yes, I will.
+> I suggested 1 in the past, but the objection that I saw (can't
+> find the email at the moment) was that the additional settings
+> are "configuration" rather than "hardware properties". What I'd
+> really need to know from you is which of properties you listed
+> as missing above are actually needed for your platform, and whether
+> they can be classified as hardware specific or just configuration.
+
+On STi Platforms we need below properties to got for option 1.
+arm,way-size;
+arm,instruction-prefetch-enable;
+arm,data-prefetch-enable;
+
+we also want a property or a way to set
+"Shareable attribute Override Enable" bit in the Auxiliary Control
+Register, bit[22].
+
+Thanks,
+srini
 > 
-> > I guess this custom GPIO implementation is going away with
-> > the transition to pinctrl else I'd requested that it be moved to
-> > drivers/gpio...
+> 	Arnd
 > 
-> Absolutely. But I suspect it will still be around for some time...
-moved no
-
-I'm not even sure we need to update it at all to simply for the switch to DT
-
-nearly all the support for old SoC is here so I see no reason to do not switch
-I even a big patch serie to switch old board to DT
-
-So for me no do not touch the old stuff
-
-Best Regards,
-J.
 > 
-> Thanks for your review. Bye,
-> -- 
-> Nicolas Ferre
