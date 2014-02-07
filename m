@@ -1,65 +1,103 @@
-From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Fri, 7 Feb 2014 21:08:54 +0530
-Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <CAGo_u6rymex=EZf0jj6rs2SpRARz2tA5F5jtT0+D-8BnSrfi9A@mail.gmail.com>
-References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
- <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
- <CAGo_u6rymex=EZf0jj6rs2SpRARz2tA5F5jtT0+D-8BnSrfi9A@mail.gmail.com>
-Message-ID: <CAJuA9ai0kk+i6sFfmw9vBDCnFPV67W5oMJqHUb7rUwS5iFgOMQ@mail.gmail.com>
+From: carlo.caione@gmail.com (Carlo Caione)
+Date: Fri, 7 Feb 2014 16:41:03 +0100
+Subject: [linux-sunxi] Re: [PATCH] irq: Add new flag to ack
+ level-triggered interrupts before unmasking
+In-Reply-To: <alpine.DEB.2.02.1402071121310.21991@ionos.tec.linutronix.de>
+References: <1391721117-27446-1-git-send-email-carlo@caione.org>
+ <alpine.DEB.2.02.1402062213590.21991@ionos.tec.linutronix.de>
+ <CAOQ7t2Z0agZdDZ_OQZPtXWXoi5NMTcOOZz04q6wEVNy0rxn4AA@mail.gmail.com>
+ <alpine.DEB.2.02.1402062229000.21991@ionos.tec.linutronix.de>
+ <CAOQ7t2bzz9vKh_5h2nF=m+JpeYVa=Ttd4XQgrAa6Lhdzjg_Qxw@mail.gmail.com>
+ <alpine.DEB.2.02.1402071121310.21991@ionos.tec.linutronix.de>
+Message-ID: <CAOQ7t2b5qVTUXOB4iWAOoTehm=u6zxP0-zQmirSF0DvEk8KddQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 7, 2014 at 8:57 PM, Nishanth Menon <nm@ti.com> wrote:
-> On Fri, Feb 7, 2014 at 9:19 AM, Thomas Abraham <ta.omasab@gmail.com> wrote:
->> From: Thomas Abraham <thomas.ab@samsung.com>
->>
->> Add a new optional boost-frequency binding for specifying the frequencies
->> usable in boost mode.
->>
->> Cc: Nishanth Menon <nm@ti.com>
->> Cc: Lukasz Majewski <l.majewski@samsung.com>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Pawel Moll <pawel.moll@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
->> Cc: Kumar Gala <galak@codeaurora.org>
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> ---
->>  Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt |   11 +++++++++++
->>  1 file changed, 11 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->>
->> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->> new file mode 100644
->> index 0000000..d925e38
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
->> @@ -0,0 +1,11 @@
->> +* Device tree binding for CPU boost frequency (aka over-clocking)
->> +
->> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
->> +overclocking) in which the CPU can operate in frequencies beyond the normal
->> +operating conditions.
->> +
->> +Optional Properties:
->> +- boost-frequency: list of frequencies in KHz to be used only in boost mode.
+On Fri, Feb 7, 2014 at 12:51 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> I can't see why it would be specific for the threaded case.
 >
-> boost-frequencies?
+> The explanation says that the NMI chip is ignoring the ack on mask,
+> which is basically the entry of the interrupt handler. Now it does not
+> matter whether you are threaded or not. The interrupt line at the NMI
+> controller is asserted in both cases. So the same issue should be
+> visible for a non threaded interrupt, if the NMI controller really
+> needs an ack on unmask.
 
-Okay, I will change it.
+Yes, you are right. I was focusing on the threaded case because it was
+the only case I have experienced with the hardware I have.
+The problem should be there also for the non threaded case (even
+though I don't know how to double check this).
+At this point I suspect that here the problem is that ACKing the NMI
+controller without ACKing ahead the device connected always fails (or
+at least is useless and the pending flag is not cleared), so when I
+unmask later the irqchip I have a spurious interrupt. That's why I
+need another ACK for the NMI controller _after_ having ACKed at device
+level.
+
+> But there is another detail:
+>
+>         sunxi_sc_nmi_handle_irq()
+>         chained_irq_enter()
+>                 NOP, because GIC uses EOI
+>
+>         generic_handle_irq();
+>                 nmi->mask();
+>                 dev_handler();
+>                 nmi->unmask();
+>
+>         chained_irq_exit()
+>                 gic->eoi();
+>
+> In the threaded case this looks like:
+>
+>         sunxi_sc_nmi_handle_irq()
+>         chained_irq_enter()
+>                 NOP, because GIC uses EOI
+>
+>         generic_handle_irq();
+>                 nmi->mask();
+>                 wake_thread();
+>
+>         chained_irq_exit()
+>                 gic->eoi();
+>
+>         run_thread()
+>                 dev_handler();
+>                 nmi->unmask();
+>
+> So the difference is that in the non threaded case the gic->eoi is
+> called after the device interrupt has been cleared and the
+> nmi->interrupt has been unmasked. And in the threaded case its the
+> other way round. I have no idea how that stuff is connected internaly,
+> but I suspect that the gic->eoi is related to this as it might
+> actually ack the NMI chip, which of course only works in the non
+> threaded case.
+
+Yeah, no really difference between threaded and non threaded.
+For the record, from a mail exchange with Allwinner's engineers: "the
+NMI module is a signal conversion module. It catches the NMI pin's
+state and generates irq to GIC", so GIC does not really ACK anything.
+BTW being a dummy "signal conversion module" this is probably why I
+still need to clear the pending status even though my IRQ line has
+already been cleared.
+
+> Now back to your patch.
+>
+> I'm not against having a flag, but this should be done less convoluted
+> and have proper names which make the use case clear along with a good
+> technical explanation of the flag in the comment.
+
+Ok, at this point do you think that a patch in the core could be
+useful or is it better to stick with modifying the unmask callback?
+
+> unmask_and_ack() plus IRQCHIP_ACK_ON_UNMASK are not really telling
+> what the heck is going on. You can restrict it to level irqs in the
+> core, but please use the proper functions and not some opencoded
+> hackery.
+
+I'll do in case of v2.
 
 Thanks,
-Thomas.
 
->
->> +  This list should be a subset of frequencies listed in "operating-points"
->> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
->> +  details about "operating-points" property.
->> --
->> 1.7.10.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Carlo Caione
