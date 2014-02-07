@@ -1,71 +1,39 @@
-From: arnab.basu@freescale.com (Arnab Basu)
-Date: Fri, 7 Feb 2014 05:41:08 +0000 (UTC)
-Subject: [PATCH 02/18] arm64: GICv3 device tree binding documentation
-References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
- <1391607050-540-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <loom.20140207T062553-254@post.gmane.org>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 7 Feb 2014 13:48:44 +0800
+Subject: [PATCH v9 00/12] Add power management support for mxs phy
+In-Reply-To: <e3a207a65094481e9a3e149ac89e6505@BL2PR03MB226.namprd03.prod.outlook.com>
+References: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
+ <e3a207a65094481e9a3e149ac89e6505@BL2PR03MB226.namprd03.prod.outlook.com>
+Message-ID: <CAL411-pR5BsNLP8cQYv=o_LsnWYnWD6qEYvWFHZz2f-zvxVJLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc
+On Mon, Jan 20, 2014 at 2:48 PM, Peter Chen <Peter.Chen@freescale.com> wrote:
+>
+>
+>
+>>
+>> Hi Felipe & Shawn,
+>>
+>> The serial adds power management support for MXS PHY, it includes:
+>>
+>> - Add one PHY API .set_wakeup, and related API implementation at mxs phy
+>> driver
+>> - misc changes and bug fixes for mxs phy to support low power mode and
+>> wakeup.
+>>
+>> It is based on the lastest Greg's usb-next, 3.13-rc5.
+>>
+>
+> Hi Felipe,
+>
+> I would like to confirm if this patchset is ok, and will be in
+> your 3.15 tree?
+>
 
-Marc Zyngier <marc.zyngier <at> arm.com> writes:
+ping...
 
-> +
-> +AArch64 SMP cores are often associated with a GICv3, providing private
-> +peripheral interrupts (PPI), shared peripheral interrupts (SPI),
-> +software generated interrupts (SGI), and locality-specific peripheral
-> +Interrupts (LPI).
-> +
-> +Main node required properties:
-> +
-> +- compatible : should at least contain  "arm,gic-v3".
-> +- interrupt-controller : Identifies the node as an interrupt controller
-> +- #interrupt-cells : Specifies the number of cells needed to encode an
-> +  interrupt source. Must be a single cell with a value of at least 3.
-> +
-> +  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
-> +  interrupts. Other values are reserved for future use.
 
-These values are defined in
-"include/dt-bindings/interrupt-controller/arm-gic.h" maybe we should start
-mentioning that here and encourage future device treese to use those defines
-to improve readability.
-
-> +
-> +  The 2nd cell contains the interrupt number for the interrupt type.
-> +  SPI interrupts are in the range [0-987]. PPI interrupts are in the
-> +  range [0-15].
-> +
-> +  The 3rd cell is the flags, encoded as follows:
-> +	bits[3:0] trigger type and level flags.
-> +		1 = edge triggered
-> +		2 = edge triggered (deprecated, for compatibility with GICv2)
-> +		4 = level triggered
-> +		8 = level triggered (deprecated, for compatibility with GICv2)
-
-Similar to the above comment
-"include/dt-bindings/interrupt-controller/irq.h" defines the trigger type
-and level flags. Although this file currently contains the GICv2 bindings,
-we could update them.
-
-Thanks
-Arnab
-
-> +
-> +  Cells 4 and beyond are reserved for future use. Where the 1st cell
-> +  has a value of 0 or 1, cells 4 and beyond act as padding, and may be
-> +  ignored. It is recommended that padding cells have a value of 0.
-> +
-> +- reg : Specifies base physical address(s) and size of the GIC
-> +  registers, in the following order:
-> +  - GIC Distributor interface (GICD)
-> +  - GIC Redistributors (GICR), one range per redistributor region
-> +  - GIC CPU interface (GICC)
-> +  - GIC Hypervisor interface (GICH)
-> +  - GIC Virtual CPU interface (GICV)
-> +
-> +  GICC, GICH and GICV are optional.
-> +
-> +- interrupts : Interrupt source of the VGIC maintenance interrupt.
-> +
+-- 
+BR,
+Peter Chen
