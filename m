@@ -1,37 +1,35 @@
-From: phdm@macq.eu (Philippe De Muyter)
-Date: Fri, 7 Feb 2014 11:51:06 +0100
-Subject: emmc on imx6 sabresd
-In-Reply-To: <20140206075748.GC3708@S2101-09.ap.freescale.net>
-References: <20140129100321.GA32101@frolo.macqel>
- <20140206075748.GC3708@S2101-09.ap.freescale.net>
-Message-ID: <20140207105106.GB7085@frolo.macqel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 7 Feb 2014 10:53:27 +0000
+Subject: [PATCH v2 05/15] mfd: max14577: Add detection of device type
+In-Reply-To: <1391767487-10017-6-git-send-email-k.kozlowski@samsung.com>
+References: <1391767487-10017-1-git-send-email-k.kozlowski@samsung.com>
+ <1391767487-10017-6-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20140207105327.GK14727@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Shawn,
-
-On Thu, Feb 06, 2014 at 03:57:50PM +0800, Shawn Guo wrote:
-> On Wed, Jan 29, 2014 at 11:03:21AM +0100, Philippe De Muyter wrote:
-> > Hi Shawn,
-> > 
-> > I try to use the emmc on my sabresd board and on a similar custom board
-> > using 3.13, and I have just discovered by reading Internet that it was
-> > not supported up to some weeks ago.  Is there a git tree somewhere that
-> > has a branch containing 3.13 or linux-next and all the fixes for emmc on
-> > sabresd ?
+> This patch continues the preparation for adding support for max77836
+> device to existing max14577 driver.
 > 
-> I think it will just work if you apply the patch [1] on top of
-> v3.14-rc1.
+> Add enum for types of devices supported by this driver. The device type
+> will be detected by matching of_device_id, or i2c_device_id as a
+> fallback.
 > 
-> Shawn
+> The patch also moves to separate function the code related to displaying
+> DeviceID register values.
 > 
-> [1] http://www.spinics.net/lists/linux-mmc/msg23039.html
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/mfd/max14577.c               |   64 ++++++++++++++++++++++++----------
+>  include/linux/mfd/max14577-private.h |   12 ++++---
+>  2 files changed, 53 insertions(+), 23 deletions(-)
 
-As I could not wait till then, I cloned the cjb's mmc tree, extracted the needed
-patches using 'git format-patch', and applied them to my (then) v3.13-rc8 tree
-using 'git am'.  I can confirm that that works perfectly.
-
-Philippe
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
 -- 
-Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
