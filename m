@@ -1,50 +1,153 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 7 Feb 2014 16:55:00 +0100
-Subject: [PATCH RFC 1/2] drivers/base: permit base components to omit the
- bind/unbind ops
+Date: Fri, 7 Feb 2014 17:53:27 +0100
+Subject: [PATCH RFC 2/2] drivers/base: declare phandle DT nodes as components
 In-Reply-To: <cover.1391793068.git.moinejf@free.fr>
 References: <cover.1391793068.git.moinejf@free.fr>
-Message-ID: <9b3c3c2c982f31b026fd1516a2b608026d55b1e9.1391793068.git.moinejf@free.fr>
+Message-ID: <9f8bbe28b00160cab2cedffa3f8fb42121035964.1391793068.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some simple components don't need to do any specific action on
-bind to / unbind from a master component.
+At system startup time, some devices depends on the availability of
+some other devices before starting. The infrastructure for componentised
+subsystems permits to handle this dependence, each driver defining
+its own role.
 
-This patch permits such components to omit the bind/unbind
-operations.
+This patch does an automatic creation of the lowest components in
+case of DT. This permits simple devices to be part of complex
+componentised subsystems without any specific code.
+
+When created from DT, the device dependence is generally indicated by
+phandle: a device which is pointed to by a phandle must be started
+before the pointing device(s).
+
+So, at device register time, the devices which are pointed to by a
+phandle are declared as components, except when they declared
+themselves as such in their probe function.
 
 Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/base/component.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ drivers/base/component.c | 12 ++++++++++++
+ drivers/base/core.c      | 18 ++++++++++++++++++
+ include/linux/of.h       |  2 ++
+ 3 files changed, 32 insertions(+)
 
 diff --git a/drivers/base/component.c b/drivers/base/component.c
-index c53efe6..0a39d7a 100644
+index 0a39d7a..3cab26b 100644
 --- a/drivers/base/component.c
 +++ b/drivers/base/component.c
-@@ -225,7 +225,8 @@ static void component_unbind(struct component *component,
+@@ -17,6 +17,7 @@
+ #include <linux/module.h>
+ #include <linux/mutex.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
+ 
+ struct master {
+ 	struct list_head node;
+@@ -336,6 +337,7 @@ EXPORT_SYMBOL_GPL(component_bind_all);
+ int component_add(struct device *dev, const struct component_ops *ops)
  {
- 	WARN_ON(!component->bound);
+ 	struct component *component;
++	struct device_node *np;
+ 	int ret;
  
--	component->ops->unbind(component->dev, master->dev, data);
-+	if (component->ops)
-+		component->ops->unbind(component->dev, master->dev, data);
- 	component->bound = false;
+ 	component = kzalloc(sizeof(*component), GFP_KERNEL);
+@@ -356,6 +358,11 @@ int component_add(struct device *dev, const struct component_ops *ops)
  
- 	/* Release all resources claimed in the binding of this component */
-@@ -274,7 +275,11 @@ static int component_bind(struct component *component, struct master *master,
- 	dev_dbg(master->dev, "binding %s (ops %ps)\n",
- 		dev_name(component->dev), component->ops);
- 
--	ret = component->ops->bind(component->dev, master->dev, data);
-+	if (component->ops)
-+		ret = component->ops->bind(component->dev, master->dev, data);
-+	else
-+		ret = 0;
+ 		kfree(component);
+ 	}
 +
- 	if (!ret) {
- 		component->bound = true;
++	np = dev->of_node;
++	if (np)
++		np->_flags |= OF_DEV_COMPONENT;
++
+ 	mutex_unlock(&component_mutex);
  
+ 	return ret < 0 ? ret : 0;
+@@ -365,6 +372,7 @@ EXPORT_SYMBOL_GPL(component_add);
+ void component_del(struct device *dev, const struct component_ops *ops)
+ {
+ 	struct component *c, *component = NULL;
++	struct device_node *np;
+ 
+ 	mutex_lock(&component_mutex);
+ 	list_for_each_entry(c, &component_list, node)
+@@ -377,6 +385,10 @@ void component_del(struct device *dev, const struct component_ops *ops)
+ 	if (component && component->master)
+ 		take_down_master(component->master);
+ 
++	np = dev->of_node;
++	if (np)
++		np->_flags &= ~OF_DEV_COMPONENT;
++
+ 	mutex_unlock(&component_mutex);
+ 
+ 	WARN_ON(!component);
+diff --git a/drivers/base/core.c b/drivers/base/core.c
+index 2b56717..0517b91 100644
+--- a/drivers/base/core.c
++++ b/drivers/base/core.c
+@@ -27,6 +27,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/netdevice.h>
+ #include <linux/sysfs.h>
++#include <linux/component.h>
+ 
+ #include "base.h"
+ #include "power/power.h"
+@@ -980,6 +981,7 @@ int device_add(struct device *dev)
+ 	struct device *parent = NULL;
+ 	struct kobject *kobj;
+ 	struct class_interface *class_intf;
++	struct device_node *np;
+ 	int error = -EINVAL;
+ 
+ 	dev = get_device(dev);
+@@ -1088,6 +1090,15 @@ int device_add(struct device *dev)
+ 				class_intf->add_dev(dev, class_intf);
+ 		mutex_unlock(&dev->class->p->mutex);
+ 	}
++
++	/* if DT-created device referenced by phandle, create a component */
++	np = dev->of_node;
++	if (np && np->phandle &&
++	    !(np->_flags & OF_DEV_COMPONENT)) {
++		component_add(dev, NULL);
++		np->_flags |= OF_DEV_IMPLICIT_COMPONENT;
++	}
++
+ done:
+ 	put_device(dev);
+ 	return error;
+@@ -1189,10 +1200,17 @@ void device_del(struct device *dev)
+ {
+ 	struct device *parent = dev->parent;
+ 	struct class_interface *class_intf;
++	struct device_node *np;
+ 
+ 	/* Notify clients of device removal.  This call must come
+ 	 * before dpm_sysfs_remove().
+ 	 */
++	np = dev->of_node;
++	if (np && (np->_flags & OF_DEV_COMPONENT)) {
++		component_del(dev, NULL);
++		np->_flags &= ~OF_DEV_IMPLICIT_COMPONENT;
++	}
++
+ 	if (dev->bus)
+ 		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
+ 					     BUS_NOTIFY_DEL_DEVICE, dev);
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 70c64ba..40f1c34 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -59,6 +59,8 @@ struct device_node {
+ 	struct	proc_dir_entry *pde;	/* this node's proc directory */
+ 	struct	kref kref;
+ 	unsigned long _flags;
++#define OF_DEV_COMPONENT 1
++#define OF_DEV_IMPLICIT_COMPONENT 2
+ 	void	*data;
+ #if defined(CONFIG_SPARC)
+ 	const char *path_component_name;
 -- 
 1.9.rc1
