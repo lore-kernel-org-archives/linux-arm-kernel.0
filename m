@@ -1,105 +1,61 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 7 Feb 2014 11:22:31 +0100
-Subject: [PATCH v3 06/15] at91: dt: at91sam9261ek: Adds DT entries for
- the 4 user buttons
-In-Reply-To: <CACh+v5O_CMcYKBKLzbcD2ypGLX_Pp+64fiqO4MWYw-J4h0KA7A@mail.gmail.com>
-References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>	<1390492639-7299-7-git-send-email-jjhiblot@traphandler.com>	<20140207082752.GV9558@ns203013.ovh.net>
- <CACh+v5O_CMcYKBKLzbcD2ypGLX_Pp+64fiqO4MWYw-J4h0KA7A@mail.gmail.com>
-Message-ID: <52F4B3E7.2080000@atmel.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 7 Feb 2014 12:33:38 +0200
+Subject: [RFC PATCH 08/15] ata: ahci_platform: Manage SATA PHY
+In-Reply-To: <5240492D.6060204@ti.com>
+References: <1379595943-14622-1-git-send-email-rogerq@ti.com>
+ <1379595943-14622-9-git-send-email-rogerq@ti.com>
+ <20130922165817.GD30946@htj.dyndns.org> <523F35E4.6050707@cogentembedded.com>
+ <20130922215107.GD27616@mtj.dyndns.org> <523FEFC2.801@ti.com>
+ <52403B4F.3070406@cogentembedded.com> <5240492D.6060204@ti.com>
+Message-ID: <52F4B682.2000201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/2014 10:30, Jean-Jacques Hiblot :
-> 2014-02-07 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
->> On 16:57 Thu 23 Jan     , Jean-Jacques Hiblot wrote:
->>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->>> ---
->>>  arch/arm/boot/dts/at91sam9261ek.dts | 39 +++++++++++++++++++++++++++++++++++++
->>>  1 file changed, 39 insertions(+)
+Hi,
+
+On 09/23/2013 04:59 PM, Roger Quadros wrote:
+> On 09/23/2013 03:59 PM, Sergei Shtylyov wrote:
+>> Hello.
 >>
->> do only one patch for the 9261ek support no nned to clean
->>>
->>> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
->>> index 8909217..5555e9f5 100644
->>> --- a/arch/arm/boot/dts/at91sam9261ek.dts
->>> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
->>> @@ -83,6 +83,15 @@
->>>                                               AT91_PIOA 23  AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
->>>                                       };
->>>                               };
->>> +
->>> +                             keys {
->>> +                                     pinctrl_keys: keys-0 {
->>> +                                             atmel,pins = <AT91_PIOA 27  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
->>> +                                             AT91_PIOA 26  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
->>> +                                             AT91_PIOA 25  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
->>> +                                             AT91_PIOA 24  AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
->>> +                                     };
->>> +                             };
+>> On 23-09-2013 11:37, Roger Quadros wrote:
 >>
->> no need this you can drop it
-> ok. I thought that it would help the user to understand the GPIO usage.
-> I'll remove all pinmux for GPIO that don't require a special hardware
-> configuration
-
-Well, me also, I like to see what the board requires for functioning
-properly. It is convenient for:
-- understanding clearly what is used and what is not
-- doing a grep when searching where a particular GPIO is used
-- describing completely the hardware (which is the purpose of DT)
-
-So, I would like additional consideration by more AT91 users before
-following this rule... And maybe a note by Linus W.
-
-Bye,
-
-
+>>>>>     Not sure why you asked -- I'm not using this driver, neither I'm
 >>
->> you just describe a gpio which we do not describe in pinctrl
->>>                       };
->>>
->>>                       watchdog at fffffd40 {
->>> @@ -109,4 +118,34 @@
->>>                       linux,default-trigger = "heartbeat";
->>>               };
->>>       };
->>> +
->>> +     gpio_keys {
->>> +             compatible = "gpio-keys";
->>> +             pinctrl-0 = <&pinctrl_keys>;
->>> +
->>> +             button_0 {
->>> +                     label = "button_0";
->>> +                     gpios = <&pioA 27 GPIO_ACTIVE_LOW>;
->>> +                     linux,code = <256>;
->>> +                     gpio-key,wakeup;
->>> +             };
->>> +             button_1 {
->>> +                     label = "button_1";
->>> +                     gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
->>> +                     linux,code = <257>;
->>> +                     gpio-key,wakeup;
->>> +             };
->>> +             button_2 {
->>> +                     label = "button_2";
->>> +                     gpios = <&pioA 25 GPIO_ACTIVE_LOW>;
->>> +                     linux,code = <258>;
->>> +                     gpio-key,wakeup;
->>> +             };
->>> +             button_3 {
->>> +                     label = "button_3";
->>> +                     gpios = <&pioA 24 GPIO_ACTIVE_LOW>;
->>> +                     linux,code = <259>;
->>> +                     gpio-key,wakeup;
->>> +             };
->>> +     };
->>>  };
->>> --
->>> 1.8.5.2
->>>
-> 
-> 
+>>>> Well, you have better grip of what's going on in the embedded world
+>>>> than me.  I'm mostly curious whether adding dependency on PHY is okay.
+>>
+>>> There is no hard dependency on presence of PHY. The driver will continue
+>>> as usual if devm_phy_get() fails.
+>>> I hope selecting GENERIC_PHY in Kconfig is not an issue.
+>>
+>>    Selecting in the AHCI_PLATFORM section? It seems I have overlooked it. No, I don't think it's a good idea. The generic PHY functions seem to be stubbed when GENERIC_PHY=n.
+>>
+> OK I will remove the select then.
 
+If I remove the select then build fails like so if we set CONFIG_GENERIC_PHY to 'm' and CONFIG_SATA_AHCI_PLATFORM to 'y'
 
--- 
-Nicolas Ferre
+drivers/built-in.o: In function `ahci_platform_enable_resources':
+(.text+0x162647): undefined reference to `phy_init'
+drivers/built-in.o: In function `ahci_platform_enable_resources':
+(.text+0x16267c): undefined reference to `phy_power_on'
+drivers/built-in.o: In function `ahci_platform_enable_resources':
+(.text+0x162694): undefined reference to `phy_exit'
+drivers/built-in.o: In function `ahci_platform_disable_resources':
+(.text+0x1626af): undefined reference to `phy_power_off'
+drivers/built-in.o: In function `ahci_platform_disable_resources':
+(.text+0x1626b7): undefined reference to `phy_exit'
+drivers/built-in.o: In function `ahci_platform_get_resources':
+(.text+0x162768): undefined reference to `devm_phy_get'
+make: *** [vmlinux] Error 1
+
+This means we need to make CONFIG_SATA_AHCI_PLATFORM depend on CONFIG_GENERIC_PHY or
+select it.
+
+OR
+
+Generic PHY layer must be fixed so that the API's are always built in.
+
+What is the better option? I believe making the PHY API's always built in is the better option.
+
+cheers,
+-roger
