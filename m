@@ -1,37 +1,59 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 7 Feb 2014 11:37:39 -0800
-Subject: Weird sched_clock behaviour during boot with -rc1
-In-Reply-To: <52F524A3.3070400@linaro.org>
-References: <20140204183641.GA25127@mudshark.cambridge.arm.com>
- <52F1518B.9010109@linaro.org>
- <20140204220045.GC20528@codeaurora.org>
- <52F524A3.3070400@linaro.org>
-Message-ID: <20140207193739.GC12815@codeaurora.org>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Fri, 07 Feb 2014 11:38:42 -0800
+Subject: [PATCH v5 00/14] Add support for MSM's mmio clock/reset controller
+In-Reply-To: <1391749891.15777.31.camel@joe-AO722>
+References: <1389811654-21397-1-git-send-email-sboyd@codeaurora.org>
+ <52F45DEE.8020400@gmail.com> <1391749891.15777.31.camel@joe-AO722>
+Message-ID: <52F53642.3030606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07, John Stultz wrote:
-> On 02/04/2014 02:00 PM, Stephen Boyd wrote:
-> >>
-> > That would work, but why can't we just hold the write seqlock
-> > during the registration? We would need to make a lockeless
-> > version of update_sched_clock() but that doesn't look too hard.
-> > It might actually turn out nicer because we call
-> > update_sched_clock() here just to set the epoch_cyc but we have
-> > to reset the epoch_ns back to 0 to start the count off right.
-> >
-> > How about this? The only concern is calling read_sched_clock()
-> > inside the seqlock, but I don't think that's a concern and if it
-> > is we can call it outside the lock at the beginning of this
-> > function.
+On 2/6/2014 9:11 PM, Joe Perches wrote:
+> On Thu, 2014-02-06 at 20:15 -0800, Frank Rowand wrote:
+>> On 1/15/2014 10:47 AM, Stephen Boyd wrote:
+>>> The first breaks a reset-controller include ordering requirement. It got
+>>> an ack so I think we're ok for it to go through the clock tree.
+>>>
+>>
+>> < snip >
+>>
+>> checkpatch is whining about patches
+>>
+>>   4
+>>   5
+>>   6
+>>   7
+>>   8
+>>
+>> (Just for completeness if someone thinks I did not check all the patches,
+>> it also whines about patch 11, but I think the whining should be ignored,
+>> and it whines about patch 1 but I think that might be a checkpatch bug.)
 > 
-> So whats the story here? Are we waiting on an ack from Will or would you
-> rather go with Josh's approach?
+> Hi Frank.
+> 
+> For patch 1, what checkpatch bug might that be?
 
-An acked-by/tested-by from Will would be good. I'll cook up a
-patch right now to do everything that has been mentioned in this
-thread.
+see below
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> I think all the checkpatch whinges in patch 11 are correct.
+
+Agreed on patch 11, judgement call on whether to ignore the warnings.
+
+> 
+> I didn't check any of 4-8.
+
+Hi Joe,
+
+Thanks for jumping in.  I did not want to bother you until I dug a little
+deeper into the warning to see if I was just misunderstanding something.
+
+Sorry, it is patch 2, not patch 1 ("[PATCH v5 02/14] clk: Add set_rate_and_parent() op"):
+
+   WARNING: Multiple spaces after return type
+   #188: FILE: include/linux/clk-provider.h:154:
+   +       int             (*set_rate_and_parent)(struct clk_hw *hw,
+
+   total: 0 errors, 1 warnings, 152 lines checked
+
+-Frank
