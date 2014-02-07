@@ -1,80 +1,86 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 7 Feb 2014 10:32:06 +0100
-Subject: [PATCH 10/21] ARM: MM: Add DT binding for Feroceon L2 cache
-In-Reply-To: <20140207012752.GO8533@titan.lakedaemon.net>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-11-git-send-email-andrew@lunn.ch>
- <20140207012752.GO8533@titan.lakedaemon.net>
-Message-ID: <20140207093206.GE17758@lunn.ch>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Fri, 7 Feb 2014 10:30:12 +0100
+Subject: [PATCH v3 06/15] at91: dt: at91sam9261ek: Adds DT entries for the
+ 4 user buttons
+In-Reply-To: <20140207082752.GV9558@ns203013.ovh.net>
+References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
+ <1390492639-7299-7-git-send-email-jjhiblot@traphandler.com>
+ <20140207082752.GV9558@ns203013.ovh.net>
+Message-ID: <CACh+v5O_CMcYKBKLzbcD2ypGLX_Pp+64fiqO4MWYw-J4h0KA7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 08:27:52PM -0500, Jason Cooper wrote:
-> On Fri, Feb 07, 2014 at 12:42:06AM +0100, Andrew Lunn wrote:
-> > Instantiate the L2 cache from DT. Indicate in DT where the cache
-> > control register is and if write through should be made.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > ---
-> >  .../devicetree/bindings/arm/mrvl/foroceon.txt      | 19 +++++++++
-> >  arch/arm/boot/dts/kirkwood.dtsi                    |  5 +++
-> >  arch/arm/include/asm/hardware/cache-feroceon-l2.h  |  2 +
-> >  arch/arm/mach-kirkwood/board-dt.c                  | 15 +------
-> >  arch/arm/mm/cache-feroceon-l2.c                    | 46 ++++++++++++++++++++++
-> >  5 files changed, 73 insertions(+), 14 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/mrvl/foroceon.txt
-> 
-> for the next revision, please split out the dtsi changes into a separate
-> patch.
-> 
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/mrvl/foroceon.txt b/Documentation/devicetree/bindings/arm/mrvl/foroceon.txt
-> > new file mode 100644
-> > index 000000000000..8058676d1476
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/mrvl/foroceon.txt
-> 
-> name typo.
-> 
-> > @@ -0,0 +1,19 @@
-> > +* Marvell Feroceon Cache
-> > +
-> > +Required properties:
-> > +- compatible : Should be "marvell,feroceon-kirkwood".
-> 
-> This is a little ambiguous, I'd like to see 'l2' in the compatible string.
-
-I will take Jason's advice on naming and change this..
-
-> > +#ifdef CONFIG_OF
-> > +static const struct of_device_id feroceon_ids[] __initconst = {
-> > +	{ .compatible = "marvell,feroceon-kirkwood"},
-> > +	{}
-> > +};
-> > +
-> > +int __init feroceon_of_init(void)
-> > +{
-> > +	struct device_node *node;
-> > +	void __iomem *base;
-> > +	bool writethrough = false;
-> > +	struct resource res;
-> > +
-> > +	node = of_find_matching_node(NULL, feroceon_ids);
-> > +	if (!node) {
-> > +		pr_info("Didn't find marvell,feroceon-*, not enabling it\n");
-> > +		return -ENODEV;
-> > +	}
-> 
-> I'd prefer to fallback to hardcoded register address here.  We know
-> we're on kirkwood at this point.
-
-We could also be on mv78xx0, sometime in the future. So we need to at
-least look at the compatible string to see what SoC we are. It is also
-rather ugly having hard coded addresses. We might as well go back to
-platform devices.
-
-I would prefer upping this to pr_err(FW_INFO, and not falling back to
-hard coded values. This is not a fatal error, the machine continues to
-run, just a bit slower.
-
-     Andrew
+2014-02-07 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> On 16:57 Thu 23 Jan     , Jean-Jacques Hiblot wrote:
+>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+>> ---
+>>  arch/arm/boot/dts/at91sam9261ek.dts | 39 +++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 39 insertions(+)
+>
+> do only one patch for the 9261ek support no nned to clean
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+>> index 8909217..5555e9f5 100644
+>> --- a/arch/arm/boot/dts/at91sam9261ek.dts
+>> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
+>> @@ -83,6 +83,15 @@
+>>                                               AT91_PIOA 23  AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
+>>                                       };
+>>                               };
+>> +
+>> +                             keys {
+>> +                                     pinctrl_keys: keys-0 {
+>> +                                             atmel,pins = <AT91_PIOA 27  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+>> +                                             AT91_PIOA 26  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+>> +                                             AT91_PIOA 25  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+>> +                                             AT91_PIOA 24  AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
+>> +                                     };
+>> +                             };
+>
+> no need this you can drop it
+ok. I thought that it would help the user to understand the GPIO usage.
+I'll remove all pinmux for GPIO that don't require a special hardware
+configuration
+>
+> you just describe a gpio which we do not describe in pinctrl
+>>                       };
+>>
+>>                       watchdog at fffffd40 {
+>> @@ -109,4 +118,34 @@
+>>                       linux,default-trigger = "heartbeat";
+>>               };
+>>       };
+>> +
+>> +     gpio_keys {
+>> +             compatible = "gpio-keys";
+>> +             pinctrl-0 = <&pinctrl_keys>;
+>> +
+>> +             button_0 {
+>> +                     label = "button_0";
+>> +                     gpios = <&pioA 27 GPIO_ACTIVE_LOW>;
+>> +                     linux,code = <256>;
+>> +                     gpio-key,wakeup;
+>> +             };
+>> +             button_1 {
+>> +                     label = "button_1";
+>> +                     gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
+>> +                     linux,code = <257>;
+>> +                     gpio-key,wakeup;
+>> +             };
+>> +             button_2 {
+>> +                     label = "button_2";
+>> +                     gpios = <&pioA 25 GPIO_ACTIVE_LOW>;
+>> +                     linux,code = <258>;
+>> +                     gpio-key,wakeup;
+>> +             };
+>> +             button_3 {
+>> +                     label = "button_3";
+>> +                     gpios = <&pioA 24 GPIO_ACTIVE_LOW>;
+>> +                     linux,code = <259>;
+>> +                     gpio-key,wakeup;
+>> +             };
+>> +     };
+>>  };
+>> --
+>> 1.8.5.2
+>>
