@@ -1,104 +1,76 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 7 Feb 2014 09:33:04 +0100
-Subject: [PATCH v3 00/15] Device Tree support for the at91sam9261ek
-In-Reply-To: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri, 07 Feb 2014 09:35:55 +0100
+Subject: [PATCH v3 04/15] ARM: at91: prepare common clk transition for
+ sam9261 SoC
+In-Reply-To: <20140207082537.GU9558@ns203013.ovh.net>
 References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <20140207083304.GX9558@ns203013.ovh.net>
+ <1390492639-7299-5-git-send-email-jjhiblot@traphandler.com>
+ <20140207082537.GU9558@ns203013.ovh.net>
+Message-ID: <52F49AEB.6060307@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Jean-Christophe,
 
-	please re-organise your patch serie
+On 07/02/2014 09:25, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 16:57 Thu 23 Jan     , Jean-Jacques Hiblot wrote:
+>>   This patch encloses sam9261 old clk registration in
+>> "#if defined(CONFIG_OLD_CLK_AT91) #endif" sections.
+>>
+>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+>> ---
+>>   arch/arm/mach-at91/at91sam9261.c | 8 ++++++--
+>>   1 file changed, 6 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+>> index 6a2c869..2c0e940 100644
+>> --- a/arch/arm/mach-at91/at91sam9261.c
+>> +++ b/arch/arm/mach-at91/at91sam9261.c
+>> @@ -25,10 +25,12 @@
+>>   #include "at91_rstc.h"
+>>   #include "soc.h"
+>>   #include "generic.h"
+>> -#include "clock.h"
+>>   #include "sam9_smc.h"
+>>   #include "pm.h"
+>>   
+>> +#if defined(CONFIG_OLD_CLK_AT91)
+>> +#include "clock.h"
+>> +
+>>   /* --------------------------------------------------------------------
+>>    *  Clocks
+>>    * -------------------------------------------------------------------- */
+>> @@ -262,7 +264,7 @@ static void __init at91sam9261_register_clocks(void)
+>>   	clk_register(&hck0);
+>>   	clk_register(&hck1);
+>>   }
+>> -
+> do this here
+>
+> #else
+> #define at91sam9261_register_clocks NULL
+>> +#endif
+>>   /* --------------------------------------------------------------------
+>>    *  GPIO
+>>    * -------------------------------------------------------------------- */
+>> @@ -362,6 +364,8 @@ AT91_SOC_START(at91sam9261)
+>>   	.extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 << AT91SAM9261_ID_IRQ1)
+>>   		    | (1 << AT91SAM9261_ID_IRQ2),
+>>   	.ioremap_registers = at91sam9261_ioremap_registers,
+>> +#if defined(CONFIG_OLD_CLK_AT91)
+>>   	.register_clocks = at91sam9261_register_clocks,
+>> +#endif
+> so no ifdef here
 
-	first SoC patch
-	  - first CCF
-	  - one patch for the SoC
-	second add the board 1 patch
-
-	no need 15 patches
+I guess he did this based on what I did for the sama5 SoC, but you're right:
+your proposal is cleaner.
 
 Best Regards,
-J.
-On 16:57 Thu 23 Jan     , Jean-Jacques Hiblot wrote:
-> This patch set aims at bringing a basic device tree support for the sam9261.
-> It's mostly based on the sam9263 and sam9x5 stuff.
-> 
-> Changes since V2:
-> * removed the smc driver from the serie. It'll be posted in an independent
->   serie later.
-> * removed the DM9000 support (it'll come with the smc driver)
-> * the sam9261 now supports the Common Clock Framework (CCF). Note: to enable
->   the CCF you must remove from the kernel config the platforms that don't
->   support it.
-> * Added basic DT binding for the bus matrix
-> * Added support for USB host
-> * Added support for USB gadget
-> * in dts(i), replaced interrupt-parent with interrupts-extended
-> * changed the nand partition plan (same as for the sama5d3)
-> * removed 'mem' parameter in command line
-> * re-ordered dt-nodes in ascending address order.
-> * split the lcd support patch in 2 parts (SOC and board)
-> 
-> 
-> Change since V1:
-> * changed the DT representation to use address translation and separate the
->   timings' configuration from the device properties by adding a "simple-bus"
->   inetrmediate node.
-> * moved the smc driver from drivers/bus to drivers/memmory
-> * smc driver now accepts timings in nanoseconds as well as raw register values
-> * smc driver can clip the timings if they're out of bound and dump them to the
->   console
-> * DM9000 timings are now described in nanosecs (for the virtue of example)
-> 
-> supported features:
-> * dbgu
-> * nand
-> * lcd
-> * leds
-> * user buttons
-> * usb host
-> * usb gadget
-> 
-> This serie relies on the 3 following patchs:
-> usb: ohci-at91: fix irq and iomem resource retrieval
-> usb: at91-udc: fix irq and iomem resource retrieval
-> ARM: at91: prepare sam9 dt boards transition to common
-> 
-> Jean-Jacques
-> 
-> 
-> 
-> Jean-Jacques Hiblot (15):
->   at91: dt: Add at91sam9261 dt SoC support
->   at91: dt: defconfig: Added the sam9261 to the list of supported SOCs
->   at91: dt: sam9261: Basic Device Tree support for the at91sam9261ek
->   ARM: at91: prepare common clk transition for sam9261 SoC
->   ARM: at91: move sam9261 SoC to common clk
->   at91: dt: at91sam9261ek: Adds DT entries for the 4 user buttons
->   at91: dt: sam9261: Added the descriptions of hck0 and hck1 clocks
->     (CCF)
->   at91: dt: sam9261: Added hclk declaration for the fb driver (non-CCF)
->   at91: dt: sam9261: Added support for the LCD display
->   at91: dt: at91sam9261ek: Added support for the LCD display
->   at91: dt: Adds support for the bus matrix declaration in the device
->     tree
->   at91: dt: sam9261: adds description for the bus matrix
->   at91: dt: sam9261: CCF: Added USB clocks
->   at91: dt: at91sam9261ek: Enabled the USB host port (OHCI)
->   at91: dt: at91sam9261ek: Enabled the USB device port
-> 
->  arch/arm/boot/dts/Makefile          |   2 +
->  arch/arm/boot/dts/at91sam9261.dtsi  | 724 ++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/at91sam9261ek.dts | 191 ++++++++++
->  arch/arm/configs/at91_dt_defconfig  |   1 +
->  arch/arm/mach-at91/Kconfig          |   1 -
->  arch/arm/mach-at91/at91sam9261.c    |  24 +-
->  arch/arm/mach-at91/setup.c          |  23 ++
->  7 files changed, 963 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/boot/dts/at91sam9261.dtsi
->  create mode 100644 arch/arm/boot/dts/at91sam9261ek.dts
-> 
-> -- 
-> 1.8.5.2
-> 
+
+Boris
+
+>>   	.init = at91sam9261_initialize,
+>>   AT91_SOC_END
+>> -- 
+>> 1.8.5.2
+>>
