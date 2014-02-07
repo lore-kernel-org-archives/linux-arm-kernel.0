@@ -1,39 +1,57 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  7 Feb 2014 16:21:53 +0100
-Subject: [PATCH v4 5/5] ARM: sun7i: dt: Add bindings for USB clocks
-In-Reply-To: <1391786513-20780-1-git-send-email-hdegoede@redhat.com>
-References: <1391786513-20780-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1391786513-20780-6-git-send-email-hdegoede@redhat.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 7 Feb 2014 09:27:23 -0600
+Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
+ binding to list boost mode frequency
+In-Reply-To: <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
+References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
+ <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
+Message-ID: <CAGo_u6rymex=EZf0jj6rs2SpRARz2tA5F5jtT0+D-8BnSrfi9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roman Byshko <rbyshko@gmail.com>
+On Fri, Feb 7, 2014 at 9:19 AM, Thomas Abraham <ta.omasab@gmail.com> wrote:
+> From: Thomas Abraham <thomas.ab@samsung.com>
+>
+> Add a new optional boost-frequency binding for specifying the frequencies
+> usable in boost mode.
+>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Lukasz Majewski <l.majewski@samsung.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> ---
+>  Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt |   11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>
+> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+> new file mode 100644
+> index 0000000..d925e38
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+> @@ -0,0 +1,11 @@
+> +* Device tree binding for CPU boost frequency (aka over-clocking)
+> +
+> +Certain CPU's can be operated in optional 'boost' mode (or sometimes referred as
+> +overclocking) in which the CPU can operate in frequencies beyond the normal
+> +operating conditions.
+> +
+> +Optional Properties:
+> +- boost-frequency: list of frequencies in KHz to be used only in boost mode.
 
-Signed-off-by: Roman Byshko <rbyshko@gmail.com>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+boost-frequencies?
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 316cab8..14d9696 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -289,6 +289,15 @@
- 			clock-output-names = "ir1";
- 		};
- 
-+		usb_clk: clk at 01c200cc {
-+			#clock-cells = <1>;
-+		        #reset-cells = <1>;
-+			compatible = "allwinner,sun4i-a10-usb-clk";
-+			reg = <0x01c200cc 0x4>;
-+			clocks = <&pll6 1>;
-+			clock-output-names = "usb_ohci0", "usb_ohci1", "usb_phy";
-+		};
-+
- 		spi3_clk: clk at 01c200d4 {
- 			#clock-cells = <0>;
- 			compatible = "allwinner,sun4i-mod0-clk";
--- 
-1.8.4.2
+> +  This list should be a subset of frequencies listed in "operating-points"
+> +  property. Refer to Documentation/devicetree/bindings/power/opp.txt for
+> +  details about "operating-points" property.
+> --
+> 1.7.10.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
