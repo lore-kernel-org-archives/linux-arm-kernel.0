@@ -1,28 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  7 Feb 2014 22:14:13 +0100
-Subject: [PATCH v2 0/2] rtc: sunxi: Change compatible patterns
-Message-ID: <1391807655-29169-1-git-send-email-maxime.ripard@free-electrons.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 7 Feb 2014 13:19:07 -0800
+Subject: [PATCH v2 1/5] ARM: msm: kill off hotplug.c
+In-Reply-To: <CE29C478-50CA-4CC8-9E80-AA9C22D9B17F@codeaurora.org>
+References: <1391553532-27001-1-git-send-email-galak@codeaurora.org>
+ <1391553532-27001-2-git-send-email-galak@codeaurora.org>
+ <20140204230707.GD20528@codeaurora.org>
+ <CE29C478-50CA-4CC8-9E80-AA9C22D9B17F@codeaurora.org>
+Message-ID: <20140207211907.GE12815@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 02/04, Kumar Gala wrote:
+> 
+> On Feb 4, 2014, at 5:07 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> 
+> > On 02/04, Kumar Gala wrote:
+> >> diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+> >> index 3721b31..251a91e 100644
+> >> --- a/arch/arm/mach-msm/platsmp.c
+> >> +++ b/arch/arm/mach-msm/platsmp.c
+> >> @@ -29,6 +29,13 @@ extern void secondary_startup(void);
+> >> 
+> >> static DEFINE_SPINLOCK(boot_lock);
+> >> 
+> >> +#ifdef CONFIG_HOTPLUG_CPU
+> >> +static void __ref msm_cpu_die(unsigned int cpu)
+> > 
+> > We shouldn't need __ref anymore either right?
+> 
+> I think we might as cpu_die is still marked __ref so I think we need it.
+> 
 
-This is the second version of the A10 RTC compatible changes.
-The only difference with the v1 being that we're now droping the old
-compatibles, instead of keeping them, since the DT maintainers said it was
-fine.
-
-Thanks,
-Maxime
-
-Maxime Ripard (2):
-  rtc: sunxi: Change compatibles
-  ARM: sunxi: dt: Convert to the new RTC compatibles
-
- Documentation/devicetree/bindings/rtc/sunxi-rtc.txt | 4 ++--
- arch/arm/boot/dts/sun4i-a10.dtsi                    | 2 +-
- drivers/rtc/rtc-sunxi.c                             | 2 +-
- 3 files changed, 4 insertions(+), 4 deletions(-)
+Someone should remove __ref from cpu_die() as well. It was only
+ever there for __cpuinit but now that __cpuinit is gone it's
+useless.
 
 -- 
-1.8.4.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
