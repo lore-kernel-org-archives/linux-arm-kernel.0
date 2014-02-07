@@ -1,80 +1,137 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 07 Feb 2014 12:05:41 +0900
-Subject: [PATCH] backlight: add PWM dependencies
-In-Reply-To: <201402061708.05845.arnd@arndb.de>
-References: <1391518634-6472-1-git-send-email-linus.walleij@linaro.org>
- <000101cf2307$97a3c770$c6eb5650$%han@samsung.com>
- <000001cf230c$60ec1ca0$22c455e0$%han@samsung.com>
- <201402061708.05845.arnd@arndb.de>
-Message-ID: <000d01cf23b1$7c1f8de0$745ea9a0$%han@samsung.com>
+From: hychao@chromium.org (Hsin-Yu Chao)
+Date: Fri,  7 Feb 2014 11:35:29 +0800
+Subject: [PATCH 1/2] ALSA: hda/ca0132 - setup/cleanup streams
+Message-ID: <1391744130-15043-1-git-send-email-hychao@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, February 07, 2014 1:08 AM, Arnd Bergmann wrote:
-> On Thursday 06 February 2014, Jingoo Han wrote:
-> > In the case of "CONFIG_HAVE_PWM=y && CONFIG_PWM=n", it makes
-> > the problem.
-> >
-> > The HAVE_PWM symbol is only for legacy platforms that provide
-> > the PWM API without using the generic framework. PXA looks to
-> > use the generic PWM framework. Then, how about removing
-> > "select HAVE_PWM" from PXA as below?
-> >
-> 
-> I think this is correct, but we may need additional patches. I notice
-> that INPUT_MAX8997_HAPTIC and INPUT_PWM_BEEPER have a dependency on
-> HAVE_PWM at the moment, so those two drivers become impossible
-> to select after your change.
-> 
-> There is also one use of HAVE_PWM outside of PXA, for ARCH_LPC32XX.
-> This one seems to have the same problem.
+When a HDMI stream is opened with the same stream tag
+as a following opened stream to ca0132, audio will be
+heard from two ports simultaneously.
+Fix this issue by change to use snd_hda_codec_setup_stream
+and snd_hda_codec_cleanup_stream instead, so that an
+inactive stream can be marked as 'dirty' when found
+with a conflict stream tag, and then get purified.
 
-I looked at all HAVE_PWMs in the latest mainline kernel 3.14-rc1.
+Signed-off-by: Hsin-Yu Chao <hychao@chromium.org>
+Reviewed-by: Chih-Chung Chang <chihchung@chromium.org>
+---
+ sound/pci/hda/patch_ca0132.c | 68 ++++++--------------------------------------
+ 1 file changed, 9 insertions(+), 59 deletions(-)
 
-1. ARM - PXA
-  ./arch/arm/mach-pxa/Kconfig
-
-2. ARM - NXP LPC32XX
-  ./arc ARM - PXA h/arm/Kconfig
-  config ARCH_LPC32XX
-  	select HAVE_PWM
-
-3. MIPS - Ingenic JZ4740 based machines
-  ./arch/mips/Kconfig
-  config MACH_JZ4740
-  	select HAVE_PWM
-
-However, the legacy PWM drivers for PXA, LPC32XX, and JZ474 were
-already moved to the generic PWM framework.
-  ./drivers/pwm/pwm-pxa.c
-  ./drivers/pwm/pwm-lpc32xx.c
-  ./drivers/pwm/pwm-jz4740.c
-
-In conclusion, HAVE_PWM should be removed, because HAVE_PWM is
-NOT required anymore.
-
-How about the following?
-
-  [PATCH 1/7] ARM: pxa: don't select HAVE_PWM
-  [PATCH 2/7] ARM: lpc32xx: don't select HAVE_PWM
-  [PATCH 3/7] ARM: remove HAVE_PWM config option
-  [PATCH 4/7] MIPS: jz4740: don't select HAVE_PWM
-  [PATCH 5/7] Input: max8997_haptic: remove HAVE_PWM dependencies
-  [PATCH 6/7] Input: pwm-beepe: remove HAVE_PWM dependencies
-  [PATCH 7/7] pwm: don't use IS_ENABLED(CONFIG_HAVE_PWM)
-
-I would like to merge it through PWM tree.
-After merging these patches, all HAVE_PWM will be removed from
-the mainline kernel. Thank you. :-)
-
-Best regards,
-Jingoo Han
-
-> 
-> Finally, I have recently encountered a couple of drivers
-> (BACKLIGHT_LM3630A, BACKLIGHT_LP855X, BACKLIGHT_LP8788) that use
-> the PWM interfaces but are missing a 'depends on PWM'. This is
-> strictly speaking a different problem, but we could try to solve
-> it at the same time.
-> 
-> 	Arnd
+diff --git a/sound/pci/hda/patch_ca0132.c b/sound/pci/hda/patch_ca0132.c
+index 54d1479..59104dc 100644
+--- a/sound/pci/hda/patch_ca0132.c
++++ b/sound/pci/hda/patch_ca0132.c
+@@ -2662,60 +2662,6 @@ static bool dspload_wait_loaded(struct hda_codec *codec)
+ }
+ 
+ /*
+- * PCM stuffs
+- */
+-static void ca0132_setup_stream(struct hda_codec *codec, hda_nid_t nid,
+-				 u32 stream_tag,
+-				 int channel_id, int format)
+-{
+-	unsigned int oldval, newval;
+-
+-	if (!nid)
+-		return;
+-
+-	snd_printdd(
+-		   "ca0132_setup_stream: NID=0x%x, stream=0x%x, "
+-		   "channel=%d, format=0x%x\n",
+-		   nid, stream_tag, channel_id, format);
+-
+-	/* update the format-id if changed */
+-	oldval = snd_hda_codec_read(codec, nid, 0,
+-				    AC_VERB_GET_STREAM_FORMAT,
+-				    0);
+-	if (oldval != format) {
+-		msleep(20);
+-		snd_hda_codec_write(codec, nid, 0,
+-				    AC_VERB_SET_STREAM_FORMAT,
+-				    format);
+-	}
+-
+-	oldval = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_CONV, 0);
+-	newval = (stream_tag << 4) | channel_id;
+-	if (oldval != newval) {
+-		snd_hda_codec_write(codec, nid, 0,
+-				    AC_VERB_SET_CHANNEL_STREAMID,
+-				    newval);
+-	}
+-}
+-
+-static void ca0132_cleanup_stream(struct hda_codec *codec, hda_nid_t nid)
+-{
+-	unsigned int val;
+-
+-	if (!nid)
+-		return;
+-
+-	snd_printdd(KERN_INFO "ca0132_cleanup_stream: NID=0x%x\n", nid);
+-
+-	val = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_CONV, 0);
+-	if (!val)
+-		return;
+-
+-	snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_STREAM_FORMAT, 0);
+-	snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0);
+-}
+-
+-/*
+  * PCM callbacks
+  */
+ static int ca0132_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
+@@ -2726,7 +2672,9 @@ static int ca0132_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
+ {
+ 	struct ca0132_spec *spec = codec->spec;
+ 
+-	ca0132_setup_stream(codec, spec->dacs[0], stream_tag, 0, format);
++	ca0132_toggle_dac_format(codec);
++
++	snd_hda_codec_setup_stream(codec, spec->dacs[0], stream_tag, 0, format);
+ 
+ 	return 0;
+ }
+@@ -2745,7 +2693,7 @@ static int ca0132_playback_pcm_cleanup(struct hda_pcm_stream *hinfo,
+ 	if (spec->effects_switch[PLAY_ENHANCEMENT - EFFECT_START_NID])
+ 		msleep(50);
+ 
+-	ca0132_cleanup_stream(codec, spec->dacs[0]);
++	snd_hda_codec_cleanup_stream(codec, spec->dacs[0]);
+ 
+ 	return 0;
+ }
+@@ -2824,8 +2772,8 @@ static int ca0132_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
+ {
+ 	struct ca0132_spec *spec = codec->spec;
+ 
+-	ca0132_setup_stream(codec, spec->adcs[substream->number],
+-			    stream_tag, 0, format);
++	snd_hda_codec_setup_stream(codec, spec->adcs[substream->number],
++				   stream_tag, 0, format);
+ 
+ 	return 0;
+ }
+@@ -2839,7 +2787,7 @@ static int ca0132_capture_pcm_cleanup(struct hda_pcm_stream *hinfo,
+ 	if (spec->dsp_state == DSP_DOWNLOADING)
+ 		return 0;
+ 
+-	ca0132_cleanup_stream(codec, hinfo->nid);
++	snd_hda_codec_cleanup_stream(codec, hinfo->nid);
+ 	return 0;
+ }
+ 
+@@ -4742,6 +4690,8 @@ static int patch_ca0132(struct hda_codec *codec)
+ 		return err;
+ 
+ 	codec->patch_ops = ca0132_patch_ops;
++	codec->pcm_format_first = 1;
++	codec->no_sticky_stream = 1;
+ 
+ 	return 0;
+ }
+-- 
+1.9.0.rc1.175.g0b1dcb5
