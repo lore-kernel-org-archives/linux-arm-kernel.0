@@ -1,345 +1,114 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  7 Feb 2014 16:49:22 +0000
-Subject: [PATCH RFC/RFT v2 7/8] ARM: kernel: add support for cpu cache
- information
-In-Reply-To: <1391791763-28518-1-git-send-email-sudeep.holla@arm.com>
-References: <1391791763-28518-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1391791763-28518-8-git-send-email-sudeep.holla@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 7 Feb 2014 08:55:22 -0800
+Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
+ initially stopped
+In-Reply-To: <20140207154453.GA8533@titan.lakedaemon.net>
+References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <52F43ED0.4050808@roeck-us.net> <20140207104044.GA11063@localhost>
+ <52F4E1C1.4010805@roeck-us.net> <20140207151727.GB8218@localhost>
+ <20140207154453.GA8533@titan.lakedaemon.net>
+Message-ID: <20140207165522.GA9158@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep Holla <sudeep.holla@arm.com>
+On Fri, Feb 07, 2014 at 10:44:53AM -0500, Jason Cooper wrote:
+> On Fri, Feb 07, 2014 at 12:17:28PM -0300, Ezequiel Garcia wrote:
+> > On Fri, Feb 07, 2014 at 05:38:09AM -0800, Guenter Roeck wrote:
+> > > On 02/07/2014 02:40 AM, Ezequiel Garcia wrote:
+> > > > On Thu, Feb 06, 2014 at 06:02:56PM -0800, Guenter Roeck wrote:
+> > > >> On 02/06/2014 09:20 AM, Ezequiel Garcia wrote:
+> > > >>> Having the watchdog initially fully stopped is important to avoid
+> > > >>> any spurious watchdog triggers, in case the registers are not in
+> > > >>> its reset state.
+> > > >>>
+> > > >>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> > > >>> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > > >>> Tested-by: Willy Tarreau <w@1wt.eu>
+> > > >>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > >>> ---
+> > > >>>    drivers/watchdog/orion_wdt.c | 3 +++
+> > > >>>    1 file changed, 3 insertions(+)
+> > > >>>
+> > > >>> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+> > > >>> index 6746033..2dbeee9 100644
+> > > >>> --- a/drivers/watchdog/orion_wdt.c
+> > > >>> +++ b/drivers/watchdog/orion_wdt.c
+> > > >>> @@ -142,6 +142,9 @@ static int orion_wdt_probe(struct platform_device *pdev)
+> > > >>>    	orion_wdt.max_timeout = wdt_max_duration;
+> > > >>>    	watchdog_init_timeout(&orion_wdt, heartbeat, &pdev->dev);
+> > > >>>
+> > > >>> +	/* Let's make sure the watchdog is fully stopped */
+> > > >>> +	orion_wdt_stop(&orion_wdt);
+> > > >>> +
+> > > >>
+> > > >> Actually we just had that in another driver, and I stumbled over it there.
+> > > >>
+> > > >> Problem with stopping the watchdog in probe unconditionally is that you can
+> > > >> use it to defeat nowayout: unload the module, then load it again,
+> > > >> and the watchdog is stopped even if nowayout is true.
+> > > >>
+> 
+> How often would a user legitimately want to unload/load the watchdog
+> module?
+> 
+Not sure what you are saying here. If you don't think the nowayout option
+should be supported, drop it. Don't claim it is supported when it isn't.
 
-This patch adds support for cacheinfo on ARM platforms.
+> > > >
+> > > > Hm... I see.
+> > > >
+> > > >> Is this really what you want ? Or, in other words, what is the problem
+> > > >> you are trying to solve ?
+> > > >>
+> > > >
+> > > > Well, this is related to the discussion about the bootloader not
+> > > > reseting the watchdog properly, provoking spurious watchdog triggering.
+> > > >
+> > > > Jason Gunthorpe explained [1] that we needed a particular sequence:
+> > > >
+> > > >   1. Disable WDT
+> > > >   2. Clear bridge
+> > > >   3. Enable WDT
+> > > >
+> > > > We added the irq handling to satisfy (2), and the watchdog stop for (1).
+> > > >
+> > > > The watchdog stop was agreed specifically [2].
+> > > >
+> > > > Ideas?
+> > > >
+> > > 
+> > > Other drivers assume that if the watchdog is running, it is supposed
+> > > to be running. The more common approach in such cases is to ping the
+> > > watchdog once to give userspace more time to get ready, but leave
+> > > it enabled. So you could check if the watchdog is enabled, and if
+> > > it was enabled re-enable it after initialization is complete
+> > > (and maybe log a message stating that the watchdog is enabled).
+> > > 
+> > > If you don't want to do that, and if you are defeating nowayout
+> > > on purpose to fix a problem with a broken bootloader,
+> > > you should at least put in comment describing the problem you are
+> > > trying to solve, and that you accept breaking nowayout with your fix.
+> 
+> Yes, this should be commented.
+> 
+> > I'm not fond of not having "nowayout" option on our driver, given I'm sure
+> > it's a watchdog feature for a good reason.
+> > 
+> > On the other side, I can't see how can we distinguish a previously
+> > and explicitly enabled watchdog, from a spurious enable by broken bootloader.
+> 
+> How about we just don't define module_exit() and leave a comment as
+> such?  It's not unprecedented, a couple of the atm drivers are
+> explicitly setup like this (uPD98402.c, zatm.c, eni.c).
+> 
+Or don't support tristate in the first place. There was some argument from
+others earlier that a watchdog should never be optional. Or drop the nowayout
+option from the driver.
 
-On ARMv7, the cache hierarchy can be identified through Cache Level ID
-register(CLIDR) while the cache geometry is provided by Cache Size ID
-register(CCSIDR).
+There is one problem, though, if you don't support a pre-enabled watchdog:
+If the system dies before the watchdog application starts running, it will
+hang. This is the reason why the watchdog is enabled on purpose by some
+boot loaders.
 
-On architecture versions before ARMv7, CLIDR and CCSIDR is not
-implemented. The cache type register(CTR) provides both cache hierarchy
-and geometry if implemented. For implementations that doesn't support
-CTR, we need to list the probable value of CTR if it was implemented
-along with the cpuid for the sake of simplicity to handle them.
-
-Since the architecture doesn't provide any way of detecting the cpus
-sharing particular cache, device tree is used fo the same purpose.
-On non-DT platforms, first level caches are per-cpu while higher level
-caches are assumed system-wide.
-
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/kernel/Makefile    |   1 +
- arch/arm/kernel/cacheinfo.c | 228 ++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mm/Kconfig         |  13 +++
- 3 files changed, 242 insertions(+)
- create mode 100644 arch/arm/kernel/cacheinfo.c
-
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index a30fc9b..f86a4ff 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -29,6 +29,7 @@ obj-y		+= entry-v7m.o v7m.o
- else
- obj-y		+= entry-armv.o
- endif
-+obj-$(CONFIG_CPU_HAS_CACHE) += cacheinfo.o
- 
- obj-$(CONFIG_OC_ETM)		+= etm.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
-diff --git a/arch/arm/kernel/cacheinfo.c b/arch/arm/kernel/cacheinfo.c
-new file mode 100644
-index 0000000..10045b7
---- /dev/null
-+++ b/arch/arm/kernel/cacheinfo.c
-@@ -0,0 +1,228 @@
-+/*
-+ *  ARM cacheinfo support
-+ *
-+ *  Copyright (C) 2014 ARM Ltd.
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/bitops.h>
-+#include <linux/cacheinfo.h>
-+#include <linux/cpu.h>
-+#include <linux/compiler.h>
-+#include <linux/of.h>
-+
-+#include <asm/cputype.h>
-+#include <asm/processor.h>
-+
-+#if __LINUX_ARM_ARCH__ < 7 /* pre ARMv7 */
-+
-+#define MAX_CACHE_LEVEL		1	/* Only 1 level supported */
-+#define CTR_CTYPE_SHIFT		24
-+#define CTR_CTYPE_MASK		(1 << CTR_CTYPE_SHIFT)
-+
-+struct ctr_info {
-+	unsigned int cpuid_id;
-+	unsigned int ctr;
-+};
-+
-+static struct ctr_info cache_ctr_list[] = {
-+};
-+
-+static int get_unimplemented_ctr(unsigned int *ctr)
-+{
-+	int i, cpuid_id = read_cpuid_id();
-+	for (i = 0; i < ARRAY_SIZE(cache_ctr_list); i++)
-+		if (cache_ctr_list[i].cpuid_id == cpuid_id) {
-+			*ctr = cache_ctr_list[i].ctr;
-+			return 0;
-+		}
-+	return -ENOENT;
-+}
-+
-+static unsigned int get_ctr(void)
-+{
-+	unsigned int ctr;
-+	if (get_unimplemented_ctr(&ctr))
-+		asm volatile ("mrc p15, 0, %0, c0, c0, 1" : "=r" (ctr));
-+	return ctr;
-+}
-+
-+static enum cache_type get_cache_type(int level)
-+{
-+	if (level > MAX_CACHE_LEVEL)
-+		return CACHE_TYPE_NOCACHE;
-+	return get_ctr() & CTR_CTYPE_MASK ?
-+		CACHE_TYPE_SEPARATE : CACHE_TYPE_UNIFIED;
-+}
-+
-+/*
-+ *  +---------------------------------+
-+ *  | 9  8  7  6 | 5  4  3 | 2 | 1  0 |
-+ *  +---------------------------------+
-+ *  |    size    |  assoc  | m |  len |
-+ *  +---------------------------------+
-+ * linelen        = 1 << (len + 3)
-+ * multiplier     = 2 + m
-+ * nsets          = 1 << (size + 6 - assoc - len)
-+ * associativity  = multiplier << (assoc - 1)
-+ * cache_size     = multiplier << (size + 8)
-+ */
-+#define CTR_LINESIZE_MASK	0x3
-+#define CTR_MULTIPLIER_SHIFT	2
-+#define CTR_MULTIPLIER_MASK	0x1
-+#define CTR_ASSOCIAT_SHIFT	3
-+#define CTR_ASSOCIAT_MASK	0x7
-+#define CTR_SIZE_SHIFT		6
-+#define CTR_SIZE_MASK		0xF
-+#define CTR_DCACHE_SHIFT	12
-+
-+static void __ci_leaf_init(enum cache_type type,
-+				  struct cache_info *this_leaf)
-+{
-+	unsigned int size, multiplier, assoc, len, tmp = get_ctr();
-+
-+	if (type == CACHE_TYPE_DATA)
-+		tmp >>= CTR_DCACHE_SHIFT;
-+
-+	len = tmp & CTR_LINESIZE_MASK;
-+	size = (tmp >> CTR_SIZE_SHIFT) & CTR_SIZE_MASK;
-+	assoc = (tmp >> CTR_ASSOCIAT_SHIFT) & CTR_ASSOCIAT_MASK;
-+	multiplier = ((tmp >> CTR_MULTIPLIER_SHIFT) & CTR_MULTIPLIER_MASK) + 2;
-+
-+	this_leaf->type = type;
-+	this_leaf->coherency_line_size = 1 << (len + 3);
-+	this_leaf->number_of_sets = 1 << (size + 6 - assoc - len);
-+	this_leaf->ways_of_associativity = multiplier << (assoc - 1);
-+	this_leaf->size = multiplier << (size + 8);
-+}
-+
-+#else /* ARMv7 */
-+
-+#define MAX_CACHE_LEVEL			7	/* Max 7 level supported */
-+/* Ctypen, bits[3(n - 1) + 2 : 3(n - 1)], for n = 1 to 7 */
-+#define CLIDR_CTYPE_SHIFT(level)	(3 * (level - 1))
-+#define CLIDR_CTYPE_MASK(level)		(7 << CLIDR_CTYPE_SHIFT(level))
-+#define CLIDR_CTYPE(clidr, level)	\
-+	(((clidr) & CLIDR_CTYPE_MASK(level)) >> CLIDR_CTYPE_SHIFT(level))
-+
-+static inline enum cache_type get_cache_type(int level)
-+{
-+	unsigned int clidr;
-+	if (level > MAX_CACHE_LEVEL)
-+		return CACHE_TYPE_NOCACHE;
-+	asm volatile ("mrc p15, 1, %0, c0, c0, 1" : "=r" (clidr));
-+	return CLIDR_CTYPE(clidr, level);
-+}
-+
-+/*
-+ * NumSets, bits[27:13] - (Number of sets in cache) - 1
-+ * Associativity, bits[12:3] - (Associativity of cache) - 1
-+ * LineSize, bits[2:0] - (Log2(Number of words in cache line)) - 2
-+ */
-+#define CCSIDR_WRITE_THROUGH	BIT(31)
-+#define CCSIDR_WRITE_BACK	BIT(30)
-+#define CCSIDR_READ_ALLOCATE	BIT(29)
-+#define CCSIDR_WRITE_ALLOCATE	BIT(28)
-+#define CCSIDR_LINESIZE_MASK	0x7
-+#define CCSIDR_ASSOCIAT_SHIFT	3
-+#define CCSIDR_ASSOCIAT_MASK	0x3FF
-+#define CCSIDR_NUMSETS_SHIFT	13
-+#define CCSIDR_NUMSETS_MASK	0x7FF
-+
-+/*
-+ * Which cache CCSIDR represents depends on CSSELR value
-+ * Make sure no one else changes CSSELR during this
-+ * smp_call_function_single prevents preemption for us
-+ */
-+static inline u32 get_ccsidr(u32 csselr)
-+{
-+	u32 ccsidr;
-+
-+	/* Put value into CSSELR */
-+	asm volatile ("mcr p15, 2, %0, c0, c0, 0" : : "r" (csselr));
-+	isb();
-+	/* Read result out of CCSIDR */
-+	asm volatile ("mrc p15, 1, %0, c0, c0, 0" : "=r" (ccsidr));
-+
-+	return ccsidr;
-+}
-+
-+static void __ci_leaf_init(enum cache_type type,
-+				  struct cache_info *this_leaf)
-+{
-+	bool is_instr_cache = type & CACHE_TYPE_INST;
-+	u32 tmp = get_ccsidr((this_leaf->level - 1) << 1 | is_instr_cache);
-+
-+	this_leaf->type = type;
-+	this_leaf->coherency_line_size =
-+	    (1 << ((tmp & CCSIDR_LINESIZE_MASK) + 2)) * 4;
-+	this_leaf->number_of_sets =
-+	    ((tmp >> CCSIDR_NUMSETS_SHIFT) & CCSIDR_NUMSETS_MASK) + 1;
-+	this_leaf->ways_of_associativity =
-+	    ((tmp >> CCSIDR_ASSOCIAT_SHIFT) & CCSIDR_ASSOCIAT_MASK) + 1;
-+	this_leaf->size = this_leaf->number_of_sets *
-+	    this_leaf->coherency_line_size * this_leaf->ways_of_associativity;
-+	this_leaf->attributes =
-+		((tmp & CCSIDR_WRITE_THROUGH) ? CACHE_WRITE_THROUGH : 0) |
-+		((tmp & CCSIDR_WRITE_BACK) ? CACHE_WRITE_BACK : 0) |
-+		((tmp & CCSIDR_READ_ALLOCATE) ? CACHE_READ_ALLOCATE : 0) |
-+		((tmp & CCSIDR_WRITE_ALLOCATE) ? CACHE_WRITE_ALLOCATE : 0);
-+}
-+
-+#endif
-+
-+static void ci_leaf_init(struct cache_info *this_leaf,
-+			 enum cache_type type, unsigned int level)
-+{
-+	this_leaf->level = level;
-+	__ci_leaf_init(type, this_leaf);
-+}
-+
-+int init_cache_level(unsigned int cpu)
-+{
-+	unsigned int ctype, level = 1, leaves = 0;
-+	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
-+
-+	if (!this_cpu_ci)
-+		return -EINVAL;
-+
-+	do {
-+		ctype = get_cache_type(level);
-+		if (ctype == CACHE_TYPE_NOCACHE)
-+			break;
-+		/* Separate instruction and data caches */
-+		leaves += (ctype == CACHE_TYPE_SEPARATE) ? 2 : 1;
-+	} while (++level <= MAX_CACHE_LEVEL);
-+
-+	this_cpu_ci->num_levels = level - 1;
-+	this_cpu_ci->num_leaves = leaves;
-+
-+	return 0;
-+}
-+
-+int populate_cache_leaves(unsigned int cpu)
-+{
-+	unsigned int level, idx;
-+	enum cache_type type;
-+	struct cpu_cacheinfo *this_cpu_ci = get_cpu_cacheinfo(cpu);
-+	struct cache_info *this_leaf = this_cpu_ci->info_list;
-+
-+	for (idx = 0, level = 1; level <= this_cpu_ci->num_levels &&
-+			idx < this_cpu_ci->num_leaves; idx++, level++) {
-+		if (!this_leaf)
-+			return -EINVAL;
-+
-+		type = get_cache_type(level);
-+		if (type == CACHE_TYPE_SEPARATE) {
-+			ci_leaf_init(this_leaf++, CACHE_TYPE_DATA, level);
-+			ci_leaf_init(this_leaf++, CACHE_TYPE_INST, level);
-+		} else {
-+			ci_leaf_init(this_leaf++, type, level);
-+		}
-+	}
-+	return 0;
-+}
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 1f8fed9..c4abb89 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -495,30 +495,42 @@ config CPU_PABRT_V7
- # The cache model
- config CPU_CACHE_V4
- 	bool
-+	select CPU_HAS_CACHE
- 
- config CPU_CACHE_V4WT
- 	bool
-+	select CPU_HAS_CACHE
- 
- config CPU_CACHE_V4WB
- 	bool
-+	select CPU_HAS_CACHE
- 
- config CPU_CACHE_V6
- 	bool
-+	select CPU_HAS_CACHE
- 
- config CPU_CACHE_V7
- 	bool
-+	select CPU_HAS_CACHE
- 
- config CPU_CACHE_NOP
- 	bool
-+	select CPU_HAS_CACHE
- 
- config CPU_CACHE_VIVT
- 	bool
-+	select CPU_HAS_CACHE
- 
- config CPU_CACHE_VIPT
- 	bool
-+	select CPU_HAS_CACHE
- 
- config CPU_CACHE_FA
- 	bool
-+	select CPU_HAS_CACHE
-+
-+config CPU_HAS_CACHE
-+	bool
- 
- if MMU
- # The copy-page model
-@@ -846,6 +858,7 @@ config DMA_CACHE_RWFO
- 
- config OUTER_CACHE
- 	bool
-+	select CPU_HAS_CACHE
- 
- config OUTER_CACHE_SYNC
- 	bool
--- 
-1.8.3.2
+Guenter
