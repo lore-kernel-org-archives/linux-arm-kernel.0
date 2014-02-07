@@ -1,72 +1,169 @@
-From: skrishnakar@gmail.com (srikanth krishnakar)
-Date: Fri, 7 Feb 2014 13:57:02 +0530
-Subject: renesas-backport.git: Linux-3.10.28 Marzen (R8A7779) missing Audio
- Support
-Message-ID: <CALDxG5hUg3BNkszevNpYdmD=YqrOLLGb0p3ZKTN7_qS9BQZ2+w@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 7 Feb 2014 09:30:07 +0100
+Subject: [PATCH v3 03/15] at91: dt: sam9261: Basic Device Tree support
+ for the at91sam9261ek
+In-Reply-To: <1390492639-7299-4-git-send-email-jjhiblot@traphandler.com>
+References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
+ <1390492639-7299-4-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <20140207083007.GW9558@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am trying to boot the Renesas R-Car H1 (Marzen) board with 3.10 LTSi
-kernel which is present at :
+On 16:57 Thu 23 Jan     , Jean-Jacques Hiblot wrote:
+> This patch implements a simple DTS to boot a at91sam9261ek with a dt-enabled
+> kernel (at91_dt_defconfig).
+> Only dbgu, nand and watchdog are described in the DT.
+> 
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> ---
+>  arch/arm/boot/dts/Makefile          |   2 +
+>  arch/arm/boot/dts/at91sam9261ek.dts | 112 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 114 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91sam9261ek.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 772a30e..ece523d 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -11,6 +11,8 @@ dtb-$(CONFIG_ARCH_AT91) += ethernut5.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += evk-pro3.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += tny_a9260.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += usb_a9260.dtb
+> +# sam9261
+> +dtb-$(CONFIG_ARCH_AT91) += at91sam9261ek.dtb
+>  # sam9263
+>  dtb-$(CONFIG_ARCH_AT91) += at91sam9263ek.dtb
+>  dtb-$(CONFIG_ARCH_AT91) += tny_a9263.dtb
+> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+> new file mode 100644
+> index 0000000..8909217
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
+> @@ -0,0 +1,112 @@
+> +/*
+> + * at91sam9261ek.dts - Device Tree file for Atmel at91sam9261 reference board
+> + *
+> + *  Copyright (C) 2013 Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> + *
+> + * Licensed under GPLv2 only.
+> + */
+> +/dts-v1/;
+> +#include "at91sam9261.dtsi"
+> +
+> +/ {
+> +	model = "Atmel at91sam9261ek";
+> +	compatible = "atmel,at91sam9261ek", "atmel,at91sam9261", "atmel,at91sam9";
+> +
+> +	chosen {
+> +		bootargs = "mem=64M console=ttyS0,115200";
+drop the mem=64M
 
-https://git.kernel.org/cgit/linux/kernel/git/horms/renesas-backport.git/
+and use linux,stdout for the console
+> +	};
+> +
+> +	memory {
+> +		reg = <0x20000000 0x4000000>;
+> +	};
+> +
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		main_clock: clock at 0 {
+> +			compatible = "atmel,osc", "fixed-clock";
+> +			clock-frequency = <18432000>;
+> +		};
+> +	};
+> +
+> +	ahb {
+> +
+> +		nand0: nand at 40000000 {
+> +			nand-bus-width = <8>;
+> +			nand-ecc-mode = "soft";
+> +			nand-on-flash-bbt = <1>;
+it's a boolean just
+			nand-on-flash-bbt;
+> +			status = "okay";
+> +
+> +			at91bootstrap at 0 {
+> +				label = "at91bootstrap";
+> +				reg = <0x0 0x40000>;
+> +			};
+> +
+> +			bootloader at 40000 {
+> +				label = "bootloader";
+> +				reg = <0x40000 0x80000>;
+> +			};
+> +
+> +			bootloaderenv at c0000 {
+> +				label = "bootloader env";
+> +				reg = <0xc0000 0xc0000>;
+> +			};
+> +
+> +			dtb at 180000 {
+> +				label = "device tree";
+> +				reg = <0x180000 0x80000>;
+> +			};
+> +
+> +			kernel at 200000 {
+> +				label = "kernel";
+> +				reg = <0x200000 0x600000>;
+> +			};
+> +
+> +			rootfs at 800000 {
+> +				label = "rootfs";
+> +				reg = <0x800000 0x0f800000>;
+> +			};
 
-Branch: backport/v3.10.28-ltsi-rc1/snapshot
+we really need to switch to UBI
+> +		};
+> +
+> +		apb {
+> +			dbgu: serial at fffff200 {
+> +				status = "okay";
+> +			};
+> +
+> +			pinctrl at fffff400 {
+> +				leds {
+> +					pinctrl_leds: leds-0 {
+> +						atmel,pins = <AT91_PIOA 13  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+> +						AT91_PIOA 14  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+> +						AT91_PIOA 23  AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
+> +					};
+> +				};
+> +			};
 
-There are no sound cards detected on booting this kernel, although
-graphics is found to be working. Are there any updates which adds the
-RCAR_SOUND support to Marzen on v3.10 LTSi kernel ?
+no need this drop it
 
---------------------------
-
-root <at> marzenh1:~# cat /proc/interrupts
-            CPU0       CPU1       CPU2       CPU3
-  29:       5840      17228       5026      14491       GIC  twd
-  59:          0          0          0          0       GIC  renesas_intc_irqpin
-  60:       8094          0          0          0       GIC  renesas_intc_irqpin
-  61:          0          0          0          0       GIC  renesas_intc_irqpin
-  62:          0          0          0          0       GIC  renesas_intc_irqpin
-  63:          0          0          0          0       GIC
-rcar-du-r8a7779, rcar-du-r8a7779
-  64:         13          0          0          0       GIC  sh_tmu.0
-  76:         60          0          0          0       GIC
-ehci_hcd:usb1, ohci_hcd:usb3
-  77:          1          0          0          0       GIC
-ehci_hcd:usb2, ohci_hcd:usb4
-  96:          0          0          0          0       GIC  r8a7779-vin.1
-  98:          0          0          0          0       GIC  r8a7779-vin.3
- 111:         82          0          0          0       GIC  i2c-rcar.0
- 112:          0          0          0          0       GIC  i2c-rcar.2
- 113:          0          0          0          0       GIC  i2c-rcar.3
- 114:          0          0          0          0       GIC  i2c-rcar.1
- 122:        982          0          0          0       GIC  sh-sci.2:mux
- 132:          0          0          0          0       GIC  sata_rcar
- 136:         52          0          0          0       GIC  sh_mobile_sdhi.0
- 173:          0          0          0          0       GIC  gpio_rcar.0
- 174:          0          0          0          0       GIC  gpio_rcar.1
- 175:          0          0          0          0       GIC  gpio_rcar.2
- 176:          0          0          0          0       GIC  gpio_rcar.3
- 177:          0          0          0          0       GIC  gpio_rcar.4
- 178:          0          0          0          0       GIC  gpio_rcar.5
- 179:          0          0          0          0       GIC  gpio_rcar.6
-2001:       8094          0          0          0  renesas_intc_irqpin  eth0
-IPI0:          0          0          0          0  CPU wakeup interrupts
-IPI1:          0          0          0          0  Timer broadcast interrupts
-IPI2:        476       1715       1732       1236  Rescheduling interrupts
-IPI3:         50         62        112        112  Function call interrupts
-IPI4:          0          0          0          0  Single function
-call interrupts
-IPI5:          0          0          0          0  CPU stop interrupts
- Err:          0
-...
-....
-.....
-root <at> marzenh1:~# aplay -l
-aplay: device_list:268: no soundcards found...
-
----------------------------
-When will be the Audio support available for R-Car Marzen (R8A7779) on
-v3.10 LTSi kernel ?
-
-Your inputs are highly appreciated.
-**********************
+you need to only describe the GPIO if you have specific pinctrl property such
+as pull up & co
+> +
+> +			watchdog at fffffd40 {
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		ds8 {
+> +			label = "ds8";
+> +			gpios = <&pioA 13 GPIO_ACTIVE_LOW>;
+> +			linux,default-trigger = "none";
+> +		};
+> +		ds7 {
+> +			label = "ds7";
+> +			gpios = <&pioA 14 GPIO_ACTIVE_LOW>;
+> +			linux,default-trigger = "nand-disk";
+> +		};
+> +		ds1 {
+> +			label = "ds1";
+> +			gpios = <&pioA 23 GPIO_ACTIVE_LOW>;
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +	};
+> +};
+> -- 
+> 1.8.5.2
+> 
