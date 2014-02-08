@@ -1,37 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat,  8 Feb 2014 21:13:03 +0100
-Subject: [PATCH] mmc: mmci: rename some extended flags
-Message-ID: <1391890383-10280-1-git-send-email-linus.walleij@linaro.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 08 Feb 2014 21:23:24 +0100
+Subject: [PATCH 01/12] ARM: S3C24XX: cpufreq-utils: don't write raw values
+ to MPLLCON when using ccf
+In-Reply-To: <201312131357.19899.heiko@sntech.de>
+References: <201312131356.40755.heiko@sntech.de>
+ <201312131357.19899.heiko@sntech.de>
+Message-ID: <52F6923C.3040103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These four (so far unused) flags are only found in the ST Micro
-versions of MMCI, so infix them properly with the _ST_ infix.
+Hi Heiko,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/mmc/host/mmci.h | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+On 13.12.2013 13:57, Heiko St?bner wrote:
+> The s3c24xx cpufreq driver needs to change the mpll speed and was doing
+> this by writing raw values from a translation table into the MPLLCON
+> register.
+>
+> Change this to use a regular clk_set_rate call when using the common
+> clock framework and only write the raw value in the samsung_clock case.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>   arch/arm/mach-s3c24xx/cpufreq-utils.c |   13 +++++++++++++
+>   1 file changed, 13 insertions(+)
+>
+> diff --git a/arch/arm/mach-s3c24xx/cpufreq-utils.c b/arch/arm/mach-s3c24xx/cpufreq-utils.c
+> index 2a0aa56..680a031 100644
+> --- a/arch/arm/mach-s3c24xx/cpufreq-utils.c
+> +++ b/arch/arm/mach-s3c24xx/cpufreq-utils.c
+> @@ -14,6 +14,7 @@
+>   #include <linux/errno.h>
+>   #include <linux/cpufreq.h>
+>   #include <linux/io.h>
+> +#include <linux/clk.h>
+>
+>   #include <mach/map.h>
+>   #include <mach/regs-clock.h>
+> @@ -60,5 +61,17 @@ void s3c2410_cpufreq_setrefresh(struct s3c_cpufreq_config *cfg)
+>    */
+>   void s3c2410_set_fvco(struct s3c_cpufreq_config *cfg)
+>   {
+> +#ifdef CONFIG_SAMSUNG_CLOCK
+>   	__raw_writel(cfg->pll.driver_data, S3C2410_MPLLCON);
+> +#endif
+> +
+> +#ifdef CONFIG_COMMON_CLK
+> +	struct clk *mpll = clk_get(NULL, "mpll");
+> +	if (IS_ERR(mpll))
+> +		return;
 
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 168bc72f7a94..84c0e59b792a 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -38,10 +38,11 @@
- #define MCI_CPSM_INTERRUPT	(1 << 8)
- #define MCI_CPSM_PENDING	(1 << 9)
- #define MCI_CPSM_ENABLE		(1 << 10)
--#define MCI_SDIO_SUSP		(1 << 11)
--#define MCI_ENCMD_COMPL		(1 << 12)
--#define MCI_NIEN		(1 << 13)
--#define MCI_CE_ATACMD		(1 << 14)
-+/* Argument flag extenstions in the ST Micro versions */
-+#define MCI_ST_SDIO_SUSP	(1 << 11)
-+#define MCI_ST_ENCMD_COMPL	(1 << 12)
-+#define MCI_ST_NIEN		(1 << 13)
-+#define MCI_ST_CE_ATACMD	(1 << 14)
- 
- #define MMCIRESPCMD		0x010
- #define MMCIRESPONSE0		0x014
--- 
-1.8.5.3
+Wouldn't it be more sensible to get the clock only once, at the time 
+cpufreq is initialized? This would avoid going through the list of all 
+clocks every CPU frequency change and be more semantically correct.
+
+If there is no good place to put this clk_get() then maybe it could be 
+simply called on first call to s3c2410_set_fvco() and the clock saved to 
+a static variable.
+
+Best regards,
+Tomasz
