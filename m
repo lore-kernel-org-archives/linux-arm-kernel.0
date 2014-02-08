@@ -1,38 +1,54 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 8 Feb 2014 12:06:35 -0500
-Subject: [PATCH] gpio: mvebu: use chained_irq_{enter, exit} for GIC
- compatibility
-In-Reply-To: <1391772559-28357-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1391772559-28357-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140208170635.GJ8533@titan.lakedaemon.net>
+Date: Sat, 8 Feb 2014 12:22:17 -0500
+Subject: [GIT PULL] mvebu: phy and ata fixes for v3.14
+Message-ID: <20140208172217.GK8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 12:29:19PM +0100, Thomas Petazzoni wrote:
-> On currently supported SoCs, the GPIO block used on Marvell EBU SoCs
-> is always connected to the Marvell MPIC. However, we are going to
-> introduce the support for newer Marvell EBU SoCs that use the
-> Cortex-A9 core, and therefore use the GIC as their main interrupt
-> controller, to which the GPIO block controlled by the gpio-mvebu
-> driver is connected.
-> 
-> The GIC interrupt controller driver uses the fasteoi flow handler. In
-> order to ensure that the eoi hook of the GIC driver gets called, the
-> GPIO driver should call chained_irq_enter() and chained_irq_exit() in
-> its handler. Without this, the first GPIO interrupt locks up the
-> system because it doesn't get acked at the GIC level.
-> 
-> This change is similar to for example commit
-> 0d978eb7349941139241a99acf05de6dd49b78d1 ("gpio: davinci: use
-> chained_irq_enter/chained_irq_exit API").
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/gpio/gpio-mvebu.c | 7 +++++++
->  1 file changed, 7 insertions(+)
+All,
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Here is a small set of fixes for fix a boot hang we are currently
+experiencing in the boot farm.  Now that we are probing for the phy, we
+didn't take into account optional phys, which causes the hang.  These
+patches fix this and restore booting on the affected platforms.
 
 thx,
 
 Jason.
+
+
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-phy_ata-fixes-3.14
+
+for you to fetch changes up to 90aa2997029fa623fe9e3ec3a469a00a34130237:
+
+  ata: sata_mv: Fix probe failures with optional phys (2014-02-05 05:48:58 +0000)
+
+----------------------------------------------------------------
+mvebu phy and ata fixes for v3.14
+
+ - phy
+    - add support for optional phys via NULL
+
+ - ata
+    - fix boot hang due to probe failure of optional phys
+
+NOTE:  Series has been Ack'd by both the phy maintainer and the ata maintainer
+for going through arm-soc
+
+----------------------------------------------------------------
+Andrew Lunn (3):
+      drivers: phy: Make NULL a valid phy reference
+      drivers: phy: Add support for optional phys
+      ata: sata_mv: Fix probe failures with optional phys
+
+ Documentation/phy.txt   | 26 +++++++++++++++------
+ drivers/ata/sata_mv.c   |  8 ++++---
+ drivers/phy/phy-core.c  | 62 ++++++++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/phy/phy.h | 14 +++++++++++
+ 4 files changed, 99 insertions(+), 11 deletions(-)
