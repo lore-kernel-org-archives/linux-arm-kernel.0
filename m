@@ -1,30 +1,48 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Fri,  7 Feb 2014 22:02:09 -0800
-Subject: [PATCH] ARM: smp_twd: Set the CLOCK_EVT_FEAT_PERCPU flag
-Message-ID: <1391839329-30971-1-git-send-email-soren.brinkmann@xilinx.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Sat, 8 Feb 2014 12:17:09 +0530
+Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
+ binding to list boost mode frequency
+In-Reply-To: <52F51FCD.5000009@arm.com>
+References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
+ <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
+ <52F50698.4060305@arm.com> <52F509BD.70903@arm.com>
+ <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
+ <52F51888.5010608@arm.com>
+ <CAGo_u6ofC4NNPiTNcSnXUvT3RZJo54=XyjetR-ok5hCBrVZkKg@mail.gmail.com>
+ <52F51FCD.5000009@arm.com>
+Message-ID: <CAJuA9agcpbKYocaQUBr2-VCXcXAo3r3urFF=+G_+ib2jCZqvwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The twd timers are per CPU devices. Set the corresponding flag to mark
-them as such.
+On Fri, Feb 7, 2014 at 11:32 PM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
+> On 07/02/14 17:37, Nishanth Menon wrote:
+>> On Fri, Feb 7, 2014 at 11:31 AM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
+>
+> [...]
+>
+>>> Yes I think its counter-intuitive as it's visible to the userspace(list of
+>>> frequencies and the boost parameters are exposed through sysfs)
+>>
+>> That will be a different problem -> as currently every single
+>> frequency in the cpufreq list has ability to be marked as boost
+>> frequency - if userspace does not maintain that, then, IMHO, fix the
+>> userspace :D
+>>
+>
+> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies gives
+> the list of frequencies based on the state of the boost feature at anytime.
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- arch/arm/kernel/smp_twd.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The list of frequencies in
+/sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
+does not change based in the state of the boost feature (enabled or
+disabled). But the scaling_max_frequency and scaling_min_frequency are
+updated based on the set of available + boost frequencies available.
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 6591e26fc13f..85407473c97d 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -294,7 +294,7 @@ static void twd_timer_setup(void)
- 
- 	clk->name = "local_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
--			CLOCK_EVT_FEAT_C3STOP;
-+			CLOCK_EVT_FEAT_C3STOP | CLOCK_EVT_FEAT_PERCPU;
- 	clk->rating = 350;
- 	clk->set_mode = twd_set_mode;
- 	clk->set_next_event = twd_set_next_event;
--- 
-1.8.5.4
+>
+> Intuitively the list without boost shouldn't have any frequency above the range
+> when it's enabled :), that's what I was referring to. So I am not talking about
+> any issue with user-space maintenance.
+>
+> Regards,
+> Sudeep
+>
