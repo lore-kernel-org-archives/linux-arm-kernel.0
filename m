@@ -1,80 +1,47 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 7 Feb 2014 18:42:54 -0800
-Subject: [Patch v5 1/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <1391546556-27702-2-git-send-email-agross@codeaurora.org>
-References: <1391546556-27702-1-git-send-email-agross@codeaurora.org>
- <1391546556-27702-2-git-send-email-agross@codeaurora.org>
-Message-ID: <20140208024254.GA10784@codeaurora.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 08 Feb 2014 03:42:53 +0100
+Subject: [PATCH v2 00/12] Samsung PM consolidation part 2 (multiplatform)
+In-Reply-To: <CAD=FV=UPH4vf2-5GuOypkkbMsDPmM7dPZJtFpHs+wBsN0wy8=Q@mail.gmail.com>
+References: <1391713977-22300-1-git-send-email-t.figa@samsung.com>	<20140207221537.GA12714@quad.lixom.net>	<52F57372.7010507@gmail.com>
+ <CAD=FV=UPH4vf2-5GuOypkkbMsDPmM7dPZJtFpHs+wBsN0wy8=Q@mail.gmail.com>
+Message-ID: <52F599AD.5070200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04, Andy Gross wrote:
-> diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom_bam_dma.c
-> new file mode 100644
-> index 0000000..214250c
-> --- /dev/null
-> +++ b/drivers/dma/qcom_bam_dma.c
-> @@ -0,0 +1,1066 @@
-> +/*
-> + * QCOM BAM DMA engine driver
+Hi Doug,
 
-Can you please move this down into the comment below?
+On 08.02.2014 01:51, Doug Anderson wrote:
+> Tomasz,
+>
+> On Fri, Feb 7, 2014 at 3:59 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>
+>>
+>> On 07.02.2014 23:15, Olof Johansson wrote:
+>>>
+>>> On Thu, Feb 06, 2014 at 08:12:45PM +0100, Tomasz Figa wrote:
+>>>
+>>>> On Exynos4210-based Trats, Exynos4412-based Trats2 and Exynos5250-based
+>>>> Arndale boards (except suspend/resume, which is broken because of
+>>>> unrelated reasons):
+>>>
+>>>
+>>> Has this been reported, and is it being worked on by anyone?
+>>
+>>
+>> Yes, reported quite a long time ago by Vikas Sajjan of Samsung/Linaro, but
+>> I'm not sure if anybody is working to fix it.
+>>
+>> I've been looking into this for a while, but couldn't really find anything
+>> except that it hangs when PMU starts power state transtion after CPU
+>> executing WFI instruction.
+>
+> It's likely it's something else, but just in case I'll point you to a
+> bug that we fixed that had the same symptom.  There's some details
+> (and a lot of noise) in <http://crbug.com/218132>.  ...or maybe just
+> look at the root cause at <http://crosreview.com/42067>.
 
-> + *
-> + * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
+OK. Thanks for pointing me to this. Will do some more tests back at the 
+office after the weekend.
 
-And split this out into its own comment block? I think this will
-make the lawyers happier.
-
-> + *
-> + * QCOM BAM DMA blocks are distributed amongst a number of the on-chip
-> + * peripherals on the MSM 8x74.  The configuration of the channels are dependent
-> + * on the way they are hard wired to that specific peripheral.  The peripheral
-> + * device tree entries specify the configuration of each channel.
-> + *
-> + * The DMA controller requires the use of external memory for storage of the
-> + * hardware descriptors for each channel.  The descriptor FIFO is accessed as a
-> + * circular buffer and operations are managed according to the offset within the
-> + * FIFO.  After pipe/channel reset, all of the pipe registers and internal state
-> + * are back to defaults.
-> + *
-> + * During DMA operations, we write descriptors to the FIFO, being careful to
-> + * handle wrapping and then write the last FIFO offset to that channel's
-> + * P_EVNT_REG register to kick off the transaction.  The P_SW_OFSTS register
-> + * indicates the current FIFO offset that is being processed, so there is some
-> + * indication of where the hardware is currently working.
-> + */
-[...]
-> +
-> +/* PIPE CTRL */
-> +#define	P_EN			BIT(1)
-
-           ^^^^
-Nitpick: Weird tab here?
-
-> +
-> +/**
-> + * bam_start_dma - start next transaction
-> + * @bchan - bam dma channel
-> + *
-> + * Note: must hold bam dma channel vc.lock
-
-You can use lockdep_assert_held() here to document this
-requirement and test for it at runtime.
-
-> + */
-> +static void bam_start_dma(struct bam_chan *bchan)
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Best regards,
+Tomasz
