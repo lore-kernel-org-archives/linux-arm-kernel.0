@@ -1,145 +1,56 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat,  8 Feb 2014 12:53:52 +0100
-Subject: [PATCH 1/2] OF: update stdout-path parsing
-Message-ID: <1391860433-5343-1-git-send-email-plagnioj@jcrosoft.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sat, 08 Feb 2014 13:25:25 -0000
+Subject: [PATCH RESEND v3] clk: return probe defer when DT clock not yet ready
+Message-ID: <20140208132446.2A26694003E@smtp1-g21.free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Today we only check if the linux,stdout-path property is present and retreive
-the node. But the DT specification allow to pass the serial options too as
-this
-	linux,stdout-path = &UART0;
+At probe time, a clock device may not be ready when some other device
+wants to use it.
 
-or with options
+This patch lets the functions clk_get/devm_clk_get return a probe defer
+when the clock is defined in the DT but not yet available.
 
-	inux,stdout-path = "/plb at 0/serial at 84000000:115200";
-
-So update the parsing to support and also the backward compatible stdout-path
-property.
-
-Cc: linux-serial at vger.kernel.org
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 ---
- drivers/of/base.c  | 57 +++++++++++++++++++++++++++++++++++++++++++++---------
- include/linux/of.h |  4 ++--
- 2 files changed, 50 insertions(+), 11 deletions(-)
+resend v3:
+	- base kernel 3.14.0-rc1
+	- __clk_get() failure is fixed
+resend v2: remove ASoc from subject (thank you, Mark)
+resend: - patch subject change from
+   [PATCH v3 1/2] ASoC: kirkwood: clk: probe defer when clock not yet ready
+	- base kernel 3.13.0-rc1
+v2: fix __clk_get() failure (from Russell King)
+---
+ drivers/clk/clk.c    | 2 +-
+ drivers/clk/clkdev.c | 2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index ff85450..ab9ff2f 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -34,6 +34,7 @@ EXPORT_SYMBOL(of_allnodes);
- struct device_node *of_chosen;
- struct device_node *of_aliases;
- static struct device_node *of_stdout;
-+static char *of_stdout_option;
- 
- DEFINE_MUTEX(of_aliases_mutex);
- 
-@@ -1783,6 +1784,45 @@ static void of_alias_add(struct alias_prop *ap, struct device_node *np,
- }
- 
- /**
-+ * of_stdout_path_scan - check if a device node matches the
-+ *                           linux,stdout-path property and parse it
-+ */
-+static void of_stdout_path_scan(void)
-+{
-+	const char *name;
-+	const char *tmp;
-+	const char *tmp_option;
-+
-+	name = of_get_property(of_chosen, "linux,stdout-path", NULL);
-+	if (!name)
-+		name = of_get_property(of_chosen, "stdout-path", NULL);
-+
-+	if (!name)
-+		return;
-+
-+	tmp_option = strchr(name, ':');
-+
-+	if (!tmp_option) {
-+		of_stdout = of_find_node_by_path(name);
-+		return;
-+	}
-+
-+	tmp = kstrndup(name, strlen(name) - strlen(tmp_option), GFP_KERNEL);
-+	if (!tmp)
-+		return;
-+
-+	of_stdout = of_find_node_by_path(tmp);
-+	if (!of_stdout)
-+		goto out;
-+
-+	tmp_option++;
-+	of_stdout_option = kstrdup(tmp_option, GFP_KERNEL);
-+
-+out:
-+	kfree(tmp);
-+}
-+
-+/**
-  * of_alias_scan - Scan all properties of 'aliases' node
-  *
-  * The function scans all the properties of 'aliases' node and populate
-@@ -1800,13 +1840,8 @@ void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align))
- 	if (of_chosen == NULL)
- 		of_chosen = of_find_node_by_path("/chosen at 0");
- 
--	if (of_chosen) {
--		const char *name;
--
--		name = of_get_property(of_chosen, "linux,stdout-path", NULL);
--		if (name)
--			of_stdout = of_find_node_by_path(name);
--	}
-+	if (of_chosen)
-+		of_stdout_path_scan();
- 
- 	of_aliases = of_find_node_by_path("/aliases");
- 	if (!of_aliases)
-@@ -1923,13 +1958,17 @@ EXPORT_SYMBOL_GPL(of_prop_next_string);
-  *                            linux,stdout-path property
-  *
-  * Check if this device node matches the linux,stdout-path property
-- * in the chosen node. return true if yes, false otherwise.
-+ * in the chosen node. return true if yes, false otherwise with the option if
-+ * requested.
-  */
--int of_device_is_stdout_path(struct device_node *dn)
-+int of_device_is_stdout_path(struct device_node *dn, char** option)
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 5517944..32d84e9 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2472,7 +2472,7 @@ EXPORT_SYMBOL_GPL(of_clk_del_provider);
+ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec)
  {
- 	if (!of_stdout)
- 		return false;
+ 	struct of_clk_provider *provider;
+-	struct clk *clk = ERR_PTR(-ENOENT);
++	struct clk *clk = ERR_PTR(-EPROBE_DEFER);
  
-+	if (option)
-+		*option = of_stdout_option;
-+
- 	return of_stdout == dn;
- }
- EXPORT_SYMBOL_GPL(of_device_is_stdout_path);
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 70c64ba..a8afe44 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -352,7 +352,7 @@ const __be32 *of_prop_next_u32(struct property *prop, const __be32 *cur,
-  */
- const char *of_prop_next_string(struct property *prop, const char *cur);
+ 	/* Check if we have such a provider in our array */
+ 	list_for_each_entry(provider, &of_clk_providers, link) {
+diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
+index 48f6721..a360b2e 100644
+--- a/drivers/clk/clkdev.c
++++ b/drivers/clk/clkdev.c
+@@ -167,6 +167,8 @@ struct clk *clk_get(struct device *dev, const char *con_id)
+ 		clk = of_clk_get_by_name(dev->of_node, con_id);
+ 		if (!IS_ERR(clk))
+ 			return clk;
++		if (PTR_ERR(clk) == -EPROBE_DEFER)
++			return clk;
+ 	}
  
--int of_device_is_stdout_path(struct device_node *dn);
-+int of_device_is_stdout_path(struct device_node *dn, char** option);
- 
- #else /* CONFIG_OF */
- 
-@@ -542,7 +542,7 @@ static inline int of_machine_is_compatible(const char *compat)
- 	return 0;
- }
- 
--static inline int of_device_is_stdout_path(struct device_node *dn)
-+static inline int of_device_is_stdout_path(struct device_node *dn, char** option)
- {
- 	return 0;
- }
+ 	return clk_get_sys(dev_id, con_id);
 -- 
-1.9.rc1
+1.9.0.rc3
