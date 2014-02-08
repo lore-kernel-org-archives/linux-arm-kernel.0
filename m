@@ -1,30 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 8 Feb 2014 10:45:37 -0500
-Subject: [PATCH 02/21] IRQ: Orion: Fix getting generic chip pointer.
-In-Reply-To: <52F55F19.3060800@gmail.com>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-3-git-send-email-andrew@lunn.ch>
- <52F55F19.3060800@gmail.com>
-Message-ID: <20140208154537.GH8533@titan.lakedaemon.net>
+From: carlo@caione.org (Carlo Caione)
+Date: Sat,  8 Feb 2014 17:03:45 +0100
+Subject: [PATCH 0/3] mfd: axp20x: Add support for PMIC axp202 and axp209
+Message-ID: <1391875428-6281-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 11:32:57PM +0100, Sebastian Hesselbarth wrote:
-> On 02/07/2014 12:41 AM, Andrew Lunn wrote:
-> >Enabling SPARSE_IRQ shows up a bug in the irq-orion bridge interrupt
-> >handler. The bridge interrupt is implemented using a single generic
-> >chip. Thus the parameter passed to irq_get_domain_generic_chip()
-> >should always be zero.
-> >
-> >Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> Indeed, I remember we talked about it: irq_get_domain_generic_chip takes
-> hwirqs, so passing 0 is sane here.
-> 
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+This set of patches add prelinary support for PMIC X-Powers axp202 and axp209.
+Only two subsystem are supported at the moment: power enable key (PEK) and
+regulators. Drivers for these two sub-system will be submitted in later
+patch-sets.
 
-Added and pushed to mvebu-next/irqchip-fixes
+Carlo Caione (3):
+  mfd: axp20x: Add mfd driver for axp20x PMIC
+  mfd: axp20x: Add dtsi for axp20x
+  mfd: axp20x: Add bindings documentation
 
-thx,
+ Documentation/devicetree/bindings/mfd/axp20x.txt |  87 ++++++++
+ arch/arm/boot/dts/axp20x.dtsi                    |   9 +
+ drivers/mfd/Kconfig                              |  12 ++
+ drivers/mfd/Makefile                             |   1 +
+ drivers/mfd/axp20x.c                             | 251 +++++++++++++++++++++++
+ include/linux/mfd/axp20x.h                       | 178 ++++++++++++++++
+ 6 files changed, 538 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/axp20x.txt
+ create mode 100644 arch/arm/boot/dts/axp20x.dtsi
+ create mode 100644 drivers/mfd/axp20x.c
+ create mode 100644 include/linux/mfd/axp20x.h
 
-Jason.
+-- 
+1.8.5.3
