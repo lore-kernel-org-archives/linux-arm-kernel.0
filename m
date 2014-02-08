@@ -1,30 +1,23 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 7 Feb 2014 19:26:07 -0800
-Subject: [PATCH v3 3/5] ARM: qcom: Split Qualcomm support into legacy
- and multiplatform
-In-Reply-To: <1391725484-6673-4-git-send-email-galak@codeaurora.org>
-References: <1391725484-6673-1-git-send-email-galak@codeaurora.org>
- <1391725484-6673-4-git-send-email-galak@codeaurora.org>
-Message-ID: <20140208032607.GC10784@codeaurora.org>
+Date: Fri, 7 Feb 2014 19:37:40 -0800
+Subject: [PATCH] ARM: dts: qcom: Add RNG device tree node
+In-Reply-To: <1391764987-17138-1-git-send-email-svarbanov@mm-sol.com>
+References: <1391764987-17138-1-git-send-email-svarbanov@mm-sol.com>
+Message-ID: <20140208033740.GD10784@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06, Kumar Gala wrote:
-> diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-qcom/platsmp.c
-> similarity index 98%
-> rename from arch/arm/mach-msm/platsmp.c
-> rename to arch/arm/mach-qcom/platsmp.c
-> index 251a91e..67823a7 100644
-> --- a/arch/arm/mach-msm/platsmp.c
-> +++ b/arch/arm/mach-qcom/platsmp.c
-> @@ -2,6 +2,7 @@
->   *  Copyright (C) 2002 ARM Ltd.
->   *  All Rights Reserved
->   *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-> + *  Copyright (c) 2014 The Linux Foundation. All rights reserved.
+On 02/07, Stanimir Varbanov wrote:
+> Add the necessary DT node to probe the rng driver on
+> msm8974 platforms.
+> 
 
-We should replace the Code Aurora Forum copyright with Linux
-Foundation here.
+Looks good. We should add it to msm8960-cdp and enable the driver
+in the defconfig as well.
+
+> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
