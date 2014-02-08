@@ -1,33 +1,35 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 8 Feb 2014 12:01:28 -0500
-Subject: [PATCH] i2c: mv64xxx: Fix locked bus when offload is selected
- but not used on a message
-In-Reply-To: <1391770588-1344-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1391770588-1344-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140208170128.GI8533@titan.lakedaemon.net>
+Date: Sat, 8 Feb 2014 12:06:35 -0500
+Subject: [PATCH] gpio: mvebu: use chained_irq_{enter, exit} for GIC
+ compatibility
+In-Reply-To: <1391772559-28357-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1391772559-28357-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140208170635.GJ8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 11:55:54AM +0100, Gregory CLEMENT wrote:
-> Offload can be used only on regular transactions and for 1 to byte
-> transfers. In the other cases we switch back to usual work flow.
+On Fri, Feb 07, 2014 at 12:29:19PM +0100, Thomas Petazzoni wrote:
+> On currently supported SoCs, the GPIO block used on Marvell EBU SoCs
+> is always connected to the Marvell MPIC. However, we are going to
+> introduce the support for newer Marvell EBU SoCs that use the
+> Cortex-A9 core, and therefore use the GIC as their main interrupt
+> controller, to which the GPIO block controlled by the gpio-mvebu
+> driver is connected.
 > 
-> In this case we need to call mv64xxx_i2c_prepare_for_io() as this
-> function is not used when we try to use offloading.
+> The GIC interrupt controller driver uses the fasteoi flow handler. In
+> order to ensure that the eoi hook of the GIC driver gets called, the
+> GPIO driver should call chained_irq_enter() and chained_irq_exit() in
+> its handler. Without this, the first GPIO interrupt locks up the
+> system because it doesn't get acked at the GIC level.
 > 
-> This commit adds this missing call when offloading have failed in the
-> MV64XXX_I2C_ACTION_OFFLOAD_SEND_START case.
+> This change is similar to for example commit
+> 0d978eb7349941139241a99acf05de6dd49b78d1 ("gpio: davinci: use
+> chained_irq_enter/chained_irq_exit API").
 > 
-> This fix the timeout seen when the the i2c driver try to access an
-> address where the device is absent on the Armada XP bases board.
-> 
-> Cc: stable at vger.kernel.org # v3.12+
-> Fixes: 930ab3d403ae (i2c: mv64xxx: Add I2C Transaction Generator support)
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  drivers/i2c/busses/i2c-mv64xxx.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
+>  drivers/gpio/gpio-mvebu.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
 
 Acked-by: Jason Cooper <jason@lakedaemon.net>
 
