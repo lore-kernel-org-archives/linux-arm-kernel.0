@@ -1,92 +1,93 @@
 From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Sat, 8 Feb 2014 10:40:01 +0530
-Subject: [PATCH v2 1/2] PM / OPP: Allow boost frequency to be looked up
- from device tree
-In-Reply-To: <52F50346.7040707@arm.com>
-References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
- <1391786342-11812-2-git-send-email-thomas.ab@samsung.com>
- <52F50346.7040707@arm.com>
-Message-ID: <CAJuA9agT4PC6YOmhCwKQ=58qaGEr1qSuhTpX57ro1pEuk++Miw@mail.gmail.com>
+Date: Sat, 8 Feb 2014 10:49:27 +0530
+Subject: [PATCH v3 1/7] cpufreq: cpufreq-cpu0: allow use of optional boost
+ mode frequencies
+In-Reply-To: <52F506EC.2070907@ti.com>
+References: <1391788548-13056-1-git-send-email-thomas.ab@samsung.com>
+ <1391788548-13056-2-git-send-email-thomas.ab@samsung.com>
+ <52F506EC.2070907@ti.com>
+Message-ID: <CAJuA9ah9xHZZknW5yfh8v8GS65TLd4uZedigEt4ATdoiy6-1Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 7, 2014 at 9:31 PM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
-> On 07/02/14 15:19, Thomas Abraham wrote:
+On Fri, Feb 7, 2014 at 9:46 PM, Nishanth Menon <nm@ti.com> wrote:
+> On 02/07/2014 09:55 AM, Thomas Abraham wrote:
 >> From: Thomas Abraham <thomas.ab@samsung.com>
 >>
->> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
->> support for CPU boost mode. This patch adds support for finding available
->> boost frequencies from device tree and marking them as usable in boost mode.
+>> Lookup for the optional boost-frequency property in cpu0 node and if
+>> available, enable support for boost mode frequencies. The frequencies
+>> usable in boost mode are determined while preparing the cpufreq table
+>> from the list of operating points available.
 >>
->> Cc: Nishanth Menon <nm@ti.com>
+>> In addition to this, enable the CPU_FREQ_BOOST_SW config option for
+>> this driver by default. On platforms that do not support boost mode,
+>> the boost mode frequencies will not be specified in cpu0 node and
+>> hence the boost mode support will not be enabled. Since this driver
+>> anyways depends on THERMAL config option, it is safe to enable
+>> CPU_FREQ_BOOST_SW config option as default.
+>>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
 >> Cc: Lukasz Majewski <l.majewski@samsung.com>
 >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 >> ---
->>  drivers/base/power/opp.c |   34 +++++++++++++++++++++++++++++++++-
->>  1 file changed, 33 insertions(+), 1 deletion(-)
+>>  Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt |    2 ++
+>>  drivers/cpufreq/Kconfig                                    |    1 +
+>>  drivers/cpufreq/cpufreq-cpu0.c                             |    3 +++
+>>  3 files changed, 6 insertions(+)
 >>
->> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
->> index fa41874..b636826 100644
->> --- a/drivers/base/power/opp.c
->> +++ b/drivers/base/power/opp.c
->> @@ -628,7 +628,8 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
->>       struct device_opp *dev_opp;
->>       struct dev_pm_opp *opp;
->>       struct cpufreq_frequency_table *freq_table;
->> -     int i = 0;
->> +     int i = 0, j, len, ret;
->> +     u32 *boost_freqs = NULL;
+>> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+>> index f055515..60f321a 100644
+>> --- a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+>> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+>> @@ -19,6 +19,8 @@ Optional properties:
+>>  - cooling-min-level:
+>>  - cooling-max-level:
+>>       Please refer to Documentation/devicetree/bindings/thermal/thermal.txt.
+>> +- boost-frequency:
+>> +     Please refer to Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
 >>
->>       /* Pretend as if I am an updater */
->>       mutex_lock(&dev_opp_list_lock);
->> @@ -650,10 +651,35 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
->>               return -ENOMEM;
+>>  Examples:
+>>
+>> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+>> index 4b029c0..52cc704 100644
+>> --- a/drivers/cpufreq/Kconfig
+>> +++ b/drivers/cpufreq/Kconfig
+>> @@ -187,6 +187,7 @@ config GENERIC_CPUFREQ_CPU0
+>>       tristate "Generic CPU0 cpufreq driver"
+>>       depends on HAVE_CLK && REGULATOR && OF && THERMAL && CPU_THERMAL
+>>       select PM_OPP
+>> +     select CPU_FREQ_BOOST_SW
+>>       help
+>>         This adds a generic cpufreq driver for CPU0 frequency management.
+>>         It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
+>> diff --git a/drivers/cpufreq/cpufreq-cpu0.c b/drivers/cpufreq/cpufreq-cpu0.c
+>> index 0c12ffc..06539eb 100644
+>> --- a/drivers/cpufreq/cpufreq-cpu0.c
+>> +++ b/drivers/cpufreq/cpufreq-cpu0.c
+>> @@ -195,6 +195,9 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
+>>                       transition_latency += ret * 1000;
 >>       }
 >>
->> +     if (of_find_property(dev->of_node, "boost-frequency", &len)) {
->> +             if (len == 0 || (len & (sizeof(u32) - 1)) != 0) {
->> +                     dev_err(dev, "%s: invalid boost frequency\n", __func__);
->> +                     ret = -EINVAL;
->> +                     goto err_boost;
->> +             }
+>> +     if (of_find_property(cpu_dev->of_node, "boost-frequency", NULL))
+>> +             cpu0_cpufreq_driver.boost_supported = true;
 >> +
->> +             boost_freqs = kzalloc(len, GFP_KERNEL);
->> +             if (!boost_freqs) {
->> +                     dev_warn(dev, "%s: no memory for boost freq table\n",
->> +                                     __func__);
->> +                     ret = -ENOMEM;
->> +                     goto err_boost;
->> +             }
->> +             of_property_read_u32_array(dev->of_node, "boost-frequency",
->> +                     boost_freqs, len / sizeof(u32));
->> +     }
->> +
->>       list_for_each_entry(opp, &dev_opp->opp_list, node) {
->>               if (opp->available) {
->>                       freq_table[i].driver_data = i;
->>                       freq_table[i].frequency = opp->rate / 1000;
->> +                     for (j = 0; j < len / sizeof(u32) && boost_freqs; j++) {
->> +                             if (boost_freqs[j] == freq_table[i].frequency) {
->> +                                     freq_table[i].driver_data =
->> +                                                     CPUFREQ_BOOST_FREQ;
->> +                                     break;
->> +                             }
->> +                     }
->>                       i++;
->>               }
->>       }
-> IIRC you had mentioned that the boost-opp was not limited to be a cpufreq, but
-> this change seems to be cpufreq only.
+>>       ret = cpufreq_register_driver(&cpu0_cpufreq_driver);
+>>       if (ret) {
+>>               pr_err("failed register driver: %d\n", ret);
+>>
+>
+> might as well hide that under the opp api which returns a bool that
+> says if boost is supported or not. that allows the parse to be
+> isolated to a single location.
 
-Yes, but as you have initiated the discussion on extending the OPP
-binding, this has been limited to cpufreq only. If the new OPP library
-has support for listing boost frequency, this can be migrated to the
-new OPP libaray.
+This is specific to the cpufreq-cpu0 driver. Other cpufreq drivers
+might want to use other methods and additional constraints to
+determine if boost has to be enabled.
 
 Thanks,
 Thomas.
 
 >
+> --
 > Regards,
-> Sudeep
->
+> Nishanth Menon
