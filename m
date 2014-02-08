@@ -1,8 +1,8 @@
 From: ta.omasab@gmail.com (Thomas Abraham)
-Date: Sat, 8 Feb 2014 12:17:09 +0530
+Date: Sat, 8 Feb 2014 12:17:46 +0530
 Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
  binding to list boost mode frequency
-In-Reply-To: <52F51FCD.5000009@arm.com>
+In-Reply-To: <CAGo_u6quxExJOyY8mvCw5sDSuz=_j0YqJ6FJW+FAdaxUeqzN9Q@mail.gmail.com>
 References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
  <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
  <52F50698.4060305@arm.com> <52F509BD.70903@arm.com>
@@ -10,39 +10,55 @@ References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
  <52F51888.5010608@arm.com>
  <CAGo_u6ofC4NNPiTNcSnXUvT3RZJo54=XyjetR-ok5hCBrVZkKg@mail.gmail.com>
  <52F51FCD.5000009@arm.com>
-Message-ID: <CAJuA9agcpbKYocaQUBr2-VCXcXAo3r3urFF=+G_+ib2jCZqvwg@mail.gmail.com>
+ <CAGo_u6quxExJOyY8mvCw5sDSuz=_j0YqJ6FJW+FAdaxUeqzN9Q@mail.gmail.com>
+Message-ID: <CAJuA9aj-LsdBiS2msOVmNRSe6mNj9QJsys9KjHZAk=9hrZOLzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 7, 2014 at 11:32 PM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
-> On 07/02/14 17:37, Nishanth Menon wrote:
->> On Fri, Feb 7, 2014 at 11:31 AM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
->
-> [...]
->
->>> Yes I think its counter-intuitive as it's visible to the userspace(list of
->>> frequencies and the boost parameters are exposed through sysfs)
+On Sat, Feb 8, 2014 at 1:11 AM, Nishanth Menon <nm@ti.com> wrote:
+> On Fri, Feb 7, 2014 at 12:02 PM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
+>> On 07/02/14 17:37, Nishanth Menon wrote:
+>>> On Fri, Feb 7, 2014 at 11:31 AM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
 >>
->> That will be a different problem -> as currently every single
->> frequency in the cpufreq list has ability to be marked as boost
->> frequency - if userspace does not maintain that, then, IMHO, fix the
->> userspace :D
+>> [...]
 >>
->
-> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies gives
-> the list of frequencies based on the state of the boost feature at anytime.
+>>>> Yes I think its counter-intuitive as it's visible to the userspace(list of
+>>>> frequencies and the boost parameters are exposed through sysfs)
+>>>
+>>> That will be a different problem -> as currently every single
+>>> frequency in the cpufreq list has ability to be marked as boost
+>>> frequency - if userspace does not maintain that, then, IMHO, fix the
+>>> userspace :D
+>>>
+>>
+>> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies gives
+>> the list of frequencies based on the state of the boost feature at anytime.
+>>
+>> Intuitively the list without boost shouldn't have any frequency above the range
+>> when it's enabled :), that's what I was referring to. So I am not talking about
+>> any issue with user-space maintenance.
+> Fair enough - but i still think it has nothing to do with dt binding
+> itself -> and i think the discussion we've had should be good for the
+> binding provided in this patch.. I hope.. if documentation needs a bit
+> of better explanation to prevent a repeat of the same discussion at a
+> later point of time, now might be a good time to add it in.
 
-The list of frequencies in
-/sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
-does not change based in the state of the boost feature (enabled or
-disabled). But the scaling_max_frequency and scaling_min_frequency are
-updated based on the set of available + boost frequencies available.
+The term boost and over-clocking have been described in the bindings
+document as being the same. Since the term over-clocking refers to
+running a CPU beyond normal operating frequencies, I tend to agree
+with Sudeep that it is not intuitive if a normal operating frequency
+is greater than a boost mode frequency.
 
->
-> Intuitively the list without boost shouldn't have any frequency above the range
-> when it's enabled :), that's what I was referring to. So I am not talking about
-> any issue with user-space maintenance.
+Otherwise, when userspace does "echo 1 >
+/sys/devices/system/cpu/cpufreq/boost", what is it supposed to mean. I
+think the original intent of boost mode patches was to allow CPU to
+operate at frequencies greater than the normal operating frequencies.
+
+Lukasz, how would you want this to be handled?
+
+Thanks,
+Thomas.
+
 >
 > Regards,
-> Sudeep
->
+> Nishanth Menon
