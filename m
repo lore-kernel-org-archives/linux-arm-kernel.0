@@ -1,58 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 8 Feb 2014 00:23:54 +0000
-Subject: [PATCH RFC 0/2] drivers/base: simplify simple DT-based components
-In-Reply-To: <20140207185911.GG26684@n2100.arm.linux.org.uk>
-References: <cover.1391793068.git.moinejf@free.fr>
- <20140207173326.GD26684@n2100.arm.linux.org.uk>
- <20140207194204.4d4326bd@armhf>
- <20140207185911.GG26684@n2100.arm.linux.org.uk>
-Message-ID: <20140208002354.GI26684@n2100.arm.linux.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 7 Feb 2014 16:51:37 -0800
+Subject: [PATCH v2 00/12] Samsung PM consolidation part 2 (multiplatform)
+In-Reply-To: <52F57372.7010507@gmail.com>
+References: <1391713977-22300-1-git-send-email-t.figa@samsung.com>
+ <20140207221537.GA12714@quad.lixom.net>
+ <52F57372.7010507@gmail.com>
+Message-ID: <CAD=FV=UPH4vf2-5GuOypkkbMsDPmM7dPZJtFpHs+wBsN0wy8=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 06:59:11PM +0000, Russell King - ARM Linux wrote:
-> Sorry.  Deferred probe does work, it's been tested with imx-drm, not
-> only from the master component but also the sub-components.  There's
-> no problem here.
+Tomasz,
 
-Here's the proof that it also works with the Cubox, and armada DRM:
+On Fri, Feb 7, 2014 at 3:59 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>
+>
+> On 07.02.2014 23:15, Olof Johansson wrote:
+>>
+>> On Thu, Feb 06, 2014 at 08:12:45PM +0100, Tomasz Figa wrote:
+>>
+>>> On Exynos4210-based Trats, Exynos4412-based Trats2 and Exynos5250-based
+>>> Arndale boards (except suspend/resume, which is broken because of
+>>> unrelated reasons):
+>>
+>>
+>> Has this been reported, and is it being worked on by anyone?
+>
+>
+> Yes, reported quite a long time ago by Vikas Sajjan of Samsung/Linaro, but
+> I'm not sure if anybody is working to fix it.
+>
+> I've been looking into this for a while, but couldn't really find anything
+> except that it hangs when PMU starts power state transtion after CPU
+> executing WFI instruction.
 
-[drm] Initialized drm 1.1.0 20060810
-...
-armada-drm armada-510-drm: master bind failed: -517
-i2c 0-0070: Driver tda998x requests probe deferral
-...
-tda998x 0-0070: found TDA19988
-armada-drm armada-510-drm: bound 0-0070 (ops tda998x_ops)
+It's likely it's something else, but just in case I'll point you to a
+bug that we fixed that had the same symptom.  There's some details
+(and a lot of noise) in <http://crbug.com/218132>.  ...or maybe just
+look at the root cause at <http://crosreview.com/42067>.
 
-So, in the above sequence, the armada DRM driver was bound to its driver
-initially, but the TDA998x driver wasn't.
-
-Then, the TDA998x driver is bound, which completes the requirements for
-the DRM master.  So the system attempts to bind.
-
-In doing so, the master probe function discovers a missing clock (because
-the SIL5531 driver hasn't probed) and it returns -EPROBE_DEFER.  This
-causes the probe of the TDA998x to be deferred.
-
-Later, deferred probes are run - at this time the SIL5531 driver has
-probed its device, and the clocks are now available.  So when the TDA998x
-driver is re-probed, it retriggers the binding attempt, and as the clock
-can now be found, the system is bound and the DRM system for the device
-is initialised.
-
-I've just committed a patch locally which makes Armada DRM fully use
-the component helper, which removes in totality the four armada_output.*
-and armada_slave.* files since they're no longer required:
-
-[cubox-3.13 e2713ff5ac2f] DRM: armada: remove non-component support
- 7 files changed, 8 insertions(+), 437 deletions(-)
- delete mode 100644 drivers/gpu/drm/armada/armada_output.c
- delete mode 100644 drivers/gpu/drm/armada/armada_output.h
- delete mode 100644 drivers/gpu/drm/armada/armada_slave.c
- delete mode 100644 drivers/gpu/drm/armada/armada_slave.h
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+-Doug
