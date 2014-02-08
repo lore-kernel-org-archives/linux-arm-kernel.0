@@ -1,47 +1,31 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 08 Feb 2014 03:42:53 +0100
-Subject: [PATCH v2 00/12] Samsung PM consolidation part 2 (multiplatform)
-In-Reply-To: <CAD=FV=UPH4vf2-5GuOypkkbMsDPmM7dPZJtFpHs+wBsN0wy8=Q@mail.gmail.com>
-References: <1391713977-22300-1-git-send-email-t.figa@samsung.com>	<20140207221537.GA12714@quad.lixom.net>	<52F57372.7010507@gmail.com>
- <CAD=FV=UPH4vf2-5GuOypkkbMsDPmM7dPZJtFpHs+wBsN0wy8=Q@mail.gmail.com>
-Message-ID: <52F599AD.5070200@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 7 Feb 2014 19:26:07 -0800
+Subject: [PATCH v3 3/5] ARM: qcom: Split Qualcomm support into legacy
+ and multiplatform
+In-Reply-To: <1391725484-6673-4-git-send-email-galak@codeaurora.org>
+References: <1391725484-6673-1-git-send-email-galak@codeaurora.org>
+ <1391725484-6673-4-git-send-email-galak@codeaurora.org>
+Message-ID: <20140208032607.GC10784@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+On 02/06, Kumar Gala wrote:
+> diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-qcom/platsmp.c
+> similarity index 98%
+> rename from arch/arm/mach-msm/platsmp.c
+> rename to arch/arm/mach-qcom/platsmp.c
+> index 251a91e..67823a7 100644
+> --- a/arch/arm/mach-msm/platsmp.c
+> +++ b/arch/arm/mach-qcom/platsmp.c
+> @@ -2,6 +2,7 @@
+>   *  Copyright (C) 2002 ARM Ltd.
+>   *  All Rights Reserved
+>   *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+> + *  Copyright (c) 2014 The Linux Foundation. All rights reserved.
 
-On 08.02.2014 01:51, Doug Anderson wrote:
-> Tomasz,
->
-> On Fri, Feb 7, 2014 at 3:59 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>
->>
->> On 07.02.2014 23:15, Olof Johansson wrote:
->>>
->>> On Thu, Feb 06, 2014 at 08:12:45PM +0100, Tomasz Figa wrote:
->>>
->>>> On Exynos4210-based Trats, Exynos4412-based Trats2 and Exynos5250-based
->>>> Arndale boards (except suspend/resume, which is broken because of
->>>> unrelated reasons):
->>>
->>>
->>> Has this been reported, and is it being worked on by anyone?
->>
->>
->> Yes, reported quite a long time ago by Vikas Sajjan of Samsung/Linaro, but
->> I'm not sure if anybody is working to fix it.
->>
->> I've been looking into this for a while, but couldn't really find anything
->> except that it hangs when PMU starts power state transtion after CPU
->> executing WFI instruction.
->
-> It's likely it's something else, but just in case I'll point you to a
-> bug that we fixed that had the same symptom.  There's some details
-> (and a lot of noise) in <http://crbug.com/218132>.  ...or maybe just
-> look at the root cause at <http://crosreview.com/42067>.
+We should replace the Code Aurora Forum copyright with Linux
+Foundation here.
 
-OK. Thanks for pointing me to this. Will do some more tests back at the 
-office after the weekend.
-
-Best regards,
-Tomasz
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
