@@ -1,21 +1,19 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 8 Feb 2014 12:22:17 -0500
-Subject: [GIT PULL] mvebu: phy and ata fixes for v3.14
-Message-ID: <20140208172217.GK8533@titan.lakedaemon.net>
+Date: Sat, 8 Feb 2014 12:31:54 -0500
+Subject: [GIT PULL] clk: mvebu: fixes for v3.14
+Message-ID: <20140208173154.GL8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+Mike,
 
-Here is a small set of fixes for fix a boot hang we are currently
-experiencing in the boot farm.  Now that we are probing for the phy, we
-didn't take into account optional phys, which causes the hang.  These
-patches fix this and restore booting on the affected platforms.
+Here's a round of fixes I've had in -next for several days.  It's not
+the ideal solution, but a short term one while we hash out a proper
+solution for v3.15+.
 
 thx,
 
 Jason.
-
 
 The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
@@ -23,32 +21,28 @@ The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-phy_ata-fixes-3.14
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-clk-fixes-3.14
 
-for you to fetch changes up to 90aa2997029fa623fe9e3ec3a469a00a34130237:
+for you to fetch changes up to 58d516ae95cbf7eed44f85a01cdfad41f17b4197:
 
-  ata: sata_mv: Fix probe failures with optional phys (2014-02-05 05:48:58 +0000)
-
-----------------------------------------------------------------
-mvebu phy and ata fixes for v3.14
-
- - phy
-    - add support for optional phys via NULL
-
- - ata
-    - fix boot hang due to probe failure of optional phys
-
-NOTE:  Series has been Ack'd by both the phy maintainer and the ata maintainer
-for going through arm-soc
+  clk: mvebu: kirkwood: maintain clock init order (2014-02-06 18:07:01 +0000)
 
 ----------------------------------------------------------------
-Andrew Lunn (3):
-      drivers: phy: Make NULL a valid phy reference
-      drivers: phy: Add support for optional phys
-      ata: sata_mv: Fix probe failures with optional phys
+mvebu clock fixes for v3.14
 
- Documentation/phy.txt   | 26 +++++++++++++++------
- drivers/ata/sata_mv.c   |  8 ++++---
- drivers/phy/phy-core.c  | 62 ++++++++++++++++++++++++++++++++++++++++++++++++-
- include/linux/phy/phy.h | 14 +++++++++++
- 4 files changed, 99 insertions(+), 11 deletions(-)
+ - kirkwood, dove, armada-xp, armada-370
+    - force clock init order broken by sorting DT ocp nodes by address
+    - fixes boot failures on affected platforms
+
+----------------------------------------------------------------
+Sebastian Hesselbarth (4):
+      clk: mvebu: armada-370: maintain clock init order
+      clk: mvebu: armada-xp: maintain clock init order
+      clk: mvebu: dove: maintain clock init order
+      clk: mvebu: kirkwood: maintain clock init order
+
+ drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
+ drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
+ drivers/clk/mvebu/dove.c       | 19 +++++++++----------
+ drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
+ 4 files changed, 44 insertions(+), 50 deletions(-)
