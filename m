@@ -1,33 +1,53 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sat,  8 Feb 2014 17:05:54 +0100
-Subject: [PATCH 2/2] input: misc: dts: Add axp20x-pek node to axp20x.dtsi
-In-Reply-To: <1391875554-6383-1-git-send-email-carlo@caione.org>
-References: <1391875554-6383-1-git-send-email-carlo@caione.org>
-Message-ID: <1391875554-6383-3-git-send-email-carlo@caione.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Sat, 8 Feb 2014 10:31:50 -0600
+Subject: [PATCH v3 1/7] cpufreq: cpufreq-cpu0: allow use of optional boost
+ mode frequencies
+In-Reply-To: <CAJuA9ah9xHZZknW5yfh8v8GS65TLd4uZedigEt4ATdoiy6-1Gg@mail.gmail.com>
+References: <1391788548-13056-1-git-send-email-thomas.ab@samsung.com>
+ <1391788548-13056-2-git-send-email-thomas.ab@samsung.com>
+ <52F506EC.2070907@ti.com>
+ <CAJuA9ah9xHZZknW5yfh8v8GS65TLd4uZedigEt4ATdoiy6-1Gg@mail.gmail.com>
+Message-ID: <CAGo_u6qdc=dRgRFNq4f4tSC7+3J5dnZfa63wR5C+HRy-z5LBbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a sub-node to axp20x.dtsi
+On Fri, Feb 7, 2014 at 11:19 PM, Thomas Abraham <ta.omasab@gmail.com> wrote:
+>>> --- a/drivers/cpufreq/cpufreq-cpu0.c
+>>> +++ b/drivers/cpufreq/cpufreq-cpu0.c
+>>> @@ -195,6 +195,9 @@ static int cpu0_cpufreq_probe(struct platform_device *pdev)
+>>>                       transition_latency += ret * 1000;
+>>>       }
+>>>
+>>> +     if (of_find_property(cpu_dev->of_node, "boost-frequency", NULL))
+>>> +             cpu0_cpufreq_driver.boost_supported = true;
+>>> +
+>> might as well hide that under the opp api which returns a bool that
+>> says if boost is supported or not. that allows the parse to be
+>> isolated to a single location.
+>
+> This is specific to the cpufreq-cpu0 driver. Other cpufreq drivers
+> might want to use other methods and additional constraints to
+> determine if boost has to be enabled.
 
-Signed-off-by: Carlo Caione <carlo@caione.org>
----
- arch/arm/boot/dts/axp20x.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+struct cpufreq_driver::boost_supported is nothing CPU0 specifc - i am
+just saying that the same property "boost-frequency" parsed by in two
+places (dev_pm_opp_init_cpufreq_table and cpu0_cpufreq_probe) is a
+very bad idea.
 
-diff --git a/arch/arm/boot/dts/axp20x.dtsi b/arch/arm/boot/dts/axp20x.dtsi
-index 98d4c7c..3d475e2 100644
---- a/arch/arm/boot/dts/axp20x.dtsi
-+++ b/arch/arm/boot/dts/axp20x.dtsi
-@@ -6,4 +6,10 @@
- 	compatible = "x-powers,axp20x";
- 	interrupt-controller;
- 	#interrupt-cells = <1>;
-+
-+	axp20x-pek {
-+		compatible = "x-powers,axp20x-pek";
-+		interrupts = <33>,  <34>;
-+		interrupt-names = "PEK_DBR", "PEK_DBF";
-+	};
- };
--- 
-1.8.5.3
+you could instead make
+int dev_pm_opp_init_cpufreq_table(struct device *dev,
+                           struct cpufreq_frequency_table **table)
+into:
+int dev_pm_opp_init_cpufreq_table(struct device *dev,
+                           struct cpufreq_frequency_table **table,
+bool *boost_supported);
+
+Then use boost_supported for anything of your driver's choice
+(including updating cpufreq_driver::boost_supported).
+
+That allows the property to be isolated into a single function, who
+can be modified without impacting other drivers at a later point in
+time.
+
+Regards,
+Nishanth Menon
