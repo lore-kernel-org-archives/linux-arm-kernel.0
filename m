@@ -1,48 +1,37 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 8 Feb 2014 12:31:54 -0500
-Subject: [GIT PULL] clk: mvebu: fixes for v3.14
-Message-ID: <20140208173154.GL8533@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat,  8 Feb 2014 21:13:03 +0100
+Subject: [PATCH] mmc: mmci: rename some extended flags
+Message-ID: <1391890383-10280-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+These four (so far unused) flags are only found in the ST Micro
+versions of MMCI, so infix them properly with the _ST_ infix.
 
-Here's a round of fixes I've had in -next for several days.  It's not
-the ideal solution, but a short term one while we hash out a proper
-solution for v3.15+.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/mmc/host/mmci.h | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-thx,
-
-Jason.
-
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-clk-fixes-3.14
-
-for you to fetch changes up to 58d516ae95cbf7eed44f85a01cdfad41f17b4197:
-
-  clk: mvebu: kirkwood: maintain clock init order (2014-02-06 18:07:01 +0000)
-
-----------------------------------------------------------------
-mvebu clock fixes for v3.14
-
- - kirkwood, dove, armada-xp, armada-370
-    - force clock init order broken by sorting DT ocp nodes by address
-    - fixes boot failures on affected platforms
-
-----------------------------------------------------------------
-Sebastian Hesselbarth (4):
-      clk: mvebu: armada-370: maintain clock init order
-      clk: mvebu: armada-xp: maintain clock init order
-      clk: mvebu: dove: maintain clock init order
-      clk: mvebu: kirkwood: maintain clock init order
-
- drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
- drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
- drivers/clk/mvebu/dove.c       | 19 +++++++++----------
- drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
- 4 files changed, 44 insertions(+), 50 deletions(-)
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 168bc72f7a94..84c0e59b792a 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -38,10 +38,11 @@
+ #define MCI_CPSM_INTERRUPT	(1 << 8)
+ #define MCI_CPSM_PENDING	(1 << 9)
+ #define MCI_CPSM_ENABLE		(1 << 10)
+-#define MCI_SDIO_SUSP		(1 << 11)
+-#define MCI_ENCMD_COMPL		(1 << 12)
+-#define MCI_NIEN		(1 << 13)
+-#define MCI_CE_ATACMD		(1 << 14)
++/* Argument flag extenstions in the ST Micro versions */
++#define MCI_ST_SDIO_SUSP	(1 << 11)
++#define MCI_ST_ENCMD_COMPL	(1 << 12)
++#define MCI_ST_NIEN		(1 << 13)
++#define MCI_ST_CE_ATACMD	(1 << 14)
+ 
+ #define MMCIRESPCMD		0x010
+ #define MMCIRESPONSE0		0x014
+-- 
+1.8.5.3
