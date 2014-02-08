@@ -1,205 +1,30 @@
-From: Guangyu.Chen@freescale.com (Nicolin Chen)
-Date: Sat, 8 Feb 2014 13:26:43 +0800
-Subject: [PATCH] ASoC: fsl: fix pm support of machine drivers
-In-Reply-To: <1391836835-14892-1-git-send-email-shawn.guo@linaro.org>
-References: <1391836835-14892-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20140208052641.GA11308@MrMyself>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Fri,  7 Feb 2014 22:02:09 -0800
+Subject: [PATCH] ARM: smp_twd: Set the CLOCK_EVT_FEAT_PERCPU flag
+Message-ID: <1391839329-30971-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 08, 2014 at 01:20:35PM +0800, Shawn Guo wrote:
-> The commit 1abe729 (ASoC: fsl: Add missing pm to current machine
-> drivers) enables pm support for a few IMX machine drivers.  But it does
-> not update dev drvdata to be the pointer to 'card'.  This causes the
+The twd timers are per CPU devices. Set the corresponding flag to mark
+them as such.
 
-Right...I forgot to merge this part.
-
-> kernel dump below in system suspend, because snd_soc_suspend() expects
-> that the dev drvdata points to 'card', while it still points to the
-> private data of machine driver.
-> 
-> This patch fixes imx-sgtl5000 and imx-wm8962 by attaching 'card' to dev
-> drvdata and private data to card drvdata.  For imx-mc13783, I simply
-> revert the pm change because it must be broken for the same reason and
-> I don't have hardware to test pm enabling code.
-
-Thank you Shawn, and sorry for screwing up.
-
-Nicolin Chen
-
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
+ arch/arm/kernel/smp_twd.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> 
-> $ echo mem > /sys/power/state
-> PM: Syncing filesystems ... done.
-> PM: Preparing system for mem sleep
-> mmc1: card e624 removed
-> Freezing user space processes ... (elapsed 0.002 seconds) done.
-> Freezing remaining freezable tasks ... (elapsed 0.002 seconds) done.
-> PM: Entering mem sleep
-> INFO: trying to register non-static key.
-> the code is fine but needs lockdep annotation.
-> turning off the locking correctness validator.
-> CPU: 0 PID: 1861 Comm: bash Not tainted 3.14.0-rc1+ #1648
-> Backtrace:
-> [<80012144>] (dump_backtrace) from [<800122e4>] (show_stack+0x18/0x1c)
->  r6:8079c77c r5:00000c5a r4:00000000 r3:00000000
-> [<800122cc>] (show_stack) from [<80637ac0>] (dump_stack+0x78/0x94)
-> [<80637a48>] (dump_stack) from [<80028918>] (warn_slowpath_common+0x6c/0x8c)
->  r4:bdb21c38 r3:be62df00
-> [<800288ac>] (warn_slowpath_common) from [<800289dc>] (warn_slowpath_fmt+0x38/0x40)
->  r8:be62e3a8 r7:bf122960 r6:00000005 r5:00000000 r4:00000000
-> [<800289a8>] (warn_slowpath_fmt) from [<8006518c>] (__lock_acquire+0x1ae0/0x1ce0)
->  r3:8079d598 r2:80799e70
-> [<800636ac>] (__lock_acquire) from [<80065894>] (lock_acquire+0x68/0x7c)
->  r10:bdb20000 r9:be62df00 r8:00000000 r7:00000000 r6:60000013 r5:bdb20000
->  r4:00000000
-> [<8006582c>] (lock_acquire) from [<8063c938>] (mutex_lock_nested+0x5c/0x3b8)
->  r7:00000000 r6:80dfc78c r5:804be444 r4:bf122928
-> [<8063c8dc>] (mutex_lock_nested) from [<804be444>] (snd_soc_suspend+0x34/0x42c)
->  r10:00000000 r9:00000000 r8:00000000 r7:bf1c4444 r6:bf1c4410 r5:be978150
->  r4:be978010
-> [<804be410>] (snd_soc_suspend) from [<8034392c>] (platform_pm_suspend+0x34/0x64)
->  r10:00000000 r8:00000000 r7:bf1c4444 r6:bf1c4410 r5:803438f8 r4:bf1c4410
-> [<803438f8>] (platform_pm_suspend) from [<80348e18>] (dpm_run_callback.isra.7+0x34/0x6c)
-> [<80348de4>] (dpm_run_callback.isra.7) from [<80349354>] (__device_suspend+0x10c/0x220)
->  r9:808dd974 r8:808c4a5c r6:00000002 r5:80e5001c r4:bf1c4410
-> [<80349248>] (__device_suspend) from [<8034a338>] (dpm_suspend+0x60/0x220)
->  r7:bf1c4410 r6:808dd90c r5:80e5001c r4:bf1c44c0
-> [<8034a2d8>] (dpm_suspend) from [<8034a790>] (dpm_suspend_start+0x60/0x68)
->  r10:8079a818 r9:00000000 r8:00000004 r7:80dfbe90 r6:80641eec r5:00000000
->  r4:00000002
-> [<8034a730>] (dpm_suspend_start) from [<8006a788>] (suspend_devices_and_enter+0x74/0x318)
->  r4:00000003 r3:80dfbe98
-> [<8006a714>] (suspend_devices_and_enter) from [<8006abd8>] (pm_suspend+0x1ac/0x244)
->  r10:8079a818 r8:00000004 r7:00000003 r6:80641eec r5:00000000 r4:00000003
-> [<8006aa2c>] (pm_suspend) from [<80069a4c>] (state_store+0x70/0xc0)
->  r5:00000003 r4:bd85ea40
-> [<800699dc>] (state_store) from [<80294034>] (kobj_attr_store+0x1c/0x28)
->  r10:beb9fe08 r8:00000000 r7:bdb21f78 r6:bd85ea40 r5:00000004 r4:beb9fe00
-> [<80294018>] (kobj_attr_store) from [<80140f90>] (sysfs_kf_write+0x54/0x58)
-> [<80140f3c>] (sysfs_kf_write) from [<8014474c>] (kernfs_fop_write+0xc4/0x160)
->  r6:bd85ea40 r5:beb9fe00 r4:00000004 r3:80140f3c
-> [<80144688>] (kernfs_fop_write) from [<800dfa14>] (vfs_write+0xbc/0x184)
->  r10:00000000 r9:00000000 r8:00000000 r7:bdb21f78 r6:00500c08 r5:00000004
->  r4:be782600
-> [<800df958>] (vfs_write) from [<800dfe00>] (SyS_write+0x48/0x70)
->  r10:00000000 r8:00000000 r7:00000004 r6:00500c08 r5:00000000 r4:be782600
-> [<800dfdb8>] (SyS_write) from [<8000e800>] (ret_fast_syscall+0x0/0x48)
->  r9:bdb20000 r8:8000e9c4 r7:00000004 r6:00500c08 r5:00000004 r4:76eb65e0
-> 
-> Fixes: 1abe729 (ASoC: fsl: Add missing pm to current machine drivers)
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  sound/soc/fsl/imx-mc13783.c  |    1 -
->  sound/soc/fsl/imx-sgtl5000.c |   10 ++++++----
->  sound/soc/fsl/imx-wm8962.c   |   11 +++++++----
->  3 files changed, 13 insertions(+), 9 deletions(-)
-> 
-> diff --git a/sound/soc/fsl/imx-mc13783.c b/sound/soc/fsl/imx-mc13783.c
-> index 79cee78..a2fd732 100644
-> --- a/sound/soc/fsl/imx-mc13783.c
-> +++ b/sound/soc/fsl/imx-mc13783.c
-> @@ -160,7 +160,6 @@ static struct platform_driver imx_mc13783_audio_driver = {
->  	.driver = {
->  		.name = "imx_mc13783",
->  		.owner = THIS_MODULE,
-> -		.pm = &snd_soc_pm_ops,
->  	},
->  	.probe = imx_mc13783_probe,
->  	.remove = imx_mc13783_remove
-> diff --git a/sound/soc/fsl/imx-sgtl5000.c b/sound/soc/fsl/imx-sgtl5000.c
-> index f2beae7..1cb22dd 100644
-> --- a/sound/soc/fsl/imx-sgtl5000.c
-> +++ b/sound/soc/fsl/imx-sgtl5000.c
-> @@ -33,8 +33,7 @@ struct imx_sgtl5000_data {
->  
->  static int imx_sgtl5000_dai_init(struct snd_soc_pcm_runtime *rtd)
->  {
-> -	struct imx_sgtl5000_data *data = container_of(rtd->card,
-> -					struct imx_sgtl5000_data, card);
-> +	struct imx_sgtl5000_data *data = snd_soc_card_get_drvdata(rtd->card);
->  	struct device *dev = rtd->card->dev;
->  	int ret;
->  
-> @@ -159,13 +158,15 @@ static int imx_sgtl5000_probe(struct platform_device *pdev)
->  	data->card.dapm_widgets = imx_sgtl5000_dapm_widgets;
->  	data->card.num_dapm_widgets = ARRAY_SIZE(imx_sgtl5000_dapm_widgets);
->  
-> +	platform_set_drvdata(pdev, &data->card);
-> +	snd_soc_card_set_drvdata(&data->card, data);
-> +
->  	ret = devm_snd_soc_register_card(&pdev->dev, &data->card);
->  	if (ret) {
->  		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
->  		goto fail;
->  	}
->  
-> -	platform_set_drvdata(pdev, data);
->  	of_node_put(ssi_np);
->  	of_node_put(codec_np);
->  
-> @@ -184,7 +185,8 @@ fail:
->  
->  static int imx_sgtl5000_remove(struct platform_device *pdev)
->  {
-> -	struct imx_sgtl5000_data *data = platform_get_drvdata(pdev);
-> +	struct snd_soc_card *card = platform_get_drvdata(pdev);
-> +	struct imx_sgtl5000_data *data = snd_soc_card_get_drvdata(card);
->  
->  	clk_put(data->codec_clk);
->  
-> diff --git a/sound/soc/fsl/imx-wm8962.c b/sound/soc/fsl/imx-wm8962.c
-> index 3fd76bc..3a3d17c 100644
-> --- a/sound/soc/fsl/imx-wm8962.c
-> +++ b/sound/soc/fsl/imx-wm8962.c
-> @@ -71,7 +71,7 @@ static int imx_wm8962_set_bias_level(struct snd_soc_card *card,
->  {
->  	struct snd_soc_dai *codec_dai = card->rtd[0].codec_dai;
->  	struct imx_priv *priv = &card_priv;
-> -	struct imx_wm8962_data *data = platform_get_drvdata(priv->pdev);
-> +	struct imx_wm8962_data *data = snd_soc_card_get_drvdata(card);
->  	struct device *dev = &priv->pdev->dev;
->  	unsigned int pll_out;
->  	int ret;
-> @@ -137,7 +137,7 @@ static int imx_wm8962_late_probe(struct snd_soc_card *card)
->  {
->  	struct snd_soc_dai *codec_dai = card->rtd[0].codec_dai;
->  	struct imx_priv *priv = &card_priv;
-> -	struct imx_wm8962_data *data = platform_get_drvdata(priv->pdev);
-> +	struct imx_wm8962_data *data = snd_soc_card_get_drvdata(card);
->  	struct device *dev = &priv->pdev->dev;
->  	int ret;
->  
-> @@ -264,13 +264,15 @@ static int imx_wm8962_probe(struct platform_device *pdev)
->  	data->card.late_probe = imx_wm8962_late_probe;
->  	data->card.set_bias_level = imx_wm8962_set_bias_level;
->  
-> +	platform_set_drvdata(pdev, &data->card);
-> +	snd_soc_card_set_drvdata(&data->card, data);
-> +
->  	ret = devm_snd_soc_register_card(&pdev->dev, &data->card);
->  	if (ret) {
->  		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
->  		goto clk_fail;
->  	}
->  
-> -	platform_set_drvdata(pdev, data);
->  	of_node_put(ssi_np);
->  	of_node_put(codec_np);
->  
-> @@ -289,7 +291,8 @@ fail:
->  
->  static int imx_wm8962_remove(struct platform_device *pdev)
->  {
-> -	struct imx_wm8962_data *data = platform_get_drvdata(pdev);
-> +	struct snd_soc_card *card = platform_get_drvdata(pdev);
-> +	struct imx_wm8962_data *data = snd_soc_card_get_drvdata(card);
->  
->  	if (!IS_ERR(data->codec_clk))
->  		clk_disable_unprepare(data->codec_clk);
-> -- 
-> 1.7.9.5
-> 
-> 
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 6591e26fc13f..85407473c97d 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -294,7 +294,7 @@ static void twd_timer_setup(void)
+ 
+ 	clk->name = "local_timer";
+ 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+-			CLOCK_EVT_FEAT_C3STOP;
++			CLOCK_EVT_FEAT_C3STOP | CLOCK_EVT_FEAT_PERCPU;
+ 	clk->rating = 350;
+ 	clk->set_mode = twd_set_mode;
+ 	clk->set_next_event = twd_set_next_event;
+-- 
+1.8.5.4
