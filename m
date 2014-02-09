@@ -1,72 +1,57 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sun, 9 Feb 2014 09:18:56 +0800
-Subject: [PATCH 1/3] crypto: Fix the pointer voodoo in unaligned ahash
-In-Reply-To: <1755989.ess5rJDo4G@tlendack-t1>
-References: <1389720829-5963-1-git-send-email-marex@denx.de>
- <1389720829-5963-2-git-send-email-marex@denx.de>
- <1755989.ess5rJDo4G@tlendack-t1>
-Message-ID: <20140209011856.GB16905@gondor.apana.org.au>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 09 Feb 2014 02:54:40 +0100
+Subject: [PATCH 02/12] dt-bindings: document s3c24xx controller for
+ external clock output
+In-Reply-To: <201312131359.00450.heiko@sntech.de>
+References: <201312131356.40755.heiko@sntech.de>
+ <201312131359.00450.heiko@sntech.de>
+Message-ID: <52F6DFE0.7030508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 14, 2014 at 01:35:50PM -0600, Tom Lendacky wrote:
-> 
-> On Tuesday, January 14, 2014 06:33:47 PM Marek Vasut wrote:
-> > Add documentation for the pointer voodoo that is happening in crypto/ahash.c
-> > in ahash_op_unaligned(). This code is quite confusing, so add a beefy chunk
-> > of documentation.
-> > 
-> > Moreover, make sure the mangled request is completely restored after finishing
-> > this unaligned operation. This means restoring all of .result, .priv, .base.data
-> > and .base.complete .
-> > 
-> > Also, remove the crypto_completion_t complete = ... line present in the
-> > ahash_op_unaligned_done() function. This type actually declares a function
-> > pointer, which is very confusing.
-> > 
-> > Finally, yet very important nonetheless, make sure the req->priv is free()'d
-> > only after the original request is restored in ahash_op_unaligned_done().
-> > The req->priv data must not be free()'d before that in ahash_op_unaligned_finish(),
-> > since we would be accessing previously free()'d data in ahash_op_unaligned_done()
-> > and cause corruption.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: David S. Miller <davem@davemloft.net>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > Cc: Tom Lendacky <thomas.lendacky@amd.com>
-> > ---
-> >  crypto/ahash.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++----------
-> >  1 file changed, 54 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/crypto/ahash.c b/crypto/ahash.c
-> > index a92dc38..5ca8ede 100644
-> > --- a/crypto/ahash.c
-> > +++ b/crypto/ahash.c
-> > @@ -29,6 +29,7 @@
-> >  struct ahash_request_priv {
-> >  	crypto_completion_t complete;
-> >  	void *data;
-> > +	void *priv;
-> >  	u8 *result;
-> >  	void *ubuf[] CRYPTO_MINALIGN_ATTR;
-> >  };
-> > @@ -200,23 +201,38 @@ static void ahash_op_unaligned_finish(struct ahash_request *req, int err)
-> >  	if (!err)
-> >  		memcpy(priv->result, req->result,
-> >  		       crypto_ahash_digestsize(crypto_ahash_reqtfm(req)));
-> > -
-> > -	kzfree(priv);
-> 
-> You can't move/remove this kzfree since a synchronous operation will not take
-> the ahash_op_unaligned_done path.  A synchronous operation will never return
-> -EINPROGRESS and the effect will be to never free the priv structure.
+Hi Heiko,
 
-Marek, did you have a chance to address this?
+On 13.12.2013 13:59, Heiko St?bner wrote:
+> The clock settings are distributed over a regular register and parts
+> of the misccr register.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>   .../bindings/clock/samsung,s3c2410-dclk.txt        |   53 ++++++++++++++++++++
+>   1 file changed, 53 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c2410-dclk.txt
+>
+> diff --git a/Documentation/devicetree/bindings/clock/samsung,s3c2410-dclk.txt b/Documentation/devicetree/bindings/clock/samsung,s3c2410-dclk.txt
+> new file mode 100644
+> index 0000000..0a1f7b1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/samsung,s3c2410-dclk.txt
+> @@ -0,0 +1,53 @@
+> +* Samsung S3C24XX External Clock Output Controller
+> +
+> +The S3C24XX series can generate clock signals on two clock output pads.
+> +The clock binding described here is applicable to all SoCs in
+> +the s3c24x family.
+> +
+> +Required Properties:
+> +
+> +- compatible: should be one of the following.
+> +  - "samsung,s3c2410-dclk" - controller in S3C2410 SoCs.
+> +  - "samsung,s3c2412-dclk" - controller in S3C2412 SoCs.
+> +  - "samsung,s3c2440-dclk" - controller in S3C2440 and S3C2442 SoCs.
+> +  - "samsung,s3c2443-dclk" - controller in S3C2443 and later SoCs.
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- #clock-cells: should be 1.
+> +- samsung,misccr: phandle to the syscon managing the misccr register, which
+> +  holds configuration settings for different soc-components (clocks, usb, ...).
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Hmm, looking at the datasheet, DCLK and CLKOUT registers seem to be part 
+of the pin controller. I wonder if there is really a need for different 
+driver and device node to handle them.
+
+Could this be simply made a part of the s3c24xx pinctrl driver, 
+extending it to register also a clock provider under the same DT node?
+
+Best regards,
+Tomasz
