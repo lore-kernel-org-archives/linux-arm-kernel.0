@@ -1,52 +1,39 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 9 Feb 2014 09:22:47 +0100
-Subject: irqchip: irq-dove: problem with the PMU interrupt controller.
-In-Reply-To: <20140209091016.26a59d44@armhf>
-References: <20140209091016.26a59d44@armhf>
-Message-ID: <20140209082247.GD29203@lunn.ch>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sun, 9 Feb 2014 17:19:41 +0800
+Subject: [PATCH] dcp: aes: Move the AES operation type from actx to rctx
+In-Reply-To: <1389720661-5820-1-git-send-email-marex@denx.de>
+References: <1389720661-5820-1-git-send-email-marex@denx.de>
+Message-ID: <20140209091941.GA19429@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 09, 2014 at 09:10:16AM +0100, Jean-Francois Moine wrote:
-> Hi Andrew,
+On Tue, Jan 14, 2014 at 06:31:01PM +0100, Marek Vasut wrote:
+> Move the AES operation type and mode from async crypto context to
+> crypto request context. This allows for recycling of the async crypto
+> context for different kinds of operations.
 > 
-> I have a WARN_ON at system startup time of the Cubox (Marvell Dove).
-> Sorry for I don't know enough about the IRQ subsystem to fix it.
-
-Hi Jean-Francois
-
-The DT node made it into -rc1, but the driver itself was forgotten by
-the IRQ maintainer. It will hopefully appear in -rc2.
-
-    Andrew
-
+> I found this problem when I used dm-crypt, which uses the same async
+> crypto context (actx) for both encryption and decryption requests.
+> Since the requests are enqueued into the processing queue, immediatelly
+> storing the type of operation into async crypto context (actx) caused
+> corruption of this information when encryption and decryption operations
+> followed imediatelly one after the other. When the first operation was
+> dequeued, the second operation was already enqueued and overwritten the
+> type of operation in actx, thus causing incorrect result of the first
+> operation.
 > 
-> irq: no irq domain found for /mbus/internal-regs/pmu-interrupt-ctrl at d0050 !
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 1 at /home/jef/c-3.14/drivers/of/platform.c:171 of_device_alloc+0x190/0x194()
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper Not tainted 3.14.0-rc1-dirty #45
-> Backtrace: 
-> [<80011720>] (dump_backtrace) from [<800119fc>] (show_stack+0x18/0x1c)
->  r6:000000ab r5:00000009 r4:00000000 r3:00000000
-> [<800119e4>] (show_stack) from [<803c8fcc>] (dump_stack+0x24/0x28)
-> [<803c8fa8>] (dump_stack) from [<8001b5cc>] (warn_slowpath_common+0x74/0x8c)
-> [<8001b558>] (warn_slowpath_common) from [<8001b688>] (warn_slowpath_null+0x24/0x2c)
->  r8:00000000 r7:00000001 r6:bb075c40 r5:bb7d7cb4 r4:00000001
-> [<8001b664>] (warn_slowpath_null) from [<802dbf0c>] (of_device_alloc+0x190/0x194)
-> [<802dbd7c>] (of_device_alloc) from [<802dbf48>] (of_platform_device_create_pdata+0x38/0x90)
->  r10:00000000 r9:bb05d890 r8:803f28fc r7:00000000 r6:bb05d890 r5:00000000
->  r4:bb7d7cb4
-> [<802dbf10>] (of_platform_device_create_pdata) from [<802dc0ac>] (of_platform_bus_create+0xf0/0x174)
->  r7:00000001 r6:00000000 r5:bb7d7cb4 r4:00000000
-> [<802dbfbc>] (of_platform_bus_create) from [<802dc108>] (of_platform_bus_create+0x14c/0x174)
-> ...
+> Fix this problem by storing the type of operation into the crypto request
+> context.
 > 
-> -- 
-> Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-> Jef		|		http://moinejf.free.fr/
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: David S. Miller <davem@davemloft.net>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Tom Lendacky <thomas.lendacky@amd.com>
+
+Patch applied.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
