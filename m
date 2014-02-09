@@ -1,84 +1,36 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 9 Feb 2014 07:15:46 +0100
-Subject: [PATCH 1/3] crypto: Fix the pointer voodoo in unaligned ahash
-In-Reply-To: <20140209011856.GB16905@gondor.apana.org.au>
-References: <1389720829-5963-1-git-send-email-marex@denx.de>
- <1755989.ess5rJDo4G@tlendack-t1> <20140209011856.GB16905@gondor.apana.org.au>
-Message-ID: <201402090715.46228.marex@denx.de>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 9 Feb 2014 09:10:16 +0100
+Subject: irqchip: irq-dove: problem with the PMU interrupt controller.
+Message-ID: <20140209091016.26a59d44@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, February 09, 2014 at 02:18:56 AM, Herbert Xu wrote:
-> On Tue, Jan 14, 2014 at 01:35:50PM -0600, Tom Lendacky wrote:
-> > On Tuesday, January 14, 2014 06:33:47 PM Marek Vasut wrote:
-> > > Add documentation for the pointer voodoo that is happening in
-> > > crypto/ahash.c in ahash_op_unaligned(). This code is quite confusing,
-> > > so add a beefy chunk of documentation.
-> > > 
-> > > Moreover, make sure the mangled request is completely restored after
-> > > finishing this unaligned operation. This means restoring all of
-> > > .result, .priv, .base.data and .base.complete .
-> > > 
-> > > Also, remove the crypto_completion_t complete = ... line present in the
-> > > ahash_op_unaligned_done() function. This type actually declares a
-> > > function pointer, which is very confusing.
-> > > 
-> > > Finally, yet very important nonetheless, make sure the req->priv is
-> > > free()'d only after the original request is restored in
-> > > ahash_op_unaligned_done(). The req->priv data must not be free()'d
-> > > before that in ahash_op_unaligned_finish(), since we would be
-> > > accessing previously free()'d data in ahash_op_unaligned_done() and
-> > > cause corruption.
-> > > 
-> > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > Cc: David S. Miller <davem@davemloft.net>
-> > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > > Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > Cc: Tom Lendacky <thomas.lendacky@amd.com>
-> > > ---
-> > > 
-> > >  crypto/ahash.c | 65
-> > >  ++++++++++++++++++++++++++++++++++++++++++++++++---------- 1 file
-> > >  changed, 54 insertions(+), 11 deletions(-)
-> > > 
-> > > diff --git a/crypto/ahash.c b/crypto/ahash.c
-> > > index a92dc38..5ca8ede 100644
-> > > --- a/crypto/ahash.c
-> > > +++ b/crypto/ahash.c
-> > > @@ -29,6 +29,7 @@
-> > > 
-> > >  struct ahash_request_priv {
-> > >  
-> > >  	crypto_completion_t complete;
-> > >  	void *data;
-> > > 
-> > > +	void *priv;
-> > > 
-> > >  	u8 *result;
-> > >  	void *ubuf[] CRYPTO_MINALIGN_ATTR;
-> > >  
-> > >  };
-> > > 
-> > > @@ -200,23 +201,38 @@ static void ahash_op_unaligned_finish(struct
-> > > ahash_request *req, int err)
-> > > 
-> > >  	if (!err)
-> > >  	
-> > >  		memcpy(priv->result, req->result,
-> > >  		
-> > >  		       crypto_ahash_digestsize(crypto_ahash_reqtfm(req)));
-> > > 
-> > > -
-> > > -	kzfree(priv);
-> > 
-> > You can't move/remove this kzfree since a synchronous operation will not
-> > take the ahash_op_unaligned_done path.  A synchronous operation will
-> > never return -EINPROGRESS and the effect will be to never free the priv
-> > structure.
-> 
-> Marek, did you have a chance to address this?
+Hi Andrew,
 
-Hi,
+I have a WARN_ON at system startup time of the Cubox (Marvell Dove).
+Sorry for I don't know enough about the IRQ subsystem to fix it.
 
-it's in the pipeline, I'm just overloaded. We missed a MW for this, right ? :-(
+irq: no irq domain found for /mbus/internal-regs/pmu-interrupt-ctrl at d0050 !
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1 at /home/jef/c-3.14/drivers/of/platform.c:171 of_device_alloc+0x190/0x194()
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper Not tainted 3.14.0-rc1-dirty #45
+Backtrace: 
+[<80011720>] (dump_backtrace) from [<800119fc>] (show_stack+0x18/0x1c)
+ r6:000000ab r5:00000009 r4:00000000 r3:00000000
+[<800119e4>] (show_stack) from [<803c8fcc>] (dump_stack+0x24/0x28)
+[<803c8fa8>] (dump_stack) from [<8001b5cc>] (warn_slowpath_common+0x74/0x8c)
+[<8001b558>] (warn_slowpath_common) from [<8001b688>] (warn_slowpath_null+0x24/0x2c)
+ r8:00000000 r7:00000001 r6:bb075c40 r5:bb7d7cb4 r4:00000001
+[<8001b664>] (warn_slowpath_null) from [<802dbf0c>] (of_device_alloc+0x190/0x194)
+[<802dbd7c>] (of_device_alloc) from [<802dbf48>] (of_platform_device_create_pdata+0x38/0x90)
+ r10:00000000 r9:bb05d890 r8:803f28fc r7:00000000 r6:bb05d890 r5:00000000
+ r4:bb7d7cb4
+[<802dbf10>] (of_platform_device_create_pdata) from [<802dc0ac>] (of_platform_bus_create+0xf0/0x174)
+ r7:00000001 r6:00000000 r5:bb7d7cb4 r4:00000000
+[<802dbfbc>] (of_platform_bus_create) from [<802dc108>] (of_platform_bus_create+0x14c/0x174)
+...
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
