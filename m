@@ -1,9 +1,9 @@
 From: richard@nod.at (Richard Weinberger)
-Date: Sun,  9 Feb 2014 19:47:52 +0100
-Subject: [PATCH 14/28] Remove MACH_SMDKC210
+Date: Sun,  9 Feb 2014 19:47:51 +0100
+Subject: [PATCH 13/28] Remove S3C24XX_GPIO_EXTRA64
 In-Reply-To: <1391971686-9517-1-git-send-email-richard@nod.at>
 References: <1391971686-9517-1-git-send-email-richard@nod.at>
-Message-ID: <1391971686-9517-15-git-send-email-richard@nod.at>
+Message-ID: <1391971686-9517-14-git-send-email-richard@nod.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,21 +11,20 @@ The symbol is an orphan, get rid of it.
 
 Signed-off-by: Richard Weinberger <richard@nod.at>
 ---
- sound/soc/samsung/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-s3c24xx/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 454f41c..7ea576c 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -145,7 +145,7 @@ config SND_SOC_SAMSUNG_RX1950_UDA1380
- 
- config SND_SOC_SAMSUNG_SMDK_WM9713
- 	tristate "SoC AC97 Audio support for SMDK with WM9713"
--	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310 || MACH_SMDKC210)
-+	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310)
- 	select SND_SOC_WM9713
- 	select SND_SAMSUNG_AC97
+diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+index d876431..1c67f04 100644
+--- a/arch/arm/mach-s3c24xx/Kconfig
++++ b/arch/arm/mach-s3c24xx/Kconfig
+@@ -521,7 +521,6 @@ config MACH_ANUBIS
+ 	select HAVE_PATA_PLATFORM
+ 	select S3C2440_XTAL_12000000
+ 	select S3C24XX_DCLK
+-	select S3C24XX_GPIO_EXTRA64
+ 	select S3C24XX_SIMTEC_PM if PM
+ 	select S3C_DEV_USB_HOST
  	help
 -- 
 1.8.4.2
