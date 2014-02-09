@@ -1,41 +1,37 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Sun, 09 Feb 2014 21:02:26 +0100
-Subject: [PATCH 12/28] Remove GENERIC_TIME
-In-Reply-To: <1391972239.567717844@f148.i.mail.ru>
-References: <1391971686-9517-1-git-send-email-richard@nod.at>
- <1391971686-9517-13-git-send-email-richard@nod.at>
- <1391972239.567717844@f148.i.mail.ru>
-Message-ID: <52F7DED2.1020509@nod.at>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 09 Feb 2014 12:03:59 -0800
+Subject: [PATCH 01/10] watchdog: xilinx: Convert driver to the watchdog
+ framework
+In-Reply-To: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
+References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
+Message-ID: <52F7DF2F.5060001@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 09.02.2014 19:57, schrieb Alexander Shiyan:
->> The symbol is an orphan, get rid of it.
->>
->> Signed-off-by: Richard Weinberger <richard@nod.at>
->> ---
->> arch/arm/mach-bcm/Kconfig | 1 -
->> 1 file changed, 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
->> index b1aa6a9..8dd5fbf 100644
->> --- a/arch/arm/mach-bcm/Kconfig
->> +++ b/arch/arm/mach-bcm/Kconfig
->> @@ -19,7 +19,6 @@ config ARCH_BCM_MOBILE
->> select CPU_V7
->> select CLKSRC_OF
->> select GENERIC_CLOCKEVENTS
->> -	select GENERIC_TIME
->> select GPIO_BCM_KONA
->> select SPARSE_IRQ
->> select TICK_ONESHOT
->> -- 
->> 1.8.4.2
-> 
-> I sent a similar patch in November, maintainers nothing did with it.
-> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/278293
+On 01/31/2014 06:18 AM, Michal Simek wrote:
+> - Remove uneeded headers, fops functions
+> - Use xilinx_wdt prefix in start/stop/keepalive functions
+>    and in new structures
+>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-Then it is time to push it. :D
+Hi Michal,
+
+>   static int xwdt_probe(struct platform_device *pdev)
+>   {
+>   	int rc;
+> @@ -314,7 +184,7 @@ static int xwdt_probe(struct platform_device *pdev)
+>   					"xlnx,wdt-enable-once", NULL);
+>   	if (tmptr == NULL) {
+>   		pr_warn("Parameter \"xlnx,wdt-enable-once\" not found in device tree!\n");
+> -		xdev.nowayout = WATCHDOG_NOWAYOUT;
+> +		watchdog_set_nowayout(&xilinx_wdt_wdd, true);
+
+Sure you want to set this to always true instead of using WATCHDOG_NOWAYOUT ?
+
+Assuming this is what you want:
+
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
 Thanks,
-//richard
+Guenter
