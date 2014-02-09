@@ -1,48 +1,65 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Sun, 9 Feb 2014 14:06:22 -0800
-Subject: [PATCH] ARM: mm: fix reporting of read-only PMD bits
-Message-ID: <20140209220622.GA30511@www.outflux.net>
+Date: Sun, 9 Feb 2014 14:18:26 -0800
+Subject: [PATCH] ARM: mm: report both sections from PMD
+Message-ID: <20140209221826.GA30556@www.outflux.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On non-LPAE, read-only PMD bits are defined with the combination
-"PMD_SECT_APX | PMD_SECT_AP_WRITE". Adjusted the bit masks to correctly
-detect this.
+On 2-level page table systems, the PMD has 2 section entries. Report
+these, otherwise ARM_PTDUMP will miss reporting permission changes on
+odd section boundaries.
 
 Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- arch/arm/mm/dump.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/pgtable-3level.h |    4 ----
+ arch/arm/include/asm/pgtable.h        |    4 ++++
+ arch/arm/mm/dump.c                    |    3 +++
+ 3 files changed, 7 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index 03243f7eeddf..fb3de59ee811 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -138,10 +138,6 @@
+ #define pud_none(pud)		(!pud_val(pud))
+ #define pud_bad(pud)		(!(pud_val(pud) & 2))
+ #define pud_present(pud)	(pud_val(pud))
+-#define pmd_table(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
+-						 PMD_TYPE_TABLE)
+-#define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
+-						 PMD_TYPE_SECT)
+ #define pmd_large(pmd)		pmd_sect(pmd)
+ 
+ #define pud_clear(pudp)			\
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 7d59b524f2af..934aa5b60c7c 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -183,6 +183,10 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+ 
+ #define pmd_none(pmd)		(!pmd_val(pmd))
+ #define pmd_present(pmd)	(pmd_val(pmd))
++#define pmd_table(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
++						 PMD_TYPE_TABLE)
++#define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
++						 PMD_TYPE_SECT)
+ 
+ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ {
 diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
-index 2b3a56414271..1f7b1e13d945 100644
+index 1f7b1e13d945..ff1559f9200c 100644
 --- a/arch/arm/mm/dump.c
 +++ b/arch/arm/mm/dump.c
-@@ -123,19 +123,19 @@ static const struct prot_bits section_bits[] = {
- #ifndef CONFIG_ARM_LPAE
- 	/* These are approximate */
- 	{
--		.mask	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
--		.val	= 0,
-+		.mask	= PMD_SECT_AP_READ | PMD_SECT_APX | PMD_SECT_AP_WRITE,
-+		.val	= PMD_SECT_APX | PMD_SECT_AP_WRITE,
- 		.set	= "    ro",
- 	}, {
--		.mask	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
-+		.mask	= PMD_SECT_AP_READ | PMD_SECT_APX | PMD_SECT_AP_WRITE,
- 		.val	= PMD_SECT_AP_WRITE,
- 		.set	= "    RW",
- 	}, {
--		.mask	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
-+		.mask	= PMD_SECT_AP_READ | PMD_SECT_APX | PMD_SECT_AP_WRITE,
- 		.val	= PMD_SECT_AP_READ,
- 		.set	= "USR ro",
- 	}, {
--		.mask	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
-+		.mask	= PMD_SECT_AP_READ | PMD_SECT_APX | PMD_SECT_AP_WRITE,
- 		.val	= PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
- 		.set	= "USR RW",
- #else
+@@ -264,6 +264,9 @@ static void walk_pmd(struct pg_state *st, pud_t *pud, unsigned long start)
+ 			note_page(st, addr, 3, pmd_val(*pmd));
+ 		else
+ 			walk_pte(st, pmd, addr);
++
++		if (SECTION_SIZE < PMD_SIZE && pmd_sect(*pmd))
++			note_page(st, addr + SECTION_SIZE, 3, pmd_val(pmd[1]));
+ 	}
+ }
+ 
 -- 
 1.7.9.5
 
