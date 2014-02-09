@@ -1,43 +1,31 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sun, 09 Feb 2014 16:01:28 +0100
-Subject: [PATCH] ARM: OMAP2+: Remove MACH_NOKIA_N800
-Message-ID: <1391958088.25424.17.camel@x220>
+From: richard@nod.at (Richard Weinberger)
+Date: Sun,  9 Feb 2014 19:47:52 +0100
+Subject: [PATCH 14/28] Remove MACH_SMDKC210
+In-Reply-To: <1391971686-9517-1-git-send-email-richard@nod.at>
+References: <1391971686-9517-1-git-send-email-richard@nod.at>
+Message-ID: <1391971686-9517-15-git-send-email-richard@nod.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The last caller of machine_is_nokia_n800() was removed in commit
-5a87cde490e1 ("ARM: OMAP2+: Remove legacy booting support for n8x0").
-That means that the Kconfig symbol MACH_NOKIA_N800 is now unused. It can
-safely be removed.
+The symbol is an orphan, get rid of it.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+Signed-off-by: Richard Weinberger <richard@nod.at>
 ---
-Untested.
+ sound/soc/samsung/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/mach-omap2/Kconfig | 4 ----
- 1 file changed, 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 653b489..66da3f5 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -268,9 +268,6 @@ config MACH_OMAP_3430SDP
- 	default y
- 	select OMAP_PACKAGE_CBB
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index 454f41c..7ea576c 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -145,7 +145,7 @@ config SND_SOC_SAMSUNG_RX1950_UDA1380
  
--config MACH_NOKIA_N800
--       bool
--
- config MACH_NOKIA_N810
-        bool
- 
-@@ -281,7 +278,6 @@ config MACH_NOKIA_N8X0
- 	bool "Nokia N800/N810"
- 	depends on SOC_OMAP2420
- 	default y
--	select MACH_NOKIA_N800
- 	select MACH_NOKIA_N810
- 	select MACH_NOKIA_N810_WIMAX
- 	select OMAP_PACKAGE_ZAC
+ config SND_SOC_SAMSUNG_SMDK_WM9713
+ 	tristate "SoC AC97 Audio support for SMDK with WM9713"
+-	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310 || MACH_SMDKC210)
++	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310)
+ 	select SND_SOC_WM9713
+ 	select SND_SAMSUNG_AC97
+ 	help
 -- 
-1.8.5.3
+1.8.4.2
