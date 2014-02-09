@@ -1,56 +1,86 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 9 Feb 2014 10:04:24 +0000
-Subject: [PATCH RFC 0/2] drivers/base: simplify simple DT-based components
-In-Reply-To: <20140209102219.3ab40b5e@armhf>
-References: <cover.1391793068.git.moinejf@free.fr>
- <20140207202351.GH26684@n2100.arm.linux.org.uk>
- <20140209102219.3ab40b5e@armhf>
-Message-ID: <20140209100424.GK26684@n2100.arm.linux.org.uk>
+Date: Sun, 9 Feb 2014 10:20:23 +0000
+Subject: [RFC/PATCH v2] ARM: vDSO gettimeofday using generic timer
+ architecture
+In-Reply-To: <1391814349-10706-1-git-send-email-nathan_lynch@mentor.com>
+References: <1391814349-10706-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <20140209102023.GL26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 09, 2014 at 10:22:19AM +0100, Jean-Francois Moine wrote:
-> On Fri, 7 Feb 2014 20:23:51 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > Here's my changes to the TDA998x driver to add support for the component
-> > helper.  The TDA998x driver retains support for the old way so that
-> > drivers can be transitioned.  For any one DRM "card" the transition to
-> 
-> I rewrote the tda998x as a simple encoder+connector (i.e. not a
-> slave_encoder) with your component helper, and the code is much clearer
-> and simpler: the DRM driver has nothing to do except to know that the
-> tda998x is a component and to set the possible_crtcs.
+On Fri, Feb 07, 2014 at 05:05:49PM -0600, Nathan Lynch wrote:
+> +	/* Grab the vDSO code pages. */
+> +	for (i = 0; i < vdso_pages; i++) {
+> +		pg = virt_to_page(&vdso_start + i*PAGE_SIZE);
+> +		ClearPageReserved(pg);
+> +		get_page(pg);
+> +		vdso_pagelist[i] = pg;
+> +	}
 
-That's exactly what I've done - the slave encoder veneer can be simply
-deleted when tilcdc is converted.
+Why do we want to clear the reserved status?  This looks over complicated
+to me.
 
-> AFAIK, only the tilcdc drm driver is using the tda998x as a
-> slave_encoder. It does a (encoder+connector) conversion to
-> (slave_encoder). Then, in your changes in the TDA998x, you do a
-> (slave_encoder) translation to (encoder+connector).
-> This seems rather complicated!
+> +
+> +	/* Sanity check the shared object header. */
+> +	vbase = vmap(vdso_pagelist, 1, 0, PAGE_KERNEL);
+> +	if (vbase == NULL) {
+> +		pr_err("Failed to map vDSO pagelist!\n");
+> +		return -ENOMEM;
+> +	} else if (memcmp(vbase, "\177ELF", 4)) {
+> +		pr_err("vDSO is not a valid ELF object!\n");
+> +		ret = -EINVAL;
+> +		goto unmap;
+> +	}
 
-No.  I first split out the slave encoder functions to be a veneer onto
-the tda998x backend, and then add the encoder & connector component
-support.  Later, the slave encoder veneer can be deleted.
+Why do we need to vmap() pages which are already accessible - vdso_start
+must be part of the kernel image, and therefore will be accessible via
+standard mappings.
 
-The reason for this is that virtually all the tda998x backend is what's
-required by the encoder & connector support - which is completely logical
-when you realise that the generic slave encoder support is just a veneer
-itself adapting the encoder & connector support to a slave encoder.
+> +
+> +	/* Grab the vDSO data page. */
+> +	pg = virt_to_page(vdso_data);
+> +	get_page(pg);
+> +	vdso_pagelist[i] = pg;
 
-So, we're basically getting rid of two veneers, but we end up with exactly
-the same functionality.
+Same goes for this.
 
-> > And yes, I'm thinking that maybe moving compare_of() into the component
-> > support so that drivers can share this generic function may be a good
-> > idea.
-> 
-> This function exists already in drivers/of/platform.c as
-> of_dev_node_match(). It just needs to be exported.
+> +static long clock_gettime_fallback(clockid_t _clkid, struct timespec *_ts)
+> +{
+> +	register struct timespec *ts asm("r1") = _ts;
+> +	register clockid_t clkid asm("r0") = _clkid;
+> +	register long ret asm ("r0");
+> +	register long nr asm("r7") = __NR_clock_gettime;
+> +
+> +	asm("swi #0" : "=r" (ret) : "r" (clkid), "r" (ts), "r" (nr) : "memory");
 
-Good, thanks for pointing that out.
+This isn't compatible with OABI, so either this must not be enabled when
+AEABI is disabled, or this needs to be fixed.
+
+> +static long clock_getres_fallback(clockid_t _clkid, struct timespec *_ts)
+> +{
+> +	register struct timespec *ts asm("r1") = _ts;
+> +	register clockid_t clkid asm("r0") = _clkid;
+> +	register long ret asm ("r0");
+> +	register long nr asm("r7") = __NR_clock_getres;
+> +
+> +	asm volatile(
+> +		"swi #0" :
+> +		"=r" (ret) :
+> +		"r" (clkid), "r" (ts), "r" (nr) :
+> +		"memory");
+
+Same here.
+
+> +static long gettimeofday_fallback(struct timeval *_tv, struct timezone *_tz)
+> +{
+> +	register struct timezone *tz asm("r1") = _tz;
+> +	register struct timeval *tv asm("r0") = _tv;
+> +	register long ret asm ("r0");
+> +	register long nr asm("r7") = __NR_gettimeofday;
+> +
+> +	asm("swi #0" : "=r" (ret) : "r" (tv), "r" (tz), "r" (nr) : "memory");
+
+and here.
 
 -- 
 FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
