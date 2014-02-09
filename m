@@ -1,88 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 9 Feb 2014 10:20:23 +0000
-Subject: [RFC/PATCH v2] ARM: vDSO gettimeofday using generic timer
- architecture
-In-Reply-To: <1391814349-10706-1-git-send-email-nathan_lynch@mentor.com>
-References: <1391814349-10706-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <20140209102023.GL26684@n2100.arm.linux.org.uk>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sun,  9 Feb 2014 14:12:36 +0200
+Subject: [PATCH 2/2] ARM: dts: N900: add missing compatible property
+In-Reply-To: <1391947956-24462-1-git-send-email-aaro.koskinen@iki.fi>
+References: <1391947956-24462-1-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <1391947956-24462-2-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 05:05:49PM -0600, Nathan Lynch wrote:
-> +	/* Grab the vDSO code pages. */
-> +	for (i = 0; i < vdso_pages; i++) {
-> +		pg = virt_to_page(&vdso_start + i*PAGE_SIZE);
-> +		ClearPageReserved(pg);
-> +		get_page(pg);
-> +		vdso_pagelist[i] = pg;
-> +	}
+Add missing compatible property to avoid problems in the future.
 
-Why do we want to clear the reserved status?  This looks over complicated
-to me.
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
+ arch/arm/boot/dts/omap3-n900.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> +
-> +	/* Sanity check the shared object header. */
-> +	vbase = vmap(vdso_pagelist, 1, 0, PAGE_KERNEL);
-> +	if (vbase == NULL) {
-> +		pr_err("Failed to map vDSO pagelist!\n");
-> +		return -ENOMEM;
-> +	} else if (memcmp(vbase, "\177ELF", 4)) {
-> +		pr_err("vDSO is not a valid ELF object!\n");
-> +		ret = -EINVAL;
-> +		goto unmap;
-> +	}
-
-Why do we need to vmap() pages which are already accessible - vdso_start
-must be part of the kernel image, and therefore will be accessible via
-standard mappings.
-
-> +
-> +	/* Grab the vDSO data page. */
-> +	pg = virt_to_page(vdso_data);
-> +	get_page(pg);
-> +	vdso_pagelist[i] = pg;
-
-Same goes for this.
-
-> +static long clock_gettime_fallback(clockid_t _clkid, struct timespec *_ts)
-> +{
-> +	register struct timespec *ts asm("r1") = _ts;
-> +	register clockid_t clkid asm("r0") = _clkid;
-> +	register long ret asm ("r0");
-> +	register long nr asm("r7") = __NR_clock_gettime;
-> +
-> +	asm("swi #0" : "=r" (ret) : "r" (clkid), "r" (ts), "r" (nr) : "memory");
-
-This isn't compatible with OABI, so either this must not be enabled when
-AEABI is disabled, or this needs to be fixed.
-
-> +static long clock_getres_fallback(clockid_t _clkid, struct timespec *_ts)
-> +{
-> +	register struct timespec *ts asm("r1") = _ts;
-> +	register clockid_t clkid asm("r0") = _clkid;
-> +	register long ret asm ("r0");
-> +	register long nr asm("r7") = __NR_clock_getres;
-> +
-> +	asm volatile(
-> +		"swi #0" :
-> +		"=r" (ret) :
-> +		"r" (clkid), "r" (ts), "r" (nr) :
-> +		"memory");
-
-Same here.
-
-> +static long gettimeofday_fallback(struct timeval *_tv, struct timezone *_tz)
-> +{
-> +	register struct timezone *tz asm("r1") = _tz;
-> +	register struct timeval *tv asm("r0") = _tv;
-> +	register long ret asm ("r0");
-> +	register long nr asm("r7") = __NR_gettimeofday;
-> +
-> +	asm("swi #0" : "=r" (ret) : "r" (tv), "r" (tz), "r" (nr) : "memory");
-
-and here.
-
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index 6fc85f963530..0bf40c90faba 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -1,6 +1,6 @@
+ /*
+  * Copyright (C) 2013 Pavel Machek <pavel@ucw.cz>
+- * Copyright 2013 Aaro Koskinen <aaro.koskinen@iki.fi>
++ * Copyright (C) 2013-2014 Aaro Koskinen <aaro.koskinen@iki.fi>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 (or later) as
+@@ -13,7 +13,7 @@
+ 
+ / {
+ 	model = "Nokia N900";
+-	compatible = "nokia,omap3-n900", "ti,omap3";
++	compatible = "nokia,omap3-n900", "ti,omap3430", "ti,omap3";
+ 
+ 	cpus {
+ 		cpu at 0 {
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.8.5.3
