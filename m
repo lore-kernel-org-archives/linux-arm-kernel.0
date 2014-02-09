@@ -1,44 +1,84 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Sun, 09 Feb 2014 07:09:49 +0100
-Subject: [PATCH] arm: add DSB after icache flush in __flush_icache_all()
-In-Reply-To: <1391592782-18576-1-git-send-email-vkale@apm.com>
-References: <1391592782-18576-1-git-send-email-vkale@apm.com>
-Message-ID: <52F71BAD.80607@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 9 Feb 2014 07:15:46 +0100
+Subject: [PATCH 1/3] crypto: Fix the pointer voodoo in unaligned ahash
+In-Reply-To: <20140209011856.GB16905@gondor.apana.org.au>
+References: <1389720829-5963-1-git-send-email-marex@denx.de>
+ <1755989.ess5rJDo4G@tlendack-t1> <20140209011856.GB16905@gondor.apana.org.au>
+Message-ID: <201402090715.46228.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 05.02.2014 10:33, schrieb Vinayak Kale:
-> Add DSB after icache flush to complete the cache maintenance operation.
->
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
+On Sunday, February 09, 2014 at 02:18:56 AM, Herbert Xu wrote:
+> On Tue, Jan 14, 2014 at 01:35:50PM -0600, Tom Lendacky wrote:
+> > On Tuesday, January 14, 2014 06:33:47 PM Marek Vasut wrote:
+> > > Add documentation for the pointer voodoo that is happening in
+> > > crypto/ahash.c in ahash_op_unaligned(). This code is quite confusing,
+> > > so add a beefy chunk of documentation.
+> > > 
+> > > Moreover, make sure the mangled request is completely restored after
+> > > finishing this unaligned operation. This means restoring all of
+> > > .result, .priv, .base.data and .base.complete .
+> > > 
+> > > Also, remove the crypto_completion_t complete = ... line present in the
+> > > ahash_op_unaligned_done() function. This type actually declares a
+> > > function pointer, which is very confusing.
+> > > 
+> > > Finally, yet very important nonetheless, make sure the req->priv is
+> > > free()'d only after the original request is restored in
+> > > ahash_op_unaligned_done(). The req->priv data must not be free()'d
+> > > before that in ahash_op_unaligned_finish(), since we would be
+> > > accessing previously free()'d data in ahash_op_unaligned_done() and
+> > > cause corruption.
+> > > 
+> > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > Cc: David S. Miller <davem@davemloft.net>
+> > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > > Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> > > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Tom Lendacky <thomas.lendacky@amd.com>
+> > > ---
+> > > 
+> > >  crypto/ahash.c | 65
+> > >  ++++++++++++++++++++++++++++++++++++++++++++++++---------- 1 file
+> > >  changed, 54 insertions(+), 11 deletions(-)
+> > > 
+> > > diff --git a/crypto/ahash.c b/crypto/ahash.c
+> > > index a92dc38..5ca8ede 100644
+> > > --- a/crypto/ahash.c
+> > > +++ b/crypto/ahash.c
+> > > @@ -29,6 +29,7 @@
+> > > 
+> > >  struct ahash_request_priv {
+> > >  
+> > >  	crypto_completion_t complete;
+> > >  	void *data;
+> > > 
+> > > +	void *priv;
+> > > 
+> > >  	u8 *result;
+> > >  	void *ubuf[] CRYPTO_MINALIGN_ATTR;
+> > >  
+> > >  };
+> > > 
+> > > @@ -200,23 +201,38 @@ static void ahash_op_unaligned_finish(struct
+> > > ahash_request *req, int err)
+> > > 
+> > >  	if (!err)
+> > >  	
+> > >  		memcpy(priv->result, req->result,
+> > >  		
+> > >  		       crypto_ahash_digestsize(crypto_ahash_reqtfm(req)));
+> > > 
+> > > -
+> > > -	kzfree(priv);
+> > 
+> > You can't move/remove this kzfree since a synchronous operation will not
+> > take the ahash_op_unaligned_done path.  A synchronous operation will
+> > never return -EINPROGRESS and the effect will be to never free the priv
+> > structure.
+> 
+> Marek, did you have a chance to address this?
 
-Should this go to -stable, too?
+Hi,
 
-I haven't looked into the details, but at least it seems to apply 
-cleanly on a 3.8 kernel.
-
-Best regards
-
-Dirk
-
-> ---
->
-> PS:
-> - This patch is tested for ARM-v7.
->
->   arch/arm/include/asm/cacheflush.h |    1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-> index ee753f1..ab91ebb 100644
-> --- a/arch/arm/include/asm/cacheflush.h
-> +++ b/arch/arm/include/asm/cacheflush.h
-> @@ -212,6 +212,7 @@ extern void copy_to_user_page(struct vm_area_struct *, struct page *,
->   static inline void __flush_icache_all(void)
->   {
->   	__flush_icache_preferred();
-> +	dsb();
->   }
->
->   /*
->
+it's in the pipeline, I'm just overloaded. We missed a MW for this, right ? :-(
