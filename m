@@ -1,61 +1,72 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 08 Feb 2014 21:23:24 +0100
-Subject: [PATCH 01/12] ARM: S3C24XX: cpufreq-utils: don't write raw values
- to MPLLCON when using ccf
-In-Reply-To: <201312131357.19899.heiko@sntech.de>
-References: <201312131356.40755.heiko@sntech.de>
- <201312131357.19899.heiko@sntech.de>
-Message-ID: <52F6923C.3040103@gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Sun, 9 Feb 2014 09:18:56 +0800
+Subject: [PATCH 1/3] crypto: Fix the pointer voodoo in unaligned ahash
+In-Reply-To: <1755989.ess5rJDo4G@tlendack-t1>
+References: <1389720829-5963-1-git-send-email-marex@denx.de>
+ <1389720829-5963-2-git-send-email-marex@denx.de>
+ <1755989.ess5rJDo4G@tlendack-t1>
+Message-ID: <20140209011856.GB16905@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Tue, Jan 14, 2014 at 01:35:50PM -0600, Tom Lendacky wrote:
+> 
+> On Tuesday, January 14, 2014 06:33:47 PM Marek Vasut wrote:
+> > Add documentation for the pointer voodoo that is happening in crypto/ahash.c
+> > in ahash_op_unaligned(). This code is quite confusing, so add a beefy chunk
+> > of documentation.
+> > 
+> > Moreover, make sure the mangled request is completely restored after finishing
+> > this unaligned operation. This means restoring all of .result, .priv, .base.data
+> > and .base.complete .
+> > 
+> > Also, remove the crypto_completion_t complete = ... line present in the
+> > ahash_op_unaligned_done() function. This type actually declares a function
+> > pointer, which is very confusing.
+> > 
+> > Finally, yet very important nonetheless, make sure the req->priv is free()'d
+> > only after the original request is restored in ahash_op_unaligned_done().
+> > The req->priv data must not be free()'d before that in ahash_op_unaligned_finish(),
+> > since we would be accessing previously free()'d data in ahash_op_unaligned_done()
+> > and cause corruption.
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> > Cc: David S. Miller <davem@davemloft.net>
+> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> > Cc: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Tom Lendacky <thomas.lendacky@amd.com>
+> > ---
+> >  crypto/ahash.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++----------
+> >  1 file changed, 54 insertions(+), 11 deletions(-)
+> > 
+> > diff --git a/crypto/ahash.c b/crypto/ahash.c
+> > index a92dc38..5ca8ede 100644
+> > --- a/crypto/ahash.c
+> > +++ b/crypto/ahash.c
+> > @@ -29,6 +29,7 @@
+> >  struct ahash_request_priv {
+> >  	crypto_completion_t complete;
+> >  	void *data;
+> > +	void *priv;
+> >  	u8 *result;
+> >  	void *ubuf[] CRYPTO_MINALIGN_ATTR;
+> >  };
+> > @@ -200,23 +201,38 @@ static void ahash_op_unaligned_finish(struct ahash_request *req, int err)
+> >  	if (!err)
+> >  		memcpy(priv->result, req->result,
+> >  		       crypto_ahash_digestsize(crypto_ahash_reqtfm(req)));
+> > -
+> > -	kzfree(priv);
+> 
+> You can't move/remove this kzfree since a synchronous operation will not take
+> the ahash_op_unaligned_done path.  A synchronous operation will never return
+> -EINPROGRESS and the effect will be to never free the priv structure.
 
-On 13.12.2013 13:57, Heiko St?bner wrote:
-> The s3c24xx cpufreq driver needs to change the mpll speed and was doing
-> this by writing raw values from a translation table into the MPLLCON
-> register.
->
-> Change this to use a regular clk_set_rate call when using the common
-> clock framework and only write the raw value in the samsung_clock case.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->   arch/arm/mach-s3c24xx/cpufreq-utils.c |   13 +++++++++++++
->   1 file changed, 13 insertions(+)
->
-> diff --git a/arch/arm/mach-s3c24xx/cpufreq-utils.c b/arch/arm/mach-s3c24xx/cpufreq-utils.c
-> index 2a0aa56..680a031 100644
-> --- a/arch/arm/mach-s3c24xx/cpufreq-utils.c
-> +++ b/arch/arm/mach-s3c24xx/cpufreq-utils.c
-> @@ -14,6 +14,7 @@
->   #include <linux/errno.h>
->   #include <linux/cpufreq.h>
->   #include <linux/io.h>
-> +#include <linux/clk.h>
->
->   #include <mach/map.h>
->   #include <mach/regs-clock.h>
-> @@ -60,5 +61,17 @@ void s3c2410_cpufreq_setrefresh(struct s3c_cpufreq_config *cfg)
->    */
->   void s3c2410_set_fvco(struct s3c_cpufreq_config *cfg)
->   {
-> +#ifdef CONFIG_SAMSUNG_CLOCK
->   	__raw_writel(cfg->pll.driver_data, S3C2410_MPLLCON);
-> +#endif
-> +
-> +#ifdef CONFIG_COMMON_CLK
-> +	struct clk *mpll = clk_get(NULL, "mpll");
-> +	if (IS_ERR(mpll))
-> +		return;
+Marek, did you have a chance to address this?
 
-Wouldn't it be more sensible to get the clock only once, at the time 
-cpufreq is initialized? This would avoid going through the list of all 
-clocks every CPU frequency change and be more semantically correct.
-
-If there is no good place to put this clk_get() then maybe it could be 
-simply called on first call to s3c2410_set_fvco() and the clock saved to 
-a static variable.
-
-Best regards,
-Tomasz
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
