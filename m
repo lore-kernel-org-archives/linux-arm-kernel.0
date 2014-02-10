@@ -1,155 +1,59 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 10 Feb 2014 18:23:16 +0100
-Subject: [PATCH 05/11] ARM: mvebu: add Device Tree for the Armada 375 DB board
-In-Reply-To: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1392053002-19831-6-git-send-email-thomas.petazzoni@free-electrons.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 10 Feb 2014 17:25:15 +0000
+Subject: [PATCH] ARM: mm: add imprecise abort non-deadly handler
+In-Reply-To: <20140210143708.GB2794@e103592.cambridge.arm.com>
+References: <1391797214-17142-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1391797214-17142-2-git-send-email-ben.dooks@codethink.co.uk>
+ <20140210143708.GB2794@e103592.cambridge.arm.com>
+Message-ID: <52F90B7B.50807@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 375 DB board is the development board from Marvell for the
-Armada 375 SoC. This commit adds a Device Tree description for this
-board, which enables the following features:
+On 10/02/14 14:37, Dave Martin wrote:
+> On Fri, Feb 07, 2014 at 06:20:14PM +0000, Ben Dooks wrote:
+>> Given that imprecise aborts may be delivered after the action that
+>> caused them (or even for non-cpu related activities such as bridge
+>> faults from a bus-master) it is possible that the wrong process is
+>> terminated as a result.
+>>
+>> It is not know at this time in an SMP system which cores get notified
+>> of an imprecise external abort, we have yet to find the right details
+>> in the architecture reference manuals. This also means that killing
+>> the process is probably the wrong thing to do on reception of these aborts.
+>>
+>> Add a handler to take and print imprecise aborts and allow the process
+>> to continue. This should ensure that the abort is shown but not kill
+>> the process that was running on the cpu core at the time.
+>
+> Not treating these as thread-specific faults seems correct, since we
+> never have a way to map these aborts back to the culprit ... except that
+> there is a likelihood the culprit is still running when the abort fires.
+>
+>
+> "Spurious" imprecise aborts pretty much always indicate a hardware error
+> or a nasty bug somewhere.
 
- * I2C buses
- * SDIO
- * Serial port
- * SPI bus, with a SPI flash. Note that the SPI bus is disabled by
-   default, because it conflicts with the NAND, and can only work if
-   the board boots out of SPI. Since most boards are shipped to boot
-   out of NAND, we're default to having the SPI bus disabled.
- * PCIe interfaces
+I need to find out where the one we are catching is coming from in our
+system.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/Makefile          |   1 +
- arch/arm/boot/dts/armada-375-db.dts | 106 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 107 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-375-db.dts
+> Another cause is badly implemented, buggy or malicious userspace software
+> being given more exotic mmaps that it is qualified to deal with
+> responsibly.  That's a nasty bug in the distro maintainer / system
+> administrator / vendor.
+>
+> So, I think this should be at least KERN_ERROR; maybe KERN_CRIT or above.
+> We must not encourage people to think that these aborts are somehow
+> benign.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b9d6a8b..f1eafbd 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -126,6 +126,7 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
- 	armada-370-netgear-rn102.dtb \
- 	armada-370-netgear-rn104.dtb \
- 	armada-370-rd.dtb \
-+	armada-375-db.dtb \
- 	armada-xp-axpwifiap.dtb \
- 	armada-xp-db.dtb \
- 	armada-xp-gp.dtb \
-diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
-new file mode 100644
-index 0000000..7b46fe2
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-375-db.dts
-@@ -0,0 +1,106 @@
-+/*
-+ * Device Tree file for Marvell Armada 375 evaluation board
-+ * (DB-88F6720)
-+ *
-+ *  Copyright (C) 2014 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "armada-375.dtsi"
-+
-+/ {
-+	model = "Marvell Armada 375 Development Board";
-+	compatible = "marvell,a375-db", "marvell,armada375";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x40000000>; /* 1 GB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
-+
-+		internal-regs {
-+			spi0: spi at 10600 {
-+				pinctrl-0 = <&spi0_pins>;
-+				pinctrl-names = "default";
-+				/*
-+				 * SPI conflicts with NAND, so we disable it
-+				 * here, and select NAND as the enabled device
-+				 * by default.
-+				 */
-+				status = "disabled";
-+
-+				spi-flash at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+					compatible = "n25q128a13";
-+					reg = <0>; /* Chip select 0 */
-+					spi-max-frequency = <108000000>;
-+				};
-+			};
-+
-+			i2c0: i2c at 11000 {
-+				status = "okay";
-+				clock-frequency = <100000>;
-+				pinctrl-0 = <&i2c0_pins>;
-+				pinctrl-names = "default";
-+			};
-+
-+			i2c1: i2c at 11100 {
-+				status = "okay";
-+				clock-frequency = <100000>;
-+				pinctrl-0 = <&i2c1_pins>;
-+				pinctrl-names = "default";
-+			};
-+
-+			serial at 12000 {
-+				clock-frequency = <200000000>;
-+				status = "okay";
-+			};
-+
-+			pinctrl {
-+				sdio_st_pins: sdio-st-pins {
-+					marvell,pins = "mpp44", "mpp45";
-+					marvell,function = "gpio";
-+				};
-+			};
-+
-+			mvsdio at d4000 {
-+				pinctrl-0 = <&sdio_pins &sdio_st_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+				cd-gpios = <&gpio1 12 0>;
-+				wp-gpios = <&gpio1 13 0>;
-+			};
-+		};
-+
-+		pcie-controller {
-+			status = "okay";
-+			/*
-+			 * The two PCIe units are accessible through
-+			 * standard PCIe slots on the board.
-+			 */
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+			pcie at 2,0 {
-+				/* Port 1, Lane 0 */
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
+Ok, KERN_ERROR or KERN_CRIT sound reasonable.
+
+> If we really want people to fix their bugs, it may be worth considering
+> panic(), or doing this when some threshold is reached.  This may be a
+> bit harsh though, at least without some threshold.
+
+I was considering also firing a WARN_ON(abort_count++ > 10) or something
+similar.
+
 -- 
-1.8.3.2
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
