@@ -1,57 +1,47 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Sun, 09 Feb 2014 19:25:34 -0800
-Subject: [PATCHv2 2/2] arm: Get rid of meminfo
-In-Reply-To: <20140207020949.GQ1706@sonymobile.com>
-References: <1391558551-31395-1-git-send-email-lauraa@codeaurora.org>
- <1391558551-31395-3-git-send-email-lauraa@codeaurora.org>
- <20140207020949.GQ1706@sonymobile.com>
-Message-ID: <52F846AE.3050800@codeaurora.org>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 10 Feb 2014 08:29:39 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBkdHM6IGkuTVg1MSBiYWJiYWdlOiBTdXBwb3J0?=
+ =?UTF-8?B?IGRpYWdub3N0aWMgTEVE?=
+In-Reply-To: <20140210030214.GB9628@S2101-09.ap.freescale.net>
+References: <1391522263-17877-1-git-send-email-Ying.Liu@freescale.com>
+ <20140210030214.GB9628@S2101-09.ap.freescale.net>
+Message-ID: <1392006579.703394606@f357.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/6/2014 6:09 PM, Courtney Cavin wrote:
-> On Wed, Feb 05, 2014 at 01:02:31AM +0100, Laura Abbott wrote:
->> memblock is now fully integrated into the kernel and is the prefered
->> method for tracking memory. Rather than reinvent the wheel with
->> meminfo, migrate to using memblock directly instead of meminfo as
->> an intermediate.
->>
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> [...]
->> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
->> index 0b11c1a..51d814e 100644
->> --- a/arch/arm/mach-pxa/spitz.c
->> +++ b/arch/arm/mach-pxa/spitz.c
->> @@ -32,6 +32,7 @@
->>   #include <linux/io.h>
->>   #include <linux/module.h>
->>   #include <linux/reboot.h>
->> +#include <linux/memblock.h>
->>
->>   #include <asm/setup.h>
->>   #include <asm/mach-types.h>
->> @@ -971,13 +972,9 @@ static void __init spitz_init(void)
->>          spitz_i2c_init();
->>   }
->>
->> -static void __init spitz_fixup(struct tag *tags, char **cmdline,
->> -                              struct meminfo *mi)
->> +static void __init spitz_fixup(struct tag *tags, char **cmdline)
->>   {
->> -       sharpsl_save_param();
->> -       mi->nr_banks = 1;
->> -       mi->bank[0].start = 0xa0000000;
->> -       mi->bank[0].size = (64*1024*1024);
->> +       memblock_addr(0xa0000000, SZ_64M);
->
-> memblock_add() ?
-Yes, that was a typo on my part. I'll send out a v3 with collected acks.
+???????????, 10 ??????? 2014, 11:02 +08:00 ?? Shawn Guo <shawn.guo@linaro.org>:
+> On Tue, Feb 04, 2014 at 09:57:42PM +0800, Liu Ying wrote:
+> > The D25 LED controlled by gpio on the i.MX51 babbage
+> > board is a diagnostic LED according to the board design.
+> > This patch adds the relevant device tree nodes to the
+> > i.MX51 babbage device tree file to support this LED.
+> > 
+> > Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/imx51-babbage.dts |   17 +++++++++++++++++
+> >  1 file changed, 17 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx51-babbage.dts
+> b/arch/arm/boot/dts/imx51-babbage.dts
+> > index be1407c..8d6a74b 100644
+> > --- a/arch/arm/boot/dts/imx51-babbage.dts
+> > +++ b/arch/arm/boot/dts/imx51-babbage.dts
+> > @@ -81,6 +81,17 @@
+> >  		};
+> >  	};
+> >  
+> > +	leds {
+> > +		compatible = "gpio-leds";
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&led_pin_gpio2_6>;
+> > +
+> > +		led-diagnostic {
+> > +			label = "diagnostic";
+> > +			gpios = <&gpio2 6 0>;
+> 
+> Just out of curiosity, how will you use/trigger the led?
 
->
-> -Courtney
->
+And GPIO bindings should be used to specify active level,
+GPIO_ACTIVE_HIGH in this case.
 
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+---
