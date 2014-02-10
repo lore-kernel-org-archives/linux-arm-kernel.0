@@ -1,75 +1,67 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 10 Feb 2014 13:17:47 +0100
-Subject: [PATCHv5] omap3: Add basic support for 720MHz part
-In-Reply-To: <CAGo_u6r4Q0QyaZ9jPyiBNT-xBqxWA1MpESiyG7quzUn5kkoLhA@mail.gmail.com>
-References: <1297239010-29683-1-git-send-email-premi@ti.com>
- <1623915.4eAJkBo57q@avalon>
- <CAGo_u6r4Q0QyaZ9jPyiBNT-xBqxWA1MpESiyG7quzUn5kkoLhA@mail.gmail.com>
-Message-ID: <3626990.QRqYkuhRtF@avalon>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 10 Feb 2014 13:17:26 +0100
+Subject: [GIT PULL] Xilinx Zynq fix for v3.14
+Message-ID: <52F8C356.8060209@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+Hi,
 
-On Friday 07 February 2014 07:51:00 Nishanth Menon wrote:
-> On Thu, Feb 6, 2014 at 1:26 PM, Laurent Pinchart wrote:
-> > On Friday 22 June 2012 11:33:51 Laurent Pinchart wrote:
-> >> On Thursday 10 February 2011 08:45:00 Kevin Hilman wrote:
-> >> > Sanjeev Premi <premi@ti.com> writes:
-> >> > > This patch adds support for speed enhanced variant of OMAP35x
-> >> > > processors. These parts allow ARM and IVA running at 720MHz
-> >> > > and 520MHz respectively.
-> >> > > 
-> >> > > These parts can be detected at runtime by reading contents of
-> >> > > PRODID.SKUID[3:0] at 0x4830A20C [1].
-> >> > > 
-> >> > > This patch specifically does following:
-> >> > >  * Add new OPP to omap34xx_opp_def_list[] - disabled by default.
-> >> > >  * Detect devices capable of running at new OPP.
-> >> > >  * Enable new OPP only if device supports it.
-> >> > >  * Check for presence of IVA before attempting to enable the
-> >> > >    corresponding OPP.
-> >> > >   
-> >> > >   [1] http://focus.ti.com/lit/ug/spruff1d/spruff1d.pdf
-> >> > > 
-> >> > > It appears from discussions (on this patch) that a variant of
-> >> > > OMAP3430 supports this OPP but lacks runtime detection. This
-> >> > > OPP can be enabled for these device by either:
-> >> > >  1) Setting the bit corresponding to OMAP3_HAS_720MHZ
-> >> > >     in 'omap3_features'. (Refer changes to id.c)
-> >> > >  
-> >> > >  2) Removing check for omap3_has_720mhz() before enabling
-> >> > >     the OPP. (Refer changes to opp3xxx_data.c)
-> >> > >  
-> >> > >  3) Calling opp_enable() for 720MHz/VDD1 and 520MHz/VDD2 in
-> >> > >     the board file. (Refer changes to opp3xxx_data.c).
-> >> > >     This should, ideally, be done before omap3_opp_init() is
-> >> > >     called during device_initcall().
-> >> > > 
-> >> > > CAUTION: This should be done for identified parts only.
-> >> > >          Else, the device could be damaged permanently.
-> >> > > 
-> >> > > Signed-off-by: Sanjeev Premi <premi@ti.com>
-> >> > > Reviewed-by: G, Manjunath Kondaiah <manjugk@ti.com>
-> >> > 
-> >> > Acked-by: Kevin Hilman <khilman@ti.com>
-> >> 
-> >> This patch seems to never have made it upstream. Is there a reason for
-> >> that
-> >> ?
-> > 
-> > Ping ?
-> 
-> We'd have to figure out a proper opp modifier logic with device tree.
-> considering that non-dt boot is slowly getting dismantled in mach-omap2, to
-> add new capabilities in non-dt is not really a good idea at this point in
-> time - Further, we do have equivalent requirements in other TI SoCs as well 
+please consider to queue this bug fix for v3.14.
 
-Good point, but I'm not sure to see where this patch is specific to legacy 
-boot. The two functions it modifies, and omap3xxx_check_features() and 
-omap3_opp_init(), are called for DT boot as well.
+Bug was reported here:
+https://lkml.org/lkml/2014/1/27/212
+
+I have also discussed this with Rob regarding memreserve DT feature.
+Here is thread with Rob:
+https://lkml.org/lkml/2014/1/31/105
+
+Moving kernel start is currently enabled by:
+"ARM: ignore memory below PHYS_OFFSET"
+(sha1: 571b14375019c3a66ef70d4d4a7083f4238aca30)
+
+Thanks,
+Michal
+
+
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.xilinx.com/linux-xlnx.git tags/zynq-fixes-for-3.14
+
+for you to fetch changes up to a73cbb758171c34cc3d58f3dfb80feef501a2079:
+
+  ARM: zynq: Reserve not DMAable space in front of the kernel (2014-02-10 13:04:35 +0100)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq fixes for v3.14
+
+- Protect DMA buffer allocation below
+  kernel start address
+
+----------------------------------------------------------------
+Michal Simek (1):
+      ARM: zynq: Reserve not DMAable space in front of the kernel
+
+ arch/arm/mach-zynq/common.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
 
 -- 
-Regards,
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-Laurent Pinchart
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/bbac3ae6/attachment.sig>
