@@ -1,33 +1,54 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 10 Feb 2014 13:50:22 -0600
-Subject: [PATCH] ARM: dts: OMAP2+: Fix boot with multi_v7_defconfig
-In-Reply-To: <1392055835-6494-1-git-send-email-rogerq@ti.com>
-References: <1392055835-6494-1-git-send-email-rogerq@ti.com>
-Message-ID: <52F92D7E.9030304@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Feb 2014 20:59:42 +0100
+Subject: [PATCH 2/3] mfd: axp20x: Add dtsi for axp20x
+In-Reply-To: <1391875428-6281-3-git-send-email-carlo@caione.org>
+References: <1391875428-6281-1-git-send-email-carlo@caione.org>
+ <1391875428-6281-3-git-send-email-carlo@caione.org>
+Message-ID: <20140210195942.GA3192@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-$subject probably needs clarity.
-On 02/10/2014 12:10 PM, Roger Quadros wrote:
-> The OMAP EHCI controller is not compatible with the EHCI
-> platform HCD driver so don't claim that we are.
+Hi Carlo,
 
-might want to refer to the change in drivers/usb/host/ehci-platform.c
-that created this regression as well.
-
-we also probably want to make better explanation about this issue and
-why we think this is the correct fix for it - for example, question
-Kevin asked in [1]
+On Sat, Feb 08, 2014 at 05:03:47PM +0100, Carlo Caione wrote:
+> This patch adds a new dtsi for supporting axp20x.
 > 
-> This fixes boot on OMAP platforms with CONFIG_USB_EHCI_HCD_PLATFORM=y
-> e.g. multi_v7_defconfig
-> 
-> Reported-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Carlo Caione <carlo@caione.org>
 > ---
+>  arch/arm/boot/dts/axp20x.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/axp20x.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/axp20x.dtsi b/arch/arm/boot/dts/axp20x.dtsi
+> new file mode 100644
+> index 0000000..98d4c7c
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/axp20x.dtsi
+> @@ -0,0 +1,9 @@
+> +/*
+> +* Integrated Power Management Chip AXP209
+> +*/
+> +
+> +&axp {
+> +	compatible = "x-powers,axp20x";
+> +	interrupt-controller;
+> +	#interrupt-cells = <1>;
+> +};
 
-[1] http://marc.info/?t=139204803900004&r=1&w=2
+Hmmm, this refers to an undefined node, I can't see this DTSI used
+anywhere, and why do you need a DTSI of its own in the first place?
+
+Thanks,
+Maxime
 
 -- 
-Regards,
-Nishanth Menon
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/b62a7ee4/attachment.sig>
