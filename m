@@ -1,37 +1,39 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 10 Feb 2014 02:20:15 +0100
-Subject: [PATCH] ARM: multiplatform: remove reference to ARCH_MULTI_V4
-In-Reply-To: <201307141034.42868.arnd@arndb.de>
-References: <1373746191.1359.37.camel@x61.thuisdomein>
- <201307141034.42868.arnd@arndb.de>
-Message-ID: <1391995215.14955.10.camel@x220>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Mon, 10 Feb 2014 09:58:13 +0800
+Subject: [Update][PATCH 1/2] clocksource: Remove outdated comments
+Message-ID: <1391997493-42564-1-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2013-07-14 at 10:34 +0200, Arnd Bergmann wrote:
-> On Saturday 13 July 2013, Paul Bolle wrote:
-> > The Kconfig symbol ARCH_MULTI_V4 was removed in commit 24e860fbfd
-> > ("ARM: multiplatform: always pick one CPU type"). Remove the last
-> > reference to it too.
-> > 
-> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> > ---
-> > 0) Untested.
-> > 
-> > 1) Commit 24e860fbfd is silent on the reason to drop ARCH_MULTI_V4. And
-> > the ARM section of the Kconfig files is rather complicated for people,
-> > like me, that aren't familiar with the way the ARM universe is divided
-> > in architectures, machines, platforms, etc. That makes it hard to say
-> > whether ARCH_MULTI_V4 was dropped on purpose or by accident.
-> 
-> It was dropped on purpose because it is unused in 3.11 but it will
-> be used again in 3.12, so I wouldn't bother with your patch.
-> 
-> Thanks anyway for looking into unused symbols, I think checking for
-> unused code like this is very useful in general.
+clocksource_register() and __clocksource_register_scale()
+always return 0, so the comment is just pointless, it's
+outdated, remove it.
 
-We're now at v3.14-rc1 and ARCH_MULTI_V4 is still unused. Are there still plans to
-use it again?
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+---
+ kernel/time/clocksource.c |    3 ---
+ 1 files changed, 0 insertions(+), 3 deletions(-)
 
-
-Paul Bolle
+diff --git a/kernel/time/clocksource.c b/kernel/time/clocksource.c
+index ba3e502..9951575 100644
+--- a/kernel/time/clocksource.c
++++ b/kernel/time/clocksource.c
+@@ -779,8 +779,6 @@ EXPORT_SYMBOL_GPL(__clocksource_updatefreq_scale);
+  * @scale:	Scale factor multiplied against freq to get clocksource hz
+  * @freq:	clocksource frequency (cycles per second) divided by scale
+  *
+- * Returns -EBUSY if registration fails, zero otherwise.
+- *
+  * This *SHOULD NOT* be called directly! Please use the
+  * clocksource_register_hz() or clocksource_register_khz helper functions.
+  */
+@@ -805,7 +803,6 @@ EXPORT_SYMBOL_GPL(__clocksource_register_scale);
+  * clocksource_register - Used to install new clocksources
+  * @cs:		clocksource to be registered
+  *
+- * Returns -EBUSY if registration fails, zero otherwise.
+  */
+ int clocksource_register(struct clocksource *cs)
+ {
+-- 
+1.7.1
