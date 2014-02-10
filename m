@@ -1,73 +1,74 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Feb 2014 11:02:17 +0800
-Subject: [PATCH] ARM: dts: i.MX51 babbage: Support diagnostic LED
-In-Reply-To: <1391522263-17877-1-git-send-email-Ying.Liu@freescale.com>
-References: <1391522263-17877-1-git-send-email-Ying.Liu@freescale.com>
-Message-ID: <20140210030214.GB9628@S2101-09.ap.freescale.net>
+Date: Mon, 10 Feb 2014 11:11:42 +0800
+Subject: [PATCH 1/3] ARM: dts: imx27-phytec-phycard-s-som: Sort entries
+In-Reply-To: <1391525972-15810-1-git-send-email-shc_work@mail.ru>
+References: <1391525972-15810-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20140210031140.GC9628@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 09:57:42PM +0800, Liu Ying wrote:
-> The D25 LED controlled by gpio on the i.MX51 babbage
-> board is a diagnostic LED according to the board design.
-> This patch adds the relevant device tree nodes to the
-> i.MX51 babbage device tree file to support this LED.
-> 
-> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
-> ---
->  arch/arm/boot/dts/imx51-babbage.dts |   17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-> index be1407c..8d6a74b 100644
-> --- a/arch/arm/boot/dts/imx51-babbage.dts
-> +++ b/arch/arm/boot/dts/imx51-babbage.dts
-> @@ -81,6 +81,17 @@
->  		};
->  	};
->  
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&led_pin_gpio2_6>;
-> +
-> +		led-diagnostic {
-> +			label = "diagnostic";
-> +			gpios = <&gpio2 6 0>;
+On Tue, Feb 04, 2014 at 06:59:30PM +0400, Alexander Shiyan wrote:
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Just out of curiosity, how will you use/trigger the led?
-
-> +		};
-> +	};
-> +
->  	sound {
->  		compatible = "fsl,imx51-babbage-sgtl5000",
->  			     "fsl,imx-audio-sgtl5000";
-> @@ -280,6 +291,12 @@
->  				MX51_PAD_CSPI1_RDY__GPIO4_26 0x80000000
->  			>;
->  		};
-> +
-> +		led_pin_gpio2_6: led_gpio2_6 {
-
-This might be copied from some existing file, but I would hope the name
-can be more generic, something like the following
-
-	pinctrl_gpio_leds: gpioledsgrp {
-
-, so that when we have more gpio controlled leds to add, we can just add
-more pins into the same group without concerning the name.
+Applied all 3, thanks.
 
 Shawn
 
-> +			fsl,pins = <
-> +				MX51_PAD_EIM_D22__GPIO2_6 0x80000000
-> +			>;
-> +		};
->  	};
+> ---
+>  arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts | 36 ++++++++++++------------
+>  1 file changed, 18 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+> index e51e550..a28b6c7 100644
+> --- a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+> +++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
+> @@ -29,6 +29,24 @@
+>  	status = "okay";
 >  };
 >  
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_fec1>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c2>;
+> +	status = "okay";
+> +
+> +	at24 at 52 {
+> +		compatible = "at,24c32";
+> +		pagesize = <32>;
+> +		reg = <0x52>;
+> +	};
+> +};
+> +
+>  &iomuxc {
+>  	imx27-phycard-s-som {
+>  		pinctrl_fec1: fec1grp {
+> @@ -62,21 +80,3 @@
+>  		};
+>  	};
+>  };
+> -
+> -&fec {
+> -	pinctrl-names = "default";
+> -	pinctrl-0 = <&pinctrl_fec1>;
+> -	status = "okay";
+> -};
+> -
+> -&i2c2 {
+> -	pinctrl-names = "default";
+> -	pinctrl-0 = <&pinctrl_i2c2>;
+> -	status = "okay";
+> -
+> -	at24 at 52 {
+> -		compatible = "at,24c32";
+> -		pagesize = <32>;
+> -		reg = <0x52>;
+> -	};
+> -};
 > -- 
-> 1.7.9.5
-> 
+> 1.8.3.2
 > 
