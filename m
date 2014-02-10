@@ -1,30 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Feb 2014 14:57:29 +0000
-Subject: [alsa-devel] [PATCH 0/7] Audio support for Armada 370 DB
-In-Reply-To: <20140210152141.1391fb67@skate>
-References: <1391102051-5319-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140210152141.1391fb67@skate>
-Message-ID: <20140210145729.GP1757@sirena.org.uk>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 10 Feb 2014 16:02:00 +0100
+Subject: [PATCH] clk: Correct handling of NULL clk in __clk_{get, put}
+In-Reply-To: <CAK9yfHxnrM--A_SZSBWzQ2B7zrtU+=n77H61bzq4ddtLrpHMBg@mail.gmail.com>
+References: <1389096223-23934-1-git-send-email-s.nawrocki@samsung.com>
+ <CAK9yfHx+=X+DiLe_WsiDkYonKCssPTOGqR76=+7N6eyAHXyQGQ@mail.gmail.com>
+ <52CFC5C9.4000006@samsung.com>
+ <CAK9yfHxnrM--A_SZSBWzQ2B7zrtU+=n77H61bzq4ddtLrpHMBg@mail.gmail.com>
+Message-ID: <52F8E9E8.8060408@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 03:21:41PM +0100, Thomas Petazzoni wrote:
+On 30/01/14 05:50, Sachin Kamat wrote:
+> On 10 January 2014 15:34, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+>> > On 08/01/14 05:44, Sachin Kamat wrote:
+>>> >> Hi Sylwester,
+>>> >>
+>>> >> On 7 January 2014 17:33, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+>>>> >>> Ensure clk->kref is dereferenced only when clk is not NULL.
+>>>> >>>
+>>>> >>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>>> >>> ---
+>>>> >>> Hi Sachin,
+>>>> >>>
+>>>> >>> please try if this patch fixes the exyno5420 boot crash.
+>>> >>
+>>> >> Confirmed that this patch works fine on 5420 as well as already
+>>> >> working 4210 and 5250 boards.
+>>> >> Thanks for the quick fix.
+>>> >>
+>>> >> Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> >
+>> > Thanks Sachin. Mike, it seems we need this patch on top of
+>> > my clk-unregister branch. Sorry for overlooking this issue.
+>> > Could you add the $subject patch to your clk-next tree ?
+>
+> Gentle ping Mike. Hope we can have this patch in rc-2.
 
-> Any comments on the patch series? I'd like these to be included in
-> 3.15, and so far I've only received one simple comment from Jason
-> Cooper regarding the defconfig changes, but no other comments.
+A gentle reminder, this patch is still not in current -rc and is required
+to fix booting of some exynos platforms.
 
-Don't send contentless pings, they're more noise in the inbox.  In this
-case the fact that you didn't use subject lines matching the subsystem
-means that they tend to get pushed down my list (or more exactly don't
-come up when I search for patches for the subsystems I maintain).  If
-your subject lines stand out in git shortlog output for the area you're
-working on that's generally an issue, for example with ASoC you're
-looking for an "ASoC: ".
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/9b87c836/attachment.sig>
+Thanks,
+Sylwester
