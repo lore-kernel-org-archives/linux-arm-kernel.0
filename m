@@ -1,116 +1,39 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Mon, 10 Feb 2014 11:20:37 +0000
-Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <20140210085305.641e6de5@amdc2363>
-References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
- <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
- <52F50698.4060305@arm.com> <52F509BD.70903@arm.com>
- <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
- <52F51888.5010608@arm.com>
- <CAGo_u6ofC4NNPiTNcSnXUvT3RZJo54=XyjetR-ok5hCBrVZkKg@mail.gmail.com>
- <52F51FCD.5000009@arm.com>
- <CAGo_u6quxExJOyY8mvCw5sDSuz=_j0YqJ6FJW+FAdaxUeqzN9Q@mail.gmail.com>
- <CAJuA9aj-LsdBiS2msOVmNRSe6mNj9QJsys9KjHZAk=9hrZOLzA@mail.gmail.com>
- <20140210085305.641e6de5@amdc2363>
-Message-ID: <52F8B605.6020108@arm.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Mon, 10 Feb 2014 11:41:58 +0000
+Subject: [PATCH 4/4] ARM: Kirkwood: Add support for many Synology NAS
+ devices
+In-Reply-To: <20140206160126.GH29860@lunn.ch>
+References: <1391634309-3123-1-git-send-email-andrew@lunn.ch>
+ <1391634309-3123-5-git-send-email-andrew@lunn.ch>
+ <20140206153939.GD8533@titan.lakedaemon.net>
+ <20140206160126.GH29860@lunn.ch>
+Message-ID: <1392032518.5117.52.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/14 07:53, Lukasz Majewski wrote:
-> Hi Thomas, Sudeep,
+On Thu, 2014-02-06 at 17:01 +0100, Andrew Lunn wrote:
+> Synology seem to build there devices like lego. They have two
+> different RTC blocks. They have three different fan alarm blocks, four
+> different led blocks, etc. And to build a product, the just select a
+> group of blocks and put them together.
 > 
->> On Sat, Feb 8, 2014 at 1:11 AM, Nishanth Menon <nm@ti.com> wrote:
->>> On Fri, Feb 7, 2014 at 12:02 PM, Sudeep Holla
->>> <Sudeep.Holla@arm.com> wrote:
->>>> On 07/02/14 17:37, Nishanth Menon wrote:
->>>>> On Fri, Feb 7, 2014 at 11:31 AM, Sudeep Holla
->>>>> <Sudeep.Holla@arm.com> wrote:
->>>>
->>>> [...]
->>>>
->>>>>> Yes I think its counter-intuitive as it's visible to the
->>>>>> userspace(list of frequencies and the boost parameters are
->>>>>> exposed through sysfs)
->>>>>
->>>>> That will be a different problem -> as currently every single
->>>>> frequency in the cpufreq list has ability to be marked as boost
->>>>> frequency - if userspace does not maintain that, then, IMHO, fix
->>>>> the userspace :D
->>>>>
->>>>
->>>> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
->>>> gives the list of frequencies based on the state of the boost
->>>> feature at anytime.
->>>>
->>>> Intuitively the list without boost shouldn't have any frequency
->>>> above the range when it's enabled :), that's what I was referring
->>>> to. So I am not talking about any issue with user-space
->>>> maintenance.
->>> Fair enough - but i still think it has nothing to do with dt binding
->>> itself -> and i think the discussion we've had should be good for
->>> the binding provided in this patch.. I hope.. if documentation
->>> needs a bit of better explanation to prevent a repeat of the same
->>> discussion at a later point of time, now might be a good time to
->>> add it in.
->>
-Nishanth, though I am not convinced that it should be list, since you have a
-valid point that this should not prevent in having this feature, I am fine with
-the list.
+> The board setup code which Ben Peddell wrote has a somewhat similar
+> structure:
+> 
+> http://klightspeed.killerwolves.net/synology/linux-3.4-synology-0.1.patch
+> 
+> It has a set of functions which add platform devices. And a table
+> driven piece of code which based on the product name calls these
+> functions to add the needed platform devices. Take a look at the table
+> to get a better idea of the re-use factor of the blocks.
+> 
+> In this DT version, i have a dtsi file for each function, and a dti
+> file for each table entry.
 
->> The term boost and over-clocking have been described in the bindings
->> document as being the same. Since the term over-clocking refers to
->> running a CPU beyond normal operating frequencies, I tend to agree
->> with Sudeep that it is not intuitive if a normal operating frequency
->> is greater than a boost mode frequency.
->>
->> Otherwise, when userspace does "echo 1 >
->> /sys/devices/system/cpu/cpufreq/boost", what is it supposed to mean. I
->> think the original intent of boost mode patches was to allow CPU to
->> operate at frequencies greater than the normal operating frequencies.
->>
->> Lukasz, how would you want this to be handled?
-> 
-> Please consider an example:
-> 
-> normal-freqs: 1400000, 1200000, 1000000, 800000, 600000, 400000, 200000
-> [1]
-> boost-freqs: 1700000, 1600000, 1500000. [2]
-> 
-> All those freqs shall be represented as OPPs freq and voltage tuple.
-> 
-> Best would be to specify all the boost-freqs as:
-> boost-freqs = <1700000 1600000 1500000> to be prepared for future
-> quirks or problems (or special cases which might show up latter).
-> If anybody can foresee any potential threads - like platform on which
-> boost freqs are 1700000 and 1500000, but not 1600000, then please share
-> this information.
-> 
-If that's the case then why should it be included in the list of OPPs.
-I know Nishanth had a valid point in other thread previously(like including
-SoC.dtsi having OPPs in platform files), but that's different problem.
+At least some other platforms deal with this by having a baseline dtsi
+where most things have status="disabled" and then a per-board .dts file
+which contains status="okay" and perhaps any specific pin bindings etc.
 
-> However, I think that it would be also acceptable to specify only:
-> boost-freq = <1500000> and mark all freqs greater or equal to it as
-> CPUFREQ_BOOST_FREQ.
-> 
-> If there aren't any potential problems, then I think the second option
-> would be a good solution (we would have only one BOOST attribute stored
-> at CPUs DTS node).
-> 
+See arch/arm/boot/dts/sun?i* for an example of this approach.
 
-Yes I prefer this to keep it simple and as per the definition of overclocking
-or turbo boost in hardware terms if possible.
-
-Just another thought, not sure how much this is true for real platforms, sharing
-it anyway. IIUC these boost frequencies have certain constraints like thermal
-and can't be sustained all the processors for long time.
-
-So does it make sense to specify normal max frequency instead of boost-frequency
-which by definition would be: "The maximum frequency that all processors are can
-sustain simultaneously without any thermal constraints".
-Ignore this if this is not the definition of boost on real platforms.
-
-
-Regards,
-Sudeep
+Ian.
