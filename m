@@ -1,224 +1,63 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Mon, 10 Feb 2014 18:21:46 +0530
-Subject: [PATCH v2] dma: Add Xilinx AXI Video Direct Memory Access Engine
- driver support
-In-Reply-To: <52F3B017.5030100@metafoo.de>
-References: <1390409565-4200-1-git-send-email-sthokal@xilinx.com>
- <1390409565-4200-2-git-send-email-sthokal@xilinx.com>
- <52E0FC22.8060903@metafoo.de>
- <CA+mB=1L6yvCwA3mKCwz83LQbXiVau110REV64rYrSzUhGE4ucA@mail.gmail.com>
- <52E2698B.6070001@metafoo.de> <20140126135933.GD10628@intel.com>
- <52E54849.2000208@metafoo.de>
- <CA+mB=1JvnTcyRnuvdnW1BCeiMLSTMrrAbKwVKgwFUmWrVuXzSw@mail.gmail.com>
- <20140128031324.GH10628@intel.com>
- <CA+mB=1K8Cqe_c6_ce-fLyphvqcr90mhCjFdZ_d4BV-VkUk-gXw@mail.gmail.com>
- <CA+mB=1L9XFC8h_qW_-K-cv5sYondL_0NiLr=9XCFxwWRjDHn1Q@mail.gmail.com>
- <52F26716.3010203@metafoo.de>
- <CA+mB=1JX5K9Cu=9WGyr_e9tUtVz6ypT9UxhJU9BNJbQA9eaRKA@mail.gmail.com>
- <52F3B017.5030100@metafoo.de>
-Message-ID: <CA+mB=1Kah-6rxeCuir-W+rhK3U5CvXnVkf0+gDqBY-4hUiyHpg@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 10 Feb 2014 13:53:08 +0100
+Subject: [PATCH v3 1/2] drivers/base: permit base components to omit the
+ bind/unbind ops
+In-Reply-To: <9b3c3c2c982f31b026fd1516a2b608026d55b1e9.1391792986.git.moinejf@free.fr>
+References: <cover.1391792986.git.moinejf@free.fr>
+ <9b3c3c2c982f31b026fd1516a2b608026d55b1e9.1391792986.git.moinejf@free.fr>
+Message-ID: <20140210125307.GG20143@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 6, 2014 at 9:23 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
-> On 02/06/2014 02:34 PM, Srikanth Thokala wrote:
->>
->> On Wed, Feb 5, 2014 at 10:00 PM, Lars-Peter Clausen <lars@metafoo.de>
->> wrote:
->>>
->>> On 02/05/2014 05:25 PM, Srikanth Thokala wrote:
->>>>
->>>>
->>>> On Fri, Jan 31, 2014 at 12:21 PM, Srikanth Thokala <sthokal@xilinx.com>
->>>> wrote:
->>>>>
->>>>>
->>>>> Hi Vinod,
->>>>>
->>>>> On Tue, Jan 28, 2014 at 8:43 AM, Vinod Koul <vinod.koul@intel.com>
->>>>> wrote:
->>>>>>
->>>>>>
->>>>>> On Mon, Jan 27, 2014 at 06:42:36PM +0530, Srikanth Thokala wrote:
->>>>>>>
->>>>>>>
->>>>>>> Hi Lars/Vinod,
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> The question here i think would be waht this device supports? Is
->>>>>>>>> the
->>>>>>>>> hardware
->>>>>>>>> capable of doing interleaved transfers, then would make sense.
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>> The hardware does 2D transfers. The parameters for a transfer are
->>>>>>>> height,
->>>>>>>> width and stride. That's only a subset of what interleaved transfers
->>>>>>>> can be
->>>>>>>> (xt->num_frames must be one for 2d transfers). But if I remember
->>>>>>>> correctly
->>>>>>>> there has been some discussion on this in the past and the result of
->>>>>>>> that
->>>>>>>> discussion was that using interleaved transfers for 2D transfers is
->>>>>>>> preferred over adding a custom API for 2D transfers.
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> I went through the prep_interleaved_dma API and I see only one
->>>>>>> descriptor
->>>>>>> is prepared per API call (i.e. per frame).  As our IP supports upto
->>>>>>> 16
->>>>>>> frame
->>>>>>> buffers (can be more in future), isn't it less efficient compared to
->>>>>>> the
->>>>>>> prep_slave_sg where we get a single sg list and can prepare all the
->>>>>>> descriptors
->>>>>>> (of non-contiguous buffers) in one go?  Correct me, if am wrong and
->>>>>>> let
->>>>>>> me
->>>>>>> know your opinions.
->>>>>>
->>>>>>
->>>>>> Well the descriptor maybe one, but that can represent multiple frames,
->>>>>> for
->>>>>> example 16 as in your case. Can you read up the documentation of how
->>>>>> multiple
->>>>>> frames are passed. Pls see include/linux/dmaengine.h
->>>>>>
->>>>>> /**
->>>>>>    * Interleaved Transfer Request
->>>>>>    * ----------------------------
->>>>>>    * A chunk is collection of contiguous bytes to be transfered.
->>>>>>    * The gap(in bytes) between two chunks is called
->>>>>> inter-chunk-gap(ICG).
->>>>>>    * ICGs may or maynot change between chunks.
->>>>>>    * A FRAME is the smallest series of contiguous {chunk,icg} pairs,
->>>>>>    *  that when repeated an integral number of times, specifies the
->>>>>> transfer.
->>>>>>    * A transfer template is specification of a Frame, the number of
->>>>>> times
->>>>>>    *  it is to be repeated and other per-transfer attributes.
->>>>>>    *
->>>>>>    * Practically, a client driver would have ready a template for each
->>>>>>    *  type of transfer it is going to need during its lifetime and
->>>>>>    *  set only 'src_start' and 'dst_start' before submitting the
->>>>>> requests.
->>>>>>    *
->>>>>>    *
->>>>>>    *  |      Frame-1        |       Frame-2       | ~ |
->>>>>> Frame-'numf'  |
->>>>>>    *  |====....==.===...=...|====....==.===...=...| ~
->>>>>> |====....==.===...=...|
->>>>>>    *
->>>>>>    *    ==  Chunk size
->>>>>>    *    ... ICG
->>>>>>    */
->>>>>
->>>>>
->>>>>
->>>>> Yes, it can handle multiple frames specified by 'numf' each of size
->>>>> 'frame_size * sgl[0].size'.
->>>>> But, I see it only works if all the frames' memory is contiguous and
->>>>> in this case we
->>>>> can just increment 'src_start' by the total frame size 'numf' number
->>>>> of times to fill in
->>>>> for each HW descriptor (each frame is one HW descriptor).  So, there
->>>>> is no issue when the
->>>>> memory is contiguous.  If the frames are non contiguous, we have to
->>>>> call this API for each
->>>>> frame (hence for each descriptor), as the src_start for each frame is
->>>>> different.  Is it correct?
->>>>>
->>>>> FYI: This hardware has an inbuilt Scatter-Gather engine.
->>>>>
->>>>
->>>> Ping?
->>>
->>>
->>>
->>> If you want to submit multiple frames at once I think you should look at
->>> how
->>> the current dmaengine API can be extended to allow that. And also provide
->>> an
->>> explanation on how this is superior over submitting them one by one.
->>
->>
->>
->> Sure.  I would start with explaning the current implementation of this
->> driver.
->>
->> Using prep_slave_sg(), we can define multiple segments in a
->> async_tx_descriptor where each frame is defined by a segment (a sg
->> list entry).  So, the slave device could DMA the data (of multiple
->> frames) with a descriptor by calling tx_submit in a transaction i.e.,
->>
->> prep_slave_sg(16)  -> tx_submit(1) -> interrupt  (16 frames)
->>
->> Using interleaved_dma(), we could not divide into segments when we
->> have scattered memory (for the reasons mentioned in above thread).
->> This implies we are restricting the slave device to process frame by
->> frame i.e.,
->>
->> interleaved_dma(1) -> tx_submit(1) -> interrupt -> interleaved_dma(2)
->> -> tx_submit (2) -> interrupt -> ........ tx_submit(16) -> interrupt
->>
->
-> The API allows you to create and submit multiple interleaved descriptors
-> before you have to issue them.
->
-> interleaved_dma(1) -> tx_submit(1) -> interleaved_dma(2) -> tx_submit(2) ->
-> ... -> issue_pending() -> interrupt
->
->
->> This implementation makes the hardware to wait until the next frame is
->> submitted.
->>
->> To overcome this, I feel it would be a good option if we could extend
->> interleaved_dma template to modify src_start/dest_start to be a
->> pointer to an array of addresses.  Here, number of addresses will be
->> defined by numf. The other option would be to include scatterlist in
->> the interleaved template. This way we can handle scattered memory
->> using this API.
->
->
-> Each "frame" in a interleaved transfer describes a single line in your video
-> frame (size = width, icg = stride). numf is the number of lines per video
-> frame. So the suggested change does not make that much sense. If you want to
-> submit multiple video frames in one batch the best option is in my opinion
-> to allow to pass an array of dma_interleaved_template structs instead of a
-> single one.
+On Fri, Feb 07, 2014 at 04:55:00PM +0100, Jean-Francois Moine wrote:
+> Some simple components don't need to do any specific action on
+> bind to / unbind from a master component.
+> 
+> This patch permits such components to omit the bind/unbind
+> operations.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>  drivers/base/component.c | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/base/component.c b/drivers/base/component.c
+> index c53efe6..0a39d7a 100644
+> --- a/drivers/base/component.c
+> +++ b/drivers/base/component.c
+> @@ -225,7 +225,8 @@ static void component_unbind(struct component *component,
+>  {
+>  	WARN_ON(!component->bound);
+>  
+> -	component->ops->unbind(component->dev, master->dev, data);
+> +	if (component->ops)
+> +		component->ops->unbind(component->dev, master->dev, data);
 
-Ok.  I agree with you.  Will fix it in v3.
+This doesn't actually do what the commit message says. This makes
+component->ops optional, not component->ops->unbind().
 
-Srikanth
+A more correct check would be:
 
->
-> - Lars
->
->>
->> Srikanth
->>
->>>
->>> - Lars
->>>
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-kernel"
->>> in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>> Please read the FAQ at  http://www.tux.org/lkml/
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
->>
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+	if (component->ops && component->ops->unbind)
+
+>  	component->bound = false;
+>  
+>  	/* Release all resources claimed in the binding of this component */
+> @@ -274,7 +275,11 @@ static int component_bind(struct component *component, struct master *master,
+>  	dev_dbg(master->dev, "binding %s (ops %ps)\n",
+>  		dev_name(component->dev), component->ops);
+>  
+> -	ret = component->ops->bind(component->dev, master->dev, data);
+> +	if (component->ops)
+> +		ret = component->ops->bind(component->dev, master->dev, data);
+
+Same here.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/0969c543/attachment.sig>
