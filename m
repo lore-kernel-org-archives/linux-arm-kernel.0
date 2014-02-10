@@ -1,38 +1,37 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 10 Feb 2014 23:38:47 +0100
-Subject: [linux-sunxi] Re: [PATCH 3/3] mfd: axp20x: Add bindings
- documentation
-In-Reply-To: <20140210220102.GG3192@lukather>
-References: <1391875428-6281-1-git-send-email-carlo@caione.org>
- <1391875428-6281-4-git-send-email-carlo@caione.org>
- <20140210201215.GC3192@lukather>
- <CAOQ7t2YBhUuVQuDhkCux4ogb8_W2Ja1RMn4+UtcUpYrR84Boug@mail.gmail.com>
- <20140210220102.GG3192@lukather>
-Message-ID: <CAOQ7t2ZT-3OnG-1BjGS9c6jdbzt1rDHRQ9ptOaXbewypiG_oBw@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 10 Feb 2014 14:40:54 -0800 (PST)
+Subject: [PATCH v2 1/3] net: stmmac:sti: Add STi SOC glue driver.
+In-Reply-To: <1391770525-24349-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1391770455-24291-1-git-send-email-srinivas.kandagatla@st.com>
+ <1391770525-24349-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <20140210.144054.2066120014050984537.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 11:01 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, Feb 10, 2014 at 09:37:37PM +0100, Carlo Caione wrote:
->> >> +Sub-nodes
->> >> +* regulators : Contain the regulator nodes. The regulators are bound using
->> >> +            their name as listed here: dcdc2, dcdc3, ldo1, ldo2, ldo3,
->> >> +            ldo4, ldo5.
->> >> +            The bindings details of individual regulator device can be found in:
->> >> +            Documentation/devicetree/bindings/regulator/regulator.txt with the
->> >> +            exception of:
->> >
->> > I'm guessing this is where you differentiate between AXP202 and
->> > AXP209?
->>
->> Not really. AXP202 and AXP209 have the same regulators (with the same
->> constrains)
->
-> Ok. What's the difference between the two then?
+From: <srinivas.kandagatla@st.com>
+Date: Fri, 7 Feb 2014 10:55:25 +0000
 
-Honestly I have no idea. For what I have seen (core, PEK and
-regulators) AXP202 and AXP209 are identical.
+> +		if (dwmac->interface == PHY_INTERFACE_MODE_MII ||
+> +			dwmac->interface == PHY_INTERFACE_MODE_GMII) {
 
--- 
-Carlo Caione
+This is not indented correctly, the first character on the second line should
+line up exactly at the column after the openning parenthesis on the first
+line.
+
+The objective is not to indent using only TAB characters, which you
+are doing here.
+
+Rather, the objective is to use the appropriate number of TAB _and_
+space characters necessary to reach the proper column.
+
+> +		const char *rs;
+> +		err = of_property_read_string(np, "st,tx-retime-src", &rs);
+
+Please add an empty line after the local variable declaration.
+
+> +		if (!strcasecmp(rs, "clk_125"))
+> +			dwmac->is_tx_retime_src_clk_125 = true;
+> +
+> +	}
+
+That empty line is superfluous, please delete it.
