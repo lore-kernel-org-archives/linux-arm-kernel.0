@@ -1,57 +1,41 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 10 Feb 2014 17:24:02 +0400
-Subject: [PATCH 1/2] ARM: shmobile: r8a7791: add Ether DT support
-In-Reply-To: <52F8CBFB.5060707@codethink.co.uk>
-References: <201402070112.48304.sergei.shtylyov@cogentembedded.com>
- <52F8CBFB.5060707@codethink.co.uk>
-Message-ID: <52F8D2F2.7080703@cogentembedded.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 10 Feb 2014 14:31:12 +0100
+Subject: [PATCH 14/28] Remove MACH_SMDKC210
+In-Reply-To: <20140210114154.GQ1757@sirena.org.uk>
+References: <1391971686-9517-1-git-send-email-richard@nod.at>
+ <1391971686-9517-15-git-send-email-richard@nod.at>
+ <20140210114154.GQ1757@sirena.org.uk>
+Message-ID: <1392039072.3585.15.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, 2014-02-10 at 11:41 +0000, Mark Brown wrote:
+> On Sun, Feb 09, 2014 at 07:47:52PM +0100, Richard Weinberger wrote:
+> Please fix whatever script you're using to generate your mails, it's
+> generating corrupt headers.
 
-On 10-02-2014 16:54, Ben Dooks wrote:
+I think Richard's mail didn't end up on lkml. But it's pretty clear what
+it must have looked like.
 
->> Define the generic R8A7791 part of the Ether device node.
+> >  config SND_SOC_SAMSUNG_SMDK_WM9713
+> >  	tristate "SoC AC97 Audio support for SMDK with WM9713"
+> > -	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310 || MACH_SMDKC210)
+> > +	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310)
+> 
+> Like I said to Paul this isn't fixing the actual issue - think about why
+> the symbol was there in the first place and why it was removed.  There
+> is a problem here but this would make it less likely that it would be
+> properly fixed.
 
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Would you mind going through this one step at a time, just to make sure
+_I_ understand what it is that you'd like to see?
 
->> ---
->>   arch/arm/boot/dts/r8a7791.dtsi |   15 ++++++++++++++-
->>   1 file changed, 14 insertions(+), 1 deletion(-)
+If so, to be absolutely sure we start from the same point: do you agree
+that the above line now effectively reads
+    depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || false || false)
 
->> Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
->> ===================================================================
->> --- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
->> +++ renesas/arch/arm/boot/dts/r8a7791.dtsi
->> @@ -2,7 +2,8 @@
->>    * Device Tree Source for the r8a7791 SoC
->>    *
->>    * Copyright (C) 2013 Renesas Electronics Corporation
->> - * Copyright (C) 2013 Renesas Solutions Corp.
->> + * Copyright (C) 2013-2014 Renesas Solutions Corp.
->> + * Copyright (C) 2014 Cogent Embedded Inc.
->>    *
->>    * This file is licensed under the terms of the GNU General Public License
->>    * version 2.  This program is licensed "as is" without any warranty of any
->> @@ -366,6 +367,18 @@
->>           status = "disabled";
->>       };
->>
->> +    ether: ethernet at ee700000 {
->> +        compatible = "renesas,ether-r8a7791";
->> +        reg = <0 0xee700000 0 0x400>;
->> +        interrupt-parent = <&gic>;
->> +        interrupts = <0 162 IRQ_TYPE_LEVEL_HIGH>;
->> +        clocks = <&mstp8_clks R8A7791_CLK_ETHER>;
->> +        phy-mode = "rmii";
->> +        #address-cells = <1>;
->> +        #size-cells = <0>;
->> +        status = "disabled";
->> +    };
+because there's neither a Kconfig symbol MACH_SMDKV310 nor a Kconfig
+symbol MACH_SMDKC210?
 
-> Is the device only capable of doing RMII?
 
-    Yes.
-
-WBR, Sergei
+Paul Bolle
