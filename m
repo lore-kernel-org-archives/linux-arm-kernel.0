@@ -1,9 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 10 Feb 2014 11:47:28 +0100
-Subject: [PATCH 2/7] ARM: shmobile: lager legacy: Add QSPI pinmux
+Date: Mon, 10 Feb 2014 11:47:32 +0100
+Subject: [PATCH 6/7] ARM: shmobile: lager legacy: Enable Quad SPI transfers
+ for the SPI FLASH
 In-Reply-To: <1392029254-15400-1-git-send-email-geert@linux-m68k.org>
 References: <1392029254-15400-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1392029254-15400-3-git-send-email-geert@linux-m68k.org>
+Message-ID: <1392029254-15400-7-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,24 +12,33 @@ From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 ---
- arch/arm/mach-shmobile/board-lager.c |    5 +++++
- 1 file changed, 5 insertions(+)
+This depends on spi-rspi updates
+
+ arch/arm/mach-shmobile/board-lager.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 317574864e7b..9e52efa2a457 100644
+index 9e52efa2a457..d7155375a322 100644
 --- a/arch/arm/mach-shmobile/board-lager.c
 +++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -606,6 +606,11 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
- 	/* I2C2 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar.2", "pfc-r8a7790",
- 				  "i2c2", "i2c2"),
-+	/* QSPI */
-+	PIN_MAP_MUX_GROUP_DEFAULT("qspi.0", "pfc-r8a7790",
-+				  "qspi_ctrl", "qspi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("qspi.0", "pfc-r8a7790",
-+				  "qspi_data4", "qspi"),
- 	/* SCIF0 (CN19: DEBUG SERIAL0) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
- 				  "scif0_data", "scif0"),
+@@ -298,12 +298,12 @@ static const struct rspi_plat_data qspi_pdata __initconst = {
+ 
+ static const struct spi_board_info spi_info[] __initconst = {
+ 	{
+-		.modalias               = "m25p80",
+-		.platform_data          = &spi_flash_data,
+-		.mode                   = SPI_MODE_0,
+-		.max_speed_hz           = 30000000,
+-		.bus_num                = 0,
+-		.chip_select            = 0,
++		.modalias	= "m25p80",
++		.platform_data	= &spi_flash_data,
++		.mode		= SPI_MODE_0 | SPI_TX_QUAD | SPI_RX_QUAD,
++		.max_speed_hz	= 30000000,
++		.bus_num	= 0,
++		.chip_select	= 0,
+ 	},
+ };
+ 
 -- 
 1.7.9.5
