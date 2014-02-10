@@ -1,43 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Feb 2014 14:40:13 +0000
-Subject: [PATCH 1/1] openfirmware: trivial: Standardise formatting of
- 'struct of_device_id' definition
-In-Reply-To: <1390489239-29001-1-git-send-email-lee.jones@linaro.org>
-References: <1390489239-29001-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20140210144013.GA26697@lee--X1>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 10 Feb 2014 14:42:28 +0000
+Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
+In-Reply-To: <20140210135659.GU26684@n2100.arm.linux.org.uk>
+References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
+ <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
+ <20140207170903.GT5976@mudshark.cambridge.arm.com>
+ <52F892C8.80508@st.com>
+ <20140210111710.GC17766@mudshark.cambridge.arm.com>
+ <20140210135659.GU26684@n2100.arm.linux.org.uk>
+Message-ID: <20140210144228.GC2794@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> It's commonly accepted that when defining a struct the '{' is appended
-> onto the first line. This helps when searching for the definition using
-> syntax similar to 'struct of_device_id {'.
+On Mon, Feb 10, 2014 at 01:56:59PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Feb 10, 2014 at 11:17:10AM +0000, Will Deacon wrote:
+> > On Mon, Feb 10, 2014 at 08:50:16AM +0000, Fabrice Gasnier wrote:
+> > > On 02/07/2014 06:09 PM, Will Deacon wrote:
+> > > > On Fri, Feb 07, 2014 at 04:19:15PM +0000, Fabrice GASNIER wrote:
+> > > >> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> > > >> index 4636d56..ef15709 100644
+> > > >> --- a/arch/arm/kernel/traps.c
+> > > >> +++ b/arch/arm/kernel/traps.c
+> > > >> @@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
+> > > >>   
+> > > >>   	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+> > > >>   	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+> > > >> +
+> > > >> +	/* Enable imprecise aborts */
+> > > >> +	local_abt_enable();
+> > > > Surely we want to enable this as early as possible? Now, putting this into
+> > > > head.S is ugly, as it duplicating it across all the proc*.S files, so why
+> > > > not setup_arch?
+> > > Sorry, I'm not sure to understand your last comment.
+> > > At least, I need it enabled before probing drivers (PCIe bus)
+> > > I've added imprecise abort enable code in traps.c, following Russel 
+> > > King's advice, please see:
+> > > http://archive.arm.linux.org.uk/lurker/message/20140131.170827.d752a1cc.en.html
+> > > As abort bit is local to a cpu, i've also added it in smp.c, but this 
+> > > may not be the right place ?
+> > > 
+> > > Please elaborate,
+> > 
+> > I was just suggesting that we move your local_abt_enable() call to
+> > setup_arch, since that's called before early_trap_init on the primary CPU.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  include/linux/mod_devicetable.h | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
-> index 45e9214..090e014 100644
-> --- a/include/linux/mod_devicetable.h
-> +++ b/include/linux/mod_devicetable.h
-> @@ -220,8 +220,7 @@ struct serio_device_id {
->  /*
->   * Struct used for matching a device
->   */
-> -struct of_device_id
-> -{
-> +struct of_device_id {
->  	char	name[32];
->  	char	type[32];
->  	char	compatible[128];
+> Why would we want to enable aborts before we've setup the vectors page
+> to handle an abort?  That's akin to enabling interrupts and hoping there
+> isn't one pending...
 
-Is anyone interested in this patch?
+Should we require CPSR.A to me masked in Booting, for all CPUs that have
+it?
 
-Or should is it okay to just take it through my tree?
+By definition, we cannot dispatch those exceptions for a while, until
+some vectors have been set up; so it makes sense in the same way that
+requiring CPSR.[IF] to be set makes sense.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+The kernel should do its best to cope anyway, and immediately mask CPSR.A
+on entry if it's a v6 or later kernel.  safe_svcmode_maskall was
+originally intended to do that, but it got watered down to cope with the
+Zaurus issues, so it now looks like most code paths don't mask CPSR.A
+there.  I'm happy to take another look at it.
+
+Cheers
+---Dave
