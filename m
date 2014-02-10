@@ -1,115 +1,32 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 10 Feb 2014 16:22:33 +0100
-Subject: [RFC PATCH 1/3] regmap: Separate regmap dev initialization
-In-Reply-To: <cover.1392045742.git.michal.simek@xilinx.com>
-References: <cover.1392045742.git.michal.simek@xilinx.com>
-Message-ID: <5998a942a3dbfb2ef965d000168cbd7007315630.1392045742.git.michal.simek@xilinx.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 10 Feb 2014 16:30:42 +0100
+Subject: [PATCH 14/28] Remove MACH_SMDKC210
+In-Reply-To: <20140210141255.GI1757@sirena.org.uk>
+References: <1391971686-9517-1-git-send-email-richard@nod.at>
+ <1391971686-9517-15-git-send-email-richard@nod.at>
+ <20140210114154.GQ1757@sirena.org.uk> <1392039072.3585.15.camel@x220>
+ <20140210141255.GI1757@sirena.org.uk>
+Message-ID: <1392046242.3585.41.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create special function regmap_attach_dev
-which can be called separately out of regmap_init.
+On Mon, 2014-02-10 at 14:12 +0000, Mark Brown wrote:
+> On Mon, Feb 10, 2014 at 02:31:12PM +0100, Paul Bolle wrote:
+> > If so, to be absolutely sure we start from the same point: do you agree
+> > that the above line now effectively reads
+> >     depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || false || false)
+> 
+> > because there's neither a Kconfig symbol MACH_SMDKV310 nor a Kconfig
+> > symbol MACH_SMDKC210?
+> 
+> Yes, that's correct.  Now, like I say think about what the symbol was
+> there for in the first place.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+So, next step: the Kconfig symbols MACH_SMDKV310 and MACH_SMDKC210 were
+removed in commit 383ffda2fa ("ARM: EXYNOS: no more support non-DT for
+EXYNOS SoCs"). That commit was part of v3.11. Correct?
 
- drivers/base/regmap/regmap.c | 41 ++++++++++++++++++++++++++++-------------
- include/linux/regmap.h       |  2 ++
- 2 files changed, 30 insertions(+), 13 deletions(-)
+Thanks for your patience.
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index b897c1a..c766f5f 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -380,6 +380,28 @@ static void regmap_range_exit(struct regmap *map)
- 	kfree(map->selector_work_buf);
- }
 
-+int regmap_attach_dev(struct device *dev, struct regmap *map,
-+		      const struct regmap_config *config)
-+{
-+	struct regmap **m;
-+
-+	map->dev = dev;
-+
-+	regmap_debugfs_init(map, config->name);
-+
-+	/* Add a devres resource for dev_get_regmap() */
-+	m = devres_alloc(dev_get_regmap_release, sizeof(*m), GFP_KERNEL);
-+	if (!m) {
-+		regmap_debugfs_exit(map);
-+		return -ENOMEM;
-+	}
-+	*m = map;
-+	devres_add(dev, m);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(regmap_attach_dev);
-+
- /**
-  * regmap_init(): Initialise register map
-  *
-@@ -397,7 +419,7 @@ struct regmap *regmap_init(struct device *dev,
- 			   void *bus_context,
- 			   const struct regmap_config *config)
- {
--	struct regmap *map, **m;
-+	struct regmap *map;
- 	int ret = -EINVAL;
- 	enum regmap_endian reg_endian, val_endian;
- 	int i, j;
-@@ -734,25 +756,18 @@ skip_format_initialization:
- 		}
- 	}
-
--	regmap_debugfs_init(map, config->name);
--
- 	ret = regcache_init(map, config);
- 	if (ret != 0)
- 		goto err_range;
-
--	/* Add a devres resource for dev_get_regmap() */
--	m = devres_alloc(dev_get_regmap_release, sizeof(*m), GFP_KERNEL);
--	if (!m) {
--		ret = -ENOMEM;
--		goto err_debugfs;
--	}
--	*m = map;
--	devres_add(dev, m);
-+	if (dev)
-+		ret = regmap_attach_dev(dev, map, config);
-+		if (ret != 0)
-+			goto err_regcache;
-
- 	return map;
-
--err_debugfs:
--	regmap_debugfs_exit(map);
-+err_regcache:
- 	regcache_exit(map);
- err_range:
- 	regmap_range_exit(map);
-diff --git a/include/linux/regmap.h b/include/linux/regmap.h
-index 4149f1a..fa4d079 100644
---- a/include/linux/regmap.h
-+++ b/include/linux/regmap.h
-@@ -317,6 +317,8 @@ struct regmap *regmap_init(struct device *dev,
- 			   const struct regmap_bus *bus,
- 			   void *bus_context,
- 			   const struct regmap_config *config);
-+int regmap_attach_dev(struct device *dev, struct regmap *map,
-+				 const struct regmap_config *config);
- struct regmap *regmap_init_i2c(struct i2c_client *i2c,
- 			       const struct regmap_config *config);
- struct regmap *regmap_init_spi(struct spi_device *dev,
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/2f6b4e20/attachment.sig>
+Paul Bolle
