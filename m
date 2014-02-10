@@ -1,51 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Feb 2014 19:50:08 +0800
-Subject: [PATCH] dt/bindings: update fsl-fec regarding compatible and clocks
-Message-ID: <1392033008-20752-1-git-send-email-shawn.guo@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 10 Feb 2014 11:41:54 +0000
+Subject: [PATCH 14/28] Remove MACH_SMDKC210
+In-Reply-To: <1391971686-9517-15-git-send-email-richard@nod.at>
+References: <1391971686-9517-1-git-send-email-richard@nod.at>
+ <1391971686-9517-15-git-send-email-richard@nod.at>
+Message-ID: <20140210114154.GQ1757@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update fsl-fec to explicitly list the supported compatible strings
-and add missing 'clocks' and 'clock-names' properties.  It does not
-change anything about how kernel drive works.  Instead, it just reflects
-how kernel driver works today.
+On Sun, Feb 09, 2014 at 07:47:52PM +0100, Richard Weinberger wrote:
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- Documentation/devicetree/bindings/net/fsl-fec.txt |   19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+> The symbol is an orphan, get rid of it.
 
-diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
-index 845ff84..3ebd395 100644
---- a/Documentation/devicetree/bindings/net/fsl-fec.txt
-+++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
-@@ -1,9 +1,26 @@
- * Freescale Fast Ethernet Controller (FEC)
- 
- Required properties:
--- compatible : Should be "fsl,<soc>-fec"
-+- compatible : Should contain one of the following:
-+		"fsl,imx25-fec"
-+		"fsl,imx27-fec"
-+		"fsl,imx28-fec"
-+		"fsl,imx6q-fec"
-+		"fsl,mvf600-fec"
- - reg : Address and length of the register set for the device
- - interrupts : Should contain fec interrupt
-+- clocks: phandle to the clocks feeding the FEC controller and phy. The
-+  following two are required:
-+   - "ipg": the peripheral access clock
-+   - "ahb": the bus clock for MAC
-+  The following two are optional:
-+   - "ptp": the sampling clock for PTP (IEEE 1588).  On SoC like i.MX6Q,
-+     the clock could come from either the internal clock control module
-+     or external oscillator via pad depending on board design.
-+   - "enet_out": the phy reference clock provided by SoC via pad, which
-+     is available on SoC like i.MX28.
-+- clock-names: Must contain the clock names described just above
-+
- - phy-mode : String, operation mode of the PHY interface.
-   Supported values are: "mii", "gmii", "sgmii", "tbi", "rmii",
-   "rgmii", "rgmii-id", "rgmii-rxid", "rgmii-txid", "rtbi", "smii".
--- 
-1.7.9.5
+Please fix whatever script you're using to generate your mails, it's
+generating corrupt headers.  Please also use subject lines consistent
+with the rest of the subsystem - between the two I very nearly just
+deleted this unread, it's only Paul's mail that made me look.
+
+>  config SND_SOC_SAMSUNG_SMDK_WM9713
+>  	tristate "SoC AC97 Audio support for SMDK with WM9713"
+> -	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310 || MACH_SMDKC210)
+> +	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310)
+
+Like I said to Paul this isn't fixing the actual issue - think about why
+the symbol was there in the first place and why it was removed.  There
+is a problem here but this would make it less likely that it would be
+properly fixed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/45e54c4b/attachment.sig>
