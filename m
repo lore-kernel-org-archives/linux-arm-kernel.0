@@ -1,34 +1,21 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 10 Feb 2014 18:47:36 +0100
-Subject: [PATCH 05/11] ARM: mvebu: add Device Tree for the Armada 375 DB
- board
-In-Reply-To: <20140210173759.GB9995@lunn.ch>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 10 Feb 2014 10:47:36 -0700
+Subject: [PATCH 00/11] Core support for Marvell Armada 375 and 38x
+In-Reply-To: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392053002-19831-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140210173759.GB9995@lunn.ch>
-Message-ID: <20140210184736.70af3774@skate>
+Message-ID: <20140210174736.GB5554@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+On Mon, Feb 10, 2014 at 06:23:11PM +0100, Thomas Petazzoni wrote:
 
-On Mon, 10 Feb 2014 18:37:59 +0100, Andrew Lunn wrote:
-> Hi Thomas
-> 
-> > +			mvsdio at d4000 {
-> > +				pinctrl-0 = <&sdio_pins &sdio_st_pins>;
-> > +				pinctrl-names = "default";
-> > +				status = "okay";
-> > +				cd-gpios = <&gpio1 12 0>;
-> > +				wp-gpios = <&gpio1 13 0>;
-> 
-> Kirkwood recently started using include/dt-bindings/gpio/gpio.h. Maybe
-> you can do the same here?
+> It is worth noting that contrary to the Marvell 370 and XP support,
+> which has been pushed mainline fairly late in the development cycle of
+> the SOCs, the support for Armada 375 and 38x is now being pushed quite
+> early in the development cycle of the SOCs. We are having mainline
+> support pretty much at the same time as the SOCs are being made
+> available to customers, which is really great!
 
-Sure, will do for the v2!
+Congratulations to Marvell, this is a major achievement!
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jason
