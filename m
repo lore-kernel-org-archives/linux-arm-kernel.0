@@ -1,74 +1,157 @@
 From: jg1.han@samsung.com (Jingoo Han)
-Date: Mon, 10 Feb 2014 10:07:20 +0900
-Subject: [PATCH 0/7] Remove HAVE_PWM config option
-Message-ID: <003901cf25fc$73002790$590076b0$%han@samsung.com>
+Date: Mon, 10 Feb 2014 10:08:27 +0900
+Subject: [PATCH 1/7] ARM: pxa: don't select HAVE_PWM
+In-Reply-To: <003901cf25fc$73002790$590076b0$%han@samsung.com>
+References: <003901cf25fc$73002790$590076b0$%han@samsung.com>
+Message-ID: <003a01cf25fc$9ac5bbf0$d05133d0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The HAVE_PWM symbol is only for legacy platforms that provide
-the PWM API without using the generic framework, while PWM symbol
-is used for PWM drivers using the generic PWM framework.
+the PWM API without using the generic framework. PXA platforms
+use the generic PWM framework, after the commit "17b2b47 pwm:
+Move PXA PWM driver to PWM framework".
 
-I looked at all HAVE_PWMs in the latest mainline kernel 3.14-rc1.
-Three platforms are still using HAVE_PWM as below:
+In the case of "CONFIG_HAVE_PWM=y && CONFIG_PWM=n", PXA platforms
+make the build errors as below. Thus, selecting HAVE_PWM should
+be removed from PXA platforms.
 
-1. ARM - PXA
-  ./arch/arm/mach-pxa/Kconfig
+drivers/built-in.o: In function `lm3630a_pwm_ctrl':
+drivers/video/backlight/lm3630a_bl.c:168: undefined reference to `pwm_config'
+drivers/video/backlight/lm3630a_bl.c:172: undefined reference to `pwm_disable'
+drivers/video/backlight/lm3630a_bl.c:170: undefined reference to `pwm_enable'
+drivers/built-in.o: In function `lp855x_pwm_ctrl':
+drivers/video/backlight/lp855x_bl.c:249: undefined reference to `pwm_config'
+drivers/video/backlight/lp855x_bl.c:253: undefined reference to `pwm_disable'
+drivers/video/backlight/lp855x_bl.c:251: undefined reference to `pwm_enable'
 
-2. ARM - NXP LPC32XX
-  ./arch/arm/Kconfig
-  config ARCH_LPC32XX
-  	select HAVE_PWM
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+---
+ arch/arm/mach-pxa/Kconfig |   15 ---------------
+ 1 file changed, 15 deletions(-)
 
-3. MIPS - Ingenic JZ4740 based machines
-  ./arch/mips/Kconfig
-  config MACH_JZ4740
-  	select HAVE_PWM
-
-However, the legacy PWM drivers for PXA, LPC32XX, and JZ474 were
-already moved to the generic PWM framework.
-  ./drivers/pwm/pwm-pxa.c
-  ./drivers/pwm/pwm-lpc32xx.c
-  ./drivers/pwm/pwm-jz4740.c
-
-In conclusion, HAVE_PWM should be removed, because HAVE_PWM is
-NOT required anymore.
-
-Jingoo Han (7):
-      ARM: pxa: don't select HAVE_PWM
-      ARM: lpc32xx: don't select HAVE_PWM
-      ARM: remove HAVE_PWM config option
-      MIPS: jz4740: don't select HAVE_PWM
-      Input: max8997_haptic: remove HAVE_PWM dependencies
-      Input: pwm-beepe: remove HAVE_PWM dependencies
-      pwm: don't use IS_ENABLED(CONFIG_HAVE_PWM)
-
- arch/arm/Kconfig           |    4 ----
- arch/arm/mach-pxa/Kconfig  |   15 ---------------
- arch/mips/Kconfig          |    1 -
- drivers/input/misc/Kconfig |    4 ++--
- include/linux/pwm.h        |    2 +-
- 5 files changed, 3 insertions(+), 23 deletions(-)
-
-I would like to merge these patches as below:
-
-1. Through arm-soc tree
-  [PATCH 1/7] ARM: pxa: don't select HAVE_PWM
-  [PATCH 2/7] ARM: lpc32xx: don't select HAVE_PWM
-  [PATCH 3/7] ARM: remove HAVE_PWM config option
-
-2. Through MIPS tree
-  [PATCH 4/7] MIPS: jz4740: don't select HAVE_PWM
-
-3. Through Input tree
-  [PATCH 5/7] Input: max8997_haptic: remove HAVE_PWM dependencies
-  [PATCH 6/7] Input: pwm-beepe: remove HAVE_PWM dependencies
-
-4. Through PWM tree
-  [PATCH 7/7] pwm: don't use IS_ENABLED(CONFIG_HAVE_PWM)
-
-After merging these patches, all HAVE_PWM will be removed from
-the mainline kernel. Thank you. :-)
-
-Best regards,
-Jingoo Han
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index 96100db..b96244c 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -7,7 +7,6 @@ comment "Intel/Marvell Dev Platforms (sorted by hardware release time)"
+ config MACH_PXA3XX_DT
+ 	bool "Support PXA3xx platforms from device tree"
+ 	select CPU_PXA300
+-	select HAVE_PWM
+ 	select POWER_SUPPLY
+ 	select PXA3xx
+ 	select USE_OF
+@@ -23,12 +22,10 @@ config ARCH_LUBBOCK
+ 
+ config MACH_MAINSTONE
+ 	bool "Intel HCDDBBVA0 Development Platform (aka Mainstone)"
+-	select HAVE_PWM
+ 	select PXA27x
+ 
+ config MACH_ZYLONITE
+ 	bool
+-	select HAVE_PWM
+ 	select PXA3xx
+ 
+ config MACH_ZYLONITE300
+@@ -69,7 +66,6 @@ config ARCH_PXA_IDP
+ config ARCH_VIPER
+ 	bool "Arcom/Eurotech VIPER SBC"
+ 	select ARCOM_PCMCIA
+-	select HAVE_PWM
+ 	select I2C_GPIO
+ 	select ISA
+ 	select PXA25x
+@@ -120,7 +116,6 @@ config MACH_CM_X300
+ 	bool "CompuLab CM-X300 modules"
+ 	select CPU_PXA300
+ 	select CPU_PXA310
+-	select HAVE_PWM
+ 	select PXA3xx
+ 
+ config MACH_CAPC7117
+@@ -211,7 +206,6 @@ config TRIZEPS_PCMCIA
+ 
+ config MACH_LOGICPD_PXA270
+ 	bool "LogicPD PXA270 Card Engine Development Platform"
+-	select HAVE_PWM
+ 	select PXA27x
+ 
+ config MACH_PCM027
+@@ -222,7 +216,6 @@ config MACH_PCM027
+ config MACH_PCM990_BASEBOARD
+ 	bool "PHYTEC PCM-990 development board"
+ 	depends on MACH_PCM027
+-	select HAVE_PWM
+ 
+ choice
+ 	prompt "display on pcm990"
+@@ -246,7 +239,6 @@ config MACH_COLIBRI
+ config MACH_COLIBRI_PXA270_INCOME
+ 	bool "Income s.r.o. PXA270 SBC"
+ 	depends on MACH_COLIBRI
+-	select HAVE_PWM
+ 	select PXA27x
+ 
+ config MACH_COLIBRI300
+@@ -275,7 +267,6 @@ comment "End-user Products (sorted by vendor name)"
+ 
+ config MACH_H4700
+ 	bool "HP iPAQ hx4700"
+-	select HAVE_PWM
+ 	select IWMMXT
+ 	select PXA27x
+ 
+@@ -289,14 +280,12 @@ config MACH_HIMALAYA
+ 
+ config MACH_MAGICIAN
+ 	bool "Enable HTC Magician Support"
+-	select HAVE_PWM
+ 	select IWMMXT
+ 	select PXA27x
+ 
+ config MACH_MIOA701
+ 	bool "Mitac Mio A701 Support"
+ 	select GPIO_SYSFS
+-	select HAVE_PWM
+ 	select IWMMXT
+ 	select PXA27x
+ 	help
+@@ -306,7 +295,6 @@ config MACH_MIOA701
+ 
+ config PXA_EZX
+ 	bool "Motorola EZX Platform"
+-	select HAVE_PWM
+ 	select IWMMXT
+ 	select PXA27x
+ 
+@@ -346,7 +334,6 @@ config MACH_MP900C
+ 
+ config ARCH_PXA_PALM
+ 	bool "PXA based Palm PDAs"
+-	select HAVE_PWM
+ 
+ config MACH_PALM27X
+ 	bool
+@@ -444,7 +431,6 @@ config MACH_TREO680
+ config MACH_RAUMFELD_RC
+ 	bool "Raumfeld Controller"
+ 	select CPU_PXA300
+-	select HAVE_PWM
+ 	select POWER_SUPPLY
+ 	select PXA3xx
+ 
+@@ -608,7 +594,6 @@ config MACH_E800
+ 
+ config MACH_ZIPIT2
+ 	bool "Zipit Z2 Handheld"
+-	select HAVE_PWM
+ 	select PXA27x
+ endmenu
+ 
+-- 
+1.7.10.4
