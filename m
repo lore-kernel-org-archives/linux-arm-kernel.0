@@ -1,31 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Feb 2014 17:56:25 +0000
-Subject: [PATCH RFC v2 00/35] Second preview of imx-drm cleanup series
-In-Reply-To: <CA+gwMcd+oMUpd2kNCVP4ojsKJtPwCXMgA2RsHT0+=p347n3ODw@mail.gmail.com>
-References: <20140210122802.GS26684@n2100.arm.linux.org.uk>
- <1392045139.6687.31.camel@pizza.hi.pengutronix.de>
- <20140210151821.GY26684@n2100.arm.linux.org.uk>
- <CA+gwMcd+oMUpd2kNCVP4ojsKJtPwCXMgA2RsHT0+=p347n3ODw@mail.gmail.com>
-Message-ID: <20140210175625.GF26684@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 10 Feb 2014 18:59:08 +0100
+Subject: [PATCH 6/6] dt: Update binding information for mvebu gating
+ clocks with Armada 380/385
+In-Reply-To: <20140210175350.GD9995@lunn.ch>
+References: <1392053569-28037-1-git-send-email-gregory.clement@free-electrons.com>
+ <1392053569-28037-7-git-send-email-gregory.clement@free-electrons.com>
+ <20140210175350.GD9995@lunn.ch>
+Message-ID: <20140210185908.3374eaf6@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 06:37:26PM +0100, Philipp Zabel wrote:
-> I'd like all of them to go through, too. If you don't want to have the DT
-> changes integrated, I'd appreciate if you could have a  look at my
-> patches on top of your series and possibly append them to your
-> series or let me synchronize somehow:
+Dear Andrew Lunn,
+
+On Mon, 10 Feb 2014 18:53:50 +0100, Andrew Lunn wrote:
+> > +The following is a list of provided IDs for Armada 380/385:
+> > +ID	Clock		Peripheral
+> > +-----------------------------------
+> > +0	audio		Audio
+> > +2	ge2		Gigabit Ethernet 2
+> > +3	ge1		Gigabit Ethernet 1
+> > +4	ge0		Gigabit Ethernet 0
+> > +5	pex1		PCIe 1
+> > +6	pex2		PCIe 2
+> > +7	pex3		PCIe 3
+> > +8	pex4		PCIe 0
 > 
-> http://archive.arm.linux.org.uk/lurker/message/20140106.145159.a1d82ba9.en.html
+> Is that last one a typo? It at least looks a bit odd.
 
-I replied to your 2nd patch there...
+Right, this should be:
 
-I'm not happy ending up with a hard dependency between v4l2 code and
-code needed for the display side to work, especially when we can end
-up with imx-drm being the primary console display.  I've outlined my
-thoughts about what I think needs to happen in the reply to patch 2.
+	8	pex0		PCIe 0
 
+(just checked again in the datasheet)
+
+Thomas
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
