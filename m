@@ -1,26 +1,33 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 10 Feb 2014 10:40:04 -0800
-Subject: [GIT PULL] at91: fixes for 3.14 #1
-In-Reply-To: <1391790986-31936-1-git-send-email-nicolas.ferre@atmel.com>
- (Nicolas Ferre's message of "Fri, 7 Feb 2014 17:36:26 +0100")
-References: <1391790986-31936-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <7hha8695h7.fsf@paris.lan>
+Date: Mon, 10 Feb 2014 10:41:25 -0800
+Subject: [GIT PULL] Xilinx Zynq fix for v3.14
+In-Reply-To: <52F8C356.8060209@monstr.eu> (Michal Simek's message of "Mon, 10
+ Feb 2014 13:17:26 +0100")
+References: <52F8C356.8060209@monstr.eu>
+Message-ID: <7hbnye95ey.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Ferre <nicolas.ferre@atmel.com> writes:
+Michal Simek <monstr@monstr.eu> writes:
 
-> Arnd, Olof, Kevin,
+> Hi,
 >
-> This is a first "fixes" series for AT91 on 3.14.
-> The content is only DT-related and quite boring.
-> I took the opportunity of this early "fixes" pull-request to collect
-> some Documentation patches that were lying around and I guess that
-> they can be merged by arm-soc nicely (addition of CCF to 2 drivers).
-> A new board is added to the lot because it is dead simple and integrates
-> well with the new sama5d36 SoC that we added earlier in this development cycle.
+> please consider to queue this bug fix for v3.14.
 >
-> Thanks, best regards,
+> Bug was reported here:
+> https://lkml.org/lkml/2014/1/27/212
+>
+> I have also discussed this with Rob regarding memreserve DT feature.
+> Here is thread with Rob:
+> https://lkml.org/lkml/2014/1/31/105
+>
+> Moving kernel start is currently enabled by:
+> "ARM: ignore memory below PHYS_OFFSET"
+> (sha1: 571b14375019c3a66ef70d4d4a7083f4238aca30)
+>
+> Thanks,
+> Michal
+>
 >
 > The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 >
@@ -28,23 +35,21 @@ Nicolas Ferre <nicolas.ferre@atmel.com> writes:
 >
 > are available in the git repository at:
 >
->   git://github.com/at91linux/linux-at91.git tags/at91-fixes
+>   git://git.xilinx.com/linux-xlnx.git tags/zynq-fixes-for-3.14
 >
-> for you to fetch changes up to b7c2b6157079811586180d13c44a1095b57c2d47:
+> for you to fetch changes up to a73cbb758171c34cc3d58f3dfb80feef501a2079:
 >
->   ARM: at91: add Atmel's SAMA5D3 Xplained board (2014-02-07 17:20:39 +0100)
+>   ARM: zynq: Reserve not DMAable space in front of the kernel (2014-02-10 13:04:35 +0100)
 >
 > ----------------------------------------------------------------
-> First series of AT91 fixes for 3.14.
-> All of them are DT-related.
-> - fixes for typos in i2c and ohci clocks
-> - addition of a USB host node for at91sam9n12ek
-> - 2 DT documentation updates that have been sent a long time ago
-> - a new board based on the sama5d36 SoC
+> arm: Xilinx Zynq fixes for v3.14
+>
+> - Protect DMA buffer allocation below
+>   kernel start address
 >
 > ----------------------------------------------------------------
 
-Pulled into fixes,
+Applied to fixes,
 
 Thanks,
 
