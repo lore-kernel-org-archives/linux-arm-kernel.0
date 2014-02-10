@@ -1,32 +1,222 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 10 Feb 2014 16:30:42 +0100
-Subject: [PATCH 14/28] Remove MACH_SMDKC210
-In-Reply-To: <20140210141255.GI1757@sirena.org.uk>
-References: <1391971686-9517-1-git-send-email-richard@nod.at>
- <1391971686-9517-15-git-send-email-richard@nod.at>
- <20140210114154.GQ1757@sirena.org.uk> <1392039072.3585.15.camel@x220>
- <20140210141255.GI1757@sirena.org.uk>
-Message-ID: <1392046242.3585.41.camel@x220>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 10 Feb 2014 16:42:06 +0100
+Subject: [RFC PATCH 2/3] mfd: syscon: Support early initialization
+In-Reply-To: <1785585d090175da81b561b17eeef95d991ff0de.1392045742.git.michal.simek@xilinx.com>
+References: <cover.1392045742.git.michal.simek@xilinx.com>
+ <1785585d090175da81b561b17eeef95d991ff0de.1392045742.git.michal.simek@xilinx.com>
+Message-ID: <52F8F34E.3030606@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-02-10 at 14:12 +0000, Mark Brown wrote:
-> On Mon, Feb 10, 2014 at 02:31:12PM +0100, Paul Bolle wrote:
-> > If so, to be absolutely sure we start from the same point: do you agree
-> > that the above line now effectively reads
-> >     depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || false || false)
+On 02/10/2014 04:22 PM, Michal Simek wrote:
+> Some platforms need to get system controller
+> ready as soon as possible.
+> The patch provides early_syscon_initialization
+> which create early mapping for all syscon compatible
+> devices in early_syscon_probe.
+> Regmap is get via syscon_early_regmap_lookup_by_phandle()
 > 
-> > because there's neither a Kconfig symbol MACH_SMDKV310 nor a Kconfig
-> > symbol MACH_SMDKC210?
+> Regular device probes attach device to regmap
+> via regmap_attach_dev().
 > 
-> Yes, that's correct.  Now, like I say think about what the symbol was
-> there for in the first place.
+> For early syscon initialization is necessary to extend
+> struct syscon and provide remove function
+> which unmap all early init structures.
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+>  drivers/mfd/syscon.c       | 126 +++++++++++++++++++++++++++++++++++++++------
+>  include/linux/mfd/syscon.h |  11 ++++
+>  2 files changed, 120 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+> index 71841f9..5935f02 100644
+> --- a/drivers/mfd/syscon.c
+> +++ b/drivers/mfd/syscon.c
+> @@ -20,12 +20,15 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+> +#include <linux/slab.h>
+>  #include <linux/mfd/syscon.h>
+> 
+>  static struct platform_driver syscon_driver;
+> 
+>  struct syscon {
+> +	void __iomem *base;
+>  	struct regmap *regmap;
+> +	struct resource res;
+>  };
+> 
+>  static int syscon_match_node(struct device *dev, void *data)
+> @@ -95,6 +98,24 @@ struct regmap *syscon_regmap_lookup_by_pdevname(const char *s)
+>  }
+>  EXPORT_SYMBOL_GPL(syscon_regmap_lookup_by_pdevname);
+> 
+> +struct regmap *syscon_early_regmap_lookup_by_phandle(struct device_node *np,
+> +						     const char *property)
+> +{
+> +	struct device_node *syscon_np;
+> +	struct syscon *syscon;
+> +
+> +	syscon_np = of_parse_phandle(np, property, 0);
+> +	if (!syscon_np)
+> +		return ERR_PTR(-ENODEV);
+> +
+> +	syscon = syscon_np->data;
+> +
+> +	of_node_put(syscon_np);
+> +
+> +	return syscon->regmap;
+> +}
+> +EXPORT_SYMBOL_GPL(syscon_early_regmap_lookup_by_phandle);
+> +
+>  struct regmap *syscon_regmap_lookup_by_phandle(struct device_node *np,
+>  					const char *property)
+>  {
+> @@ -128,40 +149,110 @@ static int syscon_probe(struct platform_device *pdev)
+>  	struct device *dev = &pdev->dev;
+>  	struct syscon *syscon;
+>  	struct resource *res;
+> -	void __iomem *base;
+> 
+> -	syscon = devm_kzalloc(dev, sizeof(*syscon), GFP_KERNEL);
+> +	/* Early syscon init */
+> +	if (pdev->dev.of_node && pdev->dev.of_node->data) {
+> +		syscon = pdev->dev.of_node->data;
+> +		res = &syscon->res;
+> +		regmap_attach_dev(dev, syscon->regmap, &syscon_regmap_config);
+> +	} else {
+> +
+> +		syscon = devm_kzalloc(dev, sizeof(*syscon), GFP_KERNEL);
+> +		if (!syscon)
+> +			return -ENOMEM;
+> +
+> +		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +		if (!res)
+> +			return -ENOENT;
+> +
+> +		syscon->base = devm_ioremap(dev, res->start,
+> +					    resource_size(res));
+> +		if (!syscon->base)
+> +			return -ENOMEM;
+> +
+> +		syscon_regmap_config.max_register = res->end - res->start - 3;
+> +		syscon->regmap = devm_regmap_init_mmio(dev, syscon->base,
+> +						&syscon_regmap_config);
+> +		if (IS_ERR(syscon->regmap)) {
+> +			dev_err(dev, "regmap init failed\n");
+> +			return PTR_ERR(syscon->regmap);
+> +		}
+> +	}
+> +
+> +	platform_set_drvdata(pdev, syscon);
+> +
+> +	dev_info(dev, "regmap %pR registered\n", res);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct platform_device_id syscon_ids[] = {
+> +	{ "syscon", },
+> +	{ }
+> +};
+> +
+> +static int syscon_remove(struct platform_device *pdev)
+> +{
+> +	struct syscon *syscon = platform_get_drvdata(pdev);
+> +
+> +	if (pdev->dev.of_node && pdev->dev.of_node->data) {
+> +		iounmap(syscon->base);
+> +		kfree(syscon);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int early_syscon_probe(struct device_node *np)
+> +{
+> +	struct syscon *syscon;
+> +
+> +	syscon = kzalloc(sizeof(*syscon), GFP_KERNEL);
+>  	if (!syscon)
+>  		return -ENOMEM;
+> 
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (!res)
+> -		return -ENOENT;
+> +	if (of_address_to_resource(np, 0, &syscon->res))
+> +		return -EINVAL;
+> 
+> -	base = devm_ioremap(dev, res->start, resource_size(res));
+> -	if (!base)
+> -		return -ENOMEM;
+> +	syscon->base = ioremap(syscon->res.start, resource_size(&syscon->res));
+> +	if (!syscon->base) {
+> +		pr_err("%s: Unable to map I/O memory\n", __func__);
+> +		return PTR_ERR(syscon->base);
+> +	}
+> 
+> -	syscon_regmap_config.max_register = res->end - res->start - 3;
+> -	syscon->regmap = devm_regmap_init_mmio(dev, base,
+> -					&syscon_regmap_config);
+> +	syscon_regmap_config.max_register = syscon->res.end -
+> +					    syscon->res.start - 3;
+> +	syscon->regmap = regmap_init_mmio(NULL, syscon->base,
+> +					  &syscon_regmap_config);
+>  	if (IS_ERR(syscon->regmap)) {
+> -		dev_err(dev, "regmap init failed\n");
+> +		pr_err("regmap init failed\n");
+>  		return PTR_ERR(syscon->regmap);
+>  	}
+> 
+> -	platform_set_drvdata(pdev, syscon);
+> +	np->data = syscon;
+> 
+> -	dev_info(dev, "regmap %pR registered\n", res);
+> +	of_node_put(np);
+> +
+> +	pr_info("%s: regmap %pR registered\n", np->full_name, &syscon->res);
+> 
+>  	return 0;
+>  }
+> 
+> -static const struct platform_device_id syscon_ids[] = {
+> -	{ "syscon", },
+> -	{ }
+> +static struct of_device_id of_syscon_ids[] = {
+> +	{ .compatible = "syscon" },
+> +	{},
+>  };
+> 
+> +void __init early_syscon_init(void)
+> +{
+> +	struct device_node *np;
+> +
+> +	for_each_matching_node_and_match(np, of_syscon_ids, NULL) {
+> +		if (!early_syscon_probe(np))
 
-So, next step: the Kconfig symbols MACH_SMDKV310 and MACH_SMDKC210 were
-removed in commit 383ffda2fa ("ARM: EXYNOS: no more support non-DT for
-EXYNOS SoCs"). That commit was part of v3.11. Correct?
+just
+if (early_syscon_probe(np))
+	BUG();
+here.
 
-Thanks for your patience.
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
 
-Paul Bolle
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/2a67d56a/attachment-0001.sig>
