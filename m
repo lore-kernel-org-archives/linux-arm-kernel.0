@@ -1,326 +1,60 @@
 From: mohit.kumar@st.com (Mohit Kumar)
-Date: Mon, 10 Feb 2014 14:21:55 +0530
-Subject: [PATCH V5 4/8] phy: st-miphy-40lp: Add skeleton driver
+Date: Mon, 10 Feb 2014 14:21:53 +0530
+Subject: [PATCH V5 2/8] SPEAr13xx: Fix static mapping table
 In-Reply-To: <cover.1391871170.git.pratyush.anand@st.com>
 References: <cover.1391871170.git.pratyush.anand@st.com>
-Message-ID: <fb505abd332645671d9ad125003d8253b6346715.1391871170.git.pratyush.anand@st.com>
+Message-ID: <9cd6b768fdad8e3f9c451d29f0ab877c37b3de4f.1391871170.git.pratyush.anand@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pratyush Anand <pratyush.anand@st.com>
 
-ST miphy-40lp supports PCIe, SATA and Super Speed USB. This driver adds
-skeleton support for the same.
-
-This skeleton defines function corresponding to phy ops as well as sleep
-pm ops. Any platform using this phy can add its own platform specific
-ops(if needed) corresponding to each phy ops.
-
-Phy specific modifications will require phy register space, which is
-passed from DT as a resource. Currently only SPEAr1310 and SPEAr1340 are
-known user of this phy, which do not need to modify phy registers
-normally. Therefore we have not retrieved phy base address from DT and
-hence not io-remapped it. However, same can be added in future if
-required.
-
-SoC specific modifications should be done in plat specific ops and phy
-specific modifications should be done in phy ops itself. As a general
-rule, follow the convention of modifying misc reg space in plat ops and
-phy reg space in phy ops.
+SPEAr13xx was using virtual address space 0xFE000000 to map physical address
+space 0xB3000000. pci_remap_io uses 0xFEE00000 as virtual address. So
+change 0xFE000000 to 0xF9000000.
 
 Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-Tested-by: Mohit Kumar <mohit.kumar@st.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Viresh Kumar <viresh.linux@gmail.com>
 Cc: spear-devel at list.st.com
+Cc: stable at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
 ---
- .../devicetree/bindings/phy/st-miphy40lp.txt       |  12 ++
- drivers/phy/Kconfig                                |   6 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-miphy40lp.c                        | 229 +++++++++++++++++++++
- 4 files changed, 248 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/st-miphy40lp.txt
- create mode 100644 drivers/phy/phy-miphy40lp.c
+ arch/arm/mach-spear/include/mach/spear.h | 4 ++--
+ arch/arm/mach-spear/spear13xx.c          | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/st-miphy40lp.txt b/Documentation/devicetree/bindings/phy/st-miphy40lp.txt
-new file mode 100644
-index 0000000..d0c7096
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/st-miphy40lp.txt
-@@ -0,0 +1,12 @@
-+Required properties:
-+- compatible : should be "st,miphy40lp-phy"
-+	Other supported soc specific compatible:
-+		"st,spear1310-miphy"
-+		"st,spear1340-miphy"
-+- reg : offset and length of the PHY register set.
-+- misc: phandle for the syscon node to access misc registers
-+- phy-id: Instance id of the phy.
-+- #phy-cells : from the generic PHY bindings, must be 1.
-+	- 1st cell: phandle to the phy node.
-+	- 2nd cell: 0 if phy (in 1st cell) is to be used for SATA, 1 for PCIe
-+	  and 2 for Super Speed USB.
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index afa2354..2f58993 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -64,4 +64,10 @@ config BCM_KONA_USB2_PHY
- 	help
- 	  Enable this to support the Broadcom Kona USB 2.0 PHY.
+diff --git a/arch/arm/mach-spear/include/mach/spear.h b/arch/arm/mach-spear/include/mach/spear.h
+index 5cdc53d..f2d6a01 100644
+--- a/arch/arm/mach-spear/include/mach/spear.h
++++ b/arch/arm/mach-spear/include/mach/spear.h
+@@ -52,10 +52,10 @@
+ #ifdef CONFIG_ARCH_SPEAR13XX
  
-+config PHY_ST_MIPHY40LP
-+	tristate "ST MIPHY 40LP driver"
-+	help
-+	  Support for ST MIPHY 40LP which can be used for PCIe, SATA and Super Speed USB.
-+	select GENERIC_PHY
-+
- endmenu
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index b57c253..c061091 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -9,3 +9,4 @@ obj-$(CONFIG_PHY_EXYNOS_MIPI_VIDEO)	+= phy-exynos-mipi-video.o
- obj-$(CONFIG_PHY_MVEBU_SATA)		+= phy-mvebu-sata.o
- obj-$(CONFIG_OMAP_USB2)			+= phy-omap-usb2.o
- obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
-+obj-$(CONFIG_PHY_ST_MIPHY40LP)		+= phy-miphy40lp.o
-diff --git a/drivers/phy/phy-miphy40lp.c b/drivers/phy/phy-miphy40lp.c
-new file mode 100644
-index 0000000..3a9ada1
---- /dev/null
-+++ b/drivers/phy/phy-miphy40lp.c
-@@ -0,0 +1,229 @@
-+/*
-+ * ST MiPHY-40LP PHY driver
-+ *
-+ * Copyright (C) 2014 ST Microelectronics
-+ * Pratyush Anand <pratyush.anand@st.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/phy/phy.h>
-+#include <linux/regmap.h>
-+
-+enum phy_mode {
-+	SATA,
-+	PCIE,
-+	SS_USB,
-+};
-+
-+struct miphy40lp_priv;
-+
-+/* platform specific function struct */
-+struct miphy40lp_plat_ops {
-+	int	(*plat_init)(struct miphy40lp_priv *priv);
-+	int	(*plat_exit)(struct miphy40lp_priv *priv);
-+	int	(*plat_power_off)(struct miphy40lp_priv *priv);
-+	int	(*plat_power_on)(struct miphy40lp_priv *priv);
-+	int	(*plat_suspend)(struct miphy40lp_priv *priv);
-+	int	(*plat_resume)(struct miphy40lp_priv *priv);
-+};
-+
-+struct miphy40lp_priv {
-+	/* regmap for any soc specific misc registers */
-+	struct regmap			*misc;
-+	/* phy struct pointer */
-+	struct phy			*phy;
-+	/* phy mode: 0 for SATA 1 for PCIe and 2 for SS-USB */
-+	enum phy_mode			mode;
-+	/* instance id of this phy */
-+	u32				id;
-+	/* platform specific callbacks */
-+	struct miphy40lp_plat_ops	*plat_ops;
-+};
-+
-+static int miphy40lp_init(struct phy *phy)
-+{
-+	struct miphy40lp_priv *priv = phy_get_drvdata(phy);
-+	struct miphy40lp_plat_ops *ops = priv->plat_ops;
-+	int ret = 0;
-+
-+	if (ops && ops->plat_init)
-+		ret = ops->plat_init(priv);
-+
-+	return ret;
-+}
-+
-+static int miphy40lp_exit(struct phy *phy)
-+{
-+	struct miphy40lp_priv *priv = phy_get_drvdata(phy);
-+	struct miphy40lp_plat_ops *ops = priv->plat_ops;
-+	int ret = 0;
-+
-+	if (ops && ops->plat_exit)
-+		ret = ops->plat_exit(priv);
-+
-+	return ret;
-+}
-+
-+static int miphy40lp_power_off(struct phy *phy)
-+{
-+	struct miphy40lp_priv *priv = phy_get_drvdata(phy);
-+	struct miphy40lp_plat_ops *ops = priv->plat_ops;
-+	int ret = 0;
-+
-+	if (ops && ops->plat_init)
-+		ret = ops->plat_init(priv);
-+
-+	return ret;
-+}
-+
-+static int miphy40lp_power_on(struct phy *phy)
-+{
-+	struct miphy40lp_priv *priv = phy_get_drvdata(phy);
-+	struct miphy40lp_plat_ops *ops = priv->plat_ops;
-+	int ret = 0;
-+
-+	if (ops && ops->plat_power_on)
-+		ret = ops->plat_power_on(priv);
-+
-+	return ret;
-+}
-+
-+static const struct of_device_id miphy40lp_of_match[] = {
-+	{ .compatible = "st,miphy40lp-phy", .data = NULL },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, miphy40lp_of_match);
-+
-+static struct phy_ops miphy40lp_ops = {
-+	.init = miphy40lp_init,
-+	.exit = miphy40lp_exit,
-+	.power_off = miphy40lp_power_off,
-+	.power_on = miphy40lp_power_on,
-+	.owner = THIS_MODULE,
-+};
-+
-+#ifdef CONFIG_PM_SLEEP
-+static int miphy40lp_suspend(struct device *dev)
-+{
-+	struct miphy40lp_priv *priv = dev_get_drvdata(dev);
-+	struct miphy40lp_plat_ops *ops = priv->plat_ops;
-+	int ret = 0;
-+
-+	if (ops && ops->plat_suspend)
-+		ret = ops->plat_suspend(priv);
-+
-+	return ret;
-+}
-+
-+static int miphy40lp_resume(struct device *dev)
-+{
-+	struct miphy40lp_priv *priv = dev_get_drvdata(dev);
-+	struct miphy40lp_plat_ops *ops = priv->plat_ops;
-+	int ret = 0;
-+
-+	if (ops && ops->plat_resume)
-+		ret = ops->plat_resume(priv);
-+
-+	return ret;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(miphy40lp_pm_ops, miphy40lp_suspend,
-+		miphy40lp_resume);
-+
-+static struct phy *miphy40lp_xlate(struct device *dev,
-+					struct of_phandle_args *args)
-+{
-+	struct miphy40lp_priv *priv = dev_get_drvdata(dev);
-+
-+	if (args->args_count < 1) {
-+		dev_err(dev, "DT did not pass correct no of args\n");
-+		return NULL;
-+	}
-+
-+	priv->mode = args->args[0];
-+
-+	return priv->phy;
-+}
-+
-+static int __init miphy40lp_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct miphy40lp_priv *priv;
-+	struct phy_provider *phy_provider;
-+	const struct of_device_id *of_id;
-+
-+	of_id = of_match_device(miphy40lp_of_match, dev);
-+	if (!of_id) {
-+		dev_err(dev, "can't find a matching platform\n");
-+		return -EINVAL;
-+	}
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv) {
-+		dev_err(dev, "can't alloc miphy40lp private date memory\n");
-+		return -ENOMEM;
-+	}
-+
-+	priv->plat_ops = (struct miphy40lp_plat_ops *)of_id->data;
-+
-+	priv->misc =
-+		syscon_regmap_lookup_by_phandle(dev->of_node, "misc");
-+	if (IS_ERR(priv->misc)) {
-+		dev_err(dev, "failed to find misc regmap\n");
-+		return PTR_ERR(priv->misc);
-+	}
-+
-+	if (of_property_read_u32(dev->of_node, "phy-id", &priv->id)) {
-+		dev_err(dev, "failed to find phy id\n");
-+		return -EINVAL;
-+	}
-+
-+	priv->phy = devm_phy_create(dev, &miphy40lp_ops, NULL);
-+	if (IS_ERR(priv->phy)) {
-+		dev_err(dev, "failed to create SATA PCIe PHY\n");
-+		return PTR_ERR(priv->phy);
-+	}
-+
-+	dev_set_drvdata(dev, priv);
-+	phy_set_drvdata(priv->phy, priv);
-+
-+	phy_provider = devm_of_phy_provider_register(dev, miphy40lp_xlate);
-+	if (IS_ERR(phy_provider)) {
-+		dev_err(dev, "failed to register phy provider\n");
-+		return PTR_ERR(phy_provider);
-+	}
-+
-+	return 0;
-+}
-+
-+static struct platform_driver miphy40lp_driver = {
-+	.driver = {
-+		.name = "miphy40lp-phy",
-+		.owner = THIS_MODULE,
-+		.pm = &miphy40lp_pm_ops,
-+		.of_match_table = of_match_ptr(miphy40lp_of_match),
-+	},
-+};
-+
-+static int __init miphy40lp_phy_init(void)
-+{
-+
-+	return platform_driver_probe(&miphy40lp_driver,
-+				miphy40lp_probe);
-+}
-+module_init(miphy40lp_phy_init);
-+
-+MODULE_DESCRIPTION("ST MIPHY-40LP driver");
-+MODULE_AUTHOR("Pratyush Anand <pratyush.anand@st.com>");
-+MODULE_LICENSE("GPL v2");
+ #define PERIP_GRP2_BASE				UL(0xB3000000)
+-#define VA_PERIP_GRP2_BASE			IOMEM(0xFE000000)
++#define VA_PERIP_GRP2_BASE			IOMEM(0xF9000000)
+ #define MCIF_SDHCI_BASE				UL(0xB3000000)
+ #define SYSRAM0_BASE				UL(0xB3800000)
+-#define VA_SYSRAM0_BASE				IOMEM(0xFE800000)
++#define VA_SYSRAM0_BASE				IOMEM(0xF9800000)
+ #define SYS_LOCATION				(VA_SYSRAM0_BASE + 0x600)
+ 
+ #define PERIP_GRP1_BASE				UL(0xE0000000)
+diff --git a/arch/arm/mach-spear/spear13xx.c b/arch/arm/mach-spear/spear13xx.c
+index 7aa6e8c..89212ff 100644
+--- a/arch/arm/mach-spear/spear13xx.c
++++ b/arch/arm/mach-spear/spear13xx.c
+@@ -52,7 +52,7 @@ void __init spear13xx_l2x0_init(void)
+ /*
+  * Following will create 16MB static virtual/physical mappings
+  * PHYSICAL		VIRTUAL
+- * 0xB3000000		0xFE000000
++ * 0xB3000000		0xF9000000
+  * 0xE0000000		0xFD000000
+  * 0xEC000000		0xFC000000
+  * 0xED000000		0xFB000000
 -- 
 1.8.1.2
