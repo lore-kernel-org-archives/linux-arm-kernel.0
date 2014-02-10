@@ -1,33 +1,42 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 10 Feb 2014 11:36:08 +0100
-Subject: [PATCH 08/17] spi: pl022: Fully gate clocks at request inactivity
-In-Reply-To: <20140204170746.GD22609@sirena.org.uk>
-References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
- <1391529538-21685-9-git-send-email-ulf.hansson@linaro.org>
- <20140204170746.GD22609@sirena.org.uk>
-Message-ID: <CAPDyKFraQUcZ_LjSAwENQA_RVqXokKKgfOZh7WD1vKmJ+5KstQ@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 10 Feb 2014 18:35:49 +0800
+Subject: [PATCH v4 3/8] ARM: dts: sun7i: Add GMAC controller node to sun7i DTSI
+In-Reply-To: <1392028554-32545-1-git-send-email-wens@csie.org>
+References: <1392028554-32545-1-git-send-email-wens@csie.org>
+Message-ID: <1392028554-32545-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 February 2014 18:07, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Feb 04, 2014 at 04:58:49PM +0100, Ulf Hansson wrote:
->> Use clk_disable_unprepare and clk_prepare_enable from the runtime PM
->> callbacks, to fully gate|ungate clocks. Potentially this will save more
->> power, depending on the clock tree for the current SOC.
->
-> The same patch has already been applied (I noticed and fixed it while
-> doing unrelated code review).
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-Sorry, didn't notice that.
-
-Thanks!
-
-Kind regards
-Ulf Hansson
-
->
->>       pinctrl_pm_select_default_state(dev);
->> -     clk_enable(pl022->clk);
->> +     clk_prepare_enable(pl022->clk);
->
-> Someone should really make this check errors though!
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index dd567ea..8eb4d54 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -645,6 +645,21 @@
+ 			status = "disabled";
+ 		};
+ 
++		gmac: ethernet at 01c50000 {
++			compatible = "allwinner,sun7i-a20-gmac";
++			reg = <0x01c50000 0x10000>;
++			interrupts = <0 85 4>;
++			interrupt-names = "macirq";
++			clocks = <&ahb_gates 49>, <&gmac_tx_clk>;
++			clock-names = "stmmaceth", "allwinner_gmac_tx";
++			snps,pbl = <2>;
++			snps,fixed-burst;
++			snps,force_sf_dma_mode;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
+ 		hstimer at 01c60000 {
+ 			compatible = "allwinner,sun7i-a20-hstimer";
+ 			reg = <0x01c60000 0x1000>;
+-- 
+1.9.rc1
