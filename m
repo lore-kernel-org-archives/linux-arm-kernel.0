@@ -1,31 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Feb 2014 18:25:19 +0000
-Subject: [alsa-devel] [PATCH 0/7] Audio support for Armada 370 DB
-In-Reply-To: <20140210160432.27281741@skate>
-References: <1391102051-5319-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140210152141.1391fb67@skate>
- <20140210145729.GP1757@sirena.org.uk>
- <20140210160432.27281741@skate>
-Message-ID: <20140210182519.GD13533@sirena.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 10 Feb 2014 19:33:34 +0100
+Subject: [PATCH] ARM: mvebu: rename mvebu_defconfig to mvebu_v7_defconfig
+In-Reply-To: <1392056399-20908-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392056399-20908-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140210183334.GH9995@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 04:04:32PM +0100, Thomas Petazzoni wrote:
+On Mon, Feb 10, 2014 at 07:19:59PM +0100, Thomas Petazzoni wrote:
+> With the merge of the Kirkwood support into arch/arm/mach-mvebu/, the
+> mvebu platform will no longer only contain ARMv7 compatible processors
+> (Armada 370, Armada XP, and soon Armada 375, Armada 38x and Dove), but
+> also ARMv5 compatible processors (Kirkwood, and hopefully Orion5x in
+> the future).
+> 
+> However, a single mvebu_defconfig cannot work, since it is not
+> possible to build a kernel that supports both ARMv5 and ARMv7
+> platforms in the same binary. As a consequence, this commit renames
+> mvebu_defconfig to mvebu_v7_defconfig, which is the configuration that
+> will build a kernel that supports all ARMv7 mvebu platforms. As
+> Kirkwood support gets merged into mach-mvebu, an additional
+> mvebu_v5_defconfig will be added.
+> 
+> Even though we already have a multi_v7_defconfig, the mvebu developers
+> found it more convenient for development to have a defconfig that
+> builds only the mvebu platforms.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/configs/{mvebu_defconfig => mvebu_v7_defconfig} | 0
+>  1 file changed, 0 insertions(+), 0 deletions(-)
+>  rename arch/arm/configs/{mvebu_defconfig => mvebu_v7_defconfig} (100%)
+> 
+> diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+> similarity index 100%
+> rename from arch/arm/configs/mvebu_defconfig
+> rename to arch/arm/configs/mvebu_v7_defconfig
 
-> Sure, sorry. The patches that are of interest to you are prefixed by
-> "sound: codec" (for the patch touching sound/soc/codecs) and "sound:
-> soc" (for the patches touching sound/soc/kirkwood).
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-> If you want, I can resend with subject lines containing 'ASoC:',
-> however maybe it's better if some other comments are made before, to
-> avoid additional noise.
+Thanks Thomas,
 
-It's OK, they are on the list and I will get to them (most likely
-tomorrow now) - I did notice them.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/6d6702e2/attachment.sig>
+       Andrew
