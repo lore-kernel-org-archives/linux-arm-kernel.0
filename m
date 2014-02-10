@@ -1,35 +1,51 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 10 Feb 2014 09:46:07 -0800
-Subject: [PATCH v3 5/7] clocksource/cadence_ttc: Use only one counter
-In-Reply-To: <alpine.DEB.2.02.1402042138480.24986@ionos.tec.linutronix.de>
-References: <1391466877-28908-1-git-send-email-soren.brinkmann@xilinx.com>
- <1391466877-28908-6-git-send-email-soren.brinkmann@xilinx.com>
- <alpine.DEB.2.02.1402042138480.24986@ionos.tec.linutronix.de>
-Message-ID: <6429e1bb-d4ad-4bf2-bd75-456324f45629@CO9EHSMHS016.ehs.local>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 10 Feb 2014 18:47:26 +0100
+Subject: [PATCH 06/11] ARM: mvebu: add Armada 380/385 support to the
+ system-controller driver
+In-Reply-To: <20140210173957.GS8533@titan.lakedaemon.net>
+References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1392053002-19831-7-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140210173957.GS8533@titan.lakedaemon.net>
+Message-ID: <20140210184726.2a787050@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Dear Jason Cooper,
 
-On Tue, Feb 04, 2014 at 09:41:53PM +0100, Thomas Gleixner wrote:
-> On Mon, 3 Feb 2014, Soren Brinkmann wrote:
-> 
-> > Currently the driver uses two of the three counters the TTC provides to
-> > implement a clocksource and a clockevent device. By using the TTC's
-> > match feature we can implement both use cases using a single counter
-> > only.
-> 
-> Are you entirely sure that this match feature is free of the infamous
-> HPET match feature issues?
-> 
-> See arch/x86/kernel/hpet.c: hpet_next_event()
-> 
-> If yes, please add a comment. If no ....
-Good catch. Looks like the comparator compares on == as well. So, I
-assume it may show similar issues. I'll have to spend some more time
-looking into this.
+On Mon, 10 Feb 2014 12:39:57 -0500, Jason Cooper wrote:
 
-Thanks for applying the first two patches of the series.
+> > Note that we intentionally do not use the same compatible string as
+> > Armada 370/XP, as the current system-controller driver is far from
+> > exploiting all the possibilities of the hardware, and we may in the
+> > future discover differences between Armada 370/XP and Armada 380/385.
+> 
+> I'd much prefer to add a new compatible string iff it accompanies
+> incompatible changes.
+> 
+> For now, I think it's best to use 'marvell,armada-370-xp-system-controller'
+> in the dtsi file and change it when you introduce the incompatible
+> features.
 
-	Thanks,
-	S?ren
+This doesn't work really well: if an user keeps an old DTB around,
+which uses the old compatible string, then you're screwed because
+there's no way a new kernel version can make the distinction between
+Armada 370/XP and Armada 380/385. If we discover than Armada 380/385
+need a special quirk to really work reliably for example, but that this
+quirk doesn't apply to Armada 370/XP, then you have a serious problem.
+
+Therefore, I would like to really insist to have separate compatible
+strings for different SOCs. As an example, we used to have the same
+compatible string for the timer between Armada 370 and Armada XP, and
+later discovered that it was not possible due to a bug affecting only
+one of the two SOCs. Our experience clearly shows that sharing
+compatible strings is a bad idea, and having separate compatible
+strings from the beginning doesn't cost anything, and offers higher
+flexibility for the future.
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
