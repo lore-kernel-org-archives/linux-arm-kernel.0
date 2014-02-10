@@ -1,90 +1,63 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 10 Feb 2014 13:48:57 -0500
-Subject: [PATCH 06/11] ARM: mvebu: add Armada 380/385 support to the
- system-controller driver
-In-Reply-To: <20140210184726.2a787050@skate>
-References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392053002-19831-7-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140210173957.GS8533@titan.lakedaemon.net>
- <20140210184726.2a787050@skate>
-Message-ID: <20140210184857.GT8533@titan.lakedaemon.net>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Mon, 10 Feb 2014 19:57:42 +0100
+Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
+In-Reply-To: <20140122235620.GC20359@xanatos> (Sarah Sharp's message of "Wed,
+ 22 Jan 2014 15:56:20 -0800")
+References: <87mwix5anm.fsf@natisbad.org> <20140116185044.GC18392@xanatos>
+ <87fvon2khn.fsf@natisbad.org> <87zjmvau23.fsf@nemi.mork.no>
+ <20140117205432.GB5618@xanatos> <87vbxhrmea.fsf@natisbad.org>
+ <20140121211741.GA12657@xanatos> <87bnz364h0.fsf@natisbad.org>
+ <20140122222641.GD29184@titan.lakedaemon.net>
+ <87mwin4ozf.fsf@natisbad.org> <20140122235620.GC20359@xanatos>
+Message-ID: <87wqh2iymx.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 06:47:26PM +0100, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
-> 
-> On Mon, 10 Feb 2014 12:39:57 -0500, Jason Cooper wrote:
-> 
-> > > Note that we intentionally do not use the same compatible string as
-> > > Armada 370/XP, as the current system-controller driver is far from
-> > > exploiting all the possibilities of the hardware, and we may in the
-> > > future discover differences between Armada 370/XP and Armada 380/385.
-> > 
-> > I'd much prefer to add a new compatible string iff it accompanies
-> > incompatible changes.
-> > 
-> > For now, I think it's best to use 'marvell,armada-370-xp-system-controller'
-> > in the dtsi file and change it when you introduce the incompatible
-> > features.
-> 
-> This doesn't work really well: if an user keeps an old DTB around,
-> which uses the old compatible string, then you're screwed because
-> there's no way a new kernel version can make the distinction between
-> Armada 370/XP and Armada 380/385. 
+Hi Sarah,
 
-devicetree is designed to handle this.  The dtb is _supposed_ to be
-separate from the kernel.
+Sarah Sharp <sarah.a.sharp@linux.intel.com> writes:
 
-> If we discover than Armada 380/385 need a special quirk to really work
-> reliably for example, but that this quirk doesn't apply to Armada
-> 370/XP, then you have a serious problem.
+> On Wed, Jan 22, 2014 at 11:43:16PM +0100, Arnaud Ebalard wrote:
+>> Hi Jason,
+>> 
+>> Jason Cooper <jason@lakedaemon.net> writes:
+>> 
+>> > On Wed, Jan 22, 2014 at 11:23:23PM +0100, Arnaud Ebalard wrote:
+>> >> With the patch applied on top of 3.13.0 kernel recompiled w/
+>> >> CONFIG_PCI_MSI enabled, I cannot reproduce the bug. I guess
+>> >> you can add my:
+>> >> 
+>> >>  Reported-and-tested-By: Arnaud Ebalard <arno@natisbad.org>
+>> >> 
+>> >> Since you'll have to push the patch to -stable team at least for 3.13,
+>> >> I wonder if it would not make sense to extend that at least to 3.12.
+>> >> and possibly 3.10 (3.2 is still widely used but I wonder if it makes
+>> >> sense to go that far).
+>> >
+>> > Can you pinpoint the commit that introduced the regression?
+>> 
+>> f5182b4155b9d686c5540a6822486400e34ddd98 "xhci: Disable MSI for some Fresco Logic hosts."
+>> 
+>> Technically, this is not per se the commit which introduced the
+>> regression but the one that *partially* fixed it by introducing the XHCI
+>> quirk to skip MSI enabling for Fresco Logic chips. The thing is it
+>> should have included the FL1009 in the targets. Sarah, can you confirm
+>> this?
+>
+> I don't know if it should have included FL1009, it was just a guess,
+> based on the fact that the 0x1000 and 0x1400 devices did need MSI
+> disabled.  I can attempt to ask the Fresco Logic folks I know, but I'm
+> not sure if/when I'll get a response back.
+>
+> That still doesn't necessarily rule out MSI issues in the Marvell PCI
+> host controller code.  Can you attach another PCI device with MSI
+> support under the host and see if it works?
 
-No, you don't.  It's the responsibility of the driver author to _not_
-make incompatible changes and to sanely fall back to default behavior.
+Unless you have some objections or some positive feedback from Fresco
+Logic people, can you queue your quirks for FL1009 for 3.14-rc* and
+-stable? Note that I am just asking, i.e. if you want to wait a bit
+more, I am not that in a hurry.
 
-Right now there are no differences, and both SoCs work with the same
-compatible string.  If later there is support added for a feature for
-one of them, we add a compatible string to differentiate the two.  When
-the driver encounters a potentially old dtb, it defaults to behaving as
-it does today.  iow, no new feature.
+Cheers,
 
-In this situation, the driver or SoC code could see the root compatible
-node is marvell,armada385 with a sys-con node using
-marvell,armada-370-xp-sys-con.  It could then print a warning about
-potentially old dtb.  Depending on the severity of the bug (which
-couldn't be too severe, otherwise you'd have code here today ;) ), you
-could even override the compatible string in the SoC code.
-
-> Therefore, I would like to really insist to have separate compatible
-> strings for different SOCs. As an example, we used to have the same
-> compatible string for the timer between Armada 370 and Armada XP, and
-> later discovered that it was not possible due to a bug affecting only
-> one of the two SOCs. Our experience clearly shows that sharing
-> compatible strings is a bad idea, and having separate compatible
-> strings from the beginning doesn't cost anything, and offers higher
-> flexibility for the future.
-
-Your argument is tempting, but I see a lot of over-quantization with
-little to no measurable gain other than "just in case."
-
-If I follow your logic and refer to the i2c transaction generator
-problem, should we go back and add compatible strings for all on-die IP
-blocks for every SoC and SoC revision?  Even though we only wish we had
-something once?  Can we anticipate every possible way an IP block will
-be broken?
-
-Ultimately, what I'm saying is that the devicetree process should be
-able to handle this kind of situation.  And if it can't, the process is
-broken.  No amount of bubblewrap and safety helmets will save us then.
-
-Now, wrt marvell,armada-38x-system-controller, if you can point out
-specific features you know about *today* that are different from the
-370/xp sys-con, please spell them out at least in the commit log.  I'm
-fine with just mentioning the features at this point, since we're
-dealing with initial SoC support.  But "...we may in the future discover
-differences between..." doesn't inspire confidence.
-
-thx,
-
-Jason.
+a+
