@@ -1,88 +1,17 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Mon, 10 Feb 2014 14:05:23 +0800
-Subject: [PATCH] ARM: dts: i.MX51 babbage: Support diagnostic LED
-In-Reply-To: <20140210030214.GB9628@S2101-09.ap.freescale.net>
-References: <1391522263-17877-1-git-send-email-Ying.Liu@freescale.com>
- <20140210030214.GB9628@S2101-09.ap.freescale.net>
-Message-ID: <52F86C23.1010101@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 10 Feb 2014 14:13:45 +0800
+Subject: [PATCH v3 1/2] ARM: dts: imx6sl-evk: Add PFUZE100 support
+In-Reply-To: <1391684271-6621-1-git-send-email-festevam@gmail.com>
+References: <1391684271-6621-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140210061343.GH9628@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2014 11:02 AM, Shawn Guo wrote:
-> On Tue, Feb 04, 2014 at 09:57:42PM +0800, Liu Ying wrote:
->> The D25 LED controlled by gpio on the i.MX51 babbage
->> board is a diagnostic LED according to the board design.
->> This patch adds the relevant device tree nodes to the
->> i.MX51 babbage device tree file to support this LED.
->>
->> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
->> ---
->>  arch/arm/boot/dts/imx51-babbage.dts |   17 +++++++++++++++++
->>  1 file changed, 17 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
->> index be1407c..8d6a74b 100644
->> --- a/arch/arm/boot/dts/imx51-babbage.dts
->> +++ b/arch/arm/boot/dts/imx51-babbage.dts
->> @@ -81,6 +81,17 @@
->>  		};
->>  	};
->>  
->> +	leds {
->> +		compatible = "gpio-leds";
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&led_pin_gpio2_6>;
->> +
->> +		led-diagnostic {
->> +			label = "diagnostic";
->> +			gpios = <&gpio2 6 0>;
+On Thu, Feb 06, 2014 at 08:57:50AM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> Just out of curiosity, how will you use/trigger the led?
+> imx6sl-evk board has Freescale PFUZE100 regulator, so add support for it.
 > 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Switch on the LED:
-echo 1 > /sys/class/leds/diagnostic/brightness
-
-Switch off the LED:
-echo 0 > /sys/class/leds/diagnostic/brightness
-
->> +		};
->> +	};
->> +
->>  	sound {
->>  		compatible = "fsl,imx51-babbage-sgtl5000",
->>  			     "fsl,imx-audio-sgtl5000";
->> @@ -280,6 +291,12 @@
->>  				MX51_PAD_CSPI1_RDY__GPIO4_26 0x80000000
->>  			>;
->>  		};
->> +
->> +		led_pin_gpio2_6: led_gpio2_6 {
-> 
-> This might be copied from some existing file, but I would hope the name
-> can be more generic, something like the following
-> 
-> 	pinctrl_gpio_leds: gpioledsgrp {
-> 
-> , so that when we have more gpio controlled leds to add, we can just add
-> more pins into the same group without concerning the name.
-> 
-
-Agree.  I will address this comment in patch v2.  Thanks!
-
-Regards,
-Liu Ying
-
-> 
->> +			fsl,pins = <
->> +				MX51_PAD_EIM_D22__GPIO2_6 0x80000000
->> +			>;
->> +		};
->>  	};
->>  };
->>  
->> -- 
->> 1.7.9.5
->>
->>
-> 
+Applied both, thanks.
