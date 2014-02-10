@@ -1,65 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Feb 2014 12:14:05 +0000
-Subject: [PATCH v2 14/15] charger: max14577: Configure battery-dependent
- settings from DTS
-In-Reply-To: <1391767487-10017-15-git-send-email-k.kozlowski@samsung.com>
-References: <1391767487-10017-1-git-send-email-k.kozlowski@samsung.com>
- <1391767487-10017-15-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20140210121405.GH22773@lee--X1>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 10 Feb 2014 16:16:27 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gdmlkZW86IGlteGZiOiBVc2UgcmVndWxhdG9yIEFQSSB3?=
+ =?UTF-8?B?aXRoIExDRCBjbGFzcyBmb3IgcG93ZXJpbmc=?=
+In-Reply-To: <52F8C091.50704@ti.com>
+References: <1387624080-15312-1-git-send-email-shc_work@mail.ru>
+ <52F8C091.50704@ti.com>
+Message-ID: <1392034587.333931582@f419.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Remove hard-coded values for:
->  - Fast Charge current,
->  - End Of Charge current,
->  - Fast Charge timer,
->  - Overvoltage Protection Threshold,
->  - Battery Constant Voltage,
-> and use DTS to configure them. This allows using the max14577 charger
-> driver with different batteries.
+???????????, 10 ??????? 2014, 14:05 +02:00 ?? Tomi Valkeinen <tomi.valkeinen@ti.com>:
+> On 21/12/13 13:08, Alexander Shiyan wrote:
+> > This patch replaces custom lcd_power() callback with
+> > regulator API over LCD class.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+> >  .../devicetree/bindings/video/fsl,imx-fb.txt       |  1 +
+> >  arch/arm/mach-imx/mach-mx27ads.c                   | 55 +++++++++++++++--
+> >  drivers/video/imxfb.c                              | 71
+> +++++++++++++++++++---
+> >  include/linux/platform_data/video-imxfb.h          |  1 -
+> >  4 files changed, 114 insertions(+), 14 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > index 46da08d..e6b1ee9 100644
+> > --- a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > @@ -15,6 +15,7 @@ Required nodes:
+> >  	- fsl,pcr: LCDC PCR value
+> >  
+> >  Optional properties:
+> > +- lcd-supply: Regulator for LCD supply voltage.
+> >  - fsl,dmacr: DMA Control Register value. This is optional. By default, the
+> >  	register is not modified as recommended by the datasheet.
+> >  - fsl,lscr1: LCDC Sharp Configuration Register value.
+> > diff --git a/arch/arm/mach-imx/mach-mx27ads.c
+...
+> > +static void __init mx27ads_regulator_init(void)
+> > +{
+> > +	struct gpio_chip *vchip;
+> > +
+> > +	vchip = kzalloc(sizeof(*vchip), GFP_KERNEL);
+> > +	vchip->owner		= THIS_MODULE;
+> > +	vchip->label		= "LCD";
+> > +	vchip->base		= MX27ADS_LCD_GPIO;
+> > +	vchip->ngpio		= 1;
+> > +	vchip->direction_output	= vgpio_dir_out;
+> > +	vchip->set		= vgpio_set;
+> > +	gpiochip_add(vchip);
+> > +
+> > +	platform_device_register_data(&platform_bus, "reg-fixed-voltage",
+> > +				      PLATFORM_DEVID_AUTO,
+> > +				      &mx27ads_lcd_regulator_pdata,
+> > +				      sizeof(mx27ads_lcd_regulator_pdata));
+> > +}
+> > +
 > 
-> Now the charger driver requires valid configuration data from DTS. In
-> case of wrong configuration data it fails during probe. Patch adds
-> of_compatible to the charger mfd cell in MFD driver core.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> Cc: Jenny Tc <jenny.tc@intel.com>
-> ---
->  drivers/mfd/max14577.c               |    5 +-
->  drivers/power/max14577_charger.c     |  234 +++++++++++++++++++++++++++++-----
->  include/linux/mfd/max14577-private.h |   10 ++
->  include/linux/mfd/max14577.h         |    8 ++
->  4 files changed, 227 insertions(+), 30 deletions(-)
+> Hmm, isn't all this something that should be in the board's .dts?
 
-<snip>
+There are no DT support for this board yet.
 
-> diff --git a/include/linux/mfd/max14577-private.h b/include/linux/mfd/max14577-private.h
-> index a8cd7de3526a..50cf70bec4d4 100644
-> --- a/include/linux/mfd/max14577-private.h
-> +++ b/include/linux/mfd/max14577-private.h
-> @@ -269,6 +269,16 @@ enum maxim_muic_charger_type {
->  #define MAX77836_CHARGER_CURRENT_LIMIT_HIGH_STEP	 25000U
->  #define MAX77836_CHARGER_CURRENT_LIMIT_MAX		475000U
->  
-> +/* MAX14577 charger End-Of-Charge current limits (as in MAXIM_CHGCTRL5 register), uA */
-
-Too many chars. Didn't checkpatch.pl complain about this?
-
-> +#define MAX14577_CHARGER_EOC_CURRENT_LIMIT_MIN		50000U
-> +#define MAX14577_CHARGER_EOC_CURRENT_LIMIT_STEP		10000U
-> +#define MAX14577_CHARGER_EOC_CURRENT_LIMIT_MAX		200000U
-> +
-> +/* MAX14577/MAX77836 Battery Constant Voltage (as in MAXIM_CHGCTRL3
-> register), uV */
-
-Same here
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+---
