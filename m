@@ -1,187 +1,255 @@
-From: shuah.kh@samsung.com (Shuah Khan)
-Date: Mon, 10 Feb 2014 09:12:24 -0700
-Subject: [RFT][PATCH 01/12] arm: change locomo platform and bus power
- management to use dev_pm_ops
-In-Reply-To: <cover.1392040064.git.shuah.kh@samsung.com>
-References: <cover.1392040064.git.shuah.kh@samsung.com>
-Message-ID: <7483e110cf0e8938e4df73dbf7f9e8da1315e9af.1392040066.git.shuah.kh@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 10 Feb 2014 11:14:41 -0500
+Subject: [PATCH v4 2/2] memory: ti-aemif: add bindings for AEMIF driver
+In-Reply-To: <1391629574-18955-3-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1391629574-18955-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1391629574-18955-3-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <52F8FAF1.9030505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change locomo platform and bus drivers to register pm ops using dev_pm_ops
-instead of legacy pm_ops. .pm hooks call existing legacy suspend and resume
-interfaces by passing in the right pm state.
+Kumar,
 
-Signed-off-by: Shuah Khan <shuah.kh@samsung.com>
----
- arch/arm/common/locomo.c |   93 ++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 78 insertions(+), 15 deletions(-)
+On Wednesday 05 February 2014 02:46 PM, Ivan Khoronzhuk wrote:
+> Add bindings for TI Async External Memory Interface (AEMIF) controller.
+> 
+> The Async External Memory Interface (EMIF16/AEMIF) controller is intended to
+> provide a glue-less interface to a variety of asynchronous memory devices like
+> ASRA M, NOR and NAND memory. A total of 256M bytes of any of these memories
+> can be accessed via 4 chip selects with 64M byte access per chip select.
+> 
+> We are not encoding CS number in reg property, it's memory partition number.
+> The CS number is encoded for Davinci NAND node using standalone property
+> "ti,davinci-chipselect" and we need to provide two memory ranges to it,
+> as result we can't encode CS number in "reg" for AEMIF child devices
+> (NAND/NOR/etc), as it will break bindings compatibility.
+> 
+> In this patch, NAND node is used just as an example of child node.
+> 
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
+Can you please have a look at the binding which we discussed in previous
+versions ? I want to queue these for 3.15 via Greg's tree but need
+your ack on DT part at least.
 
-diff --git a/arch/arm/common/locomo.c b/arch/arm/common/locomo.c
-index b55c362..a48effb 100644
---- a/arch/arm/common/locomo.c
-+++ b/arch/arm/common/locomo.c
-@@ -272,7 +272,7 @@ struct locomo_save_data {
- 	u16	LCM_SPIMD;
- };
- 
--static int locomo_suspend(struct platform_device *dev, pm_message_t state)
-+static int __locomo_suspend(struct platform_device *dev, pm_message_t state)
- {
- 	struct locomo *lchip = platform_get_drvdata(dev);
- 	struct locomo_save_data *save;
-@@ -316,7 +316,22 @@ static int locomo_suspend(struct platform_device *dev, pm_message_t state)
- 	return 0;
- }
- 
--static int locomo_resume(struct platform_device *dev)
-+static int locomo_suspend(struct device *dev)
-+{
-+	 return __locomo_suspend(to_platform_device(dev), PMSG_SUSPEND);
-+}
-+
-+static int locomo_freeze(struct device *dev)
-+{
-+	 return __locomo_suspend(to_platform_device(dev), PMSG_FREEZE);
-+}
-+
-+static int locomo_poweroff(struct device *dev)
-+{
-+	 return __locomo_suspend(to_platform_device(dev), PMSG_HIBERNATE);
-+}
-+
-+static int __locomo_resume(struct platform_device *dev)
- {
- 	struct locomo *lchip = platform_get_drvdata(dev);
- 	struct locomo_save_data *save;
-@@ -351,6 +366,11 @@ static int locomo_resume(struct platform_device *dev)
- 
- 	return 0;
- }
-+
-+static int locomo_resume(struct device *dev)
-+{
-+	 return __locomo_resume(to_platform_device(dev));
-+}
- #endif
- 
- 
-@@ -510,6 +530,18 @@ static int locomo_remove(struct platform_device *dev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+static const struct dev_pm_ops locomo_dev_pm_ops = {
-+	.suspend = locomo_suspend,
-+	.resume = locomo_resume,
-+	/* Hibernate hooks */
-+	.freeze = locomo_freeze,
-+	.thaw = locomo_resume,
-+	.poweroff = locomo_poweroff,
-+	.restore = locomo_resume,
-+};
-+#endif
-+
- /*
-  *	Not sure if this should be on the system bus or not yet.
-  *	We really want some way to register a system device at
-@@ -519,12 +551,11 @@ static int locomo_remove(struct platform_device *dev)
- static struct platform_driver locomo_device_driver = {
- 	.probe		= locomo_probe,
- 	.remove		= locomo_remove,
--#ifdef CONFIG_PM
--	.suspend	= locomo_suspend,
--	.resume		= locomo_resume,
--#endif
- 	.driver		= {
- 		.name	= "locomo",
-+#ifdef CONFIG_PM
-+		.pm	= &locomo_dev_pm_ops,
-+#endif
- 	},
- };
- 
-@@ -826,26 +857,45 @@ static int locomo_match(struct device *_dev, struct device_driver *_drv)
- 	return dev->devid == drv->devid;
- }
- 
--static int locomo_bus_suspend(struct device *dev, pm_message_t state)
-+static int __locomo_bus_suspend(struct device *dev, pm_message_t state)
- {
- 	struct locomo_dev *ldev = LOCOMO_DEV(dev);
- 	struct locomo_driver *drv = LOCOMO_DRV(dev->driver);
--	int ret = 0;
-+
-+	if (drv && drv->drv.pm && drv->drv.pm->suspend)
-+		return  drv->drv.pm->suspend(dev);
- 
- 	if (drv && drv->suspend)
--		ret = drv->suspend(ldev, state);
--	return ret;
-+		return	drv->suspend(ldev, state);
-+	return 0;
-+}
-+
-+static int locomo_bus_suspend(struct device *dev)
-+{
-+	return	__locomo_bus_suspend(dev, PMSG_SUSPEND);
-+}
-+
-+static int locomo_bus_freeze(struct device *dev)
-+{
-+	return	__locomo_bus_suspend(dev, PMSG_FREEZE);
-+}
-+
-+static int locomo_bus_poweroff(struct device *dev)
-+{
-+	return	__locomo_bus_suspend(dev, PMSG_HIBERNATE);
- }
- 
- static int locomo_bus_resume(struct device *dev)
- {
- 	struct locomo_dev *ldev = LOCOMO_DEV(dev);
- 	struct locomo_driver *drv = LOCOMO_DRV(dev->driver);
--	int ret = 0;
-+
-+	if (drv && drv->drv.pm && drv->drv.pm->resume)
-+		return	drv->drv.pm->resume(dev);
- 
- 	if (drv && drv->resume)
--		ret = drv->resume(ldev);
--	return ret;
-+		return	drv->resume(ldev);
-+	return 0;
- }
- 
- static int locomo_bus_probe(struct device *dev)
-@@ -870,13 +920,26 @@ static int locomo_bus_remove(struct device *dev)
- 	return ret;
- }
- 
-+#ifdef CONFIG_PM
-+static const struct dev_pm_ops locomo_bus_dev_pm_ops = {
-+	.suspend = locomo_bus_suspend,
-+	.resume = locomo_bus_resume,
-+	/* Hibernate hooks */
-+	.freeze = locomo_bus_freeze,
-+	.thaw = locomo_bus_resume,
-+	.poweroff = locomo_bus_poweroff,
-+	.restore = locomo_bus_resume,
-+};
-+#endif
-+
- struct bus_type locomo_bus_type = {
- 	.name		= "locomo-bus",
- 	.match		= locomo_match,
- 	.probe		= locomo_bus_probe,
- 	.remove		= locomo_bus_remove,
--	.suspend	= locomo_bus_suspend,
--	.resume		= locomo_bus_resume,
-+#ifdef CONFIG_PM
-+	.pm		= &locomo_bus_dev_pm_ops,
-+#endif
- };
- 
- int locomo_driver_register(struct locomo_driver *driver)
--- 
-1.7.10.4
+>  .../bindings/memory-controllers/ti-aemif.txt       | 210 +++++++++++++++++++++
+>  1 file changed, 210 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+> new file mode 100644
+> index 0000000..d1466dc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+> @@ -0,0 +1,210 @@
+> +* Device tree bindings for Texas instruments AEMIF controller
+> +
+> +The Async External Memory Interface (EMIF16/AEMIF) controller is intended to
+> +provide a glue-less interface to a variety of asynchronous memory devices like
+> +ASRA M, NOR and NAND memory. A total of 256M bytes of any of these memories
+> +can be accessed at any given time via four chip selects with 64M byte access
+> +per chip select. Synchronous memories such as DDR1 SD RAM, SDR SDRAM
+> +and Mobile SDR are not supported.
+> +
+> +Documentation:
+> +Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
+> +OMAP-L138 (DA850) - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
+> +Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+> +
+> +Required properties:
+> +
+> +- compatible:		"ti,davinci-aemif"
+> +			"ti,keystone-aemif"
+> +			"ti,da850-aemif"
+> +
+> +- reg:			contains offset/length value for AEMIF control registers
+> +			space.
+> +
+> +- #address-cells:	Must be 2. The partition number has to be encoded in the
+> +			first address cell and it may accept values 0..N-1
+> +			(N - total number of partitions). It's recommended to
+> +			assign N-1 number for the control partition. The second
+> +			cell is the offset into the partition.
+> +
+> +- #size-cells:		Must be set to 1.
+> +
+> +- ranges:		Contains memory regions. There are two types of
+> +			ranges/partitions:
+> +			- CS-specific partition/range. If continuous, must be
+> +			set up to reflect the memory layout for 4 chipselects,
+> +			if not then additional range/partition can be added and
+> +			child device can select the proper one.
+> +			- control partition which is common for all CS
+> +			interfaces.
+> +
+> +- clocks:		the clock feeding the controller clock. Required only
+> +			if clock tree data present in device tree.
+> +			See clock-bindings.txt
+> +
+> +- clock-names:		clock name. It has to be "aemif". Required only if clock
+> +			tree data present in device tree, in another case don't
+> +			use it.
+> +			See clock-bindings.txt
+> +
+> +- clock-ranges:		Empty property indicating that child nodes can inherit
+> +			named clocks. Required only if clock tree data present
+> +			in device tree.
+> +			See clock-bindings.txt
+> +
+> +
+> +Child chip-select (cs) nodes contain the memory devices nodes connected to
+> +such as NOR (e.g. cfi-flash) and NAND (ti,davinci-nand, see davinci-nand.txt).
+> +There might be board specific devices like FPGAs.
+> +
+> +Required child cs node properties:
+> +
+> +- #address-cells:	Must be 2.
+> +
+> +- #size-cells:		Must be 1.
+> +
+> +- ranges:		Empty property indicating that child nodes can inherit
+> +			memory layout.
+> +
+> +- clock-ranges:		Empty property indicating that child nodes can inherit
+> +			named clocks. Required only if clock tree data present
+> +			in device tree.
+> +
+> +- ti,cs-chipselect:	number of chipselect. Indicates on the aemif driver
+> +			which chipselect is used for accessing the memory. For
+> +			compatibles "ti,davinci-aemif" and "ti,keystone-aemif"
+> +			it can be in range [0-3]. For compatible
+> +			"ti,da850-aemif" range is [2-5].
+> +
+> +Optional child cs node properties:
+> +
+> +- ti,bus-width:			width of the asynchronous device's data bus
+> +				8 or 16 if not preset 8
+> +
+> +- ti,cs-ss:		enable/disable select strobe mode
+> +				In select strobe mode chip select behaves as
+> +				the strobe and is active only during the strobe
+> +				period. If present then enable.
+> +
+> +- ti,cs-ew:		enable/disable extended wait mode
+> +				if set, the controller monitors the EMIFWAIT pin
+> +				mapped to that chip select to determine if the
+> +				device wants to extend the strobe period. If
+> +				present then enable.
+> +
+> +- ti,cs-ta:		minimum turn around time, ns
+> +				Time between the end of one asynchronous memory
+> +				access and the start of another asynchronous
+> +				memory access. This delay is not incurred
+> +				between a read followed by read or a write
+> +				followed by a write to same chip select.
+> +
+> +- ti,cs-rsetup:		read setup width, ns
+> +				Time between the beginning of a memory cycle
+> +				and the activation of read strobe.
+> +				Minimum value is 1 (0 treated as 1).
+> +
+> +- ti,cs-rstobe:		read strobe width, ns
+> +				Time between the activation and deactivation of
+> +				the read strobe.
+> +				Minimum value is 1 (0 treated as 1).
+> +
+> +- ti,cs-rhold:		read hold width, ns
+> +				Time between the deactivation of the read
+> +				strobe and the end of the cycle (which may be
+> +				either an address change or the deactivation of
+> +				the chip select signal.
+> +				Minimum value is 1 (0 treated as 1).
+> +
+> +- ti,cs-wsetup:		write setup width, ns
+> +				Time between the beginning of a memory cycle
+> +				and the activation of write strobe.
+> +				Minimum value is 1 (0 treated as 1).
+> +
+> +- ti,cs-wstrobe:	write strobe width, ns
+> +				Time between the activation and deactivation of
+> +				the write strobe.
+> +				Minimum value is 1 (0 treated as 1).
+> +
+> +- ti,cs-whold:		write hold width, ns
+> +				Time between the deactivation of the write
+> +				strobe and the end of the cycle (which may be
+> +				either an address change or the deactivation of
+> +				the chip select signal.
+> +				Minimum value is 1 (0 treated as 1).
+> +
+> +If any of the above parameters are absent, current parameter value will be taken
+> +from the corresponding HW reg.
+> +
+> +Example for aemif, davinci nand and nor flash chip select shown below.
+> +
+> +memory-controller at 21000A00 {
+> +	compatible = "ti,davinci-aemif";
+> +	#address-cells = <2>;
+> +	#size-cells = <1>;
+> +	clocks = <&clkaemif 0>;
+> +	clock-names = "aemif";
+> +	clock-ranges;
+> +	reg = <0x2100A00 0x00000100>;
+> +	ranges = <0 0 0x70000000 0x10000000
+> +		  1 0 0x21000A00 0x0000100>;
+> +		  /*
+> +		   * Partition0: CS-specific memory range which is
+> +		   * implemented as continuous physical memory region
+> +		   * Partition1: control memory range
+> +		   */
+> +
+> +	nand:cs2 {
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +		clock-ranges;
+> +		ranges;
+> +
+> +		ti,cs-chipselect = <2>;
+> +		/* all timings in nanoseconds */
+> +		ti,cs-ta = <0>;
+> +		ti,cs-rhold = <7>;
+> +		ti,cs-rstrobe = <42>;
+> +		ti,cs-rsetup = <14>;
+> +		ti,cs-whold = <7>;
+> +		ti,cs-wstrobe = <42>;
+> +		ti,cs-wsetup = <14>;
+> +
+> +		nand at 0,0x8000000 {
+> +			compatible = "ti,davinci-nand";
+> +			reg = <0 0x8000000 0x4000000
+> +			       1 0x0000000 0x0000100>;
+> +			/*
+> +			 * Partition0, offset 0x8000000, size 0x4000000
+> +			 * Partition1, offset 0x0000000, size 0x0000100
+> +			 */
+> +
+> +			.. see davinci-nand.txt
+> +		};
+> +	};
+> +
+> +	nor:cs0 {
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +		clock-ranges;
+> +		ranges;
+> +
+> +		ti,cs-chipselect = <0>;
+> +		/* all timings in nanoseconds */
+> +		ti,cs-ta = <0>;
+> +		ti,cs-rhold = <8>;
+> +		ti,cs-rstrobe = <40>;
+> +		ti,cs-rsetup = <14>;
+> +		ti,cs-whold = <7>;
+> +		ti,cs-wstrobe = <40>;
+> +		ti,cs-wsetup = <14>;
+> +		ti,cs-asize = <1>;
+> +
+> +		flash at 0,0x0000000 {
+> +			compatible = "cfi-flash";
+> +			reg = <0 0x0000000 0x4000000>;
+> +
+> +			...
+> +		};
+> +	};
+> +};
+> 
