@@ -1,119 +1,64 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 10 Feb 2014 18:07:39 +0800
-Subject: [PATCH] input: sirfsoc-onkey - report onkey untouch event by
- detecting pin status
-Message-ID: <1392026859-4977-1-git-send-email-21cnbao@gmail.com>
+From: t.dakhran@samsung.com (Tarek Dakhran)
+Date: Mon, 10 Feb 2014 19:08:28 +0900
+Subject: [PATCH v6 0/3] Exynos 5410 support
+Message-ID: <1392026911-21308-1-git-send-email-t.dakhran@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xianglong Du <Xianglong.Du@csr.com>
+The series of patches represent support of Exynos 5410 SoC
 
-this patch adds a delayed_work to detect the untouch of onkey since HW will
-not generate interrupt for it.
+The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture
 
-at the same time, we move the KEY event to POWER instead of SUSPEND, which
-will be suitable for both Android and Linux. Userspace PowerManager Daemon
-will decide to suspend or shutdown based on how long we have touched onkey
+Patches add new platform description, support of clock controller and device 
+tree for Exynos 5410.
 
-Signed-off-by: Xianglong Du <Xianglong.Du@csr.com>
-Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/input/misc/sirfsoc-onkey.c |   48 ++++++++++++++++++++++++++++-------
- 1 files changed, 38 insertions(+), 10 deletions(-)
+Dual cluster support for Exynos 5410 (EDCS) has been removed from this series 
+This patches is activating only the big cluster (2xA15 cores)
 
-diff --git a/drivers/input/misc/sirfsoc-onkey.c b/drivers/input/misc/sirfsoc-onkey.c
-index e8897c3..9cd810b 100644
---- a/drivers/input/misc/sirfsoc-onkey.c
-+++ b/drivers/input/misc/sirfsoc-onkey.c
-@@ -13,16 +13,44 @@
- #include <linux/input.h>
- #include <linux/rtc/sirfsoc_rtciobrg.h>
- #include <linux/of.h>
-+#include <linux/workqueue.h>
- 
- struct sirfsoc_pwrc_drvdata {
- 	u32			pwrc_base;
- 	struct input_dev	*input;
-+	struct delayed_work	work;
- };
- 
- #define PWRC_ON_KEY_BIT			(1 << 0)
- 
- #define PWRC_INT_STATUS			0xc
- #define PWRC_INT_MASK			0x10
-+#define PWRC_PIN_STATUS			0x14
-+#define PWRC_KEY_DETECT_UP_TIME		20	/* ms*/
-+
-+static inline int sirfsoc_pwrc_is_on_key_down(
-+		struct sirfsoc_pwrc_drvdata *pwrcdrv)
-+{
-+	int state = sirfsoc_rtc_iobrg_readl(
-+				pwrcdrv->pwrc_base + PWRC_PIN_STATUS)
-+				& PWRC_ON_KEY_BIT;
-+	return !state; /* ON_KEY is active low */
-+}
-+
-+static void sirfsoc_pwrc_report_event(struct work_struct *work)
-+{
-+	struct sirfsoc_pwrc_drvdata *pwrcdrv =
-+				container_of((struct delayed_work *)work,
-+				struct sirfsoc_pwrc_drvdata, work);
-+
-+	if (!sirfsoc_pwrc_is_on_key_down(pwrcdrv)) {
-+		input_event(pwrcdrv->input, EV_PWR, KEY_POWER, 0);
-+		input_sync(pwrcdrv->input);
-+	} else {
-+		schedule_delayed_work(&pwrcdrv->work,
-+			msecs_to_jiffies(PWRC_KEY_DETECT_UP_TIME));
-+	}
-+}
- 
- static irqreturn_t sirfsoc_pwrc_isr(int irq, void *dev_id)
- {
-@@ -34,17 +62,11 @@ static irqreturn_t sirfsoc_pwrc_isr(int irq, void *dev_id)
- 	sirfsoc_rtc_iobrg_writel(int_status & ~PWRC_ON_KEY_BIT,
- 				 pwrcdrv->pwrc_base + PWRC_INT_STATUS);
- 
--	/*
--	 * For a typical Linux system, we report KEY_SUSPEND to trigger apm-power.c
--	 * to queue a SUSPEND APM event
--	 */
--	input_event(pwrcdrv->input, EV_PWR, KEY_SUSPEND, 1);
--	input_sync(pwrcdrv->input);
- 
--	/*
--	 * Todo: report KEY_POWER event for Android platforms, Android PowerManager
--	 * will handle the suspend and powerdown/hibernation
--	 */
-+	input_event(pwrcdrv->input, EV_PWR, KEY_POWER, 1);
-+	input_sync(pwrcdrv->input);
-+	schedule_delayed_work(&pwrcdrv->work,
-+		msecs_to_jiffies(PWRC_KEY_DETECT_UP_TIME));
- 
- 	return IRQ_HANDLED;
- }
-@@ -88,6 +110,8 @@ static int sirfsoc_pwrc_probe(struct platform_device *pdev)
- 	pwrcdrv->input->phys = "pwrc/input0";
- 	pwrcdrv->input->evbit[0] = BIT_MASK(EV_PWR);
- 
-+	INIT_DELAYED_WORK(&pwrcdrv->work, sirfsoc_pwrc_report_event);
-+
- 	irq = platform_get_irq(pdev, 0);
- 	error = devm_request_irq(&pdev->dev, irq,
- 				 sirfsoc_pwrc_isr, IRQF_SHARED,
-@@ -119,8 +143,12 @@ static int sirfsoc_pwrc_probe(struct platform_device *pdev)
- 
- static int sirfsoc_pwrc_remove(struct platform_device *pdev)
- {
-+	struct sirfsoc_pwrc_drvdata *pwrcdrv = dev_get_drvdata(&pdev->dev);
-+
- 	device_init_wakeup(&pdev->dev, 0);
- 
-+	cancel_delayed_work_sync(&pwrcdrv->work);
-+
- 	return 0;
- }
- 
+EDCS patch, which allows all 8 CPU cores (4 x A7 and 4 x A15) 
+to run at the same time, will be released separately
+
+Has been build on v3.14-rc1
+Has been tested on Exynos 5410 reference board (exynos_defconfig)
+
+Thanks for all your comments to Tomasz Figa, Dave Martin and Nicolas Pitre.
+I hope, this is enough clean and hasn't any dependencies to go through 
+Samsung tree.
+
+Tarek.
+
+
+Changelog:
+
+v6:
+	small changes in Makefiles for resolving conflicts related to changes in 
+	Samsung tree.
+
+Tarek Dakhran (3):
+  ARM: EXYNOS: Add support for EXYNOS5410 SoC
+  clk: exynos5410: register clocks using common clock framework
+  ARM: dts: Add initial device tree support for EXYNOS5410
+
+ .../devicetree/bindings/clock/exynos5410-clock.txt |   54 +++++
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          |   72 ++++++
+ arch/arm/boot/dts/exynos5410.dtsi                  |  140 ++++++++++++
+ arch/arm/mach-exynos/Kconfig                       |   10 +
+ arch/arm/mach-exynos/common.c                      |   18 ++
+ arch/arm/mach-exynos/include/mach/map.h            |    1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |    1 +
+ arch/arm/mach-exynos/platsmp.c                     |    2 +
+ arch/arm/plat-samsung/include/plat/cpu.h           |    8 +
+ arch/arm/plat-samsung/include/plat/map-s5p.h       |    3 +
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-exynos5410.c               |  239 ++++++++++++++++++++
+ include/dt-bindings/clock/exynos5410.h             |   32 +++
+ 14 files changed, 582 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+ create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
+ create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+ create mode 100644 drivers/clk/samsung/clk-exynos5410.c
+ create mode 100644 include/dt-bindings/clock/exynos5410.h
+
 -- 
-1.7.5.4
+1.7.10.4
