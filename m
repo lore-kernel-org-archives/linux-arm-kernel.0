@@ -1,20 +1,73 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Feb 2014 10:44:09 +0800
-Subject: [PATCH 1/2] ARM: imx_v4_v5_defconfig: Select
- CONFIG_MMC_UNSAFE_RESUME
-In-Reply-To: <1391094252-10599-1-git-send-email-fabio.estevam@freescale.com>
-References: <1391094252-10599-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20140210024406.GA9628@S2101-09.ap.freescale.net>
+Date: Mon, 10 Feb 2014 11:02:17 +0800
+Subject: [PATCH] ARM: dts: i.MX51 babbage: Support diagnostic LED
+In-Reply-To: <1391522263-17877-1-git-send-email-Ying.Liu@freescale.com>
+References: <1391522263-17877-1-git-send-email-Ying.Liu@freescale.com>
+Message-ID: <20140210030214.GB9628@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 30, 2014 at 01:04:11PM -0200, Fabio Estevam wrote:
-> PM subsystem treats mmc card as removed during suspend.
->     
-> If MMC is used to store the root file system, it is better to tell the kernel
-> not to treat it as a removable media, so select CONFIG_MMC_UNSAFE_RESUME for
-> such purpose.
+On Tue, Feb 04, 2014 at 09:57:42PM +0800, Liu Ying wrote:
+> The D25 LED controlled by gpio on the i.MX51 babbage
+> board is a diagnostic LED according to the board design.
+> This patch adds the relevant device tree nodes to the
+> i.MX51 babbage device tree file to support this LED.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx51-babbage.dts |   17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+> index be1407c..8d6a74b 100644
+> --- a/arch/arm/boot/dts/imx51-babbage.dts
+> +++ b/arch/arm/boot/dts/imx51-babbage.dts
+> @@ -81,6 +81,17 @@
+>  		};
+>  	};
+>  
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&led_pin_gpio2_6>;
+> +
+> +		led-diagnostic {
+> +			label = "diagnostic";
+> +			gpios = <&gpio2 6 0>;
 
-Applied both, thanks.
+Just out of curiosity, how will you use/trigger the led?
+
+> +		};
+> +	};
+> +
+>  	sound {
+>  		compatible = "fsl,imx51-babbage-sgtl5000",
+>  			     "fsl,imx-audio-sgtl5000";
+> @@ -280,6 +291,12 @@
+>  				MX51_PAD_CSPI1_RDY__GPIO4_26 0x80000000
+>  			>;
+>  		};
+> +
+> +		led_pin_gpio2_6: led_gpio2_6 {
+
+This might be copied from some existing file, but I would hope the name
+can be more generic, something like the following
+
+	pinctrl_gpio_leds: gpioledsgrp {
+
+, so that when we have more gpio controlled leds to add, we can just add
+more pins into the same group without concerning the name.
+
+Shawn
+
+> +			fsl,pins = <
+> +				MX51_PAD_EIM_D22__GPIO2_6 0x80000000
+> +			>;
+> +		};
+>  	};
+>  };
+>  
+> -- 
+> 1.7.9.5
+> 
+> 
