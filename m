@@ -1,57 +1,37 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 10 Feb 2014 09:13:55 +0800
-Subject: [PATCH 2/2] clocksource: Make clocksource register functions void
-In-Reply-To: <alpine.DEB.2.02.1402052139560.24986@ionos.tec.linutronix.de>
-References: <1390461166-36440-1-git-send-email-wangyijing@huawei.com>
- <52E0C889.6000106@prisktech.co.nz>
- <063D6719AE5E284EB5DD2968C1650D6D46489C@AcuExch.aculab.com>
- <alpine.DEB.2.02.1402052139560.24986@ionos.tec.linutronix.de>
-Message-ID: <52F827D3.5080906@huawei.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 10 Feb 2014 02:20:15 +0100
+Subject: [PATCH] ARM: multiplatform: remove reference to ARCH_MULTI_V4
+In-Reply-To: <201307141034.42868.arnd@arndb.de>
+References: <1373746191.1359.37.camel@x61.thuisdomein>
+ <201307141034.42868.arnd@arndb.de>
+Message-ID: <1391995215.14955.10.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014/2/6 4:40, Thomas Gleixner wrote:
-> Yijing,
+On Sun, 2013-07-14 at 10:34 +0200, Arnd Bergmann wrote:
+> On Saturday 13 July 2013, Paul Bolle wrote:
+> > The Kconfig symbol ARCH_MULTI_V4 was removed in commit 24e860fbfd
+> > ("ARM: multiplatform: always pick one CPU type"). Remove the last
+> > reference to it too.
+> > 
+> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> > ---
+> > 0) Untested.
+> > 
+> > 1) Commit 24e860fbfd is silent on the reason to drop ARCH_MULTI_V4. And
+> > the ARM section of the Kconfig files is rather complicated for people,
+> > like me, that aren't familiar with the way the ARM universe is divided
+> > in architectures, machines, platforms, etc. That makes it hard to say
+> > whether ARCH_MULTI_V4 was dropped on purpose or by accident.
 > 
-> On Thu, 23 Jan 2014, David Laight wrote:
+> It was dropped on purpose because it is unused in 3.11 but it will
+> be used again in 3.12, so I wouldn't bother with your patch.
 > 
->> From: Linuxppc-dev Tony Prisk
->>> On 23/01/14 20:12, Yijing Wang wrote:
->>>> Currently, clocksource_register() and __clocksource_register_scale()
->>>> functions always return 0, it's pointless, make functions void.
->>>> And remove the dead code that check the clocksource_register_hz()
->>>> return value.
->>> ......
->>>> -static inline int clocksource_register_hz(struct clocksource *cs, u32 hz)
->>>> +static inline void clocksource_register_hz(struct clocksource *cs, u32 hz)
->>>>   {
->>>>   	return __clocksource_register_scale(cs, 1, hz);
->>>>   }
->>>
->>> This doesn't make sense - you are still returning a value on a function
->>> declared void, and the return is now from a function that doesn't return
->>> anything either ?!?!
->>> Doesn't this throw a compile-time warning??
->>
->> It depends on the compiler.
->> Recent gcc allow it.
->> I don't know if it is actually valid C though.
->>
->> There is no excuse for it on lines like the above though.
-> 
-> Can you please resend with that fixed against 3.14-rc1 ?
+> Thanks anyway for looking into unused symbols, I think checking for
+> unused code like this is very useful in general.
 
-OK, I will resend later.
-
-Thanks!
-Yijing.
+We're now at v3.14-rc1 and ARCH_MULTI_V4 is still unused. Are there still plans to
+use it again?
 
 
-> 
-> .
-> 
-
-
--- 
-Thanks!
-Yijing
+Paul Bolle
