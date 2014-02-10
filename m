@@ -1,58 +1,31 @@
-From: linux@roeck-us.net (linux at roeck-us.net)
-Date: Mon, 10 Feb 2014 12:21:19 -0600
-Subject: [PATCH 01/17] Documentation: i2c: describe devicetree method
- for instantiating devices
-In-Reply-To: <1392026654-5343-2-git-send-email-wsa@the-dreams.de>
-References: <1392026654-5343-1-git-send-email-wsa@the-dreams.de>
- <1392026654-5343-2-git-send-email-wsa@the-dreams.de>
-Message-ID: <20140210122119.115858a7ntu4lr40@67.228.131.205>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 10 Feb 2014 18:25:19 +0000
+Subject: [alsa-devel] [PATCH 0/7] Audio support for Armada 370 DB
+In-Reply-To: <20140210160432.27281741@skate>
+References: <1391102051-5319-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140210152141.1391fb67@skate>
+ <20140210145729.GP1757@sirena.org.uk>
+ <20140210160432.27281741@skate>
+Message-ID: <20140210182519.GD13533@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Wolfram Sang <wsa@the-dreams.de>:
+On Mon, Feb 10, 2014 at 04:04:32PM +0100, Thomas Petazzoni wrote:
 
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->
->  Documentation/i2c/instantiating-devices | 34  
-> +++++++++++++++++++++++++++++++--
->  1 file changed, 32 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/i2c/instantiating-devices  
-> b/Documentation/i2c/instantiating-devices
-> index c70e7a7..6df095a 100644
-> --- a/Documentation/i2c/instantiating-devices
-> +++ b/Documentation/i2c/instantiating-devices
-> @@ -8,8 +8,8 @@ reason, the kernel code must instantiate I2C devices  
-> explicitly. There are
->  several ways to achieve this, depending on the context and requirements.
->
->
-> -Method 1: Declare the I2C devices by bus number
-> ------------------------------------------------
-> +Method 1a: Declare the I2C devices by bus number
-> +------------------------------------------------
->
->  This method is appropriate when the I2C bus is a system bus as is the case
->  for many embedded systems. On such systems, each I2C bus has a number
-> @@ -51,6 +51,36 @@ The devices will be automatically unbound and  
-> destroyed when the I2C bus
->  they sit on goes away (if ever.)
->
->
-> +Method 1b: Declare the I2C devices via devicetree
-> +-------------------------------------------------
-> +
+> Sure, sorry. The patches that are of interest to you are prefixed by
+> "sound: codec" (for the patch touching sound/soc/codecs) and "sound:
+> soc" (for the patches touching sound/soc/kirkwood).
 
-Hi Wolfram,
+> If you want, I can resend with subject lines containing 'ASoC:',
+> however maybe it's better if some other comments are made before, to
+> avoid additional noise.
 
-There is now also a means to instantiate I2C devices through
-ACPI. This is documented in Documentation/acpi/enumeration.txt.
-
-Might be worthwhile to reference it from instantiating-devices.
-I guess that would be a separate patch though.
-
-Thanks,
-Guenter
+It's OK, they are on the list and I will get to them (most likely
+tomorrow now) - I did notice them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/6d6702e2/attachment.sig>
