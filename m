@@ -1,37 +1,78 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 10 Feb 2014 14:40:54 -0800 (PST)
-Subject: [PATCH v2 1/3] net: stmmac:sti: Add STi SOC glue driver.
-In-Reply-To: <1391770525-24349-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1391770455-24291-1-git-send-email-srinivas.kandagatla@st.com>
- <1391770525-24349-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <20140210.144054.2066120014050984537.davem@davemloft.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 10 Feb 2014 20:00:20 -0300
+Subject: [PATCH v7 01/18] watchdog: orion: Add clock error handling
+In-Reply-To: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1392073237-2554-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: <srinivas.kandagatla@st.com>
-Date: Fri, 7 Feb 2014 10:55:25 +0000
+This commit adds a check for clk_prepare_enable success and introduces
+an error path to disable the clock properly.
 
-> +		if (dwmac->interface == PHY_INTERFACE_MODE_MII ||
-> +			dwmac->interface == PHY_INTERFACE_MODE_GMII) {
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Tested-by: Willy Tarreau <w@1wt.eu>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/watchdog/orion_wdt.c | 29 +++++++++++++++++++----------
+ 1 file changed, 19 insertions(+), 10 deletions(-)
 
-This is not indented correctly, the first character on the second line should
-line up exactly at the column after the openning parenthesis on the first
-line.
-
-The objective is not to indent using only TAB characters, which you
-are doing here.
-
-Rather, the objective is to use the appropriate number of TAB _and_
-space characters necessary to reach the proper column.
-
-> +		const char *rs;
-> +		err = of_property_read_string(np, "st,tx-retime-src", &rs);
-
-Please add an empty line after the local variable declaration.
-
-> +		if (!strcasecmp(rs, "clk_125"))
-> +			dwmac->is_tx_retime_src_clk_125 = true;
-> +
-> +	}
-
-That empty line is superfluous, please delete it.
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index f7722a4..7f19fa3 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -151,17 +151,24 @@ static int orion_wdt_probe(struct platform_device *pdev)
+ 	clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(clk)) {
+ 		dev_err(&pdev->dev, "Orion Watchdog missing clock\n");
+-		return -ENODEV;
++		return PTR_ERR(clk);
+ 	}
+-	clk_prepare_enable(clk);
++	ret = clk_prepare_enable(clk);
++	if (ret)
++		return ret;
+ 	wdt_tclk = clk_get_rate(clk);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res)
+-		return -ENODEV;
++	if (!res) {
++		ret = -ENODEV;
++		goto disable_clk;
++	}
++
+ 	wdt_reg = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+-	if (!wdt_reg)
+-		return -ENOMEM;
++	if (!wdt_reg) {
++		ret = -ENOMEM;
++		goto disable_clk;
++	}
+ 
+ 	wdt_max_duration = WDT_MAX_CYCLE_COUNT / wdt_tclk;
+ 
+@@ -171,14 +178,16 @@ static int orion_wdt_probe(struct platform_device *pdev)
+ 
+ 	watchdog_set_nowayout(&orion_wdt, nowayout);
+ 	ret = watchdog_register_device(&orion_wdt);
+-	if (ret) {
+-		clk_disable_unprepare(clk);
+-		return ret;
+-	}
++	if (ret)
++		goto disable_clk;
+ 
+ 	pr_info("Initial timeout %d sec%s\n",
+ 		orion_wdt.timeout, nowayout ? ", nowayout" : "");
+ 	return 0;
++
++disable_clk:
++	clk_disable_unprepare(clk);
++	return ret;
+ }
+ 
+ static int orion_wdt_remove(struct platform_device *pdev)
+-- 
+1.8.1.5
