@@ -1,42 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 10 Feb 2014 18:44:04 +0100
-Subject: [PATCH 07/11] ARM: mvebu: add initial support for the Armada
- 380/385 SOCs
-In-Reply-To: <1392053002-19831-8-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392053002-19831-8-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140210174404.GC9995@lunn.ch>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 10 Feb 2014 09:46:07 -0800
+Subject: [PATCH v3 5/7] clocksource/cadence_ttc: Use only one counter
+In-Reply-To: <alpine.DEB.2.02.1402042138480.24986@ionos.tec.linutronix.de>
+References: <1391466877-28908-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1391466877-28908-6-git-send-email-soren.brinkmann@xilinx.com>
+ <alpine.DEB.2.02.1402042138480.24986@ionos.tec.linutronix.de>
+Message-ID: <6429e1bb-d4ad-4bf2-bd75-456324f45629@CO9EHSMHS016.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas
+Hi Thomas,
 
-> +config MACH_ARMADA_380
+On Tue, Feb 04, 2014 at 09:41:53PM +0100, Thomas Gleixner wrote:
+> On Mon, 3 Feb 2014, Soren Brinkmann wrote:
+> 
+> > Currently the driver uses two of the three counters the TTC provides to
+> > implement a clocksource and a clockevent device. By using the TTC's
+> > match feature we can implement both use cases using a single counter
+> > only.
+> 
+> Are you entirely sure that this match feature is free of the infamous
+> HPET match feature issues?
+> 
+> See arch/x86/kernel/hpet.c: hpet_next_event()
+> 
+> If yes, please add a comment. If no ....
+Good catch. Looks like the comparator compares on == as well. So, I
+assume it may show similar issues. I'll have to spend some more time
+looking into this.
 
-Should this maybe be MACH_ARMADA_38X. You have PINCTRL_ARMADA_38X, so
-it seems a bit inconsistent.
+Thanks for applying the first two patches of the series.
 
-> +
-> +static void __init armada_380_timer_and_clk_init(void)
-> +{
-> +	of_clk_init(NULL);
-> +	clocksource_of_init();
-> +	BUG_ON(mvebu_mbus_dt_init());
-> +	l2x0_of_init(0, ~0UL);
-> +}
-> +
-> +static const char * const armada_380_dt_compat[] = {
-> +	"marvell,armada380",
-> +	"marvell,armada385",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 380/385 (Device Tree)")
-> +	.init_time	= armada_380_timer_and_clk_init,
-> +	.restart	= mvebu_restart,
-> +	.dt_compat	= armada_380_dt_compat,
-> +MACHINE_END
-
-This looks very similar to the 375 code. Could they be combined?
-
-     Andrew
+	Thanks,
+	S?ren
