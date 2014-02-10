@@ -1,35 +1,115 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Feb 2014 15:24:52 +0000
-Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
-In-Reply-To: <20140210151247.GD2794@e103592.cambridge.arm.com>
-References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
- <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
- <20140210141634.GA2794@e103592.cambridge.arm.com> <52F8E5E2.30805@st.com>
- <20140210151247.GD2794@e103592.cambridge.arm.com>
-Message-ID: <20140210152452.GA26684@n2100.arm.linux.org.uk>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 10 Feb 2014 16:22:33 +0100
+Subject: [RFC PATCH 1/3] regmap: Separate regmap dev initialization
+In-Reply-To: <cover.1392045742.git.michal.simek@xilinx.com>
+References: <cover.1392045742.git.michal.simek@xilinx.com>
+Message-ID: <5998a942a3dbfb2ef965d000168cbd7007315630.1392045742.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 03:12:47PM +0000, Dave Martin wrote:
-> Firstly, blindly adding 4 to PC is obviouly not right, partly because we
-> might be running an unrelated thread by the time the abort fires, and
-> also because the affected instruction might not be 4 bytes in size in a
-> Thumb kernel.
+Create special function regmap_attach_dev
+which can be called separately out of regmap_init.
 
-Exactly.  We ended up on some platforms having special accessors for PCI
-where we included a number of 'mov r0, r0' instructions after the accessor
-so we could properly cope with them - but this required knowledge that
-we were going to only receive an imprecise abort from these accessors
-and only for a few cycles after the instruction.
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-However, that's not true with modern architectures.  The point they're
-received will _not_ be the load/store which resulted in the abort, and
-in the case of a write, they could be many hundreds of cycles later,
-especially if the write has been buffered.
+ drivers/base/regmap/regmap.c | 41 ++++++++++++++++++++++++++++-------------
+ include/linux/regmap.h       |  2 ++
+ 2 files changed, 30 insertions(+), 13 deletions(-)
 
-So adding four to the PC is definitely a very /bad/ thing to do.
+diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
+index b897c1a..c766f5f 100644
+--- a/drivers/base/regmap/regmap.c
++++ b/drivers/base/regmap/regmap.c
+@@ -380,6 +380,28 @@ static void regmap_range_exit(struct regmap *map)
+ 	kfree(map->selector_work_buf);
+ }
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
++int regmap_attach_dev(struct device *dev, struct regmap *map,
++		      const struct regmap_config *config)
++{
++	struct regmap **m;
++
++	map->dev = dev;
++
++	regmap_debugfs_init(map, config->name);
++
++	/* Add a devres resource for dev_get_regmap() */
++	m = devres_alloc(dev_get_regmap_release, sizeof(*m), GFP_KERNEL);
++	if (!m) {
++		regmap_debugfs_exit(map);
++		return -ENOMEM;
++	}
++	*m = map;
++	devres_add(dev, m);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(regmap_attach_dev);
++
+ /**
+  * regmap_init(): Initialise register map
+  *
+@@ -397,7 +419,7 @@ struct regmap *regmap_init(struct device *dev,
+ 			   void *bus_context,
+ 			   const struct regmap_config *config)
+ {
+-	struct regmap *map, **m;
++	struct regmap *map;
+ 	int ret = -EINVAL;
+ 	enum regmap_endian reg_endian, val_endian;
+ 	int i, j;
+@@ -734,25 +756,18 @@ skip_format_initialization:
+ 		}
+ 	}
+
+-	regmap_debugfs_init(map, config->name);
+-
+ 	ret = regcache_init(map, config);
+ 	if (ret != 0)
+ 		goto err_range;
+
+-	/* Add a devres resource for dev_get_regmap() */
+-	m = devres_alloc(dev_get_regmap_release, sizeof(*m), GFP_KERNEL);
+-	if (!m) {
+-		ret = -ENOMEM;
+-		goto err_debugfs;
+-	}
+-	*m = map;
+-	devres_add(dev, m);
++	if (dev)
++		ret = regmap_attach_dev(dev, map, config);
++		if (ret != 0)
++			goto err_regcache;
+
+ 	return map;
+
+-err_debugfs:
+-	regmap_debugfs_exit(map);
++err_regcache:
+ 	regcache_exit(map);
+ err_range:
+ 	regmap_range_exit(map);
+diff --git a/include/linux/regmap.h b/include/linux/regmap.h
+index 4149f1a..fa4d079 100644
+--- a/include/linux/regmap.h
++++ b/include/linux/regmap.h
+@@ -317,6 +317,8 @@ struct regmap *regmap_init(struct device *dev,
+ 			   const struct regmap_bus *bus,
+ 			   void *bus_context,
+ 			   const struct regmap_config *config);
++int regmap_attach_dev(struct device *dev, struct regmap *map,
++				 const struct regmap_config *config);
+ struct regmap *regmap_init_i2c(struct i2c_client *i2c,
+ 			       const struct regmap_config *config);
+ struct regmap *regmap_init_spi(struct spi_device *dev,
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/2f6b4e20/attachment.sig>
