@@ -1,67 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Feb 2014 17:12:00 +0000
-Subject: [RFC/PATCH v2] ARM: vDSO gettimeofday using generic timer
- architecture
-In-Reply-To: <20140210165113.GA7891@linaro.org>
-References: <1391814349-10706-1-git-send-email-nathan_lynch@mentor.com>
- <20140209102023.GL26684@n2100.arm.linux.org.uk>
- <20140210165113.GA7891@linaro.org>
-Message-ID: <20140210171200.GE26684@n2100.arm.linux.org.uk>
+From: groeck@juniper.net (Guenter Roeck)
+Date: Mon, 10 Feb 2014 17:18:11 +0000
+Subject: [PATCH 01/10] watchdog: xilinx: Convert driver to the watchdog
+ framework
+In-Reply-To: <52F879CF.8080906@monstr.eu>
+References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
+ <52F7DF2F.5060001@roeck-us.net> <52F879CF.8080906@monstr.eu>
+Message-ID: <c5f221694e2041519cabeef0b7552aac@CO1PR05MB523.namprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 04:51:16PM +0000, Steve Capper wrote:
-> Hi Russell,
+> -----Original Message-----
+> From: Michal Simek [mailto:monstr at monstr.eu]
+> Sent: Sunday, February 09, 2014 11:04 PM
+> To: Guenter Roeck
+> Cc: Michal Simek; linux-kernel at vger.kernel.org; Wim Van Sebroeck;
+> linux-watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 01/10] watchdog: xilinx: Convert driver to the
+> watchdog framework
 > 
-> On Sun, Feb 09, 2014 at 10:20:23AM +0000, Russell King - ARM Linux wrote:
-> > On Fri, Feb 07, 2014 at 05:05:49PM -0600, Nathan Lynch wrote:
-> > > +	/* Grab the vDSO code pages. */
-> > > +	for (i = 0; i < vdso_pages; i++) {
-> > > +		pg = virt_to_page(&vdso_start + i*PAGE_SIZE);
-> > > +		ClearPageReserved(pg);
-> > > +		get_page(pg);
-> > > +		vdso_pagelist[i] = pg;
-> > > +	}
-> > 
-> > Why do we want to clear the reserved status?  This looks over complicated
-> > to me.
-> > 
+> On 02/09/2014 09:03 PM, Guenter Roeck wrote:
+> > On 01/31/2014 06:18 AM, Michal Simek wrote:
+> >> - Remove uneeded headers, fops functions
+> >> - Use xilinx_wdt prefix in start/stop/keepalive functions
+> >>    and in new structures
+> >>
+> >> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> >
+> > Hi Michal,
+> >
+> >>   static int xwdt_probe(struct platform_device *pdev)
+> >>   {
+> >>       int rc;
+> >> @@ -314,7 +184,7 @@ static int xwdt_probe(struct platform_device
+> *pdev)
+> >>                       "xlnx,wdt-enable-once", NULL);
+> >>       if (tmptr == NULL) {
+> >>           pr_warn("Parameter \"xlnx,wdt-enable-once\" not found in
+> device tree!\n");
+> >> -        xdev.nowayout = WATCHDOG_NOWAYOUT;
+> >> +        watchdog_set_nowayout(&xilinx_wdt_wdd, true);
+> >
+> > Sure you want to set this to always true instead of using
+> WATCHDOG_NOWAYOUT ?
 > 
-> This looks like it was inherited from the PowerPC code where the
-> behaviour of set_pte_at would change dependent on whether or not the
-> page was reserved (set_pte_at->set_pte_filter->maybe_pte_to_page). I
-> think we can safely remove this from ARM and ARM64.
-
-Great, so we can get rid of that and the get_page() on the vdso data
-page below.
-
-> > > +
-> > > +	/* Sanity check the shared object header. */
-> > > +	vbase = vmap(vdso_pagelist, 1, 0, PAGE_KERNEL);
-> > > +	if (vbase == NULL) {
-> > > +		pr_err("Failed to map vDSO pagelist!\n");
-> > > +		return -ENOMEM;
-> > > +	} else if (memcmp(vbase, "\177ELF", 4)) {
-> > > +		pr_err("vDSO is not a valid ELF object!\n");
-> > > +		ret = -EINVAL;
-> > > +		goto unmap;
-> > > +	}
-> > 
-> > Why do we need to vmap() pages which are already accessible - vdso_start
-> > must be part of the kernel image, and therefore will be accessible via
-> > standard mappings.
-> > 
+> I have checked it and
+> option CONFIG_WATCHDOG_NOWAYOUT - Disable watchdog shutdown on close
 > 
-> This is a dress rehersal for install_special_mapping more than anything.
-> If we map the page, and look at the first 4 bytes, are they what we
-> expect?
+> with this part in the header
+> 
+> 100 #ifdef CONFIG_WATCHDOG_NOWAYOUT
+> 101 #define WATCHDOG_NOWAYOUT               1
+> 102 #define WATCHDOG_NOWAYOUT_INIT_STATUS   (1 << WDOG_NO_WAY_OUT)
+> 103 #else
+> 104 #define WATCHDOG_NOWAYOUT               0
+> 105 #define WATCHDOG_NOWAYOUT_INIT_STATUS   0
+> 106 #endif
+> 
+> enable once is hardware option and it means when this option is setup
+> in hw you can't stop watchdog. That's why I think that setting up true
+> instead of WATCHDOG_NOWAYOUT is correct.
+> 
 
-My point is that we can already view this page directly by dereferencing
-vdso_start - do we really need to perform this apparant test of the MMU?
-If the MMU isn't working in this way, we have much bigger and more
-fundamental problems...
+Ok, makes sense.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Guenter
