@@ -1,48 +1,43 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 10 Feb 2014 14:37:08 +0000
-Subject: [PATCH] ARM: mm: add imprecise abort non-deadly handler
-In-Reply-To: <1391797214-17142-2-git-send-email-ben.dooks@codethink.co.uk>
-References: <1391797214-17142-1-git-send-email-ben.dooks@codethink.co.uk>
- <1391797214-17142-2-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20140210143708.GB2794@e103592.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Feb 2014 14:40:13 +0000
+Subject: [PATCH 1/1] openfirmware: trivial: Standardise formatting of
+ 'struct of_device_id' definition
+In-Reply-To: <1390489239-29001-1-git-send-email-lee.jones@linaro.org>
+References: <1390489239-29001-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140210144013.GA26697@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 06:20:14PM +0000, Ben Dooks wrote:
-> Given that imprecise aborts may be delivered after the action that
-> caused them (or even for non-cpu related activities such as bridge
-> faults from a bus-master) it is possible that the wrong process is
-> terminated as a result.
+> It's commonly accepted that when defining a struct the '{' is appended
+> onto the first line. This helps when searching for the definition using
+> syntax similar to 'struct of_device_id {'.
 > 
-> It is not know at this time in an SMP system which cores get notified
-> of an imprecise external abort, we have yet to find the right details
-> in the architecture reference manuals. This also means that killing
-> the process is probably the wrong thing to do on reception of these aborts.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  include/linux/mod_devicetable.h | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 > 
-> Add a handler to take and print imprecise aborts and allow the process
-> to continue. This should ensure that the abort is shown but not kill
-> the process that was running on the cpu core at the time.
+> diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
+> index 45e9214..090e014 100644
+> --- a/include/linux/mod_devicetable.h
+> +++ b/include/linux/mod_devicetable.h
+> @@ -220,8 +220,7 @@ struct serio_device_id {
+>  /*
+>   * Struct used for matching a device
+>   */
+> -struct of_device_id
+> -{
+> +struct of_device_id {
+>  	char	name[32];
+>  	char	type[32];
+>  	char	compatible[128];
 
-Not treating these as thread-specific faults seems correct, since we
-never have a way to map these aborts back to the culprit ... except that
-there is a likelihood the culprit is still running when the abort fires.
+Is anyone interested in this patch?
 
+Or should is it okay to just take it through my tree?
 
-"Spurious" imprecise aborts pretty much always indicate a hardware error
-or a nasty bug somewhere.
-
-Another cause is badly implemented, buggy or malicious userspace software
-being given more exotic mmaps that it is qualified to deal with
-responsibly.  That's a nasty bug in the distro maintainer / system
-administrator / vendor.
-
-So, I think this should be at least KERN_ERROR; maybe KERN_CRIT or above.
-We must not encourage people to think that these aborts are somehow
-benign.
-
-If we really want people to fix their bugs, it may be worth considering
-panic(), or doing this when some threshold is reached.  This may be a
-bit harsh though, at least without some threshold.
-
-Cheers
----Dave
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
