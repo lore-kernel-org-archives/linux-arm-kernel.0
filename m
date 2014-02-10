@@ -1,34 +1,65 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 10 Feb 2014 18:35:54 +0800
-Subject: [PATCH v4 8/8] ARM: dts: sun7i: Add ethernet alias for GMAC
+Date: Mon, 10 Feb 2014 18:35:53 +0800
+Subject: [PATCH v4 7/8] ARM: dts: sun7i: a20-olinuxino-micro: Enable GMAC
+ instead of EMAC
 In-Reply-To: <1392028554-32545-1-git-send-email-wens@csie.org>
 References: <1392028554-32545-1-git-send-email-wens@csie.org>
-Message-ID: <1392028554-32545-9-git-send-email-wens@csie.org>
+Message-ID: <1392028554-32545-8-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All Allwinner A20 boards we support can only use either EMAC or GMAC,
-as they share the same pins. As we have switched all supported to
-GMAC, we should alias GMAC (the active controller) as ethernet0,
-so u-boot will insert the MAC address for the correct controller.
+GMAC has better performance and fewer hardware issues.
+Use the GMAC in MII mode for ethernet instead of the EMAC.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 27 +++++++++++--------------
+ 1 file changed, 12 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 68c889c..1b5fb88 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -17,7 +17,7 @@
- 	interrupt-parent = <&gic>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+index ead3013..b02a796 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+@@ -19,21 +19,6 @@
+ 	compatible = "olimex,a20-olinuxino-micro", "allwinner,sun7i-a20";
  
- 	aliases {
--		ethernet0 = &emac;
-+		ethernet0 = &gmac;
- 		serial0 = &uart0;
- 		serial1 = &uart1;
- 		serial2 = &uart2;
+ 	soc at 01c00000 {
+-		emac: ethernet at 01c0b000 {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&emac_pins_a>;
+-			phy = <&phy1>;
+-			status = "okay";
+-		};
+-
+-		mdio at 01c0b080 {
+-			status = "okay";
+-
+-			phy1: ethernet-phy at 1 {
+-				reg = <1>;
+-			};
+-		};
+-
+ 		pinctrl at 01c20800 {
+ 			led_pins_olinuxino: led_pins at 0 {
+ 				allwinner,pins = "PH2";
+@@ -78,6 +63,18 @@
+ 			pinctrl-0 = <&i2c2_pins_a>;
+ 			status = "okay";
+ 		};
++
++		gmac: ethernet at 01c50000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&gmac_pins_mii_a>;
++			phy = <&phy1>;
++			phy-mode = "mii";
++			status = "okay";
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
+ 	};
+ 
+ 	leds {
 -- 
 1.9.rc1
