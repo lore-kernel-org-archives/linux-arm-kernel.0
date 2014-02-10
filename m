@@ -1,166 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Feb 2014 14:18:05 +0800
-Subject: [PATCH v2] ARM: dts: imx6qdl-sabreauto: Add PFUZE100 support
-In-Reply-To: <1391684719-7720-1-git-send-email-festevam@gmail.com>
-References: <1391684719-7720-1-git-send-email-festevam@gmail.com>
-Message-ID: <20140210061803.GI9628@S2101-09.ap.freescale.net>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 10 Feb 2014 14:09:44 +0800
+Subject: [PATCH v3 0/2] ASoC: atmel_ssc_dai: add option to choose clock
+Message-ID: <1392012586-30790-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 09:05:19AM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> mx6 sabreauto boards have Freescale PFUZE100 regulator, so add support for it.
-> 
-> ARM: dts: imx6qdl-sabreauto: Add PFUZE100 support
-> 
-> mx6 sabreauto boards have Freescale PFUZE100 regulator, so add support for it.
+When SSC work in slave mode, the clock can come from TK pin and also
+can come from RK pin, this is hardware design decided. So, make it
+available to choose where the clock from.
 
-Why duplicating the patch subject and commit log here?  Dropped the two
-lines and applied the patch.
+Changes in v3:
+  - Move the property from card to ssc device
+Series-changes: 2
+  - using "-" replace "_" in binding document
 
-Shawn
+Bo Shen (2):
+  ASoC: atmel_ssc_dai: make option to choose clock
+  Binding: atmel-ssc: add option to choose clock
 
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Keep it sorted
-> 
->  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 113 +++++++++++++++++++++++++++++++
->  1 file changed, 113 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> index 10a00e4..466a544 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> @@ -63,6 +63,112 @@
->  	status = "okay";
->  };
->  
-> +&i2c2 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c2>;
-> +	status = "okay";
-> +
-> +	pmic: pfuze100 at 08 {
-> +		compatible = "fsl,pfuze100";
-> +		reg = <0x08>;
-> +
-> +		regulators {
-> +			sw1a_reg: sw1ab {
-> +				regulator-min-microvolt = <300000>;
-> +				regulator-max-microvolt = <1875000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +				regulator-ramp-delay = <6250>;
-> +			};
-> +
-> +			sw1c_reg: sw1c {
-> +				regulator-min-microvolt = <300000>;
-> +				regulator-max-microvolt = <1875000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +				regulator-ramp-delay = <6250>;
-> +			};
-> +
-> +			sw2_reg: sw2 {
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw3a_reg: sw3a {
-> +				regulator-min-microvolt = <400000>;
-> +				regulator-max-microvolt = <1975000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw3b_reg: sw3b {
-> +				regulator-min-microvolt = <400000>;
-> +				regulator-max-microvolt = <1975000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			sw4_reg: sw4 {
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +			};
-> +
-> +			swbst_reg: swbst {
-> +				regulator-min-microvolt = <5000000>;
-> +				regulator-max-microvolt = <5150000>;
-> +			};
-> +
-> +			snvs_reg: vsnvs {
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <3000000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vref_reg: vrefddr {
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen1_reg: vgen1 {
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <1550000>;
-> +			};
-> +
-> +			vgen2_reg: vgen2 {
-> +				regulator-min-microvolt = <800000>;
-> +				regulator-max-microvolt = <1550000>;
-> +			};
-> +
-> +			vgen3_reg: vgen3 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +			};
-> +
-> +			vgen4_reg: vgen4 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen5_reg: vgen5 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +
-> +			vgen6_reg: vgen6 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-always-on;
-> +			};
-> +		};
-> +	};
-> +};
-> +
->  &iomuxc {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_hog>;
-> @@ -133,6 +239,13 @@
->  			>;
->  		};
->  
-> +		pinctrl_i2c2: i2c2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_EB2__I2C2_SCL	0x4001b8b1
-> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA	0x4001b8b1
-> +			>;
-> +		};
-> +
->  		pinctrl_pwm3: pwm1grp {
->  			fsl,pins = <
->  				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
-> -- 
-> 1.8.1.2
-> 
+ Documentation/devicetree/bindings/misc/atmel-ssc.txt |  8 ++++++++
+ drivers/misc/atmel-ssc.c                             |  6 ++++++
+ include/linux/atmel-ssc.h                            |  1 +
+ sound/soc/atmel/atmel_ssc_dai.c                      | 13 +++++++++----
+ 4 files changed, 24 insertions(+), 4 deletions(-)
+
+-- 
+1.8.5.2
