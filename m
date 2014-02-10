@@ -1,66 +1,113 @@
 From: mohit.kumar@st.com (Mohit Kumar)
-Date: Mon, 10 Feb 2014 14:21:52 +0530
-Subject: [PATCH V5 1/8] clk: SPEAr13xx: Fix pcie clock name
-In-Reply-To: <cover.1391871170.git.pratyush.anand@st.com>
-References: <cover.1391871170.git.pratyush.anand@st.com>
-Message-ID: <6e6bc5e96945862e8b6421aade15954fa05270b6.1391871170.git.pratyush.anand@st.com>
+Date: Mon, 10 Feb 2014 14:21:51 +0530
+Subject: [PATCH V5 0/8]PCI:Add SPEAr13xx PCie support
+Message-ID: <cover.1391871170.git.pratyush.anand@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pratyush Anand <pratyush.anand@st.com>
 
-Follow dt clock naming convention for PCIe clocks.
+First three patches are improvement and fixes for SPEAr13xx support.
+Patches 4-6 add miphy40lp skelten driver and support for spear1310/40 miphy
+wrapper. Patch 7 add support for SPEAr13xx PCIe.
 
-Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Mohit Kumar <mohit.kumar@st.com>
-Cc: Viresh Kumar <viresh.linux@gmail.com>
-Cc: spear-devel at list.st.com
+These pathes are tested with linux-3.14-rc1 with following patch on the top of
+it:
+Author: Balaji T K <balajitk@ti.com>
+Date:   Mon Jan 20 16:41:27 2014 +0200
+
+    ata: ahci_platform: Manage SATA PHY
+
+Tested with SPEAr1310 evaluation board:
+	- INTEL PRO 100/100 EP card
+	- USB xhci gen2 card
+ 	- Above cards connected through LeCROY PTC switch
+
+Modifications for SATA are tested with SPEAr1340-evb board
+
+Changes since v4:
+- Uses per device function pointers passed from .data field to
+  the of_device_id instead of of_device_is_compatible.
+- Incorporated other minor comments from v4
+
+Changes since v3:
+- Phy driver renamed to phy-miphy40lp
+- ahci phy hook patch used as suggested by Arnd
+- Incorporated other minor comments from v3
+
+Changes since v2:
+- Incorporated comments to move SPEAr13xx PCIe and SATA phy specific routines to
+  the phy framework
+- Modify ahci driver to include phy hooks
+- phy-core driver modifications for subsys_initcall() 
+ 
+Changes since v1:
+- Few patches of the series are already accepted and applied to mainline e.g.
+ pcie designware driver improvements,fixes for IO translation bug, PCIe dw
+ driver maintainer. So dropped these from v2.
+- Incorporated comment to move the common/reset PCIe code to the seperate driver
+- PCIe and SATA share common PHY configuration registers, so move SATA
+ platform code to the system config driver
+Fourth patch is improves pcie designware driver and fixes the IO
+translation bug. IO translation bug fix leads to the working of PCIe EP devices
+connected to RC through switch.
+
+PCIe driver support for SPEAr1310/40 platform board is added.
+
+These patches are tested with SPEAr1310 evaluation board:
+	- INTEL PRO 100/100 EP card
+	- USB xhci gen2 card
+ 	- Above cards connected through LeCROY PTC switch
+
 Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/clk/spear/spear1310_clock.c | 6 +++---
- drivers/clk/spear/spear1340_clock.c | 2 +-
- 2 files changed, 4 insertions(+), 4 deletions(-)
+Cc: devicetree at vger.kernel.org
+Cc: linux-ide at vger.kernel.org
+Cc: linux-pci at vger.kernel.org
+Cc: spear-devel at list.st.com
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-pm at vger.kernel.org
 
-diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
-index 65894f7..4daa597 100644
---- a/drivers/clk/spear/spear1310_clock.c
-+++ b/drivers/clk/spear/spear1310_clock.c
-@@ -742,19 +742,19 @@ void __init spear1310_clk_init(void __iomem *misc_base, void __iomem *ras_base)
- 	clk = clk_register_gate(NULL, "pcie_sata_0_clk", "ahb_clk", 0,
- 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_0_CLK_ENB,
- 			0, &_lock);
--	clk_register_clkdev(clk, NULL, "dw_pcie.0");
-+	clk_register_clkdev(clk, NULL, "b1000000.pcie");
- 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
- 
- 	clk = clk_register_gate(NULL, "pcie_sata_1_clk", "ahb_clk", 0,
- 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_1_CLK_ENB,
- 			0, &_lock);
--	clk_register_clkdev(clk, NULL, "dw_pcie.1");
-+	clk_register_clkdev(clk, NULL, "b1800000.pcie");
- 	clk_register_clkdev(clk, NULL, "b1800000.ahci");
- 
- 	clk = clk_register_gate(NULL, "pcie_sata_2_clk", "ahb_clk", 0,
- 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_2_CLK_ENB,
- 			0, &_lock);
--	clk_register_clkdev(clk, NULL, "dw_pcie.2");
-+	clk_register_clkdev(clk, NULL, "b4000000.pcie");
- 	clk_register_clkdev(clk, NULL, "b4000000.ahci");
- 
- 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
-diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
-index fe835c1..5a5c664 100644
---- a/drivers/clk/spear/spear1340_clock.c
-+++ b/drivers/clk/spear/spear1340_clock.c
-@@ -839,7 +839,7 @@ void __init spear1340_clk_init(void __iomem *misc_base)
- 	clk = clk_register_gate(NULL, "pcie_sata_clk", "ahb_clk", 0,
- 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_PCIE_SATA_CLK_ENB,
- 			0, &_lock);
--	clk_register_clkdev(clk, NULL, "dw_pcie");
-+	clk_register_clkdev(clk, NULL, "b1000000.pcie");
- 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
- 
- 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
+
+Mohit Kumar (2):
+  SPEAr13xx: defconfig: Update
+  MAINTAINERS: Add ST SPEAr13xx PCIe driver maintainer
+
+Pratyush Anand (6):
+  clk: SPEAr13xx: Fix pcie clock name
+  SPEAr13xx: Fix static mapping table
+  phy: st-miphy-40lp: Add skeleton driver
+  SPEAr13xx: Fixup: Move SPEAr1340 SATA platform code to phy driver
+  phy: st-miphy-40lp: Add SPEAr1310 and SPEAr1340 PCIe phy support
+  pcie: SPEAr13xx: Add designware pcie support
+
+ .../devicetree/bindings/arm/spear-misc.txt         |   4 +
+ .../devicetree/bindings/pci/spear13xx-pcie.txt     |   7 +
+ .../devicetree/bindings/phy/st-miphy40lp.txt       |  12 +
+ MAINTAINERS                                        |   6 +
+ arch/arm/boot/dts/spear1310-evb.dts                |   4 +
+ arch/arm/boot/dts/spear1310.dtsi                   |  96 +++-
+ arch/arm/boot/dts/spear1340-evb.dts                |   4 +
+ arch/arm/boot/dts/spear1340.dtsi                   |  32 +-
+ arch/arm/boot/dts/spear13xx.dtsi                   |  10 +-
+ arch/arm/configs/spear13xx_defconfig               |  15 +
+ arch/arm/mach-spear/Kconfig                        |   3 +
+ arch/arm/mach-spear/include/mach/spear.h           |   4 +-
+ arch/arm/mach-spear/spear1340.c                    | 127 +----
+ arch/arm/mach-spear/spear13xx.c                    |   2 +-
+ drivers/clk/spear/spear1310_clock.c                |   6 +-
+ drivers/clk/spear/spear1340_clock.c                |   2 +-
+ drivers/pci/host/Kconfig                           |   5 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pcie-spear13xx.c                  | 414 ++++++++++++++++
+ drivers/phy/Kconfig                                |   6 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-miphy40lp.c                        | 538 +++++++++++++++++++++
+ 22 files changed, 1160 insertions(+), 139 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/spear-misc.txt
+ create mode 100644 Documentation/devicetree/bindings/pci/spear13xx-pcie.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/st-miphy40lp.txt
+ create mode 100644 drivers/pci/host/pcie-spear13xx.c
+ create mode 100644 drivers/phy/phy-miphy40lp.c
+
 -- 
 1.8.1.2
