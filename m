@@ -1,75 +1,81 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Feb 2014 10:38:38 +0100
-Subject: [PATCH] pinctrl:at91:add drive strength configuration
-In-Reply-To: <1390285991-1634-1-git-send-email-mark.roszko@gmail.com>
-References: <20140121060637.GP9558@ns203013.ovh.net>
- <1390285991-1634-1-git-send-email-mark.roszko@gmail.com>
-Message-ID: <CACRpkdaRP_JBt3Qqb6M6PFOHcUVOdVFNTsE9fWv-U073B=3UcA@mail.gmail.com>
+Date: Mon, 10 Feb 2014 10:51:02 +0100
+Subject: [PATCH v3 06/15] at91: dt: at91sam9261ek: Adds DT entries for the
+ 4 user buttons
+In-Reply-To: <52F4B3E7.2080000@atmel.com>
+References: <1390492639-7299-1-git-send-email-jjhiblot@traphandler.com>
+ <1390492639-7299-7-git-send-email-jjhiblot@traphandler.com>
+ <20140207082752.GV9558@ns203013.ovh.net>
+ <CACh+v5O_CMcYKBKLzbcD2ypGLX_Pp+64fiqO4MWYw-J4h0KA7A@mail.gmail.com>
+ <52F4B3E7.2080000@atmel.com>
+Message-ID: <CACRpkdagVxVkknt5xob=QqnK8gQfK6KvNC_CMXPsjWK5Rh1bQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I agree with J-C that the patch shall be split in one for the DT changes and one
-for the driver changes (that I will apply to the pinctrl tree).
+On Fri, Feb 7, 2014 at 11:22 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> On 07/02/2014 10:30, Jean-Jacques Hiblot :
+>> 2014-02-07 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+>>> On 16:57 Thu 23 Jan     , Jean-Jacques Hiblot wrote:
+>>>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/at91sam9261ek.dts | 39 +++++++++++++++++++++++++++++++++++++
+>>>>  1 file changed, 39 insertions(+)
+>>>
+>>> do only one patch for the 9261ek support no nned to clean
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
+>>>> index 8909217..5555e9f5 100644
+>>>> --- a/arch/arm/boot/dts/at91sam9261ek.dts
+>>>> +++ b/arch/arm/boot/dts/at91sam9261ek.dts
+>>>> @@ -83,6 +83,15 @@
+>>>>                                               AT91_PIOA 23  AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
+>>>>                                       };
+>>>>                               };
+>>>> +
+>>>> +                             keys {
+>>>> +                                     pinctrl_keys: keys-0 {
+>>>> +                                             atmel,pins = <AT91_PIOA 27  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+>>>> +                                             AT91_PIOA 26  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+>>>> +                                             AT91_PIOA 25  AT91_PERIPH_GPIO AT91_PINCTRL_NONE
+>>>> +                                             AT91_PIOA 24  AT91_PERIPH_GPIO AT91_PINCTRL_NONE>;
+>>>> +                                     };
+>>>> +                             };
+>>>
+>>> no need this you can drop it
+>> ok. I thought that it would help the user to understand the GPIO usage.
+>> I'll remove all pinmux for GPIO that don't require a special hardware
+>> configuration
+>
+> Well, me also, I like to see what the board requires for functioning
+> properly. It is convenient for:
+> - understanding clearly what is used and what is not
+> - doing a grep when searching where a particular GPIO is used
+> - describing completely the hardware (which is the purpose of DT)
+>
+> So, I would like additional consideration by more AT91 users before
+> following this rule... And maybe a note by Linus W.
 
-On Tue, Jan 21, 2014 at 7:33 AM, Marek Roszko <mark.roszko@gmail.com> wrote:
+So this is something like a grey area, it's not like there is a definitive
+answer to it. It just reflects the fact that the pin control and GPIO
+hardware is closely connected and we're cross-talking between
+the subsystems to set up GPIOs when requested, i.e.
+gpio_request_enable() is implemented.
 
-> The SAMA5 and most SAM9xGs(baring a few exceptions like the SAM945G) have drive
-> control registers that allow configuring the output current of the gpio pins between
-> three predefined levels of low,medium and high drive.
+If that function was *not* implemented, we'd have to do it like
+this.
 
-Can we get to know a bit more about default/low/medium and high?
+What happens in this case I guess, is that if &pinctrl_keys would
+be tied to a default state, the GPIO pins would be muxed in
+twice, which is not so horrible.
 
-I.e. this:
+It becomes very interesting the day you want to add something
+else than AT91_PINCTRL_NONE as the last flag, for example
+pull-up or drive strength. Then you need both orthogonal interfaces
+to be used, so then it's helpful to have this snippet there to fill
+in the right biasing etc.
 
-> +#define DRIVE_STRENGTH_DEFAULT (0x0 << 5)
-> +#define DRIVE_STRENGTH_LOW             (0x1 << 5)
-> +#define DRIVE_STRENGTH_MED             (0x2 << 5)
-> +#define DRIVE_STRENGTH_HI              (0x3 << 5)
-(...)
-> +static unsigned at91_mux_sam9x5_get_drivestrength(void __iomem *pio, unsigned pin)
-> +{
-> +       unsigned tmp = read_drive_strength(pio + at91sam9x5_get_drive_register(pin), pin);
-> +
-> +       /*
-> +        * inverse the setting for dt defines
-> +        * 0 = hi, 1 = med, 2 = low, 3 = rsvd
-
-But in the defines ... 3-3=0 means "default" not
-"reserved"?
-
-> +        */
-> +       tmp = DRIVE_STRENGTH_HI - tmp;
-(...)
-> +#define AT91_PINCTRL_DRIVE_STRENGTH_DEFAULT    (0x0 << 5)
-> +#define AT91_PINCTRL_DRIVE_STRENGTH_LOW                (0x1 << 5)
-> +#define AT91_PINCTRL_DRIVE_STRENGTH_MED                (0x2 << 5)
-> +#define AT91_PINCTRL_DRIVE_STRENGTH_HI         (0x3 << 5)
-
-So I guess "default" is some HW-defined driver strength decided when
-synthesizing the block? (Document the answer in the bindings or
-something.)
-
-What I'm after is if this is drive strength in the sense of
-"number of driver stages" i.e. a number of extra mA per
-strength increase, usuall in 2mA or 4mA increases, so e.g.
-LOW=2mA, mid=4mA, high=6mA or if it's actually a
-slew rate thing designed for restricing the noise in silicon
-and/or electronics by providing a less steep slope containing
-less overtones. (This is usually done by another construction.)
-Which one is it?
-
-You also already have this:
-#define AT91_PINCTRL_MULTI_DRIVE        (1 << 1)
-
-How does these different things relate? Do you have to set
-MULTI_DRIVE for the settings to work? Or is it leftover cruft?
-Or what is it?
-
-Also take this opportunity to update:
-Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
-To document all these funny defines and what they are used for.
-
-The bindings changes should be part of the pinctrl driver patch.
+So I would say something lame like it depends on the suspected
+use cases.
 
 Yours,
 Linus Walleij
