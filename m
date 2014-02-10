@@ -1,245 +1,77 @@
 From: mohit.kumar@st.com (Mohit Kumar)
-Date: Mon, 10 Feb 2014 14:21:57 +0530
-Subject: [PATCH V5 6/8] phy: st-miphy-40lp: Add SPEAr1310 and SPEAr1340 PCIe
- phy support
+Date: Mon, 10 Feb 2014 14:21:54 +0530
+Subject: [PATCH V5 3/8] SPEAr13xx: defconfig: Update
 In-Reply-To: <cover.1391871170.git.pratyush.anand@st.com>
 References: <cover.1391871170.git.pratyush.anand@st.com>
-Message-ID: <fefb071b5cc2a76f18036a466427f237316a19f4.1391871170.git.pratyush.anand@st.com>
+Message-ID: <b3c7a77237ec85ffb4c880e168df6687bb13ef08.1391871170.git.pratyush.anand@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratyush Anand <pratyush.anand@st.com>
+Enable EABI, VFP and NFS configs in default configuration file for
+SPEAr13xx.
 
-SPEAr1310 and SPEAr1340 uses miphy40lp phy for PCIe. This driver adds
-support for the same.
-
-Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-Tested-by: Mohit Kumar <mohit.kumar@st.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Pratyush Anand <pratyush.anand@st.com>
 Cc: spear-devel at list.st.com
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
 ---
- drivers/phy/phy-miphy40lp.c | 165 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 165 insertions(+)
+ arch/arm/configs/spear13xx_defconfig | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/phy/phy-miphy40lp.c b/drivers/phy/phy-miphy40lp.c
-index 0ee1972..fe8535a 100644
---- a/drivers/phy/phy-miphy40lp.c
-+++ b/drivers/phy/phy-miphy40lp.c
-@@ -9,6 +9,7 @@
-  * published by the Free Software Foundation.
-  *
-  * 04/02/2014: Adding support of SATA mode for SPEAr1340.
-+ * 04/02/2014: Adding support of PCIe mode for SPEAr1340 and SPEAr1310
-  */
- 
- #include <linux/bitops.h>
-@@ -74,6 +75,80 @@
- 	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE \
- 			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
- 			SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
-+/* SPEAr1310 Registers */
-+#define SPEAR1310_PCIE_SATA_CFG			0x3A4
-+	#define SPEAR1310_PCIE_SATA2_SEL_PCIE		(0 << 31)
-+	#define SPEAR1310_PCIE_SATA1_SEL_PCIE		(0 << 30)
-+	#define SPEAR1310_PCIE_SATA0_SEL_PCIE		(0 << 29)
-+	#define SPEAR1310_PCIE_SATA2_SEL_SATA		BIT(31)
-+	#define SPEAR1310_PCIE_SATA1_SEL_SATA		BIT(30)
-+	#define SPEAR1310_PCIE_SATA0_SEL_SATA		BIT(29)
-+	#define SPEAR1310_SATA2_CFG_TX_CLK_EN		BIT(27)
-+	#define SPEAR1310_SATA2_CFG_RX_CLK_EN		BIT(26)
-+	#define SPEAR1310_SATA2_CFG_POWERUP_RESET	BIT(25)
-+	#define SPEAR1310_SATA2_CFG_PM_CLK_EN		BIT(24)
-+	#define SPEAR1310_SATA1_CFG_TX_CLK_EN		BIT(23)
-+	#define SPEAR1310_SATA1_CFG_RX_CLK_EN		BIT(22)
-+	#define SPEAR1310_SATA1_CFG_POWERUP_RESET	BIT(21)
-+	#define SPEAR1310_SATA1_CFG_PM_CLK_EN		BIT(20)
-+	#define SPEAR1310_SATA0_CFG_TX_CLK_EN		BIT(19)
-+	#define SPEAR1310_SATA0_CFG_RX_CLK_EN		BIT(18)
-+	#define SPEAR1310_SATA0_CFG_POWERUP_RESET	BIT(17)
-+	#define SPEAR1310_SATA0_CFG_PM_CLK_EN		BIT(16)
-+	#define SPEAR1310_PCIE2_CFG_DEVICE_PRESENT	BIT(11)
-+	#define SPEAR1310_PCIE2_CFG_POWERUP_RESET	BIT(10)
-+	#define SPEAR1310_PCIE2_CFG_CORE_CLK_EN		BIT(9)
-+	#define SPEAR1310_PCIE2_CFG_AUX_CLK_EN		BIT(8)
-+	#define SPEAR1310_PCIE1_CFG_DEVICE_PRESENT	BIT(7)
-+	#define SPEAR1310_PCIE1_CFG_POWERUP_RESET	BIT(6)
-+	#define SPEAR1310_PCIE1_CFG_CORE_CLK_EN		BIT(5)
-+	#define SPEAR1310_PCIE1_CFG_AUX_CLK_EN		BIT(4)
-+	#define SPEAR1310_PCIE0_CFG_DEVICE_PRESENT	BIT(3)
-+	#define SPEAR1310_PCIE0_CFG_POWERUP_RESET	BIT(2)
-+	#define SPEAR1310_PCIE0_CFG_CORE_CLK_EN		BIT(1)
-+	#define SPEAR1310_PCIE0_CFG_AUX_CLK_EN		BIT(0)
-+
-+	#define SPEAR1310_PCIE_CFG_MASK(x) ((0xF << (x * 4)) | BIT((x + 29)))
-+	#define SPEAR1310_SATA_CFG_MASK(x) ((0xF << (x * 4 + 16)) | \
-+			BIT((x + 29)))
-+	#define SPEAR1310_PCIE_CFG_VAL(x) \
-+			(SPEAR1310_PCIE_SATA##x##_SEL_PCIE | \
-+			SPEAR1310_PCIE##x##_CFG_AUX_CLK_EN | \
-+			SPEAR1310_PCIE##x##_CFG_CORE_CLK_EN | \
-+			SPEAR1310_PCIE##x##_CFG_POWERUP_RESET | \
-+			SPEAR1310_PCIE##x##_CFG_DEVICE_PRESENT)
-+	#define SPEAR1310_SATA_CFG_VAL(x) \
-+			(SPEAR1310_PCIE_SATA##x##_SEL_SATA | \
-+			SPEAR1310_SATA##x##_CFG_PM_CLK_EN | \
-+			SPEAR1310_SATA##x##_CFG_POWERUP_RESET | \
-+			SPEAR1310_SATA##x##_CFG_RX_CLK_EN | \
-+			SPEAR1310_SATA##x##_CFG_TX_CLK_EN)
-+
-+#define SPEAR1310_PCIE_MIPHY_CFG_1		0x3A8
-+	#define SPEAR1310_MIPHY_DUAL_OSC_BYPASS_EXT	BIT(31)
-+	#define SPEAR1310_MIPHY_DUAL_CLK_REF_DIV2	BIT(28)
-+	#define SPEAR1310_MIPHY_DUAL_PLL_RATIO_TOP(x)	(x << 16)
-+	#define SPEAR1310_MIPHY_SINGLE_OSC_BYPASS_EXT	BIT(15)
-+	#define SPEAR1310_MIPHY_SINGLE_CLK_REF_DIV2	BIT(12)
-+	#define SPEAR1310_MIPHY_SINGLE_PLL_RATIO_TOP(x)	(x << 0)
-+	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_SATA_MASK (0xFFFF)
-+	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE_MASK (0xFFFF << 16)
-+	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_SATA \
-+			(SPEAR1310_MIPHY_DUAL_OSC_BYPASS_EXT | \
-+			SPEAR1310_MIPHY_DUAL_CLK_REF_DIV2 | \
-+			SPEAR1310_MIPHY_DUAL_PLL_RATIO_TOP(60) | \
-+			SPEAR1310_MIPHY_SINGLE_OSC_BYPASS_EXT | \
-+			SPEAR1310_MIPHY_SINGLE_CLK_REF_DIV2 | \
-+			SPEAR1310_MIPHY_SINGLE_PLL_RATIO_TOP(60))
-+	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK \
-+			(SPEAR1310_MIPHY_SINGLE_PLL_RATIO_TOP(120))
-+	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE \
-+			(SPEAR1310_MIPHY_DUAL_OSC_BYPASS_EXT | \
-+			SPEAR1310_MIPHY_DUAL_PLL_RATIO_TOP(25) | \
-+			SPEAR1310_MIPHY_SINGLE_OSC_BYPASS_EXT | \
-+			SPEAR1310_MIPHY_SINGLE_PLL_RATIO_TOP(25))
-+
-+#define SPEAR1310_PCIE_MIPHY_CFG_2		0x3AC
- 
- enum phy_mode {
- 	SATA,
-@@ -146,12 +221,35 @@ static int miphy40lp_spear1340_sata_exit(struct miphy40lp_priv *priv)
- 	return 0;
- }
- 
-+static int miphy40lp_spear1340_pcie_init(struct miphy40lp_priv *priv)
-+{
-+	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
-+			SPEAR1340_PCIE_MIPHY_CFG_MASK,
-+			SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE);
-+	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
-+			SPEAR1340_PCIE_SATA_CFG_MASK, SPEAR1340_PCIE_CFG_VAL);
-+
-+	return 0;
-+}
-+
-+static int miphy40lp_spear1340_pcie_exit(struct miphy40lp_priv *priv)
-+{
-+	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
-+			SPEAR1340_PCIE_MIPHY_CFG_MASK, 0);
-+	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
-+			SPEAR1340_PCIE_SATA_CFG_MASK, 0);
-+
-+	return 0;
-+}
-+
- static int miphy40lp_spear1340_init(struct miphy40lp_priv *priv)
- {
- 	int ret = 0;
- 
- 	if (priv->mode == SATA)
- 		ret = miphy40lp_spear1340_sata_init(priv);
-+	else if (priv->mode == PCIE)
-+		ret = miphy40lp_spear1340_pcie_init(priv);
- 
- 	return ret;
- }
-@@ -162,6 +260,8 @@ static int miphy40lp_spear1340_exit(struct miphy40lp_priv *priv)
- 
- 	if (priv->mode == SATA)
- 		ret = miphy40lp_spear1340_sata_exit(priv);
-+	else if (priv->mode == PCIE)
-+		ret = miphy40lp_spear1340_pcie_exit(priv);
- 
- 	return ret;
- }
-@@ -193,6 +293,70 @@ static struct miphy40lp_plat_ops spear1340_phy_ops = {
- 	.plat_resume = miphy40lp_spear1340_resume,
- };
- 
-+static int miphy40lp_spear1310_pcie_init(struct miphy40lp_priv *priv)
-+{
-+	u32 val;
-+
-+	regmap_update_bits(priv->misc, SPEAR1310_PCIE_MIPHY_CFG_1,
-+			SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE_MASK,
-+			SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE);
-+
-+	switch (priv->id) {
-+	case 0:
-+		val = SPEAR1310_PCIE_CFG_VAL(0);
-+		break;
-+	case 1:
-+		val = SPEAR1310_PCIE_CFG_VAL(1);
-+		break;
-+	case 2:
-+		val = SPEAR1310_PCIE_CFG_VAL(2);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	regmap_update_bits(priv->misc, SPEAR1310_PCIE_SATA_CFG,
-+			SPEAR1310_PCIE_CFG_MASK(priv->id), val);
-+
-+	return 0;
-+}
-+
-+static int miphy40lp_spear1310_pcie_exit(struct miphy40lp_priv *priv)
-+{
-+	regmap_update_bits(priv->misc, SPEAR1310_PCIE_SATA_CFG,
-+			SPEAR1310_PCIE_CFG_MASK(priv->id), 0);
-+
-+	regmap_update_bits(priv->misc, SPEAR1310_PCIE_MIPHY_CFG_1,
-+			SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE_MASK, 0);
-+
-+	return 0;
-+}
-+
-+static int miphy40lp_spear1310_init(struct miphy40lp_priv *priv)
-+{
-+	int ret = 0;
-+
-+	if (priv->mode == PCIE)
-+		ret = miphy40lp_spear1310_pcie_init(priv);
-+
-+	return ret;
-+}
-+
-+static int miphy40lp_spear1310_exit(struct miphy40lp_priv *priv)
-+{
-+	int ret = 0;
-+
-+	if (priv->mode == PCIE)
-+		ret = miphy40lp_spear1310_pcie_exit(priv);
-+
-+	return ret;
-+}
-+
-+static struct miphy40lp_plat_ops spear1310_phy_ops = {
-+	.plat_init = miphy40lp_spear1310_init,
-+	.plat_exit = miphy40lp_spear1310_exit,
-+};
-+
- static int miphy40lp_init(struct phy *phy)
- {
- 	struct miphy40lp_priv *priv = phy_get_drvdata(phy);
-@@ -244,6 +408,7 @@ static int miphy40lp_power_on(struct phy *phy)
- static const struct of_device_id miphy40lp_of_match[] = {
- 	{ .compatible = "st,miphy40lp-phy", .data = NULL },
- 	{ .compatible = "st,spear1340-miphy", .data = &spear1340_phy_ops },
-+	{ .compatible = "st,spear1310-miphy", .data = &spear1310_phy_ops },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, miphy40lp_of_match);
+diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+index 82eaa55..1e0bb6f 100644
+--- a/arch/arm/configs/spear13xx_defconfig
++++ b/arch/arm/configs/spear13xx_defconfig
+@@ -14,10 +14,18 @@ CONFIG_MACH_SPEAR1340=y
+ CONFIG_SMP=y
+ # CONFIG_SMP_ON_UP is not set
+ # CONFIG_ARM_CPU_TOPOLOGY is not set
++CONFIG_AEABI=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_VFP=y
+ CONFIG_BINFMT_MISC=y
+ CONFIG_NET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_NET_IPIP=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_MTD=y
+ CONFIG_MTD_OF_PARTS=y
+@@ -27,6 +35,7 @@ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_FSMC=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_BLK_DEV_SD=y
+ CONFIG_ATA=y
+ # CONFIG_SATA_PMP is not set
+ CONFIG_SATA_AHCI_PLATFORM=y
+@@ -66,6 +75,7 @@ CONFIG_USB=y
+ # CONFIG_USB_DEVICE_CLASS is not set
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_STORAGE=y
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_SPEAR=y
+@@ -79,11 +89,14 @@ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT3_FS_SECURITY=y
+ CONFIG_AUTOFS4_FS=m
++CONFIG_FUSE_FS=y
+ CONFIG_MSDOS_FS=m
+ CONFIG_VFAT_FS=m
+ CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
+ CONFIG_NLS_DEFAULT="utf8"
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ASCII=m
 -- 
 1.8.1.2
