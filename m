@@ -1,65 +1,39 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 10 Feb 2014 18:35:52 +0800
-Subject: [PATCH v4 6/8] ARM: dts: sun7i: cubieboard2: Enable GMAC instead of
- EMAC
-In-Reply-To: <1392028554-32545-1-git-send-email-wens@csie.org>
-References: <1392028554-32545-1-git-send-email-wens@csie.org>
-Message-ID: <1392028554-32545-7-git-send-email-wens@csie.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 10 Feb 2014 11:37:03 +0100
+Subject: [PATCH] ARM: zynq: Add waituart implementation
+Message-ID: <13a04fc77bd93b2ad5a15a8967627a11fb7c8925.1392028615.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GMAC has better performance and fewer hardware issues.
-Use the GMAC in MII mode for ethernet instead of the EMAC.
+Add missing waituart implementation.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 27 ++++++++++++---------------
- 1 file changed, 12 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index 5c51cb8..7bf4935 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -19,21 +19,6 @@
- 	compatible = "cubietech,cubieboard2", "allwinner,sun7i-a20";
- 
- 	soc at 01c00000 {
--		emac: ethernet at 01c0b000 {
--			pinctrl-names = "default";
--			pinctrl-0 = <&emac_pins_a>;
--			phy = <&phy1>;
--			status = "okay";
--		};
--
--		mdio at 01c0b080 {
--			status = "okay";
--
--			phy1: ethernet-phy at 1 {
--				reg = <1>;
--			};
--		};
--
- 		pinctrl at 01c20800 {
- 			led_pins_cubieboard2: led_pins at 0 {
- 				allwinner,pins = "PH20", "PH21";
-@@ -60,6 +45,18 @@
- 			pinctrl-0 = <&i2c1_pins_a>;
- 			status = "okay";
- 		};
-+
-+		gmac: ethernet at 01c50000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&gmac_pins_mii_a>;
-+			phy = <&phy1>;
-+			phy-mode = "mii";
-+			status = "okay";
-+
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
- 	};
- 
- 	leds {
--- 
-1.9.rc1
+ arch/arm/include/debug/zynq.S | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/include/debug/zynq.S b/arch/arm/include/debug/zynq.S
+index f9aa974..0b762fa 100644
+--- a/arch/arm/include/debug/zynq.S
++++ b/arch/arm/include/debug/zynq.S
+@@ -42,6 +42,9 @@
+ 		.endm
+
+ 		.macro	waituart,rd,rx
++1001:		ldr	\rd, [\rx, #UART_SR_OFFSET]
++		tst	\rd, #UART_SR_TXEMPTY
++		beq	1001b
+ 		.endm
+
+ 		.macro	busyuart,rd,rx
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/cc6785ff/attachment.sig>
