@@ -1,66 +1,117 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 10 Feb 2014 20:00:19 -0300
-Subject: [PATCH v7 00/18] Armada 370/XP watchdog
-Message-ID: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Mon, 10 Feb 2014 20:00:21 -0300
+Subject: [PATCH v7 02/18] watchdog: orion: Use atomic access for shared
+ registers
+In-Reply-To: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1392073237-2554-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yet another round. This time, addressing Guenter's comment about the nowayout
-parameter. So, to allow for proper nowayout behavior, we now restrict the
-initial watchdog stop; which is only done if the watchdog is not properly
-enabled.
+Since the timer control register is shared with the clocksource driver,
+use the recently introduced atomic_io_clear_set() to access such register.
+Given the watchdog core already provides serialization for all the
+watchdog ops, this commit allows to remove the spinlock entirely.
 
-I've dropped the clocksource patch which was previously part of the series.
-The patch is independent and will be merged through the subsystem maintainer,
-Daniel Lezcano.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Tested-by: Willy Tarreau <w@1wt.eu>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/watchdog/orion_wdt.c | 42 +++++-------------------------------------
+ 1 file changed, 5 insertions(+), 37 deletions(-)
 
-Also, I've updated the multi_v7_defconfig, as per Jason Cooper request.
-
-This series depends on Sebastian's irqchip fixes to clear the bridge irqs
-cause, which Jason picked here:
-
-  http://git.infradead.org/linux-mvebu.git mvebu-next/irqchip-fixes
-
-Wim: Can we take all the watchdog changes through mvebu, with your Ack?
-This way, we can sort out the irqchip dependency.
-
-Ezequiel Garcia (18):
-  watchdog: orion: Add clock error handling
-  watchdog: orion: Use atomic access for shared registers
-  watchdog: orion: Remove unused macros
-  watchdog: orion: Make sure the watchdog is initially stopped
-  watchdog: orion: Handle the interrupt so it's properly acked
-  watchdog: orion: Make RSTOUT register a separate resource
-  watchdog: orion: Remove unneeded BRIDGE_CAUSE clear
-  watchdog: orion: Introduce an orion_watchdog device structure
-  watchdog: orion: Introduce per-compatible of_device_id data
-  watchdog: orion: Add per-compatible clock initialization
-  watchdog: orion: Add per-compatible watchdog start implementation
-  watchdog: orion: Add support for Armada 370 and Armada XP SoC
-  ARM: mvebu: Enable Armada 370/XP watchdog in the devicetree
-  ARM: kirkwood: Add RSTOUT 'reg' entry to devicetree
-  ARM: dove: Enable Dove watchdog in the devicetree
-  watchdog: orion: Enable the build on ARCH_MVEBU
-  ARM: mvebu: Enable watchdog support in defconfig
-  ARM: dove: Enable watchdog support in the defconfig
-
- .../devicetree/bindings/watchdog/marvel.txt        |  11 +-
- arch/arm/boot/dts/armada-370-xp.dtsi               |   4 +
- arch/arm/boot/dts/armada-370.dtsi                  |   5 +
- arch/arm/boot/dts/armada-xp.dtsi                   |   6 +
- arch/arm/boot/dts/dove.dtsi                        |   8 +
- arch/arm/boot/dts/kirkwood.dtsi                    |   2 +-
- arch/arm/configs/dove_defconfig                    |   2 +
- arch/arm/configs/multi_v7_defconfig                |   2 +
- arch/arm/configs/mvebu_defconfig                   |   2 +
- arch/arm/mach-dove/include/mach/bridge-regs.h      |   1 +
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h  |   1 +
- arch/arm/mach-mv78xx0/include/mach/bridge-regs.h   |   1 +
- arch/arm/mach-orion5x/include/mach/bridge-regs.h   |   1 +
- arch/arm/plat-orion/common.c                       |  10 +-
- drivers/watchdog/Kconfig                           |   2 +-
- drivers/watchdog/orion_wdt.c                       | 381 ++++++++++++++++-----
- 16 files changed, 352 insertions(+), 87 deletions(-)
-
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index 7f19fa3..b92a991 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -20,7 +20,6 @@
+ #include <linux/watchdog.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+-#include <linux/spinlock.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
+ #include <linux/of.h>
+@@ -46,25 +45,16 @@ static unsigned int wdt_max_duration;	/* (seconds) */
+ static struct clk *clk;
+ static unsigned int wdt_tclk;
+ static void __iomem *wdt_reg;
+-static DEFINE_SPINLOCK(wdt_lock);
+ 
+ static int orion_wdt_ping(struct watchdog_device *wdt_dev)
+ {
+-	spin_lock(&wdt_lock);
+-
+ 	/* Reload watchdog duration */
+ 	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
+-
+-	spin_unlock(&wdt_lock);
+ 	return 0;
+ }
+ 
+ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ {
+-	u32 reg;
+-
+-	spin_lock(&wdt_lock);
+-
+ 	/* Set watchdog duration */
+ 	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
+ 
+@@ -72,48 +62,26 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ 	writel(~WDT_INT_REQ, BRIDGE_CAUSE);
+ 
+ 	/* Enable watchdog timer */
+-	reg = readl(wdt_reg + TIMER_CTRL);
+-	reg |= WDT_EN;
+-	writel(reg, wdt_reg + TIMER_CTRL);
++	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, WDT_EN);
+ 
+ 	/* Enable reset on watchdog */
+-	reg = readl(RSTOUTn_MASK);
+-	reg |= WDT_RESET_OUT_EN;
+-	writel(reg, RSTOUTn_MASK);
+-
+-	spin_unlock(&wdt_lock);
++	atomic_io_modify(RSTOUTn_MASK, WDT_RESET_OUT_EN, WDT_RESET_OUT_EN);
+ 	return 0;
+ }
+ 
+ static int orion_wdt_stop(struct watchdog_device *wdt_dev)
+ {
+-	u32 reg;
+-
+-	spin_lock(&wdt_lock);
+-
+ 	/* Disable reset on watchdog */
+-	reg = readl(RSTOUTn_MASK);
+-	reg &= ~WDT_RESET_OUT_EN;
+-	writel(reg, RSTOUTn_MASK);
++	atomic_io_modify(RSTOUTn_MASK, WDT_RESET_OUT_EN, 0);
+ 
+ 	/* Disable watchdog timer */
+-	reg = readl(wdt_reg + TIMER_CTRL);
+-	reg &= ~WDT_EN;
+-	writel(reg, wdt_reg + TIMER_CTRL);
+-
+-	spin_unlock(&wdt_lock);
++	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, 0);
+ 	return 0;
+ }
+ 
+ static unsigned int orion_wdt_get_timeleft(struct watchdog_device *wdt_dev)
+ {
+-	unsigned int time_left;
+-
+-	spin_lock(&wdt_lock);
+-	time_left = readl(wdt_reg + WDT_VAL) / wdt_tclk;
+-	spin_unlock(&wdt_lock);
+-
+-	return time_left;
++	return readl(wdt_reg + WDT_VAL) / wdt_tclk;
+ }
+ 
+ static int orion_wdt_set_timeout(struct watchdog_device *wdt_dev,
 -- 
 1.8.1.5
