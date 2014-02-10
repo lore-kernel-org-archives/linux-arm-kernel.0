@@ -1,68 +1,29 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Mon, 10 Feb 2014 10:51:51 +0000
-Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <20140210083836.44b519bf@amdc2363>
-References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
- <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
- <52F50698.4060305@arm.com> <52F509BD.70903@arm.com>
- <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
- <52F51888.5010608@arm.com>
- <CAGo_u6ofC4NNPiTNcSnXUvT3RZJo54=XyjetR-ok5hCBrVZkKg@mail.gmail.com>
- <52F51FCD.5000009@arm.com>
- <CAJuA9agcpbKYocaQUBr2-VCXcXAo3r3urFF=+G_+ib2jCZqvwg@mail.gmail.com>
- <20140210083836.44b519bf@amdc2363>
-Message-ID: <52F8AF47.3080508@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Feb 2014 12:09:29 +0100
+Subject: [PATCH] backlight: add PWM dependencies
+In-Reply-To: <20140210104032.GB20143@ulmo.nvidia.com>
+References: <1391518634-6472-1-git-send-email-linus.walleij@linaro.org>
+ <20140210104032.GB20143@ulmo.nvidia.com>
+Message-ID: <CACRpkdb1T1GCqEpy9=fPp4hYQErLYiQqJezrFhoS3x1MU=0S9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/14 07:38, Lukasz Majewski wrote:
-> Hi Thomas, Sudeep,
-> 
->> On Fri, Feb 7, 2014 at 11:32 PM, Sudeep Holla <Sudeep.Holla@arm.com>
->> wrote:
->>> On 07/02/14 17:37, Nishanth Menon wrote:
->>>> On Fri, Feb 7, 2014 at 11:31 AM, Sudeep Holla
->>>> <Sudeep.Holla@arm.com> wrote:
->>>
->>> [...]
->>>
->>>>> Yes I think its counter-intuitive as it's visible to the
->>>>> userspace(list of frequencies and the boost parameters are
->>>>> exposed through sysfs)
->>>>
->>>> That will be a different problem -> as currently every single
->>>> frequency in the cpufreq list has ability to be marked as boost
->>>> frequency - if userspace does not maintain that, then, IMHO, fix
->>>> the userspace :D
->>>>
->>>
->>> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
->>> gives the list of frequencies based on the state of the boost
->>> feature at anytime.
->>
->> The list of frequencies in
->> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
->> does not change based in the state of the boost feature (enabled or
->> disabled). But the scaling_max_frequency and scaling_min_frequency are
->> updated based on the set of available + boost frequencies available.
-> 
-> With boost intended behavior is as follow:
-> 
-> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies [1]
-> 
-> shows the non boost frequencies no matter if boost is enabled or not.
-> Those are the "normal" frequencies.
-> 
-> When boost is supported (by enabling the CONFIG_CPU_FREQ_BOOST_SW)
-> extra sysfs attribute shows up:
-> 
-> /sys/devices/system/cpu/cpu0/cpufreq/scaling_boost_frequencies [2]
-> in which are listed only the boost frequencies.
-> 
+On Mon, Feb 10, 2014 at 11:40 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
 
-Correct, sorry I misunderstood this to dynamic change in
-scaling_available_frequencies based on state of boot.
+> it seems like at least BACKLIGHT_LP8788 is missing a corresponding
+> dependency as well.
+>
+> I have applied Sascha's patch to remove the obsolete HAVE_PWM symbol,
+> and this will fix at least the build issues. However it will also cause
+> the driver to fail at runtime because the pwm_*() functions won't work.
 
-Regards,
-Sudeep
+So it definately needs that API, not just stubs.
+
+But isn't it proper for Kconfig to allow you to break things
+like that by configuring out stuff and have stubs come in?
+
+I'm a bit torn here.
+
+Yours,
+Linus Walleij
