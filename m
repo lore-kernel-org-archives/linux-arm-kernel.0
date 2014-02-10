@@ -1,35 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Feb 2014 11:41:54 +0000
-Subject: [PATCH 14/28] Remove MACH_SMDKC210
-In-Reply-To: <1391971686-9517-15-git-send-email-richard@nod.at>
-References: <1391971686-9517-1-git-send-email-richard@nod.at>
- <1391971686-9517-15-git-send-email-richard@nod.at>
-Message-ID: <20140210114154.GQ1757@sirena.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Feb 2014 11:59:28 +0000
+Subject: [PATCH v2 13/15] regulator/mfd: max14577: Export symbols for
+ calculating charger current
+In-Reply-To: <1391767487-10017-14-git-send-email-k.kozlowski@samsung.com>
+References: <1391767487-10017-1-git-send-email-k.kozlowski@samsung.com>
+ <1391767487-10017-14-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20140210115928.GF22773@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 09, 2014 at 07:47:52PM +0100, Richard Weinberger wrote:
+> This patch prepares for changing the max14577 charger driver to allow
+> configuring battery-dependent settings from DTS.
+> 
+> The patch moves from regulator driver to MFD core driver and exports:
+>  - function for calculating register value for charger's current;
+>  - table of limits for chargers (MAX14577, MAX77836).
+> 
+> Previously they were used only by the max14577 regulator driver. In next
+> patch the charger driver will use them as well. Exporting them will
+> reduce unnecessary code duplication.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/mfd/max14577.c               |   95 ++++++++++++++++++++++++++++++++++
+>  drivers/regulator/max14577.c         |   80 +++-------------------------
+>  include/linux/mfd/max14577-private.h |   22 ++++----
+>  include/linux/mfd/max14577.h         |   23 ++++++++
+>  4 files changed, 135 insertions(+), 85 deletions(-)
 
-> The symbol is an orphan, get rid of it.
+Applied, with Mark's Ack.
 
-Please fix whatever script you're using to generate your mails, it's
-generating corrupt headers.  Please also use subject lines consistent
-with the rest of the subsystem - between the two I very nearly just
-deleted this unread, it's only Paul's mail that made me look.
-
->  config SND_SOC_SAMSUNG_SMDK_WM9713
->  	tristate "SoC AC97 Audio support for SMDK with WM9713"
-> -	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310 || MACH_SMDKC210)
-> +	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310)
-
-Like I said to Paul this isn't fixing the actual issue - think about why
-the symbol was there in the first place and why it was removed.  There
-is a problem here but this would make it less likely that it would be
-properly fixed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/45e54c4b/attachment.sig>
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
