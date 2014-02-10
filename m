@@ -1,39 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 10 Feb 2014 15:26:51 -0500
-Subject: [PATCH 2/2] ARM: keystone: dts: fix clkvcp3 control register address
-In-Reply-To: <1392064011-11986-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1392064011-11986-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1392064011-11986-3-git-send-email-santosh.shilimkar@ti.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 10 Feb 2014 21:25:30 +0100
+Subject: [linux-sunxi] Re: [PATCH 1/3] mfd: axp20x: Add mfd driver for
+ axp20x PMIC
+In-Reply-To: <20140210200232.GB3192@lukather>
+References: <1391875428-6281-1-git-send-email-carlo@caione.org>
+ <1391875428-6281-2-git-send-email-carlo@caione.org>
+ <20140210200232.GB3192@lukather>
+Message-ID: <CAOQ7t2YYyFdVoEwsHgvd1nC4N3ZHjhtt6ZfUbuzfb0FbNCgsnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+On Mon, Feb 10, 2014 at 9:02 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+>> +static struct resource axp20x_pek_resources[] = {
+>> +     {
+>> +             .name   = "PEK_DBR",
+>> +             .start  = AXP20X_IRQ_PEK_RIS_EDGE,
+>> +             .end    = AXP20X_IRQ_PEK_RIS_EDGE,
+>> +             .flags  = IORESOURCE_IRQ,
+>> +     },
+>> +     {
+>> +             .name   = "PEK_DBF",
+>> +             .start  = AXP20X_IRQ_PEK_FAL_EDGE,
+>> +             .end    = AXP20X_IRQ_PEK_FAL_EDGE,
+>> +             .flags  = IORESOURCE_IRQ,
+>> +     },
+>> +
+>> +};
+>
+> From your documentation, it seems like you want to declare them in the
+> DT too. Why do you need to declare the resources in both locations?
 
-The address for control regs in clkvcp3 node is not correct and should
-be 0x023500a8 instead of 0x0235000a8.
+It's not really a need, I thought it was a bit "clearer" also to have
+them in DT.
+But I agree it is redundant. I'll fix in v2.
 
-This lead to few unexpected behaviors while clocks were turned
-of in absence of clk_ignore_unused
+Thank you,
 
-Mike Turquette <mturquette@linaro.org>
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/boot/dts/keystone-clocks.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/keystone-clocks.dtsi b/arch/arm/boot/dts/keystone-clocks.dtsi
-index 2363593..ef58d1c 100644
---- a/arch/arm/boot/dts/keystone-clocks.dtsi
-+++ b/arch/arm/boot/dts/keystone-clocks.dtsi
-@@ -612,7 +612,7 @@ clocks {
- 		compatible = "ti,keystone,psc-clock";
- 		clocks = <&chipclk13>;
- 		clock-output-names = "vcp-3";
--		reg = <0x0235000a8 0xb00>, <0x02350060 0x400>;
-+		reg = <0x023500a8 0xb00>, <0x02350060 0x400>;
- 		reg-names = "control", "domain";
- 		domain-id = <24>;
- 	};
 -- 
-1.7.9.5
+Carlo Caione
