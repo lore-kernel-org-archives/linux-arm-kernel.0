@@ -1,101 +1,68 @@
-From: linux@roeck-us.net (linux at roeck-us.net)
-Date: Mon, 10 Feb 2014 10:48:50 -0600
-Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
- initially stopped
-In-Reply-To: <20140210122223.GF10872@localhost>
-References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <52F43ED0.4050808@roeck-us.net> <20140207104044.GA11063@localhost>
- <20140207174314.GB16263@obsidianresearch.com>
- <20140210122223.GF10872@localhost>
-Message-ID: <20140210104850.48324szjwjihb7cw@67.228.131.205>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 10 Feb 2014 16:51:16 +0000
+Subject: [RFC/PATCH v2] ARM: vDSO gettimeofday using generic timer
+ architecture
+In-Reply-To: <20140209102023.GL26684@n2100.arm.linux.org.uk>
+References: <1391814349-10706-1-git-send-email-nathan_lynch@mentor.com>
+ <20140209102023.GL26684@n2100.arm.linux.org.uk>
+Message-ID: <20140210165113.GA7891@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ezequiel Garcia <ezequiel.garcia@free-electrons.com>:
+Hi Russell,
 
-> On Fri, Feb 07, 2014 at 10:43:14AM -0700, Jason Gunthorpe wrote:
->> On Fri, Feb 07, 2014 at 07:40:45AM -0300, Ezequiel Garcia wrote:
->>
->> > Well, this is related to the discussion about the bootloader not
->> > reseting the watchdog properly, provoking spurious watchdog triggering.
->> >
->> > Jason Gunthorpe explained [1] that we needed a particular sequence:
->> >
->> >  1. Disable WDT
->> >  2. Clear bridge
->> >  3. Enable WDT
->> >
->> > We added the irq handling to satisfy (2), and the watchdog stop for (1).
->>
->> The issue here is the driver configures two 'machine kill' elements:
->> the PANIC IRQ and the RstOut setup.
->>
->> Before configuring either of those the driver needs to ensure that any
->> old watchdog events are cleared out of the HW. We must not get a
->> spurious event.
->>
->> I agree not disabling an already functional and properly configured
->> counter from the bootloader is desirable.
->>
->> So lets break it down a bit..
->>
->> 1) The IRQ:
->>   It looks like the cause bit latches high on watchdog timer
->>   expiration but has no side effect unless it is unmasked.
->>
->>   The new IRQ flow code ensures the bit is cleared during request_irq
->>   so no old events can trigger the IRQ. Thus it is solved now.
->>
->
-> Agreed.
->
->> 3) The timer itself:
->>   The WDT is just a general timer with an optional hookup to the
->>   rst control. If it is harmlessly counting but not resetting we need
->>   to stop that before enabling rst out.
->>
->
-> Actually, the current flow is to:
->
-> 1. Disable rst out and then disable the counter, in probe().
->
-> 2. Enable the counter, and then enable rst out, in start().
->
->> So, how about this for psuedo-code in probe:
->>
->> if (readl(RSTOUTn) & WDRstOutEn)
->> {
->>     /* Watchdog is configured and may be down counting,
->>        don't touch it */
->>     request_irq(..);
->> }
->> else
->> {
->>     /* Watchdog is not configured, fully disable the timer
->>        and configure for watchdog operation. */
->>     disable_watchdog();
->>     request_irq();
->>     writel(RSTOUTn), .. WDRstOutEn);
->> }
->>
->
-> Sounds good, although it seems to me it's actually simpler:
->
->   /* Let's make sure the watchdog is fully stopped, unless
->    * it's explicitly enabled and running
->    */
->   if ( !(wdt_rst_out_en && wdt_timer_enabled) ) {
->     watchdog_stop();
->   }
->
+On Sun, Feb 09, 2014 at 10:20:23AM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 07, 2014 at 05:05:49PM -0600, Nathan Lynch wrote:
+> > +	/* Grab the vDSO code pages. */
+> > +	for (i = 0; i < vdso_pages; i++) {
+> > +		pg = virt_to_page(&vdso_start + i*PAGE_SIZE);
+> > +		ClearPageReserved(pg);
+> > +		get_page(pg);
+> > +		vdso_pagelist[i] = pg;
+> > +	}
+> 
+> Why do we want to clear the reserved status?  This looks over complicated
+> to me.
+> 
 
-     if (!wdt_rst_out_en || !wdt_timer_enabled)
-         watchdog_stop();
+This looks like it was inherited from the PowerPC code where the
+behaviour of set_pte_at would change dependent on whether or not the
+page was reserved (set_pte_at->set_pte_filter->maybe_pte_to_page). I
+think we can safely remove this from ARM and ARM64.
 
-seems to be a bit easier to understand.
+> > +
+> > +	/* Sanity check the shared object header. */
+> > +	vbase = vmap(vdso_pagelist, 1, 0, PAGE_KERNEL);
+> > +	if (vbase == NULL) {
+> > +		pr_err("Failed to map vDSO pagelist!\n");
+> > +		return -ENOMEM;
+> > +	} else if (memcmp(vbase, "\177ELF", 4)) {
+> > +		pr_err("vDSO is not a valid ELF object!\n");
+> > +		ret = -EINVAL;
+> > +		goto unmap;
+> > +	}
+> 
+> Why do we need to vmap() pages which are already accessible - vdso_start
+> must be part of the kernel image, and therefore will be accessible via
+> standard mappings.
+> 
 
-Also watch out for coding style issues. Above code
-snippet has multiple violations ;-).
+This is a dress rehersal for install_special_mapping more than anything.
+If we map the page, and look at the first 4 bytes, are they what we
+expect?
 
-Guenter
+> > +
+> > +	/* Grab the vDSO data page. */
+> > +	pg = virt_to_page(vdso_data);
+> > +	get_page(pg);
+> > +	vdso_pagelist[i] = pg;
+> 
+> Same goes for this.
+> 
+
+We need the data page so we can remap it into user space via
+install_special_mapping.
+
+Cheers,
+-- 
+Steve
