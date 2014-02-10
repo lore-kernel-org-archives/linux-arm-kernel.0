@@ -1,62 +1,47 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Mon, 10 Feb 2014 12:10:55 +0200
-Subject: [PATCH v6 0/3] Introduce clocksource driver for Keystone platform
-Message-ID: <1392027058-11680-1-git-send-email-ivan.khoronzhuk@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 10 Feb 2014 11:14:46 +0100
+Subject: [PATCH 14/17] i2c: nomadik: Fixup deployment of runtime PM
+In-Reply-To: <CACRpkdZwoXf5ovmQEAN6Ugvz91+_i5uGqStR3MGXQeJGHitj3Q@mail.gmail.com>
+References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+ <1391529538-21685-15-git-send-email-ulf.hansson@linaro.org>
+ <CACRpkdZwoXf5ovmQEAN6Ugvz91+_i5uGqStR3MGXQeJGHitj3Q@mail.gmail.com>
+Message-ID: <CAPDyKFrWgB8z1rtWxU7AYvVsmNj_pfGbsozwgP_FzLODpmGRwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a broadcast timer64 based clockevent driver for keystone arch.
-This driver uses timer in 64-bit general purpose mode as clock event
-device.
+On 5 February 2014 15:34, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Feb 4, 2014 at 4:58 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>
+>> Since the device is active while a successful probe has been completed,
+>> the reference counting for the clock will be screwed up and never reach
+>> zero.
+>>
+>> The issue is resolved by implementing runtime PM callbacks and let them
+>> handle the resources accordingly, including the clock.
+>>
+>> Cc: Alessandro Rubini <rubini@unipv.it>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Wolfram Sang <wsa@the-dreams.de>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> Hm do I read it right as patch 13 breaks runtime PM by leaving
+> the device active after probe() and this patch
+> 14 fixes it again? Maybe these two patches should be squashed
+> then.
 
-Documentation:
-    http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
+You are right; but the driver will still be working, you just don't
+get the benefit from inactivating the device at request inactivity -
+as you pointed out.
 
-Based on
-git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
-keystone/master
+The reason for why I wanted to do this as separate steps was to make
+it easier for reviewing, otherwise the patch(es) would have been quite
+big and messy. I am for sure open to  adopt to your proposal, but just
+wanted to give you some more background, before I go ahead and send a
+v2.
 
-v5..v6:
-	added function to encapsulate __iowmb().
+Kind regards
+Ulf Hansson
 
-v4..v5:
-	used __iowmb() insted of wmb()
-
-v3..v4:
-	rebased on latest of linux-keystone.git keystone/master
-
-v2..v3:
-- clocksource: timer-keystone: introduce clocksource driver for
-	changed "u64" type to "unsigned long" for hz_period as more appropriate
-	hz_period rounded up by DIV_ROUND_UP(rate, HZ)
-	corrected comments
-
-v1..v2:
-- clocksource: timer-keystone: introduce clocksource driver for
-	renamed timer on "timer-keystone"
-	in keystone_timer_interrupt() evet pointer is passed via "dev_id"
-	used __relaxed variants of writel/readl and added explicit barriers
-	added "keystone_timer_disable()" for using in keystone_set_mode()
-	keystone_timer_config() is not used for disabling the timer any more
-	in case of an unsupported mode the keystone_timer_config() returns -1.
-	used request_irq() instead of setup_irq()
-	assigned irq for event_device in event_dev->irq
-	calculated timer.hz_period for CLOCK_EVT_MODE_PERIODIC at init
-	deleted spare call of keystone_timer_config() in keystone_timer_init()
-
-Ivan Khoronzhuk (3):
-  clocksource: timer-keystone: introduce clocksource driver for Keystone
-  clocksource: keystone: add bindings for keystone timer
-  arm: dts: keystone: add keystone timer entry
-
- .../bindings/timer/ti,keystone-timer.txt           |  29 +++
- arch/arm/boot/dts/keystone-clocks.dtsi             |  10 +
- arch/arm/boot/dts/keystone.dtsi                    |   7 +
- drivers/clocksource/Makefile                       |   1 +
- drivers/clocksource/timer-keystone.c               | 244 +++++++++++++++++++++
- 5 files changed, 291 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/ti,keystone-timer.txt
- create mode 100644 drivers/clocksource/timer-keystone.c
-
--- 
-1.8.3.2
+>
+> Yours,
+> Linus Walleij
