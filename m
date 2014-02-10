@@ -1,119 +1,66 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 10 Feb 2014 09:50:16 +0100
-Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
-In-Reply-To: <20140207170903.GT5976@mudshark.cambridge.arm.com>
-References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
- <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
- <20140207170903.GT5976@mudshark.cambridge.arm.com>
-Message-ID: <52F892C8.80508@st.com>
+From: mohit.kumar@st.com (Mohit Kumar)
+Date: Mon, 10 Feb 2014 14:21:52 +0530
+Subject: [PATCH V5 1/8] clk: SPEAr13xx: Fix pcie clock name
+In-Reply-To: <cover.1391871170.git.pratyush.anand@st.com>
+References: <cover.1391871170.git.pratyush.anand@st.com>
+Message-ID: <6e6bc5e96945862e8b6421aade15954fa05270b6.1391871170.git.pratyush.anand@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2014 06:09 PM, Will Deacon wrote:
-> On Fri, Feb 07, 2014 at 04:19:15PM +0000, Fabrice GASNIER wrote:
->> This patch adds imprecise abort enable/disable macros.
->> It also enables imprecise aborts when starting kernel.
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> ---
->>   arch/arm/include/asm/irqflags.h |   33 +++++++++++++++++++++++++++++++++
->>   arch/arm/kernel/smp.c           |    1 +
->>   arch/arm/kernel/traps.c         |    4 ++++
->>   3 files changed, 38 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/irqflags.h b/arch/arm/include/asm/irqflags.h
->> index 3b763d6..82e3834 100644
->> --- a/arch/arm/include/asm/irqflags.h
->> +++ b/arch/arm/include/asm/irqflags.h
->> @@ -51,6 +51,9 @@ static inline void arch_local_irq_disable(void)
->>   
->>   #define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
->>   #define local_fiq_disable() __asm__("cpsid f	@ __clf" : : : "memory", "cc")
->> +
->> +#define local_abt_enable()  __asm__("cpsie a	@ __sta" : : : "memory", "cc")
->> +#define local_abt_disable() __asm__("cpsid a	@ __cla" : : : "memory", "cc")
->>   #else
->>   
->>   /*
->> @@ -130,6 +133,36 @@ static inline void arch_local_irq_disable(void)
->>   	: "memory", "cc");					\
->>   	})
->>   
->> +/*
->> + * Enable Aborts
->> + */
->> +#define local_abt_enable()					\
->> +	({							\
->> +		unsigned long temp;				\
->> +	__asm__ __volatile__(					\
->> +	"mrs	%0, cpsr		@ sta\n"		\
->> +"	bic	%0, %0, %1\n"					\
->> +"	msr	cpsr_c, %0"					\
->> +	: "=r" (temp)						\
->> +	: "r" (PSR_A_BIT)					\
-> Can you use "i" instead of a register for this constant?
-Hi,
+From: Pratyush Anand <pratyush.anand@st.com>
 
-Sure, I will change it in a future patch.
->
->> +	: "memory", "cc");					\
-> You don't need the "cc" clobber.
-That surprises me: I think "orr" and "bic" instruction might change N 
-and Z bits, depending on the result.
-So shouldn't "cc" be placed here ?
-I also see that it is used in local_fiq_enable/disable macros just 
-above, that are similar:
-#define local_fiq_enable()                    \
-     ({                            \
-         unsigned long temp;                \
-     __asm__ __volatile__(                    \
-     "mrs    %0, cpsr        @ stf\n"        \
-"    bic    %0, %0, #64\n"                    \
-"    msr    cpsr_c, %0"                    \
-     : "=r" (temp)                        \
-     :                            \
-     : "memory", "cc");                    \
-     })
->>   #endif
->>   
->>   /*
->> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
->> index dc894ab..c2093cb 100644
->> --- a/arch/arm/kernel/smp.c
->> +++ b/arch/arm/kernel/smp.c
->> @@ -377,6 +377,7 @@ asmlinkage void secondary_start_kernel(void)
->>   
->>   	local_irq_enable();
->>   	local_fiq_enable();
->> +	local_abt_enable();
->>   
->>   	/*
->>   	 * OK, it's off to the idle thread for us
->> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
->> index 4636d56..ef15709 100644
->> --- a/arch/arm/kernel/traps.c
->> +++ b/arch/arm/kernel/traps.c
->> @@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
->>   
->>   	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
->>   	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
->> +
->> +	/* Enable imprecise aborts */
->> +	local_abt_enable();
-> Surely we want to enable this as early as possible? Now, putting this into
-> head.S is ugly, as it duplicating it across all the proc*.S files, so why
-> not setup_arch?
-Sorry, I'm not sure to understand your last comment.
-At least, I need it enabled before probing drivers (PCIe bus)
-I've added imprecise abort enable code in traps.c, following Russel 
-King's advice, please see:
-http://archive.arm.linux.org.uk/lurker/message/20140131.170827.d752a1cc.en.html
-As abort bit is local to a cpu, i've also added it in smp.c, but this 
-may not be the right place ?
+Follow dt clock naming convention for PCIe clocks.
 
-Please elaborate,
+Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Mohit Kumar <mohit.kumar@st.com>
+Cc: Viresh Kumar <viresh.linux@gmail.com>
+Cc: spear-devel at list.st.com
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/clk/spear/spear1310_clock.c | 6 +++---
+ drivers/clk/spear/spear1340_clock.c | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-Thanks,
-Fabrice
->
-> Will
+diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
+index 65894f7..4daa597 100644
+--- a/drivers/clk/spear/spear1310_clock.c
++++ b/drivers/clk/spear/spear1310_clock.c
+@@ -742,19 +742,19 @@ void __init spear1310_clk_init(void __iomem *misc_base, void __iomem *ras_base)
+ 	clk = clk_register_gate(NULL, "pcie_sata_0_clk", "ahb_clk", 0,
+ 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_0_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie.0");
++	clk_register_clkdev(clk, NULL, "b1000000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
+ 
+ 	clk = clk_register_gate(NULL, "pcie_sata_1_clk", "ahb_clk", 0,
+ 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_1_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie.1");
++	clk_register_clkdev(clk, NULL, "b1800000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b1800000.ahci");
+ 
+ 	clk = clk_register_gate(NULL, "pcie_sata_2_clk", "ahb_clk", 0,
+ 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_2_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie.2");
++	clk_register_clkdev(clk, NULL, "b4000000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b4000000.ahci");
+ 
+ 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
+diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
+index fe835c1..5a5c664 100644
+--- a/drivers/clk/spear/spear1340_clock.c
++++ b/drivers/clk/spear/spear1340_clock.c
+@@ -839,7 +839,7 @@ void __init spear1340_clk_init(void __iomem *misc_base)
+ 	clk = clk_register_gate(NULL, "pcie_sata_clk", "ahb_clk", 0,
+ 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_PCIE_SATA_CLK_ENB,
+ 			0, &_lock);
+-	clk_register_clkdev(clk, NULL, "dw_pcie");
++	clk_register_clkdev(clk, NULL, "b1000000.pcie");
+ 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
+ 
+ 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
+-- 
+1.8.1.2
