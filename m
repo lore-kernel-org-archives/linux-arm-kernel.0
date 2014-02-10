@@ -1,21 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Feb 2014 13:18:55 +0000
-Subject: [PATCH] ASoC: fsl: fix pm support of machine drivers
-In-Reply-To: <1391836835-14892-1-git-send-email-shawn.guo@linaro.org>
-References: <1391836835-14892-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20140210131855.GC1757@sirena.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 10 Feb 2014 17:24:02 +0400
+Subject: [PATCH 1/2] ARM: shmobile: r8a7791: add Ether DT support
+In-Reply-To: <52F8CBFB.5060707@codethink.co.uk>
+References: <201402070112.48304.sergei.shtylyov@cogentembedded.com>
+ <52F8CBFB.5060707@codethink.co.uk>
+Message-ID: <52F8D2F2.7080703@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 08, 2014 at 01:20:35PM +0800, Shawn Guo wrote:
-> The commit 1abe729 (ASoC: fsl: Add missing pm to current machine
-> drivers) enables pm support for a few IMX machine drivers.  But it does
+Hello.
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/a54accae/attachment.sig>
+On 10-02-2014 16:54, Ben Dooks wrote:
+
+>> Define the generic R8A7791 part of the Ether device node.
+
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+>> ---
+>>   arch/arm/boot/dts/r8a7791.dtsi |   15 ++++++++++++++-
+>>   1 file changed, 14 insertions(+), 1 deletion(-)
+
+>> Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
+>> ===================================================================
+>> --- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
+>> +++ renesas/arch/arm/boot/dts/r8a7791.dtsi
+>> @@ -2,7 +2,8 @@
+>>    * Device Tree Source for the r8a7791 SoC
+>>    *
+>>    * Copyright (C) 2013 Renesas Electronics Corporation
+>> - * Copyright (C) 2013 Renesas Solutions Corp.
+>> + * Copyright (C) 2013-2014 Renesas Solutions Corp.
+>> + * Copyright (C) 2014 Cogent Embedded Inc.
+>>    *
+>>    * This file is licensed under the terms of the GNU General Public License
+>>    * version 2.  This program is licensed "as is" without any warranty of any
+>> @@ -366,6 +367,18 @@
+>>           status = "disabled";
+>>       };
+>>
+>> +    ether: ethernet at ee700000 {
+>> +        compatible = "renesas,ether-r8a7791";
+>> +        reg = <0 0xee700000 0 0x400>;
+>> +        interrupt-parent = <&gic>;
+>> +        interrupts = <0 162 IRQ_TYPE_LEVEL_HIGH>;
+>> +        clocks = <&mstp8_clks R8A7791_CLK_ETHER>;
+>> +        phy-mode = "rmii";
+>> +        #address-cells = <1>;
+>> +        #size-cells = <0>;
+>> +        status = "disabled";
+>> +    };
+
+> Is the device only capable of doing RMII?
+
+    Yes.
+
+WBR, Sergei
