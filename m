@@ -1,44 +1,26 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 10 Feb 2014 19:33:34 +0100
-Subject: [PATCH] ARM: mvebu: rename mvebu_defconfig to mvebu_v7_defconfig
-In-Reply-To: <1392056399-20908-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392056399-20908-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140210183334.GH9995@lunn.ch>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 10 Feb 2014 10:34:12 -0800
+Subject: [PATCH] ARM: pxa: fix various compilation problems
+In-Reply-To: <CACRpkdac3UW-ZzvgfsZt2cHaUsOeDcLS++ip=diYoLCUy7HFRA@mail.gmail.com>
+ (Linus Walleij's message of "Tue, 4 Feb 2014 20:49:03 +0100")
+References: <1391518387-5934-1-git-send-email-linus.walleij@linaro.org>
+ <4895932.cC8EyYOxb5@wuerfel>
+ <CACRpkdac3UW-ZzvgfsZt2cHaUsOeDcLS++ip=diYoLCUy7HFRA@mail.gmail.com>
+Message-ID: <7hvbwm95qz.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 07:19:59PM +0100, Thomas Petazzoni wrote:
-> With the merge of the Kirkwood support into arch/arm/mach-mvebu/, the
-> mvebu platform will no longer only contain ARMv7 compatible processors
-> (Armada 370, Armada XP, and soon Armada 375, Armada 38x and Dove), but
-> also ARMv5 compatible processors (Kirkwood, and hopefully Orion5x in
-> the future).
-> 
-> However, a single mvebu_defconfig cannot work, since it is not
-> possible to build a kernel that supports both ARMv5 and ARMv7
-> platforms in the same binary. As a consequence, this commit renames
-> mvebu_defconfig to mvebu_v7_defconfig, which is the configuration that
-> will build a kernel that supports all ARMv7 mvebu platforms. As
-> Kirkwood support gets merged into mach-mvebu, an additional
-> mvebu_v5_defconfig will be added.
-> 
-> Even though we already have a multi_v7_defconfig, the mvebu developers
-> found it more convenient for development to have a defconfig that
-> builds only the mvebu platforms.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/configs/{mvebu_defconfig => mvebu_v7_defconfig} | 0
->  1 file changed, 0 insertions(+), 0 deletions(-)
->  rename arch/arm/configs/{mvebu_defconfig => mvebu_v7_defconfig} (100%)
-> 
-> diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-> similarity index 100%
-> rename from arch/arm/configs/mvebu_defconfig
-> rename to arch/arm/configs/mvebu_v7_defconfig
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+> On Tue, Feb 4, 2014 at 3:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Tuesday 04 February 2014 13:53:07 Linus Walleij wrote:
+>>> Hi ARM SoC folks: please apply this patch directly to the ARM
+>>> SoC tree fixes branch if you are happy with it.
+>>
+>> It's also needed for 3.13-backports, right?
+>
+> Yes. Tagging for stable # v3.13+ should do the trick.
 
-Thanks Thomas,
+Applied to fixes, and tagged for stable v3.13+
 
-       Andrew
+Kevin
