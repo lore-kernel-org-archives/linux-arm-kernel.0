@@ -1,42 +1,41 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Mon, 10 Feb 2014 10:46:45 +0000
-Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <CAJuA9agcpbKYocaQUBr2-VCXcXAo3r3urFF=+G_+ib2jCZqvwg@mail.gmail.com>
-References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>	<1391786342-11812-3-git-send-email-thomas.ab@samsung.com>	<52F50698.4060305@arm.com>	<52F509BD.70903@arm.com>	<CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>	<52F51888.5010608@arm.com>	<CAGo_u6ofC4NNPiTNcSnXUvT3RZJo54=XyjetR-ok5hCBrVZkKg@mail.gmail.com>	<52F51FCD.5000009@arm.com>
- <CAJuA9agcpbKYocaQUBr2-VCXcXAo3r3urFF=+G_+ib2jCZqvwg@mail.gmail.com>
-Message-ID: <52F8AE15.80301@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 10 Feb 2014 11:47:26 +0100
+Subject: [PATCH 0/7] ARM: shmobile: r8a7790/Lager QSPI SoC/board integration
+Message-ID: <1392029254-15400-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/14 06:47, Thomas Abraham wrote:
-> On Fri, Feb 7, 2014 at 11:32 PM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
->> On 07/02/14 17:37, Nishanth Menon wrote:
->>> On Fri, Feb 7, 2014 at 11:31 AM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
->>
->> [...]
->>
->>>> Yes I think its counter-intuitive as it's visible to the userspace(list of
->>>> frequencies and the boost parameters are exposed through sysfs)
->>>
->>> That will be a different problem -> as currently every single
->>> frequency in the cpufreq list has ability to be marked as boost
->>> frequency - if userspace does not maintain that, then, IMHO, fix the
->>> userspace :D
->>>
->>
->> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies gives
->> the list of frequencies based on the state of the boost feature at anytime.
-> 
-> The list of frequencies in
-> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
-> does not change based in the state of the boost feature (enabled or
-> disabled). But the scaling_max_frequency and scaling_min_frequency are
-> updated based on the set of available + boost frequencies available.
-> 
+	Hi Simon, Magnus,
 
-Ah ok, sorry just glanced the code and misunderstood it. It make sense to update
-only max_frequency.
+The following patch series completes r8a7790 SoC and Lager board
+integration for the Renesas Quad Serial Peripheral Interface. It brings
+r8a7790/Lager to the same support level as r8a7791/Koelsch, allowing access
+to the Spansion s25fl512s SPI FLASH for both legacy and multi-platform
+kernels.
 
-Regards,
-Sudeep
+    [1/7] pinctrl: sh-pfc: r8a7790: Add QSPI pin groups
+    [2/7] ARM: shmobile: lager legacy: Add QSPI pinmux
+    [3/7] ARM: shmobile: r8a7790 dtsi: Add QSPI node
+    [4/7] ARM: shmobile: lager dts: Add QSPI nodes
+    [5/7] ARM: shmobile: lager defconfig: Enable RSPI and MTD_M25P80
+    [6/7] ARM: shmobile: lager legacy: Enable Quad SPI transfers for the SPI
+	  FLASH
+    [7/7] ARM: shmobile: lager dts: Enable Quad SPI transfers for the SPI
+         FLASH
+
+Please do _not_ apply patches [6/7] and [7/7] yet, as these have a runtime
+dependency on Quad SPI support in the RSPI/QSPI driver, which is queued up
+in the linux-spi tree for v3.15.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
