@@ -1,27 +1,61 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 10 Feb 2014 18:53:50 +0100
-Subject: [PATCH 6/6] dt: Update binding information for mvebu gating
- clocks with Armada 380/385
-In-Reply-To: <1392053569-28037-7-git-send-email-gregory.clement@free-electrons.com>
-References: <1392053569-28037-1-git-send-email-gregory.clement@free-electrons.com>
- <1392053569-28037-7-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140210175350.GD9995@lunn.ch>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 10 Feb 2014 18:55:39 +0100
+Subject: [PATCH 07/11] ARM: mvebu: add initial support for the Armada
+ 380/385 SOCs
+In-Reply-To: <20140210174404.GC9995@lunn.ch>
+References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1392053002-19831-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140210174404.GC9995@lunn.ch>
+Message-ID: <20140210185539.55d19a82@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +The following is a list of provided IDs for Armada 380/385:
-> +ID	Clock		Peripheral
-> +-----------------------------------
-> +0	audio		Audio
-> +2	ge2		Gigabit Ethernet 2
-> +3	ge1		Gigabit Ethernet 1
-> +4	ge0		Gigabit Ethernet 0
-> +5	pex1		PCIe 1
-> +6	pex2		PCIe 2
-> +7	pex3		PCIe 3
-> +8	pex4		PCIe 0
+Dear Andrew Lunn,
 
-Is that last one a typo? It at least looks a bit odd.
+On Mon, 10 Feb 2014 18:44:04 +0100, Andrew Lunn wrote:
 
-Thanks
-	Andrew
+> > +config MACH_ARMADA_380
+> 
+> Should this maybe be MACH_ARMADA_38X. You have PINCTRL_ARMADA_38X, so
+> it seems a bit inconsistent.
+
+True, will fix this in v2.
+
+> > +static void __init armada_380_timer_and_clk_init(void)
+> > +{
+> > +	of_clk_init(NULL);
+> > +	clocksource_of_init();
+> > +	BUG_ON(mvebu_mbus_dt_init());
+> > +	l2x0_of_init(0, ~0UL);
+> > +}
+> > +
+> > +static const char * const armada_380_dt_compat[] = {
+> > +	"marvell,armada380",
+> > +	"marvell,armada385",
+> > +	NULL,
+> > +};
+> > +
+> > +DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 380/385 (Device Tree)")
+> > +	.init_time	= armada_380_timer_and_clk_init,
+> > +	.restart	= mvebu_restart,
+> > +	.dt_compat	= armada_380_dt_compat,
+> > +MACHINE_END
+> 
+> This looks very similar to the 375 code. Could they be combined?
+
+It is not entirely clear at this point how different they will be. For
+now, the external abort workaround applies only to Armada 375, but that
+can easily be checked by looking at the DT compatible string. Maybe we
+can decide to have a common file for now, and split it later on if we
+realize that the differences are too complex?
+
+Only problem with that (but a problem that is often difficult to
+solve) : what should be the same of this file? armada-375-38x.c ?
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
