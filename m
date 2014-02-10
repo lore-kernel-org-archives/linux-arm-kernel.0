@@ -1,57 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 10 Feb 2014 14:12:07 +0000
-Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
-In-Reply-To: <20140210135659.GU26684@n2100.arm.linux.org.uk>
-References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
- <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
- <20140207170903.GT5976@mudshark.cambridge.arm.com>
- <52F892C8.80508@st.com>
- <20140210111710.GC17766@mudshark.cambridge.arm.com>
- <20140210135659.GU26684@n2100.arm.linux.org.uk>
-Message-ID: <20140210141207.GH17766@mudshark.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 10 Feb 2014 14:12:55 +0000
+Subject: [PATCH 14/28] Remove MACH_SMDKC210
+In-Reply-To: <1392039072.3585.15.camel@x220>
+References: <1391971686-9517-1-git-send-email-richard@nod.at>
+ <1391971686-9517-15-git-send-email-richard@nod.at>
+ <20140210114154.GQ1757@sirena.org.uk>
+ <1392039072.3585.15.camel@x220>
+Message-ID: <20140210141255.GI1757@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 01:56:59PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 10, 2014 at 11:17:10AM +0000, Will Deacon wrote:
-> > On Mon, Feb 10, 2014 at 08:50:16AM +0000, Fabrice Gasnier wrote:
-> > > On 02/07/2014 06:09 PM, Will Deacon wrote:
-> > > > On Fri, Feb 07, 2014 at 04:19:15PM +0000, Fabrice GASNIER wrote:
-> > > >> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> > > >> index 4636d56..ef15709 100644
-> > > >> --- a/arch/arm/kernel/traps.c
-> > > >> +++ b/arch/arm/kernel/traps.c
-> > > >> @@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
-> > > >>   
-> > > >>   	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
-> > > >>   	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
-> > > >> +
-> > > >> +	/* Enable imprecise aborts */
-> > > >> +	local_abt_enable();
-> > > > Surely we want to enable this as early as possible? Now, putting this into
-> > > > head.S is ugly, as it duplicating it across all the proc*.S files, so why
-> > > > not setup_arch?
-> > > Sorry, I'm not sure to understand your last comment.
-> > > At least, I need it enabled before probing drivers (PCIe bus)
-> > > I've added imprecise abort enable code in traps.c, following Russel 
-> > > King's advice, please see:
-> > > http://archive.arm.linux.org.uk/lurker/message/20140131.170827.d752a1cc.en.html
-> > > As abort bit is local to a cpu, i've also added it in smp.c, but this 
-> > > may not be the right place ?
-> > > 
-> > > Please elaborate,
+On Mon, Feb 10, 2014 at 02:31:12PM +0100, Paul Bolle wrote:
+> On Mon, 2014-02-10 at 11:41 +0000, Mark Brown wrote:
+> > On Sun, Feb 09, 2014 at 07:47:52PM +0100, Richard Weinberger wrote:
+
+> > Please fix whatever script you're using to generate your mails, it's
+> > generating corrupt headers.
+
+> I think Richard's mail didn't end up on lkml. But it's pretty clear what
+> it must have looked like.
+
+I can see what it looked like from my inbox, but my mail client can't
+understand them at all and hence didn't think the mails were sent to me
+and just ignored them when hitting reply.
+
+> > >  config SND_SOC_SAMSUNG_SMDK_WM9713
+> > >  	tristate "SoC AC97 Audio support for SMDK with WM9713"
+> > > -	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310 || MACH_SMDKC210)
+> > > +	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310)
 > > 
-> > I was just suggesting that we move your local_abt_enable() call to
-> > setup_arch, since that's called before early_trap_init on the primary CPU.
-> 
-> Why would we want to enable aborts before we've setup the vectors page
-> to handle an abort?  That's akin to enabling interrupts and hoping there
-> isn't one pending...
+> > Like I said to Paul this isn't fixing the actual issue - think about why
+> > the symbol was there in the first place and why it was removed.  There
+> > is a problem here but this would make it less likely that it would be
+> > properly fixed.
 
-I figured we'd want to fall over as quickly as possible if the bootloader
-had left a pending exception for us, but you're right in that it's not very
-helpful if we can't print out a diagnostic.
+> Would you mind going through this one step at a time, just to make sure
+> _I_ understand what it is that you'd like to see?
 
-Fabrice, please ignore my suggestion and keep the unmasking where it is.
+> If so, to be absolutely sure we start from the same point: do you agree
+> that the above line now effectively reads
+>     depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || false || false)
 
-Will
+> because there's neither a Kconfig symbol MACH_SMDKV310 nor a Kconfig
+> symbol MACH_SMDKC210?
+
+Yes, that's correct.  Now, like I say think about what the symbol was
+there for in the first place.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/17ff5e43/attachment.sig>
