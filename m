@@ -1,65 +1,132 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 10 Feb 2014 14:42:28 +0000
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 10 Feb 2014 15:44:50 +0100
 Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
-In-Reply-To: <20140210135659.GU26684@n2100.arm.linux.org.uk>
+In-Reply-To: <20140210141634.GA2794@e103592.cambridge.arm.com>
 References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
  <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
- <20140207170903.GT5976@mudshark.cambridge.arm.com>
- <52F892C8.80508@st.com>
- <20140210111710.GC17766@mudshark.cambridge.arm.com>
- <20140210135659.GU26684@n2100.arm.linux.org.uk>
-Message-ID: <20140210144228.GC2794@e103592.cambridge.arm.com>
+ <20140210141634.GA2794@e103592.cambridge.arm.com>
+Message-ID: <52F8E5E2.30805@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 01:56:59PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 10, 2014 at 11:17:10AM +0000, Will Deacon wrote:
-> > On Mon, Feb 10, 2014 at 08:50:16AM +0000, Fabrice Gasnier wrote:
-> > > On 02/07/2014 06:09 PM, Will Deacon wrote:
-> > > > On Fri, Feb 07, 2014 at 04:19:15PM +0000, Fabrice GASNIER wrote:
-> > > >> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> > > >> index 4636d56..ef15709 100644
-> > > >> --- a/arch/arm/kernel/traps.c
-> > > >> +++ b/arch/arm/kernel/traps.c
-> > > >> @@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
-> > > >>   
-> > > >>   	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
-> > > >>   	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
-> > > >> +
-> > > >> +	/* Enable imprecise aborts */
-> > > >> +	local_abt_enable();
-> > > > Surely we want to enable this as early as possible? Now, putting this into
-> > > > head.S is ugly, as it duplicating it across all the proc*.S files, so why
-> > > > not setup_arch?
-> > > Sorry, I'm not sure to understand your last comment.
-> > > At least, I need it enabled before probing drivers (PCIe bus)
-> > > I've added imprecise abort enable code in traps.c, following Russel 
-> > > King's advice, please see:
-> > > http://archive.arm.linux.org.uk/lurker/message/20140131.170827.d752a1cc.en.html
-> > > As abort bit is local to a cpu, i've also added it in smp.c, but this 
-> > > may not be the right place ?
-> > > 
-> > > Please elaborate,
-> > 
-> > I was just suggesting that we move your local_abt_enable() call to
-> > setup_arch, since that's called before early_trap_init on the primary CPU.
-> 
-> Why would we want to enable aborts before we've setup the vectors page
-> to handle an abort?  That's akin to enabling interrupts and hoping there
-> isn't one pending...
+On 02/10/2014 03:16 PM, Dave Martin wrote:
+> On Fri, Feb 07, 2014 at 05:19:15PM +0100, Fabrice GASNIER wrote:
+>> This patch adds imprecise abort enable/disable macros.
+>> It also enables imprecise aborts when starting kernel.
+> Relying on imprecise aborts for hardware probing would be considered bad
+> hardware and/or software design for ARM-specific stuff.
+>
+> PCI is more generic though, so we may have to put up with this to some
+> extent.  Can you point me to the affected probing code?  I'm not very
+> familiar with that stuff...
+Hi,
 
-Should we require CPSR.A to me masked in Booting, for all CPUs that have
-it?
+I'm currently re-basing to prepare upstream of such a driver so, no code 
+for now on my side,
+but, I saw others that have similar behavior :
+http://www.spinics.net/lists/linux-pci/msg26124.html
+Basically, I think all PCI drivers using hook_fault_code(16+6, ...) use 
+similar mechanism.
+>
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> ---
+>>   arch/arm/include/asm/irqflags.h |   33 +++++++++++++++++++++++++++++++++
+>>   arch/arm/kernel/smp.c           |    1 +
+>>   arch/arm/kernel/traps.c         |    4 ++++
+>>   3 files changed, 38 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/irqflags.h b/arch/arm/include/asm/irqflags.h
+>> index 3b763d6..82e3834 100644
+>> --- a/arch/arm/include/asm/irqflags.h
+>> +++ b/arch/arm/include/asm/irqflags.h
+>> @@ -51,6 +51,9 @@ static inline void arch_local_irq_disable(void)
+>>   
+>>   #define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
+>>   #define local_fiq_disable() __asm__("cpsid f	@ __clf" : : : "memory", "cc")
+>> +
+>> +#define local_abt_enable()  __asm__("cpsie a	@ __sta" : : : "memory", "cc")
+>> +#define local_abt_disable() __asm__("cpsid a	@ __cla" : : : "memory", "cc")
+>>   #else
+>>   
+>>   /*
+>> @@ -130,6 +133,36 @@ static inline void arch_local_irq_disable(void)
+>>   	: "memory", "cc");					\
+>>   	})
+>>   
+>> +/*
+>> + * Enable Aborts
+>> + */
+>> +#define local_abt_enable()					\
+>> +	({							\
+>> +		unsigned long temp;				\
+>> +	__asm__ __volatile__(					\
+>> +	"mrs	%0, cpsr		@ sta\n"		\
+>> +"	bic	%0, %0, %1\n"					\
+>> +"	msr	cpsr_c, %0"					\
+> I suggest you use "cpsie/cpsid a" instead.  This requires ARMv6, but the
+> CPSR.A bit only exists on ARMv6 and later anyway.  Poking that bit
+> on earlier CPUs may cause unpredictable behaviour, so these macros
+> should be no-ops for v5 and earlier.
+Thanks,
+I'll prepare a new patch that way.
+>
+>> +	: "=r" (temp)						\
+>> +	: "r" (PSR_A_BIT)					\
+>> +	: "memory", "cc");					\
+>> +	})
+>> +
+>> +/*
+>> + * Disable Aborts
+>> + */
+>> +#define local_abt_disable()					\
+>> +	({							\
+>> +		unsigned long temp;				\
+>> +	__asm__ __volatile__(					\
+>> +	"mrs	%0, cpsr		@ cla\n"		\
+>> +"	orr	%0, %0, %1\n"					\
+>> +"	msr	cpsr_c, %0"					\
+>> +	: "=r" (temp)						\
+>> +	: "r" (PSR_A_BIT)					\
+>> +	: "memory", "cc");					\
+>> +	})
+>> +
+>>   #endif
+>>   
+>>   /*
+>> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+>> index dc894ab..c2093cb 100644
+>> --- a/arch/arm/kernel/smp.c
+>> +++ b/arch/arm/kernel/smp.c
+>> @@ -377,6 +377,7 @@ asmlinkage void secondary_start_kernel(void)
+>>   
+>>   	local_irq_enable();
+>>   	local_fiq_enable();
+>> +	local_abt_enable();
+>>   
+>>   	/*
+>>   	 * OK, it's off to the idle thread for us
+>> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+>> index 4636d56..ef15709 100644
+>> --- a/arch/arm/kernel/traps.c
+>> +++ b/arch/arm/kernel/traps.c
+>> @@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
+>>   
+>>   	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+>>   	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+>> +
+>> +	/* Enable imprecise aborts */
+>> +	local_abt_enable();
+> It would be good to clean up why aborts are not being consistently
+> enabled on boot.
+I did a bit of analysis and summarized it in this thread. I've not been 
+further:
+http://archive.arm.linux.org.uk/lurker/message/20140203.164322.edba427a.en.html
 
-By definition, we cannot dispatch those exceptions for a while, until
-some vectors have been set up; so it makes sense in the same way that
-requiring CPSR.[IF] to be set makes sense.
-
-The kernel should do its best to cope anyway, and immediately mask CPSR.A
-on entry if it's a v6 or later kernel.  safe_svcmode_maskall was
-originally intended to do that, but it got watered down to cope with the
-Zaurus issues, so it now looks like most code paths don't mask CPSR.A
-there.  I'm happy to take another look at it.
-
-Cheers
----Dave
+BR,
+Fabrice
+>
+> Really, they should be enabled, except for a brief window during
+> boot when the vectors are not mapped and the abort can't be dispatched.
+>
+> Cheers
+> ---Dave
