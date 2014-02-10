@@ -1,256 +1,120 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 10 Feb 2014 20:00:27 -0300
-Subject: [PATCH v7 08/18] watchdog: orion: Introduce an orion_watchdog device
- structure
+Date: Mon, 10 Feb 2014 20:00:29 -0300
+Subject: [PATCH v7 10/18] watchdog: orion: Add per-compatible clock
+ initialization
 In-Reply-To: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1392073237-2554-9-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1392073237-2554-11-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to prepare to support multiple compatible-strings, this
-commit adds a device structure to hold the driver's state.
+Following the introduction of the compatible-data field,
+it's now possible to further abstract the clock initialization.
+This will allow to support SoC with a different clock setup.
 
 Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Tested-by: Willy Tarreau <w@1wt.eu>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/watchdog/orion_wdt.c | 114 ++++++++++++++++++++++++++-----------------
- 1 file changed, 69 insertions(+), 45 deletions(-)
+ drivers/watchdog/orion_wdt.c | 53 ++++++++++++++++++++++++++------------------
+ 1 file changed, 32 insertions(+), 21 deletions(-)
 
 diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-index 65aa655..9d3a5b9 100644
+index b220e34..b48fd08 100644
 --- a/drivers/watchdog/orion_wdt.c
 +++ b/drivers/watchdog/orion_wdt.c
-@@ -44,55 +44,66 @@
- 
+@@ -42,10 +42,14 @@
  static bool nowayout = WATCHDOG_NOWAYOUT;
  static int heartbeat = -1;		/* module parameter (seconds) */
--static unsigned int wdt_max_duration;	/* (seconds) */
--static struct clk *clk;
--static unsigned int wdt_tclk;
--static void __iomem *wdt_reg;
--static void __iomem *wdt_rstout;
+ 
++struct orion_watchdog;
 +
-+struct orion_watchdog {
-+	struct watchdog_device wdt;
-+	void __iomem *reg;
-+	void __iomem *rstout;
-+	unsigned long clk_rate;
-+	struct clk *clk;
-+};
- 
- static int orion_wdt_ping(struct watchdog_device *wdt_dev)
- {
-+	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
- 	/* Reload watchdog duration */
--	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
-+	writel(dev->clk_rate * wdt_dev->timeout, dev->reg + WDT_VAL);
- 	return 0;
- }
- 
- static int orion_wdt_start(struct watchdog_device *wdt_dev)
- {
-+	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
-+
- 	/* Set watchdog duration */
--	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
-+	writel(dev->clk_rate * wdt_dev->timeout, dev->reg + WDT_VAL);
- 
- 	/* Enable watchdog timer */
--	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, WDT_EN);
-+	atomic_io_modify(dev->reg + TIMER_CTRL, WDT_EN, WDT_EN);
- 
- 	/* Enable reset on watchdog */
--	atomic_io_modify(wdt_rstout, WDT_RESET_OUT_EN, WDT_RESET_OUT_EN);
-+	atomic_io_modify(dev->rstout, WDT_RESET_OUT_EN, WDT_RESET_OUT_EN);
-+
- 	return 0;
- }
- 
- static int orion_wdt_stop(struct watchdog_device *wdt_dev)
- {
-+	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
-+
- 	/* Disable reset on watchdog */
--	atomic_io_modify(wdt_rstout, WDT_RESET_OUT_EN, 0);
-+	atomic_io_modify(dev->rstout, WDT_RESET_OUT_EN, 0);
- 
- 	/* Disable watchdog timer */
--	atomic_io_modify(wdt_reg + TIMER_CTRL, WDT_EN, 0);
-+	atomic_io_modify(dev->reg + TIMER_CTRL, WDT_EN, 0);
-+
- 	return 0;
- }
- 
--static int orion_wdt_enabled(void)
-+static int orion_wdt_enabled(struct orion_watchdog *dev)
- {
- 	bool enabled, running;
- 
--	enabled = readl(wdt_rstout) & WDT_RESET_OUT_EN;
--	running = readl(wdt_reg + TIMER_CTRL) & WDT_EN;
-+	enabled = readl(dev->rstout) & WDT_RESET_OUT_EN;
-+	running = readl(dev->reg + TIMER_CTRL) & WDT_EN;
- 
- 	return enabled && running;
- }
- 
- static unsigned int orion_wdt_get_timeleft(struct watchdog_device *wdt_dev)
- {
--	return readl(wdt_reg + WDT_VAL) / wdt_tclk;
-+	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
-+	return readl(dev->reg + WDT_VAL) / dev->clk_rate;
- }
- 
- static int orion_wdt_set_timeout(struct watchdog_device *wdt_dev,
-@@ -116,12 +127,6 @@ static const struct watchdog_ops orion_wdt_ops = {
- 	.get_timeleft = orion_wdt_get_timeleft,
+ struct orion_watchdog_data {
+ 	int wdt_counter_offset;
+ 	int wdt_enable_bit;
+ 	int rstout_enable_bit;
++	int (*clock_init)(struct platform_device *,
++			  struct orion_watchdog *);
  };
  
--static struct watchdog_device orion_wdt = {
--	.info = &orion_wdt_info,
--	.ops = &orion_wdt_ops,
--	.min_timeout = 1,
--};
--
- static irqreturn_t orion_wdt_irq(int irq, void *devid)
- {
- 	panic("Watchdog Timeout");
-@@ -157,18 +162,29 @@ static void __iomem *orion_wdt_ioremap_rstout(struct platform_device *pdev,
+ struct orion_watchdog {
+@@ -57,6 +61,22 @@ struct orion_watchdog {
+ 	const struct orion_watchdog_data *data;
+ };
  
- static int orion_wdt_probe(struct platform_device *pdev)
- {
-+	struct orion_watchdog *dev;
-+	unsigned int wdt_max_duration;	/* (seconds) */
- 	struct resource *res;
- 	int ret, irq;
- 
--	clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(clk)) {
-+	dev = devm_kzalloc(&pdev->dev, sizeof(struct orion_watchdog),
-+			   GFP_KERNEL);
-+	if (!dev)
-+		return -ENOMEM;
-+
-+	dev->wdt.info = &orion_wdt_info;
-+	dev->wdt.ops = &orion_wdt_ops;
-+	dev->wdt.min_timeout = 1;
++static int orion_wdt_clock_init(struct platform_device *pdev,
++				struct orion_watchdog *dev)
++{
++	int ret;
 +
 +	dev->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(dev->clk)) {
- 		dev_err(&pdev->dev, "Orion Watchdog missing clock\n");
--		return PTR_ERR(clk);
++	if (IS_ERR(dev->clk))
 +		return PTR_ERR(dev->clk);
- 	}
--	ret = clk_prepare_enable(clk);
 +	ret = clk_prepare_enable(dev->clk);
- 	if (ret)
- 		return ret;
--	wdt_tclk = clk_get_rate(clk);
++	if (ret)
++		return ret;
++
 +	dev->clk_rate = clk_get_rate(dev->clk);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
-@@ -176,24 +192,28 @@ static int orion_wdt_probe(struct platform_device *pdev)
- 		goto disable_clk;
- 	}
- 
--	wdt_reg = devm_ioremap(&pdev->dev, res->start, resource_size(res));
--	if (!wdt_reg) {
-+	dev->reg = devm_ioremap(&pdev->dev, res->start,
-+			       resource_size(res));
-+	if (!dev->reg) {
- 		ret = -ENOMEM;
- 		goto disable_clk;
- 	}
- 
--	wdt_rstout = orion_wdt_ioremap_rstout(pdev, res->start &
--						    INTERNAL_REGS_MASK);
--	if (!wdt_rstout) {
-+	dev->rstout = orion_wdt_ioremap_rstout(pdev, res->start &
-+						     INTERNAL_REGS_MASK);
-+	if (!dev->rstout) {
- 		ret = -ENODEV;
- 		goto disable_clk;
- 	}
- 
--	wdt_max_duration = WDT_MAX_CYCLE_COUNT / wdt_tclk;
-+	wdt_max_duration = WDT_MAX_CYCLE_COUNT / dev->clk_rate;
++	return 0;
++}
 +
-+	dev->wdt.timeout = wdt_max_duration;
-+	dev->wdt.max_timeout = wdt_max_duration;
-+	watchdog_init_timeout(&dev->wdt, heartbeat, &pdev->dev);
- 
--	orion_wdt.timeout = wdt_max_duration;
--	orion_wdt.max_timeout = wdt_max_duration;
--	watchdog_init_timeout(&orion_wdt, heartbeat, &pdev->dev);
-+	platform_set_drvdata(pdev, &dev->wdt);
-+	watchdog_set_drvdata(&dev->wdt, dev);
- 
- 	/*
- 	 * Let's make sure the watchdog is fully stopped, unless it's
-@@ -201,8 +221,8 @@ static int orion_wdt_probe(struct platform_device *pdev)
- 	 * removed and re-insterted, or if the bootloader explicitly
- 	 * set a running watchdog before booting the kernel.
- 	 */
--	if (!orion_wdt_enabled())
--		orion_wdt_stop(&orion_wdt);
-+	if (!orion_wdt_enabled(dev))
-+		orion_wdt_stop(&dev->wdt);
- 
- 	/* Request the IRQ only after the watchdog is disabled */
- 	irq = platform_get_irq(pdev, 0);
-@@ -212,37 +232,41 @@ static int orion_wdt_probe(struct platform_device *pdev)
- 		 * watchdog, so let's make it optional.
- 		 */
- 		ret = devm_request_irq(&pdev->dev, irq, orion_wdt_irq, 0,
--				       pdev->name, &orion_wdt);
-+				       pdev->name, dev);
- 		if (ret < 0) {
- 			dev_err(&pdev->dev, "failed to request IRQ\n");
- 			goto disable_clk;
- 		}
- 	}
- 
--	watchdog_set_nowayout(&orion_wdt, nowayout);
--	ret = watchdog_register_device(&orion_wdt);
-+	watchdog_set_nowayout(&dev->wdt, nowayout);
-+	ret = watchdog_register_device(&dev->wdt);
- 	if (ret)
- 		goto disable_clk;
- 
- 	pr_info("Initial timeout %d sec%s\n",
--		orion_wdt.timeout, nowayout ? ", nowayout" : "");
-+		dev->wdt.timeout, nowayout ? ", nowayout" : "");
- 	return 0;
- 
- disable_clk:
--	clk_disable_unprepare(clk);
-+	clk_disable_unprepare(dev->clk);
- 	return ret;
- }
- 
- static int orion_wdt_remove(struct platform_device *pdev)
+ static int orion_wdt_ping(struct watchdog_device *wdt_dev)
  {
--	watchdog_unregister_device(&orion_wdt);
--	clk_disable_unprepare(clk);
-+	struct watchdog_device *wdt_dev = platform_get_drvdata(pdev);
-+	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
-+
-+	watchdog_unregister_device(wdt_dev);
-+	clk_disable_unprepare(dev->clk);
- 	return 0;
- }
- 
- static void orion_wdt_shutdown(struct platform_device *pdev)
- {
--	orion_wdt_stop(&orion_wdt);
-+	struct watchdog_device *wdt_dev = platform_get_drvdata(pdev);
-+	orion_wdt_stop(wdt_dev);
- }
+ 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+@@ -172,6 +192,7 @@ static const struct orion_watchdog_data orion_data = {
+ 	.rstout_enable_bit = BIT(1),
+ 	.wdt_enable_bit = BIT(4),
+ 	.wdt_counter_offset = 0x24,
++	.clock_init = orion_wdt_clock_init,
+ };
  
  static const struct of_device_id orion_wdt_of_match_table[] = {
+@@ -206,34 +227,24 @@ static int orion_wdt_probe(struct platform_device *pdev)
+ 	dev->wdt.min_timeout = 1;
+ 	dev->data = match->data;
+ 
+-	dev->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(dev->clk)) {
+-		dev_err(&pdev->dev, "Orion Watchdog missing clock\n");
+-		return PTR_ERR(dev->clk);
+-	}
+-	ret = clk_prepare_enable(dev->clk);
+-	if (ret)
+-		return ret;
+-	dev->clk_rate = clk_get_rate(dev->clk);
+-
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res) {
+-		ret = -ENODEV;
+-		goto disable_clk;
+-	}
++	if (!res)
++		return -ENODEV;
+ 
+ 	dev->reg = devm_ioremap(&pdev->dev, res->start,
+ 			       resource_size(res));
+-	if (!dev->reg) {
+-		ret = -ENOMEM;
+-		goto disable_clk;
+-	}
++	if (!dev->reg)
++		return -ENOMEM;
+ 
+ 	dev->rstout = orion_wdt_ioremap_rstout(pdev, res->start &
+ 						     INTERNAL_REGS_MASK);
+-	if (!dev->rstout) {
+-		ret = -ENODEV;
+-		goto disable_clk;
++	if (!dev->rstout)
++		return -ENODEV;
++
++	ret = dev->data->clock_init(pdev, dev);
++	if (ret) {
++		dev_err(&pdev->dev, "cannot initialize clock\n");
++		return ret;
+ 	}
+ 
+ 	wdt_max_duration = WDT_MAX_CYCLE_COUNT / dev->clk_rate;
 -- 
 1.8.1.5
