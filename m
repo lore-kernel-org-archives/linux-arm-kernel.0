@@ -1,114 +1,75 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 10 Feb 2014 10:22:27 +0100
-Subject: [PATCH v3 1/2] ASoC: atmel_ssc_dai: make option to choose clock
-In-Reply-To: <1392012586-30790-2-git-send-email-voice.shen@atmel.com>
-References: <1392012586-30790-1-git-send-email-voice.shen@atmel.com>
- <1392012586-30790-2-git-send-email-voice.shen@atmel.com>
-Message-ID: <52F89A53.4090402@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Feb 2014 10:38:38 +0100
+Subject: [PATCH] pinctrl:at91:add drive strength configuration
+In-Reply-To: <1390285991-1634-1-git-send-email-mark.roszko@gmail.com>
+References: <20140121060637.GP9558@ns203013.ovh.net>
+ <1390285991-1634-1-git-send-email-mark.roszko@gmail.com>
+Message-ID: <CACRpkdaRP_JBt3Qqb6M6PFOHcUVOdVFNTsE9fWv-U073B=3UcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2014 07:09, Bo Shen :
-> When SSC works in slave mode, according to the hardware design, the
-> clock can get from TK pin, also can get from RK pin. So, add one
-> parameter to choose where the clock from.
-> 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+I agree with J-C that the patch shall be split in one for the DT changes and one
+for the driver changes (that I will apply to the pinctrl tree).
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Tue, Jan 21, 2014 at 7:33 AM, Marek Roszko <mark.roszko@gmail.com> wrote:
 
-> ---
-> Changes in v3:
->   - New, move clk-from-rk-pin property from card to ssc device
-> 
->  drivers/misc/atmel-ssc.c        |  6 ++++++
->  include/linux/atmel-ssc.h       |  1 +
->  sound/soc/atmel/atmel_ssc_dai.c | 13 +++++++++----
->  3 files changed, 16 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-> index 5be80840..22de137 100644
-> --- a/drivers/misc/atmel-ssc.c
-> +++ b/drivers/misc/atmel-ssc.c
-> @@ -150,6 +150,12 @@ static int ssc_probe(struct platform_device *pdev)
->  		return -ENODEV;
->  	ssc->pdata = (struct atmel_ssc_platform_data *)plat_dat;
->  
-> +	if (pdev->dev.of_node) {
-> +		struct device_node *np = pdev->dev.of_node;
-> +		ssc->clk_from_rk_pin =
-> +			of_property_read_bool(np, "atmel,clk-from-rk-pin");
-> +	}
+> The SAMA5 and most SAM9xGs(baring a few exceptions like the SAM945G) have drive
+> control registers that allow configuring the output current of the gpio pins between
+> three predefined levels of low,medium and high drive.
+
+Can we get to know a bit more about default/low/medium and high?
+
+I.e. this:
+
+> +#define DRIVE_STRENGTH_DEFAULT (0x0 << 5)
+> +#define DRIVE_STRENGTH_LOW             (0x1 << 5)
+> +#define DRIVE_STRENGTH_MED             (0x2 << 5)
+> +#define DRIVE_STRENGTH_HI              (0x3 << 5)
+(...)
+> +static unsigned at91_mux_sam9x5_get_drivestrength(void __iomem *pio, unsigned pin)
+> +{
+> +       unsigned tmp = read_drive_strength(pio + at91sam9x5_get_drive_register(pin), pin);
 > +
->  	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	ssc->regs = devm_ioremap_resource(&pdev->dev, regs);
->  	if (IS_ERR(ssc->regs))
-> diff --git a/include/linux/atmel-ssc.h b/include/linux/atmel-ssc.h
-> index 66a0e53..571a12e 100644
-> --- a/include/linux/atmel-ssc.h
-> +++ b/include/linux/atmel-ssc.h
-> @@ -18,6 +18,7 @@ struct ssc_device {
->  	struct clk		*clk;
->  	int			user;
->  	int			irq;
-> +	bool			clk_from_rk_pin;
->  };
->  
->  struct ssc_device * __must_check ssc_request(unsigned int ssc_num);
-> diff --git a/sound/soc/atmel/atmel_ssc_dai.c b/sound/soc/atmel/atmel_ssc_dai.c
-> index 8697ced..ca1d8a3 100644
-> --- a/sound/soc/atmel/atmel_ssc_dai.c
-> +++ b/sound/soc/atmel/atmel_ssc_dai.c
-> @@ -341,6 +341,7 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->  {
->  	int id = dai->id;
->  	struct atmel_ssc_info *ssc_p = &ssc_info[id];
-> +	struct ssc_device *ssc = ssc_p->ssc;
->  	struct atmel_pcm_dma_params *dma_params;
->  	int dir, channels, bits;
->  	u32 tfmr, rfmr, tcmr, rcmr;
-> @@ -466,7 +467,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->  			| SSC_BF(RCMR_START, start_event)
->  			| SSC_BF(RCMR_CKI, SSC_CKI_RISING)
->  			| SSC_BF(RCMR_CKO, SSC_CKO_NONE)
-> -			| SSC_BF(RCMR_CKS, SSC_CKS_CLOCK);
-> +			| SSC_BF(RCMR_CKS, ssc->clk_from_rk_pin ?
-> +					   SSC_CKS_PIN : SSC_CKS_CLOCK);
->  
->  		rfmr =	  SSC_BF(RFMR_FSEDGE, SSC_FSEDGE_POSITIVE)
->  			| SSC_BF(RFMR_FSOS, SSC_FSOS_NONE)
-> @@ -481,7 +483,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->  			| SSC_BF(TCMR_START, start_event)
->  			| SSC_BF(TCMR_CKI, SSC_CKI_FALLING)
->  			| SSC_BF(TCMR_CKO, SSC_CKO_NONE)
-> -			| SSC_BF(TCMR_CKS, SSC_CKS_PIN);
-> +			| SSC_BF(TCMR_CKS, ssc->clk_from_rk_pin ?
-> +					   SSC_CKS_CLOCK : SSC_CKS_PIN);
->  
->  		tfmr =	  SSC_BF(TFMR_FSEDGE, SSC_FSEDGE_POSITIVE)
->  			| SSC_BF(TFMR_FSDEN, 0)
-> @@ -550,7 +553,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->  			| SSC_BF(RCMR_START, SSC_START_RISING_RF)
->  			| SSC_BF(RCMR_CKI, SSC_CKI_RISING)
->  			| SSC_BF(RCMR_CKO, SSC_CKO_NONE)
-> -			| SSC_BF(RCMR_CKS, SSC_CKS_PIN);
-> +			| SSC_BF(RCMR_CKS, ssc->clk_from_rk_pin ?
-> +					   SSC_CKS_PIN : SSC_CKS_CLOCK);
->  
->  		rfmr =	  SSC_BF(RFMR_FSEDGE, SSC_FSEDGE_POSITIVE)
->  			| SSC_BF(RFMR_FSOS, SSC_FSOS_NONE)
-> @@ -565,7 +569,8 @@ static int atmel_ssc_hw_params(struct snd_pcm_substream *substream,
->  			| SSC_BF(TCMR_START, SSC_START_RISING_RF)
->  			| SSC_BF(TCMR_CKI, SSC_CKI_FALLING)
->  			| SSC_BF(TCMR_CKO, SSC_CKO_NONE)
-> -			| SSC_BF(TCMR_CKS, SSC_CKS_PIN);
-> +			| SSC_BF(RCMR_CKS, ssc->clk_from_rk_pin ?
-> +					   SSC_CKS_CLOCK : SSC_CKS_PIN);
->  
->  		tfmr =	  SSC_BF(TFMR_FSEDGE, SSC_FSEDGE_POSITIVE)
->  			| SSC_BF(TFMR_FSDEN, 0)
-> 
+> +       /*
+> +        * inverse the setting for dt defines
+> +        * 0 = hi, 1 = med, 2 = low, 3 = rsvd
 
+But in the defines ... 3-3=0 means "default" not
+"reserved"?
 
--- 
-Nicolas Ferre
+> +        */
+> +       tmp = DRIVE_STRENGTH_HI - tmp;
+(...)
+> +#define AT91_PINCTRL_DRIVE_STRENGTH_DEFAULT    (0x0 << 5)
+> +#define AT91_PINCTRL_DRIVE_STRENGTH_LOW                (0x1 << 5)
+> +#define AT91_PINCTRL_DRIVE_STRENGTH_MED                (0x2 << 5)
+> +#define AT91_PINCTRL_DRIVE_STRENGTH_HI         (0x3 << 5)
+
+So I guess "default" is some HW-defined driver strength decided when
+synthesizing the block? (Document the answer in the bindings or
+something.)
+
+What I'm after is if this is drive strength in the sense of
+"number of driver stages" i.e. a number of extra mA per
+strength increase, usuall in 2mA or 4mA increases, so e.g.
+LOW=2mA, mid=4mA, high=6mA or if it's actually a
+slew rate thing designed for restricing the noise in silicon
+and/or electronics by providing a less steep slope containing
+less overtones. (This is usually done by another construction.)
+Which one is it?
+
+You also already have this:
+#define AT91_PINCTRL_MULTI_DRIVE        (1 << 1)
+
+How does these different things relate? Do you have to set
+MULTI_DRIVE for the settings to work? Or is it leftover cruft?
+Or what is it?
+
+Also take this opportunity to update:
+Documentation/devicetree/bindings/pinctrl/atmel,at91-pinctrl.txt
+To document all these funny defines and what they are used for.
+
+The bindings changes should be part of the pinctrl driver patch.
+
+Yours,
+Linus Walleij
