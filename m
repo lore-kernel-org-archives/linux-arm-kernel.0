@@ -1,36 +1,33 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 10 Feb 2014 13:27:39 -0600
-Subject: [PATCHv4 0/7] omap hwspinlock dt support
-In-Reply-To: <1389658764-39199-1-git-send-email-s-anna@ti.com>
-References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
-Message-ID: <52F9282B.5000702@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Feb 2014 20:48:43 +0100
+Subject: [PATCH v4 1/8] clk: sunxi: Add Allwinner A20/A31 GMAC clock unit
+In-Reply-To: <1392028554-32545-2-git-send-email-wens@csie.org>
+References: <1392028554-32545-1-git-send-email-wens@csie.org>
+ <1392028554-32545-2-git-send-email-wens@csie.org>
+Message-ID: <20140210194843.GZ3192@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+On Mon, Feb 10, 2014 at 06:35:47PM +0800, Chen-Yu Tsai wrote:
+> The Allwinner A20/A31 clock module controls the transmit clock source
+> and interface type of the GMAC ethernet controller. Model this as
+> a single clock for GMAC drivers to use.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-On 01/13/2014 06:19 PM, Suman Anna wrote:
-> Hi,
->
-> This is an updated series mainly addressing Mark Rutland's comments
-> about hwlock specifier being always one-cell. The series adds the
-> support for #hwlock-cells property and adds a simple default OF
-> translate function.
->
-> The DTS patches from previous series have already been merged, and
-> needs this property to be added. This is handled in a separate series
-> that only deals with OMAP hwspinlock DTS patches.
->
-> The series, along with the DTS patches, is tested on top of v3.13-rc8
-> plus Tero's v13 clock DT series and Tony's 3.14 staged branches. The
-> validation on OMAP5, DRA7, AM437 requires Tero's series with couple of
-> additional base patches for AM43xx. AM43xx functionality needs a hwmod
-> fix [1] for creating the associated omap_device as well.
->
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Can you please take a look at this series and give your ack on the 
-bindings if you do not have any further comments? The only comments so 
-far are from Bjorn on the OF helpers.
+Thanks!
+Maxime
 
-regards
-Suman
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/de47ace9/attachment.sig>
