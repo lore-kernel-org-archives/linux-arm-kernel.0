@@ -1,53 +1,93 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 10 Feb 2014 18:23:20 +0100
-Subject: [PATCH 09/11] ARM: mvebu: add Device Tree for the Armada 385 DB board
+Date: Mon, 10 Feb 2014 18:23:18 +0100
+Subject: [PATCH 07/11] ARM: mvebu: add initial support for the Armada 380/385
+ SOCs
 In-Reply-To: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1392053002-19831-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1392053002-19831-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 385 DB board is the development board from Marvell for the
-Armada 385 SoC. This commit adds a Device Tree description for this
-board, which enables the following features:
-
- * Network interfaces
- * I2C buses
- * SDIO
- * Serial port
- * SPI bus, with a SPI flash
- * PCIe interfaces
+This commit adds the basic support for the Armada 380 and Armada 385
+SOCs. These SoCs share most of their IP with the Armada 370/XP
+SoCs. The main difference is the use of a Cortex A9 CPU instead of the
+PJ4B CPU. The Armada 380 is a single core Cortex-A9, while the Armada
+385 is a dual-core Cortex-A9.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/Makefile          |   1 +
- arch/arm/boot/dts/armada-385-db.dts | 101 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 102 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-385-db.dts
+ .../devicetree/bindings/arm/armada-38x.txt         | 10 ++++++
+ arch/arm/mach-mvebu/Kconfig                        | 15 ++++++++
+ arch/arm/mach-mvebu/Makefile                       |  1 +
+ arch/arm/mach-mvebu/armada-38x.c                   | 42 ++++++++++++++++++++++
+ 4 files changed, 68 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-38x.txt
+ create mode 100644 arch/arm/mach-mvebu/armada-38x.c
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f1eafbd..bd789fc 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -127,6 +127,7 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
- 	armada-370-netgear-rn104.dtb \
- 	armada-370-rd.dtb \
- 	armada-375-db.dtb \
-+	armada-385-db.dtb \
- 	armada-xp-axpwifiap.dtb \
- 	armada-xp-db.dtb \
- 	armada-xp-gp.dtb \
-diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
+diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/armada-38x.txt
 new file mode 100644
-index 0000000..566601c
+index 0000000..11f2330
 --- /dev/null
-+++ b/arch/arm/boot/dts/armada-385-db.dts
-@@ -0,0 +1,101 @@
++++ b/Documentation/devicetree/bindings/arm/armada-38x.txt
+@@ -0,0 +1,10 @@
++Marvell Armada 38x Platforms Device Tree Bindings
++-------------------------------------------------
++
++Boards with a SoC of the Marvell Armada 38x family shall have the
++following property:
++
++Required root node property:
++
++ - compatible: must contain either "marvell,armada380" or
++   "marvell,armada385" depending on the variant of the SoC being used.
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 3aefdcd..7d01583 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -52,6 +52,21 @@ config MACH_ARMADA_375
+ 	  Say 'Y' here if you want your kernel to support boards based
+ 	  on the Marvell Armada 375 SoC with device tree.
+ 
++config MACH_ARMADA_380
++	bool "Marvell Armada 380/385 boards"
++	select ARM_ERRATA_720789
++	select ARM_ERRATA_753970
++	select ARM_GIC
++	select ARMADA_370_XP_TIMER
++	select ARMADA_38X_CLK
++	select CACHE_L2X0
++	select CPU_V7
++	select NEON
++	select PINCTRL_ARMADA_38X
++	help
++	  Say 'Y' here if you want your kernel to support boards based
++	  on the Marvell Armada 380/385 SoC with device tree.
++
+ config MACH_ARMADA_XP
+ 	bool "Marvell Armada XP boards"
+ 	select ARMADA_XP_CLK
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index 9862e0f..7a439f9 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -6,6 +6,7 @@ AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
+ obj-y				 += system-controller.o mvebu-soc-id.o
+ obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o
+ obj-$(CONFIG_MACH_ARMADA_375)    += armada-375.o
++obj-$(CONFIG_MACH_ARMADA_380)    += armada-38x.o
+ obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
+ obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
+diff --git a/arch/arm/mach-mvebu/armada-38x.c b/arch/arm/mach-mvebu/armada-38x.c
+new file mode 100644
+index 0000000..936f606
+--- /dev/null
++++ b/arch/arm/mach-mvebu/armada-38x.c
+@@ -0,0 +1,42 @@
 +/*
-+ * Device Tree file for Marvell Armada 385 evaluation board
-+ * (DB-88F6820)
++ * Device Tree support for Armada 380/385 platforms.
 + *
-+ *  Copyright (C) 2014 Marvell
++ * Copyright (C) 2014 Marvell
 + *
 + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 + *
@@ -56,93 +96,35 @@ index 0000000..566601c
 + * warranty of any kind, whether express or implied.
 + */
 +
-+/dts-v1/;
-+#include "armada-385.dtsi"
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++#include <linux/clocksource.h>
++#include <linux/clk-provider.h>
++#include <linux/mbus.h>
++#include <asm/hardware/cache-l2x0.h>
++#include <asm/mach/arch.h>
++#include "common.h"
 +
-+/ {
-+	model = "Marvell Armada 385 Development Board";
-+	compatible = "marvell,a385-db", "marvell,armada385", "marvell,armada38x";
++static void __init armada_380_timer_and_clk_init(void)
++{
++	of_clk_init(NULL);
++	clocksource_of_init();
++	BUG_ON(mvebu_mbus_dt_init());
++	l2x0_of_init(0, ~0UL);
++}
 +
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x10000000>; /* 256 MB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
-+
-+		internal-regs {
-+			spi0: spi at 10600 {
-+				status = "okay";
-+
-+				spi-flash at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+					compatible = "w25q32";
-+					reg = <0>; /* Chip select 0 */
-+					spi-max-frequency = <108000000>;
-+				};
-+			};
-+
-+			i2c0: i2c at 11000 {
-+				status = "okay";
-+				clock-frequency = <100000>;
-+			};
-+
-+			i2c1: i2c at 11100 {
-+				status = "okay";
-+				clock-frequency = <100000>;
-+			};
-+
-+			serial at 12000 {
-+				clock-frequency = <200000000>;
-+				status = "okay";
-+			};
-+
-+			ethernet at 30000 {
-+				status = "okay";
-+				phy = <&phy1>;
-+				phy-mode = "rgmii";
-+			};
-+
-+			ethernet at 70000 {
-+				status = "okay";
-+				phy = <&phy0>;
-+				phy-mode = "rgmii";
-+			};
-+
-+			mdio {
-+				phy0: ethernet-phy at 0 {
-+					reg = <0>;
-+				};
-+
-+				phy1: ethernet-phy at 1 {
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
-+		pcie-controller {
-+			status = "okay";
-+			/*
-+			 * The two PCIe units are accessible through
-+			 * standard PCIe slots on the board.
-+			 */
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+			pcie at 2,0 {
-+				/* Port 1, Lane 0 */
-+				status = "okay";
-+			};
-+		};
-+	};
++static const char * const armada_380_dt_compat[] = {
++	"marvell,armada380",
++	"marvell,armada385",
++	NULL,
 +};
++
++DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 380/385 (Device Tree)")
++	.init_time	= armada_380_timer_and_clk_init,
++	.restart	= mvebu_restart,
++	.dt_compat	= armada_380_dt_compat,
++MACHINE_END
 -- 
 1.8.3.2
