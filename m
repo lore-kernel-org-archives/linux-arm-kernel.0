@@ -1,26 +1,52 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 10 Feb 2014 10:34:12 -0800
-Subject: [PATCH] ARM: pxa: fix various compilation problems
-In-Reply-To: <CACRpkdac3UW-ZzvgfsZt2cHaUsOeDcLS++ip=diYoLCUy7HFRA@mail.gmail.com>
- (Linus Walleij's message of "Tue, 4 Feb 2014 20:49:03 +0100")
-References: <1391518387-5934-1-git-send-email-linus.walleij@linaro.org>
- <4895932.cC8EyYOxb5@wuerfel>
- <CACRpkdac3UW-ZzvgfsZt2cHaUsOeDcLS++ip=diYoLCUy7HFRA@mail.gmail.com>
-Message-ID: <7hvbwm95qz.fsf@paris.lan>
+Date: Mon, 10 Feb 2014 10:37:08 -0800
+Subject: [GIT PULL] ARM: imx: fixes for 3.14
+In-Reply-To: <20140206145058.GA6610@S2101-09.ap.freescale.net> (Shawn Guo's
+ message of "Thu, 6 Feb 2014 22:51:02 +0800")
+References: <20140206145058.GA6610@S2101-09.ap.freescale.net>
+Message-ID: <7hr47a95m3.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+Shawn Guo <shawn.guo@linaro.org> writes:
 
-> On Tue, Feb 4, 2014 at 3:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Tuesday 04 February 2014 13:53:07 Linus Walleij wrote:
->>> Hi ARM SoC folks: please apply this patch directly to the ARM
->>> SoC tree fixes branch if you are happy with it.
->>
->> It's also needed for 3.13-backports, right?
+> Hi,
 >
-> Yes. Tagging for stable # v3.13+ should do the trick.
+> The 3.13 stable tree will also need this fix.  But since it does not
+> apply to 3.13 cleanly, we will need to send another one for 3.13
+> stable kernel, after this one hits mainline.
+>
+> Shawn
+>
+> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+>
+>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.14
+>
+> for you to fetch changes up to 5d0a87ba5875794ec3df14aa74ee8e18ef47d6b4:
+>
+>   ARM: imx6: Initialize low-power mode early again (2014-02-06 20:26:26 +0800)
+>
+> ----------------------------------------------------------------
+> i.MX fixes for 3.14:
+>  - Fix a regression (system hang) when preemption is enabled
+>    (CONFIG_PREEMPT=y).
+>
+> ----------------------------------------------------------------
 
-Applied to fixes, and tagged for stable v3.13+
+Applied to fixes.
+
+Thanks,
 
 Kevin
+
+> Philipp Zabel (1):
+>       ARM: imx6: Initialize low-power mode early again
+>
+>  arch/arm/mach-imx/clk-imx6q.c  |    3 +++
+>  arch/arm/mach-imx/clk-imx6sl.c |    3 +++
+>  arch/arm/mach-imx/pm-imx6q.c   |    2 --
+>  3 files changed, 6 insertions(+), 2 deletions(-)
