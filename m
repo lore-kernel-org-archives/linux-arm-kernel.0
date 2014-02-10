@@ -1,40 +1,74 @@
-From: phdm@macq.eu (Philippe De Muyter)
-Date: Mon, 10 Feb 2014 01:15:47 +0100
-Subject: imx6qdl, weim ranges and gpr1
-Message-ID: <20140210001547.GA28084@frolo.macqel>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Mon, 10 Feb 2014 10:07:20 +0900
+Subject: [PATCH 0/7] Remove HAVE_PWM config option
+Message-ID: <003901cf25fc$73002790$590076b0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello linux on i.mx6 experts,
+The HAVE_PWM symbol is only for legacy platforms that provide
+the PWM API without using the generic framework, while PWM symbol
+is used for PWM drivers using the generic PWM framework.
 
-on our i.mx6q/dl-based custom hardware we have used the weim interface to
-connect some peripherals.  Our weim dts description looks like that:
+I looked at all HAVE_PWMs in the latest mainline kernel 3.14-rc1.
+Three platforms are still using HAVE_PWM as below:
 
-&weim {
-	compatible = "fsl,imx6q-weim";
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_weim_sram_1>;
-	clocks = <&clks 196>;
-	reg = <0x021b8000 0x4000>;
-	#address-cells = <2>;
-	#size-cells = <1>;
-	ranges = <0 0 0x08000000 0x04000000>, /* 64Mb for CS0 */
-		<1 0 0x0c000000 0x04000000>; /* 64Mb for CS1 */
-	status = "okay";
+1. ARM - PXA
+  ./arch/arm/mach-pxa/Kconfig
 
-	...
-};
+2. ARM - NXP LPC32XX
+  ./arch/arm/Kconfig
+  config ARCH_LPC32XX
+  	select HAVE_PWM
 
-Actually, to achieve this mapping, I must configure some bits in IOMUXC_GPR1,
-like that:
-	regmap_update_bits(gpr, IOMUXC_GPR1, 0xfff, 0x1b);
+3. MIPS - Ingenic JZ4740 based machines
+  ./arch/mips/Kconfig
+  config MACH_JZ4740
+  	select HAVE_PWM
 
-Would it be possible to set the IOMUXC_GPR1 bits automagically, based on the
-dts description ? Where should that go, in drivers/bus/imx-weim.c or in
-arch/arm/mach-imx/mach-imx6q.c ?  Also, I do not know how to retrieve
-the 'ranges' property of the weim description.
+However, the legacy PWM drivers for PXA, LPC32XX, and JZ474 were
+already moved to the generic PWM framework.
+  ./drivers/pwm/pwm-pxa.c
+  ./drivers/pwm/pwm-lpc32xx.c
+  ./drivers/pwm/pwm-jz4740.c
 
-Thanks in advance
+In conclusion, HAVE_PWM should be removed, because HAVE_PWM is
+NOT required anymore.
 
--- 
-Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
+Jingoo Han (7):
+      ARM: pxa: don't select HAVE_PWM
+      ARM: lpc32xx: don't select HAVE_PWM
+      ARM: remove HAVE_PWM config option
+      MIPS: jz4740: don't select HAVE_PWM
+      Input: max8997_haptic: remove HAVE_PWM dependencies
+      Input: pwm-beepe: remove HAVE_PWM dependencies
+      pwm: don't use IS_ENABLED(CONFIG_HAVE_PWM)
+
+ arch/arm/Kconfig           |    4 ----
+ arch/arm/mach-pxa/Kconfig  |   15 ---------------
+ arch/mips/Kconfig          |    1 -
+ drivers/input/misc/Kconfig |    4 ++--
+ include/linux/pwm.h        |    2 +-
+ 5 files changed, 3 insertions(+), 23 deletions(-)
+
+I would like to merge these patches as below:
+
+1. Through arm-soc tree
+  [PATCH 1/7] ARM: pxa: don't select HAVE_PWM
+  [PATCH 2/7] ARM: lpc32xx: don't select HAVE_PWM
+  [PATCH 3/7] ARM: remove HAVE_PWM config option
+
+2. Through MIPS tree
+  [PATCH 4/7] MIPS: jz4740: don't select HAVE_PWM
+
+3. Through Input tree
+  [PATCH 5/7] Input: max8997_haptic: remove HAVE_PWM dependencies
+  [PATCH 6/7] Input: pwm-beepe: remove HAVE_PWM dependencies
+
+4. Through PWM tree
+  [PATCH 7/7] pwm: don't use IS_ENABLED(CONFIG_HAVE_PWM)
+
+After merging these patches, all HAVE_PWM will be removed from
+the mainline kernel. Thank you. :-)
+
+Best regards,
+Jingoo Han
