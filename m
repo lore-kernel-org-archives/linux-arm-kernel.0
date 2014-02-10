@@ -1,28 +1,185 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Feb 2014 14:33:49 +0800
-Subject: [GIT PULL] ARM: imx: device tree changes for 3.15, take 1
-In-Reply-To: <4771497.sfdTTRjnSv@phil>
-References: <20140205122258.GA13821@S2101-09.ap.freescale.net>
- <4771497.sfdTTRjnSv@phil>
-Message-ID: <20140210063347.GK9628@S2101-09.ap.freescale.net>
+From: b20788@freescale.com (Anson Huang)
+Date: Mon, 10 Feb 2014 14:34:50 +0800
+Subject: [PATCH] ARM: imx: avoid calling clk APIs in idle thread which may
+ cause schedule
+Message-ID: <1392014090-27984-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 11:04:30AM +0100, Heiko St?bner wrote:
-> Hi Shawn,
-> 
-> Am Mittwoch, 5. Februar 2014, 20:23:01 schrieb Shawn Guo:
-> >  - Make pinctrl nodes board specific to avoid floating board specific
-> >    device tree blob with so many unused pinctrl data.
-> 
-> can you take a look at "dtc: add ability to make nodes conditional on them 
-> being referenced" [0] to see if it can help to solve the floating pinctrl 
-> problem more generic in the future?
+As clk_pllv3_wait_lock will call usleep_range, and the clk APIs
+mutex lock may be held when CPU entering idle, so calling clk
+APIs must be avoided in cpu idle thread, this is to avoid reschedule
+warning in cpu idle, just access register directly to achieve that.
 
-Yes, if it gets accepted, we will consider to use it in the future
-projects.
+bad: scheduling from the idle thread!
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.14.0-rc1+ #657
+Backtrace:
+[<80012188>] (dump_backtrace) from [<8001246c>] (show_stack+0x18/0x1c)
+ r6:808c0038 r5:00000000 r4:808e5a1c r3:00000000
+[<80012454>] (show_stack) from [<8064b2ec>] (dump_stack+0x84/0x9c)
+[<8064b268>] (dump_stack) from [<80055ee0>] (dequeue_task_idle+0x20/0x30)
+ r5:808bef40 r4:bf7dff40
+[<80055ec0>] (dequeue_task_idle) from [<8004f028>] (dequeue_task+0x30/0x50)
+ r4:bf7dff40 r3:80055ec0
+[<8004eff8>] (dequeue_task) from [<800503c0>] (deactivate_task+0x30/0x34)
+ r4:bf7dff40
+[<80050390>] (deactivate_task) from [<8064d8e4>] (__schedule+0x2c8/0x5c0)
+[<8064d61c>] (__schedule) from [<8064dc14>] (schedule+0x38/0x88)
+ r10:80912964 r9:808c1e50 r8:808c0038 r7:808cbf30 r6:80e128ec r5:60000093
+ r4:80912968
+[<8064dbdc>] (schedule) from [<8064dfec>] (schedule_preempt_disabled+0x10/0x14)
+[<8064dfdc>] (schedule_preempt_disabled) from [<8064ebc0>] (mutex_lock_nested+0x1c0/0x3c0)
+[<8064ea00>] (mutex_lock_nested) from [<804ae71c>] (clk_prepare_lock+0x44/0xe4)
+ r10:806554cc r9:bf7df1bc r8:808cf4f8 r7:808cf544 r6:bf7df1b8 r5:808c0010
+ r4:80e69750
+[<804ae6d8>] (clk_prepare_lock) from [<804af214>] (clk_get_rate+0x14/0x64)
+ r6:bf7df1b8 r5:00000002 r4:bf017000 r3:80922ad0
+[<804af200>] (clk_get_rate) from [<80025d30>] (imx6sl_set_wait_clk+0x18/0x20)
+ r5:00000002 r4:00000001
+[<80025d18>] (imx6sl_set_wait_clk) from [<80023454>] (imx6sl_enter_wait+0x20/0x48)
+[<80023434>] (imx6sl_enter_wait) from [<80477c24>] (cpuidle_enter_state+0x44/0xfc)
+ r4:3c386e48 r3:80023434
+[<80477be0>] (cpuidle_enter_state) from [<80477dd8>] (cpuidle_idle_call+0xfc/0x160)
+ r8:808cf4f8 r7:00000001 r6:80e69534 r5:00000000 r4:bf7df1b8
+[<80477cdc>] (cpuidle_idle_call) from [<8000f61c>] (arch_cpu_idle+0x10/0x50)
+ r9:808c0000 r8:00000000 r7:80921a89 r6:808c8938 r5:808c899c r4:808c0000
+[<8000f60c>] (arch_cpu_idle) from [<8006fa94>] (cpu_startup_entry+0x108/0x160)
+[<8006f98c>] (cpu_startup_entry) from [<806452ac>] (rest_init+0xb4/0xdc)
+ r7:808afae0
+[<806451f8>] (rest_init) from [<8086fb58>] (start_kernel+0x328/0x38c)
+ r6:ffffffff r5:808c8880 r4:808c8a30
+[<8086f830>] (start_kernel) from [<80008074>] (0x80008074)
 
-Shawn
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/mach-imx/clk-imx6sl.c |   80 +++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 74 insertions(+), 6 deletions(-)
 
-> [0] http://www.spinics.net/lists/arm-kernel/msg303967.html
-> 
+diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+index b71570d..971f47b 100644
+--- a/arch/arm/mach-imx/clk-imx6sl.c
++++ b/arch/arm/mach-imx/clk-imx6sl.c
+@@ -18,6 +18,22 @@
+ #include "clk.h"
+ #include "common.h"
+ 
++#define CCSR			0xc
++#define BM_CCSR_PLL1_SW_CLK_SEL	(1 << 2)
++#define CACRR			0x10
++#define CDHIPR			0x48
++#define BM_CDHIPR_ARM_PODF_BUSY	(1 << 16)
++#define ARM_WAIT_DIV_396M	2
++#define ARM_WAIT_DIV_792M	4
++#define ARM_WAIT_DIV_996M	6
++
++#define PLL_ARM			0x0
++#define BM_PLL_ARM_DIV_SELECT	(0x7f << 0)
++#define BM_PLL_ARM_POWERDOWN	(1 << 12)
++#define BM_PLL_ARM_ENABLE	(1 << 13)
++#define BM_PLL_ARM_LOCK		(1 << 31)
++#define PLL_ARM_DIV_792M	66
++
+ static const char *step_sels[]		= { "osc", "pll2_pfd2", };
+ static const char *pll1_sw_sels[]	= { "pll1_sys", "step", };
+ static const char *ocram_alt_sels[]	= { "pll2_pfd2", "pll3_pfd1", };
+@@ -65,6 +81,8 @@ static struct clk_div_table video_div_table[] = {
+ 
+ static struct clk *clks[IMX6SL_CLK_END];
+ static struct clk_onecell_data clk_data;
++static void __iomem *ccm_base;
++static void __iomem *anatop_base;
+ 
+ static const u32 clks_init_on[] __initconst = {
+ 	IMX6SL_CLK_IPG, IMX6SL_CLK_ARM, IMX6SL_CLK_MMDC_ROOT,
+@@ -81,19 +99,67 @@ static const u32 clks_init_on[] __initconst = {
+  * entering WAIT mode.
+  *
+  * This function will set the ARM clk to max value within the 12:5 limit.
++ * As IPG clock is fixed@66MHz(so ARM freq must not exceed 158.4MHz),
++ * ARM freq are one of below setpoints: 396MHz, 792MHz and 996MHz, since
++ * the clk APIs can NOT be called in idle thread(may cause kernel schedule
++ * as there is sleep function in PLL wait function), so here we just slow
++ * down ARM to below freq according to previous freq:
++ *
++ * run mode      wait mode
++ * 396MHz   ->   132MHz;
++ * 792MHz   ->   158.4MHz;
++ * 996MHz   ->   142.3MHz;
+  */
++static int imx6sl_get_arm_divider_for_wait(void)
++{
++	if (readl_relaxed(ccm_base + CCSR) & BM_CCSR_PLL1_SW_CLK_SEL) {
++		return ARM_WAIT_DIV_396M;
++	} else {
++		if ((readl_relaxed(anatop_base + PLL_ARM) &
++			BM_PLL_ARM_DIV_SELECT) == PLL_ARM_DIV_792M)
++			return ARM_WAIT_DIV_792M;
++		else
++			return ARM_WAIT_DIV_996M;
++	}
++}
++
++static void imx6sl_enable_pll_arm(bool enable)
++{
++	static u32 saved_pll_arm;
++	u32 val;
++
++	if (enable) {
++		saved_pll_arm = val = readl_relaxed(anatop_base + PLL_ARM);
++		val |= BM_PLL_ARM_ENABLE;
++		val &= ~BM_PLL_ARM_POWERDOWN;
++		writel_relaxed(val, anatop_base + PLL_ARM);
++		while (!(__raw_readl(anatop_base + PLL_ARM) & BM_PLL_ARM_LOCK))
++			;
++	} else {
++		 writel_relaxed(saved_pll_arm, anatop_base + PLL_ARM);
++	}
++}
++
+ void imx6sl_set_wait_clk(bool enter)
+ {
+-	static unsigned long saved_arm_rate;
++	static unsigned long saved_arm_div;
+ 
++	/*
++	 * According to hardware design, arm podf change need
++	 * PLL1 clock enabled.
++	 */
++	imx6sl_enable_pll_arm(true);
+ 	if (enter) {
+-		unsigned long ipg_rate = clk_get_rate(clks[IMX6SL_CLK_IPG]);
+-		unsigned long max_arm_wait_rate = (12 * ipg_rate) / 5;
+-		saved_arm_rate = clk_get_rate(clks[IMX6SL_CLK_ARM]);
+-		clk_set_rate(clks[IMX6SL_CLK_ARM], max_arm_wait_rate);
++		saved_arm_div = readl_relaxed(ccm_base + CACRR);
++		writel_relaxed(imx6sl_get_arm_divider_for_wait(),
++			ccm_base + CACRR);
+ 	} else {
+-		clk_set_rate(clks[IMX6SL_CLK_ARM], saved_arm_rate);
++		writel_relaxed(saved_arm_div, ccm_base + CACRR);
+ 	}
++
++	while (__raw_readl(ccm_base + CDHIPR) & BM_CDHIPR_ARM_PODF_BUSY)
++		;
++	imx6sl_enable_pll_arm(false);
+ }
+ 
+ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+@@ -110,6 +176,7 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sl-anatop");
+ 	base = of_iomap(np, 0);
++	anatop_base = base;
+ 	WARN_ON(!base);
+ 
+ 	/*                                             type               name            parent  base         div_mask */
+@@ -157,6 +224,7 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 
+ 	np = ccm_node;
+ 	base = of_iomap(np, 0);
++	ccm_base = base;
+ 	WARN_ON(!base);
+ 
+ 	/* Reuse imx6q pm code */
+-- 
+1.7.9.5
