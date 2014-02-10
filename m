@@ -1,43 +1,116 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 10 Feb 2014 11:17:10 +0000
-Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
-In-Reply-To: <52F892C8.80508@st.com>
-References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
- <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
- <20140207170903.GT5976@mudshark.cambridge.arm.com>
- <52F892C8.80508@st.com>
-Message-ID: <20140210111710.GC17766@mudshark.cambridge.arm.com>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Mon, 10 Feb 2014 11:20:37 +0000
+Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
+ binding to list boost mode frequency
+In-Reply-To: <20140210085305.641e6de5@amdc2363>
+References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
+ <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
+ <52F50698.4060305@arm.com> <52F509BD.70903@arm.com>
+ <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
+ <52F51888.5010608@arm.com>
+ <CAGo_u6ofC4NNPiTNcSnXUvT3RZJo54=XyjetR-ok5hCBrVZkKg@mail.gmail.com>
+ <52F51FCD.5000009@arm.com>
+ <CAGo_u6quxExJOyY8mvCw5sDSuz=_j0YqJ6FJW+FAdaxUeqzN9Q@mail.gmail.com>
+ <CAJuA9aj-LsdBiS2msOVmNRSe6mNj9QJsys9KjHZAk=9hrZOLzA@mail.gmail.com>
+ <20140210085305.641e6de5@amdc2363>
+Message-ID: <52F8B605.6020108@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 08:50:16AM +0000, Fabrice Gasnier wrote:
-> On 02/07/2014 06:09 PM, Will Deacon wrote:
-> > On Fri, Feb 07, 2014 at 04:19:15PM +0000, Fabrice GASNIER wrote:
-> >> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> >> index 4636d56..ef15709 100644
-> >> --- a/arch/arm/kernel/traps.c
-> >> +++ b/arch/arm/kernel/traps.c
-> >> @@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
-> >>   
-> >>   	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
-> >>   	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
-> >> +
-> >> +	/* Enable imprecise aborts */
-> >> +	local_abt_enable();
-> > Surely we want to enable this as early as possible? Now, putting this into
-> > head.S is ugly, as it duplicating it across all the proc*.S files, so why
-> > not setup_arch?
-> Sorry, I'm not sure to understand your last comment.
-> At least, I need it enabled before probing drivers (PCIe bus)
-> I've added imprecise abort enable code in traps.c, following Russel 
-> King's advice, please see:
-> http://archive.arm.linux.org.uk/lurker/message/20140131.170827.d752a1cc.en.html
-> As abort bit is local to a cpu, i've also added it in smp.c, but this 
-> may not be the right place ?
+On 10/02/14 07:53, Lukasz Majewski wrote:
+> Hi Thomas, Sudeep,
 > 
-> Please elaborate,
+>> On Sat, Feb 8, 2014 at 1:11 AM, Nishanth Menon <nm@ti.com> wrote:
+>>> On Fri, Feb 7, 2014 at 12:02 PM, Sudeep Holla
+>>> <Sudeep.Holla@arm.com> wrote:
+>>>> On 07/02/14 17:37, Nishanth Menon wrote:
+>>>>> On Fri, Feb 7, 2014 at 11:31 AM, Sudeep Holla
+>>>>> <Sudeep.Holla@arm.com> wrote:
+>>>>
+>>>> [...]
+>>>>
+>>>>>> Yes I think its counter-intuitive as it's visible to the
+>>>>>> userspace(list of frequencies and the boost parameters are
+>>>>>> exposed through sysfs)
+>>>>>
+>>>>> That will be a different problem -> as currently every single
+>>>>> frequency in the cpufreq list has ability to be marked as boost
+>>>>> frequency - if userspace does not maintain that, then, IMHO, fix
+>>>>> the userspace :D
+>>>>>
+>>>>
+>>>> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
+>>>> gives the list of frequencies based on the state of the boost
+>>>> feature at anytime.
+>>>>
+>>>> Intuitively the list without boost shouldn't have any frequency
+>>>> above the range when it's enabled :), that's what I was referring
+>>>> to. So I am not talking about any issue with user-space
+>>>> maintenance.
+>>> Fair enough - but i still think it has nothing to do with dt binding
+>>> itself -> and i think the discussion we've had should be good for
+>>> the binding provided in this patch.. I hope.. if documentation
+>>> needs a bit of better explanation to prevent a repeat of the same
+>>> discussion at a later point of time, now might be a good time to
+>>> add it in.
+>>
+Nishanth, though I am not convinced that it should be list, since you have a
+valid point that this should not prevent in having this feature, I am fine with
+the list.
 
-I was just suggesting that we move your local_abt_enable() call to
-setup_arch, since that's called before early_trap_init on the primary CPU.
+>> The term boost and over-clocking have been described in the bindings
+>> document as being the same. Since the term over-clocking refers to
+>> running a CPU beyond normal operating frequencies, I tend to agree
+>> with Sudeep that it is not intuitive if a normal operating frequency
+>> is greater than a boost mode frequency.
+>>
+>> Otherwise, when userspace does "echo 1 >
+>> /sys/devices/system/cpu/cpufreq/boost", what is it supposed to mean. I
+>> think the original intent of boost mode patches was to allow CPU to
+>> operate at frequencies greater than the normal operating frequencies.
+>>
+>> Lukasz, how would you want this to be handled?
+> 
+> Please consider an example:
+> 
+> normal-freqs: 1400000, 1200000, 1000000, 800000, 600000, 400000, 200000
+> [1]
+> boost-freqs: 1700000, 1600000, 1500000. [2]
+> 
+> All those freqs shall be represented as OPPs freq and voltage tuple.
+> 
+> Best would be to specify all the boost-freqs as:
+> boost-freqs = <1700000 1600000 1500000> to be prepared for future
+> quirks or problems (or special cases which might show up latter).
+> If anybody can foresee any potential threads - like platform on which
+> boost freqs are 1700000 and 1500000, but not 1600000, then please share
+> this information.
+> 
+If that's the case then why should it be included in the list of OPPs.
+I know Nishanth had a valid point in other thread previously(like including
+SoC.dtsi having OPPs in platform files), but that's different problem.
 
-Will
+> However, I think that it would be also acceptable to specify only:
+> boost-freq = <1500000> and mark all freqs greater or equal to it as
+> CPUFREQ_BOOST_FREQ.
+> 
+> If there aren't any potential problems, then I think the second option
+> would be a good solution (we would have only one BOOST attribute stored
+> at CPUs DTS node).
+> 
+
+Yes I prefer this to keep it simple and as per the definition of overclocking
+or turbo boost in hardware terms if possible.
+
+Just another thought, not sure how much this is true for real platforms, sharing
+it anyway. IIUC these boost frequencies have certain constraints like thermal
+and can't be sustained all the processors for long time.
+
+So does it make sense to specify normal max frequency instead of boost-frequency
+which by definition would be: "The maximum frequency that all processors are can
+sustain simultaneously without any thermal constraints".
+Ignore this if this is not the definition of boost on real platforms.
+
+
+Regards,
+Sudeep
