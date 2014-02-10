@@ -1,65 +1,51 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 10 Feb 2014 16:06:01 +0100
-Subject: [PATCH v2 14/15] charger: max14577: Configure battery-dependent
- settings from DTS
-In-Reply-To: <20140210121405.GH22773@lee--X1>
-References: <1391767487-10017-1-git-send-email-k.kozlowski@samsung.com>
- <1391767487-10017-15-git-send-email-k.kozlowski@samsung.com>
- <20140210121405.GH22773@lee--X1>
-Message-ID: <1392044761.24553.2.camel@AMDC1943>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 10 Feb 2014 23:10:30 +0800
+Subject: imx6qdl, weim ranges and gpr1
+In-Reply-To: <20140210001547.GA28084@frolo.macqel>
+References: <20140210001547.GA28084@frolo.macqel>
+Message-ID: <20140210151027.GP9628@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-02-10 at 12:14 +0000, Lee Jones wrote:
-> > Remove hard-coded values for:
-> >  - Fast Charge current,
-> >  - End Of Charge current,
-> >  - Fast Charge timer,
-> >  - Overvoltage Protection Threshold,
-> >  - Battery Constant Voltage,
-> > and use DTS to configure them. This allows using the max14577 charger
-> > driver with different batteries.
-> > 
-> > Now the charger driver requires valid configuration data from DTS. In
-> > case of wrong configuration data it fails during probe. Patch adds
-> > of_compatible to the charger mfd cell in MFD driver core.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> > Cc: David Woodhouse <dwmw2@infradead.org>
-> > Cc: Jenny Tc <jenny.tc@intel.com>
-> > ---
-> >  drivers/mfd/max14577.c               |    5 +-
-> >  drivers/power/max14577_charger.c     |  234 +++++++++++++++++++++++++++++-----
-> >  include/linux/mfd/max14577-private.h |   10 ++
-> >  include/linux/mfd/max14577.h         |    8 ++
-> >  4 files changed, 227 insertions(+), 30 deletions(-)
+On Mon, Feb 10, 2014 at 01:15:47AM +0100, Philippe De Muyter wrote:
+> Hello linux on i.mx6 experts,
 > 
-> <snip>
+> on our i.mx6q/dl-based custom hardware we have used the weim interface to
+> connect some peripherals.  Our weim dts description looks like that:
 > 
-> > diff --git a/include/linux/mfd/max14577-private.h b/include/linux/mfd/max14577-private.h
-> > index a8cd7de3526a..50cf70bec4d4 100644
-> > --- a/include/linux/mfd/max14577-private.h
-> > +++ b/include/linux/mfd/max14577-private.h
-> > @@ -269,6 +269,16 @@ enum maxim_muic_charger_type {
-> >  #define MAX77836_CHARGER_CURRENT_LIMIT_HIGH_STEP	 25000U
-> >  #define MAX77836_CHARGER_CURRENT_LIMIT_MAX		475000U
-> >  
-> > +/* MAX14577 charger End-Of-Charge current limits (as in MAXIM_CHGCTRL5 register), uA */
+> &weim {
+> 	compatible = "fsl,imx6q-weim";
+> 	pinctrl-names = "default";
+> 	pinctrl-0 = <&pinctrl_weim_sram_1>;
+> 	clocks = <&clks 196>;
+> 	reg = <0x021b8000 0x4000>;
+> 	#address-cells = <2>;
+> 	#size-cells = <1>;
+> 	ranges = <0 0 0x08000000 0x04000000>, /* 64Mb for CS0 */
+> 		<1 0 0x0c000000 0x04000000>; /* 64Mb for CS1 */
+> 	status = "okay";
 > 
-> Too many chars. Didn't checkpatch.pl complain about this?
+> 	...
+> };
+> 
+> Actually, to achieve this mapping, I must configure some bits in IOMUXC_GPR1,
+> like that:
+> 	regmap_update_bits(gpr, IOMUXC_GPR1, 0xfff, 0x1b);
+> 
+> Would it be possible to set the IOMUXC_GPR1 bits automagically, based on the
+> dts description ?
 
-I'll fix this.
-> 
-> > +#define MAX14577_CHARGER_EOC_CURRENT_LIMIT_MIN		50000U
-> > +#define MAX14577_CHARGER_EOC_CURRENT_LIMIT_STEP		10000U
-> > +#define MAX14577_CHARGER_EOC_CURRENT_LIMIT_MAX		200000U
-> > +
-> > +/* MAX14577/MAX77836 Battery Constant Voltage (as in MAXIM_CHGCTRL3
-> > register), uV */
-> 
-> Same here
+It's possible, I think.
 
-OK
+> Where should that go, in drivers/bus/imx-weim.c or in
+> arch/arm/mach-imx/mach-imx6q.c ?
+
+I prefer to drivers/bus/imx-weim.c.
+
+> Also, I do not know how to retrieve
+> the 'ranges' property of the weim description.
+
+Just read it as an array of integers.  I will post a patch for it
+tomorrow.  And please help test it.
+
+Shawn
