@@ -1,17 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Feb 2014 14:13:45 +0800
-Subject: [PATCH v3 1/2] ARM: dts: imx6sl-evk: Add PFUZE100 support
-In-Reply-To: <1391684271-6621-1-git-send-email-festevam@gmail.com>
-References: <1391684271-6621-1-git-send-email-festevam@gmail.com>
-Message-ID: <20140210061343.GH9628@S2101-09.ap.freescale.net>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 10 Feb 2014 14:09:46 +0800
+Subject: [PATCH v3 2/2] Binding: atmel-ssc: add option to choose clock
+In-Reply-To: <1392012586-30790-1-git-send-email-voice.shen@atmel.com>
+References: <1392012586-30790-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <1392012586-30790-3-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 08:57:50AM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> imx6sl-evk board has Freescale PFUZE100 regulator, so add support for it.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Add the option to choose clock on which pin input to SSC (as slave).
+Default is on TK pin to SSC, add "atmel,clk-from-rk-pin" option to
+specify the clock is on RK pin to SSC.
 
-Applied both, thanks.
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+Changes in v3:
+  - None
+Series-changes: 2
+  - using "-" replace "_" in binding document
+
+ Documentation/devicetree/bindings/misc/atmel-ssc.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/misc/atmel-ssc.txt b/Documentation/devicetree/bindings/misc/atmel-ssc.txt
+index a45ae08..5c1e14e 100644
+--- a/Documentation/devicetree/bindings/misc/atmel-ssc.txt
++++ b/Documentation/devicetree/bindings/misc/atmel-ssc.txt
+@@ -14,6 +14,14 @@ Required properties for devices compatible with "atmel,at91sam9g45-ssc":
+   See Documentation/devicetree/bindings/dma/atmel-dma.txt for details.
+ - dma-names: Must be "tx", "rx".
+ 
++Optional properties:
++  - atmel,clk-from-rk-pin: bool property.
++     - When SSC works in slave mode, according to the hardware design, the
++       clock can get from TK pin, and also can get from RK pin. So, add
++       this parameter to choose where the clock from.
++     - By default the clock is from TK pin, if the clock from RK pin, this
++       property is needed.
++
+ Examples:
+ - PDC transfer:
+ ssc0: ssc at fffbc000 {
+-- 
+1.8.5.2
