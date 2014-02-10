@@ -1,66 +1,88 @@
-From: groeck@juniper.net (Guenter Roeck)
-Date: Mon, 10 Feb 2014 17:18:11 +0000
-Subject: [PATCH 01/10] watchdog: xilinx: Convert driver to the watchdog
- framework
-In-Reply-To: <52F879CF.8080906@monstr.eu>
-References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
- <52F7DF2F.5060001@roeck-us.net> <52F879CF.8080906@monstr.eu>
-Message-ID: <c5f221694e2041519cabeef0b7552aac@CO1PR05MB523.namprd05.prod.outlook.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 10 Feb 2014 18:23:12 +0100
+Subject: [PATCH 01/11] ARM: mvebu: add Armada 375 support to the
+ system-controller driver
+In-Reply-To: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1392053002-19831-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Michal Simek [mailto:monstr at monstr.eu]
-> Sent: Sunday, February 09, 2014 11:04 PM
-> To: Guenter Roeck
-> Cc: Michal Simek; linux-kernel at vger.kernel.org; Wim Van Sebroeck;
-> linux-watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 01/10] watchdog: xilinx: Convert driver to the
-> watchdog framework
-> 
-> On 02/09/2014 09:03 PM, Guenter Roeck wrote:
-> > On 01/31/2014 06:18 AM, Michal Simek wrote:
-> >> - Remove uneeded headers, fops functions
-> >> - Use xilinx_wdt prefix in start/stop/keepalive functions
-> >>    and in new structures
-> >>
-> >> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> >
-> > Hi Michal,
-> >
-> >>   static int xwdt_probe(struct platform_device *pdev)
-> >>   {
-> >>       int rc;
-> >> @@ -314,7 +184,7 @@ static int xwdt_probe(struct platform_device
-> *pdev)
-> >>                       "xlnx,wdt-enable-once", NULL);
-> >>       if (tmptr == NULL) {
-> >>           pr_warn("Parameter \"xlnx,wdt-enable-once\" not found in
-> device tree!\n");
-> >> -        xdev.nowayout = WATCHDOG_NOWAYOUT;
-> >> +        watchdog_set_nowayout(&xilinx_wdt_wdd, true);
-> >
-> > Sure you want to set this to always true instead of using
-> WATCHDOG_NOWAYOUT ?
-> 
-> I have checked it and
-> option CONFIG_WATCHDOG_NOWAYOUT - Disable watchdog shutdown on close
-> 
-> with this part in the header
-> 
-> 100 #ifdef CONFIG_WATCHDOG_NOWAYOUT
-> 101 #define WATCHDOG_NOWAYOUT               1
-> 102 #define WATCHDOG_NOWAYOUT_INIT_STATUS   (1 << WDOG_NO_WAY_OUT)
-> 103 #else
-> 104 #define WATCHDOG_NOWAYOUT               0
-> 105 #define WATCHDOG_NOWAYOUT_INIT_STATUS   0
-> 106 #endif
-> 
-> enable once is hardware option and it means when this option is setup
-> in hw you can't stop watchdog. That's why I think that setting up true
-> instead of WATCHDOG_NOWAYOUT is correct.
-> 
+The system controller block in the Armada 375 has different register
+offsets for the system reset and other related functions. Therefore,
+this commit introduces the new "armada-375-system-controller"
+compatible string to identify the Armada 375 variant of the system
+controller.
 
-Ok, makes sense.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ .../devicetree/bindings/arm/mvebu-system-controller.txt    |  3 ++-
+ arch/arm/mach-mvebu/system-controller.c                    | 14 ++++++++++++--
+ 2 files changed, 14 insertions(+), 3 deletions(-)
 
-Guenter
+diff --git a/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt b/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
+index 081c6a7..d24ab2e 100644
+--- a/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
++++ b/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
+@@ -1,12 +1,13 @@
+ MVEBU System Controller
+ -----------------------
+-MVEBU (Marvell SOCs: Armada 370/XP, Dove, mv78xx0, Kirkwood, Orion5x)
++MVEBU (Marvell SOCs: Armada 370/375/XP, Dove, mv78xx0, Kirkwood, Orion5x)
+ 
+ Required properties:
+ 
+ - compatible: one of:
+ 	- "marvell,orion-system-controller"
+ 	- "marvell,armada-370-xp-system-controller"
++	- "marvell,armada-375-system-controller"
+ - reg: Should contain system controller registers location and length.
+ 
+ Example:
+diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
+index a7fb89a..1806187 100644
+--- a/arch/arm/mach-mvebu/system-controller.c
++++ b/arch/arm/mach-mvebu/system-controller.c
+@@ -1,5 +1,5 @@
+ /*
+- * System controller support for Armada 370 and XP platforms.
++ * System controller support for Armada 370, 375 and XP platforms.
+  *
+  * Copyright (C) 2012 Marvell
+  *
+@@ -11,7 +11,7 @@
+  * License version 2.  This program is licensed "as is" without any
+  * warranty of any kind, whether express or implied.
+  *
+- * The Armada 370 and Armada XP SoCs both have a range of
++ * The Armada 370, 375 and Armada XP SoCs have a range of
+  * miscellaneous registers, that do not belong to a particular device,
+  * but rather provide system-level features. This basic
+  * system-controller driver provides a device tree binding for those
+@@ -47,6 +47,13 @@ static const struct mvebu_system_controller armada_370_xp_system_controller = {
+ 	.system_soft_reset = 0x1,
+ };
+ 
++static const struct mvebu_system_controller armada_375_system_controller = {
++	.rstoutn_mask_offset = 0x54,
++	.system_soft_reset_offset = 0x58,
++	.rstoutn_mask_reset_out_en = 0x1,
++	.system_soft_reset = 0x1,
++};
++
+ static const struct mvebu_system_controller orion_system_controller = {
+ 	.rstoutn_mask_offset = 0x108,
+ 	.system_soft_reset_offset = 0x10c,
+@@ -61,6 +68,9 @@ static struct of_device_id of_system_controller_table[] = {
+ 	}, {
+ 		.compatible = "marvell,armada-370-xp-system-controller",
+ 		.data = (void *) &armada_370_xp_system_controller,
++	}, {
++		.compatible = "marvell,armada-375-system-controller",
++		.data = (void *) &armada_375_system_controller,
+ 	},
+ 	{ /* end of list */ },
+ };
+-- 
+1.8.3.2
