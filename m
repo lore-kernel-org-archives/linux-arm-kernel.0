@@ -1,34 +1,81 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 10 Feb 2014 20:00:35 -0300
-Subject: [PATCH v7 16/18] watchdog: orion: Enable the build on ARCH_MVEBU
-In-Reply-To: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1392073237-2554-17-git-send-email-ezequiel.garcia@free-electrons.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Mon, 10 Feb 2014 17:23:28 -0600 (CST)
+Subject: [GIT PULL] qcom cleanups for v3.15
+Message-ID: <alpine.DEB.2.00.1402101722170.12284@galak-ubuntu.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After adding support for Armada 370/XP SoC let's enable the build on
-these platforms.
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-Tested-by: Willy Tarreau <w@1wt.eu>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- drivers/watchdog/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 4c4c566..2dda6c0 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -291,7 +291,7 @@ config DAVINCI_WATCHDOG
- 
- config ORION_WATCHDOG
- 	tristate "Orion watchdog"
--	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE
-+	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE || ARCH_MVEBU
- 	select WATCHDOG_CORE
- 	help
- 	  Say Y here if to include support for the watchdog timer
--- 
-1.8.1.5
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-cleanup-for-3.15
+
+for you to fetch changes up to cf1e8f0cd665e2a9966d2bee4e11ecc0938ff166:
+
+   ARM: qcom: Rename various msm prefixed functions to qcom (2014-02-06 16:20:41 -0600)
+
+----------------------------------------------------------------
+General cleanups for MSM/QCOM for 3.15
+
+Split of the multiplatform support for the Qualcomm SoCs into a mach-qcom
+while we leave mach-msm as legacy support.  Also, some smp and device tree
+related cleanups.
+
+----------------------------------------------------------------
+Kumar Gala (6):
+       ARM: dts: msm: split out msm8660 and msm8960 soc into dts include
+       ARM: msm: kill off hotplug.c
+       clocksource: qcom: Move clocksource code out of mach-msm
+       ARM: qcom: Split Qualcomm support into legacy and multiplatform
+       clocksource: qcom: split building of legacy vs multiplatform support
+       ARM: qcom: Rename various msm prefixed functions to qcom
+
+Rohit Vaswani (1):
+       ARM: msm: Remove pen_release usage
+
+  MAINTAINERS                                        |  8 +++
+  arch/arm/Kconfig                                   |  7 +-
+  arch/arm/Kconfig.debug                             |  2 +-
+  arch/arm/Makefile                                  |  1 +
+  arch/arm/boot/dts/Makefile                         |  6 +-
+  arch/arm/boot/dts/qcom-msm8660-surf.dts            | 59 +----------------
+  arch/arm/boot/dts/qcom-msm8660.dtsi                | 63 ++++++++++++++++++
+  arch/arm/boot/dts/qcom-msm8960-cdp.dts             | 66 +------------------
+  arch/arm/boot/dts/qcom-msm8960.dtsi                | 70 ++++++++++++++++++++
+  arch/arm/mach-msm/Kconfig                          | 54 ++--------------
+  arch/arm/mach-msm/Makefile                         |  8 ---
+  arch/arm/mach-msm/common.h                         |  1 -
+  arch/arm/mach-msm/headsmp.S                        | 39 ------------
+  arch/arm/mach-msm/hotplug.c                        | 74 ----------------------
+  arch/arm/mach-qcom/Kconfig                         | 33 ++++++++++
+  arch/arm/mach-qcom/Makefile                        |  5 ++
+  .../arm/{mach-msm/board-dt.c => mach-qcom/board.c} | 15 ++---
+  arch/arm/{mach-msm => mach-qcom}/platsmp.c         | 66 ++++++-------------
+  arch/arm/{mach-msm => mach-qcom}/scm-boot.c        |  0
+  arch/arm/{mach-msm => mach-qcom}/scm-boot.h        |  0
+  arch/arm/{mach-msm => mach-qcom}/scm.c             |  0
+  arch/arm/{mach-msm => mach-qcom}/scm.h             |  0
+  drivers/clocksource/Kconfig                        |  3 +
+  drivers/clocksource/Makefile                       |  1 +
+  .../timer.c => drivers/clocksource/qcom-timer.c    | 29 ++++-----
+  25 files changed, 240 insertions(+), 370 deletions(-)
+  create mode 100644 arch/arm/boot/dts/qcom-msm8660.dtsi
+  create mode 100644 arch/arm/boot/dts/qcom-msm8960.dtsi
+  delete mode 100644 arch/arm/mach-msm/headsmp.S
+  delete mode 100644 arch/arm/mach-msm/hotplug.c
+  create mode 100644 arch/arm/mach-qcom/Kconfig
+  create mode 100644 arch/arm/mach-qcom/Makefile
+  rename arch/arm/{mach-msm/board-dt.c => mach-qcom/board.c} (68%)
+  rename arch/arm/{mach-msm => mach-qcom}/platsmp.c (65%)
+  rename arch/arm/{mach-msm => mach-qcom}/scm-boot.c (100%)
+  rename arch/arm/{mach-msm => mach-qcom}/scm-boot.h (100%)
+  rename arch/arm/{mach-msm => mach-qcom}/scm.c (100%)
+  rename arch/arm/{mach-msm => mach-qcom}/scm.h (100%)
+  rename arch/arm/mach-msm/timer.c => drivers/clocksource/qcom-timer.c (98%)
+
+--
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
