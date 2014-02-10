@@ -1,64 +1,59 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Feb 2014 15:14:06 +0000
-Subject: [PATCH v3 1/2] drivers/base: permit base components to omit
- the bind/unbind ops
-In-Reply-To: <20140210153551.1309f017@armhf>
-References: <cover.1391792986.git.moinejf@free.fr>
- <9b3c3c2c982f31b026fd1516a2b608026d55b1e9.1391792986.git.moinejf@free.fr>
- <20140210125307.GG20143@ulmo.nvidia.com>
- <20140210131233.GT26684@n2100.arm.linux.org.uk>
- <20140210153551.1309f017@armhf>
-Message-ID: <20140210151406.GX26684@n2100.arm.linux.org.uk>
+Date: Mon, 10 Feb 2014 15:18:21 +0000
+Subject: [PATCH RFC v2 00/35] Second preview of imx-drm cleanup series
+In-Reply-To: <1392045139.6687.31.camel@pizza.hi.pengutronix.de>
+References: <20140210122802.GS26684@n2100.arm.linux.org.uk>
+ <1392045139.6687.31.camel@pizza.hi.pengutronix.de>
+Message-ID: <20140210151821.GY26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 03:35:51PM +0100, Jean-Francois Moine wrote:
-> On Mon, 10 Feb 2014 13:12:33 +0000
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > I've NAK'd these patches already - I believe they're based on a
-> > mis-understanding of how this should be used.  I believe Jean-Francois
-> > has only looked at the core, rather than looking at the imx-drm example
-> > it was posted with in an attempt to understand it.
+On Mon, Feb 10, 2014 at 04:12:19PM +0100, Philipp Zabel wrote:
+> Am Montag, den 10.02.2014, 12:28 +0000 schrieb Russell King - ARM Linux:
+> > This is the latest revision of my series cleaning up imx-drm and
+> > hopefully getting it ready to be moved out of drivers/staging.
+> > This series is updated to v3.14-rc2.
 > > 
-> > Omitting the component bind operations is absurd because it makes the
-> > component code completely pointless, since there is then no way to
-> > control the sequencing of driver initialisation - something which is
-> > one of the primary reasons for this code existing in the first place.
+> > Since the last round of patches were posted, the component support
+> > has been merged into mainline, and thus dropped from this series.
+> > Greg has taken the first three patches and merged them into his
+> > linux-next tree - however, I include them here for completness.
+> > 
+> > Most of the comments from last time still apply, and I'll look at
+> > incorporating some of the other patches that were posted in the
+> > coming week.
+> > 
+> > If I can have some acks for this, I'll start sending some of it to
+> >
+> >
+> > Greg - I'd like to at least get the five or six initial imx-hdmi
+> > patches to Greg and queued up for the next merge window sooner
+> > rather than later, preferably getting most of this ready for that
+> > window too.
 > 
-> I perfectly looked at your example and I use it now in my system.
+> For the first 9 patches up to (including) "imx-drm: ipu-v3: more
+> clocking fixes":
+> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 > 
-> You did not see what could be done with your component code. For
-> example, since november, I have not yet the clock probe_defer in the
-> mainline (http://www.spinics.net/lists/arm-kernel/msg306072.html), so,
-> there are 3 solutions:
-> 
-> - hope the patch will be some day in the mainline and, today, reboot
->   when the system does not start correctly,
-> 
-> - insert a delay in the tda998x and kirkwood probe sequences (delay
->   long enough to be sure the si5351 is started, or loop),
-> 
-> - use your component work.
-> 
-> In the last case, it is easy:
-> 
-> - the si5351 driver calls component_add (with empty ops: it has no
->   interest in the bind/unbind functions) when it is fully started (i.e.
->   registered - that was the subject of my patch),
+> As you say, comments about the device tree bindings still apply.
+> I'd prefer if the patches that currently use the crtcs property were
+> reworked to use the v4l2 style device tree bindings before they hit
+> mainline.
 
-There is only one word for this:
-Ewwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww.
+I'm trying /not/ to do that much more work on this because there's
+other things that need my attention, like a complete rewrite of the
+SDHCI mess.  I want to get the imx-drm stuff off my plate so I don't
+have to worry about it.
 
-Definitely not.
+So, I'd really like _all_ these patches to go into mainline for v3.15
+with the least rework possible so I can spend the next few months
+working on rewriting SDHCI.
 
-The component stuff is there to sort out the subsystems which expect a
-"card" but in DT we supply a set of components.  It's not there to sort
-out dependencies between different subsystems.
+What I don't want is carrying hundreds of patches across multiple
+kernel versions.
 
-I've no idea why your patch to add the deferred probing hasn't been acked
-by Mike yet, but that needs to happen before I take it.  Or, split it up
-in two so I can take the clkdev part and Mike can take the CCF part.
+Now, mind explaining what "v4l2 style device tree bindings" means?  I've
+no idea since I'm relatively new to DT.
 
 -- 
 FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
