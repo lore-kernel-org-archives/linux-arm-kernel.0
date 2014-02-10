@@ -1,53 +1,91 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 10 Feb 2014 11:37:56 +0100
-Subject: [PATCH 5/8] tty/serial: at91: add dtr control via gpio
-In-Reply-To: <CACQ1gAjQi+g0=HcR9K0rBQxBUZ_cN783sCWx40P5Hec-BdRtVg@mail.gmail.com>
-References: <1391785155-18525-1-git-send-email-richard.genoud@gmail.com>
- <1391785155-18525-6-git-send-email-richard.genoud@gmail.com>
- <1391786494.259974704@f81.i.mail.ru>
- <CACQ1gAjQi+g0=HcR9K0rBQxBUZ_cN783sCWx40P5Hec-BdRtVg@mail.gmail.com>
-Message-ID: <52F8AC04.50103@atmel.com>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Mon, 10 Feb 2014 10:40:37 +0000
+Subject: [PATCH v2 1/2] PM / OPP: Allow boost frequency to be looked up
+ from device tree
+In-Reply-To: <CAJuA9agT4PC6YOmhCwKQ=58qaGEr1qSuhTpX57ro1pEuk++Miw@mail.gmail.com>
+References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>	<1391786342-11812-2-git-send-email-thomas.ab@samsung.com>	<52F50346.7040707@arm.com>
+ <CAJuA9agT4PC6YOmhCwKQ=58qaGEr1qSuhTpX57ro1pEuk++Miw@mail.gmail.com>
+Message-ID: <52F8ACA5.1080409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2014 11:24, Richard Genoud :
-> 2014-02-07 16:21 GMT+01:00 Alexander Shiyan <shc_work@mail.ru>:
->> Hello.
->>
->> ???????,  7 ??????? 2014, 15:59 +01:00 ?? Richard Genoud <richard.genoud@gmail.com>:
->>> On sam9x5, the USART controller doesn't handle DTR/DSR/DCD/RI signals,
->>> so we have to control them via GPIO.
+On 08/02/14 05:10, Thomas Abraham wrote:
+> On Fri, Feb 7, 2014 at 9:31 PM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
+>> On 07/02/14 15:19, Thomas Abraham wrote:
+>>> From: Thomas Abraham <thomas.ab@samsung.com>
 >>>
->>> This patch permits to use a GPIO to control the DTR signal.
+>>> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
+>>> support for CPU boost mode. This patch adds support for finding available
+>>> boost frequencies from device tree and marking them as usable in boost mode.
 >>>
->>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+>>> Cc: Nishanth Menon <nm@ti.com>
+>>> Cc: Lukasz Majewski <l.majewski@samsung.com>
+>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 >>> ---
->> ...
->>> +     if (gpio_is_valid(atmel_port->gpio.dtr)) {
->>> +             if (mctrl & TIOCM_DTR)
->>> +                     gpio_set_value(atmel_port->gpio.dtr, 0);
->>> +             else
->>> +                     gpio_set_value(atmel_port->gpio.dtr, 1);
+>>>  drivers/base/power/opp.c |   34 +++++++++++++++++++++++++++++++++-
+>>>  1 file changed, 33 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+>>> index fa41874..b636826 100644
+>>> --- a/drivers/base/power/opp.c
+>>> +++ b/drivers/base/power/opp.c
+>>> @@ -628,7 +628,8 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>>>       struct device_opp *dev_opp;
+>>>       struct dev_pm_opp *opp;
+>>>       struct cpufreq_frequency_table *freq_table;
+>>> -     int i = 0;
+>>> +     int i = 0, j, len, ret;
+>>> +     u32 *boost_freqs = NULL;
+>>>
+>>>       /* Pretend as if I am an updater */
+>>>       mutex_lock(&dev_opp_list_lock);
+>>> @@ -650,10 +651,35 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>>>               return -ENOMEM;
+>>>       }
+>>>
+>>> +     if (of_find_property(dev->of_node, "boost-frequency", &len)) {
+>>> +             if (len == 0 || (len & (sizeof(u32) - 1)) != 0) {
+>>> +                     dev_err(dev, "%s: invalid boost frequency\n", __func__);
+>>> +                     ret = -EINVAL;
+>>> +                     goto err_boost;
+>>> +             }
+>>> +
+>>> +             boost_freqs = kzalloc(len, GFP_KERNEL);
+>>> +             if (!boost_freqs) {
+>>> +                     dev_warn(dev, "%s: no memory for boost freq table\n",
+>>> +                                     __func__);
+>>> +                     ret = -ENOMEM;
+>>> +                     goto err_boost;
+>>> +             }
+>>> +             of_property_read_u32_array(dev->of_node, "boost-frequency",
+>>> +                     boost_freqs, len / sizeof(u32));
 >>> +     }
->>
->> So, if you use GPIO for such purpose (here and in the other patches),
->> you should take and use GPIO active level from bindings.
->> It will make use of GPIO more flexible and deliver us from further special
->> possible bindings to declare the active level.
-> Yes, I could do that. I'll have to change the alreday merged RTS
-> binding so that it gets it's active level from DTS, but I don't think
-> it's a problem, since it's not already in mainline.
-> Linus, Nicolas, what do you think ?
+>>> +
+>>>       list_for_each_entry(opp, &dev_opp->opp_list, node) {
+>>>               if (opp->available) {
+>>>                       freq_table[i].driver_data = i;
+>>>                       freq_table[i].frequency = opp->rate / 1000;
+>>> +                     for (j = 0; j < len / sizeof(u32) && boost_freqs; j++) {
+>>> +                             if (boost_freqs[j] == freq_table[i].frequency) {
+>>> +                                     freq_table[i].driver_data =
+>>> +                                                     CPUFREQ_BOOST_FREQ;
+>>> +                                     break;
+>>> +                             }
+>>> +                     }
+>>>                       i++;
+>>>               }
+>>>       }
+>> IIRC you had mentioned that the boost-opp was not limited to be a cpufreq, but
+>> this change seems to be cpufreq only.
+> 
+> Yes, but as you have initiated the discussion on extending the OPP
+> binding, this has been limited to cpufreq only. If the new OPP library
+> has support for listing boost frequency, this can be migrated to the
+> new OPP libaray.
+> 
 
-Yes I agree. It is not used yet, so the sooner we move to this
-specification, the better.
+Fair enough, just wanted to check as I couldn't get the info following the
+thread. I might have missed it.
 
->> Actually, it would be good to have a separate unit for mctrl GPIOs,
->> which could be used for other drivers.
-> good idea, I can add them in serial_core.c
-
-That would be great. Thanks Richard!
-
-Bye,
--- 
-Nicolas Ferre
+Regards,
+Sudeep
