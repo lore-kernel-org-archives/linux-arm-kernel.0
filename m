@@ -1,35 +1,43 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 10 Feb 2014 17:36:06 +0100
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Feb 2014 16:37:00 +0000
 Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
-In-Reply-To: <20140210152452.GA26684@n2100.arm.linux.org.uk>
+In-Reply-To: <20140210162822.GF2794@e103592.cambridge.arm.com>
 References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
  <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
- <20140210141634.GA2794@e103592.cambridge.arm.com> <52F8E5E2.30805@st.com>
- <20140210151247.GD2794@e103592.cambridge.arm.com>
- <20140210152452.GA26684@n2100.arm.linux.org.uk>
-Message-ID: <52F8FFF6.80400@st.com>
+ <20140207170903.GT5976@mudshark.cambridge.arm.com> <52F892C8.80508@st.com>
+ <20140210111710.GC17766@mudshark.cambridge.arm.com>
+ <20140210135659.GU26684@n2100.arm.linux.org.uk>
+ <20140210144228.GC2794@e103592.cambridge.arm.com>
+ <20140210151934.GZ26684@n2100.arm.linux.org.uk>
+ <20140210162822.GF2794@e103592.cambridge.arm.com>
+Message-ID: <20140210163700.GD26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Feb 10, 2014 at 04:28:22PM +0000, Dave Martin wrote:
+> On Mon, Feb 10, 2014 at 03:19:34PM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Feb 10, 2014 at 02:42:28PM +0000, Dave Martin wrote:
+> > > Should we require CPSR.A to me masked in Booting, for all CPUs that have
+> > > it?
+> > 
+> > If it's not masked at boot, then there can't be an imprecise exception
+> > pending.
+> 
+> Couldn't there still be a dangling abort condition triggered by the
+> bootloader, which which doesn't raise the abort pin until after we
+> entered the kernel?
 
-On 02/10/2014 04:24 PM, Russell King - ARM Linux wrote:
-> On Mon, Feb 10, 2014 at 03:12:47PM +0000, Dave Martin wrote:
->> Firstly, blindly adding 4 to PC is obviouly not right, partly because we
->> might be running an unrelated thread by the time the abort fires, and
->> also because the affected instruction might not be 4 bytes in size in a
->> Thumb kernel.
-> Exactly.  We ended up on some platforms having special accessors for PCI
-> where we included a number of 'mov r0, r0' instructions after the accessor
-> so we could properly cope with them - but this required knowledge that
-> we were going to only receive an imprecise abort from these accessors
-> and only for a few cycles after the instruction.
->
-> However, that's not true with modern architectures.  The point they're
-> received will _not_ be the load/store which resulted in the abort, and
-> in the case of a write, they could be many hundreds of cycles later,
-> especially if the write has been buffered.
-What about putting a memory barrier after a load/store ?
-CPU should wait for the operation to complete right ?
->
-> So adding four to the PC is definitely a very /bad/ thing to do.
->
+True, but the decompressor does disable them (see safe_svcmode_maskall),
+so any raised abort is likely to hit the boot loader's vectors at that
+time.  They remain masked into the kernel from that point.
+
+If you're not using the decompressor then the A bit will be left as-is.
+
+Given that we've not yet had any failures, I'm inclined to just let the
+status-quo be for the kernel entry - if it does cause problems then it's
+clear that the right solution is that the A bit must be disabled.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
