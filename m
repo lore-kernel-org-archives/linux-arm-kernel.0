@@ -1,47 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Feb 2014 12:28:03 +0000
-Subject: [PATCH RFC v2 00/35] Second preview of imx-drm cleanup series
-Message-ID: <20140210122802.GS26684@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 10 Feb 2014 12:29:58 +0000
+Subject: [PATCH RFC v2 14/35] imx-drm: update and fix imx6 DT descriptions for
+ v3 HDMI driver
+In-Reply-To: <20140210122802.GS26684@n2100.arm.linux.org.uk>
+References: <20140210122802.GS26684@n2100.arm.linux.org.uk>
+Message-ID: <E1WCpzq-0007O5-FC@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the latest revision of my series cleaning up imx-drm and
-hopefully getting it ready to be moved out of drivers/staging.
-This series is updated to v3.14-rc2.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/boot/dts/imx6dl.dtsi  | 3 ++-
+ arch/arm/boot/dts/imx6q.dtsi   | 1 +
+ arch/arm/boot/dts/imx6qdl.dtsi | 1 -
+ 3 files changed, 3 insertions(+), 2 deletions(-)
 
-Since the last round of patches were posted, the component support
-has been merged into mainline, and thus dropped from this series.
-Greg has taken the first three patches and merged them into his
-linux-next tree - however, I include them here for completness.
-
-Most of the comments from last time still apply, and I'll look at
-incorporating some of the other patches that were posted in the
-coming week.
-
-If I can have some acks for this, I'll start sending some of it to
-Greg - I'd like to at least get the five or six initial imx-hdmi
-patches to Greg and queued up for the next merge window sooner
-rather than later, preferably getting most of this ready for that
-window too.
-
- arch/arm/boot/dts/imx51-babbage.dts        |  10 +-
- arch/arm/boot/dts/imx53-m53evk.dts         |   8 +-
- arch/arm/boot/dts/imx53-mba53.dts          |   6 +
- arch/arm/boot/dts/imx53-qsb.dts            |   8 +-
- arch/arm/boot/dts/imx6dl.dtsi              |   5 +
- arch/arm/boot/dts/imx6q-sabresd.dts        |   4 +
- arch/arm/boot/dts/imx6q.dtsi               |   5 +
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi     |   6 +
- arch/arm/boot/dts/imx6qdl.dtsi             |   9 +
- drivers/staging/imx-drm/Makefile           |   3 +-
- drivers/staging/imx-drm/imx-drm-core.c     | 831 ++++++++++-------------------
- drivers/staging/imx-drm/imx-drm.h          |  39 +-
- drivers/staging/imx-drm/imx-fb.c           |  47 --
- drivers/staging/imx-drm/imx-fbdev.c        |  74 ---
- drivers/staging/imx-drm/imx-hdmi.c         | 680 +++++++++--------------
- drivers/staging/imx-drm/imx-ldb.c          | 125 ++---
- drivers/staging/imx-drm/imx-tve.c          | 134 +++--
- drivers/staging/imx-drm/ipu-v3/ipu-di.c    | 317 +++++------
- drivers/staging/imx-drm/ipuv3-crtc.c       |  56 +-
- drivers/staging/imx-drm/parallel-display.c | 100 ++--
- 20 files changed, 934 insertions(+), 1533 deletions(-)
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 65e54b4529c5..6dc397022214 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -90,5 +90,6 @@
+ };
+ 
+ &hdmi {
++	compatible = "fsl,imx6dl-hdmi";
+ 	crtcs = <&ipu1 0>, <&ipu1 1>;
+-}
++};
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index d2467f532de6..187fe33ba515 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -161,5 +161,6 @@
+ };
+ 
+ &hdmi {
++	compatible = "fsl,imx6q-hdmi";
+ 	crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 400bbc624f25..930ebe0c2937 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1369,7 +1369,6 @@
+ 			};
+ 
+ 			hdmi: hdmi at 0120000 {
+-				compatible = "fsl,imx6q-hdmi";
+ 				reg = <0x00120000 0x9000>;
+ 				interrupts = <0 115 0x04>;
+ 				gpr = <&gpr>;
+-- 
+1.8.3.1
