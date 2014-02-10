@@ -1,41 +1,65 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 10 Feb 2014 13:09:46 +0100
-Subject: [RFC PATCHv2 0/4] Add DT support for fixed PHYs
-In-Reply-To: <CAH9NwWfutp6MitSuG-LNH=0Y0ffewuSawLXJOe2JUL7=tz7BWQ@mail.gmail.com>
-References: <1378480701-12908-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130911064248.GI30088@pengutronix.de>
- <CAH9NwWfBGHmZ+HfUndeh18NW+HyZ=c82W=O_4hJSOH-oZuM9jA@mail.gmail.com>
- <CAH9NwWfutp6MitSuG-LNH=0Y0ffewuSawLXJOe2JUL7=tz7BWQ@mail.gmail.com>
-Message-ID: <20140210130946.6a554659@skate>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Feb 2014 12:14:05 +0000
+Subject: [PATCH v2 14/15] charger: max14577: Configure battery-dependent
+ settings from DTS
+In-Reply-To: <1391767487-10017-15-git-send-email-k.kozlowski@samsung.com>
+References: <1391767487-10017-1-git-send-email-k.kozlowski@samsung.com>
+ <1391767487-10017-15-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20140210121405.GH22773@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Christian Gmeiner,
-
-On Mon, 10 Feb 2014 11:30:30 +0100, Christian Gmeiner wrote:
-
-> >> +1 for the general idea. This really looks good now. I've not much more
-> >> to say. Maybe someone from the devicetree corner has a few words for the
-> >> binding?
-> >>
-> >
-> > I tested the whole series with an I.MX6D board with the FEC driver:
-> > fec 2188000.ethernet eth0: Freescale FEC PHY driver [Generic PHY]
-> > (mii_bus:phy_addr=fixed-0:00, irq=-1)
-> >
-> > For me binding looks nice and I hope to see this patch series in 3.13.
-> >
-> > Tested-by: Christian Gmeiner <christian.gmeiner@gmail.com>
+> Remove hard-coded values for:
+>  - Fast Charge current,
+>  - End Of Charge current,
+>  - Fast Charge timer,
+>  - Overvoltage Protection Threshold,
+>  - Battery Constant Voltage,
+> and use DTS to configure them. This allows using the max14577 charger
+> driver with different batteries.
 > 
-> Is there any update on this patch series?
+> Now the charger driver requires valid configuration data from DTS. In
+> case of wrong configuration data it fails during probe. Patch adds
+> of_compatible to the charger mfd cell in MFD driver core.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Jenny Tc <jenny.tc@intel.com>
+> ---
+>  drivers/mfd/max14577.c               |    5 +-
+>  drivers/power/max14577_charger.c     |  234 +++++++++++++++++++++++++++++-----
+>  include/linux/mfd/max14577-private.h |   10 ++
+>  include/linux/mfd/max14577.h         |    8 ++
+>  4 files changed, 227 insertions(+), 30 deletions(-)
 
-I'll try to send a new version in the next few days. It's still part of
-my TODO list.
+<snip>
 
-Thanks!
+> diff --git a/include/linux/mfd/max14577-private.h b/include/linux/mfd/max14577-private.h
+> index a8cd7de3526a..50cf70bec4d4 100644
+> --- a/include/linux/mfd/max14577-private.h
+> +++ b/include/linux/mfd/max14577-private.h
+> @@ -269,6 +269,16 @@ enum maxim_muic_charger_type {
+>  #define MAX77836_CHARGER_CURRENT_LIMIT_HIGH_STEP	 25000U
+>  #define MAX77836_CHARGER_CURRENT_LIMIT_MAX		475000U
+>  
+> +/* MAX14577 charger End-Of-Charge current limits (as in MAXIM_CHGCTRL5 register), uA */
 
-Thomas
+Too many chars. Didn't checkpatch.pl complain about this?
+
+> +#define MAX14577_CHARGER_EOC_CURRENT_LIMIT_MIN		50000U
+> +#define MAX14577_CHARGER_EOC_CURRENT_LIMIT_STEP		10000U
+> +#define MAX14577_CHARGER_EOC_CURRENT_LIMIT_MAX		200000U
+> +
+> +/* MAX14577/MAX77836 Battery Constant Voltage (as in MAXIM_CHGCTRL3
+> register), uV */
+
+Same here
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
