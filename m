@@ -1,46 +1,28 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Feb 2014 14:31:20 +0800
-Subject: [PATCH] ARM: dts: i.MX51 babbage: Support diagnostic LED
-In-Reply-To: <52F87087.4000908@freescale.com>
-References: <1391522263-17877-1-git-send-email-Ying.Liu@freescale.com>
- <20140210030214.GB9628@S2101-09.ap.freescale.net>
- <1392006579.703394606@f357.i.mail.ru>
- <52F87087.4000908@freescale.com>
-Message-ID: <20140210063118.GJ9628@S2101-09.ap.freescale.net>
+Date: Mon, 10 Feb 2014 14:33:49 +0800
+Subject: [GIT PULL] ARM: imx: device tree changes for 3.15, take 1
+In-Reply-To: <4771497.sfdTTRjnSv@phil>
+References: <20140205122258.GA13821@S2101-09.ap.freescale.net>
+ <4771497.sfdTTRjnSv@phil>
+Message-ID: <20140210063347.GK9628@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 02:24:07PM +0800, Liu Ying wrote:
-> >>> @@ -81,6 +81,17 @@
-> >>>  		};
-> >>>  	};
-> >>>  
-> >>> +	leds {
-> >>> +		compatible = "gpio-leds";
-> >>> +		pinctrl-names = "default";
-> >>> +		pinctrl-0 = <&led_pin_gpio2_6>;
-> >>> +
-> >>> +		led-diagnostic {
-> >>> +			label = "diagnostic";
-> >>> +			gpios = <&gpio2 6 0>;
-> >>
-> >> Just out of curiosity, how will you use/trigger the led?
-> > 
-> > And GPIO bindings should be used to specify active level,
-> > GPIO_ACTIVE_HIGH in this case.
+On Fri, Feb 07, 2014 at 11:04:30AM +0100, Heiko St?bner wrote:
+> Hi Shawn,
 > 
-> Based on Linux 3.14-rc2, this gives me no single output:
-> grep GPIO_ACTIVE arch/arm/boot/dts/ -nr | grep imx
-
-If you grep linux-next, you will find quite a few.
-
+> Am Mittwoch, 5. Februar 2014, 20:23:01 schrieb Shawn Guo:
+> >  - Make pinctrl nodes board specific to avoid floating board specific
+> >    device tree blob with so many unused pinctrl data.
 > 
-> So, this patch follows the old approach.
-> 
-> I agree to use GPIO_ACTIVE_HIGH/GPIO_ACTIVE_LOW macros.
-> How about generating dedicated patch sets for this purpose?
-> Actually, I had one set for i.MX51 platforms.
+> can you take a look at "dtc: add ability to make nodes conditional on them 
+> being referenced" [0] to see if it can help to solve the floating pinctrl 
+> problem more generic in the future?
 
-I prefer to have this change in the same patch.
+Yes, if it gets accepted, we will consider to use it in the future
+projects.
 
 Shawn
+
+> [0] http://www.spinics.net/lists/arm-kernel/msg303967.html
+> 
