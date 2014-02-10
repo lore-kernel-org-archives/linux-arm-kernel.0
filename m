@@ -1,84 +1,168 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 10 Feb 2014 12:39:57 -0500
-Subject: [PATCH 06/11] ARM: mvebu: add Armada 380/385 support to the
- system-controller driver
-In-Reply-To: <1392053002-19831-7-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392053002-19831-7-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140210173957.GS8533@titan.lakedaemon.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 10 Feb 2014 18:42:59 +0100
+Subject: [PATCH v2] clk: respect the clock dependencies in of_clk_init
+Message-ID: <1392054179-28830-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 06:23:17PM +0100, Thomas Petazzoni wrote:
-> This commit adds support for the Armada 380/385 SoCs in the
-> system-controller driver. Since this SoC has the same system
-> controller registers layout than the Armada 370/XP at least for the
-> few features currently supported by the driver, this commit simply
-> adds a new compatible string that provides the same behavior than the
-> one provided for Armada 370/XP.
-> 
-> Note that we intentionally do not use the same compatible string as
-> Armada 370/XP, as the current system-controller driver is far from
-> exploiting all the possibilities of the hardware, and we may in the
-> future discover differences between Armada 370/XP and Armada 380/385.
+Until now the clock providers were initialized in the order found in
+the device tree. This led to have the dependencies between the clocks
+not respected: children clocks could be initialized before their
+parent clocks.
 
-I'd much prefer to add a new compatible string iff it accompanies
-incompatible changes.
+Instead of forcing each platform to manage its own initialization order,
+this patch adds this work inside the framework itself.
 
-For now, I think it's best to use 'marvell,armada-370-xp-system-controller'
-in the dtsi file and change it when you introduce the incompatible
-features.
+Using the data of the device tree the of_clk_init function now delayed
+the initialization of a clock provider if its parent provider was not
+ready yet.
 
-thx,
+The strict dependency check (all parents of a given clk must be
+initialized) was added by Boris BREZILLON
 
-Jason.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/arm/mvebu-system-controller.txt | 3 ++-
->  arch/arm/mach-mvebu/system-controller.c                           | 8 ++++++++
->  2 files changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt b/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
-> index d24ab2e..3559972 100644
-> --- a/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
-> +++ b/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
-> @@ -1,6 +1,6 @@
->  MVEBU System Controller
->  -----------------------
-> -MVEBU (Marvell SOCs: Armada 370/375/XP, Dove, mv78xx0, Kirkwood, Orion5x)
-> +MVEBU (Marvell SOCs: Armada 370/375/38x/XP, Dove, mv78xx0, Kirkwood, Orion5x)
->  
->  Required properties:
->  
-> @@ -8,6 +8,7 @@ Required properties:
->  	- "marvell,orion-system-controller"
->  	- "marvell,armada-370-xp-system-controller"
->  	- "marvell,armada-375-system-controller"
-> +	- "marvell,armada-380-system-controller"
->  - reg: Should contain system controller registers location and length.
->  
->  Example:
-> diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
-> index 1806187..b4e8bb2 100644
-> --- a/arch/arm/mach-mvebu/system-controller.c
-> +++ b/arch/arm/mach-mvebu/system-controller.c
-> @@ -71,6 +71,14 @@ static struct of_device_id of_system_controller_table[] = {
->  	}, {
->  		.compatible = "marvell,armada-375-system-controller",
->  		.data = (void *) &armada_375_system_controller,
-> +	}, {
-> +		/*
-> +		 * As far as RSTOUTn and System soft reset registers
-> +		 * are concerned, Armada 38x is similar to Armada
-> +		 * 370/XP
-> +		 */
-> +		.compatible = "marvell,armada-380-system-controller",
-> +		.data = (void *) &armada_370_xp_system_controller,
->  	},
->  	{ /* end of list */ },
->  };
-> -- 
-> 1.8.3.2
-> 
+Since the v1, I have merged the  strict dependency check from Boris.
+And of course tested on my Armada 370 and Armada XP based board
+
+ drivers/clk/clk.c | 109 ++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 106 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 5517944495d8..684976993297 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2526,24 +2526,127 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
+ }
+ EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
+ 
++struct clock_provider {
++	of_clk_init_cb_t clk_init_cb;
++	struct device_node *np;
++	struct list_head node;
++};
++
++static LIST_HEAD(clk_provider_list);
++
++/*
++ * This function looks for a parent clock. If there is one, then it
++ * checks that the provider for this parent clock was initialized, in
++ * this case the parent clock will be ready.
++ */
++static int parent_ready(struct device_node *np)
++{
++	struct of_phandle_args clkspec;
++	struct of_clk_provider *provider;
++	int num_parents;
++	bool found;
++	int i;
++
++	/*
++	 * If there is no clock parent, no need to wait for them, then
++	 * we can consider their absence as being ready
++	 */
++	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
++	if (num_parents <= 0)
++		return 1;
++
++	for (i = 0; i < num_parents; i++) {
++		if (of_parse_phandle_with_args(np, "clocks", "#clock-cells", i,
++					       &clkspec))
++			return 1;
++
++		/* Check if we have such a provider in our array */
++		found = false;
++		list_for_each_entry(provider, &of_clk_providers, link) {
++			if (provider->node == clkspec.np) {
++				found = true;
++				break;
++			}
++		}
++
++		if (!found)
++			return 0;
++	}
++
++	return 1;
++}
++
+ /**
+  * of_clk_init() - Scan and init clock providers from the DT
+  * @matches: array of compatible values and init functions for providers.
+  *
+- * This function scans the device tree for matching clock providers and
+- * calls their initialization functions
++ * This function scans the device tree for matching clock providers
++ * and calls their initialization functions. It also do it by trying
++ * to follow the dependencies.
+  */
+ void __init of_clk_init(const struct of_device_id *matches)
+ {
+ 	const struct of_device_id *match;
+ 	struct device_node *np;
++	struct clock_provider *clk_provider, *next;
++	bool is_init_done;
+ 
+ 	if (!matches)
+ 		matches = &__clk_of_table;
+ 
+ 	for_each_matching_node_and_match(np, matches, &match) {
+ 		of_clk_init_cb_t clk_init_cb = match->data;
+-		clk_init_cb(np);
++
++
++		if (parent_ready(np)) {
++			/*
++			 * The parent clock is ready or there is no
++			 * clock parent at all, in this case the
++			 * provider can be initialize immediately.
++			 */
++			clk_init_cb(np);
++		} else {
++			/*
++			 * The parent clock is not ready, this
++			 * provider is moved to a list to be
++			 * initialized later
++			 */
++			struct clock_provider *parent = kzalloc(sizeof(struct clock_provider),
++							GFP_KERNEL);
++
++			parent->clk_init_cb = match->data;
++			parent->np = np;
++			list_add(&parent->node, &clk_provider_list);
++		}
++	}
++
++	while (!list_empty(&clk_provider_list)) {
++		is_init_done = false;
++		list_for_each_entry_safe(clk_provider, next,
++					&clk_provider_list, node) {
++			if (parent_ready(clk_provider->np)) {
++				clk_provider->clk_init_cb(clk_provider->np);
++				list_del(&clk_provider->node);
++				kfree(clk_provider);
++				is_init_done = true;
++			}
++		}
++
++		if (!is_init_done) {
++			/*
++			 * We didn't managed to initialize any of the
++			 * remaining providers during the last loop,
++			 * so now we initialize all the remaining ones
++			 * unconditionally in case the clock parent
++			 * was not mandatory
++			 */
++			list_for_each_entry_safe(clk_provider, next,
++						&clk_provider_list, node) {
++				clk_provider->clk_init_cb(clk_provider->np);
++				list_del(&clk_provider->node);
++				kfree(clk_provider);
++			}
++		}
+ 	}
+ }
+ #endif
+-- 
+1.8.1.2
