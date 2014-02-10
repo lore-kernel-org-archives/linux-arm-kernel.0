@@ -1,43 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Feb 2014 16:37:00 +0000
-Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
-In-Reply-To: <20140210162822.GF2794@e103592.cambridge.arm.com>
-References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
- <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
- <20140207170903.GT5976@mudshark.cambridge.arm.com> <52F892C8.80508@st.com>
- <20140210111710.GC17766@mudshark.cambridge.arm.com>
- <20140210135659.GU26684@n2100.arm.linux.org.uk>
- <20140210144228.GC2794@e103592.cambridge.arm.com>
- <20140210151934.GZ26684@n2100.arm.linux.org.uk>
- <20140210162822.GF2794@e103592.cambridge.arm.com>
-Message-ID: <20140210163700.GD26684@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 10 Feb 2014 16:36:22 +0000
+Subject: [PATCH 14/28] Remove MACH_SMDKC210
+In-Reply-To: <1392046242.3585.41.camel@x220>
+References: <1391971686-9517-1-git-send-email-richard@nod.at>
+ <1391971686-9517-15-git-send-email-richard@nod.at>
+ <20140210114154.GQ1757@sirena.org.uk>
+ <1392039072.3585.15.camel@x220>
+ <20140210141255.GI1757@sirena.org.uk>
+ <1392046242.3585.41.camel@x220>
+Message-ID: <20140210163621.GA13533@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 04:28:22PM +0000, Dave Martin wrote:
-> On Mon, Feb 10, 2014 at 03:19:34PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Feb 10, 2014 at 02:42:28PM +0000, Dave Martin wrote:
-> > > Should we require CPSR.A to me masked in Booting, for all CPUs that have
-> > > it?
-> > 
-> > If it's not masked at boot, then there can't be an imprecise exception
-> > pending.
-> 
-> Couldn't there still be a dangling abort condition triggered by the
-> bootloader, which which doesn't raise the abort pin until after we
-> entered the kernel?
+On Mon, Feb 10, 2014 at 04:30:42PM +0100, Paul Bolle wrote:
+> On Mon, 2014-02-10 at 14:12 +0000, Mark Brown wrote:
 
-True, but the decompressor does disable them (see safe_svcmode_maskall),
-so any raised abort is likely to hit the boot loader's vectors at that
-time.  They remain masked into the kernel from that point.
+> > Yes, that's correct.  Now, like I say think about what the symbol was
+> > there for in the first place.
 
-If you're not using the decompressor then the A bit will be left as-is.
+> So, next step: the Kconfig symbols MACH_SMDKV310 and MACH_SMDKC210 were
+> removed in commit 383ffda2fa ("ARM: EXYNOS: no more support non-DT for
+> EXYNOS SoCs"). That commit was part of v3.11. Correct?
 
-Given that we've not yet had any failures, I'm inclined to just let the
-status-quo be for the kernel entry - if it does cause problems then it's
-clear that the right solution is that the A bit must be disabled.
-
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Indeed, so we can see that these platforms were converted to use DT and
+the symbols were removed as a result.  This means that a good fix here
+is to ensure that the driver can be used with DT platforms.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/68f0308e/attachment.sig>
