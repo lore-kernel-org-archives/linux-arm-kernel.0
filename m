@@ -1,75 +1,223 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 10 Feb 2014 18:32:46 +0100
-Subject: [PATCH 3/6] dt: Update binding information for mvebu gating clocks
- with Armada 375
+Date: Mon, 10 Feb 2014 18:32:47 +0100
+Subject: [PATCH 4/6] clk: mvebu: add clock support for Armada 380/385
 In-Reply-To: <1392053569-28037-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1392053569-28037-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1392053569-28037-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1392053569-28037-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the binding information for the gating clocks of the Armada 375 SoCs
+Add the clock support for the new SoCs Armada 380 and Armada 385:
+core clocks and gating clocks.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../bindings/clock/mvebu-gated-clock.txt           | 31 +++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
+ drivers/clk/mvebu/Kconfig      |   4 +
+ drivers/clk/mvebu/Makefile     |   1 +
+ drivers/clk/mvebu/armada-38x.c | 167 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 172 insertions(+)
+ create mode 100644 drivers/clk/mvebu/armada-38x.c
 
-diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-index fc2910fa7e45..cbecec1f64fa 100644
---- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-@@ -1,6 +1,6 @@
- * Gated Clock bindings for Marvell EBU SoCs
+diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
+index a54ba170634b..693f7be129f1 100644
+--- a/drivers/clk/mvebu/Kconfig
++++ b/drivers/clk/mvebu/Kconfig
+@@ -17,6 +17,10 @@ config ARMADA_375_CLK
+ 	bool
+ 	select MVEBU_CLK_COMMON
  
--Marvell Armada 370/XP, Dove and Kirkwood allow some peripheral clocks to be
-+Marvell Armada 370/375/XP, Dove and Kirkwood allow some peripheral clocks to be
- gated to save some power. The clock consumer should specify the desired clock
- by having the clock ID in its "clocks" phandle cell. The clock ID is directly
- mapped to the corresponding clock gating control bit in HW to ease manual clock
-@@ -22,6 +22,34 @@ ID	Clock	Peripheral
- 28	ddr	DDR Cntrl
- 30	sata1	SATA Host 0
++config ARMADA_38X_CLK
++	bool
++	select MVEBU_CLK_COMMON
++
+ config ARMADA_XP_CLK
+ 	bool
+ 	select MVEBU_CLK_COMMON
+diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
+index 0b13811b9f62..4c66162fb0b4 100644
+--- a/drivers/clk/mvebu/Makefile
++++ b/drivers/clk/mvebu/Makefile
+@@ -4,6 +4,7 @@ obj-$(CONFIG_MVEBU_CLK_COREDIV)	+= clk-corediv.o
  
-+The following is a list of provided IDs for Armada 375:
-+ID	Clock		Peripheral
-+-----------------------------------
-+2	mu		Management Unit
-+3	pp		Packet Processor
-+4	ptp		PTP
-+5	pex0		PCIe 0 Clock out
-+6	pex1		PCIe 1 Clock out
-+8	audio		Audio Cntrl
-+11	nd_clk		Nand Flash Cntrl
-+14	sata0_link	SATA 0 Link
-+15	sata0_core	SATA 0 Core
-+16	usb3		USB3 Host
-+17	sdio		SDHCI Host
-+18	usb		USB Host
-+19	gop		Gigabit Ethernet MAC
-+20	sata1_link	SATA 1 Link
-+21	sata1_core	SATA 1 Core
-+22	xor0		XOR DMA 0
-+23	xor1		XOR DMA 0
-+24	copro		Coprocessor
-+25	tdm		Time Division Mplx
-+28	crypto0_enc	Cryptographic Unit Port 0 Encryption
-+29	crypto0_core	Cryptographic Unit Port 0 Core
-+30	crypto1_enc	Cryptographic Unit Port 1 Encryption
-+31	crypto1_core	Cryptographic Unit Port 1 Core
+ obj-$(CONFIG_ARMADA_370_CLK)	+= armada-370.o
+ obj-$(CONFIG_ARMADA_375_CLK)	+= armada-375.o
++obj-$(CONFIG_ARMADA_38X_CLK)	+= armada-38x.o
+ obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
+ obj-$(CONFIG_DOVE_CLK)		+= dove.o
+ obj-$(CONFIG_KIRKWOOD_CLK)	+= kirkwood.o
+diff --git a/drivers/clk/mvebu/armada-38x.c b/drivers/clk/mvebu/armada-38x.c
+new file mode 100644
+index 000000000000..8bccf4ecdab6
+--- /dev/null
++++ b/drivers/clk/mvebu/armada-38x.c
+@@ -0,0 +1,167 @@
++/*
++ * Marvell Armada 380/385 SoC clocks
++ *
++ * Copyright (C) 2014 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
++ * Andrew Lunn <andrew@lunn.ch>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
++#include <linux/kernel.h>
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include "common.h"
 +
- The following is a list of provided IDs for Armada XP:
- ID	Clock	Peripheral
- -----------------------------------
-@@ -95,6 +123,7 @@ ID	Clock	Peripheral
- Required properties:
- - compatible : shall be one of the following:
- 	"marvell,armada-370-gating-clock" - for Armada 370 SoC clock gating
-+	"marvell,armada-375-gating-clock" - for Armada 375 SoC clock gating
- 	"marvell,armada-xp-gating-clock" - for Armada XP SoC clock gating
- 	"marvell,dove-gating-clock" - for Dove SoC clock gating
- 	"marvell,kirkwood-gating-clock" - for Kirkwood SoC clock gating
++/*
++ * SAR[14:10] : Ratios between PCLK0, NBCLK, HCLK and DRAM clocks
++ *
++ * SAR[15]    : TCLK frequency
++ *		 0 = 250 MHz
++ *		 1 = 200 MHz
++ */
++
++#define SAR_A380_TCLK_FREQ_OPT		  15
++#define SAR_A380_TCLK_FREQ_OPT_MASK	  0x1
++#define SAR_A380_CPU_DDR_L2_FREQ_OPT	  10
++#define SAR_A380_CPU_DDR_L2_FREQ_OPT_MASK 0x1F
++
++static const u32 armada_38x_tclk_frequencies[] __initconst = {
++	250000000,
++	200000000,
++};
++
++static u32 __init armada_38x_get_tclk_freq(void __iomem *sar)
++{
++	u8 tclk_freq_select;
++
++	tclk_freq_select = ((readl(sar) >> SAR_A380_TCLK_FREQ_OPT) &
++			    SAR_A380_TCLK_FREQ_OPT_MASK);
++	return armada_38x_tclk_frequencies[tclk_freq_select];
++}
++
++static const u32 armada_38x_cpu_frequencies[] __initconst = {
++	0, 0, 0, 0,
++	1066 * 1000 * 1000, 0, 0, 0,
++	1332 * 1000 * 1000, 0, 0, 0,
++	1600 * 1000 * 1000,
++};
++
++static u32 __init armada_38x_get_cpu_freq(void __iomem *sar)
++{
++	u8 cpu_freq_select;
++
++	cpu_freq_select = ((readl(sar) >> SAR_A380_CPU_DDR_L2_FREQ_OPT) &
++			   SAR_A380_CPU_DDR_L2_FREQ_OPT_MASK);
++	if (cpu_freq_select >= ARRAY_SIZE(armada_38x_cpu_frequencies)) {
++		pr_err("Selected CPU frequency (%d) unsupported\n",
++			cpu_freq_select);
++		return 0;
++	}
++
++	return armada_38x_cpu_frequencies[cpu_freq_select];
++}
++
++enum { A380_CPU_TO_DDR, A380_CPU_TO_L2 };
++
++static const struct coreclk_ratio armada_38x_coreclk_ratios[] __initconst = {
++	{ .id = A380_CPU_TO_L2,	 .name = "l2clk" },
++	{ .id = A380_CPU_TO_DDR, .name = "ddrclk" },
++};
++
++static const int armada_38x_cpu_l2_ratios[32][2] __initconst = {
++	{0, 1}, {0, 1}, {0, 1}, {0, 1},
++	{1, 2}, {0, 1}, {0, 1}, {0, 1},
++	{1, 2}, {0, 1}, {0, 1}, {0, 1},
++	{1, 2}, {0, 1}, {0, 1}, {0, 1},
++	{0, 1}, {0, 1}, {0, 1}, {0, 1},
++	{0, 1}, {0, 1}, {0, 1}, {0, 1},
++	{0, 1}, {0, 1}, {0, 1}, {0, 1},
++	{0, 1}, {0, 1}, {0, 1}, {0, 1},
++};
++
++static const int armada_38x_cpu_ddr_ratios[32][2] __initconst = {
++	{0, 1}, {0, 1}, {0, 1}, {0, 1},
++	{1, 2}, {0, 1}, {0, 1}, {0, 1},
++	{1, 2}, {0, 1}, {0, 1}, {0, 1},
++	{1, 2}, {0, 1}, {0, 1}, {0, 1},
++	{0, 1}, {0, 1}, {0, 1}, {0, 1},
++	{0, 1}, {0, 1}, {0, 1}, {0, 1},
++	{0, 1}, {0, 1}, {0, 1}, {0, 1},
++	{0, 1}, {0, 1}, {0, 1}, {0, 1},
++};
++
++static void __init armada_38x_get_clk_ratio(
++	void __iomem *sar, int id, int *mult, int *div)
++{
++	u32 opt = ((readl(sar) >> SAR_A380_CPU_DDR_L2_FREQ_OPT) &
++		SAR_A380_CPU_DDR_L2_FREQ_OPT_MASK);
++
++	switch (id) {
++	case A380_CPU_TO_L2:
++		*mult = armada_38x_cpu_l2_ratios[opt][0];
++		*div = armada_38x_cpu_l2_ratios[opt][1];
++		break;
++	case A380_CPU_TO_DDR:
++		*mult = armada_38x_cpu_ddr_ratios[opt][0];
++		*div = armada_38x_cpu_ddr_ratios[opt][1];
++		break;
++	}
++}
++
++static const struct coreclk_soc_desc armada_38x_coreclks = {
++	.get_tclk_freq = armada_38x_get_tclk_freq,
++	.get_cpu_freq = armada_38x_get_cpu_freq,
++	.get_clk_ratio = armada_38x_get_clk_ratio,
++	.ratios = armada_38x_coreclk_ratios,
++	.num_ratios = ARRAY_SIZE(armada_38x_coreclk_ratios),
++};
++
++static void __init armada_38x_coreclk_init(struct device_node *np)
++{
++	mvebu_coreclk_setup(np, &armada_38x_coreclks);
++}
++CLK_OF_DECLARE(armada_38x_core_clk, "marvell,armada-380-core-clock",
++	       armada_38x_coreclk_init);
++
++/*
++ * Clock Gating Control
++ */
++static const struct clk_gating_soc_desc armada_38x_gating_desc[] __initconst = {
++	{ "audio", NULL, 0 },
++	{ "ge2", NULL, 2 },
++	{ "ge1", NULL, 3 },
++	{ "ge0", NULL, 4 },
++	{ "pex1", NULL, 5 },
++	{ "pex2", NULL, 6 },
++	{ "pex3", NULL, 7 },
++	{ "pex0", NULL, 8 },
++	{ "usb3h0", NULL, 9 },
++	{ "usb3h1", NULL, 10 },
++	{ "usb3d", NULL, 11 },
++	{ "bm", NULL, 13 },
++	{ "crypto0z", NULL, 14 },
++	{ "sata0", NULL, 15 },
++	{ "crypto1z", NULL, 16 },
++	{ "sdio", NULL, 17 },
++	{ "usb2", NULL, 18 },
++	{ "crypto1", NULL, 21 },
++	{ "xor0", NULL, 22 },
++	{ "crypto0", NULL, 23 },
++	{ "tdm", NULL, 25 },
++	{ "xor1", NULL, 28 },
++	{ "sata1", NULL, 30 },
++	{ }
++};
++
++static void __init armada_38x_clk_gating_init(struct device_node *np)
++{
++	mvebu_clk_gating_setup(np, armada_38x_gating_desc);
++}
++CLK_OF_DECLARE(armada_38x_clk_gating, "marvell,armada-380-gating-clock",
++	       armada_38x_clk_gating_init);
 -- 
 1.8.1.2
