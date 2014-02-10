@@ -1,80 +1,102 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 10 Feb 2014 10:03:57 -0800
-Subject: [PATCH 05/17] mmc: mmci: Put the device into low power state at
- system suspend
-In-Reply-To: <CAPDyKFo4QG+D0wKnSEXR=2TW93HKUAbb1EUqGk_U56rS339B3Q@mail.gmail.com>
- (Ulf Hansson's message of "Mon, 10 Feb 2014 12:11:24 +0100")
-References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
- <1391529538-21685-6-git-send-email-ulf.hansson@linaro.org>
- <8738jyu1h9.fsf@paris.lan>
- <CAPDyKFo4QG+D0wKnSEXR=2TW93HKUAbb1EUqGk_U56rS339B3Q@mail.gmail.com>
-Message-ID: <7hmwhyalpu.fsf@paris.lan>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 10 Feb 2014 18:14:50 +0000 (UTC)
+Subject: OMAP baseline test results for v3.14-rc2
+Message-ID: <alpine.DEB.2.02.1402101812190.30435@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-> On 4 February 2014 20:22, Kevin Hilman <khilman@linaro.org> wrote:
->> Ulf Hansson <ulf.hansson@linaro.org> writes:
->>
->>> Due to the available runtime PM callbacks, we are now able to put our
->>> device into low power state at system suspend.
->>>
->>> Earlier we could not accomplish this without trusting a power domain
->>> for the device to take care of it. Now we are able to cope with
->>> scenarios both with and without a power domain.
->>>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>> ---
->>>  drivers/mmc/host/mmci.c |   45 +++++++++++++++++++++++++--------------------
->>>  1 file changed, 25 insertions(+), 20 deletions(-)
->>>
->>> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->>> index c88da1c..074e0cb 100644
->>> --- a/drivers/mmc/host/mmci.c
->>> +++ b/drivers/mmc/host/mmci.c
->>> @@ -1723,33 +1723,38 @@ static int mmci_remove(struct amba_device *dev)
->>>       return 0;
->>>  }
->>>
->>> -#ifdef CONFIG_SUSPEND
->>> -static int mmci_suspend(struct device *dev)
->>> +#ifdef CONFIG_PM_SLEEP
->>> +static int mmci_suspend_late(struct device *dev)
->>>  {
->>> -     struct amba_device *adev = to_amba_device(dev);
->>> -     struct mmc_host *mmc = amba_get_drvdata(adev);
->>> +     int ret = 0;
->>>
->>> -     if (mmc) {
->>> -             struct mmci_host *host = mmc_priv(mmc);
->>> -             pm_runtime_get_sync(dev);
->>> -             writel(0, host->base + MMCIMASK0);
->>> -     }
->>> +     if (pm_runtime_status_suspended(dev))
->>> +             return 0;
->>>
->>> -     return 0;
->>> +     if (dev->pm_domain && dev->pm_domain->ops.runtime_suspend)
->>> +             ret = dev->pm_domain->ops.runtime_suspend(dev);
->>> +     else
->>> +             ret = dev->bus->pm->runtime_suspend(dev);
->>> +
->>> +     if (!ret)
->>> +             pm_runtime_set_suspended(dev);
->>
->> Isn't this basically open-coding pm_runtime_suspend()...
->
-> It is similar, but with once big difference.
->
-> Since the PM core prevents pm_runtime_suspend() from invoking our
-> ->runtime_suspend callback during system suspend (it does so by
-> invoking pm_runtime_get_sync() before starting the suspend sequence),
-> we then need to make the driver handle that by itself.
+Here are some basic OMAP test results for Linux v3.14-rc2.
+Logs and other details at:
 
-Yeah, I still think we need to allow a bus/pm_domain to override that
-behavior.
+    http://www.pwsan.com/omap/testlogs/test_v3.14-rc2/20140210103104/
 
 
-Kevin
+Test summary
+------------
+
+Build: uImage+dtb:
+    Pass ( 9/ 9): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig/omap4-var-som
+
+Build: zImage:
+    Pass (13/13): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Boot to userspace:
+    FAIL ( 1/10): 2430sdp
+    skip ( 2/ 2): 5912osk, cmt3517
+    Pass ( 9/10): 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes, am335xbone, am335xbonelt,
+		  4460varsomom
+
+PM: chip retention via suspend:
+    FAIL ( 4/ 7): 2430sdp, 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 3/ 7): 3530es3beagle, 3730beaglexm, 37xxevm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 7/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes, 4460varsomom
+
+PM: chip off except CORE via suspend:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+
+PM: chip off via dynamic idle:
+    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+
+
+vmlinux object size
+(delta in bytes from test_v3.14-rc1 (38dbfb59d1175ef458d006556061adeaa8751b72)):
+   text     data      bss    total  kernel
+   +393        0        0     +393  omap1_defconfig
+   +393        0        0     +393  omap1_defconfig_1510innovator_only
+   +361        0        0     +361  omap1_defconfig_5912osk_only
+   +705      +64        0     +769  omap2plus_defconfig
+  -3467        0        0    -3467  omap2plus_defconfig_2430sdp_only
+   +649        0        0     +649  omap2plus_defconfig_am33xx_only
+   +705        0        0     +705  omap2plus_defconfig_am43xx_only
+   +701      +64        0     +765  omap2plus_defconfig_cpupm
+   +769      +64        0     +833  omap2plus_defconfig_dra7xx_only
+   +805        0        0     +805  omap2plus_defconfig_n800_multi_omap2xxx
+   +805        0        0     +805  omap2plus_defconfig_n800_only_a
+   +705      +64        0     +769  omap2plus_defconfig_no_pm
+   +705      +64        0     +769  omap2plus_defconfig_omap2_4_only
+   +705      +64        0     +769  omap2plus_defconfig_omap3_4_only
+   +705      +64        0     +769  omap2plus_defconfig_omap5_only
+   +652        0      +64     +716  rmk_omap3430_ldp_allnoconfig
+   +769        0        0     +769  rmk_omap3430_ldp_oldconfig
+   +620        0      +96     +716  rmk_omap4430_sdp_allnoconfig
+   +777      -40        0     +737  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.14-rc1 (38dbfb59d1175ef458d006556061adeaa8751b72))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
