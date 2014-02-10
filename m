@@ -1,118 +1,76 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 10 Feb 2014 14:16:40 +0000
-Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
-In-Reply-To: <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
-References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
- <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20140210141634.GA2794@e103592.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 10 Feb 2014 15:21:41 +0100
+Subject: [alsa-devel] [PATCH 0/7] Audio support for Armada 370 DB
+In-Reply-To: <1391102051-5319-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1391102051-5319-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140210152141.1391fb67@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 05:19:15PM +0100, Fabrice GASNIER wrote:
-> This patch adds imprecise abort enable/disable macros.
-> It also enables imprecise aborts when starting kernel.
+Hello,
 
-Relying on imprecise aborts for hardware probing would be considered bad
-hardware and/or software design for ARM-specific stuff.
+Any comments on the patch series? I'd like these to be included in
+3.15, and so far I've only received one simple comment from Jason
+Cooper regarding the defconfig changes, but no other comments.
 
-PCI is more generic though, so we may have to put up with this to some
-extent.  Can you point me to the affected probing code?  I'm not very
-familiar with that stuff...
+Thanks a lot!
 
+Thomas
+
+On Thu, 30 Jan 2014 18:14:04 +0100, Thomas Petazzoni wrote:
+> Hello,
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->  arch/arm/include/asm/irqflags.h |   33 +++++++++++++++++++++++++++++++++
->  arch/arm/kernel/smp.c           |    1 +
->  arch/arm/kernel/traps.c         |    4 ++++
->  3 files changed, 38 insertions(+)
+> This series of patches enable audio support on the Marvell Armada 370
+> Development Board. Since both the I2S controller on the SoC side and
+> the I2C audio codec are already supported by the kernel, the amount of
+> work is fairly limited.
 > 
-> diff --git a/arch/arm/include/asm/irqflags.h b/arch/arm/include/asm/irqflags.h
-> index 3b763d6..82e3834 100644
-> --- a/arch/arm/include/asm/irqflags.h
-> +++ b/arch/arm/include/asm/irqflags.h
-> @@ -51,6 +51,9 @@ static inline void arch_local_irq_disable(void)
->  
->  #define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
->  #define local_fiq_disable() __asm__("cpsid f	@ __clf" : : : "memory", "cc")
-> +
-> +#define local_abt_enable()  __asm__("cpsie a	@ __sta" : : : "memory", "cc")
-> +#define local_abt_disable() __asm__("cpsid a	@ __cla" : : : "memory", "cc")
->  #else
->  
->  /*
-> @@ -130,6 +133,36 @@ static inline void arch_local_irq_disable(void)
->  	: "memory", "cc");					\
->  	})
->  
-> +/*
-> + * Enable Aborts
-> + */
-> +#define local_abt_enable()					\
-> +	({							\
-> +		unsigned long temp;				\
-> +	__asm__ __volatile__(					\
-> +	"mrs	%0, cpsr		@ sta\n"		\
-> +"	bic	%0, %0, %1\n"					\
-> +"	msr	cpsr_c, %0"					\
+> Also, since the DT bindings that allows to replace the ASoC board
+> driver are still being ironed out, I'm proposing to add an old-style
+> ASoC board driver for now.
+> 
+> This set of patches only provide support for the analog output and
+> input, I am waiting for the optical cable to arrive to get the digital
+> input and output to work.
+> 
+> Patches 1 to 3 are to be taken by the ASoC maintainer, while patches 4
+> to 7 are to be taken by the mvebu maintainers.
+> 
+> Note that the audio support for Armada 370 also needs a fix to the
+> CS42L51, which is being discussed with the author of the change that
+> apparently introduced the problem (see discussion at
+> http://mailman.alsa-project.org/pipermail/alsa-devel/2014-January/071916.html).
+> 
+> Thanks,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (7):
+>   sound: codec: add Device Tree binding to cs42l51
+>   sound: soc: enable Kirkwood driver for mvebu platforms
+>   sound: soc: add ASoC board driver for Armada 370 DB
+>   ARM: mvebu: add audio I2S controller to Armada 370 Device Tree
+>   ARM: mvebu: add I2C0 muxing option for Armada 370 SoC
+>   ARM: mvebu: add audio support to Armada 370 DB
+>   ARM: mvebu: enable audio options in mvebu_defconfig
+> 
+>  .../devicetree/bindings/i2c/trivial-devices.txt    |   1 +
+>  .../devicetree/bindings/sound/mvebu-audio.txt      |   1 +
+>  arch/arm/boot/dts/armada-370-db.dts                |  46 +++++++
+>  arch/arm/boot/dts/armada-370.dtsi                  |  29 +++++
+>  arch/arm/configs/mvebu_defconfig                   |   5 +
+>  sound/soc/codecs/cs42l51.c                         |   7 +
+>  sound/soc/kirkwood/Kconfig                         |  10 +-
+>  sound/soc/kirkwood/Makefile                        |   2 +
+>  sound/soc/kirkwood/armada-370-db.c                 | 144 +++++++++++++++++++++
+>  sound/soc/kirkwood/kirkwood-i2s.c                  |   1 +
+>  10 files changed, 245 insertions(+), 1 deletion(-)
+>  create mode 100644 sound/soc/kirkwood/armada-370-db.c
+> 
 
-I suggest you use "cpsie/cpsid a" instead.  This requires ARMv6, but the
-CPSR.A bit only exists on ARMv6 and later anyway.  Poking that bit
-on earlier CPUs may cause unpredictable behaviour, so these macros
-should be no-ops for v5 and earlier.
 
-> +	: "=r" (temp)						\
-> +	: "r" (PSR_A_BIT)					\
-> +	: "memory", "cc");					\
-> +	})
-> +
-> +/*
-> + * Disable Aborts
-> + */
-> +#define local_abt_disable()					\
-> +	({							\
-> +		unsigned long temp;				\
-> +	__asm__ __volatile__(					\
-> +	"mrs	%0, cpsr		@ cla\n"		\
-> +"	orr	%0, %0, %1\n"					\
-> +"	msr	cpsr_c, %0"					\
-> +	: "=r" (temp)						\
-> +	: "r" (PSR_A_BIT)					\
-> +	: "memory", "cc");					\
-> +	})
-> +
->  #endif
->  
->  /*
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index dc894ab..c2093cb 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -377,6 +377,7 @@ asmlinkage void secondary_start_kernel(void)
->  
->  	local_irq_enable();
->  	local_fiq_enable();
-> +	local_abt_enable();
->  
->  	/*
->  	 * OK, it's off to the idle thread for us
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index 4636d56..ef15709 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
->  
->  	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
->  	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
-> +
-> +	/* Enable imprecise aborts */
-> +	local_abt_enable();
 
-It would be good to clean up why aborts are not being consistently
-enabled on boot.
-
-Really, they should be enabled, except for a brief window during
-boot when the vectors are not mapped and the abort can't be dispatched.
-
-Cheers
----Dave
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
