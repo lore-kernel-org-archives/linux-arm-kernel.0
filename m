@@ -1,54 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 10 Feb 2014 20:59:42 +0100
-Subject: [PATCH 2/3] mfd: axp20x: Add dtsi for axp20x
-In-Reply-To: <1391875428-6281-3-git-send-email-carlo@caione.org>
-References: <1391875428-6281-1-git-send-email-carlo@caione.org>
- <1391875428-6281-3-git-send-email-carlo@caione.org>
-Message-ID: <20140210195942.GA3192@lukather>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 10 Feb 2014 17:00:00 -0300
+Subject: [PATCH 0/2] irqchip: Armada 370/XP MPIC as a slave controller
+Message-ID: <1392062402-27357-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Carlo,
+The newly introduced Armada 375 and Armada 38x Marvell SoCs are based on
+Cortex-A9 CPU cores and use the ARM GIC as their main interrupt controller.
 
-On Sat, Feb 08, 2014 at 05:03:47PM +0100, Carlo Caione wrote:
-> This patch adds a new dtsi for supporting axp20x.
-> 
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> ---
->  arch/arm/boot/dts/axp20x.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
->  create mode 100644 arch/arm/boot/dts/axp20x.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/axp20x.dtsi b/arch/arm/boot/dts/axp20x.dtsi
-> new file mode 100644
-> index 0000000..98d4c7c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/axp20x.dtsi
-> @@ -0,0 +1,9 @@
-> +/*
-> +* Integrated Power Management Chip AXP209
-> +*/
-> +
-> +&axp {
-> +	compatible = "x-powers,axp20x";
-> +	interrupt-controller;
-> +	#interrupt-cells = <1>;
-> +};
+However, for various purposes (wake-up from suspend, MSI interrupts),
+the SoCs have a separate MPIC interrupt controller, acting as a slave
+to the GIC. This MPIC was already used as the primary controller on
+previous Marvell SoCs, so this commit extends the existing driver to
+allow the MPIC to be used as a GIC slave.
 
-Hmmm, this refers to an undefined node, I can't see this DTSI used
-anywhere, and why do you need a DTSI of its own in the first place?
+This series consists in two patches: the first one adds a helper function
+to handle MSI interrupts. The second patch implements a chained handler, which
+uses the previously introduced helper.
 
-Thanks,
-Maxime
+These patches apply cleanly on v3.14-rc1 plus:
+
+  36802fd irqchip: armada-370-xp: fix MSI race condition
+  e1603bb irqchip: armada-370-xp: fix IPI race condition
+
+Or simply on v3.14-rc2.
+
+Ezequiel Garcia (2):
+  irqchip: armada-370-xp: Add helper for the MSI IRQ handling
+  irqchip: armada-370-xp: Setup a chained handler for the MPIC
+
+ .../devicetree/bindings/arm/armada-370-xp-mpic.txt |  8 +-
+ drivers/irqchip/irq-armada-370-xp.c                | 96 ++++++++++++++++------
+ 2 files changed, 76 insertions(+), 28 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/b62a7ee4/attachment.sig>
+1.8.1.5
