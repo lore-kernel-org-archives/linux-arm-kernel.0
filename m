@@ -1,95 +1,64 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 10 Feb 2014 08:38:36 +0100
-Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
- binding to list boost mode frequency
-In-Reply-To: <CAJuA9agcpbKYocaQUBr2-VCXcXAo3r3urFF=+G_+ib2jCZqvwg@mail.gmail.com>
-References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
- <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
- <52F50698.4060305@arm.com> <52F509BD.70903@arm.com>
- <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
- <52F51888.5010608@arm.com>
- <CAGo_u6ofC4NNPiTNcSnXUvT3RZJo54=XyjetR-ok5hCBrVZkKg@mail.gmail.com>
- <52F51FCD.5000009@arm.com>
- <CAJuA9agcpbKYocaQUBr2-VCXcXAo3r3urFF=+G_+ib2jCZqvwg@mail.gmail.com>
-Message-ID: <20140210083836.44b519bf@amdc2363>
+From: dave.long@linaro.org (David Long)
+Date: Mon, 10 Feb 2014 02:38:52 -0500
+Subject: [PATCH v6 01/14] uprobes: allow ignoring of probe hits
+In-Reply-To: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
+References: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
+Message-ID: <1392017945-4507-2-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Sudeep,
+From: "David A. Long" <dave.long@linaro.org>
 
-> On Fri, Feb 7, 2014 at 11:32 PM, Sudeep Holla <Sudeep.Holla@arm.com>
-> wrote:
-> > On 07/02/14 17:37, Nishanth Menon wrote:
-> >> On Fri, Feb 7, 2014 at 11:31 AM, Sudeep Holla
-> >> <Sudeep.Holla@arm.com> wrote:
-> >
-> > [...]
-> >
-> >>> Yes I think its counter-intuitive as it's visible to the
-> >>> userspace(list of frequencies and the boost parameters are
-> >>> exposed through sysfs)
-> >>
-> >> That will be a different problem -> as currently every single
-> >> frequency in the cpufreq list has ability to be marked as boost
-> >> frequency - if userspace does not maintain that, then, IMHO, fix
-> >> the userspace :D
-> >>
-> >
-> > /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
-> > gives the list of frequencies based on the state of the boost
-> > feature at anytime.
-> 
-> The list of frequencies in
-> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
-> does not change based in the state of the boost feature (enabled or
-> disabled). But the scaling_max_frequency and scaling_min_frequency are
-> updated based on the set of available + boost frequencies available.
+Allow arches to decided to ignore a probe hit.  ARM will use this to
+only call handlers if the conditions to execute a conditionally executed
+instruction are satisfied.
 
-With boost intended behavior is as follow:
+Signed-off-by: David A. Long <dave.long@linaro.org>
+Acked-by: Oleg Nesterov <oleg@redhat.com>
+---
+ include/linux/uprobes.h | 1 +
+ kernel/events/uprobes.c | 9 +++++++++
+ 2 files changed, 10 insertions(+)
 
-/sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies [1]
-
-shows the non boost frequencies no matter if boost is enabled or not.
-Those are the "normal" frequencies.
-
-When boost is supported (by enabling the CONFIG_CPU_FREQ_BOOST_SW)
-extra sysfs attribute shows up:
-
-/sys/devices/system/cpu/cpu0/cpufreq/scaling_boost_frequencies [2]
-in which are listed only the boost frequencies.
-
-If the dts doesn't provide any values or as it is now no
-CPUFREQ_BOOST_FREQ flag is specified (at exynos4x12-cpufreq.c), then
-this list is empty.
-
-
-When boost is disabled the max freq (cpuinfo_max_freq) is in the range
-listed at [1].
-
-When boost is enabled this value is the sum of freqs represented at [1]
-and [2].
-
-By adding an extra attribute [2] we:
-1. Indicate that boost is supported
-2. List provided BOOST frequencies
-3. Separate boost and non boost freqs
-
-
-> 
-> >
-> > Intuitively the list without boost shouldn't have any frequency
-> > above the range when it's enabled :), that's what I was referring
-> > to. So I am not talking about any issue with user-space maintenance.
-> >
-> > Regards,
-> > Sudeep
-> >
-
-
-
+diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
+index e32251e..edff2b9 100644
+--- a/include/linux/uprobes.h
++++ b/include/linux/uprobes.h
+@@ -126,6 +126,7 @@ extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
+ extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
+ extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+ extern unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr, struct pt_regs *regs);
++extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
+ #else /* !CONFIG_UPROBES */
+ struct uprobes_state {
+ };
+diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
+index 307d87c..04709b6 100644
+--- a/kernel/events/uprobes.c
++++ b/kernel/events/uprobes.c
+@@ -1804,6 +1804,11 @@ static bool handle_trampoline(struct pt_regs *regs)
+ 	return true;
+ }
+ 
++bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs)
++{
++	return false;
++}
++
+ /*
+  * Run handler and ask thread to singlestep.
+  * Ensure all non-fatal signals cannot interrupt thread while it singlesteps.
+@@ -1858,7 +1863,11 @@ static void handle_swbp(struct pt_regs *regs)
+ 	if (!get_utask())
+ 		goto out;
+ 
++	if (arch_uprobe_ignore(&uprobe->arch, regs))
++		goto out;
++
+ 	handler_chain(uprobe, regs);
++
+ 	if (can_skip_sstep(uprobe, regs))
+ 		goto out;
+ 
 -- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+1.8.1.2
