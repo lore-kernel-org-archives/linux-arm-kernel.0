@@ -1,49 +1,44 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 10 Feb 2014 14:22:36 +0000
-Subject: [PATCH v2 2/5] irqchip: gic: use writel instead of dsb +
- writel_relaxed
+Date: Mon, 10 Feb 2014 14:22:39 +0000
+Subject: [PATCH v2 5/5] arm64: barriers: use barrier() instead of smp_mb()
+ when !SMP
 In-Reply-To: <1392042159-11603-1-git-send-email-will.deacon@arm.com>
 References: <1392042159-11603-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1392042159-11603-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1392042159-11603-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When sending an SGI to another CPU, we require a DSB to ensure that
-any pending stores to normal memory are made visible to the recipient
-before the interrupt arrives.
+The recently introduced acquire/release accessors refer to smp_mb()
+in the !CONFIG_SMP case. This is confusing when reading the code, so use
+barrier() directly when we know we're UP.
 
-Rather than use a vanilla dsb() (which will soon cause an assembly error
-on arm64) before the writel_relaxed, we can instead use dsb(ishst),
-since we just need to ensure that any pending normal writes are visible
-within the inner-shareable domain before we poke the GIC.
-
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
+ arch/arm64/include/asm/barrier.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-v1 => v2: Use dsb ishst instead of writel (which requires an L2 sync)
-          since the sync should already have been executed by the caller
-	  if required. We *might* be able to relax this further to a dmb
-	  but Catalin and I haven't got to the bottom of that yet.
-
-Marc: I dropped your Ack, so could you take another look please?
-
- drivers/irqchip/irq-gic.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 341c6016812d..26ff83c455f3 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -663,7 +663,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 	 * Ensure that stores to Normal memory are visible to the
- 	 * other CPUs before issuing the IPI.
- 	 */
--	dsb();
-+	dsb(ishst);
+diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+index 71a42d6599fb..709f1f6d6bbd 100644
+--- a/arch/arm64/include/asm/barrier.h
++++ b/arch/arm64/include/asm/barrier.h
+@@ -40,7 +40,7 @@
+ #define smp_store_release(p, v)						\
+ do {									\
+ 	compiletime_assert_atomic_type(*p);				\
+-	smp_mb();							\
++	barrier();							\
+ 	ACCESS_ONCE(*p) = (v);						\
+ } while (0)
  
- 	/* this always happens on GIC0 */
- 	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
+@@ -48,7 +48,7 @@ do {									\
+ ({									\
+ 	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
+ 	compiletime_assert_atomic_type(*p);				\
+-	smp_mb();							\
++	barrier();							\
+ 	___p1;								\
+ })
+ 
 -- 
 1.8.2.2
