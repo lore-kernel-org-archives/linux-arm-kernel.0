@@ -1,139 +1,294 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 10 Feb 2014 15:57:45 +0000
-Subject: [PATCH 22/26] ARM: omap: move dma channel allocation into plat-omap
- code
+Date: Mon, 10 Feb 2014 15:57:56 +0000
+Subject: [PATCH 24/26] dmaengine: omap-dma: move register read/writes into
+ omap-dma.c
 In-Reply-To: <20140210155531.GB26684@n2100.arm.linux.org.uk>
 References: <20140210155531.GB26684@n2100.arm.linux.org.uk>
-Message-ID: <E1WCtEv-0006XW-QU@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WCtF6-0006Xe-1x@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This really needs to be there, because otherwise the plat-omap code can
-kfree() this data structure, and then re-use the pointer later.
+Export the DMA register information from the SoC specific data, such
+that we can access the registers directly in omap-dma.c, mapping the
+register region ourselves as well.
+
+Rather than calculating the DMA channel register in its entirety for
+each access, we pre-calculate an offset base address for the allocated
+DMA channel and then just use the appropriate register offset.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-omap1/dma.c | 17 ++---------------
- arch/arm/mach-omap2/dma.c |  7 -------
- arch/arm/plat-omap/dma.c  | 11 ++++++++---
- include/linux/omap-dma.h  |  1 -
- 4 files changed, 10 insertions(+), 26 deletions(-)
+ arch/arm/mach-omap1/dma.c |  4 ++
+ arch/arm/mach-omap2/dma.c | 18 ++++++---
+ drivers/dma/omap-dma.c    | 96 ++++++++++++++++++++++++++++++++++++++++++-----
+ include/linux/omap-dma.h  |  2 +
+ 4 files changed, 105 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
-index c979e3f88bbb..d170f7d0a6ac 100644
+index a8c83ccc36fb..4be601b638d7 100644
 --- a/arch/arm/mach-omap1/dma.c
 +++ b/arch/arm/mach-omap1/dma.c
-@@ -325,17 +325,6 @@ static int __init omap1_system_dma_init(void)
- 	d->dev_caps		|= CLEAR_CSR_ON_READ;
- 	d->dev_caps		|= IS_WORD_16;
+@@ -261,9 +261,13 @@ static const struct platform_device_info omap_dma_dev_info = {
+ 	.name = "omap-dma-engine",
+ 	.id = -1,
+ 	.dma_mask = DMA_BIT_MASK(32),
++	.res = res,
++	.num_res = 1,
+ };
  
--
--	d->chan = kzalloc(sizeof(struct omap_dma_lch) *
--					(d->lch_count), GFP_KERNEL);
--	if (!d->chan) {
--		dev_err(&pdev->dev,
--			"%s: Memory allocation failed for d->chan!\n",
--			__func__);
--		ret = -ENOMEM;
--		goto exit_release_d;
--	}
--
- 	if (cpu_is_omap15xx())
- 		d->chan_count = 9;
- 	else if (cpu_is_omap16xx() || cpu_is_omap7xx()) {
-@@ -359,14 +348,14 @@ static int __init omap1_system_dma_init(void)
- 	if (ret) {
- 		dev_err(&pdev->dev, "%s: Unable to add resources for %s%d\n",
- 			__func__, pdev->name, pdev->id);
--		goto exit_release_chan;
-+		goto exit_release_d;
- 	}
- 
- 	ret = platform_device_add(pdev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "%s: Unable to add resources for %s%d\n",
- 			__func__, pdev->name, pdev->id);
--		goto exit_release_chan;
-+		goto exit_release_d;
- 	}
- 
- 	dma_pdev = platform_device_register_full(&omap_dma_dev_info);
-@@ -379,8 +368,6 @@ static int __init omap1_system_dma_init(void)
- 
- exit_release_pdev:
- 	platform_device_del(pdev);
--exit_release_chan:
--	kfree(d->chan);
- exit_release_d:
- 	kfree(d);
- exit_release_p:
+ static struct omap_system_dma_plat_info dma_plat_info __initdata = {
++	.reg_map	= reg_map,
++	.channel_stride	= 0x40,
+ 	.show_dma_caps	= omap1_show_dma_caps,
+ 	.clear_lch_regs	= omap1_clear_lch_regs,
+ 	.clear_dma	= omap1_clear_dma,
 diff --git a/arch/arm/mach-omap2/dma.c b/arch/arm/mach-omap2/dma.c
-index 244ff5012aed..9f210d637354 100644
+index 6331fc4b4054..5689c88d986d 100644
 --- a/arch/arm/mach-omap2/dma.c
 +++ b/arch/arm/mach-omap2/dma.c
-@@ -251,13 +251,6 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
- 	}
- 
- 	d = oh->dev_attr;
--	d->chan = kzalloc(sizeof(struct omap_dma_lch) *
--					(d->lch_count), GFP_KERNEL);
--
--	if (!d->chan) {
--		dev_err(&pdev->dev, "%s: kzalloc fail\n", __func__);
--		return -ENOMEM;
--	}
- 
- 	if (cpu_is_omap34xx() && (omap_type() != OMAP2_DEVICE_TYPE_GP))
- 		d->dev_caps |= HS_CHANNELS_RESERVED;
-diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
-index d4d9a5e62152..5f5b975887fc 100644
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -2030,9 +2030,16 @@ static int omap_system_dma_probe(struct platform_device *pdev)
- 
- 	dma_lch_count		= d->lch_count;
- 	dma_chan_count		= dma_lch_count;
--	dma_chan		= d->chan;
- 	enable_1510_mode	= d->dev_caps & ENABLE_1510_MODE;
- 
-+	dma_chan = devm_kcalloc(&pdev->dev, dma_lch_count,
-+				sizeof(struct omap_dma_lch), GFP_KERNEL);
-+	if (!dma_chan) {
-+		dev_err(&pdev->dev, "%s: kzalloc fail\n", __func__);
-+		return -ENOMEM;
-+	}
-+
-+
- 	if (dma_omap2plus()) {
- 		dma_linked_lch = kzalloc(sizeof(struct dma_link_info) *
- 						dma_lch_count, GFP_KERNEL);
-@@ -2117,7 +2124,6 @@ static int omap_system_dma_probe(struct platform_device *pdev)
- 	}
- 
- exit_dma_lch_fail:
--	kfree(dma_chan);
- 	return ret;
+@@ -205,12 +205,20 @@ static unsigned configure_dma_errata(void)
  }
  
-@@ -2137,7 +2143,6 @@ static int omap_system_dma_remove(struct platform_device *pdev)
- 			free_irq(dma_irq, (void *)(irq_rel + 1));
- 		}
+ static struct omap_system_dma_plat_info dma_plat_info __initdata = {
++	.reg_map	= reg_map,
++	.channel_stride	= 0x60,
+ 	.show_dma_caps	= omap2_show_dma_caps,
+ 	.clear_dma	= omap2_clear_dma,
+ 	.dma_write	= dma_write,
+ 	.dma_read	= dma_read,
+ };
+ 
++static struct platform_device_info omap_dma_dev_info = {
++	.name = "omap-dma-engine",
++	.id = -1,
++	.dma_mask = DMA_BIT_MASK(32),
++};
++
+ /* One time initializations */
+ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
+ {
+@@ -231,11 +239,15 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
+ 		return PTR_ERR(pdev);
  	}
--	kfree(dma_chan);
+ 
++	omap_dma_dev_info.res = pdev->resource;
++	omap_dma_dev_info.num_res = pdev->num_resources;
++
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!mem) {
+ 		dev_err(&pdev->dev, "%s: no mem resource\n", __func__);
+ 		return -EINVAL;
+ 	}
++
+ 	dma_base = ioremap(mem->start, resource_size(mem));
+ 	if (!dma_base) {
+ 		dev_err(&pdev->dev, "%s: ioremap fail\n", __func__);
+@@ -256,12 +268,6 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *unused)
  	return 0;
  }
  
-diff --git a/include/linux/omap-dma.h b/include/linux/omap-dma.h
-index 41328725721a..7813636a193d 100644
---- a/include/linux/omap-dma.h
-+++ b/include/linux/omap-dma.h
-@@ -268,7 +268,6 @@ struct omap_dma_dev_attr {
- 	u32 dev_caps;
- 	u16 lch_count;
- 	u16 chan_count;
--	struct omap_dma_lch *chan;
+-static const struct platform_device_info omap_dma_dev_info = {
+-	.name = "omap-dma-engine",
+-	.id = -1,
+-	.dma_mask = DMA_BIT_MASK(32),
+-};
+-
+ static int __init omap2_system_dma_init(void)
+ {
+ 	struct platform_device *pdev;
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index 1e0018f36384..00f8e566cf12 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -27,13 +27,16 @@ struct omap_dmadev {
+ 	spinlock_t lock;
+ 	struct tasklet_struct task;
+ 	struct list_head pending;
++	void __iomem *base;
++	const struct omap_dma_reg *reg_map;
+ 	struct omap_system_dma_plat_info *plat;
  };
  
- enum {
+ struct omap_chan {
+ 	struct virt_dma_chan vc;
+ 	struct list_head node;
+-	struct omap_system_dma_plat_info *plat;
++	void __iomem *channel_base;
++	const struct omap_dma_reg *reg_map;
+ 
+ 	struct dma_slave_config	cfg;
+ 	unsigned dma_sig;
+@@ -170,24 +173,77 @@ static void omap_dma_desc_free(struct virt_dma_desc *vd)
+ 	kfree(container_of(vd, struct omap_desc, vd));
+ }
+ 
++static void omap_dma_write(uint32_t val, unsigned type, void __iomem *addr)
++{
++	switch (type) {
++	case OMAP_DMA_REG_16BIT:
++		writew_relaxed(val, addr);
++		break;
++	case OMAP_DMA_REG_2X16BIT:
++		writew_relaxed(val, addr);
++		writew_relaxed(val >> 16, addr + 2);
++		break;
++	case OMAP_DMA_REG_32BIT:
++		writel_relaxed(val, addr);
++		break;
++	default:
++		WARN_ON(1);
++	}
++}
++
++static unsigned omap_dma_read(unsigned type, void __iomem *addr)
++{
++	unsigned val;
++
++	switch (type) {
++	case OMAP_DMA_REG_16BIT:
++		val = readw_relaxed(addr);
++		break;
++	case OMAP_DMA_REG_2X16BIT:
++		val = readw_relaxed(addr);
++		val |= readw_relaxed(addr + 2) << 16;
++		break;
++	case OMAP_DMA_REG_32BIT:
++		val = readl_relaxed(addr);
++		break;
++	default:
++		WARN_ON(1);
++		val = 0;
++	}
++
++	return val;
++}
++
+ static void omap_dma_glbl_write(struct omap_dmadev *od, unsigned reg, unsigned val)
+ {
+-	od->plat->dma_write(val, reg, 0);
++	const struct omap_dma_reg *r = od->reg_map + reg;
++
++	WARN_ON(r->stride);
++
++	omap_dma_write(val, r->type, od->base + r->offset);
+ }
+ 
+ static unsigned omap_dma_glbl_read(struct omap_dmadev *od, unsigned reg)
+ {
+-	return od->plat->dma_read(reg, 0);
++	const struct omap_dma_reg *r = od->reg_map + reg;
++
++	WARN_ON(r->stride);
++
++	return omap_dma_read(r->type, od->base + r->offset);
+ }
+ 
+ static void omap_dma_chan_write(struct omap_chan *c, unsigned reg, unsigned val)
+ {
+-	c->plat->dma_write(val, reg, c->dma_ch);
++	const struct omap_dma_reg *r = c->reg_map + reg;
++
++	omap_dma_write(val, r->type, c->channel_base + r->offset);
+ }
+ 
+ static unsigned omap_dma_chan_read(struct omap_chan *c, unsigned reg)
+ {
+-	return c->plat->dma_read(reg, c->dma_ch);
++	const struct omap_dma_reg *r = c->reg_map + reg;
++
++	return omap_dma_read(r->type, c->channel_base + r->offset);
+ }
+ 
+ static void omap_dma_clear_csr(struct omap_chan *c)
+@@ -198,6 +254,12 @@ static void omap_dma_clear_csr(struct omap_chan *c)
+ 		omap_dma_chan_write(c, CSR, ~0);
+ }
+ 
++static void omap_dma_assign(struct omap_dmadev *od, struct omap_chan *c,
++	unsigned lch)
++{
++	c->channel_base = od->base + od->plat->channel_stride * lch;
++}
++
+ static void omap_dma_start(struct omap_chan *c, struct omap_desc *d)
+ {
+ 	struct omap_dmadev *od = to_omap_dma_dev(c->vc.chan.device);
+@@ -400,18 +462,26 @@ static void omap_dma_sched(unsigned long data)
+ 
+ static int omap_dma_alloc_chan_resources(struct dma_chan *chan)
+ {
++	struct omap_dmadev *od = to_omap_dma_dev(chan->device);
+ 	struct omap_chan *c = to_omap_dma_chan(chan);
++	int ret;
++
++	dev_dbg(od->ddev.dev, "allocating channel for %u\n", c->dma_sig);
+ 
+-	dev_dbg(c->vc.chan.device->dev, "allocating channel for %u\n", c->dma_sig);
++	ret = omap_request_dma(c->dma_sig, "DMA engine", omap_dma_callback,
++			       c, &c->dma_ch);
+ 
+-	return omap_request_dma(c->dma_sig, "DMA engine",
+-		omap_dma_callback, c, &c->dma_ch);
++	if (ret >= 0)
++		omap_dma_assign(od, c, c->dma_ch);
++
++	return ret;
+ }
+ 
+ static void omap_dma_free_chan_resources(struct dma_chan *chan)
+ {
+ 	struct omap_chan *c = to_omap_dma_chan(chan);
+ 
++	c->channel_base = NULL;
+ 	vchan_free_chan_resources(&c->vc);
+ 	omap_free_dma(c->dma_ch);
+ 
+@@ -917,7 +987,7 @@ static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
+ 	if (!c)
+ 		return -ENOMEM;
+ 
+-	c->plat = od->plat;
++	c->reg_map = od->reg_map;
+ 	c->dma_sig = dma_sig;
+ 	c->vc.desc_free = omap_dma_desc_free;
+ 	vchan_init(&c->vc, &od->ddev);
+@@ -944,16 +1014,24 @@ static void omap_dma_free(struct omap_dmadev *od)
+ static int omap_dma_probe(struct platform_device *pdev)
+ {
+ 	struct omap_dmadev *od;
++	struct resource *res;
+ 	int rc, i;
+ 
+ 	od = devm_kzalloc(&pdev->dev, sizeof(*od), GFP_KERNEL);
+ 	if (!od)
+ 		return -ENOMEM;
+ 
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	od->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(od->base))
++		return PTR_ERR(od->base);
++
+ 	od->plat = omap_get_plat_info();
+ 	if (!od->plat)
+ 		return -EPROBE_DEFER;
+ 
++	od->reg_map = od->plat->reg_map;
++
+ 	dma_cap_set(DMA_SLAVE, od->ddev.cap_mask);
+ 	dma_cap_set(DMA_CYCLIC, od->ddev.cap_mask);
+ 	od->ddev.device_alloc_chan_resources = omap_dma_alloc_chan_resources;
+diff --git a/include/linux/omap-dma.h b/include/linux/omap-dma.h
+index 7813636a193d..41a13e70f41f 100644
+--- a/include/linux/omap-dma.h
++++ b/include/linux/omap-dma.h
+@@ -285,6 +285,8 @@ struct omap_dma_reg {
+ 
+ /* System DMA platform data structure */
+ struct omap_system_dma_plat_info {
++	const struct omap_dma_reg *reg_map;
++	unsigned channel_stride;
+ 	struct omap_dma_dev_attr *dma_attr;
+ 	u32 errata;
+ 	void (*show_dma_caps)(void);
 -- 
 1.8.3.1
