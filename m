@@ -1,59 +1,58 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 10 Feb 2014 17:25:15 +0000
-Subject: [PATCH] ARM: mm: add imprecise abort non-deadly handler
-In-Reply-To: <20140210143708.GB2794@e103592.cambridge.arm.com>
-References: <1391797214-17142-1-git-send-email-ben.dooks@codethink.co.uk>
- <1391797214-17142-2-git-send-email-ben.dooks@codethink.co.uk>
- <20140210143708.GB2794@e103592.cambridge.arm.com>
-Message-ID: <52F90B7B.50807@codethink.co.uk>
+From: courtney.cavin@sonymobile.com (Courtney Cavin)
+Date: Mon, 10 Feb 2014 09:28:09 -0800
+Subject: [PATCHv2 2/2] arm: Get rid of meminfo
+In-Reply-To: <52F846AE.3050800@codeaurora.org>
+References: <1391558551-31395-1-git-send-email-lauraa@codeaurora.org>
+ <1391558551-31395-3-git-send-email-lauraa@codeaurora.org>
+ <20140207020949.GQ1706@sonymobile.com>
+ <52F846AE.3050800@codeaurora.org>
+Message-ID: <20140210172808.GS1706@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/14 14:37, Dave Martin wrote:
-> On Fri, Feb 07, 2014 at 06:20:14PM +0000, Ben Dooks wrote:
->> Given that imprecise aborts may be delivered after the action that
->> caused them (or even for non-cpu related activities such as bridge
->> faults from a bus-master) it is possible that the wrong process is
->> terminated as a result.
->>
->> It is not know at this time in an SMP system which cores get notified
->> of an imprecise external abort, we have yet to find the right details
->> in the architecture reference manuals. This also means that killing
->> the process is probably the wrong thing to do on reception of these aborts.
->>
->> Add a handler to take and print imprecise aborts and allow the process
->> to continue. This should ensure that the abort is shown but not kill
->> the process that was running on the cpu core at the time.
->
-> Not treating these as thread-specific faults seems correct, since we
-> never have a way to map these aborts back to the culprit ... except that
-> there is a likelihood the culprit is still running when the abort fires.
->
->
-> "Spurious" imprecise aborts pretty much always indicate a hardware error
-> or a nasty bug somewhere.
+On Mon, Feb 10, 2014 at 04:25:34AM +0100, Laura Abbott wrote:
+> On 2/6/2014 6:09 PM, Courtney Cavin wrote:
+> > On Wed, Feb 05, 2014 at 01:02:31AM +0100, Laura Abbott wrote:
+> >> memblock is now fully integrated into the kernel and is the prefered
+> >> method for tracking memory. Rather than reinvent the wheel with
+> >> meminfo, migrate to using memblock directly instead of meminfo as
+> >> an intermediate.
+> >>
+> >> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> > [...]
+> >> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+> >> index 0b11c1a..51d814e 100644
+> >> --- a/arch/arm/mach-pxa/spitz.c
+> >> +++ b/arch/arm/mach-pxa/spitz.c
+> >> @@ -32,6 +32,7 @@
+> >>   #include <linux/io.h>
+> >>   #include <linux/module.h>
+> >>   #include <linux/reboot.h>
+> >> +#include <linux/memblock.h>
+> >>
+> >>   #include <asm/setup.h>
+> >>   #include <asm/mach-types.h>
+> >> @@ -971,13 +972,9 @@ static void __init spitz_init(void)
+> >>          spitz_i2c_init();
+> >>   }
+> >>
+> >> -static void __init spitz_fixup(struct tag *tags, char **cmdline,
+> >> -                              struct meminfo *mi)
+> >> +static void __init spitz_fixup(struct tag *tags, char **cmdline)
+> >>   {
+> >> -       sharpsl_save_param();
+> >> -       mi->nr_banks = 1;
+> >> -       mi->bank[0].start = 0xa0000000;
+> >> -       mi->bank[0].size = (64*1024*1024);
+> >> +       memblock_addr(0xa0000000, SZ_64M);
+> >
+> > memblock_add() ?
+> Yes, that was a typo on my part. I'll send out a v3 with collected acks.
+> 
 
-I need to find out where the one we are catching is coming from in our
-system.
+So, I also just noticed that you specifically remove the call to
+sharpsl_save_param() here.  I'm presuming that this is also an error, as
+you haven't removed it from any of the other pxa fixups, and it seems
+unrelated to the change.
 
-> Another cause is badly implemented, buggy or malicious userspace software
-> being given more exotic mmaps that it is qualified to deal with
-> responsibly.  That's a nasty bug in the distro maintainer / system
-> administrator / vendor.
->
-> So, I think this should be at least KERN_ERROR; maybe KERN_CRIT or above.
-> We must not encourage people to think that these aborts are somehow
-> benign.
-
-Ok, KERN_ERROR or KERN_CRIT sound reasonable.
-
-> If we really want people to fix their bugs, it may be worth considering
-> panic(), or doing this when some threshold is reached.  This may be a
-> bit harsh though, at least without some threshold.
-
-I was considering also firing a WARN_ON(abort_count++ > 10) or something
-similar.
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+-Courtney
