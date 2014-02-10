@@ -1,63 +1,54 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 10 Feb 2014 13:53:08 +0100
-Subject: [PATCH v3 1/2] drivers/base: permit base components to omit the
- bind/unbind ops
-In-Reply-To: <9b3c3c2c982f31b026fd1516a2b608026d55b1e9.1391792986.git.moinejf@free.fr>
-References: <cover.1391792986.git.moinejf@free.fr>
- <9b3c3c2c982f31b026fd1516a2b608026d55b1e9.1391792986.git.moinejf@free.fr>
-Message-ID: <20140210125307.GG20143@ulmo.nvidia.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 10 Feb 2014 12:54:19 +0000
+Subject: [PATCH 1/2] ARM: shmobile: r8a7791: add Ether DT support
+In-Reply-To: <201402070112.48304.sergei.shtylyov@cogentembedded.com>
+References: <201402070112.48304.sergei.shtylyov@cogentembedded.com>
+Message-ID: <52F8CBFB.5060707@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 04:55:00PM +0100, Jean-Francois Moine wrote:
-> Some simple components don't need to do any specific action on
-> bind to / unbind from a master component.
-> 
-> This patch permits such components to omit the bind/unbind
-> operations.
-> 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+On 06/02/14 22:12, Sergei Shtylyov wrote:
+> Define the generic R8A7791 part of the Ether device node.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
 > ---
->  drivers/base/component.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/base/component.c b/drivers/base/component.c
-> index c53efe6..0a39d7a 100644
-> --- a/drivers/base/component.c
-> +++ b/drivers/base/component.c
-> @@ -225,7 +225,8 @@ static void component_unbind(struct component *component,
->  {
->  	WARN_ON(!component->bound);
->  
-> -	component->ops->unbind(component->dev, master->dev, data);
-> +	if (component->ops)
-> +		component->ops->unbind(component->dev, master->dev, data);
+>   arch/arm/boot/dts/r8a7791.dtsi |   15 ++++++++++++++-
+>   1 file changed, 14 insertions(+), 1 deletion(-)
+>
+> Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
+> +++ renesas/arch/arm/boot/dts/r8a7791.dtsi
+> @@ -2,7 +2,8 @@
+>    * Device Tree Source for the r8a7791 SoC
+>    *
+>    * Copyright (C) 2013 Renesas Electronics Corporation
+> - * Copyright (C) 2013 Renesas Solutions Corp.
+> + * Copyright (C) 2013-2014 Renesas Solutions Corp.
+> + * Copyright (C) 2014 Cogent Embedded Inc.
+>    *
+>    * This file is licensed under the terms of the GNU General Public License
+>    * version 2.  This program is licensed "as is" without any warranty of any
+> @@ -366,6 +367,18 @@
+>   		status = "disabled";
+>   	};
+>
+> +	ether: ethernet at ee700000 {
+> +		compatible = "renesas,ether-r8a7791";
+> +		reg = <0 0xee700000 0 0x400>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 162 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp8_clks R8A7791_CLK_ETHER>;
+> +		phy-mode = "rmii";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		status = "disabled";
+> +	};
 
-This doesn't actually do what the commit message says. This makes
-component->ops optional, not component->ops->unbind().
+Is the device only capable of doing RMII?
 
-A more correct check would be:
 
-	if (component->ops && component->ops->unbind)
-
->  	component->bound = false;
->  
->  	/* Release all resources claimed in the binding of this component */
-> @@ -274,7 +275,11 @@ static int component_bind(struct component *component, struct master *master,
->  	dev_dbg(master->dev, "binding %s (ops %ps)\n",
->  		dev_name(component->dev), component->ops);
->  
-> -	ret = component->ops->bind(component->dev, master->dev, data);
-> +	if (component->ops)
-> +		ret = component->ops->bind(component->dev, master->dev, data);
-
-Same here.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/0969c543/attachment.sig>
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
