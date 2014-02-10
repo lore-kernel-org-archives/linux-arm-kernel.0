@@ -1,72 +1,111 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 10 Feb 2014 15:49:02 +0800
-Subject: [PATCH v3 3/3] ACPI / processor: Introduce map_gic_id() to get apic
- id from MADT or _MAT method
-In-Reply-To: <1392018542-10949-1-git-send-email-hanjun.guo@linaro.org>
-References: <1392018542-10949-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1392018542-10949-4-git-send-email-hanjun.guo@linaro.org>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 10 Feb 2014 08:53:05 +0100
+Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
+ binding to list boost mode frequency
+In-Reply-To: <CAJuA9aj-LsdBiS2msOVmNRSe6mNj9QJsys9KjHZAk=9hrZOLzA@mail.gmail.com>
+References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
+ <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
+ <52F50698.4060305@arm.com> <52F509BD.70903@arm.com>
+ <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
+ <52F51888.5010608@arm.com>
+ <CAGo_u6ofC4NNPiTNcSnXUvT3RZJo54=XyjetR-ok5hCBrVZkKg@mail.gmail.com>
+ <52F51FCD.5000009@arm.com>
+ <CAGo_u6quxExJOyY8mvCw5sDSuz=_j0YqJ6FJW+FAdaxUeqzN9Q@mail.gmail.com>
+ <CAJuA9aj-LsdBiS2msOVmNRSe6mNj9QJsys9KjHZAk=9hrZOLzA@mail.gmail.com>
+Message-ID: <20140210085305.641e6de5@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get apic id from MADT or _MAT method is not implemented on arm/arm64,
-and ACPI 5.0 introduces GIC Structure for it, so this patch introduces
-map_gic_id() to get apic id followed the ACPI 5.0 spec.
+Hi Thomas, Sudeep,
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/acpi/processor_core.c |   26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+> On Sat, Feb 8, 2014 at 1:11 AM, Nishanth Menon <nm@ti.com> wrote:
+> > On Fri, Feb 7, 2014 at 12:02 PM, Sudeep Holla
+> > <Sudeep.Holla@arm.com> wrote:
+> >> On 07/02/14 17:37, Nishanth Menon wrote:
+> >>> On Fri, Feb 7, 2014 at 11:31 AM, Sudeep Holla
+> >>> <Sudeep.Holla@arm.com> wrote:
+> >>
+> >> [...]
+> >>
+> >>>> Yes I think its counter-intuitive as it's visible to the
+> >>>> userspace(list of frequencies and the boost parameters are
+> >>>> exposed through sysfs)
+> >>>
+> >>> That will be a different problem -> as currently every single
+> >>> frequency in the cpufreq list has ability to be marked as boost
+> >>> frequency - if userspace does not maintain that, then, IMHO, fix
+> >>> the userspace :D
+> >>>
+> >>
+> >> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
+> >> gives the list of frequencies based on the state of the boost
+> >> feature at anytime.
+> >>
+> >> Intuitively the list without boost shouldn't have any frequency
+> >> above the range when it's enabled :), that's what I was referring
+> >> to. So I am not talking about any issue with user-space
+> >> maintenance.
+> > Fair enough - but i still think it has nothing to do with dt binding
+> > itself -> and i think the discussion we've had should be good for
+> > the binding provided in this patch.. I hope.. if documentation
+> > needs a bit of better explanation to prevent a repeat of the same
+> > discussion at a later point of time, now might be a good time to
+> > add it in.
+> 
+> The term boost and over-clocking have been described in the bindings
+> document as being the same. Since the term over-clocking refers to
+> running a CPU beyond normal operating frequencies, I tend to agree
+> with Sudeep that it is not intuitive if a normal operating frequency
+> is greater than a boost mode frequency.
+> 
+> Otherwise, when userspace does "echo 1 >
+> /sys/devices/system/cpu/cpufreq/boost", what is it supposed to mean. I
+> think the original intent of boost mode patches was to allow CPU to
+> operate at frequencies greater than the normal operating frequencies.
+> 
+> Lukasz, how would you want this to be handled?
 
-diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
-index 575c500..eaaeebc 100644
---- a/drivers/acpi/processor_core.c
-+++ b/drivers/acpi/processor_core.c
-@@ -71,6 +71,27 @@ static int map_lsapic_id(struct acpi_subtable_header *entry,
- 	return 0;
- }
- 
-+static int map_gic_id(struct acpi_subtable_header *entry,
-+		int device_declaration, u32 acpi_id, int *apic_id)
-+{
-+	struct acpi_madt_generic_interrupt *gic =
-+		(struct acpi_madt_generic_interrupt *)entry;
-+
-+	if (!(gic->flags & ACPI_MADT_ENABLED))
-+		return -ENODEV;
-+
-+	/* In the GIC interrupt model, logical processors are
-+	 * required to have a Processor Device object in the DSDT,
-+	 * so we should check device_declaration here
-+	 */
-+	if (device_declaration && (gic->uid == acpi_id)) {
-+		*apic_id = gic->gic_id;
-+		return 0;
-+	}
-+
-+	return -EINVAL;
-+}
-+
- static int map_madt_entry(int type, u32 acpi_id)
- {
- 	unsigned long madt_end, entry;
-@@ -106,6 +127,9 @@ static int map_madt_entry(int type, u32 acpi_id)
- 		} else if (header->type == ACPI_MADT_TYPE_LOCAL_SAPIC) {
- 			if (!map_lsapic_id(header, type, acpi_id, &apic_id))
- 				break;
-+		} else if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
-+			if (!map_gic_id(header, type, acpi_id, &apic_id))
-+				break;
- 		}
- 		entry += header->length;
- 	}
-@@ -136,6 +160,8 @@ static int map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
- 		map_lapic_id(header, acpi_id, &apic_id);
- 	} else if (header->type == ACPI_MADT_TYPE_LOCAL_SAPIC) {
- 		map_lsapic_id(header, type, acpi_id, &apic_id);
-+	} else if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
-+		map_gic_id(header, type, acpi_id, &apic_id);
- 	}
- 
- exit:
+Please consider an example:
+
+normal-freqs: 1400000, 1200000, 1000000, 800000, 600000, 400000, 200000
+[1]
+boost-freqs: 1700000, 1600000, 1500000. [2]
+
+All those freqs shall be represented as OPPs freq and voltage tuple.
+
+Best would be to specify all the boost-freqs as:
+boost-freqs = <1700000 1600000 1500000> to be prepared for future
+quirks or problems (or special cases which might show up latter).
+If anybody can foresee any potential threads - like platform on which
+boost freqs are 1700000 and 1500000, but not 1600000, then please share
+this information.
+
+However, I think that it would be also acceptable to specify only:
+boost-freq = <1500000> and mark all freqs greater or equal to it as
+CPUFREQ_BOOST_FREQ.
+
+If there aren't any potential problems, then I think the second option
+would be a good solution (we would have only one BOOST attribute stored
+at CPUs DTS node).
+
+> 
+> Thanks,
+> Thomas.
+> 
+> >
+> > Regards,
+> > Nishanth Menon
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
 -- 
-1.7.9.5
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
