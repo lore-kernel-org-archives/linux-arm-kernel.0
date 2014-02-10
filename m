@@ -1,123 +1,39 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 10 Feb 2014 08:10:51 +0100
-Subject: [PATCH v2 1/2] PM / OPP: Allow boost frequency to be looked up
- from device tree
-In-Reply-To: <CAJuA9agT4PC6YOmhCwKQ=58qaGEr1qSuhTpX57ro1pEuk++Miw@mail.gmail.com>
-References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
- <1391786342-11812-2-git-send-email-thomas.ab@samsung.com>
- <52F50346.7040707@arm.com>
- <CAJuA9agT4PC6YOmhCwKQ=58qaGEr1qSuhTpX57ro1pEuk++Miw@mail.gmail.com>
-Message-ID: <20140210081051.05da33bd@amdc2363>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 10 Feb 2014 15:37:27 +0800
+Subject: [PATCH resend] ARM: dts: imx6qdl-wandboard: use GPIO_6 for FEC
+ interrupt
+In-Reply-To: <1391725453-11988-1-git-send-email-x-linux@infra-silbe.de>
+References: <1391725453-11988-1-git-send-email-x-linux@infra-silbe.de>
+Message-ID: <20140210073725.GN9628@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Sudeep
-
-> On Fri, Feb 7, 2014 at 9:31 PM, Sudeep Holla <Sudeep.Holla@arm.com>
-> wrote:
-> > On 07/02/14 15:19, Thomas Abraham wrote:
-> >> From: Thomas Abraham <thomas.ab@samsung.com>
-> >>
-> >> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core")
-> >> adds support for CPU boost mode. This patch adds support for
-> >> finding available boost frequencies from device tree and marking
-> >> them as usable in boost mode.
-> >>
-> >> Cc: Nishanth Menon <nm@ti.com>
-> >> Cc: Lukasz Majewski <l.majewski@samsung.com>
-> >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> >> ---
-> >>  drivers/base/power/opp.c |   34 +++++++++++++++++++++++++++++++++-
-> >>  1 file changed, 33 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-> >> index fa41874..b636826 100644
-> >> --- a/drivers/base/power/opp.c
-> >> +++ b/drivers/base/power/opp.c
-> >> @@ -628,7 +628,8 @@ int dev_pm_opp_init_cpufreq_table(struct
-> >> device *dev, struct device_opp *dev_opp;
-> >>       struct dev_pm_opp *opp;
-> >>       struct cpufreq_frequency_table *freq_table;
-> >> -     int i = 0;
-> >> +     int i = 0, j, len, ret;
-> >> +     u32 *boost_freqs = NULL;
-> >>
-> >>       /* Pretend as if I am an updater */
-> >>       mutex_lock(&dev_opp_list_lock);
-> >> @@ -650,10 +651,35 @@ int dev_pm_opp_init_cpufreq_table(struct
-> >> device *dev, return -ENOMEM;
-> >>       }
-> >>
-> >> +     if (of_find_property(dev->of_node, "boost-frequency", &len))
-> >> {
-> >> +             if (len == 0 || (len & (sizeof(u32) - 1)) != 0) {
-> >> +                     dev_err(dev, "%s: invalid boost
-> >> frequency\n", __func__);
-> >> +                     ret = -EINVAL;
-> >> +                     goto err_boost;
-> >> +             }
-> >> +
-> >> +             boost_freqs = kzalloc(len, GFP_KERNEL);
-> >> +             if (!boost_freqs) {
-> >> +                     dev_warn(dev, "%s: no memory for boost freq
-> >> table\n",
-> >> +                                     __func__);
-> >> +                     ret = -ENOMEM;
-> >> +                     goto err_boost;
-> >> +             }
-> >> +             of_property_read_u32_array(dev->of_node,
-> >> "boost-frequency",
-> >> +                     boost_freqs, len / sizeof(u32));
-> >> +     }
-> >> +
-> >>       list_for_each_entry(opp, &dev_opp->opp_list, node) {
-> >>               if (opp->available) {
-> >>                       freq_table[i].driver_data = i;
-> >>                       freq_table[i].frequency = opp->rate / 1000;
-> >> +                     for (j = 0; j < len / sizeof(u32) &&
-> >> boost_freqs; j++) {
-> >> +                             if (boost_freqs[j] ==
-> >> freq_table[i].frequency) {
-> >> +                                     freq_table[i].driver_data =
-> >> +
-> >> CPUFREQ_BOOST_FREQ;
-> >> +                                     break;
-> >> +                             }
-> >> +                     }
-> >>                       i++;
-> >>               }
-> >>       }
-> > IIRC you had mentioned that the boost-opp was not limited to be a
-> > cpufreq, but this change seems to be cpufreq only.
+On Thu, Feb 06, 2014 at 11:24:13PM +0100, Sascha Silbe wrote:
+> Apply the same work-around for i.MX 6D/Q erratum 006687 as used for
+> Sabre Lite for the Wandboard Dual / Quad.
 > 
-> Yes, but as you have initiated the discussion on extending the OPP
-> binding, this has been limited to cpufreq only. If the new OPP library
-> has support for listing boost frequency, this can be migrated to the
-> new OPP libaray.
-
-I agree here with Thomas. Since we are fixing regression here, we shall
-use the existing OPP API. When agreement for the future OPPs format is
-in place, we will port the boost OPPs to it.
-
+> Like on the Sabre Lite, GPIO6 is used as a power down output for
+> camera expansion boards. However, these expansion boards do not work
+> with mainline yet anyway.
 > 
-> Thanks,
-> Thomas.
+> Tested on a Wandboard Quad. Before the patch:
 > 
-> >
-> > Regards,
-> > Sudeep
-> >
+> root at arm:~# ping -q -f -c 10000 192.168.2.1
+> PING 192.168.2.1 (192.168.2.1) 56(84) bytes of data.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --- 192.168.2.1 ping statistics ---
+> 10000 packets transmitted, 10000 received, 0% packet loss, time 97363ms
+> rtt min/avg/max/mdev = 0.290/9.586/10.198/1.432 ms, pipe 2, ipg/ewma 9.737/9.672 ms
+> 
+> After the patch:
+> 
+> root at arm:~# ping -q -f -c 10000 192.168.2.1
+> PING 192.168.2.1 (192.168.2.1) 56(84) bytes of data.
+> 
+> --- 192.168.2.1 ping statistics ---
+> 10000 packets transmitted, 10000 received, 0% packet loss, time 4810ms
+> rtt min/avg/max/mdev = 0.246/0.355/0.863/0.044 ms, ipg/ewma 0.481/0.319 ms
+> 
+> Signed-off-by: Sascha Silbe <x-linux@infra-silbe.de>
 
-
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Applied, thanks.
