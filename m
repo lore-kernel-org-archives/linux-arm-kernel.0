@@ -1,37 +1,96 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 10 Feb 2014 17:00:00 -0300
-Subject: [PATCH 0/2] irqchip: Armada 370/XP MPIC as a slave controller
-Message-ID: <1392062402-27357-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Mon, 10 Feb 2014 17:00:01 -0300
+Subject: [PATCH 1/2] irqchip: armada-370-xp: Add helper for the MSI IRQ
+ handling
+In-Reply-To: <1392062402-27357-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1392062402-27357-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1392062402-27357-2-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly introduced Armada 375 and Armada 38x Marvell SoCs are based on
-Cortex-A9 CPU cores and use the ARM GIC as their main interrupt controller.
+Introduce a helper function to handle the MSI interrupts. This makes
+the code more readable. In addition, this will allow to introduce a
+chained IRQ handler mechanism, which is needed in situations where the
+MPIC is used as a slave to another interrupt controller.
 
-However, for various purposes (wake-up from suspend, MSI interrupts),
-the SoCs have a separate MPIC interrupt controller, acting as a slave
-to the GIC. This MPIC was already used as the primary controller on
-previous Marvell SoCs, so this commit extends the existing driver to
-allow the MPIC to be used as a GIC slave.
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ drivers/irqchip/irq-armada-370-xp.c | 54 ++++++++++++++++++++-----------------
+ 1 file changed, 30 insertions(+), 24 deletions(-)
 
-This series consists in two patches: the first one adds a helper function
-to handle MSI interrupts. The second patch implements a chained handler, which
-uses the previously introduced helper.
-
-These patches apply cleanly on v3.14-rc1 plus:
-
-  36802fd irqchip: armada-370-xp: fix MSI race condition
-  e1603bb irqchip: armada-370-xp: fix IPI race condition
-
-Or simply on v3.14-rc2.
-
-Ezequiel Garcia (2):
-  irqchip: armada-370-xp: Add helper for the MSI IRQ handling
-  irqchip: armada-370-xp: Setup a chained handler for the MPIC
-
- .../devicetree/bindings/arm/armada-370-xp-mpic.txt |  8 +-
- drivers/irqchip/irq-armada-370-xp.c                | 96 ++++++++++++++++------
- 2 files changed, 76 insertions(+), 28 deletions(-)
-
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index 5409564..2ba5761 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -352,6 +352,34 @@ static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
+ 	.xlate = irq_domain_xlate_onecell,
+ };
+ 
++#ifdef CONFIG_PCI_MSI
++static void armada_370_xp_handle_msi_irq(struct pt_regs *regs)
++{
++	u32 msimask, msinr;
++
++	msimask = readl_relaxed(per_cpu_int_base +
++				ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
++		& PCI_MSI_DOORBELL_MASK;
++
++	writel(~msimask, per_cpu_int_base +
++	       ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
++
++	for (msinr = PCI_MSI_DOORBELL_START;
++	     msinr < PCI_MSI_DOORBELL_END; msinr++) {
++		int irq;
++
++		if (!(msimask & BIT(msinr)))
++			continue;
++
++		irq = irq_find_mapping(armada_370_xp_msi_domain,
++				       msinr - 16);
++		handle_IRQ(irq, regs);
++	}
++}
++#else
++static void armada_370_xp_handle_msi_irq(struct pt_regs *r) {}
++#endif
++
+ static asmlinkage void __exception_irq_entry
+ armada_370_xp_handle_irq(struct pt_regs *regs)
+ {
+@@ -372,31 +400,9 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
+ 			continue;
+ 		}
+ 
+-#ifdef CONFIG_PCI_MSI
+ 		/* MSI handling */
+-		if (irqnr == 1) {
+-			u32 msimask, msinr;
+-
+-			msimask = readl_relaxed(per_cpu_int_base +
+-						ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
+-				& PCI_MSI_DOORBELL_MASK;
+-
+-			writel(~msimask, per_cpu_int_base +
+-			       ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
+-
+-			for (msinr = PCI_MSI_DOORBELL_START;
+-			     msinr < PCI_MSI_DOORBELL_END; msinr++) {
+-				int irq;
+-
+-				if (!(msimask & BIT(msinr)))
+-					continue;
+-
+-				irq = irq_find_mapping(armada_370_xp_msi_domain,
+-						       msinr - 16);
+-				handle_IRQ(irq, regs);
+-			}
+-		}
+-#endif
++		if (irqnr == 1)
++			armada_370_xp_handle_msi_irq(regs);
+ 
+ #ifdef CONFIG_SMP
+ 		/* IPI Handling */
 -- 
 1.8.1.5
