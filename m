@@ -1,55 +1,118 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Feb 2014 14:12:55 +0000
-Subject: [PATCH 14/28] Remove MACH_SMDKC210
-In-Reply-To: <1392039072.3585.15.camel@x220>
-References: <1391971686-9517-1-git-send-email-richard@nod.at>
- <1391971686-9517-15-git-send-email-richard@nod.at>
- <20140210114154.GQ1757@sirena.org.uk>
- <1392039072.3585.15.camel@x220>
-Message-ID: <20140210141255.GI1757@sirena.org.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 10 Feb 2014 14:16:40 +0000
+Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
+In-Reply-To: <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
+References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
+ <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20140210141634.GA2794@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 02:31:12PM +0100, Paul Bolle wrote:
-> On Mon, 2014-02-10 at 11:41 +0000, Mark Brown wrote:
-> > On Sun, Feb 09, 2014 at 07:47:52PM +0100, Richard Weinberger wrote:
+On Fri, Feb 07, 2014 at 05:19:15PM +0100, Fabrice GASNIER wrote:
+> This patch adds imprecise abort enable/disable macros.
+> It also enables imprecise aborts when starting kernel.
 
-> > Please fix whatever script you're using to generate your mails, it's
-> > generating corrupt headers.
+Relying on imprecise aborts for hardware probing would be considered bad
+hardware and/or software design for ARM-specific stuff.
 
-> I think Richard's mail didn't end up on lkml. But it's pretty clear what
-> it must have looked like.
+PCI is more generic though, so we may have to put up with this to some
+extent.  Can you point me to the affected probing code?  I'm not very
+familiar with that stuff...
 
-I can see what it looked like from my inbox, but my mail client can't
-understand them at all and hence didn't think the mails were sent to me
-and just ignored them when hitting reply.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>  arch/arm/include/asm/irqflags.h |   33 +++++++++++++++++++++++++++++++++
+>  arch/arm/kernel/smp.c           |    1 +
+>  arch/arm/kernel/traps.c         |    4 ++++
+>  3 files changed, 38 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/irqflags.h b/arch/arm/include/asm/irqflags.h
+> index 3b763d6..82e3834 100644
+> --- a/arch/arm/include/asm/irqflags.h
+> +++ b/arch/arm/include/asm/irqflags.h
+> @@ -51,6 +51,9 @@ static inline void arch_local_irq_disable(void)
+>  
+>  #define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
+>  #define local_fiq_disable() __asm__("cpsid f	@ __clf" : : : "memory", "cc")
+> +
+> +#define local_abt_enable()  __asm__("cpsie a	@ __sta" : : : "memory", "cc")
+> +#define local_abt_disable() __asm__("cpsid a	@ __cla" : : : "memory", "cc")
+>  #else
+>  
+>  /*
+> @@ -130,6 +133,36 @@ static inline void arch_local_irq_disable(void)
+>  	: "memory", "cc");					\
+>  	})
+>  
+> +/*
+> + * Enable Aborts
+> + */
+> +#define local_abt_enable()					\
+> +	({							\
+> +		unsigned long temp;				\
+> +	__asm__ __volatile__(					\
+> +	"mrs	%0, cpsr		@ sta\n"		\
+> +"	bic	%0, %0, %1\n"					\
+> +"	msr	cpsr_c, %0"					\
 
-> > >  config SND_SOC_SAMSUNG_SMDK_WM9713
-> > >  	tristate "SoC AC97 Audio support for SMDK with WM9713"
-> > > -	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310 || MACH_SMDKC210)
-> > > +	depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || MACH_SMDKV310)
-> > 
-> > Like I said to Paul this isn't fixing the actual issue - think about why
-> > the symbol was there in the first place and why it was removed.  There
-> > is a problem here but this would make it less likely that it would be
-> > properly fixed.
+I suggest you use "cpsie/cpsid a" instead.  This requires ARMv6, but the
+CPSR.A bit only exists on ARMv6 and later anyway.  Poking that bit
+on earlier CPUs may cause unpredictable behaviour, so these macros
+should be no-ops for v5 and earlier.
 
-> Would you mind going through this one step at a time, just to make sure
-> _I_ understand what it is that you'd like to see?
+> +	: "=r" (temp)						\
+> +	: "r" (PSR_A_BIT)					\
+> +	: "memory", "cc");					\
+> +	})
+> +
+> +/*
+> + * Disable Aborts
+> + */
+> +#define local_abt_disable()					\
+> +	({							\
+> +		unsigned long temp;				\
+> +	__asm__ __volatile__(					\
+> +	"mrs	%0, cpsr		@ cla\n"		\
+> +"	orr	%0, %0, %1\n"					\
+> +"	msr	cpsr_c, %0"					\
+> +	: "=r" (temp)						\
+> +	: "r" (PSR_A_BIT)					\
+> +	: "memory", "cc");					\
+> +	})
+> +
+>  #endif
+>  
+>  /*
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index dc894ab..c2093cb 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -377,6 +377,7 @@ asmlinkage void secondary_start_kernel(void)
+>  
+>  	local_irq_enable();
+>  	local_fiq_enable();
+> +	local_abt_enable();
+>  
+>  	/*
+>  	 * OK, it's off to the idle thread for us
+> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+> index 4636d56..ef15709 100644
+> --- a/arch/arm/kernel/traps.c
+> +++ b/arch/arm/kernel/traps.c
+> @@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
+>  
+>  	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+>  	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
+> +
+> +	/* Enable imprecise aborts */
+> +	local_abt_enable();
 
-> If so, to be absolutely sure we start from the same point: do you agree
-> that the above line now effectively reads
->     depends on SND_SOC_SAMSUNG && (MACH_SMDK6410 || MACH_SMDKC100 || MACH_SMDKV210 || MACH_SMDKC110 || false || false)
+It would be good to clean up why aborts are not being consistently
+enabled on boot.
 
-> because there's neither a Kconfig symbol MACH_SMDKV310 nor a Kconfig
-> symbol MACH_SMDKC210?
+Really, they should be enabled, except for a brief window during
+boot when the vectors are not mapped and the abort can't be dispatched.
 
-Yes, that's correct.  Now, like I say think about what the symbol was
-there for in the first place.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/17ff5e43/attachment.sig>
+Cheers
+---Dave
