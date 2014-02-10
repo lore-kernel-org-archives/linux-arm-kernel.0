@@ -1,10 +1,10 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 10 Feb 2014 18:35:53 +0800
-Subject: [PATCH v4 7/8] ARM: dts: sun7i: a20-olinuxino-micro: Enable GMAC
- instead of EMAC
+Date: Mon, 10 Feb 2014 18:35:52 +0800
+Subject: [PATCH v4 6/8] ARM: dts: sun7i: cubieboard2: Enable GMAC instead of
+ EMAC
 In-Reply-To: <1392028554-32545-1-git-send-email-wens@csie.org>
 References: <1392028554-32545-1-git-send-email-wens@csie.org>
-Message-ID: <1392028554-32545-8-git-send-email-wens@csie.org>
+Message-ID: <1392028554-32545-7-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,15 +13,15 @@ Use the GMAC in MII mode for ethernet instead of the EMAC.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 27 +++++++++++--------------
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts | 27 ++++++++++++---------------
  1 file changed, 12 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index ead3013..b02a796 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+index 5c51cb8..7bf4935 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
 @@ -19,21 +19,6 @@
- 	compatible = "olimex,a20-olinuxino-micro", "allwinner,sun7i-a20";
+ 	compatible = "cubietech,cubieboard2", "allwinner,sun7i-a20";
  
  	soc at 01c00000 {
 -		emac: ethernet at 01c0b000 {
@@ -40,10 +40,10 @@ index ead3013..b02a796 100644
 -		};
 -
  		pinctrl at 01c20800 {
- 			led_pins_olinuxino: led_pins at 0 {
- 				allwinner,pins = "PH2";
-@@ -78,6 +63,18 @@
- 			pinctrl-0 = <&i2c2_pins_a>;
+ 			led_pins_cubieboard2: led_pins at 0 {
+ 				allwinner,pins = "PH20", "PH21";
+@@ -60,6 +45,18 @@
+ 			pinctrl-0 = <&i2c1_pins_a>;
  			status = "okay";
  		};
 +
