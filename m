@@ -1,40 +1,62 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 10 Feb 2014 19:09:03 +0100
-Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
-In-Reply-To: <20140207160954.69fbca38@skate>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-22-git-send-email-andrew@lunn.ch>
- <20140207093313.1a979a8f@skate>
- <20140207150306.GX8533@titan.lakedaemon.net>
- <20140207160954.69fbca38@skate>
-Message-ID: <20140210180903.GF9995@lunn.ch>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 10 Feb 2014 20:10:35 +0200
+Subject: [PATCH] ARM: dts: OMAP2+: Fix boot with multi_v7_defconfig
+Message-ID: <1392055835-6494-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Why not mvebu_v7 and mvebu_v5 as I suggested? mvebu_v7 would build both
-> Dove and Armada 370/XP (and the other ones we are going to introduce
-> soon), mvebu_v5 would build Kirkwood (and possibly Orion5x once I find
-> enough time to work on this platform).
+The OMAP EHCI controller is not compatible with the EHCI
+platform HCD driver so don't claim that we are.
 
-Hi Thomas
+This fixes boot on OMAP platforms with CONFIG_USB_EHCI_HCD_PLATFORM=y
+e.g. multi_v7_defconfig
 
-Could you produce a patch moving mvebu_defconfig to
-mvebu_v7_defconfig? I will generate the mvebu_v5_defconfig based on
-kirkwood_defconfig as part of my patchset.
+Reported-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+---
+ arch/arm/boot/dts/omap3.dtsi | 2 +-
+ arch/arm/boot/dts/omap4.dtsi | 2 +-
+ arch/arm/boot/dts/omap5.dtsi | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Thanks
-	Andrew
-
-
-> 
-> This way, ultimately we can simply remove kirkwood_defconfig and
-> dove_defconfig, as soon as all legacy platforms have been either
-> converted to DT, or removed.
-> 
-> Best regards,
-> 
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index a5fc83b..6b5dbf8 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -641,7 +641,7 @@
+ 			};
+ 
+ 			usbhsehci: ehci at 48064800 {
+-				compatible = "ti,ehci-omap", "usb-ehci";
++				compatible = "ti,ehci-omap";
+ 				reg = <0x48064800 0x400>;
+ 				interrupt-parent = <&intc>;
+ 				interrupts = <77>;
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index d3f8a6e..f5d754b 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -706,7 +706,7 @@
+ 			};
+ 
+ 			usbhsehci: ehci at 4a064c00 {
+-				compatible = "ti,ehci-omap", "usb-ehci";
++				compatible = "ti,ehci-omap";
+ 				reg = <0x4a064c00 0x400>;
+ 				interrupt-parent = <&gic>;
+ 				interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index a72813a..42fcffd 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -784,7 +784,7 @@
+ 			};
+ 
+ 			usbhsehci: ehci at 4a064c00 {
+-				compatible = "ti,ehci-omap", "usb-ehci";
++				compatible = "ti,ehci-omap";
+ 				reg = <0x4a064c00 0x400>;
+ 				interrupt-parent = <&gic>;
+ 				interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+-- 
+1.8.3.2
