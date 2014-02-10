@@ -1,47 +1,135 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 10 Feb 2014 10:34:50 -0700
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <201402092130.25615.arnd@arndb.de>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <3724624.kd9jZNUiTF@wuerfel>
- <20140207114607.GE5976@mudshark.cambridge.arm.com>
- <201402092130.25615.arnd@arndb.de>
-Message-ID: <20140210173450.GA5554@obsidianresearch.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 10 Feb 2014 12:35:27 -0500
+Subject: [PATCH 04/11] ARM: mvebu: add Device Tree description of the
+ Armada 375 SoC
+In-Reply-To: <1392053002-19831-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1392053002-19831-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140210173527.GR8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 09, 2014 at 09:30:25PM +0100, Arnd Bergmann wrote:
-
-> > bash-4.2# cat /proc/iomem
-> > 40000000-40ffffff : /pci
-> > 41000400-410005ff : virtio-pci
-> > 41000c00-41000dff : virtio-pci
-> > 41001400-410015ff : virtio-pci
-> > 41001c00-41001dff : virtio-pci
-> > 80000000-93ffffff : System RAM
-> >   80008000-8053df0b : Kernel code
-> >   80570000-805c07fb : Kernel data
+On Mon, Feb 10, 2014 at 06:23:15PM +0100, Thomas Petazzoni wrote:
+> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > 
-> You should normally see a parent resource for the PCI bus and the virtio-pci
-> resources under that. For some reason, neither of the two appears to have
-> been registered correctly.
+> The Armada 375 SoC is a new SoC from Marvell, based on a dual core
+> Cortex-A9 and a number of hardware blocks that are common with earlier
+> SoCs from the mvebu family.
+> 
+> The provided Device Tree describes the following parts of the SoC:
+> 
+>  * CPUs
+>  * Device Bus
+>  * Clocks
+>  * Interrupt controllers: GIC and MPIC
+>  * GPIO controllers
+>  * I2C buses
+>  * L2 cache
+>  * MBus controller
+>  * SDIO
+>  * Pinctrl
+>  * SATA
+>  * Serial
+>  * SPI buses
+>  * System controller (for reboot)
+>  * Timer
+>  * XOR engines
+>  * PCIe controllers
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-375.dtsi | 439 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 439 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/armada-375.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+> new file mode 100644
+> index 0000000..2697345
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-375.dtsi
+> @@ -0,0 +1,439 @@
+> +/*
+> + * Device Tree Include file for Marvell Armada 375 family SoC
+> + *
+> + * Copyright (C) 2014 Marvell
+> + *
+> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +#define MBUS_ID(target,attributes) (((target) << 24) | ((attributes) << 16))
+> +
+> +/ {
+> +	model = "Marvell Armada 375 family SoC";
+> +	compatible = "marvell,armada375";
+> +
+> +	aliases {
+> +		gpio0 = &gpio0;
+> +		gpio1 = &gpio1;
+> +		gpio2 = &gpio2;
+> +	};
+> +
+> +	clocks {
+> +		/* 2 GHz fixed main PLL */
+> +		mainpll: mainpll {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <2000000000>;
+> +		};
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg = <0>;
+> +		};
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a9";
+> +			reg = <1>;
+> +		};
+> +	};
+> +
+> +	soc {
+...
+> +		internal-regs {
+...
+> +			gateclk: clock-gating-control at 18220 {
+> +				compatible = "marvell,armada-375-gating-clock";
+> +				reg = <0x18220 0x4>;
+> +				clocks = <&coreclk 0>;
+> +				#clock-cells = <1>;
+> +			};
+> +
+...
+> +			coreclk: mvebu-sar at e8204 {
+> +				compatible = "marvell,armada-375-core-clock";
+> +				reg = <0xe8204 0x04>;
+> +				#clock-cells = <1>;
+> +			};
+> +
+> +			coredivclk: corediv-clock at e8250 {
+> +				compatible = "marvell,armada-375-corediv-clock";
+> +				reg = <0xe8250 0xc>;
+> +				#clock-cells = <1>;
+> +				clocks = <&mainpll>;
+> +				clock-output-names = "nand";
+> +			};
 
-I noticed this on mvebu as well..
+Thanks for putting the internal-regs nodes in order so I didn't have to
+ask.  :) Have you noticed the same problem as the other SoCs with clock
+ordering on bootup?
 
-3.13 w/ mvebu driver:
+thx,
 
-e0001000-e0001fff : /mbus/pex at e0000000/pcie at 1,0/fpga at 0/fpga_sysmon at 1000
-e0006000-e0006fff : /mbus/pex at e0000000/pcie at 1,0/fpga at 0/qdr2p at 6000
-
-3.10 w/ old kirkwood driver:
-
-e0000000-e7ffffff : PCIe 0 MEM
-  e0000000-e001ffff : 0000:00:01.0
-    e0001000-e0001fff : /mbus/pex at e0000000/pcie at 1,0/fpga at 0/fpga_sysmon at 1000
-    e0006000-e0006fff : /mbus/pex at e0000000/pcie at 1,0/fpga at 0/qdr2p at 6000
-
-The latter is obviously correct and matches x86. I'm not sure where
-the new style host drivers are going wrong, even the resource that
-should be added by the PCI core itself for the BAR is missing..
-
-Jason
+Jason.
