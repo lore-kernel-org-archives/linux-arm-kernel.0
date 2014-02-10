@@ -1,43 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 10 Feb 2014 20:47:35 +0100
-Subject: [PATCH v4 0/8] Add Allwinner A20 GMAC ethernet support
-In-Reply-To: <1392028554-32545-1-git-send-email-wens@csie.org>
-References: <1392028554-32545-1-git-send-email-wens@csie.org>
-Message-ID: <20140210194735.GY3192@lukather>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 10 Feb 2014 13:50:22 -0600
+Subject: [PATCH] ARM: dts: OMAP2+: Fix boot with multi_v7_defconfig
+In-Reply-To: <1392055835-6494-1-git-send-email-rogerq@ti.com>
+References: <1392055835-6494-1-git-send-email-rogerq@ti.com>
+Message-ID: <52F92D7E.9030304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+$subject probably needs clarity.
+On 02/10/2014 12:10 PM, Roger Quadros wrote:
+> The OMAP EHCI controller is not compatible with the EHCI
+> platform HCD driver so don't claim that we are.
 
-On Mon, Feb 10, 2014 at 06:35:46PM +0800, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> This is the v4 of the remaining Allwinner A20 GMAC glue layer patches.
-> The stmmac driver changes have been merged through net-next. The
-> remaining bits are clock and DT patches. The patches should be applied
-> over my clock renaming patches.
-> 
-> The Allwinner A20 SoC integrates an early version of dwmac
-> IP from Synopsys. On top of that is a hardware glue layer.
-> This layer needs to be configured before the dwmac can be
-> used.
-> 
-> Part of the glue layer is a clock mux, which controls the
-> source and direction of the TX clock used by GMAC.
+might want to refer to the change in drivers/usb/host/ehci-platform.c
+that created this regression as well.
 
-Just merged patches 2-8.
+we also probably want to make better explanation about this issue and
+why we think this is the correct fix for it - for example, question
+Kevin asked in [1]
+> 
+> This fixes boot on OMAP platforms with CONFIG_USB_EHCI_HCD_PLATFORM=y
+> e.g. multi_v7_defconfig
+> 
+> Reported-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
 
-Thanks!
-Maxime
+[1] http://marc.info/?t=139204803900004&r=1&w=2
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/907e36b8/attachment.sig>
+Regards,
+Nishanth Menon
