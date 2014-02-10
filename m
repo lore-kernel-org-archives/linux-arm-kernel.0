@@ -1,78 +1,32 @@
-From: fabrice.gasnier@st.com (Fabrice GASNIER)
-Date: Mon, 10 Feb 2014 17:45:56 +0100
-Subject: [PATCH v2] ARM: Add imprecise abort enable/disable macro
-Message-ID: <1392050756-11145-1-git-send-email-fabrice.gasnier@st.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 10 Feb 2014 16:46:47 +0000
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20140210162230.GK25305@arm.com>
+References: <1392037324-5069-1-git-send-email-broonie@kernel.org>
+ <20140210162230.GK25305@arm.com>
+Message-ID: <20140210164647.GB13533@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds imprecise abort enable/disable macros.
-It also enables imprecise aborts when starting kernel.
+On Mon, Feb 10, 2014 at 04:22:31PM +0000, Catalin Marinas wrote:
+> On Mon, Feb 10, 2014 at 01:02:01PM +0000, Mark Brown wrote:
 
-Changes in v2:
-Only ARMv6 and later have CPSR.A bit. On earlier CPUs,
-and ARMv7M this should be a no-op.
+> > +		if (cpu != cpuid)
+> > +			cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
+> > +	}
+> > +	smp_wmb();
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- arch/arm/include/asm/irqflags.h |   10 ++++++++++
- arch/arm/kernel/smp.c           |    1 +
- arch/arm/kernel/traps.c         |    4 ++++
- 3 files changed, 15 insertions(+)
+> I now noticed there are a couple of smp_wmb() calls in this patch. What
+> are they for?
 
-diff --git a/arch/arm/include/asm/irqflags.h b/arch/arm/include/asm/irqflags.h
-index 3b763d6..8301f87 100644
---- a/arch/arm/include/asm/irqflags.h
-+++ b/arch/arm/include/asm/irqflags.h
-@@ -51,6 +51,14 @@ static inline void arch_local_irq_disable(void)
- 
- #define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
- #define local_fiq_disable() __asm__("cpsid f	@ __clf" : : : "memory", "cc")
-+
-+#ifndef CONFIG_CPU_V7M
-+#define local_abt_enable()  __asm__("cpsie a	@ __sta" : : : "memory", "cc")
-+#define local_abt_disable() __asm__("cpsid a	@ __cla" : : : "memory", "cc")
-+#else
-+#define local_abt_enable()	do { } while (0)
-+#define local_abt_disable()	do { } while (0)
-+#endif
- #else
- 
- /*
-@@ -130,6 +138,8 @@ static inline void arch_local_irq_disable(void)
- 	: "memory", "cc");					\
- 	})
- 
-+#define local_abt_enable()	do { } while (0)
-+#define local_abt_disable()	do { } while (0)
- #endif
- 
- /*
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index dc894ab..c2093cb 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -377,6 +377,7 @@ asmlinkage void secondary_start_kernel(void)
- 
- 	local_irq_enable();
- 	local_fiq_enable();
-+	local_abt_enable();
- 
- 	/*
- 	 * OK, it's off to the idle thread for us
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 4636d56..ef15709 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
- 
- 	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
- 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
-+
-+	/* Enable imprecise aborts */
-+	local_abt_enable();
-+
- #else /* ifndef CONFIG_CPU_V7M */
- 	/*
- 	 * on V7-M there is no need to copy the vector table to a dedicated
--- 
-1.7.9.5
+To be honest I mostly cargo culted them from the ARM implementation; I
+did look a bit but didn't fully dig into it - it seemed they were
+required to ensure that the updates for the new CPU are visible over all
+CPUs.  Vincent?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/fc8ec600/attachment-0001.sig>
