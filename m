@@ -1,30 +1,61 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 10 Feb 2014 18:41:20 +0200
-Subject: [PATCH v3 3/4] ARM: keystone_defconfig: enable gpio support
-In-Reply-To: <1392050481-19086-1-git-send-email-grygorii.strashko@ti.com>
-References: <1392050481-19086-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <1392050481-19086-4-git-send-email-grygorii.strashko@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 10 Feb 2014 10:50:50 -0500
+Subject: [PATCH v6 0/3] Introduce clocksource driver for Keystone platform
+In-Reply-To: <1392027058-11680-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1392027058-11680-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <52F8F55A.2090903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable enable GPIO support for Keystone by setting CONFIG_GPIOLIB and
-CONFIG_GPIO_DAVINCI options in keystone_defconfig.
+Daniel,
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- arch/arm/configs/keystone_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
+On Monday 10 February 2014 05:10 AM, Ivan Khoronzhuk wrote:
+> Add a broadcast timer64 based clockevent driver for keystone arch.
+> This driver uses timer in 64-bit general purpose mode as clock event
+> device.
+> 
+> Documentation:
+>     http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
+> 
+> Based on
+> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+> keystone/master
+> 
+> v5..v6:
+> 	added function to encapsulate __iowmb().
+> 
+> v4..v5:
+> 	used __iowmb() insted of wmb()
+> 
+> v3..v4:
+> 	rebased on latest of linux-keystone.git keystone/master
+> 
+> v2..v3:
+> - clocksource: timer-keystone: introduce clocksource driver for
+> 	changed "u64" type to "unsigned long" for hz_period as more appropriate
+> 	hz_period rounded up by DIV_ROUND_UP(rate, HZ)
+> 	corrected comments
+> 
+> v1..v2:
+> - clocksource: timer-keystone: introduce clocksource driver for
+> 	renamed timer on "timer-keystone"
+> 	in keystone_timer_interrupt() evet pointer is passed via "dev_id"
+> 	used __relaxed variants of writel/readl and added explicit barriers
+> 	added "keystone_timer_disable()" for using in keystone_set_mode()
+> 	keystone_timer_config() is not used for disabling the timer any more
+> 	in case of an unsupported mode the keystone_timer_config() returns -1.
+> 	used request_irq() instead of setup_irq()
+> 	assigned irq for event_device in event_dev->irq
+> 	calculated timer.hz_period for CLOCK_EVT_MODE_PERIODIC at init
+> 	deleted spare call of keystone_timer_config() in keystone_timer_init()
+> 
+> Ivan Khoronzhuk (3):
+>   clocksource: timer-keystone: introduce clocksource driver for Keystone
+>   clocksource: keystone: add bindings for keystone timer
+>   arm: dts: keystone: add keystone timer entry
+> 
+Can you queue the first two patches from the series ?
+I will queue the dts patch via my tree.
 
-diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-index 332ca72..f9467ad 100644
---- a/arch/arm/configs/keystone_defconfig
-+++ b/arch/arm/configs/keystone_defconfig
-@@ -179,3 +179,6 @@ CONFIG_CRYPTO_DES=y
- CONFIG_CRYPTO_ANSI_CPRNG=y
- CONFIG_CRYPTO_USER_API_HASH=y
- CONFIG_CRYPTO_USER_API_SKCIPHER=y
-+CONFIG_GPIOLIB=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_GPIO_DAVINCI=y
--- 
-1.7.9.5
+Regards,
+Santosh
