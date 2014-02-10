@@ -1,60 +1,531 @@
 From: mohit.kumar@st.com (Mohit Kumar)
-Date: Mon, 10 Feb 2014 14:21:53 +0530
-Subject: [PATCH V5 2/8] SPEAr13xx: Fix static mapping table
+Date: Mon, 10 Feb 2014 14:21:56 +0530
+Subject: [PATCH V5 5/8] SPEAr13xx: Fixup: Move SPEAr1340 SATA platform code to
+ phy driver
 In-Reply-To: <cover.1391871170.git.pratyush.anand@st.com>
 References: <cover.1391871170.git.pratyush.anand@st.com>
-Message-ID: <9cd6b768fdad8e3f9c451d29f0ab877c37b3de4f.1391871170.git.pratyush.anand@st.com>
+Message-ID: <c6a012350a47f09679e2a43a182569e9e7c3b008.1391871170.git.pratyush.anand@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pratyush Anand <pratyush.anand@st.com>
 
-SPEAr13xx was using virtual address space 0xFE000000 to map physical address
-space 0xB3000000. pci_remap_io uses 0xFEE00000 as virtual address. So
-change 0xFE000000 to 0xF9000000.
+ahci driver needs some platform specific functions which are called at
+init, exit, suspend and resume conditions. Till now these functions were
+present in a platform driver with a fixme notes.
+
+Similar functions modifying same set of registers will also be needed in
+case of PCIe phy init/exit.
+
+So move all these SATA platform code to phy-miphy40lp driver.
 
 Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Tested-by: Mohit Kumar <mohit.kumar@st.com>
 Cc: Viresh Kumar <viresh.linux@gmail.com>
+Cc: Tejun Heo <tj@kernel.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
 Cc: spear-devel at list.st.com
-Cc: stable at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree at vger.kernel.org
+Cc: linux-ide at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-pm at vger.kernel.org
 ---
- arch/arm/mach-spear/include/mach/spear.h | 4 ++--
- arch/arm/mach-spear/spear13xx.c          | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/arm/spear-misc.txt         |   4 +
+ arch/arm/boot/dts/spear1310-evb.dts                |   4 +
+ arch/arm/boot/dts/spear1310.dtsi                   |  39 +++++-
+ arch/arm/boot/dts/spear1340-evb.dts                |   4 +
+ arch/arm/boot/dts/spear1340.dtsi                   |  13 +-
+ arch/arm/boot/dts/spear13xx.dtsi                   |   5 +
+ arch/arm/mach-spear/Kconfig                        |   2 +
+ arch/arm/mach-spear/spear1340.c                    | 127 +-----------------
+ drivers/phy/phy-miphy40lp.c                        | 144 +++++++++++++++++++++
+ 9 files changed, 212 insertions(+), 130 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/spear-misc.txt
 
-diff --git a/arch/arm/mach-spear/include/mach/spear.h b/arch/arm/mach-spear/include/mach/spear.h
-index 5cdc53d..f2d6a01 100644
---- a/arch/arm/mach-spear/include/mach/spear.h
-+++ b/arch/arm/mach-spear/include/mach/spear.h
-@@ -52,10 +52,10 @@
- #ifdef CONFIG_ARCH_SPEAR13XX
+diff --git a/Documentation/devicetree/bindings/arm/spear-misc.txt b/Documentation/devicetree/bindings/arm/spear-misc.txt
+new file mode 100644
+index 0000000..aacd36a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/spear-misc.txt
+@@ -0,0 +1,4 @@
++* SPEAr Misc configuration
++** misc node required properties:
++- compatible Should be	"st,spear1340-misc", "syscon".
++- reg: Address range of misc space
+diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
+index b56a801..d42c84b 100644
+--- a/arch/arm/boot/dts/spear1310-evb.dts
++++ b/arch/arm/boot/dts/spear1310-evb.dts
+@@ -106,6 +106,10 @@
+ 			status = "okay";
+ 		};
  
- #define PERIP_GRP2_BASE				UL(0xB3000000)
--#define VA_PERIP_GRP2_BASE			IOMEM(0xFE000000)
-+#define VA_PERIP_GRP2_BASE			IOMEM(0xF9000000)
- #define MCIF_SDHCI_BASE				UL(0xB3000000)
- #define SYSRAM0_BASE				UL(0xB3800000)
--#define VA_SYSRAM0_BASE				IOMEM(0xFE800000)
-+#define VA_SYSRAM0_BASE				IOMEM(0xF9800000)
- #define SYS_LOCATION				(VA_SYSRAM0_BASE + 0x600)
++		miphy at eb800000 {
++			status = "okay";
++		};
++
+ 		cf at b2800000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/spear1310.dtsi b/arch/arm/boot/dts/spear1310.dtsi
+index 122ae94..64e7dd5 100644
+--- a/arch/arm/boot/dts/spear1310.dtsi
++++ b/arch/arm/boot/dts/spear1310.dtsi
+@@ -29,24 +29,57 @@
+ 			#gpio-cells = <2>;
+ 		};
  
- #define PERIP_GRP1_BASE				UL(0xE0000000)
-diff --git a/arch/arm/mach-spear/spear13xx.c b/arch/arm/mach-spear/spear13xx.c
-index 7aa6e8c..89212ff 100644
---- a/arch/arm/mach-spear/spear13xx.c
-+++ b/arch/arm/mach-spear/spear13xx.c
-@@ -52,7 +52,7 @@ void __init spear13xx_l2x0_init(void)
- /*
-  * Following will create 16MB static virtual/physical mappings
-  * PHYSICAL		VIRTUAL
-- * 0xB3000000		0xFE000000
-+ * 0xB3000000		0xF9000000
-  * 0xE0000000		0xFD000000
-  * 0xEC000000		0xFC000000
-  * 0xED000000		0xFB000000
+-		ahci at b1000000 {
++		miphy0: miphy at eb800000 {
++			compatible = "st,miphy", "st,spear1310-miphy";
++			reg = <0xeb800000 0x4000>;
++			misc = <&misc>;
++			phy-id = <0>;
++			#phy-cells = <1>;
++			status = "disabled";
++		};
++
++		miphy1: miphy at eb804000 {
++			compatible = "st,miphy", "st,spear1310-miphy";
++			reg = <0xeb804000 0x4000>;
++			misc = <&misc>;
++			phy-id = <1>;
++			#phy-cells = <1>;
++			status = "disabled";
++		};
++
++		miphy2: miphy at eb808000 {
++			compatible = "st,miphy", "st,spear1310-miphy";
++			reg = <0xeb808000 0x4000>;
++			misc = <&misc>;
++			phy-id = <2>;
++			#phy-cells = <1>;
++			status = "disabled";
++		};
++
++		ahci0: ahci at b1000000 {
+ 			compatible = "snps,spear-ahci";
+ 			reg = <0xb1000000 0x10000>;
+ 			interrupts = <0 68 0x4>;
++			phys = <&miphy0 0>;
++			phy-names = "sata-phy";
+ 			status = "disabled";
+ 		};
+ 
+-		ahci at b1800000 {
++		ahci1: ahci at b1800000 {
+ 			compatible = "snps,spear-ahci";
+ 			reg = <0xb1800000 0x10000>;
+ 			interrupts = <0 69 0x4>;
++			phys = <&miphy1 0>;
++			phy-names = "sata-phy";
+ 			status = "disabled";
+ 		};
+ 
+-		ahci at b4000000 {
++		ahci2: ahci at b4000000 {
+ 			compatible = "snps,spear-ahci";
+ 			reg = <0xb4000000 0x10000>;
+ 			interrupts = <0 70 0x4>;
++			phys = <&miphy2 0>;
++			phy-names = "sata-phy";
+ 			status = "disabled";
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/spear1340-evb.dts b/arch/arm/boot/dts/spear1340-evb.dts
+index d6c30ae..b23e05e 100644
+--- a/arch/arm/boot/dts/spear1340-evb.dts
++++ b/arch/arm/boot/dts/spear1340-evb.dts
+@@ -122,6 +122,10 @@
+ 			status = "okay";
+ 		};
+ 
++		miphy at eb800000 {
++			status = "okay";
++		};
++
+ 		dma at ea800000 {
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/spear1340.dtsi b/arch/arm/boot/dts/spear1340.dtsi
+index 54d128d..7e3a04b 100644
+--- a/arch/arm/boot/dts/spear1340.dtsi
++++ b/arch/arm/boot/dts/spear1340.dtsi
+@@ -31,10 +31,21 @@
+ 			status = "disabled";
+ 		};
+ 
+-		ahci at b1000000 {
++		miphy0: miphy at eb800000 {
++			compatible = "st,miphy", "st,spear1340-miphy";
++			reg = <0xeb800000 0x4000>;
++			misc = <&misc>;
++			phy-id = <0>;
++			#phy-cells = <1>;
++			status = "disabled";
++		};
++
++		ahci0: ahci at b1000000 {
+ 			compatible = "snps,spear-ahci";
+ 			reg = <0xb1000000 0x10000>;
+ 			interrupts = <0 72 0x4>;
++			phys = <&miphy0 0>;
++			phy-names = "sata-phy";
+ 			status = "disabled";
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
+index 4382547..3a72508 100644
+--- a/arch/arm/boot/dts/spear13xx.dtsi
++++ b/arch/arm/boot/dts/spear13xx.dtsi
+@@ -220,6 +220,11 @@
+ 				  0xd8000000 0xd8000000 0x01000000
+ 				  0xe0000000 0xe0000000 0x10000000>;
+ 
++			misc: syscon at e0700000 {
++				compatible = "st,spear1340-misc", "syscon";
++				reg = <0xe0700000 0x1000>;
++			};
++
+ 			gpio0: gpio at e0600000 {
+ 				compatible = "arm,pl061", "arm,primecell";
+ 				reg = <0xe0600000 0x1000>;
+diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
+index ac1710e6..7e7f1b0 100644
+--- a/arch/arm/mach-spear/Kconfig
++++ b/arch/arm/mach-spear/Kconfig
+@@ -26,6 +26,8 @@ config ARCH_SPEAR13XX
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	select PINCTRL
+ 	select USE_OF
++	select MFD_SYSCON
++	select PHY_ST_MIPHY40LP
+ 	help
+ 	  Supports for ARM's SPEAR13XX family
+ 
+diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
+index 3fb6834..8e27093 100644
+--- a/arch/arm/mach-spear/spear1340.c
++++ b/arch/arm/mach-spear/spear1340.c
+@@ -11,138 +11,13 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#define pr_fmt(fmt) "SPEAr1340: " fmt
+-
+-#include <linux/ahci_platform.h>
+-#include <linux/amba/serial.h>
+-#include <linux/delay.h>
+ #include <linux/of_platform.h>
+ #include <asm/mach/arch.h>
+ #include "generic.h"
+-#include <mach/spear.h>
+-
+-/* FIXME: Move SATA PHY code into a standalone driver */
+-
+-/* Base addresses */
+-#define SPEAR1340_SATA_BASE			UL(0xB1000000)
+-
+-/* Power Management Registers */
+-#define SPEAR1340_PCM_CFG			(VA_MISC_BASE + 0x100)
+-#define SPEAR1340_PCM_WKUP_CFG			(VA_MISC_BASE + 0x104)
+-#define SPEAR1340_SWITCH_CTR			(VA_MISC_BASE + 0x108)
+-
+-#define SPEAR1340_PERIP1_SW_RST			(VA_MISC_BASE + 0x318)
+-#define SPEAR1340_PERIP2_SW_RST			(VA_MISC_BASE + 0x31C)
+-#define SPEAR1340_PERIP3_SW_RST			(VA_MISC_BASE + 0x320)
+-
+-/* PCIE - SATA configuration registers */
+-#define SPEAR1340_PCIE_SATA_CFG			(VA_MISC_BASE + 0x424)
+-	/* PCIE CFG MASks */
+-	#define SPEAR1340_PCIE_CFG_DEVICE_PRESENT	(1 << 11)
+-	#define SPEAR1340_PCIE_CFG_POWERUP_RESET	(1 << 10)
+-	#define SPEAR1340_PCIE_CFG_CORE_CLK_EN		(1 << 9)
+-	#define SPEAR1340_PCIE_CFG_AUX_CLK_EN		(1 << 8)
+-	#define SPEAR1340_SATA_CFG_TX_CLK_EN		(1 << 4)
+-	#define SPEAR1340_SATA_CFG_RX_CLK_EN		(1 << 3)
+-	#define SPEAR1340_SATA_CFG_POWERUP_RESET	(1 << 2)
+-	#define SPEAR1340_SATA_CFG_PM_CLK_EN		(1 << 1)
+-	#define SPEAR1340_PCIE_SATA_SEL_PCIE		(0)
+-	#define SPEAR1340_PCIE_SATA_SEL_SATA		(1)
+-	#define SPEAR1340_SATA_PCIE_CFG_MASK		0xF1F
+-	#define SPEAR1340_PCIE_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_PCIE | \
+-			SPEAR1340_PCIE_CFG_AUX_CLK_EN | \
+-			SPEAR1340_PCIE_CFG_CORE_CLK_EN | \
+-			SPEAR1340_PCIE_CFG_POWERUP_RESET | \
+-			SPEAR1340_PCIE_CFG_DEVICE_PRESENT)
+-	#define SPEAR1340_SATA_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_SATA | \
+-			SPEAR1340_SATA_CFG_PM_CLK_EN | \
+-			SPEAR1340_SATA_CFG_POWERUP_RESET | \
+-			SPEAR1340_SATA_CFG_RX_CLK_EN | \
+-			SPEAR1340_SATA_CFG_TX_CLK_EN)
+-
+-#define SPEAR1340_PCIE_MIPHY_CFG		(VA_MISC_BASE + 0x428)
+-	#define SPEAR1340_MIPHY_OSC_BYPASS_EXT		(1 << 31)
+-	#define SPEAR1340_MIPHY_CLK_REF_DIV2		(1 << 27)
+-	#define SPEAR1340_MIPHY_CLK_REF_DIV4		(2 << 27)
+-	#define SPEAR1340_MIPHY_CLK_REF_DIV8		(3 << 27)
+-	#define SPEAR1340_MIPHY_PLL_RATIO_TOP(x)	(x << 0)
+-	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA \
+-			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
+-			SPEAR1340_MIPHY_CLK_REF_DIV2 | \
+-			SPEAR1340_MIPHY_PLL_RATIO_TOP(60))
+-	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK \
+-			(SPEAR1340_MIPHY_PLL_RATIO_TOP(120))
+-	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE \
+-			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
+-			SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
+-
+-/* SATA device registration */
+-static int sata_miphy_init(struct device *dev, void __iomem *addr)
+-{
+-	writel(SPEAR1340_SATA_CFG_VAL, SPEAR1340_PCIE_SATA_CFG);
+-	writel(SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK,
+-			SPEAR1340_PCIE_MIPHY_CFG);
+-	/* Switch on sata power domain */
+-	writel((readl(SPEAR1340_PCM_CFG) | (0x800)), SPEAR1340_PCM_CFG);
+-	msleep(20);
+-	/* Disable PCIE SATA Controller reset */
+-	writel((readl(SPEAR1340_PERIP1_SW_RST) & (~0x1000)),
+-			SPEAR1340_PERIP1_SW_RST);
+-	msleep(20);
+-
+-	return 0;
+-}
+-
+-void sata_miphy_exit(struct device *dev)
+-{
+-	writel(0, SPEAR1340_PCIE_SATA_CFG);
+-	writel(0, SPEAR1340_PCIE_MIPHY_CFG);
+-
+-	/* Enable PCIE SATA Controller reset */
+-	writel((readl(SPEAR1340_PERIP1_SW_RST) | (0x1000)),
+-			SPEAR1340_PERIP1_SW_RST);
+-	msleep(20);
+-	/* Switch off sata power domain */
+-	writel((readl(SPEAR1340_PCM_CFG) & (~0x800)), SPEAR1340_PCM_CFG);
+-	msleep(20);
+-}
+-
+-int sata_suspend(struct device *dev)
+-{
+-	if (dev->power.power_state.event == PM_EVENT_FREEZE)
+-		return 0;
+-
+-	sata_miphy_exit(dev);
+-
+-	return 0;
+-}
+-
+-int sata_resume(struct device *dev)
+-{
+-	if (dev->power.power_state.event == PM_EVENT_THAW)
+-		return 0;
+-
+-	return sata_miphy_init(dev, NULL);
+-}
+-
+-static struct ahci_platform_data sata_pdata = {
+-	.init = sata_miphy_init,
+-	.exit = sata_miphy_exit,
+-	.suspend = sata_suspend,
+-	.resume = sata_resume,
+-};
+-
+-/* Add SPEAr1340 auxdata to pass platform data */
+-static struct of_dev_auxdata spear1340_auxdata_lookup[] __initdata = {
+-	OF_DEV_AUXDATA("snps,spear-ahci", SPEAR1340_SATA_BASE, NULL,
+-			&sata_pdata),
+-	{}
+-};
+ 
+ static void __init spear1340_dt_init(void)
+ {
+-	of_platform_populate(NULL, of_default_bus_match_table,
+-			spear1340_auxdata_lookup, NULL);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+ static const char * const spear1340_dt_board_compat[] = {
+diff --git a/drivers/phy/phy-miphy40lp.c b/drivers/phy/phy-miphy40lp.c
+index 3a9ada1..0ee1972 100644
+--- a/drivers/phy/phy-miphy40lp.c
++++ b/drivers/phy/phy-miphy40lp.c
+@@ -8,8 +8,10 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  *
++ * 04/02/2014: Adding support of SATA mode for SPEAr1340.
+  */
+ 
++#include <linux/bitops.h>
+ #include <linux/delay.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/kernel.h>
+@@ -19,6 +21,60 @@
+ #include <linux/phy/phy.h>
+ #include <linux/regmap.h>
+ 
++/* SPEAr1340 Registers */
++/* Power Management Registers */
++#define SPEAR1340_PCM_CFG			0x100
++	#define SPEAR1340_PCM_CFG_SATA_POWER_EN		BIT(11)
++#define SPEAR1340_PCM_WKUP_CFG			0x104
++#define SPEAR1340_SWITCH_CTR			0x108
++
++#define SPEAR1340_PERIP1_SW_RST			0x318
++	#define SPEAR1340_PERIP1_SW_RSATA		BIT(12)
++#define SPEAR1340_PERIP2_SW_RST			0x31C
++#define SPEAR1340_PERIP3_SW_RST			0x320
++
++/* PCIE - SATA configuration registers */
++#define SPEAR1340_PCIE_SATA_CFG			0x424
++	/* PCIE CFG MASks */
++	#define SPEAR1340_PCIE_CFG_DEVICE_PRESENT	BIT(11)
++	#define SPEAR1340_PCIE_CFG_POWERUP_RESET	BIT(10)
++	#define SPEAR1340_PCIE_CFG_CORE_CLK_EN		BIT(9)
++	#define SPEAR1340_PCIE_CFG_AUX_CLK_EN		BIT(8)
++	#define SPEAR1340_SATA_CFG_TX_CLK_EN		BIT(4)
++	#define SPEAR1340_SATA_CFG_RX_CLK_EN		BIT(3)
++	#define SPEAR1340_SATA_CFG_POWERUP_RESET	BIT(2)
++	#define SPEAR1340_SATA_CFG_PM_CLK_EN		BIT(1)
++	#define SPEAR1340_PCIE_SATA_SEL_PCIE		(0)
++	#define SPEAR1340_PCIE_SATA_SEL_SATA		(1)
++	#define SPEAR1340_PCIE_SATA_CFG_MASK		0xF1F
++	#define SPEAR1340_PCIE_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_PCIE | \
++			SPEAR1340_PCIE_CFG_AUX_CLK_EN | \
++			SPEAR1340_PCIE_CFG_CORE_CLK_EN | \
++			SPEAR1340_PCIE_CFG_POWERUP_RESET | \
++			SPEAR1340_PCIE_CFG_DEVICE_PRESENT)
++	#define SPEAR1340_SATA_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_SATA | \
++			SPEAR1340_SATA_CFG_PM_CLK_EN | \
++			SPEAR1340_SATA_CFG_POWERUP_RESET | \
++			SPEAR1340_SATA_CFG_RX_CLK_EN | \
++			SPEAR1340_SATA_CFG_TX_CLK_EN)
++
++#define SPEAR1340_PCIE_MIPHY_CFG		0x428
++	#define SPEAR1340_MIPHY_OSC_BYPASS_EXT		BIT(31)
++	#define SPEAR1340_MIPHY_CLK_REF_DIV2		BIT(27)
++	#define SPEAR1340_MIPHY_CLK_REF_DIV4		(2 << 27)
++	#define SPEAR1340_MIPHY_CLK_REF_DIV8		(3 << 27)
++	#define SPEAR1340_MIPHY_PLL_RATIO_TOP(x)	(x << 0)
++	#define SPEAR1340_PCIE_MIPHY_CFG_MASK		0xF80000FF
++	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA \
++			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
++			SPEAR1340_MIPHY_CLK_REF_DIV2 | \
++			SPEAR1340_MIPHY_PLL_RATIO_TOP(60))
++	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK \
++			(SPEAR1340_MIPHY_PLL_RATIO_TOP(120))
++	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE \
++			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
++			SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
++
+ enum phy_mode {
+ 	SATA,
+ 	PCIE,
+@@ -50,6 +106,93 @@ struct miphy40lp_priv {
+ 	struct miphy40lp_plat_ops	*plat_ops;
+ };
+ 
++static int miphy40lp_spear1340_sata_init(struct miphy40lp_priv *priv)
++{
++	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
++			SPEAR1340_PCIE_SATA_CFG_MASK, SPEAR1340_SATA_CFG_VAL);
++	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
++			SPEAR1340_PCIE_MIPHY_CFG_MASK,
++			SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK);
++	/* Switch on sata power domain */
++	regmap_update_bits(priv->misc, SPEAR1340_PCM_CFG,
++			SPEAR1340_PCM_CFG_SATA_POWER_EN,
++			SPEAR1340_PCM_CFG_SATA_POWER_EN);
++	msleep(20);
++	/* Disable PCIE SATA Controller reset */
++	regmap_update_bits(priv->misc, SPEAR1340_PERIP1_SW_RST,
++			SPEAR1340_PERIP1_SW_RSATA, 0);
++	msleep(20);
++
++	return 0;
++}
++
++static int miphy40lp_spear1340_sata_exit(struct miphy40lp_priv *priv)
++{
++	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
++			SPEAR1340_PCIE_SATA_CFG_MASK, 0);
++	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
++			SPEAR1340_PCIE_MIPHY_CFG_MASK, 0);
++
++	/* Enable PCIE SATA Controller reset */
++	regmap_update_bits(priv->misc, SPEAR1340_PERIP1_SW_RST,
++			SPEAR1340_PERIP1_SW_RSATA,
++			SPEAR1340_PERIP1_SW_RSATA);
++	msleep(20);
++	/* Switch off sata power domain */
++	regmap_update_bits(priv->misc, SPEAR1340_PCM_CFG,
++			SPEAR1340_PCM_CFG_SATA_POWER_EN, 0);
++	msleep(20);
++
++	return 0;
++}
++
++static int miphy40lp_spear1340_init(struct miphy40lp_priv *priv)
++{
++	int ret = 0;
++
++	if (priv->mode == SATA)
++		ret = miphy40lp_spear1340_sata_init(priv);
++
++	return ret;
++}
++
++static int miphy40lp_spear1340_exit(struct miphy40lp_priv *priv)
++{
++	int ret = 0;
++
++	if (priv->mode == SATA)
++		ret = miphy40lp_spear1340_sata_exit(priv);
++
++	return ret;
++}
++
++static int miphy40lp_spear1340_suspend(struct miphy40lp_priv *priv)
++{
++	int ret = 0;
++
++	if (priv->mode == SATA)
++		ret = miphy40lp_spear1340_sata_exit(priv);
++
++	return ret;
++}
++
++static int miphy40lp_spear1340_resume(struct miphy40lp_priv *priv)
++{
++	int ret = 0;
++
++	if (priv->mode == SATA)
++		ret = miphy40lp_spear1340_sata_init(priv);
++
++	return ret;
++}
++
++static struct miphy40lp_plat_ops spear1340_phy_ops = {
++	.plat_init = miphy40lp_spear1340_init,
++	.plat_exit = miphy40lp_spear1340_exit,
++	.plat_suspend = miphy40lp_spear1340_suspend,
++	.plat_resume = miphy40lp_spear1340_resume,
++};
++
+ static int miphy40lp_init(struct phy *phy)
+ {
+ 	struct miphy40lp_priv *priv = phy_get_drvdata(phy);
+@@ -100,6 +243,7 @@ static int miphy40lp_power_on(struct phy *phy)
+ 
+ static const struct of_device_id miphy40lp_of_match[] = {
+ 	{ .compatible = "st,miphy40lp-phy", .data = NULL },
++	{ .compatible = "st,spear1340-miphy", .data = &spear1340_phy_ops },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, miphy40lp_of_match);
 -- 
 1.8.1.2
