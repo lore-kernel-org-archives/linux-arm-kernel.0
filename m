@@ -1,62 +1,37 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 10 Feb 2014 10:18:57 -0800
-Subject: [GIT PULL] mvebu: phy and ata fixes for v3.14
-In-Reply-To: <20140208172217.GK8533@titan.lakedaemon.net> (Jason Cooper's
- message of "Sat, 8 Feb 2014 12:22:17 -0500")
-References: <20140208172217.GK8533@titan.lakedaemon.net>
-Message-ID: <7hd2iual0u.fsf@paris.lan>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 10 Feb 2014 19:19:59 +0100
+Subject: [PATCH] ARM: mvebu: rename mvebu_defconfig to mvebu_v7_defconfig
+Message-ID: <1392056399-20908-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+With the merge of the Kirkwood support into arch/arm/mach-mvebu/, the
+mvebu platform will no longer only contain ARMv7 compatible processors
+(Armada 370, Armada XP, and soon Armada 375, Armada 38x and Dove), but
+also ARMv5 compatible processors (Kirkwood, and hopefully Orion5x in
+the future).
 
-Jason Cooper <jason@lakedaemon.net> writes:
+However, a single mvebu_defconfig cannot work, since it is not
+possible to build a kernel that supports both ARMv5 and ARMv7
+platforms in the same binary. As a consequence, this commit renames
+mvebu_defconfig to mvebu_v7_defconfig, which is the configuration that
+will build a kernel that supports all ARMv7 mvebu platforms. As
+Kirkwood support gets merged into mach-mvebu, an additional
+mvebu_v5_defconfig will be added.
 
-> All,
->
-> Here is a small set of fixes for fix a boot hang we are currently
-> experiencing in the boot farm.  Now that we are probing for the phy, we
-> didn't take into account optional phys, which causes the hang.  These
-> patches fix this and restore booting on the affected platforms.
->
-> thx,
->
-> Jason.
->
->
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
->
->   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
->
-> are available in the git repository at:
->
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-phy_ata-fixes-3.14
->
-> for you to fetch changes up to 90aa2997029fa623fe9e3ec3a469a00a34130237:
->
->   ata: sata_mv: Fix probe failures with optional phys (2014-02-05 05:48:58 +0000)
->
-> ----------------------------------------------------------------
-> mvebu phy and ata fixes for v3.14
->
->  - phy
->     - add support for optional phys via NULL
->
->  - ata
->     - fix boot hang due to probe failure of optional phys
->
-> NOTE:  Series has been Ack'd by both the phy maintainer and the ata maintainer
-> for going through arm-soc
->
-> ----------------------------------------------------------------
+Even though we already have a multi_v7_defconfig, the mvebu developers
+found it more convenient for development to have a defconfig that
+builds only the mvebu platforms.
 
-Thanks, applied to fixes.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/configs/{mvebu_defconfig => mvebu_v7_defconfig} | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename arch/arm/configs/{mvebu_defconfig => mvebu_v7_defconfig} (100%)
 
-Note that the openblocks ax3 will still fail boot test on
-mvebu_defconfig in arm-soc because we're missing the the 'select
-GENERIC_PHY' Kconfig fix which seems to have gone through libata/next.
-That's fine though as things should boot fine in -next now.
-
-Thanks for the fixes,
-
-Kevin
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_v7_defconfig
+similarity index 100%
+rename from arch/arm/configs/mvebu_defconfig
+rename to arch/arm/configs/mvebu_v7_defconfig
+-- 
+1.8.3.2
