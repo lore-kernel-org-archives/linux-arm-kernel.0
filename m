@@ -1,14 +1,14 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 10 Feb 2014 18:04:55 +0100
-Subject: [PATCH 1/2] pinctrl: mvebu: add pin-muxing driver for the Marvell
- Armada 375
+Date: Mon, 10 Feb 2014 18:04:56 +0100
+Subject: [PATCH 2/2] pinctrl: mvebu: add pin-muxing driver for the Marvell
+ Armada 380/385
 In-Reply-To: <1392051896-19178-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1392051896-19178-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1392051896-19178-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1392051896-19178-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Marvell Armada 375 is a new ARM SoC from Marvell, part of the
+The Marvell Armada 380/385 are new ARM SoCs from Marvell, part of the
 mvebu family, but using a Cortex-A9 CPU core. In terms of pin-muxing,
 it is similar to Armada 370 and XP for the register layout, only
 different in the number of available pins and their
@@ -17,29 +17,30 @@ drivers/pinctrl/mvebu/ infrastructure, with no other changes that the
 list of pins and corresponding functions.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- .../pinctrl/marvell,armada-375-pinctrl.txt         |  81 ++++
+ .../pinctrl/marvell,armada-38x-pinctrl.txt         |  79 ++++
  drivers/pinctrl/mvebu/Kconfig                      |   4 +
  drivers/pinctrl/mvebu/Makefile                     |   1 +
- drivers/pinctrl/mvebu/pinctrl-armada-375.c         | 441 +++++++++++++++++++++
- 4 files changed, 527 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
- create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-375.c
+ drivers/pinctrl/mvebu/pinctrl-armada-38x.c         | 445 +++++++++++++++++++++
+ 4 files changed, 529 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
+ create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-38x.c
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
 new file mode 100644
-index 0000000..2ede59d
+index 0000000..1d45f9d
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
-@@ -0,0 +1,81 @@
-+* Marvell Armada 375 SoC pinctrl driver for mpp
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
+@@ -0,0 +1,79 @@
++* Marvell Armada 380/385 SoC pinctrl driver for mpp
 +
 +Please refer to marvell,mvebu-pinctrl.txt in this directory for common binding
 +part and usage.
 +
 +Required properties:
-+- compatible: "marvell,88f6720-pinctrl"
++- compatible: "marvell,88f6810-pinctrl", "marvell,88f6820-pinctrl" or
++  "marvell,88f6828-pinctrl" depending on the specific variant of the
++  SoC being used.
 +
 +Available mpp pins/groups and functions:
 +Note: brackets (x) are not part of the mpp name for marvell,function and given
@@ -47,82 +48,78 @@ index 0000000..2ede59d
 +
 +name          pins     functions
 +================================================================================
-+mpp0          0        gpio, dev(ad2), spi0(cs1), spi1(cs1)
-+mpp1          1        gpio, dev(ad3), spi0(mosi), spi1(mosi)
-+mpp2          2        gpio, dev(ad4), ptp(eventreq), led(c0), audio(sdi)
-+mpp3          3        gpio, dev(ad5), ptp(triggen), led(p3), audio(mclk)
-+mpp4          4        gpio, dev(ad6), spi0(miso), spi1(miso)
-+mpp5          5        gpio, dev(ad7), spi0(cs2), spi1(cs2)
-+mpp6          6        gpio, dev(ad0), led(p1), audio(rclk)
-+mpp7          7        gpio, dev(ad1), ptp(clk), led(p2), audio(extclk)
-+mpp8          8        gpio, dev (bootcs), spi0(cs0), spi1(cs0)
-+mpp9          9        gpio, nf(wen), spi0(sck), spi1(sck)
-+mpp10        10        gpio, nf(ren), dram(vttctrl), led(c1)
-+mpp11        11        gpio, dev(a0), led(c2), audio(sdo)
-+mpp12        12        gpio, dev(a1), audio(bclk)
-+mpp13        13        gpio, dev(readyn), pcie0(rstoutn), pcie1(rstoutn)
-+mpp14        14        gpio, i2c0(sda), uart1(txd)
-+mpp15        15        gpio, i2c0(sck), uart1(rxd)
-+mpp16        16        gpio, uart0(txd)
-+mpp17        17        gpio, uart0(rxd)
-+mpp18        18        gpio, tdm(intn)
-+mpp19        19        gpio, tdm(rstn)
-+mpp20        20        gpio, tdm(pclk)
-+mpp21        21        gpio, tdm(fsync)
-+mpp22        22        gpio, tdm(drx)
-+mpp23        23        gpio, tdm(dtx)
-+mpp24        24        gpio, led(p0), ge1(rxd0), sd(cmd), uart0(rts)
-+mpp25        25        gpio, led(p2), ge1(rxd1), sd(d0), uart0(cts)
-+mpp26        26        gpio, pcie0(clkreq), ge1(rxd2), sd(d2), uart1(rts)
-+mpp27        27        gpio, pcie1(clkreq), ge1(rxd3), sd(d1), uart1(cts)
-+mpp28        28        gpio, led(p3), ge1(txctl), sd(clk)
-+mpp29        29        gpio, pcie1(clkreq), ge1(rxclk), sd(d3)
-+mpp30        30        gpio, ge1(txd0), spi1(cs0)
-+mpp31        31        gpio, ge1(txd1), spi1(mosi)
-+mpp32        32        gpio, ge1(txd2), spi1(sck), ptp(triggen)
-+mpp33        33        gpio, ge1(txd3), spi1(miso)
-+mpp34        34        gpio, ge1(txclkout), spi1(sck)
-+mpp35        35        gpio, ge1(rxctl), spi1(cs1), spi0(cs2)
-+mpp36        36        gpio, pcie0(clkreq)
-+mpp37        37        gpio, pcie0(clkreq), tdm(intn), ge(mdc)
-+mpp38        38        gpio, pcie1(clkreq), ge(mdio)
-+mpp39        39        gpio, ref(clkout)
-+mpp40        40        gpio, uart1(txd)
-+mpp41        41        gpio, uart1(rxd)
-+mpp42        42        gpio, spi1(cs2), led(c0)
-+mpp43        43        gpio, sata0(prsnt), dram(vttctrl)
-+mpp44        44        gpio, sata0(prsnt)
-+mpp45        45        gpio, spi0(cs2), pcie0(rstoutn)
-+mpp46        46        gpio, led(p0), ge0(txd0), ge1(txd0)
-+mpp47        47        gpio, led(p1), ge0(txd1), ge1(txd1)
-+mpp48        48        gpio, led(p2), ge0(txd2), ge1(txd2)
-+mpp49        49        gpio, led(p3), ge0(txd3), ge1(txd3)
-+mpp50        50        gpio, led(c0), ge0(rxd0), ge1(rxd0)
-+mpp51        51        gpio, led(c1), ge0(rxd1), ge1(rxd1)
-+mpp52        52        gpio, led(c2), ge0(rxd2), ge1(rxd2)
-+mpp53        53        gpio, pcie1(rstoutn), ge0(rxd3), ge1(rxd3)
-+mpp54        54        gpio, pcie0(rstoutn), ge0(rxctl), ge1(rxctl)
-+mpp55        55        gpio, ge0(rxclk), ge1(rxclk)
-+mpp56        56        gpio, ge0(txclkout), ge1(txclkout)
-+mpp57        57        gpio, ge0(txctl), ge1(txctl)
-+mpp58        58        gpio, led(c0)
-+mpp59        59        gpio, led(c1)
-+mpp60        60        gpio, uart1(txd), led(c2)
-+mpp61        61        gpio, i2c1(sda), uart1(rxd), spi1(cs2), led(p0)
-+mpp62        62        gpio, i2c1(sck), led(p1)
-+mpp63        63        gpio, ptp(triggen), led(p2)
-+mpp64        64        gpio, dram(vttctrl), led(p3)
-+mpp65        65        gpio, sata1(prsnt)
-+mpp66        66        gpio, ptp(eventreq), spi1(cs3)
++mpp0          0        gpio, ua0(rxd)
++mpp1          1        gpio, ua0(txd)
++mpp2          2        gpio, i2c0(sck)
++mpp3          3        gpio, i2c0(sda)
++mpp4          4        gpio, ge(mdc), ua1(txd), ua0(rts)
++mpp5          5        gpio, ge(mdio), ua1(rxd), ua0(cts)
++mpp6          6        gpio, ge0(txclkout), ge0(crs), dev(cs3)
++mpp7          7        gpio, ge0(txd0), dev(ad9)
++mpp8          8        gpio, ge0(txd1), dev(ad10)
++mpp9          9        gpio, ge0(txd2), dev(ad11)
++mpp10         10       gpio, ge0(txd3), dev(ad12)
++mpp11         11       gpio, ge0(txctl), dev(ad13)
++mpp12         12       gpio, ge0(rxd0), pcie0(rstout), pcie1(rstout) [1], spi0(cs1), dev(ad14)
++mpp13         13       gpio, ge0(rxd1), pcie0(clkreq), pcie1(clkreq) [1], spi0(cs2), dev(ad15)
++mpp14         14       gpio, ge0(rxd2), ptp(clk), m(vtt_ctrl), spi0(cs3), dev(wen1)
++mpp15         15       gpio, ge0(rxd3), ge(mdc slave), pcie0(rstout), spi0(mosi), pcie1(rstout) [1]
++mpp16         16       gpio, ge0(rxctl), ge(mdio slave), m(decc_err), spi0(miso), pcie0(clkreq)
++mpp17         17       gpio, ge0(rxclk), ptp(clk), ua1(rxd), spi0(sck), sata1(prsnt)
++mpp18         18       gpio, ge0(rxerr), ptp(trig_gen), ua1(txd), spi0(cs0), pcie1(rstout) [1]
++mpp19         19       gpio, ge0(col), ptp(event_req), pcie0(clkreq), sata1(prsnt), ua0(cts)
++mpp20         20       gpio, ge0(txclk), ptp(clk), pcie1(rstout) [1], sata0(prsnt), ua0(rts)
++mpp21         21       gpio, spi0(cs1), ge1(rxd0), sata0(prsnt), sd0(cmd), dev(bootcs)
++mpp22         22       gpio, spi0(mosi), dev(ad0)
++mpp23         23       gpio, spi0(sck), dev(ad2)
++mpp24         24       gpio, spi0(miso), ua0(cts), ua1(rxd), sd0(d4), dev(ready)
++mpp25         25       gpio, spi0(cs0), ua0(rts), ua1(txd), sd0(d5), dev(cs0)
++mpp26         26       gpio, spi0(cs2), i2c1(sck), sd0(d6), dev(cs1)
++mpp27         27       gpio, spi0(cs3), ge1(txclkout), i2c1(sda), sd0(d7), dev(cs2)
++mpp28         28       gpio, ge1(txd0), sd0(clk), dev(ad5)
++mpp29         29       gpio, ge1(txd1), dev(ale0)
++mpp30         30       gpio, ge1(txd2), dev(oen)
++mpp31         31       gpio, ge1(txd3), dev(ale1)
++mpp32         32       gpio, ge1(txctl), dev(wen0)
++mpp33         33       gpio, m(decc_err), dev(ad3)
++mpp34         34       gpio, dev(ad1)
++mpp35         35       gpio, ref(clk_out1), dev(a1)
++mpp36         36       gpio, ptp(trig_gen), dev(a0)
++mpp37         37       gpio, ptp(clk), ge1(rxclk), sd0(d3), dev(ad8)
++mpp38         38       gpio, ptp(event_req), ge1(rxd1), ref(clk_out0), sd0(d0), dev(ad4)
++mpp39         39       gpio, i2c1(sck), ge1(rxd2), ua0(cts), sd0(d1), dev(a2)
++mpp40         40       gpio, i2c1(sda), ge1(rxd3), ua0(rts), sd0(d2), dev(ad6)
++mpp41         41       gpio, ua1(rxd), ge1(rxctl), ua0(cts), spi1(cs3), dev(burst/last)
++mpp42         42       gpio, ua1(txd), ua0(rts), dev(ad7)
++mpp43         43       gpio, pcie0(clkreq), m(vtt_ctrl), m(decc_err), pcie0(rstout), dev(clkout)
++mpp44         44       gpio, sata0(prsnt), sata1(prsnt), sata2(prsnt) [2], sata3(prsnt) [3], pcie0(rstout)
++mpp45         45       gpio, ref(clk_out0), pcie0(rstout), pcie1(rstout) [1], pcie2(rstout), pcie3(rstout)
++mpp46         46       gpio, ref(clk_out1), pcie0(rstout), pcie1(rstout) [1], pcie2(rstout), pcie3(rstout)
++mpp47         47       gpio, sata0(prsnt), sata1(prsnt), sata2(prsnt) [2], spi1(cs2), sata3(prsnt) [2]
++mpp48         48       gpio, sata0(prsnt), m(vtt_ctrl), tdm2c(pclk), audio(mclk), sd0(d4)
++mpp49         49       gpio, sata2(prsnt) [2], sata3(prsnt) [2], tdm2c(fsync), audio(lrclk), sd0(d5)
++mpp50         50       gpio, pcie0(rstout), pcie1(rstout) [1], tdm2c(drx), audio(extclk), sd0(cmd)
++mpp51         51       gpio, tdm2c(dtx), audio(sdo), m(decc_err)
++mpp52         52       gpio, pcie0(rstout), pcie1(rstout) [1], tdm2c(intn), audio(sdi), sd0(d6)
++mpp53         53       gpio, sata1(prsnt), sata0(prsnt), tdm2c(rstn), audio(bclk), sd0(d7)
++mpp54         54       gpio, sata0(prsnt), sata1(prsnt), pcie0(rstout), pcie1(rstout) [1], sd0(d3)
++mpp55         55       gpio, ua1(cts), ge(mdio), pcie1(clkreq) [1], spi1(cs1), sd0(d0)
++mpp56         56       gpio, ua1(rts), ge(mdc), m(decc_err), spi1(mosi)
++mpp57         57       gpio, spi1(sck), sd0(clk)
++mpp58         58       gpio, pcie1(clkreq) [1], i2c1(sck), pcie2(clkreq), spi1(miso), sd0(d1)
++mpp59         59       gpio, pcie0(rstout), i2c1(sda), pcie1(rstout) [1], spi1(cs0), sd0(d2)
++
++[1]: only available on 88F6820 and 88F6828
++[2]: only available on 88F6828
 diff --git a/drivers/pinctrl/mvebu/Kconfig b/drivers/pinctrl/mvebu/Kconfig
-index 366fa54..30c4570 100644
+index 30c4570..a22b030 100644
 --- a/drivers/pinctrl/mvebu/Kconfig
 +++ b/drivers/pinctrl/mvebu/Kconfig
-@@ -17,6 +17,10 @@ config PINCTRL_ARMADA_370
+@@ -21,6 +21,10 @@ config PINCTRL_ARMADA_375
  	bool
  	select PINCTRL_MVEBU
  
-+config PINCTRL_ARMADA_375
++config PINCTRL_ARMADA_38X
 +	bool
 +	select PINCTRL_MVEBU
 +
@@ -130,25 +127,25 @@ index 366fa54..30c4570 100644
  	bool
  	select PINCTRL_MVEBU
 diff --git a/drivers/pinctrl/mvebu/Makefile b/drivers/pinctrl/mvebu/Makefile
-index 37c2532..e306c64 100644
+index e306c64..bc1b9f1 100644
 --- a/drivers/pinctrl/mvebu/Makefile
 +++ b/drivers/pinctrl/mvebu/Makefile
-@@ -2,4 +2,5 @@ obj-$(CONFIG_PINCTRL_MVEBU)	+= pinctrl-mvebu.o
- obj-$(CONFIG_PINCTRL_DOVE)	+= pinctrl-dove.o
+@@ -3,4 +3,5 @@ obj-$(CONFIG_PINCTRL_DOVE)	+= pinctrl-dove.o
  obj-$(CONFIG_PINCTRL_KIRKWOOD)	+= pinctrl-kirkwood.o
  obj-$(CONFIG_PINCTRL_ARMADA_370) += pinctrl-armada-370.o
-+obj-$(CONFIG_PINCTRL_ARMADA_375) += pinctrl-armada-375.o
+ obj-$(CONFIG_PINCTRL_ARMADA_375) += pinctrl-armada-375.o
++obj-$(CONFIG_PINCTRL_ARMADA_38X) += pinctrl-armada-38x.o
  obj-$(CONFIG_PINCTRL_ARMADA_XP)  += pinctrl-armada-xp.o
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-375.c b/drivers/pinctrl/mvebu/pinctrl-armada-375.c
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-38x.c b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
 new file mode 100644
-index 0000000..c741a34
+index 0000000..b3aa85e
 --- /dev/null
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-375.c
-@@ -0,0 +1,441 @@
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+@@ -0,0 +1,445 @@
 +/*
-+ * Marvell Armada 375 pinctrl driver based on mvebu pinctrl core
++ * Marvell Armada 380/385 pinctrl driver based on mvebu pinctrl core
 + *
-+ * Copyright (C) 2012 Marvell
++ * Copyright (C) 2013 Marvell
 + *
 + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 + *
@@ -163,428 +160,432 @@ index 0000000..c741a34
 +#include <linux/io.h>
 +#include <linux/module.h>
 +#include <linux/platform_device.h>
-+#include <linux/clk.h>
 +#include <linux/of.h>
 +#include <linux/of_device.h>
 +#include <linux/pinctrl/pinctrl.h>
 +
 +#include "pinctrl-mvebu.h"
 +
-+static struct mvebu_mpp_mode mv88f6720_mpp_modes[] = {
-+	MPP_MODE(0,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "dev", "ad2"),
-+		 MPP_FUNCTION(0x2, "spi0", "cs1"),
-+		 MPP_FUNCTION(0x3, "spi1", "cs1"),
-+		 MPP_FUNCTION(0x5, "nand", "io2")),
-+	MPP_MODE(1,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "dev", "ad3"),
-+		 MPP_FUNCTION(0x2, "spi0", "mosi"),
-+		 MPP_FUNCTION(0x3, "spi1", "mosi"),
-+		 MPP_FUNCTION(0x5, "nand", "io3")),
-+	MPP_MODE(2,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "dev", "ad4"),
-+		 MPP_FUNCTION(0x2, "ptp", "eventreq"),
-+		 MPP_FUNCTION(0x3, "led", "c0"),
-+		 MPP_FUNCTION(0x4, "audio", "sdi"),
-+		 MPP_FUNCTION(0x5, "nand", "io4"),
-+		 MPP_FUNCTION(0x6, "spi1", "mosi")),
-+	MPP_MODE(3,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "dev", "ad5"),
-+		 MPP_FUNCTION(0x2, "ptp", "triggen"),
-+		 MPP_FUNCTION(0x3, "led", "p3"),
-+		 MPP_FUNCTION(0x4, "audio", "mclk"),
-+		 MPP_FUNCTION(0x5, "nand", "io5"),
-+		 MPP_FUNCTION(0x6, "spi1", "miso")),
-+	MPP_MODE(4,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "dev", "ad6"),
-+		 MPP_FUNCTION(0x2, "spi0", "miso"),
-+		 MPP_FUNCTION(0x3, "spi1", "miso"),
-+		 MPP_FUNCTION(0x5, "nand", "io6")),
-+	MPP_MODE(5,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "dev", "ad7"),
-+		 MPP_FUNCTION(0x2, "spi0", "cs2"),
-+		 MPP_FUNCTION(0x3, "spi1", "cs2"),
-+		 MPP_FUNCTION(0x5, "nand", "io7"),
-+		 MPP_FUNCTION(0x6, "spi1", "miso")),
-+	MPP_MODE(6,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "dev", "ad0"),
-+		 MPP_FUNCTION(0x3, "led", "p1"),
-+		 MPP_FUNCTION(0x4, "audio", "rclk"),
-+		 MPP_FUNCTION(0x5, "nand", "io0")),
-+	MPP_MODE(7,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "dev", "ad1"),
-+		 MPP_FUNCTION(0x2, "ptp", "clk"),
-+		 MPP_FUNCTION(0x3, "led", "p2"),
-+		 MPP_FUNCTION(0x4, "audio", "extclk"),
-+		 MPP_FUNCTION(0x5, "nand", "io1")),
-+	MPP_MODE(8,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "dev ", "bootcs"),
-+		 MPP_FUNCTION(0x2, "spi0", "cs0"),
-+		 MPP_FUNCTION(0x3, "spi1", "cs0"),
-+		 MPP_FUNCTION(0x5, "nand", "ce")),
-+	MPP_MODE(9,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "nf", "wen"),
-+		 MPP_FUNCTION(0x2, "spi0", "sck"),
-+		 MPP_FUNCTION(0x3, "spi1", "sck"),
-+		 MPP_FUNCTION(0x5, "nand", "we")),
-+	MPP_MODE(10,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "nf", "ren"),
-+		 MPP_FUNCTION(0x2, "dram", "vttctrl"),
-+		 MPP_FUNCTION(0x3, "led", "c1"),
-+		 MPP_FUNCTION(0x5, "nand", "re"),
-+		 MPP_FUNCTION(0x6, "spi1", "sck")),
-+	MPP_MODE(11,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "dev", "a0"),
-+		 MPP_FUNCTION(0x3, "led", "c2"),
-+		 MPP_FUNCTION(0x4, "audio", "sdo"),
-+		 MPP_FUNCTION(0x5, "nand", "cle")),
-+	MPP_MODE(12,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "dev", "a1"),
-+		 MPP_FUNCTION(0x4, "audio", "bclk"),
-+		 MPP_FUNCTION(0x5, "nand", "ale")),
-+	MPP_MODE(13,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "dev", "readyn"),
-+		 MPP_FUNCTION(0x2, "pcie0", "rstoutn"),
-+		 MPP_FUNCTION(0x3, "pcie1", "rstoutn"),
-+		 MPP_FUNCTION(0x5, "nand", "rb"),
-+		 MPP_FUNCTION(0x6, "spi1", "mosi")),
-+	MPP_MODE(14,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "i2c0", "sda"),
-+		 MPP_FUNCTION(0x3, "uart1", "txd")),
-+	MPP_MODE(15,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "i2c0", "sck"),
-+		 MPP_FUNCTION(0x3, "uart1", "rxd")),
-+	MPP_MODE(16,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "uart0", "txd")),
-+	MPP_MODE(17,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "uart0", "rxd")),
-+	MPP_MODE(18,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "tdm", "intn")),
-+	MPP_MODE(19,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "tdm", "rstn")),
-+	MPP_MODE(20,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "tdm", "pclk")),
-+	MPP_MODE(21,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "tdm", "fsync")),
-+	MPP_MODE(22,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "tdm", "drx")),
-+	MPP_MODE(23,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "tdm", "dtx")),
-+	MPP_MODE(24,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "led", "p0"),
-+		 MPP_FUNCTION(0x2, "ge1", "rxd0"),
-+		 MPP_FUNCTION(0x3, "sd", "cmd"),
-+		 MPP_FUNCTION(0x4, "uart0", "rts"),
-+		 MPP_FUNCTION(0x5, "spi0", "cs0"),
-+		 MPP_FUNCTION(0x6, "dev", "cs1")),
-+	MPP_MODE(25,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "led", "p2"),
-+		 MPP_FUNCTION(0x2, "ge1", "rxd1"),
-+		 MPP_FUNCTION(0x3, "sd", "d0"),
-+		 MPP_FUNCTION(0x4, "uart0", "cts"),
-+		 MPP_FUNCTION(0x5, "spi0", "mosi"),
-+		 MPP_FUNCTION(0x6, "dev", "cs2")),
-+	MPP_MODE(26,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "pcie0", "clkreq"),
-+		 MPP_FUNCTION(0x2, "ge1", "rxd2"),
-+		 MPP_FUNCTION(0x3, "sd", "d2"),
-+		 MPP_FUNCTION(0x4, "uart1", "rts"),
-+		 MPP_FUNCTION(0x5, "spi0", "cs1"),
-+		 MPP_FUNCTION(0x6, "led", "c1")),
-+	MPP_MODE(27,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "pcie1", "clkreq"),
-+		 MPP_FUNCTION(0x2, "ge1", "rxd3"),
-+		 MPP_FUNCTION(0x3, "sd", "d1"),
-+		 MPP_FUNCTION(0x4, "uart1", "cts"),
-+		 MPP_FUNCTION(0x5, "spi0", "miso"),
-+		 MPP_FUNCTION(0x6, "led", "c2")),
-+	MPP_MODE(28,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "led", "p3"),
-+		 MPP_FUNCTION(0x2, "ge1", "txctl"),
-+		 MPP_FUNCTION(0x3, "sd", "clk"),
-+		 MPP_FUNCTION(0x5, "dram", "vttctrl")),
-+	MPP_MODE(29,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "pcie1", "clkreq"),
-+		 MPP_FUNCTION(0x2, "ge1", "rxclk"),
-+		 MPP_FUNCTION(0x3, "sd", "d3"),
-+		 MPP_FUNCTION(0x5, "spi0", "sck"),
-+		 MPP_FUNCTION(0x6, "pcie0", "rstoutn")),
-+	MPP_MODE(30,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "ge1", "txd0"),
-+		 MPP_FUNCTION(0x3, "spi1", "cs0"),
-+		 MPP_FUNCTION(0x5, "led", "p3"),
-+		 MPP_FUNCTION(0x6, "ptp", "eventreq")),
-+	MPP_MODE(31,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "ge1", "txd1"),
-+		 MPP_FUNCTION(0x3, "spi1", "mosi"),
-+		 MPP_FUNCTION(0x5, "led", "p0")),
-+	MPP_MODE(32,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "ge1", "txd2"),
-+		 MPP_FUNCTION(0x3, "spi1", "sck"),
-+		 MPP_FUNCTION(0x4, "ptp", "triggen"),
-+		 MPP_FUNCTION(0x5, "led", "c0")),
-+	MPP_MODE(33,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "ge1", "txd3"),
-+		 MPP_FUNCTION(0x3, "spi1", "miso"),
-+		 MPP_FUNCTION(0x5, "led", "p2")),
-+	MPP_MODE(34,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "ge1", "txclkout"),
-+		 MPP_FUNCTION(0x3, "spi1", "sck"),
-+		 MPP_FUNCTION(0x5, "led", "c1")),
-+	MPP_MODE(35,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "ge1", "rxctl"),
-+		 MPP_FUNCTION(0x3, "spi1", "cs1"),
-+		 MPP_FUNCTION(0x4, "spi0", "cs2"),
-+		 MPP_FUNCTION(0x5, "led", "p1")),
-+	MPP_MODE(36,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "pcie0", "clkreq"),
-+		 MPP_FUNCTION(0x5, "led", "c2")),
-+	MPP_MODE(37,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "pcie0", "clkreq"),
-+		 MPP_FUNCTION(0x2, "tdm", "intn"),
-+		 MPP_FUNCTION(0x4, "ge", "mdc")),
-+	MPP_MODE(38,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "pcie1", "clkreq"),
-+		 MPP_FUNCTION(0x4, "ge", "mdio")),
-+	MPP_MODE(39,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x4, "ref", "clkout"),
-+		 MPP_FUNCTION(0x5, "led", "p3")),
-+	MPP_MODE(40,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x4, "uart1", "txd"),
-+		 MPP_FUNCTION(0x5, "led", "p0")),
-+	MPP_MODE(41,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x4, "uart1", "rxd"),
-+		 MPP_FUNCTION(0x5, "led", "p1")),
-+	MPP_MODE(42,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x3, "spi1", "cs2"),
-+		 MPP_FUNCTION(0x4, "led", "c0"),
-+		 MPP_FUNCTION(0x6, "ptp", "clk")),
-+	MPP_MODE(43,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "sata0", "prsnt"),
-+		 MPP_FUNCTION(0x4, "dram", "vttctrl"),
-+		 MPP_FUNCTION(0x5, "led", "c1")),
-+	MPP_MODE(44,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x4, "sata0", "prsnt")),
-+	MPP_MODE(45,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "spi0", "cs2"),
-+		 MPP_FUNCTION(0x4, "pcie0", "rstoutn"),
-+		 MPP_FUNCTION(0x5, "led", "c2"),
-+		 MPP_FUNCTION(0x6, "spi1", "cs2")),
-+	MPP_MODE(46,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "led", "p0"),
-+		 MPP_FUNCTION(0x2, "ge0", "txd0"),
-+		 MPP_FUNCTION(0x3, "ge1", "txd0"),
-+		 MPP_FUNCTION(0x6, "dev", "wen1")),
-+	MPP_MODE(47,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "led", "p1"),
-+		 MPP_FUNCTION(0x2, "ge0", "txd1"),
-+		 MPP_FUNCTION(0x3, "ge1", "txd1"),
-+		 MPP_FUNCTION(0x5, "ptp", "triggen"),
-+		 MPP_FUNCTION(0x6, "dev", "ale0")),
-+	MPP_MODE(48,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "led", "p2"),
-+		 MPP_FUNCTION(0x2, "ge0", "txd2"),
-+		 MPP_FUNCTION(0x3, "ge1", "txd2"),
-+		 MPP_FUNCTION(0x6, "dev", "ale1")),
-+	MPP_MODE(49,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "led", "p3"),
-+		 MPP_FUNCTION(0x2, "ge0", "txd3"),
-+		 MPP_FUNCTION(0x3, "ge1", "txd3"),
-+		 MPP_FUNCTION(0x6, "dev", "a2")),
-+	MPP_MODE(50,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "led", "c0"),
-+		 MPP_FUNCTION(0x2, "ge0", "rxd0"),
-+		 MPP_FUNCTION(0x3, "ge1", "rxd0"),
-+		 MPP_FUNCTION(0x5, "ptp", "eventreq"),
-+		 MPP_FUNCTION(0x6, "dev", "ad12")),
-+	MPP_MODE(51,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "led", "c1"),
-+		 MPP_FUNCTION(0x2, "ge0", "rxd1"),
-+		 MPP_FUNCTION(0x3, "ge1", "rxd1"),
-+		 MPP_FUNCTION(0x6, "dev", "ad8")),
-+	MPP_MODE(52,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "led", "c2"),
-+		 MPP_FUNCTION(0x2, "ge0", "rxd2"),
-+		 MPP_FUNCTION(0x3, "ge1", "rxd2"),
-+		 MPP_FUNCTION(0x5, "i2c0", "sda"),
-+		 MPP_FUNCTION(0x6, "dev", "ad9")),
-+	MPP_MODE(53,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "pcie1", "rstoutn"),
-+		 MPP_FUNCTION(0x2, "ge0", "rxd3"),
-+		 MPP_FUNCTION(0x3, "ge1", "rxd3"),
-+		 MPP_FUNCTION(0x5, "i2c0", "sck"),
-+		 MPP_FUNCTION(0x6, "dev", "ad10")),
-+	MPP_MODE(54,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "pcie0", "rstoutn"),
-+		 MPP_FUNCTION(0x2, "ge0", "rxctl"),
-+		 MPP_FUNCTION(0x3, "ge1", "rxctl"),
-+		 MPP_FUNCTION(0x6, "dev", "ad11")),
-+	MPP_MODE(55,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "ge0", "rxclk"),
-+		 MPP_FUNCTION(0x3, "ge1", "rxclk"),
-+		 MPP_FUNCTION(0x6, "dev", "cs0")),
-+	MPP_MODE(56,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "ge0", "txclkout"),
-+		 MPP_FUNCTION(0x3, "ge1", "txclkout"),
-+		 MPP_FUNCTION(0x6, "dev", "oe")),
-+	MPP_MODE(57,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "ge0", "txctl"),
-+		 MPP_FUNCTION(0x3, "ge1", "txctl"),
-+		 MPP_FUNCTION(0x6, "dev", "wen0")),
-+	MPP_MODE(58,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x4, "led", "c0")),
-+	MPP_MODE(59,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x4, "led", "c1")),
-+	MPP_MODE(60,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "uart1", "txd"),
-+		 MPP_FUNCTION(0x4, "led", "c2"),
-+		 MPP_FUNCTION(0x6, "dev", "ad13")),
-+	MPP_MODE(61,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "i2c1", "sda"),
-+		 MPP_FUNCTION(0x2, "uart1", "rxd"),
-+		 MPP_FUNCTION(0x3, "spi1", "cs2"),
-+		 MPP_FUNCTION(0x4, "led", "p0"),
-+		 MPP_FUNCTION(0x6, "dev", "ad14")),
-+	MPP_MODE(62,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "i2c1", "sck"),
-+		 MPP_FUNCTION(0x4, "led", "p1"),
-+		 MPP_FUNCTION(0x6, "dev", "ad15")),
-+	MPP_MODE(63,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "ptp", "triggen"),
-+		 MPP_FUNCTION(0x4, "led", "p2"),
-+		 MPP_FUNCTION(0x6, "dev", "burst")),
-+	MPP_MODE(64,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "dram", "vttctrl"),
-+		 MPP_FUNCTION(0x4, "led", "p3")),
-+	MPP_MODE(65,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x1, "sata1", "prsnt")),
-+	MPP_MODE(66,
-+		 MPP_FUNCTION(0x0, "gpio", NULL),
-+		 MPP_FUNCTION(0x2, "ptp", "eventreq"),
-+		 MPP_FUNCTION(0x4, "spi1", "cs3"),
-+		 MPP_FUNCTION(0x5, "pcie0", "rstoutn"),
-+		 MPP_FUNCTION(0x6, "dev", "cs3")),
++enum {
++	V_88F6810 = BIT(0),
++	V_88F6820 = BIT(1),
++	V_88F6828 = BIT(2),
++	V_88F6810_PLUS = (V_88F6810 | V_88F6820 | V_88F6828),
++	V_88F6820_PLUS = (V_88F6820 | V_88F6828),
 +};
 +
-+static struct mvebu_pinctrl_soc_info armada_375_pinctrl_info;
++static struct mvebu_mpp_mode armada_38x_mpp_modes[] = {
++	MPP_MODE(0,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ua0",   "rxd",        V_88F6810_PLUS)),
++	MPP_MODE(1,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ua0",   "txd",        V_88F6810_PLUS)),
++	MPP_MODE(2,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "i2c0",  "sck",        V_88F6810_PLUS)),
++	MPP_MODE(3,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "i2c0",  "sda",        V_88F6810_PLUS)),
++	MPP_MODE(4,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge",    "mdc",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ua1",   "txd",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "ua0",   "rts",        V_88F6810_PLUS)),
++	MPP_MODE(5,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge",    "mdio",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ua1",   "rxd",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "ua0",   "cts",        V_88F6810_PLUS)),
++	MPP_MODE(6,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "txclkout",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge0",   "crs",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "cs3",        V_88F6810_PLUS)),
++	MPP_MODE(7,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "txd0",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad9",        V_88F6810_PLUS)),
++	MPP_MODE(8,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "txd1",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad10",       V_88F6810_PLUS)),
++	MPP_MODE(9,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "txd2",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad11",       V_88F6810_PLUS)),
++	MPP_MODE(10,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "txd3",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad12",       V_88F6810_PLUS)),
++	MPP_MODE(11,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "txctl",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad13",       V_88F6810_PLUS)),
++	MPP_MODE(12,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "rxd0",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "pcie0", "rstout",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi0",  "cs1",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad14",       V_88F6810_PLUS)),
++	MPP_MODE(13,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "rxd1",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "pcie0", "clkreq",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "pcie1", "clkreq",     V_88F6820_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi0",  "cs2",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad15",       V_88F6810_PLUS)),
++	MPP_MODE(14,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "rxd2",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ptp",   "clk",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "m",     "vtt_ctrl",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi0",  "cs3",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "wen1",       V_88F6810_PLUS)),
++	MPP_MODE(15,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "rxd3",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge",    "mdc slave",  V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "pcie0", "rstout",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi0",  "mosi",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "pcie1", "rstout",     V_88F6820_PLUS)),
++	MPP_MODE(16,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "rxctl",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge",    "mdio slave", V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "m",     "decc_err",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi0",  "miso",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "pcie0", "clkreq",     V_88F6810_PLUS)),
++	MPP_MODE(17,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "rxclk",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ptp",   "clk",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "ua1",   "rxd",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi0",  "sck",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "sata1", "prsnt",      V_88F6810_PLUS)),
++	MPP_MODE(18,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "rxerr",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ptp",   "trig_gen",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "ua1",   "txd",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi0",  "cs0",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "pcie1", "rstout",     V_88F6820_PLUS)),
++	MPP_MODE(19,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "col",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ptp",   "event_req",  V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "pcie0", "clkreq",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "sata1", "prsnt",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "ua0",   "cts",        V_88F6810_PLUS)),
++	MPP_MODE(20,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ge0",   "txclk",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ptp",   "clk",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
++		 MPP_VAR_FUNCTION(4, "sata0", "prsnt",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "ua0",   "rts",        V_88F6810_PLUS)),
++	MPP_MODE(21,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "spi0",  "cs1",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge1",   "rxd0",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "sata0", "prsnt",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "sd0",   "cmd",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "bootcs",     V_88F6810_PLUS)),
++	MPP_MODE(22,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "spi0",  "mosi",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad0",        V_88F6810_PLUS)),
++	MPP_MODE(23,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "spi0",  "sck",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad2",        V_88F6810_PLUS)),
++	MPP_MODE(24,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "spi0",  "miso",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ua0",   "cts",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "ua1",   "rxd",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "sd0",   "d4",         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ready",      V_88F6810_PLUS)),
++	MPP_MODE(25,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "spi0",  "cs0",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ua0",   "rts",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "ua1",   "txd",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "sd0",   "d5",         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "cs0",        V_88F6810_PLUS)),
++	MPP_MODE(26,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "spi0",  "cs2",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "i2c1",  "sck",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "sd0",   "d6",         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "cs1",        V_88F6810_PLUS)),
++	MPP_MODE(27,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "spi0",  "cs3",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge1",   "txclkout",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "i2c1",  "sda",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "sd0",   "d7",         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "cs2",        V_88F6810_PLUS)),
++	MPP_MODE(28,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge1",   "txd0",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "sd0",   "clk",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad5",        V_88F6810_PLUS)),
++	MPP_MODE(29,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge1",   "txd1",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ale0",       V_88F6810_PLUS)),
++	MPP_MODE(30,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge1",   "txd2",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "oen",        V_88F6810_PLUS)),
++	MPP_MODE(31,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge1",   "txd3",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ale1",       V_88F6810_PLUS)),
++	MPP_MODE(32,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge1",   "txctl",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "wen0",       V_88F6810_PLUS)),
++	MPP_MODE(33,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "m",     "decc_err",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad3",        V_88F6810_PLUS)),
++	MPP_MODE(34,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad1",        V_88F6810_PLUS)),
++	MPP_MODE(35,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ref",   "clk_out1",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "a1",         V_88F6810_PLUS)),
++	MPP_MODE(36,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ptp",   "trig_gen",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "a0",         V_88F6810_PLUS)),
++	MPP_MODE(37,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ptp",   "clk",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge1",   "rxclk",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "sd0",   "d3",         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad8",        V_88F6810_PLUS)),
++	MPP_MODE(38,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ptp",   "event_req",  V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge1",   "rxd1",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "ref",   "clk_out0",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "sd0",   "d0",         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad4",        V_88F6810_PLUS)),
++	MPP_MODE(39,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "i2c1",  "sck",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge1",   "rxd2",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "ua0",   "cts",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "sd0",   "d1",         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "a2",         V_88F6810_PLUS)),
++	MPP_MODE(40,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "i2c1",  "sda",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge1",   "rxd3",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "ua0",   "rts",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "sd0",   "d2",         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad6",        V_88F6810_PLUS)),
++	MPP_MODE(41,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ua1",   "rxd",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge1",   "rxctl",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "ua0",   "cts",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi1",  "cs3",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "burst/last", V_88F6810_PLUS)),
++	MPP_MODE(42,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ua1",   "txd",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "ua0",   "rts",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "ad7",        V_88F6810_PLUS)),
++	MPP_MODE(43,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "pcie0", "clkreq",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "m",     "vtt_ctrl",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "m",     "decc_err",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "pcie0", "rstout",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "dev",   "clkout",     V_88F6810_PLUS)),
++	MPP_MODE(44,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "sata0", "prsnt",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "sata1", "prsnt",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "sata2", "prsnt",      V_88F6828),
++		 MPP_VAR_FUNCTION(4, "sata3", "prsnt",      V_88F6828),
++		 MPP_VAR_FUNCTION(5, "pcie0", "rstout",     V_88F6810_PLUS)),
++	MPP_MODE(45,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ref",   "clk_out0",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "pcie0", "rstout",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
++		 MPP_VAR_FUNCTION(4, "pcie2", "rstout",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "pcie3", "rstout",     V_88F6810_PLUS)),
++	MPP_MODE(46,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ref",   "clk_out1",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "pcie0", "rstout",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
++		 MPP_VAR_FUNCTION(4, "pcie2", "rstout",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "pcie3", "rstout",     V_88F6810_PLUS)),
++	MPP_MODE(47,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "sata0", "prsnt",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "sata1", "prsnt",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "sata2", "prsnt",      V_88F6828),
++		 MPP_VAR_FUNCTION(4, "spi1",  "cs2",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "sata3", "prsnt",      V_88F6828)),
++	MPP_MODE(48,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "sata0", "prsnt",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "m",     "vtt_ctrl",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "tdm2c", "pclk",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "audio", "mclk",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "sd0",   "d4",         V_88F6810_PLUS)),
++	MPP_MODE(49,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "sata2", "prsnt",      V_88F6828),
++		 MPP_VAR_FUNCTION(2, "sata3", "prsnt",      V_88F6828),
++		 MPP_VAR_FUNCTION(3, "tdm2c", "fsync",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "audio", "lrclk",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "sd0",   "d5",         V_88F6810_PLUS)),
++	MPP_MODE(50,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "pcie0", "rstout",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "pcie1", "rstout",     V_88F6820_PLUS),
++		 MPP_VAR_FUNCTION(3, "tdm2c", "drx",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "audio", "extclk",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "sd0",   "cmd",        V_88F6810_PLUS)),
++	MPP_MODE(51,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "tdm2c", "dtx",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "audio", "sdo",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "m",     "decc_err",   V_88F6810_PLUS)),
++	MPP_MODE(52,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "pcie0", "rstout",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "pcie1", "rstout",     V_88F6820_PLUS),
++		 MPP_VAR_FUNCTION(3, "tdm2c", "intn",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "audio", "sdi",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "sd0",   "d6",         V_88F6810_PLUS)),
++	MPP_MODE(53,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "sata1", "prsnt",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "sata0", "prsnt",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "tdm2c", "rstn",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "audio", "bclk",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "sd0",   "d7",         V_88F6810_PLUS)),
++	MPP_MODE(54,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "sata0", "prsnt",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "sata1", "prsnt",      V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "pcie0", "rstout",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "pcie1", "rstout",     V_88F6820_PLUS),
++		 MPP_VAR_FUNCTION(5, "sd0",   "d3",         V_88F6810_PLUS)),
++	MPP_MODE(55,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ua1",   "cts",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge",    "mdio",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "pcie1", "clkreq",     V_88F6820_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi1",  "cs1",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "sd0",   "d0",         V_88F6810_PLUS)),
++	MPP_MODE(56,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "ua1",   "rts",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "ge",    "mdc",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "m",     "decc_err",   V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi1",  "mosi",       V_88F6810_PLUS)),
++	MPP_MODE(57,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi1",  "sck",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "sd0",   "clk",        V_88F6810_PLUS)),
++	MPP_MODE(58,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "pcie1", "clkreq",     V_88F6820_PLUS),
++		 MPP_VAR_FUNCTION(2, "i2c1",  "sck",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "pcie2", "clkreq",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi1",  "miso",       V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "sd0",   "d1",         V_88F6810_PLUS)),
++	MPP_MODE(59,
++		 MPP_VAR_FUNCTION(0, "gpio",  NULL,         V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(1, "pcie0", "rstout",     V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(2, "i2c1",  "sda",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(3, "pcie1", "rstout",     V_88F6820_PLUS),
++		 MPP_VAR_FUNCTION(4, "spi1",  "cs0",        V_88F6810_PLUS),
++		 MPP_VAR_FUNCTION(5, "sd0",   "d2",         V_88F6810_PLUS)),
++};
 +
-+static struct of_device_id armada_375_pinctrl_of_match[] = {
-+	{ .compatible = "marvell,mv88f6720-pinctrl" },
++static struct mvebu_pinctrl_soc_info armada_38x_pinctrl_info;
++
++static struct of_device_id armada_38x_pinctrl_of_match[] = {
++	{
++		.compatible = "marvell,mv88f6810-pinctrl",
++		.data       = (void *) V_88F6810,
++	},
++	{
++		.compatible = "marvell,mv88f6820-pinctrl",
++		.data       = (void *) V_88F6820,
++	},
++	{
++		.compatible = "marvell,mv88f6828-pinctrl",
++		.data       = (void *) V_88F6828,
++	},
 +	{ },
 +};
 +
-+static struct mvebu_mpp_ctrl mv88f6720_mpp_controls[] = {
-+	MPP_REG_CTRL(0, 69),
++static struct mvebu_mpp_ctrl armada_38x_mpp_controls[] = {
++	MPP_REG_CTRL(0, 59),
 +};
 +
-+static struct pinctrl_gpio_range mv88f6720_mpp_gpio_ranges[] = {
++static struct pinctrl_gpio_range armada_38x_mpp_gpio_ranges[] = {
 +	MPP_GPIO_RANGE(0,   0,  0, 32),
-+	MPP_GPIO_RANGE(1,  32, 32, 32),
-+	MPP_GPIO_RANGE(2,  64, 64,  3),
++	MPP_GPIO_RANGE(1,  32, 32, 27),
 +};
 +
-+static int armada_375_pinctrl_probe(struct platform_device *pdev)
++static int armada_38x_pinctrl_probe(struct platform_device *pdev)
 +{
-+	struct mvebu_pinctrl_soc_info *soc = &armada_375_pinctrl_info;
++	struct mvebu_pinctrl_soc_info *soc = &armada_38x_pinctrl_info;
++	const struct of_device_id *match =
++		of_match_device(armada_38x_pinctrl_of_match, &pdev->dev);
 +
-+	soc->variant = 0; /* no variants for Armada 375 */
-+	soc->controls = mv88f6720_mpp_controls;
-+	soc->ncontrols = ARRAY_SIZE(mv88f6720_mpp_controls);
-+	soc->modes = mv88f6720_mpp_modes;
-+	soc->nmodes = ARRAY_SIZE(mv88f6720_mpp_modes);
-+	soc->gpioranges = mv88f6720_mpp_gpio_ranges;
-+	soc->ngpioranges = ARRAY_SIZE(mv88f6720_mpp_gpio_ranges);
++	if (!match)
++		return -ENODEV;
++
++	soc->variant = (unsigned) match->data & 0xff;
++
++	soc->controls = armada_38x_mpp_controls;
++	soc->ncontrols = ARRAY_SIZE(armada_38x_mpp_controls);
++	soc->gpioranges = armada_38x_mpp_gpio_ranges;
++	soc->ngpioranges = ARRAY_SIZE(armada_38x_mpp_gpio_ranges);
++	soc->modes = armada_38x_mpp_modes;
++	soc->nmodes = armada_38x_mpp_controls[0].npins;
 +
 +	pdev->dev.platform_data = soc;
 +
 +	return mvebu_pinctrl_probe(pdev);
 +}
 +
-+static int armada_375_pinctrl_remove(struct platform_device *pdev)
++static int armada_38x_pinctrl_remove(struct platform_device *pdev)
 +{
 +	return mvebu_pinctrl_remove(pdev);
 +}
 +
-+static struct platform_driver armada_375_pinctrl_driver = {
++static struct platform_driver armada_38x_pinctrl_driver = {
 +	.driver = {
-+		.name = "armada-375-pinctrl",
++		.name = "armada-38x-pinctrl",
 +		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(armada_375_pinctrl_of_match),
++		.of_match_table = of_match_ptr(armada_38x_pinctrl_of_match),
 +	},
-+	.probe = armada_375_pinctrl_probe,
-+	.remove = armada_375_pinctrl_remove,
++	.probe = armada_38x_pinctrl_probe,
++	.remove = armada_38x_pinctrl_remove,
 +};
 +
-+module_platform_driver(armada_375_pinctrl_driver);
++module_platform_driver(armada_38x_pinctrl_driver);
 +
 +MODULE_AUTHOR("Thomas Petazzoni <thomas.petazzoni@free-electrons.com>");
-+MODULE_DESCRIPTION("Marvell Armada 375 pinctrl driver");
++MODULE_DESCRIPTION("Marvell Armada 38x pinctrl driver");
 +MODULE_LICENSE("GPL v2");
 -- 
 1.8.3.2
