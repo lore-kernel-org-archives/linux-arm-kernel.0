@@ -1,34 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Feb 2014 16:36:22 +0000
-Subject: [PATCH 14/28] Remove MACH_SMDKC210
-In-Reply-To: <1392046242.3585.41.camel@x220>
-References: <1391971686-9517-1-git-send-email-richard@nod.at>
- <1391971686-9517-15-git-send-email-richard@nod.at>
- <20140210114154.GQ1757@sirena.org.uk>
- <1392039072.3585.15.camel@x220>
- <20140210141255.GI1757@sirena.org.uk>
- <1392046242.3585.41.camel@x220>
-Message-ID: <20140210163621.GA13533@sirena.org.uk>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 10 Feb 2014 16:38:09 +0000
+Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
+In-Reply-To: <20140210152147.GE2794@e103592.cambridge.arm.com>
+References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
+ <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
+ <20140210141634.GA2794@e103592.cambridge.arm.com>
+ <52F8E81E.70804@codethink.co.uk>
+ <20140210152147.GE2794@e103592.cambridge.arm.com>
+Message-ID: <52F90071.4080604@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 04:30:42PM +0100, Paul Bolle wrote:
-> On Mon, 2014-02-10 at 14:12 +0000, Mark Brown wrote:
+On 10/02/14 15:21, Dave Martin wrote:
+> On Mon, Feb 10, 2014 at 02:54:22PM +0000, Ben Dooks wrote:
+>> On 10/02/14 14:16, Dave Martin wrote:
+>>> On Fri, Feb 07, 2014 at 05:19:15PM +0100, Fabrice GASNIER wrote:
+>>>> This patch adds imprecise abort enable/disable macros.
+>>>> It also enables imprecise aborts when starting kernel.
+>>>
+>>> Relying on imprecise aborts for hardware probing would be considered bad
+>>> hardware and/or software design for ARM-specific stuff.
+>>>
+>>> PCI is more generic though, so we may have to put up with this to some
+>>> extent.  Can you point me to the affected probing code?  I'm not very
+>>> familiar with that stuff...
+>>
+>> The marvell pcie always had the option of delivering any bus
+>> errors as imprecise aborts. However it was /annoying/ and therefore
+>
+> You don't say ;)
+>
+>> easier just to turn it off and rely on the hardware returning 0xffff
+>> for any configuration area it couldn't get to.
+>
+> Does PCI have any way of finding out which parts of the configuration
+> space are there before you are forced to go poking around in invalid
+> address space?
+>
+> I'm guessing there may not be, otherwise this convsersation might not
+> be happening ... but I don't know too much about PCI.
 
-> > Yes, that's correct.  Now, like I say think about what the symbol was
-> > there for in the first place.
+IIRC for configuration accesses you have to wait for the PCIe core
+to get a response from the other end. The systems I've seen either
+poll for completion or hold the transaction until the pcie core has
+finished working.
 
-> So, next step: the Kconfig symbols MACH_SMDKV310 and MACH_SMDKC210 were
-> removed in commit 383ffda2fa ("ARM: EXYNOS: no more support non-DT for
-> EXYNOS SoCs"). That commit was part of v3.11. Correct?
 
-Indeed, so we can see that these platforms were converted to use DT and
-the symbols were removed as a result.  This means that a good fix here
-is to ensure that the driver can be used with DT platforms.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/68f0308e/attachment.sig>
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
