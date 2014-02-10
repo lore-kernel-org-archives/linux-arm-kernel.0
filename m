@@ -1,107 +1,46 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 10 Feb 2014 13:48:36 +0100
-Subject: [PATCH 1/7] pinctrl: sh-pfc: r8a7790: Add QSPI pin groups
-In-Reply-To: <1392029254-15400-2-git-send-email-geert@linux-m68k.org>
-References: <1392029254-15400-1-git-send-email-geert@linux-m68k.org>
- <1392029254-15400-2-git-send-email-geert@linux-m68k.org>
-Message-ID: <8438484.DB7cn7tjVR@avalon>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 10 Feb 2014 12:51:13 +0000
+Subject: [PATCH 07/17] spi: pl022: Don't ignore power domain and amba bus
+ at system suspend
+In-Reply-To: <CAPDyKFqNdw-6R12cUOre8UOTOnB-PpxHD5rPAMCwuS3i--Sesg@mail.gmail.com>
+References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+ <1391529538-21685-8-git-send-email-ulf.hansson@linaro.org>
+ <20140204191609.GU22609@sirena.org.uk>
+ <CAPDyKFqNdw-6R12cUOre8UOTOnB-PpxHD5rPAMCwuS3i--Sesg@mail.gmail.com>
+Message-ID: <20140210125113.GZ1757@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On Mon, Feb 10, 2014 at 01:33:50PM +0100, Ulf Hansson wrote:
+> On 4 February 2014 20:16, Mark Brown <broonie@kernel.org> wrote:
 
-Thank you for the patch.
+> > This seems like a fairly hideous thing to be having to open code in an
+> > individual driver, it all looks generic and like something that most if
 
-On Monday 10 February 2014 11:47:27 Geert Uytterhoeven wrote:
-> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> 
-> A QSPI function set consists of 3 groups:
->   - qspi_ctrl (2 control wires)
->   - qspi_data2 (2 data wires, for Single/Dual SPI)
->   - qspi_data4 (4 data wires, for Quad SPI)
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  drivers/pinctrl/sh-pfc/pfc-r8a7790.c |   33 +++++++++++++++++++++++++++++++
-> 1 file changed, 33 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-> b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c index c381ae63c508..bc9ced3ccd58
-> 100644
-> --- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-> +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-> @@ -2389,6 +2389,29 @@ static const unsigned int msiof3_tx_pins[] = {
->  static const unsigned int msiof3_tx_mux[] = {
->  	MSIOF3_TXD_MARK,
->  };
-> +/* - QSPI -------------------------------------------------------------- */
-> +static const unsigned int qspi_ctrl_pins[] = {
-> +	/* SPCLK, SSL */
-> +	RCAR_GP_PIN(1, 4), RCAR_GP_PIN(1, 9),
-> +};
-> +static const unsigned int qspi_ctrl_mux[] = {
-> +	SPCLK_MARK, SSL_MARK,
-> +};
-> +static const unsigned int qspi_data2_pins[] = {
-> +	/* MOSI_IO0, MISO_IO1 */
-> +	RCAR_GP_PIN(1, 5), RCAR_GP_PIN(1, 6),
-> +};
-> +static const unsigned int qspi_data2_mux[] = {
-> +	MOSI_IO0_MARK, MISO_IO1_MARK,
-> +};
-> +static const unsigned int qspi_data4_pins[] = {
-> +	/* MOSI_IO0, MISO_IO1, IO2, IO3 */
-> +	RCAR_GP_PIN(1, 5), RCAR_GP_PIN(1, 6), RCAR_GP_PIN(1, 7),
-> +	RCAR_GP_PIN(1, 8),
-> +};
-> +static const unsigned int qspi_data4_mux[] = {
-> +	MOSI_IO0_MARK, MISO_IO1_MARK, IO2_MARK, IO3_MARK,
-> +};
->  /* - SCIF0 ------------------------------------------------------------- */
-> static const unsigned int scif0_data_pins[] = {
->  	/* RX, TX */
-> @@ -3671,6 +3694,9 @@ static const struct sh_pfc_pin_group pinmux_groups[] =
-> { SH_PFC_PIN_GROUP(msiof3_ss2),
->  	SH_PFC_PIN_GROUP(msiof3_rx),
->  	SH_PFC_PIN_GROUP(msiof3_tx),
-> +	SH_PFC_PIN_GROUP(qspi_ctrl),
-> +	SH_PFC_PIN_GROUP(qspi_data2),
-> +	SH_PFC_PIN_GROUP(qspi_data4),
->  	SH_PFC_PIN_GROUP(scif0_data),
->  	SH_PFC_PIN_GROUP(scif0_clk),
->  	SH_PFC_PIN_GROUP(scif0_ctrl),
-> @@ -3970,6 +3996,12 @@ static const char * const msiof3_groups[] = {
->  	"msiof3_tx",
->  };
-> 
-> +static const char * const qspi_groups[] = {
-> +	"qspi_ctrl",
-> +	"qspi_data2",
-> +	"qspi_data4",
-> +};
-> +
->  static const char * const scif0_groups[] = {
->  	"scif0_data",
->  	"scif0_clk",
-> @@ -4212,6 +4244,7 @@ static const struct sh_pfc_function pinmux_functions[]
-> = { SH_PFC_FUNCTION(msiof0),
->  	SH_PFC_FUNCTION(msiof1),
->  	SH_PFC_FUNCTION(msiof2),
-> +	SH_PFC_FUNCTION(qspi),
->  	SH_PFC_FUNCTION(msiof3),
+...
 
-I believe qspi comes after msiof3 :-)
+> > Putting it in a helper would at least mean that it's easier for the
+> > mechanics to be transferred to the core proper later on.
 
-Apart from that the patch looks good.
+> I agree, a helper function would be nice. I have earlier sent a patch
+> to the PM core, that is similar to the code above, though it was
+> rejected in it's current form. Let me follow up on this again.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> At this point, would a way forward be to still go ahead with this
+> patch and then convert to, when/if, the helper function from the PM
+> core becomes available?
 
->  	SH_PFC_FUNCTION(scif0),
->  	SH_PFC_FUNCTION(scif1),
-
--- 
-Regards,
-
-Laurent Pinchart
+It's definitely *a* way forward, but I'm not convinced it's a good way
+forward.  Since it's something that I'd expect us to be doing in all
+drivers we'd want to replicate it all over the place which is obviously
+not good, or conversely if there are issues that prevented the code
+being added to the PM core then presumably we're just adding problematic
+code to the driver (you've not mentioned what the problems were with
+doing this in the PM core).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/caed4c27/attachment.sig>
