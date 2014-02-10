@@ -1,121 +1,42 @@
-From: linux@roeck-us.net (linux at roeck-us.net)
-Date: Mon, 10 Feb 2014 10:57:00 -0600
-Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
- initially stopped
-In-Reply-To: <20140210165405.GF15607@localhost>
-References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <52F43ED0.4050808@roeck-us.net> <20140207104044.GA11063@localhost>
- <20140207174314.GB16263@obsidianresearch.com>
- <20140210122223.GF10872@localhost>
- <20140210104850.48324szjwjihb7cw@67.228.131.205>
- <20140210165405.GF15607@localhost>
-Message-ID: <20140210105700.16955eu5u42a9xoo@67.228.131.205>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 10 Feb 2014 18:04:54 +0100
+Subject: [PATCH 0/2] Marvell Armada 375 and 38x pinctrl drivers
+Message-ID: <1392051896-19178-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ezequiel Garcia <ezequiel.garcia@free-electrons.com>:
+Linus,
 
-> On Mon, Feb 10, 2014 at 10:48:50AM -0600, linux at roeck-us.net wrote:
->> Quoting Ezequiel Garcia <ezequiel.garcia@free-electrons.com>:
->>
->> > On Fri, Feb 07, 2014 at 10:43:14AM -0700, Jason Gunthorpe wrote:
->> >> On Fri, Feb 07, 2014 at 07:40:45AM -0300, Ezequiel Garcia wrote:
->> >>
->> >> > Well, this is related to the discussion about the bootloader not
->> >> > reseting the watchdog properly, provoking spurious watchdog triggering.
->> >> >
->> >> > Jason Gunthorpe explained [1] that we needed a particular sequence:
->> >> >
->> >> >  1. Disable WDT
->> >> >  2. Clear bridge
->> >> >  3. Enable WDT
->> >> >
->> >> > We added the irq handling to satisfy (2), and the watchdog  
->> stop for (1).
->> >>
->> >> The issue here is the driver configures two 'machine kill' elements:
->> >> the PANIC IRQ and the RstOut setup.
->> >>
->> >> Before configuring either of those the driver needs to ensure that any
->> >> old watchdog events are cleared out of the HW. We must not get a
->> >> spurious event.
->> >>
->> >> I agree not disabling an already functional and properly configured
->> >> counter from the bootloader is desirable.
->> >>
->> >> So lets break it down a bit..
->> >>
->> >> 1) The IRQ:
->> >>   It looks like the cause bit latches high on watchdog timer
->> >>   expiration but has no side effect unless it is unmasked.
->> >>
->> >>   The new IRQ flow code ensures the bit is cleared during request_irq
->> >>   so no old events can trigger the IRQ. Thus it is solved now.
->> >>
->> >
->> > Agreed.
->> >
->> >> 3) The timer itself:
->> >>   The WDT is just a general timer with an optional hookup to the
->> >>   rst control. If it is harmlessly counting but not resetting we need
->> >>   to stop that before enabling rst out.
->> >>
->> >
->> > Actually, the current flow is to:
->> >
->> > 1. Disable rst out and then disable the counter, in probe().
->> >
->> > 2. Enable the counter, and then enable rst out, in start().
->> >
->> >> So, how about this for psuedo-code in probe:
->> >>
->> >> if (readl(RSTOUTn) & WDRstOutEn)
->> >> {
->> >>     /* Watchdog is configured and may be down counting,
->> >>        don't touch it */
->> >>     request_irq(..);
->> >> }
->> >> else
->> >> {
->> >>     /* Watchdog is not configured, fully disable the timer
->> >>        and configure for watchdog operation. */
->> >>     disable_watchdog();
->> >>     request_irq();
->> >>     writel(RSTOUTn), .. WDRstOutEn);
->> >> }
->> >>
->> >
->> > Sounds good, although it seems to me it's actually simpler:
->> >
->> >   /* Let's make sure the watchdog is fully stopped, unless
->> >    * it's explicitly enabled and running
->> >    */
->> >   if ( !(wdt_rst_out_en && wdt_timer_enabled) ) {
->> >     watchdog_stop();
->> >   }
->> >
->>
->>      if (!wdt_rst_out_en || !wdt_timer_enabled)
->>          watchdog_stop();
->>
->> seems to be a bit easier to understand.
->>
->
-> Yeah, I was actually planning to have a orion_wdt_enabled() function
-> to get the running and enabled status. Looks cleaner I think.
->
-> 	if (!orion_wdt_enabled())
-> 		watchdog_stop();
->
-> So the idea is OK?
->
-Sounds good to me.
+Here are two patches that add the pinctrl drivers for two new Marvell
+ARM SOCs that belong to the mach-mvebu family: the Armada 375 and the
+Armada 380/385. They are based on Cortex-A9 CPU cores, and share a
+number of peripherals with their predecessors in the mach-mvebu
+family. pinctrl-wise, they have a completely similar register layout
+than Armada 370/XP, so only a list of pins and functions has to be
+introduced, and therefore the drivers are straightforward.
 
-> I'll push the new series in a short while. Unfortunately, this change
-> means I have to rebase almost all the series, because I introduce the
-> orion watchdog struct :-(
+The core support (arch/arm/mach-mvebu) for these SOCs will be posted
+shortly, and we're aiming at having this merged for 3.15 if possible.
 
-Just trying to keep you busy :-)
+Thanks!
 
-Guenter
+Thomas
+
+Thomas Petazzoni (2):
+  pinctrl: mvebu: add pin-muxing driver for the Marvell Armada 375
+  pinctrl: mvebu: add pin-muxing driver for the Marvell Armada 380/385
+
+ .../pinctrl/marvell,armada-375-pinctrl.txt         |  81 ++++
+ .../pinctrl/marvell,armada-38x-pinctrl.txt         |  79 ++++
+ drivers/pinctrl/mvebu/Kconfig                      |   8 +
+ drivers/pinctrl/mvebu/Makefile                     |   2 +
+ drivers/pinctrl/mvebu/pinctrl-armada-375.c         | 441 ++++++++++++++++++++
+ drivers/pinctrl/mvebu/pinctrl-armada-38x.c         | 445 +++++++++++++++++++++
+ 6 files changed, 1056 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
+ create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-375.c
+ create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+
+-- 
+1.8.3.2
