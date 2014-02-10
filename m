@@ -1,51 +1,78 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Mon, 10 Feb 2014 16:38:09 +0000
-Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
-In-Reply-To: <20140210152147.GE2794@e103592.cambridge.arm.com>
-References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
- <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
- <20140210141634.GA2794@e103592.cambridge.arm.com>
- <52F8E81E.70804@codethink.co.uk>
- <20140210152147.GE2794@e103592.cambridge.arm.com>
-Message-ID: <52F90071.4080604@codethink.co.uk>
+From: fabrice.gasnier@st.com (Fabrice GASNIER)
+Date: Mon, 10 Feb 2014 17:45:56 +0100
+Subject: [PATCH v2] ARM: Add imprecise abort enable/disable macro
+Message-ID: <1392050756-11145-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/14 15:21, Dave Martin wrote:
-> On Mon, Feb 10, 2014 at 02:54:22PM +0000, Ben Dooks wrote:
->> On 10/02/14 14:16, Dave Martin wrote:
->>> On Fri, Feb 07, 2014 at 05:19:15PM +0100, Fabrice GASNIER wrote:
->>>> This patch adds imprecise abort enable/disable macros.
->>>> It also enables imprecise aborts when starting kernel.
->>>
->>> Relying on imprecise aborts for hardware probing would be considered bad
->>> hardware and/or software design for ARM-specific stuff.
->>>
->>> PCI is more generic though, so we may have to put up with this to some
->>> extent.  Can you point me to the affected probing code?  I'm not very
->>> familiar with that stuff...
->>
->> The marvell pcie always had the option of delivering any bus
->> errors as imprecise aborts. However it was /annoying/ and therefore
->
-> You don't say ;)
->
->> easier just to turn it off and rely on the hardware returning 0xffff
->> for any configuration area it couldn't get to.
->
-> Does PCI have any way of finding out which parts of the configuration
-> space are there before you are forced to go poking around in invalid
-> address space?
->
-> I'm guessing there may not be, otherwise this convsersation might not
-> be happening ... but I don't know too much about PCI.
+This patch adds imprecise abort enable/disable macros.
+It also enables imprecise aborts when starting kernel.
 
-IIRC for configuration accesses you have to wait for the PCIe core
-to get a response from the other end. The systems I've seen either
-poll for completion or hold the transaction until the pcie core has
-finished working.
+Changes in v2:
+Only ARMv6 and later have CPSR.A bit. On earlier CPUs,
+and ARMv7M this should be a no-op.
 
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ arch/arm/include/asm/irqflags.h |   10 ++++++++++
+ arch/arm/kernel/smp.c           |    1 +
+ arch/arm/kernel/traps.c         |    4 ++++
+ 3 files changed, 15 insertions(+)
 
+diff --git a/arch/arm/include/asm/irqflags.h b/arch/arm/include/asm/irqflags.h
+index 3b763d6..8301f87 100644
+--- a/arch/arm/include/asm/irqflags.h
++++ b/arch/arm/include/asm/irqflags.h
+@@ -51,6 +51,14 @@ static inline void arch_local_irq_disable(void)
+ 
+ #define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
+ #define local_fiq_disable() __asm__("cpsid f	@ __clf" : : : "memory", "cc")
++
++#ifndef CONFIG_CPU_V7M
++#define local_abt_enable()  __asm__("cpsie a	@ __sta" : : : "memory", "cc")
++#define local_abt_disable() __asm__("cpsid a	@ __cla" : : : "memory", "cc")
++#else
++#define local_abt_enable()	do { } while (0)
++#define local_abt_disable()	do { } while (0)
++#endif
+ #else
+ 
+ /*
+@@ -130,6 +138,8 @@ static inline void arch_local_irq_disable(void)
+ 	: "memory", "cc");					\
+ 	})
+ 
++#define local_abt_enable()	do { } while (0)
++#define local_abt_disable()	do { } while (0)
+ #endif
+ 
+ /*
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index dc894ab..c2093cb 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -377,6 +377,7 @@ asmlinkage void secondary_start_kernel(void)
+ 
+ 	local_irq_enable();
+ 	local_fiq_enable();
++	local_abt_enable();
+ 
+ 	/*
+ 	 * OK, it's off to the idle thread for us
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 4636d56..ef15709 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
+ 
+ 	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
+ 	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
++
++	/* Enable imprecise aborts */
++	local_abt_enable();
++
+ #else /* ifndef CONFIG_CPU_V7M */
+ 	/*
+ 	 * on V7-M there is no need to copy the vector table to a dedicated
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+1.7.9.5
