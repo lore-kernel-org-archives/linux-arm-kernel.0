@@ -1,68 +1,123 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 10 Feb 2014 08:03:43 +0100
-Subject: [PATCH 01/10] watchdog: xilinx: Convert driver to the watchdog
- framework
-In-Reply-To: <52F7DF2F.5060001@roeck-us.net>
-References: <ed4cb31c9a549343e6b492cf62fc962d39034bd0.1391177880.git.michal.simek@xilinx.com>
- <52F7DF2F.5060001@roeck-us.net>
-Message-ID: <52F879CF.8080906@monstr.eu>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 10 Feb 2014 08:10:51 +0100
+Subject: [PATCH v2 1/2] PM / OPP: Allow boost frequency to be looked up
+ from device tree
+In-Reply-To: <CAJuA9agT4PC6YOmhCwKQ=58qaGEr1qSuhTpX57ro1pEuk++Miw@mail.gmail.com>
+References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
+ <1391786342-11812-2-git-send-email-thomas.ab@samsung.com>
+ <52F50346.7040707@arm.com>
+ <CAJuA9agT4PC6YOmhCwKQ=58qaGEr1qSuhTpX57ro1pEuk++Miw@mail.gmail.com>
+Message-ID: <20140210081051.05da33bd@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2014 09:03 PM, Guenter Roeck wrote:
-> On 01/31/2014 06:18 AM, Michal Simek wrote:
->> - Remove uneeded headers, fops functions
->> - Use xilinx_wdt prefix in start/stop/keepalive functions
->>    and in new structures
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Hi Thomas, Sudeep
+
+> On Fri, Feb 7, 2014 at 9:31 PM, Sudeep Holla <Sudeep.Holla@arm.com>
+> wrote:
+> > On 07/02/14 15:19, Thomas Abraham wrote:
+> >> From: Thomas Abraham <thomas.ab@samsung.com>
+> >>
+> >> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core")
+> >> adds support for CPU boost mode. This patch adds support for
+> >> finding available boost frequencies from device tree and marking
+> >> them as usable in boost mode.
+> >>
+> >> Cc: Nishanth Menon <nm@ti.com>
+> >> Cc: Lukasz Majewski <l.majewski@samsung.com>
+> >> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> >> ---
+> >>  drivers/base/power/opp.c |   34 +++++++++++++++++++++++++++++++++-
+> >>  1 file changed, 33 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+> >> index fa41874..b636826 100644
+> >> --- a/drivers/base/power/opp.c
+> >> +++ b/drivers/base/power/opp.c
+> >> @@ -628,7 +628,8 @@ int dev_pm_opp_init_cpufreq_table(struct
+> >> device *dev, struct device_opp *dev_opp;
+> >>       struct dev_pm_opp *opp;
+> >>       struct cpufreq_frequency_table *freq_table;
+> >> -     int i = 0;
+> >> +     int i = 0, j, len, ret;
+> >> +     u32 *boost_freqs = NULL;
+> >>
+> >>       /* Pretend as if I am an updater */
+> >>       mutex_lock(&dev_opp_list_lock);
+> >> @@ -650,10 +651,35 @@ int dev_pm_opp_init_cpufreq_table(struct
+> >> device *dev, return -ENOMEM;
+> >>       }
+> >>
+> >> +     if (of_find_property(dev->of_node, "boost-frequency", &len))
+> >> {
+> >> +             if (len == 0 || (len & (sizeof(u32) - 1)) != 0) {
+> >> +                     dev_err(dev, "%s: invalid boost
+> >> frequency\n", __func__);
+> >> +                     ret = -EINVAL;
+> >> +                     goto err_boost;
+> >> +             }
+> >> +
+> >> +             boost_freqs = kzalloc(len, GFP_KERNEL);
+> >> +             if (!boost_freqs) {
+> >> +                     dev_warn(dev, "%s: no memory for boost freq
+> >> table\n",
+> >> +                                     __func__);
+> >> +                     ret = -ENOMEM;
+> >> +                     goto err_boost;
+> >> +             }
+> >> +             of_property_read_u32_array(dev->of_node,
+> >> "boost-frequency",
+> >> +                     boost_freqs, len / sizeof(u32));
+> >> +     }
+> >> +
+> >>       list_for_each_entry(opp, &dev_opp->opp_list, node) {
+> >>               if (opp->available) {
+> >>                       freq_table[i].driver_data = i;
+> >>                       freq_table[i].frequency = opp->rate / 1000;
+> >> +                     for (j = 0; j < len / sizeof(u32) &&
+> >> boost_freqs; j++) {
+> >> +                             if (boost_freqs[j] ==
+> >> freq_table[i].frequency) {
+> >> +                                     freq_table[i].driver_data =
+> >> +
+> >> CPUFREQ_BOOST_FREQ;
+> >> +                                     break;
+> >> +                             }
+> >> +                     }
+> >>                       i++;
+> >>               }
+> >>       }
+> > IIRC you had mentioned that the boost-opp was not limited to be a
+> > cpufreq, but this change seems to be cpufreq only.
 > 
-> Hi Michal,
+> Yes, but as you have initiated the discussion on extending the OPP
+> binding, this has been limited to cpufreq only. If the new OPP library
+> has support for listing boost frequency, this can be migrated to the
+> new OPP libaray.
+
+I agree here with Thomas. Since we are fixing regression here, we shall
+use the existing OPP API. When agreement for the future OPPs format is
+in place, we will port the boost OPPs to it.
+
 > 
->>   static int xwdt_probe(struct platform_device *pdev)
->>   {
->>       int rc;
->> @@ -314,7 +184,7 @@ static int xwdt_probe(struct platform_device *pdev)
->>                       "xlnx,wdt-enable-once", NULL);
->>       if (tmptr == NULL) {
->>           pr_warn("Parameter \"xlnx,wdt-enable-once\" not found in device tree!\n");
->> -        xdev.nowayout = WATCHDOG_NOWAYOUT;
->> +        watchdog_set_nowayout(&xilinx_wdt_wdd, true);
+> Thanks,
+> Thomas.
 > 
-> Sure you want to set this to always true instead of using WATCHDOG_NOWAYOUT ?
+> >
+> > Regards,
+> > Sudeep
+> >
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-I have checked it and
-option CONFIG_WATCHDOG_NOWAYOUT - Disable watchdog shutdown on close
 
-with this part in the header
-
-100 #ifdef CONFIG_WATCHDOG_NOWAYOUT
-101 #define WATCHDOG_NOWAYOUT               1
-102 #define WATCHDOG_NOWAYOUT_INIT_STATUS   (1 << WDOG_NO_WAY_OUT)
-103 #else
-104 #define WATCHDOG_NOWAYOUT               0
-105 #define WATCHDOG_NOWAYOUT_INIT_STATUS   0
-106 #endif
-
-enable once is hardware option and it means when this option is setup in
-hw you can't stop watchdog. That's why I think that setting up true
-instead of WATCHDOG_NOWAYOUT is correct.
-
-Thanks,
-Michal
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+Best regards,
 
+Lukasz Majewski
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/4b2e4d94/attachment.sig>
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
