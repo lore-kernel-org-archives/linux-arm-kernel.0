@@ -1,52 +1,70 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 10 Feb 2014 18:23:22 +0100
-Subject: [PATCH 11/11] Documentation: arm: update Marvell documentation about
- Armada 375/38x
+Date: Mon, 10 Feb 2014 18:23:17 +0100
+Subject: [PATCH 06/11] ARM: mvebu: add Armada 380/385 support to the
+ system-controller driver
 In-Reply-To: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1392053002-19831-12-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1392053002-19831-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit updates the documentation that describes the various
-families of SOCs produced by Marvell, together with the corresponding
-available technical documents. It adds Armada 375 and Armada 38x, and
-adds a link to the product brief for the already supported Armada 370.
+This commit adds support for the Armada 380/385 SoCs in the
+system-controller driver. Since this SoC has the same system
+controller registers layout than the Armada 370/XP at least for the
+few features currently supported by the driver, this commit simply
+adds a new compatible string that provides the same behavior than the
+one provided for Armada 370/XP.
+
+Note that we intentionally do not use the same compatible string as
+Armada 370/XP, as the current system-controller driver is far from
+exploiting all the possibilities of the hardware, and we may in the
+future discover differences between Armada 370/XP and Armada 380/385.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/arm/Marvell/README | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/mvebu-system-controller.txt | 3 ++-
+ arch/arm/mach-mvebu/system-controller.c                           | 8 ++++++++
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
-index 5a930c1..963ec44 100644
---- a/Documentation/arm/Marvell/README
-+++ b/Documentation/arm/Marvell/README
-@@ -83,14 +83,24 @@ EBU Armada family
-         88F6710
-         88F6707
-         88F6W11
-+    Product Brief: http://www.marvell.com/embedded-processors/armada-300/assets/Marvell_ARMADA_370_SoC.pdf
-+
-+  Armada 375 Flavors:
-+	88F6720
-+    Product Brief: http://www.marvell.com/embedded-processors/armada-300/assets/ARMADA_375_SoC-01_product_brief.pdf
-+
-+  Armada 380/385 Flavors:
-+	88F6810
-+	88F6820
-+	88F6828
+diff --git a/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt b/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
+index d24ab2e..3559972 100644
+--- a/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
++++ b/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
+@@ -1,6 +1,6 @@
+ MVEBU System Controller
+ -----------------------
+-MVEBU (Marvell SOCs: Armada 370/375/XP, Dove, mv78xx0, Kirkwood, Orion5x)
++MVEBU (Marvell SOCs: Armada 370/375/38x/XP, Dove, mv78xx0, Kirkwood, Orion5x)
  
-   Armada XP Flavors:
-         MV78230
-         MV78260
-         MV78460
-     NOTE: not to be confused with the non-SMP 78xx0 SoCs
-+    Product Brief: http://www.marvell.com/embedded-processors/armada-xp/assets/Marvell-ArmadaXP-SoC-product%20brief.pdf
+ Required properties:
  
--  Product Brief: http://www.marvell.com/embedded-processors/armada-xp/assets/Marvell-ArmadaXP-SoC-product%20brief.pdf
-   No public datasheet available.
+@@ -8,6 +8,7 @@ Required properties:
+ 	- "marvell,orion-system-controller"
+ 	- "marvell,armada-370-xp-system-controller"
+ 	- "marvell,armada-375-system-controller"
++	- "marvell,armada-380-system-controller"
+ - reg: Should contain system controller registers location and length.
  
-   Core: Sheeva ARMv7 compatible
+ Example:
+diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
+index 1806187..b4e8bb2 100644
+--- a/arch/arm/mach-mvebu/system-controller.c
++++ b/arch/arm/mach-mvebu/system-controller.c
+@@ -71,6 +71,14 @@ static struct of_device_id of_system_controller_table[] = {
+ 	}, {
+ 		.compatible = "marvell,armada-375-system-controller",
+ 		.data = (void *) &armada_375_system_controller,
++	}, {
++		/*
++		 * As far as RSTOUTn and System soft reset registers
++		 * are concerned, Armada 38x is similar to Armada
++		 * 370/XP
++		 */
++		.compatible = "marvell,armada-380-system-controller",
++		.data = (void *) &armada_370_xp_system_controller,
+ 	},
+ 	{ /* end of list */ },
+ };
 -- 
 1.8.3.2
