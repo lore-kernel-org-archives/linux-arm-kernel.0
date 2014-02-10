@@ -1,92 +1,47 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 10 Feb 2014 09:22:24 -0300
-Subject: [PATCH v6 05/19] watchdog: orion: Make sure the watchdog is
- initially stopped
-In-Reply-To: <20140207174314.GB16263@obsidianresearch.com>
-References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1391707226-18258-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <52F43ED0.4050808@roeck-us.net> <20140207104044.GA11063@localhost>
- <20140207174314.GB16263@obsidianresearch.com>
-Message-ID: <20140210122223.GF10872@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Feb 2014 12:28:03 +0000
+Subject: [PATCH RFC v2 00/35] Second preview of imx-drm cleanup series
+Message-ID: <20140210122802.GS26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 10:43:14AM -0700, Jason Gunthorpe wrote:
-> On Fri, Feb 07, 2014 at 07:40:45AM -0300, Ezequiel Garcia wrote:
-> 
-> > Well, this is related to the discussion about the bootloader not
-> > reseting the watchdog properly, provoking spurious watchdog triggering.
-> > 
-> > Jason Gunthorpe explained [1] that we needed a particular sequence:
-> > 
-> >  1. Disable WDT
-> >  2. Clear bridge
-> >  3. Enable WDT
-> > 
-> > We added the irq handling to satisfy (2), and the watchdog stop for (1).
-> 
-> The issue here is the driver configures two 'machine kill' elements:
-> the PANIC IRQ and the RstOut setup.
-> 
-> Before configuring either of those the driver needs to ensure that any
-> old watchdog events are cleared out of the HW. We must not get a
-> spurious event. 
-> 
-> I agree not disabling an already functional and properly configured
-> counter from the bootloader is desirable.
-> 
-> So lets break it down a bit..
-> 
-> 1) The IRQ:
->   It looks like the cause bit latches high on watchdog timer
->   expiration but has no side effect unless it is unmasked.
-> 
->   The new IRQ flow code ensures the bit is cleared during request_irq
->   so no old events can trigger the IRQ. Thus it is solved now.
-> 
+This is the latest revision of my series cleaning up imx-drm and
+hopefully getting it ready to be moved out of drivers/staging.
+This series is updated to v3.14-rc2.
 
-Agreed.
+Since the last round of patches were posted, the component support
+has been merged into mainline, and thus dropped from this series.
+Greg has taken the first three patches and merged them into his
+linux-next tree - however, I include them here for completness.
 
-> 3) The timer itself:
->   The WDT is just a general timer with an optional hookup to the
->   rst control. If it is harmlessly counting but not resetting we need
->   to stop that before enabling rst out.
-> 
+Most of the comments from last time still apply, and I'll look at
+incorporating some of the other patches that were posted in the
+coming week.
 
-Actually, the current flow is to:
+If I can have some acks for this, I'll start sending some of it to
+Greg - I'd like to at least get the five or six initial imx-hdmi
+patches to Greg and queued up for the next merge window sooner
+rather than later, preferably getting most of this ready for that
+window too.
 
-1. Disable rst out and then disable the counter, in probe().
-
-2. Enable the counter, and then enable rst out, in start().
-
-> So, how about this for psuedo-code in probe:
-> 
-> if (readl(RSTOUTn) & WDRstOutEn)
-> {
->     /* Watchdog is configured and may be down counting,
->        don't touch it */
->     request_irq(..);
-> }
-> else
-> {
->     /* Watchdog is not configured, fully disable the timer
->        and configure for watchdog operation. */
->     disable_watchdog();
->     request_irq();
->     writel(RSTOUTn), .. WDRstOutEn);
-> }
-> 
-
-Sounds good, although it seems to me it's actually simpler:
-
-  /* Let's make sure the watchdog is fully stopped, unless
-   * it's explicitly enabled and running
-   */
-  if ( !(wdt_rst_out_en && wdt_timer_enabled) ) {
-    watchdog_stop();
-  }
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+ arch/arm/boot/dts/imx51-babbage.dts        |  10 +-
+ arch/arm/boot/dts/imx53-m53evk.dts         |   8 +-
+ arch/arm/boot/dts/imx53-mba53.dts          |   6 +
+ arch/arm/boot/dts/imx53-qsb.dts            |   8 +-
+ arch/arm/boot/dts/imx6dl.dtsi              |   5 +
+ arch/arm/boot/dts/imx6q-sabresd.dts        |   4 +
+ arch/arm/boot/dts/imx6q.dtsi               |   5 +
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi     |   6 +
+ arch/arm/boot/dts/imx6qdl.dtsi             |   9 +
+ drivers/staging/imx-drm/Makefile           |   3 +-
+ drivers/staging/imx-drm/imx-drm-core.c     | 831 ++++++++++-------------------
+ drivers/staging/imx-drm/imx-drm.h          |  39 +-
+ drivers/staging/imx-drm/imx-fb.c           |  47 --
+ drivers/staging/imx-drm/imx-fbdev.c        |  74 ---
+ drivers/staging/imx-drm/imx-hdmi.c         | 680 +++++++++--------------
+ drivers/staging/imx-drm/imx-ldb.c          | 125 ++---
+ drivers/staging/imx-drm/imx-tve.c          | 134 +++--
+ drivers/staging/imx-drm/ipu-v3/ipu-di.c    | 317 +++++------
+ drivers/staging/imx-drm/ipuv3-crtc.c       |  56 +-
+ drivers/staging/imx-drm/parallel-display.c | 100 ++--
+ 20 files changed, 934 insertions(+), 1533 deletions(-)
