@@ -1,83 +1,47 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 10 Feb 2014 18:32:49 +0100
-Subject: [PATCH 6/6] dt: Update binding information for mvebu gating clocks
- with Armada 380/385
-In-Reply-To: <1392053569-28037-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1392053569-28037-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1392053569-28037-7-git-send-email-gregory.clement@free-electrons.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 10 Feb 2014 10:34:50 -0700
+Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
+In-Reply-To: <201402092130.25615.arnd@arndb.de>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <3724624.kd9jZNUiTF@wuerfel>
+ <20140207114607.GE5976@mudshark.cambridge.arm.com>
+ <201402092130.25615.arnd@arndb.de>
+Message-ID: <20140210173450.GA5554@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Sun, Feb 09, 2014 at 09:30:25PM +0100, Arnd Bergmann wrote:
 
-Add the binding information for the gating clocks of the Armada 380
-SoCs and the Armada 385 SoCs.
+> > bash-4.2# cat /proc/iomem
+> > 40000000-40ffffff : /pci
+> > 41000400-410005ff : virtio-pci
+> > 41000c00-41000dff : virtio-pci
+> > 41001400-410015ff : virtio-pci
+> > 41001c00-41001dff : virtio-pci
+> > 80000000-93ffffff : System RAM
+> >   80008000-8053df0b : Kernel code
+> >   80570000-805c07fb : Kernel data
+> 
+> You should normally see a parent resource for the PCI bus and the virtio-pci
+> resources under that. For some reason, neither of the two appears to have
+> been registered correctly.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- .../bindings/clock/mvebu-gated-clock.txt           | 36 +++++++++++++++++++---
- 1 file changed, 32 insertions(+), 4 deletions(-)
+I noticed this on mvebu as well..
 
-diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-index cbecec1f64fa..1533e383d6e9 100644
---- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-@@ -1,9 +1,10 @@
- * Gated Clock bindings for Marvell EBU SoCs
- 
--Marvell Armada 370/375/XP, Dove and Kirkwood allow some peripheral clocks to be
--gated to save some power. The clock consumer should specify the desired clock
--by having the clock ID in its "clocks" phandle cell. The clock ID is directly
--mapped to the corresponding clock gating control bit in HW to ease manual clock
-+Marvell Armada 370/375/380/385/XP, Dove and Kirkwood allow some
-+peripheral clocks to be gated to save some power. The clock consumer
-+should specify the desired clock by having the clock ID in its
-+"clocks" phandle cell. The clock ID is directly mapped to the
-+corresponding clock gating control bit in HW to ease manual clock
- lookup in datasheet.
- 
- The following is a list of provided IDs for Armada 370:
-@@ -49,6 +50,32 @@ ID	Clock		Peripheral
- 30	crypto1_enc	Cryptographic Unit Port 1 Encryption
- 31	crypto1_core	Cryptographic Unit Port 1 Core
- 
-+The following is a list of provided IDs for Armada 380/385:
-+ID	Clock		Peripheral
-+-----------------------------------
-+0	audio		Audio
-+2	ge2		Gigabit Ethernet 2
-+3	ge1		Gigabit Ethernet 1
-+4	ge0		Gigabit Ethernet 0
-+5	pex1		PCIe 1
-+6	pex2		PCIe 2
-+7	pex3		PCIe 3
-+8	pex4		PCIe 0
-+9	usb3h0		USB3 Host 0
-+10	usb3h1		USB3 Host 1
-+11	usb3d		USB3 Device
-+13	bm		Buffer Management
-+14	crypto0z	Cryptographic 0 Z
-+15	sata0		SATA 0
-+16	crypto1z	Cryptographic 1 Z
-+17	sdio		SDIO
-+18	usb2		USB 2
-+21	crypto1		Cryptographic 1
-+22	xor0		XOR 0
-+23	crypto0		Cryptographic 0
-+25	tdm		Time Division Multiplexing
-+28	xor1		XOR 1
-+30	sata1		SATA 1
- 
- The following is a list of provided IDs for Armada XP:
- ID	Clock	Peripheral
-@@ -124,6 +151,7 @@ Required properties:
- - compatible : shall be one of the following:
- 	"marvell,armada-370-gating-clock" - for Armada 370 SoC clock gating
- 	"marvell,armada-375-gating-clock" - for Armada 375 SoC clock gating
-+	"marvell,armada-380-gating-clock" - for Armada 380/385 SoC clock gating
- 	"marvell,armada-xp-gating-clock" - for Armada XP SoC clock gating
- 	"marvell,dove-gating-clock" - for Dove SoC clock gating
- 	"marvell,kirkwood-gating-clock" - for Kirkwood SoC clock gating
--- 
-1.8.1.2
+3.13 w/ mvebu driver:
+
+e0001000-e0001fff : /mbus/pex at e0000000/pcie at 1,0/fpga at 0/fpga_sysmon at 1000
+e0006000-e0006fff : /mbus/pex at e0000000/pcie at 1,0/fpga at 0/qdr2p at 6000
+
+3.10 w/ old kirkwood driver:
+
+e0000000-e7ffffff : PCIe 0 MEM
+  e0000000-e001ffff : 0000:00:01.0
+    e0001000-e0001fff : /mbus/pex at e0000000/pcie at 1,0/fpga at 0/fpga_sysmon at 1000
+    e0006000-e0006fff : /mbus/pex at e0000000/pcie at 1,0/fpga at 0/qdr2p at 6000
+
+The latter is obviously correct and matches x86. I'm not sure where
+the new style host drivers are going wrong, even the resource that
+should be added by the PCI core itself for the BAR is missing..
+
+Jason
