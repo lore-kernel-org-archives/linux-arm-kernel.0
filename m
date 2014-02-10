@@ -1,37 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 10 Feb 2014 19:19:59 +0100
-Subject: [PATCH] ARM: mvebu: rename mvebu_defconfig to mvebu_v7_defconfig
-Message-ID: <1392056399-20908-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: linux@roeck-us.net (linux at roeck-us.net)
+Date: Mon, 10 Feb 2014 12:21:19 -0600
+Subject: [PATCH 01/17] Documentation: i2c: describe devicetree method
+ for instantiating devices
+In-Reply-To: <1392026654-5343-2-git-send-email-wsa@the-dreams.de>
+References: <1392026654-5343-1-git-send-email-wsa@the-dreams.de>
+ <1392026654-5343-2-git-send-email-wsa@the-dreams.de>
+Message-ID: <20140210122119.115858a7ntu4lr40@67.228.131.205>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the merge of the Kirkwood support into arch/arm/mach-mvebu/, the
-mvebu platform will no longer only contain ARMv7 compatible processors
-(Armada 370, Armada XP, and soon Armada 375, Armada 38x and Dove), but
-also ARMv5 compatible processors (Kirkwood, and hopefully Orion5x in
-the future).
+Quoting Wolfram Sang <wsa@the-dreams.de>:
 
-However, a single mvebu_defconfig cannot work, since it is not
-possible to build a kernel that supports both ARMv5 and ARMv7
-platforms in the same binary. As a consequence, this commit renames
-mvebu_defconfig to mvebu_v7_defconfig, which is the configuration that
-will build a kernel that supports all ARMv7 mvebu platforms. As
-Kirkwood support gets merged into mach-mvebu, an additional
-mvebu_v5_defconfig will be added.
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>
+>  Documentation/i2c/instantiating-devices | 34  
+> +++++++++++++++++++++++++++++++--
+>  1 file changed, 32 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/i2c/instantiating-devices  
+> b/Documentation/i2c/instantiating-devices
+> index c70e7a7..6df095a 100644
+> --- a/Documentation/i2c/instantiating-devices
+> +++ b/Documentation/i2c/instantiating-devices
+> @@ -8,8 +8,8 @@ reason, the kernel code must instantiate I2C devices  
+> explicitly. There are
+>  several ways to achieve this, depending on the context and requirements.
+>
+>
+> -Method 1: Declare the I2C devices by bus number
+> ------------------------------------------------
+> +Method 1a: Declare the I2C devices by bus number
+> +------------------------------------------------
+>
+>  This method is appropriate when the I2C bus is a system bus as is the case
+>  for many embedded systems. On such systems, each I2C bus has a number
+> @@ -51,6 +51,36 @@ The devices will be automatically unbound and  
+> destroyed when the I2C bus
+>  they sit on goes away (if ever.)
+>
+>
+> +Method 1b: Declare the I2C devices via devicetree
+> +-------------------------------------------------
+> +
 
-Even though we already have a multi_v7_defconfig, the mvebu developers
-found it more convenient for development to have a defconfig that
-builds only the mvebu platforms.
+Hi Wolfram,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/configs/{mvebu_defconfig => mvebu_v7_defconfig} | 0
- 1 file changed, 0 insertions(+), 0 deletions(-)
- rename arch/arm/configs/{mvebu_defconfig => mvebu_v7_defconfig} (100%)
+There is now also a means to instantiate I2C devices through
+ACPI. This is documented in Documentation/acpi/enumeration.txt.
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-similarity index 100%
-rename from arch/arm/configs/mvebu_defconfig
-rename to arch/arm/configs/mvebu_v7_defconfig
--- 
-1.8.3.2
+Might be worthwhile to reference it from instantiating-devices.
+I guess that would be a separate patch though.
+
+Thanks,
+Guenter
