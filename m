@@ -1,43 +1,84 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 10 Feb 2014 16:02:00 +0100
-Subject: [PATCH] clk: Correct handling of NULL clk in __clk_{get, put}
-In-Reply-To: <CAK9yfHxnrM--A_SZSBWzQ2B7zrtU+=n77H61bzq4ddtLrpHMBg@mail.gmail.com>
-References: <1389096223-23934-1-git-send-email-s.nawrocki@samsung.com>
- <CAK9yfHx+=X+DiLe_WsiDkYonKCssPTOGqR76=+7N6eyAHXyQGQ@mail.gmail.com>
- <52CFC5C9.4000006@samsung.com>
- <CAK9yfHxnrM--A_SZSBWzQ2B7zrtU+=n77H61bzq4ddtLrpHMBg@mail.gmail.com>
-Message-ID: <52F8E9E8.8060408@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Feb 2014 16:03:21 +0100
+Subject: [PATCH v3 1/6] arm64: Add ftrace support
+In-Reply-To: <1391768336-5642-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1382598488-13511-1-git-send-email-takahiro.akashi@linaro.org>
+ <1391768336-5642-1-git-send-email-takahiro.akashi@linaro.org>
+ <1391768336-5642-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <201402101603.21791.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/01/14 05:50, Sachin Kamat wrote:
-> On 10 January 2014 15:34, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
->> > On 08/01/14 05:44, Sachin Kamat wrote:
->>> >> Hi Sylwester,
->>> >>
->>> >> On 7 January 2014 17:33, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
->>>> >>> Ensure clk->kref is dereferenced only when clk is not NULL.
->>>> >>>
->>>> >>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>>> >>> ---
->>>> >>> Hi Sachin,
->>>> >>>
->>>> >>> please try if this patch fixes the exyno5420 boot crash.
->>> >>
->>> >> Confirmed that this patch works fine on 5420 as well as already
->>> >> working 4210 and 5250 boards.
->>> >> Thanks for the quick fix.
->>> >>
->>> >> Tested-by: Sachin Kamat <sachin.kamat@linaro.org>
->> >
->> > Thanks Sachin. Mike, it seems we need this patch on top of
->> > my clk-unregister branch. Sorry for overlooking this issue.
->> > Could you add the $subject patch to your clk-next tree ?
->
-> Gentle ping Mike. Hope we can have this patch in rc-2.
+On Friday 07 February 2014, AKASHI Takahiro wrote:
+> @@ -0,0 +1,23 @@
 
-A gentle reminder, this patch is still not in current -rc and is required
-to fix booting of some exynos platforms.
+> +
+> +#ifdef CONFIG_FUNCTION_TRACER
+> +#define MCOUNT_ADDR		((unsigned long)_mcount)
+> +#define MCOUNT_INSN_SIZE	4 /* sizeof mcount call */
+> +
+> +#ifndef __ASSEMBLY__
+> +extern void _mcount(unsigned long);
+> +#endif /* __ASSEMBLY__ */
+> +#endif /* CONFIG_FUNCTION_TRACER */
 
-Thanks,
-Sylwester
+We generally like to have as few #ifdef as possible, and I think the
+#ifdef CONFIG_FUNCTION_TRACER here is not needed.
+
+> +#endif /* __ASM_FTRACE_H */
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 2d4554b..ca921fb 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -5,6 +5,11 @@
+>  CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+>  AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+>  
+> +ifdef CONFIG_FUNCTION_TRACER
+> +CFLAGS_REMOVE_ftrace.o = -pg
+> +CFLAGS_REMOVE_insn.o = -pg
+> +endif
+
+Same here. It never hurts to have the CFLAGS_REMOVE_* statements here, since
+you will not want to build these files for profiling.
+
+> diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
+> index 338b568..7f0512f 100644
+> --- a/arch/arm64/kernel/arm64ksyms.c
+> +++ b/arch/arm64/kernel/arm64ksyms.c
+> @@ -56,3 +56,7 @@ EXPORT_SYMBOL(clear_bit);
+>  EXPORT_SYMBOL(test_and_clear_bit);
+>  EXPORT_SYMBOL(change_bit);
+>  EXPORT_SYMBOL(test_and_change_bit);
+> +
+> +#ifdef CONFIG_FUNCTION_TRACER
+> +EXPORT_SYMBOL(_mcount);
+> +#endif
+
+This one is clearly needed of course.
+
+> +/*
+> + * Gcc with -pg will put the following code in the beginning of each function:
+> + *      mov x0, x30
+> + *      bl _mcount
+> + *	[function's body ...]
+> + * "bl _mcount" may be replaced to "bl ftrace_caller" or NOP if dynamic
+> + * ftrace is enabled.
+
+Unrelated to your patch, I have run into problems with this on arm32, maybe
+someone on Cc to this mail has an idea what to do about it:
+
+If I build a large "randconfig" kernel or "allyesconfig", the kernel image
+size exceeds 32MB, which means I can no longer link callers with a 26
+bit signed immediate argument like the "bl _mcount" here. For any other
+function calls, "gcc -mlong-calls" can be used to work around this, but
+this particular instance is created by inserting assembly statements
+into the output without considering the long-call options. Is there
+a way to get the kernel to link anyway?
+
+> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+
+Here, again, you an remove the #ifdef by making the entire file built
+only for CONFIG_FUNCTION_GRAPH_TRACER.
+
+	Arnd
