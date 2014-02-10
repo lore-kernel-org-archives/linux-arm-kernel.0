@@ -1,49 +1,118 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 10 Feb 2014 16:07:54 -0300
-Subject: [PATCH 2/2] clocksource: armada-370-xp: Add support for Armada 38x
-In-Reply-To: <1392059274-26965-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1392059274-26965-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1392059274-26965-3-git-send-email-ezequiel.garcia@free-electrons.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 10 Feb 2014 13:14:44 -0600
+Subject: [PATCHv4 4/7] hwspinlock/core: add common OF helpers
+In-Reply-To: <CAJAp7Oi7wD+VsMAd37gT04yZ4TH4ygXFmheDhvmWuanUjpBmVQ@mail.gmail.com>
+References: <1389658764-39199-1-git-send-email-s-anna@ti.com>	<1389658764-39199-5-git-send-email-s-anna@ti.com>
+ <CAJAp7Oi7wD+VsMAd37gT04yZ4TH4ygXFmheDhvmWuanUjpBmVQ@mail.gmail.com>
+Message-ID: <52F92524.3080402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Bjorn,
 
-The Armada 38x has a 25 Mhz fixed clock. Therefore, we can model it
-as compatible to the Armada XP timer for now. Nevertheless, we introduce
-a new compatible string to allow future changes.
+On 02/07/2014 04:49 PM, Bjorn Andersson wrote:
+> On Mon, Jan 13, 2014 at 4:19 PM, Suman Anna <s-anna@ti.com> wrote:
+>> This patch adds three new OF helper functions to use/request
+>> locks from a hwspinlock device instantiated through a
+>> device-tree blob.
+>
+> Nice, I ran in to the problem of needing a probe deferral on a
+> hwspinlock earlier this week so I implemented this yesterday...then I
+> got a pointer to your series.
+>
+> [snip]
+>>   /**
+>> + * of_hwspin_lock_request_specific() - request a OF phandle-based specific lock
+>> + * @np: device node from which to request the specific hwlock
+>> + * @propname: property name containing hwlock specifier(s)
+>> + * @index: index of the hwlock
+>> + *
+>> + * This function is the OF equivalent of hwspin_lock_request_specific(). This
+>> + * function provides a means for users of the hwspinlock module to request a
+>> + * specific hwspinlock using the phandle of the hwspinlock device. The requested
+>> + * lock number is indexed relative to the hwspinlock device, unlike the
+>> + * hwspin_lock_request_specific() which is an absolute lock number.
+>> + *
+>> + * Returns the address of the assigned hwspinlock, or NULL on error
+>> + */
+>> +struct hwspinlock *of_hwspin_lock_request_specific(struct device_node *np,
+>> +                                       const char *propname, int index)
+>> +{
+>> +       struct hwspinlock_device *bank;
+>> +       struct of_phandle_args args;
+>> +       int id;
+>> +       int ret;
+>> +
+>> +       ret = of_parse_phandle_with_args(np, propname, "#hwlock-cells", index,
+>> +                                        &args);
+>> +       if (ret) {
+>> +               pr_warn("%s: can't parse hwlocks property of node '%s[%d]' ret = %d\n",
+>> +                       __func__, np->full_name, index, ret);
+>> +               return NULL;
+>> +       }
+>
+> of_parse_phandle_with_args() already does pr_err if it can't find the
+> phandle and on some of the issues related to arguments. So please
+> remove this pr_warn().
 
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- drivers/clocksource/time-armada-370-xp.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Yes, I will clean this up.
 
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index 87eda6d..9fd20b2 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -24,6 +24,8 @@
-  *   * Armada 375 has a non-usable 25 Mhz fixed timer, due to hardware
-  *     issues.
-  *
-+ *   * Armada 380 has a 25 Mhz fixed timer.
-+ *
-  *   * Armada XP cannot work properly without such 25 MHz fixed timer as
-  *     doing otherwise leads to using a clocksource whose frequency varies
-  *     when doing cpufreq frequency changes.
-@@ -327,3 +329,11 @@ CLOCKSOURCE_OF_DECLARE(armada_370, "marvell,armada-370-timer",
-  */
- CLOCKSOURCE_OF_DECLARE(armada_375, "marvell,armada-375-timer",
- 		       armada_370_timer_init);
-+
-+/*
-+ * Support the Armada 38x timer as identical to the Armada XP, using the
-+ * available 25 MHz clock. We maintain a SoC-specific compatible string to
-+ * allow to change this in the future.
-+ */
-+CLOCKSOURCE_OF_DECLARE(armada_380, "marvell,armada-380-timer",
-+		       armada_xp_timer_init);
--- 
-1.8.1.5
+>
+> It seems to be standard practice to pass the error value back to the
+> consumer, so you should
+> return ERR_PTR(ret); here instead of the NULL...
+
+I have modelled the return values in this function based on the return 
+values in the existing hwspin_lock_request interfaces. I would need to
+change those functions as well.
+
+Ohad,
+Do you have any objections to the return code convention change? I agree 
+with Bjorn on the changes. If you are ok, then I will add a separate 
+patch for the existing functions and revise this patch as well.
+
+>
+>> +
+>> +       mutex_lock(&hwspinlock_tree_lock);
+>> +       list_for_each_entry(bank, &hwspinlock_devices, list)
+>> +               if (bank->dev->of_node == args.np)
+>> +                       break;
+>> +       mutex_unlock(&hwspinlock_tree_lock);
+>> +       if (&bank->list == &hwspinlock_devices) {
+>> +               pr_warn("%s: requested hwspinlock device %s is not registered\n",
+>> +                       __func__, args.np->full_name);
+>> +               return NULL;
+>
+> ...especially since you want the consumer to have the ability to
+> identify this error. Here you should
+> return ERR_PTR(-EPROBE_DEFER); so that the consumer knows that this
+> lock is not _yet_ registered, but will be in the future.
+>
+> You should remove this pr_warn as well. The standard use of this
+> function would be in a probe() and just returning this error value
+> from that probe will give you a line in the log indicating that this
+> was in fact the issue.
+
+OK.
+
+>
+>> +       }
+>> +
+>> +       id = bank->ops->of_xlate(bank, &args);
+>> +       if (id < 0 || id >= bank->num_locks) {
+>> +               pr_warn("%s: requested lock %d is either out of range [0, %d] or failed translation\n",
+>> +                       __func__, id, bank->num_locks - 1);
+>> +               return NULL;
+>
+> Please return ERR_PTR(-EINVAL); here.
+
+OK, will change this based on Ohad's ack/nack.
+
+>
+> Looking forward to your next spin, as I will actually use this interface :)
+
+Thanks for your comments. I will wait to see if there are any additional 
+comments before I refresh the series later this week.
+
+regards
+Suman
