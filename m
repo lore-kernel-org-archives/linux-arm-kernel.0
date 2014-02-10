@@ -1,46 +1,50 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 10 Feb 2014 17:28:56 +0000
-Subject: [RFC PATCH] ARM: Add imprecise abort enable/disable macro
-In-Reply-To: <20140210163700.GD26684@n2100.arm.linux.org.uk>
-References: <1391789955-26927-1-git-send-email-fabrice.gasnier@st.com>
- <1391789955-26927-2-git-send-email-fabrice.gasnier@st.com>
- <20140207170903.GT5976@mudshark.cambridge.arm.com>
- <52F892C8.80508@st.com>
- <20140210111710.GC17766@mudshark.cambridge.arm.com>
- <20140210135659.GU26684@n2100.arm.linux.org.uk>
- <20140210144228.GC2794@e103592.cambridge.arm.com>
- <20140210151934.GZ26684@n2100.arm.linux.org.uk>
- <20140210162822.GF2794@e103592.cambridge.arm.com>
- <20140210163700.GD26684@n2100.arm.linux.org.uk>
-Message-ID: <20140210172856.GG2794@e103592.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 10 Feb 2014 18:32:43 +0100
+Subject: [PATCH 0/6] Marvell Armada 375 and 38x clocks drivers
+Message-ID: <1392053569-28037-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 04:37:00PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Feb 10, 2014 at 04:28:22PM +0000, Dave Martin wrote:
-> > On Mon, Feb 10, 2014 at 03:19:34PM +0000, Russell King - ARM Linux wrote:
-> > > On Mon, Feb 10, 2014 at 02:42:28PM +0000, Dave Martin wrote:
-> > > > Should we require CPSR.A to me masked in Booting, for all CPUs that have
-> > > > it?
-> > > 
-> > > If it's not masked at boot, then there can't be an imprecise exception
-> > > pending.
-> > 
-> > Couldn't there still be a dangling abort condition triggered by the
-> > bootloader, which which doesn't raise the abort pin until after we
-> > entered the kernel?
-> 
-> True, but the decompressor does disable them (see safe_svcmode_maskall),
-> so any raised abort is likely to hit the boot loader's vectors at that
-> time.  They remain masked into the kernel from that point.
-> 
-> If you're not using the decompressor then the A bit will be left as-is.
-> 
-> Given that we've not yet had any failures, I'm inclined to just let the
-> status-quo be for the kernel entry - if it does cause problems then it's
-> clear that the right solution is that the A bit must be disabled.
+Hi Mike,
 
-OK, that seems a reasonable view.
+Here are patches that add the clocks drivers for two new Marvell ARM
+SOCs that belong to the mach-mvebu family: the Armada 375 and the
+Armada 380/385. They are based on Cortex-A9 CPU cores, and share a
+number of peripherals with their predecessors in the mach-mvebu
+family.
 
-Cheers
----Dave
+The drivers added are similar to the one already used for the other
+SoCs of this family, as usual only the data are different the logic
+remains the same ans allow us to use the common part.
+
+The core support (arch/arm/mach-mvebu) for these SOCs have just been
+posted, and we're aiming at having this merged for 3.15 if possible.
+
+Thanks,
+
+Gregory
+
+Gregory CLEMENT (4):
+  clk: mvebu: add clock support for Armada 375
+  dt: Update binding information for mvebu core clocks with Armada 375
+  dt: Update binding information for mvebu gating clocks with Armada 375
+  clk: mvebu: add clock support for Armada 380/385
+
+Thomas Petazzoni (2):
+  dt: Update binding information for mvebu core clocks with Armada
+    380/385
+  dt: Update binding information for mvebu gating clocks with Armada
+    380/385
+
+ .../devicetree/bindings/clock/mvebu-core-clock.txt |  14 ++
+ .../bindings/clock/mvebu-gated-clock.txt           |  65 +++++++-
+ drivers/clk/mvebu/Kconfig                          |   8 +
+ drivers/clk/mvebu/Makefile                         |   2 +
+ drivers/clk/mvebu/armada-375.c                     | 184 +++++++++++++++++++++
+ drivers/clk/mvebu/armada-38x.c                     | 167 +++++++++++++++++++
+ 6 files changed, 436 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/clk/mvebu/armada-375.c
+ create mode 100644 drivers/clk/mvebu/armada-38x.c
+
+-- 
+1.8.1.2
