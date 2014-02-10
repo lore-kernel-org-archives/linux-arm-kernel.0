@@ -1,39 +1,95 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Feb 2014 15:37:27 +0800
-Subject: [PATCH resend] ARM: dts: imx6qdl-wandboard: use GPIO_6 for FEC
- interrupt
-In-Reply-To: <1391725453-11988-1-git-send-email-x-linux@infra-silbe.de>
-References: <1391725453-11988-1-git-send-email-x-linux@infra-silbe.de>
-Message-ID: <20140210073725.GN9628@S2101-09.ap.freescale.net>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 10 Feb 2014 08:38:36 +0100
+Subject: [PATCH v2 2/2] Documentation: devicetree: Add boost-frequency
+ binding to list boost mode frequency
+In-Reply-To: <CAJuA9agcpbKYocaQUBr2-VCXcXAo3r3urFF=+G_+ib2jCZqvwg@mail.gmail.com>
+References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>
+ <1391786342-11812-3-git-send-email-thomas.ab@samsung.com>
+ <52F50698.4060305@arm.com> <52F509BD.70903@arm.com>
+ <CAGo_u6raZY0sKdDn4d92SKpi=eqUpf23vW8K_bEi-v62V2jdPA@mail.gmail.com>
+ <52F51888.5010608@arm.com>
+ <CAGo_u6ofC4NNPiTNcSnXUvT3RZJo54=XyjetR-ok5hCBrVZkKg@mail.gmail.com>
+ <52F51FCD.5000009@arm.com>
+ <CAJuA9agcpbKYocaQUBr2-VCXcXAo3r3urFF=+G_+ib2jCZqvwg@mail.gmail.com>
+Message-ID: <20140210083836.44b519bf@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 11:24:13PM +0100, Sascha Silbe wrote:
-> Apply the same work-around for i.MX 6D/Q erratum 006687 as used for
-> Sabre Lite for the Wandboard Dual / Quad.
-> 
-> Like on the Sabre Lite, GPIO6 is used as a power down output for
-> camera expansion boards. However, these expansion boards do not work
-> with mainline yet anyway.
-> 
-> Tested on a Wandboard Quad. Before the patch:
-> 
-> root at arm:~# ping -q -f -c 10000 192.168.2.1
-> PING 192.168.2.1 (192.168.2.1) 56(84) bytes of data.
-> 
-> --- 192.168.2.1 ping statistics ---
-> 10000 packets transmitted, 10000 received, 0% packet loss, time 97363ms
-> rtt min/avg/max/mdev = 0.290/9.586/10.198/1.432 ms, pipe 2, ipg/ewma 9.737/9.672 ms
-> 
-> After the patch:
-> 
-> root at arm:~# ping -q -f -c 10000 192.168.2.1
-> PING 192.168.2.1 (192.168.2.1) 56(84) bytes of data.
-> 
-> --- 192.168.2.1 ping statistics ---
-> 10000 packets transmitted, 10000 received, 0% packet loss, time 4810ms
-> rtt min/avg/max/mdev = 0.246/0.355/0.863/0.044 ms, ipg/ewma 0.481/0.319 ms
-> 
-> Signed-off-by: Sascha Silbe <x-linux@infra-silbe.de>
+Hi Thomas, Sudeep,
 
-Applied, thanks.
+> On Fri, Feb 7, 2014 at 11:32 PM, Sudeep Holla <Sudeep.Holla@arm.com>
+> wrote:
+> > On 07/02/14 17:37, Nishanth Menon wrote:
+> >> On Fri, Feb 7, 2014 at 11:31 AM, Sudeep Holla
+> >> <Sudeep.Holla@arm.com> wrote:
+> >
+> > [...]
+> >
+> >>> Yes I think its counter-intuitive as it's visible to the
+> >>> userspace(list of frequencies and the boost parameters are
+> >>> exposed through sysfs)
+> >>
+> >> That will be a different problem -> as currently every single
+> >> frequency in the cpufreq list has ability to be marked as boost
+> >> frequency - if userspace does not maintain that, then, IMHO, fix
+> >> the userspace :D
+> >>
+> >
+> > /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
+> > gives the list of frequencies based on the state of the boost
+> > feature at anytime.
+> 
+> The list of frequencies in
+> /sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies
+> does not change based in the state of the boost feature (enabled or
+> disabled). But the scaling_max_frequency and scaling_min_frequency are
+> updated based on the set of available + boost frequencies available.
+
+With boost intended behavior is as follow:
+
+/sys/devices/system/cpu/cpu*/cpufreq/scaling_available_frequencies [1]
+
+shows the non boost frequencies no matter if boost is enabled or not.
+Those are the "normal" frequencies.
+
+When boost is supported (by enabling the CONFIG_CPU_FREQ_BOOST_SW)
+extra sysfs attribute shows up:
+
+/sys/devices/system/cpu/cpu0/cpufreq/scaling_boost_frequencies [2]
+in which are listed only the boost frequencies.
+
+If the dts doesn't provide any values or as it is now no
+CPUFREQ_BOOST_FREQ flag is specified (at exynos4x12-cpufreq.c), then
+this list is empty.
+
+
+When boost is disabled the max freq (cpuinfo_max_freq) is in the range
+listed at [1].
+
+When boost is enabled this value is the sum of freqs represented at [1]
+and [2].
+
+By adding an extra attribute [2] we:
+1. Indicate that boost is supported
+2. List provided BOOST frequencies
+3. Separate boost and non boost freqs
+
+
+> 
+> >
+> > Intuitively the list without boost shouldn't have any frequency
+> > above the range when it's enabled :), that's what I was referring
+> > to. So I am not talking about any issue with user-space maintenance.
+> >
+> > Regards,
+> > Sudeep
+> >
+
+
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
