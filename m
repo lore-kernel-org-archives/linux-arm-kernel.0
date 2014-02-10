@@ -1,91 +1,56 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Mon, 10 Feb 2014 10:40:37 +0000
-Subject: [PATCH v2 1/2] PM / OPP: Allow boost frequency to be looked up
- from device tree
-In-Reply-To: <CAJuA9agT4PC6YOmhCwKQ=58qaGEr1qSuhTpX57ro1pEuk++Miw@mail.gmail.com>
-References: <1391786342-11812-1-git-send-email-thomas.ab@samsung.com>	<1391786342-11812-2-git-send-email-thomas.ab@samsung.com>	<52F50346.7040707@arm.com>
- <CAJuA9agT4PC6YOmhCwKQ=58qaGEr1qSuhTpX57ro1pEuk++Miw@mail.gmail.com>
-Message-ID: <52F8ACA5.1080409@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 10 Feb 2014 11:40:34 +0100
+Subject: [PATCH] backlight: add PWM dependencies
+In-Reply-To: <1391518634-6472-1-git-send-email-linus.walleij@linaro.org>
+References: <1391518634-6472-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20140210104032.GB20143@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/14 05:10, Thomas Abraham wrote:
-> On Fri, Feb 7, 2014 at 9:31 PM, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
->> On 07/02/14 15:19, Thomas Abraham wrote:
->>> From: Thomas Abraham <thomas.ab@samsung.com>
->>>
->>> Commit 6f19efc0 ("cpufreq: Add boost frequency support in core") adds
->>> support for CPU boost mode. This patch adds support for finding available
->>> boost frequencies from device tree and marking them as usable in boost mode.
->>>
->>> Cc: Nishanth Menon <nm@ti.com>
->>> Cc: Lukasz Majewski <l.majewski@samsung.com>
->>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->>> ---
->>>  drivers/base/power/opp.c |   34 +++++++++++++++++++++++++++++++++-
->>>  1 file changed, 33 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
->>> index fa41874..b636826 100644
->>> --- a/drivers/base/power/opp.c
->>> +++ b/drivers/base/power/opp.c
->>> @@ -628,7 +628,8 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
->>>       struct device_opp *dev_opp;
->>>       struct dev_pm_opp *opp;
->>>       struct cpufreq_frequency_table *freq_table;
->>> -     int i = 0;
->>> +     int i = 0, j, len, ret;
->>> +     u32 *boost_freqs = NULL;
->>>
->>>       /* Pretend as if I am an updater */
->>>       mutex_lock(&dev_opp_list_lock);
->>> @@ -650,10 +651,35 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
->>>               return -ENOMEM;
->>>       }
->>>
->>> +     if (of_find_property(dev->of_node, "boost-frequency", &len)) {
->>> +             if (len == 0 || (len & (sizeof(u32) - 1)) != 0) {
->>> +                     dev_err(dev, "%s: invalid boost frequency\n", __func__);
->>> +                     ret = -EINVAL;
->>> +                     goto err_boost;
->>> +             }
->>> +
->>> +             boost_freqs = kzalloc(len, GFP_KERNEL);
->>> +             if (!boost_freqs) {
->>> +                     dev_warn(dev, "%s: no memory for boost freq table\n",
->>> +                                     __func__);
->>> +                     ret = -ENOMEM;
->>> +                     goto err_boost;
->>> +             }
->>> +             of_property_read_u32_array(dev->of_node, "boost-frequency",
->>> +                     boost_freqs, len / sizeof(u32));
->>> +     }
->>> +
->>>       list_for_each_entry(opp, &dev_opp->opp_list, node) {
->>>               if (opp->available) {
->>>                       freq_table[i].driver_data = i;
->>>                       freq_table[i].frequency = opp->rate / 1000;
->>> +                     for (j = 0; j < len / sizeof(u32) && boost_freqs; j++) {
->>> +                             if (boost_freqs[j] == freq_table[i].frequency) {
->>> +                                     freq_table[i].driver_data =
->>> +                                                     CPUFREQ_BOOST_FREQ;
->>> +                                     break;
->>> +                             }
->>> +                     }
->>>                       i++;
->>>               }
->>>       }
->> IIRC you had mentioned that the boost-opp was not limited to be a cpufreq, but
->> this change seems to be cpufreq only.
+On Tue, Feb 04, 2014 at 01:57:14PM +0100, Linus Walleij wrote:
+> In some compilations the LM3630A and LP855X backlight drivers
+> fail like this:
 > 
-> Yes, but as you have initiated the discussion on extending the OPP
-> binding, this has been limited to cpufreq only. If the new OPP library
-> has support for listing boost frequency, this can be migrated to the
-> new OPP libaray.
+> drivers/built-in.o: In function `lm3630a_pwm_ctrl':
+> drivers/video/backlight/lm3630a_bl.c:168: undefined reference to `pwm_config'
+> drivers/video/backlight/lm3630a_bl.c:172: undefined reference to `pwm_disable'
+> drivers/video/backlight/lm3630a_bl.c:170: undefined reference to `pwm_enable'
+> drivers/built-in.o: In function `lp855x_pwm_ctrl':
+> drivers/video/backlight/lp855x_bl.c:249: undefined reference to `pwm_config'
+> drivers/video/backlight/lp855x_bl.c:253: undefined reference to `pwm_disable'
+> drivers/video/backlight/lp855x_bl.c:251: undefined reference to `pwm_enable'
 > 
+> This is because both drivers depend on the PWM framework, so
+> add this dependency to their Kconfig entries.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/video/backlight/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 
-Fair enough, just wanted to check as I couldn't get the info following the
-thread. I might have missed it.
+Hi Linus,
 
-Regards,
-Sudeep
+it seems like at least BACKLIGHT_LP8788 is missing a corresponding
+dependency as well.
+
+I have applied Sascha's patch to remove the obsolete HAVE_PWM symbol,
+and this will fix at least the build issues. However it will also cause
+the driver to fail at runtime because the pwm_*() functions won't work.
+
+So I wonder if we should still apply this patch to make it clear that
+PWM support is necessary to make the driver work. I guess the point is
+somewhat moot because even if we had PWM enabled it could still happen
+that no PWM driver is enabled to provide a PWM device... I guess it's
+equally justifiable to leave that up to the defconfig.
+
+Should we just drop this patch? Cc'ing Arnd who's commented on Jingoo's
+alternate proposal.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140210/1b95b04c/attachment.sig>
