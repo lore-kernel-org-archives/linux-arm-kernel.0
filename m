@@ -1,52 +1,24 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 10 Feb 2014 10:37:08 -0800
-Subject: [GIT PULL] ARM: imx: fixes for 3.14
-In-Reply-To: <20140206145058.GA6610@S2101-09.ap.freescale.net> (Shawn Guo's
- message of "Thu, 6 Feb 2014 22:51:02 +0800")
-References: <20140206145058.GA6610@S2101-09.ap.freescale.net>
-Message-ID: <7hr47a95m3.fsf@paris.lan>
+Date: Mon, 10 Feb 2014 10:38:34 -0800
+Subject: [PATCH] ARM: multi_v7_defconfig: Select CONFIG_SOC_DRA7XX
+In-Reply-To: <1391700571-31784-1-git-send-email-nm@ti.com> (Nishanth Menon's
+ message of "Thu, 6 Feb 2014 09:29:31 -0600")
+References: <1391700571-31784-1-git-send-email-nm@ti.com>
+Message-ID: <7hlhxi95jp.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo <shawn.guo@linaro.org> writes:
+Nishanth Menon <nm@ti.com> writes:
 
-> Hi,
+> Select CONFIG_SOC_DRA7XX so that we can boot dra7-evm.
+> DRA7 family are A15 based processors that supports LPAE and an
+> evolutionary update to the OMAP5 generation of processors.
 >
-> The 3.13 stable tree will also need this fix.  But since it does not
-> apply to 3.13 cleanly, we will need to send another one for 3.13
-> stable kernel, after this one hits mainline.
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
 >
-> Shawn
->
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
->
->   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
->
-> are available in the git repository at:
->
->   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.14
->
-> for you to fetch changes up to 5d0a87ba5875794ec3df14aa74ee8e18ef47d6b4:
->
->   ARM: imx6: Initialize low-power mode early again (2014-02-06 20:26:26 +0800)
->
-> ----------------------------------------------------------------
-> i.MX fixes for 3.14:
->  - Fix a regression (system hang) when preemption is enabled
->    (CONFIG_PREEMPT=y).
->
-> ----------------------------------------------------------------
+> based on v3.13-rc1 kernel tag - tested on v3.14-rc1 and next-20140206
 
-Applied to fixes.
-
-Thanks,
+Applied to arm-soc/fixes for v3.14-rc.
 
 Kevin
-
-> Philipp Zabel (1):
->       ARM: imx6: Initialize low-power mode early again
->
->  arch/arm/mach-imx/clk-imx6q.c  |    3 +++
->  arch/arm/mach-imx/clk-imx6sl.c |    3 +++
->  arch/arm/mach-imx/pm-imx6q.c   |    2 --
->  3 files changed, 6 insertions(+), 2 deletions(-)
