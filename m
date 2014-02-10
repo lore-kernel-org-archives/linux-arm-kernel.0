@@ -1,51 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Feb 2014 23:10:30 +0800
-Subject: imx6qdl, weim ranges and gpr1
-In-Reply-To: <20140210001547.GA28084@frolo.macqel>
-References: <20140210001547.GA28084@frolo.macqel>
-Message-ID: <20140210151027.GP9628@S2101-09.ap.freescale.net>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 10 Feb 2014 16:12:19 +0100
+Subject: [PATCH RFC v2 00/35] Second preview of imx-drm cleanup series
+In-Reply-To: <20140210122802.GS26684@n2100.arm.linux.org.uk>
+References: <20140210122802.GS26684@n2100.arm.linux.org.uk>
+Message-ID: <1392045139.6687.31.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 01:15:47AM +0100, Philippe De Muyter wrote:
-> Hello linux on i.mx6 experts,
+Am Montag, den 10.02.2014, 12:28 +0000 schrieb Russell King - ARM Linux:
+> This is the latest revision of my series cleaning up imx-drm and
+> hopefully getting it ready to be moved out of drivers/staging.
+> This series is updated to v3.14-rc2.
 > 
-> on our i.mx6q/dl-based custom hardware we have used the weim interface to
-> connect some peripherals.  Our weim dts description looks like that:
+> Since the last round of patches were posted, the component support
+> has been merged into mainline, and thus dropped from this series.
+> Greg has taken the first three patches and merged them into his
+> linux-next tree - however, I include them here for completness.
 > 
-> &weim {
-> 	compatible = "fsl,imx6q-weim";
-> 	pinctrl-names = "default";
-> 	pinctrl-0 = <&pinctrl_weim_sram_1>;
-> 	clocks = <&clks 196>;
-> 	reg = <0x021b8000 0x4000>;
-> 	#address-cells = <2>;
-> 	#size-cells = <1>;
-> 	ranges = <0 0 0x08000000 0x04000000>, /* 64Mb for CS0 */
-> 		<1 0 0x0c000000 0x04000000>; /* 64Mb for CS1 */
-> 	status = "okay";
+> Most of the comments from last time still apply, and I'll look at
+> incorporating some of the other patches that were posted in the
+> coming week.
 > 
-> 	...
-> };
-> 
-> Actually, to achieve this mapping, I must configure some bits in IOMUXC_GPR1,
-> like that:
-> 	regmap_update_bits(gpr, IOMUXC_GPR1, 0xfff, 0x1b);
-> 
-> Would it be possible to set the IOMUXC_GPR1 bits automagically, based on the
-> dts description ?
+> If I can have some acks for this, I'll start sending some of it to
+>
+>
+> Greg - I'd like to at least get the five or six initial imx-hdmi
+> patches to Greg and queued up for the next merge window sooner
+> rather than later, preferably getting most of this ready for that
+> window too.
 
-It's possible, I think.
+For the first 9 patches up to (including) "imx-drm: ipu-v3: more
+clocking fixes":
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-> Where should that go, in drivers/bus/imx-weim.c or in
-> arch/arm/mach-imx/mach-imx6q.c ?
+As you say, comments about the device tree bindings still apply.
+I'd prefer if the patches that currently use the crtcs property were
+reworked to use the v4l2 style device tree bindings before they hit
+mainline.
 
-I prefer to drivers/bus/imx-weim.c.
-
-> Also, I do not know how to retrieve
-> the 'ranges' property of the weim description.
-
-Just read it as an array of integers.  I will post a patch for it
-tomorrow.  And please help test it.
-
-Shawn
+regards
+Philipp
