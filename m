@@ -1,41 +1,45 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 11 Feb 2014 18:10:48 +0100
-Subject: [PATCH 4/8] ARM: mvebu: make use of
- of_find_matching_node_and_match
-In-Reply-To: <20140211165314.GA8533@titan.lakedaemon.net>
-References: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
- <1392135847-30791-5-git-send-email-joshc@codeaurora.org>
- <20140211165314.GA8533@titan.lakedaemon.net>
-Message-ID: <20140211181048.6934bdd3@skate>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 11 Feb 2014 12:09:35 -0500 (EST)
+Subject: [PATCH v2] ARM: asm: rename logical shift macros push pull into
+ lspush lspull
+In-Reply-To: <20140211155437.GC3035@e103592.cambridge.arm.com>
+References: <1392063589-24111-1-git-send-email-victor.kamensky@linaro.org>
+ <1392063589-24111-2-git-send-email-victor.kamensky@linaro.org>
+ <alpine.LFD.2.11.1402101607120.17677@knanqh.ubzr>
+ <20140211155437.GC3035@e103592.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.11.1402111159230.17677@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+On Tue, 11 Feb 2014, Dave Martin wrote:
 
-On Tue, 11 Feb 2014 11:53:14 -0500, Jason Cooper wrote:
-
-> > -	np = of_find_matching_node(NULL, of_system_controller_table);
-> > +	np = of_find_matching_node_and_match(NULL, of_system_controller_table,
-> > +					     &match);
-> >  	if (np) {
-> > -		const struct of_device_id *match =
-> > -		    of_match_node(of_system_controller_table, np);
+> On Mon, Feb 10, 2014 at 04:30:01PM -0500, Nicolas Pitre wrote:
+> > On Mon, 10 Feb 2014, Victor Kamensky wrote:
+> > 
+> > > Renames logical shift macros, 'push' and 'pull', defined in
+> > > arch/arm/include/asm/assembler.h, into 'lspush' and 'lspull'.
+> > 
+> > I don't have any fundamental objection to the idea, except maybe for the 
+> > actual names.  I just can't come up with anything better though.  
 > 
+> For consistency with the get_byte_ stuff, how about:
 > 
-> > -		BUG_ON(!match);
+> 	push -> towards_byte_0
+> 	pull -> from_byte_0
 > 
-> Gregory, is it ok to remove this?  It was added with the original code
-> submission for mach-mvebu.  mvebu_restart() will handle this
-> gracefully...
+> That may make the purpose a little clearer, too.
 
-The BUG_ON here can normally never be reached. If
-of_find_matching_node() returns a non-NULL result, then of_match_node()
-should also return a non-NULL result.
+I don't know if
 
-Or I'm missing something :)
+	mov	r0, r1, from_byte_0 #8
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+is that much clearer though.
+
+> (Assuming I've got them the right way around...)
+
+As you later noticed you got it wrong.  :-)
+Most likely because "full from" and "push towards" are common english 
+constructs.
+
+
+Nicolas
