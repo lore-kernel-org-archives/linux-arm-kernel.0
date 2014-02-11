@@ -1,84 +1,61 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 11 Feb 2014 20:51:36 +0200
-Subject: [PATCH] ARM: dts: omap3-n9 family: mark proper OMAP version
-In-Reply-To: <1392132541-25340-1-git-send-email-nm@ti.com>
-References: <1392132541-25340-1-git-send-email-nm@ti.com>
-Message-ID: <20140211185136.GG573@drone.musicnaut.iki.fi>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 11 Feb 2014 19:01:04 +0000
+Subject: [PATCH v2 1/5] drivers: of: add initialization code for reserved
+ memory
+In-Reply-To: <52FA33E2.4050004@samsung.com>
+References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com> <
+ 1391515773-6112-2-git-send-email-m.szyprowski@samsung.com> <20140205110538.
+ 99E47C40A89@trevor.secretlab.ca> <52FA0D6E.9090304@samsung.com> <
+ 20140211121316.24032C40C4D@trevor.secretlab.ca> <52FA33E2.4050004@samsung.
+ com>
+Message-ID: <20140211190104.7E6C5C4140E@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Feb 11, 2014 at 09:29:01AM -0600, Nishanth Menon wrote:
-> Nokia N900 uses OMAP3430 and N9/N950 uses OMAP3630. Mark SoC compatibilty
-> as per Documentation/devicetree/bindings/arm/omap/omap.txt else
-> N9/N950 will be probed as a OMAP3430 type device, since default ti,omap3
-> maps to OMAP3430 compatibility.
-
-I already sent & tested patches for this:
-
-http://marc.info/?l=linux-omap&m=139194800711362&w=2
-http://marc.info/?l=linux-omap&m=139194800011360&w=2
-
-The N9/N950 is mandatory for 3.14, as the boot hangs without it.
-
-A.
-
-> Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
+On Tue, 11 Feb 2014 15:29:54 +0100, Tomasz Figa <t.figa@samsung.com> wrote:
+> > Yes, if only because it is an define usage of the reg property. If a
+> > devtree has multiple tuples in reg, then all of those tuples should be
+> > treated as reserved, even if the kernel doesn't know how to use them.
+> >
+> > I would not do the same for size/align/alloc-ranges unless there is a
+> > very specific use case that you can define. These ones are different
+> > from the static regions because they aren't ever used to protect
+> > something that already exists in the memory.
 > 
-> just build tested. but given examples such as 
-> http://thread.gmane.org/gmane.linux.ports.arm.omap/110006
+> Is there a reason why multiple regions could not be used for this 
+> purpose, instead of adding extra complexity of having multiple reg 
+> entries per region?
 > 
-> I guess, some form of failure is expected.
+> I.e. I don't see a difference between
 > 
-> based on v3.14-rc2
+> reg1: region at 00000000 {
+> 	reg = <0x00000000 0x1000>;
+> };
 > 
->  arch/arm/boot/dts/omap3-n9.dts   |    2 +-
->  arch/arm/boot/dts/omap3-n900.dts |    2 +-
->  arch/arm/boot/dts/omap3-n950.dts |    2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+> reg2: region at 10000000 {
+> 	reg = <0x10000000 0x1000>;
+> };
 > 
-> diff --git a/arch/arm/boot/dts/omap3-n9.dts b/arch/arm/boot/dts/omap3-n9.dts
-> index 39828ce..9938b5d 100644
-> --- a/arch/arm/boot/dts/omap3-n9.dts
-> +++ b/arch/arm/boot/dts/omap3-n9.dts
-> @@ -14,5 +14,5 @@
->  
->  / {
->  	model = "Nokia N9";
-> -	compatible = "nokia,omap3-n9", "ti,omap3";
-> +	compatible = "nokia,omap3-n9", "ti,omap36xx", "ti,omap3";
->  };
-> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> index 6fc85f9..97db027 100644
-> --- a/arch/arm/boot/dts/omap3-n900.dts
-> +++ b/arch/arm/boot/dts/omap3-n900.dts
-> @@ -13,7 +13,7 @@
->  
->  / {
->  	model = "Nokia N900";
-> -	compatible = "nokia,omap3-n900", "ti,omap3";
-> +	compatible = "nokia,omap3-n900", "ti,omap3430", "ti,omap3";
->  
->  	cpus {
->  		cpu at 0 {
-> diff --git a/arch/arm/boot/dts/omap3-n950.dts b/arch/arm/boot/dts/omap3-n950.dts
-> index b076a52..261c558 100644
-> --- a/arch/arm/boot/dts/omap3-n950.dts
-> +++ b/arch/arm/boot/dts/omap3-n950.dts
-> @@ -14,5 +14,5 @@
->  
->  / {
->  	model = "Nokia N950";
-> -	compatible = "nokia,omap3-n950", "ti,omap3";
-> +	compatible = "nokia,omap3-n950", "ti,omap36xx", "ti,omap3";
->  };
-> -- 
-> 1.7.9.5
+> user {
+> 	regions = <&reg1>, <&reg2>;
+> };
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> and
+> 
+> reg: region at 00000000 {
+> 	reg = <0x00000000 0x1000>, <0x10000000 0x1000>;
+> };
+> 
+> user {
+> 	regions = <&reg>;
+> };
+> 
+> except that the former IMHO better suits the definition of memory 
+> region, which I see as a single contiguous range of memory and can be 
+> simplified to have a single reg entry per region.
+
+My point is rather if multiple reg tuples are found in a reserved memory
+node, the kernel must respect them and reserve the memory. I'm not
+arguing about whether or not that makes for a good binding.
+
+g.
