@@ -1,118 +1,196 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 11 Feb 2014 16:18:26 +0200
-Subject: [PATCH] clk: divider: fix rate calculation for fractional rates
-In-Reply-To: <1383736008-22764-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1383736008-22764-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <52FA3132.2030400@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 11 Feb 2014 15:29:54 +0100
+Subject: [PATCH v2 1/5] drivers: of: add initialization code for reserved
+ memory
+In-Reply-To: <20140211121316.24032C40C4D@trevor.secretlab.ca>
+References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com>
+ <1391515773-6112-2-git-send-email-m.szyprowski@samsung.com>
+ <20140205110538.99E47C40A89@trevor.secretlab.ca>
+ <52FA0D6E.9090304@samsung.com>
+ <20140211121316.24032C40C4D@trevor.secretlab.ca>
+Message-ID: <52FA33E2.4050004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike, ping.
+Hi,
 
- Tomi
+On 11.02.2014 13:13, Grant Likely wrote:
+> On Tue, 11 Feb 2014 12:45:50 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>> Hello,
+>>
+>> On 2014-02-05 12:05, Grant Likely wrote:
+>>> On Tue, 04 Feb 2014 13:09:29 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>>>> This patch adds device tree support for contiguous and reserved memory
+>>>> regions defined in device tree.
+>>>>
+>>>> Large memory blocks can be reliably reserved only during early boot.
+>>>> This must happen before the whole memory management subsystem is
+>>>> initialized, because we need to ensure that the given contiguous blocks
+>>>> are not yet allocated by kernel. Also it must happen before kernel
+>>>> mappings for the whole low memory are created, to ensure that there will
+>>>> be no mappings (for reserved blocks) or mapping with special properties
+>>>> can be created (for CMA blocks). This all happens before device tree
+>>>> structures are unflattened, so we need to get reserved memory layout
+>>>> directly from fdt.
+>>>>
+>>>> Later, those reserved memory regions are assigned to devices on each
+>>>> device structure initialization.
+>>>>
+>>>> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+>>>> Cc: Laura Abbott <lauraa@codeaurora.org>
+>>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>> [joshc: rework to implement new DT binding, provide mechanism for
+>>>>   plugging in new reserved-memory node handlers via
+>>>>   RESERVEDMEM_OF_DECLARE]
+>>>> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+>>>> [mszyprow: little code cleanup]
+>>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>> ---
+>>>>   drivers/of/Kconfig                |    6 +
+>>>>   drivers/of/Makefile               |    1 +
+>>>>   drivers/of/of_reserved_mem.c      |  219 +++++++++++++++++++++++++++++++++++++
+>>>>   drivers/of/platform.c             |    7 ++
+>>>>   include/asm-generic/vmlinux.lds.h |   11 ++
+>>>>   include/linux/of_reserved_mem.h   |   62 +++++++++++
+>>>>   6 files changed, 306 insertions(+)
+>>>>   create mode 100644 drivers/of/of_reserved_mem.c
+>>>>   create mode 100644 include/linux/of_reserved_mem.h
+>>>>
+>>>> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+>>>> index c6973f101a3e..aba13df56f3a 100644
+>>>> --- a/drivers/of/Kconfig
+>>>> +++ b/drivers/of/Kconfig
+>>>> @@ -75,4 +75,10 @@ config OF_MTD
+>>>>   	depends on MTD
+>>>>   	def_bool y
+>>>>
+>>>> +config OF_RESERVED_MEM
+>>>> +	depends on HAVE_MEMBLOCK
+>>>> +	def_bool y
+>>>> +	help
+>>>> +	  Helpers to allow for reservation of memory regions
+>>>> +
+>>>>   endmenu # OF
+>>>> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+>>>> index efd05102c405..ed9660adad77 100644
+>>>> --- a/drivers/of/Makefile
+>>>> +++ b/drivers/of/Makefile
+>>>> @@ -9,3 +9,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
+>>>>   obj-$(CONFIG_OF_PCI)	+= of_pci.o
+>>>>   obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+>>>>   obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+>>>> +obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
+>>>> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+>>>> new file mode 100644
+>>>> index 000000000000..f17cd56e68d9
+>>>> --- /dev/null
+>>>> +++ b/drivers/of/of_reserved_mem.c
+>>>> @@ -0,0 +1,219 @@
+>>>> +/*
+>>>> + * Device tree based initialization code for reserved memory.
+>>>> + *
+>>>> + * Copyright (c) 2013, The Linux Foundation. All Rights Reserved.
+>>>> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+>>>> + *		http://www.samsung.com
+>>>> + * Author: Marek Szyprowski <m.szyprowski@samsung.com>
+>>>> + * Author: Josh Cartwright <joshc@codeaurora.org>
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or
+>>>> + * modify it under the terms of the GNU General Public License as
+>>>> + * published by the Free Software Foundation; either version 2 of the
+>>>> + * License or (at your optional) any later version of the license.
+>>>> + */
+>>>> +#include <linux/memblock.h>
+>>>> +#include <linux/err.h>
+>>>> +#include <linux/of.h>
+>>>> +#include <linux/of_fdt.h>
+>>>> +#include <linux/of_platform.h>
+>>>> +#include <linux/mm.h>
+>>>> +#include <linux/sizes.h>
+>>>> +#include <linux/of_reserved_mem.h>
+>>>> +
+>>>> +#define MAX_RESERVED_REGIONS	16
+>>>> +static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
+>>>> +static int reserved_mem_count;
+>>>> +
+>>>> +int __init of_parse_flat_dt_reg(unsigned long node, const char *uname,
+>>>> +				   phys_addr_t *base, phys_addr_t *size)
+>>>
+>>> Useful utility function; move to drivers/of/fdt.c
+>>>
+>>>> +{
+>>>> +	unsigned long len;
+>>>> +	__be32 *prop;
+>>>> +
+>>>> +	prop = of_get_flat_dt_prop(node, "reg", &len);
+>>>> +	if (!prop)
+>>>> +		return -EINVAL;
+>>>> +
+>>>> +	if (len < (dt_root_addr_cells + dt_root_size_cells) * sizeof(__be32)) {
+>>>> +		pr_err("Reserved memory: invalid reg property in '%s' node.\n",
+>>>> +				uname);
+>>>> +		return -EINVAL;
+>>>> +	}
+>>>
+>>> This is /okay/ for an initial implementation, but it is naive. While I
+>>> suggested making #address-cells and #size-cells equal the root node
+>>> values for the purpose of simplicity, it should still be perfectly valid
+>>> to have different values if the ranges property is correctly formed.
+>>>
+>>>> +
+>>>> +	*base = dt_mem_next_cell(dt_root_addr_cells, &prop);
+>>>> +	*size = dt_mem_next_cell(dt_root_size_cells, &prop);
+>>>
+>>> Future enhancement; allow for parsing more than just the first reg
+>>> tuple.
+>>
+>> One more question. Does it really makes any sense to support more than
+>> one tuple for reg property? For consistency we should also allow more
+>> than one entry in size, align and alloc-ranges property, but I don't
+>> see any benefits for defining more than one range for a single region.
+>> Same can be achieved by defining more regions instead if one really
+>> needs such configuration.
+>
+> Yes, if only because it is an define usage of the reg property. If a
+> devtree has multiple tuples in reg, then all of those tuples should be
+> treated as reserved, even if the kernel doesn't know how to use them.
+>
+> I would not do the same for size/align/alloc-ranges unless there is a
+> very specific use case that you can define. These ones are different
+> from the static regions because they aren't ever used to protect
+> something that already exists in the memory.
 
-On 06/11/13 13:06, Tomi Valkeinen wrote:
-> clk-divider.c does not calculate the rates consistently at the moment.
-> 
-> As an example, on OMAP3 we have a clock divider with a source clock of
-> 864000000 Hz. With dividers 6, 7 and 8 the theoretical rates are:
-> 
-> 6: 144000000
-> 7: 123428571.428571...
-> 8: 108000000
-> 
-> Calling clk_round_rate() with the rate in the first column will give the
-> rate in the second column:
-> 
-> 144000000 -> 144000000
-> 143999999 -> 123428571
-> 123428572 -> 123428571
-> 123428571 -> 108000000
-> 
-> Note how clk_round_rate() returns 123428571 for rates from 123428572 to
-> 143999999, which is mathematically correct, but when clk_round_rate() is
-> called with 123428571, the returned value is surprisingly 108000000.
-> 
-> This means that the following code works a bit oddly:
-> 
-> rate = clk_round_rate(clk, 123428572);
-> clk_set_rate(clk, rate);
-> 
-> As clk_set_rate() also does clock rate rounding, the result is that the
-> clock is set to the rate of 108000000, not 123428571 returned by the
-> clk_round_rate.
-> 
-> This patch changes the clk-divider.c to use DIV_ROUND_UP when
-> calculating the rate. This gives the following behavior which fixes the
-> inconsistency:
-> 
-> 144000000 -> 144000000
-> 143999999 -> 123428572
-> 123428572 -> 123428572
-> 123428571 -> 108000000
-> 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> ---
->  drivers/clk/clk-divider.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index 8d3009e..43348f3 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -24,7 +24,7 @@
->   * Traits of this clock:
->   * prepare - clk_prepare only ensures that parents are prepared
->   * enable - clk_enable only ensures that parents are enabled
-> - * rate - rate is adjustable.  clk->rate = parent->rate / divisor
-> + * rate - rate is adjustable.  clk->rate = DIV_ROUND_UP(parent->rate / divisor)
->   * parent - fixed parent.  No clk_set_parent support
->   */
->  
-> @@ -115,7 +115,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
->  		return parent_rate;
->  	}
->  
-> -	return parent_rate / div;
-> +	return DIV_ROUND_UP(parent_rate, div);
->  }
->  
->  /*
-> @@ -185,7 +185,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
->  		}
->  		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
->  				MULT_ROUND_UP(rate, i));
-> -		now = parent_rate / i;
-> +		now = DIV_ROUND_UP(parent_rate, i);
->  		if (now <= rate && now > best) {
->  			bestdiv = i;
->  			best = now;
-> @@ -207,7 +207,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
->  	int div;
->  	div = clk_divider_bestdiv(hw, rate, prate);
->  
-> -	return *prate / div;
-> +	return DIV_ROUND_UP(*prate, div);
->  }
->  
->  static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
-> @@ -218,7 +218,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
->  	unsigned long flags = 0;
->  	u32 val;
->  
-> -	div = parent_rate / rate;
-> +	div = DIV_ROUND_UP(parent_rate, rate);
->  	value = _get_val(divider, div);
->  
->  	if (value > div_mask(divider))
-> 
+Is there a reason why multiple regions could not be used for this 
+purpose, instead of adding extra complexity of having multiple reg 
+entries per region?
 
+I.e. I don't see a difference between
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140211/7fadb1e8/attachment.sig>
+reg1: region at 00000000 {
+	reg = <0x00000000 0x1000>;
+};
+
+reg2: region at 10000000 {
+	reg = <0x10000000 0x1000>;
+};
+
+user {
+	regions = <&reg1>, <&reg2>;
+};
+
+and
+
+reg: region at 00000000 {
+	reg = <0x00000000 0x1000>, <0x10000000 0x1000>;
+};
+
+user {
+	regions = <&reg>;
+};
+
+except that the former IMHO better suits the definition of memory 
+region, which I see as a single contiguous range of memory and can be 
+simplified to have a single reg entry per region.
+
+Best regards,
+Tomasz
