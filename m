@@ -1,59 +1,31 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 11 Feb 2014 23:33:44 +0530
-Subject: [Patch v5 1/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <20140211174910.GE841@joshc.qualcomm.com>
-References: <1391546556-27702-1-git-send-email-agross@codeaurora.org>
- <1391546556-27702-2-git-send-email-agross@codeaurora.org>
- <20140211173048.GP10628@intel.com>
- <20140211174910.GE841@joshc.qualcomm.com>
-Message-ID: <20140211180344.GS10628@intel.com>
+From: bryanh@codeaurora.org (Bryan Huntsman)
+Date: Tue, 11 Feb 2014 10:10:20 -0800
+Subject: [PATCH v3 3/5] ARM: qcom: Split Qualcomm support into legacy
+ and multiplatform
+In-Reply-To: <392A0D29-65A3-403D-B645-DB74A1897170@codeaurora.org>
+References: <1391725484-6673-1-git-send-email-galak@codeaurora.org>
+ <1391725484-6673-4-git-send-email-galak@codeaurora.org>
+ <20140208032607.GC10784@codeaurora.org>
+ <392A0D29-65A3-403D-B645-DB74A1897170@codeaurora.org>
+Message-ID: <52FA678C.6050000@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 11:49:10AM -0600, Josh Cartwright wrote:
-> On Tue, Feb 11, 2014 at 11:00:48PM +0530, Vinod Koul wrote:
-> > On Tue, Feb 04, 2014 at 02:42:35PM -0600, Andy Gross wrote:
-> > > Add the DMA engine driver for the QCOM Bus Access Manager (BAM) DMA controller
-> > > found in the MSM 8x74 platforms.
-> > > 
-> > > Each BAM DMA device is associated with a specific on-chip peripheral.  Each
-> > > channel provides a uni-directional data transfer engine that is capable of
-> > > transferring data between the peripheral and system memory (System mode), or
-> > > between two peripherals (BAM2BAM).
-> > > 
-> > > The initial release of this driver only supports slave transfers between
-> > > peripherals and system memory.
-> > > 
-> > > Signed-off-by: Andy Gross <agross@codeaurora.org>
-> >
-> > > +++ b/drivers/dma/qcom_bam_dma.c
-> [..]
-> > > +static void bam_reset_channel(struct bam_chan *bchan)
-> > > +{
-> > > +	struct bam_device *bdev = bchan->bdev;
-> > > +
-> > > +	/* reset channel */
-> > > +	writel_relaxed(1, bdev->regs + BAM_P_RST(bchan->id));
-> > > +	writel_relaxed(0, bdev->regs + BAM_P_RST(bchan->id));
-> > > +
-> > > +	/* don't allow reorder of the channel reset */
-> > > +	wmb();
-> > Documentation/memory-barriers.txt describes wmb() as a CPU barier but based on
-> > above you want it to be a compiler barrier then you should do 1st write,
-> > barrier(), second write.
+On 02/11/2014 07:13 AM, Kumar Gala wrote:
+>>>  *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+>>> >> + *  Copyright (c) 2014 The Linux Foundation. All rights reserved.
+>> > 
+>> > We should replace the Code Aurora Forum copyright with Linux
+>> > Foundation here.
+> Is this something we?ve been doing?  Its normally bad form to make such changes, but I don?t know what the details re when LF took over CAF w/regards to something like Copyright.
 > 
-> It could also be that the intent was to prevent these writes from being
-> ordered before setting the initialized flag below, either way the
-> comment could be made clearer.
-yes for that case, but i am suspecting the comment is correct as it would make
-sense to ensure reset is in sequence...
+> - k
+
+Yes, the line should read:
+
+- *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++ *  Copyright (c) 2010,2014 The Linux Foundation. All rights reserved.
 
 -- 
-~Vinod
-> 
-> > > +
-> > > +	/* make sure hw is initialized when channel is used the first time  */
-> > > +	bchan->initialized = 0;
-> > > +}
-> 
--- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
