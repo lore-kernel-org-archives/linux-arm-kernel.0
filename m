@@ -1,70 +1,55 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 11 Feb 2014 22:21:16 +0100
-Subject: [PATCH] ARM: spear: Remove references to PLAT_SPEAR_SINGLE
-Message-ID: <1392153676.14317.8.camel@x220>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 11 Feb 2014 22:21:15 +0100
+Subject: [PATCH] ARM: tegra: dalmore: fix irq trigger type
+In-Reply-To: <20140211204737.GA1895@mithrandir>
+References: <4fcfcfdbc86c37c6d47ec32cdbd987f3b406e9b5.1392147256.git.stefan@agner.ch>
+ <20140211204737.GA1895@mithrandir>
+Message-ID: <30f0db808e7543d9ab6b077aa5e239f2@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig symbol PLAT_SPEAR_SINGLE briefly appeared during the v3.10
-development cycle. It was removed in a merge commit before v3.10. A few
-references to it were left in the tree, probably because they didn't
-generate merge conflicts. Whatever it was, they're useless now and can
-safely be removed.
+Am 2014-02-11 21:47, schrieb Thierry Reding:
+> On Tue, Feb 11, 2014 at 09:11:32PM +0100, Stefan Agner wrote:
+>> Trigger type needs to be IRQ_TYPE_LEVEL_HIGH since the interrupt
+>> signal gets inverted by the PMC (configured by the invert-interrupt
+>> property).
+> 
+> Isn't the reason the other way around? The PMIC generates a low-level
+> interrupt, but the GIC can only be configured to accept high-level (or
+> rising edge) and therefore the nvidia,invert-interrupt property needs to
+> be set in the PMC node?
+Hm yes agreed. I should also write the whole story here, maybe this:
 
-Reported-by: Martin Walch <walch.martin@web.de>
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-Untested.
+The GIC only support high-active interrupts. When using a PMIC with
+low-active interrupt, the PMC has to be configured by using the
+nvidia,invert-interrupt property in its node.
 
- arch/arm/mach-spear/Kconfig | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+This fix sets the GIC back to high-active and reverts commit
+eca8f98e404934027f84f72882c5e92ffbd9e5f5.
 
-diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
-index ac1710e6..1595776 100644
---- a/arch/arm/mach-spear/Kconfig
-+++ b/arch/arm/mach-spear/Kconfig
-@@ -4,7 +4,6 @@
- 
- menuconfig PLAT_SPEAR
- 	bool "ST SPEAr Family" if ARCH_MULTI_V7 || ARCH_MULTI_V5
--	default PLAT_SPEAR_SINGLE
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_AMBA
- 	select CLKSRC_MMIO
-@@ -15,7 +14,7 @@ if PLAT_SPEAR
- 
- config ARCH_SPEAR13XX
- 	bool "ST SPEAr13xx"
--	depends on ARCH_MULTI_V7 || PLAT_SPEAR_SINGLE
-+	depends on ARCH_MULTI_V7
- 	select ARCH_HAS_CPUFREQ
- 	select ARM_GIC
- 	select CPU_V7
-@@ -47,7 +46,7 @@ endif #ARCH_SPEAR13XX
- 
- config ARCH_SPEAR3XX
- 	bool "ST SPEAr3xx"
--	depends on ARCH_MULTI_V5 || PLAT_SPEAR_SINGLE
-+	depends on ARCH_MULTI_V5
- 	depends on !ARCH_SPEAR13XX
- 	select ARM_VIC
- 	select CPU_ARM926T
-@@ -80,7 +79,7 @@ endif
- 
- config ARCH_SPEAR6XX
- 	bool "ST SPEAr6XX"
--	depends on ARCH_MULTI_V5 || PLAT_SPEAR_SINGLE
-+	depends on ARCH_MULTI_V5
- 	depends on !ARCH_SPEAR13XX
- 	select ARM_VIC
- 	select CPU_ARM926T
-@@ -95,7 +94,6 @@ config MACH_SPEAR600
- 	  Supports ST SPEAr600 boards configured via the device-treesource "arch/arm/mach-spear6xx/Kconfig"
- 
- config ARCH_SPEAR_AUTO
--	def_bool PLAT_SPEAR_SINGLE
- 	depends on !ARCH_SPEAR13XX && !ARCH_SPEAR6XX
- 	select ARCH_SPEAR3XX
- 
--- 
-1.8.5.3
+> One nitpick below.
+> 
+>> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+> [...]
+>> @@ -888,8 +888,9 @@
+>>  		palmas: tps65913 at 58 {
+>>  			compatible = "ti,palmas";
+>>  			reg = <0x58>;
+>> -			interrupts = <0 86 IRQ_TYPE_LEVEL_LOW>;
+>>
+>> +			/* active-low configured by PMC invert-interrupt */
+>> +			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+> 
+> I'd prefer to keep the properties grouped as before. interrupts is a
+> "client" property, whereas #interrupt-cells and interrupt-controller
+> are "provider" properties.
+> 
+> And I think the comment would be more appropriate in the pmc node, for
+> the same reason that I think the commit description isn't entirely
+> accurate.
+Well, its kind a question where you are coming from. I read the data
+sheet/schemata, and saw that its low-active. Then I went to the PMIC
+node and checked how that interrupt is configured, and what you see is
+HIGH_ACTIVE. You then think you've found the bug and fix it by setting
+it to IRQ_TYPE_LEVEL_LOW. What you don't know is that PMC is in between
+and alters the polarity...
