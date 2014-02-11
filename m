@@ -1,30 +1,31 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 11 Feb 2014 17:32:26 +0000
-Subject: [PATCH 08/12] mfd: vexpress-sysreg: Add syscon labels as
- platform data
-In-Reply-To: <20140211172918.GH15081@lee--X1>
-References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
- <1392138636-29240-9-git-send-email-pawel.moll@arm.com>
- <20140211172918.GH15081@lee--X1>
-Message-ID: <1392139946.3380.48.camel@hornet>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 11 Feb 2014 12:32:36 -0500
+Subject: [PATCH 1/3] driver core & of: Mark of_nodes of added device as
+ populated
+In-Reply-To: <1392137610-27842-2-git-send-email-pawel.moll@arm.com>
+References: <1392137610-27842-1-git-send-email-pawel.moll@arm.com>
+ <1392137610-27842-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <52FA5EB4.7080008@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-02-11 at 17:29 +0000, Lee Jones wrote:
-> There must be better
-> ways of passing a name than through pdata, and if there isn't I'd
-> suggest setting up a sysconf pdata struct that others can use in case
-> they wish to expand the functionality further in some other
-> unfathomable way. :)
+Hi Pawel,
 
-... which I proposed in the previous patch :-)
+On 02/11/2014 11:53 AM, Pawel Moll wrote:
+> This patch tries to solve that issue in a generic way,
+> adding a "populated" flag which is set in the device_node
+> structure when a device is being created in the core.
+> Later, of_platform_populate() skips such nodes (and
+> its children) in a similar way to the non-available ones.
 
-On Tue, 2014-02-11 at 17:10 +0000, Pawel Moll wrote:
-> Alternatively I could define a syscon platform data structure,
-> something like this:
-> 
-> struct syscon_platform_data {
-> 	const char *label;
-> };
+Will there never be a case where it is useful for a parent node to be created
+early, but not necessarily the child nodes? Might only skipping nodes
+explicitly marked as populated be a more universal solution?
 
-Pawel
+Regards,
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
