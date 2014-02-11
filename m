@@ -1,48 +1,45 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Tue, 11 Feb 2014 10:24:04 -0600
-Subject: [PATCH 6/8] ARM: l2x0: make use of of_find_matching_node_and_match
-In-Reply-To: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
-References: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
-Message-ID: <1392135847-30791-7-git-send-email-joshc@codeaurora.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 11 Feb 2014 17:32:03 +0100
+Subject: [PATCH v2] clk: respect the clock dependencies in of_clk_init
+In-Reply-To: <1392054179-28830-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1392054179-28830-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140211173203.4e6c7b22@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of the of_find_matching_node()/of_match_node() pair, which requires two
-iterations through the match table, make use of of_find_matching_node_and_match(),
-which only iterates through the table once.
+Hello,
 
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
----
- arch/arm/mm/cache-l2x0.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+On Mon, 10 Feb 2014 18:42:59 +0100, Gregory CLEMENT wrote:
+> Until now the clock providers were initialized in the order found in
+> the device tree. This led to have the dependencies between the clocks
+> not respected: children clocks could be initialized before their
+> parent clocks.
+> 
+> Instead of forcing each platform to manage its own initialization order,
+> this patch adds this work inside the framework itself.
+> 
+> Using the data of the device tree the of_clk_init function now delayed
+> the initialization of a clock provider if its parent provider was not
+> ready yet.
+> 
+> The strict dependency check (all parents of a given clk must be
+> initialized) was added by Boris BREZILLON
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+> 
+> Since the v1, I have merged the  strict dependency check from Boris.
+> And of course tested on my Armada 370 and Armada XP based board
+> 
+>  drivers/clk/clk.c | 109 ++++++++++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 106 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 7abde2c..e35fff3 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -970,11 +970,12 @@ static const struct of_device_id l2x0_ids[] __initconst = {
- 
- int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
- {
-+	const struct of_device_id *match;
- 	struct device_node *np;
- 	const struct l2x0_of_data *data;
- 	struct resource res;
- 
--	np = of_find_matching_node(NULL, l2x0_ids);
-+	np = of_find_matching_node_and_match(NULL, l2x0_ids, &match);
- 	if (!np)
- 		return -ENODEV;
- 
-@@ -987,7 +988,7 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
- 
- 	l2x0_saved_regs.phy_base = res.start;
- 
--	data = of_match_node(l2x0_ids, np)->data;
-+	data = match->data;
- 
- 	/* L2 configuration can only be changed if the cache is disabled */
- 	if (!(readl_relaxed(l2x0_base + L2X0_CTRL) & L2X0_CTRL_EN)) {
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+On the newly proposed Armada 375 platform.
+
+Thomas
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
