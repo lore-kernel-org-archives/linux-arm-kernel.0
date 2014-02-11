@@ -1,77 +1,99 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Tue, 11 Feb 2014 15:46:04 +0100
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <20140211140749.GE3748@arm.com>
-References: <1392037324-5069-1-git-send-email-broonie@kernel.org>
- <20140210162230.GK25305@arm.com> <20140210164647.GB13533@sirena.org.uk>
- <CAKfTPtDih6n5ckhXUgNKrbw5EFt45uuQFFPKB2aN0NGGG96Pmg@mail.gmail.com>
- <20140211103428.GC8693@mudshark.cambridge.arm.com>
- <CAKfTPtDjF2bZsoj+tgBH-ZXYXNbXQ2mBie0FVgUy2vb_jY12FQ@mail.gmail.com>
- <20140211140749.GE3748@arm.com>
-Message-ID: <CAKfTPtDrLX6ZSV9cZckGztorrYRc-PNknaJch3nry=PzonZJHw@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 11 Feb 2014 14:22:04 +0000
+Subject: [PATCH 06/11] ARM: mvebu: add Armada 380/385 support to the
+ system-controller driver
+In-Reply-To: <20140210173957.GS8533@titan.lakedaemon.net>
+References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1392053002-19831-7-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140210173957.GS8533@titan.lakedaemon.net>
+Message-ID: <CACxGe6u--F0J=kaHnvSsyDXNaO1r++T_TgzpNyy_2JU7+07r7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 February 2014 15:07, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Feb 11, 2014 at 01:18:56PM +0000, Vincent Guittot wrote:
->> On 11 February 2014 11:34, Will Deacon <will.deacon@arm.com> wrote:
->> > On Tue, Feb 11, 2014 at 08:15:19AM +0000, Vincent Guittot wrote:
->> >> On 10 February 2014 17:46, Mark Brown <broonie@kernel.org> wrote:
->> >> > On Mon, Feb 10, 2014 at 04:22:31PM +0000, Catalin Marinas wrote:
->> >> >> On Mon, Feb 10, 2014 at 01:02:01PM +0000, Mark Brown wrote:
->> >> >
->> >> >> > +           if (cpu != cpuid)
->> >> >> > +                   cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
->> >> >> > +   }
->> >> >> > +   smp_wmb();
->> >> >
->> >> >> I now noticed there are a couple of smp_wmb() calls in this patch. What
->> >> >> are they for?
->> >> >
->> >> > To be honest I mostly cargo culted them from the ARM implementation; I
->> >> > did look a bit but didn't fully dig into it - it seemed they were
->> >> > required to ensure that the updates for the new CPU are visible over all
->> >> > CPUs.  Vincent?
->> >>
->> >> Yes that's it. we must ensure that updates are made visible to other CPUs
->> >
->> > In relation to what? The smp_* barriers ensure ordering of observability
->> > between a number of independent accesses, so you must be ensuring
->> > ordering against something else. Also, you need to guarantee ordering on the
->> > read-side too -- how is this achieved? I can't see any smp_rmb calls from a
->> > quick grep, so I assume you're making use of address dependencies?
+On Mon, Feb 10, 2014 at 5:39 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> On Mon, Feb 10, 2014 at 06:23:17PM +0100, Thomas Petazzoni wrote:
+>> This commit adds support for the Armada 380/385 SoCs in the
+>> system-controller driver. Since this SoC has the same system
+>> controller registers layout than the Armada 370/XP at least for the
+>> few features currently supported by the driver, this commit simply
+>> adds a new compatible string that provides the same behavior than the
+>> one provided for Armada 370/XP.
 >>
->> The boot sequence ensures the rmb
+>> Note that we intentionally do not use the same compatible string as
+>> Armada 370/XP, as the current system-controller driver is far from
+>> exploiting all the possibilities of the hardware, and we may in the
+>> future discover differences between Armada 370/XP and Armada 380/385.
 >
-> As Will said, smp_*mb() do not ensure absolute visibility, only relative
-> to subsequent memory accesses on the same processor. So just placing a
-> barrier at the end of a function does not mean much, it only shows half
-> of the problem it is trying to solve.
+> I'd much prefer to add a new compatible string iff it accompanies
+> incompatible changes.
+>
+> For now, I think it's best to use 'marvell,armada-370-xp-system-controller'
+> in the dtsi file and change it when you introduce the incompatible
+> features.
 
-OK, that's probably the shortcut that has been made, we want to drain
-the write buffer to make modification available to other cpus and I
-though smp_wmb and the associated mb(ishst) was there for that
-purpose.
+Actually, they are doing the right thing here. It is completely
+appropriate to encode the SoC version into the compatible string, but
+then to retain compatibility with the older device driver by including
+the earlier compatible string in the compatible list so that no code
+changes are required.
 
-Vincent
+g.
 
 >
-> How are the secondary CPUs using this information? AFAICT, secondaries
-> call smp_store_cpu_info() which also go through each CPU in
-> update_siblings_mask(). Is there any race here that smp_wmb() is trying
-> to solve?
+> thx,
 >
-> I guess for secondaries you could move the barrier just before
-> set_cpu_online(), this way it is clear that we want any previous writes
-> to become visible when this CPU is marked online. For the primary, any
-> memory writes should become visible before the CPU is started. One
-> synchronisation point is the pen release, depending on the smp_ops. I
-> think that's already covered by code like arch/arm/mach-*/platsmp.c.
+> Jason.
 >
-> So my proposal is to remove the smp_wmb() from topology.c and add it
-> where it is relevant as described above. If we have some race in
-> topology.c (like for example we may later decide to start more
-> secondaries at the same time), it needs to be solved using spinlocks.
->
-> --
-> Catalin
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/mvebu-system-controller.txt | 3 ++-
+>>  arch/arm/mach-mvebu/system-controller.c                           | 8 ++++++++
+>>  2 files changed, 10 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt b/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
+>> index d24ab2e..3559972 100644
+>> --- a/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
+>> +++ b/Documentation/devicetree/bindings/arm/mvebu-system-controller.txt
+>> @@ -1,6 +1,6 @@
+>>  MVEBU System Controller
+>>  -----------------------
+>> -MVEBU (Marvell SOCs: Armada 370/375/XP, Dove, mv78xx0, Kirkwood, Orion5x)
+>> +MVEBU (Marvell SOCs: Armada 370/375/38x/XP, Dove, mv78xx0, Kirkwood, Orion5x)
+>>
+>>  Required properties:
+>>
+>> @@ -8,6 +8,7 @@ Required properties:
+>>       - "marvell,orion-system-controller"
+>>       - "marvell,armada-370-xp-system-controller"
+>>       - "marvell,armada-375-system-controller"
+>> +     - "marvell,armada-380-system-controller"
+>>  - reg: Should contain system controller registers location and length.
+>>
+>>  Example:
+>> diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
+>> index 1806187..b4e8bb2 100644
+>> --- a/arch/arm/mach-mvebu/system-controller.c
+>> +++ b/arch/arm/mach-mvebu/system-controller.c
+>> @@ -71,6 +71,14 @@ static struct of_device_id of_system_controller_table[] = {
+>>       }, {
+>>               .compatible = "marvell,armada-375-system-controller",
+>>               .data = (void *) &armada_375_system_controller,
+>> +     }, {
+>> +             /*
+>> +              * As far as RSTOUTn and System soft reset registers
+>> +              * are concerned, Armada 38x is similar to Armada
+>> +              * 370/XP
+>> +              */
+>> +             .compatible = "marvell,armada-380-system-controller",
+>> +             .data = (void *) &armada_370_xp_system_controller,
+
+However, this would not be the right thing to do. The better solution
+is to put the following into the .dts file:
+
+compatible = "marvell,armada-380-system-controller","marvell,armada-370-system-controller"
+
+So that the kernel has the option to override the 370 version if an
+errata or extra feature support ever needs to be added.
+
+g.
