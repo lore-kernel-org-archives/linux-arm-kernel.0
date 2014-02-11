@@ -1,36 +1,39 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 11 Feb 2014 05:31:23 -0300
-Subject: [PATCH v7 00/18] Armada 370/XP watchdog
-In-Reply-To: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140211083122.GB3687@localhost>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Tue, 11 Feb 2014 11:38:31 +0300
+Subject: [RFC PATCH 2/3] staging: imx-drm-core: Use graph to find
+ connection between crtc and encoder
+In-Reply-To: <20140210162631.GC26684@n2100.arm.linux.org.uk>
+References: <1389019922-31992-1-git-send-email-p.zabel@pengutronix.de>
+ <1389019922-31992-3-git-send-email-p.zabel@pengutronix.de>
+ <20140210162631.GC26684@n2100.arm.linux.org.uk>
+Message-ID: <20140211083831.GV26722@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 08:00:19PM -0300, Ezequiel Garcia wrote:
-> Yet another round. This time, addressing Guenter's comment about the nowayout
-> parameter. So, to allow for proper nowayout behavior, we now restrict the
-> initial watchdog stop; which is only done if the watchdog is not properly
-> enabled.
+> Why is this loop soo complicated?  Why do you need to mess around with
+> this "last_ep" stuff - you don't actually end up using it.
 > 
-> I've dropped the clocksource patch which was previously part of the series.
-> The patch is independent and will be merged through the subsystem maintainer,
-> Daniel Lezcano.
+> The loop reduces down to this without comments:
 > 
-> Also, I've updated the multi_v7_defconfig, as per Jason Cooper request.
-> 
-> This series depends on Sebastian's irqchip fixes to clear the bridge irqs
-> cause, which Jason picked here:
-> 
->   http://git.infradead.org/linux-mvebu.git mvebu-next/irqchip-fixes
-> 
-> Wim: Can we take all the watchdog changes through mvebu, with your Ack?
-> This way, we can sort out the irqchip dependency.
-> 
+>  	for (i = 0; !ret; i++) {
+                    ^^^^
+Philipp, "ret" isn't set anymore in the new loop.
 
-Wim: Do you have any comments about these patches?
+>  		uint32_t mask;
+> 
+> 		ep = v4l2_of_get_next_endpoint(np, last_ep);
+> 		if (!ep)
+> 			break;
+> 
+> 		/* CSI */
+> 		mask = imx_drm_find_crtc_mask(imxdrm, ep);
+> 		of_node_put(ep);
+> 
+> 		if (mask == 0)
+> 			return -EPROBE_DEFER;
+> 
+> 		crtc_mask |= mask;
+> 	}
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+regards,
+dan carpenter
