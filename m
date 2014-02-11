@@ -1,49 +1,38 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue, 11 Feb 2014 22:44:22 +0400
-Subject: [PATCH] ARM: dts: imx27-phytec-phycard-s-som: Rename file to .dtsi
-Message-ID: <1392144262-9839-1-git-send-email-shc_work@mail.ru>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Tue, 11 Feb 2014 12:44:03 -0600
+Subject: [PATCH 3/8] ARM: at91: make use of of_find_matching_node_and_match
+In-Reply-To: <52FA61F4.90905@atmel.com>
+References: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
+ <1392135847-30791-4-git-send-email-joshc@codeaurora.org>
+ <52FA61F4.90905@atmel.com>
+Message-ID: <20140211184403.GH841@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCA-100 module cannot be used standalone. This patch renames
-module file to .dtsi and excludes it from compilation.
+On Tue, Feb 11, 2014 at 06:46:28PM +0100, Nicolas Ferre wrote:
+> On 11/02/2014 17:24, Josh Cartwright :
+> > Instead of the of_find_matching_node()/of_match_node() pair, which requires two
+> > iterations through the match table, make use of of_find_matching_node_and_match(),
+> > which only iterates through the table once.
+> > 
+> > While we're here, mark the rtsc id table const.
+> 
+> Well, I might remove this one, just because other id tables are not
+> marked as "const" in the same file... So it can be good to change all of
+> them in a raw.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/Makefile                                              | 1 -
- arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts                        | 2 +-
- .../{imx27-phytec-phycard-s-som.dts => imx27-phytec-phycard-s-som.dtsi} | 0
- 3 files changed, 1 insertion(+), 2 deletions(-)
- rename arch/arm/boot/dts/{imx27-phytec-phycard-s-som.dts => imx27-phytec-phycard-s-som.dtsi} (100%)
+Indeed, I was only looking for a specific pattern.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 222fe15..48ee3ab 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -144,7 +144,6 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx27-apf27dev.dtb \
- 	imx27-pdk.dtb \
- 	imx27-phytec-phycore-rdk.dtb \
--	imx27-phytec-phycard-s-som.dtb \
- 	imx27-phytec-phycard-s-rdk.dtb \
- 	imx31-bug.dtb \
- 	imx35-eukrea-mbimxsd35-baseboard.dtb \
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-index 1cd3a87..3c3964a 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dts
-@@ -9,7 +9,7 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
--#include "imx27-phytec-phycard-s-som.dts"
-+#include "imx27-phytec-phycard-s-som.dtsi"
- 
- / {
- 	model = "Phytec pca100 rapid development kit";
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts b/arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi
-similarity index 100%
-rename from arch/arm/boot/dts/imx27-phytec-phycard-s-som.dts
-rename to arch/arm/boot/dts/imx27-phytec-phycard-s-som.dtsi
+[..]
+> => if you want, I can take the patch with me through arm-soc with at91
+> material for 3.15 and complete your "const" modification. What do you
+> think about that?
+
+Yes, this sounds good.
+
+Thanks,
+   Josh
+
 -- 
-1.8.3.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
