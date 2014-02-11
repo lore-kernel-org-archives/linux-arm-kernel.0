@@ -1,31 +1,90 @@
-From: bryanh@codeaurora.org (Bryan Huntsman)
-Date: Tue, 11 Feb 2014 10:10:20 -0800
-Subject: [PATCH v3 3/5] ARM: qcom: Split Qualcomm support into legacy
- and multiplatform
-In-Reply-To: <392A0D29-65A3-403D-B645-DB74A1897170@codeaurora.org>
-References: <1391725484-6673-1-git-send-email-galak@codeaurora.org>
- <1391725484-6673-4-git-send-email-galak@codeaurora.org>
- <20140208032607.GC10784@codeaurora.org>
- <392A0D29-65A3-403D-B645-DB74A1897170@codeaurora.org>
-Message-ID: <52FA678C.6050000@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 11 Feb 2014 18:15:29 +0000
+Subject: [PATCH 1/3] arm64: dts: add initial dts for Samsung GH7 SoC
+ and SSDK-GH7 board
+In-Reply-To: <1392100183-30930-2-git-send-email-kgene.kim@samsung.com>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <1392100183-30930-2-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20140211181529.GC15200@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2014 07:13 AM, Kumar Gala wrote:
->>>  *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
->>> >> + *  Copyright (c) 2014 The Linux Foundation. All rights reserved.
->> > 
->> > We should replace the Code Aurora Forum copyright with Linux
->> > Foundation here.
-> Is this something we?ve been doing?  Its normally bad form to make such changes, but I don?t know what the details re when LF took over CAF w/regards to something like Copyright.
+On Tue, Feb 11, 2014 at 06:29:41AM +0000, Kukjin Kim wrote:
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Reviewed-by: Thomas Abraham <thomas.ab@samsung.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm64/boot/dts/samsung-gh7.dtsi     |  108 ++++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/samsung-ssdk-gh7.dts |   26 +++++++
+>  2 files changed, 134 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/samsung-gh7.dtsi
+>  create mode 100644 arch/arm64/boot/dts/samsung-ssdk-gh7.dts
 > 
-> - k
+> diff --git a/arch/arm64/boot/dts/samsung-gh7.dtsi b/arch/arm64/boot/dts/samsung-gh7.dtsi
+> new file mode 100644
+> index 0000000..5b8785c
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/samsung-gh7.dtsi
+> @@ -0,0 +1,108 @@
+> +/*
+> + * SAMSUNG GH7 SoC device tree source
+> + *
+> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> +*/
+> +
+> +/dts-v1/;
+> +
+> +/memreserve/ 0x80000000 0x0C400000;
 
-Yes, the line should read:
+That looks _very_ large. What is this for?
 
-- *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
-+ *  Copyright (c) 2010,2014 The Linux Foundation. All rights reserved.
+[...]
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupts = <1 13 0xff01>,	/* Secure Phys IRQ */
+> +			     <1 14 0xff01>,	/* Non-secure Phys IRQ */
+> +			     <1 11 0xff01>,	/* Virt IRQ */
+> +			     <1 10 0xff01>;	/* Hyp IRQ */
+> +		clock-frequency = <100000000>;
+
+Please, get your bootloader to set CNTFREQ. The clock frequency property
+for the timer node is a horrible hack for buggy firmware.
+
+[...]
+
+> +	amba {
+> +		compatible = "arm,amba-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		serial at 12c00000 {
+> +			compatible = "arm,pl011", "arm,primecell";
+> +			reg = <0x12c00000 0x10000>;
+> +			interrupts = <418>;
+> +		};
+> +
+> +		serial at 12c20000 {
+> +			compatible = "arm,pl011", "arm,primecell";
+> +			reg = <0x12c20000 0x10000>;
+> +			interrupts = <420>;
+> +		};
+
+Don't these need clocks?
+
+[...]
+
+> +	memory at 80000000 {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x80000000 0 0x80000000>;
+
+Minor nit, but it would be nice for the 0 values to be consistently padded.
+
+Thanks,
+Mark.
