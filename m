@@ -1,42 +1,39 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 11 Feb 2014 13:58:27 +0100
-Subject: [PATCH v6 2/3] clocksource: keystone: add bindings for keystone
- timer
-In-Reply-To: <1392027058-11680-3-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1392027058-11680-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1392027058-11680-3-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <52FA1E73.7050200@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Feb 2014 14:02:37 +0100
+Subject: [PATCH] ARM: ux500: disable msp2 device tree node
+Message-ID: <1392123757-7982-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2014 11:10 AM, Ivan Khoronzhuk wrote:
-> This patch provides bindings for the 64-bit timer in the KeyStone
-> architecture devices. The timer can be configured as a general-purpose 64-bit
-> timer, dual general-purpose 32-bit timers. When configured as dual 32-bit
-> timers, each half can operate in conjunction (chain mode) or independently
-> (unchained mode) of each other.
->
-> It is global timer is a free running up-counter and can generate interrupt
-> when the counter reaches preset counter values.
->
-> Documentation:
-> http://www.ti.com/lit/ug/sprugv5a/sprugv5a.pdf
->
-> Acked-by: Rob Herring <robh@kernel.org>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> ---
+Commit 70b41abc151f9
+"ARM: ux500: move MSP pin control to the device tree"
+accidentally activated MSP2, giving rise to a boot scroll
+scream as the kernel attempts to probe a driver for it and
+fails to obtain DMA channel 14.
 
-Applied to my tree for 3.15
+Fix this up by marking the node disabled again.
 
-Thanks !
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Hi ARM SoC guys, can you please apply this patch directly
+for fixes, there is no point to send a pull request with a
+single patch in it.
+---
+ arch/arm/boot/dts/ste-href.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-   -- Daniel
-
-
+diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
+index 0c1e8d871ed1..6cb9b68e2188 100644
+--- a/arch/arm/boot/dts/ste-href.dtsi
++++ b/arch/arm/boot/dts/ste-href.dtsi
+@@ -188,7 +188,6 @@
+ 		msp2: msp at 80117000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&msp2_default_mode>;
+-			status = "okay";
+ 		};
+ 
+ 		msp3: msp at 80125000 {
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.5.3
