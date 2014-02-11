@@ -1,227 +1,100 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 11 Feb 2014 19:53:21 +0800
-Subject: [PATCH v5] clk: sunxi: Add Allwinner A20/A31 GMAC clock unit
-Message-ID: <1392119601-1564-1-git-send-email-wens@csie.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Feb 2014 12:56:59 +0100
+Subject: [PATCH] ARM: ux500: drop a chunk of GPIO definitions
+Message-ID: <1392119819-1772-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A20/A31 clock module controls the transmit clock source
-and interface type of the GMAC ethernet controller. Model this as
-a single clock for GMAC drivers to use.
+The Ux500 GPIOs are now assigned dynamically from the device tree.
+Drop this table of static assignments.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
+ arch/arm/mach-ux500/board-mop500.h | 69 --------------------------------------
+ 1 file changed, 69 deletions(-)
 
-Hi,
-
-This is v5 of the Allwinner A20 GMAC clock patch. Hans noted a
-compiler warning: unused variable in the previous version.
-The DT bits remain the same, and Maxime has already taken them.
-
-The Allwinner A20 SoC integrates an early version of dwmac
-IP from Synopsys. On top of that is a hardware glue layer.
-This layer needs to be configured before the dwmac can be
-used.
-
-Part of the glue layer is a clock mux, which controls the
-source and direction of the TX clock used by GMAC.
-
-Changes since v4:
-
-  * Removed unused variable in GMAC clock driver left over from v3
-
-Changes since v3:
-
-  * Rework error checking in GMAC clock driver
-  * Clarify required parent clock order for GMAC clock in DT bindings
-  * Rewrite commit log for "ARM: dts: sun7i: Add ethernet alias for GMAC"
-  * Corrected "a20-olinuxino-micro" in commit message
-  * Rewrite comments in sun7i dtsi to clarify purpose of dummy clocks
-  * Rebase onto Maxime's sunxi-next branch
-
-Changes since v2:
-
-  * Added more comments on GMAC clock driver
-  * Drop CLK_SET_PARENT_GATE in GMAC clock driver
-  * Use macro for max clock parents
-  * Line wrapping
-
-Changes since v1:
-
-  * Added optional reset control to stmmac driver core
-  * Added non CONFIG_RESET_CONROLLER routines for the above change
-  * Extended callback API, as discussed with Srinivas
-  * Used new stmmac_of_data to pass features and callbacks,
-    instead of platform data, as discussed
-  * Seperated clock module glue layer into clock driver
-
-
-Cheers
-ChenYu
-
----
- Documentation/devicetree/bindings/clock/sunxi.txt | 30 +++++++
- drivers/clk/sunxi/clk-sunxi.c                     | 96 +++++++++++++++++++++++
- 2 files changed, 126 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 0cf679b..28421d2 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -37,6 +37,7 @@ Required properties:
- 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
- 	"allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
- 	"allwinner,sun7i-a20-out-clk" - for the external output clocks
-+	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index bb408b8f48de..32cc0d8d8a0e 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -7,78 +7,9 @@
+ #ifndef __BOARD_MOP500_H
+ #define __BOARD_MOP500_H
  
- Required properties for all clocks:
- - reg : shall be the control register address for the clock.
-@@ -50,6 +51,9 @@ Required properties for all clocks:
- 	If the clock module only has one output, the name shall be the
- 	module name.
+-/* For NOMADIK_NR_GPIO */
+-#include "irqs.h"
+ #include <linux/platform_data/asoc-ux500-msp.h>
+ #include <linux/amba/mmci.h>
  
-+For "allwinner,sun7i-a20-gmac-clk", the parent clocks shall be fixed rate
-+dummy clocks at 25 MHz and 125 MHz, respectively. See example.
-+
- Clock consumers should specify the desired clocks they use with a
- "clocks" phandle cell. Consumers that are using a gated clock should
- provide an additional ID in their clock property. This ID is the
-@@ -96,3 +100,29 @@ mmc0_clk: clk at 01c20088 {
- 	clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
- 	clock-output-names = "mmc0";
- };
-+
-+mii_phy_tx_clk: clk at 2 {
-+	#clock-cells = <0>;
-+	compatible = "fixed-clock";
-+	clock-frequency = <25000000>;
-+	clock-output-names = "mii_phy_tx";
-+};
-+
-+gmac_int_tx_clk: clk at 3 {
-+	#clock-cells = <0>;
-+	compatible = "fixed-clock";
-+	clock-frequency = <125000000>;
-+	clock-output-names = "gmac_int_tx";
-+};
-+
-+gmac_clk: clk at 01c20164 {
-+	#clock-cells = <0>;
-+	compatible = "allwinner,sun7i-a20-gmac-clk";
-+	reg = <0x01c20164 0x4>;
-+	/*
-+	 * The first clock must be fixed at 25MHz;
-+	 * the second clock must be fixed at 125MHz
-+	 */
-+	clocks = <&mii_phy_tx_clk>, <&gmac_int_tx_clk>;
-+	clock-output-names = "gmac";
-+};
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 736fb60..54a5d55 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -379,6 +379,102 @@ static void sun7i_a20_get_out_factors(u32 *freq, u32 parent_rate,
- 
- 
- /**
-+ * sun7i_a20_gmac_clk_setup - Setup function for A20/A31 GMAC clock module
-+ *
-+ * This clock looks something like this
-+ *                               ________________________
-+ *  MII TX clock from PHY >-----|___________    _________|----> to GMAC core
-+ *  GMAC Int. RGMII TX clk >----|___________\__/__gate---|----> to PHY
-+ *  Ext. 125MHz RGMII TX clk >--|__divider__/            |
-+ *                              |________________________|
-+ *
-+ * The external 125 MHz reference is optional, i.e. GMAC can use its
-+ * internal TX clock just fine. The A31 GMAC clock module does not have
-+ * the divider controls for the external reference.
-+ *
-+ * To keep it simple, let the GMAC use either the MII TX clock for MII mode,
-+ * and its internal TX clock for GMII and RGMII modes. The GMAC driver should
-+ * select the appropriate source and gate/ungate the output to the PHY.
-+ *
-+ * Only the GMAC should use this clock. Altering the clock so that it doesn't
-+ * match the GMAC's operation parameters will result in the GMAC not being
-+ * able to send traffic out. The GMAC driver should set the clock rate and
-+ * enable/disable this clock to configure the required state. The clock
-+ * driver then responds by auto-reparenting the clock.
-+ */
-+
-+#define SUN7I_A20_GMAC_GPIT	2
-+#define SUN7I_A20_GMAC_MASK	0x3
-+#define SUN7I_A20_GMAC_PARENTS	2
-+
-+static void __init sun7i_a20_gmac_clk_setup(struct device_node *node)
-+{
-+	struct clk *clk;
-+	struct clk_mux *mux;
-+	struct clk_gate *gate;
-+	const char *clk_name = node->name;
-+	const char *parents[SUN7I_A20_GMAC_PARENTS];
-+	void *reg;
-+
-+	if (of_property_read_string(node, "clock-output-names", &clk_name))
-+		return;
-+
-+	/* allocate mux and gate clock structs */
-+	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
-+	if (!mux)
-+		return;
-+
-+	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
-+	if (!gate)
-+		goto free_mux;
-+
-+	/* gmac clock requires exactly 2 parents */
-+	parents[0] = of_clk_get_parent_name(node, 0);
-+	parents[1] = of_clk_get_parent_name(node, 1);
-+	if (!parents[0] || !parents[1])
-+		goto free_gate;
-+
-+	reg = of_iomap(node, 0);
-+	if (!reg)
-+		goto free_gate;
-+
-+	/* set up gate and fixed rate properties */
-+	gate->reg = reg;
-+	gate->bit_idx = SUN7I_A20_GMAC_GPIT;
-+	gate->lock = &clk_lock;
-+	mux->reg = reg;
-+	mux->mask = SUN7I_A20_GMAC_MASK;
-+	mux->flags = CLK_MUX_INDEX_BIT;
-+	mux->lock = &clk_lock;
-+
-+	clk = clk_register_composite(NULL, clk_name,
-+			parents, SUN7I_A20_GMAC_PARENTS,
-+			&mux->hw, &clk_mux_ops,
-+			NULL, NULL,
-+			&gate->hw, &clk_gate_ops,
-+			0);
-+
-+	if (IS_ERR(clk))
-+		goto iounmap_reg;
-+
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	clk_register_clkdev(clk, clk_name, NULL);
-+
-+	return;
-+
-+iounmap_reg:
-+	iounmap(reg);
-+free_gate:
-+	kfree(gate);
-+free_mux:
-+	kfree(mux);
-+}
-+CLK_OF_DECLARE(sun7i_a20_gmac, "allwinner,sun7i-a20-gmac-clk",
-+		sun7i_a20_gmac_clk_setup);
-+
-+
-+
-+/**
-  * sunxi_factors_clk_setup() - Setup function for factor clocks
-  */
- 
+-/* Snowball specific GPIO assignments, this board has no GPIO expander */
+-#define SNOWBALL_ACCEL_INT1_GPIO	163
+-#define SNOWBALL_ACCEL_INT2_GPIO	164
+-#define SNOWBALL_MAGNET_DRDY_GPIO	165
+-#define SNOWBALL_SDMMC_EN_GPIO		217
+-#define SNOWBALL_SDMMC_1V8_3V_GPIO	228
+-#define SNOWBALL_SDMMC_CD_GPIO		218
+-
+-/* HREFv60-specific GPIO assignments, this board has no GPIO expander */
+-#define HREFV60_SDMMC_1V8_3V_GPIO	5
+-#define HREFV60_CAMERA_FLASH_ENABLE	21
+-#define HREFV60_MAGNET_DRDY_GPIO	32
+-#define HREFV60_DISP1_RST_GPIO		65
+-#define HREFV60_DISP2_RST_GPIO		66
+-#define HREFV60_ACCEL_INT1_GPIO		82
+-#define HREFV60_ACCEL_INT2_GPIO		83
+-#define HREFV60_SDMMC_CD_GPIO		95
+-#define HREFV60_XSHUTDOWN_SECONDARY_SENSOR 140
+-#define HREFV60_TOUCH_RST_GPIO		143
+-#define HREFV60_HAL_SW_GPIO		145
+-#define HREFV60_SDMMC_EN_GPIO		169
+-#define HREFV60_MMIO_XENON_CHARGE	170
+-#define HREFV60_PROX_SENSE_GPIO		217
+-
+-/* MOP500 generic GPIOs */
+-#define CAMERA_FLASH_INT_PIN		7
+-#define CYPRESS_TOUCH_INT_PIN		84
+-#define XSHUTDOWN_PRIMARY_SENSOR	141
+-#define XSHUTDOWN_SECONDARY_SENSOR	142
+-#define CYPRESS_TOUCH_RST_GPIO		143
+-#define MOP500_HDMI_RST_GPIO		196
+-#define CYPRESS_SLAVE_SELECT_GPIO	216
+-
+-/* GPIOs on the TC35892 expander */
+-#define MOP500_EGPIO(x)			(NOMADIK_NR_GPIO + (x))
+-#define GPIO_MAGNET_DRDY		MOP500_EGPIO(1)
+-#define GPIO_SDMMC_CD			MOP500_EGPIO(3)
+-#define GPIO_CAMERA_FLASH_ENABLE	MOP500_EGPIO(4)
+-#define GPIO_MMIO_XENON_CHARGE		MOP500_EGPIO(5)
+-#define GPIO_PROX_SENSOR		MOP500_EGPIO(7)
+-#define GPIO_HAL_SENSOR			MOP500_EGPIO(8)
+-#define GPIO_ACCEL_INT1			MOP500_EGPIO(10)
+-#define GPIO_ACCEL_INT2			MOP500_EGPIO(11)
+-#define GPIO_BU21013_CS			MOP500_EGPIO(13)
+-#define MOP500_DISP2_RST_GPIO		MOP500_EGPIO(14)
+-#define MOP500_DISP1_RST_GPIO		MOP500_EGPIO(15)
+-#define GPIO_SDMMC_EN			MOP500_EGPIO(17)
+-#define GPIO_SDMMC_1V8_3V_SEL		MOP500_EGPIO(18)
+-#define MOP500_EGPIO_END		MOP500_EGPIO(24)
+-
+-/*
+- * GPIOs on the AB8500 mixed-signals circuit
+- * Notice that we subtract 1 from the number passed into the macro, this is
+- * because the AB8500 GPIO pins are enumbered starting from 1, so the value in
+- * parens matches the GPIO pin number in the data sheet.
+- */
+-#define MOP500_AB8500_PIN_GPIO(x)	(MOP500_EGPIO_END + (x) - 1)
+-/*Snowball AB8500 GPIO */
+-#define SNOWBALL_VSMPS2_1V8_GPIO	MOP500_AB8500_PIN_GPIO(1)	/* SYSCLKREQ2/GPIO1 */
+-#define SNOWBALL_PM_GPIO1_GPIO		MOP500_AB8500_PIN_GPIO(2)	/* SYSCLKREQ3/GPIO2 */
+-#define SNOWBALL_WLAN_CLK_REQ_GPIO	MOP500_AB8500_PIN_GPIO(3)	/* SYSCLKREQ4/GPIO3 */
+-#define SNOWBALL_PM_GPIO4_GPIO		MOP500_AB8500_PIN_GPIO(4)	/* SYSCLKREQ6/GPIO4 */
+-#define SNOWBALL_EN_3V6_GPIO		MOP500_AB8500_PIN_GPIO(16)	/* PWMOUT3/GPIO16 */
+-#define SNOWBALL_PME_ETH_GPIO		MOP500_AB8500_PIN_GPIO(24)	/* SYSCLKREQ7/GPIO24 */
+-#define SNOWBALL_EN_3V3_ETH_GPIO	MOP500_AB8500_PIN_GPIO(26)	/* GPIO26 */
+-
+-struct device;
+ extern struct mmci_platform_data mop500_sdi0_data;
+ extern struct mmci_platform_data mop500_sdi1_data;
+ extern struct mmci_platform_data mop500_sdi2_data;
 -- 
-1.9.0.rc3
+1.8.5.3
