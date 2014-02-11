@@ -1,49 +1,53 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 11 Feb 2014 13:03:37 -0300
-Subject: [PATCH 0/2] Marvell Armada 375 and 38x timer support
-In-Reply-To: <1392059274-26965-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1392059274-26965-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140211160335.GB24205@localhost>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 11 Feb 2014 16:08:17 +0000
+Subject: [RFC PATCH V2 3/4] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
+In-Reply-To: <20140211154229.GF3748@arm.com>
+References: <1391703531-12845-1-git-send-email-steve.capper@linaro.org>
+ <1391703531-12845-4-git-send-email-steve.capper@linaro.org>
+ <20140211154229.GF3748@arm.com>
+Message-ID: <20140211160816.GA16371@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
-
-On Mon, Feb 10, 2014 at 04:07:52PM -0300, Ezequiel Garcia wrote:
+On Tue, Feb 11, 2014 at 03:42:29PM +0000, Catalin Marinas wrote:
+> Hi Steve,
 > 
-> This small series adds support for the two new Marvell ARM SoCs:
-> the Armada 375 and Armada 38x.
+> On Thu, Feb 06, 2014 at 04:18:50PM +0000, Steve Capper wrote:
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index 6d4dd22..129bd6a 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -28,6 +28,7 @@ config ARM64
+> >  	select HAVE_HW_BREAKPOINT if PERF_EVENTS
+> >  	select HAVE_MEMBLOCK
+> >  	select HAVE_PERF_EVENTS
+> > +	select HAVE_RCU_TABLE_FREE
+> >  	select IRQ_DOMAIN
+> >  	select MODULES_USE_ELF_RELA
+> >  	select NO_BOOTMEM
+> > diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+> > index 717031a..8999823 100644
+> > --- a/arch/arm64/include/asm/tlb.h
+> > +++ b/arch/arm64/include/asm/tlb.h
+> > @@ -27,12 +27,33 @@
+> >  
+> >  #define MMU_GATHER_BUNDLE	8
+> >  
+> > +static inline void __tlb_remove_table(void *_table)
+> > +{
+> > +	free_page_and_swap_cache((struct page *)_table);
+> > +}
 > 
-
-Please omit these patches entirely, we don't need them.
-
-The new agreement [1] is to add SoC-specific compatible strings and also
-declare the nodes as compatibles with the already supported SoC,
-whenever appropriate.
-
-[..]
-> The A375 SoC timer is modeled matching the A370 timer, while the
-> A38x SoC timer is modeled matching the AXP timer.
+> I think you can reduce your patch to just the above (and a linux/swap.h
+> include) after the arm64 conversion to generic mmu_gather below.
 > 
+> I cc'ed Peter Z for a sanity check, some of the code is close to
+> https://lkml.org/lkml/2011/3/7/302, only that it's under arch/arm64.
+> 
+> And, of course, it needs a lot more testing.
 
-So, as per the statement above, the devicetree for Armada 375 and
-Armada 38x would have these timer nodes, respectively:
+Okay, cheers Catalin, I'll give that a go.
 
-  timer {
-      compatible = "marvell,armada-375-timer", "marvell,armada-370-timer"
-  }
-
-  timer {
-      compatible = "marvell,armada-380-timer", "marvell,armada-xp-timer"
-  }
-
-(Because the Armada 375 timer uses the provided parent clock, whereas the
-Armada 380 timer uses the fixed 25 MHz clock).
-
-Therefore, we don't need any changes in the clocksource driver for now.
-
-[1] http://www.spinics.net/lists/arm-kernel/msg306727.html
+Cheers,
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Steve
