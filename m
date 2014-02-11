@@ -1,250 +1,349 @@
-From: b44548@freescale.com (Chao Fu)
-Date: Tue, 11 Feb 2014 13:48:16 +0800
-Subject: [PATCH v3 1/2] spi:fsl-dspi:convert to use regmap and big-endian
- supports
-Message-ID: <1392097697-14919-1-git-send-email-b44548@freescale.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 11 Feb 2014 07:55:44 +0100
+Subject: [PATCH v2 01/11] watchdog: xilinx: Convert driver to the watchdog
+ framework
+Message-ID: <f298edd222c57b0ce1ebad3ae50c3f715406c631.1392101734.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chao Fu <B44548@freescale.com>
+- Remove uneeded headers, fops functions
+- Use xilinx_wdt prefix in start/stop/keepalive functions
+  and in new structures
 
-Freescale DSPI module will have two endianess in different platform,
-but ARM is little endian. So when DSPI in big endian, core in little endian,
-readl and writel can not adjust R/W register in this condition.
-This patch will remove general readl/writel, and import regmap mechanism.
-Data endian will be transfered in regmap APIs.
-
-Documents: dspi add bool "big-endian" in dts node if DSPI module
-work in big endian.
-
-Signed-off-by: Chao Fu      <b44548@freescale.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 ---
-Change in v3:
-Remove readl and wrirel, and import regmap mechanism to R/W module registers.
 
-Change in v2:
-Make dspi_readx dspi_writex as inline functions.
-Modify the issue of indentation in function is_double_byte_mode.
-Add description about big endian in bindings document.
+Changes in v2: None
 
- .../devicetree/bindings/spi/spi-fsl-dspi.txt       |  2 +
- drivers/spi/spi-fsl-dspi.c                         | 80 ++++++++++++++--------
- 2 files changed, 55 insertions(+), 27 deletions(-)
+ drivers/watchdog/Kconfig         |   1 +
+ drivers/watchdog/of_xilinx_wdt.c | 204 ++++++---------------------------------
+ 2 files changed, 33 insertions(+), 172 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
-index a1fb303..5376de4 100644
---- a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
-@@ -10,6 +10,7 @@ Required properties:
- - pinctrl-names: must contain a "default" entry.
- - spi-num-chipselects : the number of the chipselect signals.
- - bus-num : the slave chip chipselect signal number.
-+- big-endian : if DSPI modudle is big endian, the bool will be set in node.
- Example:
- 
- dspi0 at 4002c000 {
-@@ -24,6 +25,7 @@ dspi0 at 4002c000 {
- 	bus-num = <0>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_dspi0_1>;
-+	big-endian;
- 	status = "okay";
- 
- 	sflash: at26df081a at 0 {
-diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-index ec79f72..fb16575 100644
---- a/drivers/spi/spi-fsl-dspi.c
-+++ b/drivers/spi/spi-fsl-dspi.c
-@@ -18,6 +18,7 @@
- #include <linux/interrupt.h>
- #include <linux/errno.h>
- #include <linux/platform_device.h>
-+#include <linux/regmap.h>
- #include <linux/sched.h>
- #include <linux/delay.h>
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 4c4c566..9db5d3c 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -1025,6 +1025,7 @@ config M54xx_WATCHDOG
+ config XILINX_WATCHDOG
+ 	tristate "Xilinx Watchdog timer"
+ 	depends on MICROBLAZE
++	select WATCHDOG_CORE
+ 	---help---
+ 	  Watchdog driver for the xps_timebase_wdt ip core.
+
+diff --git a/drivers/watchdog/of_xilinx_wdt.c b/drivers/watchdog/of_xilinx_wdt.c
+index fb57103..8c2814e 100644
+--- a/drivers/watchdog/of_xilinx_wdt.c
++++ b/drivers/watchdog/of_xilinx_wdt.c
+@@ -1,6 +1,7 @@
+ /*
+  * Watchdog Device Driver for Xilinx axi/xps_timebase_wdt
+  *
++ * (C) Copyright 2013 - 2014 Xilinx, Inc.
+  * (C) Copyright 2011 (Alejandro Cabrera <aldaya@gmail.com>)
+  *
+  * This program is free software; you can redistribute it and/or
+@@ -14,13 +15,10 @@
+ #include <linux/module.h>
+ #include <linux/types.h>
+ #include <linux/kernel.h>
+-#include <linux/fs.h>
+-#include <linux/miscdevice.h>
+ #include <linux/init.h>
+ #include <linux/ioport.h>
+ #include <linux/watchdog.h>
  #include <linux/io.h>
-@@ -108,7 +109,7 @@ struct fsl_dspi {
- 	struct spi_bitbang	bitbang;
- 	struct platform_device	*pdev;
- 
--	void __iomem		*base;
-+	struct regmap		*regmap;
- 	int			irq;
- 	struct clk 		*clk;
- 
-@@ -129,18 +130,11 @@ struct fsl_dspi {
- 
- static inline int is_double_byte_mode(struct fsl_dspi *dspi)
- {
--	return ((readl(dspi->base + SPI_CTAR(dspi->cs)) & SPI_FRAME_BITS_MASK)
--			== SPI_FRAME_BITS(8)) ? 0 : 1;
--}
-+	unsigned int val;
- 
--static void set_bit_mode(struct fsl_dspi *dspi, unsigned char bits)
--{
--	u32 temp;
-+	regmap_read(dspi->regmap, SPI_CTAR(dspi->cs), &val);
- 
--	temp = readl(dspi->base + SPI_CTAR(dspi->cs));
--	temp &= ~SPI_FRAME_BITS_MASK;
--	temp |= SPI_FRAME_BITS(bits);
--	writel(temp, dspi->base + SPI_CTAR(dspi->cs));
-+	return ((val & SPI_FRAME_BITS_MASK) == SPI_FRAME_BITS(8)) ? 0 : 1;
- }
- 
- static void hz_to_spi_baud(char *pbr, char *br, int speed_hz,
-@@ -188,7 +182,8 @@ static int dspi_transfer_write(struct fsl_dspi *dspi)
- 	 */
- 	if (tx_word && (dspi->len == 1)) {
- 		dspi->dataflags |= TRAN_STATE_WORD_ODD_NUM;
--		set_bit_mode(dspi, 8);
-+		regmap_update_bits(dspi->regmap, SPI_CTAR(dspi->cs),
-+				SPI_FRAME_BITS_MASK, SPI_FRAME_BITS(8));
- 		tx_word = 0;
- 	}
- 
-@@ -238,7 +233,8 @@ static int dspi_transfer_write(struct fsl_dspi *dspi)
- 			dspi_pushr |= SPI_PUSHR_CTCNT; /* clear counter */
- 		}
- 
--		writel(dspi_pushr, dspi->base + SPI_PUSHR);
-+		regmap_write(dspi->regmap, SPI_PUSHR, dspi_pushr);
-+
- 		tx_count++;
- 	}
- 
-@@ -253,17 +249,23 @@ static int dspi_transfer_read(struct fsl_dspi *dspi)
- 	while ((dspi->rx < dspi->rx_end)
- 			&& (rx_count < DSPI_FIFO_SIZE)) {
- 		if (rx_word) {
-+			unsigned int val;
-+
- 			if ((dspi->rx_end - dspi->rx) == 1)
- 				break;
- 
--			d = SPI_POPR_RXDATA(readl(dspi->base + SPI_POPR));
-+			regmap_read(dspi->regmap, SPI_POPR, &val);
-+			d = SPI_POPR_RXDATA(val);
- 
- 			if (!(dspi->dataflags & TRAN_STATE_RX_VOID))
- 				*(u16 *)dspi->rx = d;
- 			dspi->rx += 2;
- 
- 		} else {
--			d = SPI_POPR_RXDATA(readl(dspi->base + SPI_POPR));
-+			unsigned int val;
-+
-+			regmap_read(dspi->regmap, SPI_POPR, &val);
-+			d = SPI_POPR_RXDATA(val);
- 			if (!(dspi->dataflags & TRAN_STATE_RX_VOID))
- 				*(u8 *)dspi->rx = d;
- 			dspi->rx++;
-@@ -295,13 +297,13 @@ static int dspi_txrx_transfer(struct spi_device *spi, struct spi_transfer *t)
- 	if (!dspi->tx)
- 		dspi->dataflags |= TRAN_STATE_TX_VOID;
- 
--	writel(dspi->cur_chip->mcr_val, dspi->base + SPI_MCR);
--	writel(dspi->cur_chip->ctar_val, dspi->base + SPI_CTAR(dspi->cs));
--	writel(SPI_RSER_EOQFE, dspi->base + SPI_RSER);
-+	regmap_write(dspi->regmap, SPI_MCR, dspi->cur_chip->mcr_val);
-+	regmap_write(dspi->regmap, SPI_CTAR(dspi->cs), dspi->cur_chip->ctar_val);
-+	regmap_write(dspi->regmap, SPI_RSER, SPI_RSER_EOQFE);
- 
- 	if (t->speed_hz)
--		writel(dspi->cur_chip->ctar_val,
--				dspi->base + SPI_CTAR(dspi->cs));
-+		regmap_write(dspi->regmap, SPI_CTAR(dspi->cs),
-+				dspi->cur_chip->ctar_val);
- 
- 	dspi_transfer_write(dspi);
- 
-@@ -315,7 +317,9 @@ static int dspi_txrx_transfer(struct spi_device *spi, struct spi_transfer *t)
- static void dspi_chipselect(struct spi_device *spi, int value)
- {
- 	struct fsl_dspi *dspi = spi_master_get_devdata(spi->master);
--	u32 pushr = readl(dspi->base + SPI_PUSHR);
-+	unsigned int pushr;
-+
-+	regmap_read(dspi->regmap, SPI_PUSHR, &pushr);
- 
- 	switch (value) {
- 	case BITBANG_CS_ACTIVE:
-@@ -326,7 +330,7 @@ static void dspi_chipselect(struct spi_device *spi, int value)
- 		break;
- 	}
- 
--	writel(pushr, dspi->base + SPI_PUSHR);
-+	regmap_write(dspi->regmap, SPI_PUSHR, pushr);
- }
- 
- static int dspi_setup_transfer(struct spi_device *spi, struct spi_transfer *t)
-@@ -382,13 +386,15 @@ static irqreturn_t dspi_interrupt(int irq, void *dev_id)
- {
- 	struct fsl_dspi *dspi = (struct fsl_dspi *)dev_id;
- 
--	writel(SPI_SR_EOQF, dspi->base + SPI_SR);
-+	regmap_write(dspi->regmap, SPI_SR, SPI_SR_EOQF);
- 
- 	dspi_transfer_read(dspi);
- 
- 	if (!dspi->len) {
- 		if (dspi->dataflags & TRAN_STATE_WORD_ODD_NUM)
--			set_bit_mode(dspi, 16);
-+			regmap_update_bits(dspi->regmap, SPI_CTAR(dspi->cs),
-+				SPI_FRAME_BITS_MASK, SPI_FRAME_BITS(16));
-+
- 		dspi->waitflags = 1;
- 		wake_up_interruptible(&dspi->waitq);
- 	} else {
-@@ -435,12 +441,20 @@ static const struct dev_pm_ops dspi_pm = {
- 	SET_SYSTEM_SLEEP_PM_OPS(dspi_suspend, dspi_resume)
+-#include <linux/uaccess.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/of_address.h>
+@@ -48,22 +46,18 @@
+ struct xwdt_device {
+ 	struct resource  res;
+ 	void __iomem *base;
+-	u32 nowayout;
+ 	u32 wdt_interval;
+-	u32 boot_status;
  };
- 
-+static struct regmap_config dspi_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+	.max_register = 0x88,
-+};
-+
- static int dspi_probe(struct platform_device *pdev)
+
+ static struct xwdt_device xdev;
+
+ static  u32 timeout;
+ static  u32 control_status_reg;
+-static  u8  expect_close;
+ static  u8  no_timeout;
+-static unsigned long driver_open;
+
+ static  DEFINE_SPINLOCK(spinlock);
+
+-static void xwdt_start(void)
++static int xilinx_wdt_start(struct watchdog_device *wdd)
  {
- 	struct device_node *np = pdev->dev.of_node;
- 	struct spi_master *master;
- 	struct fsl_dspi *dspi;
- 	struct resource *res;
-+	void __iomem *base;
- 	int ret = 0, cs_num, bus_num;
- 
- 	master = spi_alloc_master(&pdev->dev, sizeof(struct fsl_dspi));
-@@ -475,12 +489,24 @@ static int dspi_probe(struct platform_device *pdev)
- 	master->bus_num = bus_num;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	dspi->base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(dspi->base)) {
--		ret = PTR_ERR(dspi->base);
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base)) {
-+		ret = PTR_ERR(base);
- 		goto out_master_put;
- 	}
- 
-+	dspi_regmap_config.lock_arg = dspi;
-+	dspi_regmap_config.val_format_endian =
-+		of_property_read_bool(np, "big-endian")
-+			? REGMAP_ENDIAN_BIG : REGMAP_ENDIAN_DEFAULT;
-+	dspi->regmap = devm_regmap_init_mmio_clk(&pdev->dev, "dspi", base,
-+						&dspi_regmap_config);
-+	if (IS_ERR(dspi->regmap)) {
-+		dev_err(&pdev->dev, "failed to init regmap: %ld\n",
-+				PTR_ERR(dspi->regmap));
-+		return PTR_ERR(dspi->regmap);
-+	}
+ 	spin_lock(&spinlock);
+
+@@ -77,9 +71,11 @@ static void xwdt_start(void)
+ 	iowrite32(XWT_CSRX_EWDT2_MASK, xdev.base + XWT_TWCSR1_OFFSET);
+
+ 	spin_unlock(&spinlock);
 +
- 	dspi->irq = platform_get_irq(pdev, 0);
- 	if (dspi->irq < 0) {
- 		dev_err(&pdev->dev, "can't get platform irq\n");
--- 
-1.8.4
++	return 0;
+ }
+
+-static void xwdt_stop(void)
++static int xilinx_wdt_stop(struct watchdog_device *wdd)
+ {
+ 	spin_lock(&spinlock);
+
+@@ -92,9 +88,11 @@ static void xwdt_stop(void)
+
+ 	spin_unlock(&spinlock);
+ 	pr_info("Stopped!\n");
++
++	return 0;
+ }
+
+-static void xwdt_keepalive(void)
++static int xilinx_wdt_keepalive(struct watchdog_device *wdd)
+ {
+ 	spin_lock(&spinlock);
+
+@@ -103,23 +101,28 @@ static void xwdt_keepalive(void)
+ 	iowrite32(control_status_reg, xdev.base + XWT_TWCSR0_OFFSET);
+
+ 	spin_unlock(&spinlock);
+-}
+
+-static void xwdt_get_status(int *status)
+-{
+-	int new_status;
++	return 0;
++}
+
+-	spin_lock(&spinlock);
++static const struct watchdog_info xilinx_wdt_ident = {
++	.options =  WDIOF_MAGICCLOSE |
++		    WDIOF_KEEPALIVEPING,
++	.firmware_version =	1,
++	.identity =	WATCHDOG_NAME,
++};
+
+-	control_status_reg = ioread32(xdev.base + XWT_TWCSR0_OFFSET);
+-	new_status = ((control_status_reg &
+-			(XWT_CSR0_WRS_MASK | XWT_CSR0_WDS_MASK)) != 0);
+-	spin_unlock(&spinlock);
++static const struct watchdog_ops xilinx_wdt_ops = {
++	.owner = THIS_MODULE,
++	.start = xilinx_wdt_start,
++	.stop = xilinx_wdt_stop,
++	.ping = xilinx_wdt_keepalive,
++};
+
+-	*status = 0;
+-	if (new_status & 1)
+-		*status |= WDIOF_CARDRESET;
+-}
++static struct watchdog_device xilinx_wdt_wdd = {
++	.info = &xilinx_wdt_ident,
++	.ops = &xilinx_wdt_ops,
++};
+
+ static u32 xwdt_selftest(void)
+ {
+@@ -146,139 +149,6 @@ static u32 xwdt_selftest(void)
+ 		return XWT_TIMER_FAILED;
+ }
+
+-static int xwdt_open(struct inode *inode, struct file *file)
+-{
+-	/* Only one process can handle the wdt at a time */
+-	if (test_and_set_bit(0, &driver_open))
+-		return -EBUSY;
+-
+-	/* Make sure that the module are always loaded...*/
+-	if (xdev.nowayout)
+-		__module_get(THIS_MODULE);
+-
+-	xwdt_start();
+-	pr_info("Started...\n");
+-
+-	return nonseekable_open(inode, file);
+-}
+-
+-static int xwdt_release(struct inode *inode, struct file *file)
+-{
+-	if (expect_close == 42) {
+-		xwdt_stop();
+-	} else {
+-		pr_crit("Unexpected close, not stopping watchdog!\n");
+-		xwdt_keepalive();
+-	}
+-
+-	clear_bit(0, &driver_open);
+-	expect_close = 0;
+-	return 0;
+-}
+-
+-/*
+- *      xwdt_write:
+- *      @file: file handle to the watchdog
+- *      @buf: buffer to write (unused as data does not matter here
+- *      @count: count of bytes
+- *      @ppos: pointer to the position to write. No seeks allowed
+- *
+- *      A write to a watchdog device is defined as a keepalive signal. Any
+- *      write of data will do, as we don't define content meaning.
+- */
+-static ssize_t xwdt_write(struct file *file, const char __user *buf,
+-						size_t len, loff_t *ppos)
+-{
+-	if (len) {
+-		if (!xdev.nowayout) {
+-			size_t i;
+-
+-			/* In case it was set long ago */
+-			expect_close = 0;
+-
+-			for (i = 0; i != len; i++) {
+-				char c;
+-
+-				if (get_user(c, buf + i))
+-					return -EFAULT;
+-				if (c == 'V')
+-					expect_close = 42;
+-			}
+-		}
+-		xwdt_keepalive();
+-	}
+-	return len;
+-}
+-
+-static const struct watchdog_info ident = {
+-	.options =  WDIOF_MAGICCLOSE |
+-		    WDIOF_KEEPALIVEPING,
+-	.firmware_version =	1,
+-	.identity =	WATCHDOG_NAME,
+-};
+-
+-/*
+- *      xwdt_ioctl:
+- *      @file: file handle to the device
+- *      @cmd: watchdog command
+- *      @arg: argument pointer
+- *
+- *      The watchdog API defines a common set of functions for all watchdogs
+- *      according to their available features.
+- */
+-static long xwdt_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+-{
+-	int status;
+-
+-	union {
+-		struct watchdog_info __user *ident;
+-		int __user *i;
+-	} uarg;
+-
+-	uarg.i = (int __user *)arg;
+-
+-	switch (cmd) {
+-	case WDIOC_GETSUPPORT:
+-		return copy_to_user(uarg.ident, &ident,
+-					sizeof(ident)) ? -EFAULT : 0;
+-
+-	case WDIOC_GETBOOTSTATUS:
+-		return put_user(xdev.boot_status, uarg.i);
+-
+-	case WDIOC_GETSTATUS:
+-		xwdt_get_status(&status);
+-		return put_user(status, uarg.i);
+-
+-	case WDIOC_KEEPALIVE:
+-		xwdt_keepalive();
+-		return 0;
+-
+-	case WDIOC_GETTIMEOUT:
+-		if (no_timeout)
+-			return -ENOTTY;
+-		else
+-			return put_user(timeout, uarg.i);
+-
+-	default:
+-		return -ENOTTY;
+-	}
+-}
+-
+-static const struct file_operations xwdt_fops = {
+-	.owner      = THIS_MODULE,
+-	.llseek     = no_llseek,
+-	.write      = xwdt_write,
+-	.open       = xwdt_open,
+-	.release    = xwdt_release,
+-	.unlocked_ioctl = xwdt_ioctl,
+-};
+-
+-static struct miscdevice xwdt_miscdev = {
+-	.minor      = WATCHDOG_MINOR,
+-	.name       = "watchdog",
+-	.fops       = &xwdt_fops,
+-};
+-
+ static int xwdt_probe(struct platform_device *pdev)
+ {
+ 	int rc;
+@@ -314,7 +184,7 @@ static int xwdt_probe(struct platform_device *pdev)
+ 					"xlnx,wdt-enable-once", NULL);
+ 	if (tmptr == NULL) {
+ 		pr_warn("Parameter \"xlnx,wdt-enable-once\" not found in device tree!\n");
+-		xdev.nowayout = WATCHDOG_NOWAYOUT;
++		watchdog_set_nowayout(&xilinx_wdt_wdd, true);
+ 	}
+
+ /*
+@@ -344,24 +214,14 @@ static int xwdt_probe(struct platform_device *pdev)
+ 		goto unmap_io;
+ 	}
+
+-	xwdt_get_status(&xdev.boot_status);
+-
+-	rc = misc_register(&xwdt_miscdev);
++	rc = watchdog_register_device(&xilinx_wdt_wdd);
+ 	if (rc) {
+-		pr_err("cannot register miscdev on minor=%d (err=%d)\n",
+-		       xwdt_miscdev.minor, rc);
++		pr_err("cannot register watchdog (err=%d)\n", rc);
+ 		goto unmap_io;
+ 	}
+
+-	if (no_timeout)
+-		pr_info("driver loaded (timeout=? sec, nowayout=%d)\n",
+-			xdev.nowayout);
+-	else
+-		pr_info("driver loaded (timeout=%d sec, nowayout=%d)\n",
+-			timeout, xdev.nowayout);
+-
+-	expect_close = 0;
+-	clear_bit(0, &driver_open);
++	dev_info(&pdev->dev, "Xilinx Watchdog Timer at %p with timeout %ds\n",
++		 xdev.base, timeout);
+
+ 	return 0;
+
+@@ -375,7 +235,7 @@ err_out:
+
+ static int xwdt_remove(struct platform_device *dev)
+ {
+-	misc_deregister(&xwdt_miscdev);
++	watchdog_unregister_device(&xilinx_wdt_wdd);
+ 	iounmap(xdev.base);
+ 	release_mem_region(xdev.res.start, resource_size(&xdev.res));
+
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140211/b18af5de/attachment.sig>
