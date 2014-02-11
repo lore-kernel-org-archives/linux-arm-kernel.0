@@ -1,40 +1,37 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 11 Feb 2014 12:55:13 -0300
-Subject: [PATCH 0/2] Armada 375/38x MBus support
-In-Reply-To: <1392060298-27094-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1392060298-27094-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140211155512.GA24205@localhost>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 11 Feb 2014 15:59:28 +0000
+Subject: [PATCH v2] ARM: asm: rename logical shift macros push pull into
+ lspush lspull
+In-Reply-To: <20140211155437.GC3035@e103592.cambridge.arm.com>
+References: <1392063589-24111-1-git-send-email-victor.kamensky@linaro.org>
+ <1392063589-24111-2-git-send-email-victor.kamensky@linaro.org>
+ <alpine.LFD.2.11.1402101607120.17677@knanqh.ubzr>
+ <20140211155437.GC3035@e103592.cambridge.arm.com>
+Message-ID: <20140211155928.GD3035@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 04:24:56PM -0300, Ezequiel Garcia wrote:
-> As part of the submission of the Armada 375/38x initial support, these
-> two small patches add MBus support.
+On Tue, Feb 11, 2014 at 03:54:37PM +0000, Dave Martin wrote:
+> On Mon, Feb 10, 2014 at 04:30:01PM -0500, Nicolas Pitre wrote:
+> > On Mon, 10 Feb 2014, Victor Kamensky wrote:
+> > 
+> > > Renames logical shift macros, 'push' and 'pull', defined in
+> > > arch/arm/include/asm/assembler.h, into 'lspush' and 'lspull'.
+> > 
+> > I don't have any fundamental objection to the idea, except maybe for the 
+> > actual names.  I just can't come up with anything better though.  
 > 
-> You will find that despite the MBus support being identical for the whole
-> SoC family: Armada 370/XP/375 and 38x, we have per-SoC compatible for each
-> of them.
+> For consistency with the get_byte_ stuff, how about:
 > 
-> Such decision is being currently discussed; see:
+> 	push -> towards_byte_0
+> 	pull -> from_byte_0
 > 
-> http://www.spinics.net/lists/arm-kernel/msg306480.html
+> That may make the purpose a little clearer, too.
 > 
+> (Assuming I've got them the right way around...)
 
-These patches are not required, so please omit them entirely.
-The new agreement [1] is to add SoC-specific compatible strings and also
-declare the nodes as compatibles with the already supported SoC,
-whenever appropriate.
+(Actually, I did get it the wrong way round by the look of it.
+But you get the general idea.)
 
-For instance, the devicetrees for Armada 375 would have this mbus node:
-
-  mbus {
-    compatible = "marvell,armada375-mbus", "marvell,armada370-mbus"
-  }
-
-And therefore, we don't need any changes in the driver for now.
-
-[1] http://www.spinics.net/lists/arm-kernel/msg306727.html
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Cheers
+---Dave
