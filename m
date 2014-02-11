@@ -1,9 +1,9 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Tue, 11 Feb 2014 10:24:02 -0600
-Subject: [PATCH 4/8] ARM: mvebu: make use of of_find_matching_node_and_match
+Date: Tue, 11 Feb 2014 10:23:59 -0600
+Subject: [PATCH 1/8] bus: arm-cci: make use of of_find_matching_node_and_match
 In-Reply-To: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
 References: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
-Message-ID: <1392135847-30791-5-git-send-email-joshc@codeaurora.org>
+Message-ID: <1392135847-30791-2-git-send-email-joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,43 +11,46 @@ Instead of the of_find_matching_node()/of_match_node() pair, which requires two
 iterations through the match table, make use of of_find_matching_node_and_match(),
 which only iterates through the table once.
 
-While we're here, mark the of_system_controller table const.
+This also has the side effect of fixing the following following error hit
+during randconfig testing:
+
+  drivers/bus/arm-cci.c: In function ?cci_probe?:
+  drivers/bus/arm-cci.c:976:49: warning: dereferencing ?void *? pointer [enabled by default]
+    cci_config = of_match_node(arm_cci_matches, np)->data;
+                                                   ^
+  drivers/bus/arm-cci.c:976:49: error: request for member ?data? in something not a structure or union
 
 Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
 ---
- arch/arm/mach-mvebu/system-controller.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ drivers/bus/arm-cci.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
-index a7fb89a..e6e300a 100644
---- a/arch/arm/mach-mvebu/system-controller.c
-+++ b/arch/arm/mach-mvebu/system-controller.c
-@@ -54,7 +54,7 @@ static const struct mvebu_system_controller orion_system_controller = {
- 	.system_soft_reset = 0x1,
- };
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 962fd35..e249cdb2 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -962,6 +962,7 @@ static const struct of_device_id arm_cci_ctrl_if_matches[] = {
  
--static struct of_device_id of_system_controller_table[] = {
-+static const struct of_device_id of_system_controller_table[] = {
- 	{
- 		.compatible = "marvell,orion-system-controller",
- 		.data = (void *) &orion_system_controller,
-@@ -90,13 +90,12 @@ void mvebu_restart(enum reboot_mode mode, const char *cmd)
- 
- static int __init mvebu_system_controller_init(void)
+ static int cci_probe(void)
  {
 +	const struct of_device_id *match;
- 	struct device_node *np;
+ 	struct cci_nb_ports const *cci_config;
+ 	int ret, i, nb_ace = 0, nb_ace_lite = 0;
+ 	struct device_node *np, *cp;
+@@ -969,11 +970,11 @@ static int cci_probe(void)
+ 	const char *match_str;
+ 	bool is_ace;
  
--	np = of_find_matching_node(NULL, of_system_controller_table);
-+	np = of_find_matching_node_and_match(NULL, of_system_controller_table,
-+					     &match);
- 	if (np) {
--		const struct of_device_id *match =
--		    of_match_node(of_system_controller_table, np);
--		BUG_ON(!match);
- 		system_controller_base = of_iomap(np, 0);
- 		mvebu_sc = (struct mvebu_system_controller *)match->data;
- 		of_node_put(np);
+-	np = of_find_matching_node(NULL, arm_cci_matches);
++	np = of_find_matching_node_and_match(NULL, arm_cci_matches, &match);
+ 	if (!np)
+ 		return -ENODEV;
+ 
+-	cci_config = of_match_node(arm_cci_matches, np)->data;
++	cci_config = match->data;
+ 	if (!cci_config)
+ 		return -ENODEV;
+ 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
