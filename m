@@ -1,34 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Feb 2014 15:12:45 +0100
-Subject: [PATCH] can: xilinx CAN controller support.
-In-Reply-To: <52FA2419.70102@monstr.eu>
-References: <6c2bcce0-9897-4d1d-a8b9-47924e40f73c@VA3EHSMHS008.ehs.local>
- <52FA1910.2060101@pengutronix.de> <52FA2419.70102@monstr.eu>
-Message-ID: <201402111512.45678.arnd@arndb.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 11 Feb 2014 14:17:51 +0000
+Subject: [PATCH RFC v3 1/3] Documentation: devicetree: psci: define CPU
+ suspend parameter
+In-Reply-To: <1392128273-8614-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1392128273-8614-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1392128273-8614-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 February 2014, Michal Simek wrote:
-> >> The only remaining question is if we should create generic DT binding
-> >> for fifo depth. Arnd, Rob: Any opinion about it?
-> >> Definitely will be worth to have one generic binding if this is generic feature.
-> >> But if this is just specific feature for us then current properties should
-> >> be fine.
-> >>
-> >> In general all these xlnx,XXX properties just reflect all configurable options
-> >> which you can setup in design tool which means that provide full hw description
-> >> with all variants and they are automatically generated from tools.
-> >>
-> >> Please let me know what you think.
-> > 
-> > I like:
-> > 
-> >     rx-fifo-depth
-> >     tx-fifo-depth
-> 
-> No problem with that. Let Kedar to fix it according this and he will send v2 with this.
-> 
+OS layers built on top of PSCI to enter low-power states require the
+power_state parameter to be passed to the PSCI CPU suspend method.
 
-Sounds reasonable to me too.
+This parameter is specific to a power state and platform specific,
+therefore must be provided by firmware to the OS in order to enable
+proper call sequence.
 
-	Arnd
+This patch adds a property in the PSCI bindings that describes how
+the CPU suspend power_state parameter should be defined in DT in
+all device nodes that rely on PSCI CPU suspend method usage.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ Documentation/devicetree/bindings/arm/psci.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index 433afe9..6fc32a5 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -42,6 +42,13 @@ Main node optional properties:
+ 
+  - migrate       : Function ID for MIGRATE operation
+ 
++Device tree nodes that require usage of PSCI CPU_SUSPEND function (ie idle
++states bindings) must specify the following properties:
++
++- power-state
++		Value type: <u32>
++		Definition: power_state parameter to pass to the PSCI
++			    suspend call.
+ 
+ Example:
+ 
+-- 
+1.8.4
