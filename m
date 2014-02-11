@@ -1,100 +1,187 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Feb 2014 12:56:59 +0100
-Subject: [PATCH] ARM: ux500: drop a chunk of GPIO definitions
-Message-ID: <1392119819-1772-1-git-send-email-linus.walleij@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 11 Feb 2014 17:36:02 +0530
+Subject: [PATCH V6 07/12] phy: st-miphy-40lp: Add SPEAr1310 and SPEAr1340
+ PCIe phy support
+In-Reply-To: <f84ed875ae7a356a8056f4645a4d1e59c665c972.1392109054.git.mohit.kumar@st.com>
+References: <cover.1392109054.git.mohit.kumar@st.com>
+ <f84ed875ae7a356a8056f4645a4d1e59c665c972.1392109054.git.mohit.kumar@st.com>
+Message-ID: <52FA122A.1010900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Ux500 GPIOs are now assigned dynamically from the device tree.
-Drop this table of static assignments.
+On Tuesday 11 February 2014 03:00 PM, Mohit Kumar wrote:
+> From: Pratyush Anand <pratyush.anand@st.com>
+> 
+> SPEAr1310 and SPEAr1340 uses miphy40lp phy for PCIe. This driver adds
+> support for the same.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.h | 69 --------------------------------------
- 1 file changed, 69 deletions(-)
+What's up with SATA support for SPEAr1310? Do you have plans of adding it soon?
+> 
+> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+> Tested-by: Mohit Kumar <mohit.kumar@st.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Viresh Kumar <viresh.linux@gmail.com>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: spear-devel at list.st.com
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/phy/phy-miphy40lp.c |  165 +++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 165 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-miphy40lp.c b/drivers/phy/phy-miphy40lp.c
+> index 16da55b..dec67ed 100644
+> --- a/drivers/phy/phy-miphy40lp.c
+> +++ b/drivers/phy/phy-miphy40lp.c
+> @@ -9,6 +9,7 @@
+>   * published by the Free Software Foundation.
+>   *
+>   * 04/02/2014: Adding support of SATA mode for SPEAr1340.
+> + * 04/02/2014: Adding support of PCIe mode for SPEAr1340 and SPEAr1310
+>   */
+>  
+>  #include <linux/bitops.h>
+> @@ -74,6 +75,80 @@
+>  	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE \
+>  			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
+>  			SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
+> +/* SPEAr1310 Registers */
+> +#define SPEAR1310_PCIE_SATA_CFG			0x3A4
+> +	#define SPEAR1310_PCIE_SATA2_SEL_PCIE		(0 << 31)
+> +	#define SPEAR1310_PCIE_SATA1_SEL_PCIE		(0 << 30)
+> +	#define SPEAR1310_PCIE_SATA0_SEL_PCIE		(0 << 29)
+> +	#define SPEAR1310_PCIE_SATA2_SEL_SATA		BIT(31)
+> +	#define SPEAR1310_PCIE_SATA1_SEL_SATA		BIT(30)
+> +	#define SPEAR1310_PCIE_SATA0_SEL_SATA		BIT(29)
+> +	#define SPEAR1310_SATA2_CFG_TX_CLK_EN		BIT(27)
+> +	#define SPEAR1310_SATA2_CFG_RX_CLK_EN		BIT(26)
+> +	#define SPEAR1310_SATA2_CFG_POWERUP_RESET	BIT(25)
+> +	#define SPEAR1310_SATA2_CFG_PM_CLK_EN		BIT(24)
+> +	#define SPEAR1310_SATA1_CFG_TX_CLK_EN		BIT(23)
+> +	#define SPEAR1310_SATA1_CFG_RX_CLK_EN		BIT(22)
+> +	#define SPEAR1310_SATA1_CFG_POWERUP_RESET	BIT(21)
+> +	#define SPEAR1310_SATA1_CFG_PM_CLK_EN		BIT(20)
+> +	#define SPEAR1310_SATA0_CFG_TX_CLK_EN		BIT(19)
+> +	#define SPEAR1310_SATA0_CFG_RX_CLK_EN		BIT(18)
+> +	#define SPEAR1310_SATA0_CFG_POWERUP_RESET	BIT(17)
+> +	#define SPEAR1310_SATA0_CFG_PM_CLK_EN		BIT(16)
+> +	#define SPEAR1310_PCIE2_CFG_DEVICE_PRESENT	BIT(11)
+> +	#define SPEAR1310_PCIE2_CFG_POWERUP_RESET	BIT(10)
+> +	#define SPEAR1310_PCIE2_CFG_CORE_CLK_EN		BIT(9)
+> +	#define SPEAR1310_PCIE2_CFG_AUX_CLK_EN		BIT(8)
+> +	#define SPEAR1310_PCIE1_CFG_DEVICE_PRESENT	BIT(7)
+> +	#define SPEAR1310_PCIE1_CFG_POWERUP_RESET	BIT(6)
+> +	#define SPEAR1310_PCIE1_CFG_CORE_CLK_EN		BIT(5)
+> +	#define SPEAR1310_PCIE1_CFG_AUX_CLK_EN		BIT(4)
+> +	#define SPEAR1310_PCIE0_CFG_DEVICE_PRESENT	BIT(3)
+> +	#define SPEAR1310_PCIE0_CFG_POWERUP_RESET	BIT(2)
+> +	#define SPEAR1310_PCIE0_CFG_CORE_CLK_EN		BIT(1)
+> +	#define SPEAR1310_PCIE0_CFG_AUX_CLK_EN		BIT(0)
+> +
+> +	#define SPEAR1310_PCIE_CFG_MASK(x) ((0xF << (x * 4)) | BIT((x + 29)))
+> +	#define SPEAR1310_SATA_CFG_MASK(x) ((0xF << (x * 4 + 16)) | \
+> +			BIT((x + 29)))
+> +	#define SPEAR1310_PCIE_CFG_VAL(x) \
+> +			(SPEAR1310_PCIE_SATA##x##_SEL_PCIE | \
+> +			SPEAR1310_PCIE##x##_CFG_AUX_CLK_EN | \
+> +			SPEAR1310_PCIE##x##_CFG_CORE_CLK_EN | \
+> +			SPEAR1310_PCIE##x##_CFG_POWERUP_RESET | \
+> +			SPEAR1310_PCIE##x##_CFG_DEVICE_PRESENT)
+> +	#define SPEAR1310_SATA_CFG_VAL(x) \
+> +			(SPEAR1310_PCIE_SATA##x##_SEL_SATA | \
+> +			SPEAR1310_SATA##x##_CFG_PM_CLK_EN | \
+> +			SPEAR1310_SATA##x##_CFG_POWERUP_RESET | \
+> +			SPEAR1310_SATA##x##_CFG_RX_CLK_EN | \
+> +			SPEAR1310_SATA##x##_CFG_TX_CLK_EN)
+> +
+> +#define SPEAR1310_PCIE_MIPHY_CFG_1		0x3A8
+> +	#define SPEAR1310_MIPHY_DUAL_OSC_BYPASS_EXT	BIT(31)
+> +	#define SPEAR1310_MIPHY_DUAL_CLK_REF_DIV2	BIT(28)
+> +	#define SPEAR1310_MIPHY_DUAL_PLL_RATIO_TOP(x)	(x << 16)
+> +	#define SPEAR1310_MIPHY_SINGLE_OSC_BYPASS_EXT	BIT(15)
+> +	#define SPEAR1310_MIPHY_SINGLE_CLK_REF_DIV2	BIT(12)
+> +	#define SPEAR1310_MIPHY_SINGLE_PLL_RATIO_TOP(x)	(x << 0)
+> +	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_SATA_MASK (0xFFFF)
+> +	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE_MASK (0xFFFF << 16)
+> +	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_SATA \
+> +			(SPEAR1310_MIPHY_DUAL_OSC_BYPASS_EXT | \
+> +			SPEAR1310_MIPHY_DUAL_CLK_REF_DIV2 | \
+> +			SPEAR1310_MIPHY_DUAL_PLL_RATIO_TOP(60) | \
+> +			SPEAR1310_MIPHY_SINGLE_OSC_BYPASS_EXT | \
+> +			SPEAR1310_MIPHY_SINGLE_CLK_REF_DIV2 | \
+> +			SPEAR1310_MIPHY_SINGLE_PLL_RATIO_TOP(60))
+> +	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK \
+> +			(SPEAR1310_MIPHY_SINGLE_PLL_RATIO_TOP(120))
+> +	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE \
+> +			(SPEAR1310_MIPHY_DUAL_OSC_BYPASS_EXT | \
+> +			SPEAR1310_MIPHY_DUAL_PLL_RATIO_TOP(25) | \
+> +			SPEAR1310_MIPHY_SINGLE_OSC_BYPASS_EXT | \
+> +			SPEAR1310_MIPHY_SINGLE_PLL_RATIO_TOP(25))
+> +
+> +#define SPEAR1310_PCIE_MIPHY_CFG_2		0x3AC
+>  
+>  enum phy_mode {
+>  	SATA,
+> @@ -146,12 +221,35 @@ static int miphy40lp_spear1340_sata_exit(struct miphy40lp_priv *priv)
+>  	return 0;
+>  }
+>  
+> +static int miphy40lp_spear1340_pcie_init(struct miphy40lp_priv *priv)
+> +{
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
+> +			SPEAR1340_PCIE_MIPHY_CFG_MASK,
+> +			SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE);
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
+> +			SPEAR1340_PCIE_SATA_CFG_MASK, SPEAR1340_PCIE_CFG_VAL);
+> +
+> +	return 0;
+> +}
+> +
+> +static int miphy40lp_spear1340_pcie_exit(struct miphy40lp_priv *priv)
+> +{
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
+> +			SPEAR1340_PCIE_MIPHY_CFG_MASK, 0);
+> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
+> +			SPEAR1340_PCIE_SATA_CFG_MASK, 0);
+> +
+> +	return 0;
+> +}
+> +
+>  static int miphy40lp_spear1340_init(struct miphy40lp_priv *priv)
+>  {
+>  	int ret = 0;
+>  
+>  	if (priv->mode == SATA)
+>  		ret = miphy40lp_spear1340_sata_init(priv);
+> +	else if (priv->mode == PCIE)
+> +		ret = miphy40lp_spear1340_pcie_init(priv);
+>  
+>  	return ret;
+>  }
+> @@ -162,6 +260,8 @@ static int miphy40lp_spear1340_exit(struct miphy40lp_priv *priv)
+>  
+>  	if (priv->mode == SATA)
+>  		ret = miphy40lp_spear1340_sata_exit(priv);
+> +	else if (priv->mode == PCIE)
+> +		ret = miphy40lp_spear1340_pcie_exit(priv);
+>  
+>  	return ret;
+>  }
+> @@ -193,6 +293,70 @@ static struct miphy40lp_plat_ops spear1340_phy_ops = {
+>  	.plat_resume = miphy40lp_spear1340_resume,
+>  };
+>  
+> +static int miphy40lp_spear1310_pcie_init(struct miphy40lp_priv *priv)
+> +{
+> +	u32 val;
+> +
+> +	regmap_update_bits(priv->misc, SPEAR1310_PCIE_MIPHY_CFG_1,
+> +			SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE_MASK,
+> +			SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE);
+> +
+> +	switch (priv->id) {
 
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index bb408b8f48de..32cc0d8d8a0e 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -7,78 +7,9 @@
- #ifndef __BOARD_MOP500_H
- #define __BOARD_MOP500_H
- 
--/* For NOMADIK_NR_GPIO */
--#include "irqs.h"
- #include <linux/platform_data/asoc-ux500-msp.h>
- #include <linux/amba/mmci.h>
- 
--/* Snowball specific GPIO assignments, this board has no GPIO expander */
--#define SNOWBALL_ACCEL_INT1_GPIO	163
--#define SNOWBALL_ACCEL_INT2_GPIO	164
--#define SNOWBALL_MAGNET_DRDY_GPIO	165
--#define SNOWBALL_SDMMC_EN_GPIO		217
--#define SNOWBALL_SDMMC_1V8_3V_GPIO	228
--#define SNOWBALL_SDMMC_CD_GPIO		218
--
--/* HREFv60-specific GPIO assignments, this board has no GPIO expander */
--#define HREFV60_SDMMC_1V8_3V_GPIO	5
--#define HREFV60_CAMERA_FLASH_ENABLE	21
--#define HREFV60_MAGNET_DRDY_GPIO	32
--#define HREFV60_DISP1_RST_GPIO		65
--#define HREFV60_DISP2_RST_GPIO		66
--#define HREFV60_ACCEL_INT1_GPIO		82
--#define HREFV60_ACCEL_INT2_GPIO		83
--#define HREFV60_SDMMC_CD_GPIO		95
--#define HREFV60_XSHUTDOWN_SECONDARY_SENSOR 140
--#define HREFV60_TOUCH_RST_GPIO		143
--#define HREFV60_HAL_SW_GPIO		145
--#define HREFV60_SDMMC_EN_GPIO		169
--#define HREFV60_MMIO_XENON_CHARGE	170
--#define HREFV60_PROX_SENSE_GPIO		217
--
--/* MOP500 generic GPIOs */
--#define CAMERA_FLASH_INT_PIN		7
--#define CYPRESS_TOUCH_INT_PIN		84
--#define XSHUTDOWN_PRIMARY_SENSOR	141
--#define XSHUTDOWN_SECONDARY_SENSOR	142
--#define CYPRESS_TOUCH_RST_GPIO		143
--#define MOP500_HDMI_RST_GPIO		196
--#define CYPRESS_SLAVE_SELECT_GPIO	216
--
--/* GPIOs on the TC35892 expander */
--#define MOP500_EGPIO(x)			(NOMADIK_NR_GPIO + (x))
--#define GPIO_MAGNET_DRDY		MOP500_EGPIO(1)
--#define GPIO_SDMMC_CD			MOP500_EGPIO(3)
--#define GPIO_CAMERA_FLASH_ENABLE	MOP500_EGPIO(4)
--#define GPIO_MMIO_XENON_CHARGE		MOP500_EGPIO(5)
--#define GPIO_PROX_SENSOR		MOP500_EGPIO(7)
--#define GPIO_HAL_SENSOR			MOP500_EGPIO(8)
--#define GPIO_ACCEL_INT1			MOP500_EGPIO(10)
--#define GPIO_ACCEL_INT2			MOP500_EGPIO(11)
--#define GPIO_BU21013_CS			MOP500_EGPIO(13)
--#define MOP500_DISP2_RST_GPIO		MOP500_EGPIO(14)
--#define MOP500_DISP1_RST_GPIO		MOP500_EGPIO(15)
--#define GPIO_SDMMC_EN			MOP500_EGPIO(17)
--#define GPIO_SDMMC_1V8_3V_SEL		MOP500_EGPIO(18)
--#define MOP500_EGPIO_END		MOP500_EGPIO(24)
--
--/*
-- * GPIOs on the AB8500 mixed-signals circuit
-- * Notice that we subtract 1 from the number passed into the macro, this is
-- * because the AB8500 GPIO pins are enumbered starting from 1, so the value in
-- * parens matches the GPIO pin number in the data sheet.
-- */
--#define MOP500_AB8500_PIN_GPIO(x)	(MOP500_EGPIO_END + (x) - 1)
--/*Snowball AB8500 GPIO */
--#define SNOWBALL_VSMPS2_1V8_GPIO	MOP500_AB8500_PIN_GPIO(1)	/* SYSCLKREQ2/GPIO1 */
--#define SNOWBALL_PM_GPIO1_GPIO		MOP500_AB8500_PIN_GPIO(2)	/* SYSCLKREQ3/GPIO2 */
--#define SNOWBALL_WLAN_CLK_REQ_GPIO	MOP500_AB8500_PIN_GPIO(3)	/* SYSCLKREQ4/GPIO3 */
--#define SNOWBALL_PM_GPIO4_GPIO		MOP500_AB8500_PIN_GPIO(4)	/* SYSCLKREQ6/GPIO4 */
--#define SNOWBALL_EN_3V6_GPIO		MOP500_AB8500_PIN_GPIO(16)	/* PWMOUT3/GPIO16 */
--#define SNOWBALL_PME_ETH_GPIO		MOP500_AB8500_PIN_GPIO(24)	/* SYSCLKREQ7/GPIO24 */
--#define SNOWBALL_EN_3V3_ETH_GPIO	MOP500_AB8500_PIN_GPIO(26)	/* GPIO26 */
--
--struct device;
- extern struct mmci_platform_data mop500_sdi0_data;
- extern struct mmci_platform_data mop500_sdi1_data;
- extern struct mmci_platform_data mop500_sdi2_data;
--- 
-1.8.5.3
+'id' should be made as optional dt property since it's not used for 1340 no?
+
+Thanks
+Kishon
