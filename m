@@ -1,67 +1,85 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 11 Feb 2014 17:52:44 +0000
-Subject: [PATCH v2 1/2] mfd: syscon: Add platform data with a regmap config
- name
-In-Reply-To: <20140211174829.GJ15081@lee--X1>
+Date: Tue, 11 Feb 2014 17:52:45 +0000
+Subject: [PATCH v2 2/2] mfd: vexpress-sysreg: Add syscon labels as platform
+ data
+In-Reply-To: <1392141165-14338-1-git-send-email-pawel.moll@arm.com>
 References: <20140211174829.GJ15081@lee--X1>
-Message-ID: <1392141165-14338-1-git-send-email-pawel.moll@arm.com>
+ <1392141165-14338-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1392141165-14338-2-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define syscon platform data structure that can be used
-to define a regmap config name. This is particularly useful
-in the regmap debugfs when there is more than one syscon
-device registered, to distinguish the register blocks.
+This patch adds platform data with label names for syscon
+registers in the relevant MFD cells.
 
 Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- drivers/mfd/syscon.c                 | 4 ++++
- include/linux/platform_data/syscon.h | 8 ++++++++
- 2 files changed, 12 insertions(+)
- create mode 100644 include/linux/platform_data/syscon.h
+ drivers/mfd/vexpress-sysreg.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-index 71841f9..854b8d9 100644
---- a/drivers/mfd/syscon.c
-+++ b/drivers/mfd/syscon.c
-@@ -18,6 +18,7 @@
- #include <linux/of.h>
+diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
+index ece5ac8..952df84 100644
+--- a/drivers/mfd/vexpress-sysreg.c
++++ b/drivers/mfd/vexpress-sysreg.c
+@@ -17,6 +17,7 @@
+ #include <linux/mfd/core.h>
  #include <linux/of_address.h>
  #include <linux/of_platform.h>
 +#include <linux/platform_data/syscon.h>
  #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/mfd/syscon.h>
-@@ -126,6 +127,7 @@ static struct regmap_config syscon_regmap_config = {
- static int syscon_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-+	struct syscon_platform_data *pdata = dev_get_platdata(dev);
- 	struct syscon *syscon;
- 	struct resource *res;
- 	void __iomem *base;
-@@ -143,6 +145,8 @@ static int syscon_probe(struct platform_device *pdev)
- 		return -ENOMEM;
+ #include <linux/slab.h>
+ #include <linux/stat.h>
+@@ -132,6 +133,10 @@ void __init vexpress_sysreg_early_init(void __iomem *base)
  
- 	syscon_regmap_config.max_register = res->end - res->start - 3;
-+	if (pdata)
-+		syscon_regmap_config.name = pdata->label;
- 	syscon->regmap = devm_regmap_init_mmio(dev, base,
- 					&syscon_regmap_config);
- 	if (IS_ERR(syscon->regmap)) {
-diff --git a/include/linux/platform_data/syscon.h b/include/linux/platform_data/syscon.h
-new file mode 100644
-index 0000000..921e59a
---- /dev/null
-+++ b/include/linux/platform_data/syscon.h
-@@ -0,0 +1,8 @@
-+#ifndef PLATFORM_DATA_SYSCON_H
-+#define PLATFORM_DATA_SYSCON_H
-+
-+struct syscon_platform_data {
-+	        const char *label;
+ /* The sysreg block is just a random collection of various functions... */
+ 
++static struct syscon_platform_data vexpress_sysreg_sys_id_pdata = {
++	.label = "sys_id",
 +};
 +
-+#endif
+ static struct bgpio_pdata vexpress_sysreg_sys_led_pdata = {
+ 	.label = "sys_led",
+ 	.base = -1,
+@@ -150,6 +155,14 @@ static struct bgpio_pdata vexpress_sysreg_sys_flash_pdata = {
+ 	.ngpio = 1,
+ };
+ 
++static struct syscon_platform_data vexpress_sysreg_sys_misc_pdata = {
++	.label = "sys_misc",
++};
++
++static struct syscon_platform_data vexpress_sysreg_sys_procid_pdata = {
++	.label = "sys_procid",
++};
++
+ static struct mfd_cell vexpress_sysreg_cells[] = {
+ 	{
+ 		.name = "syscon",
+@@ -157,6 +170,8 @@ static struct mfd_cell vexpress_sysreg_cells[] = {
+ 		.resources = (struct resource []) {
+ 			DEFINE_RES_MEM(SYS_ID, 0x4),
+ 		},
++		.platform_data = &vexpress_sysreg_sys_id_pdata,
++		.pdata_size = sizeof(vexpress_sysreg_sys_id_pdata),
+ 	}, {
+ 		.name = "basic-mmio-gpio",
+ 		.of_compatible = "arm,vexpress-sysreg,sys_led",
+@@ -190,12 +205,16 @@ static struct mfd_cell vexpress_sysreg_cells[] = {
+ 		.resources = (struct resource []) {
+ 			DEFINE_RES_MEM(SYS_MISC, 0x4),
+ 		},
++		.platform_data = &vexpress_sysreg_sys_misc_pdata,
++		.pdata_size = sizeof(vexpress_sysreg_sys_misc_pdata),
+ 	}, {
+ 		.name = "syscon",
+ 		.num_resources = 1,
+ 		.resources = (struct resource []) {
+ 			DEFINE_RES_MEM(SYS_PROCID0, 0x8),
+ 		},
++		.platform_data = &vexpress_sysreg_sys_procid_pdata,
++		.pdata_size = sizeof(vexpress_sysreg_sys_procid_pdata),
+ 	}, {
+ 		.name = "vexpress-syscfg",
+ 		.num_resources = 1,
 -- 
 1.8.3.2
