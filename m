@@ -1,48 +1,53 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Tue, 11 Feb 2014 14:19:33 -0600
-Subject: [PATCH v2 1/5] drivers: of: add initialization code for reserved
- memory
-In-Reply-To: <52FA8245.5050707@gmail.com>
-References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com>
- <1391515773-6112-2-git-send-email-m.szyprowski@samsung.com>
- <20140205110538.99E47C40A89@trevor.secretlab.ca>
- <52FA0D6E.9090304@samsung.com>
- <20140211121316.24032C40C4D@trevor.secretlab.ca>
- <52FA33E2.4050004@samsung.com>
- <20140211190104.7E6C5C4140E@trevor.secretlab.ca>
- <1392148971.3835.15.camel@pasglop> <52FA8245.5050707@gmail.com>
-Message-ID: <20140211201933.GI841@joshc.qualcomm.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 11 Feb 2014 14:21:45 -0600
+Subject: [PATCH] hwrng: msm: switch Kconfig to ARCH_QCOM depends
+Message-ID: <1392150105-21057-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 09:04:21PM +0100, Tomasz Figa wrote:
-> 
-> 
-> On 11.02.2014 21:02, Benjamin Herrenschmidt wrote:
-> >On Tue, 2014-02-11 at 19:01 +0000, Grant Likely wrote:
-> >
-> >>>except that the former IMHO better suits the definition of memory
-> >>>region, which I see as a single contiguous range of memory and can be
-> >>>simplified to have a single reg entry per region.
-> >>
-> >>My point is rather if multiple reg tuples are found in a reserved memory
-> >>node, the kernel must respect them and reserve the memory. I'm not
-> >>arguing about whether or not that makes for a good binding.
-> >
-> >agreed.
-> 
-> My point is why, if the binding defines that just a single tuple should be
-> provided.
+This is the splits the Qualcomm MSM platform into legacy support that we will
+not try and convert to multiplatform and multiplatform support.
 
-FWIW, the usecase I had mentioned in reply to Grant in the patch 5/5
-thread [1] could make use of this.  The shared memory region is split
-into a main chunk and several "auxiliary" chunk, but collectively these
-regions all share the same heap state.
+- k
 
-  Josh
+Changes from v2:
+* Dropped ARCH_MSM depends from CLKSRC_QCOM, since we select it
+* Fixed some grammar/typo's in commit messages
+* kept smp ops code in platsmp.c to match what other mach's do
+* Kept mach-qcom/Kconfig sorted alphabetically
 
-1: http://lkml.kernel.org/r/20140205192502.GO20228 at joshc.qualcomm.com
+Changes from v1:
+* Added patch to remove hotplug.c
+* Added patch to rename msm_ to qcom_
+* Changes the Kconfig to drop CPU_V7
+* used wfi() in cpu_die function
+* Added git tree to MAINTAINERS file
 
+Kumar Gala (5):
+
+We've split Qualcomm MSM support into legacy and multiplatform.  The RNG
+driver is only relevant on the multiplatform supported SoCs so switch the
+Kconfig depends to ARCH_QCOM.
+
+CC: Herbert Xu <herbert@gondor.apana.org.au>
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+ drivers/char/hw_random/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+index 2f2b084..289bd3a 100644
+--- a/drivers/char/hw_random/Kconfig
++++ b/drivers/char/hw_random/Kconfig
+@@ -343,7 +343,7 @@ config HW_RANDOM_TPM
+ 
+ config HW_RANDOM_MSM
+ 	tristate "Qualcomm MSM Random Number Generator support"
+-	depends on HW_RANDOM && ARCH_MSM
++	depends on HW_RANDOM && ARCH_QCOM
+ 	---help---
+ 	  This driver provides kernel-side support for the Random Number
+ 	  Generator hardware found on Qualcomm MSM SoCs.
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
