@@ -1,37 +1,37 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 12 Feb 2014 16:54:07 -0800
-Subject: [RFC/PATCH 2/3] arm: Add ARCH_WANT_OF_RANDOMNESS
-In-Reply-To: <20140212164907.0E958C407C9@trevor.secretlab.ca>
-References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org> <
- 1392168805-14200-3-git-send-email-lauraa@codeaurora.org>
- <20140212164907.0E958C407C9@trevor.secretlab.ca>
-Message-ID: <52FC17AF.1080508@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 11 Feb 2014 11:52:06 +0900
+Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
+In-Reply-To: <2286031.FWmKXGrGIV@wuerfel>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <1540B9A3-2485-4149-81DD-7D86A532E5D4@arm.com>
+ <D225ECFF-E2A7-44C9-8D11-20EE77077797@codeaurora.org>
+ <2286031.FWmKXGrGIV@wuerfel>
+Message-ID: <52F99056.6010906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/12/2014 8:49 AM, Grant Likely wrote:
-> On Tue, 11 Feb 2014 17:33:24 -0800, Laura Abbott <lauraa@codeaurora.org> wrote:
->> The stack canary for ARM is currently the same across reboots
->> due to lack of randomness early enough. Add ARCH_WANT_OF_RANDOMNESS
->> to allow devices to add whatever randomness they need.
+On 02/13/14 04:14, Arnd Bergmann wrote:
+> On Wednesday 12 February 2014 13:04:40 Kumar Gala wrote:
+>> On Feb 12, 2014, at 12:12 PM, Catalin Marinas<catalin.marinas@arm.com>  wrote:
+>>> On 12 Feb 2014, at 16:25, Kumar Gala<galak@codeaurora.org>  wrote:
+>>>> One reason to keep around ARCH_* is for drivers shared between arm and arm64 that depend on it.
+>>>
+>>> We already converted some of them (those depending on ARCH_VEXPRESS) to
+>>> just depend on ARM64. Ideally, at some point I?d like to see them as
+>>> defaulting to modules but I don?t think we are there yet (we had some
+>>> discussions at the last KS, I?m not sure anyone started looking into
+>>> this).
 >>
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>> I?m torn about this, I think for something like VEXPRESS it makes sense,
+>> however I think  its reasonable to still have an config symbol for a full
+>> SoC family or something of that nature.
 >
-> Do you have a draft patch for a user of this yet?
+> I think for SBSA compliant systems, we should be able to live with a
+> generic ARCH_SBSA Kconfig symbol. For more irregular embedded platforms,
+> we may need something more specific.
 >
+Basically, I agreed with Arnd's suggestion to use ARCH_SBSA. Or we need 
+to define level in Kconfig like ARCH_SBSA_L1 for level1. BTW, how about 
+compliant with SBSA Level1 and having some specific features?
 
-I had a particular patch in mind but I need to re-work it to work with 
-the upstream tree. I wanted to at least send out the infrastructure to 
-see how open people were to the idea. After reading the comments, I have 
-a couple more ideas of users as well. I'll see if I can work that in for v2.
-
-> g.
->
-
-Thanks,
-Laura
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+- Kukjin
