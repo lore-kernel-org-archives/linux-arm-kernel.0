@@ -1,107 +1,227 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 11 Feb 2014 11:50:51 +0000
-Subject: [PATCH v2 4/5] ARM: init: add support for reserved memory defined
- by device tree
-In-Reply-To: <52FA00FA.1090400@samsung.com>
-References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com> <
- 1391515773-6112-5-git-send-email-m.szyprowski@samsung.com> <20140205101510.
- 59A95C40A89@trevor.secretlab.ca> <52F38D75.4030704@samsung.com> <
- 20140210215929.4473BC408F7@trevor.secretlab.ca> <52FA00FA.1090400@samsung.
- com>
-Message-ID: <20140211115051.85084C40C4D@trevor.secretlab.ca>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 11 Feb 2014 19:53:21 +0800
+Subject: [PATCH v5] clk: sunxi: Add Allwinner A20/A31 GMAC clock unit
+Message-ID: <1392119601-1564-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Feb 2014 11:52:42 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> 
-> On 2014-02-10 22:59, Grant Likely wrote:
-> > On Thu, 06 Feb 2014 14:26:13 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > > Hello,
-> > >
-> > > On 2014-02-05 11:15, Grant Likely wrote:
-> > > > On Tue, 04 Feb 2014 13:09:32 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > > > > Enable reserved memory initialization from device tree.
-> > > > >
-> > > > > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> > > > > Cc: Laura Abbott <lauraa@codeaurora.org>
-> > > > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > > > > ---
-> > > > >  arch/arm/mm/init.c |    3 +++
-> > > > >  1 file changed, 3 insertions(+)
-> > > > >
-> > > > > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> > > > > index 804d61566a53..ebafdb479410 100644
-> > > > > --- a/arch/arm/mm/init.c
-> > > > > +++ b/arch/arm/mm/init.c
-> > > > > @@ -17,6 +17,7 @@
-> > > > >  #include <linux/nodemask.h>
-> > > > >  #include <linux/initrd.h>
-> > > > >  #include <linux/of_fdt.h>
-> > > > > +#include <linux/of_reserved_mem.h>
-> > > > >  #include <linux/highmem.h>
-> > > > >  #include <linux/gfp.h>
-> > > > >  #include <linux/memblock.h>
-> > > > > @@ -323,6 +324,8 @@ void __init arm_memblock_init(struct meminfo *mi,
-> > > > >  	if (mdesc->reserve)
-> > > > >  		mdesc->reserve();
-> > > > >
-> > > > > +	early_init_dt_scan_reserved_mem();
-> > > > > +
-> > > >
-> > > > The new binding is being made fundamental. If the reserved-memory node
-> > > > is present, then it needs to be honored, even if the kernel doesn't know
-> > > > how to use the regions. Therefore, This needs to be unconditional for
-> > > > all architectures. The hook should be called in early_init_dt_scan()
-> > > > (drivers/of/fdt.c) immediately after the early_init_dt_scan_memory()
-> > > > hook.
-> > >
-> > > In theory this will be the best solution, but it practice there is a
-> > > problem. early_init_dt_scan() is called as the first function from kernel
-> > > booting code. That time there is no memory yet added to the system, so it
-> > > would be really hard to reserve anything. Memory nodes are being added
-> > > later either with memblock_add() or by some other arch specific way.
-> >
-> > Hmmm, depends on the architecture. On ARM the memory is loaded into the
-> > meminfo structure first, and it isn't until arm_memblock_init() that
-> > memblock_add() gets called on all the regions. Some architectures do the
-> > memblock_add() directly from early_init_dt_add_memory_arch() function.
-> >
-> > The default early_init_dt_add_memory_arch() in drivers/of/fdt.c is
-> > overridden by ARM and a number of other architectures. However...
-> >
-> > > Finally, once all memory has been added to the system we can parse and
-> > > reserve all regions defined in the device tree. This really requires
-> > > creating another function which will be called by arch specific code.
-> >
-> > ...Or it means getting rid of meminfo entirely so that memblock is
-> > available earlier. Laura Abbott has just posted v2 of her series to do
-> > exactly that. If you base on that then you should be able to do exactly
-> > what I suggested.
-> 
-> I've checked Laura's patches and in fact it is possible to do memory
-> reservation as a last step in early_init_dt_scan_memory(). However still
-> see some problem which I have no idea how to resolve. Right now I focus
-> only on ARM, so I have no idea how it is solved by other architectures.
+The Allwinner A20/A31 clock module controls the transmit clock source
+and interface type of the GMAC ethernet controller. Model this as
+a single clock for GMAC drivers to use.
 
-It isn't at the moment because no other architectures are doing dynamic
-allocation of regions in this way.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-> On of the key features of the new binding is the ability to automatically
-> allocate reserved regions of the given size. However kernel, initrd, dt
-> and other sub-arch specific critical regions are marked/allocated in
-> arm_memblock_init(), which is called after setup_machine_fdt(). This
-> might lead to some serious failures when automatically reserved region
-> overlaps with some critical resources. Do you have any idea how to solve
-> this without a new callback?
+Hi,
 
-Not without moving the kernel/initrd/fdt reservation earlier, which can
-certainly be done after Laura's series is applied. It would also be
-possible to split up the fixed regions from the dynamic regions so that
-the dynamic stuff would be done later.
+This is v5 of the Allwinner A20 GMAC clock patch. Hans noted a
+compiler warning: unused variable in the previous version.
+The DT bits remain the same, and Maxime has already taken them.
 
-However, I don't want to block this series on Laura's rework. Go ahead
-and keep it as a separate hook, but make the other changes I suggested,
-particularly with regard to making the hook architecture independent.
-Further rework can be done later after Laura's series is merged.
+The Allwinner A20 SoC integrates an early version of dwmac
+IP from Synopsys. On top of that is a hardware glue layer.
+This layer needs to be configured before the dwmac can be
+used.
 
-g.
+Part of the glue layer is a clock mux, which controls the
+source and direction of the TX clock used by GMAC.
+
+Changes since v4:
+
+  * Removed unused variable in GMAC clock driver left over from v3
+
+Changes since v3:
+
+  * Rework error checking in GMAC clock driver
+  * Clarify required parent clock order for GMAC clock in DT bindings
+  * Rewrite commit log for "ARM: dts: sun7i: Add ethernet alias for GMAC"
+  * Corrected "a20-olinuxino-micro" in commit message
+  * Rewrite comments in sun7i dtsi to clarify purpose of dummy clocks
+  * Rebase onto Maxime's sunxi-next branch
+
+Changes since v2:
+
+  * Added more comments on GMAC clock driver
+  * Drop CLK_SET_PARENT_GATE in GMAC clock driver
+  * Use macro for max clock parents
+  * Line wrapping
+
+Changes since v1:
+
+  * Added optional reset control to stmmac driver core
+  * Added non CONFIG_RESET_CONROLLER routines for the above change
+  * Extended callback API, as discussed with Srinivas
+  * Used new stmmac_of_data to pass features and callbacks,
+    instead of platform data, as discussed
+  * Seperated clock module glue layer into clock driver
+
+
+Cheers
+ChenYu
+
+---
+ Documentation/devicetree/bindings/clock/sunxi.txt | 30 +++++++
+ drivers/clk/sunxi/clk-sunxi.c                     | 96 +++++++++++++++++++++++
+ 2 files changed, 126 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
+index 0cf679b..28421d2 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi.txt
+@@ -37,6 +37,7 @@ Required properties:
+ 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
+ 	"allwinner,sun4i-mod0-clk" - for the module 0 family of clocks
+ 	"allwinner,sun7i-a20-out-clk" - for the external output clocks
++	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
+ 
+ Required properties for all clocks:
+ - reg : shall be the control register address for the clock.
+@@ -50,6 +51,9 @@ Required properties for all clocks:
+ 	If the clock module only has one output, the name shall be the
+ 	module name.
+ 
++For "allwinner,sun7i-a20-gmac-clk", the parent clocks shall be fixed rate
++dummy clocks at 25 MHz and 125 MHz, respectively. See example.
++
+ Clock consumers should specify the desired clocks they use with a
+ "clocks" phandle cell. Consumers that are using a gated clock should
+ provide an additional ID in their clock property. This ID is the
+@@ -96,3 +100,29 @@ mmc0_clk: clk at 01c20088 {
+ 	clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+ 	clock-output-names = "mmc0";
+ };
++
++mii_phy_tx_clk: clk at 2 {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <25000000>;
++	clock-output-names = "mii_phy_tx";
++};
++
++gmac_int_tx_clk: clk at 3 {
++	#clock-cells = <0>;
++	compatible = "fixed-clock";
++	clock-frequency = <125000000>;
++	clock-output-names = "gmac_int_tx";
++};
++
++gmac_clk: clk at 01c20164 {
++	#clock-cells = <0>;
++	compatible = "allwinner,sun7i-a20-gmac-clk";
++	reg = <0x01c20164 0x4>;
++	/*
++	 * The first clock must be fixed at 25MHz;
++	 * the second clock must be fixed at 125MHz
++	 */
++	clocks = <&mii_phy_tx_clk>, <&gmac_int_tx_clk>;
++	clock-output-names = "gmac";
++};
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 736fb60..54a5d55 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -379,6 +379,102 @@ static void sun7i_a20_get_out_factors(u32 *freq, u32 parent_rate,
+ 
+ 
+ /**
++ * sun7i_a20_gmac_clk_setup - Setup function for A20/A31 GMAC clock module
++ *
++ * This clock looks something like this
++ *                               ________________________
++ *  MII TX clock from PHY >-----|___________    _________|----> to GMAC core
++ *  GMAC Int. RGMII TX clk >----|___________\__/__gate---|----> to PHY
++ *  Ext. 125MHz RGMII TX clk >--|__divider__/            |
++ *                              |________________________|
++ *
++ * The external 125 MHz reference is optional, i.e. GMAC can use its
++ * internal TX clock just fine. The A31 GMAC clock module does not have
++ * the divider controls for the external reference.
++ *
++ * To keep it simple, let the GMAC use either the MII TX clock for MII mode,
++ * and its internal TX clock for GMII and RGMII modes. The GMAC driver should
++ * select the appropriate source and gate/ungate the output to the PHY.
++ *
++ * Only the GMAC should use this clock. Altering the clock so that it doesn't
++ * match the GMAC's operation parameters will result in the GMAC not being
++ * able to send traffic out. The GMAC driver should set the clock rate and
++ * enable/disable this clock to configure the required state. The clock
++ * driver then responds by auto-reparenting the clock.
++ */
++
++#define SUN7I_A20_GMAC_GPIT	2
++#define SUN7I_A20_GMAC_MASK	0x3
++#define SUN7I_A20_GMAC_PARENTS	2
++
++static void __init sun7i_a20_gmac_clk_setup(struct device_node *node)
++{
++	struct clk *clk;
++	struct clk_mux *mux;
++	struct clk_gate *gate;
++	const char *clk_name = node->name;
++	const char *parents[SUN7I_A20_GMAC_PARENTS];
++	void *reg;
++
++	if (of_property_read_string(node, "clock-output-names", &clk_name))
++		return;
++
++	/* allocate mux and gate clock structs */
++	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
++	if (!mux)
++		return;
++
++	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
++	if (!gate)
++		goto free_mux;
++
++	/* gmac clock requires exactly 2 parents */
++	parents[0] = of_clk_get_parent_name(node, 0);
++	parents[1] = of_clk_get_parent_name(node, 1);
++	if (!parents[0] || !parents[1])
++		goto free_gate;
++
++	reg = of_iomap(node, 0);
++	if (!reg)
++		goto free_gate;
++
++	/* set up gate and fixed rate properties */
++	gate->reg = reg;
++	gate->bit_idx = SUN7I_A20_GMAC_GPIT;
++	gate->lock = &clk_lock;
++	mux->reg = reg;
++	mux->mask = SUN7I_A20_GMAC_MASK;
++	mux->flags = CLK_MUX_INDEX_BIT;
++	mux->lock = &clk_lock;
++
++	clk = clk_register_composite(NULL, clk_name,
++			parents, SUN7I_A20_GMAC_PARENTS,
++			&mux->hw, &clk_mux_ops,
++			NULL, NULL,
++			&gate->hw, &clk_gate_ops,
++			0);
++
++	if (IS_ERR(clk))
++		goto iounmap_reg;
++
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	clk_register_clkdev(clk, clk_name, NULL);
++
++	return;
++
++iounmap_reg:
++	iounmap(reg);
++free_gate:
++	kfree(gate);
++free_mux:
++	kfree(mux);
++}
++CLK_OF_DECLARE(sun7i_a20_gmac, "allwinner,sun7i-a20-gmac-clk",
++		sun7i_a20_gmac_clk_setup);
++
++
++
++/**
+  * sunxi_factors_clk_setup() - Setup function for factor clocks
+  */
+ 
+-- 
+1.9.0.rc3
