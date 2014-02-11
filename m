@@ -1,59 +1,20 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 11 Feb 2014 17:54:46 +0100
-Subject: [PATCH 2/2] xhci-platform: Change compatible string from
- xhci-platform to generic-xhci
-In-Reply-To: <1392137686-6562-1-git-send-email-hdegoede@redhat.com>
-References: <1392137686-6562-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1392137686-6562-2-git-send-email-hdegoede@redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Feb 2014 16:46:08 +0000
+Subject: [PATCH] ASoC: smdk_wm8994: Fix typo "wm8894"
+In-Reply-To: <1392067531.27939.19.camel@x220>
+References: <1392067531.27939.19.camel@x220>
+Message-ID: <20140211164608.GS13533@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This brings the xhci-platform bindings in sync with what we've done for
-the ohci- and ehci-platform drivers. As discussed there using platform as a
-postfix is a bit weird as the platform bus is a Linux specific thing and
-the bindings are supposed to be OS agnostic.
+On Mon, Feb 10, 2014 at 10:25:31PM +0100, Paul Bolle wrote:
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 
-Note that the old xhci-platform compatible string is kept around for, well,
-compatibility reasons.
-
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- Documentation/devicetree/bindings/usb/usb-xhci.txt | 4 ++--
- drivers/usb/host/xhci-plat.c                       | 1 +
- 2 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
-index 5752df0..90f8f60 100644
---- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
-@@ -1,14 +1,14 @@
- USB xHCI controllers
- 
- Required properties:
--  - compatible: should be "xhci-platform".
-+  - compatible: should be "generic-xhci" (deprecated: "xhci-platform").
-   - reg: should contain address and length of the standard XHCI
-     register set for the device.
-   - interrupts: one XHCI interrupt should be described here.
- 
- Example:
- 	usb at f0931000 {
--		compatible = "xhci-platform";
-+		compatible = "generic-xhci";
- 		reg = <0xf0931000 0x8c8>;
- 		interrupts = <0x0 0x4e 0x0>;
- 	};
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 8abda5c..8affef9 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -226,6 +226,7 @@ static const struct dev_pm_ops xhci_plat_pm_ops = {
- 
- #ifdef CONFIG_OF
- static const struct of_device_id usb_xhci_of_match[] = {
-+	{ .compatible = "generic-xhci" },
- 	{ .compatible = "xhci-platform" },
- 	{ },
- };
--- 
-1.8.5.3
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140211/de25949b/attachment.sig>
