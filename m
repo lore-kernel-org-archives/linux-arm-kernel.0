@@ -1,47 +1,25 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 10 Feb 2014 21:38:42 -0800
-Subject: [PATCH v3 2/5] clocksource: qcom: Move clocksource code out of
- mach-msm
-In-Reply-To: <1391725484-6673-3-git-send-email-galak@codeaurora.org>
-References: <1391725484-6673-1-git-send-email-galak@codeaurora.org>
- <1391725484-6673-3-git-send-email-galak@codeaurora.org>
-Message-ID: <20140211053842.GE10784@codeaurora.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 11 Feb 2014 13:45:50 +0800
+Subject: [PATCH v4 0/3] serial: fsl_lpuart: add DMA support
+In-Reply-To: <c2b2798647d44d3c950ce17f23551555@DM2PR03MB349.namprd03.prod.outlook.com>
+References: <1390363773-24108-1-git-send-email-yao.yuan@freescale.com>
+ <20140127075025.GC4765@S2101-09.ap.freescale.net>
+ <c1c2915231eb4595b89327e589bc521d@BL2PR03MB338.namprd03.prod.outlook.com>
+ <20140211025932.GB31484@S2101-09.ap.freescale.net>
+ <c2b2798647d44d3c950ce17f23551555@DM2PR03MB349.namprd03.prod.outlook.com>
+Message-ID: <20140211054548.GC31484@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06, Kumar Gala wrote:
-> diff --git a/arch/arm/mach-msm/timer.c b/drivers/clocksource/qcom-timer.c
-> similarity index 98%
-> rename from arch/arm/mach-msm/timer.c
-> rename to drivers/clocksource/qcom-timer.c
-> index fd16449..dca829e 100644
-> --- a/arch/arm/mach-msm/timer.c
-> +++ b/drivers/clocksource/qcom-timer.c
-> @@ -1,7 +1,7 @@
->  /*
->   *
->   * Copyright (C) 2007 Google, Inc.
-> - * Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
-> + * Copyright (c) 2009-2012,2014, The Linux Foundation. All rights reserved.
->   *
->   * This software is licensed under the terms of the GNU General Public
->   * License version 2, as published by the Free Software Foundation, and
-> @@ -26,10 +26,6 @@
->  #include <linux/of_irq.h>
->  #include <linux/sched_clock.h>
->  
-> -#include <asm/mach/time.h>
-> -
-> -#include "common.h"
-> -
+On Tue, Feb 11, 2014 at 05:34:49AM +0000, Yao Yuan wrote:
+> Here I also have a confusion.
+> IRQ is must. But DMA isn't very necessary.
+> How to deal with if one board is need DMA but another is not need?
+> You mean if DMA is be support once all of them must use dma as first?
 
-This will cause sparse warnings because we no longer have the header included.
+That's the point.  Why whether using DMA or not is a board decision?
+The DMA resource should be defined at SoC level from the beginning
+just like IO and interrupt resource.  And using DMA or PIO should be a
+decision made by device driver not device tree.
 
-  CHECK   drivers/clocksource/qcom-timer.c
-drivers/clocksource/qcom-timer.c:304:13: warning: symbol 'msm7x01_timer_init' was not declared. Should it be static?
-drivers/clocksource/qcom-timer.c:317:13: warning: symbol 'msm7x30_timer_init' was not declared. Should it be static?
-drivers/clocksource/qcom-timer.c:324:13: warning: symbol 'qsd8x50_timer_init' was not declared. Should it be static?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Shawn
