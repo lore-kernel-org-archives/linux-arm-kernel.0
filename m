@@ -1,35 +1,30 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 11 Feb 2014 11:43:00 -0500 (EST)
-Subject: [PATCH v2 1/2] ohci-platform: Change compatible string from
- usb-ohci to generic-ohci
-In-Reply-To: <1392136529-5060-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <Pine.LNX.4.44L0.1402111142260.1209-100000@iolanthe.rowland.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 11 Feb 2014 08:46:01 -0800
+Subject: [PATCH] ARM: ux500: disable msp2 device tree node
+In-Reply-To: <1392123757-7982-1-git-send-email-linus.walleij@linaro.org>
+ (Linus Walleij's message of "Tue, 11 Feb 2014 14:02:37 +0100")
+References: <1392123757-7982-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <7hy51h7g3a.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Feb 2014, Hans de Goede wrote:
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-> The initial versions of the devicetree enablement patches for ohci-platform
-> used "ohci-platform" as compatible string. However this was disliked by various
-> reviewers because the platform bus is a Linux invention and devicetree is
-> supposed to be OS agnostic. After much discussion I gave up and went with
-> the generic usb-ohci as requested.
-> 
-> In retro-spect I should have chosen something different, the dts files for many
-> existing boards already claim to be compatible with "usb-ohci", ie they have:
-> 
-> 	compatible = "ti,ohci-omap3", "usb-ohci";
-> 
-> In theory this should not be a problem since the "ti,ohci-omap3" entry takes
-> presedence, but in practice using a conflicting compatible string is an issue,
-> because it makes which driver gets used depend on driver registration order.
-> 
-> This patch changes the compatible string claimed by ohci-platform to
-> "generic-ohci", avoiding the driver registration / module loading ordering
-> problems.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Commit 70b41abc151f9
+> "ARM: ux500: move MSP pin control to the device tree"
+> accidentally activated MSP2, giving rise to a boot scroll
+> scream as the kernel attempts to probe a driver for it and
+> fails to obtain DMA channel 14.
+>
+> Fix this up by marking the node disabled again.
+>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Hi ARM SoC guys, can you please apply this patch directly
+> for fixes, there is no point to send a pull request with a
+> single patch in it.
 
-For both v2 patches:
+Applied to fixes,
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Kevin
