@@ -1,39 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Feb 2014 14:02:37 +0100
-Subject: [PATCH] ARM: ux500: disable msp2 device tree node
-Message-ID: <1392123757-7982-1-git-send-email-linus.walleij@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 11 Feb 2014 14:03:57 +0100
+Subject: [PATCH 0/2] Marvell Armada 375 and 38x timer support
+In-Reply-To: <1392059274-26965-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1392059274-26965-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <52FA1FBD.90906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 70b41abc151f9
-"ARM: ux500: move MSP pin control to the device tree"
-accidentally activated MSP2, giving rise to a boot scroll
-scream as the kernel attempts to probe a driver for it and
-fails to obtain DMA channel 14.
+On 02/10/2014 08:07 PM, Ezequiel Garcia wrote:
+> Hello Daniel,
+>
+> This small series adds support for the two new Marvell ARM SoCs:
+> the Armada 375 and Armada 38x.
+>
+> These new SoCs are based on Cortex-A9 CPU cores, and share a
+> number of peripherals with their predecessors in the mach-mvebu
+> family. The core support (arch/arm/mach-mvebu) for these SOCs have just
+> been posted, and we're aiming at having this merged for 3.15.
+>
+> The A375 SoC timer is modeled matching the A370 timer, while the
+> A38x SoC timer is modeled matching the AXP timer. However, we'd like
+> to keep the compatible strings as SoC-specific.
+>
+> In the past, we've had trouble chosing a common compatible string, resulting
+> in the introduction of per-SoC compatibles. Such compatible-string change
+> of course implies breaking backards compatibility, and was only possible
+> after agreeing that the old compatible wasn't used in production.
+>
+> So, in order to avoid such problems, we think it's better to keep them
+> separate.
+>
+> Gregory CLEMENT (2):
+>    clocksource: armada-370-xp: Add support for Armada 375
+>    clocksource: armada-370-xp: Add support for Armada 38x
+>
+>   .../bindings/timer/marvell,armada-370-xp-timer.txt | 13 ++++++++----
+>   drivers/clocksource/time-armada-370-xp.c           | 23 +++++++++++++++++++++-
+>   2 files changed, 31 insertions(+), 5 deletions(-)
 
-Fix this up by marking the node disabled again.
+Applied to my tree for 3.15.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Hi ARM SoC guys, can you please apply this patch directly
-for fixes, there is no point to send a pull request with a
-single patch in it.
----
- arch/arm/boot/dts/ste-href.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+Thanks !
 
-diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
-index 0c1e8d871ed1..6cb9b68e2188 100644
---- a/arch/arm/boot/dts/ste-href.dtsi
-+++ b/arch/arm/boot/dts/ste-href.dtsi
-@@ -188,7 +188,6 @@
- 		msp2: msp at 80117000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&msp2_default_mode>;
--			status = "okay";
- 		};
- 
- 		msp3: msp at 80125000 {
+  -- Daniel
+
+
 -- 
-1.8.5.3
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
