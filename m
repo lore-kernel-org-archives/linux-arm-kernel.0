@@ -1,78 +1,41 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Tue, 11 Feb 2014 10:24:01 -0600
-Subject: [PATCH 3/8] ARM: at91: make use of of_find_matching_node_and_match
-In-Reply-To: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
-References: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
-Message-ID: <1392135847-30791-4-git-send-email-joshc@codeaurora.org>
+Date: Tue, 11 Feb 2014 10:23:58 -0600
+Subject: [PATCH 0/8] of_find_matching_node/of_match_node ->
+ of_find_matching_node_and_match
+Message-ID: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of the of_find_matching_node()/of_match_node() pair, which requires two
-iterations through the match table, make use of of_find_matching_node_and_match(),
-which only iterates through the table once.
+This patchset updates users of the of_find_matching_node()/of_match_node() pair
+to leverage of_find_matching_node_and_match(), which only requires one walk
+through the match table.  This functionality was added by Stephen Warren[1], and
+landed in v3.8.
 
-While we're here, mark the rtsc id table const.
+Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
----
- arch/arm/mach-at91/setup.c | 16 ++++------------
- 1 file changed, 4 insertions(+), 12 deletions(-)
+1: 50c8af4cf9 (of: introduce for_each_matching_node_and_match())
 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index f7ca97b..e884de8 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -352,7 +352,7 @@ void __init at91_ioremap_matrix(u32 base_addr)
- }
- 
- #if defined(CONFIG_OF)
--static struct of_device_id rstc_ids[] = {
-+static const struct of_device_id rstc_ids[] = {
- 	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9_alt_restart },
- 	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
- 	{ /*sentinel*/ }
-@@ -363,7 +363,7 @@ static void at91_dt_rstc(void)
- 	struct device_node *np;
- 	const struct of_device_id *of_id;
- 
--	np = of_find_matching_node(NULL, rstc_ids);
-+	np = of_find_matching_node_and_match(NULL, rstc_ids, &of_id);
- 	if (!np)
- 		panic("unable to find compatible rstc node in dtb\n");
- 
-@@ -371,10 +371,6 @@ static void at91_dt_rstc(void)
- 	if (!at91_rstc_base)
- 		panic("unable to map rstc cpu registers\n");
- 
--	of_id = of_match_node(rstc_ids, np);
--	if (!of_id)
--		panic("AT91: rtsc no restart function available\n");
--
- 	arm_pm_restart = of_id->data;
- 
- 	of_node_put(np);
-@@ -392,7 +388,7 @@ static void at91_dt_ramc(void)
- 	struct device_node *np;
- 	const struct of_device_id *of_id;
- 
--	np = of_find_matching_node(NULL, ramc_ids);
-+	np = of_find_matching_node_and_match(NULL, ramc_ids, &of_id);
- 	if (!np)
- 		panic("unable to find compatible ram controller node in dtb\n");
- 
-@@ -402,11 +398,7 @@ static void at91_dt_ramc(void)
- 	/* the controller may have 2 banks */
- 	at91_ramc_base[1] = of_iomap(np, 1);
- 
--	of_id = of_match_node(ramc_ids, np);
--	if (!of_id)
--		pr_warn("AT91: ramc no standby function available\n");
--	else
--		at91_pm_set_standby(of_id->data);
-+	at91_pm_set_standby(of_id->data);
- 
- 	of_node_put(np);
- }
+Josh Cartwright (8):
+  bus: arm-cci: make use of of_find_matching_node_and_match
+  bus: mvebu-mbus: make use of of_find_matching_node_and_match
+  ARM: at91: make use of of_find_matching_node_and_match
+  ARM: mvebu: make use of of_find_matching_node_and_match
+  ARM: prima2: make use of of_find_matching_node_and_match
+  ARM: l2x0: make use of of_find_matching_node_and_match
+  C6X: make use of of_find_matching_node_and_match
+  cpufreq: ppc: make use of of_find_matching_node_and_match
+
+ arch/arm/mach-at91/setup.c              | 16 ++++------------
+ arch/arm/mach-mvebu/system-controller.c |  9 ++++-----
+ arch/arm/mach-prima2/l2x0.c             |  7 ++++---
+ arch/arm/mm/cache-l2x0.c                |  5 +++--
+ arch/c6x/platforms/plldata.c            |  7 +++----
+ drivers/bus/arm-cci.c                   |  5 +++--
+ drivers/bus/mvebu-mbus.c                |  3 +--
+ drivers/cpufreq/ppc-corenet-cpufreq.c   |  3 +--
+ 8 files changed, 23 insertions(+), 32 deletions(-)
+
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
