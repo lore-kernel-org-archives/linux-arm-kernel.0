@@ -1,60 +1,124 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Feb 2014 11:37:11 +0000
-Subject: [PATCH 6/7] mmc: arm-mmci: attempt to get mclk by name
-In-Reply-To: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
-References: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1392118632-11312-7-git-send-email-mark.rutland@arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 11 Feb 2014 12:45:31 +0100
+Subject: [PATCH] can: xilinx CAN controller support.
+In-Reply-To: <52F4A960.10809@pengutronix.de>
+References: <6c2bcce0-9897-4d1d-a8b9-47924e40f73c@VA3EHSMHS008.ehs.local>
+ <52F382D5.6090706@pengutronix.de>
+ <8b4dad82-c72a-4e1f-b1af-b8c7964bbf24@TX2EHSMHS043.ehs.local>
+ <52F4A960.10809@pengutronix.de>
+Message-ID: <da80c522-5524-4f53-9373-3f2bb6f81ddc@CO9EHSMHS015.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The primecell device tree binding (from which the pl18x binding is
-derived from) states that the apb_pclk clock input should be listed
-first for all primecell devices. The arm-mmci driver requires the mclk
-clock input, but the way it currently grabs the clock means that it
-always gets the first clock (which should be apb_pclk).
+Hi Marc,
 
-As the AMBA bus code grabs apb_pclk by name, some existing dts provide
-apb_pclk as the second clock in the clocks list to work around this, in
-violation of both the primecell binding. The pl18x binding does not
-mention clocks at all, so the first clock (MCLK) is given an arbitrary
-name.
+On 02/07/2014 10:37 AM, Marc Kleine-Budde wrote:
+> On 02/07/2014 09:42 AM, Appana Durga Kedareswara Rao wrote:
+>>>> ---
+>>>> This patch is rebased on the 3.14 rc1 kernel.
+>>>> ---
+>>>>  .../devicetree/bindings/net/can/xilinx_can.txt     |   43 +
+>>>>  drivers/net/can/Kconfig                            |    8 +
+>>>>  drivers/net/can/Makefile                           |    1 +
+>>>>  drivers/net/can/xilinx_can.c                       | 1150 ++++++++++++++++++++
+>>>>  4 files changed, 1202 insertions(+), 0 deletions(-)  create mode
+>>>> 100644 Documentation/devicetree/bindings/net/can/xilinx_can.txt
+>>>>  create mode 100644 drivers/net/can/xilinx_can.c
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/net/can/xilinx_can.txt
+>>>> b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
+>>>> new file mode 100644
+>>>> index 0000000..34f9643
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
+>>>> @@ -0,0 +1,43 @@
+>>>> +Xilinx Axi CAN/Zynq CANPS controller Device Tree Bindings
+>>>> +---------------------------------------------------------
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible               : Should be "xlnx,zynq-can-1.00.a" for Zynq
+>>> CAN
+>>>> +                     controllers and "xlnx,axi-can-1.00.a" for Axi CAN
+>>>> +                     controllers.
+>>>> +- reg                      : Physical base address and size of the Axi CAN/Zynq
+>>>> +                     CANPS registers map.
+>>>> +- interrupts               : Property with a value describing the interrupt
+>>>> +                     number.
+>>>> +- interrupt-parent : Must be core interrupt controller
+>>>> +- clock-names              : List of input clock names - "ref_clk",
+>>> "aper_clk"
+>>>> +                     (See clock bindings for details. Two clocks are
+>>>> +                      required for Zynq CAN. For Axi CAN
+>>>> +                      case it is one(ref_clk)).
+>>>> +- clocks           : Clock phandles (see clock bindings for details).
+>>>> +- xlnx,can-tx-dpth : Can Tx fifo depth (Required for Axi CAN).
+>>>> +- xlnx,can-rx-dpth : Can Rx fifo depth (Required for Axi CAN).
+>>>> +
+>>>> +
+>>>> +Example:
+>>>> +
+>>>> +For Zynq CANPS Dts file:
+>>>> +   zynq_can_0: zynq-can at e0008000 {
+>>>> +                   compatible = "xlnx,zynq-can-1.00.a";
+>>>> +                   clocks = <&clkc 19>, <&clkc 36>;
+>>>> +                   clock-names = "ref_clk", "aper_clk";
+>>>> +                   reg = <0xe0008000 0x1000>;
+>>>> +                   interrupts = <0 28 4>;
+>>>> +                   interrupt-parent = <&intc>;
+>>>
+>>> Above xlnx,can-{rx,tx}-dpth is mentioned as required, but it's not in the
+>>> Zynq example.
+>>
+>> One of the Difference b/w the AXI CAN and zynq CAN is in AXI CAN the fifo depth(tx,rx)
+>> Is user configurable. But in case of ZYNQ CAN  the fifo depth  is fixed for tx and rx fifo's(64)
+>> Xlnx,can-{rx,tx}-dpth is required only for AXI CAN case it is not required for zynq CAN.
+>> That's why didn't putted that property in device tree.
+> 
+> The device tree should be a hardware only description and should not
+> hold any user configurable data. Please split your patch into two
+> patches. The first one should add the driver with a fixed fifo size
+> (e.g. 0x40) for the AXI, too. The second patch should make the fifo
+> configurable via device tree.
 
-This patch attempts to fix the mess my having the arm-mmci driver first
-attempt to get mclk by name. If this fails, it falls back to the old
-behaviour of simply acquiring the first clock. This is compatible with
-any old dtb, whether it lists mclk by name or not, and allows the driver
-to support dtbs which do not violate the bindings. Hopefully this will
-lead to future uniformity across dtbs.
+can-rx/tx-dpth is not user configurable data as you think.
+This is FPGA where you can configure this parameter in design tools.
+It means these 2 values just describe real hardware and user can't just change it
+for different software behaviour.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
----
- drivers/mmc/host/mmci.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+Also I don't think it is worth to create 2 patches for the same driver
+where the first one is useless for axi can device. But if you think
+that it is worth to do we can create 2 patches as you suggested.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index b931226..4af962c 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1470,7 +1470,14 @@ static int mmci_probe(struct amba_device *dev,
- 	dev_dbg(mmc_dev(mmc), "designer ID = 0x%02x\n", host->hw_designer);
- 	dev_dbg(mmc_dev(mmc), "revision = 0x%01x\n", host->hw_revision);
- 
--	host->clk = devm_clk_get(&dev->dev, NULL);
-+	/*
-+	 * For compatibility with old DTBs and platform data, fall back to the
-+	 * first clock if there's not an explicitly named "mclk" entry.
-+	 */
-+	host->clk = devm_clk_get(&dev->dev, "mclk");
-+	if (IS_ERR(host->clk))
-+		host->clk = devm_clk_get(&dev->dev, NULL);
-+
- 	if (IS_ERR(host->clk)) {
- 		ret = PTR_ERR(host->clk);
- 		goto host_free;
--- 
-1.8.1.1
+Also what we can do is to define that this property is required also
+for zynq which is 0x40 and change code according too.
+
+> If it's acceptable to describe the fifo usage by device tree, I'd like
+> to make it a generic CAN driver option. But we have to look around, e.g.
+> what the Ethernet driver use to configure their hardware.
+
+I think the real question is not if this is acceptable or not. It is just
+reality that we can setup hardware fifo depth and driver has to reflect this
+because without it driver just doesn't work for axi can.
+
+The only remaining question is if we should create generic DT binding
+for fifo depth. Arnd, Rob: Any opinion about it?
+Definitely will be worth to have one generic binding if this is generic feature.
+But if this is just specific feature for us then current properties should
+be fine.
+
+In general all these xlnx,XXX properties just reflect all configurable options
+which you can setup in design tool which means that provide full hw description
+with all variants and they are automatically generated from tools.
+
+Please let me know what you think.
+
+Thanks,
+Michal
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 264 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140211/cf038ad6/attachment.sig>
