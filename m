@@ -1,43 +1,54 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 11 Feb 2014 18:50:43 +0100
-Subject: [PATCH] ARM: dts: exynos5250-arndale: Keep G3D regulator always on
-Message-ID: <1392141043-27170-1-git-send-email-t.figa@samsung.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Tue, 11 Feb 2014 11:49:10 -0600
+Subject: [Patch v5 1/2] dmaengine: add Qualcomm BAM dma driver
+In-Reply-To: <20140211173048.GP10628@intel.com>
+References: <1391546556-27702-1-git-send-email-agross@codeaurora.org>
+ <1391546556-27702-2-git-send-email-agross@codeaurora.org>
+ <20140211173048.GP10628@intel.com>
+Message-ID: <20140211174910.GE841@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Apparently, if G3D regulator is powered off, the SoC cannot enter low
-power modes and just hangs. This patch fixes this by keeping the
-regulator always on when the system is running, as suggested by Exynos 4
-User's Manual in case of Exynos4210/4x12 SoCs (Exynos5250 UM does not
-have such note, but observed behavior seems to confirm that it is true
-for this SoC as well).
+On Tue, Feb 11, 2014 at 11:00:48PM +0530, Vinod Koul wrote:
+> On Tue, Feb 04, 2014 at 02:42:35PM -0600, Andy Gross wrote:
+> > Add the DMA engine driver for the QCOM Bus Access Manager (BAM) DMA controller
+> > found in the MSM 8x74 platforms.
+> > 
+> > Each BAM DMA device is associated with a specific on-chip peripheral.  Each
+> > channel provides a uni-directional data transfer engine that is capable of
+> > transferring data between the peripheral and system memory (System mode), or
+> > between two peripherals (BAM2BAM).
+> > 
+> > The initial release of this driver only supports slave transfers between
+> > peripherals and system memory.
+> > 
+> > Signed-off-by: Andy Gross <agross@codeaurora.org>
+>
+> > +++ b/drivers/dma/qcom_bam_dma.c
+[..]
+> > +static void bam_reset_channel(struct bam_chan *bchan)
+> > +{
+> > +	struct bam_device *bdev = bchan->bdev;
+> > +
+> > +	/* reset channel */
+> > +	writel_relaxed(1, bdev->regs + BAM_P_RST(bchan->id));
+> > +	writel_relaxed(0, bdev->regs + BAM_P_RST(bchan->id));
+> > +
+> > +	/* don't allow reorder of the channel reset */
+> > +	wmb();
+> Documentation/memory-barriers.txt describes wmb() as a CPU barier but based on
+> above you want it to be a compiler barrier then you should do 1st write,
+> barrier(), second write.
 
-This fixes an issue preventing Arndale board from entering sleep mode
-observed since commit
+It could also be that the intent was to prevent these writes from being
+ordered before setting the initialized flag below, either way the
+comment could be made clearer.
 
-346f372f7b72a0 clk: exynos5250: Add CLK_IGNORE_UNUSED flag for pmu clock
+> > +
+> > +	/* make sure hw is initialized when channel is used the first time  */
+> > +	bchan->initialized = 0;
+> > +}
 
-that landed in kernel 3.11, which has fixed the clock driver to make the
-SoC actually try to enter the sleep mode.
-
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: stable at vger.kernel.org
----
- arch/arm/boot/dts/exynos5250-arndale.dts | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index e14dd62..5e9ddb8 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -287,6 +287,7 @@
- 					regulator-name = "vdd_g3d";
- 					regulator-min-microvolt = <1000000>;
- 					regulator-max-microvolt = <1000000>;
-+					regulator-always-on;
- 					regulator-boot-on;
- 					op_mode = <1>;
- 				};
 -- 
-1.8.5.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
