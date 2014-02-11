@@ -1,71 +1,76 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 11 Feb 2014 17:28:07 +0000
-Subject: [PATCH] Fix uses of dma_max_pfn() when converting to a limiting
- address
-Message-ID: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 11 Feb 2014 18:31:33 +0100
+Subject: [PATCH 4/8] ARM: mvebu: make use of
+ of_find_matching_node_and_match
+In-Reply-To: <20140211181048.6934bdd3@skate>
+References: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>	<1392135847-30791-5-git-send-email-joshc@codeaurora.org>	<20140211165314.GA8533@titan.lakedaemon.net>
+ <20140211181048.6934bdd3@skate>
+Message-ID: <52FA5E75.7030402@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We must use a 64-bit for this, otherwise overflowed bits get lost, and
-that can result in a lower than intended value set.
+On 11/02/2014 18:10, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
+> 
+> On Tue, 11 Feb 2014 11:53:14 -0500, Jason Cooper wrote:
+> 
+>>> -	np = of_find_matching_node(NULL, of_system_controller_table);
+>>> +	np = of_find_matching_node_and_match(NULL, of_system_controller_table,
+>>> +					     &match);
+>>>  	if (np) {
+>>> -		const struct of_device_id *match =
+>>> -		    of_match_node(of_system_controller_table, np);
+>>
+>>
+>>> -		BUG_ON(!match);
+>>
+>> Gregory, is it ok to remove this?  It was added with the original code
+>> submission for mach-mvebu.  mvebu_restart() will handle this
+>> gracefully...
+> 
+> The BUG_ON here can normally never be reached. If
+> of_find_matching_node() returns a non-NULL result, then of_match_node()
+> should also return a non-NULL result.
+> 
+> Or I'm missing something :)
 
-Fixes: 8e0cb8a1f6ac ("ARM: 7797/1: mmc: Use dma_max_pfn(dev) helper for bounce_limit calculations")
-Fixes: 7d35496dd982 ("ARM: 7796/1: scsi: Use dma_max_pfn(dev) helper for bounce_limit calculations")
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-While poking about with the Cubox-i4 and investigating why my UHS-1
-SD card wasn't achieving its full potential, I came across a slight
-problem... the SDHCI host sets a mask of 0xffffffff, but with the
-start of memory at pfn 0x10000, the blk code sees this when setting
-the bounce limit:
+No you're almost right!
 
-	max addr 0x0ffff000 bounce limit 0xffff dma 1
+The only case we can get it, would be if we were declaring something like:
 
-and this results in the bounce functions appearing in the profile:
+static struct of_device_id of_system_controller_table[] = {
+	{
+		.compatible = "foo,bar-controller",
+	},
+[...]
 
-00000000c00f8b70 copy_to_high_bio_irq                  1139 2.5886
-00000000c00f8d28 bounce_end_io                           12 0.0714
-00000000c00f8dd0 bounce_end_io_read_isa                   8 0.1053
+instead of
 
-which, compared to the cost of copying the data to userland and
-request handling, this is quite significant:
+static struct of_device_id of_system_controller_table[] = {
+	{
+		.compatible = "foo,bar",
+		.data = (void *) &bar_controller,
+	},
+[...]
 
-00000000c04b1794 sdhci_request                          268 0.5447
-00000000c02d0740 __copy_to_user_std                     398 0.4252
+This test is very paranoid, so I agree to remove it.
 
-With this calculation fixed, we avoid the bouncing code entirely.
 
-	max addr 0x10ffff000 bounce limit 0x10ffff dma 0
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
- drivers/mmc/card/queue.c | 2 +-
- drivers/scsi/scsi_lib.c  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/card/queue.c b/drivers/mmc/card/queue.c
-index 357bbc54fe4b..3e049c13429c 100644
---- a/drivers/mmc/card/queue.c
-+++ b/drivers/mmc/card/queue.c
-@@ -197,7 +197,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
- 	struct mmc_queue_req *mqrq_prev = &mq->mqrq[1];
- 
- 	if (mmc_dev(host)->dma_mask && *mmc_dev(host)->dma_mask)
--		limit = dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
-+		limit = (u64)dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
- 
- 	mq->card = card;
- 	mq->queue = blk_init_queue(mmc_request_fn, lock);
-diff --git a/drivers/scsi/scsi_lib.c b/drivers/scsi/scsi_lib.c
-index 7bd7f0d5f050..62ec84b42e31 100644
---- a/drivers/scsi/scsi_lib.c
-+++ b/drivers/scsi/scsi_lib.c
-@@ -1684,7 +1684,7 @@ u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
- 
- 	host_dev = scsi_get_device(shost);
- 	if (host_dev && host_dev->dma_mask)
--		bounce_limit = dma_max_pfn(host_dev) << PAGE_SHIFT;
-+		bounce_limit = (u64)dma_max_pfn(host_dev) << PAGE_SHIFT;
- 
- 	return bounce_limit;
- }
+Thanks,
+
+Gregory
+
+
+> 
+> Thomas
+> 
+
+
 -- 
-1.8.3.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
