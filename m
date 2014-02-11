@@ -1,72 +1,39 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 11 Feb 2014 15:53:19 +0200
-Subject: [PATCH] ARM: dts: OMAP2+: Fix boot with multi_v7_defconfig
-In-Reply-To: <1392055835-6494-1-git-send-email-rogerq@ti.com>
-References: <1392055835-6494-1-git-send-email-rogerq@ti.com>
-Message-ID: <52FA2B4F.3010408@ti.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 11 Feb 2014 10:53:11 -0300
+Subject: [PATCH 0/2] Marvell Armada 375 and 38x timer support
+In-Reply-To: <52FA20EF.30807@linaro.org>
+References: <1392059274-26965-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <52FA1FBD.90906@linaro.org>
+ <20140211130758.GX8533@titan.lakedaemon.net>
+ <52FA20EF.30807@linaro.org>
+Message-ID: <20140211135310.GA23150@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2014 08:10 PM, Roger Quadros wrote:
-> The OMAP EHCI controller is not compatible with the EHCI
-> platform HCD driver so don't claim that we are.
-> 
-> This fixes boot on OMAP platforms with CONFIG_USB_EHCI_HCD_PLATFORM=y
-> e.g. multi_v7_defconfig
-> 
-> Reported-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
+Daniel,
 
-Please ignore this patch as Hans has agreed to do a more proper fix in
+On Tue, Feb 11, 2014 at 02:09:03PM +0100, Daniel Lezcano wrote:
+> >>
+> >> Applied to my tree for 3.15.
+> >
+> > Please hold off until we've resolved the discussion regarding adding
+> > unneeded compatible strings.  It's under patch 6 in the main series
+> > adding support for this new SoC.
+> >
 
-http://article.gmane.org/gmane.comp.hardware.netbook.arm.sunxi/7015
+Yes, please drop it for now.
 
-cheers,
--roger
-
-> ---
->  arch/arm/boot/dts/omap3.dtsi | 2 +-
->  arch/arm/boot/dts/omap4.dtsi | 2 +-
->  arch/arm/boot/dts/omap5.dtsi | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+> >    [PATCH 06/11] ARM: mvebu: add Armada 380/385 support to the system-controller driver
 > 
-> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-> index a5fc83b..6b5dbf8 100644
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -641,7 +641,7 @@
->  			};
->  
->  			usbhsehci: ehci at 48064800 {
-> -				compatible = "ti,ehci-omap", "usb-ehci";
-> +				compatible = "ti,ehci-omap";
->  				reg = <0x48064800 0x400>;
->  				interrupt-parent = <&intc>;
->  				interrupts = <77>;
-> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-> index d3f8a6e..f5d754b 100644
-> --- a/arch/arm/boot/dts/omap4.dtsi
-> +++ b/arch/arm/boot/dts/omap4.dtsi
-> @@ -706,7 +706,7 @@
->  			};
->  
->  			usbhsehci: ehci at 4a064c00 {
-> -				compatible = "ti,ehci-omap", "usb-ehci";
-> +				compatible = "ti,ehci-omap";
->  				reg = <0x4a064c00 0x400>;
->  				interrupt-parent = <&gic>;
->  				interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index a72813a..42fcffd 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -784,7 +784,7 @@
->  			};
->  
->  			usbhsehci: ehci at 4a064c00 {
-> -				compatible = "ti,ehci-omap", "usb-ehci";
-> +				compatible = "ti,ehci-omap";
->  				reg = <0x4a064c00 0x400>;
->  				interrupt-parent = <&gic>;
->  				interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+> Ok, thanks for the heads up.
 > 
+
+Ah, my bad! I should have added a warning about the discussion as I did
+for the MBus patches. See:
+
+http://www.spinics.net/lists/arm-kernel/msg306480.html
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
