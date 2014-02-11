@@ -1,40 +1,100 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 11 Feb 2014 18:45:13 +0100
-Subject: [PATCH v2 2/4] tty/serial: at91: use dev_err instead of printk
-In-Reply-To: <1392140715-15295-1-git-send-email-richard.genoud@gmail.com>
-References: <1392140715-15295-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1392140715-15295-3-git-send-email-richard.genoud@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 11 Feb 2014 18:46:28 +0100
+Subject: [PATCH 3/8] ARM: at91: make use of of_find_matching_node_and_match
+In-Reply-To: <1392135847-30791-4-git-send-email-joshc@codeaurora.org>
+References: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
+ <1392135847-30791-4-git-send-email-joshc@codeaurora.org>
+Message-ID: <52FA61F4.90905@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For better consistency.
+On 11/02/2014 17:24, Josh Cartwright :
+> Instead of the of_find_matching_node()/of_match_node() pair, which requires two
+> iterations through the match table, make use of of_find_matching_node_and_match(),
+> which only iterates through the table once.
+> 
+> While we're here, mark the rtsc id table const.
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
----
- drivers/tty/serial/atmel_serial.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Well, I might remove this one, just because other id tables are not
+marked as "const" in the same file... So it can be good to change all of
+them in a raw.
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 91c0d8839570..ed9621a21d67 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1549,7 +1549,7 @@ static int atmel_startup(struct uart_port *port)
- 	retval = request_irq(port->irq, atmel_interrupt, IRQF_SHARED,
- 			tty ? tty->name : "atmel_serial", port);
- 	if (retval) {
--		printk("atmel_serial: atmel_startup - Can't get irq\n");
-+		dev_err(port->dev, "atmel_startup - Can't get irq\n");
- 		return retval;
- 	}
- 
-@@ -1732,7 +1732,7 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
- 		clk_disable_unprepare(atmel_port->clk);
- 		break;
- 	default:
--		printk(KERN_ERR "atmel_serial: unknown pm %d\n", state);
-+		dev_err(port->dev, "atmel_serial: unknown pm %d\n", state);
- 	}
- }
- 
+
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> ---
+>  arch/arm/mach-at91/setup.c | 16 ++++------------
+>  1 file changed, 4 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+> index f7ca97b..e884de8 100644
+> --- a/arch/arm/mach-at91/setup.c
+> +++ b/arch/arm/mach-at91/setup.c
+> @@ -352,7 +352,7 @@ void __init at91_ioremap_matrix(u32 base_addr)
+>  }
+>  
+>  #if defined(CONFIG_OF)
+> -static struct of_device_id rstc_ids[] = {
+> +static const struct of_device_id rstc_ids[] = {
+>  	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9_alt_restart },
+>  	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
+>  	{ /*sentinel*/ }
+> @@ -363,7 +363,7 @@ static void at91_dt_rstc(void)
+>  	struct device_node *np;
+>  	const struct of_device_id *of_id;
+>  
+> -	np = of_find_matching_node(NULL, rstc_ids);
+> +	np = of_find_matching_node_and_match(NULL, rstc_ids, &of_id);
+>  	if (!np)
+>  		panic("unable to find compatible rstc node in dtb\n");
+>  
+> @@ -371,10 +371,6 @@ static void at91_dt_rstc(void)
+>  	if (!at91_rstc_base)
+>  		panic("unable to map rstc cpu registers\n");
+>  
+> -	of_id = of_match_node(rstc_ids, np);
+> -	if (!of_id)
+> -		panic("AT91: rtsc no restart function available\n");
+> -
+>  	arm_pm_restart = of_id->data;
+>  
+>  	of_node_put(np);
+> @@ -392,7 +388,7 @@ static void at91_dt_ramc(void)
+>  	struct device_node *np;
+>  	const struct of_device_id *of_id;
+>  
+> -	np = of_find_matching_node(NULL, ramc_ids);
+> +	np = of_find_matching_node_and_match(NULL, ramc_ids, &of_id);
+>  	if (!np)
+>  		panic("unable to find compatible ram controller node in dtb\n");
+>  
+> @@ -402,11 +398,7 @@ static void at91_dt_ramc(void)
+>  	/* the controller may have 2 banks */
+>  	at91_ramc_base[1] = of_iomap(np, 1);
+>  
+> -	of_id = of_match_node(ramc_ids, np);
+> -	if (!of_id)
+> -		pr_warn("AT91: ramc no standby function available\n");
+> -	else
+> -		at91_pm_set_standby(of_id->data);
+> +	at91_pm_set_standby(of_id->data);
+
+Even if it changes the strict behavior of the function, I do not see any
+advantage in keeping the pr_warn() path instead of a simple panic()
+protecting the "find" and "match" together...
+
+So, without the "const" modification, it ends up with a:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+=> if you want, I can take the patch with me through arm-soc with at91
+material for 3.15 and complete your "const" modification. What do you
+think about that?
+
+>  
+>  	of_node_put(np);
+>  }
+> 
+
+Thanks for having taking care of this file, bye,
 -- 
-1.8.5
+Nicolas Ferre
