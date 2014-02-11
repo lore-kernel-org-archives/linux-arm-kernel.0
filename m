@@ -1,53 +1,41 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 11 Feb 2014 14:21:45 -0600
-Subject: [PATCH] hwrng: msm: switch Kconfig to ARCH_QCOM depends
-Message-ID: <1392150105-21057-1-git-send-email-galak@codeaurora.org>
+Date: Tue, 11 Feb 2014 14:21:59 -0600
+Subject: [PATCH] drm/msm: drop ARCH_MSM Kconfig depend
+Message-ID: <1392150119-21132-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the splits the Qualcomm MSM platform into legacy support that we will
-not try and convert to multiplatform and multiplatform support.
+The ARCH_MSM depend is redundant with ARCH_MSM8960, so we can remove it.
+Additionally, we are splitting Qualcomm MSM support into legacy (ARCH_MSM)
+and multiplatform (ARCH_QCOM).  The MSM8960 with be ARCH_QCOM going forward
+so dropping ARCH_MSM will work properly for the new ARCH_QCOM multiplatform
+build.
 
-- k
-
-Changes from v2:
-* Dropped ARCH_MSM depends from CLKSRC_QCOM, since we select it
-* Fixed some grammar/typo's in commit messages
-* kept smp ops code in platsmp.c to match what other mach's do
-* Kept mach-qcom/Kconfig sorted alphabetically
-
-Changes from v1:
-* Added patch to remove hotplug.c
-* Added patch to rename msm_ to qcom_
-* Changes the Kconfig to drop CPU_V7
-* used wfi() in cpu_die function
-* Added git tree to MAINTAINERS file
-
-Kumar Gala (5):
-
-We've split Qualcomm MSM support into legacy and multiplatform.  The RNG
-driver is only relevant on the multiplatform supported SoCs so switch the
-Kconfig depends to ARCH_QCOM.
-
-CC: Herbert Xu <herbert@gondor.apana.org.au>
 Signed-off-by: Kumar Gala <galak@codeaurora.org>
 ---
- drivers/char/hw_random/Kconfig | 2 +-
+David/Rob,
+
+If you can ack this I'll send it via linux-qcom/arm-soc tree's
+
+thanks
+
+- k
+ drivers/gpu/drm/msm/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-index 2f2b084..289bd3a 100644
---- a/drivers/char/hw_random/Kconfig
-+++ b/drivers/char/hw_random/Kconfig
-@@ -343,7 +343,7 @@ config HW_RANDOM_TPM
- 
- config HW_RANDOM_MSM
- 	tristate "Qualcomm MSM Random Number Generator support"
--	depends on HW_RANDOM && ARCH_MSM
-+	depends on HW_RANDOM && ARCH_QCOM
- 	---help---
- 	  This driver provides kernel-side support for the Random Number
- 	  Generator hardware found on Qualcomm MSM SoCs.
+diff --git a/drivers/gpu/drm/msm/Kconfig b/drivers/gpu/drm/msm/Kconfig
+index c69d1e0..b698497 100644
+--- a/drivers/gpu/drm/msm/Kconfig
++++ b/drivers/gpu/drm/msm/Kconfig
+@@ -3,7 +3,7 @@ config DRM_MSM
+ 	tristate "MSM DRM"
+ 	depends on DRM
+ 	depends on MSM_IOMMU
+-	depends on (ARCH_MSM && ARCH_MSM8960) || (ARM && COMPILE_TEST)
++	depends on ARCH_MSM8960 || (ARM && COMPILE_TEST)
+ 	select DRM_KMS_HELPER
+ 	select SHMEM
+ 	select TMPFS
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
