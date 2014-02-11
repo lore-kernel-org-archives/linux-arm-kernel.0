@@ -1,57 +1,50 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Feb 2014 17:17:21 +0000
-Subject: [PATCH 05/12] GPIO: gpio-generic: Add label to platform data
-In-Reply-To: <1392138636-29240-6-git-send-email-pawel.moll@arm.com>
+Date: Tue, 11 Feb 2014 17:24:40 +0000
+Subject: [PATCH 07/12] mfd: syscon: Consider platform data a regmap
+ config name
+In-Reply-To: <1392138636-29240-8-git-send-email-pawel.moll@arm.com>
 References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
- <1392138636-29240-6-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140211171721.GE15081@lee--X1>
+ <1392138636-29240-8-git-send-email-pawel.moll@arm.com>
+Message-ID: <20140211172440.GG15081@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> When registering more than one platform device, it is
-> useful to set the gpio chip label in the platform data.
+> Use the device platform data as a regmap config
+> name. This is particularly useful in the regmap
+> debugfs when there is more than one syscon device
+> registered, to distinguish the register blocks.
 > 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
 > Cc: Samuel Ortiz <sameo@linux.intel.com>
 > Cc: Lee Jones <lee.jones@linaro.org>
 > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 > ---
-> This patch has been already merged by Linux; it has been included
-> for completeness only.
+> Alternatively I could define a syscon platform data structure,
+> something like this:
 > 
->  drivers/gpio/gpio-generic.c     | 2 ++
->  include/linux/basic_mmio_gpio.h | 1 +
->  2 files changed, 3 insertions(+)
+> struct syscon_platform_data {
+> 	const char *label;
+> };
 > 
-> diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-generic.c
-> index d2196bf..8c778af 100644
-> --- a/drivers/gpio/gpio-generic.c
-> +++ b/drivers/gpio/gpio-generic.c
-> @@ -531,6 +531,8 @@ static int bgpio_pdev_probe(struct platform_device *pdev)
->  		return err;
+>  drivers/mfd/syscon.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+> index 71841f9..ea1770b 100644
+> --- a/drivers/mfd/syscon.c
+> +++ b/drivers/mfd/syscon.c
+> @@ -143,6 +143,7 @@ static int syscon_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
 >  
->  	if (pdata) {
-> +		if (pdata->label)
+>  	syscon_regmap_config.max_register = res->end - res->start - 3;
+> +	syscon_regmap_config.name = dev_get_platdata(&pdev->dev);
 
-Why is this check necessary?
+Perhaps the answer is waiting for me in the other set, but ...
 
-> +			bgc->gc.label = pdata->label;
->  		bgc->gc.base = pdata->base;
->  		if (pdata->ngpio > 0)
->  			bgc->gc.ngpio = pdata->ngpio;
-> diff --git a/include/linux/basic_mmio_gpio.h b/include/linux/basic_mmio_gpio.h
-> index d8a97ec..0e97856 100644
-> --- a/include/linux/basic_mmio_gpio.h
-> +++ b/include/linux/basic_mmio_gpio.h
-> @@ -19,6 +19,7 @@
->  #include <linux/spinlock_types.h>
->  
->  struct bgpio_pdata {
-> +	const char *label;
->  	int base;
->  	int ngpio;
->  };
+Isn't this going to be NULL most of the time?
+
+>  	syscon->regmap = devm_regmap_init_mmio(dev, base,
+>  					&syscon_regmap_config);
+>  	if (IS_ERR(syscon->regmap)) {
 
 -- 
 Lee Jones
