@@ -1,78 +1,105 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 11 Feb 2014 22:23:06 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MiAxLzRdIHR0eS9zZXJpYWw6IEFkZCBHUElPTElCIGhl?=
- =?UTF-8?B?bHBlcnMgZm9yIGNvbnRyb2xsaW5nIG1vZGVtIGxpbmVz?=
-In-Reply-To: <1392140715-15295-2-git-send-email-richard.genoud@gmail.com>
-References: <1392140715-15295-1-git-send-email-richard.genoud@gmail.com>
- <1392140715-15295-2-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1392142986.607813065@f171.i.mail.ru>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 11 Feb 2014 10:22:40 -0800
+Subject: [PATCH] ARM: mm: report both sections from PMD
+In-Reply-To: <20140211111751.GD3748@arm.com>
+References: <20140209221826.GA30556@www.outflux.net>
+ <20140210102935.GC25305@arm.com> <20140210104135.GD25305@arm.com>
+ <CAGXu5jL0asY2L9xvnEDwBPQoWYZAVHjtG+U7nyz=JfZtXFK34A@mail.gmail.com>
+ <20140211111751.GD3748@arm.com>
+Message-ID: <CAGXu5jKhp515gX--i-B85T1cGhTOUu2K8JuXNq5XDpxZHcCUPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Feb 11, 2014 at 3:17 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Mon, Feb 10, 2014 at 05:26:28PM +0000, Kees Cook wrote:
+>> On Mon, Feb 10, 2014 at 2:41 AM, Catalin Marinas
+>> <catalin.marinas@arm.com> wrote:
+>> > On Mon, Feb 10, 2014 at 10:29:35AM +0000, Catalin Marinas wrote:
+>> >> On Sun, Feb 09, 2014 at 10:18:26PM +0000, Kees Cook wrote:
+>> >> > diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+>> >> > index 1f7b1e13d945..ff1559f9200c 100644
+>> >> > --- a/arch/arm/mm/dump.c
+>> >> > +++ b/arch/arm/mm/dump.c
+>> >> > @@ -264,6 +264,9 @@ static void walk_pmd(struct pg_state *st, pud_t *pud, unsigned long start)
+>> >> >                     note_page(st, addr, 3, pmd_val(*pmd));
+>> >> >             else
+>> >> >                     walk_pte(st, pmd, addr);
+>> >> > +
+>> >> > +           if (SECTION_SIZE < PMD_SIZE && pmd_sect(*pmd))
+>> >> > +                   note_page(st, addr + SECTION_SIZE, 3, pmd_val(pmd[1]));
+>> >>
+>> >> You can  use pmd_large() here as well.
+>> >>
+>> >> But I think this function is broken (the "for" statement not shown
+>> >> here). The pmd_t is 32-bit with classic MMU and it uses pmd++ while the
+>> >> address grows by PMD_SIZE (two pmd_t entries).
+>> >
+>> > Actually it's ok since PTRS_PER_PMD is 1, so it only goes through this
+>> > loop once.
+>> >
+>> > But in your patch shouldn't you check for pmd_large(*(pmd+1))? The first
+>> > pmd is already caught by the 'if' statement.
+>>
+>> It wasn't clear to me what the logic should be here. If PTRS_PER_PMD
+>> is 1, then why is there this second pmd after the first? Shouldn't
+>> PTRS_PER_PMD be 2 if that's the case?
+>
+> The reason is that a hardware pte has only 256 entries (classic MMU),
+> this is 1KB. We put two pte tables together and it gives us 2KB. The
+> other 2KB in the page are used for Linux pte bits. Because we have two
+> hw pte tables in a page, we need two corresponding pmd entries.
+>
+> A side effect is that even though we don't actually have a pmd (normally
+> we should have included pgtable-nopmd.h), we still pretend we have one
+> and __pmd_populate takes care of writing two consecutive entries. If we
+> set PTRS_PER_PMD to 2, we should modify pte_alloc_one() to allocate a
+> single hw pte (1KB + 1KB for software bits). I don't think this would be
+> more efficient (there may have been other kernel restrictions in the
+> past to require a full pte table page).
+>
+>> If that's not the case, then I figured the state of needing to report
+>> the 2nd pmd depended on the type of the first one, so that's what I
+>> wrote instead of trying to figure out why PTRS_PER_PMD wasn't 2.
+>
+> I don't remember whether we can have the first pmd being a table and the
+> second one being a section. I don't think we restrict this but Russell
+> should know more.
 
-???????, 11 ??????? 2014, 18:45 +01:00 ?? Richard Genoud <richard.genoud@gmail.com>:
-> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
-> GPIO.
-> This will be useful for many boards which have a serial controller that
-> only handle CTS/RTS pins (or even just RX/TX).
-> 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> ---
+It sounds like my logic is still okay, then? Perhaps move it into the
+first "if" for readability?
 
-OK, a few comments below.
+                if (pmd_none(*pmd) || pmd_large(*pmd) || !pmd_present(*pmd)) {
+                        note_page(st, addr, 3, pmd_val(*pmd));
+                        if (SECTION_SIZE < PMD_SIZE && pmd_sect(*pmd))
+                                note_page(st, addr + SECTION_SIZE, 3,
+pmd_val(pmd[1]));
+                } else
+                        walk_pte(st, pmd, addr);
 
-...
-> +config SERIAL_MCTRL_GPIO
-> +	def_bool y
-> +	depends on GPIOLIB
+Or should be be explicitly separated (to allow for the very unlikely
+future case of pmd_large != pmd_sect)? In the LPAE case, SECTION_SIZE
+== PMD_SIZE, so IIUC, we have to continue testing for that:
 
-I suggest to move GPIOLIB dependency to serial_mctrl_gpio.h header, so
-unit can be used with or without GPIOLIB, so Kconfig will look something like this:
+                if (pmd_sect(*pmd)) {
+                        note_page(st, addr, 3, pmd_val(*pmd));
+                        if (SECTION_SIZE < PMD_SIZE)
+                                note_page(st, addr + SECTION_SIZE, 3,
+pmd_val(pmd[1]));
+                } else if (pmd_none(*pmd) || pmd_large(*pmd) ||
+!pmd_present(*pmd))
+                        note_page(st, addr, 3, pmd_val(*pmd));
+                else
+                        walk_pte(st, pmd, addr);
 
-config SERIAL_MCTRL_GPIO
-  tristate
+>> There's clearly something I'm not understanding in here. :)
+>
+> I happen to understand it from time to time but it doesn't last ;).
 
-Then, you can select this option for particular UART:
-config SERIAL_ATMEL
-  ...
-  select SERIAL_MCTRL_GPIO
+Heh, understood. Thanks for looking at this. :)
 
-...
-> +++ b/drivers/tty/serial/serial_mctrl_gpio.c
-...
-> +static const char *mctrl_gpio_of_names[UART_GPIO_MAX] = {
-> +	"cts", "dsr", "dcd", "ri", "rts", "dtr"
-> +};
+-Kees
 
-Make a combined array. This will use cycles for set/get operations.
-
-static struct {
-  const char *name;
-  unsigned int mctrl;
-} mctrl_gpios[] = {
-  { "cts", TIOCM_CTS, },
-  ...
-};
-
-...
-> +int mctrl_gpio_init(struct device *dev, struct mctrl_gpios *gpios)
-> +{
-
-I'm not sure whether to make a non-DT support at all ...
-
-> +	enum mctrl_gpio_idx i;
-> +	int err = 0;
-> +	int ret = 0;
-> +
-> +	for (i = UART_GPIO_MIN; i < UART_GPIO_MAX; i++) {
-> +		gpios->gpio[i] = gpiod_get(dev, mctrl_gpio_of_names[i]);
-
-What a reason to using gpiod_xxx() ?
-Why we cannot use standart devm_gpio_request/get/set etc. ?
-
-In addition, I recommend create this patch as separate,
-because it will most likely still be comments later.
-Thanks.
-
----
+-- 
+Kees Cook
+Chrome OS Security
