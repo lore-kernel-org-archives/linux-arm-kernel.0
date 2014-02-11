@@ -1,39 +1,74 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Tue, 11 Feb 2014 11:38:31 +0300
-Subject: [RFC PATCH 2/3] staging: imx-drm-core: Use graph to find
- connection between crtc and encoder
-In-Reply-To: <20140210162631.GC26684@n2100.arm.linux.org.uk>
-References: <1389019922-31992-1-git-send-email-p.zabel@pengutronix.de>
- <1389019922-31992-3-git-send-email-p.zabel@pengutronix.de>
- <20140210162631.GC26684@n2100.arm.linux.org.uk>
-Message-ID: <20140211083831.GV26722@mwanda>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 11 Feb 2014 08:44:03 +0000
+Subject: [RFC/PATCH v2] ARM: vDSO gettimeofday using generic timer
+ architecture
+In-Reply-To: <20140210171200.GE26684@n2100.arm.linux.org.uk>
+References: <1391814349-10706-1-git-send-email-nathan_lynch@mentor.com>
+ <20140209102023.GL26684@n2100.arm.linux.org.uk>
+ <20140210165113.GA7891@linaro.org>
+ <20140210171200.GE26684@n2100.arm.linux.org.uk>
+Message-ID: <20140211084402.GA928@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Why is this loop soo complicated?  Why do you need to mess around with
-> this "last_ep" stuff - you don't actually end up using it.
+On Mon, Feb 10, 2014 at 05:12:00PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Feb 10, 2014 at 04:51:16PM +0000, Steve Capper wrote:
+> > Hi Russell,
+> > 
+> > On Sun, Feb 09, 2014 at 10:20:23AM +0000, Russell King - ARM Linux wrote:
+> > > On Fri, Feb 07, 2014 at 05:05:49PM -0600, Nathan Lynch wrote:
+> > > > +	/* Grab the vDSO code pages. */
+> > > > +	for (i = 0; i < vdso_pages; i++) {
+> > > > +		pg = virt_to_page(&vdso_start + i*PAGE_SIZE);
+> > > > +		ClearPageReserved(pg);
+> > > > +		get_page(pg);
+> > > > +		vdso_pagelist[i] = pg;
+> > > > +	}
+> > > 
+> > > Why do we want to clear the reserved status?  This looks over complicated
+> > > to me.
+> > > 
+> > 
+> > This looks like it was inherited from the PowerPC code where the
+> > behaviour of set_pte_at would change dependent on whether or not the
+> > page was reserved (set_pte_at->set_pte_filter->maybe_pte_to_page). I
+> > think we can safely remove this from ARM and ARM64.
 > 
-> The loop reduces down to this without comments:
+> Great, so we can get rid of that and the get_page() on the vdso data
+> page below.
 > 
->  	for (i = 0; !ret; i++) {
-                    ^^^^
-Philipp, "ret" isn't set anymore in the new loop.
+> > > > +
+> > > > +	/* Sanity check the shared object header. */
+> > > > +	vbase = vmap(vdso_pagelist, 1, 0, PAGE_KERNEL);
+> > > > +	if (vbase == NULL) {
+> > > > +		pr_err("Failed to map vDSO pagelist!\n");
+> > > > +		return -ENOMEM;
+> > > > +	} else if (memcmp(vbase, "\177ELF", 4)) {
+> > > > +		pr_err("vDSO is not a valid ELF object!\n");
+> > > > +		ret = -EINVAL;
+> > > > +		goto unmap;
+> > > > +	}
+> > > 
+> > > Why do we need to vmap() pages which are already accessible - vdso_start
+> > > must be part of the kernel image, and therefore will be accessible via
+> > > standard mappings.
+> > > 
+> > 
+> > This is a dress rehersal for install_special_mapping more than anything.
+> > If we map the page, and look at the first 4 bytes, are they what we
+> > expect?
+> 
+> My point is that we can already view this page directly by dereferencing
+> vdso_start - do we really need to perform this apparant test of the MMU?
+> If the MMU isn't working in this way, we have much bigger and more
+> fundamental problems...
+> 
 
->  		uint32_t mask;
-> 
-> 		ep = v4l2_of_get_next_endpoint(np, last_ep);
-> 		if (!ep)
-> 			break;
-> 
-> 		/* CSI */
-> 		mask = imx_drm_find_crtc_mask(imxdrm, ep);
-> 		of_node_put(ep);
-> 
-> 		if (mask == 0)
-> 			return -EPROBE_DEFER;
-> 
-> 		crtc_mask |= mask;
-> 	}
+I see, yes I think people would notice the MMU not working :-).
+This code also tests the alignment of vdso_start in a roundabout way.
+I'm not sure whether or not an explicit alignment check to PAGE_SIZE
+would be beneficial instead of the test mapping.
 
-regards,
-dan carpenter
+Cheers,
+-- 
+Steve
