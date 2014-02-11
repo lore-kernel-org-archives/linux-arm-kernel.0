@@ -1,51 +1,77 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 11 Feb 2014 16:24:36 +0100
-Subject: [PATCH 06/11] ARM: mvebu: add Armada 380/385 support to the
- system-controller driver
-In-Reply-To: <CACxGe6u--F0J=kaHnvSsyDXNaO1r++T_TgzpNyy_2JU7+07r7w@mail.gmail.com>
-References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392053002-19831-7-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140210173957.GS8533@titan.lakedaemon.net>
- <CACxGe6u--F0J=kaHnvSsyDXNaO1r++T_TgzpNyy_2JU7+07r7w@mail.gmail.com>
-Message-ID: <20140211162436.2bbe5719@skate>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 11 Feb 2014 16:26:16 +0100
+Subject: [PATCH 2/2] ehci-platform: Change compatible string from usb-ehci
+ to ehci-platform
+In-Reply-To: <52FA3B2B.7050906@ti.com>
+References: <1392127826-31290-1-git-send-email-hdegoede@redhat.com>
+ <1392127826-31290-3-git-send-email-hdegoede@redhat.com>
+ <52FA3B2B.7050906@ti.com>
+Message-ID: <52FA4118.2030100@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant,
+Hi,
 
-On Tue, 11 Feb 2014 14:22:04 +0000, Grant Likely wrote:
-
-> >> +     }, {
-> >> +             /*
-> >> +              * As far as RSTOUTn and System soft reset registers
-> >> +              * are concerned, Armada 38x is similar to Armada
-> >> +              * 370/XP
-> >> +              */
-> >> +             .compatible = "marvell,armada-380-system-controller",
-> >> +             .data = (void *) &armada_370_xp_system_controller,
+On 02/11/2014 04:00 PM, Roger Quadros wrote:
+> Hi Hans,
 > 
-> However, this would not be the right thing to do. The better solution
-> is to put the following into the .dts file:
+> On 02/11/2014 04:10 PM, Hans de Goede wrote:
+>> The initial versions of the devicetree enablement patches for ehci-platform
+>> used "ehci-platform" as compatible string. However this was disliked by various
+>> reviewers because the platform bus is a Linux invention and devicetree is
+>> supposed to be OS agnostic. After much discussion I gave up, added a:
+>> "depends on !PPC_OF" to Kconfig to avoid a known conflict with PPC-OF platforms
+>> and went with the generic usb-ehci as requested.
+>>
+>> In retro-spect I should have stuck to my guns, because the dts files for many
+>> existing boards already claim to be compatible with "usb-ehci", ie they have:
+>>
+>> 	compatible = "ti,ehci-omap", "usb-ehci";
+>>
+>> In theory this should not be a problem since the "ti,ehci-omap" entry takes
+>> presedence, but in practice using a conflicting compatible string is an issue,
+>> because it makes which driver gets used depent on driver registration order.
+>>
+>> This patch changes the compatible string claimed by ehci-platform (back) to
+>> "ehci-platform", avoiding the driver registration / module loading ordering
+>> problems, and removes the "depends on !PPC_OF" workaround.
+>>
+>> Note that there already is a precedent for using ?hci-platform, in the form
+>> of xhci-platform.c using "xhci-platfrom" as compatible string.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>  Documentation/devicetree/bindings/usb/usb-ehci.txt | 4 ++--
+>>  drivers/usb/host/Kconfig                           | 1 -
+>>  drivers/usb/host/ehci-platform.c                   | 2 +-
+>>  3 files changed, 3 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> index 2c1aeeb..46f428a 100644
+>> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> @@ -1,7 +1,7 @@
+>>  USB EHCI controllers
+>>  
+>>  Required properties:
+>> -  - compatible : should be "usb-ehci".
+>> +  - compatible : should be "ehci-platform".
 > 
-> compatible = "marvell,armada-380-system-controller","marvell,armada-370-system-controller"
-> 
-> So that the kernel has the option to override the 370 version if an
-> errata or extra feature support ever needs to be added.
+> Won't this break DT binding info for power PC?
 
-Ah, right true. Makes sense. We are going to update our patch set to
-take this suggestion into account, and resubmit a v2 with this. This
-way, we don't need new to introduce in drivers new compatible strings
-for the clocksource driver, the mbus driver and the system-controller
-driver.
+The powerpc bindings have never been really properly documented, ie
+they rely on both usb-ehci and ibm,usb-ehci-440epx strings being there,
+which was never documented. Given the issues surrounding using usb-ehci
+as a compatible string I think completely removing it from the bindings
+docs is best.
 
-Thanks Grant for your suggestion.
+> I'm even OK with removing "usb-ehci" and "usb-ohci" compatibles from all OMAP dts files
+> since they aren't really compatible with the original PPC driver.
 
-Jason, are you ok with this?
+I don't think that is necessary, as your grep has shown there are a lot
+of dts files using compatible = "foo", "usb-?hci"; and some may even have
+the dts in firmware, so we should simply make sure not to break such dts.
 
-Best regards,
+Regards,
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Hans
