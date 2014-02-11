@@ -1,64 +1,60 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Feb 2014 11:37:12 +0000
-Subject: [PATCH 7/7] Documentation: devicetree: loosen primecell clock
- requirements
+Date: Tue, 11 Feb 2014 11:37:11 +0000
+Subject: [PATCH 6/7] mmc: arm-mmci: attempt to get mclk by name
 In-Reply-To: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
 References: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1392118632-11312-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <1392118632-11312-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The primecell binding requires the APB PCLK (named "apb_pclk") to be the
-first entry in the clocks list, yet existing drivers and dts files
-expect other clocks first, in clear violation of this requirement.
-Additionally, the code handling the apb_pclk always acquires the clock
-by name rather than index, making the requirement irrelevant.
+The primecell device tree binding (from which the pl18x binding is
+derived from) states that the apb_pclk clock input should be listed
+first for all primecell devices. The arm-mmci driver requires the mclk
+clock input, but the way it currently grabs the clock means that it
+always gets the first clock (which should be apb_pclk).
 
-As there are no other implementations handling the primecell bindings,
-this patch loosens the requirements to an apb_pclk entry existing in the
-clocks list. This is compatible with existing software, and any new
-software handling the weaker requirements will be able to use existing
-dts. Any software relying on the original stricter requirements will be
-unable to use many existing dts, so the loosened requirement aids
-compatibility rather than hindering it.
+As the AMBA bus code grabs apb_pclk by name, some existing dts provide
+apb_pclk as the second clock in the clocks list to work around this, in
+violation of both the primecell binding. The pl18x binding does not
+mention clocks at all, so the first clock (MCLK) is given an arbitrary
+name.
+
+This patch attempts to fix the mess my having the arm-mmci driver first
+attempt to get mclk by name. If this fails, it falls back to the old
+behaviour of simply acquiring the first clock. This is compatible with
+any old dtb, whether it lists mclk by name or not, and allows the driver
+to support dtbs which do not violate the bindings. Hopefully this will
+lead to future uniformity across dtbs.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Chris Ball <cjb@laptop.org>
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Pawel Moll <pawel.moll@arm.com>
 ---
- Documentation/devicetree/bindings/arm/primecell.txt | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/mmc/host/mmci.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/primecell.txt b/Documentation/devicetree/bindings/arm/primecell.txt
-index 0df6aca..0a66506 100644
---- a/Documentation/devicetree/bindings/arm/primecell.txt
-+++ b/Documentation/devicetree/bindings/arm/primecell.txt
-@@ -13,9 +13,10 @@ Required properties:
- Optional properties:
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index b931226..4af962c 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1470,7 +1470,14 @@ static int mmci_probe(struct amba_device *dev,
+ 	dev_dbg(mmc_dev(mmc), "designer ID = 0x%02x\n", host->hw_designer);
+ 	dev_dbg(mmc_dev(mmc), "revision = 0x%01x\n", host->hw_revision);
  
- - arm,primecell-periphid : Value to override the h/w value with
--- clocks : From common clock binding. First clock is phandle to clock for apb
--	pclk. Additional clocks are optional and specific to those peripherals.
--- clock-names : From common clock binding. Shall be "apb_pclk" for first clock.
-+- clocks : From common clock binding. One clock must be the apb pclk.
-+           Additional clocks are optional and specific to those peripherals.
-+- clock-names : From common clock binding. Shall include "apb_pclk" for the apb
-+                pclk.
- - dmas : From common DMA binding. If present, refers to one or more dma channels.
- - dma-names : From common DMA binding, needs to match the 'dmas' property.
-               Devices with exactly one receive and transmit channel shall name
-@@ -31,8 +32,8 @@ serial at fff36000 {
- 	compatible = "arm,pl011", "arm,primecell";
- 	arm,primecell-periphid = <0x00341011>;
- 
--	clocks = <&pclk>;
--	clock-names = "apb_pclk";
-+	clocks = <&refclk>, <&pclk>;
-+	clock-names = "uartclk", "apb_pclk";
- 
- 	dmas = <&dma-controller 4>, <&dma-controller 5>;
- 	dma-names = "rx", "tx";	
+-	host->clk = devm_clk_get(&dev->dev, NULL);
++	/*
++	 * For compatibility with old DTBs and platform data, fall back to the
++	 * first clock if there's not an explicitly named "mclk" entry.
++	 */
++	host->clk = devm_clk_get(&dev->dev, "mclk");
++	if (IS_ERR(host->clk))
++		host->clk = devm_clk_get(&dev->dev, NULL);
++
+ 	if (IS_ERR(host->clk)) {
+ 		ret = PTR_ERR(host->clk);
+ 		goto host_free;
 -- 
 1.8.1.1
