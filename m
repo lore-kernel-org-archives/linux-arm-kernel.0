@@ -1,38 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 11 Feb 2014 08:52:22 +0000
-Subject: [PATCH v2 2/5] irqchip: gic: use writel instead of dsb +
- writel_relaxed
-In-Reply-To: <1392042159-11603-2-git-send-email-will.deacon@arm.com>
-References: <1392042159-11603-1-git-send-email-will.deacon@arm.com>
- <1392042159-11603-2-git-send-email-will.deacon@arm.com>
-Message-ID: <52F9E4C6.8080600@arm.com>
+From: vkale@apm.com (Vinayak Kale)
+Date: Tue, 11 Feb 2014 14:29:19 +0530
+Subject: [PATCH] arm: add DSB after icache flush in __flush_icache_all()
+In-Reply-To: <52F90734.1090607@gmail.com>
+References: <1391592782-18576-1-git-send-email-vkale@apm.com>
+ <52F71BAD.80607@gmail.com> <20140210104355.GE25305@arm.com>
+ <52F90734.1090607@gmail.com>
+Message-ID: <CAPrCYkcxDHLUAG_FUv2pTwtr6JyEs9XDwbjzB4ie9qUsqs5t+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/14 14:22, Will Deacon wrote:
-> When sending an SGI to another CPU, we require a DSB to ensure that
-> any pending stores to normal memory are made visible to the recipient
-> before the interrupt arrives.
-> 
-> Rather than use a vanilla dsb() (which will soon cause an assembly error
-> on arm64) before the writel_relaxed, we can instead use dsb(ishst),
-> since we just need to ensure that any pending normal writes are visible
-> within the inner-shareable domain before we poke the GIC.
-> 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> 
-> v1 => v2: Use dsb ishst instead of writel (which requires an L2 sync)
->           since the sync should already have been executed by the caller
-> 	  if required. We *might* be able to relax this further to a dmb
-> 	  but Catalin and I haven't got to the bottom of that yet.
-> 
-> Marc: I dropped your Ack, so could you take another look please?
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+On Mon, Feb 10, 2014 at 10:37 PM, Dirk Behme <dirk.behme@gmail.com> wrote:
+> Am 10.02.2014 11:43, schrieb Catalin Marinas:
+>
+>> On Sun, Feb 09, 2014 at 06:09:49AM +0000, Dirk Behme wrote:
+>>>
+>>> Am 05.02.2014 10:33, schrieb Vinayak Kale:
+>>>>
+>>>> Add DSB after icache flush to complete the cache maintenance operation.
+>>>>
+>>>> Signed-off-by: Vinayak Kale <vkale@apm.com>
+>>>
+>>>
+>>> Should this go to -stable, too?
+>>>
+>>> I haven't looked into the details, but at least it seems to apply
+>>> cleanly on a 3.8 kernel.
+>>
+>>
+>> It should. For the similar arm64 fix I added 'cc: stable' myself (commit
+>> 5044bad43ee57).
+>
+>
+> While the arm64 patch already hit mainline, I can't find this one in
+> mainline, -next or even the patch system, yet (?)
+>
+> Vinayak: Could you put this patch into the patch system and CC stable,
+> please?
+Sure.
+>
+> Thanks
+>
+> Dirk
