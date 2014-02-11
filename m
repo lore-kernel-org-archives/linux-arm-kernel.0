@@ -1,62 +1,51 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 11 Feb 2014 16:21:10 +0100
-Subject: [PATCH 1/2] ohci-platform: Change compatible string from usb-ohci
- to ohci-platform
-In-Reply-To: <954E6E26-EEF1-4A0A-A9BC-D5CA918FAD43@codeaurora.org>
-References: <1392127826-31290-1-git-send-email-hdegoede@redhat.com>
- <1392127826-31290-2-git-send-email-hdegoede@redhat.com>
- <954E6E26-EEF1-4A0A-A9BC-D5CA918FAD43@codeaurora.org>
-Message-ID: <52FA3FE6.8040308@redhat.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 11 Feb 2014 16:24:36 +0100
+Subject: [PATCH 06/11] ARM: mvebu: add Armada 380/385 support to the
+ system-controller driver
+In-Reply-To: <CACxGe6u--F0J=kaHnvSsyDXNaO1r++T_TgzpNyy_2JU7+07r7w@mail.gmail.com>
+References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1392053002-19831-7-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140210173957.GS8533@titan.lakedaemon.net>
+ <CACxGe6u--F0J=kaHnvSsyDXNaO1r++T_TgzpNyy_2JU7+07r7w@mail.gmail.com>
+Message-ID: <20140211162436.2bbe5719@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Grant,
 
-On 02/11/2014 04:06 PM, Kumar Gala wrote:
+On Tue, 11 Feb 2014 14:22:04 +0000, Grant Likely wrote:
+
+> >> +     }, {
+> >> +             /*
+> >> +              * As far as RSTOUTn and System soft reset registers
+> >> +              * are concerned, Armada 38x is similar to Armada
+> >> +              * 370/XP
+> >> +              */
+> >> +             .compatible = "marvell,armada-380-system-controller",
+> >> +             .data = (void *) &armada_370_xp_system_controller,
 > 
-> On Feb 11, 2014, at 8:10 AM, Hans De Goede <hdegoede@redhat.com> wrote:
+> However, this would not be the right thing to do. The better solution
+> is to put the following into the .dts file:
 > 
->> The initial versions of the devicetree enablement patches for ohci-platform
->> used "ohci-platform" as compatible string. However this was disliked by various
->> reviewers because the platform bus is a Linux invention and devicetree is
->> supposed to be OS agnostic. After much discussion I gave up and went with
->> the generic usb-ohci as requested.
->>
->> In retro-spect I should have stuck to my guns, because the dts files for many
->> existing boards already claim to be compatible with "usb-ohci", ie they have:
->>
->> 	compatible = "ti,ohci-omap3", "usb-ohci";
->>
->> In theory this should not be a problem since the "ti,ohci-omap3" entry takes
->> presedence, but in practice using a conflicting compatible string is an issue,
->> because it makes which driver gets used depent on driver registration order.
->>
->> This patch changes the compatible string claimed by ohci-platform (back) to
->> "ohci-platform", avoiding the driver registration / module loading ordering
->> problems. Note that there already is a precedent for using ?hci-platform, in
->> the form of xhci-platform.c using "xhci-platfrom" as compatible string.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->> Documentation/devicetree/bindings/usb/usb-ohci.txt | 4 ++--
->> drivers/usb/host/ohci-platform.c                   | 2 +-
->> 2 files changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
->> index 6933b0c..a8e576a 100644
->> --- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
->> +++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
->> @@ -1,7 +1,7 @@
->> USB OHCI controllers
->>
->> Required properties:
->> -- compatible : "usb-ohci?
+> compatible = "marvell,armada-380-system-controller","marvell,armada-370-system-controller"
 > 
-> Why not leave ?usb-ohci? and deprecate it?
+> So that the kernel has the option to override the 370 version if an
+> errata or extra feature support ever needs to be added.
 
-As it was introduced just a couple of days ago in linux-next, and has never seen
-the light in any released kernel.
+Ah, right true. Makes sense. We are going to update our patch set to
+take this suggestion into account, and resubmit a v2 with this. This
+way, we don't need new to introduce in drivers new compatible strings
+for the clocksource driver, the mbus driver and the system-controller
+driver.
 
-Regards,
+Thanks Grant for your suggestion.
 
-Hans
+Jason, are you ok with this?
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
