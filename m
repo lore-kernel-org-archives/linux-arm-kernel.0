@@ -1,68 +1,49 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 11 Feb 2014 16:50:50 +0100
-Subject: [PATCH 06/11] ARM: mvebu: add Armada 380/385 support to the
- system-controller driver
-In-Reply-To: <20140211153005.GY8533@titan.lakedaemon.net>
-References: <1392053002-19831-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392053002-19831-7-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140210173957.GS8533@titan.lakedaemon.net>
- <CACxGe6u--F0J=kaHnvSsyDXNaO1r++T_TgzpNyy_2JU7+07r7w@mail.gmail.com>
- <20140211162436.2bbe5719@skate> <20140211153005.GY8533@titan.lakedaemon.net>
-Message-ID: <52FA46DA.2030309@free-electrons.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 11 Feb 2014 16:54:28 +0100
+Subject: ohci-/ehci-platform: Change compatible string to ?hci-platform
+In-Reply-To: <1635726.gc3dEs0zOi@wuerfel>
+References: <Pine.LNX.4.44L0.1402111023240.1209-100000@iolanthe.rowland.org>
+ <1635726.gc3dEs0zOi@wuerfel>
+Message-ID: <52FA47B4.50507@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2014 16:30, Jason Cooper wrote:
-> On Tue, Feb 11, 2014 at 04:24:36PM +0100, Thomas Petazzoni wrote:
->> Grant,
+Hi,
+
+On 02/11/2014 04:43 PM, Arnd Bergmann wrote:
+> On Tuesday 11 February 2014 10:27:12 Alan Stern wrote:
 >>
->> On Tue, 11 Feb 2014 14:22:04 +0000, Grant Likely wrote:
->>
->>>>> +     }, {
->>>>> +             /*
->>>>> +              * As far as RSTOUTn and System soft reset registers
->>>>> +              * are concerned, Armada 38x is similar to Armada
->>>>> +              * 370/XP
->>>>> +              */
->>>>> +             .compatible = "marvell,armada-380-system-controller",
->>>>> +             .data = (void *) &armada_370_xp_system_controller,
->>>
->>> However, this would not be the right thing to do. The better solution
->>> is to put the following into the .dts file:
->>>
->>> compatible = "marvell,armada-380-system-controller","marvell,armada-370-system-controller"
->>>
->>> So that the kernel has the option to override the 370 version if an
->>> errata or extra feature support ever needs to be added.
->>
->> Ah, right true. Makes sense. We are going to update our patch set to
->> take this suggestion into account, and resubmit a v2 with this. This
->> way, we don't need new to introduce in drivers new compatible strings
->> for the clocksource driver, the mbus driver and the system-controller
->> driver.
->>
->> Thanks Grant for your suggestion.
->>
->> Jason, are you ok with this?
+>> It might even be a good idea to change the "xhci-platform" string to 
+>> match, it that doesn't cause too much trouble.
 > 
-> Yes.  Thanks Grant for clearing this up.  And thanks guys for tolerating
-> my "This doesn't look right, but I'm having trouble explaining how"
-> moment :)
+> The original xhci binding was contributed by Al Cooper, but I don't
+> see any dts files using it. I agree that xhci-generic is a better
+> name than xhci-platform, and I think we should make that the recommended
+> string. If Al or someone thinks the xhci-generic string might already
+> be used in production devices, we should however allow both names
+> in the binding and in the driver.
 
-Great, with this solution we have the better of the two options:
-the ability to deal with different behaviors of the IP without
-having to update the dts and no code added in the drivers files.
+I can live with generic as pre/post fix. Looking at what seems to
+be the common trend I believe it should be a pre-fix and nost a post-fix
+though.
 
+The common way to build a compatible string seems to be:
+vendor,soc_model-function. We have a few deviations from this in the
+usb bindings, but ie the interrupt-controller bindings use this
+structure for the compatible strings everywhere.
 
-> 
-> thx,
-> 
-> Jason.
-> 
+So since generic has no vendor, we fill just the soc_model-function
+part leading to:
+generic-ohci
+generic-ehci
 
+And possible also:
+generic-uhci
+generic-xhci
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+So I'm going to respin my 2 fixup patches to move from ?hci-platform
+to generic-?hci.
+
+Regards,
+
+Hans
