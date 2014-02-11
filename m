@@ -1,49 +1,49 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 11 Feb 2014 17:03:51 +0100
-Subject: [PATCH] phy-core: Don't allow building phy-core as a module
-Message-ID: <1392134631-32030-1-git-send-email-hdegoede@redhat.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 11 Feb 2014 13:03:37 -0300
+Subject: [PATCH 0/2] Marvell Armada 375 and 38x timer support
+In-Reply-To: <1392059274-26965-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1392059274-26965-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140211160335.GB24205@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-include/phy/phy.h has stub code in there for when building without the
-phy-core enabled. This is useful for generic drivers such as ahci-platform,
-ehci-platoform and ohci-platform which have support for driving an optional
-phy passed to them through the devicetree.
+Daniel,
 
-Since on some boards this phy functionality is not needed, being able to
-disable the phy subsystem without needing a lot of #ifdef magic in the
-driver using it is quite useful.
+On Mon, Feb 10, 2014 at 04:07:52PM -0300, Ezequiel Garcia wrote:
+> 
+> This small series adds support for the two new Marvell ARM SoCs:
+> the Armada 375 and Armada 38x.
+> 
 
-However this breaks when the module using the phy subsystem is build-in and
-the phy-core is not, which leads to the build failing with missing symbol
-errors in the linking stage of the zImage.
+Please omit these patches entirely, we don't need them.
 
-Which leads to gems such as this being added to the Kconfig for achi_platform:
+The new agreement [1] is to add SoC-specific compatible strings and also
+declare the nodes as compatibles with the already supported SoC,
+whenever appropriate.
 
-	depends on GENERIC_PHY || !GENERIC_PHY
+[..]
+> The A375 SoC timer is modeled matching the A370 timer, while the
+> A38x SoC timer is modeled matching the AXP timer.
+> 
 
-Rather then duplicating this code in a lot of places using the phy-core,
-I believe it is better to simply not allow the phy-core to be built as a
-module. The phy core is quite small and has no external dependencies, so
-always building it in when enabling it should not be an issue.
+So, as per the statement above, the devicetree for Armada 375 and
+Armada 38x would have these timer nodes, respectively:
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/phy/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  timer {
+      compatible = "marvell,armada-375-timer", "marvell,armada-370-timer"
+  }
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 6070c99..6e336b4 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -5,7 +5,7 @@
- menu "PHY Subsystem"
- 
- config GENERIC_PHY
--	tristate "PHY Core"
-+	bool "PHY Core"
- 	help
- 	  Generic PHY support.
- 
+  timer {
+      compatible = "marvell,armada-380-timer", "marvell,armada-xp-timer"
+  }
+
+(Because the Armada 375 timer uses the provided parent clock, whereas the
+Armada 380 timer uses the fixed 25 MHz clock).
+
+Therefore, we don't need any changes in the clocksource driver for now.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg306727.html
 -- 
-1.8.5.3
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
