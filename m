@@ -1,107 +1,84 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 11 Feb 2014 10:33:22 +0100
-Subject: [linux-sunxi] Re: [PATCH 1/3] mfd: axp20x: Add mfd driver for
- axp20x PMIC
-In-Reply-To: <20140211091505.GE32042@lee--X1>
-References: <1391875428-6281-1-git-send-email-carlo@caione.org>
- <1391875428-6281-2-git-send-email-carlo@caione.org>
- <20140210211900.GC32042@lee--X1>
- <CAOQ7t2axObbBpVcF0z826Q2b0DaCx+wr0fvJ1X9Ek33174pOwA@mail.gmail.com>
- <20140211091505.GE32042@lee--X1>
-Message-ID: <CAOQ7t2ZWneDDrqpBQTWpmUozK8Pu4Ri97FX4E2R9NK72XECtaw@mail.gmail.com>
+From: mfuzzey@parkeon.com (Fuzzey, Martin)
+Date: Tue, 11 Feb 2014 10:34:00 +0100
+Subject: [PATCH] reset: Add generic GPIO reset driver.
+In-Reply-To: <1392038191.6687.12.camel@pizza.hi.pengutronix.de>
+References: <20140210125432.10683.86571.stgit@localhost>
+ <1392038191.6687.12.camel@pizza.hi.pengutronix.de>
+Message-ID: <CANh8QzwERe-zxCaAd4QujZJ4zcZ7SchK+w8u52fvJj0s5tx2nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 10:15 AM, Lee Jones <lee.jones@linaro.org> wrote:
->> >> +const struct of_device_id axp20x_of_match[] = {
->> >> +     { .compatible = "x-powers,axp20x", .data = (void *)AXP20X },
->> >
->> > There's no need to add device IDs if you only support one device.
+Hi Philipp,
+
+On 10 February 2014 14:16, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Hi Martin,
+>
+> Am Montag, den 10.02.2014, 13:54 +0100 schrieb Martin Fuzzey:
+>> This driver allows GPIO lines to be used as reset signals.
+>> It has two main use cases:
 >>
->> Ok. But what if in the future we want to add a new device?
+>> 1) Allow drivers to reset their hardware via a GPIO line in a standard fashion
+>> as supplied by the reset framework.
+>> This allows adhoc driver code requesting GPIOs etc to be replaced with a
+>> single call to device_reset().
 >
-> Then we add support for device identification. Until then, it's just
-> meaningless cruft.
+> have you seen the patch at https://lkml.org/lkml/2014/1/8/190:
+> "reset: Add GPIO support to reset controller framework" ?
+>
 
-Ok, I'll get rid of it in v2.
+Ah no missed that.
 
->> >> +     { },
->> >> +};
->> >> +
->> >> +static struct axp20x_dev *axp20x_pm_power_off;
->> >
->> > This looks pretty unconventional. What's the point of it?
+> Adding a GPIO reset controller device node to the device tree is the
+> wrong approach for devices enumerated in the device tree. Those should
+> just declare their reset-gpios directly.
+>
+
+Oh well if that was the conclusion.
+My use case is 2) anyway - just thought it would be sensible to
+implement a reset controller too.
+As that simplifies the driver code and makes gpio / vs more complex
+reset controller (FPGA, ..) a pure DT change.
+
+I do get the point about having to continue to support the old way
+anyway though.
+
+
+>> 2) Allow hardware on discoverable busses to be rest via a GPIO line
+>> without driver modifications.
 >>
->> On a single board we can have multiple AXPs so I track which one is in
->> charge of powering off the board (and to get the correct device in the
->> axp20x_power_off())
+>> Examples of the second use case include:
+>> * SDIO wifi modules
+>> * USB hub chips with a reset line
 >
-> Is it this device's responsibility to shut down the _entire_ board? Or
-> does the call below only turn off _this_ device?
-
-AXP shutdowns the entire board
-
->> >> +static void axp20x_power_off(void)
->> >> +{
->> >> +     regmap_write(axp20x_pm_power_off->regmap, AXP20X_OFF_CTRL, 0x80);
+> Now this is interesting. But if you export it to userspace anyway, why
+> not use the existing gpio sysfs API?
 >
-> <snip>
+
+In the normal case of reset on boot the userspace interface isn't needed.
+Setting the "auto" dt property will make the kernel do the reset by
+itself during
+early boot. This is the standard use case.
+
+The userspace interface is to let applications deal with special cases.
+It is also simpler for userspace than manlually toggling the GPIO line
+and keeps the configuration (active high / low, delay) centralised in
+the DT and consistent between the automatic on boot reset and the
+manually triggered reset.
+
+
+> I think a proper solution should handle this in the kernel. For SDIO
+> wifi modules you usually have a powerdown line that can be implemented
+> as an rfkill switch.
 >
->> >> +     of_id = of_match_device(axp20x_of_match, &i2c->dev);
->> >> +     if (!of_id) {
->> >> +             dev_err(&i2c->dev, "Unable to setup AXP20X data\n");
->> >> +             return -ENODEV;
->> >> +     }
->> >> +     axp20x->variant = (int) of_id->data;
->> >
->> > Lots of code here surrounding added device support, but only one
->> > device is supported. Why so?
->>
->> Because at the moment I support only axp202 and axp209 but I wanted
->> something future-proof
->
-> Nothing is future-proof. :)
->
-> You only need to add this functionality when it's going to be
-> utilised.
 
-I agree. Fix in v2.
+I think this is too specific. It's not just for SDIO wifi. We also
+have the problem
+of a USB hub needing to be reset.
 
->> >> +     axp20x->i2c_client = i2c;
->> >> +     i2c_set_clientdata(i2c, axp20x);
->> >> +
->> >> +     axp20x->dev = &i2c->dev;
->> >> +     dev_set_drvdata(axp20x->dev, axp20x);
->> >
->> > Do you make use of all this saving of the device container?
->> >
->> > If so, where?
->>
->> In the drivers for subsystems (input, regulators, gpio, etc..)
->
-> Can you link me to the patches please?  Any reason why they're not in
-> this set?  By submitting them together you give the Maintainers a good
-> over-view on how the system works together.
+Also even for the SDIO wifi case rfkill doesn't ssem the right
+abstraction to say "reset me"
+(particularly when firmware fails to load on warm boot if you don't).
 
-I wasn't sure it was a good idea to submit all the drivers altogether,
-so my idea was to submit one driver at a time.
-Do you think is it better to submit all the subsystems in one patch-set?
+cheers,
 
->> > Also:
->> >   i2c_set_clientdata(i2c)
->> >
->> > and:
->> >   dev_set_drvdata(i2c->dev);
->> >
->> > ... do exactly the same thing i.e. set i2c->dev->p->device_data.
->>
->> Right.
->
-> Right.  So why are you doing them both?
-
-Right == I'll fix it :)
-
-Thank you,
-
--- 
-Carlo Caione
+Martin
