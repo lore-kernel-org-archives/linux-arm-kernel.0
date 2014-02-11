@@ -1,41 +1,117 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Feb 2014 10:34:28 +0000
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <CAKfTPtDih6n5ckhXUgNKrbw5EFt45uuQFFPKB2aN0NGGG96Pmg@mail.gmail.com>
-References: <1392037324-5069-1-git-send-email-broonie@kernel.org>
- <20140210162230.GK25305@arm.com>
- <20140210164647.GB13533@sirena.org.uk>
- <CAKfTPtDih6n5ckhXUgNKrbw5EFt45uuQFFPKB2aN0NGGG96Pmg@mail.gmail.com>
-Message-ID: <20140211103428.GC8693@mudshark.cambridge.arm.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 11 Feb 2014 10:40:26 +0000
+Subject: [PATCH] ARM: mm: support big-endian page tables
+In-Reply-To: <52F9EB40.1030703@huawei.com>
+References: <52F9EB40.1030703@huawei.com>
+Message-ID: <52F9FE1A.6000607@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 08:15:19AM +0000, Vincent Guittot wrote:
-> On 10 February 2014 17:46, Mark Brown <broonie@kernel.org> wrote:
-> > On Mon, Feb 10, 2014 at 04:22:31PM +0000, Catalin Marinas wrote:
-> >> On Mon, Feb 10, 2014 at 01:02:01PM +0000, Mark Brown wrote:
-> >
-> >> > +           if (cpu != cpuid)
-> >> > +                   cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
-> >> > +   }
-> >> > +   smp_wmb();
-> >
-> >> I now noticed there are a couple of smp_wmb() calls in this patch. What
-> >> are they for?
-> >
-> > To be honest I mostly cargo culted them from the ARM implementation; I
-> > did look a bit but didn't fully dig into it - it seemed they were
-> > required to ensure that the updates for the new CPU are visible over all
-> > CPUs.  Vincent?
-> 
-> Yes that's it. we must ensure that updates are made visible to other CPUs
+On 11/02/14 09:20, Jianguo Wu wrote:
+> When enable LPAE and big-endian in a hisilicon board, while specify
+> mem=384M mem=512M at 7680M, will get bad page state:
+>
+> Freeing unused kernel memory: 180K (c0466000 - c0493000)
+> BUG: Bad page state in process init  pfn:fa442
+> page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
+> page flags: 0x40000400(reserved)
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
+> [<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
+> [<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
+> [<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
+> [<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
+> [<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
+> [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
+> [<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
+> [<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
+> [<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
+>
+> The bad pfn:fa442 is not system memory(mem=384M mem=512M at 7680M), after debugging,
+> I find in page fault handler, will get wrong pfn from pte just after set pte,
+> as follow:
+> do_anonymous_page()
+> {
+> 	...
+> 	set_pte_at(mm, address, page_table, entry);
+> 	
+> 	//debug code
+> 	pfn = pte_pfn(entry);
+> 	pr_info("pfn:0x%lx, pte:0x%llx\n", pfn, pte_val(entry));
+>
+> 	//read out the pte just set
+> 	new_pte = pte_offset_map(pmd, address);
+> 	new_pfn = pte_pfn(*new_pte);
+> 	pr_info("new pfn:0x%lx, new pte:0x%llx\n", pfn, pte_val(entry));
+> 	...
+> }
 
-In relation to what? The smp_* barriers ensure ordering of observability
-between a number of independent accesses, so you must be ensuring
-ordering against something else. Also, you need to guarantee ordering on the
-read-side too -- how is this achieved? I can't see any smp_rmb calls from a
-quick grep, so I assume you're making use of address dependencies?
+Thanks, must have missed tickling this one.
 
-/confused
+>
+> pfn:   0x1fa4f5,     pte:0xc00001fa4f575f
+> new_pfn:0xfa4f5, new_pte:0xc00000fa4f5f5f	//new pfn/pte is wrong.
+>
+> The bug is happened in cpu_v7_set_pte_ext(ptep, pte):
+> when pte is 64-bit, for little-endian, will store low 32-bit in r2,
+> high 32-bit in r3; for big-endian, will store low 32-bit in r3,
+> high 32-bit in r2, this will cause wrong pfn stored in pte,
+> so we should exchange r2 and r3 for big-endian.
+>
+> Signed-off-by: Jianguo Wu <wujianguo@huawei.com>
+> ---
+>   arch/arm/mm/proc-v7-3level.S |   10 ++++++++++
+>   1 files changed, 10 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+> index 6ba4bd9..71b3892 100644
+> --- a/arch/arm/mm/proc-v7-3level.S
+> +++ b/arch/arm/mm/proc-v7-3level.S
+> @@ -65,6 +65,15 @@ ENDPROC(cpu_v7_switch_mm)
+>    */
+>   ENTRY(cpu_v7_set_pte_ext)
+>   #ifdef CONFIG_MMU
+> +#ifdef CONFIG_CPU_ENDIAN_BE8
+> +	tst	r3, #L_PTE_VALID
+> +	beq	1f
+> +	tst	r2, #1 << (57 - 32)		@ L_PTE_NONE
+> +	bicne	r3, #L_PTE_VALID
+> +	bne	1f
+> +	tst	r2, #1 << (55 - 32)		@ L_PTE_DIRTY
+> +	orreq	r3, #L_PTE_RDONLY
+> +#else
+>   	tst	r2, #L_PTE_VALID
+>   	beq	1f
+>   	tst	r3, #1 << (57 - 32)		@ L_PTE_NONE
+> @@ -72,6 +81,7 @@ ENTRY(cpu_v7_set_pte_ext)
+>   	bne	1f
+>   	tst	r3, #1 << (55 - 32)		@ L_PTE_DIRTY
+>   	orreq	r2, #L_PTE_RDONLY
+> +#endif
+>   1:	strd	r2, r3, [r0]
+>   	ALT_SMP(W(nop))
+>   	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
+> -- 1.7.1
 
-Will
+If possible can we avoid large #ifdef blocks here?
+
+Two ideas are
+
+ARM_LE(tst r2, #L_PTE_VALID)
+ARM_BE(tst r3, #L_PTE_VALID)
+
+or change r2, r3 pair to say rlow, rhi and
+
+#ifdef  CONFIG_CPU_ENDIAN_BE8
+#define rlow r3
+#define rhi r2
+#else
+#define rlow r2
+#define rhi r3
+#endif
+
+
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
