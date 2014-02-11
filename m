@@ -1,103 +1,45 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 11 Feb 2014 07:48:32 +0100
-Subject: [PATCH] video: xilinxfb: Move xilinxfb_platform_data directly to the
- driver
-Message-ID: <af8de8bd8803b319c0f6a02ca5109768e5ef8457.1392101292.git.michal.simek@xilinx.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 10 Feb 2014 22:49:24 -0800
+Subject: [PATCH] sched_clock: Prevent callers from seeing half-updated data
+In-Reply-To: <52F55E14.9080609@linaro.org>
+References: <52F524A3.3070400@linaro.org>
+ <1391806139-20116-1-git-send-email-sboyd@codeaurora.org>
+ <20140207222237.GF12815@codeaurora.org>
+ <52F55E14.9080609@linaro.org>
+Message-ID: <20140211064924.GA14769@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No reason to have separate file in header in include/linux folder
-if this is purely driver specific structure.
+On 02/07, John Stultz wrote:
+> On 02/07/2014 02:22 PM, Stephen Boyd wrote:
+> > On 02/07, Stephen Boyd wrote:
+> >> If two sched_clock sources are registered we may end up in a
+> >> situation where a call to sched_clock() may be accessing the
+> >> epoch cycle count for the old counter and the cycle count for the
+> >> new counter. This can lead to confusing results where
+> >> sched_clock() values jump and then are reset to 0 (due to the way
+> >> the registration function forces the epoch_ns to be 0). Fix this
+> >> by reorganizing the registration function to hold the seqlock for
+> >> as short a time as possible while we update the clock_data
+> >> structure for a new counter and stop resetting the epoch_ns count
+> >> to 0.
+> > Hmm.. This won't properly accumulate time. We need to put
+> > whatever time has elapsed into epoch_ns when we register the new
+> > counter for this to work. I don't have a board with this
+> > configuration but I'll send a v2 that should fix this. Hopefully
+> > Will can test it.
+> 
+> Also maybe clarify in the commit message that this is a result of not
+> having the necessary locking in place in the registration code (likely
+> due to it not really being required in the single clock case), just so
+> Ingo and others have some more context as to why this is needed now and
+> wasn't hit before.
+> 
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Hmph... I already sent v2 before you replied. Is the commit text
+good enough? I do mention that this is about two sched_clock
+sources being registered.
 
-I have this patch in my devel tree for a while and would like
-to hear your opinion. I can't see any reason to have
-xilinxfb_platform_data in header if this is purely OF driver
-used on OF archs.
----
- drivers/video/xilinxfb.c | 15 ++++++++++++++-
- include/linux/xilinxfb.h | 30 ------------------------------
- 2 files changed, 14 insertions(+), 31 deletions(-)
- delete mode 100644 include/linux/xilinxfb.h
-
-diff --git a/drivers/video/xilinxfb.c b/drivers/video/xilinxfb.c
-index 6ff1a91..553cff2 100644
---- a/drivers/video/xilinxfb.c
-+++ b/drivers/video/xilinxfb.c
-@@ -33,7 +33,6 @@
- #include <linux/of_platform.h>
- #include <linux/of_address.h>
- #include <linux/io.h>
--#include <linux/xilinxfb.h>
- #include <linux/slab.h>
-
- #ifdef CONFIG_PPC_DCR
-@@ -84,6 +83,20 @@
-
- #define PALETTE_ENTRIES_NO	16	/* passed to fb_alloc_cmap() */
-
-+/* ML300/403 reference design framebuffer driver platform data struct */
-+struct xilinxfb_platform_data {
-+	u32 rotate_screen;      /* Flag to rotate display 180 degrees */
-+	u32 screen_height_mm;   /* Physical dimensions of screen in mm */
-+	u32 screen_width_mm;
-+	u32 xres, yres;         /* resolution of screen in pixels */
-+	u32 xvirt, yvirt;       /* resolution of memory buffer */
-+
-+	/* Physical address of framebuffer memory; If non-zero, driver
-+	* will use provided memory address instead of allocating one from
-+	* the consistent pool. */
-+	u32 fb_phys;
-+};
-+
- /*
-  * Default xilinxfb configuration
-  */
-diff --git a/include/linux/xilinxfb.h b/include/linux/xilinxfb.h
-deleted file mode 100644
-index 5a155a9..0000000
---- a/include/linux/xilinxfb.h
-+++ /dev/null
-@@ -1,30 +0,0 @@
--/*
-- * Platform device data for Xilinx Framebuffer device
-- *
-- * Copyright 2007 Secret Lab Technologies Ltd.
-- *
-- * This file is licensed under the terms of the GNU General Public License
-- * version 2.  This program is licensed "as is" without any warranty of any
-- * kind, whether express or implied.
-- */
--
--#ifndef __XILINXFB_H__
--#define __XILINXFB_H__
--
--#include <linux/types.h>
--
--/* ML300/403 reference design framebuffer driver platform data struct */
--struct xilinxfb_platform_data {
--	u32 rotate_screen;	/* Flag to rotate display 180 degrees */
--	u32 screen_height_mm;	/* Physical dimensions of screen in mm */
--	u32 screen_width_mm;
--	u32 xres, yres;		/* resolution of screen in pixels */
--	u32 xvirt, yvirt;	/* resolution of memory buffer */
--
--	/* Physical address of framebuffer memory; If non-zero, driver
--	 * will use provided memory address instead of allocating one from
--	 * the consistent pool. */
--	u32 fb_phys;
--};
--
--#endif  /* __XILINXFB_H__ */
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140211/a20eda0d/attachment.sig>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
