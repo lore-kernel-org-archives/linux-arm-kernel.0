@@ -1,164 +1,383 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 11 Feb 2014 12:45:41 +0100
-Subject: [RFC PATCH v2 1/4] staging: imx-drm: Add temporary copies of v4l2-of
- parsing functions
+Date: Tue, 11 Feb 2014 12:45:44 +0100
+Subject: [RFC PATCH v2 4/4] ARM: dts: imx6qdl: Add ports and endpoints to IPU
+ DIs
 In-Reply-To: <1392119144-27868-1-git-send-email-p.zabel@pengutronix.de>
 References: <1392119144-27868-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1392119144-27868-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1392119144-27868-5-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <philipp.zabel@gmail.com>
+This connects the IPU and display encoder (HDMI, LVDS, MIPI)
+device tree nodes using the bindings described in
+Documentation/devicetree/bindings/media/video-interfaces.txt
 
-The video interface bindings described in
-Documentation/device-tree/bindings/media/video-interfaces.txt
-are useful for DRM drivers, too. To decouple development,
-duplicate the v4l2-of parser functions temporarily. Also modify
-imx_drm_of_get_next_endpoint to decrement the refcount of prev.
+The IPU ports correspond to the two display interfaces. The
+order of endpoints in the ports is arbitrary.
 
-Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+Each encoder with an associated input multiplexer has multiple
+input ports in the device tree. The order and reg property of
+the ports must correspond to the multiplexer input order.
+
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/staging/imx-drm/Makefile     |   2 +-
- drivers/staging/imx-drm/imx-drm-of.c | 106 +++++++++++++++++++++++++++++++++++
- drivers/staging/imx-drm/imx-drm.h    |   4 ++
- 3 files changed, 111 insertions(+), 1 deletion(-)
- create mode 100644 drivers/staging/imx-drm/imx-drm-of.c
+ arch/arm/boot/dts/imx6dl.dtsi  |   9 ++-
+ arch/arm/boot/dts/imx6q.dtsi   | 115 ++++++++++++++++++++++++++++++++--
+ arch/arm/boot/dts/imx6qdl.dtsi | 137 ++++++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 248 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/Makefile b/drivers/staging/imx-drm/Makefile
-index 129e3a3..743b875 100644
---- a/drivers/staging/imx-drm/Makefile
-+++ b/drivers/staging/imx-drm/Makefile
-@@ -1,5 +1,5 @@
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 6dc3970..be63e41 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -72,6 +72,10 @@
+ 	};
+ };
  
--imxdrm-objs := imx-drm-core.o
-+imxdrm-objs := imx-drm-core.o imx-drm-of.o
++&hdmi {
++	compatible = "fsl,imx6dl-hdmi";
++};
++
+ &ldb {
+ 	clocks = <&clks 33>, <&clks 34>,
+ 		 <&clks 39>, <&clks 40>,
+@@ -88,8 +92,3 @@
+ 		crtcs = <&ipu1 0>, <&ipu1 1>;
+ 	};
+ };
+-
+-&hdmi {
+-	compatible = "fsl,imx6dl-hdmi";
+-	crtcs = <&ipu1 0>, <&ipu1 1>;
+-};
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 187fe33..f36f739 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -132,13 +132,75 @@
+ 		};
  
- obj-$(CONFIG_DRM_IMX) += imxdrm.o
+ 		ipu2: ipu at 02800000 {
+-			#crtc-cells = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 			compatible = "fsl,imx6q-ipu";
+ 			reg = <0x02800000 0x400000>;
+ 			interrupts = <0 8 0x4 0 7 0x4>;
+ 			clocks = <&clks 133>, <&clks 134>, <&clks 137>;
+ 			clock-names = "bus", "di0", "di1";
+ 			resets = <&src 4>;
++
++			port at 2 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <2>;
++
++				ipu2_di0_disp0: endpoint at 0 {
++				};
++
++				ipu2_di0_hdmi: endpoint at 1 {
++					remote-endpoint = <&hdmi_mux_2>;
++				};
++
++				ipu2_di0_mipi: endpoint at 2 {
++				};
++
++				ipu2_di0_lvds0: endpoint at 3 {
++				};
++
++				ipu2_di0_lvds1: endpoint at 4 {
++				};
++			};
++
++			port at 3 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <3>;
++
++				ipu2_di1_hdmi: endpoint at 1 {
++					remote-endpoint = <&hdmi_mux_3>;
++				};
++
++				ipu2_di1_mipi: endpoint at 2 {
++				};
++
++				ipu2_di1_lvds0: endpoint at 3 {
++				};
++
++				ipu2_di1_lvds1: endpoint at 4 {
++				};
++			};
++		};
++	};
++};
++
++&hdmi {
++	compatible = "fsl,imx6q-hdmi";
++
++	port at 2 {
++		reg = <2>;
++
++		hdmi_mux_2: endpoint {
++			remote-endpoint = <&ipu2_di0_hdmi>;
++		};
++	};
++
++	port at 3 {
++		reg = <3>;
++
++		hdmi_mux_3: endpoint {
++			remote-endpoint = <&ipu2_di1_hdmi>;
+ 		};
+ 	};
+ };
+@@ -152,15 +214,56 @@
+ 		      "di0", "di1";
  
-diff --git a/drivers/staging/imx-drm/imx-drm-of.c b/drivers/staging/imx-drm/imx-drm-of.c
-new file mode 100644
-index 0000000..12f37eb
---- /dev/null
-+++ b/drivers/staging/imx-drm/imx-drm-of.c
-@@ -0,0 +1,106 @@
-+/*
-+ * Video Interface OF binding parsing library
-+ *
-+ * Copyright (C) 2012 - 2013 Samsung Electronics Co., Ltd.
-+ * Author: Sylwester Nawrocki <s.nawrocki@samsung.com>
-+ *
-+ * Copyright (C) 2012 Renesas Electronics Corp.
-+ * Author: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of version 2 of the GNU General Public License as
-+ * published by the Free Software Foundation.
-+ */
+ 	lvds-channel at 0 {
+-		crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
++		port at 2 {
++			reg = <2>;
 +
-+#include <linux/kernel.h>
-+#include <linux/of.h>
++			lvds0_mux_2: endpoint {
++				remote-endpoint = <&ipu2_di0_lvds0>;
++			};
++		};
 +
-+/**
-+ * imx_drm_get_next_endpoint() - get next endpoint node
-+ * @parent: pointer to the parent device node
-+ * @prev: previous endpoint node, or NULL to get first
-+ *
-+ * Return: An 'endpoint' node pointer with refcount incremented. Refcount
-+ * of the passed @prev node is decremented.
-+ */
-+struct device_node *imx_drm_of_get_next_endpoint(
-+		const struct device_node *parent, struct device_node *prev)
-+{
-+	struct device_node *endpoint;
-+	struct device_node *port = NULL;
++		port at 3 {
++			reg = <3>;
 +
-+	if (!parent)
-+		return NULL;
-+
-+	if (!prev) {
-+		struct device_node *node;
-+		/*
-+		 * It's the first call, we have to find a port subnode
-+		 * within this node or within an optional 'ports' node.
-+		 */
-+		node = of_get_child_by_name(parent, "ports");
-+		if (node)
-+			parent = node;
-+
-+		port = of_get_child_by_name(parent, "port");
-+
-+		if (port) {
-+			/* Found a port, get an endpoint. */
-+			endpoint = of_get_next_child(port, NULL);
-+			of_node_put(port);
-+		} else {
-+			endpoint = NULL;
-+		}
-+
-+		if (!endpoint)
-+			pr_err("%s(): no endpoint nodes specified for %s\n",
-+			       __func__, parent->full_name);
-+		of_node_put(node);
-+	} else {
-+		port = of_get_parent(prev);
-+		if (!port) {
-+			/* Hm, has someone given us the root node ?... */
-+			of_node_put(prev);
-+			return NULL;
-+		}
-+
-+		endpoint = of_get_next_child(port, prev);
-+		if (endpoint) {
-+			of_node_put(port);
-+			return endpoint;
-+		}
-+
-+		/* No more endpoints under this port, try the next one. */
-+		do {
-+			port = of_get_next_child(parent, port);
-+			if (!port)
-+				return NULL;
-+		} while (of_node_cmp(port->name, "port"));
-+
-+		/* Pick up the first endpoint in this port. */
-+		endpoint = of_get_next_child(port, NULL);
-+		of_node_put(port);
-+	}
-+
-+	return endpoint;
-+}
-+EXPORT_SYMBOL_GPL(imx_drm_of_get_next_endpoint);
-+
-+/**
-+ * imx_drm_of_get_remote_port() - get remote port node
-+ * @node: pointer to a local endpoint device_node
-+ *
-+ * Return: Remote port node associated with remote endpoint node linked
-+ *	   to @node. Use of_node_put() on it when done.
-+ */
-+struct device_node *imx_drm_of_get_remote_port(const struct device_node *node)
-+{
-+	struct device_node *np;
-+
-+	/* Get remote endpoint node. */
-+	np = of_parse_phandle(node, "remote-endpoint", 0);
-+	if (!np)
-+		return NULL;
-+	return of_get_next_parent(np);
-+}
-+EXPORT_SYMBOL_GPL(imx_drm_of_get_remote_port);
-diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
-index aa21028..9af4a82 100644
---- a/drivers/staging/imx-drm/imx-drm.h
-+++ b/drivers/staging/imx-drm/imx-drm.h
-@@ -58,4 +58,8 @@ int imx_drm_connector_mode_valid(struct drm_connector *connector,
- void imx_drm_connector_destroy(struct drm_connector *connector);
- void imx_drm_encoder_destroy(struct drm_encoder *encoder);
++			lvds0_mux_3: endpoint {
++				remote-endpoint = <&ipu2_di1_lvds0>;
++			};
++		};
+ 	};
  
-+struct device_node *imx_drm_of_get_next_endpoint(
-+		const struct device_node *parent, struct device_node *prev);
-+struct device_node *imx_drm_of_get_remote_port(const struct device_node *node);
+ 	lvds-channel at 1 {
+-		crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
++		port at 2 {
++			reg = <2>;
 +
- #endif /* _IMX_DRM_H_ */
++			lvds1_mux_2: endpoint {
++				remote-endpoint = <&ipu2_di0_lvds1>;
++			};
++		};
++
++		port at 3 {
++			reg = <3>;
++
++			lvds1_mux_3: endpoint {
++				remote-endpoint = <&ipu2_di1_lvds1>;
++			};
++		};
+ 	};
+ };
+ 
+-&hdmi {
+-	compatible = "fsl,imx6q-hdmi";
+-	crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
++&mipi_dsi {
++	port at 2 {
++		reg = <2>;
++
++		mipi_mux_2: endpoint {
++			remote-endpoint = <&ipu2_di0_mipi>;
++		};
++	};
++
++	port at 3 {
++		reg = <3>;
++
++		mipi_mux_3: endpoint {
++			remote-endpoint = <&ipu2_di1_mipi>;
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 930ebe0..098fcc7 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1358,23 +1358,87 @@
+ 				status = "disabled";
+ 
+ 				lvds-channel at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
+ 					reg = <0>;
+ 					status = "disabled";
++
++					port at 0 {
++						reg = <0>;
++
++						lvds0_mux_0: endpoint {
++							remote-endpoint = <&ipu1_di0_lvds0>;
++						};
++					};
++
++					port at 1 {
++						reg = <1>;
++
++						lvds0_mux_1: endpoint {
++							remote-endpoint = <&ipu1_di1_lvds0>;
++						};
++					};
++
++					port at 4 {
++						lvds0: endpoint {
++						};
++					};
+ 				};
+ 
+ 				lvds-channel at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
+ 					reg = <1>;
+ 					status = "disabled";
++
++					port at 0 {
++						reg = <0>;
++
++						lvds1_mux_0: endpoint {
++							remote-endpoint = <&ipu1_di0_lvds1>;
++						};
++					};
++
++					port at 1 {
++						reg = <1>;
++
++						lvds1_mux_1: endpoint {
++							remote-endpoint = <&ipu1_di1_lvds1>;
++						};
++					};
++
++					port at 4 {
++						lvds1: endpoint {
++						};
++					};
+ 				};
+ 			};
+ 
+ 			hdmi: hdmi at 0120000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x00120000 0x9000>;
+ 				interrupts = <0 115 0x04>;
+ 				gpr = <&gpr>;
+ 				clocks = <&clks 123>, <&clks 124>;
+ 				clock-names = "iahb", "isfr";
+ 				status = "disabled";
++
++				port at 0 {
++					reg = <0>;
++
++					hdmi_mux_0: endpoint {
++						remote-endpoint = <&ipu1_di0_hdmi>;
++					};
++				};
++
++				port at 1 {
++					reg = <1>;
++
++					hdmi_mux_1: endpoint {
++						remote-endpoint = <&ipu1_di1_hdmi>;
++					};
++				};
+ 			};
+ 
+ 			dcic1: dcic at 020e4000 {
+@@ -1588,8 +1652,26 @@
+ 				reg = <0x021dc000 0x4000>;
+ 			};
+ 
+-			mipi at 021e0000 { /* MIPI-DSI */
++			mipi_dsi: mipi at 021e0000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				reg = <0x021e0000 0x4000>;
++
++				port at 0 {
++					reg = <0>;
++
++					mipi_mux_0: endpoint {
++						remote-endpoint = <&ipu1_di0_mipi>;
++					};
++				};
++
++				port at 1 {
++					reg = <1>;
++
++					mipi_mux_1: endpoint {
++						remote-endpoint = <&ipu1_di1_mipi>;
++					};
++				};
+ 			};
+ 
+ 			vdoa at 021e4000 {
+@@ -1643,13 +1725,64 @@
+ 		};
+ 
+ 		ipu1: ipu at 02400000 {
+-			#crtc-cells = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 			compatible = "fsl,imx6q-ipu";
+ 			reg = <0x02400000 0x400000>;
+ 			interrupts = <0 6 0x4 0 5 0x4>;
+ 			clocks = <&clks 130>, <&clks 131>, <&clks 132>;
+ 			clock-names = "bus", "di0", "di1";
+ 			resets = <&src 2>;
++
++			port at 2 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <2>;
++
++				ipu1_di0_disp0: endpoint at 0 {
++				};
++
++				ipu1_di0_hdmi: endpoint at 1 {
++					remote-endpoint = <&hdmi_mux_0>;
++				};
++
++				ipu1_di0_mipi: endpoint at 2 {
++					remote-endpoint = <&mipi_mux_0>;
++				};
++
++				ipu1_di0_lvds0: endpoint at 3 {
++					remote-endpoint = <&lvds0_mux_0>;
++				};
++
++				ipu1_di0_lvds1: endpoint at 4 {
++					remote-endpoint = <&lvds1_mux_0>;
++				};
++			};
++
++			port at 3 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <3>;
++
++				ipu1_di0_disp1: endpoint at 0 {
++				};
++
++				ipu1_di1_hdmi: endpoint at 1 {
++					remote-endpoint = <&hdmi_mux_1>;
++				};
++
++				ipu1_di1_mipi: endpoint at 2 {
++					remote-endpoint = <&mipi_mux_1>;
++				};
++
++				ipu1_di1_lvds0: endpoint at 3 {
++					remote-endpoint = <&lvds0_mux_1>;
++				};
++
++				ipu1_di1_lvds1: endpoint at 4 {
++					remote-endpoint = <&lvds1_mux_1>;
++				};
++			};
+ 		};
+ 	};
+ };
 -- 
 1.8.5.3
