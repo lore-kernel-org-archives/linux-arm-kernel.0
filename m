@@ -1,45 +1,26 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 11 Feb 2014 17:32:03 +0100
-Subject: [PATCH v2] clk: respect the clock dependencies in of_clk_init
-In-Reply-To: <1392054179-28830-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1392054179-28830-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140211173203.4e6c7b22@skate>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 11 Feb 2014 17:35:27 +0100
+Subject: [PATCH v2 0/2] ohci-/ehci-platform: Change compatible string to
+ generic-?hci
+Message-ID: <1392136529-5060-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Greg,
 
-On Mon, 10 Feb 2014 18:42:59 +0100, Gregory CLEMENT wrote:
-> Until now the clock providers were initialized in the order found in
-> the device tree. This led to have the dependencies between the clocks
-> not respected: children clocks could be initialized before their
-> parent clocks.
-> 
-> Instead of forcing each platform to manage its own initialization order,
-> this patch adds this work inside the framework itself.
-> 
-> Using the data of the device tree the of_clk_init function now delayed
-> the initialization of a clock provider if its parent provider was not
-> ready yet.
-> 
-> The strict dependency check (all parents of a given clk must be
-> initialized) was added by Boris BREZILLON
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
-> 
-> Since the v1, I have merged the  strict dependency check from Boris.
-> And of course tested on my Armada 370 and Armada XP based board
-> 
->  drivers/clk/clk.c | 109 ++++++++++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 106 insertions(+), 3 deletions(-)
+And here is v2 of my ohci-/ehci-platform fixes for the regression of USB
+support on various ARM boards I caused in linux-next.
 
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+As expected some people still did not like the ?hci-platform compatible
+string I went for in v1, hence this v2. The good news is it seems everyone
+seems to be able to live with generic-?hci as compatible now, so it seems this
+issue is finally settled.
 
-On the newly proposed Armada 375 platform.
+Please add these 2 patches to your usb-next tree, as said in the cover-letter
+of v1, I'm fine with you squashing these into the first 2 patches of my
+original series, but if you want them separate to preserve history that is
+fine too.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks & Regards,
+
+Hans
