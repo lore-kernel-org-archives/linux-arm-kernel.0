@@ -1,15 +1,14 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 11 Feb 2014 07:55:45 +0100
-Subject: [PATCH v2 02/11] watchdog: xilinx: Move control_status_reg to
- functions
+Date: Tue, 11 Feb 2014 07:55:46 +0100
+Subject: [PATCH v2 03/11] watchdog: xilinx: Simplify probe and remove functions
 In-Reply-To: <f298edd222c57b0ce1ebad3ae50c3f715406c631.1392101734.git.michal.simek@xilinx.com>
 References: <f298edd222c57b0ce1ebad3ae50c3f715406c631.1392101734.git.michal.simek@xilinx.com>
-Message-ID: <edb974b379ad91a5736d95133ac5dc6de882f5a6.1392101734.git.michal.simek@xilinx.com>
+Message-ID: <619599eff39de3551d53c75dd6c95678d9a81df1.1392101734.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-control_status_reg is temp variables and should be
-used locally by specific function.
+Use devm_ helper function to simplify probe and error path.
+Move ioremap to the beginning of probe function.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 Reviewed-by: Guenter Roeck <linux@roeck-us.net>
@@ -17,47 +16,111 @@ Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
 Changes in v2: None
 
- drivers/watchdog/of_xilinx_wdt.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/watchdog/of_xilinx_wdt.c | 41 +++++++++-------------------------------
+ 1 file changed, 9 insertions(+), 32 deletions(-)
 
 diff --git a/drivers/watchdog/of_xilinx_wdt.c b/drivers/watchdog/of_xilinx_wdt.c
-index 8c2814e..aca9bab 100644
+index aca9bab..7f371ed 100644
 --- a/drivers/watchdog/of_xilinx_wdt.c
 +++ b/drivers/watchdog/of_xilinx_wdt.c
-@@ -52,13 +52,14 @@ struct xwdt_device {
- static struct xwdt_device xdev;
+@@ -12,6 +12,7 @@
 
- static  u32 timeout;
--static  u32 control_status_reg;
- static  u8  no_timeout;
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
- static  DEFINE_SPINLOCK(spinlock);
++#include <linux/err.h>
+ #include <linux/module.h>
+ #include <linux/types.h>
+ #include <linux/kernel.h>
+@@ -44,7 +45,6 @@
+ #define PFX WATCHDOG_NAME ": "
 
- static int xilinx_wdt_start(struct watchdog_device *wdd)
- {
-+	u32 control_status_reg;
+ struct xwdt_device {
+-	struct resource  res;
+ 	void __iomem *base;
+ 	u32 wdt_interval;
+ };
+@@ -159,9 +159,15 @@ static int xwdt_probe(struct platform_device *pdev)
+ 	int rc;
+ 	u32 *tmptr;
+ 	u32 *pfreq;
++	struct resource *res;
+
+ 	no_timeout = 0;
+
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	xdev.base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(xdev.base))
++		return PTR_ERR(xdev.base);
 +
- 	spin_lock(&spinlock);
+ 	pfreq = (u32 *)of_get_property(pdev->dev.of_node,
+ 					"clock-frequency", NULL);
 
- 	/* Clean previous status and enable the watchdog timer */
-@@ -77,6 +78,8 @@ static int xilinx_wdt_start(struct watchdog_device *wdd)
+@@ -170,12 +176,6 @@ static int xwdt_probe(struct platform_device *pdev)
+ 		no_timeout = 1;
+ 	}
 
- static int xilinx_wdt_stop(struct watchdog_device *wdd)
+-	rc = of_address_to_resource(pdev->dev.of_node, 0, &xdev.res);
+-	if (rc) {
+-		pr_warn("invalid address!\n");
+-		return rc;
+-	}
+-
+ 	tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+ 					"xlnx,wdt-interval", NULL);
+ 	if (tmptr == NULL) {
+@@ -199,50 +199,27 @@ static int xwdt_probe(struct platform_device *pdev)
+ 	if (!no_timeout)
+ 		timeout = 2 * ((1<<xdev.wdt_interval) / *pfreq);
+
+-	if (!request_mem_region(xdev.res.start,
+-			xdev.res.end - xdev.res.start + 1, WATCHDOG_NAME)) {
+-		rc = -ENXIO;
+-		pr_err("memory request failure!\n");
+-		goto err_out;
+-	}
+-
+-	xdev.base = ioremap(xdev.res.start, xdev.res.end - xdev.res.start + 1);
+-	if (xdev.base == NULL) {
+-		rc = -ENOMEM;
+-		pr_err("ioremap failure!\n");
+-		goto release_mem;
+-	}
+-
+ 	rc = xwdt_selftest();
+ 	if (rc == XWT_TIMER_FAILED) {
+ 		pr_err("SelfTest routine error!\n");
+-		goto unmap_io;
++		return rc;
+ 	}
+
+ 	rc = watchdog_register_device(&xilinx_wdt_wdd);
+ 	if (rc) {
+ 		pr_err("cannot register watchdog (err=%d)\n", rc);
+-		goto unmap_io;
++		return rc;
+ 	}
+
+ 	dev_info(&pdev->dev, "Xilinx Watchdog Timer at %p with timeout %ds\n",
+ 		 xdev.base, timeout);
+
+ 	return 0;
+-
+-unmap_io:
+-	iounmap(xdev.base);
+-release_mem:
+-	release_mem_region(xdev.res.start, resource_size(&xdev.res));
+-err_out:
+-	return rc;
+ }
+
+ static int xwdt_remove(struct platform_device *dev)
  {
-+	u32 control_status_reg;
-+
- 	spin_lock(&spinlock);
+ 	watchdog_unregister_device(&xilinx_wdt_wdd);
+-	iounmap(xdev.base);
+-	release_mem_region(xdev.res.start, resource_size(&xdev.res));
 
- 	control_status_reg = ioread32(xdev.base + XWT_TWCSR0_OFFSET);
-@@ -94,6 +97,8 @@ static int xilinx_wdt_stop(struct watchdog_device *wdd)
-
- static int xilinx_wdt_keepalive(struct watchdog_device *wdd)
- {
-+	u32 control_status_reg;
-+
- 	spin_lock(&spinlock);
-
- 	control_status_reg = ioread32(xdev.base + XWT_TWCSR0_OFFSET);
+ 	return 0;
+ }
 --
 1.8.2.3
 
@@ -67,4 +130,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140211/425aca82/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140211/0671e8fe/attachment-0001.sig>
