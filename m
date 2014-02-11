@@ -1,42 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Feb 2014 13:59:02 +0000
-Subject: [PATCH 0/7] primecell: make correct clock parsing possible
-In-Reply-To: <20140211123356.GH26684@n2100.arm.linux.org.uk>
-References: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
- <20140211123356.GH26684@n2100.arm.linux.org.uk>
-Message-ID: <20140211135902.GA12476@e106331-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 11 Feb 2014 14:07:50 +0000
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <CAKfTPtDjF2bZsoj+tgBH-ZXYXNbXQ2mBie0FVgUy2vb_jY12FQ@mail.gmail.com>
+References: <1392037324-5069-1-git-send-email-broonie@kernel.org>
+ <20140210162230.GK25305@arm.com>
+ <20140210164647.GB13533@sirena.org.uk>
+ <CAKfTPtDih6n5ckhXUgNKrbw5EFt45uuQFFPKB2aN0NGGG96Pmg@mail.gmail.com>
+ <20140211103428.GC8693@mudshark.cambridge.arm.com>
+ <CAKfTPtDjF2bZsoj+tgBH-ZXYXNbXQ2mBie0FVgUy2vb_jY12FQ@mail.gmail.com>
+Message-ID: <20140211140749.GE3748@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 12:33:56PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 11, 2014 at 11:37:05AM +0000, Mark Rutland wrote:
-> > These patches attempt to harmonize the bindings and the drivers with what's in
-> > use today, in a backwards compatible fashion, relieving us of our present
-> > Kafkaesque nightmare. Each peripheral's clock(s) are given explicit names which
-> > can be used, though code will fall back to the existing behaviour if said names
-> > are not provided. Additionally the currently unmet ordering requirement of
-> > apb_pclk is dropped, given all existing that code requires this to be named
-> > anyway.
+On Tue, Feb 11, 2014 at 01:18:56PM +0000, Vincent Guittot wrote:
+> On 11 February 2014 11:34, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Feb 11, 2014 at 08:15:19AM +0000, Vincent Guittot wrote:
+> >> On 10 February 2014 17:46, Mark Brown <broonie@kernel.org> wrote:
+> >> > On Mon, Feb 10, 2014 at 04:22:31PM +0000, Catalin Marinas wrote:
+> >> >> On Mon, Feb 10, 2014 at 01:02:01PM +0000, Mark Brown wrote:
+> >> >
+> >> >> > +           if (cpu != cpuid)
+> >> >> > +                   cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
+> >> >> > +   }
+> >> >> > +   smp_wmb();
+> >> >
+> >> >> I now noticed there are a couple of smp_wmb() calls in this patch. What
+> >> >> are they for?
+> >> >
+> >> > To be honest I mostly cargo culted them from the ARM implementation; I
+> >> > did look a bit but didn't fully dig into it - it seemed they were
+> >> > required to ensure that the updates for the new CPU are visible over all
+> >> > CPUs.  Vincent?
+> >>
+> >> Yes that's it. we must ensure that updates are made visible to other CPUs
+> >
+> > In relation to what? The smp_* barriers ensure ordering of observability
+> > between a number of independent accesses, so you must be ensuring
+> > ordering against something else. Also, you need to guarantee ordering on the
+> > read-side too -- how is this achieved? I can't see any smp_rmb calls from a
+> > quick grep, so I assume you're making use of address dependencies?
 > 
-> The reason why these clocks ended up with NULL names was to force the
-> issue that clocks shall not be named solely by their connection IDs,
-> which was a major problem before DT.  Now that we have DT, I'm happier
-> to reinstate the names, but I think we should just reinstate the names
-> we had previously.  That should be in the git history.
+> The boot sequence ensures the rmb
 
-Good to know, that sounds fine to me.
+As Will said, smp_*mb() do not ensure absolute visibility, only relative
+to subsequent memory accesses on the same processor. So just placing a
+barrier at the end of a function does not mean much, it only shows half
+of the problem it is trying to solve.
 
-> 
-> The down-side is those names are all in capitals - but they were named
-> after the signal name(s) given in the Primecell documentation.
+How are the secondary CPUs using this information? AFAICT, secondaries
+call smp_store_cpu_info() which also go through each CPU in
+update_siblings_mask(). Is there any race here that smp_wmb() is trying
+to solve?
 
-As long as we have standardised names I'm not too worried about which
-case they happen to be in, and matching the documentation seems
-sensible. The pl050 driver expects "KMIREFCLK" already, so it would be
-in keeping with (as far as I can tell) the only Primecell driver
-currently requesting a clock by name.
+I guess for secondaries you could move the barrier just before
+set_cpu_online(), this way it is clear that we want any previous writes
+to become visible when this CPU is marked online. For the primary, any
+memory writes should become visible before the CPU is started. One
+synchronisation point is the pen release, depending on the smp_ops. I
+think that's already covered by code like arch/arm/mach-*/platsmp.c.
 
-I'll prepare a v2 shortly.
+So my proposal is to remove the smp_wmb() from topology.c and add it
+where it is relevant as described above. If we have some race in
+topology.c (like for example we may later decide to start more
+secondaries at the same time), it needs to be solved using spinlocks.
 
-Cheers,
-Mark.
+-- 
+Catalin
