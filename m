@@ -1,66 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Feb 2014 11:42:52 +0100
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <20140210173450.GA5554@obsidianresearch.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <201402092130.25615.arnd@arndb.de>
- <20140210173450.GA5554@obsidianresearch.com>
-Message-ID: <2006726.HhIT01YuXY@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Feb 2014 10:45:53 +0000
+Subject: [RFC/PATCH v2] ARM: vDSO gettimeofday using generic timer
+ architecture
+In-Reply-To: <52F9675F.1040403@mentor.com>
+References: <1391814349-10706-1-git-send-email-nathan_lynch@mentor.com>
+ <20140209102023.GL26684@n2100.arm.linux.org.uk>
+ <52F9675F.1040403@mentor.com>
+Message-ID: <20140211104553.GD8693@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 February 2014 10:34:50 Jason Gunthorpe wrote:
-
-> I noticed this on mvebu as well..
+On Mon, Feb 10, 2014 at 11:57:19PM +0000, Nathan Lynch wrote:
+> On 02/09/2014 04:20 AM, Russell King - ARM Linux wrote:
+> > On Fri, Feb 07, 2014 at 05:05:49PM -0600, Nathan Lynch wrote:
+> >> +	/* Grab the vDSO code pages. */
+> >> +	for (i = 0; i < vdso_pages; i++) {
+> >> +		pg = virt_to_page(&vdso_start + i*PAGE_SIZE);
+> >> +		ClearPageReserved(pg);
+> >> +		get_page(pg);
+> >> +		vdso_pagelist[i] = pg;
+> >> +	}
+> > 
+> > Why do we want to clear the reserved status?  This looks over complicated
+> > to me.
+> > 
+> >> +
+> >> +	/* Sanity check the shared object header. */
+> >> +	vbase = vmap(vdso_pagelist, 1, 0, PAGE_KERNEL);
+> >> +	if (vbase == NULL) {
+> >> +		pr_err("Failed to map vDSO pagelist!\n");
+> >> +		return -ENOMEM;
+> >> +	} else if (memcmp(vbase, "\177ELF", 4)) {
+> >> +		pr_err("vDSO is not a valid ELF object!\n");
+> >> +		ret = -EINVAL;
+> >> +		goto unmap;
+> >> +	}
+> > 
+> > Why do we need to vmap() pages which are already accessible - vdso_start
+> > must be part of the kernel image, and therefore will be accessible via
+> > standard mappings.
 > 
-> 3.13 w/ mvebu driver:
-> 
-> e0001000-e0001fff : /mbus/pex at e0000000/pcie at 1,0/fpga at 0/fpga_sysmon at 1000
-> e0006000-e0006fff : /mbus/pex at e0000000/pcie at 1,0/fpga at 0/qdr2p at 6000
-> 
-> 3.10 w/ old kirkwood driver:
-> 
-> e0000000-e7ffffff : PCIe 0 MEM
->   e0000000-e001ffff : 0000:00:01.0
->     e0001000-e0001fff : /mbus/pex at e0000000/pcie at 1,0/fpga at 0/fpga_sysmon at 1000
->     e0006000-e0006fff : /mbus/pex at e0000000/pcie at 1,0/fpga at 0/qdr2p at 6000
-> 
-> The latter is obviously correct and matches x86. I'm not sure where
-> the new style host drivers are going wrong, even the resource that
-> should be added by the PCI core itself for the BAR is missing..
+> Right, this stuff doesn't appear to be necessary.  Removed the vmap,
+> get_page, and ClearPageReserved calls for v3.
 
-I looked briefly at the code and found that mach-kirkwood/pcie.c does
-both request_resource() and pci_add_resource_offset(), while
-drivers/pci/host/pci-mvebu.c only does the latter. Does the patch
-below restore the previous behavior?
+Can you make the corresponding change for arm64 too, please?
 
-Since the mvebu_pcie_setup() function seems very generic at this,
-we should probably try to factor out that code into a common
-helper, at least for arm64, but ideally shared with arm32
-as well.
+> >> +static long clock_gettime_fallback(clockid_t _clkid, struct timespec *_ts)
+> >> +{
+> >> +	register struct timespec *ts asm("r1") = _ts;
+> >> +	register clockid_t clkid asm("r0") = _clkid;
+> >> +	register long ret asm ("r0");
+> >> +	register long nr asm("r7") = __NR_clock_gettime;
+> >> +
+> >> +	asm("swi #0" : "=r" (ret) : "r" (clkid), "r" (ts), "r" (nr) : "memory");
 
-	Arnd
+Might be worth making this volatile, rather than depend on the use of ret.
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 13478ec..b55e9a6 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -680,9 +680,17 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- 	struct mvebu_pcie *pcie = sys_to_pcie(sys);
- 	int i;
- 
--	if (resource_size(&pcie->realio) != 0)
-+	if (request_resource(&iomem_resource, &pcie->mem))
-+		return 0;
-+
-+	if (resource_size(&pcie->realio) != 0) {
-+		if (request_resource(&ioport_resource, &pcie->realio)) {
-+			release_resource(&pcie->mem);
-+			return 0;
-+		}
- 		pci_add_resource_offset(&sys->resources, &pcie->realio,
- 					sys->io_offset);
-+	}
- 	pci_add_resource_offset(&sys->resources, &pcie->mem, sys->mem_offset);
- 	pci_add_resource(&sys->resources, &pcie->busn);
- 
+Also, placing both _clkid and ret into "r0" worries me slightly -- is GCC
+smart enough to realise that writing to ret kills _clkid?
+
+Will
