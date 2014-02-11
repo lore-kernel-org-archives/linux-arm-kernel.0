@@ -1,94 +1,77 @@
-From: rgb@redhat.com (Richard Guy Briggs)
-Date: Tue, 11 Feb 2014 08:51:27 -0500
-Subject: [PATCH v4 0/3] arm64: Add audit support
-In-Reply-To: <1391767803-5350-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1391410590-4884-1-git-send-email-takahiro.akashi@linaro.org>
- <1391767803-5350-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140211135127.GB17952@madcap2.tricolour.ca>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Tue, 11 Feb 2014 15:46:04 +0100
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20140211140749.GE3748@arm.com>
+References: <1392037324-5069-1-git-send-email-broonie@kernel.org>
+ <20140210162230.GK25305@arm.com> <20140210164647.GB13533@sirena.org.uk>
+ <CAKfTPtDih6n5ckhXUgNKrbw5EFt45uuQFFPKB2aN0NGGG96Pmg@mail.gmail.com>
+ <20140211103428.GC8693@mudshark.cambridge.arm.com>
+ <CAKfTPtDjF2bZsoj+tgBH-ZXYXNbXQ2mBie0FVgUy2vb_jY12FQ@mail.gmail.com>
+ <20140211140749.GE3748@arm.com>
+Message-ID: <CAKfTPtDrLX6ZSV9cZckGztorrYRc-PNknaJch3nry=PzonZJHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/02/07, AKASHI Takahiro wrote:
-> This patchset adds system call audit support on arm64.
-> Both 32-bit (AUDIT_ARCH_ARM) and 64-bit tasks (AUDIT_ARCH_AARCH64)
-> are supported. Since arm64 has the exact same set of system calls
-> on LE and BE, we don't care about endianness (or more specifically
-> __AUDIT_ARCH_64BIT bit in AUDIT_ARCH_*).
-> 
-> There are some prerequisites for this patch to work correctly:
-> * "generic compat system call audit support" patch
-> * "correct a type mismatch in audit_syscall_exit()" patch
->    (already accepted and queued in 3.14)
-> * "Modify a set of system calls in audit class" patch
->    (already accepted and queued in 3.14)
-> * "__NR_* definitions for compat syscalls" patch from Catalin
-> * "make a single hook to syscall_trace() for all syscall features" patch
-> * userspace audit tool (v2.3.2 + my patch for arm64)
-> 
-> Please review them as well for better understandings.
-> 
-> This code was tested on both 32-bit and 64-bit LE userland 
-> in the following two ways:
-> 1) basic operations with auditctl/autrace
->   # auditctl -a exit,always -S openat -F path=/etc/inittab
->   # auditctl -a exit,always -F dir=/tmp -F perm=rw
->   # auditctl -a task,always
->   # autrace /bin/ls
->     by comparing output from autrace with one from strace
-> 
-> 2) audit-test-code (+ my workarounds for arm/arm64)
->   by running "audit-tool", "filter" and "syscalls" test categories.
-> 
-> Changes v1 -> v2:
-> * Modified to utilize "generic compat system call audit" [3/6, 4/6, 5/6]
->   Please note that a required header, unistd_32.h, is automatically
->   generated from unistd32.h.
-> * Refer to regs->orig_x0 instead of regs->x0 as the first argument of
->   system call in audit_syscall_entry() [6/6]
-> * Include "Add regs_return_value() in syscall.h" patch [2/6],
->   which was not intentionally included in v1 because it could be added
->   by "kprobes support".
-> 
-> Changes v2 -> v3:
-> * Remove asm/audit.h.
->   See "generic compat syscall audit support" patch v4
-> * Remove endianness dependency, ie. AUDIT_ARCH_ARMEB/AARCH64EB.
-> * Remove kernel/syscalls/Makefile which was used to create unistd32.h.
->   See Catalin's "Add __NR_* definitions for compat syscalls" patch
-> 
-> Changes v3 -> v4:
-> * Modified to sync with the patch, "make a single hook to syscall_trace()
->   for all syscall features"
-> 
-> 
-> AKASHI Takahiro (3):
->   arm64: Add regs_return_value() in syscall.h
->   arm64: Add audit support
->   arm64: audit: Add audit hook in ptrace/syscall_trace
-> 
->  arch/arm64/Kconfig               |    1 +
->  arch/arm64/include/asm/ptrace.h  |    5 +++++
->  arch/arm64/include/asm/syscall.h |   15 +++++++++++++++
->  arch/arm64/kernel/ptrace.c       |    7 +++++++
->  include/uapi/linux/audit.h       |    1 +
->  5 files changed, 29 insertions(+)
+On 11 February 2014 15:07, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Feb 11, 2014 at 01:18:56PM +0000, Vincent Guittot wrote:
+>> On 11 February 2014 11:34, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Tue, Feb 11, 2014 at 08:15:19AM +0000, Vincent Guittot wrote:
+>> >> On 10 February 2014 17:46, Mark Brown <broonie@kernel.org> wrote:
+>> >> > On Mon, Feb 10, 2014 at 04:22:31PM +0000, Catalin Marinas wrote:
+>> >> >> On Mon, Feb 10, 2014 at 01:02:01PM +0000, Mark Brown wrote:
+>> >> >
+>> >> >> > +           if (cpu != cpuid)
+>> >> >> > +                   cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
+>> >> >> > +   }
+>> >> >> > +   smp_wmb();
+>> >> >
+>> >> >> I now noticed there are a couple of smp_wmb() calls in this patch. What
+>> >> >> are they for?
+>> >> >
+>> >> > To be honest I mostly cargo culted them from the ARM implementation; I
+>> >> > did look a bit but didn't fully dig into it - it seemed they were
+>> >> > required to ensure that the updates for the new CPU are visible over all
+>> >> > CPUs.  Vincent?
+>> >>
+>> >> Yes that's it. we must ensure that updates are made visible to other CPUs
+>> >
+>> > In relation to what? The smp_* barriers ensure ordering of observability
+>> > between a number of independent accesses, so you must be ensuring
+>> > ordering against something else. Also, you need to guarantee ordering on the
+>> > read-side too -- how is this achieved? I can't see any smp_rmb calls from a
+>> > quick grep, so I assume you're making use of address dependencies?
+>>
+>> The boot sequence ensures the rmb
+>
+> As Will said, smp_*mb() do not ensure absolute visibility, only relative
+> to subsequent memory accesses on the same processor. So just placing a
+> barrier at the end of a function does not mean much, it only shows half
+> of the problem it is trying to solve.
 
-Compile and regression tested on: ppc s390 x86_64 ppc64 i686 s390x.
+OK, that's probably the shortcut that has been made, we want to drain
+the write buffer to make modification available to other cpus and I
+though smp_wmb and the associated mb(ishst) was there for that
+purpose.
 
-Acked-by: Richard Guy Briggs <rgb@redhat.com>
+Vincent
 
-> -- 
-> 1.7.9.5
-> 
+>
+> How are the secondary CPUs using this information? AFAICT, secondaries
+> call smp_store_cpu_info() which also go through each CPU in
+> update_siblings_mask(). Is there any race here that smp_wmb() is trying
+> to solve?
+>
+> I guess for secondaries you could move the barrier just before
+> set_cpu_online(), this way it is clear that we want any previous writes
+> to become visible when this CPU is marked online. For the primary, any
+> memory writes should become visible before the CPU is started. One
+> synchronisation point is the pen release, depending on the smp_ops. I
+> think that's already covered by code like arch/arm/mach-*/platsmp.c.
+>
+> So my proposal is to remove the smp_wmb() from topology.c and add it
+> where it is relevant as described above. If we have some race in
+> topology.c (like for example we may later decide to start more
+> secondaries at the same time), it needs to be solved using spinlocks.
+>
 > --
-> Linux-audit mailing list
-> Linux-audit at redhat.com
-> https://www.redhat.com/mailman/listinfo/linux-audit
-
-- RGB
-
---
-Richard Guy Briggs <rbriggs@redhat.com>
-Senior Software Engineer, Kernel Security, AMER ENG Base Operating Systems, Red Hat
-Remote, Ottawa, Canada
-Voice: +1.647.777.2635, Internal: (81) 32635, Alt: +1.613.693.0684x3545
+> Catalin
