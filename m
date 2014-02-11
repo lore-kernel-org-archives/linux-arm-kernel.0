@@ -1,157 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 11 Feb 2014 18:44:49 +0100
-Subject: [PATCH 2/3] ARM: mvebu: use GPIO DT defines in Armada 370/XP
- boards
-In-Reply-To: <1392138433-12573-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392138433-12573-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392138433-12573-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <52FA6191.1080403@free-electrons.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 11 Feb 2014 18:45:11 +0100
+Subject: [PATCH v2 0/4] tty/serial: Add helpers to use GPIOs to control modem
+ lines
+Message-ID: <1392140715-15295-1-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2014 18:07, Thomas Petazzoni wrote:
-> Instead of harcoding 0 and 1 for the gpio specifications in the Armada
-> 370/XP boards, use the <dt-bindings/gpio/gpio.h> header file and its
-> GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW definitions.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+The USART controller on sam9x5 chips (and also all AT91/SAMA5 chips
+but at91rm9200) are not capable of handling DTR/DSR/DCD/RI signal.
+Moreover, even if the controller can handle CTS/RTS, the dedicated
+CTS/RTS pins are already muxed for other peripherals (LCDC/EMAC/MMC).
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+So this patchset adds the possibility to control those lines via GPIO,
+as it is done for RTS in the patch "switch atmel serial to use gpiolib"
 
+As it was suggested by Alexander Shiyan, I made that available for
+every board.
 
-> ---
->  arch/arm/boot/dts/armada-370-mirabox.dts         | 7 ++++---
->  arch/arm/boot/dts/armada-370-rd.dts              | 3 ++-
->  arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 3 ++-
->  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 9 +++++----
->  4 files changed, 13 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-> index 944e878..2354fe0 100644
-> --- a/arch/arm/boot/dts/armada-370-mirabox.dts
-> +++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-> @@ -9,6 +9,7 @@
->   */
->  
->  /dts-v1/;
-> +#include <dt-bindings/gpio/gpio.h>
->  #include "armada-370.dtsi"
->  
->  / {
-> @@ -73,19 +74,19 @@
->  
->  				green_pwr_led {
->  					label = "mirabox:green:pwr";
-> -					gpios = <&gpio1 31 1>;
-> +					gpios = <&gpio1 31 GPIO_ACTIVE_LOW>;
->  					default-state = "keep";
->  				};
->  
->  				blue_stat_led {
->  					label = "mirabox:blue:stat";
-> -					gpios = <&gpio2 0 1>;
-> +					gpios = <&gpio2 0 GPIO_ACTIVE_LOW>;
->  					default-state = "off";
->  				};
->  
->  				green_stat_led {
->  					label = "mirabox:green:stat";
-> -					gpios = <&gpio2 1 1>;
-> +					gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
->  					default-state = "off";
->  				};
->  			};
-> diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-> index abbb807..c28865d 100644
-> --- a/arch/arm/boot/dts/armada-370-rd.dts
-> +++ b/arch/arm/boot/dts/armada-370-rd.dts
-> @@ -12,6 +12,7 @@
->   */
->  
->  /dts-v1/;
-> +#include <dt-bindings/gpio/gpio.h>
->  #include "armada-370.dtsi"
->  
->  / {
-> @@ -101,7 +102,7 @@
->  				button at 1 {
->  					label = "Software Button";
->  					linux,code = <116>;
-> -					gpios = <&gpio0 6 1>;
-> +					gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
->  				};
->  			};
->  
-> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> index c5fe572..db1ef58 100644
-> --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
-> @@ -16,6 +16,7 @@
->   */
->  
->  /dts-v1/;
-> +#include <dt-bindings/gpio/gpio.h>
->  #include "armada-xp-mv78230.dtsi"
->  
->  / {
-> @@ -158,7 +159,7 @@
->  		button at 1 {
->  			label = "Factory Reset Button";
->  			linux,code = <141>; /* KEY_SETUP */
-> -			gpios = <&gpio1 1 1>;
-> +			gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
->  		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-> index 99bcf76..944acfb 100644
-> --- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-> +++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-> @@ -11,6 +11,7 @@
->   */
->  
->  /dts-v1/;
-> +#include <dt-bindings/gpio/gpio.h>
->  #include "armada-xp-mv78260.dtsi"
->  
->  / {
-> @@ -90,19 +91,19 @@
->  
->  				red_led {
->  					label = "red_led";
-> -					gpios = <&gpio1 17 1>;
-> +					gpios = <&gpio1 17 GPIO_ACTIVE_LOW>;
->  					default-state = "off";
->  				};
->  
->  				yellow_led {
->  					label = "yellow_led";
-> -					gpios = <&gpio1 19 1>;
-> +					gpios = <&gpio1 19 GPIO_ACTIVE_LOW>;
->  					default-state = "off";
->  				};
->  
->  				green_led {
->  					label = "green_led";
-> -					gpios = <&gpio1 21 1>;
-> +					gpios = <&gpio1 21 GPIO_ACTIVE_LOW>;
->  					default-state = "keep";
->  				};
->  			};
-> @@ -115,7 +116,7 @@
->  				button at 1 {
->  					label = "Init Button";
->  					linux,code = <116>;
-> -					gpios = <&gpio1 28 0>;
-> +					gpios = <&gpio1 28 GPIO_ACTIVE_HIGH>;
->  				};
->  			};
->  
-> 
+This is based on 3.14-rc2 + Linus Walleij/Nicolas Ferre's patch:
+ 354e57f3a0a2 ARM/serial: at91: switch atmel serial to use gpiolib
+(in Uwe's tree git://git.pengutronix.de/git/ukl/linux.git dropmachtimexh )
+and Philipp Zabel's patch:
+gpiolib: make gpiod_direction_output take a logical value, add gpiod_direction_output_raw
+(there won't be a merge conflict if this last patch is not present, the
+gpios will "just" be on the wrong direction.)
+ 
+Tested on at91sam9g35, with a null modem cable between 2 serial ports,
+one with CTS/RTS controlled by the USART controller, the other via GPIO,
+full duplex transfers.
+Did some tests also with null modem cables on a PC.
 
+Updates from v2:
+	- Instead of controlling modem signal only on atmel board, the
+	code is now available for every board.
+	- The active low flag from device tree is now used.
+
+Richard Genoud (4):
+  tty/serial: Add GPIOLIB helpers for controlling modem lines
+  tty/serial: at91: use dev_err instead of printk
+  tty/serial: at91: remove unused open/close hooks
+  tty/serial: at91: use mctrl_gpio helpers
+
+ .../devicetree/bindings/serial/atmel-usart.txt     |  12 +-
+ Documentation/serial/driver                        |  21 ++
+ arch/arm/mach-at91/at91rm9200_devices.c            |  25 ++
+ arch/arm/mach-at91/at91sam9260_devices.c           |  35 +++
+ arch/arm/mach-at91/at91sam9261_devices.c           |  20 ++
+ arch/arm/mach-at91/at91sam9263_devices.c           |  20 ++
+ arch/arm/mach-at91/at91sam9g45_devices.c           |  25 ++
+ arch/arm/mach-at91/at91sam9rl_devices.c            |  25 ++
+ drivers/tty/serial/Kconfig                         |   4 +
+ drivers/tty/serial/Makefile                        |   3 +
+ drivers/tty/serial/atmel_serial.c                  | 313 +++++++++++++++++----
+ drivers/tty/serial/serial_mctrl_gpio.c             | 113 ++++++++
+ drivers/tty/serial/serial_mctrl_gpio.h             |  56 ++++
+ include/linux/platform_data/atmel.h                |   5 +
+ 14 files changed, 615 insertions(+), 62 deletions(-)
+ create mode 100644 drivers/tty/serial/serial_mctrl_gpio.c
+ create mode 100644 drivers/tty/serial/serial_mctrl_gpio.h
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.5
