@@ -1,42 +1,90 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Feb 2014 15:04:38 +0000
-Subject: [PATCH 4/7] spi: pl022: attempt to get sspclk by name
-In-Reply-To: <201402111508.06267.arnd@arndb.de>
-References: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
- <1392118632-11312-5-git-send-email-mark.rutland@arm.com>
- <20140211120645.GH13533@sirena.org.uk> <201402111508.06267.arnd@arndb.de>
-Message-ID: <20140211150438.GJ26684@n2100.arm.linux.org.uk>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 11 Feb 2014 09:06:09 -0600
+Subject: [PATCH 1/2] ohci-platform: Change compatible string from usb-ohci
+ to ohci-platform
+In-Reply-To: <1392127826-31290-2-git-send-email-hdegoede@redhat.com>
+References: <1392127826-31290-1-git-send-email-hdegoede@redhat.com>
+ <1392127826-31290-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <954E6E26-EEF1-4A0A-A9BC-D5CA918FAD43@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 03:08:06PM +0100, Arnd Bergmann wrote:
-> On Tuesday 11 February 2014, Mark Brown wrote:
-> > On Tue, Feb 11, 2014 at 11:37:09AM +0000, Mark Rutland wrote:
-> > 
-> > > -     pl022->clk = devm_clk_get(&adev->dev, NULL);
-> > > +     /*
-> > > +      * For compatibility with old DTBs and platform data, fall back to the
-> > > +      * first clock if there's not an explicitly named "sspclk" entry.
-> > > +      */
-> > > +     pl022->clk = devm_clk_get(&adev->dev, "sspclk");
-> > > +     if (IS_ERR(pl022->clk))
-> > > +             pl022->clk = devm_clk_get(&adev->dev, NULL);
-> > > +
-> > 
-> > I'll just have a bit of a grumble here and point out that this sort of
-> > stuff always worries me with the convention of using nameless clocks -
-> > it causes hassle adding further clocks.
-> 
-> I think the best solution for this is to continue with anonymous clocks
-> rather than adding names after the fact. This could be done (for DT-only
-> drivers) using the of_clk_get() interface that takes an index, or
-> we could add a generic dev_clk_get_index() or similar interface that
-> has the same behavior but also works for clkdev.
 
-Mixing devm_* and non-devm_* interfaces doesn't work.  If you want to do
-that, devm_of_clk_get() would be a prerequisit.
+On Feb 11, 2014, at 8:10 AM, Hans De Goede <hdegoede@redhat.com> wrote:
+
+> The initial versions of the devicetree enablement patches for ohci-platform
+> used "ohci-platform" as compatible string. However this was disliked by various
+> reviewers because the platform bus is a Linux invention and devicetree is
+> supposed to be OS agnostic. After much discussion I gave up and went with
+> the generic usb-ohci as requested.
+> 
+> In retro-spect I should have stuck to my guns, because the dts files for many
+> existing boards already claim to be compatible with "usb-ohci", ie they have:
+> 
+> 	compatible = "ti,ohci-omap3", "usb-ohci";
+> 
+> In theory this should not be a problem since the "ti,ohci-omap3" entry takes
+> presedence, but in practice using a conflicting compatible string is an issue,
+> because it makes which driver gets used depent on driver registration order.
+> 
+> This patch changes the compatible string claimed by ohci-platform (back) to
+> "ohci-platform", avoiding the driver registration / module loading ordering
+> problems. Note that there already is a precedent for using ?hci-platform, in
+> the form of xhci-platform.c using "xhci-platfrom" as compatible string.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> Documentation/devicetree/bindings/usb/usb-ohci.txt | 4 ++--
+> drivers/usb/host/ohci-platform.c                   | 2 +-
+> 2 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
+> index 6933b0c..a8e576a 100644
+> --- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
+> +++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
+> @@ -1,7 +1,7 @@
+> USB OHCI controllers
+> 
+> Required properties:
+> -- compatible : "usb-ohci?
+
+Why not leave ?usb-ohci? and deprecate it?
+
+> +- compatible : "ohci-platform"
+> - reg : ohci controller register range (address and length)
+> - interrupts : ohci controller interrupt
+> 
+> @@ -16,7 +16,7 @@ Optional properties:
+> Example:
+> 
+> 	ohci0: usb at 01c14400 {
+> -		compatible = "allwinner,sun4i-a10-ohci", "usb-ohci";
+> +		compatible = "allwinner,sun4i-a10-ohci", "ohci-platform";
+> 		reg = <0x01c14400 0x100>;
+> 		interrupts = <64>;
+> 		clocks = <&usb_clk 6>, <&ahb_gates 2>;
+> diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
+> index e2c28fd..59f3551 100644
+> --- a/drivers/usb/host/ohci-platform.c
+> +++ b/drivers/usb/host/ohci-platform.c
+> @@ -319,7 +319,7 @@ static int ohci_platform_resume(struct device *dev)
+> #endif /* CONFIG_PM */
+> 
+> static const struct of_device_id ohci_platform_ids[] = {
+> -	{ .compatible = "usb-ohci", },
+> +	{ .compatible = "ohci-platform", },
+> 	{ }
+> };
+> MODULE_DEVICE_TABLE(of, ohci_platform_ids);
+> -- 
+> 1.8.5.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
