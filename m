@@ -1,35 +1,38 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 11 Feb 2014 15:11:57 -0600
-Subject: [PATCH 7/9] ARM: vt8500: enable V6K instead of plain V6
+Date: Tue, 11 Feb 2014 15:11:59 -0600
+Subject: [PATCH 9/9] ARM: virt: select ARM_AMBA
 In-Reply-To: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
 References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1392153119-23248-8-git-send-email-robherring2@gmail.com>
+Message-ID: <1392153119-23248-10-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <robh@kernel.org>
 
-The wm8750 is an ARM1176 which has all the V6K extensions except for SMP,
-so V6K should be selected instead. Dropping the select will use the
-default for ARCH_MULTI_V6 which is V6K.
+Guests can use AMBA bus devices such as the PL011 uart, so enable the
+AMBA bus for mach-virt.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Tony Prisk <linux@prisktech.co.nz>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mach-vt8500/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-vt8500/Kconfig b/arch/arm/mach-vt8500/Kconfig
-index c581ed2..08f56a4 100644
---- a/arch/arm/mach-vt8500/Kconfig
-+++ b/arch/arm/mach-vt8500/Kconfig
-@@ -19,7 +19,6 @@ config ARCH_WM8750
- 	bool "WonderMedia WM8750"
- 	depends on ARCH_MULTI_V6
- 	select ARCH_VT8500
--	select CPU_V6
- 	help
- 	  Support for WonderMedia WM8750 System-on-Chip.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9790c5d..25a6b53 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -931,9 +931,10 @@ endmenu
  
+ config ARCH_VIRT
+ 	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
++	select ARM_AMBA
+ 	select ARM_GIC
+-	select HAVE_ARM_ARCH_TIMER
+ 	select ARM_PSCI
++	select HAVE_ARM_ARCH_TIMER
+ 
+ #
+ # This is sorted alphabetically by mach-* pathname.  However, plat-*
 -- 
 1.8.3.2
