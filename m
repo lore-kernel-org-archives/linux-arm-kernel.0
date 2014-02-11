@@ -1,86 +1,20 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Feb 2014 17:29:18 +0000
-Subject: [PATCH 08/12] mfd: vexpress-sysreg: Add syscon labels as
- platform data
-In-Reply-To: <1392138636-29240-9-git-send-email-pawel.moll@arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 11 Feb 2014 17:29:52 +0000
+Subject: [PATCH 05/12] GPIO: gpio-generic: Add label to platform data
+In-Reply-To: <1392139256.3380.45.camel@hornet>
 References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
- <1392138636-29240-9-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140211172918.GH15081@lee--X1>
+ <1392138636-29240-6-git-send-email-pawel.moll@arm.com>
+ <20140211171721.GE15081@lee--X1> <1392139256.3380.45.camel@hornet>
+Message-ID: <1392139792.3380.46.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This patch adds label names for syscon registers as platform
-> data for the relevant MFD cells.
-
-Okay, I see.
-
-Hmm... not sure I like this at all. It seems awfully as though you're
-bending current infrastructure to suit your needs. There must be better
-ways of passing a name than through pdata, and if there isn't I'd
-suggest setting up a sysconf pdata struct that others can use in case
-they wish to expand the functionality further in some other
-unfathomable way. :)
-
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
->  drivers/mfd/vexpress-sysreg.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+On Tue, 2014-02-11 at 17:20 +0000, Pawel Moll wrote:
+> -- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
 > 
-> diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
-> index ece5ac8..57c21a0 100644
-> --- a/drivers/mfd/vexpress-sysreg.c
-> +++ b/drivers/mfd/vexpress-sysreg.c
-> @@ -132,6 +132,8 @@ void __init vexpress_sysreg_early_init(void __iomem *base)
->  
->  /* The sysreg block is just a random collection of various functions... */
->  
-> +static const char vexpress_sysreg_sys_id_pdata[] = "sys_id";
-> +
->  static struct bgpio_pdata vexpress_sysreg_sys_led_pdata = {
->  	.label = "sys_led",
->  	.base = -1,
-> @@ -150,6 +152,10 @@ static struct bgpio_pdata vexpress_sysreg_sys_flash_pdata = {
->  	.ngpio = 1,
->  };
->  
-> +static const char vexpress_sysreg_sys_misc_pdata[] = "sys_misc";
-> +
-> +static const char vexpress_sysreg_sys_procid_pdata[] = "sys_procid";
-> +
->  static struct mfd_cell vexpress_sysreg_cells[] = {
->  	{
->  		.name = "syscon",
-> @@ -157,6 +163,8 @@ static struct mfd_cell vexpress_sysreg_cells[] = {
->  		.resources = (struct resource []) {
->  			DEFINE_RES_MEM(SYS_ID, 0x4),
->  		},
-> +		.platform_data = &vexpress_sysreg_sys_id_pdata,
-> +		.pdata_size = sizeof(vexpress_sysreg_sys_id_pdata),
->  	}, {
->  		.name = "basic-mmio-gpio",
->  		.of_compatible = "arm,vexpress-sysreg,sys_led",
-> @@ -190,12 +198,16 @@ static struct mfd_cell vexpress_sysreg_cells[] = {
->  		.resources = (struct resource []) {
->  			DEFINE_RES_MEM(SYS_MISC, 0x4),
->  		},
-> +		.platform_data = &vexpress_sysreg_sys_misc_pdata,
-> +		.pdata_size = sizeof(vexpress_sysreg_sys_misc_pdata),
->  	}, {
->  		.name = "syscon",
->  		.num_resources = 1,
->  		.resources = (struct resource []) {
->  			DEFINE_RES_MEM(SYS_PROCID0, 0x8),
->  		},
-> +		.platform_data = &vexpress_sysreg_sys_procid_pdata,
-> +		.pdata_size = sizeof(vexpress_sysreg_sys_procid_pdata),
->  	}, {
->  		.name = "vexpress-syscfg",
->  		.num_resources = 1,
+> ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+> ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Uh, sorry about this. My finger slipped...
+
+Pawel
