@@ -1,47 +1,37 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 11 Feb 2014 14:11:23 -0600
-Subject: [PATCH 2/2] ARM: dts: N900: add missing compatible property
-In-Reply-To: <1391947956-24462-2-git-send-email-aaro.koskinen@iki.fi>
-References: <1391947956-24462-1-git-send-email-aaro.koskinen@iki.fi>
- <1391947956-24462-2-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <52FA83EB.2080605@ti.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 11 Feb 2014 21:11:32 +0100
+Subject: [PATCH] ARM: tegra: dalmore: fix irq trigger type
+Message-ID: <4fcfcfdbc86c37c6d47ec32cdbd987f3b406e9b5.1392147256.git.stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2014 06:12 AM, Aaro Koskinen wrote:
-> Add missing compatible property to avoid problems in the future.
-> 
-> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Reviewed-by: Nishanth Menon <nm@ti.com>
+Trigger type needs to be IRQ_TYPE_LEVEL_HIGH since the interrupt
+signal gets inverted by the PMC (configured by the invert-interrupt
+property).
 
-> ---
->  arch/arm/boot/dts/omap3-n900.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> index 6fc85f963530..0bf40c90faba 100644
-> --- a/arch/arm/boot/dts/omap3-n900.dts
-> +++ b/arch/arm/boot/dts/omap3-n900.dts
-> @@ -1,6 +1,6 @@
->  /*
->   * Copyright (C) 2013 Pavel Machek <pavel@ucw.cz>
-> - * Copyright 2013 Aaro Koskinen <aaro.koskinen@iki.fi>
-> + * Copyright (C) 2013-2014 Aaro Koskinen <aaro.koskinen@iki.fi>
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 (or later) as
-> @@ -13,7 +13,7 @@
->  
->  / {
->  	model = "Nokia N900";
-> -	compatible = "nokia,omap3-n900", "ti,omap3";
-> +	compatible = "nokia,omap3-n900", "ti,omap3430", "ti,omap3";
->  
->  	cpus {
->  		cpu at 0 {
-> 
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+I could not test that patch since I don't have such hardware.
+However, I stumbled on that error while tracing a similar error
+on Colibri T30.
 
+ arch/arm/boot/dts/tegra114-dalmore.dts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index 73aecfb..f5025fc 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -888,8 +888,9 @@
+ 		palmas: tps65913 at 58 {
+ 			compatible = "ti,palmas";
+ 			reg = <0x58>;
+-			interrupts = <0 86 IRQ_TYPE_LEVEL_LOW>;
+ 
++			/* active-low configured by PMC invert-interrupt */
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+ 			#interrupt-cells = <2>;
+ 			interrupt-controller;
+ 
 -- 
-Regards,
-Nishanth Menon
+1.8.5.4
