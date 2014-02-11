@@ -1,56 +1,55 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 11 Feb 2014 18:36:49 +0100
-Subject: [PATCH] reset: Add generic GPIO reset driver.
-In-Reply-To: <CANh8QzwERe-zxCaAd4QujZJ4zcZ7SchK+w8u52fvJj0s5tx2nA@mail.gmail.com>
-References: <20140210125432.10683.86571.stgit@localhost>
- <1392038191.6687.12.camel@pizza.hi.pengutronix.de>
- <CANh8QzwERe-zxCaAd4QujZJ4zcZ7SchK+w8u52fvJj0s5tx2nA@mail.gmail.com>
-Message-ID: <1392140209.6943.49.camel@pizza.hi.pengutronix.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 11 Feb 2014 17:37:54 +0000
+Subject: [PATCH v2] ARM: asm: rename logical shift macros push pull into
+ lspush lspull
+In-Reply-To: <alpine.LFD.2.11.1402111159230.17677@knanqh.ubzr>
+References: <1392063589-24111-1-git-send-email-victor.kamensky@linaro.org>
+ <1392063589-24111-2-git-send-email-victor.kamensky@linaro.org>
+ <alpine.LFD.2.11.1402101607120.17677@knanqh.ubzr>
+ <20140211155437.GC3035@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1402111159230.17677@knanqh.ubzr>
+Message-ID: <20140211173754.GE3035@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+On Tue, Feb 11, 2014 at 12:09:35PM -0500, Nicolas Pitre wrote:
+> On Tue, 11 Feb 2014, Dave Martin wrote:
+> 
+> > On Mon, Feb 10, 2014 at 04:30:01PM -0500, Nicolas Pitre wrote:
+> > > On Mon, 10 Feb 2014, Victor Kamensky wrote:
+> > > 
+> > > > Renames logical shift macros, 'push' and 'pull', defined in
+> > > > arch/arm/include/asm/assembler.h, into 'lspush' and 'lspull'.
+> > > 
+> > > I don't have any fundamental objection to the idea, except maybe for the 
+> > > actual names.  I just can't come up with anything better though.  
+> > 
+> > For consistency with the get_byte_ stuff, how about:
+> > 
+> > 	push -> towards_byte_0
+> > 	pull -> from_byte_0
+> > 
+> > That may make the purpose a little clearer, too.
+> 
+> I don't know if
+> 
+> 	mov	r0, r1, from_byte_0 #8
+> 
+> is that much clearer though.
+> 
+> > (Assuming I've got them the right way around...)
+> 
+> As you later noticed you got it wrong.  :-)
+> Most likely because "full from" and "push towards" are common english 
+> constructs.
 
-Am Dienstag, den 11.02.2014, 10:34 +0100 schrieb Fuzzey, Martin:
-[...]
-> >> 2) Allow hardware on discoverable busses to be rest via a GPIO line
-> >> without driver modifications.
-> >>
-> >> Examples of the second use case include:
-> >> * SDIO wifi modules
-> >> * USB hub chips with a reset line
-> >
-> > Now this is interesting. But if you export it to userspace anyway, why
-> > not use the existing gpio sysfs API?
-> >
-> 
-> In the normal case of reset on boot the userspace interface isn't needed.
-> Setting the "auto" dt property will make the kernel do the reset by
-> itself during
-> early boot. This is the standard use case.
-> 
-> The userspace interface is to let applications deal with special cases.
-> It is also simpler for userspace than manlually toggling the GPIO line
-> and keeps the configuration (active high / low, delay) centralised in
-> the DT and consistent between the automatic on boot reset and the
-> manually triggered reset.
->
-> > I think a proper solution should handle this in the kernel. For SDIO
-> > wifi modules you usually have a powerdown line that can be implemented
-> > as an rfkill switch.
-> >
-> 
-> I think this is too specific. It's not just for SDIO wifi. We also
-> have the problem
-> of a USB hub needing to be reset.
-> 
-> Also even for the SDIO wifi case rfkill doesn't ssem the right
-> abstraction to say "reset me"
-> (particularly when firmware fails to load on warm boot if you don't).
+No more so than "pull towards" and "push from".
 
-so long as you need to take devices out of reset before they can be
-discovered, maybe the corresponding host controller would be the right
-place to put the reset.
+I'll blame it on the fact that the get_byte_ macros have wrong-
+endian numbering, which I didn't look at carefully enough ;)
 
-regards
-Philipp
+But I think we proved that my suggestion didn't really make things
+easier to understand...
+
+Cheers
+---Dave
