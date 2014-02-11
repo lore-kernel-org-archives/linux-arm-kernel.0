@@ -1,71 +1,59 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 11 Feb 2014 12:58:50 -0500 (EST)
-Subject: [PATCH v2] ARM: asm: rename logical shift macros push pull into
- lspush lspull
-In-Reply-To: <20140211173754.GE3035@e103592.cambridge.arm.com>
-References: <1392063589-24111-1-git-send-email-victor.kamensky@linaro.org>
- <1392063589-24111-2-git-send-email-victor.kamensky@linaro.org>
- <alpine.LFD.2.11.1402101607120.17677@knanqh.ubzr>
- <20140211155437.GC3035@e103592.cambridge.arm.com>
- <alpine.LFD.2.11.1402111159230.17677@knanqh.ubzr>
- <20140211173754.GE3035@e103592.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.11.1402111253160.17677@knanqh.ubzr>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 11 Feb 2014 23:33:44 +0530
+Subject: [Patch v5 1/2] dmaengine: add Qualcomm BAM dma driver
+In-Reply-To: <20140211174910.GE841@joshc.qualcomm.com>
+References: <1391546556-27702-1-git-send-email-agross@codeaurora.org>
+ <1391546556-27702-2-git-send-email-agross@codeaurora.org>
+ <20140211173048.GP10628@intel.com>
+ <20140211174910.GE841@joshc.qualcomm.com>
+Message-ID: <20140211180344.GS10628@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Feb 2014, Dave Martin wrote:
-
-> On Tue, Feb 11, 2014 at 12:09:35PM -0500, Nicolas Pitre wrote:
-> > On Tue, 11 Feb 2014, Dave Martin wrote:
-> > 
-> > > On Mon, Feb 10, 2014 at 04:30:01PM -0500, Nicolas Pitre wrote:
-> > > > On Mon, 10 Feb 2014, Victor Kamensky wrote:
-> > > > 
-> > > > > Renames logical shift macros, 'push' and 'pull', defined in
-> > > > > arch/arm/include/asm/assembler.h, into 'lspush' and 'lspull'.
-> > > > 
-> > > > I don't have any fundamental objection to the idea, except maybe for the 
-> > > > actual names.  I just can't come up with anything better though.  
+On Tue, Feb 11, 2014 at 11:49:10AM -0600, Josh Cartwright wrote:
+> On Tue, Feb 11, 2014 at 11:00:48PM +0530, Vinod Koul wrote:
+> > On Tue, Feb 04, 2014 at 02:42:35PM -0600, Andy Gross wrote:
+> > > Add the DMA engine driver for the QCOM Bus Access Manager (BAM) DMA controller
+> > > found in the MSM 8x74 platforms.
 > > > 
-> > > For consistency with the get_byte_ stuff, how about:
+> > > Each BAM DMA device is associated with a specific on-chip peripheral.  Each
+> > > channel provides a uni-directional data transfer engine that is capable of
+> > > transferring data between the peripheral and system memory (System mode), or
+> > > between two peripherals (BAM2BAM).
 > > > 
-> > > 	push -> towards_byte_0
-> > > 	pull -> from_byte_0
+> > > The initial release of this driver only supports slave transfers between
+> > > peripherals and system memory.
 > > > 
-> > > That may make the purpose a little clearer, too.
-> > 
-> > I don't know if
-> > 
-> > 	mov	r0, r1, from_byte_0 #8
-> > 
-> > is that much clearer though.
-> > 
-> > > (Assuming I've got them the right way around...)
-> > 
-> > As you later noticed you got it wrong.  :-)
-> > Most likely because "full from" and "push towards" are common english 
-> > constructs.
+> > > Signed-off-by: Andy Gross <agross@codeaurora.org>
+> >
+> > > +++ b/drivers/dma/qcom_bam_dma.c
+> [..]
+> > > +static void bam_reset_channel(struct bam_chan *bchan)
+> > > +{
+> > > +	struct bam_device *bdev = bchan->bdev;
+> > > +
+> > > +	/* reset channel */
+> > > +	writel_relaxed(1, bdev->regs + BAM_P_RST(bchan->id));
+> > > +	writel_relaxed(0, bdev->regs + BAM_P_RST(bchan->id));
+> > > +
+> > > +	/* don't allow reorder of the channel reset */
+> > > +	wmb();
+> > Documentation/memory-barriers.txt describes wmb() as a CPU barier but based on
+> > above you want it to be a compiler barrier then you should do 1st write,
+> > barrier(), second write.
 > 
-> No more so than "pull towards" and "push from".
+> It could also be that the intent was to prevent these writes from being
+> ordered before setting the initialized flag below, either way the
+> comment could be made clearer.
+yes for that case, but i am suspecting the comment is correct as it would make
+sense to ensure reset is in sequence...
 
-OK.  I'll trust you on that account.
-
-> I'll blame it on the fact that the get_byte_ macros have wrong-
-> endian numbering, which I didn't look at carefully enough ;)
+-- 
+~Vinod
 > 
-> But I think we proved that my suggestion didn't really make things
-> easier to understand...
-
-What about:
-
-	push -> next
-	pull -> prev
-
-?
-
-That would make:
-
-	mov	r0, r1, next #8
-
-
-Nicolas
+> > > +
+> > > +	/* make sure hw is initialized when channel is used the first time  */
+> > > +	bchan->initialized = 0;
+> > > +}
+> 
+-- 
