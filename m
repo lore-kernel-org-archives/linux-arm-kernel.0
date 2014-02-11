@@ -1,54 +1,64 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 11 Feb 2014 08:47:26 -0800
-Subject: [PATCH 0/3] ARM: dts: Fixes for Overo/Tobi against 3.14-rc1
-In-Reply-To: <52FA20A9.2060702@epfl.ch> (Florian Vaussard's message of "Tue,
- 11 Feb 2014 14:07:53 +0100")
-References: <1391677818-21154-1-git-send-email-florian.vaussard@epfl.ch>
- <87d2j0rwv8.fsf@paris.lan> <52FA20A9.2060702@epfl.ch>
-Message-ID: <7hsirp7g0x.fsf@paris.lan>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 11 Feb 2014 11:53:14 -0500
+Subject: [PATCH 4/8] ARM: mvebu: make use of
+ of_find_matching_node_and_match
+In-Reply-To: <1392135847-30791-5-git-send-email-joshc@codeaurora.org>
+References: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
+ <1392135847-30791-5-git-send-email-joshc@codeaurora.org>
+Message-ID: <20140211165314.GA8533@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian Vaussard <florian.vaussard@epfl.ch> writes:
+On Tue, Feb 11, 2014 at 10:24:02AM -0600, Josh Cartwright wrote:
+> Instead of the of_find_matching_node()/of_match_node() pair, which requires two
+> iterations through the match table, make use of of_find_matching_node_and_match(),
+> which only iterates through the table once.
+> 
+> While we're here, mark the of_system_controller table const.
+> 
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> ---
+>  arch/arm/mach-mvebu/system-controller.c | 9 ++++-----
+>  1 file changed, 4 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/system-controller.c b/arch/arm/mach-mvebu/system-controller.c
+> index a7fb89a..e6e300a 100644
+> --- a/arch/arm/mach-mvebu/system-controller.c
+> +++ b/arch/arm/mach-mvebu/system-controller.c
+> @@ -54,7 +54,7 @@ static const struct mvebu_system_controller orion_system_controller = {
+>  	.system_soft_reset = 0x1,
+>  };
+>  
+> -static struct of_device_id of_system_controller_table[] = {
+> +static const struct of_device_id of_system_controller_table[] = {
+>  	{
+>  		.compatible = "marvell,orion-system-controller",
+>  		.data = (void *) &orion_system_controller,
+> @@ -90,13 +90,12 @@ void mvebu_restart(enum reboot_mode mode, const char *cmd)
+>  
+>  static int __init mvebu_system_controller_init(void)
+>  {
+> +	const struct of_device_id *match;
+>  	struct device_node *np;
+>  
+> -	np = of_find_matching_node(NULL, of_system_controller_table);
+> +	np = of_find_matching_node_and_match(NULL, of_system_controller_table,
+> +					     &match);
+>  	if (np) {
+> -		const struct of_device_id *match =
+> -		    of_match_node(of_system_controller_table, np);
 
-> Hi,
->
-> On 02/06/2014 06:09 PM, Kevin Hilman wrote:
->> Florian Vaussard <florian.vaussard@epfl.ch> writes:
->> 
->>> OMAP36xx-based Overo (Storm and alike) are now failing to boot with 3.14-rc1 [1].
->>> This series fixes this, by moving model-agnostic DT into a common dtsi file,
->>> and creating model-specific DT files:
->>>
->>> - omap3-overo-tobi.dts -> older OMAP35xx Overo
->>> - omap3-overo-storm-tobi.dts -> newer OMAP36xx/AM37xx/DM37xx Overo
->>>
->>> People will have to use the right Overo / expansion board combination.
->>>
->>> (Patch 2 in an unrelated fix that was waiting in my queue.)
->>>
->>> omap3-overo-tobi.dts tested with Overo Sand (OMAP3503) and omap3-overo-storm-tobi.dts
->>> tested with Overo EarthStorm (AM3703). Both boot. With the Overo Sand, I cannot
->>> mount the ext3 rootfs, but this seems unrelated to the current topic, maybe
->>> a missing errata.
->> 
->> And I tested with my 35xx/Overo with omap3-overo-tobi.dts and my
->> 37xx/Overo STORM with omap3-overo-storm-tobi.dts and they're both
->> working.
->> 
->> Tested-by: Kevin Hilman <khilman@linaro.org>
->> 
->> Tony, with your ack, I can apply these directly to arm-soc/fixes.
->> 
->> Florian, thanks for the fixes.
->> 
->
-> This issue is still present in 3.14-rc2.
->
-> Shall I send a v2, including the suggestion of Nishanth, against 3.14-rc2?
->
 
-Feel free to send a v2.  I was just waiting for Tony to queue them up
-(or ack and I'll take them through arm-soc.)
+> -		BUG_ON(!match);
 
-Kevin
+Gregory, is it ok to remove this?  It was added with the original code
+submission for mach-mvebu.  mvebu_restart() will handle this
+gracefully...
+
+>  		system_controller_base = of_iomap(np, 0);
+>  		mvebu_sc = (struct mvebu_system_controller *)match->data;
+>  		of_node_put(np);
+
+thx,
+
+Jason.
