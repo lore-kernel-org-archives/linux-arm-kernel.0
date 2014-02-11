@@ -1,154 +1,107 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 11 Feb 2014 12:45:50 +0100
-Subject: [PATCH v2 1/5] drivers: of: add initialization code for reserved
- memory
-In-Reply-To: <20140205110538.99E47C40A89@trevor.secretlab.ca>
-References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com>
- <1391515773-6112-2-git-send-email-m.szyprowski@samsung.com>
- <20140205110538.99E47C40A89@trevor.secretlab.ca>
-Message-ID: <52FA0D6E.9090304@samsung.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 11 Feb 2014 11:50:51 +0000
+Subject: [PATCH v2 4/5] ARM: init: add support for reserved memory defined
+ by device tree
+In-Reply-To: <52FA00FA.1090400@samsung.com>
+References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com> <
+ 1391515773-6112-5-git-send-email-m.szyprowski@samsung.com> <20140205101510.
+ 59A95C40A89@trevor.secretlab.ca> <52F38D75.4030704@samsung.com> <
+ 20140210215929.4473BC408F7@trevor.secretlab.ca> <52FA00FA.1090400@samsung.
+ com>
+Message-ID: <20140211115051.85084C40C4D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, 11 Feb 2014 11:52:42 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> 
+> On 2014-02-10 22:59, Grant Likely wrote:
+> > On Thu, 06 Feb 2014 14:26:13 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > > Hello,
+> > >
+> > > On 2014-02-05 11:15, Grant Likely wrote:
+> > > > On Tue, 04 Feb 2014 13:09:32 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > > > > Enable reserved memory initialization from device tree.
+> > > > >
+> > > > > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> > > > > Cc: Laura Abbott <lauraa@codeaurora.org>
+> > > > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > > > ---
+> > > > >  arch/arm/mm/init.c |    3 +++
+> > > > >  1 file changed, 3 insertions(+)
+> > > > >
+> > > > > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> > > > > index 804d61566a53..ebafdb479410 100644
+> > > > > --- a/arch/arm/mm/init.c
+> > > > > +++ b/arch/arm/mm/init.c
+> > > > > @@ -17,6 +17,7 @@
+> > > > >  #include <linux/nodemask.h>
+> > > > >  #include <linux/initrd.h>
+> > > > >  #include <linux/of_fdt.h>
+> > > > > +#include <linux/of_reserved_mem.h>
+> > > > >  #include <linux/highmem.h>
+> > > > >  #include <linux/gfp.h>
+> > > > >  #include <linux/memblock.h>
+> > > > > @@ -323,6 +324,8 @@ void __init arm_memblock_init(struct meminfo *mi,
+> > > > >  	if (mdesc->reserve)
+> > > > >  		mdesc->reserve();
+> > > > >
+> > > > > +	early_init_dt_scan_reserved_mem();
+> > > > > +
+> > > >
+> > > > The new binding is being made fundamental. If the reserved-memory node
+> > > > is present, then it needs to be honored, even if the kernel doesn't know
+> > > > how to use the regions. Therefore, This needs to be unconditional for
+> > > > all architectures. The hook should be called in early_init_dt_scan()
+> > > > (drivers/of/fdt.c) immediately after the early_init_dt_scan_memory()
+> > > > hook.
+> > >
+> > > In theory this will be the best solution, but it practice there is a
+> > > problem. early_init_dt_scan() is called as the first function from kernel
+> > > booting code. That time there is no memory yet added to the system, so it
+> > > would be really hard to reserve anything. Memory nodes are being added
+> > > later either with memblock_add() or by some other arch specific way.
+> >
+> > Hmmm, depends on the architecture. On ARM the memory is loaded into the
+> > meminfo structure first, and it isn't until arm_memblock_init() that
+> > memblock_add() gets called on all the regions. Some architectures do the
+> > memblock_add() directly from early_init_dt_add_memory_arch() function.
+> >
+> > The default early_init_dt_add_memory_arch() in drivers/of/fdt.c is
+> > overridden by ARM and a number of other architectures. However...
+> >
+> > > Finally, once all memory has been added to the system we can parse and
+> > > reserve all regions defined in the device tree. This really requires
+> > > creating another function which will be called by arch specific code.
+> >
+> > ...Or it means getting rid of meminfo entirely so that memblock is
+> > available earlier. Laura Abbott has just posted v2 of her series to do
+> > exactly that. If you base on that then you should be able to do exactly
+> > what I suggested.
+> 
+> I've checked Laura's patches and in fact it is possible to do memory
+> reservation as a last step in early_init_dt_scan_memory(). However still
+> see some problem which I have no idea how to resolve. Right now I focus
+> only on ARM, so I have no idea how it is solved by other architectures.
 
-On 2014-02-05 12:05, Grant Likely wrote:
-> On Tue, 04 Feb 2014 13:09:29 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > This patch adds device tree support for contiguous and reserved memory
-> > regions defined in device tree.
-> >
-> > Large memory blocks can be reliably reserved only during early boot.
-> > This must happen before the whole memory management subsystem is
-> > initialized, because we need to ensure that the given contiguous blocks
-> > are not yet allocated by kernel. Also it must happen before kernel
-> > mappings for the whole low memory are created, to ensure that there will
-> > be no mappings (for reserved blocks) or mapping with special properties
-> > can be created (for CMA blocks). This all happens before device tree
-> > structures are unflattened, so we need to get reserved memory layout
-> > directly from fdt.
-> >
-> > Later, those reserved memory regions are assigned to devices on each
-> > device structure initialization.
-> >
-> > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> > Cc: Laura Abbott <lauraa@codeaurora.org>
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > [joshc: rework to implement new DT binding, provide mechanism for
-> >  plugging in new reserved-memory node handlers via
-> >  RESERVEDMEM_OF_DECLARE]
-> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> > [mszyprow: little code cleanup]
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > ---
-> >  drivers/of/Kconfig                |    6 +
-> >  drivers/of/Makefile               |    1 +
-> >  drivers/of/of_reserved_mem.c      |  219 +++++++++++++++++++++++++++++++++++++
-> >  drivers/of/platform.c             |    7 ++
-> >  include/asm-generic/vmlinux.lds.h |   11 ++
-> >  include/linux/of_reserved_mem.h   |   62 +++++++++++
-> >  6 files changed, 306 insertions(+)
-> >  create mode 100644 drivers/of/of_reserved_mem.c
-> >  create mode 100644 include/linux/of_reserved_mem.h
-> >
-> > diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> > index c6973f101a3e..aba13df56f3a 100644
-> > --- a/drivers/of/Kconfig
-> > +++ b/drivers/of/Kconfig
-> > @@ -75,4 +75,10 @@ config OF_MTD
-> >  	depends on MTD
-> >  	def_bool y
-> >
-> > +config OF_RESERVED_MEM
-> > +	depends on HAVE_MEMBLOCK
-> > +	def_bool y
-> > +	help
-> > +	  Helpers to allow for reservation of memory regions
-> > +
-> >  endmenu # OF
-> > diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-> > index efd05102c405..ed9660adad77 100644
-> > --- a/drivers/of/Makefile
-> > +++ b/drivers/of/Makefile
-> > @@ -9,3 +9,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
-> >  obj-$(CONFIG_OF_PCI)	+= of_pci.o
-> >  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
-> >  obj-$(CONFIG_OF_MTD)	+= of_mtd.o
-> > +obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
-> > diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-> > new file mode 100644
-> > index 000000000000..f17cd56e68d9
-> > --- /dev/null
-> > +++ b/drivers/of/of_reserved_mem.c
-> > @@ -0,0 +1,219 @@
-> > +/*
-> > + * Device tree based initialization code for reserved memory.
-> > + *
-> > + * Copyright (c) 2013, The Linux Foundation. All Rights Reserved.
-> > + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> > + *		http://www.samsung.com
-> > + * Author: Marek Szyprowski <m.szyprowski@samsung.com>
-> > + * Author: Josh Cartwright <joshc@codeaurora.org>
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > + * modify it under the terms of the GNU General Public License as
-> > + * published by the Free Software Foundation; either version 2 of the
-> > + * License or (at your optional) any later version of the license.
-> > + */
-> > +#include <linux/memblock.h>
-> > +#include <linux/err.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_fdt.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/mm.h>
-> > +#include <linux/sizes.h>
-> > +#include <linux/of_reserved_mem.h>
-> > +
-> > +#define MAX_RESERVED_REGIONS	16
-> > +static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
-> > +static int reserved_mem_count;
-> > +
-> > +int __init of_parse_flat_dt_reg(unsigned long node, const char *uname,
-> > +				   phys_addr_t *base, phys_addr_t *size)
->
-> Useful utility function; move to drivers/of/fdt.c
->
-> > +{
-> > +	unsigned long len;
-> > +	__be32 *prop;
-> > +
-> > +	prop = of_get_flat_dt_prop(node, "reg", &len);
-> > +	if (!prop)
-> > +		return -EINVAL;
-> > +
-> > +	if (len < (dt_root_addr_cells + dt_root_size_cells) * sizeof(__be32)) {
-> > +		pr_err("Reserved memory: invalid reg property in '%s' node.\n",
-> > +				uname);
-> > +		return -EINVAL;
-> > +	}
->
-> This is /okay/ for an initial implementation, but it is naive. While I
-> suggested making #address-cells and #size-cells equal the root node
-> values for the purpose of simplicity, it should still be perfectly valid
-> to have different values if the ranges property is correctly formed.
->
-> > +
-> > +	*base = dt_mem_next_cell(dt_root_addr_cells, &prop);
-> > +	*size = dt_mem_next_cell(dt_root_size_cells, &prop);
->
-> Future enhancement; allow for parsing more than just the first reg
-> tuple.
+It isn't at the moment because no other architectures are doing dynamic
+allocation of regions in this way.
 
-One more question. Does it really makes any sense to support more than 
-one tuple
-for reg property? For consistency we should also allow more than one 
-entry in
-size, align and alloc-ranges property, but I don't see any benefits for 
-defining
-more than one range for a single region. Same can be achieved by 
-defining more
-regions instead if one really needs such configuration.
+> On of the key features of the new binding is the ability to automatically
+> allocate reserved regions of the given size. However kernel, initrd, dt
+> and other sub-arch specific critical regions are marked/allocated in
+> arm_memblock_init(), which is called after setup_machine_fdt(). This
+> might lead to some serious failures when automatically reserved region
+> overlaps with some critical resources. Do you have any idea how to solve
+> this without a new callback?
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Not without moving the kernel/initrd/fdt reservation earlier, which can
+certainly be done after Laura's series is applied. It would also be
+possible to split up the fixed regions from the dynamic regions so that
+the dynamic stuff would be done later.
+
+However, I don't want to block this series on Laura's rework. Go ahead
+and keep it as a separate hook, but make the other changes I suggested,
+particularly with regard to making the hook architecture independent.
+Further rework can be done later after Laura's series is merged.
+
+g.
