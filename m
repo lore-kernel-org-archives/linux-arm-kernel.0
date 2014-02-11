@@ -1,29 +1,21 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 11 Feb 2014 14:41:09 -0500
-Subject: [PATCH 2/3] ARM: mvebu: use GPIO DT defines in Armada 370/XP
- boards
-In-Reply-To: <1392138433-12573-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392138433-12573-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392138433-12573-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140211194109.GJ27395@titan.lakedaemon.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 11 Feb 2014 20:43:58 +0100
+Subject: [PATCH 0/3] arm: at91: update defconfigs
+Message-ID: <1392147841-7815-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 06:07:12PM +0100, Thomas Petazzoni wrote:
-> Instead of harcoding 0 and 1 for the gpio specifications in the Armada
-> 370/XP boards, use the <dt-bindings/gpio/gpio.h> header file and its
-> GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW definitions.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-370-mirabox.dts         | 7 ++++---
->  arch/arm/boot/dts/armada-370-rd.dts              | 3 ++-
->  arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 3 ++-
->  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 9 +++++----
->  4 files changed, 13 insertions(+), 9 deletions(-)
+A few at91 defconfigs where not updated in a long time, refresh the configs for
+at91sam9rl and at91sam9260/at91sam9g20.
 
-Patches 2 and 3 applied to mvebu/dt with Gregory's Ack's.
+Alexandre Belloni (3):
+  arm: at91sam9rl: refresh defconfig
+  arm: at91sam9260_9g20: remove useless configuration
+  arm: at91sam9260_9g20: refresh configuration
 
-thx,
+ arch/arm/configs/at91sam9260_9g20_defconfig |  9 ++-------
+ arch/arm/configs/at91sam9rl_defconfig       | 10 +++++++---
+ 2 files changed, 9 insertions(+), 10 deletions(-)
 
-Jason.
+-- 
+1.8.3.2
