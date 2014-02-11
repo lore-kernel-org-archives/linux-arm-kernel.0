@@ -1,39 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Feb 2014 17:48:29 +0000
-Subject: [PATCH 08/12] mfd: vexpress-sysreg: Add syscon labels as
- platform data
-In-Reply-To: <1392139946.3380.48.camel@hornet>
-References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
- <1392138636-29240-9-git-send-email-pawel.moll@arm.com>
- <20140211172918.GH15081@lee--X1> <1392139946.3380.48.camel@hornet>
-Message-ID: <20140211174829.GJ15081@lee--X1>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 11 Feb 2014 18:50:43 +0100
+Subject: [PATCH] ARM: dts: exynos5250-arndale: Keep G3D regulator always on
+Message-ID: <1392141043-27170-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Feb 2014, Pawel Moll wrote:
+Apparently, if G3D regulator is powered off, the SoC cannot enter low
+power modes and just hangs. This patch fixes this by keeping the
+regulator always on when the system is running, as suggested by Exynos 4
+User's Manual in case of Exynos4210/4x12 SoCs (Exynos5250 UM does not
+have such note, but observed behavior seems to confirm that it is true
+for this SoC as well).
 
-> On Tue, 2014-02-11 at 17:29 +0000, Lee Jones wrote:
-> > There must be better
-> > ways of passing a name than through pdata, and if there isn't I'd
-> > suggest setting up a sysconf pdata struct that others can use in case
-> > they wish to expand the functionality further in some other
-> > unfathomable way. :)
-> 
-> ... which I proposed in the previous patch :-)
-> 
-> > Alternatively I could define a syscon platform data structure,
-> > something like this:
-> > 
-> > struct syscon_platform_data {
-> > 	const char *label;
-> > };
+This fixes an issue preventing Arndale board from entering sleep mode
+observed since commit
 
-So you did.
+346f372f7b72a0 clk: exynos5250: Add CLK_IGNORE_UNUSED flag for pmu clock
 
-Yes, this would be the lesser of the two evils. 
+that landed in kernel 3.11, which has fixed the clock driver to make the
+SoC actually try to enter the sleep mode.
 
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: stable at vger.kernel.org
+---
+ arch/arm/boot/dts/exynos5250-arndale.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+index e14dd62..5e9ddb8 100644
+--- a/arch/arm/boot/dts/exynos5250-arndale.dts
++++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+@@ -287,6 +287,7 @@
+ 					regulator-name = "vdd_g3d";
+ 					regulator-min-microvolt = <1000000>;
+ 					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
+ 					regulator-boot-on;
+ 					op_mode = <1>;
+ 				};
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.5.2
