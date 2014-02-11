@@ -1,9 +1,9 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Tue, 11 Feb 2014 10:23:59 -0600
-Subject: [PATCH 1/8] bus: arm-cci: make use of of_find_matching_node_and_match
+Date: Tue, 11 Feb 2014 10:24:01 -0600
+Subject: [PATCH 3/8] ARM: at91: make use of of_find_matching_node_and_match
 In-Reply-To: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
 References: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
-Message-ID: <1392135847-30791-2-git-send-email-joshc@codeaurora.org>
+Message-ID: <1392135847-30791-4-git-send-email-joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,46 +11,68 @@ Instead of the of_find_matching_node()/of_match_node() pair, which requires two
 iterations through the match table, make use of of_find_matching_node_and_match(),
 which only iterates through the table once.
 
-This also has the side effect of fixing the following following error hit
-during randconfig testing:
-
-  drivers/bus/arm-cci.c: In function ?cci_probe?:
-  drivers/bus/arm-cci.c:976:49: warning: dereferencing ?void *? pointer [enabled by default]
-    cci_config = of_match_node(arm_cci_matches, np)->data;
-                                                   ^
-  drivers/bus/arm-cci.c:976:49: error: request for member ?data? in something not a structure or union
+While we're here, mark the rtsc id table const.
 
 Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
 ---
- drivers/bus/arm-cci.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-at91/setup.c | 16 ++++------------
+ 1 file changed, 4 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 962fd35..e249cdb2 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -962,6 +962,7 @@ static const struct of_device_id arm_cci_ctrl_if_matches[] = {
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index f7ca97b..e884de8 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -352,7 +352,7 @@ void __init at91_ioremap_matrix(u32 base_addr)
+ }
  
- static int cci_probe(void)
- {
-+	const struct of_device_id *match;
- 	struct cci_nb_ports const *cci_config;
- 	int ret, i, nb_ace = 0, nb_ace_lite = 0;
- 	struct device_node *np, *cp;
-@@ -969,11 +970,11 @@ static int cci_probe(void)
- 	const char *match_str;
- 	bool is_ace;
+ #if defined(CONFIG_OF)
+-static struct of_device_id rstc_ids[] = {
++static const struct of_device_id rstc_ids[] = {
+ 	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9_alt_restart },
+ 	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
+ 	{ /*sentinel*/ }
+@@ -363,7 +363,7 @@ static void at91_dt_rstc(void)
+ 	struct device_node *np;
+ 	const struct of_device_id *of_id;
  
--	np = of_find_matching_node(NULL, arm_cci_matches);
-+	np = of_find_matching_node_and_match(NULL, arm_cci_matches, &match);
+-	np = of_find_matching_node(NULL, rstc_ids);
++	np = of_find_matching_node_and_match(NULL, rstc_ids, &of_id);
  	if (!np)
- 		return -ENODEV;
+ 		panic("unable to find compatible rstc node in dtb\n");
  
--	cci_config = of_match_node(arm_cci_matches, np)->data;
-+	cci_config = match->data;
- 	if (!cci_config)
- 		return -ENODEV;
+@@ -371,10 +371,6 @@ static void at91_dt_rstc(void)
+ 	if (!at91_rstc_base)
+ 		panic("unable to map rstc cpu registers\n");
  
+-	of_id = of_match_node(rstc_ids, np);
+-	if (!of_id)
+-		panic("AT91: rtsc no restart function available\n");
+-
+ 	arm_pm_restart = of_id->data;
+ 
+ 	of_node_put(np);
+@@ -392,7 +388,7 @@ static void at91_dt_ramc(void)
+ 	struct device_node *np;
+ 	const struct of_device_id *of_id;
+ 
+-	np = of_find_matching_node(NULL, ramc_ids);
++	np = of_find_matching_node_and_match(NULL, ramc_ids, &of_id);
+ 	if (!np)
+ 		panic("unable to find compatible ram controller node in dtb\n");
+ 
+@@ -402,11 +398,7 @@ static void at91_dt_ramc(void)
+ 	/* the controller may have 2 banks */
+ 	at91_ramc_base[1] = of_iomap(np, 1);
+ 
+-	of_id = of_match_node(ramc_ids, np);
+-	if (!of_id)
+-		pr_warn("AT91: ramc no standby function available\n");
+-	else
+-		at91_pm_set_standby(of_id->data);
++	at91_pm_set_standby(of_id->data);
+ 
+ 	of_node_put(np);
+ }
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
