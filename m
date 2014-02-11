@@ -1,70 +1,119 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 11 Feb 2014 20:43:59 +0100
-Subject: [PATCH 1/3] arm: at91sam9rl: refresh defconfig
-In-Reply-To: <1392147841-7815-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1392147841-7815-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1392147841-7815-2-git-send-email-alexandre.belloni@free-electrons.com>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 11 Feb 2014 11:52:19 -0800
+Subject: [PATCH v2] ARM: asm: rename logical shift macros push pull into
+ lspush lspull
+In-Reply-To: <CAA3XUr3Q8tr9-CzYHq_sfbFKSjNbrYYE8_H1-9ypnXo8HgUe2A@mail.gmail.com>
+References: <1392063589-24111-1-git-send-email-victor.kamensky@linaro.org>
+ <1392063589-24111-2-git-send-email-victor.kamensky@linaro.org>
+ <alpine.LFD.2.11.1402101607120.17677@knanqh.ubzr>
+ <20140211155437.GC3035@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1402111159230.17677@knanqh.ubzr>
+ <20140211173754.GE3035@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1402111253160.17677@knanqh.ubzr>
+ <CAA3XUr3Q8tr9-CzYHq_sfbFKSjNbrYYE8_H1-9ypnXo8HgUe2A@mail.gmail.com>
+Message-ID: <CAA3XUr3rhbooaTjDwhXVgWxnKV3-1fFNHGVTGsyAjpJrbxiQRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The defconfig for the at91sam9rl is quite old, refresh it:
- - now uses EABI instead of OABI
- - add devtmpfs support
- - add UBI/UBIfs support
- - remove a few config symbols that disappeared
+On 11 February 2014 11:36, Victor Kamensky <victor.kamensky@linaro.org> wrote:
+> On 11 February 2014 09:58, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> On Tue, 11 Feb 2014, Dave Martin wrote:
+>>
+>>> On Tue, Feb 11, 2014 at 12:09:35PM -0500, Nicolas Pitre wrote:
+>>> > On Tue, 11 Feb 2014, Dave Martin wrote:
+>>> >
+>>> > > On Mon, Feb 10, 2014 at 04:30:01PM -0500, Nicolas Pitre wrote:
+>>> > > > On Mon, 10 Feb 2014, Victor Kamensky wrote:
+>>> > > >
+>>> > > > > Renames logical shift macros, 'push' and 'pull', defined in
+>>> > > > > arch/arm/include/asm/assembler.h, into 'lspush' and 'lspull'.
+>>> > > >
+>>> > > > I don't have any fundamental objection to the idea, except maybe for the
+>>> > > > actual names.  I just can't come up with anything better though.
+>>> > >
+>>> > > For consistency with the get_byte_ stuff, how about:
+>>> > >
+>>> > >   push -> towards_byte_0
+>>> > >   pull -> from_byte_0
+>>> > >
+>>> > > That may make the purpose a little clearer, too.
+>>> >
+>>> > I don't know if
+>>> >
+>>> >     mov     r0, r1, from_byte_0 #8
+>>> >
+>>> > is that much clearer though.
+>>> >
+>>> > > (Assuming I've got them the right way around...)
+>>> >
+>>> > As you later noticed you got it wrong.  :-)
+>>> > Most likely because "full from" and "push towards" are common english
+>>> > constructs.
+>>>
+>>> No more so than "pull towards" and "push from".
+>>
+>> OK.  I'll trust you on that account.
+>>
+>>> I'll blame it on the fact that the get_byte_ macros have wrong-
+>>> endian numbering, which I didn't look at carefully enough ;)
+>>>
+>>> But I think we proved that my suggestion didn't really make things
+>>> easier to understand...
+>>
+>> What about:
+>>
+>>         push -> next
+>>         pull -> prev
+>>
+>> ?
+>>
+>> That would make:
+>>
+>>         mov     r0, r1, next #8
+>
+> I am not native English speaker, so subtle details of your
+> discussion go above my head :). For me those tokens
+> were just symbols with specific meaning of logical shifts
+> and selected endianness. I'll do as you decide. Quick
+> grep over .S files under arch/arm seems 'next' and 'prev'
+> will be OK and I did build that confirms that.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/configs/at91sam9rl_defconfig | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+Forgot to mention one detail. There is a case in
+./nwfpe/entry.S file where 'next' is used as label name. I guess,
+it should work if macro would rename it into lsl or lsr label
+name. And/or we could rename the label.
 
-diff --git a/arch/arm/configs/at91sam9rl_defconfig b/arch/arm/configs/at91sam9rl_defconfig
-index 7cf87856d63c..e60f51afcf6a 100644
---- a/arch/arm/configs/at91sam9rl_defconfig
-+++ b/arch/arm/configs/at91sam9rl_defconfig
-@@ -1,8 +1,8 @@
--CONFIG_EXPERIMENTAL=y
- # CONFIG_LOCALVERSION_AUTO is not set
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
- CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_EMBEDDED=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
-@@ -15,20 +15,23 @@ CONFIG_ARCH_AT91SAM9RL=y
- CONFIG_MACH_AT91SAM9RLEK=y
- CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
- # CONFIG_ARM_THUMB is not set
-+CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_CMDLINE="mem=64M console=ttyS0,115200 initrd=0x21100000,17105363 root=/dev/ram0 rw"
--CONFIG_FPE_NWFPE=y
-+CONFIG_AUTO_ZRELADDR=y
- CONFIG_NET=y
- CONFIG_UNIX=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_DATAFLASH=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ATMEL=y
-+CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=4
-@@ -67,6 +70,7 @@ CONFIG_EXT2_FS=y
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
-+CONFIG_UBIFS_FS=y
- CONFIG_CRAMFS=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_CODEPAGE_850=y
--- 
-1.8.3.2
+Wondering ... whether idea to have those macros
+name in way that coincides with English words would lead
+us to some conflict earlier or latter. With this respect lspull
+and lspush IMHO are somewhat better because they are
+sort of abbreviations.
+
+Thanks,
+Victor
+
+> One nit/question though: there are some cases where
+> 'push' and 'pull' macros were used in macros and macro
+> parameters were also called 'push' and 'pull'. I.e something
+> like this:
+>
+> mov     r3, lr, pull #\pull
+>
+> with rename 'pull' to 'lspull' I did not bother to rename
+> macro parameters because they are separate, have
+> just local context and 'lspull' is close to 'pull'. Resulting
+> proposed diff was:
+> -               mov     r3, lr, pull #\pull
+> +               mov     r3, lr, lspull #\pull
+>
+> I assume that if we change 'push -> next' and 'pull -> prev' I
+> will need to rename macro parameters in the same way.
+> So it will be:
+> +               mov     r3, lr, prev #\prev
+> Is it correct?
+>
+> Thanks,
+> Victor
+>
+>>
+>> Nicolas
