@@ -1,49 +1,36 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 11 Feb 2014 15:32:00 -0500
-Subject: [PATCH] drm/msm: drop ARCH_MSM Kconfig depend
-In-Reply-To: <1392150119-21132-1-git-send-email-galak@codeaurora.org>
-References: <1392150119-21132-1-git-send-email-galak@codeaurora.org>
-Message-ID: <CAF6AEGtQRhwRS+GpGqrGUNts26X=sfOKWUjbbxwUmkPs2btbYw@mail.gmail.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 11 Feb 2014 21:34:36 +0100
+Subject: [PATCH v4 0/2] [RESEND] Lager and Koelsch reference serial port
+ support
+Message-ID: <1392150878-10436-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 3:21 PM, Kumar Gala <galak@codeaurora.org> wrote:
-> The ARCH_MSM depend is redundant with ARCH_MSM8960, so we can remove it.
-> Additionally, we are splitting Qualcomm MSM support into legacy (ARCH_MSM)
-> and multiplatform (ARCH_QCOM).  The MSM8960 with be ARCH_QCOM going forward
-> so dropping ARCH_MSM will work properly for the new ARCH_QCOM multiplatform
-> build.
->
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+Hello,
 
-Acked-by: Rob Clark <robdclark@gmail.com>
+This patch set enables the serial port DT devices for the Lager and Koelsch
+reference boards.
 
+The previous "[PATCH v3 0/4] Lager and Koelsch reference serial port support"
+series that contained these two patches got partially merged in v3.14-rc1. This
+is a resent of the left-overs that we have decided to push back to v3.15,
+rebased on top of Simon's latest devel branch.
 
-> ---
-> David/Rob,
->
-> If you can ack this I'll send it via linux-qcom/arm-soc tree's
->
-> thanks
->
-> - k
->  drivers/gpu/drm/msm/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/gpu/drm/msm/Kconfig b/drivers/gpu/drm/msm/Kconfig
-> index c69d1e0..b698497 100644
-> --- a/drivers/gpu/drm/msm/Kconfig
-> +++ b/drivers/gpu/drm/msm/Kconfig
-> @@ -3,7 +3,7 @@ config DRM_MSM
->         tristate "MSM DRM"
->         depends on DRM
->         depends on MSM_IOMMU
-> -       depends on (ARCH_MSM && ARCH_MSM8960) || (ARM && COMPILE_TEST)
-> +       depends on ARCH_MSM8960 || (ARM && COMPILE_TEST)
->         select DRM_KMS_HELPER
->         select SHMEM
->         select TMPFS
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
->
+Laurent Pinchart (2):
+  ARM: shmobile: lager: Enable SCIF0 and SCIF1 serial ports in DT
+  ARM: shmobile: koelsch: Enable SCIF0 and SCIF1 serial ports in DT
+
+ arch/arm/boot/dts/r8a7790-lager.dts              | 24 ++++++++++++++---
+ arch/arm/boot/dts/r8a7791-koelsch.dts            | 24 ++++++++++++++---
+ arch/arm/mach-shmobile/board-koelsch-reference.c | 18 ++-----------
+ arch/arm/mach-shmobile/board-lager-reference.c   | 18 ++-----------
+ arch/arm/mach-shmobile/clock-r8a7790.c           | 16 +++++------
+ arch/arm/mach-shmobile/clock-r8a7791.c           | 24 ++++++++---------
+ arch/arm/mach-shmobile/setup-r8a7790.c           | 26 +++++++++---------
+ arch/arm/mach-shmobile/setup-r8a7791.c           | 34 ++++++++++++------------
+ 8 files changed, 94 insertions(+), 90 deletions(-)
+
+-- 
+Regards,
+
+Laurent Pinchart
