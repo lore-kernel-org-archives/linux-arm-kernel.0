@@ -1,46 +1,197 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Feb 2014 14:17:51 +0000
-Subject: [PATCH RFC v3 1/3] Documentation: devicetree: psci: define CPU
- suspend parameter
+Date: Tue, 11 Feb 2014 14:17:52 +0000
+Subject: [PATCH RFC v3 2/3] Documentation: arm: add cache DT bindings
 In-Reply-To: <1392128273-8614-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1392128273-8614-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1392128273-8614-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1392128273-8614-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OS layers built on top of PSCI to enter low-power states require the
-power_state parameter to be passed to the PSCI CPU suspend method.
-
-This parameter is specific to a power state and platform specific,
-therefore must be provided by firmware to the OS in order to enable
-proper call sequence.
-
-This patch adds a property in the PSCI bindings that describes how
-the CPU suspend power_state parameter should be defined in DT in
-all device nodes that rely on PSCI CPU suspend method usage.
+On ARM systems the cache topology cannot be probed at runtime, in
+particular, it is impossible to probe which CPUs share a given cache
+level. Power management software requires this knowledge to implement
+optimized power down sequences, hence this patch adds a document that
+defines the DT cache bindings for ARM systems. The bindings supersede
+cache bindings in the ePAPR (PowerPC bindings), because caches geometry for
+architected caches is probeable on ARM systems. This patch also adds
+properties that are specific to ARM architected caches to the existing ones
+defined in the ePAPR v1.1, as bindings extensions.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- Documentation/devicetree/bindings/arm/psci.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+ Documentation/devicetree/bindings/arm/cache.txt | 165 ++++++++++
+ 1 file changed, 165 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-index 433afe9..6fc32a5 100644
---- a/Documentation/devicetree/bindings/arm/psci.txt
-+++ b/Documentation/devicetree/bindings/arm/psci.txt
-@@ -42,6 +42,13 @@ Main node optional properties:
- 
-  - migrate       : Function ID for MIGRATE operation
- 
-+Device tree nodes that require usage of PSCI CPU_SUSPEND function (ie idle
-+states bindings) must specify the following properties:
+diff --git a/Documentation/devicetree/bindings/arm/cache.txt b/Documentation/devicetree/bindings/arm/cache.txt
+new file mode 100644
+index 0000000..bd9f3d9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/cache.txt
+@@ -0,0 +1,165 @@
++==========================================
++ARM processors cache binding description
++==========================================
 +
-+- power-state
-+		Value type: <u32>
-+		Definition: power_state parameter to pass to the PSCI
-+			    suspend call.
- 
- Example:
- 
++Device tree bindings for cache nodes are already part of the ePAPR standard
++v1.1 ([2]) for PowerPC platforms. This document defines the cache bindings
++for caches on ARM processor systems.
++
++On ARM based systems most of the cache properties related to cache geometry
++are probeable in HW (please refer to the processor TRMs in [1] for register
++details), hence, unless otherwise stated, the properties defined in ePAPR for
++internal, multi-level and shared caches ([2], 3.7.3, 3.8) are to be considered
++superseded on ARM.
++
++On ARM, caches are either architected (directly controlled by the processor
++through coprocessor instructions and tightly coupled with the processor
++implementation) or unarchitected (controlled through a memory mapped
++interface, implemented as a stand-alone IP external to the processor
++implementation).
++
++This document provides the device tree bindings for ARM architected caches.
++
++- ARM architected cache node
++
++	Description: must be a direct child of the cpu node.
++		     A system can contain multiple architected cache nodes
++		     per cpu node, linked through the next-level-cache phandle.
++		     The next-level-cache property in the cpu node points to
++		     the first level of architected cache for the CPU.
++		     The next-level-cache links ordering must represent the
++		     system cache hierarchy in the system, with the upper
++		     cache level represented by a cache node with a missing
++		     next-level-cache property.
++
++	ARM architected cache node defines the following properties:
++
++	- compatible
++		Usage: Required
++		Value type: <string>
++		Definition: value shall be "arm,arch-cache".
++
++	- power-domain
++		Usage: Optional
++		Value type: phandle
++		Definition: A phandle and power domain specifier as defined by
++			    bindings of power domain specified by the
++			    phandle [3].
++
++Example(dual-cluster big.LITTLE system 32-bit)
++
++	cpus {
++		#size-cells = <0>;
++		#address-cells = <1>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x0>;
++			next-level-cache = <&L1_0>;
++
++			L1_0: l1-cache {
++				compatible = "arm,arch-cache";
++				next-level-cache = <&L2_0>;
++			};
++
++			L2_0: l2-cache {
++				compatible = "arm,arch-cache";
++			};
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x1>;
++			next-level-cache = <&L1_1>;
++
++			L1_1: l1-cache {
++				compatible = "arm,arch-cache";
++				next-level-cache = <&L2_0>;
++			};
++		};
++
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x2>;
++			next-level-cache = <&L1_2>;
++
++			L1_2: l1-cache {
++				compatible = "arm,arch-cache";
++				next-level-cache = <&L2_0>;
++			};
++		};
++
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0x3>;
++			next-level-cache = <&L1_3>;
++
++			L1_3: l1-cache {
++				compatible = "arm,arch-cache";
++				next-level-cache = <&L2_0>;
++			};
++		};
++
++		cpu at 100 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x100>;
++			next-level-cache = <&L1_4>;
++
++			L1_4: l1-cache {
++				compatible = "arm,arch-cache";
++				next-level-cache = <&L2_1>;
++			};
++
++			L2_1: l2-cache {
++				compatible = "arm,arch-cache";
++			};
++		};
++
++		cpu at 101 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x101>;
++			next-level-cache = <&L1_5>;
++
++			L1_5: l1-cache {
++				compatible = "arm,arch-cache";
++				next-level-cache = <&L2_1>;
++			};
++		};
++
++		cpu at 102 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x102>;
++			next-level-cache = <&L1_6>;
++
++			L1_6: l1-cache {
++				compatible = "arm,arch-cache";
++				next-level-cache = <&L2_1>;
++			};
++		};
++
++		cpu at 103 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x103>;
++			next-level-cache = <&L1_7>;
++
++			L1_7: l1-cache {
++				compatible = "arm,arch-cache";
++				next-level-cache = <&L2_1>;
++			};
++		};
++	};
++
++[1] ARM Architecture Reference Manuals
++    http://infocenter.arm.com/help/index.jsp
++[2] ePAPR standard
++    https://www.power.org/documentation/epapr-version-1-1/
++[3] Kernel documentation - power domain bindings
++    Documentation/devicetree/bindings/power/power_domain.txt
 -- 
 1.8.4
