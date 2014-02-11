@@ -1,54 +1,103 @@
-From: david.lanzendoerfer@o2s.ch (David =?utf-8?q?Lanzend=C3=B6rfer?=)
-Date: Tue, 11 Feb 2014 20:34:51 +0100
-Subject: [PATCH v5 8/8] ARM: sunxi: Add documentation for driver for SD/MMC
- hosts found on Allwinner sunxi SoCs
-In-Reply-To: <20140211190543.4568.83517.stgit@dizzy-6.o2s.ch>
-References: <20140211190543.4568.83517.stgit@dizzy-6.o2s.ch>
-Message-ID: <20140211193450.4568.69759.stgit@dizzy-6.o2s.ch>
+From: victor.kamensky@linaro.org (Victor Kamensky)
+Date: Tue, 11 Feb 2014 11:36:33 -0800
+Subject: [PATCH v2] ARM: asm: rename logical shift macros push pull into
+ lspush lspull
+In-Reply-To: <alpine.LFD.2.11.1402111253160.17677@knanqh.ubzr>
+References: <1392063589-24111-1-git-send-email-victor.kamensky@linaro.org>
+ <1392063589-24111-2-git-send-email-victor.kamensky@linaro.org>
+ <alpine.LFD.2.11.1402101607120.17677@knanqh.ubzr>
+ <20140211155437.GC3035@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1402111159230.17677@knanqh.ubzr>
+ <20140211173754.GE3035@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1402111253160.17677@knanqh.ubzr>
+Message-ID: <CAA3XUr3Q8tr9-CzYHq_sfbFKSjNbrYYE8_H1-9ypnXo8HgUe2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
----
- .../devicetree/bindings/mmc/sunxi-mmc.txt          |   32 ++++++++++++++++++++
- 1 file changed, 32 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+On 11 February 2014 09:58, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Tue, 11 Feb 2014, Dave Martin wrote:
+>
+>> On Tue, Feb 11, 2014 at 12:09:35PM -0500, Nicolas Pitre wrote:
+>> > On Tue, 11 Feb 2014, Dave Martin wrote:
+>> >
+>> > > On Mon, Feb 10, 2014 at 04:30:01PM -0500, Nicolas Pitre wrote:
+>> > > > On Mon, 10 Feb 2014, Victor Kamensky wrote:
+>> > > >
+>> > > > > Renames logical shift macros, 'push' and 'pull', defined in
+>> > > > > arch/arm/include/asm/assembler.h, into 'lspush' and 'lspull'.
+>> > > >
+>> > > > I don't have any fundamental objection to the idea, except maybe for the
+>> > > > actual names.  I just can't come up with anything better though.
+>> > >
+>> > > For consistency with the get_byte_ stuff, how about:
+>> > >
+>> > >   push -> towards_byte_0
+>> > >   pull -> from_byte_0
+>> > >
+>> > > That may make the purpose a little clearer, too.
+>> >
+>> > I don't know if
+>> >
+>> >     mov     r0, r1, from_byte_0 #8
+>> >
+>> > is that much clearer though.
+>> >
+>> > > (Assuming I've got them the right way around...)
+>> >
+>> > As you later noticed you got it wrong.  :-)
+>> > Most likely because "full from" and "push towards" are common english
+>> > constructs.
+>>
+>> No more so than "pull towards" and "push from".
+>
+> OK.  I'll trust you on that account.
+>
+>> I'll blame it on the fact that the get_byte_ macros have wrong-
+>> endian numbering, which I didn't look at carefully enough ;)
+>>
+>> But I think we proved that my suggestion didn't really make things
+>> easier to understand...
+>
+> What about:
+>
+>         push -> next
+>         pull -> prev
+>
+> ?
+>
+> That would make:
+>
+>         mov     r0, r1, next #8
 
-diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-new file mode 100644
-index 0000000..2ebd8af
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-@@ -0,0 +1,32 @@
-+* Allwinner sunxi MMC controller
-+
-+The highspeed MMC host controller on Allwinner SoCs provides an interface
-+for MMC, SD and SDIO types of memory cards.
-+
-+Supported maximum speeds are the ones of the eMMC standard 4.5 as well
-+as the speed of SD standard 3.0.
-+Absolute maximum transfer rate is 200MB/s
-+
-+Required properties:
-+- compatible: Should be "allwinner,<revision>-<chip>-mmc".
-+  The supported chips include a10,a10s,13,a20 and a31,.
-+- base registers are 0x1000 appart, so the base of mmc1
-+  would be 0x01c0f000+0x1000=0x01c10000(see example)
-+  and so on.
-+- clocks requires the reference at the ahb clock gate
-+  with the correct index (mmc0 -> 8, mmc1 -> 9, and so on)
-+  as well as the reference to the correct mod0 clock.
-+- interrupts requires the correct IRQ line
-+  (mmc0 -> 32, mmc1 -> 33, and so on)
-+
-+Examples:
-+
-+mmc0: mmc at 01c0f000 {
-+	compatible = "allwinner,sun5i-a13-mmc";
-+	reg = <0x01c0f000 0x1000>;
-+	clocks = <&ahb_gates 8>, <&mmc0_clk>;
-+	clock-names = "ahb", "mod";
-+	interrupts = <0 32 4>;
-+	bus-width = <4>;
-+	status = "disabled";
-+};
+I am not native English speaker, so subtle details of your
+discussion go above my head :). For me those tokens
+were just symbols with specific meaning of logical shifts
+and selected endianness. I'll do as you decide. Quick
+grep over .S files under arch/arm seems 'next' and 'prev'
+will be OK and I did build that confirms that.
+
+One nit/question though: there are some cases where
+'push' and 'pull' macros were used in macros and macro
+parameters were also called 'push' and 'pull'. I.e something
+like this:
+
+mov     r3, lr, pull #\pull
+
+with rename 'pull' to 'lspull' I did not bother to rename
+macro parameters because they are separate, have
+just local context and 'lspull' is close to 'pull'. Resulting
+proposed diff was:
+-               mov     r3, lr, pull #\pull
++               mov     r3, lr, lspull #\pull
+
+I assume that if we change 'push -> next' and 'pull -> prev' I
+will need to rename macro parameters in the same way.
+So it will be:
++               mov     r3, lr, prev #\prev
+Is it correct?
+
+Thanks,
+Victor
+
+>
+> Nicolas
