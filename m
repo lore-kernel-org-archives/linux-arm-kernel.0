@@ -1,99 +1,171 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 11 Feb 2014 15:42:01 +0200
-Subject: [PATCH v9 2/4] ehci-platform: Add support for clks and phy passed
- through devicetree
-In-Reply-To: <52F9F7B3.6080802@redhat.com>
-References: <1391787403-20961-1-git-send-email-hdegoede@redhat.com>
- <1391787403-20961-3-git-send-email-hdegoede@redhat.com>
- <52F9E98B.90407@ti.com> <52F9EE06.3070003@redhat.com>
- <52F9F4C6.6080201@ti.com> <52F9F7B3.6080802@redhat.com>
-Message-ID: <52FA28A9.8010900@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 11 Feb 2014 14:46:37 +0100
+Subject: [PATCH] ARM: ux500: drop DMA channel platform data for storage
+In-Reply-To: <1392120687-12572-1-git-send-email-linus.walleij@linaro.org>
+References: <1392120687-12572-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAPDyKFoHXBVtxNNRCPix41YKmsne8Pz83naTg2v=RTfwJHeS8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2014 12:13 PM, Hans de Goede wrote:
-> Hi,
-> 
-> On 02/11/2014 11:00 AM, Roger Quadros wrote:
->> On 02/11/2014 11:31 AM, Hans de Goede wrote:
->>> Hi,
->>>
->>> On 02/11/2014 10:12 AM, Roger Quadros wrote:
->>>> Hi Hans,
->>>>
->>>> On 02/07/2014 05:36 PM, Hans de Goede wrote:
->>>>> Currently ehci-platform is only used in combination with devicetree when used
->>>>> with some Via socs. By extending it to (optionally) get clks and a phy from
->>>>> devicetree, and enabling / disabling those on power_on / off, it can be used
->>>>> more generically. Specifically after this commit it can be used for the
->>>>> ehci controller on Allwinner sunxi SoCs.
->>>>>
->>>>> Since ehci-platform is intended to handle any generic enough non pci ehci
->>>>> device, add a "usb-ehci" compatibility string.
->>>>>
->>>>> There already is a usb-ehci device-tree bindings document, update this
->>>>> with clks and phy bindings info.
->>>>>
->>>>> Although actually quite generic so far the via,vt8500 compatibilty string
->>>>> had its own bindings document. Somehow we even ended up with 2 of them. Since
->>>>> these provide no extra information over the generic usb-ehci documentation,
->>>>> this patch removes them.
->>>>>
->>>>> The ehci-ppc-of.c driver also claims the usb-ehci compatibility string,
->>>>> even though it mostly is ibm,usb-ehci-440epx specific. ehci-platform.c is
->>>>> not needed on ppc platforms, so add a !PPC_OF dependency to it to avoid
->>>>> 2 drivers claiming the same compatibility string getting build on ppc.
->>>>>
->>>>
->>>> This breaks all OMAP platforms on linux-next for the exact same reason. see [1].
->>>>
->>>> ./arch/arm/boot/dts/omap4.dtsi:				compatible = "ti,ehci-omap", "usb-ehci";
->>>> ./arch/arm/boot/dts/omap3.dtsi:				compatible = "ti,ehci-omap", "usb-ehci";
->>>> ./arch/arm/boot/dts/omap5.dtsi:				compatible = "ti,ehci-omap", "usb-ehci";
->>>
->>> That should not be the case, the driver core should try to find a driver matching
->>> the compatibility string from left to right, or in other words from most specific
->>> to least specific. This is part of the whole devicetree design.
->>>
->>> So as long as the driver claiming "ti,ehci-omap" is available at probe time that
->>> one should get used and things should work fine. Now if ehci-platform is built-in
->>> and ehci-omap is a module, then I guess one could see the described breakage.
->>>
->>> If the driver is built-in and things are not working, then we will need to do some
->>> debugging as to why the left to right matching is not working as expected.
->>
->> Both ehci_platform and ehci_omap were built-in and still the ehci_platform driver got
->> probe preference. So it looks like the left to right compatible list priority probing
->> feature doesn't work.
-> 
-> Oops, I guess nothing relies on it sofar. Well we could go and debug and fix this but...
-> 
+On 11 February 2014 13:11, Linus Walleij <linus.walleij@linaro.org> wrote:
+> The MMC/SD interface driver (MMCI) already supports picking its
+> DMA channels out of the device tree, so there is no point in
+> overriding them with identical platform data as well.
+>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-I think we have a misunderstanding. The compatible list priority probing is only for the
-platform identification compatible. I don't think it is meant to work with driver core yet.
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-http://lxr.free-electrons.com/source/Documentation/devicetree/usage-model.txt#L116
-
->>
->>>
->>> I must admit I'm not sure what happens if both are a module, the kernel direct
->>> module load will likely fail due to lack of a rootfs at that point, and then
->>> the module will later get loaded by udev I assume, at which point there are no
->>> loading ordering guarantees.
->>>
->>> The easiest solution to ensure that "ti,ehci-omap" is available at probe time
->>> (if enabled) seems to be to change USB_EHCI_HCD_OMAP to a boolean.
->>
->> That is a limitation I don't like to have for USB_EHCI_HCD_OMAP.
-> 
-> I completely understand, thinking more about this I'm simply going to change the
-> compatibility string for ohci- and ehci-platform to be "ohci-platform" resp.
-> "ehci-platform". I know there are some people who don't like the -platform
-> suffix, but though luck, as the above clearly shows using the generic "usb-ohci" /
-> "usb-ehci" they were advocating for leads to a ton of issues, and we already
-> have a precedent for ?hci-platform in the form of "xhci-platform".
-
-+1
-
-cheers,
--roger
+> ---
+>  arch/arm/mach-ux500/board-mop500-sdi.c | 79 ----------------------------------
+>  1 file changed, 79 deletions(-)
+>
+> diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
+> index fcbf3a13a539..0addb1815fa6 100644
+> --- a/arch/arm/mach-ux500/board-mop500-sdi.c
+> +++ b/arch/arm/mach-ux500/board-mop500-sdi.c
+> @@ -11,13 +11,11 @@
+>  #include <linux/amba/mmci.h>
+>  #include <linux/mmc/host.h>
+>  #include <linux/platform_device.h>
+> -#include <linux/platform_data/dma-ste-dma40.h>
+>
+>  #include <asm/mach-types.h>
+>
+>  #include "db8500-regs.h"
+>  #include "board-mop500.h"
+> -#include "ste-dma40-db8500.h"
+>
+>  /*
+>   * v2 has a new version of this block that need to be forced, the number found
+> @@ -29,20 +27,6 @@
+>   * SDI 0 (MicroSD slot)
+>   */
+>
+> -#ifdef CONFIG_STE_DMA40
+> -struct stedma40_chan_cfg mop500_sdi0_dma_cfg_rx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_DEV_TO_MEM,
+> -       .dev_type = DB8500_DMA_DEV29_SD_MM0,
+> -};
+> -
+> -static struct stedma40_chan_cfg mop500_sdi0_dma_cfg_tx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_MEM_TO_DEV,
+> -       .dev_type = DB8500_DMA_DEV29_SD_MM0,
+> -};
+> -#endif
+> -
+>  struct mmci_platform_data mop500_sdi0_data = {
+>         .f_max          = 100000000,
+>         .capabilities   = MMC_CAP_4_BIT_DATA |
+> @@ -56,30 +40,11 @@ struct mmci_platform_data mop500_sdi0_data = {
+>                                 MCI_ST_CMDDIREN |
+>                                 MCI_ST_DATA0DIREN |
+>                                 MCI_ST_DATA2DIREN,
+> -#ifdef CONFIG_STE_DMA40
+> -       .dma_filter     = stedma40_filter,
+> -       .dma_rx_param   = &mop500_sdi0_dma_cfg_rx,
+> -       .dma_tx_param   = &mop500_sdi0_dma_cfg_tx,
+> -#endif
+>  };
+>
+>  /*
+>   * SDI1 (SDIO WLAN)
+>   */
+> -#ifdef CONFIG_STE_DMA40
+> -static struct stedma40_chan_cfg sdi1_dma_cfg_rx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_DEV_TO_MEM,
+> -       .dev_type = DB8500_DMA_DEV32_SD_MM1,
+> -};
+> -
+> -static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_MEM_TO_DEV,
+> -       .dev_type = DB8500_DMA_DEV32_SD_MM1,
+> -};
+> -#endif
+> -
+>  struct mmci_platform_data mop500_sdi1_data = {
+>         .ocr_mask       = MMC_VDD_29_30,
+>         .f_max          = 100000000,
+> @@ -87,31 +52,12 @@ struct mmci_platform_data mop500_sdi1_data = {
+>                                 MMC_CAP_NONREMOVABLE,
+>         .gpio_cd        = -1,
+>         .gpio_wp        = -1,
+> -#ifdef CONFIG_STE_DMA40
+> -       .dma_filter     = stedma40_filter,
+> -       .dma_rx_param   = &sdi1_dma_cfg_rx,
+> -       .dma_tx_param   = &sdi1_dma_cfg_tx,
+> -#endif
+>  };
+>
+>  /*
+>   * SDI 2 (POP eMMC, not on DB8500ed)
+>   */
+>
+> -#ifdef CONFIG_STE_DMA40
+> -struct stedma40_chan_cfg mop500_sdi2_dma_cfg_rx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_DEV_TO_MEM,
+> -       .dev_type =  DB8500_DMA_DEV28_SD_MM2,
+> -};
+> -
+> -static struct stedma40_chan_cfg mop500_sdi2_dma_cfg_tx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_MEM_TO_DEV,
+> -       .dev_type = DB8500_DMA_DEV28_SD_MM2,
+> -};
+> -#endif
+> -
+>  struct mmci_platform_data mop500_sdi2_data = {
+>         .ocr_mask       = MMC_VDD_165_195,
+>         .f_max          = 100000000,
+> @@ -123,31 +69,11 @@ struct mmci_platform_data mop500_sdi2_data = {
+>                                 MMC_CAP_CMD23,
+>         .gpio_cd        = -1,
+>         .gpio_wp        = -1,
+> -#ifdef CONFIG_STE_DMA40
+> -       .dma_filter     = stedma40_filter,
+> -       .dma_rx_param   = &mop500_sdi2_dma_cfg_rx,
+> -       .dma_tx_param   = &mop500_sdi2_dma_cfg_tx,
+> -#endif
+>  };
+>
+>  /*
+>   * SDI 4 (on-board eMMC)
+>   */
+> -
+> -#ifdef CONFIG_STE_DMA40
+> -struct stedma40_chan_cfg mop500_sdi4_dma_cfg_rx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_DEV_TO_MEM,
+> -       .dev_type =  DB8500_DMA_DEV42_SD_MM4,
+> -};
+> -
+> -static struct stedma40_chan_cfg mop500_sdi4_dma_cfg_tx = {
+> -       .mode = STEDMA40_MODE_LOGICAL,
+> -       .dir = DMA_MEM_TO_DEV,
+> -       .dev_type = DB8500_DMA_DEV42_SD_MM4,
+> -};
+> -#endif
+> -
+>  struct mmci_platform_data mop500_sdi4_data = {
+>         .f_max          = 100000000,
+>         .capabilities   = MMC_CAP_4_BIT_DATA |
+> @@ -158,9 +84,4 @@ struct mmci_platform_data mop500_sdi4_data = {
+>                                 MMC_CAP_CMD23,
+>         .gpio_cd        = -1,
+>         .gpio_wp        = -1,
+> -#ifdef CONFIG_STE_DMA40
+> -       .dma_filter     = stedma40_filter,
+> -       .dma_rx_param   = &mop500_sdi4_dma_cfg_rx,
+> -       .dma_tx_param   = &mop500_sdi4_dma_cfg_tx,
+> -#endif
+>  };
+> --
+> 1.8.5.3
+>
