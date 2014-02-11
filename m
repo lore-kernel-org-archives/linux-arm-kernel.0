@@ -1,36 +1,63 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 11 Feb 2014 12:31:45 +0900
-Subject: [PATCH 22/28] Remove S3C24XX_GPIO_EXTRA128
-In-Reply-To: <1391971686-9517-23-git-send-email-richard@nod.at>
-References: <1391971686-9517-1-git-send-email-richard@nod.at>
- <1391971686-9517-23-git-send-email-richard@nod.at>
-Message-ID: <52F999A1.1070709@samsung.com>
+Date: Tue, 11 Feb 2014 12:33:12 +0900
+Subject: [PATCHv3 2/2] arm: Get rid of meminfo
+In-Reply-To: <1392153265-14439-3-git-send-email-lauraa@codeaurora.org>
+References: <1392153265-14439-1-git-send-email-lauraa@codeaurora.org>
+ <1392153265-14439-3-git-send-email-lauraa@codeaurora.org>
+Message-ID: <52F999F8.8070808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/14 03:48, Richard Weinberger wrote:
-> The symbol is an orphan, get rid of it.
+On 02/12/14 06:14, Laura Abbott wrote:
+> memblock is now fully integrated into the kernel and is the prefered
+> method for tracking memory. Rather than reinvent the wheel with
+> meminfo, migrate to using memblock directly instead of meminfo as
+> an intermediate.
 >
-> Signed-off-by: Richard Weinberger<richard@nod.at>
+> Acked-by: Jason Cooper<jason@lakedaemon.net>
+> Acked-by: Catalin Marinas<catalin.marinas@arm.com>
+> Acked-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+> Tested-by: Leif Lindholm<leif.lindholm@linaro.org>
+> Signed-off-by: Laura Abbott<lauraa@codeaurora.org>
 > ---
->   arch/arm/mach-s3c24xx/Kconfig | 1 -
->   1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-> index 1c67f04..bb1fa603 100644
-> --- a/arch/arm/mach-s3c24xx/Kconfig
-> +++ b/arch/arm/mach-s3c24xx/Kconfig
-> @@ -561,7 +561,6 @@ config MACH_OSIRIS
->   	select S3C2410_IOTIMING if ARM_S3C2440_CPUFREQ
->   	select S3C2440_XTAL_12000000
->   	select S3C24XX_DCLK
-> -	select S3C24XX_GPIO_EXTRA128
->   	select S3C24XX_SIMTEC_PM if PM
->   	select S3C_DEV_NAND
->   	select S3C_DEV_USB_HOST
+>   arch/arm/include/asm/mach/arch.h         |    4 +-
+>   arch/arm/include/asm/memblock.h          |    3 +-
+>   arch/arm/include/asm/setup.h             |   23 ------
+>   arch/arm/kernel/atags_parse.c            |    5 +-
+>   arch/arm/kernel/devtree.c                |    5 --
+>   arch/arm/kernel/setup.c                  |   30 ++------
+>   arch/arm/mach-clps711x/board-clep7312.c  |    7 +-
+>   arch/arm/mach-clps711x/board-edb7211.c   |   10 +--
+>   arch/arm/mach-clps711x/board-p720t.c     |    2 +-
+>   arch/arm/mach-footbridge/cats-hw.c       |    2 +-
+>   arch/arm/mach-footbridge/netwinder-hw.c  |    2 +-
+>   arch/arm/mach-msm/board-halibut.c        |    6 --
+>   arch/arm/mach-msm/board-mahimahi.c       |   13 +---
+>   arch/arm/mach-msm/board-msm7x30.c        |    3 +-
+>   arch/arm/mach-msm/board-sapphire.c       |   13 ++--
+>   arch/arm/mach-msm/board-trout.c          |    8 +--
+>   arch/arm/mach-orion5x/common.c           |    3 +-
+>   arch/arm/mach-orion5x/common.h           |    3 +-
+>   arch/arm/mach-pxa/cm-x300.c              |    3 +-
+>   arch/arm/mach-pxa/corgi.c                |   10 +--
+>   arch/arm/mach-pxa/eseries.c              |    9 +--
+>   arch/arm/mach-pxa/poodle.c               |    8 +--
+>   arch/arm/mach-pxa/spitz.c                |    8 +--
+>   arch/arm/mach-pxa/tosa.c                 |    8 +--
+>   arch/arm/mach-realview/core.c            |   11 +--
+>   arch/arm/mach-realview/core.h            |    3 +-
+>   arch/arm/mach-realview/realview_pb1176.c |    8 +--
+>   arch/arm/mach-realview/realview_pbx.c    |   17 ++---
+>   arch/arm/mach-s3c24xx/mach-smdk2413.c    |    8 +--
+>   arch/arm/mach-s3c24xx/mach-vstms.c       |    8 +--
 
-OK good, but I will squash this with 13th for mach-s3c24xx/Kconfig when 
-I apply.
+For s3c24xx,
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+>   arch/arm/mach-sa1100/assabet.c           |    2 +-
+>   arch/arm/mm/init.c                       |   67 +++++++-----------
+>   arch/arm/mm/mmu.c                        |  115 +++++++++---------------------
+>   33 files changed, 136 insertions(+), 291 deletions(-)
 
 Thanks,
 Kukjin
