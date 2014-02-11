@@ -1,37 +1,49 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 11 Feb 2014 15:59:28 +0000
-Subject: [PATCH v2] ARM: asm: rename logical shift macros push pull into
- lspush lspull
-In-Reply-To: <20140211155437.GC3035@e103592.cambridge.arm.com>
-References: <1392063589-24111-1-git-send-email-victor.kamensky@linaro.org>
- <1392063589-24111-2-git-send-email-victor.kamensky@linaro.org>
- <alpine.LFD.2.11.1402101607120.17677@knanqh.ubzr>
- <20140211155437.GC3035@e103592.cambridge.arm.com>
-Message-ID: <20140211155928.GD3035@e103592.cambridge.arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 11 Feb 2014 17:03:51 +0100
+Subject: [PATCH] phy-core: Don't allow building phy-core as a module
+Message-ID: <1392134631-32030-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 03:54:37PM +0000, Dave Martin wrote:
-> On Mon, Feb 10, 2014 at 04:30:01PM -0500, Nicolas Pitre wrote:
-> > On Mon, 10 Feb 2014, Victor Kamensky wrote:
-> > 
-> > > Renames logical shift macros, 'push' and 'pull', defined in
-> > > arch/arm/include/asm/assembler.h, into 'lspush' and 'lspull'.
-> > 
-> > I don't have any fundamental objection to the idea, except maybe for the 
-> > actual names.  I just can't come up with anything better though.  
-> 
-> For consistency with the get_byte_ stuff, how about:
-> 
-> 	push -> towards_byte_0
-> 	pull -> from_byte_0
-> 
-> That may make the purpose a little clearer, too.
-> 
-> (Assuming I've got them the right way around...)
+include/phy/phy.h has stub code in there for when building without the
+phy-core enabled. This is useful for generic drivers such as ahci-platform,
+ehci-platoform and ohci-platform which have support for driving an optional
+phy passed to them through the devicetree.
 
-(Actually, I did get it the wrong way round by the look of it.
-But you get the general idea.)
+Since on some boards this phy functionality is not needed, being able to
+disable the phy subsystem without needing a lot of #ifdef magic in the
+driver using it is quite useful.
 
-Cheers
----Dave
+However this breaks when the module using the phy subsystem is build-in and
+the phy-core is not, which leads to the build failing with missing symbol
+errors in the linking stage of the zImage.
+
+Which leads to gems such as this being added to the Kconfig for achi_platform:
+
+	depends on GENERIC_PHY || !GENERIC_PHY
+
+Rather then duplicating this code in a lot of places using the phy-core,
+I believe it is better to simply not allow the phy-core to be built as a
+module. The phy core is quite small and has no external dependencies, so
+always building it in when enabling it should not be an issue.
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/phy/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 6070c99..6e336b4 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -5,7 +5,7 @@
+ menu "PHY Subsystem"
+ 
+ config GENERIC_PHY
+-	tristate "PHY Core"
++	bool "PHY Core"
+ 	help
+ 	  Generic PHY support.
+ 
+-- 
+1.8.5.3
