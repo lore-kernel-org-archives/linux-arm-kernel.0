@@ -1,41 +1,89 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 11 Feb 2014 10:59:34 +0800
-Subject: [PATCH v4 0/3] serial: fsl_lpuart: add DMA support
-In-Reply-To: <c1c2915231eb4595b89327e589bc521d@BL2PR03MB338.namprd03.prod.outlook.com>
-References: <1390363773-24108-1-git-send-email-yao.yuan@freescale.com>
- <20140127075025.GC4765@S2101-09.ap.freescale.net>
- <c1c2915231eb4595b89327e589bc521d@BL2PR03MB338.namprd03.prod.outlook.com>
-Message-ID: <20140211025932.GB31484@S2101-09.ap.freescale.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 11 Feb 2014 12:02:21 +0900
+Subject: [PATCH 0/7] Remove HAVE_PWM config option
+In-Reply-To: <003901cf25fc$73002790$590076b0$%han@samsung.com>
+References: <003901cf25fc$73002790$590076b0$%han@samsung.com>
+Message-ID: <007801cf26d5$aeaf3040$0c0d90c0$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 01:50:14AM +0000, Yao Yuan wrote:
-> Hi, Shawn
+On Monday, February 10, 2014 10:07 AM, Jingoo Han wrote:
 > 
-> Here I just want the DMA be a selectable property for each board. 
-> Is it suitable?
+> The HAVE_PWM symbol is only for legacy platforms that provide
+> the PWM API without using the generic framework, while PWM symbol
+> is used for PWM drivers using the generic PWM framework.
+> 
+> I looked at all HAVE_PWMs in the latest mainline kernel 3.14-rc1.
+> Three platforms are still using HAVE_PWM as below:
+> 
+> 1. ARM - PXA
+>   ./arch/arm/mach-pxa/Kconfig
+> 
+> 2. ARM - NXP LPC32XX
+>   ./arch/arm/Kconfig
+>   config ARCH_LPC32XX
+>   	select HAVE_PWM
+> 
+> 3. MIPS - Ingenic JZ4740 based machines
+>   ./arch/mips/Kconfig
+>   config MACH_JZ4740
+>   	select HAVE_PWM
+> 
+> However, the legacy PWM drivers for PXA, LPC32XX, and JZ474 were
+> already moved to the generic PWM framework.
+>   ./drivers/pwm/pwm-pxa.c
+>   ./drivers/pwm/pwm-lpc32xx.c
+>   ./drivers/pwm/pwm-jz4740.c
+> 
+> In conclusion, HAVE_PWM should be removed, because HAVE_PWM is
+> NOT required anymore.
+> 
+> Jingoo Han (7):
+>       ARM: pxa: don't select HAVE_PWM
+>       ARM: lpc32xx: don't select HAVE_PWM
+>       ARM: remove HAVE_PWM config option
+>       MIPS: jz4740: don't select HAVE_PWM
+>       Input: max8997_haptic: remove HAVE_PWM dependencies
+>       Input: pwm-beepe: remove HAVE_PWM dependencies
+>       pwm: don't use IS_ENABLED(CONFIG_HAVE_PWM)
+> 
+>  arch/arm/Kconfig           |    4 ----
+>  arch/arm/mach-pxa/Kconfig  |   15 ---------------
+>  arch/mips/Kconfig          |    1 -
+>  drivers/input/misc/Kconfig |    4 ++--
+>  include/linux/pwm.h        |    2 +-
+>  5 files changed, 3 insertions(+), 23 deletions(-)
 
-No, it's not.  Just like IRQ line, DMA channel is a SoC level resource.
-It should just be there once the SoC is out there.  Nothing to do with
-board level configuration.
+(+cc Sascha Hauer, Roland Stigge)
 
-Shawn
+The same patch was already submitted by Sascha Hauer. [1]
+So, please ignore this patch. Thank you.
+
+[1] https://lkml.org/lkml/2014/1/16/262
+
+Best regards,
+Jingoo Han
 
 > 
-> > -----Original Message-----
-> > From: Shawn Guo [mailto:shawn.guo at linaro.org]
-> > Sent: Monday, January 27, 2014 3:50 PM
-> > To: Yuan Yao-B46683
-> > Cc: gregkh at linuxfoundation.org; linux at arm.linux.org.uk; arnd at arndb.de;
-> > mark.rutland at arm.com; linux-arm-kernel at lists.infradead.org; linux-
-> > serial at vger.kernel.org
-> > Subject: Re: [PATCH v4 0/3] serial: fsl_lpuart: add DMA support
-> > 
-> > On Wed, Jan 22, 2014 at 12:09:30PM +0800, Yuan Yao wrote:
-> > > Changed in v4:
-> > > - Move dma properties from dtsi to dts.
-> > 
-> > Why this change?  DMA is a SoC level resource rather than board one.
-> > 
-> > Shawn
+> I would like to merge these patches as below:
 > 
+> 1. Through arm-soc tree
+>   [PATCH 1/7] ARM: pxa: don't select HAVE_PWM
+>   [PATCH 2/7] ARM: lpc32xx: don't select HAVE_PWM
+>   [PATCH 3/7] ARM: remove HAVE_PWM config option
+> 
+> 2. Through MIPS tree
+>   [PATCH 4/7] MIPS: jz4740: don't select HAVE_PWM
+> 
+> 3. Through Input tree
+>   [PATCH 5/7] Input: max8997_haptic: remove HAVE_PWM dependencies
+>   [PATCH 6/7] Input: pwm-beepe: remove HAVE_PWM dependencies
+> 
+> 4. Through PWM tree
+>   [PATCH 7/7] pwm: don't use IS_ENABLED(CONFIG_HAVE_PWM)
+> 
+> After merging these patches, all HAVE_PWM will be removed from
+> the mainline kernel. Thank you. :-)
+> 
+> Best regards,
+> Jingoo Han
