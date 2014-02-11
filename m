@@ -1,124 +1,50 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 11 Feb 2014 12:45:31 +0100
-Subject: [PATCH] can: xilinx CAN controller support.
-In-Reply-To: <52F4A960.10809@pengutronix.de>
-References: <6c2bcce0-9897-4d1d-a8b9-47924e40f73c@VA3EHSMHS008.ehs.local>
- <52F382D5.6090706@pengutronix.de>
- <8b4dad82-c72a-4e1f-b1af-b8c7964bbf24@TX2EHSMHS043.ehs.local>
- <52F4A960.10809@pengutronix.de>
-Message-ID: <da80c522-5524-4f53-9373-3f2bb6f81ddc@CO9EHSMHS015.ehs.local>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 11 Feb 2014 12:45:40 +0100
+Subject: [RFC PATCH v2 0/4] imx-drm dt bindings
+Message-ID: <1392119144-27868-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi,
 
-On 02/07/2014 10:37 AM, Marc Kleine-Budde wrote:
-> On 02/07/2014 09:42 AM, Appana Durga Kedareswara Rao wrote:
->>>> ---
->>>> This patch is rebased on the 3.14 rc1 kernel.
->>>> ---
->>>>  .../devicetree/bindings/net/can/xilinx_can.txt     |   43 +
->>>>  drivers/net/can/Kconfig                            |    8 +
->>>>  drivers/net/can/Makefile                           |    1 +
->>>>  drivers/net/can/xilinx_can.c                       | 1150 ++++++++++++++++++++
->>>>  4 files changed, 1202 insertions(+), 0 deletions(-)  create mode
->>>> 100644 Documentation/devicetree/bindings/net/can/xilinx_can.txt
->>>>  create mode 100644 drivers/net/can/xilinx_can.c
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/net/can/xilinx_can.txt
->>>> b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
->>>> new file mode 100644
->>>> index 0000000..34f9643
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/net/can/xilinx_can.txt
->>>> @@ -0,0 +1,43 @@
->>>> +Xilinx Axi CAN/Zynq CANPS controller Device Tree Bindings
->>>> +---------------------------------------------------------
->>>> +
->>>> +Required properties:
->>>> +- compatible               : Should be "xlnx,zynq-can-1.00.a" for Zynq
->>> CAN
->>>> +                     controllers and "xlnx,axi-can-1.00.a" for Axi CAN
->>>> +                     controllers.
->>>> +- reg                      : Physical base address and size of the Axi CAN/Zynq
->>>> +                     CANPS registers map.
->>>> +- interrupts               : Property with a value describing the interrupt
->>>> +                     number.
->>>> +- interrupt-parent : Must be core interrupt controller
->>>> +- clock-names              : List of input clock names - "ref_clk",
->>> "aper_clk"
->>>> +                     (See clock bindings for details. Two clocks are
->>>> +                      required for Zynq CAN. For Axi CAN
->>>> +                      case it is one(ref_clk)).
->>>> +- clocks           : Clock phandles (see clock bindings for details).
->>>> +- xlnx,can-tx-dpth : Can Tx fifo depth (Required for Axi CAN).
->>>> +- xlnx,can-rx-dpth : Can Rx fifo depth (Required for Axi CAN).
->>>> +
->>>> +
->>>> +Example:
->>>> +
->>>> +For Zynq CANPS Dts file:
->>>> +   zynq_can_0: zynq-can at e0008000 {
->>>> +                   compatible = "xlnx,zynq-can-1.00.a";
->>>> +                   clocks = <&clkc 19>, <&clkc 36>;
->>>> +                   clock-names = "ref_clk", "aper_clk";
->>>> +                   reg = <0xe0008000 0x1000>;
->>>> +                   interrupts = <0 28 4>;
->>>> +                   interrupt-parent = <&intc>;
->>>
->>> Above xlnx,can-{rx,tx}-dpth is mentioned as required, but it's not in the
->>> Zynq example.
->>
->> One of the Difference b/w the AXI CAN and zynq CAN is in AXI CAN the fifo depth(tx,rx)
->> Is user configurable. But in case of ZYNQ CAN  the fifo depth  is fixed for tx and rx fifo's(64)
->> Xlnx,can-{rx,tx}-dpth is required only for AXI CAN case it is not required for zynq CAN.
->> That's why didn't putted that property in device tree.
-> 
-> The device tree should be a hardware only description and should not
-> hold any user configurable data. Please split your patch into two
-> patches. The first one should add the driver with a fixed fifo size
-> (e.g. 0x40) for the AXI, too. The second patch should make the fifo
-> configurable via device tree.
+these patches apply on top of Russell's second preview of the
+imx-drm cleanup series. I have added device tree bindings between
+IPU and the encoders as documented in
+Documentation/devicetree/bindings/media/video-interfaces.txt
+and used those to determine the possible_crtcs and mux_id.
 
-can-rx/tx-dpth is not user configurable data as you think.
-This is FPGA where you can configure this parameter in design tools.
-It means these 2 values just describe real hardware and user can't just change it
-for different software behaviour.
+The crtc cookie is replaced with a the port device tree node,
+which is unique and therefore allows to get rid of the di_id
+comparison. Storing the multiplexer input numbers in the device
+tree removes the need to know the ipu_id. This should also allow
+to replace IPU2 with LCDIF on i.MX6 Solo more easily.
 
-Also I don't think it is worth to create 2 patches for the same driver
-where the first one is useless for axi can device. But if you think
-that it is worth to do we can create 2 patches as you suggested.
+In v2 I've added temporary copies of the v4l2_of helpers to imx-drm
+and tested it on the SolidRun Hummingboard.
 
-Also what we can do is to define that this property is required also
-for zynq which is 0x40 and change code according too.
+regards
+Philipp
 
-> If it's acceptable to describe the fifo usage by device tree, I'd like
-> to make it a generic CAN driver option. But we have to look around, e.g.
-> what the Ethernet driver use to configure their hardware.
 
-I think the real question is not if this is acceptable or not. It is just
-reality that we can setup hardware fifo depth and driver has to reflect this
-because without it driver just doesn't work for axi can.
+Philipp Zabel (4):
+  staging: imx-drm: Add temporary copies of v4l2-of parsing functions
+  staging: imx-drm-core: Use graph to find connection between crtc and
+    encoder
+  staging: imx-drm-core: associate crtc devices with di port nodes
+  ARM: dts: imx6qdl: Add ports and endpoints to IPU DIs
 
-The only remaining question is if we should create generic DT binding
-for fifo depth. Arnd, Rob: Any opinion about it?
-Definitely will be worth to have one generic binding if this is generic feature.
-But if this is just specific feature for us then current properties should
-be fine.
+ arch/arm/boot/dts/imx6dl.dtsi          |   9 +--
+ arch/arm/boot/dts/imx6q.dtsi           | 115 +++++++++++++++++++++++++--
+ arch/arm/boot/dts/imx6qdl.dtsi         | 137 ++++++++++++++++++++++++++++++++-
+ drivers/staging/imx-drm/Makefile       |   2 +-
+ drivers/staging/imx-drm/imx-drm-core.c |  82 +++++++++++++-------
+ drivers/staging/imx-drm/imx-drm-of.c   | 106 +++++++++++++++++++++++++
+ drivers/staging/imx-drm/imx-drm.h      |   9 ++-
+ drivers/staging/imx-drm/imx-hdmi.c     |   2 +-
+ drivers/staging/imx-drm/imx-ldb.c      |   4 +-
+ drivers/staging/imx-drm/ipuv3-crtc.c   |  39 +++++++++-
+ 10 files changed, 453 insertions(+), 52 deletions(-)
+ create mode 100644 drivers/staging/imx-drm/imx-drm-of.c
 
-In general all these xlnx,XXX properties just reflect all configurable options
-which you can setup in design tool which means that provide full hw description
-with all variants and they are automatically generated from tools.
-
-Please let me know what you think.
-
-Thanks,
-Michal
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 264 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140211/cf038ad6/attachment.sig>
+-- 
+1.8.5.3
