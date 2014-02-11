@@ -1,164 +1,158 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Feb 2014 13:11:27 +0100
-Subject: [PATCH] ARM: ux500: drop DMA channel platform data for storage
-Message-ID: <1392120687-12572-1-git-send-email-linus.walleij@linaro.org>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 11 Feb 2014 12:13:16 +0000
+Subject: [PATCH v2 1/5] drivers: of: add initialization code for reserved
+ memory
+In-Reply-To: <52FA0D6E.9090304@samsung.com>
+References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com> <
+ 1391515773-6112-2-git-send-email-m.szyprowski@samsung.com> <20140205110538.
+ 99E47C40A89@trevor.secretlab.ca> <52FA0D6E.9090304@samsung.com>
+Message-ID: <20140211121316.24032C40C4D@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMC/SD interface driver (MMCI) already supports picking its
-DMA channels out of the device tree, so there is no point in
-overriding them with identical platform data as well.
+On Tue, 11 Feb 2014 12:45:50 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> Hello,
+> 
+> On 2014-02-05 12:05, Grant Likely wrote:
+> > On Tue, 04 Feb 2014 13:09:29 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > > This patch adds device tree support for contiguous and reserved memory
+> > > regions defined in device tree.
+> > >
+> > > Large memory blocks can be reliably reserved only during early boot.
+> > > This must happen before the whole memory management subsystem is
+> > > initialized, because we need to ensure that the given contiguous blocks
+> > > are not yet allocated by kernel. Also it must happen before kernel
+> > > mappings for the whole low memory are created, to ensure that there will
+> > > be no mappings (for reserved blocks) or mapping with special properties
+> > > can be created (for CMA blocks). This all happens before device tree
+> > > structures are unflattened, so we need to get reserved memory layout
+> > > directly from fdt.
+> > >
+> > > Later, those reserved memory regions are assigned to devices on each
+> > > device structure initialization.
+> > >
+> > > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> > > Cc: Laura Abbott <lauraa@codeaurora.org>
+> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > [joshc: rework to implement new DT binding, provide mechanism for
+> > >  plugging in new reserved-memory node handlers via
+> > >  RESERVEDMEM_OF_DECLARE]
+> > > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> > > [mszyprow: little code cleanup]
+> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > ---
+> > >  drivers/of/Kconfig                |    6 +
+> > >  drivers/of/Makefile               |    1 +
+> > >  drivers/of/of_reserved_mem.c      |  219 +++++++++++++++++++++++++++++++++++++
+> > >  drivers/of/platform.c             |    7 ++
+> > >  include/asm-generic/vmlinux.lds.h |   11 ++
+> > >  include/linux/of_reserved_mem.h   |   62 +++++++++++
+> > >  6 files changed, 306 insertions(+)
+> > >  create mode 100644 drivers/of/of_reserved_mem.c
+> > >  create mode 100644 include/linux/of_reserved_mem.h
+> > >
+> > > diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+> > > index c6973f101a3e..aba13df56f3a 100644
+> > > --- a/drivers/of/Kconfig
+> > > +++ b/drivers/of/Kconfig
+> > > @@ -75,4 +75,10 @@ config OF_MTD
+> > >  	depends on MTD
+> > >  	def_bool y
+> > >
+> > > +config OF_RESERVED_MEM
+> > > +	depends on HAVE_MEMBLOCK
+> > > +	def_bool y
+> > > +	help
+> > > +	  Helpers to allow for reservation of memory regions
+> > > +
+> > >  endmenu # OF
+> > > diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+> > > index efd05102c405..ed9660adad77 100644
+> > > --- a/drivers/of/Makefile
+> > > +++ b/drivers/of/Makefile
+> > > @@ -9,3 +9,4 @@ obj-$(CONFIG_OF_MDIO)	+= of_mdio.o
+> > >  obj-$(CONFIG_OF_PCI)	+= of_pci.o
+> > >  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+> > >  obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+> > > +obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
+> > > diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+> > > new file mode 100644
+> > > index 000000000000..f17cd56e68d9
+> > > --- /dev/null
+> > > +++ b/drivers/of/of_reserved_mem.c
+> > > @@ -0,0 +1,219 @@
+> > > +/*
+> > > + * Device tree based initialization code for reserved memory.
+> > > + *
+> > > + * Copyright (c) 2013, The Linux Foundation. All Rights Reserved.
+> > > + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+> > > + *		http://www.samsung.com
+> > > + * Author: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > + * Author: Josh Cartwright <joshc@codeaurora.org>
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or
+> > > + * modify it under the terms of the GNU General Public License as
+> > > + * published by the Free Software Foundation; either version 2 of the
+> > > + * License or (at your optional) any later version of the license.
+> > > + */
+> > > +#include <linux/memblock.h>
+> > > +#include <linux/err.h>
+> > > +#include <linux/of.h>
+> > > +#include <linux/of_fdt.h>
+> > > +#include <linux/of_platform.h>
+> > > +#include <linux/mm.h>
+> > > +#include <linux/sizes.h>
+> > > +#include <linux/of_reserved_mem.h>
+> > > +
+> > > +#define MAX_RESERVED_REGIONS	16
+> > > +static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
+> > > +static int reserved_mem_count;
+> > > +
+> > > +int __init of_parse_flat_dt_reg(unsigned long node, const char *uname,
+> > > +				   phys_addr_t *base, phys_addr_t *size)
+> >
+> > Useful utility function; move to drivers/of/fdt.c
+> >
+> > > +{
+> > > +	unsigned long len;
+> > > +	__be32 *prop;
+> > > +
+> > > +	prop = of_get_flat_dt_prop(node, "reg", &len);
+> > > +	if (!prop)
+> > > +		return -EINVAL;
+> > > +
+> > > +	if (len < (dt_root_addr_cells + dt_root_size_cells) * sizeof(__be32)) {
+> > > +		pr_err("Reserved memory: invalid reg property in '%s' node.\n",
+> > > +				uname);
+> > > +		return -EINVAL;
+> > > +	}
+> >
+> > This is /okay/ for an initial implementation, but it is naive. While I
+> > suggested making #address-cells and #size-cells equal the root node
+> > values for the purpose of simplicity, it should still be perfectly valid
+> > to have different values if the ranges property is correctly formed.
+> >
+> > > +
+> > > +	*base = dt_mem_next_cell(dt_root_addr_cells, &prop);
+> > > +	*size = dt_mem_next_cell(dt_root_size_cells, &prop);
+> >
+> > Future enhancement; allow for parsing more than just the first reg
+> > tuple.
+> 
+> One more question. Does it really makes any sense to support more than
+> one tuple for reg property? For consistency we should also allow more
+> than one entry in size, align and alloc-ranges property, but I don't
+> see any benefits for defining more than one range for a single region.
+> Same can be achieved by defining more regions instead if one really
+> needs such configuration.
 
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/board-mop500-sdi.c | 79 ----------------------------------
- 1 file changed, 79 deletions(-)
+Yes, if only because it is an define usage of the reg property. If a
+devtree has multiple tuples in reg, then all of those tuples should be
+treated as reserved, even if the kernel doesn't know how to use them.
 
-diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
-index fcbf3a13a539..0addb1815fa6 100644
---- a/arch/arm/mach-ux500/board-mop500-sdi.c
-+++ b/arch/arm/mach-ux500/board-mop500-sdi.c
-@@ -11,13 +11,11 @@
- #include <linux/amba/mmci.h>
- #include <linux/mmc/host.h>
- #include <linux/platform_device.h>
--#include <linux/platform_data/dma-ste-dma40.h>
- 
- #include <asm/mach-types.h>
- 
- #include "db8500-regs.h"
- #include "board-mop500.h"
--#include "ste-dma40-db8500.h"
- 
- /*
-  * v2 has a new version of this block that need to be forced, the number found
-@@ -29,20 +27,6 @@
-  * SDI 0 (MicroSD slot)
-  */
- 
--#ifdef CONFIG_STE_DMA40
--struct stedma40_chan_cfg mop500_sdi0_dma_cfg_rx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type = DB8500_DMA_DEV29_SD_MM0,
--};
--
--static struct stedma40_chan_cfg mop500_sdi0_dma_cfg_tx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV29_SD_MM0,
--};
--#endif
--
- struct mmci_platform_data mop500_sdi0_data = {
- 	.f_max		= 100000000,
- 	.capabilities	= MMC_CAP_4_BIT_DATA |
-@@ -56,30 +40,11 @@ struct mmci_platform_data mop500_sdi0_data = {
- 				MCI_ST_CMDDIREN |
- 				MCI_ST_DATA0DIREN |
- 				MCI_ST_DATA2DIREN,
--#ifdef CONFIG_STE_DMA40
--	.dma_filter	= stedma40_filter,
--	.dma_rx_param	= &mop500_sdi0_dma_cfg_rx,
--	.dma_tx_param	= &mop500_sdi0_dma_cfg_tx,
--#endif
- };
- 
- /*
-  * SDI1 (SDIO WLAN)
-  */
--#ifdef CONFIG_STE_DMA40
--static struct stedma40_chan_cfg sdi1_dma_cfg_rx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type = DB8500_DMA_DEV32_SD_MM1,
--};
--
--static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV32_SD_MM1,
--};
--#endif
--
- struct mmci_platform_data mop500_sdi1_data = {
- 	.ocr_mask	= MMC_VDD_29_30,
- 	.f_max		= 100000000,
-@@ -87,31 +52,12 @@ struct mmci_platform_data mop500_sdi1_data = {
- 				MMC_CAP_NONREMOVABLE,
- 	.gpio_cd	= -1,
- 	.gpio_wp	= -1,
--#ifdef CONFIG_STE_DMA40
--	.dma_filter	= stedma40_filter,
--	.dma_rx_param	= &sdi1_dma_cfg_rx,
--	.dma_tx_param	= &sdi1_dma_cfg_tx,
--#endif
- };
- 
- /*
-  * SDI 2 (POP eMMC, not on DB8500ed)
-  */
- 
--#ifdef CONFIG_STE_DMA40
--struct stedma40_chan_cfg mop500_sdi2_dma_cfg_rx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type =  DB8500_DMA_DEV28_SD_MM2,
--};
--
--static struct stedma40_chan_cfg mop500_sdi2_dma_cfg_tx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV28_SD_MM2,
--};
--#endif
--
- struct mmci_platform_data mop500_sdi2_data = {
- 	.ocr_mask	= MMC_VDD_165_195,
- 	.f_max		= 100000000,
-@@ -123,31 +69,11 @@ struct mmci_platform_data mop500_sdi2_data = {
- 				MMC_CAP_CMD23,
- 	.gpio_cd	= -1,
- 	.gpio_wp	= -1,
--#ifdef CONFIG_STE_DMA40
--	.dma_filter	= stedma40_filter,
--	.dma_rx_param	= &mop500_sdi2_dma_cfg_rx,
--	.dma_tx_param	= &mop500_sdi2_dma_cfg_tx,
--#endif
- };
- 
- /*
-  * SDI 4 (on-board eMMC)
-  */
--
--#ifdef CONFIG_STE_DMA40
--struct stedma40_chan_cfg mop500_sdi4_dma_cfg_rx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type =  DB8500_DMA_DEV42_SD_MM4,
--};
--
--static struct stedma40_chan_cfg mop500_sdi4_dma_cfg_tx = {
--	.mode = STEDMA40_MODE_LOGICAL,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV42_SD_MM4,
--};
--#endif
--
- struct mmci_platform_data mop500_sdi4_data = {
- 	.f_max		= 100000000,
- 	.capabilities	= MMC_CAP_4_BIT_DATA |
-@@ -158,9 +84,4 @@ struct mmci_platform_data mop500_sdi4_data = {
- 				MMC_CAP_CMD23,
- 	.gpio_cd	= -1,
- 	.gpio_wp	= -1,
--#ifdef CONFIG_STE_DMA40
--	.dma_filter	= stedma40_filter,
--	.dma_rx_param	= &mop500_sdi4_dma_cfg_rx,
--	.dma_tx_param	= &mop500_sdi4_dma_cfg_tx,
--#endif
- };
--- 
-1.8.5.3
+I would not do the same for size/align/alloc-ranges unless there is a
+very specific use case that you can define. These ones are different
+from the static regions because they aren't ever used to protect
+something that already exists in the memory.
+
+g.
