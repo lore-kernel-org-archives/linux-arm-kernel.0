@@ -1,44 +1,47 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 11 Feb 2014 14:11:46 -0500
-Subject: [PATCH] ARM: mvebu: rename mvebu_defconfig to mvebu_v7_defconfig
-In-Reply-To: <1392056399-20908-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392056399-20908-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140211191146.GF27395@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Feb 2014 20:15:18 +0100
+Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
+In-Reply-To: <20140209203412.GN26684@n2100.arm.linux.org.uk>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <201402092118.19701.arnd@arndb.de>
+ <20140209203412.GN26684@n2100.arm.linux.org.uk>
+Message-ID: <201402112015.19252.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 07:19:59PM +0100, Thomas Petazzoni wrote:
-> With the merge of the Kirkwood support into arch/arm/mach-mvebu/, the
-> mvebu platform will no longer only contain ARMv7 compatible processors
-> (Armada 370, Armada XP, and soon Armada 375, Armada 38x and Dove), but
-> also ARMv5 compatible processors (Kirkwood, and hopefully Orion5x in
-> the future).
+On Sunday 09 February 2014, Russell King - ARM Linux wrote:
+> On Sun, Feb 09, 2014 at 09:18:19PM +0100, Arnd Bergmann wrote:
+> > On Thursday 06 February 2014, Russell King - ARM Linux wrote:
+> > 
+> > > So, whenever you enumerate a PCI bus, and read the resource information
+> > > out of the BARs, you must know how that address region specified in
+> > > the BAR as a bus address maps to the host address space.
+> > > 
+> > 
+> > None of that contradicts what I wrote. Please try to understand what
+> > I suggested, which is to have a common way to communicate that
+> > information from DT to the PCI core without involving the PCI host
+> > bridge driver.
 > 
-> However, a single mvebu_defconfig cannot work, since it is not
-> possible to build a kernel that supports both ARMv5 and ARMv7
-> platforms in the same binary. As a consequence, this commit renames
-> mvebu_defconfig to mvebu_v7_defconfig, which is the configuration that
-> will build a kernel that supports all ARMv7 mvebu platforms. As
-> Kirkwood support gets merged into mach-mvebu, an additional
-> mvebu_v5_defconfig will be added.
-> 
-> Even though we already have a multi_v7_defconfig, the mvebu developers
-> found it more convenient for development to have a defconfig that
-> builds only the mvebu platforms.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/configs/{mvebu_defconfig => mvebu_v7_defconfig} | 0
->  1 file changed, 0 insertions(+), 0 deletions(-)
->  rename arch/arm/configs/{mvebu_defconfig => mvebu_v7_defconfig} (100%)
-> 
-> diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-> similarity index 100%
-> rename from arch/arm/configs/mvebu_defconfig
-> rename to arch/arm/configs/mvebu_v7_defconfig
+> Please explain it better then.
+>
 
-Applied to mvebu/defconfig with Andrew's Ack.
+Let me try again: Looking at the dw_pcie driver (since that is one of
+the few that gets it mostly right), we have quite a bit of generic
+code in dw_pcie_host_init() and in dw_pcie_setup(). All the DT parsing
+in there just implements the generic PCI DT binding, and what the
+setup function does depends exclusively on what comes out of the
+parser.
 
-thx,
+If we manage to move all the common parts into a generic helper
+function that gets called by the setup() on arm32, we no longer
+need to worry about host drivers implementing an incorrect DT
+parser or getting the io_offset calculation wrong, because they
+don't actually see any of that, plus we save a lot of duplicate
+code.
 
-Jason.
+How it fits together with the new arm64 pci support is a different
+question, but if it's just a helper function, it should really work
+on any architecture.
+
+	Arnd
