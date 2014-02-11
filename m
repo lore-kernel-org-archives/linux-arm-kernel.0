@@ -1,70 +1,56 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 11 Feb 2014 12:34:46 -0500
-Subject: [PATCH 4/8] ARM: mvebu: make use of
- of_find_matching_node_and_match
-In-Reply-To: <52FA5E75.7030402@free-electrons.com>
-References: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
- <1392135847-30791-5-git-send-email-joshc@codeaurora.org>
- <20140211165314.GA8533@titan.lakedaemon.net>
- <20140211181048.6934bdd3@skate>
- <52FA5E75.7030402@free-electrons.com>
-Message-ID: <20140211173446.GC27395@titan.lakedaemon.net>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 11 Feb 2014 18:36:49 +0100
+Subject: [PATCH] reset: Add generic GPIO reset driver.
+In-Reply-To: <CANh8QzwERe-zxCaAd4QujZJ4zcZ7SchK+w8u52fvJj0s5tx2nA@mail.gmail.com>
+References: <20140210125432.10683.86571.stgit@localhost>
+ <1392038191.6687.12.camel@pizza.hi.pengutronix.de>
+ <CANh8QzwERe-zxCaAd4QujZJ4zcZ7SchK+w8u52fvJj0s5tx2nA@mail.gmail.com>
+Message-ID: <1392140209.6943.49.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 06:31:33PM +0100, Gregory CLEMENT wrote:
-> On 11/02/2014 18:10, Thomas Petazzoni wrote:
-> > Dear Jason Cooper,
-> > 
-> > On Tue, 11 Feb 2014 11:53:14 -0500, Jason Cooper wrote:
-> > 
-> >>> -	np = of_find_matching_node(NULL, of_system_controller_table);
-> >>> +	np = of_find_matching_node_and_match(NULL, of_system_controller_table,
-> >>> +					     &match);
-> >>>  	if (np) {
-> >>> -		const struct of_device_id *match =
-> >>> -		    of_match_node(of_system_controller_table, np);
-> >>
-> >>
-> >>> -		BUG_ON(!match);
-> >>
-> >> Gregory, is it ok to remove this?  It was added with the original code
-> >> submission for mach-mvebu.  mvebu_restart() will handle this
-> >> gracefully...
-> > 
-> > The BUG_ON here can normally never be reached. If
-> > of_find_matching_node() returns a non-NULL result, then of_match_node()
-> > should also return a non-NULL result.
-> > 
-> > Or I'm missing something :)
-> 
-> No you're almost right!
-> 
-> The only case we can get it, would be if we were declaring something like:
-> 
-> static struct of_device_id of_system_controller_table[] = {
-> 	{
-> 		.compatible = "foo,bar-controller",
-> 	},
-> [...]
-> 
-> instead of
-> 
-> static struct of_device_id of_system_controller_table[] = {
-> 	{
-> 		.compatible = "foo,bar",
-> 		.data = (void *) &bar_controller,
-> 	},
-> [...]
-> 
-> This test is very paranoid, so I agree to remove it.
-> 
-> 
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Hi Martin,
 
-Ok, great!  Josh, do you want us to take the two mvebu patches through
-mvebu/arm-soc?  Or would you prefer to take them?
+Am Dienstag, den 11.02.2014, 10:34 +0100 schrieb Fuzzey, Martin:
+[...]
+> >> 2) Allow hardware on discoverable busses to be rest via a GPIO line
+> >> without driver modifications.
+> >>
+> >> Examples of the second use case include:
+> >> * SDIO wifi modules
+> >> * USB hub chips with a reset line
+> >
+> > Now this is interesting. But if you export it to userspace anyway, why
+> > not use the existing gpio sysfs API?
+> >
+> 
+> In the normal case of reset on boot the userspace interface isn't needed.
+> Setting the "auto" dt property will make the kernel do the reset by
+> itself during
+> early boot. This is the standard use case.
+> 
+> The userspace interface is to let applications deal with special cases.
+> It is also simpler for userspace than manlually toggling the GPIO line
+> and keeps the configuration (active high / low, delay) centralised in
+> the DT and consistent between the automatic on boot reset and the
+> manually triggered reset.
+>
+> > I think a proper solution should handle this in the kernel. For SDIO
+> > wifi modules you usually have a powerdown line that can be implemented
+> > as an rfkill switch.
+> >
+> 
+> I think this is too specific. It's not just for SDIO wifi. We also
+> have the problem
+> of a USB hub needing to be reset.
+> 
+> Also even for the SDIO wifi case rfkill doesn't ssem the right
+> abstraction to say "reset me"
+> (particularly when firmware fails to load on warm boot if you don't).
 
-thx,
+so long as you need to take devices out of reset before they can be
+discovered, maybe the corresponding host controller would be the right
+place to put the reset.
 
-Jason.
+regards
+Philipp
