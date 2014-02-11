@@ -1,17 +1,29 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 11 Feb 2014 15:11:12 +0200
-Subject: [PATCH] video: imxfb: Use regulator API with LCD class for
- powering
-In-Reply-To: <20140211024318.GA31484@S2101-09.ap.freescale.net>
-References: <1387624080-15312-1-git-send-email-shc_work@mail.ru>
- <52F8C091.50704@ti.com> <1392034587.333931582@f419.i.mail.ru>
- <52F8C449.2080502@ti.com> <20140211024318.GA31484@S2101-09.ap.freescale.net>
-Message-ID: <52FA2170.3040900@ti.com>
+Date: Tue, 11 Feb 2014 15:12:47 +0200
+Subject: [PATCH] video: xilinxfb: Move xilinxfb_platform_data directly
+ to the driver
+In-Reply-To: <af8de8bd8803b319c0f6a02ca5109768e5ef8457.1392101292.git.michal.simek@xilinx.com>
+References: <af8de8bd8803b319c0f6a02ca5109768e5ef8457.1392101292.git.michal.simek@xilinx.com>
+Message-ID: <52FA21CF.1040809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/14 04:43, Shawn Guo wrote:
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+On 11/02/14 08:48, Michal Simek wrote:
+> No reason to have separate file in header in include/linux folder
+> if this is purely driver specific structure.
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+> I have this patch in my devel tree for a while and would like
+> to hear your opinion. I can't see any reason to have
+> xilinxfb_platform_data in header if this is purely OF driver
+> used on OF archs.
+> ---
+>  drivers/video/xilinxfb.c | 15 ++++++++++++++-
+>  include/linux/xilinxfb.h | 30 ------------------------------
+>  2 files changed, 14 insertions(+), 31 deletions(-)
+>  delete mode 100644 include/linux/xilinxfb.h
 
 Thanks. Queued for 3.15.
 
@@ -24,4 +36,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 901 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140211/2776fa46/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140211/1077943e/attachment.sig>
