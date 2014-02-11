@@ -1,52 +1,108 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Feb 2014 17:46:54 +0000
-Subject: [PATCH 05/12] GPIO: gpio-generic: Add label to platform data
-In-Reply-To: <1392139256.3380.45.camel@hornet>
-References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
- <1392138636-29240-6-git-send-email-pawel.moll@arm.com>
- <20140211171721.GE15081@lee--X1> <1392139256.3380.45.camel@hornet>
-Message-ID: <20140211174654.GI15081@lee--X1>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 11 Feb 2014 18:47:00 +0100
+Subject: [PATCH 3/3] ARM: mvebu: use input DT defines in Armada 370/XP
+ boards
+In-Reply-To: <1392138433-12573-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392138433-12573-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1392138433-12573-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <52FA6214.7080201@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > When registering more than one platform device, it is
-> > > useful to set the gpio chip label in the platform data.
-> > >
-> > > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > > Cc: Alexandre Courbot <gnurou@gmail.com>
-> > > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > > Cc: Lee Jones <lee.jones@linaro.org>
-> > > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> > > ---
-> > > This patch has been already merged by Linux; it has been included
-> > > for completeness only.
-> > >
-> > >  drivers/gpio/gpio-generic.c     | 2 ++
-> > >  include/linux/basic_mmio_gpio.h | 1 +
-> > >  2 files changed, 3 insertions(+)
-> > >
-> > > diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-generic.c
-> > > index d2196bf..8c778af 100644
-> > > --- a/drivers/gpio/gpio-generic.c
-> > > +++ b/drivers/gpio/gpio-generic.c
-> > > @@ -531,6 +531,8 @@ static int bgpio_pdev_probe(struct platform_device *pdev)
-> > >             return err;
-> > >
-> > >     if (pdata) {
-> > > +           if (pdata->label)
-> >
-> > Why is this check necessary?
-> >
-> > > +                   bgc->gc.label = pdata->label;
-> 
-> Because bgc->gc.label is initialized to a default value in bgpio_init()
-> and I don't want to override it with NULL if there is no label passed in
-> the platform data.
+Hi Thomas,
 
-Ah ha, thanks for clarifying.
+On 11/02/2014 18:07, Thomas Petazzoni wrote:
+> Instead of harcoding keycodes specifications in the Armada 370/XP
+> boards, use the <dt-bindings/input/input.h> header file and its
+> keycode definitions.
+
+It's easier to read now,
+
+Thanks,
+
+Gregory
+
+
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+> ---
+>  arch/arm/boot/dts/armada-370-rd.dts              | 3 ++-
+>  arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 3 ++-
+>  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 3 ++-
+>  3 files changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+> index c28865d..3e2c857 100644
+> --- a/arch/arm/boot/dts/armada-370-rd.dts
+> +++ b/arch/arm/boot/dts/armada-370-rd.dts
+> @@ -12,6 +12,7 @@
+>   */
+>  
+>  /dts-v1/;
+> +#include <dt-bindings/input/input.h>
+>  #include <dt-bindings/gpio/gpio.h>
+>  #include "armada-370.dtsi"
+>  
+> @@ -101,7 +102,7 @@
+>  				#size-cells = <0>;
+>  				button at 1 {
+>  					label = "Software Button";
+> -					linux,code = <116>;
+> +					linux,code = <KEY_POWER>;
+>  					gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+>  				};
+>  			};
+> diff --git a/arch/arm/boot/dts/armada-xp-axpwifiap.dts b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> index db1ef58..d83d7d6 100644
+> --- a/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> +++ b/arch/arm/boot/dts/armada-xp-axpwifiap.dts
+> @@ -17,6 +17,7 @@
+>  
+>  /dts-v1/;
+>  #include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+>  #include "armada-xp-mv78230.dtsi"
+>  
+>  / {
+> @@ -158,7 +159,7 @@
+>  
+>  		button at 1 {
+>  			label = "Factory Reset Button";
+> -			linux,code = <141>; /* KEY_SETUP */
+> +			linux,code = <KEY_SETUP>;
+>  			gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
+>  		};
+>  	};
+> diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> index 944acfb..985948c 100644
+> --- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> +++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+> @@ -12,6 +12,7 @@
+>  
+>  /dts-v1/;
+>  #include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+>  #include "armada-xp-mv78260.dtsi"
+>  
+>  / {
+> @@ -115,7 +116,7 @@
+>  
+>  				button at 1 {
+>  					label = "Init Button";
+> -					linux,code = <116>;
+> +					linux,code = <KEY_POWER>;
+>  					gpios = <&gpio1 28 GPIO_ACTIVE_HIGH>;
+>  				};
+>  			};
+> 
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
