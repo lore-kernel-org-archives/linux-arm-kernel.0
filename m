@@ -1,50 +1,57 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 11 Feb 2014 14:04:29 -0500
-Subject: [PATCH 0/2] Marvell Armada 375 and 38x pinctrl drivers
-In-Reply-To: <1392051896-19178-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392051896-19178-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140211190429.GD27395@titan.lakedaemon.net>
+Date: Tue, 11 Feb 2014 14:06:32 -0500
+Subject: [PATCH 6/6] dt: Update binding information for mvebu gating
+ clocks with Armada 380/385
+In-Reply-To: <20140210185908.3374eaf6@skate>
+References: <1392053569-28037-1-git-send-email-gregory.clement@free-electrons.com>
+ <1392053569-28037-7-git-send-email-gregory.clement@free-electrons.com>
+ <20140210175350.GD9995@lunn.ch> <20140210185908.3374eaf6@skate>
+Message-ID: <20140211190632.GE27395@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 06:04:54PM +0100, Thomas Petazzoni wrote:
-> Linus,
+On Mon, Feb 10, 2014 at 06:59:08PM +0100, Thomas Petazzoni wrote:
+> Dear Andrew Lunn,
 > 
-> Here are two patches that add the pinctrl drivers for two new Marvell
-> ARM SOCs that belong to the mach-mvebu family: the Armada 375 and the
-> Armada 380/385. They are based on Cortex-A9 CPU cores, and share a
-> number of peripherals with their predecessors in the mach-mvebu
-> family. pinctrl-wise, they have a completely similar register layout
-> than Armada 370/XP, so only a list of pins and functions has to be
-> introduced, and therefore the drivers are straightforward.
+> On Mon, 10 Feb 2014 18:53:50 +0100, Andrew Lunn wrote:
+> > > +The following is a list of provided IDs for Armada 380/385:
+> > > +ID	Clock		Peripheral
+> > > +-----------------------------------
+> > > +0	audio		Audio
+> > > +2	ge2		Gigabit Ethernet 2
+> > > +3	ge1		Gigabit Ethernet 1
+> > > +4	ge0		Gigabit Ethernet 0
+> > > +5	pex1		PCIe 1
+> > > +6	pex2		PCIe 2
+> > > +7	pex3		PCIe 3
+> > > +8	pex4		PCIe 0
+> > 
+> > Is that last one a typo? It at least looks a bit odd.
 > 
-> The core support (arch/arm/mach-mvebu) for these SOCs will be posted
-> shortly, and we're aiming at having this merged for 3.15 if possible.
+> Right, this should be:
 > 
-> Thanks!
+> 	8	pex0		PCIe 0
 > 
-> Thomas
-> 
-> Thomas Petazzoni (2):
->   pinctrl: mvebu: add pin-muxing driver for the Marvell Armada 375
->   pinctrl: mvebu: add pin-muxing driver for the Marvell Armada 380/385
-> 
->  .../pinctrl/marvell,armada-375-pinctrl.txt         |  81 ++++
->  .../pinctrl/marvell,armada-38x-pinctrl.txt         |  79 ++++
->  drivers/pinctrl/mvebu/Kconfig                      |   8 +
->  drivers/pinctrl/mvebu/Makefile                     |   2 +
->  drivers/pinctrl/mvebu/pinctrl-armada-375.c         | 441 ++++++++++++++++++++
->  drivers/pinctrl/mvebu/pinctrl-armada-38x.c         | 445 +++++++++++++++++++++
->  6 files changed, 1056 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
->  create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-375.c
->  create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+> (just checked again in the datasheet)
 
-For the whole series,
+I can fix this up when I pull it in for Mike.  No need to redo the
+series just for this.
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+I'll let it sit for a day or two more before I pull it to give everyone
+a chance to look it over.
 
 thx,
 
 Jason.
+
+> 
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
