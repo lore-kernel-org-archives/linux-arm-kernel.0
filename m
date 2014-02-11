@@ -1,41 +1,66 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 11 Feb 2014 20:44:01 +0100
-Subject: [PATCH 3/3] arm: at91sam9260_9g20: refresh configuration
+Date: Tue, 11 Feb 2014 20:44:00 +0100
+Subject: [PATCH 2/3] arm: at91sam9260_9g20: remove useless configuration
 In-Reply-To: <1392147841-7815-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1392147841-7815-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1392147841-7815-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1392147841-7815-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select CONFIG_EMBEDDED as it it useful for that board.
+A few configuration symbols are deprecated and disappeared a few versions ago,
+remove them.
 
-Also select CONFIG_MTD_UBI to really enable UBIfs (CONFIG_FS_UBIFS depends on
-it).
+CONFIG_FPE_NWFPE depends on OABI_COMPAT which was not selected.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/configs/at91sam9260_9g20_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/at91sam9260_9g20_defconfig | 7 -------
+ 1 file changed, 7 deletions(-)
 
 diff --git a/arch/arm/configs/at91sam9260_9g20_defconfig b/arch/arm/configs/at91sam9260_9g20_defconfig
-index 2c879bc29f86..9d35cb2ddceb 100644
+index 69b6928d3d9d..2c879bc29f86 100644
 --- a/arch/arm/configs/at91sam9260_9g20_defconfig
 +++ b/arch/arm/configs/at91sam9260_9g20_defconfig
-@@ -3,6 +3,7 @@
- CONFIG_SYSVIPC=y
- CONFIG_LOG_BUF_SHIFT=14
- CONFIG_BLK_DEV_INITRD=y
-+CONFIG_EMBEDDED=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
-@@ -60,6 +61,7 @@ CONFIG_MTD_BLOCK=y
+@@ -32,15 +32,12 @@ CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+ CONFIG_AT91_SLOW_CLOCK=y
+ # CONFIG_ARM_THUMB is not set
+ CONFIG_AEABI=y
+-CONFIG_LEDS=y
+-CONFIG_LEDS_CPU=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_CMDLINE="mem=64M console=ttyS0,115200 initrd=0x21100000,3145728 root=/dev/ram0 rw"
+ CONFIG_AUTO_ZRELADDR=y
+-CONFIG_FPE_NWFPE=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -59,7 +56,6 @@ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_OF_PARTS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
  CONFIG_MTD_DATAFLASH=y
  CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ATMEL=y
-+CONFIG_MTD_UBI=y
+@@ -67,7 +63,6 @@ CONFIG_MTD_NAND_ATMEL=y
  CONFIG_BLK_DEV_LOOP=y
  CONFIG_BLK_DEV_RAM=y
  CONFIG_BLK_DEV_RAM_SIZE=8192
+-CONFIG_MISC_DEVICES=y
+ CONFIG_EEPROM_AT25=y
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+@@ -114,8 +109,6 @@ CONFIG_SND_PCM_OSS=y
+ CONFIG_SND_SEQUENCER_OSS=y
+ # CONFIG_SND_VERBOSE_PROCFS is not set
+ CONFIG_USB=y
+-CONFIG_USB_DEVICEFS=y
+-# CONFIG_USB_DEVICE_CLASS is not set
+ CONFIG_USB_MON=y
+ CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_STORAGE=y
 -- 
 1.8.3.2
