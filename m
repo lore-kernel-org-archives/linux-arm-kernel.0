@@ -1,47 +1,26 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Feb 2014 20:15:18 +0100
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <20140209203412.GN26684@n2100.arm.linux.org.uk>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <201402092118.19701.arnd@arndb.de>
- <20140209203412.GN26684@n2100.arm.linux.org.uk>
-Message-ID: <201402112015.19252.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 11 Feb 2014 14:22:28 -0500
+Subject: [PATCH 2/8] bus: mvebu-mbus: make use of
+ of_find_matching_node_and_match
+In-Reply-To: <1392135847-30791-3-git-send-email-joshc@codeaurora.org>
+References: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
+ <1392135847-30791-3-git-send-email-joshc@codeaurora.org>
+Message-ID: <20140211192228.GG27395@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 09 February 2014, Russell King - ARM Linux wrote:
-> On Sun, Feb 09, 2014 at 09:18:19PM +0100, Arnd Bergmann wrote:
-> > On Thursday 06 February 2014, Russell King - ARM Linux wrote:
-> > 
-> > > So, whenever you enumerate a PCI bus, and read the resource information
-> > > out of the BARs, you must know how that address region specified in
-> > > the BAR as a bus address maps to the host address space.
-> > > 
-> > 
-> > None of that contradicts what I wrote. Please try to understand what
-> > I suggested, which is to have a common way to communicate that
-> > information from DT to the PCI core without involving the PCI host
-> > bridge driver.
+On Tue, Feb 11, 2014 at 10:24:00AM -0600, Josh Cartwright wrote:
+> Instead of the of_find_matching_node()/of_match_node() pair, which requires two
+> iterations through the match table, make use of of_find_matching_node_and_match(),
+> which only iterates through the table once.
 > 
-> Please explain it better then.
->
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> ---
+>  drivers/bus/mvebu-mbus.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 
-Let me try again: Looking at the dw_pcie driver (since that is one of
-the few that gets it mostly right), we have quite a bit of generic
-code in dw_pcie_host_init() and in dw_pcie_setup(). All the DT parsing
-in there just implements the generic PCI DT binding, and what the
-setup function does depends exclusively on what comes out of the
-parser.
+Applied to mvebu/drivers
 
-If we manage to move all the common parts into a generic helper
-function that gets called by the setup() on arm32, we no longer
-need to worry about host drivers implementing an incorrect DT
-parser or getting the io_offset calculation wrong, because they
-don't actually see any of that, plus we save a lot of duplicate
-code.
+thx,
 
-How it fits together with the new arm64 pci support is a different
-question, but if it's just a helper function, it should really work
-on any architecture.
-
-	Arnd
+Jason.
