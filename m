@@ -1,187 +1,36 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 11 Feb 2014 17:36:02 +0530
-Subject: [PATCH V6 07/12] phy: st-miphy-40lp: Add SPEAr1310 and SPEAr1340
- PCIe phy support
-In-Reply-To: <f84ed875ae7a356a8056f4645a4d1e59c665c972.1392109054.git.mohit.kumar@st.com>
-References: <cover.1392109054.git.mohit.kumar@st.com>
- <f84ed875ae7a356a8056f4645a4d1e59c665c972.1392109054.git.mohit.kumar@st.com>
-Message-ID: <52FA122A.1010900@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Feb 2014 12:06:45 +0000
+Subject: [PATCH 4/7] spi: pl022: attempt to get sspclk by name
+In-Reply-To: <1392118632-11312-5-git-send-email-mark.rutland@arm.com>
+References: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
+ <1392118632-11312-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <20140211120645.GH13533@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 February 2014 03:00 PM, Mohit Kumar wrote:
-> From: Pratyush Anand <pratyush.anand@st.com>
-> 
-> SPEAr1310 and SPEAr1340 uses miphy40lp phy for PCIe. This driver adds
-> support for the same.
+On Tue, Feb 11, 2014 at 11:37:09AM +0000, Mark Rutland wrote:
 
-What's up with SATA support for SPEAr1310? Do you have plans of adding it soon?
-> 
-> Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-> Tested-by: Mohit Kumar <mohit.kumar@st.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Viresh Kumar <viresh.linux@gmail.com>
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: spear-devel at list.st.com
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/phy/phy-miphy40lp.c |  165 +++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 165 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/phy/phy-miphy40lp.c b/drivers/phy/phy-miphy40lp.c
-> index 16da55b..dec67ed 100644
-> --- a/drivers/phy/phy-miphy40lp.c
-> +++ b/drivers/phy/phy-miphy40lp.c
-> @@ -9,6 +9,7 @@
->   * published by the Free Software Foundation.
->   *
->   * 04/02/2014: Adding support of SATA mode for SPEAr1340.
-> + * 04/02/2014: Adding support of PCIe mode for SPEAr1340 and SPEAr1310
->   */
->  
->  #include <linux/bitops.h>
-> @@ -74,6 +75,80 @@
->  	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE \
->  			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
->  			SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
-> +/* SPEAr1310 Registers */
-> +#define SPEAR1310_PCIE_SATA_CFG			0x3A4
-> +	#define SPEAR1310_PCIE_SATA2_SEL_PCIE		(0 << 31)
-> +	#define SPEAR1310_PCIE_SATA1_SEL_PCIE		(0 << 30)
-> +	#define SPEAR1310_PCIE_SATA0_SEL_PCIE		(0 << 29)
-> +	#define SPEAR1310_PCIE_SATA2_SEL_SATA		BIT(31)
-> +	#define SPEAR1310_PCIE_SATA1_SEL_SATA		BIT(30)
-> +	#define SPEAR1310_PCIE_SATA0_SEL_SATA		BIT(29)
-> +	#define SPEAR1310_SATA2_CFG_TX_CLK_EN		BIT(27)
-> +	#define SPEAR1310_SATA2_CFG_RX_CLK_EN		BIT(26)
-> +	#define SPEAR1310_SATA2_CFG_POWERUP_RESET	BIT(25)
-> +	#define SPEAR1310_SATA2_CFG_PM_CLK_EN		BIT(24)
-> +	#define SPEAR1310_SATA1_CFG_TX_CLK_EN		BIT(23)
-> +	#define SPEAR1310_SATA1_CFG_RX_CLK_EN		BIT(22)
-> +	#define SPEAR1310_SATA1_CFG_POWERUP_RESET	BIT(21)
-> +	#define SPEAR1310_SATA1_CFG_PM_CLK_EN		BIT(20)
-> +	#define SPEAR1310_SATA0_CFG_TX_CLK_EN		BIT(19)
-> +	#define SPEAR1310_SATA0_CFG_RX_CLK_EN		BIT(18)
-> +	#define SPEAR1310_SATA0_CFG_POWERUP_RESET	BIT(17)
-> +	#define SPEAR1310_SATA0_CFG_PM_CLK_EN		BIT(16)
-> +	#define SPEAR1310_PCIE2_CFG_DEVICE_PRESENT	BIT(11)
-> +	#define SPEAR1310_PCIE2_CFG_POWERUP_RESET	BIT(10)
-> +	#define SPEAR1310_PCIE2_CFG_CORE_CLK_EN		BIT(9)
-> +	#define SPEAR1310_PCIE2_CFG_AUX_CLK_EN		BIT(8)
-> +	#define SPEAR1310_PCIE1_CFG_DEVICE_PRESENT	BIT(7)
-> +	#define SPEAR1310_PCIE1_CFG_POWERUP_RESET	BIT(6)
-> +	#define SPEAR1310_PCIE1_CFG_CORE_CLK_EN		BIT(5)
-> +	#define SPEAR1310_PCIE1_CFG_AUX_CLK_EN		BIT(4)
-> +	#define SPEAR1310_PCIE0_CFG_DEVICE_PRESENT	BIT(3)
-> +	#define SPEAR1310_PCIE0_CFG_POWERUP_RESET	BIT(2)
-> +	#define SPEAR1310_PCIE0_CFG_CORE_CLK_EN		BIT(1)
-> +	#define SPEAR1310_PCIE0_CFG_AUX_CLK_EN		BIT(0)
+> -	pl022->clk = devm_clk_get(&adev->dev, NULL);
+> +	/*
+> +	 * For compatibility with old DTBs and platform data, fall back to the
+> +	 * first clock if there's not an explicitly named "sspclk" entry.
+> +	 */
+> +	pl022->clk = devm_clk_get(&adev->dev, "sspclk");
+> +	if (IS_ERR(pl022->clk))
+> +		pl022->clk = devm_clk_get(&adev->dev, NULL);
 > +
-> +	#define SPEAR1310_PCIE_CFG_MASK(x) ((0xF << (x * 4)) | BIT((x + 29)))
-> +	#define SPEAR1310_SATA_CFG_MASK(x) ((0xF << (x * 4 + 16)) | \
-> +			BIT((x + 29)))
-> +	#define SPEAR1310_PCIE_CFG_VAL(x) \
-> +			(SPEAR1310_PCIE_SATA##x##_SEL_PCIE | \
-> +			SPEAR1310_PCIE##x##_CFG_AUX_CLK_EN | \
-> +			SPEAR1310_PCIE##x##_CFG_CORE_CLK_EN | \
-> +			SPEAR1310_PCIE##x##_CFG_POWERUP_RESET | \
-> +			SPEAR1310_PCIE##x##_CFG_DEVICE_PRESENT)
-> +	#define SPEAR1310_SATA_CFG_VAL(x) \
-> +			(SPEAR1310_PCIE_SATA##x##_SEL_SATA | \
-> +			SPEAR1310_SATA##x##_CFG_PM_CLK_EN | \
-> +			SPEAR1310_SATA##x##_CFG_POWERUP_RESET | \
-> +			SPEAR1310_SATA##x##_CFG_RX_CLK_EN | \
-> +			SPEAR1310_SATA##x##_CFG_TX_CLK_EN)
-> +
-> +#define SPEAR1310_PCIE_MIPHY_CFG_1		0x3A8
-> +	#define SPEAR1310_MIPHY_DUAL_OSC_BYPASS_EXT	BIT(31)
-> +	#define SPEAR1310_MIPHY_DUAL_CLK_REF_DIV2	BIT(28)
-> +	#define SPEAR1310_MIPHY_DUAL_PLL_RATIO_TOP(x)	(x << 16)
-> +	#define SPEAR1310_MIPHY_SINGLE_OSC_BYPASS_EXT	BIT(15)
-> +	#define SPEAR1310_MIPHY_SINGLE_CLK_REF_DIV2	BIT(12)
-> +	#define SPEAR1310_MIPHY_SINGLE_PLL_RATIO_TOP(x)	(x << 0)
-> +	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_SATA_MASK (0xFFFF)
-> +	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE_MASK (0xFFFF << 16)
-> +	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_SATA \
-> +			(SPEAR1310_MIPHY_DUAL_OSC_BYPASS_EXT | \
-> +			SPEAR1310_MIPHY_DUAL_CLK_REF_DIV2 | \
-> +			SPEAR1310_MIPHY_DUAL_PLL_RATIO_TOP(60) | \
-> +			SPEAR1310_MIPHY_SINGLE_OSC_BYPASS_EXT | \
-> +			SPEAR1310_MIPHY_SINGLE_CLK_REF_DIV2 | \
-> +			SPEAR1310_MIPHY_SINGLE_PLL_RATIO_TOP(60))
-> +	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK \
-> +			(SPEAR1310_MIPHY_SINGLE_PLL_RATIO_TOP(120))
-> +	#define SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE \
-> +			(SPEAR1310_MIPHY_DUAL_OSC_BYPASS_EXT | \
-> +			SPEAR1310_MIPHY_DUAL_PLL_RATIO_TOP(25) | \
-> +			SPEAR1310_MIPHY_SINGLE_OSC_BYPASS_EXT | \
-> +			SPEAR1310_MIPHY_SINGLE_PLL_RATIO_TOP(25))
-> +
-> +#define SPEAR1310_PCIE_MIPHY_CFG_2		0x3AC
->  
->  enum phy_mode {
->  	SATA,
-> @@ -146,12 +221,35 @@ static int miphy40lp_spear1340_sata_exit(struct miphy40lp_priv *priv)
->  	return 0;
->  }
->  
-> +static int miphy40lp_spear1340_pcie_init(struct miphy40lp_priv *priv)
-> +{
-> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
-> +			SPEAR1340_PCIE_MIPHY_CFG_MASK,
-> +			SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE);
-> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
-> +			SPEAR1340_PCIE_SATA_CFG_MASK, SPEAR1340_PCIE_CFG_VAL);
-> +
-> +	return 0;
-> +}
-> +
-> +static int miphy40lp_spear1340_pcie_exit(struct miphy40lp_priv *priv)
-> +{
-> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
-> +			SPEAR1340_PCIE_MIPHY_CFG_MASK, 0);
-> +	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
-> +			SPEAR1340_PCIE_SATA_CFG_MASK, 0);
-> +
-> +	return 0;
-> +}
-> +
->  static int miphy40lp_spear1340_init(struct miphy40lp_priv *priv)
->  {
->  	int ret = 0;
->  
->  	if (priv->mode == SATA)
->  		ret = miphy40lp_spear1340_sata_init(priv);
-> +	else if (priv->mode == PCIE)
-> +		ret = miphy40lp_spear1340_pcie_init(priv);
->  
->  	return ret;
->  }
-> @@ -162,6 +260,8 @@ static int miphy40lp_spear1340_exit(struct miphy40lp_priv *priv)
->  
->  	if (priv->mode == SATA)
->  		ret = miphy40lp_spear1340_sata_exit(priv);
-> +	else if (priv->mode == PCIE)
-> +		ret = miphy40lp_spear1340_pcie_exit(priv);
->  
->  	return ret;
->  }
-> @@ -193,6 +293,70 @@ static struct miphy40lp_plat_ops spear1340_phy_ops = {
->  	.plat_resume = miphy40lp_spear1340_resume,
->  };
->  
-> +static int miphy40lp_spear1310_pcie_init(struct miphy40lp_priv *priv)
-> +{
-> +	u32 val;
-> +
-> +	regmap_update_bits(priv->misc, SPEAR1310_PCIE_MIPHY_CFG_1,
-> +			SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE_MASK,
-> +			SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE);
-> +
-> +	switch (priv->id) {
 
-'id' should be made as optional dt property since it's not used for 1340 no?
+I'll just have a bit of a grumble here and point out that this sort of
+stuff always worries me with the convention of using nameless clocks -
+it causes hassle adding further clocks.
 
-Thanks
-Kishon
+In any case you didn't CC me on the cover letter or any of the non-SPI
+patches so I'm not sure what the dependencies are here (if there are
+any), does the series need to go in as one?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140211/3074ea65/attachment.sig>
