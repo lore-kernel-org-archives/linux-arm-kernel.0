@@ -1,39 +1,42 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 11 Feb 2014 10:53:11 -0300
-Subject: [PATCH 0/2] Marvell Armada 375 and 38x timer support
-In-Reply-To: <52FA20EF.30807@linaro.org>
-References: <1392059274-26965-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <52FA1FBD.90906@linaro.org>
- <20140211130758.GX8533@titan.lakedaemon.net>
- <52FA20EF.30807@linaro.org>
-Message-ID: <20140211135310.GA23150@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 11 Feb 2014 13:59:02 +0000
+Subject: [PATCH 0/7] primecell: make correct clock parsing possible
+In-Reply-To: <20140211123356.GH26684@n2100.arm.linux.org.uk>
+References: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
+ <20140211123356.GH26684@n2100.arm.linux.org.uk>
+Message-ID: <20140211135902.GA12476@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
-
-On Tue, Feb 11, 2014 at 02:09:03PM +0100, Daniel Lezcano wrote:
-> >>
-> >> Applied to my tree for 3.15.
-> >
-> > Please hold off until we've resolved the discussion regarding adding
-> > unneeded compatible strings.  It's under patch 6 in the main series
-> > adding support for this new SoC.
-> >
-
-Yes, please drop it for now.
-
-> >    [PATCH 06/11] ARM: mvebu: add Armada 380/385 support to the system-controller driver
+On Tue, Feb 11, 2014 at 12:33:56PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Feb 11, 2014 at 11:37:05AM +0000, Mark Rutland wrote:
+> > These patches attempt to harmonize the bindings and the drivers with what's in
+> > use today, in a backwards compatible fashion, relieving us of our present
+> > Kafkaesque nightmare. Each peripheral's clock(s) are given explicit names which
+> > can be used, though code will fall back to the existing behaviour if said names
+> > are not provided. Additionally the currently unmet ordering requirement of
+> > apb_pclk is dropped, given all existing that code requires this to be named
+> > anyway.
 > 
-> Ok, thanks for the heads up.
+> The reason why these clocks ended up with NULL names was to force the
+> issue that clocks shall not be named solely by their connection IDs,
+> which was a major problem before DT.  Now that we have DT, I'm happier
+> to reinstate the names, but I think we should just reinstate the names
+> we had previously.  That should be in the git history.
+
+Good to know, that sounds fine to me.
+
 > 
+> The down-side is those names are all in capitals - but they were named
+> after the signal name(s) given in the Primecell documentation.
 
-Ah, my bad! I should have added a warning about the discussion as I did
-for the MBus patches. See:
+As long as we have standardised names I'm not too worried about which
+case they happen to be in, and matching the documentation seems
+sensible. The pl050 driver expects "KMIREFCLK" already, so it would be
+in keeping with (as far as I can tell) the only Primecell driver
+currently requesting a clock by name.
 
-http://www.spinics.net/lists/arm-kernel/msg306480.html
+I'll prepare a v2 shortly.
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Cheers,
+Mark.
