@@ -1,41 +1,40 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 11 Feb 2014 14:21:59 -0600
-Subject: [PATCH] drm/msm: drop ARCH_MSM Kconfig depend
-Message-ID: <1392150119-21132-1-git-send-email-galak@codeaurora.org>
+Date: Tue, 11 Feb 2014 14:22:06 -0600
+Subject: [PATCH] power: reset: msm - switch Kconfig to ARCH_QCOM depends
+Message-ID: <1392150126-21744-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARCH_MSM depend is redundant with ARCH_MSM8960, so we can remove it.
-Additionally, we are splitting Qualcomm MSM support into legacy (ARCH_MSM)
-and multiplatform (ARCH_QCOM).  The MSM8960 with be ARCH_QCOM going forward
-so dropping ARCH_MSM will work properly for the new ARCH_QCOM multiplatform
-build.
+We've split Qualcomm MSM support into legacy and multiplatform.  The reset
+driver is only relevant on the multiplatform supported SoCs so switch the
+Kconfig depends to ARCH_QCOM.
 
 Signed-off-by: Kumar Gala <galak@codeaurora.org>
 ---
-David/Rob,
+Dmitry, David,
 
 If you can ack this I'll send it via linux-qcom/arm-soc tree's
 
 thanks
 
 - k
- drivers/gpu/drm/msm/Kconfig | 2 +-
+
+ drivers/power/reset/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/msm/Kconfig b/drivers/gpu/drm/msm/Kconfig
-index c69d1e0..b698497 100644
---- a/drivers/gpu/drm/msm/Kconfig
-+++ b/drivers/gpu/drm/msm/Kconfig
-@@ -3,7 +3,7 @@ config DRM_MSM
- 	tristate "MSM DRM"
- 	depends on DRM
- 	depends on MSM_IOMMU
--	depends on (ARCH_MSM && ARCH_MSM8960) || (ARM && COMPILE_TEST)
-+	depends on ARCH_MSM8960 || (ARM && COMPILE_TEST)
- 	select DRM_KMS_HELPER
- 	select SHMEM
- 	select TMPFS
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index 6d452a7..fa0e4e0 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -22,7 +22,7 @@ config POWER_RESET_GPIO
+ 
+ config POWER_RESET_MSM
+ 	bool "Qualcomm MSM power-off driver"
+-	depends on POWER_RESET && ARCH_MSM
++	depends on POWER_RESET && ARCH_QCOM
+ 	help
+ 	  Power off and restart support for Qualcomm boards.
+ 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
