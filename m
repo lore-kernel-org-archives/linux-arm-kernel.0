@@ -1,84 +1,59 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 11 Feb 2014 17:54:45 +0100
-Subject: [PATCH 1/2] uhci-platform: Change compatible string from
- platform-uhci to generic-uhci
-Message-ID: <1392137686-6562-1-git-send-email-hdegoede@redhat.com>
+Date: Tue, 11 Feb 2014 17:54:46 +0100
+Subject: [PATCH 2/2] xhci-platform: Change compatible string from
+ xhci-platform to generic-xhci
+In-Reply-To: <1392137686-6562-1-git-send-email-hdegoede@redhat.com>
+References: <1392137686-6562-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1392137686-6562-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This brings the uhci-platform bindings in sync with what we've done for
+This brings the xhci-platform bindings in sync with what we've done for
 the ohci- and ehci-platform drivers. As discussed there using platform as a
-prefix is a bit weird as the platform bus is a Linux specific thing and
+postfix is a bit weird as the platform bus is a Linux specific thing and
 the bindings are supposed to be OS agnostic.
 
-Note that the old platform-uhci compatible string is kept around for, well,
+Note that the old xhci-platform compatible string is kept around for, well,
 compatibility reasons.
-
-While at it rename the bindings txt file to match the name of all the
-other ?hci-platform bindings docs.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- Documentation/devicetree/bindings/usb/platform-uhci.txt | 15 ---------------
- Documentation/devicetree/bindings/usb/usb-uhci.txt      | 15 +++++++++++++++
- drivers/usb/host/uhci-platform.c                        |  1 +
- 3 files changed, 16 insertions(+), 15 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/usb/platform-uhci.txt
- create mode 100644 Documentation/devicetree/bindings/usb/usb-uhci.txt
+ Documentation/devicetree/bindings/usb/usb-xhci.txt | 4 ++--
+ drivers/usb/host/xhci-plat.c                       | 1 +
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/platform-uhci.txt b/Documentation/devicetree/bindings/usb/platform-uhci.txt
-deleted file mode 100644
-index a4fb071..0000000
---- a/Documentation/devicetree/bindings/usb/platform-uhci.txt
-+++ /dev/null
-@@ -1,15 +0,0 @@
--Generic Platform UHCI Controller
-------------------------------------------------------
--
--Required properties:
--- compatible : "platform-uhci"
--- reg : Should contain 1 register ranges(address and length)
--- interrupts : UHCI controller interrupt
--
--Example:
--
--	uhci at d8007b00 {
--		compatible = "platform-uhci";
--		reg = <0xd8007b00 0x200>;
--		interrupts = <43>;
--	};
-diff --git a/Documentation/devicetree/bindings/usb/usb-uhci.txt b/Documentation/devicetree/bindings/usb/usb-uhci.txt
-new file mode 100644
-index 0000000..2981334
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/usb-uhci.txt
-@@ -0,0 +1,15 @@
-+Generic Platform UHCI Controller
-+-----------------------------------------------------
-+
-+Required properties:
-+- compatible : "generic-uhci" (deprecated: "platform-uhci")
-+- reg : Should contain 1 register ranges(address and length)
-+- interrupts : UHCI controller interrupt
-+
-+Example:
-+
-+	uhci at d8007b00 {
-+		compatible = "generic-uhci";
-+		reg = <0xd8007b00 0x200>;
-+		interrupts = <43>;
-+	};
-diff --git a/drivers/usb/host/uhci-platform.c b/drivers/usb/host/uhci-platform.c
-index 44e6c9d..01833ab 100644
---- a/drivers/usb/host/uhci-platform.c
-+++ b/drivers/usb/host/uhci-platform.c
-@@ -148,6 +148,7 @@ static void uhci_hcd_platform_shutdown(struct platform_device *op)
- }
+diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+index 5752df0..90f8f60 100644
+--- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+@@ -1,14 +1,14 @@
+ USB xHCI controllers
  
- static const struct of_device_id platform_uhci_ids[] = {
-+	{ .compatible = "generic-uhci", },
- 	{ .compatible = "platform-uhci", },
- 	{}
+ Required properties:
+-  - compatible: should be "xhci-platform".
++  - compatible: should be "generic-xhci" (deprecated: "xhci-platform").
+   - reg: should contain address and length of the standard XHCI
+     register set for the device.
+   - interrupts: one XHCI interrupt should be described here.
+ 
+ Example:
+ 	usb at f0931000 {
+-		compatible = "xhci-platform";
++		compatible = "generic-xhci";
+ 		reg = <0xf0931000 0x8c8>;
+ 		interrupts = <0x0 0x4e 0x0>;
+ 	};
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 8abda5c..8affef9 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -226,6 +226,7 @@ static const struct dev_pm_ops xhci_plat_pm_ops = {
+ 
+ #ifdef CONFIG_OF
+ static const struct of_device_id usb_xhci_of_match[] = {
++	{ .compatible = "generic-xhci" },
+ 	{ .compatible = "xhci-platform" },
+ 	{ },
  };
 -- 
 1.8.5.3
