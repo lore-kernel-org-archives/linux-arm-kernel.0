@@ -1,61 +1,50 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 11 Feb 2014 19:01:04 +0000
-Subject: [PATCH v2 1/5] drivers: of: add initialization code for reserved
- memory
-In-Reply-To: <52FA33E2.4050004@samsung.com>
-References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com> <
- 1391515773-6112-2-git-send-email-m.szyprowski@samsung.com> <20140205110538.
- 99E47C40A89@trevor.secretlab.ca> <52FA0D6E.9090304@samsung.com> <
- 20140211121316.24032C40C4D@trevor.secretlab.ca> <52FA33E2.4050004@samsung.
- com>
-Message-ID: <20140211190104.7E6C5C4140E@trevor.secretlab.ca>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 11 Feb 2014 14:04:29 -0500
+Subject: [PATCH 0/2] Marvell Armada 375 and 38x pinctrl drivers
+In-Reply-To: <1392051896-19178-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392051896-19178-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140211190429.GD27395@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Feb 2014 15:29:54 +0100, Tomasz Figa <t.figa@samsung.com> wrote:
-> > Yes, if only because it is an define usage of the reg property. If a
-> > devtree has multiple tuples in reg, then all of those tuples should be
-> > treated as reserved, even if the kernel doesn't know how to use them.
-> >
-> > I would not do the same for size/align/alloc-ranges unless there is a
-> > very specific use case that you can define. These ones are different
-> > from the static regions because they aren't ever used to protect
-> > something that already exists in the memory.
+On Mon, Feb 10, 2014 at 06:04:54PM +0100, Thomas Petazzoni wrote:
+> Linus,
 > 
-> Is there a reason why multiple regions could not be used for this 
-> purpose, instead of adding extra complexity of having multiple reg 
-> entries per region?
+> Here are two patches that add the pinctrl drivers for two new Marvell
+> ARM SOCs that belong to the mach-mvebu family: the Armada 375 and the
+> Armada 380/385. They are based on Cortex-A9 CPU cores, and share a
+> number of peripherals with their predecessors in the mach-mvebu
+> family. pinctrl-wise, they have a completely similar register layout
+> than Armada 370/XP, so only a list of pins and functions has to be
+> introduced, and therefore the drivers are straightforward.
 > 
-> I.e. I don't see a difference between
+> The core support (arch/arm/mach-mvebu) for these SOCs will be posted
+> shortly, and we're aiming at having this merged for 3.15 if possible.
 > 
-> reg1: region at 00000000 {
-> 	reg = <0x00000000 0x1000>;
-> };
+> Thanks!
 > 
-> reg2: region at 10000000 {
-> 	reg = <0x10000000 0x1000>;
-> };
+> Thomas
 > 
-> user {
-> 	regions = <&reg1>, <&reg2>;
-> };
+> Thomas Petazzoni (2):
+>   pinctrl: mvebu: add pin-muxing driver for the Marvell Armada 375
+>   pinctrl: mvebu: add pin-muxing driver for the Marvell Armada 380/385
 > 
-> and
-> 
-> reg: region at 00000000 {
-> 	reg = <0x00000000 0x1000>, <0x10000000 0x1000>;
-> };
-> 
-> user {
-> 	regions = <&reg>;
-> };
-> 
-> except that the former IMHO better suits the definition of memory 
-> region, which I see as a single contiguous range of memory and can be 
-> simplified to have a single reg entry per region.
+>  .../pinctrl/marvell,armada-375-pinctrl.txt         |  81 ++++
+>  .../pinctrl/marvell,armada-38x-pinctrl.txt         |  79 ++++
+>  drivers/pinctrl/mvebu/Kconfig                      |   8 +
+>  drivers/pinctrl/mvebu/Makefile                     |   2 +
+>  drivers/pinctrl/mvebu/pinctrl-armada-375.c         | 441 ++++++++++++++++++++
+>  drivers/pinctrl/mvebu/pinctrl-armada-38x.c         | 445 +++++++++++++++++++++
+>  6 files changed, 1056 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
+>  create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-375.c
+>  create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-38x.c
 
-My point is rather if multiple reg tuples are found in a reserved memory
-node, the kernel must respect them and reserve the memory. I'm not
-arguing about whether or not that makes for a good binding.
+For the whole series,
 
-g.
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
