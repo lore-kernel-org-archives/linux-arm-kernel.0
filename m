@@ -1,516 +1,463 @@
-From: mohit.kumar@st.com (Mohit Kumar)
-Date: Tue, 11 Feb 2014 15:00:02 +0530
-Subject: [PATCH V6 06/12] SPEAr13xx: Fixup: Move SPEAr1340 SATA platform code
- to phy driver
-In-Reply-To: <cover.1392109054.git.mohit.kumar@st.com>
-References: <cover.1392109054.git.mohit.kumar@st.com>
-Message-ID: <15e900d387a71e48387cf322ca065e38691c50e5.1392109054.git.mohit.kumar@st.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 11 Feb 2014 10:31:50 +0100
+Subject: [PATCH v9 2/4] ehci-platform: Add support for clks and phy passed
+ through devicetree
+In-Reply-To: <52F9E98B.90407@ti.com>
+References: <1391787403-20961-1-git-send-email-hdegoede@redhat.com>
+ <1391787403-20961-3-git-send-email-hdegoede@redhat.com>
+ <52F9E98B.90407@ti.com>
+Message-ID: <52F9EE06.3070003@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratyush Anand <pratyush.anand@st.com>
+Hi,
 
-ahci driver needs some platform specific functions which are called at
-init, exit, suspend and resume conditions. Till now these functions were
-present in a platform driver with a fixme notes.
+On 02/11/2014 10:12 AM, Roger Quadros wrote:
+> Hi Hans,
+> 
+> On 02/07/2014 05:36 PM, Hans de Goede wrote:
+>> Currently ehci-platform is only used in combination with devicetree when used
+>> with some Via socs. By extending it to (optionally) get clks and a phy from
+>> devicetree, and enabling / disabling those on power_on / off, it can be used
+>> more generically. Specifically after this commit it can be used for the
+>> ehci controller on Allwinner sunxi SoCs.
+>>
+>> Since ehci-platform is intended to handle any generic enough non pci ehci
+>> device, add a "usb-ehci" compatibility string.
+>>
+>> There already is a usb-ehci device-tree bindings document, update this
+>> with clks and phy bindings info.
+>>
+>> Although actually quite generic so far the via,vt8500 compatibilty string
+>> had its own bindings document. Somehow we even ended up with 2 of them. Since
+>> these provide no extra information over the generic usb-ehci documentation,
+>> this patch removes them.
+>>
+>> The ehci-ppc-of.c driver also claims the usb-ehci compatibility string,
+>> even though it mostly is ibm,usb-ehci-440epx specific. ehci-platform.c is
+>> not needed on ppc platforms, so add a !PPC_OF dependency to it to avoid
+>> 2 drivers claiming the same compatibility string getting build on ppc.
+>>
+> 
+> This breaks all OMAP platforms on linux-next for the exact same reason. see [1].
+> 
+> ./arch/arm/boot/dts/omap4.dtsi:				compatible = "ti,ehci-omap", "usb-ehci";
+> ./arch/arm/boot/dts/omap3.dtsi:				compatible = "ti,ehci-omap", "usb-ehci";
+> ./arch/arm/boot/dts/omap5.dtsi:				compatible = "ti,ehci-omap", "usb-ehci";
 
-Similar functions modifying same set of registers will also be needed in
-case of PCIe phy init/exit.
+That should not be the case, the driver core should try to find a driver matching
+the compatibility string from left to right, or in other words from most specific
+to least specific. This is part of the whole devicetree design.
 
-So move all these SATA platform code to phy-miphy40lp driver.
+So as long as the driver claiming "ti,ehci-omap" is available at probe time that
+one should get used and things should work fine. Now if ehci-platform is built-in
+and ehci-omap is a module, then I guess one could see the described breakage.
 
-Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-Tested-by: Mohit Kumar <mohit.kumar@st.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Viresh Kumar <viresh.linux@gmail.com>
-Cc: Tejun Heo <tj@kernel.org>
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: spear-devel at list.st.com
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/spear1310-evb.dts |    4 +
- arch/arm/boot/dts/spear1310.dtsi    |   39 +++++++++-
- arch/arm/boot/dts/spear1340-evb.dts |    4 +
- arch/arm/boot/dts/spear1340.dtsi    |   13 +++-
- arch/arm/boot/dts/spear13xx.dtsi    |    5 +
- arch/arm/mach-spear/Kconfig         |    2 +
- arch/arm/mach-spear/spear1340.c     |  127 +------------------------------
- drivers/phy/phy-miphy40lp.c         |  144 +++++++++++++++++++++++++++++++++++
- 8 files changed, 208 insertions(+), 130 deletions(-)
+If the driver is built-in and things are not working, then we will need to do some
+debugging as to why the left to right matching is not working as expected.
 
-diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
-index b56a801..d42c84b 100644
---- a/arch/arm/boot/dts/spear1310-evb.dts
-+++ b/arch/arm/boot/dts/spear1310-evb.dts
-@@ -106,6 +106,10 @@
- 			status = "okay";
- 		};
- 
-+		miphy at eb800000 {
-+			status = "okay";
-+		};
-+
- 		cf at b2800000 {
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/spear1310.dtsi b/arch/arm/boot/dts/spear1310.dtsi
-index 122ae94..64e7dd5 100644
---- a/arch/arm/boot/dts/spear1310.dtsi
-+++ b/arch/arm/boot/dts/spear1310.dtsi
-@@ -29,24 +29,57 @@
- 			#gpio-cells = <2>;
- 		};
- 
--		ahci at b1000000 {
-+		miphy0: miphy at eb800000 {
-+			compatible = "st,miphy", "st,spear1310-miphy";
-+			reg = <0xeb800000 0x4000>;
-+			misc = <&misc>;
-+			phy-id = <0>;
-+			#phy-cells = <1>;
-+			status = "disabled";
-+		};
-+
-+		miphy1: miphy at eb804000 {
-+			compatible = "st,miphy", "st,spear1310-miphy";
-+			reg = <0xeb804000 0x4000>;
-+			misc = <&misc>;
-+			phy-id = <1>;
-+			#phy-cells = <1>;
-+			status = "disabled";
-+		};
-+
-+		miphy2: miphy at eb808000 {
-+			compatible = "st,miphy", "st,spear1310-miphy";
-+			reg = <0xeb808000 0x4000>;
-+			misc = <&misc>;
-+			phy-id = <2>;
-+			#phy-cells = <1>;
-+			status = "disabled";
-+		};
-+
-+		ahci0: ahci at b1000000 {
- 			compatible = "snps,spear-ahci";
- 			reg = <0xb1000000 0x10000>;
- 			interrupts = <0 68 0x4>;
-+			phys = <&miphy0 0>;
-+			phy-names = "sata-phy";
- 			status = "disabled";
- 		};
- 
--		ahci at b1800000 {
-+		ahci1: ahci at b1800000 {
- 			compatible = "snps,spear-ahci";
- 			reg = <0xb1800000 0x10000>;
- 			interrupts = <0 69 0x4>;
-+			phys = <&miphy1 0>;
-+			phy-names = "sata-phy";
- 			status = "disabled";
- 		};
- 
--		ahci at b4000000 {
-+		ahci2: ahci at b4000000 {
- 			compatible = "snps,spear-ahci";
- 			reg = <0xb4000000 0x10000>;
- 			interrupts = <0 70 0x4>;
-+			phys = <&miphy2 0>;
-+			phy-names = "sata-phy";
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/spear1340-evb.dts b/arch/arm/boot/dts/spear1340-evb.dts
-index d6c30ae..b23e05e 100644
---- a/arch/arm/boot/dts/spear1340-evb.dts
-+++ b/arch/arm/boot/dts/spear1340-evb.dts
-@@ -122,6 +122,10 @@
- 			status = "okay";
- 		};
- 
-+		miphy at eb800000 {
-+			status = "okay";
-+		};
-+
- 		dma at ea800000 {
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/spear1340.dtsi b/arch/arm/boot/dts/spear1340.dtsi
-index 54d128d..7e3a04b 100644
---- a/arch/arm/boot/dts/spear1340.dtsi
-+++ b/arch/arm/boot/dts/spear1340.dtsi
-@@ -31,10 +31,21 @@
- 			status = "disabled";
- 		};
- 
--		ahci at b1000000 {
-+		miphy0: miphy at eb800000 {
-+			compatible = "st,miphy", "st,spear1340-miphy";
-+			reg = <0xeb800000 0x4000>;
-+			misc = <&misc>;
-+			phy-id = <0>;
-+			#phy-cells = <1>;
-+			status = "disabled";
-+		};
-+
-+		ahci0: ahci at b1000000 {
- 			compatible = "snps,spear-ahci";
- 			reg = <0xb1000000 0x10000>;
- 			interrupts = <0 72 0x4>;
-+			phys = <&miphy0 0>;
-+			phy-names = "sata-phy";
- 			status = "disabled";
- 		};
- 
-diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
-index 4382547..3a72508 100644
---- a/arch/arm/boot/dts/spear13xx.dtsi
-+++ b/arch/arm/boot/dts/spear13xx.dtsi
-@@ -220,6 +220,11 @@
- 				  0xd8000000 0xd8000000 0x01000000
- 				  0xe0000000 0xe0000000 0x10000000>;
- 
-+			misc: syscon at e0700000 {
-+				compatible = "st,spear1340-misc", "syscon";
-+				reg = <0xe0700000 0x1000>;
-+			};
-+
- 			gpio0: gpio at e0600000 {
- 				compatible = "arm,pl061", "arm,primecell";
- 				reg = <0xe0600000 0x1000>;
-diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
-index ac1710e..7e7f1b0 100644
---- a/arch/arm/mach-spear/Kconfig
-+++ b/arch/arm/mach-spear/Kconfig
-@@ -26,6 +26,8 @@ config ARCH_SPEAR13XX
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select PINCTRL
- 	select USE_OF
-+	select MFD_SYSCON
-+	select PHY_ST_MIPHY40LP
- 	help
- 	  Supports for ARM's SPEAR13XX family
- 
-diff --git a/arch/arm/mach-spear/spear1340.c b/arch/arm/mach-spear/spear1340.c
-index 3fb6834..8e27093 100644
---- a/arch/arm/mach-spear/spear1340.c
-+++ b/arch/arm/mach-spear/spear1340.c
-@@ -11,138 +11,13 @@
-  * warranty of any kind, whether express or implied.
-  */
- 
--#define pr_fmt(fmt) "SPEAr1340: " fmt
--
--#include <linux/ahci_platform.h>
--#include <linux/amba/serial.h>
--#include <linux/delay.h>
- #include <linux/of_platform.h>
- #include <asm/mach/arch.h>
- #include "generic.h"
--#include <mach/spear.h>
--
--/* FIXME: Move SATA PHY code into a standalone driver */
--
--/* Base addresses */
--#define SPEAR1340_SATA_BASE			UL(0xB1000000)
--
--/* Power Management Registers */
--#define SPEAR1340_PCM_CFG			(VA_MISC_BASE + 0x100)
--#define SPEAR1340_PCM_WKUP_CFG			(VA_MISC_BASE + 0x104)
--#define SPEAR1340_SWITCH_CTR			(VA_MISC_BASE + 0x108)
--
--#define SPEAR1340_PERIP1_SW_RST			(VA_MISC_BASE + 0x318)
--#define SPEAR1340_PERIP2_SW_RST			(VA_MISC_BASE + 0x31C)
--#define SPEAR1340_PERIP3_SW_RST			(VA_MISC_BASE + 0x320)
--
--/* PCIE - SATA configuration registers */
--#define SPEAR1340_PCIE_SATA_CFG			(VA_MISC_BASE + 0x424)
--	/* PCIE CFG MASks */
--	#define SPEAR1340_PCIE_CFG_DEVICE_PRESENT	(1 << 11)
--	#define SPEAR1340_PCIE_CFG_POWERUP_RESET	(1 << 10)
--	#define SPEAR1340_PCIE_CFG_CORE_CLK_EN		(1 << 9)
--	#define SPEAR1340_PCIE_CFG_AUX_CLK_EN		(1 << 8)
--	#define SPEAR1340_SATA_CFG_TX_CLK_EN		(1 << 4)
--	#define SPEAR1340_SATA_CFG_RX_CLK_EN		(1 << 3)
--	#define SPEAR1340_SATA_CFG_POWERUP_RESET	(1 << 2)
--	#define SPEAR1340_SATA_CFG_PM_CLK_EN		(1 << 1)
--	#define SPEAR1340_PCIE_SATA_SEL_PCIE		(0)
--	#define SPEAR1340_PCIE_SATA_SEL_SATA		(1)
--	#define SPEAR1340_SATA_PCIE_CFG_MASK		0xF1F
--	#define SPEAR1340_PCIE_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_PCIE | \
--			SPEAR1340_PCIE_CFG_AUX_CLK_EN | \
--			SPEAR1340_PCIE_CFG_CORE_CLK_EN | \
--			SPEAR1340_PCIE_CFG_POWERUP_RESET | \
--			SPEAR1340_PCIE_CFG_DEVICE_PRESENT)
--	#define SPEAR1340_SATA_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_SATA | \
--			SPEAR1340_SATA_CFG_PM_CLK_EN | \
--			SPEAR1340_SATA_CFG_POWERUP_RESET | \
--			SPEAR1340_SATA_CFG_RX_CLK_EN | \
--			SPEAR1340_SATA_CFG_TX_CLK_EN)
--
--#define SPEAR1340_PCIE_MIPHY_CFG		(VA_MISC_BASE + 0x428)
--	#define SPEAR1340_MIPHY_OSC_BYPASS_EXT		(1 << 31)
--	#define SPEAR1340_MIPHY_CLK_REF_DIV2		(1 << 27)
--	#define SPEAR1340_MIPHY_CLK_REF_DIV4		(2 << 27)
--	#define SPEAR1340_MIPHY_CLK_REF_DIV8		(3 << 27)
--	#define SPEAR1340_MIPHY_PLL_RATIO_TOP(x)	(x << 0)
--	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA \
--			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
--			SPEAR1340_MIPHY_CLK_REF_DIV2 | \
--			SPEAR1340_MIPHY_PLL_RATIO_TOP(60))
--	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK \
--			(SPEAR1340_MIPHY_PLL_RATIO_TOP(120))
--	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE \
--			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
--			SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
--
--/* SATA device registration */
--static int sata_miphy_init(struct device *dev, void __iomem *addr)
--{
--	writel(SPEAR1340_SATA_CFG_VAL, SPEAR1340_PCIE_SATA_CFG);
--	writel(SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK,
--			SPEAR1340_PCIE_MIPHY_CFG);
--	/* Switch on sata power domain */
--	writel((readl(SPEAR1340_PCM_CFG) | (0x800)), SPEAR1340_PCM_CFG);
--	msleep(20);
--	/* Disable PCIE SATA Controller reset */
--	writel((readl(SPEAR1340_PERIP1_SW_RST) & (~0x1000)),
--			SPEAR1340_PERIP1_SW_RST);
--	msleep(20);
--
--	return 0;
--}
--
--void sata_miphy_exit(struct device *dev)
--{
--	writel(0, SPEAR1340_PCIE_SATA_CFG);
--	writel(0, SPEAR1340_PCIE_MIPHY_CFG);
--
--	/* Enable PCIE SATA Controller reset */
--	writel((readl(SPEAR1340_PERIP1_SW_RST) | (0x1000)),
--			SPEAR1340_PERIP1_SW_RST);
--	msleep(20);
--	/* Switch off sata power domain */
--	writel((readl(SPEAR1340_PCM_CFG) & (~0x800)), SPEAR1340_PCM_CFG);
--	msleep(20);
--}
--
--int sata_suspend(struct device *dev)
--{
--	if (dev->power.power_state.event == PM_EVENT_FREEZE)
--		return 0;
--
--	sata_miphy_exit(dev);
--
--	return 0;
--}
--
--int sata_resume(struct device *dev)
--{
--	if (dev->power.power_state.event == PM_EVENT_THAW)
--		return 0;
--
--	return sata_miphy_init(dev, NULL);
--}
--
--static struct ahci_platform_data sata_pdata = {
--	.init = sata_miphy_init,
--	.exit = sata_miphy_exit,
--	.suspend = sata_suspend,
--	.resume = sata_resume,
--};
--
--/* Add SPEAr1340 auxdata to pass platform data */
--static struct of_dev_auxdata spear1340_auxdata_lookup[] __initdata = {
--	OF_DEV_AUXDATA("snps,spear-ahci", SPEAR1340_SATA_BASE, NULL,
--			&sata_pdata),
--	{}
--};
- 
- static void __init spear1340_dt_init(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table,
--			spear1340_auxdata_lookup, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
- static const char * const spear1340_dt_board_compat[] = {
-diff --git a/drivers/phy/phy-miphy40lp.c b/drivers/phy/phy-miphy40lp.c
-index 98859ff..16da55b 100644
---- a/drivers/phy/phy-miphy40lp.c
-+++ b/drivers/phy/phy-miphy40lp.c
-@@ -8,8 +8,10 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  *
-+ * 04/02/2014: Adding support of SATA mode for SPEAr1340.
-  */
- 
-+#include <linux/bitops.h>
- #include <linux/delay.h>
- #include <linux/dma-mapping.h>
- #include <linux/kernel.h>
-@@ -19,6 +21,60 @@
- #include <linux/phy/phy.h>
- #include <linux/regmap.h>
- 
-+/* SPEAr1340 Registers */
-+/* Power Management Registers */
-+#define SPEAR1340_PCM_CFG			0x100
-+	#define SPEAR1340_PCM_CFG_SATA_POWER_EN		BIT(11)
-+#define SPEAR1340_PCM_WKUP_CFG			0x104
-+#define SPEAR1340_SWITCH_CTR			0x108
-+
-+#define SPEAR1340_PERIP1_SW_RST			0x318
-+	#define SPEAR1340_PERIP1_SW_RSATA		BIT(12)
-+#define SPEAR1340_PERIP2_SW_RST			0x31C
-+#define SPEAR1340_PERIP3_SW_RST			0x320
-+
-+/* PCIE - SATA configuration registers */
-+#define SPEAR1340_PCIE_SATA_CFG			0x424
-+	/* PCIE CFG MASks */
-+	#define SPEAR1340_PCIE_CFG_DEVICE_PRESENT	BIT(11)
-+	#define SPEAR1340_PCIE_CFG_POWERUP_RESET	BIT(10)
-+	#define SPEAR1340_PCIE_CFG_CORE_CLK_EN		BIT(9)
-+	#define SPEAR1340_PCIE_CFG_AUX_CLK_EN		BIT(8)
-+	#define SPEAR1340_SATA_CFG_TX_CLK_EN		BIT(4)
-+	#define SPEAR1340_SATA_CFG_RX_CLK_EN		BIT(3)
-+	#define SPEAR1340_SATA_CFG_POWERUP_RESET	BIT(2)
-+	#define SPEAR1340_SATA_CFG_PM_CLK_EN		BIT(1)
-+	#define SPEAR1340_PCIE_SATA_SEL_PCIE		(0)
-+	#define SPEAR1340_PCIE_SATA_SEL_SATA		(1)
-+	#define SPEAR1340_PCIE_SATA_CFG_MASK		0xF1F
-+	#define SPEAR1340_PCIE_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_PCIE | \
-+			SPEAR1340_PCIE_CFG_AUX_CLK_EN | \
-+			SPEAR1340_PCIE_CFG_CORE_CLK_EN | \
-+			SPEAR1340_PCIE_CFG_POWERUP_RESET | \
-+			SPEAR1340_PCIE_CFG_DEVICE_PRESENT)
-+	#define SPEAR1340_SATA_CFG_VAL	(SPEAR1340_PCIE_SATA_SEL_SATA | \
-+			SPEAR1340_SATA_CFG_PM_CLK_EN | \
-+			SPEAR1340_SATA_CFG_POWERUP_RESET | \
-+			SPEAR1340_SATA_CFG_RX_CLK_EN | \
-+			SPEAR1340_SATA_CFG_TX_CLK_EN)
-+
-+#define SPEAR1340_PCIE_MIPHY_CFG		0x428
-+	#define SPEAR1340_MIPHY_OSC_BYPASS_EXT		BIT(31)
-+	#define SPEAR1340_MIPHY_CLK_REF_DIV2		BIT(27)
-+	#define SPEAR1340_MIPHY_CLK_REF_DIV4		(2 << 27)
-+	#define SPEAR1340_MIPHY_CLK_REF_DIV8		(3 << 27)
-+	#define SPEAR1340_MIPHY_PLL_RATIO_TOP(x)	(x << 0)
-+	#define SPEAR1340_PCIE_MIPHY_CFG_MASK		0xF80000FF
-+	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA \
-+			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
-+			SPEAR1340_MIPHY_CLK_REF_DIV2 | \
-+			SPEAR1340_MIPHY_PLL_RATIO_TOP(60))
-+	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK \
-+			(SPEAR1340_MIPHY_PLL_RATIO_TOP(120))
-+	#define SPEAR1340_PCIE_SATA_MIPHY_CFG_PCIE \
-+			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
-+			SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
-+
- enum phy_mode {
- 	SATA,
- 	PCIE,
-@@ -50,6 +106,93 @@ struct miphy40lp_priv {
- 	const struct miphy40lp_plat_ops	*plat_ops;
- };
- 
-+static int miphy40lp_spear1340_sata_init(struct miphy40lp_priv *priv)
-+{
-+	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
-+			SPEAR1340_PCIE_SATA_CFG_MASK, SPEAR1340_SATA_CFG_VAL);
-+	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
-+			SPEAR1340_PCIE_MIPHY_CFG_MASK,
-+			SPEAR1340_PCIE_SATA_MIPHY_CFG_SATA_25M_CRYSTAL_CLK);
-+	/* Switch on sata power domain */
-+	regmap_update_bits(priv->misc, SPEAR1340_PCM_CFG,
-+			SPEAR1340_PCM_CFG_SATA_POWER_EN,
-+			SPEAR1340_PCM_CFG_SATA_POWER_EN);
-+	msleep(20);
-+	/* Disable PCIE SATA Controller reset */
-+	regmap_update_bits(priv->misc, SPEAR1340_PERIP1_SW_RST,
-+			SPEAR1340_PERIP1_SW_RSATA, 0);
-+	msleep(20);
-+
-+	return 0;
-+}
-+
-+static int miphy40lp_spear1340_sata_exit(struct miphy40lp_priv *priv)
-+{
-+	regmap_update_bits(priv->misc, SPEAR1340_PCIE_SATA_CFG,
-+			SPEAR1340_PCIE_SATA_CFG_MASK, 0);
-+	regmap_update_bits(priv->misc, SPEAR1340_PCIE_MIPHY_CFG,
-+			SPEAR1340_PCIE_MIPHY_CFG_MASK, 0);
-+
-+	/* Enable PCIE SATA Controller reset */
-+	regmap_update_bits(priv->misc, SPEAR1340_PERIP1_SW_RST,
-+			SPEAR1340_PERIP1_SW_RSATA,
-+			SPEAR1340_PERIP1_SW_RSATA);
-+	msleep(20);
-+	/* Switch off sata power domain */
-+	regmap_update_bits(priv->misc, SPEAR1340_PCM_CFG,
-+			SPEAR1340_PCM_CFG_SATA_POWER_EN, 0);
-+	msleep(20);
-+
-+	return 0;
-+}
-+
-+static int miphy40lp_spear1340_init(struct miphy40lp_priv *priv)
-+{
-+	int ret = 0;
-+
-+	if (priv->mode == SATA)
-+		ret = miphy40lp_spear1340_sata_init(priv);
-+
-+	return ret;
-+}
-+
-+static int miphy40lp_spear1340_exit(struct miphy40lp_priv *priv)
-+{
-+	int ret = 0;
-+
-+	if (priv->mode == SATA)
-+		ret = miphy40lp_spear1340_sata_exit(priv);
-+
-+	return ret;
-+}
-+
-+static int miphy40lp_spear1340_suspend(struct miphy40lp_priv *priv)
-+{
-+	int ret = 0;
-+
-+	if (priv->mode == SATA)
-+		ret = miphy40lp_spear1340_sata_exit(priv);
-+
-+	return ret;
-+}
-+
-+static int miphy40lp_spear1340_resume(struct miphy40lp_priv *priv)
-+{
-+	int ret = 0;
-+
-+	if (priv->mode == SATA)
-+		ret = miphy40lp_spear1340_sata_init(priv);
-+
-+	return ret;
-+}
-+
-+static struct miphy40lp_plat_ops spear1340_phy_ops = {
-+	.plat_init = miphy40lp_spear1340_init,
-+	.plat_exit = miphy40lp_spear1340_exit,
-+	.plat_suspend = miphy40lp_spear1340_suspend,
-+	.plat_resume = miphy40lp_spear1340_resume,
-+};
-+
- static int miphy40lp_init(struct phy *phy)
- {
- 	struct miphy40lp_priv *priv = phy_get_drvdata(phy);
-@@ -100,6 +243,7 @@ static int miphy40lp_power_on(struct phy *phy)
- 
- static const struct of_device_id miphy40lp_of_match[] = {
- 	{ .compatible = "st,miphy40lp-phy", .data = NULL },
-+	{ .compatible = "st,spear1340-miphy", .data = &spear1340_phy_ops },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, miphy40lp_of_match);
--- 
-1.7.0.1
+I must admit I'm not sure what happens if both are a module, the kernel direct
+module load will likely fail due to lack of a rootfs at that point, and then
+the module will later get loaded by udev I assume, at which point there are no
+loading ordering guarantees.
+
+The easiest solution to ensure that "ti,ehci-omap" is available at probe time
+(if enabled) seems to be to change USB_EHCI_HCD_OMAP to a boolean.
+
+Regards,
+
+Hans
+
+
+
+> 
+> 
+> The other platforms that claim compatibility with "usb-ehci" are
+> 
+> ARM
+> ./arch/arm/boot/dts/tegra30.dtsi:		compatible = "nvidia,tegra30-ehci", "usb-ehci";
+> ./arch/arm/boot/dts/tegra20.dtsi:		compatible = "nvidia,tegra20-ehci", "usb-ehci";
+> ./arch/arm/boot/dts/spear600.dtsi:			compatible = "st,spear600-ehci", "usb-ehci";
+> 
+> ./arch/arm/boot/dts/spear3xx.dtsi:			compatible = "st,spear600-ehci", "usb-ehci";
+> ./arch/arm/boot/dts/sama5d3.dtsi:			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+> ./arch/arm/boot/dts/at91sam9g45.dtsi:			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+> ./arch/arm/boot/dts/spear13xx.dtsi:			compatible = "st,spear600-ehci", "usb-ehci";
+> ./arch/arm/boot/dts/at91sam9x5.dtsi:			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+> ./arch/arm/boot/dts/tegra114.dtsi:		compatible = "nvidia,tegra30-ehci", "usb-ehci";
+> 
+> 
+> MIPS
+> ./arch/mips/cavium-octeon/octeon_68xx.dts:				compatible = "cavium,octeon-6335-ehci","usb-ehci";
+> ./arch/mips/cavium-octeon/octeon_3xxx.dts:				compatible = "cavium,octeon-6335-ehci","usb-ehci";
+> 
+> Do we know that we don't break these platforms as well?
+> 
+> cheers,
+> -roger
+> 
+> [1] - http://marc.info/?l=linux-usb&m=139204800102167&w=2
+> 
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+>> ---
+>>  Documentation/devicetree/bindings/usb/usb-ehci.txt |  25 +++-
+>>  .../devicetree/bindings/usb/via,vt8500-ehci.txt    |  15 ---
+>>  .../devicetree/bindings/usb/vt8500-ehci.txt        |  12 --
+>>  drivers/usb/host/Kconfig                           |   1 +
+>>  drivers/usb/host/ehci-platform.c                   | 147 +++++++++++++++++----
+>>  5 files changed, 142 insertions(+), 58 deletions(-)
+>>  delete mode 100644 Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+>>  delete mode 100644 Documentation/devicetree/bindings/usb/vt8500-ehci.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> index fa18612..2c1aeeb 100644
+>> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
+>> @@ -7,13 +7,14 @@ Required properties:
+>>      (debug-port or other) can be also specified here, but only after
+>>      definition of standard EHCI registers.
+>>    - interrupts : one EHCI interrupt should be described here.
+>> -If device registers are implemented in big endian mode, the device
+>> -node should have "big-endian-regs" property.
+>> -If controller implementation operates with big endian descriptors,
+>> -"big-endian-desc" property should be specified.
+>> -If both big endian registers and descriptors are used by the controller
+>> -implementation, "big-endian" property can be specified instead of having
+>> -both "big-endian-regs" and "big-endian-desc".
+>> +
+>> +Optional properties:
+>> + - big-endian-regs : boolean, set this for hcds with big-endian registers
+>> + - big-endian-desc : boolean, set this for hcds with big-endian descriptors
+>> + - big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
+>> + - clocks : a list of phandle + clock specifier pairs
+>> + - phys : phandle + phy specifier pair
+>> + - phy-names : "usb"
+>>  
+>>  Example (Sequoia 440EPx):
+>>      ehci at e0000300 {
+>> @@ -23,3 +24,13 @@ Example (Sequoia 440EPx):
+>>  	   reg = <0 e0000300 90 0 e0000390 70>;
+>>  	   big-endian;
+>>     };
+>> +
+>> +Example (Allwinner sun4i A10 SoC):
+>> +   ehci0: usb at 01c14000 {
+>> +	   compatible = "allwinner,sun4i-a10-ehci", "usb-ehci";
+>> +	   reg = <0x01c14000 0x100>;
+>> +	   interrupts = <39>;
+>> +	   clocks = <&ahb_gates 1>;
+>> +	   phys = <&usbphy 1>;
+>> +	   phy-names = "usb";
+>> +   };
+>> diff --git a/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt b/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+>> deleted file mode 100644
+>> index 17b3ad1..0000000
+>> --- a/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
+>> +++ /dev/null
+>> @@ -1,15 +0,0 @@
+>> -VIA/Wondermedia VT8500 EHCI Controller
+>> ------------------------------------------------------
+>> -
+>> -Required properties:
+>> -- compatible : "via,vt8500-ehci"
+>> -- reg : Should contain 1 register ranges(address and length)
+>> -- interrupts : ehci controller interrupt
+>> -
+>> -Example:
+>> -
+>> -	ehci at d8007900 {
+>> -		compatible = "via,vt8500-ehci";
+>> -		reg = <0xd8007900 0x200>;
+>> -		interrupts = <43>;
+>> -	};
+>> diff --git a/Documentation/devicetree/bindings/usb/vt8500-ehci.txt b/Documentation/devicetree/bindings/usb/vt8500-ehci.txt
+>> deleted file mode 100644
+>> index 5fb8fd6..0000000
+>> --- a/Documentation/devicetree/bindings/usb/vt8500-ehci.txt
+>> +++ /dev/null
+>> @@ -1,12 +0,0 @@
+>> -VIA VT8500 and Wondermedia WM8xxx SoC USB controllers.
+>> -
+>> -Required properties:
+>> - - compatible: Should be "via,vt8500-ehci" or "wm,prizm-ehci".
+>> - - reg: Address range of the ehci registers. size should be 0x200
+>> - - interrupts: Should contain the ehci interrupt.
+>> -
+>> -usb: ehci at D8007100 {
+>> -	compatible = "wm,prizm-ehci", "usb-ehci";
+>> -	reg = <0xD8007100 0x200>;
+>> -	interrupts = <1>;
+>> -};
+>> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+>> index a9707da..e28cbe0 100644
+>> --- a/drivers/usb/host/Kconfig
+>> +++ b/drivers/usb/host/Kconfig
+>> @@ -255,6 +255,7 @@ config USB_EHCI_ATH79
+>>  
+>>  config USB_EHCI_HCD_PLATFORM
+>>  	tristate "Generic EHCI driver for a platform device"
+>> +	depends on !PPC_OF
+>>  	default n
+>>  	---help---
+>>  	  Adds an EHCI host driver for a generic platform device, which
+>> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+>> index 01536cf..5ebd0b7 100644
+>> --- a/drivers/usb/host/ehci-platform.c
+>> +++ b/drivers/usb/host/ehci-platform.c
+>> @@ -3,6 +3,7 @@
+>>   *
+>>   * Copyright 2007 Steven Brown <sbrown@cortland.com>
+>>   * Copyright 2010-2012 Hauke Mehrtens <hauke@hauke-m.de>
+>> + * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
+>>   *
+>>   * Derived from the ohci-ssb driver
+>>   * Copyright 2007 Michael Buesch <m@bues.ch>
+>> @@ -18,6 +19,7 @@
+>>   *
+>>   * Licensed under the GNU/GPL. See COPYING for details.
+>>   */
+>> +#include <linux/clk.h>
+>>  #include <linux/dma-mapping.h>
+>>  #include <linux/err.h>
+>>  #include <linux/kernel.h>
+>> @@ -25,6 +27,7 @@
+>>  #include <linux/io.h>
+>>  #include <linux/module.h>
+>>  #include <linux/of.h>
+>> +#include <linux/phy/phy.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/usb.h>
+>>  #include <linux/usb/hcd.h>
+>> @@ -33,6 +36,13 @@
+>>  #include "ehci.h"
+>>  
+>>  #define DRIVER_DESC "EHCI generic platform driver"
+>> +#define EHCI_MAX_CLKS 3
+>> +#define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
+>> +
+>> +struct ehci_platform_priv {
+>> +	struct clk *clks[EHCI_MAX_CLKS];
+>> +	struct phy *phy;
+>> +};
+>>  
+>>  static const char hcd_name[] = "ehci-platform";
+>>  
+>> @@ -64,38 +74,90 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
+>>  	return 0;
+>>  }
+>>  
+>> +static int ehci_platform_power_on(struct platform_device *dev)
+>> +{
+>> +	struct usb_hcd *hcd = platform_get_drvdata(dev);
+>> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+>> +	int clk, ret;
+>> +
+>> +	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++) {
+>> +		ret = clk_prepare_enable(priv->clks[clk]);
+>> +		if (ret)
+>> +			goto err_disable_clks;
+>> +	}
+>> +
+>> +	if (priv->phy) {
+>> +		ret = phy_init(priv->phy);
+>> +		if (ret)
+>> +			goto err_disable_clks;
+>> +
+>> +		ret = phy_power_on(priv->phy);
+>> +		if (ret)
+>> +			goto err_exit_phy;
+>> +	}
+>> +
+>> +	return 0;
+>> +
+>> +err_exit_phy:
+>> +	phy_exit(priv->phy);
+>> +err_disable_clks:
+>> +	while (--clk >= 0)
+>> +		clk_disable_unprepare(priv->clks[clk]);
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static void ehci_platform_power_off(struct platform_device *dev)
+>> +{
+>> +	struct usb_hcd *hcd = platform_get_drvdata(dev);
+>> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+>> +	int clk;
+>> +
+>> +	if (priv->phy) {
+>> +		phy_power_off(priv->phy);
+>> +		phy_exit(priv->phy);
+>> +	}
+>> +
+>> +	for (clk = EHCI_MAX_CLKS - 1; clk >= 0; clk--)
+>> +		if (priv->clks[clk])
+>> +			clk_disable_unprepare(priv->clks[clk]);
+>> +}
+>> +
+>>  static struct hc_driver __read_mostly ehci_platform_hc_driver;
+>>  
+>>  static const struct ehci_driver_overrides platform_overrides __initconst = {
+>> -	.reset =	ehci_platform_reset,
+>> +	.reset =		ehci_platform_reset,
+>> +	.extra_priv_size =	sizeof(struct ehci_platform_priv),
+>>  };
+>>  
+>> -static struct usb_ehci_pdata ehci_platform_defaults;
+>> +static struct usb_ehci_pdata ehci_platform_defaults = {
+>> +	.power_on =		ehci_platform_power_on,
+>> +	.power_suspend =	ehci_platform_power_off,
+>> +	.power_off =		ehci_platform_power_off,
+>> +};
+>>  
+>>  static int ehci_platform_probe(struct platform_device *dev)
+>>  {
+>>  	struct usb_hcd *hcd;
+>>  	struct resource *res_mem;
+>> -	struct usb_ehci_pdata *pdata;
+>> -	int irq;
+>> -	int err;
+>> +	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+>> +	struct ehci_platform_priv *priv;
+>> +	int err, irq, clk = 0;
+>>  
+>>  	if (usb_disabled())
+>>  		return -ENODEV;
+>>  
+>>  	/*
+>> -	 * use reasonable defaults so platforms don't have to provide these.
+>> -	 * with DT probing on ARM, none of these are set.
+>> +	 * Use reasonable defaults so platforms don't have to provide these
+>> +	 * with DT probing on ARM.
+>>  	 */
+>> -	if (!dev_get_platdata(&dev->dev))
+>> -		dev->dev.platform_data = &ehci_platform_defaults;
+>> +	if (!pdata)
+>> +		pdata = &ehci_platform_defaults;
+>>  
+>>  	err = dma_coerce_mask_and_coherent(&dev->dev, DMA_BIT_MASK(32));
+>>  	if (err)
+>>  		return err;
+>>  
+>> -	pdata = dev_get_platdata(&dev->dev);
+>> -
+>>  	irq = platform_get_irq(dev, 0);
+>>  	if (irq < 0) {
+>>  		dev_err(&dev->dev, "no irq provided");
+>> @@ -107,17 +169,40 @@ static int ehci_platform_probe(struct platform_device *dev)
+>>  		return -ENXIO;
+>>  	}
+>>  
+>> +	hcd = usb_create_hcd(&ehci_platform_hc_driver, &dev->dev,
+>> +			     dev_name(&dev->dev));
+>> +	if (!hcd)
+>> +		return -ENOMEM;
+>> +
+>> +	platform_set_drvdata(dev, hcd);
+>> +	dev->dev.platform_data = pdata;
+>> +	priv = hcd_to_ehci_priv(hcd);
+>> +
+>> +	if (pdata == &ehci_platform_defaults && dev->dev.of_node) {
+>> +		priv->phy = devm_phy_get(&dev->dev, "usb");
+>> +		if (IS_ERR(priv->phy)) {
+>> +			err = PTR_ERR(priv->phy);
+>> +			if (err == -EPROBE_DEFER)
+>> +				goto err_put_hcd;
+>> +			priv->phy = NULL;
+>> +		}
+>> +
+>> +		for (clk = 0; clk < EHCI_MAX_CLKS; clk++) {
+>> +			priv->clks[clk] = of_clk_get(dev->dev.of_node, clk);
+>> +			if (IS_ERR(priv->clks[clk])) {
+>> +				err = PTR_ERR(priv->clks[clk]);
+>> +				if (err == -EPROBE_DEFER)
+>> +					goto err_put_clks;
+>> +				priv->clks[clk] = NULL;
+>> +				break;
+>> +			}
+>> +		}
+>> +	}
+>> +
+>>  	if (pdata->power_on) {
+>>  		err = pdata->power_on(dev);
+>>  		if (err < 0)
+>> -			return err;
+>> -	}
+>> -
+>> -	hcd = usb_create_hcd(&ehci_platform_hc_driver, &dev->dev,
+>> -			     dev_name(&dev->dev));
+>> -	if (!hcd) {
+>> -		err = -ENOMEM;
+>> -		goto err_power;
+>> +			goto err_put_clks;
+>>  	}
+>>  
+>>  	hcd->rsrc_start = res_mem->start;
+>> @@ -126,22 +211,28 @@ static int ehci_platform_probe(struct platform_device *dev)
+>>  	hcd->regs = devm_ioremap_resource(&dev->dev, res_mem);
+>>  	if (IS_ERR(hcd->regs)) {
+>>  		err = PTR_ERR(hcd->regs);
+>> -		goto err_put_hcd;
+>> +		goto err_power;
+>>  	}
+>>  	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
+>>  	if (err)
+>> -		goto err_put_hcd;
+>> +		goto err_power;
+>>  
+>>  	device_wakeup_enable(hcd->self.controller);
+>>  	platform_set_drvdata(dev, hcd);
+>>  
+>>  	return err;
+>>  
+>> -err_put_hcd:
+>> -	usb_put_hcd(hcd);
+>>  err_power:
+>>  	if (pdata->power_off)
+>>  		pdata->power_off(dev);
+>> +err_put_clks:
+>> +	while (--clk >= 0)
+>> +		clk_put(priv->clks[clk]);
+>> +err_put_hcd:
+>> +	if (pdata == &ehci_platform_defaults)
+>> +		dev->dev.platform_data = NULL;
+>> +
+>> +	usb_put_hcd(hcd);
+>>  
+>>  	return err;
+>>  }
+>> @@ -150,13 +241,19 @@ static int ehci_platform_remove(struct platform_device *dev)
+>>  {
+>>  	struct usb_hcd *hcd = platform_get_drvdata(dev);
+>>  	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
+>> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+>> +	int clk;
+>>  
+>>  	usb_remove_hcd(hcd);
+>> -	usb_put_hcd(hcd);
+>>  
+>>  	if (pdata->power_off)
+>>  		pdata->power_off(dev);
+>>  
+>> +	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++)
+>> +		clk_put(priv->clks[clk]);
+>> +
+>> +	usb_put_hcd(hcd);
+>> +
+>>  	if (pdata == &ehci_platform_defaults)
+>>  		dev->dev.platform_data = NULL;
+>>  
+>> @@ -207,8 +304,10 @@ static int ehci_platform_resume(struct device *dev)
+>>  static const struct of_device_id vt8500_ehci_ids[] = {
+>>  	{ .compatible = "via,vt8500-ehci", },
+>>  	{ .compatible = "wm,prizm-ehci", },
+>> +	{ .compatible = "usb-ehci", },
+>>  	{}
+>>  };
+>> +MODULE_DEVICE_TABLE(of, vt8500_ehci_ids);
+>>  
+>>  static const struct platform_device_id ehci_platform_table[] = {
+>>  	{ "ehci-platform", 0 },
+>>
+> 
