@@ -1,697 +1,192 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 11 Feb 2014 09:21:45 +0100
-Subject: [RFC PATCH] arm64: add support for AES in CCM mode using Crypto
- Extensions
-Message-ID: <1392106905-28709-1-git-send-email-ard.biesheuvel@linaro.org>
+From: b20788@freescale.com (Anson Huang)
+Date: Tue, 11 Feb 2014 16:25:48 +0800
+Subject: [PATCH V2] ARM: imx: avoid calling clk APIs in idle thread which may
+ cause schedule
+Message-ID: <1392107148-27395-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for a synchronous implementation of AES in CCM mode
-using ARMv8 Crypto Extensions, using NEON registers q0 - q5.
+As clk_pllv3_wait_lock will call usleep_range, and the clk APIs
+mutex lock may be held when CPU entering idle, so calling clk
+APIs must be avoided in cpu idle thread, this is to avoid reschedule
+warning in cpu idle, just access register directly to achieve that.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+bad: scheduling from the idle thread!
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.14.0-rc1+ #657
+Backtrace:
+[<80012188>] (dump_backtrace) from [<8001246c>] (show_stack+0x18/0x1c)
+ r6:808c0038 r5:00000000 r4:808e5a1c r3:00000000
+[<80012454>] (show_stack) from [<8064b2ec>] (dump_stack+0x84/0x9c)
+[<8064b268>] (dump_stack) from [<80055ee0>] (dequeue_task_idle+0x20/0x30)
+ r5:808bef40 r4:bf7dff40
+[<80055ec0>] (dequeue_task_idle) from [<8004f028>] (dequeue_task+0x30/0x50)
+ r4:bf7dff40 r3:80055ec0
+[<8004eff8>] (dequeue_task) from [<800503c0>] (deactivate_task+0x30/0x34)
+ r4:bf7dff40
+[<80050390>] (deactivate_task) from [<8064d8e4>] (__schedule+0x2c8/0x5c0)
+[<8064d61c>] (__schedule) from [<8064dc14>] (schedule+0x38/0x88)
+ r10:80912964 r9:808c1e50 r8:808c0038 r7:808cbf30 r6:80e128ec r5:60000093
+ r4:80912968
+[<8064dbdc>] (schedule) from [<8064dfec>] (schedule_preempt_disabled+0x10/0x14)
+[<8064dfdc>] (schedule_preempt_disabled) from [<8064ebc0>] (mutex_lock_nested+0x1c0/0x3c0)
+[<8064ea00>] (mutex_lock_nested) from [<804ae71c>] (clk_prepare_lock+0x44/0xe4)
+ r10:806554cc r9:bf7df1bc r8:808cf4f8 r7:808cf544 r6:bf7df1b8 r5:808c0010
+ r4:80e69750
+[<804ae6d8>] (clk_prepare_lock) from [<804af214>] (clk_get_rate+0x14/0x64)
+ r6:bf7df1b8 r5:00000002 r4:bf017000 r3:80922ad0
+[<804af200>] (clk_get_rate) from [<80025d30>] (imx6sl_set_wait_clk+0x18/0x20)
+ r5:00000002 r4:00000001
+[<80025d18>] (imx6sl_set_wait_clk) from [<80023454>] (imx6sl_enter_wait+0x20/0x48)
+[<80023434>] (imx6sl_enter_wait) from [<80477c24>] (cpuidle_enter_state+0x44/0xfc)
+ r4:3c386e48 r3:80023434
+[<80477be0>] (cpuidle_enter_state) from [<80477dd8>] (cpuidle_idle_call+0xfc/0x160)
+ r8:808cf4f8 r7:00000001 r6:80e69534 r5:00000000 r4:bf7df1b8
+[<80477cdc>] (cpuidle_idle_call) from [<8000f61c>] (arch_cpu_idle+0x10/0x50)
+ r9:808c0000 r8:00000000 r7:80921a89 r6:808c8938 r5:808c899c r4:808c0000
+[<8000f60c>] (arch_cpu_idle) from [<8006fa94>] (cpu_startup_entry+0x108/0x160)
+[<8006f98c>] (cpu_startup_entry) from [<806452ac>] (rest_init+0xb4/0xdc)
+ r7:808afae0
+[<806451f8>] (rest_init) from [<8086fb58>] (start_kernel+0x328/0x38c)
+ r6:ffffffff r5:808c8880 r4:808c8a30
+[<8086f830>] (start_kernel) from [<80008074>] (0x80008074)
+
+Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
-Hi all,
+Changes since V1:
+	1. Move ccm_base and anatop_base initialization after WARN check;
+	2. Only enable PLL1 when ARM is sourcing clock from 396M PFD.
 
-I am posting this for review/RFC. The main topic for feedback is the way
-I have used an inner blkcipher instance to process the encrypted + authenticated
-data.
+ arch/arm/mach-imx/clk-imx6sl.c |   83 +++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 77 insertions(+), 6 deletions(-)
 
-The point of having a dedicated module for synchronous ccm(aes) is the fact that
-mac80211 uses it for WPA2 CCMP en-/decryption, where it runs entirely in soft
-IRQ context. In this case, the performance improvement offered by dedicated AES
-instructions is likely wasted on stacking and unstacking the NEON register file,
-as the generic CCM operates on a single AES block at a time.
-
-Instead, this implementation interleaves the CTR and CBC modes at the round
-level, eliminating 50% of both the input and round key loads and (hopefully)
-eliminating pipeline stalls by operating on two AES blocks at a time.
-
-Tested with tcrypt, no performance numbers yet.
-
--- 
-Ard.
-
-
- arch/arm64/Makefile                |   1 +
- arch/arm64/crypto/Makefile         |  12 ++
- arch/arm64/crypto/aesce-ccm-core.S | 222 +++++++++++++++++++++
- arch/arm64/crypto/aesce-ccm-glue.c | 387 +++++++++++++++++++++++++++++++++++++
- 4 files changed, 622 insertions(+)
- create mode 100644 arch/arm64/crypto/Makefile
- create mode 100644 arch/arm64/crypto/aesce-ccm-core.S
- create mode 100644 arch/arm64/crypto/aesce-ccm-glue.c
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index e0b75464b7f1..a4b3e253557d 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -46,6 +46,7 @@ core-y		+= arch/arm64/emu/
- core-y		+= arch/arm64/kernel/ arch/arm64/mm/
- core-$(CONFIG_KVM) += arch/arm64/kvm/
- core-$(CONFIG_XEN) += arch/arm64/xen/
-+core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
- libs-y		:= arch/arm64/lib/ $(libs-y)
- libs-y		+= $(LIBGCC)
+diff --git a/arch/arm/mach-imx/clk-imx6sl.c b/arch/arm/mach-imx/clk-imx6sl.c
+index b71570d..f7073c0 100644
+--- a/arch/arm/mach-imx/clk-imx6sl.c
++++ b/arch/arm/mach-imx/clk-imx6sl.c
+@@ -18,6 +18,22 @@
+ #include "clk.h"
+ #include "common.h"
  
-diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
-new file mode 100644
-index 000000000000..ba10ebb53e9e
---- /dev/null
-+++ b/arch/arm64/crypto/Makefile
-@@ -0,0 +1,12 @@
-+#
-+# linux/arch/arm64/crypto/Makefile
-+#
-+# Copyright (C) 2013 - 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
-+#
-+# This program is free software; you can redistribute it and/or modify
-+# it under the terms of the GNU General Public License version 2 as
-+# published by the Free Software Foundation.
-+#
++#define CCSR			0xc
++#define BM_CCSR_PLL1_SW_CLK_SEL	(1 << 2)
++#define CACRR			0x10
++#define CDHIPR			0x48
++#define BM_CDHIPR_ARM_PODF_BUSY	(1 << 16)
++#define ARM_WAIT_DIV_396M	2
++#define ARM_WAIT_DIV_792M	4
++#define ARM_WAIT_DIV_996M	6
 +
-+aesce-ccm-y	:= aesce-ccm-glue.o aesce-ccm-core.o
-+obj-m		+= aesce-ccm.o
-diff --git a/arch/arm64/crypto/aesce-ccm-core.S b/arch/arm64/crypto/aesce-ccm-core.S
-new file mode 100644
-index 000000000000..f808c17eac45
---- /dev/null
-+++ b/arch/arm64/crypto/aesce-ccm-core.S
-@@ -0,0 +1,222 @@
-+/*
-+ * linux/arch/arm64/crypto/aesce-ccm-core.S - AES-CCM transform for
-+ *                                            ARMv8 with Crypto Extensions
++#define PLL_ARM			0x0
++#define BM_PLL_ARM_DIV_SELECT	(0x7f << 0)
++#define BM_PLL_ARM_POWERDOWN	(1 << 12)
++#define BM_PLL_ARM_ENABLE	(1 << 13)
++#define BM_PLL_ARM_LOCK		(1 << 31)
++#define PLL_ARM_DIV_792M	66
++
+ static const char *step_sels[]		= { "osc", "pll2_pfd2", };
+ static const char *pll1_sw_sels[]	= { "pll1_sys", "step", };
+ static const char *ocram_alt_sels[]	= { "pll2_pfd2", "pll3_pfd1", };
+@@ -65,6 +81,8 @@ static struct clk_div_table video_div_table[] = {
+ 
+ static struct clk *clks[IMX6SL_CLK_END];
+ static struct clk_onecell_data clk_data;
++static void __iomem *ccm_base;
++static void __iomem *anatop_base;
+ 
+ static const u32 clks_init_on[] __initconst = {
+ 	IMX6SL_CLK_IPG, IMX6SL_CLK_ARM, IMX6SL_CLK_MMDC_ROOT,
+@@ -81,19 +99,70 @@ static const u32 clks_init_on[] __initconst = {
+  * entering WAIT mode.
+  *
+  * This function will set the ARM clk to max value within the 12:5 limit.
++ * As IPG clock is fixed@66MHz(so ARM freq must not exceed 158.4MHz),
++ * ARM freq are one of below setpoints: 396MHz, 792MHz and 996MHz, since
++ * the clk APIs can NOT be called in idle thread(may cause kernel schedule
++ * as there is sleep function in PLL wait function), so here we just slow
++ * down ARM to below freq according to previous freq:
 + *
-+ * Copyright (C) 2013 - 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+	.text
-+	.arch	armv8-a+crypto
-+
-+	/*
-+	 * void ce_aes_ccm_auth_data(u8 mac[], u8 const in[], u32 abytes,
-+	 *			     u32 *macp, u8 const rk[], u32 rounds);
-+	 */
-+ENTRY(ce_aes_ccm_auth_data)
-+	ldr	w8, [x3]			/* leftover from prev round? */
-+	ld1	{v0.2d}, [x0]			/* load mac */
-+	cbz	w8, 1f
-+	sub	w8, w8, #16
-+	eor	v1.16b, v1.16b, v1.16b
-+0:	ldrb	w7, [x1], #1			/* get 1 byte of input */
-+	subs	w2, w2, #1
-+	add	w8, w8, #1
-+	ins	v1.b[0], w7
-+	ext	v1.16b, v1.16b, v1.16b, #1	/* rotate in the input bytes */
-+	beq	8f				/* out of input? */
-+	cbnz	w8, 0b
-+	eor	v0.16b, v0.16b, v1.16b
-+1:	ld1	{v3.2d}, [x4]			/* load first round key */
-+	prfm	pldl1strm, [x1]
-+	cmp	w5, #12				/* which key size? */
-+	add	x6, x4, #16
-+	sub	w7, w5, #2			/* modified # of rounds */
-+	bmi	2f
-+	bne	5f
-+	mov	v5.16b, v3.16b
-+	b	4f
-+2:	mov	v4.16b, v3.16b
-+	ld1	{v5.2d}, [x6], #16		/* load 2nd round key */
-+3:	aese	v0.16b, v4.16b
-+	aesmc	v0.16b, v0.16b
-+4:	ld1	{v3.2d}, [x6], #16		/* load next round key */
-+	aese	v0.16b, v5.16b
-+	aesmc	v0.16b, v0.16b
-+5:	ld1	{v4.2d}, [x6], #16		/* load next round key */
-+	subs	w7, w7, #3
-+	aese	v0.16b, v3.16b
-+	aesmc	v0.16b, v0.16b
-+	ld1	{v5.2d}, [x6], #16		/* load next round key */
-+	bpl	3b
-+	aese	v0.16b, v4.16b
-+	subs	w2, w2, #16			/* last data? */
-+	eor	v0.16b, v0.16b, v5.16b		/* final round */
-+	bmi	6f
-+	ld1	{v1.16b}, [x1], #16		/* load next input block */
-+	eor	v0.16b, v0.16b, v1.16b		/* xor with mac */
-+	bne	1b
-+6:	st1	{v0.2d}, [x0]			/* store mac */
-+	beq	10f
-+	adds	w2, w2, #16
-+	beq	10f
-+	mov	w8, w2
-+7:	ldrb	w7, [x1], #1
-+	umov	w6, v0.b[0]
-+	eor	w6, w6, w7
-+	strb	w6, [x0], #1
-+	subs	w2, w2, #1
-+	beq	10f
-+	ext	v0.16b, v0.16b, v0.16b, #1	/* rotate out the mac bytes */
-+	b	7b
-+8:	mov	w7, w8
-+	add	w8, w8, #16
-+9:	ext	v1.16b, v1.16b, v1.16b, #1
-+	adds	w7, w7, #1
-+	bne	9b
-+	eor	v0.16b, v0.16b, v1.16b
-+	st1	{v0.2d}, [x0]
-+10:	str	w8, [x3]
-+	ret
-+ENDPROC(ce_aes_ccm_auth_data)
-+
-+	/*
-+	 * void ce_aes_ccm_final(u8 mac[], u8 const ctr[], u8 const rk[],
-+	 * 			 u32 rounds);
-+	 */
-+ENTRY(ce_aes_ccm_final)
-+	ld1	{v3.2d}, [x2], #16		/* load first round key */
-+	ld1	{v0.2d}, [x0]			/* load mac */
-+	cmp	w3, #12				/* which key size? */
-+	sub	w3, w3, #2			/* modified # of rounds */
-+	ld1	{v1.2d}, [x1]			/* load 1st ctriv */
-+	bmi	0f
-+	bne	3f
-+	mov	v5.16b, v3.16b
-+	b	2f
-+0:	mov	v4.16b, v3.16b
-+1:	ld1	{v5.2d}, [x2], #16		/* load next round key */
-+	aese	v0.16b, v4.16b
-+	aesmc	v0.16b, v0.16b
-+	aese	v1.16b, v4.16b
-+	aesmc	v1.16b, v1.16b
-+2:	ld1	{v3.2d}, [x2], #16		/* load next round key */
-+	aese	v0.16b, v5.16b
-+	aesmc	v0.16b, v0.16b
-+	aese	v1.16b, v5.16b
-+	aesmc	v1.16b, v1.16b
-+3:	ld1	{v4.2d}, [x2], #16		/* load next round key */
-+	subs	w3, w3, #3
-+	aese	v0.16b, v3.16b
-+	aesmc	v0.16b, v0.16b
-+	aese	v1.16b, v3.16b
-+	aesmc	v1.16b, v1.16b
-+	bpl	1b
-+	aese	v0.16b, v4.16b
-+	aese	v1.16b, v4.16b
-+	/* final round key cancels out */
-+	eor	v0.16b, v0.16b, v1.16b		/* en-/decrypt the mac */
-+	st1	{v0.2d}, [x0]			/* store result */
-+	ret
-+ENDPROC(ce_aes_ccm_final)
-+
-+	.macro	aes_ccm_do_crypt,enc
-+	ldr	x8, [x6, #8]			/* load lower ctr */
-+	ld1	{v0.2d}, [x5]			/* load mac */
-+	rev	x8, x8				/* keep swabbed ctr in reg */
-+0:	/* outer loop */
-+	ld1	{v1.1d}, [x6]			/* load upper ctr */
-+	prfm	pldl1strm, [x1]
-+	add	x8, x8, #1
-+	rev	x9, x8
-+	cmp	w4, #12				/* which key size? */
-+	sub	w7, w4, #2			/* get modified # of rounds */
-+	ins	v1.d[1], x9			/* no carry in lower ctr */
-+	ld1	{v3.2d}, [x3]			/* load first round key */
-+	add	x10, x3, #16
-+	bmi	1f
-+	bne	4f
-+	mov	v5.16b, v3.16b
-+	b	3f
-+1:	mov	v4.16b, v3.16b
-+	ld1	{v5.2d}, [x10], #16		/* load 2nd round key */
-+2:	/* inner loop: 3 rounds, 2x interleaved */
-+	aese	v0.16b, v4.16b
-+	aesmc	v0.16b, v0.16b
-+	aese	v1.16b, v4.16b
-+	aesmc	v1.16b, v1.16b
-+3:	ld1	{v3.2d}, [x10], #16		/* load next round key */
-+	aese	v0.16b, v5.16b
-+	aesmc	v0.16b, v0.16b
-+	aese	v1.16b, v5.16b
-+	aesmc	v1.16b, v1.16b
-+4:	ld1	{v4.2d}, [x10], #16		/* load next round key */
-+	subs	w7, w7, #3
-+	aese	v0.16b, v3.16b
-+	aesmc	v0.16b, v0.16b
-+	aese	v1.16b, v3.16b
-+	aesmc	v1.16b, v1.16b
-+	ld1	{v5.2d}, [x10], #16		/* load next round key */
-+	bpl	2b
-+	aese	v0.16b, v4.16b
-+	aese	v1.16b, v4.16b
-+	subs	w2, w2, #16
-+	bmi	5f
-+	ld1	{v2.16b}, [x1], #16		/* load next input block */
-+	.if	\enc == 1
-+	eor	v2.16b, v2.16b, v5.16b		/* final round enc+mac */
-+	eor	v1.16b, v1.16b, v2.16b		/* xor with crypted ctr */
-+	.else
-+	eor	v2.16b, v2.16b, v1.16b		/* xor with crypted ctr */
-+	eor	v1.16b, v2.16b, v5.16b		/* final round enc */
-+	.endif
-+	eor	v0.16b, v0.16b, v2.16b		/* xor mac with pt ^ rk[last] */
-+	st1	{v1.16b}, [x0], #16		/* write output block */
-+	bne	0b
-+5:	eor	v0.16b, v0.16b, v5.16b		/* final round mac */
-+	eor	v1.16b, v1.16b, v5.16b		/* final round enc */
-+	st1	{v0.2d}, [x5]			/* store mac */
-+	beq	7f
-+	add	w2, w2, #16			/* process partial tail block */
-+6:	ldrb	w9, [x1], #1			/* get 1 byte of input */
-+	umov	w6, v1.b[0]			/* get top crypted ctr byte */
-+	umov	w7, v0.b[0]			/* get top mac byte */
-+	.if	\enc == 1
-+	eor	w7, w7, w9
-+	eor	w9, w9, w6
-+	.else
-+	eor	w9, w9, w6
-+	eor	w7, w7, w9
-+	.endif
-+	strb	w9, [x0], #1			/* store out byte */
-+	strb	w7, [x5], #1			/* store mac byte */
-+	subs	w2, w2, #1
-+	beq	8f
-+	ext	v0.16b, v0.16b, v0.16b, #1	/* shift out mac byte */
-+	ext	v1.16b, v1.16b, v1.16b, #1	/* shift out ctr byte */
-+	b	6b
-+7:	rev	x8, x8
-+	str	x8, [x6, #8]			/* store lsb end of ctr (BE) */
-+8:	ret
-+	.endm
-+
-+	/*
-+	 * void ce_aes_ccm_encrypt(u8 out[], u8 const in[], u32 cbytes,
-+	 * 			   u8 const rk[], u32 rounds, u8 mac[],
-+	 * 			   u8 ctr[]);
-+	 * void ce_aes_ccm_decrypt(u8 out[], u8 const in[], u32 cbytes,
-+	 * 			   u8 const rk[], u32 rounds, u8 mac[],
-+	 * 			   u8 ctr[]);
-+	 */
-+ENTRY(ce_aes_ccm_encrypt)
-+	aes_ccm_do_crypt	1
-+ENDPROC(ce_aes_ccm_encrypt)
-+
-+ENTRY(ce_aes_ccm_decrypt)
-+	aes_ccm_do_crypt	0
-+ENDPROC(ce_aes_ccm_decrypt)
-diff --git a/arch/arm64/crypto/aesce-ccm-glue.c b/arch/arm64/crypto/aesce-ccm-glue.c
-new file mode 100644
-index 000000000000..153a40f43a6e
---- /dev/null
-+++ b/arch/arm64/crypto/aesce-ccm-glue.c
-@@ -0,0 +1,387 @@
-+/*
-+ * linux/arch/arm64/crypto/aes-ccm-glue.c
-+ *
-+ * Copyright (C) 2013 - 2014 Linaro Ltd <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <asm/neon.h>
-+#include <asm/unaligned.h>
-+#include <crypto/aes.h>
-+#include <crypto/algapi.h>
-+#include <crypto/scatterwalk.h>
-+#include <linux/crypto.h>
-+#include <linux/module.h>
-+
-+struct crypto_ccm_aes_ctx {
-+	struct crypto_aes_ctx	*key;
-+	struct crypto_blkcipher	*blk_tfm;
-+};
-+
-+static int num_rounds(struct crypto_aes_ctx *ctx)
++ * run mode      wait mode
++ * 396MHz   ->   132MHz;
++ * 792MHz   ->   158.4MHz;
++ * 996MHz   ->   142.3MHz;
+  */
++static int imx6sl_get_arm_divider_for_wait(void)
 +{
-+	/*
-+	 * # of rounds specified by AES:
-+	 * 128 bit key		10 rounds
-+	 * 192 bit key		12 rounds
-+	 * 256 bit key		14 rounds
-+	 * => n byte key	=> 6 + (n/4) rounds
-+	 */
-+	return 6 + ctx->key_length / 4;
-+}
-+
-+asmlinkage void ce_aes_ccm_auth_data(u8 mac[], u8 const in[], u32 abytes,
-+				     u32 *macp, u32 const rk[], u32 rounds);
-+
-+asmlinkage void ce_aes_ccm_encrypt(u8 out[], u8 const in[], u32 cbytes,
-+				   u32 const rk[], u32 rounds, u8 mac[],
-+				   u8 ctr[]);
-+
-+asmlinkage void ce_aes_ccm_decrypt(u8 out[], u8 const in[], u32 cbytes,
-+				   u32 const rk[], u32 rounds, u8 mac[],
-+				   u8 ctr[]);
-+
-+asmlinkage void ce_aes_ccm_final(u8 mac[], u8 const ctr[], u32 const rk[],
-+				 u32 rounds);
-+
-+static int ccm_setkey(struct crypto_aead *tfm, const u8 *in_key,
-+		      unsigned int key_len)
-+{
-+	struct crypto_ccm_aes_ctx *ctx = crypto_aead_ctx(tfm);
-+	int ret;
-+
-+	ret = crypto_aes_expand_key(ctx->key, in_key, key_len);
-+	if (!ret)
-+		return 0;
-+
-+	tfm->base.crt_flags |= CRYPTO_TFM_RES_BAD_KEY_LEN;
-+	return -EINVAL;
-+}
-+
-+static int ccm_setauthsize(struct crypto_aead *tfm, unsigned int authsize)
-+{
-+	if ((authsize & 1) || authsize < 4)
-+		return -EINVAL;
-+	return 0;
-+}
-+
-+static int ccm_init_mac(struct aead_request *req, u8 maciv[], u32 msglen)
-+{
-+	struct crypto_aead *aead = crypto_aead_reqtfm(req);
-+	__be32 *n = (__be32 *)&maciv[AES_BLOCK_SIZE - 8];
-+	u32 l = req->iv[0] + 1;
-+
-+	/* verify that CCM dimension 'L' is set correctly in the IV */
-+	if (l < 2 || l > 8)
-+		return -EINVAL;
-+
-+	/* verify that msglen can in fact be represented in L bytes */
-+	if (msglen >> (8 * l))
-+		return -EOVERFLOW;
-+
-+	/*
-+	 * Even if the CCM spec allows L values of up to 8, the Linux cryptoapi
-+	 * uses a u32 type to represent msglen so the top 4 bytes are always 0.
-+	 */
-+	n[0] = 0;
-+	n[1] = cpu_to_be32(msglen);
-+
-+	memcpy(maciv, req->iv, AES_BLOCK_SIZE - l);
-+
-+	/*
-+	 * Meaning of byte 0 according to CCM spec (RFC 3610/NIST 800-38C)
-+	 * - bits 0..2	: max # of bytes required to represent msglen, minus 1
-+	 *                (already set by caller)
-+	 * - bits 3..5	: size of auth tag (1 => 4 bytes, 2 => 6 bytes, etc)
-+	 * - bit 6	: indicates presence of authenticate-only data
-+	 */
-+	maciv[0] |= (crypto_aead_authsize(aead) - 2) << 2;
-+	if (req->assoclen)
-+		maciv[0] |= 0x40;
-+
-+	memset(&req->iv[AES_BLOCK_SIZE - l], 0, l);
-+	return 0;
-+}
-+
-+static void ccm_calculate_auth_mac(struct aead_request *req, u8 mac[])
-+{
-+	struct crypto_aead *aead = crypto_aead_reqtfm(req);
-+	struct crypto_ccm_aes_ctx *ctx = crypto_aead_ctx(aead);
-+	struct __packed { __be16 l; __be32 h; u16 len; } ltag;
-+	struct scatter_walk walk;
-+	u32 len = req->assoclen;
-+	u32 macp = 0;
-+
-+	/* prepend the AAD with a length tag */
-+	if (len < 0xff00) {
-+		ltag.l = cpu_to_be16(len);
-+		ltag.len = 2;
-+	} else  {
-+		ltag.l = cpu_to_be16(0xfffe);
-+		put_unaligned_be32(len, &ltag.h);
-+		ltag.len = 6;
++	if (readl_relaxed(ccm_base + CCSR) & BM_CCSR_PLL1_SW_CLK_SEL) {
++		return ARM_WAIT_DIV_396M;
++	} else {
++		if ((readl_relaxed(anatop_base + PLL_ARM) &
++			BM_PLL_ARM_DIV_SELECT) == PLL_ARM_DIV_792M)
++			return ARM_WAIT_DIV_792M;
++		else
++			return ARM_WAIT_DIV_996M;
 +	}
-+
-+	ce_aes_ccm_auth_data(mac, (u8 *)&ltag, ltag.len, &macp,
-+			     ctx->key->key_enc, num_rounds(ctx->key));
-+	scatterwalk_start(&walk, req->assoc);
-+
-+	do {
-+		u32 n = scatterwalk_clamp(&walk, len);
-+		u8 *p;
-+
-+		if (!n) {
-+			scatterwalk_start(&walk, sg_next(walk.sg));
-+			n = scatterwalk_clamp(&walk, len);
-+		}
-+		p = scatterwalk_map(&walk);
-+		ce_aes_ccm_auth_data(mac, p, n, &macp,
-+				     ctx->key->key_enc, num_rounds(ctx->key));
-+		len -= n;
-+
-+		scatterwalk_unmap(p);
-+		scatterwalk_advance(&walk, n);
-+		scatterwalk_done(&walk, 0, len);
-+	} while (len);
 +}
 +
-+struct ccm_inner_desc_info {
-+	u8	ctriv[AES_BLOCK_SIZE];
-+	u8	mac[AES_BLOCK_SIZE];
-+} __aligned(8);
-+
-+static int ccm_inner_encrypt(struct blkcipher_desc *desc,
-+			     struct scatterlist *dst, struct scatterlist *src,
-+			     unsigned int nbytes)
++static void imx6sl_enable_pll_arm(bool enable)
 +{
-+	struct crypto_aes_ctx *ctx = crypto_blkcipher_ctx(desc->tfm);
-+	struct ccm_inner_desc_info *descinfo = desc->info;
-+	struct blkcipher_walk walk;
-+	int err;
++	static u32 saved_pll_arm;
++	u32 val;
 +
-+	blkcipher_walk_init(&walk, dst, src, nbytes);
-+	err = blkcipher_walk_virt_block(desc, &walk, AES_BLOCK_SIZE);
-+
-+	while (walk.nbytes) {
-+		u32 tail = walk.nbytes % AES_BLOCK_SIZE;
-+
-+		if (walk.nbytes == nbytes)
-+			tail = 0;
-+
-+		ce_aes_ccm_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
-+				   walk.nbytes - tail, ctx->key_enc,
-+				   num_rounds(ctx), descinfo->mac,
-+				   descinfo->ctriv);
-+
-+		nbytes -= walk.nbytes - tail;
-+		err = blkcipher_walk_done(desc, &walk, tail);
++	if (enable) {
++		saved_pll_arm = val = readl_relaxed(anatop_base + PLL_ARM);
++		val |= BM_PLL_ARM_ENABLE;
++		val &= ~BM_PLL_ARM_POWERDOWN;
++		writel_relaxed(val, anatop_base + PLL_ARM);
++		while (!(__raw_readl(anatop_base + PLL_ARM) & BM_PLL_ARM_LOCK))
++			;
++	} else {
++		 writel_relaxed(saved_pll_arm, anatop_base + PLL_ARM);
 +	}
-+	return err;
 +}
 +
-+static int ccm_inner_decrypt(struct blkcipher_desc *desc,
-+			     struct scatterlist *dst, struct scatterlist *src,
-+			     unsigned int nbytes)
-+{
-+	struct crypto_aes_ctx *ctx = crypto_blkcipher_ctx(desc->tfm);
-+	struct ccm_inner_desc_info *descinfo = desc->info;
-+	struct blkcipher_walk walk;
-+	int err;
+ void imx6sl_set_wait_clk(bool enter)
+ {
+-	static unsigned long saved_arm_rate;
++	static unsigned long saved_arm_div;
++	int arm_div_for_wait = imx6sl_get_arm_divider_for_wait();
 +
-+	blkcipher_walk_init(&walk, dst, src, nbytes);
-+	err = blkcipher_walk_virt_block(desc, &walk, AES_BLOCK_SIZE);
++	/*
++	 * According to hardware design, arm podf change need
++	 * PLL1 clock enabled.
++	 */
++	if (arm_div_for_wait == ARM_WAIT_DIV_396M)
++		imx6sl_enable_pll_arm(true);
+ 
+ 	if (enter) {
+-		unsigned long ipg_rate = clk_get_rate(clks[IMX6SL_CLK_IPG]);
+-		unsigned long max_arm_wait_rate = (12 * ipg_rate) / 5;
+-		saved_arm_rate = clk_get_rate(clks[IMX6SL_CLK_ARM]);
+-		clk_set_rate(clks[IMX6SL_CLK_ARM], max_arm_wait_rate);
++		saved_arm_div = readl_relaxed(ccm_base + CACRR);
++		writel_relaxed(arm_div_for_wait, ccm_base + CACRR);
+ 	} else {
+-		clk_set_rate(clks[IMX6SL_CLK_ARM], saved_arm_rate);
++		writel_relaxed(saved_arm_div, ccm_base + CACRR);
+ 	}
++	while (__raw_readl(ccm_base + CDHIPR) & BM_CDHIPR_ARM_PODF_BUSY)
++		;
 +
-+	while (walk.nbytes) {
-+		u32 tail = walk.nbytes % AES_BLOCK_SIZE;
-+
-+		if (walk.nbytes == nbytes)
-+			tail = 0;
-+
-+		ce_aes_ccm_decrypt(walk.dst.virt.addr, walk.src.virt.addr,
-+				   walk.nbytes - tail, ctx->key_enc,
-+				   num_rounds(ctx), descinfo->mac,
-+				   descinfo->ctriv);
-+
-+		nbytes -= walk.nbytes - tail;
-+		err = blkcipher_walk_done(desc, &walk, tail);
-+	}
-+	return err;
-+}
-+
-+static int ccm_encrypt(struct aead_request *req)
-+{
-+	struct crypto_aead *aead = crypto_aead_reqtfm(req);
-+	struct crypto_ccm_aes_ctx *ctx = crypto_aead_ctx(aead);
-+	struct crypto_blkcipher *blk_tfm = ctx->blk_tfm;
-+	struct ccm_inner_desc_info descinfo;
-+	int err;
-+
-+	struct blkcipher_desc desc = {
-+		.tfm	= blk_tfm,
-+		.info	= &descinfo,
-+		.flags = 0,
-+	};
-+
-+	err = ccm_init_mac(req, descinfo.mac, req->cryptlen);
-+	if (err)
-+		return err;
-+
-+	kernel_neon_begin_partial(6);
-+
-+	if (req->assoclen)
-+		ccm_calculate_auth_mac(req, descinfo.mac);
-+
-+	memcpy(descinfo.ctriv, req->iv, AES_BLOCK_SIZE);
-+
-+	/* call inner blkcipher to process the payload */
-+	err = crypto_blkcipher_crt(blk_tfm)->encrypt(&desc, req->dst, req->src,
-+						     req->cryptlen);
-+	if (!err)
-+		ce_aes_ccm_final(descinfo.mac, req->iv, ctx->key->key_enc,
-+				 num_rounds(ctx->key));
-+
-+	kernel_neon_end();
-+
-+	if (err)
-+		return err;
-+
-+	/* copy authtag to end of dst */
-+	scatterwalk_map_and_copy(descinfo.mac, req->dst, req->cryptlen,
-+				 crypto_aead_authsize(aead), 1);
-+
-+	return 0;
-+}
-+
-+static int ccm_decrypt(struct aead_request *req)
-+{
-+	struct crypto_aead *aead = crypto_aead_reqtfm(req);
-+	struct crypto_ccm_aes_ctx *ctx = crypto_aead_ctx(aead);
-+	struct crypto_blkcipher *blk_tfm = ctx->blk_tfm;
-+	struct ccm_inner_desc_info descinfo;
-+	u8 atag[AES_BLOCK_SIZE];
-+	u32 len;
-+	int err;
-+
-+	struct blkcipher_desc desc = {
-+		.tfm	= blk_tfm,
-+		.info	= &descinfo,
-+		.flags = 0,
-+	};
-+
-+	len = req->cryptlen - crypto_aead_authsize(aead);
-+	err = ccm_init_mac(req, descinfo.mac, len);
-+	if (err)
-+		return err;
-+
-+	if (req->assoclen)
-+		ccm_calculate_auth_mac(req, descinfo.mac);
-+
-+	memcpy(descinfo.ctriv, req->iv, AES_BLOCK_SIZE);
-+
-+	kernel_neon_begin_partial(6);
-+
-+	/* call inner blkcipher to process the payload */
-+	err = crypto_blkcipher_crt(blk_tfm)->decrypt(&desc, req->dst, req->src,
-+						     len);
-+	if (!err)
-+		ce_aes_ccm_final(descinfo.mac, req->iv, ctx->key->key_enc,
-+				 num_rounds(ctx->key));
-+
-+	kernel_neon_end();
-+
-+	if (err)
-+		return err;
-+
-+	/* compare calculated auth tag with the stored one */
-+	scatterwalk_map_and_copy(atag, req->src, len,
-+				 crypto_aead_authsize(aead), 0);
-+
-+	if (memcmp(descinfo.mac, atag, crypto_aead_authsize(aead)))
-+		return -EBADMSG;
-+	return 0;
-+}
-+
-+static int ccm_init(struct crypto_tfm *tfm)
-+{
-+	struct crypto_ccm_aes_ctx *ctx = crypto_tfm_ctx(tfm);
-+	struct crypto_blkcipher *blk_tfm;
-+
-+	blk_tfm = crypto_alloc_blkcipher("__driver-ccm-aesce-inner", 0, 0);
-+	if (IS_ERR(blk_tfm))
-+		return PTR_ERR(blk_tfm);
-+
-+	ctx->blk_tfm = blk_tfm;
-+	ctx->key = crypto_blkcipher_ctx(blk_tfm);
-+
-+	return 0;
-+}
-+
-+static void ccm_exit(struct crypto_tfm *tfm)
-+{
-+	struct crypto_ccm_aes_ctx *ctx = crypto_tfm_ctx(tfm);
-+
-+	crypto_free_blkcipher(ctx->blk_tfm);
-+}
-+
-+static struct crypto_alg aes_algs[] = { {
-+	.cra_name		= "__ccm-aesce-inner",
-+	.cra_driver_name	= "__driver-ccm-aesce-inner",
-+	.cra_priority		= 0,
-+	.cra_flags		= CRYPTO_ALG_TYPE_BLKCIPHER,
-+	.cra_blocksize		= 1,
-+	.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
-+	.cra_alignmask		= 7,
-+	.cra_type		= &crypto_blkcipher_type,
-+	.cra_module		= THIS_MODULE,
-+	.cra_blkcipher = {
-+		.min_keysize	= AES_MIN_KEY_SIZE,
-+		.max_keysize	= AES_MAX_KEY_SIZE,
-+		.ivsize		= sizeof(struct ccm_inner_desc_info),
-+		.setkey		= crypto_aes_set_key,
-+		.encrypt	= ccm_inner_encrypt,
-+		.decrypt	= ccm_inner_decrypt,
-+	},
-+}, {
-+	.cra_name		= "ccm(aes)",
-+	.cra_driver_name	= "ccm-aes-ce",
-+	.cra_priority		= 300,
-+	.cra_flags		= CRYPTO_ALG_TYPE_AEAD,
-+	.cra_blocksize		= 1,
-+	.cra_ctxsize		= sizeof(struct crypto_ccm_aes_ctx),
-+	.cra_alignmask		= 7,
-+	.cra_type		= &crypto_aead_type,
-+	.cra_module		= THIS_MODULE,
-+	.cra_init		= ccm_init,
-+	.cra_exit		= ccm_exit,
-+	.cra_aead = {
-+		.ivsize		= AES_BLOCK_SIZE,
-+		.maxauthsize	= AES_BLOCK_SIZE,
-+		.setkey		= ccm_setkey,
-+		.setauthsize	= ccm_setauthsize,
-+		.encrypt	= ccm_encrypt,
-+		.decrypt	= ccm_decrypt,
-+	}
-+} };
-+
-+static int __init aes_mod_init(void)
-+{
-+	if (!(elf_hwcap & HWCAP_AES))
-+		return -ENODEV;
-+	return crypto_register_algs(aes_algs, ARRAY_SIZE(aes_algs));
-+}
-+
-+static void __exit aes_mod_exit(void)
-+{
-+	crypto_unregister_algs(aes_algs, ARRAY_SIZE(aes_algs));
-+}
-+
-+module_init(aes_mod_init);
-+module_exit(aes_mod_exit);
-+
-+MODULE_DESCRIPTION("Synchronous AES in CCM mode using ARMv8 Crypto Extensions");
-+MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("ccm(aes)");
++	if (arm_div_for_wait == ARM_WAIT_DIV_396M)
++		imx6sl_enable_pll_arm(false);
+ }
+ 
+ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+@@ -111,6 +180,7 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sl-anatop");
+ 	base = of_iomap(np, 0);
+ 	WARN_ON(!base);
++	anatop_base = base;
+ 
+ 	/*                                             type               name            parent  base         div_mask */
+ 	clks[IMX6SL_CLK_PLL1_SYS]      = imx_clk_pllv3(IMX_PLLV3_SYS,	  "pll1_sys",	   "osc", base,        0x7f);
+@@ -158,6 +228,7 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 	np = ccm_node;
+ 	base = of_iomap(np, 0);
+ 	WARN_ON(!base);
++	ccm_base = base;
+ 
+ 	/* Reuse imx6q pm code */
+ 	imx6q_pm_set_ccm_base(base);
 -- 
-1.8.3.2
+1.7.9.5
