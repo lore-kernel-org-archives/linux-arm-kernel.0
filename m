@@ -1,25 +1,95 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 11 Feb 2014 10:52:24 +0000
-Subject: [PATCH RESEND] arm: add DSB after icache flush in
- __flush_icache_all()
-In-Reply-To: <1392109811-8525-1-git-send-email-vkale@apm.com>
-References: <1392109811-8525-1-git-send-email-vkale@apm.com>
-Message-ID: <20140211105224.GC3748@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 11 Feb 2014 11:52:42 +0100
+Subject: [PATCH v2 4/5] ARM: init: add support for reserved memory defined
+ by device tree
+In-Reply-To: <20140210215929.4473BC408F7@trevor.secretlab.ca>
+References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com>
+ <1391515773-6112-5-git-send-email-m.szyprowski@samsung.com>
+ <20140205101510.59A95C40A89@trevor.secretlab.ca>
+ <52F38D75.4030704@samsung.com>
+ <20140210215929.4473BC408F7@trevor.secretlab.ca>
+Message-ID: <52FA00FA.1090400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 09:10:11AM +0000, Vinayak Kale wrote:
-> Add DSB after icache flush to complete the cache maintenance operation.
-> 
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-I guess what you need to do is add:
+On 2014-02-10 22:59, Grant Likely wrote:
+> On Thu, 06 Feb 2014 14:26:13 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > Hello,
+> >
+> > On 2014-02-05 11:15, Grant Likely wrote:
+> > > On Tue, 04 Feb 2014 13:09:32 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > > > Enable reserved memory initialization from device tree.
+> > > >
+> > > > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> > > > Cc: Laura Abbott <lauraa@codeaurora.org>
+> > > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > > ---
+> > > >  arch/arm/mm/init.c |    3 +++
+> > > >  1 file changed, 3 insertions(+)
+> > > >
+> > > > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> > > > index 804d61566a53..ebafdb479410 100644
+> > > > --- a/arch/arm/mm/init.c
+> > > > +++ b/arch/arm/mm/init.c
+> > > > @@ -17,6 +17,7 @@
+> > > >  #include <linux/nodemask.h>
+> > > >  #include <linux/initrd.h>
+> > > >  #include <linux/of_fdt.h>
+> > > > +#include <linux/of_reserved_mem.h>
+> > > >  #include <linux/highmem.h>
+> > > >  #include <linux/gfp.h>
+> > > >  #include <linux/memblock.h>
+> > > > @@ -323,6 +324,8 @@ void __init arm_memblock_init(struct meminfo *mi,
+> > > >  	if (mdesc->reserve)
+> > > >  		mdesc->reserve();
+> > > >
+> > > > +	early_init_dt_scan_reserved_mem();
+> > > > +
+> > >
+> > > The new binding is being made fundamental. If the reserved-memory node
+> > > is present, then it needs to be honored, even if the kernel doesn't know
+> > > how to use the regions. Therefore, This needs to be unconditional for
+> > > all architectures. The hook should be called in early_init_dt_scan()
+> > > (drivers/of/fdt.c) immediately after the early_init_dt_scan_memory()
+> > > hook.
+> >
+> > In theory this will be the best solution, but it practice there is a
+> > problem. early_init_dt_scan() is called as the first function from kernel
+> > booting code. That time there is no memory yet added to the system, so it
+> > would be really hard to reserve anything. Memory nodes are being added
+> > later either with memblock_add() or by some other arch specific way.
+>
+> Hmmm, depends on the architecture. On ARM the memory is loaded into the
+> meminfo structure first, and it isn't until arm_memblock_init() that
+> memblock_add() gets called on all the regions. Some architectures do the
+> memblock_add() directly from early_init_dt_add_memory_arch() function.
+>
+> The default early_init_dt_add_memory_arch() in drivers/of/fdt.c is
+> overridden by ARM and a number of other architectures. However...
+>
+> > Finally, once all memory has been added to the system we can parse and
+> > reserve all regions defined in the device tree. This really requires
+> > creating another function which will be called by arch specific code.
+>
+> ...Or it means getting rid of meminfo entirely so that memblock is
+> available earlier. Laura Abbott has just posted v2 of her series to do
+> exactly that. If you base on that then you should be able to do exactly
+> what I suggested.
 
-Cc: <stable@vger.kernel.org>
+I've checked Laura's patches and in fact it is possible to do memory
+reservation as a last step in early_init_dt_scan_memory(). However still
+see some problem which I have no idea how to resolve. Right now I focus
+only on ARM, so I have no idea how it is solved by other architectures.
+On of the key features of the new binding is the ability to automatically
+allocate reserved regions of the given size. However kernel, initrd, dt
+and other sub-arch specific critical regions are marked/allocated in
+arm_memblock_init(), which is called after setup_machine_fdt(). This
+might lead to some serious failures when automatically reserved region
+overlaps with some critical resources. Do you have any idea how to solve
+this without a new callback?
 
-and send the patch to Russell's patch system (and add any other acks you
-may get in the meantime).
-
+Best regards
 -- 
-Catalin
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
