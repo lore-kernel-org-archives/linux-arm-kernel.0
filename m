@@ -1,470 +1,94 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 11 Feb 2014 12:00:38 +0200
-Subject: [PATCH v9 2/4] ehci-platform: Add support for clks and phy passed
- through devicetree
-In-Reply-To: <52F9EE06.3070003@redhat.com>
-References: <1391787403-20961-1-git-send-email-hdegoede@redhat.com>
- <1391787403-20961-3-git-send-email-hdegoede@redhat.com>
- <52F9E98B.90407@ti.com> <52F9EE06.3070003@redhat.com>
-Message-ID: <52F9F4C6.6080201@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Feb 2014 09:29:37 +0000
+Subject: [PATCH v3 7/7] devicetree: bindings: Document PM8921/8058 PMICs
+In-Reply-To: <1389206270-3728-8-git-send-email-sboyd@codeaurora.org>
+References: <1389206270-3728-1-git-send-email-sboyd@codeaurora.org>
+ <1389206270-3728-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140211092937.GG32042@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2014 11:31 AM, Hans de Goede wrote:
-> Hi,
+> PM8921 and PM8058 are PMICs found paired with MSM8960 and MSM8660
+> devices respectively. They contain subdevices such as keypads,
+> RTCs, regulators, clocks, etc.
 > 
-> On 02/11/2014 10:12 AM, Roger Quadros wrote:
->> Hi Hans,
->>
->> On 02/07/2014 05:36 PM, Hans de Goede wrote:
->>> Currently ehci-platform is only used in combination with devicetree when used
->>> with some Via socs. By extending it to (optionally) get clks and a phy from
->>> devicetree, and enabling / disabling those on power_on / off, it can be used
->>> more generically. Specifically after this commit it can be used for the
->>> ehci controller on Allwinner sunxi SoCs.
->>>
->>> Since ehci-platform is intended to handle any generic enough non pci ehci
->>> device, add a "usb-ehci" compatibility string.
->>>
->>> There already is a usb-ehci device-tree bindings document, update this
->>> with clks and phy bindings info.
->>>
->>> Although actually quite generic so far the via,vt8500 compatibilty string
->>> had its own bindings document. Somehow we even ended up with 2 of them. Since
->>> these provide no extra information over the generic usb-ehci documentation,
->>> this patch removes them.
->>>
->>> The ehci-ppc-of.c driver also claims the usb-ehci compatibility string,
->>> even though it mostly is ibm,usb-ehci-440epx specific. ehci-platform.c is
->>> not needed on ppc platforms, so add a !PPC_OF dependency to it to avoid
->>> 2 drivers claiming the same compatibility string getting build on ppc.
->>>
->>
->> This breaks all OMAP platforms on linux-next for the exact same reason. see [1].
->>
->> ./arch/arm/boot/dts/omap4.dtsi:				compatible = "ti,ehci-omap", "usb-ehci";
->> ./arch/arm/boot/dts/omap3.dtsi:				compatible = "ti,ehci-omap", "usb-ehci";
->> ./arch/arm/boot/dts/omap5.dtsi:				compatible = "ti,ehci-omap", "usb-ehci";
+> Cc: <devicetree@vger.kernel.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  .../devicetree/bindings/mfd/qcom,pm8xxx.txt        | 63 ++++++++++++++++++++++
+>  1 file changed, 63 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
 > 
-> That should not be the case, the driver core should try to find a driver matching
-> the compatibility string from left to right, or in other words from most specific
-> to least specific. This is part of the whole devicetree design.
-> 
-> So as long as the driver claiming "ti,ehci-omap" is available at probe time that
-> one should get used and things should work fine. Now if ehci-platform is built-in
-> and ehci-omap is a module, then I guess one could see the described breakage.
-> 
-> If the driver is built-in and things are not working, then we will need to do some
-> debugging as to why the left to right matching is not working as expected.
+> diff --git a/Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt b/Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
+> new file mode 100644
+> index 000000000000..e3fe625ffd58
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
+> @@ -0,0 +1,63 @@
 
-Both ehci_platform and ehci_omap were built-in and still the ehci_platform driver got
-probe preference. So it looks like the left to right compatible list priority probing
-feature doesn't work.
+<snip>
 
-> 
-> I must admit I'm not sure what happens if both are a module, the kernel direct
-> module load will likely fail due to lack of a rootfs at that point, and then
-> the module will later get loaded by udev I assume, at which point there are no
-> loading ordering guarantees.
-> 
-> The easiest solution to ensure that "ti,ehci-omap" is available at probe time
-> (if enabled) seems to be to change USB_EHCI_HCD_OMAP to a boolean.
+> +- interrupts:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
 
-That is a limitation I don't like to have for USB_EHCI_HCD_OMAP.
+Either provide an example or a comment to see the description of
+#interrupt-cells 
 
-cheers,
--roger
+> +	Definition: specifies the interrupt that indicates a subdevice
+> +		    has generated an interrupt (summary interrupt). The
+> +		    format of the specifier is defined by the binding document
+> +		    describing the node's interrupt parent.
+> +
+> +- #interrupt-cells:
+> +	Usage: required
+> +	Value type : <u32>
+> +	Definition: must be 2. Specifies the number of cells needed to encode
+> +		    an interrupt source. The 1st cell contains the interrupt
+> +		    number. The 2nd cell is the trigger type and level flags
+> +		    encoded as follows:
+> +
+> +			1 = low-to-high edge triggered
+> +			2 = high-to-low edge triggered
+> +			4 = active high level-sensitive
+> +			8 = active low level-sensitive
 
-> 
-> 
->>
->>
->> The other platforms that claim compatibility with "usb-ehci" are
->>
->> ARM
->> ./arch/arm/boot/dts/tegra30.dtsi:		compatible = "nvidia,tegra30-ehci", "usb-ehci";
->> ./arch/arm/boot/dts/tegra20.dtsi:		compatible = "nvidia,tegra20-ehci", "usb-ehci";
->> ./arch/arm/boot/dts/spear600.dtsi:			compatible = "st,spear600-ehci", "usb-ehci";
->>
->> ./arch/arm/boot/dts/spear3xx.dtsi:			compatible = "st,spear600-ehci", "usb-ehci";
->> ./arch/arm/boot/dts/sama5d3.dtsi:			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
->> ./arch/arm/boot/dts/at91sam9g45.dtsi:			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
->> ./arch/arm/boot/dts/spear13xx.dtsi:			compatible = "st,spear600-ehci", "usb-ehci";
->> ./arch/arm/boot/dts/at91sam9x5.dtsi:			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
->> ./arch/arm/boot/dts/tegra114.dtsi:		compatible = "nvidia,tegra30-ehci", "usb-ehci";
->>
->>
->> MIPS
->> ./arch/mips/cavium-octeon/octeon_68xx.dts:				compatible = "cavium,octeon-6335-ehci","usb-ehci";
->> ./arch/mips/cavium-octeon/octeon_3xxx.dts:				compatible = "cavium,octeon-6335-ehci","usb-ehci";
->>
->> Do we know that we don't break these platforms as well?
->>
->> cheers,
->> -roger
->>
->> [1] - http://marc.info/?l=linux-usb&m=139204800102167&w=2
->>
->>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>> Acked-by: Alan Stern <stern@rowland.harvard.edu>
->>> ---
->>>  Documentation/devicetree/bindings/usb/usb-ehci.txt |  25 +++-
->>>  .../devicetree/bindings/usb/via,vt8500-ehci.txt    |  15 ---
->>>  .../devicetree/bindings/usb/vt8500-ehci.txt        |  12 --
->>>  drivers/usb/host/Kconfig                           |   1 +
->>>  drivers/usb/host/ehci-platform.c                   | 147 +++++++++++++++++----
->>>  5 files changed, 142 insertions(+), 58 deletions(-)
->>>  delete mode 100644 Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
->>>  delete mode 100644 Documentation/devicetree/bindings/usb/vt8500-ehci.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/usb/usb-ehci.txt b/Documentation/devicetree/bindings/usb/usb-ehci.txt
->>> index fa18612..2c1aeeb 100644
->>> --- a/Documentation/devicetree/bindings/usb/usb-ehci.txt
->>> +++ b/Documentation/devicetree/bindings/usb/usb-ehci.txt
->>> @@ -7,13 +7,14 @@ Required properties:
->>>      (debug-port or other) can be also specified here, but only after
->>>      definition of standard EHCI registers.
->>>    - interrupts : one EHCI interrupt should be described here.
->>> -If device registers are implemented in big endian mode, the device
->>> -node should have "big-endian-regs" property.
->>> -If controller implementation operates with big endian descriptors,
->>> -"big-endian-desc" property should be specified.
->>> -If both big endian registers and descriptors are used by the controller
->>> -implementation, "big-endian" property can be specified instead of having
->>> -both "big-endian-regs" and "big-endian-desc".
->>> +
->>> +Optional properties:
->>> + - big-endian-regs : boolean, set this for hcds with big-endian registers
->>> + - big-endian-desc : boolean, set this for hcds with big-endian descriptors
->>> + - big-endian : boolean, for hcds with big-endian-regs + big-endian-desc
->>> + - clocks : a list of phandle + clock specifier pairs
->>> + - phys : phandle + phy specifier pair
->>> + - phy-names : "usb"
->>>  
->>>  Example (Sequoia 440EPx):
->>>      ehci at e0000300 {
->>> @@ -23,3 +24,13 @@ Example (Sequoia 440EPx):
->>>  	   reg = <0 e0000300 90 0 e0000390 70>;
->>>  	   big-endian;
->>>     };
->>> +
->>> +Example (Allwinner sun4i A10 SoC):
->>> +   ehci0: usb at 01c14000 {
->>> +	   compatible = "allwinner,sun4i-a10-ehci", "usb-ehci";
->>> +	   reg = <0x01c14000 0x100>;
->>> +	   interrupts = <39>;
->>> +	   clocks = <&ahb_gates 1>;
->>> +	   phys = <&usbphy 1>;
->>> +	   phy-names = "usb";
->>> +   };
->>> diff --git a/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt b/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
->>> deleted file mode 100644
->>> index 17b3ad1..0000000
->>> --- a/Documentation/devicetree/bindings/usb/via,vt8500-ehci.txt
->>> +++ /dev/null
->>> @@ -1,15 +0,0 @@
->>> -VIA/Wondermedia VT8500 EHCI Controller
->>> ------------------------------------------------------
->>> -
->>> -Required properties:
->>> -- compatible : "via,vt8500-ehci"
->>> -- reg : Should contain 1 register ranges(address and length)
->>> -- interrupts : ehci controller interrupt
->>> -
->>> -Example:
->>> -
->>> -	ehci at d8007900 {
->>> -		compatible = "via,vt8500-ehci";
->>> -		reg = <0xd8007900 0x200>;
->>> -		interrupts = <43>;
->>> -	};
->>> diff --git a/Documentation/devicetree/bindings/usb/vt8500-ehci.txt b/Documentation/devicetree/bindings/usb/vt8500-ehci.txt
->>> deleted file mode 100644
->>> index 5fb8fd6..0000000
->>> --- a/Documentation/devicetree/bindings/usb/vt8500-ehci.txt
->>> +++ /dev/null
->>> @@ -1,12 +0,0 @@
->>> -VIA VT8500 and Wondermedia WM8xxx SoC USB controllers.
->>> -
->>> -Required properties:
->>> - - compatible: Should be "via,vt8500-ehci" or "wm,prizm-ehci".
->>> - - reg: Address range of the ehci registers. size should be 0x200
->>> - - interrupts: Should contain the ehci interrupt.
->>> -
->>> -usb: ehci at D8007100 {
->>> -	compatible = "wm,prizm-ehci", "usb-ehci";
->>> -	reg = <0xD8007100 0x200>;
->>> -	interrupts = <1>;
->>> -};
->>> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
->>> index a9707da..e28cbe0 100644
->>> --- a/drivers/usb/host/Kconfig
->>> +++ b/drivers/usb/host/Kconfig
->>> @@ -255,6 +255,7 @@ config USB_EHCI_ATH79
->>>  
->>>  config USB_EHCI_HCD_PLATFORM
->>>  	tristate "Generic EHCI driver for a platform device"
->>> +	depends on !PPC_OF
->>>  	default n
->>>  	---help---
->>>  	  Adds an EHCI host driver for a generic platform device, which
->>> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
->>> index 01536cf..5ebd0b7 100644
->>> --- a/drivers/usb/host/ehci-platform.c
->>> +++ b/drivers/usb/host/ehci-platform.c
->>> @@ -3,6 +3,7 @@
->>>   *
->>>   * Copyright 2007 Steven Brown <sbrown@cortland.com>
->>>   * Copyright 2010-2012 Hauke Mehrtens <hauke@hauke-m.de>
->>> + * Copyright 2014 Hans de Goede <hdegoede@redhat.com>
->>>   *
->>>   * Derived from the ohci-ssb driver
->>>   * Copyright 2007 Michael Buesch <m@bues.ch>
->>> @@ -18,6 +19,7 @@
->>>   *
->>>   * Licensed under the GNU/GPL. See COPYING for details.
->>>   */
->>> +#include <linux/clk.h>
->>>  #include <linux/dma-mapping.h>
->>>  #include <linux/err.h>
->>>  #include <linux/kernel.h>
->>> @@ -25,6 +27,7 @@
->>>  #include <linux/io.h>
->>>  #include <linux/module.h>
->>>  #include <linux/of.h>
->>> +#include <linux/phy/phy.h>
->>>  #include <linux/platform_device.h>
->>>  #include <linux/usb.h>
->>>  #include <linux/usb/hcd.h>
->>> @@ -33,6 +36,13 @@
->>>  #include "ehci.h"
->>>  
->>>  #define DRIVER_DESC "EHCI generic platform driver"
->>> +#define EHCI_MAX_CLKS 3
->>> +#define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
->>> +
->>> +struct ehci_platform_priv {
->>> +	struct clk *clks[EHCI_MAX_CLKS];
->>> +	struct phy *phy;
->>> +};
->>>  
->>>  static const char hcd_name[] = "ehci-platform";
->>>  
->>> @@ -64,38 +74,90 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
->>>  	return 0;
->>>  }
->>>  
->>> +static int ehci_platform_power_on(struct platform_device *dev)
->>> +{
->>> +	struct usb_hcd *hcd = platform_get_drvdata(dev);
->>> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
->>> +	int clk, ret;
->>> +
->>> +	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++) {
->>> +		ret = clk_prepare_enable(priv->clks[clk]);
->>> +		if (ret)
->>> +			goto err_disable_clks;
->>> +	}
->>> +
->>> +	if (priv->phy) {
->>> +		ret = phy_init(priv->phy);
->>> +		if (ret)
->>> +			goto err_disable_clks;
->>> +
->>> +		ret = phy_power_on(priv->phy);
->>> +		if (ret)
->>> +			goto err_exit_phy;
->>> +	}
->>> +
->>> +	return 0;
->>> +
->>> +err_exit_phy:
->>> +	phy_exit(priv->phy);
->>> +err_disable_clks:
->>> +	while (--clk >= 0)
->>> +		clk_disable_unprepare(priv->clks[clk]);
->>> +
->>> +	return ret;
->>> +}
->>> +
->>> +static void ehci_platform_power_off(struct platform_device *dev)
->>> +{
->>> +	struct usb_hcd *hcd = platform_get_drvdata(dev);
->>> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
->>> +	int clk;
->>> +
->>> +	if (priv->phy) {
->>> +		phy_power_off(priv->phy);
->>> +		phy_exit(priv->phy);
->>> +	}
->>> +
->>> +	for (clk = EHCI_MAX_CLKS - 1; clk >= 0; clk--)
->>> +		if (priv->clks[clk])
->>> +			clk_disable_unprepare(priv->clks[clk]);
->>> +}
->>> +
->>>  static struct hc_driver __read_mostly ehci_platform_hc_driver;
->>>  
->>>  static const struct ehci_driver_overrides platform_overrides __initconst = {
->>> -	.reset =	ehci_platform_reset,
->>> +	.reset =		ehci_platform_reset,
->>> +	.extra_priv_size =	sizeof(struct ehci_platform_priv),
->>>  };
->>>  
->>> -static struct usb_ehci_pdata ehci_platform_defaults;
->>> +static struct usb_ehci_pdata ehci_platform_defaults = {
->>> +	.power_on =		ehci_platform_power_on,
->>> +	.power_suspend =	ehci_platform_power_off,
->>> +	.power_off =		ehci_platform_power_off,
->>> +};
->>>  
->>>  static int ehci_platform_probe(struct platform_device *dev)
->>>  {
->>>  	struct usb_hcd *hcd;
->>>  	struct resource *res_mem;
->>> -	struct usb_ehci_pdata *pdata;
->>> -	int irq;
->>> -	int err;
->>> +	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
->>> +	struct ehci_platform_priv *priv;
->>> +	int err, irq, clk = 0;
->>>  
->>>  	if (usb_disabled())
->>>  		return -ENODEV;
->>>  
->>>  	/*
->>> -	 * use reasonable defaults so platforms don't have to provide these.
->>> -	 * with DT probing on ARM, none of these are set.
->>> +	 * Use reasonable defaults so platforms don't have to provide these
->>> +	 * with DT probing on ARM.
->>>  	 */
->>> -	if (!dev_get_platdata(&dev->dev))
->>> -		dev->dev.platform_data = &ehci_platform_defaults;
->>> +	if (!pdata)
->>> +		pdata = &ehci_platform_defaults;
->>>  
->>>  	err = dma_coerce_mask_and_coherent(&dev->dev, DMA_BIT_MASK(32));
->>>  	if (err)
->>>  		return err;
->>>  
->>> -	pdata = dev_get_platdata(&dev->dev);
->>> -
->>>  	irq = platform_get_irq(dev, 0);
->>>  	if (irq < 0) {
->>>  		dev_err(&dev->dev, "no irq provided");
->>> @@ -107,17 +169,40 @@ static int ehci_platform_probe(struct platform_device *dev)
->>>  		return -ENXIO;
->>>  	}
->>>  
->>> +	hcd = usb_create_hcd(&ehci_platform_hc_driver, &dev->dev,
->>> +			     dev_name(&dev->dev));
->>> +	if (!hcd)
->>> +		return -ENOMEM;
->>> +
->>> +	platform_set_drvdata(dev, hcd);
->>> +	dev->dev.platform_data = pdata;
->>> +	priv = hcd_to_ehci_priv(hcd);
->>> +
->>> +	if (pdata == &ehci_platform_defaults && dev->dev.of_node) {
->>> +		priv->phy = devm_phy_get(&dev->dev, "usb");
->>> +		if (IS_ERR(priv->phy)) {
->>> +			err = PTR_ERR(priv->phy);
->>> +			if (err == -EPROBE_DEFER)
->>> +				goto err_put_hcd;
->>> +			priv->phy = NULL;
->>> +		}
->>> +
->>> +		for (clk = 0; clk < EHCI_MAX_CLKS; clk++) {
->>> +			priv->clks[clk] = of_clk_get(dev->dev.of_node, clk);
->>> +			if (IS_ERR(priv->clks[clk])) {
->>> +				err = PTR_ERR(priv->clks[clk]);
->>> +				if (err == -EPROBE_DEFER)
->>> +					goto err_put_clks;
->>> +				priv->clks[clk] = NULL;
->>> +				break;
->>> +			}
->>> +		}
->>> +	}
->>> +
->>>  	if (pdata->power_on) {
->>>  		err = pdata->power_on(dev);
->>>  		if (err < 0)
->>> -			return err;
->>> -	}
->>> -
->>> -	hcd = usb_create_hcd(&ehci_platform_hc_driver, &dev->dev,
->>> -			     dev_name(&dev->dev));
->>> -	if (!hcd) {
->>> -		err = -ENOMEM;
->>> -		goto err_power;
->>> +			goto err_put_clks;
->>>  	}
->>>  
->>>  	hcd->rsrc_start = res_mem->start;
->>> @@ -126,22 +211,28 @@ static int ehci_platform_probe(struct platform_device *dev)
->>>  	hcd->regs = devm_ioremap_resource(&dev->dev, res_mem);
->>>  	if (IS_ERR(hcd->regs)) {
->>>  		err = PTR_ERR(hcd->regs);
->>> -		goto err_put_hcd;
->>> +		goto err_power;
->>>  	}
->>>  	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
->>>  	if (err)
->>> -		goto err_put_hcd;
->>> +		goto err_power;
->>>  
->>>  	device_wakeup_enable(hcd->self.controller);
->>>  	platform_set_drvdata(dev, hcd);
->>>  
->>>  	return err;
->>>  
->>> -err_put_hcd:
->>> -	usb_put_hcd(hcd);
->>>  err_power:
->>>  	if (pdata->power_off)
->>>  		pdata->power_off(dev);
->>> +err_put_clks:
->>> +	while (--clk >= 0)
->>> +		clk_put(priv->clks[clk]);
->>> +err_put_hcd:
->>> +	if (pdata == &ehci_platform_defaults)
->>> +		dev->dev.platform_data = NULL;
->>> +
->>> +	usb_put_hcd(hcd);
->>>  
->>>  	return err;
->>>  }
->>> @@ -150,13 +241,19 @@ static int ehci_platform_remove(struct platform_device *dev)
->>>  {
->>>  	struct usb_hcd *hcd = platform_get_drvdata(dev);
->>>  	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
->>> +	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
->>> +	int clk;
->>>  
->>>  	usb_remove_hcd(hcd);
->>> -	usb_put_hcd(hcd);
->>>  
->>>  	if (pdata->power_off)
->>>  		pdata->power_off(dev);
->>>  
->>> +	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++)
->>> +		clk_put(priv->clks[clk]);
->>> +
->>> +	usb_put_hcd(hcd);
->>> +
->>>  	if (pdata == &ehci_platform_defaults)
->>>  		dev->dev.platform_data = NULL;
->>>  
->>> @@ -207,8 +304,10 @@ static int ehci_platform_resume(struct device *dev)
->>>  static const struct of_device_id vt8500_ehci_ids[] = {
->>>  	{ .compatible = "via,vt8500-ehci", },
->>>  	{ .compatible = "wm,prizm-ehci", },
->>> +	{ .compatible = "usb-ehci", },
->>>  	{}
->>>  };
->>> +MODULE_DEVICE_TABLE(of, vt8500_ehci_ids);
->>>  
->>>  static const struct platform_device_id ehci_platform_table[] = {
->>>  	{ "ehci-platform", 0 },
->>>
->>
+Actually I'd prefer if you used the definitions in:
+  dt-bindings/interrupt-controller/irq.h
+
+> +- interrupt-controller:
+> +	Usage: required
+> +	Value type: <empty>
+> +	Definition: identifies this node as an interrupt controller
+> +
+> +EXAMPLE
+> +
+> +	pmicintc: pmic at 0 {
+> +		compatible = "qcom,pm8921";
+> +		interrupts = <104 8>;
+
+As above.
+
+> +		#interrupt-cells = <2>;
+> +		interrupt-controller;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		pwrkey {
+> +			compatible = "qcom,pm8921-pwrkey";
+> +			interrupt-parent = <&pmicintc>;
+> +			interrupts = <50 1>, <51 1>;
+
+As above.
+
+> +		};
+> +	};
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
