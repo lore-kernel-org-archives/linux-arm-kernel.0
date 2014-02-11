@@ -1,41 +1,52 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Tue, 11 Feb 2014 10:23:58 -0600
-Subject: [PATCH 0/8] of_find_matching_node/of_match_node ->
- of_find_matching_node_and_match
-Message-ID: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
+Date: Tue, 11 Feb 2014 10:24:03 -0600
+Subject: [PATCH 5/8] ARM: prima2: make use of of_find_matching_node_and_match
+In-Reply-To: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
+References: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>
+Message-ID: <1392135847-30791-6-git-send-email-joshc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset updates users of the of_find_matching_node()/of_match_node() pair
-to leverage of_find_matching_node_and_match(), which only requires one walk
-through the match table.  This functionality was added by Stephen Warren[1], and
-landed in v3.8.
+Instead of the of_find_matching_node()/of_match_node() pair, which requires two
+iterations through the match table, make use of of_find_matching_node_and_match(),
+which only iterates through the table once.
 
-Cc: Stephen Warren <swarren@nvidia.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+While we're here, mark the prima2_l2x0 table const.
 
-1: 50c8af4cf9 (of: introduce for_each_matching_node_and_match())
+Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+---
+ arch/arm/mach-prima2/l2x0.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-Josh Cartwright (8):
-  bus: arm-cci: make use of of_find_matching_node_and_match
-  bus: mvebu-mbus: make use of of_find_matching_node_and_match
-  ARM: at91: make use of of_find_matching_node_and_match
-  ARM: mvebu: make use of of_find_matching_node_and_match
-  ARM: prima2: make use of of_find_matching_node_and_match
-  ARM: l2x0: make use of of_find_matching_node_and_match
-  C6X: make use of of_find_matching_node_and_match
-  cpufreq: ppc: make use of of_find_matching_node_and_match
-
- arch/arm/mach-at91/setup.c              | 16 ++++------------
- arch/arm/mach-mvebu/system-controller.c |  9 ++++-----
- arch/arm/mach-prima2/l2x0.c             |  7 ++++---
- arch/arm/mm/cache-l2x0.c                |  5 +++--
- arch/c6x/platforms/plldata.c            |  7 +++----
- drivers/bus/arm-cci.c                   |  5 +++--
- drivers/bus/mvebu-mbus.c                |  3 +--
- drivers/cpufreq/ppc-corenet-cpufreq.c   |  3 +--
- 8 files changed, 23 insertions(+), 32 deletions(-)
-
+diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
+index cbcbe9c..982b0b6 100644
+--- a/arch/arm/mach-prima2/l2x0.c
++++ b/arch/arm/mach-prima2/l2x0.c
+@@ -28,7 +28,7 @@ static struct l2x0_aux marco_l2x0_aux __initconst = {
+ 	.mask = L2X0_AUX_CTRL_MASK,
+ };
+ 
+-static struct of_device_id sirf_l2x0_ids[] __initconst = {
++static const struct of_device_id sirf_l2x0_ids[] __initconst = {
+ 	{ .compatible = "sirf,prima2-pl310-cache", .data = &prima2_l2x0_aux, },
+ 	{ .compatible = "sirf,marco-pl310-cache", .data = &marco_l2x0_aux, },
+ 	{},
+@@ -36,12 +36,13 @@ static struct of_device_id sirf_l2x0_ids[] __initconst = {
+ 
+ static int __init sirfsoc_l2x0_init(void)
+ {
++	const struct of_device_id *match;
+ 	struct device_node *np;
+ 	const struct l2x0_aux *aux;
+ 
+-	np = of_find_matching_node(NULL, sirf_l2x0_ids);
++	np = of_find_matching_node_and_match(NULL, sirf_l2x0_ids, &match);
+ 	if (np) {
+-		aux = of_match_node(sirf_l2x0_ids, np)->data;
++		aux = match->data;
+ 		return l2x0_of_init(aux->val, aux->mask);
+ 	}
+ 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
