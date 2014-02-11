@@ -1,259 +1,218 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 11 Feb 2014 22:06:26 +0000
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-Message-ID: <1392156389-5497-1-git-send-email-broonie@kernel.org>
+Date: Tue, 11 Feb 2014 22:06:28 +0000
+Subject: [PATCH 3/4] arm64: topology: Tell the scheduler about the relative
+ power of cores
+In-Reply-To: <1392156389-5497-1-git-send-email-broonie@kernel.org>
+References: <1392156389-5497-1-git-send-email-broonie@kernel.org>
+Message-ID: <1392156389-5497-3-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mark Brown <broonie@linaro.org>
 
-Add basic CPU topology support to arm64, based on the existing pre-v8
-code and some work done by Mark Hambleton.  This patch does not
-implement any topology discovery support since that should be based on
-information from firmware, it merely implements the scaffolding for
-integration of topology support in the architecture.
+In heterogeneous systems like big.LITTLE systems the scheduler will be
+able to make better use of the available cores if we provide power numbers
+to it indicating their relative performance. Do this by parsing the CPU
+nodes in the DT.
 
-The goal is to separate the architecture hookup for providing topology
-information from the DT parsing in order to ease review and avoid
-blocking the architecture code (which will be built on by other work)
-with the DT code review by providing something simple and basic.
-
-A following patch will implement support for parsing the DT topology
-bindings for ARM, similar patches will be needed for ACPI.
+This code currently has no effect as no information on the relative
+performance of the cores is provided.
 
 Signed-off-by: Mark Brown <broonie@linaro.org>
 ---
- arch/arm64/Kconfig                | 24 +++++++++++
- arch/arm64/include/asm/topology.h | 39 +++++++++++++++++
- arch/arm64/kernel/Makefile        |  1 +
- arch/arm64/kernel/smp.c           | 11 +++++
- arch/arm64/kernel/topology.c      | 89 +++++++++++++++++++++++++++++++++++++++
- 5 files changed, 164 insertions(+)
- create mode 100644 arch/arm64/include/asm/topology.h
- create mode 100644 arch/arm64/kernel/topology.c
+ arch/arm64/kernel/topology.c | 142 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 142 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 27bbcfc7202a..fea7b477676b 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -164,6 +164,30 @@ config SMP
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index a757297992a1..0f5a5d0cbbf0 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -19,9 +19,33 @@
+ #include <linux/nodemask.h>
+ #include <linux/of.h>
+ #include <linux/sched.h>
++#include <linux/slab.h>
  
- 	  If you don't know what to do here, say N.
+ #include <asm/topology.h>
  
-+config CPU_TOPOLOGY
-+	bool "Support CPU topology definition"
-+	depends on SMP
-+	default y
-+	help
-+	  Support CPU topology definition, based on configuration
-+	  provided by the firmware.
++/*
++ * cpu power table
++ * This per cpu data structure describes the relative capacity of each core.
++ * On a heteregenous system, cores don't have the same computation capacity
++ * and we reflect that difference in the cpu_power field so the scheduler can
++ * take this difference into account during load balance. A per cpu structure
++ * is preferred because each CPU updates its own cpu_power field during the
++ * load balance except for idle cores. One idle core is selected to run the
++ * rebalance_domains for all idle cores and the cpu_power can be updated
++ * during this sequence.
++ */
++static DEFINE_PER_CPU(unsigned long, cpu_scale);
 +
-+config SCHED_MC
-+	bool "Multi-core scheduler support"
-+	depends on CPU_TOPOLOGY
-+	help
-+	  Multi-core scheduler support improves the CPU scheduler's decision
-+	  making when dealing with multi-core CPU chips at a cost of slightly
-+	  increased overhead in some places. If unsure say N here.
++unsigned long arch_scale_freq_power(struct sched_domain *sd, int cpu)
++{
++	return per_cpu(cpu_scale, cpu);
++}
 +
-+config SCHED_SMT
-+	bool "SMT scheduler support"
-+	depends on CPU_TOPOLOGY
-+	help
-+	  Improves the CPU scheduler's decision making when dealing with
-+	  MultiThreading at a cost of slightly increased overhead in some
-+	  places. If unsure say N here.
++static void set_power_scale(unsigned int cpu, unsigned long power)
++{
++	per_cpu(cpu_scale, cpu) = power;
++}
 +
- config NR_CPUS
- 	int "Maximum number of CPUs (2-32)"
- 	range 2 32
-diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-new file mode 100644
-index 000000000000..c8a47e8f452b
---- /dev/null
-+++ b/arch/arm64/include/asm/topology.h
-@@ -0,0 +1,39 @@
-+#ifndef __ASM_TOPOLOGY_H
-+#define __ASM_TOPOLOGY_H
-+
-+#ifdef CONFIG_CPU_TOPOLOGY
-+
-+#include <linux/cpumask.h>
-+
-+struct cpu_topology {
-+	int thread_id;
-+	int core_id;
-+	int cluster_id;
-+	cpumask_t thread_sibling;
-+	cpumask_t core_sibling;
-+};
-+
-+extern struct cpu_topology cpu_topology[NR_CPUS];
-+
-+#define topology_physical_package_id(cpu)	(cpu_topology[cpu].cluster_id)
-+#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
-+#define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
-+#define topology_thread_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
-+
-+#define mc_capable()	(cpu_topology[0].cluster_id != -1)
-+#define smt_capable()	(cpu_topology[0].thread_id != -1)
-+
-+void init_cpu_topology(void);
-+void store_cpu_topology(unsigned int cpuid);
-+const struct cpumask *cpu_coregroup_mask(int cpu);
-+
-+#else
-+
-+static inline void init_cpu_topology(void) { }
-+static inline void store_cpu_topology(unsigned int cpuid) { }
-+
-+#endif
-+
-+#include <asm-generic/topology.h>
-+
-+#endif /* _ASM_ARM_TOPOLOGY_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 2d4554b13410..252b62181532 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -20,6 +20,7 @@ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
- arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
- arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
-+arm64-obj-$(CONFIG_CPU_TOPOLOGY)	+= topology.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 7cfb92a4ab66..9660750f34ba 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -114,6 +114,11 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	return ret;
+ #ifdef CONFIG_OF
+ static int __init get_cpu_for_node(struct device_node *node)
+ {
+@@ -137,9 +161,49 @@ static void __init parse_cluster(struct device_node *cluster, int depth)
+ 		cluster_id++;
  }
  
-+static void smp_store_cpu_info(unsigned int cpuid)
-+{
-+	store_cpu_topology(cpuid);
-+}
-+
- /*
-  * This is the secondary CPU boot entry.  We're using this CPUs
-  * idle thread stack, but a set of temporary page tables.
-@@ -152,6 +157,8 @@ asmlinkage void secondary_start_kernel(void)
- 	 */
- 	notify_cpu_starting(cpu);
- 
-+	smp_store_cpu_info(cpu);
-+
- 	/*
- 	 * OK, now it's safe to let the boot CPU continue.  Wait for
- 	 * the CPU migration code to notice that the CPU is online
-@@ -390,6 +397,10 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 	int err;
- 	unsigned int cpu, ncores = num_possible_cpus();
- 
-+	init_cpu_topology();
-+
-+	smp_store_cpu_info(smp_processor_id());
-+
- 	/*
- 	 * are we trying to boot more cores than exist?
- 	 */
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-new file mode 100644
-index 000000000000..cbb8d432214e
---- /dev/null
-+++ b/arch/arm64/kernel/topology.c
-@@ -0,0 +1,89 @@
-+/*
-+ * arch/arm64/kernel/topology.c
-+ *
-+ * Copyright (C) 2011,2013 Linaro Limited.
-+ *
-+ * Based on the arm32 version written by Vincent Guittot in turn based on
-+ * arch/sh/kernel/topology.c
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+
-+#include <linux/cpu.h>
-+#include <linux/cpumask.h>
-+#include <linux/init.h>
-+#include <linux/percpu.h>
-+#include <linux/node.h>
-+#include <linux/nodemask.h>
-+#include <linux/sched.h>
-+
-+#include <asm/topology.h>
++struct cpu_efficiency {
++	const char *compatible;
++	unsigned long efficiency;
++};
 +
 +/*
-+ * cpu topology table
++ * Table of relative efficiency of each processors
++ * The efficiency value must fit in 20bit and the final
++ * cpu_scale value must be in the range
++ *   0 < cpu_scale < 3*SCHED_POWER_SCALE/2
++ * in order to return@most 1 when DIV_ROUND_CLOSEST
++ * is used to compute the capacity of a CPU.
++ * Processors that are not defined in the table,
++ * use the default SCHED_POWER_SCALE value for cpu_scale.
 + */
-+struct cpu_topology cpu_topology[NR_CPUS];
-+EXPORT_SYMBOL_GPL(cpu_topology);
++static const struct cpu_efficiency table_efficiency[] = {
++	{ NULL, },
++};
 +
-+const struct cpumask *cpu_coregroup_mask(int cpu)
-+{
-+	return &cpu_topology[cpu].core_sibling;
-+}
++static unsigned long *__cpu_capacity;
++#define cpu_capacity(cpu)	__cpu_capacity[cpu]
 +
-+static void update_siblings_masks(unsigned int cpuid)
-+{
-+	struct cpu_topology *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
++static unsigned long middle_capacity = 1;
++
++/*
++ * Iterate all CPUs' descriptor in DT and compute the efficiency
++ * (as per table_efficiency). Also calculate a middle efficiency
++ * as close as possible to  (max{eff_i} - min{eff_i}) / 2
++ * This is later used to scale the cpu_power field such that an
++ * 'average' CPU is of middle power. Also see the comments near
++ * table_efficiency[] and update_cpu_power().
++ */
+ static void __init parse_dt_topology(void)
+ {
++	const struct cpu_efficiency *cpu_eff;
+ 	struct device_node *cn;
++	unsigned long min_capacity = ULONG_MAX;
++	unsigned long max_capacity = 0;
++	unsigned long capacity = 0;
 +	int cpu;
 +
-+	/* update core and thread sibling masks */
++	__cpu_capacity = kcalloc(nr_cpu_ids, sizeof(*__cpu_capacity),
++				 GFP_NOWAIT);
+ 
+ 	cn = of_find_node_by_path("/cpus");
+ 	if (!cn) {
+@@ -155,10 +219,84 @@ static void __init parse_dt_topology(void)
+ 	if (!cn)
+ 		return;
+ 	parse_cluster(cn, 0);
++
 +	for_each_possible_cpu(cpu) {
-+		cpu_topo = &cpu_topology[cpu];
++		const u32 *rate;
++		int len;
 +
-+		if (cpuid_topo->cluster_id != cpu_topo->cluster_id)
++		/* Too early to use cpu->of_node */
++		cn = of_get_cpu_node(cpu, NULL);
++		if (!cn) {
++			pr_err("Missing device node for CPU %d\n", cpu);
 +			continue;
++		}
 +
-+		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
-+		if (cpu != cpuid)
-+			cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
++		for (cpu_eff = table_efficiency; cpu_eff->compatible; cpu_eff++)
++			if (of_device_is_compatible(cn, cpu_eff->compatible))
++				break;
 +
-+		if (cpuid_topo->core_id != cpu_topo->core_id)
++		if (cpu_eff->compatible == NULL) {
++			pr_warn("%s: Unknown CPU type\n", cn->full_name);
 +			continue;
++		}
 +
-+		cpumask_set_cpu(cpuid, &cpu_topo->thread_sibling);
-+		if (cpu != cpuid)
-+			cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
++		rate = of_get_property(cn, "clock-frequency", &len);
++		if (!rate || len != 4) {
++			pr_err("%s: Missing clock-frequency property\n",
++				cn->full_name);
++			continue;
++		}
++
++		capacity = ((be32_to_cpup(rate)) >> 20) * cpu_eff->efficiency;
++
++		/* Save min capacity of the system */
++		if (capacity < min_capacity)
++			min_capacity = capacity;
++
++		/* Save max capacity of the system */
++		if (capacity > max_capacity)
++			max_capacity = capacity;
++
++		cpu_capacity(cpu) = capacity;
 +	}
-+}
 +
-+void store_cpu_topology(unsigned int cpuid)
-+{
-+	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
-+
-+	/* DT should have been parsed by the time we get here */
-+	if (cpuid_topo->core_id == -1)
-+		pr_info("CPU%u: No topology information configured\n", cpuid);
++	/* If min and max capacities are equal we bypass the update of the
++	 * cpu_scale because all CPUs have the same capacity. Otherwise, we
++	 * compute a middle_capacity factor that will ensure that the capacity
++	 * of an 'average' CPU of the system will be as close as possible to
++	 * SCHED_POWER_SCALE, which is the default value, but with the
++	 * constraint explained near table_efficiency[].
++	 */
++	if (min_capacity == max_capacity)
++		return;
++	else if (4 * max_capacity < (3 * (max_capacity + min_capacity)))
++		middle_capacity = (min_capacity + max_capacity)
++				>> (SCHED_POWER_SHIFT+1);
 +	else
-+		update_siblings_masks(cpuid);
++		middle_capacity = ((max_capacity / 3)
++				>> (SCHED_POWER_SHIFT-1)) + 1;
++
 +}
 +
 +/*
-+ * init_cpu_topology is called at boot when only one cpu is running
-+ * which prevent simultaneous write access to cpu_topology array
++ * Look for a customed capacity of a CPU in the cpu_topo_data table during the
++ * boot. The update of all CPUs is in O(n^2) for heteregeneous system but the
++ * function returns directly for SMP system.
 + */
-+void __init init_cpu_topology(void)
++static void update_cpu_power(unsigned int cpu)
 +{
-+	unsigned int cpu;
++	if (!cpu_capacity(cpu))
++		return;
 +
-+	/* init core mask and power*/
-+	for_each_possible_cpu(cpu) {
-+		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
++	set_power_scale(cpu, cpu_capacity(cpu) / middle_capacity);
 +
-+		cpu_topo->thread_id = -1;
-+		cpu_topo->core_id =  -1;
-+		cpu_topo->cluster_id = -1;
-+		cpumask_clear(&cpu_topo->core_sibling);
-+		cpumask_clear(&cpu_topo->thread_sibling);
-+	}
-+}
++	pr_info("CPU%u: update cpu_power %lu\n",
++		cpu, arch_scale_freq_power(NULL, cpu));
+ }
+ 
+ #else
+ static inline void parse_dt_topology(void) {}
++static inline void update_cpu_power(unsigned int cpuid) {}
+ #endif
+ 
+ /*
+@@ -206,6 +344,8 @@ void store_cpu_topology(unsigned int cpuid)
+ 		pr_info("CPU%u: No topology information configured\n", cpuid);
+ 	else
+ 		update_siblings_masks(cpuid);
++
++	update_cpu_power(cpuid);
+ }
+ 
+ /*
+@@ -225,6 +365,8 @@ void __init init_cpu_topology(void)
+ 		cpu_topo->cluster_id = -1;
+ 		cpumask_clear(&cpu_topo->core_sibling);
+ 		cpumask_clear(&cpu_topo->thread_sibling);
++
++		set_power_scale(cpu, SCHED_POWER_SCALE);
+ 	}
+ 
+ 	parse_dt_topology();
 -- 
 1.9.0.rc3
