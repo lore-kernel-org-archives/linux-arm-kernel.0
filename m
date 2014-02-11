@@ -1,35 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Feb 2014 15:08:06 +0100
-Subject: [PATCH 4/7] spi: pl022: attempt to get sspclk by name
-In-Reply-To: <20140211120645.GH13533@sirena.org.uk>
-References: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
- <1392118632-11312-5-git-send-email-mark.rutland@arm.com>
- <20140211120645.GH13533@sirena.org.uk>
-Message-ID: <201402111508.06267.arnd@arndb.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 11 Feb 2014 15:10:24 +0100
+Subject: ohci-/ehci-platform: Change compatible string to ?hci-platform
+Message-ID: <1392127826-31290-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 February 2014, Mark Brown wrote:
-> On Tue, Feb 11, 2014 at 11:37:09AM +0000, Mark Rutland wrote:
-> 
-> > -     pl022->clk = devm_clk_get(&adev->dev, NULL);
-> > +     /*
-> > +      * For compatibility with old DTBs and platform data, fall back to the
-> > +      * first clock if there's not an explicitly named "sspclk" entry.
-> > +      */
-> > +     pl022->clk = devm_clk_get(&adev->dev, "sspclk");
-> > +     if (IS_ERR(pl022->clk))
-> > +             pl022->clk = devm_clk_get(&adev->dev, NULL);
-> > +
-> 
-> I'll just have a bit of a grumble here and point out that this sort of
-> stuff always worries me with the convention of using nameless clocks -
-> it causes hassle adding further clocks.
+Hi Greg,
 
-I think the best solution for this is to continue with anonymous clocks
-rather than adding names after the fact. This could be done (for DT-only
-drivers) using the of_clk_get() interface that takes an index, or
-we could add a generic dev_clk_get_index() or similar interface that
-has the same behavior but also works for clkdev.
+Can you please add these 2 patches to usb-next, to unbreak usb on various
+ARM platforms?
 
-	Arnd
+These 2 patches can either be squashed into the first 2 patches of my previous
+set or added as is to preserve history, either way is fine with me.
+
+The 2nd patch also fixes one of the Kconfig issues and I've a better plan
+for the 2nd Kconfig issue too, so please consider this a self-nack for my
+drivers/usb/host/Kconfig patches.
+
+Here is a copy of the echi-platform commit-msg to explain the rationale of
+these changes, as well as how the breakage happened in the first place:
+
+The initial versions of the devicetree enablement patches for ehci-platform
+used "ehci-platform" as compatible string. However this was disliked by various
+reviewers because the platform bus is a Linux invention and devicetree is
+supposed to be OS agnostic. After much discussion I gave up, added a:
+"depends on !PPC_OF" to Kconfig to avoid a known conflict with PPC-OF platforms
+and went with the generic usb-ehci as requested.
+
+In retro-spect I should have stuck to my guns, because the dts files for many
+existing boards already claim to be compatible with "usb-ehci", ie they have:
+
+	compatible = "ti,ehci-omap", "usb-ehci";
+
+In theory this should not be a problem since the "ti,ehci-omap" entry takes
+presedence, but in practice using a conflicting compatible string is an issue,
+because it makes which driver gets used depend on driver registration order.
+
+This patch changes the compatible string claimed by ehci-platform (back) to
+"ehci-platform", avoiding the driver registration / module loading ordering
+problems, and removes the "depends on !PPC_OF" workaround.
+
+Note that there already is a precedent for using ?hci-platform, in the form
+of xhci-platform.c using "xhci-platfrom" as compatible string.
+
+Thanks & Regards,
+
+Hans
