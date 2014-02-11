@@ -1,117 +1,113 @@
 From: mohit.kumar@st.com (Mohit Kumar)
-Date: Tue, 11 Feb 2014 14:59:56 +0530
-Subject: [PATCH V6 00/12]PCI:Add SPEAr13xx PCie support
-Message-ID: <cover.1392109054.git.mohit.kumar@st.com>
+Date: Tue, 11 Feb 2014 15:00:05 +0530
+Subject: [PATCH V6 09/12] SPEAr13XX: dts: Add PCIe node information
+In-Reply-To: <cover.1392109054.git.mohit.kumar@st.com>
+References: <cover.1392109054.git.mohit.kumar@st.com>
+Message-ID: <091f0d35187b778903d0c0be32f8eb33ba2229d7.1392109054.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch# 1 and 2: Improvement and fixes for SPEAr13xx support.
-Patch# 3,5 and 8: Add DT bindings for miphy40lp, misc and pcie node
-Patch# 4,6 and 7: Add miphy40lp skelten driver and support for spear1310/40 
-miphy wrapper.
-Patch# 9-11: Add SPEAr13xx PCIe driver and dt support.
+From: Pratyush Anand <pratyush.anand@st.com>
 
-These pathes are tested with linux-3.14-rc1 with following patch on the top of
-it:
-Author: Balaji T K <balajitk@ti.com>
-Date:   Mon Jan 20 16:41:27 2014 +0200
+SPEAr1310 and SPEAr1340 supports 3 and 1 PCIe controller respectively.
+These controllers are based on synopsis designware controller.
 
-    ata: ahci_platform: Manage SATA PHY
-
-Tested with SPEAr1310 evaluation board:
-	- INTEL PRO 100/100 EP card
-	- USB xhci gen2 card
- 	- Above cards connected through LeCROY PTC switch
-
-Modifications for SATA are tested with SPEAr1340-evb board
-
-Changes since v5:
-- Split DT bindings for misc, miphy-40lp and pcie node into sepearte patches
-- Merge config options PCIE_SPEAR13XX and PCI_MSI into defconfig patch 
-- Incorporated other minor comments
-Changes since v4:
-- Uses per device function pointers passed from .data field to
-  the of_device_id instead of of_device_is_compatible.
-- Incorporated other minor comments from v4
-
-Changes since v3:
-- Phy driver renamed to phy-miphy40lp
-- ahci phy hook patch used as suggested by Arnd
-- Incorporated other minor comments from v3
-
-Changes since v2:
-- Incorporated comments to move SPEAr13xx PCIe and SATA phy specific routines to
-  the phy framework
-- Modify ahci driver to include phy hooks
-- phy-core driver modifications for subsys_initcall() 
- 
-Changes since v1:
-- Few patches of the series are already accepted and applied to mainline e.g.
- pcie designware driver improvements,fixes for IO translation bug, PCIe dw
- driver maintainer. So dropped these from v2.
-- Incorporated comment to move the common/reset PCIe code to the seperate driver
-- PCIe and SATA share common PHY configuration registers, so move SATA
- platform code to the system config driver
-Fourth patch is improves pcie designware driver and fixes the IO
-translation bug. IO translation bug fix leads to the working of PCIe EP devices
-connected to RC through switch.
-
-PCIe driver support for SPEAr1310/40 platform board is added.
-
-These patches are tested with SPEAr1310 evaluation board:
-	- INTEL PRO 100/100 EP card
-	- USB xhci gen2 card
- 	- Above cards connected through LeCROY PTC switch
-
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-ide at vger.kernel.org
-Cc: linux-pci at vger.kernel.org
+Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
+Cc: Mohit Kumar <mohit.kumar@st.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Viresh Kumar <viresh.linux@gmail.com>
 Cc: spear-devel at list.st.com
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-pm at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/boot/dts/spear1310.dtsi |   48 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/spear1340.dtsi |   16 ++++++++++++
+ 2 files changed, 64 insertions(+), 0 deletions(-)
 
-Mohit Kumar (2):
-  SPEAr13xx: defconfig: Update
-  MAINTAINERS: Add ST SPEAr13xx PCIe driver maintainer
-
-Pratyush Anand (10):
-  clk: SPEAr13XX: Fix pcie clock name
-  SPEAr13XX: Fix static mapping table
-  phy: st-miphy40lp: Add binding information
-  phy: st-miphy40lp: Add skeleton driver
-  SPEAr: misc: Add binding information
-  SPEAr13xx: Fixup: Move SPEAr1340 SATA platform code to phy driver
-  phy: st-miphy-40lp: Add SPEAr1310 and SPEAr1340 PCIe phy support
-  SPEAr13xx: Add binding information for PCIe controller
-  SPEAr13XX: dts: Add PCIe node information
-  pcie: SPEAr13xx: Add designware wrapper support
-
- .../devicetree/bindings/arm/spear-misc.txt         |    9 +
- .../devicetree/bindings/pci/spear13xx-pcie.txt     |   14 +
- .../devicetree/bindings/phy/st-miphy40lp.txt       |   18 +
- MAINTAINERS                                        |    6 +
- arch/arm/boot/dts/spear1310-evb.dts                |    4 +
- arch/arm/boot/dts/spear1310.dtsi                   |   93 ++++-
- arch/arm/boot/dts/spear1340-evb.dts                |    4 +
- arch/arm/boot/dts/spear1340.dtsi                   |   31 ++-
- arch/arm/boot/dts/spear13xx.dtsi                   |    9 +-
- arch/arm/configs/spear13xx_defconfig               |   16 +
- arch/arm/mach-spear/Kconfig                        |    3 +
- arch/arm/mach-spear/include/mach/spear.h           |    4 +-
- arch/arm/mach-spear/spear1340.c                    |  127 +-----
- arch/arm/mach-spear/spear13xx.c                    |    2 +-
- drivers/clk/spear/spear1310_clock.c                |    6 +-
- drivers/clk/spear/spear1340_clock.c                |    2 +-
- drivers/pci/host/Kconfig                           |    8 +
- drivers/pci/host/Makefile                          |    1 +
- drivers/pci/host/pcie-spear13xx.c                  |  414 +++++++++++++++
- drivers/phy/Kconfig                                |    7 +
- drivers/phy/Makefile                               |    1 +
- drivers/phy/phy-miphy40lp.c                        |  543 ++++++++++++++++++++
- 22 files changed, 1183 insertions(+), 139 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/spear-misc.txt
- create mode 100644 Documentation/devicetree/bindings/pci/spear13xx-pcie.txt
- create mode 100644 Documentation/devicetree/bindings/phy/st-miphy40lp.txt
- create mode 100644 drivers/pci/host/pcie-spear13xx.c
- create mode 100644 drivers/phy/phy-miphy40lp.c
+diff --git a/arch/arm/boot/dts/spear1310.dtsi b/arch/arm/boot/dts/spear1310.dtsi
+index 64e7dd5..136a12d 100644
+--- a/arch/arm/boot/dts/spear1310.dtsi
++++ b/arch/arm/boot/dts/spear1310.dtsi
+@@ -83,6 +83,54 @@
+ 			status = "disabled";
+ 		};
+ 
++		pcie0: pcie at b1000000 {
++			compatible = "st,spear1340-pcie", "snps,dw-pcie";
++			reg = <0xb1000000 0x4000>;
++			interrupts = <0 68 0x4>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0x0 0 &gic 68>;
++			num-lanes = <1>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			ranges = <0x00000800 0 0x80000000 0x80000000 0 0x00020000   /* configuration space */
++				0x81000000 0 0	 0x80020000 0 0x00010000   /* downstream I/O */
++				0x82000000 0 0x80030000 0xc0030000 0 0x0ffd0000>; /* non-prefetchable memory */
++			status = "disabled";
++		};
++
++		pcie1: pcie at b1800000 {
++			compatible = "st,spear1340-pcie", "snps,dw-pcie";
++			reg = <0xb1800000 0x4000>;
++			interrupts = <0 69 0x4>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0x0 0 &gic 69>;
++			num-lanes = <1>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			ranges = <0x00000800 0 0x90000000 0x90000000 0 0x00020000   /* configuration space */
++				0x81000000 0 0  0x90020000 0 0x00010000   /* downstream I/O */
++				0x82000000 0 0x90030000 0x90030000 0 0x0ffd0000>; /* non-prefetchable memory */
++			status = "disabled";
++		};
++
++		pcie2: pcie at b4000000 {
++			compatible = "st,spear1340-pcie", "snps,dw-pcie";
++			reg = <0xb4000000 0x4000>;
++			interrupts = <0 70 0x4>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0x0 0 &gic 70>;
++			num-lanes = <1>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			ranges = <0x00000800 0 0xc0000000 0xc0000000 0 0x00020000   /* configuration space */
++				0x81000000 0 0	 0xc0020000 0 0x00010000   /* downstream I/O */
++				0x82000000 0 0xc0030000 0xc0030000 0 0x0ffd0000>; /* non-prefetchable memory */
++			status = "disabled";
++		};
++
+ 		gmac1: eth at 5c400000 {
+ 			compatible = "st,spear600-gmac";
+ 			reg = <0x5c400000 0x8000>;
+diff --git a/arch/arm/boot/dts/spear1340.dtsi b/arch/arm/boot/dts/spear1340.dtsi
+index 7e3a04b..65a689c 100644
+--- a/arch/arm/boot/dts/spear1340.dtsi
++++ b/arch/arm/boot/dts/spear1340.dtsi
+@@ -49,6 +49,22 @@
+ 			status = "disabled";
+ 		};
+ 
++		pcie0: pcie at b1000000 {
++			compatible = "st,spear1340-pcie", "snps,dw-pcie";
++			reg = <0xb1000000 0x4000>;
++			interrupts = <0 68 0x4>;
++			interrupt-map-mask = <0 0 0 0>;
++			interrupt-map = <0x0 0 &gic 68>;
++			num-lanes = <1>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			ranges = <0x00000800 0 0x80000000 0x80000000 0 0x00020000   /* configuration space */
++				0x81000000 0 0	 0x80020000 0 0x00010000   /* downstream I/O */
++				0x82000000 0 0x80030000 0xc0030000 0 0x0ffd0000>; /* non-prefetchable memory */
++			status = "disabled";
++		};
++
+ 		i2s-play at b2400000 {
+ 			compatible = "snps,designware-i2s";
+ 			reg = <0xb2400000 0x10000>;
+-- 
+1.7.0.1
