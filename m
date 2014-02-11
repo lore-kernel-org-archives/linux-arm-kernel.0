@@ -1,40 +1,94 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 11 Feb 2014 08:41:10 -0600
-Subject: [PATCH] ARM: dts: OMAP2+: Fix boot with multi_v7_defconfig
-In-Reply-To: <52FA3531.8090308@redhat.com>
-References: <1392055835-6494-1-git-send-email-rogerq@ti.com>
- <52FA2B4F.3010408@ti.com> <52FA3102.7080407@ti.com>
- <52FA3531.8090308@redhat.com>
-Message-ID: <52FA3686.5080800@ti.com>
+From: rgb@redhat.com (Richard Guy Briggs)
+Date: Tue, 11 Feb 2014 08:51:27 -0500
+Subject: [PATCH v4 0/3] arm64: Add audit support
+In-Reply-To: <1391767803-5350-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1391410590-4884-1-git-send-email-takahiro.akashi@linaro.org>
+ <1391767803-5350-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140211135127.GB17952@madcap2.tricolour.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2014 08:35 AM, Hans de Goede wrote:
-> On 02/11/2014 03:17 PM, Nishanth Menon wrote:
->> On 02/11/2014 07:53 AM, Roger Quadros wrote:
->>> On 02/10/2014 08:10 PM, Roger Quadros wrote:
->>>> The OMAP EHCI controller is not compatible with the EHCI
->>>> platform HCD driver so don't claim that we are.
->>>>
->>>> This fixes boot on OMAP platforms with CONFIG_USB_EHCI_HCD_PLATFORM=y
->>>> e.g. multi_v7_defconfig
->>>>
->>>> Reported-by: Nishanth Menon <nm@ti.com>
->>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>>
->>> Please ignore this patch as Hans has agreed to do a more proper fix in
->>>
->>> http://article.gmane.org/gmane.comp.hardware.netbook.arm.sunxi/7015
->> umm.. even then, drivers/usb/host/ehci-ppc-of.c claims compatibility
->> with usb,ehci -> and we wont function with that driver either.
+On 14/02/07, AKASHI Takahiro wrote:
+> This patchset adds system call audit support on arm64.
+> Both 32-bit (AUDIT_ARCH_ARM) and 64-bit tasks (AUDIT_ARCH_AARCH64)
+> are supported. Since arm64 has the exact same set of system calls
+> on LE and BE, we don't care about endianness (or more specifically
+> __AUDIT_ARCH_64BIT bit in AUDIT_ARCH_*).
 > 
-> Right, but that has never been an issue as no kernel will ever include
-> both ppc and omap support.
+> There are some prerequisites for this patch to work correctly:
+> * "generic compat system call audit support" patch
+> * "correct a type mismatch in audit_syscall_exit()" patch
+>    (already accepted and queued in 3.14)
+> * "Modify a set of system calls in audit class" patch
+>    (already accepted and queued in 3.14)
+> * "__NR_* definitions for compat syscalls" patch from Catalin
+> * "make a single hook to syscall_trace() for all syscall features" patch
+> * userspace audit tool (v2.3.2 + my patch for arm64)
+> 
+> Please review them as well for better understandings.
+> 
+> This code was tested on both 32-bit and 64-bit LE userland 
+> in the following two ways:
+> 1) basic operations with auditctl/autrace
+>   # auditctl -a exit,always -S openat -F path=/etc/inittab
+>   # auditctl -a exit,always -F dir=/tmp -F perm=rw
+>   # auditctl -a task,always
+>   # autrace /bin/ls
+>     by comparing output from autrace with one from strace
+> 
+> 2) audit-test-code (+ my workarounds for arm/arm64)
+>   by running "audit-tool", "filter" and "syscalls" test categories.
+> 
+> Changes v1 -> v2:
+> * Modified to utilize "generic compat system call audit" [3/6, 4/6, 5/6]
+>   Please note that a required header, unistd_32.h, is automatically
+>   generated from unistd32.h.
+> * Refer to regs->orig_x0 instead of regs->x0 as the first argument of
+>   system call in audit_syscall_entry() [6/6]
+> * Include "Add regs_return_value() in syscall.h" patch [2/6],
+>   which was not intentionally included in v1 because it could be added
+>   by "kprobes support".
+> 
+> Changes v2 -> v3:
+> * Remove asm/audit.h.
+>   See "generic compat syscall audit support" patch v4
+> * Remove endianness dependency, ie. AUDIT_ARCH_ARMEB/AARCH64EB.
+> * Remove kernel/syscalls/Makefile which was used to create unistd32.h.
+>   See Catalin's "Add __NR_* definitions for compat syscalls" patch
+> 
+> Changes v3 -> v4:
+> * Modified to sync with the patch, "make a single hook to syscall_trace()
+>   for all syscall features"
+> 
+> 
+> AKASHI Takahiro (3):
+>   arm64: Add regs_return_value() in syscall.h
+>   arm64: Add audit support
+>   arm64: audit: Add audit hook in ptrace/syscall_trace
+> 
+>  arch/arm64/Kconfig               |    1 +
+>  arch/arm64/include/asm/ptrace.h  |    5 +++++
+>  arch/arm64/include/asm/syscall.h |   15 +++++++++++++++
+>  arch/arm64/kernel/ptrace.c       |    7 +++++++
+>  include/uapi/linux/audit.h       |    1 +
+>  5 files changed, 29 insertions(+)
 
-Conceptually, we have compatibility string today in dts description
-that maps a driver that cant ever handle the device. I dont have
-strong opinions either way.. just something i noticed with a git grep..
+Compile and regression tested on: ppc s390 x86_64 ppc64 i686 s390x.
 
--- 
-Regards,
-Nishanth Menon
+Acked-by: Richard Guy Briggs <rgb@redhat.com>
+
+> -- 
+> 1.7.9.5
+> 
+> --
+> Linux-audit mailing list
+> Linux-audit at redhat.com
+> https://www.redhat.com/mailman/listinfo/linux-audit
+
+- RGB
+
+--
+Richard Guy Briggs <rbriggs@redhat.com>
+Senior Software Engineer, Kernel Security, AMER ENG Base Operating Systems, Red Hat
+Remote, Ottawa, Canada
+Voice: +1.647.777.2635, Internal: (81) 32635, Alt: +1.613.693.0684x3545
