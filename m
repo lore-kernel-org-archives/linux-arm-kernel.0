@@ -1,57 +1,148 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 11 Feb 2014 14:27:07 +0100
-Subject: [RFC PATCH 0/4] i.MX6 PU power domain support
-Message-ID: <1392125231-28387-1-git-send-email-p.zabel@pengutronix.de>
+Date: Tue, 11 Feb 2014 14:27:09 +0100
+Subject: [RFC PATCH 2/4] ARM: imx6: gpc: Add pm clock support to PU power
+ domain
+In-Reply-To: <1392125231-28387-1-git-send-email-p.zabel@pengutronix.de>
+References: <1392125231-28387-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1392125231-28387-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6Q can gate off the CPU and PU (GPU/VPU) power domains using the
-Power Gating Controller (PGC) in the GPC register space. The CPU power
-domain is already handled by wait state code, but the PU power domain can
-be controlled using the generic power domain framework and power off the PU
-supply regulator if all devices in the power domain are (runtime) suspended.
+Drivers still handle clocks themselves, we only enable pm clocks of the
+GPU and VPU devices in the PU power domain temporarily during powerup
+so that the reset machinery can work.
 
-This patchset adds a GPC platform device initialized at subsys_initcall time
-(after anatop regulators) that binds to the gpc device tree node and sets up
-the PU power domain:
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/mach-imx/gpc.c | 74 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
 
-	gpc: gpc at 020dc000 {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		compatible = "fsl,imx6q-gpc";
-		reg = <0x020dc000 0x4000>;
-		interrupts = <0 89 0x04 0 90 0x04>;
-		pu-supply = <&reg_pu>;
-
-		pd_pu: power-domain at 020dc260 {
-			compatible = "fsl,power-domain";
-			reg = <0x020dc260 0x10>;
-		};
-	};
-
-It registers a platform bus notifier so that it can add GPU and VPU devices
-to the power domain when they are bound. If finds devices to be added to the
-power domain by scanning the device tree for nodes that contain a
-	power-domain = <&pd_pu>;
-property.
-
-For i.MX6QDL there is only one power domain, but on i.MX6SL I suspect the
-DISP power domain could be handled using the same mechanism.
-
-regards
-Philipp
-
-Philipp Zabel (4):
-  ARM: imx6: gpc: Add PU power domain for GPU/VPU
-  ARM: imx6: gpc: Add pm clock support to PU power domain
-  ARM: dts: imx6qdl: Allow disabling the PU regulator, add a enable ramp
-    delay
-  ARM: dts: imx6qdl: Add PU power-domain information to gpc node
-
- arch/arm/boot/dts/imx6qdl.dtsi |  11 +-
- arch/arm/mach-imx/Kconfig      |   2 +
- arch/arm/mach-imx/gpc.c        | 243 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 255 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index c3ec2c5..e3f4492 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -18,6 +18,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_clock.h>
+ #include <linux/pm_domain.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/irqchip/arm-gic.h>
+@@ -184,6 +185,7 @@ static int imx6q_pm_pu_power_off(struct generic_pm_domain *genpd)
+ 
+ static int imx6q_pm_pu_power_on(struct generic_pm_domain *genpd)
+ {
++	struct pm_domain_data *pdd;
+ 	int ret;
+ 	u32 val;
+ 	int sw, sw2iso;
+@@ -194,6 +196,10 @@ static int imx6q_pm_pu_power_on(struct generic_pm_domain *genpd)
+ 		return ret;
+ 	}
+ 
++	/* Enable PM clocks for all devices in the PU domain */
++	list_for_each_entry(pdd, &genpd->dev_list, list_node)
++		pm_clk_resume(pdd->dev);
++
+ 	/* Gate off PU domain when GPU/VPU when powered down */
+ 	writel_relaxed(0x1, gpc_base + GPC_PGC_GPU_PDN);
+ 
+@@ -210,6 +216,10 @@ static int imx6q_pm_pu_power_on(struct generic_pm_domain *genpd)
+ 	/* Wait ISO + ISO2SW IPG clock cycles */
+ 	ndelay((sw + sw2iso) * 1000 / 66);
+ 
++	/* Disable PM clocks for all devices in the PU domain */
++	list_for_each_entry(pdd, &genpd->dev_list, list_node)
++		pm_clk_suspend(pdd->dev);
++
+ 	return 0;
+ }
+ 
+@@ -219,6 +229,68 @@ static struct generic_pm_domain imx6q_pu_domain = {
+ 	.power_on = imx6q_pm_pu_power_on,
+ };
+ 
++int imx6q_pm_clk_add(struct device *dev)
++{
++	struct device_node *np = dev->of_node;
++	const char *con_id;
++	struct clk *clk;
++	int i = 0;
++
++	/* Add and prepare named clocks */
++	while (!of_property_read_string_index(np, "clock-names", i, &con_id)) {
++		pm_clk_add(dev, con_id);
++		clk = of_clk_get(np, i);
++		if (!IS_ERR(clk)) {
++			clk_prepare(clk);
++			clk_put(clk);
++		}
++		i++;
++	}
++
++	/* If no named clocks are given, add and prepare unnamed clock */
++	if (i == 1 && of_find_property(dev->of_node, "clocks", NULL)) {
++		pm_clk_add(dev, NULL);
++		clk = of_clk_get(np, 0);
++		if (!IS_ERR(clk)) {
++			clk_prepare(clk);
++			clk_put(clk);
++		}
++	}
++
++	return 0;
++}
++
++int imx6q_pm_clk_remove(struct device *dev)
++{
++	struct device_node *np = dev->of_node;
++	const char *con_id;
++	struct clk *clk;
++	int i = 0;
++
++	/* Remove and unprepare named clocks */
++	while (!of_property_read_string_index(np, "clock-names", i, &con_id)) {
++		pm_clk_remove(dev, con_id);
++		clk = of_clk_get(np, i);
++		if (!IS_ERR(clk)) {
++			clk_unprepare(clk);
++			clk_put(clk);
++		}
++		i++;
++	}
++
++	/* If no named clocks are given, remove and unprepare unnamed clock */
++	if (i == 1 && of_find_property(dev->of_node, "clocks", NULL)) {
++		pm_clk_remove(dev, NULL);
++		clk = of_clk_get(np, 0);
++		if (!IS_ERR(clk)) {
++			clk_unprepare(clk);
++			clk_put(clk);
++		}
++	}
++
++	return 0;
++}
++
+ static int imx6q_pm_notifier_call(struct notifier_block *nb,
+ 				  unsigned long event, void *data)
+ {
+@@ -237,6 +309,7 @@ static int imx6q_pm_notifier_call(struct notifier_block *nb,
+ 		if (ret)
+ 			dev_err(dev, "failed to add to power domain: %d\n",
+ 				ret);
++		imx6q_pm_clk_add(dev);
+ 		break;
+ 	case BUS_NOTIFY_UNBOUND_DRIVER:
+ 		genpd = dev_to_genpd(dev);
+@@ -246,6 +319,7 @@ static int imx6q_pm_notifier_call(struct notifier_block *nb,
+ 		if (ret)
+ 			dev_err(dev, "failed to remove from power domain: %d\n",
+ 				ret);
++		imx6q_pm_clk_remove(dev);
+ 		break;
+ 	}
+ 
 -- 
 1.8.5.3
