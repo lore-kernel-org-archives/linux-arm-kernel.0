@@ -1,37 +1,49 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 11 Feb 2014 11:52:06 +0900
-Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
-In-Reply-To: <2286031.FWmKXGrGIV@wuerfel>
+Date: Tue, 11 Feb 2014 12:03:00 +0900
+Subject: [PATCH 1/3] arm64: dts: add initial dts for Samsung GH7 SoC and
+ SSDK-GH7 board
+In-Reply-To: <52FB5DB1.4090609@arm.com>
 References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
- <1540B9A3-2485-4149-81DD-7D86A532E5D4@arm.com>
- <D225ECFF-E2A7-44C9-8D11-20EE77077797@codeaurora.org>
- <2286031.FWmKXGrGIV@wuerfel>
-Message-ID: <52F99056.6010906@samsung.com>
+ <1392100183-30930-2-git-send-email-kgene.kim@samsung.com>
+ <CAOesGMjE=zOStKoZQhYLhYtL_aWD73DcF4w6STboZPMfHkLtxA@mail.gmail.com>
+ <52FB575F.3070104@arm.com>
+ <20140212112946.GD21992@e106331-lin.cambridge.arm.com>
+ <52FB5DB1.4090609@arm.com>
+Message-ID: <52F992E4.5040800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/14 04:14, Arnd Bergmann wrote:
-> On Wednesday 12 February 2014 13:04:40 Kumar Gala wrote:
->> On Feb 12, 2014, at 12:12 PM, Catalin Marinas<catalin.marinas@arm.com>  wrote:
->>> On 12 Feb 2014, at 16:25, Kumar Gala<galak@codeaurora.org>  wrote:
->>>> One reason to keep around ARCH_* is for drivers shared between arm and arm64 that depend on it.
+On 02/12/14 20:40, Marc Zyngier wrote:
+> On 12/02/14 11:29, Mark Rutland wrote:
+>>>>> +       gic: interrupt-controller at 1C000000 {
+>>>>> +               compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+>>>>
+>>>> This looks incorrect -- you should at the very least have a more
+>>>> specific one than a15-gic? Marc?
 >>>
->>> We already converted some of them (those depending on ARCH_VEXPRESS) to
->>> just depend on ARM64. Ideally, at some point I?d like to see them as
->>> defaulting to modules but I don?t think we are there yet (we had some
->>> discussions at the last KS, I?m not sure anyone started looking into
->>> this).
+>>> "arm,cortex-a9-gic" is definitely wrong (the A9 GIC doesn't have the
+>>> virt extensions). This binding matches what the A15 GIC has, so
+>>> "arm,cortex-a15-gic" is probably fine. Main issue here is that the GICv2
+>>> driver has no compatible string for anything else.
+>>>
+>>> Should we define something more generic (like "arm,gic-v2")? Or carry on
+>>> adding more compatible strings?
 >>
->> I?m torn about this, I think for something like VEXPRESS it makes sense,
->> however I think  its reasonable to still have an config symbol for a full
->> SoC family or something of that nature.
+>> It's been proposed repeatedly, and it probably makes sense to add the
+>> generic versions to the driver, and allow for more specific ones in the
+>> binding which DTs can use. That way we don't get an explosion of strings
+>> in the driver, but if we need to handle any particular GIC specially in
+>> future we can do so.
+>>
+>> I guess for Linux we'd want to add "arm,gic-v1" and "arm,gic-v2" to the
+>> driver. We could just add "arm,gic-v1" and expect it later in the
+>> compatible list if v2 is a strict superset of v1; I think it is but I'm
+>> not a GIC expert.
 >
-> I think for SBSA compliant systems, we should be able to live with a
-> generic ARCH_SBSA Kconfig symbol. For more irregular embedded platforms,
-> we may need something more specific.
+> Sounds good to me.
 >
-Basically, I agreed with Arnd's suggestion to use ARCH_SBSA. Or we need 
-to define level in Kconfig like ARCH_SBSA_L1 for level1. BTW, how about 
-compliant with SBSA Level1 and having some specific features?
+OK, so did you guys agree to use version for gic? I'm fine to use gic-v2.
+
+And so who will take changing for others in mainline? ;-)
 
 - Kukjin
