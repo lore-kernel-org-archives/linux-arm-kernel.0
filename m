@@ -1,48 +1,92 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 11 Feb 2014 21:47:39 +0100
-Subject: [PATCH] ARM: tegra: dalmore: fix irq trigger type
-In-Reply-To: <4fcfcfdbc86c37c6d47ec32cdbd987f3b406e9b5.1392147256.git.stefan@agner.ch>
-References: <4fcfcfdbc86c37c6d47ec32cdbd987f3b406e9b5.1392147256.git.stefan@agner.ch>
-Message-ID: <20140211204737.GA1895@mithrandir>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 11 Feb 2014 14:56:48 -0600
+Subject: [Patch v5 2/2] dmaengine: qcom_bam_dma: Add device tree binding
+In-Reply-To: <1391546556-27702-3-git-send-email-agross@codeaurora.org>
+References: <1391546556-27702-1-git-send-email-agross@codeaurora.org>
+ <1391546556-27702-3-git-send-email-agross@codeaurora.org>
+Message-ID: <C8E65D93-F685-40C7-A482-C3E85D9F0558@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 09:11:32PM +0100, Stefan Agner wrote:
-> Trigger type needs to be IRQ_TYPE_LEVEL_HIGH since the interrupt
-> signal gets inverted by the PMC (configured by the invert-interrupt
-> property).
 
-Isn't the reason the other way around? The PMIC generates a low-level
-interrupt, but the GIC can only be configured to accept high-level (or
-rising edge) and therefore the nvidia,invert-interrupt property needs to
-be set in the PMC node?
+On Feb 4, 2014, at 2:42 PM, Andy Gross <agross@codeaurora.org> wrote:
 
-One nitpick below.
+> Add device tree binding support for the QCOM BAM DMA driver.
+> 
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
+> ---
+> .../devicetree/bindings/dma/qcom_bam_dma.txt       |   48 ++++++++++++++++++++
+> 1 file changed, 48 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
 
-> diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-[...]
-> @@ -888,8 +888,9 @@
->  		palmas: tps65913 at 58 {
->  			compatible = "ti,palmas";
->  			reg = <0x58>;
-> -			interrupts = <0 86 IRQ_TYPE_LEVEL_LOW>;
->  
-> +			/* active-low configured by PMC invert-interrupt */
-> +			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+Acked-by: Kumar Gala <galak@codeaurora.org>
 
-I'd prefer to keep the properties grouped as before. interrupts is a
-"client" property, whereas #interrupt-cells and interrupt-controller
-are "provider" properties.
+- k
 
-And I think the comment would be more appropriate in the pmc node, for
-the same reason that I think the commit description isn't entirely
-accurate.
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt b/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+> new file mode 100644
+> index 0000000..86344f1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+> @@ -0,0 +1,48 @@
+> +QCOM BAM DMA controller
+> +
+> +Required properties:
+> +- compatible:	Must be "qcom,bam-v1.4.0" for MSM8974 V1
+> +		Must be "qcom,bam-v1.4.1" for MSM8974 V2
+> +- reg: Address range for DMA registers
+> +- interrupts: single interrupt for this controller
+> +- #dma-cells: must be <1>
+> +- clocks: required clock
+> +- clock-names: name of clock
+> +- qcom,ee : indicates the active Execution Environment identifier (0-7)
+> +
+> +Example:
+> +
+> +	uart-bam: dma at f9984000 = {
+> +		compatible = "qcom,bam-v1.4.1";
+> +		reg = <0xf9984000 0x15000>;
+> +		interrupts = <0 94 0>;
+> +		clocks = <&gcc GCC_BAM_DMA_AHB_CLK>;
+> +		clock-names = "bam_clk";
+> +		#dma-cells = <1>;
+> +		qcom,ee = <0>;
+> +	};
+> +
+> +Client:
+> +Required properties:
+> +- dmas: List of dma channel requests
+> +- dma-names: Names of aforementioned requested channels
+> +
+> +Clients must use the format described in the dma.txt file, using a two cell
+> +specifier for each channel.
+> +
+> +The three cells in order are:
+> +  1. A phandle pointing to the DMA controller
+> +  2. The channel number
+> +
+> +Example:
+> +	serial at f991e000 {
+> +		compatible = "qcom,msm-uart";
+> +		reg = <0xf991e000 0x1000>
+> +			<0xf9944000 0x19000>;
+> +		interrupts = <0 108 0>;
+> +		clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
+> +		clock-names = "core", "iface";
+> +
+> +		dmas = <&uart-bam 0>, <&uart-bam 1>;
+> +		dma-names = "rx", "tx";
+> +	};
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140211/92fcdf86/attachment-0001.sig>
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
