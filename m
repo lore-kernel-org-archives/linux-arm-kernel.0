@@ -1,75 +1,102 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 13 Feb 2014 09:12:18 +0800
-Subject: [PATCH] ARM: tegra: dalmore: fix irq trigger type
-In-Reply-To: <52FBCDFD.1040902@wwwdotorg.org>
-References: <4fcfcfdbc86c37c6d47ec32cdbd987f3b406e9b5.1392147256.git.stefan@agner.ch>
- <20140211204737.GA1895@mithrandir>
- <30f0db808e7543d9ab6b077aa5e239f2@agner.ch> <52FBCDFD.1040902@wwwdotorg.org>
-Message-ID: <52FC1BF2.8020003@nvidia.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 11 Feb 2014 12:16:26 +0900
+Subject: [PATCH 1/3] arm64: dts: add initial dts for Samsung GH7 SoC and
+ SSDK-GH7 board
+In-Reply-To: <20140211181529.GC15200@e106331-lin.cambridge.arm.com>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <1392100183-30930-2-git-send-email-kgene.kim@samsung.com>
+ <20140211181529.GC15200@e106331-lin.cambridge.arm.com>
+Message-ID: <52F9960A.2090802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2014 03:39 AM, Stephen Warren wrote:
-> On 02/11/2014 02:21 PM, Stefan Agner wrote:
->> Am 2014-02-11 21:47, schrieb Thierry Reding:
->>> On Tue, Feb 11, 2014 at 09:11:32PM +0100, Stefan Agner wrote:
->>>> Trigger type needs to be IRQ_TYPE_LEVEL_HIGH since the interrupt
->>>> signal gets inverted by the PMC (configured by the invert-interrupt
->>>> property).
->>>
->>> Isn't the reason the other way around? The PMIC generates a low-level
->>> interrupt, but the GIC can only be configured to accept high-level (or
->>> rising edge) and therefore the nvidia,invert-interrupt property needs to
->>> be set in the PMC node?
->> Hm yes agreed. I should also write the whole story here, maybe this:
+On 02/12/14 03:15, Mark Rutland wrote:
+> On Tue, Feb 11, 2014 at 06:29:41AM +0000, Kukjin Kim wrote:
+>> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
+>> Reviewed-by: Thomas Abraham<thomas.ab@samsung.com>
+>> Cc: Catalin Marinas<catalin.marinas@arm.com>
+>> ---
+>>   arch/arm64/boot/dts/samsung-gh7.dtsi     |  108 ++++++++++++++++++++++++++++++
+>>   arch/arm64/boot/dts/samsung-ssdk-gh7.dts |   26 +++++++
+>>   2 files changed, 134 insertions(+)
+>>   create mode 100644 arch/arm64/boot/dts/samsung-gh7.dtsi
+>>   create mode 100644 arch/arm64/boot/dts/samsung-ssdk-gh7.dts
 >>
->> The GIC only support high-active interrupts. When using a PMIC with
->> low-active interrupt, the PMC has to be configured by using the
->> nvidia,invert-interrupt property in its node.
->>
->> This fix sets the GIC back to high-active and reverts commit
->> eca8f98e404934027f84f72882c5e92ffbd9e5f5.
+>> diff --git a/arch/arm64/boot/dts/samsung-gh7.dtsi b/arch/arm64/boot/dts/samsung-gh7.dtsi
+>> new file mode 100644
+>> index 0000000..5b8785c
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/samsung-gh7.dtsi
+>> @@ -0,0 +1,108 @@
+>> +/*
+>> + * SAMSUNG GH7 SoC device tree source
+>> + *
+>> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+>> + *		http://www.samsung.com
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +/dts-v1/;
+>> +
+>> +/memreserve/ 0x80000000 0x0C400000;
 >
-> (Trimming CC lists)
+> That looks _very_ large. What is this for?
 >
-> Stefan,
->
-> It'd be best to include the commit subject rather than just the commit
-> hash, i.e.:
->
-> ... and reverts commit eca8f98e4049 "ARM: tegra: dalmore: fix the irq
-> trigger type of Palmas MFD device".
->
-> It may also be helpful for the commit description to quote the kernel
-> boot message which this patch solves:
->
->> [    0.215178] genirq: Setting trigger mode 8 for irq 118 failed (gic_set_type+0x0/0xf4)
->
-> For me, applying this patch actually *causes* an interrupt storm, rather
-> than preventing one. Yet without it, no interrupts occur at all. I
-> wonder if the driver has a bug where it's not correctly clearing all
-> interrupt status (e.g. something pre-existing before boot), so once the
-> polarity is set up correctly, the interrupt is stuck?
->
-> Joseph,
->
-> As the author of the patch that's being reverted, can you please comment
-> here?
->
+Yes, I know but we need to reserve that for EL3 monitor, UEFI services, 
+secure, hypervisor and scan chanin...
 
-I had explained why I fixed this here.
-https://patchwork.kernel.org/patch/2832646/
 
-By checking the PMU_INT signal in the schematic of Dalmore, it only
-supports active low. It was connected to !PWR_INT of Tegra114 that will
-cause the system wake up automatically when syspended to LP0 if active
-high.
+> [...]
+>
+>> +	timer {
+>> +		compatible = "arm,armv8-timer";
+>> +		interrupts =<1 13 0xff01>,	/* Secure Phys IRQ */
+>> +			<1 14 0xff01>,	/* Non-secure Phys IRQ */
+>> +			<1 11 0xff01>,	/* Virt IRQ */
+>> +			<1 10 0xff01>;	/* Hyp IRQ */
+>> +		clock-frequency =<100000000>;
+>
+> Please, get your bootloader to set CNTFREQ. The clock frequency property
+> for the timer node is a horrible hack for buggy firmware.
+>
+You're right. OK.
 
-That's why my change is setting the IRQ type of PMIC to active low and
-keep the "nvidia,invert-interrupt". And it can make the LP0/1/2 work
-proper.
+> [...]
+>
+>> +	amba {
+>> +		compatible = "arm,amba-bus";
+>> +		#address-cells =<1>;
+>> +		#size-cells =<1>;
+>> +		ranges;
+>> +
+>> +		serial at 12c00000 {
+>> +			compatible = "arm,pl011", "arm,primecell";
+>> +			reg =<0x12c00000 0x10000>;
+>> +			interrupts =<418>;
+>> +		};
+>> +
+>> +		serial at 12c20000 {
+>> +			compatible = "arm,pl011", "arm,primecell";
+>> +			reg =<0x12c20000 0x10000>;
+>> +			interrupts =<420>;
+>> +		};
+>
+> Don't these need clocks?
+>
+We don't need and the clocks will be handled by bootloader...
 
-So this patch will make the PMIC not working on Dalmore and break the 
-suspend function.
+> [...]
+>
+>> +	memory at 80000000 {
+>> +		device_type = "memory";
+>> +		reg =<0x00000000 0x80000000 0 0x80000000>;
+>
+> Minor nit, but it would be nice for the 0 values to be consistently padded.
+>
+OK.
 
--Joseph
+Thanks,
+Kukjin
