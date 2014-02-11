@@ -1,171 +1,131 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 11 Feb 2014 14:46:37 +0100
-Subject: [PATCH] ARM: ux500: drop DMA channel platform data for storage
-In-Reply-To: <1392120687-12572-1-git-send-email-linus.walleij@linaro.org>
-References: <1392120687-12572-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAPDyKFoHXBVtxNNRCPix41YKmsne8Pz83naTg2v=RTfwJHeS8g@mail.gmail.com>
+From: rgb@redhat.com (Richard Guy Briggs)
+Date: Tue, 11 Feb 2014 08:49:26 -0500
+Subject: [PATCH] arm64: make a single hook to syscall_trace() for all
+ syscall features
+In-Reply-To: <1391767651-5296-1-git-send-email-takahiro.akashi@linaro.org>
+References: <52F199D3.2060409@linaro.org>
+ <1391767651-5296-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140211134926.GA17952@madcap2.tricolour.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 February 2014 13:11, Linus Walleij <linus.walleij@linaro.org> wrote:
-> The MMC/SD interface driver (MMCI) already supports picking its
-> DMA channels out of the device tree, so there is no point in
-> overriding them with identical platform data as well.
->
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On 14/02/07, AKASHI Takahiro wrote:
+> Currently syscall_trace() is called only for ptrace.
+> With additional TIF_xx flags introduced, it is now called in all the cases
+> of audit, ftrace and seccomp in addition to ptrace.
+> Those features will be implemented later, but it's safe to include them
+> now because they can not be turned on anyway.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Acked-by: Richard Guy Briggs <rgb@redhat.com>
 
 > ---
->  arch/arm/mach-ux500/board-mop500-sdi.c | 79 ----------------------------------
->  1 file changed, 79 deletions(-)
->
-> diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
-> index fcbf3a13a539..0addb1815fa6 100644
-> --- a/arch/arm/mach-ux500/board-mop500-sdi.c
-> +++ b/arch/arm/mach-ux500/board-mop500-sdi.c
-> @@ -11,13 +11,11 @@
->  #include <linux/amba/mmci.h>
->  #include <linux/mmc/host.h>
->  #include <linux/platform_device.h>
-> -#include <linux/platform_data/dma-ste-dma40.h>
->
->  #include <asm/mach-types.h>
->
->  #include "db8500-regs.h"
->  #include "board-mop500.h"
-> -#include "ste-dma40-db8500.h"
->
+>  arch/arm64/include/asm/thread_info.h |   13 +++++++++++++
+>  arch/arm64/kernel/entry.S            |    5 +++--
+>  arch/arm64/kernel/ptrace.c           |   11 +++++------
+>  3 files changed, 21 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> index 720e70b..c3df797 100644
+> --- a/arch/arm64/include/asm/thread_info.h
+> +++ b/arch/arm64/include/asm/thread_info.h
+> @@ -91,6 +91,9 @@ static inline struct thread_info *current_thread_info(void)
 >  /*
->   * v2 has a new version of this block that need to be forced, the number found
-> @@ -29,20 +27,6 @@
->   * SDI 0 (MicroSD slot)
->   */
->
-> -#ifdef CONFIG_STE_DMA40
-> -struct stedma40_chan_cfg mop500_sdi0_dma_cfg_rx = {
-> -       .mode = STEDMA40_MODE_LOGICAL,
-> -       .dir = DMA_DEV_TO_MEM,
-> -       .dev_type = DB8500_DMA_DEV29_SD_MM0,
-> -};
+>   * thread information flags:
+>   *  TIF_SYSCALL_TRACE	- syscall trace active
+> + *  TIF_SYSCALL_TRACEPOINT - syscall tracepoint for ftrace
+> + *  TIF_SYSCALL_AUDIT	- syscall auditing
+> + *  TIF_SECOMP		- syscall secure computing
+>   *  TIF_SIGPENDING	- signal pending
+>   *  TIF_NEED_RESCHED	- rescheduling necessary
+>   *  TIF_NOTIFY_RESUME	- callback before returning to user
+> @@ -101,6 +104,9 @@ static inline struct thread_info *current_thread_info(void)
+>  #define TIF_NEED_RESCHED	1
+>  #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
+>  #define TIF_SYSCALL_TRACE	8
+> +#define TIF_SYSCALL_AUDIT	9
+> +#define TIF_SYSCALL_TRACEPOINT	10
+> +#define TIF_SECCOMP		11
+>  #define TIF_POLLING_NRFLAG	16
+>  #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
+>  #define TIF_FREEZE		19
+> @@ -112,10 +118,17 @@ static inline struct thread_info *current_thread_info(void)
+>  #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+>  #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+>  #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
+> +#define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
+> +#define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
+> +#define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
+> +#define _TIF_SECCOMP		(1 << TIF_SECCOMP)
+>  #define _TIF_32BIT		(1 << TIF_32BIT)
+>  
+>  #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
+>  				 _TIF_NOTIFY_RESUME)
+>  
+> +#define _TIF_WORK_SYSCALL	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
+> +				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP)
+> +
+>  #endif /* __KERNEL__ */
+>  #endif /* __ASM_THREAD_INFO_H */
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 39ac630..c94b2ab 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -631,8 +631,9 @@ el0_svc_naked:					// compat entry point
+>  	enable_irq
+>  
+>  	get_thread_info tsk
+> -	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall tracing
+> -	tbnz	x16, #TIF_SYSCALL_TRACE, __sys_trace // are we tracing syscalls?
+> +	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall hooks
+> +	tst	x16, #_TIF_WORK_SYSCALL
+> +	b.ne	__sys_trace
+>  	adr	lr, ret_fast_syscall		// return address
+>  	cmp     scno, sc_nr                     // check upper syscall limit
+>  	b.hs	ni_sys
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index 6a8928b..64ce39f 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -1062,9 +1062,6 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+>  {
+>  	unsigned long saved_reg;
+>  
+> -	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+> -		return regs->syscallno;
 > -
-> -static struct stedma40_chan_cfg mop500_sdi0_dma_cfg_tx = {
-> -       .mode = STEDMA40_MODE_LOGICAL,
-> -       .dir = DMA_MEM_TO_DEV,
-> -       .dev_type = DB8500_DMA_DEV29_SD_MM0,
-> -};
-> -#endif
-> -
->  struct mmci_platform_data mop500_sdi0_data = {
->         .f_max          = 100000000,
->         .capabilities   = MMC_CAP_4_BIT_DATA |
-> @@ -56,30 +40,11 @@ struct mmci_platform_data mop500_sdi0_data = {
->                                 MCI_ST_CMDDIREN |
->                                 MCI_ST_DATA0DIREN |
->                                 MCI_ST_DATA2DIREN,
-> -#ifdef CONFIG_STE_DMA40
-> -       .dma_filter     = stedma40_filter,
-> -       .dma_rx_param   = &mop500_sdi0_dma_cfg_rx,
-> -       .dma_tx_param   = &mop500_sdi0_dma_cfg_tx,
-> -#endif
->  };
->
->  /*
->   * SDI1 (SDIO WLAN)
->   */
-> -#ifdef CONFIG_STE_DMA40
-> -static struct stedma40_chan_cfg sdi1_dma_cfg_rx = {
-> -       .mode = STEDMA40_MODE_LOGICAL,
-> -       .dir = DMA_DEV_TO_MEM,
-> -       .dev_type = DB8500_DMA_DEV32_SD_MM1,
-> -};
-> -
-> -static struct stedma40_chan_cfg sdi1_dma_cfg_tx = {
-> -       .mode = STEDMA40_MODE_LOGICAL,
-> -       .dir = DMA_MEM_TO_DEV,
-> -       .dev_type = DB8500_DMA_DEV32_SD_MM1,
-> -};
-> -#endif
-> -
->  struct mmci_platform_data mop500_sdi1_data = {
->         .ocr_mask       = MMC_VDD_29_30,
->         .f_max          = 100000000,
-> @@ -87,31 +52,12 @@ struct mmci_platform_data mop500_sdi1_data = {
->                                 MMC_CAP_NONREMOVABLE,
->         .gpio_cd        = -1,
->         .gpio_wp        = -1,
-> -#ifdef CONFIG_STE_DMA40
-> -       .dma_filter     = stedma40_filter,
-> -       .dma_rx_param   = &sdi1_dma_cfg_rx,
-> -       .dma_tx_param   = &sdi1_dma_cfg_tx,
-> -#endif
->  };
->
->  /*
->   * SDI 2 (POP eMMC, not on DB8500ed)
->   */
->
-> -#ifdef CONFIG_STE_DMA40
-> -struct stedma40_chan_cfg mop500_sdi2_dma_cfg_rx = {
-> -       .mode = STEDMA40_MODE_LOGICAL,
-> -       .dir = DMA_DEV_TO_MEM,
-> -       .dev_type =  DB8500_DMA_DEV28_SD_MM2,
-> -};
-> -
-> -static struct stedma40_chan_cfg mop500_sdi2_dma_cfg_tx = {
-> -       .mode = STEDMA40_MODE_LOGICAL,
-> -       .dir = DMA_MEM_TO_DEV,
-> -       .dev_type = DB8500_DMA_DEV28_SD_MM2,
-> -};
-> -#endif
-> -
->  struct mmci_platform_data mop500_sdi2_data = {
->         .ocr_mask       = MMC_VDD_165_195,
->         .f_max          = 100000000,
-> @@ -123,31 +69,11 @@ struct mmci_platform_data mop500_sdi2_data = {
->                                 MMC_CAP_CMD23,
->         .gpio_cd        = -1,
->         .gpio_wp        = -1,
-> -#ifdef CONFIG_STE_DMA40
-> -       .dma_filter     = stedma40_filter,
-> -       .dma_rx_param   = &mop500_sdi2_dma_cfg_rx,
-> -       .dma_tx_param   = &mop500_sdi2_dma_cfg_tx,
-> -#endif
->  };
->
->  /*
->   * SDI 4 (on-board eMMC)
->   */
-> -
-> -#ifdef CONFIG_STE_DMA40
-> -struct stedma40_chan_cfg mop500_sdi4_dma_cfg_rx = {
-> -       .mode = STEDMA40_MODE_LOGICAL,
-> -       .dir = DMA_DEV_TO_MEM,
-> -       .dev_type =  DB8500_DMA_DEV42_SD_MM4,
-> -};
-> -
-> -static struct stedma40_chan_cfg mop500_sdi4_dma_cfg_tx = {
-> -       .mode = STEDMA40_MODE_LOGICAL,
-> -       .dir = DMA_MEM_TO_DEV,
-> -       .dev_type = DB8500_DMA_DEV42_SD_MM4,
-> -};
-> -#endif
-> -
->  struct mmci_platform_data mop500_sdi4_data = {
->         .f_max          = 100000000,
->         .capabilities   = MMC_CAP_4_BIT_DATA |
-> @@ -158,9 +84,4 @@ struct mmci_platform_data mop500_sdi4_data = {
->                                 MMC_CAP_CMD23,
->         .gpio_cd        = -1,
->         .gpio_wp        = -1,
-> -#ifdef CONFIG_STE_DMA40
-> -       .dma_filter     = stedma40_filter,
-> -       .dma_rx_param   = &mop500_sdi4_dma_cfg_rx,
-> -       .dma_tx_param   = &mop500_sdi4_dma_cfg_tx,
-> -#endif
->  };
+>  	if (is_compat_task()) {
+>  		/* AArch32 uses ip (r12) for scratch */
+>  		saved_reg = regs->regs[12];
+> @@ -1078,10 +1075,12 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+>  		regs->regs[7] = dir;
+>  	}
+>  
+> -	if (dir)
+> +	if (dir) {
+>  		tracehook_report_syscall_exit(regs, 0);
+> -	else if (tracehook_report_syscall_entry(regs))
+> -		regs->syscallno = ~0UL;
+> +	} else {
+> +		if (tracehook_report_syscall_entry(regs))
+> +			regs->syscallno = ~0UL;
+> +	}
+>  
+>  	if (is_compat_task())
+>  		regs->regs[12] = saved_reg;
+> -- 
+> 1.7.9.5
+> 
 > --
-> 1.8.5.3
->
+> Linux-audit mailing list
+> Linux-audit at redhat.com
+> https://www.redhat.com/mailman/listinfo/linux-audit
+
+- RGB
+
+--
+Richard Guy Briggs <rbriggs@redhat.com>
+Senior Software Engineer, Kernel Security, AMER ENG Base Operating Systems, Red Hat
+Remote, Ottawa, Canada
+Voice: +1.647.777.2635, Internal: (81) 32635, Alt: +1.613.693.0684x3545
