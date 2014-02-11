@@ -1,52 +1,41 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 11 Feb 2014 16:08:17 +0000
-Subject: [RFC PATCH V2 3/4] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
-In-Reply-To: <20140211154229.GF3748@arm.com>
+Date: Tue, 11 Feb 2014 16:13:43 +0000
+Subject: [RFC PATCH V2 4/4] arm64: mm: implement get_user_pages_fast
+In-Reply-To: <20140211154859.GG3748@arm.com>
 References: <1391703531-12845-1-git-send-email-steve.capper@linaro.org>
- <1391703531-12845-4-git-send-email-steve.capper@linaro.org>
- <20140211154229.GF3748@arm.com>
-Message-ID: <20140211160816.GA16371@linaro.org>
+ <1391703531-12845-5-git-send-email-steve.capper@linaro.org>
+ <20140211154859.GG3748@arm.com>
+Message-ID: <20140211161342.GB16371@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 03:42:29PM +0000, Catalin Marinas wrote:
-> Hi Steve,
+On Tue, Feb 11, 2014 at 03:48:59PM +0000, Catalin Marinas wrote:
+> On Thu, Feb 06, 2014 at 04:18:51PM +0000, Steve Capper wrote:
+> > An implementation of get_user_pages_fast for arm64. It is based on the
+> > arm implementation (it has the added ability to walk huge puds) which
+> > is loosely on the PowerPC implementation. We disable interrupts in the
+> > walker to prevent the call_rcu_sched pagetable freeing code from
+> > running under us.
+> > 
+> > We also explicitly fire an IPI in the Transparent HugePage splitting
+> > case to prevent splits from interfering with the fast_gup walker.
+> > As THP splits are relatively rare, this should not have a noticable
+> > overhead.
+> > 
+> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> > ---
+> >  arch/arm64/include/asm/pgtable.h |   4 +
+> >  arch/arm64/mm/Makefile           |   2 +-
+> >  arch/arm64/mm/gup.c              | 297 +++++++++++++++++++++++++++++++++++++++
 > 
-> On Thu, Feb 06, 2014 at 04:18:50PM +0000, Steve Capper wrote:
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index 6d4dd22..129bd6a 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -28,6 +28,7 @@ config ARM64
-> >  	select HAVE_HW_BREAKPOINT if PERF_EVENTS
-> >  	select HAVE_MEMBLOCK
-> >  	select HAVE_PERF_EVENTS
-> > +	select HAVE_RCU_TABLE_FREE
-> >  	select IRQ_DOMAIN
-> >  	select MODULES_USE_ELF_RELA
-> >  	select NO_BOOTMEM
-> > diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
-> > index 717031a..8999823 100644
-> > --- a/arch/arm64/include/asm/tlb.h
-> > +++ b/arch/arm64/include/asm/tlb.h
-> > @@ -27,12 +27,33 @@
-> >  
-> >  #define MMU_GATHER_BUNDLE	8
-> >  
-> > +static inline void __tlb_remove_table(void *_table)
-> > +{
-> > +	free_page_and_swap_cache((struct page *)_table);
-> > +}
-> 
-> I think you can reduce your patch to just the above (and a linux/swap.h
-> include) after the arm64 conversion to generic mmu_gather below.
-> 
-> I cc'ed Peter Z for a sanity check, some of the code is close to
-> https://lkml.org/lkml/2011/3/7/302, only that it's under arch/arm64.
-> 
-> And, of course, it needs a lot more testing.
+> Why don't you make a generic gup.c implementation and let architectures
+> select it? I don't see much arm64-specific code in here.
 
-Okay, cheers Catalin, I'll give that a go.
+Certainly ARM and ARM64 will happily share the code and other
+architectures use basically the same technique in most places so could
+probably make use of a tweaked version.
+
+I'll generalise gup.c in the next revision of this series.
 
 Cheers,
 -- 
