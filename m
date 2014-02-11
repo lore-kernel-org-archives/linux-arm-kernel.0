@@ -1,76 +1,30 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 11 Feb 2014 18:31:33 +0100
-Subject: [PATCH 4/8] ARM: mvebu: make use of
- of_find_matching_node_and_match
-In-Reply-To: <20140211181048.6934bdd3@skate>
-References: <1392135847-30791-1-git-send-email-joshc@codeaurora.org>	<1392135847-30791-5-git-send-email-joshc@codeaurora.org>	<20140211165314.GA8533@titan.lakedaemon.net>
- <20140211181048.6934bdd3@skate>
-Message-ID: <52FA5E75.7030402@free-electrons.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 11 Feb 2014 17:32:26 +0000
+Subject: [PATCH 08/12] mfd: vexpress-sysreg: Add syscon labels as
+ platform data
+In-Reply-To: <20140211172918.GH15081@lee--X1>
+References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
+ <1392138636-29240-9-git-send-email-pawel.moll@arm.com>
+ <20140211172918.GH15081@lee--X1>
+Message-ID: <1392139946.3380.48.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2014 18:10, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
+On Tue, 2014-02-11 at 17:29 +0000, Lee Jones wrote:
+> There must be better
+> ways of passing a name than through pdata, and if there isn't I'd
+> suggest setting up a sysconf pdata struct that others can use in case
+> they wish to expand the functionality further in some other
+> unfathomable way. :)
+
+... which I proposed in the previous patch :-)
+
+On Tue, 2014-02-11 at 17:10 +0000, Pawel Moll wrote:
+> Alternatively I could define a syscon platform data structure,
+> something like this:
 > 
-> On Tue, 11 Feb 2014 11:53:14 -0500, Jason Cooper wrote:
-> 
->>> -	np = of_find_matching_node(NULL, of_system_controller_table);
->>> +	np = of_find_matching_node_and_match(NULL, of_system_controller_table,
->>> +					     &match);
->>>  	if (np) {
->>> -		const struct of_device_id *match =
->>> -		    of_match_node(of_system_controller_table, np);
->>
->>
->>> -		BUG_ON(!match);
->>
->> Gregory, is it ok to remove this?  It was added with the original code
->> submission for mach-mvebu.  mvebu_restart() will handle this
->> gracefully...
-> 
-> The BUG_ON here can normally never be reached. If
-> of_find_matching_node() returns a non-NULL result, then of_match_node()
-> should also return a non-NULL result.
-> 
-> Or I'm missing something :)
+> struct syscon_platform_data {
+> 	const char *label;
+> };
 
-No you're almost right!
-
-The only case we can get it, would be if we were declaring something like:
-
-static struct of_device_id of_system_controller_table[] = {
-	{
-		.compatible = "foo,bar-controller",
-	},
-[...]
-
-instead of
-
-static struct of_device_id of_system_controller_table[] = {
-	{
-		.compatible = "foo,bar",
-		.data = (void *) &bar_controller,
-	},
-[...]
-
-This test is very paranoid, so I agree to remove it.
-
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-
-Thanks,
-
-Gregory
-
-
-> 
-> Thomas
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pawel
