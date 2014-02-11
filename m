@@ -1,62 +1,56 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 11 Feb 2014 22:18:28 +0100
-Subject: [PATCH] ARM: tegra: don't timeout if CPU is powergated
-In-Reply-To: <1d5ea6b7df4573d866779857922ac650fe59af60.1392078805.git.stefan@agner.ch>
-References: <1d5ea6b7df4573d866779857922ac650fe59af60.1392078805.git.stefan@agner.ch>
-Message-ID: <20140211211827.GC1895@mithrandir>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 11 Feb 2014 15:19:17 -0600 (CST)
+Subject: [GIT PULL] qcom SoC changes for v3.15
+Message-ID: <alpine.DEB.2.00.1402111516560.9530@galak-ubuntu.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 01:44:13AM +0100, Stefan Agner wrote:
-> When booting secondary CPU(s) which are not yet powergated, a wrong
-> check lead to a timeout after 100 jiffies. With this patch, we only
-> delay powergating if CPUs are still not powered yet.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> I happend to come accross this while working on Colibri T30 support.
-> Obviously, the downstream U-Boot doesn't powergate all CPUs, so
-> the Linux kernel always timed out when booting CPU 1 through 3...
-> 
->  arch/arm/mach-tegra/platsmp.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-> index eb72ae7..929d104 100644
-> --- a/arch/arm/mach-tegra/platsmp.c
-> +++ b/arch/arm/mach-tegra/platsmp.c
-> @@ -114,7 +114,7 @@ static int tegra30_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  
->  		/* Wait for the power to come up. */
->  		timeout = jiffies + msecs_to_jiffies(100);
-> -		while (tegra_pmc_cpu_is_powered(cpu)) {
-> +		while (!tegra_pmc_cpu_is_powered(cpu)) {
->  			if (time_after(jiffies, timeout))
->  				return -ETIMEDOUT;
->  			udelay(10);
+The following changes since commit cf1e8f0cd665e2a9966d2bee4e11ecc0938ff166:
 
-This is indeed what I'd expect the code to look like. Since the code
-enables power to the CPU, the logical thing to do would be to then wait
-for it to be powered up.
+   ARM: qcom: Rename various msm prefixed functions to qcom (2014-02-06 16:20:41 -0600)
 
-I don't quite understand when exactly this will fail, since the whole
-block above is conditional on !tegra_pmc_cpu_is_powered() condition, so
-the only way that this can happen is when the first check fails, then
-the CPU is powered on and the PMC recognizes the CPU as powered before
-the while (...) is executed.
+are available in the git repository at:
 
-Thinking about it I've seen an issue on Cardhu where occasionally only
-three of the four CPUs actually came up (I've only noticed this since
-the DRM panel patches because three penguins looks kind of weird =).
-This bug would explain that issue.
+   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-3.15
 
-Any way, the new code makes much more sense than the old one, so:
+for you to fetch changes up to 6990c132abc984bd6e75ac2be1f1d657cd600f63:
 
-Reviewed-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140211/d690f873/attachment.sig>
+   ARM: qcom: Add SMP support for KPSSv2 (2014-02-11 15:00:40 -0600)
+
+----------------------------------------------------------------
+Qualcomm ARM Based SoC Updates for v3.15
+
+* Add support for determining smp ops based on device tree.
+* Add DT binding specs for Krait/Scorpion enable method
+* Add DT binding specs for various Krait Processor controller complexes
+* Add SoC SMP support for Krait Processor Subsystem v1 & v2
+
+----------------------------------------------------------------
+Rohit Vaswani (4):
+       ARM: qcom: Re-organize platsmp to make it extensible
+       devicetree: bindings: Document Krait/Scorpion cpus and enable-method
+       ARM: qcom: Add SMP support for KPSSv1
+       ARM: qcom: Add SMP support for KPSSv2
+
+Stephen Boyd (3):
+       ARM: Introduce CPU_METHOD_OF_DECLARE() for cpu hotplug/smp
+       devicetree: bindings: Document qcom,kpss-acc
+       devicetree: bindings: Document qcom,saw2 node
+
+  Documentation/devicetree/bindings/arm/cpus.txt     |  25 +-
+  .../devicetree/bindings/arm/msm/qcom,kpss-acc.txt  |  30 ++
+  .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  35 +++
+  arch/arm/include/asm/smp.h                         |   9 +
+  arch/arm/kernel/devtree.c                          |  40 +++
+  arch/arm/mach-msm/common.h                         |   2 -
+  arch/arm/mach-qcom/board.c                         |  14 -
+  arch/arm/mach-qcom/platsmp.c                       | 341 ++++++++++++++++++---
+  arch/arm/mach-qcom/scm-boot.h                      |   8 +-
+  include/asm-generic/vmlinux.lds.h                  |  10 +
+  10 files changed, 444 insertions(+), 70 deletions(-)
+  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
+  create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+
+--
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
