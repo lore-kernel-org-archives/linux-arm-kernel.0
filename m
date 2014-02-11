@@ -1,46 +1,60 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 11 Feb 2014 17:10:30 +0000
-Subject: [PATCH 06/12] mfd: vexpress-sysreg: Add labels to gpio banks
-In-Reply-To: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Feb 2014 17:17:21 +0000
+Subject: [PATCH 05/12] GPIO: gpio-generic: Add label to platform data
+In-Reply-To: <1392138636-29240-6-git-send-email-pawel.moll@arm.com>
 References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1392138636-29240-7-git-send-email-pawel.moll@arm.com>
+ <1392138636-29240-6-git-send-email-pawel.moll@arm.com>
+Message-ID: <20140211171721.GE15081@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-... so debugfs interfaces are easier to use.
+> When registering more than one platform device, it is
+> useful to set the gpio chip label in the platform data.
+> 
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+> This patch has been already merged by Linux; it has been included
+> for completeness only.
+> 
+>  drivers/gpio/gpio-generic.c     | 2 ++
+>  include/linux/basic_mmio_gpio.h | 1 +
+>  2 files changed, 3 insertions(+)
+> 
+> diff --git a/drivers/gpio/gpio-generic.c b/drivers/gpio/gpio-generic.c
+> index d2196bf..8c778af 100644
+> --- a/drivers/gpio/gpio-generic.c
+> +++ b/drivers/gpio/gpio-generic.c
+> @@ -531,6 +531,8 @@ static int bgpio_pdev_probe(struct platform_device *pdev)
+>  		return err;
+>  
+>  	if (pdata) {
+> +		if (pdata->label)
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
----
- drivers/mfd/vexpress-sysreg.c | 3 +++
- 1 file changed, 3 insertions(+)
+Why is this check necessary?
 
-diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
-index f639dff..ece5ac8 100644
---- a/drivers/mfd/vexpress-sysreg.c
-+++ b/drivers/mfd/vexpress-sysreg.c
-@@ -133,16 +133,19 @@ void __init vexpress_sysreg_early_init(void __iomem *base)
- /* The sysreg block is just a random collection of various functions... */
- 
- static struct bgpio_pdata vexpress_sysreg_sys_led_pdata = {
-+	.label = "sys_led",
- 	.base = -1,
- 	.ngpio = 8,
- };
- 
- static struct bgpio_pdata vexpress_sysreg_sys_mci_pdata = {
-+	.label = "sys_mci",
- 	.base = -1,
- 	.ngpio = 2,
- };
- 
- static struct bgpio_pdata vexpress_sysreg_sys_flash_pdata = {
-+	.label = "sys_flash",
- 	.base = -1,
- 	.ngpio = 1,
- };
+> +			bgc->gc.label = pdata->label;
+>  		bgc->gc.base = pdata->base;
+>  		if (pdata->ngpio > 0)
+>  			bgc->gc.ngpio = pdata->ngpio;
+> diff --git a/include/linux/basic_mmio_gpio.h b/include/linux/basic_mmio_gpio.h
+> index d8a97ec..0e97856 100644
+> --- a/include/linux/basic_mmio_gpio.h
+> +++ b/include/linux/basic_mmio_gpio.h
+> @@ -19,6 +19,7 @@
+>  #include <linux/spinlock_types.h>
+>  
+>  struct bgpio_pdata {
+> +	const char *label;
+>  	int base;
+>  	int ngpio;
+>  };
+
 -- 
-1.8.3.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
