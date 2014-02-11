@@ -1,35 +1,35 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 11 Feb 2014 21:04:21 +0100
-Subject: [PATCH v2 1/5] drivers: of: add initialization code for reserved
- memory
-In-Reply-To: <1392148971.3835.15.camel@pasglop>
-References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com>	 <
- 1391515773-6112-2-git-send-email-m.szyprowski@samsung.com>	 <20140205110538.
- 99E47C40A89@trevor.secretlab.ca>	 <52FA0D6E.9090304@samsung.com>	 <
- 20140211121316.24032C40C4D@trevor.secretlab.ca>	 <52FA33E2.4050004@samsung.
- com>	 <20140211190104.7E6C5C4140E@trevor.secretlab.ca>
- <1392148971.3835.15.camel@pasglop>
-Message-ID: <52FA8245.5050707@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 11 Feb 2014 14:10:07 -0600
+Subject: [PATCH] ARM: dts: omap3-n9 family: mark proper OMAP version
+In-Reply-To: <20140211185136.GG573@drone.musicnaut.iki.fi>
+References: <1392132541-25340-1-git-send-email-nm@ti.com>
+ <20140211185136.GG573@drone.musicnaut.iki.fi>
+Message-ID: <52FA839F.5090304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Aaro,
+On 02/11/2014 12:51 PM, Aaro Koskinen wrote:
+> Hi,
+> 
+> On Tue, Feb 11, 2014 at 09:29:01AM -0600, Nishanth Menon wrote:
+>> Nokia N900 uses OMAP3430 and N9/N950 uses OMAP3630. Mark SoC compatibilty
+>> as per Documentation/devicetree/bindings/arm/omap/omap.txt else
+>> N9/N950 will be probed as a OMAP3430 type device, since default ti,omap3
+>> maps to OMAP3430 compatibility.
+> 
+> I already sent & tested patches for this:
+> 
+> http://marc.info/?l=linux-omap&m=139194800711362&w=2
+> http://marc.info/?l=linux-omap&m=139194800011360&w=2
+> 
+> The N9/N950 is mandatory for 3.14, as the boot hangs without it.
+
+Thanks. Apologies on missing these, I caught these based on a git grep
+on an unrelated thing.. I will ack your patches - they are obvious
+regressions.
 
 
-On 11.02.2014 21:02, Benjamin Herrenschmidt wrote:
-> On Tue, 2014-02-11 at 19:01 +0000, Grant Likely wrote:
->
->>> except that the former IMHO better suits the definition of memory
->>> region, which I see as a single contiguous range of memory and can be
->>> simplified to have a single reg entry per region.
->>
->> My point is rather if multiple reg tuples are found in a reserved memory
->> node, the kernel must respect them and reserve the memory. I'm not
->> arguing about whether or not that makes for a good binding.
->
-> agreed.
-
-My point is why, if the binding defines that just a single tuple should 
-be provided.
-
-Best regards,
-Tomasz
+-- 
+Regards,
+Nishanth Menon
