@@ -1,42 +1,62 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 11 Feb 2014 10:20:55 +0100
-Subject: [PATCH 00/12] ARM: S3C24XX: convert s3c2410,
- s3c2440 s3c2442 to common clock framework
-In-Reply-To: <CAL5jtJm=Ehwk2ZyCJaW0NfMn8XM893r1hdCVWs2skMv4+M7yXQ@mail.gmail.com>
-References: <201312131356.40755.heiko@sntech.de> <52F7DD6E.8070303@gmail.com>
- <CAL5jtJm=Ehwk2ZyCJaW0NfMn8XM893r1hdCVWs2skMv4+M7yXQ@mail.gmail.com>
-Message-ID: <4099437.QudIaVHrIN@phil>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Feb 2014 10:24:12 +0100
+Subject: [GIT PULL] Ux500 AB8500 DT conversion
+Message-ID: <CACRpkdZcH8gmvsH_P79mtq=ws-+9aoPe6QgXPL7GW5jAjLvrhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+Hi ARM SoC folks,
 
-Am Dienstag, 11. Februar 2014, 11:46:13 schrieb Kukjin Kim:
-> 2014-02-10 1:26 GMT+05:30 Tomasz Figa <tomasz.figa@gmail.com>:
-> > 
-> > For patches 4, 5, 9, 10, 11, 12:
-> > 
-> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> > 
-> > For patches 6, 7:
-> > 
-> > Acked-by: Tomasz Figa <t.figa@samsung.com>
-> 
-> Really nice series.
-> Heiko, thanks for your effort and Tomasz, thanks for your review and ack.
-> 
-> OK, I'll apply this whole series and this will be sent to arm-soc in this
-> week.
+the following converts the AB8500 pin configuration from board
+file to device tree and removes the final pin settings board file
+config.
 
-not this fast :-)
+Please pull it into an apropriate Ux500 device tree branch, I'll
+possibly send more Ux500 DT stuff on top of this.
 
-Tomasz hat some comments about the two clk-drivers included, which I'll need 
-to address first.
+Yours,
+Linus Walleij
 
-Also, this series, as well as the other two at the moment conflict with Tomasz' 
-clock-pm changes. Our (Tomasz and me) current plan was for me to respin the 3 
-ccf conversion series against his clock-pm series, which I hope to do in the 
-next two days or so.
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 
-Heiko
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ab8500-dt-for-arm-soc
+
+for you to fetch changes up to 77ad9dfc2c7e3b5ce49efc5c0c215f7c36c91cf2:
+
+  ARM: ux500: move last AB8505 set-up to DT (2014-02-04 20:50:55 +0100)
+
+----------------------------------------------------------------
+AB8500 device tree conversion and the deletion of all
+pin-related configuration from the Ux500 board files.
+
+----------------------------------------------------------------
+Linus Walleij (10):
+      ARM: ux500: move AB8500 GPIOs to device tree
+      ARM: ux500: move AB8500 YCBCR settings to device tree
+      ARM: ux500: move AB8500 PWM out settings to device tree
+      ARM: ux500: move AB8500 audio interface 1 settings to DT
+      ARM: ux500: move AB8500 USB UICC settings to DT
+      ARM: ux500: move AB8500 DMIC settings to DT
+      ARM: ux500: move AB8500 EXTCPENA from board file to DT
+      ARM: ux500: move AB8500 modem I2C settings to DT
+      ARM: ux500: move AB8500 clock out pins to DT
+      ARM: ux500: move last AB8505 set-up to DT
+
+ arch/arm/boot/dts/ste-href-ab8500.dtsi  | 428 ++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/ste-href-ab8505.dtsi  | 240 ++++++++++++++++++
+ arch/arm/boot/dts/ste-hrefprev60.dtsi   |   1 +
+ arch/arm/boot/dts/ste-hrefv60plus.dtsi  |   1 +
+ arch/arm/boot/dts/ste-snowball.dts      |   1 +
+ arch/arm/mach-ux500/Makefile            |   1 -
+ arch/arm/mach-ux500/board-mop500-pins.c | 291 ----------------------
+ arch/arm/mach-ux500/board-mop500.h      |   4 -
+ arch/arm/mach-ux500/cpu-db8500.c        |  10 -
+ 9 files changed, 671 insertions(+), 306 deletions(-)
+ create mode 100644 arch/arm/boot/dts/ste-href-ab8500.dtsi
+ create mode 100644 arch/arm/boot/dts/ste-href-ab8505.dtsi
+ delete mode 100644 arch/arm/mach-ux500/board-mop500-pins.c
