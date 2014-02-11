@@ -1,31 +1,32 @@
-From: t.dakhran@samsung.com (Tarek Dakhran)
-Date: Tue, 11 Feb 2014 11:15:28 +0900
-Subject: [PATCH v1 0/1] Boot all secondary cores on Exynos SoC's
-Message-ID: <1392084929-14116-1-git-send-email-t.dakhran@samsung.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 11 Feb 2014 10:29:55 +0800
+Subject: [RFC PATCH V2 3/4] arm64: mm: Enable HAVE_RCU_TABLE_FREE logic
+In-Reply-To: <1391703531-12845-4-git-send-email-steve.capper@linaro.org>
+References: <1391703531-12845-1-git-send-email-steve.capper@linaro.org>
+ <1391703531-12845-4-git-send-email-steve.capper@linaro.org>
+Message-ID: <CACVXFVM6vbtHQo=EhvX3LKqKSjE2169Bo6KMdA1E_mdasW766Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to implementation of exynos_boot_secondary function
-only one secondary core boots on Exynos SoC's.
+On Fri, Feb 7, 2014 at 12:18 AM, Steve Capper <steve.capper@linaro.org> wrote:
+> In order to implement fast_get_user_pages we need to ensure that the
+> page table walker is protected from page table pages being freed from
+> under it.
+>
+> This patch enables HAVE_RCU_TABLE_FREE and incorporates it into the
+> existing arm64 TLB logic. Any page table pages belonging to address
+> spaces with multiple users will be call_rcu_sched freed. Meaning
+> that disabling interrupts will block the free and protect the fast
+> gup page walker.
+>
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
 
-Two new functions added to power up and power down secondary cores:
+Tested-by: Ming Lei <ming.lei@canonical.com>
 
-static int exynos_core_power_up(unsigned int cpu);
-static int exynos_core_power_down(unsigned int cpu).
+Without patch 3 and 4 in this patchset, we can't run go script
+successfully with thp enabled on arm64, after applying the two
+patches,  go can start working.
 
-Tested on linux kernel v3.14-rc2.
-
-Comments and additions would be appreciated.
-Thank you.
-	Tarek.
-
-Tarek Dakhran (1):
-  ARM: EXYNOS: enable boot all secondary cpus instead 2
-
- arch/arm/mach-exynos/hotplug.c  |   11 ++++--
- arch/arm/mach-exynos/platsmp.c  |   75 ++++++++++++++++++++++++++++-----------
- arch/arm/mach-exynos/regs-pmu.h |    5 +++
- 3 files changed, 68 insertions(+), 23 deletions(-)
-
--- 
-1.7.10.4
+Thanks,
+--
+Ming Lei
