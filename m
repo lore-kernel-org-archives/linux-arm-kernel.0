@@ -1,35 +1,34 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 11 Feb 2014 05:30:25 -0300
-Subject: [PATCH v6 01/19] clocksource: orion: Use atomic access for
- shared registers
-In-Reply-To: <52F96993.9090007@linaro.org>
-References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1391707226-18258-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <52F96993.9090007@linaro.org>
-Message-ID: <20140211083024.GA3687@localhost>
+Date: Tue, 11 Feb 2014 05:31:23 -0300
+Subject: [PATCH v7 00/18] Armada 370/XP watchdog
+In-Reply-To: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140211083122.GB3687@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 01:06:43AM +0100, Daniel Lezcano wrote:
-> On 02/06/2014 06:20 PM, Ezequiel Garcia wrote:
-> > Replace the driver-specific thread-safe shared register API
-> > by the recently introduced atomic_io_clear_set().
-> >
-> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > Tested-by: Willy Tarreau <w@1wt.eu>
-> > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+On Mon, Feb 10, 2014 at 08:00:19PM -0300, Ezequiel Garcia wrote:
+> Yet another round. This time, addressing Guenter's comment about the nowayout
+> parameter. So, to allow for proper nowayout behavior, we now restrict the
+> initial watchdog stop; which is only done if the watchdog is not properly
+> enabled.
 > 
-> The patch looks good for me.
+> I've dropped the clocksource patch which was previously part of the series.
+> The patch is independent and will be merged through the subsystem maintainer,
+> Daniel Lezcano.
 > 
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Also, I've updated the multi_v7_defconfig, as per Jason Cooper request.
+> 
+> This series depends on Sebastian's irqchip fixes to clear the bridge irqs
+> cause, which Jason picked here:
+> 
+>   http://git.infradead.org/linux-mvebu.git mvebu-next/irqchip-fixes
+> 
+> Wim: Can we take all the watchdog changes through mvebu, with your Ack?
+> This way, we can sort out the irqchip dependency.
 > 
 
-Daniel,
-
-Jason acked this patch for you to take it. Or do you prefer that we
-merge it with the rest of the watchdog series?
+Wim: Do you have any comments about these patches?
 
 -- 
 Ezequiel Garc?a, Free Electrons
