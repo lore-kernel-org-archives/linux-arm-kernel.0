@@ -1,25 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 12 Feb 2014 12:07:34 +0800
-Subject: [PATCH 4/9] ARM: Select V6K instead of V6 by default for
- multi-platform
-In-Reply-To: <1392153119-23248-5-git-send-email-robherring2@gmail.com>
-References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
- <1392153119-23248-5-git-send-email-robherring2@gmail.com>
-Message-ID: <20140212040732.GG31484@S2101-09.ap.freescale.net>
+From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
+Date: Wed, 12 Feb 2014 12:07:28 +0800
+Subject: [PATCH V6 07/12] phy: st-miphy-40lp: Add SPEAr1310 and
+ SPEAr1340 PCIe phy support
+In-Reply-To: <52FA122A.1010900@ti.com>
+References: <cover.1392109054.git.mohit.kumar@st.com>
+ <f84ed875ae7a356a8056f4645a4d1e59c665c972.1392109054.git.mohit.kumar@st.com>
+ <52FA122A.1010900@ti.com>
+Message-ID: <2CC2A0A4A178534D93D5159BF3BCB66189FD2CACEA@EAPEX1MAIL1.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 03:11:54PM -0600, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
-> 
-> MULTI_V6 should default to V6K as it is more optimal than V6. Any
-> platform which is not V6K should select CPU_V6 which will enable the
-> less optimal code paths.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Anton Vorontsov <anton@enomsg.org>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-...
->  arch/arm/mach-imx/Kconfig       | 1 -
+Hello Kishon,
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> -----Original Message-----
+> From: Kishon Vijay Abraham I [mailto:kishon at ti.com]
+> Sent: Tuesday, February 11, 2014 5:36 PM
+> To: Mohit KUMAR DCG; arnd at arndb.de
+> Cc: Pratyush ANAND; Viresh Kumar; spear-devel; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH V6 07/12] phy: st-miphy-40lp: Add SPEAr1310 and
+> SPEAr1340 PCIe phy support
+> 
+> On Tuesday 11 February 2014 03:00 PM, Mohit Kumar wrote:
+> > From: Pratyush Anand <pratyush.anand@st.com>
+> >
+> > SPEAr1310 and SPEAr1340 uses miphy40lp phy for PCIe. This driver adds
+> > support for the same.
+> 
+> What's up with SATA support for SPEAr1310? Do you have plans of adding it
+> soon?
+> >
+
+- yes we will be doing it after this series is finalized.
+
+[...]
+> > +
+> > +	regmap_update_bits(priv->misc, SPEAR1310_PCIE_MIPHY_CFG_1,
+> > +			SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE_MASK,
+> > +			SPEAR1310_PCIE_SATA_MIPHY_CFG_PCIE);
+> > +
+> > +	switch (priv->id) {
+> 
+> 'id' should be made as optional dt property since it's not used for 1340 no?
+> 
+- ok
+Thanks
+Mohit
