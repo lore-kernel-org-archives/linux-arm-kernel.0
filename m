@@ -1,171 +1,77 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 12 Feb 2014 16:55:44 +0100
-Subject: [PATCH 10/14] net: axienet: Use pdev instead of op
+Date: Wed, 12 Feb 2014 16:55:47 +0100
+Subject: [PATCH 13/14] net: axienet: Removed _of_ prefix in probe and remove
+ functions
 In-Reply-To: <cover.1392220536.git.michal.simek@xilinx.com>
 References: <cover.1392220536.git.michal.simek@xilinx.com>
-Message-ID: <99e22ae9202079e1c71815766a8b3f53ed464a29.1392220536.git.michal.simek@xilinx.com>
+Message-ID: <50c3d613305d2e8cf4cbb74fc87c9a178c6332e6.1392220536.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srikanth Thokala <srikanth.thokala@xilinx.com>
 
-Synchronize names with other drivers
+Synchronize names with other drivers.
 
 Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 49 ++++++++++++-----------
- 1 file changed, 25 insertions(+), 24 deletions(-)
+ drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-index 4fd8a1d..324033c 100644
+index 9a9ffbc..6dd3eee 100644
 --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
 +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-@@ -1480,7 +1480,7 @@ static void axienet_dma_err_handler(unsigned long data)
+@@ -1479,7 +1479,7 @@ static void axienet_dma_err_handler(unsigned long data)
+ }
 
  /**
-  * axienet_of_probe - Axi Ethernet probe function.
-- * @op:		Pointer to platform device structure.
-+ * @pdev:	Pointer to platform device structure.
+- * axienet_of_probe - Axi Ethernet probe function.
++ * axienet_probe - Axi Ethernet probe function.
+  * @pdev:	Pointer to platform device structure.
   * @match:	Pointer to device id structure
   *
-  * returns: 0, on success
 @@ -1491,7 +1491,7 @@ static void axienet_dma_err_handler(unsigned long data)
   * device. Parses through device tree and populates fields of
   * axienet_local. It registers the Ethernet device.
   */
--static int axienet_of_probe(struct platform_device *op)
-+static int axienet_of_probe(struct platform_device *pdev)
+-static int axienet_of_probe(struct platform_device *pdev)
++static int axienet_probe(struct platform_device *pdev)
  {
- 	__be32 *p;
- 	int size, ret = 0;
-@@ -1505,9 +1505,9 @@ static int axienet_of_probe(struct platform_device *op)
- 		return -ENOMEM;
-
- 	ether_setup(ndev);
--	platform_set_drvdata(op, ndev);
-+	platform_set_drvdata(pdev, ndev);
-
--	SET_NETDEV_DEV(ndev, &op->dev);
-+	SET_NETDEV_DEV(ndev, &pdev->dev);
- 	ndev->flags &= ~IFF_MULTICAST;  /* clear multicast */
- 	ndev->features = NETIF_F_SG;
- 	ndev->netdev_ops = &axienet_netdev_ops;
-@@ -1515,18 +1515,18 @@ static int axienet_of_probe(struct platform_device *op)
-
- 	lp = netdev_priv(ndev);
- 	lp->ndev = ndev;
--	lp->dev = &op->dev;
-+	lp->dev = &pdev->dev;
- 	lp->options = XAE_OPTION_DEFAULTS;
- 	/* Map device registers */
--	lp->regs = of_iomap(op->dev.of_node, 0);
-+	lp->regs = of_iomap(pdev->dev.of_node, 0);
- 	if (!lp->regs) {
--		dev_err(&op->dev, "could not map Axi Ethernet regs.\n");
-+		dev_err(&pdev->dev, "could not map Axi Ethernet regs.\n");
- 		goto nodev;
- 	}
- 	/* Setup checksum offload, but default to off if not specified */
- 	lp->features = 0;
-
--	p = (__be32 *) of_get_property(op->dev.of_node, "xlnx,txcsum", NULL);
-+	p = (__be32 *) of_get_property(pdev->dev.of_node, "xlnx,txcsum", NULL);
- 	if (p) {
- 		switch (be32_to_cpup(p)) {
- 		case 1:
-@@ -1547,7 +1547,7 @@ static int axienet_of_probe(struct platform_device *op)
- 			lp->csum_offload_on_tx_path = XAE_NO_CSUM_OFFLOAD;
- 		}
- 	}
--	p = (__be32 *) of_get_property(op->dev.of_node, "xlnx,rxcsum", NULL);
-+	p = (__be32 *) of_get_property(pdev->dev.of_node, "xlnx,rxcsum", NULL);
- 	if (p) {
- 		switch (be32_to_cpup(p)) {
- 		case 1:
-@@ -1570,43 +1570,44 @@ static int axienet_of_probe(struct platform_device *op)
- 	 * Here we check for memory allocated for Rx/Tx in the hardware from
- 	 * the device-tree and accordingly set flags.
- 	 */
--	p = (__be32 *) of_get_property(op->dev.of_node, "xlnx,rxmem", NULL);
-+	p = (__be32 *) of_get_property(pdev->dev.of_node, "xlnx,rxmem", NULL);
- 	if (p)
- 		lp->rxmem = be32_to_cpup(p);
--	p = (__be32 *) of_get_property(op->dev.of_node, "xlnx,temac-type",
-+	p = (__be32 *) of_get_property(pdev->dev.of_node, "xlnx,temac-type",
- 				       NULL);
- 	if (p)
- 		lp->temac_type = be32_to_cpup(p);
--	p = (__be32 *) of_get_property(op->dev.of_node, "xlnx,phy-type", NULL);
-+	p = (__be32 *) of_get_property(pdev->dev.of_node,
-+						"xlnx,phy-type", NULL);
- 	if (p)
- 		lp->phy_type = be32_to_cpup(p);
-
- 	/* Find the DMA node, map the DMA registers, and decode the DMA IRQs */
--	np = of_parse_phandle(op->dev.of_node, "axistream-connected", 0);
-+	np = of_parse_phandle(pdev->dev.of_node, "axistream-connected", 0);
- 	if (!np) {
--		dev_err(&op->dev, "could not find DMA node\n");
-+		dev_err(&pdev->dev, "could not find DMA node\n");
- 		goto err_iounmap;
- 	}
- 	lp->dma_regs = of_iomap(np, 0);
- 	if (lp->dma_regs) {
--		dev_dbg(&op->dev, "MEM base: %p\n", lp->dma_regs);
-+		dev_dbg(&pdev->dev, "MEM base: %p\n", lp->dma_regs);
- 	} else {
--		dev_err(&op->dev, "unable to map DMA registers\n");
-+		dev_err(&pdev->dev, "unable to map DMA registers\n");
- 		of_node_put(np);
- 	}
- 	lp->rx_irq = irq_of_parse_and_map(np, 1);
- 	lp->tx_irq = irq_of_parse_and_map(np, 0);
- 	of_node_put(np);
- 	if ((lp->rx_irq <= 0) || (lp->tx_irq <= 0)) {
--		dev_err(&op->dev, "could not determine irqs\n");
-+		dev_err(&pdev->dev, "could not determine irqs\n");
- 		ret = -ENOMEM;
- 		goto err_iounmap_2;
- 	}
-
- 	/* Retrieve the MAC address */
--	addr = of_get_property(op->dev.of_node, "local-mac-address", &size);
-+	addr = of_get_property(pdev->dev.of_node, "local-mac-address", &size);
- 	if ((!addr) || (size != 6)) {
--		dev_err(&op->dev, "could not find MAC address\n");
-+		dev_err(&pdev->dev, "could not find MAC address\n");
- 		ret = -ENODEV;
- 		goto err_iounmap_2;
- 	}
-@@ -1615,11 +1616,11 @@ static int axienet_of_probe(struct platform_device *op)
- 	lp->coalesce_count_rx = XAXIDMA_DFT_RX_THRESHOLD;
- 	lp->coalesce_count_tx = XAXIDMA_DFT_TX_THRESHOLD;
-
--	lp->phy_node = of_parse_phandle(op->dev.of_node, "phy-handle", 0);
-+	lp->phy_node = of_parse_phandle(pdev->dev.of_node, "phy-handle", 0);
- 	if (lp->phy_node)
--		ret = axienet_mdio_setup(lp, op->dev.of_node);
-+		ret = axienet_mdio_setup(lp, pdev->dev.of_node);
- 	if (ret)
--		dev_warn(&op->dev, "error registering MDIO bus\n");
-+		dev_warn(&pdev->dev, "error registering MDIO bus\n");
-
- 	ret = register_netdev(lp->ndev);
- 	if (ret) {
-@@ -1640,9 +1641,9 @@ nodev:
+ 	int ret;
+ 	struct device_node *np;
+@@ -1639,7 +1639,7 @@ free_netdev:
  	return ret;
  }
 
--static int axienet_of_remove(struct platform_device *op)
-+static int axienet_of_remove(struct platform_device *pdev)
+-static int axienet_of_remove(struct platform_device *pdev)
++static int axienet_remove(struct platform_device *pdev)
  {
--	struct net_device *ndev = platform_get_drvdata(op);
-+	struct net_device *ndev = platform_get_drvdata(pdev);
+ 	struct net_device *ndev = platform_get_drvdata(pdev);
  	struct axienet_local *lp = netdev_priv(ndev);
+@@ -1656,9 +1656,9 @@ static int axienet_of_remove(struct platform_device *pdev)
+ 	return 0;
+ }
 
- 	axienet_mdio_teardown(lp);
+-static struct platform_driver axienet_of_driver = {
+-	.probe = axienet_of_probe,
+-	.remove = axienet_of_remove,
++static struct platform_driver axienet_driver = {
++	.probe = axienet_probe,
++	.remove = axienet_remove,
+ 	.driver = {
+ 		 .owner = THIS_MODULE,
+ 		 .name = "xilinx_axienet",
+@@ -1666,7 +1666,7 @@ static struct platform_driver axienet_of_driver = {
+ 	},
+ };
+
+-module_platform_driver(axienet_of_driver);
++module_platform_driver(axienet_driver);
+
+ MODULE_DESCRIPTION("Xilinx Axi Ethernet driver");
+ MODULE_AUTHOR("Xilinx");
 --
 1.8.2.3
 
@@ -175,4 +81,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/eeb2829b/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/22cffea8/attachment-0001.sig>
