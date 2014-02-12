@@ -1,27 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Feb 2014 12:05:10 +0100
-Subject: [PATCH 1/2] arm64: Add seccomp support
-In-Reply-To: <CAB5YjtB6XnXRd90AUw=rJCOBKyfcngTQd3Kxft33XLCK+K=Vuw@mail.gmail.com>
-References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
- <2659759.AA5HtBcWYl@wuerfel>
- <CAB5YjtB6XnXRd90AUw=rJCOBKyfcngTQd3Kxft33XLCK+K=Vuw@mail.gmail.com>
-Message-ID: <201402121205.10802.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 12 Feb 2014 12:06:23 +0100
+Subject: [PATCH] ARM: at91/DT: add NAND + DMA property
+Message-ID: <1392203183-9851-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 February 2014, Takahiro Akashi wrote:
-> Thank you for your comment.
-> I'm afraid that I can't do so because how compat syscall numbers
-> are named varies from arch to arch. __NR_compat_read is used
-> only on arm64, while __NR_ia32_read on x86. On other archs,
-> __NR_read is common to 32-bit and 64-bit tasks.
+Add the "atmel,nand-has-dma" property to NAND node for SoC that
+can use the DMA to perform NAND accesses.
+Use of this property was added in 1b7192658a08f70df0f290634fd7cd2ecb629fc9
+(mtd: atmel_nand: add a new dt binding item for nand dma support).
 
-It's fine, I'm the maintainer for asm-generic ;-)
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91sam9g45.dtsi | 1 +
+ arch/arm/boot/dts/at91sam9n12.dtsi | 1 +
+ arch/arm/boot/dts/at91sam9x5.dtsi  | 1 +
+ arch/arm/boot/dts/sama5d3.dtsi     | 1 +
+ 4 files changed, 4 insertions(+)
 
-All future architectures are required to do it the same way as
-arm64 and use the generic syscall ABI. It just means we won't be
-able to share this header with x86 or other architectures that
-use a nonstandard string. We should have it in the generic place
-even if arm64 is the only user for now.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index cbcc058b26b4..9b6683f252cf 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -817,6 +817,7 @@
+ 			      >;
+ 			atmel,nand-addr-offset = <21>;
+ 			atmel,nand-cmd-offset = <22>;
++			atmel,nand-has-dma;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_nand>;
+ 			gpios = <&pioC 8 GPIO_ACTIVE_HIGH
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index 394e6ce2afb7..9f04808fc697 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -570,6 +570,7 @@
+ 			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
+ 			atmel,nand-addr-offset = <21>;
+ 			atmel,nand-cmd-offset = <22>;
++			atmel,nand-has-dma;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_nand>;
+ 			gpios = <&pioD 5 GPIO_ACTIVE_HIGH
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 174219de92fa..67e32067eb25 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -790,6 +790,7 @@
+ 			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
+ 			atmel,nand-addr-offset = <21>;
+ 			atmel,nand-cmd-offset = <22>;
++			atmel,nand-has-dma;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_nand>;
+ 			gpios = <&pioD 5 GPIO_ACTIVE_HIGH
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index 3d5faf85f51b..d075c5326ce7 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -1256,6 +1256,7 @@
+ 			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
+ 			atmel,nand-addr-offset = <21>;
+ 			atmel,nand-cmd-offset = <22>;
++			atmel,nand-has-dma;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
+ 			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
+-- 
+1.8.2.2
