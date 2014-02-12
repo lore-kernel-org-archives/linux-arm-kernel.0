@@ -1,23 +1,58 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Feb 2014 13:32:35 -0700
-Subject: [PATCH 3/9] ARM: select MIGHT_HAVE_CACHE_L2X0 for V7
- multi-platform
-In-Reply-To: <1392153119-23248-4-git-send-email-robherring2@gmail.com>
-References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
- <1392153119-23248-4-git-send-email-robherring2@gmail.com>
-Message-ID: <52FBDA63.6030303@wwwdotorg.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 12 Feb 2014 13:33:22 -0700
+Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
+In-Reply-To: <1545472.qN7M5OiOyA@wuerfel>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <2006726.HhIT01YuXY@wuerfel> <20140212194313.GA17248@obsidianresearch.com>
+ <1545472.qN7M5OiOyA@wuerfel>
+Message-ID: <CAErSpo52jJ1EN18v0Z_3rJapsY2G_Uxwhwfe1cWYa4tKN1dD1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2014 02:11 PM, Rob Herring wrote:
-> Many V7 platforms have an L2x0 cache, so make CONFIG_MIGHT_HAVE_CACHE_L2X0
-> visible for V7 multi-platform builds.
+On Wed, Feb 12, 2014 at 1:07 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 12 February 2014 12:43:13 Jason Gunthorpe wrote:
+>> On Tue, Feb 11, 2014 at 11:42:52AM +0100, Arnd Bergmann wrote:
+>>
+>>
+>> Still missing release_region..
+>>
+>> Thoughts on upstreamining these bits?
+>
+> Upstreaming them would be great. Patches look correct by inspection as well.
+>
+>> > Since the mvebu_pcie_setup() function seems very generic at this,
+>> > we should probably try to factor out that code into a common
+>> > helper, at least for arm64, but ideally shared with arm32
+>> > as well.
+>>
+>> Yah, especially since people are not getting it completely right..
+>>
+>> But some of the trouble here is a lack of a generic pci host driver
+>> structure, eg I have to pull the domain number out of the ARM32
+>> specific structure ..
+>
+> I'm sure that Bjorn also has some plans of his own, but I think
+> we should have a generic host driver structure and gradually move
+> stuff into it from the architecture specific structs.
 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+I don't have plans in this area right now, but I would definitely like
+to migrate things like the domain, NUMA node, etc., into a generic
+structure.
 
->  config ARCH_MULTI_V6_V7
->  	bool
-> +	select MIGHT_HAVE_CACHE_L2X0
-
-The commit description says "V7", whereas the select got added to
-"V6_V7" rather then "V7". Was that intentional?
+> Now there is a 'struct pci_host_bridge' that is used on some
+> architectures already but not on ARM. It also contains a list
+> of resource windows plus offsets, and there is a set of functions
+> associated with it:
+>
+> pci_create_root_bus()
+> pcibios_root_bridge_prepare()
+>
+> etc.
+>
+> Maybe all that's needed is to actually start using those on arm32?
+>
+>         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
