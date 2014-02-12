@@ -1,45 +1,26 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 12 Feb 2014 13:42:49 +0100
-Subject: [PATCH] ARM: mm: cache-l2x0: Check for status property of DT node
-In-Reply-To: <1392206478-11530-1-git-send-email-tushar.behera@linaro.org>
-References: <1392206478-11530-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <52FB6C49.6010401@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Feb 2014 12:43:55 +0000
+Subject: [PATCH 0/3] arm64: Use pte manipulation functions for THP
+In-Reply-To: <20140212115004.GA14527@linaro.org>
+References: <1391696171-8922-1-git-send-email-steve.capper@linaro.org>
+ <20140212094338.GA11325@linaro.org>
+ <20140212100736.GA13441@mudshark.cambridge.arm.com>
+ <20140212101602.GD29702@arm.com>
+ <20140212102112.GE13441@mudshark.cambridge.arm.com>
+ <20140212115004.GA14527@linaro.org>
+Message-ID: <20140212124355.GN26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[making Cc list a bit more comprehensive]
+On Wed, Feb 12, 2014 at 11:50:05AM +0000, Steve Capper wrote:
+> I have noticed the following for ARM:
+>  36bb94b ARM: pgtable: provide RDONLY page table bit rather than WRITE bit
+> Are you happy for me to re-introduce PTE_WRITE for the 3-level code
+> only, and keep L_PTE_RDONLY for the 2-level code?
 
-On 12.02.2014 13:01, Tushar Behera wrote:
-> Currently only the DT node is checked during l2x0 cache initialization,
-> but it doesn't check the status of the DT node. Thus it gets called
-> even if the status of DT node for L2 controller is disabled.
->
-> Add explicit check to ensure that L2 cache is initialized only for
-> desired boards.
->
-> Reported-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> ---
->   arch/arm/mm/cache-l2x0.c |    3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index 7abde2c..f075cb1 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -978,6 +978,9 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
->   	if (!np)
->   		return -ENODEV;
->
-> +	if (!of_device_is_available(np))
-> +		return -ENODEV;
-> +
->   	if (of_address_to_resource(np, 0, &res))
->   		return -ENODEV;
->
->
+Sigh, yet another cleanup reverted...  If you must.
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-
-Best regards,
-Tomasz
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
