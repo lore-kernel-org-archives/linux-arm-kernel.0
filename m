@@ -1,52 +1,61 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 12 Feb 2014 19:29:01 +0100
-Subject: [BUG] Circular locking dependency - DRM/CMA/MM/hotplug/...
-In-Reply-To: <20140212163317.GQ26684@n2100.arm.linux.org.uk>
-References: <20140211183543.GK26684@n2100.arm.linux.org.uk>
- <52FB9602.1000805@samsung.com>
- <20140212163317.GQ26684@n2100.arm.linux.org.uk>
-Message-ID: <20140212182901.GX17001@phenom.ffwll.local>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 12 Feb 2014 13:32:09 -0500
+Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
+In-Reply-To: <CAOesGMgNkdxW4znmns10-DPc4+OTWJLyx2fcJGTgdND6pp0zUQ@mail.gmail.com>
+References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
+ <201402121251.06280.arnd@arndb.de>
+ <20140212174554.GM27395@titan.lakedaemon.net>
+ <CAOesGMgNkdxW4znmns10-DPc4+OTWJLyx2fcJGTgdND6pp0zUQ@mail.gmail.com>
+Message-ID: <20140212183209.GN27395@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 04:33:17PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Feb 12, 2014 at 04:40:50PM +0100, Marek Szyprowski wrote:
-> >> -> #3 (console_lock){+.+.+.}:
-> >>         [<c0066f04>] __lock_acquire+0x151c/0x1ca0
-> >>         [<c0067c28>] lock_acquire+0xa0/0x130
-> >>         [<c006edcc>] console_lock+0x60/0x74
-> >>         [<c006f7b8>] console_cpu_notify+0x28/0x34
-> >>         [<c004904c>] notifier_call_chain+0x4c/0x8c
-> >>         [<c004916c>] __raw_notifier_call_chain+0x1c/0x24
-> >>         [<c0024124>] __cpu_notify+0x34/0x50
-> >>         [<c002424c>] cpu_notify_nofail+0x18/0x24
-> >>         [<c068e168>] _cpu_down+0x100/0x244
-> >>         [<c068e2dc>] cpu_down+0x30/0x44
-> >>         [<c036ef8c>] cpu_subsys_offline+0x14/0x18
-> >>         [<c036af28>] device_offline+0x94/0xbc
-> >>         [<c036b030>] online_store+0x4c/0x74
-> >>         [<c0368d3c>] dev_attr_store+0x20/0x2c
-> >>         [<c016b2e0>] sysfs_kf_write+0x54/0x58
-> >>         [<c016eaa4>] kernfs_fop_write+0xc4/0x160
-> >>         [<c0105a54>] vfs_write+0xbc/0x184
-> >>         [<c0105dfc>] SyS_write+0x48/0x70
-> >>         [<c000e6e0>] ret_fast_syscall+0x0/0x48
+On Wed, Feb 12, 2014 at 10:13:59AM -0800, Olof Johansson wrote:
+> On Wed, Feb 12, 2014 at 9:45 AM, Jason Cooper <jason@lakedaemon.net> wrote:
 > 
-> cpu_down() takes cpu_hotplug.lock, so here we have:
+> > I brought this up at last weeks devicetree irc meeting.  My goal is to
+> > provide early randomness for kaslr on ARM.  Currently, my idea is modify
+> > the init script to save an additional random seed from /dev/urandom to
+> > /boot/random-seed.
+> >
+> > The bootloader would then load this file into ram, and pass the
+> > address/size to the kernel either via dt, or commandline.  kaslr (run in
+> > the decompressor) would consume some of this randomness, and then
+> > random.c would consume the rest in a non-crediting initialization.
+> >
+> > While not ideal, it works in absence of an HRNG, and is no worse than
+> > the current situation of storing the seed in /var/lib/misc/random-seed.
+> > It also doesn't require modification of the bootloaders.  Just an
+> > updated kernel, and update the bootloader environment to load the
+> > seed.
 > 
-> 	cpu_hotplug.lock
-> 	console_lock
+> Hmm. There are some drawbacks with this -- it assumes you can "just
+> update the bootloader environment" which in general isn't easy to do.
 
-The patche I've linked in my other mail will break the chain here, so
-should solve this. And apparently with cpu hotplug we can hit this, too.
-And having banged my head against the console_lock wall I think doing a
-trylock here is generally the sanest option.
+true, the scope of my experience is consumer grade NASs, routers and
+APs.  At the very least, it's much easier than upgrading the bootloader.
 
-So imo we can just blame console_lock, not need to either beat up v4l,
-drm, cma or anyone else really ;-)
+Also, my pov is as a hobbyist modifying devices post-sale.  The idea is
+something I could add to my existing boxes without having to upgrade the
+bootloaders.
 
-Cheers, Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+> Also, you can't assume that /boot is writable or exists on all
+> embedded systems.
+
+In systems missing this capability, they often have the ability to
+update the kernel.  All that's needed is one block of flash.  Current
+random-seed size is 512 bytes.  I'm not saying it's easy or desirable.
+But for folks who feel it's necessary to have kaslr on embedded devices,
+it would facilitate better random numbers.  "Better" meaning much harder
+for an attacker to guess.
+
+> In general, taking both runtime and system-dependend data and using
+> that to see entropy is a good idea.
+
+Of course, I wasn't arguing for one or the other.  As you said later, in
+situations where you can't feed in a seed file, MAC addresses and serial
+numbers are better than nothing.
+
+thx,
+
+Jason.
