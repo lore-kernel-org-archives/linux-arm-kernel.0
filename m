@@ -1,59 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Feb 2014 14:26:41 +0100
-Subject: [PATCH v2 0/9] ARM: multi-platform kconfig cleanup and mach-virt
- removal
-In-Reply-To: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
-References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
-Message-ID: <201402121426.41914.arnd@arndb.de>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 12 Feb 2014 14:34:31 +0100
+Subject: [PATCH v3 0/11] Xilinx watchdog changes
+Message-ID: <cover.1392212059.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 February 2014, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
-> 
-> This series removes common kconfig options required by multi-platform
-> builds out of individual platforms as they are redundant. Patches 2 and
-> 3 make SMP and CACHE_L2X0 config options visible on MULTI_V7 builds as
-> most platforms enable these options and all platforms can run with them
-> enabled.
+Hi,
 
-Overall looks pretty good, let's wait for a few more Acks or a possible
-Nak and then put it into arm-soc. You can add my 'Acked-by' to all patches
-if you like.
+This series contains changes for Xilinx watchdog.
+The whole code series have been reviewed by Guenter
+and device-tree binding was acked by Arnd.
 
-> The previous version [1] was mainly a discussion about v6 vs. v6K.
-> Several platforms have this wrong and incorrectly select v6 when the
-> more optimal v6K option could be used. After more research, my memory
-> about i.MX31 was wrong and it does need to remain v6.
+I have also pushed this v3 to git repo
+for easier pulling here:
+git://git.monstr.eu/linux-2.6-microblaze.git watchdog
 
-Just curious: do you have more information on this? Are all i.MX31 ARMv6
-and all i.MX35 v6k as the current Kconfig claims,  or is it more
-complicated?
+Thanks,
+Michal
 
-> Finally, patch 8 removes mach-virt as it is no longer needed. The core
-> ARM code can handle all the necessary initialization and mach-virt is
-> left as a kconfig option. Although not really related to this series, 
-> it would otherwise conflict with it.
+Changes in v3:
+- Remove one if checking and use variable directly
 
-Makes sense. It's still a cleanup, so you could send it as a 
-separate patch to be applied on-top of the pull rather than the
-same pull request, although the difference is really marginal.
+Changes in v2:
+- Fix enable_once logic
+- Change patch subject
+- New patch in this series
 
-You are probably right in leaving out the non-multiplatform
-platforms, but maybe we can figure out whether they should be
-changed as well, especially as some of them are going to become
-multiplatform-enabled in the future:
+Michal Simek (11):
+  watchdog: xilinx: Convert driver to the watchdog framework
+  watchdog: xilinx: Move control_status_reg to functions
+  watchdog: xilinx: Simplify probe and remove functions
+  watchdog: xilinx: Move no_timeout to probe function
+  watchdog: xilinx: Allocate private structure per device
+  watchdog: xilinx: Fix all printk messages
+  watchdog: xilinx: Use of_property_read_u32
+  watchdog: xilinx: Use correct comment indentation
+  watchdog: xilinx: Add missing binding
+  watchdog: xilinx: Enable this driver for Zynq
+  watchdog: xilinx: Remove no_timeout variable
 
-* ARCH_S5P64X0 should be changed, it's next on the list
-* DaVinci/TNETV107X looks rather broken, I wonder if we should
-  just remove it entirely rather than fix it. I have a series
-  to fix all 'randconfig' build bugs locally and there were a
-  lot of them for TNETV107X, and I doubt fixing the build will
-  actually give you a booting kernel.
-* ARCH_MSM7X00A should just be changed, although probably nobody
-  really cares.
-* integrator and realview apparently allow both CPU_V6 and CPU_V6K
-  to be manually selected. Is that actually the correct behavior
-  in that both kinds of core tiles exist?
+ .../devicetree/bindings/watchdog/of-xilinx-wdt.txt |  23 ++
+ drivers/watchdog/Kconfig                           |  21 +-
+ drivers/watchdog/of_xilinx_wdt.c                   | 389 ++++++---------------
+ 3 files changed, 148 insertions(+), 285 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/of-xilinx-wdt.txt
 
-	Arnd
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/0c4ba478/attachment.sig>
