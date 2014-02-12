@@ -1,35 +1,35 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Wed, 12 Feb 2014 14:52:38 +0530
-Subject: [PATCH] arm64: fix psci power state pack
-Message-ID: <1392196958-2507-1-git-send-email-pgaikwad@nvidia.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 12 Feb 2014 10:24:48 +0100
+Subject: [PATCH 2/3] ARM: mvebu: use GPIO DT defines in Armada 370/XP
+ boards
+In-Reply-To: <20140212074946.GC30814@lunn.ch>
+References: <1392138433-12573-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1392138433-12573-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140212074946.GC30814@lunn.ch>
+Message-ID: <20140212102448.06d8cc56@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Values has to be shifted right to create pack.
+Dear Andrew Lunn,
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
----
- arch/arm64/kernel/psci.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+On Wed, 12 Feb 2014 08:49:46 +0100, Andrew Lunn wrote:
 
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 4f97db3..6e8f1df 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -87,11 +87,11 @@ static int psci_to_linux_errno(int errno)
- static u32 psci_power_state_pack(struct psci_power_state state)
- {
- 	return	((state.id & PSCI_POWER_STATE_ID_MASK)
--			<< PSCI_POWER_STATE_ID_SHIFT)	|
-+			>> PSCI_POWER_STATE_ID_SHIFT)	|
- 		((state.type & PSCI_POWER_STATE_TYPE_MASK)
--			<< PSCI_POWER_STATE_TYPE_SHIFT)	|
-+			>> PSCI_POWER_STATE_TYPE_SHIFT)	|
- 		((state.affinity_level & PSCI_POWER_STATE_AFFL_MASK)
--			<< PSCI_POWER_STATE_AFFL_SHIFT);
-+			>> PSCI_POWER_STATE_AFFL_SHIFT);
- }
- 
- /*
+> What i did for kirkwood is include both gpio.h and input.h in
+> kirkwood.dtsi. Quite a few other systems do that, rather than each
+> .dts file having to include them. However i don't have a strong
+> opinion.
+
+Right, I don't have a strong opinion on this either. I did it this way
+because a few other .dts files for Armada boards (Netgear NAS) were
+already including these header files.
+
+I guess it is clearly something that can be factorized later on as the
+number of Armada boards needing this grows.
+
+Thanks!
+
+Thomas
 -- 
-1.7.4.1
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
