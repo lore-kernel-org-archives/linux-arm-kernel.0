@@ -1,23 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Feb 2014 13:18:34 +0000
-Subject: [PATCH v2] ARM: Add imprecise abort enable/disable macro
-In-Reply-To: <52FB71A3.5010505@stericsson.com>
-References: <1392050756-11145-1-git-send-email-fabrice.gasnier@st.com>
- <52FB71A3.5010505@stericsson.com>
-Message-ID: <20140212131834.GP26684@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 12 Feb 2014 17:25:22 +0400
+Subject: [PATCH] ARM: shmobile: set proper DMA masks for Ether devices
+In-Reply-To: <52FB5FC0.3010808@codethink.co.uk>
+References: <201402120255.25037.sergei.shtylyov@cogentembedded.com>
+ <52FB5FC0.3010808@codethink.co.uk>
+Message-ID: <52FB7642.4000506@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 02:05:39PM +0100, Fabrice GASNIER wrote:
-> Hi,
->
-> Any comments on this patch ?
->
-> Russell, can I add this patch to your patch tracker system ?
+Hello.
 
-I don't see how this works on anything but ARMv7M.
+On 12-02-2014 15:49, Ben Dooks wrote:
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+>> Ether MAC is a DMA-capable device and so should have 'dev.dma_mask' and
+>> 'dev.coherent_dma_mask' fields set properly, to reflect 32-bit DMA addressing
+>> ability.  Currently, the code works without DMA masks but in the future, when
+>> support for NETIF_F_HIGHDMA & NETIF_F_SG would be added to the 'sh_eth' driver,
+>> the DMA masks should start to matter...
+
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+> Hi, do you have a git branch available with all the changes for getting
+> ethernet working on rcar please?
+
+    Depends on whether you want it working via DT or mere platform devices. If 
+the second, it's 3.14-rc1. If DT, I don't have a branch, only several patches 
+to apply atop of the current 'renesas.git' repo's 'devel' branch that I've 
+posted last week (note that only R8A779x is currently supported by these 
+patches and NFS boot timeout is still an issue with them).
+
+WBR, Sergei
