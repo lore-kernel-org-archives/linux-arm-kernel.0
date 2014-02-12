@@ -1,75 +1,84 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Feb 2014 13:58:33 -0800
-Subject: [PATCH] dma: mv_xor: Silence a bunch of LPAE-related warnings
-In-Reply-To: <CAPcyv4gWJA7Cv39pxtuOqj0RyivODNuae7Q0Ku27RQO8=M3HbQ@mail.gmail.com>
-References: <1391476403-26099-1-git-send-email-olof@lixom.net>
- <20140204052329.GN10628@intel.com>
- <20140204170019.GI8533@titan.lakedaemon.net>
- <CAOesGMg0mrikAp7cDkm9+5=TfR7bj7_f4=JPMxBbabEPwkQs9Q@mail.gmail.com>
- <CAPcyv4jwwRT_+c-yDycgY0d79nByvAVWH6waFWeodE9yi=7CDg@mail.gmail.com>
- <CAPcyv4gWJA7Cv39pxtuOqj0RyivODNuae7Q0Ku27RQO8=M3HbQ@mail.gmail.com>
-Message-ID: <20140212215833.GA29365@quad.lixom.net>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 12 Feb 2014 15:24:14 -0700
+Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
+In-Reply-To: <20140212221526.60fd7f8b@skate>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <201402092130.25615.arnd@arndb.de>
+ <20140210173450.GA5554@obsidianresearch.com>
+ <2006726.HhIT01YuXY@wuerfel>
+ <20140212194313.GA17248@obsidianresearch.com>
+ <20140212221526.60fd7f8b@skate>
+Message-ID: <20140212222414.GB17248@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 10:58:31AM -0800, Dan Williams wrote:
-> On Tue, Feb 4, 2014 at 10:57 AM, Dan Williams <dan.j.williams@intel.com> wrote:
-> > On Tue, Feb 4, 2014 at 10:30 AM, Olof Johansson <olof@lixom.net> wrote:
-> >> On Tue, Feb 4, 2014 at 9:00 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> >>> On Tue, Feb 04, 2014 at 10:53:29AM +0530, Vinod Koul wrote:
-> >>>> On Mon, Feb 03, 2014 at 05:13:23PM -0800, Olof Johansson wrote:
-> >>>> > Enabling some of the mvebu platforms in the multiplatform config for ARM
-> >>>> > enabled these drivers, which also triggered a bunch of warnings when LPAE
-> >>>> > is enabled (thus making phys_addr_t 64-bit).
-> >>>> >
-> >>>> > Most changes are switching printk formats, but also a bit of changes to what
-> >>>> > used to be array-based pointer arithmetic that could just be done with the
-> >>>> > address types instead.
-> >>>> >
-> >>>> > The warnings were:
-> >>>> >
-> >>>> > drivers/dma/mv_xor.c: In function 'mv_xor_tx_submit':
-> >>>> > drivers/dma/mv_xor.c:500:3: warning: format '%x' expects argument of type
-> >>>> >     'unsigned int', but argument 4 has type 'dma_addr_t' [-Wformat]
-> >>>> > drivers/dma/mv_xor.c: In function 'mv_xor_alloc_chan_resources':
-> >>>> > drivers/dma/mv_xor.c:553:13: warning: cast to pointer from integer of
-> >>>> >     different size [-Wint-to-pointer-cast]
-> >>>> > drivers/dma/mv_xor.c:555:4: warning: cast from pointer to integer of
-> >>>> >     different size [-Wpointer-to-int-cast]
-> >>>> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_memcpy':
-> >>>> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
-> >>>> >     'unsigned int', but argument 5 has type 'dma_addr_t' [-Wformat]
-> >>>> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
-> >>>> >     'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat]
-> >>>> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_xor':
-> >>>> > drivers/dma/mv_xor.c:628:2: warning: format '%u' expects argument of type
-> >>>> >     'unsigned int', but argument 7 has type 'dma_addr_t' [-Wformat]
-> >>>> >
-> >>>> > Signed-off-by: Olof Johansson <olof@lixom.net>
-> >>>> Acked-by: Vinod Koul <vinod.koul@intel.com>
-> >>>
-> >>> Olof, would you like me to queue it up?  Or do you want to take it
-> >>> directly?
-> >>>
-> >>> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> >>
-> >> I'm confused. I sent the patch to the drivers/dma maintainers and they
-> >> just acked it without asking me to pick it up myself.
-> >>
-> >> Vinod, did you ack it for me to pick it up, or for some other reason?
-> >> If you don't want to take it through your tree I'll be happy to take
-> >> it through arm-soc, just looking to clarify.
-> >>
-> >> (Jason, I can apply it directly)
-> >
-> > Vinod will correct me if I am wrong, but I take his acks to mean "yup,
-> > take it through your tree".  For this specific problem I thought we
-> > had a comprehensive fix pending from Joe Perches to add a new %pX
-> > format specifier for dma addresses?
+On Wed, Feb 12, 2014 at 10:15:26PM +0100, Thomas Petazzoni wrote:
+
+> > +#ifdef CONFIG_PCI_DOMAINS
+> > +       domain = sys->domain;
+> > +#endif
+> > +
+> > +       snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x", domain);
+> > +       pcie->mem.name = pcie->mem_name;
+> > +
+> > +       snprintf(pcie->io_name, sizeof(pcie->io_name), "PCI I/O %04x", domain);
+> > +       pcie->realio.name = pcie->io_name;
 > 
-> Never mind... that's what you are using.  Sorry for the noise.
+> I honestly don't know what PCI domains are, but this change looks
+> fairly harmless to me. I would however use kasprintf() instead maybe. I
+> can submit patches for those two changes if you want.
 
-Yep. Applied now, btw.
+For this purpose imagine that each PCI host controller driver gets a
+unique domain, and every domain has a unique
+aperture. domain:bus:device:function is the full unique path to a PCI
+device.
+
+So when you look at the resource hierarchy it makes some logical
+sense:
+
+e0000000-efffffff : PCI MEM 0000
+  e0000000-e00fffff : PCI Bus 0000:01
+    e0000000-e001ffff : 0000:01:00.0
+
+PCI Domain -> domain + subordinate bus # -> domain:bus:device:function, bar #
+
+The ARM PCI BIOS code used bus number, and Will's version ended up
+using the DT path to the PCI node. Would be nice to see an
+agreement/common code :)
+ 
+> > Still missing release_region..
+> 
+> To match which request_region?
+
+Ah, sorry, Arnd added one:
+
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 13478ec..b55e9a6 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -680,9 +680,17 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+        struct mvebu_pcie *pcie = sys_to_pcie(sys);
+        int i;
+
+-       if (resource_size(&pcie->realio) != 0)
++       if (request_resource(&iomem_resource, &pcie->mem))
++               return 0;
++
++       if (resource_size(&pcie->realio) != 0) {
++               if (request_resource(&ioport_resource, &pcie->realio)) {
++                       release_resource(&pcie->mem);
++                       return 0;
++               }
+                pci_add_resource_offset(&sys->resources, &pcie->realio,
+                                        sys->io_offset);
++       }
+        pci_add_resource_offset(&sys->resources, &pcie->mem, sys->mem_offset);
+        pci_add_resource(&sys->resources, &pcie->busn);
 
 
--Olof
+Which is why I didn't use kasprintf, that would complicate freeing
+further.
+
+Ideally we'd be able to use a devm_request_region someday.
+
+Jason
