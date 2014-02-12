@@ -1,31 +1,105 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 12 Feb 2014 13:35:54 -0800
-Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
-In-Reply-To: <20140212174554.GM27395@titan.lakedaemon.net>
-References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
- <201402121251.06280.arnd@arndb.de>
- <20140212174554.GM27395@titan.lakedaemon.net>
-Message-ID: <CAGXu5j+BQzrgoAN-TiCaaoQaEjB+JQOCZLKq+_rFoWdFR-UpqQ@mail.gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 12 Feb 2014 15:51:48 -0600
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <1392236171-10512-4-git-send-email-will.deacon@arm.com>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <1392236171-10512-4-git-send-email-will.deacon@arm.com>
+Message-ID: <D2AE4AE6-E8FA-4DD8-B92B-E37205A2548C@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 9:45 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> I brought this up at last weeks devicetree irc meeting.  My goal is to
-> provide early randomness for kaslr on ARM.  Currently, my idea is modify
-> the init script to save an additional random seed from /dev/urandom to
-> /boot/random-seed.
 
-I'm all for a good entropy source for early boot. :)
+On Feb 12, 2014, at 2:16 PM, Will Deacon <will.deacon@arm.com> wrote:
 
-I need to figure out what's needed for relocation support first
-though, before we can really tackle kernel base-address randomization
-on ARM. I haven't had a chance to look around too closely yet, but it
-seems like only x86 and ppc do this currently? Has anyone looked in
-detail and what would be needed on ARM for CONFIG_RELOCATABLE
-behavior?
+> This patch adds support for a generic PCI host controller, such as a
+> firmware-initialised device with static windows or an emulation by
+> something such as kvmtool.
+> 
+> The controller itself has no configuration registers and has its address
+> spaces described entirely by the device-tree (using the bindings from
+> ePAPR). Both CAM and ECAM are supported for Config Space accesses.
+> 
+> Corresponding documentation is added for the DT binding.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> .../devicetree/bindings/pci/arm-generic-pci.txt    |  51 ++++
+> drivers/pci/host/Kconfig                           |   7 +
+> drivers/pci/host/Makefile                          |   1 +
+> drivers/pci/host/pci-arm-generic.c                 | 318 +++++++++++++++++++++
+> 4 files changed, 377 insertions(+)
+> create mode 100644 Documentation/devicetree/bindings/pci/arm-generic-pci.txt
+> create mode 100644 drivers/pci/host/pci-arm-generic.c
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/arm-generic-pci.txt b/Documentation/devicetree/bindings/pci/arm-generic-pci.txt
+> new file mode 100644
+> index 000000000000..cc7a35ecfa2d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/arm-generic-pci.txt
+> @@ -0,0 +1,51 @@
+> +* ARM generic PCI host controller
+> +
+> +Firmware-initialised PCI host controllers and PCI emulations, such as the
+> +virtio-pci implementations found in kvmtool and other para-virtualised
+> +systems, do not require driver support for complexities such as regulator and
+> +clock management. In fact, the controller may not even require the
+> +configuration of a control interface by the operating system, instead
+> +presenting a set of fixed windows describing a subset of IO, Memory and
+> +Configuration Spaces.
+> +
+> +Such a controller can be described purely in terms of the standardized device
+> +tree bindings communicated in pci.txt:
+> +
+> +- compatible     : Must be "arm,pci-cam-generic" or "arm,pci-ecam-generic"
+> +                   depending on the layout of configuration space (CAM vs
+> +                   ECAM respectively)
 
--Kees
+What?s arm specific here?  I don?t have a great suggestion, but seems odd for this to be vendor prefixed with "arm".
+
+> +
+> +- ranges         : As described in IEEE Std 1275-1994, but must provide
+> +                   at least a definition of one or both of IO and Memory
+> +                   Space.
+> +
+> +- #address-cells : Must be 3
+> +
+> +- #size-cells    : Must be 2
+> +
+> +- reg            : The Configuration Space base address, as accessed by the
+> +                   parent bus.
+
+Isn?t the size fixed here for cam or ecam?
+
+> +
+> +Configuration Space is assumed to be memory-mapped (as opposed to being
+> +accessed via an ioport) and laid out with a direct correspondence to the
+> +geography of a PCI bus address by concatenating the various components to form
+> +an offset.
+> +
+> +For CAM, this 24-bit offset is:
+> +
+> +        cfg_offset(bus, device, function, register) =
+> +                   bus << 16 | device << 11 | function << 8 | register
+> +
+> +Whilst ECAM extends this by 4 bits to accomodate 4k of function space:
+> +
+> +        cfg_offset(bus, device, function, register) =
+> +                   bus << 20 | device << 15 | function << 12 | register
+> +
+> +Interrupt mapping is exactly as described in `Open Firmware Recommended
+> +Practice: Interrupt Mapping' and requires the following properties:
+> +
+> +- #interrupt-cells   : Must be 1
+> +
+> +- interrupt-map      : <see aforementioned specification>
+> +
+> +- interrupt-map-mask : <see aforementioned specification>
+
+Examples are always nice :)
+
+- k
 
 -- 
-Kees Cook
-Chrome OS Security
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
