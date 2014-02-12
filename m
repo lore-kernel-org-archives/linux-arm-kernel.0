@@ -1,23 +1,65 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Feb 2014 15:39:27 -0800
-Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
-In-Reply-To: <1392100183-30930-3-git-send-email-kgene.kim@samsung.com>
-References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
- <1392100183-30930-3-git-send-email-kgene.kim@samsung.com>
-Message-ID: <CAOesGMiWsWXkQkb-_VZGco0gKNZPsHf3ubR88y4Pt4-umk5_Ww@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 12 Feb 2014 01:20:04 +0100
+Subject: [PATCH] ARM: SAMSUNG: remove unneeded s3c24xx_init_cpu()
+In-Reply-To: <3865198.Kyn1P03kbU@phil>
+References: <3865198.Kyn1P03kbU@phil>
+Message-ID: <1740860.STngzZgRLl@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 10:29 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> This patch adds support for Samsung GH7 SoC in arm64/Kconfig.
->
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
+Am Sonntag, 12. Januar 2014, 21:34:29 schrieb Heiko St?bner:
+> The function is nearly empty and samsung_cpu_rev is static so already 0
+> making the function obsolete, therefore remove it.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-The overhead of building one more device tree isn't very large, and I
-don't see any other need to have a Kconfig entry per SoC at this time.
-It's of course up to Catalin, but you might just want to always
-compile all dts files instead.
+ping :-)
 
 
--Olof
+> ---
+>  arch/arm/mach-s3c24xx/common.c           |    1 -
+>  arch/arm/plat-samsung/cpu.c              |    7 -------
+>  arch/arm/plat-samsung/include/plat/cpu.h |    1 -
+>  3 files changed, 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+> index bf57d4c..97edd4d 100644
+> --- a/arch/arm/mach-s3c24xx/common.c
+> +++ b/arch/arm/mach-s3c24xx/common.c
+> @@ -232,7 +232,6 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc,
+> int size) } else {
+>  		samsung_cpu_id = s3c24xx_read_idcode_v4();
+>  	}
+> -	s3c24xx_init_cpu();
+> 
+>  	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
+> 
+> diff --git a/arch/arm/plat-samsung/cpu.c b/arch/arm/plat-samsung/cpu.c
+> index 46b426e..364963a 100644
+> --- a/arch/arm/plat-samsung/cpu.c
+> +++ b/arch/arm/plat-samsung/cpu.c
+> @@ -28,13 +28,6 @@ unsigned int samsung_rev(void)
+>  }
+>  EXPORT_SYMBOL(samsung_rev);
+> 
+> -void __init s3c24xx_init_cpu(void)
+> -{
+> -	/* nothing here yet */
+> -
+> -	samsung_cpu_rev = 0;
+> -}
+> -
+>  void __init s3c64xx_init_cpu(void)
+>  {
+>  	samsung_cpu_id = __raw_readl(S3C_VA_SYS + 0x118);
+> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h
+> b/arch/arm/plat-samsung/include/plat/cpu.h index 8f09488..262ef86 100644
+> --- a/arch/arm/plat-samsung/include/plat/cpu.h
+> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
+> @@ -207,7 +207,6 @@ extern void s5p_init_irq(u32 *vic, u32 num_vic);
+> 
+>  extern void s3c24xx_init_io(struct map_desc *mach_desc, int size);
+> 
+> -extern void s3c24xx_init_cpu(void);
+>  extern void s3c64xx_init_cpu(void);
+>  extern void s5p_init_cpu(void __iomem *cpuid_addr);
