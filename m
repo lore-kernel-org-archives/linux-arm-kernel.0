@@ -1,33 +1,86 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Feb 2014 10:55:42 +0000
-Subject: [PATCH 4/7] spi: pl022: attempt to get sspclk by name
-In-Reply-To: <20140212103329.GC21992@e106331-lin.cambridge.arm.com>
-References: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
- <1392118632-11312-5-git-send-email-mark.rutland@arm.com>
- <20140211120645.GH13533@sirena.org.uk>
- <201402111508.06267.arnd@arndb.de>
- <20140212103329.GC21992@e106331-lin.cambridge.arm.com>
-Message-ID: <20140212105542.GC28112@sirena.org.uk>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 12 Feb 2014 08:36:16 +0100
+Subject: [PATCH] PCI: imx6: Fix link_up detection
+In-Reply-To: <1392190075-23204-1-git-send-email-s.hauer@pengutronix.de>
+References: <1392190075-23204-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <201402120836.16221.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 10:33:29AM +0000, Mark Rutland wrote:
+On Wednesday, February 12, 2014 at 08:27:55 AM, Sascha Hauer wrote:
 
-> For new bindings I'd really like to push people to always use named
-> clocks as it makes things far more flexible, but I appreciate that here
-> there are issues associated with modifying an existing binding.
++CC Troy Kisky, since I think he submitted something similar some time ago 
+already.
 
-> Mark, do you have specific issues that named clocks cause that I could
-> look into?
+Otherwise I agree this happens.
 
-None, I actively prefer naming them (though Russell's point about people
-picking names poorly pre-DT does make it clear why it makes sense that
-we weren't doing that).  I was just grumbling about the fact that
-transitioning from unnamed to named is a bit ugly.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/fc22f8a3/attachment.sig>
+> This is broken since:
+> | commit e6daf4a5e1b813bc7f85507ec83b8c2452c121e6
+> | Author: Marek Vasut <marex@denx.de>
+> | Date:   Thu Dec 12 22:49:59 2013 +0100
+> | 
+> |     PCI: imx6: Report "link up" only after link training completes
+> |     
+> |     While waiting for the PHY to report the PCIe link is up, we might hit
+> |     a situation where the link training is still in progress, while the
+> |     PHY already reports the link is up.  Add additional check for this
+> |     condition.
+> |     
+> |     Signed-off-by: Marek Vasut <marex@denx.de>
+> |     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> |     Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> The problem is: Before the above commit only the
+> PCIE_PHY_DEBUG_R1_XMLH_LINK_UP bit was used to determine whether the link
+> is up or not. Since the above commit also the
+> PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING is used. This means a link still
+> being trained is as link down.
+> The designware driver changes the PORT_LOGIC_SPEED_CHANGE bit in
+> dw_pcie_host_init() which causes the link to be retrained. During the next
+> call to dw_pcie_rd_conf() the link is then reported being down and the
+> function returns PCIBIOS_DEVICE_NOT_FOUND resulting in nonfunctioning
+> PCIe.
+> 
+> This patch fixes this by waiting until the link training has finished
+> before testing the PCIE_PHY_DEBUG_R1_XMLH_LINK_UP bit. This is hardly the
+> correct solution, but I don't know what should be done instead.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Richard Zhu <r65037@freescale.com> (maintainer:PCI DRIVER FOR IMX6)
+> Cc: Shawn Guo <shawn.guo@linaro.org> (maintainer:PCI DRIVER FOR IMX6)
+> Cc: Bjorn Helgaas <bhelgaas@google.com> (supporter:PCI SUBSYSTEM)
+> Cc: linux-pci at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Marek Vasut <marex@denx.de>
+> ---
+>  drivers/pci/host/pci-imx6.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index 866bdc7..9b6b501 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -449,6 +449,7 @@ static void imx6_pcie_reset_phy(struct pcie_port *pp)
+>  static int imx6_pcie_link_up(struct pcie_port *pp)
+>  {
+>  	u32 rc, ltssm, rx_valid;
+> +	int count = 1000;
+> 
+>  	/*
+>  	 * Test if the PHY reports that the link is up and also that
+> @@ -458,8 +459,13 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
+>  	 * as well here.
+>  	 */
+>  	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
+> -	if ((rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP) &&
+> -	    !(rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING))
+> +	while (rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING) {
+> +		if (!count--)
+> +			return 0;
+> +		rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
+> +	}
+> +
+> +	if (rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP)
+>  		return 1;
+> 
+>  	/*
