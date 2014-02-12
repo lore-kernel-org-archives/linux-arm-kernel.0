@@ -1,48 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Feb 2014 21:07:40 +0100
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <20140212194313.GA17248@obsidianresearch.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <2006726.HhIT01YuXY@wuerfel> <20140212194313.GA17248@obsidianresearch.com>
-Message-ID: <1545472.qN7M5OiOyA@wuerfel>
+From: cooloney@gmail.com (Bryan Wu)
+Date: Wed, 12 Feb 2014 12:09:18 -0800
+Subject: [PATCH 1/2] ARM: tegra: enable I2C Mux driver for PCA9546 in
+ defconfig
+In-Reply-To: <52FBC6A9.7010401@wwwdotorg.org>
+References: <1391817298-10600-1-git-send-email-pengw@nvidia.com>
+ <52FBC6A9.7010401@wwwdotorg.org>
+Message-ID: <CAK5ve-+bzLkdwmab9sZGPk7p67ktVcK3mHQ2aUgMueH061ty6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 February 2014 12:43:13 Jason Gunthorpe wrote:
-> On Tue, Feb 11, 2014 at 11:42:52AM +0100, Arnd Bergmann wrote:
-> 
-> 
-> Still missing release_region..
-> 
-> Thoughts on upstreamining these bits?
+On Wed, Feb 12, 2014 at 11:08 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 02/07/2014 04:54 PM, Bryan Wu wrote:
+>> PCA9546 is used in Cardhu Tegra30 board to connect to 3 cameras.
+>> Enabling this driver for Tegra V4L2 soc camera driver and camera
+>> sensor drivers.
+>
+> I've squashed patch 1/2 into Tegra's for-3.15/defconfig branch, and
+> applied patch 2/2 to Tegra's for-3.15/dt branch.
+>
+> Note that your patches were sent with an email "From" address that
+> didn't match your signed-off-by tag, yet "git send-email" didn't insert
+> a "From" header in the email body. Can you please check your git user ID
+> and/or email settings. Consequently, I had to adjust the git author
+> field in git to match your s-o-b line.
 
-Upstreaming them would be great. Patches look correct by inspection as well.
+My bad. I need to update my git send-email script to use --from "Bryan
+Wu <pengw@nvidia.com>" instead of --from "Bryan Wu
+<cooloney@gmail.com>"
 
-> > Since the mvebu_pcie_setup() function seems very generic at this,
-> > we should probably try to factor out that code into a common
-> > helper, at least for arm64, but ideally shared with arm32
-> > as well.
-> 
-> Yah, especially since people are not getting it completely right..
-> 
-> But some of the trouble here is a lack of a generic pci host driver
-> structure, eg I have to pull the domain number out of the ARM32
-> specific structure ..
+Need I resubmit this patchset?
 
-I'm sure that Bjorn also has some plans of his own, but I think
-we should have a generic host driver structure and gradually move
-stuff into it from the architecture specific structs.
-
-Now there is a 'struct pci_host_bridge' that is used on some
-architectures already but not on ARM. It also contains a list
-of resource windows plus offsets, and there is a set of functions
-associated with it:
-
-pci_create_root_bus()
-pcibios_root_bridge_prepare()
-
-etc.
-
-Maybe all that's needed is to actually start using those on arm32?
-
-	Arnd
+Thanks,
+-Bryan
