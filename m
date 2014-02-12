@@ -1,56 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Feb 2014 18:21:28 +0000
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <20140212181913.GA16428@obsidianresearch.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <3460536.Sh23gjDa6X@wuerfel>
- <20140205190947.GA22297@mudshark.cambridge.arm.com>
- <3724624.kd9jZNUiTF@wuerfel>
- <20140207114607.GE5976@mudshark.cambridge.arm.com>
- <20140207175410.GC16263@obsidianresearch.com>
- <20140212181015.GJ29132@mudshark.cambridge.arm.com>
- <20140212181913.GA16428@obsidianresearch.com>
-Message-ID: <20140212182128.GL29132@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 Feb 2014 18:23:14 +0000
+Subject: [PATCH] arm64: smp: Add a memory barrier before we start
+ secondary cores
+In-Reply-To: <20140212145644.GP28112@sirena.org.uk>
+References: <1392205594-29186-1-git-send-email-broonie@kernel.org>
+ <20140212122727.GB29132@mudshark.cambridge.arm.com>
+ <20140212124717.GL28112@sirena.org.uk> <20140212134332.GK29702@arm.com>
+ <20140212145644.GP28112@sirena.org.uk>
+Message-ID: <F28028BE-865B-4338-BA62-3F766B922A63@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 06:19:13PM +0000, Jason Gunthorpe wrote:
-> On Wed, Feb 12, 2014 at 06:10:15PM +0000, Will Deacon wrote:
-> 
-> > > AFAIK, the job is fairly simple, when you call pci_add_resource_offset
-> > > for memory compute the offset from 
-> > >   of_pci_range.pci_addr - of_pci_range.cpu_addr
-> > > 
-> > > (or is it the other way around ?)
-> > 
-> > I think it's the other way round: bus = cpu - offset, then Arnd's example of
-> > PCI bus 0 works out as: 0 = cpu - pci->mem_start.
-> 
-> That looks right to me
-> 
-> > I added that to my driver, but I get some weird looking bus addresses in
-> > dmesg:
-> > 
-> > [    0.307585] pci-arm-generic 40000000.pci: PCI host bridge to bus 0000:00
-> > [    0.307601] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
-> > [    0.307615] pci_bus 0000:00: root bus resource [mem 0x00000000-0x3effffff] (bus address [0xffffffffbf000000-0xfffffffffdffffff])
-> > 
-> > Looking at drivers/pci/probe.c, it seems to think that res->start - offset
-> > gives a bus address, which implies that the resources are indeed *CPU*
-> > addresses.
-> > 
-> > Are you sure pci_add_resource_offset wants bus addresses?
-> 
-> Sorry, I wasn't clear: It accepts a cpu address in the struct
-> resource and an offset to convert back to a bus address.
-> 
-> You should compute 0 as the offset in the normal case, ie
-> of_pci_range.pci_addr and of_pci_range.cpu_addr should be identical,
-> which depends on the DT ranges being correct..
+On 12 Feb 2014, at 14:56, Mark Brown <broonie@kernel.org> wrote:
 
-Aha! That explains all of the confusion. I'll remove my homebrew
-resource translation code then :)
+> On Wed, Feb 12, 2014 at 01:43:32PM +0000, Catalin Marinas wrote:
+> 
+>> I think we can drop this until Vincent clarifies the synchronisation
+>> requirements (still wondering whether spinlocks are needed).
+> 
+> Even if they're not actually required for the topology code the fact
+> that we're having to think about what is needed suggests that the code
+> is going to end up being clearer and hence more maintainable going
+> forwards if we add it.
 
-Thanks,
+I think we should aim to understand the code better rather than just
+adding the spinlocks. Some simple questions:
 
-Will
+- Who uses the topology information and when? (the scheduler? first time after or
+before secondaries are started?)
+
+- Who updates the topology information? (primary and secondary startup
+code?)
+
+- What about hotplug?
+
+- Can any of the above happen in parallel on different CPUs?
+
+Catalin
