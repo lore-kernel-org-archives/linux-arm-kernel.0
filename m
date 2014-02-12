@@ -1,34 +1,68 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 12 Feb 2014 16:38:36 +0000
-Subject: [PATCH 05/14] net: axienet: Service completion interrupts ASAP
-In-Reply-To: <cafb13f2ebe4bb996bafb91e405d8609454bb920.1392220536.git.michal.simek@xilinx.com>
-References: <cover.1392220536.git.michal.simek@xilinx.com>
- <cafb13f2ebe4bb996bafb91e405d8609454bb920.1392220536.git.michal.simek@xilinx.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D0F6BDFEE@AcuExch.aculab.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 12 Feb 2014 16:40:19 +0000
+Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
+ MiPHY365x
+In-Reply-To: <1392220985-28189-1-git-send-email-lee.jones@linaro.org>
+References: <1392220985-28189-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20140212164019.GE25957@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michal Simek
-> From: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+On Wed, Feb 12, 2014 at 04:03:02PM +0000, Lee Jones wrote:
+> The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+> devices. It has 2 ports which it can use for either; both SATA, both
+> PCIe or one of each in any configuration.
 > 
-> The packet completion interrupts for TX and RX should be serviced before
-> the packets are consumed. This ensures against the degenerate case when a
-> new completion interrupt is raised after the handler has exited but before
-> the interrupts are cleared. In this case its possible for the ISR to clear
-> an unhandled interrupt (leading to potential deadlock).
+> Cc: devicetree at vger.kernel.org
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  .../devicetree/bindings/phy/phy-miphy365x.txt      | 43 ++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> new file mode 100644
+> index 0000000..fdfa7ca
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> @@ -0,0 +1,43 @@
+> +STMicroelectronics STi MIPHY365x PHY binding
+> +============================================
+> +
+> +This binding describes a miphy device that is used to control PHY hardware
+> +for SATA and PCIe.
+> +
+> +Required properties:
+> +- compatible: Should be "st,miphy365x-phy"
+> +- #phy-cells: Should be 2 (See example)
 
-I would clear the IRQ after processing the last packet, and then do a final
-check for another packet.
+The first example has #phy-cells = <1>.
 
-That reduces the number of interrupts you take and then find there is
-no work (because it was done on the previous interrupt).
+What do the cells mean? What are the expected values?
 
-There is a slight 'gotcha' in that the write to clear the IRQ can easily
-get delayed enough the that cpu exits the ISR before the IRQ line
-actually drops - leading the unwanted and unclaimed interrupts.
-A posted write over PCIe could easily take long enough.
+> +- reg:	      Address and length of the register set for the device
+> +- reg-names:  The names of the register addresses corresponding to the
+> +	      registers filled in "reg".
 
-Maybe a hybrid scheme where the IRQ is cleared when the next entry
-is still owned by the device would work.
+Whenever there is a ${PROP}-names property, there should be a list of
+explicit values, and a description of how it relates to ${PROP}. Without
+that it's a bit useless.
 
-	David
+Please provide an explicit list of expected names here.
+
+I assume here what you want is something like:
+
+- reg: a list of address + length pairs, one for each entry in reg-names
+- reg-names: should contain:
+  * "sata0" for the sata0 control registers...
+  * "sata1" ...
+  * "pcie0" ...
+  * "pcie1" ...
+
+> +- st,syscfg : Should be a phandle of the syscfg node.
+
+What's this used for?
+
+Cheers,
+Mark.
