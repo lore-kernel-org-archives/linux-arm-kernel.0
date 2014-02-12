@@ -1,33 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Feb 2014 13:46:55 +0000
-Subject: [PATCH v2 0/9] ARM: multi-platform kconfig cleanup and mach-virt
- removal
-In-Reply-To: <201402121426.41914.arnd@arndb.de>
-References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
- <201402121426.41914.arnd@arndb.de>
-Message-ID: <20140212134655.GC29132@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 12 Feb 2014 13:47:07 +0000
+Subject: [PATCH 0/3] arm64: Use pte manipulation functions for THP
+In-Reply-To: <20140212115004.GA14527@linaro.org>
+References: <1391696171-8922-1-git-send-email-steve.capper@linaro.org>
+ <20140212094338.GA11325@linaro.org>
+ <20140212100736.GA13441@mudshark.cambridge.arm.com>
+ <20140212101602.GD29702@arm.com>
+ <20140212102112.GE13441@mudshark.cambridge.arm.com>
+ <20140212115004.GA14527@linaro.org>
+Message-ID: <20140212134707.GL29702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 01:26:41PM +0000, Arnd Bergmann wrote:
-> On Tuesday 11 February 2014, Rob Herring wrote:
-> > The previous version [1] was mainly a discussion about v6 vs. v6K.
-> > Several platforms have this wrong and incorrectly select v6 when the
-> > more optimal v6K option could be used. After more research, my memory
-> > about i.MX31 was wrong and it does need to remain v6.
-> 
-> Just curious: do you have more information on this? Are all i.MX31 ARMv6
-> and all i.MX35 v6k as the current Kconfig claims,  or is it more
-> complicated?
+On Wed, Feb 12, 2014 at 11:50:05AM +0000, Steve Capper wrote:
+> I have noticed the following for ARM:
+>  36bb94b ARM: pgtable: provide RDONLY page table bit rather than WRITE bit
+> Are you happy for me to re-introduce PTE_WRITE for the 3-level code
+> only, and keep L_PTE_RDONLY for the 2-level code?
 
-Slightly tangential, but the one to watch out for is 1136. Prior to r1 (i.e.
-r0pX), it is v6 but r1pX+ are v6k (without SMP).
+But don't we create more confusion by differentiating between 2-level
+and 3-level? What about L_PTE_WRITE in all cases as pure software bit
+and PTE_RDONLY (without L_) defined just for LPAE.
 
-> * integrator and realview apparently allow both CPU_V6 and CPU_V6K
->   to be manually selected. Is that actually the correct behavior
->   in that both kinds of core tiles exist?
-
-I have 1136 r0p1 on an integrator CP, so I suppose it could also take an
-1136 r1pX without any trouble.
-
-Will
+-- 
+Catalin
