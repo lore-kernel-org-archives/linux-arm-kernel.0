@@ -1,31 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Feb 2014 19:07:56 +0100
-Subject: [PATCH v2 0/9] ARM: multi-platform kconfig cleanup and mach-virt
- removal
-In-Reply-To: <20140212171621.GI29132@mudshark.cambridge.arm.com>
-References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
- <52FBAB51.4050401@arm.com>
- <20140212171621.GI29132@mudshark.cambridge.arm.com>
-Message-ID: <44914279.FnJrZdyuux@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 12 Feb 2014 18:10:15 +0000
+Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
+In-Reply-To: <20140207175410.GC16263@obsidianresearch.com>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <3460536.Sh23gjDa6X@wuerfel>
+ <20140205190947.GA22297@mudshark.cambridge.arm.com>
+ <3724624.kd9jZNUiTF@wuerfel>
+ <20140207114607.GE5976@mudshark.cambridge.arm.com>
+ <20140207175410.GC16263@obsidianresearch.com>
+Message-ID: <20140212181015.GJ29132@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 February 2014 17:16:21 Will Deacon wrote:
-> On Wed, Feb 12, 2014 at 05:11:45PM +0000, Marc Zyngier wrote:
-> > On 12/02/14 16:53, Arnd Bergmann wrote:
-> > > 
-> > > On the topic of V6, we don't support CPU_V6T2 at all, though I assume that
-> > > there is an ARM1156 core tile for integrator and realview, and we support
-> > > running the V6/V6K parts with MMU turned off. Would all revisions of ARM1156
-> > > work with CPU_V6K and !MMU?
-> > 
-> > CPU_V6 and !MMU should work. V6K might, but that requires close
-> > inspection (WFE, SEV shouldn't be used in UP context)...
+On Fri, Feb 07, 2014 at 05:54:10PM +0000, Jason Gunthorpe wrote:
+> On Fri, Feb 07, 2014 at 11:46:07AM +0000, Will Deacon wrote:
 > 
-> Well I can boot Debian on my 1136 r0p1 (no v6k) using a v6/v7 kernel, so the
-> lack of MMU shouldn't change that.
+> > > In practice, there can be various ways that a system requires something
+> > > more complex:
+> > > 
+> > > * You can have a memory space range that puts PCI bus address zero
+> > >   at the start of the pci->mem resource. In this case, you have
+> > >   mem_offset = pci->mem.start. We should probably try not to do
+> > >   this, but there is existing hardware doing it.
+> > 
+> > If it's not the common case, then the generic driver might not need to care
+> > (at least, initially).
+> 
+> Something to think about, other people are going to reference this
+> driver when writing drivers for their own hardware, it would be nice
+> to see it perfect..
+> 
+> AFAIK, the job is fairly simple, when you call pci_add_resource_offset
+> for memory compute the offset from 
+>   of_pci_range.pci_addr - of_pci_range.cpu_addr
+> 
+> (or is it the other way around ?)
 
-I was more worried about ARM1156 not being a strict superset of V6K, i.e.
-stuff other than the MMU missing from it that the kernel would rely on.
+I think it's the other way round: bus = cpu - offset, then Arnd's example of
+PCI bus 0 works out as: 0 = cpu - pci->mem_start.
 
-	Arnd
+I added that to my driver, but I get some weird looking bus addresses in
+dmesg:
+
+[    0.307585] pci-arm-generic 40000000.pci: PCI host bridge to bus 0000:00
+[    0.307601] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+[    0.307615] pci_bus 0000:00: root bus resource [mem 0x00000000-0x3effffff] (bus address [0xffffffffbf000000-0xfffffffffdffffff])
+
+Looking at drivers/pci/probe.c, it seems to think that res->start - offset
+gives a bus address, which implies that the resources are indeed *CPU*
+addresses.
+
+Are you sure pci_add_resource_offset wants bus addresses?
+
+Will
