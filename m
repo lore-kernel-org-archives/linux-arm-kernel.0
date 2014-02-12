@@ -1,41 +1,48 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Feb 2014 13:07:42 -0700
-Subject: [PATCH v2 0/6] ARM: firmware: improvements to Trusted Foundations
- support
-In-Reply-To: <20140212013846.GB7584@quad.lixom.net>
-References: <1391747706-1847-1-git-send-email-acourbot@nvidia.com>
- <20140212013846.GB7584@quad.lixom.net>
-Message-ID: <52FBD48E.5070103@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Feb 2014 21:07:40 +0100
+Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
+In-Reply-To: <20140212194313.GA17248@obsidianresearch.com>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <2006726.HhIT01YuXY@wuerfel> <20140212194313.GA17248@obsidianresearch.com>
+Message-ID: <1545472.qN7M5OiOyA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2014 06:38 PM, Olof Johansson wrote:
-> On Fri, Feb 07, 2014 at 01:35:00PM +0900, Alexandre Courbot wrote:
->> These (mostly minor) patches fix a few typos, improve points that
->> were agreed upon when the Trusted Foundation series was initially
->> submitted, and more importantly add support for a prepare_idle()
->> firmware operation that informs the firmware a CPU is doing idle.
->> Tegra's cpuidle driver is then also updated accordingly.
->>
->> These patches should be the last step before device trees for NVIDIA
->> SHIELD and Tegra Note 7 can be submitted.
->>
->> Changes since v1:
->> - Do not remove TF support from tegra_defconfig (will automatically be taken
->>   care of during next configuration update)
->> - Add a new prepare_idle() operation to firmware_ops that informs the firmware
->>   a CPU is going idle (vs. asking the firmware to do it itself as do_idle()
->>   does)
->> - Fix idle states names in TF implementation of prepare_idle to sound less
->>   Tegra-specific
+On Wednesday 12 February 2014 12:43:13 Jason Gunthorpe wrote:
+> On Tue, Feb 11, 2014 at 11:42:52AM +0100, Arnd Bergmann wrote:
 > 
-> 1-5:
 > 
-> Acked-by: Olof Johansson <olof@lixom.net>
+> Still missing release_region..
 > 
-> Stephen asked if he should merge through Russell's tree or ours; since
-> tegra is the only user I don't have a problem merging this (via tegra
-> pull requests) but I'm giving Russell veto power. :)
+> Thoughts on upstreamining these bits?
 
-Russell, I intend to apply this series to the Tegra tree on Fri US time,
-unless I hear otherwise from you. Thanks.
+Upstreaming them would be great. Patches look correct by inspection as well.
+
+> > Since the mvebu_pcie_setup() function seems very generic at this,
+> > we should probably try to factor out that code into a common
+> > helper, at least for arm64, but ideally shared with arm32
+> > as well.
+> 
+> Yah, especially since people are not getting it completely right..
+> 
+> But some of the trouble here is a lack of a generic pci host driver
+> structure, eg I have to pull the domain number out of the ARM32
+> specific structure ..
+
+I'm sure that Bjorn also has some plans of his own, but I think
+we should have a generic host driver structure and gradually move
+stuff into it from the architecture specific structs.
+
+Now there is a 'struct pci_host_bridge' that is used on some
+architectures already but not on ARM. It also contains a list
+of resource windows plus offsets, and there is a set of functions
+associated with it:
+
+pci_create_root_bus()
+pcibios_root_bridge_prepare()
+
+etc.
+
+Maybe all that's needed is to actually start using those on arm32?
+
+	Arnd
