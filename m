@@ -1,84 +1,28 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 12 Feb 2014 15:24:14 -0700
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <20140212221526.60fd7f8b@skate>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <201402092130.25615.arnd@arndb.de>
- <20140210173450.GA5554@obsidianresearch.com>
- <2006726.HhIT01YuXY@wuerfel>
- <20140212194313.GA17248@obsidianresearch.com>
- <20140212221526.60fd7f8b@skate>
-Message-ID: <20140212222414.GB17248@obsidianresearch.com>
+Date: Wed, 12 Feb 2014 15:28:25 -0700
+Subject: [PATCH v2 2/3] ARM: bios32: use pci_enable_resource to enable
+ PCI resources
+In-Reply-To: <1392236171-10512-3-git-send-email-will.deacon@arm.com>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <1392236171-10512-3-git-send-email-will.deacon@arm.com>
+Message-ID: <20140212222825.GC17248@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 10:15:26PM +0100, Thomas Petazzoni wrote:
+On Wed, Feb 12, 2014 at 08:16:10PM +0000, Will Deacon wrote:
+> This patch moves bios32 over to using the generic code for enabling PCI
+> resources. Since the core code takes care of bridge resources too, we
+> can also drop the explicit IO and MEMORY enabling for them in the arch
+> code.
 
-> > +#ifdef CONFIG_PCI_DOMAINS
-> > +       domain = sys->domain;
-> > +#endif
-> > +
-> > +       snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x", domain);
-> > +       pcie->mem.name = pcie->mem_name;
-> > +
-> > +       snprintf(pcie->io_name, sizeof(pcie->io_name), "PCI I/O %04x", domain);
-> > +       pcie->realio.name = pcie->io_name;
-> 
-> I honestly don't know what PCI domains are, but this change looks
-> fairly harmless to me. I would however use kasprintf() instead maybe. I
-> can submit patches for those two changes if you want.
+Tested-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com> (on Kirkwood)
 
-For this purpose imagine that each PCI host controller driver gets a
-unique domain, and every domain has a unique
-aperture. domain:bus:device:function is the full unique path to a PCI
-device.
-
-So when you look at the resource hierarchy it makes some logical
-sense:
-
-e0000000-efffffff : PCI MEM 0000
-  e0000000-e00fffff : PCI Bus 0000:01
-    e0000000-e001ffff : 0000:01:00.0
-
-PCI Domain -> domain + subordinate bus # -> domain:bus:device:function, bar #
-
-The ARM PCI BIOS code used bus number, and Will's version ended up
-using the DT path to the PCI node. Would be nice to see an
-agreement/common code :)
- 
-> > Still missing release_region..
-> 
-> To match which request_region?
-
-Ah, sorry, Arnd added one:
-
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 13478ec..b55e9a6 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -680,9 +680,17 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
-        struct mvebu_pcie *pcie = sys_to_pcie(sys);
-        int i;
-
--       if (resource_size(&pcie->realio) != 0)
-+       if (request_resource(&iomem_resource, &pcie->mem))
-+               return 0;
-+
-+       if (resource_size(&pcie->realio) != 0) {
-+               if (request_resource(&ioport_resource, &pcie->realio)) {
-+                       release_resource(&pcie->mem);
-+                       return 0;
-+               }
-                pci_add_resource_offset(&sys->resources, &pcie->realio,
-                                        sys->io_offset);
-+       }
-        pci_add_resource_offset(&sys->resources, &pcie->mem, sys->mem_offset);
-        pci_add_resource(&sys->resources, &pcie->busn);
-
-
-Which is why I didn't use kasprintf, that would complicate freeing
-further.
-
-Ideally we'd be able to use a devm_request_region someday.
+PCI: bus1: Fast back to back transfers disabled
+pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+pci 0000:00:01.0: BAR 8: assigned [mem 0xe0000000-0xe00fffff]
+pci 0000:01:00.0: BAR 0: assigned [mem 0xe0000000-0xe001ffff]
+pci 0000:00:01.0: PCI bridge to [bus 01]
+pci 0000:00:01.0:   bridge window [mem 0xe0000000-0xe00fffff]
+pci 0000:00:01.0: enabling device (0140 -> 0142)
 
 Jason
