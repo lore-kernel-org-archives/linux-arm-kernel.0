@@ -1,35 +1,33 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 12 Feb 2014 10:24:48 +0100
-Subject: [PATCH 2/3] ARM: mvebu: use GPIO DT defines in Armada 370/XP
- boards
-In-Reply-To: <20140212074946.GC30814@lunn.ch>
-References: <1392138433-12573-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392138433-12573-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140212074946.GC30814@lunn.ch>
-Message-ID: <20140212102448.06d8cc56@skate>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Wed, 12 Feb 2014 11:28:21 +0200
+Subject: [PATCH] ARM: dts: qcom: Add RNG device tree node
+In-Reply-To: <20140208033740.GD10784@codeaurora.org>
+References: <1391764987-17138-1-git-send-email-svarbanov@mm-sol.com>
+ <20140208033740.GD10784@codeaurora.org>
+Message-ID: <52FB3EB5.4020207@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+Hi, Stephen
 
-On Wed, 12 Feb 2014 08:49:46 +0100, Andrew Lunn wrote:
+On 02/08/2014 05:37 AM, Stephen Boyd wrote:
+> On 02/07, Stanimir Varbanov wrote:
+>> Add the necessary DT node to probe the rng driver on
+>> msm8974 platforms.
+>>
+> 
+> Looks good. We should add it to msm8960-cdp and enable the driver
+> in the defconfig as well.
 
-> What i did for kirkwood is include both gpio.h and input.h in
-> kirkwood.dtsi. Quite a few other systems do that, rather than each
-> .dts file having to include them. However i don't have a strong
-> opinion.
+Sure, I can prepare a patch. Unfortunately I haven't msm8960 CDP to test it.
 
-Right, I don't have a strong opinion on this either. I did it this way
-because a few other .dts files for Armada boards (Netgear NAS) were
-already including these header files.
-
-I guess it is clearly something that can be factorized later on as the
-number of Armada boards needing this grows.
+> 
+>> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
+> 
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
 
 Thanks!
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+regards,
+Stan
