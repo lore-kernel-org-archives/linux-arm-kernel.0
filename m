@@ -1,82 +1,23 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Feb 2014 13:17:13 -0700
-Subject: [PATCH 1/2] ARM: tegra: enable I2C Mux driver for PCA9546 in
- defconfig
-In-Reply-To: <CAK5ve-+bzLkdwmab9sZGPk7p67ktVcK3mHQ2aUgMueH061ty6w@mail.gmail.com>
-References: <1391817298-10600-1-git-send-email-pengw@nvidia.com>
- <52FBC6A9.7010401@wwwdotorg.org>
- <CAK5ve-+bzLkdwmab9sZGPk7p67ktVcK3mHQ2aUgMueH061ty6w@mail.gmail.com>
-Message-ID: <52FBD6C9.2010905@wwwdotorg.org>
+Date: Wed, 12 Feb 2014 13:32:35 -0700
+Subject: [PATCH 3/9] ARM: select MIGHT_HAVE_CACHE_L2X0 for V7
+ multi-platform
+In-Reply-To: <1392153119-23248-4-git-send-email-robherring2@gmail.com>
+References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
+ <1392153119-23248-4-git-send-email-robherring2@gmail.com>
+Message-ID: <52FBDA63.6030303@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2014 01:09 PM, Bryan Wu wrote:
-> On Wed, Feb 12, 2014 at 11:08 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 02/07/2014 04:54 PM, Bryan Wu wrote:
->>> PCA9546 is used in Cardhu Tegra30 board to connect to 3 cameras.
->>> Enabling this driver for Tegra V4L2 soc camera driver and camera
->>> sensor drivers.
->>
->> I've squashed patch 1/2 into Tegra's for-3.15/defconfig branch, and
->> applied patch 2/2 to Tegra's for-3.15/dt branch.
->>
->> Note that your patches were sent with an email "From" address that
->> didn't match your signed-off-by tag, yet "git send-email" didn't insert
->> a "From" header in the email body. Can you please check your git user ID
->> and/or email settings. Consequently, I had to adjust the git author
->> field in git to match your s-o-b line.
-> 
-> My bad. I need to update my git send-email script to use --from "Bryan
-> Wu <pengw@nvidia.com>" instead of --from "Bryan Wu
-> <cooloney@gmail.com>"
-> 
-> Need I resubmit this patchset?
+On 02/11/2014 02:11 PM, Rob Herring wrote:
+> Many V7 platforms have an L2x0 cache, so make CONFIG_MIGHT_HAVE_CACHE_L2X0
+> visible for V7 multi-platform builds.
 
-No need to resent; I fixed them up.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
 
-Why not just put the correct values in ~/.gitconfig?
+>  config ARCH_MULTI_V6_V7
+>  	bool
+> +	select MIGHT_HAVE_CACHE_L2X0
 
-Perhaps this is because you switch between NVIDIA and non-NVIDIA email
-addresses and/or mail servers, so you can't make ~/.gitconfig static and
-universally correct? If you have a recent enough git, what I do is:
-
-$ cat ~/.gitconfig
-[include]
-        path = .gitconfig-user
-        path = .gitconfig-email-server
-...
-
-$ cat ~/.gitconfig-user-nvidia
-[user]
-	name = Stephen Warren
-	email = swarren at nvidia.com
-
-$ cat ~/.gitconfig-user-wwwdotorg
-[user]
-	name = Stephen Warren
-	email = swarren at wwwdotorg.org
-
-~/.gitconfig-user is a symlink to one of ~/.gitconfig-user-*, and I have
-a script that deletes the link and points it at a new location:
-
-$ cat `which git-switch-user`
-#!/bin/bash
-
-cd $HOME
-mainfile=.gitconfig-user
-newlink=${mainfile}-$1
-if [ ! -f ${newlink} ]; then
-    echo ERROR: ${newlink} not found
-    exit 1
-fi
-
-rm -f ${mainfile}
-ln -s ${newlink} ${mainfile}
-
-... and the same thing for email servers.
-
-Then, I can run e.g.:
-
-git-switch-email-server nvidia; \
-git send-email --to internal at nvidia.com *.patch; \
-git-switch-email-server severn-port-forwarded
+The commit description says "V7", whereas the select got added to
+"V6_V7" rather then "V7". Was that intentional?
