@@ -1,43 +1,36 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 12 Feb 2014 18:21:01 +0100
-Subject: [PATCH v2 6/7] ARM: mvebu: enable S/PDIF audio in Armada 370 DB
- Device Tree
+Date: Wed, 12 Feb 2014 18:21:02 +0100
+Subject: [PATCH v2 7/7] ARM: mvebu: enable audio options in mvebu_defconfig
 In-Reply-To: <1392225662-20431-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1392225662-20431-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1392225662-20431-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1392225662-20431-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In addition to the analog audio input and output, the Armada 370 DB
-also has S/PDIF input and output optical connectors. This commit
-improves the Device Tree description of the Armada 370 DB platform to
-enable the S/PDIF support.
+Since at least the Armada 370 SoC has audio support, it makes sense to
+enable the corresponding kernel configuration options in
+mvebu_defconfig.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-db.dts | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/configs/mvebu_defconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 7df1866..82f238a 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -163,7 +163,15 @@
- 	sound {
- 	      compatible = "marvell,a370db-audio";
- 	      marvell,audio-controller = <&audio_controller>;
--	      marvell,audio-codec = <&audio_codec>;
-+	      marvell,audio-codec = <&audio_codec &spdif_out &spdif_in>;
- 	      status = "okay";
- 	};
-+
-+	spdif_out: spdif-out {
-+	      compatible = "linux,spdif-dit";
-+	};
-+
-+	spdif_in: spdif-in {
-+	      compatible = "linux,spdif-dir";
-+	};
- };
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 0f4511d..5c58559 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -62,6 +62,11 @@ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_THERMAL=y
+ CONFIG_ARMADA_THERMAL=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SOC=y
++CONFIG_SND_KIRKWOOD_SOC=y
++CONFIG_SND_KIRKWOOD_SOC_ARMADA370_DB=y
+ CONFIG_USB_SUPPORT=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
 -- 
 1.8.3.2
