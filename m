@@ -1,26 +1,60 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 12 Feb 2014 13:47:07 +0000
-Subject: [PATCH 0/3] arm64: Use pte manipulation functions for THP
-In-Reply-To: <20140212115004.GA14527@linaro.org>
-References: <1391696171-8922-1-git-send-email-steve.capper@linaro.org>
- <20140212094338.GA11325@linaro.org>
- <20140212100736.GA13441@mudshark.cambridge.arm.com>
- <20140212101602.GD29702@arm.com>
- <20140212102112.GE13441@mudshark.cambridge.arm.com>
- <20140212115004.GA14527@linaro.org>
-Message-ID: <20140212134707.GL29702@arm.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 12 Feb 2014 21:54:47 +0800
+Subject: [PATCH] pinctrl: sirf: update copyright years to 2014
+Message-ID: <1392213287-2669-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 11:50:05AM +0000, Steve Capper wrote:
-> I have noticed the following for ARM:
->  36bb94b ARM: pgtable: provide RDONLY page table bit rather than WRITE bit
-> Are you happy for me to re-introduce PTE_WRITE for the 3-level code
-> only, and keep L_PTE_RDONLY for the 2-level code?
+From: Barry Song <Baohua.Song@csr.com>
 
-But don't we create more confusion by differentiating between 2-level
-and 3-level? What about L_PTE_WRITE in all cases as pure software bit
-and PTE_RDONLY (without L_) defined just for LPAE.
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/pinctrl/sirf/pinctrl-atlas6.c |    3 ++-
+ drivers/pinctrl/sirf/pinctrl-prima2.c |    3 ++-
+ drivers/pinctrl/sirf/pinctrl-sirf.c   |    3 ++-
+ 3 files changed, 6 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/pinctrl/sirf/pinctrl-atlas6.c b/drivers/pinctrl/sirf/pinctrl-atlas6.c
+index 2b9f320..abfa764 100644
+--- a/drivers/pinctrl/sirf/pinctrl-atlas6.c
++++ b/drivers/pinctrl/sirf/pinctrl-atlas6.c
+@@ -1,7 +1,8 @@
+ /*
+  * pinctrl pads, groups, functions for CSR SiRFatlasVI
+  *
+- * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
++ * Copyright (c) 2011 - 2014 Cambridge Silicon Radio Limited, a CSR plc group
++ * company.
+  *
+  * Licensed under GPLv2 or later.
+  */
+diff --git a/drivers/pinctrl/sirf/pinctrl-prima2.c b/drivers/pinctrl/sirf/pinctrl-prima2.c
+index dde0285..8aa76f0 100644
+--- a/drivers/pinctrl/sirf/pinctrl-prima2.c
++++ b/drivers/pinctrl/sirf/pinctrl-prima2.c
+@@ -1,7 +1,8 @@
+ /*
+  * pinctrl pads, groups, functions for CSR SiRFprimaII
+  *
+- * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
++ * Copyright (c) 2011 - 2014 Cambridge Silicon Radio Limited, a CSR plc group
++ * company.
+  *
+  * Licensed under GPLv2 or later.
+  */
+diff --git a/drivers/pinctrl/sirf/pinctrl-sirf.c b/drivers/pinctrl/sirf/pinctrl-sirf.c
+index a0d6152..72291cd 100644
+--- a/drivers/pinctrl/sirf/pinctrl-sirf.c
++++ b/drivers/pinctrl/sirf/pinctrl-sirf.c
+@@ -1,7 +1,8 @@
+ /*
+  * pinmux driver for CSR SiRFprimaII
+  *
+- * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
++ * Copyright (c) 2011 - 2014 Cambridge Silicon Radio Limited, a CSR plc group
++ * company.
+  *
+  * Licensed under GPLv2 or later.
+  */
 -- 
-Catalin
+1.7.9.5
