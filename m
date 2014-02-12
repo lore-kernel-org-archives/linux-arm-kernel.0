@@ -1,31 +1,58 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 12 Feb 2014 10:16:02 +0000
-Subject: [PATCH 0/3] arm64: Use pte manipulation functions for THP
-In-Reply-To: <20140212100736.GA13441@mudshark.cambridge.arm.com>
-References: <1391696171-8922-1-git-send-email-steve.capper@linaro.org>
- <20140212094338.GA11325@linaro.org>
- <20140212100736.GA13441@mudshark.cambridge.arm.com>
-Message-ID: <20140212101602.GD29702@arm.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Wed, 12 Feb 2014 11:06:40 +0100
+Subject: [PATCH v4 1/8] at91: dt: Adds support for the bus matrix declaration
+ in the DT
+In-Reply-To: <1392199607-27452-1-git-send-email-jjhiblot@traphandler.com>
+References: <1392199607-27452-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <1392199607-27452-2-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 10:07:37AM +0000, Will Deacon wrote:
-> On Wed, Feb 12, 2014 at 09:43:39AM +0000, Steve Capper wrote:
-> > On Thu, Feb 06, 2014 at 02:16:08PM +0000, Steve Capper wrote:
-> > > This series replaces the Transparent HugePage pmd manipulation
-> > > functions with calls to the standard pte functions. This allows the THP
-> > > code to take advantage of the new PTE_WRITE logic, and provides better
-> > > parity with the HugeTLB code (which already uses the pte functions).
-> > > 
-> > > Testing was done on the Fast Model with LTP THP tests, and the 3.14-rc1
-> > > kernel was used.
-> > 
-> > Does this series look reasonable?
-> 
-> I was waiting for the corresponding arch/arm/ changes.
+Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+---
+ arch/arm/mach-at91/setup.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-The arch/arm/ code doesn't have the PTE_WRITE changes. It's a bit more
-work here because of the classic MMU (but I hope Steve will get there ;).
-
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index f7ca97b..b8d0b66 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -487,6 +487,28 @@ end:
+ 	of_node_put(np);
+ }
+ 
++static struct of_device_id matrix_ids[] = {
++	{ .compatible = "atmel,at91sam9261-bus-matrix", },
++	{ /*sentinel*/ }
++};
++
++static void at91_dt_matrix(void)
++{
++	struct device_node *np;
++
++	np = of_find_matching_node(NULL, matrix_ids);
++	if (!np) {
++		pr_debug("AT91: unable to find compatible bus matrix controller node in dtb\n");
++		return;
++	}
++
++	at91_matrix_base = of_iomap(np, 0);
++	if (!at91_matrix_base)
++		panic("Impossible to ioremap at91_matrix_base\n");
++
++	of_node_put(np);
++}
++
+ void __init at91rm9200_dt_initialize(void)
+ {
+ 	at91_dt_ramc();
+@@ -506,6 +528,7 @@ void __init at91_dt_initialize(void)
+ 	at91_dt_rstc();
+ 	at91_dt_ramc();
+ 	at91_dt_shdwc();
++	at91_dt_matrix();
+ 
+ 	/* Init clock subsystem */
+ 	at91_dt_clock_init();
 -- 
-Catalin
+1.8.5.3
