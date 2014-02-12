@@ -1,52 +1,80 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 12 Feb 2014 14:01:01 +0900
-Subject: [PATCH 0/7] ARM: shmobile: r8a7790/Lager QSPI SoC/board
- integration
-In-Reply-To: <1392029254-15400-1-git-send-email-geert@linux-m68k.org>
-References: <1392029254-15400-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CANqRtoQZBTYXwDcfzxqs9X-o2Yftvr=TM4dLgeMagr-LGdm1uw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 11 Feb 2014 22:03:11 -0700
+Subject: [PATCH 1/2] ARM: bcm2835: fix DT node sort order
+Message-ID: <1392181392-29694-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert, Simon,
+Re-order all the DT nodes so that they're ordered by their reg address.
 
-On Mon, Feb 10, 2014 at 7:47 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
->         Hi Simon, Magnus,
->
-> The following patch series completes r8a7790 SoC and Lager board
-> integration for the Renesas Quad Serial Peripheral Interface. It brings
-> r8a7790/Lager to the same support level as r8a7791/Koelsch, allowing access
-> to the Spansion s25fl512s SPI FLASH for both legacy and multi-platform
-> kernels.
->
->     [1/7] pinctrl: sh-pfc: r8a7790: Add QSPI pin groups
->     [2/7] ARM: shmobile: lager legacy: Add QSPI pinmux
->     [3/7] ARM: shmobile: r8a7790 dtsi: Add QSPI node
->     [4/7] ARM: shmobile: lager dts: Add QSPI nodes
->     [5/7] ARM: shmobile: lager defconfig: Enable RSPI and MTD_M25P80
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+ arch/arm/boot/dts/bcm2835.dtsi | 32 ++++++++++++++++----------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
 
-Thanks a lot for this! All patches included in this series look great to me.
-
-I noticed that 1/7 turned into a v2, so feel free to omit or include
-the below ack.
-
-Acked-by: Magnus Damm <damm@opensource.se>
-
->     [6/7] ARM: shmobile: lager legacy: Enable Quad SPI transfers for the SPI
->           FLASH
->     [7/7] ARM: shmobile: lager dts: Enable Quad SPI transfers for the SPI
->          FLASH
->
-> Please do _not_ apply patches [6/7] and [7/7] yet, as these have a runtime
-> dependency on Quad SPI support in the RSPI/QSPI driver, which is queued up
-> in the linux-spi tree for v3.15.
-
-That makes sense, thanks for pointing that out. You still have my Ack
-though, so please include that when you resend.
-
-Simon, can you please pick up 2-5?
-
-Cheers,
-
-/ magnus
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index 398eac3..5ceba45 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -60,14 +60,6 @@
+ 			reg = <0x7e104000 0x10>;
+ 		};
+ 
+-		uart at 20201000 {
+-			compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
+-			reg = <0x7e201000 0x1000>;
+-			interrupts = <2 25>;
+-			clock-frequency = <3000000>;
+-			arm,primecell-periphid = <0x00241011>;
+-		};
+-
+ 		gpio: gpio {
+ 			compatible = "brcm,bcm2835-gpio";
+ 			reg = <0x7e200000 0xb4>;
+@@ -91,6 +83,14 @@
+ 			#interrupt-cells = <2>;
+ 		};
+ 
++		uart at 20201000 {
++			compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
++			reg = <0x7e201000 0x1000>;
++			interrupts = <2 25>;
++			clock-frequency = <3000000>;
++			arm,primecell-periphid = <0x00241011>;
++		};
++
+ 		i2s: i2s at 7e203000 {
+ 			compatible = "brcm,bcm2835-i2s";
+ 			reg = <0x7e203000 0x20>,
+@@ -121,6 +121,14 @@
+ 			status = "disabled";
+ 		};
+ 
++		sdhci: sdhci {
++			compatible = "brcm,bcm2835-sdhci";
++			reg = <0x7e300000 0x100>;
++			interrupts = <2 30>;
++			clocks = <&clk_mmc>;
++			status = "disabled";
++		};
++
+ 		i2c1: i2c at 20804000 {
+ 			compatible = "brcm,bcm2835-i2c";
+ 			reg = <0x7e804000 0x1000>;
+@@ -131,14 +139,6 @@
+ 			status = "disabled";
+ 		};
+ 
+-		sdhci: sdhci {
+-			compatible = "brcm,bcm2835-sdhci";
+-			reg = <0x7e300000 0x100>;
+-			interrupts = <2 30>;
+-			clocks = <&clk_mmc>;
+-			status = "disabled";
+-		};
+-
+ 		usb {
+ 			compatible = "brcm,bcm2835-usb";
+ 			reg = <0x7e980000 0x10000>;
+-- 
+1.8.3.2
