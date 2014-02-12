@@ -1,70 +1,55 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 12 Feb 2014 12:06:23 +0100
-Subject: [PATCH] ARM: at91/DT: add NAND + DMA property
-Message-ID: <1392203183-9851-1-git-send-email-nicolas.ferre@atmel.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 12 Feb 2014 11:06:49 +0000
+Subject: [PATCH 07/12] mfd: syscon: Consider platform data a regmap
+ config name
+In-Reply-To: <20140212082657.GK15081@lee--X1>
+References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
+ <1392138636-29240-8-git-send-email-pawel.moll@arm.com>
+ <1392188982.914924525@f237.i.mail.ru> <20140212082657.GK15081@lee--X1>
+Message-ID: <1392203209.3380.57.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the "atmel,nand-has-dma" property to NAND node for SoC that
-can use the DMA to perform NAND accesses.
-Use of this property was added in 1b7192658a08f70df0f290634fd7cd2ecb629fc9
-(mtd: atmel_nand: add a new dt binding item for nand dma support).
+On Wed, 2014-02-12 at 08:26 +0000, Lee Jones wrote:
+> > > Use the device platform data as a regmap config
+> > > name. This is particularly useful in the regmap
+> > > debugfs when there is more than one syscon device
+> > > registered, to distinguish the register blocks.
+> > > 
+> > > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> > > Cc: Lee Jones <lee.jones@linaro.org>
+> > > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > > ---
+> > ...
+> > > syscon_regmap_config.max_register = res->end - res->start - 3;
+> > > +	syscon_regmap_config.name = dev_get_platdata(&pdev->dev);
+> > 
+> > Is dev_name(&pdev->dev) can be used for such purpose?
+> 
+> Yes of course.
+> 
+> Either use the automatically generated name or over-ride with
+> dev->init_name prior to registration or call dev_set_name()
+> manually. Then retrieve with Alexander's suggestion.
+> 
+> Is there any technical reason why this is not possible with your
+> implementation?
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9g45.dtsi | 1 +
- arch/arm/boot/dts/at91sam9n12.dtsi | 1 +
- arch/arm/boot/dts/at91sam9x5.dtsi  | 1 +
- arch/arm/boot/dts/sama5d3.dtsi     | 1 +
- 4 files changed, 4 insertions(+)
+Hold on, guys. Let me just point out that we're talking "non-DT"
+platform devices here (either statically defined struct
+platform_device-s or - my case - the MFD cells).
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index cbcc058b26b4..9b6683f252cf 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -817,6 +817,7 @@
- 			      >;
- 			atmel,nand-addr-offset = <21>;
- 			atmel,nand-cmd-offset = <22>;
-+			atmel,nand-has-dma;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_nand>;
- 			gpios = <&pioC 8 GPIO_ACTIVE_HIGH
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 394e6ce2afb7..9f04808fc697 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -570,6 +570,7 @@
- 			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
- 			atmel,nand-addr-offset = <21>;
- 			atmel,nand-cmd-offset = <22>;
-+			atmel,nand-has-dma;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_nand>;
- 			gpios = <&pioD 5 GPIO_ACTIVE_HIGH
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 174219de92fa..67e32067eb25 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -790,6 +790,7 @@
- 			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
- 			atmel,nand-addr-offset = <21>;
- 			atmel,nand-cmd-offset = <22>;
-+			atmel,nand-has-dma;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_nand>;
- 			gpios = <&pioD 5 GPIO_ACTIVE_HIGH
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index 3d5faf85f51b..d075c5326ce7 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -1256,6 +1256,7 @@
- 			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
- 			atmel,nand-addr-offset = <21>;
- 			atmel,nand-cmd-offset = <22>;
-+			atmel,nand-has-dma;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
- 			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
--- 
-1.8.2.2
+In this case device/driver matching relies completely on device name.
+Either the pdev->name must be identical (strcmp) to pdrv->name, or the
+pdev->name must be identical (strcmp again) to one of the pdev->id_table
+entries. See platform_match() in driver/base/platform.c for more
+details.
+
+Therefore the dev_name(&pdev->dev) on a non-DT-originating sysconf
+devince will always return "sysconf.*", unless you're ready to maintain
+a growing syscon_ids[] list. If so, I will have to add three entries
+there ("sys_id", "sys_misc" and "sys_procid"). I hope you are not
+seriously considering this idea :-) After all that's what the
+platform_data was invented for.
+
+Pawel
