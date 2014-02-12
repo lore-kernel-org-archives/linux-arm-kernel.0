@@ -1,17 +1,17 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 12 Feb 2014 16:59:31 +0100
-Subject: [PATCH v3 08/13] pinctrl: mvebu: armada-370: provide generic mpp
- callbacks
+Date: Wed, 12 Feb 2014 16:59:35 +0100
+Subject: [PATCH v3 12/13] pinctrl: mvebu: dove: consolidate auto-numbered pmu
+ mpp ranges
 In-Reply-To: <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1392220776-30851-9-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1392220776-30851-13-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to get rid of passing register addresses to common pinctrl
-driver, so provide set/get callbacks for generic mpp pins that will
-be used later.
+Passing a NULL name for pin ranges will auto-generate standard names
+for each pin. With common pinctrl driver now checking NULL name correctly,
+consolidate mpp pins 0-15.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -24,43 +24,36 @@ Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/pinctrl/mvebu/pinctrl-armada-370.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ drivers/pinctrl/mvebu/pinctrl-dove.c | 17 +----------------
+ 1 file changed, 1 insertion(+), 16 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-370.c b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
-index ae1f760cbdd2..bcde42ce598f 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-370.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-370.c
-@@ -23,6 +23,30 @@
+diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
+index fdb589b21d8d..2f384d87ea92 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-dove.c
++++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
+@@ -363,22 +363,7 @@ static int dove_twsi_ctrl_set(unsigned pid, unsigned long config)
+ }
  
- #include "pinctrl-mvebu.h"
- 
-+static void __iomem *mpp_base;
-+
-+static int armada_370_mpp_ctrl_get(unsigned pid, unsigned long *config)
-+{
-+	unsigned off = (pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
-+	unsigned shift = (pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
-+
-+	*config = (readl(mpp_base + off) >> shift) & MVEBU_MPP_MASK;
-+
-+	return 0;
-+}
-+
-+static int armada_370_mpp_ctrl_set(unsigned pid, unsigned long config)
-+{
-+	unsigned off = (pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
-+	unsigned shift = (pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
-+	unsigned long reg;
-+
-+	reg = readl(mpp_base + off) & ~(MVEBU_MPP_MASK << shift);
-+	writel(reg | (config << shift), mpp_base + off);
-+
-+	return 0;
-+}
-+
- static struct mvebu_mpp_mode mv88f6710_mpp_modes[] = {
- 	MPP_MODE(0,
- 	   MPP_FUNCTION(0x0, "gpio", NULL),
+ static struct mvebu_mpp_ctrl dove_mpp_controls[] = {
+-	MPP_FUNC_CTRL(0, 0, "mpp0", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(1, 1, "mpp1", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(2, 2, "mpp2", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(3, 3, "mpp3", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(4, 4, "mpp4", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(5, 5, "mpp5", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(6, 6, "mpp6", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(7, 7, "mpp7", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(8, 8, "mpp8", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(9, 9, "mpp9", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(10, 10, "mpp10", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(11, 11, "mpp11", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(12, 12, "mpp12", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(13, 13, "mpp13", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(14, 14, "mpp14", dove_pmu_mpp_ctrl),
+-	MPP_FUNC_CTRL(15, 15, "mpp15", dove_pmu_mpp_ctrl),
++	MPP_FUNC_CTRL(0, 15, NULL, dove_pmu_mpp_ctrl),
+ 	MPP_FUNC_CTRL(16, 23, NULL, dove_mpp_ctrl),
+ 	MPP_FUNC_CTRL(24, 39, "mpp_camera", dove_mpp4_ctrl),
+ 	MPP_FUNC_CTRL(40, 45, "mpp_sdio0", dove_mpp4_ctrl),
 -- 
 1.8.5.3
