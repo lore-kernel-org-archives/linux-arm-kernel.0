@@ -1,65 +1,49 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 12 Feb 2014 01:20:04 +0100
-Subject: [PATCH] ARM: SAMSUNG: remove unneeded s3c24xx_init_cpu()
-In-Reply-To: <3865198.Kyn1P03kbU@phil>
-References: <3865198.Kyn1P03kbU@phil>
-Message-ID: <1740860.STngzZgRLl@phil>
+Date: Wed, 12 Feb 2014 01:21:38 +0100
+Subject: [PATCH] ARM: SAMSUNG: remove obsolete tick.h
+In-Reply-To: <093801cf0ddc$6f8fe060$4eafa120$@kernel.org>
+References: <1907750.XQ1uIOEDlS@phil>
+ <093801cf0ddc$6f8fe060$4eafa120$@kernel.org>
+Message-ID: <1570984.izKrWRrZLR@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 12. Januar 2014, 21:34:29 schrieb Heiko St?bner:
-> The function is nearly empty and samsung_cpu_rev is static so already 0
-> making the function obsolete, therefore remove it.
+Am Freitag, 10. Januar 2014, 17:17:43 schrieb kgene at kernel.org:
+> Heiko St?bner wrote:
+> > Commit 48cf83dc12f2 (ARM: samsung: remove unused tick.h) removed some
+> > occurences of tick.h. tick.h itself and s3c24xx_ostimer_pending was only
+> > used by the old timer driver and is not used anymore.
+> > 
+> > Therefore remove the last 3 occurences.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > 
+> >  arch/arm/mach-s3c24xx/include/mach/tick.h |   15 --------------
+> >  arch/arm/mach-s3c64xx/include/mach/tick.h |   31
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> -------------------------
+> 
+> > ----
+> > 
+> >  arch/arm/mach-s5pc100/include/mach/tick.h |   31
+> 
+> -------------------------
+> 
+> > ----
+> > 
+> >  3 files changed, 77 deletions(-)
+> >  delete mode 100644 arch/arm/mach-s3c24xx/include/mach/tick.h
+> >  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/tick.h
+> >  delete mode 100644 arch/arm/mach-s5pc100/include/mach/tick.h
+> 
+> Nice cleanup :-)
+> 
+> Applied, thanks,
 
-ping :-)
+did this make its way into your tree? Because as of now I can't see it in the 
+linux-samsung.git.
 
 
-> ---
->  arch/arm/mach-s3c24xx/common.c           |    1 -
->  arch/arm/plat-samsung/cpu.c              |    7 -------
->  arch/arm/plat-samsung/include/plat/cpu.h |    1 -
->  3 files changed, 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
-> index bf57d4c..97edd4d 100644
-> --- a/arch/arm/mach-s3c24xx/common.c
-> +++ b/arch/arm/mach-s3c24xx/common.c
-> @@ -232,7 +232,6 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc,
-> int size) } else {
->  		samsung_cpu_id = s3c24xx_read_idcode_v4();
->  	}
-> -	s3c24xx_init_cpu();
-> 
->  	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
-> 
-> diff --git a/arch/arm/plat-samsung/cpu.c b/arch/arm/plat-samsung/cpu.c
-> index 46b426e..364963a 100644
-> --- a/arch/arm/plat-samsung/cpu.c
-> +++ b/arch/arm/plat-samsung/cpu.c
-> @@ -28,13 +28,6 @@ unsigned int samsung_rev(void)
->  }
->  EXPORT_SYMBOL(samsung_rev);
-> 
-> -void __init s3c24xx_init_cpu(void)
-> -{
-> -	/* nothing here yet */
-> -
-> -	samsung_cpu_rev = 0;
-> -}
-> -
->  void __init s3c64xx_init_cpu(void)
->  {
->  	samsung_cpu_id = __raw_readl(S3C_VA_SYS + 0x118);
-> diff --git a/arch/arm/plat-samsung/include/plat/cpu.h
-> b/arch/arm/plat-samsung/include/plat/cpu.h index 8f09488..262ef86 100644
-> --- a/arch/arm/plat-samsung/include/plat/cpu.h
-> +++ b/arch/arm/plat-samsung/include/plat/cpu.h
-> @@ -207,7 +207,6 @@ extern void s5p_init_irq(u32 *vic, u32 num_vic);
-> 
->  extern void s3c24xx_init_io(struct map_desc *mach_desc, int size);
-> 
-> -extern void s3c24xx_init_cpu(void);
->  extern void s3c64xx_init_cpu(void);
->  extern void s5p_init_cpu(void __iomem *cpuid_addr);
+Thanks
+Heiko
