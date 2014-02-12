@@ -1,86 +1,41 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 12 Feb 2014 08:36:16 +0100
-Subject: [PATCH] PCI: imx6: Fix link_up detection
-In-Reply-To: <1392190075-23204-1-git-send-email-s.hauer@pengutronix.de>
-References: <1392190075-23204-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <201402120836.16221.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Feb 2014 12:03:11 +0100
+Subject: [PATCH v3 1/6] arm64: Add ftrace support
+In-Reply-To: <CAB5YjtCr2KL_q1FF8kO_VKe+feg7f9qFRKtwf3xj2h0ENwuB5g@mail.gmail.com>
+References: <1382598488-13511-1-git-send-email-takahiro.akashi@linaro.org>
+ <201402101603.21791.arnd@arndb.de>
+ <CAB5YjtCr2KL_q1FF8kO_VKe+feg7f9qFRKtwf3xj2h0ENwuB5g@mail.gmail.com>
+Message-ID: <201402121203.11657.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 12, 2014 at 08:27:55 AM, Sascha Hauer wrote:
+On Wednesday 12 February 2014, Takahiro Akashi wrote:
+> > If I build a large "randconfig" kernel or "allyesconfig", the kernel image
+> > size exceeds 32MB, which means I can no longer link callers with a 26
+> > bit signed immediate argument like the "bl _mcount" here. For any other
+> > function calls, "gcc -mlong-calls" can be used to work around this, but
+> > this particular instance is created by inserting assembly statements
+> > into the output without considering the long-call options. Is there
+> > a way to get the kernel to link anyway?
+> 
+> I hope that this won't happen on arm64 because a branch offset range is
+> +/- 128MB.
 
-+CC Troy Kisky, since I think he submitted something similar some time ago 
-already.
+Yes, we should be safe for the next decade on arm64. My question was really
+about arm32 here, hoping someone has an idea.
 
-Otherwise I agree this happens.
+> > > +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> >
+> > Here, again, you an remove the #ifdef by making the entire file built
+> > only for CONFIG_FUNCTION_GRAPH_TRACER.
+> 
+> You're right as far as patch [1/6] is concerned, but once patch [2/6] is
+> applied,
+> this file (ftrace.c) may be compiled even if CONFIG_FUNCTION_GRAPH_TRACER
+> is not enabled. (That is CONFIG_DYNAMIC_FTRACE.)
+> Sorry for any confusion by poorly-divided patchset.
 
-> This is broken since:
-> | commit e6daf4a5e1b813bc7f85507ec83b8c2452c121e6
-> | Author: Marek Vasut <marex@denx.de>
-> | Date:   Thu Dec 12 22:49:59 2013 +0100
-> | 
-> |     PCI: imx6: Report "link up" only after link training completes
-> |     
-> |     While waiting for the PHY to report the PCIe link is up, we might hit
-> |     a situation where the link training is still in progress, while the
-> |     PHY already reports the link is up.  Add additional check for this
-> |     condition.
-> |     
-> |     Signed-off-by: Marek Vasut <marex@denx.de>
-> |     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> |     Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> The problem is: Before the above commit only the
-> PCIE_PHY_DEBUG_R1_XMLH_LINK_UP bit was used to determine whether the link
-> is up or not. Since the above commit also the
-> PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING is used. This means a link still
-> being trained is as link down.
-> The designware driver changes the PORT_LOGIC_SPEED_CHANGE bit in
-> dw_pcie_host_init() which causes the link to be retrained. During the next
-> call to dw_pcie_rd_conf() the link is then reported being down and the
-> function returns PCIBIOS_DEVICE_NOT_FOUND resulting in nonfunctioning
-> PCIe.
-> 
-> This patch fixes this by waiting until the link training has finished
-> before testing the PCIE_PHY_DEBUG_R1_XMLH_LINK_UP bit. This is hardly the
-> correct solution, but I don't know what should be done instead.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Richard Zhu <r65037@freescale.com> (maintainer:PCI DRIVER FOR IMX6)
-> Cc: Shawn Guo <shawn.guo@linaro.org> (maintainer:PCI DRIVER FOR IMX6)
-> Cc: Bjorn Helgaas <bhelgaas@google.com> (supporter:PCI SUBSYSTEM)
-> Cc: linux-pci at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Marek Vasut <marex@denx.de>
-> ---
->  drivers/pci/host/pci-imx6.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index 866bdc7..9b6b501 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -449,6 +449,7 @@ static void imx6_pcie_reset_phy(struct pcie_port *pp)
->  static int imx6_pcie_link_up(struct pcie_port *pp)
->  {
->  	u32 rc, ltssm, rx_valid;
-> +	int count = 1000;
-> 
->  	/*
->  	 * Test if the PHY reports that the link is up and also that
-> @@ -458,8 +459,13 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
->  	 * as well here.
->  	 */
->  	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
-> -	if ((rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP) &&
-> -	    !(rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING))
-> +	while (rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING) {
-> +		if (!count--)
-> +			return 0;
-> +		rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
-> +	}
-> +
-> +	if (rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP)
->  		return 1;
-> 
->  	/*
+No, that was my fault. I saw it later after I had already sent out the
+message.
+
+	Arnd
