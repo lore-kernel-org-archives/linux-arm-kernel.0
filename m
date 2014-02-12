@@ -1,64 +1,35 @@
-From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 11 Feb 2014 21:57:23 -0800
-Subject: [PATCH 5/5] ARM64: KVM: fix vgic_bitmap_get_reg function for BE 64bit
- case
-In-Reply-To: <1392184643-6108-1-git-send-email-victor.kamensky@linaro.org>
-References: <1392184643-6108-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1392184643-6108-6-git-send-email-victor.kamensky@linaro.org>
+From: vkale@apm.com (Vinayak Kale)
+Date: Wed, 12 Feb 2014 12:00:01 +0530
+Subject: [PATCH RESEND] arm: add DSB after icache flush in __flush_icache_all()
+Message-ID: <1392186601-25625-1-git-send-email-vkale@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix vgic_bitmap_get_reg function to return 'right' word address of
-'unsigned long' bitmap value in case of BE 64bit image.
+Add DSB after icache flush to complete the cache maintenance operation.
 
-Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
+Signed-off-by: Vinayak Kale <vkale@apm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: <stable@vger.kernel.org>
 ---
- virt/kvm/arm/vgic.c | 27 +++++++++++++++++++++++++--
- 1 file changed, 25 insertions(+), 2 deletions(-)
+KernelVersion: 3.14-rc1
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 7e11458..e56c5f8 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -96,14 +96,37 @@ static u32 vgic_nr_lr;
- 
- static unsigned int vgic_maint_irq;
- 
-+/*
-+ * struct vgic_bitmap is union that provides two view of
-+ * the same data. In one case it is array of registers of
-+ * u32 type (.reg). And in another it is bitmap, which is
-+ * array of 'unsgined long' (.reg_ul). It works all well in
-+ * case of 32bit (u32 and 'unsigned long' have the same size).
-+ * It works ok in 64bit LE case, where 'unsigned long'
-+ * size is 8 bytes, while u32 is 4 bytes, and least siginificant
-+ * word of 'unsigned long' matches lower index of .reg array.
-+ * It breaks in 64bit BE case. In this case word sized
-+ * register of even index actually resides in least significant
-+ * word of 'unsigned long' which has address at offset plus 4
-+ * bytes. And word sized register of odd index resides at most
-+ * significant of 'unsigned long' which has offset minus 4
-+ * bytes. Define REG_OFFSET_SWIZZLE that would help to
-+ * change offset of register in case of BE 64bit system.
-+ */
-+#if defined(CONFIG_CPU_BIG_ENDIAN) && BITS_PER_LONG == 64
-+#define REG_OFFSET_SWIZZLE	1
-+#else
-+#define REG_OFFSET_SWIZZLE	0
-+#endif
-+
- static u32 *vgic_bitmap_get_reg(struct vgic_bitmap *x,
- 				int cpuid, u32 offset)
+PS:
+- This patch is tested for ARM-v7.
+
+ arch/arm/include/asm/cacheflush.h |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index ee753f1..ab91ebb 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -212,6 +212,7 @@ extern void copy_to_user_page(struct vm_area_struct *, struct page *,
+ static inline void __flush_icache_all(void)
  {
- 	offset >>= 2;
- 	if (!offset)
--		return x->percpu[cpuid].reg;
-+		return x->percpu[cpuid].reg + (offset^REG_OFFSET_SWIZZLE);
- 	else
--		return x->shared.reg + offset - 1;
-+		return x->shared.reg + ((offset - 1)^REG_OFFSET_SWIZZLE);
+ 	__flush_icache_preferred();
++	dsb();
  }
  
- static int vgic_bitmap_get_irq_val(struct vgic_bitmap *x,
+ /*
 -- 
-1.8.1.4
+1.7.9.5
