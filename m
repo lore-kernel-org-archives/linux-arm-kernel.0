@@ -1,28 +1,54 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 12 Feb 2014 15:28:25 -0700
-Subject: [PATCH v2 2/3] ARM: bios32: use pci_enable_resource to enable
- PCI resources
-In-Reply-To: <1392236171-10512-3-git-send-email-will.deacon@arm.com>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <1392236171-10512-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20140212222825.GC17248@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 12 Feb 2014 15:35:37 -0700
+Subject: [PATCH 1/2] ARM: tegra: enable I2C Mux driver for PCA9546 in
+ defconfig
+In-Reply-To: <CAK5ve-+2AGO0UCf4UOMLoqGmQLp7QN08OJbZxUc-oYZzjPdFcQ@mail.gmail.com>
+References: <1391817298-10600-1-git-send-email-pengw@nvidia.com>
+ <52FBC6A9.7010401@wwwdotorg.org>
+ <CAK5ve-+bzLkdwmab9sZGPk7p67ktVcK3mHQ2aUgMueH061ty6w@mail.gmail.com>
+ <52FBD6C9.2010905@wwwdotorg.org>
+ <CAK5ve-+2AGO0UCf4UOMLoqGmQLp7QN08OJbZxUc-oYZzjPdFcQ@mail.gmail.com>
+Message-ID: <52FBF739.1060605@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 08:16:10PM +0000, Will Deacon wrote:
-> This patch moves bios32 over to using the generic code for enabling PCI
-> resources. Since the core code takes care of bridge resources too, we
-> can also drop the explicit IO and MEMORY enabling for them in the arch
-> code.
+On 02/12/2014 02:55 PM, Bryan Wu wrote:
+> On Wed, Feb 12, 2014 at 12:17 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 02/12/2014 01:09 PM, Bryan Wu wrote:
+>>> On Wed, Feb 12, 2014 at 11:08 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>>> On 02/07/2014 04:54 PM, Bryan Wu wrote:
+>>>>> PCA9546 is used in Cardhu Tegra30 board to connect to 3 cameras.
+>>>>> Enabling this driver for Tegra V4L2 soc camera driver and camera
+>>>>> sensor drivers.
+...
+>>>> Note that your patches were sent with an email "From" address that
+>>>> didn't match your signed-off-by tag, yet "git send-email" didn't insert
+>>>> a "From" header in the email body. Can you please check your git user ID
+>>>> and/or email settings. Consequently, I had to adjust the git author
+>>>> field in git to match your s-o-b line.
+...
+>> Why not just put the correct values in ~/.gitconfig?
+>>
+>> Perhaps this is because you switch between NVIDIA and non-NVIDIA email
+>> addresses and/or mail servers, so you can't make ~/.gitconfig static and
+>> universally correct? If you have a recent enough git, what I do is:
+...
+> Awesome, I will firstly update my .gitconfig. Actually I basically
+> just have one outbound server which is gmail server. Although I put
+> From: @nvidia.com, I still use gmail server to send out patch emails.
+> Still don't wanna touch our internal email server.
 
-Tested-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com> (on Kirkwood)
+You shouldn't send email with a from address @nvidia.com from a server
+other than NVIDIA's servers. If you do, plenty of people will drop the
+email as SPAM, since NVIDIA publishes SPF[1] records (and perhaps other
+email configuration) for nvidia.com. Since there are good reasons not to
+use NVIDIA's email servers, that means: tell git the actual email
+address you're sending from (for the email settings; you should set the
+author/commit ID to your @nvidia.com address still).
 
-PCI: bus1: Fast back to back transfers disabled
-pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
-pci 0000:00:01.0: BAR 8: assigned [mem 0xe0000000-0xe00fffff]
-pci 0000:01:00.0: BAR 0: assigned [mem 0xe0000000-0xe001ffff]
-pci 0000:00:01.0: PCI bridge to [bus 01]
-pci 0000:00:01.0:   bridge window [mem 0xe0000000-0xe00fffff]
-pci 0000:00:01.0: enabling device (0140 -> 0142)
+[1] http://www.openspf.org/
 
-Jason
+$ dig -t spf nvidia.com
+...
+nvidia.com.		180	IN	SPF	\
+	"v=spf1 mx/24 mx:nvidia.com/24 -all"
