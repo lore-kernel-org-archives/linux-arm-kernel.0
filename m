@@ -1,30 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 12 Feb 2014 10:38:24 +0000
-Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
-In-Reply-To: <CAOesGMiWsWXkQkb-_VZGco0gKNZPsHf3ubR88y4Pt4-umk5_Ww@mail.gmail.com>
-References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
- <1392100183-30930-3-git-send-email-kgene.kim@samsung.com>
- <CAOesGMiWsWXkQkb-_VZGco0gKNZPsHf3ubR88y4Pt4-umk5_Ww@mail.gmail.com>
-Message-ID: <20140212103824.GF29702@arm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 12 Feb 2014 10:32:38 +0000
+Subject: [PATCH 2/3] arm64: mm: Route pmd thp functions through pte
+ equivalents
+In-Reply-To: <20140212101423.GC29702@arm.com>
+References: <1391696171-8922-1-git-send-email-steve.capper@linaro.org>
+ <1391696171-8922-3-git-send-email-steve.capper@linaro.org>
+ <20140212101423.GC29702@arm.com>
+Message-ID: <20140212103237.GA12778@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 11:39:27PM +0000, Olof Johansson wrote:
-> On Mon, Feb 10, 2014 at 10:29 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > This patch adds support for Samsung GH7 SoC in arm64/Kconfig.
-> >
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+On Wed, Feb 12, 2014 at 10:14:23AM +0000, Catalin Marinas wrote:
+> On Thu, Feb 06, 2014 at 02:16:10PM +0000, Steve Capper wrote:
+> > Rather than have separate hugetlb and transparent huge page pmd
+> > manipulation functions, re-wire our thp functions to simply call the
+> > pte equivalents.
 > 
-> The overhead of building one more device tree isn't very large, and I
-> don't see any other need to have a Kconfig entry per SoC at this time.
-> It's of course up to Catalin, but you might just want to always
-> compile all dts files instead.
+> That's one thing I don't like about hugetlb, casting pmds to ptes. Do we
+> actually save much in terms of code clean-up by doing this?
 
-For arm64, I thought of getting rid of ARCH_* Kconfig entries entirely,
-only that I haven't heard any strong opinion either way (in which case
-I'll do it, with a risk of single Image getting bigger and bigger and
-people needing smaller Image can trim their .config).
+Hi Catalin,
 
+At the moment we have ptes and hugetlb ptes behaving in the same way so
+they both make use of PTE_WRITE. I thought it would be more logical to
+tie the THP code to the pte manipulation functions too rather than
+duplicate the PTE_WRITE logic in a separate PMD_WRITE. This makes
+future pte changes apply to THP too automatically (along with hugetlb).
+
+Cheers,
 -- 
-Catalin
+Steve
