@@ -1,42 +1,184 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 12 Feb 2014 18:24:05 +0100
-Subject: [PATCH RFC v2 00/35] Second preview of imx-drm cleanup series
-In-Reply-To: <20140212095606.GM26684@n2100.arm.linux.org.uk>
-References: <20140210122802.GS26684@n2100.arm.linux.org.uk>
- <20140212095606.GM26684@n2100.arm.linux.org.uk>
-Message-ID: <1392225845.5536.53.camel@pizza.hi.pengutronix.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 12 Feb 2014 18:28:44 +0100
+Subject: [PATCH v4 3/8] at91: dt: Add at91sam9261 dt SoC support
+In-Reply-To: <1392199607-27452-4-git-send-email-jjhiblot@traphandler.com>
+References: <1392199607-27452-1-git-send-email-jjhiblot@traphandler.com>
+ <1392199607-27452-4-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <20140212172844.GE11498@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 12.02.2014, 09:56 +0000 schrieb Russell King - ARM
-Linux:
-> On Mon, Feb 10, 2014 at 12:28:03PM +0000, Russell King - ARM Linux wrote:
-> > This is the latest revision of my series cleaning up imx-drm and
-> > hopefully getting it ready to be moved out of drivers/staging.
-> > This series is updated to v3.14-rc2.
-> > 
-> > Since the last round of patches were posted, the component support
-> > has been merged into mainline, and thus dropped from this series.
-> > Greg has taken the first three patches and merged them into his
-> > linux-next tree - however, I include them here for completness.
-> > 
-> > Most of the comments from last time still apply, and I'll look at
-> > incorporating some of the other patches that were posted in the
-> > coming week.
-> > 
-> > If I can have some acks for this, I'll start sending some of it to
-> > Greg - I'd like to at least get the five or six initial imx-hdmi
-> > patches to Greg and queued up for the next merge window sooner
-> > rather than later, preferably getting most of this ready for that
-> > window too.
+Hi,
+
+On 12/02/2014 at 11:06:42 +0100, Jean-Jacques Hiblot wrote :
+> This patch adds support for the Device Tree on a sam9261-based platform
 > 
-> So far, only the first few patches have been acked by one person.  What
-> about the remainder?  There's been no comments on them either...
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> ---
+>  arch/arm/boot/dts/at91sam9261.dtsi | 740 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-at91/at91sam9261.c   |  17 +
+>  2 files changed, 757 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91sam9261.dtsi
 
-With the understanding that I loathe the current DT bindings, which are
-not the fault of this series:
+[...]
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+> +
+> +		apb {
+> +			compatible = "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +
+> +			tcb0: timer at fffa0000 {
+> +				compatible = "atmel,at91rm9200-tcb";
+> +				reg = <0xfffa0000 0x100>;
+> +				interrupts = < 17 IRQ_TYPE_LEVEL_HIGH 0
+> +					18 IRQ_TYPE_LEVEL_HIGH 0
+> +					19 IRQ_TYPE_LEVEL_HIGH 0
+> +					>;
+> +				clocks = <&tc0_clk>, <&tc1_clk>, <&tc2_clk>;
+> +				clock-names = "t0_clk", "t1_clk", "t2_clk";
+> +			};
+> +
+> +			usb1: gadget at fffa4000 {
+> +				compatible = "atmel,at91rm9200-udc";
+> +				reg = <0xfffa4000 0x4000>;
+> +				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 2>;
+> +				clocks = <&usb>, <&udc_clk>, <&udpck>;
+> +				clock-names = "usb_clk", "udc_clk", "udpck";
+> +				status = "disabled";
+> +			};
+> +
+> +			mmc0: mmc at fffa8000 {
+> +				compatible = "atmel,hsmci";
+> +				reg = <0xfffa8000 0x600>;
+> +				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_mmc0_clk>, <&pinctrl_mmc0_slot0_cmd_dat0>, <&pinctrl_mmc0_slot0_dat1_3>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				clocks = <&mci0_clk>;
+> +				clock-names = "mci_clk";
+> +				status = "disabled";
+> +			};
+> +
+> +			i2c0: i2c at fffac000 {
+> +				compatible = "atmel,at91sam9261-i2c";
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_i2c_twi>;
+> +				reg = <0xfffac000 0x100>;
+> +				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 6>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				clocks = <&twi0_clk>;
+> +				status = "disabled";
+> +			};
+> +
+> +			usart0: serial at fffb0000 {
+> +				compatible = "atmel,at91sam9260-usart";
+> +				reg = <0xfffb0000 0x200>;
+> +				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
+> +				atmel,use-dma-rx;
+> +				atmel,use-dma-tx;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_usart0>;
+> +				clocks = <&usart0_clk>;
+> +				clock-names = "usart";
+> +				status = "disabled";
+> +			};
+> +
+> +			usart1: serial at fffb4000 {
+> +				compatible = "atmel,at91sam9260-usart";
+> +				reg = <0xfffb4000 0x200>;
+> +				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+> +				atmel,use-dma-rx;
+> +				atmel,use-dma-tx;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_usart1>;
+> +				clocks = <&usart1_clk>;
+> +				clock-names = "usart";
+> +				status = "disabled";
+> +			};
+> +
+> +			usart2: serial at fffb8000{
+> +				compatible = "atmel,at91sam9260-usart";
+> +				reg = <0xfffb8000 0x200>;
+> +				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
+> +				atmel,use-dma-rx;
+> +				atmel,use-dma-tx;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_usart2>;
+> +				clocks = <&usart2_clk>;
+> +				clock-names = "usart";
+> +				status = "disabled";
+> +			};
+> +
+> +			ssc0: ssc at fffbc000 {
+> +				compatible = "atmel,at91rm9200-ssc";
+> +				reg = <0xfffbc000 0x4000>;
+> +				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+> +				status = "disabled";
+> +			};
+> +
+> +			ssc1: ssc at fffc0000 {
+> +				compatible = "atmel,at91rm9200-ssc";
+> +				reg = <0xfffc0000 0x4000>;
+> +				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
+> +				status = "disabled";
+> +			};
+> +
+> +			spi0: spi at fffc8000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "atmel,at91rm9200-spi";
+> +				reg = <0xfffc8000 0x200>;
+> +				cs-gpios = <0>, <0>, <0>, <0>;
+> +				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 3>;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_spi0>;
+> +				clocks = <&spi0_clk>;
+> +				clock-names = "spi_clk";
+> +				status = "disabled";
+> +			};
+> +
+> +			spi1: spi at fffcc000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "atmel,at91rm9200-spi";
+> +				reg = <0xfffcc000 0x200>;
+> +				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pinctrl_spi1>;
+> +				clocks = <&spi1_clk>;
+> +				clock-names = "spi_clk";
+> +				status = "disabled";
+> +			};
+> +
+> +			ramc: ramc at ffffea00 {
+> +				compatible = "atmel,at91sam9260-sdramc";
+> +				reg = <0xffffea00 0x200>;
+> +			};
+> +
 
-regards
-Philipp
+You probably copied/pasted it but according to the block diagram, the
+sdram controller is not under the apb.
+
+> +			matrix: matrix at ffffee00 {
+> +				compatible = "atmel,at91sam9261-bus-matrix";
+> +				reg = <0xffffee00 0x200>;
+> +			};
+> +
+
+Same here, the apb is actually under the bus matrix.
+
+I don't know whether it can be represented another way though.
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
