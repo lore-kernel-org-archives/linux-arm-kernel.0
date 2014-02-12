@@ -1,65 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Feb 2014 18:42:37 +0000
-Subject: [BUG] Circular locking dependency - DRM/CMA/MM/hotplug/...
-In-Reply-To: <20140212182901.GX17001@phenom.ffwll.local>
-References: <20140211183543.GK26684@n2100.arm.linux.org.uk>
- <52FB9602.1000805@samsung.com>
- <20140212163317.GQ26684@n2100.arm.linux.org.uk>
- <20140212182901.GX17001@phenom.ffwll.local>
-Message-ID: <20140212184237.GR26684@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 12 Feb 2014 13:45:21 -0500
+Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
+In-Reply-To: <1571508.yGAAZ8TNH0@wuerfel>
+References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
+ <201402121251.06280.arnd@arndb.de>
+ <20140212174554.GM27395@titan.lakedaemon.net>
+ <1571508.yGAAZ8TNH0@wuerfel>
+Message-ID: <20140212184521.GO27395@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 07:29:01PM +0100, Daniel Vetter wrote:
-> On Wed, Feb 12, 2014 at 04:33:17PM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Feb 12, 2014 at 04:40:50PM +0100, Marek Szyprowski wrote:
-> > >> -> #3 (console_lock){+.+.+.}:
-> > >>         [<c0066f04>] __lock_acquire+0x151c/0x1ca0
-> > >>         [<c0067c28>] lock_acquire+0xa0/0x130
-> > >>         [<c006edcc>] console_lock+0x60/0x74
-> > >>         [<c006f7b8>] console_cpu_notify+0x28/0x34
-> > >>         [<c004904c>] notifier_call_chain+0x4c/0x8c
-> > >>         [<c004916c>] __raw_notifier_call_chain+0x1c/0x24
-> > >>         [<c0024124>] __cpu_notify+0x34/0x50
-> > >>         [<c002424c>] cpu_notify_nofail+0x18/0x24
-> > >>         [<c068e168>] _cpu_down+0x100/0x244
-> > >>         [<c068e2dc>] cpu_down+0x30/0x44
-> > >>         [<c036ef8c>] cpu_subsys_offline+0x14/0x18
-> > >>         [<c036af28>] device_offline+0x94/0xbc
-> > >>         [<c036b030>] online_store+0x4c/0x74
-> > >>         [<c0368d3c>] dev_attr_store+0x20/0x2c
-> > >>         [<c016b2e0>] sysfs_kf_write+0x54/0x58
-> > >>         [<c016eaa4>] kernfs_fop_write+0xc4/0x160
-> > >>         [<c0105a54>] vfs_write+0xbc/0x184
-> > >>         [<c0105dfc>] SyS_write+0x48/0x70
-> > >>         [<c000e6e0>] ret_fast_syscall+0x0/0x48
+On Wed, Feb 12, 2014 at 07:17:41PM +0100, Arnd Bergmann wrote:
+> On Wednesday 12 February 2014 12:45:54 Jason Cooper wrote:
+> > I brought this up at last weeks devicetree irc meeting.  My goal is to
+> > provide early randomness for kaslr on ARM.  Currently, my idea is modify
+> > the init script to save an additional random seed from /dev/urandom to
+> > /boot/random-seed.
 > > 
-> > cpu_down() takes cpu_hotplug.lock, so here we have:
-> > 
-> > 	cpu_hotplug.lock
-> > 	console_lock
+> > The bootloader would then load this file into ram, and pass the
+> > address/size to the kernel either via dt, or commandline.  kaslr (run in
+> > the decompressor) would consume some of this randomness, and then
+> > random.c would consume the rest in a non-crediting initialization.
 > 
-> The patche I've linked in my other mail will break the chain here, so
-> should solve this. And apparently with cpu hotplug we can hit this, too.
-> And having banged my head against the console_lock wall I think doing a
-> trylock here is generally the sanest option.
-> 
-> So imo we can just blame console_lock, not need to either beat up v4l,
-> drm, cma or anyone else really ;-)
+> I like the idea, but wouldn't it be easier to pass actual random data
+> using DT, rather than the address/size?
 
-I don't think CMA needs to hold its lock across the allocations/frees
-though - given the size of this, I think it's best if /everyone/ tries
-to reduce the locking interactions where possible.
+I thought about that at first, but that requires either that the
+bootloader be upgraded to insert the data, or that userspace is
+modifying the dtb at least twice per boot.
 
-The CMA issue needs to be done anyway - what it currently means is that
-all CMA allocations in the kernel are serialised, even if an allocation
-attempt sleeps, another allocation gets blocked.
+I chose address/size to facilitate modifying existing/fielded devices.
+The user could modify the dtb once, and modify the bootloader
+environment to load X amount to Y address.  As a fallback, it could be
+expressed on the commandline for non-DT bootloaders.
 
-So, sorting that out breaks the dependency there, and if it can be broken
-elsewhere, that's an added bonus and will help prevent other issues
-like this.
+So I'm not against the idea of random-seed,{start,size} and a
+random-seed,blob.  I would just like the former to be available for
+folks interested in the capability on existing hardware w/o upgrading
+the bootloader.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+> That way we could even use the same DT binding for passing randomness
+> from the bootloader, whereever it may have found that.
+
+The problem lies in defining "whereever" ;)
+
+> If the bootloader has internet connectivity, it could even mix in
+> some data from http://www.random.org/cgi-bin/randbyte?nbytes=256&format=f
+> ;-)
+
+Gah!  Arnd, you just about gave me a heart attack.  And http no less.
+
+thx,
+
+Jason.
