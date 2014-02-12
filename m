@@ -1,49 +1,36 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 12 Feb 2014 16:55:34 +0100
-Subject: [PATCH 0/14] Xilinx axi ethernet patches
-Message-ID: <cover.1392220536.git.michal.simek@xilinx.com>
+Date: Wed, 12 Feb 2014 16:55:35 +0100
+Subject: [PATCH 01/14] net: axienet: Fix compilation error
+In-Reply-To: <cover.1392220536.git.michal.simek@xilinx.com>
+References: <cover.1392220536.git.michal.simek@xilinx.com>
+Message-ID: <72b520a1071aa2399f723ceb080c50edd1acae0f.1392220536.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add missing header to fix compilation error.
+drivers/net/ethernet/xilinx/xilinx_axienet_main.c:1575:22:
+ error: undefined identifier 'irq_of_parse_and_map'
+drivers/net/ethernet/xilinx/xilinx_axienet_main.c:1576:22:
+ error: undefined identifier 'irq_of_parse_and_map'
 
-I have exctracted patches which I have in our
-xilinx git tree which are missing in the mainline.
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-The first two patches fix compilation error and
-warnings. Then 5 feature patches
-and the rest is OF cleanup and with kernel-doc
-and checkpatch problems.
+ drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-Michal
-
-
-Michal Simek (4):
-  net: axienet: Fix compilation error
-  net: axienet: Fix compilation warnings
-  net: axienet: Fix comments blocks
-  net: axienet: Fix kernel-doc warnings
-
-Peter Crosthwaite (2):
-  net: axienet: Handle 0 packet receive gracefully
-  net: axienet: Service completion interrupts ASAP
-
-Srikanth Thokala (8):
-  net: axienet: Support for RGMII
-  net: axienet: Handle jumbo frames for lesser frame sizes
-  net: axienet: Support phy-less mode of operation
-  net: axienet: Removed checkpatch errors/warnings
-  net: axienet: Use pdev instead of op
-  net: axienet: Use devm_* calls
-  net: axienet: Use of_property_* calls
-  net: axienet: Removed _of_ prefix in probe and remove functions
-
- drivers/net/ethernet/xilinx/xilinx_axienet.h      | 108 ++++----
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 307 ++++++++++++----------
- drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c |  30 ++-
- 3 files changed, 241 insertions(+), 204 deletions(-)
-
+diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+index 1ec65fe..9fb8ab2 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
++++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+@@ -26,6 +26,7 @@
+ #include <linux/netdevice.h>
+ #include <linux/of_mdio.h>
+ #include <linux/of_platform.h>
++#include <linux/of_irq.h>
+ #include <linux/of_address.h>
+ #include <linux/skbuff.h>
+ #include <linux/spinlock.h>
 --
 1.8.2.3
 
@@ -53,4 +40,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/c0b11373/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/76d99215/attachment-0001.sig>
