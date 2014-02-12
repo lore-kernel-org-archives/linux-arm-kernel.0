@@ -1,81 +1,121 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 12 Feb 2014 16:12:06 +0000
-Subject: [PATCH 4/7] spi: pl022: attempt to get sspclk by name
-In-Reply-To: <1786282.mNUF0ZaUg2@wuerfel>
-References: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
- <201402121221.51233.arnd@arndb.de>
- <20140212114740.GE21992@e106331-lin.cambridge.arm.com>
- <1786282.mNUF0ZaUg2@wuerfel>
-Message-ID: <20140212161206.GD25957@e106331-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 12 Feb 2014 16:18:56 +0000
+Subject: [PATCH 1/3] ARM: bios32: use pci_enable_resource to enable PCI
+ resources
+In-Reply-To: <20140212010650.GI21057@google.com>
+References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
+ <1391532784-1953-2-git-send-email-will.deacon@arm.com>
+ <20140212010650.GI21057@google.com>
+Message-ID: <20140212161855.GG29132@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 01:03:26PM +0000, Arnd Bergmann wrote:
-> On Wednesday 12 February 2014 11:47:40 Mark Rutland wrote:
-> > On Wed, Feb 12, 2014 at 11:21:50AM +0000, Arnd Bergmann wrote:
-> > > On Wednesday 12 February 2014, Mark Rutland wrote:
-> > > > To me it feels odd to require the last clock in the list (apb_pclk) to
-> > > > be named, and the rest to be in a particular order. For the dt case it
-> > > > seems saner to add new clocks with names as it allows arbitrary subsets
-> > > > of clocks to be wired up and described (though obviously in this case a
-> > > > missing sspclk would be problematic).
-> > > 
-> > > Yes, good point about the missing clocks, and I also agree mixing ordered
-> > > and named clocks in one device is rather odd and can lead to trouble.
-> > > 
-> > > I guess there isn't really a good way out here, and I certainly won't
-> > > ask for it to be done one way or the other if someone else has a 
-> > > good argument which way it should be implemented.
+Hi Bjorn,
+
+[Adding rmk]
+
+On Wed, Feb 12, 2014 at 01:06:50AM +0000, Bjorn Helgaas wrote:
+> On Tue, Feb 04, 2014 at 04:53:02PM +0000, Will Deacon wrote:
+> > This patch moves bios32 over to using the generic code for enabling PCI
+> > resources. All that's left to take care of is the case of PCI bridges,
+> > which need to be enabled for both IO and MEMORY, regardless of the
+> > resource types.
 > > 
-> > Having thought about it, all dts that for the ssp_pclk must have some
-> > name for the sspclk (though the specific name is arbitrary). I could get
-> > the driver to try each of those before falling back to the index
-> > (perhaps with a helper that takes a list of known aliases), so all
-> > existing dts (that we are aware of) would work with the clock requested
-> > by name.
+> > A side-effect of this change is that we no longer explicitly enable
+> > devices when running in PCI_PROBE_ONLY mode. This stays closer to the
+> > meaning of the option and prevents us from trying to enable devices
+> > without any assigned resources (the core code refuses to enable
+> > resources without parents).
 > 
-> Strange. Why do the even have names in there? What are those strings?
-
-I guess they're there as spacers to allow the AMBA bus code to get the
-right clock when it calls clk_get(&pcdev->dev, "apb_pclk").  Everyone
-seems to have worked around the binding rather than reporting the issue
-or fixing it.
-
->From a quick grep, for pl022's SSPCLK we currently have the strings:
-
-* ssp{0,1}clk
-* spi_clk
-* spi{0,1,2,3}clk
-
-Though I may have missed a string or two where nodes get amended in more
-specific files. A grep for apb_clk to find neighbours didn't highlight
-any obvious ones.
-
+> Heh, I've been looking at this, too :)  I have a similar patch for ARM and
+> other architectures with their own versions of pcibios_enable_device().
 > 
-> I noticed that ux500 has uses four different strings, one for each
-> instance, which is obviously a bug and should just be fixed. There is
-> no way this was intentional, and we can just rely on teh fallback
-> if you want to have that anyway.
-
-Sure, I'll fix those up once we have a preferred name. I guess this
-would be SSPCLK by Russell's comments, I wasn't able to find a prior use
-in the git history, but it would be in keeping with KMIREFCLK as used by
-the pl050 driver.
-
-Given the general policy of trying to not break support for existing
-DTBs we'll need some fallback, either using the first clock or getting
-the driver to try the names above.
-
+> Several of them (arm m68k tile tegra unicore32) have this special code that
+> enables IO and MEMORY for bridges unconditionally.  But from a PCI
+> perspective, I don't know why we should do this unconditionally.  If a
+> bridge doesn't have an enabled MEM window or MEM BAR, I don't think we
+> should have to enable PCI_COMMAND_MEMORY for it.
 > 
-> > I assume that for the non-dt case it's possible to name clock inputs to
-> > a device without the clock being associated with the name globally? If
-> > so we could get rid of the index usage entirely in this case.
+> The architectures that do this only check for valid MEM BARs, i.e., they
+> only look at resources 0-5, and they don't look at the window resources.
+
+Ok, so they would miss the bridge resources, which would explain the
+additional step to enable both IO and MEM unconditionally.
+
+> The architectures that don't enable IO and MEMORY for bridges
+> unconditionally check *all* the resources up to PCI_NUM_RESOURCES, which
+> includes the BARs, bridge windows, and any IOV resources.
 > 
-> Sorry, I don't understand the question.
+> The generic pci_enable_resources() does check all the resources, so I
+> *think* it should be safe for all architectures to use that and just drop
+> the check for bridges.  What do you think?
 
-I thought one of the issues before dt was that clocks were in a global
-namespace. Mark's reply implies that's not necessarily the case, so I'll
-take a tour through clkdev to educate myself.
+Right, your explanation certainly makes sense to me: if
+pci_enable_resources() enables bridge resources, then there's no reason for
+the extra logic in the caller.
 
-Cheers,
-Mark.
+The problem is, I don't have a platform to test our theory. I've added
+Russell, since he might have a relevant ARM platform where we could test our
+change.
+
+Will
+
+> > diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> > index 317da88ae65b..9f3c76638689 100644
+> > --- a/arch/arm/kernel/bios32.c
+> > +++ b/arch/arm/kernel/bios32.c
+> > @@ -608,40 +608,25 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+> >   */
+> >  int pcibios_enable_device(struct pci_dev *dev, int mask)
+> >  {
+> > -	u16 cmd, old_cmd;
+> > -	int idx;
+> > -	struct resource *r;
+> > +	int err;
+> > +	u16 cmd;
+> >  
+> > -	pci_read_config_word(dev, PCI_COMMAND, &cmd);
+> > -	old_cmd = cmd;
+> > -	for (idx = 0; idx < 6; idx++) {
+> > -		/* Only set up the requested stuff */
+> > -		if (!(mask & (1 << idx)))
+> > -			continue;
+> > +	if (pci_has_flag(PCI_PROBE_ONLY))
+> > +		return 0;
+> >  
+> > -		r = dev->resource + idx;
+> > -		if (!r->start && r->end) {
+> > -			printk(KERN_ERR "PCI: Device %s not available because"
+> > -			       " of resource collisions\n", pci_name(dev));
+> > -			return -EINVAL;
+> > -		}
+> > -		if (r->flags & IORESOURCE_IO)
+> > -			cmd |= PCI_COMMAND_IO;
+> > -		if (r->flags & IORESOURCE_MEM)
+> > -			cmd |= PCI_COMMAND_MEMORY;
+> > -	}
+> > +	err = pci_enable_resources(dev, mask);
+> > +	if (err)
+> > +		return err;
+> >  
+> >  	/*
+> >  	 * Bridges (eg, cardbus bridges) need to be fully enabled
+> >  	 */
+> > -	if ((dev->class >> 16) == PCI_BASE_CLASS_BRIDGE)
+> > +	if ((dev->class >> 16) == PCI_BASE_CLASS_BRIDGE) {
+> > +		pci_read_config_word(dev, PCI_COMMAND, &cmd);
+> >  		cmd |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY;
+> > -
+> > -	if (cmd != old_cmd) {
+> > -		printk("PCI: enabling device %s (%04x -> %04x)\n",
+> > -		       pci_name(dev), old_cmd, cmd);
+> >  		pci_write_config_word(dev, PCI_COMMAND, cmd);
+> >  	}
+> > +
+> >  	return 0;
+> >  }
+> >  
+> > -- 
+> > 1.8.2.2
+> > 
+> 
