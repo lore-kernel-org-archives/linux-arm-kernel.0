@@ -1,87 +1,40 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 12 Feb 2014 12:18:52 +0200
-Subject: [PATCH v7 11/12] ARM: dts: OMAP2+: Get rid of incompatible ids for
- USB host nodes
-In-Reply-To: <1392200333-28397-1-git-send-email-rogerq@ti.com>
-References: <1392200333-28397-1-git-send-email-rogerq@ti.com>
-Message-ID: <1392200333-28397-12-git-send-email-rogerq@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 12 Feb 2014 10:19:46 +0000
+Subject: [PATCH] arm64: fix psci power state pack
+In-Reply-To: <1392196958-2507-1-git-send-email-pgaikwad@nvidia.com>
+References: <1392196958-2507-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <20140212101946.GD13441@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP EHCI and OHCI controllers are not compatible with drivers
-other than "ti,ehci-omap" and "ti,ohci-omap3" respectively, so get
-rid of the incompatible ids.
+On Wed, Feb 12, 2014 at 09:22:38AM +0000, Prashant Gaikwad wrote:
+> Values has to be shifted right to create pack.
 
-CC: Alan Stern <stern@rowland.harvard.edu>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/boot/dts/omap3.dtsi | 4 ++--
- arch/arm/boot/dts/omap4.dtsi | 4 ++--
- arch/arm/boot/dts/omap5.dtsi | 4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
+NAK. This doesn't make any sense to me.
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index a5fc83b..8e7de9e 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -634,14 +634,14 @@
- 			ranges;
- 
- 			usbhsohci: ohci at 48064400 {
--				compatible = "ti,ohci-omap3", "usb-ohci";
-+				compatible = "ti,ohci-omap3";
- 				reg = <0x48064400 0x400>;
- 				interrupt-parent = <&intc>;
- 				interrupts = <76>;
- 			};
- 
- 			usbhsehci: ehci at 48064800 {
--				compatible = "ti,ehci-omap", "usb-ehci";
-+				compatible = "ti,ehci-omap";
- 				reg = <0x48064800 0x400>;
- 				interrupt-parent = <&intc>;
- 				interrupts = <77>;
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 39a05ce..ff1b057 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -705,14 +705,14 @@
- 				      "refclk_60m_ext_p2";
- 
- 			usbhsohci: ohci at 4a064800 {
--				compatible = "ti,ohci-omap3", "usb-ohci";
-+				compatible = "ti,ohci-omap3";
- 				reg = <0x4a064800 0x400>;
- 				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
- 			};
- 
- 			usbhsehci: ehci at 4a064c00 {
--				compatible = "ti,ehci-omap", "usb-ehci";
-+				compatible = "ti,ehci-omap";
- 				reg = <0x4a064c00 0x400>;
- 				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index d4dae48..f65aa65 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -783,14 +783,14 @@
- 				      "refclk_60m_ext_p2";
- 
- 			usbhsohci: ohci at 4a064800 {
--				compatible = "ti,ohci-omap3", "usb-ohci";
-+				compatible = "ti,ohci-omap3";
- 				reg = <0x4a064800 0x400>;
- 				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
- 			};
- 
- 			usbhsehci: ehci at 4a064c00 {
--				compatible = "ti,ehci-omap", "usb-ehci";
-+				compatible = "ti,ehci-omap";
- 				reg = <0x4a064c00 0x400>;
- 				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
--- 
-1.8.3.2
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+> ---
+>  arch/arm64/kernel/psci.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index 4f97db3..6e8f1df 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -87,11 +87,11 @@ static int psci_to_linux_errno(int errno)
+>  static u32 psci_power_state_pack(struct psci_power_state state)
+>  {
+>  	return	((state.id & PSCI_POWER_STATE_ID_MASK)
+> -			<< PSCI_POWER_STATE_ID_SHIFT)	|
+> +			>> PSCI_POWER_STATE_ID_SHIFT)	|
+>  		((state.type & PSCI_POWER_STATE_TYPE_MASK)
+> -			<< PSCI_POWER_STATE_TYPE_SHIFT)	|
+> +			>> PSCI_POWER_STATE_TYPE_SHIFT)	|
+
+So for the type field, this becomes:
+
+  (state.type & 0x1) >> 16
+
+Are you sure?
+
+Will
