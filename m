@@ -1,34 +1,56 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 12 Feb 2014 10:52:08 -0500
-Subject: [PATCH 2/3] ARM: mvebu: use GPIO DT defines in Armada 370/XP
- boards
-In-Reply-To: <20140212102448.06d8cc56@skate>
-References: <1392138433-12573-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392138433-12573-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140212074946.GC30814@lunn.ch> <20140212102448.06d8cc56@skate>
-Message-ID: <20140212155208.GL27395@titan.lakedaemon.net>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 12 Feb 2014 16:55:34 +0100
+Subject: [PATCH 0/14] Xilinx axi ethernet patches
+Message-ID: <cover.1392220536.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 10:24:48AM +0100, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
-> 
-> On Wed, 12 Feb 2014 08:49:46 +0100, Andrew Lunn wrote:
-> 
-> > What i did for kirkwood is include both gpio.h and input.h in
-> > kirkwood.dtsi. Quite a few other systems do that, rather than each
-> > .dts file having to include them. However i don't have a strong
-> > opinion.
-> 
-> Right, I don't have a strong opinion on this either. I did it this way
-> because a few other .dts files for Armada boards (Netgear NAS) were
-> already including these header files.
-> 
-> I guess it is clearly something that can be factorized later on as the
-> number of Armada boards needing this grows.
+Hi,
 
-Same here, it's cleaner, but it can wait for cleanups next window.
+I have exctracted patches which I have in our
+xilinx git tree which are missing in the mainline.
 
-thx,
+The first two patches fix compilation error and
+warnings. Then 5 feature patches
+and the rest is OF cleanup and with kernel-doc
+and checkpatch problems.
 
-Jason.
+Thanks,
+Michal
+
+
+Michal Simek (4):
+  net: axienet: Fix compilation error
+  net: axienet: Fix compilation warnings
+  net: axienet: Fix comments blocks
+  net: axienet: Fix kernel-doc warnings
+
+Peter Crosthwaite (2):
+  net: axienet: Handle 0 packet receive gracefully
+  net: axienet: Service completion interrupts ASAP
+
+Srikanth Thokala (8):
+  net: axienet: Support for RGMII
+  net: axienet: Handle jumbo frames for lesser frame sizes
+  net: axienet: Support phy-less mode of operation
+  net: axienet: Removed checkpatch errors/warnings
+  net: axienet: Use pdev instead of op
+  net: axienet: Use devm_* calls
+  net: axienet: Use of_property_* calls
+  net: axienet: Removed _of_ prefix in probe and remove functions
+
+ drivers/net/ethernet/xilinx/xilinx_axienet.h      | 108 ++++----
+ drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 307 ++++++++++++----------
+ drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c |  30 ++-
+ 3 files changed, 241 insertions(+), 204 deletions(-)
+
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/c0b11373/attachment.sig>
