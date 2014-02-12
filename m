@@ -1,33 +1,42 @@
 From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Wed, 12 Feb 2014 11:28:21 +0200
-Subject: [PATCH] ARM: dts: qcom: Add RNG device tree node
-In-Reply-To: <20140208033740.GD10784@codeaurora.org>
-References: <1391764987-17138-1-git-send-email-svarbanov@mm-sol.com>
- <20140208033740.GD10784@codeaurora.org>
-Message-ID: <52FB3EB5.4020207@mm-sol.com>
+Date: Wed, 12 Feb 2014 11:33:14 +0200
+Subject: [PATCH] hwrng: msm: switch Kconfig to ARCH_QCOM depends
+In-Reply-To: <1392150105-21057-1-git-send-email-galak@codeaurora.org>
+References: <1392150105-21057-1-git-send-email-galak@codeaurora.org>
+Message-ID: <52FB3FDA.4060307@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stephen
-
-On 02/08/2014 05:37 AM, Stephen Boyd wrote:
-> On 02/07, Stanimir Varbanov wrote:
->> Add the necessary DT node to probe the rng driver on
->> msm8974 platforms.
->>
+Hi,
+> We've split Qualcomm MSM support into legacy and multiplatform.  The RNG
+> driver is only relevant on the multiplatform supported SoCs so switch the
+> Kconfig depends to ARCH_QCOM.
 > 
-> Looks good. We should add it to msm8960-cdp and enable the driver
-> in the defconfig as well.
-
-Sure, I can prepare a patch. Unfortunately I haven't msm8960 CDP to test it.
-
+> CC: Herbert Xu <herbert@gondor.apana.org.au>
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> ---
+>  drivers/char/hw_random/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
->> Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
-> 
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+> index 2f2b084..289bd3a 100644
+> --- a/drivers/char/hw_random/Kconfig
+> +++ b/drivers/char/hw_random/Kconfig
+> @@ -343,7 +343,7 @@ config HW_RANDOM_TPM
+>  
+>  config HW_RANDOM_MSM
+>  	tristate "Qualcomm MSM Random Number Generator support"
+> -	depends on HW_RANDOM && ARCH_MSM
+> +	depends on HW_RANDOM && ARCH_QCOM
+>  	---help---
+>  	  This driver provides kernel-side support for the Random Number
+>  	  Generator hardware found on Qualcomm MSM SoCs.
 > 
 
-Thanks!
+IMO, after this change the "MSM" abbreviation in help clause is
+irrelevant, could you remove it?
+
+Reviewed-by: Stanimir Varbanov <svarbanov@mm-sol.com>
 
 regards,
 Stan
