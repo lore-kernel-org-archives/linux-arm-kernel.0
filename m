@@ -1,31 +1,15 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Feb 2014 20:14:53 +0100
-Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
-In-Reply-To: <D225ECFF-E2A7-44C9-8D11-20EE77077797@codeaurora.org>
-References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
- <1540B9A3-2485-4149-81DD-7D86A532E5D4@arm.com>
- <D225ECFF-E2A7-44C9-8D11-20EE77077797@codeaurora.org>
-Message-ID: <2286031.FWmKXGrGIV@wuerfel>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 12 Feb 2014 12:20:29 -0700
+Subject: [PATCH] ARM: tegra: don't timeout if CPU is powergated
+In-Reply-To: <1d5ea6b7df4573d866779857922ac650fe59af60.1392078805.git.stefan@agner.ch>
+References: <1d5ea6b7df4573d866779857922ac650fe59af60.1392078805.git.stefan@agner.ch>
+Message-ID: <52FBC97D.8040809@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 February 2014 13:04:40 Kumar Gala wrote:
-> On Feb 12, 2014, at 12:12 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On 12 Feb 2014, at 16:25, Kumar Gala <galak@codeaurora.org> wrote:
-> >> One reason to keep around ARCH_* is for drivers shared between arm and arm64 that depend on it.
-> > 
-> > We already converted some of them (those depending on ARCH_VEXPRESS) to
-> > just depend on ARM64. Ideally, at some point I?d like to see them as
-> > defaulting to modules but I don?t think we are there yet (we had some
-> > discussions at the last KS, I?m not sure anyone started looking into
-> > this).
-> 
-> I?m torn about this, I think for something like VEXPRESS it makes sense,
-> however I think  its reasonable to still have an config symbol for a full
-> SoC family or something of that nature.
+On 02/10/2014 05:44 PM, Stefan Agner wrote:
+> When booting secondary CPU(s) which are not yet powergated, a wrong
+> check lead to a timeout after 100 jiffies. With this patch, we only
+> delay powergating if CPUs are still not powered yet.
 
-I think for SBSA compliant systems, we should be able to live with a
-generic ARCH_SBSA Kconfig symbol. For more irregular embedded platforms,
-we may need something more specific.
-
-	Arnd
+I've applied this to Tegra's for-3.15/soc branch.
