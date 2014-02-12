@@ -1,45 +1,61 @@
 From: victor.kamensky@linaro.org (Victor Kamensky)
-Date: Tue, 11 Feb 2014 21:41:32 -0800
-Subject: [PATCH v2 6/7] ARM: KVM: vgic mmio should hold data as LE bytes array
- in BE case
+Date: Tue, 11 Feb 2014 21:41:33 -0800
+Subject: [PATCH v2 7/7] ARM: KVM: MMIO support BE host running LE code
 In-Reply-To: <1392183693-21238-1-git-send-email-victor.kamensky@linaro.org>
 References: <1392183693-21238-1-git-send-email-victor.kamensky@linaro.org>
-Message-ID: <1392183693-21238-7-git-send-email-victor.kamensky@linaro.org>
+Message-ID: <1392183693-21238-8-git-send-email-victor.kamensky@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to recent clarifications of mmio.data array meaning -
-the mmio.data array should hold bytes as they would appear in
-memory. Vgic is little endian device. And in case of BE image
-kernel side that emulates vgic, holds data in BE form. So we
-need to byteswap cpu<->le32 vgic registers when we read/write them
-from mmio.data[].
-
-Change has no effect in LE case because cpu already runs in le32.
+In case of status register E bit is not set (LE mode) and host runs in
+BE mode we need byteswap data, so read/write is emulated correctly.
 
 Signed-off-by: Victor Kamensky <victor.kamensky@linaro.org>
 ---
- virt/kvm/arm/vgic.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_emulate.h | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 685fc72..7e11458 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -236,12 +236,12 @@ static void vgic_cpu_irq_clear(struct kvm_vcpu *vcpu, int irq)
- 
- static u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
- {
--	return *((u32 *)mmio->data) & mask;
-+	return le32_to_cpu(*((u32 *)mmio->data)) & mask;
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 0fa90c9..69b7469 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -185,9 +185,16 @@ static inline unsigned long vcpu_data_guest_to_host(struct kvm_vcpu *vcpu,
+ 		default:
+ 			return be32_to_cpu(data);
+ 		}
++	} else {
++		switch (len) {
++		case 1:
++			return data & 0xff;
++		case 2:
++			return le16_to_cpu(data & 0xffff);
++		default:
++			return le32_to_cpu(data);
++		}
+ 	}
+-
+-	return data;		/* Leave LE untouched */
  }
  
- static void mmio_data_write(struct kvm_exit_mmio *mmio, u32 mask, u32 value)
- {
--	*((u32 *)mmio->data) = value & mask;
-+	*((u32 *)mmio->data) = cpu_to_le32(value) & mask;
+ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+@@ -203,9 +210,16 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
+ 		default:
+ 			return cpu_to_be32(data);
+ 		}
++	} else {
++		switch (len) {
++		case 1:
++			return data & 0xff;
++		case 2:
++			return cpu_to_le16(data & 0xffff);
++		default:
++			return cpu_to_le32(data);
++		}
+ 	}
+-
+-	return data;		/* Leave LE untouched */
  }
  
- /**
+ #endif /* __ARM_KVM_EMULATE_H__ */
 -- 
 1.8.1.4
