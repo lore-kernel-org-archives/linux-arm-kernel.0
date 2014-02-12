@@ -1,25 +1,72 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Feb 2014 11:30:18 +0000
-Subject: [PATCH] perf: ARM64: wire up perf_regs and unwind support
-In-Reply-To: <20140212112744.GA10517@gmail.com>
-References: <1391451427-31221-1-git-send-email-jean.pihet@linaro.org>
- <CAFrcx1kApRNN7aKQr89Y51w_JqUhVZ2x4+a8Sx8-X7xb-a1=pw@mail.gmail.com>
- <20140212101011.GC13441@mudshark.cambridge.arm.com>
- <20140212112744.GA10517@gmail.com>
-Message-ID: <20140212113018.GA29132@mudshark.cambridge.arm.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Wed, 12 Feb 2014 12:30:06 +0100
+Subject: [PATCH] ARM: at91/DT: add NAND + DMA property
+In-Reply-To: <1392203183-9851-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1392203183-9851-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <52FB5B3E.4020401@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 11:27:44AM +0000, Ingo Molnar wrote:
-> * Will Deacon <will.deacon@arm.com> wrote:
-> > This needs to go via the perf tree to avoid a repeat of the mess last time.
-> 
-> If the tooling bits are fine with Arnaldo then I have no objections 
-> either - once all the bits are acked please send a single series with 
-> all 4(?) patches in it, for tip:perf/core inclusion.
-
-I think it's just 1 patch -- the other 3 are under arch/arm64, so it would
-be easier to take those via the arm64 tree and deal with any conflicts
-there.
-
-Will
+On 12/02/2014 12:06, Nicolas Ferre wrote:
+> Add the "atmel,nand-has-dma" property to NAND node for SoC that
+> can use the DMA to perform NAND accesses.
+> Use of this property was added in 1b7192658a08f70df0f290634fd7cd2ecb629fc9
+> (mtd: atmel_nand: add a new dt binding item for nand dma support).
+>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> ---
+>   arch/arm/boot/dts/at91sam9g45.dtsi | 1 +
+>   arch/arm/boot/dts/at91sam9n12.dtsi | 1 +
+>   arch/arm/boot/dts/at91sam9x5.dtsi  | 1 +
+>   arch/arm/boot/dts/sama5d3.dtsi     | 1 +
+>   4 files changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index cbcc058b26b4..9b6683f252cf 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -817,6 +817,7 @@
+>   			      >;
+>   			atmel,nand-addr-offset = <21>;
+>   			atmel,nand-cmd-offset = <22>;
+> +			atmel,nand-has-dma;
+>   			pinctrl-names = "default";
+>   			pinctrl-0 = <&pinctrl_nand>;
+>   			gpios = <&pioC 8 GPIO_ACTIVE_HIGH
+> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+> index 394e6ce2afb7..9f04808fc697 100644
+> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+> @@ -570,6 +570,7 @@
+>   			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
+>   			atmel,nand-addr-offset = <21>;
+>   			atmel,nand-cmd-offset = <22>;
+> +			atmel,nand-has-dma;
+>   			pinctrl-names = "default";
+>   			pinctrl-0 = <&pinctrl_nand>;
+>   			gpios = <&pioD 5 GPIO_ACTIVE_HIGH
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index 174219de92fa..67e32067eb25 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -790,6 +790,7 @@
+>   			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
+>   			atmel,nand-addr-offset = <21>;
+>   			atmel,nand-cmd-offset = <22>;
+> +			atmel,nand-has-dma;
+>   			pinctrl-names = "default";
+>   			pinctrl-0 = <&pinctrl_nand>;
+>   			gpios = <&pioD 5 GPIO_ACTIVE_HIGH
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index 3d5faf85f51b..d075c5326ce7 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -1256,6 +1256,7 @@
+>   			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
+>   			atmel,nand-addr-offset = <21>;
+>   			atmel,nand-cmd-offset = <22>;
+> +			atmel,nand-has-dma;
+>   			pinctrl-names = "default";
+>   			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
+>   			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
