@@ -1,61 +1,44 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 12 Feb 2014 13:32:09 -0500
-Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
-In-Reply-To: <CAOesGMgNkdxW4znmns10-DPc4+OTWJLyx2fcJGTgdND6pp0zUQ@mail.gmail.com>
-References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
- <201402121251.06280.arnd@arndb.de>
- <20140212174554.GM27395@titan.lakedaemon.net>
- <CAOesGMgNkdxW4znmns10-DPc4+OTWJLyx2fcJGTgdND6pp0zUQ@mail.gmail.com>
-Message-ID: <20140212183209.GN27395@titan.lakedaemon.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 12 Feb 2014 18:33:01 +0000
+Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
+In-Reply-To: <201401281148.10670.arnd@arndb.de>
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>
+ <52E700F0.7040708@gmail.com>
+ <CAPDyKFpOhQtiyCmzie3=sfg42Vv5_rReRNgUf8kALoE6TBe2cw@mail.gmail.com>
+ <201401281148.10670.arnd@arndb.de>
+Message-ID: <20140212183301.GL28112@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 10:13:59AM -0800, Olof Johansson wrote:
-> On Wed, Feb 12, 2014 at 9:45 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> 
-> > I brought this up at last weeks devicetree irc meeting.  My goal is to
-> > provide early randomness for kaslr on ARM.  Currently, my idea is modify
-> > the init script to save an additional random seed from /dev/urandom to
-> > /boot/random-seed.
-> >
-> > The bootloader would then load this file into ram, and pass the
-> > address/size to the kernel either via dt, or commandline.  kaslr (run in
-> > the decompressor) would consume some of this randomness, and then
-> > random.c would consume the rest in a non-crediting initialization.
-> >
-> > While not ideal, it works in absence of an HRNG, and is no worse than
-> > the current situation of storing the seed in /var/lib/misc/random-seed.
-> > It also doesn't require modification of the bootloaders.  Just an
-> > updated kernel, and update the bootloader environment to load the
-> > seed.
-> 
-> Hmm. There are some drawbacks with this -- it assumes you can "just
-> update the bootloader environment" which in general isn't easy to do.
+On Tue, Jan 28, 2014 at 11:48:10AM +0100, Arnd Bergmann wrote:
 
-true, the scope of my experience is consumer grade NASs, routers and
-APs.  At the very least, it's much easier than upgrading the bootloader.
+> I think there is another option, which does have its own pros and cons:
+> We could move all the power handling back into the sdio function driver
+> if we allow a secondary detection path using DT rather than the probing
+> of the SDIO bus. Essentially you'd have to list the class/vendor/device
+> ID for each function that cannot be autodetected in DT, and have the
+> SDIO core pretend that it found the device just by looking at the
+> device nodes, and register the struct sdio_func so it can be bound to
+> the driver. The driver then does all the power handling in a device
+> specific way. At some point the hardware gets registered at the 
+> mmc host, and the sdio core connects the bus state to the already present
+> sdio_func, possibly notifying the function driver that it has become
+> usable.
 
-Also, my pov is as a hobbyist modifying devices post-sale.  The idea is
-something I could add to my existing boxes without having to upgrade the
-bootloaders.
+> Obviously, this can only work for CAP_NONREMOVABLE devices, but those
+> are exactly the ones we are worried about here. The advantage is that
+> the power sequencing for a particular device can then be in device
+> specific code and can have an arbitrarily complex in the driver without
+> needing the mmc code to handle all possible corner cases.
 
-> Also, you can't assume that /boot is writable or exists on all
-> embedded systems.
-
-In systems missing this capability, they often have the ability to
-update the kernel.  All that's needed is one block of flash.  Current
-random-seed size is 512 bytes.  I'm not saying it's easy or desirable.
-But for folks who feel it's necessary to have kaslr on embedded devices,
-it would facilitate better random numbers.  "Better" meaning much harder
-for an attacker to guess.
-
-> In general, taking both runtime and system-dependend data and using
-> that to see entropy is a good idea.
-
-Of course, I wasn't arguing for one or the other.  As you said later, in
-situations where you can't feed in a seed file, MAC addresses and serial
-numbers are better than nothing.
-
-thx,
-
-Jason.
+I think this is going to be the most generic solution overall, it's
+going to work with other buses and it's going to allow the device to
+fully power itself off while running (I don't know if it's useful for SD
+but that's definitely common with some other buses).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/aba45cd9/attachment.sig>
