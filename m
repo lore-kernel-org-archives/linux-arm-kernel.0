@@ -1,72 +1,45 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 12 Feb 2014 12:30:06 +0100
-Subject: [PATCH] ARM: at91/DT: add NAND + DMA property
-In-Reply-To: <1392203183-9851-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1392203183-9851-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <52FB5B3E.4020401@overkiz.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 12 Feb 2014 11:40:33 +0000
+Subject: [PATCH 1/3] arm64: dts: add initial dts for Samsung GH7 SoC and
+ SSDK-GH7 board
+In-Reply-To: <20140212112946.GD21992@e106331-lin.cambridge.arm.com>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <1392100183-30930-2-git-send-email-kgene.kim@samsung.com>
+ <CAOesGMjE=zOStKoZQhYLhYtL_aWD73DcF4w6STboZPMfHkLtxA@mail.gmail.com>
+ <52FB575F.3070104@arm.com>
+ <20140212112946.GD21992@e106331-lin.cambridge.arm.com>
+Message-ID: <52FB5DB1.4090609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2014 12:06, Nicolas Ferre wrote:
-> Add the "atmel,nand-has-dma" property to NAND node for SoC that
-> can use the DMA to perform NAND accesses.
-> Use of this property was added in 1b7192658a08f70df0f290634fd7cd2ecb629fc9
-> (mtd: atmel_nand: add a new dt binding item for nand dma support).
->
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
->   arch/arm/boot/dts/at91sam9g45.dtsi | 1 +
->   arch/arm/boot/dts/at91sam9n12.dtsi | 1 +
->   arch/arm/boot/dts/at91sam9x5.dtsi  | 1 +
->   arch/arm/boot/dts/sama5d3.dtsi     | 1 +
->   4 files changed, 4 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index cbcc058b26b4..9b6683f252cf 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -817,6 +817,7 @@
->   			      >;
->   			atmel,nand-addr-offset = <21>;
->   			atmel,nand-cmd-offset = <22>;
-> +			atmel,nand-has-dma;
->   			pinctrl-names = "default";
->   			pinctrl-0 = <&pinctrl_nand>;
->   			gpios = <&pioC 8 GPIO_ACTIVE_HIGH
-> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> index 394e6ce2afb7..9f04808fc697 100644
-> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> @@ -570,6 +570,7 @@
->   			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
->   			atmel,nand-addr-offset = <21>;
->   			atmel,nand-cmd-offset = <22>;
-> +			atmel,nand-has-dma;
->   			pinctrl-names = "default";
->   			pinctrl-0 = <&pinctrl_nand>;
->   			gpios = <&pioD 5 GPIO_ACTIVE_HIGH
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index 174219de92fa..67e32067eb25 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -790,6 +790,7 @@
->   			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
->   			atmel,nand-addr-offset = <21>;
->   			atmel,nand-cmd-offset = <22>;
-> +			atmel,nand-has-dma;
->   			pinctrl-names = "default";
->   			pinctrl-0 = <&pinctrl_nand>;
->   			gpios = <&pioD 5 GPIO_ACTIVE_HIGH
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index 3d5faf85f51b..d075c5326ce7 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -1256,6 +1256,7 @@
->   			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
->   			atmel,nand-addr-offset = <21>;
->   			atmel,nand-cmd-offset = <22>;
-> +			atmel,nand-has-dma;
->   			pinctrl-names = "default";
->   			pinctrl-0 = <&pinctrl_nand0_ale_cle>;
->   			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
+On 12/02/14 11:29, Mark Rutland wrote:
+>>>> +       gic: interrupt-controller at 1C000000 {
+>>>> +               compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+>>>
+>>> This looks incorrect -- you should at the very least have a more
+>>> specific one than a15-gic? Marc?
+>>
+>> "arm,cortex-a9-gic" is definitely wrong (the A9 GIC doesn't have the
+>> virt extensions). This binding matches what the A15 GIC has, so
+>> "arm,cortex-a15-gic" is probably fine. Main issue here is that the GICv2
+>> driver has no compatible string for anything else.
+>>
+>> Should we define something more generic (like "arm,gic-v2")? Or carry on
+>> adding more compatible strings?
+> 
+> It's been proposed repeatedly, and it probably makes sense to add the
+> generic versions to the driver, and allow for more specific ones in the
+> binding which DTs can use. That way we don't get an explosion of strings
+> in the driver, but if we need to handle any particular GIC specially in
+> future we can do so.
+> 
+> I guess for Linux we'd want to add "arm,gic-v1" and "arm,gic-v2" to the
+> driver. We could just add "arm,gic-v1" and expect it later in the
+> compatible list if v2 is a strict superset of v1; I think it is but I'm
+> not a GIC expert.
+
+Sounds good to me.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
