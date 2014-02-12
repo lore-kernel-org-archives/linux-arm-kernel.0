@@ -1,26 +1,46 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 12 Feb 2014 11:04:11 -0200
-Subject: [PATCH] ARM: imx6: fix !CONFIG_PM and !CONFIG_CPU_IDLE build
-In-Reply-To: <1392201948-16311-1-git-send-email-l.stach@pengutronix.de>
-References: <1392201948-16311-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <CAOMZO5DJNBQU1oL+V3r_=WfX8b_Qd_-OVbdnzVj=AMSS8ndhcg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 12 Feb 2014 13:59:38 +0100
+Subject: [PATCH 1/2] pinctrl: nomadik: Silence compiler warn for !CONFIG_PM
+Message-ID: <1392209979-31636-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 8:45 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+The static suspend/resume functions were not being used while
+!CONFIG_PM. Fix it and convert to CONFIG_PM_SLEEP.
 
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -138,7 +138,6 @@ void imx_gpc_irq_unmask(struct irq_data *d);
->  void imx_anatop_init(void);
->  void imx_anatop_pre_suspend(void);
->  void imx_anatop_post_resume(void);
-> -int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
->  void imx6q_set_chicken_bit(void);
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/pinctrl/pinctrl-nomadik.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-This function has been renamed since commit f191d820b1b (ARM: imx: Use
-INT_MEM_CLK_LPM as the bit name)
-
-Regards,
-
-Fabio Estevam
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index 53a1111..b6c5793 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -2035,6 +2035,7 @@ static const struct of_device_id nmk_pinctrl_match[] = {
+ 	{},
+ };
+ 
++#ifdef CONFIG_PM_SLEEP
+ static int nmk_pinctrl_suspend(struct platform_device *pdev, pm_message_t state)
+ {
+ 	struct nmk_pinctrl *npct;
+@@ -2056,6 +2057,7 @@ static int nmk_pinctrl_resume(struct platform_device *pdev)
+ 
+ 	return pinctrl_force_default(npct->pctl);
+ }
++#endif
+ 
+ static int nmk_pinctrl_probe(struct platform_device *pdev)
+ {
+@@ -2151,7 +2153,7 @@ static struct platform_driver nmk_pinctrl_driver = {
+ 		.of_match_table = nmk_pinctrl_match,
+ 	},
+ 	.probe = nmk_pinctrl_probe,
+-#ifdef CONFIG_PM
++#ifdef CONFIG_PM_SLEEP
+ 	.suspend = nmk_pinctrl_suspend,
+ 	.resume = nmk_pinctrl_resume,
+ #endif
+-- 
+1.7.9.5
