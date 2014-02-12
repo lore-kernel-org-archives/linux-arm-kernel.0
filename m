@@ -1,184 +1,78 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 12 Feb 2014 18:28:44 +0100
-Subject: [PATCH v4 3/8] at91: dt: Add at91sam9261 dt SoC support
-In-Reply-To: <1392199607-27452-4-git-send-email-jjhiblot@traphandler.com>
-References: <1392199607-27452-1-git-send-email-jjhiblot@traphandler.com>
- <1392199607-27452-4-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <20140212172844.GE11498@piout.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 12 Feb 2014 12:45:54 -0500
+Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
+In-Reply-To: <201402121251.06280.arnd@arndb.de>
+References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
+ <201402121251.06280.arnd@arndb.de>
+Message-ID: <20140212174554.GM27395@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Laura,
 
-On 12/02/2014 at 11:06:42 +0100, Jean-Jacques Hiblot wrote :
-> This patch adds support for the Device Tree on a sam9261-based platform
+Sorry to hijack the thread (sort of).  :)
+
++ Kees Cook
+
+On Wed, Feb 12, 2014 at 12:51:05PM +0100, Arnd Bergmann wrote:
+> On Wednesday 12 February 2014, Laura Abbott wrote:
+> > This is an RFC to seed the random number pool earlier when using devicetree.
+> > The big issue this is trying to solve is the fact that the stack canary for
+> > ARM tends to be the same across bootups of the same device. This is because
+> > the random number pools do not get initialized until after the canary has
+> > been set up. The canary can be moved later, but in general there is still
+> > no way to reliably get random numbers early for other features (e.g. vector
+> > randomization).
 > 
-> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> ---
->  arch/arm/boot/dts/at91sam9261.dtsi | 740 +++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-at91/at91sam9261.c   |  17 +
->  2 files changed, 757 insertions(+)
->  create mode 100644 arch/arm/boot/dts/at91sam9261.dtsi
+> Implementation-wise this looks reasonable, and it obviously addresses a
+> very real problem.
+> 
+> > The goal here is to allow devices to add to the random pools via
+> > add_device_randomness or some other method of their chosing at FDT time.
+> > I realize that ARCH_RANDOM is already available but this didn't work because
+> > 1) ARCH_RANDOM is not multi-platform compatible without added
+> > infrastructure to ARM
+> 
+> That could certainly be done, but I agree that a more generic
+> approach like you did is nicer. One thing that might be useful
+> would be to wire up your OF_RANDOM infrastructure as a generic
+> implementation of ARCH_RANDOM, and merge your header file into
+> include/asm-generic/archrandom.h, with an added way to call
+> arch_get_random_long() for the devices you add.
+> 
+> > The big reason to skip ARCH_RANDOM though is that the random number generation
+> > we have would be reasonable if only seeded earlier.
+> 
+> Yes, makes sense.
+> 
+> I also wonder if we should add a 'trivial' implementation that just
+> reads a DT property full of random numbers to use as either an initial
+> seed, or to feed into arch_get_random_long(). This would allow the
+> boot loader to pass any entropy it has already gathered into the kernel,
+> but leaves the danger that people might pass static not-so-random data
+> through a precompiled dtb file ;-). If we get the boot loaders to be
+> smart enough, doing only this would be a much simpler kernel implementation
+> than your suggestion, but I'm not sure how far I want to trust boot loaders.
 
-[...]
+I brought this up at last weeks devicetree irc meeting.  My goal is to
+provide early randomness for kaslr on ARM.  Currently, my idea is modify
+the init script to save an additional random seed from /dev/urandom to
+/boot/random-seed.
 
-> +
-> +		apb {
-> +			compatible = "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			tcb0: timer at fffa0000 {
-> +				compatible = "atmel,at91rm9200-tcb";
-> +				reg = <0xfffa0000 0x100>;
-> +				interrupts = < 17 IRQ_TYPE_LEVEL_HIGH 0
-> +					18 IRQ_TYPE_LEVEL_HIGH 0
-> +					19 IRQ_TYPE_LEVEL_HIGH 0
-> +					>;
-> +				clocks = <&tc0_clk>, <&tc1_clk>, <&tc2_clk>;
-> +				clock-names = "t0_clk", "t1_clk", "t2_clk";
-> +			};
-> +
-> +			usb1: gadget at fffa4000 {
-> +				compatible = "atmel,at91rm9200-udc";
-> +				reg = <0xfffa4000 0x4000>;
-> +				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 2>;
-> +				clocks = <&usb>, <&udc_clk>, <&udpck>;
-> +				clock-names = "usb_clk", "udc_clk", "udpck";
-> +				status = "disabled";
-> +			};
-> +
-> +			mmc0: mmc at fffa8000 {
-> +				compatible = "atmel,hsmci";
-> +				reg = <0xfffa8000 0x600>;
-> +				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_mmc0_clk>, <&pinctrl_mmc0_slot0_cmd_dat0>, <&pinctrl_mmc0_slot0_dat1_3>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				clocks = <&mci0_clk>;
-> +				clock-names = "mci_clk";
-> +				status = "disabled";
-> +			};
-> +
-> +			i2c0: i2c at fffac000 {
-> +				compatible = "atmel,at91sam9261-i2c";
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_i2c_twi>;
-> +				reg = <0xfffac000 0x100>;
-> +				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 6>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				clocks = <&twi0_clk>;
-> +				status = "disabled";
-> +			};
-> +
-> +			usart0: serial at fffb0000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xfffb0000 0x200>;
-> +				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				atmel,use-dma-rx;
-> +				atmel,use-dma-tx;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_usart0>;
-> +				clocks = <&usart0_clk>;
-> +				clock-names = "usart";
-> +				status = "disabled";
-> +			};
-> +
-> +			usart1: serial at fffb4000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xfffb4000 0x200>;
-> +				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				atmel,use-dma-rx;
-> +				atmel,use-dma-tx;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_usart1>;
-> +				clocks = <&usart1_clk>;
-> +				clock-names = "usart";
-> +				status = "disabled";
-> +			};
-> +
-> +			usart2: serial at fffb8000{
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xfffb8000 0x200>;
-> +				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				atmel,use-dma-rx;
-> +				atmel,use-dma-tx;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_usart2>;
-> +				clocks = <&usart2_clk>;
-> +				clock-names = "usart";
-> +				status = "disabled";
-> +			};
-> +
-> +			ssc0: ssc at fffbc000 {
-> +				compatible = "atmel,at91rm9200-ssc";
-> +				reg = <0xfffbc000 0x4000>;
-> +				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
-> +				status = "disabled";
-> +			};
-> +
-> +			ssc1: ssc at fffc0000 {
-> +				compatible = "atmel,at91rm9200-ssc";
-> +				reg = <0xfffc0000 0x4000>;
-> +				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
-> +				status = "disabled";
-> +			};
-> +
-> +			spi0: spi at fffc8000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "atmel,at91rm9200-spi";
-> +				reg = <0xfffc8000 0x200>;
-> +				cs-gpios = <0>, <0>, <0>, <0>;
-> +				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 3>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_spi0>;
-> +				clocks = <&spi0_clk>;
-> +				clock-names = "spi_clk";
-> +				status = "disabled";
-> +			};
-> +
-> +			spi1: spi at fffcc000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "atmel,at91rm9200-spi";
-> +				reg = <0xfffcc000 0x200>;
-> +				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_spi1>;
-> +				clocks = <&spi1_clk>;
-> +				clock-names = "spi_clk";
-> +				status = "disabled";
-> +			};
-> +
-> +			ramc: ramc at ffffea00 {
-> +				compatible = "atmel,at91sam9260-sdramc";
-> +				reg = <0xffffea00 0x200>;
-> +			};
-> +
+The bootloader would then load this file into ram, and pass the
+address/size to the kernel either via dt, or commandline.  kaslr (run in
+the decompressor) would consume some of this randomness, and then
+random.c would consume the rest in a non-crediting initialization.
 
-You probably copied/pasted it but according to the block diagram, the
-sdram controller is not under the apb.
+While not ideal, it works in absence of an HRNG, and is no worse than
+the current situation of storing the seed in /var/lib/misc/random-seed.
+It also doesn't require modification of the bootloaders.  Just an
+updated kernel, and update the bootloader environment to load the
+seed.
 
-> +			matrix: matrix at ffffee00 {
-> +				compatible = "atmel,at91sam9261-bus-matrix";
-> +				reg = <0xffffee00 0x200>;
-> +			};
-> +
+Unfortunately, it's an idea so far.  I have one project to get off of my
+plate, then this is next :)
 
-Same here, the apb is actually under the bus matrix.
+thx,
 
-I don't know whether it can be represented another way though.
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jason.
