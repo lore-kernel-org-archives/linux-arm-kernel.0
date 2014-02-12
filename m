@@ -1,51 +1,24 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 12 Feb 2014 14:02:53 +0000
-Subject: [PATCH] ARM: mm: cache-l2x0: Check for status property of DT node
-In-Reply-To: <52FB6C49.6010401@samsung.com>
-References: <1392206478-11530-1-git-send-email-tushar.behera@linaro.org>
- <52FB6C49.6010401@samsung.com>
-Message-ID: <20140212140253.GC25957@e106331-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 12 Feb 2014 14:03:18 +0000
+Subject: [PATCH 8/9] ARM: virt: make mach-virt just a kconfig option
+In-Reply-To: <1392153119-23248-9-git-send-email-robherring2@gmail.com>
+References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
+ <1392153119-23248-9-git-send-email-robherring2@gmail.com>
+Message-ID: <52FB7F26.2040103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 12:42:49PM +0000, Tomasz Figa wrote:
-> [making Cc list a bit more comprehensive]
+On 11/02/14 21:11, Rob Herring wrote:
+> From: Rob Herring <robh@kernel.org>
 > 
-> On 12.02.2014 13:01, Tushar Behera wrote:
-> > Currently only the DT node is checked during l2x0 cache initialization,
-> > but it doesn't check the status of the DT node. Thus it gets called
-> > even if the status of DT node for L2 controller is disabled.
-> >
-> > Add explicit check to ensure that L2 cache is initialized only for
-> > desired boards.
-> >
-> > Reported-by: Tomasz Figa <t.figa@samsung.com>
-> > Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> > ---
-> >   arch/arm/mm/cache-l2x0.c |    3 +++
-> >   1 file changed, 3 insertions(+)
-> >
-> > diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> > index 7abde2c..f075cb1 100644
-> > --- a/arch/arm/mm/cache-l2x0.c
-> > +++ b/arch/arm/mm/cache-l2x0.c
-> > @@ -978,6 +978,9 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
-> >   	if (!np)
-> >   		return -ENODEV;
-> >
-> > +	if (!of_device_is_available(np))
-> > +		return -ENODEV;
-> > +
-> >   	if (of_address_to_resource(np, 0, &res))
-> >   		return -ENODEV;
-> >
-> >
+> The mach code for mach-virt is no longer needed, so we can remove all of
+> mach-virt except the kconfig entry.
 > 
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-Looks sensible to me.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
