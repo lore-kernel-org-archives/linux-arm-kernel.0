@@ -1,19 +1,18 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 12 Feb 2014 16:59:34 +0100
-Subject: [PATCH v3 11/13] pinctrl: mvebu: remove common get/set functions
+Date: Wed, 12 Feb 2014 16:59:36 +0100
+Subject: [PATCH v3 13/13] pinctrl: mvebu: dove: reuse mpp_{set,
+ get} in pmu callbacks
 In-Reply-To: <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1392220776-30851-12-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1392220776-30851-14-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With every SoC always providing its own get/set callbacks, we can now
-remove the generic ones, remove the obsolete base address, and always
-use the provided callbacks.
+Dove has pins that can be switched between normal and pmu functions.
+Rework pmu_mpp callbacks to reuse normal mpp callbacks.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Tested-by: Andrew Lunn <andrew@lunn.ch>
 ---
 Cc: Linus Walleij <linus.walleij@linaro.org> 
 Cc: Jason Cooper <jason@lakedaemon.net> 
@@ -24,89 +23,64 @@ Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/pinctrl/mvebu/pinctrl-mvebu.c | 49 ++---------------------------------
- 1 file changed, 2 insertions(+), 47 deletions(-)
+ drivers/pinctrl/mvebu/pinctrl-dove.c | 37 +++++++++++++++++-------------------
+ 1 file changed, 17 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-index 45e99e80502f..9908374f8f92 100644
---- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
-@@ -50,7 +50,6 @@ struct mvebu_pinctrl {
- 	struct device *dev;
- 	struct pinctrl_dev *pctldev;
- 	struct pinctrl_desc desc;
--	void __iomem *base;
- 	struct mvebu_pinctrl_group *groups;
- 	unsigned num_groups;
- 	struct mvebu_pinctrl_function *functions;
-@@ -138,43 +137,6 @@ static struct mvebu_pinctrl_function *mvebu_pinctrl_find_function_by_name(
- 	return NULL;
+diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
+index 2f384d87ea92..3e28096091b0 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-dove.c
++++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
+@@ -82,14 +82,13 @@ static int dove_pmu_mpp_ctrl_get(unsigned pid, unsigned long *config)
+ 	unsigned long pmu = readl(DOVE_PMU_MPP_GENERAL_CTRL);
+ 	unsigned long func;
+ 
+-	if (pmu & (1 << pid)) {
+-		func = readl(DOVE_PMU_SIGNAL_SELECT_0 + off);
+-		*config = (func >> shift) & MVEBU_MPP_MASK;
+-		*config |= CONFIG_PMU;
+-	} else {
+-		func = readl(DOVE_MPP_VIRT_BASE + off);
+-		*config = (func >> shift) & MVEBU_MPP_MASK;
+-	}
++	if ((pmu & BIT(pid)) == 0)
++		return dove_mpp_ctrl_get(pid, config);
++
++	func = readl(DOVE_PMU_SIGNAL_SELECT_0 + off);
++	*config = (func >> shift) & MVEBU_MPP_MASK;
++	*config |= CONFIG_PMU;
++
+ 	return 0;
  }
  
--/*
-- * Common mpp pin configuration registers on MVEBU are
-- * registers of eight 4-bit values for each mpp setting.
-- * Register offset and bit mask are calculated accordingly below.
-- */
--static int mvebu_common_mpp_get(struct mvebu_pinctrl *pctl,
--				struct mvebu_pinctrl_group *grp,
--				unsigned long *config)
--{
--	unsigned pin = grp->gid;
--	unsigned off = (pin / MPPS_PER_REG) * MPP_BITS;
--	unsigned shift = (pin % MPPS_PER_REG) * MPP_BITS;
--
--	*config = readl(pctl->base + off);
--	*config >>= shift;
--	*config &= MPP_MASK;
--
--	return 0;
--}
--
--static int mvebu_common_mpp_set(struct mvebu_pinctrl *pctl,
--				struct mvebu_pinctrl_group *grp,
--				unsigned long config)
--{
--	unsigned pin = grp->gid;
--	unsigned off = (pin / MPPS_PER_REG) * MPP_BITS;
--	unsigned shift = (pin % MPPS_PER_REG) * MPP_BITS;
--	unsigned long reg;
--
--	reg = readl(pctl->base + off);
--	reg &= ~(MPP_MASK << shift);
--	reg |= (config << shift);
--	writel(reg, pctl->base + off);
--
--	return 0;
--}
--
- static int mvebu_pinconf_group_get(struct pinctrl_dev *pctldev,
- 				unsigned gid, unsigned long *config)
- {
-@@ -184,10 +146,7 @@ static int mvebu_pinconf_group_get(struct pinctrl_dev *pctldev,
- 	if (!grp->ctrl)
- 		return -EINVAL;
+@@ -100,19 +99,17 @@ static int dove_pmu_mpp_ctrl_set(unsigned pid, unsigned long config)
+ 	unsigned long pmu = readl(DOVE_PMU_MPP_GENERAL_CTRL);
+ 	unsigned long func;
  
--	if (grp->ctrl->mpp_get)
--		return grp->ctrl->mpp_get(grp->pins[0], config);
--
--	return mvebu_common_mpp_get(pctl, grp, config);
-+	return grp->ctrl->mpp_get(grp->pins[0], config);
+-	if (config & CONFIG_PMU) {
+-		writel(pmu | (1 << pid), DOVE_PMU_MPP_GENERAL_CTRL);
+-		func = readl(DOVE_PMU_SIGNAL_SELECT_0 + off);
+-		func &= ~(MVEBU_MPP_MASK << shift);
+-		func |= (config & MVEBU_MPP_MASK) << shift;
+-		writel(func, DOVE_PMU_SIGNAL_SELECT_0 + off);
+-	} else {
+-		writel(pmu & ~(1 << pid), DOVE_PMU_MPP_GENERAL_CTRL);
+-		func = readl(DOVE_MPP_VIRT_BASE + off);
+-		func &= ~(MVEBU_MPP_MASK << shift);
+-		func |= (config & MVEBU_MPP_MASK) << shift;
+-		writel(func, DOVE_MPP_VIRT_BASE + off);
++	if ((config & CONFIG_PMU) == 0) {
++		writel(pmu & ~BIT(pid), DOVE_PMU_MPP_GENERAL_CTRL);
++		return dove_mpp_ctrl_set(pid, config);
+ 	}
++
++	writel(pmu | BIT(pid), DOVE_PMU_MPP_GENERAL_CTRL);
++	func = readl(DOVE_PMU_SIGNAL_SELECT_0 + off);
++	func &= ~(MVEBU_MPP_MASK << shift);
++	func |= (config & MVEBU_MPP_MASK) << shift;
++	writel(func, DOVE_PMU_SIGNAL_SELECT_0 + off);
++
+ 	return 0;
  }
  
- static int mvebu_pinconf_group_set(struct pinctrl_dev *pctldev,
-@@ -202,11 +161,7 @@ static int mvebu_pinconf_group_set(struct pinctrl_dev *pctldev,
- 		return -EINVAL;
- 
- 	for (i = 0; i < num_configs; i++) {
--		if (grp->ctrl->mpp_set)
--			ret = grp->ctrl->mpp_set(grp->pins[0], configs[i]);
--		else
--			ret = mvebu_common_mpp_set(pctl, grp, configs[i]);
--
-+		ret = grp->ctrl->mpp_set(grp->pins[0], configs[i]);
- 		if (ret)
- 			return ret;
- 	} /* for each config */
 -- 
 1.8.5.3
