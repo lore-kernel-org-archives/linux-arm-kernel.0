@@ -1,33 +1,46 @@
-From: acme@ghostprotocols.net (Arnaldo Carvalho de Melo)
-Date: Wed, 12 Feb 2014 10:02:02 -0300
-Subject: [PATCH] perf: ARM64: wire up perf_regs and unwind support
-In-Reply-To: <20140212113018.GA29132@mudshark.cambridge.arm.com>
-References: <1391451427-31221-1-git-send-email-jean.pihet@linaro.org>
- <CAFrcx1kApRNN7aKQr89Y51w_JqUhVZ2x4+a8Sx8-X7xb-a1=pw@mail.gmail.com>
- <20140212101011.GC13441@mudshark.cambridge.arm.com>
- <20140212112744.GA10517@gmail.com>
- <20140212113018.GA29132@mudshark.cambridge.arm.com>
-Message-ID: <20140212130202.GA7116@ghostprotocols.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 12 Feb 2014 14:03:29 +0100
+Subject: [PATCH RESEND] usb: at91-udc: fix irq and iomem resource retrieval
+In-Reply-To: <1390488102-8548-1-git-send-email-jjhiblot@traphandler.com>
+References: <1390488102-8548-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <1392210209-22142-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Wed, Feb 12, 2014 at 11:30:18AM +0000, Will Deacon escreveu:
-> On Wed, Feb 12, 2014 at 11:27:44AM +0000, Ingo Molnar wrote:
-> > * Will Deacon <will.deacon@arm.com> wrote:
-> > > This needs to go via the perf tree to avoid a repeat of the mess last time.
+From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 
-> > If the tooling bits are fine with Arnaldo then I have no objections 
-> > either - once all the bits are acked please send a single series with 
-> > all 4(?) patches in it, for tip:perf/core inclusion.
+When using dt resources retrieval (interrupts and reg properties) there is
+no predefined order for these resources in the platform dev resource
+table. Also don't expect the number of resource to be always 2.
+
+Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: stable <stable@vger.kernel.org> # 3.4
+---
+ drivers/usb/gadget/at91_udc.c | 10 ----------
+ 1 file changed, 10 deletions(-)
+
+diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+index cea8c20a1425..1926925a52a9 100644
+--- a/drivers/usb/gadget/at91_udc.c
++++ b/drivers/usb/gadget/at91_udc.c
+@@ -1709,16 +1709,6 @@ static int at91udc_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
  
-> I think it's just 1 patch -- the other 3 are under arch/arm64, so it would
-> be easier to take those via the arm64 tree and deal with any conflicts
-> there.
-
-I don't have a problem with arch specific bits, that don't touch the
-tools at all, going thru the respective arch git tree.
-
-Jiri, can you see anything problematic in this? From a quick look I
-couldn't.
-
-- Arnaldo
+-	if (pdev->num_resources != 2) {
+-		DBG("invalid num_resources\n");
+-		return -ENODEV;
+-	}
+-	if ((pdev->resource[0].flags != IORESOURCE_MEM)
+-			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
+-		DBG("invalid resource type\n");
+-		return -ENODEV;
+-	}
+-
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!res)
+ 		return -ENXIO;
+-- 
+1.8.2.2
