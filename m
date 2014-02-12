@@ -1,43 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 12 Feb 2014 08:49:46 +0100
-Subject: [PATCH 2/3] ARM: mvebu: use GPIO DT defines in Armada 370/XP
- boards
-In-Reply-To: <1392138433-12573-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392138433-12573-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392138433-12573-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140212074946.GC30814@lunn.ch>
+From: b20788@freescale.com (Anson Huang)
+Date: Wed, 12 Feb 2014 15:56:16 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6q: add 852MHz setpoint for CPU freq
+Message-ID: <1392191777-15703-1-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 06:07:12PM +0100, Thomas Petazzoni wrote:
-> Instead of harcoding 0 and 1 for the gpio specifications in the Armada
-> 370/XP boards, use the <dt-bindings/gpio/gpio.h> header file and its
-> GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW definitions.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-370-mirabox.dts         | 7 ++++---
->  arch/arm/boot/dts/armada-370-rd.dts              | 3 ++-
->  arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 3 ++-
->  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 9 +++++----
->  4 files changed, 13 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-> index 944e878..2354fe0 100644
-> --- a/arch/arm/boot/dts/armada-370-mirabox.dts
-> +++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-> @@ -9,6 +9,7 @@
->   */
->  
->  /dts-v1/;
-> +#include <dt-bindings/gpio/gpio.h>
->  #include "armada-370.dtsi"
+According to datasheet, i.MX6Q has setpoint of 852MHz
+which is exclusive with 996MHz, the fuse map of speed_grading
+defines the max speed of ARM, here we add this 852MHz
+setpoint opp info, kernel will check the speed_grading
+fuse and remove all illegal setpoints.
 
-Hi Thomas
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+ arch/arm/boot/dts/imx6q.dtsi |    2 ++
+ 1 file changed, 2 insertions(+)
 
-What i did for kirkwood is include both gpio.h and input.h in
-kirkwood.dtsi. Quite a few other systems do that, rather than each
-.dts file having to include them. However i don't have a strong
-opinion.
-
-	Andrew
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 422d169..fadf498 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -30,6 +30,7 @@
+ 				/* kHz    uV */
+ 				1200000 1275000
+ 				996000  1250000
++				852000  1250000
+ 				792000  1150000
+ 				396000  975000
+ 			>;
+@@ -37,6 +38,7 @@
+ 				/* ARM kHz  SOC-PU uV */
+ 				1200000 1275000
+ 				996000	1250000
++				852000	1250000
+ 				792000	1175000
+ 				396000	1175000
+ 			>;
+-- 
+1.7.9.5
