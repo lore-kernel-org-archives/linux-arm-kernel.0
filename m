@@ -1,40 +1,83 @@
 From: b20788@freescale.com (Anson Huang)
-Date: Wed, 12 Feb 2014 17:57:02 +0800
-Subject: [PATCH V2 1/2] ARM: dts: imx6q: add 852MHz setpoint for CPU freq
-Message-ID: <1392199023-29880-1-git-send-email-b20788@freescale.com>
+Date: Wed, 12 Feb 2014 17:57:03 +0800
+Subject: [PATCH V2 2/2] ARM: imx: add speed grading check for i.mx6 soc
+In-Reply-To: <1392199023-29880-1-git-send-email-b20788@freescale.com>
+References: <1392199023-29880-1-git-send-email-b20788@freescale.com>
+Message-ID: <1392199023-29880-2-git-send-email-b20788@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to datasheet, i.MX6Q has setpoint of 852MHz
-which is exclusive with 996MHz, the fuse map of speed_grading
-defines the max speed of ARM, here we add this 852MHz
-setpoint opp info, kernel will check the speed_grading
-fuse and remove all illegal setpoints.
+The fuse map of speed_grading[1:0] defines the max speed
+of ARM, see below the definition:
+
+2b'11: 1200000000Hz;
+2b'10: 996000000Hz;
+2b'01: 852000000Hz; -- i.MX6Q Only, exclusive with 996MHz.
+2b'00: 792000000Hz;
+
+Need to remove all illegal setpoints according to fuse
+map.
 
 Signed-off-by: Anson Huang <b20788@freescale.com>
 ---
- arch/arm/boot/dts/imx6q.dtsi |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-imx/mach-imx6q.c |   26 +++++++++++++++++++++++---
+ 1 file changed, 23 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 422d169..fadf498 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -30,6 +30,7 @@
- 				/* kHz    uV */
- 				1200000 1275000
- 				996000  1250000
-+				852000  1250000
- 				792000  1150000
- 				396000  975000
- 			>;
-@@ -37,6 +38,7 @@
- 				/* ARM kHz  SOC-PU uV */
- 				1200000 1275000
- 				996000	1250000
-+				852000	1250000
- 				792000	1175000
- 				396000	1175000
- 			>;
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index d131499..1e12685 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -253,8 +253,10 @@ static void __init imx6q_init_machine(void)
+ #define OCOTP_CFG3			0x440
+ #define OCOTP_CFG3_SPEED_SHIFT		16
+ #define OCOTP_CFG3_SPEED_1P2GHZ		0x3
++#define OCOTP_CFG3_SPEED_996MHZ		0x2
++#define OCOTP_CFG3_SPEED_852MHZ		0x1
+ 
+-static void __init imx6q_opp_check_1p2ghz(struct device *cpu_dev)
++static void __init imx6q_opp_check_speed_grading(struct device *cpu_dev)
+ {
+ 	struct device_node *np;
+ 	void __iomem *base;
+@@ -272,11 +274,29 @@ static void __init imx6q_opp_check_1p2ghz(struct device *cpu_dev)
+ 		goto put_node;
+ 	}
+ 
++	/*
++	 * SPEED_GRADING[1:0] defines the max speed of ARM:
++	 * 2b'11: 1200000000Hz;
++	 * 2b'10: 996000000Hz;
++	 * 2b'01: 852000000Hz; -- i.MX6Q Only, exclusive with 996MHz.
++	 * 2b'00: 792000000Hz;
++	 * We need to set the max speed of ARM according to fuse map.
++	 */
+ 	val = readl_relaxed(base + OCOTP_CFG3);
+ 	val >>= OCOTP_CFG3_SPEED_SHIFT;
+-	if ((val & 0x3) != OCOTP_CFG3_SPEED_1P2GHZ)
++	val &= 0x3;
++
++	if (val != OCOTP_CFG3_SPEED_1P2GHZ)
+ 		if (dev_pm_opp_disable(cpu_dev, 1200000000))
+ 			pr_warn("failed to disable 1.2 GHz OPP\n");
++	if (val < OCOTP_CFG3_SPEED_996MHZ)
++		if (dev_pm_opp_disable(cpu_dev, 996000000))
++			pr_warn("failed to disable 996 MHz OPP\n");
++	if (cpu_is_imx6q()) {
++		if (val != OCOTP_CFG3_SPEED_852MHZ)
++			if (dev_pm_opp_disable(cpu_dev, 852000000))
++				pr_warn("failed to disable 852 MHz OPP\n");
++	}
+ 
+ put_node:
+ 	of_node_put(np);
+@@ -302,7 +322,7 @@ static void __init imx6q_opp_init(void)
+ 		goto put_node;
+ 	}
+ 
+-	imx6q_opp_check_1p2ghz(cpu_dev);
++	imx6q_opp_check_speed_grading(cpu_dev);
+ 
+ put_node:
+ 	of_node_put(np);
 -- 
 1.7.9.5
