@@ -1,31 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Feb 2014 14:12:27 +0100
-Subject: [PATCH v2 05/10] ARM: mvebu: add Device Tree for the Armada 375
- DB board
-In-Reply-To: <1392200619-3141-6-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392200619-3141-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392200619-3141-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <2335694.A7tsOBXSlH@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Feb 2014 13:18:34 +0000
+Subject: [PATCH v2] ARM: Add imprecise abort enable/disable macro
+In-Reply-To: <52FB71A3.5010505@stericsson.com>
+References: <1392050756-11145-1-git-send-email-fabrice.gasnier@st.com>
+ <52FB71A3.5010505@stericsson.com>
+Message-ID: <20140212131834.GP26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 February 2014 11:23:34 Thomas Petazzoni wrote:
-> +                       i2c0: i2c at 11000 {
-> +                               status = "okay";
-> +                               clock-frequency = <100000>;
-> +                               pinctrl-0 = <&i2c0_pins>;
-> +                               pinctrl-names = "default";
-> +                       };
-> +
-> +                       i2c1: i2c at 11100 {
-> +                               status = "okay";
-> +                               clock-frequency = <100000>;
-> +                               pinctrl-0 = <&i2c1_pins>;
-> +                               pinctrl-names = "default";
-> +                       };
+On Wed, Feb 12, 2014 at 02:05:39PM +0100, Fabrice GASNIER wrote:
+> Hi,
+>
+> Any comments on this patch ?
+>
+> Russell, can I add this patch to your patch tracker system ?
 
-I think you should either use the label to reference the node here,
-or omit it in the board.dts file. There is no point in defining
-multiple identical labels.
+I don't see how this works on anything but ARMv7M.
 
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
