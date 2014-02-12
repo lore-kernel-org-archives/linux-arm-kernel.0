@@ -1,40 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Feb 2014 15:56:13 +0100
-Subject: [PATCH 2/2] ehci-platform: Change compatible string from
- usb-ehci to ehci-platform
-In-Reply-To: <52FA4118.2030100@redhat.com>
-References: <1392127826-31290-1-git-send-email-hdegoede@redhat.com>
- <1392127826-31290-3-git-send-email-hdegoede@redhat.com>
- <52FA3B2B.7050906@ti.com> <52FA4118.2030100@redhat.com>
-Message-ID: <20140212145613.GA9812@lukather>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Feb 2014 16:03:56 +0100
+Subject: [PATCH v4] gpio: davinci: reuse for keystone soc
+In-Reply-To: <1391615244-12014-1-git-send-email-grygorii.strashko@ti.com>
+References: <1391615244-12014-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <CACRpkdbrs==tpUBs=WLWkt0frBcSMRDRokOn2tvP-1gt7Qq3+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 04:26:16PM +0100, Hans de Goede wrote:
-> > I'm even OK with removing "usb-ehci" and "usb-ohci" compatibles
-> > from all OMAP dts files since they aren't really compatible with
-> > the original PPC driver.
-> 
-> I don't think that is necessary, as your grep has shown there are a
-> lot of dts files using compatible = "foo", "usb-?hci"; and some may
-> even have the dts in firmware, so we should simply make sure not to
-> break such dts.
+On Wed, Feb 5, 2014 at 4:47 PM, Grygorii Strashko
+<grygorii.strashko@ti.com> wrote:
 
-For these devices, we can't do much, but at least for the DT that are
-in Linux, relying on the fact that there is no driver having a
-compatible of "usb-ehci" to work looks very fragile. I'd be in favour
-of removing it from the OMAP DTs, and every affected DTs.
+> The similar GPIO HW block is used by keystone SoCs as
+> in Davinci SoCs.
+> Hence, reuse Davinci GPIO driver for Keystone taking into
+> account that Keystone contains ARM GIC IRQ controller which
+> is implemented using IRQ Chip.
+>
+> Documentation:
+>         http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
+>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+> Changes in v4:
+> - rebased on top of v3.14 +
+>   [patch] gpio: davinci: signedness bug in davinci_gpio_irq_setup()
 
-Maxime
+I tried applying this and it does not apply on the "devel" branch
+in the GPIO tree. Since I haven't touched one line of code in the
+DaVinci driver since v3.14-rc1 I seriously doubt that this is
+rebased on v3.14[-rc].
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/bac7bc59/attachment.sig>
+Can you please rebase the patch onto v3.14-rc1 for real and
+resend it?
+
+Yours,
+Linus Walleij
