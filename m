@@ -1,15 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Feb 2014 12:20:29 -0700
-Subject: [PATCH] ARM: tegra: don't timeout if CPU is powergated
-In-Reply-To: <1d5ea6b7df4573d866779857922ac650fe59af60.1392078805.git.stefan@agner.ch>
-References: <1d5ea6b7df4573d866779857922ac650fe59af60.1392078805.git.stefan@agner.ch>
-Message-ID: <52FBC97D.8040809@wwwdotorg.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 12 Feb 2014 20:22:43 +0100
+Subject: [PATCH] pinctrl: sunxi: use chained_irq_{enter, exit} for GIC
+ compatibility
+In-Reply-To: <1392049357-13225-1-git-send-email-wens@csie.org>
+References: <1392049357-13225-1-git-send-email-wens@csie.org>
+Message-ID: <20140212192243.GC9812@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2014 05:44 PM, Stefan Agner wrote:
-> When booting secondary CPU(s) which are not yet powergated, a wrong
-> check lead to a timeout after 100 jiffies. With this patch, we only
-> delay powergating if CPUs are still not powered yet.
+On Tue, Feb 11, 2014 at 12:22:37AM +0800, Chen-Yu Tsai wrote:
+> On tha Allwinner A20 SoC, the external interrupts on the pin controller
+> device are connected to the GIC. Without chained_irq_{enter, exit},
+> external GPIO interrupts, such as used by mmc core card detect, cause
+> the system to hang.
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-I've applied this to Tegra's for-3.15/soc branch.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/56433c62/attachment.sig>
