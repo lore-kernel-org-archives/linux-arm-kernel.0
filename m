@@ -1,61 +1,55 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 12 Feb 2014 11:50:05 +0000
-Subject: [PATCH 0/3] arm64: Use pte manipulation functions for THP
-In-Reply-To: <20140212102112.GE13441@mudshark.cambridge.arm.com>
-References: <1391696171-8922-1-git-send-email-steve.capper@linaro.org>
- <20140212094338.GA11325@linaro.org>
- <20140212100736.GA13441@mudshark.cambridge.arm.com>
- <20140212101602.GD29702@arm.com>
- <20140212102112.GE13441@mudshark.cambridge.arm.com>
-Message-ID: <20140212115004.GA14527@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Feb 2014 12:51:05 +0100
+Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
+In-Reply-To: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
+References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <201402121251.06280.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 10:21:12AM +0000, Will Deacon wrote:
-> On Wed, Feb 12, 2014 at 10:16:02AM +0000, Catalin Marinas wrote:
-> > On Wed, Feb 12, 2014 at 10:07:37AM +0000, Will Deacon wrote:
-> > > On Wed, Feb 12, 2014 at 09:43:39AM +0000, Steve Capper wrote:
-> > > > On Thu, Feb 06, 2014 at 02:16:08PM +0000, Steve Capper wrote:
-> > > > > This series replaces the Transparent HugePage pmd manipulation
-> > > > > functions with calls to the standard pte functions. This allows the THP
-> > > > > code to take advantage of the new PTE_WRITE logic, and provides better
-> > > > > parity with the HugeTLB code (which already uses the pte functions).
-> > > > > 
-> > > > > Testing was done on the Fast Model with LTP THP tests, and the 3.14-rc1
-> > > > > kernel was used.
-> > > > 
-> > > > Does this series look reasonable?
-> > > 
-> > > I was waiting for the corresponding arch/arm/ changes.
-> > 
-> > The arch/arm/ code doesn't have the PTE_WRITE changes. It's a bit more
-> > work here because of the classic MMU (but I hope Steve will get there ;).
-> 
-> Indeed, but I'm wary of divergence in the mm code between the two
-> architectures and I'd much rather we try to keep them in sync, rather than
-> improve/bug fix in one before porting the whole lot over.
+On Wednesday 12 February 2014, Laura Abbott wrote:
+> This is an RFC to seed the random number pool earlier when using devicetree.
+> The big issue this is trying to solve is the fact that the stack canary for
+> ARM tends to be the same across bootups of the same device. This is because
+> the random number pools do not get initialized until after the canary has
+> been set up. The canary can be moved later, but in general there is still
+> no way to reliably get random numbers early for other features (e.g. vector
+> randomization).
 
-I do think we need the same behaviour for 3-level code on ARM and for
-ARM64.
+Implementation-wise this looks reasonable, and it obviously addresses a
+very real problem.
 
-The PTE_WRITE changes for ARM64 allow one to distinguish between
-writable clean ptes and read only ptes which fixes a very subtle
-problem with huge pages (and maybe some other problems). This problem
-is still present in the ARM 3-level code.
+> The goal here is to allow devices to add to the random pools via
+> add_device_randomness or some other method of their chosing at FDT time.
+> I realize that ARCH_RANDOM is already available but this didn't work because
+> 1) ARCH_RANDOM is not multi-platform compatible without added
+> infrastructure to ARM
 
-The ARM 2-level code stores a separate linux/hardware pte and it is
-possible to distinguish between writable clean ptes and read only ptes.
+That could certainly be done, but I agree that a more generic
+approach like you did is nicer. One thing that might be useful
+would be to wire up your OF_RANDOM infrastructure as a generic
+implementation of ARCH_RANDOM, and merge your header file into
+include/asm-generic/archrandom.h, with an added way to call
+arch_get_random_long() for the devices you add.
 
-For ARM, I would like to split out some of the pte logic and page
-permissions from pgtable.h into pgtable-[23]level.h. Then introduce
-PTE_WRITE for the 3-level code on ARM.
- 
-Russell,
-I have noticed the following for ARM:
- 36bb94b ARM: pgtable: provide RDONLY page table bit rather than WRITE bit
-Are you happy for me to re-introduce PTE_WRITE for the 3-level code
-only, and keep L_PTE_RDONLY for the 2-level code?
+> The big reason to skip ARCH_RANDOM though is that the random number generation
+> we have would be reasonable if only seeded earlier.
 
-Thanks,
--- 
-Steve
+Yes, makes sense.
+
+I also wonder if we should add a 'trivial' implementation that just
+reads a DT property full of random numbers to use as either an initial
+seed, or to feed into arch_get_random_long(). This would allow the
+boot loader to pass any entropy it has already gathered into the kernel,
+but leaves the danger that people might pass static not-so-random data
+through a precompiled dtb file ;-). If we get the boot loaders to be
+smart enough, doing only this would be a much simpler kernel implementation
+than your suggestion, but I'm not sure how far I want to trust boot loaders.
+
+Another possibilitiy is to mix in the any contents of a "local-mac-address"
+property into the entropy at early DT probing, which would still be
+deterministic for a given machine and should not count as entropty,
+but at least give each machine with this property a unique seed in the
+absence of any other entropy source.
+
+	Arnd
