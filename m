@@ -1,98 +1,41 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Wed, 12 Feb 2014 09:33:57 +0100
-Subject: [PATCH v2 1/4] tty/serial: Add GPIOLIB helpers for controlling
- modem lines
-In-Reply-To: <1392142986.607813065@f171.i.mail.ru>
-References: <1392140715-15295-1-git-send-email-richard.genoud@gmail.com>
- <1392140715-15295-2-git-send-email-richard.genoud@gmail.com>
- <1392142986.607813065@f171.i.mail.ru>
-Message-ID: <CACQ1gAjM7n3Zs_XapmMuS83A+X_yde5+iJ9F28SCfOCGA7Bdmg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 12 Feb 2014 08:26:57 +0000
+Subject: [PATCH 07/12] mfd: syscon: Consider platform data a regmap
+ config name
+In-Reply-To: <1392188982.914924525@f237.i.mail.ru>
+References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
+ <1392138636-29240-8-git-send-email-pawel.moll@arm.com>
+ <1392188982.914924525@f237.i.mail.ru>
+Message-ID: <20140212082657.GK15081@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-02-11 19:23 GMT+01:00 Alexander Shiyan <shc_work@mail.ru>:
-> Hello.
-Hi !
->
-> ???????, 11 ??????? 2014, 18:45 +01:00 ?? Richard Genoud <richard.genoud@gmail.com>:
->> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
->> GPIO.
->> This will be useful for many boards which have a serial controller that
->> only handle CTS/RTS pins (or even just RX/TX).
->>
->> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->> ---
->
-> OK, a few comments below.
->
+> > Use the device platform data as a regmap config
+> > name. This is particularly useful in the regmap
+> > debugfs when there is more than one syscon device
+> > registered, to distinguish the register blocks.
+> > 
+> > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> > Cc: Lee Jones <lee.jones@linaro.org>
+> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > ---
 > ...
->> +config SERIAL_MCTRL_GPIO
->> +     def_bool y
->> +     depends on GPIOLIB
->
-> I suggest to move GPIOLIB dependency to serial_mctrl_gpio.h header, so
-> unit can be used with or without GPIOLIB, so Kconfig will look something like this:
->
-> config SERIAL_MCTRL_GPIO
->   tristate
->
-> Then, you can select this option for particular UART:
-> config SERIAL_ATMEL
->   ...
->   select SERIAL_MCTRL_GPIO
-Yes, you're right, it seems better like that.
+> > syscon_regmap_config.max_register = res->end - res->start - 3;
+> > +	syscon_regmap_config.name = dev_get_platdata(&pdev->dev);
+> 
+> Is dev_name(&pdev->dev) can be used for such purpose?
 
-> ...
->> +++ b/drivers/tty/serial/serial_mctrl_gpio.c
-> ...
->> +static const char *mctrl_gpio_of_names[UART_GPIO_MAX] = {
->> +     "cts", "dsr", "dcd", "ri", "rts", "dtr"
->> +};
->
-> Make a combined array. This will use cycles for set/get operations.
->
-> static struct {
->   const char *name;
->   unsigned int mctrl;
-> } mctrl_gpios[] = {
->   { "cts", TIOCM_CTS, },
->   ...
-> };
-yes, good idea !
+Yes of course.
 
-> ...
->> +int mctrl_gpio_init(struct device *dev, struct mctrl_gpios *gpios)
->> +{
->
-> I'm not sure whether to make a non-DT support at all ...
-I don't understand what you mean.
-You would like another _init() function for non-DT board ?
-Well, I thought that non DT board could handle their GPIO init (like I
-did in atmel_serial.c for platform_data based boards), but still use
-the mctrl_gpio_{get,set} functions.
+Either use the automatically generated name or over-ride with
+dev->init_name prior to registration or call dev_set_name()
+manually. Then retrieve with Alexander's suggestion.
 
+Is there any technical reason why this is not possible with your
+implementation?
 
->> +     enum mctrl_gpio_idx i;
->> +     int err = 0;
->> +     int ret = 0;
->> +
->> +     for (i = UART_GPIO_MIN; i < UART_GPIO_MAX; i++) {
->> +             gpios->gpio[i] = gpiod_get(dev, mctrl_gpio_of_names[i]);
->
-> What a reason to using gpiod_xxx() ?
-> Why we cannot use standart devm_gpio_request/get/set etc. ?
-Ah ! I missed devm_gpiod_get()
-I'll use it.
-
->
-> In addition, I recommend create this patch as separate,
-> because it will most likely still be comments later.
-Well, I'd rather not separate this patch from at least "patch 4/4
-tty/serial: at91: use mctrl_gpio helpers"
-because if the patch 4/4 is merged before this one, the compilation
-will fail, and git bisecting will be a pain.
-Or there's another solution ?
-
-> Thanks.
-
-Thanks !
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
