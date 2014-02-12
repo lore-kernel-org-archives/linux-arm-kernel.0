@@ -1,55 +1,35 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 12 Feb 2014 13:09:37 +0900
-Subject: [PATCH] ARM: shmobile: Remove legacy r8a7790 DT clocks
-Message-ID: <20140212040937.9955.38466.sendpatchset@w520>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Wed, 12 Feb 2014 10:18:33 +0530
+Subject: [PATCH] ARM: dts: exynos5250-arndale: Keep G3D regulator always on
+In-Reply-To: <1392141043-27170-1-git-send-email-t.figa@samsung.com>
+References: <1392141043-27170-1-git-send-email-t.figa@samsung.com>
+Message-ID: <CAHbNUh0gPXV36CtmsktJA+hHPDBkvVcej3xJgTRB8UqASuyeeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On 11 February 2014 23:20, Tomasz Figa <t.figa@samsung.com> wrote:
+> Apparently, if G3D regulator is powered off, the SoC cannot enter low
+> power modes and just hangs. This patch fixes this by keeping the
+> regulator always on when the system is running, as suggested by Exynos 4
+> User's Manual in case of Exynos4210/4x12 SoCs (Exynos5250 UM does not
+> have such note, but observed behavior seems to confirm that it is true
+> for this SoC as well).
+>
+> This fixes an issue preventing Arndale board from entering sleep mode
+> observed since commit
+>
+> 346f372f7b72a0 clk: exynos5250: Add CLK_IGNORE_UNUSED flag for pmu clock
+>
+> that landed in kernel 3.11, which has fixed the clock driver to make the
+> SoC actually try to enter the sleep mode.
+>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: stable at vger.kernel.org
 
-The DT device case is handled by CCF these days, so get
-rid of DT devices from the legacy clocks for r8a7790.
+Thanks for the patch.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+Tested-by: Tushar Behera <tushar.behera@linaro.org>
 
- arch/arm/mach-shmobile/clock-r8a7790.c |   11 -----------
- 1 file changed, 11 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ work/arch/arm/mach-shmobile/clock-r8a7790.c	2014-02-10 16:04:29.000000000 +0900
-@@ -328,34 +328,23 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
- 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP717]),
- 	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP716]),
--	CLKDEV_DEV_ID("e6508000.i2c", &mstp_clks[MSTP931]),
- 	CLKDEV_DEV_ID("i2c-rcar_gen2.0", &mstp_clks[MSTP931]),
--	CLKDEV_DEV_ID("e6518000.i2c", &mstp_clks[MSTP930]),
- 	CLKDEV_DEV_ID("i2c-rcar_gen2.1", &mstp_clks[MSTP930]),
--	CLKDEV_DEV_ID("e6530000.i2c", &mstp_clks[MSTP929]),
- 	CLKDEV_DEV_ID("i2c-rcar_gen2.2", &mstp_clks[MSTP929]),
--	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP928]),
- 	CLKDEV_DEV_ID("i2c-rcar_gen2.3", &mstp_clks[MSTP928]),
- 	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
- 	CLKDEV_DEV_ID("r8a7790-vin.0", &mstp_clks[MSTP811]),
- 	CLKDEV_DEV_ID("r8a7790-vin.1", &mstp_clks[MSTP810]),
- 	CLKDEV_DEV_ID("r8a7790-vin.2", &mstp_clks[MSTP809]),
- 	CLKDEV_DEV_ID("r8a7790-vin.3", &mstp_clks[MSTP808]),
--	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP502]),
- 	CLKDEV_DEV_ID("sh-dma-engine.1", &mstp_clks[MSTP501]),
--	CLKDEV_DEV_ID("ee200000.mmc", &mstp_clks[MSTP315]),
- 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
--	CLKDEV_DEV_ID("ee100000.sd", &mstp_clks[MSTP314]),
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]),
--	CLKDEV_DEV_ID("ee120000.sd", &mstp_clks[MSTP313]),
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]),
--	CLKDEV_DEV_ID("ee140000.sd", &mstp_clks[MSTP312]),
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP312]),
--	CLKDEV_DEV_ID("ee160000.sd", &mstp_clks[MSTP311]),
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.3", &mstp_clks[MSTP311]),
--	CLKDEV_DEV_ID("ee220000.mmc", &mstp_clks[MSTP305]),
- 	CLKDEV_DEV_ID("sh_mmcif.1", &mstp_clks[MSTP305]),
- 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
- 	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
+-- 
+Tushar Behera
