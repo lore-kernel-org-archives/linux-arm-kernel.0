@@ -1,100 +1,62 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 12 Feb 2014 12:43:13 -0700
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <2006726.HhIT01YuXY@wuerfel>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <201402092130.25615.arnd@arndb.de>
- <20140210173450.GA5554@obsidianresearch.com>
- <2006726.HhIT01YuXY@wuerfel>
-Message-ID: <20140212194313.GA17248@obsidianresearch.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 12 Feb 2014 14:43:47 -0500
+Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
+In-Reply-To: <1882539.R1gpoLLYks@wuerfel>
+References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
+ <1571508.yGAAZ8TNH0@wuerfel>
+ <20140212184521.GO27395@titan.lakedaemon.net>
+ <1882539.R1gpoLLYks@wuerfel>
+Message-ID: <20140212194347.GQ27395@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 11:42:52AM +0100, Arnd Bergmann wrote:
-> I looked briefly at the code and found that mach-kirkwood/pcie.c does
-> both request_resource() and pci_add_resource_offset(), while
-> drivers/pci/host/pci-mvebu.c only does the latter. Does the patch
-> below restore the previous behavior?
+On Wed, Feb 12, 2014 at 08:12:23PM +0100, Arnd Bergmann wrote:
+> On Wednesday 12 February 2014 13:45:21 Jason Cooper wrote:
+> > On Wed, Feb 12, 2014 at 07:17:41PM +0100, Arnd Bergmann wrote:
+> > > On Wednesday 12 February 2014 12:45:54 Jason Cooper wrote:
+> > > > I brought this up at last weeks devicetree irc meeting.  My goal is to
+> > > > provide early randomness for kaslr on ARM.  Currently, my idea is modify
+> > > > the init script to save an additional random seed from /dev/urandom to
+> > > > /boot/random-seed.
+> > > > 
+> > > > The bootloader would then load this file into ram, and pass the
+> > > > address/size to the kernel either via dt, or commandline.  kaslr (run in
+> > > > the decompressor) would consume some of this randomness, and then
+> > > > random.c would consume the rest in a non-crediting initialization.
+> > > 
+> > > I like the idea, but wouldn't it be easier to pass actual random data
+> > > using DT, rather than the address/size?
+> > 
+> > I thought about that at first, but that requires either that the
+> > bootloader be upgraded to insert the data, or that userspace is
+> > modifying the dtb at least twice per boot.
+> > 
+> > I chose address/size to facilitate modifying existing/fielded devices.
+> > The user could modify the dtb once, and modify the bootloader
+> > environment to load X amount to Y address.  As a fallback, it could be
+> > expressed on the commandline for non-DT bootloaders.
+> 
+> Ah, so you are interested in boot loaders that can be scripted to do
+> what you had in mind but cannot be scripted to add or modify a DT
+> property. I hadn't considered that, but you are probably right that
+> this is at least 90% of the systems you'd find in the wild today.
 
-It gets closer:
+Yes, exactly.
 
-e0000000-f0000000 : <BAD>
-  e0000000-e00fffff : PCI Bus 0000:01
-    e0000000-e001ffff : 0000:01:00.0
-      e0001000-e0001fff : /mbus/pex at e0000000/pcie at 1,0/fpga at 0/fpga_sysmon at 1000
+> Thinking this a bit further, I wonder if (at least upstream) u-boot
+> has a way to modify DT properties in a scripted way that would allow
+> the direct property. It sounds like a generally useful feature not
+> just for randomness, so if that doesn't already work, maybe someone
+> can implement it. In the simplest case, you'd only need to find the
+> address of an existing property in the dtb and load a file to
+> that location.
 
-This patch:
+Like fdtget from dtc?  The thing is, this address would only need to be
+setup once per board.  Hypothetically, debian's flash-kernel could set
+the address in the dtb, then set it in the u-boot environment.  From
+then on, only the normal initscript writing to random-seed would be
+needed.
 
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 2394e97..7fd54e9 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -876,14 +876,14 @@ static void __init mvebu_mbus_get_pcie_resources(struct device_node *np,
-        ret = of_property_read_u32_array(np, "pcie-mem-aperture", reg, ARRAY_SIZE(reg));
-        if (!ret) {
-                mem->start = reg[0];
--               mem->end = mem->start + reg[1];
-+               mem->end = mem->start + reg[1] - 1;
-                mem->flags = IORESOURCE_MEM;
-        }
- 
-        ret = of_property_read_u32_array(np, "pcie-io-aperture", reg, ARRAY_SIZE(reg));
-        if (!ret) {
-                io->start = reg[0];
--               io->end = io->start + reg[1];
-+               io->end = io->start + reg[1] - 1;
-                io->flags = IORESOURCE_IO;
-        }
- }
+thx,
 
-Fixes the wrong length (e0000000-f0000000 should be e0000000-efffffff)
-
-And this fixes the <BAD>:
-
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index ef8691a..fbb89cb 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -109,7 +109,9 @@ struct mvebu_pcie {
-        struct mvebu_pcie_port *ports;
-        struct msi_chip *msi;
-        struct resource io;
-+       char io_name[30];
-        struct resource realio;
-+       char mem_name[30];
-        struct resource mem;
-        struct resource busn;
-        int nports;
-@@ -681,10 +683,29 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
- {
-        struct mvebu_pcie *pcie = sys_to_pcie(sys);
-        int i;
-+       int domain = 0;
- 
-+#ifdef CONFIG_PCI_DOMAINS
-+       domain = sys->domain;
-+#endif
-+
-+       snprintf(pcie->mem_name, sizeof(pcie->mem_name), "PCI MEM %04x", domain);
-+       pcie->mem.name = pcie->mem_name;
-+
-+       snprintf(pcie->io_name, sizeof(pcie->io_name), "PCI I/O %04x", domain);
-+       pcie->realio.name = pcie->io_name;
-
-
-Still missing release_region..
-
-Thoughts on upstreamining these bits?
-
-> Since the mvebu_pcie_setup() function seems very generic at this,
-> we should probably try to factor out that code into a common
-> helper, at least for arm64, but ideally shared with arm32
-> as well.
-
-Yah, especially since people are not getting it completely right..
-
-But some of the trouble here is a lack of a generic pci host driver
-structure, eg I have to pull the domain number out of the ARM32
-specific structure ..
-
-Jason
+Jason.
