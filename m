@@ -1,52 +1,127 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 12 Feb 2014 16:55:41 +0100
-Subject: [PATCH 07/14] net: axienet: Support phy-less mode of operation
+Date: Wed, 12 Feb 2014 16:55:42 +0100
+Subject: [PATCH 08/14] net: axienet: Removed checkpatch errors/warnings
 In-Reply-To: <cover.1392220536.git.michal.simek@xilinx.com>
 References: <cover.1392220536.git.michal.simek@xilinx.com>
-Message-ID: <2dce248d6285beb10f3d4fcfba3c3a087e2c139f.1392220536.git.michal.simek@xilinx.com>
+Message-ID: <75b669c0a947effe74b291093abfa8c71f83736a.1392220536.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srikanth Thokala <srikanth.thokala@xilinx.com>
 
-This patch adds proper checks to handle the PHY-less case.
+Removed checkpatch.pl errors and warnings.
 
 Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 20 ++++++++++----------
+ drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c | 21 +++++++++++----------
+ 2 files changed, 21 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-index 9595403..9cc9e59 100644
+index 9cc9e59..6059a0f 100644
 --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
 +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-@@ -940,11 +940,10 @@ static int axienet_open(struct net_device *ndev)
- 					     PHY_INTERFACE_MODE_RGMII_ID);
+@@ -444,8 +444,8 @@ static void __axienet_device_reset(struct axienet_local *lp,
+ 	while (axienet_dma_in32(lp, offset) & XAXIDMA_CR_RESET_MASK) {
+ 		udelay(1);
+ 		if (--timeout == 0) {
+-			dev_err(dev, "axienet_device_reset DMA "
+-				"reset timeout!\n");
++			netdev_err(lp->ndev,
++				"axienet_device_reset DMA reset timeout!\n");
+ 			break;
  		}
-
--		if (!lp->phy_dev) {
-+		if (!lp->phy_dev)
- 			dev_err(lp->dev, "of_phy_connect() failed\n");
--			return -ENODEV;
--		}
--		phy_start(lp->phy_dev);
-+		else
-+			phy_start(lp->phy_dev);
+ 	}
+@@ -484,8 +484,8 @@ static void axienet_device_reset(struct net_device *ndev)
  	}
 
- 	/* Enable tasklets for Axi DMA error handling */
-@@ -1609,7 +1608,8 @@ static int axienet_of_probe(struct platform_device *op)
- 	lp->coalesce_count_tx = XAXIDMA_DFT_TX_THRESHOLD;
+ 	if (axienet_dma_bd_init(ndev)) {
+-		dev_err(&ndev->dev, "axienet_device_reset descriptor "
+-			"allocation failed\n");
++		netdev_err(ndev,
++			"axienet_device_reset descriptor allocation failed\n");
+ 	}
 
- 	lp->phy_node = of_parse_phandle(op->dev.of_node, "phy-handle", 0);
--	ret = axienet_mdio_setup(lp, op->dev.of_node);
-+	if (lp->phy_node)
-+		ret = axienet_mdio_setup(lp, op->dev.of_node);
- 	if (ret)
- 		dev_warn(&op->dev, "error registering MDIO bus\n");
+ 	axienet_status = axienet_ior(lp, XAE_RCW1_OFFSET);
+@@ -560,8 +560,8 @@ static void axienet_adjust_link(struct net_device *ndev)
+ 			lp->last_link = link_state;
+ 			phy_print_status(phy);
+ 		} else {
+-			dev_err(&ndev->dev, "Error setting Axi Ethernet "
+-				"mac speed\n");
++			netdev_err(ndev,
++				   "Error setting Axi Ethernet mac speed\n");
+ 		}
+ 	}
+ }
+@@ -1238,8 +1238,8 @@ axienet_ethtools_set_pauseparam(struct net_device *ndev,
+ 	struct axienet_local *lp = netdev_priv(ndev);
 
+ 	if (netif_running(ndev)) {
+-		printk(KERN_ERR	"%s: Please stop netif before applying "
+-		       "configruation\n", ndev->name);
++		netdev_err(ndev,
++			   "Please stop netif before applying configuration\n");
+ 		return -EFAULT;
+ 	}
+
+@@ -1295,8 +1295,8 @@ static int axienet_ethtools_set_coalesce(struct net_device *ndev,
+ 	struct axienet_local *lp = netdev_priv(ndev);
+
+ 	if (netif_running(ndev)) {
+-		printk(KERN_ERR	"%s: Please stop netif before applying "
+-		       "configruation\n", ndev->name);
++		netdev_err(ndev,
++			"Please stop netif before applying configuration\n");
+ 		return -EFAULT;
+ 	}
+
+diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
+index 64b4639..ef0a20c 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
++++ b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
+@@ -161,19 +161,19 @@ int axienet_mdio_setup(struct axienet_local *lp, struct device_node *np)
+
+ 	np1 = of_find_node_by_name(NULL, "cpu");
+ 	if (!np1) {
+-		printk(KERN_WARNING "%s(): Could not find CPU device node.",
+-		       __func__);
+-		printk(KERN_WARNING "Setting MDIO clock divisor to "
+-		       "default %d\n", DEFAULT_CLOCK_DIVISOR);
++		netdev_warn(lp->ndev, "Could not find CPU device node.");
++		netdev_warn(lp->ndev,
++			    "Setting MDIO clock divisor to default %d\n",
++			    DEFAULT_CLOCK_DIVISOR);
+ 		clk_div = DEFAULT_CLOCK_DIVISOR;
+ 		goto issue;
+ 	}
+ 	property_p = (u32 *) of_get_property(np1, "clock-frequency", NULL);
+ 	if (!property_p) {
+-		printk(KERN_WARNING "%s(): Could not find CPU property: "
+-		       "clock-frequency.", __func__);
+-		printk(KERN_WARNING "Setting MDIO clock divisor to "
+-		       "default %d\n", DEFAULT_CLOCK_DIVISOR);
++		netdev_warn(lp->ndev,
++			 "Could not find clock ethernet controller property.");
++		netdev_warn(lp->ndev, "Setting MDIO clock divisor to default %d\n",
++							DEFAULT_CLOCK_DIVISOR);
+ 		clk_div = DEFAULT_CLOCK_DIVISOR;
+ 		of_node_put(np1);
+ 		goto issue;
+@@ -187,8 +187,9 @@ int axienet_mdio_setup(struct axienet_local *lp, struct device_node *np)
+ 	if (host_clock % (MAX_MDIO_FREQ * 2))
+ 		clk_div++;
+
+-	printk(KERN_DEBUG "%s(): Setting MDIO clock divisor to %u based "
+-	       "on %u Hz host clock.\n", __func__, clk_div, host_clock);
++	netdev_dbg(lp->ndev,
++		"Setting MDIO clock divisor to %u based on %u Hz host clock.\n",
++		clk_div, host_clock);
+
+ 	of_node_put(np1);
+ issue:
 --
 1.8.2.3
 
@@ -56,4 +131,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/74f29ff1/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/fda4af2a/attachment.sig>
