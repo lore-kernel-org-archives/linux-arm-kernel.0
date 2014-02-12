@@ -1,51 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Feb 2014 16:58:06 +0000
-Subject: [PATCH 1/1] mfd: max665x: Differentiate between MAX665X devices
-Message-ID: <1392224286-31084-1-git-send-email-lee.jones@linaro.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 12 Feb 2014 20:00:28 +0200
+Subject: [PATCH v4] gpio: davinci: reuse for keystone soc
+In-Reply-To: <CACRpkdbrs==tpUBs=WLWkt0frBcSMRDRokOn2tvP-1gt7Qq3+w@mail.gmail.com>
+References: <1391615244-12014-1-git-send-email-grygorii.strashko@ti.com>
+ <CACRpkdbrs==tpUBs=WLWkt0frBcSMRDRokOn2tvP-1gt7Qq3+w@mail.gmail.com>
+Message-ID: <52FBB6BC.2060801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver is pretty sparse at the moment, but once we start to add
-more functionality it's highly probable that we'll be required to
-differentiate between supported devices. To enable us to do that
-efficiently via Device Tree we need to separate out the compatible
-strings, one per variant.
+Hi Linus,
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mfd/max665x.c               | 3 ++-
- include/linux/mfd/max665x-private.h | 5 +++++
- 2 files changed, 7 insertions(+), 1 deletion(-)
+On 02/12/2014 05:03 PM, Linus Walleij wrote:
+> On Wed, Feb 5, 2014 at 4:47 PM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
+>
+>> The similar GPIO HW block is used by keystone SoCs as
+>> in Davinci SoCs.
+>> Hence, reuse Davinci GPIO driver for Keystone taking into
+>> account that Keystone contains ARM GIC IRQ controller which
+>> is implemented using IRQ Chip.
+>>
+>> Documentation:
+>>          http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
+>>
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> ---
+>> Changes in v4:
+>> - rebased on top of v3.14 +
+>>    [patch] gpio: davinci: signedness bug in davinci_gpio_irq_setup()
+>
+> I tried applying this and it does not apply on the "devel" branch
+> in the GPIO tree. Since I haven't touched one line of code in the
+> DaVinci driver since v3.14-rc1 I seriously doubt that this is
+> rebased on v3.14[-rc].
+>
+> Can you please rebase the patch onto v3.14-rc1 for real and
+> resend it?
 
-diff --git a/drivers/mfd/max665x.c b/drivers/mfd/max665x.c
-index 54fdc11..3bcb765b0 100644
---- a/drivers/mfd/max665x.c
-+++ b/drivers/mfd/max665x.c
-@@ -71,7 +71,8 @@ static int max665x_remove(struct i2c_client *i2c)
- }
- 
- static struct of_device_id max665x_dt_match[] = {
--	{ .compatible = "maxim,max665x" },
-+	{ .compatible = "maxim,max6650", .data = (void *)MAX6550 },
-+	{ .compatible = "maxim,max6651", .data = (void *)MAX6551 },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, max665x_dt_match);
-diff --git a/include/linux/mfd/max665x-private.h b/include/linux/mfd/max665x-private.h
-index 293db4b..1578a04 100644
---- a/include/linux/mfd/max665x-private.h
-+++ b/include/linux/mfd/max665x-private.h
-@@ -23,6 +23,11 @@
- #include <linux/i2c.h>
- #include <linux/regmap.h>
- 
-+enum max655x_id {
-+	MAX6550 = 0,
-+	MAX6551,
-+}
-+
- struct max665x_dev {
- 	struct device *dev;
- 	struct mutex iolock;
--- 
-1.8.3.2
+Sorry, But I've to clarify that this patch is based on:
+http://www.spinics.net/lists/linux-kernel-janitors/msg18017.html
+[patch] gpio: davinci: signedness bug in davinci_gpio_irq_setup()
+
+And I did it to avoid merge conflicts between these two patches.
+
+Is it possible to apply above one first? It's not in any of your
+branches.
+
+Of Course, I can re-base this patch on clean v3.14-rc1, but then merge
+conflict will happen with "gpio: davinci: signedness.." patch.
+
+Regards,
+- grygorii
