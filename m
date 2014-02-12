@@ -1,72 +1,65 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 12 Feb 2014 13:59:39 +0100
-Subject: [PATCH 2/2] pinctrl: nomadik: Convert to modern pm_ops
-In-Reply-To: <1392209979-31636-1-git-send-email-ulf.hansson@linaro.org>
-References: <1392209979-31636-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1392209979-31636-2-git-send-email-ulf.hansson@linaro.org>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Wed, 12 Feb 2014 14:01:39 +0100
+Subject: [PATCH v4 0/8] Device Tree support for the at91sam9261ek
+In-Reply-To: <20140212134428.4a442f31@skate>
+References: <1392199607-27452-1-git-send-email-jjhiblot@traphandler.com>
+ <52FB5795.9020708@free-electrons.com>
+ <20140212133449.5c42216d@skate>
+ <CACh+v5Nv7u4WSXttvsnMPxwNwN6R4ZDRABOXr9XXBjy6mSDi5w@mail.gmail.com>
+ <20140212134428.4a442f31@skate>
+Message-ID: <CACh+v5MNSaW3nU_E2w+MV3JM_L5hmGdVSTTebLbMTV6W-fPr+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the SIMPLE_DEV_PM_OPS macro and convert to the modern pm ops.
+Thomas,
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/pinctrl/pinctrl-nomadik.c |   17 +++++++++--------
- 1 file changed, 9 insertions(+), 8 deletions(-)
+I wasn't very informative indeed.
 
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index b6c5793..cec7762 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -2036,22 +2036,22 @@ static const struct of_device_id nmk_pinctrl_match[] = {
- };
- 
- #ifdef CONFIG_PM_SLEEP
--static int nmk_pinctrl_suspend(struct platform_device *pdev, pm_message_t state)
-+static int nmk_pinctrl_suspend(struct device *dev)
- {
- 	struct nmk_pinctrl *npct;
- 
--	npct = platform_get_drvdata(pdev);
-+	npct = dev_get_drvdata(dev);
- 	if (!npct)
- 		return -EINVAL;
- 
- 	return pinctrl_force_sleep(npct->pctl);
- }
- 
--static int nmk_pinctrl_resume(struct platform_device *pdev)
-+static int nmk_pinctrl_resume(struct device *dev)
- {
- 	struct nmk_pinctrl *npct;
- 
--	npct = platform_get_drvdata(pdev);
-+	npct = dev_get_drvdata(dev);
- 	if (!npct)
- 		return -EINVAL;
- 
-@@ -2146,17 +2146,18 @@ static struct platform_driver nmk_gpio_driver = {
- 	.probe = nmk_gpio_probe,
- };
- 
-+static SIMPLE_DEV_PM_OPS(nmk_pinctrl_pm_ops,
-+			nmk_pinctrl_suspend,
-+			nmk_pinctrl_resume);
-+
- static struct platform_driver nmk_pinctrl_driver = {
- 	.driver = {
- 		.owner = THIS_MODULE,
- 		.name = "pinctrl-nomadik",
- 		.of_match_table = nmk_pinctrl_match,
-+		.pm = &nmk_pinctrl_pm_ops,
- 	},
- 	.probe = nmk_pinctrl_probe,
--#ifdef CONFIG_PM_SLEEP
--	.suspend = nmk_pinctrl_suspend,
--	.resume = nmk_pinctrl_resume,
--#endif
- };
- 
- static int __init nmk_gpio_init(void)
--- 
-1.7.9.5
+The dm9000 is instantiated from the DT, its irq is described as <&pioC
+2 IRQ_TYPE_EDGE_BOTH>
+The problem, as I see it, is that at the time the IRQ description is
+translated the irq domain doesn't exist yet and the translation fails.
+The result is that the ressource of the platform driver do not contain
+any information about an IRQ.
+The irq domain is added later when the gpio driver is probed
+(pinctrl-at91.c:1684).
+A bit later the dm9000 gets probed and fails lamely because it can't
+find an IRQ ressource.
+
+Jean-Jacques
+
+
+
+2014-02-12 13:44 GMT+01:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> Dear Jean-Jacques Hiblot,
+>
+> On Wed, 12 Feb 2014 13:36:08 +0100, Jean-Jacques Hiblot wrote:
+>
+>> >> For dm9000 the issue is (again) related to an ordering problem:
+>> >> the Ethernet need an interrupt provided by the gpio driver. Unfortunately,
+>> >> the gpio driver initialization is called after the dm900 driver
+>> >> initialization.
+>> >
+>> > And -EPROBE_DEFER doesn't solve this problem?
+>> not really the problem happens before the driver is actually probed
+>> when the ressource for the platform driver are filled
+>
+> Sorry, I don't have all the context. If I understand correctly what you
+> mean, the GPIO driver is probed through the DT, but the DM9000 driver
+> is probed in a legacy way from the board file, and you have the case
+> where the DM9000 platform_device gets registered before the GPIOs are
+> actually available? In this case, what about having the
+> of_platform_populate() call *before* the platform_device_register() for
+> your DM9000 ? Again, I don't have all the context, so I might very well
+> be getting the situation incorrectly.
+>
+> Of course, ideally, the DM9000 driver should be probed using the DT,
+> but I guess this needs the SMC DT binding that is still being
+> discussed, if I followed correctly.
+>
+> Thomas
+> --
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
