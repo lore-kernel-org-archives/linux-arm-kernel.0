@@ -1,31 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Feb 2014 17:16:21 +0000
-Subject: [PATCH v2 0/9] ARM: multi-platform kconfig cleanup and mach-virt
- removal
-In-Reply-To: <52FBAB51.4050401@arm.com>
-References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
- <20140212134655.GC29132@mudshark.cambridge.arm.com>
- <CAL_JsqJkCXSFJZzRBRTrKh16PoBjvF95uKJbZAic-pk3htf_jg@mail.gmail.com>
- <1726732.KPDAFqxz2K@wuerfel> <52FBAB51.4050401@arm.com>
-Message-ID: <20140212171621.GI29132@mudshark.cambridge.arm.com>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Wed, 12 Feb 2014 09:20:13 -0800
+Subject: [GIT PULL] bcm pinctrl rename
+Message-ID: <CAEPRUYpCVpV7HwuO6c95ybk3yp1teJgW-9qwyHnjKbs03C9bgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 05:11:45PM +0000, Marc Zyngier wrote:
-> On 12/02/14 16:53, Arnd Bergmann wrote:
-> > 
-> > On the topic of V6, we don't support CPU_V6T2 at all, though I assume that
-> > there is an ARM1156 core tile for integrator and realview, and we support
-> > running the V6/V6K parts with MMU turned off. Would all revisions of ARM1156
-> > work with CPU_V6K and !MMU?
-> 
-> CPU_V6 and !MMU should work. V6K might, but that requires close
-> inspection (WFE, SEV shouldn't be used in UP context)...
+The following changes since commit b28a960c42fcd9cfc987441fa6d1c1a471f0f9ed:
 
-Well I can boot Debian on my 1136 r0p1 (no v6k) using a v6/v7 kernel, so the
-lack of MMU shouldn't change that. The main issue was booting the same
-kernel on an A15, which resulted in speculative interrupt acks on the GIC
-(fix sitting in rmk's tree [ARM: 7954/1: mm: remove remaining domain support
-from ARMv6]).
+  Linux 3.14-rc2 (2014-02-09 18:15:47 -0800)
 
-Will
+are available in the git repository at:
+
+  git://github.com/broadcom/bcm11351.git tags/bcm-for-3.14-pinctrl-rename
+
+for you to fetch changes up to f5310a1712b68c7f83539fce6ebbfb6f0f510f5b:
+
+  Update dtsi with new pinctrl compatible string (2014-02-12 09:06:53 -0800)
+
+----------------------------------------------------------------
+Renaming pinctrl code to keep in line with rest of bcm mobile
+
+Given that this driver has been in the works for a while, it
+was written prior to the code standardizing on bcm-based naming.
+this patchset brings it in line with the remainder of the code.
+
+----------------------------------------------------------------
+Sherman Yin (4):
+      pinctrl: Rename Broadcom Capri pinctrl binding
+      pinctrl: Rename Broadcom Capri pinctrl driver
+      Update bcm_defconfig with new pinctrl CONFIG
+      Update dtsi with new pinctrl compatible string
+
+ .../bindings/pinctrl/{brcm,capri-pinctrl.txt =>
+brcm,bcm11351-pinctrl.txt}        |    8 +-
+ arch/arm/boot/dts/bcm11351.dtsi
+            |    2 +-
+ arch/arm/configs/bcm_defconfig
+            |    2 +-
+ drivers/pinctrl/Kconfig
+            |    8 +-
+ drivers/pinctrl/Makefile
+            |    2 +-
+ drivers/pinctrl/pinctrl-bcm281xx.c
+            | 1461 ++++++++++++++++++++++++++++++++++++++
+ drivers/pinctrl/pinctrl-capri.c
+            | 1454 -------------------------------------
+ 7 files changed, 1472 insertions(+), 1465 deletions(-)
+ rename Documentation/devicetree/bindings/pinctrl/{brcm,capri-pinctrl.txt
+=> brcm,bcm11351-pinctrl.txt} (98%)
+ create mode 100644 drivers/pinctrl/pinctrl-bcm281xx.c
+ delete mode 100644 drivers/pinctrl/pinctrl-capri.c
