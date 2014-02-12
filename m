@@ -1,52 +1,62 @@
-From: bcm@fixthebug.org (Christian Daudt)
-Date: Wed, 12 Feb 2014 09:20:13 -0800
-Subject: [GIT PULL] bcm pinctrl rename
-Message-ID: <CAEPRUYpCVpV7HwuO6c95ybk3yp1teJgW-9qwyHnjKbs03C9bgQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 12 Feb 2014 18:20:58 +0100
+Subject: [PATCH v2 3/7] ARM: mvebu: add audio I2S controller to Armada 370
+ Device Tree
+In-Reply-To: <1392225662-20431-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392225662-20431-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1392225662-20431-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b28a960c42fcd9cfc987441fa6d1c1a471f0f9ed:
+The Armada 370 SoC has an I2S audio controller. This commit adds the
+description of this controller to the Device Tree describing this SoC,
+as well as two possible muxing configurations for the I2S bus pins.
 
-  Linux 3.14-rc2 (2014-02-09 18:15:47 -0800)
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-are available in the git repository at:
-
-  git://github.com/broadcom/bcm11351.git tags/bcm-for-3.14-pinctrl-rename
-
-for you to fetch changes up to f5310a1712b68c7f83539fce6ebbfb6f0f510f5b:
-
-  Update dtsi with new pinctrl compatible string (2014-02-12 09:06:53 -0800)
-
-----------------------------------------------------------------
-Renaming pinctrl code to keep in line with rest of bcm mobile
-
-Given that this driver has been in the works for a while, it
-was written prior to the code standardizing on bcm-based naming.
-this patchset brings it in line with the remainder of the code.
-
-----------------------------------------------------------------
-Sherman Yin (4):
-      pinctrl: Rename Broadcom Capri pinctrl binding
-      pinctrl: Rename Broadcom Capri pinctrl driver
-      Update bcm_defconfig with new pinctrl CONFIG
-      Update dtsi with new pinctrl compatible string
-
- .../bindings/pinctrl/{brcm,capri-pinctrl.txt =>
-brcm,bcm11351-pinctrl.txt}        |    8 +-
- arch/arm/boot/dts/bcm11351.dtsi
-            |    2 +-
- arch/arm/configs/bcm_defconfig
-            |    2 +-
- drivers/pinctrl/Kconfig
-            |    8 +-
- drivers/pinctrl/Makefile
-            |    2 +-
- drivers/pinctrl/pinctrl-bcm281xx.c
-            | 1461 ++++++++++++++++++++++++++++++++++++++
- drivers/pinctrl/pinctrl-capri.c
-            | 1454 -------------------------------------
- 7 files changed, 1472 insertions(+), 1465 deletions(-)
- rename Documentation/devicetree/bindings/pinctrl/{brcm,capri-pinctrl.txt
-=> brcm,bcm11351-pinctrl.txt} (98%)
- create mode 100644 drivers/pinctrl/pinctrl-bcm281xx.c
- delete mode 100644 drivers/pinctrl/pinctrl-capri.c
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 0d8530c..e3f4c18 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -132,6 +132,20 @@
+ 							"mpp51", "mpp52", "mpp53";
+ 					marvell,function = "sd0";
+ 				};
++
++				i2s_pins1: i2s-pins1 {
++					marvell,pins = "mpp5", "mpp6", "mpp7",
++						       "mpp8", "mpp9", "mpp10",
++						       "mpp12", "mpp13";
++					marvell,function = "audio";
++				};
++
++				i2s_pins2: i2s-pins2 {
++					marvell,pins = "mpp49", "mpp47", "mpp50",
++						       "mpp59", "mpp57", "mpp61",
++						       "mpp62", "mpp60", "mpp58";
++					marvell,function = "audio";
++				};
+ 			};
+ 
+ 			gpio0: gpio at 18100 {
+@@ -196,6 +210,15 @@
+ 				clocks = <&coreclk 2>;
+ 			};
+ 
++			audio_controller: audio-controller at 30000 {
++				compatible = "marvell,armada370-audio";
++				reg = <0x30000 0x4000>;
++				interrupts = <93>;
++				clocks = <&gateclk 0>;
++				clock-names = "internal";
++				status = "disabled";
++			};
++
+ 			usb at 50000 {
+ 				clocks = <&coreclk 0>;
+ 			};
+-- 
+1.8.3.2
