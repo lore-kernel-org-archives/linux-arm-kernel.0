@@ -1,82 +1,45 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 12 Feb 2014 14:38:06 +0200
-Subject: [PATCH 00/11] ARM: dts: sbc-t3x: add support for more boards
-In-Reply-To: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
-References: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
-Message-ID: <52FB6B2E.9070106@compulab.co.il>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 12 Feb 2014 13:42:49 +0100
+Subject: [PATCH] ARM: mm: cache-l2x0: Check for status property of DT node
+In-Reply-To: <1392206478-11530-1-git-send-email-tushar.behera@linaro.org>
+References: <1392206478-11530-1-git-send-email-tushar.behera@linaro.org>
+Message-ID: <52FB6C49.6010401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping!
+[making Cc list a bit more comprehensive]
 
-On 01/12/14 15:22, Dmitry Lifshitz wrote:
-> Add support for CompuLab SBC-T3530 and SBC-T3517 boards:
-> 
-> https://compulab.co.il/products/sbcs/sbc-t3530/
-> https://compulab.co.il/products/sbcs/sbc-t3517/
-> 
-> along with respective CoMs - CM-T3530 and CM-T3517:
-> 
-> https://compulab.co.il/products/computer-on-modules/cm-t3530/
-> https://compulab.co.il/products/computer-on-modules/cm-t3517/
-> 
-> The device tree files have the following structure:
-> 
-> omap3-cm-t3x.dtsi
->  |
->  |<-- omap3-cm-t3x30.dtsi
->  |     |
->  |     |
->  |     |     -----                  -------          ------------
->  |     |    | CoM |                | Board |        | Base board |
->  |     |     -----                  -------          ------------
->  |     |                                            omap3-sb-t35.dtsi
->  |     |                                                  |
->  |     |<-- omap3-cm-t3730.dts <-- omap3-sbc-t3730.dts -->|
->  |     |                                                  |
->  |     |<-- omap3-cm-t3530.dts <-- omap3-sbc-t3530.dts -->|
->  |                                                        |
->  |<-------- omap3-cm-t3517.dts <-- omap3-sbc-t3517.dts -->|
-> 
-> 
-> where omap3-cm-t3730.dts, omap3-cm-t3530.dts, omap3-cm-t3517.dts
-> contain CoMs specific data, while omap3-sbc-t3730.dts, omap3-sbc-t3530.dts,
-> omap3-sbc-t3517.dts represent eval boards with respective core modules.
-> 
-> This series is based on Tony's omap-for-v3.14/dt branch
-> 
-> Dmitry Lifshitz (11):
->   ARM: dts: sbc-t3x: refactor DT support
->   ARM: dts: sbc-t3x: disable mmc3
->   ARM: dts: sb-t35: fix Ethernet power supply
->   ARM: dts: cm-t3x: add gpio-led pinmux
->   ARM: dts: cm-t3x30: add twl4030 gpio pullups
->   ARM: dts: cm-t3x30: add HS USB Host support
->   ARM: dts: sbc-t3730: add pinmux for usb hub reset
->   ARM: dts: cm-t3x30: add USB OTG support
->   ARM: dts: sbc-t3530: add support for sbc-t3530
->   ARM: dts: sbc-t3517: add support for sbc-t3517
->   ARM: OMAP2+: make reset pulse for sbc-t3x usb hubs
-> 
->  arch/arm/boot/dts/Makefile            |    4 +
->  arch/arm/boot/dts/omap3-cm-t3517.dts  |  137 +++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap3-cm-t3530.dts  |   13 +++
->  arch/arm/boot/dts/omap3-cm-t3730.dts  |   40 ----------
->  arch/arm/boot/dts/omap3-cm-t3x.dtsi   |  112 +++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap3-cm-t3x30.dtsi |   74 +++++++++++++-----
->  arch/arm/boot/dts/omap3-sb-t35.dtsi   |   30 +++++++-
->  arch/arm/boot/dts/omap3-sbc-t3517.dts |   44 +++++++++++
->  arch/arm/boot/dts/omap3-sbc-t3530.dts |   37 +++++++++
->  arch/arm/boot/dts/omap3-sbc-t3730.dts |   24 +++---
->  arch/arm/mach-omap2/pdata-quirks.c    |   67 ++++++++++++++++-
->  11 files changed, 506 insertions(+), 76 deletions(-)
->  create mode 100644 arch/arm/boot/dts/omap3-cm-t3517.dts
->  create mode 100644 arch/arm/boot/dts/omap3-cm-t3530.dts
->  create mode 100644 arch/arm/boot/dts/omap3-cm-t3x.dtsi
->  create mode 100644 arch/arm/boot/dts/omap3-sbc-t3517.dts
->  create mode 100644 arch/arm/boot/dts/omap3-sbc-t3530.dts
-> 
+On 12.02.2014 13:01, Tushar Behera wrote:
+> Currently only the DT node is checked during l2x0 cache initialization,
+> but it doesn't check the status of the DT node. Thus it gets called
+> even if the status of DT node for L2 controller is disabled.
+>
+> Add explicit check to ensure that L2 cache is initialized only for
+> desired boards.
+>
+> Reported-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> ---
+>   arch/arm/mm/cache-l2x0.c |    3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 7abde2c..f075cb1 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -978,6 +978,9 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+>   	if (!np)
+>   		return -ENODEV;
+>
+> +	if (!of_device_is_available(np))
+> +		return -ENODEV;
+> +
+>   	if (of_address_to_resource(np, 0, &res))
+>   		return -ENODEV;
+>
+>
 
--- 
-Regards,
-Igor.
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+
+Best regards,
+Tomasz
