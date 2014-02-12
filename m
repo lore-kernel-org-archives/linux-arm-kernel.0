@@ -1,30 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Feb 2014 20:16:09 +0000
-Subject: [PATCH v2 1/3] ARM: mach-virt: allow PCI support to be selected
-In-Reply-To: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1392236171-10512-2-git-send-email-will.deacon@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 12 Feb 2014 13:17:13 -0700
+Subject: [PATCH 1/2] ARM: tegra: enable I2C Mux driver for PCA9546 in
+ defconfig
+In-Reply-To: <CAK5ve-+bzLkdwmab9sZGPk7p67ktVcK3mHQ2aUgMueH061ty6w@mail.gmail.com>
+References: <1391817298-10600-1-git-send-email-pengw@nvidia.com>
+ <52FBC6A9.7010401@wwwdotorg.org>
+ <CAK5ve-+bzLkdwmab9sZGPk7p67ktVcK3mHQ2aUgMueH061ty6w@mail.gmail.com>
+Message-ID: <52FBD6C9.2010905@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mach-virt can make use of virtio-pci devices, which requires the guest
-kernel to have PCI support selected.
+On 02/12/2014 01:09 PM, Bryan Wu wrote:
+> On Wed, Feb 12, 2014 at 11:08 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 02/07/2014 04:54 PM, Bryan Wu wrote:
+>>> PCA9546 is used in Cardhu Tegra30 board to connect to 3 cameras.
+>>> Enabling this driver for Tegra V4L2 soc camera driver and camera
+>>> sensor drivers.
+>>
+>> I've squashed patch 1/2 into Tegra's for-3.15/defconfig branch, and
+>> applied patch 2/2 to Tegra's for-3.15/dt branch.
+>>
+>> Note that your patches were sent with an email "From" address that
+>> didn't match your signed-off-by tag, yet "git send-email" didn't insert
+>> a "From" header in the email body. Can you please check your git user ID
+>> and/or email settings. Consequently, I had to adjust the git author
+>> field in git to match your s-o-b line.
+> 
+> My bad. I need to update my git send-email script to use --from "Bryan
+> Wu <pengw@nvidia.com>" instead of --from "Bryan Wu
+> <cooloney@gmail.com>"
+> 
+> Need I resubmit this patchset?
 
-This patch selects CONFIG_MIGHT_HAVE_PCI when CONFIG_ARCH_VIRT=y.
+No need to resent; I fixed them up.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mach-virt/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Why not just put the correct values in ~/.gitconfig?
 
-diff --git a/arch/arm/mach-virt/Kconfig b/arch/arm/mach-virt/Kconfig
-index 081d46929436..f40fb55574cb 100644
---- a/arch/arm/mach-virt/Kconfig
-+++ b/arch/arm/mach-virt/Kconfig
-@@ -8,3 +8,4 @@ config ARCH_VIRT
- 	select CPU_V7
- 	select SPARSE_IRQ
- 	select USE_OF
-+	select MIGHT_HAVE_PCI
--- 
-1.8.2.2
+Perhaps this is because you switch between NVIDIA and non-NVIDIA email
+addresses and/or mail servers, so you can't make ~/.gitconfig static and
+universally correct? If you have a recent enough git, what I do is:
+
+$ cat ~/.gitconfig
+[include]
+        path = .gitconfig-user
+        path = .gitconfig-email-server
+...
+
+$ cat ~/.gitconfig-user-nvidia
+[user]
+	name = Stephen Warren
+	email = swarren at nvidia.com
+
+$ cat ~/.gitconfig-user-wwwdotorg
+[user]
+	name = Stephen Warren
+	email = swarren at wwwdotorg.org
+
+~/.gitconfig-user is a symlink to one of ~/.gitconfig-user-*, and I have
+a script that deletes the link and points it at a new location:
+
+$ cat `which git-switch-user`
+#!/bin/bash
+
+cd $HOME
+mainfile=.gitconfig-user
+newlink=${mainfile}-$1
+if [ ! -f ${newlink} ]; then
+    echo ERROR: ${newlink} not found
+    exit 1
+fi
+
+rm -f ${mainfile}
+ln -s ${newlink} ${mainfile}
+
+... and the same thing for email servers.
+
+Then, I can run e.g.:
+
+git-switch-email-server nvidia; \
+git send-email --to internal at nvidia.com *.patch; \
+git-switch-email-server severn-port-forwarded
