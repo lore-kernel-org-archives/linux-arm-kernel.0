@@ -1,49 +1,36 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Wed, 12 Feb 2014 14:09:38 +0100
-Subject: [PATCH] perf: ARM64: wire up perf_regs and unwind support
-In-Reply-To: <1391451427-31221-1-git-send-email-jean.pihet@linaro.org>
-References: <1391451427-31221-1-git-send-email-jean.pihet@linaro.org>
-Message-ID: <20140212130938.GA7624@krava.brq.redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Feb 2014 14:10:35 +0100
+Subject: [PATCH v2 03/10] ARM: mvebu: add workaround for data abort issue
+ on Armada 375
+In-Reply-To: <1392200619-3141-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392200619-3141-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1392200619-3141-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <2289743.0TLVompA6m@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 07:17:07PM +0100, Jean Pihet wrote:
-> This patch hooks in the perf_regs and libunwind code for ARM64.
-> The tools/perf/arch/arm64 is created; it contains the arch specific
-> code for DWARF unwinding.
-> 
-> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-
-SNIP
-
+On Wednesday 12 February 2014 11:23:32 Thomas Petazzoni wrote:
+> +/*
+> + * Early versions of Armada 375 SoC have a bug where the BootROM
+> + * leaves an external data abort pending. The kernel is hit by this
+> + * data abort as soon as it enters userspace, because it unmasks the
+> + * data aborts at this moment. We register a custom abort handler
+> + * below to ignore the first data abort to work around this problem.
 > + */
-> +const char *get_arch_regstr(unsigned int n)
+> +static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
+> +                                       struct pt_regs *regs)
 > +{
-> +	const struct pt_regs_dwarfnum *roff;
-> +	for (roff = regdwarfnum_table; roff->name != NULL; roff++)
-> +		if (roff->dwarfnum == n)
-> +			return roff->name;
-> +	return NULL;
+> +       static int ignore_first;
+> +
+> +       if (!ignore_first) {
+> +               ignore_first = 1;
+> +               return 0;
+> +       }
+> +
+> +       return 1;
 > +}
-> diff --git a/tools/perf/arch/arm64/util/unwind.c b/tools/perf/arch/arm64/util/unwind.c
-> new file mode 100644
-> index 0000000..8d37a4c
-> --- /dev/null
-> +++ b/tools/perf/arch/arm64/util/unwind.c
-> @@ -0,0 +1,82 @@
-> +
-> +#include <errno.h>
-> +#include <libunwind.h>
-> +#include "perf_regs.h"
-> +#include "../../util/unwind.h"
-> +
-> +int unwind__arch_reg_id(int regnum)
 
+I think this should try to match the fsr and addr field if possible and
+only ignore the one external abort you expect.
 
-I think this ^^^ wouldn't compile over acme/perf/core, bacause of
-the recent code changes for the libdw unwind:
-
-1d86598 perf callchain: Rename unwind__arch_reg_id into libunwind__arch_reg_id
-
-jirka
+	Arnd
