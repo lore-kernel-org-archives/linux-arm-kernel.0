@@ -1,32 +1,59 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 12 Feb 2014 17:25:22 +0400
-Subject: [PATCH] ARM: shmobile: set proper DMA masks for Ether devices
-In-Reply-To: <52FB5FC0.3010808@codethink.co.uk>
-References: <201402120255.25037.sergei.shtylyov@cogentembedded.com>
- <52FB5FC0.3010808@codethink.co.uk>
-Message-ID: <52FB7642.4000506@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Feb 2014 14:26:41 +0100
+Subject: [PATCH v2 0/9] ARM: multi-platform kconfig cleanup and mach-virt
+ removal
+In-Reply-To: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
+References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
+Message-ID: <201402121426.41914.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tuesday 11 February 2014, Rob Herring wrote:
+> From: Rob Herring <robh@kernel.org>
+> 
+> This series removes common kconfig options required by multi-platform
+> builds out of individual platforms as they are redundant. Patches 2 and
+> 3 make SMP and CACHE_L2X0 config options visible on MULTI_V7 builds as
+> most platforms enable these options and all platforms can run with them
+> enabled.
 
-On 12-02-2014 15:49, Ben Dooks wrote:
+Overall looks pretty good, let's wait for a few more Acks or a possible
+Nak and then put it into arm-soc. You can add my 'Acked-by' to all patches
+if you like.
 
->> Ether MAC is a DMA-capable device and so should have 'dev.dma_mask' and
->> 'dev.coherent_dma_mask' fields set properly, to reflect 32-bit DMA addressing
->> ability.  Currently, the code works without DMA masks but in the future, when
->> support for NETIF_F_HIGHDMA & NETIF_F_SG would be added to the 'sh_eth' driver,
->> the DMA masks should start to matter...
+> The previous version [1] was mainly a discussion about v6 vs. v6K.
+> Several platforms have this wrong and incorrectly select v6 when the
+> more optimal v6K option could be used. After more research, my memory
+> about i.MX31 was wrong and it does need to remain v6.
 
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Just curious: do you have more information on this? Are all i.MX31 ARMv6
+and all i.MX35 v6k as the current Kconfig claims,  or is it more
+complicated?
 
-> Hi, do you have a git branch available with all the changes for getting
-> ethernet working on rcar please?
+> Finally, patch 8 removes mach-virt as it is no longer needed. The core
+> ARM code can handle all the necessary initialization and mach-virt is
+> left as a kconfig option. Although not really related to this series, 
+> it would otherwise conflict with it.
 
-    Depends on whether you want it working via DT or mere platform devices. If 
-the second, it's 3.14-rc1. If DT, I don't have a branch, only several patches 
-to apply atop of the current 'renesas.git' repo's 'devel' branch that I've 
-posted last week (note that only R8A779x is currently supported by these 
-patches and NFS boot timeout is still an issue with them).
+Makes sense. It's still a cleanup, so you could send it as a 
+separate patch to be applied on-top of the pull rather than the
+same pull request, although the difference is really marginal.
 
-WBR, Sergei
+You are probably right in leaving out the non-multiplatform
+platforms, but maybe we can figure out whether they should be
+changed as well, especially as some of them are going to become
+multiplatform-enabled in the future:
+
+* ARCH_S5P64X0 should be changed, it's next on the list
+* DaVinci/TNETV107X looks rather broken, I wonder if we should
+  just remove it entirely rather than fix it. I have a series
+  to fix all 'randconfig' build bugs locally and there were a
+  lot of them for TNETV107X, and I doubt fixing the build will
+  actually give you a booting kernel.
+* ARCH_MSM7X00A should just be changed, although probably nobody
+  really cares.
+* integrator and realview apparently allow both CPU_V6 and CPU_V6K
+  to be manually selected. Is that actually the correct behavior
+  in that both kinds of core tiles exist?
+
+	Arnd
