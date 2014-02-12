@@ -1,39 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 12 Feb 2014 16:03:56 +0100
-Subject: [PATCH v4] gpio: davinci: reuse for keystone soc
-In-Reply-To: <1391615244-12014-1-git-send-email-grygorii.strashko@ti.com>
-References: <1391615244-12014-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <CACRpkdbrs==tpUBs=WLWkt0frBcSMRDRokOn2tvP-1gt7Qq3+w@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 12 Feb 2014 18:58:52 +0400
+Subject: [PATCH] ARM: shmobile: set proper DMA masks for Ether devices
+In-Reply-To: <52FB8526.9000601@codethink.co.uk>
+References: <201402120255.25037.sergei.shtylyov@cogentembedded.com>
+ <52FB5FC0.3010808@codethink.co.uk> <52FB7642.4000506@cogentembedded.com>
+ <52FB8526.9000601@codethink.co.uk>
+Message-ID: <52FB8C2C.1050909@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 5, 2014 at 4:47 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
+Hello.
 
-> The similar GPIO HW block is used by keystone SoCs as
-> in Davinci SoCs.
-> Hence, reuse Davinci GPIO driver for Keystone taking into
-> account that Keystone contains ARM GIC IRQ controller which
-> is implemented using IRQ Chip.
->
-> Documentation:
->         http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
->
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
-> Changes in v4:
-> - rebased on top of v3.14 +
->   [patch] gpio: davinci: signedness bug in davinci_gpio_irq_setup()
+On 12-02-2014 18:28, Ben Dooks wrote:
 
-I tried applying this and it does not apply on the "devel" branch
-in the GPIO tree. Since I haven't touched one line of code in the
-DaVinci driver since v3.14-rc1 I seriously doubt that this is
-rebased on v3.14[-rc].
+>>>> Ether MAC is a DMA-capable device and so should have 'dev.dma_mask' and
+>>>> 'dev.coherent_dma_mask' fields set properly, to reflect 32-bit DMA
+>>>> addressing
+>>>> ability.  Currently, the code works without DMA masks but in the
+>>>> future, when
+>>>> support for NETIF_F_HIGHDMA & NETIF_F_SG would be added to the
+>>>> 'sh_eth' driver,
+>>>> the DMA masks should start to matter...
 
-Can you please rebase the patch onto v3.14-rc1 for real and
-resend it?
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Yours,
-Linus Walleij
+>>> Hi, do you have a git branch available with all the changes for getting
+>>> ethernet working on rcar please?
+
+>>     Depends on whether you want it working via DT or mere platform
+>> devices. If the second, it's 3.14-rc1. If DT, I don't have a branch,
+>> only several patches to apply atop of the current 'renesas.git' repo's
+>> 'devel' branch that I've posted last week (note that only R8A779x is
+>> currently supported by these patches and NFS boot timeout is still an
+>> issue with them).
+
+> ok, I have a slightly earlier version which seems to work with nfs
+> boot for me.
+
+    There's no "slightly earlier version" (unless you mean DT support for 
+BOCK-W posted months ago). Issue with NFS is not fatal, it boots fine, just 
+somewhat slow.
+
+WBR, Sergei
