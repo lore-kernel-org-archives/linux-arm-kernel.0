@@ -1,58 +1,56 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 12 Feb 2014 10:46:54 +0200
-Subject: [PATCH] phy-core: Don't allow building phy-core as a module
-In-Reply-To: <1392134631-32030-1-git-send-email-hdegoede@redhat.com>
-References: <1392134631-32030-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <52FB34FE.6030909@ti.com>
+From: jean.pihet@linaro.org (Jean Pihet)
+Date: Wed, 12 Feb 2014 09:47:17 +0100
+Subject: [PATCH v6 0/3] perf: AARCH64 arch support
+In-Reply-To: <1391451509-31265-1-git-send-email-jean.pihet@linaro.org>
+References: <1391451509-31265-1-git-send-email-jean.pihet@linaro.org>
+Message-ID: <CAFrcx1mBWnO7mivQtGY1qLfd=KwV4ehyZoq0tV7buMiWKrTqrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2014 06:03 PM, Hans de Goede wrote:
-> include/phy/phy.h has stub code in there for when building without the
-> phy-core enabled. This is useful for generic drivers such as ahci-platform,
-> ehci-platoform and ohci-platform which have support for driving an optional
-> phy passed to them through the devicetree.
-> 
-> Since on some boards this phy functionality is not needed, being able to
-> disable the phy subsystem without needing a lot of #ifdef magic in the
-> driver using it is quite useful.
-> 
-> However this breaks when the module using the phy subsystem is build-in and
-> the phy-core is not, which leads to the build failing with missing symbol
-> errors in the linking stage of the zImage.
-> 
-> Which leads to gems such as this being added to the Kconfig for achi_platform:
-> 
-> 	depends on GENERIC_PHY || !GENERIC_PHY
-> 
-> Rather then duplicating this code in a lot of places using the phy-core,
-> I believe it is better to simply not allow the phy-core to be built as a
-> module. The phy core is quite small and has no external dependencies, so
-> always building it in when enabling it should not be an issue.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Hi Will,
 
-Acked-by: Roger Quadros <rogerq@ti.com>
+Ping on the series. Is this OK for inclusion?
 
---
-cheers,
--roger
+Regards,
+Jean
 
-> ---
->  drivers/phy/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 6070c99..6e336b4 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -5,7 +5,7 @@
->  menu "PHY Subsystem"
->  
->  config GENERIC_PHY
-> -	tristate "PHY Core"
-> +	bool "PHY Core"
->  	help
->  	  Generic PHY support.
->  
-> 
+On 3 February 2014 19:18, Jean Pihet <jean.pihet@linaro.org> wrote:
+> Add AARCH64 specific support. This includes the following:
+> - AARCH64 perf registers definition and hooks,
+> - compat mode registers use, i.e. profiling a 32-bit binary on
+>    a 64-bit system,
+> - unwinding using the dwarf information from the .debug_frame
+>    section of the ELF binary,
+> - unwinding using the frame pointer information; in 64-bit and
+>    compat modes.
+>
+> Notes:
+> - the tools/perf change is submitted separately on LKML,
+> - support for unwinding using the dwarf information in compat
+> mode requires some changes to the libunwind code. Those changes
+> have been submitted on the libunwind ML and are in discussion.
+>
+> Tested on ARMv7, ARMv8 and x86_64 platforms. The compat mode has been
+> tested on ARMv8 using statically built 32-bit binaries.
+>
+>
+> Jean Pihet (3):
+>   ARM64: perf: add support for perf registers API
+>   ARM64: perf: add support for frame pointer unwinding in compat mode
+>   ARM64: perf: support dwarf unwinding in compat mode
+>
+>  arch/arm64/Kconfig                      |  2 +
+>  arch/arm64/include/asm/compat.h         |  2 +-
+>  arch/arm64/include/asm/ptrace.h         |  3 +-
+>  arch/arm64/include/uapi/asm/Kbuild      |  1 +
+>  arch/arm64/include/uapi/asm/perf_regs.h | 40 ++++++++++++++++++
+>  arch/arm64/kernel/Makefile              |  1 +
+>  arch/arm64/kernel/perf_event.c          | 75 +++++++++++++++++++++++++++++----
+>  arch/arm64/kernel/perf_regs.c           | 44 +++++++++++++++++++
+>  8 files changed, 158 insertions(+), 10 deletions(-)
+>  create mode 100644 arch/arm64/include/uapi/asm/perf_regs.h
+>  create mode 100644 arch/arm64/kernel/perf_regs.c
+>
+> --
+> 1.7.11.7
+>
