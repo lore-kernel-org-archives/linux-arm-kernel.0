@@ -1,55 +1,94 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 12 Feb 2014 11:06:49 +0000
-Subject: [PATCH 07/12] mfd: syscon: Consider platform data a regmap
- config name
-In-Reply-To: <20140212082657.GK15081@lee--X1>
-References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
- <1392138636-29240-8-git-send-email-pawel.moll@arm.com>
- <1392188982.914924525@f237.i.mail.ru> <20140212082657.GK15081@lee--X1>
-Message-ID: <1392203209.3380.57.camel@hornet>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 12 Feb 2014 11:13:35 +0000
+Subject: [PATCH 1/3] arm64: dts: add initial dts for Samsung GH7 SoC and
+ SSDK-GH7 board
+In-Reply-To: <CAOesGMjE=zOStKoZQhYLhYtL_aWD73DcF4w6STboZPMfHkLtxA@mail.gmail.com>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <1392100183-30930-2-git-send-email-kgene.kim@samsung.com>
+ <CAOesGMjE=zOStKoZQhYLhYtL_aWD73DcF4w6STboZPMfHkLtxA@mail.gmail.com>
+Message-ID: <52FB575F.3070104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-02-12 at 08:26 +0000, Lee Jones wrote:
-> > > Use the device platform data as a regmap config
-> > > name. This is particularly useful in the regmap
-> > > debugfs when there is more than one syscon device
-> > > registered, to distinguish the register blocks.
-> > > 
-> > > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > > Cc: Lee Jones <lee.jones@linaro.org>
-> > > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> > > ---
-> > ...
-> > > syscon_regmap_config.max_register = res->end - res->start - 3;
-> > > +	syscon_regmap_config.name = dev_get_platdata(&pdev->dev);
-> > 
-> > Is dev_name(&pdev->dev) can be used for such purpose?
+On 11/02/14 23:36, Olof Johansson wrote:
+> Hi,
 > 
-> Yes of course.
+> Besides what Mark Rutland already commented on:
 > 
-> Either use the automatically generated name or over-ride with
-> dev->init_name prior to registration or call dev_set_name()
-> manually. Then retrieve with Alexander's suggestion.
+> On Mon, Feb 10, 2014 at 10:29 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> +/ {
+>> +       model = "SAMSUNG GH7";
+>> +       compatible = "samsung,gh7";
 > 
-> Is there any technical reason why this is not possible with your
-> implementation?
+> Model and compatible in the dtsi should probably always be overridden
+> by a dts that includes it, so there's little use in having it here.
+> 
+>> +       interrupt-parent = <&gic>;
+>> +       #address-cells = <2>;
+>> +       #size-cells = <2>;
+>> +
+>> +       cpus {
+>> +               #address-cells = <2>;
+>> +               #size-cells = <0>;
+>> +
+>> +               cpu at 000 {
+>> +                       device_type = "cpu";
+>> +                       compatible = "arm,armv8";
+>> +                       reg = <0x0 0x000>;
+> 
+> No need to zero-pad cpu numbers in unit address or reg.
+> 
+>> +                       enable-method = "spin-table";
+>> +                       cpu-release-addr = <0x0 0x8000fff8>;
+>> +               };
+>> +               cpu at 001 {
+>> +                       device_type = "cpu";
+>> +                       compatible = "arm,armv8";
+>> +                       reg = <0x0 0x001>;
+>> +                       enable-method = "spin-table";
+>> +                       cpu-release-addr = <0x0 0x8000fff8>;
+>> +               };
+>> +               cpu at 002 {
+>> +                       device_type = "cpu";
+>> +                       compatible = "arm,armv8";
+>> +                       reg = <0x0 0x002>;
+>> +                       enable-method = "spin-table";
+>> +                       cpu-release-addr = <0x0 0x8000fff8>;
+>> +               };
+>> +               cpu at 003 {
+>> +                       device_type = "cpu";
+>> +                       compatible = "arm,armv8";
+>> +                       reg = <0x0 0x003>;
+>> +                       enable-method = "spin-table";
+>> +                       cpu-release-addr = <0x0 0x8000fff8>;
+>> +               };
+>> +       };
+>> +
+>> +       gic: interrupt-controller at 1C000000 {
+>> +               compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+> 
+> This looks incorrect -- you should at the very least have a more
+> specific one than a15-gic? Marc?
 
-Hold on, guys. Let me just point out that we're talking "non-DT"
-platform devices here (either statically defined struct
-platform_device-s or - my case - the MFD cells).
+"arm,cortex-a9-gic" is definitely wrong (the A9 GIC doesn't have the
+virt extensions). This binding matches what the A15 GIC has, so
+"arm,cortex-a15-gic" is probably fine. Main issue here is that the GICv2
+driver has no compatible string for anything else.
 
-In this case device/driver matching relies completely on device name.
-Either the pdev->name must be identical (strcmp) to pdrv->name, or the
-pdev->name must be identical (strcmp again) to one of the pdev->id_table
-entries. See platform_match() in driver/base/platform.c for more
-details.
+Should we define something more generic (like "arm,gic-v2")? Or carry on
+adding more compatible strings?
 
-Therefore the dev_name(&pdev->dev) on a non-DT-originating sysconf
-devince will always return "sysconf.*", unless you're ready to maintain
-a growing syscon_ids[] list. If so, I will have to add three entries
-there ("sys_id", "sys_misc" and "sys_procid"). I hope you are not
-seriously considering this idea :-) After all that's what the
-platform_data was invented for.
+	M.
 
-Pawel
+>> +               #interrupt-cells = <3>;
+>> +               #address-cells = <0>;
+>> +               interrupt-controller;
+>> +               reg = <0x0 0x1C001000 0 0x1000>,        /* GIC Dist */
+>> +                     <0x0 0x1C002000 0 0x1000>,        /* GIC CPU */
+>> +                     <0x0 0x1C004000 0 0x2000>,        /* GIC VCPU Control */
+>> +                     <0x0 0x1C006000 0 0x2000>;        /* GIC VCPU */
+>> +               interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
+>> +       };
+
+-- 
+Jazz is not dead. It just smells funny...
