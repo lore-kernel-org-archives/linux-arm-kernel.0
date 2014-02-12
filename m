@@ -1,43 +1,56 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 13 Feb 2014 08:45:33 +0900
-Subject: [PATCH] ARM: shmobile: set proper DMA masks for Ether devices
-In-Reply-To: <52FB5BD0.10707@cogentembedded.com>
-References: <201402120255.25037.sergei.shtylyov@cogentembedded.com>
- <20140212013517.GE17104@verge.net.au>
- <52FB5BD0.10707@cogentembedded.com>
-Message-ID: <20140212234533.GA28472@verge.net.au>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 12 Feb 2014 17:55:08 -0600
+Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
+In-Reply-To: <1882539.R1gpoLLYks@wuerfel>
+References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
+ <1571508.yGAAZ8TNH0@wuerfel>
+ <20140212184521.GO27395@titan.lakedaemon.net>
+ <1882539.R1gpoLLYks@wuerfel>
+Message-ID: <CAL_JsqJetHbdsJd5B-FnwHRPgP9J=SXBhiYptHZMk9dhe20Fgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 03:32:32PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 12-02-2014 5:35, Simon Horman wrote:
-> 
-> >>Ether MAC is a DMA-capable device and so should have 'dev.dma_mask' and
-> >>'dev.coherent_dma_mask' fields set properly, to reflect 32-bit DMA addressing
-> >>ability.  Currently, the code works without DMA masks but in the future, when
-> >>support for NETIF_F_HIGHDMA & NETIF_F_SG would be added to the 'sh_eth' driver,
-> >>the DMA masks should start to matter...
-> 
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >Hi Sergei,
-> 
-> >please split this series up so there is a separate patch for each board.
-> 
->    Hm, I, contrariwise, gathered all board patches in the single
-> patch. Could you elaborate on why you deem it necessary to split it?
+On Wed, Feb 12, 2014 at 1:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 12 February 2014 13:45:21 Jason Cooper wrote:
+>> On Wed, Feb 12, 2014 at 07:17:41PM +0100, Arnd Bergmann wrote:
+>> > On Wednesday 12 February 2014 12:45:54 Jason Cooper wrote:
+>> > > I brought this up at last weeks devicetree irc meeting.  My goal is to
+>> > > provide early randomness for kaslr on ARM.  Currently, my idea is modify
+>> > > the init script to save an additional random seed from /dev/urandom to
+>> > > /boot/random-seed.
+>> > >
+>> > > The bootloader would then load this file into ram, and pass the
+>> > > address/size to the kernel either via dt, or commandline.  kaslr (run in
+>> > > the decompressor) would consume some of this randomness, and then
+>> > > random.c would consume the rest in a non-crediting initialization.
+>> >
+>> > I like the idea, but wouldn't it be easier to pass actual random data
+>> > using DT, rather than the address/size?
+>>
+>> I thought about that at first, but that requires either that the
+>> bootloader be upgraded to insert the data, or that userspace is
+>> modifying the dtb at least twice per boot.
+>>
+>> I chose address/size to facilitate modifying existing/fielded devices.
+>> The user could modify the dtb once, and modify the bootloader
+>> environment to load X amount to Y address.  As a fallback, it could be
+>> expressed on the commandline for non-DT bootloaders.
+>
+> Ah, so you are interested in boot loaders that can be scripted to do
+> what you had in mind but cannot be scripted to add or modify a DT
+> property. I hadn't considered that, but you are probably right that
+> this is at least 90% of the systems you'd find in the wild today.
+>
+> Thinking this a bit further, I wonder if (at least upstream) u-boot
+> has a way to modify DT properties in a scripted way that would allow
+> the direct property. It sounds like a generally useful feature not
+> just for randomness, so if that doesn't already work, maybe someone
+> can implement it. In the simplest case, you'd only need to find the
+> address of an existing property in the dtb and load a file to
+> that location.
 
-In my experience it helps to have the patches split out for two reasons:
-1. If there is a problem on one board its patch can be reverted without
-   having to bother with making a partial revert in order to leave the
-   other boards alone.
-2. It makes backporting easier in the case where there is interest in
-   one board but not another.
+You would be referring to the u-boot fdt command which can read and
+set properties. Of course, like all u-boot commands, that may or may
+not be enabled by a vendor's u-boot. :(
 
-Moreover, the boards are separate entities and in general I would
-like their patches to be separate. The same goes for SoCs.
-
-I realise this is more fine-grained than what other maintainers prefer
-but it is an approach that seems to work well for us.
+Rob
