@@ -1,26 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Feb 2014 12:21:50 +0100
-Subject: [PATCH 4/7] spi: pl022: attempt to get sspclk by name
-In-Reply-To: <20140212103329.GC21992@e106331-lin.cambridge.arm.com>
-References: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
- <201402111508.06267.arnd@arndb.de>
- <20140212103329.GC21992@e106331-lin.cambridge.arm.com>
-Message-ID: <201402121221.51233.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 12 Feb 2014 12:26:54 +0100
+Subject: [PATCH] MTD: atmel_nand: POI fall back is not an issue: change log
+ level
+Message-ID: <1392204414-20700-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 February 2014, Mark Rutland wrote:
-> To me it feels odd to require the last clock in the list (apb_pclk) to
-> be named, and the rest to be in a particular order. For the dt case it
-> seems saner to add new clocks with names as it allows arbitrary subsets
-> of clocks to be wired up and described (though obviously in this case a
-> missing sspclk would be problematic).
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/mtd/nand/atmel_nand.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Yes, good point about the missing clocks, and I also agree mixing ordered
-and named clocks in one device is rather odd and can lead to trouble.
-
-I guess there isn't really a good way out here, and I certainly won't
-ask for it to be done one way or the other if someone else has a 
-good argument which way it should be implemented.
-
-	Arnd
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index c36e9b84487c..8d210f8a072d 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -430,7 +430,7 @@ err_dma:
+ 	dma_unmap_single(dma_dev->dev, phys_addr, len, dir);
+ err_buf:
+ 	if (err != 0)
+-		dev_warn(host->dev, "Fall back to CPU I/O\n");
++		dev_dbg(host->dev, "Fall back to CPU I/O\n");
+ 	return err;
+ }
+ 
+-- 
+1.8.2.2
