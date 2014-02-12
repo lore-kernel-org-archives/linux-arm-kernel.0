@@ -1,26 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 12 Feb 2014 12:43:55 +0000
-Subject: [PATCH 0/3] arm64: Use pte manipulation functions for THP
-In-Reply-To: <20140212115004.GA14527@linaro.org>
-References: <1391696171-8922-1-git-send-email-steve.capper@linaro.org>
- <20140212094338.GA11325@linaro.org>
- <20140212100736.GA13441@mudshark.cambridge.arm.com>
- <20140212101602.GD29702@arm.com>
- <20140212102112.GE13441@mudshark.cambridge.arm.com>
- <20140212115004.GA14527@linaro.org>
-Message-ID: <20140212124355.GN26684@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 12 Feb 2014 13:44:28 +0100
+Subject: [PATCH v4 0/8] Device Tree support for the at91sam9261ek
+In-Reply-To: <CACh+v5Nv7u4WSXttvsnMPxwNwN6R4ZDRABOXr9XXBjy6mSDi5w@mail.gmail.com>
+References: <1392199607-27452-1-git-send-email-jjhiblot@traphandler.com>
+ <52FB5795.9020708@free-electrons.com>
+ <20140212133449.5c42216d@skate>
+ <CACh+v5Nv7u4WSXttvsnMPxwNwN6R4ZDRABOXr9XXBjy6mSDi5w@mail.gmail.com>
+Message-ID: <20140212134428.4a442f31@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 11:50:05AM +0000, Steve Capper wrote:
-> I have noticed the following for ARM:
->  36bb94b ARM: pgtable: provide RDONLY page table bit rather than WRITE bit
-> Are you happy for me to re-introduce PTE_WRITE for the 3-level code
-> only, and keep L_PTE_RDONLY for the 2-level code?
+Dear Jean-Jacques Hiblot,
 
-Sigh, yet another cleanup reverted...  If you must.
+On Wed, 12 Feb 2014 13:36:08 +0100, Jean-Jacques Hiblot wrote:
 
+> >> For dm9000 the issue is (again) related to an ordering problem:
+> >> the Ethernet need an interrupt provided by the gpio driver. Unfortunately,
+> >> the gpio driver initialization is called after the dm900 driver
+> >> initialization.
+> >
+> > And -EPROBE_DEFER doesn't solve this problem?
+> not really the problem happens before the driver is actually probed
+> when the ressource for the platform driver are filled
+
+Sorry, I don't have all the context. If I understand correctly what you
+mean, the GPIO driver is probed through the DT, but the DM9000 driver
+is probed in a legacy way from the board file, and you have the case
+where the DM9000 platform_device gets registered before the GPIOs are
+actually available? In this case, what about having the
+of_platform_populate() call *before* the platform_device_register() for
+your DM9000 ? Again, I don't have all the context, so I might very well
+be getting the situation incorrectly.
+
+Of course, ideally, the DM9000 driver should be probed using the DT,
+but I guess this needs the SMC DT binding that is still being
+discussed, if I followed correctly.
+
+Thomas
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
