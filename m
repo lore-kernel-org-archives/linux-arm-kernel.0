@@ -1,40 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 12 Feb 2014 18:12:31 +0000
-Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
-In-Reply-To: <B1132DDA-ECB1-4971-98AE-6DDDDD985CFB@codeaurora.org>
-References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
- <1392100183-30930-3-git-send-email-kgene.kim@samsung.com>
- <CAOesGMiWsWXkQkb-_VZGco0gKNZPsHf3ubR88y4Pt4-umk5_Ww@mail.gmail.com>
- <20140212103824.GF29702@arm.com>
- <B1132DDA-ECB1-4971-98AE-6DDDDD985CFB@codeaurora.org>
-Message-ID: <1540B9A3-2485-4149-81DD-7D86A532E5D4@arm.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 12 Feb 2014 11:20:00 -0700
+Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
+In-Reply-To: <20140212174554.GM27395@titan.lakedaemon.net>
+References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
+ <201402121251.06280.arnd@arndb.de>
+ <20140212174554.GM27395@titan.lakedaemon.net>
+Message-ID: <20140212182000.GJ5554@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 Feb 2014, at 16:25, Kumar Gala <galak@codeaurora.org> wrote:
-> On Feb 12, 2014, at 4:38 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> 
->> On Tue, Feb 11, 2014 at 11:39:27PM +0000, Olof Johansson wrote:
->>> On Mon, Feb 10, 2014 at 10:29 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
->>>> This patch adds support for Samsung GH7 SoC in arm64/Kconfig.
->>>> 
->>>> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
->>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> 
->>> The overhead of building one more device tree isn't very large, and I
->>> don't see any other need to have a Kconfig entry per SoC at this time.
->>> It's of course up to Catalin, but you might just want to always
->>> compile all dts files instead.
->> 
->> For arm64, I thought of getting rid of ARCH_* Kconfig entries entirely,
->> only that I haven't heard any strong opinion either way (in which case
->> I'll do it, with a risk of single Image getting bigger and bigger and
->> people needing smaller Image can trim their .config).
-> 
-> One reason to keep around ARCH_* is for drivers shared between arm and arm64 that depend on it.
+On Wed, Feb 12, 2014 at 12:45:54PM -0500, Jason Cooper wrote:
 
-We already converted some of them (those depending on ARCH_VEXPRESS) to
-just depend on ARM64. Ideally, at some point I?d like to see them as
-defaulting to modules but I don?t think we are there yet (we had some
-discussions at the last KS, I?m not sure anyone started looking into
-this).
+> The bootloader would then load this file into ram, and pass the
+> address/size to the kernel either via dt, or commandline.  kaslr (run in
+> the decompressor) would consume some of this randomness, and then
+> random.c would consume the rest in a non-crediting initialization.
+
+Sure is a neat idea, but I think in general it would probably be smart
+to include the entire FDT blob in the early random pool, that way you
+get MACs and other machine unique data too.
+
+>From there it is a small step to encourage bootloaders to include
+boot-time-variable data in the DT like like 'boot time of day', 'cycle
+counter', 'random blob', etc.
+
+Then you just need the bootloader to dump the random-seed file into a
+DT property.
+
+Or have the bootloader fetch randomness from any HWRNG it has a driver
+for. (eg a TPM)
+
+Jason
