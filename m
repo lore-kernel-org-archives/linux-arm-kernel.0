@@ -1,56 +1,53 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 12 Feb 2014 16:49:07 +0000
-Subject: [RFC/PATCH 2/3] arm: Add ARCH_WANT_OF_RANDOMNESS
-In-Reply-To: <1392168805-14200-3-git-send-email-lauraa@codeaurora.org>
-References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org> <
- 1392168805-14200-3-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20140212164907.0E958C407C9@trevor.secretlab.ca>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Feb 2014 17:53:08 +0100
+Subject: [PATCH v2 0/9] ARM: multi-platform kconfig cleanup and mach-virt
+ removal
+In-Reply-To: <CAL_JsqJkCXSFJZzRBRTrKh16PoBjvF95uKJbZAic-pk3htf_jg@mail.gmail.com>
+References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
+ <20140212134655.GC29132@mudshark.cambridge.arm.com>
+ <CAL_JsqJkCXSFJZzRBRTrKh16PoBjvF95uKJbZAic-pk3htf_jg@mail.gmail.com>
+Message-ID: <1726732.KPDAFqxz2K@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Feb 2014 17:33:24 -0800, Laura Abbott <lauraa@codeaurora.org> wrote:
-> The stack canary for ARM is currently the same across reboots
-> due to lack of randomness early enough. Add ARCH_WANT_OF_RANDOMNESS
-> to allow devices to add whatever randomness they need.
+On Wednesday 12 February 2014 08:07:12 Rob Herring wrote:
+> On Wed, Feb 12, 2014 at 7:46 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Feb 12, 2014 at 01:26:41PM +0000, Arnd Bergmann wrote:
+> >> On Tuesday 11 February 2014, Rob Herring wrote:
+> >> > The previous version [1] was mainly a discussion about v6 vs. v6K.
+> >> > Several platforms have this wrong and incorrectly select v6 when the
+> >> > more optimal v6K option could be used. After more research, my memory
+> >> > about i.MX31 was wrong and it does need to remain v6.
+> >>
+> >> Just curious: do you have more information on this? Are all i.MX31 ARMv6
+> >> and all i.MX35 v6k as the current Kconfig claims,  or is it more
+> >> complicated?
+> >
+> > Slightly tangential, but the one to watch out for is 1136. Prior to r1 (i.e.
+> > r0pX), it is v6 but r1pX+ are v6k (without SMP).
 > 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> Right. I originally was thinking that the MX31 1.x was r0pX and MX31
+> 2.x was r1pX and that there are no 1.x chips around. However, after
+> checking the errata sheet, 1.x is r0p1 and 2.x is r0p4. It must have
+> been one of the other 1136 chips we did that moved to r1pX.
 
-Do you have a draft patch for a user of this yet?
+Ok.
 
-g.
-
-> ---
->  arch/arm/Kconfig              |    3 +++
->  arch/arm/kernel/vmlinux.lds.S |    1 +
->  2 files changed, 4 insertions(+), 0 deletions(-)
+> >> * integrator and realview apparently allow both CPU_V6 and CPU_V6K
+> >>   to be manually selected. Is that actually the correct behavior
+> >>   in that both kinds of core tiles exist?
+> >
+> > I have 1136 r0p1 on an integrator CP, so I suppose it could also take an
+> > 1136 r1pX without any trouble.
 > 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index e254198..7ab0db1 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -222,6 +222,9 @@ config NEED_RET_TO_USER
->  config ARCH_MTD_XIP
->  	bool
->  
-> +config ARCH_WANT_OF_RANDOMNESS
-> +	def_bool n
-> +
->  config VECTORS_BASE
->  	hex
->  	default 0xffff0000 if MMU || CPU_HIGH_VECTOR
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index 7bcee5c..2198258 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -202,6 +202,7 @@ SECTIONS
->  		INIT_SETUP(16)
->  		INIT_CALLS
->  		CON_INITCALL
-> +		EARLY_RANDOM_FUNCS
->  		SECURITY_INITCALL
->  		INIT_RAM_FS
->  	}
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
+> Presumably some of both exist which is why the config options are as they are?
+
+Possible, but I wouldn't trust that part of the kernel very far. Especially
+the MMU-less CPUs in there seem to be listed a bit randomly.
+
+On the topic of V6, we don't support CPU_V6T2 at all, though I assume that
+there is an ARM1156 core tile for integrator and realview, and we support
+running the V6/V6K parts with MMU turned off. Would all revisions of ARM1156
+work with CPU_V6K and !MMU?
+
+	Arnd
