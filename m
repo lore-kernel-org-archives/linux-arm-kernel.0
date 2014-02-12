@@ -1,24 +1,22 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 12 Feb 2014 11:56:54 +0000
-Subject: [PATCH 02/12] power/reset: vexpress: Use udelay instead of timers
-In-Reply-To: <201402112159.16758.arnd@arndb.de>
-References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
- <1392138636-29240-3-git-send-email-pawel.moll@arm.com>
- <201402112159.16758.arnd@arndb.de>
-Message-ID: <1392206214.848.19.camel@hornet>
+Date: Wed, 12 Feb 2014 11:59:27 +0000
+Subject: [PATCH 09/12] hwmon: vexpress: Use devm helper for hwmon device
+ registration
+In-Reply-To: <1392206196.848.18.camel@hornet>
+References: <20140212024904.GA19352@roeck-us.net>
+ <1392206196.848.18.camel@hornet>
+Message-ID: <1392206367.848.20.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-02-11 at 20:59 +0000, Arnd Bergmann wrote:
-> On Tuesday 11 February 2014, Pawel Moll wrote:
-> > At this stage of system shutdown procedure the jiffies may
-> > not be updated anymore, so just use udelay instead.
-> 
-> comment doesn't match code: s/udelay/mdelay/
-> 
-> > +                       mdelay(1000);
-> >         }
+On Wed, 2014-02-12 at 11:56 +0000, Pawel Moll wrote:
+> > Third, I noticed that the 'label' attribute is always created but returns  
+> > -ENOENT if there is no label. A much better implementation would be to use
+> > .is_visible and not create the label attribute if its devicetree entry
+> > does not exist. I don't know how libsensors reacts to -ENOENT on a read,
+> > but no matter how it does react, it is pretty much undefined.
+> > Again, that should be handled in a separate patch.
 
-Uh, right. Well spotted. Will fix.
+Missed that one - will do as well.
 
 Pawel
