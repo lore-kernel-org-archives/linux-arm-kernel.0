@@ -1,27 +1,26 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Feb 2014 11:20:49 +0000
-Subject: [PATCH v2 2/2] mfd: vexpress-sysreg: Add syscon labels as
- platform data
-In-Reply-To: <1392141165-14338-2-git-send-email-pawel.moll@arm.com>
-References: <20140211174829.GJ15081@lee--X1>
- <1392141165-14338-1-git-send-email-pawel.moll@arm.com>
- <1392141165-14338-2-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140212112049.GB15081@lee--X1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Feb 2014 12:21:50 +0100
+Subject: [PATCH 4/7] spi: pl022: attempt to get sspclk by name
+In-Reply-To: <20140212103329.GC21992@e106331-lin.cambridge.arm.com>
+References: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
+ <201402111508.06267.arnd@arndb.de>
+ <20140212103329.GC21992@e106331-lin.cambridge.arm.com>
+Message-ID: <201402121221.51233.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This patch adds platform data with label names for syscon
-> registers in the relevant MFD cells.
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
->  drivers/mfd/vexpress-sysreg.c | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+On Wednesday 12 February 2014, Mark Rutland wrote:
+> To me it feels odd to require the last clock in the list (apb_pclk) to
+> be named, and the rest to be in a particular order. For the dt case it
+> seems saner to add new clocks with names as it allows arbitrary subsets
+> of clocks to be wired up and described (though obviously in this case a
+> missing sspclk would be problematic).
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Yes, good point about the missing clocks, and I also agree mixing ordered
+and named clocks in one device is rather odd and can lead to trouble.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I guess there isn't really a good way out here, and I certainly won't
+ask for it to be done one way or the other if someone else has a 
+good argument which way it should be implemented.
+
+	Arnd
