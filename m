@@ -1,117 +1,101 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 12 Feb 2014 16:55:46 +0100
-Subject: [PATCH 12/14] net: axienet: Use of_property_* calls
-In-Reply-To: <cover.1392220536.git.michal.simek@xilinx.com>
-References: <cover.1392220536.git.michal.simek@xilinx.com>
-Message-ID: <77b9c5c033a54916c3e5be6f67dbd59c0155bc4c.1392220536.git.michal.simek@xilinx.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 12 Feb 2014 16:59:24 +0100
+Subject: [PATCH v3 01/13] pinctrl: mvebu: count unnamed controls and allocate
+ name buffer
+In-Reply-To: <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1392220776-30851-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srikanth Thokala <srikanth.thokala@xilinx.com>
+pinctrl-mvebu allows SoCs to pass unnamed controls that will get an
+auto-generated name of "mpp<PIN#>". Currently, we are allocating name
+buffers on a per-control basis while looping over passed controls.
+This counts the total number of unnamed controls and allocates a
+global name buffer instead. The new buffer is then used while assigning
+controls to pinctrl groups later.
 
-Use of_property_* calls
-
-Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Tested-by: Andrew Lunn <andrew@lunn.ch>
 ---
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c | 24 +++++++++++++++++++-----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
 
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 41 ++++++++++-------------
- 1 file changed, 17 insertions(+), 24 deletions(-)
-
-diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-index 936a14c..9a9ffbc 100644
---- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-@@ -1493,13 +1493,13 @@ static void axienet_dma_err_handler(unsigned long data)
-  */
- static int axienet_of_probe(struct platform_device *pdev)
- {
--	__be32 *p;
--	int size, ret = 0;
-+	int ret;
- 	struct device_node *np;
- 	struct axienet_local *lp;
- 	struct net_device *ndev;
--	const void *addr;
-+	u8 mac_addr[6];
- 	struct resource *ethres, dmares;
-+	u32 value;
-
- 	ndev = alloc_etherdev(sizeof(*lp));
- 	if (!ndev)
-@@ -1530,9 +1530,9 @@ static int axienet_of_probe(struct platform_device *pdev)
- 	/* Setup checksum offload, but default to off if not specified */
- 	lp->features = 0;
-
--	p = (__be32 *) of_get_property(pdev->dev.of_node, "xlnx,txcsum", NULL);
--	if (p) {
--		switch (be32_to_cpup(p)) {
-+	ret = of_property_read_u32(pdev->dev.of_node, "xlnx,txcsum", &value);
-+	if (!ret) {
-+		switch (value) {
- 		case 1:
- 			lp->csum_offload_on_tx_path =
- 				XAE_FEATURE_PARTIAL_TX_CSUM;
-@@ -1551,9 +1551,9 @@ static int axienet_of_probe(struct platform_device *pdev)
- 			lp->csum_offload_on_tx_path = XAE_NO_CSUM_OFFLOAD;
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+index 0fd1ad31fbf9..d47650fc5119 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+@@ -598,6 +598,9 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 	void __iomem *base;
+ 	struct pinctrl_pin_desc *pdesc;
+ 	unsigned gid, n, k;
++	unsigned size, noname = 0;
++	char *noname_buf;
++	void *p;
+ 	int ret;
+ 
+ 	if (!soc || !soc->controls || !soc->modes) {
+@@ -660,6 +663,7 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 			sprintf(names + 8*k, "mpp%d", ctrl->pid+k);
+ 		ctrl->name = names;
+ 		pctl->num_groups += ctrl->npins;
++		noname += ctrl->npins;
+ 	}
+ 
+ 	pdesc = devm_kzalloc(&pdev->dev, pctl->desc.npins *
+@@ -673,12 +677,17 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 		pdesc[n].number = n;
+ 	pctl->desc.pins = pdesc;
+ 
+-	pctl->groups = devm_kzalloc(&pdev->dev, pctl->num_groups *
+-			     sizeof(struct mvebu_pinctrl_group), GFP_KERNEL);
+-	if (!pctl->groups) {
+-		dev_err(&pdev->dev, "failed to alloc pinctrl groups\n");
++	/*
++	 * allocate groups and name buffers for unnamed groups.
++	 */
++	size = pctl->num_groups * sizeof(*pctl->groups) + noname * 8;
++	p = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
++	if (!p) {
++		dev_err(&pdev->dev, "failed to alloc group data\n");
+ 		return -ENOMEM;
+ 	}
++	pctl->groups = p;
++	noname_buf = p + pctl->num_groups * sizeof(*pctl->groups);
+ 
+ 	/* assign mpp controls to groups */
+ 	gid = 0;
+@@ -692,15 +701,20 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 
+ 		/* generic mvebu register control maps to a number of groups */
+ 		if (!ctrl->mpp_get && !ctrl->mpp_set) {
++			pctl->groups[gid].name = noname_buf;
+ 			pctl->groups[gid].npins = 1;
++			sprintf(noname_buf, "mpp%d", ctrl->pid+0);
++			noname_buf += 8;
+ 
+ 			for (k = 1; k < ctrl->npins; k++) {
+ 				gid++;
+ 				pctl->groups[gid].gid = gid;
+ 				pctl->groups[gid].ctrl = ctrl;
+-				pctl->groups[gid].name = &ctrl->name[8*k];
++				pctl->groups[gid].name = noname_buf;
+ 				pctl->groups[gid].pins = &ctrl->pins[k];
+ 				pctl->groups[gid].npins = 1;
++				sprintf(noname_buf, "mpp%d", ctrl->pid+k);
++				noname_buf += 8;
+ 			}
  		}
- 	}
--	p = (__be32 *) of_get_property(pdev->dev.of_node, "xlnx,rxcsum", NULL);
--	if (p) {
--		switch (be32_to_cpup(p)) {
-+	ret = of_property_read_u32(pdev->dev.of_node, "xlnx,rxcsum", &value);
-+	if (!ret) {
-+		switch (value) {
- 		case 1:
- 			lp->csum_offload_on_rx_path =
- 				XAE_FEATURE_PARTIAL_RX_CSUM;
-@@ -1574,17 +1574,10 @@ static int axienet_of_probe(struct platform_device *pdev)
- 	 * Here we check for memory allocated for Rx/Tx in the hardware from
- 	 * the device-tree and accordingly set flags.
- 	 */
--	p = (__be32 *) of_get_property(pdev->dev.of_node, "xlnx,rxmem", NULL);
--	if (p)
--		lp->rxmem = be32_to_cpup(p);
--	p = (__be32 *) of_get_property(pdev->dev.of_node, "xlnx,temac-type",
--				       NULL);
--	if (p)
--		lp->temac_type = be32_to_cpup(p);
--	p = (__be32 *) of_get_property(pdev->dev.of_node,
--						"xlnx,phy-type", NULL);
--	if (p)
--		lp->phy_type = be32_to_cpup(p);
-+	of_property_read_u32(pdev->dev.of_node, "xlnx,rxmem", &lp->rxmem);
-+	of_property_read_u32(pdev->dev.of_node, "xlnx,temac-type",
-+					&lp->temac_type);
-+	of_property_read_u32(pdev->dev.of_node, "xlnx,phy-type", &lp->phy_type);
-
- 	/* Find the DMA node, map the DMA registers, and decode the DMA IRQs */
- 	np = of_parse_phandle(pdev->dev.of_node, "axistream-connected", 0);
-@@ -1614,13 +1607,13 @@ static int axienet_of_probe(struct platform_device *pdev)
- 	}
-
- 	/* Retrieve the MAC address */
--	addr = of_get_property(pdev->dev.of_node, "local-mac-address", &size);
--	if ((!addr) || (size != 6)) {
-+	ret = of_property_read_u8_array(pdev->dev.of_node,
-+			"local-mac-address", mac_addr, 6);
-+	if (ret) {
- 		dev_err(&pdev->dev, "could not find MAC address\n");
--		ret = -ENODEV;
- 		goto free_netdev;
- 	}
--	axienet_set_mac_address(ndev, (void *) addr);
-+	axienet_set_mac_address(ndev, (void *) mac_addr);
-
- 	lp->coalesce_count_rx = XAXIDMA_DFT_RX_THRESHOLD;
- 	lp->coalesce_count_tx = XAXIDMA_DFT_TX_THRESHOLD;
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/53eca111/attachment.sig>
+ 		gid++;
+-- 
+1.8.5.3
