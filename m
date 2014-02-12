@@ -1,30 +1,51 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 12 Feb 2014 22:01:07 +0800
-Subject: [PATCH] irqchip: sirf: update copyright years to 2014
-Message-ID: <1392213667-3194-1-git-send-email-21cnbao@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 12 Feb 2014 14:02:53 +0000
+Subject: [PATCH] ARM: mm: cache-l2x0: Check for status property of DT node
+In-Reply-To: <52FB6C49.6010401@samsung.com>
+References: <1392206478-11530-1-git-send-email-tushar.behera@linaro.org>
+ <52FB6C49.6010401@samsung.com>
+Message-ID: <20140212140253.GC25957@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Barry Song <Baohua.Song@csr.com>
+On Wed, Feb 12, 2014 at 12:42:49PM +0000, Tomasz Figa wrote:
+> [making Cc list a bit more comprehensive]
+> 
+> On 12.02.2014 13:01, Tushar Behera wrote:
+> > Currently only the DT node is checked during l2x0 cache initialization,
+> > but it doesn't check the status of the DT node. Thus it gets called
+> > even if the status of DT node for L2 controller is disabled.
+> >
+> > Add explicit check to ensure that L2 cache is initialized only for
+> > desired boards.
+> >
+> > Reported-by: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> > ---
+> >   arch/arm/mm/cache-l2x0.c |    3 +++
+> >   1 file changed, 3 insertions(+)
+> >
+> > diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> > index 7abde2c..f075cb1 100644
+> > --- a/arch/arm/mm/cache-l2x0.c
+> > +++ b/arch/arm/mm/cache-l2x0.c
+> > @@ -978,6 +978,9 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+> >   	if (!np)
+> >   		return -ENODEV;
+> >
+> > +	if (!of_device_is_available(np))
+> > +		return -ENODEV;
+> > +
+> >   	if (of_address_to_resource(np, 0, &res))
+> >   		return -ENODEV;
+> >
+> >
+> 
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/irqchip/irq-sirfsoc.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Looks sensible to me.
 
-diff --git a/drivers/irqchip/irq-sirfsoc.c b/drivers/irqchip/irq-sirfsoc.c
-index 3a070c5..de34fa1 100644
---- a/drivers/irqchip/irq-sirfsoc.c
-+++ b/drivers/irqchip/irq-sirfsoc.c
-@@ -1,7 +1,8 @@
- /*
-  * interrupt controller support for CSR SiRFprimaII
-  *
-- * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
-+ * Copyright (c) 2011 - 2014 Cambridge Silicon Radio Limited, a CSR plc group
-+ * company.
-  *
-  * Licensed under GPLv2 or later.
-  */
--- 
-1.7.9.5
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
