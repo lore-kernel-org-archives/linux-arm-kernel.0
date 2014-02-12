@@ -1,38 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 12 Feb 2014 13:43:32 +0000
-Subject: [PATCH] arm64: smp: Add a memory barrier before we start
- secondary cores
-In-Reply-To: <20140212124717.GL28112@sirena.org.uk>
-References: <1392205594-29186-1-git-send-email-broonie@kernel.org>
- <20140212122727.GB29132@mudshark.cambridge.arm.com>
- <20140212124717.GL28112@sirena.org.uk>
-Message-ID: <20140212134332.GK29702@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 12 Feb 2014 13:46:55 +0000
+Subject: [PATCH v2 0/9] ARM: multi-platform kconfig cleanup and mach-virt
+ removal
+In-Reply-To: <201402121426.41914.arnd@arndb.de>
+References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
+ <201402121426.41914.arnd@arndb.de>
+Message-ID: <20140212134655.GC29132@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 12:47:17PM +0000, Mark Brown wrote:
-> On Wed, Feb 12, 2014 at 12:27:28PM +0000, Will Deacon wrote:
-> > On Wed, Feb 12, 2014 at 11:46:34AM +0000, Mark Brown wrote:
+On Wed, Feb 12, 2014 at 01:26:41PM +0000, Arnd Bergmann wrote:
+> On Tuesday 11 February 2014, Rob Herring wrote:
+> > The previous version [1] was mainly a discussion about v6 vs. v6K.
+> > Several platforms have this wrong and incorrectly select v6 when the
+> > more optimal v6K option could be used. After more research, my memory
+> > about i.MX31 was wrong and it does need to remain v6.
 > 
-> > > Ensure that memory writes will be visible to the newly started core by
-> > > inserting a write barrier prior to starting. This adds robustness against
-> > > possible incomplete synchronisation of state.
-> 
-> > This is very vague. I still don't understand what this is being used for.
-> 
-> Me either to be honest, I wasn't entirely sure why Catalin had suggested
-> it.
+> Just curious: do you have more information on this? Are all i.MX31 ARMv6
+> and all i.MX35 v6k as the current Kconfig claims,  or is it more
+> complicated?
 
-Just in case some other CPU reads cpu_online mask (which is set before
-complete) and also expects the topology to be up to date for that CPU.
+Slightly tangential, but the one to watch out for is 1136. Prior to r1 (i.e.
+r0pX), it is v6 but r1pX+ are v6k (without SMP).
 
-> > Without a concrete example of precisely why this is required, I'm not at all
-> > happy taking patches adding random memory barriers.
-> 
-> That's fine by me, I've no attachment to this.
+> * integrator and realview apparently allow both CPU_V6 and CPU_V6K
+>   to be manually selected. Is that actually the correct behavior
+>   in that both kinds of core tiles exist?
 
-I think we can drop this until Vincent clarifies the synchronisation
-requirements (still wondering whether spinlocks are needed).
+I have 1136 r0p1 on an integrator CP, so I suppose it could also take an
+1136 r1pX without any trouble.
 
--- 
-Catalin
+Will
