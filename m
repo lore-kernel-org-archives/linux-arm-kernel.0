@@ -1,36 +1,37 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 12 Feb 2014 15:17:28 +0530
-Subject: [PATCH] ARM: S3C24XX: Fix typo "CONFIG_CPUS_3C2443"
-In-Reply-To: <1392198068.23759.7.camel@x220>
-References: <1392198068.23759.7.camel@x220>
-Message-ID: <CAK9yfHyXmY52KmKPj6=te829-R83dfM7wB813h=+=zCpzzxobA@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 12 Feb 2014 09:43:39 +0000
+Subject: [PATCH 0/3] arm64: Use pte manipulation functions for THP
+In-Reply-To: <1391696171-8922-1-git-send-email-steve.capper@linaro.org>
+References: <1391696171-8922-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140212094338.GA11325@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 February 2014 15:11, Paul Bolle <pebolle@tiscali.nl> wrote:
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> Untested. This needs testing by people with access to knowledge,
-> compilers, and/or hardware related to CPU_S3C2443. I'm not one of them.
->
->  arch/arm/mach-s3c24xx/common.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
-> index 4adaa4b..1d77d70 100644
-> --- a/arch/arm/mach-s3c24xx/common.c
-> +++ b/arch/arm/mach-s3c24xx/common.c
-> @@ -484,7 +484,7 @@ struct platform_device s3c2440_device_dma = {
->  };
->  #endif
->
-> -#if defined(CONFIG_CPUS_3C2443) || defined(CONFIG_CPU_S3C2416)
-> +#if defined(CONFIG_CPU_S3C2443) || defined(CONFIG_CPU_S3C2416)
+On Thu, Feb 06, 2014 at 02:16:08PM +0000, Steve Capper wrote:
+> This series replaces the Transparent HugePage pmd manipulation
+> functions with calls to the standard pte functions. This allows the THP
+> code to take advantage of the new PTE_WRITE logic, and provides better
+> parity with the HugeTLB code (which already uses the pte functions).
+> 
+> Testing was done on the Fast Model with LTP THP tests, and the 3.14-rc1
+> kernel was used.
 
-This is definitely a typo and the current fix looks good.
+Hi,
+Does this series look reasonable?
 
-Reviewed-by: Sachin Kamat <sachin.kamat@linaro.org>
-
+Thanks,
 -- 
-With warm regards,
-Sachin
+Steve
+
+> 
+> Steve Capper (3):
+>   arm64: mm: Remove PMD_BIT_FUNC macro
+>   arm64: mm: Route pmd thp functions through pte equivalents
+>   arm64: mm: Correct definition of pmd_mknotpresent
+> 
+>  arch/arm64/include/asm/pgtable.h | 91 +++++++++++++++++++++++++++-------------
+>  1 file changed, 62 insertions(+), 29 deletions(-)
+> 
+> -- 
+> 1.8.1.4
+> 
