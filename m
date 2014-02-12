@@ -1,96 +1,58 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 12 Feb 2014 16:59:23 +0100
-Subject: [PATCH v3 00/13] pinctrl: mvebu: restructure resource allocation
-In-Reply-To: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Wed, 12 Feb 2014 16:59:25 +0100
+Subject: [PATCH v3 02/13] pinctrl: mvebu: remove obsolete per-control name
+ buffer allocation
+In-Reply-To: <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1392220776-30851-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set restructures the common pinctrl driver part of mvebu
-to allow SoC specific controls to handle their own resources. Currently,
-the common driver maps a single resource passed by DT while the SoC
-specific controls cannot access that resource. To achieve the removal
-of knowledge of resources in the common driver, we first need to rework
-how SoC specific and common get/set callbacks are handled.
+With the introduction of a global name buffer, we can now remove
+the allocation and preparation of per-control name buffers.
 
-The patch set is based on two patch sets sent earlier [1][2] but drops
-any Dove specific removal of hardcoded addresses. This allows to have
-a clear view on the structural changes now and Dove specific changes
-later on. The Dove specific patches will be re-sent on top of this one,
-as soon as we are all happy with the resource allcation restruturing.
-
-Also, in the meantime, pinctrl driver stubs for new Armada 375/28x have
-been posted [3]. Before any of this patches move to a stable branch, I
-plan to send an updated version comprising the required patches for the
-new SoCs. As the new driver stubs are very much like what we already have
-for Armada 370/XP, let's only discuss the general approach now and add
-the branch dependency and patches later.
-
-Patches 1-3 first deal with the way we handle unnamed "generic" mpp
-controls. Patch 1 consolidates the per-control allocation of name buffers
-to counting unnamed controls first and then allocate a global name buffer
-for all those controls. Patch 2 then removes the now obsolete per-control
-allocation of name buffers. Patch 3 then makes the common driver to
-identify "generic" mpp controls by an empty name and adds some valuable
-comments about that special treatment.
-
-Patch 4 removes passing struct mvebu_mpp_ctrl to the special callback
-as the only relevant information in that struct for the callback is the
-pin number which is passed directly instead.
-
-Patches 5-9 then add some global defines and provide SoC specific
-callbacks even for the "generic" mpp controls. This allows Patch 10 to
-move resource allocation to SoC specific drivers and remove the common
-generic callbacks in Patch 11.
-
-Patches 12-13 finally apply some consolidation and reuse patches to
-Dove SoC driver that are now possible.
-
-The patches are still based on pre-v3.14 but still apply cleanly on
-v3.14-rc2 of course. They are also available on an *unstable* branch at
-
-https://github.com/shesselba/linux-dove.git unstable/mvebu-pinctrl-v3.14_v3
-
-As always they have been tested on Dove, compile-tested for the others,
-and Andrew was so kind to give his Tested-by for common and Kirkwood
-patches.
-
-[1] http://www.spinics.net/lists/arm-kernel/msg303496.html
-[2] lkml.org/lkml/2014/1/27/562
-[3] http://www.spinics.net/lists/arm-kernel/msg306409.html
-
-Sebastian Hesselbarth (13):
-  pinctrl: mvebu: count unnamed controls and allocate name buffer
-  pinctrl: mvebu: remove obsolete per-control name buffer allocation
-  pinctrl: mvebu: identify generic controls by name
-  pinctrl: mvebu: remove passing mvebu_mpp_ctrl to callbacks
-  pinctrl: mvebu: add common mpp reg defines to mvebu pinctrl include
-  pinctrl: mvebu: dove: provide generic mpp callbacks
-  pinctrl: mvebu: kirkwood: provide generic mpp callbacks
-  pinctrl: mvebu: armada-370: provide generic mpp callbacks
-  pinctrl: mvebu: armada-xp: provide generic mpp callbacks
-  pinctrl: mvebu: move resource allocation to SoC specific drivers
-  pinctrl: mvebu: remove common get/set functions
-  pinctrl: mvebu: dove: consolidate auto-numbered pmu mpp ranges
-  pinctrl: mvebu: dove: reuse mpp_{set,get} in pmu callbacks
-
- drivers/pinctrl/mvebu/pinctrl-armada-370.c |  32 ++++++-
- drivers/pinctrl/mvebu/pinctrl-armada-xp.c  |  32 ++++++-
- drivers/pinctrl/mvebu/pinctrl-dove.c       | 145 ++++++++++++++---------------
- drivers/pinctrl/mvebu/pinctrl-kirkwood.c   |  37 +++++++-
- drivers/pinctrl/mvebu/pinctrl-mvebu.c      | 122 ++++++++----------------
- drivers/pinctrl/mvebu/pinctrl-mvebu.h      |  12 ++-
- 6 files changed, 212 insertions(+), 168 deletions(-)
-
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Tested-by: Andrew Lunn <andrew@lunn.ch>
 ---
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Linus Walleij <linus.walleij@linaro.org> 
+Cc: Jason Cooper <jason@lakedaemon.net> 
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Gregory Clement <gregory.clement@free-electrons.com>
 Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
+---
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c | 9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+index d47650fc5119..c0e27e4f8953 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+@@ -636,7 +636,6 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 	pctl->desc.npins = 0;
+ 	for (n = 0; n < soc->ncontrols; n++) {
+ 		struct mvebu_mpp_ctrl *ctrl = &soc->controls[n];
+-		char *names;
+ 
+ 		pctl->desc.npins += ctrl->npins;
+ 		/* initial control pins */
+@@ -654,14 +653,6 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 		}
+ 
+ 		/* generic mvebu register control */
+-		names = devm_kzalloc(&pdev->dev, ctrl->npins * 8, GFP_KERNEL);
+-		if (!names) {
+-			dev_err(&pdev->dev, "failed to alloc mpp names\n");
+-			return -ENOMEM;
+-		}
+-		for (k = 0; k < ctrl->npins; k++)
+-			sprintf(names + 8*k, "mpp%d", ctrl->pid+k);
+-		ctrl->name = names;
+ 		pctl->num_groups += ctrl->npins;
+ 		noname += ctrl->npins;
+ 	}
 -- 
 1.8.5.3
