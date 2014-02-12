@@ -1,38 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Feb 2014 14:08:42 +0100
-Subject: [PATCH v2 02/10] ARM: mvebu: add initial support for the Armada
- 375 SOCs
-In-Reply-To: <1392200619-3141-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392200619-3141-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392200619-3141-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <3797172.YJcGPMeT5Y@wuerfel>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Wed, 12 Feb 2014 14:09:38 +0100
+Subject: [PATCH] perf: ARM64: wire up perf_regs and unwind support
+In-Reply-To: <1391451427-31221-1-git-send-email-jean.pihet@linaro.org>
+References: <1391451427-31221-1-git-send-email-jean.pihet@linaro.org>
+Message-ID: <20140212130938.GA7624@krava.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 February 2014 11:23:31 Thomas Petazzoni wrote:
-> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On Mon, Feb 03, 2014 at 07:17:07PM +0100, Jean Pihet wrote:
+> This patch hooks in the perf_regs and libunwind code for ARM64.
+> The tools/perf/arch/arm64 is created; it contains the arch specific
+> code for DWARF unwinding.
 > 
-> This commit adds the basic support for the Armada 375 SOCs. These SoCs
-> share most of their IP with the Armada 370/XP SoCs. The main
-> difference is the use of a Cortex A9 CPU instead of the PJ4B CPU. The
-> interrupt controller and the L2 cache controller are also different
-> they are respectively the GIC and the PL310.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  .../devicetree/bindings/arm/armada-375.txt         |  9 +++++
->  arch/arm/mach-mvebu/Kconfig                        | 15 ++++++++
->  arch/arm/mach-mvebu/Makefile                       |  1 +
->  arch/arm/mach-mvebu/armada-375.c                   | 44 ++++++++++++++++++++++
+> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-I don't know what the outcome was for the first version, but just
-for the record, I would prefer merging the board file into armada-370-xp.c
-without renaming that file. Keeping the separate Kconfig entry makes sense
-because we want to select different options there. If you have differences
-between the implementations (so far the 370/xp code should just work
-on 375), you can use a combination of if(IS_ENABLED(CONFIG_*)) and
-if(machine_is_compatible()) to do the detection but keep a common
-dt_compat list.
+SNIP
 
-	Arnd
+> + */
+> +const char *get_arch_regstr(unsigned int n)
+> +{
+> +	const struct pt_regs_dwarfnum *roff;
+> +	for (roff = regdwarfnum_table; roff->name != NULL; roff++)
+> +		if (roff->dwarfnum == n)
+> +			return roff->name;
+> +	return NULL;
+> +}
+> diff --git a/tools/perf/arch/arm64/util/unwind.c b/tools/perf/arch/arm64/util/unwind.c
+> new file mode 100644
+> index 0000000..8d37a4c
+> --- /dev/null
+> +++ b/tools/perf/arch/arm64/util/unwind.c
+> @@ -0,0 +1,82 @@
+> +
+> +#include <errno.h>
+> +#include <libunwind.h>
+> +#include "perf_regs.h"
+> +#include "../../util/unwind.h"
+> +
+> +int unwind__arch_reg_id(int regnum)
+
+
+I think this ^^^ wouldn't compile over acme/perf/core, bacause of
+the recent code changes for the libdw unwind:
+
+1d86598 perf callchain: Rename unwind__arch_reg_id into libunwind__arch_reg_id
+
+jirka
