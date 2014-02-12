@@ -1,55 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Feb 2014 18:10:15 +0000
-Subject: [PATCH 2/3] PCI: ARM: add support for virtual PCI host controller
-In-Reply-To: <20140207175410.GC16263@obsidianresearch.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <3460536.Sh23gjDa6X@wuerfel>
- <20140205190947.GA22297@mudshark.cambridge.arm.com>
- <3724624.kd9jZNUiTF@wuerfel>
- <20140207114607.GE5976@mudshark.cambridge.arm.com>
- <20140207175410.GC16263@obsidianresearch.com>
-Message-ID: <20140212181015.GJ29132@mudshark.cambridge.arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Feb 2014 10:13:59 -0800
+Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
+In-Reply-To: <20140212174554.GM27395@titan.lakedaemon.net>
+References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
+ <201402121251.06280.arnd@arndb.de>
+ <20140212174554.GM27395@titan.lakedaemon.net>
+Message-ID: <CAOesGMgNkdxW4znmns10-DPc4+OTWJLyx2fcJGTgdND6pp0zUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 05:54:10PM +0000, Jason Gunthorpe wrote:
-> On Fri, Feb 07, 2014 at 11:46:07AM +0000, Will Deacon wrote:
-> 
-> > > In practice, there can be various ways that a system requires something
-> > > more complex:
-> > > 
-> > > * You can have a memory space range that puts PCI bus address zero
-> > >   at the start of the pci->mem resource. In this case, you have
-> > >   mem_offset = pci->mem.start. We should probably try not to do
-> > >   this, but there is existing hardware doing it.
-> > 
-> > If it's not the common case, then the generic driver might not need to care
-> > (at least, initially).
-> 
-> Something to think about, other people are going to reference this
-> driver when writing drivers for their own hardware, it would be nice
-> to see it perfect..
-> 
-> AFAIK, the job is fairly simple, when you call pci_add_resource_offset
-> for memory compute the offset from 
->   of_pci_range.pci_addr - of_pci_range.cpu_addr
-> 
-> (or is it the other way around ?)
+On Wed, Feb 12, 2014 at 9:45 AM, Jason Cooper <jason@lakedaemon.net> wrote:
 
-I think it's the other way round: bus = cpu - offset, then Arnd's example of
-PCI bus 0 works out as: 0 = cpu - pci->mem_start.
+> I brought this up at last weeks devicetree irc meeting.  My goal is to
+> provide early randomness for kaslr on ARM.  Currently, my idea is modify
+> the init script to save an additional random seed from /dev/urandom to
+> /boot/random-seed.
+>
+> The bootloader would then load this file into ram, and pass the
+> address/size to the kernel either via dt, or commandline.  kaslr (run in
+> the decompressor) would consume some of this randomness, and then
+> random.c would consume the rest in a non-crediting initialization.
+>
+> While not ideal, it works in absence of an HRNG, and is no worse than
+> the current situation of storing the seed in /var/lib/misc/random-seed.
+> It also doesn't require modification of the bootloaders.  Just an
+> updated kernel, and update the bootloader environment to load the
+> seed.
 
-I added that to my driver, but I get some weird looking bus addresses in
-dmesg:
+Hmm. There are some drawbacks with this -- it assumes you can "just
+update the bootloader environment" which in general isn't easy to do.
+Also, you can't assume that /boot is writable or exists on all
+embedded systems.
 
-[    0.307585] pci-arm-generic 40000000.pci: PCI host bridge to bus 0000:00
-[    0.307601] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
-[    0.307615] pci_bus 0000:00: root bus resource [mem 0x00000000-0x3effffff] (bus address [0xffffffffbf000000-0xfffffffffdffffff])
+In general, taking both runtime and system-dependend data and using
+that to see entropy is a good idea. For example, device trees that
+contain serial numbers and mac addresses for the individual system. I
+think x86 feeds the DMI table in for similar purposes.
 
-Looking at drivers/pci/probe.c, it seems to think that res->start - offset
-gives a bus address, which implies that the resources are indeed *CPU*
-addresses.
+If that can be amended on some systems with a runtime seed (from
+/boot), that's good but we can't rely on it.
 
-Are you sure pci_add_resource_offset wants bus addresses?
 
-Will
+-Olof
