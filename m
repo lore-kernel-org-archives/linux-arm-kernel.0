@@ -1,94 +1,36 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 12 Feb 2014 12:30:33 +0000
-Subject: [PATCH 00/12] Versatile Express updates
-In-Reply-To: <2782419.lfJiZZjaFg@wuerfel>
-References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
- <2782419.lfJiZZjaFg@wuerfel>
-Message-ID: <1392208233.848.48.camel@hornet>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 12 Feb 2014 12:34:32 +0000
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20140212102716.GE29702@arm.com>
+References: <1392037324-5069-1-git-send-email-broonie@kernel.org>
+ <20140210162230.GK25305@arm.com>
+ <20140210164647.GB13533@sirena.org.uk>
+ <CAKfTPtDih6n5ckhXUgNKrbw5EFt45uuQFFPKB2aN0NGGG96Pmg@mail.gmail.com>
+ <20140211103428.GC8693@mudshark.cambridge.arm.com>
+ <CAKfTPtDjF2bZsoj+tgBH-ZXYXNbXQ2mBie0FVgUy2vb_jY12FQ@mail.gmail.com>
+ <20140211140749.GE3748@arm.com>
+ <CAKfTPtATfnjP7R4ABSu_GDEYkVe3W6N2HU-ZkrQmT=nF31U4GA@mail.gmail.com>
+ <20140212102716.GE29702@arm.com>
+Message-ID: <20140212123432.GK28112@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-02-11 at 19:28 +0000, Arnd Bergmann wrote:
-> On Tuesday 11 February 2014 17:10:24 Pawel Moll wrote:
-> > This series is a set of updates following the infrastructure
-> > rework and depends on it. It will be finally posted once
-> > the main series is merged. For the time being I would really
-> > appreciate feedback and/or (n)acks...
-> 
-> I haven't read the patches yet, but on a general level, do
-> you think this code can be (or should) be shared with
-> mach-versatile and mach-realview?
+On Wed, Feb 12, 2014 at 10:27:16AM +0000, Catalin Marinas wrote:
+> On Wed, Feb 12, 2014 at 08:04:54AM +0000, Vincent Guittot wrote:
 
-Haven't worked with the old ones too much, I just had a look at a couple
-of TRMs... The sysregs look similar, don't they? Deceitfully
-similar... ;-)
+> > The fields will be used to construct topology so we must ensure their
+> > visibility
 
-Let me start from the VE side and classify the registers into functional
-groups, looking at them from a MFD cells point of view:
+> I wonder whether you need spinlocks around the topology updating code.
 
-- general ID registers like SYS_ID, SYS_MISC, SYS_PROCIDx - either not
-really useful for drivers or different bitmasks if needed (eg. the
-MASTERSITE bit in SYS_MISC); in other words - good candidates for syscon
-if at all interesting
-
-- de-facto GPIO registers like SYS_LED, SYS_MCI, SYS_FLASH - easily
-covered via "basic-mmio-gpio" driver; can be simply exposed in the tree
-as subnodes
-
-- flags (SYS_*FLAGS*) - used pretty much only for SMP booting; that's
-where, I believe, we could unify and move the DT-based operations into
-plat_versatile; it is too early for the device model though, so out of
-the sysreg driver scope, really (even if the code lives here for now)
-
-- counters (SYS_100HZ, SYS_24MHZ) - the 24MHz one is used on some of the
-platforms as a sched clock source; in the fourth patch of the second
-series I moved it out into drivers/clocksource - it could be easily
-generalised and used across more platforms, but again - it's early code,
-so out of sysreg driver scope
-
-- system configuration (SYS_CFG*) - that's the main difference between
-VE and its predecessors; the older seem to provide separate system
-registers to control infrastructure like clocks etc. (eg. SYS_OSC* on
-the realview boards), while here we have the (whatever you call it ;-)
-config bus
-
-- other registers that are currently not used at all, but most of them
-differ either in naming (and location) or in offset.
-
-All this leads, I believe, to conclusion that they definitely deserve
-different compatible values. Therefore they would also require different
-mfdcells definitions. Of course we could have more than one in a single
-file and pick one via matching table but:
-
-1. There is always that little "extra" (like the master site
-configuration on VE, which doesn't happen on the previous ones)
-
-2. I'd rather not to have the non-VE stuff in arm64 kernel.
-
-So, to summarize, I think we need separate files for at least main
-families of the sysreg drivers (I didn't spent enough time on this to be
-able to find commonalities and differences inside realview and versatile
-families), but try to share as much as possible of the "functional"
-drivers (with the sched clock and the smp operations being the most
-obvious candidates).
-
-> One of the things on my (mid-term) to-do list is to completely
-> convert those two platforms over to being entirely DT based
-> and having no board specific code so we can actually delete
-> the directories along with mach-vexpress
-
-And I sympathise with this goal :-) (interestingly Olof in the past
-expressed strong and opposite opinion in the subject ;-)
-
-If you have a look at the last patch of the second series, you'll find
-that what's left in the VEXPRESS_DT machine are smp operations and
-l2x0_of_init. Then, assuming that we finally get some answer to the CLCD
-problem (latest in this subject happened here:
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/268037 - I really
-lost all hopes for CDF getting anywhere...) removal of the non-DT code
-is a matter of a single patch (and a massive negative stat :-). From
-there there's only a bunch of PM-related files in arch/arm/mach-vexpress
-that I guess could be moved somewhere else (that's what Olof didn't
-really like).
-
-Pawel
+It certainly feels a lot safer to have them; if we can't convince
+ourselves that the code is safe without them then there's very little
+cost in having them so we may as well err on the side of doing that -
+does that seem reasonable?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/a4dd9428/attachment.sig>
