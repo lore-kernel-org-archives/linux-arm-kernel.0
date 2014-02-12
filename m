@@ -1,86 +1,94 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 12 Feb 2014 20:28:39 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Do not place regulator nodes
- under simple-bus
-In-Reply-To: <20140212095450.GB21992@e106331-lin.cambridge.arm.com>
-References: <1392165078-25794-1-git-send-email-festevam@gmail.com>
- <20140212092227.GA24834@S2101-09.ap.freescale.net>
- <20140212095450.GB21992@e106331-lin.cambridge.arm.com>
-Message-ID: <20140212122837.GD24834@S2101-09.ap.freescale.net>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 12 Feb 2014 12:30:33 +0000
+Subject: [PATCH 00/12] Versatile Express updates
+In-Reply-To: <2782419.lfJiZZjaFg@wuerfel>
+References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
+ <2782419.lfJiZZjaFg@wuerfel>
+Message-ID: <1392208233.848.48.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 09:54:50AM +0000, Mark Rutland wrote:
-> > I take it as an unnecessary churn, unless I see the consensus from most
-> > of DT maintainers and arm-soc folks that we should make this change.
-> > And see comment below ...
+On Tue, 2014-02-11 at 19:28 +0000, Arnd Bergmann wrote:
+> On Tuesday 11 February 2014 17:10:24 Pawel Moll wrote:
+> > This series is a set of updates following the infrastructure
+> > rework and depends on it. It will be finally posted once
+> > the main series is merged. For the time being I would really
+> > appreciate feedback and/or (n)acks...
 > 
-> My concern is that the simple-bus is being used in a nonsensical way,
-> with a meaningless address space and reg values on children. While this
-> currently works it is not correct, and it's not even necessary. I would
-> like to limit the misuse of these constructs so as to prevent others
-> from making the same mistakes.
+> I haven't read the patches yet, but on a general level, do
+> you think this code can be (or should) be shared with
+> mach-versatile and mach-realview?
 
-Unfortunately, it's already been used quite widely.  This is not IMX
-specific, and you can grep arch/arm/boot/dts to get the idea.  I'm not
-sure if it's worth the churn to 'fix' it.  In these days, arm-soc folks
-are quite sensitive to the number of IMX patches and change sets.  50
-LOC change for one board dts, and we now have ~70 files for IMX.  That's
-why I would like to get the agreement from arm-soc folks that we should
-really make such change. 
+Haven't worked with the old ones too much, I just had a look at a couple
+of TRMs... The sysregs look similar, don't they? Deceitfully
+similar... ;-)
 
-> 
-> > 
-> > > 
-> > >  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 51 ++++++++++++++--------------------
-> > >  1 file changed, 21 insertions(+), 30 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > > index 0d816d3..d7df5b2 100644
-> > > --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > > +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> > > @@ -18,38 +18,29 @@
-> > >  		reg = <0x10000000 0x40000000>;
-> > >  	};
-> > >  
-> > > -	regulators {
-> > > -		compatible = "simple-bus";
-> > > -		#address-cells = <1>;
-> > > -		#size-cells = <0>;
-> > > -
-> > > -		reg_usb_otg_vbus: regulator at 0 {
-> > > -			compatible = "regulator-fixed";
-> > > -			reg = <0>;
-> > > -			regulator-name = "usb_otg_vbus";
-> > > -			regulator-min-microvolt = <5000000>;
-> > > -			regulator-max-microvolt = <5000000>;
-> > > -			gpio = <&gpio3 22 0>;
-> > > -			enable-active-high;
-> > > -		};
-> > > +	reg_usb_otg_vbus: regulator at 0 {
-> > 
-> > nodename at num should only be used for nodes that have 'reg' property.
-> > Why are you dropping 'reg' property here?  Right, it does not compile if
-> > you do not drop it.  You can take it as a reason of why I endorse
-> > simple-bus regulators container.
-> 
-> I don't think the logical jump from "it does not compile" to "I endorse
-> simple-bus regulators container" makes any sense. They're two separate
-> issues.
+Let me start from the VE side and classify the registers into functional
+groups, looking at them from a MFD cells point of view:
 
-You're right :)
+- general ID registers like SYS_ID, SYS_MISC, SYS_PROCIDx - either not
+really useful for drivers or different bitmasks if needed (eg. the
+MASTERSITE bit in SYS_MISC); in other words - good candidates for syscon
+if at all interesting
 
-> 
-> The unit-addresses and reg values can be dropped. They are not in the
-> regulator-fixed binding, and were never necessary. All that's necessary
-> is a unique name, and unit-addresses (which required a reg) were misused
-> to provide uniqueness. With that fixed, this will compile.
+- de-facto GPIO registers like SYS_LED, SYS_MCI, SYS_FLASH - easily
+covered via "basic-mmio-gpio" driver; can be simply exposed in the tree
+as subnodes
 
-IIRC, ePAPR recommends to use generic node name and have
-unit-addresses for uniqueness.  That's why I sent patch [1] to follow
-the way that tegra and other platforms names them.  Now you're
-suggesting to go back?
+- flags (SYS_*FLAGS*) - used pretty much only for SMP booting; that's
+where, I believe, we could unify and move the DT-based operations into
+plat_versatile; it is too early for the device model though, so out of
+the sysreg driver scope, really (even if the code lives here for now)
 
-Shawn
+- counters (SYS_100HZ, SYS_24MHZ) - the 24MHz one is used on some of the
+platforms as a sched clock source; in the fourth patch of the second
+series I moved it out into drivers/clocksource - it could be easily
+generalised and used across more platforms, but again - it's early code,
+so out of sysreg driver scope
 
-[1] http://www.spinics.net/lists/arm-kernel/msg284474.html
+- system configuration (SYS_CFG*) - that's the main difference between
+VE and its predecessors; the older seem to provide separate system
+registers to control infrastructure like clocks etc. (eg. SYS_OSC* on
+the realview boards), while here we have the (whatever you call it ;-)
+config bus
+
+- other registers that are currently not used at all, but most of them
+differ either in naming (and location) or in offset.
+
+All this leads, I believe, to conclusion that they definitely deserve
+different compatible values. Therefore they would also require different
+mfdcells definitions. Of course we could have more than one in a single
+file and pick one via matching table but:
+
+1. There is always that little "extra" (like the master site
+configuration on VE, which doesn't happen on the previous ones)
+
+2. I'd rather not to have the non-VE stuff in arm64 kernel.
+
+So, to summarize, I think we need separate files for at least main
+families of the sysreg drivers (I didn't spent enough time on this to be
+able to find commonalities and differences inside realview and versatile
+families), but try to share as much as possible of the "functional"
+drivers (with the sched clock and the smp operations being the most
+obvious candidates).
+
+> One of the things on my (mid-term) to-do list is to completely
+> convert those two platforms over to being entirely DT based
+> and having no board specific code so we can actually delete
+> the directories along with mach-vexpress
+
+And I sympathise with this goal :-) (interestingly Olof in the past
+expressed strong and opposite opinion in the subject ;-)
+
+If you have a look at the last patch of the second series, you'll find
+that what's left in the VEXPRESS_DT machine are smp operations and
+l2x0_of_init. Then, assuming that we finally get some answer to the CLCD
+problem (latest in this subject happened here:
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/268037 - I really
+lost all hopes for CDF getting anywhere...) removal of the non-DT code
+is a matter of a single patch (and a massive negative stat :-). From
+there there's only a bunch of PM-related files in arch/arm/mach-vexpress
+that I guess could be moved somewhere else (that's what Olof didn't
+really like).
+
+Pawel
