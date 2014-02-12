@@ -1,35 +1,55 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 12 Feb 2014 23:20:52 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Do not place regulator nodes
- under simple-bus
-In-Reply-To: <20140212135736.GB25957@e106331-lin.cambridge.arm.com>
-References: <1392165078-25794-1-git-send-email-festevam@gmail.com>
- <20140212092227.GA24834@S2101-09.ap.freescale.net>
- <20140212095450.GB21992@e106331-lin.cambridge.arm.com>
- <20140212122837.GD24834@S2101-09.ap.freescale.net>
- <20140212135736.GB25957@e106331-lin.cambridge.arm.com>
-Message-ID: <20140212152050.GA28749@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Feb 2014 16:35:28 +0100
+Subject: [PATCH] gpio: mvebu: use chained_irq_{enter,
+ exit} for GIC compatibility
+In-Reply-To: <1391772559-28357-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1391772559-28357-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CACRpkdbAD-mdRJ0H6LVGkyf2novmMGvADY0bi=uxdTC9vF6w+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 01:57:36PM +0000, Mark Rutland wrote:
-> As it stands, the dts are buggy. I can appreciate that you don't feel
-> this is important, but I do. It's not just an IMX issue, there is
-> widespread misunderstanding and abuse of simple-bus.
-> 
-> Said abuse is relying on current Linux implementation details, and that
-> can and will create problems if and when probing code is changed.
+On Fri, Feb 7, 2014 at 12:29 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
 
-The reality is the code already gets no chance to change on this regard,
-considering the requirement that we need to maintain the interface
-between kernel and DT as ABI.  The dts have been there like this for
-10 kernel releases or so.
+> On currently supported SoCs, the GPIO block used on Marvell EBU SoCs
+> is always connected to the Marvell MPIC. However, we are going to
+> introduce the support for newer Marvell EBU SoCs that use the
+> Cortex-A9 core, and therefore use the GIC as their main interrupt
+> controller, to which the GPIO block controlled by the gpio-mvebu
+> driver is connected.
+>
+> The GIC interrupt controller driver uses the fasteoi flow handler. In
+> order to ensure that the eoi hook of the GIC driver gets called, the
+> GPIO driver should call chained_irq_enter() and chained_irq_exit() in
+> its handler. Without this, the first GPIO interrupt locks up the
+> system because it doesn't get acked at the GIC level.
+>
+> This change is similar to for example commit
+> 0d978eb7349941139241a99acf05de6dd49b78d1 ("gpio: davinci: use
+> chained_irq_enter/chained_irq_exit API").
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-> There's no good reason for abusing the binding when we can get it right
-> today.
+That's right. Patch applied (w/Jason's ACK).
 
-As I said from the beginning, though I personally take it as a churn, I
-will still be happy take the change, as long as my upstream folks are
-also fine with it.
+Now a bigger question: isn't this something that basically *all* GPIO
+drivers supporting IRQs should be doing? I think they are basically
+all cascaded.
 
-Shawn
+When I grep drivers/gpio/* I see a lot of weird stuff. For example
+drivers like gpio-ep93xx that uses irq_set_chained_handler()
+but never calls chained_irq_[enter|exit]().
+
+I sense a need of cleanup. Ultimately I want to move a
+generic irq_chip into gpiolib, implement this with necessary callbacks
+there and try to move drivers over to using that central irqchip
+mechanism. But maybe I'm not seeing the irq subsystem in all
+its complex glory so this may be a pipe dream.
+
+I'm actually a bit uncertain about the semantics here so I'm
+asking you for some advice ...
+
+Ideas?
+
+Yours,
+Linus Walleij
