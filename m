@@ -1,97 +1,57 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 12 Feb 2014 11:23:31 +0100
-Subject: [PATCH v2 02/10] ARM: mvebu: add initial support for the Armada 375
- SOCs
+Date: Wed, 12 Feb 2014 11:23:33 +0100
+Subject: [PATCH v2 04/10] ARM: mvebu: add Device Tree description of the
+ Armada 375 SoC
 In-Reply-To: <1392200619-3141-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1392200619-3141-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1392200619-3141-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1392200619-3141-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-This commit adds the basic support for the Armada 375 SOCs. These SoCs
-share most of their IP with the Armada 370/XP SoCs. The main
-difference is the use of a Cortex A9 CPU instead of the PJ4B CPU. The
-interrupt controller and the L2 cache controller are also different
-they are respectively the GIC and the PL310.
+The Armada 375 SoC is a new SoC from Marvell, based on a dual core
+Cortex-A9 and a number of hardware blocks that are common with earlier
+SoCs from the mvebu family.
+
+The provided Device Tree describes the following parts of the SoC:
+
+ * CPUs
+ * Device Bus
+ * Clocks
+ * Interrupt controllers: GIC and MPIC
+ * GPIO controllers
+ * I2C buses
+ * L2 cache
+ * MBus controller
+ * SDIO
+ * Pinctrl
+ * SATA
+ * Serial
+ * SPI buses
+ * System controller (for reboot)
+ * Timer
+ * XOR engines
+ * PCIe controllers
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../devicetree/bindings/arm/armada-375.txt         |  9 +++++
- arch/arm/mach-mvebu/Kconfig                        | 15 ++++++++
- arch/arm/mach-mvebu/Makefile                       |  1 +
- arch/arm/mach-mvebu/armada-375.c                   | 44 ++++++++++++++++++++++
- 4 files changed, 69 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/armada-375.txt
- create mode 100644 arch/arm/mach-mvebu/armada-375.c
+ arch/arm/boot/dts/armada-375.dtsi | 439 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 439 insertions(+)
+ create mode 100644 arch/arm/boot/dts/armada-375.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-375.txt b/Documentation/devicetree/bindings/arm/armada-375.txt
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
 new file mode 100644
-index 0000000..867d0b8
+index 0000000..31de4bf
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/armada-375.txt
-@@ -0,0 +1,9 @@
-+Marvell Armada 375 Platforms Device Tree Bindings
-+-------------------------------------------------
-+
-+Boards with a SoC of the Marvell Armada 375 family shall have the
-+following property:
-+
-+Required root node property:
-+
-+compatible: must contain "marvell,armada375"
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 5e269d7..3aefdcd 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -37,6 +37,21 @@ config MACH_ARMADA_370
- 	  Say 'Y' here if you want your kernel to support boards based
- 	  on the Marvell Armada 370 SoC with device tree.
- 
-+config MACH_ARMADA_375
-+	bool "Marvell Armada 375 boards"
-+	select ARM_ERRATA_720789
-+	select ARM_ERRATA_753970
-+	select ARM_GIC
-+	select ARMADA_370_XP_TIMER
-+	select ARMADA_375_CLK
-+	select CACHE_L2X0
-+	select CPU_V7
-+	select NEON
-+	select PINCTRL_ARMADA_375
-+	help
-+	  Say 'Y' here if you want your kernel to support boards based
-+	  on the Marvell Armada 375 SoC with device tree.
-+
- config MACH_ARMADA_XP
- 	bool "Marvell Armada XP boards"
- 	select ARMADA_XP_CLK
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 878aebe..9862e0f 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -5,6 +5,7 @@ AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
- 
- obj-y				 += system-controller.o mvebu-soc-id.o
- obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o
-+obj-$(CONFIG_MACH_ARMADA_375)    += armada-375.o
- obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
- obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
-diff --git a/arch/arm/mach-mvebu/armada-375.c b/arch/arm/mach-mvebu/armada-375.c
-new file mode 100644
-index 0000000..f13c9de
---- /dev/null
-+++ b/arch/arm/mach-mvebu/armada-375.c
-@@ -0,0 +1,44 @@
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -0,0 +1,439 @@
 +/*
-+ * Device Tree support for Armada 375 platforms.
++ * Device Tree Include file for Marvell Armada 375 family SoC
 + *
 + * Copyright (C) 2014 Marvell
 + *
-+ * Lior Amsalem <alior@marvell.com>
 + * Gregory CLEMENT <gregory.clement@free-electrons.com>
 + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 + *
@@ -100,35 +60,431 @@ index 0000000..f13c9de
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <linux/clocksource.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/mbus.h>
-+#include <asm/hardware/cache-l2x0.h>
-+#include <asm/mach/arch.h>
-+#include "common.h"
++/include/ "skeleton.dtsi"
 +
-+static void __init armada_375_timer_and_clk_init(void)
-+{
-+	of_clk_init(NULL);
-+	clocksource_of_init();
-+	BUG_ON(mvebu_mbus_dt_init());
-+	l2x0_of_init(0, ~0UL);
-+}
++#define MBUS_ID(target,attributes) (((target) << 24) | ((attributes) << 16))
 +
-+static const char * const armada_375_dt_compat[] = {
-+	"marvell,armada375",
-+	NULL,
++/ {
++	model = "Marvell Armada 375 family SoC";
++	compatible = "marvell,armada375";
++
++	aliases {
++		gpio0 = &gpio0;
++		gpio1 = &gpio1;
++		gpio2 = &gpio2;
++	};
++
++	clocks {
++		/* 2 GHz fixed main PLL */
++		mainpll: mainpll {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <2000000000>;
++		};
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0>;
++		};
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <1>;
++		};
++	};
++
++	soc {
++		compatible = "marvell,armada375-mbus", "marvell,armada370-mbus", "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <1>;
++		controller = <&mbusc>;
++		interrupt-parent = <&gic>;
++		pcie-mem-aperture = <0xe0000000 0x8000000>;
++		pcie-io-aperture  = <0xe8000000 0x100000>;
++
++		bootrom {
++			compatible = "marvell,bootrom";
++			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
++		};
++
++		devbus-bootcs {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10400 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs0 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10408 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x3e) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs1 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10410 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x3d) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs2 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10418 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x3b) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs3 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <MBUS_ID(0xf0, 0x01) 0x10420 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x37) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		internal-regs {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
++
++			L2: cache-controller at 8000 {
++				compatible = "arm,pl310-cache";
++				reg = <0x8000 0x1000>;
++				cache-unified;
++				cache-level = <2>;
++			};
++
++			timer at c600 {
++				compatible = "arm,cortex-a9-twd-timer";
++				reg = <0xc600 0x20>;
++				interrupts = <1 13 0x301>;
++				clocks = <&coreclk 2>;
++			};
++
++			gic: interrupt-controller at d000 {
++				compatible = "arm,cortex-a9-gic";
++				#interrupt-cells = <3>;
++				#size-cells = <0>;
++				interrupt-controller;
++				reg = <0xd000 0x1000>,
++				      <0xc100 0x100>;
++			};
++
++			spi0: spi at 10600 {
++				compatible = "marvell,orion-spi";
++				reg = <0x10600 0x50>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				cell-index = <0>;
++				interrupts = <0 1 0x4>;
++				clocks = <&coreclk 0>;
++				status = "disabled";
++			};
++
++			spi1: spi at 10680 {
++				compatible = "marvell,orion-spi";
++				reg = <0x10680 0x50>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				cell-index = <1>;
++				interrupts = <0 63 0x4>;
++				clocks = <&coreclk 0>;
++				status = "disabled";
++			};
++
++			i2c0: i2c at 11000 {
++				compatible = "marvell,mv64xxx-i2c";
++				reg = <0x11000 0x20>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				interrupts = <0 2 0x4>;
++				timeout-ms = <1000>;
++				clocks = <&coreclk 0>;
++				status = "disabled";
++			};
++
++			i2c1: i2c at 11100 {
++				compatible = "marvell,mv64xxx-i2c";
++				reg = <0x11100 0x20>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				interrupts = <0 3 0x4>;
++				timeout-ms = <1000>;
++				clocks = <&coreclk 0>;
++				status = "disabled";
++			};
++
++			serial at 12000 {
++				compatible = "snps,dw-apb-uart";
++				reg = <0x12000 0x100>;
++				reg-shift = <2>;
++				interrupts = <0 12 4>;
++				reg-io-width = <1>;
++				status = "disabled";
++			};
++
++			serial at 12100 {
++				compatible = "snps,dw-apb-uart";
++				reg = <0x12100 0x100>;
++				reg-shift = <2>;
++				interrupts = <0 13 4>;
++				reg-io-width = <1>;
++				status = "disabled";
++			};
++
++			pinctrl {
++				compatible = "marvell,mv88f6720-pinctrl";
++				reg = <0x18000 0x24>;
++
++				i2c0_pins: i2c0-pins {
++					marvell,pins = "mpp14",  "mpp15";
++					marvell,function = "i2c0";
++				};
++
++				i2c1_pins: i2c1-pins {
++					marvell,pins = "mpp61",  "mpp62";
++					marvell,function = "i2c1";
++				};
++
++				sdio_pins: sdio-pins {
++					marvell,pins = "mpp24",  "mpp25", "mpp26",
++						     "mpp27", "mpp28", "mpp29";
++					marvell,function = "sd";
++				};
++
++				spi0_pins: spi0-pins {
++					marvell,pins = "mpp0",  "mpp1", "mpp4",
++						     "mpp5", "mpp8", "mpp9";
++					marvell,function = "spi0";
++				};
++			};
++
++			gpio0: gpio at 18100 {
++				compatible = "marvell,orion-gpio";
++				reg = <0x18100 0x40>;
++				ngpios = <32>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				interrupts = <0 53 0x4>, <0 54 0x4>,
++					     <0 55 0x4>, <0 56 0x4>;
++			};
++
++			gpio1: gpio at 18140 {
++				compatible = "marvell,orion-gpio";
++				reg = <0x18140 0x40>;
++				ngpios = <32>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				interrupts = <0 58 0x4>, <0 59 0x4>,
++					     <0 60 0x4>, <0 61 0x4>;
++			};
++
++			gpio2: gpio at 18180 {
++				compatible = "marvell,orion-gpio";
++				reg = <0x18180 0x40>;
++				ngpios = <3>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				interrupts = <0 62 0x4>;
++			};
++
++			system-controller at 18200 {
++				compatible = "marvell,armada-375-system-controller";
++				reg = <0x18200 0x100>;
++			};
++
++			gateclk: clock-gating-control at 18220 {
++				compatible = "marvell,armada-375-gating-clock";
++				reg = <0x18220 0x4>;
++				clocks = <&coreclk 0>;
++				#clock-cells = <1>;
++			};
++
++			mbusc: mbus-controller at 20000 {
++				compatible = "marvell,mbus-controller";
++				reg = <0x20000 0x100>, <0x20180 0x20>;
++			};
++
++			mpic: interrupt-controller at 20000 {
++				compatible = "marvell,mpic";
++				reg = <0x20a00 0x2d0>, <0x21070 0x58>;
++				#interrupt-cells = <1>;
++				#size-cells = <1>;
++				interrupt-controller;
++				msi-controller;
++				interrupts = <1 15 0x4>;
++			};
++
++			timer at 20300 {
++				compatible = "marvell,armada-375-timer", "marvell,armada-370-timer";
++				reg = <0x20300 0x30>, <0x21040 0x30>;
++				interrupts-extended = <&gic  0  8 4>,
++						      <&gic  0  9 4>,
++						      <&gic  0 10 4>,
++						      <&gic  0 11 4>,
++						      <&mpic 5>,
++						      <&mpic 6>;
++				clocks = <&coreclk 0>;
++			};
++
++			xor at 60800 {
++				compatible = "marvell,orion-xor";
++				reg = <0x60800 0x100
++				       0x60A00 0x100>;
++				clocks = <&gateclk 22>;
++				status = "okay";
++
++				xor00 {
++					interrupts = <0 22 0x4>;
++					dmacap,memcpy;
++					dmacap,xor;
++				};
++				xor01 {
++					interrupts = <0 23 0x4>;
++					dmacap,memcpy;
++					dmacap,xor;
++					dmacap,memset;
++				};
++			};
++
++			xor at 60900 {
++				compatible = "marvell,orion-xor";
++				reg = <0x60900 0x100
++				       0x60b00 0x100>;
++				clocks = <&gateclk 23>;
++				status = "okay";
++
++				xor10 {
++					interrupts = <0 65 0x4>;
++					dmacap,memcpy;
++					dmacap,xor;
++				};
++				xor11 {
++					interrupts = <0 66 0x4>;
++					dmacap,memcpy;
++					dmacap,xor;
++					dmacap,memset;
++				};
++			};
++
++			sata at a0000 {
++				compatible = "marvell,orion-sata";
++				reg = <0xa0000 0x5000>;
++				interrupts = <0 26 0x4>;
++				clocks = <&gateclk 14>, <&gateclk 20>;
++				clock-names = "0", "1";
++				status = "disabled";
++			};
++
++			mvsdio at d4000 {
++				compatible = "marvell,orion-sdio";
++				reg = <0xd4000 0x200>;
++				interrupts = <0 25 0x4>;
++				clocks = <&gateclk 17>;
++				bus-width = <4>;
++				cap-sdio-irq;
++				cap-sd-highspeed;
++				cap-mmc-highspeed;
++				status = "disabled";
++			};
++
++			coreclk: mvebu-sar at e8204 {
++				compatible = "marvell,armada-375-core-clock";
++				reg = <0xe8204 0x04>;
++				#clock-cells = <1>;
++			};
++
++			coredivclk: corediv-clock at e8250 {
++				compatible = "marvell,armada-375-corediv-clock";
++				reg = <0xe8250 0xc>;
++				#clock-cells = <1>;
++				clocks = <&mainpll>;
++				clock-output-names = "nand";
++			};
++		};
++
++		pcie-controller {
++			compatible = "marvell,armada-370-pcie";
++			status = "disabled";
++			device_type = "pci";
++
++			#address-cells = <3>;
++			#size-cells = <2>;
++
++			msi-parent = <&mpic>;
++			bus-range = <0x00 0xff>;
++
++			ranges =
++			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000
++				0x82000000 0 0x44000 MBUS_ID(0xf0, 0x01) 0x44000 0 0x00002000
++				0x82000000 0x1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0 MEM */
++				0x81000000 0x1 0       MBUS_ID(0x04, 0xe0) 0 1 0 /* Port 0 IO  */
++				0x82000000 0x2 0       MBUS_ID(0x04, 0xd8) 0 1 0 /* Port 1 MEM */
++				0x81000000 0x2 0       MBUS_ID(0x04, 0xd0) 0 1 0 /* Port 1 IO  */>;
++
++			pcie at 1,0 {
++				device_type = "pci";
++				assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
++				reg = <0x0800 0 0 0 0>;
++				#address-cells = <3>;
++				#size-cells = <2>;
++				#interrupt-cells = <1>;
++				ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0
++					  0x81000000 0 0 0x81000000 0x1 0 1 0>;
++				interrupt-map-mask = <0 0 0 0>;
++				interrupt-map = <0 0 0 0 &gic 0 29 0x4>;
++				marvell,pcie-port = <0>;
++				marvell,pcie-lane = <0>;
++				clocks = <&gateclk 5>;
++				status = "disabled";
++			};
++
++			pcie at 2,0 {
++				device_type = "pci";
++				assigned-addresses = <0x82000800 0 0x44000 0 0x2000>;
++				reg = <0x1000 0 0 0 0>;
++				#address-cells = <3>;
++				#size-cells = <2>;
++				#interrupt-cells = <1>;
++				ranges = <0x82000000 0 0 0x82000000 0x2 0 1 0
++					  0x81000000 0 0 0x81000000 0x2 0 1 0>;
++				interrupt-map-mask = <0 0 0 0>;
++				interrupt-map = <0 0 0 0 &gic 0 33 0x4>;
++				marvell,pcie-port = <0>;
++				marvell,pcie-lane = <1>;
++				clocks = <&gateclk 6>;
++				status = "disabled";
++			};
++
++		};
++	};
 +};
-+
-+DT_MACHINE_START(ARMADA_375_DT, "Marvell Armada 375 (Device Tree)")
-+	.init_time	= armada_375_timer_and_clk_init,
-+	.restart	= mvebu_restart,
-+	.dt_compat	= armada_375_dt_compat,
-+MACHINE_END
 -- 
 1.8.3.2
