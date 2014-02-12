@@ -1,30 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 12 Feb 2014 17:11:45 +0000
-Subject: [PATCH v2 0/9] ARM: multi-platform kconfig cleanup and mach-virt
- removal
-In-Reply-To: <1726732.KPDAFqxz2K@wuerfel>
-References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
- <20140212134655.GC29132@mudshark.cambridge.arm.com>
- <CAL_JsqJkCXSFJZzRBRTrKh16PoBjvF95uKJbZAic-pk3htf_jg@mail.gmail.com>
- <1726732.KPDAFqxz2K@wuerfel>
-Message-ID: <52FBAB51.4050401@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 12 Feb 2014 09:15:09 -0800
+Subject: [PATCH v3 07/11] watchdog: xilinx: Use of_property_read_u32
+In-Reply-To: <7cbb10853a343c9d488346596f604909ab0668b9.1392212059.git.michal.simek@xilinx.com>
+References: <cover.1392212059.git.michal.simek@xilinx.com>
+ <7cbb10853a343c9d488346596f604909ab0668b9.1392212059.git.michal.simek@xilinx.com>
+Message-ID: <20140212171509.GB20012@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/14 16:53, Arnd Bergmann wrote:
+Hi Michal,
+
+On Wed, Feb 12, 2014 at 02:41:21PM +0100, Michal Simek wrote:
+> Use of_property_read_u32 functions to clean probe function.
 > 
-> On the topic of V6, we don't support CPU_V6T2 at all, though I assume that
-> there is an ARM1156 core tile for integrator and realview, and we support
-> running the V6/V6K parts with MMU turned off. Would all revisions of ARM1156
-> work with CPU_V6K and !MMU?
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+> 
+> Changes in v3:
+> - Remove one if checking and use variable directly
+> 
 
-CPU_V6 and !MMU should work. V6K might, but that requires close
-inspection (WFE, SEV shouldn't be used in UP context)...
+Looks good.
 
-Full disclosure: I happen to have a *brand new*, freshly unwrapped
-ARM1156 core tile for a Versatile EB. All it requires is a victim with
-time on their hand...
+Another comment/remark.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+> -	pfreq = (u32 *)of_get_property(pdev->dev.of_node,
+> -					"clock-frequency", NULL);
+> -
+> -	if (pfreq == NULL) {
+> +	rc = of_property_read_u32(pdev->dev.of_node, "clock-frequency", &pfreq);
+> +	if (rc) {
+>  		dev_warn(&pdev->dev,
+>  			 "The watchdog clock frequency cannot be obtained\n");
+>  		no_timeout = true;
+>  	}
+> 
+> -	tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+> -					"xlnx,wdt-interval", NULL);
+> -	if (tmptr == NULL) {
+> +	rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-interval",
+> +				  &xdev->wdt_interval);
+> +	if (rc) {
+>  		dev_warn(&pdev->dev,
+>  			 "Parameter \"xlnx,wdt-interval\" not found\n");
+>  		no_timeout = true;
+> -	} else {
+> -		xdev->wdt_interval = *tmptr;
+>  	}
+> 
+> -	tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+> -					"xlnx,wdt-enable-once", NULL);
+> -	if (tmptr == NULL) {
+> +	rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-enable-once",
+> +				  &enable_once);
+> +	if (rc)
+>  		dev_warn(&pdev->dev,
+>  			 "Parameter \"xlnx,wdt-enable-once\" not found\n");
+> -		watchdog_set_nowayout(xilinx_wdt_wdd, true);
+> -	}
+
+All the above properties are optional. Is a warning really
+warranted in this case ? I usually associate a warning with
+something that is wrong, which is not the case here.
+
+I would encourage you to drop those warnings, but that should be
+a separate patch.
+
+Thanks,
+Guenter
