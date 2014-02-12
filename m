@@ -1,108 +1,36 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 11 Feb 2014 18:06:50 -0700
-Subject: [PATCH 1/3] ARM: bios32: use pci_enable_resource to enable PCI
- resources
-In-Reply-To: <1391532784-1953-2-git-send-email-will.deacon@arm.com>
-References: <1391532784-1953-1-git-send-email-will.deacon@arm.com>
- <1391532784-1953-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20140212010650.GI21057@google.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 12 Feb 2014 10:17:48 +0900
+Subject: [PATCH RESEND] ARM: LPC32xx: common.c: Remove unnecessary header
+ inclusion
+Message-ID: <002a01cf2790$3e2d6510$ba882f30$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 04:53:02PM +0000, Will Deacon wrote:
-> This patch moves bios32 over to using the generic code for enabling PCI
-> resources. All that's left to take care of is the case of PCI bridges,
-> which need to be enabled for both IO and MEMORY, regardless of the
-> resource types.
-> 
-> A side-effect of this change is that we no longer explicitly enable
-> devices when running in PCI_PROBE_ONLY mode. This stays closer to the
-> meaning of the option and prevents us from trying to enable devices
-> without any assigned resources (the core code refuses to enable
-> resources without parents).
+common.c includes some header files that are not really used.
 
-Heh, I've been looking at this, too :)  I have a similar patch for ARM and
-other architectures with their own versions of pcibios_enable_device().
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+---
+Compile-tested only.
 
-Several of them (arm m68k tile tegra unicore32) have this special code that
-enables IO and MEMORY for bridges unconditionally.  But from a PCI
-perspective, I don't know why we should do this unconditionally.  If a
-bridge doesn't have an enabled MEM window or MEM BAR, I don't think we
-should have to enable PCI_COMMAND_MEMORY for it.
+ arch/arm/mach-lpc32xx/common.c |    6 ------
+ 1 file changed, 6 deletions(-)
 
-The architectures that do this only check for valid MEM BARs, i.e., they
-only look at resources 0-5, and they don't look at the window resources.
-
-The architectures that don't enable IO and MEMORY for bridges
-unconditionally check *all* the resources up to PCI_NUM_RESOURCES, which
-includes the BARs, bridge windows, and any IOV resources.
-
-The generic pci_enable_resources() does check all the resources, so I
-*think* it should be safe for all architectures to use that and just drop
-the check for bridges.  What do you think?
-
-Bjorn
-
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/kernel/bios32.c | 35 ++++++++++-------------------------
->  1 file changed, 10 insertions(+), 25 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 317da88ae65b..9f3c76638689 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -608,40 +608,25 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
->   */
->  int pcibios_enable_device(struct pci_dev *dev, int mask)
->  {
-> -	u16 cmd, old_cmd;
-> -	int idx;
-> -	struct resource *r;
-> +	int err;
-> +	u16 cmd;
->  
-> -	pci_read_config_word(dev, PCI_COMMAND, &cmd);
-> -	old_cmd = cmd;
-> -	for (idx = 0; idx < 6; idx++) {
-> -		/* Only set up the requested stuff */
-> -		if (!(mask & (1 << idx)))
-> -			continue;
-> +	if (pci_has_flag(PCI_PROBE_ONLY))
-> +		return 0;
->  
-> -		r = dev->resource + idx;
-> -		if (!r->start && r->end) {
-> -			printk(KERN_ERR "PCI: Device %s not available because"
-> -			       " of resource collisions\n", pci_name(dev));
-> -			return -EINVAL;
-> -		}
-> -		if (r->flags & IORESOURCE_IO)
-> -			cmd |= PCI_COMMAND_IO;
-> -		if (r->flags & IORESOURCE_MEM)
-> -			cmd |= PCI_COMMAND_MEMORY;
-> -	}
-> +	err = pci_enable_resources(dev, mask);
-> +	if (err)
-> +		return err;
->  
->  	/*
->  	 * Bridges (eg, cardbus bridges) need to be fully enabled
->  	 */
-> -	if ((dev->class >> 16) == PCI_BASE_CLASS_BRIDGE)
-> +	if ((dev->class >> 16) == PCI_BASE_CLASS_BRIDGE) {
-> +		pci_read_config_word(dev, PCI_COMMAND, &cmd);
->  		cmd |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY;
-> -
-> -	if (cmd != old_cmd) {
-> -		printk("PCI: enabling device %s (%04x -> %04x)\n",
-> -		       pci_name(dev), old_cmd, cmd);
->  		pci_write_config_word(dev, PCI_COMMAND, cmd);
->  	}
-> +
->  	return 0;
->  }
->  
-> -- 
-> 1.8.2.2
-> 
+diff --git a/arch/arm/mach-lpc32xx/common.c b/arch/arm/mach-lpc32xx/common.c
+index d7aa54c..9713c8b 100644
+--- a/arch/arm/mach-lpc32xx/common.c
++++ b/arch/arm/mach-lpc32xx/common.c
+@@ -17,12 +17,6 @@
+  */
+ 
+ #include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/err.h>
+-#include <linux/i2c.h>
+-#include <linux/i2c-pnx.h>
+ #include <linux/io.h>
+ 
+ #include <asm/mach/map.h>
+-- 
+1.7.10.4
