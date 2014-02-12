@@ -1,35 +1,54 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Feb 2014 10:35:17 +0900
-Subject: [PATCH] ARM: shmobile: set proper DMA masks for Ether devices
-In-Reply-To: <201402120255.25037.sergei.shtylyov@cogentembedded.com>
-References: <201402120255.25037.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20140212013517.GE17104@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Feb 2014 17:36:50 -0800
+Subject: [PATCH v2 6/6] ARM: tegra: cpuidle: use firmware for power down
+In-Reply-To: <1391747706-1847-7-git-send-email-acourbot@nvidia.com>
+References: <1391747706-1847-1-git-send-email-acourbot@nvidia.com>
+ <1391747706-1847-7-git-send-email-acourbot@nvidia.com>
+Message-ID: <20140212013650.GA7584@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 02:55:24AM +0300, Sergei Shtylyov wrote:
-> Ether MAC is a DMA-capable device and so should have 'dev.dma_mask' and
-> 'dev.coherent_dma_mask' fields set properly, to reflect 32-bit DMA addressing
-> ability.  Currently, the code works without DMA masks but in the future, when
-> support for NETIF_F_HIGHDMA & NETIF_F_SG would be added to the 'sh_eth' driver,
-> the DMA masks should start to matter...
+On Fri, Feb 07, 2014 at 01:35:06PM +0900, Alexandre Courbot wrote:
+> Attempt to invoke the prepare_idle() and do_idle() firmware calls
+> to power down a CPU so an underlying firmware gets informed of
+> the idle operation and performs it by itself if designed in such a way.
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
-Hi Sergei,
-
-please split this series up so there is a separate patch for each board.
-
-Thanks
-
-> 
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 > ---
-> The patch is against 'renesas-devel-v3.14-rc1-20140207' tag in Simon Horman's
-> 'renesas.git' repo... 
+>  arch/arm/mach-tegra/cpuidle-tegra114.c | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
 > 
->  arch/arm/mach-shmobile/board-armadillo800eva.c |    2 ++
->  arch/arm/mach-shmobile/board-bockw.c           |   21 ++++++++++++++-------
->  arch/arm/mach-shmobile/board-genmai.c          |   19 ++++++++++++++-----
->  arch/arm/mach-shmobile/board-koelsch.c         |   16 ++++++++++++----
->  arch/arm/mach-shmobile/board-lager.c           |   19 ++++++++++++++-----
->  5 files changed, 56 insertions(+), 21 deletions(-)
+> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+> index e0b87300243d..558067ddc186 100644
+> --- a/arch/arm/mach-tegra/cpuidle-tegra114.c
+> +++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/cpuidle.h>
+>  #include <linux/cpu_pm.h>
+>  #include <linux/clockchips.h>
+> +#include <asm/firmware.h>
+>  
+>  #include <asm/cpuidle.h>
+>  #include <asm/suspend.h>
+> @@ -45,7 +46,15 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
+>  
+>  	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
+>  
+> -	cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+> +	call_firmware_op(prepare_idle);
+> +
+> +	switch (call_firmware_op(do_idle)) {
+> +	case -ENOSYS:
+> +		cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+> +		break;
+> +	default:
+> +		break;
+
+Do you expect other cases down the road? If not, this is a simple if instead:
+
+	/* Only call cpu_suspend if TF didn't handle the pre-suspend logic */
+	if (call_firmware_op(do_idle) == -ENOSYS)
+		cpu_suspend(....);
+
+
+-Olof
