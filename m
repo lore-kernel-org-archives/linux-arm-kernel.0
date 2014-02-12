@@ -1,88 +1,38 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 12 Feb 2014 14:07:13 +0100
-Subject: [PATCH v2] ARM: Add imprecise abort enable/disable macro
-In-Reply-To: <1392050756-11145-1-git-send-email-fabrice.gasnier@st.com>
-References: <1392050756-11145-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <52FB7201.20202@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Feb 2014 14:08:42 +0100
+Subject: [PATCH v2 02/10] ARM: mvebu: add initial support for the Armada
+ 375 SOCs
+In-Reply-To: <1392200619-3141-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392200619-3141-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1392200619-3141-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <3797172.YJcGPMeT5Y@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Any comments on this patch ?
-
-Russel, can I add this patch to your patch tracker system ?
-
-Thanks,
-Fabrice
-
-On 02/10/2014 05:45 PM, Fabrice GASNIER wrote:
-> This patch adds imprecise abort enable/disable macros.
-> It also enables imprecise aborts when starting kernel.
->
-> Changes in v2:
-> Only ARMv6 and later have CPSR.A bit. On earlier CPUs,
-> and ARMv7M this should be a no-op.
->
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+On Wednesday 12 February 2014 11:23:31 Thomas Petazzoni wrote:
+> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> This commit adds the basic support for the Armada 375 SOCs. These SoCs
+> share most of their IP with the Armada 370/XP SoCs. The main
+> difference is the use of a Cortex A9 CPU instead of the PJ4B CPU. The
+> interrupt controller and the L2 cache controller are also different
+> they are respectively the GIC and the PL310.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->   arch/arm/include/asm/irqflags.h |   10 ++++++++++
->   arch/arm/kernel/smp.c           |    1 +
->   arch/arm/kernel/traps.c         |    4 ++++
->   3 files changed, 15 insertions(+)
->
-> diff --git a/arch/arm/include/asm/irqflags.h b/arch/arm/include/asm/irqflags.h
-> index 3b763d6..8301f87 100644
-> --- a/arch/arm/include/asm/irqflags.h
-> +++ b/arch/arm/include/asm/irqflags.h
-> @@ -51,6 +51,14 @@ static inline void arch_local_irq_disable(void)
->   
->   #define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
->   #define local_fiq_disable() __asm__("cpsid f	@ __clf" : : : "memory", "cc")
-> +
-> +#ifndef CONFIG_CPU_V7M
-> +#define local_abt_enable()  __asm__("cpsie a	@ __sta" : : : "memory", "cc")
-> +#define local_abt_disable() __asm__("cpsid a	@ __cla" : : : "memory", "cc")
-> +#else
-> +#define local_abt_enable()	do { } while (0)
-> +#define local_abt_disable()	do { } while (0)
-> +#endif
->   #else
->   
->   /*
-> @@ -130,6 +138,8 @@ static inline void arch_local_irq_disable(void)
->   	: "memory", "cc");					\
->   	})
->   
-> +#define local_abt_enable()	do { } while (0)
-> +#define local_abt_disable()	do { } while (0)
->   #endif
->   
->   /*
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index dc894ab..c2093cb 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -377,6 +377,7 @@ asmlinkage void secondary_start_kernel(void)
->   
->   	local_irq_enable();
->   	local_fiq_enable();
-> +	local_abt_enable();
->   
->   	/*
->   	 * OK, it's off to the idle thread for us
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index 4636d56..ef15709 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -900,6 +900,10 @@ void __init early_trap_init(void *vectors_base)
->   
->   	flush_icache_range(vectors, vectors + PAGE_SIZE * 2);
->   	modify_domain(DOMAIN_USER, DOMAIN_CLIENT);
-> +
-> +	/* Enable imprecise aborts */
-> +	local_abt_enable();
-> +
->   #else /* ifndef CONFIG_CPU_V7M */
->   	/*
->   	 * on V7-M there is no need to copy the vector table to a dedicated
+>  .../devicetree/bindings/arm/armada-375.txt         |  9 +++++
+>  arch/arm/mach-mvebu/Kconfig                        | 15 ++++++++
+>  arch/arm/mach-mvebu/Makefile                       |  1 +
+>  arch/arm/mach-mvebu/armada-375.c                   | 44 ++++++++++++++++++++++
+
+I don't know what the outcome was for the first version, but just
+for the record, I would prefer merging the board file into armada-370-xp.c
+without renaming that file. Keeping the separate Kconfig entry makes sense
+because we want to select different options there. If you have differences
+between the implementations (so far the 370/xp code should just work
+on 375), you can use a combination of if(IS_ENABLED(CONFIG_*)) and
+if(machine_is_compatible()) to do the detection but keep a common
+dt_compat list.
+
+	Arnd
