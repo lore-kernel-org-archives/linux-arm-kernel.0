@@ -1,44 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 12 Feb 2014 18:33:01 +0000
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
-In-Reply-To: <201401281148.10670.arnd@arndb.de>
-References: <1390190215-22700-1-git-send-email-olof@lixom.net>
- <52E700F0.7040708@gmail.com>
- <CAPDyKFpOhQtiyCmzie3=sfg42Vv5_rReRNgUf8kALoE6TBe2cw@mail.gmail.com>
- <201401281148.10670.arnd@arndb.de>
-Message-ID: <20140212183301.GL28112@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Feb 2014 18:42:37 +0000
+Subject: [BUG] Circular locking dependency - DRM/CMA/MM/hotplug/...
+In-Reply-To: <20140212182901.GX17001@phenom.ffwll.local>
+References: <20140211183543.GK26684@n2100.arm.linux.org.uk>
+ <52FB9602.1000805@samsung.com>
+ <20140212163317.GQ26684@n2100.arm.linux.org.uk>
+ <20140212182901.GX17001@phenom.ffwll.local>
+Message-ID: <20140212184237.GR26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 11:48:10AM +0100, Arnd Bergmann wrote:
+On Wed, Feb 12, 2014 at 07:29:01PM +0100, Daniel Vetter wrote:
+> On Wed, Feb 12, 2014 at 04:33:17PM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Feb 12, 2014 at 04:40:50PM +0100, Marek Szyprowski wrote:
+> > >> -> #3 (console_lock){+.+.+.}:
+> > >>         [<c0066f04>] __lock_acquire+0x151c/0x1ca0
+> > >>         [<c0067c28>] lock_acquire+0xa0/0x130
+> > >>         [<c006edcc>] console_lock+0x60/0x74
+> > >>         [<c006f7b8>] console_cpu_notify+0x28/0x34
+> > >>         [<c004904c>] notifier_call_chain+0x4c/0x8c
+> > >>         [<c004916c>] __raw_notifier_call_chain+0x1c/0x24
+> > >>         [<c0024124>] __cpu_notify+0x34/0x50
+> > >>         [<c002424c>] cpu_notify_nofail+0x18/0x24
+> > >>         [<c068e168>] _cpu_down+0x100/0x244
+> > >>         [<c068e2dc>] cpu_down+0x30/0x44
+> > >>         [<c036ef8c>] cpu_subsys_offline+0x14/0x18
+> > >>         [<c036af28>] device_offline+0x94/0xbc
+> > >>         [<c036b030>] online_store+0x4c/0x74
+> > >>         [<c0368d3c>] dev_attr_store+0x20/0x2c
+> > >>         [<c016b2e0>] sysfs_kf_write+0x54/0x58
+> > >>         [<c016eaa4>] kernfs_fop_write+0xc4/0x160
+> > >>         [<c0105a54>] vfs_write+0xbc/0x184
+> > >>         [<c0105dfc>] SyS_write+0x48/0x70
+> > >>         [<c000e6e0>] ret_fast_syscall+0x0/0x48
+> > 
+> > cpu_down() takes cpu_hotplug.lock, so here we have:
+> > 
+> > 	cpu_hotplug.lock
+> > 	console_lock
+> 
+> The patche I've linked in my other mail will break the chain here, so
+> should solve this. And apparently with cpu hotplug we can hit this, too.
+> And having banged my head against the console_lock wall I think doing a
+> trylock here is generally the sanest option.
+> 
+> So imo we can just blame console_lock, not need to either beat up v4l,
+> drm, cma or anyone else really ;-)
 
-> I think there is another option, which does have its own pros and cons:
-> We could move all the power handling back into the sdio function driver
-> if we allow a secondary detection path using DT rather than the probing
-> of the SDIO bus. Essentially you'd have to list the class/vendor/device
-> ID for each function that cannot be autodetected in DT, and have the
-> SDIO core pretend that it found the device just by looking at the
-> device nodes, and register the struct sdio_func so it can be bound to
-> the driver. The driver then does all the power handling in a device
-> specific way. At some point the hardware gets registered at the 
-> mmc host, and the sdio core connects the bus state to the already present
-> sdio_func, possibly notifying the function driver that it has become
-> usable.
+I don't think CMA needs to hold its lock across the allocations/frees
+though - given the size of this, I think it's best if /everyone/ tries
+to reduce the locking interactions where possible.
 
-> Obviously, this can only work for CAP_NONREMOVABLE devices, but those
-> are exactly the ones we are worried about here. The advantage is that
-> the power sequencing for a particular device can then be in device
-> specific code and can have an arbitrarily complex in the driver without
-> needing the mmc code to handle all possible corner cases.
+The CMA issue needs to be done anyway - what it currently means is that
+all CMA allocations in the kernel are serialised, even if an allocation
+attempt sleeps, another allocation gets blocked.
 
-I think this is going to be the most generic solution overall, it's
-going to work with other buses and it's going to allow the device to
-fully power itself off while running (I don't know if it's useful for SD
-but that's definitely common with some other buses).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140212/aba45cd9/attachment.sig>
+So, sorting that out breaks the dependency there, and if it can be broken
+elsewhere, that's an added bonus and will help prevent other issues
+like this.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
