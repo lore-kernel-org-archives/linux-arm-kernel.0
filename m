@@ -1,9 +1,9 @@
-From: fabrice.gasnier@stericsson.com (Fabrice GASNIER)
-Date: Wed, 12 Feb 2014 14:05:39 +0100
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 12 Feb 2014 14:07:13 +0100
 Subject: [PATCH v2] ARM: Add imprecise abort enable/disable macro
 In-Reply-To: <1392050756-11145-1-git-send-email-fabrice.gasnier@st.com>
 References: <1392050756-11145-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <52FB71A3.5010505@stericsson.com>
+Message-ID: <52FB7201.20202@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,7 +11,7 @@ Hi,
 
 Any comments on this patch ?
 
-Russell, can I add this patch to your patch tracker system ?
+Russel, can I add this patch to your patch tracker system ?
 
 Thanks,
 Fabrice
