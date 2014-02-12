@@ -1,46 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 12 Feb 2014 14:03:29 +0100
-Subject: [PATCH RESEND] usb: at91-udc: fix irq and iomem resource retrieval
-In-Reply-To: <1390488102-8548-1-git-send-email-jjhiblot@traphandler.com>
-References: <1390488102-8548-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <1392210209-22142-1-git-send-email-nicolas.ferre@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Feb 2014 14:03:26 +0100
+Subject: [PATCH 4/7] spi: pl022: attempt to get sspclk by name
+In-Reply-To: <20140212114740.GE21992@e106331-lin.cambridge.arm.com>
+References: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
+ <201402121221.51233.arnd@arndb.de>
+ <20140212114740.GE21992@e106331-lin.cambridge.arm.com>
+Message-ID: <1786282.mNUF0ZaUg2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+On Wednesday 12 February 2014 11:47:40 Mark Rutland wrote:
+> On Wed, Feb 12, 2014 at 11:21:50AM +0000, Arnd Bergmann wrote:
+> > On Wednesday 12 February 2014, Mark Rutland wrote:
+> > > To me it feels odd to require the last clock in the list (apb_pclk) to
+> > > be named, and the rest to be in a particular order. For the dt case it
+> > > seems saner to add new clocks with names as it allows arbitrary subsets
+> > > of clocks to be wired up and described (though obviously in this case a
+> > > missing sspclk would be problematic).
+> > 
+> > Yes, good point about the missing clocks, and I also agree mixing ordered
+> > and named clocks in one device is rather odd and can lead to trouble.
+> > 
+> > I guess there isn't really a good way out here, and I certainly won't
+> > ask for it to be done one way or the other if someone else has a 
+> > good argument which way it should be implemented.
+> 
+> Having thought about it, all dts that for the ssp_pclk must have some
+> name for the sspclk (though the specific name is arbitrary). I could get
+> the driver to try each of those before falling back to the index
+> (perhaps with a helper that takes a list of known aliases), so all
+> existing dts (that we are aware of) would work with the clock requested
+> by name.
 
-When using dt resources retrieval (interrupts and reg properties) there is
-no predefined order for these resources in the platform dev resource
-table. Also don't expect the number of resource to be always 2.
+Strange. Why do the even have names in there? What are those strings?
 
-Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-Acked-by: Boris BREZILLON <b.brezillon@overkiz.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: stable <stable@vger.kernel.org> # 3.4
----
- drivers/usb/gadget/at91_udc.c | 10 ----------
- 1 file changed, 10 deletions(-)
+I noticed that ux500 has uses four different strings, one for each
+instance, which is obviously a bug and should just be fixed. There is
+no way this was intentional, and we can just rely on teh fallback
+if you want to have that anyway.
 
-diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-index cea8c20a1425..1926925a52a9 100644
---- a/drivers/usb/gadget/at91_udc.c
-+++ b/drivers/usb/gadget/at91_udc.c
-@@ -1709,16 +1709,6 @@ static int at91udc_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	if (pdev->num_resources != 2) {
--		DBG("invalid num_resources\n");
--		return -ENODEV;
--	}
--	if ((pdev->resource[0].flags != IORESOURCE_MEM)
--			|| (pdev->resource[1].flags != IORESOURCE_IRQ)) {
--		DBG("invalid resource type\n");
--		return -ENODEV;
--	}
--
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res)
- 		return -ENXIO;
--- 
-1.8.2.2
+> I assume that for the non-dt case it's possible to name clock inputs to
+> a device without the clock being associated with the name globally? If
+> so we could get rid of the index usage entirely in this case.
+
+Sorry, I don't understand the question.
+
+	Arnd
