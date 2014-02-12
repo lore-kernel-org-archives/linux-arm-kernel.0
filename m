@@ -1,56 +1,43 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 12 Feb 2014 12:18:45 +0200
-Subject: [PATCH v7 04/12] mfd: omap-usb-host: Update DT clock binding
+Date: Wed, 12 Feb 2014 12:18:46 +0200
+Subject: [PATCH v7 05/12] mfd: omap-usb-tll: Update DT clock binding
  information
 In-Reply-To: <1392200333-28397-1-git-send-email-rogerq@ti.com>
 References: <1392200333-28397-1-git-send-email-rogerq@ti.com>
-Message-ID: <1392200333-28397-5-git-send-email-rogerq@ti.com>
+Message-ID: <1392200333-28397-6-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap-usb-host driver expects certained named clocks.
+The omap-usb-tll driver needs one clock for each TLL channel.
 Add this information to the DT binding document.
 
 CC: Lee Jones <lee.jones@linaro.org>
 CC: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- .../devicetree/bindings/mfd/omap-usb-host.txt      | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ Documentation/devicetree/bindings/mfd/omap-usb-tll.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/omap-usb-host.txt b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
-index b381fa6..4721b2d 100644
---- a/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
-+++ b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
-@@ -32,6 +32,29 @@ Optional properties:
- - single-ulpi-bypass: Must be present if the controller contains a single
-   ULPI bypass control bit. e.g. OMAP3 silicon <= ES2.1
+diff --git a/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt b/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt
+index 62fe697..c58d704 100644
+--- a/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt
++++ b/Documentation/devicetree/bindings/mfd/omap-usb-tll.txt
+@@ -7,6 +7,16 @@ Required properties:
+ - interrupts : should contain the TLL module's interrupt
+ - ti,hwmod : must contain "usb_tll_hs"
  
++Optional properties:
++
 +- clocks: a list of phandles and clock-specifier pairs, one for each entry in
 +  clock-names.
 +
 +- clock-names: should include:
-+  For OMAP3
-+  * "usbhost_120m_fck" - 120MHz Functional clock.
++  * "usb_tll_hs_usb_ch0_clk" - USB TLL channel 0 clock
++  * "usb_tll_hs_usb_ch1_clk" - USB TLL channel 1 clock
++  * "usb_tll_hs_usb_ch2_clk" - USB TLL channel 2 clock
 +
-+  For OMAP4+
-+  * "refclk_60m_int" - 60MHz internal reference clock for UTMI clock mux
-+  * "refclk_60m_ext_p1" - 60MHz external ref. clock for Port 1's UTMI clock mux.
-+  * "refclk_60m_ext_p2" - 60MHz external ref. clock for Port 2's UTMI clock mux
-+  * "utmi_p1_gfclk" - Port 1 UTMI clock mux.
-+  * "utmi_p2_gfclk" - Port 2 UTMI clock mux.
-+  * "usb_host_hs_utmi_p1_clk" - Port 1 UTMI clock gate.
-+  * "usb_host_hs_utmi_p2_clk" - Port 2 UTMI clock gate.
-+  * "usb_host_hs_utmi_p3_clk" - Port 3 UTMI clock gate.
-+  * "usb_host_hs_hsic480m_p1_clk" - Port 1 480MHz HSIC clock gate.
-+  * "usb_host_hs_hsic480m_p2_clk" - Port 2 480MHz HSIC clock gate.
-+  * "usb_host_hs_hsic480m_p3_clk" - Port 3 480MHz HSIC clock gate.
-+  * "usb_host_hs_hsic60m_p1_clk" - Port 1 60MHz HSIC clock gate.
-+  * "usb_host_hs_hsic60m_p2_clk" - Port 2 60MHz HSIC clock gate.
-+  * "usb_host_hs_hsic60m_p3_clk" - Port 3 60MHz HSIC clock gate.
-+
- Required properties if child node exists:
+ Example:
  
- - #address-cells: Must be 1
+ 	usbhstll: usbhstll at 4a062000 {
 -- 
 1.8.3.2
