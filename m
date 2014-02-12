@@ -1,41 +1,76 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Feb 2014 08:26:57 +0000
-Subject: [PATCH 07/12] mfd: syscon: Consider platform data a regmap
- config name
-In-Reply-To: <1392188982.914924525@f237.i.mail.ru>
-References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
- <1392138636-29240-8-git-send-email-pawel.moll@arm.com>
- <1392188982.914924525@f237.i.mail.ru>
-Message-ID: <20140212082657.GK15081@lee--X1>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 12 Feb 2014 10:45:05 +0200
+Subject: [PATCH v2 1/2] ohci-platform: Change compatible string from
+ usb-ohci to generic-ohci
+In-Reply-To: <1392136529-5060-2-git-send-email-hdegoede@redhat.com>
+References: <1392136529-5060-1-git-send-email-hdegoede@redhat.com>
+ <1392136529-5060-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <52FB3491.3060206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Use the device platform data as a regmap config
-> > name. This is particularly useful in the regmap
-> > debugfs when there is more than one syscon device
-> > registered, to distinguish the register blocks.
-> > 
-> > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > Cc: Lee Jones <lee.jones@linaro.org>
-> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> > ---
-> ...
-> > syscon_regmap_config.max_register = res->end - res->start - 3;
-> > +	syscon_regmap_config.name = dev_get_platdata(&pdev->dev);
+On 02/11/2014 06:35 PM, Hans de Goede wrote:
+> The initial versions of the devicetree enablement patches for ohci-platform
+> used "ohci-platform" as compatible string. However this was disliked by various
+> reviewers because the platform bus is a Linux invention and devicetree is
+> supposed to be OS agnostic. After much discussion I gave up and went with
+> the generic usb-ohci as requested.
 > 
-> Is dev_name(&pdev->dev) can be used for such purpose?
+> In retro-spect I should have chosen something different, the dts files for many
+> existing boards already claim to be compatible with "usb-ohci", ie they have:
+> 
+> 	compatible = "ti,ohci-omap3", "usb-ohci";
+> 
+> In theory this should not be a problem since the "ti,ohci-omap3" entry takes
+> presedence, but in practice using a conflicting compatible string is an issue,
+> because it makes which driver gets used depend on driver registration order.
+> 
+> This patch changes the compatible string claimed by ohci-platform to
+> "generic-ohci", avoiding the driver registration / module loading ordering
+> problems.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  Documentation/devicetree/bindings/usb/usb-ohci.txt | 4 ++--
+>  drivers/usb/host/ohci-platform.c                   | 2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
+> index 6933b0c..45f67d9 100644
+> --- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
+> +++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
+> @@ -1,7 +1,7 @@
+>  USB OHCI controllers
+>  
+>  Required properties:
+> -- compatible : "usb-ohci"
+> +- compatible : "generic-ohci"
+>  - reg : ohci controller register range (address and length)
+>  - interrupts : ohci controller interrupt
+>  
+> @@ -16,7 +16,7 @@ Optional properties:
+>  Example:
+>  
+>  	ohci0: usb at 01c14400 {
+> -		compatible = "allwinner,sun4i-a10-ohci", "usb-ohci";
+> +		compatible = "allwinner,sun4i-a10-ohci", "generic-ohci";
+>  		reg = <0x01c14400 0x100>;
+>  		interrupts = <64>;
+>  		clocks = <&usb_clk 6>, <&ahb_gates 2>;
+> diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
+> index e2c28fd..b6ca0b2 100644
+> --- a/drivers/usb/host/ohci-platform.c
+> +++ b/drivers/usb/host/ohci-platform.c
+> @@ -319,7 +319,7 @@ static int ohci_platform_resume(struct device *dev)
+>  #endif /* CONFIG_PM */
+>  
+>  static const struct of_device_id ohci_platform_ids[] = {
+> -	{ .compatible = "usb-ohci", },
+> +	{ .compatible = "generic-ohci", },
+>  	{ }
+>  };
+>  MODULE_DEVICE_TABLE(of, ohci_platform_ids);
+> 
+both v2 patches
 
-Yes of course.
-
-Either use the automatically generated name or over-ride with
-dev->init_name prior to registration or call dev_set_name()
-manually. Then retrieve with Alexander's suggestion.
-
-Is there any technical reason why this is not possible with your
-implementation?
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Acked-by: Roger Quadros <rogerq@ti.com>
