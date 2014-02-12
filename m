@@ -1,55 +1,30 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 12 Feb 2014 20:00:28 +0200
-Subject: [PATCH v4] gpio: davinci: reuse for keystone soc
-In-Reply-To: <CACRpkdbrs==tpUBs=WLWkt0frBcSMRDRokOn2tvP-1gt7Qq3+w@mail.gmail.com>
-References: <1391615244-12014-1-git-send-email-grygorii.strashko@ti.com>
- <CACRpkdbrs==tpUBs=WLWkt0frBcSMRDRokOn2tvP-1gt7Qq3+w@mail.gmail.com>
-Message-ID: <52FBB6BC.2060801@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 12 Feb 2014 17:11:45 +0000
+Subject: [PATCH v2 0/9] ARM: multi-platform kconfig cleanup and mach-virt
+ removal
+In-Reply-To: <1726732.KPDAFqxz2K@wuerfel>
+References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
+ <20140212134655.GC29132@mudshark.cambridge.arm.com>
+ <CAL_JsqJkCXSFJZzRBRTrKh16PoBjvF95uKJbZAic-pk3htf_jg@mail.gmail.com>
+ <1726732.KPDAFqxz2K@wuerfel>
+Message-ID: <52FBAB51.4050401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 12/02/14 16:53, Arnd Bergmann wrote:
+> 
+> On the topic of V6, we don't support CPU_V6T2 at all, though I assume that
+> there is an ARM1156 core tile for integrator and realview, and we support
+> running the V6/V6K parts with MMU turned off. Would all revisions of ARM1156
+> work with CPU_V6K and !MMU?
 
-On 02/12/2014 05:03 PM, Linus Walleij wrote:
-> On Wed, Feb 5, 2014 at 4:47 PM, Grygorii Strashko
-> <grygorii.strashko@ti.com> wrote:
->
->> The similar GPIO HW block is used by keystone SoCs as
->> in Davinci SoCs.
->> Hence, reuse Davinci GPIO driver for Keystone taking into
->> account that Keystone contains ARM GIC IRQ controller which
->> is implemented using IRQ Chip.
->>
->> Documentation:
->>          http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
->>
->> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> ---
->> Changes in v4:
->> - rebased on top of v3.14 +
->>    [patch] gpio: davinci: signedness bug in davinci_gpio_irq_setup()
->
-> I tried applying this and it does not apply on the "devel" branch
-> in the GPIO tree. Since I haven't touched one line of code in the
-> DaVinci driver since v3.14-rc1 I seriously doubt that this is
-> rebased on v3.14[-rc].
->
-> Can you please rebase the patch onto v3.14-rc1 for real and
-> resend it?
+CPU_V6 and !MMU should work. V6K might, but that requires close
+inspection (WFE, SEV shouldn't be used in UP context)...
 
-Sorry, But I've to clarify that this patch is based on:
-http://www.spinics.net/lists/linux-kernel-janitors/msg18017.html
-[patch] gpio: davinci: signedness bug in davinci_gpio_irq_setup()
+Full disclosure: I happen to have a *brand new*, freshly unwrapped
+ARM1156 core tile for a Versatile EB. All it requires is a victim with
+time on their hand...
 
-And I did it to avoid merge conflicts between these two patches.
-
-Is it possible to apply above one first? It's not in any of your
-branches.
-
-Of Course, I can re-base this patch on clean v3.14-rc1, but then merge
-conflict will happen with "gpio: davinci: signedness.." patch.
-
-Regards,
-- grygorii
+	M.
+-- 
+Jazz is not dead. It just smells funny...
