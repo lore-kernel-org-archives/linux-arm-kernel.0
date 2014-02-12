@@ -1,92 +1,75 @@
-From: cooloney@gmail.com (Bryan Wu)
-Date: Wed, 12 Feb 2014 13:55:37 -0800
-Subject: [PATCH 1/2] ARM: tegra: enable I2C Mux driver for PCA9546 in
- defconfig
-In-Reply-To: <52FBD6C9.2010905@wwwdotorg.org>
-References: <1391817298-10600-1-git-send-email-pengw@nvidia.com>
- <52FBC6A9.7010401@wwwdotorg.org>
- <CAK5ve-+bzLkdwmab9sZGPk7p67ktVcK3mHQ2aUgMueH061ty6w@mail.gmail.com>
- <52FBD6C9.2010905@wwwdotorg.org>
-Message-ID: <CAK5ve-+2AGO0UCf4UOMLoqGmQLp7QN08OJbZxUc-oYZzjPdFcQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Feb 2014 13:58:33 -0800
+Subject: [PATCH] dma: mv_xor: Silence a bunch of LPAE-related warnings
+In-Reply-To: <CAPcyv4gWJA7Cv39pxtuOqj0RyivODNuae7Q0Ku27RQO8=M3HbQ@mail.gmail.com>
+References: <1391476403-26099-1-git-send-email-olof@lixom.net>
+ <20140204052329.GN10628@intel.com>
+ <20140204170019.GI8533@titan.lakedaemon.net>
+ <CAOesGMg0mrikAp7cDkm9+5=TfR7bj7_f4=JPMxBbabEPwkQs9Q@mail.gmail.com>
+ <CAPcyv4jwwRT_+c-yDycgY0d79nByvAVWH6waFWeodE9yi=7CDg@mail.gmail.com>
+ <CAPcyv4gWJA7Cv39pxtuOqj0RyivODNuae7Q0Ku27RQO8=M3HbQ@mail.gmail.com>
+Message-ID: <20140212215833.GA29365@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 12:17 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 02/12/2014 01:09 PM, Bryan Wu wrote:
->> On Wed, Feb 12, 2014 at 11:08 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>> On 02/07/2014 04:54 PM, Bryan Wu wrote:
->>>> PCA9546 is used in Cardhu Tegra30 board to connect to 3 cameras.
->>>> Enabling this driver for Tegra V4L2 soc camera driver and camera
->>>> sensor drivers.
->>>
->>> I've squashed patch 1/2 into Tegra's for-3.15/defconfig branch, and
->>> applied patch 2/2 to Tegra's for-3.15/dt branch.
->>>
->>> Note that your patches were sent with an email "From" address that
->>> didn't match your signed-off-by tag, yet "git send-email" didn't insert
->>> a "From" header in the email body. Can you please check your git user ID
->>> and/or email settings. Consequently, I had to adjust the git author
->>> field in git to match your s-o-b line.
->>
->> My bad. I need to update my git send-email script to use --from "Bryan
->> Wu <pengw@nvidia.com>" instead of --from "Bryan Wu
->> <cooloney@gmail.com>"
->>
->> Need I resubmit this patchset?
->
-> No need to resent; I fixed them up.
->
-> Why not just put the correct values in ~/.gitconfig?
->
-> Perhaps this is because you switch between NVIDIA and non-NVIDIA email
-> addresses and/or mail servers, so you can't make ~/.gitconfig static and
-> universally correct? If you have a recent enough git, what I do is:
->
-> $ cat ~/.gitconfig
-> [include]
->         path = .gitconfig-user
->         path = .gitconfig-email-server
-> ...
->
-> $ cat ~/.gitconfig-user-nvidia
-> [user]
->         name = Stephen Warren
->         email = swarren at nvidia.com
->
-> $ cat ~/.gitconfig-user-wwwdotorg
-> [user]
->         name = Stephen Warren
->         email = swarren at wwwdotorg.org
->
-> ~/.gitconfig-user is a symlink to one of ~/.gitconfig-user-*, and I have
-> a script that deletes the link and points it at a new location:
->
-> $ cat `which git-switch-user`
-> #!/bin/bash
->
-> cd $HOME
-> mainfile=.gitconfig-user
-> newlink=${mainfile}-$1
-> if [ ! -f ${newlink} ]; then
->     echo ERROR: ${newlink} not found
->     exit 1
-> fi
->
-> rm -f ${mainfile}
-> ln -s ${newlink} ${mainfile}
->
-> ... and the same thing for email servers.
->
-> Then, I can run e.g.:
->
-> git-switch-email-server nvidia; \
-> git send-email --to internal at nvidia.com *.patch; \
-> git-switch-email-server severn-port-forwarded
+On Tue, Feb 04, 2014 at 10:58:31AM -0800, Dan Williams wrote:
+> On Tue, Feb 4, 2014 at 10:57 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+> > On Tue, Feb 4, 2014 at 10:30 AM, Olof Johansson <olof@lixom.net> wrote:
+> >> On Tue, Feb 4, 2014 at 9:00 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> >>> On Tue, Feb 04, 2014 at 10:53:29AM +0530, Vinod Koul wrote:
+> >>>> On Mon, Feb 03, 2014 at 05:13:23PM -0800, Olof Johansson wrote:
+> >>>> > Enabling some of the mvebu platforms in the multiplatform config for ARM
+> >>>> > enabled these drivers, which also triggered a bunch of warnings when LPAE
+> >>>> > is enabled (thus making phys_addr_t 64-bit).
+> >>>> >
+> >>>> > Most changes are switching printk formats, but also a bit of changes to what
+> >>>> > used to be array-based pointer arithmetic that could just be done with the
+> >>>> > address types instead.
+> >>>> >
+> >>>> > The warnings were:
+> >>>> >
+> >>>> > drivers/dma/mv_xor.c: In function 'mv_xor_tx_submit':
+> >>>> > drivers/dma/mv_xor.c:500:3: warning: format '%x' expects argument of type
+> >>>> >     'unsigned int', but argument 4 has type 'dma_addr_t' [-Wformat]
+> >>>> > drivers/dma/mv_xor.c: In function 'mv_xor_alloc_chan_resources':
+> >>>> > drivers/dma/mv_xor.c:553:13: warning: cast to pointer from integer of
+> >>>> >     different size [-Wint-to-pointer-cast]
+> >>>> > drivers/dma/mv_xor.c:555:4: warning: cast from pointer to integer of
+> >>>> >     different size [-Wpointer-to-int-cast]
+> >>>> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_memcpy':
+> >>>> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
+> >>>> >     'unsigned int', but argument 5 has type 'dma_addr_t' [-Wformat]
+> >>>> > drivers/dma/mv_xor.c:584:2: warning: format '%x' expects argument of type
+> >>>> >     'unsigned int', but argument 6 has type 'dma_addr_t' [-Wformat]
+> >>>> > drivers/dma/mv_xor.c: In function 'mv_xor_prep_dma_xor':
+> >>>> > drivers/dma/mv_xor.c:628:2: warning: format '%u' expects argument of type
+> >>>> >     'unsigned int', but argument 7 has type 'dma_addr_t' [-Wformat]
+> >>>> >
+> >>>> > Signed-off-by: Olof Johansson <olof@lixom.net>
+> >>>> Acked-by: Vinod Koul <vinod.koul@intel.com>
+> >>>
+> >>> Olof, would you like me to queue it up?  Or do you want to take it
+> >>> directly?
+> >>>
+> >>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> >>
+> >> I'm confused. I sent the patch to the drivers/dma maintainers and they
+> >> just acked it without asking me to pick it up myself.
+> >>
+> >> Vinod, did you ack it for me to pick it up, or for some other reason?
+> >> If you don't want to take it through your tree I'll be happy to take
+> >> it through arm-soc, just looking to clarify.
+> >>
+> >> (Jason, I can apply it directly)
+> >
+> > Vinod will correct me if I am wrong, but I take his acks to mean "yup,
+> > take it through your tree".  For this specific problem I thought we
+> > had a comprehensive fix pending from Joe Perches to add a new %pX
+> > format specifier for dma addresses?
+> 
+> Never mind... that's what you are using.  Sorry for the noise.
 
-Awesome, I will firstly update my .gitconfig. Actually I basically
-just have one outbound server which is gmail server. Although I put
-From: @nvidia.com, I still use gmail server to send out patch emails.
-Still don't wanna touch our internal email server.
+Yep. Applied now, btw.
 
-Thanks a lot and it's really helpful.
--Bryan
+
+-Olof
