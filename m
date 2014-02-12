@@ -1,51 +1,57 @@
 From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 11 Feb 2014 17:33:25 -0800
-Subject: [RFC/PATCH 3/3] init: Move stack canary initialization after
- setup_arch
-In-Reply-To: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
-References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1392168805-14200-4-git-send-email-lauraa@codeaurora.org>
+Date: Tue, 11 Feb 2014 17:33:22 -0800
+Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
+Message-ID: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stack canary intialization involves getting a random number.
-Getting this random number may involve accessing caches or other
-architectural specific features which are not available until
-after the architecture is setup. Move the stack canary initialization
-later to accomodate this.
+Hi,
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- init/main.c |    9 ++++-----
- 1 files changed, 4 insertions(+), 5 deletions(-)
+This is an RFC to seed the random number pool earlier when using devicetree.
+The big issue this is trying to solve is the fact that the stack canary for
+ARM tends to be the same across bootups of the same device. This is because
+the random number pools do not get initialized until after the canary has
+been set up. The canary can be moved later, but in general there is still
+no way to reliably get random numbers early for other features (e.g. vector
+randomization).
 
-diff --git a/init/main.c b/init/main.c
-index eb03090..63d0596 100644
---- a/init/main.c
-+++ b/init/main.c
-@@ -489,11 +489,6 @@ asmlinkage void __init start_kernel(void)
- 	smp_setup_processor_id();
- 	debug_objects_early_init();
- 
--	/*
--	 * Set up the the initial canary ASAP:
--	 */
--	boot_init_stack_canary();
--
- 	cgroup_init_early();
- 
- 	local_irq_disable();
-@@ -507,6 +502,10 @@ asmlinkage void __init start_kernel(void)
- 	page_address_init();
- 	pr_notice("%s", linux_banner);
- 	setup_arch(&command_line);
-+	/*
-+	 * Set up the the initial canary ASAP:
-+	 */
-+	boot_init_stack_canary();
- 	mm_init_owner(&init_mm, &init_task);
- 	mm_init_cpumask(&init_mm);
- 	setup_command_line(command_line);
+The goal here is to allow devices to add to the random pools via
+add_device_randomness or some other method of their chosing at FDT time.
+I realize that ARCH_RANDOM is already available but this didn't work because
+1) ARCH_RANDOM is not multi-platform compatible without added
+infrastructure to ARM
+2) There is no uniform way to generate the random numbers which
+would require an additional framework (same result as #1, different
+reasons)
+3) Given there is no uniform way to generate the random numbers, it seems
+unlikely that 'early' random numbers would work the same as 'non-early'
+random number which adds another layer of complexity.
+
+The big reason to skip ARCH_RANDOM though is that the random number generation
+we have would be reasonable if only seeded earlier.
+
+Thanks,
+Laura
+
+
+Laura Abbott (3):
+  of: Add early randomness hooks
+  arm: Add ARCH_WANT_OF_RANDOMNESS
+  init: Move stack canary initialization after setup_arch
+
+ arch/arm/Kconfig                  |    3 ++
+ arch/arm/kernel/vmlinux.lds.S     |    1 +
+ drivers/of/Kconfig                |    7 ++++++
+ drivers/of/Makefile               |    1 +
+ drivers/of/fdt.c                  |    7 ++++++
+ drivers/of/of_randomness.c        |   43 +++++++++++++++++++++++++++++++++++++
+ include/asm-generic/vmlinux.lds.h |    5 ++++
+ include/linux/of_randomness.h     |   42 ++++++++++++++++++++++++++++++++++++
+ init/main.c                       |    9 +++----
+ 9 files changed, 113 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/of/of_randomness.c
+ create mode 100644 include/linux/of_randomness.h
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
