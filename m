@@ -1,77 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 12 Feb 2014 08:27:55 +0100
-Subject: [PATCH] PCI: imx6: Fix link_up detection
-Message-ID: <1392190075-23204-1-git-send-email-s.hauer@pengutronix.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 12 Feb 2014 08:49:46 +0100
+Subject: [PATCH 2/3] ARM: mvebu: use GPIO DT defines in Armada 370/XP
+ boards
+In-Reply-To: <1392138433-12573-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392138433-12573-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1392138433-12573-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140212074946.GC30814@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is broken since:
+On Tue, Feb 11, 2014 at 06:07:12PM +0100, Thomas Petazzoni wrote:
+> Instead of harcoding 0 and 1 for the gpio specifications in the Armada
+> 370/XP boards, use the <dt-bindings/gpio/gpio.h> header file and its
+> GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW definitions.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-370-mirabox.dts         | 7 ++++---
+>  arch/arm/boot/dts/armada-370-rd.dts              | 3 ++-
+>  arch/arm/boot/dts/armada-xp-axpwifiap.dts        | 3 ++-
+>  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 9 +++++----
+>  4 files changed, 13 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+> index 944e878..2354fe0 100644
+> --- a/arch/arm/boot/dts/armada-370-mirabox.dts
+> +++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+> @@ -9,6 +9,7 @@
+>   */
+>  
+>  /dts-v1/;
+> +#include <dt-bindings/gpio/gpio.h>
+>  #include "armada-370.dtsi"
 
-| commit e6daf4a5e1b813bc7f85507ec83b8c2452c121e6
-| Author: Marek Vasut <marex@denx.de>
-| Date:   Thu Dec 12 22:49:59 2013 +0100
-|
-|     PCI: imx6: Report "link up" only after link training completes
-|
-|     While waiting for the PHY to report the PCIe link is up, we might hit a
-|     situation where the link training is still in progress, while the PHY
-|     already reports the link is up.  Add additional check for this condition.
-|
-|     Signed-off-by: Marek Vasut <marex@denx.de>
-|     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-|     Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Hi Thomas
 
-The problem is: Before the above commit only the PCIE_PHY_DEBUG_R1_XMLH_LINK_UP
-bit was used to determine whether the link is up or not. Since the above commit
-also the PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING is used. This means a link
-still being trained is as link down.
-The designware driver changes the PORT_LOGIC_SPEED_CHANGE bit in
-dw_pcie_host_init() which causes the link to be retrained. During the next call
-to dw_pcie_rd_conf() the link is then reported being down and the function
-returns PCIBIOS_DEVICE_NOT_FOUND resulting in nonfunctioning PCIe.
+What i did for kirkwood is include both gpio.h and input.h in
+kirkwood.dtsi. Quite a few other systems do that, rather than each
+.dts file having to include them. However i don't have a strong
+opinion.
 
-This patch fixes this by waiting until the link training has finished before
-testing the PCIE_PHY_DEBUG_R1_XMLH_LINK_UP bit. This is hardly the correct
-solution, but I don't know what should be done instead.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Richard Zhu <r65037@freescale.com> (maintainer:PCI DRIVER FOR IMX6)
-Cc: Shawn Guo <shawn.guo@linaro.org> (maintainer:PCI DRIVER FOR IMX6)
-Cc: Bjorn Helgaas <bhelgaas@google.com> (supporter:PCI SUBSYSTEM)
-Cc: linux-pci at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Marek Vasut <marex@denx.de>
----
- drivers/pci/host/pci-imx6.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 866bdc7..9b6b501 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -449,6 +449,7 @@ static void imx6_pcie_reset_phy(struct pcie_port *pp)
- static int imx6_pcie_link_up(struct pcie_port *pp)
- {
- 	u32 rc, ltssm, rx_valid;
-+	int count = 1000;
- 
- 	/*
- 	 * Test if the PHY reports that the link is up and also that
-@@ -458,8 +459,13 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
- 	 * as well here.
- 	 */
- 	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
--	if ((rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP) &&
--	    !(rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING))
-+	while (rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING) {
-+		if (!count--)
-+			return 0;
-+		rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
-+	}
-+
-+	if (rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP)
- 		return 1;
- 
- 	/*
--- 
-1.8.5.3
+	Andrew
