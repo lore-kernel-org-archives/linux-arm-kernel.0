@@ -1,36 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Feb 2014 10:21:12 +0000
-Subject: [PATCH 0/3] arm64: Use pte manipulation functions for THP
-In-Reply-To: <20140212101602.GD29702@arm.com>
-References: <1391696171-8922-1-git-send-email-steve.capper@linaro.org>
- <20140212094338.GA11325@linaro.org>
- <20140212100736.GA13441@mudshark.cambridge.arm.com>
- <20140212101602.GD29702@arm.com>
-Message-ID: <20140212102112.GE13441@mudshark.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 12 Feb 2014 11:23:32 +0100
+Subject: [PATCH v2 03/10] ARM: mvebu: add workaround for data abort issue on
+ Armada 375
+In-Reply-To: <1392200619-3141-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392200619-3141-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1392200619-3141-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 10:16:02AM +0000, Catalin Marinas wrote:
-> On Wed, Feb 12, 2014 at 10:07:37AM +0000, Will Deacon wrote:
-> > On Wed, Feb 12, 2014 at 09:43:39AM +0000, Steve Capper wrote:
-> > > On Thu, Feb 06, 2014 at 02:16:08PM +0000, Steve Capper wrote:
-> > > > This series replaces the Transparent HugePage pmd manipulation
-> > > > functions with calls to the standard pte functions. This allows the THP
-> > > > code to take advantage of the new PTE_WRITE logic, and provides better
-> > > > parity with the HugeTLB code (which already uses the pte functions).
-> > > > 
-> > > > Testing was done on the Fast Model with LTP THP tests, and the 3.14-rc1
-> > > > kernel was used.
-> > > 
-> > > Does this series look reasonable?
-> > 
-> > I was waiting for the corresponding arch/arm/ changes.
-> 
-> The arch/arm/ code doesn't have the PTE_WRITE changes. It's a bit more
-> work here because of the classic MMU (but I hope Steve will get there ;).
+Early versions of Armada 375 SoC have a bug where the BootROM leaves
+an external data abort pending. The kernel is hit by this data abort
+as soon as it enters userspace, because it unmasks the data aborts at
+this moment. We register a custom abort handler below to ignore the
+first data abort to work around this problem.
 
-Indeed, but I'm wary of divergence in the mm code between the two
-architectures and I'd much rather we try to keep them in sync, rather than
-improve/bug fix in one before porting the whole lot over.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/armada-375.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-Will
+diff --git a/arch/arm/mach-mvebu/armada-375.c b/arch/arm/mach-mvebu/armada-375.c
+index f13c9de..d772ae2 100644
+--- a/arch/arm/mach-mvebu/armada-375.c
++++ b/arch/arm/mach-mvebu/armada-375.c
+@@ -22,14 +22,37 @@
+ #include <linux/mbus.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
++#include <asm/signal.h>
+ #include "common.h"
+ 
++/*
++ * Early versions of Armada 375 SoC have a bug where the BootROM
++ * leaves an external data abort pending. The kernel is hit by this
++ * data abort as soon as it enters userspace, because it unmasks the
++ * data aborts at this moment. We register a custom abort handler
++ * below to ignore the first data abort to work around this problem.
++ */
++static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
++					struct pt_regs *regs)
++{
++	static int ignore_first;
++
++	if (!ignore_first) {
++		ignore_first = 1;
++		return 0;
++	}
++
++	return 1;
++}
++
+ static void __init armada_375_timer_and_clk_init(void)
+ {
+ 	of_clk_init(NULL);
+ 	clocksource_of_init();
+ 	BUG_ON(mvebu_mbus_dt_init());
+ 	l2x0_of_init(0, ~0UL);
++	hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
++			"imprecise external abort");
+ }
+ 
+ static const char * const armada_375_dt_compat[] = {
+-- 
+1.8.3.2
