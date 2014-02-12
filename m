@@ -1,54 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Feb 2014 12:17:45 +0100
-Subject: [PATCH 1/2] arm64: Add seccomp support
-In-Reply-To: <201402121205.10802.arnd@arndb.de>
-References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
- <CAB5YjtB6XnXRd90AUw=rJCOBKyfcngTQd3Kxft33XLCK+K=Vuw@mail.gmail.com>
- <201402121205.10802.arnd@arndb.de>
-Message-ID: <201402121217.45763.arnd@arndb.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 12 Feb 2014 11:18:04 +0000
+Subject: [PATCH 07/12] mfd: syscon: Consider platform data a regmap
+ config name
+In-Reply-To: <1392203209.3380.57.camel@hornet>
+References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
+ <1392138636-29240-8-git-send-email-pawel.moll@arm.com>
+ <1392188982.914924525@f237.i.mail.ru>
+ <20140212082657.GK15081@lee--X1> <1392203209.3380.57.camel@hornet>
+Message-ID: <20140212111804.GZ15081@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 February 2014, Arnd Bergmann wrote:
+> > > > Use the device platform data as a regmap config
+> > > > name. This is particularly useful in the regmap
+> > > > debugfs when there is more than one syscon device
+> > > > registered, to distinguish the register blocks.
+> > > > 
+> > > > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> > > > Cc: Lee Jones <lee.jones@linaro.org>
+> > > > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> > > > ---
+> > > ...
+> > > > syscon_regmap_config.max_register = res->end - res->start - 3;
+> > > > +	syscon_regmap_config.name = dev_get_platdata(&pdev->dev);
+> > > 
+> > > Is dev_name(&pdev->dev) can be used for such purpose?
+> > 
+> > Yes of course.
+> > 
+> > Either use the automatically generated name or over-ride with
+> > dev->init_name prior to registration or call dev_set_name()
+> > manually. Then retrieve with Alexander's suggestion.
+> > 
+> > Is there any technical reason why this is not possible with your
+> > implementation?
 > 
-> On Wednesday 12 February 2014, Takahiro Akashi wrote:
-> > Thank you for your comment.
-> > I'm afraid that I can't do so because how compat syscall numbers
-> > are named varies from arch to arch. __NR_compat_read is used
-> > only on arm64, while __NR_ia32_read on x86. On other archs,
-> > __NR_read is common to 32-bit and 64-bit tasks.
+> Hold on, guys. Let me just point out that we're talking "non-DT"
+> platform devices here (either statically defined struct
+> platform_device-s or - my case - the MFD cells).
 > 
-> It's fine, I'm the maintainer for asm-generic ;-)
+> In this case device/driver matching relies completely on device name.
+> Either the pdev->name must be identical (strcmp) to pdrv->name, or the
+> pdev->name must be identical (strcmp again) to one of the pdev->id_table
+> entries. See platform_match() in driver/base/platform.c for more
+> details.
 > 
-> All future architectures are required to do it the same way as
-> arm64 and use the generic syscall ABI. It just means we won't be
-> able to share this header with x86 or other architectures that
-> use a nonstandard string. We should have it in the generic place
-> even if arm64 is the only user for now.
-> 
+> Therefore the dev_name(&pdev->dev) on a non-DT-originating sysconf
+> devince will always return "sysconf.*", unless you're ready to maintain
+> a growing syscon_ids[] list. If so, I will have to add three entries
+> there ("sys_id", "sys_misc" and "sys_procid"). I hope you are not
+> seriously considering this idea :-) After all that's what the
+> platform_data was invented for.
 
-Ok, I was wrong. The generic header file should only be used for
-architectures on which both ABIs use the generic syscall numbers,
-and arm64 obviously doesn't do that for arm32 compatibility.
+Ah, I see your predicament. I guess that is a limitation of the was
+syscon works. Usually we'd use match tables to differentiate between
+various supported devices, but I guess the 'supported devices' list
+for syscon is pretty limitless. In which case I support your second
+implementation (adding a platform_data container) for the use of
+arbitrary/useful-common names.
 
-The proper generic header file should contain
-
-#if defined(CONFIG_COMPAT) && !defined(__NR_seccomp_read_32)
-#define __NR_seccomp_read_32           __NR_read
-#define __NR_seccomp_write_32          __NR_write
-#define __NR_seccomp_exit_32           __NR_exit
-#define __NR_seccomp_sigreturn_32      __NR_rt_sigreturn
-#endif /* CONFIG_COMPAT && ! already defined */
-
-#define __NR_seccomp_read              __NR_read
-#define __NR_seccomp_write             __NR_write
-#define __NR_seccomp_exit              __NR_exit
-#define __NR_seccomp_sigreturn         __NR_rt_sigreturn
-
-and then have arm64 override the first four by defining its
-own. I would still prefer having it done this way, but it actually
-doesn't gain us that much since this default wouldn't work on
-any 64-bit architecture currently implementing seccomp. I'll leave
-it up to you whether you want to do it or not.
-
-	Arnd
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
