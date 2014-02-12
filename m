@@ -1,405 +1,179 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Wed, 12 Feb 2014 15:56:15 -0500
-Subject: [PATCH v4 6/6] arm64: add early_ioremap support
-In-Reply-To: <1392238575-10000-1-git-send-email-msalter@redhat.com>
-References: <1392238575-10000-1-git-send-email-msalter@redhat.com>
-Message-ID: <1392238575-10000-7-git-send-email-msalter@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Feb 2014 21:59:46 +0100
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <1392236171-10512-4-git-send-email-will.deacon@arm.com>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <1392236171-10512-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1645474.vdytZl6znf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for early IO or memory mappings which are needed
-before the normal ioremap() is usable. This also adds fixmap
-support for permanent fixed mappings such as that used by the
-earlyprintk device register region.
+On Wednesday 12 February 2014 20:16:11 Will Deacon wrote:
+> +- ranges         : As described in IEEE Std 1275-1994, but must provide
+> +                   at least a definition of one or both of IO and Memory
+> +                   Space.
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- Documentation/arm64/memory.txt   |  4 +-
- arch/arm64/Kconfig               |  1 +
- arch/arm64/include/asm/Kbuild    |  1 +
- arch/arm64/include/asm/fixmap.h  | 67 +++++++++++++++++++++++++++++++
- arch/arm64/include/asm/io.h      |  1 +
- arch/arm64/include/asm/memory.h  |  2 +-
- arch/arm64/kernel/early_printk.c |  8 +++-
- arch/arm64/kernel/head.S         |  9 ++---
- arch/arm64/kernel/setup.c        |  2 +
- arch/arm64/mm/ioremap.c          | 85 ++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/mmu.c              | 41 -------------------
- 11 files changed, 169 insertions(+), 52 deletions(-)
- create mode 100644 arch/arm64/include/asm/fixmap.h
+I'd say *must* provide at least non-prefetchable memory. *may* provide
+prefetchable memory and/or I/O space.
 
-diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
-index 5e054bf..953c81e 100644
---- a/Documentation/arm64/memory.txt
-+++ b/Documentation/arm64/memory.txt
-@@ -35,7 +35,7 @@ ffffffbc00000000	ffffffbdffffffff	   8GB		vmemmap
- 
- ffffffbe00000000	ffffffbffbbfffff	  ~8GB		[guard, future vmmemap]
- 
--ffffffbffbc00000	ffffffbffbdfffff	   2MB		earlyprintk device
-+ffffffbffbc00000	ffffffbffbdfffff	   2MB		fixed mappings
- 
- ffffffbffbe00000	ffffffbffbe0ffff	  64KB		PCI I/O space
- 
-@@ -60,7 +60,7 @@ fffffdfc00000000	fffffdfdffffffff	   8GB		vmemmap
- 
- fffffdfe00000000	fffffdfffbbfffff	  ~8GB		[guard, future vmmemap]
- 
--fffffdfffbc00000	fffffdfffbdfffff	   2MB		earlyprintk device
-+fffffdfffbc00000	fffffdfffbdfffff	   2MB		fixed mappings
- 
- fffffdfffbe00000	fffffdfffbe0ffff	  64KB		PCI I/O space
- 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 27bbcfc..da4304a 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -16,6 +16,7 @@ config ARM64
- 	select DCACHE_WORD_ACCESS
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
-+	select GENERIC_EARLY_IOREMAP
- 	select GENERIC_IOMAP
- 	select GENERIC_IRQ_PROBE
- 	select GENERIC_IRQ_SHOW
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 71c53ec..27e3c6b 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -10,6 +10,7 @@ generic-y += delay.h
- generic-y += div64.h
- generic-y += dma.h
- generic-y += emergency-restart.h
-+generic-y += early_ioremap.h
- generic-y += errno.h
- generic-y += ftrace.h
- generic-y += hw_irq.h
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-new file mode 100644
-index 0000000..9c1fb65
---- /dev/null
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -0,0 +1,67 @@
-+/*
-+ * fixmap.h: compile-time virtual memory allocation
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ *
-+ * Copyright (C) 1998 Ingo Molnar
-+ * Copyright (C) 2013 Mark Salter <msalter@redhat.com>
-+ *
-+ * Adapted from arch/x86_64 version.
-+ *
-+ */
-+
-+#ifndef _ASM_ARM64_FIXMAP_H
-+#define _ASM_ARM64_FIXMAP_H
-+
-+#ifndef __ASSEMBLY__
-+#include <linux/kernel.h>
-+#include <asm/page.h>
-+
-+/*
-+ * Here we define all the compile-time 'special' virtual
-+ * addresses. The point is to have a constant address at
-+ * compile time, but to set the physical address only
-+ * in the boot process.
-+ *
-+ * These 'compile-time allocated' memory buffers are
-+ * page-sized. Use set_fixmap(idx,phys) to associate
-+ * physical memory with fixmap indices.
-+ *
-+ */
-+enum fixed_addresses {
-+	FIX_EARLYCON,
-+	__end_of_permanent_fixed_addresses,
-+
-+	/*
-+	 * Temporary boot-time mappings, used by early_ioremap(),
-+	 * before ioremap() is functional.
-+	 */
-+#ifdef CONFIG_ARM64_64K_PAGES
-+#define NR_FIX_BTMAPS		4
-+#else
-+#define NR_FIX_BTMAPS		64
-+#endif
-+#define FIX_BTMAPS_SLOTS	7
-+#define TOTAL_FIX_BTMAPS	(NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
-+
-+	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
-+	FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
-+	__end_of_fixed_addresses
-+};
-+
-+#define FIXADDR_SIZE	(__end_of_permanent_fixed_addresses << PAGE_SHIFT)
-+#define FIXADDR_START	(FIXADDR_TOP - FIXADDR_SIZE)
-+
-+#define FIXMAP_PAGE_IO     __pgprot(PROT_DEVICE_nGnRE)
-+
-+extern void __early_set_fixmap(enum fixed_addresses idx,
-+			       phys_addr_t phys, pgprot_t flags);
-+
-+#define __set_fixmap __early_set_fixmap
-+
-+#include <asm-generic/fixmap.h>
-+
-+#endif /* !__ASSEMBLY__ */
-+#endif /* _ASM_ARM64_FIXMAP_H */
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 4cc813e..8fb2152 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -27,6 +27,7 @@
- #include <asm/byteorder.h>
- #include <asm/barrier.h>
- #include <asm/pgtable.h>
-+#include <asm/early_ioremap.h>
- 
- #include <xen/xen.h>
- 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 9dc5dc3..e94f945 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -49,7 +49,7 @@
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
- #define MODULES_END		(PAGE_OFFSET)
- #define MODULES_VADDR		(MODULES_END - SZ_64M)
--#define EARLYCON_IOBASE		(MODULES_VADDR - SZ_4M)
-+#define FIXADDR_TOP		(MODULES_VADDR - SZ_2M - PAGE_SIZE)
- #define TASK_SIZE_64		(UL(1) << VA_BITS)
- 
- #ifdef CONFIG_COMPAT
-diff --git a/arch/arm64/kernel/early_printk.c b/arch/arm64/kernel/early_printk.c
-index fbb6e18..850d9a4 100644
---- a/arch/arm64/kernel/early_printk.c
-+++ b/arch/arm64/kernel/early_printk.c
-@@ -26,6 +26,8 @@
- #include <linux/amba/serial.h>
- #include <linux/serial_reg.h>
- 
-+#include <asm/fixmap.h>
-+
- static void __iomem *early_base;
- static void (*printch)(char ch);
- 
-@@ -141,8 +143,10 @@ static int __init setup_early_printk(char *buf)
- 	}
- 	/* no options parsing yet */
- 
--	if (paddr)
--		early_base = early_io_map(paddr, EARLYCON_IOBASE);
-+	if (paddr) {
-+		set_fixmap_io(FIX_EARLYCON, paddr);
-+		early_base = (void __iomem *)fix_to_virt(FIX_EARLYCON);
-+	}
- 
- 	printch = match->printch;
- 	early_console = &early_console_dev;
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 0b281ff..c86bfdf 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -412,7 +412,7 @@ ENDPROC(__calc_phys_offset)
-  *   - identity mapping to enable the MMU (low address, TTBR0)
-  *   - first few MB of the kernel linear mapping to jump to once the MMU has
-  *     been enabled, including the FDT blob (TTBR1)
-- *   - UART mapping if CONFIG_EARLY_PRINTK is enabled (TTBR1)
-+ *   - pgd entry for fixed mappings (TTBR1)
-  */
- __create_page_tables:
- 	pgtbl	x25, x26, x24			// idmap_pg_dir and swapper_pg_dir addresses
-@@ -465,15 +465,12 @@ __create_page_tables:
- 	sub	x6, x6, #1			// inclusive range
- 	create_block_map x0, x7, x3, x5, x6
- 1:
--#ifdef CONFIG_EARLY_PRINTK
- 	/*
--	 * Create the pgd entry for the UART mapping. The full mapping is done
--	 * later based earlyprintk kernel parameter.
-+	 * Create the pgd entry for the fixed mappings.
- 	 */
--	ldr	x5, =EARLYCON_IOBASE		// UART virtual address
-+	ldr	x5, =FIXADDR_TOP		// Fixed mapping virtual address
- 	add	x0, x26, #2 * PAGE_SIZE		// section table address
- 	create_pgd_entry x26, x0, x5, x6, x7
--#endif
- 	ret
- ENDPROC(__create_page_tables)
- 	.ltorg
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 1c66cfb..4d2ac74 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -42,6 +42,7 @@
- #include <linux/of_fdt.h>
- #include <linux/of_platform.h>
- 
-+#include <asm/fixmap.h>
- #include <asm/cputype.h>
- #include <asm/elf.h>
- #include <asm/cputable.h>
-@@ -328,6 +329,7 @@ void __init setup_arch(char **cmdline_p)
- 	*cmdline_p = boot_command_line;
- 
- 	init_mem_pgprot();
-+	early_ioremap_init();
- 
- 	parse_early_param();
- 
-diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-index 2bb1d58..7ec3283 100644
---- a/arch/arm64/mm/ioremap.c
-+++ b/arch/arm64/mm/ioremap.c
-@@ -25,6 +25,10 @@
- #include <linux/vmalloc.h>
- #include <linux/io.h>
- 
-+#include <asm/fixmap.h>
-+#include <asm/tlbflush.h>
-+#include <asm/pgalloc.h>
-+
- static void __iomem *__ioremap_caller(phys_addr_t phys_addr, size_t size,
- 				      pgprot_t prot, void *caller)
- {
-@@ -98,3 +102,84 @@ void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
- 				__builtin_return_address(0));
- }
- EXPORT_SYMBOL(ioremap_cache);
-+
-+#ifndef CONFIG_ARM64_64K_PAGES
-+static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
-+#endif
-+
-+static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
-+{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+
-+	pgd = pgd_offset_k(addr);
-+	BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
-+
-+	pud = pud_offset(pgd, addr);
-+	BUG_ON(pud_none(*pud) || pud_bad(*pud));
-+
-+	return pmd_offset(pud, addr);
-+}
-+
-+static inline pte_t * __init early_ioremap_pte(unsigned long addr)
-+{
-+	pmd_t *pmd = early_ioremap_pmd(addr);
-+
-+	BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
-+
-+	return pte_offset_kernel(pmd, addr);
-+}
-+
-+void __init early_ioremap_init(void)
-+{
-+	pmd_t *pmd;
-+
-+	pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
-+#ifndef CONFIG_ARM64_64K_PAGES
-+	/* need to populate pmd for 4k pagesize only */
-+	pmd_populate_kernel(&init_mm, pmd, bm_pte);
-+#endif
-+	/*
-+	 * The boot-ioremap range spans multiple pmds, for which
-+	 * we are not prepared:
-+	 */
-+	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
-+		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
-+
-+	if (pmd != early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END))) {
-+		WARN_ON(1);
-+		pr_warn("pmd %p != %p\n",
-+			pmd, early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END)));
-+		pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
-+			fix_to_virt(FIX_BTMAP_BEGIN));
-+		pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
-+			fix_to_virt(FIX_BTMAP_END));
-+
-+		pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
-+		pr_warn("FIX_BTMAP_BEGIN:     %d\n",
-+			FIX_BTMAP_BEGIN);
-+	}
-+
-+	early_ioremap_setup();
-+}
-+
-+void __init __early_set_fixmap(enum fixed_addresses idx,
-+			       phys_addr_t phys, pgprot_t flags)
-+{
-+	unsigned long addr = __fix_to_virt(idx);
-+	pte_t *pte;
-+
-+	if (idx >= __end_of_fixed_addresses) {
-+		BUG();
-+		return;
-+	}
-+
-+	pte = early_ioremap_pte(addr);
-+
-+	if (pgprot_val(flags))
-+		set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
-+	else {
-+		pte_clear(&init_mm, addr, pte);
-+		flush_tlb_kernel_range(addr, addr+PAGE_SIZE);
-+	}
-+}
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index ba259a0..6b7e895 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -260,47 +260,6 @@ static void __init create_mapping(phys_addr_t phys, unsigned long virt,
- 	} while (pgd++, addr = next, addr != end);
- }
- 
--#ifdef CONFIG_EARLY_PRINTK
--/*
-- * Create an early I/O mapping using the pgd/pmd entries already populated
-- * in head.S as this function is called too early to allocated any memory. The
-- * mapping size is 2MB with 4KB pages or 64KB or 64KB pages.
-- */
--void __iomem * __init early_io_map(phys_addr_t phys, unsigned long virt)
--{
--	unsigned long size, mask;
--	bool page64k = IS_ENABLED(CONFIG_ARM64_64K_PAGES);
--	pgd_t *pgd;
--	pud_t *pud;
--	pmd_t *pmd;
--	pte_t *pte;
--
--	/*
--	 * No early pte entries with !ARM64_64K_PAGES configuration, so using
--	 * sections (pmd).
--	 */
--	size = page64k ? PAGE_SIZE : SECTION_SIZE;
--	mask = ~(size - 1);
--
--	pgd = pgd_offset_k(virt);
--	pud = pud_offset(pgd, virt);
--	if (pud_none(*pud))
--		return NULL;
--	pmd = pmd_offset(pud, virt);
--
--	if (page64k) {
--		if (pmd_none(*pmd))
--			return NULL;
--		pte = pte_offset_kernel(pmd, virt);
--		set_pte(pte, __pte((phys & mask) | PROT_DEVICE_nGnRE));
--	} else {
--		set_pmd(pmd, __pmd((phys & mask) | PROT_SECT_DEVICE_nGnRE));
--	}
--
--	return (void __iomem *)((virt & mask) + (phys & ~mask));
--}
--#endif
--
- static void __init map_mem(void)
- {
- 	struct memblock_region *reg;
--- 
-1.8.5.3
+> +- #address-cells : Must be 3
+> +
+> +- #size-cells    : Must be 2
+> +
+> +- reg            : The Configuration Space base address, as accessed by the
+> +                   parent bus.
+> +
+> +Configuration Space is assumed to be memory-mapped (as opposed to being
+> +accessed via an ioport) and laid out with a direct correspondence to the
+> +geography of a PCI bus address by concatenating the various components to form
+> +an offset.
+> +
+> +For CAM, this 24-bit offset is:
+> +
+> +        cfg_offset(bus, device, function, register) =
+> +                   bus << 16 | device << 11 | function << 8 | register
+> +
+> +Whilst ECAM extends this by 4 bits to accomodate 4k of function space:
+> +
+> +        cfg_offset(bus, device, function, register) =
+> +                   bus << 20 | device << 15 | function << 12 | register
+> +
+> +Interrupt mapping is exactly as described in `Open Firmware Recommended
+> +Practice: Interrupt Mapping' and requires the following properties:
+> +
+> +- #interrupt-cells   : Must be 1
+> +
+> +- interrupt-map      : <see aforementioned specification>
+> +
+> +- interrupt-map-mask : <see aforementioned specification>
+
+We probably want to add an optional 'bus-range' property (the default being
+<0 255> if absent), so we don't have to map all the config space.
+
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 47d46c6d8468..491d74c36f6a 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -33,4 +33,11 @@ config PCI_RCAR_GEN2
+>  	  There are 3 internal PCI controllers available with a single
+>  	  built-in EHCI/OHCI host controller present on each one.
+>  
+> +config PCI_ARM_GENERIC
+> +	bool "ARM generic PCI host controller"
+> +	depends on ARM && OF
+> +	help
+> +	  Say Y here if you want to support a simple generic PCI host
+> +	  controller, such as the one emulated by kvmtool.
+> +
+>  endmenu
+
+Looks good for now. In the long run, I'd hope to get rid of the 'ARM'
+part here and make it work on any architecture, but that requires
+significant work that we should not depend on here.
+
+
+> +struct gen_pci_cfg_window {
+> +	u64					cpu_phys;
+> +	void __iomem				*base;
+> +	u8					bus;
+> +	spinlock_t				lock;
+> +	const struct gen_pci_cfg_accessors	*accessors;
+> +};
+> +
+> +struct gen_pci_resource {
+> +	struct list_head			list;
+> +	struct resource				cpu_res;
+> +	resource_size_t				offset;
+> +};
+
+Your gen_pci_resource is actually identical to struct pci_host_bridge_window,
+which I guess is coincidence, but it would be nice to actually use
+the standard structure to make it easier to integrate with common
+infrastructure later.
+
+> +
+> +struct gen_pci {
+> +	struct device				*dev;
+> +	struct resource				*io_res;
+> +	struct list_head			mem_res;
+> +	struct gen_pci_cfg_window		cfg;
+> +};
+
+How about making this structure derived from pci_host_bridge?
+That would already contain a lot of the members, and gets two things
+right: 
+
+* it's useful to have an embedded 'struct device' here, and use dev->parent
+  to point to the device from DT
+* for I/O, we actually want a pci_host_bridge_window, not just a resource,
+  since we should keep track of the offset
+
+> +static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
+> +					      unsigned int devfn,
+> +					      int where)
+> +{
+> +	struct pci_sys_data *sys = bus->sysdata;
+> +	struct gen_pci *pci = sys->private_data;
+> +	u32 busn = bus->number;
+> +
+> +	spin_lock(&pci->cfg.lock);
+> +	if (pci->cfg.bus != busn) {
+> +		resource_size_t offset;
+> +
+> +		devm_iounmap(pci->dev, pci->cfg.base);
+> +		offset = pci->cfg.cpu_phys + (busn << 20);
+> +		pci->cfg.base = devm_ioremap(pci->dev, offset, SZ_1M);
+> +		pci->cfg.bus = busn;
+> +	}
+> +
+> +	return pci->cfg.base + ((devfn << 12) | where);
+> +}
+
+Nice idea, but unfortunately broken: we need config space access from
+atomic context, since there are drivers doing that.
+
+> +static int gen_pci_probe(struct platform_device *pdev)
+> +{
+> +	struct hw_pci hw;
+> +	struct of_pci_range range;
+> +	struct of_pci_range_parser parser;
+> +	struct gen_pci *pci;
+> +	const __be32 *reg;
+> +	const struct of_device_id *of_id;
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+
+Could you try to move almost all of this function into gen_pci_setup()?
+I suspect this will make it easier later to share this driver with other
+architectures.
+
+> +
+> +	hw = (struct hw_pci) {
+> +		.nr_controllers	= 1,
+> +		.private_data	= (void **)&pci,
+> +		.setup		= gen_pci_setup,
+> +		.map_irq	= of_irq_parse_and_map_pci,
+> +		.ops		= &gen_pci_ops,
+> +	};
+> +
+> +	pci_common_init_dev(dev, &hw);
+> +	return 0;
+> +}
+
+A missing part here seems to be a way to propagate errors from
+the pci_common_init_dev or gen_pci_setup back to the caller.
+
+This seems to be a result of the arm pcibios implementation not
+being meant for loadable modules, but I suspect it can be fixed.
+The nr_controllers>1 logic gets a bit in the way there, but it's
+also a model that seems to be getting out of fashion:
+kirkwood/dove/orion5x/mv78xx0 use it at the moment, but are
+migrating over to the new pci-mvebu code that doesn't as they
+get rid of the non-DT probing. pci-rcar-gen2.c uses it, but it
+seems they already ran into problems with that and are changing
+it. That pretty much leaves iop13xx as the only user, but at
+that point we can probably move the loop into iop13xx specific
+code.
+
+	Arnd
