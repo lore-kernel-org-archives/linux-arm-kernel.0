@@ -1,52 +1,66 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Feb 2014 12:04:35 +0100
-Subject: [PATCH v3 13/13] Documentation: arm: update Marvell documentation
- about Armada 375/38x
+Date: Thu, 13 Feb 2014 12:04:28 +0100
+Subject: [PATCH v3 06/13] ARM: mvebu: add workaround for data abort issue on
+ Armada 375
 In-Reply-To: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1392289475-8902-14-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1392289475-8902-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit updates the documentation that describes the various
-families of SOCs produced by Marvell, together with the corresponding
-available technical documents. It adds Armada 375 and Armada 38x, and
-adds a link to the product brief for the already supported Armada 370.
+Early versions of Armada 375 SoC have a bug where the BootROM leaves
+an external data abort pending. The kernel is hit by this data abort
+as soon as it enters userspace, because it unmasks the data aborts at
+this moment. We register a custom abort handler below to ignore the
+first data abort to work around this problem.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- Documentation/arm/Marvell/README | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/arm/mach-mvebu/armada-mvebu.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/Documentation/arm/Marvell/README b/Documentation/arm/Marvell/README
-index 5a930c1..963ec44 100644
---- a/Documentation/arm/Marvell/README
-+++ b/Documentation/arm/Marvell/README
-@@ -83,14 +83,24 @@ EBU Armada family
-         88F6710
-         88F6707
-         88F6W11
-+    Product Brief: http://www.marvell.com/embedded-processors/armada-300/assets/Marvell_ARMADA_370_SoC.pdf
+diff --git a/arch/arm/mach-mvebu/armada-mvebu.c b/arch/arm/mach-mvebu/armada-mvebu.c
+index 7d1687a..7e50464 100644
+--- a/arch/arm/mach-mvebu/armada-mvebu.c
++++ b/arch/arm/mach-mvebu/armada-mvebu.c
+@@ -36,6 +36,27 @@ static void __init armada_mvebu_map_io(void)
+ 	debug_ll_io_init();
+ }
+ 
++/*
++ * Early versions of Armada 375 SoC have a bug where the BootROM
++ * leaves an external data abort pending. The kernel is hit by this
++ * data abort as soon as it enters userspace, because it unmasks the
++ * data aborts at this moment. We register a custom abort handler
++ * below to ignore the first data abort to work around this
++ * problem.
++ */
++static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
++					struct pt_regs *regs)
++{
++	static int ignore_first;
 +
-+  Armada 375 Flavors:
-+	88F6720
-+    Product Brief: http://www.marvell.com/embedded-processors/armada-300/assets/ARMADA_375_SoC-01_product_brief.pdf
++	if (!ignore_first && fsr == 0x1406) {
++		ignore_first = 1;
++		return 0;
++	}
 +
-+  Armada 380/385 Flavors:
-+	88F6810
-+	88F6820
-+	88F6828
++	return 1;
++}
++
+ static void __init armada_mvebu_timer_and_clk_init(void)
+ {
+ 	of_clk_init(NULL);
+@@ -45,6 +66,10 @@ static void __init armada_mvebu_timer_and_clk_init(void)
+ #ifdef CONFIG_CACHE_L2X0
+ 	l2x0_of_init(0, ~0UL);
+ #endif
++
++	if (of_machine_is_compatible("marvell,armada375"))
++		hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
++				"imprecise external abort");
+ }
  
-   Armada XP Flavors:
-         MV78230
-         MV78260
-         MV78460
-     NOTE: not to be confused with the non-SMP 78xx0 SoCs
-+    Product Brief: http://www.marvell.com/embedded-processors/armada-xp/assets/Marvell-ArmadaXP-SoC-product%20brief.pdf
- 
--  Product Brief: http://www.marvell.com/embedded-processors/armada-xp/assets/Marvell-ArmadaXP-SoC-product%20brief.pdf
-   No public datasheet available.
- 
-   Core: Sheeva ARMv7 compatible
+ static void __init i2c_quirk(void)
 -- 
 1.8.3.2
