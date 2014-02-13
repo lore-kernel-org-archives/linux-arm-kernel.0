@@ -1,54 +1,106 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Feb 2014 12:55:26 +0100
-Subject: [PATCH v3 01/13] ARM: mvebu: rename armada-370-xp.c to
- armada-mvebu.c
-In-Reply-To: <2036226.egxWL7qC66@wuerfel>
-References: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392289475-8902-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <2036226.egxWL7qC66@wuerfel>
-Message-ID: <20140213125526.3af08c54@skate>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Feb 2014 12:00:42 +0000
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <348076699.SKFqCqFVHd@wuerfel>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <1645474.vdytZl6znf@wuerfel>
+ <20140213110401.GB13576@mudshark.cambridge.arm.com>
+ <348076699.SKFqCqFVHd@wuerfel>
+Message-ID: <20140213120042.GE13576@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
-
-On Thu, 13 Feb 2014 12:50:15 +0100, Arnd Bergmann wrote:
-> On Thursday 13 February 2014 12:04:23 Thomas Petazzoni wrote:
-> > In preparation to the introduction of the support of Armada 375 and
-> > Armada 38x, this commit renames arch/arm/mach-mvebu/armada-370-xp.c to
-> > arch/arm/mach-mvebu/armada-mvebu.c. The armada-mvebu.c name was chosen
-> > because:
+On Thu, Feb 13, 2014 at 11:47:46AM +0000, Arnd Bergmann wrote:
+> On Thursday 13 February 2014 11:04:02 Will Deacon wrote:
+> > On Wed, Feb 12, 2014 at 08:59:46PM +0000, Arnd Bergmann wrote:
+> > > On Wednesday 12 February 2014 20:16:11 Will Deacon wrote:
+> > > > +struct gen_pci_resource {
+> > > > +	struct list_head			list;
+> > > > +	struct resource				cpu_res;
+> > > > +	resource_size_t				offset;
+> > > > +};
+> > > 
+> > > Your gen_pci_resource is actually identical to struct pci_host_bridge_window,
+> > > which I guess is coincidence, but it would be nice to actually use
+> > > the standard structure to make it easier to integrate with common
+> > > infrastructure later.
 > > 
-> >  * As we are going to merge the support for Kirkwood and Dove into
-> >    mach-mvebu, there will be other files with DT_MACHINE_START
-> >    structures, so a generic name such as board-dt.c or mvebu.c does
-> >    not work.
-> > 
-> >  * A simple armada.c does not work, because there are Marvell Armada
-> >    SOCs that are not part of the MVEBU family. For example, the
-> >    Marvell Armada 1500 are part of the mach-berlin family, which is a
-> >    completely separate line of SOCs.
+> > Ha, at least I managed to come up with the same struct! I'll move to the
+> > generic version.
 > 
-> Your reasoning for the new name makes a lot of sense, but my personal
-> opinion is that I'd rather leave the name as it is and deal with the
-> fact that it's not the best name. Renaming files often causes unexpected
-> problems, in particular if someone else wants to modify the same file.
+> Hmm, I fear I was speaking too quickly, the pci_host_bridge_window actually
+> contains a pointer to the resource rather than the resource itself :(
 
-I believe it's a matter of taste here. Having a file named
-armada-370-xp.c that handles Armada 375 and Armada 38x looks highly
-confusing to me, and I believe both Gr?gory and Ezequiel were of the
-same opinion.
+I can allocate the resources dynamically as I parse them, not a problem at
+all.
 
-The number of changes to this file is very limited, so the probability
-of having a large number of complicated patches touching the same file
-being in flight is fairly low.
+> There is probably a way to do this better, at least once we unify the
+> probe() and setup() functions.
 
-Maybe we can leave this taste decision to the mach-mvebu maintainers?
+Yes, I fully expect this to be iterative.
 
-Best regards,
+> > > > +	spin_lock(&pci->cfg.lock);
+> > > > +	if (pci->cfg.bus != busn) {
+> > > > +		resource_size_t offset;
+> > > > +
+> > > > +		devm_iounmap(pci->dev, pci->cfg.base);
+> > > > +		offset = pci->cfg.cpu_phys + (busn << 20);
+> > > > +		pci->cfg.base = devm_ioremap(pci->dev, offset, SZ_1M);
+> > > > +		pci->cfg.bus = busn;
+> > > > +	}
+> > > 
+> > > Nice idea, but unfortunately broken: we need config space access from
+> > > atomic context, since there are drivers doing that.
+> > 
+> > That aside, I just took a spin_lock so this needs fixing regardless. The
+> > only solution I can think of then is to map all of the buses at setup time
+> > (making bus_ranges pretty important) and hope that I don't chew through all
+> > of vmalloc.
+> 
+> It's possible we have to go further and only map the buses that are
+> actually used, rather than the ones that are defined for the bus,
+> but just mapping the entire range is a reasonable start I think.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Okey doke.
+
+> > > > +	hw = (struct hw_pci) {
+> > > > +		.nr_controllers	= 1,
+> > > > +		.private_data	= (void **)&pci,
+> > > > +		.setup		= gen_pci_setup,
+> > > > +		.map_irq	= of_irq_parse_and_map_pci,
+> > > > +		.ops		= &gen_pci_ops,
+> > > > +	};
+> > > > +
+> > > > +	pci_common_init_dev(dev, &hw);
+> > > > +	return 0;
+> > > > +}
+> > > 
+> > > A missing part here seems to be a way to propagate errors from
+> > > the pci_common_init_dev or gen_pci_setup back to the caller.
+> > > 
+> > > This seems to be a result of the arm pcibios implementation not
+> > > being meant for loadable modules, but I suspect it can be fixed.
+> > > The nr_controllers>1 logic gets a bit in the way there, but it's
+> > > also a model that seems to be getting out of fashion:
+> > > kirkwood/dove/orion5x/mv78xx0 use it at the moment, but are
+> > > migrating over to the new pci-mvebu code that doesn't as they
+> > > get rid of the non-DT probing. pci-rcar-gen2.c uses it, but it
+> > > seems they already ran into problems with that and are changing
+> > > it. That pretty much leaves iop13xx as the only user, but at
+> > > that point we can probably move the loop into iop13xx specific
+> > > code.
+> > 
+> > Makes sense once there are no users of the field.
+> 
+> With the patch I just suggested, we can simply keep
+> pci_common_init_dev() for older (non-multiplatform) controllers 
+> and not change them at all but move on to something else for
+> the interesting ones, i.e. those we want to share with arm64.
+
+Yes, that looks sensible. An alternative is to create an hw_pci in
+pci_host_bridge_register with nr_controllers = 1 then call
+pci_common_init_dev. It would remove slightly more code, but obviously ties
+the thing to arm.
+
+Will
