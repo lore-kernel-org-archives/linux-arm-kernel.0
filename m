@@ -1,60 +1,110 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Thu, 13 Feb 2014 12:15:38 -0600
-Subject: [PATCHv2 07/16] iommu/omap: allow enable/disable even without pdata
+Date: Thu, 13 Feb 2014 12:15:32 -0600
+Subject: [PATCHv2 01/16] iommu/omap: convert to devm_* interfaces
 In-Reply-To: <1392315347-32967-1-git-send-email-s-anna@ti.com>
 References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
-Message-ID: <1392315347-32967-8-git-send-email-s-anna@ti.com>
+Message-ID: <1392315347-32967-2-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Vaussard <florian.vaussard@epfl.ch>
-
-When booting with a devicetree, no platform data is provided.
-Do not prematurely exit iommu_enable() and iommu_disable() in
-such a case.
-
-Note: As OMAP do not yet has a proper reset controller driver,
-IOMMUs requiring a reset signal should use pdata-quirks as a
-transitional solution.
+Use the various devm_ interfaces to simplify the cleanup in
+probe and remove functions.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- drivers/iommu/omap-iommu.c | 10 ++--------
- 1 file changed, 2 insertions(+), 8 deletions(-)
+ drivers/iommu/omap-iommu.c | 52 +++++++++-------------------------------------
+ 1 file changed, 10 insertions(+), 42 deletions(-)
 
 diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index f6afe8f..7672eb4 100644
+index bcd78a7..fff2ffd 100644
 --- a/drivers/iommu/omap-iommu.c
 +++ b/drivers/iommu/omap-iommu.c
-@@ -149,13 +149,10 @@ static int iommu_enable(struct omap_iommu *obj)
- 	struct platform_device *pdev = to_platform_device(obj->dev);
+@@ -941,7 +941,7 @@ static int omap_iommu_probe(struct platform_device *pdev)
+ 	struct resource *res;
  	struct iommu_platform_data *pdata = pdev->dev.platform_data;
  
--	if (!pdata)
--		return -EINVAL;
+-	obj = kzalloc(sizeof(*obj) + MMU_REG_SIZE, GFP_KERNEL);
++	obj = devm_kzalloc(&pdev->dev, sizeof(*obj) + MMU_REG_SIZE, GFP_KERNEL);
+ 	if (!obj)
+ 		return -ENOMEM;
+ 
+@@ -958,33 +958,18 @@ static int omap_iommu_probe(struct platform_device *pdev)
+ 	INIT_LIST_HEAD(&obj->mmap);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res) {
+-		err = -ENODEV;
+-		goto err_mem;
+-	}
 -
- 	if (!arch_iommu)
- 		return -ENODEV;
- 
--	if (pdata->deassert_reset) {
-+	if (pdata && pdata->deassert_reset) {
- 		err = pdata->deassert_reset(pdev, pdata->reset_name);
- 		if (err) {
- 			dev_err(obj->dev, "deassert_reset failed: %d\n", err);
-@@ -175,14 +172,11 @@ static void iommu_disable(struct omap_iommu *obj)
- 	struct platform_device *pdev = to_platform_device(obj->dev);
- 	struct iommu_platform_data *pdata = pdev->dev.platform_data;
- 
--	if (!pdata)
--		return;
+-	res = request_mem_region(res->start, resource_size(res),
+-				 dev_name(&pdev->dev));
+-	if (!res) {
+-		err = -EIO;
+-		goto err_mem;
+-	}
 -
- 	arch_iommu->disable(obj);
+-	obj->regbase = ioremap(res->start, resource_size(res));
+-	if (!obj->regbase) {
+-		err = -ENOMEM;
+-		goto err_ioremap;
+-	}
++	obj->regbase = devm_ioremap_resource(obj->dev, res);
++	if (IS_ERR(obj->regbase))
++		return PTR_ERR(obj->regbase);
  
- 	pm_runtime_put_sync(obj->dev);
+ 	irq = platform_get_irq(pdev, 0);
+-	if (irq < 0) {
+-		err = -ENODEV;
+-		goto err_irq;
+-	}
+-	err = request_irq(irq, iommu_fault_handler, IRQF_SHARED,
+-			  dev_name(&pdev->dev), obj);
++	if (irq < 0)
++		return -ENODEV;
++
++	err = devm_request_irq(obj->dev, irq, iommu_fault_handler, IRQF_SHARED,
++			       dev_name(obj->dev), obj);
+ 	if (err < 0)
+-		goto err_irq;
++		return err;
+ 	platform_set_drvdata(pdev, obj);
  
--	if (pdata->assert_reset)
-+	if (pdata && pdata->assert_reset)
- 		pdata->assert_reset(pdev, pdata->reset_name);
+ 	pm_runtime_irq_safe(obj->dev);
+@@ -992,34 +977,17 @@ static int omap_iommu_probe(struct platform_device *pdev)
+ 
+ 	dev_info(&pdev->dev, "%s registered\n", obj->name);
+ 	return 0;
+-
+-err_irq:
+-	iounmap(obj->regbase);
+-err_ioremap:
+-	release_mem_region(res->start, resource_size(res));
+-err_mem:
+-	kfree(obj);
+-	return err;
+ }
+ 
+ static int omap_iommu_remove(struct platform_device *pdev)
+ {
+-	int irq;
+-	struct resource *res;
+ 	struct omap_iommu *obj = platform_get_drvdata(pdev);
+ 
+ 	iopgtable_clear_entry_all(obj);
+ 
+-	irq = platform_get_irq(pdev, 0);
+-	free_irq(irq, obj);
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(res->start, resource_size(res));
+-	iounmap(obj->regbase);
+-
+ 	pm_runtime_disable(obj->dev);
+ 
+ 	dev_info(&pdev->dev, "%s removed\n", obj->name);
+-	kfree(obj);
+ 	return 0;
  }
  
 -- 
