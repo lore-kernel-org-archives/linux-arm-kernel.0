@@ -1,36 +1,109 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 13 Feb 2014 17:15:52 +0900
-Subject: [PATCH] clocksource: exynos_mct: remove unwanted header file
- inclusion
-In-Reply-To: <1389314025-2890-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1389314025-2890-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <52FC7F38.1060603@samsung.com>
+From: ta.omasab@gmail.com (Thomas Abraham)
+Date: Thu, 13 Feb 2014 13:32:31 +0530
+Subject: [PATCH v3 1/7] cpufreq: cpufreq-cpu0: allow use of optional boost
+ mode frequencies
+In-Reply-To: <52FB8C23.30003@samsung.com>
+References: <1391788548-13056-1-git-send-email-thomas.ab@samsung.com>
+ <1391788548-13056-2-git-send-email-thomas.ab@samsung.com>
+ <52FB8C23.30003@samsung.com>
+Message-ID: <CAJuA9agoK4vO+1mTktgc6BoHLO8qR2482uizP1LbG5zgy9Q4kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/2014 09:33 AM, Pankaj Dubey wrote:
-> remove unwanted header file inclusion "asm/mach/time.h" from exynos_mct.c
+On Wed, Feb 12, 2014 at 8:28 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Thomas,
 >
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->   drivers/clocksource/exynos_mct.c |    2 --
->   1 file changed, 2 deletions(-)
 >
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index 48f76bc..ed49b25 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -25,8 +25,6 @@
->   #include <linux/of_address.h>
->   #include <linux/clocksource.h>
->   
-> -#include <asm/mach/time.h>
-> -
->   #define EXYNOS4_MCTREG(x)		(x)
->   #define EXYNOS4_MCT_G_CNT_L		EXYNOS4_MCTREG(0x100)
->   #define EXYNOS4_MCT_G_CNT_U		EXYNOS4_MCTREG(0x104)
+> On 07.02.2014 16:55, Thomas Abraham wrote:
+>>
+>> From: Thomas Abraham <thomas.ab@samsung.com>
+>>
+>> Lookup for the optional boost-frequency property in cpu0 node and if
+>> available, enable support for boost mode frequencies. The frequencies
+>> usable in boost mode are determined while preparing the cpufreq table
+>> from the list of operating points available.
+>>
+>> In addition to this, enable the CPU_FREQ_BOOST_SW config option for
+>> this driver by default. On platforms that do not support boost mode,
+>> the boost mode frequencies will not be specified in cpu0 node and
+>> hence the boost mode support will not be enabled. Since this driver
+>> anyways depends on THERMAL config option, it is safe to enable
+>> CPU_FREQ_BOOST_SW config option as default.
+>>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Cc: Lukasz Majewski <l.majewski@samsung.com>
+>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>> ---
+>>   Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt |    2 ++
+>>   drivers/cpufreq/Kconfig                                    |    1 +
+>>   drivers/cpufreq/cpufreq-cpu0.c                             |    3 +++
+>>   3 files changed, 6 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+>> b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+>> index f055515..60f321a 100644
+>> --- a/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+>> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-cpu0.txt
+>> @@ -19,6 +19,8 @@ Optional properties:
+>>   - cooling-min-level:
+>>   - cooling-max-level:
+>>        Please refer to
+>> Documentation/devicetree/bindings/thermal/thermal.txt.
+>> +- boost-frequency:
+>> +     Please refer to
+>> Documentation/devicetree/bindings/cpufreq/cpufreq-boost.txt
+>>
+>>   Examples:
+>>
+>> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+>> index 4b029c0..52cc704 100644
+>> --- a/drivers/cpufreq/Kconfig
+>> +++ b/drivers/cpufreq/Kconfig
+>> @@ -187,6 +187,7 @@ config GENERIC_CPUFREQ_CPU0
+>>         tristate "Generic CPU0 cpufreq driver"
+>>         depends on HAVE_CLK && REGULATOR && OF && THERMAL && CPU_THERMAL
+>>         select PM_OPP
+>> +       select CPU_FREQ_BOOST_SW
+>>         help
+>>           This adds a generic cpufreq driver for CPU0 frequency
+>> management.
+>>           It supports both uniprocessor (UP) and symmetric multiprocessor
+>> (SMP)
+>> diff --git a/drivers/cpufreq/cpufreq-cpu0.c
+>> b/drivers/cpufreq/cpufreq-cpu0.c
+>> index 0c12ffc..06539eb 100644
+>> --- a/drivers/cpufreq/cpufreq-cpu0.c
+>> +++ b/drivers/cpufreq/cpufreq-cpu0.c
+>> @@ -195,6 +195,9 @@ static int cpu0_cpufreq_probe(struct platform_device
+>> *pdev)
+>>                         transition_latency += ret * 1000;
+>>         }
+>>
+>> +       if (of_find_property(cpu_dev->of_node, "boost-frequency", NULL))
+>> +               cpu0_cpufreq_driver.boost_supported = true;
+>> +
+>>         ret = cpufreq_register_driver(&cpu0_cpufreq_driver);
+>>         if (ret) {
+>>                 pr_err("failed register driver: %d\n", ret);
+>>
+>
+> I'd say that boost should be enabled depending on user's preference, as done
+> before in Exynos cpufreq driver. So both presence of boost-frequency
+> property and state of CPU_FREQ_BOOST_SW should be considered.
+>
+> As for CPU_FREQ_BOOST_SW, I don't think it should be always selected, but
+> ather, either converted to a user-selectable bool entry or made selectable
+> by other entry, like current ARM_EXYNOS_CPU_FREQ_BOOST_SW.
 
-Ping.
+We still will have the same problem on Exynos multi-platform kernel
+where one Exynos platform needs it and others don't. Same with just
+using the CPU_FREQ_BOOST_SW config option. So that was the reason to
+just fallback on presence of boost property.
 
 Thanks,
-Pankaj Dubey
+Thomas.
+
+
+>
+> Best regards,
+> Tomasz
