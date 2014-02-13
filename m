@@ -1,63 +1,122 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 13 Feb 2014 18:33:30 +0100
-Subject: [PATCH v4 07/13] ARM: dts: mvebu: Add a new set of registers to the
- PMSU node
+Date: Thu, 13 Feb 2014 18:33:32 +0100
+Subject: [PATCH v4 09/13] ARM: mvebu: Add the PMSU related part of the cpu
+ idle functions
 In-Reply-To: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1392312816-17657-8-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1392312816-17657-10-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Power Management Unit Service block also controls the Coherency
-Fabric subsystem. This new set of registers is needed for the CPU idle
-implementation for the Armada XP, it allows to enter in a deep CPU
-idle state where the Coherency Fabric and the L2 cache are powerdown.
+The cpu idle support will need to access to Power Management Service
+Unit. This commit adds the prepare and restore functions that will be
+used in the idle path of the cpuidle driver.
 
-Cc: devicetree at vger.kernel.org
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt | 12 +++++++-----
- arch/arm/boot/dts/armada-xp.dtsi                             |  2 +-
- 2 files changed, 8 insertions(+), 6 deletions(-)
+ arch/arm/mach-mvebu/pmsu.c | 85 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-index 926b4d6aae7e..8a9db0c32ba5 100644
---- a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-+++ b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
-@@ -7,14 +7,16 @@ Required properties:
- - compatible: "marvell,armada-370-xp-pmsu"
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 36d946d53f54..ec745d59fea8 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -29,6 +29,24 @@ static void __iomem *pmsu_reset_base;
+ static void __iomem *pmsu_fabric_base;
  
- - reg: Should contain PMSU registers location and length. First pair
--  for the per-CPU SW Reset Control registers, second pair for the
--  Power Management Service Unit.
-+  for the per-CPU SW Reset Control registers, second pair for the CPU
-+  Power Management Service Unit registers, third pair for the Fabric Power
-+  Management Service Unit registers.
+ /* PMSU MP registers */
++#define PMSU_CONTROL_AND_CONFIG(cpu)	    ((cpu * 0x100) + 0x4)
++#define PMSU_CONTROL_AND_CONFIG_DFS_REQ		BIT(18)
++#define PMSU_CONTROL_AND_CONFIG_PWDDN_REQ	BIT(16)
++#define PMSU_CONTROL_AND_CONFIG_L2_PWDDN	BIT(20)
++
++#define PMSU_CPU_POWER_DOWN_CONTROL(cpu)    ((cpu * 0x100) + 0x8)
++
++#define PMSU_CPU_POWER_DOWN_DIS_SNP_Q_SKIP	BIT(0)
++
++#define PMSU_STATUS_AND_MASK(cpu)	    ((cpu * 0x100) + 0xc)
++#define PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT	BIT(16)
++#define PMSU_STATUS_AND_MASK_SNP_Q_EMPTY_WAIT	BIT(17)
++#define PMSU_STATUS_AND_MASK_IRQ_WAKEUP		BIT(20)
++#define PMSU_STATUS_AND_MASK_FIQ_WAKEUP		BIT(21)
++#define PMSU_STATUS_AND_MASK_DBG_WAKEUP		BIT(22)
++#define PMSU_STATUS_AND_MASK_IRQ_MASK		BIT(24)
++#define PMSU_STATUS_AND_MASK_FIQ_MASK		BIT(25)
++
+ #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu) ((cpu * 0x100) + 0x24)
  
- Example:
+ /* PMSU reset registers */
+@@ -99,4 +117,71 @@ void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
+ 	writel(reg, pmsu_fabric_base + L2C_NFABRIC_PM_CTL);
+ }
  
--armada-370-xp-pmsu at d0022000 {
-+armada-370-xp-pmsu at 22000 {
- 	compatible = "marvell,armada-370-xp-pmsu";
--	reg = <0xd0022100 0x430>,
--	      <0xd0020800 0x20>;
-+	reg = <0x22100 0x430>,
-+	      <0x20800 0x20>,
-+	      <0x22000 0x24>;
- };
- 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index b8b84a22f0f3..f717da4f4d97 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -113,7 +113,7 @@
- 
- 			armada-370-xp-pmsu at 22000 {
- 				compatible = "marvell,armada-370-xp-pmsu";
--				reg = <0x22100 0x400>, <0x20800 0x20>;
-+				reg = <0x22100 0x400>, <0x20800 0x20>, <0x22000 0x24>;
- 			};
- 
- 			eth2: ethernet at 30000 {
++static void armada_370_xp_cpu_resume(void)
++{
++	asm volatile("bl    ll_set_cpu_coherent_and_smp\n\t"
++		     "b	    cpu_resume\n\t");
++}
++
++/* No locking is needed because we only access per-CPU registers */
++void armada_370_xp_pmsu_idle_prepare(bool deepidle)
++{
++	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
++	u32 reg;
++
++	if (pmsu_mp_base == NULL)
++		return;
++
++	/*
++	 * Adjust the PMSU configuration to wait for WFI signal, enable
++	 * IRQ and FIQ as wakeup events, set wait for snoop queue empty
++	 * indication and mask IRQ and FIQ from CPU
++	 */
++	reg = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
++	reg |= PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT    |
++	       PMSU_STATUS_AND_MASK_IRQ_WAKEUP       |
++	       PMSU_STATUS_AND_MASK_FIQ_WAKEUP       |
++	       PMSU_STATUS_AND_MASK_SNP_Q_EMPTY_WAIT |
++	       PMSU_STATUS_AND_MASK_IRQ_MASK         |
++	       PMSU_STATUS_AND_MASK_FIQ_MASK;
++	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
++
++	reg = readl(pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
++	/* ask HW to power down the L2 Cache if needed */
++	if (deepidle)
++		reg |= PMSU_CONTROL_AND_CONFIG_L2_PWDDN;
++
++	/* request power down */
++	reg |= PMSU_CONTROL_AND_CONFIG_PWDDN_REQ;
++	writel(reg, pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
++
++	/* Disable snoop disable by HW - SW is taking care of it */
++	reg = readl(pmsu_mp_base + PMSU_CPU_POWER_DOWN_CONTROL(hw_cpu));
++	reg |= PMSU_CPU_POWER_DOWN_DIS_SNP_Q_SKIP;
++	writel(reg, pmsu_mp_base + PMSU_CPU_POWER_DOWN_CONTROL(hw_cpu));
++}
++
++/* No locking is needed because we only access per-CPU registers */
++static noinline void armada_370_xp_pmsu_idle_restore(void)
++{
++	unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
++	u32 reg;
++
++	if (pmsu_mp_base == NULL)
++		return;
++
++	/* cancel ask HW to power down the L2 Cache if possible */
++	reg = readl(pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
++	reg &= ~PMSU_CONTROL_AND_CONFIG_L2_PWDDN;
++	writel(reg, pmsu_mp_base + PMSU_CONTROL_AND_CONFIG(hw_cpu));
++
++	/* cancel Enable wakeup events and mask interrupts */
++	reg = readl(pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
++	reg &= ~(PMSU_STATUS_AND_MASK_IRQ_WAKEUP | PMSU_STATUS_AND_MASK_FIQ_WAKEUP);
++	reg &= ~PMSU_STATUS_AND_MASK_CPU_IDLE_WAIT;
++	reg &= ~PMSU_STATUS_AND_MASK_SNP_Q_EMPTY_WAIT;
++	reg &= ~(PMSU_STATUS_AND_MASK_IRQ_MASK | PMSU_STATUS_AND_MASK_FIQ_MASK);
++	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
++}
++
+ early_initcall(armada_370_xp_pmsu_init);
 -- 
 1.8.1.2
