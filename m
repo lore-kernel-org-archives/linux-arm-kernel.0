@@ -1,94 +1,85 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Feb 2014 17:04:56 +0900
-Subject: [GIT PULL 00/12] Second Round of Renesas ARM Based SoC Updates for
- v3.15
-Message-ID: <cover.1392277789.git.horms+renesas@verge.net.au>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 13 Feb 2014 17:10:29 +0900
+Subject: [PATCH] pci: Add support for creating a generic host_bridge from
+ device tree
+In-Reply-To: <20140206101814.GA4993@e106497-lin.cambridge.arm.com>
+References: <1391452428-22917-1-git-send-email-Liviu.Dudau@arm.com>
+ <1391452428-22917-2-git-send-email-Liviu.Dudau@arm.com>
+ <7398333.9L5KlyFggU@wuerfel>
+ <CACoXjckKRQfR3CbC1JpgbhOumED+OqiMh1_Y73-h6q=ByMNanw@mail.gmail.com>
+ <20140206101814.GA4993@e106497-lin.cambridge.arm.com>
+Message-ID: <000201cf2893$0f5e3710$2e1aa530$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+On Thursday, February 06, 2014 7:18 PM, Liviu Dudau wrote:
+> On Wed, Feb 05, 2014 at 10:26:27PM +0000, Tanmay Inamdar wrote:
+> > Hello Liviu,
+> >
+> > I did not get the first email of this particular patch on any of
+> > subscribed mailing lists (don't know why), hence replying here.
+> 
+> Strange, it shows in the MARC and GMANE archive for linux-pci, probably
+> a hickup on your receiving side?
+> 
+> >
+> > +struct pci_host_bridge *
+> > +pci_host_bridge_of_init(struct device *parent, int busno, struct pci_ops *ops,
+> > + void *host_data, struct list_head *resources)
+> > +{
+> > + struct pci_bus *root_bus;
+> > + struct pci_host_bridge *bridge;
+> > +
+> > + /* first parse the host bridge bus ranges */
+> > + if (pci_host_bridge_of_get_ranges(parent->of_node, resources))
+> > + return NULL;
+> > +
+> > + /* then create the root bus */
+> > + root_bus = pci_create_root_bus(parent, busno, ops, host_data, resources);
+> > + if (!root_bus)
+> > + return NULL;
+> > +
+> > + bridge = to_pci_host_bridge(root_bus->bridge);
+> > +
+> > + return bridge;
+> > +}
+> >
+> > You are keeping the domain_nr inside pci_host_bridge structure. In
+> > above API, domain_nr is required in 'pci_find_bus' function called
+> > from 'pci_create_root_bus'. Since the bridge is allocated after
+> > creating root bus, 'pci_find_bus' always gets domain_nr as 0. This
+> > will cause problem for scanning multiple domains.
+> 
+> Good catch. I was switching between creating a pci_controller in arch/arm64 and
+> adding the needed bits in pci_host_bridge. After internal review I've decided to
+> add the domain_nr to pci_host_bridge, but forgot to update the code everywhere.
 
-please consider this second round of Renesas ARM Based SoC updates for v3.15.
+Hi Liviu Dudau,
 
-This pull-request is based on the first round of such changes,
-tagged as renesas-soc-for-v3.15, which I have previously sent a
-pull-request for.
+One more thing,
+I am reviewing and compiling your patch.
+Would you consider adding 'struct pci_sys_data' and 'struct hw_pci'?
 
+Currently, 4 PCIe Host drivers (pci-mvebu.c, pci-tegra.c,
+pci-rcar-gen2.c, pcie-designware.c) are using 'struct pci_sys_data'
+and 'struct hw_pci' in their drivers. Without this, it makes build
+errors.
 
-The following changes since commit 012a7069b5a10a0851584d71a1facdc40a972319:
+In arm32, 'struct pci_sys_data' and 'struct hw_pci' is defined
+in "arch/arm/include/asm/mach/pci.h".
 
-  ARM: shmobile: r8a7790: Add PCI USB host clock support (2014-02-04 10:25:03 +0900)
+Tanmay Inamdar,
+Your 'APM X-Gene PCIe' patch also needs 'struct pci_sys_data' and
+'struct hw_pci'. With Liviu Dudau's patch, it will make build
+errors. Would you check this?
 
-are available in the git repository at:
+Thank you.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.15
+Best regards,
+Jingoo Han
 
-for you to fetch changes up to 74b9ba5f35fbd071f313781498a9e244bcc6f03e:
-
-  ARM: shmobile: r8a7790: Correct SYS DMAC clock defines (2014-02-07 09:24:07 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC Updates for v3.15
-
-* r7s72100 SoC (RZ/A1H)
-  - Add clock for SH Ethernet
-  - Add RSPI clocks
-
-* r8a7791 (R-Car M2)
-  - Add QSPI clocks
-  - Use 64-bit dma_addr_t
-
-* r8a7790 (R-Car H2)
-  - Correct SYS DMAC clock defines
-  - Add audio clock
-  - Add CA15-SCU, CA7-SCU
-  - Add SYSC setup code
-  - Use 64-bit dma_addr_t
-
-----------------------------------------------------------------
-Gaku Inami (1):
-      ARM: shmobile: r8a7790 CA7-SCU enablement
-
-Geert Uytterhoeven (3):
-      ARM: shmobile: r7s72100 clock: Add RSPI clocks
-      ARM: shmobile: r7s72100 clock: Add RSPI clocks for DT
-      ARM: shmobile: r8a7791 clock: add QSPI clocks
-
-Hisashi Nakamura (1):
-      ARM: shmobile: r8a7790 SYSC setup code
-
-Keita Kobayashi (1):
-      ARM: shmobile: r8a7790 CA15-SCU enablement
-
-Kuninori Morimoto (2):
-      ARM: shmobile: r8a7778: add audio clock in new style
-      ARM: shmobile: r8a7790: add audio clock
-
-Magnus Damm (2):
-      ARM: shmobile: Use 64-bit dma_addr_t on r8a7790/r8a7791
-      ARM: shmobile: Break out R-Car SYSC PM code
-
-Simon Horman (2):
-      ARM: shmobile: r7s72100: Add clock for r7s72100-ether
-      ARM: shmobile: r8a7790: Correct SYS DMAC clock defines
-
- arch/arm/boot/dts/r8a7790.dtsi                |  23 +++++
- arch/arm/mach-shmobile/Kconfig                |   3 +
- arch/arm/mach-shmobile/Makefile               |   3 +-
- arch/arm/mach-shmobile/clock-r7s72100.c       |  30 +++++-
- arch/arm/mach-shmobile/clock-r8a7778.c        |   4 +
- arch/arm/mach-shmobile/clock-r8a7790.c        |  20 ++++
- arch/arm/mach-shmobile/clock-r8a7791.c        |  11 ++
- arch/arm/mach-shmobile/include/mach/pm-rcar.h |  15 +++
- arch/arm/mach-shmobile/include/mach/r8a7779.h |  13 +--
- arch/arm/mach-shmobile/include/mach/r8a7790.h |   1 +
- arch/arm/mach-shmobile/pm-r8a7779.c           | 131 ++----------------------
- arch/arm/mach-shmobile/pm-r8a7790.c           |  45 ++++++++
- arch/arm/mach-shmobile/pm-rcar.c              | 142 ++++++++++++++++++++++++++
- arch/arm/mach-shmobile/smp-r8a7779.c          |  17 +--
- arch/arm/mach-shmobile/smp-r8a7790.c          |  17 +++
- include/dt-bindings/clock/r8a7790-clock.h     |   4 +-
- 16 files changed, 331 insertions(+), 148 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/include/mach/pm-rcar.h
- create mode 100644 arch/arm/mach-shmobile/pm-r8a7790.c
- create mode 100644 arch/arm/mach-shmobile/pm-rcar.c
+> 
+> Thanks for reviewing this, will fix in v2.
+> 
+> Do you find porting to the new API straight forward?
+> 
