@@ -1,37 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 13 Feb 2014 09:59:59 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Do not place regulator nodes
- under simple-bus
-In-Reply-To: <CAOMZO5DMbmh56AOZjRSB062o6u6y3TrFFk507ufd_QL9nr8gSQ@mail.gmail.com>
-References: <1392165078-25794-1-git-send-email-festevam@gmail.com>
- <20140212092227.GA24834@S2101-09.ap.freescale.net>
- <20140212095450.GB21992@e106331-lin.cambridge.arm.com>
- <20140212122837.GD24834@S2101-09.ap.freescale.net>
- <20140212135736.GB25957@e106331-lin.cambridge.arm.com>
- <20140212152050.GA28749@S2101-09.ap.freescale.net>
- <CAOMZO5DMbmh56AOZjRSB062o6u6y3TrFFk507ufd_QL9nr8gSQ@mail.gmail.com>
-Message-ID: <20140213015958.GC950@S2101-09.ap.freescale.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 12 Feb 2014 19:12:42 -0700
+Subject: [PATCH 1/2] ARM: tegra: enable I2C Mux driver for PCA9546 in
+ defconfig
+In-Reply-To: <CAK5ve-LHktOUNUYRZccvmmYwcAhvQiPQYoxEWkVU6kUHr4aTUQ@mail.gmail.com>
+References: <1391817298-10600-1-git-send-email-pengw@nvidia.com>
+ <52FBC6A9.7010401@wwwdotorg.org>
+ <CAK5ve-+bzLkdwmab9sZGPk7p67ktVcK3mHQ2aUgMueH061ty6w@mail.gmail.com>
+ <52FBD6C9.2010905@wwwdotorg.org>
+ <CAK5ve-+2AGO0UCf4UOMLoqGmQLp7QN08OJbZxUc-oYZzjPdFcQ@mail.gmail.com>
+ <52FBF739.1060605@wwwdotorg.org>
+ <CAK5ve-LHktOUNUYRZccvmmYwcAhvQiPQYoxEWkVU6kUHr4aTUQ@mail.gmail.com>
+Message-ID: <52FC2A1A.2070305@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 03:22:05PM -0200, Fabio Estevam wrote:
-> On Wed, Feb 12, 2014 at 1:20 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> > On Wed, Feb 12, 2014 at 01:57:36PM +0000, Mark Rutland wrote:
-> >> As it stands, the dts are buggy. I can appreciate that you don't feel
-> >> this is important, but I do. It's not just an IMX issue, there is
-> >> widespread misunderstanding and abuse of simple-bus.
-> >>
-> >> Said abuse is relying on current Linux implementation details, and that
-> >> can and will create problems if and when probing code is changed.
-> >
-> > The reality is the code already gets no chance to change on this regard,
-> > considering the requirement that we need to maintain the interface
-> > between kernel and DT as ABI.  The dts have been there like this for
-> > 10 kernel releases or so.
-> 
-> What breakage do you see with this patch?
+On 02/12/2014 04:23 PM, Bryan Wu wrote:
+...
+> Sure, I think I just missed to set the author as @nvidia.com but SOB
+> is @nvidia.com in this patchset. And I still should use --from "Bryan
+> Wu <cooloney@gmail.com>" for sending out email from gmail server.
+> Right?
 
-I'm not talking about this patch.  I'm replying to Mark's comment saying
-some day the kernel probing code is changed.
+I think you want the following in ~/.gitconfig:
 
-Shawn
+[user]
+	name = Bryan Wu
+	email = pengw at nvidia.com
+[sendemail]
+        from = Bryan Wu <cooloney@gmail.com>
+
+I assume "--from xxx" is the same as setting the last variable I listed
+above.
