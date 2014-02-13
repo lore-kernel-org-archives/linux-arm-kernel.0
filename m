@@ -1,77 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 13 Feb 2014 13:52:52 -0600
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Feb 2014 19:53:17 +0000
 Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
  controller
-In-Reply-To: <BA5E6077-77F8-4BE8-80E5-BAB9FE111387@codeaurora.org>
+In-Reply-To: <20140213182654.GA20043@obsidianresearch.com>
 References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <1392236171-10512-4-git-send-email-will.deacon@arm.com>
- <D2AE4AE6-E8FA-4DD8-B92B-E37205A2548C@codeaurora.org>
  <20140213110721.GC13576@mudshark.cambridge.arm.com>
  <BA5E6077-77F8-4BE8-80E5-BAB9FE111387@codeaurora.org>
-Message-ID: <CAL_JsqJ=yw5b++tR5Be1hd9Bn5-h26-qaY7ndKREebztLcMo0w@mail.gmail.com>
+ <4110788.UI9TADVhpa@wuerfel>
+ <20140213182654.GA20043@obsidianresearch.com>
+Message-ID: <20140213195317.GQ13576@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 10:22 AM, Kumar Gala <galak@codeaurora.org> wrote:
->
-> On Feb 13, 2014, at 5:07 AM, Will Deacon <will.deacon@arm.com> wrote:
->
->> On Wed, Feb 12, 2014 at 09:51:48PM +0000, Kumar Gala wrote:
->>>
->>> On Feb 12, 2014, at 2:16 PM, Will Deacon <will.deacon@arm.com> wrote:
->>>
->>>> This patch adds support for a generic PCI host controller, such as a
->>>> firmware-initialised device with static windows or an emulation by
->>>> something such as kvmtool.
->>>>
->>>> The controller itself has no configuration registers and has its address
->>>> spaces described entirely by the device-tree (using the bindings from
->>>> ePAPR). Both CAM and ECAM are supported for Config Space accesses.
->>>>
->>>> Corresponding documentation is added for the DT binding.
->>>>
->>>> Signed-off-by: Will Deacon <will.deacon@arm.com>
->>>> ---
->>>> .../devicetree/bindings/pci/arm-generic-pci.txt    |  51 ++++
->>>> drivers/pci/host/Kconfig                           |   7 +
->>>> drivers/pci/host/Makefile                          |   1 +
->>>> drivers/pci/host/pci-arm-generic.c                 | 318 +++++++++++++++++++++
->>>> 4 files changed, 377 insertions(+)
->>>> create mode 100644 Documentation/devicetree/bindings/pci/arm-generic-pci.txt
->>>> create mode 100644 drivers/pci/host/pci-arm-generic.c
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/pci/arm-generic-pci.txt b/Documentation/devicetree/bindings/pci/arm-generic-pci.txt
->>>> new file mode 100644
->>>> index 000000000000..cc7a35ecfa2d
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/pci/arm-generic-pci.txt
->>>> @@ -0,0 +1,51 @@
->>>> +* ARM generic PCI host controller
->>>> +
->>>> +Firmware-initialised PCI host controllers and PCI emulations, such as the
->>>> +virtio-pci implementations found in kvmtool and other para-virtualised
->>>> +systems, do not require driver support for complexities such as regulator and
->>>> +clock management. In fact, the controller may not even require the
->>>> +configuration of a control interface by the operating system, instead
->>>> +presenting a set of fixed windows describing a subset of IO, Memory and
->>>> +Configuration Spaces.
->>>> +
->>>> +Such a controller can be described purely in terms of the standardized device
->>>> +tree bindings communicated in pci.txt:
->>>> +
->>>> +- compatible     : Must be "arm,pci-cam-generic" or "arm,pci-ecam-generic"
->>>> +                   depending on the layout of configuration space (CAM vs
->>>> +                   ECAM respectively)
->>>
->>> What's arm specific here?  I don't have a great suggestion, but seems odd
->>> for this to be vendor prefixed with "arm".
->>
->> Happy to change it, but I'm also struggling for names. Maybe "linux,..."?
->
-> I was thinking that as well, I'd say go with "linux,".
+On Thu, Feb 13, 2014 at 06:26:54PM +0000, Jason Gunthorpe wrote:
+> On Thu, Feb 13, 2014 at 05:28:20PM +0100, Arnd Bergmann wrote:
+> 
+> > > Huh?  The reg property clearly has the size in it (as shown in the
+> > > example below).  I guess I was just asking for the description
+> > > here to say what the size was for the 2 compatibles since its
+> > > fixed and known.
+> > 
+> > It's still an open question whether the config space in the reg
+> > property should cover all 256 buses or just the ones in the
+> > bus-range. In the latter case, it would be variable (but
+> > predictable) size.
+> 
+> The 'describe the hardware principle' says the reg should be the
+> entire available ECAM/CAM region the hardware is able to support.
+> 
+> This may be less than 256 busses, as ECAM allows the implementor to
+> select how many upper address bits are actually supported.
 
-Just drop the prefix altogether.
+Ok, but the ECAM/CAM base always corresponds to bus 0, right?
 
-I'm wondering if this should have host or rc in the name.
+> IMHO, the bus-range should be used to indicate the range of busses
+> discovered by the firmware, but we have historically tweaked it to
+> indicate the max range of bus numbers available on this bus (I think
+> to support the hack where two physical PCI domains were roughly glued
+> into a single Linux domain).
 
-Rob
+Ok, so this answers Kumar's point about the reg property. I'll augment it
+with a size.
+
+Will
