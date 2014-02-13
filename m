@@ -1,26 +1,60 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 12 Feb 2014 19:18:46 -0500 (EST)
-Subject: [PATCH 0/14] Xilinx axi ethernet patches
-In-Reply-To: <cover.1392220536.git.michal.simek@xilinx.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 12 Feb 2014 16:31:34 -0800
+Subject: [PATCH 08/14] net: axienet: Removed checkpatch errors/warnings
+In-Reply-To: <75b669c0a947effe74b291093abfa8c71f83736a.1392220536.git.michal.simek@xilinx.com>
 References: <cover.1392220536.git.michal.simek@xilinx.com>
-Message-ID: <20140212.191846.1464564509609498703.davem@davemloft.net>
+ <75b669c0a947effe74b291093abfa8c71f83736a.1392220536.git.michal.simek@xilinx.com>
+Message-ID: <1392251494.2214.11.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michal Simek <michal.simek@xilinx.com>
-Date: Wed, 12 Feb 2014 16:55:34 +0100
+On Wed, 2014-02-12 at 16:55 +0100, Michal Simek wrote:
+> From: Srikanth Thokala <srikanth.thokala@xilinx.com>
 
-> I have exctracted patches which I have in our
-> xilinx git tree which are missing in the mainline.
+trivia:
+
+> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+
+> +			netdev_err(lp->ndev,
+> +				"axienet_device_reset DMA reset timeout!\n");
+
+could you please align multi-line arguments to the
+appropriate open parenthesis?
+
+			netdev_err(lp->ndev,
+				   "axienet_device_reset DMA reset timeout!\n");
+
+or maybe:
+
+			netdev_err(lp->ndev, "%s: "DMA reset timeout!\n",
+				   __func__);
+
+> @@ -484,8 +484,8 @@ static void axienet_device_reset(struct net_device *ndev)
+>  	}
 > 
-> The first two patches fix compilation error and
-> warnings. Then 5 feature patches
-> and the rest is OF cleanup and with kernel-doc
-> and checkpatch problems.
+>  	if (axienet_dma_bd_init(ndev)) {
+> -		dev_err(&ndev->dev, "axienet_device_reset descriptor "
+> -			"allocation failed\n");
+> +		netdev_err(ndev,
+> +			"axienet_device_reset descriptor allocation failed\n");
 
-You should not combine bug fix and feature patches.
+etc, et al.
 
-Rather, you should submit bug fixes against the 'net' tree.  Then when
-those bug fixes get applied and propagate to the 'net-next' tree you
-can submit the feature patches and cleanups against the 'net-next'
-tree.
+> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
+[]
+> @@ -161,19 +161,19 @@ int axienet_mdio_setup(struct axienet_local *lp, struct device_node *np)
+> 
+>  	np1 = of_find_node_by_name(NULL, "cpu");
+>  	if (!np1) {
+> -		printk(KERN_WARNING "%s(): Could not find CPU device node.",
+> -		       __func__);
+> -		printk(KERN_WARNING "Setting MDIO clock divisor to "
+> -		       "default %d\n", DEFAULT_CLOCK_DIVISOR);
+> +		netdev_warn(lp->ndev, "Could not find CPU device node.");
+
+missing trailing "\n" to terminate message.
+
+> +		netdev_warn(lp->ndev,
+> +			 "Could not find clock ethernet controller property.");
+
+here too. (and alignment)
