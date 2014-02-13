@@ -1,53 +1,76 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 13 Feb 2014 08:07:45 -0500
-Subject: [PATCH v3 01/13] ARM: mvebu: rename armada-370-xp.c to
- armada-mvebu.c
-In-Reply-To: <20140213125526.3af08c54@skate>
-References: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392289475-8902-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <2036226.egxWL7qC66@wuerfel> <20140213125526.3af08c54@skate>
-Message-ID: <20140213130745.GU27395@titan.lakedaemon.net>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Thu, 13 Feb 2014 14:07:52 +0100
+Subject: [PATCH 0/8] OMAP: OMAP3 DSS related clock patches
+In-Reply-To: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <CAAfyv34RNULeCpp8LV1LudJt7+Xs+wbKp+Zm4SSrH1GJPxGkLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 12:55:26PM +0100, Thomas Petazzoni wrote:
-> Dear Arnd Bergmann,
-> 
-> On Thu, 13 Feb 2014 12:50:15 +0100, Arnd Bergmann wrote:
-> > On Thursday 13 February 2014 12:04:23 Thomas Petazzoni wrote:
-> > > In preparation to the introduction of the support of Armada 375 and
-> > > Armada 38x, this commit renames arch/arm/mach-mvebu/armada-370-xp.c to
-> > > arch/arm/mach-mvebu/armada-mvebu.c. The armada-mvebu.c name was chosen
-> > > because:
-> > > 
-> > >  * As we are going to merge the support for Kirkwood and Dove into
-> > >    mach-mvebu, there will be other files with DT_MACHINE_START
-> > >    structures, so a generic name such as board-dt.c or mvebu.c does
-> > >    not work.
-> > > 
-> > >  * A simple armada.c does not work, because there are Marvell Armada
-> > >    SOCs that are not part of the MVEBU family. For example, the
-> > >    Marvell Armada 1500 are part of the mach-berlin family, which is a
-> > >    completely separate line of SOCs.
-> > 
-> > Your reasoning for the new name makes a lot of sense, but my personal
-> > opinion is that I'd rather leave the name as it is and deal with the
-> > fact that it's not the best name. Renaming files often causes unexpected
-> > problems, in particular if someone else wants to modify the same file.
-> 
-> I believe it's a matter of taste here. Having a file named
-> armada-370-xp.c that handles Armada 375 and Armada 38x looks highly
-> confusing to me, and I believe both Gr?gory and Ezequiel were of the
-> same opinion.
-> 
-> The number of changes to this file is very limited, so the probability
-> of having a large number of complicated patches touching the same file
-> being in flight is fairly low.
-> 
-> Maybe we can leave this taste decision to the mach-mvebu maintainers?
+On Thu, Feb 13, 2014 at 11:03 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> Hi,
+>
+> I've been debugging OMAP3 related issues with DSS clocks, and I hopefully have
+> them all fixed with this series. This fixes the problems for both non-DT boot,
+> but also for DT boot with DSS DT support (which is not merged yet).
+>
+> The non-DT boot related fixes should be merged for 3.14, but I'd like the DT
+> boot related fixes to be merged for 3.14 also, as that'll make handling the DSS
+> DT support easier.
+>
+> This is based on v3.14-rc2.
+Tested on gta04 board with DSS DT patches v3 (rebased on 3.14-rc2).
+Panel is finally working fine.
+Thanks.
 
-board-v7.c and then board-v5.c ?
+Tested-by: Marek Belisko <marek@goldelico.com>
 
-thx,
+>
+>  Tomi
+>
+> Tomi Valkeinen (8):
+>   clk: divider: fix rate calculation for fractional rates
+>   clk: ti/divider: fix rate calculation for fractional rates
+>   ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
+>   ARM: dts: fix omap3 dss clock handle names
+>   ARM: dts: fix DPLL4 x2 clkouts on 3630
+>   ARM: dts: use ti,fixed-factor-clock for dpll4_m4x2_mul_ck
+>   ARM: dts: set 'ti,set-rate-parent' for dpll4_m4 path
+>   OMAPDSS: fix rounding when calculating fclk rate
+>
+>  arch/arm/boot/dts/omap3430es1-clocks.dtsi          |  6 +--
+>  .../omap36xx-am35xx-omap3430es2plus-clocks.dtsi    |  6 +--
+>  arch/arm/boot/dts/omap36xx-clocks.dtsi             | 20 +++++++
+>  arch/arm/boot/dts/omap36xx.dtsi                    |  2 +-
+>  arch/arm/boot/dts/omap3xxx-clocks.dtsi             |  8 +--
+>  arch/arm/mach-omap2/cclock3xxx_data.c              |  2 +
+>  arch/arm/mach-omap2/dpll3xxx.c                     | 62 ++++++++++++++++++++++
+>  drivers/clk/clk-divider.c                          | 10 ++--
+>  drivers/clk/ti/divider.c                           |  8 +--
+>  drivers/video/omap2/dss/dss.c                      |  4 +-
+>  include/linux/clk/ti.h                             |  4 ++
+>  11 files changed, 111 insertions(+), 21 deletions(-)
+>
+> --
+> 1.8.3.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Jason.
+BR,
+
+marek
+
+-- 
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
+
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+twitter: #opennandra
+web: http://open-nandra.com
