@@ -1,33 +1,68 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Feb 2014 09:47:25 -0800
-Subject: [PATCH] ARM: OMAP4: sleep: byteswap data for big-endian
-In-Reply-To: <52D5CBC9.5020201@ti.com>
-References: <52D404DE.2020806@ti.com>
- <CAArO44samX_uMeC93w4DBbC+yskEmrvVt_i-5VV_seatM56ypw@mail.gmail.com>
- <52D55CE5.1060902@ti.com>
- <CAA3XUr2cnF_rxMYvZfjBx22Sa8YE45o_qUU8GNoerQwhWqxhNQ@mail.gmail.com>
- <CAGo_u6oKpRFnPAWaqr9NTNAJB+m56jiDgBUgvsiZpaQ-3SF2kw@mail.gmail.com>
- <CAA3XUr1_cNuPmMU6Fs6c7Si2So0VFGcLyGJe+tS_R47BVKRXnw@mail.gmail.com>
- <CAGo_u6p7ErrKOMy4Ljg3nehVpd=DOg3XDn6gZ1nrFE_OuOjsWg@mail.gmail.com>
- <52D5A60C.7080800@ti.com>
- <CAGo_u6oGDK5s0SeE6Z7UFM6eYdgoy-E+Tj67+pBWP-wQ3r9=QA@mail.gmail.com>
- <52D5CBC9.5020201@ti.com>
-Message-ID: <20140213174724.GB27022@atomide.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 13 Feb 2014 11:06:16 -0700
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <20140213110721.GC13576@mudshark.cambridge.arm.com>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <1392236171-10512-4-git-send-email-will.deacon@arm.com>
+ <D2AE4AE6-E8FA-4DD8-B92B-E37205A2548C@codeaurora.org>
+ <20140213110721.GC13576@mudshark.cambridge.arm.com>
+Message-ID: <20140213180616.GD17248@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [140114 15:46]:
-> On Tuesday 14 January 2014 04:13 PM, Nishanth Menon wrote:
-> 
-> I haven't looked at patch myself but as you pointed out if it adds
-> dead code and makes the code un-readable then probably that something
-> we shouldn't merge.
+On Thu, Feb 13, 2014 at 11:07:21AM +0000, Will Deacon wrote:
 
-Yeah it seems the assembly parts should be done in more generic
-way using macros so the same setup can then be used for other
-SoCs. For the other trivial changes, let's try to get them merged
-to shrink down the patchset.
+> Not in this case! kvmtool generates the following:
 
-Regards,
+Well, the example is nice so someone can review it..
+ 
+> 	pci {
+> 		#address-cells = <0x3>;
+> 		#size-cells = <0x2>;
+> 		#interrupt-cells = <0x1>;
+> 		compatible = "arm,pci-cam-generic";
+> 		reg = <0x0 0x40000000>;
+> 		ranges = <0x1000000 0x0 0x0 0x0 0x0 0x0 0x10000 0x2000000 0x0 0x41000000 0x0 0x41000000 0x0 0x3f000000>;
+> 		interrupt-map = <0x0 0x0 0x0 0x1 0x1 0x0 0x4 0x1 0x800 0x0 0x0 0x1 0x1 0x0 0x5 0x1 0x1000 0x0 0x0 0x1 0x1 0x0 0x6 0x1 0x1800 0x0 0x0 0x1 0x1 0x0 0x7 0x1>;
+> 		interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
+> 	};
 
-Tony
+
+Looks like there are a few misses in the above. How about this:
+
+pci {
+    compatible = "arm,pci-cam-generic"
+    device_type = "pci";
+    ** ^^^^^^^^^^^^^^^^^
+    ** MANDATORY for the host bridge node
+    #address-cells = <3>;
+    #size-cells = <2>;
+
+    // BUS_ADDRESS(3)  CPU_PHYSICAL(2)  SIZE(2)
+    ranges = <0x1000000 0x0 0x00000000  0x0 0x00000000  0x0 0x00010000>,
+                                        ^^^^^^^^^^^^^^
+            ** ?? Is this why you had problems with the offset? Should
+	    ** be the cpu physical address of the start of the IO window.
+             <0x2000000 0x0 0x41000000  0x0 0x41000000  0x0 0x3f000000>;
+
+   
+    #interrupt-cells = <0x1>;
+    // PCI_DEVICE(3) INT#(1)  CONTROLLER(PHANDLE)  CONTROLLER_DATA(3)
+    interrupt-map = <  0x0 0x0 0x0 0x1  0x1  0x0 0x4 0x1
+                     0x800 0x0 0x0 0x1  0x1  0x0 0x5 0x1 
+                    0x1000 0x0 0x0 0x1  0x1  0x0 0x6 0x1
+                    0x1800 0x0 0x0 0x1  0x1  0x0 0x7 0x1>;
+                 **                    ^^^^^^
+                 ** This should be a phandle to the interrupt controller
+    // PCI_DEVICE(3) INT#1()
+    interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
+}
+
+I keep thinking of making a pcie-dt.h file with helper macros for
+all this. :|
+
+FWWI, I like to put a double space between the logically distinct
+things in the lists.
+
+Jason
