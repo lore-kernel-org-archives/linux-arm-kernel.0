@@ -1,68 +1,32 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 13 Feb 2014 11:06:16 -0700
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <20140213110721.GC13576@mudshark.cambridge.arm.com>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <1392236171-10512-4-git-send-email-will.deacon@arm.com>
- <D2AE4AE6-E8FA-4DD8-B92B-E37205A2548C@codeaurora.org>
- <20140213110721.GC13576@mudshark.cambridge.arm.com>
-Message-ID: <20140213180616.GD17248@obsidianresearch.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Thu, 13 Feb 2014 10:07:01 -0800
+Subject: [PATCH] Fix uses of dma_max_pfn() when converting to a limiting
+ address
+In-Reply-To: <20140213171117.GA30257@n2100.arm.linux.org.uk>
+References: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
+ <1392310690.2175.13.camel@dabdike.int.hansenpartnership.com>
+ <20140213171117.GA30257@n2100.arm.linux.org.uk>
+Message-ID: <1392314821.2175.16.camel@dabdike.int.hansenpartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 11:07:21AM +0000, Will Deacon wrote:
+On Thu, 2014-02-13 at 17:11 +0000, Russell King - ARM Linux wrote:
+> On Thu, Feb 13, 2014 at 08:58:10AM -0800, James Bottomley wrote:
+> > This doesn't really look like the right fix.  You replaced dev->dma_mask
+> > with a calculation on dev_max_pfn().  Since dev->dma_mask is always u64
+> > and dev_max_pfn is supposed to be returning the pfn of the dma_mask, it
+> > should unconditionally be 64 bits as well.  Either that or it should
+> > return dma_addr_t.
+> 
+> My reasoning is that PFNs in the system are always of type "unsigned long"
+> and therefore a function returning a pfn should have that type.  If we
+> overflow a PFN fitting in an unsigned long, we have lots of places which
+> need fixing.
 
-> Not in this case! kvmtool generates the following:
+It's not intuitive to people who need the dma mask that they're supposed
+to use dma_max_pfn() << PAGE_SHIFT but now they have to worry about the
+casting and, if they don't get it right, nothing will warn or tell them.
+what about a new macro, say dma_max_mask(dev) that just returns
+(u64)dma_max_pfn() << PAGE_SHIFT?
 
-Well, the example is nice so someone can review it..
- 
-> 	pci {
-> 		#address-cells = <0x3>;
-> 		#size-cells = <0x2>;
-> 		#interrupt-cells = <0x1>;
-> 		compatible = "arm,pci-cam-generic";
-> 		reg = <0x0 0x40000000>;
-> 		ranges = <0x1000000 0x0 0x0 0x0 0x0 0x0 0x10000 0x2000000 0x0 0x41000000 0x0 0x41000000 0x0 0x3f000000>;
-> 		interrupt-map = <0x0 0x0 0x0 0x1 0x1 0x0 0x4 0x1 0x800 0x0 0x0 0x1 0x1 0x0 0x5 0x1 0x1000 0x0 0x0 0x1 0x1 0x0 0x6 0x1 0x1800 0x0 0x0 0x1 0x1 0x0 0x7 0x1>;
-> 		interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
-> 	};
-
-
-Looks like there are a few misses in the above. How about this:
-
-pci {
-    compatible = "arm,pci-cam-generic"
-    device_type = "pci";
-    ** ^^^^^^^^^^^^^^^^^
-    ** MANDATORY for the host bridge node
-    #address-cells = <3>;
-    #size-cells = <2>;
-
-    // BUS_ADDRESS(3)  CPU_PHYSICAL(2)  SIZE(2)
-    ranges = <0x1000000 0x0 0x00000000  0x0 0x00000000  0x0 0x00010000>,
-                                        ^^^^^^^^^^^^^^
-            ** ?? Is this why you had problems with the offset? Should
-	    ** be the cpu physical address of the start of the IO window.
-             <0x2000000 0x0 0x41000000  0x0 0x41000000  0x0 0x3f000000>;
-
-   
-    #interrupt-cells = <0x1>;
-    // PCI_DEVICE(3) INT#(1)  CONTROLLER(PHANDLE)  CONTROLLER_DATA(3)
-    interrupt-map = <  0x0 0x0 0x0 0x1  0x1  0x0 0x4 0x1
-                     0x800 0x0 0x0 0x1  0x1  0x0 0x5 0x1 
-                    0x1000 0x0 0x0 0x1  0x1  0x0 0x6 0x1
-                    0x1800 0x0 0x0 0x1  0x1  0x0 0x7 0x1>;
-                 **                    ^^^^^^
-                 ** This should be a phandle to the interrupt controller
-    // PCI_DEVICE(3) INT#1()
-    interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
-}
-
-I keep thinking of making a pcie-dt.h file with helper macros for
-all this. :|
-
-FWWI, I like to put a double space between the logically distinct
-things in the lists.
-
-Jason
+James
