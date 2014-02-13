@@ -1,89 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Feb 2014 23:52:48 +0100
-Subject: [PATCH v2 2/2] ARM: sunxi: dt: Convert to the new i2c compatibles
-In-Reply-To: <20140213082630.GA3119@katana>
-References: <1391680285-16668-1-git-send-email-maxime.ripard@free-electrons.com>
- <1391680285-16668-3-git-send-email-maxime.ripard@free-electrons.com>
- <20140213082630.GA3119@katana>
-Message-ID: <20140213225248.GB15350@lukather>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 14 Feb 2014 07:57:33 +0900
+Subject: [PATCH 22/28] Remove S3C24XX_GPIO_EXTRA128
+In-Reply-To: <52F999A1.1070709@samsung.com>
+References: <1391971686-9517-1-git-send-email-richard@nod.at>
+ <1391971686-9517-23-git-send-email-richard@nod.at>
+ <52F999A1.1070709@samsung.com>
+Message-ID: <52FD4DDD.6020400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 09:26:30AM +0100, Wolfram Sang wrote:
-> 
-> Why is the devicetree list not on CC? (Added now)
-> 
-> On Thu, Feb 06, 2014 at 10:51:25AM +0100, Maxime Ripard wrote:
-> > Switch the device tree to the new compatibles introduced in the i2c drivers
-> > to have a common pattern accross all Allwinner SoCs.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/sun4i-a10.dtsi  |  6 +++---
-> >  arch/arm/boot/dts/sun5i-a10s.dtsi |  6 +++---
-> >  arch/arm/boot/dts/sun5i-a13.dtsi  |  6 +++---
-> >  arch/arm/boot/dts/sun7i-a20.dtsi  | 10 +++++-----
-> >  4 files changed, 14 insertions(+), 14 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-> > index 28273f9..ac65c8a 100644
-> > --- a/arch/arm/boot/dts/sun4i-a10.dtsi
-> > +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-> > @@ -518,7 +518,7 @@
-> >  		};
-> >  
-> >  		i2c0: i2c at 01c2ac00 {
-> > -			compatible = "allwinner,sun4i-i2c";
-> > +			compatible = "allwinner,sun4i-a10-i2c";
-> 
-> Can't we have:
-> 
-> 	compatible = "allwinner,sun4i-a10-i2c", "allwinner,sun4i-i2c";
-> 
-> ? And keep the old "allwinner,sun4i-i2c" and extend it with a SoC
-> specific a10 compatible entry when a distinction is needed?
+On 02/11/14 12:31, Kukjin Kim wrote:
+> On 02/10/14 03:48, Richard Weinberger wrote:
+>> The symbol is an orphan, get rid of it.
+>>
+>> Signed-off-by: Richard Weinberger<richard@nod.at>
+>> ---
+>> arch/arm/mach-s3c24xx/Kconfig | 1 -
+>> 1 file changed, 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-s3c24xx/Kconfig
+>> b/arch/arm/mach-s3c24xx/Kconfig
+>> index 1c67f04..bb1fa603 100644
+>> --- a/arch/arm/mach-s3c24xx/Kconfig
+>> +++ b/arch/arm/mach-s3c24xx/Kconfig
+>> @@ -561,7 +561,6 @@ config MACH_OSIRIS
+>> select S3C2410_IOTIMING if ARM_S3C2440_CPUFREQ
+>> select S3C2440_XTAL_12000000
+>> select S3C24XX_DCLK
+>> - select S3C24XX_GPIO_EXTRA128
+>> select S3C24XX_SIMTEC_PM if PM
+>> select S3C_DEV_NAND
+>> select S3C_DEV_USB_HOST
+>
+> OK good, but I will squash this with 13th for mach-s3c24xx/Kconfig when
+> I apply.
+>
++ Paul Bolle
 
-Actually, the two are exactly equivalent. The point is that the
-compatible naming scheme doesn't follow what we are using (which is
-<family>-<soc>-i2c), so we wan't to get rid of the old naming scheme
-all together.
+Richard,
 
-> > diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-> > index 6de40b6..537072c 100644
-> > --- a/arch/arm/boot/dts/sun5i-a13.dtsi
-> > +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-> > @@ -377,7 +377,7 @@
-> >  		};
-> >  
-> >  		i2c0: i2c at 01c2ac00 {
-> > -			compatible = "allwinner,sun4i-i2c";
-> > +			compatible = "allwinner,sun4i-a10-i2c";
-> 
-> For non-a10, That should be at least
-> 
-> 	compatible = "allwinner,sun4i-a13-i2c", "allwinner,sun4i-a10-i2c";
-> 
-> or
-> 
-> 	compatible = "allwinner,sun4i-a13-i2c", "allwinner,sun4i-i2c";
-> 
-> depending on the outcome above.
-> 
-> Or is my knowledge outdated already?
-> 
+I found same patch ([PATCH] ARM: s3c24xx: get rid of unneeded selects) 
+for S3C24XX from Paul before your posting. So I picked that up.
 
-Since they are strictly compatible, we don't need to introduce any
-different compatible string here.
-
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140213/e625a811/attachment.sig>
+Thanks,
+Kukjin
