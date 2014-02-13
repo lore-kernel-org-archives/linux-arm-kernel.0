@@ -1,58 +1,121 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 13 Feb 2014 11:06:19 +0000
-Subject: [PATCH v3 7/7] devicetree: bindings: Document PM8921/8058 PMICs
-In-Reply-To: <20140213053813.GB14769@codeaurora.org>
-References: <1389206270-3728-1-git-send-email-sboyd@codeaurora.org>
- <1389206270-3728-8-git-send-email-sboyd@codeaurora.org>
- <20140211092937.GG32042@lee--X1>
- <20140213053813.GB14769@codeaurora.org>
-Message-ID: <20140213110619.GI32508@lee--X1>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Feb 2014 11:07:21 +0000
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <D2AE4AE6-E8FA-4DD8-B92B-E37205A2548C@codeaurora.org>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <1392236171-10512-4-git-send-email-will.deacon@arm.com>
+ <D2AE4AE6-E8FA-4DD8-B92B-E37205A2548C@codeaurora.org>
+Message-ID: <20140213110721.GC13576@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > +- interrupts:
-> > > +	Usage: required
-> > > +	Value type: <prop-encoded-array>
-> > 
-> > Either provide an example or a comment to see the description of
-> > #interrupt-cells 
+On Wed, Feb 12, 2014 at 09:51:48PM +0000, Kumar Gala wrote:
 > 
-> It is part of the example. We also state that the format is
-> defined by the interrupt parent binding.
-
-Okay, fair enough.
-
-> > > +	Definition: specifies the interrupt that indicates a subdevice
-> > > +		    has generated an interrupt (summary interrupt). The
-> > > +		    format of the specifier is defined by the binding document
-> > > +		    describing the node's interrupt parent.
-> > > +
-> > > +- #interrupt-cells:
-> > > +	Usage: required
-> > > +	Value type : <u32>
-> > > +	Definition: must be 2. Specifies the number of cells needed to encode
-> > > +		    an interrupt source. The 1st cell contains the interrupt
-> > > +		    number. The 2nd cell is the trigger type and level flags
-> > > +		    encoded as follows:
-> > > +
-> > > +			1 = low-to-high edge triggered
-> > > +			2 = high-to-low edge triggered
-> > > +			4 = active high level-sensitive
-> > > +			8 = active low level-sensitive
-> > 
-> > Actually I'd prefer if you used the definitions in:
-> >   dt-bindings/interrupt-controller/irq.h
+> On Feb 12, 2014, at 2:16 PM, Will Deacon <will.deacon@arm.com> wrote:
 > 
-> These match the #defines in that file. I'd like to be explicit
-> about the numbers to prevent people from thinking they have to
-> use #defines and to match what other irq controllers have done
-> (gic, atmel-aic, etc.)
+> > This patch adds support for a generic PCI host controller, such as a
+> > firmware-initialised device with static windows or an emulation by
+> > something such as kvmtool.
+> > 
+> > The controller itself has no configuration registers and has its address
+> > spaces described entirely by the device-tree (using the bindings from
+> > ePAPR). Both CAM and ECAM are supported for Config Space accesses.
+> > 
+> > Corresponding documentation is added for the DT binding.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> > .../devicetree/bindings/pci/arm-generic-pci.txt    |  51 ++++
+> > drivers/pci/host/Kconfig                           |   7 +
+> > drivers/pci/host/Makefile                          |   1 +
+> > drivers/pci/host/pci-arm-generic.c                 | 318 +++++++++++++++++++++
+> > 4 files changed, 377 insertions(+)
+> > create mode 100644 Documentation/devicetree/bindings/pci/arm-generic-pci.txt
+> > create mode 100644 drivers/pci/host/pci-arm-generic.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pci/arm-generic-pci.txt b/Documentation/devicetree/bindings/pci/arm-generic-pci.txt
+> > new file mode 100644
+> > index 000000000000..cc7a35ecfa2d
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pci/arm-generic-pci.txt
+> > @@ -0,0 +1,51 @@
+> > +* ARM generic PCI host controller
+> > +
+> > +Firmware-initialised PCI host controllers and PCI emulations, such as the
+> > +virtio-pci implementations found in kvmtool and other para-virtualised
+> > +systems, do not require driver support for complexities such as regulator and
+> > +clock management. In fact, the controller may not even require the
+> > +configuration of a control interface by the operating system, instead
+> > +presenting a set of fixed windows describing a subset of IO, Memory and
+> > +Configuration Spaces.
+> > +
+> > +Such a controller can be described purely in terms of the standardized device
+> > +tree bindings communicated in pci.txt:
+> > +
+> > +- compatible     : Must be "arm,pci-cam-generic" or "arm,pci-ecam-generic"
+> > +                   depending on the layout of configuration space (CAM vs
+> > +                   ECAM respectively)
+> 
+> What?s arm specific here?  I don?t have a great suggestion, but seems odd
+> for this to be vendor prefixed with "arm".
 
-I believe people _do_ have to use the #defines? Is there a good reason
-for you not wanting to use them?
+Happy to change it, but I'm also struggling for names. Maybe "linux,..."?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> > +- ranges         : As described in IEEE Std 1275-1994, but must provide
+> > +                   at least a definition of one or both of IO and Memory
+> > +                   Space.
+> > +
+> > +- #address-cells : Must be 3
+> > +
+> > +- #size-cells    : Must be 2
+> > +
+> > +- reg            : The Configuration Space base address, as accessed by the
+> > +                   parent bus.
+> 
+> Isn?t the size fixed here for cam or ecam?
+
+Yes, which is why reg just specifies the base address.
+
+> > +Configuration Space is assumed to be memory-mapped (as opposed to being
+> > +accessed via an ioport) and laid out with a direct correspondence to the
+> > +geography of a PCI bus address by concatenating the various components to form
+> > +an offset.
+> > +
+> > +For CAM, this 24-bit offset is:
+> > +
+> > +        cfg_offset(bus, device, function, register) =
+> > +                   bus << 16 | device << 11 | function << 8 | register
+> > +
+> > +Whilst ECAM extends this by 4 bits to accomodate 4k of function space:
+> > +
+> > +        cfg_offset(bus, device, function, register) =
+> > +                   bus << 20 | device << 15 | function << 12 | register
+> > +
+> > +Interrupt mapping is exactly as described in `Open Firmware Recommended
+> > +Practice: Interrupt Mapping' and requires the following properties:
+> > +
+> > +- #interrupt-cells   : Must be 1
+> > +
+> > +- interrupt-map      : <see aforementioned specification>
+> > +
+> > +- interrupt-map-mask : <see aforementioned specification>
+> 
+> Examples are always nice :)
+
+Not in this case! kvmtool generates the following:
+
+	pci {
+		#address-cells = <0x3>;
+		#size-cells = <0x2>;
+		#interrupt-cells = <0x1>;
+		compatible = "arm,pci-cam-generic";
+		reg = <0x0 0x40000000>;
+		ranges = <0x1000000 0x0 0x0 0x0 0x0 0x0 0x10000 0x2000000 0x0 0x41000000 0x0 0x41000000 0x0 0x3f000000>;
+		interrupt-map = <0x0 0x0 0x0 0x1 0x1 0x0 0x4 0x1 0x800 0x0 0x0 0x1 0x1 0x0 0x5 0x1 0x1000 0x0 0x0 0x1 0x1 0x0 0x6 0x1 0x1800 0x0 0x0 0x1 0x1 0x0 0x7 0x1>;
+		interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
+	};
+
+I can add it if you like, but it looks like a random bunch of numbers to me.
+
+Will
