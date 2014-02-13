@@ -1,90 +1,128 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Feb 2014 16:25:52 +0000
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <BA5E6077-77F8-4BE8-80E5-BAB9FE111387@codeaurora.org>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <1392236171-10512-4-git-send-email-will.deacon@arm.com>
- <D2AE4AE6-E8FA-4DD8-B92B-E37205A2548C@codeaurora.org>
- <20140213110721.GC13576@mudshark.cambridge.arm.com>
- <BA5E6077-77F8-4BE8-80E5-BAB9FE111387@codeaurora.org>
-Message-ID: <20140213162552.GL13576@mudshark.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 13 Feb 2014 17:26:20 +0100
+Subject: [PATCH v3 00/13] pinctrl: mvebu: restructure resource allocation
+In-Reply-To: <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140213172620.76e760ba@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 04:22:25PM +0000, Kumar Gala wrote:
-> On Feb 13, 2014, at 5:07 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >>> +
-> >>> +- compatible     : Must be "arm,pci-cam-generic" or "arm,pci-ecam-generic"
-> >>> +                   depending on the layout of configuration space (CAM vs
-> >>> +                   ECAM respectively)
-> >> 
-> >> What?s arm specific here?  I don?t have a great suggestion, but seems odd
-> >> for this to be vendor prefixed with "arm".
-> > 
-> > Happy to change it, but I'm also struggling for names. Maybe "linux,?"?
+Dear Sebastian Hesselbarth,
+
+Thanks again for working on this! I have boot tested this successfully
+on an Armada XP platform, and it seems to behave normally, the debugfs
+pinctrl contents make sense.
+
+I have a few comments below, though.
+
+On Wed, 12 Feb 2014 16:59:23 +0100, Sebastian Hesselbarth wrote:
+
+> Also, in the meantime, pinctrl driver stubs for new Armada 375/28x have
+> been posted [3]. Before any of this patches move to a stable branch, I
+> plan to send an updated version comprising the required patches for the
+> new SoCs. As the new driver stubs are very much like what we already have
+> for Armada 370/XP, let's only discuss the general approach now and add
+> the branch dependency and patches later.
+
+I am not sure what you mean here in terms of the ordering for the
+patches. I'm attaching several patches, and the first three patches
+adapt your patch series to also cover 375 and 38x, assuming the pinctrl
+support for 375 and 38x is merged before your patch series.
+
+With these patches, I have 
+
+
+> Patches 1-3 first deal with the way we handle unnamed "generic" mpp
+> controls. Patch 1 consolidates the per-control allocation of name buffers
+> to counting unnamed controls first and then allocate a global name buffer
+> for all those controls. Patch 2 then removes the now obsolete per-control
+> allocation of name buffers. Patch 3 then makes the common driver to
+> identify "generic" mpp controls by an empty name and adds some valuable
+> comments about that special treatment.
+
+I must say I dislike quite a bit this unnamed mpp controls mechanism.
+Why isn't the name statically defined in the source code by the
+MPP_MODE macro, which already takes as first argument the pin number?
+
+All the calculation of the buffer size, generating the names and so on,
+looks like a lot of unnecessary code to me. But well, this unnamed
+thing was already here, so I'm not saying your patch series should do
+anything about it.
+
+> Patch 4 removes passing struct mvebu_mpp_ctrl to the special callback
+> as the only relevant information in that struct for the callback is the
+> pin number which is passed directly instead.
 > 
-> I was thinking that as well, I?d say go with ?linux,?.
+> Patches 5-9 then add some global defines and provide SoC specific
+> callbacks even for the "generic" mpp controls. This allows Patch 10 to
+> move resource allocation to SoC specific drivers and remove the common
+> generic callbacks in Patch 11.
 
-Great, I'll make that change.
+This is definitely good, but I'm wondering why the core cannot provide
+helper functions for the generic case where we have 4 bits per pin in
+contiguous registers. This would avoid duplicating the helper function
+six times (you have four in your patch series, and we'll need two more
+for A375 and A38x).
 
-> >>> +- ranges         : As described in IEEE Std 1275-1994, but must provide
-> >>> +                   at least a definition of one or both of IO and Memory
-> >>> +                   Space.
-> >>> +
-> >>> +- #address-cells : Must be 3
-> >>> +
-> >>> +- #size-cells    : Must be 2
-> >>> +
-> >>> +- reg            : The Configuration Space base address, as accessed by the
-> >>> +                   parent bus.
-> >> 
-> >> Isn?t the size fixed here for cam or ecam?
-> > 
-> > Yes, which is why reg just specifies the base address.
-> 
-> Huh?  The reg property clearly has the size in it (as shown in the example
-> below).  I guess I was just asking for the description here to say what
-> the size was for the 2 compatibles since its fixed and known.
+I've also attached other patches:
 
-Actually, the example just has a 64-bit CPU physical address with no size.
-Do I have to add a size to the binding? It's not at all useful for the driver.
+ * One patch that fixes your Armada XP handling, which missed the
+   mv78230 and mv78260 cases (PATCH 4)
 
-> >> Examples are always nice :)
-> > 
-> > Not in this case! kvmtool generates the following:
-> > 
-> > 	pci {
-> > 		#address-cells = <0x3>;
-> > 		#size-cells = <0x2>;
-> > 		#interrupt-cells = <0x1>;
-> > 		compatible = "arm,pci-cam-generic";
-> > 		reg = <0x0 0x40000000>;
-> > 		ranges = <0x1000000 0x0 0x0 0x0 0x0 0x0 0x10000 0x2000000 0x0 0x41000000 0x0 0x41000000 0x0 0x3f000000>;
-> > 		interrupt-map = <0x0 0x0 0x0 0x1 0x1 0x0 0x4 0x1 0x800 0x0 0x0 0x1 0x1 0x0 0x5 0x1 0x1000 0x0 0x0 0x1 0x1 0x0 0x6 0x1 0x1800 0x0 0x0 0x1 0x1 0x0 0x7 0x1>;
-> > 		interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
-> > 	};
-> > 
-> > I can add it if you like, but it looks like a random bunch of numbers to me.
-> 
-> You could clean it up a bit to be human readable even if its kvmtool that?s creating it.
-> 
-> 	pci {
-> 		compatible = "arm,pci-cam-generic?;
-> 		#address-cells = <3>;
-> 		#size-cells = <2>;
-> 		#interrupt-cells = <1>
-> 		reg = <0x0 0x40000000>;
-> 		ranges = <
-> 			0x1000000 0x0 0x00000000 0x0 0x00000000 0x0 0x00010000
-> 			0x2000000 0x0 0x41000000 0x0 0x41000000 0x0 0x3f000000
-> 			>;
-> 		interrupt-map = <
-> 			...
-> 				>;
-> 
-> 		interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
+ * One patch that removes MPP_REG_CTRL (PATCH 5)
 
-Sure, if you think it helps.
+ * One patch that adjusts a comment in the code that was no longer true
+   (PATCH 6)
 
-Will
+Feel free to squash these patches into the appropriate patches.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-pinctrl-mvebu-armada-375-provide-generic-mpp-callbac.patch
+Type: text/x-patch
+Size: 1659 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140213/9f210261/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-pinctrl-mvebu-armada-38x-provide-generic-mpp-callbac.patch
+Type: text/x-patch
+Size: 1604 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140213/9f210261/attachment-0001.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0003-fixup-pinctrl-mvebu-move-resource-allocation-to-SoC-.patch
+Type: text/x-patch
+Size: 2639 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140213/9f210261/attachment-0002.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0004-fixup-pinctrl-mvebu-move-resource-allocation-to-SoC-.patch
+Type: text/x-patch
+Size: 1255 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140213/9f210261/attachment-0003.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0005-pinctrl-mvebu-remove-MPP_REG_CTRL-macro.patch
+Type: text/x-patch
+Size: 1299 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140213/9f210261/attachment-0004.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0006-pinctrl-mvebu-update-comment-about-mvebu_mpp_ctrl.patch
+Type: text/x-patch
+Size: 1293 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140213/9f210261/attachment-0005.bin>
