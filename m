@@ -1,86 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Feb 2014 17:03:52 +0900
-Subject: [PATCH 05/11] ARM: shmobile: Lager USB0 cable detection workaround
+Date: Thu, 13 Feb 2014 17:03:51 +0900
+Subject: [PATCH 04/11] ARM: shmobile: bockw: use wp-gpios instead of WP pin
 In-Reply-To: <cover.1392276547.git.horms+renesas@verge.net.au>
 References: <cover.1392276547.git.horms+renesas@verge.net.au>
-Message-ID: <36be7686caa05334ca8d52df157b373a41d8d9f1.1392276547.git.horms+renesas@verge.net.au>
+Message-ID: <f729dd554e9a04a55950693ea8eca0d3aaa28d22.1392276547.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add Lager board code to check the PWEN GPIO signal and refuse to
-allow probe of the USBHS driver in case of DIP misconfiguration.
+Latest Renesas Chip has some SDHI channels and the WP pin
+availability depends on its channel or HW implementation.
+Thus, this patch decides new policy whch indicates
+WP is disabled as default.
+But, we can use wp-gpios property to enable it as
+other method.
 
-For correct operation Lager DIP switches SW5 and SW6 shall be
-configured in 2-3 position to enable USB Function support.
-
-If the DIP switch is configured incorrectly then the user can
-simply adjust the hardware and either reboot or use the bind interface
-to try to probe again:
-
-# echo renesas_usbhs > /sys/bus/platform/drivers/renesas_usbhs/bind
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager.c | 25 ++++++++++++++++++++++---
- 1 file changed, 22 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7778-bockw-reference.dts | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 30ebd08..6a7041f 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -408,13 +408,30 @@ static int usbhs_hardware_init(struct platform_device *pdev)
- {
- 	struct usbhs_private *priv = usbhs_get_priv(pdev);
- 	struct usb_phy *phy;
-+	int ret;
-+
-+	/* USB0 Function - use PWEN as GPIO input to detect DIP Switch SW5
-+	 * setting to avoid VBUS short circuit due to wrong cable.
-+	 * PWEN should be pulled up high if USB Function is selected by SW5
-+	 */
-+	gpio_request_one(RCAR_GP_PIN(5, 18), GPIOF_IN, NULL); /* USB0_PWEN */
-+	if (!gpio_get_value(RCAR_GP_PIN(5, 18))) {
-+		pr_warn("Error: USB Function not selected - check SW5 + SW6\n");
-+		ret = -ENOTSUPP;
-+		goto error;
-+	}
+diff --git a/arch/arm/boot/dts/r8a7778-bockw-reference.dts b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
+index bb62c7a..06cda19 100644
+--- a/arch/arm/boot/dts/r8a7778-bockw-reference.dts
++++ b/arch/arm/boot/dts/r8a7778-bockw-reference.dts
+@@ -17,6 +17,7 @@
+ /dts-v1/;
+ #include "r8a7778.dtsi"
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/gpio/gpio.h>
  
- 	phy = usb_get_phy_dev(&pdev->dev, 0);
--	if (IS_ERR(phy))
--		return PTR_ERR(phy);
-+	if (IS_ERR(phy)) {
-+		ret = PTR_ERR(phy);
-+		goto error;
-+	}
+ / {
+ 	model = "bockw";
+@@ -84,7 +85,7 @@
  
- 	priv->phy = phy;
- 	return 0;
-+ error:
-+	gpio_free(RCAR_GP_PIN(5, 18));
-+	return ret;
- }
+ 	sdhi0_pins: sd0 {
+ 		renesas,groups = "sdhi0_data4", "sdhi0_ctrl",
+-				  "sdhi0_cd", "sdhi0_wp";
++				  "sdhi0_cd";
+ 		renesas,function = "sdhi0";
+ 	};
  
- static int usbhs_hardware_exit(struct platform_device *pdev)
-@@ -426,6 +443,8 @@ static int usbhs_hardware_exit(struct platform_device *pdev)
- 
- 	usb_put_phy(priv->phy);
- 	priv->phy = NULL;
-+
-+	gpio_free(RCAR_GP_PIN(5, 18));
- 	return 0;
- }
- 
-@@ -536,7 +555,7 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
- 				  "vin1_clk", "vin1"),
- 	/* USB0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs", "pfc-r8a7790",
--				  "usb0", "usb0"),
-+				  "usb0_ovc_vbus", "usb0"),
+@@ -101,6 +102,7 @@
+ 	vmmc-supply = <&fixedregulator3v3>;
+ 	bus-width = <4>;
+ 	status = "okay";
++	wp-gpios = <&gpio3 18 GPIO_ACTIVE_HIGH>;
  };
  
- static void __init lager_add_standard_devices(void)
+ &hspi0 {
 -- 
 1.8.5.2
