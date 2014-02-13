@@ -1,33 +1,34 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 13 Feb 2014 17:14:13 +0900
-Subject: [PATCH 1/3] irqchip: exynos-combiner: call handle_bad_irq directly
-In-Reply-To: <52D01D96.8000401@samsung.com>
-References: <1389321142-4073-1-git-send-email-pankaj.dubey@samsung.com>
- <52D01D96.8000401@samsung.com>
-Message-ID: <52FC7ED5.1020403@samsung.com>
+Date: Thu, 13 Feb 2014 17:15:52 +0900
+Subject: [PATCH] clocksource: exynos_mct: remove unwanted header file
+ inclusion
+In-Reply-To: <1389314025-2890-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1389314025-2890-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <52FC7F38.1060603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/2014 01:19 AM, Tomasz Figa wrote:
-> Hi Pankaj,
+On 01/10/2014 09:33 AM, Pankaj Dubey wrote:
+> remove unwanted header file inclusion "asm/mach/time.h" from exynos_mct.c
 >
-> On 10.01.2014 03:32, Pankaj Dubey wrote:
->> This patch is inspired from following commit
->>   aec0095653: (irqchip: gic: Call handle_bad_irq() directly)
->>
->> Also this will help in removing unwanted inclusion
->> of header file "asm/mach/irq.h"
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   drivers/irqchip/exynos-combiner.c |    3 +--
->>   1 file changed, 1 insertion(+), 2 deletions(-)
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>   drivers/clocksource/exynos_mct.c |    2 --
+>   1 file changed, 2 deletions(-)
 >
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->
-> Best regards,
-> Tomasz
->
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 48f76bc..ed49b25 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -25,8 +25,6 @@
+>   #include <linux/of_address.h>
+>   #include <linux/clocksource.h>
+>   
+> -#include <asm/mach/time.h>
+> -
+>   #define EXYNOS4_MCTREG(x)		(x)
+>   #define EXYNOS4_MCT_G_CNT_L		EXYNOS4_MCTREG(0x100)
+>   #define EXYNOS4_MCT_G_CNT_U		EXYNOS4_MCTREG(0x104)
 
 Ping.
 
