@@ -1,33 +1,19 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Feb 2014 19:12:42 -0700
-Subject: [PATCH 1/2] ARM: tegra: enable I2C Mux driver for PCA9546 in
- defconfig
-In-Reply-To: <CAK5ve-LHktOUNUYRZccvmmYwcAhvQiPQYoxEWkVU6kUHr4aTUQ@mail.gmail.com>
-References: <1391817298-10600-1-git-send-email-pengw@nvidia.com>
- <52FBC6A9.7010401@wwwdotorg.org>
- <CAK5ve-+bzLkdwmab9sZGPk7p67ktVcK3mHQ2aUgMueH061ty6w@mail.gmail.com>
- <52FBD6C9.2010905@wwwdotorg.org>
- <CAK5ve-+2AGO0UCf4UOMLoqGmQLp7QN08OJbZxUc-oYZzjPdFcQ@mail.gmail.com>
- <52FBF739.1060605@wwwdotorg.org>
- <CAK5ve-LHktOUNUYRZccvmmYwcAhvQiPQYoxEWkVU6kUHr4aTUQ@mail.gmail.com>
-Message-ID: <52FC2A1A.2070305@wwwdotorg.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 13 Feb 2014 10:17:50 +0800
+Subject: [PATCH V2 1/2] ARM: dts: imx6q: add 852MHz setpoint for CPU freq
+In-Reply-To: <1392199023-29880-1-git-send-email-b20788@freescale.com>
+References: <1392199023-29880-1-git-send-email-b20788@freescale.com>
+Message-ID: <20140213021748.GD950@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/2014 04:23 PM, Bryan Wu wrote:
-...
-> Sure, I think I just missed to set the author as @nvidia.com but SOB
-> is @nvidia.com in this patchset. And I still should use --from "Bryan
-> Wu <cooloney@gmail.com>" for sending out email from gmail server.
-> Right?
+On Wed, Feb 12, 2014 at 05:57:02PM +0800, Anson Huang wrote:
+> According to datasheet, i.MX6Q has setpoint of 852MHz
+> which is exclusive with 996MHz, the fuse map of speed_grading
+> defines the max speed of ARM, here we add this 852MHz
+> setpoint opp info, kernel will check the speed_grading
+> fuse and remove all illegal setpoints.
+> 
+> Signed-off-by: Anson Huang <b20788@freescale.com>
 
-I think you want the following in ~/.gitconfig:
-
-[user]
-	name = Bryan Wu
-	email = pengw at nvidia.com
-[sendemail]
-        from = Bryan Wu <cooloney@gmail.com>
-
-I assume "--from xxx" is the same as setting the last variable I listed
-above.
+Applied both, thanks.
