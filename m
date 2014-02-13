@@ -1,143 +1,26 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 13 Feb 2014 15:28:01 -0800
-Subject: [PATCH v10 0/4] ata: Add APM X-Gene SoC SATA host controller
- support
-In-Reply-To: <CAPw-ZTkbpOEHowGvp-_3DcW1qW0AK_ZbpdS1LESJfhFU-n_Mtw@mail.gmail.com>
-References: <CAPw-ZTkbpOEHowGvp-_3DcW1qW0AK_ZbpdS1LESJfhFU-n_Mtw@mail.gmail.com>
-Message-ID: <CAPw-ZTn5c=v+7pbetEjXWpw9i=cG+zdeHPxO1QD0e42uFrKnCg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Feb 2014 15:28:43 -0800
+Subject: [PATCH] ARM: OMAP2+: Remove MACH_NOKIA_N800
+In-Reply-To: <20140209195021.GE573@drone.musicnaut.iki.fi>
+References: <1391958088.25424.17.camel@x220>
+ <20140209195021.GE573@drone.musicnaut.iki.fi>
+Message-ID: <20140213232842.GS28216@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun,
+* Aaro Koskinen <aaro.koskinen@iki.fi> [140209 11:53]:
+> Hi,
+> 
+> On Sun, Feb 09, 2014 at 04:01:28PM +0100, Paul Bolle wrote:
+> > The last caller of machine_is_nokia_n800() was removed in commit
+> > 5a87cde490e1 ("ARM: OMAP2+: Remove legacy booting support for n8x0").
+> > That means that the Kconfig symbol MACH_NOKIA_N800 is now unused. It can
+> > safely be removed.
+> > 
+> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> 
+> Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 
-With regard to make use of the standard ahci_platform and recent Hans'
-PHY works, the original version of the driver was an ahci_platform
-driver. Unfortunately, the APM X-Gene SATA controller is more
-complicate than an standard AHCI controller. In order to make it works
-properly, the follow additional programming sequences are required:
+Thanks applying into omap-for-v3.14/fixes.
 
-1. There are a number of errata that require workaround. Some can be
-fixed by adding broken flags while others are better to just wrap
-around the existent libahci library routines and not overly polluting
-the libahci routines.
-2. There are additional controller programming sequences to configure.
-2a. By default, RAM are powered down and require brought out of shutdown.
-2b. The controller has an additional corresponding PHY part that needs
-to be programmed after PHY configuration.
-2c. The controller requires extra programming sequence for the
-hardreset due to errata.
-2d. For the IO flush, it requires additional memory resources.
-3. With the current AHCI platform data handing and ARM64 arch support,
-if I were to add custom AHCI platform data routine, I would need
-equivalent functions and that would make the ARCH support having
-knowledge of the SATA code which I don't want. Also, the DTS
-processing/scanning in ARCH64 is NULL for platform data and would have
-make X-Gene to have its own version which I also don't want.
-
--Loc
-
-> On Thu, Jan 16, 2014 at 8:11 AM, Loc Ho <lho@apm.com> wrote:
->> This patch adds support for the APM X-Gene SoC SATA host controller. In
->> order for the host controller to work, the corresponding PHY driver
->> musts also be available.
->>
->> v10:
->>  * Update binding documentation
->>
->> v9:
->>  * Remove ACPI/EFI include files
->>  * Remove the IO flush support, interrupt routine, and DTS resources
->>  * Remove function xgene_rd, xgene_wr, and xgene_wr_flush
->>  * Remove PMP support (function xgene_ahci_qc_issue, xgene_ahci_qc_prep,
->>    xgene_ahci_qc_fill_rtf, xgene_ahci_softreset, and xgene_ahci_do_softreset)
->>  * Rename function xgene_ahci_enable_phy to xgene_ahci_force_phy_rdy
->>  * Clean up hardreset functions
->>  * Require v7 of the PHY driver
->>
->> v8:
->>  * Remove _ADDR from defines
->>  * Remove define MSTAWAUX_COHERENT_BYPASS_SET and
->>    STARAUX_COHERENT_BYPASS_SET and use direct coding
->>  * Remove the un-necessary check for DTS boot with built in ACPI table
->>  * Switch to use dma_set_mask_and_coherent for setting DMA mask
->>  * Remove ACPI table matching code
->>  * Update clock-names for sata01clk, sata23clk, and sata45clk
->>
->> v7:
->>  * Update the clock code by toggle the clock
->>  * Update the DTS clock mask values due to the clock spilt between host and
->>    v5 of the PHY drivers
->>
->> v6:
->>  * Update binding documentation
->>  * Change select PHY_XGENE_SATA to PHY_XGENE
->>  * Add ULL to constants
->>  * Change indentation and comments
->>  * Clean up the probe functions a bit more
->>  * Remove xgene_ahci_remove function
->>  * Add the flush register to DTS
->>  * Remove the interrupt-parent from DTS
->>
->> v5:
->>  * Sync up to v3 of the PHY driver
->>  * Remove MSLIM wrapper functions
->>  * Change the memory shutdown loop to use usleep_range
->>  * Use devm_ioremap_resource instead devm_ioremap
->>  * Remove suspend/resume functions as not needed
->>
->> v4:
->>  * Remove the ID property in DT
->>  * Remove the temporary PHY direct function call and use PHY function
->>  * Change printk to pr_debug
->>  * Move the IOB flush addresses into the DT
->>  * Remove the parameters retrieval function as no longer needed
->>  * Remove the header file as no longer needed
->>  * Require v2 patch of the SATA PHY driver. Require slightly modification
->>    in the Kconfig as it is moved to folder driver/phy and use Kconfig
->>    PHY_XGENE_SATA instead SATA_XGENE_PHY.
->>
->> v3:
->>  * Move out the SATA PHY to another driver
->>  * Remove the clock-cells entry from DTS
->>  * Remove debug wrapper
->>  * Remove delay functions wrapper
->>  * Clean up resource and IRQ query
->>  * Remove query clock name
->>  * Switch to use dma_set_mask/dma_coherent_mask
->>  * Remove un-necessary devm_kfree
->>  * Update GPL license header to v2
->>  * Spilt up function xgene_ahci_hardreset
->>  * Spilt up function xgene_ahci_probe
->>  * Remove all reference of CONFIG_ARCH_MSLIM
->>  * Clean up chip revision code
->>
->> v2:
->>  * Clean up file sata_xgene.c with Lindent and etc
->>  * Clean up file sata_xgene_serdes.c with Lindent and etc
->>  * Add description to each patch
->>
->> v1:
->>  * inital version
->>
->> Signed-off-by: Loc Ho <lho@apm.com>
->> Signed-off-by: Tuan Phan <tphan@apm.com>
->> Signed-off-by: Suman Tripathi <stripathi@apm.com>
->> ---
->> Loc Ho (4):
->>   ata: Export required functions by APM X-Gene SATA driver
->>   Documentation: Add documentation for APM X-Gene SoC SATA host
->>     controller DTS binding
->>   ata: Add APM X-Gene SoC SATA host controller driver
->>   arm64: Add APM X-Gene SoC SATA host controller DTS entries
->>
->>  .../devicetree/bindings/ata/apm-xgene.txt          |   70 +++
->>  arch/arm64/boot/dts/apm-storm.dtsi                 |   75 +++
->>  drivers/ata/Kconfig                                |    8 +
->>  drivers/ata/Makefile                               |    1 +
->>  drivers/ata/ahci.h                                 |    9 +
->>  drivers/ata/libahci.c                              |   16 +-
->>  drivers/ata/sata_xgene.c                           |  630 ++++++++++++++++++++
->>  7 files changed, 803 insertions(+), 6 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/ata/apm-xgene.txt
->>  create mode 100644 drivers/ata/sata_xgene.c
->>
+Tony
