@@ -1,32 +1,21 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Thu, 13 Feb 2014 10:07:01 -0800
-Subject: [PATCH] Fix uses of dma_max_pfn() when converting to a limiting
- address
-In-Reply-To: <20140213171117.GA30257@n2100.arm.linux.org.uk>
-References: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
- <1392310690.2175.13.camel@dabdike.int.hansenpartnership.com>
- <20140213171117.GA30257@n2100.arm.linux.org.uk>
-Message-ID: <1392314821.2175.16.camel@dabdike.int.hansenpartnership.com>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Thu, 13 Feb 2014 20:02:57 +0200
+Subject: [BISECTED] ssh - Received disconnect from x.x.x.x: 2: Bad packet
+ length 3149594624
+Message-ID: <52FD08D1.3030405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-02-13 at 17:11 +0000, Russell King - ARM Linux wrote:
-> On Thu, Feb 13, 2014 at 08:58:10AM -0800, James Bottomley wrote:
-> > This doesn't really look like the right fix.  You replaced dev->dma_mask
-> > with a calculation on dev_max_pfn().  Since dev->dma_mask is always u64
-> > and dev_max_pfn is supposed to be returning the pfn of the dma_mask, it
-> > should unconditionally be 64 bits as well.  Either that or it should
-> > return dma_addr_t.
-> 
-> My reasoning is that PFNs in the system are always of type "unsigned long"
-> and therefore a function returning a pfn should have that type.  If we
-> overflow a PFN fitting in an unsigned long, we have lots of places which
-> need fixing.
+Since next-21012014 I started to receive "Received disconnect from 
+x.x.x.x: 2: Bad packet length 3149594624" errors when trying to 
+establish ssh session over wifi to my N900, running Maemo 5. I bisected 
+and it turned out that commit dce5c9e35bc4085bd33eccdb8c9ec5a643507a14 
+"ARM: 7928/1: kconfig: select HAVE_EFFICIENT_UNALIGNED_ACCESS for CPUv6+ 
+&& MMU" is the first bad. There is nothing related in either dmesg or 
+syslog on the device. Reverting that commit on 3.14-rc1 make those 
+errors disappear.
 
-It's not intuitive to people who need the dma mask that they're supposed
-to use dma_max_pfn() << PAGE_SHIFT but now they have to worry about the
-casting and, if they don't get it right, nothing will warn or tell them.
-what about a new macro, say dma_max_mask(dev) that just returns
-(u64)dma_max_pfn() << PAGE_SHIFT?
+As my knowledge on how to deal with that stops here, advises on what to 
+do next to find the real problem are appreciated.
 
-James
+Ivo
