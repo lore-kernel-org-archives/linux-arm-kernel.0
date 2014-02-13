@@ -1,114 +1,74 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Feb 2014 17:13:56 +0900
-Subject: [PATCH 07/12] ARM: shmobile: r8a7790: add audio clock
+Date: Thu, 13 Feb 2014 17:13:57 +0900
+Subject: [PATCH 08/12] ARM: shmobile: r7s72100 clock: Add RSPI clocks
 In-Reply-To: <cover.1392277789.git.horms+renesas@verge.net.au>
 References: <cover.1392277789.git.horms+renesas@verge.net.au>
-Message-ID: <03850dd7aaa922424529e9c1374f2724bc7c33be.1392278855.git.horms+renesas@verge.net.au>
+Message-ID: <24ae129be242afd58dfbf4de2232a5bc4b0c55ff.1392278855.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Current audio clock doesn't have dependency to device/driver,
-but, it is not good design for DT support.
-To avoid branch merge conflict issue,
-it uses this load map, and this patch is 1) part.
- 1) add old/new style clock in platform
- 2) add new style clock method in driver
- 3) remove old tyle clock from platform
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi         | 23 +++++++++++++++++++++++
- arch/arm/mach-shmobile/clock-r8a7790.c | 20 ++++++++++++++++++++
- 2 files changed, 43 insertions(+)
+ arch/arm/mach-shmobile/clock-r7s72100.c | 21 ++++++++++++++++++---
+ 1 file changed, 18 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 71b1251..67a6d96 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -313,6 +313,29 @@
- 			clock-output-names = "extal";
- 		};
+diff --git a/arch/arm/mach-shmobile/clock-r7s72100.c b/arch/arm/mach-shmobile/clock-r7s72100.c
+index dd8ce87..ffb0fff 100644
+--- a/arch/arm/mach-shmobile/clock-r7s72100.c
++++ b/arch/arm/mach-shmobile/clock-r7s72100.c
+@@ -22,12 +22,14 @@
+ #include <mach/common.h>
+ #include <mach/r7s72100.h>
  
-+		/*
-+		 * The external audio clocks are configured as 0 Hz fixed frequency clocks by
-+		 * default. Boards that provide audio clocks should override them.
-+		 */
-+		audio_clk_a: audio_clk_a {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+			clock-output-names = "audio_clk_a";
-+		};
-+		audio_clk_b: audio_clk_b {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+			clock-output-names = "audio_clk_b";
-+		};
-+		audio_clk_c: audio_clk_c {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+			clock-output-names = "audio_clk_c";
-+		};
-+
- 		/* Special CPG clocks */
- 		cpg_clocks: cpg_clocks at e6150000 {
- 			compatible = "renesas,r8a7790-cpg-clocks",
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index 507073e..08a2803 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -91,6 +91,15 @@ static struct clk main_clk = {
- 	.ops	= &followparent_clk_ops,
+-/* registers */
++/* Frequency Control Registers */
+ #define FRQCR		0xfcfe0010
+ #define FRQCR2		0xfcfe0014
++/* Standby Control Registers */
+ #define STBCR3		0xfcfe0420
+ #define STBCR4		0xfcfe0424
+ #define STBCR9		0xfcfe0438
++#define STBCR10		0xfcfe043c
+ 
+ #define PLL_RATE 30
+ 
+@@ -145,11 +147,19 @@ struct clk div4_clks[DIV4_NR] = {
+ 					| CLK_ENABLE_ON_INIT),
  };
  
-+static struct clk audio_clk_a = {
+-enum {	MSTP97, MSTP96, MSTP95, MSTP94,
++enum {
++	MSTP107, MSTP106, MSTP105, MSTP104, MSTP103,
++	MSTP97, MSTP96, MSTP95, MSTP94,
+ 	MSTP47, MSTP46, MSTP45, MSTP44, MSTP43, MSTP42, MSTP41, MSTP40,
+-	MSTP33,	MSTP_NR };
++	MSTP33,	MSTP_NR
 +};
-+
-+static struct clk audio_clk_b = {
-+};
-+
-+static struct clk audio_clk_c = {
-+};
-+
- /*
-  * clock ratio of these clock will be updated
-  * on r8a7790_clock_init()
-@@ -124,6 +133,9 @@ SH_FIXED_RATIO_CLK_SET(ddr_clk,			pll3_clk,	1, 8);
- SH_FIXED_RATIO_CLK_SET(mp_clk,			pll1_div2_clk,	1, 15);
  
- static struct clk *main_clks[] = {
-+	&audio_clk_a,
-+	&audio_clk_b,
-+	&audio_clk_c,
- 	&extal_clk,
- 	&extal_div2_clk,
- 	&main_clk,
-@@ -267,6 +279,10 @@ static struct clk mstp_clks[MSTP_NR] = {
- static struct clk_lookup lookups[] = {
+ static struct clk mstp_clks[MSTP_NR] = {
++	[MSTP107] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 7, 0), /* RSPI0 */
++	[MSTP106] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 6, 0), /* RSPI1 */
++	[MSTP105] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 5, 0), /* RSPI2 */
++	[MSTP104] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 4, 0), /* RSPI3 */
++	[MSTP103] = SH_CLK_MSTP8(&peripheral1_clk, STBCR10, 3, 0), /* RSPI4 */
+ 	[MSTP97] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 7, 0), /* RIIC0 */
+ 	[MSTP96] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 6, 0), /* RIIC1 */
+ 	[MSTP95] = SH_CLK_MSTP8(&peripheral0_clk, STBCR9, 5, 0), /* RIIC2 */
+@@ -176,6 +186,11 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("cpu_clk", &div4_clks[DIV4_I]),
  
- 	/* main clocks */
-+	CLKDEV_CON_ID("audio_clk_a",	&audio_clk_a),
-+	CLKDEV_CON_ID("audio_clk_b",	&audio_clk_b),
-+	CLKDEV_CON_ID("audio_clk_c",	&audio_clk_c),
-+	CLKDEV_CON_ID("audio_clk_internal",	&m2_clk),
- 	CLKDEV_CON_ID("extal",		&extal_clk),
- 	CLKDEV_CON_ID("extal_div2",	&extal_div2_clk),
- 	CLKDEV_CON_ID("main",		&main_clk),
-@@ -357,6 +373,10 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_ICK_ID("du.0", "rcar-du-r8a7790", &mstp_clks[MSTP724]),
- 	CLKDEV_ICK_ID("du.1", "rcar-du-r8a7790", &mstp_clks[MSTP723]),
- 	CLKDEV_ICK_ID("du.2", "rcar-du-r8a7790", &mstp_clks[MSTP722]),
-+	CLKDEV_ICK_ID("clk_a", "rcar_sound", &audio_clk_a),
-+	CLKDEV_ICK_ID("clk_b", "rcar_sound", &audio_clk_b),
-+	CLKDEV_ICK_ID("clk_c", "rcar_sound", &audio_clk_c),
-+	CLKDEV_ICK_ID("clk_i", "rcar_sound", &m2_clk),
- 	CLKDEV_ICK_ID("ssi.0", "rcar_sound", &mstp_clks[MSTP1015]),
- 	CLKDEV_ICK_ID("ssi.1", "rcar_sound", &mstp_clks[MSTP1014]),
- 	CLKDEV_ICK_ID("ssi.2", "rcar_sound", &mstp_clks[MSTP1013]),
+ 	/* MSTP clocks */
++	CLKDEV_DEV_ID("rspi-rz.0", &mstp_clks[MSTP107]),
++	CLKDEV_DEV_ID("rspi-rz.1", &mstp_clks[MSTP106]),
++	CLKDEV_DEV_ID("rspi-rz.2", &mstp_clks[MSTP105]),
++	CLKDEV_DEV_ID("rspi-rz.3", &mstp_clks[MSTP104]),
++	CLKDEV_DEV_ID("rspi-rz.4", &mstp_clks[MSTP103]),
+ 	CLKDEV_DEV_ID("fcfee000.i2c", &mstp_clks[MSTP97]),
+ 	CLKDEV_DEV_ID("fcfee400.i2c", &mstp_clks[MSTP96]),
+ 	CLKDEV_DEV_ID("fcfee800.i2c", &mstp_clks[MSTP95]),
 -- 
 1.8.5.2
