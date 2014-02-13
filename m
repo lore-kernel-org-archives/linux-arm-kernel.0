@@ -1,187 +1,57 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 13 Feb 2014 15:09:04 +0100
-Subject: [PATCH V2 14/17] i2c: nomadik: Fixup deployment of runtime PM
-In-Reply-To: <1392300547-23365-1-git-send-email-ulf.hansson@linaro.org>
-References: <1392300547-23365-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1392300547-23365-3-git-send-email-ulf.hansson@linaro.org>
+Date: Thu, 13 Feb 2014 15:12:49 +0100
+Subject: [PATCH 14/17] i2c: nomadik: Fixup deployment of runtime PM
+In-Reply-To: <CAPDyKFrWgB8z1rtWxU7AYvVsmNj_pfGbsozwgP_FzLODpmGRwQ@mail.gmail.com>
+References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+ <1391529538-21685-15-git-send-email-ulf.hansson@linaro.org>
+ <CACRpkdZwoXf5ovmQEAN6Ugvz91+_i5uGqStR3MGXQeJGHitj3Q@mail.gmail.com>
+ <CAPDyKFrWgB8z1rtWxU7AYvVsmNj_pfGbsozwgP_FzLODpmGRwQ@mail.gmail.com>
+Message-ID: <CAPDyKFq_k7dRjuf+XW=DDkM1K2EJ_4vAAs0tTrd+WbUxqxP-tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the runtime PM state is expected to be active according to the
-amba bus, we must align our behaviour while probing to it.
+On 10 February 2014 11:14, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 5 February 2014 15:34, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Tue, Feb 4, 2014 at 4:58 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>
+>>> Since the device is active while a successful probe has been completed,
+>>> the reference counting for the clock will be screwed up and never reach
+>>> zero.
+>>>
+>>> The issue is resolved by implementing runtime PM callbacks and let them
+>>> handle the resources accordingly, including the clock.
+>>>
+>>> Cc: Alessandro Rubini <rubini@unipv.it>
+>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>> Cc: Wolfram Sang <wsa@the-dreams.de>
+>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> Hm do I read it right as patch 13 breaks runtime PM by leaving
+>> the device active after probe() and this patch
+>> 14 fixes it again? Maybe these two patches should be squashed
+>> then.
 
-Moreover, this is needed to be able to have the driver fully functional
-without depending on CONFIG_RUNTIME_PM.
+In v2 I have now squashed patch 13 into this patch 14.
 
-Since the device is active while a successful probe has been completed,
-the reference counting for the clock will be screwed up and never reach
-zero. We resolve this by implementing runtime PM callbacks and let them
-handle the resources accordingly, including the clock.
+That means patch13 shall be dropped from this patchset.
 
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
+Kind regards
+Uffe
 
-Changes in v2:
-	Rebased on top of latest i2c-nomadik branch.
-	Squashed with PATCH 13/17 from previous version.
-	Add error handling to align to previous behavior.
-
----
- drivers/i2c/busses/i2c-nomadik.c |   77 +++++++++++++++++++++++++-------------
- 1 file changed, 51 insertions(+), 26 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index d800d0f..01b78df 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -666,7 +666,7 @@ static int nmk_i2c_xfer_one(struct nmk_i2c_dev *dev, u16 flags)
- static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
- 		struct i2c_msg msgs[], int num_msgs)
- {
--	int status;
-+	int status = 0;
- 	int i;
- 	struct nmk_i2c_dev *dev = i2c_get_adapdata(i2c_adap);
- 	int j;
-@@ -675,19 +675,6 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
- 
- 	pm_runtime_get_sync(&dev->adev->dev);
- 
--	status = clk_prepare_enable(dev->clk);
--	if (status) {
--		dev_err(&dev->adev->dev, "can't prepare_enable clock\n");
--		goto out_clk;
--	}
--
--	/* Optionaly enable pins to be muxed in and configured */
--	pinctrl_pm_select_default_state(&dev->adev->dev);
--
--	status = init_hw(dev);
--	if (status)
--		goto out;
--
- 	/* Attempt three times to send the message queue */
- 	for (j = 0; j < 3; j++) {
- 		/* setup the i2c controller */
-@@ -708,12 +695,6 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
- 			break;
- 	}
- 
--out:
--	clk_disable_unprepare(dev->clk);
--out_clk:
--	/* Optionally let pins go into idle state */
--	pinctrl_pm_select_idle_state(&dev->adev->dev);
--
- 	pm_runtime_put_sync(&dev->adev->dev);
- 
- 	dev->busy = false;
-@@ -930,6 +911,41 @@ static int nmk_i2c_resume(struct device *dev)
- #define nmk_i2c_resume	NULL
- #endif
- 
-+#if CONFIG_PM
-+static int nmk_i2c_runtime_suspend(struct device *dev)
-+{
-+	struct amba_device *adev = to_amba_device(dev);
-+	struct nmk_i2c_dev *nmk_i2c = amba_get_drvdata(adev);
-+
-+	clk_disable_unprepare(nmk_i2c->clk);
-+	pinctrl_pm_select_idle_state(dev);
-+	return 0;
-+}
-+
-+static int nmk_i2c_runtime_resume(struct device *dev)
-+{
-+	struct amba_device *adev = to_amba_device(dev);
-+	struct nmk_i2c_dev *nmk_i2c = amba_get_drvdata(adev);
-+	int ret;
-+
-+	ret = clk_prepare_enable(nmk_i2c->clk);
-+	if (ret) {
-+		dev_err(dev, "can't prepare_enable clock\n");
-+		return ret;
-+	}
-+
-+	pinctrl_pm_select_default_state(dev);
-+
-+	ret = init_hw(nmk_i2c);
-+	if (ret) {
-+		clk_disable_unprepare(nmk_i2c->clk);
-+		pinctrl_pm_select_idle_state(dev);
-+	}
-+
-+	return ret;
-+}
-+#endif
-+
- /*
-  * We use noirq so that we suspend late and resume before the wakeup interrupt
-  * to ensure that we do the !pm_runtime_suspended() check in resume before
-@@ -938,6 +954,9 @@ static int nmk_i2c_resume(struct device *dev)
- static const struct dev_pm_ops nmk_i2c_pm = {
- 	.suspend_noirq	= nmk_i2c_suspend,
- 	.resume_noirq	= nmk_i2c_resume,
-+	SET_PM_RUNTIME_PM_OPS(nmk_i2c_runtime_suspend,
-+			nmk_i2c_runtime_resume,
-+			NULL)
- };
- 
- static unsigned int nmk_i2c_functionality(struct i2c_adapter *adap)
-@@ -1006,11 +1025,6 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
- 
- 	amba_set_drvdata(adev, dev);
- 
--	/* Select default pin state */
--	pinctrl_pm_select_default_state(&adev->dev);
--	/* If possible, let's go to idle until the first transfer */
--	pinctrl_pm_select_idle_state(&adev->dev);
--
- 	dev->virtbase = devm_ioremap(&adev->dev, adev->res.start,
- 				resource_size(&adev->res));
- 	if (!dev->virtbase) {
-@@ -1035,6 +1049,14 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
- 		goto err_no_mem;
- 	}
- 
-+	ret = clk_prepare_enable(dev->clk);
-+	if (ret) {
-+		dev_err(&adev->dev, "can't prepare_enable clock\n");
-+		goto err_no_mem;
-+	}
-+
-+	init_hw(dev);
-+
- 	adap = &dev->adap;
- 	adap->dev.of_node = np;
- 	adap->dev.parent = &adev->dev;
-@@ -1054,13 +1076,15 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
- 	ret = i2c_add_adapter(adap);
- 	if (ret) {
- 		dev_err(&adev->dev, "failed to add adapter\n");
--		goto err_no_mem;
-+		goto err_no_adap;
- 	}
- 
- 	pm_runtime_put(&adev->dev);
- 
- 	return 0;
- 
-+ err_no_adap:
-+	clk_disable_unprepare(dev->clk);
-  err_no_mem:
- 
- 	return ret;
-@@ -1077,6 +1101,7 @@ static int nmk_i2c_remove(struct amba_device *adev)
- 	clear_all_interrupts(dev);
- 	/* disable the controller */
- 	i2c_clr_bit(dev->virtbase + I2C_CR, I2C_CR_PE);
-+	clk_disable_unprepare(dev->clk);
- 	if (res)
- 		release_mem_region(res->start, resource_size(res));
- 
--- 
-1.7.9.5
+>
+> You are right; but the driver will still be working, you just don't
+> get the benefit from inactivating the device at request inactivity -
+> as you pointed out.
+>
+> The reason for why I wanted to do this as separate steps was to make
+> it easier for reviewing, otherwise the patch(es) would have been quite
+> big and messy. I am for sure open to  adopt to your proposal, but just
+> wanted to give you some more background, before I go ahead and send a
+> v2.
+>
+> Kind regards
+> Ulf Hansson
+>
+>>
+>> Yours,
+>> Linus Walleij
