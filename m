@@ -1,72 +1,83 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 13 Feb 2014 18:33:34 +0100
-Subject: [PATCH v4 11/13] ARM: mvebu: Register notifier callback for the
- cpuidle transition
+Date: Thu, 13 Feb 2014 18:33:28 +0100
+Subject: [PATCH v4 05/13] ARM: mvebu: Low level function to disable HW
+ coherency support
 In-Reply-To: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1392312816-17657-12-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1392312816-17657-6-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to have well encapsulated code use notifier callback for
-CPU_PM_ENTER and CPU_PM_EXIT inside the mvebu power management code.
+When going to deep idle we need to disable the SoC snooping (aka
+hardware coherency support). Playing with the coherency fabric
+requires to use assembly code to be sure that the compiler doesn't
+reorder the instructions nor do wrong optimization.
+
+This commit extends the modify_coherent_reg macro in order to manage
+enabling (setting a bit) and disabling (clearing the same bit) the
+hardware coherency support.
+
+This function will be called by the low level (in assembly) part of
+the CPU idle functions.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c | 24 ++++++++++++++++++++++++
- arch/arm/mach-mvebu/pmsu.h |  1 +
- 2 files changed, 25 insertions(+)
+ arch/arm/mach-mvebu/coherency_ll.S | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 162ae1399f2a..0e54077c31cb 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -16,6 +16,7 @@
-  * other SOC units
-  */
+diff --git a/arch/arm/mach-mvebu/coherency_ll.S b/arch/arm/mach-mvebu/coherency_ll.S
+index 7b42b4b08a80..686aba2adfc7 100644
+--- a/arch/arm/mach-mvebu/coherency_ll.S
++++ b/arch/arm/mach-mvebu/coherency_ll.S
+@@ -25,7 +25,7 @@
  
-+#include <linux/cpu_pm.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/of_address.h>
-@@ -189,4 +190,27 @@ static noinline void armada_370_xp_pmsu_idle_restore(void)
- 	writel(reg, pmsu_mp_base + PMSU_STATUS_AND_MASK(hw_cpu));
- }
+ 	.text
  
-+static int armada_370_xp_cpu_pm_notify(struct notifier_block *self,
-+				    unsigned long action, void *hcpu)
-+{
-+	if (action == CPU_PM_ENTER) {
-+		unsigned int hw_cpu = cpu_logical_map(smp_processor_id());
-+		armada_370_xp_pmsu_set_start_addr(armada_370_xp_cpu_resume,
-+						hw_cpu);
-+	} else if (action == CPU_PM_EXIT) {
-+		armada_370_xp_pmsu_idle_restore();
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block armada_370_xp_cpu_pm_notifier = {
-+	.notifier_call = armada_370_xp_cpu_pm_notify,
-+};
-+
-+int __init armada_370_xp_cpu_pm_init(void)
-+{
-+	return cpu_pm_register_notifier(&armada_370_xp_cpu_pm_notifier);
-+}
-+
- early_initcall(armada_370_xp_pmsu_init);
-diff --git a/arch/arm/mach-mvebu/pmsu.h b/arch/arm/mach-mvebu/pmsu.h
-index 054cdd8b0ece..e7a766fba757 100644
---- a/arch/arm/mach-mvebu/pmsu.h
-+++ b/arch/arm/mach-mvebu/pmsu.h
-@@ -13,5 +13,6 @@
+-	.macro modify_coherent_reg join_smp
++	.macro modify_coherent_reg join_smp clear_coherency
+ 	mrc	p15, 0, r1, c1, c0, 0
+ 	tst	r1, #CR_M @ Check MMU bit enabled
+ 	bne	1f
+@@ -61,11 +61,19 @@
+ 	sub	r1, r0, #ARMADA_XP_CFB_CFG_REG_OFFSET
+ 	.endif
  
- int armada_xp_boot_cpu(unsigned int cpu_id, void *phys_addr);
- void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void);
-+int armada_370_xp_cpu_pm_init(void);
+-	/* Enable coherency on CPU - Atomic */
++	/*
++	 * Enable coherency on CPU - Atomic (or disable depending of
++	 * the clear_coherency flag)
++	 */
+ 	add	r0, r1, #ARMADA_XP_CFB_CTL_REG_OFFSET
++
+ 1:
+ 	ldrex	r2, [r0]
++	.if \clear_coherency == 1
++	bic	r2, r2, r3
++	.else
+ 	orr	r2, r2, r3
++	.endif
+ 	strex	r1, r2, [r0]
+ 	cmp	r1, #0
+ 	bne 1b
+@@ -78,12 +86,17 @@
  
- #endif	/* __MACH_370_XP_PMSU_H */
+ /*  Enable coherency on CPU */
+ ENTRY(ll_set_cpu_coherent)
+-	modify_coherent_reg join_smp = 0
++	modify_coherent_reg join_smp = 0, clear_coherency = 0
+ ENDPROC(ll_set_cpu_coherent)
+ 
++/*  Disable coherency on CPU */
++ENTRY(ll_clear_cpu_coherent)
++	modify_coherent_reg join_smp = 0, clear_coherency = 1
++ENDPROC(ll_clear_cpu_coherent)
++
+ /* Add CPU to SMP group */
+ ENTRY(ll_set_cpu_coherent_and_smp)
+-	modify_coherent_reg join_smp = 1
++	modify_coherent_reg join_smp = 1, clear_coherency = 0
+ ENDPROC(ll_set_cpu_coherent_and_smp)
+ 
+ 	.align 2
 -- 
 1.8.1.2
