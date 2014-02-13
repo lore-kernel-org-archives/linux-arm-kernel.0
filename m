@@ -1,49 +1,50 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 13 Feb 2014 18:33:29 +0100
-Subject: [PATCH v4 06/13] ARM: mvebu: Add a new set of registers for pmsu
+Date: Thu, 13 Feb 2014 18:33:33 +0100
+Subject: [PATCH v4 10/13] ARM: mvebu: Set the start address of a CPU in a
+ separate function
 In-Reply-To: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1392312816-17657-7-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1392312816-17657-11-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Power Management Unit Service block also controls the Coherency
-Fabric subsystem. This new set of registers is needed for the CPU idle
-implementation for the Armada 370/XP, it allows to enter a deep CPU
-idle state where the Coherency Fabric and the L2 cache are powered
-down.
+Setting the start (or boot) address of A CPU is no more used only
+during SMP bring up, but will also be used by the CPU idle functions
+or later by the CPU hot plug ones.
 
-This patch also adds warnings if one of the base registers set can't
-be ioremapped.
+This commit moves it in a separate function.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/mach-mvebu/pmsu.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index d71ef53107c4..aa5ef7439d0f 100644
+index ec745d59fea8..162ae1399f2a 100644
 --- a/arch/arm/mach-mvebu/pmsu.c
 +++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -26,6 +26,7 @@
+@@ -61,6 +61,12 @@ static struct of_device_id of_pmsu_table[] = {
+ 	{ /* end of list */ },
+ };
  
- static void __iomem *pmsu_mp_base;
- static void __iomem *pmsu_reset_base;
-+static void __iomem *pmsu_fabric_base;
++static void armada_370_xp_pmsu_set_start_addr(void *start_addr, int hw_cpu)
++{
++	writel(virt_to_phys(start_addr), pmsu_mp_base +
++		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
++}
++
+ #ifdef CONFIG_SMP
+ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+ {
+@@ -73,8 +79,7 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
  
- #define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
- #define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
-@@ -67,7 +68,11 @@ static int __init armada_370_xp_pmsu_init(void)
- 	if (np) {
- 		pr_info("Initializing Power Management Service Unit\n");
- 		pmsu_mp_base = of_iomap(np, 0);
-+		WARN_ON(!pmsu_mp_base);
- 		pmsu_reset_base = of_iomap(np, 1);
-+		WARN_ON(!pmsu_reset_base);
-+		pmsu_fabric_base = of_iomap(np, 2);
-+		WARN_ON(!pmsu_fabric_base);
- 		of_node_put(np);
- 	}
+ 	hw_cpu = cpu_logical_map(cpu_id);
  
+-	writel(virt_to_phys(boot_addr), pmsu_mp_base +
+-			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
++	armada_370_xp_pmsu_set_start_addr(boot_addr, hw_cpu);
+ 
+ 	/* Release CPU from reset by clearing reset bit*/
+ 	reg = readl(pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
 -- 
 1.8.1.2
