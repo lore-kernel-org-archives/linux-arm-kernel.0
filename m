@@ -1,181 +1,89 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Feb 2014 17:03:53 +0900
-Subject: [PATCH 06/11] ARM: shmobile: lager: add sound support
+Date: Thu, 13 Feb 2014 17:03:55 +0900
+Subject: [PATCH 08/11] ARM: shmobile: genmai legacy: Add RSPI support
 In-Reply-To: <cover.1392276547.git.horms+renesas@verge.net.au>
 References: <cover.1392276547.git.horms+renesas@verge.net.au>
-Message-ID: <d58922ce8cadba7e758608fef9438bc183b46b0f.1392276547.git.horms+renesas@verge.net.au>
+Message-ID: <664517474c4993c5d560d0e394c36583b7c99535.1392276547.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-This patch adds sound support for Lager board.
-But, it is using PIO transfer at this point.
+Add RSPI platform device, resources, platform data, and SPI child.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-[horms+renesas at verge.net.au: resolved conflicts]
+On this board, only rspi4 is in use. Its bus contains a single device
+(a wm8978 audio codec).
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig       |   1 +
- arch/arm/mach-shmobile/board-lager.c | 100 +++++++++++++++++++++++++++++++++++
- 2 files changed, 101 insertions(+)
+ arch/arm/mach-shmobile/board-genmai.c | 44 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 7e3f42b..bcbd74c 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -272,6 +272,7 @@ config MACH_LAGER
- 	depends on ARCH_R8A7790
- 	select USE_OF
- 	select MICREL_PHY if SH_ETH
-+	select SND_SOC_AK4642 if SND_SIMPLE_CARD
+diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
+index 3e92e3c..c406461 100644
+--- a/arch/arm/mach-shmobile/board-genmai.c
++++ b/arch/arm/mach-shmobile/board-genmai.c
+@@ -20,15 +20,59 @@
  
- config MACH_KOELSCH
- 	bool "Koelsch board"
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 6a7041f..e8242c5 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -20,6 +20,7 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
++#include <linux/spi/rspi.h>
++#include <linux/spi/spi.h>
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include <mach/r7s72100.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
  
- #include <linux/gpio.h>
- #include <linux/gpio_keys.h>
-+#include <linux/i2c.h>
- #include <linux/input.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-@@ -52,6 +53,20 @@
- #include <linux/spi/flash.h>
- #include <linux/spi/rspi.h>
- #include <linux/spi/spi.h>
-+#include <sound/rcar_snd.h>
-+#include <sound/simple_card.h>
-+
-+/*
-+ * SSI-AK4643
-+ *
-+ * SW1: 1: AK4643
-+ *      2: CN22
-+ *      3: ADV7511
-+ *
-+ * this command is required when playback.
-+ *
-+ * # amixer set "LINEOUT Mixer DACL" on
-+ */
- 
- /* DU */
- static struct rcar_du_encoder_data lager_du_encoders[] = {
-@@ -509,6 +524,77 @@ static const struct resource usbhs_phy_resources[] __initconst = {
- 	DEFINE_RES_MEM(0xe6590100, 0x100),
- };
- 
-+/* I2C */
-+static struct i2c_board_info i2c2_devices[] = {
-+	{
-+		I2C_BOARD_INFO("ak4643", 0x12),
-+	}
-+};
-+
-+/* Sound */
-+static struct resource rsnd_resources[] __initdata = {
-+	[RSND_GEN2_SCU]  = DEFINE_RES_MEM(0xec500000, 0x1000),
-+	[RSND_GEN2_ADG]  = DEFINE_RES_MEM(0xec5a0000, 0x100),
-+	[RSND_GEN2_SSIU] = DEFINE_RES_MEM(0xec540000, 0x1000),
-+	[RSND_GEN2_SSI]  = DEFINE_RES_MEM(0xec541000, 0x1280),
-+};
-+
-+static struct rsnd_ssi_platform_info rsnd_ssi[] = {
-+	RSND_SSI_SET(0, 0, gic_spi(370), RSND_SSI_PLAY),
-+	RSND_SSI_SET(0, 0, gic_spi(371), RSND_SSI_CLK_PIN_SHARE),
-+};
-+
-+static struct rsnd_scu_platform_info rsnd_scu[2] = {
-+	/* no member at this point */
-+};
-+
-+static struct rcar_snd_info rsnd_info = {
-+	.flags		= RSND_GEN2,
-+	.ssi_info	= rsnd_ssi,
-+	.ssi_info_nr	= ARRAY_SIZE(rsnd_ssi),
-+	.scu_info	= rsnd_scu,
-+	.scu_info_nr	= ARRAY_SIZE(rsnd_scu),
-+};
-+
-+static struct asoc_simple_card_info rsnd_card_info = {
-+	.name		= "AK4643",
-+	.card		= "SSI01-AK4643",
-+	.codec		= "ak4642-codec.2-0012",
-+	.platform	= "rcar_sound",
-+	.daifmt		= SND_SOC_DAIFMT_LEFT_J,
-+	.cpu_dai = {
-+		.name	= "rcar_sound",
-+		.fmt	= SND_SOC_DAIFMT_CBS_CFS,
-+	},
-+	.codec_dai = {
-+		.name	= "ak4642-hifi",
-+		.fmt	= SND_SOC_DAIFMT_CBM_CFM,
-+		.sysclk	= 11289600,
-+	},
-+};
-+
-+static void __init lager_add_rsnd_device(void)
-+{
-+	struct platform_device_info cardinfo = {
-+		.parent         = &platform_bus,
-+		.name           = "asoc-simple-card",
-+		.id             = -1,
-+		.data           = &rsnd_card_info,
-+		.size_data      = sizeof(struct asoc_simple_card_info),
-+		.dma_mask       = DMA_BIT_MASK(32),
-+	};
-+
-+	i2c_register_board_info(2, i2c2_devices,
-+				ARRAY_SIZE(i2c2_devices));
-+
-+	platform_device_register_resndata(
-+		&platform_bus, "rcar_sound", -1,
-+		rsnd_resources, ARRAY_SIZE(rsnd_resources),
-+		&rsnd_info, sizeof(rsnd_info));
-+
-+	platform_device_register_full(&cardinfo);
++/* RSPI */
++#define RSPI_RESOURCE(idx, baseaddr, irq)				\
++static const struct resource rspi##idx##_resources[] __initconst = {	\
++	DEFINE_RES_MEM(baseaddr, 0x24),					\
++	DEFINE_RES_IRQ_NAMED(irq, "error"),				\
++	DEFINE_RES_IRQ_NAMED(irq + 1, "rx"),				\
++	DEFINE_RES_IRQ_NAMED(irq + 2, "tx"),				\
 +}
 +
- static const struct pinctrl_map lager_pinctrl_map[] = {
- 	/* DU (CN10: ARGB0, CN13: LVDS) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
-@@ -517,12 +603,24 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
- 				  "du_sync_1", "du"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
- 				  "du_clk_out_0", "du"),
-+	/* I2C2 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar.2", "pfc-r8a7790",
-+				  "i2c2", "i2c2"),
- 	/* SCIF0 (CN19: DEBUG SERIAL0) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
- 				  "scif0_data", "scif0"),
- 	/* SCIF1 (CN20: DEBUG SERIAL1) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.7", "pfc-r8a7790",
- 				  "scif1_data", "scif1"),
-+	/* SSI (CN17: sound) */
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7790",
-+				  "ssi0129_ctrl", "ssi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7790",
-+				  "ssi0_data", "ssi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7790",
-+				  "ssi1_data", "ssi"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7790",
-+				  "audio_clk_a", "audio_clk"),
- 	/* MMCIF1 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.1", "pfc-r8a7790",
- 				  "mmc1_data8", "mmc1"),
-@@ -616,6 +714,8 @@ static void __init lager_add_standard_devices(void)
- 					  &usbhs_phy_pdata,
- 					  sizeof(usbhs_phy_pdata));
- 	lager_register_usbhs();
++RSPI_RESOURCE(0, 0xe800c800, gic_iid(270));
++RSPI_RESOURCE(1, 0xe800d000, gic_iid(273));
++RSPI_RESOURCE(2, 0xe800d800, gic_iid(276));
++RSPI_RESOURCE(3, 0xe800e000, gic_iid(279));
++RSPI_RESOURCE(4, 0xe800e800, gic_iid(282));
 +
-+	lager_add_rsnd_device();
++static const struct rspi_plat_data rspi_pdata __initconst = {
++	.num_chipselect	= 1,
++};
++
++#define r7s72100_register_rspi(idx)					   \
++	platform_device_register_resndata(&platform_bus, "rspi-rz", idx,   \
++					rspi##idx##_resources,		   \
++					ARRAY_SIZE(rspi##idx##_resources), \
++					&rspi_pdata, sizeof(rspi_pdata))
++
++static const struct spi_board_info spi_info[] __initconst = {
++	{
++		.modalias               = "wm8978",
++		.max_speed_hz           = 5000000,
++		.bus_num                = 4,
++		.chip_select            = 0,
++	},
++};
++
+ static void __init genmai_add_standard_devices(void)
+ {
+ 	r7s72100_clock_init();
+ 	r7s72100_add_dt_devices();
++
++	r7s72100_register_rspi(0);
++	r7s72100_register_rspi(1);
++	r7s72100_register_rspi(2);
++	r7s72100_register_rspi(3);
++	r7s72100_register_rspi(4);
++	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
  }
  
- /*
+ static const char * const genmai_boards_compat_dt[] __initconst = {
 -- 
 1.8.5.2
