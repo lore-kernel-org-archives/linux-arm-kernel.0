@@ -1,46 +1,39 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 14 Feb 2014 08:00:52 +0900
-Subject: [PATCH] ARM: s3c24xx: get rid of unneeded selects
-In-Reply-To: <1391957465.25424.14.camel@x220>
-References: <1391957465.25424.14.camel@x220>
-Message-ID: <52FD4EA4.2060402@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Feb 2014 15:05:54 -0800
+Subject: [PATCH] mmc: omap_hsmmc: Add support for Erratum 2.1.1.128 in
+ device tree boot
+In-Reply-To: <52F246CC.6070600@ti.com>
+References: <1390260542-22213-1-git-send-email-nm@ti.com>
+ <52F0E098.3050404@ti.com> <52F104B7.6040606@ti.com>
+ <52F2465A.6060804@ti.com> <52F246CC.6070600@ti.com>
+Message-ID: <20140213230554.GI28216@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/14 23:51, Paul Bolle wrote:
-> Commit c67d0f29262b ("ARM: s3c24xx: get rid of custom<mach/gpio.h>")
-> got rid of the Kconfig symbols S3C24XX_GPIO_EXTRA64 and
-> S3C24XX_GPIO_EXTRA128. It missed one select of both of these symbols, so
-> get rid of those now.
->
-> Signed-off-by: Paul Bolle<pebolle@tiscali.nl>
-> ---
-> Untested.
->
->   arch/arm/mach-s3c24xx/Kconfig | 2 --
->   1 file changed, 2 deletions(-)
->
-> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-> index d876431..bb1fa603 100644
-> --- a/arch/arm/mach-s3c24xx/Kconfig
-> +++ b/arch/arm/mach-s3c24xx/Kconfig
-> @@ -521,7 +521,6 @@ config MACH_ANUBIS
->   	select HAVE_PATA_PLATFORM
->   	select S3C2440_XTAL_12000000
->   	select S3C24XX_DCLK
-> -	select S3C24XX_GPIO_EXTRA64
->   	select S3C24XX_SIMTEC_PM if PM
->   	select S3C_DEV_USB_HOST
->   	help
-> @@ -562,7 +561,6 @@ config MACH_OSIRIS
->   	select S3C2410_IOTIMING if ARM_S3C2440_CPUFREQ
->   	select S3C2440_XTAL_12000000
->   	select S3C24XX_DCLK
-> -	select S3C24XX_GPIO_EXTRA128
->   	select S3C24XX_SIMTEC_PM if PM
->   	select S3C_DEV_NAND
->   	select S3C_DEV_USB_HOST
+* Nishanth Menon <nm@ti.com> [140205 06:15]:
+> On Wed 05 Feb 2014 08:10:34 AM CST, Balaji T K wrote:
+> >>>
+> >>> Rather than ti,errata.. specific property, something like
+> >>> caps no/disable multiblock read is more readable in my opinion, Otherwise
+> >>
+> >> Is'nt the better definition to state i have quirk X and allow the
+> >> driver to do the necessary thing/things needed to handle quirk X? in
+> >> this case, there is just one thing to do: broken multi_block_read, in
+> >> the case of other quirks, there might be more than 1 thing to do.. let
+> >> driver figure that out, dts just states the h/w capabilty or in this
+> >> case, the quirk capability.
+> >>
+> >
+> > But in this case there is only one. disable multi block read is more readable
+> > than the errata reference, No strong feelings though.
+> 
+> Considering this might set an precedence for other quirk description, 
+> I'd like to leave it as it stands.
 
-Applied, thanks.
+Hmm if this really depends on the hardware version, how about
+just add new compatible flag ti,omap3430-rev-xyz-hsmmc that
+allows the driver to deal with the errata?
 
-- Kukjin
+Regards,
+
+Tony
