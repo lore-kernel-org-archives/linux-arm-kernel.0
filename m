@@ -1,30 +1,36 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 13 Feb 2014 13:53:58 -0200
-Subject: [PATCH 1/2] ARM: dts: imx6qdl-sabresd: Add hog entry for GPIO4_10
-Message-ID: <1392306839-10736-1-git-send-email-fabio.estevam@freescale.com>
+Date: Thu, 13 Feb 2014 13:53:59 -0200
+Subject: [PATCH 2/2] ARM: dts: imx6qdl-sabresd: Provide min/max voltages for
+ codec regulator
+In-Reply-To: <1392306839-10736-1-git-send-email-fabio.estevam@freescale.com>
+References: <1392306839-10736-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1392306839-10736-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO4_10 is the GPIO used to turn on the regulator that powers up the codec.
+Currently the following message is observed during boot:
 
-Add a hog entry for it.
+wm8962-supply: no parameters
+
+Provide min/max properties for the codec regulator.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 0d816d3..a802265 100644
+index a802265..086f770 100644
 --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -303,6 +303,7 @@
- 				MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
- 				MX6QDL_PAD_EIM_D22__GPIO3_IO22  0x80000000
- 				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25 0x80000000
-+				MX6QDL_PAD_KEY_COL2__GPIO4_IO10 0x80000000
- 			>;
+@@ -47,6 +47,8 @@
+ 			compatible = "regulator-fixed";
+ 			reg = <2>;
+ 			regulator-name = "wm8962-supply";
++			regulator-min-microvolt = <4200000>;
++			regulator-max-microvolt = <4200000>;
+ 			gpio = <&gpio4 10 0>;
+ 			enable-active-high;
  		};
- 
 -- 
 1.8.1.2
