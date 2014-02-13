@@ -1,29 +1,45 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 13 Feb 2014 13:20:14 -0700
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <20140213195317.GQ13576@mudshark.cambridge.arm.com>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <20140213110721.GC13576@mudshark.cambridge.arm.com>
- <BA5E6077-77F8-4BE8-80E5-BAB9FE111387@codeaurora.org>
- <4110788.UI9TADVhpa@wuerfel>
- <20140213182654.GA20043@obsidianresearch.com>
- <20140213195317.GQ13576@mudshark.cambridge.arm.com>
-Message-ID: <20140213202014.GF17248@obsidianresearch.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 13 Feb 2014 21:36:29 +0100
+Subject: [PATCH 1/5] i2c: mv64xxx: put offload check into offload prepare
+ function
+In-Reply-To: <1392323793-4125-1-git-send-email-wsa@the-dreams.de>
+References: <20140213094117.GA3934@katana>
+ <1392323793-4125-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <1392323793-4125-2-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 07:53:17PM +0000, Will Deacon wrote:
-> > This may be less than 256 busses, as ECAM allows the implementor to
-> > select how many upper address bits are actually supported.
-> 
-> Ok, but the ECAM/CAM base always corresponds to bus 0, right?
+It makes code simpler to read and prepares a reorganization needed for a
+bugfix.
 
-Yes, or it isn't ECAM.
+Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+---
+ drivers/i2c/busses/i2c-mv64xxx.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-> Ok, so this answers Kumar's point about the reg property. I'll augment it
-> with a size.
-
-Don't forget to request_region it as well...
-
-Jason
+diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+index b8c5187..ba64978 100644
+--- a/drivers/i2c/busses/i2c-mv64xxx.c
++++ b/drivers/i2c/busses/i2c-mv64xxx.c
+@@ -204,6 +204,9 @@ static int mv64xxx_i2c_offload_msg(struct mv64xxx_i2c_data *drv_data)
+ 	unsigned long ctrl_reg;
+ 	struct i2c_msg *msg = drv_data->msgs;
+ 
++	if (!drv_data->offload_enabled)
++		return -EOPNOTSUPP;
++
+ 	drv_data->msg = msg;
+ 	drv_data->byte_posn = 0;
+ 	drv_data->bytes_left = msg->len;
+@@ -433,8 +436,7 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
+ 
+ 		drv_data->msgs++;
+ 		drv_data->num_msgs--;
+-		if (!(drv_data->offload_enabled &&
+-				mv64xxx_i2c_offload_msg(drv_data))) {
++		if (mv64xxx_i2c_offload_msg(drv_data) < 0) {
+ 			drv_data->cntl_bits |= MV64XXX_I2C_REG_CONTROL_START;
+ 			writel(drv_data->cntl_bits,
+ 			drv_data->reg_base + drv_data->reg_offsets.control);
+-- 
+1.8.5.1
