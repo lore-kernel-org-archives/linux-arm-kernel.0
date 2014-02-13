@@ -1,22 +1,36 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Thu, 13 Feb 2014 09:28:52 +0100
-Subject: [PATCH] ARM: tegra: don't timeout if CPU is powergated
-In-Reply-To: <52FBC97D.8040809@wwwdotorg.org>
-References: <1d5ea6b7df4573d866779857922ac650fe59af60.1392078805.git.stefan@agner.ch>
- <52FBC97D.8040809@wwwdotorg.org>
-Message-ID: <4050206.sG2EzXyfMN@fb07-iapwap2>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 13 Feb 2014 09:13:34 +0100
+Subject: [PATCH] drm/i2c: tda998x: fix memory leak in case of i2c error
+Message-ID: <20140213083316.38D7D822BD@smtp6-g21.free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 12. Februar 2014, 12:20:29 schrieb Stephen Warren:
-> On 02/10/2014 05:44 PM, Stefan Agner wrote:
-> > When booting secondary CPU(s) which are not yet powergated, a wrong
-> > check lead to a timeout after 100 jiffies. With this patch, we only
-> > delay powergating if CPUs are still not powered yet.
-> 
-> I've applied this to Tegra's for-3.15/soc branch.
+When the creation of the second i2c client was failing, the private
+buffer was not freed.
 
-also for 3.14 and maybe lower versioned kernels? Since this seems to fix a bug 
-where some core doesn't come up.
+This bug was introduced by the commit 6ae668cc19e8
+'drm/i2c: tda998x: check the CEC device creation'
 
-Marc
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ drivers/gpu/drm/i2c/tda998x_drv.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index fa18cf3..faa77f5 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -1151,8 +1151,10 @@ tda998x_encoder_init(struct i2c_client *client,
+ 
+ 	priv->current_page = 0xff;
+ 	priv->cec = i2c_new_dummy(client->adapter, 0x34);
+-	if (!priv->cec)
++	if (!priv->cec) {
++		kfree(priv);
+ 		return -ENODEV;
++	}
+ 	priv->dpms = DRM_MODE_DPMS_OFF;
+ 
+ 	encoder_slave->slave_priv = priv;
+-- 
+1.9.0.rc3
