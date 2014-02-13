@@ -1,45 +1,41 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 13 Feb 2014 12:04:06 +0200
-Subject: [PATCH 8/8] OMAPDSS: fix rounding when calculating fclk rate
+Date: Thu, 13 Feb 2014 12:04:05 +0200
+Subject: [PATCH 7/8] ARM: dts: set 'ti,set-rate-parent' for dpll4_m4 path
 In-Reply-To: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1392285846-13199-9-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1392285846-13199-8-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"clk: divider: fix rate calculation for fractional rates" patch (and
-similar for TI specific divider) fixes the clk-divider's rounding. This
-patch updates the DSS driver to round the rates accordingly.
-
-This fixes the DSS's warnings about clock rate mismatch, and also fixes
-the wrong fclk rate being set.
+Set 'ti,set-rate-parent' property for clocks in the dpll4_m4 clock
+path, which is used for DSS functional clock. This fixes DSS driver's
+clock rate configuration, which needs the rate to be propagated properly
+to the divider node (dpll4_m4_ck).
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- drivers/video/omap2/dss/dss.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/omap3xxx-clocks.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/video/omap2/dss/dss.c b/drivers/video/omap2/dss/dss.c
-index 9a145da35ad3..efe7c308341d 100644
---- a/drivers/video/omap2/dss/dss.c
-+++ b/drivers/video/omap2/dss/dss.c
-@@ -471,7 +471,7 @@ bool dss_div_calc(unsigned long pck, unsigned long fck_min,
- 	fckd_stop = max(DIV_ROUND_UP(prate * m, fck_hw_max), 1ul);
+diff --git a/arch/arm/boot/dts/omap3xxx-clocks.dtsi b/arch/arm/boot/dts/omap3xxx-clocks.dtsi
+index df3c699a1893..12be2b35dae9 100644
+--- a/arch/arm/boot/dts/omap3xxx-clocks.dtsi
++++ b/arch/arm/boot/dts/omap3xxx-clocks.dtsi
+@@ -429,6 +429,7 @@
+ 		clocks = <&dpll4_m4_ck>;
+ 		ti,clock-mult = <2>;
+ 		ti,clock-div = <1>;
++		ti,set-rate-parent;
+ 	};
  
- 	for (fckd = fckd_start; fckd >= fckd_stop; --fckd) {
--		fck = prate / fckd * m;
-+		fck = DIV_ROUND_UP(prate, fckd) * m;
+ 	dpll4_m4x2_ck: dpll4_m4x2_ck {
+@@ -438,6 +439,7 @@
+ 		ti,bit-shift = <0x1d>;
+ 		reg = <0x0d00>;
+ 		ti,set-bit-to-disable;
++		ti,set-rate-parent;
+ 	};
  
- 		if (func(fck, data))
- 			return true;
-@@ -520,7 +520,7 @@ static int dss_setup_default_clock(void)
- 
- 		fck_div = DIV_ROUND_UP(prate * dss.feat->dss_fck_multiplier,
- 				max_dss_fck);
--		fck = prate / fck_div * dss.feat->dss_fck_multiplier;
-+		fck = DIV_ROUND_UP(prate, fck_div) * dss.feat->dss_fck_multiplier;
- 	}
- 
- 	r = dss_set_fck_rate(fck);
+ 	dpll4_m5_ck: dpll4_m5_ck {
 -- 
 1.8.3.2
