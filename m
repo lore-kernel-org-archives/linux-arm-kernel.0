@@ -1,60 +1,67 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 14 Feb 2014 08:17:06 +0900
-Subject: [PATCH v2 0/9] Samsung PM consolidation part 1 (clocks)
-In-Reply-To: <52F4C9CB.6060901@samsung.com>
-References: <1391710616-14226-1-git-send-email-t.figa@samsung.com>
- <CAJuA9ah97MQKrNeKG2vijFCr8b7T4r2Zr9gsGtETwtBLmKBrXg@mail.gmail.com>
- <52F4C9CB.6060901@samsung.com>
-Message-ID: <52FD5272.7010309@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Feb 2014 15:19:19 -0800
+Subject: [PATCH V2 4/4] ARM: OMAP2+: AM43x: Use gptimer as clocksource
+In-Reply-To: <1391768486-2134-5-git-send-email-lokeshvutla@ti.com>
+References: <1391768486-2134-1-git-send-email-lokeshvutla@ti.com>
+ <1391768486-2134-5-git-send-email-lokeshvutla@ti.com>
+Message-ID: <20140213231919.GO28216@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/14 20:55, Sylwester Nawrocki wrote:
-> On 07/02/14 04:45, Thomas Abraham wrote:
->> On Thu, Feb 6, 2014 at 11:46 PM, Tomasz Figa<t.figa@samsung.com>  wrote:
->>>> This series reworks suspend/resume handling of Samsung clock drivers
->>>> to cover more SoC specific aspects that are beyond simple register
->>>> save and restore. The goal is to have all the suspend/resume code
->>>> that touches the clock controller in single place, which is the
->>>> clock driver.
->>>>
->>>> On Exynos4210-based Trats, Exynos4412-based Trats2 and Exynos5250-based
->>>> Arndale boards (except suspend/resume, which is broken because of
->>>> unrelated reasons):
->>>>
->>>> Tested-by: Tomasz Figa<t.figa@samsung.com>
->>>>
->>>> Tomasz Figa (9):
->>>>    clk: exynos4: Remove remnants of non-DT support
->>>>    clk: samsung: Provide common helpers for register save/restore
->>>>    clk: samsung: exynos4: Move suspend/resume handling to SoC driver
->>>>    clk: samsung: exynos5250: Move suspend/resume handling to SoC driver
->>>>    clk: samsung: exynos5420: Move suspend/resume handling to SoC driver
->>>>    clk: samsung: s3c64xx: Move suspend/resume handling to SoC driver
->>>>    clk: samsung: Drop old suspend/resume code
->>>>    clk: samsung: exynos4: Add remaining suspend/resume handling
->>>>    ARM: EXYNOS: pm: Drop legacy Exynos4 clock suspend/resume code
->>>>
->>>>   arch/arm/mach-exynos/pm.c            | 148 +-----------------------------
->>>>   drivers/clk/samsung/clk-exynos4.c    | 172 +++++++++++++++++++++++++++++++----
->>>>   drivers/clk/samsung/clk-exynos5250.c |  49 +++++++++-
->>>>   drivers/clk/samsung/clk-exynos5420.c |  49 +++++++++-
->>>>   drivers/clk/samsung/clk-exynos5440.c |   2 +-
->>>>   drivers/clk/samsung/clk-s3c64xx.c    |  79 +++++++++++++---
->>>>   drivers/clk/samsung/clk.c            |  71 ++++++---------
->>>>   drivers/clk/samsung/clk.h            |  14 ++-
->>>>   8 files changed, 348 insertions(+), 236 deletions(-)
->>
->> Nice series!
->> Reviewed-by: Thomas Abraham<thomas.ab@samsung.com>
->
-> Yes, that's a nice cleanup.
->
-> Reviewed-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
->
-+1 Nice
+* Lokesh Vutla <lokeshvutla@ti.com> [140207 02:24]:
+> From: Rajendra Nayak <rnayak@ti.com>
+> 
+> The SyncTimer in AM43x is clocked using the following two sources:
+> 1) An inaccuarte 32k clock (CLK_32KHZ) derived from PER DPLL, causing system
+>    time to go slowly (~10% deviation).
+> 2) external 32KHz RTC clock, which may not always be available on board like
+>    in the case of ePOS EVM
+> 
+> Use gptimer as clocksource instead, as is done in the case of AM335x
+> (which does not have a SyncTimer). With this, system time keeping works
+> accurately.
 
-I've applied this whole series.
-Thanks, Tomasz.
+Hmm doesn't this also mean that PM for any deeper idle states won't
+work properly?
 
-- Kukjin
+Regards,
+
+Tony
+ 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-generic.c |    2 +-
+>  arch/arm/mach-omap2/timer.c         |    3 ++-
+>  2 files changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index 8e3daa1..5679464a 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -229,7 +229,7 @@ DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
+>  	.init_late	= am43xx_init_late,
+>  	.init_irq	= omap_gic_of_init,
+>  	.init_machine	= omap_generic_init,
+> -	.init_time	= omap3_sync32k_timer_init,
+> +	.init_time	= omap3_gptimer_timer_init,
+>  	.dt_compat	= am43_boards_compat,
+>  MACHINE_END
+>  #endif
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index 74044aa..b62de9f 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -604,7 +604,8 @@ OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
+>  			2, "timer_sys_ck", NULL);
+>  #endif /* CONFIG_ARCH_OMAP3 */
+>  
+> -#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+> +#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX) || \
+> +	defined(CONFIG_SOC_AM43XX)
+>  OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
+>  		       1, "timer_sys_ck", "ti,timer-alwon");
+>  #endif
+> -- 
+> 1.7.9.5
+> 
