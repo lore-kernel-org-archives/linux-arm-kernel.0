@@ -1,143 +1,155 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 13 Feb 2014 12:27:05 +0100
-Subject: [PATCH] pci: Add support for creating a generic host_bridge from
- device tree
-In-Reply-To: <000001cf2899$a6eb75b0$f4c26110$%han@samsung.com>
-References: <1391452428-22917-1-git-send-email-Liviu.Dudau@arm.com>
- <CACoXjc=epN8=tFQKw6kZ27hTA=a+c56q1pikX_SSMKK1rsScCw@mail.gmail.com>
- <000001cf2899$a6eb75b0$f4c26110$%han@samsung.com>
-Message-ID: <3204351.WykFFcX4zJ@wuerfel>
+Date: Thu, 13 Feb 2014 12:47:46 +0100
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <20140213110401.GB13576@mudshark.cambridge.arm.com>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <1645474.vdytZl6znf@wuerfel>
+ <20140213110401.GB13576@mudshark.cambridge.arm.com>
+Message-ID: <348076699.SKFqCqFVHd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 February 2014 17:57:41 Jingoo Han wrote:
-> I want to use 'drivers/pci/host/pcie-designware.c' for both arm32
-> and arm64, without any code changes. However, it looks impossible.
-
-It is impossible at the moment, and I agree we have to fix that.
-
-> I made 'drivers/pci/host/pcie-designware.c' based on 32bit arm PCI
-> support. Then, with Liviu's patch, do I have to make new code for arm64,
-> even though the same HW PCIe IP is used?
+On Thursday 13 February 2014 11:04:02 Will Deacon wrote:
+> Hi Arnd,
 > 
-> - For arm32
->   drivers/pci/host/pcie-designware.c
+> Thanks again for the comments.
 > 
-> - For arm64
->   drivers/pci/host/pcie-designware-arm64.c
+> On Wed, Feb 12, 2014 at 08:59:46PM +0000, Arnd Bergmann wrote:
+> > On Wednesday 12 February 2014 20:16:11 Will Deacon wrote:
+> > > +- ranges         : As described in IEEE Std 1275-1994, but must provide
+> > > +                   at least a definition of one or both of IO and Memory
+> > > +                   Space.
+> > 
+> > I'd say *must* provide at least non-prefetchable memory. *may* provide
+> > prefetchable memory and/or I/O space.
+> 
+> Can do. Should I enforce this in the driver too? (i.e. complain if
+> non-prefetchable memory is absent).
 
-As a start, I'd suggest using "#ifdef CONFIG_ARM" in the driver,
-but sharing as much code as you can. We should try to make the #else
-section of the #ifdef architecture independent and get have the arm64
-implementation shared with any architecture that doesn't have or want
-its own pcibios32.c implementation.
+Yes, good idea.
 
-> > > I am reviewing and compiling your patch.
-> > > Would you consider adding 'struct pci_sys_data' and 'struct hw_pci'?
+> > > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> > > index 47d46c6d8468..491d74c36f6a 100644
+> > > --- a/drivers/pci/host/Kconfig
+> > > +++ b/drivers/pci/host/Kconfig
+> > > @@ -33,4 +33,11 @@ config PCI_RCAR_GEN2
+> > >  	  There are 3 internal PCI controllers available with a single
+> > >  	  built-in EHCI/OHCI host controller present on each one.
+> > >  
+> > > +config PCI_ARM_GENERIC
+> > > +	bool "ARM generic PCI host controller"
+> > > +	depends on ARM && OF
+> > > +	help
+> > > +	  Say Y here if you want to support a simple generic PCI host
+> > > +	  controller, such as the one emulated by kvmtool.
+> > > +
+> > >  endmenu
+> > 
+> > Looks good for now. In the long run, I'd hope to get rid of the 'ARM'
+> > part here and make it work on any architecture, but that requires
+> > significant work that we should not depend on here.
+> 
+> Agreed. arm64 is the obvious next target (once Liviu's series is sorted out
+> -- I'm currently using a simplified port of bios32.c for testing).
 
-I would rather get rid of struct hw_pci for architecture independent
-drivers and add a different registration method on arm32 that is
-compatible with what we come up with on arm64. The main purpose of
-hw_pci is to allow multiple PCI controllers to be initialized at
-once, but we don't actually need that for any of the "modern" platforms
-where we already have a probe function that gets called once for
-each controller.
+See also the reply I just sent on the previous thread for a migration
+plan regarding the existing drivers.
 
-As a start, we could add a pci_host_bridge_register() function like
-the one below to arm32 and migrate the drivers/pci/host/ drivers
-over to use it with little effort. Instead of filling out hw_pci,
-these drivers would allocate (by embedding in their device struct)
-and fill out pci_sys_data directly. After that, we can gradually
-move more code out of the arm32 implementation into common code, if
-it doesn't already exist there, up to the point where a host driver
-no longer has to call any function in bios32.c.
+> > > +struct gen_pci_cfg_window {
+> > > +	u64					cpu_phys;
+> > > +	void __iomem				*base;
+> > > +	u8					bus;
+> > > +	spinlock_t				lock;
+> > > +	const struct gen_pci_cfg_accessors	*accessors;
+> > > +};
+> > > +
+> > > +struct gen_pci_resource {
+> > > +	struct list_head			list;
+> > > +	struct resource				cpu_res;
+> > > +	resource_size_t				offset;
+> > > +};
+> > 
+> > Your gen_pci_resource is actually identical to struct pci_host_bridge_window,
+> > which I guess is coincidence, but it would be nice to actually use
+> > the standard structure to make it easier to integrate with common
+> > infrastructure later.
+> 
+> Ha, at least I managed to come up with the same struct! I'll move to the
+> generic version.
+
+Hmm, I fear I was speaking too quickly, the pci_host_bridge_window actually
+contains a pointer to the resource rather than the resource itself :(
+
+There is probably a way to do this better, at least once we unify the
+probe() and setup() functions.
+
+> > > +static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
+> > > +					      unsigned int devfn,
+> > > +					      int where)
+> > > +{
+> > > +	struct pci_sys_data *sys = bus->sysdata;
+> > > +	struct gen_pci *pci = sys->private_data;
+> > > +	u32 busn = bus->number;
+> > > +
+> > > +	spin_lock(&pci->cfg.lock);
+> > > +	if (pci->cfg.bus != busn) {
+> > > +		resource_size_t offset;
+> > > +
+> > > +		devm_iounmap(pci->dev, pci->cfg.base);
+> > > +		offset = pci->cfg.cpu_phys + (busn << 20);
+> > > +		pci->cfg.base = devm_ioremap(pci->dev, offset, SZ_1M);
+> > > +		pci->cfg.bus = busn;
+> > > +	}
+> > > +
+> > > +	return pci->cfg.base + ((devfn << 12) | where);
+> > > +}
+> > 
+> > Nice idea, but unfortunately broken: we need config space access from
+> > atomic context, since there are drivers doing that.
+> 
+> That aside, I just took a spin_lock so this needs fixing regardless. The
+> only solution I can think of then is to map all of the buses at setup time
+> (making bus_ranges pretty important) and hope that I don't chew through all
+> of vmalloc.
+
+It's possible we have to go further and only map the buses that are
+actually used, rather than the ones that are defined for the bus,
+but just mapping the entire range is a reasonable start I think.
+
+> > > +
+> > > +	hw = (struct hw_pci) {
+> > > +		.nr_controllers	= 1,
+> > > +		.private_data	= (void **)&pci,
+> > > +		.setup		= gen_pci_setup,
+> > > +		.map_irq	= of_irq_parse_and_map_pci,
+> > > +		.ops		= &gen_pci_ops,
+> > > +	};
+> > > +
+> > > +	pci_common_init_dev(dev, &hw);
+> > > +	return 0;
+> > > +}
+> > 
+> > A missing part here seems to be a way to propagate errors from
+> > the pci_common_init_dev or gen_pci_setup back to the caller.
+> > 
+> > This seems to be a result of the arm pcibios implementation not
+> > being meant for loadable modules, but I suspect it can be fixed.
+> > The nr_controllers>1 logic gets a bit in the way there, but it's
+> > also a model that seems to be getting out of fashion:
+> > kirkwood/dove/orion5x/mv78xx0 use it at the moment, but are
+> > migrating over to the new pci-mvebu code that doesn't as they
+> > get rid of the non-DT probing. pci-rcar-gen2.c uses it, but it
+> > seems they already ran into problems with that and are changing
+> > it. That pretty much leaves iop13xx as the only user, but at
+> > that point we can probably move the loop into iop13xx specific
+> > code.
+> 
+> Makes sense once there are no users of the field.
+
+With the patch I just suggested, we can simply keep
+pci_common_init_dev() for older (non-multiplatform) controllers 
+and not change them at all but move on to something else for
+the interesting ones, i.e. those we want to share with arm64.
 
 	Arnd
-
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 317da88..12c2178 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -514,6 +514,26 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
- 	}
- }
- 
-+static void pci_common_bus_probe(struct pci_bus *bus)
-+{
-+	if (!pci_has_flag(PCI_PROBE_ONLY)) {
-+		/*
-+		 * Size the bridge windows.
-+		 */
-+		pci_bus_size_bridges(bus);
-+
-+		/*
-+		 * Assign resources.
-+		 */
-+		pci_bus_assign_resources(bus);
-+	}
-+
-+	/*
-+	 * Tell drivers about devices found.
-+	 */
-+	pci_bus_add_devices(bus);
-+}
-+
- void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
- {
- 	struct pci_sys_data *sys;
-@@ -528,27 +548,38 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
- 
- 	pci_fixup_irqs(pcibios_swizzle, pcibios_map_irq);
- 
--	list_for_each_entry(sys, &head, node) {
--		struct pci_bus *bus = sys->bus;
-+	list_for_each_entry(sys, &head, node)
-+		pci_common_bus_probe(sys->bus);
-+}
- 
--		if (!pci_has_flag(PCI_PROBE_ONLY)) {
--			/*
--			 * Size the bridge windows.
--			 */
--			pci_bus_size_bridges(bus);
- 
--			/*
--			 * Assign resources.
--			 */
--			pci_bus_assign_resources(bus);
--		}
- 
--		/*
--		 * Tell drivers about devices found.
--		 */
--		pci_bus_add_devices(bus);
--	}
-+
-+int pci_host_bridge_register(struct device *parent, struct pci_sys_data *sys, struct pci_ops *ops, int (*setup)(int nr, struct pci_sys_data *))
-+{
-+	int ret;
-+
-+	pci_add_flags(PCI_REASSIGN_ALL_RSRC);
-+	INIT_LIST_HEAD(&sys->resources);
-+
-+	ret = setup(0, sys);
-+	if (ret)
-+		return ret;
-+
-+	ret = pcibios_init_resources(0, sys);
-+	if (ret)
-+		return ret;
-+
-+	sys->bus = pci_scan_root_bus(parent, sys->busnr, ops, sys, &sys->resources);
-+	if (!sys->bus)
-+		return -ENODEV;
-+
-+	pci_fixup_irqs(pcibios_swizzle, pcibios_map_irq);
-+
-+	pci_common_bus_probe(sys->bus);
-+	return ret;
- }
-+EXPORT_SYMBOL_GPL(pci_host_bridge_register);
- 
- #ifndef CONFIG_PCI_HOST_ITE8152
- void pcibios_set_master(struct pci_dev *dev)
