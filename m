@@ -1,59 +1,41 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Thu, 13 Feb 2014 18:01:35 +0100
-Subject: [PATCH] perf: ARM64: wire up perf_regs and unwind support
-In-Reply-To: <20140212130938.GA7624@krava.brq.redhat.com>
-References: <1391451427-31221-1-git-send-email-jean.pihet@linaro.org>
- <20140212130938.GA7624@krava.brq.redhat.com>
-Message-ID: <CAFrcx1k5akgwfQ+EOPGPWX+VQVZphRgA22foihRNKntO7uRRdw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Feb 2014 17:04:08 +0000
+Subject: [PATCH 5/5] iommu/arm-smmu: fix compilation issue when
+ !CONFIG_ARM_AMBA
+In-Reply-To: <CAOZdJXW6tY=MjHGMa1EQtJayY=ToqiJOWsggCsEjfPzirUeUxg@mail.gmail.com>
+References: <1391710173-4343-1-git-send-email-will.deacon@arm.com>
+ <1391710173-4343-6-git-send-email-will.deacon@arm.com>
+ <CAOZdJXW6tY=MjHGMa1EQtJayY=ToqiJOWsggCsEjfPzirUeUxg@mail.gmail.com>
+Message-ID: <20140213170408.GM13576@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jiri,
+On Thu, Feb 13, 2014 at 04:55:25PM +0000, Timur Tabi wrote:
+> On Thu, Feb 6, 2014 at 12:09 PM, Will Deacon <will.deacon@arm.com> wrote:
+> 
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index 0ae4dd39197f..6fe7922ecc1d 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -2004,8 +2004,10 @@ static int __init arm_smmu_init(void)
+> >         if (!iommu_present(&platform_bus_type))
+> >                 bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
+> >
+> > +#ifdef CONFIG_ARM_AMBA
+> >         if (!iommu_present(&amba_bustype))
+> >                 bus_set_iommu(&amba_bustype, &arm_smmu_ops);
+> > +#endif
+> 
+> So I admit I don't know much about the ARM kernel (yet), but doesn't
+> this break multi-arch?  That is, we can't support one binary that runs
+> on a processor with AMBA and one without?
 
+Huh?
 
-On 12 February 2014 14:09, Jiri Olsa <jolsa@redhat.com> wrote:
-> On Mon, Feb 03, 2014 at 07:17:07PM +0100, Jean Pihet wrote:
->> This patch hooks in the perf_regs and libunwind code for ARM64.
->> The tools/perf/arch/arm64 is created; it contains the arch specific
->> code for DWARF unwinding.
->>
->> Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
->> Acked-by: Will Deacon <will.deacon@arm.com>
->
-> SNIP
->
->> + */
->> +const char *get_arch_regstr(unsigned int n)
->> +{
->> +     const struct pt_regs_dwarfnum *roff;
->> +     for (roff = regdwarfnum_table; roff->name != NULL; roff++)
->> +             if (roff->dwarfnum == n)
->> +                     return roff->name;
->> +     return NULL;
->> +}
->> diff --git a/tools/perf/arch/arm64/util/unwind.c b/tools/perf/arch/arm64/util/unwind.c
->> new file mode 100644
->> index 0000000..8d37a4c
->> --- /dev/null
->> +++ b/tools/perf/arch/arm64/util/unwind.c
->> @@ -0,0 +1,82 @@
->> +
->> +#include <errno.h>
->> +#include <libunwind.h>
->> +#include "perf_regs.h"
->> +#include "../../util/unwind.h"
->> +
->> +int unwind__arch_reg_id(int regnum)
->
->
-> I think this ^^^ wouldn't compile over acme/perf/core, bacause of
-> the recent code changes for the libdw unwind:
->
-> 1d86598 perf callchain: Rename unwind__arch_reg_id into libunwind__arch_reg_id
-That is correct, the patch is for mainline.
-Re-sending a rebased version on acme/perf/core in a bit.
+It's harmless to enable CONFIG_ARM_AMBA, even if you don't have any AMBA
+devices in your SoC, it just makes your binary a bit bigger because you're
+compiling in code that you don't need. Instead, you might elect to set
+CONFIG_ARM_AMBA=n, at which point the arm-smmu driver will fail to build
+without this patch.
 
-> jirka
-
-Thanks,
-Jean
+Will
