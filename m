@@ -1,32 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Feb 2014 10:06:42 +0000
-Subject: [PATCH v2 2/3] ARM: bios32: use pci_enable_resource to enable
- PCI resources
-In-Reply-To: <20140212222825.GC17248@obsidianresearch.com>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <1392236171-10512-3-git-send-email-will.deacon@arm.com>
- <20140212222825.GC17248@obsidianresearch.com>
-Message-ID: <20140213100642.GA13576@mudshark.cambridge.arm.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Thu, 13 Feb 2014 11:25:13 +0100
+Subject: [PATCH v2 1/4] ARM: dts: omap3-tobi: Fix boot with OMAP36xx-based
+ Overo
+In-Reply-To: <1392287116-4548-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1392287116-4548-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1392287116-4548-2-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 10:28:25PM +0000, Jason Gunthorpe wrote:
-> On Wed, Feb 12, 2014 at 08:16:10PM +0000, Will Deacon wrote:
-> > This patch moves bios32 over to using the generic code for enabling PCI
-> > resources. Since the core code takes care of bridge resources too, we
-> > can also drop the explicit IO and MEMORY enabling for them in the arch
-> > code.
-> 
-> Tested-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com> (on Kirkwood)
-> 
-> PCI: bus1: Fast back to back transfers disabled
-> pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
-> pci 0000:00:01.0: BAR 8: assigned [mem 0xe0000000-0xe00fffff]
-> pci 0000:01:00.0: BAR 0: assigned [mem 0xe0000000-0xe001ffff]
-> pci 0000:00:01.0: PCI bridge to [bus 01]
-> pci 0000:00:01.0:   bridge window [mem 0xe0000000-0xe00fffff]
-> pci 0000:00:01.0: enabling device (0140 -> 0142)
+Tobi expansion board can be used with both OMAP35xx-based Overo,
+and OMAP36xx-based Overo. Currently the boot is broken with newer
+OMAP36xx-based Overo (Storm and alike). Fix include file and
+compatible string to be able to boot newer models.
 
-That's really helpful. Thanks for testing, Jason!
+This will break older models. This will be addressed later.
 
-Will
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+Tested-by: Kevin Hilman <khilman@linaro.org>
+---
+ arch/arm/boot/dts/omap3-overo.dtsi | 3 ---
+ arch/arm/boot/dts/omap3-tobi.dts   | 5 ++++-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+index a461d2f..5970999 100644
+--- a/arch/arm/boot/dts/omap3-overo.dtsi
++++ b/arch/arm/boot/dts/omap3-overo.dtsi
+@@ -9,9 +9,6 @@
+ /*
+  * The Gumstix Overo must be combined with an expansion board.
+  */
+-/dts-v1/;
+-
+-#include "omap34xx.dtsi"
+ 
+ / {
+ 	pwmleds {
+diff --git a/arch/arm/boot/dts/omap3-tobi.dts b/arch/arm/boot/dts/omap3-tobi.dts
+index 7e4ad2a..0e3b8bf 100644
+--- a/arch/arm/boot/dts/omap3-tobi.dts
++++ b/arch/arm/boot/dts/omap3-tobi.dts
+@@ -10,11 +10,14 @@
+  * Tobi expansion board is manufactured by Gumstix Inc.
+  */
+ 
++/dts-v1/;
++
++#include "omap36xx.dtsi"
+ #include "omap3-overo.dtsi"
+ 
+ / {
+ 	model = "TI OMAP3 Gumstix Overo on Tobi";
+-	compatible = "ti,omap3-tobi", "ti,omap3-overo", "ti,omap3";
++	compatible = "ti,omap3-tobi", "ti,omap3-overo", "ti,omap36xx", "ti,omap3";
+ 
+ 	leds {
+ 		compatible = "gpio-leds";
+-- 
+1.8.1.2
