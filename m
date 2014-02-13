@@ -1,85 +1,48 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 13 Feb 2014 10:01:20 +0100
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through
- DT
-In-Reply-To: <CAPDyKFo9Xpxe0XzevPEeaofLeCNivnf3R_RttToP2h3aFyB4Yw@mail.gmail.com>
-References: <1390190215-22700-1-git-send-email-olof@lixom.net>	<52E700F0.7040708@gmail.com>	<CAPDyKFpOhQtiyCmzie3=sfg42Vv5_rReRNgUf8kALoE6TBe2cw@mail.gmail.com>	<201401281148.10670.arnd@arndb.de>
- <CAPDyKFo9Xpxe0XzevPEeaofLeCNivnf3R_RttToP2h3aFyB4Yw@mail.gmail.com>
-Message-ID: <52FC89E0.6050305@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 13 Feb 2014 10:41:17 +0100
+Subject: [PATCH] i2c: mv64xxx: Fix locked bus when offload is selected
+ but not used on a message
+In-Reply-To: <1391770588-1344-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1391770588-1344-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140213094117.GA3934@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> --- a/drivers/i2c/busses/i2c-mv64xxx.c
+> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+> @@ -461,8 +461,15 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
+>  	case MV64XXX_I2C_ACTION_OFFLOAD_SEND_START:
+>  		if (!mv64xxx_i2c_offload_msg(drv_data))
+>  			break;
+> -		else
+> +		else {
 
+Here you break the coding style...
 
-On 13.02.2014 09:56, Ulf Hansson wrote:
-> On 28 January 2014 11:48, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Tuesday 28 January 2014, Ulf Hansson wrote:
->>> On 28 January 2014 01:59, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->>>> On 27.01.2014 11:19, Ulf Hansson wrote:
->>>>> There is already a host capability that I think we could use to handle
->>>>> this. MMC_CAP_NONREMOVABLE, the corresponding DT binding string is
->>>>> "non-removable", and it may be set per host device.
->>>>>
->>>>> Using this cap means the mmc_rescan process that runs to detect new
->>>>> cards, will only be executed once and during boot. So, we need to make
->>>>> sure all resources and powers are provided to the card at this point.
->>>>> Otherwise the card will not be detected.
->>>>
->>>> I don't quite like this requirement, especially if you consider
->>>> multi-platform kernels where a lot of drivers is going to be provided as
->>>> modules. WLAN drivers are especially good candidates. This means that even
->>>> if the card is powered off at boot-up, if user (or init system) loads
->>>> appropriate module, which powers the chip on, MMC core must be able to
->>>> notice this.
->>>
->>> To be able to detect the card, the WLAN driver doesn't have to be
->>> probed, only the "power controller" driver. I suppose this is were it
->>> becomes a bit tricky.
->>>
->>> Somehow the mmc core needs to be involved in the probe process of the
->>> power controller driver. Could perhaps the power controller bus be
->>> located in the mmc core and thus the power controller driver needs to
->>> register itself by using a new API from the mmc core? Similar how SDIO
->>> func driver's register themselves.
->>
->> I think there is another option, which does have its own pros and cons:
->> We could move all the power handling back into the sdio function driver
->> if we allow a secondary detection path using DT rather than the probing
->> of the SDIO bus. Essentially you'd have to list the class/vendor/device
->> ID for each function that cannot be autodetected in DT, and have the
->> SDIO core pretend that it found the device just by looking at the
->> device nodes, and register the struct sdio_func so it can be bound to
->> the driver. The driver then does all the power handling in a device
->> specific way. At some point the hardware gets registered at the
->> mmc host, and the sdio core connects the bus state to the already present
->> sdio_func, possibly notifying the function driver that it has become
->> usable.
->
-> It seems like an option we could try.
->
-> There are some tricky parts that needs to be taken care of by the
-> mmc/sdio core, regarding the probe/removal and the suspend/resume
-> sequence, but I suppose it should be possible.
->
-> A minor concern is how do we handle devices that are fully powered at
-> boot? Unless the sdio func driver will be loaded we can't power off
-> them, right? Do we need to cover this case, do you think?
->
->>
->> Obviously, this can only work for CAP_NONREMOVABLE devices, but those
->> are exactly the ones we are worried about here. The advantage is that
->> the power sequencing for a particular device can then be in device
->> specific code and can have an arbitrarily complex in the driver without
->> needing the mmc code to handle all possible corner cases.
->
-> Agree!
->
-> I think a removable SDIO card won't l need this additional power
-> controller mechanism.
+>  			drv_data->action = MV64XXX_I2C_ACTION_SEND_START;
+> +			/*
+> +			 * Switch to the standard path, so we finally need to
+> +			 * prepare the io that have not been done in
+> +			 * mv64xxx_i2c_execute_msg
+> +			 */
+> +			mv64xxx_i2c_prepare_for_io(drv_data, drv_data->msgs);
+> +		}
 
-Yes, sounds good to me too. It will be more tricky to implement than the 
-solution I initially proposed, but should end up being much cleaner and 
-possibly cover more cases.
+... but more importantly, NACK. The code is already hard to follow which
+is the cause for this bug. This snipplet makes the code even harder to
+read, so it needs some simplification IMO. I'll fire up a counterpatch
+in a minute to explain what I mean.
 
-Best regards,
-Tomasz
+>  		/* FALLTHRU */
+>  	case MV64XXX_I2C_ACTION_SEND_START:
+>  		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_START,
+> -- 
+> 1.8.1.2
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140213/cee40674/attachment.sig>
