@@ -1,36 +1,126 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Thu, 13 Feb 2014 08:41:36 -0600
-Subject: [PATCH v2 2/4] ARM: dts: omap3-tobi: Use the correct vendor prefix
-In-Reply-To: <1392287116-4548-3-git-send-email-florian.vaussard@epfl.ch>
+Date: Thu, 13 Feb 2014 08:41:58 -0600
+Subject: [PATCH v2 3/4] ARM: dts: Add support for both OMAP35xx and
+ OMAP36xx Overo/Tobi
+In-Reply-To: <1392287116-4548-4-git-send-email-florian.vaussard@epfl.ch>
 References: <1392287116-4548-1-git-send-email-florian.vaussard@epfl.ch>
- <1392287116-4548-3-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <52FCD9A0.1070600@ti.com>
+ <1392287116-4548-4-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <52FCD9B6.8000407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 02/13/2014 04:25 AM, Florian Vaussard wrote:
-> Gumstix is the correct vendor for all Overo related products.
+> Unfortunatly the device tree for older OMAP35xx Overo cannot be used
+> with newer OMAP36xx and vice-versa. To address this issue, move most of
+> the Tobi DTS to a common include file, and create model-specific Tobi
+> DTS.
 > 
-> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
 Acked-by: Nishanth Menon <nm@ti.com>
 > ---
->  arch/arm/boot/dts/omap3-tobi.dts | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/Makefile                         |  3 ++-
+>  arch/arm/boot/dts/omap3-overo-storm-tobi.dts       | 22 ++++++++++++++++++++++
+>  ...omap3-tobi.dts => omap3-overo-tobi-common.dtsi} |  6 ------
+>  arch/arm/boot/dts/omap3-overo-tobi.dts             | 22 ++++++++++++++++++++++
+>  4 files changed, 46 insertions(+), 7 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/omap3-overo-storm-tobi.dts
+>  rename arch/arm/boot/dts/{omap3-tobi.dts => omap3-overo-tobi-common.dtsi} (91%)
+>  create mode 100644 arch/arm/boot/dts/omap3-overo-tobi.dts
 > 
-> diff --git a/arch/arm/boot/dts/omap3-tobi.dts b/arch/arm/boot/dts/omap3-tobi.dts
-> index 0e3b8bf..c742afa 100644
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index b9d6a8b..e8355f4 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -208,7 +208,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+>  	omap3-n900.dtb \
+>  	omap3-n9.dtb \
+>  	omap3-n950.dtb \
+> -	omap3-tobi.dtb \
+> +	omap3-overo-tobi.dtb \
+> +	omap3-overo-storm-tobi.dtb \
+>  	omap3-gta04.dtb \
+>  	omap3-igep0020.dtb \
+>  	omap3-igep0030.dtb \
+> diff --git a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
+> new file mode 100644
+> index 0000000..966b5c9
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright (C) 2012 Florian Vaussard, EPFL Mobots group
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/*
+> + * Tobi expansion board is manufactured by Gumstix Inc.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "omap36xx.dtsi"
+> +#include "omap3-overo-tobi-common.dtsi"
+> +
+> +/ {
+> +	model = "OMAP36xx/AM37xx/DM37xx Gumstix Overo on Tobi";
+> +	compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap36xx", "ti,omap3";
+> +};
+> +
+> diff --git a/arch/arm/boot/dts/omap3-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
+> similarity index 91%
+> rename from arch/arm/boot/dts/omap3-tobi.dts
+> rename to arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
+> index c742afa..4edc013 100644
 > --- a/arch/arm/boot/dts/omap3-tobi.dts
-> +++ b/arch/arm/boot/dts/omap3-tobi.dts
-> @@ -17,7 +17,7 @@
+> +++ b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
+> @@ -10,15 +10,9 @@
+>   * Tobi expansion board is manufactured by Gumstix Inc.
+>   */
+>  
+> -/dts-v1/;
+> -
+> -#include "omap36xx.dtsi"
+>  #include "omap3-overo.dtsi"
 >  
 >  / {
->  	model = "TI OMAP3 Gumstix Overo on Tobi";
-> -	compatible = "ti,omap3-tobi", "ti,omap3-overo", "ti,omap36xx", "ti,omap3";
-> +	compatible = "gumstix,omap3-tobi", "gumstix,omap3-overo", "ti,omap36xx", "ti,omap3";
->  
+> -	model = "TI OMAP3 Gumstix Overo on Tobi";
+> -	compatible = "gumstix,omap3-tobi", "gumstix,omap3-overo", "ti,omap36xx", "ti,omap3";
+> -
 >  	leds {
 >  		compatible = "gpio-leds";
+>  		heartbeat {
+> diff --git a/arch/arm/boot/dts/omap3-overo-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi.dts
+> new file mode 100644
+> index 0000000..de5653e
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/omap3-overo-tobi.dts
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright (C) 2012 Florian Vaussard, EPFL Mobots group
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/*
+> + * Tobi expansion board is manufactured by Gumstix Inc.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "omap34xx.dtsi"
+> +#include "omap3-overo-tobi-common.dtsi"
+> +
+> +/ {
+> +	model = "OMAP35xx Gumstix Overo on Tobi";
+> +	compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap3430", "ti,omap3";
+> +};
+> +
 > 
 
 
