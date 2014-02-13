@@ -1,40 +1,60 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 14 Feb 2014 00:13:33 +0100
-Subject: [PATCH] arm: dtsi: am335x-bone-common, usb0 is peripheral only
-In-Reply-To: <20140213225438.GF28216@atomide.com>
-References: <1389448851-20010-1-git-send-email-mpa@pengutronix.de>
- <20140213225438.GF28216@atomide.com>
-Message-ID: <20140213231333.GK31787@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 14 Feb 2014 08:17:06 +0900
+Subject: [PATCH v2 0/9] Samsung PM consolidation part 1 (clocks)
+In-Reply-To: <52F4C9CB.6060901@samsung.com>
+References: <1391710616-14226-1-git-send-email-t.figa@samsung.com>
+ <CAJuA9ah97MQKrNeKG2vijFCr8b7T4r2Zr9gsGtETwtBLmKBrXg@mail.gmail.com>
+ <52F4C9CB.6060901@samsung.com>
+Message-ID: <52FD5272.7010309@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 02/07/14 20:55, Sylwester Nawrocki wrote:
+> On 07/02/14 04:45, Thomas Abraham wrote:
+>> On Thu, Feb 6, 2014 at 11:46 PM, Tomasz Figa<t.figa@samsung.com>  wrote:
+>>>> This series reworks suspend/resume handling of Samsung clock drivers
+>>>> to cover more SoC specific aspects that are beyond simple register
+>>>> save and restore. The goal is to have all the suspend/resume code
+>>>> that touches the clock controller in single place, which is the
+>>>> clock driver.
+>>>>
+>>>> On Exynos4210-based Trats, Exynos4412-based Trats2 and Exynos5250-based
+>>>> Arndale boards (except suspend/resume, which is broken because of
+>>>> unrelated reasons):
+>>>>
+>>>> Tested-by: Tomasz Figa<t.figa@samsung.com>
+>>>>
+>>>> Tomasz Figa (9):
+>>>>    clk: exynos4: Remove remnants of non-DT support
+>>>>    clk: samsung: Provide common helpers for register save/restore
+>>>>    clk: samsung: exynos4: Move suspend/resume handling to SoC driver
+>>>>    clk: samsung: exynos5250: Move suspend/resume handling to SoC driver
+>>>>    clk: samsung: exynos5420: Move suspend/resume handling to SoC driver
+>>>>    clk: samsung: s3c64xx: Move suspend/resume handling to SoC driver
+>>>>    clk: samsung: Drop old suspend/resume code
+>>>>    clk: samsung: exynos4: Add remaining suspend/resume handling
+>>>>    ARM: EXYNOS: pm: Drop legacy Exynos4 clock suspend/resume code
+>>>>
+>>>>   arch/arm/mach-exynos/pm.c            | 148 +-----------------------------
+>>>>   drivers/clk/samsung/clk-exynos4.c    | 172 +++++++++++++++++++++++++++++++----
+>>>>   drivers/clk/samsung/clk-exynos5250.c |  49 +++++++++-
+>>>>   drivers/clk/samsung/clk-exynos5420.c |  49 +++++++++-
+>>>>   drivers/clk/samsung/clk-exynos5440.c |   2 +-
+>>>>   drivers/clk/samsung/clk-s3c64xx.c    |  79 +++++++++++++---
+>>>>   drivers/clk/samsung/clk.c            |  71 ++++++---------
+>>>>   drivers/clk/samsung/clk.h            |  14 ++-
+>>>>   8 files changed, 348 insertions(+), 236 deletions(-)
+>>
+>> Nice series!
+>> Reviewed-by: Thomas Abraham<thomas.ab@samsung.com>
+>
+> Yes, that's a nice cleanup.
+>
+> Reviewed-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
+>
++1 Nice
 
-On Thu, Feb 13, 2014 at 02:54:38PM -0800, Tony Lindgren wrote:
-> * Markus Pargmann <mpa@pengutronix.de> [140111 06:03]:
-> > The PMIC is using usb0 vbus line as power source. It is also connected
-> > to the am335x processor as vbus sense. But there is no possibility to
-> > pullup usb0 vbus to operate as host. This patch fixes the dr_mode of usb0.
-> 
-> That's the MUSB? AFAIK it's not possible to operate MUSB in peripheral
-> only mode because the hardware does what it wants based on the ID
-> pin state.
+I've applied this whole series.
+Thanks, Tomasz.
 
-Yes that's MUSB. The am335x reference manual describes that it is
-possible to force peripheral/host mode by setting bit 7 (IDDIG_MUX) in
-register USBnMODE to 1. Then it uses the bit written in bit 8 (IDDIG) of
-register USBnMODE to set host/peripheral mode.
-
-I am not sure if the driver supports it yet but I think the DTS should
-contain the correct mode nevertheless, especially to avoid starting the
-otg loops in the musb driver.
-
-Regards,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+- Kukjin
