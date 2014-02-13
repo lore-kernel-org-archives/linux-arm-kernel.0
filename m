@@ -1,80 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 13 Feb 2014 13:35:38 +0100
-Subject: [GIT PULL] integrator base patches for v3.15
-Message-ID: <CACRpkdYeaMqTNUTqBSg6vNa9=VucjpFFkx3diHJJNgZTg+iq1w@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 13 Feb 2014 13:36:18 +0100
+Subject: [PATCH v1 0/2] exynos_mct driver: fix irq allocation and cleanup
+In-Reply-To: <1392260923-31659-1-git-send-email-t.dakhran@samsung.com>
+References: <1392260923-31659-1-git-send-email-t.dakhran@samsung.com>
+Message-ID: <52FCBC42.6020904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+Hi Tarek,
 
-this is a set of patches I have sent for review and failed to get
-ACKs from the proper subsystem maintainers after repeated
-pings. However I now need to have this rotated in linux-next
-as a base for multiplatform, so please pull it in, it is all ARM
-drivers anyway. Russell pointed out some things and these
-have been fixed and iterated in this series.
+On 13.02.2014 04:08, Tarek Dakhran wrote:
+> exynos4_local_timer_setup called on the secondary cpu before
+> irqs are enabled. request_irq can sleep, which produces next warning:
+>
+> on boot:
+> [    0.370000] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+> [    0.370000] Setting up static identity map for 0x403b5700 - 0x403b5758
+> [    0.395000] CPU1: Booted secondary processor
+> [    0.395000] ------------[ cut here ]------------
+> [    0.395000] WARNING: CPU: 1 PID: 0 at kernel/locking/lockdep.c:2742 lockdep_trace_alloc+0xe0/0xfc()
+> [    0.395000] DEBUG_LOCKS_WARN_ON(irqs_disabled_flags(flags))
+> [    0.395000] Modules linked in:
+> [    0.395000] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.14.0-rc2-00004-g0db95f4 #128
+> [    0.395000] [<c0014308>] (unwind_backtrace) from [<c0011690>] (show_stack+0x10/0x14)
+> [    0.395000] [<c0011690>] (show_stack) from [<c03ae7d0>] (dump_stack+0x6c/0xb8)
+> [    0.395000] [<c03ae7d0>] (dump_stack) from [<c001d504>] (warn_slowpath_common+0x68/0x8c)
+> [    0.395000] [<c001d504>] (warn_slowpath_common) from [<c001d5bc>] (warn_slowpath_fmt+0x30/0x40)
+> [    0.395000] [<c001d5bc>] (warn_slowpath_fmt) from [<c0059824>] (lockdep_trace_alloc+0xe0/0xfc)
+> [    0.395000] [<c0059824>] (lockdep_trace_alloc) from [<c00bee24>] (kmem_cache_alloc+0x24/0x160)
+> [    0.395000] [<c00bee24>] (kmem_cache_alloc) from [<c0068174>] (request_threaded_irq+0x64/0x130)
+> [    0.395000] [<c0068174>] (request_threaded_irq) from [<c02efaf8>] (exynos4_local_timer_setup+0xd0/0x124)
+> [    0.395000] [<c02efaf8>] (exynos4_local_timer_setup) from [<c02efc34>] (exynos4_mct_cpu_notify+0x78/0xf0)
+> [    0.395000] [<c02efc34>] (exynos4_mct_cpu_notify) from [<c003d318>] (notifier_call_chain+0x44/0x84)
+> [    0.395000] [<c003d318>] (notifier_call_chain) from [<c001d61c>] (__cpu_notify+0x24/0x40)
+> [    0.395000] [<c001d61c>] (__cpu_notify) from [<c0013314>] (secondary_start_kernel+0xe4/0x134)
+> [    0.395000] [<c0013314>] (secondary_start_kernel) from [<40008624>] (0x40008624)
+> [    0.395000] ---[ end trace 347890460e745f50 ]---
+> [    0.420000] CPU1: update cpu_power 1024
+> [    0.420000] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+>
+> on hotplug:
+> [  108.040000] CPU3: Booted secondary processor
+> [  108.040000] BUG: sleeping function called from invalid context at mm/slub.c:965
+> [  108.040000] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/3
+> [  108.040000] INFO: lockdep is turned off.
+> [  108.040000] irq event stamp: 0
+> [  108.040000] hardirqs last  enabled at (0): [<  (null)>]   (null)
+> [  108.040000] hardirqs last disabled at (0): [<c001b768>] copy_process.part.2+0x2a4/0x12f4
+> [  108.040000] softirqs last  enabled at (0): [<c001b768>] copy_process.part.2+0x2a4/0x12f4
+> [  108.040000] softirqs last disabled at (0): [<  (null)>]   (null)
+> [  108.040000] CPU: 3 PID: 0 Comm: swapper/3 Tainted: G        W    3.14.0-rc2-00004-g0db95f4 #128
+> [  108.040000] [<c0014308>] (unwind_backtrace) from [<c0011690>] (show_stack+0x10/0x14)
+> [  108.040000] [<c0011690>] (show_stack) from [<c03ae7d0>] (dump_stack+0x6c/0xb8)
+> [  108.040000] [<c03ae7d0>] (dump_stack) from [<c00beed4>] (kmem_cache_alloc+0xd4/0x160)
+> [  108.040000] [<c00beed4>] (kmem_cache_alloc) from [<c0068174>] (request_threaded_irq+0x64/0x130)
+> [  108.040000] [<c0068174>] (request_threaded_irq) from [<c02efaf8>] (exynos4_local_timer_setup+0xd0/0x124)
+> [  108.040000] [<c02efaf8>] (exynos4_local_timer_setup) from [<c02efc34>] (exynos4_mct_cpu_notify+0x78/0xf0)
+> [  108.040000] [<c02efc34>] (exynos4_mct_cpu_notify) from [<c003d318>] (notifier_call_chain+0x44/0x84)
+> [  108.040000] [<c003d318>] (notifier_call_chain) from [<c001d61c>] (__cpu_notify+0x24/0x40)
+> [  108.040000] [<c001d61c>] (__cpu_notify) from [<c0013314>] (secondary_start_kernel+0xe4/0x134)
+> [  108.040000] [<c0013314>] (secondary_start_kernel) from [<40008624>] (0x40008624)
+>
+> First patch fixes this problem by removing request_irq from exynos4_local_timer_setup
+> Second removes non-dt stuff.
+>
+> Tested on linux kernel v3.14-rc2.
 
-Yours,
-Linus Walleij
+It would be nice to say on which boards it has been tested. Let me check 
+this on our boards anyway.
 
-The following changes since commit b28a960c42fcd9cfc987441fa6d1c1a471f0f9ed:
-
-  Linux 3.14-rc2 (2014-02-09 18:15:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/integrator-for-v3.15-1
-
-for you to fetch changes up to 29525484cd2524a31ee0924831ab43b46ea6ebe1:
-
-  ARM: integrator: select GPIO block (2014-02-13 11:21:37 +0100)
-
-----------------------------------------------------------------
-Integrator/Versatile base patch stack for the v3.15 series:
-
-- Move integrator clock definitions to the device tree, alter
-  clock and timer drivers accordingly.
-
-- Alter the VIC irqchip driver to support cascaded VICs off
-  a parent IRQ controller.
-
-- Update the IM-PD1 plugin code to use managed resources.
-
-- Register the VIC on the IM-PD1.
-
-- Select the PL061 GPIO block for the IM-PD1 on the
-  Integrator/AP.
-
-----------------------------------------------------------------
-Linus Walleij (10):
-      ARM: integrator: define clocks in the device trees
-      ARM: SP804: make Integrator/CP timer pick clock from DT
-      ARM: integrator: switch to fetch clocks from device tree
-      clk: versatile: pass a parent to the ICST clock
-      clk: versatile: respect parent rate in ICST clock
-      irqchip: vic: update the base IRQ member correctly
-      irqchip: support cascaded VICs
-      ARM: integrator: use managed resources for the IM-PD1
-      ARM: integrator: register the IM-PD1 VIC
-      ARM: integrator: select GPIO block
-
- .../devicetree/bindings/clock/arm-integrator.txt   |  34 +++++++
- arch/arm/boot/dts/integratorap.dts                 |  35 +++++++
- arch/arm/boot/dts/integratorcp.dts                 | 102 ++++++++++++++++++++-
- arch/arm/common/timer-sp.c                         |   8 +-
- arch/arm/mach-integrator/Kconfig                   |   3 +
- arch/arm/mach-integrator/impd1.c                   |  81 +++++++++-------
- arch/arm/mach-integrator/integrator_ap.c           |  19 +++-
- arch/arm/mach-integrator/integrator_cp.c           |   6 --
- arch/arm/mach-versatile/core.c                     |   2 +-
- drivers/clk/versatile/clk-icst.c                   |  21 ++++-
- drivers/clk/versatile/clk-icst.h                   |   1 +
- drivers/clk/versatile/clk-impd1.c                  |   6 +-
- drivers/clk/versatile/clk-integrator.c             |  83 +++++++----------
- drivers/clk/versatile/clk-realview.c               |   4 +-
- drivers/irqchip/irq-vic.c                          |  59 ++++++++++--
- include/linux/irqchip/arm-vic.h                    |   6 +-
- include/linux/platform_data/clk-integrator.h       |   1 -
- 17 files changed, 353 insertions(+), 118 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/arm-integrator.txt
+Best regards,
+Tomasz
