@@ -1,131 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 13 Feb 2014 21:02:54 +0800
-Subject: [PATCH] thermal: imx: update formula for thermal sensor
-In-Reply-To: <1392199595-1054-1-git-send-email-b20788@freescale.com>
-References: <1392199595-1054-1-git-send-email-b20788@freescale.com>
-Message-ID: <20140213130252.GB20842@S2101-09.ap.freescale.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 13 Feb 2014 08:07:45 -0500
+Subject: [PATCH v3 01/13] ARM: mvebu: rename armada-370-xp.c to
+ armada-mvebu.c
+In-Reply-To: <20140213125526.3af08c54@skate>
+References: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1392289475-8902-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <2036226.egxWL7qC66@wuerfel> <20140213125526.3af08c54@skate>
+Message-ID: <20140213130745.GU27395@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Copy LAKML and pengutronix folks in case they have comments.
+On Thu, Feb 13, 2014 at 12:55:26PM +0100, Thomas Petazzoni wrote:
+> Dear Arnd Bergmann,
+> 
+> On Thu, 13 Feb 2014 12:50:15 +0100, Arnd Bergmann wrote:
+> > On Thursday 13 February 2014 12:04:23 Thomas Petazzoni wrote:
+> > > In preparation to the introduction of the support of Armada 375 and
+> > > Armada 38x, this commit renames arch/arm/mach-mvebu/armada-370-xp.c to
+> > > arch/arm/mach-mvebu/armada-mvebu.c. The armada-mvebu.c name was chosen
+> > > because:
+> > > 
+> > >  * As we are going to merge the support for Kirkwood and Dove into
+> > >    mach-mvebu, there will be other files with DT_MACHINE_START
+> > >    structures, so a generic name such as board-dt.c or mvebu.c does
+> > >    not work.
+> > > 
+> > >  * A simple armada.c does not work, because there are Marvell Armada
+> > >    SOCs that are not part of the MVEBU family. For example, the
+> > >    Marvell Armada 1500 are part of the mach-berlin family, which is a
+> > >    completely separate line of SOCs.
+> > 
+> > Your reasoning for the new name makes a lot of sense, but my personal
+> > opinion is that I'd rather leave the name as it is and deal with the
+> > fact that it's not the best name. Renaming files often causes unexpected
+> > problems, in particular if someone else wants to modify the same file.
+> 
+> I believe it's a matter of taste here. Having a file named
+> armada-370-xp.c that handles Armada 375 and Armada 38x looks highly
+> confusing to me, and I believe both Gr?gory and Ezequiel were of the
+> same opinion.
+> 
+> The number of changes to this file is very limited, so the probability
+> of having a large number of complicated patches touching the same file
+> being in flight is fairly low.
+> 
+> Maybe we can leave this taste decision to the mach-mvebu maintainers?
 
-On Wed, Feb 12, 2014 at 06:06:35PM +0800, Anson Huang wrote:
-> Thermal sensor used to need two calibration points which are
-> in fuse map to get a slope for converting thermal sensor's raw
-> data to real temperature in degree C. Due to the chip calibration
-> limitation, hardware team provides an universal formula to get
-> real temperature from internal thermal sensor raw data:
-> 
-> Slope = 0.4297157 - (0.0015976 * 25C fuse);
-> 
-> Update the formula, as there will be no hot point calibration
-> data in fuse map from now on.
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
+board-v7.c and then board-v5.c ?
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+thx,
 
-Shawn
-
-> ---
->  drivers/thermal/imx_thermal.c |   39 ++++++++++++++++++++++++++-------------
->  1 file changed, 26 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
-> index 45af765..a99c631 100644
-> --- a/drivers/thermal/imx_thermal.c
-> +++ b/drivers/thermal/imx_thermal.c
-> @@ -62,12 +62,16 @@ enum imx_thermal_trip {
->  #define IMX_POLLING_DELAY		2000 /* millisecond */
->  #define IMX_PASSIVE_DELAY		1000
->  
-> +#define FACTOR0				10000000
-> +#define FACTOR1				15976
-> +#define FACTOR2				4297157
-> +
->  struct imx_thermal_data {
->  	struct thermal_zone_device *tz;
->  	struct thermal_cooling_device *cdev;
->  	enum thermal_device_mode mode;
->  	struct regmap *tempmon;
-> -	int c1, c2; /* See formula in imx_get_sensor_data() */
-> +	u32 c1, c2; /* See formula in imx_get_sensor_data() */
->  	unsigned long temp_passive;
->  	unsigned long temp_critical;
->  	unsigned long alarm_temp;
-> @@ -84,7 +88,7 @@ static void imx_set_alarm_temp(struct imx_thermal_data *data,
->  	int alarm_value;
->  
->  	data->alarm_temp = alarm_temp;
-> -	alarm_value = (alarm_temp - data->c2) / data->c1;
-> +	alarm_value = (data->c2 - alarm_temp) / data->c1;
->  	regmap_write(map, TEMPSENSE0 + REG_CLR, TEMPSENSE0_ALARM_VALUE_MASK);
->  	regmap_write(map, TEMPSENSE0 + REG_SET, alarm_value <<
->  			TEMPSENSE0_ALARM_VALUE_SHIFT);
-> @@ -136,7 +140,7 @@ static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
->  	n_meas = (val & TEMPSENSE0_TEMP_CNT_MASK) >> TEMPSENSE0_TEMP_CNT_SHIFT;
->  
->  	/* See imx_get_sensor_data() for formula derivation */
-> -	*temp = data->c2 + data->c1 * n_meas;
-> +	*temp = data->c2 - n_meas * data->c1;
->  
->  	/* Update alarm value to next higher trip point */
->  	if (data->alarm_temp == data->temp_passive && *temp >= data->temp_passive)
-> @@ -305,6 +309,7 @@ static int imx_get_sensor_data(struct platform_device *pdev)
->  	int t1, t2, n1, n2;
->  	int ret;
->  	u32 val;
-> +	u64 temp64;
->  
->  	map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
->  					      "fsl,tempmon-data");
-> @@ -330,6 +335,8 @@ static int imx_get_sensor_data(struct platform_device *pdev)
->  	 *   [31:20] - sensor value @ 25C
->  	 *    [19:8] - sensor value of hot
->  	 *     [7:0] - hot temperature value
-> +	 * Use universal formula now and only need sensor value @ 25C
-> +	 * slope = 0.4297157 - (0.0015976 * 25C fuse)
->  	 */
->  	n1 = val >> 20;
->  	n2 = (val & 0xfff00) >> 8;
-> @@ -337,20 +344,26 @@ static int imx_get_sensor_data(struct platform_device *pdev)
->  	t1 = 25; /* t1 always 25C */
->  
->  	/*
-> -	 * Derived from linear interpolation,
-> -	 * Tmeas = T2 + (Nmeas - N2) * (T1 - T2) / (N1 - N2)
-> +	 * Derived from linear interpolation:
-> +	 * slope = 0.4297157 - (0.0015976 * 25C fuse)
-> +	 * slope = (FACTOR2 - FACTOR1 * n1) / FACTOR0
-> +	 * (Nmeas - n1) / (Tmeas - t1) = slope
->  	 * We want to reduce this down to the minimum computation necessary
->  	 * for each temperature read.  Also, we want Tmeas in millicelsius
->  	 * and we don't want to lose precision from integer division. So...
-> -	 * milli_Tmeas = 1000 * T2 + 1000 * (Nmeas - N2) * (T1 - T2) / (N1 - N2)
-> -	 * Let constant c1 = 1000 * (T1 - T2) / (N1 - N2)
-> -	 * milli_Tmeas = (1000 * T2) + c1 * (Nmeas - N2)
-> -	 * milli_Tmeas = (1000 * T2) + (c1 * Nmeas) - (c1 * N2)
-> -	 * Let constant c2 = (1000 * T2) - (c1 * N2)
-> -	 * milli_Tmeas = c2 + (c1 * Nmeas)
-> +	 * Tmeas = (Nmeas - n1) / slope + t1
-> +	 * milli_Tmeas = 1000 * (Nmeas - n1) / slope + 1000 * t1
-> +	 * milli_Tmeas = -1000 * (n1 - Nmeas) / slope + 1000 * t1
-> +	 * Let constant c1 = (-1000 / slope)
-> +	 * milli_Tmeas = (n1 - Nmeas) * c1 + 1000 * t1
-> +	 * Let constant c2 = n1 *c1 + 1000 * t1
-> +	 * milli_Tmeas = c2 - Nmeas * c1
->  	 */
-> -	data->c1 = 1000 * (t1 - t2) / (n1 - n2);
-> -	data->c2 = 1000 * t2 - data->c1 * n2;
-> +	temp64 = FACTOR0;
-> +	temp64 *= 1000;
-> +	do_div(temp64, FACTOR1 * n1 - FACTOR2);
-> +	data->c1 = temp64;
-> +	data->c2 = n1 * data->c1 + 1000 * t1;
->  
->  	/*
->  	 * Set the default passive cooling trip point to 20 ?C below the
-> -- 
-> 1.7.9.5
-> 
-> 
+Jason.
