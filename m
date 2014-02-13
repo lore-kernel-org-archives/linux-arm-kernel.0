@@ -1,43 +1,28 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 14 Feb 2014 08:07:36 +0900
-Subject: [PATCH v2 7/9] clk: samsung: Drop old suspend/resume code
-In-Reply-To: <4274393.fPXjFZLa78@phil>
-References: <1391710616-14226-1-git-send-email-t.figa@samsung.com>
- <1391710616-14226-8-git-send-email-t.figa@samsung.com>
- <4274393.fPXjFZLa78@phil>
-Message-ID: <52FD5038.6090309@samsung.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 13 Feb 2014 18:08:06 -0500 (EST)
+Subject: [PATCH v2 2/2] net: axienet: Fix compilation warnings
+In-Reply-To: <9be652e995e74663de1df69e6ea101225cb670a2.1392275432.git.michal.simek@xilinx.com>
+References: <cover.1392275432.git.michal.simek@xilinx.com>
+ <cover.1392275432.git.michal.simek@xilinx.com>
+ <9be652e995e74663de1df69e6ea101225cb670a2.1392275432.git.michal.simek@xilinx.com>
+Message-ID: <20140213.180806.1440448228867354144.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/14 18:50, Heiko St?bner wrote:
-> Am Donnerstag, 6. Februar 2014, 19:16:54 schrieb Tomasz Figa:
->> Since all SoC drivers have been moved to local suspend/resume handling,
->> the old code can be safely dropped.
->>
->> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
->> Acked-by: Kyungmin Park<kyungmin.park@samsung.com>
->
-> So it looks like I'll need to respin my s3c24xx-ccf patches again, but
-> nevertheless:
->
-> Acked-by: Heiko Stuebner<heiko@sntech.de>
->
+From: Michal Simek <michal.simek@xilinx.com>
+Date: Thu, 13 Feb 2014 08:10:43 +0100
 
-Heiko,
+> Warning log:
+> xilinx_axienet_main.c: In function 'axienet_start_xmit_done':
+> xilinx_axienet_main.c:617:16: warning: operation on 'lp->tx_bd_ci' may be undefined [-Wsequence-point]
+> xilinx_axienet_main.c: In function 'axienet_start_xmit':
+> xilinx_axienet_main.c:703:18: warning: operation on 'lp->tx_bd_tail' may be undefined [-Wsequence-point]
+> xilinx_axienet_main.c:719:17: warning: operation on 'lp->tx_bd_tail' may be undefined [-Wsequence-point]
+> xilinx_axienet_main.c: In function 'axienet_recv':
+> xilinx_axienet_main.c:792:16: warning: operation on 'lp->rx_bd_ci' may be undefined [-Wsequence-point]
+> xilinx_axienet_main.c: In function 'axienet_of_probe':
+> xilinx_axienet_main.c:1501:21: warning: unused variable 'rc' [-Wunused-variable]
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-I'll apply this series, so please re-work your s3c24xx CCF based on 
-this. you can see in v3.15-next/s2r-pm-samsung.
-
-Thanks,
-- Kukjin
-
->> ---
->>   drivers/clk/samsung/clk-exynos4.c    |  2 +-
->>   drivers/clk/samsung/clk-exynos5250.c |  2 +-
->>   drivers/clk/samsung/clk-exynos5420.c |  2 +-
->>   drivers/clk/samsung/clk-exynos5440.c |  2 +-
->>   drivers/clk/samsung/clk-s3c64xx.c    |  2 +-
->>   drivers/clk/samsung/clk.c            | 54
->> +----------------------------------- drivers/clk/samsung/clk.h            |
->>   4 +--
->>   7 files changed, 7 insertions(+), 61 deletions(-)
+Applied.
