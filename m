@@ -1,97 +1,41 @@
-From: tinamdar@apm.com (Tanmay Inamdar)
-Date: Thu, 13 Feb 2014 00:36:44 -0800
-Subject: [PATCH] pci: Add support for creating a generic host_bridge from
- device tree
-In-Reply-To: <000201cf2893$0f5e3710$2e1aa530$%han@samsung.com>
-References: <1391452428-22917-1-git-send-email-Liviu.Dudau@arm.com>
- <1391452428-22917-2-git-send-email-Liviu.Dudau@arm.com>
- <7398333.9L5KlyFggU@wuerfel>
- <CACoXjckKRQfR3CbC1JpgbhOumED+OqiMh1_Y73-h6q=ByMNanw@mail.gmail.com>
- <20140206101814.GA4993@e106497-lin.cambridge.arm.com>
- <000201cf2893$0f5e3710$2e1aa530$%han@samsung.com>
-Message-ID: <CACoXjc=epN8=tFQKw6kZ27hTA=a+c56q1pikX_SSMKK1rsScCw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 13 Feb 2014 09:49:08 +0100
+Subject: [PATCH] ARM: tegra: don't timeout if CPU is powergated
+In-Reply-To: <4050206.sG2EzXyfMN@fb07-iapwap2>
+References: <1d5ea6b7df4573d866779857922ac650fe59af60.1392078805.git.stefan@agner.ch>
+ <52FBC97D.8040809@wwwdotorg.org> <4050206.sG2EzXyfMN@fb07-iapwap2>
+Message-ID: <20140213084907.GA11795@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 12:10 AM, Jingoo Han <jg1.han@samsung.com> wrote:
-> On Thursday, February 06, 2014 7:18 PM, Liviu Dudau wrote:
->> On Wed, Feb 05, 2014 at 10:26:27PM +0000, Tanmay Inamdar wrote:
->> > Hello Liviu,
->> >
->> > I did not get the first email of this particular patch on any of
->> > subscribed mailing lists (don't know why), hence replying here.
->>
->> Strange, it shows in the MARC and GMANE archive for linux-pci, probably
->> a hickup on your receiving side?
->>
->> >
->> > +struct pci_host_bridge *
->> > +pci_host_bridge_of_init(struct device *parent, int busno, struct pci_ops *ops,
->> > + void *host_data, struct list_head *resources)
->> > +{
->> > + struct pci_bus *root_bus;
->> > + struct pci_host_bridge *bridge;
->> > +
->> > + /* first parse the host bridge bus ranges */
->> > + if (pci_host_bridge_of_get_ranges(parent->of_node, resources))
->> > + return NULL;
->> > +
->> > + /* then create the root bus */
->> > + root_bus = pci_create_root_bus(parent, busno, ops, host_data, resources);
->> > + if (!root_bus)
->> > + return NULL;
->> > +
->> > + bridge = to_pci_host_bridge(root_bus->bridge);
->> > +
->> > + return bridge;
->> > +}
->> >
->> > You are keeping the domain_nr inside pci_host_bridge structure. In
->> > above API, domain_nr is required in 'pci_find_bus' function called
->> > from 'pci_create_root_bus'. Since the bridge is allocated after
->> > creating root bus, 'pci_find_bus' always gets domain_nr as 0. This
->> > will cause problem for scanning multiple domains.
->>
->> Good catch. I was switching between creating a pci_controller in arch/arm64 and
->> adding the needed bits in pci_host_bridge. After internal review I've decided to
->> add the domain_nr to pci_host_bridge, but forgot to update the code everywhere.
->
-> Hi Liviu Dudau,
->
-> One more thing,
-> I am reviewing and compiling your patch.
-> Would you consider adding 'struct pci_sys_data' and 'struct hw_pci'?
->
-> Currently, 4 PCIe Host drivers (pci-mvebu.c, pci-tegra.c,
-> pci-rcar-gen2.c, pcie-designware.c) are using 'struct pci_sys_data'
-> and 'struct hw_pci' in their drivers. Without this, it makes build
-> errors.
->
-> In arm32, 'struct pci_sys_data' and 'struct hw_pci' is defined
-> in "arch/arm/include/asm/mach/pci.h".
->
-> Tanmay Inamdar,
-> Your 'APM X-Gene PCIe' patch also needs 'struct pci_sys_data' and
-> 'struct hw_pci'. With Liviu Dudau's patch, it will make build
-> errors. Would you check this?
+On Thu, Feb 13, 2014 at 09:28:52AM +0100, Marc Dietrich wrote:
+> Am Mittwoch, 12. Februar 2014, 12:20:29 schrieb Stephen Warren:
+> > On 02/10/2014 05:44 PM, Stefan Agner wrote:
+> > > When booting secondary CPU(s) which are not yet powergated, a wrong
+> > > check lead to a timeout after 100 jiffies. With this patch, we only
+> > > delay powergating if CPUs are still not powered yet.
+> > 
+> > I've applied this to Tegra's for-3.15/soc branch.
+> 
+> also for 3.14 and maybe lower versioned kernels? Since this seems to fix a bug 
+> where some core doesn't come up.
 
-X-Gene PCIe host driver is dependent on arm64 PCI patch. My previous
-approach was based on 32bit arm PCI support. With Liviu's approach, I
-will have to make changes in host driver to get rid of hw_pci and
-pci_sys_data which are no longer required.
+Yeah, this bug has been there for pretty much forever it seems. Commit
+86e51a2ee471 "ARM: tegra: support for secondary cores on Tegra30" added
+tegra30_boot_secondary() (named tegra30_power_up_cpu() back then, which
+was renamed to tegra30_boot_secondary() in commit 0d1f79b033bb "ARM:
+tegra: refactor tegra{20,30}_boot_secondary". The latter was introduced
+in v3.10, so I guess backporting it to stable releases all the way back
+to v3.10 would be good.
 
-IMO it should not cause build errors for PCI host drivers dependent on
-architectures other than arm64. Can you post the error?
+Backporting to earlier versions (86e51a2ee471 went into v3.4) will be a
+lot more difficult since some of the APIs were renamed since then.
 
->
-> Thank you.
->
-> Best regards,
-> Jingoo Han
->
->>
->> Thanks for reviewing this, will fix in v2.
->>
->> Do you find porting to the new API straight forward?
->>
->
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140213/b74037ed/attachment-0001.sig>
