@@ -1,142 +1,165 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Feb 2014 12:04:23 +0100
-Subject: [PATCH v3 01/13] ARM: mvebu: rename armada-370-xp.c to armada-mvebu.c
-In-Reply-To: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1392289475-8902-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 13 Feb 2014 12:04:22 +0100
+Subject: [PATCH v3 00/13] Core support for Marvell Armada 375 and 38x
+Message-ID: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to the introduction of the support of Armada 375 and
-Armada 38x, this commit renames arch/arm/mach-mvebu/armada-370-xp.c to
-arch/arm/mach-mvebu/armada-mvebu.c. The armada-mvebu.c name was chosen
-because:
+Jason, Andrew, Sebastian, Gregory,
 
- * As we are going to merge the support for Kirkwood and Dove into
-   mach-mvebu, there will be other files with DT_MACHINE_START
-   structures, so a generic name such as board-dt.c or mvebu.c does
-   not work.
+Here comes the v3 of the Armada 375/38x core support.
 
- * A simple armada.c does not work, because there are Marvell Armada
-   SOCs that are not part of the MVEBU family. For example, the
-   Marvell Armada 1500 are part of the mach-berlin family, which is a
-   completely separate line of SOCs.
+Changes since v2
+================
 
-In relation to this file rename, this commit also:
+ * Integrated the support of Armada 375 and Armada 38x in the same
+   "board file" as Armada 370/XP, as suggested by Arnd Bergmann. In
+   order to achieve this, I've renamed armada-370-xp.c to
+   armada-mvebu.c, and done corresponding minor cleanups before
+   introducing Armada 375/38x support.
 
- * Renames the hidden Kconfig symbol MACH_ARMADA_370_XP to
-   MACH_ARMADA_MVEBU. This hidden symbol is selected by the various
-   per-SoC visible Kconfig options to trigger the build of
-   armada-mvebu.c.
+ * Made the data abort workaround check for a specific FSR value, as
+   suggested by Arnd Bergmann. Checking for the address is not
+   possible, because it changes from one boot to the other.
 
- * Renames a certain number of functions in armada-mvebu.c so that
-   their armada_370_xp prefix is replaced by a armada_mvebu
-   prefix. The .dt_compat array keeps its armada_370_xp prefix because
-   the new SOCs will be introduced with separate .dt_compat arrays,
-   due to the need for different SMP operations.
+ * Removed unnecessary duplicated aliases for i2c and spi nodes
+   (between .dtsi and .dts). Requested by Arnd Bergmann.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-Jason, this commit will create a trivial conflict with the patch that
-removed armada_370_xp_map_io(), which I submitted a few days. The
-conflict should be easy to resolve (simply remove the ->map_io
-function).
+ * Added aliases for network interfaces, like we already have for
+   Armada 370 and XP.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/Kconfig                             |  6 +++---
- arch/arm/mach-mvebu/Makefile                            |  2 +-
- arch/arm/mach-mvebu/{armada-370-xp.c => armada-mvebu.c} | 12 ++++++------
- 3 files changed, 10 insertions(+), 10 deletions(-)
- rename arch/arm/mach-mvebu/{armada-370-xp.c => armada-mvebu.c} (89%)
+Changes since v1
+================
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 5e269d7..35ef594 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -21,7 +21,7 @@ if ARCH_MVEBU
- 
- menu "Marvell SOC with device tree"
- 
--config MACH_ARMADA_370_XP
-+config MACH_ARMADA_MVEBU
- 	bool
- 	select ARMADA_370_XP_TIMER
- 	select HAVE_SMP
-@@ -31,7 +31,7 @@ config MACH_ARMADA_370_XP
- config MACH_ARMADA_370
- 	bool "Marvell Armada 370 boards"
- 	select ARMADA_370_CLK
--	select MACH_ARMADA_370_XP
-+	select MACH_ARMADA_MVEBU
- 	select PINCTRL_ARMADA_370
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
-@@ -40,7 +40,7 @@ config MACH_ARMADA_370
- config MACH_ARMADA_XP
- 	bool "Marvell Armada XP boards"
- 	select ARMADA_XP_CLK
--	select MACH_ARMADA_370_XP
-+	select MACH_ARMADA_MVEBU
- 	select PINCTRL_ARMADA_XP
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 878aebe..4386094 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -4,7 +4,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
- AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
- 
- obj-y				 += system-controller.o mvebu-soc-id.o
--obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o
-+obj-$(CONFIG_MACH_ARMADA_MVEBU)  += armada-mvebu.o
- obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
- obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-mvebu.c
-similarity index 89%
-rename from arch/arm/mach-mvebu/armada-370-xp.c
-rename to arch/arm/mach-mvebu/armada-mvebu.c
-index f6c9d1d..40e3a4d 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-mvebu.c
-@@ -31,12 +31,12 @@
- #include "coherency.h"
- #include "mvebu-soc-id.h"
- 
--static void __init armada_370_xp_map_io(void)
-+static void __init armada_mvebu_map_io(void)
- {
- 	debug_ll_io_init();
- }
- 
--static void __init armada_370_xp_timer_and_clk_init(void)
-+static void __init armada_mvebu_timer_and_clk_init(void)
- {
- 	of_clk_init(NULL);
- 	clocksource_of_init();
-@@ -75,7 +75,7 @@ static void __init i2c_quirk(void)
- 	return;
- }
- 
--static void __init armada_370_xp_dt_init(void)
-+static void __init armada_mvebu_dt_init(void)
- {
- 	if (of_machine_is_compatible("plathome,openblocks-ax3-4"))
- 		i2c_quirk();
-@@ -89,9 +89,9 @@ static const char * const armada_370_xp_dt_compat[] = {
- 
- DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 370/XP (Device Tree)")
- 	.smp		= smp_ops(armada_xp_smp_ops),
--	.init_machine	= armada_370_xp_dt_init,
--	.map_io		= armada_370_xp_map_io,
--	.init_time	= armada_370_xp_timer_and_clk_init,
-+	.init_machine	= armada_mvebu_dt_init,
-+	.map_io		= armada_mvebu_map_io,
-+	.init_time	= armada_mvebu_timer_and_clk_init,
- 	.restart	= mvebu_restart,
- 	.dt_compat	= armada_370_xp_dt_compat,
- MACHINE_END
+ * Merged armada-375.c and armada-38x.c into one file, as suggested by
+   Andrew Lunn.
+
+ * Do not require the introduction of new compatible strings in the
+   drivers for the timer, mbus and the 38x system controller (the 375
+   system controller being different, adding a different compatible
+   string is needed). The .dtsi files have been updated to use several
+   compatible strings: one designating the new SoC, and another one
+   designating the older SoC with which they are compatible as far as
+   we know today. Suggested by Jason Cooper and confirmed by Grant
+   Likely.
+
+ * Rename the Kconfig symbol from MACH_ARMADA_380 to MACH_ARMADA_38X,
+   as suggested by Andrew Lunn.
+
+ * Use <dt-bindings/gpio/gpio.h> defines instead of hardcoded values
+   in armada-375-db.dts. Suggested by Andrew Lunn.
+
+Original cover letter
+=====================
+
+Here is a set of 11 patches that add minimal support for the new
+Marvell Armada 375 and 38x SoCs. The Armada 375 has already been
+announced a few months ago by Marvell, and a product brief is
+available at
+http://www.marvell.com/embedded-processors/armada-375/. As far as I
+know, the Armada 380 and 385 have not yet been announced, but we
+already have working kernel support for them.
+
+Essentially, the Armada 375 is a dual-core Cortex-A9, which re-uses
+most of the IP blocks of the Armada XP, except for the network unit
+and core parts of the SoC, such as the interrupt controller or cache
+controller (GIC and PL310 are used). They also added an XHCI USB 3.0
+controller.
+
+The Armada 380 and 385 also use Cortex-A9 CPU cores (single core for
+the 380 and dual-core for the 385), but move a little further away
+than 375 in terms of peripherals: an AHCI-compatible SATA interface, a
+different MMC/SDIO interface, etc.
+
+This set of patches only add minimal support for these SOCs, as well
+as support for the peripherals for which no driver changes are
+needed. We therefore have support for:
+
+ * Device Bus
+ * Clocks
+ * Interrupt controllers: GIC and MPIC
+ * GPIO controllers
+ * I2C buses
+ * SPI buses
+ * L2 cache
+ * MBus controller
+ * SDIO (for Armada 375 only)
+ * Pinctrl
+ * SATA (for Armada 375 only)
+ * Serial
+ * System controller
+ * XOR engines
+ * PCIe controllers
+ * Network (for Armada 38x only)
+
+Some of these features require patches to other subsystems, and the
+patches are being sent to the respective maintainers currently: clock
+driver patches, pinctrl driver patches, irqchip driver patches, mbus
+driver patches, etc. There is however no build dependency between the
+arch/arm/mach-mvebu/ code and those other patches.
+
+We aim at getting this minimal support merged for 3.15.
+
+We have already working code for many more features, such as SMP,
+coherency support, NAND, SATA and SDIO for Armada 380, etc. We will be
+sending those additional features once the basic support has been
+merged.
+
+It is worth noting that contrary to the Marvell 370 and XP support,
+which has been pushed mainline fairly late in the development cycle of
+the SOCs, the support for Armada 375 and 38x is now being pushed quite
+early in the development cycle of the SOCs. We are having mainline
+support pretty much at the same time as the SOCs are being made
+available to customers, which is really great!
+
+Best regards,
+
+Thomas
+
+Gregory CLEMENT (2):
+  ARM: mvebu: add initial support for the Armada 375 SOCs
+  ARM: mvebu: add Device Tree description of the Armada 375 SoC
+
+Thomas Petazzoni (11):
+  ARM: mvebu: rename armada-370-xp.c to armada-mvebu.c
+  ARM: mvebu: rename DT machine structure for Armada 370/XP
+  ARM: mvebu: make CPU_PJ4B selection a per-SoC choice
+  ARM: mvebu: add Armada 375 support to the system-controller driver
+  ARM: mvebu: add workaround for data abort issue on Armada 375
+  ARM: mvebu: add Device Tree for the Armada 375 DB board
+  ARM: mvebu: add initial support for the Armada 380/385 SOCs
+  ARM: mvebu: add Device Tree description of the Armada 380/385 SoCs
+  ARM: mvebu: add Device Tree for the Armada 385 DB board
+  ARM: mvebu: update defconfigs for Armada 375 and 38x
+  Documentation: arm: update Marvell documentation about Armada 375/38x
+
+ Documentation/arm/Marvell/README                   |  12 +-
+ .../devicetree/bindings/arm/armada-375.txt         |   9 +
+ .../devicetree/bindings/arm/armada-38x.txt         |  10 +
+ .../bindings/arm/mvebu-system-controller.txt       |   3 +-
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/armada-375-db.dts                | 107 +++++
+ arch/arm/boot/dts/armada-375.dtsi                  | 439 +++++++++++++++++++++
+ arch/arm/boot/dts/armada-380.dtsi                  | 117 ++++++
+ arch/arm/boot/dts/armada-385-db.dts                | 101 +++++
+ arch/arm/boot/dts/armada-385.dtsi                  | 149 +++++++
+ arch/arm/boot/dts/armada-38x.dtsi                  | 345 ++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig                |   2 +
+ arch/arm/configs/mvebu_defconfig                   |   2 +
+ arch/arm/mach-mvebu/Kconfig                        |  37 +-
+ arch/arm/mach-mvebu/Makefile                       |   2 +-
+ .../mach-mvebu/{armada-370-xp.c => armada-mvebu.c} |  62 ++-
+ arch/arm/mach-mvebu/system-controller.c            |  14 +-
+ 17 files changed, 1397 insertions(+), 16 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-375.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-38x.txt
+ create mode 100644 arch/arm/boot/dts/armada-375-db.dts
+ create mode 100644 arch/arm/boot/dts/armada-375.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-380.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-385-db.dts
+ create mode 100644 arch/arm/boot/dts/armada-385.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-38x.dtsi
+ rename arch/arm/mach-mvebu/{armada-370-xp.c => armada-mvebu.c} (57%)
+
 -- 
 1.8.3.2
