@@ -1,33 +1,26 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Thu, 13 Feb 2014 12:22:55 -0600
-Subject: [PATCH 3/4] ARM: dts: OMAP4: Add IOMMU nodes
+Date: Thu, 13 Feb 2014 12:22:56 -0600
+Subject: [PATCH 4/4] ARM: dts: OMAP5: Add IOMMU nodes
 In-Reply-To: <1392315776-33197-1-git-send-email-s-anna@ti.com>
 References: <1392315776-33197-1-git-send-email-s-anna@ti.com>
-Message-ID: <1392315776-33197-4-git-send-email-s-anna@ti.com>
+Message-ID: <1392315776-33197-5-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Vaussard <florian.vaussard@epfl.ch>
+The IOMMU DT nodes have been added for the DSP and IPU
+subsystems. The MMUs in OMAP5 are identical to those in
+OMAP4, including the bus error back capability on IPU.
 
-Add the IOMMU nodes for the DSP and IPU subsystems. The external
-address space for DSP starts at 0x20000000 in OMAP4 compared to
-0x11000000 in OMAP3, and the addresses beyond 0xE0000000 are
-private address space for the Cortex-M3 cores in the IPU subsystem.
-The MMU within the IPU sub-system also supports a bus error back
-capability, not available on the DSP MMU.
-
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-[s-anna at ti.com: dma-window updates and bus error back addition]
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/boot/dts/omap4.dtsi | 17 +++++++++++++++++
+ arch/arm/boot/dts/omap5.dtsi | 17 +++++++++++++++++
  1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index d3f8a6e..1885f90 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -461,6 +461,23 @@
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index a72813a..a78fdaa 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -513,6 +513,23 @@
  			dma-names = "tx", "rx";
  		};
  
@@ -48,8 +41,8 @@ index d3f8a6e..1885f90 100644
 +			ti,iommu-bus-err-back;
 +		};
 +
- 		wdt2: wdt at 4a314000 {
- 			compatible = "ti,omap4-wdt", "ti,omap3-wdt";
- 			reg = <0x4a314000 0x80>;
+ 		keypad: keypad at 4ae1c000 {
+ 			compatible = "ti,omap4-keypad";
+ 			reg = <0x4ae1c000 0x400>;
 -- 
 1.8.5.3
