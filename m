@@ -1,42 +1,104 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 13 Feb 2014 11:52:30 -0800
-Subject: [PATCH v3] ARM: mm: report both sections from PMD
-Message-ID: <20140213195230.GA15275@www.outflux.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Feb 2014 20:01:12 +0000
+Subject: [PATCH] Fix uses of dma_max_pfn() when converting to a
+ limiting address
+In-Reply-To: <1392314821.2175.16.camel@dabdike.int.hansenpartnership.com>
+References: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
+ <1392310690.2175.13.camel@dabdike.int.hansenpartnership.com>
+ <20140213171117.GA30257@n2100.arm.linux.org.uk>
+ <1392314821.2175.16.camel@dabdike.int.hansenpartnership.com>
+Message-ID: <20140213200112.GF30257@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2-level page table systems, the PMD has 2 section entries. Report
-these, otherwise ARM_PTDUMP will miss reporting permission changes on
-odd section boundaries.
+On Thu, Feb 13, 2014 at 10:07:01AM -0800, James Bottomley wrote:
+> On Thu, 2014-02-13 at 17:11 +0000, Russell King - ARM Linux wrote:
+> > On Thu, Feb 13, 2014 at 08:58:10AM -0800, James Bottomley wrote:
+> > > This doesn't really look like the right fix.  You replaced dev->dma_mask
+> > > with a calculation on dev_max_pfn().  Since dev->dma_mask is always u64
+> > > and dev_max_pfn is supposed to be returning the pfn of the dma_mask, it
+> > > should unconditionally be 64 bits as well.  Either that or it should
+> > > return dma_addr_t.
+> > 
+> > My reasoning is that PFNs in the system are always of type "unsigned long"
+> > and therefore a function returning a pfn should have that type.  If we
+> > overflow a PFN fitting in an unsigned long, we have lots of places which
+> > need fixing.
+> 
+> It's not intuitive to people who need the dma mask that they're supposed
+> to use dma_max_pfn() << PAGE_SHIFT but now they have to worry about the
+> casting and, if they don't get it right, nothing will warn or tell them.
+> what about a new macro, say dma_max_mask(dev) that just returns
+> (u64)dma_max_pfn() << PAGE_SHIFT?
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
-v3:
- - re-reorganize, drop use of pmd_sect; suggested by Catalin Marinas.
-v2:
- - reorganize, suggested by Catalin Marinas.
----
- arch/arm/mm/dump.c |    3 +++
- 1 file changed, 3 insertions(+)
+This sounds like a good idea.
 
-diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
-index 2b342177f5de..61cc78ae9f21 100644
---- a/arch/arm/mm/dump.c
-+++ b/arch/arm/mm/dump.c
-@@ -264,6 +264,9 @@ static void walk_pmd(struct pg_state *st, pud_t *pud, unsigned long start)
- 			note_page(st, addr, 3, pmd_val(*pmd));
- 		else
- 			walk_pte(st, pmd, addr);
-+
-+		if (SECTION_SIZE < PMD_SIZE && pmd_large(pmd[1]))
-+			note_page(st, addr + SECTION_SIZE, 3, pmd_val(pmd[1]));
- 	}
- }
- 
+I've just been looking@places which do this << PAGE_SHIFT, and we
+have other places which suffer from this same bug all over the kernel,
+so maybe we actually need a pfn_to_addr() macro or similar so that
+people get this right in these other places too?  It appears to be
+quite a widespread problem.
+
+I'm surprised none of the below haven't already caused a problem.
+
+Thoughts?
+
+int __remove_pages(struct zone *zone, unsigned long phys_start_pfn,
+                 unsigned long nr_pages)
+{
+        resource_size_t start, size;
+
+        start = phys_start_pfn << PAGE_SHIFT;
+
+void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
+                unsigned long start_pfn, enum memmap_context context)
+{
+        unsigned long end_pfn = start_pfn + size;
+        unsigned long pfn;
+
+                /* The shift won't overflow because ZONE_NORMAL is below 4G. */
+                if (!is_highmem_idx(zone))
+                        set_page_address(page, __va(pfn << PAGE_SHIFT));
+
+void __init free_area_init_nodes(unsigned long *max_zone_pfn)
+{
+        unsigned long start_pfn, end_pfn;
+
+        for_each_mem_pfn_range(i, MAX_NUMNODES, &start_pfn, &end_pfn, &nid)
+                printk("  node %3d: [mem %#010lx-%#010lx]\n", nid,
+                       start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
+(thankfully, this one is just a printk).
+
+int vb2_get_contig_userptr(unsigned long vaddr, unsigned long size,
+                           struct vm_area_struct **res_vma, dma_addr_t *res_pa)
+{
+        unsigned long this_pfn, prev_pfn;
+        dma_addr_t pa = 0;
+
+                if (prev_pfn == 0)
+                        pa = this_pfn << PAGE_SHIFT;
+
+static pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+                                     unsigned long size, pgprot_t vma_prot)
+{
+#ifdef pgprot_noncached
+        phys_addr_t offset = pfn << PAGE_SHIFT;
+
+        if (uncached_access(file, offset))
+                return pgprot_noncached(vma_prot);
+#endif
+        return vma_prot;
+
+static int i810_insert_dcache_entries(struct agp_memory *mem, off_t pg_start,
+                                      int type)
+{
+        int i;
+
+        for (i = pg_start; i < (pg_start + mem->page_count); i++) {
+                dma_addr_t addr = i << PAGE_SHIFT;
+
+
 -- 
-1.7.9.5
-
-
--- 
-Kees Cook
-Chrome OS Security
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
