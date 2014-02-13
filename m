@@ -1,27 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Feb 2014 17:11:17 +0000
-Subject: [PATCH] Fix uses of dma_max_pfn() when converting to a
- limiting address
-In-Reply-To: <1392310690.2175.13.camel@dabdike.int.hansenpartnership.com>
-References: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
- <1392310690.2175.13.camel@dabdike.int.hansenpartnership.com>
-Message-ID: <20140213171117.GA30257@n2100.arm.linux.org.uk>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 13 Feb 2014 11:11:55 -0600
+Subject: [PATCH 5/5] iommu/arm-smmu: fix compilation issue when
+ !CONFIG_ARM_AMBA
+In-Reply-To: <20140213170408.GM13576@mudshark.cambridge.arm.com>
+References: <1391710173-4343-1-git-send-email-will.deacon@arm.com>
+ <1391710173-4343-6-git-send-email-will.deacon@arm.com>
+ <CAOZdJXW6tY=MjHGMa1EQtJayY=ToqiJOWsggCsEjfPzirUeUxg@mail.gmail.com>
+ <20140213170408.GM13576@mudshark.cambridge.arm.com>
+Message-ID: <52FCFCDB.5090907@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 08:58:10AM -0800, James Bottomley wrote:
-> This doesn't really look like the right fix.  You replaced dev->dma_mask
-> with a calculation on dev_max_pfn().  Since dev->dma_mask is always u64
-> and dev_max_pfn is supposed to be returning the pfn of the dma_mask, it
-> should unconditionally be 64 bits as well.  Either that or it should
-> return dma_addr_t.
+On 02/13/2014 11:04 AM, Will Deacon wrote:
 
-My reasoning is that PFNs in the system are always of type "unsigned long"
-and therefore a function returning a pfn should have that type.  If we
-overflow a PFN fitting in an unsigned long, we have lots of places which
-need fixing.
+> It's harmless to enable CONFIG_ARM_AMBA, even if you don't have any AMBA
+> devices in your SoC,
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Ah, ok.  It's seems obvious now, but somehow that didn't click.
+
+> it just makes your binary a bit bigger because you're
+> compiling in code that you don't need. Instead, you might elect to set
+> CONFIG_ARM_AMBA=n, at which point the arm-smmu driver will fail to build
+> without this patch.
+
+Ok, thanks.  We discovered the same problem internally, and had the same 
+solution, but during code reviews some concerns were raised.
