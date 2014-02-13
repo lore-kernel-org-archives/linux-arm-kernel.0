@@ -1,212 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 13 Feb 2014 09:10:54 +0100
-Subject: [PATCH v4 3/8] at91: dt: Add at91sam9261 dt SoC support
-In-Reply-To: <CACh+v5MgYB+L6vpektjAE1yTH=dvjnyP1CjJeA7vG_yOyxFkgg@mail.gmail.com>
-References: <1392199607-27452-1-git-send-email-jjhiblot@traphandler.com>	<1392199607-27452-4-git-send-email-jjhiblot@traphandler.com>	<20140212172844.GE11498@piout.net>
- <CACh+v5MgYB+L6vpektjAE1yTH=dvjnyP1CjJeA7vG_yOyxFkgg@mail.gmail.com>
-Message-ID: <52FC7E0E.2010503@atmel.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 13 Feb 2014 17:13:50 +0900
+Subject: [PATCH 01/12] ARM: shmobile: Use 64-bit dma_addr_t on r8a7790/r8a7791
+In-Reply-To: <cover.1392277789.git.horms+renesas@verge.net.au>
+References: <cover.1392277789.git.horms+renesas@verge.net.au>
+Message-ID: <2b2e7c65166aa4a7d6ca0352b249b38b45680d45.1392278855.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/02/2014 20:47, Jean-Jacques Hiblot :
-> Hi Alexandre,
-> 
-> 2014-02-12 18:28 GMT+01:00 Alexandre Belloni
-> <alexandre.belloni@free-electrons.com>:
->> Hi,
->>
->> On 12/02/2014 at 11:06:42 +0100, Jean-Jacques Hiblot wrote :
->>> This patch adds support for the Device Tree on a sam9261-based platform
->>>
->>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->>> ---
->>>  arch/arm/boot/dts/at91sam9261.dtsi | 740 +++++++++++++++++++++++++++++++++++++
->>>  arch/arm/mach-at91/at91sam9261.c   |  17 +
->>>  2 files changed, 757 insertions(+)
->>>  create mode 100644 arch/arm/boot/dts/at91sam9261.dtsi
->>
->> [...]
->>
->>> +
->>> +             apb {
->>> +                     compatible = "simple-bus";
->>> +                     #address-cells = <1>;
->>> +                     #size-cells = <1>;
->>> +                     ranges;
->>> +
->>> +                     tcb0: timer at fffa0000 {
->>> +                             compatible = "atmel,at91rm9200-tcb";
->>> +                             reg = <0xfffa0000 0x100>;
->>> +                             interrupts = < 17 IRQ_TYPE_LEVEL_HIGH 0
->>> +                                     18 IRQ_TYPE_LEVEL_HIGH 0
->>> +                                     19 IRQ_TYPE_LEVEL_HIGH 0
->>> +                                     >;
->>> +                             clocks = <&tc0_clk>, <&tc1_clk>, <&tc2_clk>;
->>> +                             clock-names = "t0_clk", "t1_clk", "t2_clk";
->>> +                     };
->>> +
->>> +                     usb1: gadget at fffa4000 {
->>> +                             compatible = "atmel,at91rm9200-udc";
->>> +                             reg = <0xfffa4000 0x4000>;
->>> +                             interrupts = <10 IRQ_TYPE_LEVEL_HIGH 2>;
->>> +                             clocks = <&usb>, <&udc_clk>, <&udpck>;
->>> +                             clock-names = "usb_clk", "udc_clk", "udpck";
->>> +                             status = "disabled";
->>> +                     };
->>> +
->>> +                     mmc0: mmc at fffa8000 {
->>> +                             compatible = "atmel,hsmci";
->>> +                             reg = <0xfffa8000 0x600>;
->>> +                             interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
->>> +                             pinctrl-names = "default";
->>> +                             pinctrl-0 = <&pinctrl_mmc0_clk>, <&pinctrl_mmc0_slot0_cmd_dat0>, <&pinctrl_mmc0_slot0_dat1_3>;
->>> +                             #address-cells = <1>;
->>> +                             #size-cells = <0>;
->>> +                             clocks = <&mci0_clk>;
->>> +                             clock-names = "mci_clk";
->>> +                             status = "disabled";
->>> +                     };
->>> +
->>> +                     i2c0: i2c at fffac000 {
->>> +                             compatible = "atmel,at91sam9261-i2c";
->>> +                             pinctrl-names = "default";
->>> +                             pinctrl-0 = <&pinctrl_i2c_twi>;
->>> +                             reg = <0xfffac000 0x100>;
->>> +                             interrupts = <11 IRQ_TYPE_LEVEL_HIGH 6>;
->>> +                             #address-cells = <1>;
->>> +                             #size-cells = <0>;
->>> +                             clocks = <&twi0_clk>;
->>> +                             status = "disabled";
->>> +                     };
->>> +
->>> +                     usart0: serial at fffb0000 {
->>> +                             compatible = "atmel,at91sam9260-usart";
->>> +                             reg = <0xfffb0000 0x200>;
->>> +                             interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
->>> +                             atmel,use-dma-rx;
->>> +                             atmel,use-dma-tx;
->>> +                             pinctrl-names = "default";
->>> +                             pinctrl-0 = <&pinctrl_usart0>;
->>> +                             clocks = <&usart0_clk>;
->>> +                             clock-names = "usart";
->>> +                             status = "disabled";
->>> +                     };
->>> +
->>> +                     usart1: serial at fffb4000 {
->>> +                             compatible = "atmel,at91sam9260-usart";
->>> +                             reg = <0xfffb4000 0x200>;
->>> +                             interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
->>> +                             atmel,use-dma-rx;
->>> +                             atmel,use-dma-tx;
->>> +                             pinctrl-names = "default";
->>> +                             pinctrl-0 = <&pinctrl_usart1>;
->>> +                             clocks = <&usart1_clk>;
->>> +                             clock-names = "usart";
->>> +                             status = "disabled";
->>> +                     };
->>> +
->>> +                     usart2: serial at fffb8000{
->>> +                             compatible = "atmel,at91sam9260-usart";
->>> +                             reg = <0xfffb8000 0x200>;
->>> +                             interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
->>> +                             atmel,use-dma-rx;
->>> +                             atmel,use-dma-tx;
->>> +                             pinctrl-names = "default";
->>> +                             pinctrl-0 = <&pinctrl_usart2>;
->>> +                             clocks = <&usart2_clk>;
->>> +                             clock-names = "usart";
->>> +                             status = "disabled";
->>> +                     };
->>> +
->>> +                     ssc0: ssc at fffbc000 {
->>> +                             compatible = "atmel,at91rm9200-ssc";
->>> +                             reg = <0xfffbc000 0x4000>;
->>> +                             interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
->>> +                             pinctrl-names = "default";
->>> +                             pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
->>> +                             status = "disabled";
->>> +                     };
->>> +
->>> +                     ssc1: ssc at fffc0000 {
->>> +                             compatible = "atmel,at91rm9200-ssc";
->>> +                             reg = <0xfffc0000 0x4000>;
->>> +                             interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
->>> +                             pinctrl-names = "default";
->>> +                             pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
->>> +                             status = "disabled";
->>> +                     };
->>> +
->>> +                     spi0: spi at fffc8000 {
->>> +                             #address-cells = <1>;
->>> +                             #size-cells = <0>;
->>> +                             compatible = "atmel,at91rm9200-spi";
->>> +                             reg = <0xfffc8000 0x200>;
->>> +                             cs-gpios = <0>, <0>, <0>, <0>;
->>> +                             interrupts = <12 IRQ_TYPE_LEVEL_HIGH 3>;
->>> +                             pinctrl-names = "default";
->>> +                             pinctrl-0 = <&pinctrl_spi0>;
->>> +                             clocks = <&spi0_clk>;
->>> +                             clock-names = "spi_clk";
->>> +                             status = "disabled";
->>> +                     };
->>> +
->>> +                     spi1: spi at fffcc000 {
->>> +                             #address-cells = <1>;
->>> +                             #size-cells = <0>;
->>> +                             compatible = "atmel,at91rm9200-spi";
->>> +                             reg = <0xfffcc000 0x200>;
->>> +                             interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
->>> +                             pinctrl-names = "default";
->>> +                             pinctrl-0 = <&pinctrl_spi1>;
->>> +                             clocks = <&spi1_clk>;
->>> +                             clock-names = "spi_clk";
->>> +                             status = "disabled";
->>> +                     };
->>> +
->>> +                     ramc: ramc at ffffea00 {
->>> +                             compatible = "atmel,at91sam9260-sdramc";
->>> +                             reg = <0xffffea00 0x200>;
->>> +                     };
->>> +
->>
->> You probably copied/pasted it but according to the block diagram, the
->> sdram controller is not under the apb.
-> You're right I copied/pasted :o) But the addresses of the registers
-> look like typical APB addresses.
-> AFAIK all the registers of this SOC are accessed through the APB
-> (except for OHCI and LCDC)
+From: Magnus Damm <damm@opensource.se>
 
-Yes, that is the point: if the register bank appears as an APB address,
-I place it on the APB bus.
-The other master interfaces (on AHB) are the ones that the IP uses, not
-us from the CPU point of view...
+Some on-chip devices on r8a7790 and r8a7791 can do
+bus mastering and access more than 32-bits of address
+space. Select ARCH_DMA_ADDR_T_64BIT when LPAE is set
+in case of multiplatform and legacy SoC support.
 
-So I think that Jean-Jacques DT is okay concerning this.
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-> So probably the real question here is what is the sense of the bus
-> hierarchy in cases where a controller is connected to several buses
-> (APB for registers, AHB/matrix for other purpose) ?
-> As I don't have any idea on how to handle this, I choose to copy/paste.
-> 
->>
->>> +                     matrix: matrix at ffffee00 {
->>> +                             compatible = "atmel,at91sam9261-bus-matrix";
->>> +                             reg = <0xffffee00 0x200>;
->>> +                     };
->>> +
->>
->> Same here, the apb is actually under the bus matrix.
->>
->> I don't know whether it can be represented another way though.
->>
->>
->> --
->> Alexandre Belloni, Free Electrons
->> Embedded Linux, Kernel and Android engineering
->> http://free-electrons.com
-> 
-> 
-
-
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 3386406..0272cd7 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -13,6 +13,7 @@ config ARCH_SHMOBILE_MULTI
+ 	select ARM_GIC
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	select MIGHT_HAVE_PCI
++	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 	select NO_IOPORT
+ 	select PINCTRL
+ 	select ARCH_REQUIRE_GPIOLIB
+@@ -123,6 +124,7 @@ config ARCH_R8A7790
+ 	select MIGHT_HAVE_PCI
+ 	select SH_CLK_CPG
+ 	select RENESAS_IRQC
++	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 
+ config ARCH_R8A7791
+ 	bool "R-Car M2 (R8A77910)"
+@@ -132,6 +134,7 @@ config ARCH_R8A7791
+ 	select MIGHT_HAVE_PCI
+ 	select SH_CLK_CPG
+ 	select RENESAS_IRQC
++	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 
+ config ARCH_EMEV2
+ 	bool "Emma Mobile EV2"
 -- 
-Nicolas Ferre
+1.8.5.2
