@@ -1,32 +1,32 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu, 13 Feb 2014 11:25:14 +0100
-Subject: [PATCH v2 2/4] ARM: dts: omap3-tobi: Use the correct vendor prefix
+Date: Thu, 13 Feb 2014 11:25:16 +0100
+Subject: [PATCH v2 4/4] Documentation: dt: OMAP: Update Overo/Tobi
 In-Reply-To: <1392287116-4548-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1392287116-4548-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1392287116-4548-3-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1392287116-4548-5-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gumstix is the correct vendor for all Overo related products.
+Update the compatible string for Overo/Tobi to reflect the latest
+changes.
 
-Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/boot/dts/omap3-tobi.dts | 2 +-
+ Documentation/devicetree/bindings/arm/omap/omap.txt | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/omap3-tobi.dts b/arch/arm/boot/dts/omap3-tobi.dts
-index 0e3b8bf..c742afa 100644
---- a/arch/arm/boot/dts/omap3-tobi.dts
-+++ b/arch/arm/boot/dts/omap3-tobi.dts
-@@ -17,7 +17,7 @@
+diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+index 34dc40c..af9b4a0 100644
+--- a/Documentation/devicetree/bindings/arm/omap/omap.txt
++++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+@@ -91,7 +91,7 @@ Boards:
+   compatible = "ti,omap3-beagle", "ti,omap3"
  
- / {
- 	model = "TI OMAP3 Gumstix Overo on Tobi";
--	compatible = "ti,omap3-tobi", "ti,omap3-overo", "ti,omap36xx", "ti,omap3";
-+	compatible = "gumstix,omap3-tobi", "gumstix,omap3-overo", "ti,omap36xx", "ti,omap3";
+ - OMAP3 Tobi with Overo : Commercial expansion board with daughter board
+-  compatible = "ti,omap3-tobi", "ti,omap3-overo", "ti,omap3"
++  compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap3"
  
- 	leds {
- 		compatible = "gpio-leds";
+ - OMAP4 SDP : Software Development Board
+   compatible = "ti,omap4-sdp", "ti,omap4430"
 -- 
 1.8.1.2
