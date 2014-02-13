@@ -1,52 +1,96 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Feb 2014 17:03:49 +0900
-Subject: [PATCH 02/11] ARM: shmobile: Koelsch: pass Ether PHY IRQ
+Date: Thu, 13 Feb 2014 17:03:50 +0900
+Subject: [PATCH 03/11] ARM: shmobile: koelsch: Add I2C support
 In-Reply-To: <cover.1392276547.git.horms+renesas@verge.net.au>
 References: <cover.1392276547.git.horms+renesas@verge.net.au>
-Message-ID: <29d9f010d7103f2b83ce1c25999a6f3a1e57f5e2.1392276547.git.horms+renesas@verge.net.au>
+Message-ID: <12c1d5a54e874f26d08fa27f13f63ef7ccf38a2a.1392276547.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Valentine Barshak <valentine.barshak@cogentembedded.com>
 
-Pass Ether's PHY IRQ (which is IRQC's IRQ0) to the 'sh_eth' driver. Set the IRQ
-trigger type to be low-level as per the Micrel PHY driver's setup.
+This adds I2C[1245] busses support to Koelsch board.
+I2C[03] do not have any slave devices connected and
+are not used because of the following:
+* I2C0 pins are multiplexed with LBSC pins;
+* I2C3 pins are multiplexed with EtherMAC and VIN0 pins.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Magnus Damm <magnus.damm@gmail.com>
+Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-koelsch.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-shmobile/board-koelsch.c | 46 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
 diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-index 2ab5c75..1ec3b91 100644
+index 1ec3b91..2741dba 100644
 --- a/arch/arm/mach-shmobile/board-koelsch.c
 +++ b/arch/arm/mach-shmobile/board-koelsch.c
-@@ -23,6 +23,7 @@
- #include <linux/gpio.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
-+#include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/leds.h>
- #include <linux/phy.h>
-@@ -92,6 +93,7 @@ static void __init koelsch_add_du_device(void)
- /* Ether */
- static const struct sh_eth_plat_data ether_pdata __initconst = {
- 	.phy			= 0x1,
-+	.phy_irq		= irq_pin(0),
- 	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
- 	.phy_interface		= PHY_INTERFACE_MODE_RMII,
- 	.ether_link_active_low	= 1,
-@@ -232,6 +234,8 @@ static void __init koelsch_init(void)
- {
- 	koelsch_add_standard_devices();
+@@ -165,6 +165,38 @@ static const struct platform_device_info sata0_info __initconst = {
+ 	.dma_mask	= DMA_BIT_MASK(32),
+ };
  
-+	irq_set_irq_type(irq_pin(0), IRQ_TYPE_LEVEL_LOW);
++/* I2C */
++static const struct resource i2c_resources[] __initconst = {
++	/* I2C0 */
++	DEFINE_RES_MEM(0xE6508000, 0x40),
++	DEFINE_RES_IRQ(gic_spi(287)),
++	/* I2C1 */
++	DEFINE_RES_MEM(0xE6518000, 0x40),
++	DEFINE_RES_IRQ(gic_spi(288)),
++	/* I2C2 */
++	DEFINE_RES_MEM(0xE6530000, 0x40),
++	DEFINE_RES_IRQ(gic_spi(286)),
++	/* I2C3 */
++	DEFINE_RES_MEM(0xE6540000, 0x40),
++	DEFINE_RES_IRQ(gic_spi(290)),
++	/* I2C4 */
++	DEFINE_RES_MEM(0xE6520000, 0x40),
++	DEFINE_RES_IRQ(gic_spi(19)),
++	/* I2C5 */
++	DEFINE_RES_MEM(0xE6528000, 0x40),
++	DEFINE_RES_IRQ(gic_spi(20)),
++};
 +
- 	if (IS_ENABLED(CONFIG_PHYLIB))
- 		phy_register_fixup_for_id("r8a7791-ether-ff:01",
- 					  koelsch_ksz8041_fixup);
++static void __init koelsch_add_i2c(unsigned idx)
++{
++	unsigned res_idx = idx * 2;
++
++	BUG_ON(res_idx >= ARRAY_SIZE(i2c_resources));
++
++	platform_device_register_simple("i2c-rcar_gen2", idx,
++					i2c_resources + res_idx, 2);
++}
++
+ static const struct pinctrl_map koelsch_pinctrl_map[] = {
+ 	/* DU */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7791", "pfc-r8a7791",
+@@ -188,6 +220,15 @@ static const struct pinctrl_map koelsch_pinctrl_map[] = {
+ 	/* SCIF1 (CN20: DEBUG SERIAL1) */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.7", "pfc-r8a7791",
+ 				  "scif1_data_d", "scif1"),
++	/* I2C1 */
++	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar_gen2.1", "pfc-r8a7791",
++				  "i2c1_e", "i2c1"),
++	/* I2C2 */
++	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar_gen2.2", "pfc-r8a7791",
++				  "i2c2", "i2c2"),
++	/* I2C4 */
++	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar_gen2.4", "pfc-r8a7791",
++				  "i2c4_c", "i2c4"),
+ };
+ 
+ static void __init koelsch_add_standard_devices(void)
+@@ -211,6 +252,11 @@ static void __init koelsch_add_standard_devices(void)
+ 	koelsch_add_du_device();
+ 
+ 	platform_device_register_full(&sata0_info);
++
++	koelsch_add_i2c(1);
++	koelsch_add_i2c(2);
++	koelsch_add_i2c(4);
++	koelsch_add_i2c(5);
+ }
+ 
+ /*
 -- 
 1.8.5.2
