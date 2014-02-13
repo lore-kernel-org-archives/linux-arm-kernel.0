@@ -1,34 +1,26 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Feb 2014 21:51:00 +0100
-Subject: [PATCH 0/5] mv64xxx updates
-In-Reply-To: <1392323793-4125-1-git-send-email-wsa@the-dreams.de>
-References: <20140213094117.GA3934@katana>
- <1392323793-4125-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <20140213215100.1d714c4b@skate>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 13 Feb 2014 19:41:21 +0100
+Subject: [PATCH] PCI: imx6: Fix link_up detection
+In-Reply-To: <52FD0F1A.4000208@boundarydevices.com>
+References: <1392190075-23204-1-git-send-email-s.hauer@pengutronix.de>
+ <201402120836.16221.marex@denx.de> <52FD0F1A.4000208@boundarydevices.com>
+Message-ID: <201402131941.21883.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfram Sang,
-
-On Thu, 13 Feb 2014 21:36:28 +0100, Wolfram Sang wrote:
-> So, this is a series I came up with trying to fix the issue found by Kevin.
-> Patches 1+2 are hopefully fixing the bug (in theory, I don't have the HW).
-> Patches 3-5 are RFC, and if patch 3 actually works (see the CHECKME), then 4+5
-> are further cleanup possibilities. And there is still more potential, I mainly
-> wanted to give some inspiration and awareness that the driver could need some
-> more love. Please test at least 1+2, comments to 3-5 very welcome.
+On Thursday, February 13, 2014 at 07:29:46 PM, Troy Kisky wrote:
+> On 2/12/2014 12:36 AM, Marek Vasut wrote:
+> > On Wednesday, February 12, 2014 at 08:27:55 AM, Sascha Hauer wrote:
+> > 
+> > +CC Troy Kisky, since I think he submitted something similar some time
+> > ago already.
+> > 
+> > Otherwise I agree this happens.
 > 
-> Sorry for the delay, I got distracted by an NMI.
+> Sorry, I haven't submitted this yet, but was planning to today. Here's
+> what would have been sent.
 
-I'm adding Maxime Ripard in Cc, since he is the maintainer of the
-Allwinner platform, which also uses this I2C driver. So I guess he
-would like to be notified of such changes in order to test that the
-driver still works for him.
+Release early, release often ... ;-)
 
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Best regards,
+Marek Vasut
