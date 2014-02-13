@@ -1,18 +1,21 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 13 Feb 2014 14:57:21 +0900
-Subject: [PATCH] ARM: shmobile: r8a7778 dtsi: Remove duplicate i2c nodes
-In-Reply-To: <1392039739-22571-1-git-send-email-geert+renesas@linux-m68k.org>
-References: <1392039739-22571-1-git-send-email-geert+renesas@linux-m68k.org>
-Message-ID: <20140213055721.GG17183@verge.net.au>
+Date: Thu, 13 Feb 2014 15:02:56 +0900
+Subject: [PATCH 0/2] Add Ether DT support for R8A7790/Lager reference board
+In-Reply-To: <201402070054.39989.sergei.shtylyov@cogentembedded.com>
+References: <201402070054.39989.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20140213060256.GH17183@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 02:42:19PM +0100, Geert Uytterhoeven wrote:
-> "ARM: shmobile: r8a7778: add I2C support on DTSI" was applied twice:
+On Fri, Feb 07, 2014 at 12:54:38AM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
->     commit ae4273ec7b25c8b9c895a4aae31f2fced980b7bf
->     commit 3acb51b9215bd99da403ecf8200f8425176b1926
+>    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+> 'renesas-devel-v3.14-rc1-20140206v2' tag. Here we add the Ether device tree
+> support working on the R8A7790/Lager reference board. The patchset requires the
+> 'sh_eth' driver device tree support posted earlier in order to work.
 > 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> [1/2] ARM: shmobile: r8a7790: add Ether DT support
+> [2/2] ARM: shmobile: lager: add Ether DT support
 
-Thanks, I have queued this up.
+Thanks. Please repost this series once the bindings have been accepted.
