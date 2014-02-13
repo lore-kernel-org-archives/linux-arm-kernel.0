@@ -1,339 +1,144 @@
-From: jean.pihet@linaro.org (Jean Pihet)
-Date: Thu, 13 Feb 2014 18:06:33 +0100
-Subject: [PATCH] perf: ARM64: wire up perf_regs and unwind support
-Message-ID: <1392311193-21214-1-git-send-email-jean.pihet@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 13 Feb 2014 18:10:47 +0100
+Subject: [PATCH v3 00/13] pinctrl: mvebu: restructure resource allocation
+In-Reply-To: <20140213175914.205803a6@skate>
+References: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140213172620.76e760ba@skate> <52FCF59E.3090100@gmail.com>
+ <20140213175914.205803a6@skate>
+Message-ID: <52FCFC97.8050200@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch hooks in the perf_regs and libunwind code for ARM64.
-The tools/perf/arch/arm64 is created; it contains the arch specific
-code for DWARF unwinding.
+On 02/13/14 17:59, Thomas Petazzoni wrote:
+> On Thu, 13 Feb 2014 17:41:02 +0100, Sebastian Hesselbarth wrote:
+>>> Thanks again for working on this! I have boot tested this successfully
+>>> on an Armada XP platform, and it seems to behave normally, the debugfs
+>>> pinctrl contents make sense.
+>>
+>> I guess this is a Tested-by ?
+>
+> Yes. My tests were admittedly fairly light, but I believe good enough :)
 
-Signed-off-by: Jean Pihet <jean.pihet@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- tools/perf/arch/arm64/Makefile                |  7 +++
- tools/perf/arch/arm64/include/perf_regs.h     | 88 +++++++++++++++++++++++++++
- tools/perf/arch/arm64/util/dwarf-regs.c       | 80 ++++++++++++++++++++++++
- tools/perf/arch/arm64/util/unwind-libunwind.c | 82 +++++++++++++++++++++++++
- tools/perf/config/Makefile                    |  8 ++-
- 5 files changed, 264 insertions(+), 1 deletion(-)
- create mode 100644 tools/perf/arch/arm64/Makefile
- create mode 100644 tools/perf/arch/arm64/include/perf_regs.h
- create mode 100644 tools/perf/arch/arm64/util/dwarf-regs.c
- create mode 100644 tools/perf/arch/arm64/util/unwind-libunwind.c
+Ok.
 
-diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
-new file mode 100644
-index 0000000..67e9b3d
---- /dev/null
-+++ b/tools/perf/arch/arm64/Makefile
-@@ -0,0 +1,7 @@
-+ifndef NO_DWARF
-+PERF_HAVE_DWARF_REGS := 1
-+LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/dwarf-regs.o
-+endif
-+ifndef NO_LIBUNWIND
-+LIB_OBJS += $(OUTPUT)arch/$(ARCH)/util/unwind-libunwind.o
-+endif
-diff --git a/tools/perf/arch/arm64/include/perf_regs.h b/tools/perf/arch/arm64/include/perf_regs.h
-new file mode 100644
-index 0000000..2359546
---- /dev/null
-+++ b/tools/perf/arch/arm64/include/perf_regs.h
-@@ -0,0 +1,88 @@
-+#ifndef ARCH_PERF_REGS_H
-+#define ARCH_PERF_REGS_H
-+
-+#include <stdlib.h>
-+#include "../../util/types.h"
-+#include <asm/perf_regs.h>
-+
-+#define PERF_REGS_MASK	((1ULL << PERF_REG_ARM64_MAX) - 1)
-+#define PERF_REG_IP	PERF_REG_ARM64_PC
-+#define PERF_REG_SP	PERF_REG_ARM64_SP
-+
-+static inline const char *perf_reg_name(int id)
-+{
-+	switch (id) {
-+	case PERF_REG_ARM64_X0:
-+		return "x0";
-+	case PERF_REG_ARM64_X1:
-+		return "x1";
-+	case PERF_REG_ARM64_X2:
-+		return "x2";
-+	case PERF_REG_ARM64_X3:
-+		return "x3";
-+	case PERF_REG_ARM64_X4:
-+		return "x4";
-+	case PERF_REG_ARM64_X5:
-+		return "x5";
-+	case PERF_REG_ARM64_X6:
-+		return "x6";
-+	case PERF_REG_ARM64_X7:
-+		return "x7";
-+	case PERF_REG_ARM64_X8:
-+		return "x8";
-+	case PERF_REG_ARM64_X9:
-+		return "x9";
-+	case PERF_REG_ARM64_X10:
-+		return "x10";
-+	case PERF_REG_ARM64_X11:
-+		return "x11";
-+	case PERF_REG_ARM64_X12:
-+		return "x12";
-+	case PERF_REG_ARM64_X13:
-+		return "x13";
-+	case PERF_REG_ARM64_X14:
-+		return "x14";
-+	case PERF_REG_ARM64_X15:
-+		return "x15";
-+	case PERF_REG_ARM64_X16:
-+		return "x16";
-+	case PERF_REG_ARM64_X17:
-+		return "x17";
-+	case PERF_REG_ARM64_X18:
-+		return "x18";
-+	case PERF_REG_ARM64_X19:
-+		return "x19";
-+	case PERF_REG_ARM64_X20:
-+		return "x20";
-+	case PERF_REG_ARM64_X21:
-+		return "x21";
-+	case PERF_REG_ARM64_X22:
-+		return "x22";
-+	case PERF_REG_ARM64_X23:
-+		return "x23";
-+	case PERF_REG_ARM64_X24:
-+		return "x24";
-+	case PERF_REG_ARM64_X25:
-+		return "x25";
-+	case PERF_REG_ARM64_X26:
-+		return "x26";
-+	case PERF_REG_ARM64_X27:
-+		return "x27";
-+	case PERF_REG_ARM64_X28:
-+		return "x28";
-+	case PERF_REG_ARM64_X29:
-+		return "x29";
-+	case PERF_REG_ARM64_SP:
-+		return "sp";
-+	case PERF_REG_ARM64_LR:
-+		return "lr";
-+	case PERF_REG_ARM64_PC:
-+		return "pc";
-+	default:
-+		return NULL;
-+	}
-+
-+	return NULL;
-+}
-+
-+#endif /* ARCH_PERF_REGS_H */
-diff --git a/tools/perf/arch/arm64/util/dwarf-regs.c b/tools/perf/arch/arm64/util/dwarf-regs.c
-new file mode 100644
-index 0000000..d49efeb
---- /dev/null
-+++ b/tools/perf/arch/arm64/util/dwarf-regs.c
-@@ -0,0 +1,80 @@
-+/*
-+ * Mapping of DWARF debug register numbers into register names.
-+ *
-+ * Copyright (C) 2010 Will Deacon, ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <stddef.h>
-+#include <dwarf-regs.h>
-+
-+struct pt_regs_dwarfnum {
-+	const char *name;
-+	unsigned int dwarfnum;
-+};
-+
-+#define STR(s) #s
-+#define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
-+#define GPR_DWARFNUM_NAME(num) \
-+	{.name = STR(%x##num), .dwarfnum = num}
-+#define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
-+
-+/*
-+ * Reference:
-+ * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0057b/IHI0057B_aadwarf64.pdf
-+ */
-+static const struct pt_regs_dwarfnum regdwarfnum_table[] = {
-+	GPR_DWARFNUM_NAME(0),
-+	GPR_DWARFNUM_NAME(1),
-+	GPR_DWARFNUM_NAME(2),
-+	GPR_DWARFNUM_NAME(3),
-+	GPR_DWARFNUM_NAME(4),
-+	GPR_DWARFNUM_NAME(5),
-+	GPR_DWARFNUM_NAME(6),
-+	GPR_DWARFNUM_NAME(7),
-+	GPR_DWARFNUM_NAME(8),
-+	GPR_DWARFNUM_NAME(9),
-+	GPR_DWARFNUM_NAME(10),
-+	GPR_DWARFNUM_NAME(11),
-+	GPR_DWARFNUM_NAME(12),
-+	GPR_DWARFNUM_NAME(13),
-+	GPR_DWARFNUM_NAME(14),
-+	GPR_DWARFNUM_NAME(15),
-+	GPR_DWARFNUM_NAME(16),
-+	GPR_DWARFNUM_NAME(17),
-+	GPR_DWARFNUM_NAME(18),
-+	GPR_DWARFNUM_NAME(19),
-+	GPR_DWARFNUM_NAME(20),
-+	GPR_DWARFNUM_NAME(21),
-+	GPR_DWARFNUM_NAME(22),
-+	GPR_DWARFNUM_NAME(23),
-+	GPR_DWARFNUM_NAME(24),
-+	GPR_DWARFNUM_NAME(25),
-+	GPR_DWARFNUM_NAME(26),
-+	GPR_DWARFNUM_NAME(27),
-+	GPR_DWARFNUM_NAME(28),
-+	GPR_DWARFNUM_NAME(29),
-+	REG_DWARFNUM_NAME("%lr", 30),
-+	REG_DWARFNUM_NAME("%sp", 31),
-+	REG_DWARFNUM_END,
-+};
-+
-+/**
-+ * get_arch_regstr() - lookup register name from it's DWARF register number
-+ * @n:	the DWARF register number
-+ *
-+ * get_arch_regstr() returns the name of the register in struct
-+ * regdwarfnum_table from it's DWARF register number. If the register is not
-+ * found in the table, this returns NULL;
-+ */
-+const char *get_arch_regstr(unsigned int n)
-+{
-+	const struct pt_regs_dwarfnum *roff;
-+	for (roff = regdwarfnum_table; roff->name != NULL; roff++)
-+		if (roff->dwarfnum == n)
-+			return roff->name;
-+	return NULL;
-+}
-diff --git a/tools/perf/arch/arm64/util/unwind-libunwind.c b/tools/perf/arch/arm64/util/unwind-libunwind.c
-new file mode 100644
-index 0000000..436ee43
---- /dev/null
-+++ b/tools/perf/arch/arm64/util/unwind-libunwind.c
-@@ -0,0 +1,82 @@
-+
-+#include <errno.h>
-+#include <libunwind.h>
-+#include "perf_regs.h"
-+#include "../../util/unwind.h"
-+
-+int libunwind__arch_reg_id(int regnum)
-+{
-+	switch (regnum) {
-+	case UNW_AARCH64_X0:
-+		return PERF_REG_ARM64_X0;
-+	case UNW_AARCH64_X1:
-+		return PERF_REG_ARM64_X1;
-+	case UNW_AARCH64_X2:
-+		return PERF_REG_ARM64_X2;
-+	case UNW_AARCH64_X3:
-+		return PERF_REG_ARM64_X3;
-+	case UNW_AARCH64_X4:
-+		return PERF_REG_ARM64_X4;
-+	case UNW_AARCH64_X5:
-+		return PERF_REG_ARM64_X5;
-+	case UNW_AARCH64_X6:
-+		return PERF_REG_ARM64_X6;
-+	case UNW_AARCH64_X7:
-+		return PERF_REG_ARM64_X7;
-+	case UNW_AARCH64_X8:
-+		return PERF_REG_ARM64_X8;
-+	case UNW_AARCH64_X9:
-+		return PERF_REG_ARM64_X9;
-+	case UNW_AARCH64_X10:
-+		return PERF_REG_ARM64_X10;
-+	case UNW_AARCH64_X11:
-+		return PERF_REG_ARM64_X11;
-+	case UNW_AARCH64_X12:
-+		return PERF_REG_ARM64_X12;
-+	case UNW_AARCH64_X13:
-+		return PERF_REG_ARM64_X13;
-+	case UNW_AARCH64_X14:
-+		return PERF_REG_ARM64_X14;
-+	case UNW_AARCH64_X15:
-+		return PERF_REG_ARM64_X15;
-+	case UNW_AARCH64_X16:
-+		return PERF_REG_ARM64_X16;
-+	case UNW_AARCH64_X17:
-+		return PERF_REG_ARM64_X17;
-+	case UNW_AARCH64_X18:
-+		return PERF_REG_ARM64_X18;
-+	case UNW_AARCH64_X19:
-+		return PERF_REG_ARM64_X19;
-+	case UNW_AARCH64_X20:
-+		return PERF_REG_ARM64_X20;
-+	case UNW_AARCH64_X21:
-+		return PERF_REG_ARM64_X21;
-+	case UNW_AARCH64_X22:
-+		return PERF_REG_ARM64_X22;
-+	case UNW_AARCH64_X23:
-+		return PERF_REG_ARM64_X23;
-+	case UNW_AARCH64_X24:
-+		return PERF_REG_ARM64_X24;
-+	case UNW_AARCH64_X25:
-+		return PERF_REG_ARM64_X25;
-+	case UNW_AARCH64_X26:
-+		return PERF_REG_ARM64_X26;
-+	case UNW_AARCH64_X27:
-+		return PERF_REG_ARM64_X27;
-+	case UNW_AARCH64_X28:
-+		return PERF_REG_ARM64_X28;
-+	case UNW_AARCH64_X29:
-+		return PERF_REG_ARM64_X29;
-+	case UNW_AARCH64_X30:
-+		return PERF_REG_ARM64_LR;
-+	case UNW_AARCH64_SP:
-+		return PERF_REG_ARM64_SP;
-+	case UNW_AARCH64_PC:
-+		return PERF_REG_ARM64_PC;
-+	default:
-+		pr_err("unwind: invalid reg id %d\n", regnum);
-+		return -EINVAL;
-+	}
-+
-+	return -EINVAL;
-+}
-diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
-index 1686583..2e3a19e 100644
---- a/tools/perf/config/Makefile
-+++ b/tools/perf/config/Makefile
-@@ -29,11 +29,17 @@ ifeq ($(ARCH),x86)
-   endif
-   NO_PERF_REGS := 0
- endif
-+
- ifeq ($(ARCH),arm)
-   NO_PERF_REGS := 0
-   LIBUNWIND_LIBS = -lunwind -lunwind-arm
- endif
- 
-+ifeq ($(ARCH),arm64)
-+  NO_PERF_REGS := 0
-+  LIBUNWIND_LIBS = -lunwind -lunwind-aarch64
-+endif
-+
- ifeq ($(LIBUNWIND_LIBS),)
-   NO_LIBUNWIND := 1
- else
-@@ -327,7 +333,7 @@ ifndef NO_LIBUNWIND
-     msg := $(warning No libunwind found, disabling post unwind support. Please install libunwind-dev[el] >= 1.1);
-     NO_LIBUNWIND := 1
-   else
--    ifeq ($(ARCH),arm)
-+    ifeq ($(ARCH),$(filter $(ARCH),arm arm64))
-       $(call feature_check,libunwind-debug-frame)
-       ifneq ($(feature-libunwind-debug-frame), 1)
-         msg := $(warning No debug_frame support found in libunwind);
--- 
-1.7.11.7
+>>> I am not sure what you mean here in terms of the ordering for the
+>>> patches. I'm attaching several patches, and the first three patches
+>>> adapt your patch series to also cover 375 and 38x, assuming the pinctrl
+>>> support for 375 and 38x is merged before your patch series.
+>>
+>> Right. If 375/38x pinctrl goes in first (what I expect), I'd have to add
+>> corresponding patches. You already sent them, I'll pick them up.
+>
+> Ok, cool. Hopefully we can sort out the merging of those two patch
+> series for 3.15 with Linus Walleij.
+
+That is the plan - or rather get his Acked-by as we are lucky to have
+pinctrl/mvebu and touching nothing else.
+
+>>> I must say I dislike quite a bit this unnamed mpp controls mechanism.
+>>> Why isn't the name statically defined in the source code by the
+>>> MPP_MODE macro, which already takes as first argument the pin number?
+>>
+>> Honestly, the unnamed mpp control thing is a bit odd. But if you tell
+>> me how to create ~60 statically defined one pin groups out of a
+>> single-line macro, we can change that easily.
+>>
+>> Back when that unnamed mpp control thing was invented, I must have been
+>> to lazy to write e.g.
+>>
+>> MPP_FUNC_CTRL(0, 0, "mpp0", armada_xp_mpp_ctrl),
+>> MPP_FUNC_CTRL(1, 1, "mpp1", armada_xp_mpp_ctrl),
+>> MPP_FUNC_CTRL(2, 2, "mpp2", armada_xp_mpp_ctrl),
+>> ...
+>> MPP_FUNC_CTRL(66, 66, "mpp66", armada_xp_mpp_ctrl),
+>>
+>> instead of
+>>
+>> MPP_FUNC_CTRL(0, 66, NULL, armada_xp_mpp_ctrl),
+>>
+>> and generate the 66 names dynamically.
+>
+> Right. But what I meant is that we already have a place where we have
+> one macro call for each pin: when defining the MPP modes. So I was
+> thinking of simplifying the whole stuff by "merging" the notion of MPP
+> control with the notion of MPP mode. This way, when you do:
+>
+> 	MPP_MODE(0,
+> 		   MPP_FUNCTION(...),
+> 		   MPP_FUNCTION(...)),
+> 	MPP_MODE(1,
+> 		   MPP_FUNCTION(...),
+> 		   MPP_FUNCTION(...)),
+> 	MPP_MODE(2,
+> 		   MPP_FUNCTION(...),
+> 		   MPP_FUNCTION(...)),
+> [...]
+> 	MPP_MODE(65,
+> 		   MPP_FUNCTION(...),
+> 		   MPP_FUNCTION(...)),
+>
+> You can take this opportunity to generate:
+>
+> 	{ "mpp0", ... },
+> 	{ "mpp1", ... },
+> 	{ "mpp2", ... },
+> 	...
+> 	{ "mpp65", ... },
+
+Ah, ok, I see. Yes that should be doable. We should definitely consider
+this for later, i.e. leave it now as is and rework later.
+
+>>> This is definitely good, but I'm wondering why the core cannot provide
+>>> helper functions for the generic case where we have 4 bits per pin in
+>>> contiguous registers. This would avoid duplicating the helper function
+>>> six times (you have four in your patch series, and we'll need two more
+>>> for A375 and A38x).
+>>
+>> I thought about it too, but we would need a soc specific callback
+>> anyway as you'll have to pass the base address somehow (and that is now
+>> known by soc specific stub only). My quick rule of thumb was that the
+>> amount of code replication would be almost the same.
+>
+> In pinctrl-mvebu.h, we could have:
+>
+> static inline int default_mpp_ctrl_get(void __iomem *base, unsigned int pid, unsigned long *config)
+> {
+>          unsigned off = (pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+>          unsigned shift = (pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+>
+>          *config = (readl(base + off) >> shift) & MVEBU_MPP_MASK;
+>
+>          return 0;
+> }
+>
+> static inline int default_mpp_ctrl_set(void __iomem *base, unsigned int pid, unsigned long config)
+> {
+>          unsigned off = (pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+>          unsigned shift = (pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+>          unsigned long reg;
+>
+>          reg = readl(base + off) & ~(MVEBU_MPP_MASK << shift);
+>          writel(reg | (config << shift), base + off);
+>
+>          return 0;
+> }
+>
+> which would slightly reduce the per-SoC code to:
+>
+> static int armada_370_mpp_ctrl_get(unsigned pid, unsigned long *config)
+> {
+> 	return default_mpp_ctrl_get(mpp_base, pid, config);
+> }
+>
+> static int armada_370_mpp_ctrl_set(unsigned pid, unsigned long config)
+> {
+> 	return default_mpp_ctrl_set(mpp_base, pid, config);
+> }
+>
+> but we admittedly cannot completely remove the per-SoC function, since
+> the mpp_base is now only known to each per-SoC driver.
+
+I guess I'll squash the above in for v4.. doesn't look that bad.
+
+Sebastian
