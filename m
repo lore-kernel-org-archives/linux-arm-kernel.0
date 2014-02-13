@@ -1,56 +1,29 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Feb 2014 15:39:47 +0900
-Subject: [PATCH] ARM: shmobile: koelsch: Enable SDHI,
- GPIO and regulators in defconfig
-Message-ID: <1392273587-12196-1-git-send-email-horms+renesas@verge.net.au>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Thu, 13 Feb 2014 14:41:59 +0800
+Subject: [PATCH 0/3] clk: mmp: bug fix for clk-frac
+In-Reply-To: <1390445262-27486-1-git-send-email-chao.xie@marvell.com>
+References: <1390445262-27486-1-git-send-email-chao.xie@marvell.com>
+Message-ID: <CADApbegKTak7Ja2P2TSm4vQy7Yx550ZARsc1jh7hQSohnQL0yQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the following:
-* regulators (needed for SDHI)
-* SDHI
-* GPIO
-* GPIO keys
-* GPIO LEDs
+hi, Mike
+How about these fix patches?
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/koelsch_defconfig | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
-index 9561139..86faab5 100644
---- a/arch/arm/configs/koelsch_defconfig
-+++ b/arch/arm/configs/koelsch_defconfig
-@@ -59,6 +59,7 @@ CONFIG_SH_ETH=y
- # CONFIG_NET_VENDOR_VIA is not set
- # CONFIG_NET_VENDOR_WIZNET is not set
- # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_SH_SCI=y
-@@ -68,13 +69,21 @@ CONFIG_I2C=y
- CONFIG_I2C_RCAR=y
- CONFIG_SPI=y
- CONFIG_SPI_RSPI=y
-+CONFIG_GPIOLIB=y
-+CONFIG_GPIO_RCAR=y
- # CONFIG_HWMON is not set
- CONFIG_THERMAL=y
- CONFIG_RCAR_THERMAL=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_REGULATOR_GPIO=y
- # CONFIG_HID is not set
- # CONFIG_USB_SUPPORT is not set
-+CONFIG_MMC=y
-+CONFIG_MMC_SDHI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
- # CONFIG_IOMMU_SUPPORT is not set
- # CONFIG_DNOTIFY is not set
- CONFIG_TMPFS=y
--- 
-1.8.5.2
+On Thu, Jan 23, 2014 at 10:47 AM, Chao Xie <chao.xie@marvell.com> wrote:
+> From: Chao Xie <chao.xie@marvell.com>
+>
+> When use the clk-frac type of mmp, some bugs are found.
+> The following 3 patches are bug fix for clk-frac
+>
+> Chao Xie (3):
+>   clk: mmp: fix wrong mask when calculate denominator
+>   clk: mmp: fix the wrong calculation formula
+>   clk: mmp: try to use closer one when do round rate
+>
+>  drivers/clk/mmp/clk-frac.c | 21 +++++++++++++--------
+>  1 file changed, 13 insertions(+), 8 deletions(-)
+>
+> --
+> 1.8.3.2
+>
