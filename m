@@ -1,102 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 13 Feb 2014 10:47:47 +0000
-Subject: [PATCH 4/4] phy: miphy365x: Provide support for the MiPHY356x
- Generic PHY
-In-Reply-To: <20140212165454.GF25957@e106331-lin.cambridge.arm.com>
-References: <1392220985-28189-1-git-send-email-lee.jones@linaro.org>
- <1392220985-28189-4-git-send-email-lee.jones@linaro.org>
- <20140212165454.GF25957@e106331-lin.cambridge.arm.com>
-Message-ID: <20140213104747.GG32508@lee--X1>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 13 Feb 2014 11:55:21 +0100
+Subject: [PATCH v2 02/10] ARM: mvebu: add initial support for the Armada
+ 375 SOCs
+In-Reply-To: <3797172.YJcGPMeT5Y@wuerfel>
+References: <1392200619-3141-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1392200619-3141-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <3797172.YJcGPMeT5Y@wuerfel>
+Message-ID: <20140213115521.303c49fa@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> > devices. It has 2 ports which it can use for either; both SATA, both
-> > PCIe or one of each in any configuration.
-> >
-> > Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Dear Arnd Bergmann,
+
+On Wed, 12 Feb 2014 14:08:42 +0100, Arnd Bergmann wrote:
+> On Wednesday 12 February 2014 11:23:31 Thomas Petazzoni wrote:
+> > From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > 
+> > This commit adds the basic support for the Armada 375 SOCs. These SoCs
+> > share most of their IP with the Armada 370/XP SoCs. The main
+> > difference is the use of a Cortex A9 CPU instead of the PJ4B CPU. The
+> > interrupt controller and the L2 cache controller are also different
+> > they are respectively the GIC and the PL310.
+> > 
+> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > > ---
-> >  drivers/phy/Kconfig         |   8 +
-> >  drivers/phy/Makefile        |   1 +
-> >  drivers/phy/phy-miphy365x.c | 634 ++++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 643 insertions(+)
-> >  create mode 100644 drivers/phy/phy-miphy365x.c
-> >
+> >  .../devicetree/bindings/arm/armada-375.txt         |  9 +++++
+> >  arch/arm/mach-mvebu/Kconfig                        | 15 ++++++++
+> >  arch/arm/mach-mvebu/Makefile                       |  1 +
+> >  arch/arm/mach-mvebu/armada-375.c                   | 44 ++++++++++++++++++++++
 > 
-> [...]
-> 
-> > +static int miphy365x_phy_get_base_addr(struct platform_device *pdev,
-> > +                                      struct miphy365x_phy *phy, u8 port)
-> > +{
-> > +       struct resource *res;
-> > +       char sata[16];
-> > +       char pcie[16];
-> 
-> Isn't 6 enough for either of these? There are at most two ports IIUC, so
-> we only need a single character for the port number.
+> I don't know what the outcome was for the first version, but just
+> for the record, I would prefer merging the board file into armada-370-xp.c
+> without renaming that file. Keeping the separate Kconfig entry makes sense
+> because we want to select different options there. If you have differences
+> between the implementations (so far the 370/xp code should just work
+> on 375), you can use a combination of if(IS_ENABLED(CONFIG_*)) and
+> if(machine_is_compatible()) to do the detection but keep a common
+> dt_compat list.
 
-Yep, being a bit overzealous there, will fix.
+Thanks for your review! I will shortly post a new version that uses a
+single "board file" (even though "board file" is a somewhat odd name in
+this DT era!).
 
-<snip>
+However, I've kept separate dt_compat lists, because we will need
+different SMP operations between Armada 370/XP (which are PJ4B based)
+and Armada 375/38x (which are Cortex-A9 based).
 
-> > +
-> > +       of_property_read_string(np, "st,sata_gen", &sata_gen);
-> 
-> This wasn't in the binding documentation. It also violates dt style;
-> s/_/-/
+Thanks!
 
-No problem, will fix.
-
-> Could these not be numbers, or can this not come from elsewhere?
-> 
-> Or are there some crazy SATA generations to support?
-
-Nope, just [1|2|3] I think. Can be numbers, will fix.
-
-> > +       if (sata_gen) {
-> > +               if (!strcmp(sata_gen, "gen3"))
-> > +                       phy_dev->sata_gen = SATA_GEN3;
-> > +               else if (!strcmp(sata_gen, "gen2"))
-> > +                       phy_dev->sata_gen = SATA_GEN2;
-> > +       }
-> > +
-> > +       phy_dev->pcie_tx_pol_inv =
-> > +               of_property_read_bool(np, "st,pcie_tx_pol_inv");
-> > +
-> > +       phy_dev->sata_tx_pol_inv =
-> > +               of_property_read_bool(np, "st,sata_tx_pol_inv");
-> 
-> Likewise for both of these on the first two points.
-
-1. Roger will fix.
-
-2. Not probeable I'm afraid.
-
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int miphy365x_phy_probe(struct platform_device *pdev)
-> > +{
-> > +       struct device_node *np = pdev->dev.of_node;
-> > +       struct miphy365x_dev *phy_dev;
-> > +       struct device *dev = &pdev->dev;
-> > +       struct phy_provider *provider;
-> > +       u8 port;
-> > +       int ret;
-> > +
-> > +       if (!np) {
-> > +               dev_err(dev, "No DT found\n");
-> 
-> s/DT/node/ ?
-
-s/DT/DT node/
-
-Will fix, thanks.
-
+Thomas
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
