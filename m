@@ -1,41 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Feb 2014 15:13:17 -0800
-Subject: [PATCH] ARM: OMAP3+: DPLL: stop reparenting to same parent if
- already done
-In-Reply-To: <1391591048-19433-1-git-send-email-nm@ti.com>
-References: <1391591048-19433-1-git-send-email-nm@ti.com>
-Message-ID: <20140213231317.GN28216@atomide.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 14 Feb 2014 00:13:33 +0100
+Subject: [PATCH] arm: dtsi: am335x-bone-common, usb0 is peripheral only
+In-Reply-To: <20140213225438.GF28216@atomide.com>
+References: <1389448851-20010-1-git-send-email-mpa@pengutronix.de>
+ <20140213225438.GF28216@atomide.com>
+Message-ID: <20140213231333.GK31787@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140205 01:06]:
-> omap3_noncore_dpll_set_rate forces a reparent to the same clk_ref
-> for every call that takes place. This is an can be done only if a change
-> is detected.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+Hi,
 
-Would like to see acks on this too before applying.
-
-Tony
-
-> ---
->  arch/arm/mach-omap2/dpll3xxx.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Thu, Feb 13, 2014 at 02:54:38PM -0800, Tony Lindgren wrote:
+> * Markus Pargmann <mpa@pengutronix.de> [140111 06:03]:
+> > The PMIC is using usb0 vbus line as power source. It is also connected
+> > to the am335x processor as vbus sense. But there is no possibility to
+> > pullup usb0 vbus to operate as host. This patch fixes the dr_mode of usb0.
 > 
-> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-> index 3185ced..d9bcbf7 100644
-> --- a/arch/arm/mach-omap2/dpll3xxx.c
-> +++ b/arch/arm/mach-omap2/dpll3xxx.c
-> @@ -525,7 +525,7 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
->  	* stuff is inherited for free
->  	*/
->  
-> -	if (!ret)
-> +	if (!ret && clk_get_parent(hw->clk) != new_parent)
->  		__clk_reparent(hw->clk, new_parent);
->  
->  	return 0;
-> -- 
-> 1.7.9.5
-> 
+> That's the MUSB? AFAIK it's not possible to operate MUSB in peripheral
+> only mode because the hardware does what it wants based on the ID
+> pin state.
+
+Yes that's MUSB. The am335x reference manual describes that it is
+possible to force peripheral/host mode by setting bit 7 (IDDIG_MUX) in
+register USBnMODE to 1. Then it uses the bit written in bit 8 (IDDIG) of
+register USBnMODE to set host/peripheral mode.
+
+I am not sure if the driver supports it yet but I think the DTS should
+contain the correct mode nevertheless, especially to avoid starting the
+otg loops in the musb driver.
+
+Regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
