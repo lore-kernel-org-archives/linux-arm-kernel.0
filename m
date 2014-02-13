@@ -1,93 +1,84 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Thu, 13 Feb 2014 13:48:40 -0600
-Subject: [PATCH v2 1/5] drivers: of: add initialization code for reserved
- memory
-In-Reply-To: <52FA87B8.8040203@gmail.com>
-References: <1391515773-6112-2-git-send-email-m.szyprowski@samsung.com>
- <20140205110538.99E47C40A89@trevor.secretlab.ca>
- <52FA0D6E.9090304@samsung.com>
- <20140211121316.24032C40C4D@trevor.secretlab.ca>
- <52FA33E2.4050004@samsung.com>
- <20140211190104.7E6C5C4140E@trevor.secretlab.ca>
- <1392148971.3835.15.camel@pasglop> <52FA8245.5050707@gmail.com>
- <20140211201933.GI841@joshc.qualcomm.com>
- <52FA87B8.8040203@gmail.com>
-Message-ID: <20140213194840.GO841@joshc.qualcomm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Feb 2014 19:51:48 +0000
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <20140213180616.GD17248@obsidianresearch.com>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <1392236171-10512-4-git-send-email-will.deacon@arm.com>
+ <D2AE4AE6-E8FA-4DD8-B92B-E37205A2548C@codeaurora.org>
+ <20140213110721.GC13576@mudshark.cambridge.arm.com>
+ <20140213180616.GD17248@obsidianresearch.com>
+Message-ID: <20140213195148.GP13576@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 09:27:36PM +0100, Tomasz Figa wrote:
-> On 11.02.2014 21:19, Josh Cartwright wrote:
-> >On Tue, Feb 11, 2014 at 09:04:21PM +0100, Tomasz Figa wrote:
-> > >On 11.02.2014 21:02, Benjamin Herrenschmidt wrote:
-> > > >On Tue, 2014-02-11 at 19:01 +0000, Grant Likely wrote:
-> > > > > > except that the former IMHO better suits the definition of memory
-> > > > > > region, which I see as a single contiguous range of memory and can be
-> > > > > > simplified to have a single reg entry per region.
-> > > > >
-> > > > > My point is rather if multiple reg tuples are found in a reserved memory
-> > > > > node, the kernel must respect them and reserve the memory. I'm not
-> > > > > arguing about whether or not that makes for a good binding.
-> > > >
-> > > > agreed.
-> > >
-> > > My point is why, if the binding defines that just a single tuple should be
-> > > provided.
-> >
-> > FWIW, the usecase I had mentioned in reply to Grant in the patch 5/5
-> > thread [1] could make use of this.  The shared memory region is split
-> > into a main chunk and several "auxiliary" chunk, but collectively these
-> > regions all share the same heap state.
-> >
-> >   Josh
-> >
-> > 1: http://lkml.kernel.org/r/20140205192502.GO20228 at joshc.qualcomm.com
->
-> The use case seems fine, but I believe it could be properly represented in
-> device tree using multiple single-reg regions as well, unless the consumer
-> can request a block of memory that crosses boundary of two sub-regions
-> specified by reg entries of single region.
+On Thu, Feb 13, 2014 at 06:06:16PM +0000, Jason Gunthorpe wrote:
+> On Thu, Feb 13, 2014 at 11:07:21AM +0000, Will Deacon wrote:
+> 
+> > Not in this case! kvmtool generates the following:
+> 
+> Well, the example is nice so someone can review it..
+>  
+> > 	pci {
+> > 		#address-cells = <0x3>;
+> > 		#size-cells = <0x2>;
+> > 		#interrupt-cells = <0x1>;
+> > 		compatible = "arm,pci-cam-generic";
+> > 		reg = <0x0 0x40000000>;
+> > 		ranges = <0x1000000 0x0 0x0 0x0 0x0 0x0 0x10000 0x2000000 0x0 0x41000000 0x0 0x41000000 0x0 0x3f000000>;
+> > 		interrupt-map = <0x0 0x0 0x0 0x1 0x1 0x0 0x4 0x1 0x800 0x0 0x0 0x1 0x1 0x0 0x5 0x1 0x1000 0x0 0x0 0x1 0x1 0x0 0x6 0x1 0x1800 0x0 0x0 0x1 0x1 0x0 0x7 0x1>;
+> > 		interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
+> > 	};
+> 
+> 
+> Looks like there are a few misses in the above. How about this:
+> 
+> pci {
+>     compatible = "arm,pci-cam-generic"
+>     device_type = "pci";
+>     ** ^^^^^^^^^^^^^^^^^
+>     ** MANDATORY for the host bridge node
 
-I could probably make a only-one-reg-entry policy work for me, but it
-makes things a bit more awkward.  I'd lose the ability to describe
-"this set of regions need to be logically handled together" directly in
-the reserved memory node, and would need to push it up a layer.
+Ok, I'll add that.
 
-	reserved-memory {
-		smem: smem {
-			reg = <...>;
-		};
-		aux1: auxiliary1 {
-			reg = <...>;
-		};
-		aux2: auxiliary2 {
-			reg = <...>;
-		};
-		...
-	};
+>     #address-cells = <3>;
+>     #size-cells = <2>;
+> 
+>     // BUS_ADDRESS(3)  CPU_PHYSICAL(2)  SIZE(2)
+>     ranges = <0x1000000 0x0 0x00000000  0x0 0x00000000  0x0 0x00010000>,
+>                                         ^^^^^^^^^^^^^^
+>             ** ?? Is this why you had problems with the offset? Should
+> 	    ** be the cpu physical address of the start of the IO window.
+>              <0x2000000 0x0 0x41000000  0x0 0x41000000  0x0 0x3f000000>;
+> 
+>    
+>     #interrupt-cells = <0x1>;
+>     // PCI_DEVICE(3) INT#(1)  CONTROLLER(PHANDLE)  CONTROLLER_DATA(3)
+>     interrupt-map = <  0x0 0x0 0x0 0x1  0x1  0x0 0x4 0x1
+>                      0x800 0x0 0x0 0x1  0x1  0x0 0x5 0x1 
+>                     0x1000 0x0 0x0 0x1  0x1  0x0 0x6 0x1
+>                     0x1800 0x0 0x0 0x1  0x1  0x0 0x7 0x1>;
+>                  **                    ^^^^^^
+>                  ** This should be a phandle to the interrupt controller
 
-	heap : heap {
-		compatible = "qcom,shared-memory";
-		memory-region = <&smem &aux1 &aux2>;
-		#smem-cells = <2>;
-	};
+That is a phandle, libfdt/kvmtool just ends up dealing with the number
+directly. I'll fix in the example.
 
-	actual_consumer1 {
-		compatible = "...";
-		smem = <&heap IDENTIFIER1 0x1000>;
-	};
+>     // PCI_DEVICE(3) INT#1()
+>     interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
+> }
+> 
+> I keep thinking of making a pcie-dt.h file with helper macros for
+> all this. :|
 
-	actual_consumer2 {
-		compatible = "...";
-		smem = <&heap IDENTIFIER2 0x1000>;
-	};
+If it's not being generated automatically, that could be useful.
 
-Maybe that's better off, I don't know.  This would also eliminate my
-need for a #memory-region-cells property.
+> FWWI, I like to put a double space between the logically distinct
+> things in the lists.
+
+
+Makes sense, I may well do the same.
 
 Thanks,
-  Josh
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Will
