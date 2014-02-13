@@ -1,47 +1,68 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 13 Feb 2014 14:24:01 +0100
-Subject: [PATCH v3 01/13] ARM: mvebu: rename armada-370-xp.c to
- armada-mvebu.c
-In-Reply-To: <20140213141355.00e8f2fd@skate>
-References: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392289475-8902-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <2036226.egxWL7qC66@wuerfel> <20140213125526.3af08c54@skate>
- <20140213130745.GU27395@titan.lakedaemon.net> <20140213141355.00e8f2fd@skate>
-Message-ID: <52FCC771.5090009@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 13 Feb 2014 07:26:43 -0600
+Subject: [PATCH 02/18] arm64: GICv3 device tree binding documentation
+In-Reply-To: <1391607050-540-3-git-send-email-marc.zyngier@arm.com>
+References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
+ <1391607050-540-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAL_JsqJMTztbjMRj1_MDevbRHVt8FoSPKLUkXEiqKx1jkzpNOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/14 14:13, Thomas Petazzoni wrote:
-> On Thu, 13 Feb 2014 08:07:45 -0500, Jason Cooper wrote:
->>>> Your reasoning for the new name makes a lot of sense, but my personal
->>>> opinion is that I'd rather leave the name as it is and deal with the
->>>> fact that it's not the best name. Renaming files often causes unexpected
->>>> problems, in particular if someone else wants to modify the same file.
->>>
->>> I believe it's a matter of taste here. Having a file named
->>> armada-370-xp.c that handles Armada 375 and Armada 38x looks highly
->>> confusing to me, and I believe both Gr?gory and Ezequiel were of the
->>> same opinion.
->>>
->>> The number of changes to this file is very limited, so the probability
->>> of having a large number of complicated patches touching the same file
->>> being in flight is fairly low.
->>>
->>> Maybe we can leave this taste decision to the mach-mvebu maintainers?
->>
->> board-v7.c and then board-v5.c ?
+On Wed, Feb 5, 2014 at 7:30 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Add the necessary documentation to support GICv3.
 >
-> Why not. But since this kind of change can be done without breaking the
-> DT compatibility, I'd first prefer to see Dove support merged into
-> mach-mvebu/ with its board file named mach-mvebu/dove.c. Then
-> progressively see what can be combined with armada-mvebu.c so that we
-> can merge both of them into board-v7.c.
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/gic-v3.txt | 81 ++++++++++++++++++++++++
+>  1 file changed, 81 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/gic-v3.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
+> new file mode 100644
+> index 0000000..93852f6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
+> @@ -0,0 +1,81 @@
+> +* ARM Generic Interrupt Controller, version 3
+> +
+> +AArch64 SMP cores are often associated with a GICv3, providing private
+> +peripheral interrupts (PPI), shared peripheral interrupts (SPI),
+> +software generated interrupts (SGI), and locality-specific peripheral
+> +Interrupts (LPI).
+> +
+> +Main node required properties:
+> +
+> +- compatible : should at least contain  "arm,gic-v3".
+> +- interrupt-controller : Identifies the node as an interrupt controller
+> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> +  interrupt source. Must be a single cell with a value of at least 3.
+> +
+> +  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
+> +  interrupts. Other values are reserved for future use.
+> +
+> +  The 2nd cell contains the interrupt number for the interrupt type.
+> +  SPI interrupts are in the range [0-987]. PPI interrupts are in the
+> +  range [0-15].
+> +
+> +  The 3rd cell is the flags, encoded as follows:
+> +       bits[3:0] trigger type and level flags.
+> +               1 = edge triggered
+> +               2 = edge triggered (deprecated, for compatibility with GICv2)
+> +               4 = level triggered
+> +               8 = level triggered (deprecated, for compatibility with GICv2)
 
-Actually, just prepared those patches today. Haven't boot tested but
-compiles cleanly. The patch set will be really small compared to KW
-patch set (but de-hardcoded pinctrl-dove will be a prerequisite).
+I don't really think compatibility is needed here. I'd just list 1 and 4.
 
-I also prefer to move to mach-mvebu/dove.c and then merge with
-armada-3{78}{05x} a cycle later.
+> +
+> +  Cells 4 and beyond are reserved for future use. Where the 1st cell
+> +  has a value of 0 or 1, cells 4 and beyond act as padding, and may be
+> +  ignored. It is recommended that padding cells have a value of 0.
 
-Sebastian
+What future use? LPIs I suppose.
+
+Otherwise, looks fine to me:
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+Rob
