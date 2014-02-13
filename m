@@ -1,120 +1,72 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 13 Feb 2014 20:59:02 +0800
-Subject: [PATCH v2] bus: imx-weim: support CS GPR config for imx6q-weim
-Message-ID: <1392296342-21115-1-git-send-email-shawn.guo@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 13 Feb 2014 12:59:46 +0000
+Subject: [PATCH 02/18] arm64: GICv3 device tree binding documentation
+In-Reply-To: <loom.20140207T062553-254@post.gmane.org>
+References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
+ <1391607050-540-3-git-send-email-marc.zyngier@arm.com>
+ <loom.20140207T062553-254@post.gmane.org>
+Message-ID: <52FCC1C2.1020203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For imx6q-weim type of device, there might a WEIM CS space configuration
-register in General Purpose Register controller, e.g. IOMUXC_GPR1 on
-i.MX6Q.
+Hi Arnab,
 
-Depending on which configuration of the following 4 is chosen for given
-system, IOMUXC_GPR1[11:0] should be set up as 05, 033, 0113 or 01111
-correspondingly.
+On 07/02/14 05:41, Arnab Basu wrote:
+> Hi Marc
+> 
+> Marc Zyngier <marc.zyngier <at> arm.com> writes:
+> 
+>> +
+>> +AArch64 SMP cores are often associated with a GICv3, providing private
+>> +peripheral interrupts (PPI), shared peripheral interrupts (SPI),
+>> +software generated interrupts (SGI), and locality-specific peripheral
+>> +Interrupts (LPI).
+>> +
+>> +Main node required properties:
+>> +
+>> +- compatible : should at least contain  "arm,gic-v3".
+>> +- interrupt-controller : Identifies the node as an interrupt controller
+>> +- #interrupt-cells : Specifies the number of cells needed to encode an
+>> +  interrupt source. Must be a single cell with a value of at least 3.
+>> +
+>> +  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
+>> +  interrupts. Other values are reserved for future use.
+> 
+> These values are defined in
+> "include/dt-bindings/interrupt-controller/arm-gic.h" maybe we should start
+> mentioning that here and encourage future device treese to use those defines
+> to improve readability.
 
-	CS0(128M) CS1(0M)  CS2(0M)  CS3(0M)
-	CS0(64M)  CS1(64M) CS2(0M)  CS3(0M)
-	CS0(64M)  CS1(32M) CS2(32M) CS3(0M)
-	CS0(32M)  CS1(32M) CS2(32M) CS3(32M)
+It may improve readability, but it makes the definition rely on
+something else. Definition and usage are two different things, and I
+want the definition to be completely self-contained and non ambiguous.
 
-The patch creates a function for imx6q-weim type of device, which scans
-'ranges' property of WEIM node and build the GPR value incrementally.
-Thus the WEIM CS GPR can be set up automatically at boot time.
+In DTS files, people can use whatever macro they decide, and it is their
+problem. They will even have out of tree DTS files, for which the
+include file is not available.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-Changes since v1:
- - Drop device tree property fsl,weim-cs-gpr
- - Use octal value for IOMUXC_GPR1[11:0] bit field
- - Use of_property_for_each_u32() to build gprval incrementally
+> 
+>> +
+>> +  The 2nd cell contains the interrupt number for the interrupt type.
+>> +  SPI interrupts are in the range [0-987]. PPI interrupts are in the
+>> +  range [0-15].
+>> +
+>> +  The 3rd cell is the flags, encoded as follows:
+>> +	bits[3:0] trigger type and level flags.
+>> +		1 = edge triggered
+>> +		2 = edge triggered (deprecated, for compatibility with GICv2)
+>> +		4 = level triggered
+>> +		8 = level triggered (deprecated, for compatibility with GICv2)
+> 
+> Similar to the above comment
+> "include/dt-bindings/interrupt-controller/irq.h" defines the trigger type
+> and level flags. Although this file currently contains the GICv2 bindings,
+> we could update them.
 
- drivers/bus/imx-weim.c |   59 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+Same as above.
 
-diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-index 3ef58c8..a120c93 100644
---- a/drivers/bus/imx-weim.c
-+++ b/drivers/bus/imx-weim.c
-@@ -11,6 +11,9 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/of_device.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
-+#include <linux/regmap.h>
- 
- struct imx_weim_devtype {
- 	unsigned int	cs_count;
-@@ -56,6 +59,59 @@ static const struct of_device_id weim_id_table[] = {
- };
- MODULE_DEVICE_TABLE(of, weim_id_table);
- 
-+static int __init imx6q_weim_gpr_setup(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct property *prop;
-+	const __be32 *p;
-+	struct regmap *gpr;
-+	u32 gprvals[4] = {
-+		05,	/* CS0(128M) CS1(0M)  CS2(0M)  CS3(0M) */
-+		033,	/* CS0(64M)  CS1(64M) CS2(0M)  CS3(0M) */
-+		0113,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
-+		0111,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
-+	};
-+	u32 gprval = 0;
-+	u32 val;
-+	int len;
-+	int cs = 0;
-+	int i = 0;
-+
-+	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
-+	if (IS_ERR(gpr)) {
-+		dev_err(&pdev->dev, "failed to find fsl,imx6q-iomuxc-gpr\n");
-+		return -ENOENT;
-+	}
-+
-+	prop = of_find_property(np, "ranges", &len);
-+	if (prop == NULL)
-+		return -ENOENT;
-+	if (len % (sizeof(u32) * 4))
-+		return -EINVAL;
-+
-+	of_property_for_each_u32(np, "ranges", prop, p, val) {
-+		if (i % 4 == 0) {
-+			cs = val;
-+		} else if (i % 4 == 3 && val) {
-+			val /= SZ_64M;
-+			val = (val << 1) | 1;
-+			gprval |= val << cs * 3;
-+		}
-+		i++;
-+	}
-+
-+	for (i = 0; i < ARRAY_SIZE(gprvals); i++) {
-+		if (gprval == gprvals[i]) {
-+			/* Found it. Set up IOMUXC_GPR1[11:0] with it. */
-+			regmap_update_bits(gpr, IOMUXC_GPR1, 0xfff, gprval);
-+			return 0;
-+		}
-+	}
-+
-+	dev_err(&pdev->dev, "Invalid 'ranges' configuration\n");
-+	return -EINVAL;
-+}
-+
- /* Parse and set the timing for this device. */
- static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
- 				    const struct imx_weim_devtype *devtype)
-@@ -92,6 +148,9 @@ static int __init weim_parse_dt(struct platform_device *pdev,
- 	struct device_node *child;
- 	int ret;
- 
-+	if (of_device_is_compatible(pdev->dev.of_node, "fsl,imx6q-weim"))
-+		imx6q_weim_gpr_setup(pdev);
-+
- 	for_each_child_of_node(pdev->dev.of_node, child) {
- 		if (!child->name)
- 			continue;
+Thanks for the review!
+
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny...
