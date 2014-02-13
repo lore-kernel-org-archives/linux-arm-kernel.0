@@ -1,115 +1,61 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 13 Feb 2014 17:26:28 +0900
-Subject: [PATCH 03/03] ARM: shmobile: Get rid of legacy KZM9D defconfig
-In-Reply-To: <20140213082558.30630.93034.sendpatchset@w520>
-References: <20140213082558.30630.93034.sendpatchset@w520>
-Message-ID: <20140213082628.30630.3186.sendpatchset@w520>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 13 Feb 2014 08:26:15 +0000
+Subject: [PATCH RESEND] ARM: mcpm: Make all mcpm functions notrace
+Message-ID: <1392279975.3469.4.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Dave Martin <dave.martin@linaro.org>
 
-Get rid of the kzm9d_defconfig. The KZM9D is now supported
-as DT only in case of EMEV2 is selected in the kernel
-configuration.
+The functions in mcpm_entry.c are mostly intended for use during
+scary cache and coherency disabling sequences, or do other things
+which confuse trace ...  like powering a CPU down and not
+returning.  Similarly for the backend code.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+For simplicity, this patch just makes whole files notrace.
+There should be more than enough traceable points on the paths to
+these functions, but we can be more fine-grained later if there is
+a need for it.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+
+Also added spc.o to the list of files as it contains functions used by
+MCPM code which have comments comments like: "might be used in code
+paths where normal cacheable locks are not working"
+
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
 ---
+ arch/arm/common/Makefile        |    1 +
+ arch/arm/mach-vexpress/Makefile |    3 +++
+ 2 files changed, 4 insertions(+)
 
- arch/arm/configs/kzm9d_defconfig |   91 --------------------------------------
- 1 file changed, 91 deletions(-)
-
---- 0001/arch/arm/configs/kzm9d_defconfig
-+++ /dev/null	2013-06-03 21:41:10.638032047 +0900
-@@ -1,91 +0,0 @@
--# CONFIG_ARM_PATCH_PHYS_VIRT is not set
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_NO_HZ=y
--CONFIG_IKCONFIG=y
--CONFIG_IKCONFIG_PROC=y
--CONFIG_LOG_BUF_SHIFT=16
--CONFIG_CC_OPTIMIZE_FOR_SIZE=y
--CONFIG_SYSCTL_SYSCALL=y
--CONFIG_EMBEDDED=y
--CONFIG_PERF_EVENTS=y
--CONFIG_SLAB=y
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_SHMOBILE_LEGACY=y
--CONFIG_ARCH_EMEV2=y
--CONFIG_MACH_KZM9D=y
--CONFIG_MEMORY_START=0x40000000
--CONFIG_MEMORY_SIZE=0x10000000
--# CONFIG_SH_TIMER_TMU is not set
--# CONFIG_SWP_EMULATE is not set
--# CONFIG_CACHE_L2X0 is not set
--CONFIG_SMP=y
--CONFIG_NR_CPUS=2
--CONFIG_HOTPLUG_CPU=y
--# CONFIG_LOCAL_TIMERS is not set
--CONFIG_AEABI=y
--# CONFIG_OABI_COMPAT is not set
--# CONFIG_CROSS_MEMORY_ATTACH is not set
--CONFIG_FORCE_MAX_ZONEORDER=13
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_ARM_APPENDED_DTB=y
--CONFIG_AUTO_ZRELADDR=y
--CONFIG_VFP=y
--# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--CONFIG_PM_RUNTIME=y
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_DHCP=y
--# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
--# CONFIG_INET_XFRM_MODE_TUNNEL is not set
--# CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
--# CONFIG_INET_DIAG is not set
--# CONFIG_IPV6 is not set
--# CONFIG_WIRELESS is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_DEVTMPFS=y
--CONFIG_DEVTMPFS_MOUNT=y
--# CONFIG_BLK_DEV is not set
--CONFIG_NETDEVICES=y
--# CONFIG_NET_VENDOR_BROADCOM is not set
--# CONFIG_NET_VENDOR_CHELSIO is not set
--# CONFIG_NET_VENDOR_CIRRUS is not set
--# CONFIG_NET_VENDOR_FARADAY is not set
--# CONFIG_NET_VENDOR_INTEL is not set
--# CONFIG_NET_VENDOR_MARVELL is not set
--# CONFIG_NET_VENDOR_MICREL is not set
--# CONFIG_NET_VENDOR_NATSEMI is not set
--# CONFIG_NET_VENDOR_SEEQ is not set
--CONFIG_SMSC911X=y
--# CONFIG_NET_VENDOR_STMICRO is not set
--# CONFIG_NET_VENDOR_WIZNET is not set
--# CONFIG_WLAN is not set
--# CONFIG_INPUT_MOUSEDEV is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--# CONFIG_SERIO is not set
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_DEVKMEM is not set
--CONFIG_SERIAL_8250=y
--CONFIG_SERIAL_8250_CONSOLE=y
--CONFIG_SERIAL_8250_EM=y
--# CONFIG_HW_RANDOM is not set
--CONFIG_GPIOLIB=y
--CONFIG_GPIO_EM=y
--# CONFIG_HWMON is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--# CONFIG_IOMMU_SUPPORT is not set
--# CONFIG_DNOTIFY is not set
--CONFIG_TMPFS=y
--# CONFIG_MISC_FILESYSTEMS is not set
--CONFIG_NFS_FS=y
--CONFIG_ROOT_NFS=y
--# CONFIG_FTRACE is not set
+diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+index 4bdc416..70b1eff 100644
+--- a/arch/arm/common/Makefile
++++ b/arch/arm/common/Makefile
+@@ -13,6 +13,7 @@ obj-$(CONFIG_SHARP_SCOOP)	+= scoop.o
+ obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+ obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
+ obj-$(CONFIG_MCPM)		+= mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock.o
++CFLAGS_REMOVE_mcpm_entry.o	= -pg
+ AFLAGS_mcpm_head.o		:= -march=armv7-a
+ AFLAGS_vlock.o			:= -march=armv7-a
+ obj-$(CONFIG_TI_PRIV_EDMA)	+= edma.o
+diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
+index 0997e0b..fc649bc 100644
+--- a/arch/arm/mach-vexpress/Makefile
++++ b/arch/arm/mach-vexpress/Makefile
+@@ -8,8 +8,11 @@ obj-y					:= v2m.o
+ obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
+ obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o	dcscb_setup.o
+ CFLAGS_dcscb.o				+= -march=armv7-a
++CFLAGS_REMOVE_dcscb.o			= -pg
+ obj-$(CONFIG_ARCH_VEXPRESS_SPC)		+= spc.o
++CFLAGS_REMOVE_spc.o			= -pg
+ obj-$(CONFIG_ARCH_VEXPRESS_TC2_PM)	+= tc2_pm.o
+ CFLAGS_tc2_pm.o				+= -march=armv7-a
++CFLAGS_REMOVE_tc2_pm.o			= -pg
+ obj-$(CONFIG_SMP)			+= platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+-- 
+1.7.10.4
