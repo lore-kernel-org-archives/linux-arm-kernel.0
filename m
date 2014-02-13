@@ -1,58 +1,55 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Feb 2014 12:04:30 +0100
-Subject: [PATCH v3 08/13] ARM: mvebu: add Device Tree for the Armada 375 DB
+Date: Thu, 13 Feb 2014 12:04:33 +0100
+Subject: [PATCH v3 11/13] ARM: mvebu: add Device Tree for the Armada 385 DB
  board
 In-Reply-To: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1392289475-8902-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1392289475-8902-12-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 375 DB board is the development board from Marvell for the
-Armada 375 SoC. This commit adds a Device Tree description for this
+The Armada 385 DB board is the development board from Marvell for the
+Armada 385 SoC. This commit adds a Device Tree description for this
 board, which enables the following features:
 
+ * Network interfaces
  * I2C buses
  * SDIO
  * Serial port
- * SPI bus, with a SPI flash. Note that the SPI bus is disabled by
-   default, because it conflicts with the NAND, and can only work if
-   the board boots out of SPI. Since most boards are shipped to boot
-   out of NAND, we're default to having the SPI bus disabled.
+ * SPI bus, with a SPI flash
  * PCIe interfaces
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
  arch/arm/boot/dts/Makefile          |   1 +
- arch/arm/boot/dts/armada-375-db.dts | 107 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 108 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-375-db.dts
+ arch/arm/boot/dts/armada-385-db.dts | 101 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 102 insertions(+)
+ create mode 100644 arch/arm/boot/dts/armada-385-db.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b9d6a8b..f1eafbd 100644
+index f1eafbd..bd789fc 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -126,6 +126,7 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
- 	armada-370-netgear-rn102.dtb \
+@@ -127,6 +127,7 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
  	armada-370-netgear-rn104.dtb \
  	armada-370-rd.dtb \
-+	armada-375-db.dtb \
+ 	armada-375-db.dtb \
++	armada-385-db.dtb \
  	armada-xp-axpwifiap.dtb \
  	armada-xp-db.dtb \
  	armada-xp-gp.dtb \
-diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
+diff --git a/arch/arm/boot/dts/armada-385-db.dts b/arch/arm/boot/dts/armada-385-db.dts
 new file mode 100644
-index 0000000..c50e246
+index 0000000..01b6cc7
 --- /dev/null
-+++ b/arch/arm/boot/dts/armada-375-db.dts
-@@ -0,0 +1,107 @@
++++ b/arch/arm/boot/dts/armada-385-db.dts
+@@ -0,0 +1,101 @@
 +/*
-+ * Device Tree file for Marvell Armada 375 evaluation board
-+ * (DB-88F6720)
++ * Device Tree file for Marvell Armada 385 evaluation board
++ * (DB-88F6820)
 + *
 + *  Copyright (C) 2014 Marvell
 + *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
 + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 + *
 + * This file is licensed under the terms of the GNU General Public
@@ -61,12 +58,11 @@ index 0000000..c50e246
 + */
 +
 +/dts-v1/;
-+#include <dt-bindings/gpio/gpio.h>
-+#include "armada-375.dtsi"
++#include "armada-385.dtsi"
 +
 +/ {
-+	model = "Marvell Armada 375 Development Board";
-+	compatible = "marvell,a375-db", "marvell,armada375";
++	model = "Marvell Armada 385 Development Board";
++	compatible = "marvell,a385-db", "marvell,armada385", "marvell,armada38x";
 +
 +	chosen {
 +		bootargs = "console=ttyS0,115200 earlyprintk";
@@ -74,7 +70,7 @@ index 0000000..c50e246
 +
 +	memory {
 +		device_type = "memory";
-+		reg = <0x00000000 0x40000000>; /* 1 GB */
++		reg = <0x00000000 0x10000000>; /* 256 MB */
 +	};
 +
 +	soc {
@@ -83,19 +79,12 @@ index 0000000..c50e246
 +
 +		internal-regs {
 +			spi at 10600 {
-+				pinctrl-0 = <&spi0_pins>;
-+				pinctrl-names = "default";
-+				/*
-+				 * SPI conflicts with NAND, so we disable it
-+				 * here, and select NAND as the enabled device
-+				 * by default.
-+				 */
-+				status = "disabled";
++				status = "okay";
 +
 +				spi-flash at 0 {
 +					#address-cells = <1>;
 +					#size-cells = <1>;
-+					compatible = "n25q128a13";
++					compatible = "w25q32";
 +					reg = <0>; /* Chip select 0 */
 +					spi-max-frequency = <108000000>;
 +				};
@@ -104,15 +93,11 @@ index 0000000..c50e246
 +			i2c at 11000 {
 +				status = "okay";
 +				clock-frequency = <100000>;
-+				pinctrl-0 = <&i2c0_pins>;
-+				pinctrl-names = "default";
 +			};
 +
 +			i2c at 11100 {
 +				status = "okay";
 +				clock-frequency = <100000>;
-+				pinctrl-0 = <&i2c1_pins>;
-+				pinctrl-names = "default";
 +			};
 +
 +			serial at 12000 {
@@ -120,19 +105,26 @@ index 0000000..c50e246
 +				status = "okay";
 +			};
 +
-+			pinctrl {
-+				sdio_st_pins: sdio-st-pins {
-+					marvell,pins = "mpp44", "mpp45";
-+					marvell,function = "gpio";
-+				};
++			ethernet at 30000 {
++				status = "okay";
++				phy = <&phy1>;
++				phy-mode = "rgmii";
 +			};
 +
-+			mvsdio at d4000 {
-+				pinctrl-0 = <&sdio_pins &sdio_st_pins>;
-+				pinctrl-names = "default";
++			ethernet at 70000 {
 +				status = "okay";
-+				cd-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-+				wp-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
++				phy = <&phy0>;
++				phy-mode = "rgmii";
++			};
++
++			mdio {
++				phy0: ethernet-phy at 0 {
++					reg = <0>;
++				};
++
++				phy1: ethernet-phy at 1 {
++					reg = <1>;
++				};
 +			};
 +		};
 +
