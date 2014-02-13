@@ -1,230 +1,102 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 13 Feb 2014 12:45:19 +0200
-Subject: [PATCH 3/8] ARM: OMAP2+: clock: fix clkoutx2 with
- CLK_SET_RATE_PARENT
-In-Reply-To: <1392285846-13199-4-git-send-email-tomi.valkeinen@ti.com>
-References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
- <1392285846-13199-4-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <52FCA23F.6090003@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 13 Feb 2014 10:47:47 +0000
+Subject: [PATCH 4/4] phy: miphy365x: Provide support for the MiPHY356x
+ Generic PHY
+In-Reply-To: <20140212165454.GF25957@e106331-lin.cambridge.arm.com>
+References: <1392220985-28189-1-git-send-email-lee.jones@linaro.org>
+ <1392220985-28189-4-git-send-email-lee.jones@linaro.org>
+ <20140212165454.GF25957@e106331-lin.cambridge.arm.com>
+Message-ID: <20140213104747.GG32508@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/02/14 12:04, Tomi Valkeinen wrote:
-> If CLK_SET_RATE_PARENT is set for a clkoutx2 clock, calling
-> clk_set_rate() on the clock "skips" the x2 multiplier as there are no
-> set_rate and round_rate functions defined for the clkoutx2.
+> > The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+> > devices. It has 2 ports which it can use for either; both SATA, both
+> > PCIe or one of each in any configuration.
+> >
+> > Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/phy/Kconfig         |   8 +
+> >  drivers/phy/Makefile        |   1 +
+> >  drivers/phy/phy-miphy365x.c | 634 ++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 643 insertions(+)
+> >  create mode 100644 drivers/phy/phy-miphy365x.c
+> >
 > 
-> This results in getting double the requested clock rates, breaking the
-> display on omap3430 based devices.
+> [...]
 > 
-> This patch implements set_rate and round_rate for clkoutx2.
+> > +static int miphy365x_phy_get_base_addr(struct platform_device *pdev,
+> > +                                      struct miphy365x_phy *phy, u8 port)
+> > +{
+> > +       struct resource *res;
+> > +       char sata[16];
+> > +       char pcie[16];
 > 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> ---
->  arch/arm/mach-omap2/cclock3xxx_data.c |  2 ++
->  arch/arm/mach-omap2/dpll3xxx.c        | 62 +++++++++++++++++++++++++++++++++++
->  include/linux/clk/ti.h                |  4 +++
->  3 files changed, 68 insertions(+)
+> Isn't 6 enough for either of these? There are at most two ports IIUC, so
+> we only need a single character for the port number.
 
-Argh. This patch 3/8 was an old version, and not valid. It does not work for
-omap3430. I had earlier posted a proper version, but somehow I managed to get
-an old version for this series.
+Yep, being a bit overzealous there, will fix.
 
-The correct version can be found from
+<snip>
 
-http://mid.gmane.org/1391080640-23370-1-git-send-email-tomi.valkeinen at ti.com
+> > +
+> > +       of_property_read_string(np, "st,sata_gen", &sata_gen);
+> 
+> This wasn't in the binding documentation. It also violates dt style;
+> s/_/-/
 
-and I'll also include it below.
+No problem, will fix.
 
- Tomi
+> Could these not be numbers, or can this not come from elsewhere?
+> 
+> Or are there some crazy SATA generations to support?
 
->From 0d46054a8b33bc1f7a37bc9b17dd1631b1a06047 Mon Sep 17 00:00:00 2001
-From: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Date: Thu, 30 Jan 2014 13:17:20 +0200
-Subject: [PATCH] ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
+Nope, just [1|2|3] I think. Can be numbers, will fix.
 
-If CLK_SET_RATE_PARENT is set for a clkoutx2 clock, calling
-clk_set_rate() on the clock "skips" the x2 multiplier as there are no
-set_rate and round_rate functions defined for the clkoutx2.
+> > +       if (sata_gen) {
+> > +               if (!strcmp(sata_gen, "gen3"))
+> > +                       phy_dev->sata_gen = SATA_GEN3;
+> > +               else if (!strcmp(sata_gen, "gen2"))
+> > +                       phy_dev->sata_gen = SATA_GEN2;
+> > +       }
+> > +
+> > +       phy_dev->pcie_tx_pol_inv =
+> > +               of_property_read_bool(np, "st,pcie_tx_pol_inv");
+> > +
+> > +       phy_dev->sata_tx_pol_inv =
+> > +               of_property_read_bool(np, "st,sata_tx_pol_inv");
+> 
+> Likewise for both of these on the first two points.
 
-This results in getting double the requested clock rates, breaking the
-display on omap3430 based devices. This got broken when
-d0f58bd3bba3877fb1af4664c4e33273d36f00e4 and related patches were merged
-for v3.14, as omapdss driver now relies more on the clk-framework and
-CLK_SET_RATE_PARENT.
+1. Roger will fix.
 
-This patch implements set_rate and round_rate for clkoutx2.
+2. Not probeable I'm afraid.
 
-Tested on OMAP3430, OMAP3630, OMAP4460.
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +static int miphy365x_phy_probe(struct platform_device *pdev)
+> > +{
+> > +       struct device_node *np = pdev->dev.of_node;
+> > +       struct miphy365x_dev *phy_dev;
+> > +       struct device *dev = &pdev->dev;
+> > +       struct phy_provider *provider;
+> > +       u8 port;
+> > +       int ret;
+> > +
+> > +       if (!np) {
+> > +               dev_err(dev, "No DT found\n");
+> 
+> s/DT/node/ ?
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/mach-omap2/cclock3xxx_data.c |  2 +
- arch/arm/mach-omap2/dpll3xxx.c        | 92 +++++++++++++++++++++++++++++------
- include/linux/clk/ti.h                |  4 ++
- 3 files changed, 83 insertions(+), 15 deletions(-)
+s/DT/DT node/
 
-diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
-index 3b05aea56d1f..11ed9152e665 100644
---- a/arch/arm/mach-omap2/cclock3xxx_data.c
-+++ b/arch/arm/mach-omap2/cclock3xxx_data.c
-@@ -433,7 +433,9 @@ static const struct clk_ops dpll4_m5x2_ck_ops = {
- 	.enable		= &omap2_dflt_clk_enable,
- 	.disable	= &omap2_dflt_clk_disable,
- 	.is_enabled	= &omap2_dflt_clk_is_enabled,
-+	.set_rate	= &omap3_clkoutx2_set_rate,
- 	.recalc_rate	= &omap3_clkoutx2_recalc,
-+	.round_rate	= &omap3_clkoutx2_round_rate,
- };
- 
- static const struct clk_ops dpll4_m5x2_ck_3630_ops = {
-diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-index 3185ced807c9..3c418ea54bbe 100644
---- a/arch/arm/mach-omap2/dpll3xxx.c
-+++ b/arch/arm/mach-omap2/dpll3xxx.c
-@@ -623,6 +623,32 @@ void omap3_dpll_deny_idle(struct clk_hw_omap *clk)
- 
- /* Clock control for DPLL outputs */
- 
-+/* Find the parent DPLL for the given clkoutx2 clock */
-+static struct clk_hw_omap *omap3_find_clkoutx2_dpll(struct clk_hw *hw)
-+{
-+	struct clk_hw_omap *pclk = NULL;
-+	struct clk *parent;
-+
-+	/* Walk up the parents of clk, looking for a DPLL */
-+	do {
-+		do {
-+			parent = __clk_get_parent(hw->clk);
-+			hw = __clk_get_hw(parent);
-+		} while (hw && (__clk_get_flags(hw->clk) & CLK_IS_BASIC));
-+		if (!hw)
-+			break;
-+		pclk = to_clk_hw_omap(hw);
-+	} while (pclk && !pclk->dpll_data);
-+
-+	/* clk does not have a DPLL as a parent?  error in the clock data */
-+	if (!pclk) {
-+		WARN_ON(1);
-+		return NULL;
-+	}
-+
-+	return pclk;
-+}
-+
- /**
-  * omap3_clkoutx2_recalc - recalculate DPLL X2 output virtual clock rate
-  * @clk: DPLL output struct clk
-@@ -637,27 +663,14 @@ unsigned long omap3_clkoutx2_recalc(struct clk_hw *hw,
- 	unsigned long rate;
- 	u32 v;
- 	struct clk_hw_omap *pclk = NULL;
--	struct clk *parent;
- 
- 	if (!parent_rate)
- 		return 0;
- 
--	/* Walk up the parents of clk, looking for a DPLL */
--	do {
--		do {
--			parent = __clk_get_parent(hw->clk);
--			hw = __clk_get_hw(parent);
--		} while (hw && (__clk_get_flags(hw->clk) & CLK_IS_BASIC));
--		if (!hw)
--			break;
--		pclk = to_clk_hw_omap(hw);
--	} while (pclk && !pclk->dpll_data);
-+	pclk = omap3_find_clkoutx2_dpll(hw);
- 
--	/* clk does not have a DPLL as a parent?  error in the clock data */
--	if (!pclk) {
--		WARN_ON(1);
-+	if (!pclk)
- 		return 0;
--	}
- 
- 	dd = pclk->dpll_data;
- 
-@@ -672,6 +685,55 @@ unsigned long omap3_clkoutx2_recalc(struct clk_hw *hw,
- 	return rate;
- }
- 
-+int omap3_clkoutx2_set_rate(struct clk_hw *hw, unsigned long rate,
-+					unsigned long parent_rate)
-+{
-+	return 0;
-+}
-+
-+long omap3_clkoutx2_round_rate(struct clk_hw *hw, unsigned long rate,
-+		unsigned long *prate)
-+{
-+	const struct dpll_data *dd;
-+	u32 v;
-+	struct clk_hw_omap *pclk = NULL;
-+
-+	if (!*prate)
-+		return 0;
-+
-+	pclk = omap3_find_clkoutx2_dpll(hw);
-+
-+	if (!pclk)
-+		return 0;
-+
-+	dd = pclk->dpll_data;
-+
-+	/* TYPE J does not have a clkoutx2 */
-+	if (dd->flags & DPLL_J_TYPE) {
-+		*prate = __clk_round_rate(__clk_get_parent(pclk->hw.clk), rate);
-+		return *prate;
-+	}
-+
-+	WARN_ON(!dd->enable_mask);
-+
-+	v = omap2_clk_readl(pclk, dd->control_reg) & dd->enable_mask;
-+	v >>= __ffs(dd->enable_mask);
-+
-+	/* If in bypass, the rate is fixed to the bypass rate*/
-+	if (v != OMAP3XXX_EN_DPLL_LOCKED)
-+		return *prate;
-+
-+	if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
-+		unsigned long best_parent;
-+
-+		best_parent = (rate / 2);
-+		*prate = __clk_round_rate(__clk_get_parent(hw->clk),
-+				best_parent);
-+	}
-+
-+	return *prate * 2;
-+}
-+
- /* OMAP3/4 non-CORE DPLL clkops */
- const struct clk_hw_omap_ops clkhwops_omap3_dpll = {
- 	.allow_idle	= omap3_dpll_allow_idle,
-diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index 092b64168d7f..4a21a872dbbd 100644
---- a/include/linux/clk/ti.h
-+++ b/include/linux/clk/ti.h
-@@ -245,6 +245,10 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
- void omap2_init_clk_clkdm(struct clk_hw *clk);
- unsigned long omap3_clkoutx2_recalc(struct clk_hw *hw,
- 				    unsigned long parent_rate);
-+int omap3_clkoutx2_set_rate(struct clk_hw *hw, unsigned long rate,
-+					unsigned long parent_rate);
-+long omap3_clkoutx2_round_rate(struct clk_hw *hw, unsigned long rate,
-+		unsigned long *prate);
- int omap2_clkops_enable_clkdm(struct clk_hw *hw);
- void omap2_clkops_disable_clkdm(struct clk_hw *hw);
- int omap2_clk_disable_autoidle_all(void);
+Will fix, thanks.
+
 -- 
-1.8.3.2
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140213/1f45fc18/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
