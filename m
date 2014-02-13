@@ -1,21 +1,30 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Feb 2014 15:30:00 -0800
-Subject: [PATCH] ARM: OMAP2+: Remove legacy macros for zoom platforms
-In-Reply-To: <1392198352.23759.10.camel@x220>
-References: <1392198352.23759.10.camel@x220>
-Message-ID: <20140213233000.GT28216@atomide.com>
+Date: Thu, 13 Feb 2014 15:36:52 -0800
+Subject: [PATCH v2 0/4] ARM: dts: Fixes for Overo/Tobi against 3.14-rc2
+In-Reply-To: <1392287116-4548-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1392287116-4548-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <20140213233652.GU28216@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Bolle <pebolle@tiscali.nl> [140212 01:48]:
-> Commit 97411608fd5f ("ARM: OMAP2+: Remove legacy support for zoom
-> platforms") removed the Kconfig symbols MACH_OMAP_ZOOM2 and
-> MACH_OMAP_ZOOM3. Remove the last usage of the related macros too.
+* Florian Vaussard <florian.vaussard@epfl.ch> [140213 02:28]:
+> OMAP36xx-based Overo (Storm and alike) are now failing to boot with 3.14-rc2 [1].
+> This series fixes this, by moving model-agnostic DT into a common dtsi file,
+> and creating model-specific DT files:
 > 
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> Untested, but should have zero impact.
+> - omap3-overo-tobi.dts -> older OMAP35xx Overo
+> - omap3-overo-storm-tobi.dts -> newer OMAP36xx/AM37xx/DM37xx Overo
+> 
+> People will have to use the right Overo / expansion board combination.
+> 
+> (Patch 2 in an unrelated fix that was waiting in my queue.)
+> 
+> omap3-overo-tobi.dts tested with Overo Sand (OMAP3503) and omap3-overo-storm-tobi.dts
+> tested with Overo EarthStorm (AM3703). Both boot. With the Overo Sand, I cannot
+> mount the ext3 rootfs, but this seems unrelated to the current topic, maybe
+> a missing errata.
 
-Thanks applying into omap-for-v3.14/fixes.
+Applying patches 1 to 3 into omap-for-v3.14/fixes thanks, the last
+one still seems to have discussion going.
 
 Tony
