@@ -1,211 +1,358 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 13 Feb 2014 20:47:41 +0800
-Subject: [PATCH] bus: imx-weim: support weim-cs-gpr for imx6q-weim
-In-Reply-To: <20140212164304.GA20251@frolo.macqel>
-References: <1392087011-31629-1-git-send-email-shawn.guo@linaro.org>
- <20140212164304.GA20251@frolo.macqel>
-Message-ID: <20140213124739.GA20842@S2101-09.ap.freescale.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 13 Feb 2014 12:47:32 +0000
+Subject: [PATCH RFC v3 3/3] Documentation: arm: define DT idle states
+ bindings
+In-Reply-To: <20140213013153.18853.21632@capellas-linux>
+References: <1392128273-8614-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1392128273-8614-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140213013153.18853.21632@capellas-linux>
+Message-ID: <20140213124731.GD26329@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 05:43:04PM +0100, Philippe De Muyter wrote:
-> Thanks Shawn.
-> 
-> On Tue, Feb 11, 2014 at 10:50:11AM +0800, Shawn Guo wrote:
-> > For imx6q-weim type of device, there might a WEIM CS space configuration
-> > register in General Purpose Register controller, e.g. IOMUXC_GPR1 on
-> > i.MX6Q.
-> > 
-> > Depending on which configuration of the following 4 is chosen for given
-> > system, IOMUXC_GPR1[11:0] should be set up as 0x5, 0x1b, 0x4b or 0x249
-> 
-> As the bits are actually grouped by 3, one could write:
-> 					... as 05, 033, 0113, or 01111
+Hi Sebastian,
 
-Indeed, it's easier to read.  Will change.
+thanks for having a look.
 
-> > correspondingly.
-> > 
-> > 	CS0(128M) CS1(0M)  CS2(0M)  CS3(0M)
-> > 	CS0(64M)  CS1(64M) CS2(0M)  CS3(0M)
-> > 	CS0(64M)  CS1(32M) CS2(32M) CS3(0M)
-> > 	CS0(32M)  CS1(32M) CS2(32M) CS3(32M)
-> > 
-> > The patch creates a table in the driver for above configurations, and
-> > detects which one is being used for the booting system by looking at
-> > 'ranges' property of WEIM node.  Thus the WEIM CS GPR can be set up
-> > automatically at boot time.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  Documentation/devicetree/bindings/bus/imx-weim.txt |    6 ++
-> >  drivers/bus/imx-weim.c                             |   83 ++++++++++++++++++++
-> >  2 files changed, 89 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
-> > index 0fd76c4..d114460f 100644
-> > --- a/Documentation/devicetree/bindings/bus/imx-weim.txt
-> > +++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
-> > @@ -19,6 +19,12 @@ Required properties:
-> >  
-> >  			   <cs-number> 0 <physical address of mapping> <size>
-> >  
-> > +Optional properties:
-> > +
-> > + - fsl,weim-cs-gpr:	Should be the phandle to the General Purpose Register
-> > +			controller that contains WEIM CS GPR register, e.g.
-> > +			IOMUXC_GPR1 on i.MX6Q.
+On Thu, Feb 13, 2014 at 01:31:53AM +0000, Sebastian Capella wrote:
+> Quoting Lorenzo Pieralisi (2014-02-11 06:17:53)
+> > +       - cpu-idle-states
+> > +               Usage: Optional
+> > +               Value type: <prop-encoded-array>
+> > +               Definition:
+> > +                       # List of phandles to cpu idle state nodes supported
+> > +                         by this cpu [1].
 > > +
 > 
-> Why require that new property ?  It makes things harder to use.
+> Should cpu idle be hyphenated in the definition like:
+>   "List of phandles to cpu-idle state nodes supported"
 
-I was originally thinking that it may help if some day we get an
-imx6q-weim type of device integrated on an new IMX SoC where the WEIM
-CS GPR is defined in other block other than IOMUXC.  But, yes, it's
-unnecessary today, and we can add it when necessary.  I will drop it
-in v2.
+No, because it is not meant to be tied to the kernel CPU idle framework.
+It is meant to be "List of phandles to idle state nodes supported by this cpu"
+and that's what I will do.
 
-> 
-> And you could add the body of your commit log here.
-> 
-> >  Timing property for child nodes. It is mandatory, not optional.
-> >  
-> >   - fsl,weim-cs-timing:	The timing array, contains timing values for the
-> > diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-> > index 3ef58c8..9c8a522 100644
-> > --- a/drivers/bus/imx-weim.c
-> > +++ b/drivers/bus/imx-weim.c
-> > @@ -11,6 +11,9 @@
-> >  #include <linux/clk.h>
-> >  #include <linux/io.h>
-> >  #include <linux/of_device.h>
-> > +#include <linux/mfd/syscon.h>
-> > +#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
-> > +#include <linux/regmap.h>
-> >  
-> >  struct imx_weim_devtype {
-> >  	unsigned int	cs_count;
-> > @@ -56,6 +59,83 @@ static const struct of_device_id weim_id_table[] = {
-> >  };
-> >  MODULE_DEVICE_TABLE(of, weim_id_table);
-> >  
-> > +struct imx6q_weim_gpr {
-> > +	u32 cssize[4];
-> > +	u32 gprval;
-> > +};
-> > +
-> > +static const struct imx6q_weim_gpr imx6q_weim_gpr_data[] __initconst = {
-> > +	{
-> > +		/* CS0(128M) CS1(0M) CS2(0M) CS3(0M) */
-> > +		.cssize = { 128, 0, 0, 0 },
-> > +		.gprval = 0x5,
-> 			05
-> > +	}, {
-> > +		/* CS0(64M) CS1(64M) CS2(0M) CS3(0M) */
-> > +		.cssize = { 64, 64, 0, 0 },
-> > +		.gprval = 0x1b,
-> 			033
-> > +	}, {
-> > +		/* CS0(64M) CS1(32M) CS2(32M) CS3(0M) */
-> > +		.cssize = { 64, 32, 32, 0 },
-> > +		.gprval = 0x4b,
-> 			0113
-> > +	}, {
-> > +		/* CS0(64M) CS1(32M) CS2(32M) CS3(0M) */
-> 		/* CS0(32M) CS1(32M) CS2(32M) CS3(32M) */
-> > +		.cssize = { 32, 32, 32, 32 },
-> > +		.gprval = 0x249,
-> 			01111
-> > +	},
-> > +};
-> > +
-> > +static int __init imx6q_weim_gpr_setup(struct platform_device *pdev)
-> > +{
-> > +	struct device_node *np = pdev->dev.of_node;
-> > +	const struct property *prop;
-> > +	struct regmap *gpr;
-> > +	u32 cssize[4] = { 0, 0, 0, 0 };
-> > +	int len;
-> > +	int ret;
-> > +	int i;
-> > +
-> > +	gpr = syscon_regmap_lookup_by_phandle(np, "fsl,weim-cs-gpr");
-> 
-> 	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
-> 
-> > +	if (IS_ERR(gpr)) {
-> > +		dev_dbg(&pdev->dev, "No weim-cs-gpr to set up\n");
-> > +		return 0;
-> > +	}
-> > +
-> > +	prop = of_find_property(np, "ranges", &len);
-> > +	if (prop == NULL)
-> > +		return -ENOENT;
-> > +	if (len % (sizeof(u32) * 4))
-> > +		return -EINVAL;
-> > +
-> > +	for (i = 0; i < len / (sizeof(u32) * 4); i++) {
-> > +		int cs;
-> > +		/* read cs index */
-> > +		ret = of_property_read_u32_index(np, "ranges", i * 4, &cs);
-> > +		if (ret)
-> > +			return ret;
-> > +		/* read cs size */
-> > +		ret = of_property_read_u32_index(np, "ranges", i * 4 + 3,
-> > +						 &cssize[cs]);
-> > +		if (ret)
-> > +			return ret;
-> > +		/* turn to MB */
-> > +		cssize[cs] >>= 20;
-> > +	}
-> > +
-> > +	for (i = 0; i < ARRAY_SIZE(imx6q_weim_gpr_data); i++) {
-> > +		ret = memcmp(cssize, imx6q_weim_gpr_data[i].cssize,
-> > +			     sizeof(cssize));
-> > +		if (ret == 0) {
-> > +			/* Find it. Set up IOMUXC_GPR1[11:0] with the gprval. */
-> 
-> 			Found it
+On a side note, that's why I was reluctant to call them idle states, for
+the records.
 
-Right.
+> Is anything implied in the ordering of this list?
+> Or is this a non-ordered array of phandles?
 
-> 
-> > +			regmap_update_bits(gpr, IOMUXC_GPR1, 0xfff,
-> > +					   imx6q_weim_gpr_data[i].gprval);
-> > +			return 0;
-> > +		}
-> > +	}
+Non-ordered.
+
+> Would it be a good idea to select a different name for this property vs.
+> the node?  It seems to get confusing sometimes.
+
+Such as ? "idle-states" ?
+
+> > +According to the Server Base System Architecture document (SBSA, [3]), the
+> > +power states an ARM CPU can be put into are identified by the following list:
 > > +
-> > +	dev_err(&pdev->dev, "Invalid 'ranges' configuration\n");
-> > +	return -EINVAL;
-> > +}
-> > +
-> >  /* Parse and set the timing for this device. */
-> >  static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
-> >  				    const struct imx_weim_devtype *devtype)
-> > @@ -92,6 +172,9 @@ static int __init weim_parse_dt(struct platform_device *pdev,
-> >  	struct device_node *child;
-> >  	int ret;
-> >  
-> > +	if (of_device_is_compatible(pdev->dev.of_node, "fsl,imx6q-weim"))
-> > +		imx6q_weim_gpr_setup(pdev);
-> > +
-> >  	for_each_child_of_node(pdev->dev.of_node, child) {
-> >  		if (!child->name)
-> >  			continue;
-> > -- 
-> > 1.7.9.5
-> > 
+> > +1 - Running
+> > +2 - Idle_standby
+> > +3 - Idle_retention
+> > +4 - Sleep
+> > +5 - Off
 > 
-> Now the most important : it works.  I have tested it successfully for the
-> 4 combinations.
+> Are these states used in the state->index value?
+> Might it be helpful to number these starting with 0?
+
+No, I will remove the numbers.
+
+> > +ARM platforms implement the power states specified in the SBSA through power
+> > +management schemes that allow an OS PM implementation to put the processor in
+> > +different idle states (which include states 1 to 4 above; "off" state is not
+> > +an idle state since it does not have wake-up capabilities, hence it is not
+> > +considered in this document).
 > 
-> Code could probably be made shorter by using 'of_prop_next_u32' and building
-> the gprval incrementally, then checking it against the four possible values,
-> though.
+> Might an implementation have both sleep and off states where they have
+> different latencies in the case a cpu can wake itself vs. a coprocessor
+> waking the cpu?
 
-Point taken.  See it in v2.
+Yes, but not in SBSA nomenclature. off as in SBSA is not an idle state,
+since it does not require IRQ wake up capabilities.
 
-Thanks for the review comments.
+An idle state requires IRQ wake-up capabilities (either through return
+from wfi or reset from coprocessor), how it is implemented it does not
+matter.
 
-Shawn
+> > +
+> > +Idle state parameters (eg entry latency) are platform specific and need to be
+> > +characterized with bindings that provide the required information to OSPM
+> > +code so that it can build the required tables and use them at runtime.
+> > +
+> > +The device tree binding definition for ARM idle states is the subject of this
+> > +document.
+> 
+> During last connect, we'd discussed that the small set of
+> states here could apply to a single node, which can represent a cpu, a
+> cluster with cache etc.  Then the complexities of the system power state
+> would be represented using a heirarchy, with each node in the
+> tree having its own state from the list above.  This would allow
+> a fairly rich system state while having just a few power states defined
+> at each level.  Is this how you're intending these bindings to go?
+
+Yes, CPUs point at states that can be reached by that CPU (eg a CPU core
+gating state is represented by a single node pointed at by all CPUs in the
+system - it the same state data, different power domains though).
+
+States are hierarchical, which means that a parent state implies entry on all
+substates that's how cluster states are defined.
+
+> > +===========================================
+> > +2 - state node
+> > +===========================================
+> 
+> should the section numbering be incremented here?  Or is this a
+> subsection?  2.1?
+
+Yes.
+
+> Also, would it be nice to have a name field for each state?
+
+There is:
+
+"The state node name shall be "stateN", where N = {0, 1, ...} is
+the node number; state nodes which are siblings within a single
+common parent node must be given a unique and sequential N value,
+starting from 0."
+
+I can remove the rule and allow people to call states as they wish
+since they already have a compatible property to match them.
+
+Actually, states can be called with any name, provided it is unique.
+
+> > +       A state node can contain state child nodes. A state node with
+> > +       children represents a hierarchical state, which is a superset of
+> > +       the child states. Hierarchical states require all CPUs on which
+> > +       they are valid to request the state in order for it to be entered.
+> 
+> Is it possible for a cpu to request a deeper state and unblock other cpus
+> from entering this state?
+
+That's not DT bindings business, hierarchical states define states that
+require all CPUs on which they are valid to enter that state for it to
+be considered "enabled".
+
+It is a hard nut to crack. In x86 this stuff does not exist and it is
+managed in HW, basically an idle state is always per-cpu (but it might
+end up becoming a package state when all CPUs in a package enter that
+state). On ARM, we want to define hierarchical states explicitly to
+link resources (ie caches) to them.
+
+CPUs are not prevented from requesting a hierarchical state, but the
+state only becomes "enabled" when all CPUs on which it is valid request
+it.
+
+I cannot think of any other way of to express this properly but still in
+a compact way.
+
+> "all CPUs on which they are valid" is this determined by seeing which
+> state's phandle is in each cpu->cpu-idle-states?
+
+Yes, does it make sense ?
+
+> > +
+> > +       A state node defines the following properties:
+> ...
+> > +       - index
+> > +               Usage: Required
+> > +               Value type: <u32>
+> > +               Definition: It represents an idle state index, starting from 2.
+> > +                           Index 0 represents the processor state "running"
+> > +                           and index 1 represents processor mode
+> > +                           "idle_standby", entered by executing a wfi
+> > +                           instruction (SBSA,[3]); indexes 0 and 1 are
+> > +                           standard ARM states that need not be described.
+> 
+> Do you think maybe something like this might be clearer?
+
+Yes it is.
+
+> Definition: It represents an idle state index.
+> 
+>         Index 0 and 1 shall not be specified and are reserved for ARM
+>         states where index 0 is running, and index 1 is idle_standby
+>         entered by executing a wfi instruction (SBSA,[3])
+> 
+> What mechanism is used to order the power states WRT power consumption?
+
+I think we should use index for that. The higher the index the lower the
+power consumption.
+
+> > +       - entry-method
+> > +               Usage: Required
+> > +               Value type: <stringlist>
+> > +               Definition: Describes the method by which a CPU enters the
+> > +                           idle state. This property is required and must be
+> > +                           one of:
+> > +
+> > +                           - "arm,psci-cpu-suspend"
+> > +                             ARM PSCI firmware interface, CPU suspend
+> > +                             method[2].
+> 
+> Can psci-cpu-suspend be assumed if entry-method is omitted?
+
+No.
+
+> Can this field be used to combine both psci and non-psci states in any order?
+
+No. I will enforce a unique entry method.
+
+> > +       - power-state
+> > +               Usage: See definition.
+> > +               Value type: <u32>
+> > +               Definition: Depends on the entry-method property value.
+> > +                           If entry-method is "arm,psci-cpu-suspend":
+> > +                               # Property is required and represents
+> > +                                 psci-power-state parameter. Please refer to
+> > +                                 [2] for PSCI bindings definition.
+> 
+> Examples use psci-power-state..
+
+Typo, sorry, it is not C unfortunately...
+
+> If we call this something like entry-method-param rather than power-state,
+> would this allow the field to be more flexible?  Is flexibility here a goal?
+
+Yes, I can call it like that.
+
+>         - power-state
+>                 Usage: See definition.
+>                 Value type: <u32>
+>                 Definition:  Parameter to pass to the entry method when
+>                         this state is being entered.
+>                         If entry-method is "arm,psci-cpu-suspend",
+>                         this parameter represents the psci-power-state
+>                         parameter. Please refer to [2] for PSCI bindings
+>                         definition.
+> 
+> > +       - power-domains
+> > +               Usage: Optional
+> > +               Value type: <prop-encoded-array>
+> > +               Definition: List of power domain specifiers ([1]) describing
+> > +                           the power domains that are affected by the idle
+> > +                           state entry.
+> 
+> How do you expect this information should be used?
+
+This defines all power domains that are affected by the state entry.
+It allows us to understand what caches, devices, whatnots have to be
+acted upon state entry.
+
+> I assume psci will be turning off the powerdomains not Linux right?
+
+This is not a PSCI only document, and even if it was, we still need to deal
+with devices. Which means we need to know what we have to save/restore (PMU,
+arch timer, GIC), and power domains help us detect that.
+
+> If so, is the structure above helpful for psci to associate the cpu
+> requesting a state to the specific power domain in the power-domains list?
+> Or is this all encoded in the parameter to PSCI suspend?  In that case,
+> what is the utility?
+
+See above.
+
+> > +       - cache-state-retained
+> > +               Usage: See definition
+> > +               Value type: <none>
+> > +               Definition: if present cache memory is retained on power down,
+> > +                           otherwise it is lost.
+> > +
+> > +       - processor-state-retained
+> > +               Usage: See definition
+> > +               Value type: <none>
+> > +               Definition: if present CPU processor logic is retained on
+> > +                           power down, otherwise it is lost.
+> 
+> I don't see a good example of these two retained state properties.
+> Isn't this the purpose of idle_retained state?  In the explanations, is
+> the term 'power down' the same as sleep or off?
+
+Ok, I will remove "power down" and replace it with "state entry".
+
+> > +
+> > +cpus {
+> > +       #size-cells = <0>;
+> > +       #address-cells = <2>;
+> > +
+> > +       cpu-idle-states {
+> > +
+> > +               STATE0: state0 {
+> > +                       compatible = "arm,cpu-idle-state";
+> > +                       index = <3>;
+> 
+> Are the index fields of nested states independent of each other or
+> sequential?
+> 
+> ie:
+>   -  does index=3 here mean pd_cluster is sleep state, and index=2
+>      below mean the cpu cluster is idle_retention? (both SBSA states)
+>   -  Or does index=3 here mean this state is the next cpu-idle state after
+>      STATE0_1 below, which has index=2?  In this case, are the indexes
+>      implied to be increasing in order of most power savings?
+
+Forget index as a link to SBSA states indexes above I should have never listed
+them as numbers. I understand index is misleading and either I remove it, or I
+leave it there to define power savings scale as you mentioned.
+
+> > +                       entry-method = "arm,psci-cpu-suspend";
+> > +                       psci-power-state = <0x1010000>;
+> > +                       entry-latency = <500>;
+> > +                       exit-latency = <1000>;
+> > +                       min-residency = <2500>;
+> > +                       power-domains = <&pd_clusters 0>;
+> > +                       STATE0_1: state0 {
+> 
+> Should this be STATE0_0?
+
+Well, yes, it is a tag though so it can be whatever we want as long as
+it is unique.
+
+> > +                               compatible = "arm,cpu-idle-state";
+> > +                               index = <2>;
+> > +                               entry-method = "arm,psci-cpu-suspend";
+> > +                               psci-power-state = <0x0010000>;
+> > +                               entry-latency = <200>;
+> > +                               exit-latency = <400>;
+> > +                               min-residency = <300>;
+> > +                               power-domains = <&pd_cores 0>,
+> > +                                               <&pd_cores 1>,
+>                                                   ...
+> > +                                               <&pd_cores 7>;
+> > +                       };
+> > +               };
+> 
+> Would it be possible to add an example illustrating more
+> complex cluster/cpu power states?  Maybe where both the cpus and
+> cluster have multiple states (sleep/retention)?
+> 
+> The current example seems to show just the cpu idle_retention state,
+> and the cluster off state.
+> 
+> Maybe an example of how you'd represent something like this with the new
+> bindings:
+> 
+> (in increasing order of power saving)
+> +-----------------+--------------------+-----------------------------------+
+> |      cpu        |      cluster       |        Notes
+> +-----------------+--------------------+-----------------------------------+
+> |    running      |      running       |      not specified running
+> |  idle_standby   |      running       |      not specified WFI
+> | idle_retention  |      running       |
+> | idle_retention  |   idle_retention   |
+> |     sleep       |   idle_retention   |
+> |     sleep       |       sleep        |
+> +-----------------|--------------------+-----------------------------------+
+> 
+> The CPU has 4 states: running, idle standby, idle_retention and sleep.
+> the first two are not specified per the instructions.
+> 
+> Then the cluster has 3 states: running, retention and sleep.
+> 
+> Maybe a complex case like this would be helpful to understand how the
+> bindings should be used.
+
+Ok, I will do that and rework the bindings accordingly.
+
+Thanks,
+Lorenzo
