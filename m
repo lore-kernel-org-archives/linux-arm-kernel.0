@@ -1,65 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 13 Feb 2014 17:28:20 +0100
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <BA5E6077-77F8-4BE8-80E5-BAB9FE111387@codeaurora.org>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <20140213110721.GC13576@mudshark.cambridge.arm.com>
- <BA5E6077-77F8-4BE8-80E5-BAB9FE111387@codeaurora.org>
-Message-ID: <4110788.UI9TADVhpa@wuerfel>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 13 Feb 2014 11:34:40 -0500
+Subject: [PATCH] Fix uses of dma_max_pfn() when converting to a limiting
+ address
+In-Reply-To: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
+References: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
+Message-ID: <52FCF420.2020603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 February 2014 10:22:25 Kumar Gala wrote:
-> On Feb 13, 2014, at 5:07 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > Happy to change it, but I'm also struggling for names. Maybe "linux,?"?
+On Tuesday 11 February 2014 12:28 PM, Russell King wrote:
+> We must use a 64-bit for this, otherwise overflowed bits get lost, and
+> that can result in a lower than intended value set.
+> 
+> Fixes: 8e0cb8a1f6ac ("ARM: 7797/1: mmc: Use dma_max_pfn(dev) helper for bounce_limit calculations")
+> Fixes: 7d35496dd982 ("ARM: 7796/1: scsi: Use dma_max_pfn(dev) helper for bounce_limit calculations")
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> While poking about with the Cubox-i4 and investigating why my UHS-1
+> SD card wasn't achieving its full potential, I came across a slight
+> problem... the SDHCI host sets a mask of 0xffffffff, but with the
+> start of memory at pfn 0x10000, the blk code sees this when setting
+> the bounce limit:
+> 
+> 	max addr 0x0ffff000 bounce limit 0xffff dma 1
+> 
+> and this results in the bounce functions appearing in the profile:
+> 
+> 00000000c00f8b70 copy_to_high_bio_irq                  1139 2.5886
+> 00000000c00f8d28 bounce_end_io                           12 0.0714
+> 00000000c00f8dd0 bounce_end_io_read_isa                   8 0.1053
+> 
+> which, compared to the cost of copying the data to userland and
+> request handling, this is quite significant:
+> 
+> 00000000c04b1794 sdhci_request                          268 0.5447
+> 00000000c02d0740 __copy_to_user_std                     398 0.4252
+> 
+> With this calculation fixed, we avoid the bouncing code entirely.
+> 
+> 	max addr 0x10ffff000 bounce limit 0x10ffff dma 0
 >
-> I was thinking that as well, I?d say go with ?linux,?.
+You are right. We were seeing an issue with SCSI HDD over PCI and
+the patch fixes that issue as well.
 
-I see nothing linux specific in there. I would only use that namespace
-for things we don't expect to work with another OS.
+I think we should send this patch to stable as well. At least 3.13
+should get this patch.
 
-> >>> +- ranges         : As described in IEEE Std 1275-1994, but must provide
-> >>> +                   at least a definition of one or both of IO and Memory
-> >>> +                   Space.
-> >>> +
-> >>> +- #address-cells : Must be 3
-> >>> +
-> >>> +- #size-cells    : Must be 2
-> >>> +
-> >>> +- reg            : The Configuration Space base address, as accessed by the
-> >>> +                   parent bus.
-> >> 
-> >> Isn?t the size fixed here for cam or ecam?
-> > 
-> > Yes, which is why reg just specifies the base address.
+Thanks RMK for the bug fix. Feel free to add, in case the patch is
+not committed already
+
+Tested-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+ 
+>  drivers/mmc/card/queue.c | 2 +-
+>  drivers/scsi/scsi_lib.c  | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> Huh?  The reg property clearly has the size in it (as shown in the example below).
-> I guess I was just asking for the description here to say what the size was for
-> the 2 compatibles since its fixed and known.
-
-It's still an open question whether the config space in the reg property should
-cover all 256 buses or just the ones in the bus-range. In the latter case,
-it would be variable (but predictable) size.
-
-> You could clean it up a bit to be human readable even if its kvmtool that?s creating it.
+> diff --git a/drivers/mmc/card/queue.c b/drivers/mmc/card/queue.c
+> index 357bbc54fe4b..3e049c13429c 100644
+> --- a/drivers/mmc/card/queue.c
+> +++ b/drivers/mmc/card/queue.c
+> @@ -197,7 +197,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
+>  	struct mmc_queue_req *mqrq_prev = &mq->mqrq[1];
+>  
+>  	if (mmc_dev(host)->dma_mask && *mmc_dev(host)->dma_mask)
+> -		limit = dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
+> +		limit = (u64)dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
+>  
+>  	mq->card = card;
+>  	mq->queue = blk_init_queue(mmc_request_fn, lock);
+> diff --git a/drivers/scsi/scsi_lib.c b/drivers/scsi/scsi_lib.c
+> index 7bd7f0d5f050..62ec84b42e31 100644
+> --- a/drivers/scsi/scsi_lib.c
+> +++ b/drivers/scsi/scsi_lib.c
+> @@ -1684,7 +1684,7 @@ u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
+>  
+>  	host_dev = scsi_get_device(shost);
+>  	if (host_dev && host_dev->dma_mask)
+> -		bounce_limit = dma_max_pfn(host_dev) << PAGE_SHIFT;
+> +		bounce_limit = (u64)dma_max_pfn(host_dev) << PAGE_SHIFT;
+>  
+>  	return bounce_limit;
+>  }
 > 
-> 	pci {
-> 		compatible = "arm,pci-cam-generic?;
-> 		#address-cells = <3>;
-> 		#size-cells = <2>;
-> 		#interrupt-cells = <1>
-> 		reg = <0x0 0x40000000>;
-> 		ranges = <
-> 			0x1000000 0x0 0x00000000 0x0 0x00000000 0x0 0x00010000
-> 			0x2000000 0x0 0x41000000 0x0 0x41000000 0x0 0x3f000000
-> 			>;
-
-Make it 
-
- 		ranges = <0x1000000 0x0 0x00000000 0x0 0x00000000 0x0 0x00010000>,
- 			 <0x2000000 0x0 0x41000000 0x0 0x41000000 0x0 0x3f000000>;
-
-and it will be perfect ;-)
-
-	Arnd
