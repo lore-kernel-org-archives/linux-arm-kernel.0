@@ -1,32 +1,56 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 13 Feb 2014 07:11:38 +0100
-Subject: [PATCH v4 3/8] at91: dt: Add at91sam9261 dt SoC support
-In-Reply-To: <20140212210446.GF11498@piout.net>
-References: <1392199607-27452-1-git-send-email-jjhiblot@traphandler.com>
- <1392199607-27452-4-git-send-email-jjhiblot@traphandler.com>
- <20140212210446.GF11498@piout.net>
-Message-ID: <CACh+v5O0fJAvT0Ze9RkcVgLQ22Lod+m1ACj0K=GLLA=9r5tVvg@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 13 Feb 2014 15:39:47 +0900
+Subject: [PATCH] ARM: shmobile: koelsch: Enable SDHI,
+ GPIO and regulators in defconfig
+Message-ID: <1392273587-12196-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-02-12 22:04 GMT+01:00 Alexandre Belloni
-<alexandre.belloni@free-electrons.com>:
-> Sorry, one more comment on that patch:
->
-> On 12/02/2014 at 11:06:42 +0100, Jean-Jacques Hiblot wrote :
->> +                     pinctrl at fffff400 {
->> +                             #address-cells = <1>;
->> +                             #size-cells = <1>;
->> +                             compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
->> +                             ranges = <0xfffff400 0xfffff400 0xa00>;
->> +
-> I believe you got the range wrong, shouldn't it be:
->                                 ranges = <0xfffff400 0xfffff400 0x600>;
->
-Yes you're right.
-Thanks for the review
->
-> --
-> Alexandre Belloni, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+Enable the following:
+* regulators (needed for SDHI)
+* SDHI
+* GPIO
+* GPIO keys
+* GPIO LEDs
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/koelsch_defconfig | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+index 9561139..86faab5 100644
+--- a/arch/arm/configs/koelsch_defconfig
++++ b/arch/arm/configs/koelsch_defconfig
+@@ -59,6 +59,7 @@ CONFIG_SH_ETH=y
+ # CONFIG_NET_VENDOR_VIA is not set
+ # CONFIG_NET_VENDOR_WIZNET is not set
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_KEYBOARD_GPIO=y
+ # CONFIG_INPUT_MOUSE is not set
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_SERIAL_SH_SCI=y
+@@ -68,13 +69,21 @@ CONFIG_I2C=y
+ CONFIG_I2C_RCAR=y
+ CONFIG_SPI=y
+ CONFIG_SPI_RSPI=y
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_RCAR=y
+ # CONFIG_HWMON is not set
+ CONFIG_THERMAL=y
+ CONFIG_RCAR_THERMAL=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_REGULATOR_GPIO=y
+ # CONFIG_HID is not set
+ # CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_SDHI=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ # CONFIG_DNOTIFY is not set
+ CONFIG_TMPFS=y
+-- 
+1.8.5.2
