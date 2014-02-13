@@ -1,104 +1,158 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 13 Feb 2014 17:13:14 +0100
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
-In-Reply-To: <20140213144106.GW26684@n2100.arm.linux.org.uk>
-References: <1390190215-22700-1-git-send-email-olof@lixom.net>
- <2874395.Ul86gYA57i@wuerfel> <20140213144106.GW26684@n2100.arm.linux.org.uk>
-Message-ID: <1626419.Ta3A7zgHIt@wuerfel>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 13 Feb 2014 10:22:25 -0600
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <20140213110721.GC13576@mudshark.cambridge.arm.com>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <1392236171-10512-4-git-send-email-will.deacon@arm.com>
+ <D2AE4AE6-E8FA-4DD8-B92B-E37205A2548C@codeaurora.org>
+ <20140213110721.GC13576@mudshark.cambridge.arm.com>
+Message-ID: <BA5E6077-77F8-4BE8-80E5-BAB9FE111387@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 February 2014 14:41:06 Russell King - ARM Linux wrote:
-> On Thu, Feb 13, 2014 at 01:48:55PM +0100, Arnd Bergmann wrote:
-> > On Thursday 13 February 2014 10:42:48 Russell King - ARM Linux wrote:
-> > > 
-> > > What if we have a platform where things subtly change, like for instance,
-> > > the wiring on the SD slot to fix a problem with UHS-1 cards, which means
-> > > you don't have UHS-1 support for some platforms but do for others.
-> > > 
-> > > What if you have a platform which uses a brcm4329 chip for Wifi, but then
-> > > later in the production run switch to using a different Wifi chipset?
-> > 
-> > As far as I can tell, the power sequencing is normally really
-> > dependent on the device. If someone has an on-board brcm4329
-> > that requires a specific set of clocks, resets, voltages etc
-> > to be routed to the chip and enabled in the correct order to
-> > allow probing, it seems unlikely that changing the wifi chipset
-> > to something else would keep the exact same requirements.
+
+On Feb 13, 2014, at 5:07 AM, Will Deacon <will.deacon@arm.com> wrote:
+
+> On Wed, Feb 12, 2014 at 09:51:48PM +0000, Kumar Gala wrote:
+>> 
+>> On Feb 12, 2014, at 2:16 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> 
+>>> This patch adds support for a generic PCI host controller, such as a
+>>> firmware-initialised device with static windows or an emulation by
+>>> something such as kvmtool.
+>>> 
+>>> The controller itself has no configuration registers and has its address
+>>> spaces described entirely by the device-tree (using the bindings from
+>>> ePAPR). Both CAM and ECAM are supported for Config Space accesses.
+>>> 
+>>> Corresponding documentation is added for the DT binding.
+>>> 
+>>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>>> ---
+>>> .../devicetree/bindings/pci/arm-generic-pci.txt    |  51 ++++
+>>> drivers/pci/host/Kconfig                           |   7 +
+>>> drivers/pci/host/Makefile                          |   1 +
+>>> drivers/pci/host/pci-arm-generic.c                 | 318 +++++++++++++++++++++
+>>> 4 files changed, 377 insertions(+)
+>>> create mode 100644 Documentation/devicetree/bindings/pci/arm-generic-pci.txt
+>>> create mode 100644 drivers/pci/host/pci-arm-generic.c
+>>> 
+>>> diff --git a/Documentation/devicetree/bindings/pci/arm-generic-pci.txt b/Documentation/devicetree/bindings/pci/arm-generic-pci.txt
+>>> new file mode 100644
+>>> index 000000000000..cc7a35ecfa2d
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/pci/arm-generic-pci.txt
+>>> @@ -0,0 +1,51 @@
+>>> +* ARM generic PCI host controller
+>>> +
+>>> +Firmware-initialised PCI host controllers and PCI emulations, such as the
+>>> +virtio-pci implementations found in kvmtool and other para-virtualised
+>>> +systems, do not require driver support for complexities such as regulator and
+>>> +clock management. In fact, the controller may not even require the
+>>> +configuration of a control interface by the operating system, instead
+>>> +presenting a set of fixed windows describing a subset of IO, Memory and
+>>> +Configuration Spaces.
+>>> +
+>>> +Such a controller can be described purely in terms of the standardized device
+>>> +tree bindings communicated in pci.txt:
+>>> +
+>>> +- compatible     : Must be "arm,pci-cam-generic" or "arm,pci-ecam-generic"
+>>> +                   depending on the layout of configuration space (CAM vs
+>>> +                   ECAM respectively)
+>> 
+>> What?s arm specific here?  I don?t have a great suggestion, but seems odd
+>> for this to be vendor prefixed with "arm".
 > 
-> That's your assertion - however, do we /know/ whether there's a situation
-> where Olof's solution doesn't work because the sequencing is wrong?
+> Happy to change it, but I'm also struggling for names. Maybe "linux,?"?
+
+I was thinking that as well, I?d say go with ?linux,?.
+
+>>> +- ranges         : As described in IEEE Std 1275-1994, but must provide
+>>> +                   at least a definition of one or both of IO and Memory
+>>> +                   Space.
+>>> +
+>>> +- #address-cells : Must be 3
+>>> +
+>>> +- #size-cells    : Must be 2
+>>> +
+>>> +- reg            : The Configuration Space base address, as accessed by the
+>>> +                   parent bus.
+>> 
+>> Isn?t the size fixed here for cam or ecam?
 > 
-> I see nothing unreasonable about the sequence:
+> Yes, which is why reg just specifies the base address.
+
+Huh?  The reg property clearly has the size in it (as shown in the example below).  I guess I was just asking for the description here to say what the size was for the 2 compatibles since its fixed and known.
+
 > 
-> 1. hold reset at low level
-> 2. apply power
-> 3. turn clock on
-> 4. apply reset
-> 5. release reset
-
-I was thinking of cases where you may need a more complex sequence:
-- wait for a device specific time between some of the steps
-  (the cw1200 driver seems to need that, but we could probably
-   get away with waiting long enough for everyone)
-- have more than one of each, and turn them on in the right order.
-  cw1200 seems to need two voltages, two gpio resets ("reset"
-  and "powerup").
-  Again, we could specify a larger number of clocks that can be
-  provided to the host, but if we make it a device specific
-  property, we already know how many we need.
-
-I can't think of anything that would require significant changes
-to the procedure though, just refinements as we run into problems.
-
-> The points being:
-> * never set a signal to a high level before power is applied, otherwise
->   we can end up supplying power through that signal (which may cause
->   damage.)  That goes for the reset and clock.
-> * devices normally want clocks running to complete their reset sequencing.
+>>> +Configuration Space is assumed to be memory-mapped (as opposed to being
+>>> +accessed via an ioport) and laid out with a direct correspondence to the
+>>> +geography of a PCI bus address by concatenating the various components to form
+>>> +an offset.
+>>> +
+>>> +For CAM, this 24-bit offset is:
+>>> +
+>>> +        cfg_offset(bus, device, function, register) =
+>>> +                   bus << 16 | device << 11 | function << 8 | register
+>>> +
+>>> +Whilst ECAM extends this by 4 bits to accomodate 4k of function space:
+>>> +
+>>> +        cfg_offset(bus, device, function, register) =
+>>> +                   bus << 20 | device << 15 | function << 12 | register
+>>> +
+>>> +Interrupt mapping is exactly as described in `Open Firmware Recommended
+>>> +Practice: Interrupt Mapping' and requires the following properties:
+>>> +
+>>> +- #interrupt-cells   : Must be 1
+>>> +
+>>> +- interrupt-map      : <see aforementioned specification>
+>>> +
+>>> +- interrupt-map-mask : <see aforementioned specification>
+>> 
+>> Examples are always nice :)
 > 
-> This is actually the sequence which MMC/SD cards do (except without the
-> reset) anyway - it's spec'd that on the MMC/SD bus, power will be applied
-> and will be stable before the clock signal is applied, and then the clock
-> signal runs for a certain number of cycles before you even start talking
-> to the card.
+> Not in this case! kvmtool generates the following:
+> 
+> 	pci {
+> 		#address-cells = <0x3>;
+> 		#size-cells = <0x2>;
+> 		#interrupt-cells = <0x1>;
+> 		compatible = "arm,pci-cam-generic";
+> 		reg = <0x0 0x40000000>;
+> 		ranges = <0x1000000 0x0 0x0 0x0 0x0 0x0 0x10000 0x2000000 0x0 0x41000000 0x0 0x41000000 0x0 0x3f000000>;
+> 		interrupt-map = <0x0 0x0 0x0 0x1 0x1 0x0 0x4 0x1 0x800 0x0 0x0 0x1 0x1 0x0 0x5 0x1 0x1000 0x0 0x0 0x1 0x1 0x0 0x6 0x1 0x1800 0x0 0x0 0x1 0x1 0x0 0x7 0x1>;
+> 		interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
+> 	};
+> 
+> I can add it if you like, but it looks like a random bunch of numbers to me.
 
-It may be dangerous to refer to the spec, since we are talking
-specifically about devices that require something beyond what the
-spec says ;-) For instance in SD/MMC cards I'd assume the device clock
-to be derived from the bus clock. However we can expect that clock
-to work already (any working mmc host driver would provide that),
-but we may need to drive the device clock. It still sounds reasonable
-to assume that the sequencing is the same as for the bus clock.
+You could clean it up a bit to be human readable even if its kvmtool that?s creating it.
 
-> That all said, we do have the problem that once we decide, we need to
-> support it because it becomes part of DT - this is one of the things I
-> hate about DT, it requires over-design.
+	pci {
+		compatible = "arm,pci-cam-generic?;
+		#address-cells = <3>;
+		#size-cells = <2>;
+		#interrupt-cells = <1>
+		reg = <0x0 0x40000000>;
+		ranges = <
+			0x1000000 0x0 0x00000000 0x0 0x00000000 0x0 0x00010000
+			0x2000000 0x0 0x41000000 0x0 0x41000000 0x0 0x3f000000
+			>;
+		interrupt-map = <
+			...
+				>;
 
-Yes, I agree. It is a problem that we have to face all the time.
-We have in the past defined bindings of both types, overdesigned
-and not thought through enough.
+		interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
 
->  Your point is "Olof's solution
-> may break if we have a device which requires a different sequence" which
-> is a valid point which has to be considered from the DT perspective and
-> addressed whether or not we actually have a device which meets that
-> criteria.  I don't see an easy solution to this.
+		
 
-I think either one will work. With Olof's suggestion that may mean we
-have to keep adding support for increasingly complex cases when we
-run into them, or it may all be easy. With my suggestion, we give
-more room for function drivers to mess things up, but at least we
-can keep the complexity in the places that need them and only need
-to change the core once.
 
-Aside from the power-on problem, my suggestion would at the same
-time solve the second problem of having a place to stick arbitrary
-DT properties for the sdio function. Again looking at the cw1200
-example, they may require passing an IRQ descriptor, a MAC address,
-the device clock rate, and two flags for things that are not
-detectable by looking at the device ID (whether a 5GHz antenna is
-connected and something about odd block size transfers).
-This is probably the main difference between the two approaches.
+> 
+> Will
 
-	Arnd
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
