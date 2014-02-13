@@ -1,67 +1,72 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Feb 2014 11:26:09 -0800
-Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
-In-Reply-To: <52F99056.6010906@samsung.com>
-References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
- <1540B9A3-2485-4149-81DD-7D86A532E5D4@arm.com>
- <D225ECFF-E2A7-44C9-8D11-20EE77077797@codeaurora.org>
- <2286031.FWmKXGrGIV@wuerfel> <52F99056.6010906@samsung.com>
-Message-ID: <CAOesGMgdDnSc=Y8i6JYeGewCh1RPYZ_AxocxKzSD265fa2-yrA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Feb 2014 19:29:09 +0000
+Subject: [BISECTED] ssh - Received disconnect from x.x.x.x: 2: Bad packet
+ length 3149594624
+In-Reply-To: <52FD1243.9040706@gmail.com>
+References: <52FD08D1.3030405@gmail.com>
+ <20140213182105.GN13576@mudshark.cambridge.arm.com>
+ <52FD1243.9040706@gmail.com>
+Message-ID: <20140213192909.GO13576@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 6:52 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> On 02/13/14 04:14, Arnd Bergmann wrote:
->>
->> On Wednesday 12 February 2014 13:04:40 Kumar Gala wrote:
->>>
->>> On Feb 12, 2014, at 12:12 PM, Catalin Marinas<catalin.marinas@arm.com>
->>> wrote:
->>>>
->>>> On 12 Feb 2014, at 16:25, Kumar Gala<galak@codeaurora.org>  wrote:
->>>>>
->>>>> One reason to keep around ARCH_* is for drivers shared between arm and
->>>>> arm64 that depend on it.
->>>>
->>>>
->>>> We already converted some of them (those depending on ARCH_VEXPRESS) to
->>>> just depend on ARM64. Ideally, at some point I'd like to see them as
->>>> defaulting to modules but I don't think we are there yet (we had some
->>>> discussions at the last KS, I'm not sure anyone started looking into
->>>> this).
->>>
->>>
->>> I'm torn about this, I think for something like VEXPRESS it makes sense,
->>> however I think  its reasonable to still have an config symbol for a full
->>> SoC family or something of that nature.
->>
->>
->> I think for SBSA compliant systems, we should be able to live with a
->> generic ARCH_SBSA Kconfig symbol. For more irregular embedded platforms,
->> we may need something more specific.
->>
-> Basically, I agreed with Arnd's suggestion to use ARCH_SBSA. Or we need to
-> define level in Kconfig like ARCH_SBSA_L1 for level1. BTW, how about
-> compliant with SBSA Level1 and having some specific features?
+On Thu, Feb 13, 2014 at 06:43:15PM +0000, Ivaylo Dimitrov wrote:
+> 
+> 
+> On 13.02.2014 20:21, Will Deacon wrote:
+> >
+> > That's certainly unexpected. The n900 has (iirc) a Cortex-A8, which as an
+> > ARMv7 core, can perform unaligned accesses to normal, cacheable memory in
+> > hardware.
+> >
+> 
+> Yep, Cortex-A8 and it has no problem to do unaligned memory accesses 
+> AFAIK. I suspect it is a driver issue, not CPU.
+> 
+> > Can you provide your .config and/or any information about your network chip
+> > please? There's a chance that the driver is doing something odd.
+> 
+> The chip is TI wl1251, you can find the config file here(actually this 
+> is the tree I am using to boot 3.14-rc1 on N900) - 
+> https://gitorious.org/linux-n900/freemangordons-linux-n900/source/1434dbd7fbc5ec257b6cd6c547689b79177d1937:arch/arm/configs/rx51_defconfig
 
-(It's a little hard to answer since nobody can download the doc and
-then talk about it.)
-
-What kind of features are you expecting though? More IP
-blocks/devices? Those are just kernel config options to enable,
-ideally as modules.
-
-x86 doesn't need config options for each generation of their platform,
-and neither should ARM64. Sure, there might be drivers that don't make
-sense to enable on some platforms, but that's what defconfigs (or
-distro configs), and modules are for -- the modules won't load unless
-the hardware is there.
-
-As long as we're not talking about massive amounts of code that is
-part of the base platform, separating out per version again doesn't
-make sense -- just enable for SBSA and it'll support Level 1 through
-whatever. If the kernel size becomes a concern we can revisit, but
-let's not start out that way.
+Ok, so based on that config I think we can narrow down the unaligned use to
+the following files:
 
 
--Olof
+# Crypto
+crypto/memneq.c:#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+crypto/memneq.c:#endif /* CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS */
+crypto/memneq.c:#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+crypto/memneq.c:#endif /* CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS */
+
+# Network
+include/linux/etherdevice.h:#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+include/linux/etherdevice.h:#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+include/linux/etherdevice.h:#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+include/linux/etherdevice.h:#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+include/linux/etherdevice.h:#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+net/mac80211/rx.c:#ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+net/ipv4/netfilter/arp_tables.c:#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+
+# Probably not relevant
+kernel/printk/printk.c:#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+kernel/taskstats.c:#if defined(CONFIG_64BIT) && !defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+lib/lz4/lz4defs.h:#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)		\
+lib/lz4/lz4defs.h:#else /* CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS */
+lib/lzo/lzo1x_compress.c:#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS) && defined(LZO_USE_CTZ64)
+lib/lzo/lzo1x_compress.c:#elif defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS) && defined(LZO_USE_CTZ32)
+lib/lzo/lzo1x_decompress_safe.c:#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+lib/lzo/lzo1x_decompress_safe.c:#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+lib/lzo/lzo1x_decompress_safe.c:#if defined(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS)
+lib/strncpy_from_user.c:#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+lib/zlib_inflate/inffast.c:#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+
+
+Can you try hacking crypto/memneq.c so that it doesn't use
+CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS please? That would at least point the
+finger at net/mac80211/rx.c or similar.
+
+Cheers,
+
+Will
