@@ -1,50 +1,76 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 13 Feb 2014 18:33:33 +0100
-Subject: [PATCH v4 10/13] ARM: mvebu: Set the start address of a CPU in a
- separate function
+Date: Thu, 13 Feb 2014 18:33:31 +0100
+Subject: [PATCH v4 08/13] ARM: mvebu: Allow to power down L2 cache controller
+ in idle mode
 In-Reply-To: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1392312816-17657-11-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1392312816-17657-9-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setting the start (or boot) address of A CPU is no more used only
-during SMP bring up, but will also be used by the CPU idle functions
-or later by the CPU hot plug ones.
+This commit adds an function which adjusts the PMSU configuration to
+automatically power down the L2 and coherency fabric when we enter a
+certain idle state.
 
-This commit moves it in a separate function.
+This feature is part of the Power Management Service Unit of the
+Armada 370 and Armada XP SoCs.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pmsu.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/pmsu.c | 24 ++++++++++++++++++++++--
+ arch/arm/mach-mvebu/pmsu.h |  1 +
+ 2 files changed, 23 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index ec745d59fea8..162ae1399f2a 100644
+index aa5ef7439d0f..36d946d53f54 100644
 --- a/arch/arm/mach-mvebu/pmsu.c
 +++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -61,6 +61,12 @@ static struct of_device_id of_pmsu_table[] = {
- 	{ /* end of list */ },
- };
+@@ -28,8 +28,15 @@ static void __iomem *pmsu_mp_base;
+ static void __iomem *pmsu_reset_base;
+ static void __iomem *pmsu_fabric_base;
  
-+static void armada_370_xp_pmsu_set_start_addr(void *start_addr, int hw_cpu)
+-#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
+-#define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
++/* PMSU MP registers */
++#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu) ((cpu * 0x100) + 0x24)
++
++/* PMSU reset registers */
++#define PMSU_RESET_CTL_OFFSET(cpu)	    (cpu * 0x8)
++
++/* PMSU fabric registers */
++#define L2C_NFABRIC_PM_CTL		    0x4
++#define L2C_NFABRIC_PM_CTL_PWR_DOWN		BIT(20)
+ 
+ static struct of_device_id of_pmsu_table[] = {
+ 	{.compatible = "marvell,armada-370-xp-pmsu"},
+@@ -79,4 +86,17 @@ static int __init armada_370_xp_pmsu_init(void)
+ 	return 0;
+ }
+ 
++void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void)
 +{
-+	writel(virt_to_phys(start_addr), pmsu_mp_base +
-+		PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
++	u32 reg;
++
++	if (pmsu_fabric_base == NULL)
++		return;
++
++	/* Enable L2 & Fabric powerdown in Deep-Idle mode - Fabric */
++	reg = readl(pmsu_fabric_base + L2C_NFABRIC_PM_CTL);
++	reg |= L2C_NFABRIC_PM_CTL_PWR_DOWN;
++	writel(reg, pmsu_fabric_base + L2C_NFABRIC_PM_CTL);
 +}
 +
- #ifdef CONFIG_SMP
- int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
- {
-@@ -73,8 +79,7 @@ int armada_xp_boot_cpu(unsigned int cpu_id, void *boot_addr)
+ early_initcall(armada_370_xp_pmsu_init);
+diff --git a/arch/arm/mach-mvebu/pmsu.h b/arch/arm/mach-mvebu/pmsu.h
+index 07a737c6b95d..054cdd8b0ece 100644
+--- a/arch/arm/mach-mvebu/pmsu.h
++++ b/arch/arm/mach-mvebu/pmsu.h
+@@ -12,5 +12,6 @@
+ #define __MACH_MVEBU_PMSU_H
  
- 	hw_cpu = cpu_logical_map(cpu_id);
+ int armada_xp_boot_cpu(unsigned int cpu_id, void *phys_addr);
++void armada_370_xp_pmsu_enable_l2_powerdown_onidle(void);
  
--	writel(virt_to_phys(boot_addr), pmsu_mp_base +
--			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
-+	armada_370_xp_pmsu_set_start_addr(boot_addr, hw_cpu);
- 
- 	/* Release CPU from reset by clearing reset bit*/
- 	reg = readl(pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
+ #endif	/* __MACH_370_XP_PMSU_H */
 -- 
 1.8.1.2
