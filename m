@@ -1,90 +1,122 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Thu, 13 Feb 2014 12:15:36 -0600
-Subject: [PATCHv2 05/16] iommu/omap: enable bus-error back on supported iommus
+Date: Thu, 13 Feb 2014 12:15:47 -0600
+Subject: [PATCHv2 16/16] ARM: OMAP2+: Remove legacy omap-iommu.c
 In-Reply-To: <1392315347-32967-1-git-send-email-s-anna@ti.com>
 References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
-Message-ID: <1392315347-32967-6-git-send-email-s-anna@ti.com>
+Message-ID: <1392315347-32967-17-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The remoteproc MMUs in OMAP4+ SoCs have some additional debug
-registers that can give out the PC value in addition to the
-MMU fault address. The PC value can be extracted properly only
-on the DSP cores, and is not available on the ARM processors
-within the IPU sub-systems. Instead, the MMUs have been enhanced
-to throw a bus-error response back to the IPU processors.
+From: Florian Vaussard <florian.vaussard@epfl.ch>
 
-This functionality is programmable through the MMU_GP_REG register.
-The cores are simply stalled if the MMU_GP_REG.BUS_ERR_BACK_EN bit
-is not set. When set, a bus-error exception is raised allowing the
-processor to handle it as a bus fault and provide additional debug
-information. This feature is turned on by default by the driver on
-iommus supporting it.
+With full DT boot, the legacy mode of platform device creation
+for OMAP IOMMUs is not needed anymore.
 
-Signed-off-by: Subramaniam Chanderashekarapuram <subramaniam.ca@ti.com>
-Signed-off-by: Suman Anna <s-anna@ti.com>
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- drivers/iommu/omap-iommu.c  | 2 ++
- drivers/iommu/omap-iommu.h  | 5 +++++
- drivers/iommu/omap-iommu2.c | 3 +++
- 3 files changed, 10 insertions(+)
+ arch/arm/mach-omap2/Makefile     |  3 --
+ arch/arm/mach-omap2/omap-iommu.c | 79 ----------------------------------------
+ 2 files changed, 82 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/omap-iommu.c
 
-diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index 4329ab1..e64025a 100644
---- a/drivers/iommu/omap-iommu.c
-+++ b/drivers/iommu/omap-iommu.c
-@@ -964,6 +964,8 @@ static int omap_iommu_probe(struct platform_device *pdev)
- 		if (err != 0)
- 			return err;
- 		obj->da_end = obj->da_start + len;
-+		if (of_find_property(of, "ti,iommu-bus-err-back", NULL))
-+			obj->has_bus_err_back = MMU_GP_REG_BUS_ERR_BACK_EN;
- 	} else {
- 		obj->nr_tlb_entries = pdata->nr_tlb_entries;
- 		obj->name = pdata->name;
-diff --git a/drivers/iommu/omap-iommu.h b/drivers/iommu/omap-iommu.h
-index 1200842..ea920c3 100644
---- a/drivers/iommu/omap-iommu.h
-+++ b/drivers/iommu/omap-iommu.h
-@@ -52,6 +52,8 @@ struct omap_iommu {
- 	void *ctx; /* iommu context: registres saved area */
- 	u32 da_start;
- 	u32 da_end;
-+
-+	int has_bus_err_back;
- };
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index e6eec6f..242933f 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -226,9 +226,6 @@ obj-$(CONFIG_SOC_DRA7XX)		+= omap_hwmod_7xx_data.o
+ obj-$(CONFIG_OMAP3_EMU)			+= emu.o
+ obj-$(CONFIG_HW_PERF_EVENTS)		+= pmu.o
  
- struct cr_regs {
-@@ -130,6 +132,7 @@ static inline struct omap_iommu *dev_to_omap_iommu(struct device *dev)
- #define MMU_READ_CAM		0x68
- #define MMU_READ_RAM		0x6c
- #define MMU_EMU_FAULT_AD	0x70
-+#define MMU_GP_REG		0x88
- 
- #define MMU_REG_SIZE		256
- 
-@@ -163,6 +166,8 @@ static inline struct omap_iommu *dev_to_omap_iommu(struct device *dev)
- #define MMU_RAM_MIXED_MASK	(1 << MMU_RAM_MIXED_SHIFT)
- #define MMU_RAM_MIXED		MMU_RAM_MIXED_MASK
- 
-+#define MMU_GP_REG_BUS_ERR_BACK_EN	0x1
-+
- /*
-  * utilities for super page(16MB, 1MB, 64KB and 4KB)
-  */
-diff --git a/drivers/iommu/omap-iommu2.c b/drivers/iommu/omap-iommu2.c
-index d745094..5e1ea3b 100644
---- a/drivers/iommu/omap-iommu2.c
-+++ b/drivers/iommu/omap-iommu2.c
-@@ -98,6 +98,9 @@ static int omap2_iommu_enable(struct omap_iommu *obj)
- 
- 	iommu_write_reg(obj, pa, MMU_TTB);
- 
-+	if (obj->has_bus_err_back)
-+		iommu_write_reg(obj, MMU_GP_REG_BUS_ERR_BACK_EN, MMU_GP_REG);
-+
- 	__iommu_set_twl(obj, true);
- 
- 	return 0;
+-iommu-$(CONFIG_OMAP_IOMMU)		:= omap-iommu.o
+-obj-y					+= $(iommu-m) $(iommu-y)
+-
+ ifneq ($(CONFIG_TIDSPBRIDGE),)
+ obj-y					+= dsp.o
+ endif
+diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
+deleted file mode 100644
+index f1fab56..0000000
+--- a/arch/arm/mach-omap2/omap-iommu.c
++++ /dev/null
+@@ -1,79 +0,0 @@
+-/*
+- * omap iommu: omap device registration
+- *
+- * Copyright (C) 2008-2009 Nokia Corporation
+- *
+- * Written by Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/of.h>
+-#include <linux/module.h>
+-#include <linux/platform_device.h>
+-#include <linux/err.h>
+-#include <linux/slab.h>
+-
+-#include <linux/platform_data/iommu-omap.h>
+-#include "soc.h"
+-#include "omap_hwmod.h"
+-#include "omap_device.h"
+-
+-static int __init omap_iommu_dev_init(struct omap_hwmod *oh, void *unused)
+-{
+-	struct platform_device *pdev;
+-	struct iommu_platform_data *pdata;
+-	struct omap_mmu_dev_attr *a = (struct omap_mmu_dev_attr *)oh->dev_attr;
+-	static int i;
+-
+-	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+-	if (!pdata)
+-		return -ENOMEM;
+-
+-	pdata->name = oh->name;
+-	pdata->nr_tlb_entries = a->nr_tlb_entries;
+-	pdata->da_start = a->da_start;
+-	pdata->da_end = a->da_end;
+-
+-	if (oh->rst_lines_cnt == 1) {
+-		pdata->reset_name = oh->rst_lines->name;
+-		pdata->assert_reset = omap_device_assert_hardreset;
+-		pdata->deassert_reset = omap_device_deassert_hardreset;
+-	}
+-
+-	pdev = omap_device_build("omap-iommu", i, oh, pdata, sizeof(*pdata));
+-
+-	kfree(pdata);
+-
+-	if (IS_ERR(pdev)) {
+-		pr_err("%s: device build err: %ld\n", __func__, PTR_ERR(pdev));
+-		return PTR_ERR(pdev);
+-	}
+-
+-	i++;
+-
+-	return 0;
+-}
+-
+-static int __init omap_iommu_init(void)
+-{
+-	/* If dtb is there, the devices will be created dynamically */
+-	if (of_have_populated_dt())
+-		return -ENODEV;
+-
+-	return omap_hwmod_for_each_by_class("mmu", omap_iommu_dev_init, NULL);
+-}
+-/* must be ready before omap3isp is probed */
+-omap_subsys_initcall(omap_iommu_init);
+-
+-static void __exit omap_iommu_exit(void)
+-{
+-	/* Do nothing */
+-}
+-module_exit(omap_iommu_exit);
+-
+-MODULE_AUTHOR("Hiroshi DOYU");
+-MODULE_DESCRIPTION("omap iommu: omap device registration");
+-MODULE_LICENSE("GPL v2");
 -- 
 1.8.5.3
