@@ -1,84 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Feb 2014 19:51:48 +0000
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <20140213180616.GD17248@obsidianresearch.com>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <1392236171-10512-4-git-send-email-will.deacon@arm.com>
- <D2AE4AE6-E8FA-4DD8-B92B-E37205A2548C@codeaurora.org>
- <20140213110721.GC13576@mudshark.cambridge.arm.com>
- <20140213180616.GD17248@obsidianresearch.com>
-Message-ID: <20140213195148.GP13576@mudshark.cambridge.arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 13 Feb 2014 11:52:03 -0800
+Subject: [PATCH v2] ARM: mm: report both sections from PMD
+In-Reply-To: <20140213171211.GJ19841@arm.com>
+References: <20140212224638.GA4558@www.outflux.net>
+ <20140213171211.GJ19841@arm.com>
+Message-ID: <CAGXu5jKG=8Fwd=yJEFF0-8tO0v4H_3sr_x2JLW4jm1Y2ouDFHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 06:06:16PM +0000, Jason Gunthorpe wrote:
-> On Thu, Feb 13, 2014 at 11:07:21AM +0000, Will Deacon wrote:
-> 
-> > Not in this case! kvmtool generates the following:
-> 
-> Well, the example is nice so someone can review it..
->  
-> > 	pci {
-> > 		#address-cells = <0x3>;
-> > 		#size-cells = <0x2>;
-> > 		#interrupt-cells = <0x1>;
-> > 		compatible = "arm,pci-cam-generic";
-> > 		reg = <0x0 0x40000000>;
-> > 		ranges = <0x1000000 0x0 0x0 0x0 0x0 0x0 0x10000 0x2000000 0x0 0x41000000 0x0 0x41000000 0x0 0x3f000000>;
-> > 		interrupt-map = <0x0 0x0 0x0 0x1 0x1 0x0 0x4 0x1 0x800 0x0 0x0 0x1 0x1 0x0 0x5 0x1 0x1000 0x0 0x0 0x1 0x1 0x0 0x6 0x1 0x1800 0x0 0x0 0x1 0x1 0x0 0x7 0x1>;
-> > 		interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
-> > 	};
-> 
-> 
-> Looks like there are a few misses in the above. How about this:
-> 
-> pci {
->     compatible = "arm,pci-cam-generic"
->     device_type = "pci";
->     ** ^^^^^^^^^^^^^^^^^
->     ** MANDATORY for the host bridge node
+On Thu, Feb 13, 2014 at 9:12 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Wed, Feb 12, 2014 at 10:46:38PM +0000, Kees Cook wrote:
+>> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+>> index 03243f7eeddf..fb3de59ee811 100644
+>> --- a/arch/arm/include/asm/pgtable-3level.h
+>> +++ b/arch/arm/include/asm/pgtable-3level.h
+>> @@ -138,10 +138,6 @@
+>>  #define pud_none(pud)                (!pud_val(pud))
+>>  #define pud_bad(pud)         (!(pud_val(pud) & 2))
+>>  #define pud_present(pud)     (pud_val(pud))
+>> -#define pmd_table(pmd)               ((pmd_val(pmd) & PMD_TYPE_MASK) == \
+>> -                                              PMD_TYPE_TABLE)
+>> -#define pmd_sect(pmd)                ((pmd_val(pmd) & PMD_TYPE_MASK) == \
+>> -                                              PMD_TYPE_SECT)
+>>  #define pmd_large(pmd)               pmd_sect(pmd)
+>>
+>>  #define pud_clear(pudp)                      \
+>> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+>> index 7d59b524f2af..934aa5b60c7c 100644
+>> --- a/arch/arm/include/asm/pgtable.h
+>> +++ b/arch/arm/include/asm/pgtable.h
+>> @@ -183,6 +183,10 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+>>
+>>  #define pmd_none(pmd)                (!pmd_val(pmd))
+>>  #define pmd_present(pmd)     (pmd_val(pmd))
+>> +#define pmd_table(pmd)               ((pmd_val(pmd) & PMD_TYPE_MASK) == \
+>> +                                              PMD_TYPE_TABLE)
+>> +#define pmd_sect(pmd)                ((pmd_val(pmd) & PMD_TYPE_MASK) == \
+>> +                                              PMD_TYPE_SECT)
+>
+> Do you still need to move these two if you only use pmd_large()? AFAICT,
+> it is equivalent to pmd_sect().
 
-Ok, I'll add that.
+Why does pmd_sect exist? I can reduce it to just using pmd_large.
 
->     #address-cells = <3>;
->     #size-cells = <2>;
-> 
->     // BUS_ADDRESS(3)  CPU_PHYSICAL(2)  SIZE(2)
->     ranges = <0x1000000 0x0 0x00000000  0x0 0x00000000  0x0 0x00010000>,
->                                         ^^^^^^^^^^^^^^
->             ** ?? Is this why you had problems with the offset? Should
-> 	    ** be the cpu physical address of the start of the IO window.
->              <0x2000000 0x0 0x41000000  0x0 0x41000000  0x0 0x3f000000>;
-> 
->    
->     #interrupt-cells = <0x1>;
->     // PCI_DEVICE(3) INT#(1)  CONTROLLER(PHANDLE)  CONTROLLER_DATA(3)
->     interrupt-map = <  0x0 0x0 0x0 0x1  0x1  0x0 0x4 0x1
->                      0x800 0x0 0x0 0x1  0x1  0x0 0x5 0x1 
->                     0x1000 0x0 0x0 0x1  0x1  0x0 0x6 0x1
->                     0x1800 0x0 0x0 0x1  0x1  0x0 0x7 0x1>;
->                  **                    ^^^^^^
->                  ** This should be a phandle to the interrupt controller
+>
+>>  static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+>>  {
+>> diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+>> index 2b342177f5de..32635b474832 100644
+>> --- a/arch/arm/mm/dump.c
+>> +++ b/arch/arm/mm/dump.c
+>> @@ -260,8 +260,14 @@ static void walk_pmd(struct pg_state *st, pud_t *pud, unsigned long start)
+>>
+>>       for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
+>>               addr = start + i * PMD_SIZE;
+>> -             if (pmd_none(*pmd) || pmd_large(*pmd) || !pmd_present(*pmd))
+>> +             if (pmd_none(*pmd) || pmd_large(*pmd) || !pmd_present(*pmd)) {
+>>                       note_page(st, addr, 3, pmd_val(*pmd));
+>> +                     if (SECTION_SIZE < PMD_SIZE &&
+>> +                         pmd_sect(*pmd) && pmd_sect(pmd[1])) {
+>
+> I think the first patch was better with pmd[0] and pmd[1] treated
+> independently if SECTION_SIZE < PMD_SIZE, only that it should have
+> checked for pmd_sect(pmd[1]). I don't see anything in
+> __map_init_section() that would prevent populating only the second pmd
+> leaving the first one empty.
 
-That is a phandle, libfdt/kvmtool just ends up dealing with the number
-directly. I'll fix in the example.
+Ah, gotcha. Okay, I will send a new version. Thanks!
 
->     // PCI_DEVICE(3) INT#1()
->     interrupt-map-mask = <0xf800 0x0 0x0 0x7>;
-> }
-> 
-> I keep thinking of making a pcie-dt.h file with helper macros for
-> all this. :|
+-Kees
 
-If it's not being generated automatically, that could be useful.
-
-> FWWI, I like to put a double space between the logically distinct
-> things in the lists.
-
-
-Makes sense, I may well do the same.
-
-Thanks,
-
-Will
+-- 
+Kees Cook
+Chrome OS Security
