@@ -1,29 +1,77 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 13 Feb 2014 10:55:25 -0600
-Subject: [PATCH 5/5] iommu/arm-smmu: fix compilation issue when
- !CONFIG_ARM_AMBA
-In-Reply-To: <1391710173-4343-6-git-send-email-will.deacon@arm.com>
-References: <1391710173-4343-1-git-send-email-will.deacon@arm.com>
- <1391710173-4343-6-git-send-email-will.deacon@arm.com>
-Message-ID: <CAOZdJXW6tY=MjHGMa1EQtJayY=ToqiJOWsggCsEjfPzirUeUxg@mail.gmail.com>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Thu, 13 Feb 2014 08:58:10 -0800
+Subject: [PATCH] Fix uses of dma_max_pfn() when converting to a limiting
+ address
+In-Reply-To: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
+References: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
+Message-ID: <1392310690.2175.13.camel@dabdike.int.hansenpartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 6, 2014 at 12:09 PM, Will Deacon <will.deacon@arm.com> wrote:
+On Tue, 2014-02-11 at 17:28 +0000, Russell King wrote:
+> We must use a 64-bit for this, otherwise overflowed bits get lost, and
+> that can result in a lower than intended value set.
+> 
+> Fixes: 8e0cb8a1f6ac ("ARM: 7797/1: mmc: Use dma_max_pfn(dev) helper for bounce_limit calculations")
+> Fixes: 7d35496dd982 ("ARM: 7796/1: scsi: Use dma_max_pfn(dev) helper for bounce_limit calculations")
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> While poking about with the Cubox-i4 and investigating why my UHS-1
+> SD card wasn't achieving its full potential, I came across a slight
+> problem... the SDHCI host sets a mask of 0xffffffff, but with the
+> start of memory at pfn 0x10000, the blk code sees this when setting
+> the bounce limit:
+> 
+> 	max addr 0x0ffff000 bounce limit 0xffff dma 1
+> 
+> and this results in the bounce functions appearing in the profile:
+> 
+> 00000000c00f8b70 copy_to_high_bio_irq                  1139 2.5886
+> 00000000c00f8d28 bounce_end_io                           12 0.0714
+> 00000000c00f8dd0 bounce_end_io_read_isa                   8 0.1053
+> 
+> which, compared to the cost of copying the data to userland and
+> request handling, this is quite significant:
+> 
+> 00000000c04b1794 sdhci_request                          268 0.5447
+> 00000000c02d0740 __copy_to_user_std                     398 0.4252
+> 
+> With this calculation fixed, we avoid the bouncing code entirely.
+> 
+> 	max addr 0x10ffff000 bounce limit 0x10ffff dma 0
+> 
+>  drivers/mmc/card/queue.c | 2 +-
+>  drivers/scsi/scsi_lib.c  | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/card/queue.c b/drivers/mmc/card/queue.c
+> index 357bbc54fe4b..3e049c13429c 100644
+> --- a/drivers/mmc/card/queue.c
+> +++ b/drivers/mmc/card/queue.c
+> @@ -197,7 +197,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
+>  	struct mmc_queue_req *mqrq_prev = &mq->mqrq[1];
+>  
+>  	if (mmc_dev(host)->dma_mask && *mmc_dev(host)->dma_mask)
+> -		limit = dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
+> +		limit = (u64)dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
+>  
+>  	mq->card = card;
+>  	mq->queue = blk_init_queue(mmc_request_fn, lock);
+> diff --git a/drivers/scsi/scsi_lib.c b/drivers/scsi/scsi_lib.c
+> index 7bd7f0d5f050..62ec84b42e31 100644
+> --- a/drivers/scsi/scsi_lib.c
+> +++ b/drivers/scsi/scsi_lib.c
+> @@ -1684,7 +1684,7 @@ u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
+>  
+>  	host_dev = scsi_get_device(shost);
+>  	if (host_dev && host_dev->dma_mask)
+> -		bounce_limit = dma_max_pfn(host_dev) << PAGE_SHIFT;
+> +		bounce_limit = (u64)dma_max_pfn(host_dev) << PAGE_SHIFT;
 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 0ae4dd39197f..6fe7922ecc1d 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -2004,8 +2004,10 @@ static int __init arm_smmu_init(void)
->         if (!iommu_present(&platform_bus_type))
->                 bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
->
-> +#ifdef CONFIG_ARM_AMBA
->         if (!iommu_present(&amba_bustype))
->                 bus_set_iommu(&amba_bustype, &arm_smmu_ops);
-> +#endif
+This doesn't really look like the right fix.  You replaced dev->dma_mask
+with a calculation on dev_max_pfn().  Since dev->dma_mask is always u64
+and dev_max_pfn is supposed to be returning the pfn of the dma_mask, it
+should unconditionally be 64 bits as well.  Either that or it should
+return dma_addr_t.
 
-So I admit I don't know much about the ARM kernel (yet), but doesn't
-this break multi-arch?  That is, we can't support one binary that runs
-on a processor with AMBA and one without?
+James
