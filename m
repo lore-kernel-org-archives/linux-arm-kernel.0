@@ -1,96 +1,86 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Feb 2014 17:03:50 +0900
-Subject: [PATCH 03/11] ARM: shmobile: koelsch: Add I2C support
+Date: Thu, 13 Feb 2014 17:03:52 +0900
+Subject: [PATCH 05/11] ARM: shmobile: Lager USB0 cable detection workaround
 In-Reply-To: <cover.1392276547.git.horms+renesas@verge.net.au>
 References: <cover.1392276547.git.horms+renesas@verge.net.au>
-Message-ID: <12c1d5a54e874f26d08fa27f13f63ef7ccf38a2a.1392276547.git.horms+renesas@verge.net.au>
+Message-ID: <36be7686caa05334ca8d52df157b373a41d8d9f1.1392276547.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Valentine Barshak <valentine.barshak@cogentembedded.com>
+From: Magnus Damm <damm@opensource.se>
 
-This adds I2C[1245] busses support to Koelsch board.
-I2C[03] do not have any slave devices connected and
-are not used because of the following:
-* I2C0 pins are multiplexed with LBSC pins;
-* I2C3 pins are multiplexed with EtherMAC and VIN0 pins.
+Add Lager board code to check the PWEN GPIO signal and refuse to
+allow probe of the USBHS driver in case of DIP misconfiguration.
 
-Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
+For correct operation Lager DIP switches SW5 and SW6 shall be
+configured in 2-3 position to enable USB Function support.
+
+If the DIP switch is configured incorrectly then the user can
+simply adjust the hardware and either reboot or use the bind interface
+to try to probe again:
+
+# echo renesas_usbhs > /sys/bus/platform/drivers/renesas_usbhs/bind
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-koelsch.c | 46 ++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+ arch/arm/mach-shmobile/board-lager.c | 25 ++++++++++++++++++++++---
+ 1 file changed, 22 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-index 1ec3b91..2741dba 100644
---- a/arch/arm/mach-shmobile/board-koelsch.c
-+++ b/arch/arm/mach-shmobile/board-koelsch.c
-@@ -165,6 +165,38 @@ static const struct platform_device_info sata0_info __initconst = {
- 	.dma_mask	= DMA_BIT_MASK(32),
- };
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index 30ebd08..6a7041f 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -408,13 +408,30 @@ static int usbhs_hardware_init(struct platform_device *pdev)
+ {
+ 	struct usbhs_private *priv = usbhs_get_priv(pdev);
+ 	struct usb_phy *phy;
++	int ret;
++
++	/* USB0 Function - use PWEN as GPIO input to detect DIP Switch SW5
++	 * setting to avoid VBUS short circuit due to wrong cable.
++	 * PWEN should be pulled up high if USB Function is selected by SW5
++	 */
++	gpio_request_one(RCAR_GP_PIN(5, 18), GPIOF_IN, NULL); /* USB0_PWEN */
++	if (!gpio_get_value(RCAR_GP_PIN(5, 18))) {
++		pr_warn("Error: USB Function not selected - check SW5 + SW6\n");
++		ret = -ENOTSUPP;
++		goto error;
++	}
  
-+/* I2C */
-+static const struct resource i2c_resources[] __initconst = {
-+	/* I2C0 */
-+	DEFINE_RES_MEM(0xE6508000, 0x40),
-+	DEFINE_RES_IRQ(gic_spi(287)),
-+	/* I2C1 */
-+	DEFINE_RES_MEM(0xE6518000, 0x40),
-+	DEFINE_RES_IRQ(gic_spi(288)),
-+	/* I2C2 */
-+	DEFINE_RES_MEM(0xE6530000, 0x40),
-+	DEFINE_RES_IRQ(gic_spi(286)),
-+	/* I2C3 */
-+	DEFINE_RES_MEM(0xE6540000, 0x40),
-+	DEFINE_RES_IRQ(gic_spi(290)),
-+	/* I2C4 */
-+	DEFINE_RES_MEM(0xE6520000, 0x40),
-+	DEFINE_RES_IRQ(gic_spi(19)),
-+	/* I2C5 */
-+	DEFINE_RES_MEM(0xE6528000, 0x40),
-+	DEFINE_RES_IRQ(gic_spi(20)),
-+};
-+
-+static void __init koelsch_add_i2c(unsigned idx)
-+{
-+	unsigned res_idx = idx * 2;
-+
-+	BUG_ON(res_idx >= ARRAY_SIZE(i2c_resources));
-+
-+	platform_device_register_simple("i2c-rcar_gen2", idx,
-+					i2c_resources + res_idx, 2);
-+}
-+
- static const struct pinctrl_map koelsch_pinctrl_map[] = {
- 	/* DU */
- 	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7791", "pfc-r8a7791",
-@@ -188,6 +220,15 @@ static const struct pinctrl_map koelsch_pinctrl_map[] = {
- 	/* SCIF1 (CN20: DEBUG SERIAL1) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.7", "pfc-r8a7791",
- 				  "scif1_data_d", "scif1"),
-+	/* I2C1 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar_gen2.1", "pfc-r8a7791",
-+				  "i2c1_e", "i2c1"),
-+	/* I2C2 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar_gen2.2", "pfc-r8a7791",
-+				  "i2c2", "i2c2"),
-+	/* I2C4 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar_gen2.4", "pfc-r8a7791",
-+				  "i2c4_c", "i2c4"),
- };
+ 	phy = usb_get_phy_dev(&pdev->dev, 0);
+-	if (IS_ERR(phy))
+-		return PTR_ERR(phy);
++	if (IS_ERR(phy)) {
++		ret = PTR_ERR(phy);
++		goto error;
++	}
  
- static void __init koelsch_add_standard_devices(void)
-@@ -211,6 +252,11 @@ static void __init koelsch_add_standard_devices(void)
- 	koelsch_add_du_device();
- 
- 	platform_device_register_full(&sata0_info);
-+
-+	koelsch_add_i2c(1);
-+	koelsch_add_i2c(2);
-+	koelsch_add_i2c(4);
-+	koelsch_add_i2c(5);
+ 	priv->phy = phy;
+ 	return 0;
++ error:
++	gpio_free(RCAR_GP_PIN(5, 18));
++	return ret;
  }
  
- /*
+ static int usbhs_hardware_exit(struct platform_device *pdev)
+@@ -426,6 +443,8 @@ static int usbhs_hardware_exit(struct platform_device *pdev)
+ 
+ 	usb_put_phy(priv->phy);
+ 	priv->phy = NULL;
++
++	gpio_free(RCAR_GP_PIN(5, 18));
+ 	return 0;
+ }
+ 
+@@ -536,7 +555,7 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
+ 				  "vin1_clk", "vin1"),
+ 	/* USB0 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs", "pfc-r8a7790",
+-				  "usb0", "usb0"),
++				  "usb0_ovc_vbus", "usb0"),
+ };
+ 
+ static void __init lager_add_standard_devices(void)
 -- 
 1.8.5.2
