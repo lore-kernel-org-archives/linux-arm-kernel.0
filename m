@@ -1,143 +1,90 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Thu, 13 Feb 2014 12:15:43 -0600
-Subject: [PATCHv2 12/16] ARM: OMAP5: hwmod data: add mmu data for ipu & dsp
+Date: Thu, 13 Feb 2014 12:15:36 -0600
+Subject: [PATCHv2 05/16] iommu/omap: enable bus-error back on supported iommus
 In-Reply-To: <1392315347-32967-1-git-send-email-s-anna@ti.com>
 References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
-Message-ID: <1392315347-32967-13-git-send-email-s-anna@ti.com>
+Message-ID: <1392315347-32967-6-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new MMU hwmod class and data structures are created
-to represent the MMUs within the IPU and DSP processor
-subsystems in OMAP5. The MMUs in OMAP5 are identical to
-those in OMAP4.
+The remoteproc MMUs in OMAP4+ SoCs have some additional debug
+registers that can give out the PC value in addition to the
+MMU fault address. The PC value can be extracted properly only
+on the DSP cores, and is not available on the ARM processors
+within the IPU sub-systems. Instead, the MMUs have been enhanced
+to throw a bus-error response back to the IPU processors.
 
+This functionality is programmable through the MMU_GP_REG register.
+The cores are simply stalled if the MMU_GP_REG.BUS_ERR_BACK_EN bit
+is not set. When set, a bus-error exception is raised allowing the
+processor to handle it as a bus fault and provide additional debug
+information. This feature is turned on by default by the driver on
+iommus supporting it.
+
+Signed-off-by: Subramaniam Chanderashekarapuram <subramaniam.ca@ti.com>
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 83 ++++++++++++++++++++++++++++++
- 1 file changed, 83 insertions(+)
+ drivers/iommu/omap-iommu.c  | 2 ++
+ drivers/iommu/omap-iommu.h  | 5 +++++
+ drivers/iommu/omap-iommu2.c | 3 +++
+ 3 files changed, 10 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-index e297d62..8923172 100644
---- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-@@ -1122,6 +1122,71 @@ static struct omap_hwmod omap54xx_mmc5_hwmod = {
+diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+index 4329ab1..e64025a 100644
+--- a/drivers/iommu/omap-iommu.c
++++ b/drivers/iommu/omap-iommu.c
+@@ -964,6 +964,8 @@ static int omap_iommu_probe(struct platform_device *pdev)
+ 		if (err != 0)
+ 			return err;
+ 		obj->da_end = obj->da_start + len;
++		if (of_find_property(of, "ti,iommu-bus-err-back", NULL))
++			obj->has_bus_err_back = MMU_GP_REG_BUS_ERR_BACK_EN;
+ 	} else {
+ 		obj->nr_tlb_entries = pdata->nr_tlb_entries;
+ 		obj->name = pdata->name;
+diff --git a/drivers/iommu/omap-iommu.h b/drivers/iommu/omap-iommu.h
+index 1200842..ea920c3 100644
+--- a/drivers/iommu/omap-iommu.h
++++ b/drivers/iommu/omap-iommu.h
+@@ -52,6 +52,8 @@ struct omap_iommu {
+ 	void *ctx; /* iommu context: registres saved area */
+ 	u32 da_start;
+ 	u32 da_end;
++
++	int has_bus_err_back;
  };
  
+ struct cr_regs {
+@@ -130,6 +132,7 @@ static inline struct omap_iommu *dev_to_omap_iommu(struct device *dev)
+ #define MMU_READ_CAM		0x68
+ #define MMU_READ_RAM		0x6c
+ #define MMU_EMU_FAULT_AD	0x70
++#define MMU_GP_REG		0x88
+ 
+ #define MMU_REG_SIZE		256
+ 
+@@ -163,6 +166,8 @@ static inline struct omap_iommu *dev_to_omap_iommu(struct device *dev)
+ #define MMU_RAM_MIXED_MASK	(1 << MMU_RAM_MIXED_SHIFT)
+ #define MMU_RAM_MIXED		MMU_RAM_MIXED_MASK
+ 
++#define MMU_GP_REG_BUS_ERR_BACK_EN	0x1
++
  /*
-+ * 'mmu' class
-+ * The memory management unit performs virtual to physical address translation
-+ * for its requestors.
-+ */
-+
-+static struct omap_hwmod_class_sysconfig omap54xx_mmu_sysc = {
-+	.rev_offs	= 0x0000,
-+	.sysc_offs	= 0x0010,
-+	.syss_offs	= 0x0014,
-+	.sysc_flags	= (SYSC_HAS_AUTOIDLE | SYSC_HAS_CLOCKACTIVITY |
-+			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET |
-+			   SYSS_HAS_RESET_STATUS),
-+	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
-+	.sysc_fields	= &omap_hwmod_sysc_type1,
-+};
-+
-+static struct omap_hwmod_class omap54xx_mmu_hwmod_class = {
-+	.name = "mmu",
-+	.sysc = &omap54xx_mmu_sysc,
-+};
-+
-+static struct omap_hwmod_rst_info omap54xx_mmu_dsp_resets[] = {
-+	{ .name = "mmu_cache", .rst_shift = 1 },
-+};
-+
-+static struct omap_hwmod omap54xx_mmu_dsp_hwmod = {
-+	.name		= "mmu_dsp",
-+	.class		= &omap54xx_mmu_hwmod_class,
-+	.clkdm_name	= "dsp_clkdm",
-+	.rst_lines	= omap54xx_mmu_dsp_resets,
-+	.rst_lines_cnt	= ARRAY_SIZE(omap54xx_mmu_dsp_resets),
-+	.main_clk	= "dpll_iva_h11x2_ck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP54XX_CM_DSP_DSP_CLKCTRL_OFFSET,
-+			.rstctrl_offs = OMAP54XX_RM_DSP_RSTCTRL_OFFSET,
-+			.context_offs = OMAP54XX_RM_DSP_DSP_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_HWCTRL,
-+		},
-+	},
-+};
-+
-+/* mmu ipu */
-+static struct omap_hwmod_rst_info omap54xx_mmu_ipu_resets[] = {
-+	{ .name = "mmu_cache", .rst_shift = 2 },
-+};
-+
-+static struct omap_hwmod omap54xx_mmu_ipu_hwmod = {
-+	.name		= "mmu_ipu",
-+	.class		= &omap54xx_mmu_hwmod_class,
-+	.clkdm_name	= "ipu_clkdm",
-+	.rst_lines	= omap54xx_mmu_ipu_resets,
-+	.rst_lines_cnt	= ARRAY_SIZE(omap54xx_mmu_ipu_resets),
-+	.main_clk	= "dpll_core_h22x2_ck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = OMAP54XX_CM_IPU_IPU_CLKCTRL_OFFSET,
-+			.rstctrl_offs = OMAP54XX_RM_IPU_RSTCTRL_OFFSET,
-+			.context_offs = OMAP54XX_RM_IPU_IPU_CONTEXT_OFFSET,
-+			.modulemode   = MODULEMODE_HWCTRL,
-+		},
-+	},
-+};
-+
-+/*
-  * 'mpu' class
-  * mpu sub-system
+  * utilities for super page(16MB, 1MB, 64KB and 4KB)
   */
-@@ -1763,6 +1828,14 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__l3_main_1 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
+diff --git a/drivers/iommu/omap-iommu2.c b/drivers/iommu/omap-iommu2.c
+index d745094..5e1ea3b 100644
+--- a/drivers/iommu/omap-iommu2.c
++++ b/drivers/iommu/omap-iommu2.c
+@@ -98,6 +98,9 @@ static int omap2_iommu_enable(struct omap_iommu *obj)
  
-+/* l4_cfg -> mmu_dsp */
-+static struct omap_hwmod_ocp_if omap54xx_l4_cfg__mmu_dsp = {
-+	.master		= &omap54xx_l4_cfg_hwmod,
-+	.slave		= &omap54xx_mmu_dsp_hwmod,
-+	.clk		= "l4_root_clk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* mpu -> l3_main_1 */
- static struct omap_hwmod_ocp_if omap54xx_mpu__l3_main_1 = {
- 	.master		= &omap54xx_mpu_hwmod,
-@@ -1787,6 +1860,14 @@ static struct omap_hwmod_ocp_if omap54xx_l4_cfg__l3_main_2 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
+ 	iommu_write_reg(obj, pa, MMU_TTB);
  
-+/* l3_main_2 -> mmu_ipu */
-+static struct omap_hwmod_ocp_if omap54xx_l3_main_2__mmu_ipu = {
-+	.master		= &omap54xx_l3_main_2_hwmod,
-+	.slave		= &omap54xx_mmu_ipu_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
++	if (obj->has_bus_err_back)
++		iommu_write_reg(obj, MMU_GP_REG_BUS_ERR_BACK_EN, MMU_GP_REG);
 +
- /* l3_main_1 -> l3_main_3 */
- static struct omap_hwmod_ocp_if omap54xx_l3_main_1__l3_main_3 = {
- 	.master		= &omap54xx_l3_main_1_hwmod,
-@@ -2345,6 +2426,7 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap54xx_l4_wkup__counter_32k,
- 	&omap54xx_l4_cfg__dma_system,
- 	&omap54xx_l4_abe__dmic,
-+	&omap54xx_l4_cfg__mmu_dsp,
- 	&omap54xx_mpu__emif1,
- 	&omap54xx_mpu__emif2,
- 	&omap54xx_l4_wkup__gpio1,
-@@ -2360,6 +2442,7 @@ static struct omap_hwmod_ocp_if *omap54xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap54xx_l4_per__i2c3,
- 	&omap54xx_l4_per__i2c4,
- 	&omap54xx_l4_per__i2c5,
-+	&omap54xx_l3_main_2__mmu_ipu,
- 	&omap54xx_l4_wkup__kbd,
- 	&omap54xx_l4_cfg__mailbox,
- 	&omap54xx_l4_abe__mcbsp1,
+ 	__iommu_set_twl(obj, true);
+ 
+ 	return 0;
 -- 
 1.8.5.3
