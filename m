@@ -1,92 +1,60 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Thu, 13 Feb 2014 12:15:41 -0600
-Subject: [PATCHv2 10/16] ARM: OMAP2+: use pdata quirks for iommu reset lines
+Date: Thu, 13 Feb 2014 12:15:34 -0600
+Subject: [PATCHv2 03/16] Documentation: dt: add OMAP iommu bindings
 In-Reply-To: <1392315347-32967-1-git-send-email-s-anna@ti.com>
 References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
-Message-ID: <1392315347-32967-11-git-send-email-s-anna@ti.com>
+Message-ID: <1392315347-32967-4-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP iommu driver performs the reset management for the
-iommu instances in processor sub-systems using the omap_device
-API which are currently supplied as platform data ops. Use pdata
-quirks to maintain the functionality as the OMAP iommu driver
-gets converted to use DT nodes, until the reset portions are
-decoupled from omap_hwmod/omap_device into a separate reset
-driver.
+From: Florian Vaussard <florian.vaussard@epfl.ch>
 
-This patch adds the pdata quirks for the reset management of
-iommus within the DSP (OMAP3 & OMAP4) and IPU subsystems (OMAP4).
+This patch adds the iommu bindings for all OMAP2+ SoCs. Apart from
+the standard bindings used by OMAP peripherals, this patch uses a
+'dma-window' (already used by Tegra SMMU) and adds two OMAP custom
+bindings - 'ti,#tlb-entries' and 'ti,iommu-bus-err-back'.
 
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+[s-anna at ti.com: split bindings document, add dra7 and bus error back]
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/mach-omap2/pdata-quirks.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ .../devicetree/bindings/iommu/ti,omap-iommu.txt    | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 3d5b24d..74e094a 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -16,12 +16,14 @@
- #include <linux/wl12xx.h>
- 
- #include <linux/platform_data/pinctrl-single.h>
-+#include <linux/platform_data/iommu-omap.h>
- 
- #include "am35xx.h"
- #include "common.h"
- #include "common-board-devices.h"
- #include "dss-common.h"
- #include "control.h"
-+#include "omap_device.h"
- 
- struct pdata_init {
- 	const char *compatible;
-@@ -92,6 +94,12 @@ static void __init hsmmc2_internal_input_clk(void)
- 	omap_ctrl_writel(reg, OMAP343X_CONTROL_DEVCONF1);
- }
- 
-+static struct iommu_platform_data omap3_iommu_pdata = {
-+	.reset_name = "mmu",
-+	.assert_reset = omap_device_assert_hardreset,
-+	.deassert_reset = omap_device_deassert_hardreset,
-+};
+diff --git a/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+new file mode 100644
+index 0000000..116492d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+@@ -0,0 +1,28 @@
++OMAP2+ IOMMU
 +
- static int omap3_sbc_t3730_twl_callback(struct device *dev,
- 					   unsigned gpio,
- 					   unsigned ngpio)
-@@ -185,6 +193,12 @@ static void __init omap4_panda_legacy_init(void)
- 	legacy_init_ehci_clk("auxclk3_ck");
- 	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 53);
- }
++Required properties:
++- compatible : Should be one of,
++		"ti,omap2-iommu" for OMAP2/OMAP3 IOMMU instances
++		"ti,omap4-iommu" for OMAP4/OMAP5 IOMMU instances
++		"ti,dra7-iommu" for DRA7xx IOMMU instances
++- ti,hwmods  : Name of the hwmod associated with the IOMMU instance
++- reg        : Address space for the configuration registers
++- interrupts : Interrupt specifier for the IOMMU instance
++- dma-window : IOVA start address and length
 +
-+static struct iommu_platform_data omap4_iommu_pdata = {
-+	.reset_name = "mmu_cache",
-+	.assert_reset = omap_device_assert_hardreset,
-+	.deassert_reset = omap_device_deassert_hardreset,
-+};
- #endif
- 
- #ifdef CONFIG_SOC_OMAP5
-@@ -240,6 +254,8 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- #ifdef CONFIG_ARCH_OMAP3
- 	OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002030, "48002030.pinmux", &pcs_pdata),
- 	OF_DEV_AUXDATA("ti,omap3-padconf", 0x48002a00, "48002a00.pinmux", &pcs_pdata),
-+	OF_DEV_AUXDATA("ti,omap2-iommu", 0x5d000000, "5d000000.mmu",
-+		       &omap3_iommu_pdata),
- 	/* Only on am3517 */
- 	OF_DEV_AUXDATA("ti,davinci_mdio", 0x5c030000, "davinci_mdio.0", NULL),
- 	OF_DEV_AUXDATA("ti,am3517-emac", 0x5c000000, "davinci_emac.0",
-@@ -248,6 +264,10 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- #ifdef CONFIG_ARCH_OMAP4
- 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a100040, "4a100040.pinmux", &pcs_pdata),
- 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a31e040, "4a31e040.pinmux", &pcs_pdata),
-+	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
-+		       &omap4_iommu_pdata),
-+	OF_DEV_AUXDATA("ti,omap4-iommu", 0x55082000, "55082000.mmu",
-+		       &omap4_iommu_pdata),
- #endif
- 	{ /* sentinel */ },
- };
++Optional properties:
++- ti,#tlb-entries : Number of entries in the translation look-aside buffer.
++                    Should be either 8 or 32 (default: 32)
++- ti,iommu-bus-err-back : Indicates the IOMMU instance supports throwing
++		          back a bus error response on MMU faults.
++
++Example:
++	/* OMAP3 ISP MMU */
++	mmu_isp: mmu at 480bd400 {
++		compatible = "ti,omap2-iommu";
++		reg = <0x480bd400 0x80>;
++		interrupts = <24>;
++		ti,hwmods = "mmu_isp";
++		ti,#tlb-entries = <8>;
++		dma-window = <0 0xfffff000>;
++	};
 -- 
 1.8.5.3
