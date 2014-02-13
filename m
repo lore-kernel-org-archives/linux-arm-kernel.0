@@ -1,46 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Feb 2014 17:04:35 +0900
-Subject: [PATCH 3/4] ARM: shmobile: koelsch defconfig: Enable RSPI and
- MTD_M25P80
-In-Reply-To: <cover.1392276997.git.horms+renesas@verge.net.au>
-References: <cover.1392276997.git.horms+renesas@verge.net.au>
-Message-ID: <201bd5ddcd9f11bb3942a062f0e907c3edc61f87.1392276997.git.horms+renesas@verge.net.au>
+Date: Thu, 13 Feb 2014 17:04:46 +0900
+Subject: [GIT PULL 0/3] Second Round of Renesas ARM Based SoC DT Updates for
+ v3.15
+Message-ID: <cover.1392275963.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-This enables support for the Spansion s25fl512s SPI FLASH on QSPI.
+please consider this second round of Renesas ARM based SoC DT updates for
+v3.15.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-Acked-by: Magnus Damm <damm@opensource.se>
-[horms+renesas at verge.net.au: resolved conflict]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/koelsch_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+This pull request is based on the first round of such updates, tagged as
+renesas-dt-for-v3.15, which I have previously sent a pull-request for.
 
-diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
-index c3b3c9d..9561139 100644
---- a/arch/arm/configs/koelsch_defconfig
-+++ b/arch/arm/configs/koelsch_defconfig
-@@ -40,6 +40,8 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_BLK_DEV_SD=y
- CONFIG_ATA=y
- CONFIG_SATA_RCAR=y
-+CONFIG_MTD=y
-+CONFIG_MTD_M25P80=y
- CONFIG_NETDEVICES=y
- # CONFIG_NET_VENDOR_ARC is not set
- # CONFIG_NET_CADENCE is not set
-@@ -64,6 +66,8 @@ CONFIG_SERIAL_SH_SCI_NR_UARTS=20
- CONFIG_SERIAL_SH_SCI_CONSOLE=y
- CONFIG_I2C=y
- CONFIG_I2C_RCAR=y
-+CONFIG_SPI=y
-+CONFIG_SPI_RSPI=y
- # CONFIG_HWMON is not set
- CONFIG_THERMAL=y
- CONFIG_RCAR_THERMAL=y
--- 
-1.8.5.2
+
+The following changes since commit 1f4c745b2c5a083c49dc11d2f0827d9a381f1ee1:
+
+  ARM: shmobile: r8a7790: Replace IRQ type numerical values with macros (2014-02-04 10:17:00 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v3.15
+
+for you to fetch changes up to e02ee513eed4bb780848a5cedbd4b39afb395d3e:
+
+  ARM: shmobile: koelsch dts: Add QSPI nodes (2014-02-06 20:36:12 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC DT Updates for v3.15
+
+r8a7791 (R-Car M2) based Koelsch board
+- Add QSPI nodes
+
+r7s72100 (RZ/A1H) SoC
+- Add RSPI nodes
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      ARM: shmobile: r7s72100 dtsi: Add RSPI nodes
+      ARM: shmobile: r8a7791 dtsi: Add QSPI node
+      ARM: shmobile: koelsch dts: Add QSPI nodes
+
+ arch/arm/boot/dts/r7s72100-genmai-reference.dts |  2 +-
+ arch/arm/boot/dts/r7s72100.dtsi                 | 75 +++++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7791-koelsch.dts           | 36 ++++++++++++
+ arch/arm/boot/dts/r8a7791.dtsi                  | 12 ++++
+ 4 files changed, 124 insertions(+), 1 deletion(-)
