@@ -1,72 +1,131 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 13 Feb 2014 12:59:46 +0000
-Subject: [PATCH 02/18] arm64: GICv3 device tree binding documentation
-In-Reply-To: <loom.20140207T062553-254@post.gmane.org>
-References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
- <1391607050-540-3-git-send-email-marc.zyngier@arm.com>
- <loom.20140207T062553-254@post.gmane.org>
-Message-ID: <52FCC1C2.1020203@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 13 Feb 2014 21:02:54 +0800
+Subject: [PATCH] thermal: imx: update formula for thermal sensor
+In-Reply-To: <1392199595-1054-1-git-send-email-b20788@freescale.com>
+References: <1392199595-1054-1-git-send-email-b20788@freescale.com>
+Message-ID: <20140213130252.GB20842@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnab,
+Copy LAKML and pengutronix folks in case they have comments.
 
-On 07/02/14 05:41, Arnab Basu wrote:
-> Hi Marc
+On Wed, Feb 12, 2014 at 06:06:35PM +0800, Anson Huang wrote:
+> Thermal sensor used to need two calibration points which are
+> in fuse map to get a slope for converting thermal sensor's raw
+> data to real temperature in degree C. Due to the chip calibration
+> limitation, hardware team provides an universal formula to get
+> real temperature from internal thermal sensor raw data:
 > 
-> Marc Zyngier <marc.zyngier <at> arm.com> writes:
+> Slope = 0.4297157 - (0.0015976 * 25C fuse);
 > 
->> +
->> +AArch64 SMP cores are often associated with a GICv3, providing private
->> +peripheral interrupts (PPI), shared peripheral interrupts (SPI),
->> +software generated interrupts (SGI), and locality-specific peripheral
->> +Interrupts (LPI).
->> +
->> +Main node required properties:
->> +
->> +- compatible : should at least contain  "arm,gic-v3".
->> +- interrupt-controller : Identifies the node as an interrupt controller
->> +- #interrupt-cells : Specifies the number of cells needed to encode an
->> +  interrupt source. Must be a single cell with a value of at least 3.
->> +
->> +  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
->> +  interrupts. Other values are reserved for future use.
+> Update the formula, as there will be no hot point calibration
+> data in fuse map from now on.
 > 
-> These values are defined in
-> "include/dt-bindings/interrupt-controller/arm-gic.h" maybe we should start
-> mentioning that here and encourage future device treese to use those defines
-> to improve readability.
+> Signed-off-by: Anson Huang <b20788@freescale.com>
 
-It may improve readability, but it makes the definition rely on
-something else. Definition and usage are two different things, and I
-want the definition to be completely self-contained and non ambiguous.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-In DTS files, people can use whatever macro they decide, and it is their
-problem. They will even have out of tree DTS files, for which the
-include file is not available.
+Shawn
 
+> ---
+>  drivers/thermal/imx_thermal.c |   39 ++++++++++++++++++++++++++-------------
+>  1 file changed, 26 insertions(+), 13 deletions(-)
 > 
->> +
->> +  The 2nd cell contains the interrupt number for the interrupt type.
->> +  SPI interrupts are in the range [0-987]. PPI interrupts are in the
->> +  range [0-15].
->> +
->> +  The 3rd cell is the flags, encoded as follows:
->> +	bits[3:0] trigger type and level flags.
->> +		1 = edge triggered
->> +		2 = edge triggered (deprecated, for compatibility with GICv2)
->> +		4 = level triggered
->> +		8 = level triggered (deprecated, for compatibility with GICv2)
+> diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+> index 45af765..a99c631 100644
+> --- a/drivers/thermal/imx_thermal.c
+> +++ b/drivers/thermal/imx_thermal.c
+> @@ -62,12 +62,16 @@ enum imx_thermal_trip {
+>  #define IMX_POLLING_DELAY		2000 /* millisecond */
+>  #define IMX_PASSIVE_DELAY		1000
+>  
+> +#define FACTOR0				10000000
+> +#define FACTOR1				15976
+> +#define FACTOR2				4297157
+> +
+>  struct imx_thermal_data {
+>  	struct thermal_zone_device *tz;
+>  	struct thermal_cooling_device *cdev;
+>  	enum thermal_device_mode mode;
+>  	struct regmap *tempmon;
+> -	int c1, c2; /* See formula in imx_get_sensor_data() */
+> +	u32 c1, c2; /* See formula in imx_get_sensor_data() */
+>  	unsigned long temp_passive;
+>  	unsigned long temp_critical;
+>  	unsigned long alarm_temp;
+> @@ -84,7 +88,7 @@ static void imx_set_alarm_temp(struct imx_thermal_data *data,
+>  	int alarm_value;
+>  
+>  	data->alarm_temp = alarm_temp;
+> -	alarm_value = (alarm_temp - data->c2) / data->c1;
+> +	alarm_value = (data->c2 - alarm_temp) / data->c1;
+>  	regmap_write(map, TEMPSENSE0 + REG_CLR, TEMPSENSE0_ALARM_VALUE_MASK);
+>  	regmap_write(map, TEMPSENSE0 + REG_SET, alarm_value <<
+>  			TEMPSENSE0_ALARM_VALUE_SHIFT);
+> @@ -136,7 +140,7 @@ static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
+>  	n_meas = (val & TEMPSENSE0_TEMP_CNT_MASK) >> TEMPSENSE0_TEMP_CNT_SHIFT;
+>  
+>  	/* See imx_get_sensor_data() for formula derivation */
+> -	*temp = data->c2 + data->c1 * n_meas;
+> +	*temp = data->c2 - n_meas * data->c1;
+>  
+>  	/* Update alarm value to next higher trip point */
+>  	if (data->alarm_temp == data->temp_passive && *temp >= data->temp_passive)
+> @@ -305,6 +309,7 @@ static int imx_get_sensor_data(struct platform_device *pdev)
+>  	int t1, t2, n1, n2;
+>  	int ret;
+>  	u32 val;
+> +	u64 temp64;
+>  
+>  	map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+>  					      "fsl,tempmon-data");
+> @@ -330,6 +335,8 @@ static int imx_get_sensor_data(struct platform_device *pdev)
+>  	 *   [31:20] - sensor value @ 25C
+>  	 *    [19:8] - sensor value of hot
+>  	 *     [7:0] - hot temperature value
+> +	 * Use universal formula now and only need sensor value @ 25C
+> +	 * slope = 0.4297157 - (0.0015976 * 25C fuse)
+>  	 */
+>  	n1 = val >> 20;
+>  	n2 = (val & 0xfff00) >> 8;
+> @@ -337,20 +344,26 @@ static int imx_get_sensor_data(struct platform_device *pdev)
+>  	t1 = 25; /* t1 always 25C */
+>  
+>  	/*
+> -	 * Derived from linear interpolation,
+> -	 * Tmeas = T2 + (Nmeas - N2) * (T1 - T2) / (N1 - N2)
+> +	 * Derived from linear interpolation:
+> +	 * slope = 0.4297157 - (0.0015976 * 25C fuse)
+> +	 * slope = (FACTOR2 - FACTOR1 * n1) / FACTOR0
+> +	 * (Nmeas - n1) / (Tmeas - t1) = slope
+>  	 * We want to reduce this down to the minimum computation necessary
+>  	 * for each temperature read.  Also, we want Tmeas in millicelsius
+>  	 * and we don't want to lose precision from integer division. So...
+> -	 * milli_Tmeas = 1000 * T2 + 1000 * (Nmeas - N2) * (T1 - T2) / (N1 - N2)
+> -	 * Let constant c1 = 1000 * (T1 - T2) / (N1 - N2)
+> -	 * milli_Tmeas = (1000 * T2) + c1 * (Nmeas - N2)
+> -	 * milli_Tmeas = (1000 * T2) + (c1 * Nmeas) - (c1 * N2)
+> -	 * Let constant c2 = (1000 * T2) - (c1 * N2)
+> -	 * milli_Tmeas = c2 + (c1 * Nmeas)
+> +	 * Tmeas = (Nmeas - n1) / slope + t1
+> +	 * milli_Tmeas = 1000 * (Nmeas - n1) / slope + 1000 * t1
+> +	 * milli_Tmeas = -1000 * (n1 - Nmeas) / slope + 1000 * t1
+> +	 * Let constant c1 = (-1000 / slope)
+> +	 * milli_Tmeas = (n1 - Nmeas) * c1 + 1000 * t1
+> +	 * Let constant c2 = n1 *c1 + 1000 * t1
+> +	 * milli_Tmeas = c2 - Nmeas * c1
+>  	 */
+> -	data->c1 = 1000 * (t1 - t2) / (n1 - n2);
+> -	data->c2 = 1000 * t2 - data->c1 * n2;
+> +	temp64 = FACTOR0;
+> +	temp64 *= 1000;
+> +	do_div(temp64, FACTOR1 * n1 - FACTOR2);
+> +	data->c1 = temp64;
+> +	data->c2 = n1 * data->c1 + 1000 * t1;
+>  
+>  	/*
+>  	 * Set the default passive cooling trip point to 20 ?C below the
+> -- 
+> 1.7.9.5
 > 
-> Similar to the above comment
-> "include/dt-bindings/interrupt-controller/irq.h" defines the trigger type
-> and level flags. Although this file currently contains the GICv2 bindings,
-> we could update them.
-
-Same as above.
-
-Thanks for the review!
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
