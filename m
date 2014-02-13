@@ -1,45 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Feb 2014 14:29:24 +0100
-Subject: [PATCH v3 01/13] ARM: mvebu: rename armada-370-xp.c to
- armada-mvebu.c
-In-Reply-To: <52FCC771.5090009@gmail.com>
-References: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392289475-8902-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <2036226.egxWL7qC66@wuerfel> <20140213125526.3af08c54@skate>
- <20140213130745.GU27395@titan.lakedaemon.net>
- <20140213141355.00e8f2fd@skate> <52FCC771.5090009@gmail.com>
-Message-ID: <20140213142924.4520ccc9@skate>
+From: hs@denx.de (Heiko Schocher)
+Date: Thu, 13 Feb 2014 14:47:38 +0100
+Subject: [PATCH] gpu:drm:tilcdc: backlight node never found
+Message-ID: <1392299258-16968-1-git-send-email-hs@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian Hesselbarth,
+In panel_probe() the backlight node is never found, correct this.
 
-On Thu, 13 Feb 2014 14:24:01 +0100, Sebastian Hesselbarth wrote:
+Signed-off-by: Heiko Schocher <hs@denx.de>
+Cc: Anatolij Gustschin <agust@denx.de>
+Cc: Benoit Parrot <bparrot@ti.com>
+Cc: Rob Clark <robdclark@gmail.com>
+Cc: David Airlie <airlied@linux.ie>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Sachin Kamat <sachin.kamat@linaro.org>
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-kernel at vger.kernel.org
+Cc: devicetree at vger.kernel.org
+---
+ drivers/gpu/drm/tilcdc/tilcdc_panel.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-> > Why not. But since this kind of change can be done without breaking the
-> > DT compatibility, I'd first prefer to see Dove support merged into
-> > mach-mvebu/ with its board file named mach-mvebu/dove.c. Then
-> > progressively see what can be combined with armada-mvebu.c so that we
-> > can merge both of them into board-v7.c.
-> 
-> Actually, just prepared those patches today. Haven't boot tested but
-> compiles cleanly. The patch set will be really small compared to KW
-> patch set (but de-hardcoded pinctrl-dove will be a prerequisite).
-
-Cool! I'm planning on giving a test to your pinctrl patches this
-afternoon, if all goes well.
-
-> I also prefer to move to mach-mvebu/dove.c and then merge with
-> armada-3{78}{05x} a cycle later.
-
-Yes, I agree. I'm fully convinced by the idea of merging the v7 support
-together, but we need to proceed step by step to avoid having horrible
-merge issues during the 3.15 cycle.
-
-Best regards,
-
-Thomas
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_panel.c b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
+index 86c6732..0b97cf4 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_panel.c
++++ b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
+@@ -356,6 +356,7 @@ static struct of_device_id panel_of_match[];
+ static int panel_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *node = pdev->dev.of_node;
++	struct device_node *backlight_node;
+ 	struct panel_module *panel_mod;
+ 	struct tilcdc_module *mod;
+ 	struct pinctrl *pinctrl;
+@@ -395,9 +396,15 @@ static int panel_probe(struct platform_device *pdev)
+ 
+ 	mod->preferred_bpp = panel_mod->info->bpp;
+ 
+-	panel_mod->backlight = of_find_backlight_by_node(node);
+-	if (panel_mod->backlight)
+-		dev_info(&pdev->dev, "found backlight\n");
++	backlight_node = of_parse_phandle(pdev->dev.of_node, "backlight", 0);
++	if (backlight_node) {
++		panel_mod->backlight =
++			of_find_backlight_by_node(backlight_node);
++		if (panel_mod->backlight)
++			dev_info(&pdev->dev, "found backlight\n");
++	} else {
++		dev_warn(&pdev->dev, "backlight node missing...\n");
++	}
+ 
+ 	return 0;
+ 
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.3.1
