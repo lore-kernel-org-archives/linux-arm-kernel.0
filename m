@@ -1,42 +1,181 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Feb 2014 17:03:54 +0900
-Subject: [PATCH 07/11] Revert "ARM: shmobile: marzen: Conditionally select
- SMSC_PHY"
+Date: Thu, 13 Feb 2014 17:03:53 +0900
+Subject: [PATCH 06/11] ARM: shmobile: lager: add sound support
 In-Reply-To: <cover.1392276547.git.horms+renesas@verge.net.au>
 References: <cover.1392276547.git.horms+renesas@verge.net.au>
-Message-ID: <c73c7ff8d5b1f4ee0bb9cd7c57c37782954b2246.1392276547.git.horms+renesas@verge.net.au>
+Message-ID: <d58922ce8cadba7e758608fef9438bc183b46b0f.1392276547.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 317af6612ee29dfcb5ae04df9c58e9f79fc8d4ff.
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This seems to prevent the board from booting now that the tree has been
-rebased on v3.14-rc1.
+This patch adds sound support for Lager board.
+But, it is using PIO transfer at this point.
 
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+[horms+renesas at verge.net.au: resolved conflicts]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/mach-shmobile/Kconfig       |   1 +
+ arch/arm/mach-shmobile/board-lager.c | 100 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 101 insertions(+)
 
 diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index bcbd74c..c431114 100644
+index 7e3f42b..bcbd74c 100644
 --- a/arch/arm/mach-shmobile/Kconfig
 +++ b/arch/arm/mach-shmobile/Kconfig
-@@ -250,7 +250,6 @@ config MACH_MARZEN
- 	depends on ARCH_R8A7779
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
--	select SMSC_PHY if SMSC911X
+@@ -272,6 +272,7 @@ config MACH_LAGER
+ 	depends on ARCH_R8A7790
  	select USE_OF
+ 	select MICREL_PHY if SH_ETH
++	select SND_SOC_AK4642 if SND_SIMPLE_CARD
  
- config MACH_MARZEN_REFERENCE
-@@ -258,7 +257,6 @@ config MACH_MARZEN_REFERENCE
- 	depends on ARCH_R8A7779
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
--	select SMSC_PHY if SMSC911X
- 	select USE_OF
- 	---help---
- 	   Use reference implementation of Marzen board support
+ config MACH_KOELSCH
+ 	bool "Koelsch board"
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index 6a7041f..e8242c5 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -20,6 +20,7 @@
+ 
+ #include <linux/gpio.h>
+ #include <linux/gpio_keys.h>
++#include <linux/i2c.h>
+ #include <linux/input.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+@@ -52,6 +53,20 @@
+ #include <linux/spi/flash.h>
+ #include <linux/spi/rspi.h>
+ #include <linux/spi/spi.h>
++#include <sound/rcar_snd.h>
++#include <sound/simple_card.h>
++
++/*
++ * SSI-AK4643
++ *
++ * SW1: 1: AK4643
++ *      2: CN22
++ *      3: ADV7511
++ *
++ * this command is required when playback.
++ *
++ * # amixer set "LINEOUT Mixer DACL" on
++ */
+ 
+ /* DU */
+ static struct rcar_du_encoder_data lager_du_encoders[] = {
+@@ -509,6 +524,77 @@ static const struct resource usbhs_phy_resources[] __initconst = {
+ 	DEFINE_RES_MEM(0xe6590100, 0x100),
+ };
+ 
++/* I2C */
++static struct i2c_board_info i2c2_devices[] = {
++	{
++		I2C_BOARD_INFO("ak4643", 0x12),
++	}
++};
++
++/* Sound */
++static struct resource rsnd_resources[] __initdata = {
++	[RSND_GEN2_SCU]  = DEFINE_RES_MEM(0xec500000, 0x1000),
++	[RSND_GEN2_ADG]  = DEFINE_RES_MEM(0xec5a0000, 0x100),
++	[RSND_GEN2_SSIU] = DEFINE_RES_MEM(0xec540000, 0x1000),
++	[RSND_GEN2_SSI]  = DEFINE_RES_MEM(0xec541000, 0x1280),
++};
++
++static struct rsnd_ssi_platform_info rsnd_ssi[] = {
++	RSND_SSI_SET(0, 0, gic_spi(370), RSND_SSI_PLAY),
++	RSND_SSI_SET(0, 0, gic_spi(371), RSND_SSI_CLK_PIN_SHARE),
++};
++
++static struct rsnd_scu_platform_info rsnd_scu[2] = {
++	/* no member at this point */
++};
++
++static struct rcar_snd_info rsnd_info = {
++	.flags		= RSND_GEN2,
++	.ssi_info	= rsnd_ssi,
++	.ssi_info_nr	= ARRAY_SIZE(rsnd_ssi),
++	.scu_info	= rsnd_scu,
++	.scu_info_nr	= ARRAY_SIZE(rsnd_scu),
++};
++
++static struct asoc_simple_card_info rsnd_card_info = {
++	.name		= "AK4643",
++	.card		= "SSI01-AK4643",
++	.codec		= "ak4642-codec.2-0012",
++	.platform	= "rcar_sound",
++	.daifmt		= SND_SOC_DAIFMT_LEFT_J,
++	.cpu_dai = {
++		.name	= "rcar_sound",
++		.fmt	= SND_SOC_DAIFMT_CBS_CFS,
++	},
++	.codec_dai = {
++		.name	= "ak4642-hifi",
++		.fmt	= SND_SOC_DAIFMT_CBM_CFM,
++		.sysclk	= 11289600,
++	},
++};
++
++static void __init lager_add_rsnd_device(void)
++{
++	struct platform_device_info cardinfo = {
++		.parent         = &platform_bus,
++		.name           = "asoc-simple-card",
++		.id             = -1,
++		.data           = &rsnd_card_info,
++		.size_data      = sizeof(struct asoc_simple_card_info),
++		.dma_mask       = DMA_BIT_MASK(32),
++	};
++
++	i2c_register_board_info(2, i2c2_devices,
++				ARRAY_SIZE(i2c2_devices));
++
++	platform_device_register_resndata(
++		&platform_bus, "rcar_sound", -1,
++		rsnd_resources, ARRAY_SIZE(rsnd_resources),
++		&rsnd_info, sizeof(rsnd_info));
++
++	platform_device_register_full(&cardinfo);
++}
++
+ static const struct pinctrl_map lager_pinctrl_map[] = {
+ 	/* DU (CN10: ARGB0, CN13: LVDS) */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
+@@ -517,12 +603,24 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
+ 				  "du_sync_1", "du"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
+ 				  "du_clk_out_0", "du"),
++	/* I2C2 */
++	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar.2", "pfc-r8a7790",
++				  "i2c2", "i2c2"),
+ 	/* SCIF0 (CN19: DEBUG SERIAL0) */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
+ 				  "scif0_data", "scif0"),
+ 	/* SCIF1 (CN20: DEBUG SERIAL1) */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.7", "pfc-r8a7790",
+ 				  "scif1_data", "scif1"),
++	/* SSI (CN17: sound) */
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7790",
++				  "ssi0129_ctrl", "ssi"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7790",
++				  "ssi0_data", "ssi"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7790",
++				  "ssi1_data", "ssi"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7790",
++				  "audio_clk_a", "audio_clk"),
+ 	/* MMCIF1 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.1", "pfc-r8a7790",
+ 				  "mmc1_data8", "mmc1"),
+@@ -616,6 +714,8 @@ static void __init lager_add_standard_devices(void)
+ 					  &usbhs_phy_pdata,
+ 					  sizeof(usbhs_phy_pdata));
+ 	lager_register_usbhs();
++
++	lager_add_rsnd_device();
+ }
+ 
+ /*
 -- 
 1.8.5.2
