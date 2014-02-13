@@ -1,84 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 13 Feb 2014 11:34:40 -0500
-Subject: [PATCH] Fix uses of dma_max_pfn() when converting to a limiting
- address
-In-Reply-To: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
-References: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
-Message-ID: <52FCF420.2020603@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 13 Feb 2014 09:36:06 -0700
+Subject: [PATCH] ARM: tegra: don't timeout if CPU is powergated
+In-Reply-To: <20140213084907.GA11795@ulmo.nvidia.com>
+References: <1d5ea6b7df4573d866779857922ac650fe59af60.1392078805.git.stefan@agner.ch>
+ <52FBC97D.8040809@wwwdotorg.org> <4050206.sG2EzXyfMN@fb07-iapwap2>
+ <20140213084907.GA11795@ulmo.nvidia.com>
+Message-ID: <52FCF476.4010908@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 February 2014 12:28 PM, Russell King wrote:
-> We must use a 64-bit for this, otherwise overflowed bits get lost, and
-> that can result in a lower than intended value set.
+On 02/13/2014 01:49 AM, Thierry Reding wrote:
+> On Thu, Feb 13, 2014 at 09:28:52AM +0100, Marc Dietrich wrote:
+>> Am Mittwoch, 12. Februar 2014, 12:20:29 schrieb Stephen Warren:
+>>> On 02/10/2014 05:44 PM, Stefan Agner wrote:
+>>>> When booting secondary CPU(s) which are not yet powergated, a wrong
+>>>> check lead to a timeout after 100 jiffies. With this patch, we only
+>>>> delay powergating if CPUs are still not powered yet.
+>>>
+>>> I've applied this to Tegra's for-3.15/soc branch.
+>>
+>> also for 3.14 and maybe lower versioned kernels? Since this seems to fix a bug 
+>> where some core doesn't come up.
 > 
-> Fixes: 8e0cb8a1f6ac ("ARM: 7797/1: mmc: Use dma_max_pfn(dev) helper for bounce_limit calculations")
-> Fixes: 7d35496dd982 ("ARM: 7796/1: scsi: Use dma_max_pfn(dev) helper for bounce_limit calculations")
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> While poking about with the Cubox-i4 and investigating why my UHS-1
-> SD card wasn't achieving its full potential, I came across a slight
-> problem... the SDHCI host sets a mask of 0xffffffff, but with the
-> start of memory at pfn 0x10000, the blk code sees this when setting
-> the bounce limit:
+> Yeah, this bug has been there for pretty much forever it seems. Commit
+> 86e51a2ee471 "ARM: tegra: support for secondary cores on Tegra30" added
+> tegra30_boot_secondary() (named tegra30_power_up_cpu() back then, which
+> was renamed to tegra30_boot_secondary() in commit 0d1f79b033bb "ARM:
+> tegra: refactor tegra{20,30}_boot_secondary". The latter was introduced
+> in v3.10, so I guess backporting it to stable releases all the way back
+> to v3.10 would be good.
 > 
-> 	max addr 0x0ffff000 bounce limit 0xffff dma 1
-> 
-> and this results in the bounce functions appearing in the profile:
-> 
-> 00000000c00f8b70 copy_to_high_bio_irq                  1139 2.5886
-> 00000000c00f8d28 bounce_end_io                           12 0.0714
-> 00000000c00f8dd0 bounce_end_io_read_isa                   8 0.1053
-> 
-> which, compared to the cost of copying the data to userland and
-> request handling, this is quite significant:
-> 
-> 00000000c04b1794 sdhci_request                          268 0.5447
-> 00000000c02d0740 __copy_to_user_std                     398 0.4252
-> 
-> With this calculation fixed, we avoid the bouncing code entirely.
-> 
-> 	max addr 0x10ffff000 bounce limit 0x10ffff dma 0
->
-You are right. We were seeing an issue with SCSI HDD over PCI and
-the patch fixes that issue as well.
+> Backporting to earlier versions (86e51a2ee471 went into v3.4) will be a
+> lot more difficult since some of the APIs were renamed since then.
 
-I think we should send this patch to stable as well. At least 3.13
-should get this patch.
-
-Thanks RMK for the bug fix. Feel free to add, in case the patch is
-not committed already
-
-Tested-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
- 
->  drivers/mmc/card/queue.c | 2 +-
->  drivers/scsi/scsi_lib.c  | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mmc/card/queue.c b/drivers/mmc/card/queue.c
-> index 357bbc54fe4b..3e049c13429c 100644
-> --- a/drivers/mmc/card/queue.c
-> +++ b/drivers/mmc/card/queue.c
-> @@ -197,7 +197,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
->  	struct mmc_queue_req *mqrq_prev = &mq->mqrq[1];
->  
->  	if (mmc_dev(host)->dma_mask && *mmc_dev(host)->dma_mask)
-> -		limit = dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
-> +		limit = (u64)dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
->  
->  	mq->card = card;
->  	mq->queue = blk_init_queue(mmc_request_fn, lock);
-> diff --git a/drivers/scsi/scsi_lib.c b/drivers/scsi/scsi_lib.c
-> index 7bd7f0d5f050..62ec84b42e31 100644
-> --- a/drivers/scsi/scsi_lib.c
-> +++ b/drivers/scsi/scsi_lib.c
-> @@ -1684,7 +1684,7 @@ u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
->  
->  	host_dev = scsi_get_device(shost);
->  	if (host_dev && host_dev->dma_mask)
-> -		bounce_limit = dma_max_pfn(host_dev) << PAGE_SHIFT;
-> +		bounce_limit = (u64)dma_max_pfn(host_dev) << PAGE_SHIFT;
->  
->  	return bounce_limit;
->  }
-> 
+I'm actually uninclined to backport this; I've never once seen an issue
+because of this problem, and nobody has reported it in older kernels.
