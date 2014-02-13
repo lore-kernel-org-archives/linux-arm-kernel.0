@@ -1,15 +1,11 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 13 Feb 2014 15:09:06 +0100
-Subject: [PATCH V2 16/17] i2c: nomadik: Remove busy check for transfers at
- suspend late
-In-Reply-To: <1392300547-23365-1-git-send-email-ulf.hansson@linaro.org>
-References: <1392300547-23365-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1392300547-23365-5-git-send-email-ulf.hansson@linaro.org>
+Date: Thu, 13 Feb 2014 15:09:02 +0100
+Subject: [PATCH V2 11/17] i2c: nomadik: Convert to devm functions
+Message-ID: <1392300547-23365-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should never be busy performing transfers at suspend late, thus
-there are no reason to check for it.
+Use devm_* functions to simplify code and error handling.
 
 Cc: Alessandro Rubini <rubini@unipv.it>
 Cc: Linus Walleij <linus.walleij@linaro.org>
@@ -21,64 +17,93 @@ Changes in v2:
 	Rebased on top of latest i2c-nomadik branch.
 
 ---
- drivers/i2c/busses/i2c-nomadik.c |   10 ----------
- 1 file changed, 10 deletions(-)
+ drivers/i2c/busses/i2c-nomadik.c |   29 +++++++++--------------------
+ 1 file changed, 9 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 80b0fd3..8a5dc57b 100644
+index bc8ba02..5faf9e2 100644
 --- a/drivers/i2c/busses/i2c-nomadik.c
 +++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -167,7 +167,6 @@ struct i2c_nmk_client {
-  * @stop: stop condition.
-  * @xfer_complete: acknowledge completion for a I2C message.
-  * @result: controller propogated result.
-- * @busy: Busy doing transfer.
-  */
- struct nmk_i2c_dev {
- 	struct i2c_vendor_data		*vendor;
-@@ -185,7 +184,6 @@ struct nmk_i2c_dev {
- 	int				stop;
- 	struct completion		xfer_complete;
- 	int				result;
--	bool				busy;
- };
+@@ -981,7 +981,7 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
+ 		return -ENODEV;
+ 	}
  
- /* controller's abort causes */
-@@ -671,8 +669,6 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
- 	struct nmk_i2c_dev *dev = i2c_get_adapdata(i2c_adap);
- 	int j;
+-	dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
++	dev = devm_kzalloc(&adev->dev, sizeof(struct nmk_i2c_dev), GFP_KERNEL);
+ 	if (!dev) {
+ 		dev_err(&adev->dev, "cannot allocate memory\n");
+ 		ret = -ENOMEM;
+@@ -1011,27 +1011,28 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
+ 	/* If possible, let's go to idle until the first transfer */
+ 	pinctrl_pm_select_idle_state(&adev->dev);
  
--	dev->busy = true;
--
- 	pm_runtime_get_sync(&dev->adev->dev);
+-	dev->virtbase = ioremap(adev->res.start, resource_size(&adev->res));
++	dev->virtbase = devm_ioremap(&adev->dev, adev->res.start,
++				resource_size(&adev->res));
+ 	if (!dev->virtbase) {
+ 		ret = -ENOMEM;
+-		goto err_no_ioremap;
++		goto err_no_mem;
+ 	}
  
- 	/* Attempt three times to send the message queue */
-@@ -697,8 +693,6 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
+ 	dev->irq = adev->irq[0];
+-	ret = request_irq(dev->irq, i2c_irq_handler, 0,
++	ret = devm_request_irq(&adev->dev, dev->irq, i2c_irq_handler, 0,
+ 				DRIVER_NAME, dev);
+ 	if (ret) {
+ 		dev_err(&adev->dev, "cannot claim the irq %d\n", dev->irq);
+-		goto err_irq;
++		goto err_no_mem;
+ 	}
  
- 	pm_runtime_put_sync(&dev->adev->dev);
+ 	pm_suspend_ignore_children(&adev->dev, true);
  
--	dev->busy = false;
--
- 	/* return the no. messages processed */
- 	if (status)
- 		return status;
-@@ -888,9 +882,6 @@ static int nmk_i2c_suspend_late(struct device *dev)
- 	struct amba_device *adev = to_amba_device(dev);
- 	struct nmk_i2c_dev *nmk_i2c = amba_get_drvdata(adev);
+-	dev->clk = clk_get(&adev->dev, NULL);
++	dev->clk = devm_clk_get(&adev->dev, NULL);
+ 	if (IS_ERR(dev->clk)) {
+ 		dev_err(&adev->dev, "could not get i2c clock\n");
+ 		ret = PTR_ERR(dev->clk);
+-		goto err_no_clk;
++		goto err_no_mem;
+ 	}
  
--	if (nmk_i2c->busy)
--		return -EBUSY;
--
- 	pinctrl_pm_select_sleep_state(dev);
+ 	adap = &dev->adap;
+@@ -1053,21 +1054,13 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
+ 	ret = i2c_add_adapter(adap);
+ 	if (ret) {
+ 		dev_err(&adev->dev, "failed to add adapter\n");
+-		goto err_add_adap;
++		goto err_no_mem;
+ 	}
+ 
+ 	pm_runtime_put(&adev->dev);
  
  	return 0;
-@@ -997,7 +988,6 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
- 		goto err_no_mem;
- 	}
- 	dev->vendor = vendor;
--	dev->busy = false;
- 	dev->adev = adev;
- 	nmk_i2c_of_probe(np, dev);
  
+- err_add_adap:
+-	clk_put(dev->clk);
+- err_no_clk:
+-	free_irq(dev->irq, dev);
+- err_irq:
+-	iounmap(dev->virtbase);
+- err_no_ioremap:
+-	kfree(dev);
+  err_no_mem:
+ 
+ 	return ret;
+@@ -1084,13 +1077,9 @@ static int nmk_i2c_remove(struct amba_device *adev)
+ 	clear_all_interrupts(dev);
+ 	/* disable the controller */
+ 	i2c_clr_bit(dev->virtbase + I2C_CR, I2C_CR_PE);
+-	free_irq(dev->irq, dev);
+-	iounmap(dev->virtbase);
+ 	if (res)
+ 		release_mem_region(res->start, resource_size(res));
+-	clk_put(dev->clk);
+ 	pm_runtime_disable(&adev->dev);
+-	kfree(dev);
+ 
+ 	return 0;
+ }
 -- 
 1.7.9.5
