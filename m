@@ -1,46 +1,29 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 14 Feb 2014 07:57:33 +0900
-Subject: [PATCH 22/28] Remove S3C24XX_GPIO_EXTRA128
-In-Reply-To: <52F999A1.1070709@samsung.com>
-References: <1391971686-9517-1-git-send-email-richard@nod.at>
- <1391971686-9517-23-git-send-email-richard@nod.at>
- <52F999A1.1070709@samsung.com>
-Message-ID: <52FD4DDD.6020400@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Feb 2014 14:57:50 -0800
+Subject: [PATCH] ARM: OMAP2+: add missing ARCH_HAS_OPP
+In-Reply-To: <52E901B3.5070307@ti.com>
+References: <1389816038-17363-1-git-send-email-nm@ti.com>
+ <52E901B3.5070307@ti.com>
+Message-ID: <20140213225749.GG28216@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/14 12:31, Kukjin Kim wrote:
-> On 02/10/14 03:48, Richard Weinberger wrote:
->> The symbol is an orphan, get rid of it.
->>
->> Signed-off-by: Richard Weinberger<richard@nod.at>
->> ---
->> arch/arm/mach-s3c24xx/Kconfig | 1 -
->> 1 file changed, 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-s3c24xx/Kconfig
->> b/arch/arm/mach-s3c24xx/Kconfig
->> index 1c67f04..bb1fa603 100644
->> --- a/arch/arm/mach-s3c24xx/Kconfig
->> +++ b/arch/arm/mach-s3c24xx/Kconfig
->> @@ -561,7 +561,6 @@ config MACH_OSIRIS
->> select S3C2410_IOTIMING if ARM_S3C2440_CPUFREQ
->> select S3C2440_XTAL_12000000
->> select S3C24XX_DCLK
->> - select S3C24XX_GPIO_EXTRA128
->> select S3C24XX_SIMTEC_PM if PM
->> select S3C_DEV_NAND
->> select S3C_DEV_USB_HOST
->
-> OK good, but I will squash this with 13th for mach-s3c24xx/Kconfig when
-> I apply.
->
-+ Paul Bolle
+* Nishanth Menon <nm@ti.com> [140129 05:29]:
+> Hi Tony,
+> On 01/15/2014 02:00 PM, Nishanth Menon wrote:
+> > OMAP5, DRA7, AM43xx all have OPPs. So select the same to allow SoC
+> > only configuration boot to work with OPP.
+> > 
+> > Reported-by: Nikhil Devshatwar <nikhil.nd@ti.com>
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
+> > ---
+> > 
+> > For DRA7, depends on: https://patchwork.kernel.org/patch/3465411/
+> 
+> Considering that dependent patch is now on linus master,
+> a gentle ping -> The patch does apply on latest linus master commit
+> 0e47c969c65e213421450c31043353ebe3c67e0c
 
-Richard,
+Thanks applying into omap-for-v3.14/fixes.
 
-I found same patch ([PATCH] ARM: s3c24xx: get rid of unneeded selects) 
-for S3C24XX from Paul before your posting. So I picked that up.
-
-Thanks,
-Kukjin
+Tony
