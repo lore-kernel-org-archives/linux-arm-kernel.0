@@ -1,102 +1,53 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 13 Feb 2014 21:22:26 +0900
-Subject: [PATCH v2 2/3] ARM: bios32: use pci_enable_resource to enable PCI
- resources
-In-Reply-To: <1392236171-10512-3-git-send-email-will.deacon@arm.com>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <1392236171-10512-3-git-send-email-will.deacon@arm.com>
-Message-ID: <000001cf28b6$41846bb0$c48d4310$%han@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 13 Feb 2014 12:23:17 +0000
+Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
+ MiPHY365x
+In-Reply-To: <20140213110314.GH32508@lee--X1>
+References: <1392220985-28189-1-git-send-email-lee.jones@linaro.org>
+ <20140212164019.GE25957@e106331-lin.cambridge.arm.com>
+ <20140213110314.GH32508@lee--X1>
+Message-ID: <20140213122317.GC5871@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 13, 2014 5:16 AM, Will Deacon wrote:
+On Thu, Feb 13, 2014 at 11:03:14AM +0000, Lee Jones wrote:
+> > > The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
+> > > devices. It has 2 ports which it can use for either; both SATA, both
+> > > PCIe or one of each in any configuration.
+> > > 
+> > > Cc: devicetree at vger.kernel.org
+> > > Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  .../devicetree/bindings/phy/phy-miphy365x.txt      | 43 ++++++++++++++++++++++
+> > >  1 file changed, 43 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> > > new file mode 100644
+> > > index 0000000..fdfa7ca
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
+> > > @@ -0,0 +1,43 @@
+> > > +STMicroelectronics STi MIPHY365x PHY binding
+> > > +============================================
+> > > +
+> > > +This binding describes a miphy device that is used to control PHY hardware
+> > > +for SATA and PCIe.
+> > > +
+> > > +Required properties:
+> > > +- compatible: Should be "st,miphy365x-phy"
+> > > +- #phy-cells: Should be 2 (See example)
+> > 
+> > The first example has #phy-cells = <1>.
 > 
-> This patch moves bios32 over to using the generic code for enabling PCI
-> resources. Since the core code takes care of bridge resources too, we
-> can also drop the explicit IO and MEMORY enabling for them in the arch
-> code.
+> Right, will fix. Should be 2.
 > 
-> A side-effect of this change is that we no longer explicitly enable
-> devices when running in PCI_PROBE_ONLY mode. This stays closer to the
-> meaning of the option and prevents us from trying to enable devices
-> without any assigned resources (the core code refuses to enable
-> resources without parents).
+> > What do the cells mean? What are the expected values?
 > 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> http://www.spinics.net/lists/arm-kernel/msg307209.html
 
-I tested this patch with NIC on Exynos platform.
-It works properly.
+Ok. Could that be mentioned in the binding document then?
 
-Tested-by: Jingoo Han <jg1.han@samsung.com> 
-
-[    0.406431] PCI: bus1: Fast back to back transfers disabled
-[    0.411912] pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
-[    0.418608] pci_bus 0000:00: busn_res: [bus 00-ff] end is updated to 01
-[    0.425351] pci 0000:00:00.0: BAR 8: assigned [mem 0x40100000-0x401fffff]
-[    0.432144] pci 0000:00:00.0: BAR 9: assigned [mem 0x40200000-0x402fffff pref]
-[    0.439426] pci 0000:00:00.0: BAR 7: assigned [io  0x1000-0x1fff]
-[    0.445599] pci 0000:01:00.0: BAR 1: assigned [mem 0x40100000-0x4017ffff]
-[    0.452488] pci 0000:01:00.0: BAR 6: assigned [mem 0x40200000-0x4023ffff pref]
-[    0.459745] pci 0000:01:00.0: BAR 0: assigned [mem 0x40180000-0x4019ffff]
-[    0.466635] pci 0000:01:00.0: BAR 3: assigned [mem 0x401a0000-0x401a3fff]
-[    0.473499] pci 0000:01:00.0: BAR 2: assigned [io  0x1000-0x101f]
-[    0.479656] pci 0000:00:00.0: PCI bridge to [bus 01]
-
-Best regards,
-Jingoo Han
-
-> ---
->  arch/arm/kernel/bios32.c | 37 +++----------------------------------
->  1 file changed, 3 insertions(+), 34 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index 317da88ae65b..91f48804e3bb 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -608,41 +608,10 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
->   */
->  int pcibios_enable_device(struct pci_dev *dev, int mask)
->  {
-> -	u16 cmd, old_cmd;
-> -	int idx;
-> -	struct resource *r;
-> -
-> -	pci_read_config_word(dev, PCI_COMMAND, &cmd);
-> -	old_cmd = cmd;
-> -	for (idx = 0; idx < 6; idx++) {
-> -		/* Only set up the requested stuff */
-> -		if (!(mask & (1 << idx)))
-> -			continue;
-> -
-> -		r = dev->resource + idx;
-> -		if (!r->start && r->end) {
-> -			printk(KERN_ERR "PCI: Device %s not available because"
-> -			       " of resource collisions\n", pci_name(dev));
-> -			return -EINVAL;
-> -		}
-> -		if (r->flags & IORESOURCE_IO)
-> -			cmd |= PCI_COMMAND_IO;
-> -		if (r->flags & IORESOURCE_MEM)
-> -			cmd |= PCI_COMMAND_MEMORY;
-> -	}
-> +	if (pci_has_flag(PCI_PROBE_ONLY))
-> +		return 0;
-> 
-> -	/*
-> -	 * Bridges (eg, cardbus bridges) need to be fully enabled
-> -	 */
-> -	if ((dev->class >> 16) == PCI_BASE_CLASS_BRIDGE)
-> -		cmd |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY;
-> -
-> -	if (cmd != old_cmd) {
-> -		printk("PCI: enabling device %s (%04x -> %04x)\n",
-> -		       pci_name(dev), old_cmd, cmd);
-> -		pci_write_config_word(dev, PCI_COMMAND, cmd);
-> -	}
-> -	return 0;
-> +	return pci_enable_resources(dev, mask);
->  }
-> 
->  int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-> --
-> 1.8.2.2
+Cheers,
+Mark.
