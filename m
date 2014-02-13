@@ -1,26 +1,19 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 13 Feb 2014 19:41:21 +0100
-Subject: [PATCH] PCI: imx6: Fix link_up detection
-In-Reply-To: <52FD0F1A.4000208@boundarydevices.com>
-References: <1392190075-23204-1-git-send-email-s.hauer@pengutronix.de>
- <201402120836.16221.marex@denx.de> <52FD0F1A.4000208@boundarydevices.com>
-Message-ID: <201402131941.21883.marex@denx.de>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 13 Feb 2014 16:25:56 -0500 (EST)
+Subject: [PATCH v3 0/3] net: stmmac: Add STi GMAC ethernet
+In-Reply-To: <1392112716-30803-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1391770455-24291-1-git-send-email-srinivas.kandagatla@st.com>
+ <1392112716-30803-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <20140213.162556.2217483759096236481.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 13, 2014 at 07:29:46 PM, Troy Kisky wrote:
-> On 2/12/2014 12:36 AM, Marek Vasut wrote:
-> > On Wednesday, February 12, 2014 at 08:27:55 AM, Sascha Hauer wrote:
-> > 
-> > +CC Troy Kisky, since I think he submitted something similar some time
-> > ago already.
-> > 
-> > Otherwise I agree this happens.
-> 
-> Sorry, I haven't submitted this yet, but was planning to today. Here's
-> what would have been sent.
+From: <srinivas.kandagatla@st.com>
+Date: Tue, 11 Feb 2014 09:58:36 +0000
 
-Release early, release often ... ;-)
+> Dave, Can I request you to take the first patch via net tree for v3.15, I can
+> request Arnd or Olof to take the DT patches via the arm-soc tree for v3.15.
 
-Best regards,
-Marek Vasut
+Since it's a new driver, I decided to add it to the plain 'net' tree.
+
+Thanks.
