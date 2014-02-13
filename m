@@ -1,44 +1,113 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 13 Feb 2014 11:00:47 +0200
-Subject: [PATCH 3/4] clk: ti: add support for default-rate property from DT
+Date: Thu, 13 Feb 2014 11:00:45 +0200
+Subject: [PATCH 1/4] clk: ti: mux: add support for default-parenting
 In-Reply-To: <1392282048-6284-1-git-send-email-t-kristo@ti.com>
 References: <1392282048-6284-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1392282048-6284-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1392282048-6284-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-default-rate property can now be used to define default rates for clocks,
-which get configured during boot.
+ti,mux-clock now supports ti,default-parent property, which can be used
+to configure the default parent of the clock during boot. This property
+can be added to board specific files, or under the clock data itself.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/prm_common.c |    2 ++
- drivers/clk/ti/clk.c             |    1 +
- 2 files changed, 3 insertions(+)
+ Documentation/devicetree/bindings/clock/ti/mux.txt |    7 ++++++
+ drivers/clk/ti/mux.c                               |   24 ++++++++++++++++++--
+ 2 files changed, 29 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index b4c4ab9..4703545 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -528,5 +528,7 @@ int __init of_prcm_init(void)
+diff --git a/Documentation/devicetree/bindings/clock/ti/mux.txt b/Documentation/devicetree/bindings/clock/ti/mux.txt
+index 2d0d170..4e291eb 100644
+--- a/Documentation/devicetree/bindings/clock/ti/mux.txt
++++ b/Documentation/devicetree/bindings/clock/ti/mux.txt
+@@ -48,6 +48,8 @@ Optional properties:
+   zero
+ - ti,set-rate-parent : clk_set_rate is propagated to parent clock,
+   not supported by the composite-mux-clock subtype
++- ti,default-parent : configures mux parent during boot to be the provided
++  phandle clock
  
- 	ti_dt_clockdomains_setup();
+ Examples:
  
-+	of_clk_set_init_rates();
+@@ -65,6 +67,7 @@ abe_dpll_bypass_clk_mux_ck: abe_dpll_bypass_clk_mux_ck at 4a306108 {
+ 	clocks = <&sys_clkin_ck>, <&sys_32k_ck>;
+ 	ti,bit-shift = <24>;
+ 	reg = <0x0108>;
++	ti,default-parent = <&sys_32k_ck>;
+ };
+ 
+ mcbsp5_mux_fck: mcbsp5_mux_fck {
+@@ -74,3 +77,7 @@ mcbsp5_mux_fck: mcbsp5_mux_fck {
+ 	ti,bit-shift = <4>;
+ 	reg = <0x02d8>;
+ };
 +
- 	return 0;
- }
-diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
-index b1a6f71..23998b7 100644
---- a/drivers/clk/ti/clk.c
-+++ b/drivers/clk/ti/clk.c
-@@ -156,6 +156,7 @@ void ti_dt_clk_init_provider(struct device_node *parent, int index)
- 		clk_init_cb = (of_clk_init_cb_t)match->data;
- 		pr_debug("%s: initializing: %s\n", __func__, np->name);
- 		clk_init_cb(np);
-+		of_clk_parse_init_rate(np, NULL);
- 	}
++&mcbsp5_mux_fck {
++	ti,default-parent = <&mcbsp_clks>;
++};
+diff --git a/drivers/clk/ti/mux.c b/drivers/clk/ti/mux.c
+index 0197a47..557a7ce 100644
+--- a/drivers/clk/ti/mux.c
++++ b/drivers/clk/ti/mux.c
+@@ -108,7 +108,8 @@ static struct clk *_register_mux(struct device *dev, const char *name,
+ 				 const char **parent_names, u8 num_parents,
+ 				 unsigned long flags, void __iomem *reg,
+ 				 u8 shift, u32 mask, u8 clk_mux_flags,
+-				 u32 *table, spinlock_t *lock)
++				 u32 *table, int default_parent,
++				 spinlock_t *lock)
+ {
+ 	struct clk_mux *mux;
+ 	struct clk *clk;
+@@ -136,6 +137,9 @@ static struct clk *_register_mux(struct device *dev, const char *name,
+ 	mux->table = table;
+ 	mux->hw.init = &init;
  
- 	list_for_each_entry_safe(retry, tmp, &retry_list, link) {
++	if (default_parent >= 0)
++		ti_clk_mux_set_parent(&mux->hw, default_parent);
++
+ 	clk = clk_register(dev, &mux->hw);
+ 
+ 	if (IS_ERR(clk))
+@@ -161,6 +165,8 @@ static void of_mux_clk_setup(struct device_node *node)
+ 	u32 mask = 0;
+ 	u32 shift = 0;
+ 	u32 flags = 0;
++	struct device_node *default_parent;
++	int default_parent_idx = -1;
+ 
+ 	num_parents = of_clk_get_parent_count(node);
+ 	if (num_parents < 2) {
+@@ -174,6 +180,19 @@ static void of_mux_clk_setup(struct device_node *node)
+ 	for (i = 0; i < num_parents; i++)
+ 		parent_names[i] = of_clk_get_parent_name(node, i);
+ 
++	default_parent = of_parse_phandle(node, "ti,default-parent", 0);
++
++	if (default_parent) {
++		for (i = 0; i < num_parents; i++) {
++			struct device_node *tmp;
++			tmp = of_parse_phandle(node, "clocks", i);
++			if (tmp == default_parent) {
++				default_parent_idx = i;
++				break;
++			}
++		}
++	}
++
+ 	reg = ti_clk_get_reg_addr(node, 0);
+ 
+ 	if (!reg)
+@@ -195,7 +214,8 @@ static void of_mux_clk_setup(struct device_node *node)
+ 	mask = (1 << fls(mask)) - 1;
+ 
+ 	clk = _register_mux(NULL, node->name, parent_names, num_parents, flags,
+-			    reg, shift, mask, clk_mux_flags, NULL, NULL);
++			    reg, shift, mask, clk_mux_flags, NULL,
++			    default_parent_idx, NULL);
+ 
+ 	if (!IS_ERR(clk))
+ 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
 -- 
 1.7.9.5
