@@ -1,137 +1,96 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Feb 2014 09:31:35 -0800
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
-In-Reply-To: <1626419.Ta3A7zgHIt@wuerfel>
-References: <1390190215-22700-1-git-send-email-olof@lixom.net>
- <2874395.Ul86gYA57i@wuerfel>
- <20140213144106.GW26684@n2100.arm.linux.org.uk>
- <1626419.Ta3A7zgHIt@wuerfel>
-Message-ID: <20140213173135.GA16336@quad.lixom.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 13 Feb 2014 18:33:24 +0100
+Subject: [PATCH v4 01/13] ARM: PJ4B: Add cpu_suspend/cpu_resume hooks for PJ4B
+In-Reply-To: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1392312816-17657-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 05:13:14PM +0100, Arnd Bergmann wrote:
-> On Thursday 13 February 2014 14:41:06 Russell King - ARM Linux wrote:
-> > On Thu, Feb 13, 2014 at 01:48:55PM +0100, Arnd Bergmann wrote:
-> > > On Thursday 13 February 2014 10:42:48 Russell King - ARM Linux wrote:
-> > > > 
-> > > > What if we have a platform where things subtly change, like for instance,
-> > > > the wiring on the SD slot to fix a problem with UHS-1 cards, which means
-> > > > you don't have UHS-1 support for some platforms but do for others.
-> > > > 
-> > > > What if you have a platform which uses a brcm4329 chip for Wifi, but then
-> > > > later in the production run switch to using a different Wifi chipset?
-> > > 
-> > > As far as I can tell, the power sequencing is normally really
-> > > dependent on the device. If someone has an on-board brcm4329
-> > > that requires a specific set of clocks, resets, voltages etc
-> > > to be routed to the chip and enabled in the correct order to
-> > > allow probing, it seems unlikely that changing the wifi chipset
-> > > to something else would keep the exact same requirements.
-> > 
-> > That's your assertion - however, do we /know/ whether there's a situation
-> > where Olof's solution doesn't work because the sequencing is wrong?
-> > 
-> > I see nothing unreasonable about the sequence:
-> > 
-> > 1. hold reset at low level
-> > 2. apply power
-> > 3. turn clock on
-> > 4. apply reset
-> > 5. release reset
-> 
-> I was thinking of cases where you may need a more complex sequence:
-> - wait for a device specific time between some of the steps
->   (the cw1200 driver seems to need that, but we could probably
->    get away with waiting long enough for everyone)
-> - have more than one of each, and turn them on in the right order.
->   cw1200 seems to need two voltages, two gpio resets ("reset"
->   and "powerup").
+PJ4B needs extra instructions for suspend and resume, so instead of
+using the armv7 version, this commit introduces specific versions for
+PJ4B.
 
-Those two gpio resets are extremely common, but on snow (the chromebook) the
-powerup gpio is hard-wired. So it's not all that unusual. As I mention in the
-patch, a positive-sense powerup and a negative-sense reset aren't all that
-different in practice.
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mm/proc-v7.S | 64 ++++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 61 insertions(+), 3 deletions(-)
 
->   Again, we could specify a larger number of clocks that can be
->   provided to the host, but if we make it a device specific
->   property, we already know how many we need.
-> 
-> I can't think of anything that would require significant changes
-> to the procedure though, just refinements as we run into problems.
-
-The main pain will be if there's a requirement to do
-gpio-requlator-gpio-regulator. We could mandate that regulators are turned on
-in order. (Also, see below).
-
-> 
-> > The points being:
-> > * never set a signal to a high level before power is applied, otherwise
-> >   we can end up supplying power through that signal (which may cause
-> >   damage.)  That goes for the reset and clock.
-> > * devices normally want clocks running to complete their reset sequencing.
-> > 
-> > This is actually the sequence which MMC/SD cards do (except without the
-> > reset) anyway - it's spec'd that on the MMC/SD bus, power will be applied
-> > and will be stable before the clock signal is applied, and then the clock
-> > signal runs for a certain number of cycles before you even start talking
-> > to the card.
-> 
-> It may be dangerous to refer to the spec, since we are talking
-> specifically about devices that require something beyond what the
-> spec says ;-) For instance in SD/MMC cards I'd assume the device clock
-> to be derived from the bus clock. However we can expect that clock
-> to work already (any working mmc host driver would provide that),
-> but we may need to drive the device clock. It still sounds reasonable
-> to assume that the sequencing is the same as for the bus clock.
-> 
-> > That all said, we do have the problem that once we decide, we need to
-> > support it because it becomes part of DT - this is one of the things I
-> > hate about DT, it requires over-design.
-> 
-> Yes, I agree. It is a problem that we have to face all the time.
-> We have in the past defined bindings of both types, overdesigned
-> and not thought through enough.
-> 
-> >  Your point is "Olof's solution
-> > may break if we have a device which requires a different sequence" which
-> > is a valid point which has to be considered from the DT perspective and
-> > addressed whether or not we actually have a device which meets that
-> > criteria.  I don't see an easy solution to this.
-> 
-> I think either one will work. With Olof's suggestion that may mean we
-> have to keep adding support for increasingly complex cases when we
-> run into them, or it may all be easy. With my suggestion, we give
-> more room for function drivers to mess things up, but at least we
-> can keep the complexity in the places that need them and only need
-> to change the core once.
-
-I always anticipated the binding needing amendment over time -- for example if
-a device needs longer delays between clock enable and reset release. But most
-of those can be handled through bindings amendments as needed (with default
-behavior for non-amended bindings the same as today).
-
-Chances are that if we do a per-device binding, we'll likely end up having
-shared helpers to parse the settings anyway, so in the end we end up with
-similar code, and similar bind maybe subtly different bindings. I suspect
-sharing one common binding and common code will be easier long-term but it's
-not a black and white choice.
-
-> Aside from the power-on problem, my suggestion would at the same
-> time solve the second problem of having a place to stick arbitrary
-> DT properties for the sdio function. Again looking at the cw1200
-> example, they may require passing an IRQ descriptor, a MAC address,
-> the device clock rate, and two flags for things that are not
-> detectable by looking at the device ID (whether a 5GHz antenna is
-> connected and something about odd block size transfers).
-> This is probably the main difference between the two approaches.
-
-So, we do have the option of making the mmc binding take a device subnode
-that gets passed in as the of_node when binding the device, and we can
-move the power/reset/clock data there even if we don't leave it up to
-the card driver to handle and act upon it. It would give us a place to
-locate per-device properties like these, but it wouldn't greatly affect
-how the rest of the solution looks.
-
-
--Olof
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index bd1781979a39..11117423a9b4 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -169,9 +169,67 @@ ENDPROC(cpu_pj4b_do_idle)
+ 	globl_equ	cpu_pj4b_do_idle,  	cpu_v7_do_idle
+ #endif
+ 	globl_equ	cpu_pj4b_dcache_clean_area,	cpu_v7_dcache_clean_area
+-	globl_equ	cpu_pj4b_do_suspend,	cpu_v7_do_suspend
+-	globl_equ	cpu_pj4b_do_resume,	cpu_v7_do_resume
+-	globl_equ	cpu_pj4b_suspend_size,	cpu_v7_suspend_size
++#ifdef CONFIG_ARM_CPU_SUSPEND
++ENTRY(cpu_pj4b_do_suspend)
++	stmfd	sp!, {r4 - r10, lr}
++	mrc	p15, 0, r4, c13, c0, 0	@ FCSE/PID
++	mrc	p15, 0, r5, c13, c0, 3	@ User r/o thread ID
++	stmia	r0!, {r4 - r5}
++	mrc	p15, 1, r6, c15, c1, 0  @ save CP15 - extra features
++	mrc	p15, 1, r7, c15, c2, 0	@ save CP15 - Aux Func Modes Ctrl 0
++	mrc	p15, 1, r8, c15, c1, 2	@ save CP15 - Aux Debug Modes Ctrl 2
++	mrc	p15, 1, r9, c15, c1, 1  @ save CP15 - Aux Debug Modes Ctrl 1
++	mrc	p15, 0, r10, c9, c14, 0  @ save CP15 - PMC
++	stmia	r0!, {r6 - r10}
++	mrc	p15, 0, r6, c3, c0, 0	@ Domain ID
++	mrc	p15, 0, r7, c2, c0, 1	@ TTB 1
++	mrc	p15, 0, r11, c2, c0, 2	@ TTB control register
++	mrc	p15, 0, r8, c1, c0, 0	@ Control register
++	mrc	p15, 0, r9, c1, c0, 1	@ Auxiliary control register
++	mrc	p15, 0, r10, c1, c0, 2	@ Co-processor access control
++	stmia	r0, {r6 - r11}
++	ldmfd	sp!, {r4 - r10, pc}
++ENDPROC(cpu_pj4b_do_suspend)
++
++ENTRY(cpu_pj4b_do_resume)
++	mov	ip, #0
++	mcr	p15, 0, ip, c7, c5, 0	@ invalidate I cache
++	mcr	p15, 0, ip, c13, c0, 1	@ set reserved context ID
++	ldmia	r0!, {r4 - r5}
++	mcr	p15, 0, r4, c13, c0, 0	@ FCSE/PID
++	mcr	p15, 0, r5, c13, c0, 3	@ User r/o thread ID
++	ldmia	r0!, {r6 - r10}
++	mcr	p15, 1, r6, c15, c1, 0  @ save CP15 - extra features
++	mcr	p15, 1, r7, c15, c2, 0	@ save CP15 - Aux Func Modes Ctrl 0
++	mcr	p15, 1, r8, c15, c1, 2	@ save CP15 - Aux Debug Modes Ctrl 2
++	mcr	p15, 1, r9, c15, c1, 1  @ save CP15 - Aux Debug Modes Ctrl 1
++	mcr	p15, 0, r10, c9, c14, 0  @ save CP15 - PMC
++	ldmia	r0, {r6 - r11}
++	mcr	p15, 0, ip, c8, c7, 0	@ invalidate TLBs
++	mcr	p15, 0, r6, c3, c0, 0	@ Domain ID
++#ifndef CONFIG_ARM_LPAE
++	ALT_SMP(orr	r1, r1, #TTB_FLAGS_SMP)
++	ALT_UP(orr	r1, r1, #TTB_FLAGS_UP)
++#endif
++	mcr	p15, 0, r1, c2, c0, 0	@ TTB 0
++	mcr	p15, 0, r7, c2, c0, 1	@ TTB 1
++	mcr	p15, 0, r11, c2, c0, 2	@ TTB control register
++	ldr	r4, =PRRR		@ PRRR
++	ldr	r5, =NMRR		@ NMRR
++	mcr	p15, 0, r4, c10, c2, 0	@ write PRRR
++	mcr	p15, 0, r5, c10, c2, 1	@ write NMRR
++	mrc	p15, 0, r4, c1, c0, 1	@ Read Auxiliary control register
++	teq	r4, r9			@ Is it already set?
++	mcrne	p15, 0, r9, c1, c0, 1	@ No, so write it
++	mcr	p15, 0, r10, c1, c0, 2	@ Co-processor access control
++	isb
++	dsb
++	mov	r0, r8			@ control register
++	b	cpu_resume_mmu
++ENDPROC(cpu_pj4b_do_resume)
++#endif
++.globl	cpu_pj4b_suspend_size
++.equ	cpu_pj4b_suspend_size, 4 * 13
+ 
+ #endif
+ 
+-- 
+1.8.1.2
