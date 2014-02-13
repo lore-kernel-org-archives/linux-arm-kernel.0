@@ -1,77 +1,146 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Thu, 13 Feb 2014 08:58:10 -0800
-Subject: [PATCH] Fix uses of dma_max_pfn() when converting to a limiting
- address
-In-Reply-To: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
-References: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
-Message-ID: <1392310690.2175.13.camel@dabdike.int.hansenpartnership.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 13 Feb 2014 17:59:14 +0100
+Subject: [PATCH v3 00/13] pinctrl: mvebu: restructure resource allocation
+In-Reply-To: <52FCF59E.3090100@gmail.com>
+References: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140213172620.76e760ba@skate> <52FCF59E.3090100@gmail.com>
+Message-ID: <20140213175914.205803a6@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-02-11 at 17:28 +0000, Russell King wrote:
-> We must use a 64-bit for this, otherwise overflowed bits get lost, and
-> that can result in a lower than intended value set.
-> 
-> Fixes: 8e0cb8a1f6ac ("ARM: 7797/1: mmc: Use dma_max_pfn(dev) helper for bounce_limit calculations")
-> Fixes: 7d35496dd982 ("ARM: 7796/1: scsi: Use dma_max_pfn(dev) helper for bounce_limit calculations")
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> While poking about with the Cubox-i4 and investigating why my UHS-1
-> SD card wasn't achieving its full potential, I came across a slight
-> problem... the SDHCI host sets a mask of 0xffffffff, but with the
-> start of memory at pfn 0x10000, the blk code sees this when setting
-> the bounce limit:
-> 
-> 	max addr 0x0ffff000 bounce limit 0xffff dma 1
-> 
-> and this results in the bounce functions appearing in the profile:
-> 
-> 00000000c00f8b70 copy_to_high_bio_irq                  1139 2.5886
-> 00000000c00f8d28 bounce_end_io                           12 0.0714
-> 00000000c00f8dd0 bounce_end_io_read_isa                   8 0.1053
-> 
-> which, compared to the cost of copying the data to userland and
-> request handling, this is quite significant:
-> 
-> 00000000c04b1794 sdhci_request                          268 0.5447
-> 00000000c02d0740 __copy_to_user_std                     398 0.4252
-> 
-> With this calculation fixed, we avoid the bouncing code entirely.
-> 
-> 	max addr 0x10ffff000 bounce limit 0x10ffff dma 0
-> 
->  drivers/mmc/card/queue.c | 2 +-
->  drivers/scsi/scsi_lib.c  | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mmc/card/queue.c b/drivers/mmc/card/queue.c
-> index 357bbc54fe4b..3e049c13429c 100644
-> --- a/drivers/mmc/card/queue.c
-> +++ b/drivers/mmc/card/queue.c
-> @@ -197,7 +197,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
->  	struct mmc_queue_req *mqrq_prev = &mq->mqrq[1];
->  
->  	if (mmc_dev(host)->dma_mask && *mmc_dev(host)->dma_mask)
-> -		limit = dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
-> +		limit = (u64)dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
->  
->  	mq->card = card;
->  	mq->queue = blk_init_queue(mmc_request_fn, lock);
-> diff --git a/drivers/scsi/scsi_lib.c b/drivers/scsi/scsi_lib.c
-> index 7bd7f0d5f050..62ec84b42e31 100644
-> --- a/drivers/scsi/scsi_lib.c
-> +++ b/drivers/scsi/scsi_lib.c
-> @@ -1684,7 +1684,7 @@ u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
->  
->  	host_dev = scsi_get_device(shost);
->  	if (host_dev && host_dev->dma_mask)
-> -		bounce_limit = dma_max_pfn(host_dev) << PAGE_SHIFT;
-> +		bounce_limit = (u64)dma_max_pfn(host_dev) << PAGE_SHIFT;
+Dear Sebastian Hesselbarth,
 
-This doesn't really look like the right fix.  You replaced dev->dma_mask
-with a calculation on dev_max_pfn().  Since dev->dma_mask is always u64
-and dev_max_pfn is supposed to be returning the pfn of the dma_mask, it
-should unconditionally be 64 bits as well.  Either that or it should
-return dma_addr_t.
+On Thu, 13 Feb 2014 17:41:02 +0100, Sebastian Hesselbarth wrote:
 
-James
+> > Thanks again for working on this! I have boot tested this successfully
+> > on an Armada XP platform, and it seems to behave normally, the debugfs
+> > pinctrl contents make sense.
+> 
+> I guess this is a Tested-by ?
+
+Yes. My tests were admittedly fairly light, but I believe good enough :)
+
+> > I am not sure what you mean here in terms of the ordering for the
+> > patches. I'm attaching several patches, and the first three patches
+> > adapt your patch series to also cover 375 and 38x, assuming the pinctrl
+> > support for 375 and 38x is merged before your patch series.
+> 
+> Right. If 375/38x pinctrl goes in first (what I expect), I'd have to add
+> corresponding patches. You already sent them, I'll pick them up.
+
+Ok, cool. Hopefully we can sort out the merging of those two patch
+series for 3.15 with Linus Walleij.
+
+> > I must say I dislike quite a bit this unnamed mpp controls mechanism.
+> > Why isn't the name statically defined in the source code by the
+> > MPP_MODE macro, which already takes as first argument the pin number?
+> 
+> Honestly, the unnamed mpp control thing is a bit odd. But if you tell
+> me how to create ~60 statically defined one pin groups out of a
+> single-line macro, we can change that easily.
+> 
+> Back when that unnamed mpp control thing was invented, I must have been
+> to lazy to write e.g.
+> 
+> MPP_FUNC_CTRL(0, 0, "mpp0", armada_xp_mpp_ctrl),
+> MPP_FUNC_CTRL(1, 1, "mpp1", armada_xp_mpp_ctrl),
+> MPP_FUNC_CTRL(2, 2, "mpp2", armada_xp_mpp_ctrl),
+> ...
+> MPP_FUNC_CTRL(66, 66, "mpp66", armada_xp_mpp_ctrl),
+> 
+> instead of
+> 
+> MPP_FUNC_CTRL(0, 66, NULL, armada_xp_mpp_ctrl),
+> 
+> and generate the 66 names dynamically.
+
+Right. But what I meant is that we already have a place where we have
+one macro call for each pin: when defining the MPP modes. So I was
+thinking of simplifying the whole stuff by "merging" the notion of MPP
+control with the notion of MPP mode. This way, when you do:
+
+	MPP_MODE(0,
+		   MPP_FUNCTION(...),
+		   MPP_FUNCTION(...)),
+	MPP_MODE(1,
+		   MPP_FUNCTION(...),
+		   MPP_FUNCTION(...)),
+	MPP_MODE(2,
+		   MPP_FUNCTION(...),
+		   MPP_FUNCTION(...)),
+[...]
+	MPP_MODE(65,
+		   MPP_FUNCTION(...),
+		   MPP_FUNCTION(...)),
+
+You can take this opportunity to generate:
+
+	{ "mpp0", ... },
+	{ "mpp1", ... },
+	{ "mpp2", ... },
+	...
+	{ "mpp65", ... },
+
+> > This is definitely good, but I'm wondering why the core cannot provide
+> > helper functions for the generic case where we have 4 bits per pin in
+> > contiguous registers. This would avoid duplicating the helper function
+> > six times (you have four in your patch series, and we'll need two more
+> > for A375 and A38x).
+> 
+> I thought about it too, but we would need a soc specific callback
+> anyway as you'll have to pass the base address somehow (and that is now
+> known by soc specific stub only). My quick rule of thumb was that the
+> amount of code replication would be almost the same.
+
+In pinctrl-mvebu.h, we could have:
+
+static inline int default_mpp_ctrl_get(void __iomem *base, unsigned int pid, unsigned long *config)
+{
+        unsigned off = (pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+        unsigned shift = (pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+
+        *config = (readl(base + off) >> shift) & MVEBU_MPP_MASK;
+
+        return 0;
+}
+
+static inline int default_mpp_ctrl_set(void __iomem *base, unsigned int pid, unsigned long config)
+{
+        unsigned off = (pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+        unsigned shift = (pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+        unsigned long reg;
+
+        reg = readl(base + off) & ~(MVEBU_MPP_MASK << shift);
+        writel(reg | (config << shift), base + off);
+
+        return 0;
+}
+
+which would slightly reduce the per-SoC code to:
+
+static int armada_370_mpp_ctrl_get(unsigned pid, unsigned long *config)
+{
+	return default_mpp_ctrl_get(mpp_base, pid, config);
+}
+
+static int armada_370_mpp_ctrl_set(unsigned pid, unsigned long config)
+{
+	return default_mpp_ctrl_set(mpp_base, pid, config);
+}
+
+but we admittedly cannot completely remove the per-SoC function, since
+the mpp_base is now only known to each per-SoC driver.
+
+> > Feel free to squash these patches into the appropriate patches.
+> 
+> Yep, thanks for these! I'll squash them in and send an updated v4 as
+> soon as the discussion here stalls.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
