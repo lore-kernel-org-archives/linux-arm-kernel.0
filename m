@@ -1,53 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 13 Feb 2014 12:23:17 +0000
-Subject: [PATCH 1/4] phy: miphy365x: Add Device Tree bindings for the
- MiPHY365x
-In-Reply-To: <20140213110314.GH32508@lee--X1>
-References: <1392220985-28189-1-git-send-email-lee.jones@linaro.org>
- <20140212164019.GE25957@e106331-lin.cambridge.arm.com>
- <20140213110314.GH32508@lee--X1>
-Message-ID: <20140213122317.GC5871@e106331-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 13 Feb 2014 13:35:38 +0100
+Subject: [GIT PULL] integrator base patches for v3.15
+Message-ID: <CACRpkdYeaMqTNUTqBSg6vNa9=VucjpFFkx3diHJJNgZTg+iq1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 11:03:14AM +0000, Lee Jones wrote:
-> > > The MiPHY365x is a Generic PHY which can serve various SATA or PCIe
-> > > devices. It has 2 ports which it can use for either; both SATA, both
-> > > PCIe or one of each in any configuration.
-> > > 
-> > > Cc: devicetree at vger.kernel.org
-> > > Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  .../devicetree/bindings/phy/phy-miphy365x.txt      | 43 ++++++++++++++++++++++
-> > >  1 file changed, 43 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> > > new file mode 100644
-> > > index 0000000..fdfa7ca
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> > > @@ -0,0 +1,43 @@
-> > > +STMicroelectronics STi MIPHY365x PHY binding
-> > > +============================================
-> > > +
-> > > +This binding describes a miphy device that is used to control PHY hardware
-> > > +for SATA and PCIe.
-> > > +
-> > > +Required properties:
-> > > +- compatible: Should be "st,miphy365x-phy"
-> > > +- #phy-cells: Should be 2 (See example)
-> > 
-> > The first example has #phy-cells = <1>.
-> 
-> Right, will fix. Should be 2.
-> 
-> > What do the cells mean? What are the expected values?
-> 
-> http://www.spinics.net/lists/arm-kernel/msg307209.html
+Hi ARM SoC folks,
 
-Ok. Could that be mentioned in the binding document then?
+this is a set of patches I have sent for review and failed to get
+ACKs from the proper subsystem maintainers after repeated
+pings. However I now need to have this rotated in linux-next
+as a base for multiplatform, so please pull it in, it is all ARM
+drivers anyway. Russell pointed out some things and these
+have been fixed and iterated in this series.
 
-Cheers,
-Mark.
+Yours,
+Linus Walleij
+
+The following changes since commit b28a960c42fcd9cfc987441fa6d1c1a471f0f9ed:
+
+  Linux 3.14-rc2 (2014-02-09 18:15:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/integrator-for-v3.15-1
+
+for you to fetch changes up to 29525484cd2524a31ee0924831ab43b46ea6ebe1:
+
+  ARM: integrator: select GPIO block (2014-02-13 11:21:37 +0100)
+
+----------------------------------------------------------------
+Integrator/Versatile base patch stack for the v3.15 series:
+
+- Move integrator clock definitions to the device tree, alter
+  clock and timer drivers accordingly.
+
+- Alter the VIC irqchip driver to support cascaded VICs off
+  a parent IRQ controller.
+
+- Update the IM-PD1 plugin code to use managed resources.
+
+- Register the VIC on the IM-PD1.
+
+- Select the PL061 GPIO block for the IM-PD1 on the
+  Integrator/AP.
+
+----------------------------------------------------------------
+Linus Walleij (10):
+      ARM: integrator: define clocks in the device trees
+      ARM: SP804: make Integrator/CP timer pick clock from DT
+      ARM: integrator: switch to fetch clocks from device tree
+      clk: versatile: pass a parent to the ICST clock
+      clk: versatile: respect parent rate in ICST clock
+      irqchip: vic: update the base IRQ member correctly
+      irqchip: support cascaded VICs
+      ARM: integrator: use managed resources for the IM-PD1
+      ARM: integrator: register the IM-PD1 VIC
+      ARM: integrator: select GPIO block
+
+ .../devicetree/bindings/clock/arm-integrator.txt   |  34 +++++++
+ arch/arm/boot/dts/integratorap.dts                 |  35 +++++++
+ arch/arm/boot/dts/integratorcp.dts                 | 102 ++++++++++++++++++++-
+ arch/arm/common/timer-sp.c                         |   8 +-
+ arch/arm/mach-integrator/Kconfig                   |   3 +
+ arch/arm/mach-integrator/impd1.c                   |  81 +++++++++-------
+ arch/arm/mach-integrator/integrator_ap.c           |  19 +++-
+ arch/arm/mach-integrator/integrator_cp.c           |   6 --
+ arch/arm/mach-versatile/core.c                     |   2 +-
+ drivers/clk/versatile/clk-icst.c                   |  21 ++++-
+ drivers/clk/versatile/clk-icst.h                   |   1 +
+ drivers/clk/versatile/clk-impd1.c                  |   6 +-
+ drivers/clk/versatile/clk-integrator.c             |  83 +++++++----------
+ drivers/clk/versatile/clk-realview.c               |   4 +-
+ drivers/irqchip/irq-vic.c                          |  59 ++++++++++--
+ include/linux/irqchip/arm-vic.h                    |   6 +-
+ include/linux/platform_data/clk-integrator.h       |   1 -
+ 17 files changed, 353 insertions(+), 118 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/arm-integrator.txt
