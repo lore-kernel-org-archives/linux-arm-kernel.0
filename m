@@ -1,83 +1,36 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Thu, 13 Feb 2014 12:15:39 -0600
-Subject: [PATCHv2 08/16] ARM: OMAP3: remove deprecated CONFIG_OMAP_IOMMU_IVA2
+Date: Thu, 13 Feb 2014 12:15:40 -0600
+Subject: [PATCHv2 09/16] ARM: OMAP2+: change the ISP device archdata MMU name
 In-Reply-To: <1392315347-32967-1-git-send-email-s-anna@ti.com>
 References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
-Message-ID: <1392315347-32967-9-git-send-email-s-anna@ti.com>
+Message-ID: <1392315347-32967-10-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Vaussard <florian.vaussard@epfl.ch>
+The IOMMU DT adaptation support uses the device name instead
+of an iommu object name. The iommu object names should eventually
+vanish when all the IOMMU users have been converted to DT nodes.
 
-CONFIG_OMAP_IOMMU_IVA2 was defined originally to avoid conflicting
-usage by tidspbridge and other iommu users. The same can be achieved
-by marking the DT node disabled, so remove this obsolete flag and
-the corresponding hwmod data can be enabled.
+NOTE: This change is not compatible with legacy boots, but OMAP3
+is expected to be DT-boot only going forward.
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-[s-anna at ti.com: revise commit log]
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 8 --------
- arch/arm/plat-omap/Kconfig                 | 3 ---
- 2 files changed, 11 deletions(-)
+ arch/arm/mach-omap2/devices.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 4c3b1e6..81dd071 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -3029,8 +3029,6 @@ static struct omap_hwmod omap3xxx_mmu_isp_hwmod = {
- 	.flags		= HWMOD_NO_IDLEST,
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 0dd6398..3bf0452 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -224,7 +224,7 @@ static struct platform_device omap3isp_device = {
  };
  
--#ifdef CONFIG_OMAP_IOMMU_IVA2
--
- /* mmu iva */
- 
- static struct omap_mmu_dev_attr mmu_iva_dev_attr = {
-@@ -3082,8 +3080,6 @@ static struct omap_hwmod omap3xxx_mmu_iva_hwmod = {
- 	.flags		= HWMOD_NO_IDLEST,
+ static struct omap_iommu_arch_data omap3_isp_iommu = {
+-	.name = "mmu_isp",
++	.name = "480bd400.mmu",
  };
  
--#endif
--
- /* l4_per -> gpio4 */
- static struct omap_hwmod_addr_space omap3xxx_gpio4_addrs[] = {
- 	{
-@@ -3855,9 +3851,7 @@ static struct omap_hwmod_ocp_if *omap34xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap3xxx_l4_core__hdq1w,
- 	&omap3xxx_sad2d__l3,
- 	&omap3xxx_l4_core__mmu_isp,
--#ifdef CONFIG_OMAP_IOMMU_IVA2
- 	&omap3xxx_l3_main__mmu_iva,
--#endif
- 	&omap34xx_l4_core__ssi,
- 	NULL
- };
-@@ -3881,9 +3875,7 @@ static struct omap_hwmod_ocp_if *omap36xx_hwmod_ocp_ifs[] __initdata = {
- 	&omap3xxx_l4_core__hdq1w,
- 	&omap3xxx_sad2d__l3,
- 	&omap3xxx_l4_core__mmu_isp,
--#ifdef CONFIG_OMAP_IOMMU_IVA2
- 	&omap3xxx_l3_main__mmu_iva,
--#endif
- 	NULL
- };
- 
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index 436ea97..02fc10d 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -86,9 +86,6 @@ config OMAP_MUX_WARNINGS
- 	  to change the pin multiplexing setup.	 When there are no warnings
- 	  printed, it's safe to deselect OMAP_MUX for your product.
- 
--config OMAP_IOMMU_IVA2
--	bool
--
- config OMAP_MPU_TIMER
- 	bool "Use mpu timer"
- 	depends on ARCH_OMAP1
+ int omap3_init_camera(struct isp_platform_data *pdata)
 -- 
 1.8.5.3
