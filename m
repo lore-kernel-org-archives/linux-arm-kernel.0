@@ -1,73 +1,22 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 13 Feb 2014 09:26:30 +0100
-Subject: [PATCH v2 2/2] ARM: sunxi: dt: Convert to the new i2c compatibles
-In-Reply-To: <1391680285-16668-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1391680285-16668-1-git-send-email-maxime.ripard@free-electrons.com>
- <1391680285-16668-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140213082630.GA3119@katana>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Thu, 13 Feb 2014 09:28:52 +0100
+Subject: [PATCH] ARM: tegra: don't timeout if CPU is powergated
+In-Reply-To: <52FBC97D.8040809@wwwdotorg.org>
+References: <1d5ea6b7df4573d866779857922ac650fe59af60.1392078805.git.stefan@agner.ch>
+ <52FBC97D.8040809@wwwdotorg.org>
+Message-ID: <4050206.sG2EzXyfMN@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Why is the devicetree list not on CC? (Added now)
-
-On Thu, Feb 06, 2014 at 10:51:25AM +0100, Maxime Ripard wrote:
-> Switch the device tree to the new compatibles introduced in the i2c drivers
-> to have a common pattern accross all Allwinner SoCs.
+Am Mittwoch, 12. Februar 2014, 12:20:29 schrieb Stephen Warren:
+> On 02/10/2014 05:44 PM, Stefan Agner wrote:
+> > When booting secondary CPU(s) which are not yet powergated, a wrong
+> > check lead to a timeout after 100 jiffies. With this patch, we only
+> > delay powergating if CPUs are still not powered yet.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/boot/dts/sun4i-a10.dtsi  |  6 +++---
->  arch/arm/boot/dts/sun5i-a10s.dtsi |  6 +++---
->  arch/arm/boot/dts/sun5i-a13.dtsi  |  6 +++---
->  arch/arm/boot/dts/sun7i-a20.dtsi  | 10 +++++-----
->  4 files changed, 14 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-> index 28273f9..ac65c8a 100644
-> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
-> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-> @@ -518,7 +518,7 @@
->  		};
->  
->  		i2c0: i2c at 01c2ac00 {
-> -			compatible = "allwinner,sun4i-i2c";
-> +			compatible = "allwinner,sun4i-a10-i2c";
+> I've applied this to Tegra's for-3.15/soc branch.
 
-Can't we have:
+also for 3.14 and maybe lower versioned kernels? Since this seems to fix a bug 
+where some core doesn't come up.
 
-	compatible = "allwinner,sun4i-a10-i2c", "allwinner,sun4i-i2c";
-
-? And keep the old "allwinner,sun4i-i2c" and extend it with a SoC
-specific a10 compatible entry when a distinction is needed?
-
-> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-> index 6de40b6..537072c 100644
-> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
-> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-> @@ -377,7 +377,7 @@
->  		};
->  
->  		i2c0: i2c at 01c2ac00 {
-> -			compatible = "allwinner,sun4i-i2c";
-> +			compatible = "allwinner,sun4i-a10-i2c";
-
-For non-a10, That should be at least
-
-	compatible = "allwinner,sun4i-a13-i2c", "allwinner,sun4i-a10-i2c";
-
-or
-
-	compatible = "allwinner,sun4i-a13-i2c", "allwinner,sun4i-i2c";
-
-depending on the outcome above.
-
-Or is my knowledge outdated already?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140213/a0ffedbe/attachment.sig>
+Marc
