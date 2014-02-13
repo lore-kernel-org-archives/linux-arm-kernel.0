@@ -1,43 +1,36 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Thu, 13 Feb 2014 12:22:53 -0600
-Subject: [PATCH 1/4] ARM: dts: OMAP3: Update ISP IOMMU node
-In-Reply-To: <1392315776-33197-1-git-send-email-s-anna@ti.com>
-References: <1392315776-33197-1-git-send-email-s-anna@ti.com>
-Message-ID: <1392315776-33197-2-git-send-email-s-anna@ti.com>
+Date: Thu, 13 Feb 2014 12:22:52 -0600
+Subject: [PATCH 0/4] OMAP IOMMU DTS nodes
+Message-ID: <1392315776-33197-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Vaussard <florian.vaussard@epfl.ch>
+Hi,
 
-Update the IOMMU node for the camera subsystem as per the
-OMAP IOMMU bindings.
+This series includes patches that adds the iommu DT nodes on
+OMAP3 (IVA), and OMAP4 and OMAP5 SoCs. It also includes an
+updated OMAP3 ISP iommu DT node patch posted previously [1].
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-[s-anna at ti.com: corrected interrupt number]
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/boot/dts/omap3.dtsi | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+Posting the series separately from the driver DT adapation
+changes [2]. The series adds the DTS patches in line with the
+new OMAP IOMMU bindings [3] posted alongside the DT adaptation.
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index a5fc83b..ac91cc3 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -411,10 +411,12 @@
- 		};
- 
- 		mmu_isp: mmu at 480bd400 {
--			compatible = "ti,omap3-mmu-isp";
--			ti,hwmods = "mmu_isp";
-+			compatible = "ti,omap2-iommu";
- 			reg = <0x480bd400 0x80>;
--			interrupts = <8>;
-+			interrupts = <24>;
-+			ti,hwmods = "mmu_isp";
-+			ti,#tlb-entries = <8>;
-+			dma-window = <0 0xfffff000>;
- 		};
- 
- 		wdt2: wdt at 48314000 {
+[1] http://marc.info/?l=linux-omap&m=138728486000628&w=2
+[2] http://marc.info/?l=linux-omap&m=139231544416973&w=2
+[3] http://marc.info/?l=linux-omap&m=139231545116981&w=2
+
+Florian Vaussard (3):
+  ARM: dts: OMAP3: Update ISP IOMMU node
+  ARM: dts: OMAP3: Add IVA IOMMU node
+  ARM: dts: OMAP4: Add IOMMU nodes
+
+Suman Anna (1):
+  ARM: dts: OMAP5: Add IOMMU nodes
+
+ arch/arm/boot/dts/omap3.dtsi | 17 ++++++++++++++---
+ arch/arm/boot/dts/omap4.dtsi | 17 +++++++++++++++++
+ arch/arm/boot/dts/omap5.dtsi | 17 +++++++++++++++++
+ 3 files changed, 48 insertions(+), 3 deletions(-)
+
 -- 
 1.8.5.3
