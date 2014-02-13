@@ -1,114 +1,72 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Thu, 13 Feb 2014 11:29:46 -0700
-Subject: [PATCH] PCI: imx6: Fix link_up detection
-In-Reply-To: <201402120836.16221.marex@denx.de>
-References: <1392190075-23204-1-git-send-email-s.hauer@pengutronix.de>
- <201402120836.16221.marex@denx.de>
-Message-ID: <52FD0F1A.4000208@boundarydevices.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 13 Feb 2014 19:38:42 +0100
+Subject: [PATCH v3 00/13] pinctrl: mvebu: restructure resource allocation
+In-Reply-To: <52FCFC97.8050200@gmail.com>
+References: <1390869573-27624-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140213172620.76e760ba@skate> <52FCF59E.3090100@gmail.com>
+ <20140213175914.205803a6@skate> <52FCFC97.8050200@gmail.com>
+Message-ID: <20140213193842.395994e5@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/12/2014 12:36 AM, Marek Vasut wrote:
-> On Wednesday, February 12, 2014 at 08:27:55 AM, Sascha Hauer wrote:
->
-> +CC Troy Kisky, since I think he submitted something similar some time ago
-> already.
->
-> Otherwise I agree this happens.
->
-Sorry, I haven't submitted this yet, but was planning to today. Here's
-what would have been sent.
+Dear Sebastian Hesselbarth,
 
- From 32c560d33fe2c3945d69f3396689f0abb76f7e1f Mon Sep 17 00:00:00 2001
-From: Marek Vasut <marex@denx.de>
-Date: Sat, 25 Jan 2014 14:22:48 -0700
-Subject: [PATCH 1/1] pci-imx6.c: wait for retraining
+On Thu, 13 Feb 2014 18:10:47 +0100, Sebastian Hesselbarth wrote:
+> >>> I am not sure what you mean here in terms of the ordering for the
+> >>> patches. I'm attaching several patches, and the first three patches
+> >>> adapt your patch series to also cover 375 and 38x, assuming the pinctrl
+> >>> support for 375 and 38x is merged before your patch series.
+> >>
+> >> Right. If 375/38x pinctrl goes in first (what I expect), I'd have to add
+> >> corresponding patches. You already sent them, I'll pick them up.
+> >
+> > Ok, cool. Hopefully we can sort out the merging of those two patch
+> > series for 3.15 with Linus Walleij.
+> 
+> That is the plan - or rather get his Acked-by as we are lucky to have
+> pinctrl/mvebu and touching nothing else.
 
-This patch handles the case where the PCIe link is up and running, yet drops
-into the LTSSM training mode. The link spends short time in the LTSSM training
-mode, but the current code can misinterpret it as the link being stalled.
-Waiting for the LTSSM training to complete fixes the issue.
+Right.
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Tested-by: Troy Kisky <troy.kisky@boundarydevices.com>
----
-  drivers/pci/host/pci-imx6.c | 47 ++++++++++++++++++++++++++++++++-------------
-  1 file changed, 34 insertions(+), 13 deletions(-)
+> > You can take this opportunity to generate:
+> >
+> > 	{ "mpp0", ... },
+> > 	{ "mpp1", ... },
+> > 	{ "mpp2", ... },
+> > 	...
+> > 	{ "mpp65", ... },
+> 
+> Ah, ok, I see. Yes that should be doable. We should definitely consider
+> this for later, i.e. leave it now as is and rework later.
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index e8663a8..ee08250 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -424,20 +424,40 @@ static void imx6_pcie_reset_phy(struct pcie_port *pp)
-  
-  static int imx6_pcie_link_up(struct pcie_port *pp)
-  {
--	u32 rc, ltssm, rx_valid;
-+	u32 rc, debug_r0, rx_valid;
-+	int count = 5;
-  
-  	/*
--	 * Test if the PHY reports that the link is up and also that
--	 * the link training finished.  It might happen that the PHY
--	 * reports the link is already up, but the link training bit
--	 * is still set, so make sure to check the training is done
--	 * as well here.
-+	 * Test if the PHY reports that the link is up and also that the LTSSM
-+	 * training finished. There are three possible states of the link when
-+	 * this code is called:
-+	 * 1) The link is DOWN (unlikely)
-+	 *     The link didn't come up yet for some reason. This usually means
-+	 *     we have a real problem somewhere. Reset the PHY and exit. This
-+	 *     state calls for inspection of the DEBUG registers.
-+	 * 2) The link is UP, but still in LTSSM training
-+	 *     Wait for the training to finish, which should take a very short
-+	 *     time. If the training does not finish, we have a problem and we
-+	 *     need to inspect the DEBUG registers. If the training does finish,
-+	 *     the link is up and operating correctly.
-+	 * 3) The link is UP and no longer in LTSSM training
-+	 *     The link is up and operating correctly.
-  	 */
--	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
--	if ((rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP) &&
--	    !(rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING))
--		return 1;
--
-+	while (1) {
-+		rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
-+		if (!(rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP))
-+			break;
-+		if (!(rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING))
-+			return 1;
-+		if (!count--)
-+			break;
-+		dev_dbg(pp->dev, "Link is up, but still in training\n");
-+		/*
-+		 * Wait a little bit, then re-check if the link finished
-+		 * the training.
-+		 */
-+		usleep_range(1000, 2000);
-+	}
-  	/*
-  	 * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
-  	 * Wait 2ms (LTSSM timeout is 24ms, PHY lock is ~5us in gen2).
-@@ -446,15 +466,16 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
-  	 * to gen2 is stuck
-  	 */
-  	pcie_phy_read(pp->dbi_base, PCIE_PHY_RX_ASIC_OUT, &rx_valid);
--	ltssm = readl(pp->dbi_base + PCIE_PHY_DEBUG_R0) & 0x3F;
-+	debug_r0 = readl(pp->dbi_base + PCIE_PHY_DEBUG_R0);
-  
-  	if (rx_valid & 0x01)
-  		return 0;
-  
--	if (ltssm != 0x0d)
-+	if ((debug_r0 & 0x3f) != 0x0d)
-  		return 0;
-  
-  	dev_err(pp->dev, "transition to gen2 is stuck, reset PHY!\n");
-+	dev_dbg(pp->dev, "debug_r0=%08x debug_r1=%08x\n", debug_r0, rc);
-  
-  	imx6_pcie_reset_phy(pp);
-  
+Sure, as I said, I don't think we should do all the possible
+improvements right now. Your patch series is already large enough :-)
+
+That being said, I haven't looked very closely at the Dove pinctrl
+driver, and this is the one that does the most funky things, with those
+cases where multiple pins are muxed with a single register control.
+
+
+> > static int armada_370_mpp_ctrl_get(unsigned pid, unsigned long *config)
+> > {
+> > 	return default_mpp_ctrl_get(mpp_base, pid, config);
+> > }
+> >
+> > static int armada_370_mpp_ctrl_set(unsigned pid, unsigned long config)
+> > {
+> > 	return default_mpp_ctrl_set(mpp_base, pid, config);
+> > }
+> >
+> > but we admittedly cannot completely remove the per-SoC function, since
+> > the mpp_base is now only known to each per-SoC driver.
+> 
+> I guess I'll squash the above in for v4.. doesn't look that bad.
+
+Cool, thanks!
+
+Thomas
 -- 
-1.8.1.2
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
