@@ -1,71 +1,41 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Thu, 13 Feb 2014 20:09:22 +0100
-Subject: [PATCH] thermal: imx: update formula for thermal sensor
-In-Reply-To: <20140213130252.GB20842@S2101-09.ap.freescale.net>
-References: <1392199595-1054-1-git-send-email-b20788@freescale.com>
- <20140213130252.GB20842@S2101-09.ap.freescale.net>
-Message-ID: <CA+gwMccQPxxi2N8wTb4ggK2LaaZk1vOS6RtnP_XfpgLgJyYrtw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 13 Feb 2014 13:15:13 -0600
+Subject: [PATCH 1/3] driver core & of: Mark of_nodes of added device as
+ populated
+In-Reply-To: <1392137610-27842-2-git-send-email-pawel.moll@arm.com>
+References: <1392137610-27842-1-git-send-email-pawel.moll@arm.com>
+ <1392137610-27842-2-git-send-email-pawel.moll@arm.com>
+Message-ID: <CAL_JsqJQy7ob87=wPOLxn3X0fTrt2QhAEJ2nPTAmCMZqNZp+sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Feb 13, 2014 at 2:02 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Tue, Feb 11, 2014 at 10:53 AM, Pawel Moll <pawel.moll@arm.com> wrote:
+> In "Device Tree powered" systems, platform devices are usually
+> massively populated with of_platform_populate() call, executed
+> at some level of initcalls, either by generic architecture
+> or by platform-specific code.
 >
-> Copy LAKML and pengutronix folks in case they have comments.
+> There are situations though where certain devices must be
+> created (and bound with drivers) before all the others.
+> This presents small challenge in DT-driven systems, as
+> devices explicitly created in early code would be created
+> again by of_platform_populate().
 >
-> On Wed, Feb 12, 2014 at 06:06:35PM +0800, Anson Huang wrote:
-> > Thermal sensor used to need two calibration points which are
-> > in fuse map to get a slope for converting thermal sensor's raw
-> > data to real temperature in degree C. Due to the chip calibration
-> > limitation, hardware team provides an universal formula to get
-> > real temperature from internal thermal sensor raw data:
-> >
-> > Slope = 0.4297157 - (0.0015976 * 25C fuse);
+> This patch tries to solve that issue in a generic way,
+> adding a "populated" flag which is set in the device_node
+> structure when a device is being created in the core.
+> Later, of_platform_populate() skips such nodes (and
+> its children) in a similar way to the non-available ones.
+>
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  drivers/base/core.c       |  4 ++++
+>  drivers/of/device.c       | 16 ++++++++++++++++
+>  drivers/of/platform.c     |  6 ++++--
+>  include/linux/of.h        |  6 ++++++
+>  include/linux/of_device.h | 11 +++++++++++
+>  5 files changed, 41 insertions(+), 2 deletions(-)
 
-I have an i.MX6Q 1.2 with 1417 counts at 25?C and 1296 counts at 105?C fused.
-Assuming that those values are fused correctly, with the old formula I get:
+Go read Grant's and my comments from your last posting.
 
-t1=25, n1=1417, t2=105, n2=1296
-c1=1000*(t1-t2)/(n1-n2)=-662, c2=1000*t2-c1*n2=962952
-T_meas=c2+c1*N_meas=962952-662*N_meas
-
-N_meas=1417 --> T_meas = 24898
-N_meas=1296 --> T_meas = 105000
-
-With the new formula, on the other hand, I would get:
-
-t1=25, n1=1417
-F0=10000000, F1=15976, 4297157
-c1=F0*1000/(F1*n1-F2)=545, c2=n1*c1+1000*25=797265
-T_meas=c2-N_meas*c1=797265-N_meas*545
-
-N_meas=1417 --> T_meas = 25000
-N_meas=1296 --> T_meas = 90945
-
-That's off by over 14?C!
-
-The default passive cooling trip point is at 85?C,
-which translated to 1326 counts before:
-alarm_value=(alarm_temp-c2)/c1=(85000-962952)/(-662)=1326
-
-With the new formula the trip count is only
-alarm_value=(c2-alarm_temp)/c1=(797265-85000)/545=1306
-That translates to 98.4?C according to the old formula. I think
-that is awfully close to the critical trip point at 100?C, which,
-according to the old formula, corresponded to 1303 counts.
-
-The new critical trip point for 100?C is at 1279 counts. According
-to the old formula this corresponds to 116.2?C, well over the
-rated maximum of 105?C.
-
-Do I need to be afraid for my old silicon?
-
-> > Update the formula, as there will be no hot point calibration
-> > data in fuse map from now on.
-
-I wonder if it would be better to keep using the high temperature
-calibration point if it is fused at all.
-
-regards
-Philipp
+Rob
