@@ -1,50 +1,26 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 14 Feb 2014 07:44:59 +0900
-Subject: [PATCH] ARM: dts: exynos5250-arndale: Keep G3D regulator always on
-In-Reply-To: <1392141043-27170-1-git-send-email-t.figa@samsung.com>
-References: <1392141043-27170-1-git-send-email-t.figa@samsung.com>
-Message-ID: <52FD4AEB.40401@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Feb 2014 14:46:14 -0800
+Subject: [PATCH 0/2] ARM: DTS: am335x-evmsk: Audio and MMC1 fix (for 3.13?)
+In-Reply-To: <52CBB788.9070404@ti.com>
+References: <1387790915-7217-1-git-send-email-peter.ujfalusi@ti.com>
+ <52CBB788.9070404@ti.com>
+Message-ID: <20140213224613.GC28216@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/12/14 02:50, Tomasz Figa wrote:
-> Apparently, if G3D regulator is powered off, the SoC cannot enter low
-> power modes and just hangs. This patch fixes this by keeping the
-> regulator always on when the system is running, as suggested by Exynos 4
-> User's Manual in case of Exynos4210/4x12 SoCs (Exynos5250 UM does not
-> have such note, but observed behavior seems to confirm that it is true
-> for this SoC as well).
->
-> This fixes an issue preventing Arndale board from entering sleep mode
-> observed since commit
->
-> 346f372f7b72a0 clk: exynos5250: Add CLK_IGNORE_UNUSED flag for pmu clock
->
-> that landed in kernel 3.11, which has fixed the clock driver to make the
-> SoC actually try to enter the sleep mode.
->
-> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
-> Acked-by: Kyungmin Park<kyungmin.park@samsung.com>
-> Cc: stable at vger.kernel.org
-> ---
->   arch/arm/boot/dts/exynos5250-arndale.dts | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-> index e14dd62..5e9ddb8 100644
-> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
-> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-> @@ -287,6 +287,7 @@
->   					regulator-name = "vdd_g3d";
->   					regulator-min-microvolt =<1000000>;
->   					regulator-max-microvolt =<1000000>;
-> +					regulator-always-on;
->   					regulator-boot-on;
->   					op_mode =<1>;
->   				};
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [140107 00:16]:
+> Hi Benoit,
+> 
+> On 12/23/2013 11:28 AM, Peter Ujfalusi wrote:
+> > Hi,
+> > 
+> > The audio frequency has been incorrectly set in the DTS file which results
+> > incorrect playback frequency on EVM-SK.
+> > 
+> > The SD card can not be used without the second patch on 3.13-rc5.
+> 
+> Can you take a look at these and if it is possible send it for 3.13?
 
-Looks good to me, applied. BTW, the patch you mentioned has been merged 
-since v3.10 so I fixed it.
+Applying both into omap-for-v3.14/fixes thanks.
 
-Thanks,
-Kukjin
+Tony
