@@ -1,129 +1,105 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 13 Feb 2014 12:04:01 +0200
-Subject: [PATCH 3/8] ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
+Date: Thu, 13 Feb 2014 12:03:59 +0200
+Subject: [PATCH 1/8] clk: divider: fix rate calculation for fractional rates
 In-Reply-To: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1392285846-13199-4-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1392285846-13199-2-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CLK_SET_RATE_PARENT is set for a clkoutx2 clock, calling
-clk_set_rate() on the clock "skips" the x2 multiplier as there are no
-set_rate and round_rate functions defined for the clkoutx2.
+clk-divider.c does not calculate the rates consistently at the moment.
 
-This results in getting double the requested clock rates, breaking the
-display on omap3430 based devices.
+As an example, on OMAP3 we have a clock divider with a source clock of
+864000000 Hz. With dividers 6, 7 and 8 the theoretical rates are:
 
-This patch implements set_rate and round_rate for clkoutx2.
+6: 144000000
+7: 123428571.428571...
+8: 108000000
+
+Calling clk_round_rate() with the rate in the first column will give the
+rate in the second column:
+
+144000000 -> 144000000
+143999999 -> 123428571
+123428572 -> 123428571
+123428571 -> 108000000
+
+Note how clk_round_rate() returns 123428571 for rates from 123428572 to
+143999999, which is mathematically correct, but when clk_round_rate() is
+called with 123428571, the returned value is surprisingly 108000000.
+
+This means that the following code works a bit oddly:
+
+rate = clk_round_rate(clk, 123428572);
+clk_set_rate(clk, rate);
+
+As clk_set_rate() also does clock rate rounding, the result is that the
+clock is set to the rate of 108000000, not 123428571 returned by the
+clk_round_rate.
+
+This patch changes the clk-divider.c to use DIV_ROUND_UP when
+calculating the rate. This gives the following behavior which fixes the
+inconsistency:
+
+144000000 -> 144000000
+143999999 -> 123428572
+123428572 -> 123428572
+123428571 -> 108000000
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Mike Turquette <mturquette@linaro.org>
 ---
- arch/arm/mach-omap2/cclock3xxx_data.c |  2 ++
- arch/arm/mach-omap2/dpll3xxx.c        | 62 +++++++++++++++++++++++++++++++++++
- include/linux/clk/ti.h                |  4 +++
- 3 files changed, 68 insertions(+)
+ drivers/clk/clk-divider.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
-index 3b05aea56d1f..11ed9152e665 100644
---- a/arch/arm/mach-omap2/cclock3xxx_data.c
-+++ b/arch/arm/mach-omap2/cclock3xxx_data.c
-@@ -433,7 +433,9 @@ static const struct clk_ops dpll4_m5x2_ck_ops = {
- 	.enable		= &omap2_dflt_clk_enable,
- 	.disable	= &omap2_dflt_clk_disable,
- 	.is_enabled	= &omap2_dflt_clk_is_enabled,
-+	.set_rate	= &omap3_clkoutx2_set_rate,
- 	.recalc_rate	= &omap3_clkoutx2_recalc,
-+	.round_rate	= &omap3_clkoutx2_round_rate,
- };
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 5543b7df8e16..ec22112e569f 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -24,7 +24,7 @@
+  * Traits of this clock:
+  * prepare - clk_prepare only ensures that parents are prepared
+  * enable - clk_enable only ensures that parents are enabled
+- * rate - rate is adjustable.  clk->rate = parent->rate / divisor
++ * rate - rate is adjustable.  clk->rate = DIV_ROUND_UP(parent->rate / divisor)
+  * parent - fixed parent.  No clk_set_parent support
+  */
  
- static const struct clk_ops dpll4_m5x2_ck_3630_ops = {
-diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
-index 3185ced807c9..4ba7e90e127b 100644
---- a/arch/arm/mach-omap2/dpll3xxx.c
-+++ b/arch/arm/mach-omap2/dpll3xxx.c
-@@ -672,6 +672,68 @@ unsigned long omap3_clkoutx2_recalc(struct clk_hw *hw,
- 	return rate;
+@@ -115,7 +115,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+ 		return parent_rate;
+ 	}
+ 
+-	return parent_rate / div;
++	return DIV_ROUND_UP(parent_rate, div);
  }
  
-+int omap3_clkoutx2_set_rate(struct clk_hw *hw, unsigned long rate,
-+					unsigned long parent_rate)
-+{
-+	return 0;
-+}
-+
-+long omap3_clkoutx2_round_rate(struct clk_hw *hw, unsigned long rate,
-+		unsigned long *prate)
-+{
-+	const struct dpll_data *dd;
-+	u32 v;
-+	struct clk_hw_omap *pclk = NULL;
-+	struct clk *parent;
-+
-+	if (!*prate)
-+		return 0;
-+
-+	/* Walk up the parents of clk, looking for a DPLL */
-+	do {
-+		do {
-+			parent = __clk_get_parent(hw->clk);
-+			hw = __clk_get_hw(parent);
-+		} while (hw && (__clk_get_flags(hw->clk) & CLK_IS_BASIC));
-+		if (!hw)
-+			break;
-+		pclk = to_clk_hw_omap(hw);
-+	} while (pclk && !pclk->dpll_data);
-+
-+	/* clk does not have a DPLL as a parent?  error in the clock data */
-+	if (!pclk) {
-+		WARN_ON(1);
-+		return 0;
-+	}
-+
-+	dd = pclk->dpll_data;
-+
-+	/* TYPE J does not have a clkoutx2 */
-+	if (dd->flags & DPLL_J_TYPE) {
-+		*prate = __clk_round_rate(__clk_get_parent(pclk->hw.clk), rate);
-+		return *prate;
-+	}
-+
-+	WARN_ON(!dd->enable_mask);
-+
-+	v = omap2_clk_readl(pclk, dd->control_reg) & dd->enable_mask;
-+	v >>= __ffs(dd->enable_mask);
-+
-+	/* If in bypass, the rate is fixed to the bypass rate*/
-+	if (v != OMAP3XXX_EN_DPLL_LOCKED)
-+		return *prate;
-+
-+	if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
-+		unsigned long best_parent;
-+
-+		best_parent = (rate / 2);
-+		*prate = __clk_round_rate(__clk_get_parent(hw->clk),
-+				best_parent);
-+	}
-+
-+	return *prate * 2;
-+}
-+
- /* OMAP3/4 non-CORE DPLL clkops */
- const struct clk_hw_omap_ops clkhwops_omap3_dpll = {
- 	.allow_idle	= omap3_dpll_allow_idle,
-diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index 092b64168d7f..4a21a872dbbd 100644
---- a/include/linux/clk/ti.h
-+++ b/include/linux/clk/ti.h
-@@ -245,6 +245,10 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
- void omap2_init_clk_clkdm(struct clk_hw *clk);
- unsigned long omap3_clkoutx2_recalc(struct clk_hw *hw,
- 				    unsigned long parent_rate);
-+int omap3_clkoutx2_set_rate(struct clk_hw *hw, unsigned long rate,
-+					unsigned long parent_rate);
-+long omap3_clkoutx2_round_rate(struct clk_hw *hw, unsigned long rate,
-+		unsigned long *prate);
- int omap2_clkops_enable_clkdm(struct clk_hw *hw);
- void omap2_clkops_disable_clkdm(struct clk_hw *hw);
- int omap2_clk_disable_autoidle_all(void);
+ /*
+@@ -185,7 +185,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+ 		}
+ 		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
+ 				MULT_ROUND_UP(rate, i));
+-		now = parent_rate / i;
++		now = DIV_ROUND_UP(parent_rate, i);
+ 		if (now <= rate && now > best) {
+ 			bestdiv = i;
+ 			best = now;
+@@ -207,7 +207,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	int div;
+ 	div = clk_divider_bestdiv(hw, rate, prate);
+ 
+-	return *prate / div;
++	return DIV_ROUND_UP(*prate, div);
+ }
+ 
+ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+@@ -218,7 +218,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	unsigned long flags = 0;
+ 	u32 val;
+ 
+-	div = parent_rate / rate;
++	div = DIV_ROUND_UP(parent_rate, rate);
+ 	value = _get_val(divider, div);
+ 
+ 	if (value > div_mask(divider))
 -- 
 1.8.3.2
