@@ -1,56 +1,82 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 12 Feb 2014 17:55:08 -0600
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 12 Feb 2014 16:06:57 -0800
 Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
-In-Reply-To: <1882539.R1gpoLLYks@wuerfel>
+In-Reply-To: <201402121251.06280.arnd@arndb.de>
 References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
- <1571508.yGAAZ8TNH0@wuerfel>
- <20140212184521.GO27395@titan.lakedaemon.net>
- <1882539.R1gpoLLYks@wuerfel>
-Message-ID: <CAL_JsqJetHbdsJd5B-FnwHRPgP9J=SXBhiYptHZMk9dhe20Fgg@mail.gmail.com>
+ <201402121251.06280.arnd@arndb.de>
+Message-ID: <52FC0CA1.5000004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 1:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 12 February 2014 13:45:21 Jason Cooper wrote:
->> On Wed, Feb 12, 2014 at 07:17:41PM +0100, Arnd Bergmann wrote:
->> > On Wednesday 12 February 2014 12:45:54 Jason Cooper wrote:
->> > > I brought this up at last weeks devicetree irc meeting.  My goal is to
->> > > provide early randomness for kaslr on ARM.  Currently, my idea is modify
->> > > the init script to save an additional random seed from /dev/urandom to
->> > > /boot/random-seed.
->> > >
->> > > The bootloader would then load this file into ram, and pass the
->> > > address/size to the kernel either via dt, or commandline.  kaslr (run in
->> > > the decompressor) would consume some of this randomness, and then
->> > > random.c would consume the rest in a non-crediting initialization.
->> >
->> > I like the idea, but wouldn't it be easier to pass actual random data
->> > using DT, rather than the address/size?
->>
->> I thought about that at first, but that requires either that the
->> bootloader be upgraded to insert the data, or that userspace is
->> modifying the dtb at least twice per boot.
->>
->> I chose address/size to facilitate modifying existing/fielded devices.
->> The user could modify the dtb once, and modify the bootloader
->> environment to load X amount to Y address.  As a fallback, it could be
->> expressed on the commandline for non-DT bootloaders.
+On 2/12/2014 3:51 AM, Arnd Bergmann wrote:
+> On Wednesday 12 February 2014, Laura Abbott wrote:
+>> This is an RFC to seed the random number pool earlier when using devicetree.
+>> The big issue this is trying to solve is the fact that the stack canary for
+>> ARM tends to be the same across bootups of the same device. This is because
+>> the random number pools do not get initialized until after the canary has
+>> been set up. The canary can be moved later, but in general there is still
+>> no way to reliably get random numbers early for other features (e.g. vector
+>> randomization).
 >
-> Ah, so you are interested in boot loaders that can be scripted to do
-> what you had in mind but cannot be scripted to add or modify a DT
-> property. I hadn't considered that, but you are probably right that
-> this is at least 90% of the systems you'd find in the wild today.
+> Implementation-wise this looks reasonable, and it obviously addresses a
+> very real problem.
 >
-> Thinking this a bit further, I wonder if (at least upstream) u-boot
-> has a way to modify DT properties in a scripted way that would allow
-> the direct property. It sounds like a generally useful feature not
-> just for randomness, so if that doesn't already work, maybe someone
-> can implement it. In the simplest case, you'd only need to find the
-> address of an existing property in the dtb and load a file to
-> that location.
+>> The goal here is to allow devices to add to the random pools via
+>> add_device_randomness or some other method of their chosing at FDT time.
+>> I realize that ARCH_RANDOM is already available but this didn't work because
+>> 1) ARCH_RANDOM is not multi-platform compatible without added
+>> infrastructure to ARM
+>
+> That could certainly be done, but I agree that a more generic
+> approach like you did is nicer. One thing that might be useful
+> would be to wire up your OF_RANDOM infrastructure as a generic
+> implementation of ARCH_RANDOM, and merge your header file into
+> include/asm-generic/archrandom.h, with an added way to call
+> arch_get_random_long() for the devices you add.
+>
 
-You would be referring to the u-boot fdt command which can read and
-set properties. Of course, like all u-boot commands, that may or may
-not be enabled by a vendor's u-boot. :(
+I originally tried that approach but ran into some hiccups related to 
+mapping for access to the HWRNG. early_ioremap would be needed to access 
+hardware registers but on ARM early_ioremap does not persist across 
+paging init. I couldn't come up with a sufficiently not terrible way to 
+unmap the early mapping and re-map with a proper ioremap.
 
-Rob
+>> The big reason to skip ARCH_RANDOM though is that the random number generation
+>> we have would be reasonable if only seeded earlier.
+>
+> Yes, makes sense.
+>
+> I also wonder if we should add a 'trivial' implementation that just
+> reads a DT property full of random numbers to use as either an initial
+> seed, or to feed into arch_get_random_long(). This would allow the
+> boot loader to pass any entropy it has already gathered into the kernel,
+> but leaves the danger that people might pass static not-so-random data
+> through a precompiled dtb file ;-). If we get the boot loaders to be
+> smart enough, doing only this would be a much simpler kernel implementation
+> than your suggestion, but I'm not sure how far I want to trust boot loaders.
+>
+
+This was similar to an option discussed internally (passing a seed on 
+the command line). Ultimately, it was concluded that relying on the 
+bootloader to do this would be too much overhead vs. doing all the work 
+in the kernel.
+
+> Another possibilitiy is to mix in the any contents of a "local-mac-address"
+> property into the entropy at early DT probing, which would still be
+> deterministic for a given machine and should not count as entropty,
+> but at least give each machine with this property a unique seed in the
+> absence of any other entropy source.
+
+Is this typically updated by the bootloader as well? I'm looking at the 
+tree and most of the instances of local-mac-address I see are all zero.
+
+>
+> 	Arnd
+
+Thanks,
+Laura
+
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
