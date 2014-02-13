@@ -1,104 +1,85 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 13 Feb 2014 11:00:48 +0200
-Subject: [PATCH 4/4] clk: ti: omap4: set default-parents and default-rates
- using DT
-In-Reply-To: <1392282048-6284-1-git-send-email-t-kristo@ti.com>
-References: <1392282048-6284-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1392282048-6284-5-git-send-email-t-kristo@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 13 Feb 2014 10:01:20 +0100
+Subject: [PATCH 1/3] mmc: add support for power-on sequencing through
+ DT
+In-Reply-To: <CAPDyKFo9Xpxe0XzevPEeaofLeCNivnf3R_RttToP2h3aFyB4Yw@mail.gmail.com>
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>	<52E700F0.7040708@gmail.com>	<CAPDyKFpOhQtiyCmzie3=sfg42Vv5_rReRNgUf8kALoE6TBe2cw@mail.gmail.com>	<201401281148.10670.arnd@arndb.de>
+ <CAPDyKFo9Xpxe0XzevPEeaofLeCNivnf3R_RttToP2h3aFyB4Yw@mail.gmail.com>
+Message-ID: <52FC89E0.6050305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setup dpll_usb_ck and dpll_abe_ck using DT properties instead of hardcoding
-the parents and rates in kernel.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/boot/dts/omap4.dtsi |   12 ++++++++++++
- drivers/clk/ti/clk-44xx.c    |   42 ------------------------------------------
- 2 files changed, 12 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index d3f8a6e..282ce66 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -761,3 +761,15 @@
- };
- 
- /include/ "omap44xx-clocks.dtsi"
-+
-+&dpll_usb_ck {
-+	default-rate = <960000000>;
-+};
-+
-+&dpll_abe_ck {
-+	default-rate = <98304000>;
-+};
-+
-+&abe_dpll_refclk_mux_ck {
-+	ti,default-parent = <&sys_32k_ck>;
-+};
-diff --git a/drivers/clk/ti/clk-44xx.c b/drivers/clk/ti/clk-44xx.c
-index ae00218..bc14a49 100644
---- a/drivers/clk/ti/clk-44xx.c
-+++ b/drivers/clk/ti/clk-44xx.c
-@@ -16,21 +16,6 @@
- #include <linux/clkdev.h>
- #include <linux/clk/ti.h>
- 
--/*
-- * OMAP4 ABE DPLL default frequency. In OMAP4460 TRM version V, section
-- * "3.6.3.2.3 CM1_ABE Clock Generator" states that the "DPLL_ABE_X2_CLK
-- * must be set to 196.608 MHz" and hence, the DPLL locked frequency is
-- * half of this value.
-- */
--#define OMAP4_DPLL_ABE_DEFFREQ				98304000
--
--/*
-- * OMAP4 USB DPLL default frequency. In OMAP4430 TRM version V, section
-- * "3.6.3.9.5 DPLL_USB Preferred Settings" shows that the preferred
-- * locked frequency for the USB DPLL is 960MHz.
-- */
--#define OMAP4_DPLL_USB_DEFFREQ				960000000
--
- static struct ti_dt_clk omap44xx_clks[] = {
- 	DT_CLK(NULL, "extalt_clkin_ck", "extalt_clkin_ck"),
- 	DT_CLK(NULL, "pad_clks_src_ck", "pad_clks_src_ck"),
-@@ -281,36 +266,9 @@ static struct ti_dt_clk omap44xx_clks[] = {
- 
- int __init omap4xxx_dt_clk_init(void)
- {
--	int rc;
--	struct clk *abe_dpll_ref, *abe_dpll, *sys_32k_ck, *usb_dpll;
--
- 	ti_dt_clocks_register(omap44xx_clks);
- 
- 	omap2_clk_disable_autoidle_all();
- 
--	/*
--	 * Lock USB DPLL on OMAP4 devices so that the L3INIT power
--	 * domain can transition to retention state when not in use.
--	 */
--	usb_dpll = clk_get_sys(NULL, "dpll_usb_ck");
--	rc = clk_set_rate(usb_dpll, OMAP4_DPLL_USB_DEFFREQ);
--	if (rc)
--		pr_err("%s: failed to configure USB DPLL!\n", __func__);
--
--	/*
--	 * On OMAP4460 the ABE DPLL fails to turn on if in idle low-power
--	 * state when turning the ABE clock domain. Workaround this by
--	 * locking the ABE DPLL on boot.
--	 * Lock the ABE DPLL in any case to avoid issues with audio.
--	 */
--	abe_dpll_ref = clk_get_sys(NULL, "abe_dpll_refclk_mux_ck");
--	sys_32k_ck = clk_get_sys(NULL, "sys_32k_ck");
--	rc = clk_set_parent(abe_dpll_ref, sys_32k_ck);
--	abe_dpll = clk_get_sys(NULL, "dpll_abe_ck");
--	if (!rc)
--		rc = clk_set_rate(abe_dpll, OMAP4_DPLL_ABE_DEFFREQ);
--	if (rc)
--		pr_err("%s: failed to configure ABE DPLL!\n", __func__);
--
- 	return 0;
- }
--- 
-1.7.9.5
+On 13.02.2014 09:56, Ulf Hansson wrote:
+> On 28 January 2014 11:48, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Tuesday 28 January 2014, Ulf Hansson wrote:
+>>> On 28 January 2014 01:59, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>>> On 27.01.2014 11:19, Ulf Hansson wrote:
+>>>>> There is already a host capability that I think we could use to handle
+>>>>> this. MMC_CAP_NONREMOVABLE, the corresponding DT binding string is
+>>>>> "non-removable", and it may be set per host device.
+>>>>>
+>>>>> Using this cap means the mmc_rescan process that runs to detect new
+>>>>> cards, will only be executed once and during boot. So, we need to make
+>>>>> sure all resources and powers are provided to the card at this point.
+>>>>> Otherwise the card will not be detected.
+>>>>
+>>>> I don't quite like this requirement, especially if you consider
+>>>> multi-platform kernels where a lot of drivers is going to be provided as
+>>>> modules. WLAN drivers are especially good candidates. This means that even
+>>>> if the card is powered off at boot-up, if user (or init system) loads
+>>>> appropriate module, which powers the chip on, MMC core must be able to
+>>>> notice this.
+>>>
+>>> To be able to detect the card, the WLAN driver doesn't have to be
+>>> probed, only the "power controller" driver. I suppose this is were it
+>>> becomes a bit tricky.
+>>>
+>>> Somehow the mmc core needs to be involved in the probe process of the
+>>> power controller driver. Could perhaps the power controller bus be
+>>> located in the mmc core and thus the power controller driver needs to
+>>> register itself by using a new API from the mmc core? Similar how SDIO
+>>> func driver's register themselves.
+>>
+>> I think there is another option, which does have its own pros and cons:
+>> We could move all the power handling back into the sdio function driver
+>> if we allow a secondary detection path using DT rather than the probing
+>> of the SDIO bus. Essentially you'd have to list the class/vendor/device
+>> ID for each function that cannot be autodetected in DT, and have the
+>> SDIO core pretend that it found the device just by looking at the
+>> device nodes, and register the struct sdio_func so it can be bound to
+>> the driver. The driver then does all the power handling in a device
+>> specific way. At some point the hardware gets registered at the
+>> mmc host, and the sdio core connects the bus state to the already present
+>> sdio_func, possibly notifying the function driver that it has become
+>> usable.
+>
+> It seems like an option we could try.
+>
+> There are some tricky parts that needs to be taken care of by the
+> mmc/sdio core, regarding the probe/removal and the suspend/resume
+> sequence, but I suppose it should be possible.
+>
+> A minor concern is how do we handle devices that are fully powered at
+> boot? Unless the sdio func driver will be loaded we can't power off
+> them, right? Do we need to cover this case, do you think?
+>
+>>
+>> Obviously, this can only work for CAP_NONREMOVABLE devices, but those
+>> are exactly the ones we are worried about here. The advantage is that
+>> the power sequencing for a particular device can then be in device
+>> specific code and can have an arbitrarily complex in the driver without
+>> needing the mmc code to handle all possible corner cases.
+>
+> Agree!
+>
+> I think a removable SDIO card won't l need this additional power
+> controller mechanism.
+
+Yes, sounds good to me too. It will be more tricky to implement than the 
+solution I initially proposed, but should end up being much cleaner and 
+possibly cover more cases.
+
+Best regards,
+Tomasz
