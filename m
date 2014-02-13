@@ -1,129 +1,63 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 13 Feb 2014 08:41:58 -0600
-Subject: [PATCH v2 3/4] ARM: dts: Add support for both OMAP35xx and
- OMAP36xx Overo/Tobi
-In-Reply-To: <1392287116-4548-4-git-send-email-florian.vaussard@epfl.ch>
-References: <1392287116-4548-1-git-send-email-florian.vaussard@epfl.ch>
- <1392287116-4548-4-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <52FCD9B6.8000407@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Feb 2014 14:41:06 +0000
+Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
+In-Reply-To: <2874395.Ul86gYA57i@wuerfel>
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>
+ <201401281148.10670.arnd@arndb.de>
+ <20140213104248.GU26684@n2100.arm.linux.org.uk> <2874395.Ul86gYA57i@wuerfel>
+Message-ID: <20140213144106.GW26684@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2014 04:25 AM, Florian Vaussard wrote:
-> Unfortunatly the device tree for older OMAP35xx Overo cannot be used
-> with newer OMAP36xx and vice-versa. To address this issue, move most of
-> the Tobi DTS to a common include file, and create model-specific Tobi
-> DTS.
+On Thu, Feb 13, 2014 at 01:48:55PM +0100, Arnd Bergmann wrote:
+> On Thursday 13 February 2014 10:42:48 Russell King - ARM Linux wrote:
+> > 
+> > What if we have a platform where things subtly change, like for instance,
+> > the wiring on the SD slot to fix a problem with UHS-1 cards, which means
+> > you don't have UHS-1 support for some platforms but do for others.
+> > 
+> > What if you have a platform which uses a brcm4329 chip for Wifi, but then
+> > later in the production run switch to using a different Wifi chipset?
 > 
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-Acked-by: Nishanth Menon <nm@ti.com>
-> ---
->  arch/arm/boot/dts/Makefile                         |  3 ++-
->  arch/arm/boot/dts/omap3-overo-storm-tobi.dts       | 22 ++++++++++++++++++++++
->  ...omap3-tobi.dts => omap3-overo-tobi-common.dtsi} |  6 ------
->  arch/arm/boot/dts/omap3-overo-tobi.dts             | 22 ++++++++++++++++++++++
->  4 files changed, 46 insertions(+), 7 deletions(-)
->  create mode 100644 arch/arm/boot/dts/omap3-overo-storm-tobi.dts
->  rename arch/arm/boot/dts/{omap3-tobi.dts => omap3-overo-tobi-common.dtsi} (91%)
->  create mode 100644 arch/arm/boot/dts/omap3-overo-tobi.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index b9d6a8b..e8355f4 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -208,7 +208,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
->  	omap3-n900.dtb \
->  	omap3-n9.dtb \
->  	omap3-n950.dtb \
-> -	omap3-tobi.dtb \
-> +	omap3-overo-tobi.dtb \
-> +	omap3-overo-storm-tobi.dtb \
->  	omap3-gta04.dtb \
->  	omap3-igep0020.dtb \
->  	omap3-igep0030.dtb \
-> diff --git a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
-> new file mode 100644
-> index 0000000..966b5c9
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
-> @@ -0,0 +1,22 @@
-> +/*
-> + * Copyright (C) 2012 Florian Vaussard, EPFL Mobots group
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/*
-> + * Tobi expansion board is manufactured by Gumstix Inc.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "omap36xx.dtsi"
-> +#include "omap3-overo-tobi-common.dtsi"
-> +
-> +/ {
-> +	model = "OMAP36xx/AM37xx/DM37xx Gumstix Overo on Tobi";
-> +	compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap36xx", "ti,omap3";
-> +};
-> +
-> diff --git a/arch/arm/boot/dts/omap3-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-> similarity index 91%
-> rename from arch/arm/boot/dts/omap3-tobi.dts
-> rename to arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-> index c742afa..4edc013 100644
-> --- a/arch/arm/boot/dts/omap3-tobi.dts
-> +++ b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-> @@ -10,15 +10,9 @@
->   * Tobi expansion board is manufactured by Gumstix Inc.
->   */
->  
-> -/dts-v1/;
-> -
-> -#include "omap36xx.dtsi"
->  #include "omap3-overo.dtsi"
->  
->  / {
-> -	model = "TI OMAP3 Gumstix Overo on Tobi";
-> -	compatible = "gumstix,omap3-tobi", "gumstix,omap3-overo", "ti,omap36xx", "ti,omap3";
-> -
->  	leds {
->  		compatible = "gpio-leds";
->  		heartbeat {
-> diff --git a/arch/arm/boot/dts/omap3-overo-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi.dts
-> new file mode 100644
-> index 0000000..de5653e
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-overo-tobi.dts
-> @@ -0,0 +1,22 @@
-> +/*
-> + * Copyright (C) 2012 Florian Vaussard, EPFL Mobots group
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/*
-> + * Tobi expansion board is manufactured by Gumstix Inc.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "omap34xx.dtsi"
-> +#include "omap3-overo-tobi-common.dtsi"
-> +
-> +/ {
-> +	model = "OMAP35xx Gumstix Overo on Tobi";
-> +	compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap3430", "ti,omap3";
-> +};
-> +
-> 
+> As far as I can tell, the power sequencing is normally really
+> dependent on the device. If someone has an on-board brcm4329
+> that requires a specific set of clocks, resets, voltages etc
+> to be routed to the chip and enabled in the correct order to
+> allow probing, it seems unlikely that changing the wifi chipset
+> to something else would keep the exact same requirements.
 
+That's your assertion - however, do we /know/ whether there's a situation
+where Olof's solution doesn't work because the sequencing is wrong?
+
+I see nothing unreasonable about the sequence:
+
+1. hold reset at low level
+2. apply power
+3. turn clock on
+4. apply reset
+5. release reset
+
+The points being:
+* never set a signal to a high level before power is applied, otherwise
+  we can end up supplying power through that signal (which may cause
+  damage.)  That goes for the reset and clock.
+* devices normally want clocks running to complete their reset sequencing.
+
+This is actually the sequence which MMC/SD cards do (except without the
+reset) anyway - it's spec'd that on the MMC/SD bus, power will be applied
+and will be stable before the clock signal is applied, and then the clock
+signal runs for a certain number of cycles before you even start talking
+to the card.
+
+That all said, we do have the problem that once we decide, we need to
+support it because it becomes part of DT - this is one of the things I
+hate about DT, it requires over-design.  Your point is "Olof's solution
+may break if we have a device which requires a different sequence" which
+is a valid point which has to be considered from the DT perspective and
+addressed whether or not we actually have a device which meets that
+criteria.  I don't see an easy solution to this.
 
 -- 
-Regards,
-Nishanth Menon
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
