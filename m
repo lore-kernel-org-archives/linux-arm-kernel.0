@@ -1,76 +1,77 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 13 Feb 2014 11:52:03 -0800
-Subject: [PATCH v2] ARM: mm: report both sections from PMD
-In-Reply-To: <20140213171211.GJ19841@arm.com>
-References: <20140212224638.GA4558@www.outflux.net>
- <20140213171211.GJ19841@arm.com>
-Message-ID: <CAGXu5jKG=8Fwd=yJEFF0-8tO0v4H_3sr_x2JLW4jm1Y2ouDFHQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 13 Feb 2014 13:52:52 -0600
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <BA5E6077-77F8-4BE8-80E5-BAB9FE111387@codeaurora.org>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <1392236171-10512-4-git-send-email-will.deacon@arm.com>
+ <D2AE4AE6-E8FA-4DD8-B92B-E37205A2548C@codeaurora.org>
+ <20140213110721.GC13576@mudshark.cambridge.arm.com>
+ <BA5E6077-77F8-4BE8-80E5-BAB9FE111387@codeaurora.org>
+Message-ID: <CAL_JsqJ=yw5b++tR5Be1hd9Bn5-h26-qaY7ndKREebztLcMo0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 9:12 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Wed, Feb 12, 2014 at 10:46:38PM +0000, Kees Cook wrote:
->> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
->> index 03243f7eeddf..fb3de59ee811 100644
->> --- a/arch/arm/include/asm/pgtable-3level.h
->> +++ b/arch/arm/include/asm/pgtable-3level.h
->> @@ -138,10 +138,6 @@
->>  #define pud_none(pud)                (!pud_val(pud))
->>  #define pud_bad(pud)         (!(pud_val(pud) & 2))
->>  #define pud_present(pud)     (pud_val(pud))
->> -#define pmd_table(pmd)               ((pmd_val(pmd) & PMD_TYPE_MASK) == \
->> -                                              PMD_TYPE_TABLE)
->> -#define pmd_sect(pmd)                ((pmd_val(pmd) & PMD_TYPE_MASK) == \
->> -                                              PMD_TYPE_SECT)
->>  #define pmd_large(pmd)               pmd_sect(pmd)
->>
->>  #define pud_clear(pudp)                      \
->> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
->> index 7d59b524f2af..934aa5b60c7c 100644
->> --- a/arch/arm/include/asm/pgtable.h
->> +++ b/arch/arm/include/asm/pgtable.h
->> @@ -183,6 +183,10 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
->>
->>  #define pmd_none(pmd)                (!pmd_val(pmd))
->>  #define pmd_present(pmd)     (pmd_val(pmd))
->> +#define pmd_table(pmd)               ((pmd_val(pmd) & PMD_TYPE_MASK) == \
->> +                                              PMD_TYPE_TABLE)
->> +#define pmd_sect(pmd)                ((pmd_val(pmd) & PMD_TYPE_MASK) == \
->> +                                              PMD_TYPE_SECT)
+On Thu, Feb 13, 2014 at 10:22 AM, Kumar Gala <galak@codeaurora.org> wrote:
 >
-> Do you still need to move these two if you only use pmd_large()? AFAICT,
-> it is equivalent to pmd_sect().
-
-Why does pmd_sect exist? I can reduce it to just using pmd_large.
-
+> On Feb 13, 2014, at 5:07 AM, Will Deacon <will.deacon@arm.com> wrote:
 >
->>  static inline pte_t *pmd_page_vaddr(pmd_t pmd)
->>  {
->> diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
->> index 2b342177f5de..32635b474832 100644
->> --- a/arch/arm/mm/dump.c
->> +++ b/arch/arm/mm/dump.c
->> @@ -260,8 +260,14 @@ static void walk_pmd(struct pg_state *st, pud_t *pud, unsigned long start)
+>> On Wed, Feb 12, 2014 at 09:51:48PM +0000, Kumar Gala wrote:
+>>>
+>>> On Feb 12, 2014, at 2:16 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>>
+>>>> This patch adds support for a generic PCI host controller, such as a
+>>>> firmware-initialised device with static windows or an emulation by
+>>>> something such as kvmtool.
+>>>>
+>>>> The controller itself has no configuration registers and has its address
+>>>> spaces described entirely by the device-tree (using the bindings from
+>>>> ePAPR). Both CAM and ECAM are supported for Config Space accesses.
+>>>>
+>>>> Corresponding documentation is added for the DT binding.
+>>>>
+>>>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>>>> ---
+>>>> .../devicetree/bindings/pci/arm-generic-pci.txt    |  51 ++++
+>>>> drivers/pci/host/Kconfig                           |   7 +
+>>>> drivers/pci/host/Makefile                          |   1 +
+>>>> drivers/pci/host/pci-arm-generic.c                 | 318 +++++++++++++++++++++
+>>>> 4 files changed, 377 insertions(+)
+>>>> create mode 100644 Documentation/devicetree/bindings/pci/arm-generic-pci.txt
+>>>> create mode 100644 drivers/pci/host/pci-arm-generic.c
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/pci/arm-generic-pci.txt b/Documentation/devicetree/bindings/pci/arm-generic-pci.txt
+>>>> new file mode 100644
+>>>> index 000000000000..cc7a35ecfa2d
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/pci/arm-generic-pci.txt
+>>>> @@ -0,0 +1,51 @@
+>>>> +* ARM generic PCI host controller
+>>>> +
+>>>> +Firmware-initialised PCI host controllers and PCI emulations, such as the
+>>>> +virtio-pci implementations found in kvmtool and other para-virtualised
+>>>> +systems, do not require driver support for complexities such as regulator and
+>>>> +clock management. In fact, the controller may not even require the
+>>>> +configuration of a control interface by the operating system, instead
+>>>> +presenting a set of fixed windows describing a subset of IO, Memory and
+>>>> +Configuration Spaces.
+>>>> +
+>>>> +Such a controller can be described purely in terms of the standardized device
+>>>> +tree bindings communicated in pci.txt:
+>>>> +
+>>>> +- compatible     : Must be "arm,pci-cam-generic" or "arm,pci-ecam-generic"
+>>>> +                   depending on the layout of configuration space (CAM vs
+>>>> +                   ECAM respectively)
+>>>
+>>> What's arm specific here?  I don't have a great suggestion, but seems odd
+>>> for this to be vendor prefixed with "arm".
 >>
->>       for (i = 0; i < PTRS_PER_PMD; i++, pmd++) {
->>               addr = start + i * PMD_SIZE;
->> -             if (pmd_none(*pmd) || pmd_large(*pmd) || !pmd_present(*pmd))
->> +             if (pmd_none(*pmd) || pmd_large(*pmd) || !pmd_present(*pmd)) {
->>                       note_page(st, addr, 3, pmd_val(*pmd));
->> +                     if (SECTION_SIZE < PMD_SIZE &&
->> +                         pmd_sect(*pmd) && pmd_sect(pmd[1])) {
+>> Happy to change it, but I'm also struggling for names. Maybe "linux,..."?
 >
-> I think the first patch was better with pmd[0] and pmd[1] treated
-> independently if SECTION_SIZE < PMD_SIZE, only that it should have
-> checked for pmd_sect(pmd[1]). I don't see anything in
-> __map_init_section() that would prevent populating only the second pmd
-> leaving the first one empty.
+> I was thinking that as well, I'd say go with "linux,".
 
-Ah, gotcha. Okay, I will send a new version. Thanks!
+Just drop the prefix altogether.
 
--Kees
+I'm wondering if this should have host or rc in the name.
 
--- 
-Kees Cook
-Chrome OS Security
+Rob
