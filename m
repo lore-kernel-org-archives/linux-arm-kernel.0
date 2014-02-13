@@ -1,33 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 13 Feb 2014 09:37:05 -0700
-Subject: [PATCH v2 4/6] ARM: firmware: add prepare_idle() operation
-In-Reply-To: <52FCA5FC.80504@samsung.com>
-References: <1391747706-1847-1-git-send-email-acourbot@nvidia.com>
- <1391747706-1847-5-git-send-email-acourbot@nvidia.com>
- <52FCA5FC.80504@samsung.com>
-Message-ID: <52FCF4B1.5030208@wwwdotorg.org>
+From: semen.protsenko@linaro.org (Semen Protsenko)
+Date: Thu, 13 Feb 2014 18:39:54 +0200
+Subject: [PATCH] mfd: vexpress-sysreg: initialize "site" variable
+Message-ID: <1392309594-28229-1-git-send-email-semen.protsenko@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2014 04:01 AM, Tomasz Figa wrote:
-> Hi Alexandre,
-> 
-> On 07.02.2014 05:35, Alexandre Courbot wrote:
->> Some firmwares do not put the CPU into idle mode themselves, but still
->> need to be informed that the CPU is about to enter idle mode before this
->> happens. Add a prepare_idle() operation to the firmware_ops structure to
->> handle such cases.
->>
->> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->> ---
->>   arch/arm/include/asm/firmware.h | 4 ++++
->>   1 file changed, 4 insertions(+)
-> 
-> I wonder if .do_idle() couldn't simply return an appropriate error code
-> to let the upper layer know that it should proceed with normal CPU idle
-> activation, while still letting the firmware know that the CPU is going
-> to idle.
+"site" variable should be initialized with 0 so that
+when "site" property doesn't exist in DTB it can be handled correctly.
 
-That seems to disagree with the naming of the operation, and the
-semantics I assume it has, though. It seems clearer to add an explicit
-separate op for this.
+"0" value means board site number is motherboard (see
+Documentation/devicetree/bindings/arm/vexpress.txt for details).
+
+Signed-off-by: Semen Protsenko <semen.protsenko@linaro.org>
+---
+ drivers/mfd/vexpress-sysreg.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
+index 981bef4..35281e8 100644
+--- a/drivers/mfd/vexpress-sysreg.c
++++ b/drivers/mfd/vexpress-sysreg.c
+@@ -168,7 +168,7 @@ static void *vexpress_sysreg_config_func_get(struct device *dev,
+ 		struct device_node *node)
+ {
+ 	struct vexpress_sysreg_config_func *config_func;
+-	u32 site;
++	u32 site = 0;
+ 	u32 position = 0;
+ 	u32 dcc = 0;
+ 	u32 func_device[2];
+-- 
+1.8.5.3
