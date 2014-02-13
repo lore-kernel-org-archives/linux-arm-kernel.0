@@ -1,36 +1,38 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 14 Feb 2014 07:23:59 +0900
-Subject: [PATCH] clocksource: exynos_mct: remove unwanted header file
- inclusion
-In-Reply-To: <1389314025-2890-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1389314025-2890-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <52FD45FF.7030100@samsung.com>
+Date: Fri, 14 Feb 2014 07:33:08 +0900
+Subject: [PATCH] ARM: S3C24XX: Fix typo "CONFIG_CPUS_3C2443"
+In-Reply-To: <CAK9yfHyXmY52KmKPj6=te829-R83dfM7wB813h=+=zCpzzxobA@mail.gmail.com>
+References: <1392198068.23759.7.camel@x220>
+ <CAK9yfHyXmY52KmKPj6=te829-R83dfM7wB813h=+=zCpzzxobA@mail.gmail.com>
+Message-ID: <52FD4824.2020303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/10/14 09:33, Pankaj Dubey wrote:
-> remove unwanted header file inclusion "asm/mach/time.h" from exynos_mct.c
+On 02/12/14 18:47, Sachin Kamat wrote:
+> On 12 February 2014 15:11, Paul Bolle<pebolle@tiscali.nl>  wrote:
+>> Signed-off-by: Paul Bolle<pebolle@tiscali.nl>
+>> ---
+>> Untested. This needs testing by people with access to knowledge,
+>> compilers, and/or hardware related to CPU_S3C2443. I'm not one of them.
+>>
+>>   arch/arm/mach-s3c24xx/common.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+>> index 4adaa4b..1d77d70 100644
+>> --- a/arch/arm/mach-s3c24xx/common.c
+>> +++ b/arch/arm/mach-s3c24xx/common.c
+>> @@ -484,7 +484,7 @@ struct platform_device s3c2440_device_dma = {
+>>   };
+>>   #endif
+>>
+>> -#if defined(CONFIG_CPUS_3C2443) || defined(CONFIG_CPU_S3C2416)
+>> +#if defined(CONFIG_CPU_S3C2443) || defined(CONFIG_CPU_S3C2416)
 >
-> Signed-off-by: Pankaj Dubey<pankaj.dubey@samsung.com>
-> ---
->   drivers/clocksource/exynos_mct.c |    2 --
->   1 file changed, 2 deletions(-)
+> This is definitely a typo and the current fix looks good.
 >
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index 48f76bc..ed49b25 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -25,8 +25,6 @@
->   #include<linux/of_address.h>
->   #include<linux/clocksource.h>
+> Reviewed-by: Sachin Kamat<sachin.kamat@linaro.org>
 >
-> -#include<asm/mach/time.h>
-> -
->   #define EXYNOS4_MCTREG(x)		(x)
->   #define EXYNOS4_MCT_G_CNT_L		EXYNOS4_MCTREG(0x100)
->   #define EXYNOS4_MCT_G_CNT_U		EXYNOS4_MCTREG(0x104)
+Applied, thanks.
 
-Looks good, applied.
-
-Thanks,
-Kukjin
+- Kukjin
