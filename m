@@ -1,67 +1,16 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Feb 2014 15:19:19 -0800
-Subject: [PATCH V2 4/4] ARM: OMAP2+: AM43x: Use gptimer as clocksource
-In-Reply-To: <1391768486-2134-5-git-send-email-lokeshvutla@ti.com>
-References: <1391768486-2134-1-git-send-email-lokeshvutla@ti.com>
- <1391768486-2134-5-git-send-email-lokeshvutla@ti.com>
-Message-ID: <20140213231919.GO28216@atomide.com>
+Date: Thu, 13 Feb 2014 15:20:28 -0800
+Subject: [PATCH] ARM: OMAP1: nokia770: enable tahvo-usb
+In-Reply-To: <1391867335-9192-1-git-send-email-aaro.koskinen@iki.fi>
+References: <1391867335-9192-1-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20140213232027.GP28216@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lokesh Vutla <lokeshvutla@ti.com> [140207 02:24]:
-> From: Rajendra Nayak <rnayak@ti.com>
-> 
-> The SyncTimer in AM43x is clocked using the following two sources:
-> 1) An inaccuarte 32k clock (CLK_32KHZ) derived from PER DPLL, causing system
->    time to go slowly (~10% deviation).
-> 2) external 32KHz RTC clock, which may not always be available on board like
->    in the case of ePOS EVM
-> 
-> Use gptimer as clocksource instead, as is done in the case of AM335x
-> (which does not have a SyncTimer). With this, system time keeping works
-> accurately.
+* Aaro Koskinen <aaro.koskinen@iki.fi> [140208 05:52]:
+> Add platform data for tahvo-usb. This is the last missing piece to get
+> Tahvo USB working with 3.14.
 
-Hmm doesn't this also mean that PM for any deeper idle states won't
-work properly?
-
-Regards,
+Applying into omap-for-v3.14/fixes thanks.
 
 Tony
- 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
->  arch/arm/mach-omap2/board-generic.c |    2 +-
->  arch/arm/mach-omap2/timer.c         |    3 ++-
->  2 files changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index 8e3daa1..5679464a 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -229,7 +229,7 @@ DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
->  	.init_late	= am43xx_init_late,
->  	.init_irq	= omap_gic_of_init,
->  	.init_machine	= omap_generic_init,
-> -	.init_time	= omap3_sync32k_timer_init,
-> +	.init_time	= omap3_gptimer_timer_init,
->  	.dt_compat	= am43_boards_compat,
->  MACHINE_END
->  #endif
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 74044aa..b62de9f 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -604,7 +604,8 @@ OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
->  			2, "timer_sys_ck", NULL);
->  #endif /* CONFIG_ARCH_OMAP3 */
->  
-> -#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
-> +#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX) || \
-> +	defined(CONFIG_SOC_AM43XX)
->  OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
->  		       1, "timer_sys_ck", "ti,timer-alwon");
->  #endif
-> -- 
-> 1.7.9.5
-> 
