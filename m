@@ -1,43 +1,230 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Feb 2014 10:42:48 +0000
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
-In-Reply-To: <201401281148.10670.arnd@arndb.de>
-References: <1390190215-22700-1-git-send-email-olof@lixom.net>
- <52E700F0.7040708@gmail.com>
- <CAPDyKFpOhQtiyCmzie3=sfg42Vv5_rReRNgUf8kALoE6TBe2cw@mail.gmail.com>
- <201401281148.10670.arnd@arndb.de>
-Message-ID: <20140213104248.GU26684@n2100.arm.linux.org.uk>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 13 Feb 2014 12:45:19 +0200
+Subject: [PATCH 3/8] ARM: OMAP2+: clock: fix clkoutx2 with
+ CLK_SET_RATE_PARENT
+In-Reply-To: <1392285846-13199-4-git-send-email-tomi.valkeinen@ti.com>
+References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
+ <1392285846-13199-4-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <52FCA23F.6090003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 11:48:10AM +0100, Arnd Bergmann wrote:
-> I think there is another option, which does have its own pros and cons:
-> We could move all the power handling back into the sdio function driver
-> if we allow a secondary detection path using DT rather than the probing
-> of the SDIO bus.
+On 13/02/14 12:04, Tomi Valkeinen wrote:
+> If CLK_SET_RATE_PARENT is set for a clkoutx2 clock, calling
+> clk_set_rate() on the clock "skips" the x2 multiplier as there are no
+> set_rate and round_rate functions defined for the clkoutx2.
+> 
+> This results in getting double the requested clock rates, breaking the
+> display on omap3430 based devices.
+> 
+> This patch implements set_rate and round_rate for clkoutx2.
+> 
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> ---
+>  arch/arm/mach-omap2/cclock3xxx_data.c |  2 ++
+>  arch/arm/mach-omap2/dpll3xxx.c        | 62 +++++++++++++++++++++++++++++++++++
+>  include/linux/clk/ti.h                |  4 +++
+>  3 files changed, 68 insertions(+)
 
-No thanks.
+Argh. This patch 3/8 was an old version, and not valid. It does not work for
+omap3430. I had earlier posted a proper version, but somehow I managed to get
+an old version for this series.
 
-What if we have a platform where things subtly change, like for instance,
-the wiring on the SD slot to fix a problem with UHS-1 cards, which means
-you don't have UHS-1 support for some platforms but do for others.
+The correct version can be found from
 
-What if you have a platform which uses a brcm4329 chip for Wifi, but then
-later in the production run switch to using a different Wifi chipset?
+http://mid.gmane.org/1391080640-23370-1-git-send-email-tomi.valkeinen at ti.com
 
-With this information encoded into DT, the number of DT files quickly
-increases, and then this presents its own problem - how do users get to
-know which DT file should be used for their platform when all they see
-externally is "a product of type A"?
+and I'll also include it below.
 
-Let's say that the board folk were kind enough to set some kind of
-identifing feature for the first but not the second (why would they,
-it's probe-able, damn it).
+ Tomi
 
-The "we can do it in DT" approach just makes things unnecessarily more
-difficult from the _user_ and _hardware_ point of view.
+>From 0d46054a8b33bc1f7a37bc9b17dd1631b1a06047 Mon Sep 17 00:00:00 2001
+From: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Date: Thu, 30 Jan 2014 13:17:20 +0200
+Subject: [PATCH] ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
 
+If CLK_SET_RATE_PARENT is set for a clkoutx2 clock, calling
+clk_set_rate() on the clock "skips" the x2 multiplier as there are no
+set_rate and round_rate functions defined for the clkoutx2.
+
+This results in getting double the requested clock rates, breaking the
+display on omap3430 based devices. This got broken when
+d0f58bd3bba3877fb1af4664c4e33273d36f00e4 and related patches were merged
+for v3.14, as omapdss driver now relies more on the clk-framework and
+CLK_SET_RATE_PARENT.
+
+This patch implements set_rate and round_rate for clkoutx2.
+
+Tested on OMAP3430, OMAP3630, OMAP4460.
+
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/mach-omap2/cclock3xxx_data.c |  2 +
+ arch/arm/mach-omap2/dpll3xxx.c        | 92 +++++++++++++++++++++++++++++------
+ include/linux/clk/ti.h                |  4 ++
+ 3 files changed, 83 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
+index 3b05aea56d1f..11ed9152e665 100644
+--- a/arch/arm/mach-omap2/cclock3xxx_data.c
++++ b/arch/arm/mach-omap2/cclock3xxx_data.c
+@@ -433,7 +433,9 @@ static const struct clk_ops dpll4_m5x2_ck_ops = {
+ 	.enable		= &omap2_dflt_clk_enable,
+ 	.disable	= &omap2_dflt_clk_disable,
+ 	.is_enabled	= &omap2_dflt_clk_is_enabled,
++	.set_rate	= &omap3_clkoutx2_set_rate,
+ 	.recalc_rate	= &omap3_clkoutx2_recalc,
++	.round_rate	= &omap3_clkoutx2_round_rate,
+ };
+ 
+ static const struct clk_ops dpll4_m5x2_ck_3630_ops = {
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index 3185ced807c9..3c418ea54bbe 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -623,6 +623,32 @@ void omap3_dpll_deny_idle(struct clk_hw_omap *clk)
+ 
+ /* Clock control for DPLL outputs */
+ 
++/* Find the parent DPLL for the given clkoutx2 clock */
++static struct clk_hw_omap *omap3_find_clkoutx2_dpll(struct clk_hw *hw)
++{
++	struct clk_hw_omap *pclk = NULL;
++	struct clk *parent;
++
++	/* Walk up the parents of clk, looking for a DPLL */
++	do {
++		do {
++			parent = __clk_get_parent(hw->clk);
++			hw = __clk_get_hw(parent);
++		} while (hw && (__clk_get_flags(hw->clk) & CLK_IS_BASIC));
++		if (!hw)
++			break;
++		pclk = to_clk_hw_omap(hw);
++	} while (pclk && !pclk->dpll_data);
++
++	/* clk does not have a DPLL as a parent?  error in the clock data */
++	if (!pclk) {
++		WARN_ON(1);
++		return NULL;
++	}
++
++	return pclk;
++}
++
+ /**
+  * omap3_clkoutx2_recalc - recalculate DPLL X2 output virtual clock rate
+  * @clk: DPLL output struct clk
+@@ -637,27 +663,14 @@ unsigned long omap3_clkoutx2_recalc(struct clk_hw *hw,
+ 	unsigned long rate;
+ 	u32 v;
+ 	struct clk_hw_omap *pclk = NULL;
+-	struct clk *parent;
+ 
+ 	if (!parent_rate)
+ 		return 0;
+ 
+-	/* Walk up the parents of clk, looking for a DPLL */
+-	do {
+-		do {
+-			parent = __clk_get_parent(hw->clk);
+-			hw = __clk_get_hw(parent);
+-		} while (hw && (__clk_get_flags(hw->clk) & CLK_IS_BASIC));
+-		if (!hw)
+-			break;
+-		pclk = to_clk_hw_omap(hw);
+-	} while (pclk && !pclk->dpll_data);
++	pclk = omap3_find_clkoutx2_dpll(hw);
+ 
+-	/* clk does not have a DPLL as a parent?  error in the clock data */
+-	if (!pclk) {
+-		WARN_ON(1);
++	if (!pclk)
+ 		return 0;
+-	}
+ 
+ 	dd = pclk->dpll_data;
+ 
+@@ -672,6 +685,55 @@ unsigned long omap3_clkoutx2_recalc(struct clk_hw *hw,
+ 	return rate;
+ }
+ 
++int omap3_clkoutx2_set_rate(struct clk_hw *hw, unsigned long rate,
++					unsigned long parent_rate)
++{
++	return 0;
++}
++
++long omap3_clkoutx2_round_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *prate)
++{
++	const struct dpll_data *dd;
++	u32 v;
++	struct clk_hw_omap *pclk = NULL;
++
++	if (!*prate)
++		return 0;
++
++	pclk = omap3_find_clkoutx2_dpll(hw);
++
++	if (!pclk)
++		return 0;
++
++	dd = pclk->dpll_data;
++
++	/* TYPE J does not have a clkoutx2 */
++	if (dd->flags & DPLL_J_TYPE) {
++		*prate = __clk_round_rate(__clk_get_parent(pclk->hw.clk), rate);
++		return *prate;
++	}
++
++	WARN_ON(!dd->enable_mask);
++
++	v = omap2_clk_readl(pclk, dd->control_reg) & dd->enable_mask;
++	v >>= __ffs(dd->enable_mask);
++
++	/* If in bypass, the rate is fixed to the bypass rate*/
++	if (v != OMAP3XXX_EN_DPLL_LOCKED)
++		return *prate;
++
++	if (__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT) {
++		unsigned long best_parent;
++
++		best_parent = (rate / 2);
++		*prate = __clk_round_rate(__clk_get_parent(hw->clk),
++				best_parent);
++	}
++
++	return *prate * 2;
++}
++
+ /* OMAP3/4 non-CORE DPLL clkops */
+ const struct clk_hw_omap_ops clkhwops_omap3_dpll = {
+ 	.allow_idle	= omap3_dpll_allow_idle,
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index 092b64168d7f..4a21a872dbbd 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -245,6 +245,10 @@ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
+ void omap2_init_clk_clkdm(struct clk_hw *clk);
+ unsigned long omap3_clkoutx2_recalc(struct clk_hw *hw,
+ 				    unsigned long parent_rate);
++int omap3_clkoutx2_set_rate(struct clk_hw *hw, unsigned long rate,
++					unsigned long parent_rate);
++long omap3_clkoutx2_round_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *prate);
+ int omap2_clkops_enable_clkdm(struct clk_hw *hw);
+ void omap2_clkops_disable_clkdm(struct clk_hw *hw);
+ int omap2_clk_disable_autoidle_all(void);
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.8.3.2
+
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140213/1f45fc18/attachment.sig>
