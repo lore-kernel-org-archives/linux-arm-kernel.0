@@ -1,36 +1,43 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Thu, 13 Feb 2014 12:22:52 -0600
-Subject: [PATCH 0/4] OMAP IOMMU DTS nodes
-Message-ID: <1392315776-33197-1-git-send-email-s-anna@ti.com>
+Date: Thu, 13 Feb 2014 12:22:54 -0600
+Subject: [PATCH 2/4] ARM: dts: OMAP3: Add IVA IOMMU node
+In-Reply-To: <1392315776-33197-1-git-send-email-s-anna@ti.com>
+References: <1392315776-33197-1-git-send-email-s-anna@ti.com>
+Message-ID: <1392315776-33197-3-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Florian Vaussard <florian.vaussard@epfl.ch>
 
-This series includes patches that adds the iommu DT nodes on
-OMAP3 (IVA), and OMAP4 and OMAP5 SoCs. It also includes an
-updated OMAP3 ISP iommu DT node patch posted previously [1].
+Add the DT node for the IOMMU within the DSP subsystem. The entry
+is disabled to keep in line with the current hwmod usage.
 
-Posting the series separately from the driver DT adapation
-changes [2]. The series adds the DTS patches in line with the
-new OMAP IOMMU bindings [3] posted alongside the DT adaptation.
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+[s-anna at ti.com: split the entry and disable the node]
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/boot/dts/omap3.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-[1] http://marc.info/?l=linux-omap&m=138728486000628&w=2
-[2] http://marc.info/?l=linux-omap&m=139231544416973&w=2
-[3] http://marc.info/?l=linux-omap&m=139231545116981&w=2
-
-Florian Vaussard (3):
-  ARM: dts: OMAP3: Update ISP IOMMU node
-  ARM: dts: OMAP3: Add IVA IOMMU node
-  ARM: dts: OMAP4: Add IOMMU nodes
-
-Suman Anna (1):
-  ARM: dts: OMAP5: Add IOMMU nodes
-
- arch/arm/boot/dts/omap3.dtsi | 17 ++++++++++++++---
- arch/arm/boot/dts/omap4.dtsi | 17 +++++++++++++++++
- arch/arm/boot/dts/omap5.dtsi | 17 +++++++++++++++++
- 3 files changed, 48 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index ac91cc3..9607187 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -419,6 +419,15 @@
+ 			dma-window = <0 0xfffff000>;
+ 		};
+ 
++		mmu_iva: mmu at 5d000000 {
++			compatible = "ti,omap2-iommu";
++			reg = <0x5d000000 0x80>;
++			interrupts = <28>;
++			ti,hwmods = "mmu_iva";
++			dma-window = <0x11000000 0xeefff000>;
++			status = "disabled";
++		};
++
+ 		wdt2: wdt at 48314000 {
+ 			compatible = "ti,omap3-wdt";
+ 			reg = <0x48314000 0x80>;
 -- 
 1.8.5.3
