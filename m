@@ -1,30 +1,48 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 13 Feb 2014 13:11:45 +0000
-Subject: [PATCH 06/12] mfd: vexpress-sysreg: Add labels to gpio banks
-In-Reply-To: <CACRpkdZjrCdhyBMF2WbDCnHuuMSpcpwiPx2k555PY3yBwdc1aw@mail.gmail.com>
-References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
- <1392138636-29240-7-git-send-email-pawel.moll@arm.com>
- <CACRpkdZjrCdhyBMF2WbDCnHuuMSpcpwiPx2k555PY3yBwdc1aw@mail.gmail.com>
-Message-ID: <1392297105.848.82.camel@hornet>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 13 Feb 2014 14:13:55 +0100
+Subject: [PATCH v3 01/13] ARM: mvebu: rename armada-370-xp.c to
+ armada-mvebu.c
+In-Reply-To: <20140213130745.GU27395@titan.lakedaemon.net>
+References: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1392289475-8902-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <2036226.egxWL7qC66@wuerfel> <20140213125526.3af08c54@skate>
+ <20140213130745.GU27395@titan.lakedaemon.net>
+Message-ID: <20140213141355.00e8f2fd@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-02-13 at 13:08 +0000, Linus Walleij wrote:
-> On Tue, Feb 11, 2014 at 6:10 PM, Pawel Moll <pawel.moll@arm.com> wrote:
-> 
-> > ... so debugfs interfaces are easier to use.
-> >
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: Alexandre Courbot <gnurou@gmail.com>
-> > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > Cc: Lee Jones <lee.jones@linaro.org>
-> > Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> 
-> This doesn't apply to the v3.14-rc1-based GPIO tree. Can you rebase it
-> with Lee's ACK so I can apply this?
+Dear Jason Cooper,
 
-Uh, it won't apply. This series depends on the one reworking sysregs.
-I'll send them separately once it's ready. Sorry about confusion and
-thanks for trying!
+On Thu, 13 Feb 2014 08:07:45 -0500, Jason Cooper wrote:
 
-Pawel
+> > > Your reasoning for the new name makes a lot of sense, but my personal
+> > > opinion is that I'd rather leave the name as it is and deal with the
+> > > fact that it's not the best name. Renaming files often causes unexpected
+> > > problems, in particular if someone else wants to modify the same file.
+> > 
+> > I believe it's a matter of taste here. Having a file named
+> > armada-370-xp.c that handles Armada 375 and Armada 38x looks highly
+> > confusing to me, and I believe both Gr?gory and Ezequiel were of the
+> > same opinion.
+> > 
+> > The number of changes to this file is very limited, so the probability
+> > of having a large number of complicated patches touching the same file
+> > being in flight is fairly low.
+> > 
+> > Maybe we can leave this taste decision to the mach-mvebu maintainers?
+> 
+> board-v7.c and then board-v5.c ?
+
+Why not. But since this kind of change can be done without breaking the
+DT compatibility, I'd first prefer to see Dove support merged into
+mach-mvebu/ with its board file named mach-mvebu/dove.c. Then
+progressively see what can be combined with armada-mvebu.c so that we
+can merge both of them into board-v7.c.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
