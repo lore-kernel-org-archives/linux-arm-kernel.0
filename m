@@ -1,60 +1,37 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 12 Feb 2014 16:31:34 -0800
-Subject: [PATCH 08/14] net: axienet: Removed checkpatch errors/warnings
-In-Reply-To: <75b669c0a947effe74b291093abfa8c71f83736a.1392220536.git.michal.simek@xilinx.com>
-References: <cover.1392220536.git.michal.simek@xilinx.com>
- <75b669c0a947effe74b291093abfa8c71f83736a.1392220536.git.michal.simek@xilinx.com>
-Message-ID: <1392251494.2214.11.camel@joe-AO722>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 12 Feb 2014 16:54:07 -0800
+Subject: [RFC/PATCH 2/3] arm: Add ARCH_WANT_OF_RANDOMNESS
+In-Reply-To: <20140212164907.0E958C407C9@trevor.secretlab.ca>
+References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org> <
+ 1392168805-14200-3-git-send-email-lauraa@codeaurora.org>
+ <20140212164907.0E958C407C9@trevor.secretlab.ca>
+Message-ID: <52FC17AF.1080508@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-02-12 at 16:55 +0100, Michal Simek wrote:
-> From: Srikanth Thokala <srikanth.thokala@xilinx.com>
+On 2/12/2014 8:49 AM, Grant Likely wrote:
+> On Tue, 11 Feb 2014 17:33:24 -0800, Laura Abbott <lauraa@codeaurora.org> wrote:
+>> The stack canary for ARM is currently the same across reboots
+>> due to lack of randomness early enough. Add ARCH_WANT_OF_RANDOMNESS
+>> to allow devices to add whatever randomness they need.
+>>
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>
+> Do you have a draft patch for a user of this yet?
+>
 
-trivia:
+I had a particular patch in mind but I need to re-work it to work with 
+the upstream tree. I wanted to at least send out the infrastructure to 
+see how open people were to the idea. After reading the comments, I have 
+a couple more ideas of users as well. I'll see if I can work that in for v2.
 
-> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> g.
+>
 
-> +			netdev_err(lp->ndev,
-> +				"axienet_device_reset DMA reset timeout!\n");
+Thanks,
+Laura
 
-could you please align multi-line arguments to the
-appropriate open parenthesis?
 
-			netdev_err(lp->ndev,
-				   "axienet_device_reset DMA reset timeout!\n");
-
-or maybe:
-
-			netdev_err(lp->ndev, "%s: "DMA reset timeout!\n",
-				   __func__);
-
-> @@ -484,8 +484,8 @@ static void axienet_device_reset(struct net_device *ndev)
->  	}
-> 
->  	if (axienet_dma_bd_init(ndev)) {
-> -		dev_err(&ndev->dev, "axienet_device_reset descriptor "
-> -			"allocation failed\n");
-> +		netdev_err(ndev,
-> +			"axienet_device_reset descriptor allocation failed\n");
-
-etc, et al.
-
-> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c b/drivers/net/ethernet/xilinx/xilinx_axienet_mdio.c
-[]
-> @@ -161,19 +161,19 @@ int axienet_mdio_setup(struct axienet_local *lp, struct device_node *np)
-> 
->  	np1 = of_find_node_by_name(NULL, "cpu");
->  	if (!np1) {
-> -		printk(KERN_WARNING "%s(): Could not find CPU device node.",
-> -		       __func__);
-> -		printk(KERN_WARNING "Setting MDIO clock divisor to "
-> -		       "default %d\n", DEFAULT_CLOCK_DIVISOR);
-> +		netdev_warn(lp->ndev, "Could not find CPU device node.");
-
-missing trailing "\n" to terminate message.
-
-> +		netdev_warn(lp->ndev,
-> +			 "Could not find clock ethernet controller property.");
-
-here too. (and alignment)
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
