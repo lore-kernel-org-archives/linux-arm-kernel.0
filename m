@@ -1,42 +1,34 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 13 Feb 2014 12:15:44 -0600
-Subject: [PATCHv2 13/16] ARM: OMAP2+: extend iommu pdata-quirks to OMAP5
-In-Reply-To: <1392315347-32967-1-git-send-email-s-anna@ti.com>
-References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
-Message-ID: <1392315347-32967-14-git-send-email-s-anna@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Feb 2014 18:21:06 +0000
+Subject: [BISECTED] ssh - Received disconnect from x.x.x.x: 2: Bad packet
+ length 3149594624
+In-Reply-To: <52FD08D1.3030405@gmail.com>
+References: <52FD08D1.3030405@gmail.com>
+Message-ID: <20140213182105.GN13576@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP5 has the same iommus as OMAP4, so extend the OMAP4
-iommu pdata quirks for OMAP5 as well.
+Hi Ivo,
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/mach-omap2/pdata-quirks.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Thanks for bisecting this.
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 74e094a..551877f 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -193,7 +193,9 @@ static void __init omap4_panda_legacy_init(void)
- 	legacy_init_ehci_clk("auxclk3_ck");
- 	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 53);
- }
-+#endif
- 
-+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
- static struct iommu_platform_data omap4_iommu_pdata = {
- 	.reset_name = "mmu_cache",
- 	.assert_reset = omap_device_assert_hardreset,
-@@ -264,6 +266,8 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- #ifdef CONFIG_ARCH_OMAP4
- 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a100040, "4a100040.pinmux", &pcs_pdata),
- 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a31e040, "4a31e040.pinmux", &pcs_pdata),
-+#endif
-+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
- 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
- 		       &omap4_iommu_pdata),
- 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x55082000, "55082000.mmu",
--- 
-1.8.5.3
+On Thu, Feb 13, 2014 at 06:02:57PM +0000, Ivaylo Dimitrov wrote:
+> Since next-21012014 I started to receive "Received disconnect from 
+> x.x.x.x: 2: Bad packet length 3149594624" errors when trying to 
+> establish ssh session over wifi to my N900, running Maemo 5. I bisected 
+> and it turned out that commit dce5c9e35bc4085bd33eccdb8c9ec5a643507a14 
+> "ARM: 7928/1: kconfig: select HAVE_EFFICIENT_UNALIGNED_ACCESS for CPUv6+ 
+> && MMU" is the first bad. There is nothing related in either dmesg or 
+> syslog on the device. Reverting that commit on 3.14-rc1 make those 
+> errors disappear.
+
+That's certainly unexpected. The n900 has (iirc) a Cortex-A8, which as an
+ARMv7 core, can perform unaligned accesses to normal, cacheable memory in
+hardware.
+
+Can you provide your .config and/or any information about your network chip
+please? There's a chance that the driver is doing something odd.
+
+Cheers,
+
+Will
