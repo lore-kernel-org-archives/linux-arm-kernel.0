@@ -1,49 +1,40 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 13 Feb 2014 11:56:14 +0100
-Subject: [PATCH v2 03/10] ARM: mvebu: add workaround for data abort
- issue on Armada 375
-In-Reply-To: <2289743.0TLVompA6m@wuerfel>
+Date: Thu, 13 Feb 2014 11:56:25 +0100
+Subject: [PATCH v2 05/10] ARM: mvebu: add Device Tree for the Armada 375
+ DB board
+In-Reply-To: <2335694.A7tsOBXSlH@wuerfel>
 References: <1392200619-3141-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392200619-3141-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <2289743.0TLVompA6m@wuerfel>
-Message-ID: <20140213115614.71e95251@skate>
+ <1392200619-3141-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <2335694.A7tsOBXSlH@wuerfel>
+Message-ID: <20140213115625.15dda6d9@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Arnd Bergmann,
 
-On Wed, 12 Feb 2014 14:10:35 +0100, Arnd Bergmann wrote:
-> On Wednesday 12 February 2014 11:23:32 Thomas Petazzoni wrote:
-> > +/*
-> > + * Early versions of Armada 375 SoC have a bug where the BootROM
-> > + * leaves an external data abort pending. The kernel is hit by this
-> > + * data abort as soon as it enters userspace, because it unmasks the
-> > + * data aborts at this moment. We register a custom abort handler
-> > + * below to ignore the first data abort to work around this problem.
-> > + */
-> > +static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
-> > +                                       struct pt_regs *regs)
-> > +{
-> > +       static int ignore_first;
+On Wed, 12 Feb 2014 14:12:27 +0100, Arnd Bergmann wrote:
+> On Wednesday 12 February 2014 11:23:34 Thomas Petazzoni wrote:
+> > +                       i2c0: i2c at 11000 {
+> > +                               status = "okay";
+> > +                               clock-frequency = <100000>;
+> > +                               pinctrl-0 = <&i2c0_pins>;
+> > +                               pinctrl-names = "default";
+> > +                       };
 > > +
-> > +       if (!ignore_first) {
-> > +               ignore_first = 1;
-> > +               return 0;
-> > +       }
-> > +
-> > +       return 1;
-> > +}
+> > +                       i2c1: i2c at 11100 {
+> > +                               status = "okay";
+> > +                               clock-frequency = <100000>;
+> > +                               pinctrl-0 = <&i2c1_pins>;
+> > +                               pinctrl-names = "default";
+> > +                       };
 > 
-> I think this should try to match the fsr and addr field if possible and
-> only ignore the one external abort you expect.
+> I think you should either use the label to reference the node here,
+> or omit it in the board.dts file. There is no point in defining
+> multiple identical labels.
 
-I've added a check on fsr. Checking addr is not possible, because the
-address changes from one boot to another. I must say I don't really
-know the details of the BootROM code that leaves this data abort
-pending, but it looks like the address that triggers the data abort is
-not always the same.
+Indeed, good point. Will be fixed in v3.
 
-Thanks for your review!
+Thanks!
 
 Thomas
 -- 
