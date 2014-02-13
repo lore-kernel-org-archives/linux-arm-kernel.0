@@ -1,97 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 13 Feb 2014 15:28:30 +0000
-Subject: [PATCH 01/18] arm64: initial support for GICv3
-In-Reply-To: <loom.20140207T065340-308@post.gmane.org>
-References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
- <1391607050-540-2-git-send-email-marc.zyngier@arm.com>
- <loom.20140207T065340-308@post.gmane.org>
-Message-ID: <52FCE49E.70800@arm.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 13 Feb 2014 07:51:47 -0800
+Subject: [PATCH 08/14] net: axienet: Removed checkpatch errors/warnings
+In-Reply-To: <ff5b1f6a-a6a7-405c-9e83-59ad33852b93@TX2EHSMHS044.ehs.local>
+References: <cover.1392220536.git.michal.simek@xilinx.com>
+ <75b669c0a947effe74b291093abfa8c71f83736a.1392220536.git.michal.simek@xilinx.com>
+ <1392251494.2214.11.camel@joe-AO722>
+ <ff5b1f6a-a6a7-405c-9e83-59ad33852b93@TX2EHSMHS044.ehs.local>
+Message-ID: <1392306707.2214.65.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnab,
+On Thu, 2014-02-13 at 08:19 +0100, Michal Simek wrote:
+> On 02/13/2014 01:31 AM, Joe Perches wrote:
+> > On Wed, 2014-02-12 at 16:55 +0100, Michal Simek wrote:
 
-Please do not trim the CC list. I missed this email (lost in the
-traffic), and contributors to the other MLs may also have comments.
+Hi again Michal.
 
-On 07/02/14 08:59, Arnab Basu wrote:
-> Hi Marc
+> >> +		netdev_warn(lp->ndev,
+> >> +			 "Could not find clock ethernet controller property.");
+> > 
+> > here too. (and alignment)
 > 
-> Marc Zyngier <marc.zyngier <at> arm.com> writes:
-> 
->> +
->> +static inline void __iomem *gic_dist_base(struct irq_data *d)
-> 
-> I would suggest that this function be renamed (something like
-> gic_base_for_irq?) since it returns dist or redist sgi base address. The
-> name suggests it always returns the dist base address.
+> This is problematic. I would like to keep 80 char limits and keeping
+> this align just break it. That's why I was using tab alignment.
+> Probably the solution is just to shorten message.
 
-I may rename it to gic_get_irq_base.
+(overly long, tiresomely trivial stuff below)
 
->> +{
->> +	if (d->hwirq < 32)	/* SGI+PPI -> SGI_base for this CPU */
->> +		return gic_data_rdist_sgi_base();
->> +
->> +	if (d->hwirq <= 1023)	/* SPI -> dist_base */
->> +		return gic_data.dist_base;
->> +
->> +	if (d->hwirq >= 8192)
->> +		BUG();		/* LPI Detected!!! */
->> +
->> +	return NULL;
->> +}
->> +
->> +static inline unsigned int gic_irq(struct irq_data *d)
->> +{
->> +	return d->hwirq;
->> +}
->> +
->> +static void gic_do_wait_for_rwp(void __iomem *base)
->> +{
->> +	u32 val;
->> +
->> +	do {
->> +		val = readl_relaxed(base + GICD_CTLR);
-> 
-> Maybe rename GICD_CTLR to GICx_CTLR since it is being used for both the
-> distributor and the redistributor.
+Your choice.  I'm not an 80 column zealot but
+please don't shorten the message just to fit
+80 columns if it impacts intelligibility.
 
-I really hate the "GICx" bit. I think instead, I'll add a comment so
-people don't get confuse about the name.
+Generally, I'd write this something like:
 
->> +		cpu_relax();
->> +	} while (val & GICD_CTLR_RWP);
-> 
-> Similar to above GICx_CTLR_RWP
-> 
-> 
->> +
->> +static int gic_irq_domain_xlate(struct irq_domain *d,
->> +				struct device_node *controller,
->> +				const u32 *intspec, unsigned int intsize,
->> +				unsigned long *out_hwirq, unsigned int *out_type)
->> +{
->> +	if (d->of_node != controller)
->> +		return -EINVAL;
->> +	if (intsize < 3)
->> +		return -EINVAL;
->> +
->> +	switch(intspec[0]) {
->> +	case 0:			/* SPI */
->> +		*out_hwirq = intspec[1] + 32;
->> +		break;
->> +	case 1:			/* PPI */
->> +		*out_hwirq = intspec[1] + 16;
->> +		break;
-> 
-> I wonder if there is any value to syncing these with the defines in
-> "include/dt-bindings/interrupt-controller/arm-gic.h" somehow.
+		netdev_warn(lp->ndev,
+			    "Could not find clock ethernet controller property\n");
 
-I'd expect the whole DTS stuff to vanish from the kernel some day, so
-I'm keen on not depending on it.
+(without the period) which is 83 columns.
 
-Thanks for the review,
+checkpatch makes exceptions for 80 column line
+length maximums for format strings.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I've no real issue if you indent it back one.
+
+fyi: this is 77 columns
+
+		netdev_warn(lp->ndev,
+			    "No clock ethernet controller property found\n");
+
+About the message itself.
+
+You dropped the "axienet_mdio_setup" function name.
+
+I believe the dmesg output will look something like:
+
+xilinx_temac 0000:01:00.0 (unregistered net_device): Could not find clock ethernet controller property.
+xilinx_temac 0000:01:00.0 (unregistered net_device): Setting MDIO clock divisor to default 29
+
+Because these 2 messages are effectively linked,
+my preference would be to emit them on a single line,
+
+Something like:
+
+xilinx_temac 0000:01:00.0 (unregistered net_device): of_get_property("clock-frequency") not found - setting MDIO clock divisor to default 29
+
+or
+
+		netdev_warn(lp->ndev,
+			    "of_get_property(\"clock-frequency\") not found - setting MDIO clock divisor to default %u\n",
+			    DEFAULT_CLOCK_DIVISOR);
