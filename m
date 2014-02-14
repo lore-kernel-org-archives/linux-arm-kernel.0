@@ -1,13 +1,18 @@
 From: mporter@linaro.org (Matt Porter)
-Date: Fri, 14 Feb 2014 10:03:55 -0500
-Subject: [PATCH] MAINTAINERS: add additional ARM BCM281xx/BCM11xxx maintainer
-Message-ID: <1392390235-19116-1-git-send-email-mporter@linaro.org>
+Date: Fri, 14 Feb 2014 10:15:03 -0500
+Subject: [PATCH v2] MAINTAINERS: add additional ARM BCM281xx/BCM11xxx
+ maintainer
+Message-ID: <1392390903-19826-1-git-send-email-mporter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Add myself as an additional maintainer for the Broadcom mobile
 SoCs.
+
+Signed-off-by: Matt Porter <mporter@linaro.org>
 ---
+Since v1: put back my missing SOB
+
  MAINTAINERS | 1 +
  1 file changed, 1 insertion(+)
 
