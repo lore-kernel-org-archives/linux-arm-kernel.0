@@ -1,62 +1,91 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 14 Feb 2014 11:02:48 +0100
-Subject: [PATCH] arm: dtsi: am335x-bone-common, usb0 is peripheral only
-In-Reply-To: <20140213232552.GR28216@atomide.com>
-References: <1389448851-20010-1-git-send-email-mpa@pengutronix.de>
- <20140213225438.GF28216@atomide.com>
- <20140213231333.GK31787@pengutronix.de>
- <20140213232552.GR28216@atomide.com>
-Message-ID: <20140214100248.GO31787@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 14 Feb 2014 10:07:01 +0000
+Subject: [PATCH v7 02/12] mfd: omap-usb-host: Get clocks based on
+ hardware revision
+In-Reply-To: <1392200333-28397-3-git-send-email-rogerq@ti.com>
+References: <1392200333-28397-1-git-send-email-rogerq@ti.com>
+ <1392200333-28397-3-git-send-email-rogerq@ti.com>
+Message-ID: <20140214100701.GC7380@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Feb 13, 2014 at 03:25:52PM -0800, Tony Lindgren wrote:
-> * Markus Pargmann <mpa@pengutronix.de> [140213 15:16]:
-> > Hi,
-> > 
-> > On Thu, Feb 13, 2014 at 02:54:38PM -0800, Tony Lindgren wrote:
-> > > * Markus Pargmann <mpa@pengutronix.de> [140111 06:03]:
-> > > > The PMIC is using usb0 vbus line as power source. It is also connected
-> > > > to the am335x processor as vbus sense. But there is no possibility to
-> > > > pullup usb0 vbus to operate as host. This patch fixes the dr_mode of usb0.
-> > > 
-> > > That's the MUSB? AFAIK it's not possible to operate MUSB in peripheral
-> > > only mode because the hardware does what it wants based on the ID
-> > > pin state.
-> > 
-> > Yes that's MUSB. The am335x reference manual describes that it is
-> > possible to force peripheral/host mode by setting bit 7 (IDDIG_MUX) in
-> > register USBnMODE to 1. Then it uses the bit written in bit 8 (IDDIG) of
-> > register USBnMODE to set host/peripheral mode.
+> Not all revisions have all the clocks so get the necessary clocks
+> based on hardware revision.
 > 
-> OK
+> This should avoid un-necessary clk_get failure messages that were
+> observed earlier.
+> 
+> Be more strict and always fail on clk_get() error.
+
+It might have been clearer if you'd broken these two pieces of
+functionality changes into two different patches. In future it would
+be preferred.
+
+> CC: Lee Jones <lee.jones@linaro.org>
+> CC: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>  drivers/mfd/omap-usb-host.c | 92 +++++++++++++++++++++++++++++++--------------
+>  1 file changed, 64 insertions(+), 28 deletions(-)
+> 
+> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+> index 0c3c9a0..60a3bed 100644
+> --- a/drivers/mfd/omap-usb-host.c
+> +++ b/drivers/mfd/omap-usb-host.c
+> @@ -665,22 +665,41 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+>  		goto err_mem;
+>  	}
 >  
-> > I am not sure if the driver supports it yet but I think the DTS should
-> > contain the correct mode nevertheless, especially to avoid starting the
-> > otg loops in the musb driver.
-> 
-> Well there's one more thing to consider.. I think in the OTG role change
-> case the VBUS is still driven externally from the original host, so the
-> lack of VBUS does not always mean that host mode should be disabled.
+> -	need_logic_fck = false;
+> +	/* Set all clocks as invalid to begin with */
+> +	omap->ehci_logic_fck = omap->init_60m_fclk = ERR_PTR(-ENODEV);
+> +	omap->utmi_p1_gfclk = omap->utmi_p2_gfclk = ERR_PTR(-ENODEV);
+> +	omap->xclk60mhsp1_ck = omap->xclk60mhsp2_ck = ERR_PTR(-ENODEV);
+> +
 
-I thought more about the hardware description than the possible role
-changes through software protocols. In a hardware perspective, this USB
-port is only in peripheral mode, as it can't drive VBUS. However is
-there any support for role change protocols in the kernel yet?
+For readability you should probably do these one per line.
 
-Perhaps we have to add a seperate DT binding for usb role changes when
-they are supported. This would help to describe the hardware
-capabilities (host, peripheral or OTG) and the role change protocols
-supported.
+>  	for (i = 0; i < omap->nports; i++) {
+> -		if (is_ehci_phy_mode(i) || is_ehci_tll_mode(i) ||
+> -			is_ehci_hsic_mode(i))
+> -				need_logic_fck |= true;
+> +		omap->utmi_clk[i] = ERR_PTR(-ENODEV);
+> +		omap->hsic480m_clk[i] = ERR_PTR(-ENODEV);
+> +		omap->hsic60m_clk[i] = ERR_PTR(-ENODEV);
+>  	}
+>  
+> -	omap->ehci_logic_fck = ERR_PTR(-EINVAL);
+> -	if (need_logic_fck) {
+> -		omap->ehci_logic_fck = devm_clk_get(dev, "ehci_logic_fck");
 
-Regards,
+Has this clock been renamed, or is it no longer required?
 
-Markus
+Perhaps you should be explicit in the commit log as to which clocks
+you're removing.
+
+> -		if (IS_ERR(omap->ehci_logic_fck)) {
+> -			ret = PTR_ERR(omap->ehci_logic_fck);
+> -			dev_dbg(dev, "ehci_logic_fck failed:%d\n", ret);
+> +	/* for OMAP3 i.e. USBHS REV1 */
+> +	if (omap->usbhs_rev == OMAP_USBHS_REV1) {
+> +		need_logic_fck = false;
+> +		for (i = 0; i < omap->nports; i++) {
+> +			if (is_ehci_phy_mode(pdata->port_mode[i]) ||
+> +			    is_ehci_tll_mode(pdata->port_mode[i]) ||
+> +			    is_ehci_hsic_mode(pdata->port_mode[i]))
+> +
+> +				need_logic_fck |= true;
+> +		}
+> +
+> +		if (need_logic_fck) {
+> +			omap->ehci_logic_fck = clk_get(dev, "usbhost_120m_fck");
+
+devm_clk_get()?
+
+<snip>
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
