@@ -1,9 +1,9 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Feb 2014 01:59:54 +0100
-Subject: [PATCH 16/27] ARM: shmobile: sh7372: Switch to new style CMT device
+Date: Fri, 14 Feb 2014 01:59:55 +0100
+Subject: [PATCH 17/27] ARM: shmobile: sh73a0: Switch to new style CMT device
 In-Reply-To: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1392339605-20691-17-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1392339605-20691-18-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,75 +13,91 @@ Switch from the old-style platform data to the new-style platform data.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/mach-shmobile/clock-sh7372.c |  6 +++---
- arch/arm/mach-shmobile/setup-sh7372.c | 30 ++++++++++++++----------------
- 2 files changed, 17 insertions(+), 19 deletions(-)
+ arch/arm/mach-shmobile/clock-sh73a0.c |  2 +-
+ arch/arm/mach-shmobile/setup-sh73a0.c | 45 ++++++++++++++++-------------------
+ 2 files changed, 22 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-sh7372.c b/arch/arm/mach-shmobile/clock-sh7372.c
-index 2848997..5557b3d 100644
---- a/arch/arm/mach-shmobile/clock-sh7372.c
-+++ b/arch/arm/mach-shmobile/clock-sh7372.c
-@@ -565,10 +565,10 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("r8a66597_hcd.1", &mstp_clks[MSTP406]), /* USB1 */
- 	CLKDEV_DEV_ID("r8a66597_udc.1", &mstp_clks[MSTP406]), /* USB1 */
- 	CLKDEV_DEV_ID("renesas_usbhs.1", &mstp_clks[MSTP406]), /* USB1 */
--	CLKDEV_DEV_ID("sh_cmt.4", &mstp_clks[MSTP405]), /* CMT4 */
--	CLKDEV_DEV_ID("sh_cmt.3", &mstp_clks[MSTP404]), /* CMT3 */
-+	CLKDEV_DEV_ID("sh-cmt-32-fast.4", &mstp_clks[MSTP405]), /* CMT4 */
-+	CLKDEV_DEV_ID("sh-cmt-32-fast.3", &mstp_clks[MSTP404]), /* CMT3 */
- 	CLKDEV_DEV_ID("sh_keysc.0", &mstp_clks[MSTP403]), /* KEYSC */
--	CLKDEV_DEV_ID("sh_cmt.2", &mstp_clks[MSTP400]), /* CMT2 */
-+	CLKDEV_DEV_ID("sh-cmt-32-fast.2", &mstp_clks[MSTP400]), /* CMT2 */
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index 23edf83..723c5c5 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -650,7 +650,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP201]), /* SCIFA3 */
+ 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP200]), /* SCIFA4 */
+ 	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP331]), /* SCIFA6 */
+-	CLKDEV_DEV_ID("sh_cmt.10", &mstp_clks[MSTP329]), /* CMT10 */
++	CLKDEV_DEV_ID("sh-cmt-48.1", &mstp_clks[MSTP329]), /* CMT1 */
+ 	CLKDEV_DEV_ID("sh_fsi2", &mstp_clks[MSTP328]), /* FSI */
+ 	CLKDEV_DEV_ID("ec230000.sound", &mstp_clks[MSTP328]), /* FSI */
+ 	CLKDEV_DEV_ID("sh_irda.0", &mstp_clks[MSTP325]), /* IrDA */
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index f74ab53..738bbe4 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -104,35 +104,32 @@ SH73A0_SCIF(PORT_SCIFA, 6, 0xe6cc0000, gic_spi(156));
+ SH73A0_SCIF(PORT_SCIFA, 7, 0xe6cd0000, gic_spi(143));
+ SH73A0_SCIF(PORT_SCIFB, 8, 0xe6c30000, gic_spi(80));
  
- 	/* ICK */
- 	CLKDEV_ICK_ID("dsit_clk", "sh-mipi-dsi.0", &div6_clks[DIV6_DSIT]),
-diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
-index 2730127..3e524d5 100644
---- a/arch/arm/mach-shmobile/setup-sh7372.c
-+++ b/arch/arm/mach-shmobile/setup-sh7372.c
-@@ -118,29 +118,27 @@ SH7372_SCIF(PORT_SCIFA, 5, 0xe6cb0000, evt2irq(0x0d40));
- SH7372_SCIF(PORT_SCIFB, 6, 0xe6c30000, evt2irq(0x0d60));
- 
- /* CMT */
-+static struct sh_timer_channel_config cmt2_channels[] = {
+-static struct sh_timer_config cmt10_platform_data = {
+-	.name = "CMT10",
+-	.channel_offset = 0x10,
+-	.timer_bit = 0,
+-	.clockevent_rating = 80,
+-	.clocksource_rating = 125,
++static struct sh_timer_channel_config cmt1_channels[] = {
 +	{
 +		.index = 0,
-+		.clockevent_rating = 125,
++		.clockevent_rating = 80,
 +		.clocksource_rating = 125,
 +	},
-+};
-+
- static struct sh_timer_config cmt2_platform_data = {
--	.name = "CMT2",
--	.channel_offset = 0x40,
--	.timer_bit = 5,
--	.clockevent_rating = 125,
--	.clocksource_rating = 125,
-+	.channels = cmt2_channels,
-+	.num_channels = ARRAY_SIZE(cmt2_channels),
-+	.channels_mask = 0x1f,
  };
  
- static struct resource cmt2_resources[] = {
+-static struct resource cmt10_resources[] = {
 -	[0] = {
--		.name	= "CMT2",
--		.start	= 0xe6130040,
--		.end	= 0xe613004b,
+-		.name	= "CMT10",
+-		.start	= 0xe6138010,
+-		.end	= 0xe613801b,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= evt2irq(0x0b80), /* CMT2 */
+-		.start	= gic_spi(65),
 -		.flags	= IORESOURCE_IRQ,
 -	},
-+	DEFINE_RES_MEM(0xe6130000, 0x50),
-+	DEFINE_RES_IRQ(evt2irq(0x0b80)),
++static struct sh_timer_config cmt1_platform_data = {
++	.channels = cmt1_channels,
++	.num_channels = ARRAY_SIZE(cmt1_channels),
  };
  
- static struct platform_device cmt2_device = {
+-static struct platform_device cmt10_device = {
 -	.name		= "sh_cmt",
-+	.name		= "sh-cmt-32-fast",
- 	.id		= 2,
+-	.id		= 10,
++static struct resource cmt1_resources[] = {
++	DEFINE_RES_MEM(0xe6138010, 0x200),
++	DEFINE_RES_IRQ(gic_spi(65)),
++};
++
++static struct platform_device cmt1_device = {
++	.name		= "sh-cmt-48",
++	.id		= 1,
  	.dev = {
- 		.platform_data	= &cmt2_platform_data,
+-		.platform_data	= &cmt10_platform_data,
++		.platform_data	= &cmt1_platform_data,
+ 	},
+-	.resource	= cmt10_resources,
+-	.num_resources	= ARRAY_SIZE(cmt10_resources),
++	.resource	= cmt1_resources,
++	.num_resources	= ARRAY_SIZE(cmt1_resources),
+ };
+ 
+ /* TMU */
+@@ -746,7 +743,7 @@ static struct platform_device *sh73a0_devices_dt[] __initdata = {
+ 	&scif6_device,
+ 	&scif7_device,
+ 	&scif8_device,
+-	&cmt10_device,
++	&cmt1_device,
+ };
+ 
+ static struct platform_device *sh73a0_early_devices[] __initdata = {
 -- 
 1.8.3.2
