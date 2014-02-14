@@ -1,171 +1,94 @@
-From: r.sh.open@gmail.com (Rahul Sharma)
-Date: Fri, 14 Feb 2014 08:54:28 +0530
-Subject: [PATCH V2 2/3] ARM: dts: add dts files for exynos5260 SoC
-In-Reply-To: <52F9F59D.1090905@gmail.com>
-References: <1391577375-17625-1-git-send-email-rahul.sharma@samsung.com>
- <1391577375-17625-3-git-send-email-rahul.sharma@samsung.com>
- <52F38C42.5030508@samsung.com>
- <CAPdUM4NBwXcnL2KK9Rsi46GWQz_KQsXF0EEeSmCb=wB8WfgUKQ@mail.gmail.com>
- <52F9F59D.1090905@gmail.com>
-Message-ID: <CAPdUM4Pu-CbuNwwjrd_8itbSbjKqTBLE5u_T_vO89jreOy4=kQ@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 14 Feb 2014 12:29:48 +0900
+Subject: [PATCH] ARM: shmobile: lager: Add internal USB PCI support
+Message-ID: <20140214032948.3287.33351.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Tomasz,
+From: Valentine Barshak <valentine.barshak@cogentembedded.com>
 
-I will add these changes to v3.
+This adds internal PCI USB host devices to R-Car H2 Lager board.
 
-Regards,
-Rahul Sharma.
+Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
+[damm at opensource.se: Rebased and reworked to only include USB1 and USB2]
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-On 11 February 2014 15:34, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi Rahul,
->
->
-> On 11.02.2014 06:22, Rahul Sharma wrote:
->>
->> Hi Tomasz,
->>
->> On 6 February 2014 18:51, Tomasz Figa <t.figa@samsung.com> wrote:
->>>
->>> Hi Rahul, Pankaj, Arun,
->>>
->>> [adding linux-arm-kernel, devicetree MLs and DT people on Cc]
->>>
->>> I think it's good time to stop accepting DTS files like this and force
->>> new
->>> ones to use the proper structure with soc node, labels for every node and
->>> node references.
->>
->>
->> I am unable to find information on SoC node and grouping inside SoC node.
->> Please
->> share some pointers.
->
->
-> Well, there is not much information needed about this. Basically all the
-> devices built into the SoC should be listed under respective bus nodes or a
-> single soc node, instead of root level. Such node should be a "simple-bus"
-> and just group the components together to separate board-specific devices
-> (which are still at root level) from SoC devices.
->
-> Even though it might seem useless, it improves DT readability a bit and
-> still most of the platforms use this approach, so for consistency, Exynos
-> should use too.
->
-> Just for reference, back in April 2013, in his review of S3C64xx DT series
-> [1], Rob Herring requested that we don't submit any new device trees using
-> flat approach and start using bus hierarchy.
->
-> [1]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/163659.html
->
->
->>>
->>>> +               spi0_bus: spi0-bus {
->>>> +                       samsung,pins = "gpa2-0", "gpa2-1", "gpa2-2",
->>>> "gpa2-3";
->>>
->>>
->>>
->>> What is the reason for SPI0 to have 4 pins, while SPI1 has just 3?
->>>
->>
->> I should align SPI1 with SPI0.
->>
->
-> Are you sure that SPI0 is the correct one? SPI usually uses four pins - SDI,
-> SDO, SCK and nCS, but we always used to treat nCS as a simple GPIO, due to
-> the fact that the controller can only support one dedicated chip select and
-> with direct GPIO control you can have more.
->
-> What is the fourth pin here?
->
->
->>>
->>>> +               cpu at 1 {
->>>> +                       device_type = "cpu";
->>>> +                       compatible = "arm,cortex-a15";
->>>> +                       reg = <1>;
->>>> +                       cci-control-port = <&cci_control1>;
->>>> +               };
->>>> +               cpu at 100 {
->>>> +                       device_type = "cpu";
->>>> +                       compatible = "arm,cortex-a7";
->>>> +                       reg = <0x100>;
->>>> +                       cci-control-port = <&cci_control0>;
->>>> +               };
->>>> +               cpu at 101 {
->>>> +                       device_type = "cpu";
->>>> +                       compatible = "arm,cortex-a7";
->>>> +                       reg = <0x101>;
->>>> +                       cci-control-port = <&cci_control0>;
->>>> +               };
->>>> +               cpu at 102 {
->>>> +                       device_type = "cpu";
->>>> +                       compatible = "arm,cortex-a7";
->>>> +                       reg = <0x102>;
->>>> +                       cci-control-port = <&cci_control0>;
->>>> +               };
->>>> +               cpu at 103 {
->>>> +                       device_type = "cpu";
->>>> +                       compatible = "arm,cortex-a7";
->>>> +                       reg = <0x103>;
->>>> +                       cci-control-port = <&cci_control0>;
->>>> +               };
->>>> +       };
->>>> +
->>>> +       cmus {
->>>> +               #address-cells = <1>;
->>>> +               #size-cells = <1>;
->>>> +               ranges;
->>>> +
->>>
->>>
->>>
->>> I don't think there is a need to group these nodes under a parent node
->>> that
->>> doesn't give any additional information, especially when the CMUs are
->>> scattered trough the whole address space, while we'd like to keep the
->>> nodes
->>> ordered by their addresses, as most platforms do.
->>>
->>
->> This is exactly the same case as "cpus". I mean, "cpus" also doesn't
->> provide
->> any common information about child cpu nodes. This looks to me as a
->> logical
->> grouping and I have implemented same thing for cmu nodes.
->> I am ok with removing this grouping Just want to understand the rational
->> behind
->> grouping cpus which seems similar to cmus.
->
->
-> The "cpus" node is a defined standard node that should be present at root of
-> device tree and include subnodes for all CPUs. This is a standard binding
-> defined for low level code to be able to simply find nodes of all CPUs in
-> the system - so they can expect that at /cpus node all the subnodes are
-> subsequent CPUs.
->
->
->> Similarly "soc" is just a logical entity used to group SoC elements which
->> looks
->> optional to me. What are we achieving with this? Please help me in
->> understanding
->> this better.
->
->
-> Also "soc" has a slightly wider meaning. It is a node grouping all nodes
-> from a single address space - the node specifies #address-cells and
-> #size-cells of this address space and all the devices under this
-> "simple-bus" can be accessed using addresses in this format. In addition, it
-> separates board-level devices from generic SoC devices.
->
-> Now, in case of "cmus", the only purpose is to group all CMU nodes together
-> and, while this improves readability a bit, it doesn't make the DT better
-> express the hardware topology, because the CMUs in the hardware are in fact
-> scattered through the whole address space, not under a contiguous block of
-> it, as the grouping would suggest.
->
-> Best regards,
-> Tomasz
+ Written against renesas-devel-v3.14-rc2-20140213
+
+ arch/arm/mach-shmobile/board-lager.c |   50 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
+
+--- 0001/arch/arm/mach-shmobile/board-lager.c
++++ work/arch/arm/mach-shmobile/board-lager.c	2014-02-14 12:16:26.000000000 +0900
+@@ -638,6 +638,48 @@ static struct resource sdhi2_resources[]
+ 	DEFINE_RES_IRQ(gic_spi(167)),
+ };
+ 
++/* Internal PCI1 */
++static const struct resource pci1_resources[] __initconst = {
++	DEFINE_RES_MEM(0xee0b0000, 0x10000),	/* CFG */
++	DEFINE_RES_MEM(0xee0a0000, 0x10000),	/* MEM */
++	DEFINE_RES_IRQ(gic_spi(112)),
++};
++
++static const struct platform_device_info pci1_info __initconst = {
++	.parent		= &platform_bus,
++	.name		= "pci-rcar-gen2",
++	.id		= 1,
++	.res		= pci1_resources,
++	.num_res	= ARRAY_SIZE(pci1_resources),
++	.dma_mask	= DMA_BIT_MASK(32),
++};
++
++static void __init lager_add_usb1_device(void)
++{
++	platform_device_register_full(&pci1_info);
++}
++
++/* Internal PCI2 */
++static const struct resource pci2_resources[] __initconst = {
++	DEFINE_RES_MEM(0xee0d0000, 0x10000),	/* CFG */
++	DEFINE_RES_MEM(0xee0c0000, 0x10000),	/* MEM */
++	DEFINE_RES_IRQ(gic_spi(113)),
++};
++
++static const struct platform_device_info pci2_info __initconst = {
++	.parent		= &platform_bus,
++	.name		= "pci-rcar-gen2",
++	.id		= 2,
++	.res		= pci2_resources,
++	.num_res	= ARRAY_SIZE(pci2_resources),
++	.dma_mask	= DMA_BIT_MASK(32),
++};
++
++static void __init lager_add_usb2_device(void)
++{
++	platform_device_register_full(&pci2_info);
++}
++
+ static const struct pinctrl_map lager_pinctrl_map[] = {
+ 	/* DU (CN10: ARGB0, CN13: LVDS) */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
+@@ -716,6 +758,12 @@ static const struct pinctrl_map lager_pi
+ 	/* USB0 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs", "pfc-r8a7790",
+ 				  "usb0_ovc_vbus", "usb0"),
++	/* USB1 */
++	PIN_MAP_MUX_GROUP_DEFAULT("pci-rcar-gen2.1", "pfc-r8a7790",
++				  "usb1", "usb1"),
++	/* USB2 */
++	PIN_MAP_MUX_GROUP_DEFAULT("pci-rcar-gen2.2", "pfc-r8a7790",
++				  "usb2", "usb2"),
+ };
+ 
+ static void __init lager_add_standard_devices(void)
+@@ -776,6 +824,8 @@ static void __init lager_add_standard_de
+ 					  &usbhs_phy_pdata,
+ 					  sizeof(usbhs_phy_pdata));
+ 	lager_register_usbhs();
++	lager_add_usb1_device();
++	lager_add_usb2_device();
+ 
+ 	lager_add_rsnd_device();
+ 
