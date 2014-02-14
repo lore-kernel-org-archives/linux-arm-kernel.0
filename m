@@ -1,88 +1,43 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Fri, 14 Feb 2014 13:21:23 +0530
-Subject: [PATCH v2 10/52] arm, kvm: Fix CPU hotplug callback registration
-In-Reply-To: <20140214074750.22701.47330.stgit@srivatsabhat.in.ibm.com>
-References: <20140214074750.22701.47330.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <20140214075122.22701.18462.stgit@srivatsabhat.in.ibm.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Fri, 14 Feb 2014 08:58:19 +0100
+Subject: [PATCH v2 4/4] Documentation: dt: OMAP: Update Overo/Tobi
+In-Reply-To: <52FCDA29.90605@ti.com>
+References: <1392287116-4548-1-git-send-email-florian.vaussard@epfl.ch>
+ <1392287116-4548-5-git-send-email-florian.vaussard@epfl.ch>
+ <52FCDA29.90605@ti.com>
+Message-ID: <52FDCC9B.2050608@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subsystems that want to register CPU hotplug callbacks, as well as perform
-initialization for the CPUs that are already online, often do it as shown
-below:
+Hi,
 
-	get_online_cpus();
+On 02/13/2014 03:43 PM, Nishanth Menon wrote:
+> On 02/13/2014 04:25 AM, Florian Vaussard wrote:
+>> Update the compatible string for Overo/Tobi to reflect the latest
+>> changes.
+>>
+>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>> ---
+>>  Documentation/devicetree/bindings/arm/omap/omap.txt | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> index 34dc40c..af9b4a0 100644
+>> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>> @@ -91,7 +91,7 @@ Boards:
+>>    compatible = "ti,omap3-beagle", "ti,omap3"
+>>  
+>>  - OMAP3 Tobi with Overo : Commercial expansion board with daughter board
+>> -  compatible = "ti,omap3-tobi", "ti,omap3-overo", "ti,omap3"
+>> +  compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap3"
+> omap3-overo-storm-tobi.dts is not covered here, so, I wonder as the
+> number of boards supported keep increasing, is'nt it better we drop
+> the board information from omap.txt?
+> 
 
-	for_each_online_cpu(cpu)
-		init_cpu(cpu);
+I am not opposed to this. We will just have checkpatch warnings due to
+undocumented compatible strings.
 
-	register_cpu_notifier(&foobar_cpu_notifier);
-
-	put_online_cpus();
-
-This is wrong, since it is prone to ABBA deadlocks involving the
-cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
-with CPU hotplug operations).
-
-Instead, the correct and race-free way of performing the callback
-registration is:
-
-	cpu_notifier_register_begin();
-
-	for_each_online_cpu(cpu)
-		init_cpu(cpu);
-
-	/* Note the use of the double underscored version of the API */
-	__register_cpu_notifier(&foobar_cpu_notifier);
-
-	cpu_notifier_register_done();
-
-
-Fix the kvm code in arm by using this latter form of callback registration.
-
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Gleb Natapov <gleb@kernel.org>
-Cc: Paolo Bonzini <pbonzini@redhat.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: kvmarm at lists.cs.columbia.edu
-Cc: kvm at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
----
-
- arch/arm/kvm/arm.c |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 1d8248e..147b917 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1050,21 +1050,26 @@ int kvm_arch_init(void *opaque)
- 		}
- 	}
- 
-+	cpu_notifier_register_begin();
-+
- 	err = init_hyp_mode();
- 	if (err)
- 		goto out_err;
- 
--	err = register_cpu_notifier(&hyp_init_cpu_nb);
-+	err = __register_cpu_notifier(&hyp_init_cpu_nb);
- 	if (err) {
- 		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
- 		goto out_err;
- 	}
- 
-+	cpu_notifier_register_done();
-+
- 	hyp_cpu_pm_init();
- 
- 	kvm_coproc_table_init();
- 	return 0;
- out_err:
-+	cpu_notifier_register_done();
- 	return err;
- }
- 
+Regards,
+Florian
