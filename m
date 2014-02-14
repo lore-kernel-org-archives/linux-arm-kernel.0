@@ -1,79 +1,100 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Feb 2014 12:05:27 +0100
-Subject: [PATCH v2 0/3] ARM: PCI: implement generic PCI host controller
-In-Reply-To: <20140213182655.GE17248@obsidianresearch.com>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <20140213182655.GE17248@obsidianresearch.com>
-Message-ID: <1800297.J3Exeqph4n@wuerfel>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 14 Feb 2014 13:12:45 +0200
+Subject: [PATCH v7 02/12] mfd: omap-usb-host: Get clocks based on hardware
+ revision
+In-Reply-To: <20140214100701.GC7380@lee--X1>
+References: <1392200333-28397-1-git-send-email-rogerq@ti.com>
+ <1392200333-28397-3-git-send-email-rogerq@ti.com>
+ <20140214100701.GC7380@lee--X1>
+Message-ID: <52FDFA2D.7090406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 February 2014 11:26:55 Jason Gunthorpe wrote:
-> The DT representation is very straightforward, just have more copies
-> of what you already have. Each DT stanza should be represented in
-> Linux a distinct PCI domain.
+On 02/14/2014 12:07 PM, Lee Jones wrote:
+>> Not all revisions have all the clocks so get the necessary clocks
+>> based on hardware revision.
+>>
+>> This should avoid un-necessary clk_get failure messages that were
+>> observed earlier.
+>>
+>> Be more strict and always fail on clk_get() error.
 > 
-> In Linux you run into two small problems
->  1) PCI Domain numbers needs to be allocated dynamically
->     * I think there should be a core thing to allocate a domain
->       object w/ a struct device, and assign a unique domain number.
->       We are already seeing drivers do things like keep track
->       of their own domain numbers via a counter (pcie-designware.c)
->       The host bridge object is similar to this but it isn't focused
->       on a domain.
+> It might have been clearer if you'd broken these two pieces of
+> functionality changes into two different patches. In future it would
+> be preferred.
 
-Right, see also my other comment I just sent in the "Re: [PATCH v2 3/3]
-PCI: ARM: add support for generic PCI host controller" thread.
+OK.
 
-The host driver is the wrong place to pick a domain number, but someone
-has to do it.
+> 
+>> CC: Lee Jones <lee.jones@linaro.org>
+>> CC: Samuel Ortiz <sameo@linux.intel.com>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>  drivers/mfd/omap-usb-host.c | 92 +++++++++++++++++++++++++++++++--------------
+>>  1 file changed, 64 insertions(+), 28 deletions(-)
+>>
+>> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+>> index 0c3c9a0..60a3bed 100644
+>> --- a/drivers/mfd/omap-usb-host.c
+>> +++ b/drivers/mfd/omap-usb-host.c
+>> @@ -665,22 +665,41 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+>>  		goto err_mem;
+>>  	}
+>>  
+>> -	need_logic_fck = false;
+>> +	/* Set all clocks as invalid to begin with */
+>> +	omap->ehci_logic_fck = omap->init_60m_fclk = ERR_PTR(-ENODEV);
+>> +	omap->utmi_p1_gfclk = omap->utmi_p2_gfclk = ERR_PTR(-ENODEV);
+>> +	omap->xclk60mhsp1_ck = omap->xclk60mhsp2_ck = ERR_PTR(-ENODEV);
+>> +
+> 
+> For readability you should probably do these one per line.
 
->  2) The space in the IO fixed mapping needs to be allocated to PCI
->     host drivers dynamically
->     * pci_ioremap_io_dynamic that takes a bus address + cpu_physical
->       address and returns a Linux virtual address.
->       The first caller can get a nice traslation where bus address ==
->       Linux virtual address, everyone after can get best efforts.
+OK.
 
-I think we can have a helper that everything we need to do
-with the I/O space:
+> 
+>>  	for (i = 0; i < omap->nports; i++) {
+>> -		if (is_ehci_phy_mode(i) || is_ehci_tll_mode(i) ||
+>> -			is_ehci_hsic_mode(i))
+>> -				need_logic_fck |= true;
+>> +		omap->utmi_clk[i] = ERR_PTR(-ENODEV);
+>> +		omap->hsic480m_clk[i] = ERR_PTR(-ENODEV);
+>> +		omap->hsic60m_clk[i] = ERR_PTR(-ENODEV);
+>>  	}
+>>  
+>> -	omap->ehci_logic_fck = ERR_PTR(-EINVAL);
+>> -	if (need_logic_fck) {
+>> -		omap->ehci_logic_fck = devm_clk_get(dev, "ehci_logic_fck");
+> 
+> Has this clock been renamed, or is it no longer required?
 
-* parse the ranges property
-* pick an appropriate virtual address window
-* ioremap the physical window there
-* compute the io_offset
-* pick a name for the resource
-* request the io resource
-* register the pci_host_bridge_window
+It is only for OMAP3 and it's actual name is "usbhost_120m_fck".
+"ehci_logic_fck" is just an alias.
 
-> You will have overlapping physical IO bus addresses - each domain will
-> have a 0 IO BAR - but those will have distinct CPU physical addresses
-> and can then be uniquely mapped into the IO mapping. So at the struct
-> resource level the two domains have disjoint IO addresses, but each
-> domain uses a different IO offset..
+> 
+> Perhaps you should be explicit in the commit log as to which clocks
+> you're removing.
+> 
+>> -		if (IS_ERR(omap->ehci_logic_fck)) {
+>> -			ret = PTR_ERR(omap->ehci_logic_fck);
+>> -			dev_dbg(dev, "ehci_logic_fck failed:%d\n", ret);
+>> +	/* for OMAP3 i.e. USBHS REV1 */
+>> +	if (omap->usbhs_rev == OMAP_USBHS_REV1) {
+>> +		need_logic_fck = false;
+>> +		for (i = 0; i < omap->nports; i++) {
+>> +			if (is_ehci_phy_mode(pdata->port_mode[i]) ||
+>> +			    is_ehci_tll_mode(pdata->port_mode[i]) ||
+>> +			    is_ehci_hsic_mode(pdata->port_mode[i]))
+>> +
+>> +				need_logic_fck |= true;
+>> +		}
+>> +
+>> +		if (need_logic_fck) {
+>> +			omap->ehci_logic_fck = clk_get(dev, "usbhost_120m_fck");
+> 
+> devm_clk_get()?
 
-This would be the common case, but when we have a generic helper function,
-it's actually not that are to handle a couple of variations of that,
-which we may see in the field and can easily be described with the
-existing binding.
+Indeed.
 
-* If we allow multiple host bridges to be in the same PCI domain with
-  a split bus space, we should also allow them to have a split I/O
-  space, e.g. have two 32KB windows, both with io_offset=0. This would
-  imply that the second bridge can only support relocatable I/O BARs.
-
-* Similar to that, you may have multiple 64KB windows with io_offset=0.
-
-* Some system may have hardwire I/O windows at a high bus address larger
-  than IO_SPACE_LIMIT. This would mean a *negative* io_offset. I can't
-  see any reason why anyone would do this, but I also don't see a reason
-  to prevent it if we can easily keep the code generic enough to handle
-  it without adding extra code.
-
-* A more obscure case would be to have multiple I/O windows on a bus.
-  This is allowed by the binding and by the pci_host_bridge_window,
-  and while again I don't see a use case, it also doesn't seem hard
-  to do, we just keep looping for all ranges rather than stop after
-  the first window.
-
-	Arnd
+cheers,
+-roger
