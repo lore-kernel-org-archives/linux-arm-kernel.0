@@ -1,48 +1,79 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 14 Feb 2014 15:54:40 +0200
-Subject: [PATCH 7/8] ARM: dts: set 'ti,set-rate-parent' for dpll4_m4 path
-In-Reply-To: <1392285846-13199-8-git-send-email-tomi.valkeinen@ti.com>
-References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
- <1392285846-13199-8-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <52FE2020.2010601@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 14 Feb 2014 17:54:46 +0400
+Subject: [PATCH] ARM: shmobile: lager: Add internal USB PCI support
+In-Reply-To: <20140214032948.3287.33351.sendpatchset@w520>
+References: <20140214032948.3287.33351.sendpatchset@w520>
+Message-ID: <52FE2026.8040801@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2014 12:04 PM, Tomi Valkeinen wrote:
-> Set 'ti,set-rate-parent' property for clocks in the dpll4_m4 clock
-> path, which is used for DSS functional clock. This fixes DSS driver's
-> clock rate configuration, which needs the rate to be propagated properly
-> to the divider node (dpll4_m4_ck).
+Hello.
 
+On 14-02-2014 7:29, Magnus Damm wrote:
 
-... squash to #6?
+> From: Valentine Barshak <valentine.barshak@cogentembedded.com>
 
--Tero
+> This adds internal PCI USB host devices to R-Car H2 Lager board.
 
->
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
+> [damm at opensource.se: Rebased and reworked to only include USB1 and USB2]
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 > ---
->   arch/arm/boot/dts/omap3xxx-clocks.dtsi | 2 ++
->   1 file changed, 2 insertions(+)
+
+>   Written against renesas-devel-v3.14-rc2-20140213
+
+>   arch/arm/mach-shmobile/board-lager.c |   50 ++++++++++++++++++++++++++++++++++
+>   1 file changed, 50 insertions(+)
+
+> --- 0001/arch/arm/mach-shmobile/board-lager.c
+> +++ work/arch/arm/mach-shmobile/board-lager.c	2014-02-14 12:16:26.000000000 +0900
+> @@ -638,6 +638,48 @@ static struct resource sdhi2_resources[]
+>   	DEFINE_RES_IRQ(gic_spi(167)),
+>   };
 >
-> diff --git a/arch/arm/boot/dts/omap3xxx-clocks.dtsi b/arch/arm/boot/dts/omap3xxx-clocks.dtsi
-> index df3c699a1893..12be2b35dae9 100644
-> --- a/arch/arm/boot/dts/omap3xxx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/omap3xxx-clocks.dtsi
-> @@ -429,6 +429,7 @@
->   		clocks = <&dpll4_m4_ck>;
->   		ti,clock-mult = <2>;
->   		ti,clock-div = <1>;
-> +		ti,set-rate-parent;
->   	};
->
->   	dpll4_m4x2_ck: dpll4_m4x2_ck {
-> @@ -438,6 +439,7 @@
->   		ti,bit-shift = <0x1d>;
->   		reg = <0x0d00>;
->   		ti,set-bit-to-disable;
-> +		ti,set-rate-parent;
->   	};
->
->   	dpll4_m5_ck: dpll4_m5_ck {
->
+> +/* Internal PCI1 */
+> +static const struct resource pci1_resources[] __initconst = {
+> +	DEFINE_RES_MEM(0xee0b0000, 0x10000),	/* CFG */
+> +	DEFINE_RES_MEM(0xee0a0000, 0x10000),	/* MEM */
+> +	DEFINE_RES_IRQ(gic_spi(112)),
+> +};
+> +
+> +static const struct platform_device_info pci1_info __initconst = {
+> +	.parent		= &platform_bus,
+> +	.name		= "pci-rcar-gen2",
+> +	.id		= 1,
+> +	.res		= pci1_resources,
+> +	.num_res	= ARRAY_SIZE(pci1_resources),
+> +	.dma_mask	= DMA_BIT_MASK(32),
+> +};
+> +
+> +static void __init lager_add_usb1_device(void)
+
+    Actually, this adds PCI device, not USB, so the name is strange.
+Also, I doubt that such functions are really necessary.
+
+> +{
+> +	platform_device_register_full(&pci1_info);
+> +}
+> +
+> +/* Internal PCI2 */
+> +static const struct resource pci2_resources[] __initconst = {
+> +	DEFINE_RES_MEM(0xee0d0000, 0x10000),	/* CFG */
+> +	DEFINE_RES_MEM(0xee0c0000, 0x10000),	/* MEM */
+> +	DEFINE_RES_IRQ(gic_spi(113)),
+> +};
+> +
+> +static const struct platform_device_info pci2_info __initconst = {
+> +	.parent		= &platform_bus,
+> +	.name		= "pci-rcar-gen2",
+> +	.id		= 2,
+> +	.res		= pci2_resources,
+> +	.num_res	= ARRAY_SIZE(pci2_resources),
+> +	.dma_mask	= DMA_BIT_MASK(32),
+> +};
+> +
+
+    I suspect the PCI resources and info could be wrapped by macros and then 
+instantiated by using only 2 lines.
+
+WBR, Sergei
