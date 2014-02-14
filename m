@@ -1,61 +1,60 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 14 Feb 2014 17:45:56 +0400
-Subject: [PATCH 26/27] ARM: shmobile: lager-reference: Enable CMT0 in
- device tree
-In-Reply-To: <1392339605-20691-27-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1392339605-20691-27-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <52FE1E14.5090400@cogentembedded.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 14 Feb 2014 15:54:09 +0200
+Subject: [PATCH 6/8] ARM: dts: use ti,
+ fixed-factor-clock for dpll4_m4x2_mul_ck
+In-Reply-To: <1392285846-13199-7-git-send-email-tomi.valkeinen@ti.com>
+References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
+ <1392285846-13199-7-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <52FE2001.1020906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 02/13/2014 12:04 PM, Tomi Valkeinen wrote:
+> We need to use set-rate-parent for dpll4_m4 clock path, so use the
+> ti,fixed-factor-clock version which supports set-rate-parent property.
 
-On 14-02-2014 5:00, Laurent Pinchart wrote:
 
-> Enable the CMT0 device and configure channel 0 as a clock event
-> provider.
+.... you are talking about the flag but not introducing it in this 
+patch, maybe squash this + patch 7...?
 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+-Tero
 
-> diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-> index 0b95bab..62b31f3 100644
-> --- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
-> +++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-> @@ -29,7 +29,6 @@ enum {
+>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> ---
+>   arch/arm/boot/dts/omap36xx-clocks.dtsi | 2 +-
+>   arch/arm/boot/dts/omap3xxx-clocks.dtsi | 6 +++---
+>   2 files changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap36xx-clocks.dtsi b/arch/arm/boot/dts/omap36xx-clocks.dtsi
+> index 0b2df76b9d38..6b5280d04a0e 100644
+> --- a/arch/arm/boot/dts/omap36xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/omap36xx-clocks.dtsi
+> @@ -79,7 +79,7 @@
 >   };
 >
->   void r8a7790_add_standard_devices(void);
-> -void r8a7790_add_dt_devices(void);
->   void r8a7790_clock_init(void);
->   void r8a7790_pinmux_init(void);
->   void r8a7790_pm_init(void);
-> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-> index 3e5813f..462c81f 100644
-> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
-> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-> @@ -294,11 +294,6 @@ static struct resource cmt0_resources[] = {
->   					  &cmt##idx##_platform_data,	\
->   					  sizeof(struct sh_timer_config))
+>   &dpll4_m4x2_mul_ck {
+> -	clock-mult = <1>;
+> +	ti,clock-mult = <1>;
+>   };
 >
-> -void __init r8a7790_add_dt_devices(void)
-> -{
-> -	r8a7790_register_cmt(0);
-> -}
-> -
->   void __init r8a7790_add_standard_devices(void)
->   {
->   	r8a7790_register_scif(0);
-> @@ -311,7 +306,7 @@ void __init r8a7790_add_standard_devices(void)
->   	r8a7790_register_scif(7);
->   	r8a7790_register_scif(8);
->   	r8a7790_register_scif(9);
-> -	r8a7790_add_dt_devices();
-> +	r8a7790_register_cmt(0);
->   	r8a7790_register_irqc(0);
->   	r8a7790_register_thermal();
->   }
-
-    IMHO, these 2 files should be split into a separate patch.
-
-WBR, Sergei
+>   &dpll4_m5x2_mul_ck {
+> diff --git a/arch/arm/boot/dts/omap3xxx-clocks.dtsi b/arch/arm/boot/dts/omap3xxx-clocks.dtsi
+> index cb04d4b37e7f..df3c699a1893 100644
+> --- a/arch/arm/boot/dts/omap3xxx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/omap3xxx-clocks.dtsi
+> @@ -425,10 +425,10 @@
+>
+>   	dpll4_m4x2_mul_ck: dpll4_m4x2_mul_ck {
+>   		#clock-cells = <0>;
+> -		compatible = "fixed-factor-clock";
+> +		compatible = "ti,fixed-factor-clock";
+>   		clocks = <&dpll4_m4_ck>;
+> -		clock-mult = <2>;
+> -		clock-div = <1>;
+> +		ti,clock-mult = <2>;
+> +		ti,clock-div = <1>;
+>   	};
+>
+>   	dpll4_m4x2_ck: dpll4_m4x2_ck {
+>
