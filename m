@@ -1,32 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 14 Feb 2014 09:12:19 -0800
-Subject: [PATCH] pinctrl: single: add low powr mode support
-In-Reply-To: <CACRpkdaMDRKXgMjtbnV8hhhuKYbNzSG1U7LYnD5WEDaUE4z8pg@mail.gmail.com>
-References: <1390893644-3458-1-git-send-email-chao.xie@marvell.com>
- <CACRpkdaMDRKXgMjtbnV8hhhuKYbNzSG1U7LYnD5WEDaUE4z8pg@mail.gmail.com>
-Message-ID: <20140214171219.GC21592@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 14 Feb 2014 11:18:24 -0600
+Subject: [PATCH 3/6] irqchip: gic: use writel instead of dsb +
+ writel_relaxed
+In-Reply-To: <20140214164803.GG10590@arm.com>
+References: <20140206115121.GN26035@mudshark.cambridge.arm.com>
+ <20140206115430.GN29446@arm.com>
+ <20140206115739.GP26035@mudshark.cambridge.arm.com>
+ <20140206120035.GQ29446@arm.com>
+ <20140206121350.GQ26035@mudshark.cambridge.arm.com>
+ <20140206122340.GC32520@arm.com>
+ <20140206132643.GS26035@mudshark.cambridge.arm.com>
+ <20140206152048.GD32520@arm.com>
+ <20140207112337.GC5976@mudshark.cambridge.arm.com>
+ <20140214163039.GG21986@mudshark.cambridge.arm.com>
+ <20140214164803.GG10590@arm.com>
+Message-ID: <CAL_JsqKVVPankw15mmen5S3Dvc4t+Kn4+LGb9UPzcSvroP-agA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [140204 12:20]:
-> On Tue, Jan 28, 2014 at 8:20 AM, Chao Xie <chao.xie@marvell.com> wrote:
-> 
-> > From: Chao Xie <chao.xie@marvell.com>
-> >
-> > For some silicons, the pin configuration register can control
-> > the output of the pin when the pad including the pin enter
-> > low power mode.
-> > For example, the pin can be "Drive 1", "Drive 0", "Float" when
-> > the pad including the pin enter low power mode.
-> > It is very useful when you want to control the power leakeage
-> > when the SOC enter low power mode, and can save more power for
-> > the low power mode.
-> >
-> > Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> 
-> Looks similar to the other pin config stuff, patch applied
-> unless Tony protests.
+On Fri, Feb 14, 2014 at 10:48 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Fri, Feb 14, 2014 at 04:30:39PM +0000, Will Deacon wrote:
+>> Well, the results are in (*drum roll*)...
+>>
+>> On Fri, Feb 07, 2014 at 11:23:37AM +0000, Will Deacon wrote:
+>> > On Thu, Feb 06, 2014 at 03:20:48PM +0000, Catalin Marinas wrote:
+>> > > On Thu, Feb 06, 2014 at 01:26:44PM +0000, Will Deacon wrote:
+>> > > > Ok, my reasoning is as follows:
+>> > > >
+>> > > >   - CPU0 tries to message CPU1. It writes to a location in normal memory,
+>> > > >     then writes to the GICD to send the SGI
+>> > > >
+>> > > >   - We need to ensure that CPU1 observes the write to normal memory before
+>> > > >     the write to GICD reaches the distributor. This is *not* about end-point
+>> > > >     ordering (the usual non-coherent DMA example).
+>> > > >
+>> > > >   - A dmb ishst ensures that the two writes are observed in order by CPU1
+>> > > >     (and, in fact, the inner-shareable domain containing CPU0).
+>> > >
+>> > > The last bullet point is not correct. DMB would only guarantee that the
+>> > > two writes (memory and GICD) are observed by CPU1 if CPU1 actually read
+>> > > the GICD (observability is defined for master accesses).
+>> >
+>> > Rather than attempt to solve this via email (your examples below are already
+>> > getting hard to follow :), how about we sit down with $drink_of_choice and
+>> > post back here with our conclusions?
+>>
+>> ... and it turns out that a dmb(ishst) is sufficient!
+>
+> Until we hear otherwise ;)
 
-Seems fine to me:
+It is a shame that all this thought and effort will just end with
+barrier related chicken bits getting set anyway. Maybe the
+$drink_of_choice was worth it. ;)
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Rob
