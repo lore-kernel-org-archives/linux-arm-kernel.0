@@ -1,168 +1,158 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Thu, 13 Feb 2014 16:29:26 -0800
-Subject: [PATCH RFC v3 3/3] Documentation: arm: define DT idle states
- bindings
-In-Reply-To: <20140213124731.GD26329@e102568-lin.cambridge.arm.com>
-References: <1392128273-8614-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1392128273-8614-4-git-send-email-lorenzo.pieralisi@arm.com>
- <20140213013153.18853.21632@capellas-linux>
- <20140213124731.GD26329@e102568-lin.cambridge.arm.com>
-Message-ID: <20140214002926.1014.3599@capellas-linux>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 14 Feb 2014 09:32:24 +0900
+Subject: [PATCH/RFC] ARM: shmobile: Add defconfig for shmobile mulitplatfom
+Message-ID: <1392337944-4000-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lorenzo Pieralisi (2014-02-13 04:47:32)
+This is intended to be a base for a defconfig to cover all
+shmobile multiplatform boards. It currently includes configuration
+for the following boards:
 
-> Such as ? "idle-states" ?
+* KZM9D
+* Lager
+* Koelsch
 
-That sounds good to me.  Our preference is for idle-states to be used
-for name of the idle-states.txt node.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/shmobile_defconfig | 129 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 129 insertions(+)
+ create mode 100644 arch/arm/configs/shmobile_defconfig
 
-> > During last connect, we'd discussed that the small set of
-> > states here could apply to a single node, which can represent a cpu, a
-> > cluster with cache etc.  Then the complexities of the system power state
-> > would be represented using a heirarchy, with each node in the
-> > tree having its own state from the list above.  This would allow
-> > a fairly rich system state while having just a few power states defined
-> > at each level.  Is this how you're intending these bindings to go?
->
-> Yes, CPUs point at states that can be reached by that CPU (eg a CPU core
-> gating state is represented by a single node pointed at by all CPUs in the
-> system - it the same state data, different power domains though).
-> 
-> States are hierarchical, which means that a parent state implies entry on all
-> substates that's how cluster states are defined.
-
-The cpu 0 node, in its cpu-idle-state array is also pointing at a cluster
-node right?  STATE0 -> power-domains refers to <pd_clusters 0>.  Is it
-correct that if the cpu's workload is such that it tolerates the
-500/1000/2500 entry/exit latency/min-residency, it will call the
-entry-method with the psci-power-state of 0x10100000 matching that node?
-
-
-> > Also, would it be nice to have a name field for each state?
-> 
-> There is:
-> 
-> "The state node name shall be "stateN", where N = {0, 1, ...} is
-> the node number; state nodes which are siblings within a single
-> common parent node must be given a unique and sequential N value,
-> starting from 0."
-> I can remove the rule and allow people to call states as they wish
-> since they already have a compatible property to match them.
-> 
-> Actually, states can be called with any name, provided it is unique.
-
-Sorry, I was referring to a descriptive name string property.  Something
-that can be useful to help a human understand what's going on.  Naming
-the nodes might work too.
-
-> > > +       A state node can contain state child nodes. A state node with
-> > > +       children represents a hierarchical state, which is a superset of
-> > > +       the child states. Hierarchical states require all CPUs on which
-> > > +       they are valid to request the state in order for it to be entered.
-> > 
-> > Is it possible for a cpu to request a deeper state and unblock other cpus
-> > from entering this state?
-> 
-> That's not DT bindings business, hierarchical states define states that
-> require all CPUs on which they are valid to enter that state for it to
-> be considered "enabled".
-> 
-> It is a hard nut to crack. In x86 this stuff does not exist and it is
-> managed in HW, basically an idle state is always per-cpu (but it might
-> end up becoming a package state when all CPUs in a package enter that
-> state). On ARM, we want to define hierarchical states explicitly to
-> link resources (ie caches) to them.
-> 
-> CPUs are not prevented from requesting a hierarchical state, but the
-> state only becomes "enabled" when all CPUs on which it is valid request
-> it.
-
-The way we've seen it work, is a cpu tries to enter the lowest state it can
-tolerate (including for eg. cluster off).  The system level code then looks
-at the allowable states from all the cpus and selects the lowest power
-state permissible for the heirarchies.
-
-Eg. this way, the last cpu preventing a cluster from going to sleep enters
-cluster sleep state (where peer cpu's have already voted for cluster
-sleep) and the cluster will sleep.  Alternately if the same cpu cannot
-tolerate the additional latency of the cluster sleeping, it will vote
-only for cpu-sleep, then the cluster remains in a state where all cpu's are
-sleeping but the cluster remains up.
-
-> I cannot think of any other way of to express this properly but still in
-> a compact way.
-
-You're doing a great job by the way!  Thanks! :)
-
-> > "all CPUs on which they are valid" is this determined by seeing which
-> > state's phandle is in each cpu->cpu-idle-states?
-> 
-> Yes, does it make sense ?
-
-Yup, maybe adding a little parenthetical text like below may help others
-as well?
-
-Hierarchical states require all CPUs on which they are valid (ie. CPU nodes
-containing cpu-idle-state arrays having a phandle reference to the state)
-to request the state in order for it to be entered.
-
-> 
-> > Definition: It represents an idle state index.
-> > 
-> >         Index 0 and 1 shall not be specified and are reserved for ARM
-> >         states where index 0 is running, and index 1 is idle_standby
-> >         entered by executing a wfi instruction (SBSA,[3])
-> > 
-> > What mechanism is used to order the power states WRT power consumption?
-> 
-> I think we should use index for that. The higher the index the lower the
-> power consumption.
-
-Ok, I think I get it now.
-If we decouple index and SBSA states, do we really need to reserve index
-0 and 1 then?
-
-> > Can this field be used to combine both psci and non-psci states in any order?
-> 
-> No. I will enforce a unique entry method.
-
-So a single entry-method for all  states in idle-states node?
-Should this be specified once only then?
-
-Should we not allow more flexibility here to mix methods where some
-states use one method and some use others?  Is this mostly a security
-concern?  What if a vendor wants to introduce a state between wfi and
-cpu-sleep?
-
-> > I assume psci will be turning off the powerdomains not Linux right?
-> 
-> This is not a PSCI only document, and even if it was, we still need to deal
-> with devices. Which means we need to know what we have to save/restore (PMU,
-> arch timer, GIC), and power domains help us detect that.
-
-> > > +
-> > > +cpus {
-> > > +       #size-cells = <0>;
-> > > +       #address-cells = <2>;
-> > > +
-> > > +       cpu-idle-states {
-> > > +
-> > > +               STATE0: state0 {
-> > > +                       compatible = "arm,cpu-idle-state";
-> > > +                       index = <3>;
-> > 
-> > Are the index fields of nested states independent of each other or
-> > sequential?
-> ...
-> I understand index is misleading and either I remove it, or I
-> leave it there to define power savings scale as you mentioned.
-
-I like index, but I was confused.  You cleared it up pretty quick with
-your earlier comment.  Removing the numbering may help, but I think
-keeping the index is useful.
-
-Thanks!
-
-Sebastian
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+new file mode 100644
+index 0000000..2912675
+--- /dev/null
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -0,0 +1,129 @@
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=16
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_EMBEDDED=y
++CONFIG_PERF_EVENTS=y
++CONFIG_SLAB=y
++CONFIG_ARCH_SHMOBILE_MULTI=y
++CONFIG_ARCH_EMEV2=y
++CONFIG_ARCH_R8A7790=y
++CONFIG_ARCH_R8A7791=y
++CONFIG_MACH_KOELSCH=y
++CONFIG_MACH_KZM9D=y
++CONFIG_MACH_LAGER=y
++# CONFIG_SWP_EMULATE is not set
++CONFIG_CPU_BPREDICT_DISABLE=y
++CONFIG_PL310_ERRATA_588369=y
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_PCI=y
++CONFIG_PCI_RCAR_GEN2=y
++CONFIG_SMP=y
++CONFIG_SCHED_MC=y
++CONFIG_HAVE_ARM_ARCH_TIMER=y
++CONFIG_NR_CPUS=8
++CONFIG_AEABI=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_KEXEC=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_PM_RUNTIME=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_M25P80=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_ATA=y
++CONFIG_SATA_RCAR=y
++CONFIG_NETDEVICES=y
++# CONFIG_NET_VENDOR_ARC is not set
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++CONFIG_SH_ETH=y
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_KEYBOARD_GPIO=y
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_EXTENDED=y
++CONFIG_SERIAL_8250_EM=y
++CONFIG_SERIAL_SH_SCI=y
++CONFIG_SERIAL_SH_SCI_NR_UARTS=20
++CONFIG_SERIAL_SH_SCI_CONSOLE=y
++CONFIG_I2C_GPIO=y
++CONFIG_I2C_RCAR=y
++CONFIG_SPI=y
++CONFIG_SPI_RSPI=y
++CONFIG_GPIO_EM=y
++CONFIG_GPIO_RCAR=y
++# CONFIG_HWMON is not set
++CONFIG_THERMAL=y
++CONFIG_RCAR_THERMAL=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_GPIO=y
++CONFIG_MEDIA_SUPPORT=y
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_SOC_CAMERA=y
++CONFIG_SOC_CAMERA_PLATFORM=y
++CONFIG_VIDEO_RCAR_VIN=y
++# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
++CONFIG_VIDEO_ADV7180=y
++CONFIG_DRM=y
++CONFIG_DRM_RCAR_DU=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SOC=y
++CONFIG_SND_SOC_RCAR=y
++CONFIG_USB_RCAR_GEN2_PHY=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHI=y
++CONFIG_MMC_SH_MMCIF=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_RTC_CLASS=y
++CONFIG_DMADEVICES=y
++CONFIG_SH_DMAE=y
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_DNOTIFY is not set
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_CONFIGFS_FS=y
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_NFS_V4_1=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++# CONFIG_ARM_UNWIND is not set
+-- 
+1.8.5.2
