@@ -1,98 +1,100 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 14 Feb 2014 12:39:02 +0100
-Subject: [PATCH 2/5] i2c: mv64xxx: refactor message start to ensure proper
- initialization
-In-Reply-To: <1392323793-4125-3-git-send-email-wsa@the-dreams.de>
-References: <20140213094117.GA3934@katana>
- <1392323793-4125-1-git-send-email-wsa@the-dreams.de>
- <1392323793-4125-3-git-send-email-wsa@the-dreams.de>
-Message-ID: <52FE0056.2030706@free-electrons.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 14 Feb 2014 12:39:00 +0100
+Subject: [PATCH] ARM: imx6: fix !CONFIG_PM and !CONFIG_CPU_IDLE build
+In-Reply-To: <20140213141944.GC20842@S2101-09.ap.freescale.net>
+References: <1392201948-16311-1-git-send-email-l.stach@pengutronix.de>
+ <20140213141944.GC20842@S2101-09.ap.freescale.net>
+Message-ID: <1392377940.6153.34.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/02/2014 21:36, Wolfram Sang wrote:
-> Because the offload mechanism can fall back to a standard transfer,
-> having two seperate initialization states is unfortunate. Let's just
-> have one state which does things consistently. This fixes a bug where
-> some preparation was missing when the fallback happened. And it makes
-> the code much easier to follow.
+Hi Shawn,
+
+Am Donnerstag, den 13.02.2014, 22:19 +0800 schrieb Shawn Guo:
+> Hi Lucas,
 > 
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-
-
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-With this one the bug we observed was fixed.
-
-
-Thanks,
-
-Gregory
-
-
-> ---
->  drivers/i2c/busses/i2c-mv64xxx.c | 27 ++++++++++-----------------
->  1 file changed, 10 insertions(+), 17 deletions(-)
+> On Wed, Feb 12, 2014 at 11:45:48AM +0100, Lucas Stach wrote:
+> > When building a kernel with only CONFIG_CPU_IDLE, but no
+> > CONFIG_PM we still need the functions to set the lpm mode
+> > and chicken bits.
+> > 
+> > Also if both options are unset, we have to stub out the
+> > set_lpm function, as this one is called from the clk
+> > driver directly.
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> > This fix depends on an earlier one by Philipp:
+> > "ARM: imx6: Initialize low-power mode early again"
+> > 
+> > Both should go to stable after a sensible sinking time.
+> > ---
+> >  arch/arm/mach-imx/Makefile   |   9 +++-
+> >  arch/arm/mach-imx/common.h   |  11 +++--
+> >  arch/arm/mach-imx/pm-imx6q.c | 112 ++++++++++++++++++++++---------------------
+> >  3 files changed, 72 insertions(+), 60 deletions(-)
 > 
-> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-> index ba64978..d52d849 100644
-> --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> @@ -97,7 +97,6 @@ enum {
->  enum {
->  	MV64XXX_I2C_ACTION_INVALID,
->  	MV64XXX_I2C_ACTION_CONTINUE,
-> -	MV64XXX_I2C_ACTION_OFFLOAD_SEND_START,
->  	MV64XXX_I2C_ACTION_SEND_START,
->  	MV64XXX_I2C_ACTION_SEND_RESTART,
->  	MV64XXX_I2C_ACTION_OFFLOAD_RESTART,
-> @@ -460,15 +459,14 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
->  			drv_data->reg_base + drv_data->reg_offsets.control);
->  		break;
->  
-> -	case MV64XXX_I2C_ACTION_OFFLOAD_SEND_START:
-> -		if (!mv64xxx_i2c_offload_msg(drv_data))
-> -			break;
-> -		else
-> -			drv_data->action = MV64XXX_I2C_ACTION_SEND_START;
-> -		/* FALLTHRU */
->  	case MV64XXX_I2C_ACTION_SEND_START:
-> -		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_START,
-> -			drv_data->reg_base + drv_data->reg_offsets.control);
-> +		/* Can we offload this msg ? */
-> +		if (mv64xxx_i2c_offload_msg(drv_data) < 0) {
-> +			/* No, switch to standard path */
-> +			mv64xxx_i2c_prepare_for_io(drv_data, drv_data->msgs);
-> +			writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_START,
-> +				drv_data->reg_base + drv_data->reg_offsets.control);
-> +		}
->  		break;
->  
->  	case MV64XXX_I2C_ACTION_SEND_ADDR_1:
-> @@ -627,15 +625,10 @@ mv64xxx_i2c_execute_msg(struct mv64xxx_i2c_data *drv_data, struct i2c_msg *msg,
->  	unsigned long	flags;
->  
->  	spin_lock_irqsave(&drv_data->lock, flags);
-> -	if (drv_data->offload_enabled) {
-> -		drv_data->action = MV64XXX_I2C_ACTION_OFFLOAD_SEND_START;
-> -		drv_data->state = MV64XXX_I2C_STATE_WAITING_FOR_START_COND;
-> -	} else {
-> -		mv64xxx_i2c_prepare_for_io(drv_data, msg);
->  
-> -		drv_data->action = MV64XXX_I2C_ACTION_SEND_START;
-> -		drv_data->state = MV64XXX_I2C_STATE_WAITING_FOR_START_COND;
-> -	}
-> +	drv_data->action = MV64XXX_I2C_ACTION_SEND_START;
-> +	drv_data->state = MV64XXX_I2C_STATE_WAITING_FOR_START_COND;
-> +
->  	drv_data->send_stop = is_last;
->  	drv_data->block = 1;
->  	mv64xxx_i2c_do_action(drv_data);
+> Since we already have so many stuff in pm-imx6q.c needed by a !CONFIG_PM
+> build, maybe we should build pm-imx6q.c without CONFIG_PM condition,
+> something like the following?
 > 
+Yes, while thinking about this again it seems to make sense. I first was
+a bit afraid of calling pm_init unconditionally, but aside from a bit
+increased binary size it should be harmless and it simplifies things a
+lot, compared with my patch.
 
+So feel free to take yours.
+
+Regards,
+Lucas
+> Shawn
+> 
+> ---8<-----------
+> 
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index befcaf5..ec41964 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -101,11 +101,9 @@ obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+>  obj-$(CONFIG_SOC_IMX6Q) += clk-imx6q.o mach-imx6q.o
+>  obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
+> 
+> -ifeq ($(CONFIG_PM),y)
+>  obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
+>  # i.MX6SL reuses i.MX6Q code
+>  obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o
+> -endif
+> 
+>  # i.MX5 based machines
+>  obj-$(CONFIG_MACH_MX51_BABBAGE) += mach-mx51_babbage.o
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> index 59c3b9b..baf439d 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -144,13 +144,11 @@ void imx6q_set_chicken_bit(void);
+>  void imx_cpu_die(unsigned int cpu);
+>  int imx_cpu_kill(unsigned int cpu);
+> 
+> -#ifdef CONFIG_PM
+>  void imx6q_pm_init(void);
+>  void imx6q_pm_set_ccm_base(void __iomem *base);
+> +#ifdef CONFIG_PM
+>  void imx5_pm_init(void);
+>  #else
+> -static inline void imx6q_pm_init(void) {}
+> -static inline void imx6q_pm_set_ccm_base(void __iomem *base) {}
+>  static inline void imx5_pm_init(void) {}
+>  #endif
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
