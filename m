@@ -1,22 +1,22 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Feb 2014 02:00:03 +0100
-Subject: [PATCH 25/27] ARM: shmobile: r8a7791: Add CMT devices to DT
+Date: Fri, 14 Feb 2014 02:00:02 +0100
+Subject: [PATCH 24/27] ARM: shmobile: r8a7790: Add CMT devices to DT
 In-Reply-To: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1392339605-20691-26-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1392339605-20691-25-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 38 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7790.dtsi | 38 ++++++++++++++++++++++++++++++++++++++
  1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 240c4ec..bcfb998 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -162,6 +162,44 @@
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 54ab318..a236c7e 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -179,6 +179,44 @@
  			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
  	};
  
@@ -26,7 +26,7 @@ index 240c4ec..bcfb998 100644
 +		interrupt-parent = <&gic>;
 +		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
 +			     <0 142 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp1_clks R8A7791_CLK_CMT0>;
++		clocks = <&mstp1_clks R8A7790_CLK_CMT0>;
 +
 +		#address-cells = <1>;
 +		#size-cells = <0>;
@@ -48,7 +48,7 @@ index 240c4ec..bcfb998 100644
 +			     <0 125 IRQ_TYPE_LEVEL_HIGH>,
 +			     <0 126 IRQ_TYPE_LEVEL_HIGH>,
 +			     <0 127 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7791_CLK_CMT1>;
++		clocks = <&mstp3_clks R8A7790_CLK_CMT1>;
 +
 +		#address-cells = <1>;
 +		#size-cells = <0>;
@@ -59,7 +59,7 @@ index 240c4ec..bcfb998 100644
 +	};
 +
  	irqc0: interrupt-controller at e61c0000 {
- 		compatible = "renesas,irqc-r8a7791", "renesas,irqc";
+ 		compatible = "renesas,irqc-r8a7790", "renesas,irqc";
  		#interrupt-cells = <2>;
 -- 
 1.8.3.2
