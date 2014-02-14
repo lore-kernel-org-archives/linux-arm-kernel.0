@@ -1,32 +1,55 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Fri, 14 Feb 2014 10:15:03 -0500
-Subject: [PATCH v2] MAINTAINERS: add additional ARM BCM281xx/BCM11xxx
- maintainer
-Message-ID: <1392390903-19826-1-git-send-email-mporter@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 14 Feb 2014 15:28:38 +0000
+Subject: [PATCH 1/2] mfd: twl4030-madc: Add devicetree support.
+In-Reply-To: <CAAfyv36FH364OPnktx_Qh6sUfwYe7hynqrc3Xs_tY4gPXqQWvA@mail.gmail.com>
+References: <1392383861-14169-1-git-send-email-marek@goldelico.com>
+ <20140214134815.GD13293@lee--X1>
+ <CAAfyv36FH364OPnktx_Qh6sUfwYe7hynqrc3Xs_tY4gPXqQWvA@mail.gmail.com>
+Message-ID: <20140214152838.GA30687@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself as an additional maintainer for the Broadcom mobile
-SoCs.
+> >> Signed-off-by: Marek Belisko <marek@goldelico.com>
+> >> ---
+> >>  .../devicetree/bindings/mfd/twl4030-madc.txt       | 18 +++++++++++++
+> >>  drivers/mfd/twl4030-madc.c                         | 31
+> >> ++++++++++++++++++++--
+> >
+<snip>
 
-Signed-off-by: Matt Porter <mporter@linaro.org>
----
-Since v1: put back my missing SOB
+> >> +static struct twl4030_madc_platform_data *
+> >> +     twl4030_madc_of_parse(struct platform_device *pdev)
+> >> +{
+> >> +     struct twl4030_madc_platform_data *pdata;
+> >> +
+> >> +     pdata = devm_kzalloc(&pdev->dev,
+> >> +                     sizeof(struct twl4030_madc_platform_data), GFP_KERNEL);
+> >
+> > s/struct twl4030_madc_platform_data/*pdata/
+> Right typo.
 
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+Sorry, my comment of ambiguous.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b2cf5cf..9d6fbfd 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1860,6 +1860,7 @@ F:	drivers/net/ethernet/broadcom/bnx2x/
- 
- BROADCOM BCM281XX/BCM11XXX ARM ARCHITECTURE
- M:	Christian Daudt <bcm@fixthebug.org>
-+M:	Matt Porter <mporter@linaro.org>
- L:	bcm-kernel-feedback-list at broadcom.com
- T:	git git://git.github.com/broadcom/bcm11351
- S:	Maintained
+I mean do this:
+
+  sizeof(*pdata)
+
+... instead of this:
+
+  sizeof(struct twl4030_madc_platform_data)
+
+> >> +     if (!pdata)
+> >> +             return ERR_PTR(-ENOMEM);
+> >> +
+> >> +     pdata->irq_line = platform_get_irq(pdev, 0);
+> >
+> > Why weren't 'resources' used in the original implementation?
+> Not sure I'm not an author :). It's passed in platform data.
+
+Yes, I saw that. It should be changed.
+
 -- 
-1.8.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
