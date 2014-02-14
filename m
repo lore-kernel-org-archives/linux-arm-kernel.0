@@ -1,34 +1,43 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 14 Feb 2014 18:07:16 +0900
-Subject: [PATCH v4] ARM: shmobile: Add defconfig for shmobile mulitplatfom
-In-Reply-To: <1392354403-30260-1-git-send-email-horms+renesas@verge.net.au>
-References: <1392354403-30260-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CANqRtoT5C432uQF6yG76PeMopF7HfqQDSyJ5SMF_77RsyC9DxA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Feb 2014 10:09:44 +0100
+Subject: use {readl|writel}_relaxed instead of readl/writel in
+ i2c-designware-core ?
+In-Reply-To: <20140214155438.4f749a79@xhacker>
+References: <20140214155438.4f749a79@xhacker>
+Message-ID: <8705989.qzo882Ldx0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 2:06 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> This is intended to be a base for a defconfig to cover all
-> shmobile multiplatform boards. It currently includes configuration
-> for the following boards:
->
-> * KZM9D
-> * Lager
-> * Koelsch
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->
-> ---
-> v4
-> * Account for removal of CONFIG_KZM9D
->   - Do not select CONFIG_MACH_KZM9D
->   - Select CONFIG_SMSC_PHY and CONFIG_REGULATOR_FIXED_VOLTAGE
+On Friday 14 February 2014 15:54:38 Jisheng Zhang wrote:
+> Hi all,
+> 
+> The writel/readl is too expensive especially on Cortex A9 w/ outer L2 cache. This
+> introduce i2c read/write error on Marvell Berlin SoCs when there are L2 cache
+> maintenance operations at the same time.
+> 
+> In our internal berlin bsp, we just replaced readl/writel with the relaxed
+> version. But AFAIK, the "relaxed" version doesn't exist on all architectures. How
+> to handle this issue? 
 
-Thanks Simon!
+In case of i2c-designware, this is safe because that driver does not perform
+DMA. In other drivers, you may have to be more careful, to ensure that all MMIO
+is serialized with DMA operations performed by the driver.
 
-Acked-by: Magnus Damm <damm@opensource.se>
+> Any suggestions are appreciated.
 
-Cheers,
+I would definitely welcome a patch that adds a default  _relaxed implementation
+to include/linux/io.h, like this:
 
-/ magnus
+#ifndef readb_relaxed
+#define readb_relaxed(p) readb(p)
+#endif
+
+and then adds "#define readb_relaxed(p) readb_relaxed(p)" etc. to all
+architectures that have a non-macro definition for readb.
+
+Alternatively, we could have a CONFIG_ARCH_MMIO_RELAXED configuration
+symbol that gets selected by any architecture that provides the _relaxed
+accessors, and get linux/io.h to define all of them for the other
+architectures.
+
+	Arnd
