@@ -1,203 +1,81 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 13 Feb 2014 17:04:09 -0800
-Subject: [PATCH 1/2] ARM: mm: allow for stricter kernel memory perms
-In-Reply-To: <1392339850-18686-1-git-send-email-keescook@chromium.org>
-References: <1392339850-18686-1-git-send-email-keescook@chromium.org>
-Message-ID: <1392339850-18686-2-git-send-email-keescook@chromium.org>
+From: fkan@apm.com (Feng Kan)
+Date: Thu, 13 Feb 2014 17:48:53 -0800
+Subject: [PATCH] gic: change access of gicc_ctrl register to read modify write.
+Message-ID: <1392342533-23345-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds CONFIG_ARM_KERNMEM_PERMS to separate the kernel memory regions
-into section-sized areas that can have different permisions. Performs
-the permission changes during free_initmem.
+This change is made to preserve the GIC v2 releated bits in the
+GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
+The original code only set the enable/disable group bit in this register.
+This code will preserve all other bits configured by the bootload except
+the enable/disable bit. The main reason for this change is to allow the
+bypass bits specified in the v2 spec to remain untouched by the current
+GIC code. In the X-Gene platform, the bypass functionality is not used
+and bypass must be disabled at all time.
 
-This uses section size instead of PMD size to reduce memory caps on
-non-LPAE systems.
-
-Based on work by Brad Spengler, Larry Bassel, and Laura Abbott.
-
-Signed-off-by: Kees Cook <keescook@chromium.org>
+Signed-off-by: Vinayak Kale <vkale@apm.com>
+Acked-by: Anup Patel <apatel@apm.com>
+Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- arch/arm/kernel/vmlinux.lds.S |   17 +++++++++
- arch/arm/mm/Kconfig           |   10 +++++
- arch/arm/mm/init.c            |   84 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 111 insertions(+)
+ drivers/irqchip/irq-gic.c |   19 ++++++++++++++++---
+ 1 files changed, 16 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 7bcee5c9b604..08fa667ef2f1 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -8,6 +8,9 @@
- #include <asm/thread_info.h>
- #include <asm/memory.h>
- #include <asm/page.h>
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+#include <asm/pgtable.h>
-+#endif
- 	
- #define PROC_INFO							\
- 	. = ALIGN(4);							\
-@@ -90,6 +93,11 @@ SECTIONS
- 		_text = .;
- 		HEAD_TEXT
- 	}
-+
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+	. = ALIGN(1<<SECTION_SHIFT);
-+#endif
-+
- 	.text : {			/* Real text segment		*/
- 		_stext = .;		/* Text and read-only data	*/
- 			__exception_text_start = .;
-@@ -145,7 +153,11 @@ SECTIONS
- 	_etext = .;			/* End of text and rodata section */
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 341c601..4a52a97e2 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+ 	void __iomem *dist_base = gic_data_dist_base(gic);
+ 	void __iomem *base = gic_data_cpu_base(gic);
+ 	unsigned int cpu_mask, cpu = smp_processor_id();
++	unsigned int ctrl_mask;
+ 	int i;
  
- #ifndef CONFIG_XIP_KERNEL
-+# ifdef CONFIG_ARM_KERNMEM_PERMS
-+	. = ALIGN(1<<SECTION_SHIFT);
-+# else
- 	. = ALIGN(PAGE_SIZE);
-+# endif
- 	__init_begin = .;
- #endif
  	/*
-@@ -220,7 +232,12 @@ SECTIONS
- 	. = PAGE_OFFSET + TEXT_OFFSET;
- #else
- 	__init_end = .;
-+
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+	. = ALIGN(1<<SECTION_SHIFT);
-+#else
- 	. = ALIGN(THREAD_SIZE);
-+#endif
- 	__data_loc = .;
- #endif
+@@ -449,13 +450,21 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+ 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
  
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 1f8fed94c2a4..999eb505faee 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -958,3 +958,13 @@ config ARCH_SUPPORTS_BIG_ENDIAN
- 	help
- 	  This option specifies the architecture can support big endian
- 	  operation.
+ 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+-	writel_relaxed(1, base + GIC_CPU_CTRL);
 +
-+config ARM_KERNMEM_PERMS
-+	bool "Restrict kernel memory permissions"
-+	help
-+	  If this is set, kernel text will be made RX, kernel data and stack
-+	  RW (otherwise all of the regions of the kernel 1-to-1 mapping
-+	  outside section boundaries remains RWX). The tradeoff is that each
-+	  region is padded to section-size (1MiB) boundaries (because their
-+	  permissions are different and splitting the 1M pages into 4K ones
-+	  causes TLB performance problems), wasting memory.
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 804d61566a53..f0b1df53f436 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -31,6 +31,11 @@
- #include <asm/tlb.h>
- #include <asm/fixmap.h>
- 
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+#include <asm/system_info.h>
-+#include <asm/cp15.h>
-+#endif
-+
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
-@@ -621,11 +626,90 @@ void __init mem_init(void)
- 	}
++	ctrl_mask = readl(base + GIC_CPU_CTRL);
++	ctrl_mask |= 0x1;
++	writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
  }
  
-+#ifdef CONFIG_ARM_KERNMEM_PERMS
-+struct section_perm {
-+	unsigned long start;
-+	unsigned long end;
-+	pmdval_t prot;
-+};
-+
-+struct section_perm __initdata section_perms[] = {
-+	/* Make pages tables, etc before _stext RW (set NX). */
-+	{
-+		.start	= PAGE_OFFSET,
-+		.end	= (unsigned long)_stext,
-+		.prot	= PMD_SECT_XN,
-+	},
-+	/* Make init RW (set NX). */
-+	{
-+		.start	= (unsigned long)__init_begin,
-+		.end	= (unsigned long)_sdata,
-+		.prot	= PMD_SECT_XN,
-+	},
-+	/* Make kernel code and rodata RX (set RO). */
-+	{
-+		.start	= (unsigned long)_stext,
-+		.end	= (unsigned long)__init_begin,
-+#ifdef CONFIG_ARM_LPAE
-+		.prot	= PMD_SECT_RDONLY,
-+#else
-+		.prot	= PMD_SECT_APX | PMD_SECT_AP_WRITE,
-+#endif
-+	},
-+};
-+
-+static inline void section_update(unsigned long addr, pmdval_t prot)
-+{
-+	pmd_t *pmd = pmd_off_k(addr);
-+
-+#ifdef CONFIG_ARM_LPAE
-+	pmd[0] = __pmd(pmd_val(pmd[0]) | prot);
-+#else
-+	if (addr & SECTION_SIZE)
-+		pmd[1] = __pmd(pmd_val(pmd[1]) | prot);
-+	else
-+		pmd[0] = __pmd(pmd_val(pmd[0]) | prot);
-+#endif
-+	flush_pmd_entry(pmd);
-+}
-+
-+static inline void fix_kernmem_perms(void)
-+{
-+	unsigned long addr;
-+	int cpu_arch = cpu_architecture();
-+	unsigned int i, cr = get_cr();
-+
-+	if (cpu_arch < CPU_ARCH_ARMv6 || !(cr & CR_XP))
-+		return;
-+
-+	for (i = 0; i < ARRAY_SIZE(section_perms); i++) {
-+		if (!IS_ALIGNED(section_perms[i].start, SECTION_SIZE) ||
-+		    !IS_ALIGNED(section_perms[i].end, SECTION_SIZE)) {
-+			pr_err("BUG: section %lx-%lx not aligned to %lx\n",
-+				section_perms[i].start, section_perms[i].end,
-+				SECTION_SIZE);
-+			continue;
-+		}
-+
-+		for (addr = section_perms[i].start;
-+		     addr < section_perms[i].end;
-+		     addr += SECTION_SIZE)
-+			section_update(addr, section_perms[i].prot);
-+	}
-+}
-+#else
-+static inline void fix_kernmem_perms(void) { }
-+#endif /* CONFIG_ARM_KERNMEM_PERMS */
-+
- void free_initmem(void)
+ void gic_cpu_if_down(void)
  {
- #ifdef CONFIG_HAVE_TCM
- 	extern char __tcm_start, __tcm_end;
-+#endif
++	unsigned int ctrl_mask;
 +
-+	fix_kernmem_perms();
+ 	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+-	writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
++
++	ctrl_mask = readl(base + GIC_CPU_CTRL);
++	ctrl_mask &= 0xfffffffe;
++	writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
+ }
  
-+#ifdef CONFIG_HAVE_TCM
- 	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
- 	free_reserved_area(&__tcm_start, &__tcm_end, -1, "TCM link");
- #endif
+ #ifdef CONFIG_CPU_PM
+@@ -566,6 +575,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+ {
+ 	int i;
+ 	u32 *ptr;
++	unsigned int ctrl_mask;
+ 	void __iomem *dist_base;
+ 	void __iomem *cpu_base;
+ 
+@@ -590,7 +600,10 @@ static void gic_cpu_restore(unsigned int gic_nr)
+ 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
+ 
+ 	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
+-	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
++
++	ctrl_mask = readl(base + GIC_CPU_CTRL);
++	ctrl_mask |= 0x1;
++	writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
+ }
+ 
+ static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
 -- 
-1.7.9.5
+1.7.6.1
