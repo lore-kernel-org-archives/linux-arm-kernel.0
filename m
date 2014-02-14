@@ -1,28 +1,81 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 14 Feb 2014 09:57:13 +0000
-Subject: [PATCH v7 01/12] mfd: omap-usb-host: Use resource managed
- clk_get()
-In-Reply-To: <1392200333-28397-2-git-send-email-rogerq@ti.com>
-References: <1392200333-28397-1-git-send-email-rogerq@ti.com>
- <1392200333-28397-2-git-send-email-rogerq@ti.com>
-Message-ID: <20140214095713.GB7380@lee--X1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Feb 2014 10:59:06 +0100
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <20140213195317.GQ13576@mudshark.cambridge.arm.com>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <20140213182654.GA20043@obsidianresearch.com>
+ <20140213195317.GQ13576@mudshark.cambridge.arm.com>
+Message-ID: <5805232.JrD2FybBlg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Use devm_clk_get() instead of clk_get().
+On Thursday 13 February 2014 19:53:17 Will Deacon wrote:
+> On Thu, Feb 13, 2014 at 06:26:54PM +0000, Jason Gunthorpe wrote:
+> > On Thu, Feb 13, 2014 at 05:28:20PM +0100, Arnd Bergmann wrote:
+> > 
+> > > > Huh?  The reg property clearly has the size in it (as shown in the
+> > > > example below).  I guess I was just asking for the description
+> > > > here to say what the size was for the 2 compatibles since its
+> > > > fixed and known.
+> > > 
+> > > It's still an open question whether the config space in the reg
+> > > property should cover all 256 buses or just the ones in the
+> > > bus-range. In the latter case, it would be variable (but
+> > > predictable) size.
+> > 
+> > The 'describe the hardware principle' says the reg should be the
+> > entire available ECAM/CAM region the hardware is able to support.
+> > 
+> > This may be less than 256 busses, as ECAM allows the implementor to
+> > select how many upper address bits are actually supported.
 > 
-> CC: Lee Jones <lee.jones@linaro.org>
-> CC: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/omap-usb-host.c | 81 +++++++++------------------------------------
->  1 file changed, 16 insertions(+), 65 deletions(-)
+> Ok, but the ECAM/CAM base always corresponds to bus 0, right?
 
-Applied, thanks.
+Ah, plus I suppose it ought to be a power-of-two size?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> > IMHO, the bus-range should be used to indicate the range of busses
+> > discovered by the firmware, but we have historically tweaked it to
+> > indicate the max range of bus numbers available on this bus (I think
+> > to support the hack where two physical PCI domains were roughly glued
+> > into a single Linux domain).
+
+There is an interesting point about the domain assignment, brought to
+my attention by Russell's comment about the hw_pci struct: If we want
+to support arbitrary combinations of pci host bridges described in DT,
+we need a better policy to decide what domain to use. The approaches
+I've seen so far are:
+
+1. We assume each host bridge in DT is a domain by itself. I think
+we do that for all DT probed bridges on ARM (aside from shmobile)
+at the moment. In some cases, the the host bridge is a really a
+fiction made up by the host driver to couple various identical
+but independent PCIe root ports, but the same fiction is shared
+between DT and the PCI core view of it. This requires that we
+enable the PCI domain code unconditionally, and breaks all user
+space that doesn't understand domains (this should be rare but
+can still exist for x86 based software).
+
+2. The architecture or platform code decides and uses a method equivalent
+to ARM's pci_common_init_dev() after it has found all host bridges.
+The architecture "knows" how many domains it wants and calls
+pci_common_init_dev() for each domain, and then the setup() callbacks
+grab as many buses as they need within the domain. For a generic
+multiplatform kernel, this means we need to add a top-level driver
+that looks at all pci hosts in DT before any of them are probed.
+It also means the pci host drivers can't be loadable modules.
+
+3. We assume there is only one domain, and require each host bridge
+in DT to specify a bus-range that is a subset of the available 256
+bus numbers. This should work for anything but really big systems
+with many hot-pluggable ports, since we need to reserve a few bus
+numbers on each port for hotplugging.
+
+4. Like 3, but start a new domain if the bus-range properties don't
+fit in the existing domains.
+
+5. Like 3, but specify a generic "pci-domain" property for DT
+that allows putting host bridges into explicit domains in
+a predictable way.
+
+	Arnd
