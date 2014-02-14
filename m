@@ -1,94 +1,163 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 14 Feb 2014 12:29:48 +0900
-Subject: [PATCH] ARM: shmobile: lager: Add internal USB PCI support
-Message-ID: <20140214032948.3287.33351.sendpatchset@w520>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 14 Feb 2014 13:01:43 +0900
+Subject: [PATCH v2] ARM: shmobile: Add defconfig for shmobile mulitplatfom
+Message-ID: <1392350503-9749-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Valentine Barshak <valentine.barshak@cogentembedded.com>
+This is intended to be a base for a defconfig to cover all
+shmobile multiplatform boards. It currently includes configuration
+for the following boards:
 
-This adds internal PCI USB host devices to R-Car H2 Lager board.
+* KZM9D
+* Lager
+* Koelsch
 
-Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
-[damm at opensource.se: Rebased and reworked to only include USB1 and USB2]
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
 ---
+v2
+* As suggested by Magnus Damm
+  - Enable SMSC911X
+---
+ arch/arm/configs/shmobile_defconfig | 129 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 129 insertions(+)
+ create mode 100644 arch/arm/configs/shmobile_defconfig
 
- Written against renesas-devel-v3.14-rc2-20140213
-
- arch/arm/mach-shmobile/board-lager.c |   50 ++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
-
---- 0001/arch/arm/mach-shmobile/board-lager.c
-+++ work/arch/arm/mach-shmobile/board-lager.c	2014-02-14 12:16:26.000000000 +0900
-@@ -638,6 +638,48 @@ static struct resource sdhi2_resources[]
- 	DEFINE_RES_IRQ(gic_spi(167)),
- };
- 
-+/* Internal PCI1 */
-+static const struct resource pci1_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xee0b0000, 0x10000),	/* CFG */
-+	DEFINE_RES_MEM(0xee0a0000, 0x10000),	/* MEM */
-+	DEFINE_RES_IRQ(gic_spi(112)),
-+};
-+
-+static const struct platform_device_info pci1_info __initconst = {
-+	.parent		= &platform_bus,
-+	.name		= "pci-rcar-gen2",
-+	.id		= 1,
-+	.res		= pci1_resources,
-+	.num_res	= ARRAY_SIZE(pci1_resources),
-+	.dma_mask	= DMA_BIT_MASK(32),
-+};
-+
-+static void __init lager_add_usb1_device(void)
-+{
-+	platform_device_register_full(&pci1_info);
-+}
-+
-+/* Internal PCI2 */
-+static const struct resource pci2_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xee0d0000, 0x10000),	/* CFG */
-+	DEFINE_RES_MEM(0xee0c0000, 0x10000),	/* MEM */
-+	DEFINE_RES_IRQ(gic_spi(113)),
-+};
-+
-+static const struct platform_device_info pci2_info __initconst = {
-+	.parent		= &platform_bus,
-+	.name		= "pci-rcar-gen2",
-+	.id		= 2,
-+	.res		= pci2_resources,
-+	.num_res	= ARRAY_SIZE(pci2_resources),
-+	.dma_mask	= DMA_BIT_MASK(32),
-+};
-+
-+static void __init lager_add_usb2_device(void)
-+{
-+	platform_device_register_full(&pci2_info);
-+}
-+
- static const struct pinctrl_map lager_pinctrl_map[] = {
- 	/* DU (CN10: ARGB0, CN13: LVDS) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
-@@ -716,6 +758,12 @@ static const struct pinctrl_map lager_pi
- 	/* USB0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs", "pfc-r8a7790",
- 				  "usb0_ovc_vbus", "usb0"),
-+	/* USB1 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("pci-rcar-gen2.1", "pfc-r8a7790",
-+				  "usb1", "usb1"),
-+	/* USB2 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("pci-rcar-gen2.2", "pfc-r8a7790",
-+				  "usb2", "usb2"),
- };
- 
- static void __init lager_add_standard_devices(void)
-@@ -776,6 +824,8 @@ static void __init lager_add_standard_de
- 					  &usbhs_phy_pdata,
- 					  sizeof(usbhs_phy_pdata));
- 	lager_register_usbhs();
-+	lager_add_usb1_device();
-+	lager_add_usb2_device();
- 
- 	lager_add_rsnd_device();
- 
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+new file mode 100644
+index 0000000..8d51717
+--- /dev/null
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -0,0 +1,129 @@
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
++CONFIG_LOG_BUF_SHIFT=16
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_EMBEDDED=y
++CONFIG_PERF_EVENTS=y
++CONFIG_SLAB=y
++CONFIG_ARCH_SHMOBILE_MULTI=y
++CONFIG_ARCH_EMEV2=y
++CONFIG_ARCH_R8A7790=y
++CONFIG_ARCH_R8A7791=y
++CONFIG_MACH_KOELSCH=y
++CONFIG_MACH_KZM9D=y
++CONFIG_MACH_LAGER=y
++# CONFIG_SWP_EMULATE is not set
++CONFIG_CPU_BPREDICT_DISABLE=y
++CONFIG_PL310_ERRATA_588369=y
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_PCI=y
++CONFIG_PCI_RCAR_GEN2=y
++CONFIG_SMP=y
++CONFIG_SCHED_MC=y
++CONFIG_HAVE_ARM_ARCH_TIMER=y
++CONFIG_NR_CPUS=8
++CONFIG_AEABI=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_KEXEC=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_PM_RUNTIME=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_M25P80=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_ATA=y
++CONFIG_SATA_RCAR=y
++CONFIG_NETDEVICES=y
++# CONFIG_NET_VENDOR_ARC is not set
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++CONFIG_SH_ETH=y
++# CONFIG_NET_VENDOR_SEEQ is not set
++CONFIG_SMSC911X=y
++# CONFIG_NET_VENDOR_STMICRO is not set
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_KEYBOARD_GPIO=y
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_EXTENDED=y
++CONFIG_SERIAL_8250_EM=y
++CONFIG_SERIAL_SH_SCI=y
++CONFIG_SERIAL_SH_SCI_NR_UARTS=20
++CONFIG_SERIAL_SH_SCI_CONSOLE=y
++CONFIG_I2C_GPIO=y
++CONFIG_I2C_RCAR=y
++CONFIG_SPI=y
++CONFIG_SPI_RSPI=y
++CONFIG_GPIO_EM=y
++CONFIG_GPIO_RCAR=y
++# CONFIG_HWMON is not set
++CONFIG_THERMAL=y
++CONFIG_RCAR_THERMAL=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_GPIO=y
++CONFIG_MEDIA_SUPPORT=y
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_SOC_CAMERA=y
++CONFIG_SOC_CAMERA_PLATFORM=y
++CONFIG_VIDEO_RCAR_VIN=y
++# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
++CONFIG_VIDEO_ADV7180=y
++CONFIG_DRM=y
++CONFIG_DRM_RCAR_DU=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SOC=y
++CONFIG_SND_SOC_RCAR=y
++CONFIG_USB_RCAR_GEN2_PHY=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHI=y
++CONFIG_MMC_SH_MMCIF=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_RTC_CLASS=y
++CONFIG_DMADEVICES=y
++CONFIG_SH_DMAE=y
++# CONFIG_IOMMU_SUPPORT is not set
++# CONFIG_DNOTIFY is not set
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_CONFIGFS_FS=y
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_NFS_V4_1=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++# CONFIG_ARM_UNWIND is not set
+-- 
+1.8.5.2
