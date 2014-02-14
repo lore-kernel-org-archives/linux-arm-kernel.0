@@ -1,82 +1,123 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 14 Feb 2014 10:46:55 +0000
-Subject: [PATCH RESEND v4 00/37] mtd: st_spi_fsm: Add new driver
-In-Reply-To: <52FA3B1A.2070304@st.com>
-References: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
- <52FA3B1A.2070304@st.com>
-Message-ID: <20140214104655.GE9462@lee--X1>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 14 Feb 2014 10:58:22 +0000
+Subject: [PATCH 23/27] clocksource: sh_cmt: Add DT support
+In-Reply-To: <1392339605-20691-24-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1392339605-20691-24-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20140214105822.GE9907@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Sorry for the delay.  I have now had a quick look through the patches.  Just a
-> couple of points :-)
+On Fri, Feb 14, 2014 at 01:00:01AM +0000, Laurent Pinchart wrote:
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  .../devicetree/bindings/timer/renesas,cmt.txt      |  75 +++++++++++++++
+>  drivers/clocksource/sh_cmt.c                       | 104 +++++++++++++++++----
+>  2 files changed, 160 insertions(+), 19 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/timer/renesas,cmt.txt
 > 
-> * stfsm_probe(): stfsm_fetch_platform_configs() needs to be called *before*
-> config() -- config() is based on platform capabilities.  Conceptually,
-> stfsm_fetch_platform_configs() should be called before stfsm_jedec_probe(), and
-> FLASH_FLAG_32BIT_ADDR should be moved out of stfsm_fetch_platform_configs(),
-> placed just after stfsm_jedec_probe() but before config().
-> 
-> * fsm_wait_busy(): logic not quite correct if we get a P_ERR or E_ERR error
-> after a timeout.  I am also not sure about returning (uint8_t)-EIO.  For what
-> its worth, this is what I did in response to Brian's comment about the race
-> condition:
+> diff --git a/Documentation/devicetree/bindings/timer/renesas,cmt.txt b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> new file mode 100644
+> index 0000000..28d4ab5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> @@ -0,0 +1,75 @@
+> +* Renesas R-Car Compare Match Timer (CMT)
+> +
+> +The CMT is a multi-channel 16/32/48-bit timer/counter with configurable clock
+> +inputs and programmable compare match.
+> +
+> +Channels share hadware resources but their counter and compare match value are
+> +independent. A particular CMT instance can implement only a subset of the
+> +channels supported by the CMT model. Channels indices start from 0 and are
+> +consecutive.
+> +
+> +Required Properties:
+> +
+> +  - compatible: must contain one of the following.
+> +    - "renesas,cmt-32" for the 32-bit CMT
+> +		(CMT0 on sh7372, sh73a0 and r8a7740)
+> +    - "renesas,cmt-32-fast" for the 32-bit CMT with fast clock support
+> +		(CMT[234] on sh7372, sh73a0 and r8a7740)
+> +    - "renasas,cmt-48" for the 48-bit CMT
+> +		(CMT1 on sh7372, sh73a0 and r8a7740)
+> +    - "renesas,cmt-48-gen2" for the second generation 48-bit CMT
+> +    		(CMT[01] on r8a73a4, r8a7790 and r8a7791)
+> +
+> +  - reg: base address and length of the registers block for the timer module.
+> +  - interrupt-parent, interrupts: interrupt-specifier for the timer, one per
+> +    channel.
 
-Thanks Angus.
+It might make more sense to describe the interrupt on the channel
+subnode. It makes it far clearer which channel has which interrupt.
 
-Brain,
+> +  - clocks: phandle and clock-specifier pair for the functional clock.
+> +  - clock-names: must be "fck".
 
-If I fix up the review comments from  Angus', Ludovic and Christophe
-are you happy to finally accept the driver? Or do you have any final
-review comments that you wish me to apply for v5?
+It would be nice to define the list once:
 
-> On 01/23/2014 10:30 AM, Lee Jones wrote:
-> > Version 4:
-> >   Tended to Brian's review comments
-> >     - Checkpatch acceptance
-> >     - MODULE_DEVICE_TABLE() name slip correction
-> >     - Timeout issue(s) resolved
-> >     - Potential infinite loop mitigated
-> >     - Code clarity suggests heeded
-> >     - Duplication with MTD core code removed
-> >     - Upgraded to using ROUND_UP() helper
-> >     - Moved non-shared header code into main driver
-> >     - Relocated dynamic msg sequence stores into main struct
-> >     - Averted adaption of static (table) data
-> >     - Basic whitespace/spelling/data type/dev_err suggestions applied
-> >   
-> > Version 3:
-> >   Okay, this thing should be fully functional now. Identify a chip
-> >   based on it's JEDEC ID, Read, Write, Erase (all or by sector).
-> >   Support for various chip quirks added too.
-> > 
-> > Version 2:
-> >   The first bunch of these patches have been on the MLs before, but
-> >   didn't receive a great deal of attention for the most part. We are
-> >   a little more featureful this time however. We can now successfully
-> >   setup and configure the N25Q256. We still can't read/write/erase
-> >   it though. I'll start work on that next week and will provide it in
-> >   the next instalment.
-> > 
-> > Version 1:
-> >   First stab at getting this thing Mainlined. It doesn't do a great deal
-> >   yet, but we are able to initialise the device and dynamically set it up
-> >   correctly based on an extracted JEDEC ID.
-> > 
-> >  Documentation/devicetree/bindings/mtd/st-fsm.txt |   26 ++
-> >  arch/arm/boot/dts/stih416-b2105.dts              |   14 +
-> >  arch/arm/boot/dts/stih416-pinctrl.dtsi           |   12 +
-> >  drivers/mtd/devices/Kconfig                      |    8 +
-> >  drivers/mtd/devices/Makefile                     |    1 +
-> >  drivers/mtd/devices/serial_flash_cmds.h          |   81 ++++
-> >  drivers/mtd/devices/st_spi_fsm.c                 | 2124 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> > 7 files changed, 2266 insertions(+)
-> > 
-> > 
-> 
+- clocks: A list of phandle + clock-specifier pairs, one for each entry
+  in clock-names.
+- clock-names: Should contain "fck" for the functional clock.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> +
+> +  - #address-cells: must be 1
+> +  - #size-cells: must be 0
+> +
+> +  - renesas,channels-mask: integer bitmask of the channels implemented by the
+> +    timer instance.
+
+This is implied by the presence of a subnode. Either remove this or the
+subnodes.
+
+> +
+> +
+> +Each channel is described by a sub-node named "channel@<idx>", where <idx> is
+> +the channel index.
+> +
+> +Channels Required Properties:
+> +
+> +  - reg: the channel index.
+> +
+> +Channels Optional Properties:
+> +
+> +  - clock-source-rating: rating of the timer as a clock source device.
+> +  - clock-event-rating: rating of the timer as a clock event device.
+
+This feels like a leak of Linux internals. Why do you need this?
+
+> +
+> +
+> +Example: R8A7790 (R-Car H2) CMT0 node
+> +
+> +	CMT0 on R8A7790 implements hardware channels 5 and 6 only and names
+> +	them channels 0 and 1 in the documentation.
+> +
+> +	cmt0: timer at ffca0000 {
+> +		compatible = "renesas,cmt-48-gen2";
+> +		reg = <0 0xffca0000 0 0x1004>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <0 142 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp1_clks R8A7790_CLK_CMT0>;
+> +
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		renesas,channels-mask = <0x60>;
+> +
+> +		channel at 0 {
+> +			reg = <0>;
+> +			clock-event-rating = <80>;
+> +		};
+> +		channel at 0 {
+> +			reg = <0>;
+> +			clock-source-rating = <80>;
+> +		};
+
+Aaargh. Use the _real_ channel IDs for the reg proeprties and get rid of
+the mask. It's pointlessly confusing.
+
+Thanks,
+Mark
