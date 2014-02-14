@@ -1,97 +1,294 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Feb 2014 01:59:59 +0100
-Subject: [PATCH 21/27] ARM: shmobile: r8a7791: Switch to new style CMT device
+Date: Fri, 14 Feb 2014 02:00:00 +0100
+Subject: [PATCH 22/27] clocksource: sh_cmt: Drop support for legacy platform
+ data
 In-Reply-To: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1392339605-20691-22-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1392339605-20691-23-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CMT (Compare Match Timer) driver implements a new style of platform
-data that handles the timer as a single device with multiple channel.
-Switch from the old-style platform data to the new-style platform data.
+Now that all platforms have switched to the new-style platform data,
+drop support for the legacy version.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/mach-shmobile/board-koelsch-reference.c |  2 +-
- arch/arm/mach-shmobile/clock-r8a7791.c           |  2 +-
- arch/arm/mach-shmobile/setup-r8a7791.c           | 26 +++++++++++++++---------
- 3 files changed, 18 insertions(+), 12 deletions(-)
+ drivers/clocksource/sh_cmt.c | 174 ++++++++++---------------------------------
+ 1 file changed, 39 insertions(+), 135 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
-index 46879d6..e67a4be7 100644
---- a/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
-@@ -39,7 +39,7 @@ static void __init koelsch_add_standard_devices(void)
+diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
+index 077879b..fe9694b 100644
+--- a/drivers/clocksource/sh_cmt.c
++++ b/drivers/clocksource/sh_cmt.c
+@@ -115,9 +115,7 @@ struct sh_cmt_device {
+ 	struct platform_device *pdev;
  
- 	clk = clk_get(NULL, "cmt0");
- 	if (!IS_ERR(clk)) {
--		clk_register_clkdev(clk, NULL, "sh_cmt.0");
-+		clk_register_clkdev(clk, NULL, "sh-cmt-48-gen2.0");
- 		clk_put(clk);
- 	}
- #else
-diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
-index fc9248d..4dac973 100644
---- a/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7791.c
-@@ -224,7 +224,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1105]), /* SCIFA3 */
- 	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
- 	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
--	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
-+	CLKDEV_DEV_ID("sh-cmt-48-gen2.0", &mstp_clks[MSTP124]),
- 	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
- 	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
- 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
-diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
-index 605f4cf..a17ebb8 100644
---- a/arch/arm/mach-shmobile/setup-r8a7791.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7791.c
-@@ -128,20 +128,26 @@ R8A7791_SCIFA(14, 0xe6c80000, gic_spi(31)); /* SCIFA5 */
- 					  &scif##index##_platform_data,	       \
- 					  sizeof(scif##index##_platform_data))
+ 	const struct sh_cmt_info *info;
+-	bool legacy;
  
--static const struct sh_timer_config cmt00_platform_data __initconst = {
--	.name = "CMT00",
--	.timer_bit = 0,
--	.clockevent_rating = 80,
-+static struct sh_timer_channel_config cmt0_channels[] = {
-+	{
-+		.index = 0,
-+		.clockevent_rating = 80,
-+	},
- };
+-	void __iomem *mapbase_ch;
+ 	void __iomem *mapbase;
+ 	struct clk *clk;
  
--static const struct resource cmt00_resources[] __initconst = {
--	DEFINE_RES_MEM(0xffca0510, 0x0c),
--	DEFINE_RES_MEM(0xffca0500, 0x04),
--	DEFINE_RES_IRQ(gic_spi(142)), /* CMT0_0 */
-+static struct sh_timer_config cmt0_platform_data = {
-+	.channels = cmt0_channels,
-+	.num_channels = ARRAY_SIZE(cmt0_channels),
-+	.channels_mask = 0x1f,
-+};
-+
-+static struct resource cmt0_resources[] = {
-+	DEFINE_RES_MEM(0xffca0000, 0x1004),
-+	DEFINE_RES_IRQ(gic_spi(142)),
- };
- 
- #define r8a7791_register_cmt(idx)					\
--	platform_device_register_resndata(&platform_bus, "sh_cmt",	\
-+	platform_device_register_resndata(&platform_bus, "sh-cmt-48-gen2", \
- 					  idx, cmt##idx##_resources,	\
- 					  ARRAY_SIZE(cmt##idx##_resources), \
- 					  &cmt##idx##_platform_data,	\
-@@ -185,7 +191,7 @@ static const struct resource thermal_resources[] __initconst = {
- 
- void __init r8a7791_add_dt_devices(void)
- {
--	r8a7791_register_cmt(00);
-+	r8a7791_register_cmt(0);
+@@ -824,58 +822,45 @@ static int sh_cmt_register(struct sh_cmt_channel *ch, char *name,
+ 	return 0;
  }
  
- void __init r8a7791_add_standard_devices(void)
+-static int sh_cmt_setup_channel(struct sh_cmt_channel *ch, unsigned int index,
++static int sh_cmt_setup_channel(struct sh_cmt_channel *ch,
+ 				const struct sh_timer_channel_config *ch_cfg,
+ 				unsigned int hwidx, struct sh_cmt_device *cmt)
+ {
+-	unsigned long clockevent_rating;
+-	unsigned long clocksource_rating;
+ 	int irq;
+ 	int ret;
+ 
+ 	ch->cmt = cmt;
+-	ch->index = ch_cfg ? ch_cfg->index : index;
++	ch->index = ch_cfg->index;
+ 	ch->hwidx = hwidx;
+ 
+ 	/*
+ 	 * Compute the address of the channel control register block. For the
+ 	 * timers with a per-channel start/stop register, compute its address
+ 	 * as well.
+-	 *
+-	 * For legacy configuration the address has been mapped explicitly.
+ 	 */
+-	if (cmt->legacy) {
+-		ch->ioctrl = cmt->mapbase_ch;
+-	} else {
+-		switch (cmt->info->model) {
+-		case SH_CMT_16BIT:
+-			ch->ioctrl = cmt->mapbase + 2 + ch->hwidx * 6;
+-			break;
+-		case SH_CMT_32BIT:
+-		case SH_CMT_48BIT:
+-			ch->ioctrl = cmt->mapbase + 0x10 + ch->hwidx * 0x10;
+-			break;
+-		case SH_CMT_32BIT_FAST:
+-			/*
+-			 * The 32-bit "fast" timer has a single channel at hwidx
+-			 * 5 but is located at offset 0x40 instead of 0x60 for
+-			 * some reason.
+-			 */
+-			ch->ioctrl = cmt->mapbase + 0x40;
+-			break;
+-		case SH_CMT_48BIT_GEN2:
+-			ch->iostart = cmt->mapbase + ch->hwidx * 0x100;
+-			ch->ioctrl = ch->iostart + 0x10;
+-			break;
+-		}
++	switch (cmt->info->model) {
++	case SH_CMT_16BIT:
++		ch->ioctrl = cmt->mapbase + 2 + ch->hwidx * 6;
++		break;
++	case SH_CMT_32BIT:
++	case SH_CMT_48BIT:
++		ch->ioctrl = cmt->mapbase + 0x10 + ch->hwidx * 0x10;
++		break;
++	case SH_CMT_32BIT_FAST:
++		/*
++		 * The 32-bit "fast" timer has a single channel at hwidx 5 but
++		 * is located at offset 0x40 instead of 0x60 for some reason.
++		 */
++		ch->ioctrl = cmt->mapbase + 0x40;
++		break;
++	case SH_CMT_48BIT_GEN2:
++		ch->iostart = cmt->mapbase + ch->hwidx * 0x100;
++		ch->ioctrl = ch->iostart + 0x10;
++		break;
+ 	}
+ 
+ 	/* Request irq using setup_irq() (too early for request_irq()). */
+-	if (cmt->legacy)
+-		irq = platform_get_irq(cmt->pdev, 0);
+-	else
+-		irq = platform_get_irq(cmt->pdev, ch->index);
+-
++	irq = platform_get_irq(cmt->pdev, ch->index);
+ 	if (irq < 0) {
+ 		dev_err(&cmt->pdev->dev, "failed to get irq\n");
+ 		return irq;
+@@ -894,20 +879,11 @@ static int sh_cmt_setup_channel(struct sh_cmt_channel *ch, unsigned int index,
+ 	ch->match_value = ch->max_match_value;
+ 	raw_spin_lock_init(&ch->lock);
+ 
+-	if (ch_cfg) {
+-		ch->timer_bit = cmt->info->model == SH_CMT_48BIT_GEN2
+-			      ? 0 : ch->hwidx;
+-		clockevent_rating = ch_cfg->clockevent_rating;
+-		clocksource_rating = ch_cfg->clocksource_rating;
+-	} else {
+-		struct sh_timer_config *cfg = cmt->pdev->dev.platform_data;
+-		ch->timer_bit = cfg->timer_bit;
+-		clockevent_rating = cfg->clockevent_rating;
+-		clocksource_rating = cfg->clocksource_rating;
+-	}
++	ch->timer_bit = cmt->info->model == SH_CMT_48BIT_GEN2 ? 0 : ch->hwidx;
+ 
+ 	ret = sh_cmt_register(ch, (char *)dev_name(&cmt->pdev->dev),
+-			      clockevent_rating, clocksource_rating);
++			      ch_cfg->clockevent_rating,
++			      ch_cfg->clocksource_rating);
+ 	if (ret) {
+ 		dev_err(&cmt->pdev->dev, "registration failed\n");
+ 		return ret;
+@@ -942,59 +918,12 @@ static int sh_cmt_map_memory(struct sh_cmt_device *cmt)
+ 	return 0;
+ }
+ 
+-static int sh_cmt_map_memory_legacy(struct sh_cmt_device *cmt)
+-{
+-	struct sh_timer_config *cfg = cmt->pdev->dev.platform_data;
+-	struct resource *res, *res2;
+-
+-	/* map memory, let mapbase_ch point to our channel */
+-	res = platform_get_resource(cmt->pdev, IORESOURCE_MEM, 0);
+-	if (!res) {
+-		dev_err(&cmt->pdev->dev, "failed to get I/O memory\n");
+-		return -ENXIO;
+-	}
+-
+-	cmt->mapbase_ch = ioremap_nocache(res->start, resource_size(res));
+-	if (cmt->mapbase_ch == NULL) {
+-		dev_err(&cmt->pdev->dev, "failed to remap I/O memory\n");
+-		return -ENXIO;
+-	}
+-
+-	/* optional resource for the shared timer start/stop register */
+-	res2 = platform_get_resource(cmt->pdev, IORESOURCE_MEM, 1);
+-
+-	/* map second resource for CMSTR */
+-	cmt->mapbase = ioremap_nocache(res2 ? res2->start :
+-				       res->start - cfg->channel_offset,
+-				       res2 ? resource_size(res2) : 2);
+-	if (cmt->mapbase == NULL) {
+-		dev_err(&cmt->pdev->dev, "failed to remap I/O second memory\n");
+-		iounmap(cmt->mapbase_ch);
+-		return -ENXIO;
+-	}
+-
+-	/* identify the model based on the resources */
+-	if (resource_size(res) == 6)
+-		cmt->info = &sh_cmt_info[SH_CMT_16BIT];
+-	else if (res2 && (resource_size(res2) == 4))
+-		cmt->info = &sh_cmt_info[SH_CMT_48BIT_GEN2];
+-	else
+-		cmt->info = &sh_cmt_info[SH_CMT_32BIT];
+-
+-	return 0;
+-}
+-
+-static void sh_cmt_unmap_memory(struct sh_cmt_device *cmt)
+-{
+-	iounmap(cmt->mapbase);
+-	if (cmt->mapbase_ch)
+-		iounmap(cmt->mapbase_ch);
+-}
+-
+ static int sh_cmt_setup(struct sh_cmt_device *cmt, struct platform_device *pdev)
+ {
+ 	struct sh_timer_config *cfg = pdev->dev.platform_data;
+ 	const struct platform_device_id *id = pdev->id_entry;
++	unsigned int mask;
++	unsigned int i;
+ 	int ret;
+ 
+ 	memset(cmt, 0, sizeof(*cmt));
+@@ -1006,10 +935,9 @@ static int sh_cmt_setup(struct sh_cmt_device *cmt, struct platform_device *pdev)
+ 	}
+ 
+ 	cmt->info = (const struct sh_cmt_info *)id->driver_data;
+-	cmt->legacy = cmt->info ? false : true;
+ 
+ 	/* Get hold of clock. */
+-	cmt->clk = clk_get(&cmt->pdev->dev, cmt->legacy ? "cmt_fck" : NULL);
++	cmt->clk = clk_get(&cmt->pdev->dev, NULL);
+ 	if (IS_ERR(cmt->clk)) {
+ 		dev_err(&cmt->pdev->dev, "cannot get clock\n");
+ 		return PTR_ERR(cmt->clk);
+@@ -1019,26 +947,14 @@ static int sh_cmt_setup(struct sh_cmt_device *cmt, struct platform_device *pdev)
+ 	if (ret < 0)
+ 		goto err_clk_put;
+ 
+-	/*
+-	 * Map the memory resource(s). We need to support both the legacy
+-	 * platform device configuration (with one device per channel) and the
+-	 * new version (with multiple channels per device).
+-	 */
+-	if (cmt->legacy)
+-		ret = sh_cmt_map_memory_legacy(cmt);
+-	else
+-		ret = sh_cmt_map_memory(cmt);
+-
++	/* Map the memory resource(s). */
++	ret = sh_cmt_map_memory(cmt);
+ 	if (ret < 0)
+ 		goto err_clk_unprepare;
+ 
+ 	/* Allocate and setup the channels. */
+-	if (cmt->legacy) {
+-		cmt->num_channels = 1;
+-	} else {
+-		cmt->num_channels = cfg->num_channels;
+-		cmt->hw_channels = ~cfg->channels_mask;
+-	}
++	cmt->num_channels = cfg->num_channels;
++	cmt->hw_channels = ~cfg->channels_mask;
+ 
+ 	cmt->channels = kzalloc(cmt->num_channels * sizeof(*cmt->channels),
+ 				GFP_KERNEL);
+@@ -1047,26 +963,15 @@ static int sh_cmt_setup(struct sh_cmt_device *cmt, struct platform_device *pdev)
+ 		goto err_unmap;
+ 	}
+ 
+-	if (cmt->legacy) {
+-		ret = sh_cmt_setup_channel(&cmt->channels[0], cfg->timer_bit,
+-					   NULL, cfg->timer_bit, cmt);
++	for (i = 0, mask = cmt->hw_channels; i < cmt->num_channels; ++i) {
++		unsigned int hwidx = ffs(mask) - 1;
++
++		ret = sh_cmt_setup_channel(&cmt->channels[i], &cfg->channels[i],
++					   hwidx, cmt);
+ 		if (ret < 0)
+ 			goto err_unmap;
+-	} else {
+-		const struct sh_timer_channel_config *ch_cfg = cfg->channels;
+-		unsigned int mask = cmt->hw_channels;
+-		unsigned int i;
+-
+-		for (i = 0; i < cmt->num_channels; ++i) {
+-			unsigned int hwidx = ffs(mask) - 1;
+ 
+-			ret = sh_cmt_setup_channel(&cmt->channels[i], 0, ch_cfg,
+-						   hwidx, cmt);
+-			if (ret < 0)
+-				goto err_unmap;
+-
+-			mask &= ~(1 << hwidx);
+-		}
++		mask &= ~(1 << hwidx);
+ 	}
+ 
+ 	platform_set_drvdata(pdev, cmt);
+@@ -1075,7 +980,7 @@ static int sh_cmt_setup(struct sh_cmt_device *cmt, struct platform_device *pdev)
+ 
+ err_unmap:
+ 	kfree(cmt->channels);
+-	sh_cmt_unmap_memory(cmt);
++	iounmap(cmt->mapbase);
+ err_clk_unprepare:
+ 	clk_unprepare(cmt->clk);
+ err_clk_put:
+@@ -1128,7 +1033,6 @@ static int sh_cmt_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct platform_device_id sh_cmt_id_table[] = {
+-	{ "sh_cmt", 0 },
+ 	{ "sh-cmt-16", (kernel_ulong_t)&sh_cmt_info[SH_CMT_16BIT] },
+ 	{ "sh-cmt-32", (kernel_ulong_t)&sh_cmt_info[SH_CMT_32BIT] },
+ 	{ "sh-cmt-32-fast", (kernel_ulong_t)&sh_cmt_info[SH_CMT_32BIT_FAST] },
 -- 
 1.8.3.2
