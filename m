@@ -1,123 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 14 Feb 2014 10:58:22 +0000
-Subject: [PATCH 23/27] clocksource: sh_cmt: Add DT support
-In-Reply-To: <1392339605-20691-24-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1392339605-20691-24-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20140214105822.GE9907@e106331-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Feb 2014 12:05:27 +0100
+Subject: [PATCH v2 0/3] ARM: PCI: implement generic PCI host controller
+In-Reply-To: <20140213182655.GE17248@obsidianresearch.com>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <20140213182655.GE17248@obsidianresearch.com>
+Message-ID: <1800297.J3Exeqph4n@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 01:00:01AM +0000, Laurent Pinchart wrote:
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  .../devicetree/bindings/timer/renesas,cmt.txt      |  75 +++++++++++++++
->  drivers/clocksource/sh_cmt.c                       | 104 +++++++++++++++++----
->  2 files changed, 160 insertions(+), 19 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/timer/renesas,cmt.txt
+On Thursday 13 February 2014 11:26:55 Jason Gunthorpe wrote:
+> The DT representation is very straightforward, just have more copies
+> of what you already have. Each DT stanza should be represented in
+> Linux a distinct PCI domain.
 > 
-> diff --git a/Documentation/devicetree/bindings/timer/renesas,cmt.txt b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-> new file mode 100644
-> index 0000000..28d4ab5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
-> @@ -0,0 +1,75 @@
-> +* Renesas R-Car Compare Match Timer (CMT)
-> +
-> +The CMT is a multi-channel 16/32/48-bit timer/counter with configurable clock
-> +inputs and programmable compare match.
-> +
-> +Channels share hadware resources but their counter and compare match value are
-> +independent. A particular CMT instance can implement only a subset of the
-> +channels supported by the CMT model. Channels indices start from 0 and are
-> +consecutive.
-> +
-> +Required Properties:
-> +
-> +  - compatible: must contain one of the following.
-> +    - "renesas,cmt-32" for the 32-bit CMT
-> +		(CMT0 on sh7372, sh73a0 and r8a7740)
-> +    - "renesas,cmt-32-fast" for the 32-bit CMT with fast clock support
-> +		(CMT[234] on sh7372, sh73a0 and r8a7740)
-> +    - "renasas,cmt-48" for the 48-bit CMT
-> +		(CMT1 on sh7372, sh73a0 and r8a7740)
-> +    - "renesas,cmt-48-gen2" for the second generation 48-bit CMT
-> +    		(CMT[01] on r8a73a4, r8a7790 and r8a7791)
-> +
-> +  - reg: base address and length of the registers block for the timer module.
-> +  - interrupt-parent, interrupts: interrupt-specifier for the timer, one per
-> +    channel.
+> In Linux you run into two small problems
+>  1) PCI Domain numbers needs to be allocated dynamically
+>     * I think there should be a core thing to allocate a domain
+>       object w/ a struct device, and assign a unique domain number.
+>       We are already seeing drivers do things like keep track
+>       of their own domain numbers via a counter (pcie-designware.c)
+>       The host bridge object is similar to this but it isn't focused
+>       on a domain.
 
-It might make more sense to describe the interrupt on the channel
-subnode. It makes it far clearer which channel has which interrupt.
+Right, see also my other comment I just sent in the "Re: [PATCH v2 3/3]
+PCI: ARM: add support for generic PCI host controller" thread.
 
-> +  - clocks: phandle and clock-specifier pair for the functional clock.
-> +  - clock-names: must be "fck".
+The host driver is the wrong place to pick a domain number, but someone
+has to do it.
 
-It would be nice to define the list once:
+>  2) The space in the IO fixed mapping needs to be allocated to PCI
+>     host drivers dynamically
+>     * pci_ioremap_io_dynamic that takes a bus address + cpu_physical
+>       address and returns a Linux virtual address.
+>       The first caller can get a nice traslation where bus address ==
+>       Linux virtual address, everyone after can get best efforts.
 
-- clocks: A list of phandle + clock-specifier pairs, one for each entry
-  in clock-names.
-- clock-names: Should contain "fck" for the functional clock.
+I think we can have a helper that everything we need to do
+with the I/O space:
 
-> +
-> +  - #address-cells: must be 1
-> +  - #size-cells: must be 0
-> +
-> +  - renesas,channels-mask: integer bitmask of the channels implemented by the
-> +    timer instance.
+* parse the ranges property
+* pick an appropriate virtual address window
+* ioremap the physical window there
+* compute the io_offset
+* pick a name for the resource
+* request the io resource
+* register the pci_host_bridge_window
 
-This is implied by the presence of a subnode. Either remove this or the
-subnodes.
+> You will have overlapping physical IO bus addresses - each domain will
+> have a 0 IO BAR - but those will have distinct CPU physical addresses
+> and can then be uniquely mapped into the IO mapping. So at the struct
+> resource level the two domains have disjoint IO addresses, but each
+> domain uses a different IO offset..
 
-> +
-> +
-> +Each channel is described by a sub-node named "channel@<idx>", where <idx> is
-> +the channel index.
-> +
-> +Channels Required Properties:
-> +
-> +  - reg: the channel index.
-> +
-> +Channels Optional Properties:
-> +
-> +  - clock-source-rating: rating of the timer as a clock source device.
-> +  - clock-event-rating: rating of the timer as a clock event device.
+This would be the common case, but when we have a generic helper function,
+it's actually not that are to handle a couple of variations of that,
+which we may see in the field and can easily be described with the
+existing binding.
 
-This feels like a leak of Linux internals. Why do you need this?
+* If we allow multiple host bridges to be in the same PCI domain with
+  a split bus space, we should also allow them to have a split I/O
+  space, e.g. have two 32KB windows, both with io_offset=0. This would
+  imply that the second bridge can only support relocatable I/O BARs.
 
-> +
-> +
-> +Example: R8A7790 (R-Car H2) CMT0 node
-> +
-> +	CMT0 on R8A7790 implements hardware channels 5 and 6 only and names
-> +	them channels 0 and 1 in the documentation.
-> +
-> +	cmt0: timer at ffca0000 {
-> +		compatible = "renesas,cmt-48-gen2";
-> +		reg = <0 0xffca0000 0 0x1004>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <0 142 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&mstp1_clks R8A7790_CLK_CMT0>;
-> +
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		renesas,channels-mask = <0x60>;
-> +
-> +		channel at 0 {
-> +			reg = <0>;
-> +			clock-event-rating = <80>;
-> +		};
-> +		channel at 0 {
-> +			reg = <0>;
-> +			clock-source-rating = <80>;
-> +		};
+* Similar to that, you may have multiple 64KB windows with io_offset=0.
 
-Aaargh. Use the _real_ channel IDs for the reg proeprties and get rid of
-the mask. It's pointlessly confusing.
+* Some system may have hardwire I/O windows at a high bus address larger
+  than IO_SPACE_LIMIT. This would mean a *negative* io_offset. I can't
+  see any reason why anyone would do this, but I also don't see a reason
+  to prevent it if we can easily keep the code generic enough to handle
+  it without adding extra code.
 
-Thanks,
-Mark
+* A more obscure case would be to have multiple I/O windows on a bus.
+  This is allowed by the binding and by the pci_host_bridge_window,
+  and while again I don't see a use case, it also doesn't seem hard
+  to do, we just keep looping for all ranges rather than stop after
+  the first window.
+
+	Arnd
