@@ -1,7 +1,7 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 14 Feb 2014 13:20:35 +0900
-Subject: [PATCH v3] ARM: shmobile: Add defconfig for shmobile mulitplatfom
-Message-ID: <1392351635-14106-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 14 Feb 2014 14:06:43 +0900
+Subject: [PATCH v4] ARM: shmobile: Add defconfig for shmobile mulitplatfom
+Message-ID: <1392354403-30260-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,6 +16,11 @@ for the following boards:
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
+v4
+* Account for removal of CONFIG_KZM9D
+  - Do not select CONFIG_MACH_KZM9D
+  - Select CONFIG_SMSC_PHY and CONFIG_REGULATOR_FIXED_VOLTAGE
+
 v3
 * As suggested by Magnus Damm
   - Do not enable RUNTIME_PM as it does not yet work with multiplatform
@@ -24,16 +29,16 @@ v2
 * As suggested by Magnus Damm
   - Enable SMSC911X for the kzm9d
 ---
- arch/arm/configs/shmobile_defconfig | 128 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 128 insertions(+)
+ arch/arm/configs/shmobile_defconfig | 129 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 129 insertions(+)
  create mode 100644 arch/arm/configs/shmobile_defconfig
 
 diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
 new file mode 100644
-index 0000000..35691cd
+index 0000000..83b0725
 --- /dev/null
 +++ b/arch/arm/configs/shmobile_defconfig
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,129 @@
 +CONFIG_SYSVIPC=y
 +CONFIG_NO_HZ=y
 +CONFIG_IKCONFIG=y
@@ -49,7 +54,6 @@ index 0000000..35691cd
 +CONFIG_ARCH_R8A7790=y
 +CONFIG_ARCH_R8A7791=y
 +CONFIG_MACH_KOELSCH=y
-+CONFIG_MACH_KZM9D=y
 +CONFIG_MACH_LAGER=y
 +# CONFIG_SWP_EMULATE is not set
 +CONFIG_CPU_BPREDICT_DISABLE=y
@@ -99,6 +103,7 @@ index 0000000..35691cd
 +# CONFIG_NET_VENDOR_STMICRO is not set
 +# CONFIG_NET_VENDOR_VIA is not set
 +# CONFIG_NET_VENDOR_WIZNET is not set
++CONFIG_SMSC_PHY=y
 +# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
 +CONFIG_KEYBOARD_GPIO=y
 +# CONFIG_INPUT_MOUSE is not set
@@ -120,6 +125,7 @@ index 0000000..35691cd
 +CONFIG_THERMAL=y
 +CONFIG_RCAR_THERMAL=y
 +CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
 +CONFIG_REGULATOR_GPIO=y
 +CONFIG_MEDIA_SUPPORT=y
 +CONFIG_MEDIA_CAMERA_SUPPORT=y
