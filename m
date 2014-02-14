@@ -1,65 +1,109 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Feb 2014 02:00:02 +0100
-Subject: [PATCH 24/27] ARM: shmobile: r8a7790: Add CMT devices to DT
+Date: Fri, 14 Feb 2014 02:00:04 +0100
+Subject: [PATCH 26/27] ARM: shmobile: lager-reference: Enable CMT0 in device
+ tree
 In-Reply-To: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1392339605-20691-25-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1392339605-20691-27-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Enable the CMT0 device and configure channel 0 as a clock event
+provider.
+
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ arch/arm/boot/dts/r8a7790-lager.dts            |  9 +++++++++
+ arch/arm/mach-shmobile/board-lager-reference.c | 15 +--------------
+ arch/arm/mach-shmobile/include/mach/r8a7790.h  |  1 -
+ arch/arm/mach-shmobile/setup-r8a7790.c         |  7 +------
+ 4 files changed, 11 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 54ab318..a236c7e 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -179,6 +179,44 @@
- 			     <1 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 4199ae4..54ab17d 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -84,6 +84,15 @@
  	};
+ };
  
-+	cmt0: timer at ffca0000 {
-+		compatible = "renesas,cmt-48-gen2";
-+		reg = <0 0xffca0000 0 0x1004>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 142 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp1_clks R8A7790_CLK_CMT0>;
++&cmt0 {
++	status = "ok";
 +
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		renesas,channels-mask = <0x60>;
-+
-+		status = "disabled";
++	channel at 0 {
++		reg = <0>;
++		clock-event-rating = <80>;
 +	};
++};
 +
-+	cmt1: timer at e6130000 {
-+		compatible = "renesas,cmt-48-gen2";
-+		reg = <0 0xe6130000 0 0x1004>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 121 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 122 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 123 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 124 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 125 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 126 IRQ_TYPE_LEVEL_HIGH>,
-+			     <0 127 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7790_CLK_CMT1>;
-+
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		renesas,channels-mask = <0xff>;
-+
-+		status = "disabled";
-+	};
-+
- 	irqc0: interrupt-controller at e61c0000 {
- 		compatible = "renesas,irqc-r8a7790", "renesas,irqc";
- 		#interrupt-cells = <2>;
+ &mmcif1 {
+ 	pinctrl-0 = <&mmc1_pins>;
+ 	pinctrl-names = "default";
+diff --git a/arch/arm/mach-shmobile/board-lager-reference.c b/arch/arm/mach-shmobile/board-lager-reference.c
+index 4dd43b1..ee95a8c 100644
+--- a/arch/arm/mach-shmobile/board-lager-reference.c
++++ b/arch/arm/mach-shmobile/board-lager-reference.c
+@@ -29,23 +29,10 @@
+ 
+ static void __init lager_add_standard_devices(void)
+ {
+-#ifdef CONFIG_COMMON_CLK
+-	/*
+-	 * This is a really crude hack to provide clkdev support to the CMT
+-	 * device until it gets moved to DT.
+-	 */
+-	struct clk *clk;
+-
+-	clk = clk_get(NULL, "cmt0");
+-	if (!IS_ERR(clk)) {
+-		clk_register_clkdev(clk, NULL, "sh-cmt-48-gen2.0");
+-		clk_put(clk);
+-	}
+-#else
++#ifndef CONFIG_COMMON_CLK
+ 	r8a7790_clock_init();
+ #endif
+ 
+-	r8a7790_add_dt_devices();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+index 0b95bab..62b31f3 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+@@ -29,7 +29,6 @@ enum {
+ };
+ 
+ void r8a7790_add_standard_devices(void);
+-void r8a7790_add_dt_devices(void);
+ void r8a7790_clock_init(void);
+ void r8a7790_pinmux_init(void);
+ void r8a7790_pm_init(void);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 3e5813f..462c81f 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -294,11 +294,6 @@ static struct resource cmt0_resources[] = {
+ 					  &cmt##idx##_platform_data,	\
+ 					  sizeof(struct sh_timer_config))
+ 
+-void __init r8a7790_add_dt_devices(void)
+-{
+-	r8a7790_register_cmt(0);
+-}
+-
+ void __init r8a7790_add_standard_devices(void)
+ {
+ 	r8a7790_register_scif(0);
+@@ -311,7 +306,7 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_scif(7);
+ 	r8a7790_register_scif(8);
+ 	r8a7790_register_scif(9);
+-	r8a7790_add_dt_devices();
++	r8a7790_register_cmt(0);
+ 	r8a7790_register_irqc(0);
+ 	r8a7790_register_thermal();
+ }
 -- 
 1.8.3.2
