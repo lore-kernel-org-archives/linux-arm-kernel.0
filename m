@@ -1,44 +1,77 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 14 Feb 2014 10:43:21 +0200
-Subject: [PATCHv14][ 3/4] video: Kconfig: Allow more broad selection of
- the imxfb framebuffer driver.
-In-Reply-To: <1390410577-22073-3-git-send-email-denis@eukrea.com>
-References: <1390410577-22073-1-git-send-email-denis@eukrea.com>
- <1390410577-22073-3-git-send-email-denis@eukrea.com>
-Message-ID: <52FDD729.60405@ti.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 14 Feb 2014 14:16:13 +0530
+Subject: [PATCH V2 4/4] ARM: OMAP2+: AM43x: Use gptimer as clocksource
+In-Reply-To: <20140213231919.GO28216@atomide.com>
+References: <1391768486-2134-1-git-send-email-lokeshvutla@ti.com>
+ <1391768486-2134-5-git-send-email-lokeshvutla@ti.com>
+ <20140213231919.GO28216@atomide.com>
+Message-ID: <52FDD7D5.30508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 22/01/14 19:09, Denis Carikli wrote:
-> Without that patch, a user can't select the imxfb driver when the i.MX25 and/or
->   the i.MX27 device tree board are selected and that no boards that selects
->   IMX_HAVE_PLATFORM_IMX_FB are compiled in.
+On Friday 14 February 2014 04:49 AM, Tony Lindgren wrote:
+> * Lokesh Vutla <lokeshvutla@ti.com> [140207 02:24]:
+>> From: Rajendra Nayak <rnayak@ti.com>
+>>
+>> The SyncTimer in AM43x is clocked using the following two sources:
+>> 1) An inaccuarte 32k clock (CLK_32KHZ) derived from PER DPLL, causing system
+>>    time to go slowly (~10% deviation).
+>> 2) external 32KHz RTC clock, which may not always be available on board like
+>>    in the case of ePOS EVM
+>>
+>> Use gptimer as clocksource instead, as is done in the case of AM335x
+>> (which does not have a SyncTimer). With this, system time keeping works
+>> accurately.
 > 
-> Cc: Eric B?nard <eric@eukrea.com>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-fbdev at vger.kernel.org
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Hmm doesn't this also mean that PM for any deeper idle states won't
+> work properly?
 
-Applied for 3.14 fbdev fixes.
+Thats true. This would mean we cannot put the peripheral/core domain down
+in idle. Suspend however can still work if suspend/resume callbacks are added
+to the clockevent and clocksource code to shut the non-wakeup domain timer.
 
-As a generic comment, I'd appreciate if you'd use normal formatting in
-the patch descriptions (no double spaces in the beginning of the lines).
+regards,
+Rajendra
 
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140214/b4a85b49/attachment.sig>
+> 
+> Regards,
+> 
+> Tony
+>  
+>> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> ---
+>>  arch/arm/mach-omap2/board-generic.c |    2 +-
+>>  arch/arm/mach-omap2/timer.c         |    3 ++-
+>>  2 files changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+>> index 8e3daa1..5679464a 100644
+>> --- a/arch/arm/mach-omap2/board-generic.c
+>> +++ b/arch/arm/mach-omap2/board-generic.c
+>> @@ -229,7 +229,7 @@ DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
+>>  	.init_late	= am43xx_init_late,
+>>  	.init_irq	= omap_gic_of_init,
+>>  	.init_machine	= omap_generic_init,
+>> -	.init_time	= omap3_sync32k_timer_init,
+>> +	.init_time	= omap3_gptimer_timer_init,
+>>  	.dt_compat	= am43_boards_compat,
+>>  MACHINE_END
+>>  #endif
+>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>> index 74044aa..b62de9f 100644
+>> --- a/arch/arm/mach-omap2/timer.c
+>> +++ b/arch/arm/mach-omap2/timer.c
+>> @@ -604,7 +604,8 @@ OMAP_SYS_32K_TIMER_INIT(3_secure, 12, "secure_32k_fck", "ti,timer-secure",
+>>  			2, "timer_sys_ck", NULL);
+>>  #endif /* CONFIG_ARCH_OMAP3 */
+>>  
+>> -#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
+>> +#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX) || \
+>> +	defined(CONFIG_SOC_AM43XX)
+>>  OMAP_SYS_GP_TIMER_INIT(3, 2, "timer_sys_ck", NULL,
+>>  		       1, "timer_sys_ck", "ti,timer-alwon");
+>>  #endif
+>> -- 
+>> 1.7.9.5
+>>
