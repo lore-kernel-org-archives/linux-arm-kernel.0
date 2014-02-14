@@ -1,103 +1,47 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 14 Feb 2014 23:03:22 +0300
-Subject: [PATCH] ARM: shmobile: lager: Add internal USB PCI support
-In-Reply-To: <CANqRtoSc7W9UXBaACnckWPhUGE5VPDN8JV9FFHZbW9ZwGhTt4Q@mail.gmail.com>
-References: <20140214032948.3287.33351.sendpatchset@w520>	<52FE2026.8040801@cogentembedded.com>
- <CANqRtoSc7W9UXBaACnckWPhUGE5VPDN8JV9FFHZbW9ZwGhTt4Q@mail.gmail.com>
-Message-ID: <52FE768A.4070404@cogentembedded.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 14 Feb 2014 11:11:07 -0800
+Subject: [PATCH 2/2] ARM: mm: keep rodata non-executable
+In-Reply-To: <20140214162257.GB2331@e103592.cambridge.arm.com>
+References: <1392339850-18686-1-git-send-email-keescook@chromium.org>
+ <1392339850-18686-3-git-send-email-keescook@chromium.org>
+ <20140214162257.GB2331@e103592.cambridge.arm.com>
+Message-ID: <CAGXu5jLmYLQpu9CDhoL-2OTdwxqrfVCFbojmpjpcpLqmA=wWYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Feb 14, 2014 at 8:22 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Thu, Feb 13, 2014 at 05:04:10PM -0800, Kees Cook wrote:
+>> Introduce "CONFIG_DEBUG_RODATA" to mostly match the x86 config, though
+>> the behavior is different: it depends on STRICT_KERNMEM_PERMS, which
+>> sets rodata read-only (but executable), where as this option additionally
+>> splits rodata from the kernel text (resulting in potentially more memory
+>> lost to padding) and sets it non-executable as well. The end result is
+>> that on builds with CONFIG_DEBUG_RODATA=y (like x86) the rodata with be
+>> marked purely read-only.
+>
+> This triggers an Oops in kexec, because we have a block of code in .text
+> which is a template for generating baremetal code to relocate the new
+> kernel, and some literal words are written into it before copying.
 
-On 02/14/2014 06:30 PM, Magnus Damm wrote:
+You're writing into the text area? I would imagine that
+CONFIG_ARM_KERNMEM_PERMS would break that. However, that's not the
+right place to be building code -- shouldn't the module area be used
+for that?
 
->>> From: Valentine Barshak <valentine.barshak@cogentembedded.com>
+> Possibly this should be in .rodata, not .text.
 
->>> This adds internal PCI USB host devices to R-Car H2 Lager board.
+Well, rodata should be neither writable nor executable.
 
->>> Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
->>> [damm at opensource.se: Rebased and reworked to only include USB1 and USB2]
->>> Signed-off-by: Magnus Damm <damm@opensource.se>
->>> ---
+> There may be a few other instances of this kind of thing.
 
->>>    Written against renesas-devel-v3.14-rc2-20140213
+This config will certainly find them! :) But, that's why it's behind a config.
 
->>>    arch/arm/mach-shmobile/board-lager.c |   50
->>> ++++++++++++++++++++++++++++++++++
->>>    1 file changed, 50 insertions(+)
+> Are you aware of similar situations on other arches?
 
->>> --- 0001/arch/arm/mach-shmobile/board-lager.c
->>> +++ work/arch/arm/mach-shmobile/board-lager.c   2014-02-14
->>> 12:16:26.000000000 +0900
->>> @@ -638,6 +638,48 @@ static struct resource sdhi2_resources[]
->>>          DEFINE_RES_IRQ(gic_spi(167)),
->>>    };
->>>
->>> +/* Internal PCI1 */
->>> +static const struct resource pci1_resources[] __initconst = {
->>> +       DEFINE_RES_MEM(0xee0b0000, 0x10000),    /* CFG */
->>> +       DEFINE_RES_MEM(0xee0a0000, 0x10000),    /* MEM */
->>> +       DEFINE_RES_IRQ(gic_spi(112)),
->>> +};
->>> +
->>> +static const struct platform_device_info pci1_info __initconst = {
->>> +       .parent         = &platform_bus,
->>> +       .name           = "pci-rcar-gen2",
->>> +       .id             = 1,
->>> +       .res            = pci1_resources,
->>> +       .num_res        = ARRAY_SIZE(pci1_resources),
->>> +       .dma_mask       = DMA_BIT_MASK(32),
->>> +};
->>> +
->>> +static void __init lager_add_usb1_device(void)
+I think there were some problems a long time ago on x86 for rodata too.
 
->>     Actually, this adds PCI device, not USB, so the name is strange.
->> Also, I doubt that such functions are really necessary.
+-Kees
 
-> Well there are only USB devices hanging off the PCI devices on the
-> actual silicon, so this naming discussion seems like splitting hairs?
-
-    I'm actually against introducing these functions in general. They're only 
-wasting the LOCs.
-
->>> +{
->>> +       platform_device_register_full(&pci1_info);
->>> +}
->>> +
->>> +/* Internal PCI2 */
->>> +static const struct resource pci2_resources[] __initconst = {
->>> +       DEFINE_RES_MEM(0xee0d0000, 0x10000),    /* CFG */
->>> +       DEFINE_RES_MEM(0xee0c0000, 0x10000),    /* MEM */
->>> +       DEFINE_RES_IRQ(gic_spi(113)),
->>> +};
->>> +
->>> +static const struct platform_device_info pci2_info __initconst = {
->>> +       .parent         = &platform_bus,
->>> +       .name           = "pci-rcar-gen2",
->>> +       .id             = 2,
->>> +       .res            = pci2_resources,
->>> +       .num_res        = ARRAY_SIZE(pci2_resources),
->>> +       .dma_mask       = DMA_BIT_MASK(32),
->>> +};
->>> +
-
->>     I suspect the PCI resources and info could be wrapped by macros and then
->> instantiated by using only 2 lines.
-
-> I suspect anything can be done. =) As you may know, I'm not the
-
-    You're too optimistic. :-)
-
-> original author of this patch. At this point in time I'm mainly
-> focusing on getting device support merged, so please feel free to send
-> either incremental patches or pick up this one and fix it yourself.
-> I'm beyond caring.
-
-    OK, I'll see what I can do when I have a time.
-
-> Thanks,
-
-> / magnus
-
-WBR, Sergei
+-- 
+Kees Cook
+Chrome OS Security
