@@ -1,259 +1,78 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Feb 2014 01:59:40 +0100
-Subject: [PATCH 02/27] clocksource: sh_cmt: Rename struct sh_cmt_priv to
- sh_cmt_device
+Date: Fri, 14 Feb 2014 01:59:43 +0100
+Subject: [PATCH 05/27] clocksource: sh_cmt: Add memory base to sh_cmt_channel
+ structure
 In-Reply-To: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1392339605-20691-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1392339605-20691-6-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Channel data is private as well, rename priv to device to make the
-distrinction between the core device and the channels clearer.
+The channel memory base is channel-specific, add it to the channel
+structure in preparation for support of multiple channels per device.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- drivers/clocksource/sh_cmt.c | 116 +++++++++++++++++++++----------------------
- 1 file changed, 58 insertions(+), 58 deletions(-)
+ drivers/clocksource/sh_cmt.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
-index 12ccd11..68cca0a 100644
+index 1ac84ff..ec10cf4 100644
 --- a/drivers/clocksource/sh_cmt.c
 +++ b/drivers/clocksource/sh_cmt.c
-@@ -35,10 +35,10 @@
- #include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- 
--struct sh_cmt_priv;
-+struct sh_cmt_device;
- 
+@@ -40,6 +40,7 @@ struct sh_cmt_device;
  struct sh_cmt_channel {
--	struct sh_cmt_priv *cmt;
-+	struct sh_cmt_device *cmt;
+ 	struct sh_cmt_device *cmt;
  
++	void __iomem *base;
  	struct irqaction irqaction;
  
-@@ -54,7 +54,7 @@ struct sh_cmt_channel {
- 	bool cs_enabled;
- };
+ 	unsigned long flags;
+@@ -132,12 +133,12 @@ static inline unsigned long sh_cmt_read_cmstr(struct sh_cmt_channel *ch)
  
--struct sh_cmt_priv {
-+struct sh_cmt_device {
- 	struct platform_device *pdev;
- 
- 	void __iomem *mapbase;
-@@ -695,136 +695,136 @@ static int sh_cmt_register(struct sh_cmt_channel *ch, char *name,
- 	return 0;
+ static inline unsigned long sh_cmt_read_cmcsr(struct sh_cmt_channel *ch)
+ {
+-	return ch->cmt->read_control(ch->cmt->mapbase_ch, CMCSR);
++	return ch->cmt->read_control(ch->base, CMCSR);
  }
  
--static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
-+static int sh_cmt_setup(struct sh_cmt_device *cmt, struct platform_device *pdev)
+ static inline unsigned long sh_cmt_read_cmcnt(struct sh_cmt_channel *ch)
  {
- 	struct sh_timer_config *cfg = pdev->dev.platform_data;
--	struct sh_cmt_channel *ch = &p->channel;
-+	struct sh_cmt_channel *ch = &cmt->channel;
- 	struct resource *res, *res2;
- 	int irq, ret;
- 	ret = -ENXIO;
- 
--	memset(p, 0, sizeof(*p));
--	p->pdev = pdev;
-+	memset(cmt, 0, sizeof(*cmt));
-+	cmt->pdev = pdev;
- 
- 	if (!cfg) {
--		dev_err(&p->pdev->dev, "missing platform data\n");
-+		dev_err(&cmt->pdev->dev, "missing platform data\n");
- 		goto err0;
- 	}
- 
--	res = platform_get_resource(p->pdev, IORESOURCE_MEM, 0);
-+	res = platform_get_resource(cmt->pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
--		dev_err(&p->pdev->dev, "failed to get I/O memory\n");
-+		dev_err(&cmt->pdev->dev, "failed to get I/O memory\n");
- 		goto err0;
- 	}
- 
- 	/* optional resource for the shared timer start/stop register */
--	res2 = platform_get_resource(p->pdev, IORESOURCE_MEM, 1);
-+	res2 = platform_get_resource(cmt->pdev, IORESOURCE_MEM, 1);
- 
--	irq = platform_get_irq(p->pdev, 0);
-+	irq = platform_get_irq(cmt->pdev, 0);
- 	if (irq < 0) {
--		dev_err(&p->pdev->dev, "failed to get irq\n");
-+		dev_err(&cmt->pdev->dev, "failed to get irq\n");
- 		goto err0;
- 	}
- 
- 	/* map memory, let mapbase point to our channel */
--	p->mapbase = ioremap_nocache(res->start, resource_size(res));
--	if (p->mapbase == NULL) {
--		dev_err(&p->pdev->dev, "failed to remap I/O memory\n");
-+	cmt->mapbase = ioremap_nocache(res->start, resource_size(res));
-+	if (cmt->mapbase == NULL) {
-+		dev_err(&cmt->pdev->dev, "failed to remap I/O memory\n");
- 		goto err0;
- 	}
- 
- 	/* map second resource for CMSTR */
--	p->mapbase_str = ioremap_nocache(res2 ? res2->start :
--					 res->start - cfg->channel_offset,
--					 res2 ? resource_size(res2) : 2);
--	if (p->mapbase_str == NULL) {
--		dev_err(&p->pdev->dev, "failed to remap I/O second memory\n");
-+	cmt->mapbase_str = ioremap_nocache(res2 ? res2->start :
-+					   res->start - cfg->channel_offset,
-+					   res2 ? resource_size(res2) : 2);
-+	if (cmt->mapbase_str == NULL) {
-+		dev_err(&cmt->pdev->dev, "failed to remap I/O second memory\n");
- 		goto err1;
- 	}
- 
- 	/* request irq using setup_irq() (too early for request_irq()) */
--	ch->irqaction.name = dev_name(&p->pdev->dev);
-+	ch->irqaction.name = dev_name(&cmt->pdev->dev);
- 	ch->irqaction.handler = sh_cmt_interrupt;
- 	ch->irqaction.dev_id = ch;
- 	ch->irqaction.flags = IRQF_TIMER | IRQF_IRQPOLL | IRQF_NOBALANCING;
- 
- 	/* get hold of clock */
--	p->clk = clk_get(&p->pdev->dev, "cmt_fck");
--	if (IS_ERR(p->clk)) {
--		dev_err(&p->pdev->dev, "cannot get clock\n");
--		ret = PTR_ERR(p->clk);
-+	cmt->clk = clk_get(&cmt->pdev->dev, "cmt_fck");
-+	if (IS_ERR(cmt->clk)) {
-+		dev_err(&cmt->pdev->dev, "cannot get clock\n");
-+		ret = PTR_ERR(cmt->clk);
- 		goto err2;
- 	}
- 
--	ret = clk_prepare(p->clk);
-+	ret = clk_prepare(cmt->clk);
- 	if (ret < 0)
- 		goto err3;
- 
- 	if (res2 && (resource_size(res2) == 4)) {
- 		/* assume both CMSTR and CMCSR to be 32-bit */
--		p->read_control = sh_cmt_read32;
--		p->write_control = sh_cmt_write32;
-+		cmt->read_control = sh_cmt_read32;
-+		cmt->write_control = sh_cmt_write32;
- 	} else {
--		p->read_control = sh_cmt_read16;
--		p->write_control = sh_cmt_write16;
-+		cmt->read_control = sh_cmt_read16;
-+		cmt->write_control = sh_cmt_write16;
- 	}
- 
- 	if (resource_size(res) == 6) {
--		p->width = 16;
--		p->read_count = sh_cmt_read16;
--		p->write_count = sh_cmt_write16;
--		p->overflow_bit = 0x80;
--		p->clear_bits = ~0x80;
-+		cmt->width = 16;
-+		cmt->read_count = sh_cmt_read16;
-+		cmt->write_count = sh_cmt_write16;
-+		cmt->overflow_bit = 0x80;
-+		cmt->clear_bits = ~0x80;
- 	} else {
--		p->width = 32;
--		p->read_count = sh_cmt_read32;
--		p->write_count = sh_cmt_write32;
--		p->overflow_bit = 0x8000;
--		p->clear_bits = ~0xc000;
-+		cmt->width = 32;
-+		cmt->read_count = sh_cmt_read32;
-+		cmt->write_count = sh_cmt_write32;
-+		cmt->overflow_bit = 0x8000;
-+		cmt->clear_bits = ~0xc000;
- 	}
- 
--	if (p->width == (sizeof(ch->max_match_value) * 8))
-+	if (cmt->width == (sizeof(ch->max_match_value) * 8))
- 		ch->max_match_value = ~0;
- 	else
--		ch->max_match_value = (1 << p->width) - 1;
-+		ch->max_match_value = (1 << cmt->width) - 1;
- 
--	ch->cmt = p;
-+	ch->cmt = cmt;
- 	ch->match_value = ch->max_match_value;
- 	raw_spin_lock_init(&ch->lock);
- 
--	ret = sh_cmt_register(ch, (char *)dev_name(&p->pdev->dev),
-+	ret = sh_cmt_register(ch, (char *)dev_name(&cmt->pdev->dev),
- 			      cfg->clockevent_rating,
- 			      cfg->clocksource_rating);
- 	if (ret) {
--		dev_err(&p->pdev->dev, "registration failed\n");
-+		dev_err(&cmt->pdev->dev, "registration failed\n");
- 		goto err4;
- 	}
- 	ch->cs_enabled = false;
- 
- 	ret = setup_irq(irq, &ch->irqaction);
- 	if (ret) {
--		dev_err(&p->pdev->dev, "failed to request irq %d\n", irq);
-+		dev_err(&cmt->pdev->dev, "failed to request irq %d\n", irq);
- 		goto err4;
- 	}
- 
--	platform_set_drvdata(pdev, p);
-+	platform_set_drvdata(pdev, cmt);
- 
- 	return 0;
- err4:
--	clk_unprepare(p->clk);
-+	clk_unprepare(cmt->clk);
- err3:
--	clk_put(p->clk);
-+	clk_put(cmt->clk);
- err2:
--	iounmap(p->mapbase_str);
-+	iounmap(cmt->mapbase_str);
- err1:
--	iounmap(p->mapbase);
-+	iounmap(cmt->mapbase);
- err0:
- 	return ret;
+-	return ch->cmt->read_count(ch->cmt->mapbase_ch, CMCNT);
++	return ch->cmt->read_count(ch->base, CMCNT);
  }
  
- static int sh_cmt_probe(struct platform_device *pdev)
+ static inline void sh_cmt_write_cmstr(struct sh_cmt_channel *ch,
+@@ -149,19 +150,19 @@ static inline void sh_cmt_write_cmstr(struct sh_cmt_channel *ch,
+ static inline void sh_cmt_write_cmcsr(struct sh_cmt_channel *ch,
+ 				      unsigned long value)
  {
--	struct sh_cmt_priv *p = platform_get_drvdata(pdev);
-+	struct sh_cmt_device *cmt = platform_get_drvdata(pdev);
- 	struct sh_timer_config *cfg = pdev->dev.platform_data;
- 	int ret;
+-	ch->cmt->write_control(ch->cmt->mapbase_ch, CMCSR, value);
++	ch->cmt->write_control(ch->base, CMCSR, value);
+ }
  
-@@ -833,20 +833,20 @@ static int sh_cmt_probe(struct platform_device *pdev)
- 		pm_runtime_enable(&pdev->dev);
- 	}
+ static inline void sh_cmt_write_cmcnt(struct sh_cmt_channel *ch,
+ 				      unsigned long value)
+ {
+-	ch->cmt->write_count(ch->cmt->mapbase_ch, CMCNT, value);
++	ch->cmt->write_count(ch->base, CMCNT, value);
+ }
  
--	if (p) {
-+	if (cmt) {
- 		dev_info(&pdev->dev, "kept as earlytimer\n");
- 		goto out;
- 	}
+ static inline void sh_cmt_write_cmcor(struct sh_cmt_channel *ch,
+ 				      unsigned long value)
+ {
+-	ch->cmt->write_count(ch->cmt->mapbase_ch, CMCOR, value);
++	ch->cmt->write_count(ch->base, CMCOR, value);
+ }
  
--	p = kmalloc(sizeof(*p), GFP_KERNEL);
--	if (p == NULL) {
-+	cmt = kmalloc(sizeof(*cmt), GFP_KERNEL);
-+	if (cmt == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate driver data\n");
- 		return -ENOMEM;
- 	}
+ static unsigned long sh_cmt_get_counter(struct sh_cmt_channel *ch,
+@@ -704,6 +705,7 @@ static int sh_cmt_setup_channel(struct sh_cmt_channel *ch,
  
--	ret = sh_cmt_setup(p, pdev);
-+	ret = sh_cmt_setup(cmt, pdev);
- 	if (ret) {
--		kfree(p);
-+		kfree(cmt);
- 		pm_runtime_idle(&pdev->dev);
- 		return ret;
- 	}
+ 	memset(ch, 0, sizeof(*ch));
+ 	ch->cmt = cmt;
++	ch->base = cmt->mapbase_ch;
+ 
+ 	/* Request irq using setup_irq() (too early for request_irq()). */
+ 	irq = platform_get_irq(cmt->pdev, 0);
 -- 
 1.8.3.2
