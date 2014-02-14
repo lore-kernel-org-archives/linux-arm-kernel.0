@@ -1,44 +1,74 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 14 Feb 2014 16:35:43 +0200
-Subject: [PATCH v4 3/4] ARM: OMAP2+: add legacy display for omap3 DBB056
-In-Reply-To: <1392387656-15186-4-git-send-email-chf.fritz@googlemail.com>
-References: <1392387656-15186-1-git-send-email-chf.fritz@googlemail.com>
- <1392387656-15186-4-git-send-email-chf.fritz@googlemail.com>
-Message-ID: <52FE29BF.9040307@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 14 Feb 2014 18:36:11 +0400
+Subject: [PATCH 26/27] ARM: shmobile: lager-reference: Enable CMT0 in
+ device tree
+In-Reply-To: <2354725.yUCM3gQqXi@avalon>
+References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2244047.l1cecWDdMU@avalon> <52FE2498.8040609@cogentembedded.com>
+ <2354725.yUCM3gQqXi@avalon>
+Message-ID: <52FE29DB.2010304@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello.
 
-On 14/02/14 16:20, Christoph Fritz wrote:
-> Full device tree support for omapdss is not yet accomplished. Until
-> then, init display by legacy platform code.
-> 
-> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
-> ---
->  arch/arm/mach-omap2/dss-common.c   |   49 ++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/dss-common.h   |    1 +
->  arch/arm/mach-omap2/pdata-quirks.c |    8 +++++-
->  3 files changed, 57 insertions(+), 1 deletion(-)
+On 14-02-2014 18:22, Laurent Pinchart wrote:
 
-I'm not nack'ing this, but I'm again hoping to get DSS DT support for
-3.15. I haven't done any bigger changes to my branch for some time now,
-and I'm just waiting to get some comments/acks for the bindings.
+>>>>> Enable the CMT0 device and configure channel 0 as a clock event
+>>>>> provider.
 
-So I suggest to also try out DSS DT for your board, based on the latest
-DSS DT branch:
+>>>>> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git work/dss-dt
+>>>>> diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h
+>>>>> b/arch/arm/mach-shmobile/include/mach/r8a7790.h index 0b95bab..62b31f3
+>>>>> 100644 --- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
+>>>>> +++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+>>>>> @@ -29,7 +29,6 @@ enum {
+>>>>>   };
+>>>>>
+>>>>>   void r8a7790_add_standard_devices(void);
+>>>>> -void r8a7790_add_dt_devices(void);
+>>>>>   void r8a7790_clock_init(void);
+>>>>>   void r8a7790_pinmux_init(void);
+>>>>>   void r8a7790_pm_init(void);
+>>>>> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c
+>>>>> b/arch/arm/mach-shmobile/setup-r8a7790.c index 3e5813f..462c81f 100644
+>>>>> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
+>>>>> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+>>>>> @@ -294,11 +294,6 @@ static struct resource cmt0_resources[] = {
+>>>>>     					  &cmt##idx##_platform_data,	\
+>>>>>     					  sizeof(struct sh_timer_config))
+>>>>>
+>>>>> -void __init r8a7790_add_dt_devices(void)
+>>>>> -{
+>>>>> -	r8a7790_register_cmt(0);
+>>>>> -}
+>>>>> -
+>>>>>   void __init r8a7790_add_standard_devices(void)
+>>>>>   {
+>>>>>     	r8a7790_register_scif(0);
+>>>>> @@ -311,7 +306,7 @@ void __init r8a7790_add_standard_devices(void)
+>>>>>     	r8a7790_register_scif(7);
+>>>>>     	r8a7790_register_scif(8);
+>>>>>     	r8a7790_register_scif(9);
+>>>>> -	r8a7790_add_dt_devices();
+>>>>> +	r8a7790_register_cmt(0);
+>>>>>     	r8a7790_register_irqc(0);
+>>>>>     	r8a7790_register_thermal();
+>>>>>   }
+>>>>>
+>>>> IMHO, these 2 files should be split into a separate patch.
+>>>
+>>> That could easily be done, but why ?
+>>
+>> It does not seem necessary to combine these changes in one patch. Remember,
+>> Simon has separate branches for boards and SoCs. So finally it's up to him
+>> to decide on this...
 
-That way you have it ready and tested if DSS DT goes forward.
+> Right, but in this case I need to remove the CMT platform device registration
+> from r8a7790_add_dt_devices()
 
- Tomi
+    You're not removing anything in these 2 files, you're just replacing 
+"indirect" call to r8a7790_register_cmt(0) with direct.
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140214/8cbe0eaa/attachment-0001.sig>
+WBR, Sergei
