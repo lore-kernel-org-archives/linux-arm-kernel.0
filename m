@@ -1,41 +1,147 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Fri, 14 Feb 2014 15:27:19 +0800
-Subject: [PATCH v5 3/3] serial: fsl_lpuart: documented the clock requirement.
-In-Reply-To: <1392362839-8004-1-git-send-email-yao.yuan@freescale.com>
-References: <1392362839-8004-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <1392362839-8004-4-git-send-email-yao.yuan@freescale.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 13 Feb 2014 23:57:17 -0800
+Subject: [PATCH v3] input: sirfsoc-onkey - report onkey untouch event by
+ detecting pin status
+In-Reply-To: <1392348001-4950-1-git-send-email-21cnbao@gmail.com>
+References: <1392348001-4950-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <20140214075717.GA14682@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a correction to the documentation. It was previously required but not documented.
+Hi Barry,
 
-Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
----
- Documentation/devicetree/bindings/serial/fsl-lpuart.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+On Fri, Feb 14, 2014 at 11:20:01AM +0800, Barry Song wrote:
+> From: Xianglong Du <Xianglong.Du@csr.com>
+> 
+> this patch adds a delayed_work to detect the untouch of onkey since HW will
+> not generate interrupt for it.
+> 
+> at the same time, we move the KEY event to POWER instead of SUSPEND, which
+> will be suitable for both Android and Linux. Userspace PowerManager Daemon
+> will decide to suspend or shutdown based on how long we have touched onkey
+> 
+> Signed-off-by: Xianglong Du <Xianglong.Du@csr.com>
+> Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  -v3: move to use custom devres action
 
-diff --git a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-index 6e1cbbf..9666f97 100644
---- a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-+++ b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-@@ -4,6 +4,8 @@ Required properties:
- - compatible : Should be "fsl,<soc>-lpuart"
- - reg : Address and length of the register set for the device
- - interrupts : Should contain uart interrupt
-+- clocks : phandle + clock specifier pairs, one for each entry in clock-names
-+- clock-names : should contain: "ipg" - the uart clock
- 
- Optional properties:
- - dmas: List of two DMA specifiers, using a three-cell specifier for each channel.
-@@ -22,6 +24,8 @@ uart0: serial at 40027000 {
- 		compatible = "fsl,vf610-lpuart";
- 		reg = <0x40027000 0x1000>;
- 		interrupts = <0 61 0x00>;
-+		clocks = <&clks VF610_CLK_UART0>;
-+		clock-names = "ipg";
- 		dmas = <&edma0 0 2>,
- 			<&edma0 0 3>;
- 		dma-names = "rx","tx";
+Thank you for making the changes, however it seems that we can control
+whether the device generates interrupts or not and so we can implement
+open and close methods. If patch below works then your
+cancel_delayed_work() call should go into sirfosc_pwrc_close() and we do
+not need to use devm_free_irq() not custom action.
+
+Thanks.
+
 -- 
-1.8.4
+Dmitry
+
+
+Input: sirfsoc-onkey - implement open and close methods
+
+From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+We can control whetehr device generates interrupts or not so let's
+implement open and close methods of input device so that we do not do any
+processing until there are users.
+
+Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
+ drivers/input/misc/sirfsoc-onkey.c |   50 +++++++++++++++++++++++++++++-------
+ 1 file changed, 40 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/input/misc/sirfsoc-onkey.c b/drivers/input/misc/sirfsoc-onkey.c
+index e8897c3..dc7db65 100644
+--- a/drivers/input/misc/sirfsoc-onkey.c
++++ b/drivers/input/misc/sirfsoc-onkey.c
+@@ -49,6 +49,35 @@ static irqreturn_t sirfsoc_pwrc_isr(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
++static void sirfsoc_pwrc_toggle_interrupts(struct sirfsoc_pwrc_drvdata *pwrcdrv,
++					   bool enable)
++{
++	u32 int_mask;
++
++	int_mask = sirfsoc_rtc_iobrg_readl(pwrcdrv->pwrc_base + PWRC_INT_MASK);
++	if (enable)
++		int_mask |= PWRC_ON_KEY_BIT;
++	else
++		int_mask &= ~PWRC_ON_KEY_BIT;
++	sirfsoc_rtc_iobrg_writel(int_mask, pwrcdrv->pwrc_base + PWRC_INT_MASK);
++}
++
++static int sirfsoc_pwrc_open(struct input_dev *input)
++{
++	struct sirfsoc_pwrc_drvdata *pwrcdrv = input_get_drvdata(input);
++
++	sirfsoc_pwrc_toggle_interrupts(pwrcdrv, true);
++
++	return 0;
++}
++
++static void sirfsoc_pwrc_close(struct input_dev *input)
++{
++	struct sirfsoc_pwrc_drvdata *pwrcdrv = input_get_drvdata(input);
++
++	sirfsoc_pwrc_toggle_interrupts(pwrcdrv, false);
++}
++
+ static const struct of_device_id sirfsoc_pwrc_of_match[] = {
+ 	{ .compatible = "sirf,prima2-pwrc" },
+ 	{},
+@@ -70,7 +99,7 @@ static int sirfsoc_pwrc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/*
+-	 * we can't use of_iomap because pwrc is not mapped in memory,
++	 * We can't use of_iomap because pwrc is not mapped in memory,
+ 	 * the so-called base address is only offset in rtciobrg
+ 	 */
+ 	error = of_property_read_u32(np, "reg", &pwrcdrv->pwrc_base);
+@@ -88,6 +117,11 @@ static int sirfsoc_pwrc_probe(struct platform_device *pdev)
+ 	pwrcdrv->input->phys = "pwrc/input0";
+ 	pwrcdrv->input->evbit[0] = BIT_MASK(EV_PWR);
+ 
++	pwrcdrv->input->open = sirfsoc_pwrc_open;
++	pwrcdrv->input->close = sirfsoc_pwrc_close;
++
++	input_set_drvdata(pwrcdrv->input, pwrcdrv);
++
+ 	irq = platform_get_irq(pdev, 0);
+ 	error = devm_request_irq(&pdev->dev, irq,
+ 				 sirfsoc_pwrc_isr, IRQF_SHARED,
+@@ -98,11 +132,6 @@ static int sirfsoc_pwrc_probe(struct platform_device *pdev)
+ 		return error;
+ 	}
+ 
+-	sirfsoc_rtc_iobrg_writel(
+-		sirfsoc_rtc_iobrg_readl(pwrcdrv->pwrc_base + PWRC_INT_MASK) |
+-			PWRC_ON_KEY_BIT,
+-		pwrcdrv->pwrc_base + PWRC_INT_MASK);
+-
+ 	error = input_register_device(pwrcdrv->input);
+ 	if (error) {
+ 		dev_err(&pdev->dev,
+@@ -129,15 +158,16 @@ static int pwrc_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct sirfsoc_pwrc_drvdata *pwrcdrv = platform_get_drvdata(pdev);
++	struct input_dev *input = pwrcdrv->input;
+ 
+ 	/*
+ 	 * Do not mask pwrc interrupt as we want pwrc work as a wakeup source
+ 	 * if users touch X_ONKEY_B, see arch/arm/mach-prima2/pm.c
+ 	 */
+-	sirfsoc_rtc_iobrg_writel(
+-		sirfsoc_rtc_iobrg_readl(
+-		pwrcdrv->pwrc_base + PWRC_INT_MASK) | PWRC_ON_KEY_BIT,
+-		pwrcdrv->pwrc_base + PWRC_INT_MASK);
++	mutex_lock(&input->mutex);
++	if (input->users)
++		sirfsoc_pwrc_toggle_interrupts(pwrcdrv, true);
++	mutex_unlock(&input->mutex);
+ 
+ 	return 0;
+ }
