@@ -1,74 +1,119 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 14 Feb 2014 18:36:11 +0400
-Subject: [PATCH 26/27] ARM: shmobile: lager-reference: Enable CMT0 in
- device tree
-In-Reply-To: <2354725.yUCM3gQqXi@avalon>
-References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2244047.l1cecWDdMU@avalon> <52FE2498.8040609@cogentembedded.com>
- <2354725.yUCM3gQqXi@avalon>
-Message-ID: <52FE29DB.2010304@cogentembedded.com>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Fri, 14 Feb 2014 15:53:18 +0100
+Subject: [PATCH 1/2] mfd: twl4030-madc: Add devicetree support.
+In-Reply-To: <20140214134815.GD13293@lee--X1>
+References: <1392383861-14169-1-git-send-email-marek@goldelico.com>
+ <20140214134815.GD13293@lee--X1>
+Message-ID: <CAAfyv36FH364OPnktx_Qh6sUfwYe7hynqrc3Xs_tY4gPXqQWvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 14-02-2014 18:22, Laurent Pinchart wrote:
-
->>>>> Enable the CMT0 device and configure channel 0 as a clock event
->>>>> provider.
-
->>>>> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-
->>>>> diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h
->>>>> b/arch/arm/mach-shmobile/include/mach/r8a7790.h index 0b95bab..62b31f3
->>>>> 100644 --- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
->>>>> +++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
->>>>> @@ -29,7 +29,6 @@ enum {
->>>>>   };
->>>>>
->>>>>   void r8a7790_add_standard_devices(void);
->>>>> -void r8a7790_add_dt_devices(void);
->>>>>   void r8a7790_clock_init(void);
->>>>>   void r8a7790_pinmux_init(void);
->>>>>   void r8a7790_pm_init(void);
->>>>> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c
->>>>> b/arch/arm/mach-shmobile/setup-r8a7790.c index 3e5813f..462c81f 100644
->>>>> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
->>>>> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
->>>>> @@ -294,11 +294,6 @@ static struct resource cmt0_resources[] = {
->>>>>     					  &cmt##idx##_platform_data,	\
->>>>>     					  sizeof(struct sh_timer_config))
->>>>>
->>>>> -void __init r8a7790_add_dt_devices(void)
->>>>> -{
->>>>> -	r8a7790_register_cmt(0);
->>>>> -}
->>>>> -
->>>>>   void __init r8a7790_add_standard_devices(void)
->>>>>   {
->>>>>     	r8a7790_register_scif(0);
->>>>> @@ -311,7 +306,7 @@ void __init r8a7790_add_standard_devices(void)
->>>>>     	r8a7790_register_scif(7);
->>>>>     	r8a7790_register_scif(8);
->>>>>     	r8a7790_register_scif(9);
->>>>> -	r8a7790_add_dt_devices();
->>>>> +	r8a7790_register_cmt(0);
->>>>>     	r8a7790_register_irqc(0);
->>>>>     	r8a7790_register_thermal();
->>>>>   }
->>>>>
->>>> IMHO, these 2 files should be split into a separate patch.
->>>
->>> That could easily be done, but why ?
+On Fri, Feb 14, 2014 at 2:48 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> Signed-off-by: Marek Belisko <marek@goldelico.com>
+>> ---
+>>  .../devicetree/bindings/mfd/twl4030-madc.txt       | 18 +++++++++++++
+>>  drivers/mfd/twl4030-madc.c                         | 31
+>> ++++++++++++++++++++--
+>
+> Please separate these into different patches.
+OK.
+>
+>>  2 files changed, 47 insertions(+), 2 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/twl4030-madc.txt
+>
+> <snip>
+>
+>> +++ b/drivers/mfd/twl4030-madc.c
+>> @@ -695,6 +695,29 @@ static int twl4030_madc_set_power(struct twl4030_madc_data *madc, int on)
+>>       return 0;
+>>  }
 >>
->> It does not seem necessary to combine these changes in one patch. Remember,
->> Simon has separate branches for boards and SoCs. So finally it's up to him
->> to decide on this...
+>> +#ifdef CONFIG_OF
+>
+> I believe we're heading for a more:
+>
+>   if (IS_ENABLED(CONFIG_OF))
+>
+> ... approach. I won't enforce it, but please consider using it.
+OK I'll use it in next version.
+>
+>> +static struct twl4030_madc_platform_data *
+>> +     twl4030_madc_of_parse(struct platform_device *pdev)
+>> +{
+>> +     struct twl4030_madc_platform_data *pdata;
+>> +
+>> +     pdata = devm_kzalloc(&pdev->dev,
+>> +                     sizeof(struct twl4030_madc_platform_data), GFP_KERNEL);
+>
+> s/struct twl4030_madc_platform_data/*pdata/
+Right typo.
+>
+>> +     if (!pdata)
+>> +             return ERR_PTR(-ENOMEM);
+>> +
+>> +     pdata->irq_line = platform_get_irq(pdev, 0);
+>
+> Why weren't 'resources' used in the original implementation?
+Not sure I'm not an author :). It's passed in platform data.
+>
+>> +     return pdata;
+>> +}
+>> +
+>> +static const struct of_device_id twl4030_madc_dt_match_table[] = {
+>> +     { .compatible = "ti,twl4030-madc" },
+>> +     {},
+>> +};
+>> +
+>> +#endif
+>> +
+>>  /*
+>>   * Initialize MADC and request for threaded irq
+>>   */
+>> @@ -706,8 +729,11 @@ static int twl4030_madc_probe(struct platform_device *pdev)
+>>       u8 regval;
+>>
+>>       if (!pdata) {
+>> -             dev_err(&pdev->dev, "platform_data not available\n");
+>> -             return -EINVAL;
+>> +             pdata = twl4030_madc_of_parse(pdev);
+>> +             if (!pdata) {
+>
+> And if you received -ENOMEM?
+Hmm right. I'll fix that.
+>
+>> +                     dev_err(&pdev->dev, "platform_data not available\n");
+>> +                     return -EINVAL;
+>> +             }
+>>       }
+>>       madc = kzalloc(sizeof(*madc), GFP_KERNEL);
+>>       if (!madc)
+>> @@ -807,6 +833,7 @@ static struct platform_driver twl4030_madc_driver = {
+>>       .driver = {
+>>                  .name = "twl4030_madc",
+>>                  .owner = THIS_MODULE,
+>> +                .of_match_table = of_match_ptr(twl4030_madc_dt_match_table),
+>>                  },
+>>  };
+>>
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
 
-> Right, but in this case I need to remove the CMT platform device registration
-> from r8a7790_add_dt_devices()
+BR,
 
-    You're not removing anything in these 2 files, you're just replacing 
-"indirect" call to r8a7790_register_cmt(0) with direct.
+marek
 
-WBR, Sergei
+-- 
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
+
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+twitter: #opennandra
+web: http://open-nandra.com
