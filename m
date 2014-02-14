@@ -1,53 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 14 Feb 2014 08:39:42 -0800
-Subject: [PATCH v2 4/4] Documentation: dt: OMAP: Update Overo/Tobi
-In-Reply-To: <52FDD082.9090006@ti.com>
-References: <1392287116-4548-1-git-send-email-florian.vaussard@epfl.ch>
- <1392287116-4548-5-git-send-email-florian.vaussard@epfl.ch>
- <52FCDA29.90605@ti.com> <52FDCC9B.2050608@epfl.ch>
- <52FDD082.9090006@ti.com>
-Message-ID: <20140214163942.GB21592@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 14 Feb 2014 09:43:04 -0700
+Subject: [PATCH 1/2] clk: fixed-rate: use full DT node name
+In-Reply-To: <20140214103556.GC9907@e106331-lin.cambridge.arm.com>
+References: <1392358613-19962-1-git-send-email-swarren@wwwdotorg.org>
+ <20140214103556.GC9907@e106331-lin.cambridge.arm.com>
+Message-ID: <52FE4798.3010605@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [140214 00:17]:
-> On 02/14/2014 01:58 AM, Florian Vaussard wrote:
-> > Hi,
-> > 
-> > On 02/13/2014 03:43 PM, Nishanth Menon wrote:
-> >> On 02/13/2014 04:25 AM, Florian Vaussard wrote:
-> >>> Update the compatible string for Overo/Tobi to reflect the latest
-> >>> changes.
-> >>>
-> >>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> >>> ---
-> >>>  Documentation/devicetree/bindings/arm/omap/omap.txt | 2 +-
-> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>>
-> >>> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> >>> index 34dc40c..af9b4a0 100644
-> >>> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-> >>> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> >>> @@ -91,7 +91,7 @@ Boards:
-> >>>    compatible = "ti,omap3-beagle", "ti,omap3"
-> >>>  
-> >>>  - OMAP3 Tobi with Overo : Commercial expansion board with daughter board
-> >>> -  compatible = "ti,omap3-tobi", "ti,omap3-overo", "ti,omap3"
-> >>> +  compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap3"
-> >> omap3-overo-storm-tobi.dts is not covered here, so, I wonder as the
-> >> number of boards supported keep increasing, is'nt it better we drop
-> >> the board information from omap.txt?
-> >>
-> > 
-> > I am not opposed to this. We will just have checkpatch warnings due to
-> > undocumented compatible strings.
+On 02/14/2014 03:35 AM, Mark Rutland wrote:
+> On Fri, Feb 14, 2014 at 06:16:52AM +0000, Stephen Warren wrote:
+>> clk-fixed-rate currently names clocks according to a node's name without
+>> the unit address. When faced with the legal and technically correct DT
+>> structure below, this causes rgistration attempts for 3 clocks with the
+>> same name, 2 of which fail.
+>>
+>> 	clocks {
+>> 		compatible = "simple-bus";
+>> 		#address-cells = <1>;
+>> 		#size-cells = <0>;
+>>
+>> 		clk_mmc: clock at 0 {
+>> 			compatible = "fixed-clock";
+>> 			reg = <0>;
+>> ...
+>> 		clk_i2c: clock at 1 {
+>> 			compatible = "fixed-clock";
+>> 			reg = <1>;
+>> ...
+>> 		clk_spi: clock at 2 {
+>> 			compatible = "fixed-clock";
+>> 			reg = <2>;
+>> ...
 > 
-> Aaah, I seemed to have missed bff5da43 commit, thanks for pointing me
-> at it - unrelated to this patch, I think the board cleanups is a
-> little overdue :(
+> I'd argue that this case isn't valid.
+
+Well, it's very widely used, and was the result of numerous discussions
+of how this kind of thing should be represented:-/
+
+> The fixed-clock binding doesn't define a reg, yet simple bus binding
+> implies that the reg property of child nodes should be interpretted as
+> the same address space as their parent (MMIO in this case?). The
+> fixed-clock nodes reg proeprties clearly aren't MMIO addresses.
 > 
-> Acked-by: Nishanth Menon <nm@ti.com>
+> Additionally, the _requred_ ranges property is missing.
 
-OK thanks picking up this too.
+Perhaps we need to invent a simple-container instead then?
 
-Tony
+> It's just nonsensical; rename them to clock_{0,1,..} instead and get rid
+> of the reg properties. Then they're named uniquely.
+
+That's not legal either. DT node names are supposed to represent the
+type of device/object (i.e. just "clock"), not the identity of the
+device/object (i.e. not include IDs etc.). Hence, the node name needs to
+be "clock" for all of them, and the unit address must be used to
+differentiate them.
