@@ -1,76 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 14 Feb 2014 09:50:43 -0800
-Subject: [GIT PULL] omap fixes against v3.14-rc1
-Message-ID: <20140214175042.GD21592@atomide.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 14 Feb 2014 11:29:10 -0700
+Subject: [PATCH 1/2] bus: mvebu-mbus: Fix incorrect size for PCI aperture
+ resources
+In-Reply-To: <1392245828-23244-1-git-send-email-jgunthorpe@obsidianresearch.com>
+References: <1392245828-23244-1-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <20140214182910.GC31093@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+On Wed, Feb 12, 2014 at 03:57:07PM -0700, Jason Gunthorpe wrote:
+> reg[0] is the DT base, reg[1] is the DT length in bytes,
+> struct resource.end is the inclusive end address, so a -1 is
+> required.
+> 
+> Tested on kirkwood.
+> 
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+Do these two patches need to go together?  I don't maintain
+drivers/bus/mvebu-mbus.c, but if these should be kept together, I'd be
+happy to merge them both, given the appropriate ack from Jason C or Thomas.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/fixes-against-rc1
-
-for you to fetch changes up to 8842446ac74263f1330f46e11ed649e2b0ed6545:
-
-  Documentation: dt: OMAP: Update Overo/Tobi (2014-02-14 08:37:53 -0800)
-
-----------------------------------------------------------------
-Fixes for omaps, mostly to deal with the 34xx vs 36xx SoC
-configuration for overo boards.
-
-----------------------------------------------------------------
-Aaro Koskinen (3):
-      ARM: OMAP1: nokia770: enable tahvo-usb
-      ARM: dts: N9/N950: fix boot hang with 3.14-rc1
-      ARM: dts: N900: add missing compatible property
-
-Florian Vaussard (4):
-      ARM: dts: omap3-tobi: Fix boot with OMAP36xx-based Overo
-      ARM: dts: omap3-tobi: Use the correct vendor prefix
-      ARM: dts: Add support for both OMAP35xx and OMAP36xx Overo/Tobi
-      Documentation: dt: OMAP: Update Overo/Tobi
-
-Marek Belisko (2):
-      ARM: dts: omap3-gta04: Add EOC irq gpio line handling.
-      ARM: dts: omap3-gta04: Fix mmc1 properties.
-
-NeilBrown (1):
-      ARM: dts: omap3-gta04: Fix 'aux' gpio key flags.
-
-Nishanth Menon (1):
-      ARM: OMAP2+: add missing ARCH_HAS_OPP
-
-Paul Bolle (2):
-      ARM: OMAP2+: Remove MACH_NOKIA_N800
-      ARM: OMAP2+: Remove legacy macros for zoom platforms
-
-Pekon Gupta (2):
-      ARM: OMAP2+: gpmc: fix: DT NAND child nodes not probed when MTD_NAND is built as module
-      ARM: OMAP2+: gpmc: fix: DT ONENAND child nodes not probed when MTD_ONENAND is built as module
-
-Peter Ujfalusi (2):
-      ARM: DTS: am335x-evmsk: Correct audio clock frequency
-      ARM: dts: am335x-evmsk: Fix mmc1 support
-
- .../devicetree/bindings/arm/omap/omap.txt          |  2 +-
- arch/arm/boot/dts/Makefile                         |  3 ++-
- arch/arm/boot/dts/am335x-evmsk.dts                 | 11 ++++++++++-
- arch/arm/boot/dts/omap3-gta04.dts                  |  6 ++++--
- arch/arm/boot/dts/omap3-n9.dts                     |  2 +-
- arch/arm/boot/dts/omap3-n900.dts                   |  4 ++--
- arch/arm/boot/dts/omap3-n950.dts                   |  2 +-
- arch/arm/boot/dts/omap3-overo-storm-tobi.dts       | 22 ++++++++++++++++++++++
- ...omap3-tobi.dts => omap3-overo-tobi-common.dtsi} |  3 ---
- arch/arm/boot/dts/omap3-overo-tobi.dts             | 22 ++++++++++++++++++++++
- arch/arm/boot/dts/omap3-overo.dtsi                 |  3 ---
- arch/arm/mach-omap1/board-nokia770.c               |  1 +
- arch/arm/mach-omap2/Kconfig                        |  8 ++++----
- arch/arm/mach-omap2/gpmc.c                         |  4 ++--
- arch/arm/mach-omap2/io.c                           |  9 ---------
- 15 files changed, 72 insertions(+), 30 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3-overo-storm-tobi.dts
- rename arch/arm/boot/dts/{omap3-tobi.dts => omap3-overo-tobi-common.dtsi} (94%)
- create mode 100644 arch/arm/boot/dts/omap3-overo-tobi.dts
+> ---
+>  drivers/bus/mvebu-mbus.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+> index 2394e97..7fd54e9 100644
+> --- a/drivers/bus/mvebu-mbus.c
+> +++ b/drivers/bus/mvebu-mbus.c
+> @@ -876,14 +876,14 @@ static void __init mvebu_mbus_get_pcie_resources(struct device_node *np,
+>  	ret = of_property_read_u32_array(np, "pcie-mem-aperture", reg, ARRAY_SIZE(reg));
+>  	if (!ret) {
+>  		mem->start = reg[0];
+> -		mem->end = mem->start + reg[1];
+> +		mem->end = mem->start + reg[1] - 1;
+>  		mem->flags = IORESOURCE_MEM;
+>  	}
+>  
+>  	ret = of_property_read_u32_array(np, "pcie-io-aperture", reg, ARRAY_SIZE(reg));
+>  	if (!ret) {
+>  		io->start = reg[0];
+> -		io->end = io->start + reg[1];
+> +		io->end = io->start + reg[1] - 1;
+>  		io->flags = IORESOURCE_IO;
+>  	}
+>  }
+> -- 
+> 1.8.1.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
