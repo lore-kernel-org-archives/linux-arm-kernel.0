@@ -1,55 +1,105 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 14 Feb 2014 15:28:38 +0000
-Subject: [PATCH 1/2] mfd: twl4030-madc: Add devicetree support.
-In-Reply-To: <CAAfyv36FH364OPnktx_Qh6sUfwYe7hynqrc3Xs_tY4gPXqQWvA@mail.gmail.com>
-References: <1392383861-14169-1-git-send-email-marek@goldelico.com>
- <20140214134815.GD13293@lee--X1>
- <CAAfyv36FH364OPnktx_Qh6sUfwYe7hynqrc3Xs_tY4gPXqQWvA@mail.gmail.com>
-Message-ID: <20140214152838.GA30687@lee--X1>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Sat, 15 Feb 2014 00:30:17 +0900
+Subject: [PATCH] ARM: shmobile: lager: Add internal USB PCI support
+In-Reply-To: <52FE2026.8040801@cogentembedded.com>
+References: <20140214032948.3287.33351.sendpatchset@w520>
+ <52FE2026.8040801@cogentembedded.com>
+Message-ID: <CANqRtoSc7W9UXBaACnckWPhUGE5VPDN8JV9FFHZbW9ZwGhTt4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> Signed-off-by: Marek Belisko <marek@goldelico.com>
-> >> ---
-> >>  .../devicetree/bindings/mfd/twl4030-madc.txt       | 18 +++++++++++++
-> >>  drivers/mfd/twl4030-madc.c                         | 31
-> >> ++++++++++++++++++++--
-> >
-<snip>
+Hi Sergei,
 
-> >> +static struct twl4030_madc_platform_data *
-> >> +     twl4030_madc_of_parse(struct platform_device *pdev)
-> >> +{
-> >> +     struct twl4030_madc_platform_data *pdata;
-> >> +
-> >> +     pdata = devm_kzalloc(&pdev->dev,
-> >> +                     sizeof(struct twl4030_madc_platform_data), GFP_KERNEL);
-> >
-> > s/struct twl4030_madc_platform_data/*pdata/
-> Right typo.
+On Fri, Feb 14, 2014 at 10:54 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Hello.
+>
+>
+> On 14-02-2014 7:29, Magnus Damm wrote:
+>
+>> From: Valentine Barshak <valentine.barshak@cogentembedded.com>
+>
+>
+>> This adds internal PCI USB host devices to R-Car H2 Lager board.
+>
+>
+>> Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
+>> [damm at opensource.se: Rebased and reworked to only include USB1 and USB2]
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> ---
+>
+>
+>>   Written against renesas-devel-v3.14-rc2-20140213
+>
+>
+>>   arch/arm/mach-shmobile/board-lager.c |   50
+>> ++++++++++++++++++++++++++++++++++
+>>   1 file changed, 50 insertions(+)
+>
+>
+>> --- 0001/arch/arm/mach-shmobile/board-lager.c
+>> +++ work/arch/arm/mach-shmobile/board-lager.c   2014-02-14
+>> 12:16:26.000000000 +0900
+>> @@ -638,6 +638,48 @@ static struct resource sdhi2_resources[]
+>>         DEFINE_RES_IRQ(gic_spi(167)),
+>>   };
+>>
+>> +/* Internal PCI1 */
+>> +static const struct resource pci1_resources[] __initconst = {
+>> +       DEFINE_RES_MEM(0xee0b0000, 0x10000),    /* CFG */
+>> +       DEFINE_RES_MEM(0xee0a0000, 0x10000),    /* MEM */
+>> +       DEFINE_RES_IRQ(gic_spi(112)),
+>> +};
+>> +
+>> +static const struct platform_device_info pci1_info __initconst = {
+>> +       .parent         = &platform_bus,
+>> +       .name           = "pci-rcar-gen2",
+>> +       .id             = 1,
+>> +       .res            = pci1_resources,
+>> +       .num_res        = ARRAY_SIZE(pci1_resources),
+>> +       .dma_mask       = DMA_BIT_MASK(32),
+>> +};
+>> +
+>> +static void __init lager_add_usb1_device(void)
+>
+>
+>    Actually, this adds PCI device, not USB, so the name is strange.
+> Also, I doubt that such functions are really necessary.
 
-Sorry, my comment of ambiguous.
+Well there are only USB devices hanging off the PCI devices on the
+actual silicon, so this naming discussion seems like splitting hairs?
 
-I mean do this:
+>> +{
+>> +       platform_device_register_full(&pci1_info);
+>> +}
+>> +
+>> +/* Internal PCI2 */
+>> +static const struct resource pci2_resources[] __initconst = {
+>> +       DEFINE_RES_MEM(0xee0d0000, 0x10000),    /* CFG */
+>> +       DEFINE_RES_MEM(0xee0c0000, 0x10000),    /* MEM */
+>> +       DEFINE_RES_IRQ(gic_spi(113)),
+>> +};
+>> +
+>> +static const struct platform_device_info pci2_info __initconst = {
+>> +       .parent         = &platform_bus,
+>> +       .name           = "pci-rcar-gen2",
+>> +       .id             = 2,
+>> +       .res            = pci2_resources,
+>> +       .num_res        = ARRAY_SIZE(pci2_resources),
+>> +       .dma_mask       = DMA_BIT_MASK(32),
+>> +};
+>> +
+>
+>
+>    I suspect the PCI resources and info could be wrapped by macros and then
+> instantiated by using only 2 lines.
 
-  sizeof(*pdata)
+I suspect anything can be done. =) As you may know, I'm not the
+original author of this patch. At this point in time I'm mainly
+focusing on getting device support merged, so please feel free to send
+either incremental patches or pick up this one and fix it yourself.
+I'm beyond caring.
 
-... instead of this:
+Thanks,
 
-  sizeof(struct twl4030_madc_platform_data)
-
-> >> +     if (!pdata)
-> >> +             return ERR_PTR(-ENOMEM);
-> >> +
-> >> +     pdata->irq_line = platform_get_irq(pdev, 0);
-> >
-> > Why weren't 'resources' used in the original implementation?
-> Not sure I'm not an author :). It's passed in platform data.
-
-Yes, I saw that. It should be changed.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+/ magnus
