@@ -1,64 +1,48 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 14 Feb 2014 15:12:47 +0200
-Subject: [PATCH v7 03/12] mfd: omap-usb-host: Use clock names as per
- function for reference clocks
-In-Reply-To: <20140214100915.GD7380@lee--X1>
-References: <1392200333-28397-1-git-send-email-rogerq@ti.com>
- <1392200333-28397-4-git-send-email-rogerq@ti.com>
- <20140214100915.GD7380@lee--X1>
-Message-ID: <52FE164F.80503@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 14 Feb 2014 15:13:44 +0200
+Subject: [PATCH] ARM: OMAP3+: DPLL: stop reparenting to same parent if
+ already done
+In-Reply-To: <20140213231317.GN28216@atomide.com>
+References: <1391591048-19433-1-git-send-email-nm@ti.com>
+ <20140213231317.GN28216@atomide.com>
+Message-ID: <52FE1688.7080105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2014 12:09 PM, Lee Jones wrote:
->> Use a meaningful name for the reference clocks so that it indicates the function.
+On 02/14/2014 01:13 AM, Tony Lindgren wrote:
+> * Nishanth Menon <nm@ti.com> [140205 01:06]:
+>> omap3_noncore_dpll_set_rate forces a reparent to the same clk_ref
+>> for every call that takes place. This is an can be done only if a change
+>> is detected.
 >>
->> CC: Lee Jones <lee.jones@linaro.org>
->> CC: Samuel Ortiz <sameo@linux.intel.com>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>
+> Would like to see acks on this too before applying.
+
+Looks good to me, ack.
+
+-Tero
+
+>
+> Tony
+>
 >> ---
->>  drivers/mfd/omap-usb-host.c | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>   arch/arm/mach-omap2/dpll3xxx.c |    2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
->> index 60a3bed..ce620a8 100644
->> --- a/drivers/mfd/omap-usb-host.c
->> +++ b/drivers/mfd/omap-usb-host.c
->> @@ -714,21 +714,21 @@ static int usbhs_omap_probe(struct platform_device *pdev)
->>  		goto err_mem;
->>  	}
->>  
->> -	omap->xclk60mhsp1_ck = devm_clk_get(dev, "xclk60mhsp1_ck");
->> +	omap->xclk60mhsp1_ck = devm_clk_get(dev, "refclk_60m_ext_p1");
-> 
-> You can't do that. These changes will have to be in the same patch as
-> the core change i.e. where they are initialised.
-
-I'm not touching them anywhere in this series. When core changes are you
-referring to?
-
-> 
->>  	if (IS_ERR(omap->xclk60mhsp1_ck)) {
->>  		ret = PTR_ERR(omap->xclk60mhsp1_ck);
->>  		dev_err(dev, "xclk60mhsp1_ck failed error:%d\n", ret);
->>  		goto err_mem;
->>  	}
->>  
->> -	omap->xclk60mhsp2_ck = devm_clk_get(dev, "xclk60mhsp2_ck");
->> +	omap->xclk60mhsp2_ck = devm_clk_get(dev, "refclk_60m_ext_p2");
->>  	if (IS_ERR(omap->xclk60mhsp2_ck)) {
->>  		ret = PTR_ERR(omap->xclk60mhsp2_ck);
->>  		dev_err(dev, "xclk60mhsp2_ck failed error:%d\n", ret);
->>  		goto err_mem;
->>  	}
->>  
->> -	omap->init_60m_fclk = devm_clk_get(dev, "init_60m_fclk");
->> +	omap->init_60m_fclk = devm_clk_get(dev, "refclk_60m_int");
->>  	if (IS_ERR(omap->init_60m_fclk)) {
->>  		ret = PTR_ERR(omap->init_60m_fclk);
->>  		dev_err(dev, "init_60m_fclk failed error:%d\n", ret);
-> 
-
---
-cheers,
--roger
+>> diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+>> index 3185ced..d9bcbf7 100644
+>> --- a/arch/arm/mach-omap2/dpll3xxx.c
+>> +++ b/arch/arm/mach-omap2/dpll3xxx.c
+>> @@ -525,7 +525,7 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
+>>   	* stuff is inherited for free
+>>   	*/
+>>
+>> -	if (!ret)
+>> +	if (!ret && clk_get_parent(hw->clk) != new_parent)
+>>   		__clk_reparent(hw->clk, new_parent);
+>>
+>>   	return 0;
+>> --
+>> 1.7.9.5
+>>
