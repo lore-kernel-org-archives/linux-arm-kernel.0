@@ -1,129 +1,115 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 14 Feb 2014 21:41:06 +0800
-Subject: [PATCH v3] input: sirfsoc-onkey - report onkey untouch event by
- detecting pin status
-In-Reply-To: <847BC5012124A94BB5CA1B26E022CCA3012BAFDC27@SHAASIEXM01.ASIA.ROOT.PRI>
-References: <1392348001-4950-1-git-send-email-21cnbao@gmail.com>
- <20140214075717.GA14682@core.coreip.homeip.net>
- <CAGsJ_4xqnZAO6vpkgTEHmfp9+nbWa1qwQ4pda6B2sSrEtbV3ZA@mail.gmail.com>
- <847BC5012124A94BB5CA1B26E022CCA3012BAFDC27@SHAASIEXM01.ASIA.ROOT.PRI>
-Message-ID: <CAGsJ_4zjtWV3Z1AJ2bqekXn54rm=k8d4iOi_zzainCEnNGefCw@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 14 Feb 2014 15:45:22 +0200
+Subject: [PATCH 1/8] clk: divider: fix rate calculation for fractional
+ rates
+In-Reply-To: <1392285846-13199-2-git-send-email-tomi.valkeinen@ti.com>
+References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
+ <1392285846-13199-2-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <52FE1DF2.2040707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Input: sirfsoc-onkey - implement open and close methods
->>
->> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->>
->> We can control whetehr device generates interrupts or not so let's
->> implement open and close methods of input device so that we do not do any
->> processing until there are users.
->>
->> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-
-Tested-by: Xianglong Du <Xianglong.Du@csr.com>
-
-Dmitry, will you push this one to your tree so that i can rebase others?
-
->> ---
->>  drivers/input/misc/sirfsoc-onkey.c |   50 +++++++++++++++++++++++++++++-------
->>  1 file changed, 40 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/input/misc/sirfsoc-onkey.c b/drivers/input/misc/sirfsoc-onkey.c
->> index e8897c3..dc7db65 100644
->> --- a/drivers/input/misc/sirfsoc-onkey.c
->> +++ b/drivers/input/misc/sirfsoc-onkey.c
->> @@ -49,6 +49,35 @@ static irqreturn_t sirfsoc_pwrc_isr(int irq, void *dev_id)
->>         return IRQ_HANDLED;
->>  }
->>
->> +static void sirfsoc_pwrc_toggle_interrupts(struct sirfsoc_pwrc_drvdata *pwrcdrv,
->> +                                          bool enable)
->> +{
->> +       u32 int_mask;
->> +
->> +       int_mask = sirfsoc_rtc_iobrg_readl(pwrcdrv->pwrc_base + PWRC_INT_MASK);
->> +       if (enable)
->> +               int_mask |= PWRC_ON_KEY_BIT;
->> +       else
->> +               int_mask &= ~PWRC_ON_KEY_BIT;
->> +       sirfsoc_rtc_iobrg_writel(int_mask, pwrcdrv->pwrc_base + PWRC_INT_MASK);
->> +}
->> +
->> +static int sirfsoc_pwrc_open(struct input_dev *input)
->> +{
->> +       struct sirfsoc_pwrc_drvdata *pwrcdrv = input_get_drvdata(input);
->> +
->> +       sirfsoc_pwrc_toggle_interrupts(pwrcdrv, true);
->> +
->> +       return 0;
->> +}
->> +
->> +static void sirfsoc_pwrc_close(struct input_dev *input)
->> +{
->> +       struct sirfsoc_pwrc_drvdata *pwrcdrv = input_get_drvdata(input);
->> +
->> +       sirfsoc_pwrc_toggle_interrupts(pwrcdrv, false);
->> +}
->> +
->>  static const struct of_device_id sirfsoc_pwrc_of_match[] = {
->>         { .compatible = "sirf,prima2-pwrc" },
->>         {},
->> @@ -70,7 +99,7 @@ static int sirfsoc_pwrc_probe(struct platform_device *pdev)
->>         }
->>
->>         /*
->> -        * we can't use of_iomap because pwrc is not mapped in memory,
->> +        * We can't use of_iomap because pwrc is not mapped in memory,
->>          * the so-called base address is only offset in rtciobrg
->>          */
->>         error = of_property_read_u32(np, "reg", &pwrcdrv->pwrc_base);
->> @@ -88,6 +117,11 @@ static int sirfsoc_pwrc_probe(struct platform_device *pdev)
->>         pwrcdrv->input->phys = "pwrc/input0";
->>         pwrcdrv->input->evbit[0] = BIT_MASK(EV_PWR);
->>
->> +       pwrcdrv->input->open = sirfsoc_pwrc_open;
->> +       pwrcdrv->input->close = sirfsoc_pwrc_close;
->> +
->> +       input_set_drvdata(pwrcdrv->input, pwrcdrv);
->> +
->>         irq = platform_get_irq(pdev, 0);
->>         error = devm_request_irq(&pdev->dev, irq,
->>                                  sirfsoc_pwrc_isr, IRQF_SHARED,
->> @@ -98,11 +132,6 @@ static int sirfsoc_pwrc_probe(struct platform_device *pdev)
->>                 return error;
->>         }
->>
->> -       sirfsoc_rtc_iobrg_writel(
->> -               sirfsoc_rtc_iobrg_readl(pwrcdrv->pwrc_base + PWRC_INT_MASK) |
->> -                       PWRC_ON_KEY_BIT,
->> -               pwrcdrv->pwrc_base + PWRC_INT_MASK);
->> -
->>         error = input_register_device(pwrcdrv->input);
->>         if (error) {
->>                 dev_err(&pdev->dev,
->> @@ -129,15 +158,16 @@ static int pwrc_resume(struct device *dev)
->>  {
->>         struct platform_device *pdev = to_platform_device(dev);
->>         struct sirfsoc_pwrc_drvdata *pwrcdrv = platform_get_drvdata(pdev);
->> +       struct input_dev *input = pwrcdrv->input;
->>
->>         /*
->>          * Do not mask pwrc interrupt as we want pwrc work as a wakeup source
->>          * if users touch X_ONKEY_B, see arch/arm/mach-prima2/pm.c
->>          */
->> -       sirfsoc_rtc_iobrg_writel(
->> -               sirfsoc_rtc_iobrg_readl(
->> -               pwrcdrv->pwrc_base + PWRC_INT_MASK) | PWRC_ON_KEY_BIT,
->> -               pwrcdrv->pwrc_base + PWRC_INT_MASK);
->> +       mutex_lock(&input->mutex);
->> +       if (input->users)
->> +               sirfsoc_pwrc_toggle_interrupts(pwrcdrv, true);
->> +       mutex_unlock(&input->mutex);
->>
->>         return 0;
->>  }
+On 02/13/2014 12:03 PM, Tomi Valkeinen wrote:
+> clk-divider.c does not calculate the rates consistently at the moment.
 >
-> -barry
+> As an example, on OMAP3 we have a clock divider with a source clock of
+> 864000000 Hz. With dividers 6, 7 and 8 the theoretical rates are:
+>
+> 6: 144000000
+> 7: 123428571.428571...
+> 8: 108000000
+>
+> Calling clk_round_rate() with the rate in the first column will give the
+> rate in the second column:
+>
+> 144000000 -> 144000000
+> 143999999 -> 123428571
+> 123428572 -> 123428571
+> 123428571 -> 108000000
+>
+> Note how clk_round_rate() returns 123428571 for rates from 123428572 to
+> 143999999, which is mathematically correct, but when clk_round_rate() is
+> called with 123428571, the returned value is surprisingly 108000000.
+>
+> This means that the following code works a bit oddly:
+>
+> rate = clk_round_rate(clk, 123428572);
+> clk_set_rate(clk, rate);
+>
+> As clk_set_rate() also does clock rate rounding, the result is that the
+> clock is set to the rate of 108000000, not 123428571 returned by the
+> clk_round_rate.
+>
+> This patch changes the clk-divider.c to use DIV_ROUND_UP when
+> calculating the rate. This gives the following behavior which fixes the
+> inconsistency:
+>
+> 144000000 -> 144000000
+> 143999999 -> 123428572
+> 123428572 -> 123428572
+> 123428571 -> 108000000
+>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> ---
+>   drivers/clk/clk-divider.c | 10 +++++-----
+>   1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index 5543b7df8e16..ec22112e569f 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -24,7 +24,7 @@
+>    * Traits of this clock:
+>    * prepare - clk_prepare only ensures that parents are prepared
+>    * enable - clk_enable only ensures that parents are enabled
+> - * rate - rate is adjustable.  clk->rate = parent->rate / divisor
+> + * rate - rate is adjustable.  clk->rate = DIV_ROUND_UP(parent->rate / divisor)
+>    * parent - fixed parent.  No clk_set_parent support
+>    */
+>
+> @@ -115,7 +115,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+>   		return parent_rate;
+>   	}
+>
+> -	return parent_rate / div;
+> +	return DIV_ROUND_UP(parent_rate, div);
+>   }
+>
+>   /*
+> @@ -185,7 +185,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+>   		}
+>   		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
+>   				MULT_ROUND_UP(rate, i));
+> -		now = parent_rate / i;
+> +		now = DIV_ROUND_UP(parent_rate, i);
+>   		if (now <= rate && now > best) {
+>   			bestdiv = i;
+>   			best = now;
+> @@ -207,7 +207,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+>   	int div;
+>   	div = clk_divider_bestdiv(hw, rate, prate);
+>
+> -	return *prate / div;
+> +	return DIV_ROUND_UP(*prate, div);
+>   }
+>
+>   static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+> @@ -218,7 +218,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+>   	unsigned long flags = 0;
+>   	u32 val;
+>
+> -	div = parent_rate / rate;
+> +	div = DIV_ROUND_UP(parent_rate, rate);
+>   	value = _get_val(divider, div);
+>
+>   	if (value > div_mask(divider))
+>
 
--barry
+Basically the patch looks good to me, but it might be good to have a 
+testing round of sort with this. It can potentially cause regressions on 
+multiple boards if the drivers happen to rely on the "broken" clock 
+rates. Same for patch #2 which is a copy paste of this one, but only 
+impacts TI boards.
+
+-Tero
