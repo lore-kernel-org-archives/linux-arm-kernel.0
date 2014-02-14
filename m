@@ -1,139 +1,62 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 14 Feb 2014 17:00:46 +0000
-Subject: [PATCH v4 12/13] cpuidle: mvebu: Add initial CPU idle support
- for Armada 370/XP SoC
-In-Reply-To: <1392312816-17657-13-git-send-email-gregory.clement@free-electrons.com>
-References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
- <1392312816-17657-13-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140214170046.GA32564@e102568-lin.cambridge.arm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 14 Feb 2014 17:05:59 +0000
+Subject: [PATCH v3] ARM: mm: report both sections from PMD
+In-Reply-To: <20140213195230.GA15275@www.outflux.net>
+References: <20140213195230.GA15275@www.outflux.net>
+Message-ID: <20140214170558.GA13608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 05:33:35PM +0000, Gregory CLEMENT wrote:
-
-[...]
-
-> diff --git a/drivers/cpuidle/cpuidle-armada-370-xp.c b/drivers/cpuidle/cpuidle-armada-370-xp.c
-> new file mode 100644
-> index 000000000000..57c69812e79d
-> --- /dev/null
-> +++ b/drivers/cpuidle/cpuidle-armada-370-xp.c
-> @@ -0,0 +1,120 @@
-> +/*
-> + * Marvell Armada 370 and Armada XP SoC cpuidle driver
-> + *
-> + * Copyright (C) 2013 Marvell
-> + *
-> + * Nadav Haklai <nadavh@marvell.com>
-> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + *
-> + * Maintainer: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> + */
+On Thu, Feb 13, 2014 at 11:52:30AM -0800, Kees Cook wrote:
+> On 2-level page table systems, the PMD has 2 section entries. Report
+> these, otherwise ARM_PTDUMP will miss reporting permission changes on
+> odd section boundaries.
+> 
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+> v3:
+>  - re-reorganize, drop use of pmd_sect; suggested by Catalin Marinas.
+> v2:
+>  - reorganize, suggested by Catalin Marinas.
+> ---
+>  arch/arm/mm/dump.c |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+> index 2b342177f5de..61cc78ae9f21 100644
+> --- a/arch/arm/mm/dump.c
+> +++ b/arch/arm/mm/dump.c
+> @@ -264,6 +264,9 @@ static void walk_pmd(struct pg_state *st, pud_t *pud, unsigned long start)
+>  			note_page(st, addr, 3, pmd_val(*pmd));
+>  		else
+>  			walk_pte(st, pmd, addr);
 > +
-> +#include <linux/cpu_pm.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/module.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/suspend.h>
-> +#include <asm/suspend.h>
-> +#include <linux/smp.h>
-> +#include <asm/cpuidle.h>
-> +#include <asm/smp_plat.h>
-> +#include <linux/platform_device.h>
-> +#include <asm/cp15.h>
-> +#include <asm/cacheflush.h>
+> +		if (SECTION_SIZE < PMD_SIZE && pmd_large(pmd[1]))
+> +			note_page(st, addr + SECTION_SIZE, 3, pmd_val(pmd[1]));
+>  	}
+>  }
+>  
+> -- 
+> 1.7.9.5
 
-You should order them <linux/...>, then <asm/...>
+This picks up an odd megabyte aligned section on my Arndale board with
+short descriptors on 3.14-rc2. Behaves as expected with long descriptors
+too (does nothing).
 
-> +
-> +#define ARMADA_370_XP_MAX_STATES	3
+FWIW:
+Tested-by: Steve Capper <steve.capper@linaro.org>
 
-Is this macro really needed ?
+Cheers,
+-- 
+Steve
 
-> +#define ARMADA_370_XP_FLAG_DEEP_IDLE	0x10000
-> +extern void armada_370_xp_pmsu_idle_prepare(bool deepidle);
-> +extern void ll_clear_cpu_coherent(void);
-> +extern void ll_set_cpu_coherent(void);
-> +
-> +noinline static int armada_370_xp_cpu_suspend(unsigned long deepidle)
-> +{
-> +	armada_370_xp_pmsu_idle_prepare(deepidle);
-> +
-> +	v7_exit_coherency_flush(all);
-
-The macro above clears the C bit in SCTLR and exit coherency (clears SMP
-bit in SCTLR), let's keep this in mind, see below.
-
-> +	ll_clear_cpu_coherent();
-
-And the macro above uses ldr/str exclusives, and this is done with MMU
-on and off (on cold-boot before jumping to secondary_startup and also
-before jumping to cpu_resume in armada_370_xp_cpu_resume).
-
-Can you explain to me how load/store exclusives work on this platform ?
-
-ARM ARM A3.4.5
-
-"It is IMPLEMENTATION DEFINED whether LDREX and STREX operations can be
-performed to a memory region with the Device or Strongly-ordered memory
-attribute. Unless the implementation documentation explicitly states that
-LDREX and STREX operations to a memory region with the Device or
-Strongly-ordered attribute are permitted, the effect of such operations is
-UNPREDICTABLE."
-
-At least code must be commented and an explanation on why this works has
-to be given.
-
-> +
-> +	dsb();
-> +
-> +	wfi();
-> +
-> +	ll_set_cpu_coherent();
-> +
-> +	asm volatile(
-> +	"mrc	p15, 0, %0, c1, c0, 0 \n\t"
-> +	"tst	%0, #(1 << 2) \n\t"
-> +	"orreq	r0, %0, #(1 << 2) \n\t"
-> +	"mcreq	p15, 0, %0, c1, c0, 0 \n\t"
-> +	"isb	"
-> +	: : "r" (0));
-
-First of all, complex code like this must be commented.
-
-Moreover, this sequence is wrong. If wfi completes the kernel would explode.
-
-1) where is the SMP bit in SCTLR restored ?
-2) where are tlbs flushed (ie processors run out of coherency for _some_
-   time, so tlbs might be stale) ?
-
-> +
-> +	return 0;
-> +}
-> +
-> +static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
-> +				struct cpuidle_driver *drv,
-> +				int index)
-> +{
-> +	bool deepidle = false;
-> +	cpu_pm_enter();
-> +
-> +	if (drv->states[index].flags & ARMADA_370_XP_FLAG_DEEP_IDLE)
-> +		deepidle = true;
-> +
-> +	cpu_suspend(deepidle, armada_370_xp_cpu_suspend);
-> +
-> +	cpu_pm_exit();
-> +
-> +	return index;
-
-You should check the cpu_suspend return value and demote the idle state
-accordingly, if it failed.
-
-Thanks,
-Lorenzo
+> 
+> 
+> -- 
+> Kees Cook
+> Chrome OS Security
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
