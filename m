@@ -1,84 +1,90 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 14 Feb 2014 16:24:58 +0000
-Subject: [BISECTED] ssh - Received disconnect from x.x.x.x: 2: Bad packet
- length 3149594624
-In-Reply-To: <52FE407C.3080002@gmail.com>
-References: <52FD08D1.3030405@gmail.com>
- <20140213182105.GN13576@mudshark.cambridge.arm.com>
- <52FD1243.9040706@gmail.com>
- <20140213192909.GO13576@mudshark.cambridge.arm.com>
- <52FE407C.3080002@gmail.com>
-Message-ID: <20140214162458.GF21986@mudshark.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 14 Feb 2014 17:26:44 +0100
+Subject: [PATCH 26/27] ARM: shmobile: lager-reference: Enable CMT0 in
+ device tree
+In-Reply-To: <52FE29DB.2010304@cogentembedded.com>
+References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2354725.yUCM3gQqXi@avalon> <52FE29DB.2010304@cogentembedded.com>
+Message-ID: <1395114.O6aqLXJV0J@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 04:12:44PM +0000, Ivaylo Dimitrov wrote:
-> On 13.02.2014 21:29, Will Deacon wrote:
-> >
-> > Can you try hacking crypto/memneq.c so that it doesn't use
-> > CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS please? That would at least point the
-> > finger at net/mac80211/rx.c or similar.
-> >
+Hi Sergei,
+
+On Friday 14 February 2014 18:36:11 Sergei Shtylyov wrote:
+> Hello.
 > 
-> Well, I am lazy so I hacked net/mac80211/rx.c first:
-
-No problem, thanks for having a go.
-
-> index c24ca0d..6839c77 100644
-> --- a/net/mac80211/rx.c
-> +++ b/net/mac80211/rx.c
-> @@ -1963,7 +1963,7 @@ ieee80211_deliver_skb(struct ieee80211_rx_data *rx)
->                  }
->          }
+> On 14-02-2014 18:22, Laurent Pinchart wrote:
+> >>>>> Enable the CMT0 device and configure channel 0 as a clock event
+> >>>>> provider.
+> >>>>> 
+> >>>>> Signed-off-by: Laurent Pinchart
+> >>>>> <laurent.pinchart+renesas@ideasonboard.com>
+> >>>>> 
+> >>>>> diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> >>>>> b/arch/arm/mach-shmobile/include/mach/r8a7790.h index 0b95bab..62b31f3
+> >>>>> 100644 --- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> >>>>> +++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> >>>>> @@ -29,7 +29,6 @@ enum {
+> >>>>> 
+> >>>>>   };
+> >>>>>   
+> >>>>>   void r8a7790_add_standard_devices(void);
+> >>>>> 
+> >>>>> -void r8a7790_add_dt_devices(void);
+> >>>>> 
+> >>>>>   void r8a7790_clock_init(void);
+> >>>>>   void r8a7790_pinmux_init(void);
+> >>>>>   void r8a7790_pm_init(void);
+> >>>>> 
+> >>>>> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c
+> >>>>> b/arch/arm/mach-shmobile/setup-r8a7790.c index 3e5813f..462c81f 100644
+> >>>>> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
+> >>>>> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+> >>>>> @@ -294,11 +294,6 @@ static struct resource cmt0_resources[] = {
+> >>>>>     					  &cmt##idx##_platform_data,	\
+> >>>>>     					  sizeof(struct sh_timer_config))
+> >>>>> 
+> >>>>> -void __init r8a7790_add_dt_devices(void)
+> >>>>> -{
+> >>>>> -	r8a7790_register_cmt(0);
+> >>>>> -}
+> >>>>> -
+> >>>>>  void __init r8a7790_add_standard_devices(void)
+> >>>>>  {
+> >>>>>     	r8a7790_register_scif(0);
+> >>>>> @@ -311,7 +306,7 @@ void __init r8a7790_add_standard_devices(void)
+> >>>>> 	r8a7790_register_scif(7);
+> >>>>>  	r8a7790_register_scif(8);
+> >>>>>  	r8a7790_register_scif(9);
+> >>>>> -	r8a7790_add_dt_devices();
+> >>>>> +	r8a7790_register_cmt(0);
+> >>>>> 	r8a7790_register_irqc(0);
+> >>>>> 	r8a7790_register_thermal();
+> >>>>> }
+> >>>> 
+> >>>> IMHO, these 2 files should be split into a separate patch.
+> >>> 
+> >>> That could easily be done, but why ?
+> >> 
+> >> It does not seem necessary to combine these changes in one patch.
+> >> Remember, Simon has separate branches for boards and SoCs. So finally
+> >> it's up to him to decide on this...
+> > 
+> > Right, but in this case I need to remove the CMT platform device
+> > registration from r8a7790_add_dt_devices()
 > 
-> -#ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
-> +//#ifndef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
->          if (skb) {
->                  /* 'align' will only take the values 0 or 2 here since all
->                   * frames are required to be aligned to 2-byte boundaries
-> @@ -1987,7 +1987,7 @@ ieee80211_deliver_skb(struct ieee80211_rx_data *rx)
->                          }
->                  }
->          }
-> -#endif
-> +//#endif
-> 
->          if (skb) {
->                  /* deliver to local stack */
-> 
-> 
-> and that seems to fix the problem.
-> 
-> I am not sure whom I should forward the problem.
+> You're not removing anything in these 2 files, you're just replacing
+> "indirect" call to r8a7790_register_cmt(0) with direct.
 
-Well, we probably need a bit more to go on, because I doubt that this code
-is to blame. More likely, the issue is in the caller.
-Looking at drivers/net/wireless/ti/wl1251/rx.c:182
+OK, I see what you mean now. Given that the patch removes the 
+r8a7790_add_dt_devices() call from arch/arm/mach-shmobile/board-lager-
+reference.c, I could indeed split those two changes into a separate patch as 
+there's no-one calling the function anymore. That would introduce a dependency 
+between the branches, which might not be better. I'll let Simon comment on 
+what he would prefer and will act accordingly.
 
-        /* The actual length doesn't include the target's alignment */
-        skb->len = desc->length  - PLCP_HEADER_LENGTH;
+-- 
+Regards,
 
-        fc = (u16 *)skb->data;
-
-        if ((*fc & IEEE80211_FCTL_STYPE) == IEEE80211_STYPE_BEACON)
-                beacon = 1;
-
-        wl1251_rx_status(wl, desc, &status, beacon);
-
-        wl1251_debug(DEBUG_RX, "rx skb 0x%p: %d B %s", skb, skb->len,
-                     beacon ? "beacon" : "");
-
-        memcpy(IEEE80211_SKB_RXCB(skb), &status, sizeof(status));
-        ieee80211_rx_ni(wl->hw, skb);
-
-I wonder whether that first line (with the comment about alignment) is
-assuming some behaviour from the mac80211 layer.
-
-You could try putting back the UNALIGNED_ACCESS in net/mac80211/rx.c and
-commenting out the skb->len = desc->length  - PLCP_HEADER_LENGTH;  line
-above.
-
-Adding the original author (I think) and John Linville, since I'm well out
-of my depth in this code!
-
-Will
+Laurent Pinchart
