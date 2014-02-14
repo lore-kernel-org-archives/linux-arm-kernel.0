@@ -1,39 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 14 Feb 2014 14:28:06 +0000
-Subject: [PATCH] KVM: ARM: vgic: plug irq injection race
-Message-ID: <1392388086-24730-1-git-send-email-marc.zyngier@arm.com>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Fri, 14 Feb 2014 14:33:18 +0000
+Subject: [PATCH RESEND] ARM: mcpm: Make all mcpm functions notrace
+In-Reply-To: <1392279975.3469.4.camel@linaro1.home>
+References: <1392279975.3469.4.camel@linaro1.home>
+Message-ID: <52FE292E.70008@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it stands, nothing prevents userspace from injecting an interrupt
-before the guest's GIC is actually initialized.
+Hi Tixy,
 
-This goes unnoticed so far (as everything is pretty much statically
-allocated), but ends up exploding in a spectacular way once we switch
-to a more dynamic allocation (the GIC data structure isn't there yet).
+On 13/02/14 08:26, Jon Medhurst (Tixy) wrote:
+> From: Dave Martin <dave.martin@linaro.org>
+> 
+> The functions in mcpm_entry.c are mostly intended for use during
+> scary cache and coherency disabling sequences, or do other things
+> which confuse trace ...  like powering a CPU down and not
+> returning.  Similarly for the backend code.
+> 
+> For simplicity, this patch just makes whole files notrace.
+> There should be more than enough traceable points on the paths to
+> these functions, but we can be more fine-grained later if there is
+> a need for it.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> 
+> Also added spc.o to the list of files as it contains functions used by
+> MCPM code which have comments comments like: "might be used in code
+> paths where normal cacheable locks are not working"
+>
 
-The fix is to test for the "ready" flag in the VGIC distributor before
-trying to inject the interrupt. Note that in order to avoid breaking
-userspace, we have to ignore what is essentially an error.
+Just realised that spc.c now has OPP functionality too. As the comment above
+says this can be fine grained later, but just wanted to mention here. IMO we can
+restrict notrace to just below functions in spc.c
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ve_spc_cpu_in_wfi
+ve_spc_cpu_wakeup_irq
+ve_spc_global_wakeup_irq
+ve_spc_powerdown
+ve_spc_set_resume_addr
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index be456ce..d40fe61 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1386,7 +1386,8 @@ out:
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
- 			bool level)
- {
--	if (vgic_update_irq_state(kvm, cpuid, irq_num, level))
-+	if (likely(vgic_initialized(kvm)) &&
-+	    vgic_update_irq_state(kvm, cpuid, irq_num, level))
- 		vgic_kick_vcpus(kvm);
- 
- 	return 0;
--- 
-1.8.3.4
+Regards,
+Sudeep
