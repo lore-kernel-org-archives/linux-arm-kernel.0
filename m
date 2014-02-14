@@ -1,135 +1,171 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 14 Feb 2014 11:20:01 +0800
-Subject: [PATCH v3] input: sirfsoc-onkey - report onkey untouch event by
- detecting pin status
-Message-ID: <1392348001-4950-1-git-send-email-21cnbao@gmail.com>
+From: r.sh.open@gmail.com (Rahul Sharma)
+Date: Fri, 14 Feb 2014 08:54:28 +0530
+Subject: [PATCH V2 2/3] ARM: dts: add dts files for exynos5260 SoC
+In-Reply-To: <52F9F59D.1090905@gmail.com>
+References: <1391577375-17625-1-git-send-email-rahul.sharma@samsung.com>
+ <1391577375-17625-3-git-send-email-rahul.sharma@samsung.com>
+ <52F38C42.5030508@samsung.com>
+ <CAPdUM4NBwXcnL2KK9Rsi46GWQz_KQsXF0EEeSmCb=wB8WfgUKQ@mail.gmail.com>
+ <52F9F59D.1090905@gmail.com>
+Message-ID: <CAPdUM4Pu-CbuNwwjrd_8itbSbjKqTBLE5u_T_vO89jreOy4=kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xianglong Du <Xianglong.Du@csr.com>
+Thanks Tomasz,
 
-this patch adds a delayed_work to detect the untouch of onkey since HW will
-not generate interrupt for it.
+I will add these changes to v3.
 
-at the same time, we move the KEY event to POWER instead of SUSPEND, which
-will be suitable for both Android and Linux. Userspace PowerManager Daemon
-will decide to suspend or shutdown based on how long we have touched onkey
+Regards,
+Rahul Sharma.
 
-Signed-off-by: Xianglong Du <Xianglong.Du@csr.com>
-Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- -v3: move to use custom devres action
-
- drivers/input/misc/sirfsoc-onkey.c |   60 +++++++++++++++++++++++++++++------
- 1 files changed, 49 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/input/misc/sirfsoc-onkey.c b/drivers/input/misc/sirfsoc-onkey.c
-index e8897c3..b354da8 100644
---- a/drivers/input/misc/sirfsoc-onkey.c
-+++ b/drivers/input/misc/sirfsoc-onkey.c
-@@ -13,16 +13,44 @@
- #include <linux/input.h>
- #include <linux/rtc/sirfsoc_rtciobrg.h>
- #include <linux/of.h>
-+#include <linux/workqueue.h>
- 
- struct sirfsoc_pwrc_drvdata {
- 	u32			pwrc_base;
- 	struct input_dev	*input;
-+	struct delayed_work	work;
- };
- 
- #define PWRC_ON_KEY_BIT			(1 << 0)
- 
- #define PWRC_INT_STATUS			0xc
- #define PWRC_INT_MASK			0x10
-+#define PWRC_PIN_STATUS			0x14
-+#define PWRC_KEY_DETECT_UP_TIME		20	/* ms*/
-+
-+static inline int sirfsoc_pwrc_is_on_key_down(
-+		struct sirfsoc_pwrc_drvdata *pwrcdrv)
-+{
-+	int state = sirfsoc_rtc_iobrg_readl(
-+				pwrcdrv->pwrc_base + PWRC_PIN_STATUS)
-+				& PWRC_ON_KEY_BIT;
-+	return !state; /* ON_KEY is active low */
-+}
-+
-+static void sirfsoc_pwrc_report_event(struct work_struct *work)
-+{
-+	struct sirfsoc_pwrc_drvdata *pwrcdrv =
-+				container_of((struct delayed_work *)work,
-+				struct sirfsoc_pwrc_drvdata, work);
-+
-+	if (!sirfsoc_pwrc_is_on_key_down(pwrcdrv)) {
-+		input_event(pwrcdrv->input, EV_KEY, KEY_POWER, 0);
-+		input_sync(pwrcdrv->input);
-+	} else {
-+		schedule_delayed_work(&pwrcdrv->work,
-+			msecs_to_jiffies(PWRC_KEY_DETECT_UP_TIME));
-+	}
-+}
- 
- static irqreturn_t sirfsoc_pwrc_isr(int irq, void *dev_id)
- {
-@@ -34,21 +62,22 @@ static irqreturn_t sirfsoc_pwrc_isr(int irq, void *dev_id)
- 	sirfsoc_rtc_iobrg_writel(int_status & ~PWRC_ON_KEY_BIT,
- 				 pwrcdrv->pwrc_base + PWRC_INT_STATUS);
- 
--	/*
--	 * For a typical Linux system, we report KEY_SUSPEND to trigger apm-power.c
--	 * to queue a SUSPEND APM event
--	 */
--	input_event(pwrcdrv->input, EV_PWR, KEY_SUSPEND, 1);
--	input_sync(pwrcdrv->input);
- 
--	/*
--	 * Todo: report KEY_POWER event for Android platforms, Android PowerManager
--	 * will handle the suspend and powerdown/hibernation
--	 */
-+	input_event(pwrcdrv->input, EV_KEY, KEY_POWER, 1);
-+	input_sync(pwrcdrv->input);
-+	schedule_delayed_work(&pwrcdrv->work,
-+		msecs_to_jiffies(PWRC_KEY_DETECT_UP_TIME));
- 
- 	return IRQ_HANDLED;
- }
- 
-+static void sirfsoc_pwrc_stop_updetect(void *data)
-+{
-+	struct sirfsoc_pwrc_drvdata *pwrcdrv = data;
-+
-+	cancel_delayed_work_sync(&pwrcdrv->work);
-+}
-+
- static const struct of_device_id sirfsoc_pwrc_of_match[] = {
- 	{ .compatible = "sirf,prima2-pwrc" },
- 	{},
-@@ -86,7 +115,9 @@ static int sirfsoc_pwrc_probe(struct platform_device *pdev)
- 
- 	pwrcdrv->input->name = "sirfsoc pwrckey";
- 	pwrcdrv->input->phys = "pwrc/input0";
--	pwrcdrv->input->evbit[0] = BIT_MASK(EV_PWR);
-+	pwrcdrv->input->evbit[0] = BIT_MASK(EV_KEY);
-+
-+	INIT_DELAYED_WORK(&pwrcdrv->work, sirfsoc_pwrc_report_event);
- 
- 	irq = platform_get_irq(pdev, 0);
- 	error = devm_request_irq(&pdev->dev, irq,
-@@ -98,6 +129,13 @@ static int sirfsoc_pwrc_probe(struct platform_device *pdev)
- 		return error;
- 	}
- 
-+	error = devm_add_action(&pdev->dev, sirfsoc_pwrc_stop_updetect, pwrcdrv);
-+	if (error) {
-+		dev_err(&pdev->dev, "failed to add stop untouch detection action, %d\n",
-+			error);
-+		return error;
-+	}
-+
- 	sirfsoc_rtc_iobrg_writel(
- 		sirfsoc_rtc_iobrg_readl(pwrcdrv->pwrc_base + PWRC_INT_MASK) |
- 			PWRC_ON_KEY_BIT,
--- 
-1.7.5.4
+On 11 February 2014 15:34, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Rahul,
+>
+>
+> On 11.02.2014 06:22, Rahul Sharma wrote:
+>>
+>> Hi Tomasz,
+>>
+>> On 6 February 2014 18:51, Tomasz Figa <t.figa@samsung.com> wrote:
+>>>
+>>> Hi Rahul, Pankaj, Arun,
+>>>
+>>> [adding linux-arm-kernel, devicetree MLs and DT people on Cc]
+>>>
+>>> I think it's good time to stop accepting DTS files like this and force
+>>> new
+>>> ones to use the proper structure with soc node, labels for every node and
+>>> node references.
+>>
+>>
+>> I am unable to find information on SoC node and grouping inside SoC node.
+>> Please
+>> share some pointers.
+>
+>
+> Well, there is not much information needed about this. Basically all the
+> devices built into the SoC should be listed under respective bus nodes or a
+> single soc node, instead of root level. Such node should be a "simple-bus"
+> and just group the components together to separate board-specific devices
+> (which are still at root level) from SoC devices.
+>
+> Even though it might seem useless, it improves DT readability a bit and
+> still most of the platforms use this approach, so for consistency, Exynos
+> should use too.
+>
+> Just for reference, back in April 2013, in his review of S3C64xx DT series
+> [1], Rob Herring requested that we don't submit any new device trees using
+> flat approach and start using bus hierarchy.
+>
+> [1]
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/163659.html
+>
+>
+>>>
+>>>> +               spi0_bus: spi0-bus {
+>>>> +                       samsung,pins = "gpa2-0", "gpa2-1", "gpa2-2",
+>>>> "gpa2-3";
+>>>
+>>>
+>>>
+>>> What is the reason for SPI0 to have 4 pins, while SPI1 has just 3?
+>>>
+>>
+>> I should align SPI1 with SPI0.
+>>
+>
+> Are you sure that SPI0 is the correct one? SPI usually uses four pins - SDI,
+> SDO, SCK and nCS, but we always used to treat nCS as a simple GPIO, due to
+> the fact that the controller can only support one dedicated chip select and
+> with direct GPIO control you can have more.
+>
+> What is the fourth pin here?
+>
+>
+>>>
+>>>> +               cpu at 1 {
+>>>> +                       device_type = "cpu";
+>>>> +                       compatible = "arm,cortex-a15";
+>>>> +                       reg = <1>;
+>>>> +                       cci-control-port = <&cci_control1>;
+>>>> +               };
+>>>> +               cpu at 100 {
+>>>> +                       device_type = "cpu";
+>>>> +                       compatible = "arm,cortex-a7";
+>>>> +                       reg = <0x100>;
+>>>> +                       cci-control-port = <&cci_control0>;
+>>>> +               };
+>>>> +               cpu at 101 {
+>>>> +                       device_type = "cpu";
+>>>> +                       compatible = "arm,cortex-a7";
+>>>> +                       reg = <0x101>;
+>>>> +                       cci-control-port = <&cci_control0>;
+>>>> +               };
+>>>> +               cpu at 102 {
+>>>> +                       device_type = "cpu";
+>>>> +                       compatible = "arm,cortex-a7";
+>>>> +                       reg = <0x102>;
+>>>> +                       cci-control-port = <&cci_control0>;
+>>>> +               };
+>>>> +               cpu at 103 {
+>>>> +                       device_type = "cpu";
+>>>> +                       compatible = "arm,cortex-a7";
+>>>> +                       reg = <0x103>;
+>>>> +                       cci-control-port = <&cci_control0>;
+>>>> +               };
+>>>> +       };
+>>>> +
+>>>> +       cmus {
+>>>> +               #address-cells = <1>;
+>>>> +               #size-cells = <1>;
+>>>> +               ranges;
+>>>> +
+>>>
+>>>
+>>>
+>>> I don't think there is a need to group these nodes under a parent node
+>>> that
+>>> doesn't give any additional information, especially when the CMUs are
+>>> scattered trough the whole address space, while we'd like to keep the
+>>> nodes
+>>> ordered by their addresses, as most platforms do.
+>>>
+>>
+>> This is exactly the same case as "cpus". I mean, "cpus" also doesn't
+>> provide
+>> any common information about child cpu nodes. This looks to me as a
+>> logical
+>> grouping and I have implemented same thing for cmu nodes.
+>> I am ok with removing this grouping Just want to understand the rational
+>> behind
+>> grouping cpus which seems similar to cmus.
+>
+>
+> The "cpus" node is a defined standard node that should be present at root of
+> device tree and include subnodes for all CPUs. This is a standard binding
+> defined for low level code to be able to simply find nodes of all CPUs in
+> the system - so they can expect that at /cpus node all the subnodes are
+> subsequent CPUs.
+>
+>
+>> Similarly "soc" is just a logical entity used to group SoC elements which
+>> looks
+>> optional to me. What are we achieving with this? Please help me in
+>> understanding
+>> this better.
+>
+>
+> Also "soc" has a slightly wider meaning. It is a node grouping all nodes
+> from a single address space - the node specifies #address-cells and
+> #size-cells of this address space and all the devices under this
+> "simple-bus" can be accessed using addresses in this format. In addition, it
+> separates board-level devices from generic SoC devices.
+>
+> Now, in case of "cmus", the only purpose is to group all CMU nodes together
+> and, while this improves readability a bit, it doesn't make the DT better
+> express the hardware topology, because the CMUs in the hardware are in fact
+> scattered through the whole address space, not under a contiguous block of
+> it, as the grouping would suggest.
+>
+> Best regards,
+> Tomasz
