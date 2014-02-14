@@ -1,158 +1,105 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 14 Feb 2014 09:32:24 +0900
-Subject: [PATCH/RFC] ARM: shmobile: Add defconfig for shmobile mulitplatfom
-Message-ID: <1392337944-4000-1-git-send-email-horms+renesas@verge.net.au>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 14 Feb 2014 01:59:38 +0100
+Subject: [PATCH 00/27] Renesas CMT (Compare Match Timer) DT bindings
+Message-ID: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is intended to be a base for a defconfig to cover all
-shmobile multiplatform boards. It currently includes configuration
-for the following boards:
+Hello,
 
-* KZM9D
-* Lager
-* Koelsch
+This patch set adds DT support to the Renesas CMT driver.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 129 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 129 insertions(+)
- create mode 100644 arch/arm/configs/shmobile_defconfig
+The first 14 patches are a bunch of necessary cleanups that reorganize the
+driver, its platform data, and the memory, interrupt and clock resources it
+expects. As a result the driver accepts a new platform data model close to the
+hardware with supports for all the timer channels using a single device.
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-new file mode 100644
-index 0000000..2912675
---- /dev/null
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -0,0 +1,129 @@
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_LOG_BUF_SHIFT=16
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_EMBEDDED=y
-+CONFIG_PERF_EVENTS=y
-+CONFIG_SLAB=y
-+CONFIG_ARCH_SHMOBILE_MULTI=y
-+CONFIG_ARCH_EMEV2=y
-+CONFIG_ARCH_R8A7790=y
-+CONFIG_ARCH_R8A7791=y
-+CONFIG_MACH_KOELSCH=y
-+CONFIG_MACH_KZM9D=y
-+CONFIG_MACH_LAGER=y
-+# CONFIG_SWP_EMULATE is not set
-+CONFIG_CPU_BPREDICT_DISABLE=y
-+CONFIG_PL310_ERRATA_588369=y
-+CONFIG_ARM_ERRATA_754322=y
-+CONFIG_PCI=y
-+CONFIG_PCI_RCAR_GEN2=y
-+CONFIG_SMP=y
-+CONFIG_SCHED_MC=y
-+CONFIG_HAVE_ARM_ARCH_TIMER=y
-+CONFIG_NR_CPUS=8
-+CONFIG_AEABI=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_KEXEC=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_PM_RUNTIME=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_MTD=y
-+CONFIG_MTD_M25P80=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_ATA=y
-+CONFIG_SATA_RCAR=y
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_VENDOR_ARC is not set
-+# CONFIG_NET_CADENCE is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+CONFIG_SH_ETH=y
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+# CONFIG_NET_VENDOR_STMICRO is not set
-+# CONFIG_NET_VENDOR_VIA is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_KEYBOARD_GPIO=y
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_EXTENDED=y
-+CONFIG_SERIAL_8250_EM=y
-+CONFIG_SERIAL_SH_SCI=y
-+CONFIG_SERIAL_SH_SCI_NR_UARTS=20
-+CONFIG_SERIAL_SH_SCI_CONSOLE=y
-+CONFIG_I2C_GPIO=y
-+CONFIG_I2C_RCAR=y
-+CONFIG_SPI=y
-+CONFIG_SPI_RSPI=y
-+CONFIG_GPIO_EM=y
-+CONFIG_GPIO_RCAR=y
-+# CONFIG_HWMON is not set
-+CONFIG_THERMAL=y
-+CONFIG_RCAR_THERMAL=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_GPIO=y
-+CONFIG_MEDIA_SUPPORT=y
-+CONFIG_MEDIA_CAMERA_SUPPORT=y
-+CONFIG_V4L_PLATFORM_DRIVERS=y
-+CONFIG_SOC_CAMERA=y
-+CONFIG_SOC_CAMERA_PLATFORM=y
-+CONFIG_VIDEO_RCAR_VIN=y
-+# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
-+CONFIG_VIDEO_ADV7180=y
-+CONFIG_DRM=y
-+CONFIG_DRM_RCAR_DU=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_SOC=y
-+CONFIG_SND_SOC_RCAR=y
-+CONFIG_USB_RCAR_GEN2_PHY=y
-+CONFIG_MMC=y
-+CONFIG_MMC_SDHI=y
-+CONFIG_MMC_SH_MMCIF=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_DMADEVICES=y
-+CONFIG_SH_DMAE=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+# CONFIG_DNOTIFY is not set
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_CONFIGFS_FS=y
-+# CONFIG_MISC_FILESYSTEMS is not set
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_NFS_V4_1=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
-+# CONFIG_ENABLE_WARN_DEPRECATED is not set
-+# CONFIG_ENABLE_MUST_CHECK is not set
-+# CONFIG_ARM_UNWIND is not set
+The next 7 patches (15 to 21) move all platforms from the old to the new
+platform data model. Patch 22 then drops support for the old model, and patch
+23 finally adds DT support.
+
+Patches 24 to 27 then add the CMT devices to the r8a7790 and r8a7791 device
+trees, and enable them for the lager-reference and koelsch-reference boards.
+
+The patches are based on top of Simon's latest devel branch with the
+"[PATCH v4 0/2] [RESEND] Lager and Koelsch reference serial port support"
+series applied.
+
+Laurent Pinchart (27):
+  clocksource: sh_cmt: Split channel fields from sh_cmt_priv
+  clocksource: sh_cmt: Rename struct sh_cmt_priv to sh_cmt_device
+  clocksource: sh_cmt: Split channel setup to separate function
+  clocksource: sh_cmt: Rename mapbase/mapbase_str to mapbase_ch/mapbase
+  clocksource: sh_cmt: Add memory base to sh_cmt_channel structure
+  clocksource: sh_cmt: Add index to struct sh_cmt_channel
+  clocksource: sh_cmt: Replace kmalloc + memset with kzalloc
+  clocksource: sh_cmt: Allocate channels dynamically
+  clocksource: sh_cmt: Split static information from sh_cmt_device
+  clocksource: sh_cmt: Replace hardcoded register values with macros
+  clocksource: sh_cmt: Add support for multiple channels per device
+  clocksource: sh_cmt: Acquire default clock in the non-legacy case
+  clocksource: sh_cmt: Remove FSF mail address from GPL notice
+  clocksource: sh_cmt: Sort headers alphabetically
+  sh: Switch to new style CMT device
+  ARM: shmobile: sh7372: Switch to new style CMT device
+  ARM: shmobile: sh73a0: Switch to new style CMT device
+  ARM: shmobile: r8a73a4: Switch to new style CMT device
+  ARM: shmobile: r8a7740: Switch to new style CMT device
+  ARM: shmobile: r8a7790: Switch to new style CMT device
+  ARM: shmobile: r8a7791: Switch to new style CMT device
+  clocksource: sh_cmt: Drop support for legacy platform data
+  clocksource: sh_cmt: Add DT support
+  ARM: shmobile: r8a7790: Add CMT devices to DT
+  ARM: shmobile: r8a7791: Add CMT devices to DT
+  ARM: shmobile: lager-reference: Enable CMT0 in device tree
+  ARM: shmobile: koelsch-reference: Enable CMT0 in device tree
+
+ .../devicetree/bindings/timer/renesas,cmt.txt      |  75 ++
+ arch/arm/boot/dts/r8a7790-lager.dts                |   9 +
+ arch/arm/boot/dts/r8a7790.dtsi                     |  38 +
+ arch/arm/boot/dts/r8a7791-koelsch.dts              |   9 +
+ arch/arm/boot/dts/r8a7791.dtsi                     |  38 +
+ arch/arm/mach-shmobile/board-koelsch-reference.c   |  15 +-
+ arch/arm/mach-shmobile/board-lager-reference.c     |  15 +-
+ arch/arm/mach-shmobile/clock-r8a73a4.c             |   2 +-
+ arch/arm/mach-shmobile/clock-r8a7740.c             |   2 +-
+ arch/arm/mach-shmobile/clock-r8a7790.c             |   2 +-
+ arch/arm/mach-shmobile/clock-r8a7791.c             |   2 +-
+ arch/arm/mach-shmobile/clock-sh7372.c              |   6 +-
+ arch/arm/mach-shmobile/clock-sh73a0.c              |   2 +-
+ arch/arm/mach-shmobile/include/mach/r8a7790.h      |   1 -
+ arch/arm/mach-shmobile/include/mach/r8a7791.h      |   1 -
+ arch/arm/mach-shmobile/setup-r8a73a4.c             |  25 +-
+ arch/arm/mach-shmobile/setup-r8a7740.c             |  45 +-
+ arch/arm/mach-shmobile/setup-r8a7790.c             |  31 +-
+ arch/arm/mach-shmobile/setup-r8a7791.c             |  31 +-
+ arch/arm/mach-shmobile/setup-sh7372.c              |  30 +-
+ arch/arm/mach-shmobile/setup-sh73a0.c              |  45 +-
+ arch/sh/kernel/cpu/clock-cpg.c                     |   3 +-
+ arch/sh/kernel/cpu/sh2/setup-sh7619.c              |  73 +-
+ arch/sh/kernel/cpu/sh2a/clock-sh7264.c             |   2 +-
+ arch/sh/kernel/cpu/sh2a/clock-sh7269.c             |   2 +-
+ arch/sh/kernel/cpu/sh2a/setup-sh7203.c             |  73 +-
+ arch/sh/kernel/cpu/sh2a/setup-sh7206.c             |  73 +-
+ arch/sh/kernel/cpu/sh2a/setup-sh7264.c             |  76 +-
+ arch/sh/kernel/cpu/sh2a/setup-sh7269.c             |  73 +-
+ arch/sh/kernel/cpu/sh3/setup-sh7720.c              | 155 +---
+ arch/sh/kernel/cpu/sh4a/clock-sh7343.c             |   2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7366.c             |   2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7722.c             |   2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7723.c             |   2 +-
+ arch/sh/kernel/cpu/sh4a/clock-sh7724.c             |   2 +-
+ arch/sh/kernel/cpu/sh4a/setup-sh7343.c             |  28 +-
+ arch/sh/kernel/cpu/sh4a/setup-sh7366.c             |  27 +-
+ arch/sh/kernel/cpu/sh4a/setup-sh7722.c             |  28 +-
+ arch/sh/kernel/cpu/sh4a/setup-sh7723.c             |  28 +-
+ arch/sh/kernel/cpu/sh4a/setup-sh7724.c             |  28 +-
+ drivers/clocksource/sh_cmt.c                       | 903 +++++++++++++--------
+ include/linux/sh_timer.h                           |   9 +
+ 42 files changed, 1078 insertions(+), 937 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/renesas,cmt.txt
+
 -- 
-1.8.5.2
+Regards,
+
+Laurent Pinchart
