@@ -1,89 +1,83 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 14 Feb 2014 10:21:52 +0100
-Subject: [PATCH 08/14] net: axienet: Removed checkpatch errors/warnings
-In-Reply-To: <1392306707.2214.65.camel@joe-AO722>
-References: <cover.1392220536.git.michal.simek@xilinx.com>
- <75b669c0a947effe74b291093abfa8c71f83736a.1392220536.git.michal.simek@xilinx.com>
- <1392251494.2214.11.camel@joe-AO722>
- <ff5b1f6a-a6a7-405c-9e83-59ad33852b93@TX2EHSMHS044.ehs.local>
- <1392306707.2214.65.camel@joe-AO722>
-Message-ID: <6d50c843-86d3-4333-ac6f-9901dbad36ed@AM1EHSMHS007.ehs.local>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Fri, 14 Feb 2014 10:23:44 +0100
+Subject: [PATCH 4/6] net: cpsw: Use cpsw-ctrl-macid driver
+In-Reply-To: <20140213193702.GE17650@pengutronix.de>
+References: <1387385242-1161-1-git-send-email-mpa@pengutronix.de>
+ <1387385242-1161-5-git-send-email-mpa@pengutronix.de>
+ <20140213193702.GE17650@pengutronix.de>
+Message-ID: <20140214092344.GM31787@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2014 04:51 PM, Joe Perches wrote:
-> On Thu, 2014-02-13 at 08:19 +0100, Michal Simek wrote:
->> On 02/13/2014 01:31 AM, Joe Perches wrote:
->>> On Wed, 2014-02-12 at 16:55 +0100, Michal Simek wrote:
-> 
-> Hi again Michal.
-> 
->>>> +		netdev_warn(lp->ndev,
->>>> +			 "Could not find clock ethernet controller property.");
->>>
->>> here too. (and alignment)
->>
->> This is problematic. I would like to keep 80 char limits and keeping
->> this align just break it. That's why I was using tab alignment.
->> Probably the solution is just to shorten message.
-> 
-> (overly long, tiresomely trivial stuff below)
-> 
-> Your choice.  I'm not an 80 column zealot but
-> please don't shorten the message just to fit
-> 80 columns if it impacts intelligibility.
+Hi Uwe,
 
-I am trying to keep 80 chars and follow subsystem
-standards.
+On Thu, Feb 13, 2014 at 08:37:02PM +0100, Uwe Kleine-K?nig wrote:
+> Hello Markus,
+> 
+> On Wed, Dec 18, 2013 at 05:47:20PM +0100, Markus Pargmann wrote:
+> > Use ctrl-macid driver to obtain the macids stored in the processor. This
+> > is only done when defined in DT.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  Documentation/devicetree/bindings/net/cpsw.txt |  5 +++++
+> >  drivers/net/ethernet/ti/cpsw.c                 | 18 ++++++++++++++----
+> >  drivers/net/ethernet/ti/cpsw.h                 |  2 ++
+> >  3 files changed, 21 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
+> > index c39f077..b95c38b 100644
+> > --- a/Documentation/devicetree/bindings/net/cpsw.txt
+> > +++ b/Documentation/devicetree/bindings/net/cpsw.txt
+> > @@ -34,6 +34,11 @@ Required properties:
+> >  Optional properties:
+> >  - dual_emac_res_vlan	: Specifies VID to be used to segregate the ports
+> >  - mac-address		: Specifies slave MAC address
+> > +- ti,mac-address-ctrl	: When cpsw-ctrl-macid support is compiledin, this can
+> > +			  be set to a phandle with one argument, see
+> > +			  cpsw-ctrl-macid.txt. If this method fails, cpsw falls
+> > +			  back to mac-address or random mac-address.
+> > +
+> >  
+> >  Note: "ti,hwmods" field is used to fetch the base address and irq
+> >  resources from TI, omap hwmod data base during device registration.
+> > diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+> > index 5120d9c..382d793 100644
+> > --- a/drivers/net/ethernet/ti/cpsw.c
+> > +++ b/drivers/net/ethernet/ti/cpsw.c
+> > @@ -1804,9 +1804,16 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+> >  		snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
+> >  			 PHY_ID_FMT, mdio->name, phyid);
+> >  
+> > -		mac_addr = of_get_mac_address(slave_node);
+> > -		if (mac_addr)
+> > -			memcpy(slave_data->mac_addr, mac_addr, ETH_ALEN);
+> > +		ret = cpsw_ctrl_macid_read(slave_node, slave_data->mac_addr);
+> > +		if (ret) {
+> > +			if (ret == -EPROBE_DEFER)
+> > +				return ret;
+> > +
+> > +			mac_addr = of_get_mac_address(slave_node);
+> > +			if (mac_addr)
+> > +				memcpy(slave_data->mac_addr, mac_addr,
+> > +						ETH_ALEN);
+> > +		}
+> I'd do it the other way round: Use the contents from an explicit
+> "mac-address" or "local-mac-address" property (i.e. of_get_mac_address)
+> and if that doesn't return anything use the mac-address-ctrl as
+> fallback.
 
-> Generally, I'd write this something like:
-> 
-> 		netdev_warn(lp->ndev,
-> 			    "Could not find clock ethernet controller property\n");
-> 
-> (without the period) which is 83 columns.
+Yes you are right. In this case this wouldn't even influence any boots
+with u-boot which already set the correct mac-address property.
 
-ok.
-
-> checkpatch makes exceptions for 80 column line
-> length maximums for format strings.
-
-yes but testing systems reports it because that 80 chars
-is still default value.
-
-
-> 
-> I've no real issue if you indent it back one.
-> 
-> fyi: this is 77 columns
-> 
-> 		netdev_warn(lp->ndev,
-> 			    "No clock ethernet controller property found\n");
-> 
-> About the message itself.
-> 
-> You dropped the "axienet_mdio_setup" function name.
-> 
-> I believe the dmesg output will look something like:
-> 
-> xilinx_temac 0000:01:00.0 (unregistered net_device): Could not find clock ethernet controller property.
-> xilinx_temac 0000:01:00.0 (unregistered net_device): Setting MDIO clock divisor to default 29
-> 
-> Because these 2 messages are effectively linked,
-> my preference would be to emit them on a single line,
-> 
-> Something like:
-> 
-> xilinx_temac 0000:01:00.0 (unregistered net_device): of_get_property("clock-frequency") not found - setting MDIO clock divisor to default 29
-> 
-> or
-> 
-> 		netdev_warn(lp->ndev,
-> 			    "of_get_property(\"clock-frequency\") not found - setting MDIO clock divisor to default %u\n",
-> 			    DEFAULT_CLOCK_DIVISOR);
-> 
-
-But then you are breaking 80 char limits a lot.
+I will fix this.
 
 Thanks,
-Michal
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
