@@ -1,46 +1,51 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 14 Feb 2014 09:43:51 -0700
-Subject: [PATCH 1/2] clk: fixed-rate: use full DT node name
-In-Reply-To: <20140214103556.GC9907@e106331-lin.cambridge.arm.com>
-References: <1392358613-19962-1-git-send-email-swarren@wwwdotorg.org>
- <20140214103556.GC9907@e106331-lin.cambridge.arm.com>
-Message-ID: <52FE47C7.3050509@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 14 Feb 2014 16:48:03 +0000
+Subject: [PATCH 3/6] irqchip: gic: use writel instead of dsb +
+ writel_relaxed
+In-Reply-To: <20140214163039.GG21986@mudshark.cambridge.arm.com>
+References: <20140206115121.GN26035@mudshark.cambridge.arm.com>
+ <20140206115430.GN29446@arm.com>
+ <20140206115739.GP26035@mudshark.cambridge.arm.com>
+ <20140206120035.GQ29446@arm.com>
+ <20140206121350.GQ26035@mudshark.cambridge.arm.com>
+ <20140206122340.GC32520@arm.com>
+ <20140206132643.GS26035@mudshark.cambridge.arm.com>
+ <20140206152048.GD32520@arm.com>
+ <20140207112337.GC5976@mudshark.cambridge.arm.com>
+ <20140214163039.GG21986@mudshark.cambridge.arm.com>
+Message-ID: <20140214164803.GG10590@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2014 03:35 AM, Mark Rutland wrote:
-> On Fri, Feb 14, 2014 at 06:16:52AM +0000, Stephen Warren wrote:
->> clk-fixed-rate currently names clocks according to a node's name without
->> the unit address. When faced with the legal and technically correct DT
->> structure below, this causes rgistration attempts for 3 clocks with the
->> same name, 2 of which fail.
->>
->> 	clocks {
->> 		compatible = "simple-bus";
->> 		#address-cells = <1>;
->> 		#size-cells = <0>;
->>
->> 		clk_mmc: clock at 0 {
->> 			compatible = "fixed-clock";
->> 			reg = <0>;
->> ...
->> 		clk_i2c: clock at 1 {
->> 			compatible = "fixed-clock";
->> 			reg = <1>;
->> ...
->> 		clk_spi: clock at 2 {
->> 			compatible = "fixed-clock";
->> 			reg = <2>;
->> ...
+On Fri, Feb 14, 2014 at 04:30:39PM +0000, Will Deacon wrote:
+> Well, the results are in (*drum roll*)...
 > 
-> I'd argue that this case isn't valid.
+> On Fri, Feb 07, 2014 at 11:23:37AM +0000, Will Deacon wrote:
+> > On Thu, Feb 06, 2014 at 03:20:48PM +0000, Catalin Marinas wrote:
+> > > On Thu, Feb 06, 2014 at 01:26:44PM +0000, Will Deacon wrote:
+> > > > Ok, my reasoning is as follows:
+> > > > 
+> > > >   - CPU0 tries to message CPU1. It writes to a location in normal memory,
+> > > >     then writes to the GICD to send the SGI
+> > > > 
+> > > >   - We need to ensure that CPU1 observes the write to normal memory before
+> > > >     the write to GICD reaches the distributor. This is *not* about end-point
+> > > >     ordering (the usual non-coherent DMA example).
+> > > > 
+> > > >   - A dmb ishst ensures that the two writes are observed in order by CPU1
+> > > >     (and, in fact, the inner-shareable domain containing CPU0).
+> > > 
+> > > The last bullet point is not correct. DMB would only guarantee that the
+> > > two writes (memory and GICD) are observed by CPU1 if CPU1 actually read
+> > > the GICD (observability is defined for master accesses).
+> > 
+> > Rather than attempt to solve this via email (your examples below are already
+> > getting hard to follow :), how about we sit down with $drink_of_choice and
+> > post back here with our conclusions?
 > 
-> The fixed-clock binding doesn't define a reg, yet simple bus binding
-> implies that the reg property of child nodes should be interpretted as
-> the same address space as their parent (MMIO in this case?). The
-> fixed-clock nodes reg proeprties clearly aren't MMIO addresses.
-> 
-> Additionally, the _requred_ ranges property is missing.
+> ... and it turns out that a dmb(ishst) is sufficient!
 
-Oh, IIRC that was deliberate to indicate that the child address space
-was disjoint from the parent address space.
+Until we hear otherwise ;)
+
+-- 
+Catalin
