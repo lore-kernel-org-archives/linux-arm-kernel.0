@@ -1,70 +1,86 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 14 Feb 2014 11:51:04 -0700
-Subject: [PATCH] mvebu : pcie: dt: potential issue in range parsing
-In-Reply-To: <20140205172107.GU8533@titan.lakedaemon.net>
-References: <1389349431-7997-1-git-send-email-jjhiblot@traphandler.com>
- <20140205164710.082f689e@skate>
- <20140205172107.GU8533@titan.lakedaemon.net>
-Message-ID: <20140214185103.GE31093@google.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 14 Feb 2014 22:56:59 +0300
+Subject: [PATCH 26/27] ARM: shmobile: lager-reference: Enable CMT0 in
+ device tree
+In-Reply-To: <1395114.O6aqLXJV0J@avalon>
+References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2354725.yUCM3gQqXi@avalon> <52FE29DB.2010304@cogentembedded.com>
+ <1395114.O6aqLXJV0J@avalon>
+Message-ID: <52FE750B.6070509@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 12:21:07PM -0500, Jason Cooper wrote:
-> 
-> + Bjorn, linux-pci
-> 
-> Bjorn,
-> 
-> It looks like this didn't get Cc'd to linux-pci.  Here's a link:
-> 
->   http://www.spinics.net/lists/arm-kernel/msg299721.html
+On 02/14/2014 07:26 PM, Laurent Pinchart wrote:
 
-Thanks for the heads-up; I had indeed missed this (I mostly rely on
-patchwork, which only tracks linux-pci, and it's not smart enough to
-extract quoted patches).
+>>>>>>> Enable the CMT0 device and configure channel 0 as a clock event
+>>>>>>> provider.
 
-Applied to pci/host-mvebu for v3.15, thanks!
+>>>>>>> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-> 
-> On Wed, Feb 05, 2014 at 04:47:10PM +0100, Thomas Petazzoni wrote:
-> > Dear Jean-Jacques Hiblot,
-> > 
-> > On Fri, 10 Jan 2014 11:23:51 +0100, Jean-Jacques Hiblot wrote:
-> > > The second parameter of of_read_number is not the index, but a size.
-> > > As it happens, in this case it may work just fine because of the the conversion
-> > > to u32 and the favorable endianness on this architecture.
-> > > 
-> > > Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> > > ---
-> > >  drivers/pci/host/pci-mvebu.c | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> > > index c269e43..877e8ce 100644
-> > > --- a/drivers/pci/host/pci-mvebu.c
-> > > +++ b/drivers/pci/host/pci-mvebu.c
-> > > @@ -768,7 +768,7 @@ static int mvebu_get_tgt_attr(struct device_node *np, int devfn,
-> > >  
-> > >  	for (i = 0; i < nranges; i++) {
-> > >  		u32 flags = of_read_number(range, 1);
-> > > -		u32 slot = of_read_number(range, 2);
-> > > +		u32 slot = of_read_number(range + 1, 1);
-> > >  		u64 cpuaddr = of_read_number(range + na, pna);
-> > >  		unsigned long rtype;
-> > >  
-> > 
-> > Sorry for the long delay, and thanks for the fix!
-> > 
-> > Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > 
-> > (on Armada 370, with PCIe cards plugged in)
-> 
-> 
-> Fixes: 11be65472a427 ("PCI: mvebu: Adapt to the new device tree layout")
-> Cc: <stable@vger.kernel.org> # v3.12+
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> 
-> thx,
-> 
-> Jason.
+>>>>>>> diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h
+>>>>>>> b/arch/arm/mach-shmobile/include/mach/r8a7790.h index 0b95bab..62b31f3
+>>>>>>> 100644 --- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
+>>>>>>> +++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+>>>>>>> @@ -29,7 +29,6 @@ enum {
+>>>>>>>
+>>>>>>>    };
+>>>>>>>
+>>>>>>>    void r8a7790_add_standard_devices(void);
+>>>>>>>
+>>>>>>> -void r8a7790_add_dt_devices(void);
+>>>>>>>
+>>>>>>>    void r8a7790_clock_init(void);
+>>>>>>>    void r8a7790_pinmux_init(void);
+>>>>>>>    void r8a7790_pm_init(void);
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c
+>>>>>>> b/arch/arm/mach-shmobile/setup-r8a7790.c index 3e5813f..462c81f 100644
+>>>>>>> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
+>>>>>>> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+>>>>>>> @@ -294,11 +294,6 @@ static struct resource cmt0_resources[] = {
+>>>>>>>      					  &cmt##idx##_platform_data,	\
+>>>>>>>      					  sizeof(struct sh_timer_config))
+>>>>>>>
+>>>>>>> -void __init r8a7790_add_dt_devices(void)
+>>>>>>> -{
+>>>>>>> -	r8a7790_register_cmt(0);
+>>>>>>> -}
+>>>>>>> -
+>>>>>>>   void __init r8a7790_add_standard_devices(void)
+>>>>>>>   {
+>>>>>>>      	r8a7790_register_scif(0);
+>>>>>>> @@ -311,7 +306,7 @@ void __init r8a7790_add_standard_devices(void)
+>>>>>>> 	r8a7790_register_scif(7);
+>>>>>>>   	r8a7790_register_scif(8);
+>>>>>>>   	r8a7790_register_scif(9);
+>>>>>>> -	r8a7790_add_dt_devices();
+>>>>>>> +	r8a7790_register_cmt(0);
+>>>>>>> 	r8a7790_register_irqc(0);
+>>>>>>> 	r8a7790_register_thermal();
+>>>>>>> }
+
+>>>>>> IMHO, these 2 files should be split into a separate patch.
+
+>>>>> That could easily be done, but why ?
+
+>>>> It does not seem necessary to combine these changes in one patch.
+>>>> Remember, Simon has separate branches for boards and SoCs. So finally
+>>>> it's up to him to decide on this...
+
+>>> Right, but in this case I need to remove the CMT platform device
+>>> registration from r8a7790_add_dt_devices()
+
+>> You're not removing anything in these 2 files, you're just replacing
+>> "indirect" call to r8a7790_register_cmt(0) with direct.
+
+> OK, I see what you mean now. Given that the patch removes the
+> r8a7790_add_dt_devices() call from arch/arm/mach-shmobile/board-lager-
+> reference.c, I could indeed split those two changes into a separate patch as
+> there's no-one calling the function anymore. That would introduce a dependency
+> between the branches, which might not be better. I'll let Simon comment on
+> what he would prefer and will act accordingly.
+
+    Yes, the branch inter-dependencies are bad too. I didn't think about it, 
+sorry.
+
+WBR, Sergei
