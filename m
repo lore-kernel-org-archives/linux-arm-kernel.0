@@ -1,96 +1,95 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 14 Feb 2014 13:48:15 +0000
-Subject: [PATCH 1/2] mfd: twl4030-madc: Add devicetree support.
-In-Reply-To: <1392383861-14169-1-git-send-email-marek@goldelico.com>
-References: <1392383861-14169-1-git-send-email-marek@goldelico.com>
-Message-ID: <20140214134815.GD13293@lee--X1>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 14 Feb 2014 15:48:42 +0200
+Subject: [PATCH 4/8] ARM: dts: fix omap3 dss clock handle names
+In-Reply-To: <1392285846-13199-5-git-send-email-tomi.valkeinen@ti.com>
+References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
+ <1392285846-13199-5-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <52FE1EBA.7060901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Signed-off-by: Marek Belisko <marek@goldelico.com>
+On 02/13/2014 12:04 PM, Tomi Valkeinen wrote:
+> The DSS fclk and iclk handles are named differently on OMAP3430 ES1 than
+> on later OMAP revisions. The ES1 has handles 'dss1_alwon_fck_3430es1'
+> and 'dss_ick_3430es1', whereas later revisions have similar names but
+> ending with 'es2'.
+>
+> This means we don't have one clock handle to which we could refer to
+> when defining the DSS clocks.
+>
+> However, as the namespaces are separate for ES1 and ES2+ OMAPs, we can
+> just rename the handles to 'dss1_alwon_fck' and 'dss_ick' for both ES1
+> and ES2+, removing the issue.
+>
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+
+Acked-by: Tero Kristo <t-kristo@ti.com>
+
 > ---
->  .../devicetree/bindings/mfd/twl4030-madc.txt       | 18 +++++++++++++
->  drivers/mfd/twl4030-madc.c                         | 31
-> ++++++++++++++++++++--
-
-Please separate these into different patches.
-
->  2 files changed, 47 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mfd/twl4030-madc.txt
-
-<snip>
-
-> +++ b/drivers/mfd/twl4030-madc.c
-> @@ -695,6 +695,29 @@ static int twl4030_madc_set_power(struct twl4030_madc_data *madc, int on)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_OF
-
-I believe we're heading for a more:
-
-  if (IS_ENABLED(CONFIG_OF))
-
-... approach. I won't enforce it, but please consider using it.
-
-> +static struct twl4030_madc_platform_data *
-> +	twl4030_madc_of_parse(struct platform_device *pdev)
-> +{
-> +	struct twl4030_madc_platform_data *pdata;
-> +
-> +	pdata = devm_kzalloc(&pdev->dev,
-> +			sizeof(struct twl4030_madc_platform_data), GFP_KERNEL);
-
-s/struct twl4030_madc_platform_data/*pdata/
-
-> +	if (!pdata)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	pdata->irq_line = platform_get_irq(pdev, 0);
-
-Why weren't 'resources' used in the original implementation?
-
-> +	return pdata;
-> +}
-> +
-> +static const struct of_device_id twl4030_madc_dt_match_table[] = {
-> +	{ .compatible = "ti,twl4030-madc" },
-> +	{},
-> +};
-> +
-> +#endif
-> +
->  /*
->   * Initialize MADC and request for threaded irq
->   */
-> @@ -706,8 +729,11 @@ static int twl4030_madc_probe(struct platform_device *pdev)
->  	u8 regval;
->  
->  	if (!pdata) {
-> -		dev_err(&pdev->dev, "platform_data not available\n");
-> -		return -EINVAL;
-> +		pdata = twl4030_madc_of_parse(pdev);
-> +		if (!pdata) {
-
-And if you received -ENOMEM?
-
-> +			dev_err(&pdev->dev, "platform_data not available\n");
-> +			return -EINVAL;
-> +		}
->  	}
->  	madc = kzalloc(sizeof(*madc), GFP_KERNEL);
->  	if (!madc)
-> @@ -807,6 +833,7 @@ static struct platform_driver twl4030_madc_driver = {
->  	.driver = {
->  		   .name = "twl4030_madc",
->  		   .owner = THIS_MODULE,
-> +		   .of_match_table = of_match_ptr(twl4030_madc_dt_match_table),
->  		   },
->  };
->  
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>   arch/arm/boot/dts/omap3430es1-clocks.dtsi                     | 6 +++---
+>   arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi | 6 +++---
+>   2 files changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap3430es1-clocks.dtsi b/arch/arm/boot/dts/omap3430es1-clocks.dtsi
+> index 02f6c7fabbec..f9202656168f 100644
+> --- a/arch/arm/boot/dts/omap3430es1-clocks.dtsi
+> +++ b/arch/arm/boot/dts/omap3430es1-clocks.dtsi
+> @@ -152,7 +152,7 @@
+>   		clocks = <&usb_l4_gate_ick>, <&usb_l4_div_ick>;
+>   	};
+>
+> -	dss1_alwon_fck_3430es1: dss1_alwon_fck_3430es1 {
+> +	dss1_alwon_fck: dss1_alwon_fck_3430es1 {
+>   		#clock-cells = <0>;
+>   		compatible = "ti,gate-clock";
+>   		clocks = <&dpll4_m4x2_ck>;
+> @@ -161,7 +161,7 @@
+>   		ti,set-rate-parent;
+>   	};
+>
+> -	dss_ick_3430es1: dss_ick_3430es1 {
+> +	dss_ick: dss_ick_3430es1 {
+>   		#clock-cells = <0>;
+>   		compatible = "ti,omap3-no-wait-interface-clock";
+>   		clocks = <&l4_ick>;
+> @@ -184,7 +184,7 @@
+>   	dss_clkdm: dss_clkdm {
+>   		compatible = "ti,clockdomain";
+>   		clocks = <&dss_tv_fck>, <&dss_96m_fck>, <&dss2_alwon_fck>,
+> -			 <&dss1_alwon_fck_3430es1>, <&dss_ick_3430es1>;
+> +			 <&dss1_alwon_fck>, <&dss_ick>;
+>   	};
+>
+>   	d2d_clkdm: d2d_clkdm {
+> diff --git a/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi b/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
+> index af9ae5346bf2..080fb3f4e429 100644
+> --- a/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
+> +++ b/arch/arm/boot/dts/omap36xx-am35xx-omap3430es2plus-clocks.dtsi
+> @@ -160,7 +160,7 @@
+>   		ti,bit-shift = <30>;
+>   	};
+>
+> -	dss1_alwon_fck_3430es2: dss1_alwon_fck_3430es2 {
+> +	dss1_alwon_fck: dss1_alwon_fck_3430es2 {
+>   		#clock-cells = <0>;
+>   		compatible = "ti,dss-gate-clock";
+>   		clocks = <&dpll4_m4x2_ck>;
+> @@ -169,7 +169,7 @@
+>   		ti,set-rate-parent;
+>   	};
+>
+> -	dss_ick_3430es2: dss_ick_3430es2 {
+> +	dss_ick: dss_ick_3430es2 {
+>   		#clock-cells = <0>;
+>   		compatible = "ti,omap3-dss-interface-clock";
+>   		clocks = <&l4_ick>;
+> @@ -216,7 +216,7 @@
+>   	dss_clkdm: dss_clkdm {
+>   		compatible = "ti,clockdomain";
+>   		clocks = <&dss_tv_fck>, <&dss_96m_fck>, <&dss2_alwon_fck>,
+> -			 <&dss1_alwon_fck_3430es2>, <&dss_ick_3430es2>;
+> +			 <&dss1_alwon_fck>, <&dss_ick>;
+>   	};
+>
+>   	core_l4_clkdm: core_l4_clkdm {
+>
