@@ -1,93 +1,103 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 14 Feb 2014 12:42:28 +0100
-Subject: [PATCH 3/5] i2c: mv64xxx: refactor send_start
-In-Reply-To: <1392323793-4125-4-git-send-email-wsa@the-dreams.de>
-References: <20140213094117.GA3934@katana>
- <1392323793-4125-1-git-send-email-wsa@the-dreams.de>
- <1392323793-4125-4-git-send-email-wsa@the-dreams.de>
-Message-ID: <52FE0124.6090808@free-electrons.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 14 Feb 2014 12:49:38 +0100
+Subject: [PATCH V2 2/3] ARM: dts: add dts files for exynos5260 SoC
+In-Reply-To: <CAPdUM4Pr7UC3wzYMsO+sYQHRDGixSNsR3XQuHBomsi-H-dfOZw@mail.gmail.com>
+References: <1391577375-17625-1-git-send-email-rahul.sharma@samsung.com>
+ <1391577375-17625-3-git-send-email-rahul.sharma@samsung.com>
+ <52F38C42.5030508@samsung.com>
+ <CAPdUM4NBwXcnL2KK9Rsi46GWQz_KQsXF0EEeSmCb=wB8WfgUKQ@mail.gmail.com>
+ <52F9F59D.1090905@gmail.com>
+ <CAPdUM4Pu-CbuNwwjrd_8itbSbjKqTBLE5u_T_vO89jreOy4=kQ@mail.gmail.com>
+ <CAPdUM4Pr7UC3wzYMsO+sYQHRDGixSNsR3XQuHBomsi-H-dfOZw@mail.gmail.com>
+Message-ID: <52FE02D2.7050305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/02/2014 21:36, Wolfram Sang wrote:
-> For start and restart, we are doing the same thing. Let's consolidate
-> that.
-> 
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+On 14.02.2014 12:28, Rahul Sharma wrote:
+> On 14 February 2014 08:54, Rahul Sharma <r.sh.open@gmail.com> wrote:
+>> Thanks Tomasz,
+>>
+>> I will add these changes to v3.
+>>
+>> Regards,
+>> Rahul Sharma.
+>>
+>> On 11 February 2014 15:34, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+>>> Hi Rahul,
+>>>
+>>>
+>>> On 11.02.2014 06:22, Rahul Sharma wrote:
+>>>>
+>>>> Hi Tomasz,
+>>>>
+>>>> On 6 February 2014 18:51, Tomasz Figa <t.figa@samsung.com> wrote:
+>>>>>
+>>>>> Hi Rahul, Pankaj, Arun,
+>>>>>
+>>>>> [adding linux-arm-kernel, devicetree MLs and DT people on Cc]
+>>>>>
+>>>>> I think it's good time to stop accepting DTS files like this and force
+>>>>> new
+>>>>> ones to use the proper structure with soc node, labels for every node and
+>>>>> node references.
+>>>>
+>>>>
+>>>> I am unable to find information on SoC node and grouping inside SoC node.
+>>>> Please
+>>>> share some pointers.
+>>>
+>>>
+>>> Well, there is not much information needed about this. Basically all the
+>>> devices built into the SoC should be listed under respective bus nodes or a
+>>> single soc node, instead of root level. Such node should be a "simple-bus"
+>>> and just group the components together to separate board-specific devices
+>>> (which are still at root level) from SoC devices.
+>>>
+>>> Even though it might seem useless, it improves DT readability a bit and
+>>> still most of the platforms use this approach, so for consistency, Exynos
+>>> should use too.
+>>>
+>>> Just for reference, back in April 2013, in his review of S3C64xx DT series
+>>> [1], Rob Herring requested that we don't submit any new device trees using
+>>> flat approach and start using bus hierarchy.
+>>>
+>>> [1]
+>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/163659.html
+>>>
+>>>
+>>>>>
+>>>>>> +               spi0_bus: spi0-bus {
+>>>>>> +                       samsung,pins = "gpa2-0", "gpa2-1", "gpa2-2",
+>>>>>> "gpa2-3";
+>>>>>
+>>>>>
+>>>>>
+>>>>> What is the reason for SPI0 to have 4 pins, while SPI1 has just 3?
+>>>>>
+>>>>
+>>>> I should align SPI1 with SPI0.
+>>>>
+>>>
+>>> Are you sure that SPI0 is the correct one? SPI usually uses four pins - SDI,
+>>> SDO, SCK and nCS, but we always used to treat nCS as a simple GPIO, due to
+>>> the fact that the controller can only support one dedicated chip select and
+>>> with direct GPIO control you can have more.
+>>>
+>>> What is the fourth pin here?
+>>>
+>
+> As you said, these are CLK, SS, MISO, MOSI (gpa2-0 to gpa2-3). Fourth pin is
+> CS. It can be defined as a simple GPIO but better to include it in the
+> SPI pingroup
+> as it belongs to there.
 
-With my first tests it continue to work with this change,
-but I want to have a closer look on it
+I have to disagree here.
 
-Thanks,
+If you define a pin in pinctrl group then it is tied to this specific 
+hardware function and you can't use it as GPIO.
 
-Gregory
+Since it's board specific to use it as HW chip select or GPIO chip 
+select (the usual setup), it should not be included in this group.
 
-
-> ---
->  drivers/i2c/busses/i2c-mv64xxx.c | 30 ++++++++++++++++--------------
->  1 file changed, 16 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-> index d52d849..9c37b59 100644
-> --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> @@ -419,6 +419,17 @@ mv64xxx_i2c_fsm(struct mv64xxx_i2c_data *drv_data, u32 status)
->  	}
->  }
->  
-> +static void mv64xxx_i2c_send_start(struct mv64xxx_i2c_data *drv_data)
-> +{
-> +	/* Can we offload this msg ? */
-> +	if (mv64xxx_i2c_offload_msg(drv_data) < 0) {
-> +		/* No, switch to standard path */
-> +		mv64xxx_i2c_prepare_for_io(drv_data, drv_data->msgs);
-> +		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_START,
-> +			drv_data->reg_base + drv_data->reg_offsets.control);
-> +	}
-> +}
-> +
->  static void
->  mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
->  {
-> @@ -435,14 +446,11 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
->  
->  		drv_data->msgs++;
->  		drv_data->num_msgs--;
-> -		if (mv64xxx_i2c_offload_msg(drv_data) < 0) {
-> -			drv_data->cntl_bits |= MV64XXX_I2C_REG_CONTROL_START;
-> -			writel(drv_data->cntl_bits,
-> -			drv_data->reg_base + drv_data->reg_offsets.control);
-> +		// CHECKME: Does it work? Order of writel and prepare_for_io is
-> +		// exchanged. Also, do we need to change cntl_bits in drv_data
-> +		// with |= MV64XXX_I2C_REG_CONTROL_START?
-> +		mv64xxx_i2c_send_start(drv_data);
->  
-> -			/* Setup for the next message */
-> -			mv64xxx_i2c_prepare_for_io(drv_data, drv_data->msgs);
-> -		}
->  		if (drv_data->errata_delay)
->  			udelay(5);
->  
-> @@ -460,13 +468,7 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
->  		break;
->  
->  	case MV64XXX_I2C_ACTION_SEND_START:
-> -		/* Can we offload this msg ? */
-> -		if (mv64xxx_i2c_offload_msg(drv_data) < 0) {
-> -			/* No, switch to standard path */
-> -			mv64xxx_i2c_prepare_for_io(drv_data, drv_data->msgs);
-> -			writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_START,
-> -				drv_data->reg_base + drv_data->reg_offsets.control);
-> -		}
-> +		mv64xxx_i2c_send_start(drv_data);
->  		break;
->  
->  	case MV64XXX_I2C_ACTION_SEND_ADDR_1:
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Best regards,
+Tomasz
