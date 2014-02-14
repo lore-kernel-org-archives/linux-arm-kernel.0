@@ -1,34 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Feb 2014 18:06:12 +0100
-Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
-In-Reply-To: <CAOesGMgdDnSc=Y8i6JYeGewCh1RPYZ_AxocxKzSD265fa2-yrA@mail.gmail.com>
-References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
- <52F99056.6010906@samsung.com>
- <CAOesGMgdDnSc=Y8i6JYeGewCh1RPYZ_AxocxKzSD265fa2-yrA@mail.gmail.com>
-Message-ID: <201402141806.12711.arnd@arndb.de>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Fri, 14 Feb 2014 19:11:27 +0200
+Subject: [BISECTED] ssh - Received disconnect from x.x.x.x: 2: Bad packet
+ length 3149594624
+In-Reply-To: <20140214162458.GF21986@mudshark.cambridge.arm.com>
+References: <52FD08D1.3030405@gmail.com>
+ <20140213182105.GN13576@mudshark.cambridge.arm.com>
+ <52FD1243.9040706@gmail.com>
+ <20140213192909.GO13576@mudshark.cambridge.arm.com>
+ <52FE407C.3080002@gmail.com>
+ <20140214162458.GF21986@mudshark.cambridge.arm.com>
+Message-ID: <52FE4E3F.6020407@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 February 2014, Olof Johansson wrote:
-> On Mon, Feb 10, 2014 at 6:52 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > On 02/13/14 04:14, Arnd Bergmann wrote:
-> >> On Wednesday 12 February 2014 13:04:40 Kumar Gala wrote:
-> > Basically, I agreed with Arnd's suggestion to use ARCH_SBSA. Or we need to
-> > define level in Kconfig like ARCH_SBSA_L1 for level1. BTW, how about
-> > compliant with SBSA Level1 and having some specific features?
 
-My feeling is that we don't need to use the levels for Kconfig, although
-we might want to use them DT compatible strings, even if it ends up looking
-a little funny when you do 
 
-	compatible = "arm,sbsa-l3", "arm,sbsa-l2", "arm,sbsa-l1";
+On 14.02.2014 18:24, Will Deacon wrote:
+>
+> You could try putting back the UNALIGNED_ACCESS in net/mac80211/rx.c and
+> commenting out the skb->len = desc->length  - PLCP_HEADER_LENGTH;  line
+> above.
 
-> What kind of features are you expecting though? More IP
-> blocks/devices? Those are just kernel config options to enable,
-> ideally as modules.
+This seems to fix the issue too, but I am afraid there is more to be 
+done, as I see
 
-Right, I think we can just put them into defconfig. No need to
-"select" them from Kconfig since the extra options wouldn't be
-required for booting or using the system.
+Feb 14 18:33:46 Nokia-N900 kernel: [   88.599853] wlan0: authenticate 
+with 00:23:cd:17:86:d0
+Feb 14 18:33:46 Nokia-N900 kernel: [   88.781860] wlan0: send auth to 
+00:23:cd:17:86:d0 (try 1/3)
+Feb 14 18:33:46 Nokia-N900 kernel: [   88.799804] wlan0: authenticated
+Feb 14 18:33:46 Nokia-N900 kernel: [   88.806243] wlan0: associating 
+with AP with corrupt probe response
+Feb 14 18:33:46 Nokia-N900 kernel: [   88.814544] wlan0: associate with 
+00:23:cd:17:86:d0 (try 1/3)
+Feb 14 18:33:46 Nokia-N900 kernel: [   88.826416] wlan0: RX AssocResp 
+from 00:23:cd:17:86:d0 (capab=0x431 status=0 aid=2)
 
-	Arnd
+spit in dmesg log. AFAIR this is the first time I see "associating with 
+AP with corrupt probe response" in dmesg, no matter of the kernel 
+version. Despite of that error message, wlan seems to work as it should, 
+so far. I guess we need the driver's author saying on the issue.
+
+Thanks,
+Ivo
