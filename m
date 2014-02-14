@@ -1,46 +1,59 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 14 Feb 2014 10:16:20 +0100
-Subject: [PATCH v2] can: xilinx CAN controller support.
-In-Reply-To: <52FDDE30.8020405@monstr.eu>
-References: <\> <0dc128ac-e5cd-47bd-9ab1-3a545c3e2043@CO9EHSMHS012.ehs.local>
- <52FD1B16.6020600@pengutronix.de> <52FDD9FE.8040908@monstr.eu>
- <52FDDC24.8070805@pengutronix.de> <52FDDE30.8020405@monstr.eu>
-Message-ID: <52FDDEE4.9060902@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 14 Feb 2014 10:18:58 +0100
+Subject: [PATCH 23/27] clocksource: sh_cmt: Add DT support
+In-Reply-To: <1392339605-20691-24-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1392339605-20691-24-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CAMuHMdUPJ_Wz85AJeYF8vnkOfjd8A7fHb45bL5-B0bAPqNHnhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2014 10:13 AM, Michal Simek wrote:
->>> That's not entirely truth. If you look at Microblaze then you will see
->>> that Microblaze can be BE and LE.
->>> There is just missing endian detection which we will add to the next version.
->>
->> As far as I know the endianess of the kernel is fixed and known during
->> compile time. Correct me if I'm wrong. So there is no need for a runtime
->> detection of the endianess and so no need for {read,write}_reg function
->> pointers.
-> 
-> Endianess of the kernel is fixed and know during compile time
-> but what it is not fixed is endianess of that IP at compile time.
-> 
-> On fpga you can use bridges, partial reconfiguration, etc where
-> the only solution which is run-time endian detection via registers.
-> 
-> For example: drivers/block/xsysace.c, drivers/spi/spi-xilinx.c, etc
+On Fri, Feb 14, 2014 at 2:00 AM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
+> +++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> @@ -0,0 +1,75 @@
+> +* Renesas R-Car Compare Match Timer (CMT)
+> +
+> +The CMT is a multi-channel 16/32/48-bit timer/counter with configurable clock
 
-Okay, now I get it. You can make it more complex then it used to be :D
+16-bit is mentioned here ...
 
-Marc
+> +inputs and programmable compare match.
+> +
+> +Channels share hadware resources but their counter and compare match value are
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+hardware
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140214/7910cbee/attachment.sig>
+> +independent. A particular CMT instance can implement only a subset of the
+> +channels supported by the CMT model. Channels indices start from 0 and are
+
+Channel indices
+
+> +consecutive.
+> +
+> +Required Properties:
+> +
+> +  - compatible: must contain one of the following.
+
+... why not add "renesas,cmt-16" here (and one extra line in the actual driver),
+while you're at it?
+
+> +    - "renesas,cmt-32" for the 32-bit CMT
+> +               (CMT0 on sh7372, sh73a0 and r8a7740)
+> +    - "renesas,cmt-32-fast" for the 32-bit CMT with fast clock support
+> +               (CMT[234] on sh7372, sh73a0 and r8a7740)
+> +    - "renasas,cmt-48" for the 48-bit CMT
+> +               (CMT1 on sh7372, sh73a0 and r8a7740)
+> +    - "renesas,cmt-48-gen2" for the second generation 48-bit CMT
+> +               (CMT[01] on r8a73a4, r8a7790 and r8a7791)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
