@@ -1,121 +1,107 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 14 Feb 2014 13:53:10 -0800
-Subject: [GIT PULL] ARM: SoC: fixes for v3.14-rc3
-Message-ID: <7hlhxd5pkp.fsf@paris.lan>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Fri, 14 Feb 2014 22:00:47 +0000
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <5805232.JrD2FybBlg@wuerfel>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <20140213182654.GA20043@obsidianresearch.com>
+ <20140213195317.GQ13576@mudshark.cambridge.arm.com>
+ <5805232.JrD2FybBlg@wuerfel>
+Message-ID: <20140214220047.GA5394@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+On Fri, Feb 14, 2014 at 10:59:06AM +0100, Arnd Bergmann wrote:
+> On Thursday 13 February 2014 19:53:17 Will Deacon wrote:
+> > On Thu, Feb 13, 2014 at 06:26:54PM +0000, Jason Gunthorpe wrote:
+> > > On Thu, Feb 13, 2014 at 05:28:20PM +0100, Arnd Bergmann wrote:
+> > > 
+> > > > > Huh?  The reg property clearly has the size in it (as shown in the
+> > > > > example below).  I guess I was just asking for the description
+> > > > > here to say what the size was for the 2 compatibles since its
+> > > > > fixed and known.
+> > > > 
+> > > > It's still an open question whether the config space in the reg
+> > > > property should cover all 256 buses or just the ones in the
+> > > > bus-range. In the latter case, it would be variable (but
+> > > > predictable) size.
+> > > 
+> > > The 'describe the hardware principle' says the reg should be the
+> > > entire available ECAM/CAM region the hardware is able to support.
+> > > 
+> > > This may be less than 256 busses, as ECAM allows the implementor to
+> > > select how many upper address bits are actually supported.
+> > 
+> > Ok, but the ECAM/CAM base always corresponds to bus 0, right?
+> 
+> Ah, plus I suppose it ought to be a power-of-two size?
+> 
+> > > IMHO, the bus-range should be used to indicate the range of busses
+> > > discovered by the firmware, but we have historically tweaked it to
+> > > indicate the max range of bus numbers available on this bus (I think
+> > > to support the hack where two physical PCI domains were roughly glued
+> > > into a single Linux domain).
+> 
+> There is an interesting point about the domain assignment, brought to
+> my attention by Russell's comment about the hw_pci struct: If we want
+> to support arbitrary combinations of pci host bridges described in DT,
+> we need a better policy to decide what domain to use. The approaches
+> I've seen so far are:
+> 
+> 1. We assume each host bridge in DT is a domain by itself. I think
+> we do that for all DT probed bridges on ARM (aside from shmobile)
+> at the moment. In some cases, the the host bridge is a really a
+> fiction made up by the host driver to couple various identical
+> but independent PCIe root ports, but the same fiction is shared
+> between DT and the PCI core view of it. This requires that we
+> enable the PCI domain code unconditionally, and breaks all user
+> space that doesn't understand domains (this should be rare but
+> can still exist for x86 based software).
+> 
+> 2. The architecture or platform code decides and uses a method equivalent
+> to ARM's pci_common_init_dev() after it has found all host bridges.
+> The architecture "knows" how many domains it wants and calls
+> pci_common_init_dev() for each domain, and then the setup() callbacks
+> grab as many buses as they need within the domain. For a generic
+> multiplatform kernel, this means we need to add a top-level driver
+> that looks at all pci hosts in DT before any of them are probed.
+> It also means the pci host drivers can't be loadable modules.
+> 
+> 3. We assume there is only one domain, and require each host bridge
+> in DT to specify a bus-range that is a subset of the available 256
+> bus numbers. This should work for anything but really big systems
+> with many hot-pluggable ports, since we need to reserve a few bus
+> numbers on each port for hotplugging.
+> 
+> 4. Like 3, but start a new domain if the bus-range properties don't
+> fit in the existing domains.
+> 
+> 5. Like 3, but specify a generic "pci-domain" property for DT
+> that allows putting host bridges into explicit domains in
+> a predictable way.
 
-Please pull the following arm-soc fixes for v3.14-rc.  Thanks.
+What I'm going to suggest in my v2 patch (hope to send it before Monday)
+is a new API in the generic PCI code that will allow you to create a
+host bridge in a new domain or in the existing domain, with the management
+of the domain number being done in the generic code.
 
-Kevin
+Something like:
 
+  int create_hostbridge_in_new_domain(....);
+  int create_hostbridge(....);
 
+with the functions being wrappers around the pci_hostbridge_of_init function
+that I'm introducing.
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+What do you think?
 
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+Best regards,
+Liviu
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
-
-for you to fetch changes up to 31fd8f5b89f22a88940a9838dfd1564f3d440247:
-
-  dma: mv_xor: Silence a bunch of LPAE-related warnings (2014-02-12 16:21:17 -0800)
-
-----------------------------------------------------------------
-A collection of ARM SoC fixes for v3.14-rc1.
-
-Mostly a collection of Kconfig, device tree data and compilation fixes
-along with fix to drivers/phy that fixes a boot regression on some
-Marvell mvebu platforms.
-
-----------------------------------------------------------------
-Andrew Lunn (3):
-      drivers: phy: Make NULL a valid phy reference
-      drivers: phy: Add support for optional phys
-      ata: sata_mv: Fix probe failures with optional phys
-
-Bo Shen (1):
-      ARM: at91: enable USB host on at91sam9n12ek board
-
-Boris BREZILLON (3):
-      ARM: at91/dt: fix sama5d3 ohci hclk clock reference
-      mmc: atmel-mci: document clock properties
-      spi/atmel: document clock properties
-
-Jean-Jacques Hiblot (1):
-      ARM: at91/dt: sam9263: fix compatibility string for the I2C
-
-Kevin Hilman (2):
-      Merge tag 'mvebu-phy_ata-fixes-3.14' of git://git.infradead.org/linux-mvebu into fixes
-      Merge tag 'at91-fixes' of git://github.com/at91linux/linux-at91 into fixes
-
-Linus Walleij (3):
-      ARM: pxa: fix compilation problem on AM300EPD board
-      ARM: pxa: fix various compilation problems
-      ARM: ux500: disable msp2 device tree node
-
-Michal Simek (1):
-      ARM: zynq: Reserve not DMAable space in front of the kernel
-
-Nicolas Ferre (1):
-      ARM: at91: add Atmel's SAMA5D3 Xplained board
-
-Nishanth Menon (1):
-      ARM: multi_v7_defconfig: Select CONFIG_SOC_DRA7XX
-
-Olof Johansson (1):
-      dma: mv_xor: Silence a bunch of LPAE-related warnings
-
-Philipp Zabel (1):
-      ARM: imx6: Initialize low-power mode early again
-
-Rob Herring (3):
-      ARM: hisi: fix kconfig warning on HAVE_ARM_TWD
-      ARM: moxart: move DMA_OF selection to driver
-      ARM: fix HAVE_ARM_TWD selection for OMAP and shmobile
-
- Documentation/devicetree/bindings/mmc/atmel-hsmci.txt |   5 ++
- Documentation/devicetree/bindings/spi/spi_atmel.txt   |   5 ++
- Documentation/phy.txt                                 |  26 +++++++---
- arch/arm/boot/dts/Makefile                            |   1 +
- arch/arm/boot/dts/at91-sama5d3_xplained.dts           | 229 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9263.dtsi                    |   2 +-
- arch/arm/boot/dts/at91sam9n12ek.dts                   |   4 ++
- arch/arm/boot/dts/sama5d3.dtsi                        |   2 +-
- arch/arm/boot/dts/ste-href.dtsi                       |   1 -
- arch/arm/configs/multi_v7_defconfig                   |   1 +
- arch/arm/mach-hisi/Kconfig                            |   2 +-
- arch/arm/mach-imx/clk-imx6q.c                         |   3 ++
- arch/arm/mach-imx/clk-imx6sl.c                        |   3 ++
- arch/arm/mach-imx/pm-imx6q.c                          |   2 -
- arch/arm/mach-moxart/Kconfig                          |   1 -
- arch/arm/mach-omap2/Kconfig                           |   2 +-
- arch/arm/mach-pxa/am300epd.c                          |   1 +
- arch/arm/mach-pxa/include/mach/balloon3.h             |   2 +
- arch/arm/mach-pxa/include/mach/corgi.h                |   1 +
- arch/arm/mach-pxa/include/mach/csb726.h               |   2 +
- arch/arm/mach-pxa/include/mach/gumstix.h              |   1 +
- arch/arm/mach-pxa/include/mach/idp.h                  |   1 +
- arch/arm/mach-pxa/include/mach/palmld.h               |   2 +
- arch/arm/mach-pxa/include/mach/palmt5.h               |   2 +
- arch/arm/mach-pxa/include/mach/palmtc.h               |   2 +
- arch/arm/mach-pxa/include/mach/palmtx.h               |   2 +
- arch/arm/mach-pxa/include/mach/pcm027.h               |   2 +
- arch/arm/mach-pxa/include/mach/pcm990_baseboard.h     |   1 +
- arch/arm/mach-pxa/include/mach/poodle.h               |   2 +
- arch/arm/mach-pxa/include/mach/spitz.h                |   2 +-
- arch/arm/mach-pxa/include/mach/tosa.h                 |   2 +
- arch/arm/mach-pxa/include/mach/trizeps4.h             |   2 +
- arch/arm/mach-shmobile/Kconfig                        |   2 +-
- arch/arm/mach-zynq/common.c                           |  14 ++++++
- drivers/ata/sata_mv.c                                 |   8 ++--
- drivers/dma/Kconfig                                   |   1 +
- drivers/dma/mv_xor.c                                  |  24 +++++-----
- drivers/phy/phy-core.c                                |  62 +++++++++++++++++++++++-
- include/linux/phy/phy.h                               |  14 ++++++
- 39 files changed, 408 insertions(+), 33 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-sama5d3_xplained.dts
+> 
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
