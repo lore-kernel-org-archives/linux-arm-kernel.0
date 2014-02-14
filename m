@@ -1,90 +1,52 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Feb 2014 17:26:44 +0100
-Subject: [PATCH 26/27] ARM: shmobile: lager-reference: Enable CMT0 in
- device tree
-In-Reply-To: <52FE29DB.2010304@cogentembedded.com>
-References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <2354725.yUCM3gQqXi@avalon> <52FE29DB.2010304@cogentembedded.com>
-Message-ID: <1395114.O6aqLXJV0J@avalon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 14 Feb 2014 16:30:39 +0000
+Subject: [PATCH 3/6] irqchip: gic: use writel instead of dsb +
+ writel_relaxed
+In-Reply-To: <20140207112337.GC5976@mudshark.cambridge.arm.com>
+References: <20140206114559.GK29446@arm.com>
+ <20140206115121.GN26035@mudshark.cambridge.arm.com>
+ <20140206115430.GN29446@arm.com>
+ <20140206115739.GP26035@mudshark.cambridge.arm.com>
+ <20140206120035.GQ29446@arm.com>
+ <20140206121350.GQ26035@mudshark.cambridge.arm.com>
+ <20140206122340.GC32520@arm.com>
+ <20140206132643.GS26035@mudshark.cambridge.arm.com>
+ <20140206152048.GD32520@arm.com>
+ <20140207112337.GC5976@mudshark.cambridge.arm.com>
+Message-ID: <20140214163039.GG21986@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Well, the results are in (*drum roll*)...
 
-On Friday 14 February 2014 18:36:11 Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 14-02-2014 18:22, Laurent Pinchart wrote:
-> >>>>> Enable the CMT0 device and configure channel 0 as a clock event
-> >>>>> provider.
-> >>>>> 
-> >>>>> Signed-off-by: Laurent Pinchart
-> >>>>> <laurent.pinchart+renesas@ideasonboard.com>
-> >>>>> 
-> >>>>> diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h
-> >>>>> b/arch/arm/mach-shmobile/include/mach/r8a7790.h index 0b95bab..62b31f3
-> >>>>> 100644 --- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
-> >>>>> +++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-> >>>>> @@ -29,7 +29,6 @@ enum {
-> >>>>> 
-> >>>>>   };
-> >>>>>   
-> >>>>>   void r8a7790_add_standard_devices(void);
-> >>>>> 
-> >>>>> -void r8a7790_add_dt_devices(void);
-> >>>>> 
-> >>>>>   void r8a7790_clock_init(void);
-> >>>>>   void r8a7790_pinmux_init(void);
-> >>>>>   void r8a7790_pm_init(void);
-> >>>>> 
-> >>>>> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c
-> >>>>> b/arch/arm/mach-shmobile/setup-r8a7790.c index 3e5813f..462c81f 100644
-> >>>>> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
-> >>>>> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-> >>>>> @@ -294,11 +294,6 @@ static struct resource cmt0_resources[] = {
-> >>>>>     					  &cmt##idx##_platform_data,	\
-> >>>>>     					  sizeof(struct sh_timer_config))
-> >>>>> 
-> >>>>> -void __init r8a7790_add_dt_devices(void)
-> >>>>> -{
-> >>>>> -	r8a7790_register_cmt(0);
-> >>>>> -}
-> >>>>> -
-> >>>>>  void __init r8a7790_add_standard_devices(void)
-> >>>>>  {
-> >>>>>     	r8a7790_register_scif(0);
-> >>>>> @@ -311,7 +306,7 @@ void __init r8a7790_add_standard_devices(void)
-> >>>>> 	r8a7790_register_scif(7);
-> >>>>>  	r8a7790_register_scif(8);
-> >>>>>  	r8a7790_register_scif(9);
-> >>>>> -	r8a7790_add_dt_devices();
-> >>>>> +	r8a7790_register_cmt(0);
-> >>>>> 	r8a7790_register_irqc(0);
-> >>>>> 	r8a7790_register_thermal();
-> >>>>> }
-> >>>> 
-> >>>> IMHO, these 2 files should be split into a separate patch.
-> >>> 
-> >>> That could easily be done, but why ?
-> >> 
-> >> It does not seem necessary to combine these changes in one patch.
-> >> Remember, Simon has separate branches for boards and SoCs. So finally
-> >> it's up to him to decide on this...
+On Fri, Feb 07, 2014 at 11:23:37AM +0000, Will Deacon wrote:
+> On Thu, Feb 06, 2014 at 03:20:48PM +0000, Catalin Marinas wrote:
+> > On Thu, Feb 06, 2014 at 01:26:44PM +0000, Will Deacon wrote:
+> > > Ok, my reasoning is as follows:
+> > > 
+> > >   - CPU0 tries to message CPU1. It writes to a location in normal memory,
+> > >     then writes to the GICD to send the SGI
+> > > 
+> > >   - We need to ensure that CPU1 observes the write to normal memory before
+> > >     the write to GICD reaches the distributor. This is *not* about end-point
+> > >     ordering (the usual non-coherent DMA example).
+> > > 
+> > >   - A dmb ishst ensures that the two writes are observed in order by CPU1
+> > >     (and, in fact, the inner-shareable domain containing CPU0).
 > > 
-> > Right, but in this case I need to remove the CMT platform device
-> > registration from r8a7790_add_dt_devices()
+> > The last bullet point is not correct. DMB would only guarantee that the
+> > two writes (memory and GICD) are observed by CPU1 if CPU1 actually read
+> > the GICD (observability is defined for master accesses).
 > 
-> You're not removing anything in these 2 files, you're just replacing
-> "indirect" call to r8a7790_register_cmt(0) with direct.
+> Rather than attempt to solve this via email (your examples below are already
+> getting hard to follow :), how about we sit down with $drink_of_choice and
+> post back here with our conclusions?
 
-OK, I see what you mean now. Given that the patch removes the 
-r8a7790_add_dt_devices() call from arch/arm/mach-shmobile/board-lager-
-reference.c, I could indeed split those two changes into a separate patch as 
-there's no-one calling the function anymore. That would introduce a dependency 
-between the branches, which might not be better. I'll let Simon comment on 
-what he would prefer and will act accordingly.
+... and it turns out that a dmb(ishst) is sufficient!
 
--- 
-Regards,
+This counter-intuitive result was brought to you by ARM Ltd, purveyors of
+fine grained memory barrier instructions.
 
-Laurent Pinchart
+I'll spin the patch again.
+
+Will
