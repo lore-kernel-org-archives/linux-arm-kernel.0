@@ -1,70 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 14 Feb 2014 09:05:29 +0900
-Subject: Samsung-clk patches for 3.15
-In-Reply-To: <52E6F726.1070900@gmail.com>
-References: <52E27AE9.7040501@samsung.com> <52E6EDC1.9080003@gmail.com>
- <251c01cf1bbd$36802390$a3806ab0$@samsung.com> <52E6F726.1070900@gmail.com>
-Message-ID: <52FD5DC9.6000006@samsung.com>
+From: sarah.a.sharp@linux.intel.com (Sarah Sharp)
+Date: Thu, 13 Feb 2014 16:09:10 -0800
+Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
+In-Reply-To: <87wqh2iymx.fsf@natisbad.org>
+References: <87fvon2khn.fsf@natisbad.org> <87zjmvau23.fsf@nemi.mork.no>
+ <20140117205432.GB5618@xanatos> <87vbxhrmea.fsf@natisbad.org>
+ <20140121211741.GA12657@xanatos> <87bnz364h0.fsf@natisbad.org>
+ <20140122222641.GD29184@titan.lakedaemon.net>
+ <87mwin4ozf.fsf@natisbad.org> <20140122235620.GC20359@xanatos>
+ <87wqh2iymx.fsf@natisbad.org>
+Message-ID: <20140214000910.GB16889@xanatos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/28/14 09:17, Tomasz Figa wrote:
->
->
-> On 28.01.2014 01:09, Kukjin Kim wrote:
->> Tomasz Figa wrote:
->>>
->>> [Forgot to Cc Mike...]
->>>
->>> On 24.01.2014 15:38, Tomasz Figa wrote:
->>>> Hi,
->>>>
->>
->> Hi,
->>
->>>> Linux 3.14 is going to include Andrzej Hajda's patches converting
->>>> Samsung clock drivers to use clock ID defines in include/dt-bindings,
->>>> instead of local enums, but to avoid unnecessary merge conflicts we
->>>> have converted only the clock driver, leaving DTS files unchanged yet.
->>>>
->>>> We intend to complete the conversion in 3.15, by replacing magic
->>>> numbers in DTS files with respective preprocessor macros, but to
->>>> reduce potential conflicts we need help of you, Samsung clock patches
->>> authors :).
->>>>
->>>> I'd like to ask anybody who already has patches for DTS files adding
->>>> any clock-related contents still using numeric IDs, e.g. clock
->>>> properties in nodes or full nodes containing clock properties, to make
->>>> sure that the patches are merged before Andrzej sends the conversion
->>>> patches. Then Andrzej's script will generate patches updating all
->>>> clock properties, leaving no numeric IDs in DTS files.
->>>>
->>
->> There are several DTS patches in v3.14-drop/soc-exynos-2 branch of my
->> tree
->> for 3.15 and it will be merged after done of multiplatform, I need to
->> rebase
->> them based on v3.14-rc1 though...So I think, would be better if we could
->> update DTS with using Andrzej's script after merging it into arm-soc...
->
-> Basically my intention is to:
->
-> 1) Have any existing patches using clock numbers merged in reasonable
-> period of time (to not miss the merge window with DTS conversion patches).
->
-> 2) Stop accepting such patches anymore.
->
-> 3) Rerun Andrzej's script and convert all device tree sources to use
-> clock macros.
->
-> Andrzej's patches for DTSes should go through your tree anyway (as any
-> Samsung DTS patches by default), so it shouldn't be a problem,
-> regardless of merging anything into arm-soc.
->
+On Mon, Feb 10, 2014 at 07:57:42PM +0100, Arnaud Ebalard wrote:
+> Sarah Sharp <sarah.a.sharp@linux.intel.com> writes:
+> 
+> > On Wed, Jan 22, 2014 at 11:43:16PM +0100, Arnaud Ebalard wrote:
+> >> f5182b4155b9d686c5540a6822486400e34ddd98 "xhci: Disable MSI for some Fresco Logic hosts."
+> >> 
+> >> Technically, this is not per se the commit which introduced the
+> >> regression but the one that *partially* fixed it by introducing the XHCI
+> >> quirk to skip MSI enabling for Fresco Logic chips. The thing is it
+> >> should have included the FL1009 in the targets. Sarah, can you confirm
+> >> this?
+> >
+> > I don't know if it should have included FL1009, it was just a guess,
+> > based on the fact that the 0x1000 and 0x1400 devices did need MSI
+> > disabled.  I can attempt to ask the Fresco Logic folks I know, but I'm
+> > not sure if/when I'll get a response back.
+> >
+> > That still doesn't necessarily rule out MSI issues in the Marvell PCI
+> > host controller code.  Can you attach another PCI device with MSI
+> > support under the host and see if it works?
+> 
+> Unless you have some objections or some positive feedback from Fresco
+> Logic people, can you queue your quirks for FL1009 for 3.14-rc* and
+> -stable? Note that I am just asking, i.e. if you want to wait a bit
+> more, I am not that in a hurry.
 
-Makes sense, OK. I agreed. I'll apply Andrzej's "[PATCH RESEND v2 00/12] 
-clk/exynos convert clock IDs to macros" and every exynos dt should be 
-posted based on that from now on.
+Sorry for not getting back to you sooner.  The Fresco Logic folks said
+that the FL1000 and FL1400 hosts are actually the same chipset, and it
+doesn't support MSI.  However, they say the FL1009 *should* support MSI.
 
-Thanks,
-- Kukjin
+So that doesn't rule out issues with the Marvell PCI MSI code.  I
+suspect that's actually the root cause, since I haven't gotten any bug
+reports that the FL1009 doesn't work with MSI enabled on other systems.
+
+Sarah Sharp
