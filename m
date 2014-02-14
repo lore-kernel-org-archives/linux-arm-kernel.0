@@ -1,63 +1,52 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 14 Feb 2014 17:15:03 -0300
-Subject: [PATCH 4/4] clk: mvebu: add Armada 375 support to the corediv clock
- driver
-In-Reply-To: <1392408903-31237-4-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1392408903-31237-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1392408903-31237-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <1392408903-31237-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <1392408903-31237-4-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1392408903-31237-5-git-send-email-ezequiel.garcia@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 14 Feb 2014 21:36:29 +0100
+Subject: [PATCH v2 2/2] ARM: sunxi: dt: Convert to the new i2c compatibles
+In-Reply-To: <20140214074407.GA2569@katana>
+References: <1391680285-16668-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1391680285-16668-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20140213082630.GA3119@katana> <20140213225248.GB15350@lukather>
+ <20140214074407.GA2569@katana>
+Message-ID: <20140214203629.GE15350@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Fri, Feb 14, 2014 at 08:44:07AM +0100, Wolfram Sang wrote:
+> 
+> > > For non-a10, That should be at least
+> > > 
+> > > 	compatible = "allwinner,sun4i-a13-i2c", "allwinner,sun4i-a10-i2c";
+> > > 
+> > > or
+> > > 
+> > > 	compatible = "allwinner,sun4i-a13-i2c", "allwinner,sun4i-i2c";
+> > > 
+> > > depending on the outcome above.
+> > > 
+> > > Or is my knowledge outdated already?
+> > > 
+> > 
+> > Since they are strictly compatible, we don't need to introduce any
+> > different compatible string here.
+> 
+> You never know all errata in advance. From what I know, one should
+> always use the specfic naming first, and then the generic fallback. So,
+> in case a distinction is needed later (think errata), then one doesn't
+> need to change the devicetrees.
+> 
 
-This commit adds support for the Core Divider clocks of the Armada
-375. Compared to Armada 370 and XP the Core Divider clocks of the 375
-cannot be gated: only their ratio can be changed. This is reflected by
-the fact that the enable, disable and is_enabled clock operations are
-not defined, and that the enable_bit_offset field is also undefined.
+And adding a A13-specific compatible wouldn't change anything, because
+it does work on at least one revision of them, so if you'd have to
+deal with an errata, you'd have to introduce a new compatible for this
+revision only anyway.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- drivers/clk/mvebu/clk-corediv.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
-diff --git a/drivers/clk/mvebu/clk-corediv.c b/drivers/clk/mvebu/clk-corediv.c
-index f9e8a12..4da6076 100644
---- a/drivers/clk/mvebu/clk-corediv.c
-+++ b/drivers/clk/mvebu/clk-corediv.c
-@@ -204,6 +204,18 @@ static const struct clk_corediv_soc_desc armada370_corediv_soc = {
- 	.ratio_offset = 0x8,
- };
- 
-+static const struct clk_corediv_soc_desc armada375_corediv_soc = {
-+	.descs = mvebu_corediv_desc,
-+	.ndescs = ARRAY_SIZE(mvebu_corediv_desc),
-+	.ops = {
-+		.recalc_rate = clk_corediv_recalc_rate,
-+		.round_rate = clk_corediv_round_rate,
-+		.set_rate = clk_corediv_set_rate,
-+	},
-+	.ratio_reload = BIT(8),
-+	.ratio_offset = 0x8,
-+};
-+
- static void __init
- mvebu_corediv_clk_init(struct device_node *node,
- 		       const struct clk_corediv_soc_desc *soc_desc)
-@@ -271,3 +283,10 @@ static void __init armada370_corediv_clk_init(struct device_node *node)
- }
- CLK_OF_DECLARE(armada370_corediv_clk, "marvell,armada-370-corediv-clock",
- 	       armada370_corediv_clk_init);
-+
-+static void __init armada375_corediv_clk_init(struct device_node *node)
-+{
-+	return mvebu_corediv_clk_init(node, &armada375_corediv_soc);
-+}
-+CLK_OF_DECLARE(armada375_corediv_clk, "marvell,armada-375-corediv-clock",
-+	       armada375_corediv_clk_init);
 -- 
-1.8.1.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140214/357283a9/attachment.sig>
