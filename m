@@ -1,57 +1,83 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 14 Feb 2014 11:18:24 -0600
-Subject: [PATCH 3/6] irqchip: gic: use writel instead of dsb +
- writel_relaxed
-In-Reply-To: <20140214164803.GG10590@arm.com>
-References: <20140206115121.GN26035@mudshark.cambridge.arm.com>
- <20140206115430.GN29446@arm.com>
- <20140206115739.GP26035@mudshark.cambridge.arm.com>
- <20140206120035.GQ29446@arm.com>
- <20140206121350.GQ26035@mudshark.cambridge.arm.com>
- <20140206122340.GC32520@arm.com>
- <20140206132643.GS26035@mudshark.cambridge.arm.com>
- <20140206152048.GD32520@arm.com>
- <20140207112337.GC5976@mudshark.cambridge.arm.com>
- <20140214163039.GG21986@mudshark.cambridge.arm.com>
- <20140214164803.GG10590@arm.com>
-Message-ID: <CAL_JsqKVVPankw15mmen5S3Dvc4t+Kn4+LGb9UPzcSvroP-agA@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Sat, 15 Feb 2014 02:22:00 +0900
+Subject: [PATCH 23/27] clocksource: sh_cmt: Add DT support
+In-Reply-To: <1790131.DSZsj6HrSK@avalon>
+References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <107109887.afEv2P92gg@avalon>
+ <CANqRtoS-d-CW3XX3_E2dgJ83btRZYWiMCYmWUJAPqh9EeBhLEQ@mail.gmail.com>
+ <1790131.DSZsj6HrSK@avalon>
+Message-ID: <CANqRtoROALpUqi8rKWRpQk7LGc0BqU14AKg-2MgYBMNoEFGA4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 10:48 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Fri, Feb 14, 2014 at 04:30:39PM +0000, Will Deacon wrote:
->> Well, the results are in (*drum roll*)...
->>
->> On Fri, Feb 07, 2014 at 11:23:37AM +0000, Will Deacon wrote:
->> > On Thu, Feb 06, 2014 at 03:20:48PM +0000, Catalin Marinas wrote:
->> > > On Thu, Feb 06, 2014 at 01:26:44PM +0000, Will Deacon wrote:
->> > > > Ok, my reasoning is as follows:
->> > > >
->> > > >   - CPU0 tries to message CPU1. It writes to a location in normal memory,
->> > > >     then writes to the GICD to send the SGI
->> > > >
->> > > >   - We need to ensure that CPU1 observes the write to normal memory before
->> > > >     the write to GICD reaches the distributor. This is *not* about end-point
->> > > >     ordering (the usual non-coherent DMA example).
->> > > >
->> > > >   - A dmb ishst ensures that the two writes are observed in order by CPU1
->> > > >     (and, in fact, the inner-shareable domain containing CPU0).
->> > >
->> > > The last bullet point is not correct. DMB would only guarantee that the
->> > > two writes (memory and GICD) are observed by CPU1 if CPU1 actually read
->> > > the GICD (observability is defined for master accesses).
->> >
->> > Rather than attempt to solve this via email (your examples below are already
->> > getting hard to follow :), how about we sit down with $drink_of_choice and
->> > post back here with our conclusions?
->>
->> ... and it turns out that a dmb(ishst) is sufficient!
+Hi Laurent,
+
+On Sat, Feb 15, 2014 at 1:12 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Magnus,
 >
-> Until we hear otherwise ;)
+> On Saturday 15 February 2014 01:01:30 Magnus Damm wrote:
+>> On Sat, Feb 15, 2014 at 12:53 AM, Laurent Pinchart wrote:
+>> > On Friday 14 February 2014 10:58:22 Mark Rutland wrote:
+>> >> On Fri, Feb 14, 2014 at 01:00:01AM +0000, Laurent Pinchart wrote:
+>> >> > +Channels Optional Properties:
+>> >> > +
+>> >> > +  - clock-source-rating: rating of the timer as a clock source device.
+>> >> > +  - clock-event-rating: rating of the timer as a clock event device.
+>> >>
+>> >> This feels like a leak of Linux internals. Why do you need this?
+>> >
+>> > You're right, it is. The clock source and clock event ratings are
+>> > currently configured through platform data, I'll need to find a way to
+>> > compute them in the driver instead.
+>>
+>> That would be very good!
+>
+> Any pointer would be appreciated :-) How did you compute the various ratings
+> used in platform data all over the place ?
 
-It is a shame that all this thought and effort will just end with
-barrier related chicken bits getting set anyway. Maybe the
-$drink_of_choice was worth it. ;)
+Historically we used the rating to select between CMT and TMU. For
+clock sources I suppose you also have the jiffy rating to consider.
+And for the SMP parts we have ARM IP for TWD and arch timers that have
+their ratings too. So you need to check all the timers on a particular
+system and consider what you want to have operating by default. The
+ARM IP timers should be preferred if available. For clock sources the
+rule is probably the higher resolution the better.
 
-Rob
+>> > There's still one piece of Linux-specific data I need though, as I need to
+>> > specify for each channel whether to use it as a clock source device, a
+>> > clock event device, both of them or none. That's configuration
+>> > information that needs to be provided somehow.
+>>
+>> I think you can decide clock source or clock event assignment based on
+>> number of channels available. If you have only a single channel then both
+>> clock event and clock source need to be supported. Otherwise use one channel
+>> for clock source and the rest for clock events.
+>
+> That won't match the current situation. Look at CMT0 in r8a7790 for instance.
+> There's two hardware channels available, and we only use the first one, for
+> clock events only.
+
+You are correct. The reason for that is that the CMT driver today is
+optimized for combined clock event and clock source operation.
+
+Historically the hardware it initially was written for (sh-mobile on
+the SH arch) only had a single timer channel so combined operation was
+required for tickless to work. But since you're asking how to allocate
+channels then I propose checking numbers of channels available and go
+from there. With that the r8a7790 support can only get better. =)
+
+>> This is probably out of scope for this DT conversion, but it would be neat
+>> if you somehow could specify the CPU affinity for a channel to tie a clock
+>> event to an individual CPU core. This would make a a per-cpu timer unless
+>> I'm mistaken. But that's more of a software policy than anything else.
+>
+> Yes, that's a configuration that needs to be specified somewhere. I don't know
+> where though.
+
+As long as you have per-channel interrupts described in DT you can
+probably handle this in a generic way in the driver.
+
+Thanks,
+
+/ magnus
