@@ -1,34 +1,62 @@
 From: yao.yuan@freescale.com (Yuan Yao)
-Date: Fri, 14 Feb 2014 15:27:16 +0800
-Subject: [PATCH v5 0/3] serial: fsl_lpuart: add DMA support
-Message-ID: <1392362839-8004-1-git-send-email-yao.yuan@freescale.com>
+Date: Fri, 14 Feb 2014 15:27:17 +0800
+Subject: [PATCH v5 1/3] ARM: dts: vf610: lpuart: Add eDMA support
+In-Reply-To: <1392362839-8004-1-git-send-email-yao.yuan@freescale.com>
+References: <1392362839-8004-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <1392362839-8004-2-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add lpuart dts node properties for eDMA support, them depend on the eDMA driver.
 
-Changed in v5:
-- Revoke move dma properties from dtsi to dts.
-- Change the explanations for dmas, dma-names in document.
-- Change the description for [PATCH 3] serial: fsl_lpuart: documented the clock requirement.
+Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+---
+ arch/arm/boot/dts/vf610.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Changed in v4:
-- Move dma properties from dtsi to dts.
-- Cancle the macro(SERIAL_FSL_LPUART_DMA)  .
-- Separate the document for clocks which undocumented before into a single patch.
-- Change some explanations in document(clocks, clock-names, dmas, dma-names).
-- Change "lpuart-tx" and "lpuart-rx" to "tx" and "rx".
-
-Changed in v3:
-- Use the streaming DMA API for receive.
-- Add the macro(SERIAL_FSL_LPUART_DMA) and dts node propertie for whether using the dma.
-- Adjust some coding style.
-
-Changed in v2:
-- Add eDMA support for lpuart receive.
-- Use dma_mapping_error test dma_map_single.
-- Change some names of variable.
-- Fix some bugs.
-
-Added in v1:
-- Add device tree bindings for lupart eDMA support.
-- Add eDMA support for lpuart send.
+diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+index 365e0fa..8f523b0 100644
+--- a/arch/arm/boot/dts/vf610.dtsi
++++ b/arch/arm/boot/dts/vf610.dtsi
+@@ -94,6 +94,9 @@
+ 				interrupts = <0 61 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks VF610_CLK_UART0>;
+ 				clock-names = "ipg";
++				dmas = <&edma0 0 2>,
++					<&edma0 0 3>;
++				dma-names = "rx","tx";
+ 				status = "disabled";
+ 			};
+ 
+@@ -103,6 +106,9 @@
+ 				interrupts = <0 62 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks VF610_CLK_UART1>;
+ 				clock-names = "ipg";
++				dmas = <&edma0 0 4>,
++					<&edma0 0 5>;
++				dma-names = "rx","tx";
+ 				status = "disabled";
+ 			};
+ 
+@@ -112,6 +118,9 @@
+ 				interrupts = <0 63 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks VF610_CLK_UART2>;
+ 				clock-names = "ipg";
++				dmas = <&edma0 0 6>,
++					<&edma0 0 7>;
++				dma-names = "rx","tx";
+ 				status = "disabled";
+ 			};
+ 
+@@ -121,6 +130,9 @@
+ 				interrupts = <0 64 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks VF610_CLK_UART3>;
+ 				clock-names = "ipg";
++				dmas = <&edma0 0 8>,
++					<&edma0 0 9>;
++				dma-names = "rx","tx";
+ 				status = "disabled";
+ 			};
+ 
+-- 
+1.8.4
