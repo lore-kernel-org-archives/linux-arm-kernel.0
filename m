@@ -1,115 +1,71 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 14 Feb 2014 15:45:22 +0200
-Subject: [PATCH 1/8] clk: divider: fix rate calculation for fractional
- rates
-In-Reply-To: <1392285846-13199-2-git-send-email-tomi.valkeinen@ti.com>
-References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
- <1392285846-13199-2-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <52FE1DF2.2040707@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 14 Feb 2014 14:48:44 +0100
+Subject: [PATCH 26/27] ARM: shmobile: lager-reference: Enable CMT0 in
+ device tree
+In-Reply-To: <52FE1E14.5090400@cogentembedded.com>
+References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1392339605-20691-27-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <52FE1E14.5090400@cogentembedded.com>
+Message-ID: <2244047.l1cecWDdMU@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2014 12:03 PM, Tomi Valkeinen wrote:
-> clk-divider.c does not calculate the rates consistently at the moment.
->
-> As an example, on OMAP3 we have a clock divider with a source clock of
-> 864000000 Hz. With dividers 6, 7 and 8 the theoretical rates are:
->
-> 6: 144000000
-> 7: 123428571.428571...
-> 8: 108000000
->
-> Calling clk_round_rate() with the rate in the first column will give the
-> rate in the second column:
->
-> 144000000 -> 144000000
-> 143999999 -> 123428571
-> 123428572 -> 123428571
-> 123428571 -> 108000000
->
-> Note how clk_round_rate() returns 123428571 for rates from 123428572 to
-> 143999999, which is mathematically correct, but when clk_round_rate() is
-> called with 123428571, the returned value is surprisingly 108000000.
->
-> This means that the following code works a bit oddly:
->
-> rate = clk_round_rate(clk, 123428572);
-> clk_set_rate(clk, rate);
->
-> As clk_set_rate() also does clock rate rounding, the result is that the
-> clock is set to the rate of 108000000, not 123428571 returned by the
-> clk_round_rate.
->
-> This patch changes the clk-divider.c to use DIV_ROUND_UP when
-> calculating the rate. This gives the following behavior which fixes the
-> inconsistency:
->
-> 144000000 -> 144000000
-> 143999999 -> 123428572
-> 123428572 -> 123428572
-> 123428571 -> 108000000
->
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> ---
->   drivers/clk/clk-divider.c | 10 +++++-----
->   1 file changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index 5543b7df8e16..ec22112e569f 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -24,7 +24,7 @@
->    * Traits of this clock:
->    * prepare - clk_prepare only ensures that parents are prepared
->    * enable - clk_enable only ensures that parents are enabled
-> - * rate - rate is adjustable.  clk->rate = parent->rate / divisor
-> + * rate - rate is adjustable.  clk->rate = DIV_ROUND_UP(parent->rate / divisor)
->    * parent - fixed parent.  No clk_set_parent support
->    */
->
-> @@ -115,7 +115,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
->   		return parent_rate;
->   	}
->
-> -	return parent_rate / div;
-> +	return DIV_ROUND_UP(parent_rate, div);
->   }
->
->   /*
-> @@ -185,7 +185,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
->   		}
->   		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
->   				MULT_ROUND_UP(rate, i));
-> -		now = parent_rate / i;
-> +		now = DIV_ROUND_UP(parent_rate, i);
->   		if (now <= rate && now > best) {
->   			bestdiv = i;
->   			best = now;
-> @@ -207,7 +207,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
->   	int div;
->   	div = clk_divider_bestdiv(hw, rate, prate);
->
-> -	return *prate / div;
-> +	return DIV_ROUND_UP(*prate, div);
->   }
->
->   static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
-> @@ -218,7 +218,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
->   	unsigned long flags = 0;
->   	u32 val;
->
-> -	div = parent_rate / rate;
-> +	div = DIV_ROUND_UP(parent_rate, rate);
->   	value = _get_val(divider, div);
->
->   	if (value > div_mask(divider))
->
+Hi Sergei,
 
-Basically the patch looks good to me, but it might be good to have a 
-testing round of sort with this. It can potentially cause regressions on 
-multiple boards if the drivers happen to rely on the "broken" clock 
-rates. Same for patch #2 which is a copy paste of this one, but only 
-impacts TI boards.
+Thank you for the review.
 
--Tero
+On Friday 14 February 2014 17:45:56 Sergei Shtylyov wrote:
+> On 14-02-2014 5:00, Laurent Pinchart wrote:
+> > Enable the CMT0 device and configure channel 0 as a clock event
+> > provider.
+> > 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > 
+> > diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> > b/arch/arm/mach-shmobile/include/mach/r8a7790.h index 0b95bab..62b31f3
+> > 100644
+> > --- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> > +++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> > @@ -29,7 +29,6 @@ enum {
+> >  };
+> >   
+> >  void r8a7790_add_standard_devices(void);
+> > -void r8a7790_add_dt_devices(void);
+> >  void r8a7790_clock_init(void);
+> >  void r8a7790_pinmux_init(void);
+> >  void r8a7790_pm_init(void);
+> > diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c
+> > b/arch/arm/mach-shmobile/setup-r8a7790.c index 3e5813f..462c81f 100644
+> > --- a/arch/arm/mach-shmobile/setup-r8a7790.c
+> > +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+> > @@ -294,11 +294,6 @@ static struct resource cmt0_resources[] = {
+> >   					  &cmt##idx##_platform_data,	\
+> >   					  sizeof(struct sh_timer_config))
+> > 
+> > -void __init r8a7790_add_dt_devices(void)
+> > -{
+> > -	r8a7790_register_cmt(0);
+> > -}
+> > -
+> >  void __init r8a7790_add_standard_devices(void)
+> >  {
+> >   	r8a7790_register_scif(0);
+> > @@ -311,7 +306,7 @@ void __init r8a7790_add_standard_devices(void)
+> >   	r8a7790_register_scif(7);
+> >   	r8a7790_register_scif(8);
+> >   	r8a7790_register_scif(9);
+> > -	r8a7790_add_dt_devices();
+> > +	r8a7790_register_cmt(0);
+> >   	r8a7790_register_irqc(0);
+> >   	r8a7790_register_thermal();
+> >  }
+> 
+>     IMHO, these 2 files should be split into a separate patch.
+
+That could easily be done, but why ?
+
+-- 
+Regards,
+
+Laurent Pinchart
