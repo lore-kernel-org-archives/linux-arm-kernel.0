@@ -1,34 +1,24 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 14 Feb 2014 17:42:56 +0000
-Subject: [PATCH 16/22] arm64: Add function to create identity mappings
-In-Reply-To: <1391619853-10601-17-git-send-email-leif.lindholm@linaro.org>
-References: <1391619853-10601-1-git-send-email-leif.lindholm@linaro.org>
- <1391619853-10601-17-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <20140214174256.GC12304@arm.com>
+From: sre@ring0.de (Sebastian Reichel)
+Date: Fri, 14 Feb 2014 18:40:41 +0100
+Subject: [PATCH 1/2] mfd: twl4030-madc: Add devicetree support.
+In-Reply-To: <1392383861-14169-1-git-send-email-marek@goldelico.com>
+References: <1392383861-14169-1-git-send-email-marek@goldelico.com>
+Message-ID: <20140214174040.GB26969@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 05:04:07PM +0000, Leif Lindholm wrote:
-> +void __init create_id_mapping(phys_addr_t addr, phys_addr_t size, int map_io)
-> +{
-> +	pgd_t *pgd = &idmap_pg_dir[pgd_index(addr)];
-> +
-> +	if (pgd >= &idmap_pg_dir[ARRAY_SIZE(idmap_pg_dir)]) {
-> +		pr_warn("BUG: not creating id mapping for 0x%016llx\n", addr);
-> +		return;
-> +	}
-> +	__create_mapping(pgd, addr, addr, size, map_io);
-> +}
+Hi Marek,
 
-I'm a bit worried because I gave some feedback in the past but it didn't
-make to this patch.
+I have prepared a patchset, which adds DT bindings for twl4030-madc
+using the standard IIO DT API. I have not yet send the patchset,
+since I have not yet found the time to test the patchset. I will
+send them as RFC now.
 
-What I said on 22nd of January:
-
-  The condition above is always false since pgd_index() already ands the
-  index with (PTRS_PER_PGD - 1). Better check addr against something like
-  (PTRS_PER_PGD * PGDIR_SIZE) (for clarity, you could do other shifts,
-  doesn't really matter).
-
--- 
-Catalin
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140214/2a7c85d4/attachment.sig>
