@@ -1,30 +1,28 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 14 Feb 2014 10:51:21 +0100
-Subject: [PATCH 0/3] arm: at91: update defconfigs
-In-Reply-To: <1392147841-7815-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1392147841-7815-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <52FDE719.4040107@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 14 Feb 2014 09:57:13 +0000
+Subject: [PATCH v7 01/12] mfd: omap-usb-host: Use resource managed
+ clk_get()
+In-Reply-To: <1392200333-28397-2-git-send-email-rogerq@ti.com>
+References: <1392200333-28397-1-git-send-email-rogerq@ti.com>
+ <1392200333-28397-2-git-send-email-rogerq@ti.com>
+Message-ID: <20140214095713.GB7380@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2014 20:43, Alexandre Belloni :
-> A few at91 defconfigs where not updated in a long time, refresh the configs for
-> at91sam9rl and at91sam9260/at91sam9g20.
+> Use devm_clk_get() instead of clk_get().
 > 
-> Alexandre Belloni (3):
->   arm: at91sam9rl: refresh defconfig
->   arm: at91sam9260_9g20: remove useless configuration
->   arm: at91sam9260_9g20: refresh configuration
-> 
->  arch/arm/configs/at91sam9260_9g20_defconfig |  9 ++-------
->  arch/arm/configs/at91sam9rl_defconfig       | 10 +++++++---
->  2 files changed, 9 insertions(+), 10 deletions(-)
+> CC: Lee Jones <lee.jones@linaro.org>
+> CC: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mfd/omap-usb-host.c | 81 +++++++++------------------------------------
+>  1 file changed, 16 insertions(+), 65 deletions(-)
 
+Applied, thanks.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-stacked in at91-3.15-cleanup
-
-Thanks, bye,
 -- 
-Nicolas Ferre
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
