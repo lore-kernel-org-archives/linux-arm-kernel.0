@@ -1,52 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 14 Feb 2014 21:36:29 +0100
-Subject: [PATCH v2 2/2] ARM: sunxi: dt: Convert to the new i2c compatibles
-In-Reply-To: <20140214074407.GA2569@katana>
-References: <1391680285-16668-1-git-send-email-maxime.ripard@free-electrons.com>
- <1391680285-16668-3-git-send-email-maxime.ripard@free-electrons.com>
- <20140213082630.GA3119@katana> <20140213225248.GB15350@lukather>
- <20140214074407.GA2569@katana>
-Message-ID: <20140214203629.GE15350@lukather>
+From: lho@apm.com (Loc Ho)
+Date: Fri, 14 Feb 2014 13:44:08 -0800
+Subject: [PATCH v10 0/4] ata: Add APM X-Gene SoC SATA host controller
+ support
+In-Reply-To: <20140214150322.GB29516@htj.dyndns.org>
+References: <CAPw-ZTkbpOEHowGvp-_3DcW1qW0AK_ZbpdS1LESJfhFU-n_Mtw@mail.gmail.com>
+ <CAPw-ZTn5c=v+7pbetEjXWpw9i=cG+zdeHPxO1QD0e42uFrKnCg@mail.gmail.com>
+ <20140214150322.GB29516@htj.dyndns.org>
+Message-ID: <CAPw-ZT=DGKfshpKb2K7+=gXyzbi8r51MeURJDv9d5YgHfE8prw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 08:44:07AM +0100, Wolfram Sang wrote:
-> 
-> > > For non-a10, That should be at least
-> > > 
-> > > 	compatible = "allwinner,sun4i-a13-i2c", "allwinner,sun4i-a10-i2c";
-> > > 
-> > > or
-> > > 
-> > > 	compatible = "allwinner,sun4i-a13-i2c", "allwinner,sun4i-i2c";
-> > > 
-> > > depending on the outcome above.
-> > > 
-> > > Or is my knowledge outdated already?
-> > > 
-> > 
-> > Since they are strictly compatible, we don't need to introduce any
-> > different compatible string here.
-> 
-> You never know all errata in advance. From what I know, one should
-> always use the specfic naming first, and then the generic fallback. So,
-> in case a distinction is needed later (think errata), then one doesn't
-> need to change the devicetrees.
-> 
+Hi Tejun,
 
-And adding a A13-specific compatible wouldn't change anything, because
-it does work on at least one revision of them, so if you'd have to
-deal with an errata, you'd have to introduce a new compatible for this
-revision only anyway.
+>
+> On Thu, Feb 13, 2014 at 03:28:01PM -0800, Loc Ho wrote:
+>> 1. There are a number of errata that require workaround. Some can be
+>> fixed by adding broken flags while others are better to just wrap
+>> around the existent libahci library routines and not overly polluting
+>> the libahci routines.
+>> 2. There are additional controller programming sequences to configure.
+>> 2a. By default, RAM are powered down and require brought out of shutdown.
+>> 2b. The controller has an additional corresponding PHY part that needs
+>> to be programmed after PHY configuration.
+>
+> Have you looked at the latest patchset Hans posted?  He added multiple
+> PHY support and split up init to three steps so that each platform
+> driver can mix and match as they see fit.  Looking at xgene driver,
+> sure there are things specific to the driver but there also are
+> non-insignificant amount of boilerplate code and that's what I'm
+> primarily concerned about.  It may be okay when you have two or three
+> drivers duplicating some code but it looks like we could have many
+> more and I *really* want to avoid the situation where the same piece
+> of code is copied over N times.  In addition, frankly, not many people
+> except yourself would care about these drivers once they're merged and
+> many of these are gonna be painful to test making later refactoring a
+> lot harder.
+>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140214/357283a9/attachment.sig>
+Ok... I will look into Hans' patch again. To be sure that I am looking
+at the correct patch, are you referring to this one:
+
+http://www.spinics.net/lists/linux-ide/msg47628.html
+
+-Loc
