@@ -1,238 +1,63 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 14 Feb 2014 17:15:02 -0300
-Subject: [PATCH 3/4] clk: mvebu: refactor corediv driver to support more SoC
-In-Reply-To: <1392408903-31237-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Fri, 14 Feb 2014 17:15:03 -0300
+Subject: [PATCH 4/4] clk: mvebu: add Armada 375 support to the corediv clock
+ driver
+In-Reply-To: <1392408903-31237-4-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1392408903-31237-1-git-send-email-ezequiel.garcia@free-electrons.com>
  <1392408903-31237-2-git-send-email-ezequiel.garcia@free-electrons.com>
  <1392408903-31237-3-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1392408903-31237-4-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1392408903-31237-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1392408903-31237-5-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-This commit refactors the corediv clock driver so that it is capable
-of handling various SOCs that have slightly different corediv clock
-registers and capabilities.
-
-It introduces a clk_corediv_soc_desc structure that encapsulates all
-the SoC specific details.
+This commit adds support for the Core Divider clocks of the Armada
+375. Compared to Armada 370 and XP the Core Divider clocks of the 375
+cannot be gated: only their ratio can be changed. This is reflected by
+the fact that the enable, disable and is_enabled clock operations are
+not defined, and that the enable_bit_offset field is also undefined.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/clk/mvebu/clk-corediv.c | 81 +++++++++++++++++++++++++++++------------
- 1 file changed, 57 insertions(+), 24 deletions(-)
+ drivers/clk/mvebu/clk-corediv.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
 diff --git a/drivers/clk/mvebu/clk-corediv.c b/drivers/clk/mvebu/clk-corediv.c
-index 59db71d..f9e8a12 100644
+index f9e8a12..4da6076 100644
 --- a/drivers/clk/mvebu/clk-corediv.c
 +++ b/drivers/clk/mvebu/clk-corediv.c
-@@ -18,9 +18,6 @@
- #include "common.h"
- 
- #define CORE_CLK_DIV_RATIO_MASK		0xff
--#define CORE_CLK_DIV_RATIO_RELOAD	BIT(8)
--#define CORE_CLK_DIV_ENABLE_OFFSET	24
--#define CORE_CLK_DIV_RATIO_OFFSET	0x8
- 
- /*
-  * This structure describes the hardware details (bit offset and mask)
-@@ -36,6 +33,21 @@ struct clk_corediv_desc {
+@@ -204,6 +204,18 @@ static const struct clk_corediv_soc_desc armada370_corediv_soc = {
+ 	.ratio_offset = 0x8,
  };
  
- /*
-+ * This structure describes the hardware details to configure the core
-+ * divider clocks on a given SoC. Amongst others, it points to the
-+ * array of core divider clock descriptors for this SoC, as well as
-+ * the corresponding operations to manipulate them.
-+ */
-+struct clk_corediv_soc_desc {
-+	const struct clk_corediv_desc *descs;
-+	unsigned int ndescs;
-+	const struct clk_ops ops;
-+	u32 ratio_reload;
-+	u32 enable_bit_offset;
-+	u32 ratio_offset;
-+};
-+
-+/*
-  * This structure represents one core divider clock for the clock
-  * framework, and is dynamically allocated for each core divider clock
-  * existing in the current SoC.
-@@ -44,6 +56,7 @@ struct clk_corediv {
- 	struct clk_hw hw;
- 	void __iomem *reg;
- 	const struct clk_corediv_desc *desc;
-+	const struct clk_corediv_soc_desc *soc_desc;
- 	spinlock_t lock;
- };
- 
-@@ -63,8 +76,9 @@ static const struct clk_corediv_desc mvebu_corediv_desc[] = {
- static int clk_corediv_is_enabled(struct clk_hw *hwclk)
- {
- 	struct clk_corediv *corediv = to_corediv_clk(hwclk);
-+	const struct clk_corediv_soc_desc *soc_desc = corediv->soc_desc;
- 	const struct clk_corediv_desc *desc = corediv->desc;
--	u32 enable_mask = BIT(desc->fieldbit) << CORE_CLK_DIV_ENABLE_OFFSET;
-+	u32 enable_mask = BIT(desc->fieldbit) << soc_desc->enable_bit_offset;
- 
- 	return !!(readl(corediv->reg) & enable_mask);
- }
-@@ -72,6 +86,7 @@ static int clk_corediv_is_enabled(struct clk_hw *hwclk)
- static int clk_corediv_enable(struct clk_hw *hwclk)
- {
- 	struct clk_corediv *corediv = to_corediv_clk(hwclk);
-+	const struct clk_corediv_soc_desc *soc_desc = corediv->soc_desc;
- 	const struct clk_corediv_desc *desc = corediv->desc;
- 	unsigned long flags = 0;
- 	u32 reg;
-@@ -79,7 +94,7 @@ static int clk_corediv_enable(struct clk_hw *hwclk)
- 	spin_lock_irqsave(&corediv->lock, flags);
- 
- 	reg = readl(corediv->reg);
--	reg |= (BIT(desc->fieldbit) << CORE_CLK_DIV_ENABLE_OFFSET);
-+	reg |= (BIT(desc->fieldbit) << soc_desc->enable_bit_offset);
- 	writel(reg, corediv->reg);
- 
- 	spin_unlock_irqrestore(&corediv->lock, flags);
-@@ -90,6 +105,7 @@ static int clk_corediv_enable(struct clk_hw *hwclk)
- static void clk_corediv_disable(struct clk_hw *hwclk)
- {
- 	struct clk_corediv *corediv = to_corediv_clk(hwclk);
-+	const struct clk_corediv_soc_desc *soc_desc = corediv->soc_desc;
- 	const struct clk_corediv_desc *desc = corediv->desc;
- 	unsigned long flags = 0;
- 	u32 reg;
-@@ -97,7 +113,7 @@ static void clk_corediv_disable(struct clk_hw *hwclk)
- 	spin_lock_irqsave(&corediv->lock, flags);
- 
- 	reg = readl(corediv->reg);
--	reg &= ~(BIT(desc->fieldbit) << CORE_CLK_DIV_ENABLE_OFFSET);
-+	reg &= ~(BIT(desc->fieldbit) << soc_desc->enable_bit_offset);
- 	writel(reg, corediv->reg);
- 
- 	spin_unlock_irqrestore(&corediv->lock, flags);
-@@ -107,10 +123,11 @@ static unsigned long clk_corediv_recalc_rate(struct clk_hw *hwclk,
- 					 unsigned long parent_rate)
- {
- 	struct clk_corediv *corediv = to_corediv_clk(hwclk);
-+	const struct clk_corediv_soc_desc *soc_desc = corediv->soc_desc;
- 	const struct clk_corediv_desc *desc = corediv->desc;
- 	u32 reg, div;
- 
--	reg = readl(corediv->reg + CORE_CLK_DIV_RATIO_OFFSET);
-+	reg = readl(corediv->reg + soc_desc->ratio_offset);
- 	div = (reg >> desc->offset) & desc->mask;
- 	return parent_rate / div;
- }
-@@ -134,6 +151,7 @@ static int clk_corediv_set_rate(struct clk_hw *hwclk, unsigned long rate,
- 			    unsigned long parent_rate)
- {
- 	struct clk_corediv *corediv = to_corediv_clk(hwclk);
-+	const struct clk_corediv_soc_desc *soc_desc = corediv->soc_desc;
- 	const struct clk_corediv_desc *desc = corediv->desc;
- 	unsigned long flags = 0;
- 	u32 reg, div;
-@@ -143,17 +161,17 @@ static int clk_corediv_set_rate(struct clk_hw *hwclk, unsigned long rate,
- 	spin_lock_irqsave(&corediv->lock, flags);
- 
- 	/* Write new divider to the divider ratio register */
--	reg = readl(corediv->reg + CORE_CLK_DIV_RATIO_OFFSET);
-+	reg = readl(corediv->reg + soc_desc->ratio_offset);
- 	reg &= ~(desc->mask << desc->offset);
- 	reg |= (div & desc->mask) << desc->offset;
--	writel(reg, corediv->reg + CORE_CLK_DIV_RATIO_OFFSET);
-+	writel(reg, corediv->reg + soc_desc->ratio_offset);
- 
- 	/* Set reload-force for this clock */
- 	reg = readl(corediv->reg) | BIT(desc->fieldbit);
- 	writel(reg, corediv->reg);
- 
- 	/* Now trigger the clock update */
--	reg = readl(corediv->reg) | CORE_CLK_DIV_RATIO_RELOAD;
-+	reg = readl(corediv->reg) | soc_desc->ratio_reload;
- 	writel(reg, corediv->reg);
- 
- 	/*
-@@ -161,7 +179,7 @@ static int clk_corediv_set_rate(struct clk_hw *hwclk, unsigned long rate,
- 	 * ratios request and the reload request.
- 	 */
- 	udelay(1000);
--	reg &= ~(CORE_CLK_DIV_RATIO_MASK | CORE_CLK_DIV_RATIO_RELOAD);
-+	reg &= ~(CORE_CLK_DIV_RATIO_MASK | soc_desc->ratio_reload);
- 	writel(reg, corediv->reg);
- 	udelay(1000);
- 
-@@ -170,16 +188,25 @@ static int clk_corediv_set_rate(struct clk_hw *hwclk, unsigned long rate,
- 	return 0;
- }
- 
--static const struct clk_ops corediv_ops = {
--	.enable = clk_corediv_enable,
--	.disable = clk_corediv_disable,
--	.is_enabled = clk_corediv_is_enabled,
--	.recalc_rate = clk_corediv_recalc_rate,
--	.round_rate = clk_corediv_round_rate,
--	.set_rate = clk_corediv_set_rate,
-+static const struct clk_corediv_soc_desc armada370_corediv_soc = {
++static const struct clk_corediv_soc_desc armada375_corediv_soc = {
 +	.descs = mvebu_corediv_desc,
 +	.ndescs = ARRAY_SIZE(mvebu_corediv_desc),
 +	.ops = {
-+		.enable = clk_corediv_enable,
-+		.disable = clk_corediv_disable,
-+		.is_enabled = clk_corediv_is_enabled,
 +		.recalc_rate = clk_corediv_recalc_rate,
 +		.round_rate = clk_corediv_round_rate,
 +		.set_rate = clk_corediv_set_rate,
 +	},
 +	.ratio_reload = BIT(8),
-+	.enable_bit_offset = 24,
 +	.ratio_offset = 0x8,
- };
- 
--static void __init mvebu_corediv_clk_init(struct device_node *node)
-+static void __init
-+mvebu_corediv_clk_init(struct device_node *node,
-+		       const struct clk_corediv_soc_desc *soc_desc)
- {
- 	struct clk_init_data init;
- 	struct clk_corediv *corediv;
-@@ -195,7 +222,7 @@ static void __init mvebu_corediv_clk_init(struct device_node *node)
- 
- 	parent_name = of_clk_get_parent_name(node, 0);
- 
--	clk_data.clk_num = ARRAY_SIZE(mvebu_corediv_desc);
-+	clk_data.clk_num = soc_desc->ndescs;
- 
- 	/* clks holds the clock array */
- 	clks = kcalloc(clk_data.clk_num, sizeof(struct clk *),
-@@ -216,10 +243,11 @@ static void __init mvebu_corediv_clk_init(struct device_node *node)
- 		init.num_parents = 1;
- 		init.parent_names = &parent_name;
- 		init.name = clk_name;
--		init.ops = &corediv_ops;
-+		init.ops = &soc_desc->ops;
- 		init.flags = 0;
- 
--		corediv[i].desc = mvebu_corediv_desc + i;
-+		corediv[i].soc_desc = soc_desc;
-+		corediv[i].desc = soc_desc->descs + i;
- 		corediv[i].reg = base;
- 		corediv[i].hw.init = &init;
- 
-@@ -236,5 +264,10 @@ err_free_clks:
- err_unmap:
- 	iounmap(base);
- }
--CLK_OF_DECLARE(mvebu_corediv_clk, "marvell,armada-370-corediv-clock",
--	       mvebu_corediv_clk_init);
++};
 +
-+static void __init armada370_corediv_clk_init(struct device_node *node)
+ static void __init
+ mvebu_corediv_clk_init(struct device_node *node,
+ 		       const struct clk_corediv_soc_desc *soc_desc)
+@@ -271,3 +283,10 @@ static void __init armada370_corediv_clk_init(struct device_node *node)
+ }
+ CLK_OF_DECLARE(armada370_corediv_clk, "marvell,armada-370-corediv-clock",
+ 	       armada370_corediv_clk_init);
++
++static void __init armada375_corediv_clk_init(struct device_node *node)
 +{
-+	return mvebu_corediv_clk_init(node, &armada370_corediv_soc);
++	return mvebu_corediv_clk_init(node, &armada375_corediv_soc);
 +}
-+CLK_OF_DECLARE(armada370_corediv_clk, "marvell,armada-370-corediv-clock",
-+	       armada370_corediv_clk_init);
++CLK_OF_DECLARE(armada375_corediv_clk, "marvell,armada-375-corediv-clock",
++	       armada375_corediv_clk_init);
 -- 
 1.8.1.5
