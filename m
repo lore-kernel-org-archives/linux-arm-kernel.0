@@ -1,75 +1,61 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 14 Feb 2014 15:52:39 +0200
-Subject: [PATCH 5/8] ARM: dts: fix DPLL4 x2 clkouts on 3630
-In-Reply-To: <1392285846-13199-6-git-send-email-tomi.valkeinen@ti.com>
-References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
- <1392285846-13199-6-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <52FE1FA7.3080306@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 14 Feb 2014 17:45:56 +0400
+Subject: [PATCH 26/27] ARM: shmobile: lager-reference: Enable CMT0 in
+ device tree
+In-Reply-To: <1392339605-20691-27-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1392339605-20691-27-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <52FE1E14.5090400@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2014 12:04 PM, Tomi Valkeinen wrote:
-> OMAP3630 DPLL4 is different than on OMAP3430, in that it doesn't have
-> the x2 multiplier for its outputs. This is not currently reflected in
-> the clock DT data.
->
-> Fix the issue by setting the clock multiplier to 1 (instead of 2) for the
-> DPLL4 output clocks.
->
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> ---
->   arch/arm/boot/dts/omap36xx-clocks.dtsi | 20 ++++++++++++++++++++
->   arch/arm/boot/dts/omap36xx.dtsi        |  2 +-
->   2 files changed, 21 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/omap36xx-clocks.dtsi b/arch/arm/boot/dts/omap36xx-clocks.dtsi
-> index 2fcf253b677c..0b2df76b9d38 100644
-> --- a/arch/arm/boot/dts/omap36xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/omap36xx-clocks.dtsi
-> @@ -70,6 +70,26 @@
->   	};
+Hello.
+
+On 14-02-2014 5:00, Laurent Pinchart wrote:
+
+> Enable the CMT0 device and configure channel 0 as a clock event
+> provider.
+
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+
+> diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> index 0b95bab..62b31f3 100644
+> --- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> +++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
+> @@ -29,7 +29,6 @@ enum {
 >   };
 >
-> +&dpll4_m2x2_mul_ck {
-> +	clock-mult = <1>;
-> +};
-> +
-> +&dpll4_m3x2_mul_ck {
-> +	clock-mult = <1>;
-> +};
-> +
-> +&dpll4_m4x2_mul_ck {
-> +	clock-mult = <1>;
-> +};
-> +
-> +&dpll4_m5x2_mul_ck {
-> +	clock-mult = <1>;
-> +};
-> +
-> +&dpll4_m6x2_mul_ck {
-> +	clock-mult = <1>;
-> +};
-> +
->   &cm_clockdomains {
->   	dpll4_clkdm: dpll4_clkdm {
->   		compatible = "ti,clockdomain";
-> diff --git a/arch/arm/boot/dts/omap36xx.dtsi b/arch/arm/boot/dts/omap36xx.dtsi
-> index 7e8dee9175d6..5e1bcd06a996 100644
-> --- a/arch/arm/boot/dts/omap36xx.dtsi
-> +++ b/arch/arm/boot/dts/omap36xx.dtsi
-> @@ -52,7 +52,7 @@
->   	};
->   };
+>   void r8a7790_add_standard_devices(void);
+> -void r8a7790_add_dt_devices(void);
+>   void r8a7790_clock_init(void);
+>   void r8a7790_pinmux_init(void);
+>   void r8a7790_pm_init(void);
+> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+> index 3e5813f..462c81f 100644
+> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
+> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+> @@ -294,11 +294,6 @@ static struct resource cmt0_resources[] = {
+>   					  &cmt##idx##_platform_data,	\
+>   					  sizeof(struct sh_timer_config))
 >
-> -/include/ "omap36xx-clocks.dtsi"
->   /include/ "omap34xx-omap36xx-clocks.dtsi"
->   /include/ "omap36xx-omap3430es2plus-clocks.dtsi"
->   /include/ "omap36xx-am35xx-omap3430es2plus-clocks.dtsi"
-> +/include/ "omap36xx-clocks.dtsi"
->
+> -void __init r8a7790_add_dt_devices(void)
+> -{
+> -	r8a7790_register_cmt(0);
+> -}
+> -
+>   void __init r8a7790_add_standard_devices(void)
+>   {
+>   	r8a7790_register_scif(0);
+> @@ -311,7 +306,7 @@ void __init r8a7790_add_standard_devices(void)
+>   	r8a7790_register_scif(7);
+>   	r8a7790_register_scif(8);
+>   	r8a7790_register_scif(9);
+> -	r8a7790_add_dt_devices();
+> +	r8a7790_register_cmt(0);
+>   	r8a7790_register_irqc(0);
+>   	r8a7790_register_thermal();
+>   }
 
-I think this re-ordering of the includes is unnecessary.
+    IMHO, these 2 files should be split into a separate patch.
 
-Other than that, the patch looks okay to me, so acked.
-
--Tero
+WBR, Sergei
