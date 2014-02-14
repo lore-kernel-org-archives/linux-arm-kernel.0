@@ -1,52 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 14 Feb 2014 16:30:39 +0000
-Subject: [PATCH 3/6] irqchip: gic: use writel instead of dsb +
- writel_relaxed
-In-Reply-To: <20140207112337.GC5976@mudshark.cambridge.arm.com>
-References: <20140206114559.GK29446@arm.com>
- <20140206115121.GN26035@mudshark.cambridge.arm.com>
- <20140206115430.GN29446@arm.com>
- <20140206115739.GP26035@mudshark.cambridge.arm.com>
- <20140206120035.GQ29446@arm.com>
- <20140206121350.GQ26035@mudshark.cambridge.arm.com>
- <20140206122340.GC32520@arm.com>
- <20140206132643.GS26035@mudshark.cambridge.arm.com>
- <20140206152048.GD32520@arm.com>
- <20140207112337.GC5976@mudshark.cambridge.arm.com>
-Message-ID: <20140214163039.GG21986@mudshark.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 14 Feb 2014 08:31:03 -0800
+Subject: [PATCH V2 1/2] mmc: omap_hsmmc: Add support for quirky omap3
+ hsmmc controller
+In-Reply-To: <1392356749-32091-2-git-send-email-nm@ti.com>
+References: <1392356749-32091-1-git-send-email-nm@ti.com>
+ <1392356749-32091-2-git-send-email-nm@ti.com>
+Message-ID: <20140214163102.GA21592@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Well, the results are in (*drum roll*)...
-
-On Fri, Feb 07, 2014 at 11:23:37AM +0000, Will Deacon wrote:
-> On Thu, Feb 06, 2014 at 03:20:48PM +0000, Catalin Marinas wrote:
-> > On Thu, Feb 06, 2014 at 01:26:44PM +0000, Will Deacon wrote:
-> > > Ok, my reasoning is as follows:
-> > > 
-> > >   - CPU0 tries to message CPU1. It writes to a location in normal memory,
-> > >     then writes to the GICD to send the SGI
-> > > 
-> > >   - We need to ensure that CPU1 observes the write to normal memory before
-> > >     the write to GICD reaches the distributor. This is *not* about end-point
-> > >     ordering (the usual non-coherent DMA example).
-> > > 
-> > >   - A dmb ishst ensures that the two writes are observed in order by CPU1
-> > >     (and, in fact, the inner-shareable domain containing CPU0).
-> > 
-> > The last bullet point is not correct. DMB would only guarantee that the
-> > two writes (memory and GICD) are observed by CPU1 if CPU1 actually read
-> > the GICD (observability is defined for master accesses).
+* Nishanth Menon <nm@ti.com> [140213 21:48]:
+> When device is booted using devicetree, platforms impacted by Erratum
+> 2.1.1.128 is not detected easily in the mmc driver. This erratum
+> indicates that the module cannot do multi-block transfers. Platforms
+> such as LDP which use OMAP3 ES revision prior to ES3.0 are impacted by
+> this.
 > 
-> Rather than attempt to solve this via email (your examples below are already
-> getting hard to follow :), how about we sit down with $drink_of_choice and
-> post back here with our conclusions?
+> Provide a new compatible property "ti,omap3-pre-es3-hsmmc" to allow
+> driver to determine if driver needs to implement quirks associated
+> with the specific module version (primarily because the IP revision
+> information is not sufficient for the same).
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-... and it turns out that a dmb(ishst) is sufficient!
+Looks good to me, would be good to get this into the -rc cycle
+as LDP is one of the automated boot testing boards for us.
 
-This counter-intuitive result was brought to you by ARM Ltd, purveyors of
-fine grained memory barrier instructions.
+If you guys want me to pick up both of the patches let me know,
+otherwise feel free to add my ack.
 
-I'll spin the patch again.
+Regards,
 
-Will
+Tony
