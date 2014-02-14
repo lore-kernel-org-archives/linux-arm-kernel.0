@@ -1,52 +1,64 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Feb 2014 17:15:24 +0100
-Subject: [PATCH 23/27] clocksource: sh_cmt: Add DT support
-In-Reply-To: <20140214155951.GA22449@joshc.qualcomm.com>
-References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <107109887.afEv2P92gg@avalon> <20140214155951.GA22449@joshc.qualcomm.com>
-Message-ID: <14506828.ROIfyxOcTT@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 14 Feb 2014 08:20:03 -0800
+Subject: [PATCH] arm: dtsi: am335x-bone-common, usb0 is peripheral only
+In-Reply-To: <20140214100248.GO31787@pengutronix.de>
+References: <1389448851-20010-1-git-send-email-mpa@pengutronix.de>
+ <20140213225438.GF28216@atomide.com>
+ <20140213231333.GK31787@pengutronix.de>
+ <20140213232552.GR28216@atomide.com>
+ <20140214100248.GO31787@pengutronix.de>
+Message-ID: <20140214162003.GB9743@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
-
-On Friday 14 February 2014 09:59:51 Josh Cartwright wrote:
-> On Fri, Feb 14, 2014 at 04:53:08PM +0100, Laurent Pinchart wrote:
-> > On Friday 14 February 2014 10:58:22 Mark Rutland wrote:
-> > > On Fri, Feb 14, 2014 at 01:00:01AM +0000, Laurent Pinchart wrote:
-> > > > +Channels Optional Properties:
-> > > > +
-> > > > +  - clock-source-rating: rating of the timer as a clock source
-> > > > device.
-> > > > +  - clock-event-rating: rating of the timer as a clock event device.
-> > > 
-> > > This feels like a leak of Linux internals. Why do you need this?
-> > 
-> > You're right, it is. The clock source and clock event ratings are
-> > currently configured through platform data, I'll need to find a way to
-> > compute them in the driver instead.
-> > 
-> > There's still one piece of Linux-specific data I need though, as I need to
-> > specify for each channel whether to use it as a clock source device, a
-> > clock event device, both of them or none. That's configuration
-> > information that needs to be provided somehow.
+* Markus Pargmann <mpa@pengutronix.de> [140214 02:05]:
+> Hi,
 > 
-> Are all the channels equally capable?  We had this problem for the
-> cadence_ttc timer used on Zynq, and decided to just statically allocate
-> the first timer to be the clocksource, and the second to be the
-> clockevent.
+> On Thu, Feb 13, 2014 at 03:25:52PM -0800, Tony Lindgren wrote:
+> > * Markus Pargmann <mpa@pengutronix.de> [140213 15:16]:
+> > > Hi,
+> > > 
+> > > On Thu, Feb 13, 2014 at 02:54:38PM -0800, Tony Lindgren wrote:
+> > > > * Markus Pargmann <mpa@pengutronix.de> [140111 06:03]:
+> > > > > The PMIC is using usb0 vbus line as power source. It is also connected
+> > > > > to the am335x processor as vbus sense. But there is no possibility to
+> > > > > pullup usb0 vbus to operate as host. This patch fixes the dr_mode of usb0.
+> > > > 
+> > > > That's the MUSB? AFAIK it's not possible to operate MUSB in peripheral
+> > > > only mode because the hardware does what it wants based on the ID
+> > > > pin state.
+> > > 
+> > > Yes that's MUSB. The am335x reference manual describes that it is
+> > > possible to force peripheral/host mode by setting bit 7 (IDDIG_MUX) in
+> > > register USBnMODE to 1. Then it uses the bit written in bit 8 (IDDIG) of
+> > > register USBnMODE to set host/peripheral mode.
+> > 
+> > OK
+> >  
+> > > I am not sure if the driver supports it yet but I think the DTS should
+> > > contain the correct mode nevertheless, especially to avoid starting the
+> > > otg loops in the musb driver.
+> > 
+> > Well there's one more thing to consider.. I think in the OTG role change
+> > case the VBUS is still driven externally from the original host, so the
+> > lack of VBUS does not always mean that host mode should be disabled.
+> 
+> I thought more about the hardware description than the possible role
+> changes through software protocols. In a hardware perspective, this USB
+> port is only in peripheral mode, as it can't drive VBUS. However is
+> there any support for role change protocols in the kernel yet?
 
-No, they're not. The channels can be implemented with different counter 
-widths, different available prescalers and source clocks and different power 
-management features (not all of them are capable to run in all sleep states).
+There's some to trigger it, if you grep -ri hnp drivers/usb/
+you'll see some references to it.
+ 
+> Perhaps we have to add a seperate DT binding for usb role changes when
+> they are supported. This would help to describe the hardware
+> capabilities (host, peripheral or OTG) and the role change protocols
+> supported.
 
-> Also, should the rating really be user configurable?
+Yeah it might be worth discussing on the USB list what's the best way
+to deal with all that.
 
-Probably not. I suppose the rating should be computed by the driver based on 
-the source clock frequency, prescaler and counter width. Any help there would 
-be very appreciated, I'm pretty new to clock source and clock event devices.
-
--- 
 Regards,
 
-Laurent Pinchart
+Tony
