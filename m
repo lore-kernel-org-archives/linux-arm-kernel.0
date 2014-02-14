@@ -1,43 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Feb 2014 10:09:44 +0100
-Subject: use {readl|writel}_relaxed instead of readl/writel in
- i2c-designware-core ?
-In-Reply-To: <20140214155438.4f749a79@xhacker>
-References: <20140214155438.4f749a79@xhacker>
-Message-ID: <8705989.qzo882Ldx0@wuerfel>
+Date: Fri, 14 Feb 2014 10:11:11 +0100
+Subject: [PATCH v5 0/3] serial: fsl_lpuart: add DMA support
+In-Reply-To: <1392362839-8004-1-git-send-email-yao.yuan@freescale.com>
+References: <1392362839-8004-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <2297536.ERjsbpLrzg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 February 2014 15:54:38 Jisheng Zhang wrote:
-> Hi all,
+On Friday 14 February 2014 15:27:16 Yuan Yao wrote:
+> Changed in v5:
+> - Revoke move dma properties from dtsi to dts.
+> - Change the explanations for dmas, dma-names in document.
+> - Change the description for [PATCH 3] serial: fsl_lpuart: documented the clock requirement.
+
+Whole series
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+> Changed in v4:
+> - Move dma properties from dtsi to dts.
+> - Cancle the macro(SERIAL_FSL_LPUART_DMA)  .
+> - Separate the document for clocks which undocumented before into a single patch.
+> - Change some explanations in document(clocks, clock-names, dmas, dma-names).
+> - Change "lpuart-tx" and "lpuart-rx" to "tx" and "rx".
 > 
-> The writel/readl is too expensive especially on Cortex A9 w/ outer L2 cache. This
-> introduce i2c read/write error on Marvell Berlin SoCs when there are L2 cache
-> maintenance operations at the same time.
+> Changed in v3:
+> - Use the streaming DMA API for receive.
+> - Add the macro(SERIAL_FSL_LPUART_DMA) and dts node propertie for whether using the dma.
+> - Adjust some coding style.
 > 
-> In our internal berlin bsp, we just replaced readl/writel with the relaxed
-> version. But AFAIK, the "relaxed" version doesn't exist on all architectures. How
-> to handle this issue? 
-
-In case of i2c-designware, this is safe because that driver does not perform
-DMA. In other drivers, you may have to be more careful, to ensure that all MMIO
-is serialized with DMA operations performed by the driver.
-
-> Any suggestions are appreciated.
-
-I would definitely welcome a patch that adds a default  _relaxed implementation
-to include/linux/io.h, like this:
-
-#ifndef readb_relaxed
-#define readb_relaxed(p) readb(p)
-#endif
-
-and then adds "#define readb_relaxed(p) readb_relaxed(p)" etc. to all
-architectures that have a non-macro definition for readb.
-
-Alternatively, we could have a CONFIG_ARCH_MMIO_RELAXED configuration
-symbol that gets selected by any architecture that provides the _relaxed
-accessors, and get linux/io.h to define all of them for the other
-architectures.
-
-	Arnd
+> Changed in v2:
+> - Add eDMA support for lpuart receive.
+> - Use dma_mapping_error test dma_map_single.
+> - Change some names of variable.
+> - Fix some bugs.
+> 
+> Added in v1:
+> - Add device tree bindings for lupart eDMA support.
+> - Add eDMA support for lpuart send.
+> 
