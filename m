@@ -1,51 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 14 Feb 2014 10:24:15 +0000
-Subject: [PATCH v5 2/3] serial: fsl_lpuart: add DMA support
-In-Reply-To: <1392362839-8004-3-git-send-email-yao.yuan@freescale.com>
-References: <1392362839-8004-1-git-send-email-yao.yuan@freescale.com>
- <1392362839-8004-3-git-send-email-yao.yuan@freescale.com>
-Message-ID: <20140214102415.GB9907@e106331-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Feb 2014 11:29:25 +0100
+Subject: [PATCH 0/6] ARM: integrator: multiplatform advancements
+Message-ID: <1392373771-17303-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 07:27:18AM +0000, Yuan Yao wrote:
-> Add dma support for lpuart. This function depend on DMA driver.
-> You can turn on it by write both the dmas and dma-name properties in dts node.
-> 
-> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-> ---
->  .../devicetree/bindings/serial/fsl-lpuart.txt      |  19 +-
->  drivers/tty/serial/fsl_lpuart.c                    | 430 ++++++++++++++++++++-
->  2 files changed, 433 insertions(+), 16 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> index 6fd1dd1..6e1cbbf 100644
-> --- a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> +++ b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
-> @@ -5,10 +5,24 @@ Required properties:
->  - reg : Address and length of the register set for the device
->  - interrupts : Should contain uart interrupt
-> 
-> +Optional properties:
-> +- dmas: List of two DMA specifiers, using a three-cell specifier for each channel.
-> +       a phandle plus two integer cells. The three cells in order are:
-> +       1.A phandle pointing to the DMA controller.
-> +       2.specifies the channel group(DMAMUX) in which this request can be multiplexed,
-> +       3.specifies the request source.
+This takes some steps towards enabling multiplatform support for the
+Integrator. This also removes some minor strings attached to the
+Versatile and RealView platforms to help them advancing.
 
-The precise format of a dma-specifier is up to the DMA binding. Why does
-the client binding care?
+File movement is trivial, but I need some advice on the memory.h
+removal patch which is more of a puzzle due to lack of history
+with this header on my behalf.
 
-> +- dma-names: Contains one identifier string for each DMA specifier in the dmas property.
-> +       "tx" for the transmit channel, "rx" for the receive channel.
-> +
-> +Note: Optional properties for DMA support. Write them both or both not.
-> +
+What remains for multiplatform afte this is just one
+thing: <plat/clcd.h>. That is the only dependency toward
+plat-versatile and the <plat/*> inclusion hierarchy remaining
+for the Integrator.
 
-All you need is something like:
+This is a display database and timing set-up callback driver
+where the Versatile family looks up settings for VGA and similar
+displays.
 
-dmas: A list of two dma specifiers, one for each entry in dma-names
-dma-names: should contain "tx" and "rx".
+I'm tempted to attempt to just move this down into drivers/video
+alongside the CLCD driver with some platform data header in
+<linux/platform_data/video-clcd.h>.
 
-Thanks,
-Mark.
+The *real* solution, one might argue is to convert the CLCD
+driver to DRM and add device tree bindings, but it appears that
+this is an orthogonal goal that has been attempted by other with
+mixed results.
+
+I have tested all patches on the Integrator/AP and Integrator/CP,
+but I'd appreciate help testing some PCI traffic as well if
+you (Will!) have an Integrator/AP with working PCI set-up.
+
+Since this is based on other patches from me, here is a
+pullable branch based on v3.14-rc2:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git multiplatform
+
+
+Linus Walleij (6):
+  ARM: integrator: localize the lm.h header
+  ARM: integrator: localize the impd1.h header
+  ARM: integrator: merge platform.h to hardware.h
+  ARM: integrator: localize the hardware.h header
+  ARM: integrator: register sched_clock directly
+  RFC: ARM: integrator: get rid of <mach/memory.h>
+
+ arch/arm/Kconfig                                 |   1 -
+ arch/arm/mach-integrator/core.c                  |   4 +-
+ arch/arm/mach-integrator/hardware.h              | 354 +++++++++++++++++++++
+ arch/arm/mach-integrator/impd1.c                 |   4 +-
+ arch/arm/mach-integrator/impd1.h                 |  14 +
+ arch/arm/mach-integrator/include/mach/hardware.h |  45 ---
+ arch/arm/mach-integrator/include/mach/impd1.h    |  18 --
+ arch/arm/mach-integrator/include/mach/lm.h       |  23 --
+ arch/arm/mach-integrator/include/mach/memory.h   |  34 --
+ arch/arm/mach-integrator/include/mach/platform.h | 382 -----------------------
+ arch/arm/mach-integrator/integrator_ap.c         |   6 +-
+ arch/arm/mach-integrator/integrator_cp.c         |  17 +-
+ arch/arm/mach-integrator/leds.c                  |   4 +-
+ arch/arm/mach-integrator/lm.c                    |   2 +-
+ arch/arm/mach-integrator/lm.h                    |  23 ++
+ arch/arm/mach-integrator/pci_v3.c                |   4 +-
+ drivers/clk/versatile/clk-impd1.c                |   6 +-
+ 17 files changed, 411 insertions(+), 530 deletions(-)
+ create mode 100644 arch/arm/mach-integrator/hardware.h
+ create mode 100644 arch/arm/mach-integrator/impd1.h
+ delete mode 100644 arch/arm/mach-integrator/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-integrator/include/mach/impd1.h
+ delete mode 100644 arch/arm/mach-integrator/include/mach/lm.h
+ delete mode 100644 arch/arm/mach-integrator/include/mach/memory.h
+ delete mode 100644 arch/arm/mach-integrator/include/mach/platform.h
+ create mode 100644 arch/arm/mach-integrator/lm.h
+
+-- 
+1.8.5.3
