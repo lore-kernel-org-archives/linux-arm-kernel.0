@@ -1,64 +1,93 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 14 Feb 2014 11:29:30 +0100
-Subject: [PATCH 5/6] ARM: integrator: register sched_clock directly
-In-Reply-To: <1392373771-17303-1-git-send-email-linus.walleij@linaro.org>
-References: <1392373771-17303-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1392373771-17303-6-git-send-email-linus.walleij@linaro.org>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 14 Feb 2014 11:29:20 +0100
+Subject: [PATCH v2 10/52] arm, kvm: Fix CPU hotplug callback registration
+In-Reply-To: <20140214075122.22701.18462.stgit@srivatsabhat.in.ibm.com>
+References: <20140214074750.22701.47330.stgit@srivatsabhat.in.ibm.com>
+ <20140214075122.22701.18462.stgit@srivatsabhat.in.ibm.com>
+Message-ID: <52FDF000.5070609@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The detour through plat-versatile/sched-clock.c is hard to migrate
-to multiplatform set-up and it's very little code being duplicated
-so let's just inline the sched_clock registration and cut one more
-dependency to plat-versatile.
+Il 14/02/2014 08:51, Srivatsa S. Bhat ha scritto:
+> Subsystems that want to register CPU hotplug callbacks, as well as perform
+> initialization for the CPUs that are already online, often do it as shown
+> below:
+>
+> 	get_online_cpus();
+>
+> 	for_each_online_cpu(cpu)
+> 		init_cpu(cpu);
+>
+> 	register_cpu_notifier(&foobar_cpu_notifier);
+>
+> 	put_online_cpus();
+>
+> This is wrong, since it is prone to ABBA deadlocks involving the
+> cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
+> with CPU hotplug operations).
+>
+> Instead, the correct and race-free way of performing the callback
+> registration is:
+>
+> 	cpu_notifier_register_begin();
+>
+> 	for_each_online_cpu(cpu)
+> 		init_cpu(cpu);
+>
+> 	/* Note the use of the double underscored version of the API */
+> 	__register_cpu_notifier(&foobar_cpu_notifier);
+>
+> 	cpu_notifier_register_done();
+>
+>
+> Fix the kvm code in arm by using this latter form of callback registration.
+>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Gleb Natapov <gleb@kernel.org>
+> Cc: Paolo Bonzini <pbonzini@redhat.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Ingo Molnar <mingo@kernel.org>
+> Cc: kvmarm at lists.cs.columbia.edu
+> Cc: kvm at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+> ---
+>
+>  arch/arm/kvm/arm.c |    7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 1d8248e..147b917 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -1050,21 +1050,26 @@ int kvm_arch_init(void *opaque)
+>  		}
+>  	}
+>
+> +	cpu_notifier_register_begin();
+> +
+>  	err = init_hyp_mode();
+>  	if (err)
+>  		goto out_err;
+>
+> -	err = register_cpu_notifier(&hyp_init_cpu_nb);
+> +	err = __register_cpu_notifier(&hyp_init_cpu_nb);
+>  	if (err) {
+>  		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
+>  		goto out_err;
+>  	}
+>
+> +	cpu_notifier_register_done();
+> +
+>  	hyp_cpu_pm_init();
+>
+>  	kvm_coproc_table_init();
+>  	return 0;
+>  out_err:
+> +	cpu_notifier_register_done();
+>  	return err;
+>  }
+>
+>
 
-This also makes this sched_clock implementation compulsory.
-
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Jonathan Austin <jonathan.austin@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-integrator/integrator_cp.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index c97ab88897cf..a938242b0c95 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -27,6 +27,7 @@
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
- #include <linux/sys_soc.h>
-+#include <linux/sched_clock.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -36,7 +37,6 @@
- #include <asm/mach/time.h>
- 
- #include <plat/clcd.h>
--#include <plat/sched_clock.h>
- 
- #include "hardware.h"
- #include "cm.h"
-@@ -225,11 +225,14 @@ static struct clcd_board clcd_data = {
- 
- #define REFCOUNTER (__io_address(INTEGRATOR_HDR_BASE) + 0x28)
- 
-+static u64 notrace intcp_read_sched_clock(void)
-+{
-+	return readl(REFCOUNTER);
-+}
-+
- static void __init intcp_init_early(void)
- {
--#ifdef CONFIG_PLAT_VERSATILE_SCHED_CLOCK
--	versatile_sched_clock_init(REFCOUNTER, 24000000);
--#endif
-+	sched_clock_register(intcp_read_sched_clock, 32, 24000000);
- }
- 
- static const struct of_device_id fpga_irq_of_match[] __initconst = {
--- 
-1.8.5.3
+Acked-by: Paolo Bonzini <pbonzini@redhat.com>
