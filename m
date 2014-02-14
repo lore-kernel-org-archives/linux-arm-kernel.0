@@ -1,51 +1,42 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 14 Feb 2014 02:14:58 -0600
-Subject: [PATCH v2 4/4] Documentation: dt: OMAP: Update Overo/Tobi
-In-Reply-To: <52FDCC9B.2050608@epfl.ch>
-References: <1392287116-4548-1-git-send-email-florian.vaussard@epfl.ch>
- <1392287116-4548-5-git-send-email-florian.vaussard@epfl.ch>
- <52FCDA29.90605@ti.com> <52FDCC9B.2050608@epfl.ch>
-Message-ID: <52FDD082.9090006@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 14 Feb 2014 09:26:06 +0100
+Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
+In-Reply-To: <20140214000910.GB16889@xanatos>
+References: <87fvon2khn.fsf@natisbad.org> <87zjmvau23.fsf@nemi.mork.no>
+ <20140117205432.GB5618@xanatos> <87vbxhrmea.fsf@natisbad.org>
+ <20140121211741.GA12657@xanatos> <87bnz364h0.fsf@natisbad.org>
+ <20140122222641.GD29184@titan.lakedaemon.net>
+ <87mwin4ozf.fsf@natisbad.org> <20140122235620.GC20359@xanatos>
+ <87wqh2iymx.fsf@natisbad.org> <20140214000910.GB16889@xanatos>
+Message-ID: <20140214092606.7db96949@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2014 01:58 AM, Florian Vaussard wrote:
-> Hi,
+Sarah, Arnaud,
+
+On Thu, 13 Feb 2014 16:09:10 -0800, Sarah Sharp wrote:
+
+> > Unless you have some objections or some positive feedback from Fresco
+> > Logic people, can you queue your quirks for FL1009 for 3.14-rc* and
+> > -stable? Note that I am just asking, i.e. if you want to wait a bit
+> > more, I am not that in a hurry.
 > 
-> On 02/13/2014 03:43 PM, Nishanth Menon wrote:
->> On 02/13/2014 04:25 AM, Florian Vaussard wrote:
->>> Update the compatible string for Overo/Tobi to reflect the latest
->>> changes.
->>>
->>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->>> ---
->>>  Documentation/devicetree/bindings/arm/omap/omap.txt | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
->>> index 34dc40c..af9b4a0 100644
->>> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
->>> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
->>> @@ -91,7 +91,7 @@ Boards:
->>>    compatible = "ti,omap3-beagle", "ti,omap3"
->>>  
->>>  - OMAP3 Tobi with Overo : Commercial expansion board with daughter board
->>> -  compatible = "ti,omap3-tobi", "ti,omap3-overo", "ti,omap3"
->>> +  compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap3"
->> omap3-overo-storm-tobi.dts is not covered here, so, I wonder as the
->> number of boards supported keep increasing, is'nt it better we drop
->> the board information from omap.txt?
->>
+> Sorry for not getting back to you sooner.  The Fresco Logic folks said
+> that the FL1000 and FL1400 hosts are actually the same chipset, and it
+> doesn't support MSI.  However, they say the FL1009 *should* support MSI.
 > 
-> I am not opposed to this. We will just have checkpatch warnings due to
-> undocumented compatible strings.
+> So that doesn't rule out issues with the Marvell PCI MSI code.  I
+> suspect that's actually the root cause, since I haven't gotten any bug
+> reports that the FL1009 doesn't work with MSI enabled on other systems.
 
-Aaah, I seemed to have missed bff5da43 commit, thanks for pointing me
-at it - unrelated to this patch, I think the board cleanups is a
-little overdue :(
+Ok, I'll try to have a look into this, by re-reading the entire
+thread, and trying to propose some patches that add debugging details
+in the Marvell PCI MSI code to try to understand what's going on.
 
-Acked-by: Nishanth Menon <nm@ti.com>
+Thanks!
 
+Thomas
 -- 
-Regards,
-Nishanth Menon
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
