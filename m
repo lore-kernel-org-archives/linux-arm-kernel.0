@@ -1,99 +1,56 @@
-From: naresh.kamboju@linaro.org (Naresh Kamboju)
-Date: Fri, 14 Feb 2014 14:32:47 +0530
-Subject: How to get the Linux kernel coverage data on ARM arch when I run LTP
- test?
-Message-ID: <CA+G9fYuT4TSs=3j6K9zztsTgFNVp2YG6JT-2Q_L==1P5G+SBew@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 14 Feb 2014 10:04:36 +0100
+Subject: [PATCH v2] can: xilinx CAN controller support.
+In-Reply-To: <52FDD9FE.8040908@monstr.eu>
+References: <\> <0dc128ac-e5cd-47bd-9ab1-3a545c3e2043@CO9EHSMHS012.ehs.local>
+ <52FD1B16.6020600@pengutronix.de> <52FDD9FE.8040908@monstr.eu>
+Message-ID: <52FDDC24.8070805@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On 02/14/2014 09:55 AM, Michal Simek wrote:
+> Hi Marc,
+> 
+>>> +	int waiting_ech_skb_num;
+>>> +	int xcan_echo_skb_max_tx;
+>>> +	int xcan_echo_skb_max_rx;
+>>> +	struct napi_struct napi;
+>>> +	spinlock_t ech_skb_lock;
+>>> +	u32 (*read_reg)(const struct xcan_priv *priv, int reg);
+>>> +	void (*write_reg)(const struct xcan_priv *priv, int reg, u32 val);
+>>
+>> Please remove read_reg, write_reg, as long as there isn't any BE support
+>> in the driver, call them directly.
+> 
+> That's not entirely truth. If you look at Microblaze then you will see
+> that Microblaze can be BE and LE.
+> There is just missing endian detection which we will add to the next version.
 
-Sorry for the wide distribution:
+As far as I know the endianess of the kernel is fixed and known during
+compile time. Correct me if I'm wrong. So there is no need for a runtime
+detection of the endianess and so no need for {read,write}_reg function
+pointers.
 
-According to LTP page info,
-http://ltp.sourceforge.net/coverage/gcov.php
-http://ltp.sourceforge.net/coverage/lcov.php
+> But because MB io helper functions are broken for a while you should be
+> able to use this driver on both endianess.
+> 
+> btw: I would prefer to use ioread32 and ioread32be instead of readl.
+> Is it OK for you?
 
-My question is
-How to get kernel coverage when I run LTP test?
+Make it so. :)
 
-Since we do not have direct GCOV support on ARM I have enabled ( just
-for experiment)
+Marc
 
-$ git diff  kernel/gcov/Kconfig
-diff --git a/kernel/gcov/Kconfig b/kernel/gcov/Kconfig
-index d4da55d..fceac85 100644
---- a/kernel/gcov/Kconfig
-+++ b/kernel/gcov/Kconfig
-@@ -35,7 +35,7 @@ config GCOV_KERNEL
- config GCOV_PROFILE_ALL
-        bool "Profile entire Kernel"
-        depends on GCOV_KERNEL
--       depends on SUPERH || S390 || X86 || PPC || MICROBLAZE
-+       depends on SUPERH || S390 || X86 || PPC || MICROBLAZE || ARM
-        default n
-        ---help---
-        This options activates profiling for the entire kernel.
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-I have enabled below kernel config and built the kernel.
-CONFIG_GCOV_KERNEL=y
-CONFIG_GCOV_PROFILE_ALL=y
-CONFIG_GCOV_FORMAT_AUTODETECT=y
-
-of course I have disabled gcov on below folders and files, because
-since it is an experiment i would like to be on safe side
-- arch/arm/mm/
-- arch/arm/kernel/
-- arch/arm/boot/
-- arch/arm/boot/compressed/
-- arch/arm/boot/bootp/
-- arch/arm/boot/dts
-
-Arndale booted with this configuration successfully.
-Took more than 65 seconds to finish boot.
-
-gcov related files are found under /sys/ similer to X86 machine.
-And  gcov supporting files filename.gcda are having links to kernel source
-root at linaro-developer:~# ls /sys/kernel/debug/gcov/
-reset  tmp
-root at linaro-developer:~#
-
-root at linaro-developer:~# ls /sys/kernel/debug/gcov/tmp/
-linux-linaro-3.13-2014.01
-root at linaro-developer:~# ls
-/sys/kernel/debug/gcov/tmp/linux-linaro-3.13-2014.01/
-arch  block  crypto  drivers  fs  init  ipc  kernel  lib  mm  security  virt
-root at linaro-developer:~# ls
-/sys/kernel/debug/gcov/tmp/linux-linaro-3.13-2014.01/kernel/time.* -l
--rw------- 1 root root 0 Jan  1  1970
-/sys/kernel/debug/gcov/tmp/linux-linaro-3.13-2014.01/kernel/time.gcda
-lrwxrwxrwx 1 root root 0 Jan  1  1970
-/sys/kernel/debug/gcov/tmp/linux-linaro-3.13-2014.01/kernel/time.gcno
--> /tmp/linux-linaro-3.13-2014.01/kernel/time.gcno
-root at linaro-developer:~#
-
-Source are placed under /tmp/
-root at linaro-developer:/tmp/linux-linaro-3.13-2014.01# ls  kernel/time.* -l
--rw-rw-r-- 1 linaro linaro  19233 Jan 24  2014 kernel/time.c
--rw-rw-r-- 1 linaro linaro  12768 Feb 13  2014 kernel/time.gcno
--rw-rw-r-- 1 linaro linaro 136444 Feb 13  2014 kernel/time.o
-root at linaro-developer:/tmp/linux-linaro-3.13-2014.01#
-
-
-root at linaro-developer:/tmp/linux-linaro-3.13-2014.01# gcov kernel/gcov/base.c -o
- /sys/kernel/debug/gcov/tmp/linux-linaro-3.13-2014.01/kernel/gcov/
-File 'kernel/gcov/base.c'
-Lines executed:43.18% of 44
-Creating 'base.c.gcov'
-
-root at linaro-developer:/tmp/linux-linaro-3.13-2014.01#
-
-The above experiment gives coverage of a single file base.c when i run
-gcov manually.
-Is there any way to get Linux kernel coverage of all files after
-running LTP test cases ?
-
-Thanks in advance.
-
-Best regards
-Naresh Kamboju
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 242 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140214/93e45d11/attachment.sig>
