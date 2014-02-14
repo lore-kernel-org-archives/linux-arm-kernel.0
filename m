@@ -1,49 +1,64 @@
-From: christian.gmeiner@gmail.com (Christian Gmeiner)
-Date: Fri, 14 Feb 2014 13:55:05 +0100
-Subject: imx6: usbhc2/3 and HSIC
-In-Reply-To: <CAH9NwWf8rc+PJygNP45x669nyiPqirF_PHOXGEQ_CX7PWaB7pQ@mail.gmail.com>
-References: <CAH9NwWckD5Rmr9oW2Gr071V2p0FjRJcttYpB4qQNEWTxDEJ6qw@mail.gmail.com>
- <1390815772.4847.9.camel@weser.hi.pengutronix.de>
- <CAH9NwWf8rc+PJygNP45x669nyiPqirF_PHOXGEQ_CX7PWaB7pQ@mail.gmail.com>
-Message-ID: <CAH9NwWcMQDH+NrSaRxLkj12NtDtuNFzQcBXNmjm4F__z5YewYw@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 14 Feb 2014 15:12:47 +0200
+Subject: [PATCH v7 03/12] mfd: omap-usb-host: Use clock names as per
+ function for reference clocks
+In-Reply-To: <20140214100915.GD7380@lee--X1>
+References: <1392200333-28397-1-git-send-email-rogerq@ti.com>
+ <1392200333-28397-4-git-send-email-rogerq@ti.com>
+ <20140214100915.GD7380@lee--X1>
+Message-ID: <52FE164F.80503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-01-27 17:42 GMT+01:00 Christian Gmeiner <christian.gmeiner@gmail.com>:
-> Hi Lucas
->
-> 2014-01-27 Lucas Stach <l.stach@pengutronix.de>:
->> Hi Christian,
+On 02/14/2014 12:09 PM, Lee Jones wrote:
+>> Use a meaningful name for the reference clocks so that it indicates the function.
 >>
->> Am Montag, den 27.01.2014, 10:22 +0100 schrieb Christian Gmeiner:
->>> Hi all...
->>>
->>> does anyone used the usbhc2 or usbhc3 in HSIC mode? I am trying my
->>> luck but I do not
->>> get it to work. Is there anything special I need to take care of?
->>>
->> I remember we had this working on a board back in the 3.10 days. The
->> only thing I remember which is specific to HSIC is in the attached
->> patch. This isn't really clean and should be done in a better way for
->> mainline, but maybe it provides some pointers for you.
+>> CC: Lee Jones <lee.jones@linaro.org>
+>> CC: Samuel Ortiz <sameo@linux.intel.com>
+>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>> ---
+>>  drivers/mfd/omap-usb-host.c | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
 >>
->
-> Thanks for the small patch... I got it almost working - the HSIC
-> device seems to have some problems.
-> I hope to find some time soon to get this stuff into mainline.
->
+>> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+>> index 60a3bed..ce620a8 100644
+>> --- a/drivers/mfd/omap-usb-host.c
+>> +++ b/drivers/mfd/omap-usb-host.c
+>> @@ -714,21 +714,21 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+>>  		goto err_mem;
+>>  	}
+>>  
+>> -	omap->xclk60mhsp1_ck = devm_clk_get(dev, "xclk60mhsp1_ck");
+>> +	omap->xclk60mhsp1_ck = devm_clk_get(dev, "refclk_60m_ext_p1");
+> 
+> You can't do that. These changes will have to be in the same patch as
+> the core change i.e. where they are initialised.
 
-It does not work :(
+I'm not touching them anywhere in this series. When core changes are you
+referring to?
 
-Here are some logs: http://dpaste.com/hold/1617947/
-It looks like EHCI takes over and does one port (the HSIC?). The problem
-seems now that the port never changes its status to connected, but I am
-100% sure that there is a LAN9730 [1] connected to that usbhc.
+> 
+>>  	if (IS_ERR(omap->xclk60mhsp1_ck)) {
+>>  		ret = PTR_ERR(omap->xclk60mhsp1_ck);
+>>  		dev_err(dev, "xclk60mhsp1_ck failed error:%d\n", ret);
+>>  		goto err_mem;
+>>  	}
+>>  
+>> -	omap->xclk60mhsp2_ck = devm_clk_get(dev, "xclk60mhsp2_ck");
+>> +	omap->xclk60mhsp2_ck = devm_clk_get(dev, "refclk_60m_ext_p2");
+>>  	if (IS_ERR(omap->xclk60mhsp2_ck)) {
+>>  		ret = PTR_ERR(omap->xclk60mhsp2_ck);
+>>  		dev_err(dev, "xclk60mhsp2_ck failed error:%d\n", ret);
+>>  		goto err_mem;
+>>  	}
+>>  
+>> -	omap->init_60m_fclk = devm_clk_get(dev, "init_60m_fclk");
+>> +	omap->init_60m_fclk = devm_clk_get(dev, "refclk_60m_int");
+>>  	if (IS_ERR(omap->init_60m_fclk)) {
+>>  		ret = PTR_ERR(omap->init_60m_fclk);
+>>  		dev_err(dev, "init_60m_fclk failed error:%d\n", ret);
+> 
 
-[1] http://www.microchip.com/wwwproducts/Devices.aspx?product=LAN9730
-
-greets
 --
-Christian Gmeiner, MSc
-
-https://soundcloud.com/christian-gmeiner
+cheers,
+-roger
