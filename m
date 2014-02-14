@@ -1,45 +1,66 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 14 Feb 2014 11:52:01 +0000
-Subject: [PATCH RESEND] ARM: mcpm: Make all mcpm functions notrace
-In-Reply-To: <alpine.LFD.2.11.1402131542120.17677@knanqh.ubzr>
-References: <1392279975.3469.4.camel@linaro1.home>
- <alpine.LFD.2.11.1402131542120.17677@knanqh.ubzr>
-Message-ID: <1392378721.3475.12.camel@linaro1.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Feb 2014 13:02:38 +0100
+Subject: [PATCH 6/6] RFC: ARM: integrator: get rid of <mach/memory.h>
+In-Reply-To: <1392373771-17303-7-git-send-email-linus.walleij@linaro.org>
+References: <1392373771-17303-1-git-send-email-linus.walleij@linaro.org>
+ <1392373771-17303-7-git-send-email-linus.walleij@linaro.org>
+Message-ID: <10797321.8ugLLdzljr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-02-13 at 15:42 -0500, Nicolas Pitre wrote:
-> On Thu, 13 Feb 2014, Jon Medhurst (Tixy) wrote:
+On Friday 14 February 2014 11:29:31 Linus Walleij wrote:
+> The Integrator has a custom <mach/memory.h> header defining the
+> BUS_OFFSET for *_to_bus and bus_to_* operations as offset from
+> 0x80000000.
 > 
-> > From: Dave Martin <dave.martin@linaro.org>
-> > 
-> > The functions in mcpm_entry.c are mostly intended for use during
-> > scary cache and coherency disabling sequences, or do other things
-> > which confuse trace ...  like powering a CPU down and not
-> > returning.  Similarly for the backend code.
-> > 
-> > For simplicity, this patch just makes whole files notrace.
-> > There should be more than enough traceable points on the paths to
-> > these functions, but we can be more fine-grained later if there is
-> > a need for it.
-> > 
-> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > 
-> > Also added spc.o to the list of files as it contains functions used by
-> > MCPM code which have comments comments like: "might be used in code
-> > paths where normal cacheable locks are not working"
-> > 
-> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> 
-> Please send to RMK's patch system.
+> I have searched the documentation and cannot find any clue to
+> this set-up. The Integrators have no intrinsic DMA engine(s)
+> that need to perform any bus translations. The only thing I can
+> think of is the PCIv3 host found in the Integrator/AP. After
+> searching its documentation I cannot find any hint whatsoever
+> saying that it would perform DMA operations to memory offset
+> to 0x80000000. The PCIv3 driver does not configure anything
+> for DMA, and the hardware contains registers to configure
+> the local (CPU) side address translation. When I dump the
+> default values of these registers (the Linux driver does not
+> touch them) they contain zeroes meaning a 1-to-1 mapping to
+> the bus.
 
-Thanks, added as patch 7962/2 [1]. (My first attempt accidentally
-omitted the "From: Dave Martin" line - I hope the patch system
-understands such lines).
+I think this will be break bus-mastering PCI adapters. In theory
+any PCI add-on card can be a bus-master and write to the host
+memory. An offset of 0x80000000 in the PCI host is not uncommon
+for this. Basically what the PCI host does is forward any PCI
+transaction with a destination below 2GB to the PCI bus so it
+can target an MMIO register, and forward transactions above
+2GB to the parent bus, flipping the high-order bit in the process.
 
-[1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7962/2
+In the old days, we had virt_to_bus() and bus_to_virt() as
+interfaces for drivers to convert between a kernel pointer
+and an address that can be used for DMA. We have long ago
+(except for a handful of drivers that depend on CONFIG_TO_BUS
+and won't build on integrator or multiplatform) stopped using
+those in drivers, since the translation may be dependent on
+the specific device (e.g. different offsets), or may be nonlinear
+in case of an IOMMU.
 
--- 
-Tixy
+The interface that drivers use now is defined in dma-mapping.h
+and abstracted through dma_map_ops on ARM and some other
+architectures. What you need for a multiplatform kernel to
+work on integrator is to set the dma_map_ops for all PCI
+devices to an implementation that adds the correct offset.
+
+One way to do this would be to define an integrator specific
+dma_map_ops struct that adds a constant value for each operation
+and then calls into the regular arm_dma_ops. That would be
+an easy way out, but would not help the next person with the
+same problem.
+A more sophisticated approach, following what we did on
+powerpc, would be to add an offset field to struct dev_archdata
+and apply that in pfn_to_dma/dma_to_pfn/dma_to_virt/virt_to_dma
+so it gets used by all dma_map_ops implementations. For PCI
+devices, you probably have to copy the offset from the parent
+in the pcibios_add_device() function in that case, while for
+devices probed through DT (only the pci host bridge in this
+case), you have to parse the "dma_ranges" property.
+
+	Arnd
