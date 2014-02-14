@@ -1,24 +1,76 @@
-From: sre@ring0.de (Sebastian Reichel)
-Date: Fri, 14 Feb 2014 18:40:41 +0100
-Subject: [PATCH 1/2] mfd: twl4030-madc: Add devicetree support.
-In-Reply-To: <1392383861-14169-1-git-send-email-marek@goldelico.com>
-References: <1392383861-14169-1-git-send-email-marek@goldelico.com>
-Message-ID: <20140214174040.GB26969@earth.universe>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 14 Feb 2014 09:50:43 -0800
+Subject: [GIT PULL] omap fixes against v3.14-rc1
+Message-ID: <20140214175042.GD21592@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
-I have prepared a patchset, which adds DT bindings for twl4030-madc
-using the standard IIO DT API. I have not yet send the patchset,
-since I have not yet found the time to test the patchset. I will
-send them as RFC now.
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140214/2a7c85d4/attachment.sig>
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/fixes-against-rc1
+
+for you to fetch changes up to 8842446ac74263f1330f46e11ed649e2b0ed6545:
+
+  Documentation: dt: OMAP: Update Overo/Tobi (2014-02-14 08:37:53 -0800)
+
+----------------------------------------------------------------
+Fixes for omaps, mostly to deal with the 34xx vs 36xx SoC
+configuration for overo boards.
+
+----------------------------------------------------------------
+Aaro Koskinen (3):
+      ARM: OMAP1: nokia770: enable tahvo-usb
+      ARM: dts: N9/N950: fix boot hang with 3.14-rc1
+      ARM: dts: N900: add missing compatible property
+
+Florian Vaussard (4):
+      ARM: dts: omap3-tobi: Fix boot with OMAP36xx-based Overo
+      ARM: dts: omap3-tobi: Use the correct vendor prefix
+      ARM: dts: Add support for both OMAP35xx and OMAP36xx Overo/Tobi
+      Documentation: dt: OMAP: Update Overo/Tobi
+
+Marek Belisko (2):
+      ARM: dts: omap3-gta04: Add EOC irq gpio line handling.
+      ARM: dts: omap3-gta04: Fix mmc1 properties.
+
+NeilBrown (1):
+      ARM: dts: omap3-gta04: Fix 'aux' gpio key flags.
+
+Nishanth Menon (1):
+      ARM: OMAP2+: add missing ARCH_HAS_OPP
+
+Paul Bolle (2):
+      ARM: OMAP2+: Remove MACH_NOKIA_N800
+      ARM: OMAP2+: Remove legacy macros for zoom platforms
+
+Pekon Gupta (2):
+      ARM: OMAP2+: gpmc: fix: DT NAND child nodes not probed when MTD_NAND is built as module
+      ARM: OMAP2+: gpmc: fix: DT ONENAND child nodes not probed when MTD_ONENAND is built as module
+
+Peter Ujfalusi (2):
+      ARM: DTS: am335x-evmsk: Correct audio clock frequency
+      ARM: dts: am335x-evmsk: Fix mmc1 support
+
+ .../devicetree/bindings/arm/omap/omap.txt          |  2 +-
+ arch/arm/boot/dts/Makefile                         |  3 ++-
+ arch/arm/boot/dts/am335x-evmsk.dts                 | 11 ++++++++++-
+ arch/arm/boot/dts/omap3-gta04.dts                  |  6 ++++--
+ arch/arm/boot/dts/omap3-n9.dts                     |  2 +-
+ arch/arm/boot/dts/omap3-n900.dts                   |  4 ++--
+ arch/arm/boot/dts/omap3-n950.dts                   |  2 +-
+ arch/arm/boot/dts/omap3-overo-storm-tobi.dts       | 22 ++++++++++++++++++++++
+ ...omap3-tobi.dts => omap3-overo-tobi-common.dtsi} |  3 ---
+ arch/arm/boot/dts/omap3-overo-tobi.dts             | 22 ++++++++++++++++++++++
+ arch/arm/boot/dts/omap3-overo.dtsi                 |  3 ---
+ arch/arm/mach-omap1/board-nokia770.c               |  1 +
+ arch/arm/mach-omap2/Kconfig                        |  8 ++++----
+ arch/arm/mach-omap2/gpmc.c                         |  4 ++--
+ arch/arm/mach-omap2/io.c                           |  9 ---------
+ 15 files changed, 72 insertions(+), 30 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap3-overo-storm-tobi.dts
+ rename arch/arm/boot/dts/{omap3-tobi.dts => omap3-overo-tobi-common.dtsi} (94%)
+ create mode 100644 arch/arm/boot/dts/omap3-overo-tobi.dts
