@@ -1,7 +1,7 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 14 Feb 2014 13:01:43 +0900
-Subject: [PATCH v2] ARM: shmobile: Add defconfig for shmobile mulitplatfom
-Message-ID: <1392350503-9749-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 14 Feb 2014 13:20:35 +0900
+Subject: [PATCH v3] ARM: shmobile: Add defconfig for shmobile mulitplatfom
+Message-ID: <1392351635-14106-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,20 +16,24 @@ for the following boards:
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
+v3
+* As suggested by Magnus Damm
+  - Do not enable RUNTIME_PM as it does not yet work with multiplatform
+
 v2
 * As suggested by Magnus Damm
-  - Enable SMSC911X
+  - Enable SMSC911X for the kzm9d
 ---
- arch/arm/configs/shmobile_defconfig | 129 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 129 insertions(+)
+ arch/arm/configs/shmobile_defconfig | 128 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 128 insertions(+)
  create mode 100644 arch/arm/configs/shmobile_defconfig
 
 diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
 new file mode 100644
-index 0000000..8d51717
+index 0000000..35691cd
 --- /dev/null
 +++ b/arch/arm/configs/shmobile_defconfig
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,128 @@
 +CONFIG_SYSVIPC=y
 +CONFIG_NO_HZ=y
 +CONFIG_IKCONFIG=y
@@ -65,7 +69,6 @@ index 0000000..8d51717
 +CONFIG_VFP=y
 +CONFIG_NEON=y
 +# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_PM_RUNTIME=y
 +CONFIG_NET=y
 +CONFIG_PACKET=y
 +CONFIG_UNIX=y
