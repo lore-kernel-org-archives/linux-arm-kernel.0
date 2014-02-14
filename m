@@ -1,51 +1,105 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Fri, 14 Feb 2014 10:49:47 -0600
-Subject: [PATCH v2 2/2] crypto: omap-des: Add config and build options
-Message-ID: <1392396587-24524-1-git-send-email-joelf@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 14 Feb 2014 08:54:26 -0800
+Subject: [PATCH v8 0/4] ARM: BCM5301X: initial support for the
+ BCM5301X/BCM470X SoCs with ARM CPU
+In-Reply-To: <1391468506-5800-1-git-send-email-hauke@hauke-m.de>
+References: <1391468506-5800-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <52FE4A42.3090309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add config and build options for the omap-des driver.
+Hi Christian,
 
-Signed-off-by: Joel Fernandes <joelf@ti.com>
----
- drivers/crypto/Kconfig  |   11 +++++++++++
- drivers/crypto/Makefile |    1 +
- 2 files changed, 12 insertions(+)
+Le 03/02/2014 15:01, Hauke Mehrtens a ?crit :
+> This adds initial support for Broadcom network SoC from the BCM5301X
+> and BCM470X line.
+>
+> I do not have any documentation, only the vendor source code published
+> by Asus and Netgear to conform with the GPL, it would be nice to get
+> some documentation for this Soc like this
+> https://www.broadcom.com/collateral/pg/440X-PG02-R.pdf
+> for the Broadcom BCM440X Ethernet controller.
+>
+> With some additional patches I got Ethernet working with ~250 MBit/s.
+>
+> A bootlog can be found here:
+> http://hauke-m.de/files/openwrt/devices/R6250/openwrt-boot-2014-01-05.txt
+>
+> This is based on 3.14-rc1.
+>
+> Christian Daudt could you please take these patches.
 
-diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-index 13857f5..8e38000 100644
---- a/drivers/crypto/Kconfig
-+++ b/drivers/crypto/Kconfig
-@@ -262,6 +262,17 @@ config CRYPTO_DEV_OMAP_AES
- 	  OMAP processors have AES module accelerator. Select this if you
- 	  want to use the OMAP module for AES algorithms.
- 
-+config CRYPTO_DEV_OMAP_DES
-+	tristate "Support for OMAP DES3DES hw engine"
-+	depends on ARCH_OMAP2PLUS
-+	select CRYPTO_DES
-+	select CRYPTO_BLKCIPHER2
-+	help
-+	  OMAP processors have DES/3DES module accelerator. Select this if you
-+	  want to use the OMAP module for DES and 3DES algorithms. Currently
-+	  the ECB and CBC modes of operation supported by the driver. Also
-+	  accesses made on unaligned boundaries are also supported.
-+
- config CRYPTO_DEV_PICOXCELL
- 	tristate "Support for picoXcell IPSEC and Layer2 crypto engines"
- 	depends on ARCH_PICOXCELL && HAVE_CLK
-diff --git a/drivers/crypto/Makefile b/drivers/crypto/Makefile
-index 0bc6aa0..9a53fb8 100644
---- a/drivers/crypto/Makefile
-+++ b/drivers/crypto/Makefile
-@@ -13,6 +13,7 @@ obj-$(CONFIG_CRYPTO_DEV_NIAGARA2) += n2_crypto.o
- n2_crypto-y := n2_core.o n2_asm.o
- obj-$(CONFIG_CRYPTO_DEV_NX) += nx/
- obj-$(CONFIG_CRYPTO_DEV_OMAP_AES) += omap-aes.o
-+obj-$(CONFIG_CRYPTO_DEV_OMAP_DES) += omap-des.o
- obj-$(CONFIG_CRYPTO_DEV_OMAP_SHAM) += omap-sham.o
- obj-$(CONFIG_CRYPTO_DEV_PADLOCK_AES) += padlock-aes.o
- obj-$(CONFIG_CRYPTO_DEV_PADLOCK_SHA) += padlock-sha.o
--- 
-1.7.9.5
+Christian, have you been able to get a look at those patches? How do you 
+want to proceed for patches affecting bcm5301x in the future? Except for 
+a few cases (Kconfig, Makefile), support for bcm5301x is orthogonal to 
+the other bcm-mobile SoCs, should that be taken care of by the arm-soc 
+maintainers directly?
+
+Thanks!
+
+>
+> Changes since v7:
+>   * reorder debug options
+>   * rebase on 3.14-rc1
+>
+> Changes since v6:
+>   * rebase on arm-soc.git branch next/soc
+>   * use ranges in dts files for SoC blocks
+>
+> Changes since v5:
+>   * restructured the dts files, own file for the SoC family, the SoC and
+>     the device
+>
+> Changes since v4:
+>   * removed bcm5301x_timer_init(), this function is not needed
+>   * removed GENERIC_TIME this is dead
+>   * made fault handler check for code and just catch the first fault.
+>
+> Changes since v3:
+>   * rebase on Linus 3.13-rc7
+>   * split the workaround into an own patch
+>   * add L2 cache controller to Device tree
+>   * rename config option
+>   * add local-timer and SCU entry to device tree
+>
+> Changes since v2:
+>   * use vendor prefix brcm
+>   * move code to arch/arm/mach-bcm/
+>   * cleanup arch/arm/mach-bcm/bcm5301x.c
+>   * rename to bcm5301x
+>   * split into more patches
+>
+> Changes since v1:
+>   * add file Documentation/devicetree/bindings/arm/bcm4708.txt
+>   * rename bcm5301x to bcm4708 in dts files
+>   * use preprocessor includes in dts file
+>   * add CONFIG_ARCH_BCM53XX to multi_v7_defconfig
+>   * remove init_machine callback
+>   * rename vendor prefix from brcm to bcm
+>   * split into two patches
+>
+> Hauke Mehrtens (4):
+>    ARM: BCM5301X: initial support for the BCM5301X/BCM470X SoCs with ARM
+>      CPU
+>    ARM: BCM5301X: add early debugging support
+>    ARM: BCM5301X: add dts files for BCM4708 SoC
+>    ARM: BCM5301X: workaround suppress fault
+>
+>   Documentation/devicetree/bindings/arm/bcm4708.txt |    8 ++
+>   MAINTAINERS                                       |    8 ++
+>   arch/arm/Kconfig.debug                            |    7 ++
+>   arch/arm/boot/dts/Makefile                        |    1 +
+>   arch/arm/boot/dts/bcm4708-netgear-r6250.dts       |   35 ++++++++
+>   arch/arm/boot/dts/bcm4708.dtsi                    |   34 ++++++++
+>   arch/arm/boot/dts/bcm5301x.dtsi                   |   95 +++++++++++++++++++++
+>   arch/arm/configs/multi_v7_defconfig               |    1 +
+>   arch/arm/mach-bcm/Kconfig                         |   26 ++++++
+>   arch/arm/mach-bcm/Makefile                        |    1 +
+>   arch/arm/mach-bcm/bcm_5301x.c                     |   61 +++++++++++++
+>   11 files changed, 277 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/arm/bcm4708.txt
+>   create mode 100644 arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+>   create mode 100644 arch/arm/boot/dts/bcm4708.dtsi
+>   create mode 100644 arch/arm/boot/dts/bcm5301x.dtsi
+>   create mode 100644 arch/arm/mach-bcm/bcm_5301x.c
+>
