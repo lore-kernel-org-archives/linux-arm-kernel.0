@@ -1,83 +1,92 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Sat, 15 Feb 2014 02:22:00 +0900
-Subject: [PATCH 23/27] clocksource: sh_cmt: Add DT support
-In-Reply-To: <1790131.DSZsj6HrSK@avalon>
-References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <107109887.afEv2P92gg@avalon>
- <CANqRtoS-d-CW3XX3_E2dgJ83btRZYWiMCYmWUJAPqh9EeBhLEQ@mail.gmail.com>
- <1790131.DSZsj6HrSK@avalon>
-Message-ID: <CANqRtoROALpUqi8rKWRpQk7LGc0BqU14AKg-2MgYBMNoEFGA4Q@mail.gmail.com>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Fri, 14 Feb 2014 18:35:25 +0100
+Subject: How to select between different display timings?
+In-Reply-To: <20140214150208.12417b11@ipc1.ka-ro>
+References: <1375966287-6784-1-git-send-email-LW@KARO-electronics.de>
+ <1375966287-6784-8-git-send-email-LW@KARO-electronics.de>
+ <52FE1F2D.4010102@de.bosch.com> <20140214150208.12417b11@ipc1.ka-ro>
+Message-ID: <52FE53DD.7040102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Sat, Feb 15, 2014 at 1:12 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Magnus,
+Am 14.02.2014 15:02, schrieb Lothar Wa?mann:
+> Hi,
 >
-> On Saturday 15 February 2014 01:01:30 Magnus Damm wrote:
->> On Sat, Feb 15, 2014 at 12:53 AM, Laurent Pinchart wrote:
->> > On Friday 14 February 2014 10:58:22 Mark Rutland wrote:
->> >> On Fri, Feb 14, 2014 at 01:00:01AM +0000, Laurent Pinchart wrote:
->> >> > +Channels Optional Properties:
->> >> > +
->> >> > +  - clock-source-rating: rating of the timer as a clock source device.
->> >> > +  - clock-event-rating: rating of the timer as a clock event device.
->> >>
->> >> This feels like a leak of Linux internals. Why do you need this?
->> >
->> > You're right, it is. The clock source and clock event ratings are
->> > currently configured through platform data, I'll need to find a way to
->> > compute them in the driver instead.
+> Dirk Behme wrote:
+>> Hi Lothar and Shawn,
 >>
->> That would be very good!
->
-> Any pointer would be appreciated :-) How did you compute the various ratings
-> used in platform data all over the place ?
-
-Historically we used the rating to select between CMT and TMU. For
-clock sources I suppose you also have the jiffy rating to consider.
-And for the SMP parts we have ARM IP for TWD and arch timers that have
-their ratings too. So you need to check all the timers on a particular
-system and consider what you want to have operating by default. The
-ARM IP timers should be preferred if available. For clock sources the
-rule is probably the higher resolution the better.
-
->> > There's still one piece of Linux-specific data I need though, as I need to
->> > specify for each channel whether to use it as a clock source device, a
->> > clock event device, both of them or none. That's configuration
->> > information that needs to be provided somehow.
+>> On 08.08.2013 14:51, Lothar Wa?mann wrote:
+>>> - add Copyright header
+>>> - use label references for better readability
+>>> - sort the entries alphabetically
+>>> - add some aliases used by U-Boot to edit the DT data
+>>>
+>>> Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+>>> ---
+>>>    arch/arm/boot/dts/imx28-tx28.dts |  693 +++++++++++++++++++++++++++++++++-----
+>>>    1 files changed, 611 insertions(+), 82 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
+>>> index 37be532..866af60 100644
+>>> --- a/arch/arm/boot/dts/imx28-tx28.dts
+>>> +++ b/arch/arm/boot/dts/imx28-tx28.dts
+>> ...
+>>> +&lcdif {
+>>> +       pinctrl-names = "default";
+>>> +       pinctrl-0 = <&lcdif_24bit_pins_a &lcdif_sync_pins_a &lcdif_ctrl_pins_a>;
+>>> +       lcd-supply = <&reg_lcd>;
+>>> +       display = <&display>;
+>>> +       status = "okay";
+>>> +
+>>> +       display: display at 0 {
+>>> +               bits-per-pixel = <32>;
+>>> +               bus-width = <24>;
+>>> +
+>>> +               display-timings {
+>>> +                       native-mode = <&timing5>;
+>                              ^^^^^^^^^^^^^^^^^^^^^^^^^
+>>> +                       timing0: timing0 {
+> [...]
+>>> +                       };
+>>> +               };
+>>> +       };
+>>> +};
 >>
->> I think you can decide clock source or clock event assignment based on
->> number of channels available. If you have only a single channel then both
->> clock event and clock source need to be supported. Otherwise use one channel
->> for clock source and the rest for clock events.
->
-> That won't match the current situation. Look at CMT0 in r8a7790 for instance.
-> There's two hardware channels available, and we only use the first one, for
-> clock events only.
+>> Being no graphics expert, looking at above device tree change, I'd like
+>> to understand how this can be used to switch between different display
+>> timings?
+>>
+>> In the kernel, I've found the code which selects the default/native-mode
+>> (of_display_timing.c). But, as here, if there is a native/default mode,
+>> there are alternative modes. I haven't understood how and who to select
+>> these other modes? In this case, how could the alternative modes
+>> timing0/1/2/3/4 be selected in the kernel?
+>>
+>> Do you have any pointers regarding this?
+>>
+> You need to set the property 'native-mode' to the phandle of the
+> display-timings entry like marked above.
 
-You are correct. The reason for that is that the CMT driver today is
-optimized for combined clock event and clock source operation.
+Hmm, let's see if we talk about the same thing ;) Let me rephrase my 
+questions:
 
-Historically the hardware it initially was written for (sh-mobile on
-the SH arch) only had a single timer channel so combined operation was
-required for tickless to work. But since you're asking how to allocate
-channels then I propose checking numbers of channels available and go
-from there. With that the r8a7790 support can only get better. =)
+Using above example and booting a system with the resulting .dtb, 
+timing5 is selected at boot time, correct?
 
->> This is probably out of scope for this DT conversion, but it would be neat
->> if you somehow could specify the CPU affinity for a channel to tie a clock
->> event to an individual CPU core. This would make a a per-cpu timer unless
->> I'm mistaken. But that's more of a software policy than anything else.
->
-> Yes, that's a configuration that needs to be specified somewhere. I don't know
-> where though.
+Assuming I want to use timing1 instead: who would set when the 
+property 'native-mode' to &timing1?
 
-As long as you have per-channel interrupts described in DT you can
-probably handle this in a generic way in the driver.
+Can the switch to
 
-Thanks,
+native-mode = <&timing1>;
 
-/ magnus
+only be done at compile time of the dts -> dtb? Or can this be done at 
+boot/kernel run time, too?
+
+In the end, I'm looking for a way to have several timings like above 
+in the device tree, and select one at kernel boot time based on the 
+display detected. Would this be possible?
+
+Many thanks and best regards
+
+Dirk
