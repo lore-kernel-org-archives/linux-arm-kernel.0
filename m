@@ -1,45 +1,82 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 14 Feb 2014 11:42:50 +0100
-Subject: [PATCH v2 4/6] ARM: firmware: add prepare_idle() operation
-In-Reply-To: <52FDA6B4.6070404@nvidia.com>
-References: <1391747706-1847-1-git-send-email-acourbot@nvidia.com>
- <1391747706-1847-5-git-send-email-acourbot@nvidia.com>
- <52FCA5FC.80504@samsung.com> <52FDA6B4.6070404@nvidia.com>
-Message-ID: <52FDF32A.1040809@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 14 Feb 2014 10:46:55 +0000
+Subject: [PATCH RESEND v4 00/37] mtd: st_spi_fsm: Add new driver
+In-Reply-To: <52FA3B1A.2070304@st.com>
+References: <1390473085-24626-1-git-send-email-lee.jones@linaro.org>
+ <52FA3B1A.2070304@st.com>
+Message-ID: <20140214104655.GE9462@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.02.2014 06:16, Alexandre Courbot wrote:
-> On 02/13/2014 08:01 PM, Tomasz Figa wrote:
->> Hi Alexandre,
->>
->> On 07.02.2014 05:35, Alexandre Courbot wrote:
->>> Some firmwares do not put the CPU into idle mode themselves, but still
->>> need to be informed that the CPU is about to enter idle mode before this
->>> happens. Add a prepare_idle() operation to the firmware_ops structure to
->>> handle such cases.
->>>
->>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->>> ---
->>>    arch/arm/include/asm/firmware.h | 4 ++++
->>>    1 file changed, 4 insertions(+)
->>
->> I wonder if .do_idle() couldn't simply return an appropriate error code
->> to let the upper layer know that it should proceed with normal CPU idle
->> activation, while still letting the firmware know that the CPU is going
->> to idle.
->
-> In our particular case I agree it would be enough to use do_idle() to
-> let the firmware know about the operation and have it return -ENOSYS so
-> the kernel actually performs it. I'm afraid this might not fulfill all
-> needs though (e.g. one can imagine a firmware where the OS needs to take
-> action between the notification and the actual shutdown), and as Stephen
-> pointed out that would make the name of the function ambiguous at best.
-> I'd rather keep it the current way for clarity.
->
+> Sorry for the delay.  I have now had a quick look through the patches.  Just a
+> couple of points :-)
+> 
+> * stfsm_probe(): stfsm_fetch_platform_configs() needs to be called *before*
+> config() -- config() is based on platform capabilities.  Conceptually,
+> stfsm_fetch_platform_configs() should be called before stfsm_jedec_probe(), and
+> FLASH_FLAG_32BIT_ADDR should be moved out of stfsm_fetch_platform_configs(),
+> placed just after stfsm_jedec_probe() but before config().
+> 
+> * fsm_wait_busy(): logic not quite correct if we get a P_ERR or E_ERR error
+> after a timeout.  I am also not sure about returning (uint8_t)-EIO.  For what
+> its worth, this is what I did in response to Brian's comment about the race
+> condition:
 
-OK. I'm not strongly against this, just wanted some more thought on 
-this, so please move on.
+Thanks Angus.
 
-Best regards,
-Tomasz
+Brain,
+
+If I fix up the review comments from  Angus', Ludovic and Christophe
+are you happy to finally accept the driver? Or do you have any final
+review comments that you wish me to apply for v5?
+
+> On 01/23/2014 10:30 AM, Lee Jones wrote:
+> > Version 4:
+> >   Tended to Brian's review comments
+> >     - Checkpatch acceptance
+> >     - MODULE_DEVICE_TABLE() name slip correction
+> >     - Timeout issue(s) resolved
+> >     - Potential infinite loop mitigated
+> >     - Code clarity suggests heeded
+> >     - Duplication with MTD core code removed
+> >     - Upgraded to using ROUND_UP() helper
+> >     - Moved non-shared header code into main driver
+> >     - Relocated dynamic msg sequence stores into main struct
+> >     - Averted adaption of static (table) data
+> >     - Basic whitespace/spelling/data type/dev_err suggestions applied
+> >   
+> > Version 3:
+> >   Okay, this thing should be fully functional now. Identify a chip
+> >   based on it's JEDEC ID, Read, Write, Erase (all or by sector).
+> >   Support for various chip quirks added too.
+> > 
+> > Version 2:
+> >   The first bunch of these patches have been on the MLs before, but
+> >   didn't receive a great deal of attention for the most part. We are
+> >   a little more featureful this time however. We can now successfully
+> >   setup and configure the N25Q256. We still can't read/write/erase
+> >   it though. I'll start work on that next week and will provide it in
+> >   the next instalment.
+> > 
+> > Version 1:
+> >   First stab at getting this thing Mainlined. It doesn't do a great deal
+> >   yet, but we are able to initialise the device and dynamically set it up
+> >   correctly based on an extracted JEDEC ID.
+> > 
+> >  Documentation/devicetree/bindings/mtd/st-fsm.txt |   26 ++
+> >  arch/arm/boot/dts/stih416-b2105.dts              |   14 +
+> >  arch/arm/boot/dts/stih416-pinctrl.dtsi           |   12 +
+> >  drivers/mtd/devices/Kconfig                      |    8 +
+> >  drivers/mtd/devices/Makefile                     |    1 +
+> >  drivers/mtd/devices/serial_flash_cmds.h          |   81 ++++
+> >  drivers/mtd/devices/st_spi_fsm.c                 | 2124 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+> > 7 files changed, 2266 insertions(+)
+> > 
+> > 
+> 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
