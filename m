@@ -1,77 +1,51 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Fri, 14 Feb 2014 13:26:13 +0530
-Subject: [PATCH v2 31/52] arm64,
- debug-monitors: Fix CPU hotplug callback registration
-In-Reply-To: <20140214074750.22701.47330.stgit@srivatsabhat.in.ibm.com>
-References: <20140214074750.22701.47330.stgit@srivatsabhat.in.ibm.com>
-Message-ID: <20140214075612.22701.36819.stgit@srivatsabhat.in.ibm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 14 Feb 2014 02:14:58 -0600
+Subject: [PATCH v2 4/4] Documentation: dt: OMAP: Update Overo/Tobi
+In-Reply-To: <52FDCC9B.2050608@epfl.ch>
+References: <1392287116-4548-1-git-send-email-florian.vaussard@epfl.ch>
+ <1392287116-4548-5-git-send-email-florian.vaussard@epfl.ch>
+ <52FCDA29.90605@ti.com> <52FDCC9B.2050608@epfl.ch>
+Message-ID: <52FDD082.9090006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subsystems that want to register CPU hotplug callbacks, as well as perform
-initialization for the CPUs that are already online, often do it as shown
-below:
+On 02/14/2014 01:58 AM, Florian Vaussard wrote:
+> Hi,
+> 
+> On 02/13/2014 03:43 PM, Nishanth Menon wrote:
+>> On 02/13/2014 04:25 AM, Florian Vaussard wrote:
+>>> Update the compatible string for Overo/Tobi to reflect the latest
+>>> changes.
+>>>
+>>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>>> ---
+>>>  Documentation/devicetree/bindings/arm/omap/omap.txt | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>>> index 34dc40c..af9b4a0 100644
+>>> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+>>> @@ -91,7 +91,7 @@ Boards:
+>>>    compatible = "ti,omap3-beagle", "ti,omap3"
+>>>  
+>>>  - OMAP3 Tobi with Overo : Commercial expansion board with daughter board
+>>> -  compatible = "ti,omap3-tobi", "ti,omap3-overo", "ti,omap3"
+>>> +  compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap3"
+>> omap3-overo-storm-tobi.dts is not covered here, so, I wonder as the
+>> number of boards supported keep increasing, is'nt it better we drop
+>> the board information from omap.txt?
+>>
+> 
+> I am not opposed to this. We will just have checkpatch warnings due to
+> undocumented compatible strings.
 
-	get_online_cpus();
+Aaah, I seemed to have missed bff5da43 commit, thanks for pointing me
+at it - unrelated to this patch, I think the board cleanups is a
+little overdue :(
 
-	for_each_online_cpu(cpu)
-		init_cpu(cpu);
+Acked-by: Nishanth Menon <nm@ti.com>
 
-	register_cpu_notifier(&foobar_cpu_notifier);
-
-	put_online_cpus();
-
-This is wrong, since it is prone to ABBA deadlocks involving the
-cpu_add_remove_lock and the cpu_hotplug.lock (when running concurrently
-with CPU hotplug operations).
-
-Instead, the correct and race-free way of performing the callback
-registration is:
-
-	cpu_notifier_register_begin();
-
-	for_each_online_cpu(cpu)
-		init_cpu(cpu);
-
-	/* Note the use of the double underscored version of the API */
-	__register_cpu_notifier(&foobar_cpu_notifier);
-
-	cpu_notifier_register_done();
-
-
-Fix the debug-monitors code in arm64 by using this latter form of callback
-registration.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
----
-
- arch/arm64/kernel/debug-monitors.c |    6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index 636ba8b..c985531 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -155,12 +155,16 @@ static struct notifier_block os_lock_nb = {
- 
- static int debug_monitors_init(void)
- {
-+	cpu_notifier_register_begin();
-+
- 	/* Clear the OS lock. */
- 	smp_call_function(clear_os_lock, NULL, 1);
- 	clear_os_lock(NULL);
- 
- 	/* Register hotplug handler. */
--	register_cpu_notifier(&os_lock_nb);
-+	__register_cpu_notifier(&os_lock_nb);
-+
-+	cpu_notifier_register_done();
- 	return 0;
- }
- postcore_initcall(debug_monitors_init);
+-- 
+Regards,
+Nishanth Menon
