@@ -1,50 +1,96 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Feb 2014 13:47:56 +0000
-Subject: [PATCH 0/6] ARM: integrator: multiplatform advancements
-In-Reply-To: <1392373771-17303-1-git-send-email-linus.walleij@linaro.org>
-References: <1392373771-17303-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20140214134756.GI30257@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 14 Feb 2014 13:48:15 +0000
+Subject: [PATCH 1/2] mfd: twl4030-madc: Add devicetree support.
+In-Reply-To: <1392383861-14169-1-git-send-email-marek@goldelico.com>
+References: <1392383861-14169-1-git-send-email-marek@goldelico.com>
+Message-ID: <20140214134815.GD13293@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 11:29:25AM +0100, Linus Walleij wrote:
-> The *real* solution, one might argue is to convert the CLCD
-> driver to DRM and add device tree bindings, but it appears that
-> this is an orthogonal goal that has been attempted by other with
-> mixed results.
+> Signed-off-by: Marek Belisko <marek@goldelico.com>
+> ---
+>  .../devicetree/bindings/mfd/twl4030-madc.txt       | 18 +++++++++++++
+>  drivers/mfd/twl4030-madc.c                         | 31
+> ++++++++++++++++++++--
 
-What mixed results?  You know, I find it rather sick that people run
-around trying to do this to a driver that I authored and maintain
-without one comment to me about it.  It sometimes feels like people
-think I don't exist anymore.
+Please separate these into different patches.
 
-The biggest complaint I've heard against DRM is the amount of code
-required.  That's partly because we haven't - until now - had a good
-way to separate the "connectors" as stand-alone implementations separate
-from the core DRM drivers.  I'm hopeful that by 3.15, we will see some
-implementations (imx-drm and armada) start making use of this.
+>  2 files changed, 47 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/twl4030-madc.txt
 
-Also, remember that DRM is Direct Rendering Manager, which incorporates
-Kernel Mode Setting.  It's the KMS part which is most relevant to things
-like CLCD since it has no GPU.  However, the non-KMS bits also are when
-you have something like a Mali GPU or other GPU.
+<snip>
 
-We /really/ need these GPUs to move over to DRM - any ARM platform using
-a GPU today is inherently insecure since they all have been coded to push
-physical addresses around everywhere, which basically means userspace can
-use the GPU to access parts of the system such as overwriting bits of the
-kernel.
+> +++ b/drivers/mfd/twl4030-madc.c
+> @@ -695,6 +695,29 @@ static int twl4030_madc_set_power(struct twl4030_madc_data *madc, int on)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_OF
 
-It's useless write-protecting the vectors page and/or the kernel text in
-a vain attempt to provide additional security if the GPU can be used from
-userspace to write to that RAM.
+I believe we're heading for a more:
 
-Having everything under DRM eliminates that problem because userspace only
-gets to deal with handles to the various buffers rather than physical
-addresses, which ensures that you can't specify an address for a buffer
-you don't own.
+  if (IS_ENABLED(CONFIG_OF))
+
+... approach. I won't enforce it, but please consider using it.
+
+> +static struct twl4030_madc_platform_data *
+> +	twl4030_madc_of_parse(struct platform_device *pdev)
+> +{
+> +	struct twl4030_madc_platform_data *pdata;
+> +
+> +	pdata = devm_kzalloc(&pdev->dev,
+> +			sizeof(struct twl4030_madc_platform_data), GFP_KERNEL);
+
+s/struct twl4030_madc_platform_data/*pdata/
+
+> +	if (!pdata)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	pdata->irq_line = platform_get_irq(pdev, 0);
+
+Why weren't 'resources' used in the original implementation?
+
+> +	return pdata;
+> +}
+> +
+> +static const struct of_device_id twl4030_madc_dt_match_table[] = {
+> +	{ .compatible = "ti,twl4030-madc" },
+> +	{},
+> +};
+> +
+> +#endif
+> +
+>  /*
+>   * Initialize MADC and request for threaded irq
+>   */
+> @@ -706,8 +729,11 @@ static int twl4030_madc_probe(struct platform_device *pdev)
+>  	u8 regval;
+>  
+>  	if (!pdata) {
+> -		dev_err(&pdev->dev, "platform_data not available\n");
+> -		return -EINVAL;
+> +		pdata = twl4030_madc_of_parse(pdev);
+> +		if (!pdata) {
+
+And if you received -ENOMEM?
+
+> +			dev_err(&pdev->dev, "platform_data not available\n");
+> +			return -EINVAL;
+> +		}
+>  	}
+>  	madc = kzalloc(sizeof(*madc), GFP_KERNEL);
+>  	if (!madc)
+> @@ -807,6 +833,7 @@ static struct platform_driver twl4030_madc_driver = {
+>  	.driver = {
+>  		   .name = "twl4030_madc",
+>  		   .owner = THIS_MODULE,
+> +		   .of_match_table = of_match_ptr(twl4030_madc_dt_match_table),
+>  		   },
+>  };
+>  
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
