@@ -1,105 +1,166 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Sat, 15 Feb 2014 00:30:17 +0900
-Subject: [PATCH] ARM: shmobile: lager: Add internal USB PCI support
-In-Reply-To: <52FE2026.8040801@cogentembedded.com>
-References: <20140214032948.3287.33351.sendpatchset@w520>
- <52FE2026.8040801@cogentembedded.com>
-Message-ID: <CANqRtoSc7W9UXBaACnckWPhUGE5VPDN8JV9FFHZbW9ZwGhTt4Q@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 14 Feb 2014 16:53:08 +0100
+Subject: [PATCH 23/27] clocksource: sh_cmt: Add DT support
+In-Reply-To: <20140214105822.GE9907@e106331-lin.cambridge.arm.com>
+References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1392339605-20691-24-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20140214105822.GE9907@e106331-lin.cambridge.arm.com>
+Message-ID: <107109887.afEv2P92gg@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi Mark,
 
-On Fri, Feb 14, 2014 at 10:54 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Hello.
->
->
-> On 14-02-2014 7:29, Magnus Damm wrote:
->
->> From: Valentine Barshak <valentine.barshak@cogentembedded.com>
->
->
->> This adds internal PCI USB host devices to R-Car H2 Lager board.
->
->
->> Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
->> [damm at opensource.se: Rebased and reworked to only include USB1 and USB2]
->> Signed-off-by: Magnus Damm <damm@opensource.se>
->> ---
->
->
->>   Written against renesas-devel-v3.14-rc2-20140213
->
->
->>   arch/arm/mach-shmobile/board-lager.c |   50
->> ++++++++++++++++++++++++++++++++++
->>   1 file changed, 50 insertions(+)
->
->
->> --- 0001/arch/arm/mach-shmobile/board-lager.c
->> +++ work/arch/arm/mach-shmobile/board-lager.c   2014-02-14
->> 12:16:26.000000000 +0900
->> @@ -638,6 +638,48 @@ static struct resource sdhi2_resources[]
->>         DEFINE_RES_IRQ(gic_spi(167)),
->>   };
->>
->> +/* Internal PCI1 */
->> +static const struct resource pci1_resources[] __initconst = {
->> +       DEFINE_RES_MEM(0xee0b0000, 0x10000),    /* CFG */
->> +       DEFINE_RES_MEM(0xee0a0000, 0x10000),    /* MEM */
->> +       DEFINE_RES_IRQ(gic_spi(112)),
->> +};
->> +
->> +static const struct platform_device_info pci1_info __initconst = {
->> +       .parent         = &platform_bus,
->> +       .name           = "pci-rcar-gen2",
->> +       .id             = 1,
->> +       .res            = pci1_resources,
->> +       .num_res        = ARRAY_SIZE(pci1_resources),
->> +       .dma_mask       = DMA_BIT_MASK(32),
->> +};
->> +
->> +static void __init lager_add_usb1_device(void)
->
->
->    Actually, this adds PCI device, not USB, so the name is strange.
-> Also, I doubt that such functions are really necessary.
+Thank you for the review.
 
-Well there are only USB devices hanging off the PCI devices on the
-actual silicon, so this naming discussion seems like splitting hairs?
+On Friday 14 February 2014 10:58:22 Mark Rutland wrote:
+> On Fri, Feb 14, 2014 at 01:00:01AM +0000, Laurent Pinchart wrote:
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  .../devicetree/bindings/timer/renesas,cmt.txt      |  75 +++++++++++++++
+> >  drivers/clocksource/sh_cmt.c                       | 104 +++++++++++++---
+> >  2 files changed, 160 insertions(+), 19 deletions(-)
+> >  create mode 100644
+> >  Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> > b/Documentation/devicetree/bindings/timer/renesas,cmt.txt new file mode
+> > 100644
+> > index 0000000..28d4ab5
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/timer/renesas,cmt.txt
+> > @@ -0,0 +1,75 @@
+> > +* Renesas R-Car Compare Match Timer (CMT)
+> > +
+> > +The CMT is a multi-channel 16/32/48-bit timer/counter with configurable
+> > clock
+> > +inputs and programmable compare match.
+> > +
+> > +Channels share hadware resources but their counter and compare match
+> > value are
+> > +independent. A particular CMT instance can implement only a subset of the
+> > +channels supported by the CMT model. Channels indices start from 0 and
+> > are
+> > +consecutive.
+> > +
+> > +Required Properties:
+> > +
+> > +  - compatible: must contain one of the following.
+> > +    - "renesas,cmt-32" for the 32-bit CMT
+> > +		(CMT0 on sh7372, sh73a0 and r8a7740)
+> > +    - "renesas,cmt-32-fast" for the 32-bit CMT with fast clock support
+> > +		(CMT[234] on sh7372, sh73a0 and r8a7740)
+> > +    - "renasas,cmt-48" for the 48-bit CMT
+> > +		(CMT1 on sh7372, sh73a0 and r8a7740)
+> > +    - "renesas,cmt-48-gen2" for the second generation 48-bit CMT
+> > +    		(CMT[01] on r8a73a4, r8a7790 and r8a7791)
+> > +
+> > +  - reg: base address and length of the registers block for the timer
+> > module.
+> > +  - interrupt-parent, interrupts: interrupt-specifier for the timer, one
+> > per
+> > +    channel.
+> 
+> It might make more sense to describe the interrupt on the channel
+> subnode. It makes it far clearer which channel has which interrupt.
 
->> +{
->> +       platform_device_register_full(&pci1_info);
->> +}
->> +
->> +/* Internal PCI2 */
->> +static const struct resource pci2_resources[] __initconst = {
->> +       DEFINE_RES_MEM(0xee0d0000, 0x10000),    /* CFG */
->> +       DEFINE_RES_MEM(0xee0c0000, 0x10000),    /* MEM */
->> +       DEFINE_RES_IRQ(gic_spi(113)),
->> +};
->> +
->> +static const struct platform_device_info pci2_info __initconst = {
->> +       .parent         = &platform_bus,
->> +       .name           = "pci-rcar-gen2",
->> +       .id             = 2,
->> +       .res            = pci2_resources,
->> +       .num_res        = ARRAY_SIZE(pci2_resources),
->> +       .dma_mask       = DMA_BIT_MASK(32),
->> +};
->> +
+That's a good point. I'm relying on platform_get_irq() which won't support 
+that usage, but I can switch to of_irq_to_resource() instead.
+
+> > +  - clocks: phandle and clock-specifier pair for the functional clock.
+> > +  - clock-names: must be "fck".
+> 
+> It would be nice to define the list once:
+> 
+> - clocks: A list of phandle + clock-specifier pairs, one for each entry
+>   in clock-names.
+> - clock-names: Should contain "fck" for the functional clock.
+
+OK.
+
+> > +
+> > +  - #address-cells: must be 1
+> > +  - #size-cells: must be 0
+> > +
+> > +  - renesas,channels-mask: integer bitmask of the channels implemented by
+> > the
+> > +    timer instance.
+> 
+> This is implied by the presence of a subnode. Either remove this or the
+> subnodes.
 >
->
->    I suspect the PCI resources and info could be wrapped by macros and then
-> instantiated by using only 2 lines.
+> > +
+> > +
+> > +Each channel is described by a sub-node named "channel@<idx>", where
+> > <idx> is +the channel index.
+> > +
+> > +Channels Required Properties:
+> > +
+> > +  - reg: the channel index.
+> > +
+> > +Channels Optional Properties:
+> > +
+> > +  - clock-source-rating: rating of the timer as a clock source device.
+> > +  - clock-event-rating: rating of the timer as a clock event device.
+> 
+> This feels like a leak of Linux internals. Why do you need this?
 
-I suspect anything can be done. =) As you may know, I'm not the
-original author of this patch. At this point in time I'm mainly
-focusing on getting device support merged, so please feel free to send
-either incremental patches or pick up this one and fix it yourself.
-I'm beyond caring.
+You're right, it is. The clock source and clock event ratings are currently 
+configured through platform data, I'll need to find a way to compute them in 
+the driver instead.
 
-Thanks,
+There's still one piece of Linux-specific data I need though, as I need to 
+specify for each channel whether to use it as a clock source device, a clock 
+event device, both of them or none. That's configuration information that 
+needs to be provided somehow.
 
-/ magnus
+> > +
+> > +
+> > +Example: R8A7790 (R-Car H2) CMT0 node
+> > +
+> > +	CMT0 on R8A7790 implements hardware channels 5 and 6 only and names
+> > +	them channels 0 and 1 in the documentation.
+> > +
+> > +	cmt0: timer at ffca0000 {
+> > +		compatible = "renesas,cmt-48-gen2";
+> > +		reg = <0 0xffca0000 0 0x1004>;
+> > +		interrupt-parent = <&gic>;
+> > +		interrupts = <0 142 IRQ_TYPE_LEVEL_HIGH>,
+> > +			     <0 142 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&mstp1_clks R8A7790_CLK_CMT0>;
+> > +
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		renesas,channels-mask = <0x60>;
+> > +
+> > +		channel at 0 {
+> > +			reg = <0>;
+> > +			clock-event-rating = <80>;
+> > +		};
+> > +		channel at 0 {
+> > +			reg = <0>;
+> > +			clock-source-rating = <80>;
+> > +		};
+> 
+> Aaargh. Use the _real_ channel IDs for the reg proeprties and get rid of
+> the mask. It's pointlessly confusing.
+
+There's two real channel IDs. One of them is the value used in the hardware 
+implementation (5 and 6 in this case, used to compute the channel registers 
+block address) and the other one is the value used throughout the datasheet, 0 
+and 1 in this case.
+
+The later is used by the driver to reference the correct interrupt, which 
+won't be needed anymore when referencing interrupts in the channel subnodes 
+directly. It's also used to print messages to the kernel log and match the 
+channel numbers specified in the datasheets. I could use the hardware channel 
+number instead, but that might become confusing.
+
+-- 
+Regards,
+
+Laurent Pinchart
