@@ -1,79 +1,49 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 14 Feb 2014 17:54:46 +0400
-Subject: [PATCH] ARM: shmobile: lager: Add internal USB PCI support
-In-Reply-To: <20140214032948.3287.33351.sendpatchset@w520>
-References: <20140214032948.3287.33351.sendpatchset@w520>
-Message-ID: <52FE2026.8040801@cogentembedded.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 14 Feb 2014 13:57:36 +0000
+Subject: [PATCH RESEND] ARM: mcpm: Make all mcpm functions notrace
+In-Reply-To: <1392378721.3475.12.camel@linaro1.home>
+References: <1392279975.3469.4.camel@linaro1.home>
+ <alpine.LFD.2.11.1402131542120.17677@knanqh.ubzr>
+ <1392378721.3475.12.camel@linaro1.home>
+Message-ID: <20140214135731.GA2331@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Feb 14, 2014 at 11:52:01AM +0000, Jon Medhurst (Tixy) wrote:
+> On Thu, 2014-02-13 at 15:42 -0500, Nicolas Pitre wrote:
+> > On Thu, 13 Feb 2014, Jon Medhurst (Tixy) wrote:
+> > 
+> > > From: Dave Martin <dave.martin@linaro.org>
+> > > 
+> > > The functions in mcpm_entry.c are mostly intended for use during
+> > > scary cache and coherency disabling sequences, or do other things
+> > > which confuse trace ...  like powering a CPU down and not
+> > > returning.  Similarly for the backend code.
+> > > 
+> > > For simplicity, this patch just makes whole files notrace.
+> > > There should be more than enough traceable points on the paths to
+> > > these functions, but we can be more fine-grained later if there is
+> > > a need for it.
+> > > 
+> > > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > > 
+> > > Also added spc.o to the list of files as it contains functions used by
+> > > MCPM code which have comments comments like: "might be used in code
+> > > paths where normal cacheable locks are not working"
+> > > 
+> > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> > 
+> > Acked-by: Nicolas Pitre <nico@linaro.org>
+> > 
+> > Please send to RMK's patch system.
+> 
+> Thanks, added as patch 7962/2 [1]. (My first attempt accidentally
+> omitted the "From: Dave Martin" line - I hope the patch system
+> understands such lines).
 
-On 14-02-2014 7:29, Magnus Damm wrote:
+I won't lost sleep over it if not...
 
-> From: Valentine Barshak <valentine.barshak@cogentembedded.com>
+I'd forgotten about this patch, to be honest.
 
-> This adds internal PCI USB host devices to R-Car H2 Lager board.
-
-> Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
-> [damm at opensource.se: Rebased and reworked to only include USB1 and USB2]
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> ---
-
->   Written against renesas-devel-v3.14-rc2-20140213
-
->   arch/arm/mach-shmobile/board-lager.c |   50 ++++++++++++++++++++++++++++++++++
->   1 file changed, 50 insertions(+)
-
-> --- 0001/arch/arm/mach-shmobile/board-lager.c
-> +++ work/arch/arm/mach-shmobile/board-lager.c	2014-02-14 12:16:26.000000000 +0900
-> @@ -638,6 +638,48 @@ static struct resource sdhi2_resources[]
->   	DEFINE_RES_IRQ(gic_spi(167)),
->   };
->
-> +/* Internal PCI1 */
-> +static const struct resource pci1_resources[] __initconst = {
-> +	DEFINE_RES_MEM(0xee0b0000, 0x10000),	/* CFG */
-> +	DEFINE_RES_MEM(0xee0a0000, 0x10000),	/* MEM */
-> +	DEFINE_RES_IRQ(gic_spi(112)),
-> +};
-> +
-> +static const struct platform_device_info pci1_info __initconst = {
-> +	.parent		= &platform_bus,
-> +	.name		= "pci-rcar-gen2",
-> +	.id		= 1,
-> +	.res		= pci1_resources,
-> +	.num_res	= ARRAY_SIZE(pci1_resources),
-> +	.dma_mask	= DMA_BIT_MASK(32),
-> +};
-> +
-> +static void __init lager_add_usb1_device(void)
-
-    Actually, this adds PCI device, not USB, so the name is strange.
-Also, I doubt that such functions are really necessary.
-
-> +{
-> +	platform_device_register_full(&pci1_info);
-> +}
-> +
-> +/* Internal PCI2 */
-> +static const struct resource pci2_resources[] __initconst = {
-> +	DEFINE_RES_MEM(0xee0d0000, 0x10000),	/* CFG */
-> +	DEFINE_RES_MEM(0xee0c0000, 0x10000),	/* MEM */
-> +	DEFINE_RES_IRQ(gic_spi(113)),
-> +};
-> +
-> +static const struct platform_device_info pci2_info __initconst = {
-> +	.parent		= &platform_bus,
-> +	.name		= "pci-rcar-gen2",
-> +	.id		= 2,
-> +	.res		= pci2_resources,
-> +	.num_res	= ARRAY_SIZE(pci2_resources),
-> +	.dma_mask	= DMA_BIT_MASK(32),
-> +};
-> +
-
-    I suspect the PCI resources and info could be wrapped by macros and then 
-instantiated by using only 2 lines.
-
-WBR, Sergei
+Cheers
+---Dave
