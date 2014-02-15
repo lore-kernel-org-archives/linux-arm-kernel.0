@@ -1,31 +1,34 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 15 Feb 2014 11:20:17 +0100
-Subject: [PATCH v2 19/23] ARM: MVEBU: Enable mvebu-soc-id on Kirkwood
+Date: Sat, 15 Feb 2014 11:20:12 +0100
+Subject: [PATCH v2 14/23] ARM: MM Enable building Feroceon L2 cache controller
+ with ARCH_MVEBU
 In-Reply-To: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
 References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1392459621-24003-20-git-send-email-andrew@lunn.ch>
+Message-ID: <1392459621-24003-15-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the Kirkwood PCIe compatibility string to mvebu-soc-id, so that it
-can get the SoC ID and revision from the PCIe endpoints.
+Kirkwood, which uses the Feroceon L2 cache controller will soon be
+moving into mach-mvebu. Allow the cache controller to be built in this
+situration.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mach-mvebu/mvebu-soc-id.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
-index f3b325f6cbd4..f3d4cf53f746 100644
---- a/arch/arm/mach-mvebu/mvebu-soc-id.c
-+++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
-@@ -38,6 +38,7 @@ static bool is_id_valid;
- static const struct of_device_id mvebu_pcie_of_match_table[] = {
- 	{ .compatible = "marvell,armada-xp-pcie", },
- 	{ .compatible = "marvell,armada-370-pcie", },
-+	{ .compatible = "marvell,kirkwood-pcie" },
- 	{},
- };
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 1f8fed94c2a4..dccd7e177653 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -855,7 +855,7 @@ config OUTER_CACHE_SYNC
  
+ config CACHE_FEROCEON_L2
+ 	bool "Enable the Feroceon L2 cache controller"
+-	depends on ARCH_KIRKWOOD || ARCH_MV78XX0
++	depends on ARCH_KIRKWOOD || ARCH_MV78XX0 || ARCH_MVEBU
+ 	default y
+ 	select OUTER_CACHE
+ 	help
 -- 
 1.8.5.3
