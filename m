@@ -1,99 +1,218 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 15 Feb 2014 11:19:58 +0100
-Subject: [PATCH v2 00/23] Move DT kirkwood into mach-mvebu
-Message-ID: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
+Date: Sat, 15 Feb 2014 11:20:01 +0100
+Subject: [PATCH v2 03/23] ARM: Kirkwood: Convert mv88f6281gtw_ge switch setup
+ to DT
+In-Reply-To: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
+References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1392459621-24003-4-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The process of making most kirkwood boards boot using DT is nearly
-complete. We can now move these boards into mach-mvebu, freeing them
-of the legacy code needed for none-DT systems. At the same time, they
-can become part of ARCH_MULTI_V5.
+The mv88f6281gtw_ge has a ethernet switch connected to the ethernet
+port of the SoC. Convert the platform device instantiation to a DT
+instantiation.
 
-Since v1:
-mv88f6281gtw_ge switch really does now use DT.
-The L2 Cache binding has been re-written.
-kirkwood.dtsi changes have been placed into there own patch.
-Added mvebu_v5_defconfig
-Fixed a few typos in changelogs
-Added a few Cc:s
-
-Andrew Lunn (23):
-  ARM: Kirkwood: Give pm.c its own header file.
-  IRQ: Orion: Fix getting generic chip pointer.
-  ARM: Kirkwood: Convert mv88f6281gtw_ge switch setup to DT
-  ARM: Kirkwood: Drop printing the SoC type and revision
-  ARM: Kirkwood: Seperate board-dt from common and pcie code.
-  ARM: Kirkwood: ioremap the cpu_config register before using it.
-  ARM: Kirkwood: ioremap memory control register
-  ARM: MVEBU: Add ARCH_MULTI_V7 to SoCs
-  ARM: Orion: Move cache-feroceon-l2.h out of plat-orion
-  ARM: MM: Add DT binding for Feroceon L2 cache
-  ARM: Kirkwood: Instantiate L2 cache from DT.
-  ARM: Fix default CPU selection for ARCH_MULTI_V5
-  ARM: Fix MULTI_TLB for feroceon
-  ARM: MM Enable building Feroceon L2 cache controller with ARCH_MVEBU
-  ARM: Move kirkwood DT boards into mach-mvebu
-  ARM: MVEBU: Let kirkwood use the system controller for restart
-  ARM: MVEBU: Instantiate system controller in kirkwood.dtsi
-  drivers: Enable building of Kirkwood drivers for mach-mvebu
-  ARM: MVEBU: Enable mvebu-soc-id on Kirkwood
-  ARM: config: Add a multi_v5_defconfig
-  ARM: MVEBU: Simplifiy headers and make local
-  ARM: config: Add mvebu_v5_defconfig
-  ARM: Kirkwood: Remove DT support
-
- .../devicetree/bindings/arm/mrvl/feroceon.txt      |  17 ++
- arch/arm/Kconfig                                   |   2 +-
- arch/arm/boot/dts/Makefile                         |  34 ++--
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts     |  62 +++++++
- arch/arm/boot/dts/kirkwood.dtsi                    |  10 ++
- arch/arm/configs/kirkwood_defconfig                |   6 -
- arch/arm/configs/multi_v5_defconfig                | 183 ++++++++++++++++++++
- arch/arm/configs/mvebu_v5_defconfig                | 166 ++++++++++++++++++
- arch/arm/include/asm/hardware/cache-feroceon-l2.h  |  13 ++
- arch/arm/mach-kirkwood/Kconfig                     |  25 ---
- arch/arm/mach-kirkwood/Makefile                    |   6 +-
- arch/arm/mach-kirkwood/board-dt.c                  | 150 ----------------
- arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c     |  50 ------
- arch/arm/mach-kirkwood/common.c                    |   3 +-
- arch/arm/mach-kirkwood/common.h                    |  13 --
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h  |   2 +
- arch/arm/mach-kirkwood/pm.c                        |   9 +-
- arch/arm/mach-kirkwood/pm.h                        |  26 +++
- arch/arm/mach-mv78xx0/common.c                     |   2 +-
- arch/arm/mach-mvebu/Kconfig                        |  28 ++-
- arch/arm/mach-mvebu/Makefile                       |   1 +
- arch/arm/mach-mvebu/kirkwood-pm.c                  |  76 +++++++++
- arch/arm/mach-mvebu/kirkwood-pm.h                  |  26 +++
- arch/arm/mach-mvebu/kirkwood.c                     | 189 +++++++++++++++++++++
- arch/arm/mach-mvebu/kirkwood.h                     |  22 +++
- arch/arm/mach-mvebu/mvebu-soc-id.c                 |   1 +
- arch/arm/mm/Kconfig                                |   2 +-
- arch/arm/mm/cache-feroceon-l2.c                    |  54 +++++-
- arch/arm/mm/proc-feroceon.S                        |   2 +-
- arch/arm/mm/tlb-v4wbi.S                            |   3 +
- .../plat-orion/include/plat/cache-feroceon-l2.h    |  11 --
- drivers/cpufreq/Kconfig.arm                        |   2 +-
- drivers/cpuidle/Kconfig.arm                        |   2 +-
- drivers/irqchip/irq-orion.c                        |   3 +-
- drivers/leds/Kconfig                               |   4 +-
- drivers/phy/Kconfig                                |   2 +-
- drivers/thermal/Kconfig                            |   2 +-
- sound/soc/kirkwood/Kconfig                         |   2 +-
- 38 files changed, 914 insertions(+), 297 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mrvl/feroceon.txt
- create mode 100644 arch/arm/configs/multi_v5_defconfig
- create mode 100644 arch/arm/configs/mvebu_v5_defconfig
- create mode 100644 arch/arm/include/asm/hardware/cache-feroceon-l2.h
- delete mode 100644 arch/arm/mach-kirkwood/board-dt.c
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Cc: florian at openwrt.org
+---
+v2
+Remove the spurius Module.symvers
+Really do describe the switch in DT.
+---
+ arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 62 ++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/Kconfig                 |  7 ---
+ arch/arm/mach-kirkwood/Makefile                |  1 -
+ arch/arm/mach-kirkwood/board-dt.c              |  3 --
+ arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c | 50 ---------------------
+ arch/arm/mach-kirkwood/common.h                |  7 ---
+ 6 files changed, 62 insertions(+), 68 deletions(-)
  delete mode 100644 arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c
- create mode 100644 arch/arm/mach-kirkwood/pm.h
- create mode 100644 arch/arm/mach-mvebu/kirkwood-pm.c
- create mode 100644 arch/arm/mach-mvebu/kirkwood-pm.h
- create mode 100644 arch/arm/mach-mvebu/kirkwood.c
- create mode 100644 arch/arm/mach-mvebu/kirkwood.h
- delete mode 100644 arch/arm/plat-orion/include/plat/cache-feroceon-l2.h
 
+diff --git a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+index dc86429756d7..2cb0dc529165 100644
+--- a/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
++++ b/arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts
+@@ -122,4 +122,66 @@
+ 			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
++
++	dsa at 0 {
++		compatible = "marvell,dsa";
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		dsa,ethernet = <&eth0>;
++		dsa,mii-bus = <&ethphy0>;
++
++		switch at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0 0>;	/* MDIO address 0, switch 0 in tree */
++
++			port at 0 {
++				reg = <0>;
++				label = "lan1";
++			};
++
++			port at 1 {
++				reg = <1>;
++				label = "lan2";
++			};
++
++			port at 2 {
++				reg = <2>;
++				label = "lan3";
++			};
++
++			port at 3 {
++				reg = <3>;
++				label = "lan4";
++			};
++
++			port at 4 {
++				reg = <4>;
++				label = "wan";
++			};
++
++			port at 5 {
++				reg = <5>;
++				label = "cpu";
++			};
++		};
++	};
++};
++
++&mdio {
++	status = "okay";
++
++	ethphy0: ethernet-phy at ff {
++		reg = <0xff>; 	/* No phy attached */
++		speed = <1000>;
++		duplex = <1>;
++	};
++};
++
++&eth0 {
++	status = "okay";
++	ethernet0-port at 0 {
++		phy-handle = <&ethphy0>;
++	};
+ };
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index fe8319ad3158..df4b26340ae4 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -106,13 +106,6 @@ config ARCH_KIRKWOOD_DT
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell Kirkwood using flattened device tree.
+ 
+-config MACH_MV88F6281GTW_GE_DT
+-	bool "Marvell 88F6281 GTW GE Board (Flattened Device Tree)"
+-	depends on ARCH_KIRKWOOD_DT
+-	help
+-	  Say 'Y' here if you want your kernel to support the
+-	  Marvell 88F6281 GTW GE Board (Flattened Device Tree).
+-
+ endmenu
+ 
+ endif
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index 144b51102939..dc22bf5b21ed 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -13,4 +13,3 @@ obj-$(CONFIG_MACH_TS219)		+= ts219-setup.o tsx1x-common.o
+ obj-$(CONFIG_MACH_TS41X)		+= ts41x-setup.o tsx1x-common.o
+ 
+ obj-$(CONFIG_ARCH_KIRKWOOD_DT)		+= board-dt.o
+-obj-$(CONFIG_MACH_MV88F6281GTW_GE_DT)	+= board-mv88f6281gtw_ge.o
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index ceffdc8ffbbd..e74b31aa9736 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -131,9 +131,6 @@ static void __init kirkwood_dt_init(void)
+ 	kexec_reinit = kirkwood_enable_pcie;
+ #endif
+ 
+-	if (of_machine_is_compatible("marvell,mv88f6281gtw-ge"))
+-		mv88f6281gtw_ge_init();
+-
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+diff --git a/arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c b/arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c
+deleted file mode 100644
+index ee5eea678c11..000000000000
+--- a/arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c
++++ /dev/null
+@@ -1,50 +0,0 @@
+-/*
+- * arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c
+- *
+- * Marvell 88F6281 GTW GE Board Setup
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/irq.h>
+-#include <linux/timer.h>
+-#include <linux/mv643xx_eth.h>
+-#include <linux/ethtool.h>
+-#include <linux/gpio.h>
+-#include <net/dsa.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/pci.h>
+-#include <mach/kirkwood.h>
+-#include "common.h"
+-
+-static struct mv643xx_eth_platform_data mv88f6281gtw_ge_ge00_data = {
+-	.phy_addr	= MV643XX_ETH_PHY_NONE,
+-	.speed		= SPEED_1000,
+-	.duplex		= DUPLEX_FULL,
+-};
+-
+-static struct dsa_chip_data mv88f6281gtw_ge_switch_chip_data = {
+-	.port_names[0]	= "lan1",
+-	.port_names[1]	= "lan2",
+-	.port_names[2]	= "lan3",
+-	.port_names[3]	= "lan4",
+-	.port_names[4]	= "wan",
+-	.port_names[5]	= "cpu",
+-};
+-
+-static struct dsa_platform_data mv88f6281gtw_ge_switch_plat_data = {
+-	.nr_chips	= 1,
+-	.chip		= &mv88f6281gtw_ge_switch_chip_data,
+-};
+-
+-void __init mv88f6281gtw_ge_init(void)
+-{
+-	kirkwood_ge00_init(&mv88f6281gtw_ge_ge00_data);
+-	kirkwood_ge00_switch_init(&mv88f6281gtw_ge_switch_plat_data, NO_IRQ);
+-}
+diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+index 1296de94febf..832a4e2ab8d7 100644
+--- a/arch/arm/mach-kirkwood/common.h
++++ b/arch/arm/mach-kirkwood/common.h
+@@ -58,13 +58,6 @@ void kirkwood_cpufreq_init(void);
+ void kirkwood_restart(enum reboot_mode, const char *);
+ void kirkwood_clk_init(void);
+ 
+-/* board init functions for boards not fully converted to fdt */
+-#ifdef CONFIG_MACH_MV88F6281GTW_GE_DT
+-void mv88f6281gtw_ge_init(void);
+-#else
+-static inline void mv88f6281gtw_ge_init(void) {};
+-#endif
+-
+ /* early init functions not converted to fdt yet */
+ char *kirkwood_id(void);
+ void kirkwood_l2_init(void);
 -- 
 1.8.5.3
