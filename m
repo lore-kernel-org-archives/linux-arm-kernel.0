@@ -1,62 +1,91 @@
 From: david.lanzendoerfer@o2s.ch (David =?utf-8?q?Lanzend=C3=B6rfer?=)
-Date: Sun, 16 Feb 2014 00:33:25 +0100
-Subject: [PATCH v6 2/8] clk: sunxi: Implement MMC phase control
-In-Reply-To: <20140215233011.30460.27261.stgit@dizzy-6.o2s.ch>
-References: <20140215233011.30460.27261.stgit@dizzy-6.o2s.ch>
-Message-ID: <20140215233325.30460.77028.stgit@dizzy-6.o2s.ch>
+Date: Sun, 16 Feb 2014 00:33:12 +0100
+Subject: [PATCH v6 0/8] 
+Message-ID: <20140215233011.30460.27261.stgit@dizzy-6.o2s.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emilio L?pez <emilio@elopez.com.ar>
+Hello
+The following patchset adds support for the SD/MMC host found in the Allwinner SoCs.
+It contains all the necessary modifications for clock environment and also the device
+tree script modification which add it to all the boards using it.
+The clock environment function needed for phase offset configuration has
+been proposed and implemented by Emilio.
+A lot of work and cleanup has been done by Hans de Goede. Special thanks to him!
+This patchset is the 4th attempt to send this driver upstream.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+Changes since v1:
+-Using mmc_of_parse instead of diy dt parsing
+-Adding nodes for all mmc controller to the dtsi files,
+ including sofar unused controllers
+-Using generic GPIO slot library for WP/CD
+-Adding additional MMC device nodes into DTSI files
+
+Changes since v2:
+-Add missing Signed-off-by tags
+-Stop using __raw_readl / __raw_writel so that barriers are properly used
+-Adding missing new lines
+-Adding missing patch for automatic reparenting of clocks
+
+Changes since v3:
+-Move clk_enable / disable into host_init / exit (Hans)
+-Fix hang on boot caused by irq storm (Hans)
+
+Changes since v4:
+-moving sunxi-mci.{c/h} to sunxi-mmc.{c/h}
+-removing camel cases from the defines in  sunxi-mmc.h
+-moving defines out of the struct definition
+ since this is bad coding style
+-adding documentation for the device tree binding
+
+Changes since v5:
+-adding host initialization for when the sdio irq is enabled
+ (just to make sure having a defined state at all time)
+-add mmc support fixup: set pullup on cd pins
+-fixup: Don't set MMC_CAP_NEEDS_POLL /  MMC_CAP_4_BIT_DATA
+
 ---
- drivers/clk/sunxi/clk-sunxi.c |   35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index abb6c5a..33b9977 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -377,6 +377,41 @@ static void sun7i_a20_get_out_factors(u32 *freq, u32 parent_rate,
- 
- 
- /**
-+ * clk_sunxi_mmc_phase_control() - configures MMC clock phase control
-+ */
-+
-+void clk_sunxi_mmc_phase_control(struct clk_hw *hw, u8 sample, u8 output)
-+{
-+	#define to_clk_composite(_hw) container_of(_hw, struct clk_composite, hw)
-+	#define to_clk_factors(_hw) container_of(_hw, struct clk_factors, hw)
-+
-+	struct clk_composite *composite = to_clk_composite(hw);
-+	struct clk_hw *rate_hw = composite->rate_hw;
-+	struct clk_factors *factors = to_clk_factors(rate_hw);
-+	unsigned long flags = 0;
-+	u32 reg;
-+
-+	if (factors->lock)
-+		spin_lock_irqsave(factors->lock, flags);
-+
-+	reg = readl(factors->reg);
-+
-+	/* set sample clock phase control */
-+	reg &= ~(0x7 << 20);
-+	reg |= ((sample & 0x7) << 20);
-+
-+	/* set output clock phase control */
-+	reg &= ~(0x7 << 8);
-+	reg |= ((output & 0x7) << 8);
-+
-+	writel(reg, factors->reg);
-+
-+	if (factors->lock)
-+		spin_unlock_irqrestore(factors->lock, flags);
-+}
-+
-+
-+/**
-  * sunxi_factors_clk_setup() - Setup function for factor clocks
-  */
- 
+David Lanzend?rfer (5):
+      ARM: sunxi: Add driver for SD/MMC hosts found on Allwinner sunxi SoCs
+      ARM: dts: sun7i: Add support for mmc
+      ARM: dts: sun4i: Add support for mmc
+      ARM: dts: sun5i: Add support for mmc
+      ARM: sunxi: Add documentation for driver for SD/MMC hosts found on Allwinner sunxi SoCs
+
+Emilio L?pez (2):
+      clk: sunxi: factors: automatic reparenting support
+      clk: sunxi: Implement MMC phase control
+
+Hans de Goede (1):
+      ARM: sunxi: clk: export clk_sunxi_mmc_phase_control
+
+
+ .../devicetree/bindings/mmc/sunxi-mmc.txt          |   32 +
+ arch/arm/boot/dts/sun4i-a10-a1000.dts              |    8 
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |    8 
+ arch/arm/boot/dts/sun4i-a10.dtsi                   |   54 +
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts   |   30 +
+ arch/arm/boot/dts/sun5i-a10s.dtsi                  |   44 +
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts    |   15 
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |   15 
+ arch/arm/boot/dts/sun5i-a13.dtsi                   |   37 +
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |    8 
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |    8 
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts    |   23 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |   61 +
+ drivers/clk/sunxi/clk-factors.c                    |   36 +
+ drivers/clk/sunxi/clk-sunxi.c                      |   35 +
+ drivers/mmc/host/Kconfig                           |    7 
+ drivers/mmc/host/Makefile                          |    2 
+ drivers/mmc/host/sunxi-mmc.c                       |  876 ++++++++++++++++++++
+ drivers/mmc/host/sunxi-mmc.h                       |  239 +++++
+ include/linux/clk/sunxi.h                          |   22 +
+ 20 files changed, 1560 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+ create mode 100644 drivers/mmc/host/sunxi-mmc.c
+ create mode 100644 drivers/mmc/host/sunxi-mmc.h
+ create mode 100644 include/linux/clk/sunxi.h
+
+-- 
+Signature
