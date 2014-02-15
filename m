@@ -1,29 +1,29 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 15 Feb 2014 11:20:18 +0100
-Subject: [PATCH v2 20/23] ARM: config: Add a multi_v5_defconfig
+Date: Sat, 15 Feb 2014 11:20:20 +0100
+Subject: [PATCH v2 22/23] ARM: config: Add mvebu_v5_defconfig
 In-Reply-To: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
 References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1392459621-24003-21-git-send-email-andrew@lunn.ch>
+Message-ID: <1392459621-24003-23-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow regression build testing of multi v5 systems, add a
-multi_v5_defconfig, similar to the multi_v7_defconfig. This is based
-on kirkwood_defconfig, but with a few other boards added which claim
-to be MULTI_v5.
+Now that there is both v5 and v7 systems in mach-mvebu, the
+mvebu_defconfig is not sufficient, since these systems cannot be
+combined. Add a v5 defconfig which is based on kirkwood_defconfig,
+but purely DT.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/configs/multi_v5_defconfig | 183 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 183 insertions(+)
- create mode 100644 arch/arm/configs/multi_v5_defconfig
+ arch/arm/configs/mvebu_v5_defconfig | 166 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 166 insertions(+)
+ create mode 100644 arch/arm/configs/mvebu_v5_defconfig
 
-diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
+diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
 new file mode 100644
-index 000000000000..8282fab6b514
+index 000000000000..42e4ec641b4c
 --- /dev/null
-+++ b/arch/arm/configs/multi_v5_defconfig
-@@ -0,0 +1,183 @@
++++ b/arch/arm/configs/mvebu_v5_defconfig
+@@ -0,0 +1,166 @@
 +CONFIG_SYSVIPC=y
 +CONFIG_NO_HZ=y
 +CONFIG_HIGH_RES_TIMERS=y
@@ -37,23 +37,17 @@ index 000000000000..8282fab6b514
 +# CONFIG_ARCH_MULTI_V7 is not set
 +CONFIG_ARCH_MVEBU=y
 +CONFIG_MACH_KIRKWOOD=y
-+CONFIG_ARCH_MXC=y
-+CONFIG_MACH_IMX25_DT=y
-+CONFIG_MACH_IMX27_DT=y
-+CONFIG_ARCH_U300=y
++# CONFIG_CPU_FEROCEON_OLD_ID is not set
 +CONFIG_PCI_MVEBU=y
 +CONFIG_PREEMPT=y
 +CONFIG_AEABI=y
 +CONFIG_HIGHMEM=y
 +CONFIG_ZBOOT_ROM_TEXT=0x0
 +CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
 +CONFIG_CPU_FREQ=y
 +CONFIG_CPU_FREQ_STAT_DETAILS=y
 +CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
 +CONFIG_CPU_IDLE=y
-+CONFIG_ARM_KIRKWOOD_CPUIDLE=y
 +CONFIG_NET=y
 +CONFIG_PACKET=y
 +CONFIG_UNIX=y
@@ -111,23 +105,15 @@ index 000000000000..8282fab6b514
 +# CONFIG_I2C_COMPAT is not set
 +CONFIG_I2C_CHARDEV=y
 +CONFIG_I2C_MV64XXX=y
-+CONFIG_I2C_NOMADIK=y
 +CONFIG_SPI=y
 +CONFIG_SPI_ORION=y
 +CONFIG_GPIO_SYSFS=y
-+CONFIG_POWER_RESET_QNAP=y
 +CONFIG_SENSORS_ADT7475=y
 +CONFIG_SENSORS_LM63=y
 +CONFIG_SENSORS_LM75=y
 +CONFIG_SENSORS_LM85=y
 +CONFIG_THERMAL=y
-+CONFIG_KIRKWOOD_THERMAL=y
 +CONFIG_WATCHDOG=y
-+# CONFIG_ABX500_CORE is not set
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_SOC=y
-+CONFIG_SND_KIRKWOOD_SOC=y
 +CONFIG_HID_DRAGONRISE=y
 +CONFIG_HID_GYRATION=y
 +CONFIG_HID_TWINHAN=y
@@ -198,9 +184,6 @@ index 000000000000..8282fab6b514
 +# CONFIG_FTRACE is not set
 +CONFIG_DEBUG_USER=y
 +CONFIG_DEBUG_LL=y
-+CONFIG_DEBUG_MVEBU_UART_ALTERNATE=y
-+CONFIG_DEBUG_UART_VIRT=0xfed12000
-+CONFIG_EARLY_PRINTK=y
 +CONFIG_CRYPTO_CBC=m
 +CONFIG_CRYPTO_PCBC=m
 +# CONFIG_CRYPTO_ANSI_CPRNG is not set
