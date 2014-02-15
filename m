@@ -1,56 +1,52 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 16 Feb 2014 02:07:46 +0900
-Subject: [PATCH] ARM: dts: fix incorrect vdd_arm voltage range for
- Exynos4412 based boards
-In-Reply-To: <1390043483-1219-1-git-send-email-thomas.ab@samsung.com>
-References: <1390043483-1219-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <52FF9EE2.4090705@samsung.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Sat, 15 Feb 2014 18:08:12 +0100
+Subject: [PATCH] clk:at91: Fix memory leak in of_at91_clk_master_setup()
+In-Reply-To: <52FA2338.3030707@overkiz.com>
+References: <1392124507-14463-1-git-send-email-standby24x7@gmail.com>
+ <52FA2338.3030707@overkiz.com>
+Message-ID: <52FF9EFC.2060707@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/14 20:11, Thomas Abraham wrote:
-> From: Thomas Abraham<thomas.ab@samsung.com>
->
-> To allow Exynos4412 based Odroidx and Origen-quad boards to operate between
-> 200MHz to 1.4Ghz, update the vdd_arm voltage range to operate between these
-> cpu clock speeds.
->
-> Cc: Dongjin Kim<tobetter@gmail.com>
-> Signed-off-by: Thomas Abraham<thomas.ab@samsung.com>
-> ---
->   arch/arm/boot/dts/exynos4412-odroidx.dts |    2 +-
->   arch/arm/boot/dts/exynos4412-origen.dts  |    4 ++--
->   2 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
-> index 9804fcb..12459b0 100644
-> --- a/arch/arm/boot/dts/exynos4412-odroidx.dts
-> +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-> @@ -251,7 +251,7 @@
->   				buck2_reg: BUCK2 {
->   					regulator-name = "vdd_arm";
->   					regulator-min-microvolt =<900000>;
-> -					regulator-max-microvolt =<1300000>;
-> +					regulator-max-microvolt =<1350000>;
->   					regulator-always-on;
->   					regulator-boot-on;
->   				};
-> diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
-> index 6bc0539..388f035 100644
-> --- a/arch/arm/boot/dts/exynos4412-origen.dts
-> +++ b/arch/arm/boot/dts/exynos4412-origen.dts
-> @@ -459,8 +459,8 @@
->
->   				buck2_reg: BUCK2 {
->   					regulator-name = "vdd_arm";
-> -					regulator-min-microvolt =<925000>;
-> -					regulator-max-microvolt	=<1300000>;
-> +					regulator-min-microvolt =<900000>;
-> +					regulator-max-microvolt	=<1350000>;
->   					regulator-always-on;
->   					regulator-boot-on;
->   					op_mode =<1>; /* Normal Mode */
+Hi Mike,
 
-Applied, thanks.
+Could you take this patch for the next 3.14 release ?
 
-- Kukjin
+Best Regards,
+
+Boris
+
+On 11/02/2014 14:18, Boris BREZILLON wrote:
+> On 11/02/2014 14:15, Masanari Iida wrote:
+>> cppcheck detected following error
+>> [clk-master.c:245]: (error) Memory leak: characteristics
+>>
+>> The original code forgot to free characteristics when
+>> irq_of_parse_and_map() failed.
+>>
+>> Signed-off-by: Masanari Iida <standby24x7@gmail.com>
+> Acked-by Boris BREZILLON <b.brezillon@overkiz.com>
+>
+> Thanks for fixing this.
+>
+> Best Regards,
+>
+> Boris
+>> ---
+>>   drivers/clk/at91/clk-master.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clk/at91/clk-master.c 
+>> b/drivers/clk/at91/clk-master.c
+>> index bd313f7..c1af80b 100644
+>> --- a/drivers/clk/at91/clk-master.c
+>> +++ b/drivers/clk/at91/clk-master.c
+>> @@ -242,7 +242,7 @@ of_at91_clk_master_setup(struct device_node *np, 
+>> struct at91_pmc *pmc,
+>>         irq = irq_of_parse_and_map(np, 0);
+>>       if (!irq)
+>> -        return;
+>> +        goto out_free_characteristics;
+>>         clk = at91_clk_register_master(pmc, irq, name, num_parents,
+>>                          parent_names, layout,
+>
