@@ -1,22 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 15 Feb 2014 15:06:42 +0100
-Subject: [PATCH v2 00/23] Move DT kirkwood into mach-mvebu
-In-Reply-To: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
-References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
-Message-ID: <2750178.78BCPXNIeH@wuerfel>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 15 Feb 2014 18:10:22 +0400
+Subject: [PATCH] ARM: common/scoop.c: Remove redundant code
+Message-ID: <1392473422-17274-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 15 February 2014 11:19:58 Andrew Lunn wrote:
-> The process of making most kirkwood boards boot using DT is nearly
-> complete. We can now move these boards into mach-mvebu, freeing them
-> of the legacy code needed for none-DT systems. At the same time, they
-> can become part of ARCH_MULTI_V5.
+Statements following return will never be executed.
+This patch removes this code.
 
-Great to see this happening at last, great work everyone who was
-involved!
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/common/scoop.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-Feel free to add 'Acked-by: Arnd Bergmann <arnd@arndb.de>' to all
-patches I didn't comment on.
-
-	Arnd
+diff --git a/arch/arm/common/scoop.c b/arch/arm/common/scoop.c
+index a5c3dc3..6ef146e 100644
+--- a/arch/arm/common/scoop.c
++++ b/arch/arm/common/scoop.c
+@@ -232,8 +232,6 @@ static int scoop_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
+-	if (devptr->gpio.base != -1)
+-		temp = gpiochip_remove(&devptr->gpio);
+ err_gpio:
+ 	platform_set_drvdata(pdev, NULL);
+ err_ioremap:
+-- 
+1.8.3.2
