@@ -1,23 +1,30 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 15 Feb 2014 11:19:32 -0800
-Subject: [PATCH 01/12] misc: vexpress-syscfg: Add udelay-based delay
-In-Reply-To: <1392138636-29240-2-git-send-email-pawel.moll@arm.com>
-References: <1392138636-29240-1-git-send-email-pawel.moll@arm.com>
- <1392138636-29240-2-git-send-email-pawel.moll@arm.com>
-Message-ID: <20140215191932.GA2280@kroah.com>
+Date: Sat, 15 Feb 2014 11:23:25 -0800
+Subject: [PATCH v5 1/6] spmi: Linux driver framework for SPMI
+In-Reply-To: <1391468739-20987-2-git-send-email-joshc@codeaurora.org>
+References: <1391468739-20987-1-git-send-email-joshc@codeaurora.org>
+ <1391468739-20987-2-git-send-email-joshc@codeaurora.org>
+Message-ID: <20140215192325.GB2280@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 05:10:25PM +0000, Pawel Moll wrote:
-> It is normally preferable to yield the task
-> waiting for syscfg operations (that can take
-> up to dozens of milliseconds), but when the
-> system is shutting down it may not be possible.
+On Mon, Feb 03, 2014 at 05:05:33PM -0600, Josh Cartwright wrote:
+> From: Kenneth Heitke <kheitke@codeaurora.org>
+> 
+> System Power Management Interface (SPMI) is a specification
+> developed by the MIPI (Mobile Industry Process Interface) Alliance
+> optimized for the real time control of Power Management ICs (PMIC).
+> 
+> SPMI is a two-wire serial interface that supports up to 4 master
+> devices and up to 16 logical slaves.
+> 
+> The framework supports message APIs, multiple busses (1 controller
+> per bus) and multiple clients/slave devices per controller.
+> 
+> Signed-off-by: Kenneth Heitke <kheitke@codeaurora.org>
+> Signed-off-by: Michael Bohan <mbohan@codeaurora.org>
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
 
-Really?  What happens at shutdown that prevents things from being
-scheduled?  Why would you want to busy-loop instead at this point in
-time?
+Looks good, nice bus code.
 
-thanks,
-
-greg k-h
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
