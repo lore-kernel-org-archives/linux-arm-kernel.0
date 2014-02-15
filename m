@@ -1,30 +1,38 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 15 Feb 2014 18:10:22 +0400
-Subject: [PATCH] ARM: common/scoop.c: Remove redundant code
-Message-ID: <1392473422-17274-1-git-send-email-shc_work@mail.ru>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 15 Feb 2014 15:44:53 +0100
+Subject: [PATCH 2/5] i2c: mv64xxx: refactor message start to ensure
+ proper initialization
+In-Reply-To: <52FE0056.2030706@free-electrons.com>
+References: <20140213094117.GA3934@katana>
+ <1392323793-4125-1-git-send-email-wsa@the-dreams.de>
+ <1392323793-4125-3-git-send-email-wsa@the-dreams.de>
+ <52FE0056.2030706@free-electrons.com>
+Message-ID: <20140215144453.GB2579@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Statements following return will never be executed.
-This patch removes this code.
+On Fri, Feb 14, 2014 at 12:39:02PM +0100, Gregory CLEMENT wrote:
+> On 13/02/2014 21:36, Wolfram Sang wrote:
+> > Because the offload mechanism can fall back to a standard transfer,
+> > having two seperate initialization states is unfortunate. Let's just
+> > have one state which does things consistently. This fixes a bug where
+> > some preparation was missing when the fallback happened. And it makes
+> > the code much easier to follow.
+> > 
+> > Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> 
+> 
+> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> With this one the bug we observed was fixed.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/common/scoop.c | 2 --
- 1 file changed, 2 deletions(-)
+I squashed patches 1+2 (easier handling for stable) and applied to
+for-current, thanks!
 
-diff --git a/arch/arm/common/scoop.c b/arch/arm/common/scoop.c
-index a5c3dc3..6ef146e 100644
---- a/arch/arm/common/scoop.c
-+++ b/arch/arm/common/scoop.c
-@@ -232,8 +232,6 @@ static int scoop_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
--	if (devptr->gpio.base != -1)
--		temp = gpiochip_remove(&devptr->gpio);
- err_gpio:
- 	platform_set_drvdata(pdev, NULL);
- err_ioremap:
--- 
-1.8.3.2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140215/5266b037/attachment.sig>
