@@ -1,64 +1,120 @@
 From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Sat, 15 Feb 2014 17:30:16 +0530
-Subject: [PATCH v3 0/3] Add Xilinx AXI Video DMA Engine driver
-Message-ID: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
+Date: Sat, 15 Feb 2014 17:30:17 +0530
+Subject: [PATCH v3 1/3] dma: Support multiple interleaved frames with
+ non-contiguous memory
+In-Reply-To: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
+References: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
+Message-ID: <1392465619-27614-2-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The current implementation of interleaved DMA API support multiple
+frames only when the memory is contiguous by incrementing src_start/
+dst_start members of interleaved template.
 
-This is the driver for Xilinx AXI Video Direct Memory Access Engine.
-It is a soft IP core, which provides high-bandwidth direct memory
-access between memory and AXI4-Stream video type target peripherals
-including peripherals which support AXI4-Stream Video Protocol. The
-core provides efficient two dimensional DMA operations with independent
-asynchronous read and write channel operation.
+But, when the memory is non-contiguous it will restrict slave device
+to not submit multiple frames in a batch.  This patch handles this
+issue by allowing the slave device to send array of interleaved dma
+templates each having a different memory location.
 
-For more information on the IP, please refer to
-http://www.xilinx.com/support/documentation/ip_documentation/axi_vdma/v6_1/pg020_axi_vdma.pdf
+Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+---
+ Documentation/dmaengine.txt              |    2 +-
+ drivers/dma/imx-dma.c                    |    3 ++-
+ drivers/dma/sirf-dma.c                   |    3 ++-
+ drivers/media/platform/m2m-deinterlace.c |    2 +-
+ include/linux/dmaengine.h                |    6 +++---
+ 5 files changed, 9 insertions(+), 7 deletions(-)
 
-This patch also provides a test client, which assumes read and write channels
-of the core are configured in a back-to-back connection.  It transfers
-data on the write channel, read and verify the data on the read channel.
-
-Use cases:
-++++++++++
-1. Xilinx Video Targeted Reference design
-   http://www.wiki.xilinx.com/Zynq+Base+TRD+14.5
-2. Common Display Framework
-   http://events.linuxfoundation.org/sites/events/files/slides/20131024-elce.pdf
-
-Regards,
-Srikanth
-
-Changes in v3:
-- Created a separate patch for the DT binding documentation as suggested by
-  Vinod, Thanks.
-- Added support for interleaved frames with non-contiguous memory as suggested
-  by Lars, Thanks.
-- Rebased on v3.14.0-rc2 
-
-Srikanth Thokala (3):
-  dma: Support multiple interleaved frames with non-contiguous memory
-  dma: Add Xilinx Video DMA DT Binding Documentation
-  dma: Add Xilinx AXI Video Direct Memory Access Engine driver support
-
- .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   75 ++
- Documentation/dmaengine.txt                        |    2 +-
- drivers/dma/Kconfig                                |   14 +
- drivers/dma/Makefile                               |    1 +
- drivers/dma/imx-dma.c                              |    3 +-
- drivers/dma/sirf-dma.c                             |    3 +-
- drivers/dma/xilinx/Makefile                        |    1 +
- drivers/dma/xilinx/xilinx_vdma.c                   | 1388 ++++++++++++++++++++
- drivers/media/platform/m2m-deinterlace.c           |    2 +-
- include/linux/amba/xilinx_dma.h                    |   46 +
- include/linux/dmaengine.h                          |    6 +-
- 11 files changed, 1534 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
- create mode 100644 drivers/dma/xilinx/Makefile
- create mode 100644 drivers/dma/xilinx/xilinx_vdma.c
- create mode 100644 include/linux/amba/xilinx_dma.h
-
+diff --git a/Documentation/dmaengine.txt b/Documentation/dmaengine.txt
+index 879b6e3..c642614 100644
+--- a/Documentation/dmaengine.txt
++++ b/Documentation/dmaengine.txt
+@@ -94,7 +94,7 @@ The slave DMA usage consists of following steps:
+ 		size_t period_len, enum dma_data_direction direction);
+ 
+ 	struct dma_async_tx_descriptor *(*device_prep_interleaved_dma)(
+-		struct dma_chan *chan, struct dma_interleaved_template *xt,
++		struct dma_chan *chan, struct dma_interleaved_template **xts,
+ 		unsigned long flags);
+ 
+    The peripheral driver is expected to have mapped the scatterlist for
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index 6f9ac20..e2c52ce 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -954,12 +954,13 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
+ }
+ 
+ static struct dma_async_tx_descriptor *imxdma_prep_dma_interleaved(
+-	struct dma_chan *chan, struct dma_interleaved_template *xt,
++	struct dma_chan *chan, struct dma_interleaved_template **xts,
+ 	unsigned long flags)
+ {
+ 	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+ 	struct imxdma_engine *imxdma = imxdmac->imxdma;
+ 	struct imxdma_desc *desc;
++	struct dma_interleaved_template *xt = *xts;
+ 
+ 	dev_dbg(imxdma->dev, "%s channel: %d src_start=0x%llx dst_start=0x%llx\n"
+ 		"   src_sgl=%s dst_sgl=%s numf=%zu frame_size=%zu\n", __func__,
+diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+index d4d3a31..b6a150b 100644
+--- a/drivers/dma/sirf-dma.c
++++ b/drivers/dma/sirf-dma.c
+@@ -509,12 +509,13 @@ sirfsoc_dma_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+ }
+ 
+ static struct dma_async_tx_descriptor *sirfsoc_dma_prep_interleaved(
+-	struct dma_chan *chan, struct dma_interleaved_template *xt,
++	struct dma_chan *chan, struct dma_interleaved_template **xts,
+ 	unsigned long flags)
+ {
+ 	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(chan);
+ 	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
+ 	struct sirfsoc_dma_desc *sdesc = NULL;
++	struct dma_interleaved_template *xt = *xts;
+ 	unsigned long iflags;
+ 	int ret;
+ 
+diff --git a/drivers/media/platform/m2m-deinterlace.c b/drivers/media/platform/m2m-deinterlace.c
+index 6bb86b5..468110a 100644
+--- a/drivers/media/platform/m2m-deinterlace.c
++++ b/drivers/media/platform/m2m-deinterlace.c
+@@ -343,7 +343,7 @@ static void deinterlace_issue_dma(struct deinterlace_ctx *ctx, int op,
+ 	ctx->xt->dst_sgl = true;
+ 	flags = DMA_CTRL_ACK | DMA_PREP_INTERRUPT;
+ 
+-	tx = dmadev->device_prep_interleaved_dma(chan, ctx->xt, flags);
++	tx = dmadev->device_prep_interleaved_dma(chan, &ctx->xt, flags);
+ 	if (tx == NULL) {
+ 		v4l2_warn(&pcdev->v4l2_dev, "DMA interleaved prep error\n");
+ 		return;
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index c5c92d5..2f77a9a 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -675,7 +675,7 @@ struct dma_device {
+ 		size_t period_len, enum dma_transfer_direction direction,
+ 		unsigned long flags, void *context);
+ 	struct dma_async_tx_descriptor *(*device_prep_interleaved_dma)(
+-		struct dma_chan *chan, struct dma_interleaved_template *xt,
++		struct dma_chan *chan, struct dma_interleaved_template **xts,
+ 		unsigned long flags);
+ 	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		unsigned long arg);
+@@ -752,10 +752,10 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_cyclic(
+ }
+ 
+ static inline struct dma_async_tx_descriptor *dmaengine_prep_interleaved_dma(
+-		struct dma_chan *chan, struct dma_interleaved_template *xt,
++		struct dma_chan *chan, struct dma_interleaved_template **xts,
+ 		unsigned long flags)
+ {
+-	return chan->device->device_prep_interleaved_dma(chan, xt, flags);
++	return chan->device->device_prep_interleaved_dma(chan, xts, flags);
+ }
+ 
+ static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps)
 -- 
 1.7.9.5
