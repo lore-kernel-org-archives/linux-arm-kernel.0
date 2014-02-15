@@ -1,33 +1,20 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 15 Feb 2014 11:20:10 +0100
-Subject: [PATCH v2 12/23] ARM: Fix default CPU selection for ARCH_MULTI_V5
+Date: Sat, 15 Feb 2014 11:22:36 +0100
+Subject: [PATCH v2 00/23] Move DT kirkwood into mach-mvebu
 In-Reply-To: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
 References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1392459621-24003-13-git-send-email-andrew@lunn.ch>
+Message-ID: <20140215102236.GA24242@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU_ARM926T should be selected if no other CPU is. Put the ! in the
-right place so this works.
+On Sat, Feb 15, 2014 at 11:19:58AM +0100, Andrew Lunn wrote:
+> The process of making most kirkwood boards boot using DT is nearly
+> complete. We can now move these boards into mach-mvebu, freeing them
+> of the legacy code needed for none-DT systems. At the same time, they
+> can become part of ARCH_MULTI_V5.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-cc: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Patchset can also be found in
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e25419817791..beba369d74de 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -898,7 +898,7 @@ config ARCH_MULTI_V5
- 	bool "ARMv5 based platforms (ARM926T, XSCALE, PJ1, ...)"
- 	depends on !ARCH_MULTI_V6_V7
- 	select ARCH_MULTI_V4_V5
--	select CPU_ARM926T if (!CPU_ARM946E || CPU_ARM1020 || \
-+	select CPU_ARM926T if !(CPU_ARM946E || CPU_ARM1020 || \
- 		CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || \
- 		CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_FEROCEON)
- 
--- 
-1.8.5.3
+https://github.com/lunn/linux.git v3.14-rc1-mvebu-v2
+
+	  Andrew
