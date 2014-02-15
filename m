@@ -1,113 +1,211 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 15 Feb 2014 11:20:16 +0100
-Subject: [PATCH v2 18/23] drivers: Enable building of Kirkwood drivers for
- mach-mvebu
+Date: Sat, 15 Feb 2014 11:20:18 +0100
+Subject: [PATCH v2 20/23] ARM: config: Add a multi_v5_defconfig
 In-Reply-To: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
 References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1392459621-24003-19-git-send-email-andrew@lunn.ch>
+Message-ID: <1392459621-24003-21-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the move to mach-mvebu, drivers Kconfig need tweeking to allow
-the kirkwood specific drivers to be built.
+To allow regression build testing of multi v5 systems, add a
+multi_v5_defconfig, similar to the multi_v7_defconfig. This is based
+on kirkwood_defconfig, but with a few other boards added which claim
+to be MULTI_v5.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-v2
-Simplify cpufreq/Kconfig.arm
 ---
- drivers/cpufreq/Kconfig.arm | 2 +-
- drivers/cpuidle/Kconfig.arm | 2 +-
- drivers/leds/Kconfig        | 4 ++--
- drivers/phy/Kconfig         | 2 +-
- drivers/thermal/Kconfig     | 2 +-
- sound/soc/kirkwood/Kconfig  | 2 +-
- 6 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/configs/multi_v5_defconfig | 183 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 183 insertions(+)
+ create mode 100644 arch/arm/configs/multi_v5_defconfig
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 31297499a60a..077db3aa985b 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -113,7 +113,7 @@ config ARM_INTEGRATOR
- 	  If in doubt, say Y.
- 
- config ARM_KIRKWOOD_CPUFREQ
--	def_bool ARCH_KIRKWOOD && OF
-+	def_bool MACH_KIRKWOOD
- 	help
- 	  This adds the CPUFreq driver for Marvell Kirkwood
- 	  SoCs.
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index d988948a89a0..97ccc31dbdd8 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -22,7 +22,7 @@ config ARM_HIGHBANK_CPUIDLE
- 
- config ARM_KIRKWOOD_CPUIDLE
- 	bool "CPU Idle Driver for Marvell Kirkwood SoCs"
--	depends on ARCH_KIRKWOOD
-+	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
- 	help
- 	  This adds the CPU Idle driver for Marvell Kirkwood SoCs.
- 
-diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index 72156c123033..44c358ecf5a1 100644
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -421,7 +421,7 @@ config LEDS_MC13783
- config LEDS_NS2
- 	tristate "LED support for Network Space v2 GPIO LEDs"
- 	depends on LEDS_CLASS
--	depends on ARCH_KIRKWOOD
-+	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
- 	default y
- 	help
- 	  This option enable support for the dual-GPIO LED found on the
-@@ -431,7 +431,7 @@ config LEDS_NS2
- config LEDS_NETXBIG
- 	tristate "LED support for Big Network series LEDs"
- 	depends on LEDS_CLASS
--	depends on ARCH_KIRKWOOD
-+	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
- 	default y
- 	help
- 	  This option enable support for LEDs found on the LaCie 2Big
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index afa2354f6600..5e6b33f9c294 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -24,7 +24,7 @@ config PHY_EXYNOS_MIPI_VIDEO
- 
- config PHY_MVEBU_SATA
- 	def_bool y
--	depends on ARCH_KIRKWOOD || ARCH_DOVE
-+	depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD
- 	depends on OF
- 	select GENERIC_PHY
- 
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index 35c066489a19..1bc9cbc4f1b8 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -142,7 +142,7 @@ config RCAR_THERMAL
- 
- config KIRKWOOD_THERMAL
- 	tristate "Temperature sensor on Marvell Kirkwood SoCs"
--	depends on ARCH_KIRKWOOD
-+	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
- 	depends on OF
- 	help
- 	  Support for the Kirkwood thermal sensor driver into the Linux thermal
-diff --git a/sound/soc/kirkwood/Kconfig b/sound/soc/kirkwood/Kconfig
-index 78ed4a42ad21..106e2e22fed2 100644
---- a/sound/soc/kirkwood/Kconfig
-+++ b/sound/soc/kirkwood/Kconfig
-@@ -1,6 +1,6 @@
- config SND_KIRKWOOD_SOC
- 	tristate "SoC Audio for the Marvell Kirkwood and Dove chips"
--	depends on ARCH_KIRKWOOD || ARCH_DOVE || COMPILE_TEST
-+	depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD || COMPILE_TEST
- 	help
- 	  Say Y or M if you want to add support for codecs attached to
- 	  the Kirkwood I2S interface. You will also need to select the
+diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
+new file mode 100644
+index 000000000000..8282fab6b514
+--- /dev/null
++++ b/arch/arm/configs/multi_v5_defconfig
+@@ -0,0 +1,183 @@
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=19
++CONFIG_PROFILING=y
++CONFIG_OPROFILE=y
++CONFIG_KPROBES=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_ARCH_MULTI_V7 is not set
++CONFIG_ARCH_MVEBU=y
++CONFIG_MACH_KIRKWOOD=y
++CONFIG_ARCH_MXC=y
++CONFIG_MACH_IMX25_DT=y
++CONFIG_MACH_IMX27_DT=y
++CONFIG_ARCH_U300=y
++CONFIG_PCI_MVEBU=y
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_STAT_DETAILS=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_CPU_IDLE=y
++CONFIG_ARM_KIRKWOOD_CPUIDLE=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++# CONFIG_IPV6 is not set
++CONFIG_NET_PKTGEN=m
++CONFIG_CFG80211=y
++CONFIG_MAC80211=y
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_JEDECPROBE=y
++CONFIG_MTD_CFI_ADV_OPTIONS=y
++CONFIG_MTD_CFI_GEOMETRY=y
++# CONFIG_MTD_MAP_BANK_WIDTH_4 is not set
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_STAA=y
++CONFIG_MTD_PHYSMAP=y
++CONFIG_MTD_M25P80=y
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_ORION=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_EEPROM_AT24=y
++# CONFIG_SCSI_PROC_FS is not set
++CONFIG_BLK_DEV_SD=y
++CONFIG_BLK_DEV_SR=m
++CONFIG_CHR_DEV_SG=m
++CONFIG_ATA=y
++CONFIG_SATA_AHCI=y
++CONFIG_SATA_MV=y
++CONFIG_NETDEVICES=y
++CONFIG_NET_DSA_MV88E6123_61_65=y
++CONFIG_MV643XX_ETH=y
++CONFIG_R8169=y
++CONFIG_MARVELL_PHY=y
++CONFIG_LIBERTAS=y
++CONFIG_LIBERTAS_SDIO=y
++CONFIG_INPUT_EVDEV=y
++CONFIG_KEYBOARD_GPIO=y
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_LEGACY_PTY_COUNT=16
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_RUNTIME_UARTS=2
++CONFIG_SERIAL_OF_PLATFORM=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++# CONFIG_I2C_COMPAT is not set
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_MV64XXX=y
++CONFIG_I2C_NOMADIK=y
++CONFIG_SPI=y
++CONFIG_SPI_ORION=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_POWER_RESET_QNAP=y
++CONFIG_SENSORS_ADT7475=y
++CONFIG_SENSORS_LM63=y
++CONFIG_SENSORS_LM75=y
++CONFIG_SENSORS_LM85=y
++CONFIG_THERMAL=y
++CONFIG_KIRKWOOD_THERMAL=y
++CONFIG_WATCHDOG=y
++# CONFIG_ABX500_CORE is not set
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SOC=y
++CONFIG_SND_KIRKWOOD_SOC=y
++CONFIG_HID_DRAGONRISE=y
++CONFIG_HID_GYRATION=y
++CONFIG_HID_TWINHAN=y
++CONFIG_HID_NTRIG=y
++CONFIG_HID_PANTHERLORD=y
++CONFIG_HID_PETALYNX=y
++CONFIG_HID_SAMSUNG=y
++CONFIG_HID_SONY=y
++CONFIG_HID_SUNPLUS=y
++CONFIG_HID_GREENASIA=y
++CONFIG_HID_SMARTJOYPLUS=y
++CONFIG_HID_TOPSEED=y
++CONFIG_HID_THRUSTMASTER=y
++CONFIG_HID_ZEROPLUS=y
++CONFIG_USB=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_ROOT_HUB_TT=y
++CONFIG_USB_PRINTER=m
++CONFIG_USB_STORAGE=y
++CONFIG_USB_STORAGE_DATAFAB=y
++CONFIG_USB_STORAGE_FREECOM=y
++CONFIG_USB_STORAGE_SDDR09=y
++CONFIG_USB_STORAGE_SDDR55=y
++CONFIG_USB_STORAGE_JUMPSHOT=y
++CONFIG_MMC=y
++CONFIG_SDIO_UART=y
++CONFIG_MMC_MVSDIO=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_TIMER=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_RS5C372=y
++CONFIG_RTC_DRV_PCF8563=y
++CONFIG_RTC_DRV_S35390A=y
++CONFIG_RTC_DRV_MV=y
++CONFIG_DMADEVICES=y
++CONFIG_MV_XOR=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT3_FS=y
++# CONFIG_EXT3_FS_XATTR is not set
++CONFIG_EXT4_FS=y
++CONFIG_ISO9660_FS=m
++CONFIG_JOLIET=y
++CONFIG_UDF_FS=m
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_JFFS2_FS=y
++CONFIG_CRAMFS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_CODEPAGE_850=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_ISO8859_2=y
++CONFIG_NLS_UTF8=y
++CONFIG_DEBUG_INFO=y
++CONFIG_DEBUG_FS=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_KERNEL=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_PREEMPT is not set
++# CONFIG_FTRACE is not set
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_MVEBU_UART_ALTERNATE=y
++CONFIG_DEBUG_UART_VIRT=0xfed12000
++CONFIG_EARLY_PRINTK=y
++CONFIG_CRYPTO_CBC=m
++CONFIG_CRYPTO_PCBC=m
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++CONFIG_CRYPTO_DEV_MV_CESA=y
++CONFIG_CRC_CCITT=y
++CONFIG_LIBCRC32C=y
 -- 
 1.8.5.3
