@@ -1,50 +1,64 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 15 Feb 2014 11:48:25 +0000
-Subject: [PATCH v3 0/6] IIO pulse capture support for TI ECAP
-In-Reply-To: <52F29DBD.9050305@cogentembedded.com>
-References: <1391626901-31684-1-git-send-email-mporter@linaro.org>
- <52F29DBD.9050305@cogentembedded.com>
-Message-ID: <52FF5409.8050903@kernel.org>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Sat, 15 Feb 2014 17:30:16 +0530
+Subject: [PATCH v3 0/3] Add Xilinx AXI Video DMA Engine driver
+Message-ID: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/14 20:23, Sergei Shtylyov wrote:
-> Hello.
->
-> On 02/05/2014 10:01 PM, Matt Porter wrote:
->
-> [...]
->
->> This series adds support for PWM capture devices within IIO and
->> adds a TI ECAP IIO driver.
->
->> PWM capture devices are supported using a new IIO "pulse" channel type.
->
->> The IIO ECAP driver implements interrupt driven triggered buffer capture
->> only as raw sample reads are not applicable to this hardware.
->> Initially, the driver supports a single pulse width measurement with
->> configurable polarity. The ECAP hardware can support measurement of a
->> complete period and duty cycle but this is not yet implemented.
->
+Hi,
 
-> How about pulse counting? I have the hardware that can also
-> countpulses in addition to measuring the periods, so I'm interested
-> in this work (initially I supported it in driver/misc/ but it got
-> turned down for iio).
->
-I'm afraid I'd forgotten this completely if you can dig out some links
-to that discussion it would be great. Only one I can find right now
-is a request that you post an ABI introducing this as a generic pulse
-counter rather than a speed measurement.
+This is the driver for Xilinx AXI Video Direct Memory Access Engine.
+It is a soft IP core, which provides high-bandwidth direct memory
+access between memory and AXI4-Stream video type target peripherals
+including peripherals which support AXI4-Stream Video Protocol. The
+core provides efficient two dimensional DMA operations with independent
+asynchronous read and write channel operation.
 
-Good point though - under my previous sketched outline, perhaps
+For more information on the IP, please refer to
+http://www.xilinx.com/support/documentation/ip_documentation/axi_vdma/v6_1/pg020_axi_vdma.pdf
 
-in_waveform_cyclecount_input?  (I would imagine that it doesn't come
-out needing scaling!)
+This patch also provides a test client, which assumes read and write channels
+of the core are configured in a back-to-back connection.  It transfers
+data on the write channel, read and verify the data on the read channel.
 
-> WBR, Sergei
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Use cases:
+++++++++++
+1. Xilinx Video Targeted Reference design
+   http://www.wiki.xilinx.com/Zynq+Base+TRD+14.5
+2. Common Display Framework
+   http://events.linuxfoundation.org/sites/events/files/slides/20131024-elce.pdf
+
+Regards,
+Srikanth
+
+Changes in v3:
+- Created a separate patch for the DT binding documentation as suggested by
+  Vinod, Thanks.
+- Added support for interleaved frames with non-contiguous memory as suggested
+  by Lars, Thanks.
+- Rebased on v3.14.0-rc2 
+
+Srikanth Thokala (3):
+  dma: Support multiple interleaved frames with non-contiguous memory
+  dma: Add Xilinx Video DMA DT Binding Documentation
+  dma: Add Xilinx AXI Video Direct Memory Access Engine driver support
+
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   75 ++
+ Documentation/dmaengine.txt                        |    2 +-
+ drivers/dma/Kconfig                                |   14 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/imx-dma.c                              |    3 +-
+ drivers/dma/sirf-dma.c                             |    3 +-
+ drivers/dma/xilinx/Makefile                        |    1 +
+ drivers/dma/xilinx/xilinx_vdma.c                   | 1388 ++++++++++++++++++++
+ drivers/media/platform/m2m-deinterlace.c           |    2 +-
+ include/linux/amba/xilinx_dma.h                    |   46 +
+ include/linux/dmaengine.h                          |    6 +-
+ 11 files changed, 1534 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+ create mode 100644 drivers/dma/xilinx/Makefile
+ create mode 100644 drivers/dma/xilinx/xilinx_vdma.c
+ create mode 100644 include/linux/amba/xilinx_dma.h
+
+-- 
+1.7.9.5
