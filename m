@@ -1,242 +1,113 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Sat, 15 Feb 2014 21:15:23 +0100
-Subject: [PATCH 2/2] rtc: rtc-ds1307: add alarm support for mcp7941x chips
-In-Reply-To: <1392495323-22875-1-git-send-email-simon.guinot@sequanux.org>
-References: <1392495323-22875-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1392495323-22875-3-git-send-email-simon.guinot@sequanux.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 15 Feb 2014 20:52:00 +0000
+Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
+In-Reply-To: <1528854.BAQRr94nzx@wuerfel>
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>
+ <1580658.FIe4en5bEU@wuerfel> <52FF6A16.5080201@gmail.com>
+ <1528854.BAQRr94nzx@wuerfel>
+Message-ID: <20140215205159.GL30257@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds alarm support for the Microchip RTC devices MCP794xx.
-Note that two programmable alarms are provided by the chip but only one
-is used by the driver.
+On Sat, Feb 15, 2014 at 05:21:11PM +0100, Arnd Bergmann wrote:
+> On Saturday 15 February 2014 14:22:30 Tomasz Figa wrote:
+> > On 15.02.2014 14:09, Arnd Bergmann wrote:
+> >
+> > > For spi-mode SDIO devices I'm assuming it's similar, except that
+> > > you'd describe the actual SDIO device in the board info rather than
+> > > create a fake SDIO controller. Still not discoverable unless I'm
+> > > missing your point.
+> > 
+> > I'm not sure if we should assume that SPI = MMC over SPI. I believe 
+> > there might be a custom protocol involved as well.
+> 
+> In case of SD/MMC, you essentially have three separate command sets:
+> SPI, MMC and SD, and each of them has multiple versions. MMC and SD
+> compatible devices generally also support the SPI command set (IIRC
+> it is required,
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
----
- drivers/rtc/rtc-ds1307.c | 183 ++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 182 insertions(+), 1 deletion(-)
+SPI support is mandatory for SDIO as well.
 
-diff --git a/drivers/rtc/rtc-ds1307.c b/drivers/rtc/rtc-ds1307.c
-index 8c70b2238e88..580379a97f0c 100644
---- a/drivers/rtc/rtc-ds1307.c
-+++ b/drivers/rtc/rtc-ds1307.c
-@@ -154,6 +154,7 @@ static const struct chip_desc chips[last_ds_type] = {
- 		.alarm		= 1,
- 	},
- 	[mcp7941x] = {
-+		.alarm		= 1,
- 		/* this is battery backed SRAM */
- 		.nvram_offset	= 0x20,
- 		.nvram_size	= 0x40,
-@@ -606,6 +607,178 @@ static const struct rtc_class_ops ds13xx_rtc_ops = {
- 
- /*----------------------------------------------------------------------*/
- 
-+/*
-+ * Alarm support for mcp7941x devices.
-+ */
-+
-+#define MCP7941X_REG_CONTROL		0x07
-+#	define MCP7941X_BIT_ALM0_EN	0x10
-+#	define MCP7941X_BIT_ALM1_EN	0x20
-+#define MCP7941X_REG_ALARM0_BASE	0x0a
-+#define MCP7941X_REG_ALARM0_CTRL	0x0d
-+#define MCP7941X_REG_ALARM1_BASE	0x11
-+#define MCP7941X_REG_ALARM1_CTRL	0x14
-+#	define MCP7941X_BIT_ALMX_IF	(1 << 3)
-+#	define MCP7941X_BIT_ALMX_C0	(1 << 4)
-+#	define MCP7941X_BIT_ALMX_C1	(1 << 5)
-+#	define MCP7941X_BIT_ALMX_C2	(1 << 6)
-+#	define MCP7941X_BIT_ALMX_POL	(1 << 7)
-+#	define MCP7941X_MSK_ALMX_MATCH	(MCP7941X_BIT_ALMX_C0 | \
-+					 MCP7941X_BIT_ALMX_C1 | \
-+					 MCP7941X_BIT_ALMX_C2)
-+
-+static void mcp7941x_work(struct work_struct *work)
-+{
-+	struct ds1307 *ds1307 = container_of(work, struct ds1307, work);
-+	struct i2c_client *client = ds1307->client;
-+	int reg, ret;
-+
-+	mutex_lock(&ds1307->rtc->ops_lock);
-+
-+	/* Check and clear alarm 0 interrupt flag. */
-+	reg = i2c_smbus_read_byte_data(client, MCP7941X_REG_ALARM0_CTRL);
-+	if (reg < 0)
-+		goto out;
-+	if (!(reg & MCP7941X_BIT_ALMX_IF))
-+		goto out;
-+	reg &= ~MCP7941X_BIT_ALMX_IF;
-+	ret = i2c_smbus_write_byte_data(client, MCP7941X_REG_ALARM0_CTRL, reg);
-+	if (ret < 0)
-+		goto out;
-+
-+	/* Disable alarm 0. */
-+	reg = i2c_smbus_read_byte_data(client, MCP7941X_REG_CONTROL);
-+	if (reg < 0)
-+		goto out;
-+	reg &= ~MCP7941X_BIT_ALM0_EN;
-+	ret = i2c_smbus_write_byte_data(client, MCP7941X_REG_CONTROL, reg);
-+	if (ret < 0)
-+		goto out;
-+
-+	rtc_update_irq(ds1307->rtc, 1, RTC_AF | RTC_IRQF);
-+
-+out:
-+	if (test_bit(HAS_ALARM, &ds1307->flags))
-+		enable_irq(client->irq);
-+	mutex_unlock(&ds1307->rtc->ops_lock);
-+}
-+
-+static int mcp7941x_read_alarm(struct device *dev, struct rtc_wkalrm *t)
-+{
-+	struct i2c_client *client = to_i2c_client(dev);
-+	struct ds1307 *ds1307 = i2c_get_clientdata(client);
-+	u8 *regs = ds1307->regs;
-+	int ret;
-+
-+	if (!test_bit(HAS_ALARM, &ds1307->flags))
-+		return -EINVAL;
-+
-+	/* Read control and alarm 0 registers. */
-+	ret = ds1307->read_block_data(client, MCP7941X_REG_CONTROL, 10, regs);
-+	if (ret < 0)
-+		return ret;
-+
-+	t->enabled = !!(regs[0] & MCP7941X_BIT_ALM0_EN);
-+
-+	/* Report alarm 0 time assuming 24-hour and day-of-month modes. */
-+	t->time.tm_sec = bcd2bin(ds1307->regs[3] & 0x7f);
-+	t->time.tm_min = bcd2bin(ds1307->regs[4] & 0x7f);
-+	t->time.tm_hour = bcd2bin(ds1307->regs[5] & 0x3f);
-+	t->time.tm_wday = bcd2bin(ds1307->regs[6] & 0x7) - 1;
-+	t->time.tm_mday = bcd2bin(ds1307->regs[7] & 0x3f);
-+	t->time.tm_mon = bcd2bin(ds1307->regs[8] & 0x1f) - 1;
-+	t->time.tm_year = -1;
-+	t->time.tm_yday = -1;
-+	t->time.tm_isdst = -1;
-+
-+	dev_dbg(dev, "%s, sec=%d min=%d hour=%d wday=%d mday=%d mon=%d "
-+		"enabled=%d polarity=%d irq=%d match=%d\n", __func__,
-+		t->time.tm_sec, t->time.tm_min, t->time.tm_hour,
-+		t->time.tm_wday, t->time.tm_mday, t->time.tm_mon, t->enabled,
-+		!!(ds1307->regs[6] & MCP7941X_BIT_ALMX_POL),
-+		!!(ds1307->regs[6] & MCP7941X_BIT_ALMX_IF),
-+		(ds1307->regs[6] & MCP7941X_MSK_ALMX_MATCH) >> 4);
-+
-+	return 0;
-+}
-+
-+static int mcp7941x_set_alarm(struct device *dev, struct rtc_wkalrm *t)
-+{
-+	struct i2c_client *client = to_i2c_client(dev);
-+	struct ds1307 *ds1307 = i2c_get_clientdata(client);
-+	unsigned char *regs = ds1307->regs;
-+	int ret;
-+
-+	if (!test_bit(HAS_ALARM, &ds1307->flags))
-+		return -EINVAL;
-+
-+	dev_dbg(dev, "%s, sec=%d min=%d hour=%d wday=%d mday=%d mon=%d "
-+		"enabled=%d pending=%d\n", __func__,
-+		t->time.tm_sec, t->time.tm_min, t->time.tm_hour,
-+		t->time.tm_wday, t->time.tm_mday, t->time.tm_mon,
-+		t->enabled, t->pending);
-+
-+	/* Read control and alarm 0 registers. */
-+	ret = ds1307->read_block_data(client, MCP7941X_REG_CONTROL, 10, regs);
-+	if (ret < 0)
-+		return ret;
-+
-+	/* Set alarm 0, using 24-hour and day-of-month modes. */
-+	regs[3] = bin2bcd(t->time.tm_sec);
-+	regs[4] = bin2bcd(t->time.tm_min);
-+	regs[5] = bin2bcd(t->time.tm_hour);
-+	regs[6] = bin2bcd(t->time.tm_wday) + 1;
-+	regs[7] = bin2bcd(t->time.tm_mday);
-+	regs[8] = bin2bcd(t->time.tm_mon) + 1;
-+
-+	/* Clear the alarm 0 interrupt flag. */
-+	regs[6] &= ~MCP7941X_BIT_ALMX_IF;
-+	/* Set alarm match: second, minute, hour, day, date, month. */
-+	regs[6] |= MCP7941X_MSK_ALMX_MATCH;
-+
-+	if (t->enabled)
-+		regs[0] |= MCP7941X_BIT_ALM0_EN;
-+	else
-+		regs[0] &= ~MCP7941X_BIT_ALM0_EN;
-+
-+	ret = ds1307->write_block_data(client, MCP7941X_REG_CONTROL, 10, regs);
-+	if (ret < 0)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static int mcp7941x_alarm_irq_enable(struct device *dev, unsigned int enabled)
-+{
-+	struct i2c_client *client = to_i2c_client(dev);
-+	struct ds1307 *ds1307 = i2c_get_clientdata(client);
-+	int reg;
-+
-+	if (!test_bit(HAS_ALARM, &ds1307->flags))
-+		return -EINVAL;
-+
-+	reg = i2c_smbus_read_byte_data(client, MCP7941X_REG_CONTROL);
-+	if (reg < 0)
-+		return reg;
-+
-+	if (enabled)
-+		reg |= MCP7941X_BIT_ALM0_EN;
-+	else
-+		reg &= ~MCP7941X_BIT_ALM0_EN;
-+
-+	return i2c_smbus_write_byte_data(client, MCP7941X_REG_CONTROL, reg);
-+}
-+
-+static const struct rtc_class_ops mcp7941x_rtc_ops = {
-+	.read_time	= ds1307_get_time,
-+	.set_time	= ds1307_set_time,
-+	.read_alarm	= mcp7941x_read_alarm,
-+	.set_alarm	= mcp7941x_set_alarm,
-+	.alarm_irq_enable = mcp7941x_alarm_irq_enable,
-+};
-+
-+/*----------------------------------------------------------------------*/
-+
- static ssize_t
- ds1307_nvram_read(struct file *filp, struct kobject *kobj,
- 		struct bin_attribute *attr,
-@@ -678,6 +851,7 @@ static int ds1307_probe(struct i2c_client *client,
- 		[ds_1339] = DS1339_BIT_BBSQI,
- 		[ds_3231] = DS3231_BIT_BBSQW,
- 	};
-+	const struct rtc_class_ops *rtc_ops = &ds13xx_rtc_ops;
- 
- 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA)
- 	    && !i2c_check_functionality(adapter, I2C_FUNC_SMBUS_I2C_BLOCK))
-@@ -816,6 +990,13 @@ static int ds1307_probe(struct i2c_client *client,
- 	case ds_1388:
- 		ds1307->offset = 1; /* Seconds starts at 1 */
- 		break;
-+	case mcp7941x:
-+		rtc_ops = &mcp7941x_rtc_ops;
-+		if (ds1307->client->irq > 0 && chip->alarm) {
-+			INIT_WORK(&ds1307->work, mcp7941x_work);
-+			want_irq = true;
-+		}
-+		break;
- 	default:
- 		break;
- 	}
-@@ -929,7 +1110,7 @@ read_rtc:
- 
- 	device_set_wakeup_capable(&client->dev, want_irq);
- 	ds1307->rtc = devm_rtc_device_register(&client->dev, client->name,
--				&ds13xx_rtc_ops, THIS_MODULE);
-+				rtc_ops, THIS_MODULE);
- 	if (IS_ERR(ds1307->rtc)) {
- 		err = PTR_ERR(ds1307->rtc);
- 		dev_err(&client->dev,
+SDIO has CIS (remember card information structures... like PCMCIA)
+which identifies the various different logical functions of the device,
+giving class information, vendor information etc.
+
+So... certainly the type of the attached device is discoverable even
+on SPI.
+
+> If a device supports both SDIO and SPI, I think a straightforward
+> implementation would be to use the exact same command set, but
+> you are right that this isn't the only possibility, and the SD/MMC
+> shows how they can be slightly different already.
+
+Given that the SPI mode is mandatory for SDIO cards, why would you
+also implement another SPI mode with different commands?
+
+> > Stepping aside from SPI, I already gave an example of a WLAN chip that 
+> > supports multiple control busses [1]. In addition to the commonly used 
+> > SDIO, it supports USB and HSIC as well:
+> > 
+> > [1] http://www.marvell.com/wireless/assets/marvell_avastar_88w8797.pdf
+> > 
+> > Moreover, some of Samsung boards use HSIC to communicate with modem 
+> > chips, which have exactly the same problem as we're trying to solve here 
+> > - they need to be powered on to be discovered.
+> 
+> Thanks, this definitely makes a good example. I see that it also
+> supports SPI mode for SDIO as mentioned in your link.
+
+Well, USB is another discoverable bus.  As HSIC is a derivative of USB,
+I'd be surprised if it weren't discoverable there too.
+
+So, out of everything identified so far, we have no undiscoverable buses.
+
+> Agreed. Putting the same chip on USB or HSIC has the exact same
+> requirements, since we also have a discoverable bus, but actually
+> finding the device likely involves some power-on sequencing before
+> the bus controller can find it.
+
+That's partly the nature of integrating something onto a board where you
+want maximal power savings.  It's basically that dreaded word which
+software people seem to hate: "embedded".
+
+> * Arnd's proposal (change bus code to probe nonstandard devices
+>   from DT if we can't easily detect them):
+>   + Matches what we already do for PCI (at least on powerpc)
+>     and AMBA/Primecell devices: If a device can't be probed
+>     using the standard method, we treat it as nondiscoverable
+>     and describe it using DT.
+>   + Devices can have arbitrary complex requirements without
+>     impacting the core, since all code is contained in the
+>     driver for the nonstandard device.
+>   + Properties that are required for probing and runtime
+>     configuration only have to be set once (e.g. you may
+>     need clk_get() for probing and clk_set_rate() for
+>     runtime-pm).
+>   + Devices that have alternative bus interfaces like 88w8797
+>     can implement the power-on code in a central place per
+>     driver, and can reuse the code they have for nondiscoverable
+>     buses on the buses that are normally discoverable but
+>     broken here.
+>   - Still need to modify each subsystem to have alternate
+>     ways of probing, and match up devices later.
+>   - Has to be implemented in each driver that needs it, making
+>     it harder to share code for drivers with the same need
+>     (e.g. every device that just needs an external reset
+>     trigger).
+
+ - requires different DT if the chip is changed, which causes problems
+   for users to identify which out of zillions of DT files they should
+   use for their exact platform.
+ - have to work out how to match up the fake device with a probed device
+   when it becomes available: existing SDIO drivers all assume that the
+   card has been through a fairly complex initialisation sequence already.
+ - multi-function SDIO is much harder to deal with since you have mutliple
+   drivers involved, and the SDIO device as a whole needs initialisation
+   before anyone can drive it.
+ - adds complexity to the SDIO drivers; they would have to know whether
+   they're embedded or on a plug-in card.
+
 -- 
-1.8.5.3
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
