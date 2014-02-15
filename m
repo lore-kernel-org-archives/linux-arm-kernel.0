@@ -1,21 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 14 Feb 2014 23:33:09 -0700
-Subject: [PATCH V2] ARM: bcm2835: node name unit address cleanup
-In-Reply-To: <1392357884-17682-1-git-send-email-swarren@wwwdotorg.org>
-References: <1392357884-17682-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <52FF0A25.3080208@wwwdotorg.org>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 15 Feb 2014 12:05:30 +0400
+Subject: [PATCH 1/4] ARM: clps711x: autcpu12: Fix incorrect NAND CLE GPIO
+Message-ID: <1392451533-12858-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2014 11:04 PM, Stephen Warren wrote:
-> DT nodes that contain a reg property should include a unit address in
-> their name. Add the missing unit addresses.
-> 
-> The unit address in a node name must match the value in the reg property.
-> Fix the cases where they don't match.
-> 
-> Don't fix the /clocks/* node names yet; that causes problems the clock
-> driver to attempt to register multiple clocks with the same name, which
-> fails.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-clps711x/board-autcpu12.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I've applied this to bcm2835's for-3.15/dt branch.
+diff --git a/arch/arm/mach-clps711x/board-autcpu12.c b/arch/arm/mach-clps711x/board-autcpu12.c
+index f8d71a8..5f83113 100644
+--- a/arch/arm/mach-clps711x/board-autcpu12.c
++++ b/arch/arm/mach-clps711x/board-autcpu12.c
+@@ -73,7 +73,7 @@
+ #define AUTCPU12_SMC_NCE	(AUTCPU12_MMGPIO_BASE + 0) /* Bit 0 */
+ #define AUTCPU12_SMC_RDY	CLPS711X_GPIO(1, 2)
+ #define AUTCPU12_SMC_ALE	CLPS711X_GPIO(1, 3)
+-#define AUTCPU12_SMC_CLE	CLPS711X_GPIO(1, 3)
++#define AUTCPU12_SMC_CLE	CLPS711X_GPIO(1, 4)
+ 
+ /* LCD contrast digital potentiometer */
+ #define AUTCPU12_DPOT_CS	CLPS711X_GPIO(4, 0)
+-- 
+1.8.3.2
