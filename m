@@ -1,138 +1,61 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 15 Feb 2014 11:20:03 +0100
-Subject: [PATCH v2 05/23] ARM: Kirkwood: Seperate board-dt from common and
- pcie code.
+Date: Sat, 15 Feb 2014 11:20:11 +0100
+Subject: [PATCH v2 13/23] ARM: Fix MULTI_TLB for feroceon
 In-Reply-To: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
 References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1392459621-24003-6-git-send-email-andrew@lunn.ch>
+Message-ID: <1392459621-24003-14-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to move DT support into mach-mvebu, the DT code
-needs to be cleanly separated from common and pcie code. Import the
-needed bits of these files into board-dt.c. The "common" code then
-becomes purely legacy, supporting none DT boards, so reflect this in
-the Makefile targets.
+Feroceon has the same flush operations as v4wbi, but has an additional
+flag, TLB_L2CLEAN_FR. When building with MULTI_TLB this flag is placed
+into cpu_tlb.tlb_flags, so there needs to be a cpu_tlb specifically
+for feroceon, rather than sharing the v4wbi.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mach-kirkwood/Makefile   |  3 +-
- arch/arm/mach-kirkwood/board-dt.c | 88 ++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 88 insertions(+), 3 deletions(-)
+ arch/arm/mm/proc-feroceon.S | 2 +-
+ arch/arm/mm/tlb-v4wbi.S     | 3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index dc22bf5b21ed..3a72c5c6e747 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -1,5 +1,4 @@
--obj-y				+= common.o pcie.o
--obj-$(CONFIG_KIRKWOOD_LEGACY)	+= irq.o mpp.o
-+obj-$(CONFIG_KIRKWOOD_LEGACY)	+= irq.o mpp.o common.o pcie.o
- obj-$(CONFIG_PM)		+= pm.o
+diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
+index db79b62c92fb..b76c2706cb02 100644
+--- a/arch/arm/mm/proc-feroceon.S
++++ b/arch/arm/mm/proc-feroceon.S
+@@ -607,7 +607,7 @@ __\name\()_proc_info:
+ 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+ 	.long	\cpu_name
+ 	.long	feroceon_processor_functions
+-	.long	v4wbi_tlb_fns
++	.long	fr_tlb_fns
+ 	.long	feroceon_user_fns
+ 	.long	\cache
+ 	 .size	__\name\()_proc_info, . - __\name\()_proc_info
+diff --git a/arch/arm/mm/tlb-v4wbi.S b/arch/arm/mm/tlb-v4wbi.S
+index 1f6062b6c1c1..4e053fef3487 100644
+--- a/arch/arm/mm/tlb-v4wbi.S
++++ b/arch/arm/mm/tlb-v4wbi.S
+@@ -28,6 +28,7 @@
+  *	- mm    - mm_struct describing address space
+  */
+ 	.align	5
++ENTRY(fr_flush_user_tlb_range)
+ ENTRY(v4wbi_flush_user_tlb_range)
+ 	vma_vm_mm ip, r2
+ 	act_mm	r3				@ get current->active_mm
+@@ -46,6 +47,7 @@ ENTRY(v4wbi_flush_user_tlb_range)
+ 	blo	1b
+ 	mov	pc, lr
  
- obj-$(CONFIG_MACH_D2NET_V2)		+= d2net_v2-setup.o lacie_v2-common.o
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index a0c0ff39788e..64151a4a378f 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -21,11 +21,97 @@
- #include <linux/irqchip.h>
- #include <linux/kexec.h>
- #include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
- #include <mach/bridge-regs.h>
- #include <plat/common.h>
--#include "common.h"
-+#include <plat/cache-feroceon-l2.h>
-+#include <plat/pcie.h>
- #include "pm.h"
++ENTRY(fr_flush_kern_tlb_range)
+ ENTRY(v4wbi_flush_kern_tlb_range)
+ 	mov	r3, #0
+ 	mcr	p15, 0, r3, c7, c10, 4		@ drain WB
+@@ -62,3 +64,4 @@ ENTRY(v4wbi_flush_kern_tlb_range)
  
-+static struct map_desc kirkwood_io_desc[] __initdata = {
-+	{
-+		.virtual	= (unsigned long) KIRKWOOD_REGS_VIRT_BASE,
-+		.pfn		= __phys_to_pfn(KIRKWOOD_REGS_PHYS_BASE),
-+		.length		= KIRKWOOD_REGS_SIZE,
-+		.type		= MT_DEVICE,
-+	},
-+};
-+
-+static void __init kirkwood_map_io(void)
-+{
-+	iotable_init(kirkwood_io_desc, ARRAY_SIZE(kirkwood_io_desc));
-+}
-+
-+static void __init kirkwood_l2_init(void)
-+{
-+#ifdef CONFIG_CACHE_FEROCEON_L2
-+#ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
-+	writel(readl(L2_CONFIG_REG) | L2_WRITETHROUGH, L2_CONFIG_REG);
-+	feroceon_l2_init(1);
-+#else
-+	writel(readl(L2_CONFIG_REG) & ~L2_WRITETHROUGH, L2_CONFIG_REG);
-+	feroceon_l2_init(0);
-+#endif
-+#endif
-+}
-+
-+static struct resource kirkwood_cpufreq_resources[] = {
-+	[0] = {
-+		.start  = CPU_CONTROL_PHYS,
-+		.end    = CPU_CONTROL_PHYS + 3,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device kirkwood_cpufreq_device = {
-+	.name		= "kirkwood-cpufreq",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(kirkwood_cpufreq_resources),
-+	.resource	= kirkwood_cpufreq_resources,
-+};
-+
-+static void __init kirkwood_cpufreq_init(void)
-+{
-+	platform_device_register(&kirkwood_cpufreq_device);
-+}
-+
-+static struct resource kirkwood_cpuidle_resource[] = {
-+	{
-+		.flags	= IORESOURCE_MEM,
-+		.start	= DDR_OPERATION_BASE,
-+		.end	= DDR_OPERATION_BASE + 3,
-+	},
-+};
-+
-+static struct platform_device kirkwood_cpuidle = {
-+	.name		= "kirkwood_cpuidle",
-+	.id		= -1,
-+	.resource	= kirkwood_cpuidle_resource,
-+	.num_resources	= 1,
-+};
-+
-+static void __init kirkwood_cpuidle_init(void)
-+{
-+	platform_device_register(&kirkwood_cpuidle);
-+}
-+
-+/* Temporary here since mach-mvebu has a function we can use */
-+static void kirkwood_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	/*
-+	 * Enable soft reset to assert RSTOUTn.
-+	 */
-+	writel(SOFT_RESET_OUT_EN, RSTOUTn_MASK);
-+
-+	/*
-+	 * Assert soft reset.
-+	 */
-+	writel(SOFT_RESET, SYSTEM_SOFT_RESET);
-+
-+	while (1)
-+		;
-+}
-+
- #define MV643XX_ETH_MAC_ADDR_LOW	0x0414
- #define MV643XX_ETH_MAC_ADDR_HIGH	0x0418
- 
+ 	/* define struct cpu_tlb_fns (see <asm/tlbflush.h> and proc-macros.S) */
+ 	define_tlb_functions v4wbi, v4wbi_tlb_flags
++	define_tlb_functions fr, fr_tlb_flags
 -- 
 1.8.5.3
