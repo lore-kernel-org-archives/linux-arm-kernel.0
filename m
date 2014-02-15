@@ -1,72 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 15 Feb 2014 14:03:26 +0100
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <20140214220047.GA5394@bart.dudau.co.uk>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <5805232.JrD2FybBlg@wuerfel> <20140214220047.GA5394@bart.dudau.co.uk>
-Message-ID: <2312919.pM61KLBcYY@wuerfel>
+Date: Sat, 15 Feb 2014 14:09:39 +0100
+Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
+In-Reply-To: <20140215122733.GK30257@n2100.arm.linux.org.uk>
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>
+ <3871646.18hjUjnpmg@wuerfel> <20140215122733.GK30257@n2100.arm.linux.org.uk>
+Message-ID: <1580658.FIe4en5bEU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 February 2014 22:00:47 Liviu Dudau wrote:
+On Saturday 15 February 2014 12:27:33 Russell King - ARM Linux wrote:
+> On Sat, Feb 15, 2014 at 01:18:02PM +0100, Arnd Bergmann wrote:
+> > If a wlan adapter has both SPI and SDIO front-ends, the external
+> > dependencies (reset, clock, voltage, ...) will be the same, and
+> > from the kernel perspective the main difference is that SPI cannot
+> > be probed at all, while SDIO can be probed as long as the device
+> > is powered on already.
 > 
-> What I'm going to suggest in my v2 patch (hope to send it before Monday)
-> is a new API in the generic PCI code that will allow you to create a
-> host bridge in a new domain or in the existing domain, with the management
-> of the domain number being done in the generic code.
-> 
-> Something like:
-> 
->   int create_hostbridge_in_new_domain(....);
->   int create_hostbridge(....);
-> 
-> with the functions being wrappers around the pci_hostbridge_of_init function
-> that I'm introducing.
-> 
-> What do you think?
+> Remember that MMC/SD/SDIO cards can be driven by either a MMC host
+> interface, or a SPI interface.  Both are probe-able.
 
-Not sure. It would still keep the decision about whether to use a
-new domain or not in the host bridge driver, but that doesn't seem
-like the right place. The same driver might be used in different
-ways based on what is around it.
+I knew about MMC/SD cards being required to understand simple SPI,
+I wasn't sure about SDIO. My understanding however is that you
+have to use the mmc_spi host driver to actually use MMC/SD devices
+as a block device, and that requires having either a DT description
+for the host or an spi_board_info, which I would not consider
+discoverable.
 
-I've also had a look at the MIPS implementation now, which has its
-own way of dealing with this, see arch/mips/pci/pci.c.
-
-There was also an interesting comment in the MIPS header file:
-
-        /* For compatibility with current (as of July 2003) pciutils
-           and XFree86. Eventually will be removed. */
-        unsigned int need_domain_info;
-
-This is over ten years old, so I wonder if we can start assuming that
-domains work out of the box now. All references to problems from 
-PCI domains are about old code (ca. pre-2007) that doesn't understand
-nonzero domains and that has since been fixed. I am pretty sure we
-don't need to ever worry about stuffing multiple host bridges into
-a domain other than the first one, and I also doubt we have to worry
-about the problem at all on arm64 as we won't run old binaries on it
-(or arm32 compat mode binaries that need to manage PCI devices).
-
-Can anyone with more experience on the subject than me (Bjorn,
-Russell, Jason, ...) think of a reason why we would not want to
-just use a new domain for every host bridge we find?
-
-If we do need to stuff multiple buses into one domain, how about
-using this approach in pci_hostbridge_of_init():
-
-  The first time we add a host bridge, scan the entire DT for
-  devices setting device_type="pci". If there is actually more
-  than one host bridge, check all "bus-range" properties to
-  see if they overlap. If there is no overlap or only one
-  bridge, don't use domains.
-  If there is any overlap at all, or there are multiple host
-  bridge and one of them does not have a bus-range property,
-  use a separate domain per host bridge.
-  Remember the function was called before so it doesn't
-  have to scan the DT again, and count the domain locally.
-
-Does this make sense?
+For spi-mode SDIO devices I'm assuming it's similar, except that
+you'd describe the actual SDIO device in the board info rather than
+create a fake SDIO controller. Still not discoverable unless I'm
+missing your point.
 
 	Arnd
