@@ -1,69 +1,71 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 15 Feb 2014 11:20:04 +0100
-Subject: [PATCH v2 06/23] ARM: Kirkwood: ioremap the cpu_config register
- before using it.
+Date: Sat, 15 Feb 2014 11:20:05 +0100
+Subject: [PATCH v2 07/23] ARM: Kirkwood: ioremap memory control register
 In-Reply-To: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
 References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1392459621-24003-7-git-send-email-andrew@lunn.ch>
+Message-ID: <1392459621-24003-8-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the move to mach-mvebu and MULTI_V5, the global iomap for all
-registers will be going away. So explicitly map the CPU configuration
-register before using it.
+To allow removal of the global map of registers, make the pm code
+ioremap the registers it needs.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mach-kirkwood/board-dt.c                 | 22 +++++++++++++++-------
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  1 +
- 2 files changed, 16 insertions(+), 7 deletions(-)
+ arch/arm/mach-kirkwood/include/mach/bridge-regs.h | 1 +
+ arch/arm/mach-kirkwood/pm.c                       | 9 ++++++---
+ 2 files changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 64151a4a378f..91b61a971af2 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -191,15 +191,23 @@ eth_fixup_skip:
- 	}
- }
- 
-+/*
-+ * Disable propagation of mbus errors to the CPU local bus, as this
-+ * causes mbus errors (which can occur for example for PCI aborts) to
-+ * throw CPU aborts, which we're not set up to deal with.
-+ */
-+void kirkwood_disable_mbus_error_propagation(void)
-+{
-+	void __iomem *cpu_config;
-+
-+	cpu_config = ioremap(CPU_CONFIG_PHYS, 4);
-+	writel(readl(cpu_config) & ~CPU_CONFIG_ERROR_PROP, cpu_config);
-+}
-+
-+
- static void __init kirkwood_dt_init(void)
- {
--	/*
--	 * Disable propagation of mbus errors to the CPU local bus,
--	 * as this causes mbus errors (which can occur for example
--	 * for PCI aborts) to throw CPU aborts, which we're not set
--	 * up to deal with.
--	 */
--	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
-+	kirkwood_disable_mbus_error_propagation();
- 
- 	BUG_ON(mvebu_mbus_dt_init());
- 
 diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-index 8b9d1c9ff199..2bd12fde1781 100644
+index 2bd12fde1781..6e5077e2ec26 100644
 --- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
 +++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-@@ -14,6 +14,7 @@
- #include <mach/kirkwood.h>
+@@ -80,5 +80,6 @@
+ #define CGC_RESERVED		(0x6 << 21)
  
- #define CPU_CONFIG		(BRIDGE_VIRT_BASE + 0x0100)
-+#define CPU_CONFIG_PHYS		(BRIDGE_PHYS_BASE + 0x0100)
- #define CPU_CONFIG_ERROR_PROP	0x00000004
+ #define MEMORY_PM_CTRL		(BRIDGE_VIRT_BASE + 0x118)
++#define MEMORY_PM_CTRL_PHYS	(BRIDGE_PHYS_BASE + 0x118)
  
- #define CPU_CONTROL		(BRIDGE_VIRT_BASE + 0x0104)
+ #endif
+diff --git a/arch/arm/mach-kirkwood/pm.c b/arch/arm/mach-kirkwood/pm.c
+index c6ab8d9303a5..8e5e0329d04c 100644
+--- a/arch/arm/mach-kirkwood/pm.c
++++ b/arch/arm/mach-kirkwood/pm.c
+@@ -21,15 +21,16 @@
+ #include "common.h"
+ 
+ static void __iomem *ddr_operation_base;
++static void __iomem *memory_pm_ctrl;
+ 
+ static void kirkwood_low_power(void)
+ {
+ 	u32 mem_pm_ctrl;
+ 
+-	mem_pm_ctrl = readl(MEMORY_PM_CTRL);
++	mem_pm_ctrl = readl(memory_pm_ctrl);
+ 
+ 	/* Set peripherals to low-power mode */
+-	writel_relaxed(~0, MEMORY_PM_CTRL);
++	writel_relaxed(~0, memory_pm_ctrl);
+ 
+ 	/* Set DDR in self-refresh */
+ 	writel_relaxed(0x7, ddr_operation_base);
+@@ -41,7 +42,7 @@ static void kirkwood_low_power(void)
+ 	 */
+ 	cpu_do_idle();
+ 
+-	writel_relaxed(mem_pm_ctrl, MEMORY_PM_CTRL);
++	writel_relaxed(mem_pm_ctrl, memory_pm_ctrl);
+ }
+ 
+ static int kirkwood_suspend_enter(suspend_state_t state)
+@@ -69,5 +70,7 @@ static const struct platform_suspend_ops kirkwood_suspend_ops = {
+ void __init kirkwood_pm_init(void)
+ {
+ 	ddr_operation_base = ioremap(DDR_OPERATION_BASE, 4);
++	memory_pm_ctrl = ioremap(MEMORY_PM_CTRL_PHYS, 4);
++
+ 	suspend_set_ops(&kirkwood_suspend_ops);
+ }
 -- 
 1.8.5.3
