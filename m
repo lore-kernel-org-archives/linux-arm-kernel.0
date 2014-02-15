@@ -1,39 +1,73 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 15 Feb 2014 17:39:09 -0500 (EST)
-Subject: [PATCH v2 10/23] ARM: MM: Add DT binding for Feroceon L2 cache
-In-Reply-To: <201402152212.02580.arnd@arndb.de>
-References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
- <2979047.tn4oVevojb@wuerfel> <20140215135930.GA26088@lunn.ch>
- <201402152212.02580.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.11.1402151735300.17677@knanqh.ubzr>
+From: david.lanzendoerfer@o2s.ch (David =?utf-8?q?Lanzend=C3=B6rfer?=)
+Date: Sun, 16 Feb 2014 00:33:19 +0100
+Subject: [PATCH v6 1/8] clk: sunxi: factors: automatic reparenting support
+In-Reply-To: <20140215233011.30460.27261.stgit@dizzy-6.o2s.ch>
+References: <20140215233011.30460.27261.stgit@dizzy-6.o2s.ch>
+Message-ID: <20140215233319.30460.86023.stgit@dizzy-6.o2s.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 15 Feb 2014, Arnd Bergmann wrote:
+From: Emilio L?pez <emilio@elopez.com.ar>
 
-> On Saturday 15 February 2014, Andrew Lunn wrote:
-> > None of the _defconfig's ever turn on
-> > CACHE_FEROCEON_L2_WRITETHROUGH. I also did a quick google and could
-> > not find any usage of it.
-> > 
-> > So i see two options:
-> > 
-> > 1) Remove the wr-override from the DT binding and use
-> > CACHE_FEROCEON_L2_WRITETHROUGH.
-> > 
-> > 2) Remove CACHE_FEROCEON_L2_WRITETHROUGH and make proc-feroceon.S do
-> > the right thing at runtime.
-> > 
-> > I suspect i will go for 1), it is simpler.
-> 
-> Yes, fair enough. I'd hope we could just kill the option altogether,
-> but it's probably hard to find anyone who would remember what it
-> was introduced for, unless Nico knows.
+This commit implements .determine_rate, so that our factor clocks can be
+reparented when needed.
 
-There was a time when we didn't know what cache mode was the best 
-performance wise.  The right answer is "it depends on the work load" of 
-course.  Hence it was made optional for people to play with and choose 
-for themselves.
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
+ drivers/clk/sunxi/clk-factors.c |   36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-
-Nicolas
+diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+index 9e23264..3806d97 100644
+--- a/drivers/clk/sunxi/clk-factors.c
++++ b/drivers/clk/sunxi/clk-factors.c
+@@ -77,6 +77,41 @@ static long clk_factors_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	return rate;
+ }
+ 
++static long clk_factors_determine_rate(struct clk_hw *hw, unsigned long rate,
++				       unsigned long *best_parent_rate,
++				       struct clk **best_parent_p)
++{
++	struct clk *clk = hw->clk, *parent, *best_parent = NULL;
++	int i, num_parents;
++	unsigned long parent_rate, best = 0, child_rate, best_child_rate = 0;
++
++	/* find the parent that can help provide the fastest rate <= rate */
++	num_parents = __clk_get_num_parents(clk);
++	for (i = 0; i < num_parents; i++) {
++		parent = clk_get_parent_by_index(clk, i);
++		if (!parent)
++			continue;
++		if (__clk_get_flags(clk) & CLK_SET_RATE_PARENT)
++			parent_rate = __clk_round_rate(parent, rate);
++		else
++			parent_rate = __clk_get_rate(parent);
++
++		child_rate = clk_factors_round_rate(hw, rate, &parent_rate);
++
++		if (child_rate <= rate && child_rate > best_child_rate) {
++			best_parent = parent;
++			best = parent_rate;
++			best_child_rate = child_rate;
++		}
++	}
++
++	if (best_parent)
++		*best_parent_p = best_parent;
++	*best_parent_rate = best;
++
++	return best_child_rate;
++}
++
+ static int clk_factors_set_rate(struct clk_hw *hw, unsigned long rate,
+ 				unsigned long parent_rate)
+ {
+@@ -113,6 +148,7 @@ static int clk_factors_set_rate(struct clk_hw *hw, unsigned long rate,
+ }
+ 
+ const struct clk_ops clk_factors_ops = {
++	.determine_rate = clk_factors_determine_rate,
+ 	.recalc_rate = clk_factors_recalc_rate,
+ 	.round_rate = clk_factors_round_rate,
+ 	.set_rate = clk_factors_set_rate,
