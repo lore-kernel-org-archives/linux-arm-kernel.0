@@ -1,29 +1,61 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 15 Feb 2014 02:36:46 +0100
-Subject: [PATCH v3 2/3] ARM: dts: add dts files for exynos5260 SoC
-In-Reply-To: <1392385032-22015-3-git-send-email-rahul.sharma@samsung.com>
-References: <1392385032-22015-1-git-send-email-rahul.sharma@samsung.com>
- <1392385032-22015-3-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <52FEC4AE.2080009@gmail.com>
+From: rapatel@apm.com (Ravi Patel)
+Date: Fri, 14 Feb 2014 18:21:58 -0800
+Subject: [PATCH V3 0/4] mailbox: xgene: Add support for APM X-Gene SoC Queue
+ Manager/Traffic Manager
+Message-ID: <1392430922-24643-1-git-send-email-rapatel@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds support for APM X-Gene SoC Queue Manager/Traffic Manager.
+ QMTM is required by APM X-Gene SoC Ethernet, PktDMA (XOR Engine) and
+ Security Engine subsystems. All subsystems communicate with QMTM using
+ messages which include information about the work to be performed and
+ the location of associated data buffers.
 
-On 14.02.2014 14:37, Rahul Sharma wrote:
-> The patch adds the dts files for exynos5260.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
-> ---
->   arch/arm/boot/dts/exynos5260-pinctrl.dtsi |  574 +++++++++++++++++++++++++++++
->   arch/arm/boot/dts/exynos5260.dtsi         |  304 +++++++++++++++
->   2 files changed, 878 insertions(+)
->   create mode 100644 arch/arm/boot/dts/exynos5260-pinctrl.dtsi
->   create mode 100644 arch/arm/boot/dts/exynos5260.dtsi
+V3:
+ * Switch to mailbox framework
+ * Add support for little and big endian kernel
+ * Change virt_to_phys function call to dma_zalloc_coherent
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+V2:
+ * Adding COMPILE_TEST dependency for QMTM in Kconfig
+ * Updated license banner as per review comments
+ * Fixed alignment for macros
+ * Changed EXPORT_SYMBOL to EXPORT_SYMBOL_GPL
 
-Best regards,
-Tomasz
+V1:
+ * inital version
+
+Signed-off-by: Ravi Patel <rapatel@apm.com>
+Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+---
+Ravi Patel (4):
+  Documentation: mailbox: APM X-Gene SoC QMTM
+  Documentation: devicetree: bindings for APM X-Gene SoC QMTM
+  mailbox: xgene: base driver for APM X-Gene SoC QMTM
+  arm64: boot: dts: entries for APM X-Gene SoC QMTM
+
+ .../devicetree/bindings/mailbox/apm-xgene-qmtm.txt |   53 ++
+ Documentation/mailbox/apm-xgene-qmtm.txt           |  149 ++++++
+ MAINTAINERS                                        |    9 +
+ arch/arm64/boot/dts/apm-storm.dtsi                 |   18 +-
+ drivers/mailbox/Kconfig                            |    2 +
+ drivers/mailbox/Makefile                           |    1 +
+ drivers/mailbox/xgene/Kconfig                      |    9 +
+ drivers/mailbox/xgene/Makefile                     |    7 +
+ drivers/mailbox/xgene/xgene_qmtm_main.c            |  516 ++++++++++++++++++++
+ drivers/mailbox/xgene/xgene_qmtm_main.h            |  112 +++++
+ drivers/mailbox/xgene/xgene_qmtm_storm.c           |  358 ++++++++++++++
+ include/linux/platform_data/xgene_qmtm.h           |  300 ++++++++++++
+ 12 files changed, 1533 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/apm-xgene-qmtm.txt
+ create mode 100644 Documentation/mailbox/apm-xgene-qmtm.txt
+ create mode 100644 drivers/mailbox/xgene/Kconfig
+ create mode 100644 drivers/mailbox/xgene/Makefile
+ create mode 100644 drivers/mailbox/xgene/xgene_qmtm_main.c
+ create mode 100644 drivers/mailbox/xgene/xgene_qmtm_main.h
+ create mode 100644 drivers/mailbox/xgene/xgene_qmtm_storm.c
+ create mode 100644 include/linux/platform_data/xgene_qmtm.h
+
+-- 
+1.7.9.5
