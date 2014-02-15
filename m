@@ -1,44 +1,31 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 15 Feb 2014 14:59:30 +0100
-Subject: [PATCH v2 10/23] ARM: MM: Add DT binding for Feroceon L2 cache
-In-Reply-To: <2979047.tn4oVevojb@wuerfel>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 15 Feb 2014 15:03:45 +0100
+Subject: [PATCH v2 20/23] ARM: config: Add a multi_v5_defconfig
+In-Reply-To: <1392459621-24003-21-git-send-email-andrew@lunn.ch>
 References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
- <1392459621-24003-11-git-send-email-andrew@lunn.ch>
- <2979047.tn4oVevojb@wuerfel>
-Message-ID: <20140215135930.GA26088@lunn.ch>
+ <1392459621-24003-21-git-send-email-andrew@lunn.ch>
+Message-ID: <3111881.Wp1d8VNNp3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 15, 2014 at 02:23:23PM +0100, Arnd Bergmann wrote:
-> On Saturday 15 February 2014 11:20:08 Andrew Lunn wrote:
-> > Instantiate the L2 cache from DT. Indicate in DT where the cache
-> > control register is and if write through should be made.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > cc: devicetree at vger.kernel.org
-> > 
+On Saturday 15 February 2014 11:20:18 Andrew Lunn wrote:
+> To allow regression build testing of multi v5 systems, add a
+> multi_v5_defconfig, similar to the multi_v7_defconfig. This is based
+> on kirkwood_defconfig, but with a few other boards added which claim
+> to be MULTI_v5.
 > 
-> I guess this answers part of my question for patch 5, but I also
-> wonder if the run-time setting is correct now with the hardcoded
-> #ifdef in arch/arm/mm/proc-feroceon.S checkign for the
-> Kconfig option. Presumably the code should match whatever is
-> set in the cache control register.
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-Humm, yes, good point.
+How about making this a multi_v4_v5_defconfig? We have a much smaller
+number of v4/v4t platforms (moxart, i.MX1) that are multiplatform capable or
+could besome so in the future (clps711x, gemini, at91rm9200,
+some s3c24xx, omap15xx, integrator) compared to the multitude of v5
+platforms, so it might not be useful to start a separate
+multi_v4_defconfig.
 
-None of the _defconfig's ever turn on
-CACHE_FEROCEON_L2_WRITETHROUGH. I also did a quick google and could
-not find any usage of it.
+OTOH if there is a significant performance impact in enabling
+CPU_32v4 and CPU_32v4T, we probably want to keep them separate.
 
-So i see two options:
+Any opinions?
 
-1) Remove the wr-override from the DT binding and use
-CACHE_FEROCEON_L2_WRITETHROUGH.
-
-2) Remove CACHE_FEROCEON_L2_WRITETHROUGH and make proc-feroceon.S do
-the right thing at runtime.
-
-I suspect i will go for 1), it is simpler.
-
-  Thanks
-	Andrew
+	Arnd
