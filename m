@@ -1,44 +1,56 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 16 Feb 2014 02:04:00 +0900
-Subject: [PATCH 19/73] arm: mach-s3c64xx mach-crag6410-module.c is not
- modular
-In-Reply-To: <20140123131621.GD11589@opensource.wolfsonmicro.com>
-References: <1390339396-3479-1-git-send-email-paul.gortmaker@windriver.com>
- <1390339396-3479-20-git-send-email-paul.gortmaker@windriver.com>
- <20140123131621.GD11589@opensource.wolfsonmicro.com>
-Message-ID: <52FF9E00.90005@samsung.com>
+Date: Sun, 16 Feb 2014 02:07:46 +0900
+Subject: [PATCH] ARM: dts: fix incorrect vdd_arm voltage range for
+ Exynos4412 based boards
+In-Reply-To: <1390043483-1219-1-git-send-email-thomas.ab@samsung.com>
+References: <1390043483-1219-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <52FF9EE2.4090705@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/14 22:16, Charles Keepax wrote:
-> On Tue, Jan 21, 2014 at 04:22:22PM -0500, Paul Gortmaker wrote:
->> Despite the name mach-crag6410-module.c, the code is built for
->> MACH_WLF_CRAGG_6410 -- which is bool, and hence this code is
->> either present or absent.  It will never be modular, so using
->> module_init as an alias for __initcall can be somewhat
->> misleading.
->>
->> Fix this up now, so that we can relocate module_init from
->> init.h into module.h in the future.  If we don't do this, we'd
->> have to add module.h to obviously non-modular code, and that
->> would be a worse thing.
->>
->> Note that direct use of __initcall is discouraged, vs. one
->> of the priority categorized subgroups.  As __initcall gets
->> mapped onto device_initcall, our use of device_initcall
->> directly in this change means that the runtime impact is
->> zero -- it will remain at level 6 in initcall ordering.
->>
->> Cc: Ben Dooks<ben-linux@fluff.org>
->> Cc: Kukjin Kim<kgene.kim@samsung.com>
->> Cc: Russell King<linux@arm.linux.org.uk>
->> Cc: patches at opensource.wolfsonmicro.com
->> Cc: linux-arm-kernel at lists.infradead.org
->> Signed-off-by: Paul Gortmaker<paul.gortmaker@windriver.com>
->> ---
+On 01/18/14 20:11, Thomas Abraham wrote:
+> From: Thomas Abraham<thomas.ab@samsung.com>
 >
-> Tested-by: Charles Keepax<ckeepax@opensource.wolfsonmicro.com>
+> To allow Exynos4412 based Odroidx and Origen-quad boards to operate between
+> 200MHz to 1.4Ghz, update the vdd_arm voltage range to operate between these
+> cpu clock speeds.
 >
-Thanks, applied.
+> Cc: Dongjin Kim<tobetter@gmail.com>
+> Signed-off-by: Thomas Abraham<thomas.ab@samsung.com>
+> ---
+>   arch/arm/boot/dts/exynos4412-odroidx.dts |    2 +-
+>   arch/arm/boot/dts/exynos4412-origen.dts  |    4 ++--
+>   2 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> index 9804fcb..12459b0 100644
+> --- a/arch/arm/boot/dts/exynos4412-odroidx.dts
+> +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> @@ -251,7 +251,7 @@
+>   				buck2_reg: BUCK2 {
+>   					regulator-name = "vdd_arm";
+>   					regulator-min-microvolt =<900000>;
+> -					regulator-max-microvolt =<1300000>;
+> +					regulator-max-microvolt =<1350000>;
+>   					regulator-always-on;
+>   					regulator-boot-on;
+>   				};
+> diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
+> index 6bc0539..388f035 100644
+> --- a/arch/arm/boot/dts/exynos4412-origen.dts
+> +++ b/arch/arm/boot/dts/exynos4412-origen.dts
+> @@ -459,8 +459,8 @@
+>
+>   				buck2_reg: BUCK2 {
+>   					regulator-name = "vdd_arm";
+> -					regulator-min-microvolt =<925000>;
+> -					regulator-max-microvolt	=<1300000>;
+> +					regulator-min-microvolt =<900000>;
+> +					regulator-max-microvolt	=<1350000>;
+>   					regulator-always-on;
+>   					regulator-boot-on;
+>   					op_mode =<1>; /* Normal Mode */
+
+Applied, thanks.
 
 - Kukjin
