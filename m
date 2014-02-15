@@ -1,34 +1,67 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 15 Feb 2014 11:20:12 +0100
-Subject: [PATCH v2 14/23] ARM: MM Enable building Feroceon L2 cache controller
- with ARCH_MVEBU
+Date: Sat, 15 Feb 2014 11:20:14 +0100
+Subject: [PATCH v2 16/23] ARM: MVEBU: Let kirkwood use the system controller
+ for restart
 In-Reply-To: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
 References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1392459621-24003-15-git-send-email-andrew@lunn.ch>
+Message-ID: <1392459621-24003-17-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kirkwood, which uses the Feroceon L2 cache controller will soon be
-moving into mach-mvebu. Allow the cache controller to be built in this
-situration.
+The mvebu system controller already supports restarting orion
+systems. Remove all the C code which will be replaced by the system
+controller.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Split the patch into two, DT goes into a new patch
+---
+ arch/arm/mach-mvebu/kirkwood.c | 20 ++------------------
+ 1 file changed, 2 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 1f8fed94c2a4..dccd7e177653 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -855,7 +855,7 @@ config OUTER_CACHE_SYNC
+diff --git a/arch/arm/mach-mvebu/kirkwood.c b/arch/arm/mach-mvebu/kirkwood.c
+index 56e83035bc97..af77923a3483 100644
+--- a/arch/arm/mach-mvebu/kirkwood.c
++++ b/arch/arm/mach-mvebu/kirkwood.c
+@@ -27,6 +27,7 @@
+ #include <plat/common.h>
+ #include <plat/pcie.h>
+ #include "kirkwood-pm.h"
++#include "common.h"
  
- config CACHE_FEROCEON_L2
- 	bool "Enable the Feroceon L2 cache controller"
--	depends on ARCH_KIRKWOOD || ARCH_MV78XX0
-+	depends on ARCH_KIRKWOOD || ARCH_MV78XX0 || ARCH_MVEBU
- 	default y
- 	select OUTER_CACHE
- 	help
+ static struct resource kirkwood_cpufreq_resources[] = {
+ 	[0] = {
+@@ -68,23 +69,6 @@ static void __init kirkwood_cpuidle_init(void)
+ 	platform_device_register(&kirkwood_cpuidle);
+ }
+ 
+-/* Temporary here since mach-mvebu has a function we can use */
+-static void kirkwood_restart(enum reboot_mode mode, const char *cmd)
+-{
+-	/*
+-	 * Enable soft reset to assert RSTOUTn.
+-	 */
+-	writel(SOFT_RESET_OUT_EN, RSTOUTn_MASK);
+-
+-	/*
+-	 * Assert soft reset.
+-	 */
+-	writel(SOFT_RESET, SYSTEM_SOFT_RESET);
+-
+-	while (1)
+-		;
+-}
+-
+ #define MV643XX_ETH_MAC_ADDR_LOW	0x0414
+ #define MV643XX_ETH_MAC_ADDR_HIGH	0x0418
+ 
+@@ -203,6 +187,6 @@ static const char * const kirkwood_dt_board_compat[] = {
+ DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)")
+ 	/* Maintainer: Jason Cooper <jason@lakedaemon.net> */
+ 	.init_machine	= kirkwood_dt_init,
+-	.restart	= kirkwood_restart,
++	.restart	= mvebu_restart,
+ 	.dt_compat	= kirkwood_dt_board_compat,
+ MACHINE_END
 -- 
 1.8.5.3
