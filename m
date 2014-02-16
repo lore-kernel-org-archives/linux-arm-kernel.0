@@ -1,50 +1,72 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 16 Feb 2014 21:10:36 +0800
-Subject: [PATCH v3] bus: imx-weim: support CS GPR config for imx6q-weim
-In-Reply-To: <1392548881.675863030@f320.i.mail.ru>
-References: <1392539924-23583-1-git-send-email-shawn.guo@linaro.org>
- <20140216105636.GE2946@S2101-09.ap.freescale.net>
- <1392548881.675863030@f320.i.mail.ru>
-Message-ID: <20140216131034.GF2946@S2101-09.ap.freescale.net>
+From: tonyho.profession@gmail.com (TonyHo)
+Date: Sun, 16 Feb 2014 13:11:47 +0000 (UTC)
+Subject: [linux-pm] ARM hibernation / suspend-to-disk
+References: <20130529081005.GA25561@hal> <51A6399D.4090606@ti.com>
+ <20140128141458.GD8713@xo-6d-61-c0.localdomain>
+ <20140128182245.18840.51279@capellas-linux>
+Message-ID: <loom.20140216T140206-196@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 16, 2014 at 03:08:01PM +0400, Alexander Shiyan wrote:
-> ???????????, 16 ??????? 2014, 18:56 +08:00 ?? Shawn Guo <shawn.guo@linaro.org>:
-> > On Sun, Feb 16, 2014 at 04:38:44PM +0800, Shawn Guo wrote:
-> > > @@ -56,6 +59,55 @@ static const struct of_device_id weim_id_table[] = {
-> > >  };
-> > >  MODULE_DEVICE_TABLE(of, weim_id_table);
-> > >  
-> > > +static int __init imx6q_weim_gpr_setup(struct platform_device *pdev)
-> > > +{
-> > > +	struct device_node *np = pdev->dev.of_node;
-> > > +	struct property *prop;
-> > > +	const __be32 *p;
-> > > +	struct regmap *gpr;
-> > > +	u32 gprvals[4] = {
-> > > +		05,	/* CS0(128M) CS1(0M)  CS2(0M)  CS3(0M) */
-> > > +		033,	/* CS0(64M)  CS1(64M) CS2(0M)  CS3(0M) */
-> > > +		0113,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
-> > > +		01111,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
-> > > +	};
-> > > +	u32 gprval = 0;
-> > > +	u32 val;
-> > > +	int cs = 0;
-> > > +	int i = 0;
-> > > +
-> > > +	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
-> > 
-> > When trying to improve the bindings doc imx-weim.txt, I checked hardware
-> > manuals and found that SoCs imx50, imx53, imx6q, imx6dl and imx6sl all
-> > need the same CS GPR setup.  It's inappropriate to look up by hard-coded
-> > compatible "fsl,imx6q-iomuxc-gpr" then.  So I'm going to add the
-> > property fsl,weim-cs-gpr back, and update bindings doc accordingly.
+Sebastian Capella <sebastian.capella <at> linaro.org> writes:
+
 > 
-> You can add additional call into struct imx_weim_devtype for handle
-> soc-specific stuff.
+> Quoting Pavel Machek (2014-01-28 06:14:58)
+> > > > what's the status of suspend-to-disk on ARM? The most recent 
+discussion I
+> > > > found is:
+> > > > http://lists.linuxfoundation.org/pipermail/linux-pm/2012-
+November/034997.html
+> > > > 
+> > > > with no replies at all. Is anyone still working on that? Anyone got 
+it running?
+> 
+> Hi Pavel, Russ,
+> 
+> I have been looking and working with Russ' most recent branch based
+> on the 3.12 kernel, which includes the big pile of patches for OMAP.
+> (https://github.com/russdill/linux/commits/arm-hibernation-am33xx-v3.12)
+> 
+> He has hibernation mostly working and I have been able to run 1400 or
+> so entry/exits overnight there on beaglebone black without issue.
+> Combining this with device activity has been tricky.  An active
+> network will lose the link on restore.  Active SD traffic will
+> eventually hang (Last night ran for about 11 hours before hanging
+> after ~350 or so hibernations).  I have not found where this is or
+> the cause.
+> 
+> > > For ARM hibernation support to get merged, there needs to be at least
+> > > one platform that supports it. the am335x code I have is not ready as 
+it
+> > > still relies on PM patchsets that have not yet themselves been merged.
+> > 
+> > Given that we have chicken-and-egg problem here, I believe it makes 
+sense
+> > to merge generic ARM hibernation support now.
+> 
+> If you want to go ahead with upstreaming the base patch, Russ, would you
+> like me to do that for you or will you have time to do this?
+> 
+> Otherwise, I am still looking at how to get this upstream by verifying
+> on omap 5.  In my case, I still have the chicken egg problem, where I'm 
+> trying to verify on omap 5 with out of tree patches.
+> 
+> Thanks,
+> 
+> Sebastian
+> 
 
-Yes, imx_weim_devtype is the place to code soc-specific stuff.  But for
-this particular case, an additional DT property is more flexible.
-
-Shawn
+Hi Sebastian ,Pavel ,Russ:
+ I want to build the kernel https://github.com/russdill/linux/commits/arm-
+hibernation-am33xx-v3.12 to be used in BeagleBone black too, after I clone 
+and checkout the branch, I'm not sure whether my opration is right, can 
+someone help me to comfirm?
+Below is my operation:
+1. make ARCH=arm CROSS_COMPILE=/media/work/BBB/tools/arm-2010.09/bin/arm-
+none-linux-gnueabi- omap2plus_defconfig . Is the omap2plus_defconfig is 
+right configuration file?
+2. russdill says his board is BeagleBone(http://www.youtube.com/watch?
+v=3hdbH-Ur-hE), so if there would be some modificaiton to be done before 
+compile this source code? 
+3. Is there any intructions about using and compiling the hibernation source 
+code?
