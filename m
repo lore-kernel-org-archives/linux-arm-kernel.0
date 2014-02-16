@@ -1,26 +1,42 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 16 Feb 2014 18:02:01 +0100
-Subject: [PATCH V2 11/17] i2c: nomadik: Convert to devm functions
-In-Reply-To: <CAPDyKFrt6QJVSypP5iD_oVxRUvNhzxGcbZ703zR1K8gwJ5uCeQ@mail.gmail.com>
-References: <1392300547-23365-1-git-send-email-ulf.hansson@linaro.org>
- <20140215150345.GD2579@katana>
- <CAPDyKFrt6QJVSypP5iD_oVxRUvNhzxGcbZ703zR1K8gwJ5uCeQ@mail.gmail.com>
-Message-ID: <20140216170201.GA2831@katana>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Sun, 16 Feb 2014 18:26:00 +0100
+Subject: [PATCH] arm: omap3: cm-t35: remove MACH_CM_T3730
+Message-ID: <1392571560.28866.16.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Kconfig symbol MACH_CM_T3730 was added in v3.1. It has never been
+used. Setting it has no effect. There are no calls for
+machine_is_cm_t3730(). This symbol can safely be removed.
 
-> Would a way forward be to let you carry all the patches through your
-> tree? I believe all but patch 17 can be safely merged. It is only this
-> one that depends on the changes in the amba bus, so we can put this
-> one on hold for a while.
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Tested only with "git grep".
 
-I'd favour this. Will do this next week unless somebody objects.
+ arch/arm/mach-omap2/Kconfig | 4 ----
+ 1 file changed, 4 deletions(-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140216/a5322d11/attachment.sig>
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 66da3f5..7d4934e 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -292,7 +292,6 @@ config MACH_CM_T35
+ 	bool "CompuLab CM-T35/CM-T3730 modules"
+ 	depends on ARCH_OMAP3
+ 	default y
+-	select MACH_CM_T3730
+ 	select OMAP_PACKAGE_CUS
+ 
+ config MACH_CM_T3517
+@@ -301,9 +300,6 @@ config MACH_CM_T3517
+ 	default y
+ 	select OMAP_PACKAGE_CBB
+ 
+-config MACH_CM_T3730
+-       bool
+-
+ config MACH_SBC3530
+ 	bool "OMAP3 SBC STALKER board"
+ 	depends on ARCH_OMAP3
+-- 
+1.8.5.3
