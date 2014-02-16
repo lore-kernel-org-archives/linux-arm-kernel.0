@@ -1,184 +1,42 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 16 Feb 2014 23:08:27 +0100
-Subject: [PATCH v6] ARM: DTS: imx5* imx6*, use imx51-ssi
-In-Reply-To: <1390220023-6423-1-git-send-email-mpa@pengutronix.de>
-References: <20140118083840.GD3430@S2101-09.ap.freescale.net>
- <1390220023-6423-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140216220827.GC31006@pengutronix.de>
+From: rientjes@google.com (David Rientjes)
+Date: Sun, 16 Feb 2014 14:17:44 -0800 (PST)
+Subject: Recent 3.x kernels: Memory leak causing OOMs
+In-Reply-To: <20140216200503.GN30257@n2100.arm.linux.org.uk>
+References: <20140216200503.GN30257@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1402161406120.26926@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Sun, 16 Feb 2014, Russell King - ARM Linux wrote:
 
-On Mon, Jan 20, 2014 at 01:13:43PM +0100, Markus Pargmann wrote:
-> imx51-ssi and imx21-ssi are different IPs. imx51-ssi supports online
-> reconfiguration and needs this for correct interaction with SDMA. This
-> patch adds imx51-ssi before each imx21-ssi for all imx5/imx6 SoCs.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
-> Hi Shawn,
-> 
-> Sorry for that last patch. I fixed it in this patch.
+> Mem-info:
+> Normal per-cpu:
+> CPU    0: hi:   42, btch:   7 usd:  36
+> active_anon:28041 inactive_anon:104 isolated_anon:0
+>  active_file:11 inactive_file:11 isolated_file:0
+>  unevictable:0 dirty:1 writeback:6 unstable:0
+>  free:342 slab_reclaimable:170 slab_unreclaimable:570
+>  mapped:13 shmem:139 pagetables:95 bounce:0
+>  free_cma:0
+> Normal free:1368kB min:1384kB low:1728kB high:2076kB active_anon:112164kB inactive_anon:416kB active_file:44kB inactive_file:44kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:131072kB managed:120152kB mlocked:0kB dirty:4kB
+> writeback:24kB mapped:52kB shmem:556kB slab_reclaimable:680kB slab_unreclaimable:2280kB kernel_stack:248kB pagetables:380kB unstable:0kB bounce:0kB free_cma:0kB writeback_tmp:0kB pages_scanned:136 all_unreclaimable? yes
 
-Ping. Should I send this again after rebasing it onto your latest branch?
+All memory is accounted for here, there appears to be no leakage.
 
-Regards,
+> [ pid ]   uid  tgid total_vm      rss nr_ptes swapents oom_score_adj name
+...
+> [  756]     0   756    28163    27776      57        0             0 ld-linux.so.2
 
-Markus
+This is taking ~108MB of your ~117MB memory.
 
-> 
-> Thanks,
-> 
-> Markus
-> 
->  arch/arm/boot/dts/imx50.dtsi   |  7 +++++--
->  arch/arm/boot/dts/imx53.dtsi   | 10 +++++++---
->  arch/arm/boot/dts/imx6qdl.dtsi | 12 +++++++++---
->  arch/arm/boot/dts/imx6sl.dtsi  | 12 +++++++++---
->  4 files changed, 30 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
-> index 01c0499..24df4f4f 100644
-> --- a/arch/arm/boot/dts/imx50.dtsi
-> +++ b/arch/arm/boot/dts/imx50.dtsi
-> @@ -140,7 +140,9 @@
->  				};
->  
->  				ssi2: ssi at 50014000 {
-> -					compatible = "fsl,imx50-ssi", "fsl,imx21-ssi";
-> +					compatible = "fsl,imx50-ssi",
-> +							"fsl,imx51-ssi",
-> +							"fsl,imx21-ssi";
->  					reg = <0x50014000 0x4000>;
->  					interrupts = <30>;
->  					clocks = <&clks IMX5_CLK_SSI2_IPG_GATE>;
-> @@ -445,7 +447,8 @@
->  			};
->  
->  			ssi1: ssi at 63fcc000 {
-> -				compatible = "fsl,imx50-ssi", "fsl,imx21-ssi";
-> +				compatible = "fsl,imx50-ssi", "fsl,imx51-ssi",
-> +							"fsl,imx21-ssi";
->  				reg = <0x63fcc000 0x4000>;
->  				interrupts = <29>;
->  				clocks = <&clks IMX5_CLK_SSI1_IPG_GATE>;
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index 4dbde25..73e103b 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -171,7 +171,9 @@
->  				};
->  
->  				ssi2: ssi at 50014000 {
-> -					compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
-> +					compatible = "fsl,imx53-ssi",
-> +							"fsl,imx51-ssi",
-> +							"fsl,imx21-ssi";
->  					reg = <0x50014000 0x4000>;
->  					interrupts = <30>;
->  					clocks = <&clks IMX5_CLK_SSI2_IPG_GATE>;
-> @@ -590,7 +592,8 @@
->  			};
->  
->  			ssi1: ssi at 63fcc000 {
-> -				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
-> +				compatible = "fsl,imx53-ssi", "fsl,imx51-ssi",
-> +						"fsl,imx21-ssi";
->  				reg = <0x63fcc000 0x4000>;
->  				interrupts = <29>;
->  				clocks = <&clks IMX5_CLK_SSI1_IPG_GATE>;
-> @@ -617,7 +620,8 @@
->  			};
->  
->  			ssi3: ssi at 63fe8000 {
-> -				compatible = "fsl,imx53-ssi", "fsl,imx21-ssi";
-> +				compatible = "fsl,imx53-ssi", "fsl,imx51-ssi",
-> +						"fsl,imx21-ssi";
->  				reg = <0x63fe8000 0x4000>;
->  				interrupts = <96>;
->  				clocks = <&clks IMX5_CLK_SSI3_IPG_GATE>;
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 8a86502..cf7956e 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -247,7 +247,9 @@
->  				};
->  
->  				ssi1: ssi at 02028000 {
-> -					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
-> +					compatible = "fsl,imx6q-ssi",
-> +							"fsl,imx51-ssi",
-> +							"fsl,imx21-ssi";
->  					reg = <0x02028000 0x4000>;
->  					interrupts = <0 46 IRQ_TYPE_LEVEL_HIGH>;
->  					clocks = <&clks 178>;
-> @@ -260,7 +262,9 @@
->  				};
->  
->  				ssi2: ssi at 0202c000 {
-> -					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
-> +					compatible = "fsl,imx6q-ssi",
-> +							"fsl,imx51-ssi",
-> +							"fsl,imx21-ssi";
->  					reg = <0x0202c000 0x4000>;
->  					interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
->  					clocks = <&clks 179>;
-> @@ -273,7 +277,9 @@
->  				};
->  
->  				ssi3: ssi at 02030000 {
-> -					compatible = "fsl,imx6q-ssi","fsl,imx21-ssi";
-> +					compatible = "fsl,imx6q-ssi",
-> +							"fsl,imx51-ssi",
-> +							"fsl,imx21-ssi";
->  					reg = <0x02030000 0x4000>;
->  					interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>;
->  					clocks = <&clks 180>;
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index a449c4f..95bb37b 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -226,7 +226,9 @@
->  				};
->  
->  				ssi1: ssi at 02028000 {
-> -					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
-> +					compatible = "fsl,imx6sl-ssi",
-> +							"fsl,imx51-ssi",
-> +							"fsl,imx21-ssi";
->  					reg = <0x02028000 0x4000>;
->  					interrupts = <0 46 IRQ_TYPE_LEVEL_HIGH>;
->  					clocks = <&clks IMX6SL_CLK_SSI1>;
-> @@ -238,7 +240,9 @@
->  				};
->  
->  				ssi2: ssi at 0202c000 {
-> -					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
-> +					compatible = "fsl,imx6sl-ssi",
-> +							"fsl,imx51-ssi",
-> +							"fsl,imx21-ssi";
->  					reg = <0x0202c000 0x4000>;
->  					interrupts = <0 47 IRQ_TYPE_LEVEL_HIGH>;
->  					clocks = <&clks IMX6SL_CLK_SSI2>;
-> @@ -250,7 +254,9 @@
->  				};
->  
->  				ssi3: ssi at 02030000 {
-> -					compatible = "fsl,imx6sl-ssi","fsl,imx21-ssi";
-> +					compatible = "fsl,imx6sl-ssi",
-> +							"fsl,imx51-ssi",
-> +							"fsl,imx21-ssi";
->  					reg = <0x02030000 0x4000>;
->  					interrupts = <0 48 IRQ_TYPE_LEVEL_HIGH>;
->  					clocks = <&clks IMX6SL_CLK_SSI3>;
-> -- 
-> 1.8.5.2
-> 
-> 
+Three possibilies that immediately jump to mind:
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ - if this is an SMP kernel, then too much free memory is being accounted
+   for in cpu-0 vmstat differential and not returned to the ZVC pages 
+   count,
+
+ - there is a too little amount of "managed" memory attributed to 
+   ZONE_NORMAL, the ~10MB difference between "present" and "managed"
+   memory, or
+
+ - ld-linux.so.2 is using too much memory.
