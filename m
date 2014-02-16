@@ -1,51 +1,31 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sun, 16 Feb 2014 20:05:24 +0100
-Subject: [PATCH] arm: sti: Remove SOC_STIH415 and SOC_STIH416
-Message-ID: <1392577524.28866.32.camel@x220>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Sun, 16 Feb 2014 23:06:55 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gYXJtOiBpbXg6IHJlbW92ZSBNQUNIX01YTEFEUw==?=
+In-Reply-To: <1392576223.28866.24.camel@x220>
+References: <1392573811.28866.22.camel@x220>
+ <1392574562.956803244@f244.i.mail.ru>
+ <1392576223.28866.24.camel@x220>
+Message-ID: <1392577615.265469392@f161.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig symbols SOC_STIH415 and SOC_STIH416 were added in v3.11.
-They have never been used. They default to "y" but nothing cares. They
-can safely be removed.
+???????????, 16 ??????? 2014, 19:43 +01:00 ?? Paul Bolle <pebolle@tiscali.nl>:
+> On Sun, 2014-02-16 at 22:16 +0400, Alexander Shiyan wrote:
+> > ???????????, 16 ??????? 2014, 19:03 +01:00 ?? Paul Bolle
+> <pebolle@tiscali.nl>:
+> > > The Kconfig symbol MACH_MXLADS was added in v2.6.29. It has never been
+> > > used. Setting it has no effect. There are no calls for
+> > > machine_is_mxlads(). This symbol can safely be removed.
+> > > 
+> > > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+> > 
+> > This is used by mach-mx1ads.c
+> 
+> How is it used?
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+Kconfig selects MACH_MXLADS, this enables machine_arch_type
+from include/generated/mach-types.h which used for machine_is_xx() macro,
+so if multiple boards is defined in the kernel, this cause to incorrect matching.
+Russel, Arnd, fixme.
+
 ---
-Tested with "git grep".
-
- arch/arm/mach-sti/Kconfig | 23 -----------------------
- 1 file changed, 23 deletions(-)
-
-diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-index d71654b..c360ae1 100644
---- a/arch/arm/mach-sti/Kconfig
-+++ b/arch/arm/mach-sti/Kconfig
-@@ -21,26 +21,3 @@ menuconfig ARCH_STI
- 	  for discovery
- 	  More information at Documentation/arm/STiH41x and
- 	  at Documentation/devicetree
--
--
--if ARCH_STI
--
--config SOC_STIH415
--	bool "STiH415 STMicroelectronics Consumer Electronics family"
--	default y
--	help
--	  This enables support for STMicroelectronics Digital Consumer
--	  Electronics family StiH415 parts, primarily targeted at set-top-box
--	  and other digital audio/video applications using Flattned Device
--	  Trees.
--
--config SOC_STIH416
--	bool "STiH416 STMicroelectronics Consumer Electronics family"
--	default y
--	help
--	  This enables support for STMicroelectronics Digital Consumer
--	  Electronics family StiH416 parts, primarily targeted at set-top-box
--	  and other digital audio/video applications using Flattened Device
--	  Trees.
--
--endif
--- 
-1.8.5.3
