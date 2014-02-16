@@ -1,69 +1,45 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 16 Feb 2014 21:33:52 +0100
-Subject: [PATCH 02/12] dt-bindings: document s3c24xx controller for
- external clock output
-In-Reply-To: <52F6DFE0.7030508@gmail.com>
-References: <201312131356.40755.heiko@sntech.de>
- <201312131359.00450.heiko@sntech.de> <52F6DFE0.7030508@gmail.com>
-Message-ID: <5620516.DA2mHk7Kko@phil>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Sun, 16 Feb 2014 21:35:00 +0100
+Subject: [PATCH] arm: imx: remove MACH_MXLADS
+In-Reply-To: <1392578464.996901773@f49.i.mail.ru>
+References: <1392573811.28866.22.camel@x220>
+ <1392577615.265469392@f161.i.mail.ru> <1392577965.28866.37.camel@x220>
+ <1392578464.996901773@f49.i.mail.ru>
+Message-ID: <1392582900.28866.85.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 9. Februar 2014, 02:54:40 schrieb Tomasz Figa:
-> Hi Heiko,
-> 
-> On 13.12.2013 13:59, Heiko St?bner wrote:
-> > The clock settings are distributed over a regular register and parts
-> > of the misccr register.
+On Sun, 2014-02-16 at 23:21 +0400, Alexander Shiyan wrote:
+> ???????????, 16 ??????? 2014, 20:12 +01:00 ?? Paul Bolle <pebolle@tiscali.nl>:
+> > On Sun, 2014-02-16 at 23:06 +0400, Alexander Shiyan wrote:
+> > > Kconfig selects MACH_MXLADS, this enables machine_arch_type
+> > > from include/generated/mach-types.h which used for machine_is_xx() macro,
+> > > so if multiple boards is defined in the kernel, this cause to incorrect
+> > matching.
 > > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > 
-> >   .../bindings/clock/samsung,s3c2410-dclk.txt        |   53
-> >   ++++++++++++++++++++ 1 file changed, 53 insertions(+)
-> >   create mode 100644
-> >   Documentation/devicetree/bindings/clock/samsung,s3c2410-dclk.txt> 
-> > diff --git
-> > a/Documentation/devicetree/bindings/clock/samsung,s3c2410-dclk.txt
-> > b/Documentation/devicetree/bindings/clock/samsung,s3c2410-dclk.txt new
-> > file mode 100644
-> > index 0000000..0a1f7b1
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/samsung,s3c2410-dclk.txt
-> > @@ -0,0 +1,53 @@
-> > +* Samsung S3C24XX External Clock Output Controller
-> > +
-> > +The S3C24XX series can generate clock signals on two clock output pads.
-> > +The clock binding described here is applicable to all SoCs in
-> > +the s3c24x family.
-> > +
-> > +Required Properties:
-> > +
-> > +- compatible: should be one of the following.
-> > +  - "samsung,s3c2410-dclk" - controller in S3C2410 SoCs.
-> > +  - "samsung,s3c2412-dclk" - controller in S3C2412 SoCs.
-> > +  - "samsung,s3c2440-dclk" - controller in S3C2440 and S3C2442 SoCs.
-> > +  - "samsung,s3c2443-dclk" - controller in S3C2443 and later SoCs.
-> > +- reg: physical base address of the controller and length of memory
-> > mapped
-> > +  region.
-> > +- #clock-cells: should be 1.
-> > +- samsung,misccr: phandle to the syscon managing the misccr register,
-> > which +  holds configuration settings for different soc-components
-> > (clocks, usb, ...).
-> Hmm, looking at the datasheet, DCLK and CLKOUT registers seem to be part
-> of the pin controller. I wonder if there is really a need for different
-> driver and device node to handle them.
+> > But, as I stated in the commit explanation, there are no users of
+> > machine_is_mxlads().
 > 
-> Could this be simply made a part of the s3c24xx pinctrl driver,
-> extending it to register also a clock provider under the same DT node?
+> If you have MXLADS and FOO boards support in the kernel (for example)
+> and you want to start MXLADS version, your machine_is_FOO() will be positive,
+> since machine_arch_type will be constant value FOO in this case.
 
-it could, but of course the non-dt platforms would not be able to use it in 
-this case.
+I think it might be helpful - for people trying to understand this
+thread - to add a quote from https://lkml.org/lkml/2013/3/8/473 :
+    So, the result is that:
+    - de-selected platforms have their if (machine_is_xxx()) { } optimised
+      out of the kernel.
+    - for a kernel built targetting one platform, all the
+      if (machine_is_xxx()) tests are optimised away, leaving only the
+      relevant code behind.
+    - otherwise, we get the _appropriate_ conditional code for the
+      configuration generated.
 
-So I guess, we could get rid of this dt binding, implement the clkout handling 
-in the pinctrl driver for dt platforms, but use the platform-driver this 
-binding described for the time we're still handling non-dt s3c24xx machines.
+Back to the issue at hand: without my patch ARCH_MX1ADS selects
+MACH_MXLADS. So it seems in this case people will have to select
+ARCH_MX1ADS besides selecting FOO. Wouldn't that solve this problem?
+Note that the MACH_MXLADS is now basically meant to be selected by
+ARCH_MX1ADS and not set directly anyway.
 
 
-Heiko
+Paul Bolle
