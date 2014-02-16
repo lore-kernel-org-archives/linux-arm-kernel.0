@@ -1,44 +1,45 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 16 Feb 2014 18:33:17 +0100
-Subject: [PATCH 1/2] ARM: SAMSUNG: use generic uncompress.h
-In-Reply-To: <3594365.ORKU4Q2jDp@phil>
-References: <3594365.ORKU4Q2jDp@phil>
-Message-ID: <9414533.cBWCZj35Zp@phil>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Sun, 16 Feb 2014 18:34:40 +0100
+Subject: [PATCH] arm: msm: remove MACH_MSM7X30_SURF
+Message-ID: <1392572080.28866.19.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All Samsung platforms use the custom uncompress.h simply to setup the uart
-for the initial debug output. This can also be done using the generic
-uncompress.h.
+The Kconfig symbol MACH_MSM7X30_SURF was added in v2.6.35. It has never
+been used. Setting it has no effect. There are no calls for
+machine_is_mach_msm7x30(). This symbol can safely be removed.
 
-Suggested-by: Sachin Kamat <sachin.kamat@linaro.org>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 ---
- arch/arm/Kconfig.debug | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Tested only with "git grep".
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 0531da8..a160744 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1145,7 +1145,7 @@ config DEBUG_UART_8250_FLOW_CONTROL
- 
- config DEBUG_UNCOMPRESS
- 	bool
--	depends on ARCH_MULTIPLATFORM || ARCH_MSM
-+	depends on ARCH_MULTIPLATFORM || ARCH_MSM || PLAT_SAMSUNG
- 	default y if DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
- 		     (!DEBUG_TEGRA_UART || !ZBOOT_ROM)
+ arch/arm/mach-msm/Kconfig | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 9625cf3..dab941a 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -62,7 +62,6 @@ config ARCH_MSM7X30
+ 	select ARCH_MSM_SCORPION
+ 	select CPU_V7
+ 	select GPIO_MSM_V1
+-	select MACH_MSM7X30_SURF # if !
+ 	select MSM_GPIOMUX
+ 	select MSM_PROC_COMM
+ 	select MSM_SMD
+@@ -115,12 +114,6 @@ config MACH_TROUT
  	help
-@@ -1161,7 +1161,8 @@ config DEBUG_UNCOMPRESS
+ 	  Support for the HTC Dream, T-Mobile G1, Android ADP1 devices.
  
- config UNCOMPRESS_INCLUDE
- 	string
--	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM
-+	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
-+					PLAT_SAMSUNG
- 	default "mach/uncompress.h"
- 
- config EARLY_PRINTK
+-config MACH_MSM7X30_SURF
+-	depends on ARCH_MSM7X30
+-	bool "MSM7x30 SURF"
+-	help
+-	  Support for the Qualcomm MSM7x30 SURF eval board.
+-
+ config MACH_QSD8X50_SURF
+ 	depends on ARCH_QSD8X50
+ 	bool "QSD8x50 SURF"
 -- 
 1.8.5.3
