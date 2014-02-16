@@ -1,58 +1,161 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Sun, 16 Feb 2014 14:44:07 +0100
-Subject: [PATCH V2 11/17] i2c: nomadik: Convert to devm functions
-In-Reply-To: <20140215150345.GD2579@katana>
-References: <1392300547-23365-1-git-send-email-ulf.hansson@linaro.org>
- <20140215150345.GD2579@katana>
-Message-ID: <CAPDyKFrt6QJVSypP5iD_oVxRUvNhzxGcbZ703zR1K8gwJ5uCeQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 16 Feb 2014 22:03:01 +0800
+Subject: [PATCH v4] bus: imx-weim: support CS GPR configuration
+Message-ID: <1392559381-30842-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 February 2014 16:03, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Thu, Feb 13, 2014 at 03:09:02PM +0100, Ulf Hansson wrote:
->> Use devm_* functions to simplify code and error handling.
->>
->> Cc: Alessandro Rubini <rubini@unipv.it>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Wolfram Sang <wsa@the-dreams.de>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>
->> Changes in v2:
->>       Rebased on top of latest i2c-nomadik branch.
->
-> Since this depends on Linus' patch already, I think it would be cleaner
-> if I pick this kinda unrelated (but wanted) devm patch, and ack the
-> PM stuff. If this for some reason makes things more complicated, I can
-> also simply ack this one.
+For imx50-weim and imx6q-weim type of devices, there might a WEIM CS
+space configuration register in General Purpose Register controller,
+e.g. IOMUXC_GPR1 on i.MX6Q.
 
-I think we will end up having merge conflicts, especially for the
-changes in the probe function if we decide to split it.
+Depending on which configuration of the following 4 is chosen for given
+system, IOMUXC_GPR1[11:0] should be set up as 05, 033, 0113 or 01111
+correspondingly.
 
-Would a way forward be to let you carry all the patches through your
-tree? I believe all but patch 17 can be safely merged. It is only this
-one that depends on the changes in the amba bus, so we can put this
-one on hold for a while.
+	CS0(128M) CS1(0M)  CS2(0M)  CS3(0M)
+	CS0(64M)  CS1(64M) CS2(0M)  CS3(0M)
+	CS0(64M)  CS1(32M) CS2(32M) CS3(0M)
+	CS0(32M)  CS1(32M) CS2(32M) CS3(32M)
 
-Another option would be if you drop Linus' patch from you branch and
-let him collect all the patches in a pull request instead?
+The patch creates a function for such type of devices, which scans
+'ranges' property of WEIM node and build the GPR value incrementally.
+Thus the WEIM CS GPR can be set up automatically at boot time.
 
-I happy with whatever we thinks are easiest. :-)
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Changes since v3:
+ - Add DT property fsl,weim-cs-gpr back, so that the support can work
+   for more i.MX SoCs than just i.MX6Q.
 
->
->> -     dev->virtbase = ioremap(adev->res.start, resource_size(&adev->res));
->> +     dev->virtbase = devm_ioremap(&adev->dev, adev->res.start,
->> +                             resource_size(&adev->res));
->>       if (!dev->virtbase) {
->>               ret = -ENOMEM;
->
-> IS_ERR()!
+ Documentation/devicetree/bindings/bus/imx-weim.txt |   27 +++++++++-
+ drivers/bus/imx-weim.c                             |   55 ++++++++++++++++++++
+ 2 files changed, 81 insertions(+), 1 deletion(-)
 
-Will fix in a v2!
-
->
-
-Thanks!
-
-Kind regards
-Ulf Hansson
+diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
+index 0fd76c4..363c970 100644
+--- a/Documentation/devicetree/bindings/bus/imx-weim.txt
++++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
+@@ -8,7 +8,12 @@ The actual devices are instantiated from the child nodes of a WEIM node.
+ 
+ Required properties:
+ 
+- - compatible:		Should be set to "fsl,<soc>-weim"
++ - compatible:		Should contain one of the following:
++			  "fsl,imx1-weim"
++			  "fsl,imx27-weim"
++			  "fsl,imx51-weim"
++			  "fsl,imx50-weim"
++			  "fsl,imx6q-weim"
+  - reg:			A resource specifier for the register space
+ 			(see the example below)
+  - clocks:		the clock, see the example below.
+@@ -19,6 +24,26 @@ Required properties:
+ 
+ 			   <cs-number> 0 <physical address of mapping> <size>
+ 
++Optional properties:
++
++ - fsl,weim-cs-gpr:	For "fsl,imx50-weim" and "fsl,imx6q-weim" type of
++			devices, it should be the phandle to the system General
++			Purpose Register controller that contains WEIM CS GPR
++			register, e.g. IOMUXC_GPR1 on i.MX6Q.  IOMUXC_GPR1[11:0]
++			should be set up as one of the following 4 possible
++			values depending on the CS space configuration.
++
++			IOMUXC_GPR1[11:0]    CS0    CS1    CS2    CS3
++			---------------------------------------------
++				05	    128M     0M     0M     0M
++				033          64M    64M     0M     0M
++				0113         64M    32M    32M     0M
++				01111        32M    32M    32M    32M
++
++			In case that the property is absent, the reset value or
++			what bootloader sets up in IOMUXC_GPR1[11:0] will be
++			used.
++
+ Timing property for child nodes. It is mandatory, not optional.
+ 
+  - fsl,weim-cs-timing:	The timing array, contains timing values for the
+diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+index 3ef58c8..35e9529 100644
+--- a/drivers/bus/imx-weim.c
++++ b/drivers/bus/imx-weim.c
+@@ -11,6 +11,9 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/of_device.h>
++#include <linux/mfd/syscon.h>
++#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
++#include <linux/regmap.h>
+ 
+ struct imx_weim_devtype {
+ 	unsigned int	cs_count;
+@@ -56,6 +59,55 @@ static const struct of_device_id weim_id_table[] = {
+ };
+ MODULE_DEVICE_TABLE(of, weim_id_table);
+ 
++static int __init imx_weim_gpr_setup(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct property *prop;
++	const __be32 *p;
++	struct regmap *gpr;
++	u32 gprvals[4] = {
++		05,	/* CS0(128M) CS1(0M)  CS2(0M)  CS3(0M) */
++		033,	/* CS0(64M)  CS1(64M) CS2(0M)  CS3(0M) */
++		0113,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
++		01111,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
++	};
++	u32 gprval = 0;
++	u32 val;
++	int cs = 0;
++	int i = 0;
++
++	gpr = syscon_regmap_lookup_by_phandle(np, "fsl,weim-cs-gpr");
++	if (IS_ERR(gpr)) {
++		dev_dbg(&pdev->dev, "failed to find weim-cs-gpr\n");
++		return 0;
++	}
++
++	of_property_for_each_u32(np, "ranges", prop, p, val) {
++		if (i % 4 == 0) {
++			cs = val;
++		} else if (i % 4 == 3 && val) {
++			val = (val / SZ_32M) | 1;
++			gprval |= val << cs * 3;
++		}
++		i++;
++	}
++
++	if (i == 0 || i % 4)
++		goto err;
++
++	for (i = 0; i < ARRAY_SIZE(gprvals); i++) {
++		if (gprval == gprvals[i]) {
++			/* Found it. Set up IOMUXC_GPR1[11:0] with it. */
++			regmap_update_bits(gpr, IOMUXC_GPR1, 0xfff, gprval);
++			return 0;
++		}
++	}
++
++err:
++	dev_err(&pdev->dev, "Invalid 'ranges' configuration\n");
++	return -EINVAL;
++}
++
+ /* Parse and set the timing for this device. */
+ static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
+ 				    const struct imx_weim_devtype *devtype)
+@@ -92,6 +144,9 @@ static int __init weim_parse_dt(struct platform_device *pdev,
+ 	struct device_node *child;
+ 	int ret;
+ 
++	if (devtype == &imx50_weim_devtype)
++		imx_weim_gpr_setup(pdev);
++
+ 	for_each_child_of_node(pdev->dev.of_node, child) {
+ 		if (!child->name)
+ 			continue;
+-- 
+1.7.9.5
