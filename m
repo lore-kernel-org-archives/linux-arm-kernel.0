@@ -1,38 +1,21 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 15 Feb 2014 23:17:19 -0300
-Subject: [PATCH v2 06/23] ARM: Kirkwood: ioremap the cpu_config register
- before using it.
-In-Reply-To: <1392459621-24003-7-git-send-email-andrew@lunn.ch>
+Date: Sat, 15 Feb 2014 23:22:09 -0300
+Subject: [PATCH v2 04/23] ARM: Kirkwood: Drop printing the SoC type and
+ revision
+In-Reply-To: <1392459621-24003-5-git-send-email-andrew@lunn.ch>
 References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
- <1392459621-24003-7-git-send-email-andrew@lunn.ch>
-Message-ID: <20140216021718.GA8926@localhost>
+ <1392459621-24003-5-git-send-email-andrew@lunn.ch>
+Message-ID: <20140216022208.GB8926@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Sat, Feb 15, 2014 at 11:20:02AM +0100, Andrew Lunn wrote:
+> This will be added back using the mach-mvebu equivelent once the move
+> has been made.
+> 
 
-On Sat, Feb 15, 2014 at 11:20:04AM +0100, Andrew Lunn wrote:
-[..]
->  
-> +/*
-> + * Disable propagation of mbus errors to the CPU local bus, as this
-> + * causes mbus errors (which can occur for example for PCI aborts) to
-> + * throw CPU aborts, which we're not set up to deal with.
-> + */
-> +void kirkwood_disable_mbus_error_propagation(void)
-> +{
-> +	void __iomem *cpu_config;
-> +
-> +	cpu_config = ioremap(CPU_CONFIG_PHYS, 4);
-> +	writel(readl(cpu_config) & ~CPU_CONFIG_ERROR_PROP, cpu_config);
-> +}
-> +
+Minor typo: s/equivelent/equivalent
 
-Any reason why this function above is not static __init?
-
-And then: any reason why you're not unmapping the region?
-
-(Sorry if this was already discussed)
 -- 
 Ezequiel Garc?a, Free Electrons
 Embedded Linux, Kernel and Android Engineering
