@@ -1,48 +1,117 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sun, 16 Feb 2014 19:51:37 +0100
-Subject: [PATCH] arm: omap: remove OMAP_PACKAGE_ZAC and OMAP_PACKAGE_ZAF
-Message-ID: <1392576697.28866.27.camel@x220>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sun, 16 Feb 2014 20:00:56 +0100
+Subject: [PATCH] regulator: core bugfix: Use normal enable for always_on
+ regulators
+Message-ID: <1392577256-20475-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig symbols OMAP_PACKAGE_ZAC and OMAP_PACKAGE_ZAF were added in
-v2.6.36. They have never been used. Setting them has no effect. These
-symbols can safely be removed.
+always_on regulators are currently enabled at registration using the
+enable function of struct regulator_ops.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+The regulator framework does support gpios to enable/disable regulators.
+gpios are not handled through struct regulator_ops functions as they are
+a basic component of the framework. Instead they are handled within
+_regulator_do_enable(). Unfortunately always-on regulator do not use
+this function, to gpio-controlled always-on regulators which are not
+enabled on boot. Furthermore they are disabled the whole time because
+regulator_enable() does not call _regulator_do_enable() for always-on
+regulator.
+
+This patch seperates _regulator_do_enable_no_delay from the
+_regulator_do_enable function to be able to call the enable function
+without delays. It then fixes the always_on behaviour by using this
+function.
+
+Cc: stable at vger.kernel.org
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
-Tested with "git grep".
+ drivers/regulator/core.c | 45 +++++++++++++++++++++++++++------------------
+ 1 file changed, 27 insertions(+), 18 deletions(-)
 
-A sort of related cleanup would be removing the preprocessoer defines of
-OMAP_PACKAGE_ZAC and OMAP_PACKAGE_ZAF that are unused since v3.14-rc1.
-
- arch/arm/mach-omap2/Kconfig | 7 -------
- 1 file changed, 7 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 7d4934e..bb51eeb 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -165,12 +165,6 @@ config SOC_TI81XX
- 	depends on ARCH_OMAP3
- 	default y
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 16a309e..8469244 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -953,6 +953,8 @@ static int machine_constraints_current(struct regulator_dev *rdev,
+ 	return 0;
+ }
  
--config OMAP_PACKAGE_ZAF
--       bool
--
--config OMAP_PACKAGE_ZAC
--       bool
--
- config OMAP_PACKAGE_CBC
-        bool
++static int _regulator_do_enable_no_delay(struct regulator_dev *rdev);
++
+ /**
+  * set_machine_constraints - sets regulator constraints
+  * @rdev: regulator source
+@@ -1013,9 +1015,8 @@ static int set_machine_constraints(struct regulator_dev *rdev,
+ 	/* If the constraints say the regulator should be on at this point
+ 	 * and we have control then make sure it is enabled.
+ 	 */
+-	if ((rdev->constraints->always_on || rdev->constraints->boot_on) &&
+-	    ops->enable) {
+-		ret = ops->enable(rdev);
++	if (rdev->constraints->always_on || rdev->constraints->boot_on) {
++		ret = _regulator_do_enable_no_delay(rdev);
+ 		if (ret < 0) {
+ 			rdev_err(rdev, "failed to enable\n");
+ 			goto out;
+@@ -1745,6 +1746,24 @@ static int regulator_ena_gpio_ctrl(struct regulator_dev *rdev, bool enable)
+ 	return 0;
+ }
  
-@@ -280,7 +274,6 @@ config MACH_NOKIA_N8X0
- 	default y
- 	select MACH_NOKIA_N810
- 	select MACH_NOKIA_N810_WIMAX
--	select OMAP_PACKAGE_ZAC
++static int _regulator_do_enable_no_delay(struct regulator_dev *rdev)
++{
++	int ret;
++
++	if (rdev->ena_pin) {
++		ret = regulator_ena_gpio_ctrl(rdev, true);
++		if (ret < 0)
++			return ret;
++		rdev->ena_gpio_state = 1;
++	} else if (rdev->desc->ops->enable) {
++		ret = rdev->desc->ops->enable(rdev);
++	} else {
++		ret = -EINVAL;
++	}
++
++	return ret;
++}
++
+ static int _regulator_do_enable(struct regulator_dev *rdev)
+ {
+ 	int ret, delay;
+@@ -1760,18 +1779,9 @@ static int _regulator_do_enable(struct regulator_dev *rdev)
  
- config MACH_NOKIA_RX51
- 	bool "Nokia N900 (RX-51) phone"
+ 	trace_regulator_enable(rdev_get_name(rdev));
+ 
+-	if (rdev->ena_pin) {
+-		ret = regulator_ena_gpio_ctrl(rdev, true);
+-		if (ret < 0)
+-			return ret;
+-		rdev->ena_gpio_state = 1;
+-	} else if (rdev->desc->ops->enable) {
+-		ret = rdev->desc->ops->enable(rdev);
+-		if (ret < 0)
+-			return ret;
+-	} else {
+-		return -EINVAL;
+-	}
++	ret = _regulator_do_enable_no_delay(rdev);
++	if (ret)
++		return ret;
+ 
+ 	/* Allow the regulator to ramp; it would be useful to extend
+ 	 * this for bulk operations so that the regulators can ramp
+@@ -3633,9 +3643,8 @@ int regulator_suspend_finish(void)
+ 		struct regulator_ops *ops = rdev->desc->ops;
+ 
+ 		mutex_lock(&rdev->mutex);
+-		if ((rdev->use_count > 0  || rdev->constraints->always_on) &&
+-				ops->enable) {
+-			error = ops->enable(rdev);
++		if (rdev->use_count > 0  || rdev->constraints->always_on) {
++			error = _regulator_do_enable_no_delay(rdev);
+ 			if (error)
+ 				ret = error;
+ 		} else {
 -- 
 1.8.5.3
