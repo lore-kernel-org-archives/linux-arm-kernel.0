@@ -1,63 +1,58 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Mon, 17 Feb 2014 00:31:32 +0100
-Subject: [PATCH] arm: msm: remove MACH_MSM7X30_SURF
-In-Reply-To: <20140216231407.GA18892@fifo99.com>
-References: <1392572080.28866.19.camel@x220>
- <20140216231407.GA18892@fifo99.com>
-Message-ID: <1392593492.28648.11.camel@x220>
+From: rientjes@google.com (David Rientjes)
+Date: Sun, 16 Feb 2014 15:42:46 -0800 (PST)
+Subject: Recent 3.x kernels: Memory leak causing OOMs
+In-Reply-To: <20140216225000.GO30257@n2100.arm.linux.org.uk>
+References: <20140216200503.GN30257@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1402161406120.26926@chino.kir.corp.google.com>
+ <20140216225000.GO30257@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1402161531380.10992@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+On Sun, 16 Feb 2014, Russell King - ARM Linux wrote:
 
-On Sun, 2014-02-16 at 23:14 +0000, dwalker at fifo99.com wrote:
-> On Sun, Feb 16, 2014 at 06:34:40PM +0100, Paul Bolle wrote:
-> > The Kconfig symbol MACH_MSM7X30_SURF was added in v2.6.35. It has never
-> > been used. Setting it has no effect. There are no calls for
-> > machine_is_mach_msm7x30(). This symbol can safely be removed.
-> > 
-> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> > ---
-> > Tested only with "git grep".
-> > 
-> >  arch/arm/mach-msm/Kconfig | 7 -------
-> >  1 file changed, 7 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-> > index 9625cf3..dab941a 100644
-> > --- a/arch/arm/mach-msm/Kconfig
-> > +++ b/arch/arm/mach-msm/Kconfig
-> > @@ -62,7 +62,6 @@ config ARCH_MSM7X30
-> >  	select ARCH_MSM_SCORPION
-> >  	select CPU_V7
-> >  	select GPIO_MSM_V1
-> > -	select MACH_MSM7X30_SURF # if !
-> >  	select MSM_GPIOMUX
-> >  	select MSM_PROC_COMM
-> >  	select MSM_SMD
-> > @@ -115,12 +114,6 @@ config MACH_TROUT
-> >  	help
-> >  	  Support for the HTC Dream, T-Mobile G1, Android ADP1 devices.
-> >  
-> > -config MACH_MSM7X30_SURF
-> > -	depends on ARCH_MSM7X30
-> > -	bool "MSM7x30 SURF"
-> > -	help
-> > -	  Support for the Qualcomm MSM7x30 SURF eval board.
-> > -
+> However, that doesn't negate the point which I brought up in my other
+> mail - I have been chasing a memory leak elsewhere, and I so far have
+> two dumps off a different machine - both of these logs are from the
+> same machine, which took 41 days to OOM.
 > 
+> http://www.home.arm.linux.org.uk/~rmk/misc/log-20131228.txt
+> http://www.home.arm.linux.org.uk/~rmk/misc/log-20140208.txt
 > 
-> It's not really enough .. There are support files for this platform, if you remove it you need to remove
-> those files also. You could also go the other way and connect the config option to those files.
 
-What support files are you thinking about here?
+You actually have free memory in both of these, the problem is 
+fragmentation: the first log shows oom kills where order=2 and the second 
+long shows oom kills where order=3.
 
-(Note that I need to rethink this patch anyway. The discussion about the
-patch that removes MACH_MXLADS showed me that machine_is_mach_msm7x30()
-is used in a more subtle way than I remembered. I hope to revisit this
-and similar patches in a few days to review them myself.)
+If I look at an example from the second log:
 
-Thanks,
+Normal free:35052kB min:1416kB low:1768kB high:2124kB active_anon:28kB 
+inactive_anon:60kB active_file:140kB inactive_file:140kB unevictable:0kB 
+isolated(anon):0kB isolated(file):0kB present:131072kB managed:125848kB 
+mlocked:0kB dirty:0kB writeback:40kB mapped:0kB shmem:0kB 
+slab_reclaimable:3024kB slab_unreclaimable:9036kB kernel_stack:1248kB 
+pagetables:1696kB unstable:0kB bounce:0kB free_cma:0kB writeback_tmp:0kB 
+pages_scanned:574 all_unreclaimable? yes
 
+you definitely are missing memory somewhere, but I'm not sure it's going 
+to be detected by kmemleak since the slab stats aren't very high.  The 
+system has ~123MB of memory, ~34.5MB is user or free memory, ~12MB is 
+slab, and ~3MB for stack and pagetables means you're missing over half of 
+your memory somewhere.  There's types of memory that isn't shown here for 
+things like vmalloc(), things that call alloc_pages() directly, hugepages, 
+etc.
 
-Paul Bolle
+You also have a lot of swap available:
+
+Free swap  = 1011476kB
+Total swap = 1049256kB
+
+These ooms are coming from the high-order sk_page_frag_refill() which has 
+been changed recently to fallback without calling the oom killer, you'll 
+need commit ed98df3361f0 ("net: use __GFP_NORETRY for high order 
+allocations") that Linus merged about 1.5 weeks ago.
+
+So I'd recommend forgetting about kmemleak here, try a kernel with that 
+commit to avoid the oom killing, and then capture /proc/meminfo at regular 
+intervals to see if something continuously grows that isn't captured in 
+the oom log.
