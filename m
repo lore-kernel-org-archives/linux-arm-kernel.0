@@ -1,55 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 16 Feb 2014 22:50:00 +0000
-Subject: Recent 3.x kernels: Memory leak causing OOMs
-In-Reply-To: <alpine.DEB.2.02.1402161406120.26926@chino.kir.corp.google.com>
-References: <20140216200503.GN30257@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1402161406120.26926@chino.kir.corp.google.com>
-Message-ID: <20140216225000.GO30257@n2100.arm.linux.org.uk>
+From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
+Date: Sun, 16 Feb 2014 18:15:44 -0500
+Subject: [PATCH 1/1] ARM: OMAP5: Fix reboot handling
+Message-ID: <1392592544-7884-1-git-send-email-vaibhav.bedia@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 16, 2014 at 02:17:44PM -0800, David Rientjes wrote:
-> On Sun, 16 Feb 2014, Russell King - ARM Linux wrote:
-> 
-> > Mem-info:
-> > Normal per-cpu:
-> > CPU    0: hi:   42, btch:   7 usd:  36
-> > active_anon:28041 inactive_anon:104 isolated_anon:0
-> >  active_file:11 inactive_file:11 isolated_file:0
-> >  unevictable:0 dirty:1 writeback:6 unstable:0
-> >  free:342 slab_reclaimable:170 slab_unreclaimable:570
-> >  mapped:13 shmem:139 pagetables:95 bounce:0
-> >  free_cma:0
-> > Normal free:1368kB min:1384kB low:1728kB high:2076kB active_anon:112164kB inactive_anon:416kB active_file:44kB inactive_file:44kB unevictable:0kB isolated(anon):0kB isolated(file):0kB present:131072kB managed:120152kB mlocked:0kB dirty:4kB
-> > writeback:24kB mapped:52kB shmem:556kB slab_reclaimable:680kB slab_unreclaimable:2280kB kernel_stack:248kB pagetables:380kB unstable:0kB bounce:0kB free_cma:0kB writeback_tmp:0kB pages_scanned:136 all_unreclaimable? yes
-> 
-> All memory is accounted for here, there appears to be no leakage.
-> 
-> > [ pid ]   uid  tgid total_vm      rss nr_ptes swapents oom_score_adj name
-> ...
-> > [  756]     0   756    28163    27776      57        0             0 ld-linux.so.2
-> 
-> This is taking ~108MB of your ~117MB memory.
+Use the correct register offset for issuing the
+reset command in OMAP5. Since dev_inst is set dynamically
+OMAP4 should not be affected by this change.
 
-Damn, you're right.  I was reading that as kB not pages, which means this
-is an /old/ real OOM.  It should only be taking around 30MB.  Sorry for
-wasting people's time with that one.
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@gmail.com>
+---
+Applies on top of v3.14-rc3
 
-However, that doesn't negate the point which I brought up in my other
-mail - I have been chasing a memory leak elsewhere, and I so far have
-two dumps off a different machine - both of these logs are from the
-same machine, which took 41 days to OOM.
+ arch/arm/mach-omap2/prminst44xx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-http://www.home.arm.linux.org.uk/~rmk/misc/log-20131228.txt
-http://www.home.arm.linux.org.uk/~rmk/misc/log-20140208.txt
-
-Rik van Riel had a look at the second one, and we came to the conclusion
-that running kmemleak would be a good idea - which I have been over the
-last 7 days and it's found nothing yet.  Both of those OOMs in those logs
-required a reboot to recover the machine to a usable state - in the second
-one, you could log in but it wasn't pleasant.
-
+diff --git a/arch/arm/mach-omap2/prminst44xx.c b/arch/arm/mach-omap2/prminst44xx.c
+index 6334b96..280f3c5 100644
+--- a/arch/arm/mach-omap2/prminst44xx.c
++++ b/arch/arm/mach-omap2/prminst44xx.c
+@@ -183,11 +183,11 @@ void omap4_prminst_global_warm_sw_reset(void)
+ 					OMAP4_PRM_RSTCTRL_OFFSET);
+ 	v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
+ 	omap4_prminst_write_inst_reg(v, OMAP4430_PRM_PARTITION,
+-				 OMAP4430_PRM_DEVICE_INST,
++				 dev_inst,
+ 				 OMAP4_PRM_RSTCTRL_OFFSET);
+ 
+ 	/* OCP barrier */
+ 	v = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
+-				    OMAP4430_PRM_DEVICE_INST,
++				    dev_inst,
+ 				    OMAP4_PRM_RSTCTRL_OFFSET);
+ }
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.8.1.2
