@@ -1,71 +1,26 @@
-From: mikpelinux@gmail.com (Mikael Pettersson)
-Date: Sun, 16 Feb 2014 17:48:03 +0100
-Subject: [REGRESSION] 3.14-rc2 boot failure on Kirkwood (qnap ts-119p+)
-In-Reply-To: <20140216152802.GA3637@localhost>
-References: <21248.39509.418884.931848@gargle.gargle.HOWL>
- <20140216143735.GA8680@localhost>
- <21248.54474.414445.790516@gargle.gargle.HOWL>
- <20140216152802.GA3637@localhost>
-Message-ID: <21248.60355.895333.625080@gargle.gargle.HOWL>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 16 Feb 2014 18:02:01 +0100
+Subject: [PATCH V2 11/17] i2c: nomadik: Convert to devm functions
+In-Reply-To: <CAPDyKFrt6QJVSypP5iD_oVxRUvNhzxGcbZ703zR1K8gwJ5uCeQ@mail.gmail.com>
+References: <1392300547-23365-1-git-send-email-ulf.hansson@linaro.org>
+ <20140215150345.GD2579@katana>
+ <CAPDyKFrt6QJVSypP5iD_oVxRUvNhzxGcbZ703zR1K8gwJ5uCeQ@mail.gmail.com>
+Message-ID: <20140216170201.GA2831@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ezequiel Garcia writes:
- > On Sun, Feb 16, 2014 at 04:10:02PM +0100, Mikael Pettersson wrote:
- > > Ezequiel Garcia writes:
- > >  > Hi Mikael,
- > >  > 
- > >  > On Sun, Feb 16, 2014 at 12:00:37PM +0100, Mikael Pettersson wrote:
- > >  > > My Kirkwood box worked fine with the 3.13 kernel, but with 3.14-rc2
- > >  > > boot always fails due to a kernel NULL dereference in __clk_put.
- > >  > > 
- > >  > > This is a non-DT kernel, with:
- > >  > > 
- > >  > > CONFIG_ARCH_KIRKWOOD=y
- > >  > > CONFIG_KIRKWOOD_LEGACY=y
- > >  > > CONFIG_MACH_TS219=y
- > >  > > # CONFIG_ARCH_KIRKWOOD_DT is not set
- > >  > > 
- > >  > 
- > >  > Thanks for the report. I thought this issue was already fixed, but I
- > >  > cannot find it on either the mailing lists or linux-next.
- > >  > 
- > >  > So, in case it hasn't been fixed here's an untested fix for you to test.
- > >  > Please try this patch and let us know.
- > >  > 
- > >  > Your SATA won't work but if the patch is OK the kernel wont't blow away.
- > > 
- > > Thanks, this fixes the oops but does leave sata_mv non-functional,
- > > which is still a major regression from 3.13.
- > > 
- > 
- > Please, try linux-next to get the most recent fixes and make sure you have
- > CONFIG_PHY_MVEBU_SATA enabled.
 
-If I backport
+> Would a way forward be to let you carry all the patches through your
+> tree? I believe all but patch 17 can be safely merged. It is only this
+> one that depends on the changes in the amba bus, so we can put this
+> one on hold for a while.
 
-"drivers: phy: Make NULL a valid phy reference" (04c2facad8fee66c981a51852806d8923336f362)
-"drivers: phy: Add support for optional phys" (788a4d56ff378bff0b8e685d03a962b36903a149)
-"ata: sata_mv: Fix probe failures with optional phys" (90aa2997029fa623fe9e3ec3a469a00a34130237)
+I'd favour this. Will do this next week unless somebody objects.
 
-from linux-next, and fix up your sata_mv cleanup fixes for a context reject in
-hunk #2, and enable CONFIG_OF and CONFIG_GENERIC_PHY, then I get a 3.14-rc2-ish
-kernel that boots and mounts its root fileystem.
-
-Still,
-
-@@ -123,6 +124,8 @@
- loop: module loaded
- sata_mv sata_mv.0: version 1.28
- sata_mv sata_mv.0: cannot get optional clkdev
-+sata_mv sata_mv.0: unable to find phy
-+sata_mv sata_mv.0: unable to find phy
- sata_mv sata_mv.0: slots 32 ports 2
- scsi0 : sata_mv
- scsi1 : sata_mv
-
-tells me that the PHY dependency is artificial.
-
-I hope this all can be resolved in a clean way before 3.14 final.
-
-/Mikael
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140216/a5322d11/attachment.sig>
