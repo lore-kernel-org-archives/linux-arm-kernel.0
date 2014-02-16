@@ -1,30 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 16 Feb 2014 09:58:07 +0800
-Subject: [RFC PATCH 1/3] regmap: Separate regmap dev initialization
-In-Reply-To: <5998a942a3dbfb2ef965d000168cbd7007315630.1392045742.git.michal.simek@xilinx.com>
-References: <cover.1392045742.git.michal.simek@xilinx.com>
- <5998a942a3dbfb2ef965d000168cbd7007315630.1392045742.git.michal.simek@xilinx.com>
-Message-ID: <20140216015807.GX4451@sirena.org.uk>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 15 Feb 2014 23:17:19 -0300
+Subject: [PATCH v2 06/23] ARM: Kirkwood: ioremap the cpu_config register
+ before using it.
+In-Reply-To: <1392459621-24003-7-git-send-email-andrew@lunn.ch>
+References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
+ <1392459621-24003-7-git-send-email-andrew@lunn.ch>
+Message-ID: <20140216021718.GA8926@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 04:22:33PM +0100, Michal Simek wrote:
-> Create special function regmap_attach_dev
-> which can be called separately out of regmap_init.
+Hi Andrew,
 
-Applied, thanks.  I've pushed a signed tag too so dependencies can pull
-this in:
+On Sat, Feb 15, 2014 at 11:20:04AM +0100, Andrew Lunn wrote:
+[..]
+>  
+> +/*
+> + * Disable propagation of mbus errors to the CPU local bus, as this
+> + * causes mbus errors (which can occur for example for PCI aborts) to
+> + * throw CPU aborts, which we're not set up to deal with.
+> + */
+> +void kirkwood_disable_mbus_error_propagation(void)
+> +{
+> +	void __iomem *cpu_config;
+> +
+> +	cpu_config = ioremap(CPU_CONFIG_PHYS, 4);
+> +	writel(readl(cpu_config) & ~CPU_CONFIG_ERROR_PROP, cpu_config);
+> +}
+> +
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git tags/nodev
+Any reason why this function above is not static __init?
 
-When sending things like this that add new functionality it's often
-helpful to send the patches adding users to review along with the core
-patch since this helps to review if the usage is actually sane and
-sensible.  From a purely regmap point of view this seems OK but...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140216/0d9e2231/attachment.sig>
+And then: any reason why you're not unmapping the region?
+
+(Sorry if this was already discussed)
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
