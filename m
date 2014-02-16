@@ -1,24 +1,26 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sat, 15 Feb 2014 23:34:58 -0300
-Subject: [PATCH v2 01/23] ARM: Kirkwood: Give pm.c its own header file.
-In-Reply-To: <1392459621-24003-2-git-send-email-andrew@lunn.ch>
+Date: Sat, 15 Feb 2014 23:35:41 -0300
+Subject: [PATCH v2 07/23] ARM: Kirkwood: ioremap memory control register
+In-Reply-To: <1392459621-24003-8-git-send-email-andrew@lunn.ch>
 References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
- <1392459621-24003-2-git-send-email-andrew@lunn.ch>
-Message-ID: <20140216023457.GC8926@localhost>
+ <1392459621-24003-8-git-send-email-andrew@lunn.ch>
+Message-ID: <20140216023540.GD8926@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 15, 2014 at 11:19:59AM +0100, Andrew Lunn wrote:
-> The pm code needs to be seperated from common.h in order to split DT
-> and non-DT systems apart. Move the declarations into a header file of
-> its own and include it where needed.
+On Sat, Feb 15, 2014 at 11:20:05AM +0100, Andrew Lunn wrote:
+> To allow removal of the global map of registers, make the pm code
+> ioremap the registers it needs.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/mach-kirkwood/include/mach/bridge-regs.h | 1 +
+>  arch/arm/mach-kirkwood/pm.c                       | 9 ++++++---
+>  2 files changed, 7 insertions(+), 3 deletions(-)
 > 
 
-s/seperated/separated
-
-Other than that:
-
 Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+
 -- 
 Ezequiel Garc?a, Free Electrons
 Embedded Linux, Kernel and Android Engineering
