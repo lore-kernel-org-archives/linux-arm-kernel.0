@@ -1,62 +1,25 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 16 Feb 2014 20:10:55 +0100
-Subject: [PATCH] dma: sdma: Add imx25 compatible
-Message-ID: <1392577855-23375-1-git-send-email-mpa@pengutronix.de>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Sun, 16 Feb 2014 20:12:45 +0100
+Subject: [PATCH] arm: imx: remove MACH_MXLADS
+In-Reply-To: <1392577615.265469392@f161.i.mail.ru>
+References: <1392573811.28866.22.camel@x220>
+ <1392574562.956803244@f244.i.mail.ru> <1392576223.28866.24.camel@x220>
+ <1392577615.265469392@f161.i.mail.ru>
+Message-ID: <1392577965.28866.37.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx25 did not work without a firmware previously.
+On Sun, 2014-02-16 at 23:06 +0400, Alexander Shiyan wrote:
+> Kconfig selects MACH_MXLADS, this enables machine_arch_type
+> from include/generated/mach-types.h which used for machine_is_xx() macro,
+> so if multiple boards is defined in the kernel, this cause to incorrect matching.
 
-This patch adds a DT compatible to pass the correct data with the
-default script addresses for imx25.
+But, as I stated in the commit explanation, there are no users of
+machine_is_mxlads().
 
-Add imx25 compatible to the list of compatibles in the binding
-documentation.
+> Russel, Arnd, fixme.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt | 16 ++++++++++------
- drivers/dma/imx-sdma.c                                 |  1 +
- 2 files changed, 11 insertions(+), 6 deletions(-)
+What does that mean?
 
-diff --git a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-index 68b83ec..ee9be99 100644
---- a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-+++ b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-@@ -1,12 +1,16 @@
- * Freescale Smart Direct Memory Access (SDMA) Controller for i.MX
- 
- Required properties:
--- compatible : Should be "fsl,imx31-sdma", "fsl,imx31-to1-sdma",
--  "fsl,imx31-to2-sdma", "fsl,imx35-sdma", "fsl,imx35-to1-sdma",
--  "fsl,imx35-to2-sdma", "fsl,imx51-sdma", "fsl,imx53-sdma" or
--  "fsl,imx6q-sdma". The -to variants should be preferred since they
--  allow to determnine the correct ROM script addresses needed for
--  the driver to work without additional firmware.
-+- compatible : Should be one of
-+      "fsl,imx25-sdma"
-+      "fsl,imx31-sdma", "fsl,imx31-to1-sdma", "fsl,imx31-to2-sdma"
-+      "fsl,imx35-sdma", "fsl,imx35-to1-sdma", "fsl,imx35-to2-sdma"
-+      "fsl,imx51-sdma"
-+      "fsl,imx53-sdma"
-+      "fsl,imx6q-sdma"
-+  The -to variants should be preferred since they allow to determnine the
-+  correct ROM script addresses needed for the driver to work without additional
-+  firmware.
- - reg : Should contain SDMA registers location and length
- - interrupts : Should contain SDMA interrupt
- - #dma-cells : Must be <3>.
-diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-index bdefc10..ce2ad7f 100644
---- a/drivers/dma/imx-sdma.c
-+++ b/drivers/dma/imx-sdma.c
-@@ -449,6 +449,7 @@ static const struct of_device_id sdma_dt_ids[] = {
- 	{ .compatible = "fsl,imx51-sdma", .data = &sdma_imx51, },
- 	{ .compatible = "fsl,imx35-sdma", .data = &sdma_imx35, },
- 	{ .compatible = "fsl,imx31-sdma", .data = &sdma_imx31, },
-+	{ .compatible = "fsl,imx25-sdma", .data = &sdma_imx25, },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sdma_dt_ids);
--- 
-1.8.5.3
+
+Paul Bolle
