@@ -1,24 +1,48 @@
 From: pebolle@tiscali.nl (Paul Bolle)
-Date: Sun, 16 Feb 2014 19:43:43 +0100
-Subject: [PATCH] arm: imx: remove MACH_MXLADS
-In-Reply-To: <1392574562.956803244@f244.i.mail.ru>
-References: <1392573811.28866.22.camel@x220>
- <1392574562.956803244@f244.i.mail.ru>
-Message-ID: <1392576223.28866.24.camel@x220>
+Date: Sun, 16 Feb 2014 19:51:37 +0100
+Subject: [PATCH] arm: omap: remove OMAP_PACKAGE_ZAC and OMAP_PACKAGE_ZAF
+Message-ID: <1392576697.28866.27.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2014-02-16 at 22:16 +0400, Alexander Shiyan wrote:
-> ???????????, 16 ??????? 2014, 19:03 +01:00 ?? Paul Bolle <pebolle@tiscali.nl>:
-> > The Kconfig symbol MACH_MXLADS was added in v2.6.29. It has never been
-> > used. Setting it has no effect. There are no calls for
-> > machine_is_mxlads(). This symbol can safely be removed.
-> > 
-> > Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> 
-> This is used by mach-mx1ads.c
+The Kconfig symbols OMAP_PACKAGE_ZAC and OMAP_PACKAGE_ZAF were added in
+v2.6.36. They have never been used. Setting them has no effect. These
+symbols can safely be removed.
 
-How is it used?
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Tested with "git grep".
 
+A sort of related cleanup would be removing the preprocessoer defines of
+OMAP_PACKAGE_ZAC and OMAP_PACKAGE_ZAF that are unused since v3.14-rc1.
 
-Paul Bolle
+ arch/arm/mach-omap2/Kconfig | 7 -------
+ 1 file changed, 7 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 7d4934e..bb51eeb 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -165,12 +165,6 @@ config SOC_TI81XX
+ 	depends on ARCH_OMAP3
+ 	default y
+ 
+-config OMAP_PACKAGE_ZAF
+-       bool
+-
+-config OMAP_PACKAGE_ZAC
+-       bool
+-
+ config OMAP_PACKAGE_CBC
+        bool
+ 
+@@ -280,7 +274,6 @@ config MACH_NOKIA_N8X0
+ 	default y
+ 	select MACH_NOKIA_N810
+ 	select MACH_NOKIA_N810_WIMAX
+-	select OMAP_PACKAGE_ZAC
+ 
+ config MACH_NOKIA_RX51
+ 	bool "Nokia N900 (RX-51) phone"
+-- 
+1.8.5.3
