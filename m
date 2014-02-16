@@ -1,28 +1,24 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 16 Feb 2014 23:01:42 +0100
-Subject: [PATCH v2] ARM: dts: tps65910 backup battery regulator
-In-Reply-To: <1389888503-32013-1-git-send-email-mpa@pengutronix.de>
-References: <1387539808-24910-3-git-send-email-mpa@pengutronix.de>
- <1389888503-32013-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140216220142.GA31006@pengutronix.de>
+Date: Sun, 16 Feb 2014 23:03:11 +0100
+Subject: [PATCH v4 0/2] usb: musb dsps updates
+In-Reply-To: <1389950556-6453-1-git-send-email-mpa@pengutronix.de>
+References: <1389950556-6453-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20140216220311.GB31006@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Jan 16, 2014 at 05:08:23PM +0100, Markus Pargmann wrote:
-> This patch adds a devicetree node for the backup battery regulator.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
+On Fri, Jan 17, 2014 at 10:22:34AM +0100, Markus Pargmann wrote:
 > Hi,
 > 
-> Mark Brown applied [1] the other part of the series which adds 'vbb' as
-> regulator-compatible. I forgot to add you in Cc.
+> The two remaining patches from the previous series "usb: musb bugfixes". In v4
+> I used the device name for the debugfs root dir and added a commit message to
+> the second patch.
 
-Any comments on this?
+Felipe, could you please have a look at this?
 
-Regards,
+Thanks,
 
 Markus
 
@@ -31,26 +27,14 @@ Markus
 > 
 > Markus
 > 
-> [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/289815/focus=290089
 > 
->  arch/arm/boot/dts/tps65910.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
+> Markus Pargmann (2):
+>   usb: musb: dsps, debugfs files
+>   usb: musb: dsps, use devm_kzalloc
 > 
-> diff --git a/arch/arm/boot/dts/tps65910.dtsi b/arch/arm/boot/dts/tps65910.dtsi
-> index 92693a8..b0ac665 100644
-> --- a/arch/arm/boot/dts/tps65910.dtsi
-> +++ b/arch/arm/boot/dts/tps65910.dtsi
-> @@ -82,5 +82,10 @@
->  			reg = <12>;
->  			regulator-compatible = "vmmc";
->  		};
-> +
-> +		vbb_reg: regulator at 13 {
-> +			reg = <13>;
-> +			regulator-compatible = "vbb";
-> +		};
->  	};
->  };
+>  drivers/usb/musb/musb_dsps.c | 58 +++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 55 insertions(+), 3 deletions(-)
+> 
 > -- 
 > 1.8.5.2
 > 
