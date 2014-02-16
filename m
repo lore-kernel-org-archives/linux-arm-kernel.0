@@ -1,81 +1,42 @@
-From: christian.gmeiner@gmail.com (Christian Gmeiner)
-Date: Sun, 16 Feb 2014 15:12:38 +0100
-Subject: [PATCH] ARM: imx6: build pm-imx6q.c independently of CONFIG_PM
-In-Reply-To: <1392539194-23447-1-git-send-email-shawn.guo@linaro.org>
-References: <1392539194-23447-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CAH9NwWf1RpAj8=AfQmPBdFJRWVWNS=qK5hjLzb2JkQsA0-EMXg@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Sun, 16 Feb 2014 18:22:44 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2NF0gYnVzOiBpbXgtd2VpbTogc3VwcG9ydCBDUyBHUFIg?=
+ =?UTF-8?B?Y29uZmlndXJhdGlvbg==?=
+In-Reply-To: <1392559381-30842-1-git-send-email-shawn.guo@linaro.org>
+References: <1392559381-30842-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1392560564.725313659@f356.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-02-16 9:26 GMT+01:00 Shawn Guo <shawn.guo@linaro.org>:
-> When building a kernel image with only CONFIG_CPU_IDLE but no CONFIG_PM,
-> we will get the following link error.
->
->   LD      init/built-in.o
-> arch/arm/mach-imx/built-in.o: In function `imx6q_enter_wait':
-> platform-spi_imx.c:(.text+0x25c0): undefined reference to `imx6q_set_lpm'
-> platform-spi_imx.c:(.text+0x25d4): undefined reference to `imx6q_set_lpm'
-> arch/arm/mach-imx/built-in.o: In function `imx6q_cpuidle_init':
-> platform-spi_imx.c:(.init.text+0x75d4): undefined reference to `imx6q_set_chicken_bit'
-> make[1]: *** [vmlinux] Error 1
->
-> Since pm-imx6q.c has been a collection of library functions that access
-> CCM low-power registers used by not only suspend but also cpuidle and
-> other drivers, let's build pm-imx6q.c independently of CONFIG_PM to fix
-> above error.
->
-> Reported-by: Lucas Stach <l.stach@pengutronix.de>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: stable at vger.kernel.org
-> ---
->  arch/arm/mach-imx/Makefile |    2 --
->  arch/arm/mach-imx/common.h |    4 +---
->  2 files changed, 1 insertion(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index befcaf5..ec41964 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -101,11 +101,9 @@ obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
->  obj-$(CONFIG_SOC_IMX6Q) += clk-imx6q.o mach-imx6q.o
->  obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
->
-> -ifeq ($(CONFIG_PM),y)
->  obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
->  # i.MX6SL reuses i.MX6Q code
->  obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o
-> -endif
->
->  # i.MX5 based machines
->  obj-$(CONFIG_MACH_MX51_BABBAGE) += mach-mx51_babbage.o
-> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> index 59c3b9b..baf439d 100644
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -144,13 +144,11 @@ void imx6q_set_chicken_bit(void);
->  void imx_cpu_die(unsigned int cpu);
->  int imx_cpu_kill(unsigned int cpu);
->
-> -#ifdef CONFIG_PM
->  void imx6q_pm_init(void);
->  void imx6q_pm_set_ccm_base(void __iomem *base);
-> +#ifdef CONFIG_PM
->  void imx5_pm_init(void);
->  #else
-> -static inline void imx6q_pm_init(void) {}
-> -static inline void imx6q_pm_set_ccm_base(void __iomem *base) {}
->  static inline void imx5_pm_init(void) {}
->  #endif
->
-> --
-> 1.7.9.5
->
+???????????, 16 ??????? 2014, 22:03 +08:00 ?? Shawn Guo <shawn.guo@linaro.org>:
+> For imx50-weim and imx6q-weim type of devices, there might a WEIM CS
+> space configuration register in General Purpose Register controller,
+> e.g. IOMUXC_GPR1 on i.MX6Q.
+...
+> +static int __init imx_weim_gpr_setup(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct property *prop;
+> +	const __be32 *p;
+> +	struct regmap *gpr;
+> +	u32 gprvals[4] = {
+> +		05,	/* CS0(128M) CS1(0M)  CS2(0M)  CS3(0M) */
+> +		033,	/* CS0(64M)  CS1(64M) CS2(0M)  CS3(0M) */
+> +		0113,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
+> +		01111,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
+> +	};
+> +	u32 gprval = 0;
+> +	u32 val;
+> +	int cs = 0;
+> +	int i = 0;
+> +
+> +	gpr = syscon_regmap_lookup_by_phandle(np, "fsl,weim-cs-gpr");
+> +	if (IS_ERR(gpr)) {
+> +		dev_dbg(&pdev->dev, "failed to find weim-cs-gpr\n");
+> +		return 0;
 
-Looks good - I hit the same issue a few days ago.
+Only one comment:
+You do not use these error codes in the probe(),
+so let's declare this function as void.
 
-Acked-by: Christian Gmeiner <christian.gmeiner@gmail.com>
-
---
-Christian Gmeiner, MSc
-
-https://soundcloud.com/christian-gmeiner
+---
