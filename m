@@ -1,129 +1,69 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 17 Feb 2014 18:43:30 -0500
-Subject: [PATCH v2 18/23] drivers: Enable building of Kirkwood drivers
- for mach-mvebu
-In-Reply-To: <1392459621-24003-19-git-send-email-andrew@lunn.ch>
-References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
- <1392459621-24003-19-git-send-email-andrew@lunn.ch>
-Message-ID: <20140217234330.GJ7862@titan.lakedaemon.net>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 17 Feb 2014 20:42:57 -0300
+Subject: [PATCH v7 11/18] watchdog: orion: Add per-compatible watchdog
+ start implementation
+In-Reply-To: <20140217211113.GD7862@titan.lakedaemon.net>
+References: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1392073237-2554-12-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20140217210822.GC7862@titan.lakedaemon.net>
+ <20140217211113.GD7862@titan.lakedaemon.net>
+Message-ID: <20140217234256.GA28783@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
-
-Please Cc; this to all of the relevant maintainers to collect Acks.
-
-thx,
-
-Jason.
-
-On Sat, Feb 15, 2014 at 11:20:16AM +0100, Andrew Lunn wrote:
-> With the move to mach-mvebu, drivers Kconfig need tweeking to allow
-> the kirkwood specific drivers to be built.
+On Mon, Feb 17, 2014 at 04:11:13PM -0500, Jason Cooper wrote:
+> On Mon, Feb 17, 2014 at 04:08:22PM -0500, Jason Cooper wrote:
+> > On Mon, Feb 10, 2014 at 08:00:30PM -0300, Ezequiel Garcia wrote:
+> > > To handle differences between SoCs this commit adds per-compatible
+> > > string start() function for the watchdog kick-off. This is preparation
+> > > work and makes no functionality changes to the current driver.
+> > > 
+> > > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> > > Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > > Tested-by: Willy Tarreau <w@1wt.eu>
+> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > ---
+> > >  drivers/watchdog/orion_wdt.c | 12 +++++++++++-
+> > >  1 file changed, 11 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+> > > index b48fd08..3925297 100644
+> > > --- a/drivers/watchdog/orion_wdt.c
+> > > +++ b/drivers/watchdog/orion_wdt.c
+> > > @@ -50,6 +50,7 @@ struct orion_watchdog_data {
+> > >  	int rstout_enable_bit;
+> > 
+> > 
+> > >  	int (*clock_init)(struct platform_device *,
+> > >  			  struct orion_watchdog *);
+> > 
+> > this...
+> > 
+> > > +	int (*start)(struct watchdog_device *);
+> > >  };
+> > >  
+> > >  struct orion_watchdog {
+> > ...
+> > > @@ -193,6 +202,7 @@ static const struct orion_watchdog_data orion_data = {
+> > >  	.wdt_enable_bit = BIT(4),
+> > >  	.wdt_counter_offset = 0x24,
+> > 
+> > 
+> > >  	.clock_init = orion_wdt_clock_init,
+> > 
+> > and this...
+> > 
+> > > +	.start = orion_start,
+> > >  };
+> > 
+> > cause a failure to apply the patch.  I hand-jammed it (attached), please
+> > let me know what is going on here (missed dep?)
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> v2
-> Simplify cpufreq/Kconfig.arm
-> ---
->  drivers/cpufreq/Kconfig.arm | 2 +-
->  drivers/cpuidle/Kconfig.arm | 2 +-
->  drivers/leds/Kconfig        | 4 ++--
->  drivers/phy/Kconfig         | 2 +-
->  drivers/thermal/Kconfig     | 2 +-
->  sound/soc/kirkwood/Kconfig  | 2 +-
->  6 files changed, 7 insertions(+), 7 deletions(-)
+> disregard.  I missed patch 10.  It helps.  :)
 > 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 31297499a60a..077db3aa985b 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -113,7 +113,7 @@ config ARM_INTEGRATOR
->  	  If in doubt, say Y.
->  
->  config ARM_KIRKWOOD_CPUFREQ
-> -	def_bool ARCH_KIRKWOOD && OF
-> +	def_bool MACH_KIRKWOOD
->  	help
->  	  This adds the CPUFreq driver for Marvell Kirkwood
->  	  SoCs.
-> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-> index d988948a89a0..97ccc31dbdd8 100644
-> --- a/drivers/cpuidle/Kconfig.arm
-> +++ b/drivers/cpuidle/Kconfig.arm
-> @@ -22,7 +22,7 @@ config ARM_HIGHBANK_CPUIDLE
->  
->  config ARM_KIRKWOOD_CPUIDLE
->  	bool "CPU Idle Driver for Marvell Kirkwood SoCs"
-> -	depends on ARCH_KIRKWOOD
-> +	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
->  	help
->  	  This adds the CPU Idle driver for Marvell Kirkwood SoCs.
->  
-> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-> index 72156c123033..44c358ecf5a1 100644
-> --- a/drivers/leds/Kconfig
-> +++ b/drivers/leds/Kconfig
-> @@ -421,7 +421,7 @@ config LEDS_MC13783
->  config LEDS_NS2
->  	tristate "LED support for Network Space v2 GPIO LEDs"
->  	depends on LEDS_CLASS
-> -	depends on ARCH_KIRKWOOD
-> +	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
->  	default y
->  	help
->  	  This option enable support for the dual-GPIO LED found on the
-> @@ -431,7 +431,7 @@ config LEDS_NS2
->  config LEDS_NETXBIG
->  	tristate "LED support for Big Network series LEDs"
->  	depends on LEDS_CLASS
-> -	depends on ARCH_KIRKWOOD
-> +	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
->  	default y
->  	help
->  	  This option enable support for LEDs found on the LaCie 2Big
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index afa2354f6600..5e6b33f9c294 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -24,7 +24,7 @@ config PHY_EXYNOS_MIPI_VIDEO
->  
->  config PHY_MVEBU_SATA
->  	def_bool y
-> -	depends on ARCH_KIRKWOOD || ARCH_DOVE
-> +	depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD
->  	depends on OF
->  	select GENERIC_PHY
->  
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index 35c066489a19..1bc9cbc4f1b8 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -142,7 +142,7 @@ config RCAR_THERMAL
->  
->  config KIRKWOOD_THERMAL
->  	tristate "Temperature sensor on Marvell Kirkwood SoCs"
-> -	depends on ARCH_KIRKWOOD
-> +	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
->  	depends on OF
->  	help
->  	  Support for the Kirkwood thermal sensor driver into the Linux thermal
-> diff --git a/sound/soc/kirkwood/Kconfig b/sound/soc/kirkwood/Kconfig
-> index 78ed4a42ad21..106e2e22fed2 100644
-> --- a/sound/soc/kirkwood/Kconfig
-> +++ b/sound/soc/kirkwood/Kconfig
-> @@ -1,6 +1,6 @@
->  config SND_KIRKWOOD_SOC
->  	tristate "SoC Audio for the Marvell Kirkwood and Dove chips"
-> -	depends on ARCH_KIRKWOOD || ARCH_DOVE || COMPILE_TEST
-> +	depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD || COMPILE_TEST
->  	help
->  	  Say Y or M if you want to add support for codecs attached to
->  	  the Kirkwood I2S interface. You will also need to select the
-> -- 
-> 1.8.5.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Phhheeew... my heart stopped for a minute ;-)
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
