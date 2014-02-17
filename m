@@ -1,35 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 17 Feb 2014 18:44:35 +0000
-Subject: [PATCH] asm-generic: add sched_setattr/sched_getattr syscalls
-In-Reply-To: <1391441617-21518-1-git-send-email-james.hogan@imgtec.com>
-References: <1391441617-21518-1-git-send-email-james.hogan@imgtec.com>
-Message-ID: <20140217184435.GD8361@arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 17 Feb 2014 11:16:58 -0800
+Subject: [PATCH v3] input: sirfsoc-onkey - report onkey untouch event by
+ detecting pin status
+In-Reply-To: <CAGsJ_4zjtWV3Z1AJ2bqekXn54rm=k8d4iOi_zzainCEnNGefCw@mail.gmail.com>
+References: <1392348001-4950-1-git-send-email-21cnbao@gmail.com>
+ <20140214075717.GA14682@core.coreip.homeip.net>
+ <CAGsJ_4xqnZAO6vpkgTEHmfp9+nbWa1qwQ4pda6B2sSrEtbV3ZA@mail.gmail.com>
+ <847BC5012124A94BB5CA1B26E022CCA3012BAFDC27@SHAASIEXM01.ASIA.ROOT.PRI>
+ <CAGsJ_4zjtWV3Z1AJ2bqekXn54rm=k8d4iOi_zzainCEnNGefCw@mail.gmail.com>
+Message-ID: <20140217191658.GA19223@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 03:33:37PM +0000, James Hogan wrote:
-> Add the sched_setattr and sched_getattr syscalls to the generic syscall
-> list, which is used by the following architectures: arc, arm64, c6x,
-> hexagon, metag, openrisc, score, tile, unicore32.
+On Fri, Feb 14, 2014 at 09:41:06PM +0800, Barry Song wrote:
+> >> Input: sirfsoc-onkey - implement open and close methods
+> >>
+> >> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> >>
+> >> We can control whetehr device generates interrupts or not so let's
+> >> implement open and close methods of input device so that we do not do any
+> >> processing until there are users.
+> >>
+> >> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 > 
-> Signed-off-by: James Hogan <james.hogan@imgtec.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: linux-arch at vger.kernel.org
-> Cc: Vineet Gupta <vgupta@synopsys.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
-> Cc: linux-c6x-dev at linux-c6x.org
-> Cc: Richard Kuo <rkuo@codeaurora.org>
-> Cc: linux-hexagon at vger.kernel.org
-> Cc: linux-metag at vger.kernel.org
-> Cc: Jonas Bonn <jonas@southpole.se>
-> Cc: linux at lists.openrisc.net
-> Cc: Chen Liqin <liqin.linux@gmail.com>
-> Cc: Lennox Wu <lennox.wu@gmail.com>
-> Cc: Chris Metcalf <cmetcalf@tilera.com>
-> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+> Tested-by: Xianglong Du <Xianglong.Du@csr.com>
+> 
+> Dmitry, will you push this one to your tree so that i can rebase others?
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+I rebased and pushed everything out, please take a look to make sure it
+all looks good.
+
+Thanks.
+
+-- 
+Dmitry
