@@ -1,103 +1,80 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Feb 2014 18:12:10 +0000
-Subject: [PATCH v3 1/6] arm64: Add ftrace support
-In-Reply-To: <1391768336-5642-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1382598488-13511-1-git-send-email-takahiro.akashi@linaro.org>
- <1391768336-5642-1-git-send-email-takahiro.akashi@linaro.org>
- <1391768336-5642-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140217181209.GF26590@mudshark.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 17 Feb 2014 19:17:12 +0100
+Subject: [PATCH] arm64: add workaround for ambiguous C99 stdint.h types
+In-Reply-To: <20140217180237.GC8361@arm.com>
+References: <1390768248-1688-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140217122334.GA19102@arm.com>
+ <CAKv+Gu_=kgP1LS-HN6n+QfHMyi142aNpGR0roqRo2tinYXdxPw@mail.gmail.com>
+ <20140217174247.GA8361@arm.com>
+ <CAKv+Gu-RmZ4h=6+h_Fn+NQbDN81FNZHhnVd7Nfspx_LynJ1w6Q@mail.gmail.com>
+ <20140217180237.GC8361@arm.com>
+Message-ID: <CAKv+Gu-rV5mvfegjqGUb+nET8FLsB2Xx0DdXjnNU0BCUUOYBTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 10:18:51AM +0000, AKASHI Takahiro wrote:
-> This patch implements arm64 specific part to support function tracers,
-> such as function (CONFIG_FUNCTION_TRACER), function_graph
-> (CONFIG_FUNCTION_GRAPH_TRACER) and function profiler
-> (CONFIG_FUNCTION_PROFILER).
-> 
-> With 'function' tracer, all the functions in the kernel are traced with
-> timestamps in ${sysfs}/tracing/trace. If function_graph tracer is
-> specified, call graph is generated.
-> 
-> The kernel must be compiled with -pg option so that _mcount() is inserted
-> at the beginning of functions. This function is called on every function's
-> entry as long as tracing is enabled.
-> In addition, function_graph tracer also needs to be able to probe function's
-> exit. ftrace_graph_caller() & return_to_handler do this by faking link
-> register's value to intercept function's return path.
-> 
-> More details on architecture specific requirements are described in
-> Documentation/trace/ftrace-design.txt.
+On 17 February 2014 19:02, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Feb 17, 2014 at 05:57:22PM +0000, Ard Biesheuvel wrote:
+>> On 17 February 2014 18:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Mon, Feb 17, 2014 at 12:40:18PM +0000, Ard Biesheuvel wrote:
+>> >> On 17 February 2014 13:23, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> >> > On Sun, Jan 26, 2014 at 08:30:48PM +0000, Ard Biesheuvel wrote:
+>> >> >> In a way similar to ARM commit 09096f6a0ee2 ("ARM: 7822/1: add workaround
+>> >> >> for ambiguous C99 stdint.h types"), this patch redefines the macros that
+>> >> >> are used in stdint.h so its definitions of uint64_t and int64_t are
+>> >> >> compatible with those of the kernel.
+>> >> >>
+>> >> >> In order to do so, drop types.h from generic-y and create a specific arm64
+>> >> >> version identical to the generic one with just the #define overrides added.
+>> >> >
+>> >> > I tried but still can't get what this patch is about. Do the
+>> >> > linux/types.h types ever get to user space? We have uapi/linux/types.h
+>> >> > for this.
+>> >> >
+>> >> > Can you give an example of where this is needed? Which source file
+>> >> > includes both stdint.h and linux/types.h (non-uapi version)?
+>> >>
+>> >> It's not about user space, it is mainly about the use of NEON
+>> >> instrinsics in the kernel.
+>> >>
+>> >> If you do the following:
+>> >>
+>> >> #Include <linux/types.h>
+>> >> #include <arm_neon.h>
+>> >
+>> > For other intrinsics that we use like __builtin_ctzl(), do we need to
+>> > explicitly include gcc headers? I don't think we do and I really don't
+>> > like such arm_neon.h include which brings in other user headers. Don't
+>> > we have any work around this?
+>>
+>> Well, I talked to the toolchain guys at the time and they really
+>> disliked the idea of coding directly against the __builtins because
+>> they are not considered a stable interface, especially because the
+>> interface that /is/ considered stable (arm_neon.h) is supported both
+>> on ARM and on arm64.
+>
+> Than we don't use the Neon __builtins in the kernel.
+>
+>> > My inbox only has some discussion in May last year on the linaro-kernel
+>> > list without any clear conclusion (it could be that I deleted other
+>> > emails).
+>>
+>> There was some discussion, indeed, but for ARM, with the conclusion
+>> being the fix I mentioned in the patch: 09096f6a0ee2 ("ARM: 7822/1:
+>> add workaround
+>> for ambiguous C99 stdint.h types"), only in that case, the ambiguity
+>> is (unsurprisingly) about the 32 bit types, not the 64 bit ones.
+>
+> My worry is that some future toolchain may include something else in
+> this file and get other type conflicts. It really looks fragile.
+>
 
-[...]
+Well, the GCC folks are quite careful not to depend on arbitrary user
+headers when the -ffreestanding option is set. Also, the real problem
+is the fact that Linux defines C99 types, but does so in an
+incompatible way. (I.e., one could also argue that the Linux typedefs
+should be based on GCC's builtin #defines of __INT64_TYPE,
+__UINT64_TYPE, etc if defined). So the chances of something similar
+reappearing all of a sudden are quite slim imo.
 
-> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-> new file mode 100644
-> index 0000000..0d5dfdb
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/ftrace.h
-> @@ -0,0 +1,23 @@
-> +/*
-> + * arch/arm64/include/asm/ftrace.h
-> + *
-> + * Copyright (C) 2013 Linaro Limited
-> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#ifndef __ASM_FTRACE_H
-> +#define __ASM_FTRACE_H
-> +
-> +#ifdef CONFIG_FUNCTION_TRACER
-> +#define MCOUNT_ADDR            ((unsigned long)_mcount)
-> +#define MCOUNT_INSN_SIZE       4 /* sizeof mcount call */
-
-You can use AARCH64_INSN_SIZE here.
-
-> +#include <linux/linkage.h>
-> +#include <asm/ftrace.h>
-> +
-> +/*
-> + * Gcc with -pg will put the following code in the beginning of each function:
-> + *      mov x0, x30
-> + *      bl _mcount
-> + *     [function's body ...]
-> + * "bl _mcount" may be replaced to "bl ftrace_caller" or NOP if dynamic
-> + * ftrace is enabled.
-> + *
-> + * Please note that x0 as an argument will not be used here because we can
-> + * get lr(x30) of insturmented function at any time by winding up call stack
-
-instrumented
-
-> + * as long as the kernel is compiled without -fomit-frame-pointer.
-> + * (or CONFIG_FRAME_POINTER, this is forced on arm64)
-> + *
-> + * stack layout after mcount_enter:
-> + *
-> + *   0 ---------------------------------------- sp of _mcount()
-> + *      x29: fp of instrumented function       fp is not winded
-> + *     --------------------
-> + *      x30: lr of _mcount() (= instrumented function's pc)
-> + * +16 ---------------------------------------- sp of instrumented function
-> + *
-> + *     ....
-> + *
-> + * +xx ---------------------------------------- fp of instrumented function
-> + *      x29: fp of parent
-> + *     --------------------
-> + *      x30: lr of insturmented function (= parent's pc)
-> + *     --------------------
-> + *      xxx
-> + */
-> +
-> +       .macro mcount_enter
-> +       stp     x29, x30, [sp, #-48]!
-> +       .endm
-
-Can you elaborate in your comment about where this 48 comes from please? I
-can't join it up with your ascii art.
-
-Will
+Regards,
+Ard.
