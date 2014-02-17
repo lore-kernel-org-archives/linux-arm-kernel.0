@@ -1,55 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 17 Feb 2014 09:26:58 +0000
-Subject: [PATCH 1/2] mfd: palmas: support IRQ inversion at the board level
-In-Reply-To: <1392415108-4365-1-git-send-email-swarren@wwwdotorg.org>
-References: <1392415108-4365-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140217092658.GC17875@lee--X1>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 17 Feb 2014 10:27:48 +0100
+Subject: [PATCH v6] ARM: DTS: imx5* imx6*, use imx51-ssi
+In-Reply-To: <20140217012643.GA9879@S2101-09.ap.freescale.net>
+References: <20140118083840.GD3430@S2101-09.ap.freescale.net>
+ <1390220023-6423-1-git-send-email-mpa@pengutronix.de>
+ <20140216220827.GC31006@pengutronix.de>
+ <20140217012643.GA9879@S2101-09.ap.freescale.net>
+Message-ID: <20140217092748.GA9197@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Stephen Warren <swarren@nvidia.com>
+On Mon, Feb 17, 2014 at 09:26:45AM +0800, Shawn Guo wrote:
+> On Sun, Feb 16, 2014 at 11:08:27PM +0100, Markus Pargmann wrote:
+> > Hi Shawn,
+> > 
+> > On Mon, Jan 20, 2014 at 01:13:43PM +0100, Markus Pargmann wrote:
+> > > imx51-ssi and imx21-ssi are different IPs. imx51-ssi supports online
+> > > reconfiguration and needs this for correct interaction with SDMA. This
+> > > patch adds imx51-ssi before each imx21-ssi for all imx5/imx6 SoCs.
+> > > 
+> > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > > ---
+> > > Hi Shawn,
+> > > 
+> > > Sorry for that last patch. I fixed it in this patch.
+> > 
+> > Ping. Should I send this again after rebasing it onto your latest branch?
 > 
-> Some boards or SoCs have an inverter between the PMIC IRQ output pin and
-> the IRQ controller input signal.
-> 
-> The IRQ specifier in DT is meant to represent the IRQ flags at the input
-> to the IRQ controller.
-> 
-> The Palmas HW's IRQ output has configurable polarity. The driver
-> currently selects the output polarity by querying the input polarity at
-> the IRQ controller. This works fine if the IRQ signal is routed directly
-> from the PMIC to the IRQ controller with no intervening logic. However,
-> if the signal is inverted between the two, this automatic polarity
-> selection gets the wrong answer.
-> 
-> Add an additional optional DT and platform data parameter which indicates
-> that such an inversion occurs. If this option is enabled, the Palmas
-> driver will configure its IRQ output to the opposite polarity of the IRQ
-> controller's input.
-> 
-> An alternative would have been to add a new non-optional DT parameter to
-> indicate the exact desired output polarity. However, this would have been
-> an incompatible change to the DT binding.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> If this patch could be applied to its own branch (w/ signed tag) in the
-> MFD tree, that would great; then I can pull patch 1/2 into the Tegra tree
-> so that I can apply patch 2/2 to the Tegra tree. Thanks.
-> ---
->  Documentation/devicetree/bindings/mfd/palmas.txt | 6 ++++++
->  drivers/mfd/palmas.c                             | 4 ++++
->  include/linux/mfd/palmas.h                       | 1 +
->  3 files changed, 11 insertions(+)
+> I believe I've applied the v5 with a minor fix [1].  I split it into 2
+> though, one for imx5 [2] and the other for imx6 [2], because I have to
+> make my imx/dt pull request small to please arm-soc folks.
 
-For the core changes:
-  Acked-by: Lee Jones <lee.jones@linaro.org>
+Oh thanks, I didn't notice that you applied v5 already.
 
-NB: The DT guys prefer documentation to be submitted in a separate
-patch these days.
+Regards,
+
+Markus
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140217/e892f742/attachment.sig>
