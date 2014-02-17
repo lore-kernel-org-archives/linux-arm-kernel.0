@@ -1,148 +1,35 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 17 Feb 2014 22:37:11 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MyAxLzddIHR0eS9zZXJpYWw6IEFkZCBHUElPTElCIGhl?=
- =?UTF-8?B?bHBlcnMgZm9yIGNvbnRyb2xsaW5nIG1vZGVtIGxpbmVz?=
-In-Reply-To: <1392656247-3351-2-git-send-email-richard.genoud@gmail.com>
-References: <1392656247-3351-1-git-send-email-richard.genoud@gmail.com>
- <1392656247-3351-2-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1392662231.122430857@f359.i.mail.ru>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 17 Feb 2014 18:44:35 +0000
+Subject: [PATCH] asm-generic: add sched_setattr/sched_getattr syscalls
+In-Reply-To: <1391441617-21518-1-git-send-email-james.hogan@imgtec.com>
+References: <1391441617-21518-1-git-send-email-james.hogan@imgtec.com>
+Message-ID: <20140217184435.GD8361@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-A few comments below..
-
-???????????, 17 ??????? 2014, 17:57 +01:00 ?? Richard Genoud <richard.genoud@gmail.com>:
-> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
-> GPIO.
-> This will be useful for many boards which have a serial controller that
-> only handle CTS/RTS pins (or even just RX/TX).
+On Mon, Feb 03, 2014 at 03:33:37PM +0000, James Hogan wrote:
+> Add the sched_setattr and sched_getattr syscalls to the generic syscall
+> list, which is used by the following architectures: arc, arm64, c6x,
+> hexagon, metag, openrisc, score, tile, unicore32.
 > 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> ---
-...
-> diff --git a/drivers/tty/serial/serial_mctrl_gpio.c b/drivers/tty/serial/serial_mctrl_gpio.c
-...
-> +static const struct {
-> +	const char *name;
-> +	unsigned int mctrl;
-> +	bool dir_out;
-> +} mctrl_gpios_desc[] = {
-> +	{ "cts", TIOCM_CTS, false, },
-> +	{ "dsr", TIOCM_DSR, false, },
-> +	{ "dcd", TIOCM_CD, false, },
-> +	{ "ri", TIOCM_RI, false, },
-> +	{ "rts", TIOCM_RTS, true, },
-> +	{ "dtr", TIOCM_DTR, true, },
-> +	{ "out1", TIOCM_OUT1, true, },
-> +	{ "out2", TIOCM_OUT2, true, },
-> +};
-> +
-> +void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
-> +{
-> +	enum mctrl_gpio_idx i;
-> +
-> +	for (i = 0; i < UART_GPIO_MAX; i++)
+> Signed-off-by: James Hogan <james.hogan@imgtec.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-arch at vger.kernel.org
+> Cc: Vineet Gupta <vgupta@synopsys.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Mark Salter <msalter@redhat.com>
+> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
+> Cc: linux-c6x-dev at linux-c6x.org
+> Cc: Richard Kuo <rkuo@codeaurora.org>
+> Cc: linux-hexagon at vger.kernel.org
+> Cc: linux-metag at vger.kernel.org
+> Cc: Jonas Bonn <jonas@southpole.se>
+> Cc: linux at lists.openrisc.net
+> Cc: Chen Liqin <liqin.linux@gmail.com>
+> Cc: Lennox Wu <lennox.wu@gmail.com>
+> Cc: Chris Metcalf <cmetcalf@tilera.com>
+> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
 
-Use ARRAY_SIZE(mctrl_gpios_desc) here and elsewhere below.
-
-> +		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
-> +		    mctrl_gpios_desc[i].dir_out)
-> +			gpiod_set_value(gpios->gpio[i],
-> +					!!(mctrl & mctrl_gpios_desc[i].mctrl));
-> +}
-> +EXPORT_SYMBOL_GPL(mctrl_gpio_set);
-> +
-> +unsigned int mctrl_gpio_get(struct mctrl_gpios *gpios, unsigned int *mctrl)
-> +{
-
-Why you want to put mctrl as parameter here?
-Let's return mctrl from GPIOs, then handle this value as you want int the driver.
-
-> +	enum mctrl_gpio_idx i;
-> +
-> +	for (i = 0; i < UART_GPIO_MAX; i++) {
-> +		if (!IS_ERR_OR_NULL(gpios->gpio[i]) &&
-> +		    !mctrl_gpios_desc[i].dir_out) {
-> +			if (gpiod_get_value(gpios->gpio[i]))
-> +				*mctrl |= mctrl_gpios_desc[i].mctrl;
-> +			else
-> +				*mctrl &= ~mctrl_gpios_desc[i].mctrl;
-> +		}
-> +	}
-> +
-> +	return *mctrl;
-> +}
-> +EXPORT_SYMBOL_GPL(mctrl_gpio_get);
-> +
-
-> +int mctrl_gpio_init(struct device *dev, struct mctrl_gpios *gpios)
-> +{
-
-I suggest to allocate "gpios" here and return pointer to this structure
-or ERR_PTR(). Additionally, as I mentioned before, add "index" variable
-to specify port number.
-
-> +	enum mctrl_gpio_idx i;
-> +	int err = 0;
-> +	int ret = 0;
-> +
-> +	for (i = 0; i < UART_GPIO_MAX; i++) {
-> +		gpios->gpio[i] = devm_gpiod_get(dev, mctrl_gpios_desc[i].name);
-> +
-> +		/*
-> +		 * The GPIOs are maybe not all filled,
-> +		 * this is not an error.
-> +		 */
-> +		if (IS_ERR_OR_NULL(gpios->gpio[i]))
-> +			continue;
-> +
-> +		if (mctrl_gpios_desc[i].dir_out)
-> +			err = gpiod_direction_output(gpios->gpio[i], 0);
-> +		else
-> +			err = gpiod_direction_input(gpios->gpio[i]);
-> +		if (err) {
-> +			dev_err(dev, "Unable to set direction for %s GPIO",
-> +				mctrl_gpios_desc[i].name);
-> +			devm_gpiod_put(dev, gpios->gpio[i]);
-> +			gpios->gpio[i] = NULL;
-> +			ret--;
-> +		}
-> +	}
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(mctrl_gpio_init);
-...
-> diff --git a/drivers/tty/serial/serial_mctrl_gpio.h b/drivers/tty/serial/serial_mctrl_gpio.h
-...
-> +enum mctrl_gpio_idx {
-> +	UART_GPIO_CTS,
-> +	UART_GPIO_DSR,
-> +	UART_GPIO_DCD,
-> +	UART_GPIO_RI,
-> +	UART_GPIO_RTS,
-> +	UART_GPIO_DTR,
-> +	UART_GPIO_OUT1,
-> +	UART_GPIO_OUT2,
-> +	UART_GPIO_MAX,
-> +};
-> +
-> +struct mctrl_gpios {
-> +	struct gpio_desc *gpio[UART_GPIO_MAX];
-
-struct gpio_desc *gpio;
-
-...
-> +static inline
-> +int mctrl_gpio_init(struct device *dev, struct mctrl_gpios *gpios)
-> +{
-> +	return -UART_GPIO_MAX;
-
-return -ENOSYS;
-
-...
-
-Thanks.
----
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
