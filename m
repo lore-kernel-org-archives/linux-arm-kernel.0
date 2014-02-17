@@ -1,9 +1,9 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 17 Feb 2014 17:57:25 +0100
-Subject: [PATCH v3 5/7] ARM: at91: gpio: implement get_direction
+Date: Mon, 17 Feb 2014 17:57:26 +0100
+Subject: [PATCH v3 6/7] pinctrl: at91: implement get_direction
 In-Reply-To: <1392656247-3351-1-git-send-email-richard.genoud@gmail.com>
 References: <1392656247-3351-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1392656247-3351-6-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1392656247-3351-7-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,46 +12,38 @@ Otherwise, it returns -EINVAL.
 
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 ---
- arch/arm/mach-at91/gpio.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/pinctrl/pinctrl-at91.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/mach-at91/gpio.c b/arch/arm/mach-at91/gpio.c
-index a5afcf76550e..afbe34027e62 100644
---- a/arch/arm/mach-at91/gpio.c
-+++ b/arch/arm/mach-at91/gpio.c
-@@ -49,6 +49,7 @@ static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset);
- static void at91_gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip);
- static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val);
- static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset);
-+static int at91_gpiolib_get_direction(struct gpio_chip *chip, unsigned offset);
- static int at91_gpiolib_direction_output(struct gpio_chip *chip,
- 					 unsigned offset, int val);
- static int at91_gpiolib_direction_input(struct gpio_chip *chip,
-@@ -60,6 +61,7 @@ static int at91_gpiolib_to_irq(struct gpio_chip *chip, unsigned offset);
- 		.chip = {						\
- 			.label		  = name,			\
- 			.request	  = at91_gpiolib_request,	\
-+			.get_direction    = at91_gpiolib_get_direction, \
- 			.direction_input  = at91_gpiolib_direction_input, \
- 			.direction_output = at91_gpiolib_direction_output, \
- 			.get		  = at91_gpiolib_get,		\
-@@ -799,6 +801,17 @@ static int at91_gpiolib_request(struct gpio_chip *chip, unsigned offset)
- 	return 0;
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index d990e33d8aa7..9bd18fdc604a 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -1137,6 +1137,17 @@ static void at91_gpio_free(struct gpio_chip *chip, unsigned offset)
+ 	pinctrl_free_gpio(gpio);
  }
  
-+static int at91_gpiolib_get_direction(struct gpio_chip *chip, unsigned offset)
++static int at91_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
 +{
 +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
 +	void __iomem *pio = at91_gpio->regbase;
 +	unsigned mask = 1 << offset;
 +	u32 osr;
 +
-+	osr = __raw_readl(pio + PIO_OSR);
++	osr = readl_relaxed(pio + PIO_OSR);
 +	return !(osr & mask);
 +}
 +
- static int at91_gpiolib_direction_input(struct gpio_chip *chip,
- 					unsigned offset)
+ static int at91_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
  {
+ 	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+@@ -1543,6 +1554,7 @@ static int at91_gpio_of_irq_setup(struct device_node *node,
+ static struct gpio_chip at91_gpio_template = {
+ 	.request		= at91_gpio_request,
+ 	.free			= at91_gpio_free,
++	.get_direction		= at91_gpio_get_direction,
+ 	.direction_input	= at91_gpio_direction_input,
+ 	.get			= at91_gpio_get,
+ 	.direction_output	= at91_gpio_direction_output,
 -- 
 1.8.5
