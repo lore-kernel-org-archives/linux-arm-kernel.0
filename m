@@ -1,73 +1,77 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 17 Feb 2014 16:20:53 +0100
-Subject: [PATCH V3 15/17] i2c: nomadik: Convert to late and early system PM
- callbacks
-Message-ID: <1392650453-14925-1-git-send-email-ulf.hansson@linaro.org>
+Date: Mon, 17 Feb 2014 16:21:02 +0100
+Subject: [PATCH V3 16/17] i2c: nomadik: Remove busy check for transfers at
+ suspend late
+Message-ID: <1392650462-14960-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At system suspend_late, runtime PM has been disabled by the PM core
-which means we can safely operate on these resources. Consequentially
-we no longer have to wait until the noirq phase of the system suspend.
+We should never be busy performing transfers at suspend late, thus
+there are no reason to check for it.
 
 Cc: Alessandro Rubini <rubini@unipv.it>
 Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Wolfram Sang <wsa@the-dreams.de>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/i2c/busses/i2c-nomadik.c |   18 ++++--------------
- 1 file changed, 4 insertions(+), 14 deletions(-)
+ drivers/i2c/busses/i2c-nomadik.c |   10 ----------
+ 1 file changed, 10 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 3e08ba1..0a6d438 100644
+index 0a6d438..ceb3d05 100644
 --- a/drivers/i2c/busses/i2c-nomadik.c
 +++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -882,9 +882,8 @@ static irqreturn_t i2c_irq_handler(int irq, void *arg)
- 	return IRQ_HANDLED;
- }
+@@ -167,7 +167,6 @@ struct i2c_nmk_client {
+  * @stop: stop condition.
+  * @xfer_complete: acknowledge completion for a I2C message.
+  * @result: controller propogated result.
+- * @busy: Busy doing transfer.
+  */
+ struct nmk_i2c_dev {
+ 	struct i2c_vendor_data		*vendor;
+@@ -185,7 +184,6 @@ struct nmk_i2c_dev {
+ 	int				stop;
+ 	struct completion		xfer_complete;
+ 	int				result;
+-	bool				busy;
+ };
  
+ /* controller's abort causes */
+@@ -671,8 +669,6 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
+ 	struct nmk_i2c_dev *dev = i2c_get_adapdata(i2c_adap);
+ 	int j;
+ 
+-	dev->busy = true;
 -
--#ifdef CONFIG_PM
--static int nmk_i2c_suspend(struct device *dev)
-+#ifdef CONFIG_PM_SLEEP
-+static int nmk_i2c_suspend_late(struct device *dev)
- {
+ 	pm_runtime_get_sync(&dev->adev->dev);
+ 
+ 	/* Attempt three times to send the message queue */
+@@ -697,8 +693,6 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
+ 
+ 	pm_runtime_put_sync(&dev->adev->dev);
+ 
+-	dev->busy = false;
+-
+ 	/* return the no. messages processed */
+ 	if (status)
+ 		return status;
+@@ -888,9 +882,6 @@ static int nmk_i2c_suspend_late(struct device *dev)
  	struct amba_device *adev = to_amba_device(dev);
  	struct nmk_i2c_dev *nmk_i2c = amba_get_drvdata(adev);
-@@ -897,7 +896,7 @@ static int nmk_i2c_suspend(struct device *dev)
- 	return 0;
- }
  
--static int nmk_i2c_resume(struct device *dev)
-+static int nmk_i2c_resume_early(struct device *dev)
- {
- 	/* First go to the default state */
- 	pinctrl_pm_select_default_state(dev);
-@@ -906,9 +905,6 @@ static int nmk_i2c_resume(struct device *dev)
+-	if (nmk_i2c->busy)
+-		return -EBUSY;
+-
+ 	pinctrl_pm_select_sleep_state(dev);
  
  	return 0;
- }
--#else
--#define nmk_i2c_suspend	NULL
--#define nmk_i2c_resume	NULL
- #endif
+@@ -997,7 +988,6 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
+ 		goto err_no_mem;
+ 	}
+ 	dev->vendor = vendor;
+-	dev->busy = false;
+ 	dev->adev = adev;
+ 	nmk_i2c_of_probe(np, dev);
  
- #if CONFIG_PM
-@@ -946,14 +942,8 @@ static int nmk_i2c_runtime_resume(struct device *dev)
- }
- #endif
- 
--/*
-- * We use noirq so that we suspend late and resume before the wakeup interrupt
-- * to ensure that we do the !pm_runtime_suspended() check in resume before
-- * there has been a regular pm runtime resume (via pm_runtime_get_sync()).
-- */
- static const struct dev_pm_ops nmk_i2c_pm = {
--	.suspend_noirq	= nmk_i2c_suspend,
--	.resume_noirq	= nmk_i2c_resume,
-+	SET_LATE_SYSTEM_SLEEP_PM_OPS(nmk_i2c_suspend_late, nmk_i2c_resume_early)
- 	SET_PM_RUNTIME_PM_OPS(nmk_i2c_runtime_suspend,
- 			nmk_i2c_runtime_resume,
- 			NULL)
 -- 
 1.7.9.5
