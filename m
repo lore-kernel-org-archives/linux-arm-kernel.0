@@ -1,62 +1,43 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Mon, 17 Feb 2014 08:57:06 +0100
-Subject: [PATCH] arm: sti: Remove SOC_STIH415 and SOC_STIH416
-In-Reply-To: <1392577524.28866.32.camel@x220>
-References: <1392577524.28866.32.camel@x220>
-Message-ID: <5301C0D2.8040408@st.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 17 Feb 2014 17:02:27 +0900
+Subject: [PATCH 2/5] ARM: shmobile: r8a7791: add i2c master nodes to dtsi
+In-Reply-To: <20140217075410.GA2633@katana>
+References: <1392543658-5030-1-git-send-email-wsa@the-dreams.de>
+ <1392543658-5030-3-git-send-email-wsa@the-dreams.de>
+ <20140217075410.GA2633@katana>
+Message-ID: <CANqRtoSDxQfSw5PJB6-UcL-UuMySBkoCqfC+1H=o-EBA18ouLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+Hi Wolfram,
 
-On 02/16/2014 08:05 PM, Paul Bolle wrote:
-> The Kconfig symbols SOC_STIH415 and SOC_STIH416 were added in v3.11.
-> They have never been used. They default to "y" but nothing cares. They
-> can safely be removed.
+On Mon, Feb 17, 2014 at 4:54 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> On Sun, Feb 16, 2014 at 10:40:55AM +0100, Wolfram Sang wrote:
+>> From: Wolfram Sang <wsa@sang-engineering.com>
+>>
+>> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+>
+> From your other mail:
+>
+> "[2/5] needs to be reworked to exclude the r8a7790 compatible string."
+>
+>> +             compatible = "renesas,i2c-r8a7791", "renesas,i2c-r8a7790";
+>
+> Why is that? From my knowledge, you start with the exact compatible
+> property and hardware compatible entries may follow.
 
-This is going to be used by the reset controller series from Srinivas:
-http://marc.info/?l=linux-arm-kernel&m=139143833415806&w=2
+I think this boils down to if they really are compatible or not. If
+for instance a 16550 port would be compatible with 8250 on a hardware
+level then using them in the order of "16550", "8250" makes sense. In
+this case the r8a7791 i2c is not really strictly based on r8a7790 i2c,
+it is just that r8a7790 has support in the driver. So it's a short cut
+instead of actual hardware compatibility.
 
-Regards,
-Maxime
+So far we've dealt with this by updating the driver and only relying
+on the actual SoC name as suffix.
 
->
-> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
-> ---
-> Tested with "git grep".
->
->   arch/arm/mach-sti/Kconfig | 23 -----------------------
->   1 file changed, 23 deletions(-)
->
-> diff --git a/arch/arm/mach-sti/Kconfig b/arch/arm/mach-sti/Kconfig
-> index d71654b..c360ae1 100644
-> --- a/arch/arm/mach-sti/Kconfig
-> +++ b/arch/arm/mach-sti/Kconfig
-> @@ -21,26 +21,3 @@ menuconfig ARCH_STI
->   	  for discovery
->   	  More information at Documentation/arm/STiH41x and
->   	  at Documentation/devicetree
-> -
-> -
-> -if ARCH_STI
-> -
-> -config SOC_STIH415
-> -	bool "STiH415 STMicroelectronics Consumer Electronics family"
-> -	default y
-> -	help
-> -	  This enables support for STMicroelectronics Digital Consumer
-> -	  Electronics family StiH415 parts, primarily targeted at set-top-box
-> -	  and other digital audio/video applications using Flattned Device
-> -	  Trees.
-> -
-> -config SOC_STIH416
-> -	bool "STiH416 STMicroelectronics Consumer Electronics family"
-> -	default y
-> -	help
-> -	  This enables support for STMicroelectronics Digital Consumer
-> -	  Electronics family StiH416 parts, primarily targeted at set-top-box
-> -	  and other digital audio/video applications using Flattened Device
-> -	  Trees.
-> -
-> -endif
->
+I'm sure there are tons of opinions. =)
+
+Cheers,
+
+/ magnus
