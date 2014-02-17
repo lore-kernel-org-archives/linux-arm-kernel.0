@@ -1,31 +1,114 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 17 Feb 2014 13:57:39 +0100
-Subject: [PATCH v2] ARM: Add imprecise abort enable/disable macro
-In-Reply-To: <20140212131834.GP26684@n2100.arm.linux.org.uk>
-References: <1392050756-11145-1-git-send-email-fabrice.gasnier@st.com>
- <52FB71A3.5010505@stericsson.com>
- <20140212131834.GP26684@n2100.arm.linux.org.uk>
-Message-ID: <53020743.1070509@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Feb 2014 14:00:43 +0100
+Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
+In-Reply-To: <20140215205159.GL30257@n2100.arm.linux.org.uk>
+References: <1390190215-22700-1-git-send-email-olof@lixom.net>
+ <1528854.BAQRr94nzx@wuerfel> <20140215205159.GL30257@n2100.arm.linux.org.uk>
+Message-ID: <201402171400.43899.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Saturday 15 February 2014, Russell King - ARM Linux wrote:
+> On Sat, Feb 15, 2014 at 05:21:11PM +0100, Arnd Bergmann wrote:
+> > On Saturday 15 February 2014 14:22:30 Tomasz Figa wrote:
+> > > On 15.02.2014 14:09, Arnd Bergmann wrote:
+> > >
+> > > > For spi-mode SDIO devices I'm assuming it's similar, except that
+> > > > you'd describe the actual SDIO device in the board info rather than
+> > > > create a fake SDIO controller. Still not discoverable unless I'm
+> > > > missing your point.
+> > > 
+> > > I'm not sure if we should assume that SPI = MMC over SPI. I believe 
+> > > there might be a custom protocol involved as well.
+> > 
+> > In case of SD/MMC, you essentially have three separate command sets:
+> > SPI, MMC and SD, and each of them has multiple versions. MMC and SD
+> > compatible devices generally also support the SPI command set (IIRC
+> > it is required,
+> 
+> SPI support is mandatory for SDIO as well.
+> 
+> SDIO has CIS (remember card information structures... like PCMCIA)
+> which identifies the various different logical functions of the device,
+> giving class information, vendor information etc.
+> 
+> So... certainly the type of the attached device is discoverable even
+> on SPI
 
-On 02/12/2014 02:18 PM, Russell King - ARM Linux wrote:
-> On Wed, Feb 12, 2014 at 02:05:39PM +0100, Fabrice GASNIER wrote:
->> Hi,
->>
->> Any comments on this patch ?
->>
->> Russell, can I add this patch to your patch tracker system ?
-> I don't see how this works on anything but ARMv7M.
->
-Hi Russel,
+But how are SPI SDIO devices used in Linux and described in DT?
 
-I'm not sure how I can help to do that part for ARMv7M.
-Point is I don't have any ARMv7M hardware at my disposal to develop 
-and/or test with.
+If we always use the MMC_SPI host controller driver and only
+describe the controller in DT, then you are right, and there is
+no difference to the normal SDIO case.
 
-Hopefully someone can help or take care of this part ?
+If we just describe it as an SPI device OTOH, the fact that we can
+identify it is useless, because we first have to know what it
+is before we can ask for its identity.
 
-BR,
-Fabrice
+> > If a device supports both SDIO and SPI, I think a straightforward
+> > implementation would be to use the exact same command set, but
+> > you are right that this isn't the only possibility, and the SD/MMC
+> > shows how they can be slightly different already.
+> 
+> Given that the SPI mode is mandatory for SDIO cards, why would you
+> also implement another SPI mode with different commands?
+
+I don't know why, I was just saying that it's what storage SD cards do.
+
+> > > Stepping aside from SPI, I already gave an example of a WLAN chip that 
+> > > supports multiple control busses [1]. In addition to the commonly used 
+> > > SDIO, it supports USB and HSIC as well:
+> > > 
+> > > [1] http://www.marvell.com/wireless/assets/marvell_avastar_88w8797.pdf
+> > > 
+> > > Moreover, some of Samsung boards use HSIC to communicate with modem 
+> > > chips, which have exactly the same problem as we're trying to solve here 
+> > > - they need to be powered on to be discovered.
+> > 
+> > Thanks, this definitely makes a good example. I see that it also
+> > supports SPI mode for SDIO as mentioned in your link.
+> 
+> Well, USB is another discoverable bus.  As HSIC is a derivative of USB,
+> I'd be surprised if it weren't discoverable there too.
+> 
+> So, out of everything identified so far, we have no undiscoverable buses.
+
+The device also lists a high-speed uart interface. While in Linux a
+tty line discipline is not exactly the same as a driver, I would
+still count it as a nondiscoverable interface.
+
+>  - requires different DT if the chip is changed, which causes problems
+>    for users to identify which out of zillions of DT files they should
+>    use for their exact platform.
+
+I'm still not buying this argument. Making any changes to the board
+design that are visible to software can have this effect.
+
+>  - have to work out how to match up the fake device with a probed device
+>    when it becomes available: existing SDIO drivers all assume that the
+>    card has been through a fairly complex initialisation sequence already.
+
+This one is an implementation detail. Yes, we have to ensure it works,
+but it's not inherently harder that getting the other approach to work.
+
+>  - multi-function SDIO is much harder to deal with since you have mutliple
+>    drivers involved, and the SDIO device as a whole needs initialisation
+>    before anyone can drive it.
+
+Agreed, this point is a big one that I hadn't considered before.
+I agree that my approach isn't ideal for multifunction cards, especially
+when you want to be able to load function drivers individually or have
+only one of them in use. It can probably work fine for things like calling
+clk_get() where you can simply describe the clock in each function device
+node separately, but I don't see how I'd easily use a 'reset' line
+that has to be triggered for the first function driver that gets loaded
+but must not be triggered again for the second one :(
+
+>  - adds complexity to the SDIO drivers; they would have to know whether
+>    they're embedded or on a plug-in card.
+
+How so? If a device can be a plug-in card, I would assume that it is
+actually discoverable without a special power-on sequence, while a device
+that needs this can't be used standalone.
+
+	Arnd
