@@ -1,95 +1,64 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 17 Feb 2014 16:28:41 +0100
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Mon, 17 Feb 2014 12:31:37 -0300
 Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-In-Reply-To: <20140217152147.GC2765@localhost>
+In-Reply-To: <53022504.1010908@free-electrons.com>
 References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <20140205183457.GW8533@titan.lakedaemon.net>
  <20140217141336.GA2765@localhost> <53021BD2.3090301@free-electrons.com>
- <20140217152147.GC2765@localhost>
-Message-ID: <53022AA9.8090606@free-electrons.com>
+ <53021FD9.2070406@elopez.com.ar> <53022504.1010908@free-electrons.com>
+Message-ID: <53022B59.3060905@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/2014 16:21, Ezequiel Garcia wrote:
-> On Mon, Feb 17, 2014 at 03:25:22PM +0100, Gregory CLEMENT wrote:
->> On 17/02/2014 15:13, Ezequiel Garcia wrote:
->>> On Wed, Feb 05, 2014 at 01:34:57PM -0500, Jason Cooper wrote:
->>>> On Sat, Jan 25, 2014 at 07:19:06PM +0100, Sebastian Hesselbarth wrote:
->>>>> This patch set fixes clk init order that went upside-down with
->>>>> v3.14. I haven't really investigated what caused this, but I assume
->>>>> it is related with DT node reordering by addresses.
->>>>>
->>>>> Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
->>>>> registered before core clocks driver. Unfortunately, we cannot
->>>>> return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
->>>>> init order for our drivers is always core clocks before clock gating,
->>>>> we maintain init order ourselves by hooking CLK_OF_DECLARE to one
->>>>> init function that will register core clocks before clock gating
->>>>> driver.
->>>>>
->>>>> This patch is based on pre-v3.14-rc1 mainline and should go in as
->>>>> fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
->>>>> I suggest Jason picks it up as a topic branch.
->>>>>
->>>>> The patches have been boot tested on Dove and compile-tested only
->>>>> for Kirkwood, Armada 370 and XP.
->>>>>
->>>>> Sebastian Hesselbarth (4):
->>>>>   clk: mvebu: armada-370: maintain clock init order
->>>>>   clk: mvebu: armada-xp: maintain clock init order
->>>>>   clk: mvebu: dove: maintain clock init order
->>>>>   clk: mvebu: kirkwood: maintain clock init order
->>>>>
->>>>>  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
->>>>>  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
->>>>>  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
->>>>>  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
->>>>>  4 files changed, 44 insertions(+), 50 deletions(-)
->>>>
->>>> Whole series applied to mvebu/clk-fixes.
->>>>
->>>
->>> Are we still in time to consider Emilio's oneline proposal?
->>> (Emilio: would you mind preparing a suitable patch against dove,
->>> kirkwood, armada370/xp, so we can see the real thing?).
->>
->> I am still strongly against this proposal because hard-coded the parent
->> clock name in the driver seems very wrong and moreover in some circumstances
->> (if there is no output-name, which is our default case) this proposal
->> just ignored the parent clock given by the device tree and this looked
->> more wrong.
->>
-> 
-> So you're against the proposal as a permanent fix, *and* against the
-> proposal as a workaround fix?
+Hi,
 
-Yes
+El 17/02/14 12:04, Gregory CLEMENT escribi?:
+(snip)
+> Please read what I have written: "if there is no output-name, which is our
+> default case) this proposal just ignored the parent clock given by the device
+> tree".
+>
+> Extract of your code from the link you pointed:
+>
+> const char *default_parent = "tclk";
+>
+> [...]
+>
+> of_property_read_string_index(clkspec.np, "clock-output-names",
+> 					      clkspec.args_count ? clkspec.args[0] : 0,
+> 					      &default_parent);
+>
+> example of a valid dts:
+> 			gateclk: clock-gating-control at 18220 {
+> 				compatible = "marvell,foo-bar-gating-clock";
+> 				reg = <0x18220 0x4>;
+> 				clocks = <&coreclk 1>;
+> 				#clock-cells = <1>;
+> 			};
+>
+> So in this fictional but still valid example, the device tree indicates that the parent
+> clock of the gating clock is the 2nd clock provided by the coreclk which is currently
+> "cpuclk". As no clock-output-names is used, then this will be totally ignore and instead
+> of using "cpuclk" as parent "tclk" will be used.
 
-> 
->>>
->>> Sebastian fix works perfect, and it easy to understand. However, it has
->>> quite a large diffstat. When compared to Emilio's oneline proposal, it
->>> seems to me it would be preferable, unless it's broken.
->>>
->>> Workaround or not, the fact is this code will be in v3.14, so maybe we
->>> can spend some time considering a cleaner option.
->>>
-> 
-> Before discussing the solution as compared to your for-v3.15 clock
-> registration order patch, I wanted to trigger some discussion around
-> replacing this big and intrusive workaround with Emilio's oneline fix.
-> 
-> Let's suppose we're considering them as workaround to live just one or
-> two releases. Wouldn't it be better to take the least instrusive?
-> 
+I can see your point now, but as this is completely fictional, I'd say 
+it's irrelevant. You can just add the names if Marvell ever makes a chip 
+that sources the gates from the second coreclk. As far as I can see on 
+the device trees in Linux, all mvebu hardware always sources them from 
+tclk. Don't try to over-engineer your driver for something that is 
+unlikely to happen in reality.
 
-The better solution is the one which doesn't add another regression and until
-today I though we had an agreement to use the patch set from Sebastian. If
-I remember well Jason had sent a pull request for it.
+If you in the future need to support another legacy platform with a 
+half-cooked DT not listing the names, you can always list the right 
+parent on the divisor table (see link for example) and override the default.
 
+http://lxr.free-electrons.com/source/drivers/clk/mvebu/kirkwood.c?v=3.13#L222
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> I hope this example will show you, what I disagree with this proposal and why it
+> introduce some regression.
+
+It's not a regression if things don't break :-)
+
+Cheers,
+
+Emilio
