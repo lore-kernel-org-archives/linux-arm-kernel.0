@@ -1,50 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 17 Feb 2014 10:07:35 +0000
-Subject: [PATCH v3 14/15] charger: max14577: Configure battery-dependent
- settings from DTS
-In-Reply-To: <1392627950-26927-15-git-send-email-k.kozlowski@samsung.com>
-References: <1392627950-26927-1-git-send-email-k.kozlowski@samsung.com>
- <1392627950-26927-15-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20140217100735.GA20218@lee--X1>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 17 Feb 2014 11:08:07 +0100
+Subject: [PATCH 2/5] ARM: shmobile: r8a7791: add i2c master nodes to dtsi
+In-Reply-To: <CANqRtoRgMaAzzvD9OK+=_J2Or5HZHzg4RUb899-bXjM7LKHSyw@mail.gmail.com>
+References: <1392543658-5030-1-git-send-email-wsa@the-dreams.de>
+ <1392543658-5030-3-git-send-email-wsa@the-dreams.de>
+ <20140217075410.GA2633@katana>
+ <CANqRtoSDxQfSw5PJB6-UcL-UuMySBkoCqfC+1H=o-EBA18ouLQ@mail.gmail.com>
+ <CAMuHMdW8MLknykkfu9XS5CDpuJcRNyPz+GV5bhUNGndxFacnQw@mail.gmail.com>
+ <20140217091900.GD2633@katana>
+ <CAMuHMdV5KNBcFh5E0bKaLNboZUbuXmMkzdYozqWLvro7Kwjhjw@mail.gmail.com>
+ <20140217093126.GE2633@katana>
+ <CANqRtoRgMaAzzvD9OK+=_J2Or5HZHzg4RUb899-bXjM7LKHSyw@mail.gmail.com>
+Message-ID: <20140217100807.GA4424@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> diff --git a/include/linux/mfd/max14577-private.h b/include/linux/mfd/max14577-private.h
-> index a8cd7de3526a..fc69d7beb1aa 100644
-> --- a/include/linux/mfd/max14577-private.h
-> +++ b/include/linux/mfd/max14577-private.h
-> @@ -269,6 +269,20 @@ enum maxim_muic_charger_type {
->  #define MAX77836_CHARGER_CURRENT_LIMIT_HIGH_STEP	 25000U
->  #define MAX77836_CHARGER_CURRENT_LIMIT_MAX		475000U
->  
-> +/* MAX14577 charger End-Of-Charge current limits
-> + * (as in MAXIM_CHGCTRL5 register), uA
-> + */
-> +#define MAX14577_CHARGER_EOC_CURRENT_LIMIT_MIN		50000U
-> +#define MAX14577_CHARGER_EOC_CURRENT_LIMIT_STEP		10000U
-> +#define MAX14577_CHARGER_EOC_CURRENT_LIMIT_MAX		200000U
-> +
-> +/* MAX14577/MAX77836 Battery Constant Voltage
-> + * (as in MAXIM_CHGCTRL3 register), uV
-> + */
 
-These are not proper multi-line comments.
+> It won't break because anyone who modifies r8a7790 support need to
+> make it specific to that SoC to not pull in r8a7791 into some
+> assumption.
 
-Documentation/CodingSytle:
+Geert's assumption was that exactly this can be forgotten. While this is
+true, my point was that this is a bug. And as it turned out, neither
+this or that solution helps the case :) It needs to be fixed or done
+properly right from the beginning.
 
- The preferred style for long (multi-line) comments is:
- 
-         /*
-          * This is the preferred style for multi-line
-          * comments in the Linux kernel source code.
-          * Please use it consistently.
-          *
-          * Description:  A column of asterisks on the left side,
-          * with beginning and ending almost-blank lines.
-          */
+> realize that there is no shortcut for adding the compatible string to
+> the driver. It has to be done sooner or later anyway.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+OK, can be seen this way. As said before, I'll resend.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140217/da3468bd/attachment.sig>
