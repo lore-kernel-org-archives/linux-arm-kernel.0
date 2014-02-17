@@ -1,38 +1,33 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 17 Feb 2014 10:36:25 +0900
-Subject: [PATCH 02/03] ARM: shmobile: Remove KZM9D board code
-In-Reply-To: <20140217000202.GA18898@verge.net.au>
-References: <20140213082558.30630.93034.sendpatchset@w520>
- <20140213082618.30630.64196.sendpatchset@w520>
- <20140217000202.GA18898@verge.net.au>
-Message-ID: <CANqRtoRrm12Fb1gxHKCSi=MzywvdcoPPpCESsff6BofPwuSvCw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 16 Feb 2014 20:39:49 -0500
+Subject: [PATCH 1/2] bus: mvebu-mbus: Fix incorrect size for PCI
+ aperture resources
+In-Reply-To: <20140214182910.GC31093@google.com>
+References: <1392245828-23244-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <20140214182910.GC31093@google.com>
+Message-ID: <20140217013949.GE7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Fri, Feb 14, 2014 at 11:29:10AM -0700, Bjorn Helgaas wrote:
+> On Wed, Feb 12, 2014 at 03:57:07PM -0700, Jason Gunthorpe wrote:
+> > reg[0] is the DT base, reg[1] is the DT length in bytes,
+> > struct resource.end is the inclusive end address, so a -1 is
+> > required.
+> > 
+> > Tested on kirkwood.
+> > 
+> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> 
+> Do these two patches need to go together?  I don't maintain
+> drivers/bus/mvebu-mbus.c, but if these should be kept together, I'd be
+> happy to merge them both, given the appropriate ack from Jason C or Thomas.
 
-On Mon, Feb 17, 2014 at 9:02 AM, Simon Horman <horms@verge.net.au> wrote:
-> Hi Magnus,
->
-> I'm not clear on the motivation for removing emev2_smp_ops from
-> emev2.h only to have to add it as an extern to setup-emev2.c.
-> But if thats how you like to roll then I have no objections.
+I have one small change for mvebu-mbus queued up, which won't conflict
+here.  Please take both:
 
-Hehe, I suppose I felt a sudden urge to remove that particular header file.
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-> However, what I would like to ask is that the emev2.h shuffling,
-> that is the changes to emev2.h, setup-emev2.c and smp-emev2.c
-> could be moved into a follow-up patch that I will queue up at a later date.
+thx,
 
-That's fine.
-
-> The reason is that these really seem to be SoC changes but
-> the main portion of this patch is a board change. And as you
-> know the arm-soc people like soc and board changes split into
-> different branches.
-
-Sure. Would you like me to redo 2/3 to break out the header file bits?
-
-Thanks,
-
-/ magnus
+Jason.
