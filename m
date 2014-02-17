@@ -1,51 +1,175 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 17 Feb 2014 10:27:48 +0100
-Subject: [PATCH v6] ARM: DTS: imx5* imx6*, use imx51-ssi
-In-Reply-To: <20140217012643.GA9879@S2101-09.ap.freescale.net>
-References: <20140118083840.GD3430@S2101-09.ap.freescale.net>
- <1390220023-6423-1-git-send-email-mpa@pengutronix.de>
- <20140216220827.GC31006@pengutronix.de>
- <20140217012643.GA9879@S2101-09.ap.freescale.net>
-Message-ID: <20140217092748.GA9197@pengutronix.de>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Mon, 17 Feb 2014 14:59:23 +0530
+Subject: [PATCH v3 1/3] dma: Support multiple interleaved frames with
+ non-contiguous memory
+In-Reply-To: <20140217084316.GY10628@intel.com>
+References: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
+ <1392465619-27614-2-git-send-email-sthokal@xilinx.com>
+ <20140217084316.GY10628@intel.com>
+Message-ID: <CA+mB=1K4_RpgfpWCfLy=PYOCzPThNf0Z6oSEK5Vrjh=W_YabhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 09:26:45AM +0800, Shawn Guo wrote:
-> On Sun, Feb 16, 2014 at 11:08:27PM +0100, Markus Pargmann wrote:
-> > Hi Shawn,
-> > 
-> > On Mon, Jan 20, 2014 at 01:13:43PM +0100, Markus Pargmann wrote:
-> > > imx51-ssi and imx21-ssi are different IPs. imx51-ssi supports online
-> > > reconfiguration and needs this for correct interaction with SDMA. This
-> > > patch adds imx51-ssi before each imx21-ssi for all imx5/imx6 SoCs.
-> > > 
-> > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > > ---
-> > > Hi Shawn,
-> > > 
-> > > Sorry for that last patch. I fixed it in this patch.
-> > 
-> > Ping. Should I send this again after rebasing it onto your latest branch?
-> 
-> I believe I've applied the v5 with a minor fix [1].  I split it into 2
-> though, one for imx5 [2] and the other for imx6 [2], because I have to
-> make my imx/dt pull request small to please arm-soc folks.
+On Mon, Feb 17, 2014 at 2:13 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Sat, Feb 15, 2014 at 05:30:17PM +0530, Srikanth Thokala wrote:
+>> The current implementation of interleaved DMA API support multiple
+>> frames only when the memory is contiguous by incrementing src_start/
+>> dst_start members of interleaved template.
+>>
+>> But, when the memory is non-contiguous it will restrict slave device
+>> to not submit multiple frames in a batch.  This patch handles this
+>> issue by allowing the slave device to send array of interleaved dma
+>> templates each having a different memory location.
+> This seems to be missing the numbers of templates you are sending, wouldnt this
+> require sending ARRAY_SiZE too?
+>
+> And why send double pointer?
 
-Oh thanks, I didn't notice that you applied v5 already.
+Array size is not required, when we pass the double pointer.  The last
+element would be
+pointed to NULL and we could get the number of templates from this condition.
+Here is an example snippet,
 
-Regards,
+In slave device driver,
 
-Markus
+        struct dma_interleaved_template **xts;
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140217/e892f742/attachment.sig>
+        xts = kcalloc(frm_cnt+1, sizeof(struct
+dma_interleaved_template *), GFP_KERNEL);
+        /* Error check for xts */
+        for (i = 0; i < frm_cnt; i++) {
+                xts[i] = kmalloc(sizeof(struct
+dma_interleaved_template), GFP_KERNEL);
+                /* Error check for xts[i] */
+        }
+        xts[i] = NULL;
+
+In DMA engine driver,  we could get the number of frames by,
+
+        for (; xts[frmno] != NULL; frmno++);
+
+I felt this way is simpler than adding an extra argument to the API.
+Please let me know
+your opinion and suggest me a better way.
+
+Thanks
+Srikanth
+
+>
+> --
+> ~Vinod
+>
+>>
+>> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+>> ---
+>>  Documentation/dmaengine.txt              |    2 +-
+>>  drivers/dma/imx-dma.c                    |    3 ++-
+>>  drivers/dma/sirf-dma.c                   |    3 ++-
+>>  drivers/media/platform/m2m-deinterlace.c |    2 +-
+>>  include/linux/dmaengine.h                |    6 +++---
+>>  5 files changed, 9 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/Documentation/dmaengine.txt b/Documentation/dmaengine.txt
+>> index 879b6e3..c642614 100644
+>> --- a/Documentation/dmaengine.txt
+>> +++ b/Documentation/dmaengine.txt
+>> @@ -94,7 +94,7 @@ The slave DMA usage consists of following steps:
+>>               size_t period_len, enum dma_data_direction direction);
+>>
+>>       struct dma_async_tx_descriptor *(*device_prep_interleaved_dma)(
+>> -             struct dma_chan *chan, struct dma_interleaved_template *xt,
+>> +             struct dma_chan *chan, struct dma_interleaved_template **xts,
+>>               unsigned long flags);
+>>
+>>     The peripheral driver is expected to have mapped the scatterlist for
+>> diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+>> index 6f9ac20..e2c52ce 100644
+>> --- a/drivers/dma/imx-dma.c
+>> +++ b/drivers/dma/imx-dma.c
+>> @@ -954,12 +954,13 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
+>>  }
+>>
+>>  static struct dma_async_tx_descriptor *imxdma_prep_dma_interleaved(
+>> -     struct dma_chan *chan, struct dma_interleaved_template *xt,
+>> +     struct dma_chan *chan, struct dma_interleaved_template **xts,
+>>       unsigned long flags)
+>>  {
+>>       struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
+>>       struct imxdma_engine *imxdma = imxdmac->imxdma;
+>>       struct imxdma_desc *desc;
+>> +     struct dma_interleaved_template *xt = *xts;
+>>
+>>       dev_dbg(imxdma->dev, "%s channel: %d src_start=0x%llx dst_start=0x%llx\n"
+>>               "   src_sgl=%s dst_sgl=%s numf=%zu frame_size=%zu\n", __func__,
+>> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+>> index d4d3a31..b6a150b 100644
+>> --- a/drivers/dma/sirf-dma.c
+>> +++ b/drivers/dma/sirf-dma.c
+>> @@ -509,12 +509,13 @@ sirfsoc_dma_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+>>  }
+>>
+>>  static struct dma_async_tx_descriptor *sirfsoc_dma_prep_interleaved(
+>> -     struct dma_chan *chan, struct dma_interleaved_template *xt,
+>> +     struct dma_chan *chan, struct dma_interleaved_template **xts,
+>>       unsigned long flags)
+>>  {
+>>       struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(chan);
+>>       struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
+>>       struct sirfsoc_dma_desc *sdesc = NULL;
+>> +     struct dma_interleaved_template *xt = *xts;
+>>       unsigned long iflags;
+>>       int ret;
+>>
+>> diff --git a/drivers/media/platform/m2m-deinterlace.c b/drivers/media/platform/m2m-deinterlace.c
+>> index 6bb86b5..468110a 100644
+>> --- a/drivers/media/platform/m2m-deinterlace.c
+>> +++ b/drivers/media/platform/m2m-deinterlace.c
+>> @@ -343,7 +343,7 @@ static void deinterlace_issue_dma(struct deinterlace_ctx *ctx, int op,
+>>       ctx->xt->dst_sgl = true;
+>>       flags = DMA_CTRL_ACK | DMA_PREP_INTERRUPT;
+>>
+>> -     tx = dmadev->device_prep_interleaved_dma(chan, ctx->xt, flags);
+>> +     tx = dmadev->device_prep_interleaved_dma(chan, &ctx->xt, flags);
+>>       if (tx == NULL) {
+>>               v4l2_warn(&pcdev->v4l2_dev, "DMA interleaved prep error\n");
+>>               return;
+>> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+>> index c5c92d5..2f77a9a 100644
+>> --- a/include/linux/dmaengine.h
+>> +++ b/include/linux/dmaengine.h
+>> @@ -675,7 +675,7 @@ struct dma_device {
+>>               size_t period_len, enum dma_transfer_direction direction,
+>>               unsigned long flags, void *context);
+>>       struct dma_async_tx_descriptor *(*device_prep_interleaved_dma)(
+>> -             struct dma_chan *chan, struct dma_interleaved_template *xt,
+>> +             struct dma_chan *chan, struct dma_interleaved_template **xts,
+>>               unsigned long flags);
+>>       int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+>>               unsigned long arg);
+>> @@ -752,10 +752,10 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_cyclic(
+>>  }
+>>
+>>  static inline struct dma_async_tx_descriptor *dmaengine_prep_interleaved_dma(
+>> -             struct dma_chan *chan, struct dma_interleaved_template *xt,
+>> +             struct dma_chan *chan, struct dma_interleaved_template **xts,
+>>               unsigned long flags)
+>>  {
+>> -     return chan->device->device_prep_interleaved_dma(chan, xt, flags);
+>> +     return chan->device->device_prep_interleaved_dma(chan, xts, flags);
+>>  }
+>>
+>>  static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps)
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> --
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
