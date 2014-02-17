@@ -1,43 +1,99 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 17 Feb 2014 12:28:00 +0530
-Subject: [PATCH 1/1] ARM: OMAP5: Fix reboot handling
-In-Reply-To: <1392592544-7884-1-git-send-email-vaibhav.bedia@gmail.com>
-References: <1392592544-7884-1-git-send-email-vaibhav.bedia@gmail.com>
-Message-ID: <5301B2F8.2000007@ti.com>
+From: wujianguo@huawei.com (Jianguo Wu)
+Date: Mon, 17 Feb 2014 15:05:19 +0800
+Subject: [PATCH v2] ARM: mm: support big-endian page tables
+Message-ID: <5301B4AF.1040305@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 February 2014 04:45 AM, Vaibhav Bedia wrote:
-> Use the correct register offset for issuing the
-> reset command in OMAP5. Since dev_inst is set dynamically
-> OMAP4 should not be affected by this change.
-> 
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@gmail.com>
+When enable LPAE and big-endian in a hisilicon board, while specify
+mem=384M mem=512M at 7680M, will get bad page state:
 
-Acked-by: Rajendra Nayak <rnayak@ti.com>
+Freeing unused kernel memory: 180K (c0466000 - c0493000)
+BUG: Bad page state in process init  pfn:fa442
+page:c7749840 count:0 mapcount:-1 mapping:  (null) index:0x0
+page flags: 0x40000400(reserved)
+Modules linked in:
+CPU: 0 PID: 1 Comm: init Not tainted 3.10.27+ #66
+[<c000f5f0>] (unwind_backtrace+0x0/0x11c) from [<c000cbc4>] (show_stack+0x10/0x14)
+[<c000cbc4>] (show_stack+0x10/0x14) from [<c009e448>] (bad_page+0xd4/0x104)
+[<c009e448>] (bad_page+0xd4/0x104) from [<c009e520>] (free_pages_prepare+0xa8/0x14c)
+[<c009e520>] (free_pages_prepare+0xa8/0x14c) from [<c009f8ec>] (free_hot_cold_page+0x18/0xf0)
+[<c009f8ec>] (free_hot_cold_page+0x18/0xf0) from [<c00b5444>] (handle_pte_fault+0xcf4/0xdc8)
+[<c00b5444>] (handle_pte_fault+0xcf4/0xdc8) from [<c00b6458>] (handle_mm_fault+0xf4/0x120)
+[<c00b6458>] (handle_mm_fault+0xf4/0x120) from [<c0013754>] (do_page_fault+0xfc/0x354)
+[<c0013754>] (do_page_fault+0xfc/0x354) from [<c0008400>] (do_DataAbort+0x2c/0x90)
+[<c0008400>] (do_DataAbort+0x2c/0x90) from [<c0008fb4>] (__dabt_usr+0x34/0x40)
 
-> ---
-> Applies on top of v3.14-rc3
-> 
->  arch/arm/mach-omap2/prminst44xx.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/prminst44xx.c b/arch/arm/mach-omap2/prminst44xx.c
-> index 6334b96..280f3c5 100644
-> --- a/arch/arm/mach-omap2/prminst44xx.c
-> +++ b/arch/arm/mach-omap2/prminst44xx.c
-> @@ -183,11 +183,11 @@ void omap4_prminst_global_warm_sw_reset(void)
->  					OMAP4_PRM_RSTCTRL_OFFSET);
->  	v |= OMAP4430_RST_GLOBAL_WARM_SW_MASK;
->  	omap4_prminst_write_inst_reg(v, OMAP4430_PRM_PARTITION,
-> -				 OMAP4430_PRM_DEVICE_INST,
-> +				 dev_inst,
->  				 OMAP4_PRM_RSTCTRL_OFFSET);
->  
->  	/* OCP barrier */
->  	v = omap4_prminst_read_inst_reg(OMAP4430_PRM_PARTITION,
-> -				    OMAP4430_PRM_DEVICE_INST,
-> +				    dev_inst,
->  				    OMAP4_PRM_RSTCTRL_OFFSET);
->  }
-> 
+The bad pfn:fa442 is not system memory(mem=384M mem=512M at 7680M), after debugging,
+I find in page fault handler, will get wrong pfn from pte just after set pte,
+as follow:
+do_anonymous_page()
+{
+	...
+	set_pte_at(mm, address, page_table, entry);
+	
+	//debug code
+	pfn = pte_pfn(entry);
+	pr_info("pfn:0x%lx, pte:0x%llx\n", pfn, pte_val(entry));
+
+	//read out the pte just set
+	new_pte = pte_offset_map(pmd, address);
+	new_pfn = pte_pfn(*new_pte);
+	pr_info("new pfn:0x%lx, new pte:0x%llx\n", pfn, pte_val(entry));
+	...
+}
+
+pfn:   0x1fa4f5,     pte:0xc00001fa4f575f
+new_pfn:0xfa4f5, new_pte:0xc00000fa4f5f5f	//new pfn/pte is wrong.
+
+The bug is happened in cpu_v7_set_pte_ext(ptep, pte):
+when pte is 64-bit, for little-endian, will store low 32-bit in r2,
+high 32-bit in r3; for big-endian, will store low 32-bit in r3,
+high 32-bit in r2, this will cause wrong pfn stored in pte,
+so we should exchange r2 and r3 for big-endian.
+
+Signed-off-by: Jianguo Wu <wujianguo@huawei.com>
+---
+ arch/arm/mm/proc-v7-3level.S |   18 +++++++++++++-----
+ 1 files changed, 13 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index 01a719e..22e3ad6 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -64,6 +64,14 @@ ENTRY(cpu_v7_switch_mm)
+ 	mov	pc, lr
+ ENDPROC(cpu_v7_switch_mm)
+ 
++#ifdef __ARMEB__
++#define rl r3
++#define rh r2
++#else
++#define rl r2
++#define rh r3
++#endif
++
+ /*
+  * cpu_v7_set_pte_ext(ptep, pte)
+  *
+@@ -73,13 +81,13 @@ ENDPROC(cpu_v7_switch_mm)
+  */
+ ENTRY(cpu_v7_set_pte_ext)
+ #ifdef CONFIG_MMU
+-	tst	r2, #L_PTE_VALID
++	tst	rl, #L_PTE_VALID
+ 	beq	1f
+-	tst	r3, #1 << (57 - 32)		@ L_PTE_NONE
+-	bicne	r2, #L_PTE_VALID
++	tst	rh, #1 << (57 - 32)		@ L_PTE_NONE
++	bicne	rl, #L_PTE_VALID
+ 	bne	1f
+-	tst	r3, #1 << (55 - 32)		@ L_PTE_DIRTY
+-	orreq	r2, #L_PTE_RDONLY
++	tst	rh, #1 << (55 - 32)		@ L_PTE_DIRTY
++	orreq	rl, #L_PTE_RDONLY
+ 1:	strd	r2, r3, [r0]
+ 	ALT_SMP(W(nop))
+ 	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
+-- 
+1.7.1
