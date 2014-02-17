@@ -1,36 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Feb 2014 09:26:45 +0800
-Subject: [PATCH v6] ARM: DTS: imx5* imx6*, use imx51-ssi
-In-Reply-To: <20140216220827.GC31006@pengutronix.de>
-References: <20140118083840.GD3430@S2101-09.ap.freescale.net>
- <1390220023-6423-1-git-send-email-mpa@pengutronix.de>
- <20140216220827.GC31006@pengutronix.de>
-Message-ID: <20140217012643.GA9879@S2101-09.ap.freescale.net>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 17 Feb 2014 10:36:25 +0900
+Subject: [PATCH 02/03] ARM: shmobile: Remove KZM9D board code
+In-Reply-To: <20140217000202.GA18898@verge.net.au>
+References: <20140213082558.30630.93034.sendpatchset@w520>
+ <20140213082618.30630.64196.sendpatchset@w520>
+ <20140217000202.GA18898@verge.net.au>
+Message-ID: <CANqRtoRrm12Fb1gxHKCSi=MzywvdcoPPpCESsff6BofPwuSvCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 16, 2014 at 11:08:27PM +0100, Markus Pargmann wrote:
-> Hi Shawn,
-> 
-> On Mon, Jan 20, 2014 at 01:13:43PM +0100, Markus Pargmann wrote:
-> > imx51-ssi and imx21-ssi are different IPs. imx51-ssi supports online
-> > reconfiguration and needs this for correct interaction with SDMA. This
-> > patch adds imx51-ssi before each imx21-ssi for all imx5/imx6 SoCs.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> > Hi Shawn,
-> > 
-> > Sorry for that last patch. I fixed it in this patch.
-> 
-> Ping. Should I send this again after rebasing it onto your latest branch?
+Hi Simon,
 
-I believe I've applied the v5 with a minor fix [1].  I split it into 2
-though, one for imx5 [2] and the other for imx6 [2], because I have to
-make my imx/dt pull request small to please arm-soc folks.
+On Mon, Feb 17, 2014 at 9:02 AM, Simon Horman <horms@verge.net.au> wrote:
+> Hi Magnus,
+>
+> I'm not clear on the motivation for removing emev2_smp_ops from
+> emev2.h only to have to add it as an extern to setup-emev2.c.
+> But if thats how you like to roll then I have no objections.
 
-Shawn
+Hehe, I suppose I felt a sudden urge to remove that particular header file.
 
-[1] http://thread.gmane.org/gmane.linux.alsa.devel/117689/focus=117729
-[2] http://git.linaro.org/people/shawn.guo/linux-2.6.git/commitdiff/28f93d0bbe171cf0c9051f22b550890740776bbb
-[3] http://git.linaro.org/people/shawn.guo/linux-2.6.git/commitdiff/98ea6ad2edd21f953a43bd27182000a18a44dc20
+> However, what I would like to ask is that the emev2.h shuffling,
+> that is the changes to emev2.h, setup-emev2.c and smp-emev2.c
+> could be moved into a follow-up patch that I will queue up at a later date.
+
+That's fine.
+
+> The reason is that these really seem to be SoC changes but
+> the main portion of this patch is a board change. And as you
+> know the arm-soc people like soc and board changes split into
+> different branches.
+
+Sure. Would you like me to redo 2/3 to break out the header file bits?
+
+Thanks,
+
+/ magnus
