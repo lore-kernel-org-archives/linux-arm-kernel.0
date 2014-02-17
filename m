@@ -1,38 +1,65 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 17 Feb 2014 21:53:14 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MyAwLzddIHR0eS9zZXJpYWw6IEFkZCBoZWxwZXJzIHRv?=
- =?UTF-8?B?IHVzZSBHUElPcyB0byBjb250cm9sIG1vZGVtIGxpbmVzIGFuZCBpbXBsZW1l?=
- =?UTF-8?B?bnQgYXRtZWxfc2VyaWFsLmM=?=
-In-Reply-To: <1392656247-3351-1-git-send-email-richard.genoud@gmail.com>
-References: <1392656247-3351-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1392659594.887845512@f137.i.mail.ru>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 17 Feb 2014 17:55:52 +0000
+Subject: [PATCH v9 4/5] arm64: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+In-Reply-To: <alpine.DEB.2.02.1402171225000.27926@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
+ <1389292336-9292-4-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1402171225000.27926@kaball.uk.xensource.com>
+Message-ID: <20140217175552.GB8361@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-???????????, 17 ??????? 2014, 17:57 +01:00 ?? Richard Genoud <richard.genoud@gmail.com>:
-> The USART controller on sam9x5 chips (and also all AT91/SAMA5 chips
-> but at91rm9200) are not capable of handling DTR/DSR/DCD/RI signal.
-> Moreover, even if the controller can handle CTS/RTS, the dedicated
-> CTS/RTS pins are already muxed for other peripherals (LCDC/EMAC/MMC).
+On Mon, Feb 17, 2014 at 12:25:42PM +0000, Stefano Stabellini wrote:
+> On Thu, 9 Jan 2014, Stefano Stabellini wrote:
+> > Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
+> > Necessary duplication of paravirt.h and paravirt.c with ARM.
+> > 
+> > The only paravirt interface supported is pv_time_ops.steal_clock, so no
+> > runtime pvops patching needed.
+> > 
+> > This allows us to make use of steal_account_process_tick for stolen
+> > ticks accounting.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > CC: will.deacon at arm.com
+> > CC: nico at linaro.org
+> > CC: marc.zyngier at arm.com
+> > CC: cov at codeaurora.org
+> > CC: arnd at arndb.de
+> > CC: olof at lixom.net
+> > CC: Catalin.Marinas at arm.com
 > 
-> So this patchset adds the possibility to control those lines via GPIO,
-> as it is done for RTS in the patch "switch atmel serial to use gpiolib"
-> 
-> As it was suggested by Alexander Shiyan, I made that available for
-> every board.
-> 
-> Patch 1 implements the generic helpers to control modem lines via GPIO
-> Patches 2 and 3 are just a little tidy up of atmel_serial.c.
-> Patch 4 implements modem control lines in atmel_serial atmel_serial.
-> Patches 5 and 6 implement the get_direction() gpio call for at91, as
-> it is needed by gpiod_get_direction().
-> Patch 7 implement the interrupts of CTS/DSR/DCD/RI.
+> Catalin, Will, are you happy with this patch for 3.15?
 
-I still recommend split this series. The first patch must be a separate,
-2 and 3 - independent to this series, 5 and 6 - to the appropriate mailing lists,
-and finally as soon as all of the previous will be applied - you can send 7.
+It's pretty small and looks fine to me. However, I would like someone
+with more virtualisation experience than me to ack it (e.g. Marc Z).
 
-Thanks.
----
+Some nitpicks:
+
+> > +config PARAVIRT
+> > +	bool "Enable paravirtualization code"
+> > +	---help---
+> > +	  This changes the kernel so it can modify itself when it is run
+> > +	  under a hypervisor, potentially improving performance significantly
+> > +	  over full virtualization.
+> > +
+> > +config PARAVIRT_TIME_ACCOUNTING
+> > +	bool "Paravirtual steal time accounting"
+> > +	select PARAVIRT
+> > +	default n
+> > +	---help---
+
+For consistency with this file, just use "help" rather than
+"---help---".
+
+> > --- /dev/null
+> > +++ b/arch/arm64/include/asm/paravirt.h
+> > @@ -0,0 +1,20 @@
+> > +#ifndef _ASM_ARM64_PARAVIRT_H
+> > +#define _ASM_ARM64_PARAVIRT_H
+
+__ASM_PARAVIRT_H for consistency.
+
+-- 
+Catalin
