@@ -1,63 +1,50 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 17 Feb 2014 15:19:34 -0300
-Subject: [RFC PATCH v2 03/14] of: mtd: add documentation for
- nand-ecc-level property
-In-Reply-To: <CACxGe6vW3m8DA3rGSane6GNmjXHt=pjAPVr25WZyopV9jA-XUw@mail.gmail.com>
-References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
- <1391006064-28890-4-git-send-email-b.brezillon.dev@gmail.com>
- <20140129175331.GA27143@localhost>
- <20140205111500.B19FDC40A89@trevor.secretlab.ca>
- <52F23DF4.7010901@gmail.com> <20140205141917.GA25091@localhost>
- <CACxGe6vW3m8DA3rGSane6GNmjXHt=pjAPVr25WZyopV9jA-XUw@mail.gmail.com>
-Message-ID: <20140217181933.GH2765@localhost>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 17 Feb 2014 13:23:12 -0500
+Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
+In-Reply-To: <1418981.0py7JxXCp8@wuerfel>
+References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
+ <201402121251.06280.arnd@arndb.de>
+ <20140217155419.682F7C401D4@trevor.secretlab.ca>
+ <1418981.0py7JxXCp8@wuerfel>
+Message-ID: <20140217182312.GV7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 04:43:51PM +0000, Grant Likely wrote:
-> On Wed, Feb 5, 2014 at 2:19 PM, Ezequiel Garcia
-> <ezequiel.garcia@free-electrons.com> wrote:
-> > Hi Grant, Boris:
-> >
-> > (BTW, dropped Russell, Rob Landley and some unrelated mailing lists from Cc,
-> > and added Thomas, Gregory and Rob Herring).
-> >
-> > On Wed, Feb 05, 2014 at 02:34:44PM +0100, Boris BREZILLON wrote:
-> >> On 05/02/2014 12:15, Grant Likely wrote:
-> >> > On Wed, 29 Jan 2014 14:53:32 -0300, Ezequiel Garcia <ezequiel.garcia@free-electrons.com> wrote:
-> > [..]
-> >> >>
-> >> >> Maybe we can discuss about it now?
-> >> >>
-> >> >>    nand-ecc-strength : integer ECC required strength.
-> >> >>    nand-ecc-size : integer step size associated to the ECC strength.
-> >> > I'm okay with either, but the above binding is indeed more readable.
-> >>
-> >> That's fine by me, if everybody agrees, let's go for the
-> >> nand-ecc-strength/nand-ecc-size couple then.
-> >>
-> >
-> > Great. So, if some DT dictator^C^Cmaintainers can Ack this binding,
-> > I can send a new patchset, with pxa3xx-nand using it...
-> >
-> >> I'll rebase next version of my series on Ezequiel's patch providing
-> >> these OF helpers.
-> >>
-> >
-> > ... and then you can base on it?
-> >
-> > This is the original patchset:
-> >
-> > http://permalink.gmane.org/gmane.linux.drivers.devicetree/58764
-> > http://permalink.gmane.org/gmane.linux.drivers.devicetree/58763
+On Mon, Feb 17, 2014 at 05:13:07PM +0100, Arnd Bergmann wrote:
+> On Monday 17 February 2014 15:54:19 Grant Likely wrote:
+> > On Wed, 12 Feb 2014 11:20:00 -0700, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
+> > > On Wed, Feb 12, 2014 at 12:45:54PM -0500, Jason Cooper wrote:
+> > > 
+> > > > The bootloader would then load this file into ram, and pass the
+> > > > address/size to the kernel either via dt, or commandline.  kaslr (run in
+> > > > the decompressor) would consume some of this randomness, and then
+> > > > random.c would consume the rest in a non-crediting initialization.
+> > > 
+> > > Sure is a neat idea, but I think in general it would probably be smart
+> > > to include the entire FDT blob in the early random pool, that way you
+> > > get MACs and other machine unique data too.
+> > 
+> > I applied a patch that did exactly that (109b623629), and then reverted
+> > it (b920ecc82) shortly thereafter because add_device_randomness() is
+> > a rather slow function and FDTs can get large. I'd like to see someone
+> > do a reasonable analysis on the cost of using an FDT for randomness
+> > before I reapply a patch doing something similar. An awful lot of the
+> > FDT data is not very random, but there are certainly portions of it that
+> > are appropriate for the random pool.
 > 
-> I've looked at both. Go ahead and add my a-b line:
-> 
-> Acked-by: Grant Likely <grant.likely@linaro.org>
+> Could we use a faster hash function that scans the entire device tree and
+> then just feed the output of that into add_device_randomness? We probably
+> can't expect that there is a lot of entropy in the DT blob, so the
+> result wouldn't be all that different in terms of quality of the random
+> seed.
 
-Cool. Thanks!
+I think it would be easier to identify the few attributes that differ
+from board to board (mac address, serial number, etc), and differ from
+boot to boot (random-seed, timestamp) and just extract and feed those
+in.
 
-I'll push a patchset now.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+We already have the fdt parsing code in the decompressor...
+
+thx,
+
+Jason.
