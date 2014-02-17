@@ -1,54 +1,54 @@
-From: david.lanzendoerfer@o2s.ch (David =?utf-8?q?Lanzend=C3=B6rfer?=)
-Date: Mon, 17 Feb 2014 11:03:02 +0100
-Subject: [PATCH v7 8/8] ARM: sunxi: Add documentation for driver for SD/MMC
- hosts found on Allwinner sunxi SoCs
-In-Reply-To: <20140217095907.15040.81893.stgit@pagira.o2s.ch>
-References: <20140217095907.15040.81893.stgit@pagira.o2s.ch>
-Message-ID: <20140217100302.15040.56273.stgit@pagira.o2s.ch>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 17 Feb 2014 11:05:03 +0100
+Subject: [PATCH v3 7/7] ARM: dts: imx6sl: Add power-domain information to gpc
+ node
+In-Reply-To: <1392631503-17283-1-git-send-email-p.zabel@pengutronix.de>
+References: <1392631503-17283-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1392631503-17283-8-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
----
- .../devicetree/bindings/mmc/sunxi-mmc.txt          |   32 ++++++++++++++++++++
- 1 file changed, 32 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+The PGC that is part of GPC controls isolation and power sequencing of the
+power domains. The PU power domain will be handled by the generic pm domain
+framework and needs a phandle to the PU regulator to turn off power when
+the domain is disabled.
 
-diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-new file mode 100644
-index 0000000..5ce8c5e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-@@ -0,0 +1,32 @@
-+* Allwinner sunxi MMC controller
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6sl.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 28558f1..774e1fb 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -529,9 +529,27 @@
+ 			};
+ 
+ 			gpc: gpc at 020dc000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
+ 				compatible = "fsl,imx6sl-gpc", "fsl,imx6q-gpc";
+ 				reg = <0x020dc000 0x4000>;
+ 				interrupts = <0 89 0x04>;
++				pu-supply = <&reg_pu>;
 +
-+The highspeed MMC host controller on Allwinner SoCs provides an interface
-+for MMC, SD and SDIO types of memory cards.
++				pd_display: display-power-domain at 020dc240 {
++					compatible = "fsl,imx6q-power-domain";
++					reg = <0x020dc240 0x10>;
++				};
 +
-+Supported maximum speeds are the ones of the eMMC standard 4.5 as well
-+as the speed of SD standard 3.0.
-+Absolute maximum transfer rate is 200MB/s
++				pd_pu: pu-power-domain at 020dc260 {
++					compatible = "fsl,imx6q-power-domain";
++					reg = <0x020dc260 0x10>;
++				};
 +
-+Required properties:
-+- compatible: Should be "allwinner,<revision>-<chip>-mmc".
-+  The supported chips include a10, a10s, 13, a20 and a31.
-+- base registers are 0x1000 appart, so the base of mmc1
-+  would be 0x01c0f000+0x1000=0x01c10000(see example)
-+  and so on.
-+- clocks requires the reference at the ahb clock gate
-+  with the correct index (mmc0 -> 8, mmc1 -> 9, and so on)
-+  as well as the reference to the correct mod0 clock.
-+- interrupts requires the correct IRQ line
-+  (mmc0 -> 32, mmc1 -> 33, and so on)
-+
-+Examples:
-+
-+mmc0: mmc at 01c0f000 {
-+	compatible = "allwinner,sun5i-a13-mmc";
-+	reg = <0x01c0f000 0x1000>;
-+	clocks = <&ahb_gates 8>, <&mmc0_clk>;
-+	clock-names = "ahb", "mod";
-+	interrupts = <0 32 4>;
-+	bus-width = <4>;
-+	status = "disabled";
-+};
++				pd_arm: cpu-power-domain at 020dc2a0 {
++					compatible = "fsl,imx6q-power-domain";
++					reg = <0x020dc2a0 0x10>;
++				};
+ 			};
+ 
+ 			gpr: iomuxc-gpr at 020e0000 {
+-- 
+1.8.5.3
