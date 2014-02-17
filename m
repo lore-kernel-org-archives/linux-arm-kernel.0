@@ -1,108 +1,63 @@
-From: jingchang.lu@freescale.com (Jingchang Lu)
-Date: Mon, 17 Feb 2014 09:08:00 +0000
-Subject: [PATCHv11 2/2] dma: Add Freescale eDMA engine driver support
-In-Reply-To: <ca19105670be4af882ed72d3e004a6c7@BLUPR03MB472.namprd03.prod.outlook.com>
-References: <1390209831-15679-1-git-send-email-b35083@freescale.com>
- <ca19105670be4af882ed72d3e004a6c7@BLUPR03MB472.namprd03.prod.outlook.com>
-Message-ID: <de84e857254848fb86dfcffa65617f47@BL2PR03MB467.namprd03.prod.outlook.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 17 Feb 2014 10:11:37 +0100
+Subject: [PATCH 2/5] ARM: shmobile: r8a7791: add i2c master nodes to dtsi
+In-Reply-To: <CANqRtoSDxQfSw5PJB6-UcL-UuMySBkoCqfC+1H=o-EBA18ouLQ@mail.gmail.com>
+References: <1392543658-5030-1-git-send-email-wsa@the-dreams.de>
+ <1392543658-5030-3-git-send-email-wsa@the-dreams.de>
+ <20140217075410.GA2633@katana>
+ <CANqRtoSDxQfSw5PJB6-UcL-UuMySBkoCqfC+1H=o-EBA18ouLQ@mail.gmail.com>
+Message-ID: <CAMuHMdW8MLknykkfu9XS5CDpuJcRNyPz+GV5bhUNGndxFacnQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Vinod,
+On Mon, Feb 17, 2014 at 9:02 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> On Mon, Feb 17, 2014 at 4:54 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>> On Sun, Feb 16, 2014 at 10:40:55AM +0100, Wolfram Sang wrote:
+>>> From: Wolfram Sang <wsa@sang-engineering.com>
+>>>
+>>> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+>>
+>> From your other mail:
+>>
+>> "[2/5] needs to be reworked to exclude the r8a7790 compatible string."
+>>
+>>> +             compatible = "renesas,i2c-r8a7791", "renesas,i2c-r8a7790";
+>>
+>> Why is that? From my knowledge, you start with the exact compatible
+>> property and hardware compatible entries may follow.
 
-    Could you please help merge this patch? We are having some other upstreaming
-patches using the dma functionality pending the acceptance of the eDMA driver.
-    Many thanks!
+Thanks for posting the link to the device tree wiki/quoting from it.
+I had faint memories of that quote, but couldn't remember where I read it.
 
-Best Regards,
-Jingchang
+> I think this boils down to if they really are compatible or not. If
+> for instance a 16550 port would be compatible with 8250 on a hardware
+> level then using them in the order of "16550", "8250" makes sense. In
+> this case the r8a7791 i2c is not really strictly based on r8a7790 i2c,
+> it is just that r8a7790 has support in the driver. So it's a short cut
+> instead of actual hardware compatibility.
+>
+> So far we've dealt with this by updating the driver and only relying
+> on the actual SoC name as suffix.
+>
+> I'm sure there are tons of opinions. =)
 
-> -----Original Message-----
-> From: Lu Jingchang-B35083
-> Sent: Monday, January 27, 2014 1:20 PM
-> To: Lu Jingchang-B35083; vinod.koul at intel.com
-> Cc: dan.j.williams at intel.com; arnd at arndb.de; shawn.guo at linaro.org;
-> pawel.moll at arm.com; mark.rutland at arm.com; swarren at wwwdotorg.org; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; Wang Huan-B18965
-> Subject: RE: [PATCHv11 2/2] dma: Add Freescale eDMA engine driver support
-> 
-> Hi, Vinod,
-> 
->   Let me give some more explanation on the eDMA engine pause and
-> termination here:
-> The eDMA engine is a request-driven controller, it manage all channels in
-> one engine and schedule them to perform each one's transfer when one's
-> dma request arrive.
-> When a dma request of a specific channel is received, the channel's
-> appropriate TCD Parameter contents are loaded into the eDMA engine, and
-> the appropriate reads and writes Perform until the minor byte transfer
-> count has transferred, the number of bytes to transfer per request is
-> determined by the salve's characteristics, such as the FIFO size, and the
-> dma request condition is also determined by specific slave, such as FIFO
-> empty.
-> And to the transfer a bunch of data need many dma requests.
->   So if the dma request enable bit of a channel is cleared, there will be
-> no further dma Request received by the eDMA engine, thus the channel will
-> never be scheduled to run by the eDMA engine, the channel is paused,
-> halted, also as stopped. If the channel need to transfer the remained
-> data with the previous setting, just set the dma request enable bit, the
-> transfer will complete with slave's dma request.(resume) If the
-> parameters need be changed, corresponding register parameters can be
-> reprogrammed, after all is ok, the dma request enable bit can be set to
-> enable a new dma transfer.(terminate)
->   So is this ok and could it be merged, thanks!
-> 
-> 
-> Best Regards,
-> Jingchang
-> 
-> 
-> > -----Original Message-----
-> > From: Jingchang Lu [mailto:b35083 at freescale.com]
-> > Sent: Monday, January 20, 2014 5:24 PM
-> > To: vinod.koul at intel.com
-> > Cc: dan.j.williams at intel.com; arnd at arndb.de; shawn.guo at linaro.org;
-> > pawel.moll at arm.com; mark.rutland at arm.com; swarren at wwwdotorg.org; linux-
-> > kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > devicetree at vger.kernel.org; Lu Jingchang-B35083; Wang Huan-B18965
-> > Subject: [PATCHv11 2/2] dma: Add Freescale eDMA engine driver support
-> >
-> > Add Freescale enhanced direct memory(eDMA) controller support.
-> > This module can be found on Vybrid and LS-1 SoCs.
-> >
-> > Signed-off-by: Alison Wang <b18965@freescale.com>
-> > Signed-off-by: Jingchang Lu <b35083@freescale.com>
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> > changes in v11:
-> >  Add dma device_slave_caps definition.
-> >
-> > changes in v10:
-> >  define fsl_edma_mutex in fsl_edma_engine instead of global.
-> >  minor changes of binding description.
-> >
-> > changes in v9:
-> >  define endian's operating functions instead of macro definition.
-> >  remove the filter function, using dma_get_slave_channel instead.
-> >
-> > changes in v8:
-> >  change the edma driver according eDMA dts change.
-> >  add big-endian and little-endian handling.
-> >
-> >  no changes in v4 ~ v7.
-> >
-> >  changes in v3:
-> >   add vf610 edma dt-bindings namespace with prefix VF610_*.
-> >
-> >  changes in v2:
-> >   using generic dma-channels property instead of fsl,dma-channels.
-> >
-> >  Documentation/devicetree/bindings/dma/fsl-edma.txt |  76 ++
-> >  drivers/dma/Kconfig                                |  10 +
-> >  drivers/dma/Makefile                               |   1 +
-> >  drivers/dma/fsl-edma.c                             | 975
-> > +++++++++++++++++++++
-> >  4 files changed, 1062 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/dma/fsl-edma.txt
-> >  create mode 100644 drivers/dma/fsl-edma.c
+Hehe ;-)
+
+I think the tricky part is when a driver for "renesas,i2c-r8a7790" is updated
+with a new feature for r8a7790, which doesn't necessarily exist in r8a7791.
+Then the compatible entry above will cause breakage.
+
+In our case, this probably won't happen, as we will have "renesas,i2c-r8a7791"
+in the driver, but the driver could be forked in between the addition of
+"renesas,i2c-r8a7790" and "renesas,i2c-r8a7791" in our non-ideal world.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
