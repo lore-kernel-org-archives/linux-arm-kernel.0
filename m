@@ -1,62 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 17 Feb 2014 12:29:48 +0000
-Subject: [PATCH] arm64: Add pdev_archdata for dmamask
-In-Reply-To: <52E70AEF.4060602@codeaurora.org>
-References: <1390845177-2626-1-git-send-email-lauraa@codeaurora.org>
- <20140127193149.GV15937@n2100.arm.linux.org.uk>
- <52E70AEF.4060602@codeaurora.org>
-Message-ID: <20140217122948.GB19102@arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 17 Feb 2014 14:29:45 +0200
+Subject: [PATCH 2/2] ARM: DTS: OMAP4: Add gpmc_fck clock node
+In-Reply-To: <1392636465-31459-3-git-send-email-florian.vaussard@epfl.ch>
+References: <1392636465-31459-1-git-send-email-florian.vaussard@epfl.ch>
+ <1392636465-31459-3-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <530200B9.8090407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 28, 2014 at 01:42:07AM +0000, Laura Abbott wrote:
-> On 1/27/2014 11:31 AM, Russell King - ARM Linux wrote:
-> > On Mon, Jan 27, 2014 at 09:52:57AM -0800, Laura Abbott wrote:
-> >> The dma_mask for a device structure is a pointer. This pointer
-> >> needs to be set up before the dma mask can actually be set. Most
-> >> frameworks in the kernel take care of setting this up properly but
-> >> platform devices that don't follow a regular bus structure may not
-> >> ever have this set. As a result, checks such as dma_capable will
-> >> always return false on a raw platform device and dma_set_mask will
-> >> always return -EIO. Fix this by adding a dma_mask in the
-> >> platform_device archdata and setting it to be the dma_mask. Devices
-> >> used in other frameworks can change this as needed.
-> >
-> > You shouldn't need to do this.  I went through a lot of the drivers we
-> > currently have, fixing them up in various manners.  The basic rules
-> > for this stuff are:
-> >
-> > - It is the responsibility of the code creating the device to set a
-> >    reasonable default for the dma mask according to the bus and whether
-> >    DMA is supportable.
-> >
-> > - It is the responsibility of the driver _always_ to make a call to
-> >    dma_set_mask() and/or dma_set_coherent_mask() according to the
-> >    driver's needs if the driver is going to be using DMA.
-> >
-> > As a work-around for the buggy situation we have in the kernel with DT,
-> > various buggy workarounds have been incorporated into drivers which
-> > involve writing directly to the DMA masks, and other such games.  None
-> > of that is necessary when the dma_coerce_*() functions are used - but
-> > these are a stop-gap until the DT code gets fixed.
-> >
-> > The real answer here is to make DT conform to the first point above
-> > and not add yet another different hack to the kernel.
-> >
-> 
-> powerpc ran into this exact problem before and fixed it using this 
-> method (a77ce8167cc1d0370fcb1d79b367d62e050cb2b0
-> "driver core: Add ability for arch code to setup pdev_archdata" and
->   314b02f503c2c219fde0fcf6f086fda415f8a847 "powerpc: implement 
-> arch_setup_pdev_archdata") so there is at least some precedent for this 
-> method.
-> 
-> Are there patches/discussion somewhere else on what a proper solution 
-> would be in the DT?
+On 02/17/2014 01:27 PM, Florian Vaussard wrote:
+> Add the gpmc_fck clock, derived from l3_ick, and reference it from
+> the GPMC node to get it correctly working.
+>
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> ---
+>   arch/arm/boot/dts/omap4.dtsi           | 2 ++
+>   arch/arm/boot/dts/omap44xx-clocks.dtsi | 6 ++++++
+>   2 files changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index d3f8a6e..8a0cc71 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -275,6 +275,8 @@
+>   			gpmc,num-waitpins = <4>;
+>   			ti,hwmods = "gpmc";
+>   			ti,no-idle-on-init;
+> +			clocks = <&gpmc_fck>;
+> +			clock-names = "fck";
+>   		};
+>
+>   		uart1: serial at 4806a000 {
+> diff --git a/arch/arm/boot/dts/omap44xx-clocks.dtsi b/arch/arm/boot/dts/omap44xx-clocks.dtsi
+> index c821ff5..ae2c441 100644
+> --- a/arch/arm/boot/dts/omap44xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/omap44xx-clocks.dtsi
+> @@ -1036,6 +1036,12 @@
+>   		ti,index-power-of-two;
+>   	};
+>
+> +	gpmc_fck: gpmc_fck {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,clkdm-gate-clock";
+> +		clocks = <&l3_div_ck>;
+> +	};
+> +
 
-I guess this comes under the system topology discussion we briefly
-touched at the kernel summit. Dave Martin (cc'ed) is looking into this
-now, so at some point we'll have some longer discussions on the list.
+Why not implement a proper gate clock for CM_L3_2_GPMC_CLKCTRL? The 
+approach you have taken looks good to me otherwise.
 
--- 
-Catalin
+-Tero
+
+>   	gpio2_dbclk: gpio2_dbclk {
+>   		#clock-cells = <0>;
+>   		compatible = "ti,gate-clock";
+>
