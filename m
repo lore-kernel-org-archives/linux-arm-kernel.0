@@ -1,64 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Feb 2014 13:30:04 +0800
-Subject: [PATCH] dt/bindings: update fsl-fec regarding compatible and
- clocks
-In-Reply-To: <1392033008-20752-1-git-send-email-shawn.guo@linaro.org>
-References: <1392033008-20752-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20140217053003.GI9879@S2101-09.ap.freescale.net>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 17 Feb 2014 11:01:20 +0530
+Subject: [PATCH] ARM: OMAP2+: AM43xx: implement support for machine restart
+Message-ID: <1392615080-2196-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob and DT folks,
+Add restart hook so that AM4372 builds can restart the platform.
 
-On Mon, Feb 10, 2014 at 07:50:08PM +0800, Shawn Guo wrote:
-> Update fsl-fec to explicitly list the supported compatible strings
-> and add missing 'clocks' and 'clock-names' properties.  It does not
-> change anything about how kernel drive works.  Instead, it just reflects
-> how kernel driver works today.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+Applies on top of v3.14-rc3 + Fix reboot handling patch from Vaibhav[1]
+[1] https://patchwork.kernel.org/patch/3659031/
 
-Any comments?  Or can it be applied?
+ arch/arm/mach-omap2/Makefile        |    1 +
+ arch/arm/mach-omap2/board-generic.c |    1 +
+ arch/arm/mach-omap2/prminst44xx.c   |    3 +++
+ 3 files changed, 5 insertions(+)
 
-Shawn
-
-> ---
->  Documentation/devicetree/bindings/net/fsl-fec.txt |   19 ++++++++++++++++++-
->  1 file changed, 18 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
-> index 845ff84..3ebd395 100644
-> --- a/Documentation/devicetree/bindings/net/fsl-fec.txt
-> +++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
-> @@ -1,9 +1,26 @@
->  * Freescale Fast Ethernet Controller (FEC)
->  
->  Required properties:
-> -- compatible : Should be "fsl,<soc>-fec"
-> +- compatible : Should contain one of the following:
-> +		"fsl,imx25-fec"
-> +		"fsl,imx27-fec"
-> +		"fsl,imx28-fec"
-> +		"fsl,imx6q-fec"
-> +		"fsl,mvf600-fec"
->  - reg : Address and length of the register set for the device
->  - interrupts : Should contain fec interrupt
-> +- clocks: phandle to the clocks feeding the FEC controller and phy. The
-> +  following two are required:
-> +   - "ipg": the peripheral access clock
-> +   - "ahb": the bus clock for MAC
-> +  The following two are optional:
-> +   - "ptp": the sampling clock for PTP (IEEE 1588).  On SoC like i.MX6Q,
-> +     the clock could come from either the internal clock control module
-> +     or external oscillator via pad depending on board design.
-> +   - "enet_out": the phy reference clock provided by SoC via pad, which
-> +     is available on SoC like i.MX28.
-> +- clock-names: Must contain the clock names described just above
-> +
->  - phy-mode : String, operation mode of the PHY interface.
->    Supported values are: "mii", "gmii", "sgmii", "tbi", "rmii",
->    "rgmii", "rgmii-id", "rgmii-rxid", "rgmii-txid", "rtbi", "smii".
-> -- 
-> 1.7.9.5
-> 
-> 
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index e6eec6f..8421f38 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -60,6 +60,7 @@ AFLAGS_sram34xx.o			:=-Wa,-march=armv7-a
+ obj-$(CONFIG_SOC_OMAP2420)		+= omap2-restart.o
+ obj-$(CONFIG_SOC_OMAP2430)		+= omap2-restart.o
+ obj-$(CONFIG_SOC_AM33XX)		+= am33xx-restart.o
++obj-$(CONFIG_SOC_AM43XX)		+= omap4-restart.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= omap3-restart.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= omap4-restart.o
+ obj-$(CONFIG_SOC_OMAP5)			+= omap4-restart.o
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 5679464a..bc6013f 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -231,6 +231,7 @@ DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
+ 	.init_machine	= omap_generic_init,
+ 	.init_time	= omap3_gptimer_timer_init,
+ 	.dt_compat	= am43_boards_compat,
++	.restart	= omap44xx_restart,
+ MACHINE_END
+ #endif
+ 
+diff --git a/arch/arm/mach-omap2/prminst44xx.c b/arch/arm/mach-omap2/prminst44xx.c
+index 280f3c5..05fcf6d 100644
+--- a/arch/arm/mach-omap2/prminst44xx.c
++++ b/arch/arm/mach-omap2/prminst44xx.c
+@@ -25,6 +25,7 @@
+ #include "prminst44xx.h"
+ #include "prm-regbits-44xx.h"
+ #include "prcm44xx.h"
++#include "prcm43xx.h"
+ #include "prcm_mpu44xx.h"
+ #include "soc.h"
+ 
+@@ -176,6 +177,8 @@ void omap4_prminst_global_warm_sw_reset(void)
+ 		dev_inst = OMAP54XX_PRM_DEVICE_INST;
+ 	else if (soc_is_dra7xx())
+ 		dev_inst = DRA7XX_PRM_DEVICE_INST;
++	else if (soc_is_am43xx())
++		dev_inst = AM43XX_PRM_DEVICE_INST;
+ 	else
+ 		return;
+ 
+-- 
+1.7.9.5
