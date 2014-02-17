@@ -1,209 +1,55 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 17 Feb 2014 09:49:25 +0100
-Subject: [PATCH v4 12/13] cpuidle: mvebu: Add initial CPU idle support
- for Armada 370/XP SoC
-In-Reply-To: <1392312816-17657-13-git-send-email-gregory.clement@free-electrons.com>
-References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
- <1392312816-17657-13-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <5301CD15.7080807@linaro.org>
+From: phdm@macq.eu (Philippe De Muyter)
+Date: Mon, 17 Feb 2014 09:52:21 +0100
+Subject: [PATCH v4] bus: imx-weim: support CS GPR configuration
+In-Reply-To: <20140216143114.GH2946@S2101-09.ap.freescale.net>
+References: <1392559381-30842-1-git-send-email-shawn.guo@linaro.org>
+ <1392560564.725313659@f356.i.mail.ru>
+ <20140216143114.GH2946@S2101-09.ap.freescale.net>
+Message-ID: <20140217085221.GB23095@frolo.macqel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/2014 06:33 PM, Gregory CLEMENT wrote:
-> Add the wfi, cpu idle and cpu deep idle power states support for the
-> Armada XP SoCs.
->
-> All the latencies and the power consumption values used at the
-> "armada_370_xp_idle_driver" structure are preliminary and will be
-> modified in the future after running some measurements and analysis.
->
-> Based on the work of Nadav Haklai.
->
-> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->   drivers/cpuidle/Kconfig.arm             |   5 ++
->   drivers/cpuidle/Makefile                |   1 +
->   drivers/cpuidle/cpuidle-armada-370-xp.c | 120 ++++++++++++++++++++++++++++++++
->   3 files changed, 126 insertions(+)
->   create mode 100644 drivers/cpuidle/cpuidle-armada-370-xp.c
->
-> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-> index d988948a89a0..f377eb0840e3 100644
-> --- a/drivers/cpuidle/Kconfig.arm
-> +++ b/drivers/cpuidle/Kconfig.arm
-> @@ -1,6 +1,11 @@
->   #
->   # ARM CPU Idle drivers
->   #
-> +config ARM_ARMADA_370_XP_CPUIDLE
-> +	bool "CPU Idle Driver for Armada 370/XP family processors"
-> +	depends on ARCH_MVEBU
-> +	help
-> +	  Select this to enable cpuidle on Armada 370/XP processors.
->
->   config ARM_BIG_LITTLE_CPUIDLE
->   	bool "Support for ARM big.LITTLE processors"
-> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-> index f71ae1b373c5..9902d052bd87 100644
-> --- a/drivers/cpuidle/Makefile
-> +++ b/drivers/cpuidle/Makefile
-> @@ -7,6 +7,7 @@ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
->
->   ##################################################################################
->   # ARM SoC drivers
-> +obj-$(CONFIG_ARM_ARMADA_370_XP_CPUIDLE) += cpuidle-armada-370-xp.o
->   obj-$(CONFIG_ARM_BIG_LITTLE_CPUIDLE)	+= cpuidle-big_little.o
->   obj-$(CONFIG_ARM_HIGHBANK_CPUIDLE)	+= cpuidle-calxeda.o
->   obj-$(CONFIG_ARM_KIRKWOOD_CPUIDLE)	+= cpuidle-kirkwood.o
-> diff --git a/drivers/cpuidle/cpuidle-armada-370-xp.c b/drivers/cpuidle/cpuidle-armada-370-xp.c
-> new file mode 100644
-> index 000000000000..57c69812e79d
-> --- /dev/null
-> +++ b/drivers/cpuidle/cpuidle-armada-370-xp.c
-> @@ -0,0 +1,120 @@
-> +/*
-> + * Marvell Armada 370 and Armada XP SoC cpuidle driver
-> + *
-> + * Copyright (C) 2013 Marvell
-> + *
-> + * Nadav Haklai <nadavh@marvell.com>
-> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + *
-> + * Maintainer: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> + */
+On Sun, Feb 16, 2014 at 10:31:16PM +0800, Shawn Guo wrote:
+> On Sun, Feb 16, 2014 at 06:22:44PM +0400, Alexander Shiyan wrote:
+> > ???????????, 16 ??????? 2014, 22:03 +08:00 ?? Shawn Guo <shawn.guo@linaro.org>:
+> > > For imx50-weim and imx6q-weim type of devices, there might a WEIM CS
+> > > space configuration register in General Purpose Register controller,
+> > > e.g. IOMUXC_GPR1 on i.MX6Q.
+> > ...
+> > > +static int __init imx_weim_gpr_setup(struct platform_device *pdev)
+> > > +{
+> > > +	struct device_node *np = pdev->dev.of_node;
+> > > +	struct property *prop;
+> > > +	const __be32 *p;
+> > > +	struct regmap *gpr;
+> > > +	u32 gprvals[4] = {
+> > > +		05,	/* CS0(128M) CS1(0M)  CS2(0M)  CS3(0M) */
+> > > +		033,	/* CS0(64M)  CS1(64M) CS2(0M)  CS3(0M) */
+> > > +		0113,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
+> > > +		01111,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
+> > > +	};
+> > > +	u32 gprval = 0;
+> > > +	u32 val;
+> > > +	int cs = 0;
+> > > +	int i = 0;
+> > > +
+> > > +	gpr = syscon_regmap_lookup_by_phandle(np, "fsl,weim-cs-gpr");
+> > > +	if (IS_ERR(gpr)) {
+> > > +		dev_dbg(&pdev->dev, "failed to find weim-cs-gpr\n");
+> > > +		return 0;
+> > 
+> > Only one comment:
+> > You do not use these error codes in the probe(),
+> > so let's declare this function as void.
+> 
+> Oh, yes.  I should check return of imx_weim_gpr_setup() in probe().
+> Will add in the next version.
 
-Hi Gregory,
+Well, as all the error cases are already covered by error messages, there is
+no added value in testing that again in probe().  As Alexander wrote, you can
+declare imx_weim_gpr_setup() as 'void'.
 
-> +#include <linux/cpu_pm.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/module.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/suspend.h>
-> +#include <asm/suspend.h>
-> +#include <linux/smp.h>
-> +#include <asm/cpuidle.h>
-> +#include <asm/smp_plat.h>
-> +#include <linux/platform_device.h>
-> +#include <asm/cp15.h>
-> +#include <asm/cacheflush.h>
-
-the convention for the drivers inside this directory is to not include 
-<asm/*>.
-
-> +#define ARMADA_370_XP_MAX_STATES	3
-> +#define ARMADA_370_XP_FLAG_DEEP_IDLE	0x10000
-> +extern void armada_370_xp_pmsu_idle_prepare(bool deepidle);
-> +extern void ll_clear_cpu_coherent(void);
-> +extern void ll_set_cpu_coherent(void);
-
-Here you have to declare three low level functions which should not be 
-visible in this driver.
-
-I think you can go one step more in the code encapsulation by doing like 
-the cpuidle-at91 driver:
-	* Move armada_370_xp_cpu_suspend inside arch/arm/mach-mvebu/pm.c or 
-whereever you want
-	* Assign the suspend function to the platform device data file
-	* Get the suspend function as a callback for suspend from the field above
-
-
-> +noinline static int armada_370_xp_cpu_suspend(unsigned long deepidle)
-> +{
-> +	armada_370_xp_pmsu_idle_prepare(deepidle);
-> +
-> +	v7_exit_coherency_flush(all);
-> +
-> +	ll_clear_cpu_coherent();
-> +
-> +	dsb();
-> +
-> +	wfi();
-> +
-> +	ll_set_cpu_coherent();
-> +
-> +	asm volatile(
-> +	"mrc	p15, 0, %0, c1, c0, 0 \n\t"
-> +	"tst	%0, #(1 << 2) \n\t"
-> +	"orreq	r0, %0, #(1 << 2) \n\t"
-> +	"mcreq	p15, 0, %0, c1, c0, 0 \n\t"
-> +	"isb	"
-> +	: : "r" (0));
-> +
-> +	return 0;
-> +}
-> +
-> +static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
-> +				struct cpuidle_driver *drv,
-> +				int index)
-> +{
-> +	bool deepidle = false;
-> +	cpu_pm_enter();
-> +
-> +	if (drv->states[index].flags & ARMADA_370_XP_FLAG_DEEP_IDLE)
-> +		deepidle = true;
-> +
-> +	cpu_suspend(deepidle, armada_370_xp_cpu_suspend);
-> +
-> +	cpu_pm_exit();
-> +
-> +	return index;
-> +}
-> +
-> +static struct cpuidle_driver armada_370_xp_idle_driver = {
-> +	.name			= "armada_370_xp_idle",
-> +	.states[0]		= ARM_CPUIDLE_WFI_STATE,
-> +	.states[1]		= {
-> +		.enter			= armada_370_xp_enter_idle,
-> +		.exit_latency		= 10,
-> +		.power_usage		= 50,
-> +		.target_residency	= 100,
-> +		.flags			= CPUIDLE_FLAG_TIME_VALID,
-> +		.name			= "MV CPU IDLE",
-> +		.desc			= "CPU power down",
-> +	},
-> +	.states[2]		= {
-> +		.enter			= armada_370_xp_enter_idle,
-> +		.exit_latency		= 100,
-> +		.power_usage		= 5,
-> +		.target_residency	= 1000,
-> +		.flags			= CPUIDLE_FLAG_TIME_VALID |
-> +						ARMADA_370_XP_FLAG_DEEP_IDLE,
-> +		.name			= "MV CPU DEEP IDLE",
-> +		.desc			= "CPU and L2 Fabric power down",
-> +	},
-> +	.state_count = ARMADA_370_XP_MAX_STATES,
-> +};
-> +
-> +static int armada_370_xp_cpuidle_probe(struct platform_device *pdev)
-> +{
-> +	return cpuidle_register(&armada_370_xp_idle_driver, NULL);
-> +}
-> +
-> +static struct platform_driver armada_370_xp_cpuidle_plat_driver = {
-> +	.driver = {
-> +		.name = "cpuidle-armada-370-xp",
-> +		.owner = THIS_MODULE,
-> +	},
-> +	.probe = armada_370_xp_cpuidle_probe,
-> +};
-> +
-> +module_platform_driver(armada_370_xp_cpuidle_plat_driver);
-> +
-> +MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
-> +MODULE_DESCRIPTION("Armada 370/XP cpu idle driver");
-> +MODULE_LICENSE("GPL");
->
-
+Philippe
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
