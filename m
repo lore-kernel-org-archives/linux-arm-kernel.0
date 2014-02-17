@@ -1,57 +1,33 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 17 Feb 2014 15:44:50 -0500
-Subject: [GIT PULL] mvebu: irqchip driver for v3.15
-Message-ID: <20140217204450.GB7862@titan.lakedaemon.net>
+From: mbizon@freebox.fr (Maxime Bizon)
+Date: Mon, 17 Feb 2014 22:02:31 +0100
+Subject: Recent 3.x kernels: Memory leak causing OOMs
+In-Reply-To: <20140216225000.GO30257@n2100.arm.linux.org.uk>
+References: <20140216200503.GN30257@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1402161406120.26926@chino.kir.corp.google.com>
+ <20140216225000.GO30257@n2100.arm.linux.org.uk>
+Message-ID: <1392670951.24429.10.camel@sakura.staff.proxad.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
 
-Yes, the below is correct.  The original pull request was sent to Thomas
-at the beginning of December.  We emailed back a forth several times,
-with no objection from him.  He just didn't have time to get to it.
-I've replied to the original thread letting him know I was going to go
-ahead and take it through mvebu/arm-soc.  Regrettably, I have to assume
-silence is consent.  I've included him in the Cc: in case he objects.
+On Sun, 2014-02-16 at 22:50 +0000, Russell King - ARM Linux wrote:
 
-We have an arrangement where I put together the mvebu patches for
-irqchip into a branch and send them to him.  Unfortunately, we haven't
-quite worked out what to do when this process fails.
+> http://www.home.arm.linux.org.uk/~rmk/misc/log-20140208.txt
 
-Obviously, this driver has been in -next for a _long_ time :)  So there
-shouldn't be any hiccups.  I've left it based on v3.13 since that is how
-it's been tested.  Please let me know if that's not ok.
+[<c0064ce0>] (__alloc_pages_nodemask+0x0/0x694) from [<c022273c>] (sk_page_frag_refill+0x78/0x108)
+[<c02226c4>] (sk_page_frag_refill+0x0/0x108) from [<c026a3a4>] (tcp_sendmsg+0x654/0xd1c)  r6:00000520 r5:c277bae0 r4:c68f37c0
+[<c0269d50>] (tcp_sendmsg+0x0/0xd1c) from [<c028ca9c>] (inet_sendmsg+0x64/0x70)
 
-Despite the tag title, this is now intended for v3.15.
+FWIW I had OOMs with the exact same backtrace on kirkwood platform
+(512MB RAM), but sorry I don't have the full dump anymore.
 
-thx,
+I found a slow leaking process, and since I fixed that leak I now have
+uptime better than 7 days, *but* there was definitely some memory left
+when the OOM happened, so it appears to be related to fragmentation.
 
-Jason.
+>From what I recall, clearing the page cache helped making the box live a
+little bit longer. Does it make sense or should alloc_pages() discard
+its content when trying to satisfy high order allocations ?
 
-The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-
-  Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-irqchip-3.14
-
-for you to fetch changes up to 40b367d95fb3d60fc1edb9ba8f6ef52272e48936:
-
-  irqchip: irq-dove: Add PMU interrupt controller. (2013-11-26 15:04:53 +0000)
-
-----------------------------------------------------------------
-mvebu irqchip changes for v3.14
-
- - add Dove PMU interrupt controller
-
-----------------------------------------------------------------
-Andrew Lunn (1):
-      irqchip: irq-dove: Add PMU interrupt controller.
-
- .../interrupt-controller/marvell,dove-pmu-intc.txt |  17 +++
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-dove.c                         | 126 +++++++++++++++++++++
- 3 files changed, 144 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,dove-pmu-intc.txt
- create mode 100644 drivers/irqchip/irq-dove.c
+-- 
+Maxime
