@@ -1,90 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Feb 2014 17:35:22 +0000
-Subject: [PATCH] arm64: make a single hook to syscall_trace() for all
- syscall features
-In-Reply-To: <1391767651-5296-1-git-send-email-takahiro.akashi@linaro.org>
-References: <52F199D3.2060409@linaro.org>
- <1391767651-5296-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140217173522.GD26590@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 17 Feb 2014 17:42:48 +0000
+Subject: [PATCH] arm64: add workaround for ambiguous C99 stdint.h types
+In-Reply-To: <CAKv+Gu_=kgP1LS-HN6n+QfHMyi142aNpGR0roqRo2tinYXdxPw@mail.gmail.com>
+References: <1390768248-1688-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140217122334.GA19102@arm.com>
+ <CAKv+Gu_=kgP1LS-HN6n+QfHMyi142aNpGR0roqRo2tinYXdxPw@mail.gmail.com>
+Message-ID: <20140217174247.GA8361@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 10:07:31AM +0000, AKASHI Takahiro wrote:
-> Currently syscall_trace() is called only for ptrace.
-> With additional TIF_xx flags introduced, it is now called in all the cases
-> of audit, ftrace and seccomp in addition to ptrace.
-> Those features will be implemented later, but it's safe to include them
-> now because they can not be turned on anyway.
+On Mon, Feb 17, 2014 at 12:40:18PM +0000, Ard Biesheuvel wrote:
+> On 17 February 2014 13:23, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Sun, Jan 26, 2014 at 08:30:48PM +0000, Ard Biesheuvel wrote:
+> >> In a way similar to ARM commit 09096f6a0ee2 ("ARM: 7822/1: add workaround
+> >> for ambiguous C99 stdint.h types"), this patch redefines the macros that
+> >> are used in stdint.h so its definitions of uint64_t and int64_t are
+> >> compatible with those of the kernel.
+> >>
+> >> In order to do so, drop types.h from generic-y and create a specific arm64
+> >> version identical to the generic one with just the #define overrides added.
+> >
+> > I tried but still can't get what this patch is about. Do the
+> > linux/types.h types ever get to user space? We have uapi/linux/types.h
+> > for this.
+> >
+> > Can you give an example of where this is needed? Which source file
+> > includes both stdint.h and linux/types.h (non-uapi version)?
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/include/asm/thread_info.h |   13 +++++++++++++
->  arch/arm64/kernel/entry.S            |    5 +++--
->  arch/arm64/kernel/ptrace.c           |   11 +++++------
->  3 files changed, 21 insertions(+), 8 deletions(-)
+> It's not about user space, it is mainly about the use of NEON
+> instrinsics in the kernel.
 > 
-> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-> index 720e70b..c3df797 100644
-> --- a/arch/arm64/include/asm/thread_info.h
-> +++ b/arch/arm64/include/asm/thread_info.h
+> If you do the following:
+> 
+> #Include <linux/types.h>
+> #include <arm_neon.h>
 
-[...]
+For other intrinsics that we use like __builtin_ctzl(), do we need to
+explicitly include gcc headers? I don't think we do and I really don't
+like such arm_neon.h include which brings in other user headers. Don't
+we have any work around this?
 
-> +#define _TIF_WORK_SYSCALL	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
-> +				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP)
+My inbox only has some discussion in May last year on the linaro-kernel
+list without any clear conclusion (it could be that I deleted other
+emails).
 
-This is called _TIF_SYSCALL_WORK on arch/arm/, any reason not to follow the
-naming convention here?
-
->  #endif /* __KERNEL__ */
->  #endif /* __ASM_THREAD_INFO_H */
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 39ac630..c94b2ab 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -631,8 +631,9 @@ el0_svc_naked:					// compat entry point
->  	enable_irq
->  
->  	get_thread_info tsk
-> -	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall tracing
-> -	tbnz	x16, #TIF_SYSCALL_TRACE, __sys_trace // are we tracing syscalls?
-> +	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall hooks
-> +	tst	x16, #_TIF_WORK_SYSCALL
-> +	b.ne	__sys_trace
->  	adr	lr, ret_fast_syscall		// return address
->  	cmp     scno, sc_nr                     // check upper syscall limit
->  	b.hs	ni_sys
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 6a8928b..64ce39f 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -1062,9 +1062,6 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
->  {
->  	unsigned long saved_reg;
->  
-> -	if (!test_thread_flag(TIF_SYSCALL_TRACE))
-> -		return regs->syscallno;
-
-This doesn't look right for things like audit (where we don't want to report
-the syscall if only _TIF_SYSCALL_AUDIT is set, for example).
-
->  	if (is_compat_task()) {
->  		/* AArch32 uses ip (r12) for scratch */
->  		saved_reg = regs->regs[12];
-> @@ -1078,10 +1075,12 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
->  		regs->regs[7] = dir;
->  	}
->  
-> -	if (dir)
-> +	if (dir) {
->  		tracehook_report_syscall_exit(regs, 0);
-> -	else if (tracehook_report_syscall_entry(regs))
-> -		regs->syscallno = ~0UL;
-> +	} else {
-> +		if (tracehook_report_syscall_entry(regs))
-> +			regs->syscallno = ~0UL;
-> +	}
-
-This hunk doesn't do anything.
-
-Will
+-- 
+Catalin
