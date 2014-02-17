@@ -1,106 +1,74 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 17 Feb 2014 22:43:41 +0100
-Subject: [PATCH 23/27] clocksource: sh_cmt: Add DT support
-In-Reply-To: <CANqRtoRVCK0jgadwvreMRt1HVVyUmb-CLt5mFEGmvju_VFFbPQ@mail.gmail.com>
-References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <35710038.vGLtzuIoLe@avalon>
- <CANqRtoRVCK0jgadwvreMRt1HVVyUmb-CLt5mFEGmvju_VFFbPQ@mail.gmail.com>
-Message-ID: <3240866.imZR2oMAtf@avalon>
+From: klightspeed@killerwolves.net (klightspeed at killerwolves.net)
+Date: Tue, 18 Feb 2014 07:45:33 +1000
+Subject: [PATCH v4 0/4] DT support for kirkwood based Synology NAS boxes
+Message-ID: <1392673537-17308-1-git-send-email-klightspeed@killerwolves.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+This patchset adds support for around 30 kirkwood bases Synology NAS
+boxes. Patch #1 generalized the qnap power off driver so that it can
+also be used for Synology devices. Patch #2 and #3 document vendor
+prefixes and i2c trivial devices. Patch #4 adds the synology DT files.
 
-On Monday 17 February 2014 10:48:55 Magnus Damm wrote:
-> On Mon, Feb 17, 2014 at 10:45 AM, Laurent Pinchart wrote:
-> > On Saturday 15 February 2014 02:22:00 Magnus Damm wrote:
-> >> On Sat, Feb 15, 2014 at 1:12 AM, Laurent Pinchart wrote:
-> >> > On Saturday 15 February 2014 01:01:30 Magnus Damm wrote:
-> >> >> On Sat, Feb 15, 2014 at 12:53 AM, Laurent Pinchart wrote:
-> >> >> > On Friday 14 February 2014 10:58:22 Mark Rutland wrote:
-> >> >> >> On Fri, Feb 14, 2014 at 01:00:01AM +0000, Laurent Pinchart wrote:
-> >> >> >> > +Channels Optional Properties:
-> >> >> >> > +
-> >> >> >> > +  - clock-source-rating: rating of the timer as a clock source
-> >> >> >> > device.
-> >> >> >> > +  - clock-event-rating: rating of the timer as a clock event
-> >> >> >> > device.
-> >> >> >> 
-> >> >> >> This feels like a leak of Linux internals. Why do you need this?
-> >> >> > 
-> >> >> > You're right, it is. The clock source and clock event ratings are
-> >> >> > currently configured through platform data, I'll need to find a way
-> >> >> > to compute them in the driver instead.
-> >> >> 
-> >> >> That would be very good!
-> >> > 
-> >> > Any pointer would be appreciated :-) How did you compute the various
-> >> > ratings used in platform data all over the place ?
-> >> 
-> >> Historically we used the rating to select between CMT and TMU. For
-> >> clock sources I suppose you also have the jiffy rating to consider.
-> >> And for the SMP parts we have ARM IP for TWD and arch timers that have
-> >> their ratings too. So you need to check all the timers on a particular
-> >> system and consider what you want to have operating by default. The
-> >> ARM IP timers should be preferred if available. For clock sources the
-> >> rule is probably the higher resolution the better.
-> >> 
-> >> >> > There's still one piece of Linux-specific data I need though, as I
-> >> >> > need to specify for each channel whether to use it as a clock source
-> >> >> > device, a clock event device, both of them or none. That's
-> >> >> > configuration information that needs to be provided somehow.
-> >> >> 
-> >> >> I think you can decide clock source or clock event assignment based on
-> >> >> number of channels available. If you have only a single channel then
-> >> >> both clock event and clock source need to be supported. Otherwise use
-> >> >> one channel for clock source and the rest for clock events.
-> >> > 
-> >> > That won't match the current situation. Look at CMT0 in r8a7790 for
-> >> > instance. There's two hardware channels available, and we only use the
-> >> > first one, for clock events only.
-> >> 
-> >> You are correct. The reason for that is that the CMT driver today is
-> >> optimized for combined clock event and clock source operation.
-> >> 
-> >> Historically the hardware it initially was written for (sh-mobile on
-> >> the SH arch) only had a single timer channel so combined operation was
-> >> required for tickless to work. But since you're asking how to allocate
-> >> channels then I propose checking numbers of channels available and go
-> >> from there. With that the r8a7790 support can only get better. =)
-> >> 
-> >> >> This is probably out of scope for this DT conversion, but it would be
-> >> >> neat if you somehow could specify the CPU affinity for a channel to
-> >> >> tie a clock event to an individual CPU core. This would make a a per-
-> >> >> cpu timer unless I'm mistaken. But that's more of a software policy
-> >> >> than anything else.
-> >> > 
-> >> > Yes, that's a configuration that needs to be specified somewhere. I
-> >> > don't know where though.
-> >> 
-> >> As long as you have per-channel interrupts described in DT you can
-> >> probably handle this in a generic way in the driver.
-> > 
-> > But how do we decide whether to use a single timer channel or one channel
-> > per CPU ? Will the kernel use one clock event device per CPU
-> > automatically ? I have to confess I have no idea how this works.
-> 
-> I guess that's the tricky bit about timer support, it is a mix of
-> hardware description and software configuration. So it sounds to me
-> that we need some kind of software configuration interface. But it can
-> probably be considered when/if we add such kind of support to the
-> driver. Probably out of scope for now.
-> 
-> Regardless it seems to me that the hardware description in DT doesn't
-> need to care about this.
+v2:
+Typo fix in qnap-poweroff.c
+Use ricoy stock ticker instead of ricoh
+Describe the lego structure of the hardware
 
-I'll revisit that later. Per-CPU timers is not a high priority for now, so 
-I'll just return -EAGAIN :-)
+v3:
+Merge synology dtsi files into a single dtsi file
 
-Nonetheless, specifying which timer channel to use as a clock source and which 
-channel to use as a clock event device might need to be specified in DT (or 
-somewhere else, but I'm not sure what other options we have here).
+v4:
+Various minor fixes to synology dtsi file
+
+Andrew Lunn (3):
+  Power: Reset: Generalize qnap-poweroff to with on Synology devices.
+  DT: Vendor prefixes: Add ricoh, ssi and synology
+  DT: i2c: Trivial: Add sii, s35390a, fix ricoh vendor prefix
+
+Ben Peddell (1):
+  ARM: Kirkwood: Add support for many Synology NAS devices
+
+ .../devicetree/bindings/i2c/trivial-devices.txt    |   3 +-
+ .../bindings/power_supply/qnap-poweroff.txt        |   5 +-
+ .../devicetree/bindings/vendor-prefixes.txt        |   3 +
+ arch/arm/boot/dts/Makefile                         |  15 +
+ arch/arm/boot/dts/kirkwood-ds109.dts               |  41 +
+ arch/arm/boot/dts/kirkwood-ds110jv10.dts           |  41 +
+ arch/arm/boot/dts/kirkwood-ds111.dts               |  44 ++
+ arch/arm/boot/dts/kirkwood-ds112.dts               |  48 ++
+ arch/arm/boot/dts/kirkwood-ds209.dts               |  44 ++
+ arch/arm/boot/dts/kirkwood-ds210.dts               |  46 ++
+ arch/arm/boot/dts/kirkwood-ds212.dts               |  47 ++
+ arch/arm/boot/dts/kirkwood-ds212j.dts              |  41 +
+ arch/arm/boot/dts/kirkwood-ds409.dts               |  48 ++
+ arch/arm/boot/dts/kirkwood-ds409slim.dts           |  40 +
+ arch/arm/boot/dts/kirkwood-ds411.dts               |  52 ++
+ arch/arm/boot/dts/kirkwood-ds411j.dts              |  48 ++
+ arch/arm/boot/dts/kirkwood-ds411slim.dts           |  48 ++
+ arch/arm/boot/dts/kirkwood-rs212.dts               |  48 ++
+ arch/arm/boot/dts/kirkwood-rs409.dts               |  44 ++
+ arch/arm/boot/dts/kirkwood-rs411.dts               |  44 ++
+ arch/arm/boot/dts/kirkwood-synology.dtsi           | 871 +++++++++++++++++++++
+ drivers/power/reset/qnap-poweroff.c                |  46 +-
+ 22 files changed, 1655 insertions(+), 12 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds109.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds110jv10.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds111.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds112.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds209.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds210.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds212.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds212j.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds409.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds409slim.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds411.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds411j.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds411slim.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rs212.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rs409.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rs411.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-synology.dtsi
 
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.3.2
