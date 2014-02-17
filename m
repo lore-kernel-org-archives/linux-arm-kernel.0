@@ -1,62 +1,35 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 17 Feb 2014 11:13:37 -0300
-Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-In-Reply-To: <20140205183457.GW8533@titan.lakedaemon.net>
-References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140205183457.GW8533@titan.lakedaemon.net>
-Message-ID: <20140217141336.GA2765@localhost>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 17 Feb 2014 15:23:20 +0100
+Subject: [PATCH v4 02/13] ARM: mvebu: rename DT machine structure for Armada
+ 370/XP
+In-Reply-To: <1392647011-30117-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392647011-30117-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1392647011-30117-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 01:34:57PM -0500, Jason Cooper wrote:
-> On Sat, Jan 25, 2014 at 07:19:06PM +0100, Sebastian Hesselbarth wrote:
-> > This patch set fixes clk init order that went upside-down with
-> > v3.14. I haven't really investigated what caused this, but I assume
-> > it is related with DT node reordering by addresses.
-> > 
-> > Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
-> > registered before core clocks driver. Unfortunately, we cannot
-> > return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
-> > init order for our drivers is always core clocks before clock gating,
-> > we maintain init order ourselves by hooking CLK_OF_DECLARE to one
-> > init function that will register core clocks before clock gating
-> > driver.
-> > 
-> > This patch is based on pre-v3.14-rc1 mainline and should go in as
-> > fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
-> > I suggest Jason picks it up as a topic branch.
-> > 
-> > The patches have been boot tested on Dove and compile-tested only
-> > for Kirkwood, Armada 370 and XP.
-> > 
-> > Sebastian Hesselbarth (4):
-> >   clk: mvebu: armada-370: maintain clock init order
-> >   clk: mvebu: armada-xp: maintain clock init order
-> >   clk: mvebu: dove: maintain clock init order
-> >   clk: mvebu: kirkwood: maintain clock init order
-> > 
-> >  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
-> >  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
-> >  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
-> >  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
-> >  4 files changed, 44 insertions(+), 50 deletions(-)
-> 
-> Whole series applied to mvebu/clk-fixes.
-> 
+Due to a mistake made when merging Armada 370 and Armada XP DT machine
+structures, the name of the structure was incorrectly chosen as being
+ARMADA_XP_DT, while the structure also covers Armada 370. Therefore,
+we rename the structure to ARMADA_370_XP_DT.
 
-Are we still in time to consider Emilio's oneline proposal?
-(Emilio: would you mind preparing a suitable patch against dove,
-kirkwood, armada370/xp, so we can see the real thing?).
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/board-v7.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Sebastian fix works perfect, and it easy to understand. However, it has
-quite a large diffstat. When compared to Emilio's oneline proposal, it
-seems to me it would be preferable, unless it's broken.
-
-Workaround or not, the fact is this code will be in v3.14, so maybe we
-can spend some time considering a cleaner option.
-
-Or is this just rubbish?
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index fc2fb6e..84817fd 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -87,7 +87,7 @@ static const char * const armada_370_xp_dt_compat[] = {
+ 	NULL,
+ };
+ 
+-DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 370/XP (Device Tree)")
++DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
+ 	.smp		= smp_ops(armada_xp_smp_ops),
+ 	.init_machine	= mvebu_dt_init,
+ 	.map_io		= mvebu_map_io,
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+1.8.3.2
