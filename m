@@ -1,214 +1,55 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 17 Feb 2014 11:30:57 +0100
-Subject: [PATCH 3/3] ARM: at91: dt: sam9rl: Device Tree for the
- at91sam9rlek
-In-Reply-To: <1392426860-19589-4-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1392426860-19589-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1392426860-19589-4-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5301E4E1.60408@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 17 Feb 2014 10:37:06 +0000
+Subject: [PATCH v6 2/3] serial: fsl_lpuart: add DMA support
+In-Reply-To: <1392614888-10261-3-git-send-email-yao.yuan@freescale.com>
+References: <1392614888-10261-1-git-send-email-yao.yuan@freescale.com>
+ <1392614888-10261-3-git-send-email-yao.yuan@freescale.com>
+Message-ID: <20140217103706.GA18920@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/2014 02:14, Alexandre Belloni :
-> Add a device tree for the at91sam9rl-ek. For now it supports:
->  - MMC
->  - dbgu
->  - usart1
->  - watchdog
->  - nand
->  - leds
->  - buttons
+On Mon, Feb 17, 2014 at 05:28:07AM +0000, Yuan Yao wrote:
+> Add dma support for lpuart. This function depend on DMA driver.
+> You can turn on it by write both the dmas and dma-name properties in dts node.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm/boot/dts/Makefile         |   2 +
->  arch/arm/boot/dts/at91sam9rlek.dts | 151 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 153 insertions(+)
->  create mode 100644 arch/arm/boot/dts/at91sam9rlek.dts
+>  .../devicetree/bindings/serial/fsl-lpuart.txt      |  19 +-
+>  drivers/tty/serial/fsl_lpuart.c                    | 430 ++++++++++++++++++++-
+>  2 files changed, 433 insertions(+), 16 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index d57c1a65b24f..bb28e65d17ee 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -28,6 +28,8 @@ dtb-$(CONFIG_ARCH_AT91) += at91sam9m10g45ek.dtb
->  dtb-$(CONFIG_ARCH_AT91) += pm9g45.dtb
->  # sam9n12
->  dtb-$(CONFIG_ARCH_AT91) += at91sam9n12ek.dtb
-> +# sam9rl
-> +dtb-$(CONFIG_ARCH_AT91) += at91sam9rlek.dtb
->  # sam9x5
->  dtb-$(CONFIG_ARCH_AT91) += at91-ariag25.dtb
->  dtb-$(CONFIG_ARCH_AT91) += at91sam9g15ek.dtb
-> diff --git a/arch/arm/boot/dts/at91sam9rlek.dts b/arch/arm/boot/dts/at91sam9rlek.dts
-> new file mode 100644
-> index 000000000000..5ec9589613a1
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/at91sam9rlek.dts
-> @@ -0,0 +1,151 @@
-> +/*
-> + * at91sam9rlek.dts - Device Tree file for Atmel at91sam9rl reference board
-> + *
-> + *  Copyright (C) 2014  Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> + *
-> + * Licensed under GPLv2 only
-> + */
-> +/dts-v1/;
-> +#include "at91sam9rl.dtsi"
-> +
-> +/ {
-> +	model = "Atmel at91sam9rlek";
-> +	compatible = "atmel,at91sam9rlek", "atmel,at91sam9rl", "atmel,at91sam9";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 rootfstype=ubifs root=ubi0:rootfs ubi.mtd=7 rw";
-
-Isn't it ubi.mtd=5 according to the NAND layer below?
-
-> +	};
-> +
-> +	memory {
-> +		reg = <0x20000000 0x4000000>;
-> +	};
-> +
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		main_clock: clock at 0 {
-> +			compatible = "atmel,osc", "fixed-clock";
-> +			clock-frequency = <12000000>;
-> +		};
-> +	};
-> +
-> +	ahb {
-> +		apb {
-> +			mmc0: mmc at fffa4000 {
-
-Use address ascending order, even for the board, please.
-
-> +				pinctrl-0 = <
-> +					&pinctrl_board_mmc0
-> +					&pinctrl_mmc0_clk
-> +					&pinctrl_mmc0_slot0_cmd_dat0
-> +					&pinctrl_mmc0_slot0_dat1_3>;
-> +				status = "okay";
-> +				slot at 0 {
-> +					reg = <0>;
-> +					bus-width = <4>;
-> +					cd-gpios = <&pioA 15 GPIO_ACTIVE_HIGH>;
-> +				};
-> +			};
-> +
-> +			dbgu: serial at fffff200 {
-> +				status = "okay";
-> +			};
-> +
-> +			usart0: serial at fffb0000 {
-> +				pinctrl-0 = <
-> +					&pinctrl_usart0
-> +					&pinctrl_usart0_rts
-> +					&pinctrl_usart0_cts>;
-> +				status = "okay";
-> +			};
-> +
-> +			pinctrl at fffff400 {
-> +				mmc0 {
-> +					pinctrl_board_mmc0: mmc0-board {
-> +						atmel,pins =
-> +							<AT91_PIOA 15 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-> +					};
-> +				};
-> +			};
-> +
-> +			watchdog at fffffd40 {
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		nand0: nand at 40000000 {
-> +			nand-bus-width = <8>;
-> +			nand-ecc-mode = "soft";
-> +			nand-on-flash-bbt = <1>;
-> +			status = "okay";
-> +
-> +			at91bootstrap at 0 {
-> +				label = "at91bootstrap";
-> +				reg = <0x0 0x40000>;
-> +			};
-> +
-> +			bootloader at 40000 {
-> +				label = "bootloader";
-> +				reg = <0x40000 0x80000>;
-> +			};
-> +
-> +			bootloaderenv at c0000 {
-> +				label = "bootloader env";
-> +				reg = <0xc0000 0xc0000>;
-> +			};
-> +
-> +			dtb at 180000 {
-> +				label = "device tree";
-> +				reg = <0x180000 0x80000>;
-> +			};
-> +
-> +			kernel at 200000 {
-> +				label = "kernel";
-> +				reg = <0x200000 0x600000>;
-> +			};
-> +
-> +			rootfs at 800000 {
-> +				label = "rootfs";
-> +				reg = <0x800000 0x0f800000>;
-> +			};
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +
-> +		ds1 {
-> +			label = "ds1";
-> +			gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		ds2 {
-> +			label = "ds2";
-> +			gpios = <&pioD 16 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		ds3 {
-> +			label = "ds3";
-> +			gpios = <&pioD 14 GPIO_ACTIVE_HIGH>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +
-> +		right_click {
-> +			label = "right_click";
-> +			gpios = <&pioB 0 GPIO_ACTIVE_LOW>;
-> +			linux,code = <273>;
-> +			gpio-key,wakeup;
-> +		};
-> +
-> +		left_click {
-> +			label = "left_click";
-> +			gpios = <&pioB 1 GPIO_ACTIVE_LOW>;
-> +			linux,code = <272>;
-> +			gpio-key,wakeup;
-> +		};
-> +	};
-> +};
+> diff --git a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
+> index 6fd1dd1..6e1cbbf 100644
+> --- a/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
+> +++ b/Documentation/devicetree/bindings/serial/fsl-lpuart.txt
+> @@ -5,10 +5,19 @@ Reqiuired properties:
+>  - reg : Address and length of the register set for the device
+>  - interrupts : Should contain uart interrupt
 > 
+> +Optional properties:
+> +- dmas: A list of two dma specifiers, one for each entry in dma-names.
+> +- dma-names: should contain "tx" and "rx".
+> +
+> +Note: Optional properties for DMA support. Write them both or both not.
+> +
+>  Example:
+> 
+>  uart0: serial at 40027000 {
+> -              compatible = "fsl,vf610-lpuart";
+> -              reg = <0x40027000 0x1000>;
+> -              interrupts = <0 61 0x00>;
+> -       };
+> +               compatible = "fsl,vf610-lpuart";
+> +               reg = <0x40027000 0x1000>;
+> +               interrupts = <0 61 0x00>;
+> +               dmas = <&edma0 0 2>,
+> +                       <&edma0 0 3>;
+> +               dma-names = "rx","tx";
+> +       };
 
-Otherwise, seems okay:
+For the binding:
 
-when corrected, you can add my:
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
--- 
-Nicolas Ferre
+Mark.
