@@ -1,122 +1,46 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 17 Feb 2014 12:44:22 -0300
-Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-In-Reply-To: <53022AA9.8090606@free-electrons.com>
-References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140205183457.GW8533@titan.lakedaemon.net>
- <20140217141336.GA2765@localhost>
- <53021BD2.3090301@free-electrons.com>
- <20140217152147.GC2765@localhost>
- <53022AA9.8090606@free-electrons.com>
-Message-ID: <20140217154421.GD2765@localhost>
+Date: Mon, 17 Feb 2014 12:48:00 -0300
+Subject: [PATCH 0/2] irqchip: Armada 370/XP MPIC as a slave controller
+In-Reply-To: <1392062402-27357-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1392062402-27357-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140217154759.GE2765@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 04:28:41PM +0100, Gregory CLEMENT wrote:
-> On 17/02/2014 16:21, Ezequiel Garcia wrote:
-> > On Mon, Feb 17, 2014 at 03:25:22PM +0100, Gregory CLEMENT wrote:
-> >> On 17/02/2014 15:13, Ezequiel Garcia wrote:
-> >>> On Wed, Feb 05, 2014 at 01:34:57PM -0500, Jason Cooper wrote:
-> >>>> On Sat, Jan 25, 2014 at 07:19:06PM +0100, Sebastian Hesselbarth wrote:
-> >>>>> This patch set fixes clk init order that went upside-down with
-> >>>>> v3.14. I haven't really investigated what caused this, but I assume
-> >>>>> it is related with DT node reordering by addresses.
-> >>>>>
-> >>>>> Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
-> >>>>> registered before core clocks driver. Unfortunately, we cannot
-> >>>>> return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
-> >>>>> init order for our drivers is always core clocks before clock gating,
-> >>>>> we maintain init order ourselves by hooking CLK_OF_DECLARE to one
-> >>>>> init function that will register core clocks before clock gating
-> >>>>> driver.
-> >>>>>
-> >>>>> This patch is based on pre-v3.14-rc1 mainline and should go in as
-> >>>>> fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
-> >>>>> I suggest Jason picks it up as a topic branch.
-> >>>>>
-> >>>>> The patches have been boot tested on Dove and compile-tested only
-> >>>>> for Kirkwood, Armada 370 and XP.
-> >>>>>
-> >>>>> Sebastian Hesselbarth (4):
-> >>>>>   clk: mvebu: armada-370: maintain clock init order
-> >>>>>   clk: mvebu: armada-xp: maintain clock init order
-> >>>>>   clk: mvebu: dove: maintain clock init order
-> >>>>>   clk: mvebu: kirkwood: maintain clock init order
-> >>>>>
-> >>>>>  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
-> >>>>>  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
-> >>>>>  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
-> >>>>>  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
-> >>>>>  4 files changed, 44 insertions(+), 50 deletions(-)
-> >>>>
-> >>>> Whole series applied to mvebu/clk-fixes.
-> >>>>
-> >>>
-> >>> Are we still in time to consider Emilio's oneline proposal?
-> >>> (Emilio: would you mind preparing a suitable patch against dove,
-> >>> kirkwood, armada370/xp, so we can see the real thing?).
-> >>
-> >> I am still strongly against this proposal because hard-coded the parent
-> >> clock name in the driver seems very wrong and moreover in some circumstances
-> >> (if there is no output-name, which is our default case) this proposal
-> >> just ignored the parent clock given by the device tree and this looked
-> >> more wrong.
-> >>
-> > 
-> > So you're against the proposal as a permanent fix, *and* against the
-> > proposal as a workaround fix?
+Hi Thomas:
+
+On Mon, Feb 10, 2014 at 05:00:00PM -0300, Ezequiel Garcia wrote:
+> The newly introduced Armada 375 and Armada 38x Marvell SoCs are based on
+> Cortex-A9 CPU cores and use the ARM GIC as their main interrupt controller.
 > 
-> Yes
+> However, for various purposes (wake-up from suspend, MSI interrupts),
+> the SoCs have a separate MPIC interrupt controller, acting as a slave
+> to the GIC. This MPIC was already used as the primary controller on
+> previous Marvell SoCs, so this commit extends the existing driver to
+> allow the MPIC to be used as a GIC slave.
 > 
-> > 
-> >>>
-> >>> Sebastian fix works perfect, and it easy to understand. However, it has
-> >>> quite a large diffstat. When compared to Emilio's oneline proposal, it
-> >>> seems to me it would be preferable, unless it's broken.
-> >>>
-> >>> Workaround or not, the fact is this code will be in v3.14, so maybe we
-> >>> can spend some time considering a cleaner option.
-> >>>
-> > 
-> > Before discussing the solution as compared to your for-v3.15 clock
-> > registration order patch, I wanted to trigger some discussion around
-> > replacing this big and intrusive workaround with Emilio's oneline fix.
-> > 
-> > Let's suppose we're considering them as workaround to live just one or
-> > two releases. Wouldn't it be better to take the least instrusive?
-> > 
+> This series consists in two patches: the first one adds a helper function
+> to handle MSI interrupts. The second patch implements a chained handler, which
+> uses the previously introduced helper.
 > 
-> The better solution is the one which doesn't add another regression and until
-> today I though we had an agreement to use the patch set from Sebastian. If
-> I remember well Jason had sent a pull request for it.
+> These patches apply cleanly on v3.14-rc1 plus:
 > 
+>   36802fd irqchip: armada-370-xp: fix MSI race condition
+>   e1603bb irqchip: armada-370-xp: fix IPI race condition
+> 
+> Or simply on v3.14-rc2.
+> 
+> Ezequiel Garcia (2):
+>   irqchip: armada-370-xp: Add helper for the MSI IRQ handling
+>   irqchip: armada-370-xp: Setup a chained handler for the MPIC
+> 
+>  .../devicetree/bindings/arm/armada-370-xp-mpic.txt |  8 +-
+>  drivers/irqchip/irq-armada-370-xp.c                | 96 ++++++++++++++++------
+>  2 files changed, 76 insertions(+), 28 deletions(-)
 > 
 
-Right. If you think it adds a regression, then that's a perfectly valid reasons
-for nacking.
+Any comments on this?
 
-However, I'd like to double-check we have such a regression. I guess you're
-talking about the "tclk" name being hardcoded. IMHO, it's hardcoded in the
-driver in the first place:
-
-void __init mvebu_coreclk_setup(struct device_node *np,
-				const struct coreclk_soc_desc *desc)
-{
-	const char *tclk_name = "tclk";
-[..]
-
-So it wouldn't be too nasty?
-
-I think you also mentioned the hypothetical case where the name
-is overloaded in the devicetree, so it's not "tclk", no? In that case,
-Emilio's fix would break.
-
-However, we don't have such situation in our 'canonical' devicetrees,
-so if the devicetree is allowed to be change, it can also be
-changed to add clock-output-name's so the name doesn't have to be
-obtained after the clock is registered.
-
-Which would solve it, no?
 -- 
 Ezequiel Garc?a, Free Electrons
 Embedded Linux, Kernel and Android Engineering
