@@ -1,68 +1,80 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 17 Feb 2014 12:30:19 +0900
-Subject: [PATCH] ARM: shmobile: koelsch: Enable SDHI, GPIO and regulators
- in defconfig
-In-Reply-To: <1392273587-12196-1-git-send-email-horms+renesas@verge.net.au>
-References: <1392273587-12196-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20140217033019.GA19146@verge.net.au>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Mon, 17 Feb 2014 08:35:43 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBkdHM6IGlteDI3LXBoeXRlYy1waHljb3JlLSo6?=
+ =?UTF-8?B?IEFkZCBkaWFnbm9zdGljIFBNSUMgTEVEcw==?=
+In-Reply-To: <20140217025527.GG9879@S2101-09.ap.freescale.net>
+References: <1392464118-3353-1-git-send-email-shc_work@mail.ru>
+ <20140217025527.GG9879@S2101-09.ap.freescale.net>
+Message-ID: <1392611743.839161955@f87.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 03:39:47PM +0900, Simon Horman wrote:
-> Enable the following:
-> * regulators (needed for SDHI)
-> * SDHI
-> * GPIO
-> * GPIO keys
-> * GPIO LEDs
+???????????, 17 ??????? 2014, 10:55 +08:00 ?? Shawn Guo <shawn.guo@linaro.org>:
+> On Sat, Feb 15, 2014 at 03:35:18PM +0400, Alexander Shiyan wrote:
+> > PCM-038 module have three triple LEDs connected to PMIC which
+> > can be used for diagnostic purposes. This patch adds support
+> > for these LEDs for PCM-038 SOM and adds basic LED-triggers for
+> > these LEDs for PCM-970 RDK, the remaining LEDs are available
+> > for use from userspace.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+> >  arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts  | 50
+> +++++++++++++++++++++++++
+> >  arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi |  6 +++
+> >  2 files changed, 56 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+> b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+> > index 9f8ad51..9a07543 100644
+> > --- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+...
+> > +	ledr3: led at 9 {
+> > +		reg = <9>;
+> > +		label = "system:red3:nand";
+> > +		linux,default-trigger = "nand-disk";
+> > +	};
+> > +
+> > +	ledg3: led at 10 {
+> > +		reg = <10>;
+> > +		label = "system:green3:live";
+> > +		linux,default-trigger = "heartbeat";
+> > +	};
+> > +
+> > +	ledb3: led at 11 {
+> > +		reg = <11>;
+> > +		label = "system:blue3:cpu";
+> > +		linux,default-trigger = "cpu0";
 > 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> I do not see this trigger and above "nand-disk" in
+> Documentation/devicetree/bindings/leds/common.txt.
+> So they're just missing from bindings doc and kernel actually supports
+> them?
 
-I have queued this up.
+Yes, seems this is undocumented yet.
+Defined in drivers/mtd/nand/nand_base.c: nand_base_init().
+Present in the mainline kernel.
 
-> ---
->  arch/arm/configs/koelsch_defconfig | 9 +++++++++
->  1 file changed, 9 insertions(+)
+...
+> > +++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+> > @@ -69,6 +69,12 @@
+> >  		fsl,mc13xxx-uses-adc;
+> >  		fsl,mc13xxx-uses-rtc;
+> >  
+> > +		pmicleds: leds {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			led-control = <0x001 0x000 0x000 0x000 0x000 0x000>;
 > 
-> diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
-> index 9561139..86faab5 100644
-> --- a/arch/arm/configs/koelsch_defconfig
-> +++ b/arch/arm/configs/koelsch_defconfig
-> @@ -59,6 +59,7 @@ CONFIG_SH_ETH=y
->  # CONFIG_NET_VENDOR_VIA is not set
->  # CONFIG_NET_VENDOR_WIZNET is not set
->  # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-> +CONFIG_KEYBOARD_GPIO=y
->  # CONFIG_INPUT_MOUSE is not set
->  # CONFIG_LEGACY_PTYS is not set
->  CONFIG_SERIAL_SH_SCI=y
-> @@ -68,13 +69,21 @@ CONFIG_I2C=y
->  CONFIG_I2C_RCAR=y
->  CONFIG_SPI=y
->  CONFIG_SPI_RSPI=y
-> +CONFIG_GPIOLIB=y
-> +CONFIG_GPIO_RCAR=y
->  # CONFIG_HWMON is not set
->  CONFIG_THERMAL=y
->  CONFIG_RCAR_THERMAL=y
-> +CONFIG_REGULATOR=y
-> +CONFIG_REGULATOR_FIXED_VOLTAGE=y
-> +CONFIG_REGULATOR_GPIO=y
->  # CONFIG_HID is not set
->  # CONFIG_USB_SUPPORT is not set
-> +CONFIG_MMC=y
-> +CONFIG_MMC_SDHI=y
->  CONFIG_NEW_LEDS=y
->  CONFIG_LEDS_CLASS=y
-> +CONFIG_LEDS_GPIO=y
->  # CONFIG_IOMMU_SUPPORT is not set
->  # CONFIG_DNOTIFY is not set
->  CONFIG_TMPFS=y
-> -- 
-> 1.8.5.2
+> I can only see led-control mentioned in
+> Documentation/devicetree/bindings/mfd/mc13xxx.txt as below.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> - leds : Contain the led nodes and initial register values in property
+> "led-control".
 > 
+> But I failed to see where this property is actually defined.
+
+Not quite understand the question. Please rephrase.
+
+---
