@@ -1,80 +1,26 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 17 Feb 2014 16:35:08 +0900
-Subject: [PATCH] ARM: shmobile: Remove EMEV2 header file
-Message-ID: <20140217073508.11156.21720.sendpatchset@w520>
+Date: Mon, 17 Feb 2014 16:35:21 +0900
+Subject: [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
+In-Reply-To: <20140217072111.GA23528@verge.net.au>
+References: <20140217063152.21876.6981.sendpatchset@w520>
+ <20140217072111.GA23528@verge.net.au>
+Message-ID: <CANqRtoS7dKZcjcF3k6wq21UKmZG44txjbLfesmP+S4-tR0UNCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Mon, Feb 17, 2014 at 4:21 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Feb 17, 2014 at 03:31:52PM +0900, Magnus Damm wrote:
+>> From: Magnus Damm <damm@opensource.se>
+>>
+>> On R-Car Gen2 SoCs such as r8a7790 and r8a7791 the hardware boot
+>> mode bit MD21 indicates if hardware debug mode is enabled or not.
+>>
+>> In case hardware debug mode is enabled print a warning and refrain
+>> from booting secondary CPU cores. Without this patch Koelsch boards
+>> with SW8-4 set to OFF will hang at SMP boot.
+>
+> Out of interest, is this the solution to your recent SMP troubles?
 
-There is no C board code left for the EMEV2 SoC, so
-get rid of the emev2.h include file to save some lines.
-While at it make functions static.
+Yes, one of them. =)
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- Written against renesas-devel-v3.14-rc3-20140217
-
- Depends on "[PATCH v2] ARM: shmobile: Remove KZM9D board code"
-
- arch/arm/mach-shmobile/include/mach/emev2.h |    8 --------
- arch/arm/mach-shmobile/setup-emev2.c        |    7 ++++---
- arch/arm/mach-shmobile/smp-emev2.c          |    1 -
- 3 files changed, 4 insertions(+), 12 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/include/mach/emev2.h
-+++ /dev/null	2013-06-03 21:41:10.638032047 +0900
-@@ -1,8 +0,0 @@
--#ifndef __ASM_EMEV2_H__
--#define __ASM_EMEV2_H__
--
--extern void emev2_map_io(void);
--extern void emev2_init_delay(void);
--extern struct smp_operations emev2_smp_ops;
--
--#endif /* __ASM_EMEV2_H__ */
---- 0001/arch/arm/mach-shmobile/setup-emev2.c
-+++ work/arch/arm/mach-shmobile/setup-emev2.c	2014-02-17 16:30:05.000000000 +0900
-@@ -21,7 +21,6 @@
- #include <linux/init.h>
- #include <linux/of_platform.h>
- #include <mach/common.h>
--#include <mach/emev2.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -38,12 +37,12 @@ static struct map_desc emev2_io_desc[] _
- #endif
- };
- 
--void __init emev2_map_io(void)
-+static void __init emev2_map_io(void)
- {
- 	iotable_init(emev2_io_desc, ARRAY_SIZE(emev2_io_desc));
- }
- 
--void __init emev2_init_delay(void)
-+static void __init emev2_init_delay(void)
- {
- 	shmobile_setup_delay(533, 1, 3); /* Cortex-A9 @ 533MHz */
- }
-@@ -59,6 +58,8 @@ static const char *emev2_boards_compat_d
- 	NULL,
- };
- 
-+extern struct smp_operations emev2_smp_ops;
-+
- DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
- 	.smp		= smp_ops(emev2_smp_ops),
- 	.map_io		= emev2_map_io,
---- 0001/arch/arm/mach-shmobile/smp-emev2.c
-+++ work/arch/arm/mach-shmobile/smp-emev2.c	2014-02-17 16:25:23.000000000 +0900
-@@ -24,7 +24,6 @@
- #include <linux/io.h>
- #include <linux/delay.h>
- #include <mach/common.h>
--#include <mach/emev2.h>
- #include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
- 
+/ magnus
