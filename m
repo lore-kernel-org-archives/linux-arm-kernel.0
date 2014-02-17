@@ -1,31 +1,32 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 17 Feb 2014 17:17:02 +0100
-Subject: [PATCH v2 0/5] ARM: sun6i: Add support for the A31 I2C controller
-In-Reply-To: <20140217152430.GC3119@lukather>
-References: <1389609293-2824-1-git-send-email-maxime.ripard@free-electrons.com>
- <20140217133755.GA3119@lukather> <20140217142612.GA15157@katana>
- <20140217152430.GC3119@lukather>
-Message-ID: <20140217161702.GA20470@katana>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 17 Feb 2014 16:34:21 +0000
+Subject: [PATCH RFC v3 3/3] Documentation: arm: define DT idle states
+ bindings
+In-Reply-To: <20140216013956.GV4451@sirena.org.uk>
+References: <1392128273-8614-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1392128273-8614-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140216013956.GV4451@sirena.org.uk>
+Message-ID: <20140217163421.GD20125@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 04:24:30PM +0100, Maxime Ripard wrote:
-> On Mon, Feb 17, 2014 at 03:26:12PM +0100, Wolfram Sang wrote:
-> > 
-> > > It's been over a month now, and no sign of life from you on this patch
-> > > so far... Should I just take this patchset through my tree? :)
-> > 
-> > Nope.
+On Sun, Feb 16, 2014 at 01:39:56AM +0000, Mark Brown wrote:
+
+[...]
+
+> > +	- cache-state-retained
+> > +		Usage: See definition
+> > +		Value type: <none>
+> > +		Definition: if present cache memory is retained on power down,
+> > +			    otherwise it is lost.
 > 
-> Then please review those 40 lines of code.
+> Might be better to define which caches?
 
-They are due when they are due. If you want to speed it up, you are very
-welcome to review patches on the i2c mailing list.
+I do not expect caches in the same power domain to have different retention
+capabilities, so a flag per-state should be enough. If anyone is unhappy
+about this please flag it up. List of caches affected can be retrieved by
+walking the power-domain specifiers and check those against the caches power
+domains.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140217/3c19f1d4/attachment-0001.sig>
+Thanks,
+Lorenzo
