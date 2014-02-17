@@ -1,80 +1,93 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 17 Feb 2014 19:17:12 +0100
-Subject: [PATCH] arm64: add workaround for ambiguous C99 stdint.h types
-In-Reply-To: <20140217180237.GC8361@arm.com>
-References: <1390768248-1688-1-git-send-email-ard.biesheuvel@linaro.org>
- <20140217122334.GA19102@arm.com>
- <CAKv+Gu_=kgP1LS-HN6n+QfHMyi142aNpGR0roqRo2tinYXdxPw@mail.gmail.com>
- <20140217174247.GA8361@arm.com>
- <CAKv+Gu-RmZ4h=6+h_Fn+NQbDN81FNZHhnVd7Nfspx_LynJ1w6Q@mail.gmail.com>
- <20140217180237.GC8361@arm.com>
-Message-ID: <CAKv+Gu-rV5mvfegjqGUb+nET8FLsB2Xx0DdXjnNU0BCUUOYBTA@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 17 Feb 2014 15:19:03 -0300
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <530231C5.8090905@free-electrons.com>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140205183457.GW8533@titan.lakedaemon.net>
+ <20140217141336.GA2765@localhost>
+ <53021BD2.3090301@free-electrons.com>
+ <20140217152147.GC2765@localhost>
+ <53022AA9.8090606@free-electrons.com>
+ <20140217154421.GD2765@localhost>
+ <530231C5.8090905@free-electrons.com>
+Message-ID: <20140217181902.GG2765@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 February 2014 19:02, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Mon, Feb 17, 2014 at 05:57:22PM +0000, Ard Biesheuvel wrote:
->> On 17 February 2014 18:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Mon, Feb 17, 2014 at 12:40:18PM +0000, Ard Biesheuvel wrote:
->> >> On 17 February 2014 13:23, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> >> > On Sun, Jan 26, 2014 at 08:30:48PM +0000, Ard Biesheuvel wrote:
->> >> >> In a way similar to ARM commit 09096f6a0ee2 ("ARM: 7822/1: add workaround
->> >> >> for ambiguous C99 stdint.h types"), this patch redefines the macros that
->> >> >> are used in stdint.h so its definitions of uint64_t and int64_t are
->> >> >> compatible with those of the kernel.
->> >> >>
->> >> >> In order to do so, drop types.h from generic-y and create a specific arm64
->> >> >> version identical to the generic one with just the #define overrides added.
->> >> >
->> >> > I tried but still can't get what this patch is about. Do the
->> >> > linux/types.h types ever get to user space? We have uapi/linux/types.h
->> >> > for this.
->> >> >
->> >> > Can you give an example of where this is needed? Which source file
->> >> > includes both stdint.h and linux/types.h (non-uapi version)?
->> >>
->> >> It's not about user space, it is mainly about the use of NEON
->> >> instrinsics in the kernel.
->> >>
->> >> If you do the following:
->> >>
->> >> #Include <linux/types.h>
->> >> #include <arm_neon.h>
->> >
->> > For other intrinsics that we use like __builtin_ctzl(), do we need to
->> > explicitly include gcc headers? I don't think we do and I really don't
->> > like such arm_neon.h include which brings in other user headers. Don't
->> > we have any work around this?
->>
->> Well, I talked to the toolchain guys at the time and they really
->> disliked the idea of coding directly against the __builtins because
->> they are not considered a stable interface, especially because the
->> interface that /is/ considered stable (arm_neon.h) is supported both
->> on ARM and on arm64.
->
-> Than we don't use the Neon __builtins in the kernel.
->
->> > My inbox only has some discussion in May last year on the linaro-kernel
->> > list without any clear conclusion (it could be that I deleted other
->> > emails).
->>
->> There was some discussion, indeed, but for ARM, with the conclusion
->> being the fix I mentioned in the patch: 09096f6a0ee2 ("ARM: 7822/1:
->> add workaround
->> for ambiguous C99 stdint.h types"), only in that case, the ambiguity
->> is (unsurprisingly) about the 32 bit types, not the 64 bit ones.
->
-> My worry is that some future toolchain may include something else in
-> this file and get other type conflicts. It really looks fragile.
->
+On Mon, Feb 17, 2014 at 04:59:01PM +0100, Gregory CLEMENT wrote:
+[..]
+> > 
+> > Right. If you think it adds a regression, then that's a perfectly valid reasons
+> > for nacking.
+> > 
+> > However, I'd like to double-check we have such a regression. I guess you're
+> > talking about the "tclk" name being hardcoded. IMHO, it's hardcoded in the
+> > driver in the first place:
+> > 
+> > void __init mvebu_coreclk_setup(struct device_node *np,
+> > 				const struct coreclk_soc_desc *desc)
+> > {
+> > 	const char *tclk_name = "tclk";
+> > [..] 
+> 
+> 
+> Here it is just about giving a name to a clock. As in the device tree
+> we only refer to the clock by index, the name don't matter.
+> 
 
-Well, the GCC folks are quite careful not to depend on arbitrary user
-headers when the -ffreestanding option is set. Also, the real problem
-is the fact that Linux defines C99 types, but does so in an
-incompatible way. (I.e., one could also argue that the Linux typedefs
-should be based on GCC's builtin #defines of __INT64_TYPE,
-__UINT64_TYPE, etc if defined). So the chances of something similar
-reappearing all of a sudden are quite slim imo.
+Unless I'm really confused about what's the problem here, the *name* is
+*all* that matters.
 
-Regards,
-Ard.
+We're having a clock *registration* order issue (which is different from clock
+enable). Let me try to explain the issue, in case it's still not clear.
+
+I'll stick to the current specific problem but it can apply to any other
+pair of parent/child.
+
+Some of the mvebu clocks are registered as part of the "core" clock
+group, modeled by the "marvell,armada-370-core-clock" compatible node.
+
+Another group of mvebu clocks are registered as part of the "gating"
+clock group, modeled by the "marvell,armada-370-gating-clock" compatible
+node.
+
+By default, all the gating clocks are child of the first registered core
+clock. This clock is named "tclk" by default, and this name can be overloaded
+in the devicetree.
+
+So far, so good, right?
+
+The issue we're trying to fix, arises from the mvebu_clk_gating_setup()
+trying to get the name of this "tclk", as a registered clock.
+
+In other words, the current code needs the tclk to be registered, for it
+will ask his name like this:
+
+	const char *default_parent = NULL;
+
+	clk = of_clk_get(np, 0);
+	if (!IS_ERR(clk)) {
+		default_parent = __clk_get_name(clk);
+		clk_put(clk);
+	}
+
+Once it gets the name, all goes smoothly. Notice how the clock is obtained
+for the sole purpose of getting the name of it, which shows clearly it's the
+*name* that matters.
+
+The ordering issue happens when the gating clock group is probed, before
+the core clock group. In that case, it's not possible to get the
+"&coreclk 0" (which is wrongly assumed to be registered), and so it's
+not possible to get the name.
+
+So the root of the problem is that snippet above, which adds a
+completely unneeded registration order requirement. Instead, we should
+be looking for the names: we can hardcode the name or fetch it from the
+devicetree (Emilio has posted patches for both).
+
+I really don't see why we're not fixing this, instead of adding yet
+another layer of complexity to the problem.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
