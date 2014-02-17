@@ -1,26 +1,31 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 17 Feb 2014 16:35:21 +0900
-Subject: [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
-In-Reply-To: <20140217072111.GA23528@verge.net.au>
-References: <20140217063152.21876.6981.sendpatchset@w520>
- <20140217072111.GA23528@verge.net.au>
-Message-ID: <CANqRtoS7dKZcjcF3k6wq21UKmZG44txjbLfesmP+S4-tR0UNCQ@mail.gmail.com>
+From: david.lanzendoerfer@o2s.ch (David =?ISO-8859-1?Q?Lanzend=F6rfer?=)
+Date: Mon, 17 Feb 2014 08:34:07 +0100
+Subject: [linux-sunxi] [PATCH v6 4/8] ARM: sunxi: Add driver for SD/MMC
+ hosts found on Allwinner sunxi SoCs
+In-Reply-To: <1744603.zMUgfmoUUP@pagira.o2s.ch>
+References: <20140216050933.728.25526.stgit@dizzy-6.o2s.ch>
+ <1392542548.11093.13.camel@chi.lan> <1744603.zMUgfmoUUP@pagira.o2s.ch>
+Message-ID: <2307315.ANYRul4IVf@pagira.o2s.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 4:21 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Feb 17, 2014 at 03:31:52PM +0900, Magnus Damm wrote:
->> From: Magnus Damm <damm@opensource.se>
->>
->> On R-Car Gen2 SoCs such as r8a7790 and r8a7791 the hardware boot
->> mode bit MD21 indicates if hardware debug mode is enabled or not.
->>
->> In case hardware debug mode is enabled print a warning and refrain
->> from booting secondary CPU cores. Without this patch Koelsch boards
->> with SW8-4 set to OFF will hang at SMP boot.
->
-> Out of interest, is this the solution to your recent SMP troubles?
+> > ETIMETRAVEL
+> I'm not really into this licensing and copyright stuff.
+> Could you maybe point out what the correct copyright would be?
+I forgot to squash an important commit of mine in anyway.
+I asked wikipedia about the form the copyright should be formed.
+I hope the new revision will be satisfying...
 
-Yes, one of them. =)
+-david
 
-/ magnus
+/*
+funny...
+I don't get stuck at technical issues but on burocracy once again>_>
+*/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140217/b08357db/attachment.sig>
