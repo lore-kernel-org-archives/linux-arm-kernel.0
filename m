@@ -1,139 +1,86 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 17 Feb 2014 16:57:11 +0000
-Subject: [PATCH 02/18] arm64: GICv3 device tree binding documentation
-In-Reply-To: <20140217012120.GC21070@cbox>
-References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
- <1391607050-540-3-git-send-email-marc.zyngier@arm.com>
- <20140217012120.GC21070@cbox>
-Message-ID: <53023F66.8040709@arm.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 17 Feb 2014 17:57:20 +0100
+Subject: [PATCH v3 0/7] tty/serial: Add helpers to use GPIOs to control modem
+ lines and implement atmel_serial.c
+Message-ID: <1392656247-3351-1-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/14 01:21, Christoffer Dall wrote:
-> On Wed, Feb 05, 2014 at 01:30:34PM +0000, Marc Zyngier wrote:
->> Add the necessary documentation to support GICv3.
->>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  Documentation/devicetree/bindings/arm/gic-v3.txt | 81 ++++++++++++++++++++++++
->>  1 file changed, 81 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/gic-v3.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/gic-v3.txt b/Documentation/devicetree/bindings/arm/gic-v3.txt
->> new file mode 100644
->> index 0000000..93852f6
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/gic-v3.txt
->> @@ -0,0 +1,81 @@
->> +* ARM Generic Interrupt Controller, version 3
->> +
->> +AArch64 SMP cores are often associated with a GICv3, providing private
->> +peripheral interrupts (PPI), shared peripheral interrupts (SPI),
->> +software generated interrupts (SGI), and locality-specific peripheral
->> +Interrupts (LPI).
-> 
-> Super-over-ridiculous-nit: capitalize the definitions, e.g. Private
-> Peripheral Interrupts (PPI)
+The USART controller on sam9x5 chips (and also all AT91/SAMA5 chips
+but at91rm9200) are not capable of handling DTR/DSR/DCD/RI signal.
+Moreover, even if the controller can handle CTS/RTS, the dedicated
+CTS/RTS pins are already muxed for other peripherals (LCDC/EMAC/MMC).
 
-Sure.
+So this patchset adds the possibility to control those lines via GPIO,
+as it is done for RTS in the patch "switch atmel serial to use gpiolib"
 
->> +
->> +Main node required properties:
->> +
->> +- compatible : should at least contain  "arm,gic-v3".
->> +- interrupt-controller : Identifies the node as an interrupt controller
->> +- #interrupt-cells : Specifies the number of cells needed to encode an
->> +  interrupt source. Must be a single cell with a value of at least 3.
->> +
->> +  The 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI
->> +  interrupts. Other values are reserved for future use.
->> +
->> +  The 2nd cell contains the interrupt number for the interrupt type.
->> +  SPI interrupts are in the range [0-987]. PPI interrupts are in the
->> +  range [0-15].
->> +
->> +  The 3rd cell is the flags, encoded as follows:
->> +	bits[3:0] trigger type and level flags.
->> +		1 = edge triggered
->> +		2 = edge triggered (deprecated, for compatibility with GICv2)
->> +		4 = level triggered
->> +		8 = level triggered (deprecated, for compatibility with GICv2)
->> +
->> +  Cells 4 and beyond are reserved for future use. Where the 1st cell
->> +  has a value of 0 or 1, cells 4 and beyond act as padding, and may be
->> +  ignored. It is recommended that padding cells have a value of 0.
-> 
-> another-super-nit: Saying "If the 1st cell" or "When the 1st cell"
-> sounds more clear to me, but I may be wrong.
+As it was suggested by Alexander Shiyan, I made that available for
+every board.
 
-Works for me.
+Patch 1 implements the generic helpers to control modem lines via GPIO
+Patches 2 and 3 are just a little tidy up of atmel_serial.c.
+Patch 4 implements modem control lines in atmel_serial atmel_serial.
+Patches 5 and 6 implement the get_direction() gpio call for at91, as
+it is needed by gpiod_get_direction().
+Patch 7 implement the interrupts of CTS/DSR/DCD/RI.
 
->> +
->> +- reg : Specifies base physical address(s) and size of the GIC
->> +  registers, in the following order:
->> +  - GIC Distributor interface (GICD)
->> +  - GIC Redistributors (GICR), one range per redistributor region
->> +  - GIC CPU interface (GICC)
->> +  - GIC Hypervisor interface (GICH)
->> +  - GIC Virtual CPU interface (GICV)
->> +
->> +  GICC, GICH and GICV are optional.
->> +
->> +- interrupts : Interrupt source of the VGIC maintenance interrupt.
->> +
->> +Optional
->> +
->> +- redistributor-stride : If using padding pages, specifies the stride
->> +  of consecutive redistributors. Must be a multiple of 64kB.
-> 
-> How is this going to be used?  What would the size of the padding then
-> be?  I couldn't find anything about this in the specs.
-> 
-> Or does this mean the total size of the set of contiguous pages for each
-> of the redistributors?  That seems to make the math in the example below
-> work.
+This is based on 3.14-rc3 + Linus Walleij/Nicolas Ferre's patch:
+ 354e57f3a0a2 ARM/serial: at91: switch atmel serial to use gpiolib
+(in Uwe's tree git://git.pengutronix.de/git/ukl/linux.git dropmachtimexh )
+and Philipp Zabel's patch:
+ 8f984bc11e1cc gpiolib: make gpiod_direction_output take a logical value
+(in gpio tree git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git )
+(there won't be a merge conflict if this last patch is not present, the
+gpios will "just" be on the wrong direction.)
+ 
+Tested on at91sam9g35, with a null modem cable between 2 serial ports,
+one with CTS/RTS controlled by the USART controller, the other via GPIO,
+full duplex transfers.
+Did some tests also with null modem cables on a PC.
 
-Indeed. This is to allow overriding of the size of a single
-redistributor. The driver will follow the spec to the letter (two or
-four 64k pages, depending on GICR_TYPER.VLPI), except when this
-parameter is present.
+Updates from v2:
+	- remove UART_GPIO_MIN/UART_GPIO_MAX_INPUT and use a direction
+	boolean instead.
+	- implement get_direction in at91 pinctrl and mach-at91/gpio.c.
+	- remove the get_mctrl_gpio_name() function that was used for
+	logs only.
+	- split atmel_serial.c patch in 2.
+	- use a gpio lookup table to declare modem gpios in platform
+	devices boards. So there's no more special case for platform
+	data gpios in atmel_serial.c.
 
->> +
->> +- #redistributor-regions: The number of independent contiguous regions
->> +  occupied by the redistributors. Required if more than one such
->> +  region is present.
->> +
->> +Examples:
->> +
->> +	gic: interrupt-controller at 2cf00000 {
->> +		compatible = "arm,gic-v3";
->> +		#interrupt-cells = <3>;
->> +		interrupt-controller;
->> +		reg = <0x0 0x2f000000 0 0x10000>,	// GICD
->> +		      <0x0 0x2f100000 0 0x200000>,	// GICR
->> +		      <0x0 0x2c000000 0 0x2000>,	// GICC
->> +		      <0x0 0x2c010000 0 0x2000>,	// GICH
->> +		      <0x0 0x2c020000 0 0x2000>;	// GICV
->> +		interrupts = <1 9 4>;
->> +	};
->> +
->> +	gic: interrupt-controller at 2c010000 {
->> +		compatible = "arm,gic-v3";
->> +		#interrupt-cells = <3>;
->> +		interrupt-controller;
->> +		redistributor-stride = 0x40000;		// 256kB stride
-> 
-> I raised the point in patch 1 about the stide value being read as a
-> 64-bit value, which would imply that the example should be the
-> following, I think:
-> 
-> +		redistributor-stride = <0x0 0x40000>;		// 256kB stride
+Updates from v1:
+	- Instead of controlling modem signal only on atmel board, the
+	code is now available for every board.
+	- The active low flag from device tree is now used.
 
-Indeed. I'll fix this.
+Richard Genoud (7):
+  tty/serial: Add GPIOLIB helpers for controlling modem lines
+  tty/serial: at91: use dev_err instead of printk
+  tty/serial: at91: remove unused open/close hooks
+  tty/serial: at91: use mctrl_gpio helpers
+  ARM: at91: gpio: implement get_direction
+  pinctrl: at91: implement get_direction
+  tty/serial: at91: add interrupts for modem control lines
 
-Thanks for the review,
+ Documentation/serial/driver              |  21 +++
+ arch/arm/mach-at91/at91rm9200_devices.c  |  16 +-
+ arch/arm/mach-at91/at91sam9260_devices.c |   7 -
+ arch/arm/mach-at91/at91sam9261_devices.c |   4 -
+ arch/arm/mach-at91/at91sam9263_devices.c |   4 -
+ arch/arm/mach-at91/at91sam9g45_devices.c |   5 -
+ arch/arm/mach-at91/at91sam9rl_devices.c  |   5 -
+ arch/arm/mach-at91/gpio.c                |  13 ++
+ drivers/pinctrl/pinctrl-at91.c           |  12 ++
+ drivers/tty/serial/Kconfig               |   4 +
+ drivers/tty/serial/Makefile              |   3 +
+ drivers/tty/serial/atmel_serial.c        | 249 +++++++++++++++++++++++--------
+ drivers/tty/serial/serial_mctrl_gpio.c   | 112 ++++++++++++++
+ drivers/tty/serial/serial_mctrl_gpio.h   |  92 ++++++++++++
+ include/linux/platform_data/atmel.h      |   1 -
+ 15 files changed, 456 insertions(+), 92 deletions(-)
+ create mode 100644 drivers/tty/serial/serial_mctrl_gpio.c
+ create mode 100644 drivers/tty/serial/serial_mctrl_gpio.h
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+1.8.5
