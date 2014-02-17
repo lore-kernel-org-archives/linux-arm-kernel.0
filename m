@@ -1,40 +1,66 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 17 Feb 2014 17:57:22 +0100
-Subject: [PATCH v3 2/7] tty/serial: at91: use dev_err instead of printk
+Date: Mon, 17 Feb 2014 17:57:23 +0100
+Subject: [PATCH v3 3/7] tty/serial: at91: remove unused open/close hooks
 In-Reply-To: <1392656247-3351-1-git-send-email-richard.genoud@gmail.com>
 References: <1392656247-3351-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1392656247-3351-3-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1392656247-3351-4-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For better consistency.
+commit 95e629b761ce36996d1befe2824d5346b5a220b9 removed the use of board
+specific hooks in serial_at91.h, so now, the open/close hook are just
+dead code.
 
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 ---
- drivers/tty/serial/atmel_serial.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/tty/serial/atmel_serial.c | 21 ---------------------
+ 1 file changed, 21 deletions(-)
 
 diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 91c0d8839570..ed9621a21d67 100644
+index ed9621a21d67..a51b3a762948 100644
 --- a/drivers/tty/serial/atmel_serial.c
 +++ b/drivers/tty/serial/atmel_serial.c
-@@ -1549,7 +1549,7 @@ static int atmel_startup(struct uart_port *port)
- 	retval = request_irq(port->irq, atmel_interrupt, IRQF_SHARED,
- 			tty ? tty->name : "atmel_serial", port);
- 	if (retval) {
--		printk("atmel_serial: atmel_startup - Can't get irq\n");
-+		dev_err(port->dev, "atmel_startup - Can't get irq\n");
- 		return retval;
- 	}
+@@ -112,9 +112,6 @@ static void atmel_stop_rx(struct uart_port *port);
+ #define UART_PUT_TCR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_TCR)
+ #define UART_GET_TCR(port)	__raw_readl((port)->membase + ATMEL_PDC_TCR)
  
-@@ -1732,7 +1732,7 @@ static void atmel_serial_pm(struct uart_port *port, unsigned int state,
- 		clk_disable_unprepare(atmel_port->clk);
- 		break;
- 	default:
--		printk(KERN_ERR "atmel_serial: unknown pm %d\n", state);
-+		dev_err(port->dev, "atmel_serial: unknown pm %d\n", state);
+-static int (*atmel_open_hook)(struct uart_port *);
+-static void (*atmel_close_hook)(struct uart_port *);
+-
+ struct atmel_dma_buffer {
+ 	unsigned char	*buf;
+ 	dma_addr_t	dma_addr;
+@@ -1569,17 +1566,6 @@ static int atmel_startup(struct uart_port *port)
+ 		if (retval < 0)
+ 			atmel_set_ops(port);
  	}
+-	/*
+-	 * If there is a specific "open" function (to register
+-	 * control line interrupts)
+-	 */
+-	if (atmel_open_hook) {
+-		retval = atmel_open_hook(port);
+-		if (retval) {
+-			free_irq(port->irq, port);
+-			return retval;
+-		}
+-	}
+ 
+ 	/* Save current CSR for comparison in atmel_tasklet_func() */
+ 	atmel_port->irq_status_prev = UART_GET_CSR(port);
+@@ -1678,13 +1664,6 @@ static void atmel_shutdown(struct uart_port *port)
+ 	 * Free the interrupt
+ 	 */
+ 	free_irq(port->irq, port);
+-
+-	/*
+-	 * If there is a specific "close" function (to unregister
+-	 * control line interrupts)
+-	 */
+-	if (atmel_close_hook)
+-		atmel_close_hook(port);
  }
  
+ /*
 -- 
 1.8.5
