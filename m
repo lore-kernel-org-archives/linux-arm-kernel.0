@@ -1,64 +1,65 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Mon, 17 Feb 2014 12:31:37 -0300
-Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-In-Reply-To: <53022504.1010908@free-electrons.com>
-References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140205183457.GW8533@titan.lakedaemon.net>
- <20140217141336.GA2765@localhost> <53021BD2.3090301@free-electrons.com>
- <53021FD9.2070406@elopez.com.ar> <53022504.1010908@free-electrons.com>
-Message-ID: <53022B59.3060905@elopez.com.ar>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 17 Feb 2014 16:44:06 +0100
+Subject: [PATCH 0/2] Marvell Armada 375 and 38x pinctrl drivers
+In-Reply-To: <1392051896-19178-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392051896-19178-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140217164406.17d3f59e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Linus,
 
-El 17/02/14 12:04, Gregory CLEMENT escribi?:
-(snip)
-> Please read what I have written: "if there is no output-name, which is our
-> default case) this proposal just ignored the parent clock given by the device
-> tree".
->
-> Extract of your code from the link you pointed:
->
-> const char *default_parent = "tclk";
->
-> [...]
->
-> of_property_read_string_index(clkspec.np, "clock-output-names",
-> 					      clkspec.args_count ? clkspec.args[0] : 0,
-> 					      &default_parent);
->
-> example of a valid dts:
-> 			gateclk: clock-gating-control at 18220 {
-> 				compatible = "marvell,foo-bar-gating-clock";
-> 				reg = <0x18220 0x4>;
-> 				clocks = <&coreclk 1>;
-> 				#clock-cells = <1>;
-> 			};
->
-> So in this fictional but still valid example, the device tree indicates that the parent
-> clock of the gating clock is the 2nd clock provided by the coreclk which is currently
-> "cpuclk". As no clock-output-names is used, then this will be totally ignore and instead
-> of using "cpuclk" as parent "tclk" will be used.
+Do you intend to integrate the following patches for 3.15 ? They have
+been Acked-by Jason Cooper, one of the mvebu maintainer, and are just
+additions of simple mvebu pinctrl drivers that follow the existing
+mvebu pinctrl common logic with nothing fancy.
 
-I can see your point now, but as this is completely fictional, I'd say 
-it's irrelevant. You can just add the names if Marvell ever makes a chip 
-that sources the gates from the second coreclk. As far as I can see on 
-the device trees in Linux, all mvebu hardware always sources them from 
-tclk. Don't try to over-engineer your driver for something that is 
-unlikely to happen in reality.
+We have agreed with Sebastian Hesselbarth, who is doing a more serious
+rework of the pinctrl mvebu stuff, that those two patches should go in
+first, so that they don't miss 3.15.
 
-If you in the future need to support another legacy platform with a 
-half-cooked DT not listing the names, you can always list the right 
-parent on the divisor table (see link for example) and override the default.
+Thanks a lot,
 
-http://lxr.free-electrons.com/source/drivers/clk/mvebu/kirkwood.c?v=3.13#L222
+Thomas
 
-> I hope this example will show you, what I disagree with this proposal and why it
-> introduce some regression.
+On Mon, 10 Feb 2014 18:04:54 +0100, Thomas Petazzoni wrote:
+> Linus,
+> 
+> Here are two patches that add the pinctrl drivers for two new Marvell
+> ARM SOCs that belong to the mach-mvebu family: the Armada 375 and the
+> Armada 380/385. They are based on Cortex-A9 CPU cores, and share a
+> number of peripherals with their predecessors in the mach-mvebu
+> family. pinctrl-wise, they have a completely similar register layout
+> than Armada 370/XP, so only a list of pins and functions has to be
+> introduced, and therefore the drivers are straightforward.
+> 
+> The core support (arch/arm/mach-mvebu) for these SOCs will be posted
+> shortly, and we're aiming at having this merged for 3.15 if possible.
+> 
+> Thanks!
+> 
+> Thomas
+> 
+> Thomas Petazzoni (2):
+>   pinctrl: mvebu: add pin-muxing driver for the Marvell Armada 375
+>   pinctrl: mvebu: add pin-muxing driver for the Marvell Armada 380/385
+> 
+>  .../pinctrl/marvell,armada-375-pinctrl.txt         |  81 ++++
+>  .../pinctrl/marvell,armada-38x-pinctrl.txt         |  79 ++++
+>  drivers/pinctrl/mvebu/Kconfig                      |   8 +
+>  drivers/pinctrl/mvebu/Makefile                     |   2 +
+>  drivers/pinctrl/mvebu/pinctrl-armada-375.c         | 441 ++++++++++++++++++++
+>  drivers/pinctrl/mvebu/pinctrl-armada-38x.c         | 445 +++++++++++++++++++++
+>  6 files changed, 1056 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
+>  create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-375.c
+>  create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+> 
 
-It's not a regression if things don't break :-)
 
-Cheers,
 
-Emilio
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
