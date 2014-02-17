@@ -1,77 +1,83 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 17 Feb 2014 16:21:02 +0100
-Subject: [PATCH V3 16/17] i2c: nomadik: Remove busy check for transfers at
- suspend late
-Message-ID: <1392650462-14960-1-git-send-email-ulf.hansson@linaro.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Mon, 17 Feb 2014 12:21:48 -0300
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <53021BD2.3090301@free-electrons.com>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140205183457.GW8533@titan.lakedaemon.net>
+ <20140217141336.GA2765@localhost>
+ <53021BD2.3090301@free-electrons.com>
+Message-ID: <20140217152147.GC2765@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should never be busy performing transfers at suspend late, thus
-there are no reason to check for it.
+On Mon, Feb 17, 2014 at 03:25:22PM +0100, Gregory CLEMENT wrote:
+> On 17/02/2014 15:13, Ezequiel Garcia wrote:
+> > On Wed, Feb 05, 2014 at 01:34:57PM -0500, Jason Cooper wrote:
+> >> On Sat, Jan 25, 2014 at 07:19:06PM +0100, Sebastian Hesselbarth wrote:
+> >>> This patch set fixes clk init order that went upside-down with
+> >>> v3.14. I haven't really investigated what caused this, but I assume
+> >>> it is related with DT node reordering by addresses.
+> >>>
+> >>> Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
+> >>> registered before core clocks driver. Unfortunately, we cannot
+> >>> return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
+> >>> init order for our drivers is always core clocks before clock gating,
+> >>> we maintain init order ourselves by hooking CLK_OF_DECLARE to one
+> >>> init function that will register core clocks before clock gating
+> >>> driver.
+> >>>
+> >>> This patch is based on pre-v3.14-rc1 mainline and should go in as
+> >>> fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
+> >>> I suggest Jason picks it up as a topic branch.
+> >>>
+> >>> The patches have been boot tested on Dove and compile-tested only
+> >>> for Kirkwood, Armada 370 and XP.
+> >>>
+> >>> Sebastian Hesselbarth (4):
+> >>>   clk: mvebu: armada-370: maintain clock init order
+> >>>   clk: mvebu: armada-xp: maintain clock init order
+> >>>   clk: mvebu: dove: maintain clock init order
+> >>>   clk: mvebu: kirkwood: maintain clock init order
+> >>>
+> >>>  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
+> >>>  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
+> >>>  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
+> >>>  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
+> >>>  4 files changed, 44 insertions(+), 50 deletions(-)
+> >>
+> >> Whole series applied to mvebu/clk-fixes.
+> >>
+> > 
+> > Are we still in time to consider Emilio's oneline proposal?
+> > (Emilio: would you mind preparing a suitable patch against dove,
+> > kirkwood, armada370/xp, so we can see the real thing?).
+> 
+> I am still strongly against this proposal because hard-coded the parent
+> clock name in the driver seems very wrong and moreover in some circumstances
+> (if there is no output-name, which is our default case) this proposal
+> just ignored the parent clock given by the device tree and this looked
+> more wrong.
+> 
 
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/i2c/busses/i2c-nomadik.c |   10 ----------
- 1 file changed, 10 deletions(-)
+So you're against the proposal as a permanent fix, *and* against the
+proposal as a workaround fix?
 
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 0a6d438..ceb3d05 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -167,7 +167,6 @@ struct i2c_nmk_client {
-  * @stop: stop condition.
-  * @xfer_complete: acknowledge completion for a I2C message.
-  * @result: controller propogated result.
-- * @busy: Busy doing transfer.
-  */
- struct nmk_i2c_dev {
- 	struct i2c_vendor_data		*vendor;
-@@ -185,7 +184,6 @@ struct nmk_i2c_dev {
- 	int				stop;
- 	struct completion		xfer_complete;
- 	int				result;
--	bool				busy;
- };
- 
- /* controller's abort causes */
-@@ -671,8 +669,6 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
- 	struct nmk_i2c_dev *dev = i2c_get_adapdata(i2c_adap);
- 	int j;
- 
--	dev->busy = true;
--
- 	pm_runtime_get_sync(&dev->adev->dev);
- 
- 	/* Attempt three times to send the message queue */
-@@ -697,8 +693,6 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
- 
- 	pm_runtime_put_sync(&dev->adev->dev);
- 
--	dev->busy = false;
--
- 	/* return the no. messages processed */
- 	if (status)
- 		return status;
-@@ -888,9 +882,6 @@ static int nmk_i2c_suspend_late(struct device *dev)
- 	struct amba_device *adev = to_amba_device(dev);
- 	struct nmk_i2c_dev *nmk_i2c = amba_get_drvdata(adev);
- 
--	if (nmk_i2c->busy)
--		return -EBUSY;
--
- 	pinctrl_pm_select_sleep_state(dev);
- 
- 	return 0;
-@@ -997,7 +988,6 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
- 		goto err_no_mem;
- 	}
- 	dev->vendor = vendor;
--	dev->busy = false;
- 	dev->adev = adev;
- 	nmk_i2c_of_probe(np, dev);
- 
+> > 
+> > Sebastian fix works perfect, and it easy to understand. However, it has
+> > quite a large diffstat. When compared to Emilio's oneline proposal, it
+> > seems to me it would be preferable, unless it's broken.
+> > 
+> > Workaround or not, the fact is this code will be in v3.14, so maybe we
+> > can spend some time considering a cleaner option.
+> > 
+
+Before discussing the solution as compared to your for-v3.15 clock
+registration order patch, I wanted to trigger some discussion around
+replacing this big and intrusive workaround with Emilio's oneline fix.
+
+Let's suppose we're considering them as workaround to live just one or
+two releases. Wouldn't it be better to take the least instrusive?
 -- 
-1.7.9.5
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
