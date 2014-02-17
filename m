@@ -1,84 +1,151 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 17 Feb 2014 21:08:53 +0100
-Subject: [PATCH v5 5/7] ARM: S3C24XX: prevent conflicts between ccf and
- non-ccf s3c24xx-socs
+Date: Mon, 17 Feb 2014 21:09:33 +0100
+Subject: [PATCH v5 6/7] ARM: dt: add clock data for s3c2416
 In-Reply-To: <2678040.KALsQ0bZFm@phil>
 References: <2678040.KALsQ0bZFm@phil>
-Message-ID: <7452395.HGklL2HQyK@phil>
+Message-ID: <2730351.Rbk38HtDO7@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the conversion to the common-clock-framework is done in multiple
-steps, it is necessary to prevent conflicts between the different
-struct clk implementations.
-
-For this include the s3c24xx_setup_clocks function only when
-SAMSUNG_CLOCK is selected and make the socs we don't convert this
-time explicitly depend on SAMSUNG_CLOCK, which gets only selected
-automatically if COMMON_CLK is not enabled.
+This adds the clock controller itself, the xti clock on the smdk2416
+as well as the clock references in the individual device nodes.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-s3c24xx/Kconfig  | 4 ++++
- arch/arm/mach-s3c24xx/common.c | 2 ++
- 2 files changed, 6 insertions(+)
+ arch/arm/boot/dts/s3c2416-smdk2416.dts | 13 +++++++++++
+ arch/arm/boot/dts/s3c2416.dtsi         | 42 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 55 insertions(+)
 
-diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
-index 4cbecaf..2ac7d1f 100644
---- a/arch/arm/mach-s3c24xx/Kconfig
-+++ b/arch/arm/mach-s3c24xx/Kconfig
-@@ -25,6 +25,7 @@ comment "S3C24XX SoCs"
- config CPU_S3C2410
- 	bool "SAMSUNG S3C2410"
- 	default y
-+	depends on SAMSUNG_CLOCK
- 	select CPU_ARM920T
- 	select CPU_LLSERIAL_S3C2410
- 	select S3C2410_CLOCK
-@@ -38,6 +39,7 @@ config CPU_S3C2410
+diff --git a/arch/arm/boot/dts/s3c2416-smdk2416.dts b/arch/arm/boot/dts/s3c2416-smdk2416.dts
+index 59594cf..ea92fd6 100644
+--- a/arch/arm/boot/dts/s3c2416-smdk2416.dts
++++ b/arch/arm/boot/dts/s3c2416-smdk2416.dts
+@@ -19,6 +19,19 @@
+ 		reg =  <0x30000000 0x4000000>;
+ 	};
  
- config CPU_S3C2412
- 	bool "SAMSUNG S3C2412"
-+	depends on SAMSUNG_CLOCK
- 	select CPU_ARM926T
- 	select CPU_LLSERIAL_S3C2440
- 	select S3C2412_DMA if S3C24XX_DMA
-@@ -58,6 +60,7 @@ config CPU_S3C2416
++	clocks {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		xti: xti {
++			compatible = "fixed-clock";
++			clock-frequency = <12000000>;
++			clock-output-names = "xti";
++			#clock-cells = <0>;
++		};
++	};
++
+ 	serial at 50000000 {
+ 		status = "okay";
+ 		pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/s3c2416.dtsi b/arch/arm/boot/dts/s3c2416.dtsi
+index e6555bd..955e4a4 100644
+--- a/arch/arm/boot/dts/s3c2416.dtsi
++++ b/arch/arm/boot/dts/s3c2416.dtsi
+@@ -8,6 +8,7 @@
+  * published by the Free Software Foundation.
+  */
  
- config CPU_S3C2440
- 	bool "SAMSUNG S3C2440"
-+	depends on SAMSUNG_CLOCK
- 	select CPU_ARM920T
- 	select CPU_LLSERIAL_S3C2440
- 	select S3C2410_CLOCK
-@@ -68,6 +71,7 @@ config CPU_S3C2440
++#include <dt-bindings/clock/s3c2443.h>
+ #include "s3c24xx.dtsi"
+ #include "s3c2416-pinctrl.dtsi"
  
- config CPU_S3C2442
- 	bool "SAMSUNG S3C2442"
-+	depends on SAMSUNG_CLOCK
- 	select CPU_ARM920T
- 	select CPU_LLSERIAL_S3C2440
- 	select S3C2410_CLOCK
-diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
-index 4adaa4b..46af4e5 100644
---- a/arch/arm/mach-s3c24xx/common.c
-+++ b/arch/arm/mach-s3c24xx/common.c
-@@ -319,6 +319,7 @@ struct s3c24xx_uart_resources s3c2410_uart_resources[] __initdata = {
+@@ -28,26 +29,53 @@
+ 		compatible = "samsung,s3c2416-irq";
+ 	};
  
- /* initialise all the clocks */
++	clocks: clock-controller at 0x4c000000 {
++		compatible = "samsung,s3c2416-clock";
++		reg = <0x4c000000 0x40>;
++		#clock-cells = <1>;
++	};
++
+ 	pinctrl at 56000000 {
+ 		compatible = "samsung,s3c2416-pinctrl";
+ 	};
  
-+#ifdef CONFIG_SAMSUNG_CLOCK
- void __init_or_cpufreq s3c24xx_setup_clocks(unsigned long fclk,
- 					   unsigned long hclk,
- 					   unsigned long pclk)
-@@ -331,6 +332,7 @@ void __init_or_cpufreq s3c24xx_setup_clocks(unsigned long fclk,
- 	clk_p.rate = pclk;
- 	clk_f.rate = fclk;
- }
-+#endif
++	timer at 51000000 {
++		clocks = <&clocks PCLK_PWM>;
++		clock-names = "timers";
++	};
++
+ 	serial at 50000000 {
+ 		compatible = "samsung,s3c2440-uart";
++		clock-names = "uart", "clk_uart_baud2",
++				"clk_uart_baud3";
++		clocks = <&clocks PCLK_UART0>, <&clocks PCLK_UART0>,
++				<&clocks SCLK_UART>;
+ 	};
  
- #if defined(CONFIG_CPU_S3C2410) || defined(CONFIG_CPU_S3C2412) || \
- 	defined(CONFIG_CPU_S3C2440) || defined(CONFIG_CPU_S3C2442)
+ 	serial at 50004000 {
+ 		compatible = "samsung,s3c2440-uart";
++		clock-names = "uart", "clk_uart_baud2",
++				"clk_uart_baud3";
++		clocks = <&clocks PCLK_UART1>, <&clocks PCLK_UART1>,
++				<&clocks SCLK_UART>;
+ 	};
+ 
+ 	serial at 50008000 {
+ 		compatible = "samsung,s3c2440-uart";
++		clock-names = "uart", "clk_uart_baud2",
++				"clk_uart_baud3";
++		clocks = <&clocks PCLK_UART2>, <&clocks PCLK_UART2>,
++				<&clocks SCLK_UART>;
+ 	};
+ 
+ 	serial at 5000C000 {
+ 		compatible = "samsung,s3c2440-uart";
+ 		reg = <0x5000C000 0x4000>;
+ 		interrupts = <1 18 24 4>, <1 18 25 4>;
++		clock-names = "uart", "clk_uart_baud2",
++				"clk_uart_baud3";
++		clocks = <&clocks PCLK_UART3>, <&clocks PCLK_UART3>,
++				<&clocks SCLK_UART>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -55,6 +83,10 @@
+ 		compatible = "samsung,s3c6410-sdhci";
+ 		reg = <0x4AC00000 0x100>;
+ 		interrupts = <0 0 21 3>;
++		clock-names = "hsmmc", "mmc_busclk.0",
++				"mmc_busclk.2";
++		clocks = <&clocks HCLK_HSMMC0>, <&clocks HCLK_HSMMC0>,
++				<&clocks MUX_HSMMC0>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -62,18 +94,28 @@
+ 		compatible = "samsung,s3c6410-sdhci";
+ 		reg = <0x4A800000 0x100>;
+ 		interrupts = <0 0 20 3>;
++		clock-names = "hsmmc", "mmc_busclk.0",
++				"mmc_busclk.2";
++		clocks = <&clocks HCLK_HSMMC1>, <&clocks HCLK_HSMMC1>,
++				<&clocks MUX_HSMMC1>;
+ 		status = "disabled";
+ 	};
+ 
+ 	watchdog at 53000000 {
+ 		interrupts = <1 9 27 3>;
++		clocks = <&clocks PCLK_WDT>;
++		clock-names = "watchdog";
+ 	};
+ 
+ 	rtc at 57000000 {
+ 		compatible = "samsung,s3c2416-rtc";
++		clocks = <&clocks PCLK_RTC>;
++		clock-names = "rtc";
+ 	};
+ 
+ 	i2c at 54000000 {
+ 		compatible = "samsung,s3c2440-i2c";
++		clocks = <&clocks PCLK_I2C0>;
++		clock-names = "i2c";
+ 	};
+ };
 -- 
 1.8.5.3
