@@ -1,53 +1,44 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 17 Feb 2014 16:43:51 +0000
-Subject: [RFC PATCH v2 03/14] of: mtd: add documentation for
- nand-ecc-level property
-In-Reply-To: <20140205141917.GA25091@localhost>
-References: <1391006064-28890-1-git-send-email-b.brezillon.dev@gmail.com>
- <1391006064-28890-4-git-send-email-b.brezillon.dev@gmail.com>
- <20140129175331.GA27143@localhost>
- <20140205111500.B19FDC40A89@trevor.secretlab.ca>
- <52F23DF4.7010901@gmail.com> <20140205141917.GA25091@localhost>
-Message-ID: <CACxGe6vW3m8DA3rGSane6GNmjXHt=pjAPVr25WZyopV9jA-XUw@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Mon, 17 Feb 2014 16:47:08 +0000
+Subject: [PATCH v2 1/5] drivers: of: add initialization code for reserved
+ memory
+In-Reply-To: <52FA8245.5050707@gmail.com>
+References: <1391515773-6112-1-git-send-email-m.szyprowski@samsung.com>	 <
+ 1391515773-6112-2-git-send-email-m.szyprowski@samsung.com>	 <20140205110538 .
+ 99E47C40A89@trevor.secretlab.ca>	 <52FA0D6E.9090304@samsung.com>	 <
+ 20140211121316.24032C40C4D@trevor.secretlab.ca>	 <52FA33E2.4050004@samsung.
+ com>	 <20140211190104.7E6C5C4140E@trevor.secretlab.ca> <1392148971.3835.15.
+ camel@pasglop> <52FA8245.5050707@gmail.com>
+Message-ID: <20140217164708.B332BC403B4@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 5, 2014 at 2:19 PM, Ezequiel Garcia
-<ezequiel.garcia@free-electrons.com> wrote:
-> Hi Grant, Boris:
->
-> (BTW, dropped Russell, Rob Landley and some unrelated mailing lists from Cc,
-> and added Thomas, Gregory and Rob Herring).
->
-> On Wed, Feb 05, 2014 at 02:34:44PM +0100, Boris BREZILLON wrote:
->> On 05/02/2014 12:15, Grant Likely wrote:
->> > On Wed, 29 Jan 2014 14:53:32 -0300, Ezequiel Garcia <ezequiel.garcia@free-electrons.com> wrote:
-> [..]
->> >>
->> >> Maybe we can discuss about it now?
->> >>
->> >>    nand-ecc-strength : integer ECC required strength.
->> >>    nand-ecc-size : integer step size associated to the ECC strength.
->> > I'm okay with either, but the above binding is indeed more readable.
->>
->> That's fine by me, if everybody agrees, let's go for the
->> nand-ecc-strength/nand-ecc-size couple then.
->>
->
-> Great. So, if some DT dictator^C^Cmaintainers can Ack this binding,
-> I can send a new patchset, with pxa3xx-nand using it...
->
->> I'll rebase next version of my series on Ezequiel's patch providing
->> these OF helpers.
->>
->
-> ... and then you can base on it?
->
-> This is the original patchset:
->
-> http://permalink.gmane.org/gmane.linux.drivers.devicetree/58764
-> http://permalink.gmane.org/gmane.linux.drivers.devicetree/58763
+On Tue, 11 Feb 2014 21:04:21 +0100, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> 
+> 
+> On 11.02.2014 21:02, Benjamin Herrenschmidt wrote:
+> > On Tue, 2014-02-11 at 19:01 +0000, Grant Likely wrote:
+> >
+> >>> except that the former IMHO better suits the definition of memory
+> >>> region, which I see as a single contiguous range of memory and can be
+> >>> simplified to have a single reg entry per region.
+> >>
+> >> My point is rather if multiple reg tuples are found in a reserved memory
+> >> node, the kernel must respect them and reserve the memory. I'm not
+> >> arguing about whether or not that makes for a good binding.
+> >
+> > agreed.
+> 
+> My point is why, if the binding defines that just a single tuple should 
+> be provided.
 
-I've looked at both. Go ahead and add my a-b line:
+It's irrelevant because it gets processed at a different level. It's
+important that the core early setup code can quickly parse all the
+reserved regions without having any idea what the end-user binding is.
+Multiple reg tuples is just fine in this regard.
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
+Whether or not multiple tuples makes sense is defined for each
+particular use case by the driver actually using it without impacting
+core initialization code one iota.
+
+g.
