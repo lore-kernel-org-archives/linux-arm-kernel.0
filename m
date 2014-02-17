@@ -1,154 +1,62 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 17 Feb 2014 12:25:42 +0000
-Subject: [PATCH v9 4/5] arm64: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <1389292336-9292-4-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
- <1389292336-9292-4-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <alpine.DEB.2.02.1402171225000.27926@kaball.uk.xensource.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 17 Feb 2014 12:29:48 +0000
+Subject: [PATCH] arm64: Add pdev_archdata for dmamask
+In-Reply-To: <52E70AEF.4060602@codeaurora.org>
+References: <1390845177-2626-1-git-send-email-lauraa@codeaurora.org>
+ <20140127193149.GV15937@n2100.arm.linux.org.uk>
+ <52E70AEF.4060602@codeaurora.org>
+Message-ID: <20140217122948.GB19102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Jan 2014, Stefano Stabellini wrote:
-> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
-> Necessary duplication of paravirt.h and paravirt.c with ARM.
+On Tue, Jan 28, 2014 at 01:42:07AM +0000, Laura Abbott wrote:
+> On 1/27/2014 11:31 AM, Russell King - ARM Linux wrote:
+> > On Mon, Jan 27, 2014 at 09:52:57AM -0800, Laura Abbott wrote:
+> >> The dma_mask for a device structure is a pointer. This pointer
+> >> needs to be set up before the dma mask can actually be set. Most
+> >> frameworks in the kernel take care of setting this up properly but
+> >> platform devices that don't follow a regular bus structure may not
+> >> ever have this set. As a result, checks such as dma_capable will
+> >> always return false on a raw platform device and dma_set_mask will
+> >> always return -EIO. Fix this by adding a dma_mask in the
+> >> platform_device archdata and setting it to be the dma_mask. Devices
+> >> used in other frameworks can change this as needed.
+> >
+> > You shouldn't need to do this.  I went through a lot of the drivers we
+> > currently have, fixing them up in various manners.  The basic rules
+> > for this stuff are:
+> >
+> > - It is the responsibility of the code creating the device to set a
+> >    reasonable default for the dma mask according to the bus and whether
+> >    DMA is supportable.
+> >
+> > - It is the responsibility of the driver _always_ to make a call to
+> >    dma_set_mask() and/or dma_set_coherent_mask() according to the
+> >    driver's needs if the driver is going to be using DMA.
+> >
+> > As a work-around for the buggy situation we have in the kernel with DT,
+> > various buggy workarounds have been incorporated into drivers which
+> > involve writing directly to the DMA masks, and other such games.  None
+> > of that is necessary when the dma_coerce_*() functions are used - but
+> > these are a stop-gap until the DT code gets fixed.
+> >
+> > The real answer here is to make DT conform to the first point above
+> > and not add yet another different hack to the kernel.
+> >
 > 
-> The only paravirt interface supported is pv_time_ops.steal_clock, so no
-> runtime pvops patching needed.
+> powerpc ran into this exact problem before and fixed it using this 
+> method (a77ce8167cc1d0370fcb1d79b367d62e050cb2b0
+> "driver core: Add ability for arch code to setup pdev_archdata" and
+>   314b02f503c2c219fde0fcf6f086fda415f8a847 "powerpc: implement 
+> arch_setup_pdev_archdata") so there is at least some precedent for this 
+> method.
 > 
-> This allows us to make use of steal_account_process_tick for stolen
-> ticks accounting.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: will.deacon at arm.com
-> CC: nico at linaro.org
-> CC: marc.zyngier at arm.com
-> CC: cov at codeaurora.org
-> CC: arnd at arndb.de
-> CC: olof at lixom.net
-> CC: Catalin.Marinas at arm.com
+> Are there patches/discussion somewhere else on what a proper solution 
+> would be in the DT?
 
-Catalin, Will, are you happy with this patch for 3.15?
+I guess this comes under the system topology discussion we briefly
+touched at the kernel summit. Dave Martin (cc'ed) is looking into this
+now, so at some point we'll have some longer discussions on the list.
 
- 
-> Changes in v7:
-> - ifdef CONFIG_PARAVIRT the content of paravirt.h.
-> ---
->  arch/arm64/Kconfig                |   20 ++++++++++++++++++++
->  arch/arm64/include/asm/paravirt.h |   20 ++++++++++++++++++++
->  arch/arm64/kernel/Makefile        |    1 +
->  arch/arm64/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
->  4 files changed, 66 insertions(+)
->  create mode 100644 arch/arm64/include/asm/paravirt.h
->  create mode 100644 arch/arm64/kernel/paravirt.c
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 6d4dd22..d1003ba 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -212,6 +212,25 @@ config HAVE_ARCH_TRANSPARENT_HUGEPAGE
->  
->  source "mm/Kconfig"
->  
-> +config PARAVIRT
-> +	bool "Enable paravirtualization code"
-> +	---help---
-> +	  This changes the kernel so it can modify itself when it is run
-> +	  under a hypervisor, potentially improving performance significantly
-> +	  over full virtualization.
-> +
-> +config PARAVIRT_TIME_ACCOUNTING
-> +	bool "Paravirtual steal time accounting"
-> +	select PARAVIRT
-> +	default n
-> +	---help---
-> +	  Select this option to enable fine granularity task steal time
-> +	  accounting. Time spent executing other tasks in parallel with
-> +	  the current vCPU is discounted from the vCPU power. To account for
-> +	  that, there can be a small performance impact.
-> +
-> +	  If in doubt, say N here.
-> +
->  config XEN_DOM0
->  	def_bool y
->  	depends on XEN
-> @@ -220,6 +239,7 @@ config XEN
->  	bool "Xen guest support on ARM64 (EXPERIMENTAL)"
->  	depends on ARM64 && OF
->  	select SWIOTLB_XEN
-> +	select PARAVIRT
->  	help
->  	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM64.
->  
-> diff --git a/arch/arm64/include/asm/paravirt.h b/arch/arm64/include/asm/paravirt.h
-> new file mode 100644
-> index 0000000..fd5f428
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/paravirt.h
-> @@ -0,0 +1,20 @@
-> +#ifndef _ASM_ARM64_PARAVIRT_H
-> +#define _ASM_ARM64_PARAVIRT_H
-> +
-> +#ifdef CONFIG_PARAVIRT
-> +struct static_key;
-> +extern struct static_key paravirt_steal_enabled;
-> +extern struct static_key paravirt_steal_rq_enabled;
-> +
-> +struct pv_time_ops {
-> +	unsigned long long (*steal_clock)(int cpu);
-> +};
-> +extern struct pv_time_ops pv_time_ops;
-> +
-> +static inline u64 paravirt_steal_clock(int cpu)
-> +{
-> +	return pv_time_ops.steal_clock(cpu);
-> +}
-> +#endif
-> +
-> +#endif
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 5ba2fd4..1dee735 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -18,6 +18,7 @@ arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o
->  arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
->  arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
->  arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
-> +arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
->  
->  obj-y					+= $(arm64-obj-y) vdso/
->  obj-m					+= $(arm64-obj-m)
-> diff --git a/arch/arm64/kernel/paravirt.c b/arch/arm64/kernel/paravirt.c
-> new file mode 100644
-> index 0000000..53f371e
-> --- /dev/null
-> +++ b/arch/arm64/kernel/paravirt.c
-> @@ -0,0 +1,25 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * Copyright (C) 2013 Citrix Systems
-> + *
-> + * Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> + */
-> +
-> +#include <linux/export.h>
-> +#include <linux/jump_label.h>
-> +#include <linux/types.h>
-> +#include <asm/paravirt.h>
-> +
-> +struct static_key paravirt_steal_enabled;
-> +struct static_key paravirt_steal_rq_enabled;
-> +
-> +struct pv_time_ops pv_time_ops;
-> +EXPORT_SYMBOL_GPL(pv_time_ops);
-> -- 
-> 1.7.10.4
-> 
+-- 
+Catalin
