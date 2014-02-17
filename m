@@ -1,137 +1,178 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 17 Feb 2014 14:13:16 +0530
-Subject: [PATCH v3 1/3] dma: Support multiple interleaved frames with
- non-contiguous memory
-In-Reply-To: <1392465619-27614-2-git-send-email-sthokal@xilinx.com>
-References: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
- <1392465619-27614-2-git-send-email-sthokal@xilinx.com>
-Message-ID: <20140217084316.GY10628@intel.com>
+From: phdm@macq.eu (Philippe De Muyter)
+Date: Mon, 17 Feb 2014 09:48:43 +0100
+Subject: [PATCH v4] bus: imx-weim: support CS GPR configuration
+In-Reply-To: <1392559381-30842-1-git-send-email-shawn.guo@linaro.org>
+References: <1392559381-30842-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20140217084843.GA23095@frolo.macqel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 15, 2014 at 05:30:17PM +0530, Srikanth Thokala wrote:
-> The current implementation of interleaved DMA API support multiple
-> frames only when the memory is contiguous by incrementing src_start/
-> dst_start members of interleaved template.
+On Sun, Feb 16, 2014 at 10:03:01PM +0800, Shawn Guo wrote:
+> For imx50-weim and imx6q-weim type of devices, there might a WEIM CS
+> space configuration register in General Purpose Register controller,
+> e.g. IOMUXC_GPR1 on i.MX6Q.
 > 
-> But, when the memory is non-contiguous it will restrict slave device
-> to not submit multiple frames in a batch.  This patch handles this
-> issue by allowing the slave device to send array of interleaved dma
-> templates each having a different memory location.
-This seems to be missing the numbers of templates you are sending, wouldnt this
-require sending ARRAY_SiZE too?
-
-And why send double pointer?
-
--- 
-~Vinod
-
+> Depending on which configuration of the following 4 is chosen for given
+> system, IOMUXC_GPR1[11:0] should be set up as 05, 033, 0113 or 01111
+> correspondingly.
 > 
-> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
+> 	CS0(128M) CS1(0M)  CS2(0M)  CS3(0M)
+> 	CS0(64M)  CS1(64M) CS2(0M)  CS3(0M)
+> 	CS0(64M)  CS1(32M) CS2(32M) CS3(0M)
+> 	CS0(32M)  CS1(32M) CS2(32M) CS3(32M)
+> 
+> The patch creates a function for such type of devices, which scans
+> 'ranges' property of WEIM node and build the GPR value incrementally.
+> Thus the WEIM CS GPR can be set up automatically at boot time.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
->  Documentation/dmaengine.txt              |    2 +-
->  drivers/dma/imx-dma.c                    |    3 ++-
->  drivers/dma/sirf-dma.c                   |    3 ++-
->  drivers/media/platform/m2m-deinterlace.c |    2 +-
->  include/linux/dmaengine.h                |    6 +++---
->  5 files changed, 9 insertions(+), 7 deletions(-)
+> Changes since v3:
+>  - Add DT property fsl,weim-cs-gpr back, so that the support can work
+>    for more i.MX SoCs than just i.MX6Q.
 > 
-> diff --git a/Documentation/dmaengine.txt b/Documentation/dmaengine.txt
-> index 879b6e3..c642614 100644
-> --- a/Documentation/dmaengine.txt
-> +++ b/Documentation/dmaengine.txt
-> @@ -94,7 +94,7 @@ The slave DMA usage consists of following steps:
->  		size_t period_len, enum dma_data_direction direction);
+>  Documentation/devicetree/bindings/bus/imx-weim.txt |   27 +++++++++-
+>  drivers/bus/imx-weim.c                             |   55 ++++++++++++++++++++
+>  2 files changed, 81 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
+> index 0fd76c4..363c970 100644
+> --- a/Documentation/devicetree/bindings/bus/imx-weim.txt
+> +++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
+> @@ -8,7 +8,12 @@ The actual devices are instantiated from the child nodes of a WEIM node.
 >  
->  	struct dma_async_tx_descriptor *(*device_prep_interleaved_dma)(
-> -		struct dma_chan *chan, struct dma_interleaved_template *xt,
-> +		struct dma_chan *chan, struct dma_interleaved_template **xts,
->  		unsigned long flags);
+>  Required properties:
 >  
->     The peripheral driver is expected to have mapped the scatterlist for
-> diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-> index 6f9ac20..e2c52ce 100644
-> --- a/drivers/dma/imx-dma.c
-> +++ b/drivers/dma/imx-dma.c
-> @@ -954,12 +954,13 @@ static struct dma_async_tx_descriptor *imxdma_prep_dma_memcpy(
->  }
+> - - compatible:		Should be set to "fsl,<soc>-weim"
+> + - compatible:		Should contain one of the following:
+> +			  "fsl,imx1-weim"
+> +			  "fsl,imx27-weim"
+> +			  "fsl,imx51-weim"
+> +			  "fsl,imx50-weim"
+> +			  "fsl,imx6q-weim"
+>   - reg:			A resource specifier for the register space
+>  			(see the example below)
+>   - clocks:		the clock, see the example below.
+> @@ -19,6 +24,26 @@ Required properties:
 >  
->  static struct dma_async_tx_descriptor *imxdma_prep_dma_interleaved(
-> -	struct dma_chan *chan, struct dma_interleaved_template *xt,
-> +	struct dma_chan *chan, struct dma_interleaved_template **xts,
->  	unsigned long flags)
->  {
->  	struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
->  	struct imxdma_engine *imxdma = imxdmac->imxdma;
->  	struct imxdma_desc *desc;
-> +	struct dma_interleaved_template *xt = *xts;
+>  			   <cs-number> 0 <physical address of mapping> <size>
 >  
->  	dev_dbg(imxdma->dev, "%s channel: %d src_start=0x%llx dst_start=0x%llx\n"
->  		"   src_sgl=%s dst_sgl=%s numf=%zu frame_size=%zu\n", __func__,
-> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-> index d4d3a31..b6a150b 100644
-> --- a/drivers/dma/sirf-dma.c
-> +++ b/drivers/dma/sirf-dma.c
-> @@ -509,12 +509,13 @@ sirfsoc_dma_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
->  }
+> +Optional properties:
+> +
+> + - fsl,weim-cs-gpr:	For "fsl,imx50-weim" and "fsl,imx6q-weim" type of
+> +			devices, it should be the phandle to the system General
+> +			Purpose Register controller that contains WEIM CS GPR
+> +			register, e.g. IOMUXC_GPR1 on i.MX6Q.  IOMUXC_GPR1[11:0]
+> +			should be set up as one of the following 4 possible
+> +			values depending on the CS space configuration.
+> +
+> +			IOMUXC_GPR1[11:0]    CS0    CS1    CS2    CS3
+> +			---------------------------------------------
+> +				05	    128M     0M     0M     0M
+> +				033          64M    64M     0M     0M
+> +				0113         64M    32M    32M     0M
+> +				01111        32M    32M    32M    32M
+> +
+> +			In case that the property is absent, the reset value or
+> +			what bootloader sets up in IOMUXC_GPR1[11:0] will be
+> +			used.
+> +
+>  Timing property for child nodes. It is mandatory, not optional.
 >  
->  static struct dma_async_tx_descriptor *sirfsoc_dma_prep_interleaved(
-> -	struct dma_chan *chan, struct dma_interleaved_template *xt,
-> +	struct dma_chan *chan, struct dma_interleaved_template **xts,
->  	unsigned long flags)
->  {
->  	struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(chan);
->  	struct sirfsoc_dma_chan *schan = dma_chan_to_sirfsoc_dma_chan(chan);
->  	struct sirfsoc_dma_desc *sdesc = NULL;
-> +	struct dma_interleaved_template *xt = *xts;
->  	unsigned long iflags;
+>   - fsl,weim-cs-timing:	The timing array, contains timing values for the
+
+Could you also add the following line to the example in the same file :
+
+		fsl,weim-cs-gpr = <&gpr>;
+
+It took me some time to figure it out :)
+
+> diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+> index 3ef58c8..35e9529 100644
+> --- a/drivers/bus/imx-weim.c
+> +++ b/drivers/bus/imx-weim.c
+> @@ -11,6 +11,9 @@
+>  #include <linux/clk.h>
+>  #include <linux/io.h>
+>  #include <linux/of_device.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+> +#include <linux/regmap.h>
+>  
+>  struct imx_weim_devtype {
+>  	unsigned int	cs_count;
+> @@ -56,6 +59,55 @@ static const struct of_device_id weim_id_table[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, weim_id_table);
+>  
+> +static int __init imx_weim_gpr_setup(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct property *prop;
+> +	const __be32 *p;
+> +	struct regmap *gpr;
+> +	u32 gprvals[4] = {
+> +		05,	/* CS0(128M) CS1(0M)  CS2(0M)  CS3(0M) */
+> +		033,	/* CS0(64M)  CS1(64M) CS2(0M)  CS3(0M) */
+> +		0113,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
+> +		01111,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
+
+			   CS0(32M)			CS3(32M)
+
+> +	};
+> +	u32 gprval = 0;
+> +	u32 val;
+> +	int cs = 0;
+> +	int i = 0;
+> +
+> +	gpr = syscon_regmap_lookup_by_phandle(np, "fsl,weim-cs-gpr");
+> +	if (IS_ERR(gpr)) {
+> +		dev_dbg(&pdev->dev, "failed to find weim-cs-gpr\n");
+> +		return 0;
+> +	}
+> +
+> +	of_property_for_each_u32(np, "ranges", prop, p, val) {
+> +		if (i % 4 == 0) {
+> +			cs = val;
+> +		} else if (i % 4 == 3 && val) {
+> +			val = (val / SZ_32M) | 1;
+> +			gprval |= val << cs * 3;
+> +		}
+> +		i++;
+> +	}
+> +
+> +	if (i == 0 || i % 4)
+> +		goto err;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(gprvals); i++) {
+> +		if (gprval == gprvals[i]) {
+> +			/* Found it. Set up IOMUXC_GPR1[11:0] with it. */
+> +			regmap_update_bits(gpr, IOMUXC_GPR1, 0xfff, gprval);
+> +			return 0;
+> +		}
+> +	}
+> +
+> +err:
+> +	dev_err(&pdev->dev, "Invalid 'ranges' configuration\n");
+> +	return -EINVAL;
+> +}
+> +
+>  /* Parse and set the timing for this device. */
+>  static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
+>  				    const struct imx_weim_devtype *devtype)
+> @@ -92,6 +144,9 @@ static int __init weim_parse_dt(struct platform_device *pdev,
+>  	struct device_node *child;
 >  	int ret;
 >  
-> diff --git a/drivers/media/platform/m2m-deinterlace.c b/drivers/media/platform/m2m-deinterlace.c
-> index 6bb86b5..468110a 100644
-> --- a/drivers/media/platform/m2m-deinterlace.c
-> +++ b/drivers/media/platform/m2m-deinterlace.c
-> @@ -343,7 +343,7 @@ static void deinterlace_issue_dma(struct deinterlace_ctx *ctx, int op,
->  	ctx->xt->dst_sgl = true;
->  	flags = DMA_CTRL_ACK | DMA_PREP_INTERRUPT;
->  
-> -	tx = dmadev->device_prep_interleaved_dma(chan, ctx->xt, flags);
-> +	tx = dmadev->device_prep_interleaved_dma(chan, &ctx->xt, flags);
->  	if (tx == NULL) {
->  		v4l2_warn(&pcdev->v4l2_dev, "DMA interleaved prep error\n");
->  		return;
-> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-> index c5c92d5..2f77a9a 100644
-> --- a/include/linux/dmaengine.h
-> +++ b/include/linux/dmaengine.h
-> @@ -675,7 +675,7 @@ struct dma_device {
->  		size_t period_len, enum dma_transfer_direction direction,
->  		unsigned long flags, void *context);
->  	struct dma_async_tx_descriptor *(*device_prep_interleaved_dma)(
-> -		struct dma_chan *chan, struct dma_interleaved_template *xt,
-> +		struct dma_chan *chan, struct dma_interleaved_template **xts,
->  		unsigned long flags);
->  	int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
->  		unsigned long arg);
-> @@ -752,10 +752,10 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_cyclic(
->  }
->  
->  static inline struct dma_async_tx_descriptor *dmaengine_prep_interleaved_dma(
-> -		struct dma_chan *chan, struct dma_interleaved_template *xt,
-> +		struct dma_chan *chan, struct dma_interleaved_template **xts,
->  		unsigned long flags)
->  {
-> -	return chan->device->device_prep_interleaved_dma(chan, xt, flags);
-> +	return chan->device->device_prep_interleaved_dma(chan, xts, flags);
->  }
->  
->  static inline int dma_get_slave_caps(struct dma_chan *chan, struct dma_slave_caps *caps)
+> +	if (devtype == &imx50_weim_devtype)
+> +		imx_weim_gpr_setup(pdev);
+> +
+>  	for_each_child_of_node(pdev->dev.of_node, child) {
+>  		if (!child->name)
+>  			continue;
 > -- 
 > 1.7.9.5
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
+Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
