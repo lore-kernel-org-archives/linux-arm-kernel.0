@@ -1,276 +1,178 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Mon, 17 Feb 2014 15:22:38 +0530
-Subject: [PATCH v3 1/3] dma: Support multiple interleaved frames with
- non-contiguous memory
-In-Reply-To: <5301DA0A.8030400@metafoo.de>
-References: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
- <1392465619-27614-2-git-send-email-sthokal@xilinx.com>
- <20140217084316.GY10628@intel.com>
- <CA+mB=1K4_RpgfpWCfLy=PYOCzPThNf0Z6oSEK5Vrjh=W_YabhQ@mail.gmail.com>
- <5301D7CD.5000405@metafoo.de>
- <CA+mB=1LjuVKYWZCaje14UtHRZ4UoLWEhYV05XyjUMgM=uKH2_A@mail.gmail.com>
- <5301DA0A.8030400@metafoo.de>
-Message-ID: <CA+mB=1KZJ24KXKBtPpvq+Ssjy6pJ6RbJvq+n=ZiXOQFA7B1gOQ@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 17 Feb 2014 10:58:06 +0100
+Subject: [PATCH 11/27] clocksource: sh_cmt: Add support for multiple
+ channels per device
+In-Reply-To: <CANqRtoQ=QJ0YVjp+8y+H9OTk=iRf6Jdeg_J9PMyYa-9WbgfXyA@mail.gmail.com>
+References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <2041255.QOGrHiKJmD@avalon>
+ <CANqRtoQ=QJ0YVjp+8y+H9OTk=iRf6Jdeg_J9PMyYa-9WbgfXyA@mail.gmail.com>
+Message-ID: <3050110.8B4nKkQ5Sd@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 3:14 PM, Lars-Peter Clausen <lars@metafoo.de> wrote:
-> On 02/17/2014 10:42 AM, Srikanth Thokala wrote:
->>
->> On Mon, Feb 17, 2014 at 3:05 PM, Lars-Peter Clausen <lars@metafoo.de>
->> wrote:
->>>
->>> On 02/17/2014 10:29 AM, Srikanth Thokala wrote:
->>>>
->>>>
->>>> On Mon, Feb 17, 2014 at 2:13 PM, Vinod Koul <vinod.koul@intel.com>
->>>> wrote:
->>>>>
->>>>>
->>>>> On Sat, Feb 15, 2014 at 05:30:17PM +0530, Srikanth Thokala wrote:
->>>>>>
->>>>>>
->>>>>> The current implementation of interleaved DMA API support multiple
->>>>>> frames only when the memory is contiguous by incrementing src_start/
->>>>>> dst_start members of interleaved template.
->>>>>>
->>>>>> But, when the memory is non-contiguous it will restrict slave device
->>>>>> to not submit multiple frames in a batch.  This patch handles this
->>>>>> issue by allowing the slave device to send array of interleaved dma
->>>>>> templates each having a different memory location.
->>>>>
->>>>>
->>>>> This seems to be missing the numbers of templates you are sending,
->>>>> wouldnt this
->>>>> require sending ARRAY_SiZE too?
->>>>>
->>>>> And why send double pointer?
->>>>
->>>>
->>>>
->>>> Array size is not required, when we pass the double pointer.  The last
->>>> element would be
->>>> pointed to NULL and we could get the number of templates from this
->>>> condition.
->>>> Here is an example snippet,
->>>>
->>>> In slave device driver,
->>>>
->>>>           struct dma_interleaved_template **xts;
->>>>
->>>>           xts = kcalloc(frm_cnt+1, sizeof(struct
->>>> dma_interleaved_template *), GFP_KERNEL);
->>>>           /* Error check for xts */
->>>>           for (i = 0; i < frm_cnt; i++) {
->>>>                   xts[i] = kmalloc(sizeof(struct
->>>> dma_interleaved_template), GFP_KERNEL);
->>>>                   /* Error check for xts[i] */
->>>>           }
->>>>           xts[i] = NULL;
->>>>
->>>> In DMA engine driver,  we could get the number of frames by,
->>>>
->>>>           for (; xts[frmno] != NULL; frmno++);
->>>>
->>>> I felt this way is simpler than adding an extra argument to the API.
->>>> Please let me know
->>>> your opinion and suggest me a better way.
->>>
->>>
->>>
->>> I think Vinod's suggestion of passing in an array of
->>> interleaved_templates
->>> and the size of the array is better than what you are currently doing.
->>
->>
->> Ok, Lars.  I will update with this in my v4. Thanks.
->>
->>>
->>> Btw. you also need to update the current implementations and users of the
->>> API accordingly.
->>
->>
->> Yes, I have updated them in this patch.
->
->
-> But you didn't update them accordingly to your proposed semantics. The
-> caller didn't NULL terminate the array and the drivers did blindly assume
-> there will always be exactly one transfer.
+Hi Magnus,
 
-Ok, got it.  I will correct in v4.  Thanks for pointing this.
+On Monday 17 February 2014 11:07:06 Magnus Damm wrote:
+> On Mon, Feb 17, 2014 at 10:48 AM, Laurent Pinchart wrote:
+> > On Monday 17 February 2014 10:41:31 Magnus Damm wrote:
+> >> On Mon, Feb 17, 2014 at 3:18 AM, Laurent Pinchart wrote:
+> >> > On Saturday 15 February 2014 13:46:54 Thomas Gleixner wrote:
+> >> >> On Fri, 14 Feb 2014, Laurent Pinchart wrote:
+> >> >> > CMT hardware devices can support multiple channels, with global
+> >> >> > registers and per-channel registers. The sh_cmt driver currently
+> >> >> > models the hardware with one Linux device per channel. This model
+> >> >> > makes it difficult to handle global registers in a clean way.
+> >> >> > 
+> >> >> > Add support for a new model that uses one Linux device per timer
+> >> >> > with multiple channels per device. This requires changes to platform
+> >> >> > data, add new channel configuration fields.
+> >> >> > 
+> >> >> > Support for the legacy model is kept and will be removed after all
+> >> >> > platforms switch to the new model.
+> >> >> > 
+> >> >> > Signed-off-by: Laurent Pinchart
+> >> >> > <laurent.pinchart+renesas@ideasonboard.com>
+> >> >> > ---
+> >> >> > 
+> >> >> >  drivers/clocksource/sh_cmt.c | 299 ++++++++++++++++++++++++--------
+> >> >> >  include/linux/sh_timer.h     |   9 ++
+> >> >> >  2 files changed, 239 insertions(+), 69 deletions(-)
+> >> >> > 
+> >> >> > diff --git a/drivers/clocksource/sh_cmt.c
+> >> >> > b/drivers/clocksource/sh_cmt.c
+> >> >> > index 5280231..8390f0f 100644
+> >> >> > --- a/drivers/clocksource/sh_cmt.c
+> >> >> > +++ b/drivers/clocksource/sh_cmt.c
+> > 
+> > [snip]
+> > 
+> >> >> > @@ -85,11 +94,15 @@ struct sh_cmt_info {
+> >> >> > 
+> >> >> >  struct sh_cmt_channel {
+> >> >> >     struct sh_cmt_device *cmt;
+> >> >> > 
+> >> >> > -   unsigned int index;
+> >> >> > -   void __iomem *base;
+> >> >> > +   unsigned int index;     /* Index in the documentation */
+> >> >> > +   unsigned int hwidx;     /* Real hardware index */
+> >> >> > +
+> >> >> > +   void __iomem *iostart;
+> >> >> > +   void __iomem *ioctrl;
+> >> >> > 
+> >> >> >     struct irqaction irqaction;
+> >> >> 
+> >> >> While you are at it, can you please get rid of that irqaction and use
+> >> >> request_irq() ?
+> >> > 
+> >> > The driver claims it can't use request_irq() because the function is
+> >> > not available for early platform devices. If the situation has changed
+> >> > I'd gladly get rid of irqaction.
+> >> 
+> >> With the risk of stating the obvious, this depends on how early the
+> >> early platform device stuff is being run. The actual location may not
+> >> be the same on SH and ARM for instance.
+> >> 
+> >> On ARM we are doing all we can to initialize these devices as late as
+> >> ever possible in the MULTIPLAFORM (DT reference) case. Once we manage
+> >> to remove the legacy ARM case then there is one less user of early
+> >> platform timers.
+> >> 
+> >> One perhaps reasonable way forward could be to use request_irq() in
+> >> case of DT and leave the legacy platform data case to rely on
+> >> irqaction.
+> > 
+> > The whole point of switching from setup_irq() to request_irq() is to
+> > simplify the code. Adding request_irq() as an option would go in the
+> > opposite direction.
+> 
+> The point of switching to setup_irq() was not very clear to me. I
+> think it is fine to switch to using it over time, and I'm open to any
+> alternative ways forward. Usually moving in incremental steps means
+> more crap in the short term, but if someone could come up with a way
+> that involves little crap then I'm all for that! =)
 
-Srikanth
+I've had a quick look at request_irq(). The function is defined as a static 
+inline in include/linux/interrupt.h:
 
->
->
->>
->> Thanks
->> Srikanth
->>
->>
->>>
->>>
->>>>
->>>>>
->>>>> --
->>>>> ~Vinod
->>>>>
->>>>>>
->>>>>> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
->>>>>> ---
->>>>>>    Documentation/dmaengine.txt              |    2 +-
->>>>>>    drivers/dma/imx-dma.c                    |    3 ++-
->>>>>>    drivers/dma/sirf-dma.c                   |    3 ++-
->>>>>>    drivers/media/platform/m2m-deinterlace.c |    2 +-
->>>>>>    include/linux/dmaengine.h                |    6 +++---
->>>>>>    5 files changed, 9 insertions(+), 7 deletions(-)
->>>>>>
->>>>>> diff --git a/Documentation/dmaengine.txt b/Documentation/dmaengine.txt
->>>>>> index 879b6e3..c642614 100644
->>>>>> --- a/Documentation/dmaengine.txt
->>>>>> +++ b/Documentation/dmaengine.txt
->>>>>> @@ -94,7 +94,7 @@ The slave DMA usage consists of following steps:
->>>>>>                 size_t period_len, enum dma_data_direction direction);
->>>>>>
->>>>>>         struct dma_async_tx_descriptor
->>>>>> *(*device_prep_interleaved_dma)(
->>>>>> -             struct dma_chan *chan, struct dma_interleaved_template
->>>>>> *xt,
->>>>>> +             struct dma_chan *chan, struct dma_interleaved_template
->>>>>> **xts,
->>>>>>                 unsigned long flags);
->>>>>>
->>>>>>       The peripheral driver is expected to have mapped the scatterlist
->>>>>> for
->>>>>> diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
->>>>>> index 6f9ac20..e2c52ce 100644
->>>>>> --- a/drivers/dma/imx-dma.c
->>>>>> +++ b/drivers/dma/imx-dma.c
->>>>>> @@ -954,12 +954,13 @@ static struct dma_async_tx_descriptor
->>>>>> *imxdma_prep_dma_memcpy(
->>>>>>    }
->>>>>>
->>>>>>    static struct dma_async_tx_descriptor *imxdma_prep_dma_interleaved(
->>>>>> -     struct dma_chan *chan, struct dma_interleaved_template *xt,
->>>>>> +     struct dma_chan *chan, struct dma_interleaved_template **xts,
->>>>>>         unsigned long flags)
->>>>>>    {
->>>>>>         struct imxdma_channel *imxdmac = to_imxdma_chan(chan);
->>>>>>         struct imxdma_engine *imxdma = imxdmac->imxdma;
->>>>>>         struct imxdma_desc *desc;
->>>>>> +     struct dma_interleaved_template *xt = *xts;
->>>>>>
->>>>>>         dev_dbg(imxdma->dev, "%s channel: %d src_start=0x%llx
->>>>>> dst_start=0x%llx\n"
->>>>>>                 "   src_sgl=%s dst_sgl=%s numf=%zu frame_size=%zu\n",
->>>>>> __func__,
->>>>>> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
->>>>>> index d4d3a31..b6a150b 100644
->>>>>> --- a/drivers/dma/sirf-dma.c
->>>>>> +++ b/drivers/dma/sirf-dma.c
->>>>>> @@ -509,12 +509,13 @@ sirfsoc_dma_tx_status(struct dma_chan *chan,
->>>>>> dma_cookie_t cookie,
->>>>>>    }
->>>>>>
->>>>>>    static struct dma_async_tx_descriptor
->>>>>> *sirfsoc_dma_prep_interleaved(
->>>>>> -     struct dma_chan *chan, struct dma_interleaved_template *xt,
->>>>>> +     struct dma_chan *chan, struct dma_interleaved_template **xts,
->>>>>>         unsigned long flags)
->>>>>>    {
->>>>>>         struct sirfsoc_dma *sdma = dma_chan_to_sirfsoc_dma(chan);
->>>>>>         struct sirfsoc_dma_chan *schan =
->>>>>> dma_chan_to_sirfsoc_dma_chan(chan);
->>>>>>         struct sirfsoc_dma_desc *sdesc = NULL;
->>>>>> +     struct dma_interleaved_template *xt = *xts;
->>>>>>         unsigned long iflags;
->>>>>>         int ret;
->>>>>>
->>>>>> diff --git a/drivers/media/platform/m2m-deinterlace.c
->>>>>> b/drivers/media/platform/m2m-deinterlace.c
->>>>>> index 6bb86b5..468110a 100644
->>>>>> --- a/drivers/media/platform/m2m-deinterlace.c
->>>>>> +++ b/drivers/media/platform/m2m-deinterlace.c
->>>>>> @@ -343,7 +343,7 @@ static void deinterlace_issue_dma(struct
->>>>>> deinterlace_ctx *ctx, int op,
->>>>>>         ctx->xt->dst_sgl = true;
->>>>>>         flags = DMA_CTRL_ACK | DMA_PREP_INTERRUPT;
->>>>>>
->>>>>> -     tx = dmadev->device_prep_interleaved_dma(chan, ctx->xt, flags);
->>>>>> +     tx = dmadev->device_prep_interleaved_dma(chan, &ctx->xt, flags);
->>>>>>         if (tx == NULL) {
->>>>>>                 v4l2_warn(&pcdev->v4l2_dev, "DMA interleaved prep
->>>>>> error\n");
->>>>>>                 return;
->>>>>> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
->>>>>> index c5c92d5..2f77a9a 100644
->>>>>> --- a/include/linux/dmaengine.h
->>>>>> +++ b/include/linux/dmaengine.h
->>>>>> @@ -675,7 +675,7 @@ struct dma_device {
->>>>>>                 size_t period_len, enum dma_transfer_direction
->>>>>> direction,
->>>>>>                 unsigned long flags, void *context);
->>>>>>         struct dma_async_tx_descriptor
->>>>>> *(*device_prep_interleaved_dma)(
->>>>>> -             struct dma_chan *chan, struct dma_interleaved_template
->>>>>> *xt,
->>>>>> +             struct dma_chan *chan, struct dma_interleaved_template
->>>>>> **xts,
->>>>>>                 unsigned long flags);
->>>>>>         int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd
->>>>>> cmd,
->>>>>>                 unsigned long arg);
->>>>>> @@ -752,10 +752,10 @@ static inline struct dma_async_tx_descriptor
->>>>>> *dmaengine_prep_dma_cyclic(
->>>>>>    }
->>>>>>
->>>>>>    static inline struct dma_async_tx_descriptor
->>>>>> *dmaengine_prep_interleaved_dma(
->>>>>> -             struct dma_chan *chan, struct dma_interleaved_template
->>>>>> *xt,
->>>>>> +             struct dma_chan *chan, struct dma_interleaved_template
->>>>>> **xts,
->>>>>>                 unsigned long flags)
->>>>>>    {
->>>>>> -     return chan->device->device_prep_interleaved_dma(chan, xt,
->>>>>> flags);
->>>>>> +     return chan->device->device_prep_interleaved_dma(chan, xts,
->>>>>> flags);
->>>>>>    }
->>>>>>
->>>>>>    static inline int dma_get_slave_caps(struct dma_chan *chan, struct
->>>>>> dma_slave_caps *caps)
->>>>>> --
->>>>>> 1.7.9.5
->>>>>>
->>>>>> --
->>>>>> To unsubscribe from this list: send the line "unsubscribe dmaengine"
->>>>>> in
->>>>>> the body of a message to majordomo at vger.kernel.org
->>>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>>>
->>>>>
->>>>>
->>>>> --
->>>>> --
->>>>> To unsubscribe from this list: send the line "unsubscribe linux-kernel"
->>>>> in
->>>>> the body of a message to majordomo at vger.kernel.org
->>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>>> Please read the FAQ at  http://www.tux.org/lkml/
->>>
->>>
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-kernel"
->>> in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>> Please read the FAQ at  http://www.tux.org/lkml/
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+static inline int __must_check
+request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,
+            const char *name, void *dev)
+{
+        return request_threaded_irq(irq, handler, NULL, flags, name, dev);
+}
+
+request_threaded_irq() is implemented in kernel/irq/manage.c. I've removed the 
+code paths that would never be taken when called by the sh_cmt driver, due to
+
+- handler not being NULL
+- thread_fn being NULL
+- CONFIG_DEBUG_SHIRQ_FIXME not being set
+- IRQF_SHARED not being set
+
+int request_threaded_irq(unsigned int irq, irq_handler_t handler,
+                         irq_handler_t thread_fn, unsigned long irqflags,
+                         const char *devname, void *dev_id)
+{
+        struct irqaction *action;
+        struct irq_desc *desc;
+        int retval;
+
+        desc = irq_to_desc(irq);
+        if (!desc)
+                return -EINVAL;
+
+        if (!irq_settings_can_request(desc) ||
+            WARN_ON(irq_settings_is_per_cpu_devid(desc)))
+                return -EINVAL;
+
+        action = kzalloc(sizeof(struct irqaction), GFP_KERNEL);
+        if (!action)
+                return -ENOMEM;
+
+        action->handler = handler;
+        action->thread_fn = thread_fn;
+        action->flags = irqflags;
+        action->name = devname;
+        action->dev_id = dev_id;
+
+        chip_bus_lock(desc);
+        retval = __setup_irq(irq, desc, action);
+        chip_bus_sync_unlock(desc);
+
+        if (retval)
+                kfree(action);
+
+        return retval;
+}
+
+setup_irq() is implemented in the same file as
+
+int setup_irq(unsigned int irq, struct irqaction *act)
+{
+        int retval;
+        struct irq_desc *desc = irq_to_desc(irq);
+
+        if (WARN_ON(irq_settings_is_per_cpu_devid(desc)))
+                return -EINVAL;
+        chip_bus_lock(desc);
+        retval = __setup_irq(irq, desc, act);
+        chip_bus_sync_unlock(desc);
+
+        return retval;
+}
+
+The only two differences between request_irq() and setup_irq() would thus be
+
+- the extra !irq_settings_can_request(desc) check
+- the extra kzalloc() call
+
+The former should only be true for chained IRQ handlers, which isn't the case 
+here. The latter is just a kmalloc + kmap_atomic + memset as far as I can 
+tell.
+
+It thus seems safe to replace setup_irq() with request_irq().
+
+-- 
+Regards,
+
+Laurent Pinchart
