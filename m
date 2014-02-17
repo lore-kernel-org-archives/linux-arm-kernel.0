@@ -1,47 +1,37 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 17 Feb 2014 15:31:52 +0900
-Subject: [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
-Message-ID: <20140217063152.21876.6981.sendpatchset@w520>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Mon, 17 Feb 2014 13:28:05 +0800
+Subject: [PATCH v6 0/3] serial: fsl_lpuart: add DMA support 
+Message-ID: <1392614888-10261-1-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
 
-On R-Car Gen2 SoCs such as r8a7790 and r8a7791 the hardware boot
-mode bit MD21 indicates if hardware debug mode is enabled or not.
+Changed in v6:
+- Change the explanations for dmas, dma-names in document.
 
-In case hardware debug mode is enabled print a warning and refrain
-from booting secondary CPU cores. Without this patch Koelsch boards
-with SW8-4 set to OFF will hang at SMP boot.
+Changed in v5:
+- Revoke move dma properties from dtsi to dts.
+- Change the explanations for dmas, dma-names in document.
+- Change the  description for [PATCH 3] serial: fsl_lpuart: documented the clock requirement.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+Changed in v4:
+- Move dma properties from dtsi to dts.
+- Cancle the macro(SERIAL_FSL_LPUART_DMA)  .
+- Separate the document for clocks which undocumented before into a single patch.
+- Change some explanations in document(clocks, clock-names, dmas, dma-names).
+- Change "lpuart-tx" and "lpuart-rx" to "tx" and "rx".
 
- Written against renesas-devel-v3.14-rc2-20140213
+Changed in v3:
+- Use the streaming DMA API for receive.
+- Add the macro(SERIAL_FSL_LPUART_DMA) and dts node propertie for whether using the dma.
+- Adjust some coding style.
 
- arch/arm/mach-shmobile/platsmp-apmu.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+Changed in v2:
+- Add eDMA support for lpuart receive.
+- Use dma_mapping_error test dma_map_single.
+- Change some names of variable.
+- Fix some bugs.
 
---- 0001/arch/arm/mach-shmobile/platsmp-apmu.c
-+++ work/arch/arm/mach-shmobile/platsmp-apmu.c	2014-02-17 15:11:15.000000000 +0900
-@@ -17,6 +17,7 @@
- #include <asm/cp15.h>
- #include <asm/smp_plat.h>
- #include <mach/common.h>
-+#include <mach/rcar-gen2.h>
- 
- static struct {
- 	void __iomem *iomem;
-@@ -136,6 +137,12 @@ void __init shmobile_smp_apmu_prepare_cp
- 
- int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
-+	/* Refrain boot when hardware debug mode is enabled */
-+	if (rcar_gen2_read_mode_pins() & BIT(21)) {
-+		pr_warn("Unable to boot CPU%d when MD21 is set\n", cpu);
-+		return -ENOTSUPP;
-+	}
-+
- 	/* For this particular CPU register boot vector */
- 	shmobile_smp_hook(cpu, virt_to_phys(shmobile_invalidate_start), 0);
- 
+Added in v1:
+- Add device tree bindings for lupart eDMA support.
+- Add eDMA support for lpuart send.
