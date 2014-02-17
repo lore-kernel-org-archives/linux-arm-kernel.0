@@ -1,42 +1,54 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 17 Feb 2014 16:21:28 +0900
-Subject: [PATCH] ARM: shmobile: Remove Koelsch DT reference legacy clock bits
-Message-ID: <20140217072128.27086.81905.sendpatchset@w520>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 17 Feb 2014 16:21:14 +0900
+Subject: [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
+In-Reply-To: <20140217063152.21876.6981.sendpatchset@w520>
+References: <20140217063152.21876.6981.sendpatchset@w520>
+Message-ID: <20140217072111.GA23528@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Mon, Feb 17, 2014 at 03:31:52PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> On R-Car Gen2 SoCs such as r8a7790 and r8a7791 the hardware boot
+> mode bit MD21 indicates if hardware debug mode is enabled or not.
+> 
+> In case hardware debug mode is enabled print a warning and refrain
+> from booting secondary CPU cores. Without this patch Koelsch boards
+> with SW8-4 set to OFF will hang at SMP boot.
 
-Koelsch DT reference is these days built for multiplatform
-only which means that CCF comes with the package. Remove
-unused legacy code ifdefs to clean up the code.
+Out of interest, is this the solution to your recent SMP troubles?
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- Written against renesas-devel-v3.14-rc3-20140217
-
- arch/arm/mach-shmobile/board-koelsch-reference.c |    5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ work/arch/arm/mach-shmobile/board-koelsch-reference.c	2014-02-17 16:10:07.000000000 +0900
-@@ -84,7 +84,6 @@ static void __init koelsch_add_du_device
- 
- static void __init koelsch_add_standard_devices(void)
- {
--#ifdef CONFIG_COMMON_CLK
- 	/*
- 	 * This is a really crude hack to provide clkdev support to the CMT and
- 	 * DU devices until they get moved to DT.
-@@ -125,9 +124,7 @@ static void __init koelsch_add_standard_
- 			clk_put(clk);
- 		}
- 	}
--#else
--	r8a7791_clock_init();
--#endif
-+
- 	r8a7791_add_dt_devices();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  Written against renesas-devel-v3.14-rc2-20140213
+> 
+>  arch/arm/mach-shmobile/platsmp-apmu.c |    7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> --- 0001/arch/arm/mach-shmobile/platsmp-apmu.c
+> +++ work/arch/arm/mach-shmobile/platsmp-apmu.c	2014-02-17 15:11:15.000000000 +0900
+> @@ -17,6 +17,7 @@
+>  #include <asm/cp15.h>
+>  #include <asm/smp_plat.h>
+>  #include <mach/common.h>
+> +#include <mach/rcar-gen2.h>
+>  
+>  static struct {
+>  	void __iomem *iomem;
+> @@ -136,6 +137,12 @@ void __init shmobile_smp_apmu_prepare_cp
+>  
+>  int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  {
+> +	/* Refrain boot when hardware debug mode is enabled */
+> +	if (rcar_gen2_read_mode_pins() & BIT(21)) {
+> +		pr_warn("Unable to boot CPU%d when MD21 is set\n", cpu);
+> +		return -ENOTSUPP;
+> +	}
+> +
+>  	/* For this particular CPU register boot vector */
+>  	shmobile_smp_hook(cpu, virt_to_phys(shmobile_invalidate_start), 0);
+>  
+> 
