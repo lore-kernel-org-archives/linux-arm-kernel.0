@@ -1,56 +1,98 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 17 Feb 2014 19:03:20 +0900
-Subject: [PATCH 2/5] ARM: shmobile: r8a7791: add i2c master nodes to dtsi
-In-Reply-To: <20140217093126.GE2633@katana>
-References: <1392543658-5030-1-git-send-email-wsa@the-dreams.de>
- <1392543658-5030-3-git-send-email-wsa@the-dreams.de>
- <20140217075410.GA2633@katana>
- <CANqRtoSDxQfSw5PJB6-UcL-UuMySBkoCqfC+1H=o-EBA18ouLQ@mail.gmail.com>
- <CAMuHMdW8MLknykkfu9XS5CDpuJcRNyPz+GV5bhUNGndxFacnQw@mail.gmail.com>
- <20140217091900.GD2633@katana>
- <CAMuHMdV5KNBcFh5E0bKaLNboZUbuXmMkzdYozqWLvro7Kwjhjw@mail.gmail.com>
- <20140217093126.GE2633@katana>
-Message-ID: <CANqRtoRgMaAzzvD9OK+=_J2Or5HZHzg4RUb899-bXjM7LKHSyw@mail.gmail.com>
+From: david.lanzendoerfer@o2s.ch (David =?utf-8?q?Lanzend=C3=B6rfer?=)
+Date: Mon, 17 Feb 2014 11:02:08 +0100
+Subject: [PATCH v7 0/8] ARM: sunxi: Add driver for SD/MMC hosts found on
+ allwinner sunxi SOCs
+Message-ID: <20140217095907.15040.81893.stgit@pagira.o2s.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 6:31 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Mon, Feb 17, 2014 at 10:23:31AM +0100, Geert Uytterhoeven wrote:
->> Hi Wolfram,
->>
->> On Mon, Feb 17, 2014 at 10:19 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
->> >> I think the tricky part is when a driver for "renesas,i2c-r8a7790" is updated
->> >> with a new feature for r8a7790, which doesn't necessarily exist in r8a7791.
->> >> Then the compatible entry above will cause breakage.
->> >
->> > If the driver is updated in that way, then it MUST introduce an r8a7791
->> > compatible entry and make sure the new feature is only used on r8a7790.
->> > Otherwise it is a bug. If this is adhered, we won't have a breakage
->> > because the specific entry (here r8a7791) always comes first. Or?
->>
->> That will indeed prevent breakage. But in the distributed development world,
->> the person who modifies the driver may not be aware of the r8a7791.
->
-> Then it will break even with a seperate r8a7791 compatible entry as
-> well, sadly. Currently, the only thing encoded in the .data field of all
-> compatibles, is which generation of the core is used. This is the same
-> for r8a7790 and r8a7791 (this is why they ARE compatible ;)). So, even
-> in the unlikely case of an r8a7790-only-feature, some code/reactoring to
-> make the distinction is absolutely necessary.
+Hello
+The following patchset adds support for the SD/MMC host found in the Allwinner SoCs.
+It contains all the necessary modifications for clock environment and also the device
+tree script modification which add it to all the boards using it.
+The clock environment function needed for phase offset configuration has
+been proposed and implemented by Emilio.
+A lot of work and cleanup has been done by Hans de Goede. Special thanks to him!
+This patchset is the 4th attempt to send this driver upstream.
 
-It won't break because anyone who modifies r8a7790 support need to
-make it specific to that SoC to not pull in r8a7791 into some
-assumption. Just because the driver assumes something now doesn't mean
-the hardware actually is compatible.
+Changes since v1:
+-Using mmc_of_parse instead of diy dt parsing
+-Adding nodes for all mmc controller to the dtsi files,
+ including sofar unused controllers
+-Using generic GPIO slot library for WP/CD
+-Adding additional MMC device nodes into DTSI files
 
-I think I understand your proposal with making an assumption of the
-current state of the driver and making sure to add the new SoC
-compatible value before adjusting the fallback. But this mainly seems
-like a optimization to improve throughput commit-wise. I actually
-proposed the same way for SDHI, but now when I think about it I
-realize that there is no shortcut for adding the compatible string to
-the driver. It has to be done sooner or later anyway.
+Changes since v2:
+-Add missing Signed-off-by tags
+-Stop using __raw_readl / __raw_writel so that barriers are properly used
+-Adding missing new lines
+-Adding missing patch for automatic reparenting of clocks
 
-Or what am I missing? =)
+Changes since v3:
+-Move clk_enable / disable into host_init / exit (Hans)
+-Fix hang on boot caused by irq storm (Hans)
 
-/ magnus
+Changes since v4:
+-moving sunxi-mci.{c/h} to sunxi-mmc.{c/h}
+-removing camel cases from the defines in  sunxi-mmc.h
+-moving defines out of the struct definition
+ since this is bad coding style
+-adding documentation for the device tree binding
+
+Changes since v5:
+-adding host initialization for when the sdio irq is enabled
+ (just to make sure having a defined state at all time)
+-add mmc support fixup: set pullup on cd pins
+-fixup: Don't set MMC_CAP_NEEDS_POLL /  MMC_CAP_4_BIT_DATA
+
+Changes since v6:
+-fixing copyright info in sunxi-mmc.*
+-s/__SUNXI_MCI_H__/__SUNXI_MMC_H__/g
+-s/SDXC_RESPONSE_/SDXC_RESP_/g
+-s/define/definitions <- Comment from Priit Laes
+
+---
+
+David Lanzend?rfer (5):
+      ARM: sunxi: Add driver for SD/MMC hosts found on Allwinner sunxi SoCs
+      ARM: dts: sun7i: Add support for mmc
+      ARM: dts: sun4i: Add support for mmc
+      ARM: dts: sun5i: Add support for mmc
+      ARM: sunxi: Add documentation for driver for SD/MMC hosts found on Allwinner sunxi SoCs
+
+Emilio L?pez (2):
+      clk: sunxi: factors: automatic reparenting support
+      clk: sunxi: Implement MMC phase control
+
+Hans de Goede (1):
+      ARM: sunxi: clk: export clk_sunxi_mmc_phase_control
+
+
+ .../devicetree/bindings/mmc/sunxi-mmc.txt          |   32 +
+ arch/arm/boot/dts/sun4i-a10-a1000.dts              |    8 
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |    8 
+ arch/arm/boot/dts/sun4i-a10.dtsi                   |   54 +
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts   |   30 +
+ arch/arm/boot/dts/sun5i-a10s.dtsi                  |   44 +
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts    |   15 
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |   15 
+ arch/arm/boot/dts/sun5i-a13.dtsi                   |   37 +
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts        |    8 
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |    8 
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts    |   23 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |   61 +
+ drivers/clk/sunxi/clk-factors.c                    |   36 +
+ drivers/clk/sunxi/clk-sunxi.c                      |   35 +
+ drivers/mmc/host/Kconfig                           |    7 
+ drivers/mmc/host/Makefile                          |    2 
+ drivers/mmc/host/sunxi-mmc.c                       |  876 ++++++++++++++++++++
+ drivers/mmc/host/sunxi-mmc.h                       |  239 +++++
+ include/linux/clk/sunxi.h                          |   22 +
+ 20 files changed, 1560 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+ create mode 100644 drivers/mmc/host/sunxi-mmc.c
+ create mode 100644 drivers/mmc/host/sunxi-mmc.h
+ create mode 100644 include/linux/clk/sunxi.h
+
+-- 
+Signature
