@@ -1,39 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Feb 2014 17:13:07 +0100
-Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
-In-Reply-To: <20140217155419.682F7C401D4@trevor.secretlab.ca>
-References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
- <201402121251.06280.arnd@arndb.de>
- <20140217155419.682F7C401D4@trevor.secretlab.ca>
-Message-ID: <1418981.0py7JxXCp8@wuerfel>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 17 Feb 2014 17:13:50 +0100
+Subject: [PATCH 2/2] ARM: DTS: OMAP4: Add gpmc_fck clock node
+In-Reply-To: <530200B9.8090407@ti.com>
+References: <1392636465-31459-1-git-send-email-florian.vaussard@epfl.ch>
+ <1392636465-31459-3-git-send-email-florian.vaussard@epfl.ch>
+ <530200B9.8090407@ti.com>
+Message-ID: <5302353E.7090506@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 February 2014 15:54:19 Grant Likely wrote:
-> On Wed, 12 Feb 2014 11:20:00 -0700, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
-> > On Wed, Feb 12, 2014 at 12:45:54PM -0500, Jason Cooper wrote:
-> > 
-> > > The bootloader would then load this file into ram, and pass the
-> > > address/size to the kernel either via dt, or commandline.  kaslr (run in
-> > > the decompressor) would consume some of this randomness, and then
-> > > random.c would consume the rest in a non-crediting initialization.
-> > 
-> > Sure is a neat idea, but I think in general it would probably be smart
-> > to include the entire FDT blob in the early random pool, that way you
-> > get MACs and other machine unique data too.
+Hi,
+
+On 02/17/2014 01:29 PM, Tero Kristo wrote:
+> On 02/17/2014 01:27 PM, Florian Vaussard wrote:
+>> Add the gpmc_fck clock, derived from l3_ick, and reference it from
+>> the GPMC node to get it correctly working.
+>>
+>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>> ---
+>>   arch/arm/boot/dts/omap4.dtsi           | 2 ++
+>>   arch/arm/boot/dts/omap44xx-clocks.dtsi | 6 ++++++
+>>   2 files changed, 8 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>> index d3f8a6e..8a0cc71 100644
+>> --- a/arch/arm/boot/dts/omap4.dtsi
+>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>> @@ -275,6 +275,8 @@
+>>               gpmc,num-waitpins = <4>;
+>>               ti,hwmods = "gpmc";
+>>               ti,no-idle-on-init;
+>> +            clocks = <&gpmc_fck>;
+>> +            clock-names = "fck";
+>>           };
+>>
+>>           uart1: serial at 4806a000 {
+>> diff --git a/arch/arm/boot/dts/omap44xx-clocks.dtsi
+>> b/arch/arm/boot/dts/omap44xx-clocks.dtsi
+>> index c821ff5..ae2c441 100644
+>> --- a/arch/arm/boot/dts/omap44xx-clocks.dtsi
+>> +++ b/arch/arm/boot/dts/omap44xx-clocks.dtsi
+>> @@ -1036,6 +1036,12 @@
+>>           ti,index-power-of-two;
+>>       };
+>>
+>> +    gpmc_fck: gpmc_fck {
+>> +        #clock-cells = <0>;
+>> +        compatible = "ti,clkdm-gate-clock";
+>> +        clocks = <&l3_div_ck>;
+>> +    };
+>> +
 > 
-> I applied a patch that did exactly that (109b623629), and then reverted
-> it (b920ecc82) shortly thereafter because add_device_randomness() is
-> a rather slow function and FDTs can get large. I'd like to see someone
-> do a reasonable analysis on the cost of using an FDT for randomness
-> before I reapply a patch doing something similar. An awful lot of the
-> FDT data is not very random, but there are certainly portions of it that
-> are appropriate for the random pool.
+> Why not implement a proper gate clock for CM_L3_2_GPMC_CLKCTRL? The
+> approach you have taken looks good to me otherwise.
+> 
 
-Could we use a faster hash function that scans the entire device tree and
-then just feed the output of that into add_device_randomness? We probably
-can't expect that there is a lot of entropy in the DT blob, so the
-result wouldn't be all that different in terms of quality of the random
-seed.
+So something like:
 
-	Arnd
+        gpmc_fck: gpmc_fck {
+                #clock-cells = <0>;
+                compatible = "ti,gate-clock";
+                clocks = <&l3_div_ck>;
+                reg = <(CM_L3_2_GPMC_CLKCTRL)>;
+                ti,bit-shift = <0>;
+        };
+
+? I was not sure for gate-clock, as setting the bit will enable the
+clock only if the corresponding clock domain (CD_L3_2) is enabled as well.
+
+Regards,
+Florian
