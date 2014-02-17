@@ -1,693 +1,157 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 17 Feb 2014 11:40:01 +0100
-Subject: [PATCH 1/3] ARM: at91: Add at91sam9rl DT SoC support
-In-Reply-To: <1392426860-19589-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1392426860-19589-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1392426860-19589-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5301E701.9090500@atmel.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 17 Feb 2014 10:40:41 +0000
+Subject: [PATCH RFC v3 3/3] Documentation: arm: define DT idle states
+ bindings
+In-Reply-To: <20140216013956.GV4451@sirena.org.uk>
+References: <1392128273-8614-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1392128273-8614-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <20140216013956.GV4451@sirena.org.uk>
+Message-ID: <20140217104040.GB20125@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/2014 02:14, Alexandre Belloni :
-> This adds preliminary DT support for the at91sam9rl.
+On Sun, Feb 16, 2014 at 01:39:56AM +0000, Mark Brown wrote:
+> On Tue, Feb 11, 2014 at 02:17:53PM +0000, Lorenzo Pieralisi wrote:
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/at91sam9rl.dtsi | 626 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-at91/at91sam9rl.c   |  16 +
->  2 files changed, 642 insertions(+)
->  create mode 100644 arch/arm/boot/dts/at91sam9rl.dtsi
+> > +According to the Server Base System Architecture document (SBSA, [3]), the
+> > +power states an ARM CPU can be put into are identified by the following list:
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
-> new file mode 100644
-> index 000000000000..cf67d3a553b2
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/at91sam9rl.dtsi
-> @@ -0,0 +1,626 @@
-> +/*
-> + * at91sam9rl.dtsi - Device Tree Include file for AT91SAM9RL family SoC
-> + *
-> + *  Copyright (C) 2014 Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> + *
-> + * Licensed under GPLv2 or later.
-> + */
-> +
-> +#include "skeleton.dtsi"
-> +#include <dt-bindings/pinctrl/at91.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +/ {
-> +	model = "Atmel AT91SAM9RL family SoC";
-> +	compatible = "atmel,at91sam9rl";
-> +	interrupt-parent = <&aic>;
-> +
-> +	aliases {
-> +		serial0 = &dbgu;
-> +		serial1 = &usart0;
-> +		serial2 = &usart1;
-> +		serial3 = &usart2;
-> +		serial4 = &usart3;
-> +		gpio0 = &pioA;
-> +		gpio1 = &pioB;
-> +		gpio2 = &pioC;
-> +		gpio3 = &pioD;
-> +		tcb0 = &tcb0;
-> +		i2c0 = &i2c0;
-> +		i2c1 = &i2c1;
-> +		ssc0 = &ssc0;
-> +		ssc1 = &ssc1;
-> +	};
+> > +1 - Running
+> > +2 - Idle_standby
+> > +3 - Idle_retention
+> > +4 - Sleep
+> > +5 - Off
+> 
+> > +ARM platforms implement the power states specified in the SBSA through power
+> > +management schemes that allow an OS PM implementation to put the processor in
+> > +different idle states (which include states 1 to 4 above; "off" state is not
+> > +an idle state since it does not have wake-up capabilities, hence it is not
+> > +considered in this document).
+> 
+> This is explicitly talking about SBSA - is there any restriction with
+> regard to non-SBSA systems?  I can't think of any right now and this
+> seems purely informational but it might be worth mentioning that
+> non-SBSA systems might potentially have other states if the intention is
+> to allow that.
 
-Nit: add a white line here please.
+It is informational, for nomenclature reasons. I do not think we have a
+problem here, I will check if rewording is necessary.
 
-> +	cpus {
-> +		#address-cells = <0>;
-> +		#size-cells = <0>;
-> +
-> +		cpu {
-> +			compatible = "arm,arm926ej-s";
-> +			device_type = "cpu";
-> +		};
-> +	};
-> +
-> +	memory {
-> +		reg = <0x20000000 0x04000000>;
-> +	};
-> +
-> +	ahb {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		apb {
-> +			compatible = "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			tcb0: timer at fffa0000 {
-> +				compatible = "atmel,at91rm9200-tcb";
-> +				reg = <0xfffa0000 0x100>;
-> +				interrupts = <16 IRQ_TYPE_LEVEL_HIGH 0
-> +					      17 IRQ_TYPE_LEVEL_HIGH 0
-> +					      18 IRQ_TYPE_LEVEL_HIGH 0>;
-> +			};
-> +
-> +			mmc0: mmc at fffa4000 {
-> +				compatible = "atmel,hsmci";
-> +				reg = <0xfffa4000 0x600>;
-> +				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				pinctrl-names = "default";
-> +				status = "disabled";
-> +			};
-> +
-> +			i2c0: i2c at fffa8000 {
-> +				compatible = "atmel,at91sam9260-i2c";
-> +				reg = <0xfffa8000 0x100>;
-> +				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 6>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				status = "disabled";
-> +			};
-> +
-> +			i2c1: i2c at fffac000 {
-> +				compatible = "atmel,at91sam9260-i2c";
-> +				reg = <0xfffac000 0x100>;
-> +				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 6>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				status = "disabled";
-> +			};
-> +
-> +			usart0: serial at fffb0000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xfffb0000 0x200>;
-> +				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				atmel,use-dma-rx;
-> +				atmel,use-dma-tx;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_usart0>;
-> +				status = "disabled";
-> +			};
-> +
-> +			usart1: serial at fffb4000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xfffb4000 0x200>;
-> +				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				atmel,use-dma-rx;
-> +				atmel,use-dma-tx;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_usart1>;
-> +				status = "disabled";
-> +			};
-> +
-> +			usart2: serial at fffb8000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xfffb8000 0x200>;
-> +				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				atmel,use-dma-rx;
-> +				atmel,use-dma-tx;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_usart2>;
-> +				status = "disabled";
-> +			};
-> +
-> +			usart3: serial at fffbc000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xfffbc000 0x200>;
-> +				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				atmel,use-dma-rx;
-> +				atmel,use-dma-tx;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_usart3>;
-> +				status = "disabled";
-> +			};
-> +
-> +			ssc0: ssc at fffc0000 {
-> +				compatible = "atmel,at91rm9200-ssc";
-> +				reg = <0xfffc0000 0x4000>;
-> +				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
-> +				status = "disabled";
-> +			};
-> +
-> +			ssc1: ssc at fffc4000 {
-> +				compatible = "atmel,at91rm9200-ssc";
-> +				reg = <0xfffc4000 0x4000>;
-> +				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
-> +				status = "disabled";
-> +			};
-> +
-> +			spi0: spi at fffcc000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "atmel,at91rm9200-spi";
-> +				reg = <0xfffcc000 0x200>;
-> +				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_spi0>;
-> +				status = "disabled";
-> +			};
-> +
-> +			adc0: adc at fffd0000 {
-> +				compatible = "atmel,at91sam9260-adc";
-> +				reg = <0xfffd0000 0x100>;
-> +				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				atmel,adc-use-external-triggers;
-> +				atmel,adc-channels-used = <0xf>;
-> +				atmel,adc-vref = <3300>;
-> +				atmel,adc-num-channels = <4>;
-> +				atmel,adc-startup-time = <15>;
-> +				atmel,adc-channel-base = <0x30>;
-> +				atmel,adc-drdy-mask = <0x10000>;
-> +				atmel,adc-status-register = <0x1c>;
-> +				atmel,adc-trigger-register = <0x04>;
-> +				atmel,adc-res = <8 10>;
-> +				atmel,adc-res-names = "lowres", "highres";
-> +				atmel,adc-use-res = "highres";
-> +
-> +				trigger at 0 {
-> +					trigger-name = "timer-counter-0";
-> +					trigger-value = <0x1>;
-> +				};
-> +				trigger at 1 {
-> +					trigger-name = "timer-counter-1";
-> +					trigger-value = <0x3>;
-> +				};
-> +
-> +				trigger at 2 {
-> +					trigger-name = "timer-counter-2";
-> +					trigger-value = <0x5>;
-> +				};
-> +
-> +				trigger at 3 {
-> +					trigger-name = "external";
-> +					trigger-value = <0x13>;
-> +					trigger-external;
-> +				};
-> +			};
-> +
-> +			usb0: gadget at fffd4000 {
-> +				compatible = "atmel,at91rm9200-udc";
-> +				reg = <0xfffd4000 0x4000>;
-> +				interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
-> +				status = "disabled";
-> +			};
-> +
-> +			ramc0: ramc at ffffea00 {
-> +				compatible = "atmel,at91sam9260-sdramc";
-> +				reg = <0xffffea00 0x200>;
-> +			};
-> +
-> +			aic: interrupt-controller at fffff000 {
-> +				#interrupt-cells = <3>;
-> +				compatible = "atmel,at91rm9200-aic";
-> +				interrupt-controller;
-> +				reg = <0xfffff000 0x200>;
-> +				atmel,external-irqs = <31>;
-> +			};
-> +
-> +			dbgu: serial at fffff200 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xfffff200 0x200>;
-> +				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&pinctrl_dbgu>;
-> +				status = "disabled";
-> +			};
-> +
-> +			pinctrl at fffff400 {
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
-> +				ranges = <0xfffff400 0xfffff400 0x800>;
-> +
-> +				atmel,mux-mask = <
-> +				      /*    A         B     */
-> +				       0xffffffff 0xe05c6738  /* pioA */
-> +				       0xffffffff 0x0000c780  /* pioB */
-> +				       0xffffffff 0xe3ffff0e  /* pioC */
-> +				       0x003fffff 0x0001ff3c  /* pioD */
-> +				      >;
-> +
-> +				/* shared pinctrl settings */
-> +				dbgu {
-> +					pinctrl_dbgu: dbgu-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 21 AT91_PERIPH_A AT91_PINCTRL_NONE
-> +							 AT91_PIOA 22 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;
-> +					};
-> +				};
-> +
-> +				usart0 {
-> +					pinctrl_usart0: usart0-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 6 AT91_PERIPH_A AT91_PINCTRL_NONE
-> +							 AT91_PIOA 7 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;
-> +					};
-> +
-> +					pinctrl_usart0_rts: usart0_rts-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 9 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart0_cts: usart0_cts-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 10 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart0_dtr_dsr: usart0_dtr_dsr-0 {
-> +						atmel,pins =
-> +							<AT91_PIOD 14 AT91_PERIPH_A AT91_PINCTRL_NONE
-> +							 AT91_PIOD 15 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart0_dcd: usart0_dcd-0 {
-> +						atmel,pins =
-> +							<AT91_PIOD 16 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart0_ri: usart0_ri-0 {
-> +						atmel,pins =
-> +							<AT91_PIOD 17 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart0_sck: usart0_sck-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 8 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +				};
-> +
-> +				usart1 {
-> +					pinctrl_usart1: usart1-0 {
-> +						atmel,pins =
-> +						/*TODO check pullup necessary*/
-> +							<AT91_PIOA 11 AT91_PERIPH_A AT91_PINCTRL_PULL_UP
-> +							 AT91_PIOA 12 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart1_rts: usart1_rts-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 18 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart1_cts: usart1_cts-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 19 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart1_sck: usart1_sck-0 {
-> +						atmel,pins =
-> +							<AT91_PIOD 2 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +				};
-> +
-> +				usart2 {
-> +					pinctrl_usart2: usart2-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 13 AT91_PERIPH_A AT91_PINCTRL_PULL_UP
-> +							 AT91_PIOA 14 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart2_rts: usart2_rts-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 29 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart2_cts: usart2_cts-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 30 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart2_sck: usart2_sck-0 {
-> +						atmel,pins =
-> +							<AT91_PIOD 9 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +				};
-> +
-> +				usart3 {
-> +					pinctrl_usart3: usart3-0 {
-> +						atmel,pins =
-> +							<AT91_PIOB 0 AT91_PERIPH_A AT91_PINCTRL_PULL_UP
-> +							 AT91_PIOB 1 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart3_rts: usart3_rts-0 {
-> +						atmel,pins =
-> +							<AT91_PIOD 4 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart3_cts: usart3_cts-0 {
-> +						atmel,pins =
-> +							<AT91_PIOD 3 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_usart3_sck: usart3_sck-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 20 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +				};
-> +
-> +				nand {
-> +					pinctrl_nand: nand-0 {
-> +						atmel,pins =
-> +							<AT91_PIOD 17 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP
-> +							 AT91_PIOB 6 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;
-> +					};
-> +
-> +					pinctrl_nand0_ale_cle: nand_ale_cle-0 {
-> +						atmel,pins =
-> +							<AT91_PIOB 2 AT91_PERIPH_A AT91_PINCTRL_NONE
-> +							 AT91_PIOB 3 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_nand0_oe_we: nand_oe_we-0 {
-> +						atmel,pins =
-> +							<AT91_PIOB 4 AT91_PERIPH_A AT91_PINCTRL_NONE
-> +							 AT91_PIOB 5 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_nand0_cs: nand_cs-0 {
-> +						atmel,pins =
-> +							<AT91_PIOB 6 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +				};
-> +
-> +				mmc0 {
-> +					pinctrl_mmc0_clk: mmc0_clk-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 2 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_mmc0_slot0_cmd_dat0: mmc0_slot0_cmd_dat0-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 0 AT91_PERIPH_A AT91_PINCTRL_PULL_UP
-> +							 AT91_PIOA 1 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;
-> +					};
-> +
-> +					pinctrl_mmc0_slot0_dat1_3: mmc0_slot0_dat1_3-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 3 AT91_PERIPH_A AT91_PINCTRL_PULL_UP
-> +							 AT91_PIOA 4 AT91_PERIPH_A AT91_PINCTRL_PULL_UP
-> +							 AT91_PIOA 5 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;
-> +					};
-> +				};
-> +
-> +				ssc0 {
-> +					pinctrl_ssc0_tx: ssc0_tx-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 15 AT91_PERIPH_A AT91_PINCTRL_NONE
-> +							 AT91_PIOC 0 AT91_PERIPH_A AT91_PINCTRL_NONE
-> +							 AT91_PIOC 1 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_ssc0_rx: ssc0_rx-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE
-> +							 AT91_PIOA 16 AT91_PERIPH_A AT91_PINCTRL_NONE
-> +							 AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +				};
-> +
-> +				ssc1 {
-> +					pinctrl_ssc1_tx: ssc1_tx-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 13 AT91_PERIPH_B AT91_PINCTRL_NONE
-> +							 AT91_PIOA 29 AT91_PERIPH_B AT91_PINCTRL_NONE
-> +							 AT91_PIOA 30 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_ssc1_rx: ssc1_rx-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 8 AT91_PERIPH_B AT91_PINCTRL_NONE
-> +							 AT91_PIOA 9 AT91_PERIPH_B AT91_PINCTRL_NONE
-> +							 AT91_PIOA 14 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +				};
-> +
-> +				spi0 {
-> +					pinctrl_spi0: spi0-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 25 AT91_PERIPH_A AT91_PINCTRL_NONE
-> +							 AT91_PIOA 26 AT91_PERIPH_A AT91_PINCTRL_NONE
-> +							 AT91_PIOA 27 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +				};
-> +
-> +				i2c_gpio0 {
-> +					pinctrl_i2c_gpio0: i2c_gpio0-0 {
-> +						atmel,pins =
-> +							<AT91_PIOA 23 AT91_PERIPH_GPIO AT91_PINCTRL_MULTI_DRIVE
-> +							 AT91_PIOA 24 AT91_PERIPH_GPIO AT91_PINCTRL_MULTI_DRIVE>;
-> +					};
-> +				};
-> +
-> +				i2c_gpio1 {
-> +					pinctrl_i2c_gpio1: i2c_gpio1-0 {
-> +						atmel,pins =
-> +							<AT91_PIOD 10 AT91_PERIPH_GPIO AT91_PINCTRL_MULTI_DRIVE
-> +							 AT91_PIOD 11 AT91_PERIPH_GPIO AT91_PINCTRL_MULTI_DRIVE>;
-> +					};
-> +				};
-> +
-> +				tcb0 {
-> +					pinctrl_tcb0_tclk0: tcb0_tclk0-0 {
-> +						atmel,pins = <AT91_PIOA 3 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_tcb0_tclk1: tcb0_tclk1-0 {
-> +						atmel,pins = <AT91_PIOC 31 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_tcb0_tclk2: tcb0_tclk2-0 {
-> +						atmel,pins = <AT91_PIOD 21 AT91_PERIPH_A AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_tcb0_tioa0: tcb0_tioa0-0 {
-> +						atmel,pins = <AT91_PIOA 4 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_tcb0_tioa1: tcb0_tioa1-0 {
-> +						atmel,pins = <AT91_PIOC 29 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_tcb0_tioa2: tcb0_tioa2-0 {
-> +						atmel,pins = <AT91_PIOD 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_tcb0_tiob0: tcb0_tiob0-0 {
-> +						atmel,pins = <AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_tcb0_tiob1: tcb0_tiob1-0 {
-> +						atmel,pins = <AT91_PIOC 30 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +
-> +					pinctrl_tcb0_tiob2: tcb0_tiob2-0 {
-> +						atmel,pins = <AT91_PIOD 11 AT91_PERIPH_B AT91_PINCTRL_NONE>;
-> +					};
-> +				};
-> +
-> +				pioA: gpio at fffff400 {
-> +					compatible = "atmel,at91rm9200-gpio";
-> +					reg = <0xfffff400 0x200>;
-> +					interrupts = <2 IRQ_TYPE_LEVEL_HIGH 1>;
-> +					#gpio-cells = <2>;
-> +					gpio-controller;
-> +					interrupt-controller;
-> +					#interrupt-cells = <2>;
-> +				};
-> +
-> +				pioB: gpio at fffff600 {
-> +					compatible = "atmel,at91rm9200-gpio";
-> +					reg = <0xfffff600 0x200>;
-> +					interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
-> +					#gpio-cells = <2>;
-> +					gpio-controller;
-> +					interrupt-controller;
-> +					#interrupt-cells = <2>;
-> +				};
-> +
-> +				pioC: gpio at fffff800 {
-> +					compatible = "atmel,at91rm9200-gpio";
-> +					reg = <0xfffff800 0x200>;
-> +					interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
-> +					#gpio-cells = <2>;
-> +					gpio-controller;
-> +					interrupt-controller;
-> +					#interrupt-cells = <2>;
-> +				};
-> +
-> +				pioD: gpio at fffffa00 {
-> +					compatible = "atmel,at91rm9200-gpio";
-> +					reg = <0xfffffa00 0x200>;
-> +					interrupts = <5 IRQ_TYPE_LEVEL_HIGH 1>;
-> +					#gpio-cells = <2>;
-> +					gpio-controller;
-> +					interrupt-controller;
-> +					#interrupt-cells = <2>;
-> +				};
-> +			};
-> +
-> +			pmc: pmc at fffffc00 {
-> +				compatible = "atmel,at91rm9200-pmc";
-> +				reg = <0xfffffc00 0x100>;
-> +			};
-> +
-> +			rstc at fffffd00 {
-> +				compatible = "atmel,at91sam9260-rstc";
-> +				reg = <0xfffffd00 0x10>;
-> +			};
-> +
-> +			shdwc at fffffd10 {
-> +				compatible = "atmel,at91sam9260-shdwc";
-> +				reg = <0xfffffd10 0x10>;
-> +			};
-> +
-> +			pit: timer at fffffd30 {
-> +				compatible = "atmel,at91sam9260-pit";
-> +				reg = <0xfffffd30 0xf>;
-> +				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-> +			};
-> +
-> +			watchdog at fffffd40 {
-> +				compatible = "atmel,at91sam9260-wdt";
-> +				reg = <0xfffffd40 0x10>;
-> +				status = "disabled";
-> +			};
-> +		};
-> +
-> +		nand0: nand at 40000000 {
-> +			compatible = "atmel,at91rm9200-nand";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			reg = <0x40000000 0x10000000
-> +			       0xffffe800 0x200
-> +			      >;
-> +			atmel,nand-addr-offset = <21>;
-> +			atmel,nand-cmd-offset = <22>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_nand>;
-> +			gpios = <&pioD 17 GPIO_ACTIVE_HIGH
-> +				 &pioB 6 GPIO_ACTIVE_HIGH
-> +				 0
-> +				>;
-> +			status = "disabled";
-> +		};
-> +	};
-> +
-> +	i2c at 0 {
-> +		compatible = "i2c-gpio";
-> +		gpios = <&pioA 23 GPIO_ACTIVE_HIGH /* sda */
-> +			 &pioA 24 GPIO_ACTIVE_HIGH /* scl */
-> +			>;
-> +		i2c-gpio,sda-open-drain;
-> +		i2c-gpio,scl-open-drain;
-> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_i2c_gpio0>;
-> +		status = "disabled";
-> +	};
-> +
-> +	i2c at 1 {
-> +		compatible = "i2c-gpio";
-> +		gpios = <&pioD 10 GPIO_ACTIVE_HIGH /* sda */
-> +			 &pioD 11 GPIO_ACTIVE_HIGH /* scl */
-> +			>;
-> +		i2c-gpio,sda-open-drain;
-> +		i2c-gpio,scl-open-drain;
-> +		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_i2c_gpio1>;
-> +		status = "disabled";
-> +	};
-> +};
-> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-> index 0750ffb7e6b1..3644d479f81c 100644
-> --- a/arch/arm/mach-at91/at91sam9rl.c
-> +++ b/arch/arm/mach-at91/at91sam9rl.c
-> @@ -196,6 +196,22 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_ID("pioB", &pioB_clk),
->  	CLKDEV_CON_ID("pioC", &pioC_clk),
->  	CLKDEV_CON_ID("pioD", &pioD_clk),
-> +	/* more lookup table for DT entries */
-> +	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
-> +	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-> +	CLKDEV_CON_DEV_ID("usart", "ffffb400.serial", &usart1_clk),
-> +	CLKDEV_CON_DEV_ID("usart", "ffffb800.serial", &usart2_clk),
-> +	CLKDEV_CON_DEV_ID("usart", "ffffbc00.serial", &usart3_clk),
-> +	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
-> +	CLKDEV_CON_DEV_ID("t1_clk", "fffa0000.timer", &tc1_clk),
-> +	CLKDEV_CON_DEV_ID("t2_clk", "fffa0000.timer", &tc2_clk),
-> +	CLKDEV_CON_DEV_ID("mci_clk", "fffa4000.mmc", &mmc_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "fffa8000.i2c", &twi0_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "fffac000.i2c", &twi1_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioA_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioD_clk),
->  };
->  
->  static struct clk_lookup usart_clocks_lookups[] = {
+> > +- state node
+> > +
+> > +	Description: must be child of either the cpu-idle-states node or
+> > +		     a state node.
+> > +
+> > +	The state node name shall be "stateN", where N = {0, 1, ...} is
+> > +	the node number; state nodes which are siblings within a single common
+> > +	parent node must be given a unique and sequential N value, starting
+> > +	from 0.
+> 
+> This came up with the CPU bindings as well but I'm really not convinced
+> that making the naming of the nodes important is great - it's not normal
+> for DT and it makes the usual enumeration code not work.  Can we not
+> just have a property for state number in the node instead and allow the
+> name to be anything?  It seems we even have the index property
+> already...
 
-Alexandre, it seems okay but... I would like all new AT91 SoC converted
-to DT to include the CCF from the beginning. It will prevent to have a
-temporary phase were people start to use the DT and then have to move
-again to another DT description with CCF.
+Name can be anything now, acked.
+ 
+> > +	- compatible
+> > +		Usage: Required
+> > +		Value type: <stringlist>
+> > +		Definition: Must be "arm,cpu-idle-state".
+> 
+> Do we really need this given that the location in the tree is fixed -
+> what would we extend it with in future?
 
-Please follow what Jean-Jacques did for sam9261 DT + CCF.
+I do not think it hurts either, honestly. Unless there is a strong
+reason to remove it I would leave it there.
 
-Bye,
--- 
-Nicolas Ferre
+> > +	- index
+> > +		Usage: Required
+> > +		Value type: <u32>
+> > +		Definition: It represents an idle state index, starting from 2.
+> > +			    Index 0 represents the processor state "running"
+> > +			    and index 1 represents processor mode
+> > +			    "idle_standby", entered by executing a wfi
+> > +			    instruction (SBSA,[3]); indexes 0 and 1 are
+> > +			    standard ARM states that need not be described.
+> 
+> ...but other numbers are valid.
+
+Now it is sequential {0,1,....} and I defined what it means in terms of
+power consumption (ordering).
+
+> > +	- entry-method
+> > +		Usage: Required
+> > +		Value type: <stringlist>
+> > +		Definition: Describes the method by which a CPU enters the
+> > +			    idle state. This property is required and must be
+> > +			    one of:
+> > +
+> > +			    - "arm,psci-cpu-suspend"
+> > +			      ARM PSCI firmware interface, CPU suspend
+> > +			      method[2].
+> > +
+> > +			    - "[vendor],[method]"
+> > +			      An implementation dependent string with
+> > +			      format "vendor,method", where vendor is a string
+> > +			      denoting the name of the manufacturer and
+> > +			      method is a string specifying the mechanism
+> > +			      used to enter the idle state.
+> 
+> Might be worth reversing these - arm,psci-cpu-suspend is just an example
+> of a (hopefully very widely used) vendor method.  Given that everyone is
+> supposed to be using PSCI might it even be worth making it the default
+> and the property optional?
+
+I think it is ok as it is, honestly. It is certainly not through this
+property that psci will be mandated, it is just a way to describe an
+entry method and it seems fine to me.
+
+> > +	- power-state
+> > +		Usage: See definition.
+> > +		Value type: <u32>
+> > +		Definition: Depends on the entry-method property value.
+> > +			    If entry-method is "arm,psci-cpu-suspend":
+> > +				# Property is required and represents
+> > +				  psci-power-state parameter. Please refer to
+> > +				  [2] for PSCI bindings definition.
+> 
+> Should we just have the entry method nodes define their own properties
+> for this stuff?  I guess this goes back to the comment I made on some
+> other binding that it might be cleaner to have an explicit PSCI binding
+> rather than put PSCI explicitly in indiidual bindings.
+
+I added to the PSCI bindings in this series. OK, I can add something like:
+"Refer to entry-method bindings for the property value definition".
+
+> > +	- entry-latency
+> > +		Usage: Required
+> > +		Value type: <prop-encoded-array>
+> > +		Definition: u32 value representing worst case latency
+> > +			    in microseconds required to enter the idle state.
+> 
+> Why is this defined as an array?
+
+For possible extensions.
+
+> > +	- cache-state-retained
+> > +		Usage: See definition
+> > +		Value type: <none>
+> > +		Definition: if present cache memory is retained on power down,
+> > +			    otherwise it is lost.
+> 
+> Might be better to define which caches?
+> 
+> > +		STATE1: state1 {
+> > +			compatible = "arm,cpu-idle-state";
+> 
+> Even if we stick with the node name being meaningful it'd be nice to
+> replace the STATEN here with a meaningful state name to improve
+> legibility.  
+
+Ok I will add this to v4.
+
+Thanks,
+Lorenzo
