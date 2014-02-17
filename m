@@ -1,98 +1,26 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 17 Feb 2014 11:07:06 +0900
-Subject: [PATCH 11/27] clocksource: sh_cmt: Add support for multiple
- channels per device
-In-Reply-To: <2041255.QOGrHiKJmD@avalon>
-References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <7782053.5pYg74TXhN@avalon>
- <CANqRtoSQ53E-xbe0PM_-=NY0ouVkhW8tac-5ZuLYYwAO072aTg@mail.gmail.com>
- <2041255.QOGrHiKJmD@avalon>
-Message-ID: <CANqRtoQ=QJ0YVjp+8y+H9OTk=iRf6Jdeg_J9PMyYa-9WbgfXyA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 16 Feb 2014 23:11:40 -0300
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-sabresd: Add hog entry for GPIO4_10
+In-Reply-To: <20140217020519.GC9879@S2101-09.ap.freescale.net>
+References: <1392306839-10736-1-git-send-email-fabio.estevam@freescale.com>
+ <20140217020519.GC9879@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5AmsyyvoXsVoquu3mt3URbwJoqDi0gg93LJnaeMhJfGPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Mon, Feb 17, 2014 at 10:48 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Magnus,
->
-> On Monday 17 February 2014 10:41:31 Magnus Damm wrote:
->> On Mon, Feb 17, 2014 at 3:18 AM, Laurent Pinchart wrote:
->> > On Saturday 15 February 2014 13:46:54 Thomas Gleixner wrote:
->> >> On Fri, 14 Feb 2014, Laurent Pinchart wrote:
->> >> > CMT hardware devices can support multiple channels, with global
->> >> > registers and per-channel registers. The sh_cmt driver currently models
->> >> > the hardware with one Linux device per channel. This model makes it
->> >> > difficult to handle global registers in a clean way.
->> >> >
->> >> > Add support for a new model that uses one Linux device per timer with
->> >> > multiple channels per device. This requires changes to platform data,
->> >> > add new channel configuration fields.
->> >> >
->> >> > Support for the legacy model is kept and will be removed after all
->> >> > platforms switch to the new model.
->> >> >
->> >> > Signed-off-by: Laurent Pinchart
->> >> > <laurent.pinchart+renesas@ideasonboard.com>
->> >> > ---
->> >> >
->> >> >  drivers/clocksource/sh_cmt.c | 299 ++++++++++++++++++++++++++---------
->> >> >  include/linux/sh_timer.h     |   9 ++
->> >> >  2 files changed, 239 insertions(+), 69 deletions(-)
->> >> >
->> >> > diff --git a/drivers/clocksource/sh_cmt.c
->> >> > b/drivers/clocksource/sh_cmt.c
->> >> > index 5280231..8390f0f 100644
->> >> > --- a/drivers/clocksource/sh_cmt.c
->> >> > +++ b/drivers/clocksource/sh_cmt.c
->
-> [snip]
->
->> >> > @@ -85,11 +94,15 @@ struct sh_cmt_info {
->> >> >
->> >> >  struct sh_cmt_channel {
->> >> >     struct sh_cmt_device *cmt;
->> >> > -   unsigned int index;
->> >> > -   void __iomem *base;
->> >> > +   unsigned int index;     /* Index in the documentation */
->> >> > +   unsigned int hwidx;     /* Real hardware index */
->> >> > +
->> >> > +   void __iomem *iostart;
->> >> > +   void __iomem *ioctrl;
->> >> >
->> >> >     struct irqaction irqaction;
->> >>
->> >> While you are at it, can you please get rid of that irqaction and use
->> >> request_irq() ?
->> >
->> > The driver claims it can't use request_irq() because the function is not
->> > available for early platform devices. If the situation has changed I'd
->> > gladly get rid of irqaction.
+On Sun, Feb 16, 2014 at 11:05 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On Thu, Feb 13, 2014 at 01:53:58PM -0200, Fabio Estevam wrote:
+>> GPIO4_10 is the GPIO used to turn on the regulator that powers up the codec.
 >>
->> With the risk of stating the obvious, this depends on how early the
->> early platform device stuff is being run. The actual location may not
->> be the same on SH and ARM for instance.
->>
->> On ARM we are doing all we can to initialize these devices as late as
->> ever possible in the MULTIPLAFORM (DT reference) case. Once we manage
->> to remove the legacy ARM case then there is one less user of early
->> platform timers.
->>
->> One perhaps reasonable way forward could be to use request_irq() in
->> case of DT and leave the legacy platform data case to rely on
->> irqaction.
+>> Add a hog entry for it.
 >
-> The whole point of switching from setup_irq() to request_irq() is to simplify
-> the code. Adding request_irq() as an option would go in the opposite
-> direction.
+> I'm going to be strict on hog pin use.  It does not sound like a true
+> hog pin.  Is it possible to have a pinctrl state for that regulator
+> setting this pin up?
 
-The point of switching to setup_irq() was not very clear to me. I
-think it is fine to switch to using it over time, and I'm open to any
-alternative ways forward. Usually moving in incremental steps means
-more crap in the short term, but if someone could come up with a way
-that involves little crap then I'm all for that! =)
+Could you please explain when a pin should or should not be placed
+into the hog group?
 
-Thanks,
+Regards,
 
-/ magnus
+Fabio Estevam
