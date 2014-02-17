@@ -1,108 +1,88 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 17 Feb 2014 10:41:31 +0900
-Subject: [PATCH 11/27] clocksource: sh_cmt: Add support for multiple
- channels per device
-In-Reply-To: <7782053.5pYg74TXhN@avalon>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 17 Feb 2014 02:45:22 +0100
+Subject: [PATCH 23/27] clocksource: sh_cmt: Add DT support
+In-Reply-To: <CANqRtoROALpUqi8rKWRpQk7LGc0BqU14AKg-2MgYBMNoEFGA4Q@mail.gmail.com>
 References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1392339605-20691-12-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <alpine.DEB.2.02.1402151345450.21991@ionos.tec.linutronix.de>
- <7782053.5pYg74TXhN@avalon>
-Message-ID: <CANqRtoSQ53E-xbe0PM_-=NY0ouVkhW8tac-5ZuLYYwAO072aTg@mail.gmail.com>
+ <1790131.DSZsj6HrSK@avalon>
+ <CANqRtoROALpUqi8rKWRpQk7LGc0BqU14AKg-2MgYBMNoEFGA4Q@mail.gmail.com>
+Message-ID: <35710038.vGLtzuIoLe@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+Hi Magnus,
 
-On Mon, Feb 17, 2014 at 3:18 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Thomas,
->
-> On Saturday 15 February 2014 13:46:54 Thomas Gleixner wrote:
->> On Fri, 14 Feb 2014, Laurent Pinchart wrote:
->> > CMT hardware devices can support multiple channels, with global
->> > registers and per-channel registers. The sh_cmt driver currently models
->> > the hardware with one Linux device per channel. This model makes it
->> > difficult to handle global registers in a clean way.
->> >
->> > Add support for a new model that uses one Linux device per timer with
->> > multiple channels per device. This requires changes to platform data,
->> > add new channel configuration fields.
->> >
->> > Support for the legacy model is kept and will be removed after all
->> > platforms switch to the new model.
->> >
->> > Signed-off-by: Laurent Pinchart
->> > <laurent.pinchart+renesas@ideasonboard.com>
->> > ---
->> >
->> >  drivers/clocksource/sh_cmt.c | 299 +++++++++++++++++++++++++++++---------
->> >  include/linux/sh_timer.h     |   9 ++
->> >  2 files changed, 239 insertions(+), 69 deletions(-)
->> >
->> > diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
->> > index 5280231..8390f0f 100644
->> > --- a/drivers/clocksource/sh_cmt.c
->> > +++ b/drivers/clocksource/sh_cmt.c
->> > @@ -53,7 +53,16 @@ struct sh_cmt_device;
->> >
->> >   * channel registers block. All other versions have a shared start/stop
->> >   register * located in the global space.
->> >   *
->> >
->> > - * Note that CMT0 on r8a73a4, r8a7790 and r8a7791, while implementing
->> > 32-bit + * Channels are indexed from 0 to N-1 in the documentation. The
->> > channel index + * infers the start/stop bit position in the control
->> > register and the channel + * registers block address. Some CMT instances
->> > have a subset of channels + * available, in which case the index in the
->> > documentation doesn't match the + * "real" index as implemented in
->> > hardware. This is for instance the case with + * CMT0 on r8a7740, which
->> > is a 32-bit variant with a single channel numbered 0 + * in the
->> > documentation but using start/stop bit 5 and having its registers + *
->> > block at 0x60.
->> > + *
->> > + * Similarly CMT0 on r8a73a4, r8a7790 and r8a7791, while implementing
->> > 32-bit>
->> >   * channels only, is a 48-bit gen2 CMT with the 48-bit channels
->> >   unavailable.
->> >   */
->> >
->> > @@ -85,11 +94,15 @@ struct sh_cmt_info {
->> >
->> >  struct sh_cmt_channel {
->> >
->> >     struct sh_cmt_device *cmt;
->> >
->> > -   unsigned int index;
->> >
->> > -   void __iomem *base;
->> > +   unsigned int index;     /* Index in the documentation */
->> > +   unsigned int hwidx;     /* Real hardware index */
->> > +
->> > +   void __iomem *iostart;
->> > +   void __iomem *ioctrl;
->> >
->> >     struct irqaction irqaction;
->>
->> While you are at it, can you please get rid of that irqaction and use
->> request_irq() ?
->
-> The driver claims it can't use request_irq() because the function is not
-> available for early platform devices. If the situation has changed I'd gladly
-> get rid of irqaction.
+On Saturday 15 February 2014 02:22:00 Magnus Damm wrote:
+> On Sat, Feb 15, 2014 at 1:12 AM, Laurent Pinchart wrote:
+> > On Saturday 15 February 2014 01:01:30 Magnus Damm wrote:
+> >> On Sat, Feb 15, 2014 at 12:53 AM, Laurent Pinchart wrote:
+> >> > On Friday 14 February 2014 10:58:22 Mark Rutland wrote:
+> >> >> On Fri, Feb 14, 2014 at 01:00:01AM +0000, Laurent Pinchart wrote:
+> >> >> > +Channels Optional Properties:
+> >> >> > +
+> >> >> > +  - clock-source-rating: rating of the timer as a clock source
+> >> >> > device.
+> >> >> > +  - clock-event-rating: rating of the timer as a clock event
+> >> >> > device.
+> >> >> 
+> >> >> This feels like a leak of Linux internals. Why do you need this?
+> >> > 
+> >> > You're right, it is. The clock source and clock event ratings are
+> >> > currently configured through platform data, I'll need to find a way to
+> >> > compute them in the driver instead.
+> >> 
+> >> That would be very good!
+> > 
+> > Any pointer would be appreciated :-) How did you compute the various
+> > ratings used in platform data all over the place ?
+> 
+> Historically we used the rating to select between CMT and TMU. For
+> clock sources I suppose you also have the jiffy rating to consider.
+> And for the SMP parts we have ARM IP for TWD and arch timers that have
+> their ratings too. So you need to check all the timers on a particular
+> system and consider what you want to have operating by default. The
+> ARM IP timers should be preferred if available. For clock sources the
+> rule is probably the higher resolution the better.
+> 
+> >> > There's still one piece of Linux-specific data I need though, as I need
+> >> > to specify for each channel whether to use it as a clock source device,
+> >> > a clock event device, both of them or none. That's configuration
+> >> > information that needs to be provided somehow.
+> >> 
+> >> I think you can decide clock source or clock event assignment based on
+> >> number of channels available. If you have only a single channel then both
+> >> clock event and clock source need to be supported. Otherwise use one
+> >> channel for clock source and the rest for clock events.
+> > 
+> > That won't match the current situation. Look at CMT0 in r8a7790 for
+> > instance. There's two hardware channels available, and we only use the
+> > first one, for clock events only.
+> 
+> You are correct. The reason for that is that the CMT driver today is
+> optimized for combined clock event and clock source operation.
+> 
+> Historically the hardware it initially was written for (sh-mobile on
+> the SH arch) only had a single timer channel so combined operation was
+> required for tickless to work. But since you're asking how to allocate
+> channels then I propose checking numbers of channels available and go
+> from there. With that the r8a7790 support can only get better. =)
+> 
+> >> This is probably out of scope for this DT conversion, but it would be
+> >> neat if you somehow could specify the CPU affinity for a channel to tie a
+> >> clock event to an individual CPU core. This would make a a per-cpu timer
+> >> unless I'm mistaken. But that's more of a software policy than anything
+> >> else.
+> > 
+> > Yes, that's a configuration that needs to be specified somewhere. I don't
+> > know where though.
+> 
+> As long as you have per-channel interrupts described in DT you can
+> probably handle this in a generic way in the driver.
 
-With the risk of stating the obvious, this depends on how early the
-early platform device stuff is being run. The actual location may not
-be the same on SH and ARM for instance.
+But how do we decide whether to use a single timer channel or one channel per 
+CPU ? Will the kernel use one clock event device per CPU automatically ? I 
+have to confess I have no idea how this works.
 
-On ARM we are doing all we can to initialize these devices as late as
-ever possible in the MULTIPLAFORM (DT reference) case. Once we manage
-to remove the legacy ARM case then there is one less user of early
-platform timers.
+-- 
+Regards,
 
-One perhaps reasonable way forward could be to use request_irq() in
-case of DT and leave the legacy platform data case to rely on
-irqaction.
-
-Cheers,
-
-/ magnus
+Laurent Pinchart
