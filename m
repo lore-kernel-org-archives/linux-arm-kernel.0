@@ -1,64 +1,29 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 17 Feb 2014 16:11:13 -0500
-Subject: [PATCH v7 11/18] watchdog: orion: Add per-compatible watchdog
- start implementation
-In-Reply-To: <20140217210822.GC7862@titan.lakedaemon.net>
-References: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1392073237-2554-12-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140217210822.GC7862@titan.lakedaemon.net>
-Message-ID: <20140217211113.GD7862@titan.lakedaemon.net>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 17 Feb 2014 22:19:43 +0100
+Subject: [PATCH 3/4] pinctrl-sunxi: Fix masking when setting irq type
+In-Reply-To: <1392671984-29872-1-git-send-email-hdegoede@redhat.com>
+References: <1392671984-29872-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1392671984-29872-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 04:08:22PM -0500, Jason Cooper wrote:
-> On Mon, Feb 10, 2014 at 08:00:30PM -0300, Ezequiel Garcia wrote:
-> > To handle differences between SoCs this commit adds per-compatible
-> > string start() function for the watchdog kick-off. This is preparation
-> > work and makes no functionality changes to the current driver.
-> > 
-> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> > Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> > Tested-by: Willy Tarreau <w@1wt.eu>
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > ---
-> >  drivers/watchdog/orion_wdt.c | 12 +++++++++++-
-> >  1 file changed, 11 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-> > index b48fd08..3925297 100644
-> > --- a/drivers/watchdog/orion_wdt.c
-> > +++ b/drivers/watchdog/orion_wdt.c
-> > @@ -50,6 +50,7 @@ struct orion_watchdog_data {
-> >  	int rstout_enable_bit;
-> 
-> 
-> >  	int (*clock_init)(struct platform_device *,
-> >  			  struct orion_watchdog *);
-> 
-> this...
-> 
-> > +	int (*start)(struct watchdog_device *);
-> >  };
-> >  
-> >  struct orion_watchdog {
-> ...
-> > @@ -193,6 +202,7 @@ static const struct orion_watchdog_data orion_data = {
-> >  	.wdt_enable_bit = BIT(4),
-> >  	.wdt_counter_offset = 0x24,
-> 
-> 
-> >  	.clock_init = orion_wdt_clock_init,
-> 
-> and this...
-> 
-> > +	.start = orion_start,
-> >  };
-> 
-> cause a failure to apply the patch.  I hand-jammed it (attached), please
-> let me know what is going on here (missed dep?)
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/pinctrl/pinctrl-sunxi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-disregard.  I missed patch 10.  It helps.  :)
-
-thx,
-
-Jason.
+diff --git a/drivers/pinctrl/pinctrl-sunxi.c b/drivers/pinctrl/pinctrl-sunxi.c
+index cc9bd1b..917af0a 100644
+--- a/drivers/pinctrl/pinctrl-sunxi.c
++++ b/drivers/pinctrl/pinctrl-sunxi.c
+@@ -583,7 +583,7 @@ static int sunxi_pinctrl_irq_set_type(struct irq_data *d,
+ 	spin_lock_irqsave(&pctl->lock, flags);
+ 
+ 	regval = readl(pctl->membase + reg);
+-	regval &= ~IRQ_CFG_IRQ_MASK;
++	regval &= ~(IRQ_CFG_IRQ_MASK << index);
+ 	writel(regval | (mode << index), pctl->membase + reg);
+ 
+ 	spin_unlock_irqrestore(&pctl->lock, flags);
+-- 
+1.8.5.3
