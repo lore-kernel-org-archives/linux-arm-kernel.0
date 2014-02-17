@@ -1,77 +1,106 @@
-From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 17 Feb 2014 22:24:39 +0100
-Subject: [PATCH] dt/bindings: update fsl-fec regarding compatible and
- clocks
-In-Reply-To: <1392033008-20752-1-git-send-email-shawn.guo@linaro.org>
-References: <1392033008-20752-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20140217212439.GZ4524@book.gsilab.sittig.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 17 Feb 2014 22:43:41 +0100
+Subject: [PATCH 23/27] clocksource: sh_cmt: Add DT support
+In-Reply-To: <CANqRtoRVCK0jgadwvreMRt1HVVyUmb-CLt5mFEGmvju_VFFbPQ@mail.gmail.com>
+References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <35710038.vGLtzuIoLe@avalon>
+ <CANqRtoRVCK0jgadwvreMRt1HVVyUmb-CLt5mFEGmvju_VFFbPQ@mail.gmail.com>
+Message-ID: <3240866.imZR2oMAtf@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 19:50 +0800, Shawn Guo wrote:
+Hi Magnus,
+
+On Monday 17 February 2014 10:48:55 Magnus Damm wrote:
+> On Mon, Feb 17, 2014 at 10:45 AM, Laurent Pinchart wrote:
+> > On Saturday 15 February 2014 02:22:00 Magnus Damm wrote:
+> >> On Sat, Feb 15, 2014 at 1:12 AM, Laurent Pinchart wrote:
+> >> > On Saturday 15 February 2014 01:01:30 Magnus Damm wrote:
+> >> >> On Sat, Feb 15, 2014 at 12:53 AM, Laurent Pinchart wrote:
+> >> >> > On Friday 14 February 2014 10:58:22 Mark Rutland wrote:
+> >> >> >> On Fri, Feb 14, 2014 at 01:00:01AM +0000, Laurent Pinchart wrote:
+> >> >> >> > +Channels Optional Properties:
+> >> >> >> > +
+> >> >> >> > +  - clock-source-rating: rating of the timer as a clock source
+> >> >> >> > device.
+> >> >> >> > +  - clock-event-rating: rating of the timer as a clock event
+> >> >> >> > device.
+> >> >> >> 
+> >> >> >> This feels like a leak of Linux internals. Why do you need this?
+> >> >> > 
+> >> >> > You're right, it is. The clock source and clock event ratings are
+> >> >> > currently configured through platform data, I'll need to find a way
+> >> >> > to compute them in the driver instead.
+> >> >> 
+> >> >> That would be very good!
+> >> > 
+> >> > Any pointer would be appreciated :-) How did you compute the various
+> >> > ratings used in platform data all over the place ?
+> >> 
+> >> Historically we used the rating to select between CMT and TMU. For
+> >> clock sources I suppose you also have the jiffy rating to consider.
+> >> And for the SMP parts we have ARM IP for TWD and arch timers that have
+> >> their ratings too. So you need to check all the timers on a particular
+> >> system and consider what you want to have operating by default. The
+> >> ARM IP timers should be preferred if available. For clock sources the
+> >> rule is probably the higher resolution the better.
+> >> 
+> >> >> > There's still one piece of Linux-specific data I need though, as I
+> >> >> > need to specify for each channel whether to use it as a clock source
+> >> >> > device, a clock event device, both of them or none. That's
+> >> >> > configuration information that needs to be provided somehow.
+> >> >> 
+> >> >> I think you can decide clock source or clock event assignment based on
+> >> >> number of channels available. If you have only a single channel then
+> >> >> both clock event and clock source need to be supported. Otherwise use
+> >> >> one channel for clock source and the rest for clock events.
+> >> > 
+> >> > That won't match the current situation. Look at CMT0 in r8a7790 for
+> >> > instance. There's two hardware channels available, and we only use the
+> >> > first one, for clock events only.
+> >> 
+> >> You are correct. The reason for that is that the CMT driver today is
+> >> optimized for combined clock event and clock source operation.
+> >> 
+> >> Historically the hardware it initially was written for (sh-mobile on
+> >> the SH arch) only had a single timer channel so combined operation was
+> >> required for tickless to work. But since you're asking how to allocate
+> >> channels then I propose checking numbers of channels available and go
+> >> from there. With that the r8a7790 support can only get better. =)
+> >> 
+> >> >> This is probably out of scope for this DT conversion, but it would be
+> >> >> neat if you somehow could specify the CPU affinity for a channel to
+> >> >> tie a clock event to an individual CPU core. This would make a a per-
+> >> >> cpu timer unless I'm mistaken. But that's more of a software policy
+> >> >> than anything else.
+> >> > 
+> >> > Yes, that's a configuration that needs to be specified somewhere. I
+> >> > don't know where though.
+> >> 
+> >> As long as you have per-channel interrupts described in DT you can
+> >> probably handle this in a generic way in the driver.
+> > 
+> > But how do we decide whether to use a single timer channel or one channel
+> > per CPU ? Will the kernel use one clock event device per CPU
+> > automatically ? I have to confess I have no idea how this works.
 > 
-> Update fsl-fec to explicitly list the supported compatible strings
-> and add missing 'clocks' and 'clock-names' properties.  It does not
-> change anything about how kernel drive works.  Instead, it just reflects
-> how kernel driver works today.
+> I guess that's the tricky bit about timer support, it is a mix of
+> hardware description and software configuration. So it sounds to me
+> that we need some kind of software configuration interface. But it can
+> probably be considered when/if we add such kind of support to the
+> driver. Probably out of scope for now.
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  Documentation/devicetree/bindings/net/fsl-fec.txt |   19 ++++++++++++++++++-
->  1 file changed, 18 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
-> index 845ff84..3ebd395 100644
-> --- a/Documentation/devicetree/bindings/net/fsl-fec.txt
-> +++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
-> @@ -1,9 +1,26 @@
->  * Freescale Fast Ethernet Controller (FEC)
->  
->  Required properties:
-> -- compatible : Should be "fsl,<soc>-fec"
-> +- compatible : Should contain one of the following:
-> +		"fsl,imx25-fec"
-> +		"fsl,imx27-fec"
-> +		"fsl,imx28-fec"
-> +		"fsl,imx6q-fec"
-> +		"fsl,mvf600-fec"
+> Regardless it seems to me that the hardware description in DT doesn't
+> need to care about this.
 
-This appears to miss all the PowerPC based SoCs.  See
-  git grep 'fsl,.*-fec' arch/*/boot/dts
+I'll revisit that later. Per-CPU timers is not a high priority for now, so 
+I'll just return -EAGAIN :-)
 
->  - reg : Address and length of the register set for the device
->  - interrupts : Should contain fec interrupt
-> +- clocks: phandle to the clocks feeding the FEC controller and phy. The
-> +  following two are required:
-> +   - "ipg": the peripheral access clock
-> +   - "ahb": the bus clock for MAC
-> +  The following two are optional:
-> +   - "ptp": the sampling clock for PTP (IEEE 1588).  On SoC like i.MX6Q,
-> +     the clock could come from either the internal clock control module
-> +     or external oscillator via pad depending on board design.
-> +   - "enet_out": the phy reference clock provided by SoC via pad, which
-> +     is available on SoC like i.MX28.
-> +- clock-names: Must contain the clock names described just above
-> +
+Nonetheless, specifying which timer channel to use as a clock source and which 
+channel to use as a clock event device might need to be specified in DT (or 
+somewhere else, but I'm not sure what other options we have here).
 
-Listing 'clocks' under the "required properties" all of a sudden
-invalidates existing device trees, if they don't carry the
-property which before the change was not required, not even
-documented.
-
-The PowerPC based chips probably have differing sets of clocks.
-I'm aware of the MPC512x, where one "per" clock is sufficient,
-and even this spec is optional.  Other machines may not have yet
-been converted to CCF.
-
-Your description needs to get rephrased, it triggers Mark
-Rutland's regular "clocks are not just phandles" reply.  See how
-he suggested quite a few times a better wording.
-
-
-virtually yours
-Gerhard Sittig
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
-Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
+Regards,
+
+Laurent Pinchart
