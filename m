@@ -1,65 +1,72 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 17 Feb 2014 17:55:52 +0000
-Subject: [PATCH v9 4/5] arm64: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <alpine.DEB.2.02.1402171225000.27926@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1401091755390.21510@kaball.uk.xensource.com>
- <1389292336-9292-4-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1402171225000.27926@kaball.uk.xensource.com>
-Message-ID: <20140217175552.GB8361@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 17 Feb 2014 18:57:22 +0100
+Subject: [PATCH] arm64: add workaround for ambiguous C99 stdint.h types
+In-Reply-To: <20140217174247.GA8361@arm.com>
+References: <1390768248-1688-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140217122334.GA19102@arm.com>
+ <CAKv+Gu_=kgP1LS-HN6n+QfHMyi142aNpGR0roqRo2tinYXdxPw@mail.gmail.com>
+ <20140217174247.GA8361@arm.com>
+Message-ID: <CAKv+Gu-RmZ4h=6+h_Fn+NQbDN81FNZHhnVd7Nfspx_LynJ1w6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 12:25:42PM +0000, Stefano Stabellini wrote:
-> On Thu, 9 Jan 2014, Stefano Stabellini wrote:
-> > Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
-> > Necessary duplication of paravirt.h and paravirt.c with ARM.
-> > 
-> > The only paravirt interface supported is pv_time_ops.steal_clock, so no
-> > runtime pvops patching needed.
-> > 
-> > This allows us to make use of steal_account_process_tick for stolen
-> > ticks accounting.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > CC: will.deacon at arm.com
-> > CC: nico at linaro.org
-> > CC: marc.zyngier at arm.com
-> > CC: cov at codeaurora.org
-> > CC: arnd at arndb.de
-> > CC: olof at lixom.net
-> > CC: Catalin.Marinas at arm.com
-> 
-> Catalin, Will, are you happy with this patch for 3.15?
+On 17 February 2014 18:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Feb 17, 2014 at 12:40:18PM +0000, Ard Biesheuvel wrote:
+>> On 17 February 2014 13:23, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Sun, Jan 26, 2014 at 08:30:48PM +0000, Ard Biesheuvel wrote:
+>> >> In a way similar to ARM commit 09096f6a0ee2 ("ARM: 7822/1: add workaround
+>> >> for ambiguous C99 stdint.h types"), this patch redefines the macros that
+>> >> are used in stdint.h so its definitions of uint64_t and int64_t are
+>> >> compatible with those of the kernel.
+>> >>
+>> >> In order to do so, drop types.h from generic-y and create a specific arm64
+>> >> version identical to the generic one with just the #define overrides added.
+>> >
+>> > I tried but still can't get what this patch is about. Do the
+>> > linux/types.h types ever get to user space? We have uapi/linux/types.h
+>> > for this.
+>> >
+>> > Can you give an example of where this is needed? Which source file
+>> > includes both stdint.h and linux/types.h (non-uapi version)?
+>>
+>> It's not about user space, it is mainly about the use of NEON
+>> instrinsics in the kernel.
+>>
+>> If you do the following:
+>>
+>> #Include <linux/types.h>
+>> #include <arm_neon.h>
+>
+> For other intrinsics that we use like __builtin_ctzl(), do we need to
+> explicitly include gcc headers? I don't think we do and I really don't
+> like such arm_neon.h include which brings in other user headers. Don't
+> we have any work around this?
+>
 
-It's pretty small and looks fine to me. However, I would like someone
-with more virtualisation experience than me to ack it (e.g. Marc Z).
+Well, I talked to the toolchain guys at the time and they really
+disliked the idea of coding directly against the __builtins because
+they are not considered a stable interface, especially because the
+interface that /is/ considered stable (arm_neon.h) is supported both
+on ARM and on arm64.
 
-Some nitpicks:
+> My inbox only has some discussion in May last year on the linaro-kernel
+> list without any clear conclusion (it could be that I deleted other
+> emails).
+>
 
-> > +config PARAVIRT
-> > +	bool "Enable paravirtualization code"
-> > +	---help---
-> > +	  This changes the kernel so it can modify itself when it is run
-> > +	  under a hypervisor, potentially improving performance significantly
-> > +	  over full virtualization.
-> > +
-> > +config PARAVIRT_TIME_ACCOUNTING
-> > +	bool "Paravirtual steal time accounting"
-> > +	select PARAVIRT
-> > +	default n
-> > +	---help---
+There was some discussion, indeed, but for ARM, with the conclusion
+being the fix I mentioned in the patch: 09096f6a0ee2 ("ARM: 7822/1:
+add workaround
+for ambiguous C99 stdint.h types"), only in that case, the ambiguity
+is (unsurprisingly) about the 32 bit types, not the 64 bit ones.
 
-For consistency with this file, just use "help" rather than
-"---help---".
+It all comes down to whether you are interested in supporting NEON
+intrinsics (not __builtins, but intrinsics that require a support
+header). If you do, this is probably the easiest way to do so, i.e.,
+merge this patch and document the fact that the NEON intrinsics object
+files need to be built with -ffreestanding (as is the case for ARM).
+Only then can you freely #include <arm_neon.h> in code that also
+(indirectly) includes <linux/types.h>.
 
-> > --- /dev/null
-> > +++ b/arch/arm64/include/asm/paravirt.h
-> > @@ -0,0 +1,20 @@
-> > +#ifndef _ASM_ARM64_PARAVIRT_H
-> > +#define _ASM_ARM64_PARAVIRT_H
-
-__ASM_PARAVIRT_H for consistency.
-
--- 
-Catalin
+Regards,
+Ard.
