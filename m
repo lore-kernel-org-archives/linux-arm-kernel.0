@@ -1,38 +1,123 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 17 Feb 2014 22:07:50 +0100
-Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
-In-Reply-To: <20140217182312.GV7862@titan.lakedaemon.net>
-References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
- <201402121251.06280.arnd@arndb.de>
- <20140217155419.682F7C401D4@trevor.secretlab.ca>
- <1418981.0py7JxXCp8@wuerfel>
- <20140217182312.GV7862@titan.lakedaemon.net>
-Message-ID: <CAMuHMdW7S=o4oHVsNtYo0i_giB5cgWhygo-GgSaA1Kur6m3vng@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 17 Feb 2014 16:08:22 -0500
+Subject: [PATCH v7 11/18] watchdog: orion: Add per-compatible watchdog
+ start implementation
+In-Reply-To: <1392073237-2554-12-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1392073237-2554-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1392073237-2554-12-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140217210822.GC7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 7:23 PM, Jason Cooper <jason@lakedaemon.net> wrote:
->> Could we use a faster hash function that scans the entire device tree and
->> then just feed the output of that into add_device_randomness? We probably
->> can't expect that there is a lot of entropy in the DT blob, so the
->> result wouldn't be all that different in terms of quality of the random
->> seed.
->
-> I think it would be easier to identify the few attributes that differ
-> from board to board (mac address, serial number, etc), and differ from
-> boot to boot (random-seed, timestamp) and just extract and feed those
-> in.
+On Mon, Feb 10, 2014 at 08:00:30PM -0300, Ezequiel Garcia wrote:
+> To handle differences between SoCs this commit adds per-compatible
+> string start() function for the watchdog kick-off. This is preparation
+> work and makes no functionality changes to the current driver.
+> 
+> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Tested-by: Willy Tarreau <w@1wt.eu>
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>  drivers/watchdog/orion_wdt.c | 12 +++++++++++-
+>  1 file changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+> index b48fd08..3925297 100644
+> --- a/drivers/watchdog/orion_wdt.c
+> +++ b/drivers/watchdog/orion_wdt.c
+> @@ -50,6 +50,7 @@ struct orion_watchdog_data {
+>  	int rstout_enable_bit;
 
-Isn't identifying those (mostly) a manual process?
-Calculating a fast hash is fully automatic.
 
-Gr{oetje,eeting}s,
+>  	int (*clock_init)(struct platform_device *,
+>  			  struct orion_watchdog *);
 
-                        Geert
+this...
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> +	int (*start)(struct watchdog_device *);
+>  };
+>  
+>  struct orion_watchdog {
+...
+> @@ -193,6 +202,7 @@ static const struct orion_watchdog_data orion_data = {
+>  	.wdt_enable_bit = BIT(4),
+>  	.wdt_counter_offset = 0x24,
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+
+>  	.clock_init = orion_wdt_clock_init,
+
+and this...
+
+> +	.start = orion_start,
+>  };
+
+cause a failure to apply the patch.  I hand-jammed it (attached), please
+let me know what is going on here (missed dep?)
+
+thx,
+
+Jason.
+
+-----------8<-----------------
+commit 14181fe244605b53829ec87f9f6af85d5ec2f8ce
+Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Date:   Mon Feb 10 20:00:30 2014 -0300
+
+    watchdog: orion: Add per-compatible watchdog start implementation
+    
+    To handle differences between SoCs this commit adds per-compatible
+    string start() function for the watchdog kick-off. This is preparation
+    work and makes no functionality changes to the current driver.
+    
+    Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+    Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+    Tested-by: Willy Tarreau <w@1wt.eu>
+    Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+    Acked-by: Wim Van Sebroeck <wim@iguana.be>
+    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index b220e34285d1..573859cff72f 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -46,6 +46,7 @@ struct orion_watchdog_data {
+ 	int wdt_counter_offset;
+ 	int wdt_enable_bit;
+ 	int rstout_enable_bit;
++	int (*start)(struct watchdog_device *);
+ };
+ 
+ struct orion_watchdog {
+@@ -66,7 +67,7 @@ static int orion_wdt_ping(struct watchdog_device *wdt_dev)
+ 	return 0;
+ }
+ 
+-static int orion_wdt_start(struct watchdog_device *wdt_dev)
++static int orion_start(struct watchdog_device *wdt_dev)
+ {
+ 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+ 
+@@ -85,6 +86,14 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
+ 	return 0;
+ }
+ 
++static int orion_wdt_start(struct watchdog_device *wdt_dev)
++{
++	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
++
++	/* There are some per-SoC quirks to handle */
++	return dev->data->start(wdt_dev);
++}
++
+ static int orion_wdt_stop(struct watchdog_device *wdt_dev)
+ {
+ 	struct orion_watchdog *dev = watchdog_get_drvdata(wdt_dev);
+@@ -172,6 +181,7 @@ static const struct orion_watchdog_data orion_data = {
+ 	.rstout_enable_bit = BIT(1),
+ 	.wdt_enable_bit = BIT(4),
+ 	.wdt_counter_offset = 0x24,
++	.start = orion_start,
+ };
+ 
+ static const struct of_device_id orion_wdt_of_match_table[] = {
