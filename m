@@ -1,55 +1,34 @@
-From: phdm@macq.eu (Philippe De Muyter)
-Date: Mon, 17 Feb 2014 09:52:21 +0100
-Subject: [PATCH v4] bus: imx-weim: support CS GPR configuration
-In-Reply-To: <20140216143114.GH2946@S2101-09.ap.freescale.net>
-References: <1392559381-30842-1-git-send-email-shawn.guo@linaro.org>
- <1392560564.725313659@f356.i.mail.ru>
- <20140216143114.GH2946@S2101-09.ap.freescale.net>
-Message-ID: <20140217085221.GB23095@frolo.macqel>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 17 Feb 2014 09:52:27 +0100
+Subject: [PATCH] ARM: shmobile: Remove __init from
+ rcar_gen2_read_mode_pins()
+In-Reply-To: <20140217063510.21892.52120.sendpatchset@w520>
+References: <20140217063510.21892.52120.sendpatchset@w520>
+Message-ID: <CAMuHMdUqTQnngm9kY5oz-n2s8=qtS5XsTXF8rvNS1PFRJvK7Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 16, 2014 at 10:31:16PM +0800, Shawn Guo wrote:
-> On Sun, Feb 16, 2014 at 06:22:44PM +0400, Alexander Shiyan wrote:
-> > ???????????, 16 ??????? 2014, 22:03 +08:00 ?? Shawn Guo <shawn.guo@linaro.org>:
-> > > For imx50-weim and imx6q-weim type of devices, there might a WEIM CS
-> > > space configuration register in General Purpose Register controller,
-> > > e.g. IOMUXC_GPR1 on i.MX6Q.
-> > ...
-> > > +static int __init imx_weim_gpr_setup(struct platform_device *pdev)
-> > > +{
-> > > +	struct device_node *np = pdev->dev.of_node;
-> > > +	struct property *prop;
-> > > +	const __be32 *p;
-> > > +	struct regmap *gpr;
-> > > +	u32 gprvals[4] = {
-> > > +		05,	/* CS0(128M) CS1(0M)  CS2(0M)  CS3(0M) */
-> > > +		033,	/* CS0(64M)  CS1(64M) CS2(0M)  CS3(0M) */
-> > > +		0113,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
-> > > +		01111,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M) */
-> > > +	};
-> > > +	u32 gprval = 0;
-> > > +	u32 val;
-> > > +	int cs = 0;
-> > > +	int i = 0;
-> > > +
-> > > +	gpr = syscon_regmap_lookup_by_phandle(np, "fsl,weim-cs-gpr");
-> > > +	if (IS_ERR(gpr)) {
-> > > +		dev_dbg(&pdev->dev, "failed to find weim-cs-gpr\n");
-> > > +		return 0;
-> > 
-> > Only one comment:
-> > You do not use these error codes in the probe(),
-> > so let's declare this function as void.
-> 
-> Oh, yes.  I should check return of imx_weim_gpr_setup() in probe().
-> Will add in the next version.
+On Mon, Feb 17, 2014 at 7:35 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> From: Magnus Damm <damm@opensource.se>
+>
+> Remove __init from rcar_gen2_read_mode_pins() to allow
+> it to be used after boot. For instance the R-Car Gen2
+> MD21 check is needed even in the case of CPU Hotplug.
 
-Well, as all the error cases are already covered by error messages, there is
-no added value in testing that again in probe().  As Alexander wrote, you can
-declare imx_weim_gpr_setup() as 'void'.
+This is a prerequisite for "[PATCH] ARM: shmobile: Check MD21 at SMP
+boot in case of APMU"
 
-Philippe
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
--- 
-Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
