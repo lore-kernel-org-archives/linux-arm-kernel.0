@@ -1,20 +1,34 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 17 Feb 2014 12:23:53 +0900
-Subject: [PATCH 03/03] ARM: shmobile: Get rid of legacy KZM9D defconfig
-In-Reply-To: <20140213082628.30630.3186.sendpatchset@w520>
-References: <20140213082558.30630.93034.sendpatchset@w520>
- <20140213082628.30630.3186.sendpatchset@w520>
-Message-ID: <20140217032349.GI7772@verge.net.au>
+Date: Mon, 17 Feb 2014 12:24:44 +0900
+Subject: [PATCH v4] ARM: shmobile: Add defconfig for shmobile mulitplatfom
+In-Reply-To: <CANqRtoT5C432uQF6yG76PeMopF7HfqQDSyJ5SMF_77RsyC9DxA@mail.gmail.com>
+References: <1392354403-30260-1-git-send-email-horms+renesas@verge.net.au>
+ <CANqRtoT5C432uQF6yG76PeMopF7HfqQDSyJ5SMF_77RsyC9DxA@mail.gmail.com>
+Message-ID: <20140217032441.GJ7772@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 05:26:28PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+On Fri, Feb 14, 2014 at 06:07:16PM +0900, Magnus Damm wrote:
+> On Fri, Feb 14, 2014 at 2:06 PM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > This is intended to be a base for a defconfig to cover all
+> > shmobile multiplatform boards. It currently includes configuration
+> > for the following boards:
+> >
+> > * KZM9D
+> > * Lager
+> > * Koelsch
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> > ---
+> > v4
+> > * Account for removal of CONFIG_KZM9D
+> >   - Do not select CONFIG_MACH_KZM9D
+> >   - Select CONFIG_SMSC_PHY and CONFIG_REGULATOR_FIXED_VOLTAGE
 > 
-> Get rid of the kzm9d_defconfig. The KZM9D is now supported
-> as DT only in case of EMEV2 is selected in the kernel
-> configuration.
+> Thanks Simon!
 > 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+> Acked-by: Magnus Damm <damm@opensource.se>
 
-Thanks, I have queued this up.
+Thanks, I have queued this up after correcting my typo in the subject.
