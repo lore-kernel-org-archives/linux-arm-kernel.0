@@ -1,32 +1,44 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 17 Feb 2014 15:13:34 -0500
-Subject: irqchip: irq-dove: problem with the PMU interrupt controller.
-In-Reply-To: <20140209082247.GD29203@lunn.ch>
-References: <20140209091016.26a59d44@armhf>
- <20140209082247.GD29203@lunn.ch>
-Message-ID: <20140217201334.GZ7862@titan.lakedaemon.net>
+Date: Mon, 17 Feb 2014 15:27:09 -0500
+Subject: [PATCH 0/2] irqchip: Armada 370/XP MPIC as a slave controller
+In-Reply-To: <1392062402-27357-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1392062402-27357-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20140217202709.GA7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 09, 2014 at 09:22:47AM +0100, Andrew Lunn wrote:
-> On Sun, Feb 09, 2014 at 09:10:16AM +0100, Jean-Francois Moine wrote:
-> > Hi Andrew,
-> > 
-> > I have a WARN_ON at system startup time of the Cubox (Marvell Dove).
-> > Sorry for I don't know enough about the IRQ subsystem to fix it.
+On Mon, Feb 10, 2014 at 05:00:00PM -0300, Ezequiel Garcia wrote:
+> The newly introduced Armada 375 and Armada 38x Marvell SoCs are based on
+> Cortex-A9 CPU cores and use the ARM GIC as their main interrupt controller.
 > 
-> Hi Jean-Francois
+> However, for various purposes (wake-up from suspend, MSI interrupts),
+> the SoCs have a separate MPIC interrupt controller, acting as a slave
+> to the GIC. This MPIC was already used as the primary controller on
+> previous Marvell SoCs, so this commit extends the existing driver to
+> allow the MPIC to be used as a GIC slave.
 > 
-> The DT node made it into -rc1, but the driver itself was forgotten by
-> the IRQ maintainer. It will hopefully appear in -rc2.
+> This series consists in two patches: the first one adds a helper function
+> to handle MSI interrupts. The second patch implements a chained handler, which
+> uses the previously introduced helper.
+> 
+> These patches apply cleanly on v3.14-rc1 plus:
+> 
+>   36802fd irqchip: armada-370-xp: fix MSI race condition
+>   e1603bb irqchip: armada-370-xp: fix IPI race condition
+> 
+> Or simply on v3.14-rc2.
+> 
+> Ezequiel Garcia (2):
+>   irqchip: armada-370-xp: Add helper for the MSI IRQ handling
+>   irqchip: armada-370-xp: Setup a chained handler for the MPIC
+> 
+>  .../devicetree/bindings/arm/armada-370-xp-mpic.txt |  8 +-
+>  drivers/irqchip/irq-armada-370-xp.c                | 96 ++++++++++++++++------
+>  2 files changed, 76 insertions(+), 28 deletions(-)
 
-Unfortunately, this didn't happen.  I've posted a patch to revert adding
-the DT node for v3.14.  It'll be re-added in conjunction with the driver
-code.  Hopefully for v3.15.
-
-  http://www.spinics.net/lists/arm-kernel/msg308413.html
-
-Please test and let me know if that fixes the WARN_ON.
+I've tentatively applied these to mvebu/irqchip with the dependencies on
+v3.14-rc1 + tags/mvebu-irqchip-fixes-3.13 to get them some coverage in
+-next.
 
 thx,
 
