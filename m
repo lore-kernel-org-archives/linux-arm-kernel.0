@@ -1,66 +1,91 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 17 Feb 2014 15:23:24 +0100
-Subject: [PATCH v4 06/13] ARM: mvebu: add workaround for data abort issue on
- Armada 375
+Date: Mon, 17 Feb 2014 15:23:27 +0100
+Subject: [PATCH v4 09/13] ARM: mvebu: add initial support for the Armada
+ 380/385 SOCs
 In-Reply-To: <1392647011-30117-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1392647011-30117-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1392647011-30117-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1392647011-30117-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Early versions of Armada 375 SoC have a bug where the BootROM leaves
-an external data abort pending. The kernel is hit by this data abort
-as soon as it enters userspace, because it unmasks the data aborts at
-this moment. We register a custom abort handler below to ignore the
-first data abort to work around this problem.
+This commit adds the basic support for the Armada 380 and Armada 385
+SOCs. These SoCs share most of their IP with the Armada 370/XP
+SoCs. The main difference is the use of a Cortex A9 CPU instead of the
+PJ4B CPU. The Armada 380 is a single core Cortex-A9, while the Armada
+385 is a dual-core Cortex-A9.
+
+The support is introduced in board-v7.c, together with Armada 370/XP,
+but a separate DT structure is added, because Armada 38x will need a
+different set of SMP operations when the SMP support is introduced.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/board-v7.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ Documentation/devicetree/bindings/arm/armada-38x.txt | 10 ++++++++++
+ arch/arm/mach-mvebu/Kconfig                          | 14 ++++++++++++++
+ arch/arm/mach-mvebu/board-v7.c                       | 12 ++++++++++++
+ 3 files changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-38x.txt
 
+diff --git a/Documentation/devicetree/bindings/arm/armada-38x.txt b/Documentation/devicetree/bindings/arm/armada-38x.txt
+new file mode 100644
+index 0000000..11f2330
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/armada-38x.txt
+@@ -0,0 +1,10 @@
++Marvell Armada 38x Platforms Device Tree Bindings
++-------------------------------------------------
++
++Boards with a SoC of the Marvell Armada 38x family shall have the
++following property:
++
++Required root node property:
++
++ - compatible: must contain either "marvell,armada380" or
++   "marvell,armada385" depending on the variant of the SoC being used.
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 3b74a84..884b275a 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -51,6 +51,20 @@ config MACH_ARMADA_375
+ 	  Say 'Y' here if you want your kernel to support boards based
+ 	  on the Marvell Armada 375 SoC with device tree.
+ 
++config MACH_ARMADA_38X
++	bool "Marvell Armada 380/385 boards"
++	select ARM_ERRATA_720789
++	select ARM_ERRATA_753970
++	select ARM_GIC
++	select ARMADA_38X_CLK
++	select CPU_V7
++	select MACH_MVEBU_V7
++	select NEON
++	select PINCTRL_ARMADA_38X
++	help
++	  Say 'Y' here if you want your kernel to support boards based
++	  on the Marvell Armada 380/385 SoC with device tree.
++
+ config MACH_ARMADA_XP
+ 	bool "Marvell Armada XP boards"
+ 	select ARMADA_XP_CLK
 diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-index f60ed1b..3d4feae 100644
+index 3d4feae..95ca216 100644
 --- a/arch/arm/mach-mvebu/board-v7.c
 +++ b/arch/arm/mach-mvebu/board-v7.c
-@@ -36,6 +36,27 @@ static void __init mvebu_map_io(void)
- 	debug_ll_io_init();
- }
- 
-+/*
-+ * Early versions of Armada 375 SoC have a bug where the BootROM
-+ * leaves an external data abort pending. The kernel is hit by this
-+ * data abort as soon as it enters userspace, because it unmasks the
-+ * data aborts at this moment. We register a custom abort handler
-+ * below to ignore the first data abort to work around this
-+ * problem.
-+ */
-+static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
-+					struct pt_regs *regs)
-+{
-+	static int ignore_first;
+@@ -131,3 +131,15 @@ DT_MACHINE_START(ARMADA_375_DT, "Marvell Armada 375 (Device Tree)")
+ 	.restart	= mvebu_restart,
+ 	.dt_compat	= armada_375_dt_compat,
+ MACHINE_END
 +
-+	if (!ignore_first && fsr == 0x1406) {
-+		ignore_first = 1;
-+		return 0;
-+	}
++static const char * const armada_38x_dt_compat[] = {
++	"marvell,armada380",
++	"marvell,armada385",
++	NULL,
++};
 +
-+	return 1;
-+}
-+
- static void __init mvebu_timer_and_clk_init(void)
- {
- 	of_clk_init(NULL);
-@@ -45,6 +66,10 @@ static void __init mvebu_timer_and_clk_init(void)
- #ifdef CONFIG_CACHE_L2X0
- 	l2x0_of_init(0, ~0UL);
- #endif
-+
-+	if (of_machine_is_compatible("marvell,armada375"))
-+		hook_fault_code(16 + 6, armada_375_external_abort_wa, SIGBUS, 0,
-+				"imprecise external abort");
- }
- 
- static void __init i2c_quirk(void)
++DT_MACHINE_START(ARMADA_38X_DT, "Marvell Armada 380/385 (Device Tree)")
++	.init_time	= mvebu_timer_and_clk_init,
++	.restart	= mvebu_restart,
++	.dt_compat	= armada_38x_dt_compat,
++MACHINE_END
 -- 
 1.8.3.2
