@@ -1,41 +1,36 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 17 Feb 2014 11:23:36 +0100
-Subject: [PATCH v3 01/13] ARM: mvebu: rename armada-370-xp.c to
- armada-mvebu.c
-In-Reply-To: <20140217024951.GI7862@titan.lakedaemon.net>
-References: <1392289475-8902-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392289475-8902-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <2036226.egxWL7qC66@wuerfel> <20140213125526.3af08c54@skate>
- <20140213130745.GU27395@titan.lakedaemon.net>
- <20140213141355.00e8f2fd@skate> <52FCC771.5090009@gmail.com>
- <20140213142924.4520ccc9@skate>
- <20140217024951.GI7862@titan.lakedaemon.net>
-Message-ID: <20140217112336.5ecbb54f@skate>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 17 Feb 2014 11:25:12 +0100
+Subject: [PATCH 2/5] ARM: shmobile: r8a7791: add i2c master nodes to dtsi
+In-Reply-To: <CANqRtoRumYg15MnZJyow67h=SGSt079GAuY+e5S9KwK-Z0wc9A@mail.gmail.com>
+References: <1392543658-5030-3-git-send-email-wsa@the-dreams.de>
+ <20140217075410.GA2633@katana>
+ <CANqRtoSDxQfSw5PJB6-UcL-UuMySBkoCqfC+1H=o-EBA18ouLQ@mail.gmail.com>
+ <CAMuHMdW8MLknykkfu9XS5CDpuJcRNyPz+GV5bhUNGndxFacnQw@mail.gmail.com>
+ <20140217091900.GD2633@katana>
+ <CAMuHMdV5KNBcFh5E0bKaLNboZUbuXmMkzdYozqWLvro7Kwjhjw@mail.gmail.com>
+ <20140217093126.GE2633@katana>
+ <CANqRtoRgMaAzzvD9OK+=_J2Or5HZHzg4RUb899-bXjM7LKHSyw@mail.gmail.com>
+ <20140217100807.GA4424@katana>
+ <CANqRtoRumYg15MnZJyow67h=SGSt079GAuY+e5S9KwK-Z0wc9A@mail.gmail.com>
+Message-ID: <20140217102512.GA4666@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
 
-On Sun, 16 Feb 2014 21:49:51 -0500, Jason Cooper wrote:
-
-> > Yes, I agree. I'm fully convinced by the idea of merging the v7 support
-> > together, but we need to proceed step by step to avoid having horrible
-> > merge issues during the 3.15 cycle.
+> >> realize that there is no shortcut for adding the compatible string to
+> >> the driver. It has to be done sooner or later anyway.
+> >
+> > OK, can be seen this way. As said before, I'll resend.
 > 
-> Yeah, I don't see how anything can go wrong at all.  :)
-> 
-> btw - I'll hold off on pulling this for a new revision.  Looks like the
-> only change left in the file name.
+> Thanks! I'd be happy to discuss this more over a beverage in the not
+> so distant future! =)
 
-I'll be posting a v4 today. It will contain this rename, and also a few
-more DT nodes for Armada 375 that enable NAND support, since we have
-sent the corediv clock patches, which were necessary for NAND support
-to work.
+Yay! :)
 
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140217/82eb0498/attachment.sig>
