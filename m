@@ -1,94 +1,90 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Mon, 17 Feb 2014 16:53:46 +0000
-Subject: [PATCH v2 1/5] drivers: of: add initialization code for reserved
- memory
-In-Reply-To: <20140213194840.GO841@joshc.qualcomm.com>
-References: <1391515773-6112-2-git-send-email-m.szyprowski@samsung.com> <
- 20140205110538.99E47C40A89@trevor.secretlab.ca> <52FA0D6E.9090304@samsung.
- com> <20140211121316.24032C40C4D@trevor.secretlab.ca> <52FA33E2.4050004@
- samsung.com> <20140211190104.7E6C5C4140E@trevor.secretlab.ca> <1392148971.
- 3835.15.camel@pasglop> <52FA8245.5050707@gmail.com> <20140211201933.GI841@
- joshc.qualcomm.com> <52FA87B8.8040203@gmail.com> <20140213194840.GO841@
- joshc.qualcomm.com>
-Message-ID: <20140217165346.4C5B3C403B4@trevor.secretlab.ca>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Feb 2014 17:35:22 +0000
+Subject: [PATCH] arm64: make a single hook to syscall_trace() for all
+ syscall features
+In-Reply-To: <1391767651-5296-1-git-send-email-takahiro.akashi@linaro.org>
+References: <52F199D3.2060409@linaro.org>
+ <1391767651-5296-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140217173522.GD26590@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Feb 2014 13:48:40 -0600, Josh Cartwright <joshc@codeaurora.org> wrote:
-> On Tue, Feb 11, 2014 at 09:27:36PM +0100, Tomasz Figa wrote:
-> > On 11.02.2014 21:19, Josh Cartwright wrote:
-> > >On Tue, Feb 11, 2014 at 09:04:21PM +0100, Tomasz Figa wrote:
-> > > >On 11.02.2014 21:02, Benjamin Herrenschmidt wrote:
-> > > > >On Tue, 2014-02-11 at 19:01 +0000, Grant Likely wrote:
-> > > > > > > except that the former IMHO better suits the definition of memory
-> > > > > > > region, which I see as a single contiguous range of memory and can be
-> > > > > > > simplified to have a single reg entry per region.
-> > > > > >
-> > > > > > My point is rather if multiple reg tuples are found in a reserved memory
-> > > > > > node, the kernel must respect them and reserve the memory. I'm not
-> > > > > > arguing about whether or not that makes for a good binding.
-> > > > >
-> > > > > agreed.
-> > > >
-> > > > My point is why, if the binding defines that just a single tuple should be
-> > > > provided.
-> > >
-> > > FWIW, the usecase I had mentioned in reply to Grant in the patch 5/5
-> > > thread [1] could make use of this.  The shared memory region is split
-> > > into a main chunk and several "auxiliary" chunk, but collectively these
-> > > regions all share the same heap state.
-> > >
-> > >   Josh
-> > >
-> > > 1: http://lkml.kernel.org/r/20140205192502.GO20228 at joshc.qualcomm.com
-> >
-> > The use case seems fine, but I believe it could be properly represented in
-> > device tree using multiple single-reg regions as well, unless the consumer
-> > can request a block of memory that crosses boundary of two sub-regions
-> > specified by reg entries of single region.
+On Fri, Feb 07, 2014 at 10:07:31AM +0000, AKASHI Takahiro wrote:
+> Currently syscall_trace() is called only for ptrace.
+> With additional TIF_xx flags introduced, it is now called in all the cases
+> of audit, ftrace and seccomp in addition to ptrace.
+> Those features will be implemented later, but it's safe to include them
+> now because they can not be turned on anyway.
 > 
-> I could probably make a only-one-reg-entry policy work for me, but it
-> makes things a bit more awkward.  I'd lose the ability to describe
-> "this set of regions need to be logically handled together" directly in
-> the reserved memory node, and would need to push it up a layer.
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/include/asm/thread_info.h |   13 +++++++++++++
+>  arch/arm64/kernel/entry.S            |    5 +++--
+>  arch/arm64/kernel/ptrace.c           |   11 +++++------
+>  3 files changed, 21 insertions(+), 8 deletions(-)
 > 
-> 	reserved-memory {
-> 		smem: smem {
-> 			reg = <...>;
-> 		};
-> 		aux1: auxiliary1 {
-> 			reg = <...>;
-> 		};
-> 		aux2: auxiliary2 {
-> 			reg = <...>;
-> 		};
-> 		...
-> 	};
+> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> index 720e70b..c3df797 100644
+> --- a/arch/arm64/include/asm/thread_info.h
+> +++ b/arch/arm64/include/asm/thread_info.h
 
-If the regions are used for different purposes, it makes sense I think
-to have a separate node for each. Multiple tuples would make more sense
-for something like valid DMA regions for a broken device that can only
-DMA into a few windows; you could have one tuple per window within a
-single node.
+[...]
 
-It would be possible to collect multiple associated nodes under one
-parent node which in turn has reserved-memory for its parent:
+> +#define _TIF_WORK_SYSCALL	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
+> +				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP)
 
-	reserved-memory {
-		ranges;
-		reserved-group {
-			ranges;
-			smem: smem {
-				reg = <...>;
-			};
-			aux1: auxiliary1 {
-				reg = <...>;
-			};
-			aux2: auxiliary2 {
-				reg = <...>;
-			};
-		};
-		...
-	};
+This is called _TIF_SYSCALL_WORK on arch/arm/, any reason not to follow the
+naming convention here?
 
-g.
+>  #endif /* __KERNEL__ */
+>  #endif /* __ASM_THREAD_INFO_H */
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 39ac630..c94b2ab 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -631,8 +631,9 @@ el0_svc_naked:					// compat entry point
+>  	enable_irq
+>  
+>  	get_thread_info tsk
+> -	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall tracing
+> -	tbnz	x16, #TIF_SYSCALL_TRACE, __sys_trace // are we tracing syscalls?
+> +	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall hooks
+> +	tst	x16, #_TIF_WORK_SYSCALL
+> +	b.ne	__sys_trace
+>  	adr	lr, ret_fast_syscall		// return address
+>  	cmp     scno, sc_nr                     // check upper syscall limit
+>  	b.hs	ni_sys
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index 6a8928b..64ce39f 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -1062,9 +1062,6 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+>  {
+>  	unsigned long saved_reg;
+>  
+> -	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+> -		return regs->syscallno;
+
+This doesn't look right for things like audit (where we don't want to report
+the syscall if only _TIF_SYSCALL_AUDIT is set, for example).
+
+>  	if (is_compat_task()) {
+>  		/* AArch32 uses ip (r12) for scratch */
+>  		saved_reg = regs->regs[12];
+> @@ -1078,10 +1075,12 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+>  		regs->regs[7] = dir;
+>  	}
+>  
+> -	if (dir)
+> +	if (dir) {
+>  		tracehook_report_syscall_exit(regs, 0);
+> -	else if (tracehook_report_syscall_entry(regs))
+> -		regs->syscallno = ~0UL;
+> +	} else {
+> +		if (tracehook_report_syscall_entry(regs))
+> +			regs->syscallno = ~0UL;
+> +	}
+
+This hunk doesn't do anything.
+
+Will
