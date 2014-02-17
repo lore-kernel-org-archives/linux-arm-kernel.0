@@ -1,47 +1,32 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 17 Feb 2014 12:48:00 -0300
-Subject: [PATCH 0/2] irqchip: Armada 370/XP MPIC as a slave controller
-In-Reply-To: <1392062402-27357-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1392062402-27357-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140217154759.GE2765@localhost>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Mon, 17 Feb 2014 15:54:19 +0000
+Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
+In-Reply-To: <20140212182000.GJ5554@obsidianresearch.com>
+References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org> <
+ 201402121251.06280.arnd@arndb.de> <20140212174554.GM27395@titan.lakedaemon.
+ net> <20140212182000.GJ5554@obsidianresearch.com>
+Message-ID: <20140217155419.682F7C401D4@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas:
+On Wed, 12 Feb 2014 11:20:00 -0700, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
+> On Wed, Feb 12, 2014 at 12:45:54PM -0500, Jason Cooper wrote:
+> 
+> > The bootloader would then load this file into ram, and pass the
+> > address/size to the kernel either via dt, or commandline.  kaslr (run in
+> > the decompressor) would consume some of this randomness, and then
+> > random.c would consume the rest in a non-crediting initialization.
+> 
+> Sure is a neat idea, but I think in general it would probably be smart
+> to include the entire FDT blob in the early random pool, that way you
+> get MACs and other machine unique data too.
 
-On Mon, Feb 10, 2014 at 05:00:00PM -0300, Ezequiel Garcia wrote:
-> The newly introduced Armada 375 and Armada 38x Marvell SoCs are based on
-> Cortex-A9 CPU cores and use the ARM GIC as their main interrupt controller.
-> 
-> However, for various purposes (wake-up from suspend, MSI interrupts),
-> the SoCs have a separate MPIC interrupt controller, acting as a slave
-> to the GIC. This MPIC was already used as the primary controller on
-> previous Marvell SoCs, so this commit extends the existing driver to
-> allow the MPIC to be used as a GIC slave.
-> 
-> This series consists in two patches: the first one adds a helper function
-> to handle MSI interrupts. The second patch implements a chained handler, which
-> uses the previously introduced helper.
-> 
-> These patches apply cleanly on v3.14-rc1 plus:
-> 
->   36802fd irqchip: armada-370-xp: fix MSI race condition
->   e1603bb irqchip: armada-370-xp: fix IPI race condition
-> 
-> Or simply on v3.14-rc2.
-> 
-> Ezequiel Garcia (2):
->   irqchip: armada-370-xp: Add helper for the MSI IRQ handling
->   irqchip: armada-370-xp: Setup a chained handler for the MPIC
-> 
->  .../devicetree/bindings/arm/armada-370-xp-mpic.txt |  8 +-
->  drivers/irqchip/irq-armada-370-xp.c                | 96 ++++++++++++++++------
->  2 files changed, 76 insertions(+), 28 deletions(-)
-> 
+I applied a patch that did exactly that (109b623629), and then reverted
+it (b920ecc82) shortly thereafter because add_device_randomness() is
+a rather slow function and FDTs can get large. I'd like to see someone
+do a reasonable analysis on the cost of using an FDT for randomness
+before I reapply a patch doing something similar. An awful lot of the
+FDT data is not very random, but there are certainly portions of it that
+are appropriate for the random pool.
 
-Any comments on this?
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+g.
