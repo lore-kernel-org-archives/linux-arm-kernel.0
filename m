@@ -1,160 +1,55 @@
 From: joshc@codeaurora.org (Josh Cartwright)
-Date: Mon, 17 Feb 2014 16:31:53 -0600
-Subject: [PATCH v4 1/4] Power: Reset: Generalize qnap-poweroff to with on
- Synology devices.
-In-Reply-To: <1392673537-17308-2-git-send-email-klightspeed@killerwolves.net>
+Date: Mon, 17 Feb 2014 16:34:13 -0600
+Subject: [PATCH v4 2/4] DT: Vendor prefixes: Add ricoh, ssi and synology
+In-Reply-To: <1392673537-17308-3-git-send-email-klightspeed@killerwolves.net>
 References: <1392673537-17308-1-git-send-email-klightspeed@killerwolves.net>
- <1392673537-17308-2-git-send-email-klightspeed@killerwolves.net>
-Message-ID: <20140217223153.GA31116@joshc.qualcomm.com>
+ <1392673537-17308-3-git-send-email-klightspeed@killerwolves.net>
+Message-ID: <20140217223413.GB31116@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello-
-
-Few nits below.
-
-On Tue, Feb 18, 2014 at 07:45:34AM +1000, klightspeed at killerwolves.net wrote:
+On Tue, Feb 18, 2014 at 07:45:35AM +1000, klightspeed at killerwolves.net wrote:
 > From: Andrew Lunn <andrew@lunn.ch>
 > 
-> The Synology NAS devices use a very similar mechanism to QNAP NAS
-> devices to power off. Both send a single charactor command to a PIC,
-> over the second serial port. However the baud rate and the command
-> differ. Generalize the driver to support this.
+> The following patches make use of vendor names ricoh, ssi and
+> synology.  Add them to the vendor prefix list.
 > 
 > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > Acked-by: Jason Cooper <jason@lakedaemon.net>
-> Cc: Anton Vorontsov <anton@enomsg.org>
-> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> Cc: David Woodhouse <dwmw2@infradead.org>
 > ---
->  .../bindings/power_supply/qnap-poweroff.txt        |  5 ++-
->  drivers/power/reset/qnap-poweroff.c                | 46 +++++++++++++++++-----
->  2 files changed, 40 insertions(+), 11 deletions(-)
+> v2:
+> Use stock ticker for Ricoh as vendor name
+> s/Richoh/Ricoh/
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt b/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
-> index 0347d83..af25e77 100644
-> --- a/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
-> +++ b/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
-> @@ -6,8 +6,11 @@ Orion5x SoCs. Sending the character 'A', at 19200 baud, tells the
->  microcontroller to turn the power off. This driver adds a handler to
->  pm_power_off which is called to turn the power off.
->  
-> +Synology NAS devices use a similar scheme, but a different baud rate,
-> +9600, and a different character, '1'.
-> +
->  Required Properties:
-> -- compatible: Should be "qnap,power-off"
-> +- compatible: Should be "qnap,power-off" or "synology,power-off"
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 40ce2df..8427681 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -72,6 +72,7 @@ ralink	Mediatek/Ralink Technology Corp.
+>  ramtron	Ramtron International
+>  realtek Realtek Semiconductor Corp.
+>  renesas	Renesas Electronics Corporation
+> +ricoy	Ricoh Co. Ltd.
+>  rockchip	Fuzhou Rockchip Electronics Co., Ltd
+>  samsung	Samsung Semiconductor
+>  sbs	Smart Battery System
+> @@ -79,11 +80,13 @@ schindler	Schindler
+>  sil	Silicon Image
+>  silabs	Silicon Laboratories
+>  simtek
+> +sii	Seiko Instruments, Inc.
+>  sirf	SiRF Technology, Inc.
+>  snps 	Synopsys, Inc.
+>  st	STMicroelectronics
+>  ste	ST-Ericsson
+>  stericsson	ST-Ericsson
+> +synology	Synology, Inc.
 
-Hmm.. Neither 'qnap' or 'synology' are described in
-Documentation/devicetree/bindings/vendor-prefixes.txt.  Perhaps they
-should be added?
-
->  
->  - reg: Address and length of the register set for UART1
->  - clocks: tclk clock
-> diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
-> index 37f56f7..10c91fa 100644
-> --- a/drivers/power/reset/qnap-poweroff.c
-> +++ b/drivers/power/reset/qnap-poweroff.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * QNAP Turbo NAS Board power off
-> + * QNAP Turbo NAS Board power off. Can also be used on Synology devices.
->   *
->   * Copyright (C) 2012 Andrew Lunn <andrew@lunn.ch>
->   *
-> @@ -25,17 +25,42 @@
->  
->  #define UART1_REG(x)	(base + ((UART_##x) << 2))
->  
-> +struct power_off_cfg {
-> +	u32 baud;
-> +	char cmd;
-> +};
-> +
-> +static const struct power_off_cfg qnap_power_off_cfg = {
-> +	.baud = 19200,
-> +	.cmd = 'A',
-> +};
-> +
-> +static const struct power_off_cfg synology_power_off_cfg = {
-> +	.baud = 9600,
-> +	.cmd = '1',
-> +};
-> +
-> +static const struct of_device_id qnap_power_off_of_match_table[] = {
-> +	{ .compatible = "qnap,power-off",
-> +	  .data = (void *) &qnap_power_off_cfg,
-> +	},
-> +	{ .compatible = "synology,power-off",
-> +	  .data = (void *) &synology_power_off_cfg,
-
-The casts here should not be necessary.
-
-> +	},
-> +	{}
-> +};
-> +
->  static void __iomem *base;
->  static unsigned long tclk;
-> +static struct power_off_cfg *cfg;
-
-const?
-
->  
->  static void qnap_power_off(void)
->  {
-> -	/* 19200 baud divisor */
-> -	const unsigned divisor = ((tclk + (8 * 19200)) / (16 * 19200));
-> +	const unsigned divisor = ((tclk + (8 * cfg->baud)) / (16 * cfg->baud));
->  
->  	pr_err("%s: triggering power-off...\n", __func__);
->  
-> -	/* hijack UART1 and reset into sane state (19200,8n1) */
-> +	/* hijack UART1 and reset into sane state */
->  	writel(0x83, UART1_REG(LCR));
->  	writel(divisor & 0xff, UART1_REG(DLL));
->  	writel((divisor >> 8) & 0xff, UART1_REG(DLM));
-> @@ -44,16 +69,21 @@ static void qnap_power_off(void)
->  	writel(0x00, UART1_REG(FCR));
->  	writel(0x00, UART1_REG(MCR));
->  
-> -	/* send the power-off command 'A' to PIC */
-> -	writel('A', UART1_REG(TX));
-> +	/* send the power-off command to PIC */
-> +	writel(cfg->cmd, UART1_REG(TX));
->  }
->  
->  static int qnap_power_off_probe(struct platform_device *pdev)
->  {
-> +	struct device_node *np = pdev->dev.of_node;
->  	struct resource *res;
->  	struct clk *clk;
->  	char symname[KSYM_NAME_LEN];
->  
-> +	const struct of_device_id *match =
-> +		of_match_node(qnap_power_off_of_match_table, np);
-> +	cfg = (struct power_off_cfg *)match->data;
-
-This cast is not necessary.
->
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (!res) {
->  		dev_err(&pdev->dev, "Missing resource");
-> @@ -94,10 +124,6 @@ static int qnap_power_off_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static const struct of_device_id qnap_power_off_of_match_table[] = {
-> -	{ .compatible = "qnap,power-off", },
-> -	{}
-> -};
->  MODULE_DEVICE_TABLE(of, qnap_power_off_of_match_table);
-
-You should probably move this up above with the table.
-
-  Josh
+Oh, great!  Looks like this one is added (see my comment on patch 1).
+I'm wondering if 'qnap' should be added as well.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
