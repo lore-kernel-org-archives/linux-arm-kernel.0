@@ -1,59 +1,47 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Mon, 17 Feb 2014 00:25:13 -0600
-Subject: [GIT PULL] SOCFPGA DT updates for 3.15
-In-Reply-To: <53019DE5.2010604@gmail.com>
-References: <1391621517-17219-1-git-send-email-dinguyen@altera.com>
- <53019DE5.2010604@gmail.com>
-Message-ID: <1392618313.29346.2.camel@linux-builds1>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 17 Feb 2014 15:31:52 +0900
+Subject: [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
+Message-ID: <20140217063152.21876.6981.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2014-02-16 at 23:28 -0600, Dinh Nguyen wrote:
-> On 2/5/14 11:31 AM, dinguyen at altera.com wrote:
-> > Hi Arnd, Kevin, and Olof,
-> >
-> > Please consider pulling in these 2 patches for the enabling SD/MMC on the SOCFPGA
-> > platform.
-> >
-> > Thanks,
-> > Dinh
-> >
-> > The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-> >
-> >   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga-dts-for-3.15
-> >
-> > for you to fetch changes up to e422c12bc07192289c3fec4edd457e6ffaa03b2b:
-> >
-> >   ARM: socfpga_defconfig: enable SD/MMC support (2014-02-05 11:19:34 -0600)
-> >
-> > ----------------------------------------------------------------
-> > SOCFPGA dts updates for v3.15
-> >
-> > ----------------------------------------------------------------
-> > Dinh Nguyen (2):
-> >       dts: socfpga: Add support for SD/MMC on the SOCFPGA platform
-> >       ARM: socfpga_defconfig: enable SD/MMC support
-> >
-> >  arch/arm/boot/dts/socfpga.dtsi          |   13 ++++++++++++-
-> >  arch/arm/boot/dts/socfpga_arria5.dtsi   |   11 +++++++++++
-> >  arch/arm/boot/dts/socfpga_cyclone5.dtsi |   11 +++++++++++
-> >  arch/arm/boot/dts/socfpga_vt.dts        |   11 +++++++++++
-> >  arch/arm/configs/socfpga_defconfig      |    2 ++
-> >  5 files changed, 47 insertions(+), 1 deletion(-)
-> Just a ping...
-> 
+From: Magnus Damm <damm@opensource.se>
 
-Apologies, but please ignore this thread. I need to rework this based on
-this thread:
+On R-Car Gen2 SoCs such as r8a7790 and r8a7791 the hardware boot
+mode bit MD21 indicates if hardware debug mode is enabled or not.
 
-http://thread.gmane.org/gmane.linux.kernel.mmc/25039/focus=25076
+In case hardware debug mode is enabled print a warning and refrain
+from booting secondary CPU cores. Without this patch Koelsch boards
+with SW8-4 set to OFF will hang at SMP boot.
 
-Dinh
-> Thanks,
-> Dinh
-> 
-> 
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Written against renesas-devel-v3.14-rc2-20140213
+
+ arch/arm/mach-shmobile/platsmp-apmu.c |    7 +++++++
+ 1 file changed, 7 insertions(+)
+
+--- 0001/arch/arm/mach-shmobile/platsmp-apmu.c
++++ work/arch/arm/mach-shmobile/platsmp-apmu.c	2014-02-17 15:11:15.000000000 +0900
+@@ -17,6 +17,7 @@
+ #include <asm/cp15.h>
+ #include <asm/smp_plat.h>
+ #include <mach/common.h>
++#include <mach/rcar-gen2.h>
+ 
+ static struct {
+ 	void __iomem *iomem;
+@@ -136,6 +137,12 @@ void __init shmobile_smp_apmu_prepare_cp
+ 
+ int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
++	/* Refrain boot when hardware debug mode is enabled */
++	if (rcar_gen2_read_mode_pins() & BIT(21)) {
++		pr_warn("Unable to boot CPU%d when MD21 is set\n", cpu);
++		return -ENOTSUPP;
++	}
++
+ 	/* For this particular CPU register boot vector */
+ 	shmobile_smp_hook(cpu, virt_to_phys(shmobile_invalidate_start), 0);
+ 
