@@ -1,43 +1,85 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 16 Feb 2014 21:35:54 -0500
-Subject: [PATCH 0/4] Core Divider support for Armada 375 SoC
-In-Reply-To: <1392408903-31237-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1392408903-31237-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140217023554.GG7862@titan.lakedaemon.net>
+Date: Sun, 16 Feb 2014 21:46:38 -0500
+Subject: [PATCH v2 0/7] Audio support for Armada 370 DB
+In-Reply-To: <1392225662-20431-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392225662-20431-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140217024638.GH7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 05:14:59PM -0300, Ezequiel Garcia wrote:
-> These changes add support in the Core Divider clock driver, to support
-> the newly introduced Armada 375 SoC.
+On Wed, Feb 12, 2014 at 06:20:55PM +0100, Thomas Petazzoni wrote:
+> Hello,
 > 
-> The first and second patches, are just cosmetic and documentation
-> improvements.
+> This series of patches enable audio support on the Marvell Armada 370
+> Development Board. Since both the I2S controller on the SoC side and
+> the I2C audio codec are already supported by the kernel, the amount of
+> work is fairly limited.
 > 
-> The third patch adds the required infrastructure to support more SoCs.
+> Changes since v1:
 > 
-> Finally, the fourth patch make use of the infrastructure to add the
-> Armada 375 support. Compared to the previously supported Armada 370 and
-> Armada XP Core Divider clocks, the Armada 375 SoC Core Dividers have
-> a different register layout and lacks the capability to gate a clock.
+>  * Drop patches "sound: codec: add Device Tree binding to cs42l51" and
+>    " sound: soc: enable Kirkwood driver for mvebu platforms" since
+>    they have been applied by Mark Brown.
 > 
-> The core and clock support for the Armada 375 SoC has been submitted recently,
-> and we're aiming at having this merged for 3.15, if at all possible.
+>  * Set DAI format directly in the snd_soc_dai_link structure instead
+>    of separately calling snd_soc_dai_set_fmt(). Suggested by Mark
+>    Brown.
 > 
-> Special thanks to Thomas for cooking this!
+>  * Do not call snd_soc_dapm_enable_pin(), as Mark Brown mentionned
+>    that DAPM widgets default to enabled. It allowed to entirely remove
+>    the dai_init operation.
 > 
-> Thomas Petazzoni (4):
->   clk: mvebu: do not copy the contents of clk_corediv_desc
->   clk: mvebu: add a little bit of documentation about data structures
->   clk: mvebu: refactor corediv driver to support more SoC
->   clk: mvebu: add Armada 375 support to the corediv clock driver
+>  * Use devm_snd_soc_register_card() instead of
+>    snd_soc_register_card(), as suggested by Mark Brown.
 > 
->  drivers/clk/mvebu/clk-corediv.c | 131 ++++++++++++++++++++++++++++++----------
->  1 file changed, 100 insertions(+), 31 deletions(-)
+>  * Wrote a Device Tree binding document for the DT binding introduced
+>    by this driver. Requested by Mark Brown.
+> 
+>  * Use the DT to look up the controller and the codec, as suggested by
+>    Mark Brown.
+> 
+>  * Add S/PDIF support, which has been successfully tested. I've kept
+>    it as separate patches (for both the ASoC machine driver, and the
+>    Device Tree bits), so that it can be reviewed and applied
+>    separately.
+> 
+>  * Modified the commit title so that they contain "ASoC", as requested
+>    by Mark Brown.
+> 
+> Patches 1 and 2 are to be reviewed/applied by the ASoC maintainer Mark
+> Brown, while patches 3 to 7 are to be reviewed/applied by the ARM
+> mvebu maintainers.
+> 
+> Note that the audio support for Armada 370 also needs a fix to the
+> CS42L51, which is being discussed with the author of the change that
+> apparently introduced the problem (see discussion at
+> http://mailman.alsa-project.org/pipermail/alsa-devel/2014-January/071916.html).
+> 
+> Thanks,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (7):
+>   sound: ASoC: add ASoC board driver for Armada 370 DB
+>   sound: ASoC: add S/PDIF support to Armada 370 DB ASoC driver
+>   ARM: mvebu: add audio I2S controller to Armada 370 Device Tree
+>   ARM: mvebu: add I2C0 muxing option for Armada 370 SoC
+>   ARM: mvebu: add audio support to Armada 370 DB
+>   ARM: mvebu: enable S/PDIF audio in Armada 370 DB Device Tree
+>   ARM: mvebu: enable audio options in mvebu_defconfig
+> 
+>  .../bindings/sound/armada-370db-audio.txt          |  27 ++++
+>  arch/arm/boot/dts/armada-370-db.dts                |  56 ++++++++
+>  arch/arm/boot/dts/armada-370.dtsi                  |  28 ++++
+>  arch/arm/configs/mvebu_defconfig                   |   5 +
+>  sound/soc/kirkwood/Kconfig                         |   9 ++
+>  sound/soc/kirkwood/Makefile                        |   2 +
+>  sound/soc/kirkwood/armada-370-db.c                 | 148 +++++++++++++++++++++
+>  7 files changed, 275 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/armada-370db-audio.txt
+>  create mode 100644 sound/soc/kirkwood/armada-370-db.c
 
-as with the 3xx clock series, I've tentatively applied this to
-mvebu/clk-3xx.  I was able to build this series, so I've placed it at
-the start of the stack.  I'll tag it separately as well.
+Patches 3 to 6 applied to mvebu/dt.  Patch 7 applied to mvebu/defconfig
 
 thx,
 
