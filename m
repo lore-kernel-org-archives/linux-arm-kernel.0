@@ -1,121 +1,81 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Feb 2014 10:55:29 +0800
-Subject: [PATCH] ARM: dts: imx27-phytec-phycore-*: Add diagnostic PMIC LEDs
-In-Reply-To: <1392464118-3353-1-git-send-email-shc_work@mail.ru>
-References: <1392464118-3353-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20140217025527.GG9879@S2101-09.ap.freescale.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 16 Feb 2014 21:57:05 -0500
+Subject: [PATCH v4 07/13] ARM: dts: mvebu: Add a new set of registers
+ to the PMSU node
+In-Reply-To: <1392312816-17657-8-git-send-email-gregory.clement@free-electrons.com>
+References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
+ <1392312816-17657-8-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140217025705.GJ7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 15, 2014 at 03:35:18PM +0400, Alexander Shiyan wrote:
-> PCM-038 module have three triple LEDs connected to PMIC which
-> can be used for diagnostic purposes. This patch adds support
-> for these LEDs for PCM-038 SOM and adds basic LED-triggers for
-> these LEDs for PCM-970 RDK, the remaining LEDs are available
-> for use from userspace.
+On Thu, Feb 13, 2014 at 06:33:30PM +0100, Gregory CLEMENT wrote:
+> The Power Management Unit Service block also controls the Coherency
+> Fabric subsystem. This new set of registers is needed for the CPU idle
+> implementation for the Armada XP, it allows to enter in a deep CPU
+> idle state where the Coherency Fabric and the L2 cache are powerdown.
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
->  arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts  | 50 +++++++++++++++++++++++++
->  arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi |  6 +++
->  2 files changed, 56 insertions(+)
+>  Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt | 12 +++++++-----
+>  arch/arm/boot/dts/armada-xp.dtsi                             |  2 +-
+>  2 files changed, 8 insertions(+), 6 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> index 9f8ad51..9a07543 100644
-> --- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> +++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> @@ -96,6 +96,56 @@
->  	status = "okay";
+> diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+> index 926b4d6aae7e..8a9db0c32ba5 100644
+> --- a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+> +++ b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+> @@ -7,14 +7,16 @@ Required properties:
+>  - compatible: "marvell,armada-370-xp-pmsu"
+>  
+>  - reg: Should contain PMSU registers location and length. First pair
+> -  for the per-CPU SW Reset Control registers, second pair for the
+> -  Power Management Service Unit.
+> +  for the per-CPU SW Reset Control registers, second pair for the CPU
+> +  Power Management Service Unit registers, third pair for the Fabric Power
+> +  Management Service Unit registers.
+
+Please mention explicitly that previous versions of this binding only
+specified the first two registers.  I haven't dug through the rest of
+this series yet, but I assume the driver will behave sanely when
+encountering an old dtb w/o the third reg entry?
+
+thx,
+
+Jason.
+
+>  
+>  Example:
+>  
+> -armada-370-xp-pmsu at d0022000 {
+> +armada-370-xp-pmsu at 22000 {
+>  	compatible = "marvell,armada-370-xp-pmsu";
+> -	reg = <0xd0022100 0x430>,
+> -	      <0xd0020800 0x20>;
+> +	reg = <0x22100 0x430>,
+> +	      <0x20800 0x20>,
+> +	      <0x22000 0x24>;
 >  };
 >  
-> +&pmicleds {
-> +	ledr1: led at 3 {
-> +		reg = <3>;
-> +		label = "system:red1:user";
-> +	};
-> +
-> +	ledg1: led at 4 {
-> +		reg = <4>;
-> +		label = "system:green1:user";
-> +	};
-> +
-> +	ledb1: led at 5 {
-> +		reg = <5>;
-> +		label = "system:blue1:user";
-> +	};
-> +
-> +	ledr2: led at 6 {
-> +		reg = <6>;
-> +		label = "system:red2:user";
-> +	};
-> +
-> +	ledg2: led at 7 {
-> +		reg = <7>;
-> +		label = "system:green2:user";
-> +	};
-> +
-> +	ledb2: led at 8 {
-> +		reg = <8>;
-> +		label = "system:blue2:user";
-> +	};
-> +
-> +	ledr3: led at 9 {
-> +		reg = <9>;
-> +		label = "system:red3:nand";
-> +		linux,default-trigger = "nand-disk";
-> +	};
-> +
-> +	ledg3: led at 10 {
-> +		reg = <10>;
-> +		label = "system:green3:live";
-> +		linux,default-trigger = "heartbeat";
-> +	};
-> +
-> +	ledb3: led at 11 {
-> +		reg = <11>;
-> +		label = "system:blue3:cpu";
-> +		linux,default-trigger = "cpu0";
-
-
-I do not see this trigger and above "nand-disk" in
-Documentation/devicetree/bindings/leds/common.txt.
-So they're just missing from bindings doc and kernel actually supports
-them?
-
-> +	};
-> +};
-> +
->  &sdhci2 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_sdhc2>;
-> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-> index 230cfaf..258eafa 100644
-> --- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-> +++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-> @@ -69,6 +69,12 @@
->  		fsl,mc13xxx-uses-adc;
->  		fsl,mc13xxx-uses-rtc;
+> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> index b8b84a22f0f3..f717da4f4d97 100644
+> --- a/arch/arm/boot/dts/armada-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> @@ -113,7 +113,7 @@
 >  
-> +		pmicleds: leds {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			led-control = <0x001 0x000 0x000 0x000 0x000 0x000>;
-
-I can only see led-control mentioned in
-Documentation/devicetree/bindings/mfd/mc13xxx.txt as below.
-
-- leds : Contain the led nodes and initial register values in property
-  "led-control".
-
-But I failed to see where this property is actually defined.
-
-Shawn
-
-> +		};
-> +
->  		regulators {
->  			/* SW1A and SW1B joined operation */
->  			sw1_reg: sw1a {
+>  			armada-370-xp-pmsu at 22000 {
+>  				compatible = "marvell,armada-370-xp-pmsu";
+> -				reg = <0x22100 0x400>, <0x20800 0x20>;
+> +				reg = <0x22100 0x400>, <0x20800 0x20>, <0x22000 0x24>;
+>  			};
+>  
+>  			eth2: ethernet at 30000 {
 > -- 
-> 1.8.3.2
+> 1.8.1.2
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
