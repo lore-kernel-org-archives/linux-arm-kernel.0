@@ -1,88 +1,250 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 17 Feb 2014 11:04:57 +0100
-Subject: [PATCH v3 1/7] Documentation: Add device tree bindings for Freescale
- i.MX GPC
+Date: Mon, 17 Feb 2014 11:04:58 +0100
+Subject: [PATCH v3 2/7] ARM: imx6: gpc: Add PU power domain for GPU/VPU
 In-Reply-To: <1392631503-17283-1-git-send-email-p.zabel@pengutronix.de>
 References: <1392631503-17283-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1392631503-17283-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1392631503-17283-3-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6 contains a power controller that controls power gating and
-sequencing for the SoC's power domains.
+When generic pm domain support is enabled, the PGC can be used
+to completely gate power to the PU power domain containing GPU3D,
+GPU2D, and VPU cores.
+This code triggers the PGC powerdown sequence to disable the GPU/VPU
+isolation cells and gate power and then disables the PU regulator.
+To reenable, the reverse powerup sequence is triggered after the PU
+regulaotor is enabled again.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- .../devicetree/bindings/power/fsl,imx-gpc.txt      | 61 ++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+Changes since v2:
+ - Only disable the power domain on boot if CONFIG_PM_RUNTIME is enabled
+ - Removed superfluous second assignment of imx6q_pu_domain.of_node
+---
+ arch/arm/mach-imx/Kconfig |   2 +
+ arch/arm/mach-imx/gpc.c   | 173 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 175 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-new file mode 100644
-index 0000000..3ec8c0e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-@@ -0,0 +1,61 @@
-+Freescale i.MX General Power Controller
-+=======================================
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 33567aa..3c58f2e 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -808,6 +808,7 @@ config SOC_IMX6Q
+ 	select PL310_ERRATA_727915 if CACHE_PL310
+ 	select PL310_ERRATA_769419 if CACHE_PL310
+ 	select PM_OPP if PM
++	select PM_GENERIC_DOMAINS if PM
+ 
+ 	help
+ 	  This enables support for Freescale i.MX6 Quad processor.
+@@ -827,6 +828,7 @@ config SOC_IMX6SL
+ 	select PL310_ERRATA_588369 if CACHE_PL310
+ 	select PL310_ERRATA_727915 if CACHE_PL310
+ 	select PL310_ERRATA_769419 if CACHE_PL310
++	select PM_GENERIC_DOMAINS if PM
+ 
+ 	help
+ 	  This enables support for Freescale i.MX6 SoloLite processor.
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index 586e017..c61126c 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -10,19 +10,32 @@
+  * http://www.gnu.org/copyleft/gpl.html
+  */
+ 
++#include <linux/clk.h>
++#include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
++#include <linux/platform_device.h>
++#include <linux/pm_domain.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/irqchip/arm-gic.h>
+ #include "common.h"
++#include "hardware.h"
+ 
++#define GPC_CNTR		0x000
+ #define GPC_IMR1		0x008
++#define GPC_PGC_GPU_PDN		0x260
++#define GPC_PGC_GPU_PUPSCR	0x264
++#define GPC_PGC_GPU_PDNSCR	0x268
+ #define GPC_PGC_CPU_PDN		0x2a0
+ 
+ #define IMR_NUM			4
+ 
++#define GPU_VPU_PUP_REQ		BIT(1)
++#define GPU_VPU_PDN_REQ		BIT(0)
 +
-+The i.MX6Q General Power Control (GPC) block contains DVFS load tracking
-+counters and Power Gating Control (PGC) for the CPU and PU (GPU/VPU) power
-+domains.
+ static void __iomem *gpc_base;
+ static u32 gpc_wake_irqs[IMR_NUM];
+ static u32 gpc_saved_imrs[IMR_NUM];
+@@ -138,3 +151,163 @@ void __init imx_gpc_init(void)
+ 	gic_arch_extn.irq_unmask = imx_gpc_irq_unmask;
+ 	gic_arch_extn.irq_set_wake = imx_gpc_irq_set_wake;
+ }
 +
-+Required properties:
-+- compatible: Should be "fsl,imx6q-gpc"
-+- reg: should be register base and length as documented in the
-+  datasheet
-+- interrupts: Should contain GPC interrupt request 1
-+- pu-supply: Link to the LDO regulator powering the PU power domain
-+- #address-cells, #size-cells: Should be <1>
++static struct regulator *pu_reg;
 +
-+The gpc node should contain 'power-domain' subnodes for each power domain.
-+These serve as phandle targets for devices belonging to the power domain:
++static int imx6q_pm_pu_power_off(struct generic_pm_domain *genpd)
++{
++	u32 val;
++	int iso, iso2sw;
 +
-+Power domains controlled by a PGC register set
-+==============================================
++	/* Read ISO and ISO2SW power down delays */
++	val = readl_relaxed(gpc_base + GPC_PGC_GPU_PDNSCR);
++	iso = val & 0x3f;
++	iso2sw = (val >> 8) & 0x3f;
 +
-+Required properties:
-+- compatible: Should be "fsl,imx6q-power-domain"
-+- reg: should be register base and length as documented in the
-+  datasheet
++	/* Gate off PU domain when GPU/VPU when powered down */
++	writel_relaxed(0x1, gpc_base + GPC_PGC_GPU_PDN);
 +
-+Specifying power domain for IP modules
-+======================================
++	/* Request GPC to power down GPU/VPU */
++	val = readl_relaxed(gpc_base + GPC_CNTR);
++	val |= GPU_VPU_PDN_REQ;
++	writel_relaxed(val, gpc_base + GPC_CNTR);
 +
-+IP cores belonging to a power domain should contain a 'power-domain' property
-+that is a phandle pointing to the power-domain subnode of the gpc device node.
++	/* Wait ISO + ISO2SW IPG clock cycles */
++	ndelay((iso + iso2sw) * 1000 / 66);
 +
-+Required properties:
-+- power-domain: A phandle pointing to the power-domain device tree node
++	regulator_disable(pu_reg);
 +
++	return 0;
++}
 +
-+Example:
++static int imx6q_pm_pu_power_on(struct generic_pm_domain *genpd)
++{
++	int ret;
++	u32 val;
++	int sw, sw2iso;
 +
-+	gpc: gpc at 020dc000 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "fsl,imx6q-gpc";
-+		reg = <0x020dc000 0x4000>;
-+		interrupts = <0 89 0x04 0 90 0x04>;
-+		pu-supply = <&reg_pu>;
++	ret = regulator_enable(pu_reg);
++	if (ret) {
++		pr_err("%s: failed to enable regulator: %d\n", __func__, ret);
++		return ret;
++	}
 +
-+		pd_pu: power-domain at 020dc260 {
-+			compatible = "fsl,imx6q-power-domain";
-+			reg = <0x020dc260 0x10>;
-+		};
-+	};
++	/* Gate off PU domain when GPU/VPU when powered down */
++	writel_relaxed(0x1, gpc_base + GPC_PGC_GPU_PDN);
 +
-+Example of a device that is part of a power domain:
++	/* Read ISO and ISO2SW power down delays */
++	val = readl_relaxed(gpc_base + GPC_PGC_GPU_PUPSCR);
++	sw = val & 0x3f;
++	sw2iso = (val >> 8) & 0x3f;
 +
-+	vpu: vpu at 02040000 {
-+		reg = <0x02040000 0x3c000>;
-+		/* ... */
-+		power-domain = <&pd_pu>;
-+		/* ... */
-+	};
++	/* Request GPC to power up GPU/VPU */
++	val = readl_relaxed(gpc_base + GPC_CNTR);
++	val |= GPU_VPU_PUP_REQ;
++	writel_relaxed(val, gpc_base + GPC_CNTR);
 +
++	/* Wait ISO + ISO2SW IPG clock cycles */
++	ndelay((sw + sw2iso) * 1000 / 66);
++
++	return 0;
++}
++
++static struct generic_pm_domain imx6q_pu_domain = {
++	.name = "PU",
++	.power_off = imx6q_pm_pu_power_off,
++	.power_on = imx6q_pm_pu_power_on,
++};
++
++static int imx6q_pm_notifier_call(struct notifier_block *nb,
++				  unsigned long event, void *data)
++{
++	struct generic_pm_domain *genpd;
++	struct device *dev = data;
++	struct device_node *np;
++	int ret;
++
++	switch (event) {
++	case BUS_NOTIFY_BIND_DRIVER:
++		np = of_parse_phandle(dev->of_node, "power-domain", 0);
++		if (!np || np != imx6q_pu_domain.of_node)
++			return NOTIFY_DONE;
++
++		ret = pm_genpd_of_add_device(np, dev);
++		if (ret)
++			dev_err(dev, "failed to add to power domain: %d\n",
++				ret);
++		break;
++	case BUS_NOTIFY_UNBOUND_DRIVER:
++		genpd = dev_to_genpd(dev);
++		if (IS_ERR(genpd) || genpd != &imx6q_pu_domain)
++			return NOTIFY_DONE;
++
++		ret = pm_genpd_remove_device(genpd, dev);
++		if (ret)
++			dev_err(dev, "failed to remove from power domain: %d\n",
++				ret);
++		break;
++	}
++
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block imx6q_platform_nb = {
++	.notifier_call = imx6q_pm_notifier_call,
++};
++
++static int imx_gpc_probe(struct platform_device *pdev)
++{
++	struct device_node *np;
++	bool is_off;
++	int ret;
++
++	np = of_get_child_by_name(pdev->dev.of_node, "pu-power-domain");
++	if (!np) {
++		dev_err(&pdev->dev, "missing pu-power-domain node\n");
++		return -EINVAL;
++	}
++	imx6q_pu_domain.of_node = np;
++
++	pu_reg = devm_regulator_get(&pdev->dev, "pu");
++	if (IS_ERR(pu_reg)) {
++		ret = PTR_ERR(pu_reg);
++		dev_err(&pdev->dev, "failed to get pu regulator: %d\n", ret);
++		return ret;
++	}
++
++	/* The regulator is initially enabled */
++	ret = regulator_enable(pu_reg);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to enable pu regulator: %d\n", ret);
++		return ret;
++	}
++
++	is_off = IS_ENABLED(CONFIG_PM_RUNTIME);
++	if (is_off)
++		imx6q_pm_pu_power_off(&imx6q_pu_domain);
++
++	pm_genpd_init(&imx6q_pu_domain, NULL, is_off);
++	bus_register_notifier(&platform_bus_type, &imx6q_platform_nb);
++
++	return 0;
++}
++
++static struct of_device_id imx_gpc_dt_ids[] = {
++	{ .compatible = "fsl,imx6q-gpc" },
++	{ }
++};
++
++static struct platform_driver imx_gpc_driver = {
++	.driver = {
++		.name = "imx-gpc",
++		.owner = THIS_MODULE,
++		.of_match_table = imx_gpc_dt_ids,
++	},
++	.probe = imx_gpc_probe,
++};
++
++static int __init imx_pgc_init(void)
++{
++	return platform_driver_register(&imx_gpc_driver);
++}
++subsys_initcall(imx_pgc_init);
 -- 
 1.8.5.3
