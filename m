@@ -1,34 +1,54 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 16 Feb 2014 22:06:02 -0500
-Subject: [PATCH 0/2] Kirkwood RD88F6192 and RD88F6281 DT conversion
-In-Reply-To: <1392469193-25883-1-git-send-email-andrew@lunn.ch>
-References: <1392469193-25883-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20140217030602.GK7862@titan.lakedaemon.net>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 17 Feb 2014 08:40:43 +0530
+Subject: [PATCH v3 1/3] ARM: EXYNOS: initial board support for exynos5260
+ SoC
+In-Reply-To: <1392385032-22015-2-git-send-email-rahul.sharma@samsung.com>
+References: <1392385032-22015-1-git-send-email-rahul.sharma@samsung.com>
+ <1392385032-22015-2-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <CAK9yfHyb7ij0soCmrJvw9OrW2mKdY1QBpnqLdzeRHqdvOGN61g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 15, 2014 at 01:59:51PM +0100, Andrew Lunn wrote:
-> These two patches convert two Marvell Reference designs from old style
-> setup files to DT. No testing has been performed other than that they
-> compile.
-> 
-> Andrew Lunn (2):
->   ARM: Kirkwood: Add DT description of rd88f6192.
->   ARM: Kirkwood: convert rd88f6281-setup.c to DT.
-> 
->  arch/arm/boot/dts/Makefile                  |   3 +
->  arch/arm/boot/dts/kirkwood-rd88f6192.dts    | 112 ++++++++++++++++++++
->  arch/arm/boot/dts/kirkwood-rd88f6281-a0.dts |  26 +++++
->  arch/arm/boot/dts/kirkwood-rd88f6281-a1.dts |  31 ++++++
->  arch/arm/boot/dts/kirkwood-rd88f6281.dtsi   | 152 ++++++++++++++++++++++++++++
->  5 files changed, 324 insertions(+)
->  create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6192.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281-a0.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281-a1.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
+Hi Rahul,
 
-Series applied to mvebu/dt
+On 14 February 2014 19:07, Rahul Sharma <rahul.sharma@samsung.com> wrote:
+> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+>
+> This patch add basic arch side support for exynos5260 SoC.
+>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
+> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Kconfig             |    9 +++++++++
+>  arch/arm/mach-exynos/common.c            |   11 +++++++++++
+>  arch/arm/mach-exynos/include/mach/map.h  |    1 +
+>  arch/arm/mach-exynos/mach-exynos5-dt.c   |    1 +
+>  arch/arm/plat-samsung/include/plat/cpu.h |    8 ++++++++
+>  5 files changed, 30 insertions(+)
+>
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 4c414af..5c96248 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -91,6 +91,15 @@ config SOC_EXYNOS5250
+>         help
+>           Enable EXYNOS5250 SoC support
+>
+> +config SOC_EXYNOS5260
+> +       bool "SAMSUNG EXYNOS5260"
+> +       default y
+> +       depends on ARCH_EXYNOS5
+> +       select AUTO_ZRELADDR
+> +       select SAMSUNG_DMADEV
+> +       help
+> +         Enable EXYNOS5260 SoC support
+> +
 
-thx,
+Per SoC entries are no longer needed with the patch at [1].
 
-Jason.
+[1] http://www.spinics.net/lists/linux-samsung-soc/msg26253.html
+
+-- 
+With warm regards,
+Sachin
