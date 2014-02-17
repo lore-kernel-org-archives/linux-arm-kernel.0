@@ -1,36 +1,50 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 17 Feb 2014 11:16:58 -0800
-Subject: [PATCH v3] input: sirfsoc-onkey - report onkey untouch event by
- detecting pin status
-In-Reply-To: <CAGsJ_4zjtWV3Z1AJ2bqekXn54rm=k8d4iOi_zzainCEnNGefCw@mail.gmail.com>
-References: <1392348001-4950-1-git-send-email-21cnbao@gmail.com>
- <20140214075717.GA14682@core.coreip.homeip.net>
- <CAGsJ_4xqnZAO6vpkgTEHmfp9+nbWa1qwQ4pda6B2sSrEtbV3ZA@mail.gmail.com>
- <847BC5012124A94BB5CA1B26E022CCA3012BAFDC27@SHAASIEXM01.ASIA.ROOT.PRI>
- <CAGsJ_4zjtWV3Z1AJ2bqekXn54rm=k8d4iOi_zzainCEnNGefCw@mail.gmail.com>
-Message-ID: <20140217191658.GA19223@core.coreip.homeip.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 17 Feb 2014 19:24:33 +0000
+Subject: [RESEND PATCH] ARM: dove: dt: revert PMU interrupt controller node
+In-Reply-To: <20140207180836.GE8533@titan.lakedaemon.net>
+References: <20140207180836.GE8533@titan.lakedaemon.net>
+Message-ID: <1392665073-25831-1-git-send-email-jason@lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 09:41:06PM +0800, Barry Song wrote:
-> >> Input: sirfsoc-onkey - implement open and close methods
-> >>
-> >> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> >>
-> >> We can control whetehr device generates interrupts or not so let's
-> >> implement open and close methods of input device so that we do not do any
-> >> processing until there are users.
-> >>
-> >> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> 
-> Tested-by: Xianglong Du <Xianglong.Du@csr.com>
-> 
-> Dmitry, will you push this one to your tree so that i can rebase others?
+The corresponding driver didn't make it into v3.14, so we need to remove
+the node.  Dove systems fail to boot with the node present and no
+driver.
 
-I rebased and pushed everything out, please take a look to make sure it
-all looks good.
+This node will be re-added when the driver makes it to mainline.
 
-Thanks.
+Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+---
+Sorry for the resend, infradead.org didn't like the way I specified the list
+address.
 
+And after more careful reading, I missed a '>' in my cut-n-paste of Andrew's
+email address.  Sorry for the unnecessary noise.
+
+Also, I plan to submit this in mvebu/dt-fixes for v3.14
+
+ arch/arm/boot/dts/dove.dtsi | 9 ---------
+ 1 file changed, 9 deletions(-)
+
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 2b76524f4aa7..967898528062 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -379,15 +379,6 @@
+ 				#clock-cells = <1>;
+ 			};
+ 
+-			pmu_intc: pmu-interrupt-ctrl at d0050 {
+-				compatible = "marvell,dove-pmu-intc";
+-				interrupt-controller;
+-				#interrupt-cells = <1>;
+-				reg = <0xd0050 0x8>;
+-				interrupts = <33>;
+-				marvell,#interrupts = <7>;
+-			};
+-
+ 			pinctrl: pin-ctrl at d0200 {
+ 				compatible = "marvell,dove-pinctrl";
+ 				reg = <0xd0200 0x10>;
 -- 
-Dmitry
+1.8.5.5
