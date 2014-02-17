@@ -1,45 +1,24 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 17 Feb 2014 09:53:02 +0100
-Subject: [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
-In-Reply-To: <20140217063152.21876.6981.sendpatchset@w520>
-References: <20140217063152.21876.6981.sendpatchset@w520>
-Message-ID: <CAMuHMdUiRb0VmtTw-v04Ex-YyfV00+ixQoDgE3yD8kKXxVWCxQ@mail.gmail.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 17 Feb 2014 10:02:48 +0100
+Subject: [PATCH] arm: imx: remove MACH_MXLADS
+In-Reply-To: <1392612187.657010375@f87.i.mail.ru>
+References: <1392573811.28866.22.camel@x220>
+ <1392578464.996901773@f49.i.mail.ru> <1392582900.28866.85.camel@x220>
+ <1392612187.657010375@f87.i.mail.ru>
+Message-ID: <1392627768.10966.23.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 7:31 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> From: Magnus Damm <damm@opensource.se>
->
-> On R-Car Gen2 SoCs such as r8a7790 and r8a7791 the hardware boot
-> mode bit MD21 indicates if hardware debug mode is enabled or not.
->
-> In case hardware debug mode is enabled print a warning and refrain
-> from booting secondary CPU cores. Without this patch Koelsch boards
-> with SW8-4 set to OFF will hang at SMP boot.
+On Mon, 2014-02-17 at 08:43 +0400, Alexander Shiyan wrote:
+> It seems that even in the current state, Kconfig for i.MX contains an error.
+> As a start, we should rename ARCH_MX1ADS to MACH_MX1ADS first.
 
-Ah, mine was set to OFF.
+Last year I admitted that I didn't entirely grasped the differences
+between "arch", "platform", and "machine" in the arch/arm universe[1].
+Perhaps someone could help me understand why it's better to use
+MACH_MX1ADS here.
 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+Paul Bolle
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-with one minor nit:
-
->  int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  {
-> +       /* Refrain boot when hardware debug mode is enabled */
-> +       if (rcar_gen2_read_mode_pins() & BIT(21)) {
-> +               pr_warn("Unable to boot CPU%d when MD21 is set\n", cpu);
-
-%u
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+[1] http://driverdev.linuxdriverproject.org/pipermail/driverdev-devel/2013-May/038204.html
