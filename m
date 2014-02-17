@@ -1,82 +1,43 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 17 Feb 2014 14:39:06 +0100
-Subject: [PATCH] Fix uses of dma_max_pfn() when converting to a limiting
- address
-In-Reply-To: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
-References: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAPDyKFqb6w9rcDsVX6PivpGdC0_9njgzaOMNOF4F_8zJOPhfDg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Feb 2014 14:37:55 +0100
+Subject: [PATCH v2 0/5] ARM: sun6i: Add support for the A31 I2C controller
+In-Reply-To: <1389609293-2824-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1389609293-2824-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140217133755.GA3119@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 February 2014 18:28, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> We must use a 64-bit for this, otherwise overflowed bits get lost, and
-> that can result in a lower than intended value set.
->
-> Fixes: 8e0cb8a1f6ac ("ARM: 7797/1: mmc: Use dma_max_pfn(dev) helper for bounce_limit calculations")
-> Fixes: 7d35496dd982 ("ARM: 7796/1: scsi: Use dma_max_pfn(dev) helper for bounce_limit calculations")
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Hi Wolfram,
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+On Mon, Jan 13, 2014 at 11:34:48AM +0100, Maxime Ripard wrote:
+> Hi everyone,
+> 
+> This patchset adds support the A31 i2c controller. This is mostly the
+> same controller as the one found in the other Allwinner SoCs, except
+> for the interrupts acking.
+> 
+> On the other SoCs using this driver, the interrupts are acked by
+> clearing the INT_FLAG bit in the control register, while on the A31,
+> the interrupt is acked by writing that bit into the control register.
+> 
+> The other difference is that the I2C IP is maintained in reset by a
+> reset controller, so we're adding optionnal support for the reset
+> framework in the driver to deassert the device from reset.
 
-> ---
-> While poking about with the Cubox-i4 and investigating why my UHS-1
-> SD card wasn't achieving its full potential, I came across a slight
-> problem... the SDHCI host sets a mask of 0xffffffff, but with the
-> start of memory at pfn 0x10000, the blk code sees this when setting
-> the bounce limit:
->
->         max addr 0x0ffff000 bounce limit 0xffff dma 1
->
-> and this results in the bounce functions appearing in the profile:
->
-> 00000000c00f8b70 copy_to_high_bio_irq                  1139 2.5886
-> 00000000c00f8d28 bounce_end_io                           12 0.0714
-> 00000000c00f8dd0 bounce_end_io_read_isa                   8 0.1053
->
-> which, compared to the cost of copying the data to userland and
-> request handling, this is quite significant:
->
-> 00000000c04b1794 sdhci_request                          268 0.5447
-> 00000000c02d0740 __copy_to_user_std                     398 0.4252
->
-> With this calculation fixed, we avoid the bouncing code entirely.
->
->         max addr 0x10ffff000 bounce limit 0x10ffff dma 0
->
->  drivers/mmc/card/queue.c | 2 +-
->  drivers/scsi/scsi_lib.c  | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/card/queue.c b/drivers/mmc/card/queue.c
-> index 357bbc54fe4b..3e049c13429c 100644
-> --- a/drivers/mmc/card/queue.c
-> +++ b/drivers/mmc/card/queue.c
-> @@ -197,7 +197,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card,
->         struct mmc_queue_req *mqrq_prev = &mq->mqrq[1];
->
->         if (mmc_dev(host)->dma_mask && *mmc_dev(host)->dma_mask)
-> -               limit = dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
-> +               limit = (u64)dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
->
->         mq->card = card;
->         mq->queue = blk_init_queue(mmc_request_fn, lock);
-> diff --git a/drivers/scsi/scsi_lib.c b/drivers/scsi/scsi_lib.c
-> index 7bd7f0d5f050..62ec84b42e31 100644
-> --- a/drivers/scsi/scsi_lib.c
-> +++ b/drivers/scsi/scsi_lib.c
-> @@ -1684,7 +1684,7 @@ u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
->
->         host_dev = scsi_get_device(shost);
->         if (host_dev && host_dev->dma_mask)
-> -               bounce_limit = dma_max_pfn(host_dev) << PAGE_SHIFT;
-> +               bounce_limit = (u64)dma_max_pfn(host_dev) << PAGE_SHIFT;
->
->         return bounce_limit;
->  }
-> --
-> 1.8.3.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+It's been over a month now, and no sign of life from you on this patch
+so far... Should I just take this patchset through my tree? :)
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140217/cee08417/attachment.sig>
