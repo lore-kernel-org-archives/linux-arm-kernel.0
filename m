@@ -1,54 +1,31 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 17 Feb 2014 12:56:56 +0000
-Subject: [PATCH 1/3] ahci: st: Provide DT bindings for ST's SATA implementation
-Message-ID: <1392641818-23419-1-git-send-email-lee.jones@linaro.org>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 17 Feb 2014 13:57:39 +0100
+Subject: [PATCH v2] ARM: Add imprecise abort enable/disable macro
+In-Reply-To: <20140212131834.GP26684@n2100.arm.linux.org.uk>
+References: <1392050756-11145-1-git-send-email-fabrice.gasnier@st.com>
+ <52FB71A3.5010505@stericsson.com>
+ <20140212131834.GP26684@n2100.arm.linux.org.uk>
+Message-ID: <53020743.1070509@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: devicetree at vger.kernel.org
-Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/devicetree/bindings/ata/ahci-st.txt | 31 +++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/ata/ahci-st.txt
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-st.txt b/Documentation/devicetree/bindings/ata/ahci-st.txt
-new file mode 100644
-index 0000000..1b69fa9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/ata/ahci-st.txt
-@@ -0,0 +1,31 @@
-+STMicroelectronics STi SATA controller
-+
-+This binding describes a SATA device.
-+
-+Required properties:
-+ - compatible	   : Must be "st,ahci"
-+ - reg		   : Physical base addresses and length of register sets
-+ - interrupts	   : Interrupt associated with the SATA device
-+ - interrupt-names :   Associated name must be; "hostc"
-+ - resets	   : The power-down and soft-reset lines of SATA IP
-+ - reset-names	   :   Associated names must be; "pwr-dwn" and "sw-rst"
-+ - clocks	   : The phandle for the clock
-+ - clock-names	   :   Associated name must be; "ahci_clk"
-+ - phys		   : The phandle for the PHY device
-+ - phy-names	   :   Associated name must be; "ahci_phy"
-+
-+Example:
-+
-+	sata0: sata at fe380000 {
-+		compatible      = "st,ahci";
-+		reg             = <0xfe380000 0x1000>;
-+		interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
-+		interrupt-names = "hostc";
-+		phys	        = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
-+		phy-names       = "ahci_phy";
-+		resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
-+				  <&softreset STIH416_SATA0_SOFTRESET>;
-+		reset-names     = "pwr-dwn", "sw-rst";
-+		clocks	        = <&CLK_S_ICN_REG_0>;
-+		clock-names     = "ahci_clk";
-+	};
--- 
-1.8.3.2
+On 02/12/2014 02:18 PM, Russell King - ARM Linux wrote:
+> On Wed, Feb 12, 2014 at 02:05:39PM +0100, Fabrice GASNIER wrote:
+>> Hi,
+>>
+>> Any comments on this patch ?
+>>
+>> Russell, can I add this patch to your patch tracker system ?
+> I don't see how this works on anything but ARMv7M.
+>
+Hi Russel,
+
+I'm not sure how I can help to do that part for ARMv7M.
+Point is I don't have any ARMv7M hardware at my disposal to develop 
+and/or test with.
+
+Hopefully someone can help or take care of this part ?
+
+BR,
+Fabrice
