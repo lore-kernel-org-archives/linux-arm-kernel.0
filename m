@@ -1,68 +1,64 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 17 Feb 2014 12:34:21 +0000
-Subject: [PATCH 2/2] ARM: mm: keep rodata non-executable
-In-Reply-To: <CAGXu5jLmYLQpu9CDhoL-2OTdwxqrfVCFbojmpjpcpLqmA=wWYA@mail.gmail.com>
-References: <1392339850-18686-1-git-send-email-keescook@chromium.org>
- <1392339850-18686-3-git-send-email-keescook@chromium.org>
- <20140214162257.GB2331@e103592.cambridge.arm.com>
- <CAGXu5jLmYLQpu9CDhoL-2OTdwxqrfVCFbojmpjpcpLqmA=wWYA@mail.gmail.com>
-Message-ID: <20140217123415.GA2182@e103592.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Feb 2014 12:43:42 +0000
+Subject: [PATCH] Fix uses of dma_max_pfn() when converting to a
+ limiting address
+In-Reply-To: <20140213200112.GF30257@n2100.arm.linux.org.uk>
+References: <E1WDH7v-00038J-2k@rmk-PC.arm.linux.org.uk>
+ <1392310690.2175.13.camel@dabdike.int.hansenpartnership.com>
+ <20140213171117.GA30257@n2100.arm.linux.org.uk>
+ <1392314821.2175.16.camel@dabdike.int.hansenpartnership.com>
+ <20140213200112.GF30257@n2100.arm.linux.org.uk>
+Message-ID: <20140217124342.GP30257@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 11:11:07AM -0800, Kees Cook wrote:
-> On Fri, Feb 14, 2014 at 8:22 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> > On Thu, Feb 13, 2014 at 05:04:10PM -0800, Kees Cook wrote:
-> >> Introduce "CONFIG_DEBUG_RODATA" to mostly match the x86 config, though
-> >> the behavior is different: it depends on STRICT_KERNMEM_PERMS, which
-> >> sets rodata read-only (but executable), where as this option additionally
-> >> splits rodata from the kernel text (resulting in potentially more memory
-> >> lost to padding) and sets it non-executable as well. The end result is
-> >> that on builds with CONFIG_DEBUG_RODATA=y (like x86) the rodata with be
-> >> marked purely read-only.
-> >
-> > This triggers an Oops in kexec, because we have a block of code in .text
-> > which is a template for generating baremetal code to relocate the new
-> > kernel, and some literal words are written into it before copying.
+On Thu, Feb 13, 2014 at 08:01:12PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Feb 13, 2014 at 10:07:01AM -0800, James Bottomley wrote:
+> > On Thu, 2014-02-13 at 17:11 +0000, Russell King - ARM Linux wrote:
+> > > On Thu, Feb 13, 2014 at 08:58:10AM -0800, James Bottomley wrote:
+> > > > This doesn't really look like the right fix.  You replaced dev->dma_mask
+> > > > with a calculation on dev_max_pfn().  Since dev->dma_mask is always u64
+> > > > and dev_max_pfn is supposed to be returning the pfn of the dma_mask, it
+> > > > should unconditionally be 64 bits as well.  Either that or it should
+> > > > return dma_addr_t.
+> > > 
+> > > My reasoning is that PFNs in the system are always of type "unsigned long"
+> > > and therefore a function returning a pfn should have that type.  If we
+> > > overflow a PFN fitting in an unsigned long, we have lots of places which
+> > > need fixing.
+> > 
+> > It's not intuitive to people who need the dma mask that they're supposed
+> > to use dma_max_pfn() << PAGE_SHIFT but now they have to worry about the
+> > casting and, if they don't get it right, nothing will warn or tell them.
+> > what about a new macro, say dma_max_mask(dev) that just returns
+> > (u64)dma_max_pfn() << PAGE_SHIFT?
 > 
-> You're writing into the text area? I would imagine that
-> CONFIG_ARM_KERNMEM_PERMS would break that. However, that's not the
-> right place to be building code -- shouldn't the module area be used
-> for that?
+> This sounds like a good idea.
 > 
-> > Possibly this should be in .rodata, not .text.
+> I've just been looking at places which do this << PAGE_SHIFT, and we
+> have other places which suffer from this same bug all over the kernel,
+> so maybe we actually need a pfn_to_addr() macro or similar so that
+> people get this right in these other places too?  It appears to be
+> quite a widespread problem.
 > 
-> Well, rodata should be neither writable nor executable.
-
-We're not writing into code exactly.
-
-This code is never executed in-place in vmlinux.  It gets copied, and
-only copies are ever executed.
-
-Some pointers and offsets get poked into the code to configure it.
-
-I think it would be better simply to put the code in .rodata, and
-poke paramaters into the copy, not the original -- but that's a bit
-more awkward to code up, since the values can't be poked simply by
-writing global variables.
-
+> I'm surprised none of the below haven't already caused a problem.
 > 
-> > There may be a few other instances of this kind of thing.
-> 
-> This config will certainly find them! :) But, that's why it's behind a config.
+> Thoughts?
 
-I haven't tested exhaustively, but it think this is sufficient for a
-Tested-by.  The patch does seem to be doing what it is intended to
-do, and doesn't seem to be triggering false positives all over the
-place.
+Okay, as there's been no response to this, I'm going to push the patch
+as-is to Linus this evening.
 
-> 
-> > Are you aware of similar situations on other arches?
-> 
-> I think there were some problems a long time ago on x86 for rodata too.
+Nevertheless, your point is valid, but it is more of a general problem in
+the kernel than with this specific change - and it's more important to fix
+the existing problem here than to try and work out a new way of sorting
+this out to fix the general case in the middle of the -rc series.
 
-It would be good to get this kexec case fixed -- I'll try to hack up
-a separate patch.
+It is arguable that people _should_ know that shifting an unsigned long
+left and assigning it to a u64 doesn't automatically get any of the high
+bits set - the promotion happens at assignment, not while the expression
+is being evaluated.
 
-Cheers
----Dave
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
