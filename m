@@ -1,110 +1,57 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 17 Feb 2014 08:43:05 +0100
-Subject: [PATCH] [RFC] ARM: ixp4xx: fix timer latch calculation
-In-Reply-To: <1391423479-10007-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20140113194259.GG29475@pengutronix.de>
- <1391423479-10007-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20140217074305.GB1844@pengutronix.de>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Mon, 17 Feb 2014 13:22:55 +0530
+Subject: [PATCH 1/1] ARM: OMAP: Kill warning in CPUIDLE code with !CONFIG_SMP
+Message-ID: <1392623575-4884-1-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Olof,
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-I'd like to remove the timex.h cleanup from my todo list as done. How
-can we get forward here?
+for non SMP build, NR_CPUS is 1 and hence the code complains with below
+warnings.
 
-Best regards
-Uwe
+arch/arm/mach-omap2/cpuidle44xx.c:207:8: warning: array subscript is above array bounds [-Warray-bounds]
+arch/arm/mach-omap2/cpuidle44xx.c:212:11: warning: array subscript is above array bounds [-Warray-bounds]
 
-On Mon, Feb 03, 2014 at 11:31:19AM +0100, Uwe Kleine-K?nig wrote:
-> In commit f0402f9b4711 ("ARM: ixp4xx: stop using <mach/timex.h>")
-> I didn't intend to implement a functional change, but as Olof noticed I
-> failed---at least a bit. Before this commit the following was used to
-> determine the latch value used:
-> 
-> 	#define IXP4XX_TIMER_FREQ 66666000
-> 	#define CLOCK_TICK_RATE \
-> 		(((IXP4XX_TIMER_FREQ / HZ & ~IXP4XX_OST_RELOAD_MASK) + 1) * HZ)
-> 	#define LATCH ((CLOCK_TICK_RATE + HZ/2) / HZ)
-> 
-> The complicated calculation was done "b/c the timer register ignores the
-> bottom 2 bits of the LATCH value." With HZ=100 CLOCK_TICK_RATE used to
-> calculate to 66666100 and so LATCH to 666661. In ixp4xx_set_mode the
-> term
-> 
-> 	LATCH & ~IXP4XX_OST_RELOAD_MASK
-> 
-> was used to write to the relevant register (with IXP4XX_OST_RELOAD_MASK
-> being 3) and so effectively 666660 was used.
-> 
-> In commit f0402f9b4711 I translated that to:
-> 
-> 	#define IXP4XX_TIMER_FREQ 66666000
-> 	#define IXP4XX_LATCH DIV_ROUND_CLOSEST(IXP4XX_TIMER_FREQ, HZ)
-> 
-> which results in the same register writes, but still doesn't bear in
-> mind that the two least significant bits cannot be specified (which is
-> relevant only when HZ or IXP4XX_TIMER_FREQ are changed).
-> 
-> Instead of reverting back to the old approach use a more obvious and
-> also more correct way to calculate LATCH. (Regarding the more
-> correct claim: With IXP4XX_TIMER_FREQ == 66665999, the old code resulted
-> in LATCH = 666657 corresponding to a cycle time of 0.009999940149400597
-> seconds (error: -6.0e-8 s) while the new approach results in LATCH =
-> 666660 and so a cycle time of 0.010000000150001503 seconds
-> (error: 1.5e-10 s).)
-> 
-> Fixes: f0402f9b4711 ("ARM: ixp4xx: stop using <mach/timex.h>")
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> I didn't hear anything back from the ixp4xx maintainers, I didn't find a
-> reference manual and I don't have an ixp4xx machine to test this patch.
-> Still I'm confident it works as expected and results in a more exact
-> clock calculation than both before and after my patch.
-> 
-> Olof requested this to be a seperate patch to not need to reverify the
-> rest of the series. Does this make the series ready to be merged for
-> 3.15 now? If so, should I send a new pull request with this patch
-> applied on top of the old request or do you handle that yourself?
-> 
-> Best regards
-> Uwe
-> 
->  arch/arm/mach-ixp4xx/common.c | 10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-> index 20b62aa30086..37e6cdac1642 100644
-> --- a/arch/arm/mach-ixp4xx/common.c
-> +++ b/arch/arm/mach-ixp4xx/common.c
-> @@ -45,7 +45,15 @@
->  #include <asm/mach/time.h>
->  
->  #define IXP4XX_TIMER_FREQ 66666000
-> -#define IXP4XX_LATCH DIV_ROUND_CLOSEST(IXP4XX_TIMER_FREQ, HZ)
-> +
-> +/*
-> + * The timer register doesn't allow to specify the two least significant bits of
-> + * the timeout value and assumes them being zero. So make sure IXP4XX_LATCH is
-> + * the best value with the two least significant bits unset.
-> + */
-> +#define IXP4XX_LATCH DIV_ROUND_CLOSEST(IXP4XX_TIMER_FREQ, \
-> +				       (IXP4XX_OST_RELOAD_MASK + 1) * HZ) * \
-> +			(IXP4XX_OST_RELOAD_MASK + 1)
->  
->  static void __init ixp4xx_clocksource_init(void);
->  static void __init ixp4xx_clockevent_init(void);
-> -- 
-> 1.8.5.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Kill it by making array size fixed.
 
+Acked-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+---
+This patch is created on top of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git master
+
+---
+ arch/arm/mach-omap2/cpuidle44xx.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+index 4c158c8..01fc710 100644
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -23,6 +23,8 @@
+ #include "prm.h"
+ #include "clockdomain.h"
+ 
++#define MAX_CPUS	2
++
+ /* Machine specific information */
+ struct idle_statedata {
+ 	u32 cpu_state;
+@@ -48,11 +50,11 @@ static struct idle_statedata omap4_idle_data[] = {
+ 	},
+ };
+ 
+-static struct powerdomain *mpu_pd, *cpu_pd[NR_CPUS];
+-static struct clockdomain *cpu_clkdm[NR_CPUS];
++static struct powerdomain *mpu_pd, *cpu_pd[MAX_CPUS];
++static struct clockdomain *cpu_clkdm[MAX_CPUS];
+ 
+ static atomic_t abort_barrier;
+-static bool cpu_done[NR_CPUS];
++static bool cpu_done[MAX_CPUS];
+ static struct idle_statedata *state_ptr = &omap4_idle_data[0];
+ 
+ /* Private functions */
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.9.0.rc3.21.g475c52b
