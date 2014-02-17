@@ -1,40 +1,63 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 17 Feb 2014 10:12:37 +0100
-Subject: [PATCH 2/5] ARM: shmobile: r8a7791: add i2c master nodes to dtsi
-In-Reply-To: <CANqRtoSDxQfSw5PJB6-UcL-UuMySBkoCqfC+1H=o-EBA18ouLQ@mail.gmail.com>
-References: <1392543658-5030-1-git-send-email-wsa@the-dreams.de>
- <1392543658-5030-3-git-send-email-wsa@the-dreams.de>
- <20140217075410.GA2633@katana>
- <CANqRtoSDxQfSw5PJB6-UcL-UuMySBkoCqfC+1H=o-EBA18ouLQ@mail.gmail.com>
-Message-ID: <20140217091237.GC2633@katana>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 17 Feb 2014 10:18:40 +0100
+Subject: [PATCH] arm: imx: remove MACH_MXLADS
+In-Reply-To: <1392627768.10966.23.camel@x220>
+References: <1392573811.28866.22.camel@x220>
+ <1392578464.996901773@f49.i.mail.ru>
+ <1392582900.28866.85.camel@x220>
+ <1392612187.657010375@f87.i.mail.ru>
+ <1392627768.10966.23.camel@x220>
+Message-ID: <20140217091840.GO17250@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Feb 17, 2014 at 10:02:48AM +0100, Paul Bolle wrote:
+> On Mon, 2014-02-17 at 08:43 +0400, Alexander Shiyan wrote:
+> > It seems that even in the current state, Kconfig for i.MX contains an error.
+> > As a start, we should rename ARCH_MX1ADS to MACH_MX1ADS first.
 
-> > Why is that? From my knowledge, you start with the exact compatible
-> > property and hardware compatible entries may follow.
-> 
-> I think this boils down to if they really are compatible or not. If
-> for instance a 16550 port would be compatible with 8250 on a hardware
-> level then using them in the order of "16550", "8250" makes sense. In
-> this case the r8a7791 i2c is not really strictly based on r8a7790 i2c,
-> it is just that r8a7790 has support in the driver. So it's a short cut
-> instead of actual hardware compatibility.
+No. Have a look at arch/arm/tools/mach-types:
 
-I don't get this point. The legacy board code for koelsch and lager both
-create a platform_device with "i2c-rcar_gen2", so the cores surely must
-be compatible? Maybe the cores are not strictly based on each other, but
-compatible, yes, I'd say.
+mxlads                  MACH_MXLADS             MXLADS	1851
+mx1ads                  ARCH_MX1ADS             MX1ADS  160
 
-> So far we've dealt with this by updating the driver and only relying
-> on the actual SoC name as suffix.
+And what gen-mach-types makes from it:
 
-OK, for consistency reasons I will resend.
+#ifdef CONFIG_MACH_MXLADS
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type     __machine_arch_type
+# else
+#  define machine_arch_type     MACH_TYPE_MXLADS
+# endif
+# define machine_is_mxlads()    (machine_arch_type == MACH_TYPE_MXLADS)
+#else
+# define machine_is_mxlads()    (0)
+#endif
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140217/064932de/attachment.sig>
+#ifdef CONFIG_ARCH_MX1ADS
+# ifdef machine_arch_type
+#  undef machine_arch_type
+#  define machine_arch_type     __machine_arch_type
+# else
+#  define machine_arch_type     MACH_TYPE_MX1ADS
+# endif
+# define machine_is_mx1ads()    (machine_arch_type == MACH_TYPE_MX1ADS)
+#else
+# define machine_is_mx1ads()    (0)
+#endif
+
+So machine_is_mx1ads() can only ever evaluate to true when
+CONFIG_ARCH_MX1ADS is set and machine_is_mxlads() can only evaluate to true
+when CONFIG_MACH_MXLADS is set.
+
+Whether to use ARCH or MACH simply depends on what Russell has in the
+machine registry database for a given board.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
