@@ -1,23 +1,36 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 17 Feb 2014 21:07:26 +0900
-Subject: [PATCH V2 2/2] ARM: shmobile: r8a7791: add i2c2 bus to koelsch dt
-In-Reply-To: <1392633882-12142-2-git-send-email-wsa@the-dreams.de>
-References: <1392633882-12142-1-git-send-email-wsa@the-dreams.de>
- <1392633882-12142-2-git-send-email-wsa@the-dreams.de>
-Message-ID: <CANqRtoT56p4XtYaPhk8abrRppdiO+ekey_mGhE+WyAX1u10f+Q@mail.gmail.com>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Mon, 17 Feb 2014 17:51:45 +0530
+Subject: [PATCH v9 1/6] arm64: Add macros to manage processor debug state
+In-Reply-To: <20140129105546.GC26622@mudshark.cambridge.arm.com>
+References: <1390908022-10287-1-git-send-email-vijay.kilari@gmail.com>
+ <1390908022-10287-2-git-send-email-vijay.kilari@gmail.com>
+ <20140129105546.GC26622@mudshark.cambridge.arm.com>
+Message-ID: <CALicx6uw3En92GhrKpAoavzwwNKWR8C8hHcS5B+eyLX_dC0LBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 7:44 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
+Hi Catalin,
+
+   If it is ok, can you please merge these patches
+
+Regards
+Vijay
+
+On Wed, Jan 29, 2014 at 4:25 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Jan 28, 2014 at 11:20:17AM +0000, vijay.kilari at gmail.com wrote:
+>> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+>>
+>> Add macros to enable and disable to manage PSTATE.D
+>> for debugging. The macros local_dbg_save and local_dbg_restore
+>> are moved to irqflags.h file
+>>
+>> KGDB boot tests fail because of PSTATE.D is masked.
+>> unmask it for debugging support
+>>
+>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 >
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
-> ---
->  arch/arm/boot/dts/r8a7791-koelsch.dts | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-
-Acked-by: Magnus Damm <damm@opensource.se>
-
-Thanks,
-
-/ magnus
+> Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> Cheers,
+>
+> Will
