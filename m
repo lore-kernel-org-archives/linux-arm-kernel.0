@@ -1,83 +1,52 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 17 Feb 2014 12:21:48 -0300
-Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-In-Reply-To: <53021BD2.3090301@free-electrons.com>
-References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140205183457.GW8533@titan.lakedaemon.net>
- <20140217141336.GA2765@localhost>
- <53021BD2.3090301@free-electrons.com>
-Message-ID: <20140217152147.GC2765@localhost>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 17 Feb 2014 10:23:23 -0500
+Subject: [v3.14-rc3 BUG] 1) panic and 2) SATA not working (Was Re:
+ [PATCH] ATA: SATA_MV: Add missing Kconfig select statememnt)
+In-Reply-To: <20140217151315.GB2765@localhost>
+References: <52e00d45.5gijwyKGLiVLcCNX%fengguang.wu@intel.com>
+ <1390420593-27697-1-git-send-email-andrew@lunn.ch>
+ <20140129182035.GM30842@htj.dyndns.org>
+ <20140217151315.GB2765@localhost>
+Message-ID: <20140217152323.GP7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 03:25:22PM +0100, Gregory CLEMENT wrote:
-> On 17/02/2014 15:13, Ezequiel Garcia wrote:
-> > On Wed, Feb 05, 2014 at 01:34:57PM -0500, Jason Cooper wrote:
-> >> On Sat, Jan 25, 2014 at 07:19:06PM +0100, Sebastian Hesselbarth wrote:
-> >>> This patch set fixes clk init order that went upside-down with
-> >>> v3.14. I haven't really investigated what caused this, but I assume
-> >>> it is related with DT node reordering by addresses.
-> >>>
-> >>> Anyway, with v3.14 for MVEBU SoCs, the clock gating driver gets
-> >>> registered before core clocks driver. Unfortunately, we cannot
-> >>> return -EPROBE_DEFER in drivers initialized by clk_of_init. As the
-> >>> init order for our drivers is always core clocks before clock gating,
-> >>> we maintain init order ourselves by hooking CLK_OF_DECLARE to one
-> >>> init function that will register core clocks before clock gating
-> >>> driver.
-> >>>
-> >>> This patch is based on pre-v3.14-rc1 mainline and should go in as
-> >>> fixes for it. As we now send MVEBU clk pull-requests to Mike directly,
-> >>> I suggest Jason picks it up as a topic branch.
-> >>>
-> >>> The patches have been boot tested on Dove and compile-tested only
-> >>> for Kirkwood, Armada 370 and XP.
-> >>>
-> >>> Sebastian Hesselbarth (4):
-> >>>   clk: mvebu: armada-370: maintain clock init order
-> >>>   clk: mvebu: armada-xp: maintain clock init order
-> >>>   clk: mvebu: dove: maintain clock init order
-> >>>   clk: mvebu: kirkwood: maintain clock init order
-> >>>
-> >>>  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
-> >>>  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
-> >>>  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
-> >>>  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
-> >>>  4 files changed, 44 insertions(+), 50 deletions(-)
-> >>
-> >> Whole series applied to mvebu/clk-fixes.
-> >>
+On Mon, Feb 17, 2014 at 12:13:16PM -0300, Ezequiel Garcia wrote:
+> On Wed, Jan 29, 2014 at 01:20:35PM -0500, Tejun Heo wrote:
+> > On Wed, Jan 22, 2014 at 08:56:33PM +0100, Andrew Lunn wrote:
+> > > SATA_MV depends on GENERIC_PHY. So if SATA_MV is built in, GENERIC_PHY
+> > > cannot be modular. Fixes build error found by kbuild test robot.
+> > > 
+> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > > 
-> > Are we still in time to consider Emilio's oneline proposal?
-> > (Emilio: would you mind preparing a suitable patch against dove,
-> > kirkwood, armada370/xp, so we can see the real thing?).
+> > Applied to libata/for-3.14-fixes.  Thanks.
+> > 
 > 
-> I am still strongly against this proposal because hard-coded the parent
-> clock name in the driver seems very wrong and moreover in some circumstances
-> (if there is no output-name, which is our default case) this proposal
-> just ignored the parent clock given by the device tree and this looked
-> more wrong.
+> Tejun, Jason:
 > 
+> The lack of this patch in -rc3, just made my Armada XP GP board panic.
+> 
+> The panic is the same as this one (reported on Kirkwood):
+> http://www.spinics.net/lists/arm-kernel/msg308080.html
+> 
+> Which is fixed in linux-next (and should be in -rc4, right?) by:
+> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=8ad116e649b21a42e3cccfb3c1b8d5ea52ba19e5
+> 
+> The SATA won't get probed unless this commit from linux-next is also applied:
+> 
+> commit 49c8f1ffe26ffddfb7244a24db21c0b4a79e1c52
+> Author: Andrew Lunn <andrew@lunn.ch>
+> Date:   Wed Jan 22 20:56:33 2014 +0100
+> 
+>     ATA: SATA_MV: Add missing Kconfig select statememnt
+> 
+> I guess it felt through someone cracks...
 
-So you're against the proposal as a permanent fix, *and* against the
-proposal as a workaround fix?
+Well, sort of.  By the time I saw it, and realized it should be kept
+next to the phy series fixes, Tejun had already taken it.
 
-> > 
-> > Sebastian fix works perfect, and it easy to understand. However, it has
-> > quite a large diffstat. When compared to Emilio's oneline proposal, it
-> > seems to me it would be preferable, unless it's broken.
-> > 
-> > Workaround or not, the fact is this code will be in v3.14, so maybe we
-> > can spend some time considering a cleaner option.
-> > 
+Looking back, I don't have the patch in my inbox...
 
-Before discussing the solution as compared to your for-v3.15 clock
-registration order patch, I wanted to trigger some discussion around
-replacing this big and intrusive workaround with Emilio's oneline fix.
+thx,
 
-Let's suppose we're considering them as workaround to live just one or
-two releases. Wouldn't it be better to take the least instrusive?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Jason.
