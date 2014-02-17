@@ -1,54 +1,56 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 17 Feb 2014 11:05:03 +0100
-Subject: [PATCH v3 7/7] ARM: dts: imx6sl: Add power-domain information to gpc
- node
+Date: Mon, 17 Feb 2014 11:05:00 +0100
+Subject: [PATCH v3 4/7] ARM: imx6: gpc: Add observed worst case latencies
 In-Reply-To: <1392631503-17283-1-git-send-email-p.zabel@pengutronix.de>
 References: <1392631503-17283-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1392631503-17283-8-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1392631503-17283-5-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PGC that is part of GPC controls isolation and power sequencing of the
-power domains. The PU power domain will be handled by the generic pm domain
-framework and needs a phandle to the PU regulator to turn off power when
-the domain is disabled.
+This avoids the "... latency exceeded, new value ..." warnings
+emitted by the power domain framework code whenever the PU domain
+is enabled or disabled.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6sl.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/mach-imx/gpc.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 28558f1..774e1fb 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -529,9 +529,27 @@
- 			};
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index e16e36a..9ca81d8 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -225,6 +225,8 @@ static struct generic_pm_domain imx6q_pu_domain = {
+ 	.name = "PU",
+ 	.power_off = imx6q_pm_pu_power_off,
+ 	.power_on = imx6q_pm_pu_power_on,
++	.power_off_latency_ns = 25000,
++	.power_on_latency_ns = 2000000,
+ };
  
- 			gpc: gpc at 020dc000 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
- 				compatible = "fsl,imx6sl-gpc", "fsl,imx6q-gpc";
- 				reg = <0x020dc000 0x4000>;
- 				interrupts = <0 89 0x04>;
-+				pu-supply = <&reg_pu>;
-+
-+				pd_display: display-power-domain at 020dc240 {
-+					compatible = "fsl,imx6q-power-domain";
-+					reg = <0x020dc240 0x10>;
-+				};
-+
-+				pd_pu: pu-power-domain at 020dc260 {
-+					compatible = "fsl,imx6q-power-domain";
-+					reg = <0x020dc260 0x10>;
-+				};
-+
-+				pd_arm: cpu-power-domain at 020dc2a0 {
-+					compatible = "fsl,imx6q-power-domain";
-+					reg = <0x020dc2a0 0x10>;
-+				};
- 			};
+ int imx6q_pm_clk_add(struct device *dev)
+@@ -289,6 +291,13 @@ int imx6q_pm_clk_remove(struct device *dev)
+ 	return 0;
+ }
  
- 			gpr: iomuxc-gpr at 020e0000 {
++static struct gpd_timing_data pu_timing_data = {
++	.stop_latency_ns = 2000,
++	.start_latency_ns = 2000,
++	.save_state_latency_ns = 5000,
++	.restore_state_latency_ns = 20000000, /* VPU firmware reload */
++};
++
+ static int imx6q_pm_notifier_call(struct notifier_block *nb,
+ 				  unsigned long event, void *data)
+ {
+@@ -303,7 +312,7 @@ static int imx6q_pm_notifier_call(struct notifier_block *nb,
+ 		if (!np || np != imx6q_pu_domain.of_node)
+ 			return NOTIFY_DONE;
+ 
+-		ret = pm_genpd_of_add_device(np, dev);
++		ret = __pm_genpd_of_add_device(np, dev, &pu_timing_data);
+ 		if (ret)
+ 			dev_err(dev, "failed to add to power domain: %d\n",
+ 				ret);
 -- 
 1.8.5.3
