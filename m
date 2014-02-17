@@ -1,89 +1,187 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 18 Feb 2014 08:25:11 +0900
-Subject: [PATCH 1/3] mmc: add support for power-on sequencing through DT
-In-Reply-To: <1528854.BAQRr94nzx@wuerfel>
-References: <1390190215-22700-1-git-send-email-olof@lixom.net>
- <1580658.FIe4en5bEU@wuerfel> <52FF6A16.5080201@gmail.com>
- <1528854.BAQRr94nzx@wuerfel>
-Message-ID: <20140217232511.GA2669@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 17 Feb 2014 18:38:55 -0500
+Subject: [PATCH v2 10/23] ARM: MM: Add DT binding for Feroceon L2 cache
+In-Reply-To: <1392459621-24003-11-git-send-email-andrew@lunn.ch>
+References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
+ <1392459621-24003-11-git-send-email-andrew@lunn.ch>
+Message-ID: <20140217233855.GI7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 15, 2014 at 05:21:11PM +0100, Arnd Bergmann wrote:
-> On Saturday 15 February 2014 14:22:30 Tomasz Figa wrote:
+On Sat, Feb 15, 2014 at 11:20:08AM +0100, Andrew Lunn wrote:
+> Instantiate the L2 cache from DT. Indicate in DT where the cache
+> control register is and if write through should be made.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> cc: devicetree at vger.kernel.org
+> ---
+> v2:
+> Change compatible strings to follow l2x0 convention
+> Only expect register for kirkwood-cache.
+> Default to write through if no DT node.
+> Rename writethrough to wt-override to follow l2cc binding.
+> Split kirkwood.dtsi change into a patch of its own.
+> ---
+>  .../devicetree/bindings/arm/mrvl/feroceon.txt      | 17 +++++++
+>  arch/arm/include/asm/hardware/cache-feroceon-l2.h  |  2 +
+>  arch/arm/mach-kirkwood/board-dt.c                  | 15 +------
+>  arch/arm/mm/cache-feroceon-l2.c                    | 52 ++++++++++++++++++++++
+>  4 files changed, 72 insertions(+), 14 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/mrvl/feroceon.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/mrvl/feroceon.txt b/Documentation/devicetree/bindings/arm/mrvl/feroceon.txt
+> new file mode 100644
+> index 000000000000..d6d7d6195ed1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/mrvl/feroceon.txt
+> @@ -0,0 +1,17 @@
+> +* Marvell Feroceon Cache
+> +
+> +Required properties:
+> +- compatible : Should be either "marvell,ferocean-cache" or
+> +  	       "marvell,kirkwood-cache".
+> +
+> +Optional properties:
+> +- wt-override: If present then L2 is forced to Write through mode
+> +- reg        : Address of the L2 cache control register. Mandatory for
+> +  	       "marvell,kirkwood-cache", not used by "marvell,ferocean-cache"
 
-> > I'm not sure if we should assume that SPI = MMC over SPI. I believe 
-> > there might be a custom protocol involved as well.
+s/ferocean/feroceon/
 
-> In case of SD/MMC, you essentially have three separate command sets:
-> SPI, MMC and SD, and each of them has multiple versions. MMC and SD
-> compatible devices generally also support the SPI command set (IIRC
+If there's nothing else deserving a new series, I'll tweak this (and the
+other spelling nits that matter) when I pull in the series.
 
-...
+thx,
 
-> If a device supports both SDIO and SPI, I think a straightforward
-> implementation would be to use the exact same command set, but
-> you are right that this isn't the only possibility, and the SD/MMC
-> shows how they can be slightly different already.
+Jason.
 
-I'm aware of existing devices that do in fact break this assumption.
-
-> > Stepping aside from SPI, I already gave an example of a WLAN chip that 
-> > supports multiple control busses [1]. In addition to the commonly used 
-> > SDIO, it supports USB and HSIC as well:
-
-> > [1] http://www.marvell.com/wireless/assets/marvell_avastar_88w8797.pdf
-
-> > Moreover, some of Samsung boards use HSIC to communicate with modem 
-> > chips, which have exactly the same problem as we're trying to solve here 
-> > - they need to be powered on to be discovered.
-
-> Thanks, this definitely makes a good example. I see that it also
-> supports SPI mode for SDIO as mentioned in your link.
-
-Slimbus has all these issues too with the added fun that for normal
-operation some devices want to be in a low power mode where they're
-disconnected from the Slimbus a lot of the time.
-
-> * Olof's proposal (add properties or a child node to the host
->   controller node with just power-on sequencing information):
->   + We only need one implementation for each bus, possibly shared
->     across buses to some degree, and can handle lots of devices
->     without having to touch their individual drivers.
->   + A logical extension of things we already do on SD cards
->     (CD/WP GPIOs, external clocks and voltages supplied to
->     standard compliant devices as part of the normal probing)
->   - The shared code may get rather complex to deal with all
->     possible corner cases we run into over the years.
->   - Somewhat harder to do if you have to attach the power
->     information to a device node for a USB hub port, rather
->     than an SDIO controller that only has one slave device.
-
-We would also need mechanisms to allow devices to take over the running
-of their own resources for cases like the Slimbus ones I mentioned, and
-some mechanism to cope with devices that hotplug themselves in normal
-operation.
-
-> * Arnd's proposal (change bus code to probe nonstandard devices
->   from DT if we can't easily detect them):
-
-I've also proposed this in the past FWIW but never got far enough
-through my list of things I want to do with my subsystems to actually
-start coding.
-
->   - Has to be implemented in each driver that needs it, making
->     it harder to share code for drivers with the same need
->     (e.g. every device that just needs an external reset
->     trigger).
-
-I think we can probably come up with some standard helpers that work
-well for the common case here (see also some of the discussions about
-power domains ensuring that core IP clocks are provided for IPs, it's
-kind of circling back to the same issues).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/ff86593e/attachment.sig>
+> +
+> +
+> +Example:
+> +		l2: l2-cache at 20128 {
+> +			compatible = "marvell,kirkwood-cache";
+> +			reg = <0x20128 0x4>;
+> +		};
+> diff --git a/arch/arm/include/asm/hardware/cache-feroceon-l2.h b/arch/arm/include/asm/hardware/cache-feroceon-l2.h
+> index 8edd330aabf6..12e1588dc4f1 100644
+> --- a/arch/arm/include/asm/hardware/cache-feroceon-l2.h
+> +++ b/arch/arm/include/asm/hardware/cache-feroceon-l2.h
+> @@ -9,3 +9,5 @@
+>   */
+>  
+>  extern void __init feroceon_l2_init(int l2_wt_override);
+> +extern int __init feroceon_of_init(void);
+> +
+> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> index 34c35510fd17..2ef59ee2182d 100644
+> --- a/arch/arm/mach-kirkwood/board-dt.c
+> +++ b/arch/arm/mach-kirkwood/board-dt.c
+> @@ -42,19 +42,6 @@ static void __init kirkwood_map_io(void)
+>  	iotable_init(kirkwood_io_desc, ARRAY_SIZE(kirkwood_io_desc));
+>  }
+>  
+> -static void __init kirkwood_l2_init(void)
+> -{
+> -#ifdef CONFIG_CACHE_FEROCEON_L2
+> -#ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
+> -	writel(readl(L2_CONFIG_REG) | L2_WRITETHROUGH, L2_CONFIG_REG);
+> -	feroceon_l2_init(1);
+> -#else
+> -	writel(readl(L2_CONFIG_REG) & ~L2_WRITETHROUGH, L2_CONFIG_REG);
+> -	feroceon_l2_init(0);
+> -#endif
+> -#endif
+> -}
+> -
+>  static struct resource kirkwood_cpufreq_resources[] = {
+>  	[0] = {
+>  		.start  = CPU_CONTROL_PHYS,
+> @@ -211,7 +198,7 @@ static void __init kirkwood_dt_init(void)
+>  
+>  	BUG_ON(mvebu_mbus_dt_init());
+>  
+> -	kirkwood_l2_init();
+> +	feroceon_of_init();
+>  
+>  	kirkwood_cpufreq_init();
+>  	kirkwood_cpuidle_init();
+> diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
+> index 898362e7972b..17a1ecd7a40c 100644
+> --- a/arch/arm/mm/cache-feroceon-l2.c
+> +++ b/arch/arm/mm/cache-feroceon-l2.c
+> @@ -13,11 +13,16 @@
+>   */
+>  
+>  #include <linux/init.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+>  #include <linux/highmem.h>
+> +#include <linux/io.h>
+>  #include <asm/cacheflush.h>
+>  #include <asm/cp15.h>
+>  #include <asm/hardware/cache-feroceon-l2.h>
+>  
+> +#define L2_WRITETHROUGH_KIRKWOOD	BIT(4)
+> +
+>  /*
+>   * Low-level cache maintenance operations.
+>   *
+> @@ -350,3 +355,50 @@ void __init feroceon_l2_init(int __l2_wt_override)
+>  	printk(KERN_INFO "Feroceon L2: Cache support initialised%s.\n",
+>  			 l2_wt_override ? ", in WT override mode" : "");
+>  }
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id feroceon_ids[] __initconst = {
+> +	{ .compatible = "marvell,kirkwood-cache"},
+> +	{ .compatible = "marvell,feroceon-cache"},
+> +	{}
+> +};
+> +
+> +int __init feroceon_of_init(void)
+> +{
+> +	struct device_node *node;
+> +	void __iomem *base;
+> +	bool l2_wt_override = false;
+> +	struct resource res;
+> +
+> +	node = of_find_matching_node(NULL, feroceon_ids);
+> +	if (!node) {
+> +		/*
+> +		 * If we don't know the write through state then
+> +		 * assume it is write back, as that is the safest
+> +		 * option.
+> +		 */
+> +		feroceon_l2_init(0);
+> +		return 0;
+> +	}
+> +
+> +	if (of_device_is_compatible(node, "marvell,kirkwood-cache")) {
+> +		if (of_property_read_bool(node, "wt-override"))
+> +			l2_wt_override = true;
+> +
+> +		if (of_address_to_resource(node, 0, &res))
+> +			return -ENODEV;
+> +
+> +		base = ioremap(res.start, resource_size(&res));
+> +		if (!base)
+> +			return -ENOMEM;
+> +
+> +		if (l2_wt_override)
+> +			writel(readl(base) | L2_WRITETHROUGH_KIRKWOOD, base);
+> +		else
+> +			writel(readl(base) & ~L2_WRITETHROUGH_KIRKWOOD, base);
+> +	}
+> +
+> +	feroceon_l2_init(l2_wt_override);
+> +
+> +	return 0;
+> +}
+> +#endif
+> -- 
+> 1.8.5.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
