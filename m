@@ -1,44 +1,54 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 17 Feb 2014 20:14:31 +0900
-Subject: [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
-In-Reply-To: <CAMuHMdUiRb0VmtTw-v04Ex-YyfV00+ixQoDgE3yD8kKXxVWCxQ@mail.gmail.com>
-References: <20140217063152.21876.6981.sendpatchset@w520>
- <CAMuHMdUiRb0VmtTw-v04Ex-YyfV00+ixQoDgE3yD8kKXxVWCxQ@mail.gmail.com>
-Message-ID: <CANqRtoR1o+9NAwheRVffnY0LpdUKcK_hW9aAdZ_6+orav5vsXQ@mail.gmail.com>
+Date: Mon, 17 Feb 2014 20:16:47 +0900
+Subject: [PATCH] ARM: shmobile: Remove __init from
+ rcar_gen2_read_mode_pins()
+In-Reply-To: <1453243.5L1W6bkVz8@avalon>
+References: <20140217063510.21892.52120.sendpatchset@w520>
+ <1453243.5L1W6bkVz8@avalon>
+Message-ID: <CANqRtoR7C_v+PQt3J1tjSxvFcX87NZqZZ16tBULBYBz=_F-rFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 5:53 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Mon, Feb 17, 2014 at 7:31 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+Hi Laurent,
+
+On Mon, Feb 17, 2014 at 7:59 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Magnus,
+>
+> Thank you for the patch.
+>
+> On Monday 17 February 2014 15:35:10 Magnus Damm wrote:
 >> From: Magnus Damm <damm@opensource.se>
 >>
->> On R-Car Gen2 SoCs such as r8a7790 and r8a7791 the hardware boot
->> mode bit MD21 indicates if hardware debug mode is enabled or not.
+>> Remove __init from rcar_gen2_read_mode_pins() to allow
+>> it to be used after boot. For instance the R-Car Gen2
+>> MD21 check is needed even in the case of CPU Hotplug.
 >>
->> In case hardware debug mode is enabled print a warning and refrain
->> from booting secondary CPU cores. Without this patch Koelsch boards
->> with SW8-4 set to OFF will hang at SMP boot.
->
-> Ah, mine was set to OFF.
->
 >> Signed-off-by: Magnus Damm <damm@opensource.se>
->
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-
-Thanks!
-
-> with one minor nit:
->
->>  int shmobile_smp_apmu_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>> ---
+>>
+>>  Written against renesas-devel-v3.14-rc2-20140213
+>>
+>>  arch/arm/mach-shmobile/setup-rcar-gen2.c |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> --- 0001/arch/arm/mach-shmobile/setup-rcar-gen2.c
+>> +++ work/arch/arm/mach-shmobile/setup-rcar-gen2.c     2014-02-17
+>> 15:02:48.000000000 +0900 @@ -28,7 +28,7 @@
+>>
+>>  #define MODEMR 0xe6160060
+>>
+>> -u32 __init rcar_gen2_read_mode_pins(void)
+>> +u32 rcar_gen2_read_mode_pins(void)
 >>  {
->> +       /* Refrain boot when hardware debug mode is enabled */
->> +       if (rcar_gen2_read_mode_pins() & BIT(21)) {
->> +               pr_warn("Unable to boot CPU%d when MD21 is set\n", cpu);
+>>       void __iomem *modemr = ioremap_nocache(MODEMR, 4);
+>>       u32 mode;
 >
-> %u
+> Should we read the value once at boot time and cache it ?
 
-Good catch, will send a V2.
+Seems a bit of a micro-optimization to me, but sure, it can't hurt.
+
+Care to cook up an incremental patch implementing that? =)
 
 Cheers,
 
