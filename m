@@ -1,180 +1,179 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 17 Feb 2014 15:23:26 +0100
-Subject: [PATCH v4 08/13] ARM: mvebu: add Device Tree for the Armada 375 DB
- board
-In-Reply-To: <1392647011-30117-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392647011-30117-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1392647011-30117-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon, 17 Feb 2014 15:23:18 +0100
+Subject: [PATCH v4 00/13] Core support for Marvell Armada 375 and 38x
+Message-ID: <1392647011-30117-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 375 DB board is the development board from Marvell for the
-Armada 375 SoC. This commit adds a Device Tree description for this
-board, which enables the following features:
+Jason, Andrew, Sebastian, Gregory,
 
+Here comes the v4 of the Armada 375/38x core support.
+
+Changes since v3
+================
+
+ * Renamed the armada-mvebu.c file to board-v7.c file, as it is aimed
+   at containing the DT_MACHINE_START structure and related operations
+   for all the mvebu v7 platforms, Marvell Dove
+   included. Consequently, renamed the MACH_ARMADA_MVEBU hidden
+   Kconfig symbol to MACH_MVEBU_V7, and functions named
+   armada_mvebu_<something>() to just mvebu_<something>().
+
+ * Added NAND support for Armada 375, both at the SoC level (.dtsi)
+   and the board level (.dts). Thanks to Ezequiel Garcia for providing
+   the patches!
+
+Changes since v2
+================
+
+ * Integrated the support of Armada 375 and Armada 38x in the same
+   "board file" as Armada 370/XP, as suggested by Arnd Bergmann. In
+   order to achieve this, I've renamed armada-370-xp.c to
+   armada-mvebu.c, and done corresponding minor cleanups before
+   introducing Armada 375/38x support.
+
+ * Made the data abort workaround check for a specific FSR value, as
+   suggested by Arnd Bergmann. Checking for the address is not
+   possible, because it changes from one boot to the other.
+
+ * Removed unnecessary duplicated aliases for i2c and spi nodes
+   (between .dtsi and .dts). Requested by Arnd Bergmann.
+
+ * Added aliases for network interfaces, like we already have for
+   Armada 370 and XP.
+
+Changes since v1
+================
+
+ * Merged armada-375.c and armada-38x.c into one file, as suggested by
+   Andrew Lunn.
+
+ * Do not require the introduction of new compatible strings in the
+   drivers for the timer, mbus and the 38x system controller (the 375
+   system controller being different, adding a different compatible
+   string is needed). The .dtsi files have been updated to use several
+   compatible strings: one designating the new SoC, and another one
+   designating the older SoC with which they are compatible as far as
+   we know today. Suggested by Jason Cooper and confirmed by Grant
+   Likely.
+
+ * Rename the Kconfig symbol from MACH_ARMADA_380 to MACH_ARMADA_38X,
+   as suggested by Andrew Lunn.
+
+ * Use <dt-bindings/gpio/gpio.h> defines instead of hardcoded values
+   in armada-375-db.dts. Suggested by Andrew Lunn.
+
+Original cover letter
+=====================
+
+Here is a set of 11 patches that add minimal support for the new
+Marvell Armada 375 and 38x SoCs. The Armada 375 has already been
+announced a few months ago by Marvell, and a product brief is
+available at
+http://www.marvell.com/embedded-processors/armada-375/. As far as I
+know, the Armada 380 and 385 have not yet been announced, but we
+already have working kernel support for them.
+
+Essentially, the Armada 375 is a dual-core Cortex-A9, which re-uses
+most of the IP blocks of the Armada XP, except for the network unit
+and core parts of the SoC, such as the interrupt controller or cache
+controller (GIC and PL310 are used). They also added an XHCI USB 3.0
+controller.
+
+The Armada 380 and 385 also use Cortex-A9 CPU cores (single core for
+the 380 and dual-core for the 385), but move a little further away
+than 375 in terms of peripherals: an AHCI-compatible SATA interface, a
+different MMC/SDIO interface, etc.
+
+This set of patches only add minimal support for these SOCs, as well
+as support for the peripherals for which no driver changes are
+needed. We therefore have support for:
+
+ * Device Bus
+ * Clocks
+ * Interrupt controllers: GIC and MPIC
+ * GPIO controllers
  * I2C buses
- * SDIO
- * Serial port
- * SPI bus, with a SPI flash. Note that the SPI bus is disabled by
-   default, because it conflicts with the NAND, and can only work if
-   the board boots out of SPI. Since most boards are shipped to boot
-   out of NAND, we're default to having the SPI bus disabled.
- * PCIe interfaces
+ * SPI buses
+ * L2 cache
+ * MBus controller
+ * SDIO (for Armada 375 only)
+ * Pinctrl
+ * SATA (for Armada 375 only)
+ * Serial
+ * System controller
+ * XOR engines
+ * PCIe controllers
+ * Network (for Armada 38x only)
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/Makefile          |   1 +
- arch/arm/boot/dts/armada-375-db.dts | 130 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 131 insertions(+)
+Some of these features require patches to other subsystems, and the
+patches are being sent to the respective maintainers currently: clock
+driver patches, pinctrl driver patches, irqchip driver patches, mbus
+driver patches, etc. There is however no build dependency between the
+arch/arm/mach-mvebu/ code and those other patches.
+
+We aim at getting this minimal support merged for 3.15.
+
+We have already working code for many more features, such as SMP,
+coherency support, NAND, SATA and SDIO for Armada 380, etc. We will be
+sending those additional features once the basic support has been
+merged.
+
+It is worth noting that contrary to the Marvell 370 and XP support,
+which has been pushed mainline fairly late in the development cycle of
+the SOCs, the support for Armada 375 and 38x is now being pushed quite
+early in the development cycle of the SOCs. We are having mainline
+support pretty much at the same time as the SOCs are being made
+available to customers, which is really great!
+
+Best regards,
+
+Thomas
+
+Gregory CLEMENT (2):
+  ARM: mvebu: add initial support for the Armada 375 SOCs
+  ARM: mvebu: add Device Tree description of the Armada 375 SoC
+
+Thomas Petazzoni (11):
+  ARM: mvebu: rename armada-370-xp.c to board-v7.c
+  ARM: mvebu: rename DT machine structure for Armada 370/XP
+  ARM: mvebu: make CPU_PJ4B selection a per-SoC choice
+  ARM: mvebu: add Armada 375 support to the system-controller driver
+  ARM: mvebu: add workaround for data abort issue on Armada 375
+  ARM: mvebu: add Device Tree for the Armada 375 DB board
+  ARM: mvebu: add initial support for the Armada 380/385 SOCs
+  ARM: mvebu: add Device Tree description of the Armada 380/385 SoCs
+  ARM: mvebu: add Device Tree for the Armada 385 DB board
+  ARM: mvebu: update defconfigs for Armada 375 and 38x
+  Documentation: arm: update Marvell documentation about Armada 375/38x
+
+ Documentation/arm/Marvell/README                   |  12 +-
+ .../devicetree/bindings/arm/armada-375.txt         |   9 +
+ .../devicetree/bindings/arm/armada-38x.txt         |  10 +
+ .../bindings/arm/mvebu-system-controller.txt       |   3 +-
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/armada-375-db.dts                | 130 ++++++
+ arch/arm/boot/dts/armada-375.dtsi                  | 458 +++++++++++++++++++++
+ arch/arm/boot/dts/armada-380.dtsi                  | 117 ++++++
+ arch/arm/boot/dts/armada-385-db.dts                | 101 +++++
+ arch/arm/boot/dts/armada-385.dtsi                  | 149 +++++++
+ arch/arm/boot/dts/armada-38x.dtsi                  | 345 ++++++++++++++++
+ arch/arm/configs/multi_v7_defconfig                |   2 +
+ arch/arm/configs/mvebu_defconfig                   |   2 +
+ arch/arm/mach-mvebu/Kconfig                        |  37 +-
+ arch/arm/mach-mvebu/Makefile                       |   2 +-
+ .../arm/mach-mvebu/{armada-370-xp.c => board-v7.c} |  62 ++-
+ arch/arm/mach-mvebu/system-controller.c            |  14 +-
+ 17 files changed, 1439 insertions(+), 16 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-375.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-38x.txt
  create mode 100644 arch/arm/boot/dts/armada-375-db.dts
+ create mode 100644 arch/arm/boot/dts/armada-375.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-380.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-385-db.dts
+ create mode 100644 arch/arm/boot/dts/armada-385.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-38x.dtsi
+ rename arch/arm/mach-mvebu/{armada-370-xp.c => board-v7.c} (58%)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b9d6a8b..f1eafbd 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -126,6 +126,7 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
- 	armada-370-netgear-rn102.dtb \
- 	armada-370-netgear-rn104.dtb \
- 	armada-370-rd.dtb \
-+	armada-375-db.dtb \
- 	armada-xp-axpwifiap.dtb \
- 	armada-xp-db.dtb \
- 	armada-xp-gp.dtb \
-diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
-new file mode 100644
-index 0000000..9378d31
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-375-db.dts
-@@ -0,0 +1,130 @@
-+/*
-+ * Device Tree file for Marvell Armada 375 evaluation board
-+ * (DB-88F6720)
-+ *
-+ *  Copyright (C) 2014 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include <dt-bindings/gpio/gpio.h>
-+#include "armada-375.dtsi"
-+
-+/ {
-+	model = "Marvell Armada 375 Development Board";
-+	compatible = "marvell,a375-db", "marvell,armada375";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x40000000>; /* 1 GB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
-+
-+		internal-regs {
-+			spi at 10600 {
-+				pinctrl-0 = <&spi0_pins>;
-+				pinctrl-names = "default";
-+				/*
-+				 * SPI conflicts with NAND, so we disable it
-+				 * here, and select NAND as the enabled device
-+				 * by default.
-+				 */
-+				status = "disabled";
-+
-+				spi-flash at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+					compatible = "n25q128a13";
-+					reg = <0>; /* Chip select 0 */
-+					spi-max-frequency = <108000000>;
-+				};
-+			};
-+
-+			i2c at 11000 {
-+				status = "okay";
-+				clock-frequency = <100000>;
-+				pinctrl-0 = <&i2c0_pins>;
-+				pinctrl-names = "default";
-+			};
-+
-+			i2c at 11100 {
-+				status = "okay";
-+				clock-frequency = <100000>;
-+				pinctrl-0 = <&i2c1_pins>;
-+				pinctrl-names = "default";
-+			};
-+
-+			serial at 12000 {
-+				clock-frequency = <200000000>;
-+				status = "okay";
-+			};
-+
-+			pinctrl {
-+				sdio_st_pins: sdio-st-pins {
-+					marvell,pins = "mpp44", "mpp45";
-+					marvell,function = "gpio";
-+				};
-+			};
-+
-+			nand: nand at d0000 {
-+				pinctrl-0 = <&nand_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+				num-cs = <1>;
-+				marvell,nand-keep-config;
-+				marvell,nand-enable-arbiter;
-+				nand-on-flash-bbt;
-+
-+				partition at 0 {
-+					label = "U-Boot";
-+					reg = <0 0x800000>;
-+				};
-+				partition at 800000 {
-+					label = "Linux";
-+					reg = <0x800000 0x800000>;
-+				};
-+				partition at 1000000 {
-+					label = "Filesystem";
-+					reg = <0x1000000 0x3f000000>;
-+				};
-+			};
-+
-+			mvsdio at d4000 {
-+				pinctrl-0 = <&sdio_pins &sdio_st_pins>;
-+				pinctrl-names = "default";
-+				status = "okay";
-+				cd-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-+				wp-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
-+			};
-+		};
-+
-+		pcie-controller {
-+			status = "okay";
-+			/*
-+			 * The two PCIe units are accessible through
-+			 * standard PCIe slots on the board.
-+			 */
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+			pcie at 2,0 {
-+				/* Port 1, Lane 0 */
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
 -- 
 1.8.3.2
