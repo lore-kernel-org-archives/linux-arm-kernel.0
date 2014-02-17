@@ -1,83 +1,79 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 17 Feb 2014 16:21:14 +0100
-Subject: [PATCH V3 17/17] i2c: nomadik: Fixup system suspend
-Message-ID: <1392650474-14995-1-git-send-email-ulf.hansson@linaro.org>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Mon, 17 Feb 2014 16:24:51 +0100
+Subject: [PATCH v2] clk: at91: optimization of the set_rate callback
+In-Reply-To: <52F1FC52.1040205@overkiz.com>
+References: <52F1FC52.1040205@overkiz.com>
+Message-ID: <1392650691-20215-1-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For !CONFIG_PM_RUNTIME, the device were never put back into active
-state while resuming.
-
-For CONFIG_PM_RUNTIME, we blindly trusted the device to be inactive
-while we were about to handle it at suspend late, which is just too
-optimistic.
-
-Even if the driver uses pm_runtime_put_sync() after each tranfer to
-return it's runtime PM resources, there are no guarantees this will
-actually mean the device will inactivated. The reason is that the PM
-core will prevent runtime suspend during system suspend, and thus when
-a transfer occurs during the early phases of system suspend the device
-will be kept active after the transfer.
-
-To handle both issues above, we need to re-use the runtime PM callbacks
-and check the runtime PM state of the device before proceeding with our
-operations for system suspend.
-
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
 ---
- drivers/i2c/busses/i2c-nomadik.c |   29 ++++++++++++++++++++++-------
- 1 file changed, 22 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index ceb3d05..650f5f9 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -879,21 +879,36 @@ static irqreturn_t i2c_irq_handler(int irq, void *arg)
- #ifdef CONFIG_PM_SLEEP
- static int nmk_i2c_suspend_late(struct device *dev)
- {
--	struct amba_device *adev = to_amba_device(dev);
--	struct nmk_i2c_dev *nmk_i2c = amba_get_drvdata(adev);
-+	if (!pm_runtime_status_suspended(dev)) {
-+		int ret = 0;
-+		if (dev->pm_domain && dev->pm_domain->ops.runtime_suspend)
-+			ret = dev->pm_domain->ops.runtime_suspend(dev);
-+		else
-+			ret = dev->bus->pm->runtime_suspend(dev);
-+		if (ret)
-+			return ret;
-+
-+		pm_runtime_set_suspended(dev);
-+	}
+Hi,
+this fixes the commit's log as indicated by Boris.
+cheers,
+Jean-jacques
+
+ drivers/clk/at91/clk-programmable.c | 38 ++++++++-----------------------------
+ 1 file changed, 8 insertions(+), 30 deletions(-)
+
+diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
+index 7bcc725..62e2509 100644
+--- a/drivers/clk/at91/clk-programmable.c
++++ b/drivers/clk/at91/clk-programmable.c
+@@ -139,43 +139,21 @@ static int clk_programmable_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct clk_programmable *prog = to_clk_programmable(hw);
+ 	struct at91_pmc *pmc = prog->pmc;
+ 	const struct clk_programmable_layout *layout = prog->layout;
+-	unsigned long best_rate = parent_rate;
+-	unsigned long best_diff;
+-	unsigned long new_diff;
+-	unsigned long cur_rate;
++	unsigned long div = parent_rate / rate;
+ 	int shift = 0;
+ 	u32 tmp = pmc_read(pmc, AT91_PMC_PCKR(prog->id)) &
+ 		  ~(PROG_PRES_MASK << layout->pres_shift);
  
- 	pinctrl_pm_select_sleep_state(dev);
+-	if (rate > parent_rate)
+-		return parent_rate;
+-	else
+-		best_diff = parent_rate - rate;
++	if (!div)
++		return -EINVAL;
+ 
+-	if (!best_diff) {
+-		pmc_write(pmc, AT91_PMC_PCKR(prog->id), tmp | shift);
+-		return 0;
+-	}
 -
- 	return 0;
- }
+-	for (shift = 1; shift < PROG_PRES_MASK; shift++) {
+-		cur_rate = parent_rate >> shift;
+-
+-		if (cur_rate > rate)
+-			new_diff = cur_rate - rate;
+-		else
+-			new_diff = rate - cur_rate;
+-
+-		if (!new_diff)
+-			break;
++	shift = fls(div) - 1;
  
- static int nmk_i2c_resume_early(struct device *dev)
- {
--	/* First go to the default state */
--	pinctrl_pm_select_default_state(dev);
--	/* Then let's idle the pins until the next transfer happens */
--	pinctrl_pm_select_idle_state(dev);
-+	int ret = 0;
-+
-+	if (dev->pm_domain && dev->pm_domain->ops.runtime_resume)
-+		ret = dev->pm_domain->ops.runtime_resume(dev);
-+	else
-+		ret = dev->bus->pm->runtime_resume(dev);
-+	if (ret) {
-+		dev_err(dev, "problem resuming\n");
-+		return ret;
-+	}
+-		if (new_diff < best_diff) {
+-			best_diff = new_diff;
+-			best_rate = cur_rate;
+-		}
++	if (div != (1<<shift))
++		return -EINVAL;
  
-+	pm_runtime_set_active(dev);
- 	return 0;
- }
- #endif
+-		if (rate > cur_rate)
+-			break;
+-	}
++	if (shift >= PROG_PRES_MASK)
++		return -EINVAL;
+ 
+ 	pmc_write(pmc, AT91_PMC_PCKR(prog->id),
+ 		  tmp | (shift << layout->pres_shift));
 -- 
-1.7.9.5
+1.8.5.3
