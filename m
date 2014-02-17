@@ -1,43 +1,41 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 17 Feb 2014 09:38:49 -0500
-Subject: [PATCH 0/2] clk: keystone: Couple of fixes for 3.14-rcx
-In-Reply-To: <1392064011-11986-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1392064011-11986-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <53021EF9.2040105@ti.com>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Mon, 17 Feb 2014 11:42:33 -0300
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <53021BD2.3090301@free-electrons.com>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140205183457.GW8533@titan.lakedaemon.net>
+ <20140217141336.GA2765@localhost> <53021BD2.3090301@free-electrons.com>
+Message-ID: <53021FD9.2070406@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping,
+Hi Gregory, Ezequiel,
 
-On Monday 10 February 2014 03:26 PM, Santosh Shilimkar wrote:
-> Mike,
-> 
-> Can you please look at these couple of keystone clock fixes ?
-> Without these, we have seen some random kernel crashes. I
-> have included the dts fix since both fixes are related. Do
-> let me know if you prefer dts patch to be sent it via arm-soc tree.
-> 
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-> 
->   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git for_3.14-rcx/clk-fixes
-> 
-> for you to fetch changes up to 565bbdcd3b91523b4142587c00206302e091a23e:
-> 
->   ARM: keystone: dts: fix clkvcp3 control register address (2014-02-10 15:17:43 -0500)
-> 
-> ----------------------------------------------------------------
-> Ivan Khoronzhuk (2):
->       clk: keystone: gate: fix clk_init_data initialization
->       ARM: keystone: dts: fix clkvcp3 control register address
-> 
->  arch/arm/boot/dts/keystone-clocks.dtsi |    2 +-
->  drivers/clk/keystone/gate.c            |    1 +
->  2 files changed, 2 insertions(+), 1 deletion(-)
-> 
-> Regards,
-> Santosh
-> 
+ >> Are we still in time to consider Emilio's oneline proposal?
+>> (Emilio: would you mind preparing a suitable patch against dove,
+>> kirkwood, armada370/xp, so we can see the real thing?).
+
+The patch is in a common file, so it does not need patching anything for 
+each platform.
+
+> I am still strongly against this proposal because hard-coded the parent
+> clock name in the driver seems very wrong
+
+It is hardcoded already when the parent is registered, so I do not 
+understand your concern.
+
+http://lxr.free-electrons.com/source/drivers/clk/mvebu/common.c?v=3.13#L34
+
+> and moreover in some circumstances
+> (if there is no output-name, which is our default case) this proposal
+> just ignored the parent clock given by the device tree and this looked
+> more wrong.
+
+I have sent a second patch addressing this comment, but you do not seem 
+to have taken too serious a look at it.
+
+http://www.spinics.net/lists/arm-kernel/msg305922.html
+
+Cheers,
+
+Emilio
