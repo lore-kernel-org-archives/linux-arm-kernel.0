@@ -1,32 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Feb 2014 19:10:03 +0100
-Subject: [PATCH v4 1/7] Documentation: Add device tree bindings for
- Freescale i.MX GPC
-In-Reply-To: <1392737687-25003-2-git-send-email-p.zabel@pengutronix.de>
-References: <1392737687-25003-1-git-send-email-p.zabel@pengutronix.de>
- <1392737687-25003-2-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <2328803.HhaG6blXIR@wuerfel>
+Date: Tue, 18 Feb 2014 19:13:47 +0100
+Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
+In-Reply-To: <CAOesGMhnUDcUL7hREV=EYEGr5YG-ZLL6v9NiGcrBr6477WfdyQ@mail.gmail.com>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <5302B306.8090503@samsung.com>
+ <CAOesGMhnUDcUL7hREV=EYEGr5YG-ZLL6v9NiGcrBr6477WfdyQ@mail.gmail.com>
+Message-ID: <6032891.ndY8FikAMY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 February 2014 16:34:41 Philipp Zabel wrote:
-> +
-> +Example of a device that is part of a power domain:
-> +
-> +       vpu: vpu at 02040000 {
-> +               reg = <0x02040000 0x3c000>;
-> +               /* ... */
-> +               fsl,power-domain = <&pd_pu>;
-> +               /* ... */
-> +       };
-> +
+On Tuesday 18 February 2014 08:16:13 Olof Johansson wrote:
+> On Mon, Feb 17, 2014 at 5:10 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> > On 02/15/14 02:06, Arnd Bergmann wrote:
+> >> My feeling is that we don't need to use the levels for Kconfig, although
+> >> we might want to use them DT compatible strings, even if it ends up
+> >> looking
+> >> a little funny when you do
+> >>
+> >>         compatible = "arm,sbsa-l3", "arm,sbsa-l2", "arm,sbsa-l1";
+> >>
+> >>> What kind of features are you expecting though? More IP
+> >>> blocks/devices? Those are just kernel config options to enable,
+> >>> ideally as modules.
+> >>
+> >>
+> >> Right, I think we can just put them into defconfig. No need to
+> >> "select" them from Kconfig since the extra options wouldn't be
+> >> required for booting or using the system.
+> >>
+> > As I commented above, how about MCT? Samsung has a plan to use MCT on ARMv8,
+> > it is not for used for GH7 though...
+> 
+> It looks like the clocksource drivers are all based around being
+> enabled based on platforms instead of individually selectable. That
+> causes a problem here. I think we should change the clocksource
+> Kconfig instead. Then it's just a matter of making sure your defconfig
+> has the needed driver enabled.
+> 
+> (Adding Daniel and Thomas in case they have objections to that approach)
 
-I'm really not too happy about platforms starting to add random
-bindings for power domains. Unfortunately I didn't catch exynos
-doing this first, but I don't want to see another platform like
-that.
++John Stultz
 
-Can we please come up with a proper generic power domain binding
-first and then add platform specific users?
+IIRC it was John who insisted on doing it the current way, although
+I can't remember his reasoning.
 
 	Arnd
