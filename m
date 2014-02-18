@@ -1,99 +1,132 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 18 Feb 2014 09:30:21 -0800
-Subject: [PATCH v4 1/2] usb: musb: dsps, debugfs files
-In-Reply-To: <20140218170335.GC28506@saruman.home>
-References: <1389950556-6453-1-git-send-email-mpa@pengutronix.de>
- <1389950556-6453-2-git-send-email-mpa@pengutronix.de>
- <20140218162054.GE9878@saruman.home>
- <20140218165911.GA17486@kroah.com>
- <20140218170335.GC28506@saruman.home>
-Message-ID: <20140218173021.GA17368@kroah.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 18 Feb 2014 16:58:15 +0000
+Subject: [PATCH v3 3/6] drivers: of: implement reserved-memory handling
+ for dma
+In-Reply-To: <1392730681-14695-4-git-send-email-m.szyprowski@samsung.com>
+References: <1392730681-14695-1-git-send-email-m.szyprowski@samsung.com> <
+ 1392730681-14695-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20140218165815.C7661C40517@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 11:03:35AM -0600, Felipe Balbi wrote:
-> On Tue, Feb 18, 2014 at 08:59:11AM -0800, Greg KH wrote:
-> > On Tue, Feb 18, 2014 at 10:20:54AM -0600, Felipe Balbi wrote:
-> > > On Fri, Jan 17, 2014 at 10:22:35AM +0100, Markus Pargmann wrote:
-> > > > debugfs files to show the contents of important dsps registers.
-> > > > 
-> > > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > > > ---
-> > > >  drivers/usb/musb/musb_dsps.c | 54 ++++++++++++++++++++++++++++++++++++++++++++
-> > > >  1 file changed, 54 insertions(+)
-> > > > 
-> > > > diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
-> > > > index 593d3c9..d0a97d6 100644
-> > > > --- a/drivers/usb/musb/musb_dsps.c
-> > > > +++ b/drivers/usb/musb/musb_dsps.c
-> > > > @@ -46,6 +46,8 @@
-> > > >  #include <linux/of_irq.h>
-> > > >  #include <linux/usb/of.h>
-> > > >  
-> > > > +#include <linux/debugfs.h>
-> > > > +
-> > > >  #include "musb_core.h"
-> > > >  
-> > > >  static const struct of_device_id musb_dsps_of_match[];
-> > > > @@ -137,6 +139,26 @@ struct dsps_glue {
-> > > >  	unsigned long last_timer;    /* last timer data for each instance */
-> > > >  
-> > > >  	struct dsps_context context;
-> > > > +	struct debugfs_regset32 regset;
-> > > > +	struct dentry *dbgfs_root;
-> > > > +};
-> > > > +
-> > > > +static const struct debugfs_reg32 dsps_musb_regs[] = {
-> > > > +	{ "revision",		0x00 },
-> > > > +	{ "control",		0x14 },
-> > > > +	{ "status",		0x18 },
-> > > > +	{ "eoi",		0x24 },
-> > > > +	{ "intr0_stat",		0x30 },
-> > > > +	{ "intr1_stat",		0x34 },
-> > > > +	{ "intr0_set",		0x38 },
-> > > > +	{ "intr1_set",		0x3c },
-> > > > +	{ "txmode",		0x70 },
-> > > > +	{ "rxmode",		0x74 },
-> > > > +	{ "autoreq",		0xd0 },
-> > > > +	{ "srpfixtime",		0xd4 },
-> > > > +	{ "tdown",		0xd8 },
-> > > > +	{ "phy_utmi",		0xe0 },
-> > > > +	{ "mode",		0xe8 },
-> > > >  };
-> > > >  
-> > > >  static void dsps_musb_try_idle(struct musb *musb, unsigned long timeout)
-> > > > @@ -369,6 +391,30 @@ out:
-> > > >  	return ret;
-> > > >  }
-> > > >  
-> > > > +static int dsps_musb_dbg_init(struct musb *musb, struct dsps_glue *glue)
-> > > > +{
-> > > > +	struct dentry *root;
-> > > > +	struct dentry *file;
-> > > > +	char buf[128];
-> > > > +
-> > > > +	sprintf(buf, "%s.dsps", dev_name(musb->controller));
-> > > > +	root = debugfs_create_dir(buf, NULL);
-> > > > +	if (!root)
-> > > 
-> > > wrong, you should be using IS_ERR()
-> > 
-> > !root is fine, IS_ERR() will fail if CONFIG_DEBUGFS is not enabled.
+On Tue, 18 Feb 2014 14:37:58 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> From: Josh Cartwright <joshc@codeaurora.org>
 > 
-> in that case, files will be created on parent directory right ?
+> Add support for handling 'shared-dma-pool' reserved-memory nodes using
+> dma exclusive driver (dma_alloc_coherent()).
+> 
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/of/Kconfig               |    7 ++++
+>  drivers/of/Makefile              |    1 +
+>  drivers/of/of_reserved_mem_dma.c |   65 ++++++++++++++++++++++++++++++++++++++
 
-If, for some reason, creating a directory fails and then creating a file
-would succeed, yes, that will happen.
+I don't see any reason to have this separate from of_reserved_mem.c
 
-> If we pass a ERR_PTR(-ENODEV), otoh, we will try to dereference it in
-> __create_file().
+>  3 files changed, 73 insertions(+)
+>  create mode 100644 drivers/of/of_reserved_mem_dma.c
+> 
+> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+> index f25931dfc6db..7f00b801bcd2 100644
+> --- a/drivers/of/Kconfig
+> +++ b/drivers/of/Kconfig
+> @@ -80,4 +80,11 @@ config OF_RESERVED_MEM
+>  	help
+>  	  Helpers to allow for reservation of memory regions
+>  
+> +config OF_RESERVED_MEM_DMA
+> +	depends on OF_RESERVED_MEM
+> +	depends on HAVE_GENERIC_DMA_COHERENT
+> +	def_bool y
+> +	help
+> +	  Helpers for reserving memory regions for DMA use
+> +
+>  endmenu # OF
+> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+> index ed9660adad77..6142227ca854 100644
+> --- a/drivers/of/Makefile
+> +++ b/drivers/of/Makefile
+> @@ -10,3 +10,4 @@ obj-$(CONFIG_OF_PCI)	+= of_pci.o
+>  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+>  obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+>  obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
+> +obj-$(CONFIG_OF_RESERVED_MEM_DMA) += of_reserved_mem_dma.o
+> diff --git a/drivers/of/of_reserved_mem_dma.c b/drivers/of/of_reserved_mem_dma.c
+> new file mode 100644
+> index 000000000000..a3e596d1091d
+> --- /dev/null
+> +++ b/drivers/of/of_reserved_mem_dma.c
+> @@ -0,0 +1,65 @@
+> +/*
+> + * Device tree based initialization code for DMA reserved regions.
+> + *
+> + * Copyright (c) 2013, The Linux Foundation. All Rights Reserved.
+> + * Copyright (c) 2013,2014 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + * Author: Marek Szyprowski <m.szyprowski@samsung.com>
+> + * Author: Josh Cartwright <joshc@codeaurora.org>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of the
+> + * License or (at your optional) any later version of the license.
+> + */
+> +#include <linux/memblock.h>
+> +#include <linux/err.h>
+> +#include <linux/of.h>
+> +#include <linux/of_fdt.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/mm.h>
+> +#include <linux/sizes.h>
+> +#include <linux/mm_types.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/of_reserved_mem.h>
+> +
+> +static void rmem_dma_device_init(struct reserved_mem *rmem,
+> +				 struct device *dev,
+> +				 struct of_phandle_args *args)
+> +{
+> +	dma_declare_coherent_memory(dev, rmem->base, rmem->base,
+> +		rmem->size, DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+> +}
+> +
+> +static void rmem_dma_device_release(struct reserved_mem *rmem,
+> +				    struct device *dev)
+> +{
+> +	dma_release_declared_memory(dev);
+> +}
+> +
+> +static const struct reserved_mem_ops rmem_dma_ops = {
+> +	.device_init	= rmem_dma_device_init,
+> +	.device_release	= rmem_dma_device_release,
+> +};
+> +
+> +static int __init rmem_dma_setup(struct reserved_mem *rmem,
+> +				 unsigned long node,
+> +				 const char *uname)
+> +{
+> +	int err;
+> +
+> +	if (of_get_flat_dt_prop(node, "reusable", NULL))
+> +		return -EINVAL;
+> +
+> +	err = memblock_remove(rmem->base, rmem->size);
 
-No, because -ENODEV will only happen if debugfs is not enabled, so no
-dereference will ever happen.
+Isn't the memblock_remove() now handled by the core code? Or am I
+mis-reading it?
 
-Don't worry about checking return values from debugfs, it shouldn't be
-needed.
-
-thanks,
-
-greg k-h
+> +	if (err == 0) {
+> +		rmem->ops = &rmem_dma_ops;
+> +		pr_info("Reserved memory: created DMA memory pool at %pa, size %ld MiB\n",
+> +			&rmem->base, (unsigned long)rmem->size / SZ_1M);
+> +	} else {
+> +		pr_err("Reserved memory: unable to setup '%s' memory region for DMA.\n",
+> +		       uname);
+> +	}
+> +	return err;
+> +}
+> +RESERVEDMEM_OF_DECLARE(dma, "shared-dma-pool", rmem_dma_setup);
+> -- 
+> 1.7.9.5
+> 
