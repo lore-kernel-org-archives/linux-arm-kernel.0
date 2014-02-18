@@ -1,126 +1,43 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 18 Feb 2014 09:51:30 +0900
-Subject: [PATCH 23/27] clocksource: sh_cmt: Add DT support
-In-Reply-To: <3240866.imZR2oMAtf@avalon>
-References: <1392339605-20691-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <35710038.vGLtzuIoLe@avalon>
- <CANqRtoRVCK0jgadwvreMRt1HVVyUmb-CLt5mFEGmvju_VFFbPQ@mail.gmail.com>
- <3240866.imZR2oMAtf@avalon>
-Message-ID: <CANqRtoQFeX0y3A9ojKMo8ao+PRFiCzcmjfOqexBRzv-4P1s7Uw@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 18 Feb 2014 10:10:30 +0900
+Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
+In-Reply-To: <201402141806.12711.arnd@arndb.de>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <52F99056.6010906@samsung.com>
+ <CAOesGMgdDnSc=Y8i6JYeGewCh1RPYZ_AxocxKzSD265fa2-yrA@mail.gmail.com>
+ <201402141806.12711.arnd@arndb.de>
+Message-ID: <5302B306.8090503@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On Tue, Feb 18, 2014 at 6:43 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Magnus,
+On 02/15/14 02:06, Arnd Bergmann wrote:
+> On Thursday 13 February 2014, Olof Johansson wrote:
+>> On Mon, Feb 10, 2014 at 6:52 PM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>>> On 02/13/14 04:14, Arnd Bergmann wrote:
+>>>> On Wednesday 12 February 2014 13:04:40 Kumar Gala wrote:
+>>> Basically, I agreed with Arnd's suggestion to use ARCH_SBSA. Or we need to
+>>> define level in Kconfig like ARCH_SBSA_L1 for level1. BTW, how about
+>>> compliant with SBSA Level1 and having some specific features?
 >
-> On Monday 17 February 2014 10:48:55 Magnus Damm wrote:
->> On Mon, Feb 17, 2014 at 10:45 AM, Laurent Pinchart wrote:
->> > On Saturday 15 February 2014 02:22:00 Magnus Damm wrote:
->> >> On Sat, Feb 15, 2014 at 1:12 AM, Laurent Pinchart wrote:
->> >> > On Saturday 15 February 2014 01:01:30 Magnus Damm wrote:
->> >> >> On Sat, Feb 15, 2014 at 12:53 AM, Laurent Pinchart wrote:
->> >> >> > On Friday 14 February 2014 10:58:22 Mark Rutland wrote:
->> >> >> >> On Fri, Feb 14, 2014 at 01:00:01AM +0000, Laurent Pinchart wrote:
->> >> >> >> > +Channels Optional Properties:
->> >> >> >> > +
->> >> >> >> > +  - clock-source-rating: rating of the timer as a clock source
->> >> >> >> > device.
->> >> >> >> > +  - clock-event-rating: rating of the timer as a clock event
->> >> >> >> > device.
->> >> >> >>
->> >> >> >> This feels like a leak of Linux internals. Why do you need this?
->> >> >> >
->> >> >> > You're right, it is. The clock source and clock event ratings are
->> >> >> > currently configured through platform data, I'll need to find a way
->> >> >> > to compute them in the driver instead.
->> >> >>
->> >> >> That would be very good!
->> >> >
->> >> > Any pointer would be appreciated :-) How did you compute the various
->> >> > ratings used in platform data all over the place ?
->> >>
->> >> Historically we used the rating to select between CMT and TMU. For
->> >> clock sources I suppose you also have the jiffy rating to consider.
->> >> And for the SMP parts we have ARM IP for TWD and arch timers that have
->> >> their ratings too. So you need to check all the timers on a particular
->> >> system and consider what you want to have operating by default. The
->> >> ARM IP timers should be preferred if available. For clock sources the
->> >> rule is probably the higher resolution the better.
->> >>
->> >> >> > There's still one piece of Linux-specific data I need though, as I
->> >> >> > need to specify for each channel whether to use it as a clock source
->> >> >> > device, a clock event device, both of them or none. That's
->> >> >> > configuration information that needs to be provided somehow.
->> >> >>
->> >> >> I think you can decide clock source or clock event assignment based on
->> >> >> number of channels available. If you have only a single channel then
->> >> >> both clock event and clock source need to be supported. Otherwise use
->> >> >> one channel for clock source and the rest for clock events.
->> >> >
->> >> > That won't match the current situation. Look at CMT0 in r8a7790 for
->> >> > instance. There's two hardware channels available, and we only use the
->> >> > first one, for clock events only.
->> >>
->> >> You are correct. The reason for that is that the CMT driver today is
->> >> optimized for combined clock event and clock source operation.
->> >>
->> >> Historically the hardware it initially was written for (sh-mobile on
->> >> the SH arch) only had a single timer channel so combined operation was
->> >> required for tickless to work. But since you're asking how to allocate
->> >> channels then I propose checking numbers of channels available and go
->> >> from there. With that the r8a7790 support can only get better. =)
->> >>
->> >> >> This is probably out of scope for this DT conversion, but it would be
->> >> >> neat if you somehow could specify the CPU affinity for a channel to
->> >> >> tie a clock event to an individual CPU core. This would make a a per-
->> >> >> cpu timer unless I'm mistaken. But that's more of a software policy
->> >> >> than anything else.
->> >> >
->> >> > Yes, that's a configuration that needs to be specified somewhere. I
->> >> > don't know where though.
->> >>
->> >> As long as you have per-channel interrupts described in DT you can
->> >> probably handle this in a generic way in the driver.
->> >
->> > But how do we decide whether to use a single timer channel or one channel
->> > per CPU ? Will the kernel use one clock event device per CPU
->> > automatically ? I have to confess I have no idea how this works.
->>
->> I guess that's the tricky bit about timer support, it is a mix of
->> hardware description and software configuration. So it sounds to me
->> that we need some kind of software configuration interface. But it can
->> probably be considered when/if we add such kind of support to the
->> driver. Probably out of scope for now.
->>
->> Regardless it seems to me that the hardware description in DT doesn't
->> need to care about this.
+Well, how about ARMv8 mobile SoC? I think, it is not compatible with 
+SBSA. For example, you know MCT can be used for ARMv8 cores instead of 
+ARCH Timer. So I'm not sure ARCH_SBSA is really good choice...
+
+> My feeling is that we don't need to use the levels for Kconfig, although
+> we might want to use them DT compatible strings, even if it ends up looking
+> a little funny when you do
 >
-> I'll revisit that later. Per-CPU timers is not a high priority for now, so
-> I'll just return -EAGAIN :-)
+> 	compatible = "arm,sbsa-l3", "arm,sbsa-l2", "arm,sbsa-l1";
+>
+>> What kind of features are you expecting though? More IP
+>> blocks/devices? Those are just kernel config options to enable,
+>> ideally as modules.
+>
+> Right, I think we can just put them into defconfig. No need to
+> "select" them from Kconfig since the extra options wouldn't be
+> required for booting or using the system.
+>
+As I commented above, how about MCT? Samsung has a plan to use MCT on 
+ARMv8, it is not for used for GH7 though...
 
-Thanks, that's fine.
-
-> Nonetheless, specifying which timer channel to use as a clock source and which
-> channel to use as a clock event device might need to be specified in DT (or
-> somewhere else, but I'm not sure what other options we have here).
-
-I disagree about the need for specifying clock source or clock event
-channel in DT.  Since per-cpu timers is out of scope for now then why
-don't we simply just let the driver automatically allocate the during
-run-time?
-
-In case one CMT channel exists:
-Use that for both clock source and clock event.
-
-In case more than one CMT channel exists:
-Use one separate channel for clock source and one separate channel for
-clock event.
-
-That would cover our existing use case, no?
-
-Thanks,
-
-/ magnus
+- Kukjin
