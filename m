@@ -1,58 +1,35 @@
-From: naresh.kamboju@linaro.org (Naresh Kamboju)
-Date: Tue, 18 Feb 2014 20:00:21 +0530
-Subject: [LTP] How to get the Linux kernel coverage data on ARM arch when
- I run LTP test?
-In-Reply-To: <52FDE52A.4070002@linux.vnet.ibm.com>
-References: <CA+G9fYuT4TSs=3j6K9zztsTgFNVp2YG6JT-2Q_L==1P5G+SBew@mail.gmail.com>
- <52FDE52A.4070002@linux.vnet.ibm.com>
-Message-ID: <CA+G9fYv9+Fhyz=nVZQZXxLU0YMTJadfr1XVVVb9P=inEfUaDuA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Feb 2014 14:31:27 +0000
+Subject: [PATCH] ARM: kernel: improve error message when LPAE config
+ doesn't match CPU
+In-Reply-To: <1392729618-25094-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392729618-25094-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140218143126.GI4178@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 February 2014 15:13, Peter Oberparleiter
-<oberpar@linux.vnet.ibm.com> wrote:
-> On 14.02.2014 10:02, Naresh Kamboju wrote:
->> root at linaro-developer:/tmp/linux-linaro-3.13-2014.01# gcov kernel/gcov/base.c -o
->>  /sys/kernel/debug/gcov/tmp/linux-linaro-3.13-2014.01/kernel/gcov/
->> File 'kernel/gcov/base.c'
->> Lines executed:43.18% of 44
->> Creating 'base.c.gcov'
->>
->> root at linaro-developer:/tmp/linux-linaro-3.13-2014.01#
->>
->> The above experiment gives coverage of a single file base.c when i run
->> gcov manually.
->> Is there any way to get Linux kernel coverage of all files after
->> running LTP test cases ?
->
-> 1. Reset coverage data: lcov -z
-> 2. Run LTP (or any other test case)
-> 3. Capture coverage data: lcov -c -o coverage.info
-> 4. Generate HTML output: genhtml coverage.info -o out
-> 5. View HTML output: <browser> out/index.html
+On Tue, Feb 18, 2014 at 01:20:18PM +0000, Thomas Petazzoni wrote:
+> Currently, when the kernel is configured with LPAE support, but the
+> CPU doesn't support it, the error message is fairly cryptic:
+> 
+>   Error: unrecognized/unsupported processor variant (0x561f5811).
+> 
+> This messages is normally shown when there is an issue when comparing
+> the processor ID (CP15 0, c0, c0) with the values/masks described in
+> proc-v7.S. However, the same message is displayed when LPAE support is
+> enabled in the kernel configuration, but not available in the CPU,
+> after looking at ID_MMFR0 (CP15 0, c0, c1, 4). Having the same error
+> message is highly misleading.
+> 
+> This commit improves this by showing a different error message when
+> this situation occurs:
+> 
+>   Error: Kernel with LPAE support, but CPU does not support LPAE.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-It is working !!!
-LTP executed on linux-linaro build on vexpress-tc2 target.
-Please find results obtained
-http://people.linaro.org/~naresh.kamboju/linux-linaro-coverage-by-ltp/
+Looks sensible enough to me:
 
-The plan is to run all linaro test suite and to get coverage date.
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Peter Oberparleiter,
-Thank you very much for your help.
-
-Best regards
-Naresh Kamboju
-
->
-> More information on lcov can be found on the page behind the second URL
-> your quoted in your mail.
->
->
-> Regards,
->   Peter Oberparleiter
->
-> --
-> Peter Oberparleiter
-> Linux on System z Development - IBM Germany
->
+Will
