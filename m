@@ -1,113 +1,163 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 18 Feb 2014 20:12:00 +0000
-Subject: [PATCH 28/34] imx-drm: imx-drm-core: move allocation of imxdrm device
- to driver load function
+Date: Tue, 18 Feb 2014 20:12:05 +0000
+Subject: [PATCH 29/34] imx-drm: imx-drm-core: various cleanups
 In-Reply-To: <20140218200900.GM21483@n2100.arm.linux.org.uk>
 References: <20140218200900.GM21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WFr1M-0007kE-BU@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WFr1R-0007kI-Ez@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is now no longer necessary to keep this structure around; we can
-allocate it upon DRM driver load and destroy it thereafter without
-affecting the other components now.
+Various cleanups are possible after the previous round of changes; these
+have no real functional bearing other than tidying up the code.
 
 Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c | 47 +++++-----------------------------
- 1 file changed, 6 insertions(+), 41 deletions(-)
+ drivers/staging/imx-drm/imx-drm-core.c | 47 ++++++++++++----------------------
+ drivers/staging/imx-drm/imx-drm.h      |  5 ++--
+ 2 files changed, 19 insertions(+), 33 deletions(-)
 
 diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index d5b82cb0cfae..35c8f7cf6900 100644
+index 35c8f7cf6900..7939cea8311a 100644
 --- a/drivers/staging/imx-drm/imx-drm-core.c
 +++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -38,7 +38,6 @@ struct imx_drm_crtc;
+@@ -15,12 +15,12 @@
+  */
+ #include <linux/component.h>
+ #include <linux/device.h>
++#include <linux/fb.h>
++#include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <drm/drmP.h>
+ #include <drm/drm_fb_helper.h>
+ #include <drm/drm_crtc_helper.h>
+-#include <linux/fb.h>
+-#include <linux/module.h>
+ #include <drm/drm_gem_cma_helper.h>
+ #include <drm/drm_fb_cma_helper.h>
+ 
+@@ -28,12 +28,6 @@
+ 
+ #define MAX_CRTC	4
+ 
+-struct crtc_cookie {
+-	void *cookie;
+-	int id;
+-	struct list_head list;
+-};
+-
+ struct imx_drm_crtc;
  
  struct imx_drm_device {
- 	struct drm_device			*drm;
--	struct device				*dev;
- 	struct imx_drm_crtc			*crtc[MAX_CRTC];
- 	int					pipes;
- 	struct drm_fbdev_cma			*fbhelper;
-@@ -206,13 +205,6 @@ int imx_drm_connector_mode_valid(struct drm_connector *connector,
- }
- EXPORT_SYMBOL(imx_drm_connector_mode_valid);
- 
--static struct imx_drm_device *imx_drm_device;
--
--static struct imx_drm_device *__imx_drm_device(void)
--{
--	return imx_drm_device;
--}
--
- void imx_drm_connector_destroy(struct drm_connector *connector)
- {
- 	drm_sysfs_connector_remove(connector);
-@@ -236,10 +228,14 @@ static struct drm_mode_config_funcs imx_drm_mode_config_funcs = {
-  */
- static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
- {
--	struct imx_drm_device *imxdrm = __imx_drm_device();
-+	struct imx_drm_device *imxdrm;
- 	struct drm_connector *connector;
- 	int ret;
- 
-+	imxdrm = devm_kzalloc(drm->dev, sizeof(*imxdrm), GFP_KERNEL);
-+	if (!imxdrm)
-+		return -ENOMEM;
-+
- 	imxdrm->drm = drm;
- 
- 	drm->dev_private = imxdrm;
-@@ -604,8 +600,6 @@ static int imx_drm_platform_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	imx_drm_device->dev = &pdev->dev;
--
- 	return component_master_add(&pdev->dev, &imx_drm_ops);
- }
- 
-@@ -630,36 +624,7 @@ static struct platform_driver imx_drm_pdrv = {
- 		.of_match_table = imx_drm_dt_ids,
- 	},
+@@ -47,7 +41,8 @@ struct imx_drm_crtc {
+ 	struct drm_crtc				*crtc;
+ 	int					pipe;
+ 	struct imx_drm_crtc_helper_funcs	imx_drm_helper_funcs;
+-	struct crtc_cookie			cookie;
++	void					*cookie;
++	int					id;
+ 	int					mux_id;
  };
--
--static int __init imx_drm_init(void)
--{
--	int ret;
--
--	imx_drm_device = kzalloc(sizeof(*imx_drm_device), GFP_KERNEL);
--	if (!imx_drm_device)
--		return -ENOMEM;
--
--	ret = platform_driver_register(&imx_drm_pdrv);
--	if (ret)
--		goto err_pdrv;
--
--	return 0;
--
--err_pdrv:
--	kfree(imx_drm_device);
--
--	return ret;
--}
--
--static void __exit imx_drm_exit(void)
--{
--	platform_driver_unregister(&imx_drm_pdrv);
--
--	kfree(imx_drm_device);
--}
--
--module_init(imx_drm_init);
--module_exit(imx_drm_exit);
-+module_platform_driver(imx_drm_pdrv);
  
- MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
- MODULE_DESCRIPTION("i.MX drm driver core");
+@@ -271,9 +266,9 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+ 		goto err_kms;
+ 
+ 	/*
+-	 * with vblank_disable_allowed = true, vblank interrupt will be disabled
+-	 * by drm timer once a current process gives up ownership of
+-	 * vblank event.(after drm_vblank_put function is called)
++	 * with vblank_disable_allowed = true, vblank interrupt will be
++	 * disabled by drm timer once a current process gives up ownership
++	 * of vblank event. (after drm_vblank_put function is called)
+ 	 */
+ 	drm->vblank_disable_allowed = true;
+ 
+@@ -350,26 +345,20 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 	 * The vblank arrays are dimensioned by MAX_CRTC - we can't
+ 	 * pass IDs greater than this to those functions.
+ 	 */
+-	if (imxdrm->pipes >= MAX_CRTC) {
+-		ret = -EINVAL;
+-		goto err_busy;
+-	}
++	if (imxdrm->pipes >= MAX_CRTC)
++		return -EINVAL;
+ 
+-	if (imxdrm->drm->open_count) {
+-		ret = -EBUSY;
+-		goto err_busy;
+-	}
++	if (imxdrm->drm->open_count)
++		return -EBUSY;
+ 
+ 	imx_drm_crtc = kzalloc(sizeof(*imx_drm_crtc), GFP_KERNEL);
+-	if (!imx_drm_crtc) {
+-		ret = -ENOMEM;
+-		goto err_alloc;
+-	}
++	if (!imx_drm_crtc)
++		return -ENOMEM;
+ 
+ 	imx_drm_crtc->imx_drm_helper_funcs = *imx_drm_helper_funcs;
+ 	imx_drm_crtc->pipe = imxdrm->pipes++;
+-	imx_drm_crtc->cookie.cookie = cookie;
+-	imx_drm_crtc->cookie.id = id;
++	imx_drm_crtc->cookie = cookie;
++	imx_drm_crtc->id = id;
+ 	imx_drm_crtc->mux_id = imx_drm_crtc->pipe;
+ 	imx_drm_crtc->crtc = crtc;
+ 
+@@ -392,8 +381,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ err_register:
+ 	imxdrm->crtc[imx_drm_crtc->pipe] = NULL;
+ 	kfree(imx_drm_crtc);
+-err_alloc:
+-err_busy:
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(imx_drm_add_crtc);
+@@ -429,8 +416,8 @@ static uint32_t imx_drm_find_crtc_mask(struct imx_drm_device *imxdrm,
+ 
+ 	for (i = 0; i < MAX_CRTC; i++) {
+ 		struct imx_drm_crtc *imx_drm_crtc = imxdrm->crtc[i];
+-		if (imx_drm_crtc && imx_drm_crtc->cookie.id == id &&
+-		    imx_drm_crtc->cookie.cookie == cookie)
++		if (imx_drm_crtc && imx_drm_crtc->id == id &&
++		    imx_drm_crtc->cookie == cookie)
+ 			return drm_crtc_mask(imx_drm_crtc->crtc);
+ 	}
+ 
+diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
+index ae9c96d181fa..aa2102866689 100644
+--- a/drivers/staging/imx-drm/imx-drm.h
++++ b/drivers/staging/imx-drm/imx-drm.h
+@@ -5,14 +5,15 @@
+ 
+ #define IPU_PIX_FMT_GBR24	v4l2_fourcc('G', 'B', 'R', '3')
+ 
++struct device_node;
+ struct drm_crtc;
+ struct drm_connector;
+ struct drm_device;
+ struct drm_display_mode;
+ struct drm_encoder;
+-struct imx_drm_crtc;
+ struct drm_fbdev_cma;
+ struct drm_framebuffer;
++struct imx_drm_crtc;
+ struct platform_device;
+ 
+ int imx_drm_crtc_id(struct imx_drm_crtc *crtc);
+@@ -48,8 +49,6 @@ int imx_drm_panel_format_pins(struct drm_encoder *encoder,
+ int imx_drm_panel_format(struct drm_encoder *encoder,
+ 		u32 interface_pix_fmt);
+ 
+-struct device_node;
+-
+ int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder);
+ int imx_drm_encoder_parse_of(struct drm_device *drm,
+ 	struct drm_encoder *encoder, struct device_node *np);
 -- 
 1.8.3.1
