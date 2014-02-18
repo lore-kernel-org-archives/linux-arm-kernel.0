@@ -1,92 +1,92 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Tue, 18 Feb 2014 14:32:17 -0600
-Subject: [RFC PATCH 0/6] PM: introduce voltage domain abstraction
-Message-ID: <1392755543-28335-1-git-send-email-nm@ti.com>
+Date: Tue, 18 Feb 2014 14:32:21 -0600
+Subject: [RFC PATCH 4/6] devicetree: bindings: add documentation for
+ voltagedomain
+In-Reply-To: <1392755543-28335-1-git-send-email-nm@ti.com>
+References: <1392755543-28335-1-git-send-email-nm@ti.com>
+Message-ID: <1392755543-28335-5-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add documentation for voltage domain binding format. Specific
+voltage domains will have bindings corresponding to them.
 
-On many SoCs such as OMAP, hardware blocks are isolated into voltage
-domains allowing for individual tweaks for optimal power-performance
-tradeoffs. Frameworks such as cpufreq, devfreq provide a top level
-control of these hardware blocks. Most SoCs have different knobs to
-fine tune the voltages. They may supply multiple supplies to various
-voltage planes on the same voltage domains.
-
-Regulator framework provides us a with an appropriate representation
-of consumer model, however, we lack the abstraction necessary to
-isolate the necessary sequencing for a specific voltage domain.
-
-There has been few attempts previously taken such as [3] [4],
-this series is a further development of of Mike's series[1] where
-cpufreq-cpu0 driver was first targetted with clk notifiers. While I do
-understand the concerns Mike has in [2], this could be a base on which
-further work may be done.
-
-In a nutshell, this (for cpufreq-cpu0 as an example):
-maintains the legacy definitions used by cpufreq/devfreq such as:
-&cpu0 {
-	cpu0-supply = <&regulator_x>;
-};
-
-on other SoCs where this might turn out to be a more detailed
-implementation,
-&cpu0 {
-	cpu0-voltdm = <&voltdm_x>;
-};
-
-To enure this is split off from clk framework, I chose
-drivers/power/voltdm as the location for the new files, I'd love to
-hear opinions and suggestions on the approach.
-
-The series is based on 3.14-rc3 and is available here:
-https://github.com/nmenon/linux-2.6-playground/commits/push/voltdm-notifier-rfc
-
-A testing branch for Beagle-XM (OMAP3630 as testbed):
-	https://github.com/nmenon/linux-2.6-playground/commits/testing/beagle-xm-voltdm-notifier-rfc
-	Log: http://slexy.org/view/s20TgkN7kf
-
-NOTE: TI platforms potentially need further development, however, this
-forms the basis of the development.
-
-Mike Turquette (2):
-  PM / Voltagedomain: Add generic clk notifier handler for regulator
-    based dynamic voltage scaling
-  cpufreq: cpufreq-cpu0: use clk rate-change notifiers
-
-Nishanth Menon (4):
-  PM / Voltagedomain: introduce voltage domain driver support
-  devicetree: bindings: add documentation for voltagedomain
-  PM / Voltagedomain: introduce basic voltage domain support for OMAP
-  devicetree: bindings: voltagedomain: add bindings for OMAP compatible
-    SoCs
-
- .../bindings/power/voltdm/voltage_domain.txt       |   65 +++
- .../bindings/power/voltdm/voltdm_omap.txt          |   24 +
- drivers/cpufreq/Kconfig                            |    1 +
- drivers/cpufreq/cpufreq-cpu0.c                     |  140 ++----
- drivers/power/Kconfig                              |    1 +
- drivers/power/Makefile                             |    1 +
- drivers/power/voltdm/Kconfig                       |   19 +
- drivers/power/voltdm/Makefile                      |    6 +
- drivers/power/voltdm/core.c                        |  508 ++++++++++++++++++++
- drivers/power/voltdm/voltage_domain_private.h      |   86 ++++
- drivers/power/voltdm/voltdm_omap.c                 |  287 +++++++++++
- include/linux/pm_voltage_domain.h                  |   47 ++
- 12 files changed, 1086 insertions(+), 99 deletions(-)
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ .../bindings/power/voltdm/voltage_domain.txt       |   65 ++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/power/voltdm/voltage_domain.txt
- create mode 100644 Documentation/devicetree/bindings/power/voltdm/voltdm_omap.txt
- create mode 100644 drivers/power/voltdm/Kconfig
- create mode 100644 drivers/power/voltdm/Makefile
- create mode 100644 drivers/power/voltdm/core.c
- create mode 100644 drivers/power/voltdm/voltage_domain_private.h
- create mode 100644 drivers/power/voltdm/voltdm_omap.c
- create mode 100644 include/linux/pm_voltage_domain.h
 
-[1] https://lkml.org/lkml/2013/7/7/110 (original RFC)
-[2] http://marc.info/?l=linux-arm-kernel&m=137947787621572&w=2 (runtime pm should enable regulator)
-[3] http://marc.info/?t=136603111700006&r=1&w=2
-[4] http://git.omapzoom.org/?p=kernel/omap.git;a=blob;f=arch/arm/mach-omap2/dvfs.c;hb=p-linux-omap-3.4
+diff --git a/Documentation/devicetree/bindings/power/voltdm/voltage_domain.txt b/Documentation/devicetree/bindings/power/voltdm/voltage_domain.txt
+new file mode 100644
+index 0000000..da48a19
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power/voltdm/voltage_domain.txt
+@@ -0,0 +1,65 @@
++Specifying Voltage Domain information for devices
++=================================================
++
++1. Specifying a voltage domain.
++
++SoCs may have multiple voltage domains under which various clocks operate.
++
++Mandatory Properties:
++- #voltdm-cells - indicates if there are specifiers needed to reference the
++  voltage domain
++
++Optional Properties:
++- voltage-tolerance: Specify the voltage tolerance in percentage
++
++2. Voltage domain consumer
++consumer nodes can be reference using the below binding:
++- <name>-voltdm: phandle to the voltage domain node.
++
++Examples:
++
++A. Voltage Domain controlling multiple regulator
++voltage_domain_mpu: voltdm at 1 {
++	compatible = "xyz";
++	#voltdm-cells = <0>;
++	vdd-supply = <&vcc>;
++	vbb-supply = <&abb_mpu>;
++	...
++};
++
++voltage_domain_gpu: voltdm at 2 {
++	compatible = "xyz";
++	#voltdm-cells = <0>;
++	vdd-supply = <&dcdc2>;
++	vbb-supply = <&abb_gpu>;
++	...
++};
++...
++&cpu0 {
++	cpu0-voltdm = <&voltage_domain_mpu>;
++	voltage-tolerance = <1>;
++};
++
++&gpu {
++	gpu-voltdm = <&voltage_domain_gpu>;
++};
++
++B. Indexed voltage domain device
++
++#define SOC_XYZ_VOLTAGE_DOMAIN_MPU	0
++#define SOC_XYZ_VOLTAGE_DOMAIN_GFX	1
++
++voltage_domain_socx: voltdm at 1 {
++	compatible = "abc";
++	#voltdm-cells = <1>;
++	...
++};
++...
++&cpu0 {
++	cpu0-voltdm = <&voltage_domain_socx SOC_XYZ_VOLTAGE_DOMAIN_MPU>;
++	voltage-tolerance = <1>;
++};
++
++&gpu {
++	gpu-voltdm = <&voltage_domain_socx SOC_XYZ_VOLTAGE_DOMAIN_GFX>;
++};
 -- 
 1.7.9.5
