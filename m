@@ -1,37 +1,89 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 18 Feb 2014 12:41:30 +0900
-Subject: [PATCH v4 0/2] [RESEND] Lager and Koelsch reference serial port
- support
-In-Reply-To: <1392150878-10436-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1392150878-10436-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CANqRtoSG_aD7EkUoEPKGk3NsjKihXiMhuKw8nAe-G86sFL+VuA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 18 Feb 2014 11:45:48 +0800
+Subject: [PATCH RESEND v11 1/2] ARM: dts: vf610: Add eDMA node
+In-Reply-To: <1392689832-17011-2-git-send-email-b35083@freescale.com>
+References: <1392689832-17011-1-git-send-email-b35083@freescale.com>
+ <1392689832-17011-2-git-send-email-b35083@freescale.com>
+Message-ID: <20140218034546.GE15716@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Tue, Feb 18, 2014 at 10:17:11AM +0800, Jingchang Lu wrote:
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-On Wed, Feb 12, 2014 at 5:34 AM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
-> Hello,
->
-> This patch set enables the serial port DT devices for the Lager and Koelsch
-> reference boards.
->
-> The previous "[PATCH v3 0/4] Lager and Koelsch reference serial port support"
-> series that contained these two patches got partially merged in v3.14-rc1. This
-> is a resent of the left-overs that we have decided to push back to v3.15,
-> rebased on top of Simon's latest devel branch.
->
-> Laurent Pinchart (2):
->   ARM: shmobile: lager: Enable SCIF0 and SCIF1 serial ports in DT
->   ARM: shmobile: koelsch: Enable SCIF0 and SCIF1 serial ports in DT
+Applied, thanks.
 
-Thanks for your efforts. As discussed earlier, to minimize amount of
-churn and risk of short term breakage it is probably wise to wait with
-this series until we have removed legacy board support. My goal is
-still to be able to merge this in v3.15 but if that is possible or not
-depends on how well our DT reference migration efforts will go.
+Shawn
 
-Cheers,
-
-/ magnus
+> ---
+> no changes in v10 ~ v11.
+> 
+> changes in v9:
+>  remove include/dt-bindings/dma/vf610-edma.h, the request source ID
+>  is the same as SoC's reference manual.
+> 
+> changes in v8:
+>  describe dmamux info in edma node to avoid confusion.
+>  change eDMA requst source macro definitions.
+> 
+>  changes in v7:
+>  fix dmamux2 and dmamux3 register number.
+> 
+>  no changes in v2 ~ v6.
+> 
+>  arch/arm/boot/dts/vf610.dtsi | 30 ++++++++++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
+> index 48dbfe5..8febb29f 100644
+> --- a/arch/arm/boot/dts/vf610.dtsi
+> +++ b/arch/arm/boot/dts/vf610.dtsi
+> @@ -88,6 +88,21 @@
+>  				arm,tag-latency = <2 2 2>;
+>  			};
+>  
+> +			edma0: dma-controller at 40018000 {
+> +				#dma-cells = <2>;
+> +				compatible = "fsl,vf610-edma";
+> +				reg = <0x40018000 0x2000>,
+> +					<0x40024000 0x1000>,
+> +					<0x40025000 0x1000>;
+> +				interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>,
+> +						<0 9 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupt-names = "edma-tx", "edma-err";
+> +				dma-channels = <32>;
+> +				clock-names = "dmamux0", "dmamux1";
+> +				clocks = <&clks VF610_CLK_DMAMUX0>,
+> +					<&clks VF610_CLK_DMAMUX1>;
+> +			};
+> +
+>  			uart0: serial at 40027000 {
+>  				compatible = "fsl,vf610-lpuart";
+>  				reg = <0x40027000 0x1000>;
+> @@ -263,6 +278,21 @@
+>  			reg = <0x40080000 0x80000>;
+>  			ranges;
+>  
+> +			edma1: dma-controller at 40098000 {
+> +				#dma-cells = <2>;
+> +				compatible = "fsl,vf610-edma";
+> +				reg = <0x40098000 0x2000>,
+> +					<0x400a1000 0x1000>,
+> +					<0x400a2000 0x1000>;
+> +				interrupts = <0 10 IRQ_TYPE_LEVEL_HIGH>,
+> +						<0 11 IRQ_TYPE_LEVEL_HIGH>;
+> +				interrupt-names = "edma-tx", "edma-err";
+> +				dma-channels = <32>;
+> +				clock-names = "dmamux0", "dmamux1";
+> +				clocks = <&clks VF610_CLK_DMAMUX2>,
+> +					<&clks VF610_CLK_DMAMUX3>;
+> +			};
+> +
+>  			uart4: serial at 400a9000 {
+>  				compatible = "fsl,vf610-lpuart";
+>  				reg = <0x400a9000 0x1000>;
+> -- 
+> 1.8.0
+> 
+> 
