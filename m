@@ -1,64 +1,163 @@
 From: rahul.sharma@samsung.com (Rahul Sharma)
-Date: Tue, 18 Feb 2014 17:26:05 +0530
-Subject: [PATCH v3 0/5] clk: exynos: add support for exynos5260 SoC
-Message-ID: <1392724570-27977-1-git-send-email-rahul.sharma@samsung.com>
+Date: Tue, 18 Feb 2014 17:26:07 +0530
+Subject: [PATCH v3 2/5] clk/samsung: add support for pll2550xx
+In-Reply-To: <1392724570-27977-1-git-send-email-rahul.sharma@samsung.com>
+References: <1392724570-27977-1-git-send-email-rahul.sharma@samsung.com>
+Message-ID: <1392724570-27977-3-git-send-email-rahul.sharma@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rahul Sharma <Rahul.Sharma@samsung.com>
+From: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-Add basic support for exynos5260 SoC.
+exynos5260 use pll2550xx and it has different bit fields
+for P,M,S values as compared to pll2550. Support for
+pll2550xx is added here.
 
-This series is based on Kukjin's for-next and
-Mike's clk-next branches.
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
+Signed-off-by: Arun Kumar K <arun.kk@samsung.com>
+---
+ drivers/clk/samsung/clk-pll.c |  108 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/samsung/clk-pll.h |    1 +
+ 2 files changed, 109 insertions(+)
 
-This patch is dependent on the following series from
-Tomasz Figa <t.figa@samsung.com>:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/205144.html
-
-V3:
-  1) Removed "samsung,exynos5260-clock" property from clock files.
-  2) Replaced "__SPIN_LOCK_UNLOCKED(lock)" with spin_lock_init.
-  3) Removed '(' and ')' around numeric constants in macros.
-
-V2:
-  1) Move suspend resume handling to Exynos5410 Clock file.
-  2) Removed Unused Macros and Condition checks for Exynos5260.
-  3) Add spin lock to clock provider context.
-  4) Add clock provider context for Exynos5410.
-  5) Uniform implementation for callbacks for PLL2550xx.
-  6) Split Exynos5260 clock file patch to bring it under 100 Kb limit.
-  7) Replace aclk/pclk/hclk gates with combined gates.
-  8) Remove CLK_IGNORE_UNUSED flag for gate clocks.
-
-Pankaj Dubey (1):
-  clk/samsung: add support for pll2550xx
-
-Rahul Sharma (4):
-  clk/samsung: add support for multiple clock providers
-  clk/samsung: add support for pll2650xx
-  clk/exynos5260: add macros and documentation for exynos5260
-  clk/exynos5260: add clock file for exynos5260
-
- .../devicetree/bindings/clock/exynos5260-clock.txt |  299 +++
- drivers/clk/samsung/Makefile                       |    1 +
- drivers/clk/samsung/clk-exynos4.c                  |   47 +-
- drivers/clk/samsung/clk-exynos5250.c               |   25 +-
- drivers/clk/samsung/clk-exynos5260.c               | 2235 ++++++++++++++++++++
- drivers/clk/samsung/clk-exynos5260.h               |  480 +++++
- drivers/clk/samsung/clk-exynos5420.c               |   24 +-
- drivers/clk/samsung/clk-exynos5440.c               |   18 +-
- drivers/clk/samsung/clk-pll.c                      |  223 +-
- drivers/clk/samsung/clk-pll.h                      |    2 +
- drivers/clk/samsung/clk-s3c64xx.c                  |   44 +-
- drivers/clk/samsung/clk.c                          |  115 +-
- drivers/clk/samsung/clk.h                          |   72 +-
- include/dt-bindings/clk/exynos5260-clk.h           |  234 ++
- 14 files changed, 3670 insertions(+), 149 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/exynos5260-clock.txt
- create mode 100644 drivers/clk/samsung/clk-exynos5260.c
- create mode 100644 drivers/clk/samsung/clk-exynos5260.h
- create mode 100644 include/dt-bindings/clk/exynos5260-clk.h
-
+diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+index dced769..56b3fbe 100644
+--- a/drivers/clk/samsung/clk-pll.c
++++ b/drivers/clk/samsung/clk-pll.c
+@@ -710,6 +710,108 @@ struct clk * __init samsung_clk_register_pll2550x(const char *name,
+ 	return clk;
+ }
+ 
++/*
++ * PLL2550xx Clock Type
++ */
++
++/* Maximum lock time can be 270 * PDIV cycles */
++#define PLL2550XX_LOCK_FACTOR 270
++
++#define PLL2550XX_M_MASK		0x3FF
++#define PLL2550XX_P_MASK		0x3F
++#define PLL2550XX_S_MASK		0x7
++#define PLL2550XX_LOCK_STAT_MASK	0x1
++#define PLL2550XX_M_SHIFT		9
++#define PLL2550XX_P_SHIFT		3
++#define PLL2550XX_S_SHIFT		0
++#define PLL2550XX_LOCK_STAT_SHIFT	21
++
++static unsigned long samsung_pll2550xx_recalc_rate(struct clk_hw *hw,
++				unsigned long parent_rate)
++{
++	struct samsung_clk_pll *pll = to_clk_pll(hw);
++	u32 mdiv, pdiv, sdiv, pll_con;
++	u64 fvco = parent_rate;
++
++	pll_con = __raw_readl(pll->con_reg);
++	mdiv = (pll_con >> PLL2550XX_M_SHIFT) & PLL2550XX_M_MASK;
++	pdiv = (pll_con >> PLL2550XX_P_SHIFT) & PLL2550XX_P_MASK;
++	sdiv = (pll_con >> PLL2550XX_S_SHIFT) & PLL2550XX_S_MASK;
++
++	fvco *= mdiv;
++	do_div(fvco, (pdiv << sdiv));
++
++	return (unsigned long)fvco;
++}
++
++static inline bool samsung_pll2550xx_mp_change(u32 mdiv, u32 pdiv, u32 pll_con)
++{
++	u32 old_mdiv, old_pdiv;
++
++	old_mdiv = (pll_con >> PLL2550XX_M_SHIFT) & PLL2550XX_M_MASK;
++	old_pdiv = (pll_con >> PLL2550XX_P_SHIFT) & PLL2550XX_P_MASK;
++
++	return mdiv != old_mdiv || pdiv != old_pdiv;
++}
++
++static int samsung_pll2550xx_set_rate(struct clk_hw *hw, unsigned long drate,
++					unsigned long prate)
++{
++	struct samsung_clk_pll *pll = to_clk_pll(hw);
++	const struct samsung_pll_rate_table *rate;
++	u32 tmp;
++
++	/* Get required rate settings from table */
++	rate = samsung_get_pll_settings(pll, drate);
++	if (!rate) {
++		pr_err("%s: Invalid rate : %lu for pll clk %s\n", __func__,
++			drate, __clk_get_name(hw->clk));
++		return -EINVAL;
++	}
++
++	tmp = __raw_readl(pll->con_reg);
++
++	if (!(samsung_pll2550xx_mp_change(rate->mdiv, rate->pdiv, tmp))) {
++		/* If only s change, change just s value only*/
++		tmp &= ~(PLL2550XX_S_MASK << PLL2550XX_S_SHIFT);
++		tmp |= rate->sdiv << PLL2550XX_S_SHIFT;
++		__raw_writel(tmp, pll->con_reg);
++
++		return 0;
++	}
++
++	/* Set PLL lock time. */
++	__raw_writel(rate->pdiv * PLL2550XX_LOCK_FACTOR, pll->lock_reg);
++
++	/* Change PLL PMS values */
++	tmp &= ~((PLL2550XX_M_MASK << PLL2550XX_M_SHIFT) |
++			(PLL2550XX_P_MASK << PLL2550XX_P_SHIFT) |
++			(PLL2550XX_S_MASK << PLL2550XX_S_SHIFT));
++	tmp |= (rate->mdiv << PLL2550XX_M_SHIFT) |
++			(rate->pdiv << PLL2550XX_P_SHIFT) |
++			(rate->sdiv << PLL2550XX_S_SHIFT);
++	__raw_writel(tmp, pll->con_reg);
++
++	/* wait_lock_time */
++	do {
++		cpu_relax();
++		tmp = __raw_readl(pll->con_reg);
++	} while (!(tmp & (PLL2550XX_LOCK_STAT_MASK
++			<< PLL2550XX_LOCK_STAT_SHIFT)));
++
++	return 0;
++}
++
++static const struct clk_ops samsung_pll2550xx_clk_ops = {
++	.recalc_rate = samsung_pll2550xx_recalc_rate,
++	.round_rate = samsung_pll_round_rate,
++	.set_rate = samsung_pll2550xx_set_rate,
++};
++
++static const struct clk_ops samsung_pll2550xx_clk_min_ops = {
++	.recalc_rate = samsung_pll2550xx_recalc_rate,
++};
++
+ static void __init _samsung_clk_register_pll(struct samsung_clk_provider *ctx,
+ 				struct samsung_pll_clock *pll_clk,
+ 				void __iomem *base)
+@@ -787,6 +889,12 @@ static void __init _samsung_clk_register_pll(struct samsung_clk_provider *ctx,
+ 		else
+ 			init.ops = &samsung_pll46xx_clk_ops;
+ 		break;
++	case pll_2550xx:
++		if (!pll->rate_table)
++			init.ops = &samsung_pll2550xx_clk_min_ops;
++		else
++			init.ops = &samsung_pll2550xx_clk_ops;
++		break;
+ 	default:
+ 		pr_warn("%s: Unknown pll type for pll clk %s\n",
+ 			__func__, pll_clk->name);
+diff --git a/drivers/clk/samsung/clk-pll.h b/drivers/clk/samsung/clk-pll.h
+index 6c39030..e106470 100644
+--- a/drivers/clk/samsung/clk-pll.h
++++ b/drivers/clk/samsung/clk-pll.h
+@@ -25,6 +25,7 @@ enum samsung_pll_type {
+ 	pll_4650c,
+ 	pll_6552,
+ 	pll_6553,
++	pll_2550xx,
+ };
+ 
+ #define PLL_35XX_RATE(_rate, _m, _p, _s)			\
 -- 
 1.7.9.5
