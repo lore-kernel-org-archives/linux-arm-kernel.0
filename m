@@ -1,44 +1,43 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Tue, 18 Feb 2014 12:56:23 -0600
-Subject: [PATCH v5 1/6] spmi: Linux driver framework for SPMI
-In-Reply-To: <20140215234748.GA26494@saruman.home>
-References: <1391468739-20987-1-git-send-email-joshc@codeaurora.org>
- <1391468739-20987-2-git-send-email-joshc@codeaurora.org>
- <20140215234748.GA26494@saruman.home>
-Message-ID: <20140218185623.GF31116@joshc.qualcomm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 18 Feb 2014 15:59:27 -0300
+Subject: PMIC driver prevents gpio-leds to work
+In-Reply-To: <1392749026.163265479@f312.i.mail.ru>
+References: <CAOMZO5D0fa0yzwQbNLG_=oJ_8_WBBqWBF=D9QzSwLwC0jh+deQ@mail.gmail.com>
+ <1392749026.163265479@f312.i.mail.ru>
+Message-ID: <CAOMZO5DWkxv8q+1+LsOYPPLqxXCAW2q9LRXyn-zV-SSSW10AwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 15, 2014 at 05:47:48PM -0600, Felipe Balbi wrote:
-> On Mon, Feb 03, 2014 at 05:05:33PM -0600, Josh Cartwright wrote:
-> > +#ifdef CONFIG_PM_RUNTIME
-> > +static int spmi_runtime_suspend(struct device *dev)
-> > +{
-> > +	struct spmi_device *sdev = to_spmi_device(dev);
-> > +	int err;
-> > +
-> > +	err = pm_generic_runtime_suspend(dev);
-> > +	if (err)
-> > +		return err;
-> > +
-> > +	return spmi_command_sleep(sdev);
-> 
-> shouldn't this too calls be swapped ? I mean, some pm_runtime
-> implementations could be gating clocks at the driver's
-> ->runtime_suspend() callback.
+On Tue, Feb 18, 2014 at 3:43 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> ???????, 18 ??????? 2014, 15:20 -03:00 ?? Fabio Estevam <festevam@gmail.com>:
+>> Hi,
+>>
+>> I am running into the following issue on imx6sl-evk.dts:
+>>
+>> - I can only get the user GPIO LED to work if I unselect the PFUZE100
+>> PMIC driver
+>>
+>> - This happens on linux-next as well as in the internal FSL kernel based on 3.10
+>>
+>> With CONFIG_REGULATOR_PFUZE100=y then the LED blinks only once and
+>> stops instead of blinking at the heartbeat rate.
+>>
+>> Changing to CONFIG_REGULATOR_PFUZE100=n then the LED blinks normally.
+>>
+>> I am not sure how the PMIC driver could interact and make the
+>> gpio-leds driver to fail.
+>>
+>> Any suggestions?
+>
+> Perhaps, one of regulators turn off the power for a pin-group where LED is connected.
 
-Perhaps.  I had added the explicit SLEEP/WAKEUP commands to
-suspend()/resume(), but now I'm thinking issuing these commands should
-not be the responsibility of the core, since the semantics of the
-SLEEP/ACTIVE state aren't well defined in general (each
-implementation/slave defines what, if anything, these states mean).
+That did the trick, thanks.
 
-Fortunately, there are no users yet, so this is a painless change. :)
+I thought that 'regulator-always-on' was enough, but I also need
+'regulator-boot-on' as well.
 
-Thanks for taking a look.
+Will submit the patch later today.
 
-  Josh
+Thanks,
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Fabio Estevam
