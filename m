@@ -1,82 +1,52 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 18 Feb 2014 16:03:44 +0200
-Subject: [PATCH 1/5] ARM: omap2: cm-t35: Add regulators and clock for
- camera sensor
-In-Reply-To: <9621770.WFqvfViqR7@avalon>
-References: <1392069284-18024-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <1392069284-18024-2-git-send-email-laurent.pinchart@ideasonboard.com>
- <9621770.WFqvfViqR7@avalon>
-Message-ID: <53036840.3050605@compulab.co.il>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 18 Feb 2014 15:04:29 +0100
+Subject: [PATCH] rtc: mv: reset date if after year 2038
+In-Reply-To: <1392729966-25394-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392729966-25394-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140218140429.GE17984@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
-
-On 02/18/14 14:47, Laurent Pinchart wrote:
-> Mauro, Tony,
+On Tue, Feb 18, 2014 at 02:26:06PM +0100, Thomas Petazzoni wrote:
+> Dates after January, 19th 2038 are badly handled by userspace due to
+> the time being stored on 32 bits. This causes issues on some Marvell
+> platform on which the RTC is initialized by default to a date that's
+> beyond 2038, causing a really weird behavior of the RTC.
 > 
-> On Monday 10 February 2014 22:54:40 Laurent Pinchart wrote:
->> The camera sensor will soon require regulators and clocks. Register
->> fixed regulators for its VAA and VDD power supplies and a fixed rate
->> clock for its master clock.
+> In order to avoid that, reset the date to a sane value if the RTC is
+> beyond 2038.
 > 
-> This patch is a prerequisite for a set of 4 patches that need to go through 
-> the linux-media tree. It would simpler if it could go through the same tree as 
-> well. Given that arch/arm/mach-omap2/board-cm-t35.c has seen very little 
-> activity recently I believe the risk of conflict is pretty low.
-
-Indeed, as we work on DT stuff of cm-t35/3730 and pretty much stopped
-updating the board-cm-t35.c file.
-
-> Tony, would 
-> that be fine with you ?
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/rtc/rtc-mv.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
->> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
+> index d536c59..f124dc6 100644
+> --- a/drivers/rtc/rtc-mv.c
+> +++ b/drivers/rtc/rtc-mv.c
+> @@ -222,6 +222,7 @@ static int __init mv_rtc_probe(struct platform_device *pdev)
+>  	struct resource *res;
+>  	struct rtc_plat_data *pdata;
+>  	u32 rtc_time;
+> +	u32 rtc_date;
+>  	int ret = 0;
+>  
+>  	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> @@ -257,6 +258,17 @@ static int __init mv_rtc_probe(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> +	/*
+> +	 * A date after January 19th, 2038 does not fit on 32 bits and
+> +	 * will confuse the kernel and userspace. Reset to a sane date
+> +	 * (January 1st, 2013) if we're after 2038.
+> +	 */
 
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+Hi Thomas
 
->> ---
->>  arch/arm/mach-omap2/board-cm-t35.c | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->>
->> diff --git a/arch/arm/mach-omap2/board-cm-t35.c
->> b/arch/arm/mach-omap2/board-cm-t35.c index 8dd0ec8..018353d 100644
->> --- a/arch/arm/mach-omap2/board-cm-t35.c
->> +++ b/arch/arm/mach-omap2/board-cm-t35.c
->> @@ -16,6 +16,8 @@
->>   *
->>   */
->>
->> +#include <linux/clk-provider.h>
->> +#include <linux/clkdev.h>
->>  #include <linux/kernel.h>
->>  #include <linux/init.h>
->>  #include <linux/platform_device.h>
->> @@ -542,8 +544,22 @@ static struct isp_platform_data cm_t35_isp_pdata = {
->>  	.subdevs = cm_t35_isp_subdevs,
->>  };
->>
->> +static struct regulator_consumer_supply cm_t35_camera_supplies[] = {
->> +	REGULATOR_SUPPLY("vaa", "3-005d"),
->> +	REGULATOR_SUPPLY("vdd", "3-005d"),
->> +};
->> +
->>  static void __init cm_t35_init_camera(void)
->>  {
->> +	struct clk *clk;
->> +
->> +	clk = clk_register_fixed_rate(NULL, "mt9t001-clkin", NULL, CLK_IS_ROOT,
->> +				      48000000);
->> +	clk_register_clkdev(clk, NULL, "3-005d");
->> +
->> +	regulator_register_fixed(2, cm_t35_camera_supplies,
->> +				 ARRAY_SIZE(cm_t35_camera_supplies));
->> +
->>  	if (omap3_init_camera(&cm_t35_isp_pdata) < 0)
->>  		pr_warn("CM-T3x: Failed registering camera device!\n");
->>  }
-> 
+Would it be better to reset back to 01/01/1970? When we do reach 32
+bit rollover, and assuming the world continues to exist, it has a
+better chance of being right than 01/01/2013.
 
--- 
-Regards,
-Igor.
+       Andrew
