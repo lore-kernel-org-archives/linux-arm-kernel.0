@@ -1,41 +1,100 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 18 Feb 2014 21:50:05 +0100
-Subject: [PATCH V3 11/17] i2c: nomadik: Convert to devm functions
-In-Reply-To: <20140218184327.GF18768@katana>
-References: <1392650418-14820-1-git-send-email-ulf.hansson@linaro.org>
- <20140218110109.GA18768@katana>
- <CAPDyKFpRaAAer00dqcXR-qOT9S8-SDTnaMUHRwWCZ93w-wnTDA@mail.gmail.com>
- <20140218184327.GF18768@katana>
-Message-ID: <CAPDyKFrBPy+QxgU-PpcGsvy8n=GLEWZHA+0FLfhnV780tt8YWQ@mail.gmail.com>
+From: digitaleric@google.com (Eric Northup)
+Date: Tue, 18 Feb 2014 12:57:51 -0800
+Subject: [PATCH v4 00/12] arm/arm64: KVM: host cache maintenance when
+ guest caches are off
+In-Reply-To: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
+References: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <CAG7+5M3nBfX7qfq9d6Cvrpk2YeoHsy1yG0PjmTspa6zqQvUsXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 February 2014 19:43, Wolfram Sang <wsa@the-dreams.de> wrote:
+On Tue, Feb 18, 2014 at 7:27 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 >
->> I added the IS_ERR, check as you suggested. That caused a rebase of
->> the other patches as well.
->>
->> Sorry if it was unclear.
+> When we run a guest with cache disabled, we don't flush the cache to
+> the Point of Coherency, hence possibly missing bits of data that have
+> been written in the cache, but have not yet reached memory.
 >
-> No problem. I am about to apply all patches except 17 as you suggested.
-> It fails here, however, although I applied Linus' patch first. What
-> exactly is your base? Any chance to publish your branch?
+> We also have the opposite issue: when a guest enables its cache,
+> whatever sits in the cache is suddenly going to become visible,
+> shadowing whatever the guest has written into RAM.
 >
+> There are several approaches to these issues:
+> - Using the DC bit when caches are off: this breaks guests assuming
+>   caches off while doing DMA operations. Bootloaders, for example.
+>   It also breaks the I-D coherency.
+> - Fetch the memory attributes on translation fault, and flush the
+>   cache while handling the fault. This relies on using the PAR_EL1
+>   register to obtain the Stage-1 memory attributes, and tends to be
+>   slow.
+> - Detecting the translation faults occuring with MMU off (and
+>   performing a cache clean), and trapping SCTLR_EL1 to detect the
+>   moment when the guest is turning its caches on (and performing a
+>   cache invalidation). Trapping of SCTLR_EL1 is then disabled to
+>   ensure the best performance.
 
-I have several branches. :-)
+This will preclude noticing the 2nd .. Nth cache off -> on cycles,
+right?  Will any guests care - doesn't kexec go through a caches-off
+state?
 
-My patches applies on top 3.14-rc1 + Linus' patch.
-
-It also applies on
-"git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git"
-on the i2c-nomadik, which already holds Linus's patch. This is what I
-thought was important due what's stated in the MAINATAINERS file.
-
-Now, I guess I should use your tree instead,
-"git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git". Any
-particular branch I should use?  Maybe it's also better if I just
-resend the patches in a new patchset, once I rebased them towards your
-tree?
-
-Kind regards
-Uffe
+>
+> This patch series implements the last solution, for both arm and
+> arm64. Tested on TC2 (ARMv7) and FVP model (ARMv8).
+>
+> From v3 (http://www.spinics.net/lists/arm-kernel/msg305211.html)
+> - Dropped the LPAE-specific pmd_addr_end
+> - Added kvm_p[gum]d_addr_end to deal with 40bit IPAs, and fixed the
+>   callers of p[gum]d_addr_end with IPA parameters
+> - Added patch #12 which, while not strictly related, felt a bit lonely
+>   on the mailing list
+>
+> From v2 (http://www.spinics.net/lists/arm-kernel/msg302472.html):
+> - Addressed most (hopefully all) of Christoffer's comments
+> - Added a new LPAE pmd_addr_end to deal with 40bit IPAs
+>
+> From v1 (http://www.spinics.net/lists/kvm/msg99404.html):
+> - Fixed AArch32 VM handling on arm64 (Reported by Anup)
+> - Added ARMv7 support:
+>   * Fixed a couple of issues regarding handling of 64bit cp15 regs
+>   * Per-vcpu HCR
+>   * Switching of AMAIR0 and AMAIR1
+>
+> Marc Zyngier (12):
+>   arm64: KVM: force cache clean on page fault when caches are off
+>   arm64: KVM: allows discrimination of AArch32 sysreg access
+>   arm64: KVM: trap VM system registers until MMU and caches are ON
+>   ARM: KVM: introduce kvm_p*d_addr_end
+>   arm64: KVM: flush VM pages before letting the guest enable caches
+>   ARM: KVM: force cache clean on page fault when caches are off
+>   ARM: KVM: fix handling of trapped 64bit coprocessor accesses
+>   ARM: KVM: fix ordering of 64bit coprocessor accesses
+>   ARM: KVM: introduce per-vcpu HYP Configuration Register
+>   ARM: KVM: add world-switch for AMAIR{0,1}
+>   ARM: KVM: trap VM system registers until MMU and caches are ON
+>   ARM: KVM: fix warning in mmu.c
+>
+>  arch/arm/include/asm/kvm_arm.h   |   4 +-
+>  arch/arm/include/asm/kvm_asm.h   |   4 +-
+>  arch/arm/include/asm/kvm_host.h  |   9 ++--
+>  arch/arm/include/asm/kvm_mmu.h   |  29 +++++++++--
+>  arch/arm/kernel/asm-offsets.c    |   1 +
+>  arch/arm/kvm/coproc.c            |  84 +++++++++++++++++++++++-------
+>  arch/arm/kvm/coproc.h            |  14 +++--
+>  arch/arm/kvm/coproc_a15.c        |   2 +-
+>  arch/arm/kvm/coproc_a7.c         |   2 +-
+>  arch/arm/kvm/guest.c             |   1 +
+>  arch/arm/kvm/interrupts_head.S   |  21 +++++---
+>  arch/arm/kvm/mmu.c               | 110 ++++++++++++++++++++++++++++++++++++---
+>  arch/arm64/include/asm/kvm_arm.h |   3 +-
+>  arch/arm64/include/asm/kvm_asm.h |   3 +-
+>  arch/arm64/include/asm/kvm_mmu.h |  21 ++++++--
+>  arch/arm64/kvm/sys_regs.c        |  99 ++++++++++++++++++++++++++++++-----
+>  arch/arm64/kvm/sys_regs.h        |   2 +
+>  17 files changed, 341 insertions(+), 68 deletions(-)
+>
+> --
+> 1.8.3.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
