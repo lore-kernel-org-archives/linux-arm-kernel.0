@@ -1,192 +1,276 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 18 Feb 2014 12:36:03 +0100
-Subject: [RFC PATCH v3 2/9] staging: imx-drm: Add temporary copies of v4l2-of
- parsing functions
+Date: Tue, 18 Feb 2014 12:36:08 +0100
+Subject: [RFC PATCH v3 7/9] ARM: dts: imx53: Add IPU DI ports and endpoints,
+ move imx-drm node to dtsi
 In-Reply-To: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
 References: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1392723370-4772-3-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1392723370-4772-8-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <philipp.zabel@gmail.com>
+This patch connects IPU and display encoder (VGA, LVDS)
+device tree nodes, as well as parallel displays on the DISP0
+and DISP1 outputs, using the OF graph bindings described in
+Documentation/devicetree/bindings/media/video-interfaces.txt
 
-The existing v4l2-of parser functions for the video interface bindings
-described in Documentation/device-tree/bindings/media/video-interfaces.txt
-are useful for DRM drivers, too. They will be moved to drivers/media
-so they can be used by drm drivers, too. Until then, duplicate the
-v4l2-of parser functions temporarily.
+The IPU ports correspond to the two display interfaces. The
+order of endpoints in the ports is arbitrary.
 
-Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+Since the imx-drm node now only needs to contain links to the
+display interfaces, it can be moved to the SoC dtsi level. At
+the board level, only connections between the display interface
+ports and encoders or panels have to be added.
+
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/staging/imx-drm/Makefile     |   2 +-
- drivers/staging/imx-drm/imx-drm-of.c | 132 +++++++++++++++++++++++++++++++++++
- drivers/staging/imx-drm/imx-drm.h    |   6 ++
- 3 files changed, 139 insertions(+), 1 deletion(-)
- create mode 100644 drivers/staging/imx-drm/imx-drm-of.c
+ arch/arm/boot/dts/imx53-m53evk.dts | 17 +++++-----
+ arch/arm/boot/dts/imx53-mba53.dts  | 15 +++++----
+ arch/arm/boot/dts/imx53-qsb.dts    | 17 +++++-----
+ arch/arm/boot/dts/imx53.dtsi       | 64 +++++++++++++++++++++++++++++++++++---
+ 4 files changed, 89 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/Makefile b/drivers/staging/imx-drm/Makefile
-index 129e3a3..743b875 100644
---- a/drivers/staging/imx-drm/Makefile
-+++ b/drivers/staging/imx-drm/Makefile
-@@ -1,5 +1,5 @@
+diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
+index ee6107b..0298adc 100644
+--- a/arch/arm/boot/dts/imx53-m53evk.dts
++++ b/arch/arm/boot/dts/imx53-m53evk.dts
+@@ -23,7 +23,6 @@
+ 	soc {
+ 		display1: display at di1 {
+ 			compatible = "fsl,imx-parallel-display";
+-			crtcs = <&ipu 1>;
+ 			interface-pix-fmt = "bgr666";
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_ipu_disp2_1>;
+@@ -44,6 +43,12 @@
+ 				};
+ 			};
+ 		};
++
++		port {
++			display1_in: endpoint {
++				remote-endpoint = <&ipu_di1_disp1>;
++			};
++		};
+ 	};
  
--imxdrm-objs := imx-drm-core.o
-+imxdrm-objs := imx-drm-core.o imx-drm-of.o
+ 	backlight {
+@@ -53,12 +58,6 @@
+ 		default-brightness-level = <6>;
+ 	};
  
- obj-$(CONFIG_DRM_IMX) += imxdrm.o
+-	imx-drm {
+-		compatible = "fsl,imx-drm";
+-		crtcs = <&ipu 1>;
+-		connectors = <&display1>;
+-	};
+-
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		pinctrl-names = "default";
+@@ -227,6 +226,10 @@
+ 	};
+ };
  
-diff --git a/drivers/staging/imx-drm/imx-drm-of.c b/drivers/staging/imx-drm/imx-drm-of.c
-new file mode 100644
-index 0000000..e14b4f3
---- /dev/null
-+++ b/drivers/staging/imx-drm/imx-drm-of.c
-@@ -0,0 +1,132 @@
-+/*
-+ * Video Interface OF binding parsing library
-+ *
-+ * Copyright (C) 2012 - 2013 Samsung Electronics Co., Ltd.
-+ * Author: Sylwester Nawrocki <s.nawrocki@samsung.com>
-+ *
-+ * Copyright (C) 2012 Renesas Electronics Corp.
-+ * Author: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of version 2 of the GNU General Public License as
-+ * published by the Free Software Foundation.
-+ */
++&ipu_di1_disp1 {
++	remote-endpoint = <&display1_in>;
++};
 +
-+#include <linux/kernel.h>
-+#include <linux/of.h>
-+
-+/**
-+ * imx_drm_of_get_next_endpoint() - get next endpoint node
-+ * @parent: pointer to the parent device node
-+ * @prev: previous endpoint node, or NULL to get first
-+ *
-+ * Return: An 'endpoint' node pointer with refcount incremented. Refcount
-+ * of the passed @prev node is decremented.
-+ */
-+struct device_node *imx_drm_of_get_next_endpoint(
-+		const struct device_node *parent, struct device_node *prev)
-+{
-+	struct device_node *endpoint;
-+	struct device_node *port = NULL;
-+
-+	if (!parent)
-+		return NULL;
-+
-+	if (!prev) {
-+		struct device_node *node;
-+		/*
-+		 * It's the first call, we have to find a port subnode
-+		 * within this node or within an optional 'ports' node.
-+		 */
-+		node = of_get_child_by_name(parent, "ports");
-+		if (node)
-+			parent = node;
-+
-+		port = of_get_child_by_name(parent, "port");
-+
-+		if (port) {
-+			/* Found a port, get an endpoint. */
-+			endpoint = of_get_next_child(port, NULL);
-+			of_node_put(port);
-+		} else {
-+			endpoint = NULL;
-+		}
-+
-+		if (!endpoint)
-+			pr_err("%s(): no endpoint nodes specified for %s\n",
-+			       __func__, parent->full_name);
-+		of_node_put(node);
-+	} else {
-+		port = of_get_parent(prev);
-+		if (!port) {
-+			/* Hm, has someone given us the root node ?... */
-+			of_node_put(prev);
-+			return NULL;
-+		}
-+
-+		endpoint = of_get_next_child(port, prev);
-+		if (endpoint) {
-+			of_node_put(port);
-+			return endpoint;
-+		}
-+
-+		/* No more endpoints under this port, try the next one. */
-+		do {
-+			port = of_get_next_child(parent, port);
-+			if (!port)
-+				return NULL;
-+		} while (of_node_cmp(port->name, "port"));
-+
-+		/* Pick up the first endpoint in this port. */
-+		endpoint = of_get_next_child(port, NULL);
-+		of_node_put(port);
-+	}
-+
-+	return endpoint;
-+}
-+EXPORT_SYMBOL_GPL(imx_drm_of_get_next_endpoint);
-+
-+/**
-+ * imx_drm_of_get_remote_port_parent() - get remote port's parent node
-+ * @node: pointer to a local endpoint device_node
-+ *
-+ * Return: Remote device node associated with remote endpoint node linked
-+ *	   to @node. Use of_node_put() on it when done.
-+ */
-+struct device_node *imx_drm_of_get_remote_port_parent(
-+			       const struct device_node *node)
-+{
-+	struct device_node *np;
-+	unsigned int depth;
-+
-+	/* Get remote endpoint node. */
-+	np = of_parse_phandle(node, "remote-endpoint", 0);
-+
-+	/* Walk 3 levels up only if there is 'ports' node. */
-+	for (depth = 3; depth && np; depth--) {
-+		np = of_get_next_parent(np);
-+		if (depth == 2 && of_node_cmp(np->name, "ports"))
-+			break;
-+	}
-+	return np;
-+}
-+EXPORT_SYMBOL(imx_drm_of_get_remote_port_parent);
-+
-+/**
-+ * imx_drm_of_get_remote_port() - get remote port node
-+ * @node: pointer to a local endpoint device_node
-+ *
-+ * Return: Remote port node associated with remote endpoint node linked
-+ *	   to @node. Use of_node_put() on it when done.
-+ */
-+struct device_node *imx_drm_of_get_remote_port(const struct device_node *node)
-+{
-+	struct device_node *np;
-+
-+	/* Get remote endpoint node. */
-+	np = of_parse_phandle(node, "remote-endpoint", 0);
-+	if (!np)
-+		return NULL;
-+	return of_get_next_parent(np);
-+}
-+EXPORT_SYMBOL_GPL(imx_drm_of_get_remote_port);
-diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
-index aa21028..793a80b 100644
---- a/drivers/staging/imx-drm/imx-drm.h
-+++ b/drivers/staging/imx-drm/imx-drm.h
-@@ -58,4 +58,10 @@ int imx_drm_connector_mode_valid(struct drm_connector *connector,
- void imx_drm_connector_destroy(struct drm_connector *connector);
- void imx_drm_encoder_destroy(struct drm_encoder *encoder);
+ &nfc {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_nand_1>;
+diff --git a/arch/arm/boot/dts/imx53-mba53.dts b/arch/arm/boot/dts/imx53-mba53.dts
+index 9b6e769..3c3d69e 100644
+--- a/arch/arm/boot/dts/imx53-mba53.dts
++++ b/arch/arm/boot/dts/imx53-mba53.dts
+@@ -38,15 +38,14 @@
+ 		compatible = "fsl,imx-parallel-display";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_disp1_1>;
+-		crtcs = <&ipu 1>;
+ 		interface-pix-fmt = "rgb24";
+ 		status = "disabled";
+-	};
  
-+struct device_node *imx_drm_of_get_next_endpoint(
-+		const struct device_node *parent, struct device_node *prev);
-+struct device_node *imx_drm_of_get_remote_port_parent(
-+			       const struct device_node *node);
-+struct device_node *imx_drm_of_get_remote_port(const struct device_node *node);
+-	imx-drm {
+-		compatible = "fsl,imx-drm";
+-		crtcs = <&ipu 1>;
+-		connectors = <&disp1>, <&tve>;
++		port {
++			display1_in: endpoint {
++				remote-endpoint = <&ipu_di1_disp1>;
++			};
++		};
+ 	};
+ 
+ 	reg_3p2v: 3p2v {
+@@ -147,6 +146,10 @@
+ 	};
+ };
+ 
++&ipu_di1_disp1 {
++	remote-endpoint = <&display1_in>;
++};
 +
- #endif /* _IMX_DRM_H_ */
+ &cspi {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
+index 3cb4f77..8b25428 100644
+--- a/arch/arm/boot/dts/imx53-qsb.dts
++++ b/arch/arm/boot/dts/imx53-qsb.dts
+@@ -23,7 +23,6 @@
+ 
+ 	display0: display at di0 {
+ 		compatible = "fsl,imx-parallel-display";
+-		crtcs = <&ipu 0>;
+ 		interface-pix-fmt = "rgb565";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_ipu_disp0_1>;
+@@ -46,6 +45,12 @@
+ 				pixelclk-active = <0>;
+ 			};
+ 		};
++
++		port {
++			display0_in: endpoint {
++				remote-endpoint = <&ipu_di0_disp0>;
++			};
++		};
+ 	};
+ 
+ 	gpio-keys {
+@@ -72,12 +77,6 @@
+ 		};
+ 	};
+ 
+-	imx-drm {
+-		compatible = "fsl,imx-drm";
+-		crtcs = <&ipu 0>;
+-		connectors = <&display0>;
+-	};
+-
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		pinctrl-names = "default";
+@@ -132,6 +131,10 @@
+ 	status = "okay";
+ };
+ 
++&ipu_di0_disp0 {
++	remote-endpoint = <&display0_in>;
++};
++
+ &ssi2 {
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 4307e80..5b89b91 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -45,6 +45,11 @@
+ 		};
+ 	};
+ 
++	imx-drm {
++		compatible = "fsl,imx-drm";
++		ports = <&ipu_di0>, <&ipu_di1>;
++	};
++
+ 	tzic: tz-interrupt-controller at 0fffc000 {
+ 		compatible = "fsl,imx53-tzic", "fsl,tzic";
+ 		interrupt-controller;
+@@ -85,13 +90,49 @@
+ 		ranges;
+ 
+ 		ipu: ipu at 18000000 {
+-			#crtc-cells = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 			compatible = "fsl,imx53-ipu";
+ 			reg = <0x18000000 0x080000000>;
+ 			interrupts = <11 10>;
+ 			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
+ 			clock-names = "bus", "di0", "di1";
+ 			resets = <&src 2>;
++
++			ipu_di0: port at 2 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <2>;
++
++				ipu_di0_disp0: endpoint at 0 {
++					reg = <0>;
++				};
++
++				ipu_di0_lvds0: endpoint at 1 {
++					reg = <1>;
++					remote-endpoint = <&lvds0_in>;
++				};
++			};
++
++			ipu_di1: port at 3 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <3>;
++
++				ipu_di1_disp1: endpoint at 0 {
++					reg = <0>;
++				};
++
++				ipu_di1_lvds1: endpoint at 1 {
++					reg = <1>;
++					remote-endpoint = <&lvds1_in>;
++				};
++
++				ipu_di1_tve: endpoint at 2 {
++					reg = <2>;
++					remote-endpoint = <&tve_in>;
++				};
++			};
+ 		};
+ 
+ 		aips at 50000000 { /* AIPS1 */
+@@ -838,14 +879,24 @@
+ 
+ 				lvds-channel at 0 {
+ 					reg = <0>;
+-					crtcs = <&ipu 0>;
+ 					status = "disabled";
++
++					port {
++						lvds0_in: endpoint {
++							remote-endpoint = <&ipu_di0_lvds0>;
++						};
++					};
+ 				};
+ 
+ 				lvds-channel at 1 {
+ 					reg = <1>;
+-					crtcs = <&ipu 1>;
+ 					status = "disabled";
++
++					port {
++						lvds1_in: endpoint {
++							remote-endpoint = <&ipu_di0_lvds0>;
++						};
++					};
+ 				};
+ 			};
+ 
+@@ -1103,8 +1154,13 @@
+ 				interrupts = <92>;
+ 				clocks = <&clks 69>, <&clks 116>;
+ 				clock-names = "tve", "di_sel";
+-				crtcs = <&ipu 1>;
+ 				status = "disabled";
++
++				port {
++					tve_in: endpoint {
++						remote-endpoint = <&ipu_di1_tve>;
++					};
++				};
+ 			};
+ 
+ 			vpu: vpu at 63ff4000 {
 -- 
 1.8.5.3
