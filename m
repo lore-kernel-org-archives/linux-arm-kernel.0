@@ -1,72 +1,98 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 18 Feb 2014 14:55:57 +0000
-Subject: [PATCH 30/35] mtd: st_spi_fsm: Add the ability to write to FSM's
- status register
-In-Reply-To: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
-References: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1392735362-1245-31-git-send-email-lee.jones@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 18 Feb 2014 16:03:22 +0100
+Subject: [PATCH 1/5] ARM: omap2: cm-t35: Add regulators and clock for
+ camera sensor
+In-Reply-To: <53036840.3050605@compulab.co.il>
+References: <1392069284-18024-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <9621770.WFqvfViqR7@avalon> <53036840.3050605@compulab.co.il>
+Message-ID: <3444638.OmucgL67eO@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by Angus Clark <angus.clark@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mtd/devices/st_spi_fsm.c | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+Hi Igor,
 
-diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 5b2993d..b32df09 100644
---- a/drivers/mtd/devices/st_spi_fsm.c
-+++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -588,6 +588,23 @@ static struct stfsm_seq stfsm_seq_erase_chip = {
- 		    SEQ_CFG_STARTSEQ),
- };
- 
-+static struct stfsm_seq stfsm_seq_write_status = {
-+	.seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+		       SEQ_OPC_OPCODE(FLASH_CMD_WREN) | SEQ_OPC_CSDEASSERT),
-+	.seq_opc[1] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+		       SEQ_OPC_OPCODE(FLASH_CMD_WRSR)),
-+	.seq = {
-+		STFSM_INST_CMD1,
-+		STFSM_INST_CMD2,
-+		STFSM_INST_STA_WR1,
-+		STFSM_INST_STOP,
-+	},
-+	.seq_cfg = (SEQ_CFG_PADS_1 |
-+		    SEQ_CFG_READNOTWRITE |
-+		    SEQ_CFG_CSDEASSERT |
-+		    SEQ_CFG_STARTSEQ),
-+};
-+
- static struct stfsm_seq stfsm_seq_wrvcr = {
- 	.seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
- 		       SEQ_OPC_OPCODE(FLASH_CMD_WREN) | SEQ_OPC_CSDEASSERT),
-@@ -817,6 +834,25 @@ static int stfsm_read_status(struct stfsm *fsm, uint8_t cmd,
- 	return 0;
- }
- 
-+static int stfsm_write_status(struct stfsm *fsm, uint16_t status,
-+			       int sta_bytes)
-+{
-+	struct stfsm_seq *seq = &stfsm_seq_write_status;
-+
-+	dev_dbg(fsm->dev, "writing STA[%s] 0x%04x\n",
-+		(sta_bytes == 1) ? "1" : "1+2", status);
-+
-+	seq->status = (uint32_t)status | STA_PADS_1 | STA_CSDEASSERT;
-+	seq->seq[2] = (sta_bytes == 1) ?
-+		STFSM_INST_STA_WR1 : STFSM_INST_STA_WR1_2;
-+
-+	stfsm_load_seq(fsm, seq);
-+
-+	stfsm_wait_seq(fsm);
-+
-+	return 0;
-+};
-+
- static int stfsm_wrvcr(struct stfsm *fsm, uint8_t data)
- {
- 	struct stfsm_seq *seq = &stfsm_seq_wrvcr;
+On Tuesday 18 February 2014 16:03:44 Igor Grinberg wrote:
+> On 02/18/14 14:47, Laurent Pinchart wrote:
+> > On Monday 10 February 2014 22:54:40 Laurent Pinchart wrote:
+> >> The camera sensor will soon require regulators and clocks. Register
+> >> fixed regulators for its VAA and VDD power supplies and a fixed rate
+> >> clock for its master clock.
+> > 
+> > This patch is a prerequisite for a set of 4 patches that need to go
+> > through the linux-media tree. It would simpler if it could go through the
+> > same tree as well. Given that arch/arm/mach-omap2/board-cm-t35.c has seen
+> > very little activity recently I believe the risk of conflict is pretty
+> > low.
+> 
+> Indeed, as we work on DT stuff of cm-t35/3730 and pretty much stopped
+> updating the board-cm-t35.c file.
+
+DT support for the OMAP3 ISP is coming. Too slowly, but it's coming :-)
+
+> > Tony, would
+> > that be fine with you ?
+> > 
+> >> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> 
+> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+
+Thank you. Tony, could I get your ack as well to push this through Mauro's 
+tree ?
+
+> >> ---
+> >> 
+> >>  arch/arm/mach-omap2/board-cm-t35.c | 16 ++++++++++++++++
+> >>  1 file changed, 16 insertions(+)
+> >> 
+> >> diff --git a/arch/arm/mach-omap2/board-cm-t35.c
+> >> b/arch/arm/mach-omap2/board-cm-t35.c index 8dd0ec8..018353d 100644
+> >> --- a/arch/arm/mach-omap2/board-cm-t35.c
+> >> +++ b/arch/arm/mach-omap2/board-cm-t35.c
+> >> @@ -16,6 +16,8 @@
+> >> 
+> >>   *
+> >>   */
+> >> 
+> >> +#include <linux/clk-provider.h>
+> >> +#include <linux/clkdev.h>
+> >> 
+> >>  #include <linux/kernel.h>
+> >>  #include <linux/init.h>
+> >>  #include <linux/platform_device.h>
+> >> 
+> >> @@ -542,8 +544,22 @@ static struct isp_platform_data cm_t35_isp_pdata = {
+> >> 
+> >>  	.subdevs = cm_t35_isp_subdevs,
+> >>  
+> >>  };
+> >> 
+> >> +static struct regulator_consumer_supply cm_t35_camera_supplies[] = {
+> >> +	REGULATOR_SUPPLY("vaa", "3-005d"),
+> >> +	REGULATOR_SUPPLY("vdd", "3-005d"),
+> >> +};
+> >> +
+> >> 
+> >>  static void __init cm_t35_init_camera(void)
+> >>  {
+> >> 
+> >> +	struct clk *clk;
+> >> +
+> >> +	clk = clk_register_fixed_rate(NULL, "mt9t001-clkin", NULL, 
+CLK_IS_ROOT,
+> >> +				      48000000);
+> >> +	clk_register_clkdev(clk, NULL, "3-005d");
+> >> +
+> >> +	regulator_register_fixed(2, cm_t35_camera_supplies,
+> >> +				 ARRAY_SIZE(cm_t35_camera_supplies));
+> >> +
+> >> 
+> >>  	if (omap3_init_camera(&cm_t35_isp_pdata) < 0)
+> >>  	
+> >>  		pr_warn("CM-T3x: Failed registering camera device!\n");
+> >>  
+> >>  }
+
 -- 
-1.8.3.2
+Regards,
+
+Laurent Pinchart
