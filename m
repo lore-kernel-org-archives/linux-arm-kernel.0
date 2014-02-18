@@ -1,41 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Feb 2014 21:19:21 +0100
-Subject: [PATCH v3 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <20140218195732.GL2010@mudshark.cambridge.arm.com>
-References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
- <20140218193654.GK2010@mudshark.cambridge.arm.com>
- <20140218195732.GL2010@mudshark.cambridge.arm.com>
-Message-ID: <1433616.UrvWxRt80Z@wuerfel>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 18 Feb 2014 12:22:05 -0800
+Subject: [PATCH] dt: platform driver: Fill the resources before probe and
+ defer if needed
+In-Reply-To: <1392285429-9325-1-git-send-email-jjhiblot@traphandler.com>
+References: <1392285429-9325-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <20140218202205.GA13835@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 February 2014 19:57:32 Will Deacon wrote:
-> On Tue, Feb 18, 2014 at 07:36:54PM +0000, Will Deacon wrote:
-> > On Tue, Feb 18, 2014 at 07:32:33PM +0000, Arnd Bergmann wrote:
-> > > On Tuesday 18 February 2014 19:09:29 Will Deacon wrote:
-> > > Regarding the PCI_PROBE_ONLY flag, how do you set that? Should we
-> > > have a standard DT property for that? On PowerPC we already specified
-> > > "linux,pci-probe-only" and "linux,pci-assign-all-buses", which seems
-> > > reasonable to use in architecture independent code as well.
-> > 
-> > For arch/arm/ it's done on the command line (pci=firmware) but yes, for the
-> > generic driver it sounds like a good idea to put this in the device-tree.
-> > I'll look at adding the ppc properties in the next version.
+On Thu, Feb 13, 2014 at 10:57:09AM +0100, Jean-Jacques Hiblot wrote:
+> The goal of this patch is to allow drivers to be probed even if at the time of
+> the DT parsing some of their ressources are not available yet.
 > 
-> Damn, I spoke too soon. PowerPC puts this information in the /chosen node, so
-> it applies to all PCI host controllers in the system. That then maps nicely
-> to pci_{add,clear}_flags which are global properties in Linux.
+> In the current situation, the resource of a platform device are filled from the
+> DT at the time the device is created (of_device_alloc()). The drawbackof this
+> is that a device sitting close to the top of the DT (ahb for example) but
+> depending on ressources that are initialized later (IRQ domain dynamically
+> created for example)  will fail to probe because the ressources don't exist
+> at this time.
 > 
-> It sounds like this should really be per-controller. What do you think?
+> This patch fills the resource structure only before the device is probed and
+> will defer the probe if the resource are not available yet.
+> 
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/base/platform.c     |  6 ++++
+>  drivers/of/platform.c       | 71 +++++++++++++++++++++++++++++----------------
+>  include/linux/of_platform.h | 10 +++++++
+>  3 files changed, 62 insertions(+), 25 deletions(-)
 
-I don't have a strong opinion either way. I think the reason for having it
-in the /chosen node is so that a second-stage boot loader can easily
-override it, which is not a concern for us. In particular, the properties
-are only used on rtas-pci, which means we access the config space to
-firmware runtime abstraction services rather than hardware registers.
-
-Apparently the embedded powerpc platforms don't support these flags at
-all, which I also didn't notice at first.
-
-	Arnd
+I need some others to ack this before I can take it...
