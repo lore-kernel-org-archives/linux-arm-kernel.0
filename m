@@ -1,42 +1,139 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 18 Feb 2014 20:11:50 +0000
-Subject: [PATCH 26/34] imx-drm: imx-drm-core: get rid of
- drm_mode_group_init_legacy_group()
+Date: Tue, 18 Feb 2014 20:11:55 +0000
+Subject: [PATCH 27/34] imx-drm: imx-drm-core: kill off mutex
 In-Reply-To: <20140218200900.GM21483@n2100.arm.linux.org.uk>
 References: <20140218200900.GM21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WFr1C-0007k5-4D@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WFr1H-0007k9-7q@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we're now operating like a conventional DRM driver, doing all
-the initialisation within the driver's ->load callback, we don't
-need to mess around with the mode groups - we can rely on the one
-in the DRM platform code.
+This mutex doesn't protect anything anymore; get rid of it.
 
 Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c | 6 ------
- 1 file changed, 6 deletions(-)
+ drivers/staging/imx-drm/imx-drm-core.c | 26 +++-----------------------
+ 1 file changed, 3 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index b27c42539e49..dd97412d6c8a 100644
+index dd97412d6c8a..d5b82cb0cfae 100644
 --- a/drivers/staging/imx-drm/imx-drm-core.c
 +++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -274,12 +274,6 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+@@ -40,14 +40,12 @@ struct imx_drm_device {
+ 	struct drm_device			*drm;
+ 	struct device				*dev;
+ 	struct imx_drm_crtc			*crtc[MAX_CRTC];
+-	struct mutex				mutex;
+ 	int					pipes;
+ 	struct drm_fbdev_cma			*fbhelper;
+ };
  
+ struct imx_drm_crtc {
+ 	struct drm_crtc				*crtc;
+-	struct imx_drm_device			*imxdrm;
+ 	int					pipe;
+ 	struct imx_drm_crtc_helper_funcs	imx_drm_helper_funcs;
+ 	struct crtc_cookie			cookie;
+@@ -270,8 +268,6 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+ 
+ 	drm_mode_config_init(drm);
+ 
+-	mutex_lock(&imxdrm->mutex);
+-
  	drm_kms_helper_poll_init(drm);
  
--	/* setup the grouping for the legacy output */
--	ret = drm_mode_group_init_legacy_group(drm,
--			&drm->primary->mode_group);
--	if (ret)
--		goto err_kms;
--
  	ret = drm_vblank_init(drm, MAX_CRTC);
+@@ -287,12 +283,10 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+ 
+ 	platform_set_drvdata(drm->platformdev, drm);
+ 
+-	mutex_unlock(&imxdrm->mutex);
+-
+ 	/* Now try and bind all our sub-components */
+ 	ret = component_bind_all(drm->dev, drm);
  	if (ret)
- 		goto err_kms;
+-		goto err_relock;
++		goto err_vblank;
+ 
+ 	/*
+ 	 * All components are now added, we can publish the connector sysfs
+@@ -332,13 +326,11 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+ 
+ err_unbind:
+ 	component_unbind_all(drm->dev, drm);
+-err_relock:
+-	mutex_lock(&imxdrm->mutex);
++err_vblank:
+ 	drm_vblank_cleanup(drm);
+ err_kms:
+ 	drm_kms_helper_poll_fini(drm);
+ 	drm_mode_config_cleanup(drm);
+-	mutex_unlock(&imxdrm->mutex);
+ 
+ 	return ret;
+ }
+@@ -358,8 +350,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 	struct imx_drm_crtc *imx_drm_crtc;
+ 	int ret;
+ 
+-	mutex_lock(&imxdrm->mutex);
+-
+ 	/*
+ 	 * The vblank arrays are dimensioned by MAX_CRTC - we can't
+ 	 * pass IDs greater than this to those functions.
+@@ -386,7 +376,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 	imx_drm_crtc->cookie.id = id;
+ 	imx_drm_crtc->mux_id = imx_drm_crtc->pipe;
+ 	imx_drm_crtc->crtc = crtc;
+-	imx_drm_crtc->imxdrm = imxdrm;
+ 
+ 	imxdrm->crtc[imx_drm_crtc->pipe] = imx_drm_crtc;
+ 
+@@ -402,8 +391,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 	drm_crtc_init(drm, crtc,
+ 			imx_drm_crtc->imx_drm_helper_funcs.crtc_funcs);
+ 
+-	mutex_unlock(&imxdrm->mutex);
+-
+ 	return 0;
+ 
+ err_register:
+@@ -411,7 +398,6 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 	kfree(imx_drm_crtc);
+ err_alloc:
+ err_busy:
+-	mutex_unlock(&imxdrm->mutex);
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(imx_drm_add_crtc);
+@@ -421,16 +407,12 @@ EXPORT_SYMBOL_GPL(imx_drm_add_crtc);
+  */
+ int imx_drm_remove_crtc(struct imx_drm_crtc *imx_drm_crtc)
+ {
+-	struct imx_drm_device *imxdrm = imx_drm_crtc->imxdrm;
+-
+-	mutex_lock(&imxdrm->mutex);
++	struct imx_drm_device *imxdrm = imx_drm_crtc->crtc->dev->dev_private;
+ 
+ 	drm_crtc_cleanup(imx_drm_crtc->crtc);
+ 
+ 	imxdrm->crtc[imx_drm_crtc->pipe] = NULL;
+ 
+-	mutex_unlock(&imxdrm->mutex);
+-
+ 	kfree(imx_drm_crtc);
+ 
+ 	return 0;
+@@ -657,8 +639,6 @@ static int __init imx_drm_init(void)
+ 	if (!imx_drm_device)
+ 		return -ENOMEM;
+ 
+-	mutex_init(&imx_drm_device->mutex);
+-
+ 	ret = platform_driver_register(&imx_drm_pdrv);
+ 	if (ret)
+ 		goto err_pdrv;
 -- 
 1.8.3.1
