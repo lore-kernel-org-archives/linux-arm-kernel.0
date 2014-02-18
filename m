@@ -1,62 +1,65 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 18 Feb 2014 11:30:07 -0500
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.15
-Message-ID: <20140218163007.GV7862@titan.lakedaemon.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 18 Feb 2014 08:33:16 -0800
+Subject: BUG: Null pointer dereference on booting TC2 with
+ vexpress_defconfig
+In-Reply-To: <53033E37.6000402@arm.com>
+References: <20140217223907.GH21070@cbox>
+	<53033E37.6000402@arm.com>
+Message-ID: <CAMJs5B-G86o8Tjcwg+dvDETqQ5qiDsDFB9kBPtL=RBLqFqpAOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+On 18 February 2014 03:04, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
+> On 17/02/14 22:39, Christoffer Dall wrote:
+>> Booting my TC2 using 3.14-rc3 and vexpress_defconfig causes a NULL
+>> pointer dereference in schedule_work_on.
+>>
+>> A quick look at the trace indicates that schedule_work() is called
+>> before system_wq is initialized.
+>>
+>> Further, a bisect seems to indicate that this call path is triggered by
+>> the changes in this merge commit of Theodore T'so's random_for_linus
+>> tag:
+>> 0891ad829d2a0501053703df66029e843e3b8365
+>>
+>> (However, my bisect may not be 100% correct, as some of the commits
+>> between 3.13 and 3.12 don't boot the TC2 with vexpress_defconfig,
+>> specifically the ones after f9300eaaac1ca300083ad41937923a90cc3a2394,
+>> which causes boot to halt after "ARM CCI driver probed").
+>>
+> Yes that requires some changes in defconfig to continue to work across
+> these changes(mainly have all these new configs disabled)
+>
 
-Nothing special here.  These have been in next at least a week (the
-kirkwood boards much longer).  Please pull.
+So vexpress_defconfig is known to not work on TC2?
 
-thx,
+>> Disabling CONFIG_ARCH_VEXPRESS_TC2_PM avoids the issue.
+>>
+> Are you just disabling this or even CONFIG_MCPM ? Are the secondaries cpus
+> coming up ?
+>
 
-Jason.
+Disabling CONFIG_ARCH_VEXPRESS_TC2_PM allows the system to boot, but
+only with one CPU.
 
+Disabling CONFIG_MCPM allows SMP boot as well.
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+>> I'm not familiar enough with any of these code paths to quicly identify
+>> what the issue could be.  Apologies if I missed a previous post about
+>> this issue (I couldn't find anything but would be surprised if I'm the
+>> only one doing vexpress_defconfig on a TC2).
+>>
+> I just tried and it works fine. If CONFIG_MCPM and CONFIG_ARCH_VEXPRESS_TC2_PM,
+> it requires some changes in board configurations(for bootmon), I assume you have
+> done those changes.
+>
 
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+What works fine? With both configs enabled?
 
-are available in the git repository at:
+I didn't change anything on the boot monitor side.  Can you give me a
+pointer to the specifics?  Was there an announcement about this
+somewhere that I failed to locate?
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.15
+Thanks for your help!
 
-for you to fetch changes up to 5c0169d1c503aab2d62ee6f6e342a78e2ea9e3ed:
-
-  ARM: mvebu: use input DT defines in Armada 370/XP boards (2014-02-11 19:35:39 +0000)
-
-----------------------------------------------------------------
-mvebu DT changes for v3.15
-
- - kirkwood
-    - new board QNAP 419
-    - new board Excito Bubba B3
-
- - mvebu
-    - use gpio and input defines for Armada 370/XP boards
-
-----------------------------------------------------------------
-Andrew Lunn (2):
-      ARM: Kirkwood: Add support for Excito Bubba B3
-      ARM: Kirkwood: Add DT description of QNAP 419
-
-Thomas Petazzoni (2):
-      ARM: mvebu: use GPIO DT defines in Armada 370/XP boards
-      ARM: mvebu: use input DT defines in Armada 370/XP boards
-
- arch/arm/boot/dts/Makefile                       |   7 +-
- arch/arm/boot/dts/armada-370-mirabox.dts         |   7 +-
- arch/arm/boot/dts/armada-370-rd.dts              |   6 +-
- arch/arm/boot/dts/armada-xp-axpwifiap.dts        |   6 +-
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  12 +-
- arch/arm/boot/dts/kirkwood-b3.dts                | 204 +++++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-ts419-6281.dts        |  20 +++
- arch/arm/boot/dts/kirkwood-ts419-6282.dts        |  32 ++++
- arch/arm/boot/dts/kirkwood-ts419.dtsi            |  75 +++++++++
- 9 files changed, 355 insertions(+), 14 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-b3.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6281.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6282.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-ts419.dtsi
+-Christoffer
