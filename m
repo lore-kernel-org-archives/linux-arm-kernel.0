@@ -1,70 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Feb 2014 19:40:51 +0100
-Subject: [PATCH v2 0/3] ARM: PCI: implement generic PCI host controller
-In-Reply-To: <20140218180005.GD29304@obsidianresearch.com>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <1800297.J3Exeqph4n@wuerfel> <20140218180005.GD29304@obsidianresearch.com>
-Message-ID: <3296233.1sYEW4ig2k@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 18 Feb 2014 19:42:42 +0100
+Subject: [PATCH v2 05/23] ARM: Kirkwood: Seperate board-dt from common
+ and pcie code.
+In-Reply-To: <20140218183746.GH29304@obsidianresearch.com>
+References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
+ <1392459621-24003-6-git-send-email-andrew@lunn.ch>
+ <3017687.o0PD1Sf7lM@wuerfel> <20140215140505.GB26088@lunn.ch>
+ <20140218183746.GH29304@obsidianresearch.com>
+Message-ID: <20140218184242.GJ17984@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 February 2014 11:00:05 Jason Gunthorpe wrote:
-> 
-> > > You will have overlapping physical IO bus addresses - each domain will
-> > > have a 0 IO BAR - but those will have distinct CPU physical addresses
-> > > and can then be uniquely mapped into the IO mapping. So at the struct
-> > > resource level the two domains have disjoint IO addresses, but each
-> > > domain uses a different IO offset..
-> > 
-> > This would be the common case, but when we have a generic helper function,
-> > it's actually not that are to handle a couple of variations of that,
-> > which we may see in the field and can easily be described with the
-> > existing binding.
-> 
-> I agree the DT binding ranges has enough flexibility to describe all
-> of these cases, but I kind of circle back to the domain discussion and
-> ask 'Why?'. 
-> 
-> As far as I can see there are two reasonable ways to handle IO space:
->  - The IO space is 1:1 mapped to the Physical CPU Address. In most
->    cases this would require 32 bit IO BARS in all devices.
+> Can we worry about this after Andrew's shuffling is done?
 
-I wouldn't consider this one reasonable ;-)
+Hi Jason
 
-In particular, it would break /dev/port access horribly.
+I think so. I plan to keep to a config option for the moment and
+remove the wt-override from DT. We can put it back again later.
 
->  - The IO space in a domain is always 0 -> 64k and thus only ever
->    requires 16 bit BARs
-> 
-> And this is possible too:
->  - The IO space is 1:1: mapped to Linux Virtual IO port numbers
->    (which are a fiction) and devices sometimes require 32 bit
->    IO BARs. This gives you lspci output that matches dmesg and
->    /proc/ioport.
-
-These two seem fine.
-
-> Things get more complex if you want to support legacy non-BAR IO (eg
-> VGA). Then you *really* want every domain to support 0->64k and you
-> need driver support to setup a window for the legacy IO port. (eg on a
-> multi-port root complex there is non-PCI spec hardware that routes the
-> VGA addresses to the root port bridge that connects to the VGA card)
-> Plus you probably need a memory hole around 1M..
-
-For the I/O space part of this, that would be the same as your second
-example above. For memory space, you need both the 640k-1M window and
-the 15M-16M window. We have a couple of ARM platforms that actually
-have a PCI MMIO window starting at bus address 0 with a mem_offset
-matching the physical base address to facilitate VGA access,
-try 'git grep -w vga_base'.
-
-> But, I think this is overthinking things. IO space really is
-> deprecated, and 0->64k is a fine default for everything but very
-> specialized cases.
-
-We may not need the entire complexity to handle all cases, but
-I think it's a good idea to detect the ones we don't handle and
-then warn about them. For some things, just doing it right may be
-easier than detecting the case where we don't.
-
-	Arnd
+       Andrew
