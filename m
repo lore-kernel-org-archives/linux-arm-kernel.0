@@ -1,28 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Feb 2014 19:16:38 +0000
-Subject: [PATCH v3 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <16012311.obgTYIWsOC@wuerfel>
-References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
- <10244486.cKXs90tdz5@wuerfel>
- <20140218185150.GE2010@mudshark.cambridge.arm.com>
- <16012311.obgTYIWsOC@wuerfel>
-Message-ID: <20140218191637.GI2010@mudshark.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 18 Feb 2014 14:28:41 -0500
+Subject: [GIT PULL] clk: mvebu: fixes for v3.14
+In-Reply-To: <20140208173154.GL8533@titan.lakedaemon.net>
+References: <20140208173154.GL8533@titan.lakedaemon.net>
+Message-ID: <20140218192841.GG7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 07:11:25PM +0000, Arnd Bergmann wrote:
-> On Tuesday 18 February 2014 18:51:50 Will Deacon wrote:
-> > 
-> > kvmtool provides an i8042, pci-shmem, an rtc, 8250 and vesa at the usual PC
-> > offsets. On ARM, I regularly use the 8250 (there are even DT bindings for
-> > it) and MarcZ got the rtc working for fun. Not tried the others though.
+Mike,
+
+On Sat, Feb 08, 2014 at 12:31:54PM -0500, Jason Cooper wrote:
+> Mike,
 > 
-> Ah, interesting. But which ones are between 0x1000-0x6200? The ones
-> you list should all be in the ISA range between 0x0-0xfff as far
-> as I can tell, which we keep clear of by setting PCIBIOS_MIN_IO
-> to 0x1000.
+> Here's a round of fixes I've had in -next for several days.  It's not
+> the ideal solution, but a short term one while we hash out a proper
+> solution for v3.15+.
 
-I think there's just a hole between 0x1000 - 0x6200.
+Ping?  just didn't want this to fall off of your plate.
 
-Will
+thx,
+
+Jason.
+
+> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+> 
+>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-clk-fixes-3.14
+> 
+> for you to fetch changes up to 58d516ae95cbf7eed44f85a01cdfad41f17b4197:
+> 
+>   clk: mvebu: kirkwood: maintain clock init order (2014-02-06 18:07:01 +0000)
+> 
+> ----------------------------------------------------------------
+> mvebu clock fixes for v3.14
+> 
+>  - kirkwood, dove, armada-xp, armada-370
+>     - force clock init order broken by sorting DT ocp nodes by address
+>     - fixes boot failures on affected platforms
+> 
+> ----------------------------------------------------------------
+> Sebastian Hesselbarth (4):
+>       clk: mvebu: armada-370: maintain clock init order
+>       clk: mvebu: armada-xp: maintain clock init order
+>       clk: mvebu: dove: maintain clock init order
+>       clk: mvebu: kirkwood: maintain clock init order
+> 
+>  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
+>  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
+>  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
+>  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
+>  4 files changed, 44 insertions(+), 50 deletions(-)
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
