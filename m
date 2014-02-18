@@ -1,83 +1,220 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 18 Feb 2014 15:11:06 +0000
-Subject: [PATCH RFC 24/31] mmc: sdhci: set_uhs_signaling() need not return a
- value
-In-Reply-To: <20140218150801.GD21483@n2100.arm.linux.org.uk>
-References: <20140218150801.GD21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WFmKA-0006nS-0z@rmk-PC.arm.linux.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 18 Feb 2014 16:10:38 +0100
+Subject: [PATCH v7 5/8] ARM: dts: sun7i: Add support for mmc
+In-Reply-To: <20140218142221.GJ3142@lukather>
+References: <20140217095907.15040.81893.stgit@pagira.o2s.ch>
+ <20140217100241.15040.24836.stgit@pagira.o2s.ch>
+ <20140218142221.GJ3142@lukather>
+Message-ID: <530377EE.8010909@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The set_uhs_signaling() method gives the impression that it can fail,
-but anything returned from the method is entirely ignored by the sdhci
-driver.  So returning failure has no effect.
+Hi,
 
-So, kill the idea that it's possible for this to return an error by
-removing the returned value.
+On 02/18/2014 03:22 PM, Maxime Ripard wrote:
+> On Mon, Feb 17, 2014 at 11:02:41AM +0100, David Lanzend?rfer wrote:
+>> Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     |    8 +++
+>>   arch/arm/boot/dts/sun7i-a20-cubietruck.dts      |    8 +++
+>>   arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts |   23 +++++++++
+>>   arch/arm/boot/dts/sun7i-a20.dtsi                |   61 +++++++++++++++++++++++
+>>   4 files changed, 100 insertions(+)
+>>
+>
+> I'd prefer to have three patches here:
+>     - One that add the controllers
+>     - One that add the pin muxing options
+>     - One that enable the controllers on the various boards.
+>
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+>> index 5c51cb8..ae800b6 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+>> +++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+>> @@ -34,6 +34,14 @@
+>>   			};
+>>   		};
+>>
+>> +		mmc0: mmc at 01c0f000 {
+>> +			pinctrl-names = "default", "default";
+>> +			pinctrl-0 = <&mmc0_pins_a>;
+>> +			pinctrl-1 = <&mmc0_cd_pin_reference_design>;
+>
+> This can be made a single pinctrl group, you don't need the pinctrl-1
+> stuff, it only complicates the node.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-=-DO NOT APPLY-=
- drivers/mmc/host/sdhci-esdhc-imx.c | 4 ++--
- drivers/mmc/host/sdhci-pxav3.c     | 4 +---
- drivers/mmc/host/sdhci.h           | 2 +-
- 3 files changed, 4 insertions(+), 6 deletions(-)
+Then how do we deal with boards which use a different gpio for card-detect ?
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 5ad4883155a5..ae346d60adb7 100644
-=-DO NOT APPLY-= a/drivers/mmc/host/sdhci-esdhc-imx.c
-=+DO NOT APPLY+= b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -839,7 +839,7 @@ static int esdhc_change_pinstate(struct sdhci_host *host,
- 	return pinctrl_select_state(imx_data->pinctrl, pinctrl);
- }
- 
--static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
-=+DO NOT APPLY+=static void esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
- 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
-@@ -877,7 +877,7 @@ static int esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
- 		break;
- 	}
- 
--	return esdhc_change_pinstate(host, uhs);
-=+DO NOT APPLY+=	esdhc_change_pinstate(host, uhs);
- }
- 
- static void esdhc_reset(struct sdhci_host *host, u8 mask)
-diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-index 3d6b574528ea..13f8552ed0b3 100644
-=-DO NOT APPLY-= a/drivers/mmc/host/sdhci-pxav3.c
-=+DO NOT APPLY+= b/drivers/mmc/host/sdhci-pxav3.c
-@@ -131,7 +131,7 @@ static void pxav3_gen_init_74_clocks(struct sdhci_host *host, u8 power_mode)
- 	pxa->power_mode = power_mode;
- }
- 
--static int pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
-=+DO NOT APPLY+=static void pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
- {
- 	u16 ctrl_2;
- 
-@@ -165,8 +165,6 @@ static int pxav3_set_uhs_signaling(struct sdhci_host *host, unsigned int uhs)
- 	dev_dbg(mmc_dev(host->mmc),
- 		"%s uhs = %d, ctrl_2 = %04X\n",
- 		__func__, uhs, ctrl_2);
--
--	return 0;
- }
- 
- static const struct sdhci_ops pxav3_sdhci_ops = {
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index ac20195f667b..3179a8053019 100644
-=-DO NOT APPLY-= a/drivers/mmc/host/sdhci.h
-=+DO NOT APPLY+= b/drivers/mmc/host/sdhci.h
-@@ -287,7 +287,7 @@ struct sdhci_ops {
- 	unsigned int    (*get_ro)(struct sdhci_host *host);
- 	void		(*reset)(struct sdhci_host *host, u8 mask);
- 	int	(*platform_execute_tuning)(struct sdhci_host *host, u32 opcode);
--	int	(*set_uhs_signaling)(struct sdhci_host *host, unsigned int uhs);
-=+DO NOT APPLY+=	void	(*set_uhs_signaling)(struct sdhci_host *host, unsigned int uhs);
- 	void	(*hw_reset)(struct sdhci_host *host);
- 	void	(*platform_suspend)(struct sdhci_host *host);
- 	void	(*platform_resume)(struct sdhci_host *host);
--- 
-1.8.3.1
+In that case we don't want to change the mux setting of the reference
+design cd pin. IOW I believe that having 2 separate pinctrl settings for
+this is the rigt thing todo. I would prefer using just mmc0_cd_pin_a instead
+of _reference_design though.
+
+Oh wait, you're probably talking about using:
+			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
+
+Yes that would be better.
+
+>
+>> +			cd-gpios = <&pio 7 1 0>; /* PH1 */
+>> +			status = "okay";
+>> +		};
+>> +
+>>   		pinctrl at 01c20800 {
+>>   			led_pins_cubieboard2: led_pins at 0 {
+>>   				allwinner,pins = "PH20", "PH21";
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+>> index f9dcb61..370cef84 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+>> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+>> @@ -19,6 +19,14 @@
+>>   	compatible = "cubietech,cubietruck", "allwinner,sun7i-a20";
+>>
+>>   	soc at 01c00000 {
+>> +		mmc0: mmc at 01c0f000 {
+>> +			pinctrl-names = "default", "default";
+>> +			pinctrl-0 = <&mmc0_pins_a>;
+>> +			pinctrl-1 = <&mmc0_cd_pin_reference_design>;
+>> +			cd-gpios = <&pio 7 1 0>; /* PH1 */
+>> +			status = "okay";
+>> +		};
+>> +
+>>   		pinctrl at 01c20800 {
+>>   			led_pins_cubietruck: led_pins at 0 {
+>>   				allwinner,pins = "PH7", "PH11", "PH20", "PH21";
+>> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+>> index ead3013..685ec06 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+>> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+>> @@ -34,7 +34,30 @@
+>>   			};
+>>   		};
+>>
+>> +		mmc0: mmc at 01c0f000 {
+>> +			pinctrl-names = "default", "default";
+>> +			pinctrl-0 = <&mmc0_pins_a>;
+>> +			pinctrl-1 = <&mmc0_cd_pin_reference_design>;
+>> +			cd-gpios = <&pio 7 1 0>; /* PH1 */
+>> +			status = "okay";
+>> +		};
+>> +
+>> +		mmc3: mmc at 01c12000 {
+>> +			pinctrl-names = "default", "default";
+>> +			pinctrl-0 = <&mmc3_pins_a>;
+>> +			pinctrl-1 = <&mmc3_cd_pin_olinuxinom>;
+>> +			cd-gpios = <&pio 7 11 0>; /* PH11 */
+>> +			status = "okay";
+>> +		};
+>> +
+>>   		pinctrl at 01c20800 {
+>> +			mmc3_cd_pin_olinuxinom: mmc3_cd_pin at 0 {
+>> +				allwinner,pins = "PH11";
+>> +				allwinner,function = "gpio_in";
+>> +				allwinner,drive = <0>;
+>> +				allwinner,pull = <1>;
+>> +			};
+>> +
+>>   			led_pins_olinuxino: led_pins at 0 {
+>>   				allwinner,pins = "PH2";
+>>   				allwinner,function = "gpio_out";
+>> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+>> index 9ff0948..5b55414 100644
+>> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+>> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+>> @@ -355,6 +355,46 @@
+>>   			#size-cells = <0>;
+>>   		};
+>>
+>> +		mmc0: mmc at 01c0f000 {
+>> +			compatible = "allwinner,sun5i-a13-mmc";
+>> +			reg = <0x01c0f000 0x1000>;
+>> +			clocks = <&ahb_gates 8>, <&mmc0_clk>;
+>> +			clock-names = "ahb", "mod";
+>> +			interrupts = <0 32 4>;
+>> +			bus-width = <4>;
+>
+> This belongs to the board, the controller itself is able to handle
+> several bus width.
+
+I believe that providing some form of default in the dtsi makes sense
+here and all boards we've seen sofar always use 4 bits, we can always
+override this from the dts file itself.
+
+>
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		mmc1: mmc at 01c10000 {
+>> +			compatible = "allwinner,sun5i-a13-mmc";
+>> +			reg = <0x01c10000 0x1000>;
+>> +			clocks = <&ahb_gates 9>, <&mmc1_clk>;
+>> +			clock-names = "ahb", "mod";
+>> +			interrupts = <0 33 4>;
+>> +			bus-width = <4>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		mmc2: mmc at 01c11000 {
+>> +			compatible = "allwinner,sun5i-a13-mmc";
+>> +			reg = <0x01c11000 0x1000>;
+>> +			clocks = <&ahb_gates 10>, <&mmc2_clk>;
+>> +			clock-names = "ahb", "mod";
+>> +			interrupts = <0 34 4>;
+>> +			bus-width = <4>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		mmc3: mmc at 01c12000 {
+>> +			compatible = "allwinner,sun5i-a13-mmc";
+>> +			reg = <0x01c12000 0x1000>;
+>> +			clocks = <&ahb_gates 11>, <&mmc3_clk>;
+>> +			clock-names = "ahb", "mod";
+>> +			interrupts = <0 35 4>;
+>> +			bus-width = <4>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>>   		pio: pinctrl at 01c20800 {
+>>   			compatible = "allwinner,sun7i-a20-pinctrl";
+>>   			reg = <0x01c20800 0x400>;
+>> @@ -432,6 +472,27 @@
+>>   				allwinner,drive = <0>;
+>>   				allwinner,pull = <0>;
+>>   			};
+>> +
+>> +			mmc0_pins_a: mmc0 at 0 {
+>> +				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
+>> +				allwinner,function = "mmc0";
+>> +				allwinner,drive = <3>;
+>> +				allwinner,pull = <0>;
+>> +			};
+>> +
+>> +			mmc0_cd_pin_reference_design: mmc0_cd_pin at 0 {
+>> +				allwinner,pins = "PH1";
+>> +				allwinner,function = "gpio_in";
+>> +				allwinner,drive = <0>;
+>> +				allwinner,pull = <1>;
+>> +			};
+>> +
+>> +			mmc3_pins_a: mmc3 at 0 {
+>> +				allwinner,pins = "PI4","PI5","PI6","PI7","PI8","PI9";
+>> +				allwinner,function = "mmc3";
+>> +				allwinner,drive = <3>;
+>> +				allwinner,pull = <0>;
+>> +			};
+>>   		};
+>>
+>>   		timer at 01c20c00 {
+>>
+>
+> Looks good otherwise.
+>
+> Thanks!
+> Maxime
+>
+
+
+Regards,
+
+Hans
