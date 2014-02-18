@@ -1,70 +1,60 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 18 Feb 2014 14:46:27 +0800
-Subject: [PATCH 1/5] ARM: prima2: l2x0: fix checkpatch issues
+Date: Tue, 18 Feb 2014 14:46:28 +0800
+Subject: [PATCH 2/5] ARM: prima2: platsmp: fix checkpatch issues
 In-Reply-To: <1392705991-29967-1-git-send-email-21cnbao@gmail.com>
 References: <1392705991-29967-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1392705991-29967-2-git-send-email-21cnbao@gmail.com>
+Message-ID: <1392705991-29967-3-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Barry Song <Baohua.Song@csr.com>
 
-Fix the below checkpatch issues:
+fix the below checkpatch issues:
+ERROR: code indent should use tabs where possible
+141: FILE: platsmp.c:141:
++        .smp_prepare_cpus       = sirfsoc_smp_prepare_cpus,$
 
-ERROR: open brace '{' following struct go on the same line
-15: FILE: l2x0.c:15:
-+struct l2x0_aux
-+{
+WARNING: please, no spaces at the start of a line
+141: FILE: platsmp.c:141:
++        .smp_prepare_cpus       = sirfsoc_smp_prepare_cpus,$
 
-ERROR: Use of __initconst requires a separate use of const
-20: FILE: l2x0.c:20:
-+static struct l2x0_aux prima2_l2x0_aux __initconst = {
+ERROR: code indent should use tabs where possible
+142: FILE: platsmp.c:142:
++        .smp_secondary_init     = sirfsoc_secondary_init,$
 
-ERROR: Use of __initconst requires a separate use of const
-25: FILE: l2x0.c:25:
-+static struct l2x0_aux marco_l2x0_aux __initconst = {
+WARNING: please, no spaces at the start of a line
+142: FILE: platsmp.c:142:
++        .smp_secondary_init     = sirfsoc_secondary_init,$
 
-ERROR: Use of __initconst requires a separate use of const
-31: FILE: l2x0.c:31:
-+static struct of_device_id sirf_l2x0_ids[] __initconst = {
+ERROR: code indent should use tabs where possible
+143: FILE: platsmp.c:143:
++        .smp_boot_secondary     = sirfsoc_boot_secondary,$
+
+WARNING: please, no spaces at the start of a line
+143: FILE: platsmp.c:143:
++        .smp_boot_secondary     = sirfsoc_boot_secondary,$
 
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/mach-prima2/l2x0.c |    9 ++++-----
- 1 files changed, 4 insertions(+), 5 deletions(-)
+ arch/arm/mach-prima2/platsmp.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-prima2/l2x0.c b/arch/arm/mach-prima2/l2x0.c
-index cbcbe9c..c710253 100644
---- a/arch/arm/mach-prima2/l2x0.c
-+++ b/arch/arm/mach-prima2/l2x0.c
-@@ -11,24 +11,23 @@
- #include <linux/of.h>
- #include <asm/hardware/cache-l2x0.h>
+diff --git a/arch/arm/mach-prima2/platsmp.c b/arch/arm/mach-prima2/platsmp.c
+index e358b07..335c12e 100644
+--- a/arch/arm/mach-prima2/platsmp.c
++++ b/arch/arm/mach-prima2/platsmp.c
+@@ -138,9 +138,9 @@ static void __init sirfsoc_smp_prepare_cpus(unsigned int max_cpus)
+ }
  
--struct l2x0_aux
--{
-+struct l2x0_aux {
- 	u32 val;
- 	u32 mask;
- };
- 
--static struct l2x0_aux prima2_l2x0_aux __initconst = {
-+static const struct l2x0_aux prima2_l2x0_aux __initconst = {
- 	.val = 2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT,
- 	.mask =	0,
- };
- 
--static struct l2x0_aux marco_l2x0_aux __initconst = {
-+static const struct l2x0_aux marco_l2x0_aux __initconst = {
- 	.val = (2 << L2X0_AUX_CTRL_WAY_SIZE_SHIFT) |
- 		(1 << L2X0_AUX_CTRL_ASSOCIATIVITY_SHIFT),
- 	.mask = L2X0_AUX_CTRL_MASK,
- };
- 
--static struct of_device_id sirf_l2x0_ids[] __initconst = {
-+static const struct of_device_id sirf_l2x0_ids[] __initconst = {
- 	{ .compatible = "sirf,prima2-pl310-cache", .data = &prima2_l2x0_aux, },
- 	{ .compatible = "sirf,marco-pl310-cache", .data = &marco_l2x0_aux, },
- 	{},
+ struct smp_operations sirfsoc_smp_ops __initdata = {
+-        .smp_prepare_cpus       = sirfsoc_smp_prepare_cpus,
+-        .smp_secondary_init     = sirfsoc_secondary_init,
+-        .smp_boot_secondary     = sirfsoc_boot_secondary,
++	.smp_prepare_cpus       = sirfsoc_smp_prepare_cpus,
++	.smp_secondary_init     = sirfsoc_secondary_init,
++	.smp_boot_secondary     = sirfsoc_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die                = sirfsoc_cpu_die,
+ #endif
 -- 
 1.7.5.4
