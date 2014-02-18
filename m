@@ -1,36 +1,79 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 18 Feb 2014 12:27:02 -0800
-Subject: [PATCH v4 0/2] Introduce AEMIF driver for Davinci/Keystone archs
-In-Reply-To: <53037113.3090105@ti.com>
-References: <1391629574-18955-1-git-send-email-ivan.khoronzhuk@ti.com>
- <53037113.3090105@ti.com>
-Message-ID: <20140218202702.GA18642@kroah.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 18 Feb 2014 21:27:51 +0100
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <53039894.10905@keymile.com>
+References: <51DD88A4.1030506@keymile.com> <20130710185706.72b124a4@skate>
+ <51DD9A8C.10608@keymile.com> <20130711163220.2b3adf38@skate>
+ <53039894.10905@keymile.com>
+Message-ID: <20140218212751.07c2aeb5@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 09:41:23AM -0500, Santosh Shilimkar wrote:
-> Greg,
+Dear Gerlando Falauto,
+
+On Tue, 18 Feb 2014 18:29:56 +0100, Gerlando Falauto wrote:
+
+> I tried these settings (a long time ago) and everything seemed to work 
+> fine. Except, we now have a different problem.
+> Essentially, this device requires 128MB for a given BAR to provide a 
+> PCI-to-localbus bridge. (another BAR provides the configuration space to 
+> configure chip select regions and so on).
+> Apparently, only the first 64MB of this BAR seem to work correctly with 
+> the new driver. As soon as you exceed that, reads (always?) return 0.
+> Other BARs (which are then of course assigned a higher region) seem to 
+> work just fine, so it looks like a per-BAR limitation.
 > 
-> On Wednesday 05 February 2014 02:46 PM, Ivan Khoronzhuk wrote:
-> > These patches introduce Async External Memory Interface (EMIF16/AEMIF)
-> > controller driver for Davinci/Keystone archs.
-> > 
-> > For more informations see documentation:
-> > Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
-> > OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
-> > Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
-> > 
-> Can you please have a look at the series ? It has been on the list for
-> sometime and all the outstanding comments are addressed so far. If
-> you are ok with it, I would like to get these queued up for 3.15
-> via your tree.
+> This was not a problem with a 3.0 kernel. Do you have any idea what 
+> could be wrong here?
+> I'm currently using a 3.10 kernel, where your patches for the pci-mvebu 
+> driver were forcibly brought in (without full support for the MBUS 
+> description at device tree level though).
 
-Why my tree?  Am I the drivers/memory/ maintainer?
+[...]
 
-/me digs in git...
+> mvebu-pcie pcie-controller.1: PCIe0.0: link up
+> mvebu-pcie pcie-controller.1: PCI host bridge to bus 0000:00
+> pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
+> pci_bus 0000:00: root bus resource [mem 0xe0000000-0xefffffff]
+> pci_bus 0000:00: root bus resource [bus 00-ff]
+> pci 0000:00:01.0: [11ab:7846] type 01 class 0x060400
+> PCI: bus0: Fast back to back transfers disabled
+> pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+> pci 0000:01:00.0: [10ee:0008] type 00 class 0x050000
+> pci 0000:01:00.0: reg 10: [mem 0x00000000-0x00000fff]
+> pci 0000:01:00.0: reg 14: [mem 0x00000000-0x07ffffff]
+> pci 0000:01:00.0: reg 18: [mem 0x00000000-0x00000fff]
+> pci 0000:01:00.0: reg 1c: [mem 0x00000000-0x007fffff]
+> pci 0000:01:00.0: reg 20: [mem 0x00000000-0x00001fff]
+> pci 0000:01:00.0: reg 24: [mem 0x00000000-0x00000fff]
+> pci 0000:01:00.0: supports D1 D2
+> pci 0000:01:00.0: PME# supported from D0 D1 D2 D3hot
+> PCI: bus1: Fast back to back transfers disabled
+> pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+> pci 0000:00:01.0: BAR 8: assigned [mem 0xe0000000-0xebffffff]
+> pci 0000:01:00.0: BAR 1: assigned [mem 0xe0000000-0xe7ffffff]
 
-Ah, it looks like I might be...
+So I guess this one is the 128 MB BAR, right?
 
-Ok, let me go review this.
+> pci 0000:01:00.0: BAR 3: assigned [mem 0xe8000000-0xe87fffff]
+> pci 0000:01:00.0: BAR 4: assigned [mem 0xe8800000-0xe8801fff]
+> pci 0000:01:00.0: BAR 0: assigned [mem 0xe8802000-0xe8802fff]
+> pci 0000:01:00.0: BAR 2: assigned [mem 0xe8803000-0xe8803fff]
+> pci 0000:01:00.0: BAR 5: assigned [mem 0xe8804000-0xe8804fff]
 
-greg k-h
+So in total, for the device 0000:01:00, the memory region should go
+from 0xe0000000 to 0xe8804fff. This means that a 256 MB window is
+needed for this device, because only power of two sizes are possible
+for MBus windows.
+
+Can you give me the output of /sys/kernel/debug/mvebu-mbus/devices ? It
+will tell us how the MBus windows are configured, as I suspect the
+problem might be here.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
