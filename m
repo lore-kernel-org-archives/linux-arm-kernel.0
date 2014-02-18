@@ -1,17 +1,33 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 18 Feb 2014 11:48:20 +0800
-Subject: [PATCH v6 1/3] ARM: dts: vf610: lpuart: Add eDMA support
-In-Reply-To: <1392614888-10261-2-git-send-email-yao.yuan@freescale.com>
-References: <1392614888-10261-1-git-send-email-yao.yuan@freescale.com>
- <1392614888-10261-2-git-send-email-yao.yuan@freescale.com>
-Message-ID: <20140218034818.GF15716@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 18 Feb 2014 13:16:49 +0900
+Subject: [PATCH 01/03] ARM: shmobile: Remove legacy EMEV2 SoC support
+In-Reply-To: <20140217032306.GH7772@verge.net.au>
+References: <20140213082558.30630.93034.sendpatchset@w520>
+ <20140213082608.30630.40000.sendpatchset@w520>
+ <20140217032306.GH7772@verge.net.au>
+Message-ID: <20140218041643.GB32417@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 01:28:06PM +0800, Yuan Yao wrote:
-> Add lpuart dts node properties for eDMA support, them depend on the eDMA driver.
+On Mon, Feb 17, 2014 at 12:23:09PM +0900, Simon Horman wrote:
+> On Thu, Feb 13, 2014 at 05:26:08PM +0900, Magnus Damm wrote:
+> > From: Magnus Damm <damm@opensource.se>
+> > 
+> > Get rid of legacy EMEV2 SoC code including the legacy clock
+> > framework implementation. The multiplatform implementation
+> > together with DT board support shall be used instead.
+> > 
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
 > 
-> Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Thanks, I have queued this up.
 
-Applied, thanks.
+I have dropped this patch for now and plan to deffer it.
+This is because although this is patch 1 of the series
+it removes emev2_clock_init() which causes the build
+of board-kzm9d-reference.c to fail without
+"ARM: shmobile: Remove Lager DT reference legacy clock bits".
+
+My current thinking is that the best way to sequence this is to
+queue up the board and defconfig changes for v3.15 but wait
+for v3.16 to queue up the SoC changes. This avoids tedious
+dependencies of SoC patches on board patches in the same release cycle.
