@@ -1,62 +1,36 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Feb 2014 19:10:23 +0000
-Subject: [PATCH v3 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <2340480.VAU4NNbBD8@wuerfel>
+Date: Tue, 18 Feb 2014 19:10:50 +0000
+Subject: [PATCH v3 2/3] ARM: bios32: use pci_enable_resource to enable
+ PCI resources
+In-Reply-To: <20140218154139.GF21483@n2100.arm.linux.org.uk>
 References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
- <1392726043-31088-4-git-send-email-will.deacon@arm.com>
- <2340480.VAU4NNbBD8@wuerfel>
-Message-ID: <20140218191023.GG2010@mudshark.cambridge.arm.com>
+ <1392726043-31088-3-git-send-email-will.deacon@arm.com>
+ <20140218154139.GF21483@n2100.arm.linux.org.uk>
+Message-ID: <20140218191049.GH2010@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 01:46:44PM +0000, Arnd Bergmann wrote:
-> On Tuesday 18 February 2014 12:20:43 Will Deacon wrote:
+On Tue, Feb 18, 2014 at 03:41:39PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Feb 18, 2014 at 12:20:42PM +0000, Will Deacon wrote:
+> > This patch moves bios32 over to using the generic code for enabling PCI
+> > resources. Since the core code takes care of bridge resources too, we
+> > can also drop the explicit IO and MEMORY enabling for them in the arch
+> > code.
+> > 
+> > A side-effect of this change is that we no longer explicitly enable
+> > devices when running in PCI_PROBE_ONLY mode. This stays closer to the
+> > meaning of the option and prevents us from trying to enable devices
+> > without any assigned resources (the core code refuses to enable
+> > resources without parents).
+> > 
+> > Tested-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> > Tested-by: Jingoo Han <jg1.han@samsung.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> > +static int gen_pci_alloc_io_offset(u32 sz, resource_size_t *offset)
-> > +{
-> > +	static DECLARE_BITMAP(io_map, (IO_SPACE_LIMIT + 1) / SZ_64K);
-> > +	int idx, num_wins;
-> > +
-> > +	if (sz > SZ_64K)
-> > +		return -ENOSPC;
-> > +
-> > +	num_wins = (IO_SPACE_LIMIT + 1) / SZ_64K;
-> > +	idx = 0;
-> > +	do {
-> > +		idx = find_next_zero_bit(io_map, num_wins, idx);
-> > +		if (idx == num_wins)
-> > +			return -ENOSPC;
-> > +	} while (test_and_set_bit(idx, io_map));
-> > +
-> > +	*offset = idx * SZ_64K;
-> > +	return 0;
-> > +}
+> Tested acceptably fine here with crudbus-from-hell.
 > 
-> Sicne you're always starting the search at 0 and you never free
-> the map, this is essentially the same as remembering the last number
-> that was used and using the next one, right?
+> Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Yes, I can implement that easily enough. I was wondering if there was a case
-for allowing windows to be freed, but it doesn't feel especially compelling.
-
-> You should also pass the rang->pci_addr here to calculate the
-> offset in case the pci_addr is not zero.
-> 
-> > +	/* Register our I/O and Memory resources */
-> > +	res_valid = 0;
-> > +	list_for_each_entry(win, &pci->host.windows, list) {
-> > +		struct resource *parent;
-> > +
-> > +		if (resource_type(win->res) == IORESOURCE_IO) {
-> > +			parent = &ioport_resource;
-> > +			err = pci_ioremap_io(win->offset, win->res->start);
-> 
-> and consequently pass the pci_addr rather than the offset here. How about
-> moving the pci_ioremap_io() call into gen_pci_alloc_io_offset()?
-
-Can do.
-
-Thanks for the feedback.
+Cheers Russell.
 
 Will
