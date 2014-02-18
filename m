@@ -1,80 +1,57 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 18 Feb 2014 12:36:06 +0100
-Subject: [RFC PATCH v3 5/9] staging: imx-drm: Document imx-hdmi device tree
- bindings
+Date: Tue, 18 Feb 2014 12:36:02 +0100
+Subject: [RFC PATCH v3 1/9] staging: imx-drm-core: don't request probe
+ deferral in imx_drm_encoder_parse_of
 In-Reply-To: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
 References: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1392723370-4772-6-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1392723370-4772-2-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree binding documentation for the HDMI transmitter
-on i.MX6.
+From: Lucas Stach <l.stach@pengutronix.de>
 
+Since imx_drm_encoder_parse_of is called from the encoder bind callbacks,
+it is too late to request probe deferral. Rather the core should make sure
+that the crtcs are bound before the encoders, after all needed components
+are probed.
+
+This fixes probe failure when using the LDB on i.MX6.
+
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- .../devicetree/bindings/staging/imx-drm/hdmi.txt   | 53 ++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+ drivers/staging/imx-drm/imx-drm-core.c | 16 ++++------------
+ 1 file changed, 4 insertions(+), 12 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-new file mode 100644
-index 0000000..7dcd673a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-@@ -0,0 +1,53 @@
-+Device-Tree bindings for HDMI Transmitter
+diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+index dcba518..98a97a2 100644
+--- a/drivers/staging/imx-drm/imx-drm-core.c
++++ b/drivers/staging/imx-drm/imx-drm-core.c
+@@ -457,21 +457,13 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
+ 			return ret;
+ 
+ 		id = args.args_count > 0 ? args.args[0] : 0;
+-		mask = imx_drm_find_crtc_mask(imxdrm, args.np, id);
++		crtc_mask |= imx_drm_find_crtc_mask(imxdrm, args.np, id);
+ 		of_node_put(args.np);
+-
+-		/*
+-		 * If we failed to find the CRTC(s) which this encoder is
+-		 * supposed to be connected to, it's because the CRTC has
+-		 * not been registered yet.  Defer probing, and hope that
+-		 * the required CRTC is added later.
+-		 */
+-		if (mask == 0)
+-			return -EPROBE_DEFER;
+-
+-		crtc_mask |= mask;
+ 	}
+ 
++	if (i == 0 || !crtc_mask)
++		return -ENOENT;
 +
-+HDMI Transmitter
-+================
-+
-+The LVDS Display Bridge device tree node contains up to two lvds-channel
-+nodes describing each of the two LVDS encoder channels of the bridge.
-+
-+Required properties:
-+ - #address-cells : should be <1>
-+ - #size-cells : should be <0>
-+ - compatible : should be "fsl,imx6q-hdmi" or "fsl,imx6dl-hdmi".
-+ - gpr : should be <&gpr>.
-+   The phandle points to the iomuxc-gpr region containing the HDMI
-+   multiplexer control register.
-+ - clocks, clock-names : phandles to the HDMI iahb and isrf clocks, as described
-+   in Documentation/devicetree/bindings/clock/clock-bindings.txt and
-+   Documentation/devicetree/bindings/clock/imx6q-clock.txt.
-+ - port@[0-4]: Up to four port nodes with endpoint definitions as defined in
-+   Documentation/devicetree/bindings/media/video-interfaces.txt,
-+   corresponding to the four inputs to the HDMI multiplexer.
-+
-+example:
-+
-+	gpr: iomuxc-gpr at 020e0000 {
-+		/* ... */
-+	};
-+
-+        hdmi: hdmi at 0120000 {
-+                #address-cells = <1>;
-+                #size-cells = <0>;
-+                reg = <0x00120000 0x9000>;
-+                interrupts = <0 115 0x04>;
-+                gpr = <&gpr>;
-+                clocks = <&clks 123>, <&clks 124>;
-+                clock-names = "iahb", "isfr";
-+
-+                port at 0 {
-+                        reg = <0>;
-+
-+                        hdmi_mux_0: endpoint {
-+                                remote-endpoint = <&ipu1_di0_hdmi>;
-+                        };
-+                };
-+
-+                port at 1 {
-+                        reg = <1>;
-+
-+                        hdmi_mux_1: endpoint {
-+                                remote-endpoint = <&ipu1_di1_hdmi>;
-+                        };
-+                };
-+        };
+ 	encoder->possible_crtcs = crtc_mask;
+ 
+ 	/* FIXME: this is the mask of outputs which can clone this output. */
 -- 
 1.8.5.3
