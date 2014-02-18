@@ -1,64 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Feb 2014 08:16:13 -0800
-Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
-In-Reply-To: <5302B306.8090503@samsung.com>
-References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
- <52F99056.6010906@samsung.com>
- <CAOesGMgdDnSc=Y8i6JYeGewCh1RPYZ_AxocxKzSD265fa2-yrA@mail.gmail.com>
- <201402141806.12711.arnd@arndb.de> <5302B306.8090503@samsung.com>
-Message-ID: <CAOesGMhnUDcUL7hREV=EYEGr5YG-ZLL6v9NiGcrBr6477WfdyQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 18 Feb 2014 10:19:06 -0600
+Subject: [PATCH 2/2] USB: at91: using USBA_NR_DMAS for DMA channels
+In-Reply-To: <1389927565-22477-2-git-send-email-voice.shen@atmel.com>
+References: <1389927565-22477-1-git-send-email-voice.shen@atmel.com>
+ <1389927565-22477-2-git-send-email-voice.shen@atmel.com>
+Message-ID: <20140218161839.GD9878@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 5:10 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> On 02/15/14 02:06, Arnd Bergmann wrote:
->>
->> On Thursday 13 February 2014, Olof Johansson wrote:
->>>
->>> On Mon, Feb 10, 2014 at 6:52 PM, Kukjin Kim<kgene.kim@samsung.com>
->>> wrote:
->>>>
->>>> On 02/13/14 04:14, Arnd Bergmann wrote:
->>>>>
->>>>> On Wednesday 12 February 2014 13:04:40 Kumar Gala wrote:
->>>>
->>>> Basically, I agreed with Arnd's suggestion to use ARCH_SBSA. Or we need
->>>> to
->>>> define level in Kconfig like ARCH_SBSA_L1 for level1. BTW, how about
->>>> compliant with SBSA Level1 and having some specific features?
->>
->>
-> Well, how about ARMv8 mobile SoC? I think, it is not compatible with SBSA.
-> For example, you know MCT can be used for ARMv8 cores instead of ARCH Timer.
-> So I'm not sure ARCH_SBSA is really good choice...
->
->
->> My feeling is that we don't need to use the levels for Kconfig, although
->> we might want to use them DT compatible strings, even if it ends up
->> looking
->> a little funny when you do
->>
->>         compatible = "arm,sbsa-l3", "arm,sbsa-l2", "arm,sbsa-l1";
->>
->>> What kind of features are you expecting though? More IP
->>> blocks/devices? Those are just kernel config options to enable,
->>> ideally as modules.
->>
->>
->> Right, I think we can just put them into defconfig. No need to
->> "select" them from Kconfig since the extra options wouldn't be
->> required for booting or using the system.
->>
-> As I commented above, how about MCT? Samsung has a plan to use MCT on ARMv8,
-> it is not for used for GH7 though...
+On Fri, Jan 17, 2014 at 10:59:25AM +0800, Bo Shen wrote:
+> When the SoC is earlier than sama5d3 SoC, which have the same number
+> endpoints and DMAs. However for sama5d3 SoC, it has different number
+> for endpoints and DMAs. So, define USBA_NR_DMAs for DMA channels
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> ---
+> 
+>  drivers/usb/gadget/atmel_usba_udc.c | 2 +-
+>  drivers/usb/gadget/atmel_usba_udc.h | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+> index 7e67a81..5cded1c 100644
+> --- a/drivers/usb/gadget/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/atmel_usba_udc.c
+> @@ -1661,7 +1661,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+>  	if (dma_status) {
+>  		int i;
+>  
+> -		for (i = 1; i < USBA_NR_ENDPOINTS; i++)
+> +		for (i = 1; i < USBA_NR_DMAS; i++)
+>  			if (dma_status & (1 << i))
+>  				usba_dma_irq(udc, &udc->usba_ep[i]);
+>  	}
+> diff --git a/drivers/usb/gadget/atmel_usba_udc.h b/drivers/usb/gadget/atmel_usba_udc.h
+> index 2922db5..a70706e 100644
+> --- a/drivers/usb/gadget/atmel_usba_udc.h
+> +++ b/drivers/usb/gadget/atmel_usba_udc.h
+> @@ -210,7 +210,7 @@
+>  #define USBA_FIFO_BASE(x)	((x) << 16)
+>  
+>  /* Synth parameters */
+> -#define USBA_NR_ENDPOINTS	7
+> +#define USBA_NR_DMAS		7
 
-It looks like the clocksource drivers are all based around being
-enabled based on platforms instead of individually selectable. That
-causes a problem here. I think we should change the clocksource
-Kconfig instead. Then it's just a matter of making sure your defconfig
-has the needed driver enabled.
+what's the difference ? You just renamed this macro. Also, please
+clarify a bit your commit log.
 
-(Adding Daniel and Thomas in case they have objections to that approach)
-
-
--Olof
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/32376893/attachment.sig>
