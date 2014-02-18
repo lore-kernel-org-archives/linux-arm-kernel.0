@@ -1,52 +1,73 @@
 From: ashutosh.s@phytec.in (Ashutosh singh)
-Date: Tue, 18 Feb 2014 19:16:24 +0530
-Subject: [PATCH v2 3/4] Phytec phyFLEX-i.MX6 : Added GPMI-NAND Support
+Date: Tue, 18 Feb 2014 19:16:23 +0530
+Subject: [PATCH v2 2/4] Phytec phyFLEX-i.MX6 : Added USB_HOST Support
 In-Reply-To: <1392731185-4885-1-git-send-email-ashutosh.s@phytec.in>
 References: <1392731185-4885-1-git-send-email-ashutosh.s@phytec.in>
-Message-ID: <1392731185-4885-3-git-send-email-ashutosh.s@phytec.in>
+Message-ID: <1392731185-4885-2-git-send-email-ashutosh.s@phytec.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for GPMI-NAND on Phytec phyFLEX-i.MX6 Quad module.
+This patch adds support for USB_HOST on Phytec phyFLEX-i.MX6 Quad module.
 
 Signed-off-by: Ashutosh singh <ashutosh.s@phytec.in>
 ---
  arch/arm/boot/dts/imx6q-phytec-pbab01.dts  |    4 ++++
- arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi |    7 +++++++
- 2 files changed, 11 insertions(+)
+ arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi |   14 ++++++++++++++
+ 2 files changed, 18 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
-index 91aecba..21c8b37 100644
+index 87c3702..91aecba 100644
 --- a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
 +++ b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
-@@ -21,6 +21,10 @@
+@@ -25,6 +25,10 @@
  	status = "okay";
  };
  
-+&gpmi {
++&usbh1 {
 +	status = "okay";
 +};
 +
- &uart4 {
+ &usbotg {
  	status = "okay";
  };
 diff --git a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-index 12a02f7..32097b4 100644
+index e025ad2..12a02f7 100644
 --- a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
 +++ b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-@@ -174,6 +174,13 @@
+@@ -26,6 +26,14 @@
+ 		regulator-max-microvolt = <5000000>;
+ 		gpio = <&gpio4 15 0>;
+ 	};
++
++	reg_usb_h1_vbus: regulator at 1 {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_h1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio1 0 0>;
++	};
+ };
+ 
+ &ecspi3 {
+@@ -143,6 +151,7 @@
+ 				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24 0x80000000 /* SPI NOR chipselect */
+ 				MX6QDL_PAD_DI0_PIN15__GPIO4_IO17  0x80000000 /* PMIC interrupt */
+ 				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15   0x80000000 /* USB_OTG_PWR_EN */
++				MX6QDL_PAD_GPIO_0__USB_H1_PWR     0x80000000 /* USB_H1_PWR_EN */
+ 			>;
+ 		};
+ 	};
+@@ -171,6 +180,11 @@
  	status = "disabled";
  };
  
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpmi_nand_1>;
-+	nand-on-flash-bbt;
++&usbh1 {
++	vbus-supply = <&reg_usb_h1_vbus>;
 +	status = "disabled";
 +};
 +
- &uart4 {
+ &usbotg {
+ 	vbus-supply = <&reg_usb_otg_vbus>;
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart4_1>;
 -- 
 1.7.9.5
