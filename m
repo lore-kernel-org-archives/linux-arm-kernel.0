@@ -1,100 +1,59 @@
-From: digitaleric@google.com (Eric Northup)
-Date: Tue, 18 Feb 2014 12:57:51 -0800
-Subject: [PATCH v4 00/12] arm/arm64: KVM: host cache maintenance when
- guest caches are off
-In-Reply-To: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
-References: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAG7+5M3nBfX7qfq9d6Cvrpk2YeoHsy1yG0PjmTspa6zqQvUsXg@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 18 Feb 2014 14:15:37 -0700
+Subject: [PATCH] PCI: imx6: Fix link_up detection
+In-Reply-To: <52FE6DA7.1010305@boundarydevices.com>
+References: <1392190075-23204-1-git-send-email-s.hauer@pengutronix.de>
+ <201402120836.16221.marex@denx.de>
+ <52FD0F1A.4000208@boundarydevices.com>
+ <20140214064153.GE17250@pengutronix.de>
+ <52FE6DA7.1010305@boundarydevices.com>
+Message-ID: <20140218211537.GC8786@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 7:27 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->
-> When we run a guest with cache disabled, we don't flush the cache to
-> the Point of Coherency, hence possibly missing bits of data that have
-> been written in the cache, but have not yet reached memory.
->
-> We also have the opposite issue: when a guest enables its cache,
-> whatever sits in the cache is suddenly going to become visible,
-> shadowing whatever the guest has written into RAM.
->
-> There are several approaches to these issues:
-> - Using the DC bit when caches are off: this breaks guests assuming
->   caches off while doing DMA operations. Bootloaders, for example.
->   It also breaks the I-D coherency.
-> - Fetch the memory attributes on translation fault, and flush the
->   cache while handling the fault. This relies on using the PAR_EL1
->   register to obtain the Stage-1 memory attributes, and tends to be
->   slow.
-> - Detecting the translation faults occuring with MMU off (and
->   performing a cache clean), and trapping SCTLR_EL1 to detect the
->   moment when the guest is turning its caches on (and performing a
->   cache invalidation). Trapping of SCTLR_EL1 is then disabled to
->   ensure the best performance.
+On Fri, Feb 14, 2014 at 12:25:27PM -0700, Troy Kisky wrote:
+> On 2/13/2014 11:41 PM, Sascha Hauer wrote:
+> > On Thu, Feb 13, 2014 at 11:29:46AM -0700, Troy Kisky wrote:
+> >> On 2/12/2014 12:36 AM, Marek Vasut wrote:
+> >>> On Wednesday, February 12, 2014 at 08:27:55 AM, Sascha Hauer wrote:
+> >>>
+> >>> +CC Troy Kisky, since I think he submitted something similar some time ago
+> >>> already.
+> >>>
+> >>> Otherwise I agree this happens.
+> >>>
+> >> Sorry, I haven't submitted this yet, but was planning to today. Here's
+> >> what would have been sent.
+> >>
+> >> From 32c560d33fe2c3945d69f3396689f0abb76f7e1f Mon Sep 17 00:00:00 2001
+> >> From: Marek Vasut <marex@denx.de>
+> >> Date: Sat, 25 Jan 2014 14:22:48 -0700
+> >> Subject: [PATCH 1/1] pci-imx6.c: wait for retraining
+> >>
+> >> This patch handles the case where the PCIe link is up and running, yet drops
+> >> into the LTSSM training mode. The link spends short time in the LTSSM training
+> >> mode, but the current code can misinterpret it as the link being stalled.
+> >> Waiting for the LTSSM training to complete fixes the issue.
+> >>
+> >> Signed-off-by: Marek Vasut <marex@denx.de>
+> >> Tested-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> > 
+> > Thanks, that works.
+> > 
+> > Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > 
+> > Sascha
+> 
+> I don't want to step on your toes, does that means you
+> expect me to send a formal patch ?
 
-This will preclude noticing the 2nd .. Nth cache off -> on cycles,
-right?  Will any guests care - doesn't kexec go through a caches-off
-state?
+I don't care which way we go, but we should make progress on this.
 
->
-> This patch series implements the last solution, for both arm and
-> arm64. Tested on TC2 (ARMv7) and FVP model (ARMv8).
->
-> From v3 (http://www.spinics.net/lists/arm-kernel/msg305211.html)
-> - Dropped the LPAE-specific pmd_addr_end
-> - Added kvm_p[gum]d_addr_end to deal with 40bit IPAs, and fixed the
->   callers of p[gum]d_addr_end with IPA parameters
-> - Added patch #12 which, while not strictly related, felt a bit lonely
->   on the mailing list
->
-> From v2 (http://www.spinics.net/lists/arm-kernel/msg302472.html):
-> - Addressed most (hopefully all) of Christoffer's comments
-> - Added a new LPAE pmd_addr_end to deal with 40bit IPAs
->
-> From v1 (http://www.spinics.net/lists/kvm/msg99404.html):
-> - Fixed AArch32 VM handling on arm64 (Reported by Anup)
-> - Added ARMv7 support:
->   * Fixed a couple of issues regarding handling of 64bit cp15 regs
->   * Per-vcpu HCR
->   * Switching of AMAIR0 and AMAIR1
->
-> Marc Zyngier (12):
->   arm64: KVM: force cache clean on page fault when caches are off
->   arm64: KVM: allows discrimination of AArch32 sysreg access
->   arm64: KVM: trap VM system registers until MMU and caches are ON
->   ARM: KVM: introduce kvm_p*d_addr_end
->   arm64: KVM: flush VM pages before letting the guest enable caches
->   ARM: KVM: force cache clean on page fault when caches are off
->   ARM: KVM: fix handling of trapped 64bit coprocessor accesses
->   ARM: KVM: fix ordering of 64bit coprocessor accesses
->   ARM: KVM: introduce per-vcpu HYP Configuration Register
->   ARM: KVM: add world-switch for AMAIR{0,1}
->   ARM: KVM: trap VM system registers until MMU and caches are ON
->   ARM: KVM: fix warning in mmu.c
->
->  arch/arm/include/asm/kvm_arm.h   |   4 +-
->  arch/arm/include/asm/kvm_asm.h   |   4 +-
->  arch/arm/include/asm/kvm_host.h  |   9 ++--
->  arch/arm/include/asm/kvm_mmu.h   |  29 +++++++++--
->  arch/arm/kernel/asm-offsets.c    |   1 +
->  arch/arm/kvm/coproc.c            |  84 +++++++++++++++++++++++-------
->  arch/arm/kvm/coproc.h            |  14 +++--
->  arch/arm/kvm/coproc_a15.c        |   2 +-
->  arch/arm/kvm/coproc_a7.c         |   2 +-
->  arch/arm/kvm/guest.c             |   1 +
->  arch/arm/kvm/interrupts_head.S   |  21 +++++---
->  arch/arm/kvm/mmu.c               | 110 ++++++++++++++++++++++++++++++++++++---
->  arch/arm64/include/asm/kvm_arm.h |   3 +-
->  arch/arm64/include/asm/kvm_asm.h |   3 +-
->  arch/arm64/include/asm/kvm_mmu.h |  21 ++++++--
->  arch/arm64/kvm/sys_regs.c        |  99 ++++++++++++++++++++++++++++++-----
->  arch/arm64/kvm/sys_regs.h        |   2 +
->  17 files changed, 341 insertions(+), 68 deletions(-)
->
-> --
-> 1.8.3.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+It looks like Troy's patch is slightly more extensive (adds comments, uses
+actual times instead of a CPU speed-dependent wait loop, prints registers
+for analysis in failure case), so based on that, I would go that route.
+
+But we need an ack from Richard or Shawn anyway, so I'll just wait for
+direction from them.
+
+Bjorn
