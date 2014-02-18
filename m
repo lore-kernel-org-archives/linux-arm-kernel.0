@@ -1,84 +1,56 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 18 Feb 2014 10:34:36 -0700
-Subject: [PATCH 1/2] clk: fixed-rate: use full DT node name
-In-Reply-To: <20140218112323.GB6051@e106331-lin.cambridge.arm.com>
-References: <1392358613-19962-1-git-send-email-swarren@wwwdotorg.org>
- <20140214103556.GC9907@e106331-lin.cambridge.arm.com>
- <52FE4798.3010605@wwwdotorg.org>
- <20140218112323.GB6051@e106331-lin.cambridge.arm.com>
-Message-ID: <530399AC.2070204@wwwdotorg.org>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 18 Feb 2014 18:34:57 +0100
+Subject: [PATCH] arm: socfpga: reserve the region at start of phys mem
+Message-ID: <1392744897-6384-1-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2014 04:23 AM, Mark Rutland wrote:
-> On Fri, Feb 14, 2014 at 04:43:04PM +0000, Stephen Warren wrote:
->> On 02/14/2014 03:35 AM, Mark Rutland wrote:
->>> On Fri, Feb 14, 2014 at 06:16:52AM +0000, Stephen Warren wrote:
->>>> clk-fixed-rate currently names clocks according to a node's name without
->>>> the unit address. When faced with the legal and technically correct DT
->>>> structure below, this causes rgistration attempts for 3 clocks with the
->>>> same name, 2 of which fail.
->>>>
->>>> 	clocks {
->>>> 		compatible = "simple-bus";
->>>> 		#address-cells = <1>;
->>>> 		#size-cells = <0>;
->>>>
->>>> 		clk_mmc: clock at 0 {
->>>> 			compatible = "fixed-clock";
->>>> 			reg = <0>;
->>>> ...
->>>> 		clk_i2c: clock at 1 {
->>>> 			compatible = "fixed-clock";
->>>> 			reg = <1>;
->>>> ...
->>>> 		clk_spi: clock at 2 {
->>>> 			compatible = "fixed-clock";
->>>> 			reg = <2>;
->>>> ...
->>>
->>> I'd argue that this case isn't valid.
->>
->> Well, it's very widely used, and was the result of numerous discussions
->> of how this kind of thing should be represented:-/
-> 
-> Maybe we have to live with it then. :/
+The SMP bringup code copies trampline code to the physical location 0x0.
+If somebody allocated memory from this location then it will be
+overwritten.
+This patch reserves the few bytes so that it won't be used by the memory
+allocator.
 
-Great:-)
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/arm/mach-socfpga/socfpga.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-...
->>> It's just nonsensical; rename them to clock_{0,1,..} instead and get rid
->>> of the reg properties. Then they're named uniquely.
->>
->> That's not legal either. DT node names are supposed to represent the
->> type of device/object (i.e. just "clock"), not the identity of the
->> device/object (i.e. not include IDs etc.). Hence, the node name needs to
->> be "clock" for all of them, and the unit address must be used to
->> differentiate them.
-> 
-> As far as I can see from ePAPR, the only requriement is:
-> 
->   The node-name shall start with a lower or uppercase character and
->   should describe the general class of device.
-> 
-> IMO clock_1 describes the general class of device as well as clock at 1,
-> while also not filling a unexpected property with a meaningless value.
-
-I believe section 2.2.2 "Generic Names Recommendation" is the source of
-the rule that nodes should be named after the type of object rather than
-the identity.
-
-"""
-The name of a node should be somewhat generic, reflecting the function
-of the device and not its precise programming model. If appropriate, the
-name should be one of the following choices:
-
-* atm
-* cache-controller
-* compact-flash
-* can
-* cpu
-...
-"""
-
-(I note e.g. "cpu" not "cpu-1", "cpu_2", etc.)
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index a9050e6..2ba992a 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -26,6 +26,7 @@
+ #include <linux/phy.h>
+ #include <linux/micrel_phy.h>
+ #include <linux/sys_soc.h>
++#include <linux/memblock.h>
+ 
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
+@@ -315,6 +316,17 @@ static void __init socfpga_cyclone5_init(void)
+ 	socfpga_soc_device_init();
+ }
+ 
++static void __init socfmpga_smp_reserve(void)
++{
++#ifdef CONFIG_SMP
++	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
++	int ret;
++
++	ret = memblock_reserve(0, trampoline_size);
++	WARN_ON(ret);
++#endif
++}
++
+ static const char *altera_dt_match[] = {
+ 	"altr,socfpga",
+ 	NULL
+@@ -327,4 +339,5 @@ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
+ 	.init_machine	= socfpga_cyclone5_init,
+ 	.restart	= socfpga_cyclone5_restart,
+ 	.dt_compat	= altera_dt_match,
++	.reserve	= socfmpga_smp_reserve,
+ MACHINE_END
+-- 
+1.9.0.rc3
