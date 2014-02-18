@@ -1,45 +1,50 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 18 Feb 2014 14:55:53 +0000
-Subject: [PATCH 26/35] mtd: st_spi_fsm: Write to Flash via the FSM FIFO
+Date: Tue, 18 Feb 2014 14:55:44 +0000
+Subject: [PATCH 17/35] mtd: st_spi_fsm: Prepare read/write sequences according
+ to configuration
 In-Reply-To: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
 References: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1392735362-1245-27-git-send-email-lee.jones@linaro.org>
+Message-ID: <1392735362-1245-18-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we write data to the FIFO the FSM Controller subsequently writes
-that data out to the Serial Flash chip.
+Firstly we search for our preference read/write configuration based on a
+given chip's capabilities. Then we actually set up the message sequence
+accordingly.
 
 Acked-by Angus Clark <angus.clark@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index e4815fe..ea55548 100644
+index 94b0cb4..3f5603c 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -668,6 +668,20 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
- 	}
+@@ -618,6 +618,23 @@ static void stfsm_prepare_rw_seq(struct stfsm *fsm,
+ 	seq->seq[i++] = STFSM_INST_STOP;
  }
  
-+static int stfsm_write_fifo(struct stfsm *fsm,
-+			    const uint32_t *buf, const uint32_t size)
++static int stfsm_search_prepare_rw_seq(struct stfsm *fsm,
++				       struct stfsm_seq *seq,
++				       struct seq_rw_config *cfgs)
 +{
-+	uint32_t words = size >> 2;
++	struct seq_rw_config *config;
 +
-+	dev_dbg(fsm->dev, "writing %d bytes to FIFO\n", size);
++	config = stfsm_search_seq_rw_configs(fsm, cfgs);
++	if (!config) {
++		dev_err(fsm->dev, "failed to find suitable config\n");
++		return -EINVAL;
++	}
 +
-+	BUG_ON((((uint32_t)buf) & 0x3) || (size & 0x3));
++	stfsm_prepare_rw_seq(fsm, seq, config);
 +
-+	writesl(fsm->base + SPI_FAST_SEQ_DATA_REG, buf, words);
-+
-+	return size;
++	return 0;
 +}
 +
- static int stfsm_enter_32bit_addr(struct stfsm *fsm, int enter)
+ static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
  {
- 	struct stfsm_seq *seq = &stfsm_seq_en_32bit_addr;
+ 	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
 -- 
 1.8.3.2
