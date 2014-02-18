@@ -1,53 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Feb 2014 14:46:44 +0100
-Subject: [PATCH v3 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <1392726043-31088-4-git-send-email-will.deacon@arm.com>
-References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
- <1392726043-31088-4-git-send-email-will.deacon@arm.com>
-Message-ID: <2340480.VAU4NNbBD8@wuerfel>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 18 Feb 2014 21:54:55 +0800
+Subject: [PATCH v4 0/5] Prepare for running ACPI on !x86 and !ia64
+Message-ID: <1392731700-10992-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 February 2014 12:20:43 Will Deacon wrote:
+Some of the ACPI code is arch-dependent and make the code can't be
+compiled on !x86 or !ia64, the first two patches just do some rework
+on the idle_boot_override and _PDC related stuff to make the ACPI
+code more arch-independent.
 
-> +static int gen_pci_alloc_io_offset(u32 sz, resource_size_t *offset)
-> +{
-> +	static DECLARE_BITMAP(io_map, (IO_SPACE_LIMIT + 1) / SZ_64K);
-> +	int idx, num_wins;
-> +
-> +	if (sz > SZ_64K)
-> +		return -ENOSPC;
-> +
-> +	num_wins = (IO_SPACE_LIMIT + 1) / SZ_64K;
-> +	idx = 0;
-> +	do {
-> +		idx = find_next_zero_bit(io_map, num_wins, idx);
-> +		if (idx == num_wins)
-> +			return -ENOSPC;
-> +	} while (test_and_set_bit(idx, io_map));
-> +
-> +	*offset = idx * SZ_64K;
-> +	return 0;
-> +}
+The third patch just introduce map_gic_id() for ACPI processor core
+followed the ACPI 5.0 spec. Last two patches are just some cleanups.
 
-Sicne you're always starting the search at 0 and you never free
-the map, this is essentially the same as remembering the last number
-that was used and using the next one, right?
+I have compiled the kernel successfully after appling this patch set
+on x86 and ia64.
 
-You should also pass the rang->pci_addr here to calculate the
-offset in case the pci_addr is not zero.
+Changes for v4:
+a) remove preprocessor directives in function bodies;
+b) add another two patches for cleanups.
 
-> +	/* Register our I/O and Memory resources */
-> +	res_valid = 0;
-> +	list_for_each_entry(win, &pci->host.windows, list) {
-> +		struct resource *parent;
-> +
-> +		if (resource_type(win->res) == IORESOURCE_IO) {
-> +			parent = &ioport_resource;
-> +			err = pci_ioremap_io(win->offset, win->res->start);
+Changes for v3:
+Fix the issues pointed out by Lan Tianyu and add the Reviewed-by for
+first patch.
 
-and consequently pass the pci_addr rather than the offset here. How about
-moving the pci_ioremap_io() call into gen_pci_alloc_io_offset()?
+Changes for v2:
+a) add #if defined(CONFIG_X86) || defined(CONFIG_IA64) for
+   idle_boot_override related code;
+b) Rebased on 3.14-rc1.
 
-	Arnd
+Changes since the RFC version:
+a) Remove the RFC tag;
+b) Move idle_boot_override out of the arch directory suggested
+   by Alan;
+c) Make these 3 patches as a separate patch set since there are
+   not not related to the ARM/ARM64 platform.
+
+Hanjun Guo (5):
+  ACPI / idle: Make idle_boot_override depend on x86 and ia64
+  ACPI / processor_core: Rework _PDC related stuff to make it more
+    arch-independent
+  ACPI / processor: Introduce map_gic_id() to get apic id from MADT or
+    _MAT method
+  ACPI: Move BAD_MADT_ENTRY() to linux/acpi.h
+  ACPI: Replace printk with pr_* in tables.c
+
+ arch/ia64/include/asm/acpi.h  |    5 +--
+ arch/ia64/kernel/acpi.c       |   18 ++++++--
+ arch/x86/include/asm/acpi.h   |   19 +--------
+ arch/x86/kernel/acpi/boot.c   |    4 --
+ arch/x86/kernel/acpi/cstate.c |   29 +++++++++++++
+ drivers/acpi/processor_core.c |   92 ++++++++++++++++++++++++-----------------
+ drivers/acpi/tables.c         |   51 +++++++++--------------
+ include/linux/acpi.h          |    4 ++
+ 8 files changed, 124 insertions(+), 98 deletions(-)
+
+-- 
+1.7.9.5
