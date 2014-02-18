@@ -1,33 +1,27 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 18 Feb 2014 14:46:31 +0800
-Subject: [PATCH 5/5] ARM: prima2: staticize sirfsoc_init_late function
-In-Reply-To: <1392705991-29967-1-git-send-email-21cnbao@gmail.com>
-References: <1392705991-29967-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1392705991-29967-6-git-send-email-21cnbao@gmail.com>
+Date: Tue, 18 Feb 2014 14:46:26 +0800
+Subject: [PATCH 0/5] ARM: prima2: a couple of minor fixes
+Message-ID: <1392705991-29967-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Barry Song <Baohua.Song@csr.com>
 
-sirfsoc_init_late() is a local function not an extern interface to anyone.
+this patchset includes a couple of minor fixes about checkpatch issues, typo
+and staticizing function.
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/mach-prima2/common.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Barry Song (5):
+  ARM: prima2: l2x0: fix checkpatch issues
+  ARM: prima2: platsmp: fix checkpatch issues
+  ARM: prima2: common: fix checkpatch issues
+  ARM: prima2: rtciobrg: fix the typo about license
+  ARM: prima2: staticize sirfsoc_init_late function
 
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index 6926dbc..3b8865a 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -15,7 +15,7 @@
- #include <linux/of_platform.h>
- #include "common.h"
- 
--void __init sirfsoc_init_late(void)
-+static void __init sirfsoc_init_late(void)
- {
- 	sirfsoc_pm_init();
- }
+ arch/arm/mach-prima2/common.c   |    8 ++++----
+ arch/arm/mach-prima2/l2x0.c     |    9 ++++-----
+ arch/arm/mach-prima2/platsmp.c  |    6 +++---
+ arch/arm/mach-prima2/rtciobrg.c |    2 +-
+ 4 files changed, 12 insertions(+), 13 deletions(-)
+
 -- 
 1.7.5.4
