@@ -1,209 +1,464 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 18 Feb 2014 20:11:19 +0000
-Subject: [PATCH 20/34] imx-drm: use supplied drm_device where possible
+Date: Tue, 18 Feb 2014 20:11:34 +0000
+Subject: [PATCH 23/34] imx-drm: parallel-display,imx-tve,imx-ldb: initialise
+ drm components directly
 In-Reply-To: <20140218200900.GM21483@n2100.arm.linux.org.uk>
 References: <20140218200900.GM21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WFr0h-0007jf-GC@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WFr0w-0007js-QO@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The component helper provides us the drm_device which is being
-registered.  Rather than having to reference a global in imx-drm-core,
-use this to get the imxdrm device, and also use it to register the CRTC
-against.
-
-This means we never have CRTCs/encoders/connectors without the drivers
-private data being accessible.
-
-Remove the module owner field as well; this provides no protection
-against the device being unbound.
+Now that our bind function is only ever called during the main DRM
+driver ->load callback, we don't need to have the imx_drm_connector or
+imx_drm_encoder abstractions anymore.  So let's get rid of it, and move
+the DRM connector and encoder setup into the connector support files.
 
 Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c | 34 +++++-----------------------------
- drivers/staging/imx-drm/imx-drm.h      |  4 ++--
- drivers/staging/imx-drm/ipuv3-crtc.c   |  9 +++++----
- 3 files changed, 12 insertions(+), 35 deletions(-)
+ drivers/staging/imx-drm/imx-ldb.c          | 68 ++++++++++--------------------
+ drivers/staging/imx-drm/imx-tve.c          | 58 +++++++------------------
+ drivers/staging/imx-drm/parallel-display.c | 61 ++++++++-------------------
+ 3 files changed, 54 insertions(+), 133 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 3e3fd281fe6e..3d1c6b6c4388 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -52,7 +52,6 @@ struct imx_drm_crtc {
- 	struct imx_drm_device			*imxdrm;
- 	int					pipe;
- 	struct imx_drm_crtc_helper_funcs	imx_drm_helper_funcs;
--	struct module				*owner;
- 	struct crtc_cookie			cookie;
- 	int					mux_id;
- };
-@@ -74,7 +73,6 @@ static int legacyfb_depth = 16;
- module_param(legacyfb_depth, int, 0444);
- 
- static void imx_drm_device_put(void);
--static struct imx_drm_device *__imx_drm_device(void);
- 
- int imx_drm_crtc_id(struct imx_drm_crtc *crtc)
- {
-@@ -114,7 +112,7 @@ static int imx_drm_driver_unload(struct drm_device *drm)
- 
- struct imx_drm_crtc *imx_drm_find_crtc(struct drm_crtc *crtc)
- {
--	struct imx_drm_device *imxdrm = __imx_drm_device();
-+	struct imx_drm_device *imxdrm = crtc->dev->dev_private;
- 	unsigned i;
- 
- 	for (i = 0; i < MAX_CRTC; i++)
-@@ -241,7 +239,6 @@ static struct drm_device *imx_drm_device_get(void)
- 	struct imx_drm_device *imxdrm = __imx_drm_device();
- 	struct imx_drm_encoder *enc;
- 	struct imx_drm_connector *con;
--	struct imx_drm_crtc *crtc;
- 
- 	list_for_each_entry(enc, &imxdrm->encoder_list, list) {
- 		if (!try_module_get(enc->owner)) {
-@@ -259,19 +256,8 @@ static struct drm_device *imx_drm_device_get(void)
- 		}
- 	}
- 
--	list_for_each_entry(crtc, &imxdrm->crtc_list, list) {
--		if (!try_module_get(crtc->owner)) {
--			dev_err(imxdrm->dev, "could not get module %s\n",
--					module_name(crtc->owner));
--			goto unwind_crtc;
--		}
--	}
--
- 	return imxdrm->drm;
- 
--unwind_crtc:
--	list_for_each_entry_continue_reverse(crtc, &imxdrm->crtc_list, list)
--		module_put(crtc->owner);
- unwind_con:
- 	list_for_each_entry_continue_reverse(con, &imxdrm->connector_list, list)
- 		module_put(con->owner);
-@@ -290,13 +276,9 @@ static void imx_drm_device_put(void)
- 	struct imx_drm_device *imxdrm = __imx_drm_device();
- 	struct imx_drm_encoder *enc;
- 	struct imx_drm_connector *con;
--	struct imx_drm_crtc *crtc;
- 
- 	mutex_lock(&imxdrm->mutex);
- 
--	list_for_each_entry(crtc, &imxdrm->crtc_list, list)
--		module_put(crtc->owner);
--
- 	list_for_each_entry(con, &imxdrm->connector_list, list)
- 		module_put(con->owner);
- 
-@@ -536,12 +518,12 @@ static void imx_drm_update_possible_crtcs(void)
-  * The return value if !NULL is a cookie for the caller to pass to
-  * imx_drm_remove_crtc later.
-  */
--int imx_drm_add_crtc(struct drm_crtc *crtc,
-+int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
- 		struct imx_drm_crtc **new_crtc,
- 		const struct imx_drm_crtc_helper_funcs *imx_drm_helper_funcs,
--		struct module *owner, void *cookie, int id)
-+		void *cookie, int id)
- {
--	struct imx_drm_device *imxdrm = __imx_drm_device();
-+	struct imx_drm_device *imxdrm = drm->dev_private;
- 	struct imx_drm_crtc *imx_drm_crtc;
- 	int ret;
- 
-@@ -575,8 +557,6 @@ int imx_drm_add_crtc(struct drm_crtc *crtc,
- 	imx_drm_crtc->crtc = crtc;
- 	imx_drm_crtc->imxdrm = imxdrm;
- 
--	imx_drm_crtc->owner = owner;
--
- 	imxdrm->crtc[imx_drm_crtc->pipe] = imx_drm_crtc;
- 
- 	*new_crtc = imx_drm_crtc;
-@@ -588,11 +568,9 @@ int imx_drm_add_crtc(struct drm_crtc *crtc,
- 	drm_crtc_helper_add(crtc,
- 			imx_drm_crtc->imx_drm_helper_funcs.crtc_helper_funcs);
- 
--	drm_crtc_init(imxdrm->drm, crtc,
-+	drm_crtc_init(drm, crtc,
- 			imx_drm_crtc->imx_drm_helper_funcs.crtc_funcs);
- 
--	drm_mode_group_reinit(imxdrm->drm);
--
- 	imx_drm_update_possible_crtcs();
- 
- 	mutex_unlock(&imxdrm->mutex);
-@@ -622,8 +600,6 @@ int imx_drm_remove_crtc(struct imx_drm_crtc *imx_drm_crtc)
- 
- 	imxdrm->crtc[imx_drm_crtc->pipe] = NULL;
- 
--	drm_mode_group_reinit(imxdrm->drm);
--
- 	mutex_unlock(&imxdrm->mutex);
- 
- 	kfree(imx_drm_crtc);
-diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
-index d1fb1146240e..78465239ed4c 100644
---- a/drivers/staging/imx-drm/imx-drm.h
-+++ b/drivers/staging/imx-drm/imx-drm.h
-@@ -25,10 +25,10 @@ struct imx_drm_crtc_helper_funcs {
- 	const struct drm_crtc_funcs *crtc_funcs;
- };
- 
--int imx_drm_add_crtc(struct drm_crtc *crtc,
-+int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
- 		struct imx_drm_crtc **new_crtc,
- 		const struct imx_drm_crtc_helper_funcs *imx_helper_funcs,
--		struct module *owner, void *cookie, int id);
-+		void *cookie, int id);
- int imx_drm_remove_crtc(struct imx_drm_crtc *);
- int imx_drm_init_drm(struct platform_device *pdev,
- 		int preferred_bpp);
-diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
-index d779ad2d1f4e..e646017c32ac 100644
---- a/drivers/staging/imx-drm/ipuv3-crtc.c
-+++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-@@ -336,7 +336,7 @@ static int ipu_get_resources(struct ipu_crtc *ipu_crtc,
+diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
+index d00f93f3440d..5168c76cff53 100644
+--- a/drivers/staging/imx-drm/imx-ldb.c
++++ b/drivers/staging/imx-drm/imx-ldb.c
+@@ -59,9 +59,8 @@ struct imx_ldb;
+ struct imx_ldb_channel {
+ 	struct imx_ldb *ldb;
+ 	struct drm_connector connector;
+-	struct imx_drm_connector *imx_drm_connector;
+ 	struct drm_encoder encoder;
+-	struct imx_drm_encoder *imx_drm_encoder;
++	struct device_node *child;
+ 	int chno;
+ 	void *edid;
+ 	int edid_len;
+@@ -92,11 +91,6 @@ static enum drm_connector_status imx_ldb_connector_detect(
+ 	return connector_status_connected;
  }
  
- static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
--		struct ipu_client_platformdata *pdata)
-+	struct ipu_client_platformdata *pdata, struct drm_device *drm)
+-static void imx_ldb_connector_destroy(struct drm_connector *connector)
+-{
+-	/* do not free here */
+-}
+-
+ static int imx_ldb_connector_get_modes(struct drm_connector *connector)
  {
- 	struct ipu_soc *ipu = dev_get_drvdata(ipu_crtc->dev->parent);
- 	int dp = -EINVAL;
-@@ -350,9 +350,9 @@ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
+ 	struct imx_ldb_channel *imx_ldb_ch = con_to_imx_ldb_ch(connector);
+@@ -308,16 +302,11 @@ static void imx_ldb_encoder_disable(struct drm_encoder *encoder)
+ 	}
+ }
+ 
+-static void imx_ldb_encoder_destroy(struct drm_encoder *encoder)
+-{
+-	/* do not free here */
+-}
+-
+ static struct drm_connector_funcs imx_ldb_connector_funcs = {
+ 	.dpms = drm_helper_connector_dpms,
+ 	.fill_modes = drm_helper_probe_single_connector_modes,
+ 	.detect = imx_ldb_connector_detect,
+-	.destroy = imx_ldb_connector_destroy,
++	.destroy = imx_drm_connector_destroy,
+ };
+ 
+ static struct drm_connector_helper_funcs imx_ldb_connector_helper_funcs = {
+@@ -327,7 +316,7 @@ static struct drm_connector_helper_funcs imx_ldb_connector_helper_funcs = {
+ };
+ 
+ static struct drm_encoder_funcs imx_ldb_encoder_funcs = {
+-	.destroy = imx_ldb_encoder_destroy,
++	.destroy = imx_drm_encoder_destroy,
+ };
+ 
+ static struct drm_encoder_helper_funcs imx_ldb_encoder_helper_funcs = {
+@@ -354,45 +343,36 @@ static int imx_ldb_get_clk(struct imx_ldb *ldb, int chno)
+ 	return PTR_ERR_OR_ZERO(ldb->clk_pll[chno]);
+ }
+ 
+-static int imx_ldb_register(struct imx_ldb_channel *imx_ldb_ch)
++static int imx_ldb_register(struct drm_device *drm,
++	struct imx_ldb_channel *imx_ldb_ch)
+ {
+-	int ret;
+ 	struct imx_ldb *ldb = imx_ldb_ch->ldb;
++	int ret;
++
++	ret = imx_drm_encoder_parse_of(drm, &imx_ldb_ch->encoder,
++				       imx_ldb_ch->child);
++	if (ret)
++		return ret;
+ 
+ 	ret = imx_ldb_get_clk(ldb, imx_ldb_ch->chno);
+ 	if (ret)
  		return ret;
++
+ 	if (ldb->ldb_ctrl & LDB_SPLIT_MODE_EN) {
+-		ret |= imx_ldb_get_clk(ldb, 1);
++		ret = imx_ldb_get_clk(ldb, 1);
+ 		if (ret)
+ 			return ret;
  	}
  
--	ret = imx_drm_add_crtc(&ipu_crtc->base,
-+	ret = imx_drm_add_crtc(drm, &ipu_crtc->base,
- 			&ipu_crtc->imx_crtc,
--			&ipu_crtc_helper_funcs, THIS_MODULE,
-+			&ipu_crtc_helper_funcs,
- 			ipu_crtc->dev->parent->of_node, pdata->di);
- 	if (ret) {
- 		dev_err(ipu_crtc->dev, "adding crtc failed with %d.\n", ret);
-@@ -404,6 +404,7 @@ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
- static int ipu_drm_bind(struct device *dev, struct device *master, void *data)
+-	imx_ldb_ch->connector.funcs = &imx_ldb_connector_funcs;
+-	imx_ldb_ch->encoder.funcs = &imx_ldb_encoder_funcs;
+-
+-	imx_ldb_ch->encoder.encoder_type = DRM_MODE_ENCODER_LVDS;
+-	imx_ldb_ch->connector.connector_type = DRM_MODE_CONNECTOR_LVDS;
+-
+ 	drm_encoder_helper_add(&imx_ldb_ch->encoder,
+ 			&imx_ldb_encoder_helper_funcs);
+-	ret = imx_drm_add_encoder(&imx_ldb_ch->encoder,
+-			&imx_ldb_ch->imx_drm_encoder, THIS_MODULE);
+-	if (ret) {
+-		dev_err(ldb->dev, "adding encoder failed with %d\n", ret);
+-		return ret;
+-	}
++	drm_encoder_init(drm, &imx_ldb_ch->encoder, &imx_ldb_encoder_funcs,
++			 DRM_MODE_ENCODER_LVDS);
+ 
+ 	drm_connector_helper_add(&imx_ldb_ch->connector,
+ 			&imx_ldb_connector_helper_funcs);
+-
+-	ret = imx_drm_add_connector(&imx_ldb_ch->connector,
+-			&imx_ldb_ch->imx_drm_connector, THIS_MODULE);
+-	if (ret) {
+-		imx_drm_remove_encoder(imx_ldb_ch->imx_drm_encoder);
+-		dev_err(ldb->dev, "adding connector failed with %d\n", ret);
+-		return ret;
+-	}
++	drm_connector_init(drm, &imx_ldb_ch->connector,
++			   &imx_ldb_connector_funcs, DRM_MODE_CONNECTOR_LVDS);
+ 
+ 	drm_mode_connector_attach_encoder(&imx_ldb_ch->connector,
+ 			&imx_ldb_ch->encoder);
+@@ -453,6 +433,7 @@ MODULE_DEVICE_TABLE(of, imx_ldb_dt_ids);
+ 
+ static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
  {
- 	struct ipu_client_platformdata *pdata = dev->platform_data;
 +	struct drm_device *drm = data;
- 	struct ipu_crtc *ipu_crtc;
+ 	struct device_node *np = dev->of_node;
+ 	const struct of_device_id *of_id =
+ 			of_match_device(imx_ldb_dt_ids, dev);
+@@ -523,6 +504,7 @@ static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
+ 		channel = &imx_ldb->channel[i];
+ 		channel->ldb = imx_ldb;
+ 		channel->chno = i;
++		channel->child = child;
+ 
+ 		edidp = of_get_property(child, "edid", &channel->edid_len);
+ 		if (edidp) {
+@@ -565,11 +547,9 @@ static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
+ 			return -EINVAL;
+ 		}
+ 
+-		ret = imx_ldb_register(channel);
++		ret = imx_ldb_register(drm, channel);
+ 		if (ret)
+ 			return ret;
+-
+-		imx_drm_encoder_add_possible_crtcs(channel->imx_drm_encoder, child);
+ 	}
+ 
+ 	dev_set_drvdata(dev, imx_ldb);
+@@ -585,13 +565,9 @@ static void imx_ldb_unbind(struct device *dev, struct device *master,
+ 
+ 	for (i = 0; i < 2; i++) {
+ 		struct imx_ldb_channel *channel = &imx_ldb->channel[i];
+-		struct drm_connector *connector = &channel->connector;
+-		struct drm_encoder *encoder = &channel->encoder;
+-
+-		drm_mode_connector_detach_encoder(connector, encoder);
+ 
+-		imx_drm_remove_connector(channel->imx_drm_connector);
+-		imx_drm_remove_encoder(channel->imx_drm_encoder);
++		channel->connector.funcs->destroy(&channel->connector);
++		channel->encoder.funcs->destroy(&channel->encoder);
+ 	}
+ }
+ 
+diff --git a/drivers/staging/imx-drm/imx-tve.c b/drivers/staging/imx-drm/imx-tve.c
+index ad840d78a09a..702c0c3204ed 100644
+--- a/drivers/staging/imx-drm/imx-tve.c
++++ b/drivers/staging/imx-drm/imx-tve.c
+@@ -111,9 +111,7 @@ enum {
+ 
+ struct imx_tve {
+ 	struct drm_connector connector;
+-	struct imx_drm_connector *imx_drm_connector;
+ 	struct drm_encoder encoder;
+-	struct imx_drm_encoder *imx_drm_encoder;
+ 	struct device *dev;
+ 	spinlock_t lock;	/* register lock */
+ 	bool enabled;
+@@ -226,11 +224,6 @@ static enum drm_connector_status imx_tve_connector_detect(
+ 	return connector_status_connected;
+ }
+ 
+-static void imx_tve_connector_destroy(struct drm_connector *connector)
+-{
+-	/* do not free here */
+-}
+-
+ static int imx_tve_connector_get_modes(struct drm_connector *connector)
+ {
+ 	struct imx_tve *tve = con_to_tve(connector);
+@@ -368,16 +361,11 @@ static void imx_tve_encoder_disable(struct drm_encoder *encoder)
+ 	tve_disable(tve);
+ }
+ 
+-static void imx_tve_encoder_destroy(struct drm_encoder *encoder)
+-{
+-	/* do not free here */
+-}
+-
+ static struct drm_connector_funcs imx_tve_connector_funcs = {
+ 	.dpms = drm_helper_connector_dpms,
+ 	.fill_modes = drm_helper_probe_single_connector_modes,
+ 	.detect = imx_tve_connector_detect,
+-	.destroy = imx_tve_connector_destroy,
++	.destroy = imx_drm_connector_destroy,
+ };
+ 
+ static struct drm_connector_helper_funcs imx_tve_connector_helper_funcs = {
+@@ -387,7 +375,7 @@ static struct drm_connector_helper_funcs imx_tve_connector_helper_funcs = {
+ };
+ 
+ static struct drm_encoder_funcs imx_tve_encoder_funcs = {
+-	.destroy = imx_tve_encoder_destroy,
++	.destroy = imx_drm_encoder_destroy,
+ };
+ 
+ static struct drm_encoder_helper_funcs imx_tve_encoder_helper_funcs = {
+@@ -507,7 +495,7 @@ static int tve_clk_init(struct imx_tve *tve, void __iomem *base)
+ 	return 0;
+ }
+ 
+-static int imx_tve_register(struct imx_tve *tve)
++static int imx_tve_register(struct drm_device *drm, struct imx_tve *tve)
+ {
+ 	int encoder_type;
  	int ret;
+@@ -515,30 +503,19 @@ static int imx_tve_register(struct imx_tve *tve)
+ 	encoder_type = tve->mode == TVE_MODE_VGA ?
+ 				DRM_MODE_ENCODER_DAC : DRM_MODE_ENCODER_TVDAC;
  
-@@ -413,7 +414,7 @@ static int ipu_drm_bind(struct device *dev, struct device *master, void *data)
+-	tve->connector.funcs = &imx_tve_connector_funcs;
+-	tve->encoder.funcs = &imx_tve_encoder_funcs;
+-
+-	tve->encoder.encoder_type = encoder_type;
+-	tve->connector.connector_type = DRM_MODE_CONNECTOR_VGA;
++	ret = imx_drm_encoder_parse_of(drm, &tve->encoder,
++				       tve->dev->of_node);
++	if (ret)
++		return ret;
  
- 	ipu_crtc->dev = dev;
+ 	drm_encoder_helper_add(&tve->encoder, &imx_tve_encoder_helper_funcs);
+-	ret = imx_drm_add_encoder(&tve->encoder, &tve->imx_drm_encoder,
+-			THIS_MODULE);
+-	if (ret) {
+-		dev_err(tve->dev, "adding encoder failed with %d\n", ret);
+-		return ret;
+-	}
++	drm_encoder_init(drm, &tve->encoder, &imx_tve_encoder_funcs,
++			 encoder_type);
  
--	ret = ipu_crtc_init(ipu_crtc, pdata);
-+	ret = ipu_crtc_init(ipu_crtc, pdata, drm);
+ 	drm_connector_helper_add(&tve->connector,
+ 			&imx_tve_connector_helper_funcs);
+-
+-	ret = imx_drm_add_connector(&tve->connector,
+-			&tve->imx_drm_connector, THIS_MODULE);
+-	if (ret) {
+-		imx_drm_remove_encoder(tve->imx_drm_encoder);
+-		dev_err(tve->dev, "adding connector failed with %d\n", ret);
+-		return ret;
+-	}
++	drm_connector_init(drm, &tve->connector, &imx_tve_connector_funcs,
++			   DRM_MODE_CONNECTOR_VGA);
+ 
+ 	drm_mode_connector_attach_encoder(&tve->connector, &tve->encoder);
+ 
+@@ -587,6 +564,7 @@ static const int of_get_tve_mode(struct device_node *np)
+ static int imx_tve_bind(struct device *dev, struct device *master, void *data)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
++	struct drm_device *drm = data;
+ 	struct device_node *np = dev->of_node;
+ 	struct device_node *ddc_node;
+ 	struct imx_tve *tve;
+@@ -701,12 +679,10 @@ static int imx_tve_bind(struct device *dev, struct device *master, void *data)
+ 	/* disable cable detection for VGA mode */
+ 	ret = regmap_write(tve->regmap, TVE_CD_CONT_REG, 0);
+ 
+-	ret = imx_tve_register(tve);
++	ret = imx_tve_register(drm, tve);
  	if (ret)
  		return ret;
  
+-	ret = imx_drm_encoder_add_possible_crtcs(tve->imx_drm_encoder, np);
+-
+ 	dev_set_drvdata(dev, tve);
+ 
+ 	return 0;
+@@ -716,13 +692,9 @@ static void imx_tve_unbind(struct device *dev, struct device *master,
+ 	void *data)
+ {
+ 	struct imx_tve *tve = dev_get_drvdata(dev);
+-	struct drm_connector *connector = &tve->connector;
+-	struct drm_encoder *encoder = &tve->encoder;
+-
+-	drm_mode_connector_detach_encoder(connector, encoder);
+ 
+-	imx_drm_remove_connector(tve->imx_drm_connector);
+-	imx_drm_remove_encoder(tve->imx_drm_encoder);
++	tve->connector.funcs->destroy(&tve->connector);
++	tve->encoder.funcs->destroy(&tve->encoder);
+ 
+ 	if (!IS_ERR(tve->dac_reg))
+ 		regulator_disable(tve->dac_reg);
+diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
+index 4019cae35ff9..d610f0726bb2 100644
+--- a/drivers/staging/imx-drm/parallel-display.c
++++ b/drivers/staging/imx-drm/parallel-display.c
+@@ -33,9 +33,7 @@
+ 
+ struct imx_parallel_display {
+ 	struct drm_connector connector;
+-	struct imx_drm_connector *imx_drm_connector;
+ 	struct drm_encoder encoder;
+-	struct imx_drm_encoder *imx_drm_encoder;
+ 	struct device *dev;
+ 	void *edid;
+ 	int edid_len;
+@@ -50,11 +48,6 @@ static enum drm_connector_status imx_pd_connector_detect(
+ 	return connector_status_connected;
+ }
+ 
+-static void imx_pd_connector_destroy(struct drm_connector *connector)
+-{
+-	/* do not free here */
+-}
+-
+ static int imx_pd_connector_get_modes(struct drm_connector *connector)
+ {
+ 	struct imx_parallel_display *imxpd = con_to_imxpd(connector);
+@@ -126,16 +119,11 @@ static void imx_pd_encoder_disable(struct drm_encoder *encoder)
+ {
+ }
+ 
+-static void imx_pd_encoder_destroy(struct drm_encoder *encoder)
+-{
+-	/* do not free here */
+-}
+-
+ static struct drm_connector_funcs imx_pd_connector_funcs = {
+ 	.dpms = drm_helper_connector_dpms,
+ 	.fill_modes = drm_helper_probe_single_connector_modes,
+ 	.detect = imx_pd_connector_detect,
+-	.destroy = imx_pd_connector_destroy,
++	.destroy = imx_drm_connector_destroy,
+ };
+ 
+ static struct drm_connector_helper_funcs imx_pd_connector_helper_funcs = {
+@@ -145,7 +133,7 @@ static struct drm_connector_helper_funcs imx_pd_connector_helper_funcs = {
+ };
+ 
+ static struct drm_encoder_funcs imx_pd_encoder_funcs = {
+-	.destroy = imx_pd_encoder_destroy,
++	.destroy = imx_drm_encoder_destroy,
+ };
+ 
+ static struct drm_encoder_helper_funcs imx_pd_encoder_helper_funcs = {
+@@ -157,36 +145,26 @@ static struct drm_encoder_helper_funcs imx_pd_encoder_helper_funcs = {
+ 	.disable = imx_pd_encoder_disable,
+ };
+ 
+-static int imx_pd_register(struct imx_parallel_display *imxpd)
++static int imx_pd_register(struct drm_device *drm,
++	struct imx_parallel_display *imxpd)
+ {
+ 	int ret;
+ 
+-	drm_mode_connector_attach_encoder(&imxpd->connector, &imxpd->encoder);
+-
+-	imxpd->connector.funcs = &imx_pd_connector_funcs;
+-	imxpd->encoder.funcs = &imx_pd_encoder_funcs;
+-
+-	imxpd->encoder.encoder_type = DRM_MODE_ENCODER_NONE;
+-	imxpd->connector.connector_type = DRM_MODE_CONNECTOR_VGA;
++	ret = imx_drm_encoder_parse_of(drm, &imxpd->encoder,
++				       imxpd->dev->of_node);
++	if (ret)
++		return ret;
+ 
+ 	drm_encoder_helper_add(&imxpd->encoder, &imx_pd_encoder_helper_funcs);
+-	ret = imx_drm_add_encoder(&imxpd->encoder, &imxpd->imx_drm_encoder,
+-			THIS_MODULE);
+-	if (ret) {
+-		dev_err(imxpd->dev, "adding encoder failed with %d\n", ret);
+-		return ret;
+-	}
++	drm_encoder_init(drm, &imxpd->encoder, &imx_pd_encoder_funcs,
++			 DRM_MODE_ENCODER_NONE);
+ 
+ 	drm_connector_helper_add(&imxpd->connector,
+ 			&imx_pd_connector_helper_funcs);
++	drm_connector_init(drm, &imxpd->connector, &imx_pd_connector_funcs,
++			   DRM_MODE_CONNECTOR_VGA);
+ 
+-	ret = imx_drm_add_connector(&imxpd->connector,
+-			&imxpd->imx_drm_connector, THIS_MODULE);
+-	if (ret) {
+-		imx_drm_remove_encoder(imxpd->imx_drm_encoder);
+-		dev_err(imxpd->dev, "adding connector failed with %d\n", ret);
+-		return ret;
+-	}
++	drm_mode_connector_attach_encoder(&imxpd->connector, &imxpd->encoder);
+ 
+ 	imxpd->connector.encoder = &imxpd->encoder;
+ 
+@@ -195,6 +173,7 @@ static int imx_pd_register(struct imx_parallel_display *imxpd)
+ 
+ static int imx_pd_bind(struct device *dev, struct device *master, void *data)
+ {
++	struct drm_device *drm = data;
+ 	struct device_node *np = dev->of_node;
+ 	const u8 *edidp;
+ 	struct imx_parallel_display *imxpd;
+@@ -221,12 +200,10 @@ static int imx_pd_bind(struct device *dev, struct device *master, void *data)
+ 
+ 	imxpd->dev = dev;
+ 
+-	ret = imx_pd_register(imxpd);
++	ret = imx_pd_register(drm, imxpd);
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = imx_drm_encoder_add_possible_crtcs(imxpd->imx_drm_encoder, np);
+-
+ 	dev_set_drvdata(dev, imxpd);
+ 
+ 	return 0;
+@@ -236,13 +213,9 @@ static void imx_pd_unbind(struct device *dev, struct device *master,
+ 	void *data)
+ {
+ 	struct imx_parallel_display *imxpd = dev_get_drvdata(dev);
+-	struct drm_connector *connector = &imxpd->connector;
+-	struct drm_encoder *encoder = &imxpd->encoder;
+-
+-	drm_mode_connector_detach_encoder(connector, encoder);
+ 
+-	imx_drm_remove_connector(imxpd->imx_drm_connector);
+-	imx_drm_remove_encoder(imxpd->imx_drm_encoder);
++	imxpd->encoder.funcs->destroy(&imxpd->encoder);
++	imxpd->connector.funcs->destroy(&imxpd->connector);
+ }
+ 
+ static const struct component_ops imx_pd_ops = {
 -- 
 1.8.3.1
