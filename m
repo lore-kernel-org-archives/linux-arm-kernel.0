@@ -1,48 +1,76 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 18 Feb 2014 15:27:13 +0000
-Subject: [PATCH 3/5] arm: mm: Make mmu_gather aware of huge pages
-In-Reply-To: <1392737235-27286-1-git-send-email-steve.capper@linaro.org>
-References: <1392737235-27286-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1392737235-27286-4-git-send-email-steve.capper@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 18 Feb 2014 15:27:23 +0000
+Subject: [PATCH v4 02/12] arm64: KVM: allows discrimination of AArch32 sysreg
+ access
+In-Reply-To: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
+References: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1392737253-10480-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Huge pages on short descriptors are arranged as pairs of 1MB sections.
-We need to be careful and ensure that the TLBs for both sections are
-flushed when we tlb_add_flush on a HugeTLB page.
+The current handling of AArch32 trapping is slightly less than
+perfect, as it is not possible (from a handler point of view)
+to distinguish it from an AArch64 access, nor to tell a 32bit
+from a 64bit access either.
 
-This patch extends the tlb flush range to HPAGE_SIZE rather than
-PAGE_SIZE when addresses belonging to huge page VMAs are added to
-the flush range.
+Fix this by introducing two additional flags:
+- is_aarch32: true if the access was made in AArch32 mode
+- is_32bit: true if is_aarch32 == true and a MCR/MRC instruction
+  was used to perform the access (as opposed to MCRR/MRRC).
 
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
+This allows a handler to cover all the possible conditions in which
+a system register gets trapped.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/tlb.h | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 6 ++++++
+ arch/arm64/kvm/sys_regs.h | 2 ++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
-index 0baf7f0..b2498e6 100644
---- a/arch/arm/include/asm/tlb.h
-+++ b/arch/arm/include/asm/tlb.h
-@@ -81,10 +81,17 @@ static inline void tlb_flush(struct mmu_gather *tlb)
- static inline void tlb_add_flush(struct mmu_gather *tlb, unsigned long addr)
- {
- 	if (!tlb->fullmm) {
-+		unsigned long size = PAGE_SIZE;
-+
- 		if (addr < tlb->range_start)
- 			tlb->range_start = addr;
--		if (addr + PAGE_SIZE > tlb->range_end)
--			tlb->range_end = addr + PAGE_SIZE;
-+
-+		if (!config_enabled(CONFIG_ARM_LPAE) && tlb->vma
-+				&& is_vm_hugetlb_page(tlb->vma))
-+			size = HPAGE_SIZE;
-+
-+		if (addr + size > tlb->range_end)
-+			tlb->range_end = addr + size;
- 	}
- }
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 02e9d09..bf03e0f 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -437,6 +437,8 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+ 	int Rt2 = (hsr >> 10) & 0xf;
  
++	params.is_aarch32 = true;
++	params.is_32bit = false;
+ 	params.CRm = (hsr >> 1) & 0xf;
+ 	params.Rt = (hsr >> 5) & 0xf;
+ 	params.is_write = ((hsr & 1) == 0);
+@@ -480,6 +482,8 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	struct sys_reg_params params;
+ 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+ 
++	params.is_aarch32 = true;
++	params.is_32bit = true;
+ 	params.CRm = (hsr >> 1) & 0xf;
+ 	params.Rt  = (hsr >> 5) & 0xf;
+ 	params.is_write = ((hsr & 1) == 0);
+@@ -549,6 +553,8 @@ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	struct sys_reg_params params;
+ 	unsigned long esr = kvm_vcpu_get_hsr(vcpu);
+ 
++	params.is_aarch32 = false;
++	params.is_32bit = false;
+ 	params.Op0 = (esr >> 20) & 3;
+ 	params.Op1 = (esr >> 14) & 0x7;
+ 	params.CRn = (esr >> 10) & 0xf;
+diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+index d50d372..d411e25 100644
+--- a/arch/arm64/kvm/sys_regs.h
++++ b/arch/arm64/kvm/sys_regs.h
+@@ -30,6 +30,8 @@ struct sys_reg_params {
+ 	u8	Op2;
+ 	u8	Rt;
+ 	bool	is_write;
++	bool	is_aarch32;
++	bool	is_32bit;	/* Only valid if is_aarch32 is true */
+ };
+ 
+ struct sys_reg_desc {
 -- 
-1.8.1.4
+1.8.3.4
