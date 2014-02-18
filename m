@@ -1,102 +1,148 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 18 Feb 2014 14:37:55 +0100
-Subject: [PATCH v3 0/6] reserved-memory regions/CMA in devicetree, again
-Message-ID: <1392730681-14695-1-git-send-email-m.szyprowski@samsung.com>
+Date: Tue, 18 Feb 2014 14:37:56 +0100
+Subject: [PATCH v3 1/6] base: dma-contiguous: add
+ dma_contiguous_init_reserved_mem() function
+In-Reply-To: <1392730681-14695-1-git-send-email-m.szyprowski@samsung.com>
+References: <1392730681-14695-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1392730681-14695-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all!
+Add new dma_contiguous_init_reserved_mem() function, which creates CMA area
+from previously reserved memory region.
 
-This is yet another update of the second attempt to add basic support
-for dynamic allocation of memory reserved regions defined in device
-tree.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/base/dma-contiguous.c  |   70 +++++++++++++++++++++++++++-------------
+ include/linux/dma-contiguous.h |    7 ++++
+ 2 files changed, 55 insertions(+), 22 deletions(-)
 
-This time I've tried to address all the issues reported by Grant Likely.
-The side-effect of it is a complete rewrite of memory reservation code,
-which results in added support for for multiple tuples in 'reg' property
-and complete support for 'size', 'align' and 'alloc-ranges' properties.
-
-The initial code for this feature were posted here [1], merged as commit
-9d8eab7af79cb4ce2de5de39f82c455b1f796963 ("drivers: of: add
-initialization code for dma reserved memory") and later reverted by
-commit 1931ee143b0ab72924944bc06e363d837ba05063. For more information,
-see [2]. Finally a new bindings has been proposed [3] and Josh
-Cartwright a few days ago prepared some code which implements those
-bindings [4]. This finally pushed me again to find some time to finish
-this task and review the code. Josh agreed to give me the ownership of
-this series to continue preparing them for mainline inclusion.
-
-For more information please refer to the changlelog below.
-
-[1]: http://lkml.kernel.org/g/1377527959-5080-1-git-send-email-m.szyprowski at samsung.com
-[2]: http://lkml.kernel.org/g/1381476448-14548-1-git-send-email-m.szyprowski at samsung.com
-[3]: http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
-[4]: http://thread.gmane.org/gmane.linux.documentation/19579
-
-Changelog:
-
-v3:
-- refactored memory reservation code, created common code to parse reg, size,
-  align, alloc-ranges properties
-- added support for multiple tuples in 'reg' property
-- memory is reserved regardless of presence of the driver for its compatible
-- prepared arch specific hooks for memory reservation (defaults use memblock
-  calls)
-- removed node matching by string during device initialization
-- CMA init code: added checks for required region alignment
-- more code cleanup here and there
-
-v2: http://thread.gmane.org/gmane.linux.documentation/19870/
-- removed copying of the node name
-- split shared-dma-pool handling into separate files (one for CMA and one
-  for dma_declare_coherent based implementations) for making the code easier
-  to understand
-- added support for AMBA devices, changed prototypes to use struct decice
-  instead of struct platform_device
-- renamed some functions to better match other names used in drivers/of/
-- restructured the rest of the code a bit for better readability
-- added 'reusable' property to exmaple linux,cma node in documentation
-- exclusive dma (dma_coherent) is used for only handling 'shared-dma-pool'
-  regions without 'reusable' property and CMA is used only for handling
-  'shared-dma-pool' regions with 'reusable' property.
-
-v1: http://thread.gmane.org/gmane.linux.documentation/19579
-- initial version prepared by Josh Cartwright
-
-Summary:
-
-Grant Likely (1):
-  of: document bindings for reserved-memory nodes
-
-Josh Cartwright (2):
-  drivers: of: implement reserved-memory handling for dma
-  drivers: of: implement reserved-memory handling for cma
-
-Marek Szyprowski (3):
-  base: dma-contiguous: add dma_contiguous_init_reserved_mem() function
-  drivers: of: add initialization code for reserved memory
-  ARM: init: add support for reserved memory defined by device tree
-
- .../bindings/reserved-memory/reserved-memory.txt   |  138 +++++++
- arch/arm/Kconfig                                   |    1 +
- arch/arm/mm/init.c                                 |    3 +
- drivers/base/dma-contiguous.c                      |   70 ++--
- drivers/of/Kconfig                                 |   19 +
- drivers/of/Makefile                                |    3 +
- drivers/of/fdt.c                                   |    2 +
- drivers/of/of_reserved_mem.c                       |  390 ++++++++++++++++++++
- drivers/of/of_reserved_mem_cma.c                   |   68 ++++
- drivers/of/of_reserved_mem_dma.c                   |   65 ++++
- drivers/of/platform.c                              |    7 +
- include/asm-generic/vmlinux.lds.h                  |   11 +
- include/linux/dma-contiguous.h                     |    7 +
- include/linux/of_reserved_mem.h                    |   65 ++++
- 14 files changed, 827 insertions(+), 22 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
- create mode 100644 drivers/of/of_reserved_mem.c
- create mode 100644 drivers/of/of_reserved_mem_cma.c
- create mode 100644 drivers/of/of_reserved_mem_dma.c
- create mode 100644 include/linux/of_reserved_mem.h
-
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index 165c2c299e57..ece82e8f3a8b 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -182,6 +182,53 @@ static int __init cma_init_reserved_areas(void)
+ core_initcall(cma_init_reserved_areas);
+ 
+ /**
++ * dma_contiguous_init_reserved_mem() - reserve custom contiguous area
++ * @size: Size of the reserved area (in bytes),
++ * @base: Base address of the reserved area optional, use 0 for any
++ * @limit: End address of the reserved memory (optional, 0 for any).
++ * @res_cma: Pointer to store the created cma region.
++ *
++ * This function reserves memory from early allocator. It should be
++ * called by arch specific code once the early allocator (memblock or bootmem)
++ * has been activated and all other subsystems have already allocated/reserved
++ * memory. This function allows to create custom reserved areas for specific
++ * devices.
++ */
++int __init dma_contiguous_init_reserved_mem(phys_addr_t size, phys_addr_t base,
++				       struct cma **res_cma)
++{
++	struct cma *cma = &cma_areas[cma_area_count];
++	phys_addr_t alignment;
++
++	/* Sanity checks */
++	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
++		pr_err("Not enough slots for CMA reserved regions!\n");
++		return -ENOSPC;
++	}
++
++	if (!size || !memblock_is_region_reserved(base, size))
++		return -EINVAL;
++
++	/* Sanitise input arguments */
++	alignment = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
++	if (ALIGN(base, alignment) != base || ALIGN(size, alignment) != size)
++		return -EINVAL;
++
++	cma->base_pfn = PFN_DOWN(base);
++	cma->count = size >> PAGE_SHIFT;
++	*res_cma = cma;
++	cma_area_count++;
++
++	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
++		(unsigned long)base);
++
++	/* Architecture specific contiguous memory fixup. */
++	dma_contiguous_early_fixup(base, size);
++	return 0;
++}
++
++
++/**
+  * dma_contiguous_reserve_area() - reserve custom contiguous area
+  * @size: Size of the reserved area (in bytes),
+  * @base: Base address of the reserved area optional, use 0 for any
+@@ -197,7 +244,6 @@ core_initcall(cma_init_reserved_areas);
+ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+ 				       phys_addr_t limit, struct cma **res_cma)
+ {
+-	struct cma *cma = &cma_areas[cma_area_count];
+ 	phys_addr_t alignment;
+ 	int ret = 0;
+ 
+@@ -205,12 +251,6 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+ 		 (unsigned long)size, (unsigned long)base,
+ 		 (unsigned long)limit);
+ 
+-	/* Sanity checks */
+-	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+-		pr_err("Not enough slots for CMA reserved regions!\n");
+-		return -ENOSPC;
+-	}
+-
+ 	if (!size)
+ 		return -EINVAL;
+ 
+@@ -241,21 +281,7 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+ 		}
+ 	}
+ 
+-	/*
+-	 * Each reserved area must be initialised later, when more kernel
+-	 * subsystems (like slab allocator) are available.
+-	 */
+-	cma->base_pfn = PFN_DOWN(base);
+-	cma->count = size >> PAGE_SHIFT;
+-	*res_cma = cma;
+-	cma_area_count++;
+-
+-	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
+-		(unsigned long)base);
+-
+-	/* Architecture specific contiguous memory fixup. */
+-	dma_contiguous_early_fixup(base, size);
+-	return 0;
++	return dma_contiguous_init_reserved_mem(size, base, res_cma);
+ err:
+ 	pr_err("CMA: failed to reserve %ld MiB\n", (unsigned long)size / SZ_1M);
+ 	return ret;
+diff --git a/include/linux/dma-contiguous.h b/include/linux/dma-contiguous.h
+index 3b28f937d959..550497393ae7 100644
+--- a/include/linux/dma-contiguous.h
++++ b/include/linux/dma-contiguous.h
+@@ -90,6 +90,8 @@ void dma_contiguous_reserve(phys_addr_t addr_limit);
+ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+ 				       phys_addr_t limit, struct cma **res_cma);
+ 
++int dma_contiguous_init_reserved_mem(phys_addr_t size, phys_addr_t base,
++				     struct cma **res_cma);
+ /**
+  * dma_declare_contiguous() - reserve area for contiguous memory handling
+  *			      for particular device
+@@ -140,6 +142,11 @@ static inline int dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base
+ 	return -ENOSYS;
+ }
+ 
++static inline int dma_contiguous_init_reserved_mem(phys_addr_t size,
++				phys_addr_t base, struct cma **res_cma) {
++	return -ENOSYS;
++}
++
+ static inline
+ int dma_declare_contiguous(struct device *dev, phys_addr_t size,
+ 			   phys_addr_t base, phys_addr_t limit)
 -- 
 1.7.9.5
