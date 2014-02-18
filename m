@@ -1,66 +1,38 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 18 Feb 2014 09:41:23 -0500
-Subject: [PATCH v4 0/2] Introduce AEMIF driver for Davinci/Keystone archs
-In-Reply-To: <1391629574-18955-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1391629574-18955-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <53037113.3090105@ti.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Tue, 18 Feb 2014 11:42:43 -0300
+Subject: [PATCH v4 0/5] clk: sunxi usb clks support
+In-Reply-To: <1391786513-20780-1-git-send-email-hdegoede@redhat.com>
+References: <1391786513-20780-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <53037163.80103@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+Hi Hans,
 
-On Wednesday 05 February 2014 02:46 PM, Ivan Khoronzhuk wrote:
-> These patches introduce Async External Memory Interface (EMIF16/AEMIF)
-> controller driver for Davinci/Keystone archs.
-> 
-> For more informations see documentation:
-> Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
-> OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
-> Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
-> 
-Can you please have a look at the series ? It has been on the list for
-sometime and all the outstanding comments are addressed so far. If
-you are ok with it, I would like to get these queued up for 3.15
-via your tree.
+El 07/02/14 12:21, Hans de Goede escribi?:
+> Hi All,
+>
+> And here is v4 of my sunxi usb clks support series.
+>
+> Changes since v2:
+> -rename the compatibilty strings from foo-usb-gates-clk to foo-usb-clk
+>
+> Changes since v3:
+> -rename the compatibilty string for sun4i-usb-clk to sun4i-a10-usb-clk
+>
+> Note the dts bits (patches 3-5) of this series depends on Chen-Yu Tsai's clk
+> rename series.
+>
+> Emilio, should Mike pick patches 1-2 up directly, or should they go through
+> your tree?
 
-> Based on
-> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
-> keystone/master
-> 
-> v3..v4:
-> 	rebased on latest of linux-keystone.git keystone/master
-> 
-> v2..v3 (https://lkml.org/lkml/2013/12/11/148):
-> - memory: ti-aemif: introduce AEMIF driver
-> 	changed to work with multiple AEMIF controllers
-> 	corrected "copyright" to "authors" in header
-> 	changed compatible "ti,omap-L138-aemif" to "ti,da850-aeimf"
-> 	used NULL in clk_get() instead of "aemif" name
-> 	driver can be build as loadable module
-> 	treat all child nodes as cs nodes, it makes code simpler
-> 
-> - memory: ti-aemif: add bindings for AEMIF driver
-> 	deleted direct link driver/memory/ti-aemif.c
-> 	clarified description of controller ranges property
-> 	changed compatible "ti,omap-L138-aemif" to "ti,da850-aeimf"
-> 	added cs number information in commit log
-> 	removed compatible property from cs node, it makes code simpler
-> 
-> v1..v2 (https://lkml.org/lkml/2013/11/21/170):
-> - memory: ti-aemif: introduce AEMIF driver
-> - memory: ti-aemif: add bindings for AEMIF driver
-> 	added ti.cs-chipselect property instead of representing chipselect
-> 	number in cs node name.
-> 
-> Ivan Khoronzhuk (2):
->   memory: ti-aemif: introduce AEMIF driver
->   memory: ti-aemif: add bindings for AEMIF driver
-> 
->  .../bindings/memory-controllers/ti-aemif.txt       | 210 ++++++++++
->  drivers/memory/Kconfig                             |  11 +
->  drivers/memory/Makefile                            |   1 +
->  drivers/memory/ti-aemif.c                          | 429 +++++++++++++++++++++
->  4 files changed, 651 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
->  create mode 100644 drivers/memory/ti-aemif.c
-> 
+I have taken 1-2 on sunxi-clk-for-mike with acks from Maxime and Philipp.
+
+> Maxime, can you please add patches 3-5 to your dts tree ? Assuming that
+> wens clk rename patches are already there.
+
+Maxime, please do :)
+
+Cheers, and thanks for working on USB!
+
+Emilio
