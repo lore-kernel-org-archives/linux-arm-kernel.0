@@ -1,86 +1,62 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 18 Feb 2014 15:27:21 +0000
-Subject: [PATCH v4 00/12] arm/arm64: KVM: host cache maintenance when guest
+Date: Tue, 18 Feb 2014 15:27:27 +0000
+Subject: [PATCH v4 06/12] ARM: KVM: force cache clean on page fault when
  caches are off
-Message-ID: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
+In-Reply-To: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
+References: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1392737253-10480-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we run a guest with cache disabled, we don't flush the cache to
-the Point of Coherency, hence possibly missing bits of data that have
-been written in the cache, but have not yet reached memory.
+In order for a guest with caches disabled to observe data written
+contained in a given page, we need to make sure that page is
+committed to memory, and not just hanging in the cache (as guest
+accesses are completely bypassing the cache until it decides to
+enable it).
 
-We also have the opposite issue: when a guest enables its cache,
-whatever sits in the cache is suddenly going to become visible,
-shadowing whatever the guest has written into RAM.
+For this purpose, hook into the coherent_cache_guest_page
+function and flush the region if the guest SCTLR
+register doesn't show the MMU and caches as being enabled.
 
-There are several approaches to these issues:
-- Using the DC bit when caches are off: this breaks guests assuming
-  caches off while doing DMA operations. Bootloaders, for example.
-  It also breaks the I-D coherency.
-- Fetch the memory attributes on translation fault, and flush the
-  cache while handling the fault. This relies on using the PAR_EL1
-  register to obtain the Stage-1 memory attributes, and tends to be
-  slow.
-- Detecting the translation faults occuring with MMU off (and
-  performing a cache clean), and trapping SCTLR_EL1 to detect the
-  moment when the guest is turning its caches on (and performing a
-  cache invalidation). Trapping of SCTLR_EL1 is then disabled to
-  ensure the best performance.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/kvm_mmu.h | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-This patch series implements the last solution, for both arm and
-arm64. Tested on TC2 (ARMv7) and FVP model (ARMv8).
-
->From v3 (http://www.spinics.net/lists/arm-kernel/msg305211.html)
-- Dropped the LPAE-specific pmd_addr_end
-- Added kvm_p[gum]d_addr_end to deal with 40bit IPAs, and fixed the
-  callers of p[gum]d_addr_end with IPA parameters
-- Added patch #12 which, while not strictly related, felt a bit lonely
-  on the mailing list
-
->From v2 (http://www.spinics.net/lists/arm-kernel/msg302472.html):
-- Addressed most (hopefully all) of Christoffer's comments
-- Added a new LPAE pmd_addr_end to deal with 40bit IPAs
-
->From v1 (http://www.spinics.net/lists/kvm/msg99404.html):
-- Fixed AArch32 VM handling on arm64 (Reported by Anup)
-- Added ARMv7 support:
-  * Fixed a couple of issues regarding handling of 64bit cp15 regs
-  * Per-vcpu HCR
-  * Switching of AMAIR0 and AMAIR1
-
-Marc Zyngier (12):
-  arm64: KVM: force cache clean on page fault when caches are off
-  arm64: KVM: allows discrimination of AArch32 sysreg access
-  arm64: KVM: trap VM system registers until MMU and caches are ON
-  ARM: KVM: introduce kvm_p*d_addr_end
-  arm64: KVM: flush VM pages before letting the guest enable caches
-  ARM: KVM: force cache clean on page fault when caches are off
-  ARM: KVM: fix handling of trapped 64bit coprocessor accesses
-  ARM: KVM: fix ordering of 64bit coprocessor accesses
-  ARM: KVM: introduce per-vcpu HYP Configuration Register
-  ARM: KVM: add world-switch for AMAIR{0,1}
-  ARM: KVM: trap VM system registers until MMU and caches are ON
-  ARM: KVM: fix warning in mmu.c
-
- arch/arm/include/asm/kvm_arm.h   |   4 +-
- arch/arm/include/asm/kvm_asm.h   |   4 +-
- arch/arm/include/asm/kvm_host.h  |   9 ++--
- arch/arm/include/asm/kvm_mmu.h   |  29 +++++++++--
- arch/arm/kernel/asm-offsets.c    |   1 +
- arch/arm/kvm/coproc.c            |  84 +++++++++++++++++++++++-------
- arch/arm/kvm/coproc.h            |  14 +++--
- arch/arm/kvm/coproc_a15.c        |   2 +-
- arch/arm/kvm/coproc_a7.c         |   2 +-
- arch/arm/kvm/guest.c             |   1 +
- arch/arm/kvm/interrupts_head.S   |  21 +++++---
- arch/arm/kvm/mmu.c               | 110 ++++++++++++++++++++++++++++++++++++---
- arch/arm64/include/asm/kvm_arm.h |   3 +-
- arch/arm64/include/asm/kvm_asm.h |   3 +-
- arch/arm64/include/asm/kvm_mmu.h |  21 ++++++--
- arch/arm64/kvm/sys_regs.c        |  99 ++++++++++++++++++++++++++++++-----
- arch/arm64/kvm/sys_regs.h        |   2 +
- 17 files changed, 341 insertions(+), 68 deletions(-)
-
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index e2a8df4..64cb440d 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -129,9 +129,19 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 
+ struct kvm;
+ 
++#define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
++
++static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
++{
++	return (vcpu->arch.cp15[c1_SCTLR] & 0b101) == 0b101;
++}
++
+ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+ 					     unsigned long size)
+ {
++	if (!vcpu_has_cache_enabled(vcpu))
++		kvm_flush_dcache_to_poc((void *)hva, size);
++	
+ 	/*
+ 	 * If we are going to insert an instruction page and the icache is
+ 	 * either VIPT or PIPT, there is a potential problem where the host
+@@ -152,8 +162,6 @@ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+ 	}
+ }
+ 
+-#define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
+-
+ void stage2_flush_vm(struct kvm *kvm);
+ 
+ #endif	/* !__ASSEMBLY__ */
 -- 
 1.8.3.4
