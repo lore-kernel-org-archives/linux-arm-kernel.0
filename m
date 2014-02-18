@@ -1,51 +1,82 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 18 Feb 2014 10:42:05 -0700
-Subject: [PATCH 1/2] mfd: palmas: support IRQ inversion at the board level
-In-Reply-To: <20140217092658.GC17875@lee--X1>
-References: <1392415108-4365-1-git-send-email-swarren@wwwdotorg.org>
- <20140217092658.GC17875@lee--X1>
-Message-ID: <53039B6D.8080004@wwwdotorg.org>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Tue, 18 Feb 2014 18:44:08 +0100
+Subject: [BUG] Circular locking dependency - DRM/CMA/MM/hotplug/...
+In-Reply-To: <53036D51.2070502@samsung.com>
+References: <20140211183543.GK26684@n2100.arm.linux.org.uk>
+ <52FB9602.1000805@samsung.com>
+ <20140212163317.GQ26684@n2100.arm.linux.org.uk>
+ <53036D51.2070502@samsung.com>
+Message-ID: <xa1t8ut8wc2f.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/17/2014 02:26 AM, Lee Jones wrote:
->> From: Stephen Warren <swarren@nvidia.com>
+> On 2014-02-12 17:33, Russell King - ARM Linux wrote:
+>> What if we did these changes:
 >>
->> Some boards or SoCs have an inverter between the PMIC IRQ output pin and
->> the IRQ controller input signal.
+>> struct page *dma_alloc_from_contiguous(struct device *dev, int count,
+>>                                         unsigned int align)
+>> {
+>> ...
+>>          mutex_lock(&cma_mutex);
+>> ...
+>>          for (;;) {
+>>                  pageno = bitmap_find_next_zero_area(cma->bitmap, cma->count,
+>>                                                      start, count, mask);
+>>                  if (pageno >= cma->count)
+>>                          break;
 >>
->> The IRQ specifier in DT is meant to represent the IRQ flags at the input
->> to the IRQ controller.
->>
->> The Palmas HW's IRQ output has configurable polarity. The driver
->> currently selects the output polarity by querying the input polarity at
->> the IRQ controller. This works fine if the IRQ signal is routed directly
->> from the PMIC to the IRQ controller with no intervening logic. However,
->> if the signal is inverted between the two, this automatic polarity
->> selection gets the wrong answer.
->>
->> Add an additional optional DT and platform data parameter which indicates
->> that such an inversion occurs. If this option is enabled, the Palmas
->> driver will configure its IRQ output to the opposite polarity of the IRQ
->> controller's input.
->>
->> An alternative would have been to add a new non-optional DT parameter to
->> indicate the exact desired output polarity. However, this would have been
->> an incompatible change to the DT binding.
->>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->> If this patch could be applied to its own branch (w/ signed tag) in the
->> MFD tree, that would great; then I can pull patch 1/2 into the Tegra tree
->> so that I can apply patch 2/2 to the Tegra tree. Thanks.
->> ---
->>  Documentation/devicetree/bindings/mfd/palmas.txt | 6 ++++++
->>  drivers/mfd/palmas.c                             | 4 ++++
->>  include/linux/mfd/palmas.h                       | 1 +
->>  3 files changed, 11 insertions(+)
-> 
-> For the core changes:
->   Acked-by: Lee Jones <lee.jones@linaro.org>
+>>                  pfn = cma->base_pfn + pageno;
+>> +               bitmap_set(cma->bitmap, pageno, count);
+>> +               mutex_unlock(&cma_mutex);
+>>                  ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
+>> +               mutex_lock(&cma_mutex);
+>>                  if (ret == 0) {
+>> -                       bitmap_set(cma->bitmap, pageno, count);
+>>                          page = pfn_to_page(pfn);
+>>                          break;
+>> -               } else if (ret != -EBUSY) {
+>> +		}
+>> +		bitmap_clear(cma->bitmap, pageno, count);
+>> +		if (ret != -EBUSY) {
+>>                          break;
+>>                  }
+>> ...
+>>          mutex_unlock(&cma_mutex);
+>>          pr_debug("%s(): returned %p\n", __func__, page);
+>>          return page;
+>> }
 
-Thanks. Since you ack'd this and are an MFD maintainer, was that an
-indication that I should take this patch through the Tegra tree?
+Like Marek said, this will fail if two concurrent calls to
+alloc_contig_range are made such that they operate on the same pageblock
+(which is possible as the allocated regions do not need to be pageblock
+aligned).
+
+Another mutex could be added just for this one call, but as I understand
+this would not solve the problem.
+
+>> bool dma_release_from_contiguous(struct device *dev, struct page *pages,
+>>                                   int count)
+>> {
+>> ...
+>> +       free_contig_range(pfn, count);
+>>          mutex_lock(&cma_mutex);
+>>          bitmap_clear(cma->bitmap, pfn - cma->base_pfn, count);
+>> -       free_contig_range(pfn, count);
+>>          mutex_unlock(&cma_mutex);
+>> ...
+>> }
+
+This *should* be fine.  Didn't test it.
+
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
+ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 835 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/d68d0a91/attachment-0001.sig>
