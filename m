@@ -1,37 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Feb 2014 19:43:21 +0100
-Subject: [PATCH v2 05/23] ARM: Kirkwood: Seperate board-dt from common and
- pcie code.
-In-Reply-To: <20140218183746.GH29304@obsidianresearch.com>
-References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
- <20140215140505.GB26088@lunn.ch>
- <20140218183746.GH29304@obsidianresearch.com>
-Message-ID: <2739928.UWFnYz3xQ3@wuerfel>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 18 Feb 2014 19:43:27 +0100
+Subject: [PATCH V3 11/17] i2c: nomadik: Convert to devm functions
+In-Reply-To: <CAPDyKFpRaAAer00dqcXR-qOT9S8-SDTnaMUHRwWCZ93w-wnTDA@mail.gmail.com>
+References: <1392650418-14820-1-git-send-email-ulf.hansson@linaro.org>
+ <20140218110109.GA18768@katana>
+ <CAPDyKFpRaAAer00dqcXR-qOT9S8-SDTnaMUHRwWCZ93w-wnTDA@mail.gmail.com>
+Message-ID: <20140218184327.GF18768@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 February 2014 11:37:46 Jason Gunthorpe wrote:
+
+> I added the IS_ERR, check as you suggested. That caused a rebase of
+> the other patches as well.
 > 
-> No idea of the history, but for DMA heavy work loads write-through is
-> better since you spend less cpu cycles doing cache flushing, while for
-> CPU centric work loads write-back is better since you spend less time
-> waiting for memory.
-> 
-> Since these SOCs are popular for storage and networking apps I'm not
-> surprised to see this option.
+> Sorry if it was unclear.
 
-Ok, that makes much more sense than anything I could come up with ;-)
+No problem. I am about to apply all patches except 17 as you suggested.
+It fails here, however, although I applied Linus' patch first. What
+exactly is your base? Any chance to publish your branch?
 
-> But a static config option is not really in-line with current thinking
-> on these sorts of things. A DT option would be better (IMHO), but even
-> that is probably not going to be universally loved.
-
-One of the later patches actually introduced a DT property for
-it, but the implementation of that seemed incomplete, so the current
-plan is to keep the Kconfig option for now.
-
-> Can we worry about this after Andrew's shuffling is done?
-
-Sure.
-
-	Arnd
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/a90a39ec/attachment.sig>
