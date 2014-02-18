@@ -1,67 +1,50 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Tue, 18 Feb 2014 10:33:21 -0600
-Subject: [PATCH v2] usb: phy: msm: fix compilation errors when
- !CONFIG_PM_SLEEP
-In-Reply-To: <20140218162407.GF9878@saruman.home>
-References: <87lhyemr3y.fsf@linaro.org>
- <1389981531-15539-1-git-send-email-joshc@codeaurora.org>
- <20140117182650.GZ8153@joshc.qualcomm.com>
- <20140218162407.GF9878@saruman.home>
-Message-ID: <20140218163321.GE31116@joshc.qualcomm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 18 Feb 2014 11:36:28 -0500
+Subject: [GIT PULL] ARM: mvebu soc changes for v3.15
+Message-ID: <20140218163628.GW7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 10:24:16AM -0600, Felipe Balbi wrote:
-> On Fri, Jan 17, 2014 at 12:26:50PM -0600, Josh Cartwright wrote:
-> > On Fri, Jan 17, 2014 at 11:58:51AM -0600, Josh Cartwright wrote:
-> > > Both the PM_RUNTIME and PM_SLEEP callbacks call into the common
-> > > msm_otg_{suspend,resume} routines, however these routines are only being
-> > > built when CONFIG_PM_SLEEP.  In addition, msm_otg_{suspend,resume} also
-> > > depends on msm_hsusb_config_vddcx(), which is only built when
-> > > CONFIG_PM_SLEEP.
-> > > 
-> > > Fix the CONFIG_PM_RUNTIME, !CONFIG_PM_SLEEP case by changing the
-> > > preprocessor conditional, and moving msm_hsusb_config_vddcx().
-> > > 
-> > > While we're here, eliminate the CONFIG_PM conditional for setting
-> > > up the dev_pm_ops.
-> > > 
-> > > This address the following errors Russell King has hit doing randconfig
-> > > builds:
-> > > 
-> > > drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_suspend':
-> > > drivers/usb/phy/phy-msm-usb.c:1691:2: error: implicit declaration of function 'msm_otg_suspend'
-> > > drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_resume':
-> > > drivers/usb/phy/phy-msm-usb.c:1699:2: error: implicit declaration of function 'msm_otg_resume'
-> > > 
-> > > Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
-> > > Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> > > ---
-> > > v1->v2: Change conditional to simply CONFIG_PM (thanks ccov and khilman!)
-> > > 
-> > >  drivers/usb/phy/phy-msm-usb.c | 57 ++++++++++++++++++++-----------------------
-> > >  1 file changed, 26 insertions(+), 31 deletions(-)
-> > > 
-> > > diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
-> > > index 8546c8d..5b169a7 100644
-> > > --- a/drivers/usb/phy/phy-msm-usb.c
-> > > +++ b/drivers/usb/phy/phy-msm-usb.c
-> > [..]
-> > > @@ -440,7 +414,32 @@ static int msm_otg_reset(struct usb_phy *phy)
-> > >  #define PHY_SUSPEND_TIMEOUT_USEC	(500 * 1000)
-> > >  #define PHY_RESUME_TIMEOUT_USEC	(100 * 1000)
-> > >  
-> > > -#ifdef CONFIG_PM_SLEEP
-> > > +#if CONFIG_PM
-> > 
-> > *sigh*.  This, of course, should have been #ifdef CONFIG_PM.  Fixed
-> > v3 below.
-> 
-> sorry, please git send-email it properly.
+All,
 
-No problem, will do.  FWIW, it's applicable with git am --scissors.
+A small round of changes that have been sitting in -next for a week or
+so.  Please pull.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+thx,
+
+Jason.
+
+
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.15
+
+for you to fetch changes up to 08bb3adfd3adeb4653095e7968b6a46cef940404:
+
+  ARM: mvebu: remove unneeded ->map_io field for Armada 370/XP (2014-02-11 19:33:04 +0000)
+
+----------------------------------------------------------------
+mvebu soc changes for v3.15
+
+ - mvebu
+    - Makefile cleanup and remove map_io
+    - use of_find_matching_node_and_match
+
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      ARM: mvebu: Makefile clean-up
+
+Josh Cartwright (1):
+      ARM: mvebu: make use of of_find_matching_node_and_match
+
+Thomas Petazzoni (1):
+      ARM: mvebu: remove unneeded ->map_io field for Armada 370/XP
+
+ arch/arm/mach-mvebu/Makefile            | 3 +--
+ arch/arm/mach-mvebu/armada-370-xp.c     | 6 ------
+ arch/arm/mach-mvebu/system-controller.c | 9 ++++-----
+ 3 files changed, 5 insertions(+), 13 deletions(-)
