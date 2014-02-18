@@ -1,51 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Feb 2014 15:49:30 +0000
-Subject: [PATCH V2] arm: mm: Remove hugetlb warning from Coherent DMA
- allocator
-In-Reply-To: <20140218154549.GA28193@linaro.org>
-References: <1389866863-24460-1-git-send-email-steve.capper@linaro.org>
- <20140218154549.GA28193@linaro.org>
-Message-ID: <20140218154930.GG21483@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 18 Feb 2014 16:51:28 +0100
+Subject: [PATCH] net: ethernet: remove unneeded dependency of mvneta and
+ update help text
+In-Reply-To: <20140218154512.GA10691@localhost>
+References: <1392719391-8851-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140218122952.GM7862@titan.lakedaemon.net>
+ <20140218134532.7607a616@skate>
+ <20140218125206.GN7862@titan.lakedaemon.net>
+ <20140218141303.77c77272@skate> <20140218135809.GD17984@lunn.ch>
+ <20140218151027.710ab2f3@skate> <20140218154512.GA10691@localhost>
+Message-ID: <20140218165128.5535a9ef@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 03:45:51PM +0000, Steve Capper wrote:
-> On Thu, Jan 16, 2014 at 10:07:43AM +0000, Steve Capper wrote:
-> > The Coherant DMA allocator allocates pages of high order then splits
-> > them up into smaller pages.
+Dear Ezequiel Garcia,
+
+On Tue, 18 Feb 2014 12:45:12 -0300, Ezequiel Garcia wrote:
+
+> > At the very end of the clean up, when even Orion5x support will be
+> > merged in mach-mvebu/, then we can certainly replace these dependencies
+> > by a "depends on ARCH_MVEBU". But for the time being, PLAT_ORION seems
+> > like the right common denominator for all these platforms.
 > > 
-> > This splitting logic would run into problems if the allocator was
-> > given compound pages. Thus the Coherant DMA allocator was originally
-> > incompatible with compound pages existing and, by extension, huge
-> > pages. A compile #error was put in place whenever huge pages were
-> > enabled.
-> > 
-> > Compatibility with compound pages has since been introduced by the
-> > following commit (which merely excludes GFP_COMP pages from being
-> > requested by the coherant DMA allocator):
-> >   ea2e705 ARM: 7172/1: dma: Drop GFP_COMP for DMA memory allocations
-> > 
-> > When huge page support was introduced to ARM, the compile #error in
-> > dma-mapping.c was replaced by a #warning when it should have been
-> > removed instead.
-> > 
-> > This patch removes the compile #warning in dma-mapping.c when huge
-> > pages are enabled.
-> > 
-> > Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> > ---
-> > Changed in V2: commit message completely re-written to give a better
-> > justification.
-> > ---
-> >  arch/arm/mm/dma-mapping.c | 3 ---
-> >  1 file changed, 3 deletions(-)
 > 
-> Would anyone object to this going into Russell's patch system?
+> Last time we talked about this with Sebastian and Andrew it was decided
+> that the right choice is:
+> 
+>   MACH_KIRKWOOD || MACH_DOVE || MACH_ARMADA_370_XP
 
-It's been a month, no one's objected, so please put it in the patch
-system anyway, thanks.
+And why not Orion5x and MV78xx0 ?
 
+> 
+> Which would become MACH_MVEBU.
+> 
+> Of course, this is near the nitpick boundary, so AFAIC you can leave
+> PLAT_ORION as in v2, if you feel like.
+
+As I suggested previously, PLAT_ORION is what *today* controls the
+visibility of all Marvell EBU drivers. Please grep for PLAT_ORION in
+your kernel tree. So why on earth would we invent something completely
+different for mvneta?
+
+When tomorrow ARCH_MVEBU will be used for all mvebu platforms, then
+indeed PLAT_ORION can be changed to ARCH_MVEBU.
+
+Your suggestion above to use MACH_ARMADA_370_XP is *precisely* what
+this patch is removing, because MACH_ARMADA_370_XP is being removed
+from arch/arm/mach-mvebu/.
+
+Thomas
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
