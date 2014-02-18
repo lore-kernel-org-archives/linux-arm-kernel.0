@@ -1,29 +1,22 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 18 Feb 2014 15:20:49 -0300
-Subject: PMIC driver prevents gpio-leds to work
-Message-ID: <CAOMZO5D0fa0yzwQbNLG_=oJ_8_WBBqWBF=D9QzSwLwC0jh+deQ@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 18 Feb 2014 11:21:42 -0700
+Subject: [PATCH v3 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <1392726043-31088-4-git-send-email-will.deacon@arm.com>
+References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
+ <1392726043-31088-4-git-send-email-will.deacon@arm.com>
+Message-ID: <20140218182142.GF29304@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Feb 18, 2014 at 12:20:43PM +0000, Will Deacon wrote:
+> +
+> +    // BUS_ADDRESS(3)  CPU_PHYSICAL(2)  SIZE(2)
+> +    ranges = <0x1000000 0x0 0x00000000  0x0 0x00000000  0x0 0x00010000>,
+                                           ^^^^^^^^^^^^^^
 
-I am running into the following issue on imx6sl-evk.dts:
+This probably shouldn't be 0 in the example, nor in your kvm tool
+output. For example purposes any value will do.
 
-- I can only get the user GPIO LED to work if I unselect the PFUZE100
-PMIC driver
-
-- This happens on linux-next as well as in the internal FSL kernel based on 3.10
-
-With CONFIG_REGULATOR_PFUZE100=y then the LED blinks only once and
-stops instead of blinking at the heartbeat rate.
-
-Changing to CONFIG_REGULATOR_PFUZE100=n then the LED blinks normally.
-
-I am not sure how the PMIC driver could interact and make the
-gpio-leds driver to fail.
-
-Any suggestions?
-
-Thanks,
-
-Fabio Estevam
+Regards,
+Jason
