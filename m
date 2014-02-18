@@ -1,38 +1,54 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 18 Feb 2014 12:45:09 +0100
-Subject: [PATCH RFC v2 00/35] Second preview of imx-drm cleanup series
-In-Reply-To: <20140210175625.GF26684@n2100.arm.linux.org.uk>
-References: <20140210122802.GS26684@n2100.arm.linux.org.uk>
- <1392045139.6687.31.camel@pizza.hi.pengutronix.de>
- <20140210151821.GY26684@n2100.arm.linux.org.uk>
- <CA+gwMcd+oMUpd2kNCVP4ojsKJtPwCXMgA2RsHT0+=p347n3ODw@mail.gmail.com>
- <20140210175625.GF26684@n2100.arm.linux.org.uk>
-Message-ID: <1392723909.3606.25.camel@pizza.hi.pengutronix.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 18 Feb 2014 11:47:29 +0000
+Subject: [PATCH RFC v4 1/3] Documentation: devicetree: psci: define CPU
+ suspend parameter
+In-Reply-To: <1392724051-11950-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1392724051-11950-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1392724051-11950-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+OS layers built on top of PSCI to enter low-power states require the
+power_state parameter to be passed to the PSCI CPU suspend method.
 
-Am Montag, den 10.02.2014, 17:56 +0000 schrieb Russell King - ARM Linux:
-> On Mon, Feb 10, 2014 at 06:37:26PM +0100, Philipp Zabel wrote:
-> > I'd like all of them to go through, too. If you don't want to have the DT
-> > changes integrated, I'd appreciate if you could have a  look at my
-> > patches on top of your series and possibly append them to your
-> > series or let me synchronize somehow:
-> > 
-> > http://archive.arm.linux.org.uk/lurker/message/20140106.145159.a1d82ba9.en.html
-> 
-> I replied to your 2nd patch there...
-> 
-> I'm not happy ending up with a hard dependency between v4l2 code and
-> code needed for the display side to work, especially when we can end
-> up with imx-drm being the primary console display.  I've outlined my
-> thoughts about what I think needs to happen in the reply to patch 2.
+This parameter is specific to a power state and platform specific,
+therefore must be provided by firmware to the OS in order to enable
+proper call sequence.
 
-Thanks for your comments there. I have just updated and resent this
-series ([RFC PATCH v3 0/9] imx-drm dt bindings), still with a temporary
-local copy of the v4l2_of functions, as long as the final resting place
-of the v4l2_of/of_graph functions seems to be a matter of discussion.
+This patch adds a property in the PSCI bindings that describes how
+the CPU suspend power_state parameter should be defined in DT in
+all device nodes that rely on PSCI CPU suspend method usage.
 
-regards
-Philipp
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ Documentation/devicetree/bindings/arm/psci.txt | 11 +++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index 433afe9..797c48f 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -42,6 +42,14 @@ Main node optional properties:
+ 
+  - migrate       : Function ID for MIGRATE operation
+ 
++Device tree nodes that require usage of PSCI CPU_SUSPEND function (ie idle
++states bindings[1]) must specify the following properties:
++
++- entry-method-param
++		Usage: Required for idle states bindings [1].
++		Value type: <u32>
++		Definition: power_state parameter to pass to the PSCI
++			    suspend call.
+ 
+ Example:
+ 
+@@ -53,3 +61,6 @@ Example:
+ 		cpu_on		= <0x95c10002>;
+ 		migrate		= <0x95c10003>;
+ 	};
++
++[1] Kernel documentation - ARM idle states bindings
++    Documentation/devicetree/bindings/arm/idle-states.txt
+-- 
+1.8.4
