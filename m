@@ -1,150 +1,107 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 18 Feb 2014 15:27:11 +0000
-Subject: [PATCH 1/5] mm: hugetlb: Introduce huge_pte_{page,present,young}
-In-Reply-To: <1392737235-27286-1-git-send-email-steve.capper@linaro.org>
-References: <1392737235-27286-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1392737235-27286-2-git-send-email-steve.capper@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 18 Feb 2014 15:27:25 +0000
+Subject: [PATCH v4 04/12] ARM: KVM: introduce kvm_p*d_addr_end
+In-Reply-To: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
+References: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1392737253-10480-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce huge pte versions of pte_page, pte_present and pte_young.
-This allows ARM (without LPAE) to use alternative pte processing logic
-for huge ptes.
+The use of p*d_addr_end with stage-2 translation is slightly dodgy,
+as the IPA is 40bits, while all the p*d_addr_end helpers are
+taking an unsigned long (arm64 is fine with that as unligned long
+is 64bit).
 
-Where these functions are not defined by architectural code they
-fallback to the standard functions.
+The fix is to introduce 64bit clean versions of the same helpers,
+and use them in the stage-2 page table code.
 
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/hugetlb.h | 12 ++++++++++++
- mm/hugetlb.c            | 22 +++++++++++-----------
- 2 files changed, 23 insertions(+), 11 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   | 13 +++++++++++++
+ arch/arm/kvm/mmu.c               | 10 +++++-----
+ arch/arm64/include/asm/kvm_mmu.h |  4 ++++
+ 3 files changed, 22 insertions(+), 5 deletions(-)
 
-diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
-index 8c43cc4..4992487 100644
---- a/include/linux/hugetlb.h
-+++ b/include/linux/hugetlb.h
-@@ -353,6 +353,18 @@ static inline pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index f997b9e..88bba33 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -114,6 +114,19 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 	pmd_val(*pmd) |= L_PMD_S2_RDWR;
  }
- #endif
  
-+#ifndef huge_pte_page
-+#define huge_pte_page(pte)	pte_page(pte)
-+#endif
++/* Open coded p*d_addr_end that can deal with 64bit addresses */
++#define kvm_pgd_addr_end(addr, end)					\
++({	u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;		\
++	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
++})
 +
-+#ifndef huge_pte_present
-+#define huge_pte_present(pte)	pte_present(pte)
-+#endif
++#define kvm_pud_addr_end(addr,end)		(end)
 +
-+#ifndef huge_pte_mkyoung
-+#define huge_pte_mkyoung(pte)	pte_mkyoung(pte)
-+#endif
++#define kvm_pmd_addr_end(addr, end)					\
++({	u64 __boundary = ((addr) + PMD_SIZE) & PMD_MASK;		\
++	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
++})
 +
- static inline struct hstate *page_hstate(struct page *page)
- {
- 	VM_BUG_ON_PAGE(!PageHuge(page), page);
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index c01cb9f..d1a38c9 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -2319,7 +2319,7 @@ static pte_t make_huge_pte(struct vm_area_struct *vma, struct page *page,
- 		entry = huge_pte_wrprotect(mk_huge_pte(page,
- 					   vma->vm_page_prot));
- 	}
--	entry = pte_mkyoung(entry);
-+	entry = huge_pte_mkyoung(entry);
- 	entry = pte_mkhuge(entry);
- 	entry = arch_make_huge_pte(entry, vma, page, writable);
+ struct kvm;
  
-@@ -2379,7 +2379,7 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
- 			if (cow)
- 				huge_ptep_set_wrprotect(src, addr, src_pte);
- 			entry = huge_ptep_get(src_pte);
--			ptepage = pte_page(entry);
-+			ptepage = huge_pte_page(entry);
- 			get_page(ptepage);
- 			page_dup_rmap(ptepage);
- 			set_huge_pte_at(dst, addr, dst_pte, entry);
-@@ -2398,7 +2398,7 @@ static int is_hugetlb_entry_migration(pte_t pte)
- {
- 	swp_entry_t swp;
- 
--	if (huge_pte_none(pte) || pte_present(pte))
-+	if (huge_pte_none(pte) || huge_pte_present(pte))
- 		return 0;
- 	swp = pte_to_swp_entry(pte);
- 	if (non_swap_entry(swp) && is_migration_entry(swp))
-@@ -2411,7 +2411,7 @@ static int is_hugetlb_entry_hwpoisoned(pte_t pte)
- {
- 	swp_entry_t swp;
- 
--	if (huge_pte_none(pte) || pte_present(pte))
-+	if (huge_pte_none(pte) || huge_pte_present(pte))
- 		return 0;
- 	swp = pte_to_swp_entry(pte);
- 	if (non_swap_entry(swp) && is_hwpoison_entry(swp))
-@@ -2464,7 +2464,7 @@ again:
- 			goto unlock;
+ static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 415fd63..7f84116 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -145,7 +145,7 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+ 		pgd = pgdp + pgd_index(addr);
+ 		pud = pud_offset(pgd, addr);
+ 		if (pud_none(*pud)) {
+-			addr = pud_addr_end(addr, end);
++			addr = kvm_pud_addr_end(addr, end);
+ 			continue;
  		}
  
--		page = pte_page(pte);
-+		page = huge_pte_page(pte);
- 		/*
- 		 * If a reference page is supplied, it is because a specific
- 		 * page is being unmapped, not a range. Ensure the page we
-@@ -2614,7 +2614,7 @@ static int hugetlb_cow(struct mm_struct *mm, struct vm_area_struct *vma,
- 	unsigned long mmun_start;	/* For mmu_notifiers */
- 	unsigned long mmun_end;		/* For mmu_notifiers */
- 
--	old_page = pte_page(pte);
-+	old_page = huge_pte_page(pte);
- 
- retry_avoidcopy:
- 	/* If no-one else is actually using this page, avoid the copy
-@@ -2965,7 +2965,7 @@ int hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
- 	 * Note that locking order is always pagecache_page -> page,
- 	 * so no worry about deadlock.
- 	 */
--	page = pte_page(entry);
-+	page = huge_pte_page(entry);
- 	get_page(page);
- 	if (page != pagecache_page)
- 		lock_page(page);
-@@ -2985,7 +2985,7 @@ int hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
- 		}
- 		entry = huge_pte_mkdirty(entry);
- 	}
--	entry = pte_mkyoung(entry);
-+	entry = huge_pte_mkyoung(entry);
- 	if (huge_ptep_set_access_flags(vma, address, ptep, entry,
- 						flags & FAULT_FLAG_WRITE))
- 		update_mmu_cache(vma, address, ptep);
-@@ -3077,7 +3077,7 @@ long follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
+@@ -155,13 +155,13 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+ 			 * move on.
+ 			 */
+ 			clear_pud_entry(kvm, pud, addr);
+-			addr = pud_addr_end(addr, end);
++			addr = kvm_pud_addr_end(addr, end);
+ 			continue;
  		}
  
- 		pfn_offset = (vaddr & ~huge_page_mask(h)) >> PAGE_SHIFT;
--		page = pte_page(huge_ptep_get(pte));
-+		page = huge_pte_page(huge_ptep_get(pte));
- same_page:
- 		if (pages) {
- 			pages[i] = mem_map_offset(page, pfn_offset);
-@@ -3425,7 +3425,7 @@ follow_huge_pmd(struct mm_struct *mm, unsigned long address,
- {
- 	struct page *page;
+ 		pmd = pmd_offset(pud, addr);
+ 		if (pmd_none(*pmd)) {
+-			addr = pmd_addr_end(addr, end);
++			addr = kvm_pmd_addr_end(addr, end);
+ 			continue;
+ 		}
  
--	page = pte_page(*(pte_t *)pmd);
-+	page = huge_pte_page(*(pte_t *)pmd);
- 	if (page)
- 		page += ((address & ~PMD_MASK) >> PAGE_SHIFT);
- 	return page;
-@@ -3437,7 +3437,7 @@ follow_huge_pud(struct mm_struct *mm, unsigned long address,
- {
- 	struct page *page;
+@@ -176,10 +176,10 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+ 		 */
+ 		if (kvm_pmd_huge(*pmd) || page_empty(pte)) {
+ 			clear_pmd_entry(kvm, pmd, addr);
+-			next = pmd_addr_end(addr, end);
++			next = kvm_pmd_addr_end(addr, end);
+ 			if (page_empty(pmd) && !page_empty(pud)) {
+ 				clear_pud_entry(kvm, pud, addr);
+-				next = pud_addr_end(addr, end);
++				next = kvm_pud_addr_end(addr, end);
+ 			}
+ 		}
  
--	page = pte_page(*(pte_t *)pud);
-+	page = huge_pte_page(*(pte_t *)pud);
- 	if (page)
- 		page += ((address & ~PUD_MASK) >> PAGE_SHIFT);
- 	return page;
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index c04b419..19cb328 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -121,6 +121,10 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 	pmd_val(*pmd) |= PMD_S2_RDWR;
+ }
+ 
++#define kvm_pgd_addr_end(addr, end)	pgd_addr_end(addr, end)
++#define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
++#define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
++
+ struct kvm;
+ 
+ #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
 -- 
-1.8.1.4
+1.8.3.4
