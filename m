@@ -1,42 +1,58 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 18 Feb 2014 07:52:06 -0500
-Subject: [PATCH] net: ethernet: remove unneeded dependency of mvneta
- and update help text
-In-Reply-To: <20140218134532.7607a616@skate>
-References: <1392719391-8851-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140218122952.GM7862@titan.lakedaemon.net>
- <20140218134532.7607a616@skate>
-Message-ID: <20140218125206.GN7862@titan.lakedaemon.net>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 18 Feb 2014 12:55:42 +0000
+Subject: [PATCH] NET: fec: only enable napi if we are successful
+Message-ID: <E1WFkD8-0004pj-Pr@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 01:45:32PM +0100, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
-> 
-> On Tue, 18 Feb 2014 07:29:52 -0500, Jason Cooper wrote:
-> 
-> > >  config MVNETA
-> > > -	tristate "Marvell Armada 370/XP network interface support"
-> > > -	depends on MACH_ARMADA_370_XP
-> > 
-> > Have you build-tested this on the usual fail scenarios?  eg x86_64,
-> > powerpc, s390, allno, allyes, allmod, etc?
-> > 
-> > I think you might be opening up pandora's box here without needing to.
-> > :)
-> 
-> No, I haven't tested all the build scenarios of course. If you feel
-> that this is too dangerous, I can resend a patch that replaces 'depends
-> on ARMADA_370_XP' by 'depends on PLAT_ORION'. Would this be OK for you?
+If napi is left enabled after a failed attempt to bring the interface
+up, we BUG:
 
-I'm fine either way.  I'm definitely a "What's in the box?" kind of guy.
-But I do like being prepared.
+fec 2188000.ethernet eth0: no PHY, assuming direct connection to switch
+libphy: PHY fixed-0:00 not found
+fec 2188000.ethernet eth0: could not attach to PHY
+------------[ cut here ]------------
+kernel BUG at include/linux/netdevice.h:502!
+Internal error: Oops - BUG: 0 [#1] SMP ARM
+...
+PC is at fec_enet_open+0x4d0/0x500
+LR is at __dev_open+0xa4/0xfc
 
-The real question is: Do you think this IP block will ever be found on
-anything other than Marvell Armada boards?  If so, stick with this
-version and build test the crap out of it.  Otherwise, let's save
-opening the box for another day.
+Only enable napi after we are past all the failure paths.
 
-thx,
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+No individual is apparently listed as a maintainer for this driver, so
+I'm just guesing...
 
-Jason.
+I noticed this error when there were other problems with the driver
+which resulted in the phy not being found, but it would be a good idea
+to fix this error too.
+
+ drivers/net/ethernet/freescale/fec_main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index d4782b42401b..903362a7b584 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -1778,8 +1778,6 @@ fec_enet_open(struct net_device *ndev)
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+ 	int ret;
+ 
+-	napi_enable(&fep->napi);
+-
+ 	/* I should reset the ring buffers here, but I don't yet know
+ 	 * a simple way to do that.
+ 	 */
+@@ -1794,6 +1792,8 @@ fec_enet_open(struct net_device *ndev)
+ 		fec_enet_free_buffers(ndev);
+ 		return ret;
+ 	}
++
++	napi_enable(&fep->napi);
+ 	phy_start(fep->phy_dev);
+ 	netif_start_queue(ndev);
+ 	fep->opened = 1;
+-- 
+1.8.3.1
