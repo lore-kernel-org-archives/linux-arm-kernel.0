@@ -1,22 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Feb 2014 15:41:02 +0000
-Subject: [PATCH v4 04/12] ARM: KVM: introduce kvm_p*d_addr_end
-In-Reply-To: <1392737253-10480-5-git-send-email-marc.zyngier@arm.com>
-References: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
- <1392737253-10480-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140218154101.GC904@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Feb 2014 15:41:39 +0000
+Subject: [PATCH v3 2/3] ARM: bios32: use pci_enable_resource to enable
+ PCI resources
+In-Reply-To: <1392726043-31088-3-git-send-email-will.deacon@arm.com>
+References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
+ <1392726043-31088-3-git-send-email-will.deacon@arm.com>
+Message-ID: <20140218154139.GF21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 03:27:25PM +0000, Marc Zyngier wrote:
-> The use of p*d_addr_end with stage-2 translation is slightly dodgy,
-> as the IPA is 40bits, while all the p*d_addr_end helpers are
-> taking an unsigned long (arm64 is fine with that as unligned long
-> is 64bit).
+On Tue, Feb 18, 2014 at 12:20:42PM +0000, Will Deacon wrote:
+> This patch moves bios32 over to using the generic code for enabling PCI
+> resources. Since the core code takes care of bridge resources too, we
+> can also drop the explicit IO and MEMORY enabling for them in the arch
+> code.
 > 
-> The fix is to introduce 64bit clean versions of the same helpers,
-> and use them in the stage-2 page table code.
+> A side-effect of this change is that we no longer explicitly enable
+> devices when running in PCI_PROBE_ONLY mode. This stays closer to the
+> meaning of the option and prevents us from trying to enable devices
+> without any assigned resources (the core code refuses to enable
+> resources without parents).
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Tested-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> Tested-by: Jingoo Han <jg1.han@samsung.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Tested acceptably fine here with crudbus-from-hell.
+
+Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
