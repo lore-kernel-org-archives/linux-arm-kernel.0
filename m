@@ -1,68 +1,94 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 18 Feb 2014 14:55:37 +0000
-Subject: [PATCH 10/35] mtd: st_spi_fsm: Search for preferred FSM message
- sequence configurations
+Date: Tue, 18 Feb 2014 14:55:36 +0000
+Subject: [PATCH 09/35] mtd: st_spi_fsm: Dynamically setup flash device based
+ on JEDEC ID
 In-Reply-To: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
 References: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1392735362-1245-11-git-send-email-lee.jones@linaro.org>
+Message-ID: <1392735362-1245-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we provide a means to traverse though all supplied FSM message
-sequence configurations and pick one based on our chip's capabilities.
-The first one we match will be the preferred one, as they are
-presented in order of preference.
+Using previously added infrastructure we can now extract a device's JEDEC
+ID, compare it to a list of known and supported devices and make assumptions
+based on known characteristics of a given chip.
 
 Acked-by Angus Clark <angus.clark@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 90fbd64..68fa12e 100644
+index bc5ed352..90fbd64 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -222,6 +222,18 @@ struct stfsm_seq {
- 	uint32_t seq_cfg;
- } __packed __aligned(4);
+@@ -204,6 +204,7 @@ struct stfsm {
+ 	struct resource		*region;
+ 	struct mtd_info		mtd;
+ 	struct mutex		lock;
++	struct flash_info       *info;
  
-+/* Parameters to configure a READ or WRITE FSM sequence */
-+struct seq_rw_config {
-+	uint32_t        flags;          /* flags to support config */
-+	uint8_t         cmd;            /* FLASH command */
-+	int             write;          /* Write Sequence */
-+	uint8_t         addr_pads;      /* No. of addr pads (MODE & DUMMY) */
-+	uint8_t         data_pads;      /* No. of data pads */
-+	uint8_t         mode_data;      /* MODE data */
-+	uint8_t         mode_cycles;    /* No. of MODE cycles */
-+	uint8_t         dummy_cycles;   /* No. of DUMMY cycles */
-+};
+ 	uint32_t                fifo_dir_delay;
+ };
+@@ -477,6 +478,7 @@ static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
+ 
+ static struct flash_info *stfsm_jedec_probe(struct stfsm *fsm)
+ {
++	struct flash_info	*info;
+ 	u16                     ext_jedec;
+ 	u32			jedec;
+ 	u8			id[5];
+@@ -494,6 +496,15 @@ static struct flash_info *stfsm_jedec_probe(struct stfsm *fsm)
+ 	dev_dbg(fsm->dev, "JEDEC =  0x%08x [%02x %02x %02x %02x %02x]\n",
+ 		jedec, id[0], id[1], id[2], id[3], id[4]);
+ 
++	for (info = flash_types; info->name; info++) {
++		if (info->jedec_id == jedec) {
++			if (info->ext_id && info->ext_id != ext_jedec)
++				continue;
++			return info;
++		}
++	}
++	dev_err(fsm->dev, "Unrecognized JEDEC id %06x\n", jedec);
 +
- /* SPI Flash Device Table */
- struct flash_info {
- 	char            *name;
-@@ -462,6 +474,21 @@ static void stfsm_read_fifo(struct stfsm *fsm, uint32_t *buf,
- 	}
+ 	return NULL;
  }
  
-+/* Search for preferred configuration based on available flags */
-+static struct seq_rw_config *
-+stfsm_search_seq_rw_configs(struct stfsm *fsm,
-+			    struct seq_rw_config cfgs[])
-+{
-+	struct seq_rw_config *config;
-+	int flags = fsm->info->flags;
-+
-+	for (config = cfgs; config->cmd != 0; config++)
-+		if ((config->flags & flags) == config->flags)
-+			return config;
-+
-+	return NULL;
-+}
-+
- static void stfsm_read_jedec(struct stfsm *fsm, uint8_t *const jedec)
+@@ -588,6 +599,7 @@ static int stfsm_init(struct stfsm *fsm)
+ static int stfsm_probe(struct platform_device *pdev)
  {
- 	const struct stfsm_seq *seq = &stfsm_seq_read_jedec;
+ 	struct device_node *np = pdev->dev.of_node;
++	struct flash_info *info;
+ 	struct resource *res;
+ 	struct stfsm *fsm;
+ 	int ret;
+@@ -626,7 +638,10 @@ static int stfsm_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* Detect SPI FLASH device */
+-	stfsm_jedec_probe(fsm);
++	info = stfsm_jedec_probe(fsm);
++	if (!info)
++		return -ENODEV;
++	fsm->info = info;
+ 
+ 	platform_set_drvdata(pdev, fsm);
+ 
+@@ -635,6 +650,15 @@ static int stfsm_probe(struct platform_device *pdev)
+ 	fsm->mtd.writesize	= 4;
+ 	fsm->mtd.writebufsize	= fsm->mtd.writesize;
+ 	fsm->mtd.flags		= MTD_CAP_NORFLASH;
++	fsm->mtd.size		= info->sector_size * info->n_sectors;
++	fsm->mtd.erasesize	= info->sector_size;
++
++	dev_err(&pdev->dev,
++		"Found serial flash device: %s\n"
++		" size = %llx (%lldMiB) erasesize = 0x%08x (%uKiB)\n",
++		info->name,
++		(long long)fsm->mtd.size, (long long)(fsm->mtd.size >> 20),
++		fsm->mtd.erasesize, (fsm->mtd.erasesize >> 10));
+ 
+ 	return mtd_device_parse_register(&fsm->mtd, NULL, NULL, NULL, 0);
+ }
 -- 
 1.8.3.2
