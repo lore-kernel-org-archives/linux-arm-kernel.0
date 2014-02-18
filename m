@@ -1,120 +1,39 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Tue, 18 Feb 2014 20:06:45 +0530
-Subject: [PATCH V2 1/2] mmc: omap_hsmmc: Add support for quirky omap3
- hsmmc controller
-In-Reply-To: <1392356749-32091-2-git-send-email-nm@ti.com>
-References: <1392356749-32091-1-git-send-email-nm@ti.com>
- <1392356749-32091-2-git-send-email-nm@ti.com>
-Message-ID: <53036FFD.1040008@ti.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 18 Feb 2014 22:37:46 +0800
+Subject: [PATCH v4 5/5] ACPI: Replace printk with pr_* in tables.c
+In-Reply-To: <1392732373.22752.22.camel@joe-AO722>
+References: <1392731700-10992-1-git-send-email-hanjun.guo@linaro.org>
+ <1392731700-10992-6-git-send-email-hanjun.guo@linaro.org>
+ <1392732373.22752.22.camel@joe-AO722>
+Message-ID: <5303703A.8060002@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 February 2014 11:15 AM, Nishanth Menon wrote:
-> When device is booted using devicetree, platforms impacted by Erratum
-> 2.1.1.128 is not detected easily in the mmc driver. This erratum
-> indicates that the module cannot do multi-block transfers. Platforms
-> such as LDP which use OMAP3 ES revision prior to ES3.0 are impacted by
-> this.
+On 2014?02?18? 22:06, Joe Perches wrote:
+> On Tue, 2014-02-18 at 21:55 +0800, Hanjun Guo wrote:
+>> This patch just do some clean up to replace printk with pr_*,
+>> no functional change.
+> trivial note:
 >
-> Provide a new compatible property "ti,omap3-pre-es3-hsmmc" to allow
-> driver to determine if driver needs to implement quirks associated
-> with the specific module version (primarily because the IP revision
-> information is not sufficient for the same).
+>> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+> []
+>> @@ -55,8 +55,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>>   		{
+>>   			struct acpi_madt_local_apic *p =
+>>   			    (struct acpi_madt_local_apic *)header;
+>> -			printk(KERN_INFO PREFIX
+>> -			       "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+>> +			pr_info(PREFIX "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+>>   			       p->processor_id, p->id,
+>>   			       (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+> It'd be nice to realign the additional lines to the open
+> parenthesis, here and everywhere else in this patch
 >
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> 			pr_info(PREFIX "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+> 				p->processor_id, p->id,
+> 				(p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
 
-looks good to me
-Acked-by: Balaji T K <balajitk@ti.com>
+Thanks for your comments, will update patch 1/5 and 5/5 follow your 
+suggestion :)
 
-> ---
-> Changes since v1:
-> 	- new compatible flag as suggested by Tony which contains
-> 	  the relevant controller flag to work around the erratum
->
-> V1: https://patchwork.kernel.org/patch/3514851/
->
->   .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |    1 +
->   drivers/mmc/host/omap_hsmmc.c                      |   26 +++++++++++++++++---
->   2 files changed, 23 insertions(+), 4 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> index 8c8908a..ce80561 100644
-> --- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> @@ -10,6 +10,7 @@ Required properties:
->   - compatible:
->    Should be "ti,omap2-hsmmc", for OMAP2 controllers
->    Should be "ti,omap3-hsmmc", for OMAP3 controllers
-> + Should be "ti,omap3-pre-es3-hsmmc" for OMAP3 controllers pre ES3.0
->    Should be "ti,omap4-hsmmc", for OMAP4 controllers
->   - ti,hwmods: Must be "mmc<n>", n is controller instance starting 1
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 575f9cc..390f421 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -192,6 +192,11 @@ struct omap_hsmmc_host {
->   	struct	omap_mmc_platform_data	*pdata;
->   };
->
-> +struct omap_mmc_of_data {
-> +	u32 reg_offset;
-> +	u8 controller_flags;
-> +};
-> +
->   static int omap_hsmmc_card_detect(struct device *dev, int slot)
->   {
->   	struct omap_hsmmc_host *host = dev_get_drvdata(dev);
-> @@ -1678,18 +1683,29 @@ static void omap_hsmmc_debugfs(struct mmc_host *mmc)
->   #endif
->
->   #ifdef CONFIG_OF
-> -static u16 omap4_reg_offset = 0x100;
-> +static const struct omap_mmc_of_data omap3_pre_es3_mmc_of_data = {
-> +	/* See 35xx errata 2.1.1.128 in SPRZ278F */
-> +	.controller_flags = OMAP_HSMMC_BROKEN_MULTIBLOCK_READ,
-> +};
-> +
-> +static const struct omap_mmc_of_data omap4_mmc_of_data = {
-> +	.reg_offset = 0x100,
-> +};
->
->   static const struct of_device_id omap_mmc_of_match[] = {
->   	{
->   		.compatible = "ti,omap2-hsmmc",
->   	},
->   	{
-> +		.compatible = "ti,omap3-pre-es3-hsmmc",
-> +		.data = &omap3_pre_es3_mmc_of_data,
-> +	},
-> +	{
->   		.compatible = "ti,omap3-hsmmc",
->   	},
->   	{
->   		.compatible = "ti,omap4-hsmmc",
-> -		.data = &omap4_reg_offset,
-> +		.data = &omap4_mmc_of_data,
->   	},
->   	{},
->   };
-> @@ -1759,6 +1775,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
->   	dma_cap_mask_t mask;
->   	unsigned tx_req, rx_req;
->   	struct pinctrl *pinctrl;
-> +	const struct omap_mmc_of_data *data;
->
->   	match = of_match_device(of_match_ptr(omap_mmc_of_match), &pdev->dev);
->   	if (match) {
-> @@ -1768,8 +1785,9 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
->   			return PTR_ERR(pdata);
->
->   		if (match->data) {
-> -			const u16 *offsetp = match->data;
-> -			pdata->reg_offset = *offsetp;
-> +			data = match->data;
-> +			pdata->reg_offset = data->reg_offset;
-> +			pdata->controller_flags |= data->controller_flags;
->   		}
->   	}
->
->
+Hanjun
