@@ -1,20 +1,27 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 18 Feb 2014 20:10:02 +0000
-Subject: [PATCH 05/34] imx-drm: imx-hdmi: fix CTS/N setup at init time
+Date: Tue, 18 Feb 2014 20:10:07 +0000
+Subject: [PATCH 06/34] imx-drm: ipu-v3: more inteligent DI clock selection
 In-Reply-To: <20140218200900.GM21483@n2100.arm.linux.org.uk>
 References: <20140218200900.GM21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WFqzS-0007iO-8V@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WFqzX-0007iS-CH@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many of the variables for the audio clock regenerator (CTS/N) were not
-initialised in any way.  The pixel rate which was being used also
-wasn't being adjusted at all when the display mode is modified.
+The DI clock selection was very rudimentary: it would statically use
+either the IPU internal clock or the DI external clock depending on
+which "encoder" was being used.  In the case of HDMI, it would always
+use the IPU clock.
 
-Get rid of the seaprate 'pixel_clk_rate', and use the stored pixel
-clock rate instead.  Pass this desired pixel clock rate into
-hdmi_set_clk_regenerator().  Collapse down hdmi_init_clk_regenerator()
-since it is a copy of hdmi_set_clk_regenerator(), and pass a default
+Moreover, using the IPU clock resulted in fractional divisors, which
+are achieved by skipping clock pulses.  This can result in the HDMI
+PHY PLL being frequency modulated, and the attached device is then
+unable to properly lock on to the TMDS clock.
+
+We need at least 1% accurate and stable clocks for HDMI.
+
+Arrange for the DI clock to be sourced from the IPU internal clock
+if it can satisfy our requirements, otherwise switch to the DI
+external clock and try and set the external clock to our desired
 pixel clock rate.
 
 Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
@@ -22,105 +29,89 @@ Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-hdmi.c | 48 ++++++++------------------------------
- 1 file changed, 10 insertions(+), 38 deletions(-)
+ drivers/staging/imx-drm/ipu-v3/ipu-di.c | 54 +++++++++++++++++++++++++++++++--
+ 1 file changed, 52 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
-index ec5b5e2ada34..05cf8a07b456 100644
---- a/drivers/staging/imx-drm/imx-hdmi.c
-+++ b/drivers/staging/imx-drm/imx-hdmi.c
-@@ -134,7 +134,6 @@ struct imx_hdmi {
- 	struct i2c_adapter *ddc;
- 	void __iomem *regs;
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+index 948a49b289ef..8c7241bb435c 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+@@ -544,10 +544,48 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 	if ((sig->v_sync_width == 0) || (sig->h_sync_width == 0))
+ 		return -EINVAL;
  
--	unsigned long pixel_clk_rate;
- 	unsigned int sample_rate;
- 	int ratio;
- };
-@@ -328,34 +327,25 @@ static unsigned int hdmi_compute_cts(unsigned int freq, unsigned long pixel_clk,
- 		return (cts * ratio) / 100;
- }
++	dev_dbg(di->ipu->dev, "Clocks: IPU %luHz DI %luHz Needed %luHz\n",
++		clk_get_rate(di->clk_ipu),
++		clk_get_rate(di->clk_di),
++		sig->pixelclock);
++
++	/*
++	 * CLKMODE_EXT means we must use the DI clock: this is needed
++	 * for things like LVDS which needs to feed the DI and LDB with
++	 * the same pixel clock.
++	 *
++	 * For other interfaces, we can arbitarily select between the DI
++	 * specific clock and the internal IPU clock.  See DI_GENERAL
++	 * bit 20.  We select the IPU clock if it can give us a clock
++	 * rate within 1% of the requested frequency, otherwise we use
++	 * the DI clock.
++	 */
+ 	if (sig->clkflags & IPU_DI_CLKMODE_EXT)
+ 		parent = di->clk_di;
+-	else
+-		parent = di->clk_ipu;
++	else {
++		unsigned long rate, clkrate;
++		unsigned div, error;
++
++		clkrate = clk_get_rate(di->clk_ipu);
++		div = (clkrate + sig->pixelclock / 2) / sig->pixelclock;
++		rate = clkrate / div;
++
++		error = rate / (sig->pixelclock / 1000);
++
++		dev_dbg(di->ipu->dev, "  IPU clock can give %lu with divider %u, error %d.%u%%\n",
++			rate, div, (signed)(error - 1000) / 10, error % 10);
++
++		/* Allow a 1% error */
++		if (error < 1010 && error >= 990) {
++			parent = di->clk_ipu;
++		} else {
++			parent = di->clk_di;
++
++			ret = clk_set_rate(parent, sig->pixelclock);
++			if (ret)
++				dev_err(di->ipu->dev, "Setting of DI clock failed: %d\n", ret);
++		}
++	}
  
--static void hdmi_get_pixel_clk(struct imx_hdmi *hdmi)
--{
--	unsigned long rate;
--
--	rate = 65000000; /* FIXME */
--
--	if (rate)
--		hdmi->pixel_clk_rate = rate;
--}
--
--static void hdmi_set_clk_regenerator(struct imx_hdmi *hdmi)
-+static void hdmi_set_clk_regenerator(struct imx_hdmi *hdmi,
-+	unsigned long pixel_clk)
- {
- 	unsigned int clk_n, clk_cts;
- 
--	clk_n = hdmi_compute_n(hdmi->sample_rate, hdmi->pixel_clk_rate,
-+	clk_n = hdmi_compute_n(hdmi->sample_rate, pixel_clk,
- 			       hdmi->ratio);
--	clk_cts = hdmi_compute_cts(hdmi->sample_rate, hdmi->pixel_clk_rate,
-+	clk_cts = hdmi_compute_cts(hdmi->sample_rate, pixel_clk,
- 				   hdmi->ratio);
- 
- 	if (!clk_cts) {
- 		dev_dbg(hdmi->dev, "%s: pixel clock not supported: %lu\n",
--			 __func__, hdmi->pixel_clk_rate);
-+			 __func__, pixel_clk);
- 		return;
+ 	ret = clk_set_parent(di->clk_di_pixel, parent);
+ 	if (ret) {
+@@ -557,6 +595,11 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 		return ret;
  	}
  
- 	dev_dbg(hdmi->dev, "%s: samplerate=%d  ratio=%d  pixelclk=%lu  N=%d cts=%d\n",
- 		__func__, hdmi->sample_rate, hdmi->ratio,
--		hdmi->pixel_clk_rate, clk_n, clk_cts);
-+		pixel_clk, clk_n, clk_cts);
++	/*
++	 * CLKMODE_SYNC means that we want the DI to be clocked at the
++	 * same rate as the parent clock.  This is needed (eg) for LDB
++	 * which needs to be fed with the same pixel clock.
++	 */
+ 	if (sig->clkflags & IPU_DI_CLKMODE_SYNC)
+ 		round = clk_get_rate(parent);
+ 	else
+@@ -564,6 +607,13 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
  
- 	hdmi_set_clock_regenerator_n(hdmi, clk_n);
- 	hdmi_regenerate_cts(hdmi, clk_cts);
-@@ -363,32 +353,12 @@ static void hdmi_set_clk_regenerator(struct imx_hdmi *hdmi)
+ 	ret = clk_set_rate(di->clk_di_pixel, round);
  
- static void hdmi_init_clk_regenerator(struct imx_hdmi *hdmi)
- {
--	unsigned int clk_n, clk_cts;
--
--	clk_n = hdmi_compute_n(hdmi->sample_rate, hdmi->pixel_clk_rate,
--			       hdmi->ratio);
--	clk_cts = hdmi_compute_cts(hdmi->sample_rate, hdmi->pixel_clk_rate,
--				   hdmi->ratio);
--
--	if (!clk_cts) {
--		dev_dbg(hdmi->dev, "%s: pixel clock not supported: %lu\n",
--			 __func__, hdmi->pixel_clk_rate);
--		return;
--	}
--
--	dev_dbg(hdmi->dev, "%s: samplerate=%d  ratio=%d  pixelclk=%lu  N=%d cts=%d\n",
--		__func__, hdmi->sample_rate, hdmi->ratio,
--		hdmi->pixel_clk_rate, clk_n, clk_cts);
--
--	hdmi_set_clock_regenerator_n(hdmi, clk_n);
--	hdmi_regenerate_cts(hdmi, clk_cts);
-+	hdmi_set_clk_regenerator(hdmi, 74250000);
- }
- 
- static void hdmi_clk_regenerator_update_pixel_clock(struct imx_hdmi *hdmi)
- {
--	/* Get pixel clock from ipu */
--	hdmi_get_pixel_clk(hdmi);
--	hdmi_set_clk_regenerator(hdmi);
-+	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock);
- }
- 
- /*
-@@ -1636,6 +1606,8 @@ static int imx_hdmi_platform_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	hdmi->dev = &pdev->dev;
-+	hdmi->sample_rate = 48000;
-+	hdmi->ratio = 100;
- 
- 	if (of_id) {
- 		const struct platform_device_id *device_id = of_id->data;
++	dev_dbg(di->ipu->dev, "Want %luHz IPU %luHz DI %luHz using %s, got %luHz\n",
++		sig->pixelclock,
++		clk_get_rate(di->clk_ipu),
++		clk_get_rate(di->clk_di),
++		parent == di->clk_di ? "DI" : "IPU",
++		clk_get_rate(di->clk_di_pixel));
++
+ 	h_total = sig->width + sig->h_sync_width + sig->h_start_width +
+ 		sig->h_end_width;
+ 	v_total = sig->height + sig->v_sync_width + sig->v_start_width +
 -- 
 1.8.3.1
