@@ -1,308 +1,80 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 18 Feb 2014 20:09:41 +0000
-Subject: [PATCH 01/34] imx-drm: imx-hdmi: convert HDMI clock settings to
- tabular form
+Date: Tue, 18 Feb 2014 20:09:46 +0000
+Subject: [PATCH 02/34] imx-drm: imx-hdmi: clean up setting CSC registers
 In-Reply-To: <20140218200900.GM21483@n2100.arm.linux.org.uk>
 References: <20140218200900.GM21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WFqz7-0007hu-Ep@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WFqzC-0007hy-I6@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than having large if() and switch() statements, provide a table
-to look up the register settings for various clock rates.
+Rather than manually writing each register sequentially, we can use a
+loop to reduce the amount of code.
 
 Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-hdmi.c | 250 ++++++++++++++-----------------------
- 1 file changed, 95 insertions(+), 155 deletions(-)
+ drivers/staging/imx-drm/imx-hdmi.c | 40 +++++++++++++-------------------------
+ 1 file changed, 14 insertions(+), 26 deletions(-)
 
 diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
-index 62ce0e86f14b..cb316bf3ec56 100644
+index cb316bf3ec56..18de310e50e0 100644
 --- a/drivers/staging/imx-drm/imx-hdmi.c
 +++ b/drivers/staging/imx-drm/imx-hdmi.c
-@@ -806,19 +806,94 @@ static void imx_hdmi_phy_sel_interface_control(struct imx_hdmi *hdmi, u8 enable)
- 			 HDMI_PHY_CONF0_SELDIPIF_MASK);
- }
- 
-+enum {
-+	RES_8,
-+	RES_10,
-+	RES_12,
-+	RES_MAX,
-+};
-+
-+struct mpll_config {
-+	unsigned long mpixelclock;
-+	struct {
-+		u16 cpce;
-+		u16 gmp;
-+	} res[RES_MAX];
-+};
-+
-+static const struct mpll_config mpll_config[] = {
-+	{
-+		45250000, {
-+			{ 0x01e0, 0x0000 },
-+			{ 0x21e1, 0x0000 },
-+			{ 0x41e2, 0x0000 }
-+		},
-+	}, {
-+		92500000, {
-+			{ 0x0140, 0x0005 },
-+			{ 0x2141, 0x0005 },
-+			{ 0x4142, 0x0005 },
-+		},
-+	}, {
-+		148500000, {
-+			{ 0x00a0, 0x000a },
-+			{ 0x20a1, 0x000a },
-+			{ 0x40a2, 0x000a },
-+		},
-+	}, {
-+		~0UL, {
-+			{ 0x00a0, 0x000a },
-+			{ 0x2001, 0x000f },
-+			{ 0x4002, 0x000f },
-+		},
-+	}
-+};
-+
-+struct curr_ctrl {
-+	unsigned long mpixelclock;
-+	u16 curr[RES_MAX];
-+};
-+
-+static const struct curr_ctrl curr_ctrl[] = {
-+	/*	pixelclk     bpp8    bpp10   bpp12 */
-+	{
-+		 54000000, { 0x091c, 0x091c, 0x06dc },
-+	}, {
-+		 58400000, { 0x091c, 0x06dc, 0x06dc },
-+	}, {
-+		 72000000, { 0x06dc, 0x06dc, 0x091c },
-+	}, {
-+		 74250000, { 0x06dc, 0x0b5c, 0x091c },
-+	}, {
-+		118800000, { 0x091c, 0x091c, 0x06dc },
-+	}, {
-+		216000000, { 0x06dc, 0x0b5c, 0x091c },
-+	}
-+};
-+
- static int hdmi_phy_configure(struct imx_hdmi *hdmi, unsigned char prep,
- 			      unsigned char res, int cscon)
+@@ -480,6 +480,7 @@ static int is_color_space_interpolation(struct imx_hdmi *hdmi)
+ static void imx_hdmi_update_csc_coeffs(struct imx_hdmi *hdmi)
  {
-+	unsigned res_idx, i;
- 	u8 val, msec;
+ 	const u16 (*csc_coeff)[3][4] = &csc_coeff_default;
++	unsigned i;
+ 	u32 csc_scale = 1;
+ 	u8 val;
  
--	/* color resolution 0 is 8 bit colour depth */
--	if (!res)
--		res = 8;
--
- 	if (prep)
- 		return -EINVAL;
--	else if (res != 8 && res != 12)
-+
-+	switch (res) {
-+	case 0:	/* color resolution 0 is 8 bit colour depth */
-+	case 8:
-+		res_idx = RES_8;
-+		break;
-+	case 10:
-+		res_idx = RES_10;
-+		break;
-+	case 12:
-+		res_idx = RES_12;
-+		break;
-+	default:
- 		return -EINVAL;
-+	}
- 
- 	/* Enable csc path */
- 	if (cscon)
-@@ -845,165 +920,30 @@ static int hdmi_phy_configure(struct imx_hdmi *hdmi, unsigned char prep,
- 			HDMI_PHY_I2CM_SLAVE_ADDR);
- 	hdmi_phy_test_clear(hdmi, 0);
- 
--	if (hdmi->hdmi_data.video_mode.mpixelclock <= 45250000) {
--		switch (res) {
--		case 8:
--			/* PLL/MPLL Cfg */
--			hdmi_phy_i2c_write(hdmi, 0x01e0, 0x06);
--			hdmi_phy_i2c_write(hdmi, 0x0000, 0x15);  /* GMPCTRL */
--			break;
--		case 10:
--			hdmi_phy_i2c_write(hdmi, 0x21e1, 0x06);
--			hdmi_phy_i2c_write(hdmi, 0x0000, 0x15);
--			break;
--		case 12:
--			hdmi_phy_i2c_write(hdmi, 0x41e2, 0x06);
--			hdmi_phy_i2c_write(hdmi, 0x0000, 0x15);
--			break;
--		default:
--			return -EINVAL;
--		}
--	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 92500000) {
--		switch (res) {
--		case 8:
--			hdmi_phy_i2c_write(hdmi, 0x0140, 0x06);
--			hdmi_phy_i2c_write(hdmi, 0x0005, 0x15);
--			break;
--		case 10:
--			hdmi_phy_i2c_write(hdmi, 0x2141, 0x06);
--			hdmi_phy_i2c_write(hdmi, 0x0005, 0x15);
--			break;
--		case 12:
--			hdmi_phy_i2c_write(hdmi, 0x4142, 0x06);
--			hdmi_phy_i2c_write(hdmi, 0x0005, 0x15);
--		default:
--			return -EINVAL;
--		}
--	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 148500000) {
--		switch (res) {
--		case 8:
--			hdmi_phy_i2c_write(hdmi, 0x00a0, 0x06);
--			hdmi_phy_i2c_write(hdmi, 0x000a, 0x15);
--			break;
--		case 10:
--			hdmi_phy_i2c_write(hdmi, 0x20a1, 0x06);
--			hdmi_phy_i2c_write(hdmi, 0x000a, 0x15);
--			break;
--		case 12:
--			hdmi_phy_i2c_write(hdmi, 0x40a2, 0x06);
--			hdmi_phy_i2c_write(hdmi, 0x000a, 0x15);
--		default:
--			return -EINVAL;
--		}
--	} else {
--		switch (res) {
--		case 8:
--			hdmi_phy_i2c_write(hdmi, 0x00a0, 0x06);
--			hdmi_phy_i2c_write(hdmi, 0x000a, 0x15);
-+	/* PLL/MPLL Cfg - always match on final entry */
-+	for (i = 0; i < ARRAY_SIZE(mpll_config) - 1; i++)
-+		if (hdmi->hdmi_data.video_mode.mpixelclock <=
-+		    mpll_config[i].mpixelclock)
- 			break;
--		case 10:
--			hdmi_phy_i2c_write(hdmi, 0x2001, 0x06);
--			hdmi_phy_i2c_write(hdmi, 0x000f, 0x15);
--			break;
--		case 12:
--			hdmi_phy_i2c_write(hdmi, 0x4002, 0x06);
--			hdmi_phy_i2c_write(hdmi, 0x000f, 0x15);
--		default:
--			return -EINVAL;
--		}
--	}
- 
--	if (hdmi->hdmi_data.video_mode.mpixelclock <= 54000000) {
--		switch (res) {
--		case 8:
--			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);  /* CURRCTRL */
--			break;
--		case 10:
--			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
--			break;
--		case 12:
--			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
--			break;
--		default:
--			return -EINVAL;
--		}
--	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 58400000) {
--		switch (res) {
--		case 8:
--			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
--			break;
--		case 10:
--			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
--			break;
--		case 12:
--			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
--			break;
--		default:
--			return -EINVAL;
--		}
--	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 72000000) {
--		switch (res) {
--		case 8:
--			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
--			break;
--		case 10:
--			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
--			break;
--		case 12:
--			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
--			break;
--		default:
--			return -EINVAL;
--		}
--	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 74250000) {
--		switch (res) {
--		case 8:
--			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
--			break;
--		case 10:
--			hdmi_phy_i2c_write(hdmi, 0x0b5c, 0x10);
--			break;
--		case 12:
--			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
--			break;
--		default:
--			return -EINVAL;
--		}
--	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 118800000) {
--		switch (res) {
--		case 8:
--			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
--			break;
--		case 10:
--			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
--			break;
--		case 12:
--			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
--			break;
--		default:
--			return -EINVAL;
--		}
--	} else if (hdmi->hdmi_data.video_mode.mpixelclock <= 216000000) {
--		switch (res) {
--		case 8:
--			hdmi_phy_i2c_write(hdmi, 0x06dc, 0x10);
--			break;
--		case 10:
--			hdmi_phy_i2c_write(hdmi, 0x0b5c, 0x10);
--			break;
--		case 12:
--			hdmi_phy_i2c_write(hdmi, 0x091c, 0x10);
-+	hdmi_phy_i2c_write(hdmi, mpll_config[i].res[res_idx].cpce, 0x06);
-+	hdmi_phy_i2c_write(hdmi, mpll_config[i].res[res_idx].gmp, 0x15);
-+
-+	for (i = 0; i < ARRAY_SIZE(curr_ctrl); i++)
-+		if (hdmi->hdmi_data.video_mode.mpixelclock <=
-+		    curr_ctrl[i].mpixelclock)
- 			break;
--		default:
--			return -EINVAL;
--		}
--	} else {
-+
-+	if (i >= ARRAY_SIZE(curr_ctrl)) {
- 		dev_err(hdmi->dev,
- 				"Pixel clock %d - unsupported by HDMI\n",
- 				hdmi->hdmi_data.video_mode.mpixelclock);
- 		return -EINVAL;
+@@ -498,32 +499,19 @@ static void imx_hdmi_update_csc_coeffs(struct imx_hdmi *hdmi)
+ 		}
  	}
  
-+	/* CURRCTRL */
-+	hdmi_phy_i2c_write(hdmi, curr_ctrl[i].curr[res_idx], 0x10);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[0][0] & 0xff), HDMI_CSC_COEF_A1_LSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[0][0] >> 8), HDMI_CSC_COEF_A1_MSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[0][1] & 0xff), HDMI_CSC_COEF_A2_LSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[0][1] >> 8), HDMI_CSC_COEF_A2_MSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[0][2] & 0xff), HDMI_CSC_COEF_A3_LSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[0][2] >> 8), HDMI_CSC_COEF_A3_MSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[0][3] & 0xff), HDMI_CSC_COEF_A4_LSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[0][3] >> 8), HDMI_CSC_COEF_A4_MSB);
+-
+-	hdmi_writeb(hdmi, ((*csc_coeff)[1][0] & 0xff), HDMI_CSC_COEF_B1_LSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[1][0] >> 8), HDMI_CSC_COEF_B1_MSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[1][1] & 0xff), HDMI_CSC_COEF_B2_LSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[1][1] >> 8), HDMI_CSC_COEF_B2_MSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[1][2] & 0xff), HDMI_CSC_COEF_B3_LSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[1][2] >> 8), HDMI_CSC_COEF_B3_MSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[1][3] & 0xff), HDMI_CSC_COEF_B4_LSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[1][3] >> 8), HDMI_CSC_COEF_B4_MSB);
+-
+-	hdmi_writeb(hdmi, ((*csc_coeff)[2][0] & 0xff), HDMI_CSC_COEF_C1_LSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[2][0] >> 8), HDMI_CSC_COEF_C1_MSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[2][1] & 0xff), HDMI_CSC_COEF_C2_LSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[2][1] >> 8), HDMI_CSC_COEF_C2_MSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[2][2] & 0xff), HDMI_CSC_COEF_C3_LSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[2][2] >> 8), HDMI_CSC_COEF_C3_MSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[2][3] & 0xff), HDMI_CSC_COEF_C4_LSB);
+-	hdmi_writeb(hdmi, ((*csc_coeff)[2][3] >> 8), HDMI_CSC_COEF_C4_MSB);
++	/* The CSC registers are sequential, alternating MSB then LSB */
++	for (i = 0; i < ARRAY_SIZE(csc_coeff_default[0]); i++) {
++		u16 coeff_a = (*csc_coeff)[0][i];
++		u16 coeff_b = (*csc_coeff)[1][i];
++		u16 coeff_c = (*csc_coeff)[2][i];
 +
- 	hdmi_phy_i2c_write(hdmi, 0x0000, 0x13);  /* PLLPHBYCTRL */
- 	hdmi_phy_i2c_write(hdmi, 0x0006, 0x17);
- 	/* RESISTANCE TERM 133Ohm Cfg */
++		hdmi_writeb(hdmi, coeff_a & 0xff, HDMI_CSC_COEF_A1_LSB + i * 2);
++		hdmi_writeb(hdmi, coeff_a >> 8, HDMI_CSC_COEF_A1_MSB + i * 2);
++		hdmi_writeb(hdmi, coeff_b & 0xff, HDMI_CSC_COEF_B1_LSB + i * 2);
++		hdmi_writeb(hdmi, coeff_b >> 8, HDMI_CSC_COEF_B1_MSB + i * 2);
++		hdmi_writeb(hdmi, coeff_c & 0xff, HDMI_CSC_COEF_C1_LSB + i * 2);
++		hdmi_writeb(hdmi, coeff_c >> 8, HDMI_CSC_COEF_C1_MSB + i * 2);
++	}
+ 
+ 	val = hdmi_readb(hdmi, HDMI_CSC_SCALE);
+ 	val &= ~HDMI_CSC_SCALE_CSCSCALE_MASK;
 -- 
 1.8.3.1
