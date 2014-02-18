@@ -1,127 +1,138 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 18 Feb 2014 14:55:34 +0000
-Subject: [PATCH 07/35] mtd: devices: Provide header for shared OPCODEs and
- SFDP commands
+Date: Tue, 18 Feb 2014 14:55:49 +0000
+Subject: [PATCH 22/35] mtd: st_spi_fsm: Supply the N25Qxxx specific read
+ configurations
 In-Reply-To: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
 References: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1392735362-1245-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1392735362-1245-23-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-JEDEC have helped to standardise a great deal of the commands which
-can be issued to a Serial Flash devices. Many of the Serial Flash
-Discoverable Parameters (SFDP) commands are generic across devices.
-This patch provides a shared point where these commands can be
-defined.
+The N25Qxxx Serial Flash devices required different sequence
+configurations depending on whether they're running in 24bit (3Byte)
+or 32bit (4Byte) mode. We provide those here.
 
-Suggested-by: Mark Brown <broonie@kernel.org>
 Acked-by Angus Clark <angus.clark@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/serial_flash_cmds.h | 81 +++++++++++++++++++++++++++++++++
- drivers/mtd/devices/st_spi_fsm.c        |  2 +
- 2 files changed, 83 insertions(+)
- create mode 100644 drivers/mtd/devices/serial_flash_cmds.h
+ drivers/mtd/devices/st_spi_fsm.c | 91 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 91 insertions(+)
 
-diff --git a/drivers/mtd/devices/serial_flash_cmds.h b/drivers/mtd/devices/serial_flash_cmds.h
-new file mode 100644
-index 0000000..4f0c2c7
---- /dev/null
-+++ b/drivers/mtd/devices/serial_flash_cmds.h
-@@ -0,0 +1,81 @@
-+/*
-+ * Generic/SFDP Flash Commands and Device Capabilities
-+ *
-+ * Copyright (C) 2013 Lee Jones <lee.jones@lianro.org>
-+ *
-+ * This code is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#ifndef _MTD_SERIAL_FLASH_CMDS_H
-+#define _MTD_SERIAL_FLASH_CMDS_H
-+
-+/* Generic Flash Commands/OPCODEs */
-+#define FLASH_CMD_WREN		0x06
-+#define FLASH_CMD_WRDI		0x04
-+#define FLASH_CMD_RDID		0x9f
-+#define FLASH_CMD_RDSR		0x05
-+#define FLASH_CMD_RDSR2		0x35
-+#define FLASH_CMD_WRSR		0x01
-+#define FLASH_CMD_SE_4K		0x20
-+#define FLASH_CMD_SE_32K	0x52
-+#define FLASH_CMD_SE		0xd8
-+#define FLASH_CMD_CHIPERASE	0xc7
-+#define FLASH_CMD_WRVCR		0x81
-+#define FLASH_CMD_RDVCR		0x85
-+
-+/* JEDEC Standard - Serial Flash Discoverable Parmeters (SFDP) Commands */
-+#define FLASH_CMD_READ		0x03	/* READ */
-+#define FLASH_CMD_READ_FAST	0x0b	/* FAST READ */
-+#define FLASH_CMD_READ_1_1_2	0x3b	/* DUAL OUTPUT READ */
-+#define FLASH_CMD_READ_1_2_2	0xbb	/* DUAL I/O READ */
-+#define FLASH_CMD_READ_1_1_4	0x6b	/* QUAD OUTPUT READ */
-+#define FLASH_CMD_READ_1_4_4	0xeb	/* QUAD I/O READ */
-+
-+#define FLASH_CMD_WRITE		0x02	/* PAGE PROGRAM */
-+#define FLASH_CMD_WRITE_1_1_2	0xa2	/* DUAL INPUT PROGRAM */
-+#define FLASH_CMD_WRITE_1_2_2	0xd2	/* DUAL INPUT EXT PROGRAM */
-+#define FLASH_CMD_WRITE_1_1_4	0x32	/* QUAD INPUT PROGRAM */
-+#define FLASH_CMD_WRITE_1_4_4	0x12	/* QUAD INPUT EXT PROGRAM */
-+
-+#define FLASH_CMD_EN4B_ADDR	0xb7	/* Enter 4-byte address mode */
-+#define FLASH_CMD_EX4B_ADDR	0xe9	/* Exit 4-byte address mode */
-+
-+/* READ commands with 32-bit addressing */
-+#define FLASH_CMD_READ4		0x13
-+#define FLASH_CMD_READ4_FAST	0x0c
-+#define FLASH_CMD_READ4_1_1_2	0x3c
-+#define FLASH_CMD_READ4_1_2_2	0xbc
-+#define FLASH_CMD_READ4_1_1_4	0x6c
-+#define FLASH_CMD_READ4_1_4_4	0xec
-+
-+/* Configuration flags */
-+#define FLASH_FLAG_SINGLE	0x000000ff
-+#define FLASH_FLAG_READ_WRITE	0x00000001
-+#define FLASH_FLAG_READ_FAST	0x00000002
-+#define FLASH_FLAG_SE_4K	0x00000004
-+#define FLASH_FLAG_SE_32K	0x00000008
-+#define FLASH_FLAG_CE		0x00000010
-+#define FLASH_FLAG_32BIT_ADDR	0x00000020
-+#define FLASH_FLAG_RESET	0x00000040
-+#define FLASH_FLAG_DYB_LOCKING	0x00000080
-+
-+#define FLASH_FLAG_DUAL		0x0000ff00
-+#define FLASH_FLAG_READ_1_1_2	0x00000100
-+#define FLASH_FLAG_READ_1_2_2	0x00000200
-+#define FLASH_FLAG_READ_2_2_2	0x00000400
-+#define FLASH_FLAG_WRITE_1_1_2	0x00001000
-+#define FLASH_FLAG_WRITE_1_2_2	0x00002000
-+#define FLASH_FLAG_WRITE_2_2_2	0x00004000
-+
-+#define FLASH_FLAG_QUAD		0x00ff0000
-+#define FLASH_FLAG_READ_1_1_4	0x00010000
-+#define FLASH_FLAG_READ_1_4_4	0x00020000
-+#define FLASH_FLAG_READ_4_4_4	0x00040000
-+#define FLASH_FLAG_WRITE_1_1_4	0x00100000
-+#define FLASH_FLAG_WRITE_1_4_4	0x00200000
-+#define FLASH_FLAG_WRITE_4_4_4	0x00400000
-+
-+#endif /* _MTD_SERIAL_FLASH_CMDS_H */
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index 250162a..2bfea2d 100644
+index 576712c..73db64e 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -21,6 +21,8 @@
- #include <linux/io.h>
- #include <linux/of.h>
+@@ -200,6 +200,53 @@
  
-+#include "serial_flash_cmds.h"
+ #define STFSM_MAX_WAIT_SEQ_MS  1000     /* FSM execution time */
+ 
++/* Flash Commands */
++#define FLASH_CMD_WREN         0x06
++#define FLASH_CMD_WRDI         0x04
++#define FLASH_CMD_RDID         0x9f
++#define FLASH_CMD_RDSR         0x05
++#define FLASH_CMD_RDSR2                0x35
++#define FLASH_CMD_WRSR         0x01
++#define FLASH_CMD_SE_4K                0x20
++#define FLASH_CMD_SE_32K       0x52
++#define FLASH_CMD_SE           0xd8
++#define FLASH_CMD_CHIPERASE    0xc7
++#define FLASH_CMD_WRVCR                0x81
++#define FLASH_CMD_RDVCR                0x85
 +
- /*
-  * FSM SPI Controller Registers
-  */
++#define FLASH_CMD_READ         0x03    /* READ */
++#define FLASH_CMD_READ_FAST    0x0b    /* FAST READ */
++#define FLASH_CMD_READ_1_1_2   0x3b    /* DUAL OUTPUT READ */
++#define FLASH_CMD_READ_1_2_2   0xbb    /* DUAL I/O READ */
++#define FLASH_CMD_READ_1_1_4   0x6b    /* QUAD OUTPUT READ */
++#define FLASH_CMD_READ_1_4_4   0xeb    /* QUAD I/O READ */
++
++#define FLASH_CMD_WRITE                0x02    /* PAGE PROGRAM */
++#define FLASH_CMD_WRITE_1_1_2  0xa2    /* DUAL INPUT PROGRAM */
++#define FLASH_CMD_WRITE_1_2_2  0xd2    /* DUAL INPUT EXT PROGRAM */
++#define FLASH_CMD_WRITE_1_1_4  0x32    /* QUAD INPUT PROGRAM */
++#define FLASH_CMD_WRITE_1_4_4  0x12    /* QUAD INPUT EXT PROGRAM */
++
++#define FLASH_CMD_EN4B_ADDR    0xb7    /* Enter 4-byte address mode */
++#define FLASH_CMD_EX4B_ADDR    0xe9    /* Exit 4-byte address mode */
++
++/* READ commands with 32-bit addressing (N25Q256 and S25FLxxxS) */
++#define FLASH_CMD_READ4                0x13
++#define FLASH_CMD_READ4_FAST   0x0c
++#define FLASH_CMD_READ4_1_1_2  0x3c
++#define FLASH_CMD_READ4_1_2_2  0xbc
++#define FLASH_CMD_READ4_1_1_4  0x6c
++#define FLASH_CMD_READ4_1_4_4  0xec
++
++/*
++ * Flags to tweak operation of default read/write/erase routines
++ */
++#define CFG_READ_TOGGLE_32BIT_ADDR     0x00000001
++#define CFG_WRITE_TOGGLE_32BIT_ADDR    0x00000002
++#define CFG_WRITE_EX_32BIT_ADDR_DELAY  0x00000004
++#define CFG_ERASESEC_TOGGLE_32BIT_ADDR 0x00000008
++#define CFG_S25FL_CHECK_ERROR_FLAGS    0x00000010
++
+ struct stfsm {
+ 	struct device		*dev;
+ 	void __iomem		*base;
+@@ -208,6 +255,7 @@ struct stfsm {
+ 	struct mutex		lock;
+ 	struct flash_info       *info;
+ 
++	uint32_t                configuration;
+ 	uint32_t                fifo_dir_delay;
+ 	bool                    booted_from_spi;
+ 	bool                    reset_signal;
+@@ -402,6 +450,49 @@ static struct seq_rw_config default_write_configs[] = {
+ 	{0x00,			 0,			0, 0, 0, 0x00, 0, 0},
+ };
+ 
++/*
++ * [N25Qxxx] Configuration
++ */
++#define N25Q_VCR_DUMMY_CYCLES(x)	(((x) & 0xf) << 4)
++#define N25Q_VCR_XIP_DISABLED		((uint8_t)0x1 << 3)
++#define N25Q_VCR_WRAP_CONT		0x3
++
++/* N25Q 3-byte Address READ configurations
++ *	- 'FAST' variants configured for 8 dummy cycles.
++ *
++ * Note, the number of dummy cycles used for 'FAST' READ operations is
++ * configurable and would normally be tuned according to the READ command and
++ * operating frequency.  However, this applies universally to all 'FAST' READ
++ * commands, including those used by the SPIBoot controller, and remains in
++ * force until the device is power-cycled.  Since the SPIBoot controller is
++ * hard-wired to use 8 dummy cycles, we must configure the device to also use 8
++ * cycles.
++ */
++static struct seq_rw_config n25q_read3_configs[] = {
++	{FLASH_FLAG_READ_1_4_4, FLASH_CMD_READ_1_4_4,	0, 4, 4, 0x00, 0, 8},
++	{FLASH_FLAG_READ_1_1_4, FLASH_CMD_READ_1_1_4,	0, 1, 4, 0x00, 0, 8},
++	{FLASH_FLAG_READ_1_2_2, FLASH_CMD_READ_1_2_2,	0, 2, 2, 0x00, 0, 8},
++	{FLASH_FLAG_READ_1_1_2, FLASH_CMD_READ_1_1_2,	0, 1, 2, 0x00, 0, 8},
++	{FLASH_FLAG_READ_FAST,	FLASH_CMD_READ_FAST,	0, 1, 1, 0x00, 0, 8},
++	{FLASH_FLAG_READ_WRITE, FLASH_CMD_READ,	        0, 1, 1, 0x00, 0, 0},
++	{0x00,			0,			0, 0, 0, 0x00, 0, 0},
++};
++
++/* N25Q 4-byte Address READ configurations
++ *	- use special 4-byte address READ commands (reduces overheads, and
++ *        reduces risk of hitting watchdog reset issues).
++ *	- 'FAST' variants configured for 8 dummy cycles (see note above.)
++ */
++static struct seq_rw_config n25q_read4_configs[] = {
++	{FLASH_FLAG_READ_1_4_4, FLASH_CMD_READ4_1_4_4,	0, 4, 4, 0x00, 0, 8},
++	{FLASH_FLAG_READ_1_1_4, FLASH_CMD_READ4_1_1_4,	0, 1, 4, 0x00, 0, 8},
++	{FLASH_FLAG_READ_1_2_2, FLASH_CMD_READ4_1_2_2,	0, 2, 2, 0x00, 0, 8},
++	{FLASH_FLAG_READ_1_1_2, FLASH_CMD_READ4_1_1_2,	0, 1, 2, 0x00, 0, 8},
++	{FLASH_FLAG_READ_FAST,	FLASH_CMD_READ4_FAST,	0, 1, 1, 0x00, 0, 8},
++	{FLASH_FLAG_READ_WRITE, FLASH_CMD_READ4,	0, 1, 1, 0x00, 0, 0},
++	{0x00,			0,			0, 0, 0, 0x00, 0, 0},
++};
++
+ static struct stfsm_seq stfsm_seq_en_32bit_addr;/* Dynamically populated */
+ 
+ static struct stfsm_seq stfsm_seq_read_jedec = {
 -- 
 1.8.3.2
