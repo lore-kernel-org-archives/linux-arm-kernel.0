@@ -1,56 +1,28 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Tue, 18 Feb 2014 17:11:43 +0530
-Subject: [PATCH v4 1/3] ARM: EXYNOS: initial board support for exynos5260
- SoC
-In-Reply-To: <2203874.7pS2uKgoKp@wuerfel>
-References: <1392721076-26630-1-git-send-email-rahul.sharma@samsung.com>
- <1392721076-26630-2-git-send-email-rahul.sharma@samsung.com>
- <2203874.7pS2uKgoKp@wuerfel>
-Message-ID: <CAK9yfHwcteO78JG4OhRZtMcpAd-aN85sxqELJ3ZLW0D0PXoZ7w@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 18 Feb 2014 12:43:22 +0100
+Subject: [PATCH V3 11/17] i2c: nomadik: Convert to devm functions
+In-Reply-To: <20140218110109.GA18768@katana>
+References: <1392650418-14820-1-git-send-email-ulf.hansson@linaro.org>
+ <20140218110109.GA18768@katana>
+Message-ID: <CAPDyKFpRaAAer00dqcXR-qOT9S8-SDTnaMUHRwWCZ93w-wnTDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On 18 February 2014 16:33, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 18 February 2014 16:27:54 Rahul Sharma wrote:
->> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
->> index 7654f19..1cc52c9 100644
->> --- a/arch/arm/mach-exynos/common.c
->> +++ b/arch/arm/mach-exynos/common.c
->> @@ -176,6 +176,15 @@ static struct map_desc exynos5250_iodesc[] __initdata = {
->>       },
->>  };
+On 18 February 2014 12:01, Wolfram Sang <wsa@the-dreams.de> wrote:
+> On Mon, Feb 17, 2014 at 04:20:18PM +0100, Ulf Hansson wrote:
+>> Use devm_* functions to simplify code and error handling.
 >>
->> +static struct map_desc exynos5260_iodesc[] __initdata = {
->> +     {
->> +             .virtual        = (unsigned long)S5P_VA_SYSRAM_NS,
->> +             .pfn            = __phys_to_pfn(EXYNOS5260_PA_SYSRAM_NS),
->> +             .length         = SZ_4K,
->> +             .type           = MT_DEVICE,
->> +     },
->> +};
->> +
->>  static struct map_desc exynos5_iodesc[] __initdata = {
->>       {
->>               .virtual        = (unsigned long)S3C_VA_SYS,
->> @@ -331,6 +340,8 @@ static void __init exynos_map_io(void)
->>               iotable_init(exynos4x12_iodesc, ARRAY_SIZE(exynos4x12_iodesc));
->>       if (soc_is_exynos5250())
->>               iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
->> +     if (soc_is_exynos5260())
->> +             iotable_init(exynos5260_iodesc, ARRAY_SIZE(exynos5260_iodesc));
->>  }
+>> Cc: Alessandro Rubini <rubini@unipv.it>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Wolfram Sang <wsa@the-dreams.de>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 >
-> As I commented before, I think we really shouldn't do this any more: There
-> is no excuse why you still need to add SoC specific code here. Please put
-> the SYSRAM into DT and make a proper abstraction for it so you don't have
-> to modify the kernel every time a new SoC variant comes out.
+> What has changed in V3? I didn't get the cover letter.
 
-Do we have any bindings already defined for this kind of stuff or is
-this implemented in
-any other platform/architecture for reference?
+I added the IS_ERR, check as you suggested. That caused a rebase of
+the other patches as well.
 
--- 
-With warm regards,
-Sachin
+Sorry if it was unclear.
+
+Kind regards
+Uffe
