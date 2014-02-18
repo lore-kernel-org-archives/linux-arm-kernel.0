@@ -1,58 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 18 Feb 2014 18:01:52 +0000
-Subject: [PATCH 1/2] mfd: palmas: support IRQ inversion at the board level
-In-Reply-To: <53039B6D.8080004@wwwdotorg.org>
-References: <1392415108-4365-1-git-send-email-swarren@wwwdotorg.org>
- <20140217092658.GC17875@lee--X1> <53039B6D.8080004@wwwdotorg.org>
-Message-ID: <20140218180152.GB31706@lee--X1>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Feb 2014 19:10:03 +0100
+Subject: [PATCH v4 1/7] Documentation: Add device tree bindings for
+ Freescale i.MX GPC
+In-Reply-To: <1392737687-25003-2-git-send-email-p.zabel@pengutronix.de>
+References: <1392737687-25003-1-git-send-email-p.zabel@pengutronix.de>
+ <1392737687-25003-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <2328803.HhaG6blXIR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> From: Stephen Warren <swarren@nvidia.com>
-> >>
-> >> Some boards or SoCs have an inverter between the PMIC IRQ output pin and
-> >> the IRQ controller input signal.
-> >>
-> >> The IRQ specifier in DT is meant to represent the IRQ flags at the input
-> >> to the IRQ controller.
-> >>
-> >> The Palmas HW's IRQ output has configurable polarity. The driver
-> >> currently selects the output polarity by querying the input polarity at
-> >> the IRQ controller. This works fine if the IRQ signal is routed directly
-> >> from the PMIC to the IRQ controller with no intervening logic. However,
-> >> if the signal is inverted between the two, this automatic polarity
-> >> selection gets the wrong answer.
-> >>
-> >> Add an additional optional DT and platform data parameter which indicates
-> >> that such an inversion occurs. If this option is enabled, the Palmas
-> >> driver will configure its IRQ output to the opposite polarity of the IRQ
-> >> controller's input.
-> >>
-> >> An alternative would have been to add a new non-optional DT parameter to
-> >> indicate the exact desired output polarity. However, this would have been
-> >> an incompatible change to the DT binding.
-> >>
-> >> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> >> ---
-> >> If this patch could be applied to its own branch (w/ signed tag) in the
-> >> MFD tree, that would great; then I can pull patch 1/2 into the Tegra tree
-> >> so that I can apply patch 2/2 to the Tegra tree. Thanks.
-> >> ---
-> >>  Documentation/devicetree/bindings/mfd/palmas.txt | 6 ++++++
-> >>  drivers/mfd/palmas.c                             | 4 ++++
-> >>  include/linux/mfd/palmas.h                       | 1 +
-> >>  3 files changed, 11 insertions(+)
-> > 
-> > For the core changes:
-> >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Thanks. Since you ack'd this and are an MFD maintainer, was that an
-> indication that I should take this patch through the Tegra tree?
+On Tuesday 18 February 2014 16:34:41 Philipp Zabel wrote:
+> +
+> +Example of a device that is part of a power domain:
+> +
+> +       vpu: vpu at 02040000 {
+> +               reg = <0x02040000 0x3c000>;
+> +               /* ... */
+> +               fsl,power-domain = <&pd_pu>;
+> +               /* ... */
+> +       };
+> +
 
-No, it was an indication that we still require more Acks. :)
+I'm really not too happy about platforms starting to add random
+bindings for power domains. Unfortunately I didn't catch exynos
+doing this first, but I don't want to see another platform like
+that.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Can we please come up with a proper generic power domain binding
+first and then add platform specific users?
+
+	Arnd
