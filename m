@@ -1,34 +1,35 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 18 Feb 2014 06:06:13 -0800
-Subject: [PATCH v4 5/5] ACPI: Replace printk with pr_* in tables.c
-In-Reply-To: <1392731700-10992-6-git-send-email-hanjun.guo@linaro.org>
-References: <1392731700-10992-1-git-send-email-hanjun.guo@linaro.org>
- <1392731700-10992-6-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1392732373.22752.22.camel@joe-AO722>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 18 Feb 2014 15:05:16 +0100
+Subject: [PATCH v7 1/8] clk: sunxi: factors: automatic reparenting support
+In-Reply-To: <20140217100215.15040.63745.stgit@pagira.o2s.ch>
+References: <20140217095907.15040.81893.stgit@pagira.o2s.ch>
+ <20140217100215.15040.63745.stgit@pagira.o2s.ch>
+Message-ID: <20140218140516.GG3142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2014-02-18 at 21:55 +0800, Hanjun Guo wrote:
-> This patch just do some clean up to replace printk with pr_*,
-> no functional change.
+On Mon, Feb 17, 2014 at 11:02:15AM +0100, David Lanzend?rfer wrote:
+> From: Emilio L?pez <emilio@elopez.com.ar>
+> 
+> This commit implements .determine_rate, so that our factor clocks can be
+> reparented when needed.
+> 
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 
-trivial note:
+Your signed-off-by is missing here.
 
-> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-[]
-> @@ -55,8 +55,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
->  		{
->  			struct acpi_madt_local_apic *p =
->  			    (struct acpi_madt_local_apic *)header;
-> -			printk(KERN_INFO PREFIX
-> -			       "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
-> +			pr_info(PREFIX "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
->  			       p->processor_id, p->id,
->  			       (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+Once you added it, you can add my Acked-by
 
-It'd be nice to realign the additional lines to the open
-parenthesis, here and everywhere else in this patch
+Maxime
 
-			pr_info(PREFIX "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
-				p->processor_id, p->id,
-				(p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/054fe3c9/attachment-0001.sig>
