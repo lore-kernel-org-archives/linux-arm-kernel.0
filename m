@@ -1,54 +1,74 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 18 Feb 2014 16:34:47 +0100
-Subject: [PATCH v4 7/7] ARM: dts: imx6sl: Add power-domain information to gpc
- node
-In-Reply-To: <1392737687-25003-1-git-send-email-p.zabel@pengutronix.de>
-References: <1392737687-25003-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1392737687-25003-8-git-send-email-p.zabel@pengutronix.de>
+Date: Tue, 18 Feb 2014 16:34:40 +0100
+Subject: [PATCH v4 0/7] i.MX6 PU power domain support
+Message-ID: <1392737687-25003-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PGC that is part of GPC controls isolation and power sequencing of the
-power domains. The PU power domain will be handled by the generic pm domain
-framework and needs a phandle to the PU regulator to turn off power when
-the domain is disabled.
+The i.MX6Q can gate off the CPU and PU (GPU/VPU) power domains using the
+Power Gating Controller (PGC) in the GPC register space. The CPU power
+domain is already handled by wait state code, but the PU power domain can
+be controlled using the generic power domain framework and power off the PU
+supply regulator if all devices in the power domain are (runtime) suspended.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/boot/dts/imx6sl.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+This patchset adds a GPC platform device initialized at subsys_initcall time
+(after anatop regulators) that binds to the gpc device tree node and sets up
+the PU power domain:
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 28558f1..774e1fb 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -529,9 +529,27 @@
- 			};
- 
- 			gpc: gpc at 020dc000 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
- 				compatible = "fsl,imx6sl-gpc", "fsl,imx6q-gpc";
- 				reg = <0x020dc000 0x4000>;
- 				interrupts = <0 89 0x04>;
-+				pu-supply = <&reg_pu>;
-+
-+				pd_display: display-power-domain at 020dc240 {
-+					compatible = "fsl,imx6q-power-domain";
-+					reg = <0x020dc240 0x10>;
-+				};
-+
-+				pd_pu: pu-power-domain at 020dc260 {
-+					compatible = "fsl,imx6q-power-domain";
-+					reg = <0x020dc260 0x10>;
-+				};
-+
-+				pd_arm: cpu-power-domain at 020dc2a0 {
-+					compatible = "fsl,imx6q-power-domain";
-+					reg = <0x020dc2a0 0x10>;
-+				};
- 			};
- 
- 			gpr: iomuxc-gpr at 020e0000 {
+	gpc: gpc at 020dc000 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "fsl,imx6q-gpc";
+		reg = <0x020dc000 0x4000>;
+		interrupts = <0 89 0x04 0 90 0x04>;
+		pu-supply = <&reg_pu>;
+
+		pd_pu: pu-power-domain at 020dc260 {
+			compatible = "fsl,imx6q-power-domain";
+			reg = <0x020dc260 0x10>;
+		};
+
+		pd_arm: cpu-power-domain at 020dc2a0 {
+			compatible = "fsl,imx6q-power-domain";
+			reg = <0x020dc2a0 0x10>;
+		};
+	};
+
+The cpu-power-domain node is included for completeness' sake, it is not
+currently used by the code.
+It registers a platform bus notifier so that it can add GPU and VPU devices
+to the power domain when they are bound. If finds devices to be added to the
+power domain by scanning the device tree for nodes that contain a
+	power-domain = <&pd_pu>;
+property.
+
+For i.MX6QDL there is only one power domain that can be disabled at runtime,
+on i.MX6SL there is an additional DISPLAY power domain, which is not yet
+handled by the code.
+
+Changes since v3:
+ - Use fsl,power-domain property name to link devices to power domains
+
+regards
+Philipp
+
+Philipp Zabel (7):
+  Documentation: Add device tree bindings for Freescale i.MX GPC
+  ARM: imx6: gpc: Add PU power domain for GPU/VPU
+  ARM: imx6: gpc: Add pm clock support to PU power domain
+  ARM: imx6: gpc: Add observed worst case latencies
+  ARM: dts: imx6qdl: Allow disabling the PU regulator, add a enable ramp
+    delay
+  ARM: dts: imx6qdl: Add power-domain information to gpc node
+  ARM: dts: imx6sl: Add power-domain information to gpc node
+
+ .../devicetree/bindings/power/fsl,imx-gpc.txt      |  58 +++++
+ arch/arm/boot/dts/imx6qdl.dtsi                     |  16 +-
+ arch/arm/boot/dts/imx6sl.dtsi                      |  18 ++
+ arch/arm/mach-imx/Kconfig                          |   2 +
+ arch/arm/mach-imx/gpc.c                            | 256 +++++++++++++++++++++
+ 5 files changed, 349 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+
 -- 
 1.8.5.3
