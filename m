@@ -1,47 +1,120 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 18 Feb 2014 15:27:33 +0000
-Subject: [PATCH v4 12/12] ARM: KVM: fix warning in mmu.c
+Date: Tue, 18 Feb 2014 15:27:30 +0000
+Subject: [PATCH v4 09/12] ARM: KVM: introduce per-vcpu HYP Configuration
+ Register
 In-Reply-To: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
 References: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1392737253-10480-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1392737253-10480-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compiling with THP enabled leads to the following warning:
+So far, KVM/ARM used a fixed HCR configuration per guest, except for
+the VI/VF/VA bits to control the interrupt in absence of VGIC.
 
-arch/arm/kvm/mmu.c: In function ?unmap_range?:
-arch/arm/kvm/mmu.c:177:39: warning: ?pte? may be used uninitialized in this function [-Wmaybe-uninitialized]
-   if (kvm_pmd_huge(*pmd) || page_empty(pte)) {
-                                        ^
-Code inspection reveals that these two cases are mutually exclusive,
-so GCC is a bit overzealous here. Silence it anyway by initializing
-pte to NULL and testing it later on.
+With the upcoming need to dynamically reconfigure trapping, it becomes
+necessary to allow the HCR to be changed on a per-vcpu basis.
+
+The fix here is to mimic what KVM/arm64 already does: a per vcpu HCR
+field, initialized at setup time.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/kvm/mmu.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_arm.h  | 1 -
+ arch/arm/include/asm/kvm_host.h | 9 ++++++---
+ arch/arm/kernel/asm-offsets.c   | 1 +
+ arch/arm/kvm/guest.c            | 1 +
+ arch/arm/kvm/interrupts_head.S  | 9 +++------
+ 5 files changed, 11 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 209f20f..5e56cbc 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -144,6 +144,7 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
- 	while (addr < end) {
- 		pgd = pgdp + pgd_index(addr);
- 		pud = pud_offset(pgd, addr);
-+		pte = NULL;
- 		if (pud_none(*pud)) {
- 			addr = kvm_pud_addr_end(addr, end);
- 			continue;
-@@ -174,7 +175,7 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
- 		/*
- 		 * If the pmd entry is to be cleared, walk back up the ladder
- 		 */
--		if (kvm_pmd_huge(*pmd) || page_empty(pte)) {
-+		if (kvm_pmd_huge(*pmd) || (pte && page_empty(pte))) {
- 			clear_pmd_entry(kvm, pmd, addr);
- 			next = kvm_pmd_addr_end(addr, end);
- 			if (page_empty(pmd) && !page_empty(pud)) {
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+index 1d3153c..a843e74 100644
+--- a/arch/arm/include/asm/kvm_arm.h
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -69,7 +69,6 @@
+ #define HCR_GUEST_MASK (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
+ 			HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
+ 			HCR_TWE | HCR_SWIO | HCR_TIDCP)
+-#define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
+ 
+ /* System Control Register (SCTLR) bits */
+ #define SCTLR_TE	(1 << 30)
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index ba6d33a..918fdc1 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -101,6 +101,12 @@ struct kvm_vcpu_arch {
+ 	/* The CPU type we expose to the VM */
+ 	u32 midr;
+ 
++	/* HYP trapping configuration */
++	u32 hcr;
++
++	/* Interrupt related fields */
++	u32 irq_lines;		/* IRQ and FIQ levels */
++
+ 	/* Exception Information */
+ 	struct kvm_vcpu_fault_info fault;
+ 
+@@ -128,9 +134,6 @@ struct kvm_vcpu_arch {
+ 	/* IO related fields */
+ 	struct kvm_decode mmio_decode;
+ 
+-	/* Interrupt related fields */
+-	u32 irq_lines;		/* IRQ and FIQ levels */
+-
+ 	/* Cache some mmu pages needed inside spinlock regions */
+ 	struct kvm_mmu_memory_cache mmu_page_cache;
+ 
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index dbe0476..713e807 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -174,6 +174,7 @@ int main(void)
+   DEFINE(VCPU_FIQ_REGS,		offsetof(struct kvm_vcpu, arch.regs.fiq_regs));
+   DEFINE(VCPU_PC,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_pc));
+   DEFINE(VCPU_CPSR,		offsetof(struct kvm_vcpu, arch.regs.usr_regs.ARM_cpsr));
++  DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
+   DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
+   DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
+   DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.fault.hxfar));
+diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+index 20f8d97..0c8c044 100644
+--- a/arch/arm/kvm/guest.c
++++ b/arch/arm/kvm/guest.c
+@@ -38,6 +38,7 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
+ 
+ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
+ {
++	vcpu->arch.hcr = HCR_GUEST_MASK;
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 4a2a97a..7cb41e1 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -597,17 +597,14 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 
+ /* Enable/Disable: stage-2 trans., trap interrupts, trap wfi, trap smc */
+ .macro configure_hyp_role operation
+-	mrc	p15, 4, r2, c1, c1, 0	@ HCR
+-	bic	r2, r2, #HCR_VIRT_EXCP_MASK
+-	ldr	r3, =HCR_GUEST_MASK
+ 	.if \operation == vmentry
+-	orr	r2, r2, r3
++	ldr	r2, [vcpu, #VCPU_HCR]
+ 	ldr	r3, [vcpu, #VCPU_IRQ_LINES]
+ 	orr	r2, r2, r3
+ 	.else
+-	bic	r2, r2, r3
++	mov	r2, #0
+ 	.endif
+-	mcr	p15, 4, r2, c1, c1, 0
++	mcr	p15, 4, r2, c1, c1, 0	@ HCR
+ .endm
+ 
+ .macro load_vcpu
 -- 
 1.8.3.4
