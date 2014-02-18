@@ -1,54 +1,92 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Feb 2014 22:24:34 +0100
-Subject: [BUG] FL1009: xHCI host not responding to stop endpoint command.
-In-Reply-To: <87ppmk2lbs.fsf@natisbad.org>
-References: <87eh4dot61.fsf@natisbad.org> <87sissopaf.fsf@natisbad.org>
- <20140114170719.GA12126@xanatos> <87bnzekz5l.fsf@natisbad.org>
- <063D6719AE5E284EB5DD2968C1650D6D45C5AB@AcuExch.aculab.com>
- <87mwix5anm.fsf@natisbad.org> <20140116185044.GC18392@xanatos>
- <87fvon2khn.fsf@natisbad.org> <87zjmvau23.fsf@nemi.mork.no>
- <20140117205432.GB5618@xanatos> <87vbxhrmea.fsf@natisbad.org>
- <20140218141031.255bd1ba@skate> <87ppmk2lbs.fsf@natisbad.org>
-Message-ID: <20140218222434.7e447b80@skate>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 18 Feb 2014 13:32:32 -0800
+Subject: BUG: Null pointer dereference on booting TC2 with
+ vexpress_defconfig
+In-Reply-To: <5303916B.5060303@arm.com>
+References: <20140217223907.GH21070@cbox> <53033E37.6000402@arm.com>
+ <CAMJs5B-G86o8Tjcwg+dvDETqQ5qiDsDFB9kBPtL=RBLqFqpAOQ@mail.gmail.com>
+ <5303916B.5060303@arm.com>
+Message-ID: <20140218213232.GD2084@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnaud Ebalard,
-
-On Tue, 18 Feb 2014 21:54:31 +0100, Arnaud Ebalard wrote:
-
-> > I finally got some idea: your kernel 3.13-rc7 lacks a very important
-> > fix we did in the irqchip driver MSI handling. You really need to have
-> > http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/irqchip/irq-armada-370-xp.c?id=c7f7bd4a136e4b02dd2a66bf95aec545bd93e8db
-> > applied to get proper MSI behavior. Without this patch, there is a race
-> > condition, and some MSI interrupts might be lost.
+On Tue, Feb 18, 2014 at 04:59:23PM +0000, Sudeep Holla wrote:
+> On 18/02/14 16:33, Christoffer Dall wrote:
+> > On 18 February 2014 03:04, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
+> >> On 17/02/14 22:39, Christoffer Dall wrote:
+> >>> Booting my TC2 using 3.14-rc3 and vexpress_defconfig causes a NULL
+> >>> pointer dereference in schedule_work_on.
+> >>>
+> >>> A quick look at the trace indicates that schedule_work() is called
+> >>> before system_wq is initialized.
+> >>>
+> >>> Further, a bisect seems to indicate that this call path is triggered by
+> >>> the changes in this merge commit of Theodore T'so's random_for_linus
+> >>> tag:
+> >>> 0891ad829d2a0501053703df66029e843e3b8365
+> >>>
+> >>> (However, my bisect may not be 100% correct, as some of the commits
+> >>> between 3.13 and 3.12 don't boot the TC2 with vexpress_defconfig,
+> >>> specifically the ones after f9300eaaac1ca300083ad41937923a90cc3a2394,
+> >>> which causes boot to halt after "ARM CCI driver probed").
+> >>>
+> >> Yes that requires some changes in defconfig to continue to work across
+> >> these changes(mainly have all these new configs disabled)
+> >>
+> > 
+> > So vexpress_defconfig is known to not work on TC2?
 > >
-> > This commit was merged in v3.14-rc2, and backported to 3.13 and
-> > previous stable releases.
-> >
-> > Can you test after applying this commit?
 > 
-> Just to be sure, I compiled a 3.13 w/ PCI_MSI enabled and w/o the fix:
-> it failed as usual. Then, I just applied the fix on top of it and tested
-> again: I was unable to make it fail, i.e. this oneline fixes the issue.
-
-Cool!
-
-> Sarah, I guess this also validates the fact that FL1009 has good MSI
-> support ;-)
+> I would say yes before v3.13 for TC2 at-least. Pawel's commit: 81d6e719d1f8(
+> ARM: vexpress: Enable platform-specific options in defconfig) enabled several VE
+> specific features.
 > 
-> Thanks for the time you both spent. Let's close the case.
+> >>> Disabling CONFIG_ARCH_VEXPRESS_TC2_PM avoids the issue.
+> >>>
+> >> Are you just disabling this or even CONFIG_MCPM ? Are the secondaries cpus
+> >> coming up ?
+> >>
+> > 
+> > Disabling CONFIG_ARCH_VEXPRESS_TC2_PM allows the system to boot, but
+> > only with one CPU.
+> > 
+> > Disabling CONFIG_MCPM allows SMP boot as well.
+> > 
+> Yes that's what I suspected.
+> 
+> >>> I'm not familiar enough with any of these code paths to quicly identify
+> >>> what the issue could be.  Apologies if I missed a previous post about
+> >>> this issue (I couldn't find anything but would be surprised if I'm the
+> >>> only one doing vexpress_defconfig on a TC2).
+> >>>
+> >> I just tried and it works fine. If CONFIG_MCPM and CONFIG_ARCH_VEXPRESS_TC2_PM,
+> >> it requires some changes in board configurations(for bootmon), I assume you have
+> >> done those changes.
+> >>
+> > 
+> > What works fine? With both configs enabled?
+> > 
+> Yes with the default vexpress_defconfig as is in the mainline.
+> 
+> > I didn't change anything on the boot monitor side.  Can you give me a
+> > pointer to the specifics?  Was there an announcement about this
+> > somewhere that I failed to locate?
+> > 
+> 
+> You might be having very old firmware that doesn't support percpu mailbox and
+> hence can't enable CONFIG_MCPM. You can refer CFGREG48 in Section 3.3.2 of [1]
+> for details. You can grab the latest firmware in single step from [2] under
+> Firmware tab.
+> 
+> [2] http://releases.linaro.org/14.01/openembedded/vexpress-lsk/
 
-You're welcome. Sorry for having realized so late from where the
-problem could be coming from, and that it was in fact already fixed.
+Thanks, unfortunately when I flash this newest firmware, I just see:
 
-Thanks to you for reporting and investigating the issue in the first
-place!
+Setting DVI mode for VGA.
+Releasing Daughterboard resets.
+Switching MCC log to UART1.
 
-Best regards,
+And it never seems to proceed.  Any pointers to what I could be doing
+wrong?
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+-Christoffer
