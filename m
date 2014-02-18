@@ -1,56 +1,67 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 18 Feb 2014 09:18:58 +0900
-Subject: [PATCH] ARM: shmobile: Remove __init from
- rcar_gen2_read_mode_pins()
-In-Reply-To: <CANqRtoR7C_v+PQt3J1tjSxvFcX87NZqZZ16tBULBYBz=_F-rFg@mail.gmail.com>
-References: <20140217063510.21892.52120.sendpatchset@w520>
- <1453243.5L1W6bkVz8@avalon>
- <CANqRtoR7C_v+PQt3J1tjSxvFcX87NZqZZ16tBULBYBz=_F-rFg@mail.gmail.com>
-Message-ID: <20140218001854.GE4776@verge.net.au>
+Date: Tue, 18 Feb 2014 09:26:11 +0900
+Subject: [PATCH 15/15] sh: intc: Enable driver compilation with
+ COMPILE_TEST
+In-Reply-To: <20140108043558.GG15891@verge.net.au>
+References: <1385515117-23664-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1385515117-23664-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <3670569.dVXQxeaJBM@avalon> <2305561.CqXvNryyXG@avalon>
+ <20140108043558.GG15891@verge.net.au>
+Message-ID: <20140218002610.GA9754@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 08:16:47PM +0900, Magnus Damm wrote:
-> Hi Laurent,
+On Wed, Jan 08, 2014 at 01:35:59PM +0900, Simon Horman wrote:
+> On Tue, Jan 07, 2014 at 10:54:41AM +0100, Laurent Pinchart wrote:
+> > On Wednesday 11 December 2013 13:52:31 Laurent Pinchart wrote:
+> > > Hi Magnus,
+> > > 
+> > > Could you tell me who is responsible for merging drivers/sh patches ? If
+> > > that's one of you, could you please pick this patch up for v3.14 ?
+> > 
+> > Ping ?
 > 
-> On Mon, Feb 17, 2014 at 7:59 PM, Laurent Pinchart
-> <laurent.pinchart@ideasonboard.com> wrote:
-> > Hi Magnus,
-> >
-> > Thank you for the patch.
-> >
-> > On Monday 17 February 2014 15:35:10 Magnus Damm wrote:
-> >> From: Magnus Damm <damm@opensource.se>
-> >>
-> >> Remove __init from rcar_gen2_read_mode_pins() to allow
-> >> it to be used after boot. For instance the R-Car Gen2
-> >> MD21 check is needed even in the case of CPU Hotplug.
-> >>
-> >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> >> ---
-> >>
-> >>  Written against renesas-devel-v3.14-rc2-20140213
-> >>
-> >>  arch/arm/mach-shmobile/setup-rcar-gen2.c |    2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> --- 0001/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> >> +++ work/arch/arm/mach-shmobile/setup-rcar-gen2.c     2014-02-17
-> >> 15:02:48.000000000 +0900 @@ -28,7 +28,7 @@
-> >>
-> >>  #define MODEMR 0xe6160060
-> >>
-> >> -u32 __init rcar_gen2_read_mode_pins(void)
-> >> +u32 rcar_gen2_read_mode_pins(void)
-> >>  {
-> >>       void __iomem *modemr = ioremap_nocache(MODEMR, 4);
-> >>       u32 mode;
-> >
-> > Should we read the value once at boot time and cache it ?
-> 
-> Seems a bit of a micro-optimization to me, but sure, it can't hurt.
-> 
-> Care to cook up an incremental patch implementing that? =)
+> I am happy to take this if no one objects.
 
-I have decided to take this patch as-is.
-Feel free to make incremental changes on top of it.
+Sorry for the extended delay on this one.
+I have finally queued it up.
+
+> > > On Wednesday 27 November 2013 02:18:37 Laurent Pinchart wrote:
+> > > > This helps increasing build testing coverage.
+> > > > 
+> > > > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > > > Signed-off-by: Laurent Pinchart
+> > > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > > ---
+> > > > 
+> > > >  drivers/sh/intc/Kconfig | 2 +-
+> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > > 
+> > > > diff --git a/drivers/sh/intc/Kconfig b/drivers/sh/intc/Kconfig
+> > > > index a305731..f7d9061 100644
+> > > > --- a/drivers/sh/intc/Kconfig
+> > > > +++ b/drivers/sh/intc/Kconfig
+> > > > @@ -6,7 +6,7 @@ comment "Interrupt controller options"
+> > > > 
+> > > >  config INTC_USERIMASK
+> > > >  
+> > > >  	bool "Userspace interrupt masking support"
+> > > > 
+> > > > -	depends on ARCH_SHMOBILE || (SUPERH && CPU_SH4A)
+> > > > +	depends on ARCH_SHMOBILE || (SUPERH && CPU_SH4A) || COMPILE_TEST
+> > > > 
+> > > >  	help
+> > > >  	
+> > > >  	  This enables support for hardware-assisted userspace hardirq
+> > > >  	  masking.
+> > 
+> > -- 
+> > Regards,
+> > 
+> > Laurent Pinchart
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
