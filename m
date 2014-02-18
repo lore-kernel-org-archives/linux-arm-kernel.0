@@ -1,29 +1,45 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 18 Feb 2014 18:09:18 -0500 (EST)
-Subject: [PATCH v2] net: ethernet: update dependency and help text of
- mvneta
-In-Reply-To: <1392729491-24913-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392729491-24913-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140218.180918.2278994810974129533.davem@davemloft.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 19 Feb 2014 00:14:16 +0100
+Subject: [PATCH] rtc: mv: reset date if after year 2038
+In-Reply-To: <20140218191111.GH31116@joshc.qualcomm.com>
+References: <1392729966-25394-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140218191111.GH31116@joshc.qualcomm.com>
+Message-ID: <20140219001416.45a79767@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Date: Tue, 18 Feb 2014 14:18:11 +0100
+Dear Josh Cartwright,
 
-> With the introduction of the support for Armada 375 and Armada 38x,
-> the hidden Kconfig option MACH_ARMADA_370_XP is being renamed to
-> MACH_MVEBU_V7. Therefore, the dependency that was used for the mvneta
-> driver can no longer work. This commit replaces this dependency by a
-> dependency on PLAT_ORION, which is used similarly for the mv643xx_eth
-> driver.
+On Tue, 18 Feb 2014 13:11:11 -0600, Josh Cartwright wrote:
+> On Tue, Feb 18, 2014 at 02:26:06PM +0100, Thomas Petazzoni wrote:
+> > Dates after January, 19th 2038 are badly handled by userspace due to
+> > the time being stored on 32 bits. This causes issues on some Marvell
+> > platform on which the RTC is initialized by default to a date that's
+> > beyond 2038, causing a really weird behavior of the RTC.
+> > 
+> > In order to avoid that, reset the date to a sane value if the RTC is
+> > beyond 2038.
 > 
-> In addition to this, it takes this opportunity to adjust the
-> description and help text to indicate that the driver can is also used
-> for Armada 38x. Note that Armada 375 cannot use this driver as it has
-> a completely different networking unit, which will require a separate
-> driver.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Just so I better understand: is this really a problem that is unique to
+> this particular RTC?  It smells a bit like we're papering over a problem
+> that may exist for other RTCs as well, and if so, is better solved in
+> the core.
 
-Applied, thanks.
+I'd say it depends on how the RTC internally encodes the date. Some RTC
+may have an internal date representation that allows to represent dates
+past 2^32 seconds after Epoch, while maybe some RTC do not.
+
+However, it is true that a fairly large number of RTC drivers seem to
+use the bcd2bin() function, which indicates the RTC internally uses a
+BCD representation, which allows to represent dates past 2^32 seconds
+after Epoch.
+
+That being said, I don't think the RTC core has any knowledge of what
+the internal RTC representation of time is, so I don't know how the
+core could fix things up without this information.
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
