@@ -1,19 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 18 Feb 2014 10:22:15 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_DEBUG_FS
-In-Reply-To: <1392659460-6821-1-git-send-email-fabio.estevam@freescale.com>
-References: <1392659460-6821-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20140218022214.GC15716@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 18 Feb 2014 11:31:06 +0900
+Subject: [PATCH] ARM: shmobile: Remove EMEV2 header file
+In-Reply-To: <20140218000926.GB4776@verge.net.au>
+References: <20140217073508.11156.21720.sendpatchset@w520>
+ <20140218000926.GB4776@verge.net.au>
+Message-ID: <20140218023103.GA17063@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 02:51:00PM -0300, Fabio Estevam wrote:
-> CONFIG_DEBUG_FS is a very useful debug option as it allow us to access key
-> data such as the clock tree, for example:
+On Tue, Feb 18, 2014 at 09:09:29AM +0900, Simon Horman wrote:
+> On Mon, Feb 17, 2014 at 04:35:08PM +0900, Magnus Damm wrote:
+> > From: Magnus Damm <damm@opensource.se>
+> > 
+> > There is no C board code left for the EMEV2 SoC, so
+> > get rid of the emev2.h include file to save some lines.
+> > While at it make functions static.
+> > 
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
 > 
-> mount -t debugfs debugfs /sys/kernel/debug
-> cat /sys/kernel/debug/clk/clk_summary
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Thanks, I have queued this up.
 
-Applied, thanks. 
+I have changed my mind and decided to defer this patch
+to avoid a tedious dependency of an SoC patch on a board patch.
