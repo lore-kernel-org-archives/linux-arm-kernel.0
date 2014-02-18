@@ -1,83 +1,169 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 18 Feb 2014 12:36:01 +0100
-Subject: [RFC PATCH v3 0/9] imx-drm dt bindings
-Message-ID: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
+Date: Tue, 18 Feb 2014 12:36:05 +0100
+Subject: [RFC PATCH v3 4/9] staging: imx-drm: Document updated imx-drm device
+ tree bindings
+In-Reply-To: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
+References: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1392723370-4772-5-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch updates the device tree binding documentation for i.MX IPU/display
+nodes using the OF graph bindings documented in
+Documentation/devicetree/bindings/media/video-interfaces.txt.
 
-here is an updated and more complete version of the imx-drm DT binding
-series. These patches apply on top of Russell's second preview of the
-imx-drm cleanup series on v3.14-rc2. I have added device tree bindings
-between IPU and the encoders as documented in
-Documentation/devicetree/bindings/media/video-interfaces.txt
-and used those to determine the possible_crtcs and mux_id.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       | 48 +++++++++++++++++++---
+ .../devicetree/bindings/staging/imx-drm/ldb.txt    | 20 +++++++--
+ 2 files changed, 59 insertions(+), 9 deletions(-)
 
-The crtc cookie is replaced with a the port device tree node,
-which is unique and therefore allows to get rid of the di_id
-comparison. Storing the multiplexer input numbers in the device
-tree removes the need to know the ipu_id. This should also allow
-to replace IPU2 with LCDIF on i.MX6 Solo more easily.
-
-In v3 also connections between display interface ports and encoders are
-used to find all necessary components, so that only the display interfaces
-have to be configured in the imx-drm node. This allows to move the imx-drm
-node into the SoC level dtsi. I've also updated the existing i.MX51 and
-i.MX53 device trees this time and updated/added the devicetree binding
-documentation.
-
-Patch 2/9 adds a temporary copy of the v4l2_of parser functions. Those
-are going to be moved to some place where they can be used by drm drivers,
-eventually, so those local copies can be dropped again.
-
-regards
-Philipp
-
-Lucas Stach (1):
-  staging: imx-drm-core: don't request probe deferral in
-    imx_drm_encoder_parse_of
-
-Philipp Zabel (8):
-  staging: imx-drm: Add temporary copies of v4l2-of parsing functions
-  staging: imx-drm-core: Use OF graph to find components and connections
-    between encoder and crtcs
-  staging: imx-drm: Document updated imx-drm device tree bindings
-  staging: imx-drm: Document imx-hdmi device tree bindings
-  ARM: dts: imx51: Add IPU ports and endpoints, move imx-drm node to
-    dtsi
-  ARM: dts: imx53: Add IPU DI ports and endpoints, move imx-drm node to
-    dtsi
-  ARM: dts: imx6qdl: Add IPU DI ports and endpoints, move imx-drm node
-    to dtsi
-  staging: imx-drm: Update TODO
-
- .../bindings/staging/imx-drm/fsl-imx-drm.txt       |  48 ++++-
- .../devicetree/bindings/staging/imx-drm/hdmi.txt   |  53 +++++
- .../devicetree/bindings/staging/imx-drm/ldb.txt    |  20 +-
- arch/arm/boot/dts/imx51-apf51dev.dts               |  11 +-
- arch/arm/boot/dts/imx51-babbage.dts                |  28 ++-
- arch/arm/boot/dts/imx51.dtsi                       |  22 ++-
- arch/arm/boot/dts/imx53-m53evk.dts                 |  17 +-
- arch/arm/boot/dts/imx53-mba53.dts                  |  15 +-
- arch/arm/boot/dts/imx53-qsb.dts                    |  17 +-
- arch/arm/boot/dts/imx53.dtsi                       |  64 +++++-
- arch/arm/boot/dts/imx6dl.dtsi                      |  22 +--
- arch/arm/boot/dts/imx6q-sabresd.dts                |   4 -
- arch/arm/boot/dts/imx6q.dtsi                       | 124 +++++++++++-
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |   6 -
- arch/arm/boot/dts/imx6qdl.dtsi                     | 138 ++++++++++++-
- drivers/staging/imx-drm/Makefile                   |   2 +-
- drivers/staging/imx-drm/TODO                       |   5 -
- drivers/staging/imx-drm/imx-drm-core.c             | 217 ++++++++++++++-------
- drivers/staging/imx-drm/imx-drm-of.c               | 132 +++++++++++++
- drivers/staging/imx-drm/imx-drm.h                  |  11 +-
- drivers/staging/imx-drm/imx-hdmi.c                 |   2 +-
- drivers/staging/imx-drm/imx-ldb.c                  |   4 +-
- drivers/staging/imx-drm/ipuv3-crtc.c               |  47 ++++-
- 23 files changed, 842 insertions(+), 167 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
- create mode 100644 drivers/staging/imx-drm/imx-drm-of.c
-
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+index b876d49..bfa19a4 100644
+--- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
++++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+@@ -1,3 +1,22 @@
++Freescale i.MX DRM master device
++================================
++
++The freescale i.MX DRM master device is a virtual device needed to list all
++IPU or other display interface nodes that comprise the graphics subsystem.
++
++Required properties:
++- compatible: Should be "fsl,imx-drm"
++- ports: Should contain a list of phandles pointing to display interface ports
++  of IPU devices
++
++example:
++
++imx-drm {
++	compatible = "fsl,imx-drm";
++	ports = <&ipu_di0>;
++};
++
++
+ Freescale i.MX IPUv3
+ ====================
+ 
+@@ -7,18 +26,31 @@ Required properties:
+   datasheet
+ - interrupts: Should contain sync interrupt and error interrupt,
+   in this order.
+-- #crtc-cells: 1, See below
+ - resets: phandle pointing to the system reset controller and
+           reset line index, see reset/fsl,imx-src.txt for details
++Optional properties:
++- port@[0-3]: Port nodes with endpoint definitions as defined in
++  Documentation/devicetree/bindings/media/video-interfaces.txt.
++  Ports 0 and 1 should correspond to CSI0 and CSI1,
++  ports 2 and 3 should correspond to DI0 and DI1, respectively.
+ 
+ example:
+ 
+ ipu: ipu at 18000000 {
+-	#crtc-cells = <1>;
++	#address-cells = <1>;
++	#size-cells = <0>;
+ 	compatible = "fsl,imx53-ipu";
+ 	reg = <0x18000000 0x080000000>;
+ 	interrupts = <11 10>;
+ 	resets = <&src 2>;
++
++	ipu_di0: port at 2 {
++		reg = <2>;
++
++		ipu_di0_disp0: endpoint {
++			remote-endpoint = <&display_in>;
++		};
++	};
+ };
+ 
+ Parallel display support
+@@ -26,19 +58,25 @@ Parallel display support
+ 
+ Required properties:
+ - compatible: Should be "fsl,imx-parallel-display"
+-- crtc: the crtc this display is connected to, see below
+ Optional properties:
+ - interface_pix_fmt: How this display is connected to the
+-  crtc. Currently supported types: "rgb24", "rgb565", "bgr666"
++  display interface. Currently supported types: "rgb24", "rgb565", "bgr666"
+ - edid: verbatim EDID data block describing attached display.
+ - ddc: phandle describing the i2c bus handling the display data
+   channel
++- port: A port node with endpoint definitions as defined in
++  Documentation/devicetree/bindings/media/video-interfaces.txt.
+ 
+ example:
+ 
+ display at di0 {
+ 	compatible = "fsl,imx-parallel-display";
+ 	edid = [edid-data];
+-	crtc = <&ipu 0>;
+ 	interface-pix-fmt = "rgb24";
++
++	port {
++		display_in: endpoint {
++			remote-endpoint = <&ipu_di0_disp0>;
++		};
++	};
+ };
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt b/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
+index ed93778..578a1fc 100644
+--- a/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
++++ b/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
+@@ -50,12 +50,14 @@ have a look at Documentation/devicetree/bindings/video/display-timing.txt.
+ 
+ Required properties:
+  - reg : should be <0> or <1>
+- - crtcs : a list of phandles with index pointing to the IPU display interfaces
+-           that can be used as video source for this channel.
+  - fsl,data-mapping : should be "spwg" or "jeida"
+                       This describes how the color bits are laid out in the
+                       serialized LVDS signal.
+  - fsl,data-width : should be <18> or <24>
++ - port: A port node with endpoint definitions as defined in
++   Documentation/devicetree/bindings/media/video-interfaces.txt.
++   On i.MX6, there should be four ports (port@[0-3]) that correspond
++   to the four LVDS multiplexer inputs.
+ 
+ example:
+ 
+@@ -77,23 +79,33 @@ ldb: ldb at 53fa8008 {
+ 
+ 	lvds-channel at 0 {
+ 		reg = <0>;
+-		crtcs = <&ipu 0>;
+ 		fsl,data-mapping = "spwg";
+ 		fsl,data-width = <24>;
+ 
+ 		display-timings {
+ 			/* ... */
+ 		};
++
++		port {
++			lvds0_in: endpoint {
++				remote-endpoint = <&ipu_di0_lvds0>;
++			};
++		};
+ 	};
+ 
+ 	lvds-channel at 1 {
+ 		reg = <1>;
+-		crtcs = <&ipu 1>;
+ 		fsl,data-mapping = "spwg";
+ 		fsl,data-width = <24>;
+ 
+ 		display-timings {
+ 			/* ... */
+ 		};
++
++		port {
++			lvds1_in: endpoint {
++				remote-endpoint = <&ipu_di1_lvds1>;
++			};
++		};
+ 	};
+ };
 -- 
 1.8.5.3
