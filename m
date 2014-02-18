@@ -1,50 +1,102 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Feb 2014 11:29:51 +0100
-Subject: [PATCH] net: ethernet: remove unneeded dependency of mvneta and
- update help text
-Message-ID: <1392719391-8851-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Feb 2014 10:30:16 +0000
+Subject: [PATCH 1/3] arm64: dts: add initial dts for Samsung GH7 SoC
+ and SSDK-GH7 board
+In-Reply-To: <52F9960A.2090802@samsung.com>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <1392100183-30930-2-git-send-email-kgene.kim@samsung.com>
+ <20140211181529.GC15200@e106331-lin.cambridge.arm.com>
+ <52F9960A.2090802@samsung.com>
+Message-ID: <20140218103015.GA6051@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of the support for Armada 375 and Armada 38x,
-the hidden Kconfig option MACH_ARMADA_370_XP is being renamed to
-MACH_MVEBU_V7. Therefore, the dependency that was used for the mvneta
-driver can no longer work.
+On Tue, Feb 11, 2014 at 03:16:26AM +0000, Kukjin Kim wrote:
+> On 02/12/14 03:15, Mark Rutland wrote:
+> > On Tue, Feb 11, 2014 at 06:29:41AM +0000, Kukjin Kim wrote:
+> >> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
+> >> Reviewed-by: Thomas Abraham<thomas.ab@samsung.com>
+> >> Cc: Catalin Marinas<catalin.marinas@arm.com>
+> >> ---
+> >>   arch/arm64/boot/dts/samsung-gh7.dtsi     |  108 ++++++++++++++++++++++++++++++
+> >>   arch/arm64/boot/dts/samsung-ssdk-gh7.dts |   26 +++++++
+> >>   2 files changed, 134 insertions(+)
+> >>   create mode 100644 arch/arm64/boot/dts/samsung-gh7.dtsi
+> >>   create mode 100644 arch/arm64/boot/dts/samsung-ssdk-gh7.dts
+> >>
+> >> diff --git a/arch/arm64/boot/dts/samsung-gh7.dtsi b/arch/arm64/boot/dts/samsung-gh7.dtsi
+> >> new file mode 100644
+> >> index 0000000..5b8785c
+> >> --- /dev/null
+> >> +++ b/arch/arm64/boot/dts/samsung-gh7.dtsi
+> >> @@ -0,0 +1,108 @@
+> >> +/*
+> >> + * SAMSUNG GH7 SoC device tree source
+> >> + *
+> >> + * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+> >> + *		http://www.samsung.com
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or modify
+> >> + * it under the terms of the GNU General Public License version 2 as
+> >> + * published by the Free Software Foundation.
+> >> +*/
+> >> +
+> >> +/dts-v1/;
+> >> +
+> >> +/memreserve/ 0x80000000 0x0C400000;
+> >
+> > That looks _very_ large. What is this for?
+> >
+> Yes, I know but we need to reserve that for EL3 monitor, UEFI services, 
+> secure, hypervisor and scan chanin...
 
-However, such a dependency is not really necessary: there is no point
-in preventing this driver from being built in other situations, just
-like the mv643xx_eth driver. As a consequence, this commit removes the
-unnecessary Kconfig dependency.
+OK. How much of that memory does the kernel need to know about then?
 
-In addition to this, it takes this opportunity to adjust the
-description and help text to indicate that the driver can is also used
-for Armada 38x. Note that Armada 375 cannot use this driver as it has
-a completely different networking unit, which will require a separate
-driver.
+Surely the kernel shouldn't be able to map the EL3 monitor or hypervisor
+at all?
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/net/ethernet/marvell/Kconfig | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+What address is the kernel getting loaded at if everything up to
+0x8C400000 isn't usable?
 
-diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
-index 6300fd2..97b91f7 100644
---- a/drivers/net/ethernet/marvell/Kconfig
-+++ b/drivers/net/ethernet/marvell/Kconfig
-@@ -43,12 +43,11 @@ config MVMDIO
- 	  This driver is used by the MV643XX_ETH and MVNETA drivers.
- 
- config MVNETA
--	tristate "Marvell Armada 370/XP network interface support"
--	depends on MACH_ARMADA_370_XP
-+	tristate "Marvell Armada 370/38x/XP network interface support"
- 	select MVMDIO
- 	---help---
- 	  This driver supports the network interface units in the
--	  Marvell ARMADA XP and ARMADA 370 SoC family.
-+	  Marvell ARMADA XP, ARMADA 370 and Armada 38x SoC family.
- 
- 	  Note that this driver is distinct from the mv643xx_eth
- 	  driver, which should be used for the older Marvell SoCs
--- 
-1.8.3.2
+[...]
+
+> 
+> > [...]
+> >
+> >> +	amba {
+> >> +		compatible = "arm,amba-bus";
+> >> +		#address-cells =<1>;
+> >> +		#size-cells =<1>;
+> >> +		ranges;
+> >> +
+> >> +		serial at 12c00000 {
+> >> +			compatible = "arm,pl011", "arm,primecell";
+> >> +			reg =<0x12c00000 0x10000>;
+> >> +			interrupts =<418>;
+> >> +		};
+> >> +
+> >> +		serial at 12c20000 {
+> >> +			compatible = "arm,pl011", "arm,primecell";
+> >> +			reg =<0x12c20000 0x10000>;
+> >> +			interrupts =<420>;
+> >> +		};
+> >
+> > Don't these need clocks?
+> >
+> We don't need and the clocks will be handled by bootloader...
+
+While that might be sufficient for the device to function, Linux doesn't
+know that from this DT, and as far as I can see the device can't
+possibly probe, as no clocks are provided through platform data:
+
+of_platform_bus_create will call of_amba_device_create for anyting
+compatible with "arm,primecell". This in turn will call amba_device_add,
+which will call amba_get_enable_pclk. Then clk_get(&pcdev->dev,
+"apb_pclk") should fail, amba_device_add should fail, and
+of_platform_bus_create will stop trying to probe the node.
+of_platform_populate will carry on probing other nodes.
+
+Surely the pl011 nodes at least need "apb_pclk"?
+
+Cheers,
+Mark.
