@@ -1,28 +1,24 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 18 Feb 2014 12:43:22 +0100
-Subject: [PATCH V3 11/17] i2c: nomadik: Convert to devm functions
-In-Reply-To: <20140218110109.GA18768@katana>
-References: <1392650418-14820-1-git-send-email-ulf.hansson@linaro.org>
- <20140218110109.GA18768@katana>
-Message-ID: <CAPDyKFpRaAAer00dqcXR-qOT9S8-SDTnaMUHRwWCZ93w-wnTDA@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 18 Feb 2014 17:11:52 +0530
+Subject: [PATCH] dma: sdma: Add imx25 compatible
+In-Reply-To: <1392577855-23375-1-git-send-email-mpa@pengutronix.de>
+References: <1392577855-23375-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20140218114152.GG10628@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 February 2014 12:01, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Mon, Feb 17, 2014 at 04:20:18PM +0100, Ulf Hansson wrote:
->> Use devm_* functions to simplify code and error handling.
->>
->> Cc: Alessandro Rubini <rubini@unipv.it>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Wolfram Sang <wsa@the-dreams.de>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->
-> What has changed in V3? I didn't get the cover letter.
+On Sun, Feb 16, 2014 at 08:10:55PM +0100, Markus Pargmann wrote:
+> imx25 did not work without a firmware previously.
+> 
+> This patch adds a DT compatible to pass the correct data with the
+> default script addresses for imx25.
+> 
+> Add imx25 compatible to the list of compatibles in the binding
+> documentation.
+> 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-I added the IS_ERR, check as you suggested. That caused a rebase of
-the other patches as well.
+Applie,d thanks
 
-Sorry if it was unclear.
-
-Kind regards
-Uffe
+-- 
+~Vinod
