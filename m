@@ -1,83 +1,41 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Tue, 18 Feb 2014 16:59:23 +0000
-Subject: BUG: Null pointer dereference on booting TC2 with
- vexpress_defconfig
-In-Reply-To: <CAMJs5B-G86o8Tjcwg+dvDETqQ5qiDsDFB9kBPtL=RBLqFqpAOQ@mail.gmail.com>
-References: <20140217223907.GH21070@cbox>	<53033E37.6000402@arm.com>
- <CAMJs5B-G86o8Tjcwg+dvDETqQ5qiDsDFB9kBPtL=RBLqFqpAOQ@mail.gmail.com>
-Message-ID: <5303916B.5060303@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 18 Feb 2014 18:02:38 +0100
+Subject: [PATCH 03/17] mmc: mmci: Mask IRQs for all variants during
+ runtime suspend
+In-Reply-To: <20140218164614.GI21483@n2100.arm.linux.org.uk>
+References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+ <1391529538-21685-4-git-send-email-ulf.hansson@linaro.org>
+ <20140218160542.GH21483@n2100.arm.linux.org.uk>
+ <CAPDyKFq3uAoo7p-7hZgBmMJ4jf9A7dC0aUZJYUE0z1Qq5W=0bw@mail.gmail.com>
+ <20140218164614.GI21483@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFrjOyg8K2UfE61NiQLNJy+6RrRf_Y8ogECNAiGDobS1Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/02/14 16:33, Christoffer Dall wrote:
-> On 18 February 2014 03:04, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
->> On 17/02/14 22:39, Christoffer Dall wrote:
->>> Booting my TC2 using 3.14-rc3 and vexpress_defconfig causes a NULL
->>> pointer dereference in schedule_work_on.
->>>
->>> A quick look at the trace indicates that schedule_work() is called
->>> before system_wq is initialized.
->>>
->>> Further, a bisect seems to indicate that this call path is triggered by
->>> the changes in this merge commit of Theodore T'so's random_for_linus
->>> tag:
->>> 0891ad829d2a0501053703df66029e843e3b8365
->>>
->>> (However, my bisect may not be 100% correct, as some of the commits
->>> between 3.13 and 3.12 don't boot the TC2 with vexpress_defconfig,
->>> specifically the ones after f9300eaaac1ca300083ad41937923a90cc3a2394,
->>> which causes boot to halt after "ARM CCI driver probed").
->>>
->> Yes that requires some changes in defconfig to continue to work across
->> these changes(mainly have all these new configs disabled)
->>
-> 
-> So vexpress_defconfig is known to not work on TC2?
+On 18 February 2014 17:46, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Feb 18, 2014 at 05:36:52PM +0100, Ulf Hansson wrote:
+>> If we add SDIO irq support to mmci in future; parts of that
+>> implementation includes a re-route of DAT1 to a GPIO irq when entering
+>> runtime suspend state. The mmci HW will in runtime suspend state, not
+>> be responsible for handling irqs, which is the same as of today.
 >
+> Note that the "irq thread" in sdio_irq is scheduled for destruction -
+> it's buggy when the system is under high load and a driver claims a
+> SDIO irq.  Sched people hate it too...
 
-I would say yes before v3.13 for TC2 at-least. Pawel's commit: 81d6e719d1f8(
-ARM: vexpress: Enable platform-specific options in defconfig) enabled several VE
-specific features.
+We kind of realized that too, in the early days for ux500. At that
+point we converted it to a use a dedicated work queue, which improved
+the behaviour, don't remember the details why, but maybe I should
+collect the patches and send them out. :-)
 
->>> Disabling CONFIG_ARCH_VEXPRESS_TC2_PM avoids the issue.
->>>
->> Are you just disabling this or even CONFIG_MCPM ? Are the secondaries cpus
->> coming up ?
->>
-> 
-> Disabling CONFIG_ARCH_VEXPRESS_TC2_PM allows the system to boot, but
-> only with one CPU.
-> 
-> Disabling CONFIG_MCPM allows SMP boot as well.
-> 
-Yes that's what I suspected.
+Finally we moved to use a separate GPIO irq as a dedicated SDIO irq
+line for our cw1200 wlan chip, mostly due to gain a bit of
+performance. That happened to simplified the mmci part as well, which
+was welcome.
 
->>> I'm not familiar enough with any of these code paths to quicly identify
->>> what the issue could be.  Apologies if I missed a previous post about
->>> this issue (I couldn't find anything but would be surprised if I'm the
->>> only one doing vexpress_defconfig on a TC2).
->>>
->> I just tried and it works fine. If CONFIG_MCPM and CONFIG_ARCH_VEXPRESS_TC2_PM,
->> it requires some changes in board configurations(for bootmon), I assume you have
->> done those changes.
->>
-> 
-> What works fine? With both configs enabled?
-> 
-Yes with the default vexpress_defconfig as is in the mainline.
-
-> I didn't change anything on the boot monitor side.  Can you give me a
-> pointer to the specifics?  Was there an announcement about this
-> somewhere that I failed to locate?
-> 
-
-You might be having very old firmware that doesn't support percpu mailbox and
-hence can't enable CONFIG_MCPM. You can refer CFGREG48 in Section 3.3.2 of [1]
-for details. You can grab the latest firmware in single step from [2] under
-Firmware tab.
-
-Regards,
-Sudeep
-
-[1] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0503g/CHDCADED.html
-[2] http://releases.linaro.org/14.01/openembedded/vexpress-lsk/
+>
+> --
+> FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+> in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+> Estimate before purchase was "up to 13.2Mbit".
