@@ -1,131 +1,40 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 18 Feb 2014 23:26:39 +0100
-Subject: [PATCH V4 11/17] i2c: nomadik: Convert to devm functions
-In-Reply-To: <1392762022-10871-1-git-send-email-ulf.hansson@linaro.org>
-References: <1392762022-10871-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAPDyKFqLNWYxCgQ1+LArCUT9bVcHY9ZnoqQn505g6fc1QV3DDw@mail.gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Tue, 18 Feb 2014 22:34:12 +0000
+Subject: [PATCH] dt: platform driver: Fill the resources before probe and
+ defer if needed
+In-Reply-To: <20140218202205.GA13835@kroah.com>
+References: <1392285429-9325-1-git-send-email-jjhiblot@traphandler.com> <
+ 20140218202205.GA13835@kroah.com>
+Message-ID: <20140218223412.B0DBCC40517@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 February 2014 23:20, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> Use devm_* functions to simplify code and error handling.
->
-> Cc: Alessandro Rubini <rubini@unipv.it>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->
-> Changes in v4:
->         Rebased on top of Linus Walleij's v2 patch:
->         "i2c: nomadik: factor platform data into state container"
->
->         Note, only this patch needed to be rebased in the patchset.
->
-> ---
->  drivers/i2c/busses/i2c-nomadik.c |   36 +++++++++++++++---------------------
->  1 file changed, 15 insertions(+), 21 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-> index b0b9390..cd15c03 100644
-> --- a/drivers/i2c/busses/i2c-nomadik.c
-> +++ b/drivers/i2c/busses/i2c-nomadik.c
-> @@ -976,7 +976,12 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
->         struct i2c_vendor_data *vendor = id->data;
->         u32 max_fifo_threshold = (vendor->fifodepth / 2) - 1;
->
-> -       dev = kzalloc(sizeof(struct nmk_i2c_dev), GFP_KERNEL);
-> +       if (!np) {
-> +               dev_err(&adev->dev, "no device node\n");
-> +               return -ENODEV;
-> +       }
-> +
+On Tue, 18 Feb 2014 12:22:05 -0800, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Thu, Feb 13, 2014 at 10:57:09AM +0100, Jean-Jacques Hiblot wrote:
+> > The goal of this patch is to allow drivers to be probed even if at the time of
+> > the DT parsing some of their ressources are not available yet.
+> > 
+> > In the current situation, the resource of a platform device are filled from the
+> > DT at the time the device is created (of_device_alloc()). The drawbackof this
+> > is that a device sitting close to the top of the DT (ahb for example) but
+> > depending on ressources that are initialized later (IRQ domain dynamically
+> > created for example)  will fail to probe because the ressources don't exist
+> > at this time.
+> > 
+> > This patch fills the resource structure only before the device is probed and
+> > will defer the probe if the resource are not available yet.
+> > 
+> > Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> > Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > ---
+> >  drivers/base/platform.c     |  6 ++++
+> >  drivers/of/platform.c       | 71 +++++++++++++++++++++++++++++----------------
+> >  include/linux/of_platform.h | 10 +++++++
+> >  3 files changed, 62 insertions(+), 25 deletions(-)
+> 
+> I need some others to ack this before I can take it...
 
-Argh, I managed to screw up again. The above code should not be there.
-The rebase of Linus v2 failed.
+Yes, please let me review it first, and I'll probably want to take it
+through the devicetree branch.
 
-Hold on, v5 coming soon. :-)
-
-Kind regards
-Uffe
-
-> +       dev = devm_kzalloc(&adev->dev, sizeof(struct nmk_i2c_dev), GFP_KERNEL);
->         if (!dev) {
->                 dev_err(&adev->dev, "cannot allocate memory\n");
->                 ret = -ENOMEM;
-> @@ -1006,27 +1011,28 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
->         /* If possible, let's go to idle until the first transfer */
->         pinctrl_pm_select_idle_state(&adev->dev);
->
-> -       dev->virtbase = ioremap(adev->res.start, resource_size(&adev->res));
-> -       if (!dev->virtbase) {
-> +       dev->virtbase = devm_ioremap(&adev->dev, adev->res.start,
-> +                               resource_size(&adev->res));
-> +       if (IS_ERR(dev->virtbase)) {
->                 ret = -ENOMEM;
-> -               goto err_no_ioremap;
-> +               goto err_no_mem;
->         }
->
->         dev->irq = adev->irq[0];
-> -       ret = request_irq(dev->irq, i2c_irq_handler, 0,
-> +       ret = devm_request_irq(&adev->dev, dev->irq, i2c_irq_handler, 0,
->                                 DRIVER_NAME, dev);
->         if (ret) {
->                 dev_err(&adev->dev, "cannot claim the irq %d\n", dev->irq);
-> -               goto err_irq;
-> +               goto err_no_mem;
->         }
->
->         pm_suspend_ignore_children(&adev->dev, true);
->
-> -       dev->clk = clk_get(&adev->dev, NULL);
-> +       dev->clk = devm_clk_get(&adev->dev, NULL);
->         if (IS_ERR(dev->clk)) {
->                 dev_err(&adev->dev, "could not get i2c clock\n");
->                 ret = PTR_ERR(dev->clk);
-> -               goto err_no_clk;
-> +               goto err_no_mem;
->         }
->
->         adap = &dev->adap;
-> @@ -1048,21 +1054,13 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
->         ret = i2c_add_adapter(adap);
->         if (ret) {
->                 dev_err(&adev->dev, "failed to add adapter\n");
-> -               goto err_add_adap;
-> +               goto err_no_mem;
->         }
->
->         pm_runtime_put(&adev->dev);
->
->         return 0;
->
-> - err_add_adap:
-> -       clk_put(dev->clk);
-> - err_no_clk:
-> -       free_irq(dev->irq, dev);
-> - err_irq:
-> -       iounmap(dev->virtbase);
-> - err_no_ioremap:
-> -       kfree(dev);
->   err_no_mem:
->
->         return ret;
-> @@ -1079,13 +1077,9 @@ static int nmk_i2c_remove(struct amba_device *adev)
->         clear_all_interrupts(dev);
->         /* disable the controller */
->         i2c_clr_bit(dev->virtbase + I2C_CR, I2C_CR_PE);
-> -       free_irq(dev->irq, dev);
-> -       iounmap(dev->virtbase);
->         if (res)
->                 release_mem_region(res->start, resource_size(res));
-> -       clk_put(dev->clk);
->         pm_runtime_disable(&adev->dev);
-> -       kfree(dev);
->
->         return 0;
->  }
-> --
-> 1.7.9.5
->
+g.
