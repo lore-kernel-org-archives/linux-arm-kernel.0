@@ -1,69 +1,62 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Feb 2014 10:24:16 -0600
-Subject: [PATCH v2] usb: phy: msm: fix compilation errors when
- !CONFIG_PM_SLEEP
-In-Reply-To: <20140117182650.GZ8153@joshc.qualcomm.com>
-References: <87lhyemr3y.fsf@linaro.org>
- <1389981531-15539-1-git-send-email-joshc@codeaurora.org>
- <20140117182650.GZ8153@joshc.qualcomm.com>
-Message-ID: <20140218162407.GF9878@saruman.home>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 18 Feb 2014 11:30:07 -0500
+Subject: [GIT PULL] ARM: mvebu: DT changes for v3.15
+Message-ID: <20140218163007.GV7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 12:26:50PM -0600, Josh Cartwright wrote:
-> On Fri, Jan 17, 2014 at 11:58:51AM -0600, Josh Cartwright wrote:
-> > Both the PM_RUNTIME and PM_SLEEP callbacks call into the common
-> > msm_otg_{suspend,resume} routines, however these routines are only being
-> > built when CONFIG_PM_SLEEP.  In addition, msm_otg_{suspend,resume} also
-> > depends on msm_hsusb_config_vddcx(), which is only built when
-> > CONFIG_PM_SLEEP.
-> > 
-> > Fix the CONFIG_PM_RUNTIME, !CONFIG_PM_SLEEP case by changing the
-> > preprocessor conditional, and moving msm_hsusb_config_vddcx().
-> > 
-> > While we're here, eliminate the CONFIG_PM conditional for setting
-> > up the dev_pm_ops.
-> > 
-> > This address the following errors Russell King has hit doing randconfig
-> > builds:
-> > 
-> > drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_suspend':
-> > drivers/usb/phy/phy-msm-usb.c:1691:2: error: implicit declaration of function 'msm_otg_suspend'
-> > drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_resume':
-> > drivers/usb/phy/phy-msm-usb.c:1699:2: error: implicit declaration of function 'msm_otg_resume'
-> > 
-> > Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
-> > Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> > ---
-> > v1->v2: Change conditional to simply CONFIG_PM (thanks ccov and khilman!)
-> > 
-> >  drivers/usb/phy/phy-msm-usb.c | 57 ++++++++++++++++++++-----------------------
-> >  1 file changed, 26 insertions(+), 31 deletions(-)
-> > 
-> > diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
-> > index 8546c8d..5b169a7 100644
-> > --- a/drivers/usb/phy/phy-msm-usb.c
-> > +++ b/drivers/usb/phy/phy-msm-usb.c
-> [..]
-> > @@ -440,7 +414,32 @@ static int msm_otg_reset(struct usb_phy *phy)
-> >  #define PHY_SUSPEND_TIMEOUT_USEC	(500 * 1000)
-> >  #define PHY_RESUME_TIMEOUT_USEC	(100 * 1000)
-> >  
-> > -#ifdef CONFIG_PM_SLEEP
-> > +#if CONFIG_PM
-> 
-> *sigh*.  This, of course, should have been #ifdef CONFIG_PM.  Fixed
-> v3 below.
+All,
 
-sorry, please git send-email it properly.
+Nothing special here.  These have been in next at least a week (the
+kirkwood boards much longer).  Please pull.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/3f152bfa/attachment.sig>
+thx,
+
+Jason.
+
+
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.15
+
+for you to fetch changes up to 5c0169d1c503aab2d62ee6f6e342a78e2ea9e3ed:
+
+  ARM: mvebu: use input DT defines in Armada 370/XP boards (2014-02-11 19:35:39 +0000)
+
+----------------------------------------------------------------
+mvebu DT changes for v3.15
+
+ - kirkwood
+    - new board QNAP 419
+    - new board Excito Bubba B3
+
+ - mvebu
+    - use gpio and input defines for Armada 370/XP boards
+
+----------------------------------------------------------------
+Andrew Lunn (2):
+      ARM: Kirkwood: Add support for Excito Bubba B3
+      ARM: Kirkwood: Add DT description of QNAP 419
+
+Thomas Petazzoni (2):
+      ARM: mvebu: use GPIO DT defines in Armada 370/XP boards
+      ARM: mvebu: use input DT defines in Armada 370/XP boards
+
+ arch/arm/boot/dts/Makefile                       |   7 +-
+ arch/arm/boot/dts/armada-370-mirabox.dts         |   7 +-
+ arch/arm/boot/dts/armada-370-rd.dts              |   6 +-
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts        |   6 +-
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |  12 +-
+ arch/arm/boot/dts/kirkwood-b3.dts                | 204 +++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-ts419-6281.dts        |  20 +++
+ arch/arm/boot/dts/kirkwood-ts419-6282.dts        |  32 ++++
+ arch/arm/boot/dts/kirkwood-ts419.dtsi            |  75 +++++++++
+ 9 files changed, 355 insertions(+), 14 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-b3.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6281.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ts419-6282.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ts419.dtsi
