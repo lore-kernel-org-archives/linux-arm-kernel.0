@@ -1,94 +1,153 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 18 Feb 2014 20:12:10 +0000
-Subject: [PATCH 30/34] imx-drm: imx-drm-core: add core hotplug connector
- support
+Date: Tue, 18 Feb 2014 20:12:15 +0000
+Subject: [PATCH 31/34] imx-drm: imx-hdmi: add hotplug support to HDMI component
 In-Reply-To: <20140218200900.GM21483@n2100.arm.linux.org.uk>
 References: <20140218200900.GM21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WFr1W-0007kM-Il@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WFr1b-0007kQ-MO@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add core imx-drm support for hotplug connector support.  We need to
-setup the poll helper after we've setup the connectors; the helper
-scans the connectors to determine their capabilities.
+Add hotplug support.  We have to make the interrupt handler threaded so
+we can call drm_helper_hpd_irq_event().  Keeping in mind that we will
+want to share the interrupt with other HDMI interface drivers (eg, audio
+and CEC) put the groundwork in now for that, rather than just using
+IRQF_ONESHOT.
+
+Also, we must not call drm_helper_hpd_irq_event() until we have fully
+setup the connector; keep the interrupt(s) muted until after that point.
 
 Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c | 21 +++++++++++++++++----
- 1 file changed, 17 insertions(+), 4 deletions(-)
+ drivers/staging/imx-drm/imx-hdmi.c | 40 +++++++++++++++++++++++++++++++-------
+ 1 file changed, 33 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 7939cea8311a..dcba51853e8a 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -69,7 +69,11 @@ static int imx_drm_driver_unload(struct drm_device *drm)
- {
- #if IS_ENABLED(CONFIG_DRM_IMX_FB_HELPER)
- 	struct imx_drm_device *imxdrm = drm->dev_private;
-+#endif
+diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
+index 8c586453df11..ab16aba7788d 100644
+--- a/drivers/staging/imx-drm/imx-hdmi.c
++++ b/drivers/staging/imx-drm/imx-hdmi.c
+@@ -120,6 +120,8 @@ struct imx_hdmi {
+ 	struct clk *isfr_clk;
+ 	struct clk *iahb_clk;
+ 
++	enum drm_connector_status connector_status;
 +
-+	drm_kms_helper_poll_fini(drm);
+ 	struct hdmi_data_info hdmi_data;
+ 	int vic;
  
-+#if IS_ENABLED(CONFIG_DRM_IMX_FB_HELPER)
- 	if (imxdrm->fbhelper)
- 		drm_fbdev_cma_fini(imxdrm->fbhelper);
- #endif
-@@ -77,7 +81,6 @@ static int imx_drm_driver_unload(struct drm_device *drm)
- 	component_unbind_all(drm->dev, drm);
+@@ -1301,9 +1303,6 @@ static int imx_hdmi_fb_registered(struct imx_hdmi *hdmi)
+ 	/* Clear Hotplug interrupts */
+ 	hdmi_writeb(hdmi, HDMI_IH_PHY_STAT0_HPD, HDMI_IH_PHY_STAT0);
  
- 	drm_vblank_cleanup(drm);
--	drm_kms_helper_poll_fini(drm);
- 	drm_mode_config_cleanup(drm);
- 
+-	/* Unmute interrupts */
+-	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
+-
  	return 0;
-@@ -213,8 +216,18 @@ void imx_drm_encoder_destroy(struct drm_encoder *encoder)
  }
- EXPORT_SYMBOL_GPL(imx_drm_encoder_destroy);
  
-+static void imx_drm_output_poll_changed(struct drm_device *drm)
-+{
-+#if IS_ENABLED(CONFIG_DRM_IMX_FB_HELPER)
-+	struct imx_drm_device *imxdrm = drm->dev_private;
-+
-+	drm_fbdev_cma_hotplug_event(imxdrm->fbhelper);
-+#endif
-+}
-+
- static struct drm_mode_config_funcs imx_drm_mode_config_funcs = {
- 	.fb_create = drm_fb_cma_create,
-+	.output_poll_changed = imx_drm_output_poll_changed,
+@@ -1372,8 +1371,9 @@ static void imx_hdmi_poweroff(struct imx_hdmi *hdmi)
+ static enum drm_connector_status imx_hdmi_connector_detect(struct drm_connector
+ 							*connector, bool force)
+ {
+-	/* FIXME */
+-	return connector_status_connected;
++	struct imx_hdmi *hdmi = container_of(connector, struct imx_hdmi,
++					     connector);
++	return hdmi->connector_status;
+ }
+ 
+ static int imx_hdmi_connector_get_modes(struct drm_connector *connector)
+@@ -1487,6 +1487,18 @@ static struct drm_connector_helper_funcs imx_hdmi_connector_helper_funcs = {
+ 	.best_encoder = imx_hdmi_connector_best_encoder,
  };
  
- /*
-@@ -259,8 +272,6 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
++static irqreturn_t imx_hdmi_hardirq(int irq, void *dev_id)
++{
++	struct imx_hdmi *hdmi = dev_id;
++	u8 intr_stat;
++
++	intr_stat = hdmi_readb(hdmi, HDMI_IH_PHY_STAT0);
++	if (intr_stat)
++		hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
++
++	return intr_stat ? IRQ_WAKE_THREAD : IRQ_NONE;
++}
++
+ static irqreturn_t imx_hdmi_irq(int irq, void *dev_id)
+ {
+ 	struct imx_hdmi *hdmi = dev_id;
+@@ -1503,17 +1515,21 @@ static irqreturn_t imx_hdmi_irq(int irq, void *dev_id)
  
- 	drm_mode_config_init(drm);
+ 			hdmi_modb(hdmi, 0, HDMI_PHY_HPD, HDMI_PHY_POL0);
  
--	drm_kms_helper_poll_init(drm);
--
- 	ret = drm_vblank_init(drm, MAX_CRTC);
- 	if (ret)
- 		goto err_kms;
-@@ -313,6 +324,9 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
- 		goto err_unbind;
++			hdmi->connector_status = connector_status_connected;
+ 			imx_hdmi_poweron(hdmi);
+ 		} else {
+ 			dev_dbg(hdmi->dev, "EVENT=plugout\n");
+ 
+ 			hdmi_modb(hdmi, HDMI_PHY_HPD, HDMI_PHY_HPD, HDMI_PHY_POL0);
+ 
++			hdmi->connector_status = connector_status_disconnected;
+ 			imx_hdmi_poweroff(hdmi);
+ 		}
++		drm_helper_hpd_irq_event(hdmi->connector.dev);
  	}
- #endif
+ 
+ 	hdmi_writeb(hdmi, intr_stat, HDMI_IH_PHY_STAT0);
++	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -1527,6 +1543,8 @@ static int imx_hdmi_register(struct drm_device *drm, struct imx_hdmi *hdmi)
+ 	if (ret)
+ 		return ret;
+ 
++	hdmi->connector.polled = DRM_CONNECTOR_POLL_HPD;
 +
-+	drm_kms_helper_poll_init(drm);
+ 	drm_encoder_helper_add(&hdmi->encoder, &imx_hdmi_encoder_helper_funcs);
+ 	drm_encoder_init(drm, &hdmi->encoder, &imx_hdmi_encoder_funcs,
+ 			 DRM_MODE_ENCODER_TMDS);
+@@ -1578,6 +1596,7 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
+ 		return -ENOMEM;
+ 
+ 	hdmi->dev = dev;
++	hdmi->connector_status = connector_status_disconnected;
+ 	hdmi->sample_rate = 48000;
+ 	hdmi->ratio = 100;
+ 
+@@ -1601,8 +1620,9 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
+ 	if (irq < 0)
+ 		return -EINVAL;
+ 
+-	ret = devm_request_irq(dev, irq, imx_hdmi_irq, 0,
+-			       dev_name(dev), hdmi);
++	ret = devm_request_threaded_irq(dev, irq, imx_hdmi_hardirq,
++					imx_hdmi_irq, IRQF_SHARED,
++					dev_name(dev), hdmi);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1678,6 +1698,9 @@ static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
+ 	if (ret)
+ 		goto err_iahb;
+ 
++	/* Unmute interrupts */
++	hdmi_writeb(hdmi, ~HDMI_IH_PHY_STAT0_HPD, HDMI_IH_MUTE_PHY_STAT0);
 +
+ 	dev_set_drvdata(dev, hdmi);
+ 
  	return 0;
+@@ -1695,6 +1718,9 @@ static void imx_hdmi_unbind(struct device *dev, struct device *master,
+ {
+ 	struct imx_hdmi *hdmi = dev_get_drvdata(dev);
  
- err_unbind:
-@@ -320,7 +334,6 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
- err_vblank:
- 	drm_vblank_cleanup(drm);
- err_kms:
--	drm_kms_helper_poll_fini(drm);
- 	drm_mode_config_cleanup(drm);
++	/* Disable all interrupts */
++	hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
++
+ 	hdmi->connector.funcs->destroy(&hdmi->connector);
+ 	hdmi->encoder.funcs->destroy(&hdmi->encoder);
  
- 	return ret;
 -- 
 1.8.3.1
