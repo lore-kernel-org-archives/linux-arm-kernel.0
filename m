@@ -1,105 +1,62 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Wed, 19 Feb 2014 00:33:39 +0530
-Subject: [PATCH v3 1/3] dma: Support multiple interleaved frames with
- non-contiguous memory
-In-Reply-To: <CA+mB=1K43MDZj0Rx3q=ETQMaFsG1j7TXsH6v-7a26JdtqTJkbw@mail.gmail.com>
-References: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
- <1392465619-27614-2-git-send-email-sthokal@xilinx.com>
- <CAJe_Zhc_GNNSDWNFuk+cMHEqxfSCJB_ey=Bf+SwJK-nS=u9ceg@mail.gmail.com>
- <CA+mB=1KdZZpTmpA0Xp_c4mhgFbjRZ6urYrCwdvoTCmcugQMDUA@mail.gmail.com>
- <CAJe_ZhdOmu3k9gbPdQzPteyzwsMA8OzWHdhHnXudbF=X7JMhVQ@mail.gmail.com>
- <CA+mB=1K43MDZj0Rx3q=ETQMaFsG1j7TXsH6v-7a26JdtqTJkbw@mail.gmail.com>
-Message-ID: <CAJe_ZhfedP7Paf3Zq9chL0WUeLJrsy_DJL05sSbfqnfTtji=HQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Feb 2014 19:10:23 +0000
+Subject: [PATCH v3 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <2340480.VAU4NNbBD8@wuerfel>
+References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
+ <1392726043-31088-4-git-send-email-will.deacon@arm.com>
+ <2340480.VAU4NNbBD8@wuerfel>
+Message-ID: <20140218191023.GG2010@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 February 2014 23:16, Srikanth Thokala <sthokal@xilinx.com> wrote:
-> On Tue, Feb 18, 2014 at 10:20 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
->> On 18 February 2014 16:58, Srikanth Thokala <sthokal@xilinx.com> wrote:
->>> On Mon, Feb 17, 2014 at 3:27 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
->>>> On 15 February 2014 17:30, Srikanth Thokala <sthokal@xilinx.com> wrote:
->>>>> The current implementation of interleaved DMA API support multiple
->>>>> frames only when the memory is contiguous by incrementing src_start/
->>>>> dst_start members of interleaved template.
->>>>>
->>>>> But, when the memory is non-contiguous it will restrict slave device
->>>>> to not submit multiple frames in a batch.  This patch handles this
->>>>> issue by allowing the slave device to send array of interleaved dma
->>>>> templates each having a different memory location.
->>>>>
->>>> How fragmented could be memory in your case? Is it inefficient to
->>>> submit separate transfers for each segment/frame?
->>>> It will help if you could give a typical example (chunk size and gap
->>>> in bytes) of what you worry about.
->>>
->>> With scatter-gather engine feature in the hardware, submitting separate
->>> transfers for each frame look inefficient. As an example, our DMA engine
->>> supports up to 16 video frames, with each frame (a typical video frame
->>> size) being contiguous in memory but frames are scattered into different
->>> locations. We could not definitely submit frame by frame as it would be
->>> software overhead (HW interrupting for each frame) resulting in video lags.
->>>
->> IIUIC, it is 30fps and one dma interrupt per frame ... it doesn't seem
->> inefficient at all. Even poor-latency audio would generate a higher
->> interrupt-rate. So the "inefficiency concern" doesn't seem valid to
->> me.
->>
->> Not to mean we shouldn't strive to reduce the interrupt-rate further.
->> Another option is to emulate the ring-buffer scheme of ALSA.... which
->> should be possible since for a session of video playback the frame
->> buffers' locations wouldn't change.
->>
->> Yet another option is to use the full potential of the
->> interleaved-xfer api as such. It seems you confuse a 'video frame'
->> with the interleaved-xfer api's 'frame'. They are different.
->>
->> Assuming your one video frame is F bytes long and Gk is the gap in
->> bytes between end of frame [k] and start of frame [k+1] and  Gi != Gj
->> for i!=j
->> In the context of interleaved-xfer api, you have just 1 Frame of 16
->> chunks. Each chunk is Fbytes and the inter-chunk-gap(ICG) is Gk  where
->> 0<=k<15
->> So for your use-case .....
->>   dma_interleaved_template.numf = 1   /* just 1 frame */
->>   dma_interleaved_template.frame_size = 16  /* containing 16 chunks */
->>    ...... //other parameters
->>
->> You have 3 options to choose from and all should work just as fine.
->> Otherwise please state your problem in real numbers (video-frames'
->> size, count & gap in bytes).
->
-> Initially I interpreted interleaved template the same.  But, Lars corrected me
-> in the subsequent discussion and let me put it here briefly,
->
-> In the interleaved template, each frame represents a line of size denoted by
-> chunk.size and the stride by icg.  'numf' represent number of frames i.e.
-> number of lines.
->
-> In video frame context,
-> chunk.size -> hsize
-> chunk.icg -> stride
-> numf -> vsize
-> and frame_size is always 1 as it will have only one chunk in a line.
->
-But you said in your last post
-  "with each frame (a typical video frame size) being contiguous in memory"
- ... which is not true from what you write above. Anyways, my first 2
-suggestions still hold.
+On Tue, Feb 18, 2014 at 01:46:44PM +0000, Arnd Bergmann wrote:
+> On Tuesday 18 February 2014 12:20:43 Will Deacon wrote:
+> 
+> > +static int gen_pci_alloc_io_offset(u32 sz, resource_size_t *offset)
+> > +{
+> > +	static DECLARE_BITMAP(io_map, (IO_SPACE_LIMIT + 1) / SZ_64K);
+> > +	int idx, num_wins;
+> > +
+> > +	if (sz > SZ_64K)
+> > +		return -ENOSPC;
+> > +
+> > +	num_wins = (IO_SPACE_LIMIT + 1) / SZ_64K;
+> > +	idx = 0;
+> > +	do {
+> > +		idx = find_next_zero_bit(io_map, num_wins, idx);
+> > +		if (idx == num_wins)
+> > +			return -ENOSPC;
+> > +	} while (test_and_set_bit(idx, io_map));
+> > +
+> > +	*offset = idx * SZ_64K;
+> > +	return 0;
+> > +}
+> 
+> Sicne you're always starting the search at 0 and you never free
+> the map, this is essentially the same as remembering the last number
+> that was used and using the next one, right?
 
-> So, the API would not allow to pass multiple frames and we came up with a
-> resolution to pass an array of interleaved template structs to handle this.
->
-Yeah the API doesn't allow such xfers that don't fall into any
-'regular expression' of a transfer and also because no controller
-natively supports such xfers -- your controller will break your
-request up into 16 transfers and program them individually, right?
-   BTW if you insist you could still express the 16 video frames as 1
-interleaved-xfer frame with frame_size = (vsize + 1) * 16   ;)
+Yes, I can implement that easily enough. I was wondering if there was a case
+for allowing windows to be freed, but it doesn't feel especially compelling.
 
-Again, I would suggest you implement ring-buffer type scheme. Say
-prepare 16 interleaved xfer templates and queue them. Upon each
-xfer-done callback (i.e frame rendered), update the data and queue it
-back. It might be much simpler for your actual case. At 30fps, 33ms to
-queue a dma request should _not_ result in any frame-drop.
+> You should also pass the rang->pci_addr here to calculate the
+> offset in case the pci_addr is not zero.
+> 
+> > +	/* Register our I/O and Memory resources */
+> > +	res_valid = 0;
+> > +	list_for_each_entry(win, &pci->host.windows, list) {
+> > +		struct resource *parent;
+> > +
+> > +		if (resource_type(win->res) == IORESOURCE_IO) {
+> > +			parent = &ioport_resource;
+> > +			err = pci_ioremap_io(win->offset, win->res->start);
+> 
+> and consequently pass the pci_addr rather than the offset here. How about
+> moving the pci_ioremap_io() call into gen_pci_alloc_io_offset()?
 
--Jassi
+Can do.
+
+Thanks for the feedback.
+
+Will
