@@ -1,60 +1,24 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 18 Feb 2014 14:28:41 -0500
-Subject: [GIT PULL] clk: mvebu: fixes for v3.14
-In-Reply-To: <20140208173154.GL8533@titan.lakedaemon.net>
-References: <20140208173154.GL8533@titan.lakedaemon.net>
-Message-ID: <20140218192841.GG7862@titan.lakedaemon.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 18 Feb 2014 11:30:56 -0800
+Subject: [PATCH v4 12/12] ARM: KVM: fix warning in mmu.c
+In-Reply-To: <1392737253-10480-13-git-send-email-marc.zyngier@arm.com>
+References: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
+ <1392737253-10480-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20140218193056.GB2084@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+On Tue, Feb 18, 2014 at 03:27:33PM +0000, Marc Zyngier wrote:
+> Compiling with THP enabled leads to the following warning:
+> 
+> arch/arm/kvm/mmu.c: In function ?unmap_range?:
+> arch/arm/kvm/mmu.c:177:39: warning: ?pte? may be used uninitialized in this function [-Wmaybe-uninitialized]
+>    if (kvm_pmd_huge(*pmd) || page_empty(pte)) {
+>                                         ^
+> Code inspection reveals that these two cases are mutually exclusive,
+> so GCC is a bit overzealous here. Silence it anyway by initializing
+> pte to NULL and testing it later on.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-On Sat, Feb 08, 2014 at 12:31:54PM -0500, Jason Cooper wrote:
-> Mike,
-> 
-> Here's a round of fixes I've had in -next for several days.  It's not
-> the ideal solution, but a short term one while we hash out a proper
-> solution for v3.15+.
-
-Ping?  just didn't want this to fall off of your plate.
-
-thx,
-
-Jason.
-
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-> 
->   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-clk-fixes-3.14
-> 
-> for you to fetch changes up to 58d516ae95cbf7eed44f85a01cdfad41f17b4197:
-> 
->   clk: mvebu: kirkwood: maintain clock init order (2014-02-06 18:07:01 +0000)
-> 
-> ----------------------------------------------------------------
-> mvebu clock fixes for v3.14
-> 
->  - kirkwood, dove, armada-xp, armada-370
->     - force clock init order broken by sorting DT ocp nodes by address
->     - fixes boot failures on affected platforms
-> 
-> ----------------------------------------------------------------
-> Sebastian Hesselbarth (4):
->       clk: mvebu: armada-370: maintain clock init order
->       clk: mvebu: armada-xp: maintain clock init order
->       clk: mvebu: dove: maintain clock init order
->       clk: mvebu: kirkwood: maintain clock init order
-> 
->  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
->  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
->  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
->  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
->  4 files changed, 44 insertions(+), 50 deletions(-)
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
