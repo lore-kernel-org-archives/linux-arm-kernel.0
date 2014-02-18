@@ -1,42 +1,36 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 18 Feb 2014 15:34:37 -0500
-Subject: [PATCH v4 0/2] Introduce AEMIF driver for Davinci/Keystone archs
-In-Reply-To: <20140218202702.GA18642@kroah.com>
-References: <1391629574-18955-1-git-send-email-ivan.khoronzhuk@ti.com>
- <53037113.3090105@ti.com> <20140218202702.GA18642@kroah.com>
-Message-ID: <5303C3DD.5050209@ti.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 18 Feb 2014 13:38:01 -0700
+Subject: [PATCH 1/2] bus: mvebu-mbus: Fix incorrect size for PCI aperture
+ resources
+In-Reply-To: <20140217013949.GE7862@titan.lakedaemon.net>
+References: <1392245828-23244-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <20140214182910.GC31093@google.com>
+ <20140217013949.GE7862@titan.lakedaemon.net>
+Message-ID: <20140218203801.GA8786@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 February 2014 03:27 PM, Greg KH wrote:
-> On Tue, Feb 18, 2014 at 09:41:23AM -0500, Santosh Shilimkar wrote:
->> Greg,
->>
->> On Wednesday 05 February 2014 02:46 PM, Ivan Khoronzhuk wrote:
->>> These patches introduce Async External Memory Interface (EMIF16/AEMIF)
->>> controller driver for Davinci/Keystone archs.
->>>
->>> For more informations see documentation:
->>> Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
->>> OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
->>> Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
->>>
->> Can you please have a look at the series ? It has been on the list for
->> sometime and all the outstanding comments are addressed so far. If
->> you are ok with it, I would like to get these queued up for 3.15
->> via your tree.
+On Sun, Feb 16, 2014 at 08:39:49PM -0500, Jason Cooper wrote:
+> On Fri, Feb 14, 2014 at 11:29:10AM -0700, Bjorn Helgaas wrote:
+> > On Wed, Feb 12, 2014 at 03:57:07PM -0700, Jason Gunthorpe wrote:
+> > > reg[0] is the DT base, reg[1] is the DT length in bytes,
+> > > struct resource.end is the inclusive end address, so a -1 is
+> > > required.
+> > > 
+> > > Tested on kirkwood.
+> > > 
+> > > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> > 
+> > Do these two patches need to go together?  I don't maintain
+> > drivers/bus/mvebu-mbus.c, but if these should be kept together, I'd be
+> > happy to merge them both, given the appropriate ack from Jason C or Thomas.
 > 
-> Why my tree?  Am I the drivers/memory/ maintainer?
+> I have one small change for mvebu-mbus queued up, which won't conflict
+> here.  Please take both:
 > 
-> /me digs in git...
-> 
-> Ah, it looks like I might be...
-> 
-yes :-)
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-> Ok, let me go review this.
-> 
-Thanks a lot.
+I added the acks and applied both patches to pci/host-mvebu for v3.15,
+thanks!
 
-Regards,
-Santosh
+Bjorn
