@@ -1,56 +1,56 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 17 Feb 2014 18:57:15 -0500
-Subject: [PATCH v2 12/23] ARM: Fix default CPU selection for ARCH_MULTI_V5
-In-Reply-To: <1392459621-24003-13-git-send-email-andrew@lunn.ch>
-References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
- <1392459621-24003-13-git-send-email-andrew@lunn.ch>
-Message-ID: <20140217235715.GL7862@titan.lakedaemon.net>
+From: klightspeed@killerwolves.net (Ben Peddell)
+Date: Tue, 18 Feb 2014 10:07:04 +1000
+Subject: [PATCH v4 2/4] DT: Vendor prefixes: Add ricoh, ssi and synology
+In-Reply-To: <20140217223413.GB31116@joshc.qualcomm.com>
+References: <1392673537-17308-1-git-send-email-klightspeed@killerwolves.net>
+ <1392673537-17308-3-git-send-email-klightspeed@killerwolves.net>
+ <20140217223413.GB31116@joshc.qualcomm.com>
+Message-ID: <5302A428.3060708@killerwolves.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
-
-12, 13, and 14 should go into rmk's patch tracker.
-
-Russell, we'd really like to move kirkwood DT into mach-mvebu for v3.15.
-Is there any possibility you could create a topic branch for us
-containing the this patch and the other two I mentioned, above?
-
-Or, if you don't think there will be any significant conflicts, would
-you mind Acking these three for us to take through mvebu/arm-soc?
-
-thx,
-
-Jason.
-
-On Sat, Feb 15, 2014 at 11:20:10AM +0100, Andrew Lunn wrote:
-> CPU_ARM926T should be selected if no other CPU is. Put the ! in the
-> right place so this works.
+On 18/02/2014 8:34 AM, Josh Cartwright wrote:
+> On Tue, Feb 18, 2014 at 07:45:35AM +1000, klightspeed at killerwolves.net wrote:
+>> From: Andrew Lunn <andrew@lunn.ch>
+>>
+>> The following patches make use of vendor names ricoh, ssi and
+>> synology.  Add them to the vendor prefix list.
+>>
+>> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+>> ---
+>> v2:
+>> Use stock ticker for Ricoh as vendor name
+>> s/Richoh/Ricoh/
+>> ---
+>>  Documentation/devicetree/bindings/vendor-prefixes.txt | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> index 40ce2df..8427681 100644
+>> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> @@ -72,6 +72,7 @@ ralink	Mediatek/Ralink Technology Corp.
+>>  ramtron	Ramtron International
+>>  realtek Realtek Semiconductor Corp.
+>>  renesas	Renesas Electronics Corporation
+>> +ricoy	Ricoh Co. Ltd.
+>>  rockchip	Fuzhou Rockchip Electronics Co., Ltd
+>>  samsung	Samsung Semiconductor
+>>  sbs	Smart Battery System
+>> @@ -79,11 +80,13 @@ schindler	Schindler
+>>  sil	Silicon Image
+>>  silabs	Silicon Laboratories
+>>  simtek
+>> +sii	Seiko Instruments, Inc.
+>>  sirf	SiRF Technology, Inc.
+>>  snps 	Synopsys, Inc.
+>>  st	STMicroelectronics
+>>  ste	ST-Ericsson
+>>  stericsson	ST-Ericsson
+>> +synology	Synology, Inc.
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> cc: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index e25419817791..beba369d74de 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -898,7 +898,7 @@ config ARCH_MULTI_V5
->  	bool "ARMv5 based platforms (ARM926T, XSCALE, PJ1, ...)"
->  	depends on !ARCH_MULTI_V6_V7
->  	select ARCH_MULTI_V4_V5
-> -	select CPU_ARM926T if (!CPU_ARM946E || CPU_ARM1020 || \
-> +	select CPU_ARM926T if !(CPU_ARM946E || CPU_ARM1020 || \
->  		CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || \
->  		CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_FEROCEON)
->  
-> -- 
-> 1.8.5.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Oh, great!  Looks like this one is added (see my comment on patch 1).
+> I'm wondering if 'qnap' should be added as well.
+
+Do we want to use "qnap" or their ticker "qnapsz"?
