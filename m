@@ -1,447 +1,489 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 18 Feb 2014 12:36:09 +0100
-Subject: [RFC PATCH v3 8/9] ARM: dts: imx6qdl: Add IPU DI ports and endpoints,
- move imx-drm node to dtsi
+Date: Tue, 18 Feb 2014 12:36:04 +0100
+Subject: [RFC PATCH v3 3/9] staging: imx-drm-core: Use OF graph to find
+ components and connections between encoder and crtcs
 In-Reply-To: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
 References: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1392723370-4772-9-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1392723370-4772-4-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch connects IPU and display encoder (HDMI, LVDS, MIPI)
-device tree nodes, as well as parallel displays on the DISP0
-and DISP1 outputs, using the OF graph bindings described in
+This patch adds support to find the involved components connected to the
+IPU display interface ports using the OF graph bindings documented in
 Documentation/devicetree/bindings/media/video-interfaces.txt
 
-The IPU ports correspond to the two display interfaces. The
-order of endpoints in the ports is arbitrary.
+Each display interface needs to have an associated port node in the
+device tree. We can associate this node with the crtc platform device
+and use it to find the crtc corresponding to a given port node instead
+of using a combination of parent device node and id number, as before.
 
-Each encoder with an associated input multiplexer has multiple
-input ports in the device tree. The order and reg property of
-the ports must correspond to the multiplexer input order.
+Explicitly converting the void* cookie to the port device tree node
+allows to get rid of the ipu_id and di_id fields. The multiplexer
+setting on i.MX6 now can be obtained from the port id (reg property)
+in the device tree.
 
-Since the imx-drm node now only needs to contain links to the
-display interfaces, it can be moved to the SoC dtsi level. At
-the board level, only connections between the display interface
-ports and encoders or panels have to be added.
+The imx-drm node now needs a ports property that contains phandles
+to each of the IPU display interface port nodes. From there, all
+attached encoders are scanned and enabled encoders are added to a
+waiting list.
+The bind order makes sure that once all components are probed, crtcs
+are bound before encoders, so that imx_drm_encoder_parse_of can be
+called from the encoder bind callbacks.
+
+For parsing the OF graph, temporary copies of the V4L2 OF graph
+helpers are used, that can be removed again once those are available
+at a generic place.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6dl.dtsi          |  22 +++---
- arch/arm/boot/dts/imx6q-sabresd.dts    |   4 -
- arch/arm/boot/dts/imx6q.dtsi           | 124 +++++++++++++++++++++++++++--
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi |   6 --
- arch/arm/boot/dts/imx6qdl.dtsi         | 138 ++++++++++++++++++++++++++++++++-
- 5 files changed, 263 insertions(+), 31 deletions(-)
+ drivers/staging/imx-drm/imx-drm-core.c | 203 ++++++++++++++++++++++-----------
+ drivers/staging/imx-drm/imx-drm.h      |   5 +-
+ drivers/staging/imx-drm/imx-hdmi.c     |   2 +-
+ drivers/staging/imx-drm/imx-ldb.c      |   4 +-
+ drivers/staging/imx-drm/ipuv3-crtc.c   |  47 ++++++--
+ 5 files changed, 185 insertions(+), 76 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 6dc3970..8ba94b8 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -70,6 +70,15 @@
- 			};
- 		};
- 	};
-+
-+	imx-drm {
-+		compatible = "fsl,imx-drm";
-+		ports = <&ipu1_di0>, <&ipu1_di1>;
-+	};
+diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+index 98a97a2..92246d9 100644
+--- a/drivers/staging/imx-drm/imx-drm-core.c
++++ b/drivers/staging/imx-drm/imx-drm-core.c
+@@ -30,6 +30,11 @@
+ 
+ struct imx_drm_crtc;
+ 
++struct imx_drm_component {
++	struct device_node *of_node;
++	struct list_head list;
 +};
 +
-+&hdmi {
-+	compatible = "fsl,imx6dl-hdmi";
+ struct imx_drm_device {
+ 	struct drm_device			*drm;
+ 	struct imx_drm_crtc			*crtc[MAX_CRTC];
+@@ -41,9 +46,7 @@ struct imx_drm_crtc {
+ 	struct drm_crtc				*crtc;
+ 	int					pipe;
+ 	struct imx_drm_crtc_helper_funcs	imx_drm_helper_funcs;
+-	void					*cookie;
+-	int					id;
+-	int					mux_id;
++	struct device_node			*port;
  };
  
- &ldb {
-@@ -79,17 +88,4 @@
- 	clock-names = "di0_pll", "di1_pll",
- 		      "di0_sel", "di1_sel",
- 		      "di0", "di1";
+ static int legacyfb_depth = 16;
+@@ -341,14 +344,11 @@ err_kms:
+ 
+ /*
+  * imx_drm_add_crtc - add a new crtc
+- *
+- * The return value if !NULL is a cookie for the caller to pass to
+- * imx_drm_remove_crtc later.
+  */
+ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 		struct imx_drm_crtc **new_crtc,
+ 		const struct imx_drm_crtc_helper_funcs *imx_drm_helper_funcs,
+-		void *cookie, int id)
++		struct device_node *port)
+ {
+ 	struct imx_drm_device *imxdrm = drm->dev_private;
+ 	struct imx_drm_crtc *imx_drm_crtc;
+@@ -370,9 +370,7 @@ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 
+ 	imx_drm_crtc->imx_drm_helper_funcs = *imx_drm_helper_funcs;
+ 	imx_drm_crtc->pipe = imxdrm->pipes++;
+-	imx_drm_crtc->cookie = cookie;
+-	imx_drm_crtc->id = id;
+-	imx_drm_crtc->mux_id = imx_drm_crtc->pipe;
++	imx_drm_crtc->port = port;
+ 	imx_drm_crtc->crtc = crtc;
+ 
+ 	imxdrm->crtc[imx_drm_crtc->pipe] = imx_drm_crtc;
+@@ -416,21 +414,26 @@ int imx_drm_remove_crtc(struct imx_drm_crtc *imx_drm_crtc)
+ EXPORT_SYMBOL_GPL(imx_drm_remove_crtc);
+ 
+ /*
+- * Find the DRM CRTC possible mask for the device node cookie/id.
++ * Find the DRM CRTC possible mask for the connected endpoint.
+  *
+  * The encoder possible masks are defined by their position in the
+  * mode_config crtc_list.  This means that CRTCs must not be added
+  * or removed once the DRM device has been fully initialised.
+  */
+ static uint32_t imx_drm_find_crtc_mask(struct imx_drm_device *imxdrm,
+-	void *cookie, int id)
++	struct device_node *endpoint)
+ {
++	struct device_node *port;
+ 	unsigned i;
+ 
++	port = imx_drm_of_get_remote_port(endpoint);
++	if (!port)
++		return 0;
++	of_node_put(port);
++
+ 	for (i = 0; i < MAX_CRTC; i++) {
+ 		struct imx_drm_crtc *imx_drm_crtc = imxdrm->crtc[i];
+-		if (imx_drm_crtc && imx_drm_crtc->id == id &&
+-		    imx_drm_crtc->cookie == cookie)
++		if (imx_drm_crtc && imx_drm_crtc->port == port)
+ 			return drm_crtc_mask(imx_drm_crtc->crtc);
+ 	}
+ 
+@@ -441,26 +444,20 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
+ 	struct drm_encoder *encoder, struct device_node *np)
+ {
+ 	struct imx_drm_device *imxdrm = drm->dev_private;
++	struct device_node *ep = NULL;
+ 	uint32_t crtc_mask = 0;
+-	int i, ret = 0;
 -
--	lvds-channel at 0 {
--		crtcs = <&ipu1 0>, <&ipu1 1>;
--	};
+-	for (i = 0; !ret; i++) {
+-		struct of_phandle_args args;
+-		uint32_t mask;
+-		int id;
++	int i;
+ 
+-		ret = of_parse_phandle_with_args(np, "crtcs", "#crtc-cells", i,
+-						 &args);
+-		if (ret == -ENOENT)
++	for (i = 0; ; i++) {
++		ep = imx_drm_of_get_next_endpoint(np, ep);
++		if (!ep)
+ 			break;
+-		if (ret < 0)
+-			return ret;
+ 
+-		id = args.args_count > 0 ? args.args[0] : 0;
+-		crtc_mask |= imx_drm_find_crtc_mask(imxdrm, args.np, id);
+-		of_node_put(args.np);
++		crtc_mask |= imx_drm_find_crtc_mask(imxdrm, ep);
+ 	}
+ 
++	if (ep)
++		of_node_put(ep);
+ 	if (i == 0 || !crtc_mask)
+ 		return -ENOENT;
+ 
+@@ -473,11 +470,36 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
+ }
+ EXPORT_SYMBOL_GPL(imx_drm_encoder_parse_of);
+ 
+-int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder)
++/*
++ * @node: device tree node containing encoder input ports
++ * @encoder: drm_encoder
++ */
++int imx_drm_encoder_get_mux_id(struct device_node *node,
++			       struct drm_encoder *encoder)
+ {
+ 	struct imx_drm_crtc *imx_crtc = imx_drm_find_crtc(encoder->crtc);
++	struct device_node *ep = NULL;
++	struct device_node *port;
++	int id, ret;
++
++	if (!node || !imx_crtc)
++		return -EINVAL;
++
++	do {
++		ep = imx_drm_of_get_next_endpoint(node, ep);
++		if (!ep)
++			break;
+ 
+-	return imx_crtc ? imx_crtc->mux_id : -EINVAL;
++		port = imx_drm_of_get_remote_port(ep);
++		of_node_put(port);
++		if (port == imx_crtc->port) {
++			ret = of_property_read_u32(ep->parent, "reg", &id);
++			of_node_put(ep);
++			return ret ? ret : id;
++		}
++	} while (ep);
++
++	return -EINVAL;
+ }
+ EXPORT_SYMBOL_GPL(imx_drm_encoder_get_mux_id);
+ 
+@@ -520,48 +542,29 @@ static struct drm_driver imx_drm_driver = {
+ 	.patchlevel		= 0,
+ };
+ 
+-static int compare_parent_of(struct device *dev, void *data)
+-{
+-	struct of_phandle_args *args = data;
+-	return dev->parent && dev->parent->of_node == args->np;
+-}
 -
--	lvds-channel at 1 {
--		crtcs = <&ipu1 0>, <&ipu1 1>;
--	};
--};
+ static int compare_of(struct device *dev, void *data)
+ {
+-	return dev->of_node == data;
+-}
 -
--&hdmi {
--	compatible = "fsl,imx6dl-hdmi";
--	crtcs = <&ipu1 0>, <&ipu1 1>;
- };
-diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
-index 66f220a..9cbdfe7 100644
---- a/arch/arm/boot/dts/imx6q-sabresd.dts
-+++ b/arch/arm/boot/dts/imx6q-sabresd.dts
-@@ -20,10 +20,6 @@
- 	compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
- };
- 
--&imx_drm {
--	crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
--};
+-static int imx_drm_add_components(struct device *master, struct master *m)
+-{
+-	struct device_node *np = master->of_node;
+-	unsigned i;
+-	int ret;
 -
- &sata {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index 187fe33..db356e6 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -132,13 +132,84 @@
- 		};
+-	for (i = 0; ; i++) {
+-		struct of_phandle_args args;
++	struct device_node *np = data;
  
- 		ipu2: ipu at 02800000 {
--			#crtc-cells = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 			compatible = "fsl,imx6q-ipu";
- 			reg = <0x02800000 0x400000>;
- 			interrupts = <0 8 0x4 0 7 0x4>;
- 			clocks = <&clks 133>, <&clks 134>, <&clks 137>;
- 			clock-names = "bus", "di0", "di1";
- 			resets = <&src 4>;
-+
-+			ipu2_di0: port at 2 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <2>;
-+
-+				ipu2_di0_disp0: endpoint at 0 {
-+				};
-+
-+				ipu2_di0_hdmi: endpoint at 1 {
-+					remote-endpoint = <&hdmi_mux_2>;
-+				};
-+
-+				ipu2_di0_mipi: endpoint at 2 {
-+				};
-+
-+				ipu2_di0_lvds0: endpoint at 3 {
-+					remote-endpoint = <&lvds0_mux_2>;
-+				};
-+
-+				ipu2_di0_lvds1: endpoint at 4 {
-+					remote-endpoint = <&lvds1_mux_2>;
-+				};
-+			};
-+
-+			ipu2_di1: port at 3 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <3>;
-+
-+				ipu2_di1_hdmi: endpoint at 1 {
-+					remote-endpoint = <&hdmi_mux_3>;
-+				};
-+
-+				ipu2_di1_mipi: endpoint at 2 {
-+				};
-+
-+				ipu2_di1_lvds0: endpoint at 3 {
-+					remote-endpoint = <&lvds0_mux_3>;
-+				};
-+
-+				ipu2_di1_lvds1: endpoint at 4 {
-+					remote-endpoint = <&lvds1_mux_3>;
-+				};
-+			};
-+		};
-+	};
-+
-+	imx-drm {
-+		compatible = "fsl,imx-drm";
-+		ports = <&ipu1_di0>, <&ipu1_di1>, <&ipu2_di0>, <&ipu2_di1>;
-+	};
-+};
-+
-+&hdmi {
-+	compatible = "fsl,imx6q-hdmi";
-+
-+	port at 2 {
-+		reg = <2>;
-+
-+		hdmi_mux_2: endpoint {
-+			remote-endpoint = <&ipu2_di0_hdmi>;
-+		};
-+	};
-+
-+	port at 3 {
-+		reg = <3>;
-+
-+		hdmi_mux_3: endpoint {
-+			remote-endpoint = <&ipu2_di1_hdmi>;
- 		};
- 	};
- };
-@@ -152,15 +223,56 @@
- 		      "di0", "di1";
- 
- 	lvds-channel at 0 {
--		crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
-+		port at 2 {
-+			reg = <2>;
-+
-+			lvds0_mux_2: endpoint {
-+				remote-endpoint = <&ipu2_di0_lvds0>;
-+			};
-+		};
-+
-+		port at 3 {
-+			reg = <3>;
-+
-+			lvds0_mux_3: endpoint {
-+				remote-endpoint = <&ipu2_di1_lvds0>;
-+			};
-+		};
- 	};
- 
- 	lvds-channel at 1 {
--		crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
-+		port at 2 {
-+			reg = <2>;
-+
-+			lvds1_mux_2: endpoint {
-+				remote-endpoint = <&ipu2_di0_lvds1>;
-+			};
-+		};
-+
-+		port at 3 {
-+			reg = <3>;
-+
-+			lvds1_mux_3: endpoint {
-+				remote-endpoint = <&ipu2_di1_lvds1>;
-+			};
-+		};
- 	};
- };
- 
--&hdmi {
--	compatible = "fsl,imx6q-hdmi";
--	crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
-+&mipi_dsi {
-+	port at 2 {
-+		reg = <2>;
-+
-+		mipi_mux_2: endpoint {
-+			remote-endpoint = <&ipu2_di0_mipi>;
-+		};
-+	};
-+
-+	port at 3 {
-+		reg = <3>;
-+
-+		mipi_mux_3: endpoint {
-+			remote-endpoint = <&ipu2_di1_mipi>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index dfca3e0..e75e11b 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -62,12 +62,6 @@
- 		};
- 	};
- 
--	imx_drm: imx-drm {
--		compatible = "fsl,imx-drm";
--		crtcs = <&ipu1 0>, <&ipu1 1>;
--		connectors = <&ldb>;
--	};
+-		ret = of_parse_phandle_with_fixed_args(np, "crtcs", 1,
+-						       i, &args);
+-		if (ret)
+-			break;
 -
- 	sound {
- 		compatible = "fsl,imx6q-sabresd-wm8962",
- 			   "fsl,imx-audio-wm8962";
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 930ebe0..368168c 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -1358,23 +1358,87 @@
- 				status = "disabled";
+-		ret = component_master_add_child(m, compare_parent_of, &args);
+-		of_node_put(args.np);
+-
+-		if (ret)
+-			return ret;
++	/* Special case for LDB, one device for two channels */
++	if (of_node_cmp(np->name, "lvds-channel") == 0) {
++		np = of_get_parent(np);
++		of_node_put(np);
+ 	}
  
- 				lvds-channel at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
- 					reg = <0>;
- 					status = "disabled";
-+
-+					port at 0 {
-+						reg = <0>;
-+
-+						lvds0_mux_0: endpoint {
-+							remote-endpoint = <&ipu1_di0_lvds0>;
-+						};
-+					};
-+
-+					port at 1 {
-+						reg = <1>;
-+
-+						lvds0_mux_1: endpoint {
-+							remote-endpoint = <&ipu1_di1_lvds0>;
-+						};
-+					};
-+
-+					port at 4 {
-+						lvds0: endpoint {
-+						};
-+					};
- 				};
+-	for (i = 0; ; i++) {
+-		struct device_node *node;
++	return dev->of_node == np;
++}
  
- 				lvds-channel at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
- 					reg = <1>;
- 					status = "disabled";
-+
-+					port at 0 {
-+						reg = <0>;
-+
-+						lvds1_mux_0: endpoint {
-+							remote-endpoint = <&ipu1_di0_lvds1>;
-+						};
-+					};
-+
-+					port at 1 {
-+						reg = <1>;
-+
-+						lvds1_mux_1: endpoint {
-+							remote-endpoint = <&ipu1_di1_lvds1>;
-+						};
-+					};
-+
-+					port at 4 {
-+						lvds1: endpoint {
-+						};
-+					};
- 				};
- 			};
+-		node = of_parse_phandle(np, "connectors", i);
+-		if (!node)
+-			break;
++static LIST_HEAD(imx_drm_components);
  
- 			hdmi: hdmi at 0120000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x00120000 0x9000>;
- 				interrupts = <0 115 0x04>;
- 				gpr = <&gpr>;
- 				clocks = <&clks 123>, <&clks 124>;
- 				clock-names = "iahb", "isfr";
- 				status = "disabled";
-+
-+				port at 0 {
-+					reg = <0>;
-+
-+					hdmi_mux_0: endpoint {
-+						remote-endpoint = <&ipu1_di0_hdmi>;
-+					};
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+
-+					hdmi_mux_1: endpoint {
-+						remote-endpoint = <&ipu1_di1_hdmi>;
-+					};
-+				};
- 			};
+-		ret = component_master_add_child(m, compare_of, node);
+-		of_node_put(node);
++static int imx_drm_add_components(struct device *master, struct master *m)
++{
++	struct imx_drm_component *component;
++	int ret;
  
- 			dcic1: dcic at 020e4000 {
-@@ -1588,8 +1652,27 @@
- 				reg = <0x021dc000 0x4000>;
- 			};
- 
--			mipi at 021e0000 { /* MIPI-DSI */
-+			mipi_dsi: mipi at 021e0000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x021e0000 0x4000>;
-+				status = "disabled";
-+
-+				port at 0 {
-+					reg = <0>;
-+
-+					mipi_mux_0: endpoint {
-+						remote-endpoint = <&ipu1_di0_mipi>;
-+					};
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+
-+					mipi_mux_1: endpoint {
-+						remote-endpoint = <&ipu1_di1_mipi>;
-+					};
-+				};
- 			};
- 
- 			vdoa at 021e4000 {
-@@ -1643,13 +1726,64 @@
- 		};
- 
- 		ipu1: ipu at 02400000 {
--			#crtc-cells = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 			compatible = "fsl,imx6q-ipu";
- 			reg = <0x02400000 0x400000>;
- 			interrupts = <0 6 0x4 0 5 0x4>;
- 			clocks = <&clks 130>, <&clks 131>, <&clks 132>;
- 			clock-names = "bus", "di0", "di1";
- 			resets = <&src 2>;
-+
-+			ipu1_di0: port at 2 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <2>;
-+
-+				ipu1_di0_disp0: endpoint at 0 {
-+				};
-+
-+				ipu1_di0_hdmi: endpoint at 1 {
-+					remote-endpoint = <&hdmi_mux_0>;
-+				};
-+
-+				ipu1_di0_mipi: endpoint at 2 {
-+					remote-endpoint = <&mipi_mux_0>;
-+				};
-+
-+				ipu1_di0_lvds0: endpoint at 3 {
-+					remote-endpoint = <&lvds0_mux_0>;
-+				};
-+
-+				ipu1_di0_lvds1: endpoint at 4 {
-+					remote-endpoint = <&lvds1_mux_0>;
-+				};
-+			};
-+
-+			ipu1_di1: port at 3 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <3>;
-+
-+				ipu1_di0_disp1: endpoint at 0 {
-+				};
-+
-+				ipu1_di1_hdmi: endpoint at 1 {
-+					remote-endpoint = <&hdmi_mux_1>;
-+				};
-+
-+				ipu1_di1_mipi: endpoint at 2 {
-+					remote-endpoint = <&mipi_mux_1>;
-+				};
-+
-+				ipu1_di1_lvds0: endpoint at 3 {
-+					remote-endpoint = <&lvds0_mux_1>;
-+				};
-+
-+				ipu1_di1_lvds1: endpoint at 4 {
-+					remote-endpoint = <&lvds1_mux_1>;
-+				};
-+			};
- 		};
- 	};
++	list_for_each_entry(component, &imx_drm_components, list) {
++		ret = component_master_add_child(m, compare_of,
++						 component->of_node);
+ 		if (ret)
+ 			return ret;
+ 	}
+@@ -584,9 +587,81 @@ static const struct component_master_ops imx_drm_ops = {
+ 	.unbind = imx_drm_unbind,
  };
+ 
++static struct imx_drm_component *imx_drm_find_component(struct device *dev,
++							struct device_node *node)
++{
++	struct imx_drm_component *component;
++
++	list_for_each_entry(component, &imx_drm_components, list)
++		if (component->of_node == node)
++			return component;
++
++	return NULL;
++}
++
++static int imx_drm_add_component(struct device *dev, struct device_node *node)
++{
++	struct imx_drm_component *component;
++
++	if (imx_drm_find_component(dev, node))
++		return 0;
++
++	component = devm_kzalloc(dev, sizeof(*component), GFP_KERNEL);
++	if (!component)
++		return -ENOMEM;
++
++	component->of_node = node;
++	list_add_tail(&component->list, &imx_drm_components);
++
++	return 0;
++}
++
+ static int imx_drm_platform_probe(struct platform_device *pdev)
+ {
++	struct device_node *ep, *port, *remote;
+ 	int ret;
++	int i;
++
++	/*
++	 * Bind the IPU display interface ports first, so that
++	 * imx_drm_encoder_parse_of called from encoder .bind callbacks
++	 * works as expected.
++	 */
++	for (i = 0; ; i++) {
++		port = of_parse_phandle(pdev->dev.of_node, "ports", i);
++		if (!port)
++			break;
++
++		ret = imx_drm_add_component(&pdev->dev, port);
++		if (ret < 0)
++			return ret;
++	}
++
++	if (i == 0) {
++		dev_err(&pdev->dev, "missing 'ports' property\n");
++		return -ENODEV;
++	}
++
++	/* Then bind all encoders */
++	for (i = 0; ; i++) {
++		port = of_parse_phandle(pdev->dev.of_node, "ports", i);
++		if (!port)
++			break;
++
++		for_each_child_of_node(port, ep) {
++			remote = imx_drm_of_get_remote_port_parent(ep);
++			if (!remote || !of_device_is_available(remote)) {
++				of_node_put(remote);
++				continue;
++			}
++
++			ret = imx_drm_add_component(&pdev->dev, remote);
++			of_node_put(remote);
++			if (ret < 0)
++				return ret;
++		}
++		of_node_put(port);
++	}
+ 
+ 	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+ 	if (ret)
+diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
+index 793a80b..447ddd7 100644
+--- a/drivers/staging/imx-drm/imx-drm.h
++++ b/drivers/staging/imx-drm/imx-drm.h
+@@ -30,7 +30,7 @@ struct imx_drm_crtc_helper_funcs {
+ int imx_drm_add_crtc(struct drm_device *drm, struct drm_crtc *crtc,
+ 		struct imx_drm_crtc **new_crtc,
+ 		const struct imx_drm_crtc_helper_funcs *imx_helper_funcs,
+-		void *cookie, int id);
++		struct device_node *port);
+ int imx_drm_remove_crtc(struct imx_drm_crtc *);
+ int imx_drm_init_drm(struct platform_device *pdev,
+ 		int preferred_bpp);
+@@ -49,7 +49,8 @@ int imx_drm_panel_format_pins(struct drm_encoder *encoder,
+ int imx_drm_panel_format(struct drm_encoder *encoder,
+ 		u32 interface_pix_fmt);
+ 
+-int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder);
++int imx_drm_encoder_get_mux_id(struct device_node *node,
++		struct drm_encoder *encoder);
+ int imx_drm_encoder_parse_of(struct drm_device *drm,
+ 	struct drm_encoder *encoder, struct device_node *np);
+ 
+diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
+index a677e33..8509814 100644
+--- a/drivers/staging/imx-drm/imx-hdmi.c
++++ b/drivers/staging/imx-drm/imx-hdmi.c
+@@ -1453,7 +1453,7 @@ static void imx_hdmi_encoder_prepare(struct drm_encoder *encoder)
+ static void imx_hdmi_encoder_commit(struct drm_encoder *encoder)
+ {
+ 	struct imx_hdmi *hdmi = container_of(encoder, struct imx_hdmi, encoder);
+-	int mux = imx_drm_encoder_get_mux_id(encoder);
++	int mux = imx_drm_encoder_get_mux_id(hdmi->dev->of_node, encoder);
+ 
+ 	imx_hdmi_set_ipu_di_mux(hdmi, mux);
+ 
+diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
+index 5168c76..301c430 100644
+--- a/drivers/staging/imx-drm/imx-ldb.c
++++ b/drivers/staging/imx-drm/imx-ldb.c
+@@ -168,7 +168,7 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
+ 	u32 pixel_fmt;
+ 	unsigned long serial_clk;
+ 	unsigned long di_clk = mode->clock * 1000;
+-	int mux = imx_drm_encoder_get_mux_id(encoder);
++	int mux = imx_drm_encoder_get_mux_id(imx_ldb_ch->child, encoder);
+ 
+ 	if (ldb->ldb_ctrl & LDB_SPLIT_MODE_EN) {
+ 		/* dual channel LVDS mode */
+@@ -203,7 +203,7 @@ static void imx_ldb_encoder_commit(struct drm_encoder *encoder)
+ 	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
+ 	struct imx_ldb *ldb = imx_ldb_ch->ldb;
+ 	int dual = ldb->ldb_ctrl & LDB_SPLIT_MODE_EN;
+-	int mux = imx_drm_encoder_get_mux_id(encoder);
++	int mux = imx_drm_encoder_get_mux_id(imx_ldb_ch->child, encoder);
+ 
+ 	if (dual) {
+ 		clk_prepare_enable(ldb->clk[0]);
+diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
+index e646017..a8d0178 100644
+--- a/drivers/staging/imx-drm/ipuv3-crtc.c
++++ b/drivers/staging/imx-drm/ipuv3-crtc.c
+@@ -350,10 +350,8 @@ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
+ 		return ret;
+ 	}
+ 
+-	ret = imx_drm_add_crtc(drm, &ipu_crtc->base,
+-			&ipu_crtc->imx_crtc,
+-			&ipu_crtc_helper_funcs,
+-			ipu_crtc->dev->parent->of_node, pdata->di);
++	ret = imx_drm_add_crtc(drm, &ipu_crtc->base, &ipu_crtc->imx_crtc,
++			&ipu_crtc_helper_funcs, ipu_crtc->dev->of_node);
+ 	if (ret) {
+ 		dev_err(ipu_crtc->dev, "adding crtc failed with %d.\n", ret);
+ 		goto err_put_resources;
+@@ -401,6 +399,28 @@ err_put_resources:
+ 	return ret;
+ }
+ 
++static struct device_node *ipu_drm_get_port_by_id(struct device_node *parent,
++						  int port_id)
++{
++	struct device_node *port;
++	int id, ret;
++
++	port = of_get_child_by_name(parent, "port");
++	while (port) {
++		ret = of_property_read_u32(port, "reg", &id);
++		if (!ret && id == port_id)
++			return port;
++
++		do {
++			port = of_get_next_child(parent, port);
++			if (!port)
++				return NULL;
++		} while (of_node_cmp(port->name, "port"));
++	}
++
++	return NULL;
++}
++
+ static int ipu_drm_bind(struct device *dev, struct device *master, void *data)
+ {
+ 	struct ipu_client_platformdata *pdata = dev->platform_data;
+@@ -441,16 +461,29 @@ static const struct component_ops ipu_crtc_ops = {
+ 
+ static int ipu_drm_probe(struct platform_device *pdev)
+ {
++	struct device *dev = &pdev->dev;
++	struct ipu_client_platformdata *pdata = dev->platform_data;
+ 	int ret;
+ 
+-	if (!pdev->dev.platform_data)
++	if (!dev->platform_data)
+ 		return -EINVAL;
+ 
+-	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
++	if (!dev->of_node) {
++		/* Associate crtc device with the corresponding DI port node */
++		dev->of_node = ipu_drm_get_port_by_id(dev->parent->of_node,
++						      pdata->di + 2);
++		if (!dev->of_node) {
++			dev_err(dev, "missing port@%d node in %s\n",
++				pdata->di + 2, dev->parent->of_node->full_name);
++			return -ENODEV;
++		}
++	}
++
++	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
+ 	if (ret)
+ 		return ret;
+ 
+-	return component_add(&pdev->dev, &ipu_crtc_ops);
++	return component_add(dev, &ipu_crtc_ops);
+ }
+ 
+ static int ipu_drm_remove(struct platform_device *pdev)
 -- 
 1.8.5.3
