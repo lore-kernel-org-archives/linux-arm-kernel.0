@@ -1,65 +1,67 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 18 Feb 2014 08:33:16 -0800
-Subject: BUG: Null pointer dereference on booting TC2 with
- vexpress_defconfig
-In-Reply-To: <53033E37.6000402@arm.com>
-References: <20140217223907.GH21070@cbox>
-	<53033E37.6000402@arm.com>
-Message-ID: <CAMJs5B-G86o8Tjcwg+dvDETqQ5qiDsDFB9kBPtL=RBLqFqpAOQ@mail.gmail.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Tue, 18 Feb 2014 10:33:21 -0600
+Subject: [PATCH v2] usb: phy: msm: fix compilation errors when
+ !CONFIG_PM_SLEEP
+In-Reply-To: <20140218162407.GF9878@saruman.home>
+References: <87lhyemr3y.fsf@linaro.org>
+ <1389981531-15539-1-git-send-email-joshc@codeaurora.org>
+ <20140117182650.GZ8153@joshc.qualcomm.com>
+ <20140218162407.GF9878@saruman.home>
+Message-ID: <20140218163321.GE31116@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 February 2014 03:04, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
-> On 17/02/14 22:39, Christoffer Dall wrote:
->> Booting my TC2 using 3.14-rc3 and vexpress_defconfig causes a NULL
->> pointer dereference in schedule_work_on.
->>
->> A quick look at the trace indicates that schedule_work() is called
->> before system_wq is initialized.
->>
->> Further, a bisect seems to indicate that this call path is triggered by
->> the changes in this merge commit of Theodore T'so's random_for_linus
->> tag:
->> 0891ad829d2a0501053703df66029e843e3b8365
->>
->> (However, my bisect may not be 100% correct, as some of the commits
->> between 3.13 and 3.12 don't boot the TC2 with vexpress_defconfig,
->> specifically the ones after f9300eaaac1ca300083ad41937923a90cc3a2394,
->> which causes boot to halt after "ARM CCI driver probed").
->>
-> Yes that requires some changes in defconfig to continue to work across
-> these changes(mainly have all these new configs disabled)
->
+On Tue, Feb 18, 2014 at 10:24:16AM -0600, Felipe Balbi wrote:
+> On Fri, Jan 17, 2014 at 12:26:50PM -0600, Josh Cartwright wrote:
+> > On Fri, Jan 17, 2014 at 11:58:51AM -0600, Josh Cartwright wrote:
+> > > Both the PM_RUNTIME and PM_SLEEP callbacks call into the common
+> > > msm_otg_{suspend,resume} routines, however these routines are only being
+> > > built when CONFIG_PM_SLEEP.  In addition, msm_otg_{suspend,resume} also
+> > > depends on msm_hsusb_config_vddcx(), which is only built when
+> > > CONFIG_PM_SLEEP.
+> > > 
+> > > Fix the CONFIG_PM_RUNTIME, !CONFIG_PM_SLEEP case by changing the
+> > > preprocessor conditional, and moving msm_hsusb_config_vddcx().
+> > > 
+> > > While we're here, eliminate the CONFIG_PM conditional for setting
+> > > up the dev_pm_ops.
+> > > 
+> > > This address the following errors Russell King has hit doing randconfig
+> > > builds:
+> > > 
+> > > drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_suspend':
+> > > drivers/usb/phy/phy-msm-usb.c:1691:2: error: implicit declaration of function 'msm_otg_suspend'
+> > > drivers/usb/phy/phy-msm-usb.c: In function 'msm_otg_runtime_resume':
+> > > drivers/usb/phy/phy-msm-usb.c:1699:2: error: implicit declaration of function 'msm_otg_resume'
+> > > 
+> > > Cc: Ivan T. Ivanov <iivanov@mm-sol.com>
+> > > Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> > > ---
+> > > v1->v2: Change conditional to simply CONFIG_PM (thanks ccov and khilman!)
+> > > 
+> > >  drivers/usb/phy/phy-msm-usb.c | 57 ++++++++++++++++++++-----------------------
+> > >  1 file changed, 26 insertions(+), 31 deletions(-)
+> > > 
+> > > diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
+> > > index 8546c8d..5b169a7 100644
+> > > --- a/drivers/usb/phy/phy-msm-usb.c
+> > > +++ b/drivers/usb/phy/phy-msm-usb.c
+> > [..]
+> > > @@ -440,7 +414,32 @@ static int msm_otg_reset(struct usb_phy *phy)
+> > >  #define PHY_SUSPEND_TIMEOUT_USEC	(500 * 1000)
+> > >  #define PHY_RESUME_TIMEOUT_USEC	(100 * 1000)
+> > >  
+> > > -#ifdef CONFIG_PM_SLEEP
+> > > +#if CONFIG_PM
+> > 
+> > *sigh*.  This, of course, should have been #ifdef CONFIG_PM.  Fixed
+> > v3 below.
+> 
+> sorry, please git send-email it properly.
 
-So vexpress_defconfig is known to not work on TC2?
+No problem, will do.  FWIW, it's applicable with git am --scissors.
 
->> Disabling CONFIG_ARCH_VEXPRESS_TC2_PM avoids the issue.
->>
-> Are you just disabling this or even CONFIG_MCPM ? Are the secondaries cpus
-> coming up ?
->
-
-Disabling CONFIG_ARCH_VEXPRESS_TC2_PM allows the system to boot, but
-only with one CPU.
-
-Disabling CONFIG_MCPM allows SMP boot as well.
-
->> I'm not familiar enough with any of these code paths to quicly identify
->> what the issue could be.  Apologies if I missed a previous post about
->> this issue (I couldn't find anything but would be surprised if I'm the
->> only one doing vexpress_defconfig on a TC2).
->>
-> I just tried and it works fine. If CONFIG_MCPM and CONFIG_ARCH_VEXPRESS_TC2_PM,
-> it requires some changes in board configurations(for bootmon), I assume you have
-> done those changes.
->
-
-What works fine? With both configs enabled?
-
-I didn't change anything on the boot monitor side.  Can you give me a
-pointer to the specifics?  Was there an announcement about this
-somewhere that I failed to locate?
-
-Thanks for your help!
-
--Christoffer
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
