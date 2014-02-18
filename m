@@ -1,56 +1,69 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Feb 2014 14:18:11 +0100
-Subject: [PATCH v2] net: ethernet: update dependency and help text of mvneta
-Message-ID: <1392729491-24913-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 18 Feb 2014 14:20:18 +0100
+Subject: [PATCH] ARM: kernel: improve error message when LPAE config doesn't
+ match CPU
+Message-ID: <1392729618-25094-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of the support for Armada 375 and Armada 38x,
-the hidden Kconfig option MACH_ARMADA_370_XP is being renamed to
-MACH_MVEBU_V7. Therefore, the dependency that was used for the mvneta
-driver can no longer work. This commit replaces this dependency by a
-dependency on PLAT_ORION, which is used similarly for the mv643xx_eth
-driver.
+Currently, when the kernel is configured with LPAE support, but the
+CPU doesn't support it, the error message is fairly cryptic:
 
-In addition to this, it takes this opportunity to adjust the
-description and help text to indicate that the driver can is also used
-for Armada 38x. Note that Armada 375 cannot use this driver as it has
-a completely different networking unit, which will require a separate
-driver.
+  Error: unrecognized/unsupported processor variant (0x561f5811).
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-Changes since v1:
- - Instead of removing the Kconfig dependency, replace it by a
-   dependency on PLAT_ORION, in order to avoid building mvneta on too
-   many architectures and getting weird build issues. Suggested by
-   Jason Cooper.
- - Fix capitalization in the Kconfig help text.
+This messages is normally shown when there is an issue when comparing
+the processor ID (CP15 0, c0, c0) with the values/masks described in
+proc-v7.S. However, the same message is displayed when LPAE support is
+enabled in the kernel configuration, but not available in the CPU,
+after looking at ID_MMFR0 (CP15 0, c0, c1, 4). Having the same error
+message is highly misleading.
+
+This commit improves this by showing a different error message when
+this situation occurs:
+
+  Error: Kernel with LPAE support, but CPU does not support LPAE.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/Kconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/kernel/head-common.S | 12 ++++++++++++
+ arch/arm/kernel/head.S        |  2 +-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
-index 6300fd2..68e6a66 100644
---- a/drivers/net/ethernet/marvell/Kconfig
-+++ b/drivers/net/ethernet/marvell/Kconfig
-@@ -43,12 +43,12 @@ config MVMDIO
- 	  This driver is used by the MV643XX_ETH and MVNETA drivers.
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index 47cd974..c96ecac 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -177,6 +177,18 @@ __lookup_processor_type_data:
+ 	.long	__proc_info_end
+ 	.size	__lookup_processor_type_data, . - __lookup_processor_type_data
  
- config MVNETA
--	tristate "Marvell Armada 370/XP network interface support"
--	depends on MACH_ARMADA_370_XP
-+	tristate "Marvell Armada 370/38x/XP network interface support"
-+	depends on PLAT_ORION
- 	select MVMDIO
- 	---help---
- 	  This driver supports the network interface units in the
--	  Marvell ARMADA XP and ARMADA 370 SoC family.
-+	  Marvell ARMADA XP, ARMADA 370 and ARMADA 38x SoC family.
++__error_lpae:
++#ifdef CONFIG_DEBUG_LL
++	adr	r0, str_lpae
++	bl 	printascii
++	b	__error
++str_lpae: .asciz "\nError: Kernel with LPAE support, but CPU does not support LPAE.\n"
++#else
++	b	__error
++#endif
++	.align
++ENDPROC(__error_lpae)
++
+ __error_p:
+ #ifdef CONFIG_DEBUG_LL
+ 	adr	r0, str_p1
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 914616e..f5f381d 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -102,7 +102,7 @@ ENTRY(stext)
+ 	and	r3, r3, #0xf			@ extract VMSA support
+ 	cmp	r3, #5				@ long-descriptor translation table format?
+  THUMB( it	lo )				@ force fixup-able long branch encoding
+-	blo	__error_p			@ only classic page table format
++	blo	__error_lpae			@ only classic page table format
+ #endif
  
- 	  Note that this driver is distinct from the mv643xx_eth
- 	  driver, which should be used for the older Marvell SoCs
+ #ifndef CONFIG_XIP_KERNEL
 -- 
 1.8.3.2
