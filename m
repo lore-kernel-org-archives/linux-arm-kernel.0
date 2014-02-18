@@ -1,28 +1,72 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 18 Feb 2014 09:58:02 -0500
-Subject: [PATCH] rtc: mv: reset date if after year 2038
-In-Reply-To: <1392729966-25394-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392729966-25394-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140218145802.GR7862@titan.lakedaemon.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 18 Feb 2014 14:55:47 +0000
+Subject: [PATCH 20/35] mtd: st_spi_fsm: Update the flash Volatile
+ Configuration Register
+In-Reply-To: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
+References: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1392735362-1245-21-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 02:26:06PM +0100, Thomas Petazzoni wrote:
-> Dates after January, 19th 2038 are badly handled by userspace due to
-> the time being stored on 32 bits. This causes issues on some Marvell
-> platform on which the RTC is initialized by default to a date that's
-> beyond 2038, causing a really weird behavior of the RTC.
-> 
-> In order to avoid that, reset the date to a sane value if the RTC is
-> beyond 2038.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/rtc/rtc-mv.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+The FSM Serial Flash Controller is driven by issuing a standard set of
+register writes we call a message sequence. This patch supplies a method
+to prepare the message sequence responsible for updating a chip's VCR.
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Acked-by Angus Clark <angus.clark@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mtd/devices/st_spi_fsm.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-thx,
-
-Jason.
+diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
+index e20f4cb..208b6c3 100644
+--- a/drivers/mtd/devices/st_spi_fsm.c
++++ b/drivers/mtd/devices/st_spi_fsm.c
+@@ -415,6 +415,23 @@ static struct stfsm_seq stfsm_seq_erase_sector = {
+ 		    SEQ_CFG_STARTSEQ),
+ };
+ 
++static struct stfsm_seq stfsm_seq_wrvcr = {
++	.seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
++		       SEQ_OPC_OPCODE(FLASH_CMD_WREN) | SEQ_OPC_CSDEASSERT),
++	.seq_opc[1] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
++		       SEQ_OPC_OPCODE(FLASH_CMD_WRVCR)),
++	.seq = {
++		STFSM_INST_CMD1,
++		STFSM_INST_CMD2,
++		STFSM_INST_STA_WR1,
++		STFSM_INST_STOP,
++	},
++	.seq_cfg = (SEQ_CFG_PADS_1 |
++		    SEQ_CFG_READNOTWRITE |
++		    SEQ_CFG_CSDEASSERT |
++		    SEQ_CFG_STARTSEQ),
++};
++
+ static int stfsm_n25q_en_32bit_addr_seq(struct stfsm_seq *seq)
+ {
+ 	seq->seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
+@@ -542,6 +559,21 @@ static int stfsm_enter_32bit_addr(struct stfsm *fsm, int enter)
+ 	return 0;
+ }
+ 
++static int stfsm_wrvcr(struct stfsm *fsm, uint8_t data)
++{
++	struct stfsm_seq *seq = &stfsm_seq_wrvcr;
++
++	dev_dbg(fsm->dev, "writing VCR 0x%02x\n", data);
++
++	seq->status = (STA_DATA_BYTE1(data) | STA_PADS_1 | STA_CSDEASSERT);
++
++	stfsm_load_seq(fsm, seq);
++
++	stfsm_wait_seq(fsm);
++
++	return 0;
++}
++
+ /*
+  * SoC reset on 'boot-from-spi' systems
+  *
+-- 
+1.8.3.2
