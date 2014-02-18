@@ -1,67 +1,191 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 18 Feb 2014 21:54:59 +0800
-Subject: [PATCH v4 4/5] ACPI: Move BAD_MADT_ENTRY() to linux/acpi.h
+Date: Tue, 18 Feb 2014 21:55:00 +0800
+Subject: [PATCH v4 5/5] ACPI: Replace printk with pr_* in tables.c
 In-Reply-To: <1392731700-10992-1-git-send-email-hanjun.guo@linaro.org>
 References: <1392731700-10992-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1392731700-10992-5-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1392731700-10992-6-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BAD_MADT_ENTRY() is arch independent and will be used for all
-archs which parsing MADT table, so move it to linux/acpi.h to
-simply the code.
+This patch just do some clean up to replace printk with pr_*,
+no functional change.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/ia64/kernel/acpi.c     |    4 ----
- arch/x86/kernel/acpi/boot.c |    4 ----
- include/linux/acpi.h        |    4 ++++
- 3 files changed, 4 insertions(+), 8 deletions(-)
+ drivers/acpi/tables.c |   51 +++++++++++++++++++------------------------------
+ 1 file changed, 20 insertions(+), 31 deletions(-)
 
-diff --git a/arch/ia64/kernel/acpi.c b/arch/ia64/kernel/acpi.c
-index af9d9e4..f7bd074 100644
---- a/arch/ia64/kernel/acpi.c
-+++ b/arch/ia64/kernel/acpi.c
-@@ -54,10 +54,6 @@
- #include <asm/sal.h>
- #include <asm/cyclone.h>
+diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+index 5837f85..97bc6df 100644
+--- a/drivers/acpi/tables.c
++++ b/drivers/acpi/tables.c
+@@ -55,8 +55,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 		{
+ 			struct acpi_madt_local_apic *p =
+ 			    (struct acpi_madt_local_apic *)header;
+-			printk(KERN_INFO PREFIX
+-			       "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
++			pr_info(PREFIX "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+ 			       p->processor_id, p->id,
+ 			       (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+ 		}
+@@ -66,8 +65,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 		{
+ 			struct acpi_madt_local_x2apic *p =
+ 			    (struct acpi_madt_local_x2apic *)header;
+-			printk(KERN_INFO PREFIX
+-			       "X2APIC (apic_id[0x%02x] uid[0x%02x] %s)\n",
++			pr_info(PREFIX "X2APIC (apic_id[0x%02x] uid[0x%02x] %s)\n",
+ 			       p->local_apic_id, p->uid,
+ 			       (p->lapic_flags & ACPI_MADT_ENABLED) ?
+ 			       "enabled" : "disabled");
+@@ -78,8 +76,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 		{
+ 			struct acpi_madt_io_apic *p =
+ 			    (struct acpi_madt_io_apic *)header;
+-			printk(KERN_INFO PREFIX
+-			       "IOAPIC (id[0x%02x] address[0x%08x] gsi_base[%d])\n",
++			pr_info(PREFIX "IOAPIC (id[0x%02x] address[0x%08x] gsi_base[%d])\n",
+ 			       p->id, p->address, p->global_irq_base);
+ 		}
+ 		break;
+@@ -88,15 +85,13 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 		{
+ 			struct acpi_madt_interrupt_override *p =
+ 			    (struct acpi_madt_interrupt_override *)header;
+-			printk(KERN_INFO PREFIX
+-			       "INT_SRC_OVR (bus %d bus_irq %d global_irq %d %s %s)\n",
++			pr_info(PREFIX "INT_SRC_OVR (bus %d bus_irq %d global_irq %d %s %s)\n",
+ 			       p->bus, p->source_irq, p->global_irq,
+ 			       mps_inti_flags_polarity[p->inti_flags & ACPI_MADT_POLARITY_MASK],
+ 			       mps_inti_flags_trigger[(p->inti_flags & ACPI_MADT_TRIGGER_MASK) >> 2]);
+ 			if (p->inti_flags  &
+ 			    ~(ACPI_MADT_POLARITY_MASK | ACPI_MADT_TRIGGER_MASK))
+-				printk(KERN_INFO PREFIX
+-				       "INT_SRC_OVR unexpected reserved flags: 0x%x\n",
++				pr_info(PREFIX "INT_SRC_OVR unexpected reserved flags: 0x%x\n",
+ 				       p->inti_flags  &
+ 					~(ACPI_MADT_POLARITY_MASK | ACPI_MADT_TRIGGER_MASK));
  
--#define BAD_MADT_ENTRY(entry, end) (                                        \
--		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
--		((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
--
- #define PREFIX			"ACPI: "
+@@ -107,8 +102,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 		{
+ 			struct acpi_madt_nmi_source *p =
+ 			    (struct acpi_madt_nmi_source *)header;
+-			printk(KERN_INFO PREFIX
+-			       "NMI_SRC (%s %s global_irq %d)\n",
++			pr_info(PREFIX "NMI_SRC (%s %s global_irq %d)\n",
+ 			       mps_inti_flags_polarity[p->inti_flags & ACPI_MADT_POLARITY_MASK],
+ 			       mps_inti_flags_trigger[(p->inti_flags & ACPI_MADT_TRIGGER_MASK) >> 2],
+ 			       p->global_irq);
+@@ -119,8 +113,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 		{
+ 			struct acpi_madt_local_apic_nmi *p =
+ 			    (struct acpi_madt_local_apic_nmi *)header;
+-			printk(KERN_INFO PREFIX
+-			       "LAPIC_NMI (acpi_id[0x%02x] %s %s lint[0x%x])\n",
++			pr_info(PREFIX "LAPIC_NMI (acpi_id[0x%02x] %s %s lint[0x%x])\n",
+ 			       p->processor_id,
+ 			       mps_inti_flags_polarity[p->inti_flags & ACPI_MADT_POLARITY_MASK	],
+ 			       mps_inti_flags_trigger[(p->inti_flags & ACPI_MADT_TRIGGER_MASK) >> 2],
+@@ -137,7 +130,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 			polarity = p->inti_flags & ACPI_MADT_POLARITY_MASK;
+ 			trigger = (p->inti_flags & ACPI_MADT_TRIGGER_MASK) >> 2;
  
- unsigned int acpi_cpei_override;
-diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
-index 1dac942..123f9e3 100644
---- a/arch/x86/kernel/acpi/boot.c
-+++ b/arch/x86/kernel/acpi/boot.c
-@@ -53,10 +53,6 @@ EXPORT_SYMBOL(acpi_disabled);
- # include <asm/proto.h>
- #endif				/* X86 */
+-			printk(KERN_INFO PREFIX
++			pr_info(PREFIX
+ 			       "X2APIC_NMI (uid[0x%02x] %s %s lint[0x%x])\n",
+ 			       p->uid,
+ 			       mps_inti_flags_polarity[polarity],
+@@ -150,8 +143,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 		{
+ 			struct acpi_madt_local_apic_override *p =
+ 			    (struct acpi_madt_local_apic_override *)header;
+-			printk(KERN_INFO PREFIX
+-			       "LAPIC_ADDR_OVR (address[%p])\n",
++			pr_info(PREFIX "LAPIC_ADDR_OVR (address[%p])\n",
+ 			       (void *)(unsigned long)p->address);
+ 		}
+ 		break;
+@@ -160,7 +152,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 		{
+ 			struct acpi_madt_io_sapic *p =
+ 			    (struct acpi_madt_io_sapic *)header;
+-			printk(KERN_INFO PREFIX
++			pr_info(PREFIX
+ 			       "IOSAPIC (id[0x%x] address[%p] gsi_base[%d])\n",
+ 			       p->id, (void *)(unsigned long)p->address,
+ 			       p->global_irq_base);
+@@ -171,7 +163,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 		{
+ 			struct acpi_madt_local_sapic *p =
+ 			    (struct acpi_madt_local_sapic *)header;
+-			printk(KERN_INFO PREFIX
++			pr_info(PREFIX
+ 			       "LSAPIC (acpi_id[0x%02x] lsapic_id[0x%02x] lsapic_eid[0x%02x] %s)\n",
+ 			       p->processor_id, p->id, p->eid,
+ 			       (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+@@ -182,7 +174,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 		{
+ 			struct acpi_madt_interrupt_source *p =
+ 			    (struct acpi_madt_interrupt_source *)header;
+-			printk(KERN_INFO PREFIX
++			pr_info(PREFIX
+ 			       "PLAT_INT_SRC (%s %s type[0x%x] id[0x%04x] eid[0x%x] iosapic_vector[0x%x] global_irq[0x%x]\n",
+ 			       mps_inti_flags_polarity[p->inti_flags & ACPI_MADT_POLARITY_MASK],
+ 			       mps_inti_flags_trigger[(p->inti_flags & ACPI_MADT_TRIGGER_MASK) >> 2],
+@@ -192,8 +184,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 		break;
  
--#define BAD_MADT_ENTRY(entry, end) (					    \
--		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
--		((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
--
- #define PREFIX			"ACPI: "
+ 	default:
+-		printk(KERN_WARNING PREFIX
+-		       "Found unsupported MADT entry (type = 0x%x)\n",
++		pr_warn(PREFIX "Found unsupported MADT entry (type = 0x%x)\n",
+ 		       header->type);
+ 		break;
+ 	}
+@@ -225,7 +216,7 @@ acpi_table_parse_entries(char *id,
+ 		acpi_get_table_with_size(id, 0, &table_header, &tbl_size);
  
- int acpi_noirq;				/* skip ACPI IRQ initialization */
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 1151a1d..6a15ddd 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -108,6 +108,10 @@ static inline void acpi_initrd_override(void *data, size_t size)
- }
- #endif
+ 	if (!table_header) {
+-		printk(KERN_WARNING PREFIX "%4.4s not present\n", id);
++		pr_warn(PREFIX "%4.4s not present\n", id);
+ 		return -ENODEV;
+ 	}
  
-+#define BAD_MADT_ENTRY(entry, end) (					    \
-+		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
-+		((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
-+
- char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
- void __acpi_unmap_table(char *map, unsigned long size);
- int early_acpi_boot_init(void);
+@@ -256,8 +247,8 @@ acpi_table_parse_entries(char *id,
+ 		    ((unsigned long)entry + entry->length);
+ 	}
+ 	if (max_entries && count > max_entries) {
+-		printk(KERN_WARNING PREFIX "[%4.4s:0x%02x] ignored %i entries of "
+-		       "%i found\n", id, entry_id, count - max_entries, count);
++		pr_warn(PREFIX "[%4.4s:0x%02x] ignored %i entries of %i found\n",
++			id, entry_id, count - max_entries, count);
+ 	}
+ 
+ 	early_acpi_os_unmap_memory((char *)table_header, tbl_size);
+@@ -322,11 +313,9 @@ static void __init check_multiple_madt(void)
+ 
+ 	acpi_get_table_with_size(ACPI_SIG_MADT, 2, &table, &tbl_size);
+ 	if (table) {
+-		printk(KERN_WARNING PREFIX
+-		       "BIOS bug: multiple APIC/MADT found,"
+-		       " using %d\n", acpi_apic_instance);
+-		printk(KERN_WARNING PREFIX
+-		       "If \"acpi_apic_instance=%d\" works better, "
++		pr_warn(PREFIX "BIOS bug: multiple APIC/MADT found, using %d\n",
++			acpi_apic_instance);
++		pr_warn(PREFIX "If \"acpi_apic_instance=%d\" works better, "
+ 		       "notify linux-acpi at vger.kernel.org\n",
+ 		       acpi_apic_instance ? 0 : 2);
+ 		early_acpi_os_unmap_memory(table, tbl_size);
+@@ -365,7 +354,7 @@ static int __init acpi_parse_apic_instance(char *str)
+ 
+ 	acpi_apic_instance = simple_strtoul(str, NULL, 0);
+ 
+-	printk(KERN_NOTICE PREFIX "Shall use APIC/MADT table %d\n",
++	pr_notice(PREFIX "Shall use APIC/MADT table %d\n",
+ 	       acpi_apic_instance);
+ 
+ 	return 0;
 -- 
 1.7.9.5
