@@ -1,43 +1,76 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 18 Feb 2014 14:11:58 +0800
-Subject: [PATCH v3] input: sirfsoc-onkey - report onkey untouch event by
- detecting pin status
-In-Reply-To: <20140217191658.GA19223@core.coreip.homeip.net>
-References: <1392348001-4950-1-git-send-email-21cnbao@gmail.com>
- <20140214075717.GA14682@core.coreip.homeip.net>
- <CAGsJ_4xqnZAO6vpkgTEHmfp9+nbWa1qwQ4pda6B2sSrEtbV3ZA@mail.gmail.com>
- <847BC5012124A94BB5CA1B26E022CCA3012BAFDC27@SHAASIEXM01.ASIA.ROOT.PRI>
- <CAGsJ_4zjtWV3Z1AJ2bqekXn54rm=k8d4iOi_zzainCEnNGefCw@mail.gmail.com>
- <20140217191658.GA19223@core.coreip.homeip.net>
-Message-ID: <CAGsJ_4yqAz6eVM0stvzstiC+rxuCK5G-0QM=F2NJWEviYJDD9Q@mail.gmail.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 18 Feb 2014 14:33:53 +0800
+Subject: [PATCH] arm64: Add architecture support for PCI
+In-Reply-To: <1391453028-23191-2-git-send-email-Liviu.Dudau@arm.com>
+References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
+ <1391453028-23191-2-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <5302FED1.80903@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-02-18 3:16 GMT+08:00 Dmitry Torokhov <dmitry.torokhov@gmail.com>:
-> On Fri, Feb 14, 2014 at 09:41:06PM +0800, Barry Song wrote:
->> >> Input: sirfsoc-onkey - implement open and close methods
->> >>
->> >> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->> >>
->> >> We can control whetehr device generates interrupts or not so let's
->> >> implement open and close methods of input device so that we do not do any
->> >> processing until there are users.
->> >>
->> >> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->>
->> Tested-by: Xianglong Du <Xianglong.Du@csr.com>
->>
->> Dmitry, will you push this one to your tree so that i can rebase others?
->
-> I rebased and pushed everything out, please take a look to make sure it
-> all looks good.
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mm.h>
+> +#include <linux/of_pci.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/slab.h>
+> +
+> +#include <asm/pci-bridge.h>
+> +
+> +
+> +/*
+> + * Return the domain number for this bus
+> + */
+> +int pci_domain_nr(struct pci_bus *bus)
+> +{
+> +	struct pci_host_bridge *bridge = to_pci_host_bridge(bus->bridge);
 
-thanks, we have done a update to CSR local tree.
+Here bus is specific to root bus ? or, what about use find_pci_host_bridge() to get the pci_host_bridge
+instead.
 
->
-> Thanks.
->
-> --
-> Dmitry
+> +
+> +	if (bridge)
+> +		return bridge->domain_nr;
+> +
+> +	return 0;
+> +}
+> +
+> +int pci_proc_domain(struct pci_bus *bus)
+> +{
+> +	return pci_domain_nr(bus);
+> +}
+> +
+> +/*
+> + * Called after each bus is probed, but before its children are examined
+> + */
+> +void pcibios_fixup_bus(struct pci_bus *bus)
+> +{
+> +	struct pci_dev *dev;
+> +	struct resource *res;
+> +	int i;
+> +
+> +	if (bus->self != NULL) {
 
--barry
+What about use !pci_is_root_bus() ?
+
+> +		pci_read_bridge_bases(bus);
+> +
+> +		pci_bus_for_each_resource(bus, res, i) {
+> +			if (!res || !res->flags || res->parent)
+> +				continue;
+> +
+> +			/*
+> +			 * If we are going to reassign everything, we can
+> +			 * shrink the P2P resource to have zero size to
+> +			 * save space
+> +			 */
+> +			if (pci_has_flag(PCI_REASSIGN_ALL_RSRC)) {
+> +				res->flags |= IORESOURCE_UNSET;
+> +				res->start = 0;
+> +				res->end = -1;
+> +				continue;
+> +			}
+> +		}
+> +	}
+> +
