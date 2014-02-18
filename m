@@ -1,32 +1,36 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 18 Feb 2014 21:23:29 +0100 (CET)
-Subject: [GIT PULL] irqchip: mvebu fixes for v3.14
-In-Reply-To: <20140218162210.GU7862@titan.lakedaemon.net>
-References: <20140218162210.GU7862@titan.lakedaemon.net>
-Message-ID: <alpine.DEB.2.02.1402182122010.4468@ionos.tec.linutronix.de>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 18 Feb 2014 12:27:02 -0800
+Subject: [PATCH v4 0/2] Introduce AEMIF driver for Davinci/Keystone archs
+In-Reply-To: <53037113.3090105@ti.com>
+References: <1391629574-18955-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <53037113.3090105@ti.com>
+Message-ID: <20140218202702.GA18642@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Feb 2014, Jason Cooper wrote:
-
-> Thomas,
+On Tue, Feb 18, 2014 at 09:41:23AM -0500, Santosh Shilimkar wrote:
+> Greg,
 > 
-> Here is a small round of fixes for irq-orion.c.  They've been in -next
-> for over a week.  Please pull.
-> 
-> We have a set of watchdog changes depending on this that are going
-> through mvebu/arm-soc.  So please don't rebase, just let me know if
-> there's something that isn't right.  I'll fix it up and resend.
+> On Wednesday 05 February 2014 02:46 PM, Ivan Khoronzhuk wrote:
+> > These patches introduce Async External Memory Interface (EMIF16/AEMIF)
+> > controller driver for Davinci/Keystone archs.
+> > 
+> > For more informations see documentation:
+> > Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
+> > OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
+> > Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+> > 
+> Can you please have a look at the series ? It has been on the list for
+> sometime and all the outstanding comments are addressed so far. If
+> you are ok with it, I would like to get these queued up for 3.15
+> via your tree.
 
-Just a nit:
+Why my tree?  Am I the drivers/memory/ maintainer?
 
-12bd4f7: IRQ: Orion: Fix getting generic chip pointer.
-e0318ec: irqchip: orion: clear stale interrupts in irq_startup
-5f40067: irqchip: orion: use handle_edge_irq on bridge irqs
-7b119fd: irqchip: orion: clear bridge cause register on init
+/me digs in git...
 
-Can you see it ?
+Ah, it looks like I might be...
 
-Thanks,
+Ok, let me go review this.
 
-	tglx
+greg k-h
