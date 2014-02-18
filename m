@@ -1,98 +1,52 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 18 Feb 2014 16:03:22 +0100
-Subject: [PATCH 1/5] ARM: omap2: cm-t35: Add regulators and clock for
- camera sensor
-In-Reply-To: <53036840.3050605@compulab.co.il>
-References: <1392069284-18024-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <9621770.WFqvfViqR7@avalon> <53036840.3050605@compulab.co.il>
-Message-ID: <3444638.OmucgL67eO@avalon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 18 Feb 2014 14:55:27 +0000
+Subject: [PATCH v5 00/35] mtd: st_spi_fsm: Add new driver
+Message-ID: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Igor,
+This should be the final version.
 
-On Tuesday 18 February 2014 16:03:44 Igor Grinberg wrote:
-> On 02/18/14 14:47, Laurent Pinchart wrote:
-> > On Monday 10 February 2014 22:54:40 Laurent Pinchart wrote:
-> >> The camera sensor will soon require regulators and clocks. Register
-> >> fixed regulators for its VAA and VDD power supplies and a fixed rate
-> >> clock for its master clock.
-> > 
-> > This patch is a prerequisite for a set of 4 patches that need to go
-> > through the linux-media tree. It would simpler if it could go through the
-> > same tree as well. Given that arch/arm/mach-omap2/board-cm-t35.c has seen
-> > very little activity recently I believe the risk of conflict is pretty
-> > low.
-> 
-> Indeed, as we work on DT stuff of cm-t35/3730 and pretty much stopped
-> updating the board-cm-t35.c file.
+Version 5:
+  Tended to Christophe, Ludovic and Angus' comments.
 
-DT support for the OMAP3 ISP is coming. Too slowly, but it's coming :-)
+Version 4:
+  Tended to Brian's review comments
+    - Checkpatch acceptance
+    - MODULE_DEVICE_TABLE() name slip correction
+    - Timeout issue(s) resolved
+    - Potential infinite loop mitigated
+    - Code clarity suggests heeded
+    - Duplication with MTD core code removed
+    - Upgraded to using ROUND_UP() helper
+    - Moved non-shared header code into main driver
+    - Relocated dynamic msg sequence stores into main struct
+    - Averted adaption of static (table) data
+    - Basic whitespace/spelling/data type/dev_err suggestions applied
 
-> > Tony, would
-> > that be fine with you ?
-> > 
-> >> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> 
-> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+Version 3:
+  Okay, this thing should be fully functional now. Identify a chip
+  based on it's JEDEC ID, Read, Write, Erase (all or by sector).
+  Support for various chip quirks added too.
 
-Thank you. Tony, could I get your ack as well to push this through Mauro's 
-tree ?
+Version 2:
+  The first bunch of these patches have been on the MLs before, but
+  didn't receive a great deal of attention for the most part. We are
+  a little more featureful this time however. We can now successfully
+  setup and configure the N25Q256. We still can't read/write/erase
+  it though. I'll start work on that next week and will provide it in
+  the next instalment.
 
-> >> ---
-> >> 
-> >>  arch/arm/mach-omap2/board-cm-t35.c | 16 ++++++++++++++++
-> >>  1 file changed, 16 insertions(+)
-> >> 
-> >> diff --git a/arch/arm/mach-omap2/board-cm-t35.c
-> >> b/arch/arm/mach-omap2/board-cm-t35.c index 8dd0ec8..018353d 100644
-> >> --- a/arch/arm/mach-omap2/board-cm-t35.c
-> >> +++ b/arch/arm/mach-omap2/board-cm-t35.c
-> >> @@ -16,6 +16,8 @@
-> >> 
-> >>   *
-> >>   */
-> >> 
-> >> +#include <linux/clk-provider.h>
-> >> +#include <linux/clkdev.h>
-> >> 
-> >>  #include <linux/kernel.h>
-> >>  #include <linux/init.h>
-> >>  #include <linux/platform_device.h>
-> >> 
-> >> @@ -542,8 +544,22 @@ static struct isp_platform_data cm_t35_isp_pdata = {
-> >> 
-> >>  	.subdevs = cm_t35_isp_subdevs,
-> >>  
-> >>  };
-> >> 
-> >> +static struct regulator_consumer_supply cm_t35_camera_supplies[] = {
-> >> +	REGULATOR_SUPPLY("vaa", "3-005d"),
-> >> +	REGULATOR_SUPPLY("vdd", "3-005d"),
-> >> +};
-> >> +
-> >> 
-> >>  static void __init cm_t35_init_camera(void)
-> >>  {
-> >> 
-> >> +	struct clk *clk;
-> >> +
-> >> +	clk = clk_register_fixed_rate(NULL, "mt9t001-clkin", NULL, 
-CLK_IS_ROOT,
-> >> +				      48000000);
-> >> +	clk_register_clkdev(clk, NULL, "3-005d");
-> >> +
-> >> +	regulator_register_fixed(2, cm_t35_camera_supplies,
-> >> +				 ARRAY_SIZE(cm_t35_camera_supplies));
-> >> +
-> >> 
-> >>  	if (omap3_init_camera(&cm_t35_isp_pdata) < 0)
-> >>  	
-> >>  		pr_warn("CM-T3x: Failed registering camera device!\n");
-> >>  
-> >>  }
+Version 1:
+  First stab at getting this thing Mainlined. It doesn't do a great deal
+  yet, but we are able to initialise the device and dynamically set it up
+  correctly based on an extracted JEDEC ID.
 
--- 
-Regards,
-
-Laurent Pinchart
+ Documentation/devicetree/bindings/mtd/st-fsm.txt |   26 ++
+ arch/arm/boot/dts/stih416-b2105.dts              |   14 +
+ arch/arm/boot/dts/stih416-pinctrl.dtsi           |   12 +
+ drivers/mtd/devices/Kconfig                      |    8 +
+ drivers/mtd/devices/Makefile                     |    1 +
+ drivers/mtd/devices/serial_flash_cmds.h          |   81 +++++
+ drivers/mtd/devices/st_spi_fsm.c                 | 2122 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 7 files changed, 2264 insertions(+)
