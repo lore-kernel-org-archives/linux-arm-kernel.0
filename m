@@ -1,50 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 18 Feb 2014 11:36:28 -0500
-Subject: [GIT PULL] ARM: mvebu soc changes for v3.15
-Message-ID: <20140218163628.GW7862@titan.lakedaemon.net>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 18 Feb 2014 17:36:52 +0100
+Subject: [PATCH 03/17] mmc: mmci: Mask IRQs for all variants during
+ runtime suspend
+In-Reply-To: <20140218160542.GH21483@n2100.arm.linux.org.uk>
+References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+ <1391529538-21685-4-git-send-email-ulf.hansson@linaro.org>
+ <20140218160542.GH21483@n2100.arm.linux.org.uk>
+Message-ID: <CAPDyKFq3uAoo7p-7hZgBmMJ4jf9A7dC0aUZJYUE0z1Qq5W=0bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+On 18 February 2014 17:05, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Feb 04, 2014 at 04:58:44PM +0100, Ulf Hansson wrote:
+>> In runtime suspended state, we are not expecting IRQs and thus we can
+>> safely mask them, not only for pwrreg_nopower variants but for all.
+>>
+>> Obviously we then also need to make sure we restore the IRQ mask while
+>> becoming runtime resumed.
+>
+> So, what happens when this patch is applied, and a SDIO card is attached
+> which expects to receive interrupts at any moment?
 
-A small round of changes that have been sitting in -next for a week or
-so.  Please pull.
+Currently, no variant implements SDIO irq.
 
-thx,
+The SDIO irq polling mode from the sdio core will still be functional,
+as of today. So, this patch will not break SDIO.
 
-Jason.
+>
+> Given that I've run into this during the last week with a SDHCI controller,
+> I'm not that thrilled with other interfaces doing the same broken thing.
 
+If we add SDIO irq support to mmci in future; parts of that
+implementation includes a re-route of DAT1 to a GPIO irq when entering
+runtime suspend state. The mmci HW will in runtime suspend state, not
+be responsible for handling irqs, which is the same as of today.
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+Kind regards
+Ulf Hansson
 
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.15
-
-for you to fetch changes up to 08bb3adfd3adeb4653095e7968b6a46cef940404:
-
-  ARM: mvebu: remove unneeded ->map_io field for Armada 370/XP (2014-02-11 19:33:04 +0000)
-
-----------------------------------------------------------------
-mvebu soc changes for v3.15
-
- - mvebu
-    - Makefile cleanup and remove map_io
-    - use of_find_matching_node_and_match
-
-----------------------------------------------------------------
-Gregory CLEMENT (1):
-      ARM: mvebu: Makefile clean-up
-
-Josh Cartwright (1):
-      ARM: mvebu: make use of of_find_matching_node_and_match
-
-Thomas Petazzoni (1):
-      ARM: mvebu: remove unneeded ->map_io field for Armada 370/XP
-
- arch/arm/mach-mvebu/Makefile            | 3 +--
- arch/arm/mach-mvebu/armada-370-xp.c     | 6 ------
- arch/arm/mach-mvebu/system-controller.c | 9 ++++-----
- 3 files changed, 5 insertions(+), 13 deletions(-)
+>
+> --
+> FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+> in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+> Estimate before purchase was "up to 13.2Mbit".
