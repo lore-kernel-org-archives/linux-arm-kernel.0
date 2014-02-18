@@ -1,89 +1,60 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Feb 2014 10:50:32 -0600
-Subject: [PATCH v9 11/12] usb: phy-mxs: Add system suspend/resume API
-In-Reply-To: <1388111921-17326-12-git-send-email-peter.chen@freescale.com>
-References: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
- <1388111921-17326-12-git-send-email-peter.chen@freescale.com>
-Message-ID: <20140218165032.GN9878@saruman.home>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 18 Feb 2014 10:40:39 -0600
+Subject: [PATCH] gpio: msm: switch Kconfig to ARCH_QCOM depends
+In-Reply-To: <1392150132-21877-1-git-send-email-galak@codeaurora.org>
+References: <1392150132-21877-1-git-send-email-galak@codeaurora.org>
+Message-ID: <E7F3569D-CA91-4419-A7C2-B62E2830995E@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 27, 2013 at 10:38:40AM +0800, Peter Chen wrote:
-> We need this to keep PHY's power on or off during the system
-> suspend mode. If we need to enable USB wakeup, then we
-> must keep PHY's power being on during the system suspend mode.
-> Otherwise, we need to keep PHY's power being off to save power.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/phy/phy-mxs-usb.c |   61 +++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 61 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-> index 96aac05..53b8dad 100644
-> --- a/drivers/usb/phy/phy-mxs-usb.c
-> +++ b/drivers/usb/phy/phy-mxs-usb.c
-> @@ -57,6 +57,10 @@
->  #define BM_USBPHY_DEBUG_CLKGATE			BIT(30)
->  
->  /* Anatop Registers */
-> +#define ANADIG_ANA_MISC0			0x150
-> +#define ANADIG_ANA_MISC0_SET			0x154
-> +#define ANADIG_ANA_MISC0_CLR			0x158
-> +
->  #define ANADIG_USB1_VBUS_DET_STAT		0x1c0
->  #define ANADIG_USB2_VBUS_DET_STAT		0x220
->  
-> @@ -65,6 +69,9 @@
->  #define ANADIG_USB2_LOOPBACK_SET		0x244
->  #define ANADIG_USB2_LOOPBACK_CLR		0x248
->  
-> +#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	BIT(12)
-> +#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG_SL BIT(11)
-> +
->  #define BM_ANADIG_USB1_VBUS_DET_STAT_VBUS_VALID	BIT(3)
->  #define BM_ANADIG_USB2_VBUS_DET_STAT_VBUS_VALID	BIT(3)
->  
-> @@ -134,6 +141,16 @@ struct mxs_phy {
->  	int port_id;
->  };
->  
-> +static inline bool is_imx6q_phy(struct mxs_phy *mxs_phy)
-> +{
-> +	return mxs_phy->data == &imx6q_phy_data;
-> +}
-> +
-> +static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
-> +{
-> +	return mxs_phy->data == &imx6sl_phy_data;
-> +}
-> +
->  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
->  {
->  	int ret;
-> @@ -382,6 +399,8 @@ static int mxs_phy_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, mxs_phy);
->  
-> +	device_set_wakeup_capable(&pdev->dev, true);
-> +
->  	ret = usb_add_phy_dev(&mxs_phy->phy);
->  	if (ret)
->  		return ret;
-> @@ -398,6 +417,47 @@ static int mxs_phy_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM_SLEEP
 
-please use CONFIG_PM instead.
+On Feb 11, 2014, at 2:22 PM, Kumar Gala <galak@codeaurora.org> wrote:
+
+> We've split Qualcomm MSM support into legacy and multiplatform.  The gpio
+> msm-v2 driver is only relevant on the multiplatform supported SoCs so
+> switch the Kconfig depends to ARCH_QCOM.
+> 
+> CC: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> ---
+> Linus,
+> 
+> If you can ack this I'll send it via linux-qcom/arm-soc tree's
+> 
+> thanks
+> 
+> - k
+
+ping
+
+- k
+
+> 
+> drivers/gpio/Kconfig | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index 6973387..aa74949 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -192,7 +192,7 @@ config GPIO_MSM_V1
+> 
+> config GPIO_MSM_V2
+> 	tristate "Qualcomm MSM GPIO v2"
+> -	depends on GPIOLIB && OF && ARCH_MSM
+> +	depends on GPIOLIB && OF && ARCH_QCOM
+> 	help
+> 	  Say yes here to support the GPIO interface on ARM v7 based
+> 	  Qualcomm MSM chips.  Most of the pins on the MSM can be
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/c6fa3615/attachment.sig>
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
