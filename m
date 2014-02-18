@@ -1,58 +1,70 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 18 Feb 2014 11:37:46 -0700
-Subject: [PATCH v2 05/23] ARM: Kirkwood: Seperate board-dt from common
- and pcie code.
-In-Reply-To: <20140215140505.GB26088@lunn.ch>
-References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
- <1392459621-24003-6-git-send-email-andrew@lunn.ch>
- <3017687.o0PD1Sf7lM@wuerfel> <20140215140505.GB26088@lunn.ch>
-Message-ID: <20140218183746.GH29304@obsidianresearch.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Feb 2014 19:40:51 +0100
+Subject: [PATCH v2 0/3] ARM: PCI: implement generic PCI host controller
+In-Reply-To: <20140218180005.GD29304@obsidianresearch.com>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <1800297.J3Exeqph4n@wuerfel> <20140218180005.GD29304@obsidianresearch.com>
+Message-ID: <3296233.1sYEW4ig2k@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 15, 2014 at 03:05:05PM +0100, Andrew Lunn wrote:
-> On Sat, Feb 15, 2014 at 02:18:08PM +0100, Arnd Bergmann wrote:
-> > On Saturday 15 February 2014 11:20:03 Andrew Lunn wrote:
-> > > +static void __init kirkwood_l2_init(void)
-> > > +{
-> > > +#ifdef CONFIG_CACHE_FEROCEON_L2
-> > > +#ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
-> > > +       writel(readl(L2_CONFIG_REG) | L2_WRITETHROUGH, L2_CONFIG_REG);
-> > > +       feroceon_l2_init(1);
-> > > +#else
-> > > +       writel(readl(L2_CONFIG_REG) & ~L2_WRITETHROUGH, L2_CONFIG_REG);
-> > > +       feroceon_l2_init(0);
-> > > +#endif
-> > > +#endif
-> > > +}
+On Tuesday 18 February 2014 11:00:05 Jason Gunthorpe wrote:
+> 
+> > > You will have overlapping physical IO bus addresses - each domain will
+> > > have a 0 IO BAR - but those will have distinct CPU physical addresses
+> > > and can then be uniquely mapped into the IO mapping. So at the struct
+> > > resource level the two domains have disjoint IO addresses, but each
+> > > domain uses a different IO offset..
 > > 
-> > I assume this is correct, but I don't understand it. Why is there a
-> > configuration option for this? Do both write-through and write-back
-> > work on all machines, or could there be a case where some machine
-> > actually requires a particular mode? If not, isn't write-back
-> > normally "better", so you won't actually ever want to set write-through
-> > mode?
+> > This would be the common case, but when we have a generic helper function,
+> > it's actually not that are to handle a couple of variations of that,
+> > which we may see in the field and can easily be described with the
+> > existing binding.
 > 
-> Hi Arnd
+> I agree the DT binding ranges has enough flexibility to describe all
+> of these cases, but I kind of circle back to the domain discussion and
+> ask 'Why?'. 
 > 
-> The honest answer is, i've no idea. I'm just shuffling code around in
-> this patch, and not applying my brain as to what this code does....
+> As far as I can see there are two reasonable ways to handle IO space:
+>  - The IO space is 1:1 mapped to the Physical CPU Address. In most
+>    cases this would require 32 bit IO BARS in all devices.
+
+I wouldn't consider this one reasonable ;-)
+
+In particular, it would break /dev/port access horribly.
+
+>  - The IO space in a domain is always 0 -> 64k and thus only ever
+>    requires 16 bit BARs
 > 
-> Maybe JasonG has a better idea of this history of this?
+> And this is possible too:
+>  - The IO space is 1:1: mapped to Linux Virtual IO port numbers
+>    (which are a fiction) and devices sometimes require 32 bit
+>    IO BARs. This gives you lspci output that matches dmesg and
+>    /proc/ioport.
 
-No idea of the history, but for DMA heavy work loads write-through is
-better since you spend less cpu cycles doing cache flushing, while for
-CPU centric work loads write-back is better since you spend less time
-waiting for memory.
+These two seem fine.
 
-Since these SOCs are popular for storage and networking apps I'm not
-surprised to see this option.
+> Things get more complex if you want to support legacy non-BAR IO (eg
+> VGA). Then you *really* want every domain to support 0->64k and you
+> need driver support to setup a window for the legacy IO port. (eg on a
+> multi-port root complex there is non-PCI spec hardware that routes the
+> VGA addresses to the root port bridge that connects to the VGA card)
+> Plus you probably need a memory hole around 1M..
 
-But a static config option is not really in-line with current thinking
-on these sorts of things. A DT option would be better (IMHO), but even
-that is probably not going to be universally loved.
+For the I/O space part of this, that would be the same as your second
+example above. For memory space, you need both the 640k-1M window and
+the 15M-16M window. We have a couple of ARM platforms that actually
+have a PCI MMIO window starting at bus address 0 with a mem_offset
+matching the physical base address to facilitate VGA access,
+try 'git grep -w vga_base'.
 
-Can we worry about this after Andrew's shuffling is done?
+> But, I think this is overthinking things. IO space really is
+> deprecated, and 0->64k is a fine default for everything but very
+> specialized cases.
 
-Regards,
-Jason
+We may not need the entire complexity to handle all cases, but
+I think it's a good idea to detect the ones we don't handle and
+then warn about them. For some things, just doing it right may be
+easier than detecting the case where we don't.
+
+	Arnd
