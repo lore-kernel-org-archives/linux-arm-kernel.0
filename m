@@ -1,38 +1,51 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 18 Feb 2014 18:49:04 -0500 (EST)
-Subject: [PATCHv4 2/2] arm: Get rid of meminfo
-In-Reply-To: <20140218230710.GO21483@n2100.arm.linux.org.uk>
-References: <1392761733-32628-1-git-send-email-lauraa@codeaurora.org>
- <1392761733-32628-3-git-send-email-lauraa@codeaurora.org>
- <20140218230710.GO21483@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1402181848140.17677@knanqh.ubzr>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 18 Feb 2014 16:51:58 -0700
+Subject: [PATCH] ARM: tegra: only run PL310 init on systems with one
+Message-ID: <1392767518-27821-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Feb 2014, Russell King - ARM Linux wrote:
+From: Stephen Warren <swarren@nvidia.com>
 
-> On Tue, Feb 18, 2014 at 02:15:33PM -0800, Laura Abbott wrote:
-> > memblock is now fully integrated into the kernel and is the prefered
-> > method for tracking memory. Rather than reinvent the wheel with
-> > meminfo, migrate to using memblock directly instead of meminfo as
-> > an intermediate.
-> 
-> >  #define NR_BANKS	CONFIG_ARM_NR_BANKS
-> >  
-> > -struct membank {
-> > -	phys_addr_t start;
-> > -	phys_addr_t size;
-> > -	unsigned int highmem;
-> > -};
-> > -
-> > -struct meminfo {
-> > -	int nr_banks;
-> > -	struct membank bank[NR_BANKS];
-> > -};
-> 
-> Doesn't this make NR_BANKS (and CONFIG_ARM_NR_BANKS) unused?
+Fix tegra_init_cache() to check whether the system has a PL310 cache
+before touching the PL310 registers. This prevents access to non-existent
+registers on Tegra114 and later.
 
-Still used in atag_to_fdt.c but I just sent a patch moving it there.
+Note for stable kernels:
+In <= v3.12, the file to patch is arch/arm/mach-tegra/common.c.
 
+Cc: <stable@vger.kernel.org> # v3.9+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Another fix for 3.14
 
-Nicolas
+ arch/arm/mach-tegra/tegra.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+index 303a285d80fd..6191603379e1 100644
+--- a/arch/arm/mach-tegra/tegra.c
++++ b/arch/arm/mach-tegra/tegra.c
+@@ -73,10 +73,20 @@ u32 tegra_uart_config[3] = {
+ static void __init tegra_init_cache(void)
+ {
+ #ifdef CONFIG_CACHE_L2X0
++	static const struct of_device_id pl310_ids[] __initconst = {
++		{ .compatible = "arm,pl310-cache",  },
++		{}
++	};
++
++	struct device_node *np;
+ 	int ret;
+ 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
+ 	u32 aux_ctrl, cache_type;
+ 
++	np = of_find_matching_node(NULL, pl310_ids);
++	if (!np)
++		return;
++
+ 	cache_type = readl(p + L2X0_CACHE_TYPE);
+ 	aux_ctrl = (cache_type & 0x700) << (17-8);
+ 	aux_ctrl |= 0x7C400001;
+-- 
+1.8.1.5
