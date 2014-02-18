@@ -1,66 +1,38 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Feb 2014 11:50:19 -0600
-Subject: [PATCH v4 1/2] usb: musb: dsps, debugfs files
-In-Reply-To: <20140218173021.GA17368@kroah.com>
-References: <1389950556-6453-1-git-send-email-mpa@pengutronix.de>
- <1389950556-6453-2-git-send-email-mpa@pengutronix.de>
- <20140218162054.GE9878@saruman.home>
- <20140218165911.GA17486@kroah.com>
- <20140218170335.GC28506@saruman.home>
- <20140218173021.GA17368@kroah.com>
-Message-ID: <20140218175018.GF28506@saruman.home>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 18 Feb 2014 12:56:24 -0500
+Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
+In-Reply-To: <CAMuHMdW7S=o4oHVsNtYo0i_giB5cgWhygo-GgSaA1Kur6m3vng@mail.gmail.com>
+References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org>
+ <201402121251.06280.arnd@arndb.de>
+ <20140217155419.682F7C401D4@trevor.secretlab.ca>
+ <1418981.0py7JxXCp8@wuerfel>
+ <20140217182312.GV7862@titan.lakedaemon.net>
+ <CAMuHMdW7S=o4oHVsNtYo0i_giB5cgWhygo-GgSaA1Kur6m3vng@mail.gmail.com>
+Message-ID: <20140218175624.GY7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Feb 18, 2014 at 09:30:21AM -0800, Greg KH wrote:
-> > > > > +static int dsps_musb_dbg_init(struct musb *musb, struct dsps_glue *glue)
-> > > > > +{
-> > > > > +	struct dentry *root;
-> > > > > +	struct dentry *file;
-> > > > > +	char buf[128];
-> > > > > +
-> > > > > +	sprintf(buf, "%s.dsps", dev_name(musb->controller));
-> > > > > +	root = debugfs_create_dir(buf, NULL);
-> > > > > +	if (!root)
-> > > > 
-> > > > wrong, you should be using IS_ERR()
-> > > 
-> > > !root is fine, IS_ERR() will fail if CONFIG_DEBUGFS is not enabled.
-> > 
-> > in that case, files will be created on parent directory right ?
+On Mon, Feb 17, 2014 at 10:07:50PM +0100, Geert Uytterhoeven wrote:
+> On Mon, Feb 17, 2014 at 7:23 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> >> Could we use a faster hash function that scans the entire device tree and
+> >> then just feed the output of that into add_device_randomness? We probably
+> >> can't expect that there is a lot of entropy in the DT blob, so the
+> >> result wouldn't be all that different in terms of quality of the random
+> >> seed.
+> >
+> > I think it would be easier to identify the few attributes that differ
+> > from board to board (mac address, serial number, etc), and differ from
+> > boot to boot (random-seed, timestamp) and just extract and feed those
+> > in.
 > 
-> If, for some reason, creating a directory fails and then creating a file
-> would succeed, yes, that will happen.
-> 
-> > If we pass a ERR_PTR(-ENODEV), otoh, we will try to dereference it in
-> > __create_file().
-> 
-> No, because -ENODEV will only happen if debugfs is not enabled, so no
-> dereference will ever happen.
-> 
-> Don't worry about checking return values from debugfs, it shouldn't be
-> needed.
+> Isn't identifying those (mostly) a manual process?
+> Calculating a fast hash is fully automatic.
 
-aha, now I see. I missed the:
+The list would be pretty short, and once created wouldn't likely change
+too often.  But it really depends on the 'fast hash'.  if the two
+methods have comparable speed, I'd definitely prefer the hash.  Easier
+to maintain.
 
-348         if (error) {
-349                 dentry = NULL;
-350                 simple_release_fs(&debugfs_mount, &debugfs_mount_count);
-351         }
+thx,
 
-in fs/debugfs/inode.c::__create_file(). I'll apply this patch in a few
-hours (randconfig running).
-
-cheers
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/508bb275/attachment.sig>
+Jason.
