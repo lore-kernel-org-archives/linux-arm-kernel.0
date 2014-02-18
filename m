@@ -1,30 +1,21 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 18 Feb 2014 11:35:25 +0900
-Subject: [PATCH] ARM: shmobile: Remove EMEV2 header file
-In-Reply-To: <20140218023103.GA17063@verge.net.au>
-References: <20140217073508.11156.21720.sendpatchset@w520>
- <20140218000926.GB4776@verge.net.au>
- <20140218023103.GA17063@verge.net.au>
-Message-ID: <CANqRtoSmphPAaxOFjAQcZ8RDigJpjYG3yCFMr5C_cw6JCHghkw@mail.gmail.com>
+From: b35083@freescale.com (Jingchang Lu)
+Date: Tue, 18 Feb 2014 10:17:10 +0800
+Subject: [PATCH RESEND v11 0/2] dma: Add Freescale eDMA engine driver support
+Message-ID: <1392689832-17011-1-git-send-email-b35083@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 11:31 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Feb 18, 2014 at 09:09:29AM +0900, Simon Horman wrote:
->> On Mon, Feb 17, 2014 at 04:35:08PM +0900, Magnus Damm wrote:
->> > From: Magnus Damm <damm@opensource.se>
->> >
->> > There is no C board code left for the EMEV2 SoC, so
->> > get rid of the emev2.h include file to save some lines.
->> > While at it make functions static.
->> >
->> > Signed-off-by: Magnus Damm <damm@opensource.se>
->>
->> Thanks, I have queued this up.
->
-> I have changed my mind and decided to defer this patch
-> to avoid a tedious dependency of an SoC patch on a board patch.
+This series add Freescale eDMA engine support.
 
-That's fine. We can handle further cleanup later. Thanks for your help!
+Jingchang Lu (2):
+      ARM: dts: vf610: Add eDMA node
+      dma: Add Freescale eDMA engine driver support
 
-/ magnus
+ Documentation/devicetree/bindings/dma/fsl-edma.txt |  76 ++
+ arch/arm/boot/dts/vf610.dtsi                       |  30 +
+ drivers/dma/Kconfig                                |  10 +
+ drivers/dma/Makefile                               |   1 +
+ drivers/dma/fsl-edma.c                             | 975 +++++++++++++++++++++
+ 5 files changed, 1092 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/fsl-edma.txt
+ create mode 100644 drivers/dma/fsl-edma.c
