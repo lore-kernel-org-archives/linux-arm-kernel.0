@@ -1,93 +1,117 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Tue, 18 Feb 2014 23:16:15 +0530
-Subject: [PATCH v3 1/3] dma: Support multiple interleaved frames with
- non-contiguous memory
-In-Reply-To: <CAJe_ZhdOmu3k9gbPdQzPteyzwsMA8OzWHdhHnXudbF=X7JMhVQ@mail.gmail.com>
-References: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
- <1392465619-27614-2-git-send-email-sthokal@xilinx.com>
- <CAJe_Zhc_GNNSDWNFuk+cMHEqxfSCJB_ey=Bf+SwJK-nS=u9ceg@mail.gmail.com>
- <CA+mB=1KdZZpTmpA0Xp_c4mhgFbjRZ6urYrCwdvoTCmcugQMDUA@mail.gmail.com>
- <CAJe_ZhdOmu3k9gbPdQzPteyzwsMA8OzWHdhHnXudbF=X7JMhVQ@mail.gmail.com>
-Message-ID: <CA+mB=1K43MDZj0Rx3q=ETQMaFsG1j7TXsH6v-7a26JdtqTJkbw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 18 Feb 2014 17:48:33 +0000 (UTC)
+Subject: OMAP baseline test results for v3.14-rc3
+Message-ID: <alpine.DEB.2.02.1402181746390.6702@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 10:20 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
-> On 18 February 2014 16:58, Srikanth Thokala <sthokal@xilinx.com> wrote:
->> On Mon, Feb 17, 2014 at 3:27 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
->>> On 15 February 2014 17:30, Srikanth Thokala <sthokal@xilinx.com> wrote:
->>>> The current implementation of interleaved DMA API support multiple
->>>> frames only when the memory is contiguous by incrementing src_start/
->>>> dst_start members of interleaved template.
->>>>
->>>> But, when the memory is non-contiguous it will restrict slave device
->>>> to not submit multiple frames in a batch.  This patch handles this
->>>> issue by allowing the slave device to send array of interleaved dma
->>>> templates each having a different memory location.
->>>>
->>> How fragmented could be memory in your case? Is it inefficient to
->>> submit separate transfers for each segment/frame?
->>> It will help if you could give a typical example (chunk size and gap
->>> in bytes) of what you worry about.
->>
->> With scatter-gather engine feature in the hardware, submitting separate
->> transfers for each frame look inefficient. As an example, our DMA engine
->> supports up to 16 video frames, with each frame (a typical video frame
->> size) being contiguous in memory but frames are scattered into different
->> locations. We could not definitely submit frame by frame as it would be
->> software overhead (HW interrupting for each frame) resulting in video lags.
->>
-> IIUIC, it is 30fps and one dma interrupt per frame ... it doesn't seem
-> inefficient at all. Even poor-latency audio would generate a higher
-> interrupt-rate. So the "inefficiency concern" doesn't seem valid to
-> me.
->
-> Not to mean we shouldn't strive to reduce the interrupt-rate further.
-> Another option is to emulate the ring-buffer scheme of ALSA.... which
-> should be possible since for a session of video playback the frame
-> buffers' locations wouldn't change.
->
-> Yet another option is to use the full potential of the
-> interleaved-xfer api as such. It seems you confuse a 'video frame'
-> with the interleaved-xfer api's 'frame'. They are different.
->
-> Assuming your one video frame is F bytes long and Gk is the gap in
-> bytes between end of frame [k] and start of frame [k+1] and  Gi != Gj
-> for i!=j
-> In the context of interleaved-xfer api, you have just 1 Frame of 16
-> chunks. Each chunk is Fbytes and the inter-chunk-gap(ICG) is Gk  where
-> 0<=k<15
-> So for your use-case .....
->   dma_interleaved_template.numf = 1   /* just 1 frame */
->   dma_interleaved_template.frame_size = 16  /* containing 16 chunks */
->    ...... //other parameters
->
-> You have 3 options to choose from and all should work just as fine.
-> Otherwise please state your problem in real numbers (video-frames'
-> size, count & gap in bytes).
 
-Initially I interpreted interleaved template the same.  But, Lars corrected me
-in the subsequent discussion and let me put it here briefly,
+Here are some basic OMAP test results for Linux v3.14-rc3.
+Logs and other details at:
 
-In the interleaved template, each frame represents a line of size denoted by
-chunk.size and the stride by icg.  'numf' represent number of frames i.e.
-number of lines.
+    http://www.pwsan.com/omap/testlogs/test_v3.14-rc3/20140217214814/
 
-In video frame context,
-chunk.size -> hsize
-chunk.icg -> stride
-numf -> vsize
-and frame_size is always 1 as it will have only one chunk in a line.
 
-So, the API would not allow to pass multiple frames and we came up with a
-resolution to pass an array of interleaved template structs to handle this.
+Test summary
+------------
 
-Srikanth
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
->
-> -Jassi
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Build: uImage+dtb:
+    Pass ( 9/ 9): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig/omap4-var-som
+
+Build: zImage:
+    Pass (13/13): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig
+
+Boot to userspace:
+    FAIL ( 1/12): 2430sdp
+    skip ( 2/12): 5912osk, cmt3517
+    Pass ( 9/12): 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes, am335xbone, am335xbonelt,
+		  4460varsomom
+
+PM: chip retention via suspend:
+    FAIL ( 4/ 7): 2430sdp, 4430es2panda, 4460pandaes, 4460varsomom
+    Pass ( 3/ 7): 3530es3beagle, 3730beaglexm, 37xxevm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 7/ 7): 2430sdp, 3530es3beagle, 3730beaglexm, 37xxevm,
+		  4430es2panda, 4460pandaes, 4460varsomom
+
+PM: chip off except CORE via suspend:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    FAIL ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+
+PM: chip off via dynamic idle:
+    FAIL ( 5/ 5): 3530es3beagle, 37xxevm, 4430es2panda, 4460pandaes,
+		  4460varsomom
+
+
+vmlinux object size
+(delta in bytes from test_v3.14-rc2 
+(b28a960c42fcd9cfc987441fa6d1c1a471f0f9ed)):
+   text     data      bss    total  kernel
+  +9089     +256        0    +9345  omap1_defconfig
+  +5085     +288        0    +5373  omap1_defconfig_1510innovator_only
+  +4993     +264        0    +5257  omap1_defconfig_5912osk_only
++8797439  +826332  +291072  +9914843  multi_v7_defconfig
+  +5340     +304        0    +5644  omap2plus_defconfig
+  +9164     +288        0    +9452  omap2plus_defconfig_2430sdp_only
+  +4996     +272        0    +5268  omap2plus_defconfig_am33xx_only
+  +5068     +304        0    +5372  omap2plus_defconfig_am43xx_only
+  +9372     +264        0    +9636  omap2plus_defconfig_cpupm
+  +5148     +264        0    +5412  omap2plus_defconfig_dra7xx_only
+   +581        0        0     +581  omap2plus_defconfig_n800_multi_omap2xxx
+   +549        0        0     +549  omap2plus_defconfig_n800_only_a
+  +9372     +256        0    +9628  omap2plus_defconfig_no_pm
+  +5276     +256        0    +5532  omap2plus_defconfig_omap2_4_only
+  +5276     +272        0    +5548  omap2plus_defconfig_omap3_4_only
+ +11048     +896        0   +11944  omap2plus_defconfig_omap5_only
+   +388        0      -88     +300  rmk_omap3430_ldp_allnoconfig
+   +449        0        0     +449  rmk_omap3430_ldp_oldconfig
+   +388        0      -88     +300  rmk_omap4430_sdp_allnoconfig
+   +317        0      -64     +253  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.14-rc2 
+(b28a960c42fcd9cfc987441fa6d1c1a471f0f9ed))
+  avail  rsrvd   high  freed  board          kconfig
+    -8k     8k      .      .  2430sdp        omap2plus_defconfig
+    -8k     8k      .      .  3517evm        omap2plus_defconfig
+    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
+    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
+    -8k     8k      .      .  37xxevm        omap2plus_defconfig
+    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
+    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
+    -8k     8k      .      .  4460varsomom   omap2plus_defconfig
+    -8k     8k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
+
+
+Have added a build config for multi_v7_defconfig.  Not booting it yet on 
+any boards.
