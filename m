@@ -1,82 +1,93 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Tue, 18 Feb 2014 18:44:08 +0100
-Subject: [BUG] Circular locking dependency - DRM/CMA/MM/hotplug/...
-In-Reply-To: <53036D51.2070502@samsung.com>
-References: <20140211183543.GK26684@n2100.arm.linux.org.uk>
- <52FB9602.1000805@samsung.com>
- <20140212163317.GQ26684@n2100.arm.linux.org.uk>
- <53036D51.2070502@samsung.com>
-Message-ID: <xa1t8ut8wc2f.fsf@mina86.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Tue, 18 Feb 2014 23:16:15 +0530
+Subject: [PATCH v3 1/3] dma: Support multiple interleaved frames with
+ non-contiguous memory
+In-Reply-To: <CAJe_ZhdOmu3k9gbPdQzPteyzwsMA8OzWHdhHnXudbF=X7JMhVQ@mail.gmail.com>
+References: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
+ <1392465619-27614-2-git-send-email-sthokal@xilinx.com>
+ <CAJe_Zhc_GNNSDWNFuk+cMHEqxfSCJB_ey=Bf+SwJK-nS=u9ceg@mail.gmail.com>
+ <CA+mB=1KdZZpTmpA0Xp_c4mhgFbjRZ6urYrCwdvoTCmcugQMDUA@mail.gmail.com>
+ <CAJe_ZhdOmu3k9gbPdQzPteyzwsMA8OzWHdhHnXudbF=X7JMhVQ@mail.gmail.com>
+Message-ID: <CA+mB=1K43MDZj0Rx3q=ETQMaFsG1j7TXsH6v-7a26JdtqTJkbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 2014-02-12 17:33, Russell King - ARM Linux wrote:
->> What if we did these changes:
+On Tue, Feb 18, 2014 at 10:20 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+> On 18 February 2014 16:58, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>> On Mon, Feb 17, 2014 at 3:27 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+>>> On 15 February 2014 17:30, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>>>> The current implementation of interleaved DMA API support multiple
+>>>> frames only when the memory is contiguous by incrementing src_start/
+>>>> dst_start members of interleaved template.
+>>>>
+>>>> But, when the memory is non-contiguous it will restrict slave device
+>>>> to not submit multiple frames in a batch.  This patch handles this
+>>>> issue by allowing the slave device to send array of interleaved dma
+>>>> templates each having a different memory location.
+>>>>
+>>> How fragmented could be memory in your case? Is it inefficient to
+>>> submit separate transfers for each segment/frame?
+>>> It will help if you could give a typical example (chunk size and gap
+>>> in bytes) of what you worry about.
 >>
->> struct page *dma_alloc_from_contiguous(struct device *dev, int count,
->>                                         unsigned int align)
->> {
->> ...
->>          mutex_lock(&cma_mutex);
->> ...
->>          for (;;) {
->>                  pageno = bitmap_find_next_zero_area(cma->bitmap, cma->count,
->>                                                      start, count, mask);
->>                  if (pageno >= cma->count)
->>                          break;
+>> With scatter-gather engine feature in the hardware, submitting separate
+>> transfers for each frame look inefficient. As an example, our DMA engine
+>> supports up to 16 video frames, with each frame (a typical video frame
+>> size) being contiguous in memory but frames are scattered into different
+>> locations. We could not definitely submit frame by frame as it would be
+>> software overhead (HW interrupting for each frame) resulting in video lags.
 >>
->>                  pfn = cma->base_pfn + pageno;
->> +               bitmap_set(cma->bitmap, pageno, count);
->> +               mutex_unlock(&cma_mutex);
->>                  ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
->> +               mutex_lock(&cma_mutex);
->>                  if (ret == 0) {
->> -                       bitmap_set(cma->bitmap, pageno, count);
->>                          page = pfn_to_page(pfn);
->>                          break;
->> -               } else if (ret != -EBUSY) {
->> +		}
->> +		bitmap_clear(cma->bitmap, pageno, count);
->> +		if (ret != -EBUSY) {
->>                          break;
->>                  }
->> ...
->>          mutex_unlock(&cma_mutex);
->>          pr_debug("%s(): returned %p\n", __func__, page);
->>          return page;
->> }
+> IIUIC, it is 30fps and one dma interrupt per frame ... it doesn't seem
+> inefficient at all. Even poor-latency audio would generate a higher
+> interrupt-rate. So the "inefficiency concern" doesn't seem valid to
+> me.
+>
+> Not to mean we shouldn't strive to reduce the interrupt-rate further.
+> Another option is to emulate the ring-buffer scheme of ALSA.... which
+> should be possible since for a session of video playback the frame
+> buffers' locations wouldn't change.
+>
+> Yet another option is to use the full potential of the
+> interleaved-xfer api as such. It seems you confuse a 'video frame'
+> with the interleaved-xfer api's 'frame'. They are different.
+>
+> Assuming your one video frame is F bytes long and Gk is the gap in
+> bytes between end of frame [k] and start of frame [k+1] and  Gi != Gj
+> for i!=j
+> In the context of interleaved-xfer api, you have just 1 Frame of 16
+> chunks. Each chunk is Fbytes and the inter-chunk-gap(ICG) is Gk  where
+> 0<=k<15
+> So for your use-case .....
+>   dma_interleaved_template.numf = 1   /* just 1 frame */
+>   dma_interleaved_template.frame_size = 16  /* containing 16 chunks */
+>    ...... //other parameters
+>
+> You have 3 options to choose from and all should work just as fine.
+> Otherwise please state your problem in real numbers (video-frames'
+> size, count & gap in bytes).
 
-Like Marek said, this will fail if two concurrent calls to
-alloc_contig_range are made such that they operate on the same pageblock
-(which is possible as the allocated regions do not need to be pageblock
-aligned).
+Initially I interpreted interleaved template the same.  But, Lars corrected me
+in the subsequent discussion and let me put it here briefly,
 
-Another mutex could be added just for this one call, but as I understand
-this would not solve the problem.
+In the interleaved template, each frame represents a line of size denoted by
+chunk.size and the stride by icg.  'numf' represent number of frames i.e.
+number of lines.
 
->> bool dma_release_from_contiguous(struct device *dev, struct page *pages,
->>                                   int count)
->> {
->> ...
->> +       free_contig_range(pfn, count);
->>          mutex_lock(&cma_mutex);
->>          bitmap_clear(cma->bitmap, pfn - cma->base_pfn, count);
->> -       free_contig_range(pfn, count);
->>          mutex_unlock(&cma_mutex);
->> ...
->> }
+In video frame context,
+chunk.size -> hsize
+chunk.icg -> stride
+numf -> vsize
+and frame_size is always 1 as it will have only one chunk in a line.
 
-This *should* be fine.  Didn't test it.
+So, the API would not allow to pass multiple frames and we came up with a
+resolution to pass an array of interleaved template structs to handle this.
 
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 835 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/d68d0a91/attachment-0001.sig>
+Srikanth
+
+>
+> -Jassi
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
