@@ -1,40 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Feb 2014 14:13:03 +0100
-Subject: [PATCH] net: ethernet: remove unneeded dependency of mvneta and
- update help text
-In-Reply-To: <20140218125206.GN7862@titan.lakedaemon.net>
-References: <1392719391-8851-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140218122952.GM7862@titan.lakedaemon.net>
- <20140218134532.7607a616@skate>
- <20140218125206.GN7862@titan.lakedaemon.net>
-Message-ID: <20140218141303.77c77272@skate>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 18 Feb 2014 13:09:33 +0000
+Subject: [PATCH RFC 2/2] ARM: add support for Cubox-i PWM-driven front panel
+ LED
+Message-ID: <E1WFkQX-0005JX-OC@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+The front panel LED on the Cubox-i is driven by one of the iMX6 PWM
+channels, and is wired between the PWM output and supply.  This means
+that outputting a low level results in the LED being turned on, so we
+need the duty cycle inverted.
 
-On Tue, 18 Feb 2014 07:52:06 -0500, Jason Cooper wrote:
+There's a question about whether the output inversion should be at the
+pwm or pwm-leds level - setting the output inversion bit in the iMX6
+results in a PWM duty cycle of zero outputting logic zero, meaning that
+the LED is fully on.  This is undesirable, as it becomes impossible to
+turn the LED fully off.
 
-> > No, I haven't tested all the build scenarios of course. If you feel
-> > that this is too dangerous, I can resend a patch that replaces 'depends
-> > on ARMADA_370_XP' by 'depends on PLAT_ORION'. Would this be OK for you?
-> 
-> I'm fine either way.  I'm definitely a "What's in the box?" kind of guy.
-> But I do like being prepared.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+=-DO NOT APPLY-=
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-And it's all in your honour!
-
-> The real question is: Do you think this IP block will ever be found on
-> anything other than Marvell Armada boards?  If so, stick with this
-> version and build test the crap out of it.  Otherwise, let's save
-> opening the box for another day.
-
-At this point, I don't expect to see this IP in any other SOCs than
-Marvell Armada EBU, so I'll resend with a "depends on PLAT_ORION", as I
-agree it is much safer in terms of build problems.
-
-Thomas
+diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+index 64daa3b311f6..d9fbd7ff17df 100644
+=-DO NOT APPLY-= a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+=+DO NOT APPLY+= b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+@@ -12,6 +12,20 @@
+ 		pinctrl-0 = <&pinctrl_cubox_i_ir>;
+ 	};
+ 
+=+DO NOT APPLY+=	pwmleds {
+=+DO NOT APPLY+=		compatible = "pwm-leds";
+=+DO NOT APPLY+=		pinctrl-names = "default";
+=+DO NOT APPLY+=		pinctrl-0 = <&pinctrl_cubox_i_pwm1>;
+=+DO NOT APPLY+=
+=+DO NOT APPLY+=		front {
+=+DO NOT APPLY+=			active-low;
+=+DO NOT APPLY+=			default-brightness = <128>;
+=+DO NOT APPLY+=			label = "imx6:red:front";
+=+DO NOT APPLY+=			max-brightness = <248>;
+=+DO NOT APPLY+=			pwms = <&pwm1 0 50000>;
+=+DO NOT APPLY+=		};
+=+DO NOT APPLY+=	};
+=+DO NOT APPLY+=
+ 	regulators {
+ 		compatible = "simple-bus";
+ 
+@@ -88,6 +102,10 @@
+ 			>;
+ 		};
+ 
+=+DO NOT APPLY+=		pinctrl_cubox_i_pwm1: cubox-i-pwm1-front-led {
+=+DO NOT APPLY+=			fsl,pins = <MX6QDL_PAD_DISP0_DAT8__PWM1_OUT 0x1b0b0>;
+=+DO NOT APPLY+=		};
+=+DO NOT APPLY+=
+ 		pinctrl_cubox_i_spdif: cubox-i-spdif {
+ 			fsl,pins = <MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x1b0b0>;
+ 		};
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.3.1
