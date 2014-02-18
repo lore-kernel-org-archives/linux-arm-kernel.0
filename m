@@ -1,107 +1,111 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 18 Feb 2014 15:27:25 +0000
-Subject: [PATCH v4 04/12] ARM: KVM: introduce kvm_p*d_addr_end
+Date: Tue, 18 Feb 2014 15:27:22 +0000
+Subject: [PATCH v4 01/12] arm64: KVM: force cache clean on page fault when
+ caches are off
 In-Reply-To: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
 References: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1392737253-10480-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1392737253-10480-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The use of p*d_addr_end with stage-2 translation is slightly dodgy,
-as the IPA is 40bits, while all the p*d_addr_end helpers are
-taking an unsigned long (arm64 is fine with that as unligned long
-is 64bit).
+In order for the guest with caches off to observe data written
+contained in a given page, we need to make sure that page is
+committed to memory, and not just hanging in the cache (as
+guest accesses are completely bypassing the cache until it
+decides to enable it).
 
-The fix is to introduce 64bit clean versions of the same helpers,
-and use them in the stage-2 page table code.
+For this purpose, hook into the coherent_icache_guest_page
+function and flush the region if the guest SCTLR_EL1
+register doesn't show the MMU  and caches as being enabled.
+The function also get renamed to coherent_cache_guest_page.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_mmu.h   | 13 +++++++++++++
- arch/arm/kvm/mmu.c               | 10 +++++-----
- arch/arm64/include/asm/kvm_mmu.h |  4 ++++
- 3 files changed, 22 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  4 ++--
+ arch/arm/kvm/mmu.c               |  4 ++--
+ arch/arm64/include/asm/kvm_mmu.h | 16 ++++++++++++----
+ 3 files changed, 16 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index f997b9e..88bba33 100644
+index 77de4a4..f997b9e 100644
 --- a/arch/arm/include/asm/kvm_mmu.h
 +++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -114,6 +114,19 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
- 	pmd_val(*pmd) |= L_PMD_S2_RDWR;
- }
+@@ -116,8 +116,8 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
  
-+/* Open coded p*d_addr_end that can deal with 64bit addresses */
-+#define kvm_pgd_addr_end(addr, end)					\
-+({	u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;		\
-+	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
-+})
-+
-+#define kvm_pud_addr_end(addr,end)		(end)
-+
-+#define kvm_pmd_addr_end(addr, end)					\
-+({	u64 __boundary = ((addr) + PMD_SIZE) & PMD_MASK;		\
-+	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
-+})
-+
  struct kvm;
  
- static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+-static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+-					      unsigned long size)
++static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
++					     unsigned long size)
+ {
+ 	/*
+ 	 * If we are going to insert an instruction page and the icache is
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 415fd63..7f84116 100644
+index 5809069..415fd63 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -145,7 +145,7 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
- 		pgd = pgdp + pgd_index(addr);
- 		pud = pud_offset(pgd, addr);
- 		if (pud_none(*pud)) {
--			addr = pud_addr_end(addr, end);
-+			addr = kvm_pud_addr_end(addr, end);
- 			continue;
+@@ -713,7 +713,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			kvm_set_s2pmd_writable(&new_pmd);
+ 			kvm_set_pfn_dirty(pfn);
  		}
- 
-@@ -155,13 +155,13 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
- 			 * move on.
- 			 */
- 			clear_pud_entry(kvm, pud, addr);
--			addr = pud_addr_end(addr, end);
-+			addr = kvm_pud_addr_end(addr, end);
- 			continue;
+-		coherent_icache_guest_page(kvm, hva & PMD_MASK, PMD_SIZE);
++		coherent_cache_guest_page(vcpu, hva & PMD_MASK, PMD_SIZE);
+ 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
+ 	} else {
+ 		pte_t new_pte = pfn_pte(pfn, PAGE_S2);
+@@ -721,7 +721,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 			kvm_set_s2pte_writable(&new_pte);
+ 			kvm_set_pfn_dirty(pfn);
  		}
- 
- 		pmd = pmd_offset(pud, addr);
- 		if (pmd_none(*pmd)) {
--			addr = pmd_addr_end(addr, end);
-+			addr = kvm_pmd_addr_end(addr, end);
- 			continue;
- 		}
- 
-@@ -176,10 +176,10 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
- 		 */
- 		if (kvm_pmd_huge(*pmd) || page_empty(pte)) {
- 			clear_pmd_entry(kvm, pmd, addr);
--			next = pmd_addr_end(addr, end);
-+			next = kvm_pmd_addr_end(addr, end);
- 			if (page_empty(pmd) && !page_empty(pud)) {
- 				clear_pud_entry(kvm, pud, addr);
--				next = pud_addr_end(addr, end);
-+				next = kvm_pud_addr_end(addr, end);
- 			}
- 		}
+-		coherent_icache_guest_page(kvm, hva, PAGE_SIZE);
++		coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
+ 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, false);
+ 	}
  
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index c04b419..19cb328 100644
+index 680f74e..c04b419 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -121,6 +121,10 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
- 	pmd_val(*pmd) |= PMD_S2_RDWR;
+@@ -106,7 +106,6 @@ static inline bool kvm_is_write_fault(unsigned long esr)
+ 	return true;
  }
  
-+#define kvm_pgd_addr_end(addr, end)	pgd_addr_end(addr, end)
-+#define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
-+#define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
-+
+-static inline void kvm_clean_dcache_area(void *addr, size_t size) {}
+ static inline void kvm_clean_pgd(pgd_t *pgd) {}
+ static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
+ static inline void kvm_clean_pte(pte_t *pte) {}
+@@ -124,9 +123,19 @@ static inline void kvm_set_s2pmd_writable(pmd_t *pmd)
+ 
  struct kvm;
  
- #define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+-static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+-					      unsigned long size)
++#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
++
++static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+ {
++	return (vcpu_sys_reg(vcpu, SCTLR_EL1) & 0b101) == 0b101;
++}
++
++static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
++					     unsigned long size)
++{
++	if (!vcpu_has_cache_enabled(vcpu))
++		kvm_flush_dcache_to_poc((void *)hva, size);
++
+ 	if (!icache_is_aliasing()) {		/* PIPT */
+ 		flush_icache_range(hva, hva + size);
+ 	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
+@@ -135,7 +144,6 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, hva_t hva,
+ 	}
+ }
+ 
+-#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+ 
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ARM64_KVM_MMU_H__ */
 -- 
 1.8.3.4
