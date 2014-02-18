@@ -1,27 +1,56 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 18 Feb 2014 09:16:09 +0900
-Subject: [PATCH] ARM: shmobile: Remove Lager DT reference legacy clock bits
-In-Reply-To: <2604597.BoRkzP9NO2@avalon>
-References: <20140217071945.27066.10828.sendpatchset@w520>
- <2604597.BoRkzP9NO2@avalon>
-Message-ID: <20140218001608.GD4776@verge.net.au>
+Date: Tue, 18 Feb 2014 09:18:58 +0900
+Subject: [PATCH] ARM: shmobile: Remove __init from
+ rcar_gen2_read_mode_pins()
+In-Reply-To: <CANqRtoR7C_v+PQt3J1tjSxvFcX87NZqZZ16tBULBYBz=_F-rFg@mail.gmail.com>
+References: <20140217063510.21892.52120.sendpatchset@w520>
+ <1453243.5L1W6bkVz8@avalon>
+ <CANqRtoR7C_v+PQt3J1tjSxvFcX87NZqZZ16tBULBYBz=_F-rFg@mail.gmail.com>
+Message-ID: <20140218001854.GE4776@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 12:07:05PM +0100, Laurent Pinchart wrote:
-> Hi Magnus,
+On Mon, Feb 17, 2014 at 08:16:47PM +0900, Magnus Damm wrote:
+> Hi Laurent,
 > 
-> Thank you for the patch.
+> On Mon, Feb 17, 2014 at 7:59 PM, Laurent Pinchart
+> <laurent.pinchart@ideasonboard.com> wrote:
+> > Hi Magnus,
+> >
+> > Thank you for the patch.
+> >
+> > On Monday 17 February 2014 15:35:10 Magnus Damm wrote:
+> >> From: Magnus Damm <damm@opensource.se>
+> >>
+> >> Remove __init from rcar_gen2_read_mode_pins() to allow
+> >> it to be used after boot. For instance the R-Car Gen2
+> >> MD21 check is needed even in the case of CPU Hotplug.
+> >>
+> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >> ---
+> >>
+> >>  Written against renesas-devel-v3.14-rc2-20140213
+> >>
+> >>  arch/arm/mach-shmobile/setup-rcar-gen2.c |    2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> --- 0001/arch/arm/mach-shmobile/setup-rcar-gen2.c
+> >> +++ work/arch/arm/mach-shmobile/setup-rcar-gen2.c     2014-02-17
+> >> 15:02:48.000000000 +0900 @@ -28,7 +28,7 @@
+> >>
+> >>  #define MODEMR 0xe6160060
+> >>
+> >> -u32 __init rcar_gen2_read_mode_pins(void)
+> >> +u32 rcar_gen2_read_mode_pins(void)
+> >>  {
+> >>       void __iomem *modemr = ioremap_nocache(MODEMR, 4);
+> >>       u32 mode;
+> >
+> > Should we read the value once at boot time and cache it ?
 > 
-> On Monday 17 February 2014 16:19:45 Magnus Damm wrote:
-> > From: Magnus Damm <damm@opensource.se>
-> > 
-> > Lager DT reference is these days built for multiplatform
-> > only which means that CCF comes with the package. Remove
-> > unused legacy code ifdefs to clean up the code.
-> > 
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> Seems a bit of a micro-optimization to me, but sure, it can't hurt.
 > 
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Care to cook up an incremental patch implementing that? =)
 
-Thanks, I have queued this up.
+I have decided to take this patch as-is.
+Feel free to make incremental changes on top of it.
