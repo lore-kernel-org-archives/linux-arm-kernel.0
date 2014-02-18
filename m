@@ -1,34 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 18 Feb 2014 15:38:56 +0000
-Subject: [PATCH 1/2] arm64: Add seccomp support
-In-Reply-To: <1391767892-5395-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
- <1391767892-5395-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140218153856.GB904@localhost>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue, 18 Feb 2014 19:39:06 +0400
+Subject: [PATCH 1/4] ARM: clps711x: autcpu12: Fix incorrect NAND CLE GPIO
+In-Reply-To: <201402181611.41742.arnd@arndb.de>
+References: <1392451533-12858-1-git-send-email-shc_work@mail.ru>
+ <201402181611.41742.arnd@arndb.de>
+Message-ID: <20140218193906.d9ad07dc64c75f46e6c78257@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 07, 2014 at 10:11:31AM +0000, AKASHI Takahiro wrote:
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -26,6 +26,7 @@
->  #include <linux/smp.h>
->  #include <linux/ptrace.h>
->  #include <linux/user.h>
-> +#include <linux/seccomp.h>
->  #include <linux/security.h>
->  #include <linux/init.h>
->  #include <linux/signal.h>
-> @@ -1064,6 +1065,10 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
->  {
->  	unsigned long saved_reg;
->  
-> +	if (!dir && secure_computing((int)regs->syscallno))
-> +		/* seccomp failures shouldn't expose any additional code. */
-> +		return -1;
+Hello.
 
-That's only restricted to the arm64 code but could we use a more
-meaningful error number?
+On Tue, 18 Feb 2014 16:11:41 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
+
+> On Saturday 15 February 2014, Alexander Shiyan wrote:
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> 
+> The patches all look good to me. Please let us know whether we should apply
+> them directly of if you were just looking for a review. (it helps to put
+> that into the [PATCH 0/4] message).
+
+Before that, I tried to send an accompanying message to the arm at kernel.org,
+but unfortunately my email is blocked for sending to this address.
+
+While I expect to applying some other patches for this architecture, I do a
+minor changes that do not have potential conflicts when applying one to
+the other. Yes, please apply them, if it possible.
+
+Thanks.
 
 -- 
-Catalin
+Alexander Shiyan <shc_work@mail.ru>
