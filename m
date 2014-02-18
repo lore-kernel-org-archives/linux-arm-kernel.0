@@ -1,60 +1,69 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Feb 2014 15:10:27 +0100
-Subject: [PATCH] net: ethernet: remove unneeded dependency of mvneta and
- update help text
-In-Reply-To: <20140218135809.GD17984@lunn.ch>
-References: <1392719391-8851-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140218122952.GM7862@titan.lakedaemon.net>
- <20140218134532.7607a616@skate>
- <20140218125206.GN7862@titan.lakedaemon.net>
- <20140218141303.77c77272@skate> <20140218135809.GD17984@lunn.ch>
-Message-ID: <20140218151027.710ab2f3@skate>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 18 Feb 2014 09:15:30 -0500
+Subject: [PATCH] rtc: mv: reset date if after year 2038
+In-Reply-To: <20140218140429.GE17984@lunn.ch>
+References: <1392729966-25394-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140218140429.GE17984@lunn.ch>
+Message-ID: <20140218141530.GP7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
-
-On Tue, 18 Feb 2014 14:58:09 +0100, Andrew Lunn wrote:
-
-> PLAT_ORION is a bit of an odd thing now.
+On Tue, Feb 18, 2014 at 03:04:29PM +0100, Andrew Lunn wrote:
+> On Tue, Feb 18, 2014 at 02:26:06PM +0100, Thomas Petazzoni wrote:
+> > Dates after January, 19th 2038 are badly handled by userspace due to
+> > the time being stored on 32 bits. This causes issues on some Marvell
+> > platform on which the RTC is initialized by default to a date that's
+> > beyond 2038, causing a really weird behavior of the RTC.
+> > 
+> > In order to avoid that, reset the date to a sane value if the RTC is
+> > beyond 2038.
+> > 
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > ---
+> >  drivers/rtc/rtc-mv.c | 12 ++++++++++++
+> >  1 file changed, 12 insertions(+)
+> > 
+> > diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
+> > index d536c59..f124dc6 100644
+> > --- a/drivers/rtc/rtc-mv.c
+> > +++ b/drivers/rtc/rtc-mv.c
+> > @@ -222,6 +222,7 @@ static int __init mv_rtc_probe(struct platform_device *pdev)
+> >  	struct resource *res;
+> >  	struct rtc_plat_data *pdata;
+> >  	u32 rtc_time;
+> > +	u32 rtc_date;
+> >  	int ret = 0;
+> >  
+> >  	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+> > @@ -257,6 +258,17 @@ static int __init mv_rtc_probe(struct platform_device *pdev)
+> >  		}
+> >  	}
+> >  
+> > +	/*
+> > +	 * A date after January 19th, 2038 does not fit on 32 bits and
+> > +	 * will confuse the kernel and userspace. Reset to a sane date
+> > +	 * (January 1st, 2013) if we're after 2038.
+> > +	 */
 > 
-> For me, PLAT_ORION means arch/arm/plat-orion. 
+> Hi Thomas
+> 
+> Would it be better to reset back to 01/01/1970? When we do reach 32
+> bit rollover, and assuming the world continues to exist, it has a
+> better chance of being right than 01/01/2013.
 
-No, it is PLAT_ORION_LEGACY which means arch/arm/plat-orion.
+The real issue here is that you don't want the clock to go *backwards*
+when ntpdate/ntpd starts up.  That causes all kinds of badness (for
+dhcp and friends).
 
-> But as far as i know, 370/XP does not actually use anything from
-> arch/arm/plat-orion. When kirkwood moves into mach-mvebu, it also will
-> not use any code from it, and i suspect dove is the same.
+So, by definition, any date _before_ the correct time is better than
+being in the future.  Since the code can't be executed before it's
+written, any date between 1/1/1970 and now is acceptable.
 
-Interestingly, we have -I$(srctree)/arch/arm/plat-orion/include in
-mach-mvebu/Makefile. Might be something to revisit later on.
+Not all ntpd configurations allow a large initial offset (jump to $now)
+before disciplining the clock.  So the closer we can be to the user's
+$now, the better.  In this case, the date chosen in the patch is a lot
+better than 1/1/1970.
 
-> So maybe in a few cycles, when only mach-orion5x is left, we can merge
-> arch/arm/plat-orion into arch/arm/mach-orion5x and PLAT_ORION goes
-> away?
+thx,
 
-We also have mach-mv78xx0 to worry about, unless we decide to remove
-support for it entirely. And even if plat-orion is merged into
-mach-orion5x, we will keep PLAT_ORION as a way to indicate that the
-platform needs to use a certain number of drivers (see below).
-
-> Or do we want to define that PLAT_ORION means any system which can
-> make use of mvebu drivers?
-
-This is what it means today. The MV_XOR driver is under PLAT_ORION, the
-gpio driver is under PLAT_ORION, the Device Bus driver is under
-PLAT_ORION, the I2C driver is under PLAT_ORION, the pinctrl driver as
-well, and so on and so on.
-
-At the very end of the clean up, when even Orion5x support will be
-merged in mach-mvebu/, then we can certainly replace these dependencies
-by a "depends on ARCH_MVEBU". But for the time being, PLAT_ORION seems
-like the right common denominator for all these platforms.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jason.
