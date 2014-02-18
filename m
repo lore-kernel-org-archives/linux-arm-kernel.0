@@ -1,52 +1,34 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 18 Feb 2014 07:29:52 -0500
-Subject: [PATCH] net: ethernet: remove unneeded dependency of mvneta
- and update help text
-In-Reply-To: <1392719391-8851-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392719391-8851-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140218122952.GM7862@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Feb 2014 12:36:24 +0000
+Subject: [PATCH RFC v2 00/35] Second preview of imx-drm cleanup series
+In-Reply-To: <1392723909.3606.25.camel@pizza.hi.pengutronix.de>
+References: <20140210122802.GS26684@n2100.arm.linux.org.uk>
+ <1392045139.6687.31.camel@pizza.hi.pengutronix.de>
+ <20140210151821.GY26684@n2100.arm.linux.org.uk>
+ <CA+gwMcd+oMUpd2kNCVP4ojsKJtPwCXMgA2RsHT0+=p347n3ODw@mail.gmail.com>
+ <20140210175625.GF26684@n2100.arm.linux.org.uk>
+ <1392723909.3606.25.camel@pizza.hi.pengutronix.de>
+Message-ID: <20140218123624.GB21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 11:29:51AM +0100, Thomas Petazzoni wrote:
-> With the introduction of the support for Armada 375 and Armada 38x,
-> the hidden Kconfig option MACH_ARMADA_370_XP is being renamed to
-> MACH_MVEBU_V7. Therefore, the dependency that was used for the mvneta
-> driver can no longer work.
-> 
-> However, such a dependency is not really necessary: there is no point
-> in preventing this driver from being built in other situations, just
-> like the mv643xx_eth driver. As a consequence, this commit removes the
-> unnecessary Kconfig dependency.
-> 
-> In addition to this, it takes this opportunity to adjust the
-> description and help text to indicate that the driver can is also used
-> for Armada 38x. Note that Armada 375 cannot use this driver as it has
-> a completely different networking unit, which will require a separate
-> driver.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/net/ethernet/marvell/Kconfig | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
-> index 6300fd2..97b91f7 100644
-> --- a/drivers/net/ethernet/marvell/Kconfig
-> +++ b/drivers/net/ethernet/marvell/Kconfig
-> @@ -43,12 +43,11 @@ config MVMDIO
->  	  This driver is used by the MV643XX_ETH and MVNETA drivers.
->  
->  config MVNETA
-> -	tristate "Marvell Armada 370/XP network interface support"
-> -	depends on MACH_ARMADA_370_XP
+On Tue, Feb 18, 2014 at 12:45:09PM +0100, Philipp Zabel wrote:
+> Thanks for your comments there. I have just updated and resent this
+> series ([RFC PATCH v3 0/9] imx-drm dt bindings), still with a temporary
+> local copy of the v4l2_of functions, as long as the final resting place
+> of the v4l2_of/of_graph functions seems to be a matter of discussion.
 
-Have you build-tested this on the usual fail scenarios?  eg x86_64,
-powerpc, s390, allno, allyes, allmod, etc?
+Okay.  My plans are to send more of these patches imminently to Greg.
+I've just pulled them forward to -rc3, which means that four have now
+dropped out of the series (as three have been recently merged and one
+due to that build fix for imx-hdmi.)
 
-I think you might be opening up pandora's box here without needing to.
-:)
+I'm just debating whether I need to send the whole series out again or
+not before doing that... any opinion?
 
-thx,
+Nothing's really changed in the patch set since the last time.
 
-Jason.
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
