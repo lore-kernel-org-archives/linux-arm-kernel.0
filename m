@@ -1,38 +1,29 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Tue, 18 Feb 2014 11:42:43 -0300
-Subject: [PATCH v4 0/5] clk: sunxi usb clks support
-In-Reply-To: <1391786513-20780-1-git-send-email-hdegoede@redhat.com>
-References: <1391786513-20780-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <53037163.80103@elopez.com.ar>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue, 18 Feb 2014 18:44:44 +0400
+Subject: [PATCH v2 RESEND 1/3] ARM: clps711x: Add CLPS711X irqchip driver
+In-Reply-To: <1391328466-30873-1-git-send-email-shc_work@mail.ru>
+References: <1391328466-30873-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20140218184444.a942a399e1dec0a286d5251b@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On Sun,  2 Feb 2014 12:07:46 +0400
+Alexander Shiyan <shc_work@mail.ru> wrote:
 
-El 07/02/14 12:21, Hans de Goede escribi?:
-> Hi All,
->
-> And here is v4 of my sunxi usb clks support series.
->
-> Changes since v2:
-> -rename the compatibilty strings from foo-usb-gates-clk to foo-usb-clk
->
-> Changes since v3:
-> -rename the compatibilty string for sun4i-usb-clk to sun4i-a10-usb-clk
->
-> Note the dts bits (patches 3-5) of this series depends on Chen-Yu Tsai's clk
-> rename series.
->
-> Emilio, should Mike pick patches 1-2 up directly, or should they go through
-> your tree?
+> This adds the irqchip driver for Cirrus Logic CLPS711X series SoCs.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/Kconfig                |   2 -
+>  arch/arm/mach-clps711x/common.h |   3 +
+>  drivers/irqchip/Kconfig         |   8 ++
+>  drivers/irqchip/Makefile        |   1 +
+>  drivers/irqchip/irq-clps711x.c  | 243 ++++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 255 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/irqchip/irq-clps711x.c
+...
 
-I have taken 1-2 on sunxi-clk-for-mike with acks from Maxime and Philipp.
+Ping.
 
-> Maxime, can you please add patches 3-5 to your dts tree ? Assuming that
-> wens clk rename patches are already there.
-
-Maxime, please do :)
-
-Cheers, and thanks for working on USB!
-
-Emilio
+-- 
+Alexander Shiyan <shc_work@mail.ru>
