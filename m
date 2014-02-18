@@ -1,77 +1,56 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 18 Feb 2014 13:09:28 +0000
-Subject: [PATCH RFC 1/2] leds: add DT support for LEDs wired to supply and
- default brightness
-Message-ID: <E1WFkQS-0005JS-L5@rmk-PC.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 18 Feb 2014 14:18:11 +0100
+Subject: [PATCH v2] net: ethernet: update dependency and help text of mvneta
+Message-ID: <1392729491-24913-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some PWM outputs are wired such that the LED they're controlling is
-connected to supply rather than ground.  Therefore, the duty cycle
-needs to be inverted to make the LED behave as it should do.
+With the introduction of the support for Armada 375 and Armada 38x,
+the hidden Kconfig option MACH_ARMADA_370_XP is being renamed to
+MACH_MVEBU_V7. Therefore, the dependency that was used for the mvneta
+driver can no longer work. This commit replaces this dependency by a
+dependency on PLAT_ORION, which is used similarly for the mv643xx_eth
+driver.
 
-We also provide a way to specify the default brightness when a
-trigger is not specified.
+In addition to this, it takes this opportunity to adjust the
+description and help text to indicate that the driver can is also used
+for Armada 38x. Note that Armada 375 cannot use this driver as it has
+a completely different networking unit, which will require a separate
+driver.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-=-DO NOT APPLY-=
- Documentation/devicetree/bindings/leds/leds-pwm.txt |  3 +++
- drivers/leds/leds-pwm.c                             | 15 +++++++++++----
- 2 files changed, 14 insertions(+), 4 deletions(-)
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Changes since v1:
+ - Instead of removing the Kconfig dependency, replace it by a
+   dependency on PLAT_ORION, in order to avoid building mvneta on too
+   many architectures and getting weird build issues. Suggested by
+   Jason Cooper.
+ - Fix capitalization in the Kconfig help text.
 
-diff --git a/Documentation/devicetree/bindings/leds/leds-pwm.txt b/Documentation/devicetree/bindings/leds/leds-pwm.txt
-index 7297107cf832..ffcb74ab61fd 100644
-=-DO NOT APPLY-= a/Documentation/devicetree/bindings/leds/leds-pwm.txt
-=+DO NOT APPLY+= b/Documentation/devicetree/bindings/leds/leds-pwm.txt
-@@ -13,6 +13,9 @@ node's name represents the name of the corresponding LED.
-   For the pwms and pwm-names property please refer to:
-   Documentation/devicetree/bindings/pwm/pwm.txt
- - max-brightness : Maximum brightness possible for the LED
-=+DO NOT APPLY+=- default-brightness : (optional) Default brightness for the LED
-=+DO NOT APPLY+=- active-low : (optional) For PWMs where the LED is wired to supply
-=+DO NOT APPLY+=  rather than ground.
- - label :  (optional)
-   see Documentation/devicetree/bindings/leds/common.txt
- - linux,default-trigger :  (optional)
-diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
-index 605047428b5a..fe2cd849b593 100644
-=-DO NOT APPLY-= a/drivers/leds/leds-pwm.c
-=+DO NOT APPLY+= b/drivers/leds/leds-pwm.c
-@@ -70,6 +70,10 @@ static void led_pwm_set(struct led_classdev *led_cdev,
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/Kconfig | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
+index 6300fd2..68e6a66 100644
+--- a/drivers/net/ethernet/marvell/Kconfig
++++ b/drivers/net/ethernet/marvell/Kconfig
+@@ -43,12 +43,12 @@ config MVMDIO
+ 	  This driver is used by the MV643XX_ETH and MVNETA drivers.
  
- 	duty *= brightness;
- 	do_div(duty, max);
-=+DO NOT APPLY+=
-=+DO NOT APPLY+=	if (led_dat->active_low)
-=+DO NOT APPLY+=		duty = led_dat->period - duty;
-=+DO NOT APPLY+=
- 	led_dat->duty = duty;
+ config MVNETA
+-	tristate "Marvell Armada 370/XP network interface support"
+-	depends on MACH_ARMADA_370_XP
++	tristate "Marvell Armada 370/38x/XP network interface support"
++	depends on PLAT_ORION
+ 	select MVMDIO
+ 	---help---
+ 	  This driver supports the network interface units in the
+-	  Marvell ARMADA XP and ARMADA 370 SoC family.
++	  Marvell ARMADA XP, ARMADA 370 and ARMADA 38x SoC family.
  
- 	if (led_dat->can_sleep)
-@@ -93,6 +97,10 @@ static int led_pwm_create_of(struct platform_device *pdev,
- 	for_each_child_of_node(pdev->dev.of_node, child) {
- 		struct led_pwm_data *led_dat = &priv->leds[priv->num_leds];
- 
-=+DO NOT APPLY+=		led_dat->cdev.brightness_set = led_pwm_set;
-=+DO NOT APPLY+=		led_dat->cdev.brightness = LED_OFF;
-=+DO NOT APPLY+=		led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
-=+DO NOT APPLY+=
- 		led_dat->cdev.name = of_get_property(child, "label",
- 						     NULL) ? : child->name;
- 
-@@ -110,10 +118,9 @@ static int led_pwm_create_of(struct platform_device *pdev,
- 						"linux,default-trigger", NULL);
- 		of_property_read_u32(child, "max-brightness",
- 				     &led_dat->cdev.max_brightness);
--
--		led_dat->cdev.brightness_set = led_pwm_set;
--		led_dat->cdev.brightness = LED_OFF;
--		led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
-=+DO NOT APPLY+=		of_property_read_u32(child, "default-brightness",
-=+DO NOT APPLY+=				     &led_dat->cdev.brightness);
-=+DO NOT APPLY+=		led_dat->active_low = of_property_read_bool(child, "active-low");
- 
- 		led_dat->can_sleep = pwm_can_sleep(led_dat->pwm);
- 		if (led_dat->can_sleep)
+ 	  Note that this driver is distinct from the mv643xx_eth
+ 	  driver, which should be used for the older Marvell SoCs
 -- 
-1.8.3.1
+1.8.3.2
