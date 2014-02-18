@@ -1,52 +1,43 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 18 Feb 2014 15:04:29 +0100
-Subject: [PATCH] rtc: mv: reset date if after year 2038
-In-Reply-To: <1392729966-25394-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392729966-25394-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140218140429.GE17984@lunn.ch>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 18 Feb 2014 09:06:04 -0500
+Subject: [PATCH v2] net: ethernet: update dependency and help text of
+ mvneta
+In-Reply-To: <1392729491-24913-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392729491-24913-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140218140604.GO7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 02:26:06PM +0100, Thomas Petazzoni wrote:
-> Dates after January, 19th 2038 are badly handled by userspace due to
-> the time being stored on 32 bits. This causes issues on some Marvell
-> platform on which the RTC is initialized by default to a date that's
-> beyond 2038, causing a really weird behavior of the RTC.
+On Tue, Feb 18, 2014 at 02:18:11PM +0100, Thomas Petazzoni wrote:
+> With the introduction of the support for Armada 375 and Armada 38x,
+> the hidden Kconfig option MACH_ARMADA_370_XP is being renamed to
+> MACH_MVEBU_V7. Therefore, the dependency that was used for the mvneta
+> driver can no longer work. This commit replaces this dependency by a
+> dependency on PLAT_ORION, which is used similarly for the mv643xx_eth
+> driver.
 > 
-> In order to avoid that, reset the date to a sane value if the RTC is
-> beyond 2038.
+> In addition to this, it takes this opportunity to adjust the
+> description and help text to indicate that the driver can is also used
+> for Armada 38x. Note that Armada 375 cannot use this driver as it has
+> a completely different networking unit, which will require a separate
+> driver.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  drivers/rtc/rtc-mv.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+> Changes since v1:
+>  - Instead of removing the Kconfig dependency, replace it by a
+>    dependency on PLAT_ORION, in order to avoid building mvneta on too
+>    many architectures and getting weird build issues. Suggested by
+>    Jason Cooper.
+>  - Fix capitalization in the Kconfig help text.
 > 
-> diff --git a/drivers/rtc/rtc-mv.c b/drivers/rtc/rtc-mv.c
-> index d536c59..f124dc6 100644
-> --- a/drivers/rtc/rtc-mv.c
-> +++ b/drivers/rtc/rtc-mv.c
-> @@ -222,6 +222,7 @@ static int __init mv_rtc_probe(struct platform_device *pdev)
->  	struct resource *res;
->  	struct rtc_plat_data *pdata;
->  	u32 rtc_time;
-> +	u32 rtc_date;
->  	int ret = 0;
->  
->  	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> @@ -257,6 +258,17 @@ static int __init mv_rtc_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> +	/*
-> +	 * A date after January 19th, 2038 does not fit on 32 bits and
-> +	 * will confuse the kernel and userspace. Reset to a sane date
-> +	 * (January 1st, 2013) if we're after 2038.
-> +	 */
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/net/ethernet/marvell/Kconfig | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 
-Hi Thomas
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Would it be better to reset back to 01/01/1970? When we do reach 32
-bit rollover, and assuming the world continues to exist, it has a
-better chance of being right than 01/01/2013.
+thx,
 
-       Andrew
+Jason.
