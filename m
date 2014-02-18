@@ -1,220 +1,107 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 18 Feb 2014 16:10:38 +0100
-Subject: [PATCH v7 5/8] ARM: dts: sun7i: Add support for mmc
-In-Reply-To: <20140218142221.GJ3142@lukather>
-References: <20140217095907.15040.81893.stgit@pagira.o2s.ch>
- <20140217100241.15040.24836.stgit@pagira.o2s.ch>
- <20140218142221.GJ3142@lukather>
-Message-ID: <530377EE.8010909@redhat.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 18 Feb 2014 15:11:31 +0000
+Subject: [PATCH RFC 29/31] mmc: sdhci-of-esdhc: remove
+ platform_suspend/platform_resume callbacks
+In-Reply-To: <20140218150801.GD21483@n2100.arm.linux.org.uk>
+References: <20140218150801.GD21483@n2100.arm.linux.org.uk>
+Message-ID: <E1WFmKZ-0006nm-JF@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+We don't need these hooks in order to insert code in these paths, we
+can just provide our own handlers and call the main sdhci handlers as
+appropriate.
 
-On 02/18/2014 03:22 PM, Maxime Ripard wrote:
-> On Mon, Feb 17, 2014 at 11:02:41AM +0100, David Lanzend?rfer wrote:
->> Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     |    8 +++
->>   arch/arm/boot/dts/sun7i-a20-cubietruck.dts      |    8 +++
->>   arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts |   23 +++++++++
->>   arch/arm/boot/dts/sun7i-a20.dtsi                |   61 +++++++++++++++++++++++
->>   4 files changed, 100 insertions(+)
->>
->
-> I'd prefer to have three patches here:
->     - One that add the controllers
->     - One that add the pin muxing options
->     - One that enable the controllers on the various boards.
->
->> diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
->> index 5c51cb8..ae800b6 100644
->> --- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
->> +++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
->> @@ -34,6 +34,14 @@
->>   			};
->>   		};
->>
->> +		mmc0: mmc at 01c0f000 {
->> +			pinctrl-names = "default", "default";
->> +			pinctrl-0 = <&mmc0_pins_a>;
->> +			pinctrl-1 = <&mmc0_cd_pin_reference_design>;
->
-> This can be made a single pinctrl group, you don't need the pinctrl-1
-> stuff, it only complicates the node.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+=-DO NOT APPLY-=
+ drivers/mmc/host/sdhci-of-esdhc.c | 55 +++++++++++++++++++++++++--------------
+ 1 file changed, 36 insertions(+), 19 deletions(-)
 
-Then how do we deal with boards which use a different gpio for card-detect ?
-
-In that case we don't want to change the mux setting of the reference
-design cd pin. IOW I believe that having 2 separate pinctrl settings for
-this is the rigt thing todo. I would prefer using just mmc0_cd_pin_a instead
-of _reference_design though.
-
-Oh wait, you're probably talking about using:
-			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-
-Yes that would be better.
-
->
->> +			cd-gpios = <&pio 7 1 0>; /* PH1 */
->> +			status = "okay";
->> +		};
->> +
->>   		pinctrl at 01c20800 {
->>   			led_pins_cubieboard2: led_pins at 0 {
->>   				allwinner,pins = "PH20", "PH21";
->> diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->> index f9dcb61..370cef84 100644
->> --- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->> +++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
->> @@ -19,6 +19,14 @@
->>   	compatible = "cubietech,cubietruck", "allwinner,sun7i-a20";
->>
->>   	soc at 01c00000 {
->> +		mmc0: mmc at 01c0f000 {
->> +			pinctrl-names = "default", "default";
->> +			pinctrl-0 = <&mmc0_pins_a>;
->> +			pinctrl-1 = <&mmc0_cd_pin_reference_design>;
->> +			cd-gpios = <&pio 7 1 0>; /* PH1 */
->> +			status = "okay";
->> +		};
->> +
->>   		pinctrl at 01c20800 {
->>   			led_pins_cubietruck: led_pins at 0 {
->>   				allwinner,pins = "PH7", "PH11", "PH20", "PH21";
->> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
->> index ead3013..685ec06 100644
->> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
->> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
->> @@ -34,7 +34,30 @@
->>   			};
->>   		};
->>
->> +		mmc0: mmc at 01c0f000 {
->> +			pinctrl-names = "default", "default";
->> +			pinctrl-0 = <&mmc0_pins_a>;
->> +			pinctrl-1 = <&mmc0_cd_pin_reference_design>;
->> +			cd-gpios = <&pio 7 1 0>; /* PH1 */
->> +			status = "okay";
->> +		};
->> +
->> +		mmc3: mmc at 01c12000 {
->> +			pinctrl-names = "default", "default";
->> +			pinctrl-0 = <&mmc3_pins_a>;
->> +			pinctrl-1 = <&mmc3_cd_pin_olinuxinom>;
->> +			cd-gpios = <&pio 7 11 0>; /* PH11 */
->> +			status = "okay";
->> +		};
->> +
->>   		pinctrl at 01c20800 {
->> +			mmc3_cd_pin_olinuxinom: mmc3_cd_pin at 0 {
->> +				allwinner,pins = "PH11";
->> +				allwinner,function = "gpio_in";
->> +				allwinner,drive = <0>;
->> +				allwinner,pull = <1>;
->> +			};
->> +
->>   			led_pins_olinuxino: led_pins at 0 {
->>   				allwinner,pins = "PH2";
->>   				allwinner,function = "gpio_out";
->> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
->> index 9ff0948..5b55414 100644
->> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
->> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
->> @@ -355,6 +355,46 @@
->>   			#size-cells = <0>;
->>   		};
->>
->> +		mmc0: mmc at 01c0f000 {
->> +			compatible = "allwinner,sun5i-a13-mmc";
->> +			reg = <0x01c0f000 0x1000>;
->> +			clocks = <&ahb_gates 8>, <&mmc0_clk>;
->> +			clock-names = "ahb", "mod";
->> +			interrupts = <0 32 4>;
->> +			bus-width = <4>;
->
-> This belongs to the board, the controller itself is able to handle
-> several bus width.
-
-I believe that providing some form of default in the dtsi makes sense
-here and all boards we've seen sofar always use 4 bits, we can always
-override this from the dts file itself.
-
->
->> +			status = "disabled";
->> +		};
->> +
->> +		mmc1: mmc at 01c10000 {
->> +			compatible = "allwinner,sun5i-a13-mmc";
->> +			reg = <0x01c10000 0x1000>;
->> +			clocks = <&ahb_gates 9>, <&mmc1_clk>;
->> +			clock-names = "ahb", "mod";
->> +			interrupts = <0 33 4>;
->> +			bus-width = <4>;
->> +			status = "disabled";
->> +		};
->> +
->> +		mmc2: mmc at 01c11000 {
->> +			compatible = "allwinner,sun5i-a13-mmc";
->> +			reg = <0x01c11000 0x1000>;
->> +			clocks = <&ahb_gates 10>, <&mmc2_clk>;
->> +			clock-names = "ahb", "mod";
->> +			interrupts = <0 34 4>;
->> +			bus-width = <4>;
->> +			status = "disabled";
->> +		};
->> +
->> +		mmc3: mmc at 01c12000 {
->> +			compatible = "allwinner,sun5i-a13-mmc";
->> +			reg = <0x01c12000 0x1000>;
->> +			clocks = <&ahb_gates 11>, <&mmc3_clk>;
->> +			clock-names = "ahb", "mod";
->> +			interrupts = <0 35 4>;
->> +			bus-width = <4>;
->> +			status = "disabled";
->> +		};
->> +
->>   		pio: pinctrl at 01c20800 {
->>   			compatible = "allwinner,sun7i-a20-pinctrl";
->>   			reg = <0x01c20800 0x400>;
->> @@ -432,6 +472,27 @@
->>   				allwinner,drive = <0>;
->>   				allwinner,pull = <0>;
->>   			};
->> +
->> +			mmc0_pins_a: mmc0 at 0 {
->> +				allwinner,pins = "PF0","PF1","PF2","PF3","PF4","PF5";
->> +				allwinner,function = "mmc0";
->> +				allwinner,drive = <3>;
->> +				allwinner,pull = <0>;
->> +			};
->> +
->> +			mmc0_cd_pin_reference_design: mmc0_cd_pin at 0 {
->> +				allwinner,pins = "PH1";
->> +				allwinner,function = "gpio_in";
->> +				allwinner,drive = <0>;
->> +				allwinner,pull = <1>;
->> +			};
->> +
->> +			mmc3_pins_a: mmc3 at 0 {
->> +				allwinner,pins = "PI4","PI5","PI6","PI7","PI8","PI9";
->> +				allwinner,function = "mmc3";
->> +				allwinner,drive = <3>;
->> +				allwinner,pull = <0>;
->> +			};
->>   		};
->>
->>   		timer at 01c20c00 {
->>
->
-> Looks good otherwise.
->
-> Thanks!
-> Maxime
->
-
-
-Regards,
-
-Hans
+diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
+index fcaeae5f55b8..605815e52f5f 100644
+=-DO NOT APPLY-= a/drivers/mmc/host/sdhci-of-esdhc.c
+=+DO NOT APPLY+= b/drivers/mmc/host/sdhci-of-esdhc.c
+@@ -241,20 +241,6 @@ static void esdhc_of_set_clock(struct sdhci_host *host, unsigned int clock)
+ 	mdelay(1);
+ }
+ 
+-#ifdef CONFIG_PM
+-static u32 esdhc_proctl;
+-static void esdhc_of_suspend(struct sdhci_host *host)
+-{
+-	esdhc_proctl = sdhci_be32bs_readl(host, SDHCI_HOST_CONTROL);
+-}
+-
+-static void esdhc_of_resume(struct sdhci_host *host)
+-{
+-	esdhc_of_enable_dma(host);
+-	sdhci_be32bs_writel(host, esdhc_proctl, SDHCI_HOST_CONTROL);
+-}
+-#endif
+-
+ static void esdhc_of_platform_init(struct sdhci_host *host)
+ {
+ 	u32 vvn;
+@@ -302,16 +288,47 @@ static const struct sdhci_ops sdhci_esdhc_ops = {
+ 	.get_max_clock = esdhc_of_get_max_clock,
+ 	.get_min_clock = esdhc_of_get_min_clock,
+ 	.platform_init = esdhc_of_platform_init,
+-#ifdef CONFIG_PM
+-	.platform_suspend = esdhc_of_suspend,
+-	.platform_resume = esdhc_of_resume,
+-#endif
+ 	.adma_workaround = esdhci_of_adma_workaround,
+ 	.set_bus_width = esdhc_pltfm_set_bus_width,
+ 	.reset = sdhci_reset,
+ 	.set_uhs_signaling = sdhci_set_uhs_signaling,
+ };
+ 
+=+DO NOT APPLY+=#ifdef CONFIG_PM
+=+DO NOT APPLY+=
+=+DO NOT APPLY+=static u32 esdhc_proctl;
+=+DO NOT APPLY+=static int esdhc_of_suspend(struct device *dev)
+=+DO NOT APPLY+={
+=+DO NOT APPLY+=	struct sdhci_host *host = dev_get_drvdata(dev);
+=+DO NOT APPLY+=
+=+DO NOT APPLY+=	esdhc_proctl = sdhci_be32bs_readl(host, SDHCI_HOST_CONTROL);
+=+DO NOT APPLY+=
+=+DO NOT APPLY+=	return sdhci_suspend_host(host);
+=+DO NOT APPLY+=}
+=+DO NOT APPLY+=
+=+DO NOT APPLY+=static void esdhc_of_resume(device *dev)
+=+DO NOT APPLY+={
+=+DO NOT APPLY+=	struct sdhci_host *host = dev_get_drvdata(dev);
+=+DO NOT APPLY+=	int ret = sdhci_resume_host(host);
+=+DO NOT APPLY+=
+=+DO NOT APPLY+=	if (ret == 0) {
+=+DO NOT APPLY+=		/* Isn't this already done by sdhci_resume_host() ? --rmk */
+=+DO NOT APPLY+=		esdhc_of_enable_dma(host);
+=+DO NOT APPLY+=		sdhci_be32bs_writel(host, esdhc_proctl, SDHCI_HOST_CONTROL);
+=+DO NOT APPLY+=	}
+=+DO NOT APPLY+=
+=+DO NOT APPLY+=	return ret;
+=+DO NOT APPLY+=}
+=+DO NOT APPLY+=
+=+DO NOT APPLY+=static const struct dev_pm_ops esdhc_pmops = {
+=+DO NOT APPLY+=	.suspend	= esdhci_of_suspend,
+=+DO NOT APPLY+=	.resume		= esdhci_of_resume,
+=+DO NOT APPLY+=};
+=+DO NOT APPLY+=#define ESDHC_PMOPS (&esdhc_pmops)
+=+DO NOT APPLY+=#else
+=+DO NOT APPLY+=#define ESDHC_PMOPS NULL
+=+DO NOT APPLY+=#endif
+=+DO NOT APPLY+=
+ static const struct sdhci_pltfm_data sdhci_esdhc_pdata = {
+ 	/*
+ 	 * card detection could be handled via GPIO
+@@ -373,7 +390,7 @@ static struct platform_driver sdhci_esdhc_driver = {
+ 		.name = "sdhci-esdhc",
+ 		.owner = THIS_MODULE,
+ 		.of_match_table = sdhci_esdhc_of_match,
+-		.pm = SDHCI_PLTFM_PMOPS,
+=+DO NOT APPLY+=		.pm = ESDHC_PMOPS,
+ 	},
+ 	.probe = sdhci_esdhc_probe,
+ 	.remove = sdhci_esdhc_remove,
+-- 
+1.8.3.1
