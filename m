@@ -1,46 +1,79 @@
-From: Sudeep.Holla@arm.com (Sudeep Holla)
-Date: Tue, 18 Feb 2014 11:04:23 +0000
-Subject: BUG: Null pointer dereference on booting TC2 with
- vexpress_defconfig
-In-Reply-To: <20140217223907.GH21070@cbox>
-References: <20140217223907.GH21070@cbox>
-Message-ID: <53033E37.6000402@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Feb 2014 11:23:24 +0000
+Subject: [PATCH 1/2] clk: fixed-rate: use full DT node name
+In-Reply-To: <52FE4798.3010605@wwwdotorg.org>
+References: <1392358613-19962-1-git-send-email-swarren@wwwdotorg.org>
+ <20140214103556.GC9907@e106331-lin.cambridge.arm.com>
+ <52FE4798.3010605@wwwdotorg.org>
+Message-ID: <20140218112323.GB6051@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/14 22:39, Christoffer Dall wrote:
-> Booting my TC2 using 3.14-rc3 and vexpress_defconfig causes a NULL
-> pointer dereference in schedule_work_on.
+On Fri, Feb 14, 2014 at 04:43:04PM +0000, Stephen Warren wrote:
+> On 02/14/2014 03:35 AM, Mark Rutland wrote:
+> > On Fri, Feb 14, 2014 at 06:16:52AM +0000, Stephen Warren wrote:
+> >> clk-fixed-rate currently names clocks according to a node's name without
+> >> the unit address. When faced with the legal and technically correct DT
+> >> structure below, this causes rgistration attempts for 3 clocks with the
+> >> same name, 2 of which fail.
+> >>
+> >> 	clocks {
+> >> 		compatible = "simple-bus";
+> >> 		#address-cells = <1>;
+> >> 		#size-cells = <0>;
+> >>
+> >> 		clk_mmc: clock at 0 {
+> >> 			compatible = "fixed-clock";
+> >> 			reg = <0>;
+> >> ...
+> >> 		clk_i2c: clock at 1 {
+> >> 			compatible = "fixed-clock";
+> >> 			reg = <1>;
+> >> ...
+> >> 		clk_spi: clock at 2 {
+> >> 			compatible = "fixed-clock";
+> >> 			reg = <2>;
+> >> ...
+> > 
+> > I'd argue that this case isn't valid.
 > 
-> A quick look at the trace indicates that schedule_work() is called
-> before system_wq is initialized.
-> 
-> Further, a bisect seems to indicate that this call path is triggered by
-> the changes in this merge commit of Theodore T'so's random_for_linus
-> tag:
-> 0891ad829d2a0501053703df66029e843e3b8365
-> 
-> (However, my bisect may not be 100% correct, as some of the commits
-> between 3.13 and 3.12 don't boot the TC2 with vexpress_defconfig,
-> specifically the ones after f9300eaaac1ca300083ad41937923a90cc3a2394,
-> which causes boot to halt after "ARM CCI driver probed").
-> 
-Yes that requires some changes in defconfig to continue to work across
-these changes(mainly have all these new configs disabled)
+> Well, it's very widely used, and was the result of numerous discussions
+> of how this kind of thing should be represented:-/
 
-> Disabling CONFIG_ARCH_VEXPRESS_TC2_PM avoids the issue.
-> 
-Are you just disabling this or even CONFIG_MCPM ? Are the secondaries cpus
-coming up ?
+Maybe we have to live with it then. :/
 
-> I'm not familiar enough with any of these code paths to quicly identify
-> what the issue could be.  Apologies if I missed a previous post about
-> this issue (I couldn't find anything but would be surprised if I'm the
-> only one doing vexpress_defconfig on a TC2).
 > 
-I just tried and it works fine. If CONFIG_MCPM and CONFIG_ARCH_VEXPRESS_TC2_PM,
-it requires some changes in board configurations(for bootmon), I assume you have
-done those changes.
+> > The fixed-clock binding doesn't define a reg, yet simple bus binding
+> > implies that the reg property of child nodes should be interpretted as
+> > the same address space as their parent (MMIO in this case?). The
+> > fixed-clock nodes reg proeprties clearly aren't MMIO addresses.
+> > 
+> > Additionally, the _requred_ ranges property is missing.
+> 
+> Perhaps we need to invent a simple-container instead then?
 
-Regards,
-Sudeep
+As you mention in your other reply, it makes some sense to omit ranges
+if the address space is disjoint. My concern is that the address space
+is meaningless and arbitrary. If we had a real disjoint address space
+we'd have another kind of bus node as the container.
+
+> 
+> > It's just nonsensical; rename them to clock_{0,1,..} instead and get rid
+> > of the reg properties. Then they're named uniquely.
+> 
+> That's not legal either. DT node names are supposed to represent the
+> type of device/object (i.e. just "clock"), not the identity of the
+> device/object (i.e. not include IDs etc.). Hence, the node name needs to
+> be "clock" for all of them, and the unit address must be used to
+> differentiate them.
+
+As far as I can see from ePAPR, the only requriement is:
+
+  The node-name shall start with a lower or uppercase character and
+  should describe the general class of device.
+
+IMO clock_1 describes the general class of device as well as clock at 1,
+while also not filling a unexpected property with a meaningless value.
+
+Thanks,
+Mark.
