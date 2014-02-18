@@ -1,72 +1,146 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 18 Feb 2014 17:28:43 +0200
-Subject: [PATCH v7 03/12] mfd: omap-usb-host: Use clock names as per
- function for reference clocks
-In-Reply-To: <20140214133330.GC13293@lee--X1>
-References: <1392200333-28397-1-git-send-email-rogerq@ti.com>
- <1392200333-28397-4-git-send-email-rogerq@ti.com>
- <20140214100915.GD7380@lee--X1> <52FE164F.80503@ti.com>
- <20140214133330.GC13293@lee--X1>
-Message-ID: <53037C2B.6070701@ti.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 18 Feb 2014 15:27:15 +0000
+Subject: [PATCH 5/5] arm: mm: Add Transparent HugePage support for non-LPAE
+In-Reply-To: <1392737235-27286-1-git-send-email-steve.capper@linaro.org>
+References: <1392737235-27286-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1392737235-27286-6-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2014 03:33 PM, Lee Jones wrote:
->>>> Use a meaningful name for the reference clocks so that it indicates the function.
->>>>
->>>> CC: Lee Jones <lee.jones@linaro.org>
->>>> CC: Samuel Ortiz <sameo@linux.intel.com>
->>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
->>>> ---
->>>>  drivers/mfd/omap-usb-host.c | 6 +++---
->>>>  1 file changed, 3 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
->>>> index 60a3bed..ce620a8 100644
->>>> --- a/drivers/mfd/omap-usb-host.c
->>>> +++ b/drivers/mfd/omap-usb-host.c
->>>> @@ -714,21 +714,21 @@ static int usbhs_omap_probe(struct platform_device *pdev)
->>>>  		goto err_mem;
->>>>  	}
->>>>  
->>>> -	omap->xclk60mhsp1_ck = devm_clk_get(dev, "xclk60mhsp1_ck");
->>>> +	omap->xclk60mhsp1_ck = devm_clk_get(dev, "refclk_60m_ext_p1");
->>>
->>> You can't do that. These changes will have to be in the same patch as
->>> the core change i.e. where they are initialised.
->>
->> I'm not touching them anywhere in this series. When core changes are you
->> referring to?
-> 
-> The ones in:
->   arch/arm/mach-omap2/cclock3xxx_data.c
+Much of the required code for THP has been implemented in the
+earlier non-LPAE HugeTLB patch.
 
-OK, right. They are now no longer needed so I'll get rid of them.
-In fact that change should either be in a separate patch or combined with PATCH 2
-in this series. What do you suggest?
+One more domain bit is used (to store whether or not the THP is
+splitting).
 
-cheers,
--roger
-> 
->>>>  	if (IS_ERR(omap->xclk60mhsp1_ck)) {
->>>>  		ret = PTR_ERR(omap->xclk60mhsp1_ck);
->>>>  		dev_err(dev, "xclk60mhsp1_ck failed error:%d\n", ret);
->>>>  		goto err_mem;
->>>>  	}
->>>>  
->>>> -	omap->xclk60mhsp2_ck = devm_clk_get(dev, "xclk60mhsp2_ck");
->>>> +	omap->xclk60mhsp2_ck = devm_clk_get(dev, "refclk_60m_ext_p2");
->>>>  	if (IS_ERR(omap->xclk60mhsp2_ck)) {
->>>>  		ret = PTR_ERR(omap->xclk60mhsp2_ck);
->>>>  		dev_err(dev, "xclk60mhsp2_ck failed error:%d\n", ret);
->>>>  		goto err_mem;
->>>>  	}
->>>>  
->>>> -	omap->init_60m_fclk = devm_clk_get(dev, "init_60m_fclk");
->>>> +	omap->init_60m_fclk = devm_clk_get(dev, "refclk_60m_int");
->>>>  	if (IS_ERR(omap->init_60m_fclk)) {
->>>>  		ret = PTR_ERR(omap->init_60m_fclk);
->>>>  		dev_err(dev, "init_60m_fclk failed error:%d\n", ret);
->>>
->>
-> 
+Some THP helper functions are defined; and we have to re-define
+pmd_page such that it distinguishes between page tables and
+sections.
+
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm/Kconfig                      |  2 +-
+ arch/arm/include/asm/pgtable-2level.h | 32 ++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/pgtable-3level.h |  1 +
+ arch/arm/include/asm/pgtable.h        |  2 --
+ arch/arm/include/asm/tlb.h            |  3 +++
+ 5 files changed, 37 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 58b17b1..48dc4b5 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1820,7 +1820,7 @@ config SYS_SUPPORTS_HUGETLBFS
+ 
+ config HAVE_ARCH_TRANSPARENT_HUGEPAGE
+        def_bool y
+-       depends on ARM_LPAE
++       depends on SYS_SUPPORTS_HUGETLBFS
+ 
+ config ARCH_WANT_GENERAL_HUGETLB
+ 	def_bool y
+diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
+index 1fb2050..0882d77 100644
+--- a/arch/arm/include/asm/pgtable-2level.h
++++ b/arch/arm/include/asm/pgtable-2level.h
+@@ -211,6 +211,7 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+  */
+ #define PMD_DSECT_DIRTY		(_AT(pmdval_t, 1) << 5)
+ #define PMD_DSECT_AF		(_AT(pmdval_t, 1) << 6)
++#define PMD_DSECT_SPLITTING	(_AT(pmdval_t, 1) << 7)
+ 
+ #define PMD_BIT_FUNC(fn,op) \
+ static inline pmd_t pmd_##fn(pmd_t pmd) { pmd_val(pmd) op; return pmd; }
+@@ -235,6 +236,16 @@ extern pgprot_t get_huge_pgprot(pgprot_t newprot);
+ 
+ #define pfn_pmd(pfn,prot) __pmd(__pfn_to_phys(pfn) | pgprot_val(prot));
+ #define mk_pmd(page,prot) pfn_pmd(page_to_pfn(page),get_huge_pgprot(prot));
++#define pmd_mkhuge(pmd)	(pmd)
++
++#ifdef CONFIG_TRANSPARENT_HUGEPAGE
++#define pmd_trans_splitting(pmd)       (pmd_val(pmd) & PMD_DSECT_SPLITTING)
++#define pmd_trans_huge(pmd)            (pmd_thp_or_huge(pmd))
++#else
++static inline int pmd_trans_huge(pmd_t pmd);
++#endif
++
++#define pmd_mknotpresent(pmd)  (__pmd(0))
+ 
+ PMD_BIT_FUNC(mkdirty, |= PMD_DSECT_DIRTY);
+ PMD_BIT_FUNC(mkwrite, |= PMD_SECT_AP_WRITE);
+@@ -242,6 +253,8 @@ PMD_BIT_FUNC(wrprotect,	&= ~PMD_SECT_AP_WRITE);
+ PMD_BIT_FUNC(mknexec,	|= PMD_SECT_XN);
+ PMD_BIT_FUNC(rmprotnone, |= PMD_TYPE_SECT);
+ PMD_BIT_FUNC(mkyoung, |= PMD_DSECT_AF);
++PMD_BIT_FUNC(mkold, &= ~PMD_DSECT_AF);
++PMD_BIT_FUNC(mksplitting, |= PMD_DSECT_SPLITTING);
+ 
+ #define pmd_young(pmd)			(pmd_val(pmd) & PMD_DSECT_AF)
+ #define pmd_write(pmd)			(pmd_val(pmd) & PMD_SECT_AP_WRITE)
+@@ -282,6 +295,25 @@ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
+ 	return pmd;
+ }
+ 
++static inline int has_transparent_hugepage(void)
++{
++	return 1;
++}
++
++static inline struct page *pmd_page(pmd_t pmd)
++{
++	/*
++	 * for a section, we need to mask off more of the pmd
++	 * before looking up the page as it is a section descriptor.
++	 *
++	 * pmd_page only gets sections from the thp code.
++	 */
++	if (pmd_trans_huge(pmd))
++		return (phys_to_page(pmd_val(pmd) & HPAGE_MASK));
++
++	return phys_to_page(pmd_val(pmd) & PHYS_MASK);
++}
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif /* _ASM_PGTABLE_2LEVEL_H */
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index c1c8b37..aa2683f 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -211,6 +211,7 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+ 
+ #define pmd_hugewillfault(pmd)	(!pmd_young(pmd) || !pmd_write(pmd))
+ #define pmd_thp_or_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
++#define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+ 
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+ #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 9cc40bc..3675c63 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -189,8 +189,6 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ 	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
+ }
+ 
+-#define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+-
+ #ifndef CONFIG_HIGHPTE
+ #define __pte_map(pmd)		pmd_page_vaddr(*(pmd))
+ #define __pte_unmap(pte)	do { } while (0)
+diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
+index b2498e6..77037d9 100644
+--- a/arch/arm/include/asm/tlb.h
++++ b/arch/arm/include/asm/tlb.h
+@@ -218,6 +218,9 @@ static inline void
+ tlb_remove_pmd_tlb_entry(struct mmu_gather *tlb, pmd_t *pmdp, unsigned long addr)
+ {
+ 	tlb_add_flush(tlb, addr);
++#ifndef CONFIG_ARM_LPAE
++	tlb_add_flush(tlb, addr + SZ_1M);
++#endif
+ }
+ 
+ #define pte_free_tlb(tlb, ptep, addr)	__pte_free_tlb(tlb, ptep, addr)
+-- 
+1.8.1.4
