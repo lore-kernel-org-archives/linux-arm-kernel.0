@@ -1,98 +1,40 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 18 Feb 2014 23:03:31 +0100
-Subject: [PATCH] ARM: tegra: Add head numbers to display controllers
-Message-ID: <1392761011-21701-1-git-send-email-thierry.reding@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 18 Feb 2014 15:06:35 -0700
+Subject: [PATCH] ARM: tegra: add SPI flash to Venice2 DT
+Message-ID: <1392761195-20643-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+From: Stephen Warren <swarren@nvidia.com>
 
-The number of the head specifies the index of the display controller
-unit and is required to properly configure outputs so that they receive
-video data from the correct source.
+Venice2 contains an SPI Flash chip, which contains the bootloader.
+Add this to the DT, so the kernel can access it.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-Hi Olof, Kevin,
+ arch/arm/boot/dts/tegra124-venice2.dts | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Stephen requested that I send this patch your way so that it can be
-applied for 3.14. They aren't strictly necessary because there's a
-fallback if they are missing but if they aren't present, the driver
-will output undesirable error messages.
-
-Thanks,
-Thierry
-
- arch/arm/boot/dts/tegra114.dtsi | 4 ++++
- arch/arm/boot/dts/tegra20.dtsi  | 4 ++++
- arch/arm/boot/dts/tegra30.dtsi  | 4 ++++
- 3 files changed, 12 insertions(+)
-
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 389e987ec281..44ec401ec366 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -57,6 +57,8 @@
- 			resets = <&tegra_car 27>;
- 			reset-names = "dc";
+diff --git a/arch/arm/boot/dts/tegra124-venice2.dts b/arch/arm/boot/dts/tegra124-venice2.dts
+index 1ad3f334fb16..e71aeb9929b4 100644
+--- a/arch/arm/boot/dts/tegra124-venice2.dts
++++ b/arch/arm/boot/dts/tegra124-venice2.dts
+@@ -914,6 +914,16 @@
+ 		};
+ 	};
  
-+			nvidia,head = <0>;
++	spi at 7000da00 {
++		status = "okay";
++		spi-max-frequency = <25000000>;
++		spi-flash at 0 {
++			compatible = "winbond,w25q32dw";
++			reg = <0>;
++			spi-max-frequency = <20000000>;
++		};
++	};
 +
- 			rgb {
- 				status = "disabled";
- 			};
-@@ -72,6 +74,8 @@
- 			resets = <&tegra_car 26>;
- 			reset-names = "dc";
- 
-+			nvidia,head = <1>;
-+
- 			rgb {
- 				status = "disabled";
- 			};
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 480ecda3416b..48d2a7f4d0c0 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -94,6 +94,8 @@
- 			resets = <&tegra_car 27>;
- 			reset-names = "dc";
- 
-+			nvidia,head = <0>;
-+
- 			rgb {
- 				status = "disabled";
- 			};
-@@ -109,6 +111,8 @@
- 			resets = <&tegra_car 26>;
- 			reset-names = "dc";
- 
-+			nvidia,head = <1>;
-+
- 			rgb {
- 				status = "disabled";
- 			};
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 18d52a7704cc..7f995739c1a7 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -170,6 +170,8 @@
- 			resets = <&tegra_car 27>;
- 			reset-names = "dc";
- 
-+			nvidia,head = <0>;
-+
- 			rgb {
- 				status = "disabled";
- 			};
-@@ -185,6 +187,8 @@
- 			resets = <&tegra_car 26>;
- 			reset-names = "dc";
- 
-+			nvidia,head = <1>;
-+
- 			rgb {
- 				status = "disabled";
- 			};
+ 	pmc at 7000e400 {
+ 		nvidia,invert-interrupt;
+ 		nvidia,suspend-mode = <1>;
 -- 
-1.8.4.2
+1.8.1.5
