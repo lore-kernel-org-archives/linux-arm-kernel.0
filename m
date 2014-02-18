@@ -1,69 +1,82 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 18 Feb 2014 15:27:10 +0000
-Subject: [PATCH 0/5] Huge pages for short descriptors on ARM
-Message-ID: <1392737235-27286-1-git-send-email-steve.capper@linaro.org>
+Date: Tue, 18 Feb 2014 15:27:12 +0000
+Subject: [PATCH 2/5] arm: mm: Adjust the parameters for __sync_icache_dcache
+In-Reply-To: <1392737235-27286-1-git-send-email-steve.capper@linaro.org>
+References: <1392737235-27286-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1392737235-27286-3-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-This series brings HugeTLB pages and Transparent Huge Pages (THP) to
-ARM on short descriptors.
+Rather than take a pte_t as an input, break this down to the pfn
+and whether or not the memory is executable.
 
-We use a pair of 1MB sections to represent a 2MB huge page. Both
-HugeTLB and THP entries are represented by PMDs with the same bit
-layout.
+This allows us to use this function for ptes and pmds.
 
-The short descriptor page table manipulation code on ARM makes a
-distinction between Linux and hardware ptes and performs the necessary
-translation in the assembler pte setter functions. The huge page code
-instead manipulates the hardware entries directly.
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm/include/asm/pgtable.h | 6 +++---
+ arch/arm/mm/flush.c            | 9 ++++-----
+ 2 files changed, 7 insertions(+), 8 deletions(-)
 
-There is one small bit of translation that takes place to populate an
-appropriate pgprot_t value for the VMA containing the huge page. Once
-we have that pgprot_t, we can manipulate huge ptes/pmds as normal with
-the bit and modify funcs.
-
-In order to be able to manipulate huge ptes directly, I've introduced
-three new manipulation functions: huge_pte_page, huge_present and
-huge_pte_young. If undefined, these will default to the standard pte
-analogues.
-
-I have tested this series on an Arndale board running 3.14-rc3. The
-libhugetlbfs checks, LTP and some custom THP PROT_NONE tests were used
-to test this series.
-
-Since the RFC in December, I have rebased the code against 3.14-rc3 and
-tidied up the code.
-
-Cheers,
---
-Steve
-
-Steve Capper (5):
-  mm: hugetlb: Introduce huge_pte_{page,present,young}
-  arm: mm: Adjust the parameters for __sync_icache_dcache
-  arm: mm: Make mmu_gather aware of huge pages
-  arm: mm: HugeTLB support for non-LPAE systems
-  arm: mm: Add Transparent HugePage support for non-LPAE
-
- arch/arm/Kconfig                      |   4 +-
- arch/arm/include/asm/hugetlb-2level.h | 121 +++++++++++++++++++++++++++++++
- arch/arm/include/asm/hugetlb-3level.h |   6 ++
- arch/arm/include/asm/hugetlb.h        |  10 +--
- arch/arm/include/asm/pgtable-2level.h | 133 +++++++++++++++++++++++++++++++++-
- arch/arm/include/asm/pgtable-3level.h |   3 +-
- arch/arm/include/asm/pgtable.h        |   9 +--
- arch/arm/include/asm/tlb.h            |  14 +++-
- arch/arm/kernel/head.S                |  10 ++-
- arch/arm/mm/fault.c                   |  13 ----
- arch/arm/mm/flush.c                   |   9 +--
- arch/arm/mm/fsr-2level.c              |   4 +-
- arch/arm/mm/hugetlbpage.c             |   2 +-
- arch/arm/mm/mmu.c                     |  51 +++++++++++++
- include/linux/hugetlb.h               |  12 +++
- mm/hugetlb.c                          |  22 +++---
- 16 files changed, 370 insertions(+), 53 deletions(-)
- create mode 100644 arch/arm/include/asm/hugetlb-2level.h
-
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 7d59b52..9b4ad36 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -225,11 +225,11 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ #define pte_present_user(pte)  (pte_present(pte) && (pte_val(pte) & L_PTE_USER))
+ 
+ #if __LINUX_ARM_ARCH__ < 6
+-static inline void __sync_icache_dcache(pte_t pteval)
++static inline void __sync_icache_dcache(unsigned long pfn, int exec);
+ {
+ }
+ #else
+-extern void __sync_icache_dcache(pte_t pteval);
++extern void __sync_icache_dcache(unsigned long pfn, int exec);
+ #endif
+ 
+ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+@@ -238,7 +238,7 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+ 	unsigned long ext = 0;
+ 
+ 	if (addr < TASK_SIZE && pte_present_user(pteval)) {
+-		__sync_icache_dcache(pteval);
++		__sync_icache_dcache(pte_pfn(pteval), pte_exec(pteval));
+ 		ext |= PTE_EXT_NG;
+ 	}
+ 
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 3387e60..df0d5ca 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -232,16 +232,15 @@ static void __flush_dcache_aliases(struct address_space *mapping, struct page *p
+ }
+ 
+ #if __LINUX_ARM_ARCH__ >= 6
+-void __sync_icache_dcache(pte_t pteval)
++void __sync_icache_dcache(unsigned long pfn, int exec)
+ {
+-	unsigned long pfn;
+ 	struct page *page;
+ 	struct address_space *mapping;
+ 
+-	if (cache_is_vipt_nonaliasing() && !pte_exec(pteval))
++	if (cache_is_vipt_nonaliasing() && !exec)
+ 		/* only flush non-aliasing VIPT caches for exec mappings */
+ 		return;
+-	pfn = pte_pfn(pteval);
++
+ 	if (!pfn_valid(pfn))
+ 		return;
+ 
+@@ -254,7 +253,7 @@ void __sync_icache_dcache(pte_t pteval)
+ 	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+ 		__flush_dcache_page(mapping, page);
+ 
+-	if (pte_exec(pteval))
++	if (exec)
+ 		__flush_icache_all();
+ }
+ #endif
 -- 
 1.8.1.4
