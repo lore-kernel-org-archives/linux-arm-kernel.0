@@ -1,51 +1,76 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Feb 2014 10:19:06 -0600
-Subject: [PATCH 2/2] USB: at91: using USBA_NR_DMAS for DMA channels
-In-Reply-To: <1389927565-22477-2-git-send-email-voice.shen@atmel.com>
-References: <1389927565-22477-1-git-send-email-voice.shen@atmel.com>
- <1389927565-22477-2-git-send-email-voice.shen@atmel.com>
-Message-ID: <20140218161839.GD9878@saruman.home>
+Date: Tue, 18 Feb 2014 10:20:54 -0600
+Subject: [PATCH v4 1/2] usb: musb: dsps, debugfs files
+In-Reply-To: <1389950556-6453-2-git-send-email-mpa@pengutronix.de>
+References: <1389950556-6453-1-git-send-email-mpa@pengutronix.de>
+ <1389950556-6453-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <20140218162054.GE9878@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 17, 2014 at 10:59:25AM +0800, Bo Shen wrote:
-> When the SoC is earlier than sama5d3 SoC, which have the same number
-> endpoints and DMAs. However for sama5d3 SoC, it has different number
-> for endpoints and DMAs. So, define USBA_NR_DMAs for DMA channels
+On Fri, Jan 17, 2014 at 10:22:35AM +0100, Markus Pargmann wrote:
+> debugfs files to show the contents of important dsps registers.
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 > ---
+>  drivers/usb/musb/musb_dsps.c | 54 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
 > 
->  drivers/usb/gadget/atmel_usba_udc.c | 2 +-
->  drivers/usb/gadget/atmel_usba_udc.h | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-> index 7e67a81..5cded1c 100644
-> --- a/drivers/usb/gadget/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/atmel_usba_udc.c
-> @@ -1661,7 +1661,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
->  	if (dma_status) {
->  		int i;
+> diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
+> index 593d3c9..d0a97d6 100644
+> --- a/drivers/usb/musb/musb_dsps.c
+> +++ b/drivers/usb/musb/musb_dsps.c
+> @@ -46,6 +46,8 @@
+>  #include <linux/of_irq.h>
+>  #include <linux/usb/of.h>
 >  
-> -		for (i = 1; i < USBA_NR_ENDPOINTS; i++)
-> +		for (i = 1; i < USBA_NR_DMAS; i++)
->  			if (dma_status & (1 << i))
->  				usba_dma_irq(udc, &udc->usba_ep[i]);
->  	}
-> diff --git a/drivers/usb/gadget/atmel_usba_udc.h b/drivers/usb/gadget/atmel_usba_udc.h
-> index 2922db5..a70706e 100644
-> --- a/drivers/usb/gadget/atmel_usba_udc.h
-> +++ b/drivers/usb/gadget/atmel_usba_udc.h
-> @@ -210,7 +210,7 @@
->  #define USBA_FIFO_BASE(x)	((x) << 16)
+> +#include <linux/debugfs.h>
+> +
+>  #include "musb_core.h"
 >  
->  /* Synth parameters */
-> -#define USBA_NR_ENDPOINTS	7
-> +#define USBA_NR_DMAS		7
+>  static const struct of_device_id musb_dsps_of_match[];
+> @@ -137,6 +139,26 @@ struct dsps_glue {
+>  	unsigned long last_timer;    /* last timer data for each instance */
+>  
+>  	struct dsps_context context;
+> +	struct debugfs_regset32 regset;
+> +	struct dentry *dbgfs_root;
+> +};
+> +
+> +static const struct debugfs_reg32 dsps_musb_regs[] = {
+> +	{ "revision",		0x00 },
+> +	{ "control",		0x14 },
+> +	{ "status",		0x18 },
+> +	{ "eoi",		0x24 },
+> +	{ "intr0_stat",		0x30 },
+> +	{ "intr1_stat",		0x34 },
+> +	{ "intr0_set",		0x38 },
+> +	{ "intr1_set",		0x3c },
+> +	{ "txmode",		0x70 },
+> +	{ "rxmode",		0x74 },
+> +	{ "autoreq",		0xd0 },
+> +	{ "srpfixtime",		0xd4 },
+> +	{ "tdown",		0xd8 },
+> +	{ "phy_utmi",		0xe0 },
+> +	{ "mode",		0xe8 },
+>  };
+>  
+>  static void dsps_musb_try_idle(struct musb *musb, unsigned long timeout)
+> @@ -369,6 +391,30 @@ out:
+>  	return ret;
+>  }
+>  
+> +static int dsps_musb_dbg_init(struct musb *musb, struct dsps_glue *glue)
+> +{
+> +	struct dentry *root;
+> +	struct dentry *file;
+> +	char buf[128];
+> +
+> +	sprintf(buf, "%s.dsps", dev_name(musb->controller));
+> +	root = debugfs_create_dir(buf, NULL);
+> +	if (!root)
 
-what's the difference ? You just renamed this macro. Also, please
-clarify a bit your commit log.
+wrong, you should be using IS_ERR()
 
 -- 
 balbi
@@ -55,4 +80,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/32376893/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/2b850196/attachment.sig>
