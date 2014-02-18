@@ -1,262 +1,58 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 18 Feb 2014 15:25:21 +0100
-Subject: [BUG] Circular locking dependency - DRM/CMA/MM/hotplug/...
-In-Reply-To: <20140212163317.GQ26684@n2100.arm.linux.org.uk>
-References: <20140211183543.GK26684@n2100.arm.linux.org.uk>
- <52FB9602.1000805@samsung.com> <20140212163317.GQ26684@n2100.arm.linux.org.uk>
-Message-ID: <53036D51.2070502@samsung.com>
+From: naresh.kamboju@linaro.org (Naresh Kamboju)
+Date: Tue, 18 Feb 2014 20:00:21 +0530
+Subject: [LTP] How to get the Linux kernel coverage data on ARM arch when
+ I run LTP test?
+In-Reply-To: <52FDE52A.4070002@linux.vnet.ibm.com>
+References: <CA+G9fYuT4TSs=3j6K9zztsTgFNVp2YG6JT-2Q_L==1P5G+SBew@mail.gmail.com>
+ <52FDE52A.4070002@linux.vnet.ibm.com>
+Message-ID: <CA+G9fYv9+Fhyz=nVZQZXxLU0YMTJadfr1XVVVb9P=inEfUaDuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 14 February 2014 15:13, Peter Oberparleiter
+<oberpar@linux.vnet.ibm.com> wrote:
+> On 14.02.2014 10:02, Naresh Kamboju wrote:
+>> root at linaro-developer:/tmp/linux-linaro-3.13-2014.01# gcov kernel/gcov/base.c -o
+>>  /sys/kernel/debug/gcov/tmp/linux-linaro-3.13-2014.01/kernel/gcov/
+>> File 'kernel/gcov/base.c'
+>> Lines executed:43.18% of 44
+>> Creating 'base.c.gcov'
+>>
+>> root at linaro-developer:/tmp/linux-linaro-3.13-2014.01#
+>>
+>> The above experiment gives coverage of a single file base.c when i run
+>> gcov manually.
+>> Is there any way to get Linux kernel coverage of all files after
+>> running LTP test cases ?
+>
+> 1. Reset coverage data: lcov -z
+> 2. Run LTP (or any other test case)
+> 3. Capture coverage data: lcov -c -o coverage.info
+> 4. Generate HTML output: genhtml coverage.info -o out
+> 5. View HTML output: <browser> out/index.html
 
-On 2014-02-12 17:33, Russell King - ARM Linux wrote:
-> On Wed, Feb 12, 2014 at 04:40:50PM +0100, Marek Szyprowski wrote:
-> > Hello,
-> >
-> > On 2014-02-11 19:35, Russell King - ARM Linux wrote:
-> >> The cubox-i4 just hit a new lockdep problem - not quite sure what to
-> >> make of this - it looks like an interaction between quite a lot of
-> >> locks - I suspect more than the lockdep code is reporting in its
-> >> "Possible unsafe locking scenario" report.
-> >>
-> >> I'm hoping I've sent this to appropriate people...  if anyone thinks
-> >> this needs to go to someone else, please forward it.  Thanks.
-> >
-> > From the attached log it looks like an issue (AB-BA deadlock) between
-> > device mutex (&dev->struct_mutex) and mm semaphore (&mm->mmap_sem).
-> > Similar issue has been discussed quite a long time ago in v4l2
-> > subsystem:
->
-> I think there's more locks involved than just those two.
->
-> > https://www.mail-archive.com/linux-media at vger.kernel.org/msg38599.html
-> > http://www.spinics.net/lists/linux-media/msg40225.html
-> >
-> > Solving it probably requires some changes in DRM core. I see no direct
-> > relation between this issue and CMA itself.
->
-> I don't think so - the locking in DRM is pretty sane. Let's take a
-> look:
->
-> >> the existing dependency chain (in reverse order) is:
-> >> -> #5 (&dev->struct_mutex){+.+...}:
-> >>         [<c0066f04>] __lock_acquire+0x151c/0x1ca0
-> >>         [<c0067c28>] lock_acquire+0xa0/0x130
-> >>         [<c0698180>] mutex_lock_nested+0x5c/0x3ac
-> >>         [<c0350c30>] drm_gem_mmap+0x40/0xdc
-> >>         [<c03671d8>] drm_gem_cma_mmap+0x14/0x2c
-> >>         [<c00ef4f4>] mmap_region+0x3ac/0x59c
-> >>         [<c00ef9ac>] do_mmap_pgoff+0x2c8/0x370
-> >>         [<c00dd730>] vm_mmap_pgoff+0x6c/0x9c
-> >>         [<c00ee1fc>] SyS_mmap_pgoff+0x54/0x98
-> >>         [<c000e6e0>] ret_fast_syscall+0x0/0x48
->
-> vm_mmap_pgoff() takes mm->mmap_sem before calling do_mmap_pgoff().
-> So, this results in the following locking order:
->
-> 	mm->mmap_sem
-> 	dev->struct_mutex
->
-> >> -> #4 (&mm->mmap_sem){++++++}:
-> >>         [<c0066f04>] __lock_acquire+0x151c/0x1ca0
-> >>         [<c0067c28>] lock_acquire+0xa0/0x130
-> >>         [<c00e6c5c>] might_fault+0x6c/0x94
-> >>         [<c0335440>] con_set_unimap+0x158/0x27c
-> >>         [<c032f800>] vt_ioctl+0x1298/0x1388
-> >>         [<c0323f44>] tty_ioctl+0x168/0xbf4
-> >>         [<c0115fac>] do_vfs_ioctl+0x84/0x664
-> >>         [<c01165d0>] SyS_ioctl+0x44/0x64
-> >>         [<c000e6e0>] ret_fast_syscall+0x0/0x48
->
-> vt_ioctl() takes the console lock, so this results in:
->
-> 	console_lock
-> 	mm->mmap_sem
->
-> >> -> #3 (console_lock){+.+.+.}:
-> >>         [<c0066f04>] __lock_acquire+0x151c/0x1ca0
-> >>         [<c0067c28>] lock_acquire+0xa0/0x130
-> >>         [<c006edcc>] console_lock+0x60/0x74
-> >>         [<c006f7b8>] console_cpu_notify+0x28/0x34
-> >>         [<c004904c>] notifier_call_chain+0x4c/0x8c
-> >>         [<c004916c>] __raw_notifier_call_chain+0x1c/0x24
-> >>         [<c0024124>] __cpu_notify+0x34/0x50
-> >>         [<c002424c>] cpu_notify_nofail+0x18/0x24
-> >>         [<c068e168>] _cpu_down+0x100/0x244
-> >>         [<c068e2dc>] cpu_down+0x30/0x44
-> >>         [<c036ef8c>] cpu_subsys_offline+0x14/0x18
-> >>         [<c036af28>] device_offline+0x94/0xbc
-> >>         [<c036b030>] online_store+0x4c/0x74
-> >>         [<c0368d3c>] dev_attr_store+0x20/0x2c
-> >>         [<c016b2e0>] sysfs_kf_write+0x54/0x58
-> >>         [<c016eaa4>] kernfs_fop_write+0xc4/0x160
-> >>         [<c0105a54>] vfs_write+0xbc/0x184
-> >>         [<c0105dfc>] SyS_write+0x48/0x70
-> >>         [<c000e6e0>] ret_fast_syscall+0x0/0x48
->
-> cpu_down() takes cpu_hotplug.lock, so here we have:
->
-> 	cpu_hotplug.lock
-> 	console_lock
->
-> >> -> #2 (cpu_hotplug.lock){+.+.+.}:
-> >>         [<c0066f04>] __lock_acquire+0x151c/0x1ca0
-> >>         [<c0067c28>] lock_acquire+0xa0/0x130
-> >>         [<c0698180>] mutex_lock_nested+0x5c/0x3ac
-> >>         [<c0024218>] get_online_cpus+0x3c/0x58
-> >>         [<c00d0ab0>] lru_add_drain_all+0x24/0x190
-> >>         [<c0101d3c>] migrate_prep+0x10/0x18
-> >>         [<c00cba04>] alloc_contig_range+0xf4/0x30c
-> >>         [<c0371588>] dma_alloc_from_contiguous+0x7c/0x130
-> >>         [<c0018ef8>] __alloc_from_contiguous+0x38/0x12c
-> >>         [<c0908694>] atomic_pool_init+0x74/0x128
-> >>         [<c0008850>] do_one_initcall+0x3c/0x164
-> >>         [<c0903c98>] kernel_init_freeable+0x104/0x1d0
-> >>         [<c068de54>] kernel_init+0x10/0xec
-> >>         [<c000e7a8>] ret_from_fork+0x14/0x2c
->
-> dma_alloc_from_contiguous takes the cma_mutex, so here we end up with:
->
-> 	cma_mutex
-> 	cpu_hotplug.lock
->
-> >> -> #1 (lock){+.+...}:
-> >>         [<c0066f04>] __lock_acquire+0x151c/0x1ca0
-> >>         [<c0067c28>] lock_acquire+0xa0/0x130
-> >>         [<c0698180>] mutex_lock_nested+0x5c/0x3ac
-> >>         [<c00d0aa8>] lru_add_drain_all+0x1c/0x190
-> >>         [<c0101d3c>] migrate_prep+0x10/0x18
-> >>         [<c00cba04>] alloc_contig_range+0xf4/0x30c
-> >>         [<c0371588>] dma_alloc_from_contiguous+0x7c/0x130
-> >>         [<c0018ef8>] __alloc_from_contiguous+0x38/0x12c
-> >>         [<c0908694>] atomic_pool_init+0x74/0x128
-> >>         [<c0008850>] do_one_initcall+0x3c/0x164
-> >>         [<c0903c98>] kernel_init_freeable+0x104/0x1d0
-> >>         [<c068de54>] kernel_init+0x10/0xec
-> >>         [<c000e7a8>] ret_from_fork+0x14/0x2c
->
-> Ditto - here we have:
->
-> 	cma_mutex
-> 	lock
->
-> where "lock" is nicely named... this is a lock inside lru_add_drain_all()
-> and under this lock, we call get_online_cpus() and put_online_cpus().
-> get_online_cpus() takes cpu_hotplug.lock, so here we also have:
->
-> 	cma_mutex
-> 	lock
-> 	cpu_hotplug.lock
->
-> >> -> #0 (cma_mutex){+.+.+.}:
-> >>         [<c0690850>] print_circular_bug+0x70/0x2f0
-> >>         [<c0066f68>] __lock_acquire+0x1580/0x1ca0
-> >>         [<c0067c28>] lock_acquire+0xa0/0x130
-> >>         [<c0698180>] mutex_lock_nested+0x5c/0x3ac
-> >>         [<c03716f4>] dma_release_from_contiguous+0xb8/0xf8
-> >>         [<c00197a4>] __arm_dma_free.isra.11+0x194/0x218
-> >>         [<c0019868>] arm_dma_free+0x1c/0x24
-> >>         [<c0366e34>] drm_gem_cma_free_object+0x68/0xb8
-> >>         [<c0351194>] drm_gem_object_free+0x30/0x38
-> >>         [<c0351318>] drm_gem_object_handle_unreference_unlocked+0x108/0x148
-> >>         [<c0351498>] drm_gem_handle_delete+0xb0/0x10c
-> >>         [<c0351508>] drm_gem_dumb_destroy+0x14/0x18
-> >>         [<c035e838>] drm_mode_destroy_dumb_ioctl+0x34/0x40
-> >>         [<c034f918>] drm_ioctl+0x3f4/0x498
-> >>         [<c0115fac>] do_vfs_ioctl+0x84/0x664
-> >>         [<c01165d0>] SyS_ioctl+0x44/0x64
-> >>         [<c000e6e0>] ret_fast_syscall+0x0/0x48
->
-> drm_gem_object_unreference_unlocked takes dev->struct_mutex, so:
->
-> 	dev->struct_mutex
-> 	cma_mutex
->
->
-> So, the full locking dependency tree is this:
->
-> CPU0		CPU1		CPU2		CPU3		CPU4
-> dev->struct_mutex (from #0)
-> 		mm->mmap_sem
-> 		dev->struct_mutex (from #5)
-> 				console_lock (from #4)
-> 				mm->mmap_sem
-> 						cpu_hotplug.lock (from #3)
-> 						console_lock
-> 								cma_mutex (from #2, but also from #1)
-> 								cpu_hotplug.lock
-> cma_mutex
->
-> Which is pretty sick - and I don't think that blaming this solely on V4L2
-> nor DRM is particularly fair.  I believe the onus is on every author of
-> one of those locks involved in that chain needs to re-analyse whether
-> their locking is sane.
->
-> For instance, what is cma_mutex protecting?  Is it protecting the CMA
-> bitmap?
+It is working !!!
+LTP executed on linux-linaro build on vexpress-tc2 target.
+Please find results obtained
+http://people.linaro.org/~naresh.kamboju/linux-linaro-coverage-by-ltp/
 
-This lock is protecting CMA bitmap and also serializes all CMA allocations.
-It is required by memory management core to serialize all calls to
-alloc_contig_range() (otherwise page block's migrate types might get
-overwritten). I don't see any other obvious solution for serializing
-alloc_contig_range() calls.
+The plan is to run all linaro test suite and to get coverage date.
 
-> What if we did these changes:
->
-> struct page *dma_alloc_from_contiguous(struct device *dev, int count,
->                                         unsigned int align)
-> {
-> ...
->          mutex_lock(&cma_mutex);
-> ...
->          for (;;) {
->                  pageno = bitmap_find_next_zero_area(cma->bitmap, cma->count,
->                                                      start, count, mask);
->                  if (pageno >= cma->count)
->                          break;
->
->                  pfn = cma->base_pfn + pageno;
-> +               bitmap_set(cma->bitmap, pageno, count);
-> +               mutex_unlock(&cma_mutex);
->                  ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
-> +               mutex_lock(&cma_mutex);
->                  if (ret == 0) {
-> -                       bitmap_set(cma->bitmap, pageno, count);
->                          page = pfn_to_page(pfn);
->                          break;
-> -               } else if (ret != -EBUSY) {
-> +		}
-> +		bitmap_clear(cma->bitmap, pageno, count);
-> +		if (ret != -EBUSY) {
->                          break;
->                  }
-> ...
->          mutex_unlock(&cma_mutex);
->          pr_debug("%s(): returned %p\n", __func__, page);
->          return page;
-> }
->
->
-> bool dma_release_from_contiguous(struct device *dev, struct page *pages,
->                                   int count)
-> {
-> ...
-> +       free_contig_range(pfn, count);
->          mutex_lock(&cma_mutex);
->          bitmap_clear(cma->bitmap, pfn - cma->base_pfn, count);
-> -       free_contig_range(pfn, count);
->          mutex_unlock(&cma_mutex);
-> ...
-> }
->
-> which avoids the dependency between cma_mutex and cpu_hotplug.lock ?
-
-This will not work correctly if there will be 2 concurrent calls to 
-alloc_contig_range(),
-which will touch the same memory page blocks.
+Peter Oberparleiter,
+Thank you very much for your help.
 
 Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Naresh Kamboju
+
+>
+> More information on lcov can be found on the page behind the second URL
+> your quoted in your mail.
+>
+>
+> Regards,
+>   Peter Oberparleiter
+>
+> --
+> Peter Oberparleiter
+> Linux on System z Development - IBM Germany
+>
