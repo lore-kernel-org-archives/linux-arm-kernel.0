@@ -1,138 +1,180 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 18 Feb 2014 20:10:32 +0000
-Subject: [PATCH 11/34] imx-drm: imx-drm-core: sanitise
- imx_drm_encoder_get_mux_id()
+Date: Tue, 18 Feb 2014 20:10:38 +0000
+Subject: [PATCH 12/34] imx-drm: imx-drm-core: use array instead of list for
+ CRTCs
 In-Reply-To: <20140218200900.GM21483@n2100.arm.linux.org.uk>
 References: <20140218200900.GM21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WFqzw-0007iu-UN@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WFr02-0007j6-1r@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Address the following issues:
-- imx_drm_encoder_get_mux_id() searches the CRTC list for the matching
-  CRTC, and returns the position within this list as the MUX programming
-  value for encoders.  This is sub-optimal for two reasons:
-  1. It relies upon the CRTC list not changing during the lifetime of
-     the driver.
-  2. It is dependent on the initialisation order of the CRTCs.
-
-  We address (1) in this patch, leaving (2) until a better solution can
-  be found, as (2) requires larger changes.
-
-- imx_drm_encoder is unused.  Instead, pass the drm_encoder which is
-  slightly more useful; all callers pass encoder->crtc as the required
-  crtc, so move this inside the function.
+The DRM core indexes vblank by number, so there's little point
+maintaining a list, and have to scan the list to find the appropriate
+structure.  Instead, use an array of pointers to the CRTCs.
 
 Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c | 17 ++++++-----------
- drivers/staging/imx-drm/imx-drm.h      |  3 +--
- drivers/staging/imx-drm/imx-hdmi.c     |  3 +--
- drivers/staging/imx-drm/imx-ldb.c      |  6 ++----
- 4 files changed, 10 insertions(+), 19 deletions(-)
+ drivers/staging/imx-drm/imx-drm-core.c | 57 ++++++++++++++--------------------
+ 1 file changed, 23 insertions(+), 34 deletions(-)
 
 diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 236ed66f116a..92fde89f58ac 100644
+index 92fde89f58ac..c5268847a54e 100644
 --- a/drivers/staging/imx-drm/imx-drm-core.c
 +++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -53,6 +53,7 @@ struct imx_drm_crtc {
- 	struct imx_drm_crtc_helper_funcs	imx_drm_helper_funcs;
- 	struct module				*owner;
- 	struct crtc_cookie			cookie;
-+	int					mux_id;
+@@ -34,10 +34,12 @@ struct crtc_cookie {
+ 	struct list_head list;
  };
  
- struct imx_drm_encoder {
-@@ -503,7 +504,7 @@ int imx_drm_add_crtc(struct drm_crtc *crtc,
- 	imx_drm_crtc->pipe = imxdrm->pipes++;
- 	imx_drm_crtc->cookie.cookie = cookie;
- 	imx_drm_crtc->cookie.id = id;
--
-+	imx_drm_crtc->mux_id = imx_drm_crtc->pipe;
- 	imx_drm_crtc->crtc = crtc;
- 	imx_drm_crtc->imxdrm = imxdrm;
++struct imx_drm_crtc;
++
+ struct imx_drm_device {
+ 	struct drm_device			*drm;
+ 	struct device				*dev;
+-	struct list_head			crtc_list;
++	struct imx_drm_crtc			*crtc[MAX_CRTC];
+ 	struct list_head			encoder_list;
+ 	struct list_head			connector_list;
+ 	struct mutex				mutex;
+@@ -47,7 +49,6 @@ struct imx_drm_device {
  
-@@ -657,22 +658,16 @@ int imx_drm_encoder_add_possible_crtcs(
- }
- EXPORT_SYMBOL_GPL(imx_drm_encoder_add_possible_crtcs);
+ struct imx_drm_crtc {
+ 	struct drm_crtc				*crtc;
+-	struct list_head			list;
+ 	struct imx_drm_device			*imxdrm;
+ 	int					pipe;
+ 	struct imx_drm_crtc_helper_funcs	imx_drm_helper_funcs;
+@@ -69,6 +70,8 @@ struct imx_drm_connector {
+ 	struct module				*owner;
+ };
  
--int imx_drm_encoder_get_mux_id(struct imx_drm_encoder *imx_drm_encoder,
--		struct drm_crtc *crtc)
-+int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder)
++static struct imx_drm_device *__imx_drm_device(void);
++
+ int imx_drm_crtc_id(struct imx_drm_crtc *crtc)
  {
- 	struct imx_drm_device *imxdrm = __imx_drm_device();
- 	struct imx_drm_crtc *imx_crtc;
--	int i = 0;
+ 	return crtc->pipe;
+@@ -96,34 +99,28 @@ static int imx_drm_driver_unload(struct drm_device *drm)
+ 	return 0;
+ }
  
--	list_for_each_entry(imx_crtc, &imxdrm->crtc_list, list) {
+-/*
+- * We don't care at all for crtc numbers, but the core expects the
+- * crtcs to be numbered
+- */
+-static struct imx_drm_crtc *imx_drm_crtc_by_num(struct imx_drm_device *imxdrm,
+-		int num)
++struct imx_drm_crtc *imx_drm_find_crtc(struct drm_crtc *crtc)
+ {
+-	struct imx_drm_crtc *imx_drm_crtc;
++	struct imx_drm_device *imxdrm = __imx_drm_device();
++	unsigned i;
++
++	for (i = 0; i < MAX_CRTC; i++)
++		if (imxdrm->crtc[i] && imxdrm->crtc[i]->crtc == crtc)
++			return imxdrm->crtc[i];
+ 
+-	list_for_each_entry(imx_drm_crtc, &imxdrm->crtc_list, list)
+-		if (imx_drm_crtc->pipe == num)
+-			return imx_drm_crtc;
+ 	return NULL;
+ }
+ 
+ int imx_drm_crtc_panel_format_pins(struct drm_crtc *crtc, u32 encoder_type,
+ 		u32 interface_pix_fmt, int hsync_pin, int vsync_pin)
+ {
+-	struct imx_drm_device *imxdrm = crtc->dev->dev_private;
+-	struct imx_drm_crtc *imx_crtc;
+ 	struct imx_drm_crtc_helper_funcs *helper;
++	struct imx_drm_crtc *imx_crtc;
+ 
+-	list_for_each_entry(imx_crtc, &imxdrm->crtc_list, list)
 -		if (imx_crtc->crtc == crtc)
 -			goto found;
--		i++;
--	}
-+	list_for_each_entry(imx_crtc, &imxdrm->crtc_list, list)
-+		if (imx_crtc->crtc == encoder->crtc)
-+			return imx_crtc->mux_id;
++	imx_crtc = imx_drm_find_crtc(crtc);
++	if (!imx_crtc)
++		return -EINVAL;
  
- 	return -EINVAL;
+-	return -EINVAL;
 -found:
--	return i;
+ 	helper = &imx_crtc->imx_drm_helper_funcs;
+ 	if (helper->set_interface_pix_fmt)
+ 		return helper->set_interface_pix_fmt(crtc,
+@@ -162,10 +159,9 @@ EXPORT_SYMBOL_GPL(imx_drm_handle_vblank);
+ static int imx_drm_enable_vblank(struct drm_device *drm, int crtc)
+ {
+ 	struct imx_drm_device *imxdrm = drm->dev_private;
+-	struct imx_drm_crtc *imx_drm_crtc;
++	struct imx_drm_crtc *imx_drm_crtc = imxdrm->crtc[crtc];
+ 	int ret;
+ 
+-	imx_drm_crtc = imx_drm_crtc_by_num(imxdrm, crtc);
+ 	if (!imx_drm_crtc)
+ 		return -EINVAL;
+ 
+@@ -181,9 +177,8 @@ static int imx_drm_enable_vblank(struct drm_device *drm, int crtc)
+ static void imx_drm_disable_vblank(struct drm_device *drm, int crtc)
+ {
+ 	struct imx_drm_device *imxdrm = drm->dev_private;
+-	struct imx_drm_crtc *imx_drm_crtc;
++	struct imx_drm_crtc *imx_drm_crtc = imxdrm->crtc[crtc];
+ 
+-	imx_drm_crtc = imx_drm_crtc_by_num(imxdrm, crtc);
+ 	if (!imx_drm_crtc)
+ 		return;
+ 
+@@ -510,7 +505,7 @@ int imx_drm_add_crtc(struct drm_crtc *crtc,
+ 
+ 	imx_drm_crtc->owner = owner;
+ 
+-	list_add_tail(&imx_drm_crtc->list, &imxdrm->crtc_list);
++	imxdrm->crtc[imx_drm_crtc->pipe] = imx_drm_crtc;
+ 
+ 	*new_crtc = imx_drm_crtc;
+ 
+@@ -533,7 +528,7 @@ int imx_drm_add_crtc(struct drm_crtc *crtc,
+ 	return 0;
+ 
+ err_register:
+-	list_del(&imx_drm_crtc->list);
++	imxdrm->crtc[imx_drm_crtc->pipe] = NULL;
+ 	kfree(imx_drm_crtc);
+ err_alloc:
+ err_busy:
+@@ -553,7 +548,7 @@ int imx_drm_remove_crtc(struct imx_drm_crtc *imx_drm_crtc)
+ 
+ 	drm_crtc_cleanup(imx_drm_crtc->crtc);
+ 
+-	list_del(&imx_drm_crtc->list);
++	imxdrm->crtc[imx_drm_crtc->pipe] = NULL;
+ 
+ 	drm_mode_group_reinit(imxdrm->drm);
+ 
+@@ -660,14 +655,9 @@ EXPORT_SYMBOL_GPL(imx_drm_encoder_add_possible_crtcs);
+ 
+ int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder)
+ {
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
+-	struct imx_drm_crtc *imx_crtc;
+-
+-	list_for_each_entry(imx_crtc, &imxdrm->crtc_list, list)
+-		if (imx_crtc->crtc == encoder->crtc)
+-			return imx_crtc->mux_id;
++	struct imx_drm_crtc *imx_crtc = imx_drm_find_crtc(encoder->crtc);
+ 
+-	return -EINVAL;
++	return imx_crtc ? imx_crtc->mux_id : -EINVAL;
  }
  EXPORT_SYMBOL_GPL(imx_drm_encoder_get_mux_id);
  
-diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
-index ae90c9c15312..5649f180dc44 100644
---- a/drivers/staging/imx-drm/imx-drm.h
-+++ b/drivers/staging/imx-drm/imx-drm.h
-@@ -64,8 +64,7 @@ void imx_drm_fb_helper_set(struct drm_fbdev_cma *fbdev_helper);
+@@ -854,7 +844,6 @@ static int __init imx_drm_init(void)
+ 		return -ENOMEM;
  
- struct device_node;
+ 	mutex_init(&imx_drm_device->mutex);
+-	INIT_LIST_HEAD(&imx_drm_device->crtc_list);
+ 	INIT_LIST_HEAD(&imx_drm_device->connector_list);
+ 	INIT_LIST_HEAD(&imx_drm_device->encoder_list);
  
--int imx_drm_encoder_get_mux_id(struct imx_drm_encoder *imx_drm_encoder,
--		struct drm_crtc *crtc);
-+int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder);
- int imx_drm_encoder_add_possible_crtcs(struct imx_drm_encoder *imx_drm_encoder,
- 		struct device_node *np);
- 
-diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
-index 05cf8a07b456..a90f08d52ee7 100644
---- a/drivers/staging/imx-drm/imx-hdmi.c
-+++ b/drivers/staging/imx-drm/imx-hdmi.c
-@@ -1467,8 +1467,7 @@ static void imx_hdmi_encoder_prepare(struct drm_encoder *encoder)
- static void imx_hdmi_encoder_commit(struct drm_encoder *encoder)
- {
- 	struct imx_hdmi *hdmi = container_of(encoder, struct imx_hdmi, encoder);
--	int mux = imx_drm_encoder_get_mux_id(hdmi->imx_drm_encoder,
--					     encoder->crtc);
-+	int mux = imx_drm_encoder_get_mux_id(encoder);
- 
- 	imx_hdmi_set_ipu_di_mux(hdmi, mux);
- 
-diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
-index 7e593296ac47..4aa47ae2a3ca 100644
---- a/drivers/staging/imx-drm/imx-ldb.c
-+++ b/drivers/staging/imx-drm/imx-ldb.c
-@@ -179,8 +179,7 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
- 	u32 pixel_fmt;
- 	unsigned long serial_clk;
- 	unsigned long di_clk = mode->clock * 1000;
--	int mux = imx_drm_encoder_get_mux_id(imx_ldb_ch->imx_drm_encoder,
--					     encoder->crtc);
-+	int mux = imx_drm_encoder_get_mux_id(encoder);
- 
- 	if (ldb->ldb_ctrl & LDB_SPLIT_MODE_EN) {
- 		/* dual channel LVDS mode */
-@@ -216,8 +215,7 @@ static void imx_ldb_encoder_commit(struct drm_encoder *encoder)
- 	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
- 	struct imx_ldb *ldb = imx_ldb_ch->ldb;
- 	int dual = ldb->ldb_ctrl & LDB_SPLIT_MODE_EN;
--	int mux = imx_drm_encoder_get_mux_id(imx_ldb_ch->imx_drm_encoder,
--					     encoder->crtc);
-+	int mux = imx_drm_encoder_get_mux_id(encoder);
- 
- 	if (dual) {
- 		clk_prepare_enable(ldb->clk[0]);
 -- 
 1.8.3.1
