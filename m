@@ -1,30 +1,29 @@
 From: davem@davemloft.net (David Miller)
-Date: Tue, 18 Feb 2014 18:07:30 -0500 (EST)
-Subject: [PATCH] NET: fec: only enable napi if we are successful
-In-Reply-To: <E1WFkD8-0004pj-Pr@rmk-PC.arm.linux.org.uk>
-References: <E1WFkD8-0004pj-Pr@rmk-PC.arm.linux.org.uk>
-Message-ID: <20140218.180730.54681622364091114.davem@davemloft.net>
+Date: Tue, 18 Feb 2014 18:09:18 -0500 (EST)
+Subject: [PATCH v2] net: ethernet: update dependency and help text of
+ mvneta
+In-Reply-To: <1392729491-24913-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392729491-24913-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20140218.180918.2278994810974129533.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-Date: Tue, 18 Feb 2014 12:55:42 +0000
+From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Date: Tue, 18 Feb 2014 14:18:11 +0100
 
-> If napi is left enabled after a failed attempt to bring the interface
-> up, we BUG:
+> With the introduction of the support for Armada 375 and Armada 38x,
+> the hidden Kconfig option MACH_ARMADA_370_XP is being renamed to
+> MACH_MVEBU_V7. Therefore, the dependency that was used for the mvneta
+> driver can no longer work. This commit replaces this dependency by a
+> dependency on PLAT_ORION, which is used similarly for the mv643xx_eth
+> driver.
 > 
-> fec 2188000.ethernet eth0: no PHY, assuming direct connection to switch
-> libphy: PHY fixed-0:00 not found
-> fec 2188000.ethernet eth0: could not attach to PHY
-> ------------[ cut here ]------------
-> kernel BUG at include/linux/netdevice.h:502!
-> Internal error: Oops - BUG: 0 [#1] SMP ARM
-> ...
-> PC is at fec_enet_open+0x4d0/0x500
-> LR is at __dev_open+0xa4/0xfc
+> In addition to this, it takes this opportunity to adjust the
+> description and help text to indicate that the driver can is also used
+> for Armada 38x. Note that Armada 375 cannot use this driver as it has
+> a completely different networking unit, which will require a separate
+> driver.
 > 
-> Only enable napi after we are past all the failure paths.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Applied, thanks a lot Russell.
+Applied, thanks.
