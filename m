@@ -1,36 +1,70 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Feb 2014 13:45:32 +0100
-Subject: [PATCH] net: ethernet: remove unneeded dependency of mvneta and
- update help text
-In-Reply-To: <20140218122952.GM7862@titan.lakedaemon.net>
-References: <1392719391-8851-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140218122952.GM7862@titan.lakedaemon.net>
-Message-ID: <20140218134532.7607a616@skate>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 18 Feb 2014 13:47:04 +0100
+Subject: [PATCH 1/5] ARM: omap2: cm-t35: Add regulators and clock for
+ camera sensor
+In-Reply-To: <1392069284-18024-2-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1392069284-18024-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <1392069284-18024-2-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <9621770.WFqvfViqR7@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+Mauro, Tony,
 
-On Tue, 18 Feb 2014 07:29:52 -0500, Jason Cooper wrote:
+On Monday 10 February 2014 22:54:40 Laurent Pinchart wrote:
+> The camera sensor will soon require regulators and clocks. Register
+> fixed regulators for its VAA and VDD power supplies and a fixed rate
+> clock for its master clock.
 
-> >  config MVNETA
-> > -	tristate "Marvell Armada 370/XP network interface support"
-> > -	depends on MACH_ARMADA_370_XP
+This patch is a prerequisite for a set of 4 patches that need to go through 
+the linux-media tree. It would simpler if it could go through the same tree as 
+well. Given that arch/arm/mach-omap2/board-cm-t35.c has seen very little 
+activity recently I believe the risk of conflict is pretty low. Tony, would 
+that be fine with you ?
+
+> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> ---
+>  arch/arm/mach-omap2/board-cm-t35.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
 > 
-> Have you build-tested this on the usual fail scenarios?  eg x86_64,
-> powerpc, s390, allno, allyes, allmod, etc?
+> diff --git a/arch/arm/mach-omap2/board-cm-t35.c
+> b/arch/arm/mach-omap2/board-cm-t35.c index 8dd0ec8..018353d 100644
+> --- a/arch/arm/mach-omap2/board-cm-t35.c
+> +++ b/arch/arm/mach-omap2/board-cm-t35.c
+> @@ -16,6 +16,8 @@
+>   *
+>   */
 > 
-> I think you might be opening up pandora's box here without needing to.
-> :)
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/platform_device.h>
+> @@ -542,8 +544,22 @@ static struct isp_platform_data cm_t35_isp_pdata = {
+>  	.subdevs = cm_t35_isp_subdevs,
+>  };
+> 
+> +static struct regulator_consumer_supply cm_t35_camera_supplies[] = {
+> +	REGULATOR_SUPPLY("vaa", "3-005d"),
+> +	REGULATOR_SUPPLY("vdd", "3-005d"),
+> +};
+> +
+>  static void __init cm_t35_init_camera(void)
+>  {
+> +	struct clk *clk;
+> +
+> +	clk = clk_register_fixed_rate(NULL, "mt9t001-clkin", NULL, CLK_IS_ROOT,
+> +				      48000000);
+> +	clk_register_clkdev(clk, NULL, "3-005d");
+> +
+> +	regulator_register_fixed(2, cm_t35_camera_supplies,
+> +				 ARRAY_SIZE(cm_t35_camera_supplies));
+> +
+>  	if (omap3_init_camera(&cm_t35_isp_pdata) < 0)
+>  		pr_warn("CM-T3x: Failed registering camera device!\n");
+>  }
 
-No, I haven't tested all the build scenarios of course. If you feel
-that this is too dangerous, I can resend a patch that replaces 'depends
-on ARMADA_370_XP' by 'depends on PLAT_ORION'. Would this be OK for you?
-
-Thanks,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Regards,
+
+Laurent Pinchart
