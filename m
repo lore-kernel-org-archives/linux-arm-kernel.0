@@ -1,23 +1,80 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 18 Feb 2014 16:59:24 +0530
-Subject: [PATCH RESEND v11 2/2] dma: Add Freescale eDMA engine driver
- support
-In-Reply-To: <1392689832-17011-3-git-send-email-b35083@freescale.com>
-References: <1392689832-17011-1-git-send-email-b35083@freescale.com>
- <1392689832-17011-3-git-send-email-b35083@freescale.com>
-Message-ID: <20140218112924.GF10628@intel.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 18 Feb 2014 12:36:06 +0100
+Subject: [RFC PATCH v3 5/9] staging: imx-drm: Document imx-hdmi device tree
+ bindings
+In-Reply-To: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
+References: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1392723370-4772-6-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 10:17:12AM +0800, Jingchang Lu wrote:
-> Add Freescale enhanced direct memory(eDMA) controller support.
-> This module can be found on Vybrid and LS-1 SoCs.
-> 
-> Signed-off-by: Alison Wang <b18965@freescale.com>
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+This patch adds device tree binding documentation for the HDMI transmitter
+on i.MX6.
 
-Applied, thanks
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ .../devicetree/bindings/staging/imx-drm/hdmi.txt   | 53 ++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
 
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+new file mode 100644
+index 0000000..7dcd673a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+@@ -0,0 +1,53 @@
++Device-Tree bindings for HDMI Transmitter
++
++HDMI Transmitter
++================
++
++The LVDS Display Bridge device tree node contains up to two lvds-channel
++nodes describing each of the two LVDS encoder channels of the bridge.
++
++Required properties:
++ - #address-cells : should be <1>
++ - #size-cells : should be <0>
++ - compatible : should be "fsl,imx6q-hdmi" or "fsl,imx6dl-hdmi".
++ - gpr : should be <&gpr>.
++   The phandle points to the iomuxc-gpr region containing the HDMI
++   multiplexer control register.
++ - clocks, clock-names : phandles to the HDMI iahb and isrf clocks, as described
++   in Documentation/devicetree/bindings/clock/clock-bindings.txt and
++   Documentation/devicetree/bindings/clock/imx6q-clock.txt.
++ - port@[0-4]: Up to four port nodes with endpoint definitions as defined in
++   Documentation/devicetree/bindings/media/video-interfaces.txt,
++   corresponding to the four inputs to the HDMI multiplexer.
++
++example:
++
++	gpr: iomuxc-gpr at 020e0000 {
++		/* ... */
++	};
++
++        hdmi: hdmi at 0120000 {
++                #address-cells = <1>;
++                #size-cells = <0>;
++                reg = <0x00120000 0x9000>;
++                interrupts = <0 115 0x04>;
++                gpr = <&gpr>;
++                clocks = <&clks 123>, <&clks 124>;
++                clock-names = "iahb", "isfr";
++
++                port at 0 {
++                        reg = <0>;
++
++                        hdmi_mux_0: endpoint {
++                                remote-endpoint = <&ipu1_di0_hdmi>;
++                        };
++                };
++
++                port at 1 {
++                        reg = <1>;
++
++                        hdmi_mux_1: endpoint {
++                                remote-endpoint = <&ipu1_di1_hdmi>;
++                        };
++                };
++        };
 -- 
-~Vinod
+1.8.5.3
