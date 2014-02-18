@@ -1,181 +1,83 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 18 Feb 2014 12:36:07 +0100
-Subject: [RFC PATCH v3 6/9] ARM: dts: imx51: Add IPU ports and endpoints,
- move imx-drm node to dtsi
-In-Reply-To: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
-References: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1392723370-4772-7-git-send-email-p.zabel@pengutronix.de>
+Date: Tue, 18 Feb 2014 12:36:01 +0100
+Subject: [RFC PATCH v3 0/9] imx-drm dt bindings
+Message-ID: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch connects IPU and and parallel display device tree
-nodes using the OF graph bindings described in
+Hi,
+
+here is an updated and more complete version of the imx-drm DT binding
+series. These patches apply on top of Russell's second preview of the
+imx-drm cleanup series on v3.14-rc2. I have added device tree bindings
+between IPU and the encoders as documented in
 Documentation/devicetree/bindings/media/video-interfaces.txt
+and used those to determine the possible_crtcs and mux_id.
 
-The IPU ports correspond to the two display interfaces. The
-order of endpoints in the ports is arbitrary.
+The crtc cookie is replaced with a the port device tree node,
+which is unique and therefore allows to get rid of the di_id
+comparison. Storing the multiplexer input numbers in the device
+tree removes the need to know the ipu_id. This should also allow
+to replace IPU2 with LCDIF on i.MX6 Solo more easily.
 
-Since the imx-drm node now only needs to contain links to the
-display interfaces, it can be moved to the SoC dtsi level. At
-the board level, only connections between the display interface
-ports and panels have to be added.
+In v3 also connections between display interface ports and encoders are
+used to find all necessary components, so that only the display interfaces
+have to be configured in the imx-drm node. This allows to move the imx-drm
+node into the SoC level dtsi. I've also updated the existing i.MX51 and
+i.MX53 device trees this time and updated/added the devicetree binding
+documentation.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- arch/arm/boot/dts/imx51-apf51dev.dts | 11 ++++++++++-
- arch/arm/boot/dts/imx51-babbage.dts  | 28 ++++++++++++++++++++--------
- arch/arm/boot/dts/imx51.dtsi         | 22 +++++++++++++++++++++-
- 3 files changed, 51 insertions(+), 10 deletions(-)
+Patch 2/9 adds a temporary copy of the v4l2_of parser functions. Those
+are going to be moved to some place where they can be used by drm drivers,
+eventually, so those local copies can be dropped again.
 
-diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
-index 5a7f552..d3f9814 100644
---- a/arch/arm/boot/dts/imx51-apf51dev.dts
-+++ b/arch/arm/boot/dts/imx51-apf51dev.dts
-@@ -18,7 +18,6 @@
- 
- 	display at di1 {
- 		compatible = "fsl,imx-parallel-display";
--		crtcs = <&ipu 0>;
- 		interface-pix-fmt = "bgr666";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_ipu_disp1_1>;
-@@ -41,6 +40,12 @@
- 				pixelclk-active = <0>;
- 			};
- 		};
-+
-+		port {
-+			display_in: endpoint {
-+				remote-endpoint = <&ipu_di0_disp0>;
-+			};
-+		};
- 	};
- 
- 	gpio-keys {
-@@ -122,3 +127,7 @@
- 		};
- 	};
- };
-+
-+&ipu_di0_disp0 {
-+	remote-endpoint = <&display_in>;
-+};
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 6ff15a0..6719271 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -23,7 +23,6 @@
- 
- 	display0: display at di0 {
- 		compatible = "fsl,imx-parallel-display";
--		crtcs = <&ipu 0>;
- 		interface-pix-fmt = "rgb24";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_ipu_disp1_1>;
-@@ -41,11 +40,16 @@
- 				vsync-len = <10>;
- 			};
- 		};
-+
-+		port {
-+			display0_in: endpoint {
-+				remote-endpoint = <&ipu_di0_disp0>;
-+			};
-+		};
- 	};
- 
- 	display1: display at di1 {
- 		compatible = "fsl,imx-parallel-display";
--		crtcs = <&ipu 1>;
- 		interface-pix-fmt = "rgb565";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_ipu_disp2_1>;
-@@ -68,6 +72,12 @@
- 				pixelclk-active = <0>;
- 			};
- 		};
-+
-+		port {
-+			display1_in: endpoint {
-+				remote-endpoint = <&ipu_di1_disp1>;
-+			};
-+		};
- 	};
- 
- 	gpio-keys {
-@@ -81,12 +91,6 @@
- 		};
- 	};
- 
--	imx-drm {
--		compatible = "fsl,imx-drm";
--		crtcs = <&ipu 0>, <&ipu 1>;
--		connectors = <&display0>, <&display1>;
--	};
--
- 	sound {
- 		compatible = "fsl,imx51-babbage-sgtl5000",
- 			     "fsl,imx-audio-sgtl5000";
-@@ -264,6 +268,14 @@
- 	};
- };
- 
-+&ipu_di0_disp0 {
-+	remote-endpoint = <&display0_in>;
-+};
-+
-+&ipu_di1_disp1 {
-+	remote-endpoint = <&display1_in>;
-+};
-+
- &ssi2 {
- 	fsl,mode = "i2s-slave";
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 4bcdd3a..536644c 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -79,6 +79,11 @@
- 		};
- 	};
- 
-+	imx-drm {
-+		compatible = "fsl,imx-drm";
-+		ports = <&ipu_di0>, <&ipu_di1>;
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -92,13 +97,28 @@
- 		};
- 
- 		ipu: ipu at 40000000 {
--			#crtc-cells = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 			compatible = "fsl,imx51-ipu";
- 			reg = <0x40000000 0x20000000>;
- 			interrupts = <11 10>;
- 			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
- 			clock-names = "bus", "di0", "di1";
- 			resets = <&src 2>;
-+
-+			ipu_di0: port at 2 {
-+				reg = <2>;
-+
-+				ipu_di0_disp0: endpoint {
-+				};
-+			};
-+
-+			ipu_di1: port at 3 {
-+				reg = <3>;
-+
-+				ipu_di1_disp1: endpoint {
-+				};
-+			};
- 		};
- 
- 		aips at 70000000 { /* AIPS1 */
+regards
+Philipp
+
+Lucas Stach (1):
+  staging: imx-drm-core: don't request probe deferral in
+    imx_drm_encoder_parse_of
+
+Philipp Zabel (8):
+  staging: imx-drm: Add temporary copies of v4l2-of parsing functions
+  staging: imx-drm-core: Use OF graph to find components and connections
+    between encoder and crtcs
+  staging: imx-drm: Document updated imx-drm device tree bindings
+  staging: imx-drm: Document imx-hdmi device tree bindings
+  ARM: dts: imx51: Add IPU ports and endpoints, move imx-drm node to
+    dtsi
+  ARM: dts: imx53: Add IPU DI ports and endpoints, move imx-drm node to
+    dtsi
+  ARM: dts: imx6qdl: Add IPU DI ports and endpoints, move imx-drm node
+    to dtsi
+  staging: imx-drm: Update TODO
+
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       |  48 ++++-
+ .../devicetree/bindings/staging/imx-drm/hdmi.txt   |  53 +++++
+ .../devicetree/bindings/staging/imx-drm/ldb.txt    |  20 +-
+ arch/arm/boot/dts/imx51-apf51dev.dts               |  11 +-
+ arch/arm/boot/dts/imx51-babbage.dts                |  28 ++-
+ arch/arm/boot/dts/imx51.dtsi                       |  22 ++-
+ arch/arm/boot/dts/imx53-m53evk.dts                 |  17 +-
+ arch/arm/boot/dts/imx53-mba53.dts                  |  15 +-
+ arch/arm/boot/dts/imx53-qsb.dts                    |  17 +-
+ arch/arm/boot/dts/imx53.dtsi                       |  64 +++++-
+ arch/arm/boot/dts/imx6dl.dtsi                      |  22 +--
+ arch/arm/boot/dts/imx6q-sabresd.dts                |   4 -
+ arch/arm/boot/dts/imx6q.dtsi                       | 124 +++++++++++-
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |   6 -
+ arch/arm/boot/dts/imx6qdl.dtsi                     | 138 ++++++++++++-
+ drivers/staging/imx-drm/Makefile                   |   2 +-
+ drivers/staging/imx-drm/TODO                       |   5 -
+ drivers/staging/imx-drm/imx-drm-core.c             | 217 ++++++++++++++-------
+ drivers/staging/imx-drm/imx-drm-of.c               | 132 +++++++++++++
+ drivers/staging/imx-drm/imx-drm.h                  |  11 +-
+ drivers/staging/imx-drm/imx-hdmi.c                 |   2 +-
+ drivers/staging/imx-drm/imx-ldb.c                  |   4 +-
+ drivers/staging/imx-drm/ipuv3-crtc.c               |  47 ++++-
+ 23 files changed, 842 insertions(+), 167 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+ create mode 100644 drivers/staging/imx-drm/imx-drm-of.c
+
 -- 
 1.8.5.3
