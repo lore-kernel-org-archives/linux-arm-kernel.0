@@ -1,39 +1,66 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 18 Feb 2014 22:37:46 +0800
-Subject: [PATCH v4 5/5] ACPI: Replace printk with pr_* in tables.c
-In-Reply-To: <1392732373.22752.22.camel@joe-AO722>
-References: <1392731700-10992-1-git-send-email-hanjun.guo@linaro.org>
- <1392731700-10992-6-git-send-email-hanjun.guo@linaro.org>
- <1392732373.22752.22.camel@joe-AO722>
-Message-ID: <5303703A.8060002@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 18 Feb 2014 09:41:23 -0500
+Subject: [PATCH v4 0/2] Introduce AEMIF driver for Davinci/Keystone archs
+In-Reply-To: <1391629574-18955-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1391629574-18955-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <53037113.3090105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?02?18? 22:06, Joe Perches wrote:
-> On Tue, 2014-02-18 at 21:55 +0800, Hanjun Guo wrote:
->> This patch just do some clean up to replace printk with pr_*,
->> no functional change.
-> trivial note:
->
->> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-> []
->> @@ -55,8 +55,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
->>   		{
->>   			struct acpi_madt_local_apic *p =
->>   			    (struct acpi_madt_local_apic *)header;
->> -			printk(KERN_INFO PREFIX
->> -			       "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
->> +			pr_info(PREFIX "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
->>   			       p->processor_id, p->id,
->>   			       (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
-> It'd be nice to realign the additional lines to the open
-> parenthesis, here and everywhere else in this patch
->
-> 			pr_info(PREFIX "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
-> 				p->processor_id, p->id,
-> 				(p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+Greg,
 
-Thanks for your comments, will update patch 1/5 and 5/5 follow your 
-suggestion :)
+On Wednesday 05 February 2014 02:46 PM, Ivan Khoronzhuk wrote:
+> These patches introduce Async External Memory Interface (EMIF16/AEMIF)
+> controller driver for Davinci/Keystone archs.
+> 
+> For more informations see documentation:
+> Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
+> OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
+> Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+> 
+Can you please have a look at the series ? It has been on the list for
+sometime and all the outstanding comments are addressed so far. If
+you are ok with it, I would like to get these queued up for 3.15
+via your tree.
 
-Hanjun
+> Based on
+> git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+> keystone/master
+> 
+> v3..v4:
+> 	rebased on latest of linux-keystone.git keystone/master
+> 
+> v2..v3 (https://lkml.org/lkml/2013/12/11/148):
+> - memory: ti-aemif: introduce AEMIF driver
+> 	changed to work with multiple AEMIF controllers
+> 	corrected "copyright" to "authors" in header
+> 	changed compatible "ti,omap-L138-aemif" to "ti,da850-aeimf"
+> 	used NULL in clk_get() instead of "aemif" name
+> 	driver can be build as loadable module
+> 	treat all child nodes as cs nodes, it makes code simpler
+> 
+> - memory: ti-aemif: add bindings for AEMIF driver
+> 	deleted direct link driver/memory/ti-aemif.c
+> 	clarified description of controller ranges property
+> 	changed compatible "ti,omap-L138-aemif" to "ti,da850-aeimf"
+> 	added cs number information in commit log
+> 	removed compatible property from cs node, it makes code simpler
+> 
+> v1..v2 (https://lkml.org/lkml/2013/11/21/170):
+> - memory: ti-aemif: introduce AEMIF driver
+> - memory: ti-aemif: add bindings for AEMIF driver
+> 	added ti.cs-chipselect property instead of representing chipselect
+> 	number in cs node name.
+> 
+> Ivan Khoronzhuk (2):
+>   memory: ti-aemif: introduce AEMIF driver
+>   memory: ti-aemif: add bindings for AEMIF driver
+> 
+>  .../bindings/memory-controllers/ti-aemif.txt       | 210 ++++++++++
+>  drivers/memory/Kconfig                             |  11 +
+>  drivers/memory/Makefile                            |   1 +
+>  drivers/memory/ti-aemif.c                          | 429 +++++++++++++++++++++
+>  4 files changed, 651 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+>  create mode 100644 drivers/memory/ti-aemif.c
+> 
