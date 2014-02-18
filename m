@@ -1,36 +1,32 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 18 Feb 2014 14:55:47 +0000
-Subject: [PATCH 20/35] mtd: st_spi_fsm: Update the flash Volatile
- Configuration Register
+Date: Tue, 18 Feb 2014 14:55:57 +0000
+Subject: [PATCH 30/35] mtd: st_spi_fsm: Add the ability to write to FSM's
+ status register
 In-Reply-To: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
 References: <1392735362-1245-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1392735362-1245-21-git-send-email-lee.jones@linaro.org>
+Message-ID: <1392735362-1245-31-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-The FSM Serial Flash Controller is driven by issuing a standard set of
-register writes we call a message sequence. This patch supplies a method
-to prepare the message sequence responsible for updating a chip's VCR.
 
 Acked-by Angus Clark <angus.clark@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mtd/devices/st_spi_fsm.c | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ drivers/mtd/devices/st_spi_fsm.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
 diff --git a/drivers/mtd/devices/st_spi_fsm.c b/drivers/mtd/devices/st_spi_fsm.c
-index e20f4cb..208b6c3 100644
+index 5b2993d..b32df09 100644
 --- a/drivers/mtd/devices/st_spi_fsm.c
 +++ b/drivers/mtd/devices/st_spi_fsm.c
-@@ -415,6 +415,23 @@ static struct stfsm_seq stfsm_seq_erase_sector = {
+@@ -588,6 +588,23 @@ static struct stfsm_seq stfsm_seq_erase_chip = {
  		    SEQ_CFG_STARTSEQ),
  };
  
-+static struct stfsm_seq stfsm_seq_wrvcr = {
++static struct stfsm_seq stfsm_seq_write_status = {
 +	.seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
 +		       SEQ_OPC_OPCODE(FLASH_CMD_WREN) | SEQ_OPC_CSDEASSERT),
 +	.seq_opc[1] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-+		       SEQ_OPC_OPCODE(FLASH_CMD_WRVCR)),
++		       SEQ_OPC_OPCODE(FLASH_CMD_WRSR)),
 +	.seq = {
 +		STFSM_INST_CMD1,
 +		STFSM_INST_CMD2,
@@ -43,30 +39,34 @@ index e20f4cb..208b6c3 100644
 +		    SEQ_CFG_STARTSEQ),
 +};
 +
- static int stfsm_n25q_en_32bit_addr_seq(struct stfsm_seq *seq)
- {
- 	seq->seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
-@@ -542,6 +559,21 @@ static int stfsm_enter_32bit_addr(struct stfsm *fsm, int enter)
+ static struct stfsm_seq stfsm_seq_wrvcr = {
+ 	.seq_opc[0] = (SEQ_OPC_PADS_1 | SEQ_OPC_CYCLES(8) |
+ 		       SEQ_OPC_OPCODE(FLASH_CMD_WREN) | SEQ_OPC_CSDEASSERT),
+@@ -817,6 +834,25 @@ static int stfsm_read_status(struct stfsm *fsm, uint8_t cmd,
  	return 0;
  }
  
-+static int stfsm_wrvcr(struct stfsm *fsm, uint8_t data)
++static int stfsm_write_status(struct stfsm *fsm, uint16_t status,
++			       int sta_bytes)
 +{
-+	struct stfsm_seq *seq = &stfsm_seq_wrvcr;
++	struct stfsm_seq *seq = &stfsm_seq_write_status;
 +
-+	dev_dbg(fsm->dev, "writing VCR 0x%02x\n", data);
++	dev_dbg(fsm->dev, "writing STA[%s] 0x%04x\n",
++		(sta_bytes == 1) ? "1" : "1+2", status);
 +
-+	seq->status = (STA_DATA_BYTE1(data) | STA_PADS_1 | STA_CSDEASSERT);
++	seq->status = (uint32_t)status | STA_PADS_1 | STA_CSDEASSERT;
++	seq->seq[2] = (sta_bytes == 1) ?
++		STFSM_INST_STA_WR1 : STFSM_INST_STA_WR1_2;
 +
 +	stfsm_load_seq(fsm, seq);
 +
 +	stfsm_wait_seq(fsm);
 +
 +	return 0;
-+}
++};
 +
- /*
-  * SoC reset on 'boot-from-spi' systems
-  *
+ static int stfsm_wrvcr(struct stfsm *fsm, uint8_t data)
+ {
+ 	struct stfsm_seq *seq = &stfsm_seq_wrvcr;
 -- 
 1.8.3.2
