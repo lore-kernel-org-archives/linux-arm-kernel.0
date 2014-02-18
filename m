@@ -1,71 +1,69 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 18 Feb 2014 14:32:58 -0700
-Subject: [PATCH] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <1392564830-5868-1-git-send-email-sthokal@xilinx.com>
-References: <1392564830-5868-1-git-send-email-sthokal@xilinx.com>
-Message-ID: <CAErSpo5FGPhgnp8Gfy-1_Lk7ckCi7U5+z5pLnPU+jScPxD5yUQ@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 18 Feb 2014 22:40:07 +0100
+Subject: [PATCH] regulator: core bugfix: Use normal enable for always_on
+ regulators
+In-Reply-To: <20140218001420.GF2669@sirena.org.uk>
+References: <1392577256-20475-1-git-send-email-mpa@pengutronix.de>
+ <20140218001420.GF2669@sirena.org.uk>
+Message-ID: <20140218214007.GE10590@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Arnd]
+On Tue, Feb 18, 2014 at 09:14:20AM +0900, Mark Brown wrote:
+> On Sun, Feb 16, 2014 at 08:00:56PM +0100, Markus Pargmann wrote:
+> 
+> Please use more standard subject lines, don't do things like "core
+> bugfix", just write a normal changelog.
 
-On Sun, Feb 16, 2014 at 8:33 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
-> This is the driver for Xilinx AXI PCIe Host Bridge Soft IP
->
-> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
-> ---
-> - Rebased on v3.14.0-rc2
-> ---
->  .../devicetree/bindings/pci/xilinx-pcie.txt        |   43 +
->  drivers/pci/host/Kconfig                           |    7 +
->  drivers/pci/host/Makefile                          |    1 +
->  drivers/pci/host/pci-xilinx.c                      |  985 ++++++++++++++++++++
->  4 files changed, 1036 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/xilinx-pcie.txt
->  create mode 100644 drivers/pci/host/pci-xilinx.c
->
-> diff --git a/Documentation/devicetree/bindings/pci/xilinx-pcie.txt b/Documentation/devicetree/bindings/pci/xilinx-pcie.txt
-> new file mode 100644
-> index 0000000..66a2487
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/xilinx-pcie.txt
-> @@ -0,0 +1,43 @@
-> +* Xilinx AXI PCIe Root Port Bridge DT description
-> +
-> +Required properties:
-> +- #address-cells: Address representation for root ports, set to <3>
-> +- #size-cells: Size representation for root ports, set to <2>
-> +- compatible: Should contain "xlnx,axi-pcie-1.00.a"
-> +- reg: Should contain AXI PCIe registers location and length
-> +- interrupts: Should contain AXI PCIe interrupt
-> +- ranges: ranges for the PCI memory regions
-> +       Please refer to the standard PCI bus binding document for a more
-> +       detailed explanation
-> +- xlnx,axibar-num: Number of memory regions configured in the hardware,
-> +       maximum being three which is configurable in the hardware.
-> +- xlnx,include-rc: Root Port (=1) or End Point (=0)
-> +- xlnx,pciebar2axibar-0: Translation address from PCIe to AXI
-> +       Only one PCIe BAR is applicable in Root port mode, it can be
-> +       either 32/64-bit. If it is 64-bit BAR, lower 32 bits are present
-> +       in 'xlnx,pciebar2axibar-0' and Upper 32 bits in 'xlnx,pciebar2
-> +       axibar-1'. And if it is 32-bit BAR, only 'xlnx,pciebar2axibar-0'
-> +       is valid
-> +
-> +Optional properties
-> +- xlnx,pciebar-as: PCIe BAR aperture size is 32 (=0) or 64-bit (=1).
-> +- xlnx,pciebar2axibar-1: Translation address from PCIe to AXI, contains
-> +       upper 32 bits if PCIe BAR size is 64-bit. When xlnx,pciebar-as
-> +       is set, this is a required property and should contain a valid
-> +       value (other than FF's)
+Okay, will fix.
 
-I hardly know anything about DT, but xlnx,pciebar2axibar-0,
-xlnx,pciebar-as, and xlnx,pciebar2axibar-1 look strange to me.  Is
-that really the DT way of dealing with 32/64-bit BARs and host bridge
-address translation?  I don't see similar things in the other files in
-Documentation/devicetree/bindings/pci/, even though some of the other
-drivers/pci/host/*.c files do use pci_add_resource_offset(), which
-indicates that they support address translation.
+> 
+> > +static int _regulator_do_enable_no_delay(struct regulator_dev *rdev)
+> > +{
+> > +	int ret;
+> > +
+> > +	if (rdev->ena_pin) {
+> > +		ret = regulator_ena_gpio_ctrl(rdev, true);
+> > +		if (ret < 0)
+> > +			return ret;
+> > +		rdev->ena_gpio_state = 1;
+> > +	} else if (rdev->desc->ops->enable) {
+> > +		ret = rdev->desc->ops->enable(rdev);
+> > +	} else {
+> > +		ret = -EINVAL;
+> > +	}
+> > +
+> > +	return ret;
+> > +}
+> 
+> I don't understand this.  Why is this called _no_delay() and why don't
+> we want to delay when applying constraints?  We don't want to ever be in
+> a position where we think a supply is enabled but it has in fact not
+> finished ramping, and of course enable() may in fact be blocking anyway.
 
-Please also include a MAINTAINERS update for drivers/pci/host/pci-xilinx.c.
+I tried not to modify the current behaviour of the core driver for
+non-gpio regulators. Before this patch only ops->enable() was called
+which also didn't have a delay. So I seperated the non-delay enable
+function to have the same behaviour for normal regulators.
 
-Bjorn
+Also the constraints are applied when registering a new regulator. For
+"boot-on" we should not delay because this regulator is already on by
+definition. But I am not sure what to do with always-on regulators?
+
+Thanks,
+
+Markus
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/a448bd84/attachment.sig>
