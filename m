@@ -1,70 +1,50 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 18 Feb 2014 11:46:50 +0100
-Subject: [PATCH v6 1/3] clocksource: timer-keystone: introduce clocksource
- driver for Keystone
-In-Reply-To: <CABuKBeJNwe5VXi2SvPX6Cne-iMHP7bbZarJDNAzuCMbg0E-bCQ@mail.gmail.com>
-References: <1392027058-11680-1-git-send-email-ivan.khoronzhuk@ti.com>	<1392027058-11680-2-git-send-email-ivan.khoronzhuk@ti.com>	<52FA1E59.1000307@linaro.org>
- <CABuKBeJNwe5VXi2SvPX6Cne-iMHP7bbZarJDNAzuCMbg0E-bCQ@mail.gmail.com>
-Message-ID: <53033A1A.5050404@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Feb 2014 11:53:49 +0100
+Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
+In-Reply-To: <5302B306.8090503@samsung.com>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <201402141806.12711.arnd@arndb.de> <5302B306.8090503@samsung.com>
+Message-ID: <2152943.isBRrxZ7xx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2014 11:40 AM, Matthias Brugger wrote:
-> 2014-02-11 13:58 GMT+01:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->> On 02/10/2014 11:10 AM, Ivan Khoronzhuk wrote:
->>>
->>> Add broadcast clock-event device for the Keystone arch.
->>>
->>> The timer can be configured as a general-purpose 64-bit timer,
->>> dual general-purpose 32-bit timers. When configured as dual 32-bit
->>> timers, each half can operate in conjunction (chain mode) or
->>> independently (unchained mode) of each other.
->>>
->>> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
->>> Acked-by: Santosh shilimkar <santosh.shilimkar@ti.com>
->>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> ---
->>
->>
->> Applied to my tree for 3.15
->
-> I wanted to send a trivial follow-up patch, but I can't find the tree
-> to which you have applied this patch.
-> Would you mind to indicate me where I can find it.
+On Tuesday 18 February 2014 10:10:30 Kukjin Kim wrote:
+> On 02/15/14 02:06, Arnd Bergmann wrote:
+> > On Thursday 13 February 2014, Olof Johansson wrote:
+> >> On Mon, Feb 10, 2014 at 6:52 PM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+> >>> On 02/13/14 04:14, Arnd Bergmann wrote:
+> >>>> On Wednesday 12 February 2014 13:04:40 Kumar Gala wrote:
+> >>> Basically, I agreed with Arnd's suggestion to use ARCH_SBSA. Or we need to
+> >>> define level in Kconfig like ARCH_SBSA_L1 for level1. BTW, how about
+> >>> compliant with SBSA Level1 and having some specific features?
+> >
+> Well, how about ARMv8 mobile SoC? I think, it is not compatible with 
+> SBSA. For example, you know MCT can be used for ARMv8 cores instead of 
+> ARCH Timer. So I'm not sure ARCH_SBSA is really good choice...
 
-Sure.
+Sure, if you are talking about an embedded SoC that is not SBSA compliant,
+we shouldn't try to make it work with ARCH_SBSA and instead give it
+its own Kconfig symbol.
 
-git://git.linaro.org/people/daniel.lezcano/linux.git #clockevents/3.15
+> > My feeling is that we don't need to use the levels for Kconfig, although
+> > we might want to use them DT compatible strings, even if it ends up looking
+> > a little funny when you do
+> >
+> > 	compatible = "arm,sbsa-l3", "arm,sbsa-l2", "arm,sbsa-l1";
+> >
+> >> What kind of features are you expecting though? More IP
+> >> blocks/devices? Those are just kernel config options to enable,
+> >> ideally as modules.
+> >
+> > Right, I think we can just put them into defconfig. No need to
+> > "select" them from Kconfig since the extra options wouldn't be
+> > required for booting or using the system.
+> >
+> As I commented above, how about MCT? Samsung has a plan to use MCT on 
+> ARMv8, it is not for used for GH7 though...
 
-Regards
-   -- Daniel
+If it's just one driver that is needed in addition to the usual stuff,
+we can also just make it a standalone option and turn it on in the
+generic defconfig. We won't need a per-platform option in that case.
 
->
-> Cheers,
-> Matthias
->
->>
->> --
->>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->>
->> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
->> <http://twitter.com/#!/linaroorg> Twitter |
->> <http://www.linaro.org/linaro-blog/> Blog
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
->
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+	Arnd
