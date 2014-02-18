@@ -1,77 +1,83 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 18 Feb 2014 08:59:11 -0800
-Subject: [PATCH v4 1/2] usb: musb: dsps, debugfs files
-In-Reply-To: <20140218162054.GE9878@saruman.home>
-References: <1389950556-6453-1-git-send-email-mpa@pengutronix.de>
- <1389950556-6453-2-git-send-email-mpa@pengutronix.de>
- <20140218162054.GE9878@saruman.home>
-Message-ID: <20140218165911.GA17486@kroah.com>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Tue, 18 Feb 2014 16:59:23 +0000
+Subject: BUG: Null pointer dereference on booting TC2 with
+ vexpress_defconfig
+In-Reply-To: <CAMJs5B-G86o8Tjcwg+dvDETqQ5qiDsDFB9kBPtL=RBLqFqpAOQ@mail.gmail.com>
+References: <20140217223907.GH21070@cbox>	<53033E37.6000402@arm.com>
+ <CAMJs5B-G86o8Tjcwg+dvDETqQ5qiDsDFB9kBPtL=RBLqFqpAOQ@mail.gmail.com>
+Message-ID: <5303916B.5060303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 10:20:54AM -0600, Felipe Balbi wrote:
-> On Fri, Jan 17, 2014 at 10:22:35AM +0100, Markus Pargmann wrote:
-> > debugfs files to show the contents of important dsps registers.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  drivers/usb/musb/musb_dsps.c | 54 ++++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 54 insertions(+)
-> > 
-> > diff --git a/drivers/usb/musb/musb_dsps.c b/drivers/usb/musb/musb_dsps.c
-> > index 593d3c9..d0a97d6 100644
-> > --- a/drivers/usb/musb/musb_dsps.c
-> > +++ b/drivers/usb/musb/musb_dsps.c
-> > @@ -46,6 +46,8 @@
-> >  #include <linux/of_irq.h>
-> >  #include <linux/usb/of.h>
-> >  
-> > +#include <linux/debugfs.h>
-> > +
-> >  #include "musb_core.h"
-> >  
-> >  static const struct of_device_id musb_dsps_of_match[];
-> > @@ -137,6 +139,26 @@ struct dsps_glue {
-> >  	unsigned long last_timer;    /* last timer data for each instance */
-> >  
-> >  	struct dsps_context context;
-> > +	struct debugfs_regset32 regset;
-> > +	struct dentry *dbgfs_root;
-> > +};
-> > +
-> > +static const struct debugfs_reg32 dsps_musb_regs[] = {
-> > +	{ "revision",		0x00 },
-> > +	{ "control",		0x14 },
-> > +	{ "status",		0x18 },
-> > +	{ "eoi",		0x24 },
-> > +	{ "intr0_stat",		0x30 },
-> > +	{ "intr1_stat",		0x34 },
-> > +	{ "intr0_set",		0x38 },
-> > +	{ "intr1_set",		0x3c },
-> > +	{ "txmode",		0x70 },
-> > +	{ "rxmode",		0x74 },
-> > +	{ "autoreq",		0xd0 },
-> > +	{ "srpfixtime",		0xd4 },
-> > +	{ "tdown",		0xd8 },
-> > +	{ "phy_utmi",		0xe0 },
-> > +	{ "mode",		0xe8 },
-> >  };
-> >  
-> >  static void dsps_musb_try_idle(struct musb *musb, unsigned long timeout)
-> > @@ -369,6 +391,30 @@ out:
-> >  	return ret;
-> >  }
-> >  
-> > +static int dsps_musb_dbg_init(struct musb *musb, struct dsps_glue *glue)
-> > +{
-> > +	struct dentry *root;
-> > +	struct dentry *file;
-> > +	char buf[128];
-> > +
-> > +	sprintf(buf, "%s.dsps", dev_name(musb->controller));
-> > +	root = debugfs_create_dir(buf, NULL);
-> > +	if (!root)
+On 18/02/14 16:33, Christoffer Dall wrote:
+> On 18 February 2014 03:04, Sudeep Holla <Sudeep.Holla@arm.com> wrote:
+>> On 17/02/14 22:39, Christoffer Dall wrote:
+>>> Booting my TC2 using 3.14-rc3 and vexpress_defconfig causes a NULL
+>>> pointer dereference in schedule_work_on.
+>>>
+>>> A quick look at the trace indicates that schedule_work() is called
+>>> before system_wq is initialized.
+>>>
+>>> Further, a bisect seems to indicate that this call path is triggered by
+>>> the changes in this merge commit of Theodore T'so's random_for_linus
+>>> tag:
+>>> 0891ad829d2a0501053703df66029e843e3b8365
+>>>
+>>> (However, my bisect may not be 100% correct, as some of the commits
+>>> between 3.13 and 3.12 don't boot the TC2 with vexpress_defconfig,
+>>> specifically the ones after f9300eaaac1ca300083ad41937923a90cc3a2394,
+>>> which causes boot to halt after "ARM CCI driver probed").
+>>>
+>> Yes that requires some changes in defconfig to continue to work across
+>> these changes(mainly have all these new configs disabled)
+>>
 > 
-> wrong, you should be using IS_ERR()
+> So vexpress_defconfig is known to not work on TC2?
+>
 
-!root is fine, IS_ERR() will fail if CONFIG_DEBUGFS is not enabled.
+I would say yes before v3.13 for TC2 at-least. Pawel's commit: 81d6e719d1f8(
+ARM: vexpress: Enable platform-specific options in defconfig) enabled several VE
+specific features.
+
+>>> Disabling CONFIG_ARCH_VEXPRESS_TC2_PM avoids the issue.
+>>>
+>> Are you just disabling this or even CONFIG_MCPM ? Are the secondaries cpus
+>> coming up ?
+>>
+> 
+> Disabling CONFIG_ARCH_VEXPRESS_TC2_PM allows the system to boot, but
+> only with one CPU.
+> 
+> Disabling CONFIG_MCPM allows SMP boot as well.
+> 
+Yes that's what I suspected.
+
+>>> I'm not familiar enough with any of these code paths to quicly identify
+>>> what the issue could be.  Apologies if I missed a previous post about
+>>> this issue (I couldn't find anything but would be surprised if I'm the
+>>> only one doing vexpress_defconfig on a TC2).
+>>>
+>> I just tried and it works fine. If CONFIG_MCPM and CONFIG_ARCH_VEXPRESS_TC2_PM,
+>> it requires some changes in board configurations(for bootmon), I assume you have
+>> done those changes.
+>>
+> 
+> What works fine? With both configs enabled?
+> 
+Yes with the default vexpress_defconfig as is in the mainline.
+
+> I didn't change anything on the boot monitor side.  Can you give me a
+> pointer to the specifics?  Was there an announcement about this
+> somewhere that I failed to locate?
+> 
+
+You might be having very old firmware that doesn't support percpu mailbox and
+hence can't enable CONFIG_MCPM. You can refer CFGREG48 in Section 3.3.2 of [1]
+for details. You can grab the latest firmware in single step from [2] under
+Firmware tab.
+
+Regards,
+Sudeep
+
+[1] http://infocenter.arm.com/help/topic/com.arm.doc.ddi0503g/CHDCADED.html
+[2] http://releases.linaro.org/14.01/openembedded/vexpress-lsk/
