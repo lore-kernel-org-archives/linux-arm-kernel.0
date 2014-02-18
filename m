@@ -1,41 +1,43 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 18 Feb 2014 13:25:49 +0900
-Subject: [PATCH 01/03] ARM: shmobile: Remove legacy EMEV2 SoC support
-In-Reply-To: <20140218041643.GB32417@verge.net.au>
-References: <20140213082558.30630.93034.sendpatchset@w520>
- <20140213082608.30630.40000.sendpatchset@w520>
- <20140217032306.GH7772@verge.net.au>
- <20140218041643.GB32417@verge.net.au>
-Message-ID: <CANqRtoTKLjHvjFHNtz3Qr9Mm+1ZafqxQFr7NtgTHNLh+4L+_NA@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 18 Feb 2014 14:11:58 +0800
+Subject: [PATCH v3] input: sirfsoc-onkey - report onkey untouch event by
+ detecting pin status
+In-Reply-To: <20140217191658.GA19223@core.coreip.homeip.net>
+References: <1392348001-4950-1-git-send-email-21cnbao@gmail.com>
+ <20140214075717.GA14682@core.coreip.homeip.net>
+ <CAGsJ_4xqnZAO6vpkgTEHmfp9+nbWa1qwQ4pda6B2sSrEtbV3ZA@mail.gmail.com>
+ <847BC5012124A94BB5CA1B26E022CCA3012BAFDC27@SHAASIEXM01.ASIA.ROOT.PRI>
+ <CAGsJ_4zjtWV3Z1AJ2bqekXn54rm=k8d4iOi_zzainCEnNGefCw@mail.gmail.com>
+ <20140217191658.GA19223@core.coreip.homeip.net>
+Message-ID: <CAGsJ_4yqAz6eVM0stvzstiC+rxuCK5G-0QM=F2NJWEviYJDD9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Tue, Feb 18, 2014 at 1:16 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Feb 17, 2014 at 12:23:09PM +0900, Simon Horman wrote:
->> On Thu, Feb 13, 2014 at 05:26:08PM +0900, Magnus Damm wrote:
->> > From: Magnus Damm <damm@opensource.se>
->> >
->> > Get rid of legacy EMEV2 SoC code including the legacy clock
->> > framework implementation. The multiplatform implementation
->> > together with DT board support shall be used instead.
->> >
->> > Signed-off-by: Magnus Damm <damm@opensource.se>
+2014-02-18 3:16 GMT+08:00 Dmitry Torokhov <dmitry.torokhov@gmail.com>:
+> On Fri, Feb 14, 2014 at 09:41:06PM +0800, Barry Song wrote:
+>> >> Input: sirfsoc-onkey - implement open and close methods
+>> >>
+>> >> From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>> >>
+>> >> We can control whetehr device generates interrupts or not so let's
+>> >> implement open and close methods of input device so that we do not do any
+>> >> processing until there are users.
+>> >>
+>> >> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 >>
->> Thanks, I have queued this up.
+>> Tested-by: Xianglong Du <Xianglong.Du@csr.com>
+>>
+>> Dmitry, will you push this one to your tree so that i can rebase others?
 >
-> I have dropped this patch for now and plan to deffer it.
-> This is because although this is patch 1 of the series
-> it removes emev2_clock_init() which causes the build
-> of board-kzm9d-reference.c to fail without
-> "ARM: shmobile: Remove Lager DT reference legacy clock bits".
+> I rebased and pushed everything out, please take a look to make sure it
+> all looks good.
+
+thanks, we have done a update to CSR local tree.
+
 >
-> My current thinking is that the best way to sequence this is to
-> queue up the board and defconfig changes for v3.15 but wait
-> for v3.16 to queue up the SoC changes. This avoids tedious
-> dependencies of SoC patches on board patches in the same release cycle.
+> Thanks.
+>
+> --
+> Dmitry
 
-Thanks, that's of course fine with me!
-
-/ magnus
+-barry
