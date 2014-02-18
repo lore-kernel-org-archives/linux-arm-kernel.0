@@ -1,44 +1,116 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 18 Feb 2014 09:39:40 +0000
-Subject: [RFC/PATCH 0/3] Add devicetree scanning for randomness
-In-Reply-To: <1418981.0py7JxXCp8@wuerfel>
-References: <1392168805-14200-1-git-send-email-lauraa@codeaurora.org> <
- 201402121251.06280.arnd@arndb.de> <20140217155419.682F7C401D4@trevor.
- secretlab.ca> <1418981.0py7JxXCp8@wuerfel>
-Message-ID: <20140218093940.7A822C403C8@trevor.secretlab.ca>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 18 Feb 2014 10:47:00 +0100
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <20140217181902.GG2765@localhost>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140205183457.GW8533@titan.lakedaemon.net>
+ <20140217141336.GA2765@localhost> <53021BD2.3090301@free-electrons.com>
+ <20140217152147.GC2765@localhost> <53022AA9.8090606@free-electrons.com>
+ <20140217154421.GD2765@localhost> <530231C5.8090905@free-electrons.com>
+ <20140217181902.GG2765@localhost>
+Message-ID: <53032C14.9020502@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Feb 2014 17:13:07 +0100, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 17 February 2014 15:54:19 Grant Likely wrote:
-> > On Wed, 12 Feb 2014 11:20:00 -0700, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
-> > > On Wed, Feb 12, 2014 at 12:45:54PM -0500, Jason Cooper wrote:
-> > > 
-> > > > The bootloader would then load this file into ram, and pass the
-> > > > address/size to the kernel either via dt, or commandline.  kaslr (run in
-> > > > the decompressor) would consume some of this randomness, and then
-> > > > random.c would consume the rest in a non-crediting initialization.
-> > > 
-> > > Sure is a neat idea, but I think in general it would probably be smart
-> > > to include the entire FDT blob in the early random pool, that way you
-> > > get MACs and other machine unique data too.
-> > 
-> > I applied a patch that did exactly that (109b623629), and then reverted
-> > it (b920ecc82) shortly thereafter because add_device_randomness() is
-> > a rather slow function and FDTs can get large. I'd like to see someone
-> > do a reasonable analysis on the cost of using an FDT for randomness
-> > before I reapply a patch doing something similar. An awful lot of the
-> > FDT data is not very random, but there are certainly portions of it that
-> > are appropriate for the random pool.
+On 17/02/2014 19:19, Ezequiel Garcia wrote:
+> On Mon, Feb 17, 2014 at 04:59:01PM +0100, Gregory CLEMENT wrote:
+> [..]
+>>>
+>>> Right. If you think it adds a regression, then that's a perfectly valid reasons
+>>> for nacking.
+>>>
+>>> However, I'd like to double-check we have such a regression. I guess you're
+>>> talking about the "tclk" name being hardcoded. IMHO, it's hardcoded in the
+>>> driver in the first place:
+>>>
+>>> void __init mvebu_coreclk_setup(struct device_node *np,
+>>> 				const struct coreclk_soc_desc *desc)
+>>> {
+>>> 	const char *tclk_name = "tclk";
+>>> [..] 
+>>
+>>
+>> Here it is just about giving a name to a clock. As in the device tree
+>> we only refer to the clock by index, the name don't matter.
+>>
 > 
-> Could we use a faster hash function that scans the entire device tree and
-> then just feed the output of that into add_device_randomness? We probably
-> can't expect that there is a lot of entropy in the DT blob, so the
-> result wouldn't be all that different in terms of quality of the random
-> seed.
+> Unless I'm really confused about what's the problem here, the *name* is
+> *all* that matters.
 > 
-> 	Arnd
+> We're having a clock *registration* order issue (which is different from clock
+> enable). Let me try to explain the issue, in case it's still not clear.
+> 
+> I'll stick to the current specific problem but it can apply to any other
+> pair of parent/child.
+> 
+> Some of the mvebu clocks are registered as part of the "core" clock
+> group, modeled by the "marvell,armada-370-core-clock" compatible node.
+> 
+> Another group of mvebu clocks are registered as part of the "gating"
+> clock group, modeled by the "marvell,armada-370-gating-clock" compatible
+> node.
+> 
+> By default, all the gating clocks are child of the first registered core
+> clock. This clock is named "tclk" by default, and this name can be overloaded
+> in the devicetree.
+> 
+> So far, so good, right?
+> 
+> The issue we're trying to fix, arises from the mvebu_clk_gating_setup()
+> trying to get the name of this "tclk", as a registered clock.
+> 
+> In other words, the current code needs the tclk to be registered, for it
+> will ask his name like this:
+> 
+> 	const char *default_parent = NULL;
+> 
+> 	clk = of_clk_get(np, 0);
+> 	if (!IS_ERR(clk)) {
+> 		default_parent = __clk_get_name(clk);
+> 		clk_put(clk);
+> 	}
+> 
+> Once it gets the name, all goes smoothly. Notice how the clock is obtained
+> for the sole purpose of getting the name of it, which shows clearly it's the
+> *name* that matters.
+> 
+> The ordering issue happens when the gating clock group is probed, before
+> the core clock group. In that case, it's not possible to get the
+> "&coreclk 0" (which is wrongly assumed to be registered), and so it's
+> not possible to get the name.
+> 
+> So the root of the problem is that snippet above, which adds a
+> completely unneeded registration order requirement. Instead, we should
+> be looking for the names: we can hardcode the name or fetch it from the
+> devicetree (Emilio has posted patches for both).
+> 
+> I really don't see why we're not fixing this, instead of adding yet
+> another layer of complexity to the problem.
 
-Yes, I think that is a good solution.
+All this have already discussed in the previous emails. And even if Emilio
+denied introducing a regression, it was what the code did. See my example
+here:
+http://article.gmane.org/gmane.linux.kernel/1649439
 
-g.
+Now as you both are really annoying with it, what would be an acceptable
+version would be the something like the patch attached. There will be still
+an issue if old dtb is used with recent kernel, but at least the user will
+be warned.
+
+This code only fix the Armada 370 case, a complete solution should modify
+the dtsi for Armada XP, Armada 375, Armada 38x, Kirkwood and Dove. It should
+also make the outputname mandatory for gate-clk for consistency.
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-RFC-clk-mvebu-make-clock-output-names-mandatory.patch
+Type: text/x-diff
+Size: 4907 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/aa2cea05/attachment.bin>
