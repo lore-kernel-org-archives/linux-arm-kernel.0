@@ -1,36 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Feb 2014 19:10:50 +0000
-Subject: [PATCH v3 2/3] ARM: bios32: use pci_enable_resource to enable
- PCI resources
-In-Reply-To: <20140218154139.GF21483@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Feb 2014 20:11:25 +0100
+Subject: [PATCH v3 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <20140218185150.GE2010@mudshark.cambridge.arm.com>
 References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
- <1392726043-31088-3-git-send-email-will.deacon@arm.com>
- <20140218154139.GF21483@n2100.arm.linux.org.uk>
-Message-ID: <20140218191049.GH2010@mudshark.cambridge.arm.com>
+ <10244486.cKXs90tdz5@wuerfel>
+ <20140218185150.GE2010@mudshark.cambridge.arm.com>
+Message-ID: <16012311.obgTYIWsOC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 03:41:39PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 18, 2014 at 12:20:42PM +0000, Will Deacon wrote:
-> > This patch moves bios32 over to using the generic code for enabling PCI
-> > resources. Since the core code takes care of bridge resources too, we
-> > can also drop the explicit IO and MEMORY enabling for them in the arch
-> > code.
-> > 
-> > A side-effect of this change is that we no longer explicitly enable
-> > devices when running in PCI_PROBE_ONLY mode. This stays closer to the
-> > meaning of the option and prevents us from trying to enable devices
-> > without any assigned resources (the core code refuses to enable
-> > resources without parents).
-> > 
-> > Tested-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > Tested-by: Jingoo Han <jg1.han@samsung.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Tuesday 18 February 2014 18:51:50 Will Deacon wrote:
 > 
-> Tested acceptably fine here with crudbus-from-hell.
-> 
-> Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> kvmtool provides an i8042, pci-shmem, an rtc, 8250 and vesa at the usual PC
+> offsets. On ARM, I regularly use the 8250 (there are even DT bindings for
+> it) and MarcZ got the rtc working for fun. Not tried the others though.
 
-Cheers Russell.
+Ah, interesting. But which ones are between 0x1000-0x6200? The ones
+you list should all be in the ISA range between 0x0-0xfff as far
+as I can tell, which we keep clear of by setting PCIBIOS_MIN_IO
+to 0x1000.
 
-Will
+	Arnd
