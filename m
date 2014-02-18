@@ -1,26 +1,34 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 18 Feb 2014 10:44:06 -0800
-Subject: [PATCH v3 7/7] devicetree: bindings: Document PM8921/8058 PMICs
-In-Reply-To: <20140213110619.GI32508@lee--X1>
-References: <1389206270-3728-1-git-send-email-sboyd@codeaurora.org>
- <1389206270-3728-8-git-send-email-sboyd@codeaurora.org>
- <20140211092937.GG32042@lee--X1> <20140213053813.GB14769@codeaurora.org>
- <20140213110619.GI32508@lee--X1>
-Message-ID: <5303A9F6.4030904@codeaurora.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 18 Feb 2014 11:45:42 -0700
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <1663692.UxtD9eTEBL@wuerfel>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <2312919.pM61KLBcYY@wuerfel>
+ <20140218174125.GC29304@obsidianresearch.com>
+ <1663692.UxtD9eTEBL@wuerfel>
+Message-ID: <20140218184542.GA22004@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/14 03:06, Lee Jones wrote:
->> These match the #defines in that file. I'd like to be explicit
->> about the numbers to prevent people from thinking they have to
->> use #defines and to match what other irq controllers have done
->> (gic, atmel-aic, etc.)
-> I believe people _do_ have to use the #defines? Is there a good reason
-> for you not wanting to use them?
->
+On Tue, Feb 18, 2014 at 07:25:35PM +0100, Arnd Bergmann wrote:
 
-No, there isn't any requirement to use #defines in DT.
+> Apple have also used the same trick on their G5 Macs, presumably
+> to simplify things for OS9 and OS-X, but even at the time making
+> it harder for Linux.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+I actually think some x86's have done the same thing, however the
+firmware hides all that from the OS and the OS just sees a normal PCI
+environment. So if we can't hide the mess in firmware, the next best
+place is in drivers?
+
+> Do we even need stable domain numbers? If we do, aliases sound fine.
+> A more complex method would be to sort them by MMIO window address
+> or perhaps by phandle.
+
+PCI ordering has been a bane in the past on x86, so I think stable
+domain numbers is certainly desirable. Particularly since the domain
+number may be influenced by module load order :( Alises followed by
+sorting by phandle sounds great to me.
+
+Jason
