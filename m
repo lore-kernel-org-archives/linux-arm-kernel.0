@@ -1,68 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Feb 2014 21:15:12 +0100
+Date: Tue, 18 Feb 2014 21:19:21 +0100
 Subject: [PATCH v3 3/3] PCI: ARM: add support for generic PCI host
  controller
-In-Reply-To: <20140218184420.GD2010@mudshark.cambridge.arm.com>
+In-Reply-To: <20140218195732.GL2010@mudshark.cambridge.arm.com>
 References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
- <20140218182142.GF29304@obsidianresearch.com>
- <20140218184420.GD2010@mudshark.cambridge.arm.com>
-Message-ID: <3220206.h6hgmMzWTX@wuerfel>
+ <20140218193654.GK2010@mudshark.cambridge.arm.com>
+ <20140218195732.GL2010@mudshark.cambridge.arm.com>
+Message-ID: <1433616.UrvWxRt80Z@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 February 2014 18:44:20 Will Deacon wrote:
-> On Tue, Feb 18, 2014 at 06:21:42PM +0000, Jason Gunthorpe wrote:
-> > On Tue, Feb 18, 2014 at 12:20:43PM +0000, Will Deacon wrote:
-> > > +
-> > > +    // BUS_ADDRESS(3)  CPU_PHYSICAL(2)  SIZE(2)
-> > > +    ranges = <0x1000000 0x0 0x00000000  0x0 0x00000000  0x0 0x00010000>,
-> >                                            ^^^^^^^^^^^^^^
+On Tuesday 18 February 2014 19:57:32 Will Deacon wrote:
+> On Tue, Feb 18, 2014 at 07:36:54PM +0000, Will Deacon wrote:
+> > On Tue, Feb 18, 2014 at 07:32:33PM +0000, Arnd Bergmann wrote:
+> > > On Tuesday 18 February 2014 19:09:29 Will Deacon wrote:
+> > > Regarding the PCI_PROBE_ONLY flag, how do you set that? Should we
+> > > have a standard DT property for that? On PowerPC we already specified
+> > > "linux,pci-probe-only" and "linux,pci-assign-all-buses", which seems
+> > > reasonable to use in architecture independent code as well.
 > > 
-> > This probably shouldn't be 0 in the example, nor in your kvm tool
-> > output. For example purposes any value will do.
+> > For arch/arm/ it's done on the command line (pci=firmware) but yes, for the
+> > generic driver it sounds like a good idea to put this in the device-tree.
+> > I'll look at adding the ppc properties in the next version.
 > 
-> Hmm, so kvmtool actually provides a PC ioport at 0x0, which is handy since
-> there's an 8250 down there. That means we have:
+> Damn, I spoke too soon. PowerPC puts this information in the /chosen node, so
+> it applies to all PCI host controllers in the system. That then maps nicely
+> to pci_{add,clear}_flags which are global properties in Linux.
 > 
-> 0x0    - 0x6200  : Weird PC stuff
-> 0x6200 - 0x10000 : PCI IO space
-> 
-> Should I just change everything to be offset by 0x6200?
+> It sounds like this should really be per-controller. What do you think?
 
-Some more comments about this:
+I don't have a strong opinion either way. I think the reason for having it
+in the /chosen node is so that a second-stage boot loader can easily
+override it, which is not a concern for us. In particular, the properties
+are only used on rtas-pci, which means we access the config space to
+firmware runtime abstraction services rather than hardware registers.
 
-* After I looked at the kvmtool code some more, I think it would be nice to
-  actually move the I/O space window to a nonzero location, e.g. between the
-  PCI space and the AXI space. It's really confusing the way it is, and easy
-  to introduce bugs if you have any code that accidentally relies on the
-  numbers matching up. For all I can tell, kvmtool should just work fine
-  with any definition of ARM_IOPORT_AREA, as long as you apply the trivial
-  patch below.
-
-* pci_get_io_space_block() is a very confusing name for a function that
-  allocates a memory space block in kvmtool. It seems that KVM_IOPORT_AREA
-  is a misnomer for the same reason. Note that PowerPC sets KVM_IOPORT_AREA
-  to zero, but has the I/O space window at SPAPR_PCI_IO_WIN_ADDR, 
-  which is non-zero.
-
-* It's interesting that you also support I/O space access to the PCI config
-  space through PC-Style ports 0cf8-0cff. Not sure if that helps at all,
-  but it is another standard way to probe the bus that could easily be
-  implemented as an alternative to CAM and ECAM, in a generic PCI host
-  driver.
+Apparently the embedded powerpc platforms don't support these flags at
+all, which I also didn't notice at first.
 
 	Arnd
-
-diff --git a/tools/kvm/arm/kvm-cpu.c b/tools/kvm/arm/kvm-cpu.c
-index b017994..caf9a57 100644
---- a/tools/kvm/arm/kvm-cpu.c
-+++ b/tools/kvm/arm/kvm-cpu.c
-@@ -105,7 +105,7 @@ bool kvm_cpu__emulate_mmio(struct kvm *kvm, u64 phys_addr, u8 *data, u32 len,
- 		return kvm__emulate_mmio(kvm, phys_addr, data, len, is_write);
- 	} else if (arm_addr_in_ioport_region(phys_addr)) {
- 		int direction = is_write ? KVM_EXIT_IO_OUT : KVM_EXIT_IO_IN;
--		u16 port = phys_addr & USHRT_MAX;
-+		u16 port = (phys_addr - ARM_IOPORT_AREA) & USHRT_MAX;
- 		return kvm__emulate_io(kvm, port, data, direction, len, 1);
- 	} else if (arm_addr_in_pci_region(phys_addr)) {
- 		return kvm__emulate_mmio(kvm, phys_addr, data, len, is_write);
