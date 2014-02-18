@@ -1,115 +1,68 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 18 Feb 2014 20:11:24 +0000
-Subject: [PATCH 21/34] imx-drm: imx-drm-core: provide helper function to parse
- possible crtcs
+Date: Tue, 18 Feb 2014 20:11:29 +0000
+Subject: [PATCH 22/34] imx-drm: imx-drm-core: provide common connector and
+ encoder cleanup functions
 In-Reply-To: <20140218200900.GM21483@n2100.arm.linux.org.uk>
 References: <20140218200900.GM21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WFr0m-0007jj-JI@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WFr0r-0007jn-Mc@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a helper function to parse possible crtcs before the encoder
-is registered.  The crtc mask is derived from the position of the
-CRTCs registered in the drm_device.
+Provide two helper functions to assist with cleaning up imx-drm
+connectors and encoders.
 
 Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c | 66 ++++++++++++++++++++++++++++++++++
- drivers/staging/imx-drm/imx-drm.h      |  2 ++
- 2 files changed, 68 insertions(+)
+ drivers/staging/imx-drm/imx-drm-core.c | 13 +++++++++++++
+ drivers/staging/imx-drm/imx-drm.h      |  3 +++
+ 2 files changed, 16 insertions(+)
 
 diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 3d1c6b6c4388..5cac6ee24472 100644
+index 5cac6ee24472..1f50acd5a982 100644
 --- a/drivers/staging/imx-drm/imx-drm-core.c
 +++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -658,6 +658,72 @@ int imx_drm_add_encoder(struct drm_encoder *encoder,
+@@ -363,6 +363,19 @@ static void imx_drm_connector_unregister(
+ 	drm_mode_group_reinit(imxdrm->drm);
  }
- EXPORT_SYMBOL_GPL(imx_drm_add_encoder);
  
-+/*
-+ * Find the DRM CRTC possible mask for the device node cookie/id.
-+ *
-+ * The encoder possible masks are defined by their position in the
-+ * mode_config crtc_list.  This means that CRTCs must not be added
-+ * or removed once the DRM device has been fully initialised.
-+ */
-+static uint32_t imx_drm_find_crtc_mask(struct imx_drm_device *imxdrm,
-+	void *cookie, int id)
++void imx_drm_connector_destroy(struct drm_connector *connector)
 +{
-+	unsigned i;
-+
-+	for (i = 0; i < MAX_CRTC; i++) {
-+		struct imx_drm_crtc *imx_drm_crtc = imxdrm->crtc[i];
-+		if (imx_drm_crtc && imx_drm_crtc->cookie.id == id &&
-+		    imx_drm_crtc->cookie.cookie == cookie)
-+			return drm_crtc_mask(imx_drm_crtc->crtc);
-+	}
-+
-+	return 0;
++	drm_sysfs_connector_remove(connector);
++	drm_connector_cleanup(connector);
 +}
++EXPORT_SYMBOL_GPL(imx_drm_connector_destroy);
 +
-+int imx_drm_encoder_parse_of(struct drm_device *drm,
-+	struct drm_encoder *encoder, struct device_node *np)
++void imx_drm_encoder_destroy(struct drm_encoder *encoder)
 +{
-+	struct imx_drm_device *imxdrm = drm->dev_private;
-+	uint32_t crtc_mask = 0;
-+	int i, ret = 0;
-+
-+	for (i = 0; !ret; i++) {
-+		struct of_phandle_args args;
-+		uint32_t mask;
-+		int id;
-+
-+		ret = of_parse_phandle_with_args(np, "crtcs", "#crtc-cells", i,
-+						 &args);
-+		if (ret == -ENOENT)
-+			break;
-+		if (ret < 0)
-+			return ret;
-+
-+		id = args.args_count > 0 ? args.args[0] : 0;
-+		mask = imx_drm_find_crtc_mask(imxdrm, args.np, id);
-+		of_node_put(args.np);
-+
-+		/*
-+		 * If we failed to find the CRTC(s) which this encoder is
-+		 * supposed to be connected to, it's because the CRTC has
-+		 * not been registered yet.  Defer probing, and hope that
-+		 * the required CRTC is added later.
-+		 */
-+		if (mask == 0)
-+			return -EPROBE_DEFER;
-+
-+		crtc_mask |= mask;
-+	}
-+
-+	encoder->possible_crtcs = crtc_mask;
-+
-+	/* FIXME: this is the mask of outputs which can clone this output. */
-+	encoder->possible_clones = ~0;
-+
-+	return 0;
++	drm_encoder_cleanup(encoder);
 +}
-+EXPORT_SYMBOL_GPL(imx_drm_encoder_parse_of);
++EXPORT_SYMBOL_GPL(imx_drm_encoder_destroy);
 +
- int imx_drm_encoder_add_possible_crtcs(
- 		struct imx_drm_encoder *imx_drm_encoder,
- 		struct device_node *np)
+ static struct drm_mode_config_funcs imx_drm_mode_config_funcs = {
+ 	.fb_create = drm_fb_cma_create,
+ };
 diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
-index 78465239ed4c..49d4aaf33f97 100644
+index 49d4aaf33f97..0543606c587a 100644
 --- a/drivers/staging/imx-drm/imx-drm.h
 +++ b/drivers/staging/imx-drm/imx-drm.h
-@@ -64,6 +64,8 @@ struct device_node;
- int imx_drm_encoder_get_mux_id(struct drm_encoder *encoder);
- int imx_drm_encoder_add_possible_crtcs(struct imx_drm_encoder *imx_drm_encoder,
- 		struct device_node *np);
-+int imx_drm_encoder_parse_of(struct drm_device *drm,
-+	struct drm_encoder *encoder, struct device_node *np);
+@@ -8,6 +8,7 @@
+ struct drm_crtc;
+ struct drm_connector;
+ struct drm_device;
++struct drm_display_mode;
+ struct drm_encoder;
+ struct imx_drm_crtc;
+ struct drm_fbdev_cma;
+@@ -69,5 +70,7 @@ int imx_drm_encoder_parse_of(struct drm_device *drm,
  
  int imx_drm_connector_mode_valid(struct drm_connector *connector,
  	struct drm_display_mode *mode);
++void imx_drm_connector_destroy(struct drm_connector *connector);
++void imx_drm_encoder_destroy(struct drm_encoder *encoder);
+ 
+ #endif /* _IMX_DRM_H_ */
 -- 
 1.8.3.1
