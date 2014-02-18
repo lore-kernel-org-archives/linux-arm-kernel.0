@@ -1,35 +1,63 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 18 Feb 2014 16:40:04 -0300
-Subject: [PATCH] ARM: dts: imx6sl-evk: Keep VGEN1 regulator always enabled
-Message-ID: <1392752404-524-1-git-send-email-fabio.estevam@freescale.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Tue, 18 Feb 2014 11:52:25 -0800
+Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
+In-Reply-To: <6032891.ndY8FikAMY@wuerfel>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <5302B306.8090503@samsung.com>
+ <CAOesGMhnUDcUL7hREV=EYEGr5YG-ZLL6v9NiGcrBr6477WfdyQ@mail.gmail.com>
+ <6032891.ndY8FikAMY@wuerfel>
+Message-ID: <CALAqxLX6STNqUeVO2G18bm_HKabpoRxZTa3uK6i-JP97zEYVZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On imx6sl-evk board the VGEN1 regulator powers up the NVCC_1.2V domain of the
-imx6sl SoC, so we need to keep it always powered.
+On Tue, Feb 18, 2014 at 10:13 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 18 February 2014 08:16:13 Olof Johansson wrote:
+>> On Mon, Feb 17, 2014 at 5:10 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> > On 02/15/14 02:06, Arnd Bergmann wrote:
+>> >> My feeling is that we don't need to use the levels for Kconfig, although
+>> >> we might want to use them DT compatible strings, even if it ends up
+>> >> looking
+>> >> a little funny when you do
+>> >>
+>> >>         compatible = "arm,sbsa-l3", "arm,sbsa-l2", "arm,sbsa-l1";
+>> >>
+>> >>> What kind of features are you expecting though? More IP
+>> >>> blocks/devices? Those are just kernel config options to enable,
+>> >>> ideally as modules.
+>> >>
+>> >>
+>> >> Right, I think we can just put them into defconfig. No need to
+>> >> "select" them from Kconfig since the extra options wouldn't be
+>> >> required for booting or using the system.
+>> >>
+>> > As I commented above, how about MCT? Samsung has a plan to use MCT on ARMv8,
+>> > it is not for used for GH7 though...
+>>
+>> It looks like the clocksource drivers are all based around being
+>> enabled based on platforms instead of individually selectable. That
+>> causes a problem here. I think we should change the clocksource
+>> Kconfig instead. Then it's just a matter of making sure your defconfig
+>> has the needed driver enabled.
+>>
+>> (Adding Daniel and Thomas in case they have objections to that approach)
+>
+> +John Stultz
+>
+> IIRC it was John who insisted on doing it the current way, although
+> I can't remember his reasoning.
 
-This problem has been observed by the fact that a GPIO connected to an LED could
-not work when the PMIC driver was enabled.
+Are we really expecting there to be SoC specific clocksources here? I
+thought we were getting away from that sort of stuff with the
+architecture timer?
 
-Keeping VGEN1 regulator always enabled fixes the problem.
+I'm fine with clocksources being selected by other functionality
+options (ie: on x86 ACPI PM timer clocksource doesn't have a prompt,
+but depends on the ACPI option). I just don't want to force users to
+have to navigate through tons of deep menus to select clocksource
+options that logically duplicate other selections already made.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6sl-evk.dts | 2 ++
- 1 file changed, 2 insertions(+)
+But again, I handed this maintainership over to Daniel, so I can be
+considered just a crank yelling from the sidelines :)
 
-diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-index 889422c..2ae933b 100644
---- a/arch/arm/boot/dts/imx6sl-evk.dts
-+++ b/arch/arm/boot/dts/imx6sl-evk.dts
-@@ -195,6 +195,8 @@
- 			vgen1_reg: vgen1 {
- 				regulator-min-microvolt = <800000>;
- 				regulator-max-microvolt = <1550000>;
-+				regulator-boot-on;
-+				regulator-always-on;
- 			};
- 
- 			vgen2_reg: vgen2 {
--- 
-1.8.1.2
+thanks
+-john
