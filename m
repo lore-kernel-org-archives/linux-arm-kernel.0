@@ -1,79 +1,272 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Feb 2014 21:27:51 +0100
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <53039894.10905@keymile.com>
-References: <51DD88A4.1030506@keymile.com> <20130710185706.72b124a4@skate>
- <51DD9A8C.10608@keymile.com> <20130711163220.2b3adf38@skate>
- <53039894.10905@keymile.com>
-Message-ID: <20140218212751.07c2aeb5@skate>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 18 Feb 2014 12:30:49 -0800
+Subject: [PATCH v4 1/2] memory: ti-aemif: introduce AEMIF driver
+In-Reply-To: <1391629574-18955-2-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1391629574-18955-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1391629574-18955-2-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <20140218203049.GA18647@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gerlando Falauto,
-
-On Tue, 18 Feb 2014 18:29:56 +0100, Gerlando Falauto wrote:
-
-> I tried these settings (a long time ago) and everything seemed to work 
-> fine. Except, we now have a different problem.
-> Essentially, this device requires 128MB for a given BAR to provide a 
-> PCI-to-localbus bridge. (another BAR provides the configuration space to 
-> configure chip select regions and so on).
-> Apparently, only the first 64MB of this BAR seem to work correctly with 
-> the new driver. As soon as you exceed that, reads (always?) return 0.
-> Other BARs (which are then of course assigned a higher region) seem to 
-> work just fine, so it looks like a per-BAR limitation.
+On Wed, Feb 05, 2014 at 09:46:13PM +0200, Ivan Khoronzhuk wrote:
+> Add new AEMIF driver for EMIF16 Texas Instruments controller.
+> The EMIF16 module is intended to provide a glue-less interface to
+> a variety of asynchronous memory devices like ASRA M, NOR and NAND
+> memory. A total of 256M bytes of any of these memories can be
+> accessed at any given time via 4 chip selects with 64M byte access
+> per chip select.
 > 
-> This was not a problem with a 3.0 kernel. Do you have any idea what 
-> could be wrong here?
-> I'm currently using a 3.10 kernel, where your patches for the pci-mvebu 
-> driver were forcibly brought in (without full support for the MBUS 
-> description at device tree level though).
+> Synchronous memories such as DDR1 SD RAM, SDR SDRAM and Mobile SDR
+> are not supported.
+> 
+> This controller is used on SoCs like Davinci, Keysone2
+> 
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com
+> Signed-off-by: [initial author] Murali Karicheri <m-karicheri2@ti.com>
 
-[...]
+What's this [] stuff?
 
-> mvebu-pcie pcie-controller.1: PCIe0.0: link up
-> mvebu-pcie pcie-controller.1: PCI host bridge to bus 0000:00
-> pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
-> pci_bus 0000:00: root bus resource [mem 0xe0000000-0xefffffff]
-> pci_bus 0000:00: root bus resource [bus 00-ff]
-> pci 0000:00:01.0: [11ab:7846] type 01 class 0x060400
-> PCI: bus0: Fast back to back transfers disabled
-> pci 0000:00:01.0: bridge configuration invalid ([bus 00-00]), reconfiguring
-> pci 0000:01:00.0: [10ee:0008] type 00 class 0x050000
-> pci 0000:01:00.0: reg 10: [mem 0x00000000-0x00000fff]
-> pci 0000:01:00.0: reg 14: [mem 0x00000000-0x07ffffff]
-> pci 0000:01:00.0: reg 18: [mem 0x00000000-0x00000fff]
-> pci 0000:01:00.0: reg 1c: [mem 0x00000000-0x007fffff]
-> pci 0000:01:00.0: reg 20: [mem 0x00000000-0x00001fff]
-> pci 0000:01:00.0: reg 24: [mem 0x00000000-0x00000fff]
-> pci 0000:01:00.0: supports D1 D2
-> pci 0000:01:00.0: PME# supported from D0 D1 D2 D3hot
-> PCI: bus1: Fast back to back transfers disabled
-> pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
-> pci 0000:00:01.0: BAR 8: assigned [mem 0xe0000000-0xebffffff]
-> pci 0000:01:00.0: BAR 1: assigned [mem 0xe0000000-0xe7ffffff]
+If Murali wrote this, that name needs to be in a "From:" line in the
+patch to properly attribute it, and drop the [] here.
 
-So I guess this one is the 128 MB BAR, right?
 
-> pci 0000:01:00.0: BAR 3: assigned [mem 0xe8000000-0xe87fffff]
-> pci 0000:01:00.0: BAR 4: assigned [mem 0xe8800000-0xe8801fff]
-> pci 0000:01:00.0: BAR 0: assigned [mem 0xe8802000-0xe8802fff]
-> pci 0000:01:00.0: BAR 2: assigned [mem 0xe8803000-0xe8803fff]
-> pci 0000:01:00.0: BAR 5: assigned [mem 0xe8804000-0xe8804fff]
 
-So in total, for the device 0000:01:00, the memory region should go
-from 0xe0000000 to 0xe8804fff. This means that a 256 MB window is
-needed for this device, because only power of two sizes are possible
-for MBus windows.
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
+>  drivers/memory/Kconfig    |  11 ++
+>  drivers/memory/Makefile   |   1 +
+>  drivers/memory/ti-aemif.c | 429 ++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 441 insertions(+)
+>  create mode 100644 drivers/memory/ti-aemif.c
+> 
+> diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+> index 29a11db..7bc3982 100644
+> --- a/drivers/memory/Kconfig
+> +++ b/drivers/memory/Kconfig
+> @@ -7,6 +7,17 @@ menuconfig MEMORY
+>  
+>  if MEMORY
+>  
+> +config TI_AEMIF
+> +	tristate "Texas Instruments AEMIF driver"
+> +	depends on (ARCH_DAVINCI || ARCH_KEYSTONE) && OF
+> +	help
+> +	  This driver is for the AEMIF module available in Texas Instruments
+> +	  SoCs. AEMIF stands for Asynchronous External Memory Interface and
+> +	  is intended to provide a glue-less interface to a variety of
+> +	  asynchronuous memory devices like ASRAM, NOR and NAND memory. A total
+> +	  of 256M bytes of any of these memories can be accessed at a given
+> +	  time via four chip selects with 64M byte access per chip select.
+> +
+>  config TI_EMIF
+>  	tristate "Texas Instruments EMIF driver"
+>  	depends on ARCH_OMAP2PLUS
+> diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
+> index 969d923..d4e150c 100644
+> --- a/drivers/memory/Makefile
+> +++ b/drivers/memory/Makefile
+> @@ -5,6 +5,7 @@
+>  ifeq ($(CONFIG_DDR),y)
+>  obj-$(CONFIG_OF)		+= of_memory.o
+>  endif
+> +obj-$(CONFIG_TI_AEMIF)		+= ti-aemif.o
+>  obj-$(CONFIG_TI_EMIF)		+= emif.o
+>  obj-$(CONFIG_MVEBU_DEVBUS)	+= mvebu-devbus.o
+>  obj-$(CONFIG_TEGRA20_MC)	+= tegra20-mc.o
+> diff --git a/drivers/memory/ti-aemif.c b/drivers/memory/ti-aemif.c
+> new file mode 100644
+> index 0000000..8d15d87
+> --- /dev/null
+> +++ b/drivers/memory/ti-aemif.c
+> @@ -0,0 +1,429 @@
+> +/*
+> + * TI AEMIF driver
+> + *
+> + * Copyright (C) 2010 - 2013 Texas Instruments Incorporated. http://www.ti.com/
+> + *
+> + * Authors:
+> + * Murali Karicheri <m-karicheri2@ti.com>
+> + * Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define TA_SHIFT	2
+> +#define RHOLD_SHIFT	4
+> +#define RSTROBE_SHIFT	7
+> +#define RSETUP_SHIFT	13
+> +#define WHOLD_SHIFT	17
+> +#define WSTROBE_SHIFT	20
+> +#define WSETUP_SHIFT	26
+> +#define EW_SHIFT	30
+> +#define SS_SHIFT	31
+> +
+> +#define TA(x)		((x) << TA_SHIFT)
+> +#define RHOLD(x)	((x) << RHOLD_SHIFT)
+> +#define RSTROBE(x)	((x) << RSTROBE_SHIFT)
+> +#define RSETUP(x)	((x) << RSETUP_SHIFT)
+> +#define WHOLD(x)	((x) << WHOLD_SHIFT)
+> +#define WSTROBE(x)	((x) << WSTROBE_SHIFT)
+> +#define WSETUP(x)	((x) << WSETUP_SHIFT)
+> +#define EW(x)		((x) << EW_SHIFT)
+> +#define SS(x)		((x) << SS_SHIFT)
+> +
+> +#define ASIZE_MAX	0x1
+> +#define TA_MAX		0x3
+> +#define RHOLD_MAX	0x7
+> +#define RSTROBE_MAX	0x3f
+> +#define RSETUP_MAX	0xf
+> +#define WHOLD_MAX	0x7
+> +#define WSTROBE_MAX	0x3f
+> +#define WSETUP_MAX	0xf
+> +#define EW_MAX		0x1
+> +#define SS_MAX		0x1
+> +#define NUM_CS		4
+> +
+> +#define TA_VAL(x)	(((x) & TA(TA_MAX)) >> TA_SHIFT)
+> +#define RHOLD_VAL(x)	(((x) & RHOLD(RHOLD_MAX)) >> RHOLD_SHIFT)
+> +#define RSTROBE_VAL(x)	(((x) & RSTROBE(RSTROBE_MAX)) >> RSTROBE_SHIFT)
+> +#define RSETUP_VAL(x)	(((x) & RSETUP(RSETUP_MAX)) >> RSETUP_SHIFT)
+> +#define WHOLD_VAL(x)	(((x) & WHOLD(WHOLD_MAX)) >> WHOLD_SHIFT)
+> +#define WSTROBE_VAL(x)	(((x) & WSTROBE(WSTROBE_MAX)) >> WSTROBE_SHIFT)
+> +#define WSETUP_VAL(x)	(((x) & WSETUP(WSETUP_MAX)) >> WSETUP_SHIFT)
+> +#define EW_VAL(x)	(((x) & EW(EW_MAX)) >> EW_SHIFT)
+> +#define SS_VAL(x)	(((x) & SS(SS_MAX)) >> SS_SHIFT)
+> +
+> +#define NRCSR_OFFSET	0x00
+> +#define AWCCR_OFFSET	0x04
+> +#define A1CR_OFFSET	0x10
+> +
+> +#define ACR_ASIZE_MASK	0x3
+> +#define ACR_EW_MASK	BIT(30)
+> +#define ACR_SS_MASK	BIT(31)
+> +#define ASIZE_16BIT	1
+> +
+> +#define CONFIG_MASK	(TA(TA_MAX) | \
+> +				RHOLD(RHOLD_MAX) | \
+> +				RSTROBE(RSTROBE_MAX) |	\
+> +				RSETUP(RSETUP_MAX) | \
+> +				WHOLD(WHOLD_MAX) | \
+> +				WSTROBE(WSTROBE_MAX) | \
+> +				WSETUP(WSETUP_MAX) | \
+> +				EW(EW_MAX) | SS(SS_MAX) | \
+> +				ASIZE_MAX)
+> +
+> +#define DRV_NAME	"ti-aemif"
 
-Can you give me the output of /sys/kernel/debug/mvebu-mbus/devices ? It
-will tell us how the MBus windows are configured, as I suspect the
-problem might be here.
+What's wrong with KBUILD_MODNAME?
 
-Thanks!
+> +static int aemif_probe(struct platform_device *pdev)
+> +{
+> +	int ret  = -ENODEV, i;
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Extra spaces?
+
+Split this into two lines?
+
+> +	struct resource *res;
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+> +	struct device_node *child_np;
+> +	struct aemif_device *aemif;
+> +
+> +	if (np == NULL)
+> +		return 0;
+> +
+> +	aemif = devm_kzalloc(dev, sizeof(*aemif), GFP_KERNEL);
+> +	if (!aemif) {
+> +		dev_err(dev, "cannot allocate memory for aemif\n");
+
+Not needed, you'll get a message from kzalloc about this.
+
+> +		return -ENOMEM;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, aemif);
+> +
+> +	aemif->clk = devm_clk_get(dev, NULL);
+> +	if (IS_ERR(aemif->clk)) {
+> +		dev_err(dev, "cannot get clock 'aemif'\n");
+> +		return PTR_ERR(aemif->clk);
+
+No freeing memory?
+
+> +	}
+> +
+> +	clk_prepare_enable(aemif->clk);
+> +	aemif->clk_rate = clk_get_rate(aemif->clk) / MSEC_PER_SEC;
+> +
+> +	if (of_device_is_compatible(np, "ti,da850-aemif"))
+> +		aemif->cs_offset = 2;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	aemif->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(aemif->base)) {
+> +		ret = PTR_ERR(aemif->base);
+> +		goto error;
+> +	}
+> +
+> +	/*
+> +	 * For every controller device node, there is a cs device node that
+> +	 * describe the bus configuration parameters. This functions iterate
+> +	 * over these nodes and update the cs data array.
+> +	 */
+> +	for_each_available_child_of_node(np, child_np) {
+> +		ret = of_aemif_parse_abus_config(pdev, child_np);
+> +		if (ret < 0)
+> +			goto error;
+> +	}
+> +
+> +	for (i = 0; i < aemif->num_cs; i++) {
+> +		ret = aemif_config_abus(pdev, i);
+> +		if (ret < 0) {
+> +			dev_err(dev, "Error configuring chip select %d\n",
+> +				aemif->cs_data[i].cs);
+> +			goto error;
+> +		}
+> +	}
+> +
+> +	/*
+> +	 * Create a child devices explicitly from here to
+> +	 * guarantee that the child will be probed after the AEMIF timing
+> +	 * parameters are set.
+> +	 */
+> +	for_each_available_child_of_node(np, child_np) {
+> +		ret = of_platform_populate(child_np, NULL, NULL, dev);
+> +		if (ret < 0)
+> +			goto error;
+> +	}
+> +
+> +	return 0;
+> +error:
+> +	clk_disable_unprepare(aemif->clk);
+> +	return ret;
+
+No freeing memory?
+
+> +}
+> +
+> +static int aemif_remove(struct platform_device *pdev)
+> +{
+> +	struct aemif_device *aemif = platform_get_drvdata(pdev);
+> +	clk_disable_unprepare(aemif->clk);
+
+Extra line needed.
+
+> +	return 0;
+> +}
+
+thanks,
+
+greg k-h
