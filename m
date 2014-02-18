@@ -1,826 +1,249 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 18 Feb 2014 20:10:53 +0000
-Subject: [PATCH 15/34] imx-drm: convert to componentised device support
+Date: Tue, 18 Feb 2014 20:11:08 +0000
+Subject: [PATCH 18/34] imx-drm: remove separate imx-fbdev
 In-Reply-To: <20140218200900.GM21483@n2100.arm.linux.org.uk>
 References: <20140218200900.GM21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WFr0H-0007jL-Df@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WFr0W-0007jX-OJ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the componentised device support for imx-drm.  This requires all
-the sub-components and the master device to register with the component
-device support.
+Now that we know when the components of the imx-drm subsystem will be
+initialised, we can move the fbdev helper initialisation and teardown
+into imx-drm-core.  This gives us the required ordering that DRM wants
+in both driver load and unload methods.
+
+We can also stop exporting the imx_drm_device_get() and
+imx_drm_device_put() methods; nothing but the fbdev helper was making
+use of these.
 
 Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/imx51-babbage.dts        |  10 ++-
- arch/arm/boot/dts/imx53-m53evk.dts         |   8 ++-
- arch/arm/boot/dts/imx53-mba53.dts          |   6 ++
- arch/arm/boot/dts/imx53-qsb.dts            |   8 ++-
- arch/arm/boot/dts/imx6q-sabresd.dts        |   4 ++
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi     |   6 ++
- drivers/staging/imx-drm/imx-drm-core.c     | 105 +++++++++++++++++++++++------
- drivers/staging/imx-drm/imx-ldb.c          |  40 +++++++----
- drivers/staging/imx-drm/imx-tve.c          |  63 ++++++++++-------
- drivers/staging/imx-drm/ipuv3-crtc.c       |  46 +++++++++----
- drivers/staging/imx-drm/parallel-display.c |  30 +++++++--
- 11 files changed, 246 insertions(+), 80 deletions(-)
+ drivers/staging/imx-drm/Makefile       |  1 -
+ drivers/staging/imx-drm/imx-drm-core.c | 43 ++++++++++++++------
+ drivers/staging/imx-drm/imx-drm.h      |  3 --
+ drivers/staging/imx-drm/imx-fbdev.c    | 74 ----------------------------------
+ 4 files changed, 31 insertions(+), 90 deletions(-)
+ delete mode 100644 drivers/staging/imx-drm/imx-fbdev.c
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index be1407cf5abd..6ff15a0eacb3 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -21,7 +21,7 @@
- 		reg = <0x90000000 0x20000000>;
- 	};
+diff --git a/drivers/staging/imx-drm/Makefile b/drivers/staging/imx-drm/Makefile
+index 4677585b5ad5..5239f908ceec 100644
+--- a/drivers/staging/imx-drm/Makefile
++++ b/drivers/staging/imx-drm/Makefile
+@@ -6,7 +6,6 @@ obj-$(CONFIG_DRM_IMX) += imxdrm.o
+ obj-$(CONFIG_DRM_IMX_PARALLEL_DISPLAY) += parallel-display.o
+ obj-$(CONFIG_DRM_IMX_TVE) += imx-tve.o
+ obj-$(CONFIG_DRM_IMX_LDB) += imx-ldb.o
+-obj-$(CONFIG_DRM_IMX_FB_HELPER) += imx-fbdev.o
+ obj-$(CONFIG_DRM_IMX_IPUV3_CORE) += ipu-v3/
  
--	display at di0 {
-+	display0: display at di0 {
- 		compatible = "fsl,imx-parallel-display";
- 		crtcs = <&ipu 0>;
- 		interface-pix-fmt = "rgb24";
-@@ -43,7 +43,7 @@
- 		};
- 	};
- 
--	display at di1 {
-+	display1: display at di1 {
- 		compatible = "fsl,imx-parallel-display";
- 		crtcs = <&ipu 1>;
- 		interface-pix-fmt = "rgb565";
-@@ -81,6 +81,12 @@
- 		};
- 	};
- 
-+	imx-drm {
-+		compatible = "fsl,imx-drm";
-+		crtcs = <&ipu 0>, <&ipu 1>;
-+		connectors = <&display0>, <&display1>;
-+	};
-+
- 	sound {
- 		compatible = "fsl,imx51-babbage-sgtl5000",
- 			     "fsl,imx-audio-sgtl5000";
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index 7d304d02ed38..ee6107b6484c 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -21,7 +21,7 @@
- 	};
- 
- 	soc {
--		display at di1 {
-+		display1: display at di1 {
- 			compatible = "fsl,imx-parallel-display";
- 			crtcs = <&ipu 1>;
- 			interface-pix-fmt = "bgr666";
-@@ -53,6 +53,12 @@
- 		default-brightness-level = <6>;
- 	};
- 
-+	imx-drm {
-+		compatible = "fsl,imx-drm";
-+		crtcs = <&ipu 1>;
-+		connectors = <&display1>;
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx53-mba53.dts b/arch/arm/boot/dts/imx53-mba53.dts
-index a63090267941..9b6e76980a74 100644
---- a/arch/arm/boot/dts/imx53-mba53.dts
-+++ b/arch/arm/boot/dts/imx53-mba53.dts
-@@ -43,6 +43,12 @@
- 		status = "disabled";
- 	};
- 
-+	imx-drm {
-+		compatible = "fsl,imx-drm";
-+		crtcs = <&ipu 1>;
-+		connectors = <&disp1>, <&tve>;
-+	};
-+
- 	reg_3p2v: 3p2v {
- 		compatible = "regulator-fixed";
- 		regulator-name = "3P2V";
-diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-index 91a5935a4aac..3cb4f7791a91 100644
---- a/arch/arm/boot/dts/imx53-qsb.dts
-+++ b/arch/arm/boot/dts/imx53-qsb.dts
-@@ -21,7 +21,7 @@
- 		reg = <0x70000000 0x40000000>;
- 	};
- 
--	display at di0 {
-+	display0: display at di0 {
- 		compatible = "fsl,imx-parallel-display";
- 		crtcs = <&ipu 0>;
- 		interface-pix-fmt = "rgb565";
-@@ -72,6 +72,12 @@
- 		};
- 	};
- 
-+	imx-drm {
-+		compatible = "fsl,imx-drm";
-+		crtcs = <&ipu 0>;
-+		connectors = <&display0>;
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
-index 9cbdfe7a0931..66f220a82e45 100644
---- a/arch/arm/boot/dts/imx6q-sabresd.dts
-+++ b/arch/arm/boot/dts/imx6q-sabresd.dts
-@@ -20,6 +20,10 @@
- 	compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
- };
- 
-+&imx_drm {
-+	crtcs = <&ipu1 0>, <&ipu1 1>, <&ipu2 0>, <&ipu2 1>;
-+};
-+
- &sata {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index e75e11b36dff..dfca3e001398 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -62,6 +62,12 @@
- 		};
- 	};
- 
-+	imx_drm: imx-drm {
-+		compatible = "fsl,imx-drm";
-+		crtcs = <&ipu1 0>, <&ipu1 1>;
-+		connectors = <&ldb>;
-+	};
-+
- 	sound {
- 		compatible = "fsl,imx6q-sabresd-wm8962",
- 			   "fsl,imx-audio-wm8962";
+ imx-ipuv3-crtc-objs  := ipuv3-crtc.o ipuv3-plane.o
 diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index d9786eca3a36..82b0337096b0 100644
+index 3cd330e646f7..5a60886b3a6b 100644
 --- a/drivers/staging/imx-drm/imx-drm-core.c
 +++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -13,7 +13,7 @@
-  * GNU General Public License for more details.
-  *
-  */
--
-+#include <linux/component.h>
- #include <linux/device.h>
- #include <linux/platform_device.h>
- #include <drm/drmP.h>
-@@ -90,6 +90,8 @@ static int imx_drm_driver_unload(struct drm_device *drm)
+@@ -70,6 +70,10 @@ struct imx_drm_connector {
+ 	struct module				*owner;
+ };
+ 
++static int legacyfb_depth = 16;
++module_param(legacyfb_depth, int, 0444);
++
++static void imx_drm_device_put(void);
+ static struct imx_drm_device *__imx_drm_device(void);
+ 
+ int imx_drm_crtc_id(struct imx_drm_crtc *crtc)
+@@ -80,16 +84,23 @@ EXPORT_SYMBOL_GPL(imx_drm_crtc_id);
+ 
+ static void imx_drm_driver_lastclose(struct drm_device *drm)
  {
++#if IS_ENABLED(CONFIG_DRM_IMX_FB_HELPER)
  	struct imx_drm_device *imxdrm = drm->dev_private;
  
-+	component_unbind_all(drm->dev, drm);
+ 	if (imxdrm->fbhelper)
+ 		drm_fbdev_cma_restore_mode(imxdrm->fbhelper);
++#endif
+ }
+ 
+ static int imx_drm_driver_unload(struct drm_device *drm)
+ {
++#if IS_ENABLED(CONFIG_DRM_IMX_FB_HELPER)
+ 	struct imx_drm_device *imxdrm = drm->dev_private;
+ 
++	if (imxdrm->fbhelper)
++		drm_fbdev_cma_fini(imxdrm->fbhelper);
++#endif
 +
+ 	component_unbind_all(drm->dev, drm);
+ 
  	imx_drm_device_put();
- 
- 	drm_vblank_cleanup(drm);
-@@ -371,11 +373,8 @@ static void imx_drm_connector_unregister(
+@@ -225,7 +236,7 @@ static struct imx_drm_device *__imx_drm_device(void)
+ 	return imx_drm_device;
  }
  
- /*
-- * Called by the CRTC driver when all CRTCs are registered. This
-- * puts all the pieces together and initializes the driver.
-- * Once this is called no more CRTCs can be registered since
-- * the drm core has hardcoded the number of crtcs in several
-- * places.
-+ * Main DRM initialisation. This binds, initialises and registers
-+ * with DRM the subcomponents of the driver.
-  */
- static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+-struct drm_device *imx_drm_device_get(void)
++static struct drm_device *imx_drm_device_get(void)
  {
-@@ -428,8 +427,15 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+ 	struct imx_drm_device *imxdrm = __imx_drm_device();
+ 	struct imx_drm_encoder *enc;
+@@ -273,9 +284,8 @@ struct drm_device *imx_drm_device_get(void)
+ 	return NULL;
  
- 	platform_set_drvdata(drm->platformdev, drm);
+ }
+-EXPORT_SYMBOL_GPL(imx_drm_device_get);
+ 
+-void imx_drm_device_put(void)
++static void imx_drm_device_put(void)
+ {
+ 	struct imx_drm_device *imxdrm = __imx_drm_device();
+ 	struct imx_drm_encoder *enc;
+@@ -295,7 +305,6 @@ void imx_drm_device_put(void)
+ 
  	mutex_unlock(&imxdrm->mutex);
-+
-+	/* Now try and bind all our sub-components */
-+	ret = component_bind_all(drm->dev, drm);
-+	if (ret)
-+		goto err_relock;
- 	return 0;
+ }
+-EXPORT_SYMBOL_GPL(imx_drm_device_put);
  
-+err_relock:
-+	mutex_lock(&imxdrm->mutex);
- err_vblank:
- 	drm_vblank_cleanup(drm);
- err_kms:
-@@ -809,6 +815,70 @@ static struct drm_driver imx_drm_driver = {
- 	.patchlevel		= 0,
- };
+ static int drm_mode_group_reinit(struct drm_device *dev)
+ {
+@@ -450,6 +459,24 @@ static int imx_drm_driver_load(struct drm_device *drm, unsigned long flags)
+ 		}
+ 	}
  
-+static int compare_parent_of(struct device *dev, void *data)
-+{
-+	struct of_phandle_args *args = data;
-+	return dev->parent && dev->parent->of_node == args->np;
-+}
-+
-+static int compare_of(struct device *dev, void *data)
-+{
-+	return dev->of_node == data;
-+}
-+
-+static int imx_drm_add_components(struct device *master, struct master *m)
-+{
-+	struct device_node *np = master->of_node;
-+	unsigned i;
-+	int ret;
-+
-+	for (i = 0; ; i++) {
-+		struct of_phandle_args args;
-+
-+		ret = of_parse_phandle_with_fixed_args(np, "crtcs", 1,
-+						       i, &args);
-+		if (ret)
-+			break;
-+
-+		ret = component_master_add_child(m, compare_parent_of, &args);
-+		of_node_put(args.np);
-+
-+		if (ret)
-+			return ret;
++	/*
++	 * All components are now initialised, so setup the fb helper.
++	 * The fb helper takes copies of key hardware information, so the
++	 * crtcs/connectors/encoders must not change after this point.
++	 */
++#if IS_ENABLED(CONFIG_DRM_IMX_FB_HELPER)
++	if (legacyfb_depth != 16 && legacyfb_depth != 32) {
++		dev_warn(drm->dev, "Invalid legacyfb_depth.  Defaulting to 16bpp\n");
++		legacyfb_depth = 16;
 +	}
-+
-+	for (i = 0; ; i++) {
-+		struct device_node *node;
-+
-+		node = of_parse_phandle(np, "connectors", i);
-+		if (!node)
-+			break;
-+
-+		ret = component_master_add_child(m, compare_of, node);
-+		of_node_put(node);
-+
-+		if (ret)
-+			return ret;
++	imxdrm->fbhelper = drm_fbdev_cma_init(drm, legacyfb_depth,
++				drm->mode_config.num_crtc, MAX_CRTC);
++	if (IS_ERR(imxdrm->fbhelper)) {
++		ret = PTR_ERR(imxdrm->fbhelper);
++		imxdrm->fbhelper = NULL;
++		goto err_unbind;
 +	}
-+	return 0;
-+}
-+
-+static int imx_drm_bind(struct device *dev)
-+{
-+	return drm_platform_init(&imx_drm_driver, to_platform_device(dev));
-+}
-+
-+static void imx_drm_unbind(struct device *dev)
-+{
-+	drm_put_dev(dev_get_drvdata(dev));
-+}
-+
-+static const struct component_master_ops imx_drm_ops = {
-+	.add_components = imx_drm_add_components,
-+	.bind = imx_drm_bind,
-+	.unbind = imx_drm_unbind,
-+};
-+
- static int imx_drm_platform_probe(struct platform_device *pdev)
- {
- 	int ret;
-@@ -819,27 +889,31 @@ static int imx_drm_platform_probe(struct platform_device *pdev)
++#endif
+ 	return 0;
  
- 	imx_drm_device->dev = &pdev->dev;
- 
--	return drm_platform_init(&imx_drm_driver, pdev);
-+	return component_master_add(&pdev->dev, &imx_drm_ops);
+ err_unbind:
+@@ -767,14 +794,6 @@ int imx_drm_add_connector(struct drm_connector *connector,
  }
+ EXPORT_SYMBOL_GPL(imx_drm_add_connector);
  
- static int imx_drm_platform_remove(struct platform_device *pdev)
- {
--	drm_put_dev(platform_get_drvdata(pdev));
+-void imx_drm_fb_helper_set(struct drm_fbdev_cma *fbdev_helper)
+-{
+-	struct imx_drm_device *imxdrm = __imx_drm_device();
 -
-+	component_master_del(&pdev->dev, &imx_drm_ops);
- 	return 0;
- }
- 
-+static const struct of_device_id imx_drm_dt_ids[] = {
-+	{ .compatible = "fsl,imx-drm", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, imx_drm_dt_ids);
-+
- static struct platform_driver imx_drm_pdrv = {
- 	.probe		= imx_drm_platform_probe,
- 	.remove		= imx_drm_platform_remove,
- 	.driver		= {
- 		.owner	= THIS_MODULE,
- 		.name	= "imx-drm",
-+		.of_match_table = imx_drm_dt_ids,
- 	},
- };
- 
--static struct platform_device *imx_drm_pdev;
+-	imxdrm->fbhelper = fbdev_helper;
+-}
+-EXPORT_SYMBOL_GPL(imx_drm_fb_helper_set);
 -
- static int __init imx_drm_init(void)
- {
- 	int ret;
-@@ -852,12 +926,6 @@ static int __init imx_drm_init(void)
- 	INIT_LIST_HEAD(&imx_drm_device->connector_list);
- 	INIT_LIST_HEAD(&imx_drm_device->encoder_list);
- 
--	imx_drm_pdev = platform_device_register_simple("imx-drm", -1, NULL, 0);
--	if (IS_ERR(imx_drm_pdev)) {
--		ret = PTR_ERR(imx_drm_pdev);
--		goto err_pdev;
--	}
--
- 	ret = platform_driver_register(&imx_drm_pdrv);
- 	if (ret)
- 		goto err_pdrv;
-@@ -865,8 +933,6 @@ static int __init imx_drm_init(void)
- 	return 0;
- 
- err_pdrv:
--	platform_device_unregister(imx_drm_pdev);
--err_pdev:
- 	kfree(imx_drm_device);
- 
- 	return ret;
-@@ -874,7 +940,6 @@ static int __init imx_drm_init(void)
- 
- static void __exit imx_drm_exit(void)
- {
--	platform_device_unregister(imx_drm_pdev);
- 	platform_driver_unregister(&imx_drm_pdrv);
- 
- 	kfree(imx_drm_device);
-diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
-index dd29a4aad376..d00f93f3440d 100644
---- a/drivers/staging/imx-drm/imx-ldb.c
-+++ b/drivers/staging/imx-drm/imx-ldb.c
-@@ -20,6 +20,7 @@
- 
- #include <linux/module.h>
- #include <linux/clk.h>
-+#include <linux/component.h>
- #include <drm/drmP.h>
- #include <drm/drm_fb_helper.h>
- #include <drm/drm_crtc_helper.h>
-@@ -450,11 +451,11 @@ static const struct of_device_id imx_ldb_dt_ids[] = {
- };
- MODULE_DEVICE_TABLE(of, imx_ldb_dt_ids);
- 
--static int imx_ldb_probe(struct platform_device *pdev)
-+static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
- {
--	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *np = dev->of_node;
- 	const struct of_device_id *of_id =
--			of_match_device(imx_ldb_dt_ids, &pdev->dev);
-+			of_match_device(imx_ldb_dt_ids, dev);
- 	struct device_node *child;
- 	const u8 *edidp;
- 	struct imx_ldb *imx_ldb;
-@@ -464,17 +465,17 @@ static int imx_ldb_probe(struct platform_device *pdev)
- 	int ret;
- 	int i;
- 
--	imx_ldb = devm_kzalloc(&pdev->dev, sizeof(*imx_ldb), GFP_KERNEL);
-+	imx_ldb = devm_kzalloc(dev, sizeof(*imx_ldb), GFP_KERNEL);
- 	if (!imx_ldb)
- 		return -ENOMEM;
- 
- 	imx_ldb->regmap = syscon_regmap_lookup_by_phandle(np, "gpr");
- 	if (IS_ERR(imx_ldb->regmap)) {
--		dev_err(&pdev->dev, "failed to get parent regmap\n");
-+		dev_err(dev, "failed to get parent regmap\n");
- 		return PTR_ERR(imx_ldb->regmap);
- 	}
- 
--	imx_ldb->dev = &pdev->dev;
-+	imx_ldb->dev = dev;
- 
- 	if (of_id)
- 		imx_ldb->lvds_mux = of_id->data;
-@@ -512,7 +513,7 @@ static int imx_ldb_probe(struct platform_device *pdev)
- 			return -EINVAL;
- 
- 		if (dual && i > 0) {
--			dev_warn(&pdev->dev, "dual-channel mode, ignoring second output\n");
-+			dev_warn(dev, "dual-channel mode, ignoring second output\n");
- 			continue;
- 		}
- 
-@@ -551,7 +552,7 @@ static int imx_ldb_probe(struct platform_device *pdev)
- 			break;
- 		case LVDS_BIT_MAP_JEIDA:
- 			if (datawidth == 18) {
--				dev_err(&pdev->dev, "JEIDA standard only supported in 24 bit\n");
-+				dev_err(dev, "JEIDA standard only supported in 24 bit\n");
- 				return -EINVAL;
- 			}
- 			if (i == 0 || dual)
-@@ -560,7 +561,7 @@ static int imx_ldb_probe(struct platform_device *pdev)
- 				imx_ldb->ldb_ctrl |= LDB_DATA_WIDTH_CH1_24 | LDB_BIT_MAP_CH1_JEIDA;
- 			break;
- 		default:
--			dev_err(&pdev->dev, "data mapping not specified or invalid\n");
-+			dev_err(dev, "data mapping not specified or invalid\n");
- 			return -EINVAL;
- 		}
- 
-@@ -571,14 +572,15 @@ static int imx_ldb_probe(struct platform_device *pdev)
- 		imx_drm_encoder_add_possible_crtcs(channel->imx_drm_encoder, child);
- 	}
- 
--	platform_set_drvdata(pdev, imx_ldb);
-+	dev_set_drvdata(dev, imx_ldb);
- 
- 	return 0;
- }
- 
--static int imx_ldb_remove(struct platform_device *pdev)
-+static void imx_ldb_unbind(struct device *dev, struct device *master,
-+	void *data)
- {
--	struct imx_ldb *imx_ldb = platform_get_drvdata(pdev);
-+	struct imx_ldb *imx_ldb = dev_get_drvdata(dev);
- 	int i;
- 
- 	for (i = 0; i < 2; i++) {
-@@ -591,7 +593,21 @@ static int imx_ldb_remove(struct platform_device *pdev)
- 		imx_drm_remove_connector(channel->imx_drm_connector);
- 		imx_drm_remove_encoder(channel->imx_drm_encoder);
- 	}
-+}
- 
-+static const struct component_ops imx_ldb_ops = {
-+	.bind	= imx_ldb_bind,
-+	.unbind	= imx_ldb_unbind,
-+};
-+
-+static int imx_ldb_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &imx_ldb_ops);
-+}
-+
-+static int imx_ldb_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &imx_ldb_ops);
- 	return 0;
- }
- 
-diff --git a/drivers/staging/imx-drm/imx-tve.c b/drivers/staging/imx-drm/imx-tve.c
-index 77131e5770f3..ad840d78a09a 100644
---- a/drivers/staging/imx-drm/imx-tve.c
-+++ b/drivers/staging/imx-drm/imx-tve.c
-@@ -20,6 +20,7 @@
- 
- #include <linux/clk.h>
- #include <linux/clk-provider.h>
-+#include <linux/component.h>
- #include <linux/module.h>
- #include <linux/i2c.h>
- #include <linux/regmap.h>
-@@ -583,9 +584,10 @@ static const int of_get_tve_mode(struct device_node *np)
- 	return -EINVAL;
- }
- 
--static int imx_tve_probe(struct platform_device *pdev)
-+static int imx_tve_bind(struct device *dev, struct device *master, void *data)
- {
--	struct device_node *np = pdev->dev.of_node;
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct device_node *np = dev->of_node;
- 	struct device_node *ddc_node;
- 	struct imx_tve *tve;
- 	struct resource *res;
-@@ -594,11 +596,11 @@ static int imx_tve_probe(struct platform_device *pdev)
- 	int irq;
- 	int ret;
- 
--	tve = devm_kzalloc(&pdev->dev, sizeof(*tve), GFP_KERNEL);
-+	tve = devm_kzalloc(dev, sizeof(*tve), GFP_KERNEL);
- 	if (!tve)
- 		return -ENOMEM;
- 
--	tve->dev = &pdev->dev;
-+	tve->dev = dev;
- 	spin_lock_init(&tve->lock);
- 
- 	ddc_node = of_parse_phandle(np, "ddc", 0);
-@@ -609,7 +611,7 @@ static int imx_tve_probe(struct platform_device *pdev)
- 
- 	tve->mode = of_get_tve_mode(np);
- 	if (tve->mode != TVE_MODE_VGA) {
--		dev_err(&pdev->dev, "only VGA mode supported, currently\n");
-+		dev_err(dev, "only VGA mode supported, currently\n");
- 		return -EINVAL;
- 	}
- 
-@@ -618,7 +620,7 @@ static int imx_tve_probe(struct platform_device *pdev)
- 					   &tve->hsync_pin);
- 
- 		if (ret < 0) {
--			dev_err(&pdev->dev, "failed to get vsync pin\n");
-+			dev_err(dev, "failed to get vsync pin\n");
- 			return ret;
- 		}
- 
-@@ -626,40 +628,40 @@ static int imx_tve_probe(struct platform_device *pdev)
- 					    &tve->vsync_pin);
- 
- 		if (ret < 0) {
--			dev_err(&pdev->dev, "failed to get vsync pin\n");
-+			dev_err(dev, "failed to get vsync pin\n");
- 			return ret;
- 		}
- 	}
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	base = devm_ioremap_resource(&pdev->dev, res);
-+	base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(base))
- 		return PTR_ERR(base);
- 
- 	tve_regmap_config.lock_arg = tve;
--	tve->regmap = devm_regmap_init_mmio_clk(&pdev->dev, "tve", base,
-+	tve->regmap = devm_regmap_init_mmio_clk(dev, "tve", base,
- 						&tve_regmap_config);
- 	if (IS_ERR(tve->regmap)) {
--		dev_err(&pdev->dev, "failed to init regmap: %ld\n",
-+		dev_err(dev, "failed to init regmap: %ld\n",
- 			PTR_ERR(tve->regmap));
- 		return PTR_ERR(tve->regmap);
- 	}
- 
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
--		dev_err(&pdev->dev, "failed to get irq\n");
-+		dev_err(dev, "failed to get irq\n");
- 		return irq;
- 	}
- 
--	ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
-+	ret = devm_request_threaded_irq(dev, irq, NULL,
- 					imx_tve_irq_handler, IRQF_ONESHOT,
- 					"imx-tve", tve);
- 	if (ret < 0) {
--		dev_err(&pdev->dev, "failed to request irq: %d\n", ret);
-+		dev_err(dev, "failed to request irq: %d\n", ret);
- 		return ret;
- 	}
- 
--	tve->dac_reg = devm_regulator_get(&pdev->dev, "dac");
-+	tve->dac_reg = devm_regulator_get(dev, "dac");
- 	if (!IS_ERR(tve->dac_reg)) {
- 		regulator_set_voltage(tve->dac_reg, 2750000, 2750000);
- 		ret = regulator_enable(tve->dac_reg);
-@@ -667,17 +669,17 @@ static int imx_tve_probe(struct platform_device *pdev)
- 			return ret;
- 	}
- 
--	tve->clk = devm_clk_get(&pdev->dev, "tve");
-+	tve->clk = devm_clk_get(dev, "tve");
- 	if (IS_ERR(tve->clk)) {
--		dev_err(&pdev->dev, "failed to get high speed tve clock: %ld\n",
-+		dev_err(dev, "failed to get high speed tve clock: %ld\n",
- 			PTR_ERR(tve->clk));
- 		return PTR_ERR(tve->clk);
- 	}
- 
- 	/* this is the IPU DI clock input selector, can be parented to tve_di */
--	tve->di_sel_clk = devm_clk_get(&pdev->dev, "di_sel");
-+	tve->di_sel_clk = devm_clk_get(dev, "di_sel");
- 	if (IS_ERR(tve->di_sel_clk)) {
--		dev_err(&pdev->dev, "failed to get ipu di mux clock: %ld\n",
-+		dev_err(dev, "failed to get ipu di mux clock: %ld\n",
- 			PTR_ERR(tve->di_sel_clk));
- 		return PTR_ERR(tve->di_sel_clk);
- 	}
-@@ -688,11 +690,11 @@ static int imx_tve_probe(struct platform_device *pdev)
- 
- 	ret = regmap_read(tve->regmap, TVE_COM_CONF_REG, &val);
- 	if (ret < 0) {
--		dev_err(&pdev->dev, "failed to read configuration register: %d\n", ret);
-+		dev_err(dev, "failed to read configuration register: %d\n", ret);
- 		return ret;
- 	}
- 	if (val != 0x00100000) {
--		dev_err(&pdev->dev, "configuration register default value indicates this is not a TVEv2\n");
-+		dev_err(dev, "configuration register default value indicates this is not a TVEv2\n");
- 		return -ENODEV;
- 	}
- 
-@@ -705,14 +707,15 @@ static int imx_tve_probe(struct platform_device *pdev)
- 
- 	ret = imx_drm_encoder_add_possible_crtcs(tve->imx_drm_encoder, np);
- 
--	platform_set_drvdata(pdev, tve);
-+	dev_set_drvdata(dev, tve);
- 
- 	return 0;
- }
- 
--static int imx_tve_remove(struct platform_device *pdev)
-+static void imx_tve_unbind(struct device *dev, struct device *master,
-+	void *data)
- {
--	struct imx_tve *tve = platform_get_drvdata(pdev);
-+	struct imx_tve *tve = dev_get_drvdata(dev);
- 	struct drm_connector *connector = &tve->connector;
- 	struct drm_encoder *encoder = &tve->encoder;
- 
-@@ -723,7 +726,21 @@ static int imx_tve_remove(struct platform_device *pdev)
- 
- 	if (!IS_ERR(tve->dac_reg))
- 		regulator_disable(tve->dac_reg);
-+}
- 
-+static const struct component_ops imx_tve_ops = {
-+	.bind	= imx_tve_bind,
-+	.unbind	= imx_tve_unbind,
-+};
-+
-+static int imx_tve_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &imx_tve_ops);
-+}
-+
-+static int imx_tve_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &imx_tve_ops);
- 	return 0;
- }
- 
-diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
-index 08e0a3b29174..d779ad2d1f4e 100644
---- a/drivers/staging/imx-drm/ipuv3-crtc.c
-+++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-@@ -17,6 +17,7 @@
-  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-  * MA 02110-1301, USA.
+ /*
+  * imx_drm_remove_connector - remove a connector
   */
-+#include <linux/component.h>
- #include <linux/module.h>
- #include <linux/export.h>
- #include <linux/device.h>
-@@ -400,43 +401,60 @@ static int ipu_crtc_init(struct ipu_crtc *ipu_crtc,
- 	return ret;
- }
+diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
+index e3ca0c6b6a39..d1fb1146240e 100644
+--- a/drivers/staging/imx-drm/imx-drm.h
++++ b/drivers/staging/imx-drm/imx-drm.h
+@@ -54,13 +54,10 @@ void imx_drm_mode_config_init(struct drm_device *drm);
  
--static int ipu_drm_probe(struct platform_device *pdev)
-+static int ipu_drm_bind(struct device *dev, struct device *master, void *data)
- {
--	struct ipu_client_platformdata *pdata = pdev->dev.platform_data;
-+	struct ipu_client_platformdata *pdata = dev->platform_data;
- 	struct ipu_crtc *ipu_crtc;
- 	int ret;
+ struct drm_gem_cma_object *imx_drm_fb_get_obj(struct drm_framebuffer *fb);
  
--	if (!pdata)
+-struct drm_device *imx_drm_device_get(void);
+-void imx_drm_device_put(void);
+ int imx_drm_panel_format_pins(struct drm_encoder *encoder,
+ 		u32 interface_pix_fmt, int hsync_pin, int vsync_pin);
+ int imx_drm_panel_format(struct drm_encoder *encoder,
+ 		u32 interface_pix_fmt);
+-void imx_drm_fb_helper_set(struct drm_fbdev_cma *fbdev_helper);
+ 
+ struct device_node;
+ 
+diff --git a/drivers/staging/imx-drm/imx-fbdev.c b/drivers/staging/imx-drm/imx-fbdev.c
+deleted file mode 100644
+index 8331739c3d08..000000000000
+--- a/drivers/staging/imx-drm/imx-fbdev.c
++++ /dev/null
+@@ -1,74 +0,0 @@
+-/*
+- * i.MX drm driver
+- *
+- * Copyright (C) 2012 Sascha Hauer, Pengutronix
+- *
+- * Based on Samsung Exynos code
+- *
+- * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License
+- * as published by the Free Software Foundation; either version 2
+- * of the License, or (at your option) any later version.
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-#include <linux/module.h>
+-#include <drm/drmP.h>
+-#include <drm/drm_crtc.h>
+-#include <drm/drm_crtc_helper.h>
+-#include <drm/drm_fb_cma_helper.h>
+-
+-#include "imx-drm.h"
+-
+-#define MAX_CONNECTOR		4
+-#define PREFERRED_BPP		16
+-
+-static struct drm_fbdev_cma *fbdev_cma;
+-
+-static int legacyfb_depth = 16;
+-
+-module_param(legacyfb_depth, int, 0444);
+-
+-static int __init imx_fb_helper_init(void)
+-{
+-	struct drm_device *drm = imx_drm_device_get();
+-
+-	if (!drm)
 -		return -EINVAL;
 -
--	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
--	if (ret)
--		return ret;
+-	if (legacyfb_depth != 16 && legacyfb_depth != 32) {
+-		pr_warn("i.MX legacyfb: invalid legacyfb_depth setting. defaulting to 16bpp\n");
+-		legacyfb_depth = 16;
+-	}
 -
--	ipu_crtc = devm_kzalloc(&pdev->dev, sizeof(*ipu_crtc), GFP_KERNEL);
-+	ipu_crtc = devm_kzalloc(dev, sizeof(*ipu_crtc), GFP_KERNEL);
- 	if (!ipu_crtc)
- 		return -ENOMEM;
- 
--	ipu_crtc->dev = &pdev->dev;
-+	ipu_crtc->dev = dev;
- 
- 	ret = ipu_crtc_init(ipu_crtc, pdata);
- 	if (ret)
- 		return ret;
- 
--	platform_set_drvdata(pdev, ipu_crtc);
-+	dev_set_drvdata(dev, ipu_crtc);
- 
- 	return 0;
- }
- 
--static int ipu_drm_remove(struct platform_device *pdev)
-+static void ipu_drm_unbind(struct device *dev, struct device *master,
-+	void *data)
- {
--	struct ipu_crtc *ipu_crtc = platform_get_drvdata(pdev);
-+	struct ipu_crtc *ipu_crtc = dev_get_drvdata(dev);
- 
- 	imx_drm_remove_crtc(ipu_crtc->imx_crtc);
- 
- 	ipu_plane_put_resources(ipu_crtc->plane[0]);
- 	ipu_put_resources(ipu_crtc);
-+}
-+
-+static const struct component_ops ipu_crtc_ops = {
-+	.bind = ipu_drm_bind,
-+	.unbind = ipu_drm_unbind,
-+};
- 
-+static int ipu_drm_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+
-+	if (!pdev->dev.platform_data)
-+		return -EINVAL;
-+
-+	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
-+	if (ret)
-+		return ret;
-+
-+	return component_add(&pdev->dev, &ipu_crtc_ops);
-+}
-+
-+static int ipu_drm_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &ipu_crtc_ops);
- 	return 0;
- }
- 
-diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-index 12bcf4f58bdf..4019cae35ff9 100644
---- a/drivers/staging/imx-drm/parallel-display.c
-+++ b/drivers/staging/imx-drm/parallel-display.c
-@@ -18,6 +18,7 @@
-  * MA 02110-1301, USA.
-  */
- 
-+#include <linux/component.h>
- #include <linux/module.h>
- #include <drm/drmP.h>
- #include <drm/drm_fb_helper.h>
-@@ -192,15 +193,15 @@ static int imx_pd_register(struct imx_parallel_display *imxpd)
- 	return 0;
- }
- 
--static int imx_pd_probe(struct platform_device *pdev)
-+static int imx_pd_bind(struct device *dev, struct device *master, void *data)
- {
--	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *np = dev->of_node;
- 	const u8 *edidp;
- 	struct imx_parallel_display *imxpd;
- 	int ret;
- 	const char *fmt;
- 
--	imxpd = devm_kzalloc(&pdev->dev, sizeof(*imxpd), GFP_KERNEL);
-+	imxpd = devm_kzalloc(dev, sizeof(*imxpd), GFP_KERNEL);
- 	if (!imxpd)
- 		return -ENOMEM;
- 
-@@ -218,7 +219,7 @@ static int imx_pd_probe(struct platform_device *pdev)
- 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_BGR666;
- 	}
- 
--	imxpd->dev = &pdev->dev;
-+	imxpd->dev = dev;
- 
- 	ret = imx_pd_register(imxpd);
- 	if (ret)
-@@ -226,14 +227,15 @@ static int imx_pd_probe(struct platform_device *pdev)
- 
- 	ret = imx_drm_encoder_add_possible_crtcs(imxpd->imx_drm_encoder, np);
- 
--	platform_set_drvdata(pdev, imxpd);
-+	dev_set_drvdata(dev, imxpd);
- 
- 	return 0;
- }
- 
--static int imx_pd_remove(struct platform_device *pdev)
-+static void imx_pd_unbind(struct device *dev, struct device *master,
-+	void *data)
- {
--	struct imx_parallel_display *imxpd = platform_get_drvdata(pdev);
-+	struct imx_parallel_display *imxpd = dev_get_drvdata(dev);
- 	struct drm_connector *connector = &imxpd->connector;
- 	struct drm_encoder *encoder = &imxpd->encoder;
- 
-@@ -241,7 +243,21 @@ static int imx_pd_remove(struct platform_device *pdev)
- 
- 	imx_drm_remove_connector(imxpd->imx_drm_connector);
- 	imx_drm_remove_encoder(imxpd->imx_drm_encoder);
-+}
- 
-+static const struct component_ops imx_pd_ops = {
-+	.bind	= imx_pd_bind,
-+	.unbind	= imx_pd_unbind,
-+};
-+
-+static int imx_pd_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &imx_pd_ops);
-+}
-+
-+static int imx_pd_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &imx_pd_ops);
- 	return 0;
- }
- 
+-	fbdev_cma = drm_fbdev_cma_init(drm, legacyfb_depth,
+-			drm->mode_config.num_crtc, MAX_CONNECTOR);
+-
+-	if (IS_ERR(fbdev_cma)) {
+-		imx_drm_device_put();
+-		return PTR_ERR(fbdev_cma);
+-	}
+-
+-	imx_drm_fb_helper_set(fbdev_cma);
+-
+-	return 0;
+-}
+-
+-static void __exit imx_fb_helper_exit(void)
+-{
+-	imx_drm_fb_helper_set(NULL);
+-	drm_fbdev_cma_fini(fbdev_cma);
+-	imx_drm_device_put();
+-}
+-
+-late_initcall(imx_fb_helper_init);
+-module_exit(imx_fb_helper_exit);
+-
+-MODULE_DESCRIPTION("Freescale i.MX legacy fb driver");
+-MODULE_AUTHOR("Sascha Hauer, Pengutronix");
+-MODULE_LICENSE("GPL");
 -- 
 1.8.3.1
