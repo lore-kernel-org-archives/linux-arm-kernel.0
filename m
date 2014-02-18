@@ -1,28 +1,32 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 18 Feb 2014 19:43:27 +0100
-Subject: [PATCH V3 11/17] i2c: nomadik: Convert to devm functions
-In-Reply-To: <CAPDyKFpRaAAer00dqcXR-qOT9S8-SDTnaMUHRwWCZ93w-wnTDA@mail.gmail.com>
-References: <1392650418-14820-1-git-send-email-ulf.hansson@linaro.org>
- <20140218110109.GA18768@katana>
- <CAPDyKFpRaAAer00dqcXR-qOT9S8-SDTnaMUHRwWCZ93w-wnTDA@mail.gmail.com>
-Message-ID: <20140218184327.GF18768@katana>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Tue, 18 Feb 2014 22:43:46 +0400
+Subject: =?UTF-8?B?UmU6IFBNSUMgZHJpdmVyIHByZXZlbnRzIGdwaW8tbGVkcyB0byB3b3Jr?=
+In-Reply-To: <CAOMZO5D0fa0yzwQbNLG_=oJ_8_WBBqWBF=D9QzSwLwC0jh+deQ@mail.gmail.com>
+References: <CAOMZO5D0fa0yzwQbNLG_=oJ_8_WBBqWBF=D9QzSwLwC0jh+deQ@mail.gmail.com>
+Message-ID: <1392749026.163265479@f312.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> I added the IS_ERR, check as you suggested. That caused a rebase of
-> the other patches as well.
+???????, 18 ??????? 2014, 15:20 -03:00 ?? Fabio Estevam <festevam@gmail.com>:
+> Hi,
 > 
-> Sorry if it was unclear.
+> I am running into the following issue on imx6sl-evk.dts:
+> 
+> - I can only get the user GPIO LED to work if I unselect the PFUZE100
+> PMIC driver
+> 
+> - This happens on linux-next as well as in the internal FSL kernel based on 3.10
+> 
+> With CONFIG_REGULATOR_PFUZE100=y then the LED blinks only once and
+> stops instead of blinking at the heartbeat rate.
+> 
+> Changing to CONFIG_REGULATOR_PFUZE100=n then the LED blinks normally.
+> 
+> I am not sure how the PMIC driver could interact and make the
+> gpio-leds driver to fail.
+> 
+> Any suggestions?
 
-No problem. I am about to apply all patches except 17 as you suggested.
-It fails here, however, although I applied Linus' patch first. What
-exactly is your base? Any chance to publish your branch?
+Perhaps, one of regulators turn off the power for a pin-group where LED is connected.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140218/a90a39ec/attachment.sig>
+---
