@@ -1,59 +1,93 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 18 Feb 2014 21:54:55 +0800
-Subject: [PATCH v4 0/5] Prepare for running ACPI on !x86 and !ia64
-Message-ID: <1392731700-10992-1-git-send-email-hanjun.guo@linaro.org>
+Date: Tue, 18 Feb 2014 21:54:56 +0800
+Subject: [PATCH v4 1/5] ACPI / idle: Make idle_boot_override depend on x86 and
+ ia64
+In-Reply-To: <1392731700-10992-1-git-send-email-hanjun.guo@linaro.org>
+References: <1392731700-10992-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1392731700-10992-2-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of the ACPI code is arch-dependent and make the code can't be
-compiled on !x86 or !ia64, the first two patches just do some rework
-on the idle_boot_override and _PDC related stuff to make the ACPI
-code more arch-independent.
+idle_boot_override depends on x86 and ia64 now, and we can not
+foresee it will be used on ARM or ARM64, so move the code into
+CONFIG_X86 and CONFIG_IA64 #ifdefs to make processor_core.c
+can be compiled on ARM64.
 
-The third patch just introduce map_gic_id() for ACPI processor core
-followed the ACPI 5.0 spec. Last two patches are just some cleanups.
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ drivers/acpi/processor_core.c |   47 ++++++++++++++++++++++++-----------------
+ 1 file changed, 28 insertions(+), 19 deletions(-)
 
-I have compiled the kernel successfully after appling this patch set
-on x86 and ia64.
-
-Changes for v4:
-a) remove preprocessor directives in function bodies;
-b) add another two patches for cleanups.
-
-Changes for v3:
-Fix the issues pointed out by Lan Tianyu and add the Reviewed-by for
-first patch.
-
-Changes for v2:
-a) add #if defined(CONFIG_X86) || defined(CONFIG_IA64) for
-   idle_boot_override related code;
-b) Rebased on 3.14-rc1.
-
-Changes since the RFC version:
-a) Remove the RFC tag;
-b) Move idle_boot_override out of the arch directory suggested
-   by Alan;
-c) Make these 3 patches as a separate patch set since there are
-   not not related to the ARM/ARM64 platform.
-
-Hanjun Guo (5):
-  ACPI / idle: Make idle_boot_override depend on x86 and ia64
-  ACPI / processor_core: Rework _PDC related stuff to make it more
-    arch-independent
-  ACPI / processor: Introduce map_gic_id() to get apic id from MADT or
-    _MAT method
-  ACPI: Move BAD_MADT_ENTRY() to linux/acpi.h
-  ACPI: Replace printk with pr_* in tables.c
-
- arch/ia64/include/asm/acpi.h  |    5 +--
- arch/ia64/kernel/acpi.c       |   18 ++++++--
- arch/x86/include/asm/acpi.h   |   19 +--------
- arch/x86/kernel/acpi/boot.c   |    4 --
- arch/x86/kernel/acpi/cstate.c |   29 +++++++++++++
- drivers/acpi/processor_core.c |   92 ++++++++++++++++++++++++-----------------
- drivers/acpi/tables.c         |   51 +++++++++--------------
- include/linux/acpi.h          |    4 ++
- 8 files changed, 124 insertions(+), 98 deletions(-)
-
+diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+index 7c50a4c..636fd59 100644
+--- a/drivers/acpi/processor_core.c
++++ b/drivers/acpi/processor_core.c
+@@ -19,24 +19,6 @@
+ #define _COMPONENT		ACPI_PROCESSOR_COMPONENT
+ ACPI_MODULE_NAME("processor_core");
+ 
+-static int __init set_no_mwait(const struct dmi_system_id *id)
+-{
+-	printk(KERN_NOTICE PREFIX "%s detected - "
+-		"disabling mwait for CPU C-states\n", id->ident);
+-	boot_option_idle_override = IDLE_NOMWAIT;
+-	return 0;
+-}
+-
+-static struct dmi_system_id processor_idle_dmi_table[] __initdata = {
+-	{
+-	set_no_mwait, "Extensa 5220", {
+-	DMI_MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+-	DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+-	DMI_MATCH(DMI_PRODUCT_VERSION, "0100"),
+-	DMI_MATCH(DMI_BOARD_NAME, "Columbia") }, NULL},
+-	{},
+-};
+-
+ static int map_lapic_id(struct acpi_subtable_header *entry,
+ 		 u32 acpi_id, int *apic_id)
+ {
+@@ -379,13 +361,40 @@ early_init_pdc(acpi_handle handle, u32 lvl, void *context, void **rv)
+ 	return AE_OK;
+ }
+ 
+-void __init acpi_early_processor_set_pdc(void)
++#if defined(CONFIG_X86) || defined(CONFIG_IA64)
++static int __init set_no_mwait(const struct dmi_system_id *id)
++{
++	pr_notice(PREFIX "%s detected - disabling mwait for CPU C-states\n",
++			id->ident);
++	boot_option_idle_override = IDLE_NOMWAIT;
++	return 0;
++}
++
++static struct dmi_system_id processor_idle_dmi_table[] __initdata = {
++	{
++	set_no_mwait, "Extensa 5220", {
++	DMI_MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
++	DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
++	DMI_MATCH(DMI_PRODUCT_VERSION, "0100"),
++	DMI_MATCH(DMI_BOARD_NAME, "Columbia") }, NULL},
++	{},
++};
++
++static void __init processor_dmi_check(void)
+ {
+ 	/*
+ 	 * Check whether the system is DMI table. If yes, OSPM
+ 	 * should not use mwait for CPU-states.
+ 	 */
+ 	dmi_check_system(processor_idle_dmi_table);
++}
++#else
++static inline void processor_dmi_check(void) {}
++#endif
++
++void __init acpi_early_processor_set_pdc(void)
++{
++	processor_dmi_check();
+ 
+ 	acpi_walk_namespace(ACPI_TYPE_PROCESSOR, ACPI_ROOT_OBJECT,
+ 			    ACPI_UINT32_MAX,
 -- 
 1.7.9.5
