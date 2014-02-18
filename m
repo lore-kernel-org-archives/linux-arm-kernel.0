@@ -1,33 +1,53 @@
-From: ashutosh.s@phytec.in (Ashutosh singh)
-Date: Tue, 18 Feb 2014 19:16:25 +0530
-Subject: [PATCH v2 4/4] Phytec phyFLEX-i.MX6 : Added SATA Support
-In-Reply-To: <1392731185-4885-1-git-send-email-ashutosh.s@phytec.in>
-References: <1392731185-4885-1-git-send-email-ashutosh.s@phytec.in>
-Message-ID: <1392731185-4885-4-git-send-email-ashutosh.s@phytec.in>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Feb 2014 14:46:44 +0100
+Subject: [PATCH v3 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <1392726043-31088-4-git-send-email-will.deacon@arm.com>
+References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
+ <1392726043-31088-4-git-send-email-will.deacon@arm.com>
+Message-ID: <2340480.VAU4NNbBD8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for SATA on Phytec phyFLEX-i.MX6 Quad module.
+On Tuesday 18 February 2014 12:20:43 Will Deacon wrote:
 
-Signed-off-by: Ashutosh singh <ashutosh.s@phytec.in>
----
- arch/arm/boot/dts/imx6q-phytec-pbab01.dts |    4 ++++
- 1 file changed, 4 insertions(+)
+> +static int gen_pci_alloc_io_offset(u32 sz, resource_size_t *offset)
+> +{
+> +	static DECLARE_BITMAP(io_map, (IO_SPACE_LIMIT + 1) / SZ_64K);
+> +	int idx, num_wins;
+> +
+> +	if (sz > SZ_64K)
+> +		return -ENOSPC;
+> +
+> +	num_wins = (IO_SPACE_LIMIT + 1) / SZ_64K;
+> +	idx = 0;
+> +	do {
+> +		idx = find_next_zero_bit(io_map, num_wins, idx);
+> +		if (idx == num_wins)
+> +			return -ENOSPC;
+> +	} while (test_and_set_bit(idx, io_map));
+> +
+> +	*offset = idx * SZ_64K;
+> +	return 0;
+> +}
 
-diff --git a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
-index 21c8b37..5607c33 100644
---- a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
-+++ b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
-@@ -25,6 +25,10 @@
- 	status = "okay";
- };
- 
-+&sata {
-+	status = "okay";
-+};
-+
- &uart4 {
- 	status = "okay";
- };
--- 
-1.7.9.5
+Sicne you're always starting the search at 0 and you never free
+the map, this is essentially the same as remembering the last number
+that was used and using the next one, right?
+
+You should also pass the rang->pci_addr here to calculate the
+offset in case the pci_addr is not zero.
+
+> +	/* Register our I/O and Memory resources */
+> +	res_valid = 0;
+> +	list_for_each_entry(win, &pci->host.windows, list) {
+> +		struct resource *parent;
+> +
+> +		if (resource_type(win->res) == IORESOURCE_IO) {
+> +			parent = &ioport_resource;
+> +			err = pci_ioremap_io(win->offset, win->res->start);
+
+and consequently pass the pci_addr rather than the offset here. How about
+moving the pci_ioremap_io() call into gen_pci_alloc_io_offset()?
+
+	Arnd
