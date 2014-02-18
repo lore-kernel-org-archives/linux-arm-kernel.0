@@ -1,43 +1,34 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 18 Feb 2014 09:06:04 -0500
-Subject: [PATCH v2] net: ethernet: update dependency and help text of
- mvneta
-In-Reply-To: <1392729491-24913-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392729491-24913-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20140218140604.GO7862@titan.lakedaemon.net>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 18 Feb 2014 06:06:13 -0800
+Subject: [PATCH v4 5/5] ACPI: Replace printk with pr_* in tables.c
+In-Reply-To: <1392731700-10992-6-git-send-email-hanjun.guo@linaro.org>
+References: <1392731700-10992-1-git-send-email-hanjun.guo@linaro.org>
+ <1392731700-10992-6-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1392732373.22752.22.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 02:18:11PM +0100, Thomas Petazzoni wrote:
-> With the introduction of the support for Armada 375 and Armada 38x,
-> the hidden Kconfig option MACH_ARMADA_370_XP is being renamed to
-> MACH_MVEBU_V7. Therefore, the dependency that was used for the mvneta
-> driver can no longer work. This commit replaces this dependency by a
-> dependency on PLAT_ORION, which is used similarly for the mv643xx_eth
-> driver.
-> 
-> In addition to this, it takes this opportunity to adjust the
-> description and help text to indicate that the driver can is also used
-> for Armada 38x. Note that Armada 375 cannot use this driver as it has
-> a completely different networking unit, which will require a separate
-> driver.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-> Changes since v1:
->  - Instead of removing the Kconfig dependency, replace it by a
->    dependency on PLAT_ORION, in order to avoid building mvneta on too
->    many architectures and getting weird build issues. Suggested by
->    Jason Cooper.
->  - Fix capitalization in the Kconfig help text.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/net/ethernet/marvell/Kconfig | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+On Tue, 2014-02-18 at 21:55 +0800, Hanjun Guo wrote:
+> This patch just do some clean up to replace printk with pr_*,
+> no functional change.
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+trivial note:
 
-thx,
+> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+[]
+> @@ -55,8 +55,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>  		{
+>  			struct acpi_madt_local_apic *p =
+>  			    (struct acpi_madt_local_apic *)header;
+> -			printk(KERN_INFO PREFIX
+> -			       "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+> +			pr_info(PREFIX "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+>  			       p->processor_id, p->id,
+>  			       (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
 
-Jason.
+It'd be nice to realign the additional lines to the open
+parenthesis, here and everywhere else in this patch
+
+			pr_info(PREFIX "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+				p->processor_id, p->id,
+				(p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
