@@ -1,172 +1,124 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 18 Feb 2014 14:38:01 +0100
-Subject: [PATCH v3 6/6] of: document bindings for reserved-memory nodes
-In-Reply-To: <1392730681-14695-1-git-send-email-m.szyprowski@samsung.com>
-References: <1392730681-14695-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1392730681-14695-7-git-send-email-m.szyprowski@samsung.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Tue, 18 Feb 2014 14:44:30 +0100
+Subject: [PATCH] dt/bindings: update fsl-fec regarding compatible and
+ clocks
+In-Reply-To: <20140218020901.GA15716@S2101-09.ap.freescale.net>
+References: <1392033008-20752-1-git-send-email-shawn.guo@linaro.org>
+ <20140217212439.GZ4524@book.gsilab.sittig.org>
+ <20140218020901.GA15716@S2101-09.ap.freescale.net>
+Message-ID: <20140218134430.GC4524@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grant Likely <grant.likely@linaro.org>
+On Tue, Feb 18, 2014 at 10:09 +0800, Shawn Guo wrote:
+> 
+> On Mon, Feb 17, 2014 at 10:24:39PM +0100, Gerhard Sittig wrote:
+> > On Mon, Feb 10, 2014 at 19:50 +0800, Shawn Guo wrote:
+> > > 
+> > > Update fsl-fec to explicitly list the supported compatible strings
+> > > and add missing 'clocks' and 'clock-names' properties.  It does not
+> > > change anything about how kernel drive works.  Instead, it just reflects
+> > > how kernel driver works today.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > ---
+> > >  Documentation/devicetree/bindings/net/fsl-fec.txt |   19 ++++++++++++++++++-
+> > >  1 file changed, 18 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
+> > > index 845ff84..3ebd395 100644
+> > > --- a/Documentation/devicetree/bindings/net/fsl-fec.txt
+> > > +++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
+> > > @@ -1,9 +1,26 @@
+> > >  * Freescale Fast Ethernet Controller (FEC)
+> > >  
+> > >  Required properties:
+> > > -- compatible : Should be "fsl,<soc>-fec"
+> > > +- compatible : Should contain one of the following:
+> > > +		"fsl,imx25-fec"
+> > > +		"fsl,imx27-fec"
+> > > +		"fsl,imx28-fec"
+> > > +		"fsl,imx6q-fec"
+> > > +		"fsl,mvf600-fec"
+> > 
+> > This appears to miss all the PowerPC based SoCs.  See
+> >   git grep 'fsl,.*-fec' arch/*/boot/dts
+> 
+> Hmm, this is a binding for IMX FEC/ENET, and the driver is
+> drivers/net/ethernet/freescale/fec_main.c.
 
-Reserved memory nodes allow for the reservation of static (fixed
-address) regions, or dynamically allocated regions for a specific
-purpose.
+The binding text says otherwise.  It claims to apply for
+"fsl,<soc>-fec" compatibles.
 
-Signed-off-by: Grant Likely <grant.likely@linaro.org>
-[joshc: Based on binding document proposed (in non-patch form) here:
- http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
- adapted to support #memory-region-cells]
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- .../bindings/reserved-memory/reserved-memory.txt   |  138 ++++++++++++++++++++
- 1 file changed, 138 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+It's funny how the first line of the source you point to talks
+about being a FEC driver for MPC8xx. :)  But that doesn't matter
+here, as it's just a comment in some code.
 
-diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-new file mode 100644
-index 000000000000..a606ce90c9c4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-@@ -0,0 +1,138 @@
-+*** Reserved memory regions ***
-+
-+Reserved memory is specified as a node under the /reserved-memory node.
-+The operating system shall exclude reserved memory from normal usage
-+one can create child nodes describing particular reserved (excluded from
-+normal use) memory regions. Such memory regions are usually designed for
-+the special usage by various device drivers.
-+
-+Parameters for each memory region can be encoded into the device tree
-+with the following nodes:
-+
-+/reserved-memory node
-+---------------------
-+#address-cells, #size-cells (required) - standard definition
-+    - Should use the same values as the root node
-+#memory-region-cells (required) - dictates number of cells used in the child
-+                                  nodes memory-region specifier
-+ranges (required) - standard definition
-+    - Should be empty
-+
-+/reserved-memory/ child nodes
-+-----------------------------
-+Each child of the reserved-memory node specifies one or more regions of
-+reserved memory. Each child node may either use a 'reg' property to
-+specify a specific range of reserved memory, or a 'size' property with
-+optional constraints to request a dynamically allocated block of memory.
-+
-+Following the generic-names recommended practice, node names should
-+reflect the purpose of the node (ie. "framebuffer" or "dma-pool"). Unit
-+address (@<address>) should be appended to the name if the node is a
-+static allocation.
-+
-+Properties:
-+Requires either a) or b) below.
-+a) static allocation
-+   reg (required) - standard definition
-+b) dynamic allocation
-+   size (required) - length based on parent's #size-cells
-+                   - Size in bytes of memory to reserve.
-+   alignment (optional) - length based on parent's #size-cells
-+                        - Address boundary for alignment of allocation.
-+   alloc-ranges (optional) - prop-encoded-array (address, length pairs).
-+                           - Specifies regions of memory that are
-+                             acceptable to allocate from.
-+
-+If both reg and size are present, then the reg property takes precedence
-+and size is ignored.
-+
-+Additional properties:
-+compatible (optional) - standard definition
-+    - may contain the following strings:
-+        - shared-dma-pool: This indicates a region of memory meant to be
-+          used as a shared pool of DMA buffers for a set of devices. It can
-+          be used by an operating system to instanciate the necessary pool
-+          management subsystem if necessary.
-+        - vendor specific string in the form <vendor>,[<device>-]<usage>
-+no-map (optional) - empty property
-+    - Indicates the operating system must not create a virtual mapping
-+      of the region as part of its standard mapping of system memory,
-+      nor permit speculative access to it under any circumstances other
-+      than under the control of the device driver using the region.
-+reusable (optional) - empty property
-+    - The operating system can use the memory in this region with the
-+      limitation that the device driver(s) owning the region need to be
-+      able to reclaim it back. Typically that means that the operating
-+      system can use that region to store volatile or cached data that
-+      can be otherwise regenerated or migrated elsewhere.
-+
-+Linux implementation note:
-+- If a "linux,cma-default" property is present, then Linux will use the
-+  region for the default pool of the contiguous memory allocator.
-+
-+Device node references to reserved memory
-+-----------------------------------------
-+Regions in the /reserved-memory node may be referenced by other device
-+nodes by adding a memory-region property to the device node.
-+
-+memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
-+
-+Example
-+-------
-+This example defines 3 contiguous regions are defined for Linux kernel:
-+one default of all device drivers (named linux,cma at 72000000 and 64MiB in size),
-+one dedicated to the framebuffer device (named framebuffer at 78000000, 8MiB), and
-+one for multimedia processing (named multimedia-memory at 77000000, 64MiB).
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	memory {
-+		reg = <0x40000000 0x40000000>;
-+	};
-+
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		/* global autoconfigured region for contiguous allocations */
-+		linux,cma {
-+			compatible = "shared-dma-pool";
-+			reusable;
-+			#memory-region-cells = <0>;
-+			size = <0x4000000>;
-+			alignment = <0x2000>;
-+			linux,cma-default;
-+		};
-+
-+		display_reserved: framebuffer at 78000000 {
-+			#memory-region-cells = <0>;
-+			reg = <0x78000000 0x800000>;
-+		};
-+
-+		multimedia_reserved: multimedia at 77000000 {
-+			compatible = "acme,multimedia-memory";
-+			#memory-region-cells = <1>;
-+			reg = <0x77000000 0x4000000>;
-+		};
-+	};
-+
-+	/* ... */
-+
-+	fb0: video at 12300000 {
-+		memory-region = <&display_reserved>;
-+		/* ... */
-+	};
-+
-+	scaler: scaler at 12500000 {
-+		memory-region = <&multimedia_reserved 0xdeadbeef>;
-+		/* ... */
-+	};
-+
-+	codec: codec at 12600000 {
-+		memory-region = <&multimedia_reserved 0xfeebdaed>;
-+		/* ... */
-+	};
-+};
+> I think I've listed all the compatibles that the driver
+> supports.
+
+You got it backwards.  The binding is not the after-the-fact
+documentation of a specific Linux driver.  Instead the Linux
+driver is (supposed to be) an implementation of what the binding
+specifies.  And in this case, there are several drivers, each
+managing a subset of the compatibles space, each supposed to
+follow the spec.  See
+
+  git grep 'fsl,.*-fec' drivers/net/ethernet
+
+> > >  - reg : Address and length of the register set for the device
+> > >  - interrupts : Should contain fec interrupt
+> > > +- clocks: phandle to the clocks feeding the FEC controller and phy. The
+> > > +  following two are required:
+> > > +   - "ipg": the peripheral access clock
+> > > +   - "ahb": the bus clock for MAC
+> > > +  The following two are optional:
+> > > +   - "ptp": the sampling clock for PTP (IEEE 1588).  On SoC like i.MX6Q,
+> > > +     the clock could come from either the internal clock control module
+> > > +     or external oscillator via pad depending on board design.
+> > > +   - "enet_out": the phy reference clock provided by SoC via pad, which
+> > > +     is available on SoC like i.MX28.
+> > > +- clock-names: Must contain the clock names described just above
+> > > +
+> > 
+> > Listing 'clocks' under the "required properties" all of a sudden
+> > invalidates existing device trees, if they don't carry the
+> > property which before the change was not required, not even
+> > documented.
+> 
+> Since the day we move to device tree clock lookup, the driver fec_main
+> does not probe at all if the property is absent.
+
+That's an implementation detail.  It's not what the spec says,
+and neither is what the spec is to blindly follow after the / a
+driver created the fact.  Instead, a binding gets designed, and
+the software follows.
+
+In reality, the doc may be behind as developers are more
+concerned about the code.  But still when you "update" the
+binding, don't break compatibility!  Even if you'd adjust all
+drivers you can spot, it's still only Linux and not all device
+tree users.
+
+> > The PowerPC based chips probably have differing sets of clocks.
+> > I'm aware of the MPC512x, where one "per" clock is sufficient,
+> > and even this spec is optional.  Other machines may not have yet
+> > been converted to CCF.
+> 
+> Again, the binding is created for IMX FEC/ENET controller and the driver
+> fec_main, so I'm not sure you should look at this binding for
+> PowerPC/MPC512x stuff at all.
+
+See above, the binding is _not_ specific to i.MX, it's a FEC
+binding.  Which happens to apply to several architectures, as the
+FEC is used in several SoCs.  And keep in mind that the device
+tree binding is OS agnostic, Linux details just are not the
+reference.
+
+
+virtually yours
+Gerhard Sittig
 -- 
-1.7.9.5
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
