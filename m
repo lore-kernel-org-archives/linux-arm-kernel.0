@@ -1,186 +1,132 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 18 Feb 2014 20:10:48 +0000
-Subject: [PATCH 14/34] imx-drm: simplify setup of panel format
+Date: Tue, 18 Feb 2014 20:10:58 +0000
+Subject: [PATCH 16/34] imx-drm: imx-hdmi: convert to a component device
 In-Reply-To: <20140218200900.GM21483@n2100.arm.linux.org.uk>
 References: <20140218200900.GM21483@n2100.arm.linux.org.uk>
-Message-ID: <E1WFr0C-0007jH-9r@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1WFr0M-0007jP-HY@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The encoder format passed into imx_drm_crtc_panel_format*() is the
-encoder format used for DRM in most cases; the HDMI encoder sets
-this to none, but this is incorrect, it should be TMDS.
-
-Since this is the case, we can pass the drm_encoder structure
-directly into this function and use the supplied fields there to
-configure the CRTC.
+Convert imx-hdmi to be a component device; it will bind and unbind
+at the appropriate moment in the main DRM driver's functions.
 
 Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Acked-by: Shawn Guo <shawn.guo@linaro.org>
 Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/staging/imx-drm/imx-drm-core.c     | 18 ++++++++----------
- drivers/staging/imx-drm/imx-drm.h          |  4 ++--
- drivers/staging/imx-drm/imx-hdmi.c         |  3 +--
- drivers/staging/imx-drm/imx-ldb.c          |  3 +--
- drivers/staging/imx-drm/imx-tve.c          | 12 +++++++-----
- drivers/staging/imx-drm/ipuv3-crtc.c       |  1 +
- drivers/staging/imx-drm/parallel-display.c |  3 +--
- 7 files changed, 21 insertions(+), 23 deletions(-)
+ drivers/staging/imx-drm/imx-hdmi.c | 41 +++++++++++++++++++++++++++-----------
+ 1 file changed, 29 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
-index 7f14ed040072..d9786eca3a36 100644
---- a/drivers/staging/imx-drm/imx-drm-core.c
-+++ b/drivers/staging/imx-drm/imx-drm-core.c
-@@ -111,32 +111,30 @@ struct imx_drm_crtc *imx_drm_find_crtc(struct drm_crtc *crtc)
- 	return NULL;
- }
- 
--int imx_drm_crtc_panel_format_pins(struct drm_crtc *crtc, u32 encoder_type,
-+int imx_drm_panel_format_pins(struct drm_encoder *encoder,
- 		u32 interface_pix_fmt, int hsync_pin, int vsync_pin)
- {
- 	struct imx_drm_crtc_helper_funcs *helper;
- 	struct imx_drm_crtc *imx_crtc;
- 
--	imx_crtc = imx_drm_find_crtc(crtc);
-+	imx_crtc = imx_drm_find_crtc(encoder->crtc);
- 	if (!imx_crtc)
- 		return -EINVAL;
- 
- 	helper = &imx_crtc->imx_drm_helper_funcs;
- 	if (helper->set_interface_pix_fmt)
--		return helper->set_interface_pix_fmt(crtc,
--				encoder_type, interface_pix_fmt,
-+		return helper->set_interface_pix_fmt(encoder->crtc,
-+				encoder->encoder_type, interface_pix_fmt,
- 				hsync_pin, vsync_pin);
- 	return 0;
- }
--EXPORT_SYMBOL_GPL(imx_drm_crtc_panel_format_pins);
-+EXPORT_SYMBOL_GPL(imx_drm_panel_format_pins);
- 
--int imx_drm_crtc_panel_format(struct drm_crtc *crtc, u32 encoder_type,
--		u32 interface_pix_fmt)
-+int imx_drm_panel_format(struct drm_encoder *encoder, u32 interface_pix_fmt)
- {
--	return imx_drm_crtc_panel_format_pins(crtc, encoder_type,
--					      interface_pix_fmt, 2, 3);
-+	return imx_drm_panel_format_pins(encoder, interface_pix_fmt, 2, 3);
- }
--EXPORT_SYMBOL_GPL(imx_drm_crtc_panel_format);
-+EXPORT_SYMBOL_GPL(imx_drm_panel_format);
- 
- int imx_drm_crtc_vblank_get(struct imx_drm_crtc *imx_drm_crtc)
- {
-diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
-index 4eb594ce9cff..e3ca0c6b6a39 100644
---- a/drivers/staging/imx-drm/imx-drm.h
-+++ b/drivers/staging/imx-drm/imx-drm.h
-@@ -56,9 +56,9 @@ struct drm_gem_cma_object *imx_drm_fb_get_obj(struct drm_framebuffer *fb);
- 
- struct drm_device *imx_drm_device_get(void);
- void imx_drm_device_put(void);
--int imx_drm_crtc_panel_format_pins(struct drm_crtc *crtc, u32 encoder_type,
-+int imx_drm_panel_format_pins(struct drm_encoder *encoder,
- 		u32 interface_pix_fmt, int hsync_pin, int vsync_pin);
--int imx_drm_crtc_panel_format(struct drm_crtc *crtc, u32 encoder_type,
-+int imx_drm_panel_format(struct drm_encoder *encoder,
- 		u32 interface_pix_fmt);
- void imx_drm_fb_helper_set(struct drm_fbdev_cma *fbdev_helper);
- 
 diff --git a/drivers/staging/imx-drm/imx-hdmi.c b/drivers/staging/imx-drm/imx-hdmi.c
-index 4b690459f3bb..50475e606849 100644
+index 50475e606849..14b4a4b976b9 100644
 --- a/drivers/staging/imx-drm/imx-hdmi.c
 +++ b/drivers/staging/imx-drm/imx-hdmi.c
-@@ -1453,8 +1453,7 @@ static void imx_hdmi_encoder_prepare(struct drm_encoder *encoder)
- 	struct imx_hdmi *hdmi = container_of(encoder, struct imx_hdmi, encoder);
+@@ -12,6 +12,7 @@
+  * Copyright (C) 2010, Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+  */
  
- 	imx_hdmi_poweroff(hdmi);
--	imx_drm_crtc_panel_format(encoder->crtc, DRM_MODE_ENCODER_NONE,
--				  V4L2_PIX_FMT_RGB24);
-+	imx_drm_panel_format(encoder, V4L2_PIX_FMT_RGB24);
- }
++#include <linux/component.h>
+ #include <linux/irq.h>
+ #include <linux/delay.h>
+ #include <linux/err.h>
+@@ -1582,21 +1583,22 @@ static const struct of_device_id imx_hdmi_dt_ids[] = {
+ };
+ MODULE_DEVICE_TABLE(of, imx_hdmi_dt_ids);
  
- static void imx_hdmi_encoder_commit(struct drm_encoder *encoder)
-diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
-index c6ec1e9e95cc..dd29a4aad376 100644
---- a/drivers/staging/imx-drm/imx-ldb.c
-+++ b/drivers/staging/imx-drm/imx-ldb.c
-@@ -200,8 +200,7 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
- 		pixel_fmt = V4L2_PIX_FMT_RGB24;
- 	}
- 
--	imx_drm_crtc_panel_format(encoder->crtc, DRM_MODE_ENCODER_LVDS,
--			pixel_fmt);
-+	imx_drm_panel_format(encoder, pixel_fmt);
- }
- 
- static void imx_ldb_encoder_commit(struct drm_encoder *encoder)
-diff --git a/drivers/staging/imx-drm/imx-tve.c b/drivers/staging/imx-drm/imx-tve.c
-index 2d4e0973a02a..77131e5770f3 100644
---- a/drivers/staging/imx-drm/imx-tve.c
-+++ b/drivers/staging/imx-drm/imx-tve.c
-@@ -310,13 +310,11 @@ static void imx_tve_encoder_prepare(struct drm_encoder *encoder)
- 
- 	switch (tve->mode) {
- 	case TVE_MODE_VGA:
--		imx_drm_crtc_panel_format_pins(encoder->crtc,
--				DRM_MODE_ENCODER_DAC, IPU_PIX_FMT_GBR24,
-+		imx_drm_panel_format_pins(encoder, IPU_PIX_FMT_GBR24,
- 				tve->hsync_pin, tve->vsync_pin);
- 		break;
- 	case TVE_MODE_TVOUT:
--		imx_drm_crtc_panel_format(encoder->crtc, DRM_MODE_ENCODER_TVDAC,
--					  V4L2_PIX_FMT_YUV444);
-+		imx_drm_panel_format(encoder, V4L2_PIX_FMT_YUV444);
- 		break;
- 	}
- }
-@@ -510,12 +508,16 @@ static int tve_clk_init(struct imx_tve *tve, void __iomem *base)
- 
- static int imx_tve_register(struct imx_tve *tve)
+-static int imx_hdmi_platform_probe(struct platform_device *pdev)
++static int imx_hdmi_bind(struct device *dev, struct device *master, void *data)
  {
-+	int encoder_type;
- 	int ret;
++	struct platform_device *pdev = to_platform_device(dev);
+ 	const struct of_device_id *of_id =
+-				of_match_device(imx_hdmi_dt_ids, &pdev->dev);
+-	struct device_node *np = pdev->dev.of_node;
++				of_match_device(imx_hdmi_dt_ids, dev);
++	struct device_node *np = dev->of_node;
+ 	struct device_node *ddc_node;
+ 	struct imx_hdmi *hdmi;
+ 	struct resource *iores;
+ 	int ret, irq;
  
-+	encoder_type = tve->mode == TVE_MODE_VGA ?
-+				DRM_MODE_ENCODER_DAC : DRM_MODE_ENCODER_TVDAC;
+-	hdmi = devm_kzalloc(&pdev->dev, sizeof(*hdmi), GFP_KERNEL);
++	hdmi = devm_kzalloc(dev, sizeof(*hdmi), GFP_KERNEL);
+ 	if (!hdmi)
+ 		return -ENOMEM;
+ 
+-	hdmi->dev = &pdev->dev;
++	hdmi->dev = dev;
+ 	hdmi->sample_rate = 48000;
+ 	hdmi->ratio = 100;
+ 
+@@ -1620,13 +1622,13 @@ static int imx_hdmi_platform_probe(struct platform_device *pdev)
+ 	if (irq < 0)
+ 		return -EINVAL;
+ 
+-	ret = devm_request_irq(&pdev->dev, irq, imx_hdmi_irq, 0,
+-			       dev_name(&pdev->dev), hdmi);
++	ret = devm_request_irq(dev, irq, imx_hdmi_irq, 0,
++			       dev_name(dev), hdmi);
+ 	if (ret)
+ 		return ret;
+ 
+ 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	hdmi->regs = devm_ioremap_resource(&pdev->dev, iores);
++	hdmi->regs = devm_ioremap_resource(dev, iores);
+ 	if (IS_ERR(hdmi->regs))
+ 		return PTR_ERR(hdmi->regs);
+ 
+@@ -1665,7 +1667,7 @@ static int imx_hdmi_platform_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* Product and revision IDs */
+-	dev_info(&pdev->dev,
++	dev_info(dev,
+ 		"Detected HDMI controller 0x%x:0x%x:0x%x:0x%x\n",
+ 		hdmi_readb(hdmi, HDMI_DESIGN_ID),
+ 		hdmi_readb(hdmi, HDMI_REVISION_ID),
+@@ -1699,7 +1701,7 @@ static int imx_hdmi_platform_probe(struct platform_device *pdev)
+ 
+ 	imx_drm_encoder_add_possible_crtcs(hdmi->imx_drm_encoder, np);
+ 
+-	platform_set_drvdata(pdev, hdmi);
++	dev_set_drvdata(dev, hdmi);
+ 
+ 	return 0;
+ 
+@@ -1711,9 +1713,10 @@ static int imx_hdmi_platform_probe(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
+-static int imx_hdmi_platform_remove(struct platform_device *pdev)
++static void imx_hdmi_unbind(struct device *dev, struct device *master,
++	void *data)
+ {
+-	struct imx_hdmi *hdmi = platform_get_drvdata(pdev);
++	struct imx_hdmi *hdmi = dev_get_drvdata(dev);
+ 	struct drm_connector *connector = &hdmi->connector;
+ 	struct drm_encoder *encoder = &hdmi->encoder;
+ 
+@@ -1724,7 +1727,21 @@ static int imx_hdmi_platform_remove(struct platform_device *pdev)
+ 	clk_disable_unprepare(hdmi->iahb_clk);
+ 	clk_disable_unprepare(hdmi->isfr_clk);
+ 	i2c_put_adapter(hdmi->ddc);
++}
+ 
++static const struct component_ops hdmi_ops = {
++	.bind	= imx_hdmi_bind,
++	.unbind	= imx_hdmi_unbind,
++};
 +
- 	tve->connector.funcs = &imx_tve_connector_funcs;
- 	tve->encoder.funcs = &imx_tve_encoder_funcs;
- 
--	tve->encoder.encoder_type = DRM_MODE_ENCODER_NONE;
-+	tve->encoder.encoder_type = encoder_type;
- 	tve->connector.connector_type = DRM_MODE_CONNECTOR_VGA;
- 
- 	drm_encoder_helper_add(&tve->encoder, &imx_tve_encoder_helper_funcs);
-diff --git a/drivers/staging/imx-drm/ipuv3-crtc.c b/drivers/staging/imx-drm/ipuv3-crtc.c
-index 22be104fbda9..08e0a3b29174 100644
---- a/drivers/staging/imx-drm/ipuv3-crtc.c
-+++ b/drivers/staging/imx-drm/ipuv3-crtc.c
-@@ -284,6 +284,7 @@ static int ipu_set_interface_pix_fmt(struct drm_crtc *crtc, u32 encoder_type,
- 		ipu_crtc->di_clkflags = IPU_DI_CLKMODE_SYNC |
- 			IPU_DI_CLKMODE_EXT;
- 		break;
-+	case DRM_MODE_ENCODER_TMDS:
- 	case DRM_MODE_ENCODER_NONE:
- 		ipu_crtc->di_clkflags = 0;
- 		break;
-diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-index 18a3e8aae22a..12bcf4f58bdf 100644
---- a/drivers/staging/imx-drm/parallel-display.c
-+++ b/drivers/staging/imx-drm/parallel-display.c
-@@ -108,8 +108,7 @@ static void imx_pd_encoder_prepare(struct drm_encoder *encoder)
- {
- 	struct imx_parallel_display *imxpd = enc_to_imxpd(encoder);
- 
--	imx_drm_crtc_panel_format(encoder->crtc, DRM_MODE_ENCODER_NONE,
--			imxpd->interface_pix_fmt);
-+	imx_drm_panel_format(encoder, imxpd->interface_pix_fmt);
++static int imx_hdmi_platform_probe(struct platform_device *pdev)
++{
++	return component_add(&pdev->dev, &hdmi_ops);
++}
++
++static int imx_hdmi_platform_remove(struct platform_device *pdev)
++{
++	component_del(&pdev->dev, &hdmi_ops);
+ 	return 0;
  }
  
- static void imx_pd_encoder_commit(struct drm_encoder *encoder)
 -- 
 1.8.3.1
