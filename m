@@ -1,38 +1,30 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 19 Feb 2014 15:14:09 +0400
-Subject: =?UTF-8?B?UmU6IFtSRkMgUEFUQ0ggdjIgMS8yXSBtZmQ6IHN5c2NvbjogU3VwcG9ydCBl?=
- =?UTF-8?B?YXJseSBpbml0aWFsaXphdGlvbg==?=
-In-Reply-To: <fa3178534fcf4488fc45a9a24e44b2588acb38c6.1392807832.git.michal.simek@xilinx.com>
-References: <cover.1392807832.git.michal.simek@xilinx.com>
- <fa3178534fcf4488fc45a9a24e44b2588acb38c6.1392807832.git.michal.simek@xilinx.com>
-Message-ID: <1392808449.306481065@f243.i.mail.ru>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 19 Feb 2014 08:15:03 -0300
+Subject: PMIC driver prevents gpio-leds to work
+In-Reply-To: <20140219033801.GN2669@sirena.org.uk>
+References: <CAOMZO5D0fa0yzwQbNLG_=oJ_8_WBBqWBF=D9QzSwLwC0jh+deQ@mail.gmail.com>
+ <1392749026.163265479@f312.i.mail.ru>
+ <CAOMZO5DWkxv8q+1+LsOYPPLqxXCAW2q9LRXyn-zV-SSSW10AwQ@mail.gmail.com>
+ <20140219033801.GN2669@sirena.org.uk>
+Message-ID: <CAOMZO5C8nxX2KiBsYrWqXXYMnSOJ+r28CQ-azvfxqqfWUUPKeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?????, 19 ??????? 2014, 12:04 +01:00 ?? Michal Simek <michal.simek@xilinx.com>:
-> Some platforms need to get system controller
-> ready as soon as possible.
-> The patch provides early_syscon_initialization
-> which create early mapping for all syscon compatible
-> devices in early_syscon_probe.
-> Regmap is get via syscon_early_regmap_lookup_by_phandle()
-> 
-> Regular device probes attach device to regmap
-> via regmap_attach_dev().
-> 
-> For early syscon initialization is necessary to extend
-> struct syscon and provide remove function
-> which unmap all early init structures.
-> 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
-...
+On Wed, Feb 19, 2014 at 12:38 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Tue, Feb 18, 2014 at 03:59:27PM -0300, Fabio Estevam wrote:
+>
+>> I thought that 'regulator-always-on' was enough, but I also need
+>> 'regulator-boot-on' as well.
+>
+> That sounds wrong, like something is forgetting to do an enable at some
+> point or there's some problem with the enable operation.  What's the
+> actual root cause here?  boot-on should really only be needed for
+> regulators where you can't read the status.
 
-> +static struct of_device_id of_syscon_ids[] = {
-> +	{ .compatible = "syscon" },
-> +	{},
->  };
+Thanks for your explanation, Mark.
 
-You should move syscon_ids out of #ifdef CONFIG_OF
+Sent v2 of the patch.
 
----
+Regards,
+
+Fabio Estevam
