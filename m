@@ -1,45 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 19 Feb 2014 21:19:50 +0100
-Subject: [GIT PULL] efm32 cleanups for next
-Message-ID: <20140219201950.GC6988@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 19 Feb 2014 21:20:52 +0100
+Subject: [PATCH 2/2] ARM: efm32: drop unused file <mach/timex.h>
+In-Reply-To: <1392841252-25918-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20140219201950.GC6988@pengutronix.de>
+ <1392841252-25918-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1392841252-25918-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This file is unused since commit
 
-the following changes since commit 11d73c56b96b4297bd96273e9a22b7c72d13f1fa:
+	79f08d9ed217 (ARM: drop <mach/timex.h> for !ARCH_MULTIPLATFORM, too)
 
-  Merge tag 'dropmachtimexh-v2' of git://git.pengutronix.de/git/ukl/linux into next/cleanup (2014-02-18 22:19:33 -0800)
+.
 
-are available in the git repository at:
-
-  git://git.pengutronix.de/git/ukl/linux.git tags/efm32-next
-
-for you to fetch changes up to c72b549182841e3ce3e4849cd7c9b178615f8224:
-
-  ARM: efm32: drop unused file <mach/timex.h> (2014-02-19 11:50:52 +0100)
-
-----------------------------------------------------------------
-Just two simple cleanups for efm32 removing two now unused files.
-
-----------------------------------------------------------------
-Uwe Kleine-K?nig (2):
-      ARM: efm32: drop unused file entry-macro.S
-      ARM: efm32: drop unused file <mach/timex.h>
-
-These changes are trivial enough that I don't expect any opposition, 
-so they come at once in the form of a pull request. I will send the two
-patches as reply to this mail anyhow.
-
-Best regards
-Uwe
-
- arch/arm/mach-efm32/include/mach/entry-macro.S | 4 ----
- arch/arm/mach-efm32/include/mach/timex.h       | 3 ---
- 2 files changed, 7 deletions(-)
- delete mode 100644 arch/arm/mach-efm32/include/mach/entry-macro.S
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-efm32/include/mach/timex.h | 3 ---
+ 1 file changed, 3 deletions(-)
  delete mode 100644 arch/arm/mach-efm32/include/mach/timex.h
 
+diff --git a/arch/arm/mach-efm32/include/mach/timex.h b/arch/arm/mach-efm32/include/mach/timex.h
+deleted file mode 100644
+index 7a8b26da6599..000000000000
+--- a/arch/arm/mach-efm32/include/mach/timex.h
++++ /dev/null
+@@ -1,3 +0,0 @@
+-/*
+- * Empty file waiting for deletion once <mach/timex.h> isn't needed any more.
+- */
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.8.5.3
