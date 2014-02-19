@@ -1,71 +1,39 @@
 From: klightspeed@killerwolves.net (klightspeed at killerwolves.net)
-Date: Thu, 20 Feb 2014 04:59:11 +1000
-Subject: [PATCH v6 1/4] DT: Vendor prefixes: Add ricoh, qnap, sii and synology
+Date: Thu, 20 Feb 2014 04:59:13 +1000
+Subject: [PATCH v6 3/4] DT: i2c: Trivial: Add sii, s35390a,
+ fix ricoh vendor prefix
 In-Reply-To: <1392836354-28886-1-git-send-email-klightspeed@killerwolves.net>
 References: <1392836354-28886-1-git-send-email-klightspeed@killerwolves.net>
-Message-ID: <1392836354-28886-2-git-send-email-klightspeed@killerwolves.net>
+Message-ID: <1392836354-28886-4-git-send-email-klightspeed@killerwolves.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrew Lunn <andrew@lunn.ch>
 
-The following patches make use of vendor names:
-* ricoy (Ricoh Co. Ltd.);
-* qnap (QNAP Systems, Inc.);
-* sii (Seiko Instruments, Inc.); and
-* synology (Synology, Inc.)
+Add the Seiko Instruments Inc S35390a to the list of trivial i2c
+devices. At the same time, correct the vendor prefix for ricoh, which
+should be the ticker symbol ricoy.
 
-Add them to the vendor prefix list.
-
-Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Acked-by: Jason Cooper <jason@lakedaemon.net>
 ---
-v2:
-Use stock ticker for Ricoh as vendor name
-s/Richoh/Ricoh/
+ Documentation/devicetree/bindings/i2c/trivial-devices.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-v5:
-Add vendor prefix for QNAP
-
-v6:
-Revert qnap vendor prefix change from v5
-Now properly based on -rc1
-
----
- Documentation/devicetree/bindings/vendor-prefixes.txt | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 40ce2df..ef1b77c 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -68,10 +68,12 @@ picochip	Picochip Ltd
- powervr	PowerVR (deprecated, use img)
- qca	Qualcomm Atheros, Inc.
- qcom	Qualcomm, Inc
-+qnap	QNAP Systems, Inc.
- ralink	Mediatek/Ralink Technology Corp.
- ramtron	Ramtron International
- realtek Realtek Semiconductor Corp.
- renesas	Renesas Electronics Corporation
-+ricoy	Ricoh Co. Ltd.
- rockchip	Fuzhou Rockchip Electronics Co., Ltd
- samsung	Samsung Semiconductor
- sbs	Smart Battery System
-@@ -79,12 +81,14 @@ schindler	Schindler
- sil	Silicon Image
- silabs	Silicon Laboratories
- simtek
-+sii	Seiko Instruments, Inc.
- sirf	SiRF Technology, Inc.
- snps 	Synopsys, Inc.
- st	STMicroelectronics
- ste	ST-Ericsson
- stericsson	ST-Ericsson
-+synology	Synology, Inc.
- ti	Texas Instruments
- tlm	Trusted Logic Mobility
- toshiba	Toshiba Corporation
+diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+index 1a1ac2e..5f37191 100644
+--- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
++++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+@@ -56,8 +56,9 @@ ovti,ov5642		OV5642: Color CMOS QSXGA (5-megapixel) Image Sensor with OmniBSI an
+ pericom,pt7c4338	Real-time Clock Module
+ plx,pex8648		48-Lane, 12-Port PCI Express Gen 2 (5.0 GT/s) Switch
+ ramtron,24c64		i2c serial eeprom  (24cxx)
+-ricoh,rs5c372a		I2C bus SERIAL INTERFACE REAL-TIME CLOCK IC
++ricoy,rs5c372a		I2C bus SERIAL INTERFACE REAL-TIME CLOCK IC
+ samsung,24ad0xd1	S524AD0XF1 (128K/256K-bit Serial EEPROM for Low Power)
++sii,s35390a		2-wire CMOS real-time clock
+ st-micro,24c256		i2c serial eeprom  (24cxx)
+ stm,m41t00		Serial Access TIMEKEEPER
+ stm,m41t62		Serial real-time clock (RTC) with alarm
 -- 
 1.8.3.2
