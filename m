@@ -1,48 +1,33 @@
 From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Wed, 19 Feb 2014 10:05:39 +0530
-Subject: [PATCH v10 4/6] KGDB: make kgdb_breakpoint() as noinline
+Date: Wed, 19 Feb 2014 10:05:41 +0530
+Subject: [PATCH v10 6/6] arm64: KGDB: Add KGDB config
 In-Reply-To: <1392784541-18034-1-git-send-email-vijay.kilari@gmail.com>
 References: <1392784541-18034-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1392784541-18034-5-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <1392784541-18034-7-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-The function kgdb_breakpoint() sets up break point at
-compile time by calling arch_kgdb_breakpoint();
-Though this call is surrounded by wmb() barrier,
-the compile can still re-order the break point,
-because this scheduling barrier is not a code motion
-barrier in gcc.
-
-Making kgdb_breakpoint() as noinline solves this problem
-of code reording around break point instruction and also
-avoids problem of being called as inline function from
-other places
-
-More details about discussion on this can be found here
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/269732
+Add HAVE_ARCH_KGDB for arm64 Kconfig
 
 Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Jason Wessel <jason.wessel@windriver.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- kernel/debug/debug_core.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/kernel/debug/debug_core.c b/kernel/debug/debug_core.c
-index 61d1d14..16ff807 100644
---- a/kernel/debug/debug_core.c
-+++ b/kernel/debug/debug_core.c
-@@ -1047,7 +1047,7 @@ int dbg_io_get_char(void)
-  * otherwise as a quick means to stop program execution and "break" into
-  * the debugger.
-  */
--void kgdb_breakpoint(void)
-+noinline void kgdb_breakpoint(void)
- {
- 	atomic_inc(&kgdb_setting_breakpoint);
- 	wmb(); /* Sync point before breakpoint */
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 27bbcfc..02107f2 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -38,6 +38,7 @@ config ARM64
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_PATA_PLATFORM
+ 	select HAVE_PERF_EVENTS
++	select HAVE_ARCH_KGDB
+ 	select IRQ_DOMAIN
+ 	select MODULES_USE_ELF_RELA
+ 	select NO_BOOTMEM
 -- 
 1.7.9.5
