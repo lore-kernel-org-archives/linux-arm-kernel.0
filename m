@@ -1,26 +1,19 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 19 Feb 2014 17:44:59 +0000 (UTC)
-Subject: [PATCH 1/1] ARM: OMAP5: Fix reboot handling
-In-Reply-To: <alpine.DEB.2.02.1402191738320.8777@utopia.booyaka.com>
-References: <1392592544-7884-1-git-send-email-vaibhav.bedia@gmail.com>
- <alpine.DEB.2.02.1402191738320.8777@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1402191744520.8777@utopia.booyaka.com>
+Date: Wed, 19 Feb 2014 17:48:51 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: AM43xx: implement support for machine restart
+In-Reply-To: <1392615080-2196-1-git-send-email-lokeshvutla@ti.com>
+References: <1392615080-2196-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <alpine.DEB.2.02.1402191748360.8777@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Feb 2014, Paul Walmsley wrote:
+On Mon, 17 Feb 2014, Lokesh Vutla wrote:
 
-> On Sun, 16 Feb 2014, Vaibhav Bedia wrote:
+> Add restart hook so that AM4372 builds can restart the platform.
 > 
-> > Use the correct register offset for issuing the
-> > reset command in OMAP5. Since dev_inst is set dynamically
-> > OMAP4 should not be affected by this change.
-> > 
-> > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@gmail.com>
-> 
-> Thanks, queued for v3.14-rc with Lokesh's Tested-by:.
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 
-(and Rajendra's ack also)
+Thanks, queued for v3.15.
 
 
 - Paul
