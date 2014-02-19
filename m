@@ -1,62 +1,61 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Feb 2014 15:11:56 +0800
-Subject: [PATCH 2/4] ARM: dts: Enable SAI ALSA SoC DAI device for Vybrid
- VF610 TOWER board.
-In-Reply-To: <1392788323-6092-3-git-send-email-Li.Xiubo@freescale.com>
-References: <1392788323-6092-1-git-send-email-Li.Xiubo@freescale.com>
- <1392788323-6092-3-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <20140219071154.GG3010@S2101-09.ap.freescale.net>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Wed, 19 Feb 2014 15:15:48 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Support debug LED
+Message-ID: <1392794148-335-1-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 01:38:41PM +0800, Xiubo Li wrote:
-> This patch adds and enables the SAI device.
-> 
-> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+The D9 LED controlled by gpio on the imx6qdl-sabreauto
+CPU board is a debug LED according to the board design.
+This patch adds the relevant device tree nodes to the
+imx6qdl-sabreauto device tree file to support this LED.
 
-The patch subject can be a little short like
+Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-  ARM: dts: vf610-twr: Enable SAI ALSA SoC DAI device
-
-Shawn
-
-> ---
->  arch/arm/boot/dts/vf610-twr.dts | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-> index e3a3805..8217854 100644
-> --- a/arch/arm/boot/dts/vf610-twr.dts
-> +++ b/arch/arm/boot/dts/vf610-twr.dts
-> @@ -127,9 +127,27 @@
->  				VF610_PAD_PTB5__UART1_RX		0x21a1
->  			>;
->  		};
-> +
-> +		pinctrl_sai2: sai2grp {
-> +		      fsl,pins = <
-> +			      VF610_PAD_PTA16__SAI2_TX_BCLK   0x02ed
-> +			      VF610_PAD_PTA18__SAI2_TX_DATA   0x02ee
-> +			      VF610_PAD_PTA19__SAI2_TX_SYNC   0x02ed
-> +			      VF610_PAD_PTA21__SAI2_RX_BCLK   0x02ed
-> +			      VF610_PAD_PTA22__SAI2_RX_DATA   0x02ed
-> +			      VF610_PAD_PTA23__SAI2_RX_SYNC   0x02ed
-> +			      VF610_PAD_PTB18__EXT_AUDIO_MCLK 0x02ed
-> +			>;
-> +		};
->  	};
->  };
->  
-> +&sai2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_sai2>;
-> +	status = "okay";
-> +};
-> +
->  &uart1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_uart1>;
-> -- 
-> 1.8.4
-> 
-> 
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index 33e9bff..009abd6 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -10,11 +10,24 @@
+  * http://www.gnu.org/copyleft/gpl.html
+  */
+ 
++#include <dt-bindings/gpio/gpio.h>
++
+ / {
+ 	memory {
+ 		reg = <0x10000000 0x80000000>;
+ 	};
+ 
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_leds>;
++
++		user {
++			label = "debug";
++			gpios = <&gpio5 15 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
+ 	sound-spdif {
+ 		compatible = "fsl,imx-audio-spdif",
+ 			   "fsl,imx-sabreauto-spdif";
+@@ -217,6 +230,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_gpio_leds: gpioledsgrp {
++			fsl,pins = <
++				MX6QDL_PAD_DISP0_DAT21__GPIO5_IO15	0x80000000
++			>;
++		};
++
+ 		pinctrl_gpmi_nand: gpminandgrp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
+-- 
+1.7.9.5
