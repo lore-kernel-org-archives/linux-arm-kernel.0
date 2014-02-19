@@ -1,88 +1,36 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 19 Feb 2014 17:58:42 +0100
-Subject: [PATCH RFC v1 1/3] clk: Add function to parse an arbitrary clocks list
- property
+Date: Wed, 19 Feb 2014 17:58:43 +0100
+Subject: [PATCH RFC v1 2/3] of: Add definition of maximum length of a property
+ name
 In-Reply-To: <1392829124-25705-1-git-send-email-s.nawrocki@samsung.com>
 References: <1392829124-25705-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1392829124-25705-2-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1392829124-25705-3-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The of_clk_get_list_entry() function is like of_clk_get() except it allows
-to pass name of a DT property containing list of phandles and clock specifiers.
-For of_clk_get() it has been hard coded to "clocks".
+Maximum length of a property name is defined by ePAPR (2.2.4.1) as
+31 characters. Add a corresponding definition, including the trailing
+null space.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/clk/clk.h    |    3 +++
- drivers/clk/clkdev.c |   25 +++++++++++++++++++++----
- 2 files changed, 24 insertions(+), 4 deletions(-)
+ include/linux/of.h |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
-index 795cc9f..dd9def1 100644
---- a/drivers/clk/clk.h
-+++ b/drivers/clk/clk.h
-@@ -10,7 +10,10 @@
-  */
-
- #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 70c64ba..7f71221 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -30,6 +30,9 @@
+ typedef u32 phandle;
+ typedef u32 ihandle;
+ 
++/* Maximum length of name of a property, including terminating null */
++#define OF_PROP_NAME_MAXLEN	32
 +
- struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec);
- void of_clk_lock(void);
- void of_clk_unlock(void);
-+struct clk *of_clk_get_list_entry(struct device_node *np,
-+				  const char *list_name, int index);
- #endif
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index a360b2e..465662e 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -27,17 +27,28 @@ static LIST_HEAD(clocks);
- static DEFINE_MUTEX(clocks_mutex);
-
- #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
--struct clk *of_clk_get(struct device_node *np, int index)
-+/**
-+ * of_clk_get_list_entry() - Parse and lookup a clock referenced by a device node
-+ * @np: pointer to clock consumer node
-+ * @list_name: name of the clock list property
-+ * @index: index to the clock list
-+ *
-+ * This function parses the @list_name property and together with @index
-+ * value indicating an entry of the list uses it to look up the struct clk
-+ * from the registered list of clock providers.
-+ */
-+struct clk *of_clk_get_list_entry(struct device_node *np,
-+				  const char *list_name, int index)
- {
- 	struct of_phandle_args clkspec;
- 	struct clk *clk;
- 	int rc;
-
--	if (index < 0)
-+	if (index < 0 || !list_name)
- 		return ERR_PTR(-EINVAL);
-
--	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
--					&clkspec);
-+	rc = of_parse_phandle_with_args(np, list_name, "#clock-cells",
-+					index, &clkspec);
- 	if (rc)
- 		return ERR_PTR(rc);
-
-@@ -51,6 +62,12 @@ struct clk *of_clk_get(struct device_node *np, int index)
- 	of_node_put(clkspec.np);
- 	return clk;
- }
-+EXPORT_SYMBOL(of_clk_get_list_entry);
-+
-+struct clk *of_clk_get(struct device_node *np, int index)
-+{
-+	return of_clk_get_list_entry(np, "clocks", index);
-+}
- EXPORT_SYMBOL(of_clk_get);
-
- /**
---
+ struct property {
+ 	char	*name;
+ 	int	length;
+-- 
 1.7.9.5
