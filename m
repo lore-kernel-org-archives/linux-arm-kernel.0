@@ -1,32 +1,51 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 19 Feb 2014 10:06:54 -0500
-Subject: [PATCH 3/3] ahci: st: Add support for ST's SATA IP
-In-Reply-To: <20140219150121.GG10504@lee--X1>
-References: <1392641818-23419-1-git-send-email-lee.jones@linaro.org>
- <1392641818-23419-3-git-send-email-lee.jones@linaro.org>
- <20140218233645.GP31892@mtj.dyndns.org>
- <20140219083025.GB10504@lee--X1>
- <20140219140458.GA10134@htj.dyndns.org>
- <20140219150121.GG10504@lee--X1>
-Message-ID: <20140219150654.GH10134@htj.dyndns.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 19 Feb 2014 12:01:48 -0300
+Subject: [PATCH v6 01/19] clocksource: orion: Use atomic access for
+ shared registers
+In-Reply-To: <20140211094730.GG3687@localhost>
+References: <1391707226-18258-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1391707226-18258-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <52F96993.9090007@linaro.org> <20140211083024.GA3687@localhost>
+ <52F9E947.5020004@linaro.org> <20140211094730.GG3687@localhost>
+Message-ID: <20140219150147.GA4954@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Lee.
+On Tue, Feb 11, 2014 at 06:47:30AM -0300, Ezequiel Garcia wrote:
+> On Tue, Feb 11, 2014 at 10:11:35AM +0100, Daniel Lezcano wrote:
+> > On 02/11/2014 09:30 AM, Ezequiel Garcia wrote:
+> > > On Tue, Feb 11, 2014 at 01:06:43AM +0100, Daniel Lezcano wrote:
+> > >> On 02/06/2014 06:20 PM, Ezequiel Garcia wrote:
+> > >>> Replace the driver-specific thread-safe shared register API
+> > >>> by the recently introduced atomic_io_clear_set().
+> > >>>
+> > >>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > >>> Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > >>> Tested-by: Willy Tarreau <w@1wt.eu>
+> > >>> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> > >>> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > >>
+> > >> The patch looks good for me.
+> > >>
+> > >> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > >>
+> > >
+> > > Daniel,
+> > >
+> > > Jason acked this patch for you to take it. Or do you prefer that we
+> > > merge it with the rest of the watchdog series?
+> > 
+> > I can pick it, but doesn't the watchdog series depend on it ?
+> > 
+> 
+> Nope. It's indepedent of it.
 
-On Wed, Feb 19, 2014 at 03:01:21PM +0000, Lee Jones wrote:
-> I think that's a pretty unfair ask. I could understand if the
-> patch(es) didn't apply, or were hindered by the new API change, but I
-> do not believe that is the case?
+Daniel,
 
-Let me make it very clear to you.  If you want your code in, you help
-maintaining the larger code base.  I'm already extremely annoyed about
-the general behavior of embedded developers where the general attitude
-seems to be doing whatever to get *my* driver in the tree.  So, fuck
-you a little bit and if you want to make it happen faster, help Hans'
-patchset mature.  Unfair my ass.
-
-Thanks.
+Ping? This patch is independent of the watchdog series, and there won't
+be any conflicts with it, so I think it's safe for you to take it.
 
 -- 
-tejun
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
