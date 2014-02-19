@@ -1,38 +1,68 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 19 Feb 2014 20:39:09 +0900
-Subject: [PATCH 1/2] arm64: Add seccomp support
-In-Reply-To: <20140218153856.GB904@localhost>
-References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
- <1391767892-5395-2-git-send-email-takahiro.akashi@linaro.org>
- <20140218153856.GB904@localhost>
-Message-ID: <530497DD.2020806@linaro.org>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 19 Feb 2014 12:44:50 +0100
+Subject: [RFC PATCH v2 1/2] mfd: syscon: Support early initialization
+In-Reply-To: <20140219114132.GC10504@lee--X1>
+References: <cover.1392807832.git.michal.simek@xilinx.com>
+ <fa3178534fcf4488fc45a9a24e44b2588acb38c6.1392807832.git.michal.simek@xilinx.com>
+ <20140219114132.GC10504@lee--X1>
+Message-ID: <53049932.8020901@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2014 12:38 AM, Catalin Marinas wrote:
-> On Fri, Feb 07, 2014 at 10:11:31AM +0000, AKASHI Takahiro wrote:
->> --- a/arch/arm64/kernel/ptrace.c
->> +++ b/arch/arm64/kernel/ptrace.c
->> @@ -26,6 +26,7 @@
->>   #include <linux/smp.h>
->>   #include <linux/ptrace.h>
->>   #include <linux/user.h>
->> +#include <linux/seccomp.h>
->>   #include <linux/security.h>
->>   #include <linux/init.h>
->>   #include <linux/signal.h>
->> @@ -1064,6 +1065,10 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
->>   {
->>   	unsigned long saved_reg;
+On 02/19/2014 12:41 PM, Lee Jones wrote:
+> FAO Arnd, Mark,
+> 
+>> Some platforms need to get system controller
+>> ready as soon as possible.
+>> The patch provides early_syscon_initialization
+>> which create early mapping for all syscon compatible
+>> devices in early_syscon_probe.
+>> Regmap is get via syscon_early_regmap_lookup_by_phandle()
 >>
->> +	if (!dir && secure_computing((int)regs->syscallno))
->> +		/* seccomp failures shouldn't expose any additional code. */
->> +		return -1;
->
-> That's only restricted to the arm64 code but could we use a more
-> meaningful error number?
+>> Regular device probes attach device to regmap
+>> via regmap_attach_dev().
+>>
+>> For early syscon initialization is necessary to extend
+>> struct syscon and provide remove function
+>> which unmap all early init structures.
+>>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> ---
+>>
+>> Changes in v2:
+>> - Fix bad logic in early_syscon_probe
+>> - Fix compilation failure for x86_64 reported by zero day testing system
+>> - Regmap change available here
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git tags/nodev
+>>
+>>  drivers/mfd/syscon.c       | 128 +++++++++++++++++++++++++++++++++++++++------
+>>  include/linux/mfd/syscon.h |  11 ++++
+>>  2 files changed, 122 insertions(+), 17 deletions(-)
+> 
+> I have the same reservations as last time:
+> 
+>   http://archive.arm.linux.org.uk/lurker/message/20140212.095424.96cb7281.html
+> 
+> I believe you were waiting for Arnd and/or Mark to comment.
 
-Other architectures, including arm, also return just -1 in syscall_trace_enter(),
-but of course, we can use another value, say, -EPERM or -ENOSYS?
+yes on Arnd because Mark already applied that regmap part.
+But of course any input how to get this done will be helpful.
 
--Takahiro AKASHI
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140219/df6ad924/attachment.sig>
