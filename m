@@ -1,48 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Feb 2014 15:01:21 +0000
-Subject: [PATCH 3/3] ahci: st: Add support for ST's SATA IP
-In-Reply-To: <20140219140458.GA10134@htj.dyndns.org>
-References: <1392641818-23419-1-git-send-email-lee.jones@linaro.org>
- <1392641818-23419-3-git-send-email-lee.jones@linaro.org>
- <20140218233645.GP31892@mtj.dyndns.org>
- <20140219083025.GB10504@lee--X1>
- <20140219140458.GA10134@htj.dyndns.org>
-Message-ID: <20140219150121.GG10504@lee--X1>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 19 Feb 2014 10:02:49 -0500
+Subject: [PATCH v6 00/18] ahci: library-ise ahci_platform, add sunxi
+ driver and cleanup imx driver
+In-Reply-To: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
+References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140219150249.GG10134@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Can I do this as a subsequent patch though? The current patch fits
-> > neatly onto our internal stable kernel (currently v3.10). The added
-> > work will require back-porting Hans' patch-set, which has not yet
-> > reached Mainline.
-> 
-> Hmm.... I'll apply Hans' patchset pretty soon and we still have some
-> time in this devel cycle so I'd much prefer applying the final patch.
+Hello,
 
-I think that's a pretty unfair ask. I could understand if the
-patch(es) didn't apply, or were hindered by the new API change, but I
-do not believe that is the case?
+On Wed, Feb 19, 2014 at 01:01:42PM +0100, Hans de Goede wrote:
+> Here is v6 of my patchset for adding ahci-sunxi support. This has been
+> tested with Allwinner A10, Allwinner A20 and Freeware imx6x SoCs, including
+> suspend / resume. Note that since my last revision the ahci_imx driver has
+> also grown imx53 sata support, it would be good if some-one could test that
+> with this series.
 
-FWIW, I have tried to apply the patches Hans send me, but they don't
-seem to apply cleanly.
+Stopping review here.  I really like where it's headed in general and
+most review points, except for lack of devres usage, are rather
+cosmetic.  I'm not completely decided yet whether we can defer devres
+until later or should go for it in the first round.
 
-Base is v3.14-rc1:
-
-Applying: ahci-platform: Add support for devices with more then 1 clock
-fatal: sha1 information is lacking or useless (drivers/ata/ahci_platform.c).
-Repository lacks necessary blobs to fall back on 3-way merge.
-Cannot fall back to three-way merge.
-Patch failed at 0001 ahci-platform: Add support for devices with more then 1 clock
-The copy of the patch that failed is found in:
-   .git/rebase-apply/patch
-When you have resolved this problem, run "git am --resolved".
-If you prefer to skip this patch, run "git am --skip" instead.
-To restore the original branch and stop patching, run "git am --abort".
-
-Any ideas?
+Thanks.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+tejun
