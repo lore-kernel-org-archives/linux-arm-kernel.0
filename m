@@ -1,19 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 19 Feb 2014 17:05:45 +0000
-Subject: [PATCH 2/2] arm64: asm: remove redundant "cc" clobbers
-In-Reply-To: <1391516953-14541-2-git-send-email-will.deacon@arm.com>
-References: <1391516953-14541-1-git-send-email-will.deacon@arm.com>
- <1391516953-14541-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20140219170544.GF22252@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 19 Feb 2014 09:05:45 -0800
+Subject: [PATCH 1/5] ARM: omap2: cm-t35: Add regulators and clock for
+ camera sensor
+In-Reply-To: <3444638.OmucgL67eO@avalon>
+References: <1392069284-18024-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <9621770.WFqvfViqR7@avalon> <53036840.3050605@compulab.co.il>
+ <3444638.OmucgL67eO@avalon>
+Message-ID: <20140219170545.GC27263@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 12:29:13PM +0000, Will Deacon wrote:
-> cbnz/tbnz don't update the condition flags, so remove the "cc" clobbers
-> from inline asm blocks that only use these instructions to implement
-> conditional branches.
+* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [140218 07:05]:
+> Hi Igor,
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> On Tuesday 18 February 2014 16:03:44 Igor Grinberg wrote:
+> > On 02/18/14 14:47, Laurent Pinchart wrote:
+> > > On Monday 10 February 2014 22:54:40 Laurent Pinchart wrote:
+> > >> The camera sensor will soon require regulators and clocks. Register
+> > >> fixed regulators for its VAA and VDD power supplies and a fixed rate
+> > >> clock for its master clock.
+> > > 
+> > > This patch is a prerequisite for a set of 4 patches that need to go
+> > > through the linux-media tree. It would simpler if it could go through the
+> > > same tree as well. Given that arch/arm/mach-omap2/board-cm-t35.c has seen
+> > > very little activity recently I believe the risk of conflict is pretty
+> > > low.
+> > 
+> > Indeed, as we work on DT stuff of cm-t35/3730 and pretty much stopped
+> > updating the board-cm-t35.c file.
+> 
+> DT support for the OMAP3 ISP is coming. Too slowly, but it's coming :-)
+> 
+> > > Tony, would
+> > > that be fine with you ?
+> > > 
+> > >> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > 
+> > Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+> 
+> Thank you. Tony, could I get your ack as well to push this through Mauro's 
+> tree ?
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Sure, the board-*.c files will get removed soonish, but meanwhile:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
