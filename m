@@ -1,61 +1,72 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Wed, 19 Feb 2014 15:15:48 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Support debug LED
-Message-ID: <1392794148-335-1-git-send-email-Ying.Liu@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 19 Feb 2014 15:13:51 +0800
+Subject: [PATCH 3/4] ARM: dts: Enable SGTL5000 codec based audio driver
+ node for VF610 TOWER.
+In-Reply-To: <1392788323-6092-4-git-send-email-Li.Xiubo@freescale.com>
+References: <1392788323-6092-1-git-send-email-Li.Xiubo@freescale.com>
+ <1392788323-6092-4-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <20140219071349.GH3010@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The D9 LED controlled by gpio on the imx6qdl-sabreauto
-CPU board is a debug LED according to the board design.
-This patch adds the relevant device tree nodes to the
-imx6qdl-sabreauto device tree file to support this LED.
+On Wed, Feb 19, 2014 at 01:38:42PM +0800, Xiubo Li wrote:
+> This patch adds and enables SGTL5000 codec support.
+> 
+> Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
+> ---
+>  arch/arm/boot/dts/vf610-twr.dts | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+> index 8217854..29790c9 100644
+> --- a/arch/arm/boot/dts/vf610-twr.dts
+> +++ b/arch/arm/boot/dts/vf610-twr.dts
+> @@ -34,6 +34,17 @@
+>  		};
+>  	};
+>  
+> +	regulators {
+> +		compatible = "simple-bus";
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+		#address-cells = <1>;
+		#size-cells = <0>;
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 33e9bff..009abd6 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -10,11 +10,24 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- / {
- 	memory {
- 		reg = <0x10000000 0x80000000>;
- 	};
- 
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_leds>;
-+
-+		user {
-+			label = "debug";
-+			gpios = <&gpio5 15 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
- 	sound-spdif {
- 		compatible = "fsl,imx-audio-spdif",
- 			   "fsl,imx-sabreauto-spdif";
-@@ -217,6 +230,12 @@
- 			>;
- 		};
- 
-+		pinctrl_gpio_leds: gpioledsgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT21__GPIO5_IO15	0x80000000
-+			>;
-+		};
-+
- 		pinctrl_gpmi_nand: gpminandgrp {
- 			fsl,pins = <
- 				MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
--- 
-1.7.9.5
+> +
+> +		reg_3p3v: 3p3v {
+
+		reg_3p3v: regulator at 0 {
+
+> +			compatible = "regulator-fixed";
+
+			reg = <0>;
+
+Shawn
+
+> +			regulator-name = "3P3V";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +	};
+>  };
+>  
+>  &dspi0 {
+> @@ -72,6 +83,14 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_i2c0>;
+>  	status = "okay";
+> +
+> +	codec: sgtl5000 at 0a {
+> +	       compatible = "fsl,sgtl5000";
+> +	       reg = <0x0a>;
+> +	       VDDA-supply = <&reg_3p3v>;
+> +	       VDDIO-supply = <&reg_3p3v>;
+> +	       clocks = <&clks VF610_CLK_SAI2>;
+> +       };
+>  };
+>  
+>  &iomuxc {
+> -- 
+> 1.8.4
+> 
+> 
