@@ -1,48 +1,81 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 19 Feb 2014 15:11:10 -0600
-Subject: [PATCH 1/3] clk: socfpga: Fix integer overflow in clock calculation
-Message-ID: <1392844273-11918-1-git-send-email-dinguyen@altera.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 19 Feb 2014 15:17:48 -0600
+Subject: [PATCH v7 1/4] DT: Vendor prefixes: Add ricoh, qnap,
+ sii and synology
+In-Reply-To: <1392840157-31072-2-git-send-email-klightspeed@killerwolves.net>
+References: <1392840157-31072-1-git-send-email-klightspeed@killerwolves.net>
+ <1392840157-31072-2-git-send-email-klightspeed@killerwolves.net>
+Message-ID: <CAL_JsqLR4efVwHL4KCHqqLfj64Uf+TefwDrpKjTpQE5uS6HPTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Wed, Feb 19, 2014 at 2:02 PM,  <klightspeed@killerwolves.net> wrote:
+> From: Andrew Lunn <andrew@lunn.ch>
+>
+> The following patches make use of vendor names:
+> * ricoh (Ricoh Co. Ltd.);
+> * qnap (QNAP Systems, Inc.);
+> * sii (Seiko Instruments, Inc.); and
+> * synology (Synology, Inc.)
+>
+> Add them to the vendor prefix list.
+>
+> Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Use 64-bit integer for calculating clock rate. Also use do_div for the
-64-bit division.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Signed-off-by: Graham Moore <grmoore@altera.com>
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- drivers/clk/socfpga/clk-pll.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/clk/socfpga/clk-pll.c b/drivers/clk/socfpga/clk-pll.c
-index 362004e..834b6e9 100644
---- a/drivers/clk/socfpga/clk-pll.c
-+++ b/drivers/clk/socfpga/clk-pll.c
-@@ -44,7 +44,8 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
- 					 unsigned long parent_rate)
- {
- 	struct socfpga_pll *socfpgaclk = to_socfpga_clk(hwclk);
--	unsigned long divf, divq, vco_freq, reg;
-+	unsigned long divf, divq, reg;
-+	unsigned long long vco_freq;
- 	unsigned long bypass;
- 
- 	reg = readl(socfpgaclk->hw.reg);
-@@ -54,8 +55,9 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
- 
- 	divf = (reg & SOCFPGA_PLL_DIVF_MASK) >> SOCFPGA_PLL_DIVF_SHIFT;
- 	divq = (reg & SOCFPGA_PLL_DIVQ_MASK) >> SOCFPGA_PLL_DIVQ_SHIFT;
--	vco_freq = parent_rate * (divf + 1);
--	return vco_freq / (1 + divq);
-+	vco_freq = (unsigned long long)parent_rate * (divf + 1);
-+	do_div(vco_freq, (1 + divq));
-+	return (unsigned long)vco_freq;
- }
- 
- static struct clk_ops clk_pll_ops = {
--- 
-1.7.9.5
+> ---
+> v2:
+> Use stock ticker for Ricoh as vendor name
+> s/Richoh/Ricoh/
+>
+> v5:
+> Add vendor prefix for QNAP
+>
+> v6:
+> Revert qnap vendor prefix change from v5
+> Now properly based on -rc1
+>
+> v7:
+> Revert ricoh vendor prefix change from v2
+>
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 3f900cd..4a52fa9 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -65,10 +65,12 @@ picochip    Picochip Ltd
+>  powervr        PowerVR (deprecated, use img)
+>  qca    Qualcomm Atheros, Inc.
+>  qcom   Qualcomm, Inc.
+> +qnap   QNAP Systems, Inc.
+>  ralink Mediatek/Ralink Technology Corp.
+>  ramtron        Ramtron International
+>  realtek Realtek Semiconductor Corp.
+>  renesas        Renesas Electronics Corporation
+> +ricoh  Ricoh Co. Ltd.
+>  rockchip       Fuzhou Rockchip Electronics Co., Ltd
+>  samsung        Samsung Semiconductor
+>  sbs    Smart Battery System
+> @@ -76,11 +78,13 @@ schindler   Schindler
+>  sil    Silicon Image
+>  silabs Silicon Laboratories
+>  simtek
+> +sii    Seiko Instruments, Inc.
+>  sirf   SiRF Technology, Inc.
+>  snps   Synopsys, Inc.
+>  st     STMicroelectronics
+>  ste    ST-Ericsson
+>  stericsson     ST-Ericsson
+> +synology       Synology, Inc.
+>  ti     Texas Instruments
+>  tlm    Trusted Logic Mobility
+>  toshiba        Toshiba Corporation
+> --
+> 1.8.3.2
+>
