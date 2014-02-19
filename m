@@ -1,41 +1,48 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Feb 2014 14:59:53 +0800
-Subject: [PATCH v3 1/4] Phytec phyFLEX-i.MX6 : Added USB_OTG Support
-In-Reply-To: <53045225.50509@phytec.in>
-References: <1392731185-4885-1-git-send-email-ashutosh.s@phytec.in>
- <20140219022307.GL15716@S2101-09.ap.freescale.net>
- <20140219055824.GB3010@S2101-09.ap.freescale.net>
- <53045225.50509@phytec.in>
-Message-ID: <20140219065949.GD3010@S2101-09.ap.freescale.net>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 19 Feb 2014 07:58:46 +0100
+Subject: [PATCH 1/1] imx-drm: imx-drm-core: fix the build warning
+In-Reply-To: <1392787693-12539-1-git-send-email-peter.chen@freescale.com>
+References: <1392787693-12539-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20140219075846.32f5fde4@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not send email in html.
+Hi,
 
-On Wed, Feb 19, 2014 at 12:11:41PM +0530, Ashutosh wrote:
-> By seeing the discussion would the below changes is appropriate
+Peter Chen wrote:
+> /home/b29397/work/projects/upstream/usb/usb/drivers/staging/imx-drm/imx-drm-core.c: In function 'imx_drm_driver_unload':
+> /home/b29397/work/projects/upstream/usb/usb/drivers/staging/imx-drm/imx-drm-core.c:87:25: warning: unused variable 'imxdrm' [-Wunused-variable]
 > 
-> regulators {
->                 compatible = "simple-bus";
->                 #address-cells = <1>;
->                 #size-cells = <0>;
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/staging/imx-drm/imx-drm-core.c |    2 --
+>  1 files changed, 0 insertions(+), 2 deletions(-)
 > 
->                 reg_usb_otg_vbus: regulator at 0 {
->                                compatible = "regulator-fixed";
->                                 reg = <0>;
->                                 regulator-name = "usb_otg_vbus";
->                                 regulator-min-microvolt = <5000000>;
->                                 regulator-max-microvolt = <5000000>;
->                                 gpio = <&gpio4 15 0>;
->                 };
-> 
-> But as Mark [1] suggested not to use simple bus. Which one is more appropriate
-> ?
+> diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+> index 236ed66..573fe88 100644
+> --- a/drivers/staging/imx-drm/imx-drm-core.c
+> +++ b/drivers/staging/imx-drm/imx-drm-core.c
+> @@ -84,8 +84,6 @@ static void imx_drm_driver_lastclose(struct drm_device *drm)
+>  
+>  static int imx_drm_driver_unload(struct drm_device *drm)
+>  {
+> -	struct imx_drm_device *imxdrm = drm->dev_private;
+> -
+>  	imx_drm_device_put();
+>  
+>  	drm_vblank_cleanup(drm);
+>
+You obviously missed: <20140210102906.GP26684@n2100.arm.linux.org.uk>
 
-Since it's already been used so widely and provided us a nice way to use
-the generic node name, I believe Mark is giving up his position.
 
-Shawn
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-> 
-> [1] http://www.spinics.net/lists/linux-usb/msg101477.html
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
