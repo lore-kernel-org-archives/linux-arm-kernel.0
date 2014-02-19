@@ -1,10 +1,10 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 19 Feb 2014 16:12:38 +0100
+Date: Wed, 19 Feb 2014 16:17:43 +0100
 Subject: [PATCH v3 15/15] mfd: max14577: Add device tree bindings document
 In-Reply-To: <1392627950-26927-16-git-send-email-k.kozlowski@samsung.com>
 References: <1392627950-26927-1-git-send-email-k.kozlowski@samsung.com>
  <1392627950-26927-16-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5304C9E6.9060705@samsung.com>
+Message-ID: <5304CB17.6060807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,6 +28,11 @@ On 17.02.2014 10:05, Krzysztof Kozlowski wrote:
 >   Documentation/devicetree/bindings/mfd/max14577.txt |  149 ++++++++++++++++++++
 >   1 file changed, 149 insertions(+)
 >   create mode 100644 Documentation/devicetree/bindings/mfd/max14577.txt
+
+OK, so the "maxim,max14577" compatible string somehow showed up in the 
+kernel without any documentation, interesting...
+
+Anyway:
 
 Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
