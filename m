@@ -1,33 +1,39 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 19 Feb 2014 14:05:53 +0100
-Subject: [PATCH v5 4/5] ARM: Kirkwood: Fix qnap vendor prefix
-In-Reply-To: <1392814154-11284-5-git-send-email-klightspeed@killerwolves.net>
-References: <1392814154-11284-1-git-send-email-klightspeed@killerwolves.net>
- <1392814154-11284-5-git-send-email-klightspeed@killerwolves.net>
-Message-ID: <20140219130553.GO17984@lunn.ch>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 19 Feb 2014 13:21:04 +0000
+Subject: [PATCH v3 2/5] irqchip: gic: use dmb ishst instead of dsb when
+ raising a softirq
+In-Reply-To: <1392812917-29302-2-git-send-email-will.deacon@arm.com>
+References: <1392812917-29302-1-git-send-email-will.deacon@arm.com>
+ <1392812917-29302-2-git-send-email-will.deacon@arm.com>
+Message-ID: <5304AFC0.6020202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
-> index a75db7f..d350ece 100644
-> --- a/drivers/power/reset/qnap-poweroff.c
-> +++ b/drivers/power/reset/qnap-poweroff.c
-> @@ -41,7 +41,7 @@ static const struct power_off_cfg synology_power_off_cfg = {
->  };
->  
->  static const struct of_device_id qnap_power_off_of_match_table[] = {
-> -	{ .compatible = "qnap,power-off",
-> +	{ .compatible = "qnapsz,power-off",
->  	  .data = &qnap_power_off_cfg,
->  	},
+On 19/02/14 12:28, Will Deacon wrote:
+> When sending an SGI to another CPU, we require a barrier to ensure that
+> any pending stores to normal memory are made visible to the recipient
+> before the interrupt arrives.
+> 
+> Rather than use a vanilla dsb() (which will soon cause an assembly error
+> on arm64) before the writel_relaxed, we can instead use dsb(ishst),
+> since we just need to ensure that any pending normal writes are visible
+> within the inner-shareable domain before we poke the GIC.
+> 
+> With this observation, we can then further weaken the barrier to a
+> dmb(ishst), since other CPUs in the inner-shareable domain must observe
+> the write to the distributor before the SGI is generated.
+> 
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Hi Ben
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-This causes issues for devices using old DT blobs. You need to keep
-the old entry as well as supporting the new vendor prefix.
+I'll queue a similar fix for the GICv3 code.
 
-We need to consider, is it worth the hassle of changing the prefix,
-since it has been in use for a long time. I think using the stock
-ticker is a "rule of thumb" and not a strict requirement.
+Thanks,
 
-      Andrew
+	M.
+-- 
+Jazz is not dead. It just smells funny...
