@@ -1,109 +1,42 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 19 Feb 2014 13:22:18 -0700
-Subject: [PATCH 1/1] pci-imx6.c: wait for retraining
-Message-ID: <1392841338-13527-1-git-send-email-troy.kisky@boundarydevices.com>
+From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
+Date: Wed, 19 Feb 2014 17:24:40 -0300
+Subject: [PATCH 0/4] clk: mvebu: fix clk init order
+In-Reply-To: <53032C14.9020502@free-electrons.com>
+References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140205183457.GW8533@titan.lakedaemon.net>
+ <20140217141336.GA2765@localhost> <53021BD2.3090301@free-electrons.com>
+ <20140217152147.GC2765@localhost> <53022AA9.8090606@free-electrons.com>
+ <20140217154421.GD2765@localhost> <530231C5.8090905@free-electrons.com>
+ <20140217181902.GG2765@localhost> <53032C14.9020502@free-electrons.com>
+Message-ID: <53051308.5040202@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Vasut <marex@denx.de>
+Hi Gregory,
 
-This patch handles the case where the PCIe link is up and running, yet drops
-into the LTSSM training mode. The link spends short time in the LTSSM training
-mode, but the current code can misinterpret it as the link being stalled.
-Waiting for the LTSSM training to complete fixes the issue.
+El 18/02/14 06:47, Gregory CLEMENT escribi?:
+(snip)
+> (...) what would be an acceptable
+> version would be the something like the patch attached. There will be still
+> an issue if old dtb is used with recent kernel, but at least the user will
+> be warned.
 
-Quoting Sascha, "This is broken since
-commit e6daf4a5e1b813bc7f85507ec83b8c2452c121e6
-PCI: imx6: Report "link up" only after link training completes
+The patch you attached is similar in spirit to what I suggested, but 
+with way more warnings sprinkled around. I don't really mind either way, 
+and if you prefer big warnings so be it; it's your driver after all :-)
 
-The designware driver changes the PORT_LOGIC_SPEED_CHANGE bit in
-dw_pcie_host_init() which causes the link to be retrained. During the next call
-to dw_pcie_rd_conf() the link is then reported being down and the function
-returns PCIBIOS_DEVICE_NOT_FOUND resulting in nonfunctioning PCIe."
+> This code only fix the Armada 370 case, a complete solution should modify
+> the dtsi for Armada XP, Armada 375, Armada 38x, Kirkwood and Dove. It should
+> also make the outputname mandatory for gate-clk for consistency.
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Tested-by: Troy Kisky <troy.kisky@boundarydevices.com>
-Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
----
- drivers/pci/host/pci-imx6.c | 47 ++++++++++++++++++++++++++++++++-------------
- 1 file changed, 34 insertions(+), 13 deletions(-)
+Again, all of them are your calls. Fix the issue as you see fit; as long 
+as it's a technically sound I'm ok with it. But please don't reinvent 
+the wheel on framework code under a principle that has no proven reason 
+to be to cover up for a buggy driver.
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index e8663a8..ee08250 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -424,20 +424,40 @@ static void imx6_pcie_reset_phy(struct pcie_port *pp)
- 
- static int imx6_pcie_link_up(struct pcie_port *pp)
- {
--	u32 rc, ltssm, rx_valid;
-+	u32 rc, debug_r0, rx_valid;
-+	int count = 5;
- 
- 	/*
--	 * Test if the PHY reports that the link is up and also that
--	 * the link training finished.  It might happen that the PHY
--	 * reports the link is already up, but the link training bit
--	 * is still set, so make sure to check the training is done
--	 * as well here.
-+	 * Test if the PHY reports that the link is up and also that the LTSSM
-+	 * training finished. There are three possible states of the link when
-+	 * this code is called:
-+	 * 1) The link is DOWN (unlikely)
-+	 *     The link didn't come up yet for some reason. This usually means
-+	 *     we have a real problem somewhere. Reset the PHY and exit. This
-+	 *     state calls for inspection of the DEBUG registers.
-+	 * 2) The link is UP, but still in LTSSM training
-+	 *     Wait for the training to finish, which should take a very short
-+	 *     time. If the training does not finish, we have a problem and we
-+	 *     need to inspect the DEBUG registers. If the training does finish,
-+	 *     the link is up and operating correctly.
-+	 * 3) The link is UP and no longer in LTSSM training
-+	 *     The link is up and operating correctly.
- 	 */
--	rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
--	if ((rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP) &&
--	    !(rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING))
--		return 1;
--
-+	while (1) {
-+		rc = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
-+		if (!(rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP))
-+			break;
-+		if (!(rc & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING))
-+			return 1;
-+		if (!count--)
-+			break;
-+		dev_dbg(pp->dev, "Link is up, but still in training\n");
-+		/*
-+		 * Wait a little bit, then re-check if the link finished
-+		 * the training.
-+		 */
-+		usleep_range(1000, 2000);
-+	}
- 	/*
- 	 * From L0, initiate MAC entry to gen2 if EP/RC supports gen2.
- 	 * Wait 2ms (LTSSM timeout is 24ms, PHY lock is ~5us in gen2).
-@@ -446,15 +466,16 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
- 	 * to gen2 is stuck
- 	 */
- 	pcie_phy_read(pp->dbi_base, PCIE_PHY_RX_ASIC_OUT, &rx_valid);
--	ltssm = readl(pp->dbi_base + PCIE_PHY_DEBUG_R0) & 0x3F;
-+	debug_r0 = readl(pp->dbi_base + PCIE_PHY_DEBUG_R0);
- 
- 	if (rx_valid & 0x01)
- 		return 0;
- 
--	if (ltssm != 0x0d)
-+	if ((debug_r0 & 0x3f) != 0x0d)
- 		return 0;
- 
- 	dev_err(pp->dev, "transition to gen2 is stuck, reset PHY!\n");
-+	dev_dbg(pp->dev, "debug_r0=%08x debug_r1=%08x\n", debug_r0, rc);
- 
- 	imx6_pcie_reset_phy(pp);
- 
--- 
-1.8.1.2
+Cheers, and have a great Wednesday :)
+
+Emilio
+
+PS: I'd really appreciate it if you could keep me cc'ed on respins of 
+patches I comment on in the future.
