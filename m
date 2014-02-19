@@ -1,36 +1,28 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 19 Feb 2014 19:59:33 +0400
-Subject: =?UTF-8?B?UmU6IFtQYXRjaCB2MyAyMC8yM10gQVJNOiBjb25maWc6IEFkZCBhIG11bHRp?=
- =?UTF-8?B?X3Y1X2RlZmNvbmZpZw==?=
-In-Reply-To: <2242951.MozLvvuPx0@wuerfel>
-References: <1392819174-11634-1-git-send-email-andrew@lunn.ch>
- <1392822524.597155607@f84.i.mail.ru> <2242951.MozLvvuPx0@wuerfel>
-Message-ID: <1392825573.346096924@f191.i.mail.ru>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 19 Feb 2014 17:00:16 +0100
+Subject: [PATCH v4 1/7] Documentation: Add device tree bindings for
+ Freescale i.MX GPC
+In-Reply-To: <2846176.fTzGkcQEPX@wuerfel>
+References: <1392737687-25003-1-git-send-email-p.zabel@pengutronix.de>
+ <201402191538.08507.arnd@arndb.de> <5304C4E9.6090505@samsung.com>
+ <2846176.fTzGkcQEPX@wuerfel>
+Message-ID: <1392825616.3445.51.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?????, 19 ??????? 2014, 16:54 +01:00 ?? Arnd Bergmann <arnd@arndb.de>:
-> On Wednesday 19 February 2014 19:08:44 Alexander Shiyan wrote:
-> > ?????, 19 ??????? 2014, 15:54 +01:00 ?? Arnd Bergmann <arnd@arndb.de>:
-> > > On Wednesday 19 February 2014 18:19:08 Alexander Shiyan wrote:
-> 
-> > > > Should we disable lowlevel debug for multi-* config?
-> > > 
-> > > Yes, definitely.
-> > > 
-> > > On a related note, I'd like to add a CONFIG_BROKEN_MULTIPLATFORM Kconfig
-> > > symbol and make all options depend on that which will result in a kernel
-> > >
+Am Mittwoch, den 19.02.2014, 15:56 +0100 schrieb Arnd Bergmann:
+> On Wednesday 19 February 2014 15:51:21 Tomasz Figa wrote:
 > > 
-> > config DEBUG_LL
-> >   depends on! ARCH_MULTIPLATFORM
+> > Just wanted to share a link with you. 
 > > 
-> > is not enough for this?
+> > http://www.spinics.net/lists/devicetree/msg18051.html
 > 
-> No, because that means you can no longer enable DEBUG_LL for any
-> kernel on MVEBU, IMX or any platform that depends on ARCH_MULTIPLATFORM.
+> Excellent, thanks for the heads-up.
+> 
+> Philipp, please review that patch and see if you can build on top of that
+> for your work.
 
-Case when I chose multiplatform but I know exactly what machine/platform I use?
-OK. Understood.
+Thanks, I'll do that.
 
----
+regards
+Philipp
