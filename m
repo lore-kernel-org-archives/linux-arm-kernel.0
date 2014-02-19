@@ -1,74 +1,27 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 20 Feb 2014 02:28:59 +0300
-Subject: [PATCH v2 2/2] ARM: shmobile: koelsch: add Ether DT support
-In-Reply-To: <201402200225.00598.sergei.shtylyov@cogentembedded.com>
-References: <201402200225.00598.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201402200229.00432.sergei.shtylyov@cogentembedded.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Thu, 20 Feb 2014 00:03:10 +0100
+Subject: I2C dummy adapter driver ?
+Message-ID: <5305382E.9050902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Koelsch board dependent part of the Ether device node. 
+Hi All,
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+I was wondering whether it would be reasonable to create a generic
+Linux dummy I2C bus controller driver. The rationale behind it is
+there might be hardware configurations where I2C communication is
+handled by firmware but still it is useful to have I2C slave devices
+instantiated by a Linux I2C bus adapter driver.
+It would be useful to have the common devicetree I2C binding scheme
+working regardless of where the I2C communication is handled - in
+firmware or by the host CPU.
 
----
-Changes in version 2:
-- moved PHY pin node phandle from PHY device node to the Ether device node, thus
-  removing all pin control properties from the PHY node;
-- refreshed the patch.
+Currently we have a somewhat dummy I2C adapter driver at drivers/media/
+platform/exynos4-is/fimc-is-i2c.c. But it is going to be needed by
+multiple SoCs and I thought about separating it or creating a generic
+dummy I2C adapter driver.
 
- arch/arm/boot/dts/r8a7791-koelsch.dts |   28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+Thoughts, suggestions ?
 
-Index: renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ renesas/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -2,7 +2,8 @@
-  * Device Tree Source for the Koelsch board
-  *
-  * Copyright (C) 2013 Renesas Electronics Corporation
-- * Copyright (C) 2013 Renesas Solutions Corp.
-+ * Copyright (C) 2013-2014 Renesas Solutions Corp.
-+ * Copyright (C) 2014 Cogent Embedded, Inc.
-  *
-  * This file is licensed under the terms of the GNU General Public License
-  * version 2.  This program is licensed "as is" without any warranty of any
-@@ -146,12 +147,37 @@
- 		renesas,function = "scif1";
- 	};
- 
-+	ether_pins: ether {
-+		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
-+		renesas,function = "eth";
-+	};
-+
-+	phy1_pins: phy1 {
-+		renesas,groups = "intc_irq0";
-+		renesas,function = "intc";
-+	};
-+
- 	qspi_pins: spi {
- 		renesas,groups = "qspi_ctrl", "qspi_data4";
- 		renesas,function = "qspi";
- 	};
- };
- 
-+&ether {
-+	pinctrl-0 = <&ether_pins &phy1_pins>;
-+	pinctrl-names = "default";
-+
-+	phy-handle = <&phy1>;
-+	renesas,ether-link-active-low;
-+	status = "ok";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+		interrupt-parent = <&irqc0>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
- &sata0 {
- 	status = "okay";
- };
+Thanks,
+Sylwester
