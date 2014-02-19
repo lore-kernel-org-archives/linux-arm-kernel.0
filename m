@@ -1,51 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 19 Feb 2014 21:54:46 +0100
-Subject: [PATCH v2 01/19] serial: sh-sci: Enable the driver on all ARM
- platforms
-In-Reply-To: <1383086274-11049-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383086274-11049-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20140219205446.GD6988@pengutronix.de>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 19 Feb 2014 14:10:51 -0700
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <3905203.TvF8RmfLsz@wuerfel>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <3312083.odPX4th7oi@wuerfel>
+ <CAErSpo5PCTyZ5jzumJxD=CCN+-t-Z31Cw+9ejT_oTQ4fFQePag@mail.gmail.com>
+ <3905203.TvF8RmfLsz@wuerfel>
+Message-ID: <20140219211051.GA17826@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 29, 2013 at 11:37:36PM +0100, Laurent Pinchart wrote:
-> Renesas ARM platforms are transitioning from single-platform to
-> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-> and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
-> COMPILE_TEST.
-> 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: linux-serial at vger.kernel.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  drivers/tty/serial/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index febd45c..9a5a8ef 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -709,7 +709,7 @@ config SERIAL_IP22_ZILOG_CONSOLE
->  
->  config SERIAL_SH_SCI
->  	tristate "SuperH SCI(F) serial port support"
-> -	depends on HAVE_CLK && (SUPERH || ARCH_SHMOBILE)
-> +	depends on HAVE_CLK && (SUPERH || ARM || COMPILE_TEST)
->  	select SERIAL_CORE
-This patch is in mainline as d4f9e7b3d12e92ede642f6f4fc7d959f06da8ccc
-since v3.13-rc1. I wonder if
+On Wed, Feb 19, 2014 at 09:48:48PM +0100, Arnd Bergmann wrote:
 
-	depends on HAVE_CLK && (SUPERH || ARCH_SHMOBILE || COMPILE_TEST)
+> Hmm, we'll have to think about that. From a DT perspective, we try
+> to keep things local to the node using it, so listing only the
+> registers we are allowed to access is more natural.
 
-isn't the better option. (Since bf98c1eac1d4a6bcf00532e4fa41d8126cd6c187
-ARCH_SHMOBILE is enabled for both multi-platform and legacy shmobile
-configs.) Or do you plan to deprecate ARCH_SHMOBILE?
+If I understand the restriction properly, in a modern PCI-E world it
+boils down to a limition on the configuration of each PCI-PCI root
+port bridge (eg, a limited range of valid bus values, and apertures)
 
-Best regards
-Uwe
+AFAIK it comes from the hidden per-socket routing registers that the
+firwmare configures. Range X->Y (bus #, IO and MMIO) will be routed to
+a specific physical socket, and then the PCI-E bridges in that socket
+claim the transatcion based on their local config to select the
+ultimate egress port.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+So describing and restricting the bridge DT node itself, under a
+single top level PCI domain stanza seems pretty reasonable.
+
+As does containing the restrictions in a HW driver with knowledge of
+the hidden registers, especially for firmware-less embedded. This is
+part of what mvebu is doing already.
+
+Jason
