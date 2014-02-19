@@ -1,138 +1,124 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 19 Feb 2014 15:12:36 +0100
-Subject: [Patch v3 05/23] ARM: Kirkwood: Seperate board-dt from common and
- pcie code.
+Date: Wed, 19 Feb 2014 15:12:49 +0100
+Subject: [Patch v3 18/23] drivers: Enable building of Kirkwood drivers for
+ mach-mvebu
 In-Reply-To: <1392819174-11634-1-git-send-email-andrew@lunn.ch>
 References: <1392819174-11634-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1392819174-11634-6-git-send-email-andrew@lunn.ch>
+Message-ID: <1392819174-11634-19-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to move DT support into mach-mvebu, the DT code
-needs to be cleanly separated from common and pcie code. Import the
-needed bits of these files into board-dt.c. The "common" code then
-becomes purely legacy, supporting none DT boards, so reflect this in
-the Makefile targets.
+With the move of kirkwood into mach-mvebu, drivers Kconfig need
+tweeking to allow the kirkwood specific drivers to be built.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Richard Purdie <rpurdie@rpsys.net>
+Cc: Bryan Wu <cooloney@gmail.com>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Eduardo Valentin <eduardo.valentin@ti.com>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Liam Girdwood <lgirdwood@gmail.com>
+v2
+Simplify cpufreq/Kconfig.arm
 ---
- arch/arm/mach-kirkwood/Makefile   |  3 +-
- arch/arm/mach-kirkwood/board-dt.c | 88 ++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 88 insertions(+), 3 deletions(-)
+ drivers/cpufreq/Kconfig.arm | 2 +-
+ drivers/cpuidle/Kconfig.arm | 2 +-
+ drivers/leds/Kconfig        | 4 ++--
+ drivers/phy/Kconfig         | 2 +-
+ drivers/thermal/Kconfig     | 2 +-
+ sound/soc/kirkwood/Kconfig  | 2 +-
+ 6 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index dc22bf5b21ed..3a72c5c6e747 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -1,5 +1,4 @@
--obj-y				+= common.o pcie.o
--obj-$(CONFIG_KIRKWOOD_LEGACY)	+= irq.o mpp.o
-+obj-$(CONFIG_KIRKWOOD_LEGACY)	+= irq.o mpp.o common.o pcie.o
- obj-$(CONFIG_PM)		+= pm.o
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 31297499a60a..077db3aa985b 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -113,7 +113,7 @@ config ARM_INTEGRATOR
+ 	  If in doubt, say Y.
  
- obj-$(CONFIG_MACH_D2NET_V2)		+= d2net_v2-setup.o lacie_v2-common.o
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index a0c0ff39788e..64151a4a378f 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -21,11 +21,97 @@
- #include <linux/irqchip.h>
- #include <linux/kexec.h>
- #include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
- #include <mach/bridge-regs.h>
- #include <plat/common.h>
--#include "common.h"
-+#include <plat/cache-feroceon-l2.h>
-+#include <plat/pcie.h>
- #include "pm.h"
+ config ARM_KIRKWOOD_CPUFREQ
+-	def_bool ARCH_KIRKWOOD && OF
++	def_bool MACH_KIRKWOOD
+ 	help
+ 	  This adds the CPUFreq driver for Marvell Kirkwood
+ 	  SoCs.
+diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
+index d988948a89a0..97ccc31dbdd8 100644
+--- a/drivers/cpuidle/Kconfig.arm
++++ b/drivers/cpuidle/Kconfig.arm
+@@ -22,7 +22,7 @@ config ARM_HIGHBANK_CPUIDLE
  
-+static struct map_desc kirkwood_io_desc[] __initdata = {
-+	{
-+		.virtual	= (unsigned long) KIRKWOOD_REGS_VIRT_BASE,
-+		.pfn		= __phys_to_pfn(KIRKWOOD_REGS_PHYS_BASE),
-+		.length		= KIRKWOOD_REGS_SIZE,
-+		.type		= MT_DEVICE,
-+	},
-+};
-+
-+static void __init kirkwood_map_io(void)
-+{
-+	iotable_init(kirkwood_io_desc, ARRAY_SIZE(kirkwood_io_desc));
-+}
-+
-+static void __init kirkwood_l2_init(void)
-+{
-+#ifdef CONFIG_CACHE_FEROCEON_L2
-+#ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
-+	writel(readl(L2_CONFIG_REG) | L2_WRITETHROUGH, L2_CONFIG_REG);
-+	feroceon_l2_init(1);
-+#else
-+	writel(readl(L2_CONFIG_REG) & ~L2_WRITETHROUGH, L2_CONFIG_REG);
-+	feroceon_l2_init(0);
-+#endif
-+#endif
-+}
-+
-+static struct resource kirkwood_cpufreq_resources[] = {
-+	[0] = {
-+		.start  = CPU_CONTROL_PHYS,
-+		.end    = CPU_CONTROL_PHYS + 3,
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device kirkwood_cpufreq_device = {
-+	.name		= "kirkwood-cpufreq",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(kirkwood_cpufreq_resources),
-+	.resource	= kirkwood_cpufreq_resources,
-+};
-+
-+static void __init kirkwood_cpufreq_init(void)
-+{
-+	platform_device_register(&kirkwood_cpufreq_device);
-+}
-+
-+static struct resource kirkwood_cpuidle_resource[] = {
-+	{
-+		.flags	= IORESOURCE_MEM,
-+		.start	= DDR_OPERATION_BASE,
-+		.end	= DDR_OPERATION_BASE + 3,
-+	},
-+};
-+
-+static struct platform_device kirkwood_cpuidle = {
-+	.name		= "kirkwood_cpuidle",
-+	.id		= -1,
-+	.resource	= kirkwood_cpuidle_resource,
-+	.num_resources	= 1,
-+};
-+
-+static void __init kirkwood_cpuidle_init(void)
-+{
-+	platform_device_register(&kirkwood_cpuidle);
-+}
-+
-+/* Temporary here since mach-mvebu has a function we can use */
-+static void kirkwood_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	/*
-+	 * Enable soft reset to assert RSTOUTn.
-+	 */
-+	writel(SOFT_RESET_OUT_EN, RSTOUTn_MASK);
-+
-+	/*
-+	 * Assert soft reset.
-+	 */
-+	writel(SOFT_RESET, SYSTEM_SOFT_RESET);
-+
-+	while (1)
-+		;
-+}
-+
- #define MV643XX_ETH_MAC_ADDR_LOW	0x0414
- #define MV643XX_ETH_MAC_ADDR_HIGH	0x0418
+ config ARM_KIRKWOOD_CPUIDLE
+ 	bool "CPU Idle Driver for Marvell Kirkwood SoCs"
+-	depends on ARCH_KIRKWOOD
++	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
+ 	help
+ 	  This adds the CPU Idle driver for Marvell Kirkwood SoCs.
  
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index 72156c123033..44c358ecf5a1 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -421,7 +421,7 @@ config LEDS_MC13783
+ config LEDS_NS2
+ 	tristate "LED support for Network Space v2 GPIO LEDs"
+ 	depends on LEDS_CLASS
+-	depends on ARCH_KIRKWOOD
++	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
+ 	default y
+ 	help
+ 	  This option enable support for the dual-GPIO LED found on the
+@@ -431,7 +431,7 @@ config LEDS_NS2
+ config LEDS_NETXBIG
+ 	tristate "LED support for Big Network series LEDs"
+ 	depends on LEDS_CLASS
+-	depends on ARCH_KIRKWOOD
++	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
+ 	default y
+ 	help
+ 	  This option enable support for LEDs found on the LaCie 2Big
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index afa2354f6600..5e6b33f9c294 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -24,7 +24,7 @@ config PHY_EXYNOS_MIPI_VIDEO
+ 
+ config PHY_MVEBU_SATA
+ 	def_bool y
+-	depends on ARCH_KIRKWOOD || ARCH_DOVE
++	depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD
+ 	depends on OF
+ 	select GENERIC_PHY
+ 
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index 35c066489a19..1bc9cbc4f1b8 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -142,7 +142,7 @@ config RCAR_THERMAL
+ 
+ config KIRKWOOD_THERMAL
+ 	tristate "Temperature sensor on Marvell Kirkwood SoCs"
+-	depends on ARCH_KIRKWOOD
++	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
+ 	depends on OF
+ 	help
+ 	  Support for the Kirkwood thermal sensor driver into the Linux thermal
+diff --git a/sound/soc/kirkwood/Kconfig b/sound/soc/kirkwood/Kconfig
+index 78ed4a42ad21..106e2e22fed2 100644
+--- a/sound/soc/kirkwood/Kconfig
++++ b/sound/soc/kirkwood/Kconfig
+@@ -1,6 +1,6 @@
+ config SND_KIRKWOOD_SOC
+ 	tristate "SoC Audio for the Marvell Kirkwood and Dove chips"
+-	depends on ARCH_KIRKWOOD || ARCH_DOVE || COMPILE_TEST
++	depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD || COMPILE_TEST
+ 	help
+ 	  Say Y or M if you want to add support for codecs attached to
+ 	  the Kirkwood I2S interface. You will also need to select the
 -- 
 1.8.5.3
