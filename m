@@ -1,156 +1,60 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 19 Feb 2014 15:33:38 +0100
-Subject: [PATCH V2 07/17] spi: pl022: Don't ignore power domain and amba bus
- at system suspend
-Message-ID: <1392820418-6972-1-git-send-email-ulf.hansson@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Feb 2014 15:38:08 +0100
+Subject: [PATCH v4 1/7] Documentation: Add device tree bindings for
+ Freescale i.MX GPC
+In-Reply-To: <1392802255.3445.18.camel@pizza.hi.pengutronix.de>
+References: <1392737687-25003-1-git-send-email-p.zabel@pengutronix.de>
+ <2328803.HhaG6blXIR@wuerfel>
+ <1392802255.3445.18.camel@pizza.hi.pengutronix.de>
+Message-ID: <201402191538.08507.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the available runtime PM callbacks for CONFIG_PM, we are now
-able to put the device into complete low power state at system suspend.
+On Wednesday 19 February 2014, Philipp Zabel wrote:
 
-Previously only the resources controlled by the driver were put into
-low power state at system suspend. Both the amba bus and a potential
-power domain were ignored, which now isn't the case any more.
+> Am Dienstag, den 18.02.2014, 19:10 +0100 schrieb Arnd Bergmann:
+> > On Tuesday 18 February 2014 16:34:41 Philipp Zabel wrote:
+> > > +
+> > > +Example of a device that is part of a power domain:
+> > > +
+> > > +       vpu: vpu at 02040000 {
+> > > +               reg = <0x02040000 0x3c000>;
+> > > +               /* ... */
+> > > +               fsl,power-domain = <&pd_pu>;
+> > > +               /* ... */
+> > > +       };
+> > > +
+> > 
+> > I'm really not too happy about platforms starting to add random
+> > bindings for power domains. Unfortunately I didn't catch exynos
+> > doing this first, but I don't want to see another platform like
+> > that.
+> > 
+> > Can we please come up with a proper generic power domain binding
+> > first and then add platform specific users?
+> 
+> what is the process here? I've seen the samsung bindings and copied the
+> pattern. I guess the Exynos bindings are set in stone, and the i.MX
+> power domains can be handled using the same bindings.
 
-Moreover, putting the device into low power state couldn't be done
-without first bringing it back to full power. This constraint don't
-exists any more.
+* First of all, get the pm domain maintainers into the loop, then make
+  sure all other users of pm domains are aware of what you are doing.
 
-Cc: Mark Brown <broonie@kernel.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
+* Come up with a way to describe a pm_domain in a sufficiently generic
+  way. It's possible you just need a phandle, but experience on other
+  subsystems suggests that it helps to allow arguments, as we do for
+  clocks, dmas, mailboxes, etc.
 
-Changes in v2:
-	Rebased on top of latest spi-pl022 patches.
+* Draft a generic binding that can work on all platforms
 
-	Note, currently this patch shall not be applied since first we want
-	to sort out the result from another patch to the PM core.
-	http://marc.info/?l=linux-pm&m=139228211505423&w=2
+* Implement support for the generic binding in the platform independent
+  code.
 
----
- drivers/spi/spi-pl022.c |   74 +++++++++++++++++++++++------------------------
- 1 file changed, 37 insertions(+), 37 deletions(-)
+* Add a specific binding for your hardware.
 
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 6dfcabf..7b016a2 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2277,35 +2277,7 @@ pl022_remove(struct amba_device *adev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM
--/*
-- * These two functions are used from both suspend/resume and
-- * the runtime counterparts to handle external resources like
-- * clocks, pins and regulators when going to sleep.
-- */
--static void pl022_suspend_resources(struct pl022 *pl022, bool runtime)
--{
--	clk_disable_unprepare(pl022->clk);
--
--	if (runtime)
--		pinctrl_pm_select_idle_state(&pl022->adev->dev);
--	else
--		pinctrl_pm_select_sleep_state(&pl022->adev->dev);
--}
--
--static void pl022_resume_resources(struct pl022 *pl022, bool runtime)
--{
--	/* First go to the default state */
--	pinctrl_pm_select_default_state(&pl022->adev->dev);
--	if (!runtime)
--		/* Then let's idle the pins until the next transfer happens */
--		pinctrl_pm_select_idle_state(&pl022->adev->dev);
--
--	clk_prepare_enable(pl022->clk);
--}
--#endif
--
--#ifdef CONFIG_SUSPEND
-+#ifdef CONFIG_PM_SLEEP
- static int pl022_suspend(struct device *dev)
- {
- 	struct pl022 *pl022 = dev_get_drvdata(dev);
-@@ -2317,8 +2289,23 @@ static int pl022_suspend(struct device *dev)
- 		return ret;
- 	}
- 
--	pm_runtime_get_sync(dev);
--	pl022_suspend_resources(pl022, false);
-+	pm_runtime_disable(dev);
-+
-+	if (!pm_runtime_status_suspended(dev)) {
-+		if (dev->pm_domain && dev->pm_domain->ops.runtime_suspend)
-+			ret = dev->pm_domain->ops.runtime_suspend(dev);
-+		else
-+			ret = dev->bus->pm->runtime_suspend(dev);
-+
-+		if (ret) {
-+			pm_runtime_enable(dev);
-+			return ret;
-+		}
-+
-+		pm_runtime_set_suspended(dev);
-+	}
-+
-+	pinctrl_pm_select_sleep_state(dev);
- 
- 	dev_dbg(dev, "suspended\n");
- 	return 0;
-@@ -2327,10 +2314,19 @@ static int pl022_suspend(struct device *dev)
- static int pl022_resume(struct device *dev)
- {
- 	struct pl022 *pl022 = dev_get_drvdata(dev);
--	int ret;
-+	int ret = 0;
- 
--	pl022_resume_resources(pl022, false);
--	pm_runtime_put(dev);
-+	if (dev->pm_domain && dev->pm_domain->ops.runtime_resume)
-+		ret = dev->pm_domain->ops.runtime_resume(dev);
-+	else
-+		ret = dev->bus->pm->runtime_resume(dev);
-+
-+	if (ret)
-+		dev_err(dev, "problem resuming\n");
-+	else
-+		pm_runtime_set_active(dev);
-+
-+	pm_runtime_enable(dev);
- 
- 	/* Start the queue running */
- 	ret = spi_master_resume(pl022->master);
-@@ -2341,14 +2337,16 @@ static int pl022_resume(struct device *dev)
- 
- 	return ret;
- }
--#endif	/* CONFIG_PM */
-+#endif
- 
- #ifdef CONFIG_PM
- static int pl022_runtime_suspend(struct device *dev)
- {
- 	struct pl022 *pl022 = dev_get_drvdata(dev);
- 
--	pl022_suspend_resources(pl022, true);
-+	clk_disable(pl022->clk);
-+	pinctrl_pm_select_idle_state(dev);
-+
- 	return 0;
- }
- 
-@@ -2356,7 +2354,9 @@ static int pl022_runtime_resume(struct device *dev)
- {
- 	struct pl022 *pl022 = dev_get_drvdata(dev);
- 
--	pl022_resume_resources(pl022, true);
-+	pinctrl_pm_select_default_state(dev);
-+	clk_enable(pl022->clk);
-+
- 	return 0;
- }
- #endif
--- 
-1.7.9.5
+* Implement support for your hardware binding on top of the generic
+  code.
+
+* Get everyone involved to Ack the generic binding and implementation.
+
+	Arnd
