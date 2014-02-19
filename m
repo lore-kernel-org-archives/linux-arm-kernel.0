@@ -1,86 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 19 Feb 2014 13:27:59 +0100
-Subject: [PATCH V4 17/17] i2c: nomadik: Fixup system suspend
-Message-ID: <1392812879-19251-1-git-send-email-ulf.hansson@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Feb 2014 12:28:35 +0000
+Subject: [PATCH v3 3/5] iommu/arm-smmu: provide option to dsb macro when
+ publishing tables
+In-Reply-To: <1392812917-29302-1-git-send-email-will.deacon@arm.com>
+References: <1392812917-29302-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1392812917-29302-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For !CONFIG_PM_RUNTIME, the device were never put back into active
-state while resuming.
+On coherent systems, publishing new page tables to the SMMU walker is
+achieved with a dsb instruction. In fact, this can be a dsb(ishst) which
+also provides the mandatory barrier option for arm64.
 
-For CONFIG_PM_RUNTIME, we blindly trusted the device to be inactive
-while we were about to handle it at suspend late, which is just too
-optimistic.
-
-Even if the driver uses pm_runtime_put_sync() after each tranfer to
-return it's runtime PM resources, there are no guarantees this will
-actually mean the device will inactivated. The reason is that the PM
-core will prevent runtime suspend during system suspend, and thus when
-a transfer occurs during the early phases of system suspend the device
-will be kept active after the transfer.
-
-To handle both issues above, we need to re-use the runtime PM callbacks
-and check the runtime PM state of the device before proceeding with our
-operations for system suspend.
-
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
+ drivers/iommu/arm-smmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Changes in v4:
-	Rebased on top of v4 of patch 16.
-
----
- drivers/i2c/busses/i2c-nomadik.c |   28 +++++++++++++++++++++++-----
- 1 file changed, 23 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 8082f5c..267375f 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -879,18 +879,36 @@ static irqreturn_t i2c_irq_handler(int irq, void *arg)
- #ifdef CONFIG_PM_SLEEP
- static int nmk_i2c_suspend_late(struct device *dev)
- {
--	pinctrl_pm_select_sleep_state(dev);
-+	if (!pm_runtime_status_suspended(dev)) {
-+		int ret = 0;
-+		if (dev->pm_domain && dev->pm_domain->ops.runtime_suspend)
-+			ret = dev->pm_domain->ops.runtime_suspend(dev);
-+		else
-+			ret = dev->bus->pm->runtime_suspend(dev);
-+		if (ret)
-+			return ret;
-+
-+		pm_runtime_set_suspended(dev);
-+	}
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 8911850c9444..8f6fee54f3b1 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1417,7 +1417,7 @@ out_unlock:
  
-+	pinctrl_pm_select_sleep_state(dev);
- 	return 0;
+ 	/* Ensure new page tables are visible to the hardware walker */
+ 	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+-		dsb();
++		dsb(ishst);
+ 
+ 	return ret;
  }
- 
- static int nmk_i2c_resume_early(struct device *dev)
- {
--	/* First go to the default state */
--	pinctrl_pm_select_default_state(dev);
--	/* Then let's idle the pins until the next transfer happens */
--	pinctrl_pm_select_idle_state(dev);
-+	int ret = 0;
-+
-+	if (dev->pm_domain && dev->pm_domain->ops.runtime_resume)
-+		ret = dev->pm_domain->ops.runtime_resume(dev);
-+	else
-+		ret = dev->bus->pm->runtime_resume(dev);
-+	if (ret) {
-+		dev_err(dev, "problem resuming\n");
-+		return ret;
-+	}
- 
-+	pm_runtime_set_active(dev);
- 	return 0;
- }
- #endif
 -- 
-1.7.9.5
+1.8.2.2
