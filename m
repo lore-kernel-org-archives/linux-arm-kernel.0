@@ -1,36 +1,108 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 19 Feb 2014 11:33:20 +0100
-Subject: [GIT PULL v2] get rid of <mach/timex.h>
-In-Reply-To: <20140219064104.GA24381@quad.lixom.net>
-References: <20140218213736.GA6988@pengutronix.de>
- <20140219064104.GA24381@quad.lixom.net>
-Message-ID: <20140219103319.GB6988@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 19 Feb 2014 10:33:38 +0000
+Subject: [PATCH] irqchip:gic: change access of gicc_ctrl register to read
+ modify write.
+In-Reply-To: <1392761550-11662-1-git-send-email-fkan@apm.com>
+References: <1392761550-11662-1-git-send-email-fkan@apm.com>
+Message-ID: <53048882.9070706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Olof,
+Hi Feng,
 
-On Tue, Feb 18, 2014 at 10:41:04PM -0800, Olof Johansson wrote:
-> > The series still creates the same merge conflicts when being pulled into
-> > linus/master. See
-> > http://git.pengutronix.de/?p=ukl/linux.git;a=commitdiff;h=dropmachtimexh-merged
-> > for how I resolved for the first pull request.
-> > 
-> > It would be great to get this merged into v3.15-rc1.
+On 18/02/14 22:12, Feng Kan wrote:
+> This change is made to preserve the GIC v2 releated bits in the
+> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
+> The original code only set the enable/disable group bit in this register.
+> This code will preserve all other bits configured by the bootload except
+
+This "all other bits" in itself is a major problem, see below.
+
+> the enable/disable bit. The main reason for this change is to allow the
+> bypass bits specified in the v2 spec to remain untouched by the current
+> GIC code. In the X-Gene platform, the bypass functionality is not used
+> and bypass must be disabled at all time.
 > 
-> Merged in as cleanup/timex-removal into next/cleanup.
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Acked-by: Anup Patel <apatel@apm.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+>  drivers/irqchip/irq-gic.c | 18 +++++++++++++++---
+>  1 file changed, 15 insertions(+), 3 deletions(-)
 > 
-> Note that your conflict resolution was incorrect at least for the
-> mach-sa1100 case, where the SA1100_LATCH define is still needed.
-Your resolution looks correct. SA1100_LATCH was missing from mine
-because my -merged branch was based on an earlier pull request that
-had the "ARM: sa1100: stop using mach/timex.h" broken with respect to
-LATCH. I redid the merge on top of v3.14-rc3 that you used as base, too,
-and got to the exact same merge resolution as you.
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 341c601..9adc3e1 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>  	void __iomem *dist_base = gic_data_dist_base(gic);
+>  	void __iomem *base = gic_data_cpu_base(gic);
+>  	unsigned int cpu_mask, cpu = smp_processor_id();
+> +	unsigned int ctrl_mask;
+>  	int i;
+>  
+>  	/*
+> @@ -449,13 +450,20 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>  		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
+>  
+>  	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+> -	writel_relaxed(1, base + GIC_CPU_CTRL);
+> +
+> +	ctrl_mask = readl(base + GIC_CPU_CTRL);
+> +	ctrl_mask |= 0x1;
+> +	writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
 
-Thanks for picking up my series
-Uwe
+So what if the firmware used a different EOImode? We would end up in a
+situation where we don't deactivate the interrupts anymore. Not good.
 
+You should only preserve the bits that actually matter, and that won't
+have an impact with the way the kernel works.
+
+>  }
+>  
+>  void gic_cpu_if_down(void)
+>  {
+> +	unsigned int ctrl_mask;
+>  	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+> -	writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
+> +
+> +	ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
+> +	ctrl_mask &= 0xfffffffe;
+
+nit: use
+
+	ctlr_mask &= ~1;
+
+in order to be consistent with the rest of the code.
+
+> +	writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
+>  }
+>  
+>  #ifdef CONFIG_CPU_PM
+> @@ -566,6 +574,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>  {
+>  	int i;
+>  	u32 *ptr;
+> +	unsigned int ctrl_mask;
+>  	void __iomem *dist_base;
+>  	void __iomem *cpu_base;
+>  
+> @@ -590,7 +599,10 @@ static void gic_cpu_restore(unsigned int gic_nr)
+>  		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
+>  
+>  	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
+> -	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
+> +
+> +	ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
+> +	ctrl_mask |= 0x1;
+> +	writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
+>  }
+>  
+>  static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
+> 
+
+Thanks,
+
+	M.
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Jazz is not dead. It just smells funny...
