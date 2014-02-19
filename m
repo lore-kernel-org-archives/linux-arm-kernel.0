@@ -1,55 +1,75 @@
 From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Wed, 19 Feb 2014 15:42:29 +0800
-Subject: [PATCH v2 2/4] ARM: dts: vf610-twr: Enable SAI ALSA SoC DAI device
+Date: Wed, 19 Feb 2014 15:42:31 +0800
+Subject: [PATCH v2 4/4] ARM: dts: vf610-twr: Add simple-card support.
 In-Reply-To: <1392795751-13351-1-git-send-email-Li.Xiubo@freescale.com>
 References: <1392795751-13351-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1392795751-13351-3-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <1392795751-13351-5-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds and enables the SAI device.
+This patch adds and enables simple-card support in DT node.
 
 Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/vf610-twr.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/vf610-twr.dts | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
 diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index e3a3805..bcee3bb 100644
+index 0f4bff5..a553aa2 100644
 --- a/arch/arm/boot/dts/vf610-twr.dts
 +++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -121,6 +121,18 @@
- 			>;
+@@ -48,6 +48,35 @@
+ 			regulator-always-on;
  		};
- 
-+		pinctrl_sai2: sai2grp {
-+		      fsl,pins = <
-+				VF610_PAD_PTA16__SAI2_TX_BCLK		0x02ed
-+				VF610_PAD_PTA18__SAI2_TX_DATA		0x02ee
-+				VF610_PAD_PTA19__SAI2_TX_SYNC		0x02ed
-+				VF610_PAD_PTA21__SAI2_RX_BCLK		0x02ed
-+				VF610_PAD_PTA22__SAI2_RX_DATA		0x02ed
-+				VF610_PAD_PTA23__SAI2_RX_SYNC		0x02ed
-+				VF610_PAD_PTB18__EXT_AUDIO_MCLK		0x02ed
-+			>;
+ 	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,widgets =
++			"Microphone", "Microphone Jack",
++			"Headphone", "Headphone Jack",
++			"Speaker", "Speaker Ext",
++			"Line", "Line In Jack";
++		simple-audio-card,routing =
++			"MIC_IN", "Microphone Jack",
++			"Microphone Jack", "Mic Bias",
++			"LINE_IN", "Line In Jack",
++			"Headphone Jack", "HP_OUT",
++			"Speaker Ext", "LINE_OUT";
++
++		simple-audio-card,cpu {
++			sound-dai = <&sai2>;
++			master-clkdir-out;
++			frame-master;
++			bitclock-master;
 +		};
 +
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				VF610_PAD_PTB4__UART1_TX		0x21a2
-@@ -130,6 +142,12 @@
- 	};
++		simple-audio-card,codec {
++			sound-dai = <&codec>;
++			frame-master;
++			bitclock-master;
++		};
++	};
  };
  
-+&sai2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sai2>;
-+	status = "okay";
-+};
-+
- &uart1 {
+ &dspi0 {
+@@ -88,6 +117,7 @@
+ 	status = "okay";
+ 
+ 	codec: sgtl5000 at 0a {
++	       #sound-dai-cells = <0>;
+ 	       compatible = "fsl,sgtl5000";
+ 	       reg = <0x0a>;
+ 	       VDDA-supply = <&reg_3p3v>;
+@@ -165,6 +195,7 @@
+ };
+ 
+ &sai2 {
++	#sound-dai-cells = <0>;
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
+ 	pinctrl-0 = <&pinctrl_sai2>;
+ 	status = "okay";
 -- 
 1.8.4
