@@ -1,56 +1,37 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 19 Feb 2014 15:14:41 -0800
-Subject: [PATCH v4 1/4] clocksource/cadence_ttc: Call
- clockevents_update_freq() with IRQs enabled
+Date: Wed, 19 Feb 2014 15:14:43 -0800
+Subject: [PATCH v4 3/4] arm: zynq: Don't use arm_global_timer with cpufreq
 In-Reply-To: <1392851684-29950-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1392851684-29950-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1392851684-29950-2-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1392851684-29950-4-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer core takes care of serialization and IRQs. Hence the driver is
-no longer required to disable interrupts when calling
-clockevents_update_freq().
+The timer frequency of the arm_global_timer depends on the CPU
+frequency. With cpufreq altering that frequency the arm_global_timer
+does not maintain a stable time base. Therefore don't enable that timer
+in case cpufreq is enabled.
 
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
 v4:
  - no change
 
- drivers/clocksource/cadence_ttc_timer.c | 17 ++---------------
- 1 file changed, 2 insertions(+), 15 deletions(-)
+ arch/arm/mach-zynq/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
-index 63f176de0d02..f05b9fdc7425 100644
---- a/drivers/clocksource/cadence_ttc_timer.c
-+++ b/drivers/clocksource/cadence_ttc_timer.c
-@@ -321,25 +321,12 @@ static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
- 
- 	switch (event) {
- 	case POST_RATE_CHANGE:
--	{
--		unsigned long flags;
--
--		/*
--		 * clockevents_update_freq should be called with IRQ disabled on
--		 * the CPU the timer provides events for. The timer we use is
--		 * common to both CPUs, not sure if we need to run on both
--		 * cores.
--		 */
--		local_irq_save(flags);
--		clockevents_update_freq(&ttcce->ce,
--				ndata->new_rate / PRESCALE);
--		local_irq_restore(flags);
--
- 		/* update cached frequency */
- 		ttc->freq = ndata->new_rate;
- 
-+		clockevents_update_freq(&ttcce->ce, ndata->new_rate / PRESCALE);
-+
- 		/* fall through */
--	}
- 	case PRE_RATE_CHANGE:
- 	case ABORT_RATE_CHANGE:
- 	default:
+diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
+index 6b04260aa142..f84fab14f0b7 100644
+--- a/arch/arm/mach-zynq/Kconfig
++++ b/arch/arm/mach-zynq/Kconfig
+@@ -13,6 +13,6 @@ config ARCH_ZYNQ
+ 	select HAVE_SMP
+ 	select SPARSE_IRQ
+ 	select CADENCE_TTC_TIMER
+-	select ARM_GLOBAL_TIMER
++	select ARM_GLOBAL_TIMER if !CPU_FREQ
+ 	help
+ 	  Support for Xilinx Zynq ARM Cortex A9 Platform
 -- 
 1.9.0.1.g4196000
