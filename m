@@ -1,84 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 19 Feb 2014 16:39:37 +0000
-Subject: [PATCH 3/3] ahci: st: Add support for ST's SATA IP
-In-Reply-To: <20140219153624.GI10134@htj.dyndns.org>
-References: <1392641818-23419-1-git-send-email-lee.jones@linaro.org>
- <1392641818-23419-3-git-send-email-lee.jones@linaro.org>
- <20140218233645.GP31892@mtj.dyndns.org>
- <20140219083025.GB10504@lee--X1>
- <20140219140458.GA10134@htj.dyndns.org>
- <20140219150121.GG10504@lee--X1>
- <20140219150654.GH10134@htj.dyndns.org>
- <20140219152336.GH10504@lee--X1>
- <20140219153624.GI10134@htj.dyndns.org>
-Message-ID: <20140219163937.GI10504@lee--X1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 19 Feb 2014 16:41:25 +0000
+Subject: [PATCH 1/2] arm64: Add seccomp support
+In-Reply-To: <530497DD.2020806@linaro.org>
+References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
+ <1391767892-5395-2-git-send-email-takahiro.akashi@linaro.org>
+ <20140218153856.GB904@localhost> <530497DD.2020806@linaro.org>
+Message-ID: <20140219164125.GD22252@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Since when has maintaining core code been the responsibility of the
-> > leaf driver developers? If you're aware that the core code is
-> > sub-standard then it's you who should be fixing it.
+On Wed, Feb 19, 2014 at 11:39:09AM +0000, AKASHI Takahiro wrote:
+> On 02/19/2014 12:38 AM, Catalin Marinas wrote:
+> > On Fri, Feb 07, 2014 at 10:11:31AM +0000, AKASHI Takahiro wrote:
+> >> --- a/arch/arm64/kernel/ptrace.c
+> >> +++ b/arch/arm64/kernel/ptrace.c
+> >> @@ -26,6 +26,7 @@
+> >>   #include <linux/smp.h>
+> >>   #include <linux/ptrace.h>
+> >>   #include <linux/user.h>
+> >> +#include <linux/seccomp.h>
+> >>   #include <linux/security.h>
+> >>   #include <linux/init.h>
+> >>   #include <linux/signal.h>
+> >> @@ -1064,6 +1065,10 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+> >>   {
+> >>   	unsigned long saved_reg;
+> >>
+> >> +	if (!dir && secure_computing((int)regs->syscallno))
+> >> +		/* seccomp failures shouldn't expose any additional code. */
+> >> +		return -1;
+> >
+> > That's only restricted to the arm64 code but could we use a more
+> > meaningful error number?
 > 
-> No, there isn't this clear divide between core and the leaf
-> developers.  People working on the "core" don't just grow off the
-> ground.  You can't just go around piling mess around claiming that
-> it's not your responsbility and then expect someone else to clean up
-> after you.  How can that be *possibly* sustainable?
+> Other architectures, including arm, also return just -1 in syscall_trace_enter(),
+> but of course, we can use another value, say, -EPERM or -ENOSYS?
 
-That's not what I said was it? You're misinterpreting me.
-
-I'm more than happy to work on core code and have done in the past.
-However, if every subsystem maintainer I submit patches to forced me
-to undertake some API clean-ups/re-write or convert to another
-future/development API prior to acceptance I wouldn't be able to get
-any of my own work done.
-
-> > I think it's great that forward thinking developers like Hans take on
-> > challenges to improve subsystems which are lacking in one way or
-> 
-> Yeah, which happened only because I pushed back and Hans isn't even
-> paid to do it.  Doesn't that say something?
-
-It tells me that Hans has more spare time than I do.
-
-This work would even be something I'd be interested in helping out
-with - even in my own time, but the way you speak to people doesn't
-exactly inspire them to go out of my way to work with you does it?
-
-> Nobody is actually helping Hans' work.  Not at all, nada, zilch.
-> Just complain when directed towards it.
-
-Again, that's not what I said. It's great that your subsystem is being
-improved, but insisting that anyone who submits new code to rebase
-on top of some development patches which only exist in mail form, and
-refusing to take patches until they do so doesn't seem right to me.
-
-> > another, but holding back other development while this process is
-> > ongoing is fundamentally wrong. Especially in this case where you're
-> > still actively reviewing/NACKing the core changes.
-> > 
-> > Changes to APIs should either support backward-capability or change all
-> > effected drivers. I haven't been able to apply the patches yet, so I
-> > can't tell which one of these holds true, but I believe it's the
-> > former. In which case any new driver using the _current_ (not old)
-> > API should fold neatly in. I've even offered to convert to the new API
-> > once it's Mainlined. How can I say fairer than that?
-> > 
-> > Finally, do try and stay at least a little bit professional on the
-> > MLs. That sort of disrespectful, rude behaviour may be how you guys do
-> > it at Redhat, but most will think it's nothing more than childish.
-> 
-> If you want me to be respectful towards you, don't be a crybaby
-> screaming "it's not fair".  It apparently isn't clear to you that you
-> have to chip in for the whole thing to be maintainable in the long
-> term.  Unfair... lol, that was a good one, really.
-
-It appears you've just regressed into childhood again. Let's continue
-this when you are able to have an adult conversation which other
-grown-ups.
+Actually we have another case of setting regs->syscallno = ~0UL in the
+same function, so we could do the same (also in line with entry.S).
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
