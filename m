@@ -1,28 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Feb 2014 20:31:06 -0800
-Subject: [PATCH] ARM: tegra: only run PL310 init on systems with one
-In-Reply-To: <1392767518-27821-1-git-send-email-swarren@wwwdotorg.org>
-References: <1392767518-27821-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140219043106.GA19089@quad.lixom.net>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Wed, 19 Feb 2014 10:05:40 +0530
+Subject: [PATCH v10 5/6] misc: debug: remove compilation warnings
+In-Reply-To: <1392784541-18034-1-git-send-email-vijay.kilari@gmail.com>
+References: <1392784541-18034-1-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <1392784541-18034-6-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 04:51:58PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Fix tegra_init_cache() to check whether the system has a PL310 cache
-> before touching the PL310 registers. This prevents access to non-existent
-> registers on Tegra114 and later.
-> 
-> Note for stable kernels:
-> In <= v3.12, the file to patch is arch/arm/mach-tegra/common.c.
-> 
-> Cc: <stable@vger.kernel.org> # v3.9+
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Another fix for 3.14
+From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-Applied.
+typecast instruction_pointer macro to unsigned long to
+resolve following compiler warnings like
+warning: format '%lx' expects argument of type 'long unsigned int',
+but argument 2 has type 'u64' [-Wformat]
 
+Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/ptrace.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
--Olof
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index 0e7fa49..5233966 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -164,7 +164,7 @@ static inline int valid_user_regs(struct user_pt_regs *regs)
+ 	return 0;
+ }
+ 
+-#define instruction_pointer(regs)	(regs)->pc
++#define instruction_pointer(regs)	((unsigned long)(regs)->pc)
+ 
+ #ifdef CONFIG_SMP
+ extern unsigned long profile_pc(struct pt_regs *regs);
+-- 
+1.7.9.5
