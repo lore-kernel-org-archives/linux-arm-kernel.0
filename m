@@ -1,33 +1,56 @@
-From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
-Date: Thu, 20 Feb 2014 00:59:53 +0200
-Subject: [GIT PULL] ARM: kprobes: big-endian support
-In-Reply-To: <52D3D784.2000600@linaro.org>
-References: <52D3D784.2000600@linaro.org>
-Message-ID: <53053769.5090100@linaro.org>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Wed, 19 Feb 2014 15:14:41 -0800
+Subject: [PATCH v4 1/4] clocksource/cadence_ttc: Call
+ clockevents_update_freq() with IRQs enabled
+In-Reply-To: <1392851684-29950-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1392851684-29950-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1392851684-29950-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2014 02:09 PM, Taras Kondratiuk wrote:
-> Hi Russell,
-> 
-> Please pull fixes for ARM Kprobes big-endian support.
-> 
-> It is reworked initial Ben's series for big endian support [1].
-> Dropped patches that are not directly related to kprobes.
-> Current set of patches is enough to have functional BE kprobes.
-> 
-> One ARM kprobe test fails on Cortex-A15 boards (TC2 and Keystone2 EVM),
-> while it passes on Pandaboard. The issue is not related to this series
-> and already present in v3.13-rc7.
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg285210.html
-> 
+The timer core takes care of serialization and IRQs. Hence the driver is
+no longer required to disable interrupts when calling
+clockevents_update_freq().
 
-Hi Russell,
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+v4:
+ - no change
 
-This pull request is based on 3.13-rc8, but it applies cleanly to
-3.14-rc3, because kprobes are not touched since then.
-Do I need to resent a new pull request based on 3.14-rc3 anyway?
+ drivers/clocksource/cadence_ttc_timer.c | 17 ++---------------
+ 1 file changed, 2 insertions(+), 15 deletions(-)
 
+diff --git a/drivers/clocksource/cadence_ttc_timer.c b/drivers/clocksource/cadence_ttc_timer.c
+index 63f176de0d02..f05b9fdc7425 100644
+--- a/drivers/clocksource/cadence_ttc_timer.c
++++ b/drivers/clocksource/cadence_ttc_timer.c
+@@ -321,25 +321,12 @@ static int ttc_rate_change_clockevent_cb(struct notifier_block *nb,
+ 
+ 	switch (event) {
+ 	case POST_RATE_CHANGE:
+-	{
+-		unsigned long flags;
+-
+-		/*
+-		 * clockevents_update_freq should be called with IRQ disabled on
+-		 * the CPU the timer provides events for. The timer we use is
+-		 * common to both CPUs, not sure if we need to run on both
+-		 * cores.
+-		 */
+-		local_irq_save(flags);
+-		clockevents_update_freq(&ttcce->ce,
+-				ndata->new_rate / PRESCALE);
+-		local_irq_restore(flags);
+-
+ 		/* update cached frequency */
+ 		ttc->freq = ndata->new_rate;
+ 
++		clockevents_update_freq(&ttcce->ce, ndata->new_rate / PRESCALE);
++
+ 		/* fall through */
+-	}
+ 	case PRE_RATE_CHANGE:
+ 	case ABORT_RATE_CHANGE:
+ 	default:
 -- 
-Taras Kondratiuk
+1.9.0.1.g4196000
