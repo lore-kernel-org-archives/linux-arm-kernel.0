@@ -1,64 +1,59 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 19 Feb 2014 12:17:02 +0000
-Subject: [PATCH 1/2] drivers: cci: Extend support to CCI revisions > r1p2
+Date: Wed, 19 Feb 2014 12:17:03 +0000
+Subject: [PATCH 2/2] drivers: cci: Export CCI PMU revision
 In-Reply-To: <1392812223-29274-1-git-send-email-punit.agrawal@arm.com>
 References: <1392812223-29274-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <1392812223-29274-2-git-send-email-punit.agrawal@arm.com>
+Message-ID: <1392812223-29274-3-git-send-email-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver queries the CCI IP revision to distinguish between r0 and r1
-scheme for event numbers and currently supports upto version r1p2. To
-minimise code churn every time there's a new version of the IP, assume
-that event numbering doesn't change for revisions > r1p0 (which is
-the case).
+The event numbering changed between revision r0 and r1 of the CCI
+PMU. Expose this to userspace to allow tooling to handle the
+differences in event numbers.
 
-The driver will still need an update for future revisions that change
-the event numbers.
-
+Suggested-by: Drew Richardson <Drew.Richardson@arm.com>
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/bus/arm-cci.c |   12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
+ drivers/bus/arm-cci.c |   12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 962fd35..da485ae 100644
+index da485ae..5a86da9 100644
 --- a/drivers/bus/arm-cci.c
 +++ b/drivers/bus/arm-cci.c
-@@ -88,8 +88,7 @@ static unsigned long cci_ctrl_phys;
+@@ -31,7 +31,6 @@
  
- #define CCI_REV_R0		0
- #define CCI_REV_R1		1
--#define CCI_REV_R0_P4		4
--#define CCI_REV_R1_P2		6
-+#define CCI_REV_R1_PX		5
+ #define DRIVER_NAME		"CCI-400"
+ #define DRIVER_NAME_PMU		DRIVER_NAME " PMU"
+-#define PMU_NAME		"CCI_400"
  
- #define CCI_PMU_EVT_SEL		0x000
- #define CCI_PMU_CNTR		0x004
-@@ -193,21 +192,16 @@ static int probe_cci_revision(void)
- 	rev = readl_relaxed(cci_ctrl_base + CCI_PID2) & CCI_PID2_REV_MASK;
- 	rev >>= CCI_PID2_REV_SHIFT;
+ #define CCI_PORT_CTRL		0x0
+ #define CCI_CTRL_STATUS		0xc
+@@ -162,6 +161,15 @@ static struct pmu_port_event_ranges port_event_range[] = {
+ 	},
+ };
  
--	if (rev <= CCI_REV_R0_P4)
-+	if (rev < CCI_REV_R1_PX)
- 		return CCI_REV_R0;
--	else if (rev <= CCI_REV_R1_P2)
-+	else
- 		return CCI_REV_R1;
--
--	return -ENOENT;
- }
- 
- static struct pmu_port_event_ranges *port_range_by_rev(void)
++/*
++ * Export different PMU names for the different revisions so userspace knows
++ * because the event ids are different
++ */
++static char *const pmu_names[] = {
++	[CCI_REV_R0] = "CCI_400",
++	[CCI_REV_R1] = "CCI_400_r1",
++};
++
+ struct cci_pmu_drv_data {
+ 	void __iomem *base;
+ 	struct arm_pmu *cci_pmu;
+@@ -520,7 +528,7 @@ static void pmu_write_counter(struct perf_event *event, u32 value)
+ static int cci_pmu_init(struct arm_pmu *cci_pmu, struct platform_device *pdev)
  {
- 	int rev = probe_cci_revision();
- 
--	if (rev < 0)
--		return NULL;
--
- 	return &port_event_range[rev];
- }
- 
+ 	*cci_pmu = (struct arm_pmu){
+-		.name             = PMU_NAME,
++		.name		  = pmu_names[probe_cci_revision()],
+ 		.max_period       = (1LLU << 32) - 1,
+ 		.get_hw_events    = pmu_get_hw_events,
+ 		.get_event_idx    = pmu_get_event_idx,
 -- 
 1.7.10.4
