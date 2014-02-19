@@ -1,23 +1,60 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Feb 2014 09:12:49 +0800
-Subject: [PATCH v9 01/12] usb: doc: phy-mxs: Add more compatible strings
-In-Reply-To: <20140218164924.GM9878@saruman.home>
-References: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
- <1388111921-17326-2-git-send-email-peter.chen@freescale.com>
- <20140218164924.GM9878@saruman.home>
-Message-ID: <20140219011247.GH15716@S2101-09.ap.freescale.net>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed, 19 Feb 2014 09:14:58 +0800
+Subject: [PATCH 2/2] USB: at91: using USBA_NR_DMAS for DMA channels
+In-Reply-To: <20140218161839.GD9878@saruman.home>
+References: <1389927565-22477-1-git-send-email-voice.shen@atmel.com>
+ <1389927565-22477-2-git-send-email-voice.shen@atmel.com>
+ <20140218161839.GD9878@saruman.home>
+Message-ID: <53040592.2000707@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 10:49:24AM -0600, Felipe Balbi wrote:
-> On Fri, Dec 27, 2013 at 10:38:30AM +0800, Peter Chen wrote:
-> > Add "fsl,imx6q-usbphy" for imx6dq and imx6dl, add
-> > "fsl,imx6sl-usbphy" for imx6sl.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> 
-> anybody from DT to give me an Acked-by ?
+Hi Felipe Balbi,
 
-Unfortunately, the DT maintainers and list are not on copy.
+On 02/19/2014 12:19 AM, Felipe Balbi wrote:
+> On Fri, Jan 17, 2014 at 10:59:25AM +0800, Bo Shen wrote:
+>> When the SoC is earlier than sama5d3 SoC, which have the same number
+>> endpoints and DMAs. However for sama5d3 SoC, it has different number
+>> for endpoints and DMAs. So, define USBA_NR_DMAs for DMA channels
+>>
+>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>> ---
+>>
+>>   drivers/usb/gadget/atmel_usba_udc.c | 2 +-
+>>   drivers/usb/gadget/atmel_usba_udc.h | 2 +-
+>>   2 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+>> index 7e67a81..5cded1c 100644
+>> --- a/drivers/usb/gadget/atmel_usba_udc.c
+>> +++ b/drivers/usb/gadget/atmel_usba_udc.c
+>> @@ -1661,7 +1661,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+>>   	if (dma_status) {
+>>   		int i;
+>>
+>> -		for (i = 1; i < USBA_NR_ENDPOINTS; i++)
+>> +		for (i = 1; i < USBA_NR_DMAS; i++)
+>>   			if (dma_status & (1 << i))
+>>   				usba_dma_irq(udc, &udc->usba_ep[i]);
+>>   	}
+>> diff --git a/drivers/usb/gadget/atmel_usba_udc.h b/drivers/usb/gadget/atmel_usba_udc.h
+>> index 2922db5..a70706e 100644
+>> --- a/drivers/usb/gadget/atmel_usba_udc.h
+>> +++ b/drivers/usb/gadget/atmel_usba_udc.h
+>> @@ -210,7 +210,7 @@
+>>   #define USBA_FIFO_BASE(x)	((x) << 16)
+>>
+>>   /* Synth parameters */
+>> -#define USBA_NR_ENDPOINTS	7
+>> +#define USBA_NR_DMAS		7
+>
+> what's the difference ? You just renamed this macro. Also, please
+> clarify a bit your commit log.
 
-Shawn
+As commit message said, the SoC before sama5d3, the endpoint number is 
+the same as DMA channel number, so use endpoints definition for DMA 
+channel number, however after sama5d3, the endpoints is not the same as 
+DMA channel, so use DMA micro for DMA channels.
+
+Best Regards,
+Bo Shen
