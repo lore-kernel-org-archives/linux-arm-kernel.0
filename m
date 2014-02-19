@@ -1,197 +1,74 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 19 Feb 2014 16:32:26 +0100
-Subject: [PATCHv2 3/8] ARM: at91: dt: sam9rl: Device Tree for the at91sam9rlek
+Date: Wed, 19 Feb 2014 16:32:27 +0100
+Subject: [PATCHv2 4/8] ARM: at91: prepare sam9 dt boards transition to common
+ clk
 In-Reply-To: <1392823951-26053-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1392823951-26053-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1392823951-26053-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1392823951-26053-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device tree for the at91sam9rl-ek. For now it supports:
- - MMC
- - dbgu
- - usart1
- - watchdog
- - nand
- - leds
- - buttons
+From: Boris BREZILLON <b.brezillon@overkiz.com>
 
+This patch prepare the transition to common clk for sam9 dt boards by
+replacing the timer init callback.
+
+Clocks registration cannot be done in early init callback (as formerly done
+by the old clk implementation) because it requires dynamic allocation
+which is not ready yet during early init.
+
+In the other hand, at91 clocks must be registered before
+at91sam926x_pit_init is called because PIT (Periodic Interval Timer) driver
+request the master clk (mck).
+
+A new function (at91sam9_dt_timer_init) is created to fullfil these needs.
+This function registers all at91 clks using the dt definition before
+calling the PIT init function.
+The device tree clock registration is enabled only if common clk is
+selected. Else the old clk registration is been done during
+at91_dt_initialize call.
+
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/Makefile         |   2 +
- arch/arm/boot/dts/at91sam9rlek.dts | 151 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 153 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91sam9rlek.dts
+ arch/arm/mach-at91/board-dt-sam9.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 6d1e43d46187..ce58477cfa33 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -29,6 +29,8 @@ dtb-$(CONFIG_ARCH_AT91) += at91sam9m10g45ek.dtb
- dtb-$(CONFIG_ARCH_AT91) += pm9g45.dtb
- # sam9n12
- dtb-$(CONFIG_ARCH_AT91) += at91sam9n12ek.dtb
-+# sam9rl
-+dtb-$(CONFIG_ARCH_AT91) += at91sam9rlek.dtb
- # sam9x5
- dtb-$(CONFIG_ARCH_AT91) += at91-ariag25.dtb
- dtb-$(CONFIG_ARCH_AT91) += at91-cosino_mega2560.dtb
-diff --git a/arch/arm/boot/dts/at91sam9rlek.dts b/arch/arm/boot/dts/at91sam9rlek.dts
-new file mode 100644
-index 000000000000..aa76b1d7285a
---- /dev/null
-+++ b/arch/arm/boot/dts/at91sam9rlek.dts
-@@ -0,0 +1,151 @@
-+/*
-+ * at91sam9rlek.dts - Device Tree file for Atmel at91sam9rl reference board
-+ *
-+ *  Copyright (C) 2014  Alexandre Belloni <alexandre.belloni@free-electrons.com>
-+ *
-+ * Licensed under GPLv2 only
-+ */
-+/dts-v1/;
-+#include "at91sam9rl.dtsi"
+diff --git a/arch/arm/mach-at91/board-dt-sam9.c b/arch/arm/mach-at91/board-dt-sam9.c
+index 3dab868b02fa..575b0be66ca8 100644
+--- a/arch/arm/mach-at91/board-dt-sam9.c
++++ b/arch/arm/mach-at91/board-dt-sam9.c
+@@ -13,6 +13,7 @@
+ #include <linux/gpio.h>
+ #include <linux/of.h>
+ #include <linux/of_irq.h>
++#include <linux/clk-provider.h>
+ 
+ #include <asm/setup.h>
+ #include <asm/irq.h>
+@@ -25,6 +26,14 @@
+ #include "generic.h"
+ 
+ 
++static void __init sam9_dt_timer_init(void)
++{
++#if defined(CONFIG_COMMON_CLK)
++	of_clk_init(NULL);
++#endif
++	at91sam926x_pit_init();
++}
 +
-+/ {
-+	model = "Atmel at91sam9rlek";
-+	compatible = "atmel,at91sam9rlek", "atmel,at91sam9rl", "atmel,at91sam9";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 rootfstype=ubifs root=ubi0:rootfs ubi.mtd=5 rw";
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x4000000>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		main_clock: clock at 0 {
-+			compatible = "atmel,osc", "fixed-clock";
-+			clock-frequency = <12000000>;
-+		};
-+	};
-+
-+	ahb {
-+		apb {
-+			mmc0: mmc at fffa4000 {
-+				pinctrl-0 = <
-+					&pinctrl_board_mmc0
-+					&pinctrl_mmc0_clk
-+					&pinctrl_mmc0_slot0_cmd_dat0
-+					&pinctrl_mmc0_slot0_dat1_3>;
-+				status = "okay";
-+				slot at 0 {
-+					reg = <0>;
-+					bus-width = <4>;
-+					cd-gpios = <&pioA 15 GPIO_ACTIVE_HIGH>;
-+				};
-+			};
-+
-+			usart0: serial at fffb0000 {
-+				pinctrl-0 = <
-+					&pinctrl_usart0
-+					&pinctrl_usart0_rts
-+					&pinctrl_usart0_cts>;
-+				status = "okay";
-+			};
-+
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
-+
-+			pinctrl at fffff400 {
-+				mmc0 {
-+					pinctrl_board_mmc0: mmc0-board {
-+						atmel,pins =
-+							<AT91_PIOA 15 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
-+					};
-+				};
-+			};
-+
-+			watchdog at fffffd40 {
-+				status = "okay";
-+			};
-+		};
-+
-+		nand0: nand at 40000000 {
-+			nand-bus-width = <8>;
-+			nand-ecc-mode = "soft";
-+			nand-on-flash-bbt = <1>;
-+			status = "okay";
-+
-+			at91bootstrap at 0 {
-+				label = "at91bootstrap";
-+				reg = <0x0 0x40000>;
-+			};
-+
-+			bootloader at 40000 {
-+				label = "bootloader";
-+				reg = <0x40000 0x80000>;
-+			};
-+
-+			bootloaderenv at c0000 {
-+				label = "bootloader env";
-+				reg = <0xc0000 0xc0000>;
-+			};
-+
-+			dtb at 180000 {
-+				label = "device tree";
-+				reg = <0x180000 0x80000>;
-+			};
-+
-+			kernel at 200000 {
-+				label = "kernel";
-+				reg = <0x200000 0x600000>;
-+			};
-+
-+			rootfs at 800000 {
-+				label = "rootfs";
-+				reg = <0x800000 0x0f800000>;
-+			};
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		ds1 {
-+			label = "ds1";
-+			gpios = <&pioD 15 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		ds2 {
-+			label = "ds2";
-+			gpios = <&pioD 16 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		ds3 {
-+			label = "ds3";
-+			gpios = <&pioD 14 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+
-+		right_click {
-+			label = "right_click";
-+			gpios = <&pioB 0 GPIO_ACTIVE_LOW>;
-+			linux,code = <273>;
-+			gpio-key,wakeup;
-+		};
-+
-+		left_click {
-+			label = "left_click";
-+			gpios = <&pioB 1 GPIO_ACTIVE_LOW>;
-+			linux,code = <272>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+};
+ static const struct of_device_id irq_of_match[] __initconst = {
+ 
+ 	{ .compatible = "atmel,at91rm9200-aic", .data = at91_aic_of_init },
+@@ -43,7 +52,7 @@ static const char *at91_dt_board_compat[] __initdata = {
+ 
+ DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM (Device Tree)")
+ 	/* Maintainer: Atmel */
+-	.init_time	= at91sam926x_pit_init,
++	.init_time	= sam9_dt_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.handle_irq	= at91_aic_handle_irq,
+ 	.init_early	= at91_dt_initialize,
 -- 
 1.8.3.2
