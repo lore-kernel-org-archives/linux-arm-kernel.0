@@ -1,42 +1,55 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Wed, 19 Feb 2014 17:24:40 -0300
-Subject: [PATCH 0/4] clk: mvebu: fix clk init order
-In-Reply-To: <53032C14.9020502@free-electrons.com>
-References: <1390673950-4521-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140205183457.GW8533@titan.lakedaemon.net>
- <20140217141336.GA2765@localhost> <53021BD2.3090301@free-electrons.com>
- <20140217152147.GC2765@localhost> <53022AA9.8090606@free-electrons.com>
- <20140217154421.GD2765@localhost> <530231C5.8090905@free-electrons.com>
- <20140217181902.GG2765@localhost> <53032C14.9020502@free-electrons.com>
-Message-ID: <53051308.5040202@elopez.com.ar>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 19 Feb 2014 21:29:01 +0100
+Subject: [PATCH v2] ARM: make isa_mode macro more robust and fix for v7-M
+In-Reply-To: <1387186673-7439-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1387186673-7439-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1392841741-16438-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+The definition of isa_mode hardcodes the values to shift PSR_J_BIT and
+PSR_T_BIT to move them to bits 1 and 0 respectively. Instead use __ffs to
+calculate the shift from the #define already used for masking.
 
-El 18/02/14 06:47, Gregory CLEMENT escribi?:
-(snip)
-> (...) what would be an acceptable
-> version would be the something like the patch attached. There will be still
-> an issue if old dtb is used with recent kernel, but at least the user will
-> be warned.
+This is relevant on v7-M as there PSR_T_BIT is 0x01000000 instead of
+0x00000020 for V7-[AR] and earlier. Because of that isa_mode produced
+values >= 0x80000 which are unsuitable to index into isa_modes[4] there
+and so made __show_regs read from undefined memory which resulted in
+hangs and crashes.
 
-The patch you attached is similar in spirit to what I suggested, but 
-with way more warnings sprinkled around. I don't really mind either way, 
-and if you prefer big warnings so be it; it's your driver after all :-)
+Moreover isa_mode is wrong for v7-M even after this robustness fix as
+there is no J-bit in the PSR register. So hardcode isa_mode to "Thumb"
+for v7-M.
 
-> This code only fix the Armada 370 case, a complete solution should modify
-> the dtsi for Armada XP, Armada 375, Armada 38x, Kirkwood and Dove. It should
-> also make the outputname mandatory for gate-clk for consistency.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Changes since (implicit) v1, sent with Message-Id:
+1387186673-7439-1-git-send-email-u.kleine-koenig at pengutronix.de:
 
-Again, all of them are your calls. Fix the issue as you see fit; as long 
-as it's a technically sound I'm ok with it. But please don't reinvent 
-the wheel on framework code under a principle that has no proven reason 
-to be to cover up for a buggy driver.
+ - fix !CONFIG_CPU_V7M compilation because of a missing ')'
+ 
+ arch/arm/include/asm/ptrace.h | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Cheers, and have a great Wednesday :)
-
-Emilio
-
-PS: I'd really appreciate it if you could keep me cc'ed on respins of 
-patches I comment on in the future.
+diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
+index 04c99f36ff7f..627a03ebb987 100644
+--- a/arch/arm/include/asm/ptrace.h
++++ b/arch/arm/include/asm/ptrace.h
+@@ -27,9 +27,13 @@ struct pt_regs {
+ #define thumb_mode(regs) (0)
+ #endif
+ 
++#ifndef CONFIG_CPU_V7M
+ #define isa_mode(regs) \
+-	((((regs)->ARM_cpsr & PSR_J_BIT) >> 23) | \
+-	 (((regs)->ARM_cpsr & PSR_T_BIT) >> 5))
++	((((regs)->ARM_cpsr & PSR_J_BIT) >> (__ffs(PSR_J_BIT) - 1)) | \
++	 (((regs)->ARM_cpsr & PSR_T_BIT) >> (__ffs(PSR_T_BIT))))
++#else
++#define isa_mode(regs) 1 /* Thumb */
++#endif
+ 
+ #define processor_mode(regs) \
+ 	((regs)->ARM_cpsr & MODE_MASK)
+-- 
+1.8.5.2
