@@ -1,60 +1,37 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 19 Feb 2014 12:00:37 -0500
-Subject: [PATCH 3/3] ahci: st: Add support for ST's SATA IP
-In-Reply-To: <20140219163937.GI10504@lee--X1>
-References: <1392641818-23419-1-git-send-email-lee.jones@linaro.org>
- <1392641818-23419-3-git-send-email-lee.jones@linaro.org>
- <20140218233645.GP31892@mtj.dyndns.org>
- <20140219083025.GB10504@lee--X1>
- <20140219140458.GA10134@htj.dyndns.org>
- <20140219150121.GG10504@lee--X1>
- <20140219150654.GH10134@htj.dyndns.org>
- <20140219152336.GH10504@lee--X1>
- <20140219153624.GI10134@htj.dyndns.org>
- <20140219163937.GI10504@lee--X1>
-Message-ID: <20140219170037.GK10134@htj.dyndns.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 19 Feb 2014 18:01:18 +0100
+Subject: [PATCH v4 13/13] ARM: mvebu: register the cpuidle driver for
+ the Armada XP SoCs
+In-Reply-To: <5304E14F.3020303@free-electrons.com>
+References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
+ <1392312816-17657-14-git-send-email-gregory.clement@free-electrons.com>
+ <20140219174634.17123478@skate>
+ <5304E14F.3020303@free-electrons.com>
+Message-ID: <20140219180118.4915a6db@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 04:39:37PM +0000, Lee Jones wrote:
-> Again, that's not what I said. It's great that your subsystem is being
-> improved, but insisting that anyone who submits new code to rebase
-> on top of some development patches which only exist in mail form, and
-> refusing to take patches until they do so doesn't seem right to me.
+Dear Gregory CLEMENT,
 
-No policy is perfect and nothing can be decided solely on single
-policy.  There of course are trade-offs to make depending on the
-specific circumstances.  The problem, here, is that what has been
-going on is skewed towards one extreme and has potential to develop
-into a fairly large mess if left uncorrected.
+On Wed, 19 Feb 2014 17:52:31 +0100, Gregory CLEMENT wrote:
 
-The message I've been sending out has been pretty clear.  There are
-multiple people duplicating about the same thing in their drivers.
-Fortunately, Hans' refactoring is pretty close to completion and
-should help simplifying most of them.  I'm not even asking you to do
-the bulk of work.  Just take a look at it and help / push if you can.
-It may be unfortunate that the circumstances haven't been completely
-aligned for your convenience but that's what needs to be done to keep
-things sustainable.
+> > What about putting this in pmsu.c, in an arch_initcall() (or some other
+> > initcall level) ? The cpuidle feature is really tied to the PMSU, so I
+> > believe it makes sense to have the cpuidle-armada-370-xp
+> > platform_device declared and registered in pmsu.c. As an added bonus,
+> > you don't need to expose
+> > armada_370_xp_pmsu_enable_l2_powerdown_onidle() and
+> > armada_370_xp_cpu_pm_init() in a header: they can remain static
+> > functions private to pmsu.c.
+> 
+> It sounds like a good idea, the tricky part will be to find the accurate
+> initcall level: not too early and not too late.
 
-This is a collaborative work and what I asked you isn't some
-insurmountable amount of extra work.  It's just beyond me that your
-response is "it's not fair".  No wonder the whole thing has been
-drifting towards mess.  That's not how this works.  Judging from your
-linaro address, I assume you have been involved with some upstream
-work, how can this possibly be your response?  Such attitude is
-actively harmful and has no place in upstream development.
+Make it an arch_initcall(). This is the point where ->init_machine() is
+called in armada-370-xp.c.
 
-Again, of course, there can be trade-offs.  We sometimes do need to
-take termporal hits in maintainability for faster hardware enablement
-or whatnot; however, we can't do that without trust that the people
-dumping stuff which needs later cleanups would actually help.
-Unfortnately, I have close to zero trust given the recent developments
-and your "it's not fair, that's not my responsibility" attitude
-clearly confirms the conclusion.
-
-So, please take long look at how you perceive upstream development.
-It's a collaborative process.  Other people don't owe you by default.
-
+Thomas
 -- 
-tejun
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
