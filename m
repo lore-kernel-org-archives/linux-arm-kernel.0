@@ -1,75 +1,59 @@
 From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Wed, 19 Feb 2014 15:42:31 +0800
-Subject: [PATCH v2 4/4] ARM: dts: vf610-twr: Add simple-card support.
+Date: Wed, 19 Feb 2014 15:42:30 +0800
+Subject: [PATCH v2 3/4] ARM: dts: vf610-twr: Enable SGTL5000 codec.
 In-Reply-To: <1392795751-13351-1-git-send-email-Li.Xiubo@freescale.com>
 References: <1392795751-13351-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1392795751-13351-5-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <1392795751-13351-4-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds and enables simple-card support in DT node.
+This patch adds and enables SGTL5000 codec support.
 
 Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/boot/dts/vf610-twr.dts | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/arm/boot/dts/vf610-twr.dts | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
 diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index 0f4bff5..a553aa2 100644
+index bcee3bb..0f4bff5 100644
 --- a/arch/arm/boot/dts/vf610-twr.dts
 +++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -48,6 +48,35 @@
- 			regulator-always-on;
+@@ -34,6 +34,20 @@
  		};
  	};
+ 
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,widgets =
-+			"Microphone", "Microphone Jack",
-+			"Headphone", "Headphone Jack",
-+			"Speaker", "Speaker Ext",
-+			"Line", "Line In Jack";
-+		simple-audio-card,routing =
-+			"MIC_IN", "Microphone Jack",
-+			"Microphone Jack", "Mic Bias",
-+			"LINE_IN", "Line In Jack",
-+			"Headphone Jack", "HP_OUT",
-+			"Speaker Ext", "LINE_OUT";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&sai2>;
-+			master-clkdir-out;
-+			frame-master;
-+			bitclock-master;
-+		};
-+
-+		simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+			frame-master;
-+			bitclock-master;
++		reg_3p3v: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
 +		};
 +	};
  };
  
  &dspi0 {
-@@ -88,6 +117,7 @@
+@@ -72,6 +86,14 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_i2c0>;
  	status = "okay";
- 
- 	codec: sgtl5000 at 0a {
-+	       #sound-dai-cells = <0>;
- 	       compatible = "fsl,sgtl5000";
- 	       reg = <0x0a>;
- 	       VDDA-supply = <&reg_3p3v>;
-@@ -165,6 +195,7 @@
++
++	codec: sgtl5000 at 0a {
++	       compatible = "fsl,sgtl5000";
++	       reg = <0x0a>;
++	       VDDA-supply = <&reg_3p3v>;
++	       VDDIO-supply = <&reg_3p3v>;
++	       clocks = <&clks VF610_CLK_SAI2>;
++       };
  };
  
- &sai2 {
-+	#sound-dai-cells = <0>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_sai2>;
- 	status = "okay";
+ &iomuxc {
 -- 
 1.8.4
