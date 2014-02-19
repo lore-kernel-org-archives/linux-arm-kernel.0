@@ -1,108 +1,90 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 19 Feb 2014 18:18:09 +0100
-Subject: [PATCH v6 00/18] ahci: library-ise ahci_platform, add sunxi driver
- and cleanup imx driver
-In-Reply-To: <20140219162511.GJ10134@htj.dyndns.org>
-References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
- <20140219150249.GG10134@htj.dyndns.org> <5304CD33.1080704@redhat.com>
- <20140219162511.GJ10134@htj.dyndns.org>
-Message-ID: <5304E751.5040608@redhat.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 19 Feb 2014 18:19:51 +0100
+Subject: [PATCH v4 12/13] cpuidle: mvebu: Add initial CPU idle support
+ for Armada 370/XP SoC
+In-Reply-To: <20140219175145.4b4fcba5@skate>
+References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>	<1392312816-17657-13-git-send-email-gregory.clement@free-electrons.com>
+ <20140219175145.4b4fcba5@skate>
+Message-ID: <5304E7B7.3040206@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 02/19/2014 05:25 PM, Tejun Heo wrote:
-> Hello, Hans.
+On 19/02/2014 17:51, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
 > 
-> On Wed, Feb 19, 2014 at 04:26:43PM +0100, Hans de Goede wrote:
->> The devres usage are really 2 different issues:
->>
->> 1) There is the issue that we're getting clocks by index (this is by design as
->> clk-names are not generic), but there is no devm_get_clk_by_index (or some
->> such), this is a shortcoming of the clk-core, which needs a separate patch
->> to fix. I would rather not delay this patch-set based on getting a patch
->> into another subsys.
+> On Thu, 13 Feb 2014 18:33:35 +0100, Gregory CLEMENT wrote:
 > 
-> Yes, that'd be my usual preference too.  The only reason I'm hesitant
-> is because nobody seems to be too interested in long term aspect of
-> the code base and the only leverage I have seems to be rejecting
-> drivers until things become right.
+>> +config ARM_ARMADA_370_XP_CPUIDLE
+>> +	bool "CPU Idle Driver for Armada 370/XP family processors"
 > 
->> Note that even with devm_get_clk_by_index we can unfortunately not get rid of
->> ahci_platform_put_resources() as in Roger's follow-up patches it gets used for
->> putting some runtime pm related resources too.
->>
->> I guess this argues for simply turning ahci_platform_get_resources into a
->> devm_ahci_platform_get_resources doing its own devm handling, and then
->> making ahci_platform_put_resources a private function called by the devm
->> framework. If you agree I can do that for the next patch-set.
+> Sorry to bring the naming issue, but it looks like the Armada 38x has a
+> PMSU that looks almost identical to the Armada XP PMSU, except that it
+> doesn't have the L2 fabric registers (probably because Armada 38x uses
+> the PL310 and not the Marvell L2 cache).
 > 
-> Note that libata core already does something similar.  Please take a
-> look at ata_host_alloc() for details.  You don't really need to create
-> a separate devm_ prefixed variant.  Just making the function register
-> devres automatically should be enough.  If this is too much work, I'm
-> okay with deferring it until later if you promise to do it soonish.
+> Therefore, should this cpuidle driver be named Armada 370/XP, or
+> ARMADA_MVEBU for example?
+
+Well most of the code is related to the coherency and the L2 cache, so
+a different L2 cache is a significant difference. The CPU are also different
+for example the PJ4B can  use LDREX/STREX without MMU whereas the Cortex A9
+can't.
+
+> 
+>> +noinline static int armada_370_xp_cpu_suspend(unsigned long deepidle)
+> 
+> 
+> 
+>> +{
+>> +	armada_370_xp_pmsu_idle_prepare(deepidle);
+>> +
+>> +	v7_exit_coherency_flush(all);
+>> +
+>> +	ll_clear_cpu_coherent();
+>> +
+>> +	dsb();
+>> +
+>> +	wfi();
+>> +
+>> +	ll_set_cpu_coherent();
+>> +
+>> +	asm volatile(
+>> +	"mrc	p15, 0, %0, c1, c0, 0 \n\t"
+>> +	"tst	%0, #(1 << 2) \n\t"
+>> +	"orreq	r0, %0, #(1 << 2) \n\t"
+>> +	"mcreq	p15, 0, %0, c1, c0, 0 \n\t"
+>> +	"isb	"
+>> +	: : "r" (0));
+> 
+> I believe a little comment on top of this assembly block would be good
+> to have, to at least give a quick idea on what's going on.
+
+I am on it, I had the same remark from Lorenzo Pieralisi.
+
+> 
+> Also, I'm a bit unsure about your choice of mixing C and assembly here.
+> This function is already calling ll_clear_cpu_coherent() and
+> ll_set_cpu_coherent() that are assembly functions implement in
+> coherency_ll.S. Shouldn't we do the same for this final bit of assembly?
+
+I made several tries when I converted most of the code in C, so I am not
+sure but I think that using a C function didn't work here. But as Lorenzo
+pointed they were mistakes in this code, so once I will have fixed them, I
+will try again.
+
+
+Thanks,
+
+Gregory
+
+
+> 
+> Thomas
 > 
 
-Ok, I'll try to do this for the next revision.
 
->> 2) In some comments you also seem to want devm variants of enable / disable
->> resources, or at least have ahci_platform_put_resources do the disable
->> automatically. The problem is that most of the functions called here need to
->> be balanced, they increment / decrement usage counters in the clk / regulator
->> subsystems, so we cannot simply unconditional do an ahci_platform_disable_resources
->> in ahci_platform_put_resources
->>
->> Doing the disable automatically requires tracking the enable state, and doing this
->> per resource, since the whole idea of having a separate ahci_platform_enable_resources
->> is that some drivers may want to override its behavior doing things in a different
->> order.
->>
->> To ensure proper tracking we would then need to offer ahci_platform_enable_regulator,
->> etc. functions, and ensure that all drivers using the ahci_platform framework
->> always go through these, rather then calling directly into the relevant framework.
->>
->> This is all doable, and I'm not against doing this but before spending a couple of
->> hours coding this all up, I would like to hear back from you whether you would like
->> to see this, or would rather keep things as is.
-> 
-> Yes, in principle, I want every resource used by ahci_platform to be
-> devres managed.  I *think* devres should be flexible enough to handle
-> what you're describing (each devres resource can have data for state
-> tracking and devres resources can be looked up and modified, so the
-> different orders should be okay) but if not I'd be happy to help
-> extend it so that it can.
-
-Most of the resources are already devres managed (I use devm functions
-to get them), the problem is not in freeing our reference to the resources,
-the problem is that we've sequences like this:
-
-devm_get_foo
-enable_foo
-disable_foo
-(automatic release foo)
-
-Where enable / disable can be done repeatedly (ie each suspend / resume).
-
->From your review comments, I take it that you want the final disable_foo
-on driver release to happen automatically.
-
-My preference for this would be to extend the devres tracking already present
-in the relevant subsystems to keep track of the enable count done through a
-specific reference, to allow automatic disable (if needed) on release.
-
-But thinking more about this, I think that doing this automatically is a bad
-idea, because then we fixate the shutdown sequence to a certain order (the
-order in which we did the _get_foo for the resources) and the correct order may
-be device specific.
-
-So TL;DR: Yes to making things so that ahci_platform_put_resources gets done
-automatically, no to automating the disable calls.
-
-If I don't hear back from you, then I'll respin the patch-set assuming that
-you agree to the above.
-
-Regards,
-
-Hans
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
