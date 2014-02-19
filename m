@@ -1,40 +1,22 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Feb 2014 16:04:31 -0800
-Subject: [PATCH RESEND] ARM: imx6: build pm-imx6q.c independently of
- CONFIG_PM
-In-Reply-To: <1392690905-16839-1-git-send-email-shawn.guo@linaro.org>
-References: <1392690905-16839-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20140219000431.GC25055@quad.lixom.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 18 Feb 2014 16:06:02 -0800
+Subject: [GIT PULL] qcom cleanups for v3.15
+In-Reply-To: <alpine.DEB.2.00.1402101722170.12284@galak-ubuntu.qualcomm.com>
+References: <alpine.DEB.2.00.1402101722170.12284@galak-ubuntu.qualcomm.com>
+Message-ID: <5303F56A.9010107@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 10:35:05AM +0800, Shawn Guo wrote:
-> When building a kernel image with only CONFIG_CPU_IDLE but no CONFIG_PM,
-> we will get the following link error.
-> 
->   LD      init/built-in.o
-> arch/arm/mach-imx/built-in.o: In function `imx6q_enter_wait':
-> platform-spi_imx.c:(.text+0x25c0): undefined reference to `imx6q_set_lpm'
-> platform-spi_imx.c:(.text+0x25d4): undefined reference to `imx6q_set_lpm'
-> arch/arm/mach-imx/built-in.o: In function `imx6q_cpuidle_init':
-> platform-spi_imx.c:(.init.text+0x75d4): undefined reference to `imx6q_set_chicken_bit'
-> make[1]: *** [vmlinux] Error 1
-> 
-> Since pm-imx6q.c has been a collection of library functions that access
-> CCM low-power registers used by not only suspend but also cpuidle and
-> other drivers, let's build pm-imx6q.c independently of CONFIG_PM to fix
-> above error.
-> 
-> Reported-by: Lucas Stach <l.stach@pengutronix.de>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: stable at vger.kernel.org
-> Acked-by: Christian Gmeiner <christian.gmeiner@gmail.com>
-> ---
-> Kevin, Olof, Arnd,
-> 
-> Please apply this fix for v3.14.  Thanks.
+On 02/10/14 15:23, Kumar Gala wrote:
+>
+> Kumar Gala (6):
+>       ARM: dts: msm: split out msm8660 and msm8960 soc into dts include
+>       ARM: msm: kill off hotplug.c
+>       clocksource: qcom: Move clocksource code out of mach-msm
+>       ARM: qcom: Split Qualcomm support into legacy and multiplatform
 
-Applied, thanks.
+Sorry to nag, but can you please address my comment on this patch?
 
-
--Olof
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
