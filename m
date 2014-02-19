@@ -1,35 +1,26 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 19 Feb 2014 20:13:02 +0000 (UTC)
-Subject: [RFC PATCH] ARM: OMAP2+: clockdomain: Reintroduce SW_SLEEP
- Support (fwd)
-In-Reply-To: <CANacCWxZ8bfXvMed8Qk93n81uEb9YBtHK-Pe_EtJSAUYzrfL-g@mail.gmail.com>
-References: <alpine.DEB.2.02.1402191824260.8777@utopia.booyaka.com>
- <CANacCWy10TTJenrZ6hdTN8bCpAQQjRa5MOBPde7bnn-LM+VFbw@mail.gmail.com>
- <alpine.DEB.2.02.1402191920040.8777@utopia.booyaka.com>
- <CANacCWxZ8bfXvMed8Qk93n81uEb9YBtHK-Pe_EtJSAUYzrfL-g@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1402192005080.8777@utopia.booyaka.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 19 Feb 2014 12:13:27 -0800
+Subject: [GIT PULL] qcom cleanups for v3.15
+In-Reply-To: <E25A5939-BFC3-44AF-9A7D-C7E8013720A6@codeaurora.org>
+References: <alpine.DEB.2.00.1402101722170.12284@galak-ubuntu.qualcomm.com>
+ <5303F56A.9010107@codeaurora.org>
+ <FE60A8A0-B1C4-46F2-96E8-95FE25503DAF@codeaurora.org>
+ <5304FE4B.1020408@codeaurora.org>
+ <E25A5939-BFC3-44AF-9A7D-C7E8013720A6@codeaurora.org>
+Message-ID: <53051067.1010908@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Feb 2014, Vaibhav Bedia wrote:
+On 02/19/14 11:30, Kumar Gala wrote:
+> On Feb 19, 2014, at 12:56 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>
+>> Yes the copyright one.
+> Was going to send that as a separate patch.  So no reason to hold up this pull request on it.
+>
+>
 
-> After spending a lot of time looking at the code and PRCM specs for the
-> different chips i had come to the conclusion that in reality the Catalog
-> parts had the same hardware minus intelligence ;)
+Ok sounds good.
 
-Did you look at the RTL?
-
-> The control bits are the same with just the AUTO modes in the PWRDM,
-> CLKDM, CLKCTRL never being supported.
-
-I'm not sure it's that simple.  For example PWRSTCTRL/PWRSTST offsets are 
-handled very differently between AM335x and the other OMAPs.  Also the 
-LOGICRETSTATE mask bits are different.  These unnecessary deltas suggest 
-to me that the underlying hardware implementation is different.
-
-I spent some time a few years ago trying to find some hardware guy to give 
-some straight answers about the implementation history for the underlying 
-blocks, but was never able to find that person.
-
-
-- Paul
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
