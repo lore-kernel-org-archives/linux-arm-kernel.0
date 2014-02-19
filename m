@@ -1,41 +1,60 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Feb 2014 09:50:01 +0800
-Subject: [PATCH v9 01/12] usb: doc: phy-mxs: Add more compatible strings
-In-Reply-To: <20140219004408.GA11878@shlinux1.ap.freescale.net>
-References: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
- <1388111921-17326-2-git-send-email-peter.chen@freescale.com>
- <20140218164924.GM9878@saruman.home>
- <20140219011247.GH15716@S2101-09.ap.freescale.net>
- <20140219012419.GB30027@saruman.home>
- <20140219004408.GA11878@shlinux1.ap.freescale.net>
-Message-ID: <20140219014958.GJ15716@S2101-09.ap.freescale.net>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Tue, 18 Feb 2014 17:52:06 -0800
+Subject: [PATCH RFC v1 0/3] hibernation support on ARM
+Message-ID: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 08:44:12AM +0800, Peter Chen wrote:
-> On Tue, Feb 18, 2014 at 07:24:19PM -0600, Felipe Balbi wrote:
-> > On Wed, Feb 19, 2014 at 09:12:49AM +0800, Shawn Guo wrote:
-> > > On Tue, Feb 18, 2014 at 10:49:24AM -0600, Felipe Balbi wrote:
-> > > > On Fri, Dec 27, 2013 at 10:38:30AM +0800, Peter Chen wrote:
-> > > > > Add "fsl,imx6q-usbphy" for imx6dq and imx6dl, add
-> > > > > "fsl,imx6sl-usbphy" for imx6sl.
-> > > > > 
-> > > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > > 
-> > > > anybody from DT to give me an Acked-by ?
-> > > 
-> > > Unfortunately, the DT maintainers and list are not on copy.
-> > 
-> > Then we need this series to be resent. I'll drop from my queue for now.
-> > 
-> > -- 
-> > balbi
-> 
-> Oh, I had thought it was ok that shawn has applied dts change.
-> Do we really need dts maintainer's ack for doc if dts has already
-> applied?
+Patches adding support for hibernation on ARM
+  - ARM hibernation / suspend-to-disk
+  - Fix hang in freeze_processes during hibernation
+  - add an irq disabled version of soft_restart
 
-Yes.  If DT maintainers have objection, I will need to drop the dts
-patch too.
+Patches based on v3.13 tag, verified hibernation on beaglebone black on a branch
+based on 3.13 merged with initial omap support from Russ Dill which be found here:
+http://git.linaro.org/git-ro/people/sebastian.capella/linux.git hibernation_3.13_russMerge
 
-Shawn
+[PATCH RFC v1 1/3] ARM: Add irq disabled version of soft_restart.
+ arch/arm/include/asm/system_misc.h |    1 +
+ arch/arm/kernel/process.c          |   15 ++++++++++-----
+ 2 files changed, 11 insertions(+), 5 deletions(-)
+
+ Adds the ability to run soft restart with local_irq/fiq_disable
+ Useful in hibernation code paths
+
+[PATCH RFC v1 2/3] Fix hibernation restore hang in freeze_processes
+ drivers/base/firmware_class.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+ Add handling for PM_RESTORE_PREPARE notifier
+
+[PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
+ arch/arm/include/asm/memory.h |    1 +
+ arch/arm/kernel/Makefile      |    1 +
+ arch/arm/kernel/hibernate.c   |  106 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/Kconfig           |    5 ++
+ include/linux/suspend.h       |    2 +
+ 5 files changed, 115 insertions(+)
+
+ Adds support for ARM based hibernation
+
+
+
+Additional notes:
+
+There are two checkpatch warnings added by this patch.  These follow
+behavior in existing hibernation implementations on other platforms.
+
+    WARNING: externs should be avoided in .c files
+    #116: FILE: arch/arm/kernel/hibernate.c:26:
+    +extern const void __nosave_begin, __nosave_end;
+
+  This extern is picking up the linker nosave region definitions, only
+  used in hibernate.  Follows same extern line used mips, powerpc, s390,
+  sh, sparc, x86 & unicore32
+
+    WARNING: externs should be avoided in .c files
+    #191: FILE: arch/arm/kernel/hibernate.c:101:
+    +extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
+
+  This extern is used in the arch/arm/ in hibernate, process and bL_switcher
