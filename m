@@ -1,36 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 19 Feb 2014 23:11:02 +0900
-Subject: [PATCH v3 02/15] mfd: max14577: Rename and add MAX14577 symbols
- to prepare for max77836
-In-Reply-To: <1392813881.17652.14.camel@AMDC1943>
-References: <1392627950-26927-1-git-send-email-k.kozlowski@samsung.com>
- <1392627950-26927-3-git-send-email-k.kozlowski@samsung.com>
- <1392813881.17652.14.camel@AMDC1943>
-Message-ID: <20140219141102.GA2669@sirena.org.uk>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Wed, 19 Feb 2014 14:33:40 +0000
+Subject: [PATCH v5 3/5] ACPI / processor: Introduce map_gic_id() to get
+ apic id from MADT or _MAT method
+In-Reply-To: <1392740638-2479-4-git-send-email-hanjun.guo@linaro.org>
+References: <1392740638-2479-1-git-send-email-hanjun.guo@linaro.org>
+ <1392740638-2479-4-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <5304C0C4.3080601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 01:44:41PM +0100, Krzysztof Kozlowski wrote:
+Hi Hanjun,
 
-> I want to push whole MAX77836 patchset through Lee Jones' MFD tree and I
-> still need acks from power and regulator subsystems.
+On 18/02/14 16:23, Hanjun Guo wrote:
+> Get apic id from MADT or _MAT method is not implemented on arm/arm64,
+> and ACPI 5.0 introduces GIC Structure for it, so this patch introduces
+> map_gic_id() to get apic id followed the ACPI 5.0 spec.
+> 
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  drivers/acpi/processor_core.c |   26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+> 
+> diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+> index 4dcf776..d316d9b 100644
+> --- a/drivers/acpi/processor_core.c
+> +++ b/drivers/acpi/processor_core.c
+> @@ -71,6 +71,27 @@ static int map_lsapic_id(struct acpi_subtable_header *entry,
+>  	return 0;
+>  }
+>  
+> +static int map_gic_id(struct acpi_subtable_header *entry,
+> +		int device_declaration, u32 acpi_id, int *apic_id)
+> +{
+> +	struct acpi_madt_generic_interrupt *gic =
+> +		(struct acpi_madt_generic_interrupt *)entry;
+> +
+> +	if (!(gic->flags & ACPI_MADT_ENABLED))
+> +		return -ENODEV;
+> +
+> +	/* In the GIC interrupt model, logical processors are
+> +	 * required to have a Processor Device object in the DSDT,
+> +	 * so we should check device_declaration here
+> +	 */
+> +	if (device_declaration && (gic->uid == acpi_id)) {
+> +		*apic_id = gic->gic_id;
 
-> I would appreciate if you could find time to look at these patches and
-> let me know your opinion (or just add Acked-by):
-> [PATCH v3 02/15] mfd: max14577: Rename and add MAX14577 symbols...
-> [PATCH v3 03/15] mfd: max14577: Rename state container to maxim_core
-> [PATCH v3 04/15] mfd: max14577: Add "muic" suffix to regmap and irq_chip
+I have mentioned this earlier, it's not clear yet to me how does this work ?
+It needs more clarity in the form of comment here at-least as the ACPIv5.0 is
+also not so clear or explicit on how to handle this.
 
-I don't have these patches, I expect it looked like the series was going
-to get a respin.
+Here you are expecting gic->uid = acpi_id which is fine, while acpi_map_cpuid
+matches apic_id with cpu_physical_id(which must be MPIDR in ARM{32,64}). The
+latter imposes restriction that gic->gic_id has to be MPIDR. Does that mean we
+are imposing restriction on GIC ID to be MPIDR ? If so please document it here
+and please explain the reason behind that choice.
 
-To be honest the number of large patch serieses you've been sending
-iterations of (sometimes partial series without context too) doesn't
-push them up the priority list, it'd help to rate limit things a bit.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140219/487752f9/attachment.sig>
+I would expect _UID to be MPIDR rather than GIC ID but you may have some reasons
+for this choice.
+
+Regards,
+Sudeep
