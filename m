@@ -1,77 +1,57 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 19 Feb 2014 17:52:31 +0100
-Subject: [PATCH v4 13/13] ARM: mvebu: register the cpuidle driver for
- the Armada XP SoCs
-In-Reply-To: <20140219174634.17123478@skate>
-References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>	<1392312816-17657-14-git-send-email-gregory.clement@free-electrons.com>
- <20140219174634.17123478@skate>
-Message-ID: <5304E14F.3020303@free-electrons.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Wed, 19 Feb 2014 10:50:49 -0600
+Subject: [PATCH] rtc: mv: reset date if after year 2038
+In-Reply-To: <20140219001416.45a79767@skate>
+References: <1392729966-25394-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140218191111.GH31116@joshc.qualcomm.com>
+ <20140219001416.45a79767@skate>
+Message-ID: <20140219165049.GB31820@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/02/2014 17:46, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
-> 
-> On Thu, 13 Feb 2014 18:33:36 +0100, Gregory CLEMENT wrote:
->> The cpuidle is a platform driver so we have to register the device
->> during the initialization of the boards.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  arch/arm/mach-mvebu/armada-370-xp.c | 12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>
->> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
->> index f6c9d1d85c14..81b42980311c 100644
->> --- a/arch/arm/mach-mvebu/armada-370-xp.c
->> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
->> @@ -30,6 +30,11 @@
->>  #include "common.h"
->>  #include "coherency.h"
->>  #include "mvebu-soc-id.h"
->> +#include "pmsu.h"
->> +
->> +static struct platform_device armada_xp_cpuidle_device = {
->> +	.name = "cpuidle-armada-370-xp",
->> +};
->>  
->>  static void __init armada_370_xp_map_io(void)
->>  {
->> @@ -80,6 +85,13 @@ static void __init armada_370_xp_dt_init(void)
->>  	if (of_machine_is_compatible("plathome,openblocks-ax3-4"))
->>  		i2c_quirk();
->>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
->> +	if (of_find_compatible_node(NULL, NULL, "marvell,armada-370-xp-pmsu")
->> +		&& of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric")
->> +		&& of_machine_is_compatible("marvell,armadaxp")) {
->> +		armada_370_xp_pmsu_enable_l2_powerdown_onidle();
->> +		armada_370_xp_cpu_pm_init();
->> +		platform_device_register(&armada_xp_cpuidle_device);
->> +	}
-> 
-> What about putting this in pmsu.c, in an arch_initcall() (or some other
-> initcall level) ? The cpuidle feature is really tied to the PMSU, so I
-> believe it makes sense to have the cpuidle-armada-370-xp
-> platform_device declared and registered in pmsu.c. As an added bonus,
-> you don't need to expose
-> armada_370_xp_pmsu_enable_l2_powerdown_onidle() and
-> armada_370_xp_cpu_pm_init() in a header: they can remain static
-> functions private to pmsu.c.
+On Wed, Feb 19, 2014 at 12:14:16AM +0100, Thomas Petazzoni wrote:
+> On Tue, 18 Feb 2014 13:11:11 -0600, Josh Cartwright wrote:
+> > On Tue, Feb 18, 2014 at 02:26:06PM +0100, Thomas Petazzoni wrote:
+> > > Dates after January, 19th 2038 are badly handled by userspace due to
+> > > the time being stored on 32 bits. This causes issues on some Marvell
+> > > platform on which the RTC is initialized by default to a date that's
+> > > beyond 2038, causing a really weird behavior of the RTC.
+> > >
+> > > In order to avoid that, reset the date to a sane value if the RTC is
+> > > beyond 2038.
+>
+> > Just so I better understand: is this really a problem that is unique to
+> > this particular RTC?  It smells a bit like we're papering over a problem
+> > that may exist for other RTCs as well, and if so, is better solved in
+> > the core.
+>
+> I'd say it depends on how the RTC internally encodes the date. Some RTC
+> may have an internal date representation that allows to represent dates
+> past 2^32 seconds after Epoch, while maybe some RTC do not.
+>
+> However, it is true that a fairly large number of RTC drivers seem to
+> use the bcd2bin() function, which indicates the RTC internally uses a
+> BCD representation, which allows to represent dates past 2^32 seconds
+> after Epoch.
+>
+> That being said, I don't think the RTC core has any knowledge of what
+> the internal RTC representation of time is, so I don't know how the
+> core could fix things up without this information.
 
-It sounds like a good idea, the tricky part will be to find the accurate
-initcall level: not too early and not too late.
+Yeah, I agree that with the current state of affairs, the RTC core
+doesn't have enough information to be managing this in a central way.
+I'm wondering if the RTC core should provide a richer interface for a
+driver to provide bounds information, and let the core figure out these
+problems.  But that's a question for Alessandro :).
+
+Anyway, could you clarify where the 32-bit assumption is currently being
+made?  From my cursory glance at the ioctl/sysfs interfaces, the use of
+struct rtc_time looks safe.  Is the real problem in usermode?  What is
+"weird behavior" in this case?
 
 Thanks,
-
-Gregory
-
-> 
-> Thomas
-> 
-
+  Josh
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
