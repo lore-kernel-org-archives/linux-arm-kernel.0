@@ -1,81 +1,146 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 19 Feb 2014 11:25:11 -0500
-Subject: [PATCH v6 00/18] ahci: library-ise ahci_platform, add sunxi
- driver and cleanup imx driver
-In-Reply-To: <5304CD33.1080704@redhat.com>
-References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
- <20140219150249.GG10134@htj.dyndns.org>
- <5304CD33.1080704@redhat.com>
-Message-ID: <20140219162511.GJ10134@htj.dyndns.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 19 Feb 2014 17:27:48 +0100
+Subject: [PATCH v4 04/13] ARM: mvebu: Remove the unused argument of
+ set_cpu_coherent()
+In-Reply-To: <1392312816-17657-5-git-send-email-gregory.clement@free-electrons.com>
+References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
+ <1392312816-17657-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140219172748.0b7ab37f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Hans.
+Dear Gregory CLEMENT,
 
-On Wed, Feb 19, 2014 at 04:26:43PM +0100, Hans de Goede wrote:
-> The devres usage are really 2 different issues:
+On Thu, 13 Feb 2014 18:33:27 +0100, Gregory CLEMENT wrote:
+> set_cpu_coherent() took the SMP group ID as parameter. But this
+> parameter was never used, and the CPU always use the SMP group 0. So
+> we can remove this parameter.
 > 
-> 1) There is the issue that we're getting clocks by index (this is by design as
-> clk-names are not generic), but there is no devm_get_clk_by_index (or some
-> such), this is a shortcoming of the clk-core, which needs a separate patch
-> to fix. I would rather not delay this patch-set based on getting a patch
-> into another subsys.
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Yes, that'd be my usual preference too.  The only reason I'm hesitant
-is because nobody seems to be too interested in long term aspect of
-the code base and the only leverage I have seems to be rejecting
-drivers until things become right.
+This patch does much more than what the title and commit log says. The
+title and commit log says the patch is removing the useless parameter
+of set_cpu_coherent(), which I'm fine with.
 
-> Note that even with devm_get_clk_by_index we can unfortunately not get rid of
-> ahci_platform_put_resources() as in Roger's follow-up patches it gets used for
-> putting some runtime pm related resources too.
-> 
-> I guess this argues for simply turning ahci_platform_get_resources into a
-> devm_ahci_platform_get_resources doing its own devm handling, and then
-> making ahci_platform_put_resources a private function called by the devm
-> framework. If you agree I can do that for the next patch-set.
+But this patch also renames ll_set_cpu_coherent() to
+ll_set_cpu_coherent_and_smp(), introduces the modify_coherent_reg
+macro, etc.
 
-Note that libata core already does something similar.  Please take a
-look at ata_host_alloc() for details.  You don't really need to create
-a separate devm_ prefixed variant.  Just making the function register
-devres automatically should be enough.  If this is too much work, I'm
-okay with deferring it until later if you promise to do it soonish.
+And actually, I'm really unhappy about this modify_coherent_reg macro.
+It is a large blurb of assembly with some conditions in the middle. I
+have already stated this in previous reviews of this patch series, but
+you have not taken into account my comments: this stuff should be split
+in separate functions, each function doing *one* thing, and then those
+functions are called in sequence depending on what needs to be done
+whether you're starting a secondary CPU, entering or exiting deep idle,
+etc.
 
-> 2) In some comments you also seem to want devm variants of enable / disable
-> resources, or at least have ahci_platform_put_resources do the disable
-> automatically. The problem is that most of the functions called here need to
-> be balanced, they increment / decrement usage counters in the clk / regulator
-> subsystems, so we cannot simply unconditional do an ahci_platform_disable_resources
-> in ahci_platform_put_resources
-> 
-> Doing the disable automatically requires tracking the enable state, and doing this
-> per resource, since the whole idea of having a separate ahci_platform_enable_resources
-> is that some drivers may want to override its behavior doing things in a different
-> order.
-> 
-> To ensure proper tracking we would then need to offer ahci_platform_enable_regulator,
-> etc. functions, and ensure that all drivers using the ahci_platform framework
-> always go through these, rather then calling directly into the relevant framework.
-> 
-> This is all doable, and I'm not against doing this but before spending a couple of
-> hours coding this all up, I would like to hear back from you whether you would like
-> to see this, or would rather keep things as is.
+Here is what I would prefer to see:
 
-Yes, in principle, I want every resource used by ahci_platform to be
-devres managed.  I *think* devres should be flexible enough to handle
-what you're describing (each devres resource can have data for state
-tracking and devres resources can be looked up and modified, so the
-different orders should be okay) but if not I'd be happy to help
-extend it so that it can.
+/* Returns with r1 filled with the coherency base address */
+ENTRY(ll_get_coherency_base)
+	mrc	p15, 0, r1, c1, c0, 0
+	tst	r1, #CR_M @ Check MMU bit enabled
+	bne	1f
 
-I'm not sure how many more ahci_platform drivers we'll get but the
-rate seems pretty high in recent months, so I think it's worthwhile to
-provide full devres coverage even if that complicates ahci_platform a
-bit if it can simplify leaf drivers.  Again, if you commit to doing it
-in the foreseeable future, I'm okay with proceeding as-is, but it
-needs to happen one way or another.
+	/* use physical address of the coherency register */
+	adr	r1, 3f
+	ldr	r3, [r1]
+	ldr	r1, [r1, r3]
+	b	2f
+1:
+	/* use virtual address of the coherency register */
+	ldr	r1, =coherency_base
+	ldr	r1, [r1]
+2:
+	mov	pc, lr
+ENDPROC(ll_get_coherency_base)
 
-Thanks.
+/* Returns with the CPU ID in r3 */
+ENTRY(ll_get_cpuid)
+	mrc	15, 0, r3, cr0, cr0, 5
+	and	r3, r3, #15
+	mov	r2, #(1 << 24)
+	lsl	r3, r2, r3
+	ARM_BE8(rev	r3, r3)
+	mov	pc, lr
+ENDPROC(ll_get_cpuid)
 
+ENTRY(ll_add_cpu_to_smp_group)
+	bl	ll_get_coherency_base
+	bl	ll_get_cpuid
+	add	r0, r1, #ARMADA_XP_CFB_CFG_REG_OFFSET
+1:
+	ldrex	r2, [r0]
+	orr	r2, r2, r3
+	strex	r1, r2, [r0]
+	cmp	r1, #0
+	bne	1b
+	mov	pc, lr
+ENDPROC(ll_add_cpu_to_smp_group)
+
+ENTRY(ll_enable_coherency)
+	bl	ll_get_coherency_base
+	bl	ll_get_cpuid
+	add	r0, r1, #ARMADA_XP_CFB_CTL_REG_OFFSET
+1:
+	ldrex	r2, [r0]
+	orr	r2, r2, r3
+	strex	r1, r2, [r0]
+	cmp	r1, #0
+	bne	1b
+	dsb
+	mov	pc, lr
+ENDPROC(ll_enable_coherency)
+
+ENTRY(ll_disable_coherency)
+	bl	ll_get_coherency_base
+	bl	ll_get_cpuid
+	add	r0, r1, #ARMADA_XP_CFB_CTL_REG_OFFSET
+1:
+	ldrex	r2, [r0]
+	bic	r2, r2, r3
+	strex	r1, r2, [r0]
+	cmp	r1, #0
+	bne	1b
+	dsb
+	mov	pc, lr
+ENDPROC(ll_disable_coherency)
+
+And then, your C code calls ll_disable_coherency(),
+ll_enable_coherency() and/or ll_add_cpu_to_smp_group().
+
+An alternative solution is to implement more of this stuff in C, with
+only a small helper function in assembly to do the atomic bit set or
+clear magic:
+
+/* First argument:  address
+   Second argument: bit mask 
+*/
+ENTRY(ll_atomic_bit_set)
+1:
+	ldrex	r2, [r0]
+	orr	r2, r2, r1
+	strex	r3, r2, [r0]
+	cmp	r3, #0
+	bne	1b
+	dsb
+	mov	pc, lr
+ENDPROC(ll_atomic_bit_set)
+
+ENTRY(ll_atomic_bit_clear)
+1:
+	ldrex	r2, [r0]
+	bic	r2, r2, r1
+	strex	r3, r2, [r0]
+	cmp	r3, #0
+	bne	1b
+	dsb
+	mov	pc, lr
+ENDPROC(ll_atomic_bit_clear)
+
+Thomas
 -- 
-tejun
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
