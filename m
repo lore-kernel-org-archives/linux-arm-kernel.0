@@ -1,60 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Feb 2014 15:38:08 +0100
-Subject: [PATCH v4 1/7] Documentation: Add device tree bindings for
- Freescale i.MX GPC
-In-Reply-To: <1392802255.3445.18.camel@pizza.hi.pengutronix.de>
-References: <1392737687-25003-1-git-send-email-p.zabel@pengutronix.de>
- <2328803.HhaG6blXIR@wuerfel>
- <1392802255.3445.18.camel@pizza.hi.pengutronix.de>
-Message-ID: <201402191538.08507.arnd@arndb.de>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 19 Feb 2014 09:42:00 -0500
+Subject: [PATCH v6 01/18] libahci: Allow drivers to override start_engine
+In-Reply-To: <1392811320-3132-2-git-send-email-hdegoede@redhat.com>
+References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
+ <1392811320-3132-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140219144200.GB10134@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 February 2014, Philipp Zabel wrote:
+Hello,
 
-> Am Dienstag, den 18.02.2014, 19:10 +0100 schrieb Arnd Bergmann:
-> > On Tuesday 18 February 2014 16:34:41 Philipp Zabel wrote:
-> > > +
-> > > +Example of a device that is part of a power domain:
-> > > +
-> > > +       vpu: vpu at 02040000 {
-> > > +               reg = <0x02040000 0x3c000>;
-> > > +               /* ... */
-> > > +               fsl,power-domain = <&pd_pu>;
-> > > +               /* ... */
-> > > +       };
-> > > +
-> > 
-> > I'm really not too happy about platforms starting to add random
-> > bindings for power domains. Unfortunately I didn't catch exynos
-> > doing this first, but I don't want to see another platform like
-> > that.
-> > 
-> > Can we please come up with a proper generic power domain binding
-> > first and then add platform specific users?
-> 
-> what is the process here? I've seen the samsung bindings and copied the
-> pattern. I guess the Exynos bindings are set in stone, and the i.MX
-> power domains can be handled using the same bindings.
+On Wed, Feb 19, 2014 at 01:01:43PM +0100, Hans de Goede wrote:
+> diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+> index 2289efd..2c04211 100644
+> --- a/drivers/ata/ahci.h
+> +++ b/drivers/ata/ahci.h
+> @@ -323,6 +323,8 @@ struct ahci_host_priv {
+>  	u32			em_msg_type;	/* EM message type */
+>  	struct clk		*clk;		/* Only for platforms supporting clk */
+>  	void			*plat_data;	/* Other platform data */
+> +	/* Optional ahci_start_engine override */
+> +	void			(*start_engine)(struct ata_port *ap);
 
-* First of all, get the pm domain maintainers into the loop, then make
-  sure all other users of pm domains are aware of what you are doing.
+Can you please add that this gets initialized to the default during
+save_initial_config and can be overridden anytime before the host is
+activated?
 
-* Come up with a way to describe a pm_domain in a sufficiently generic
-  way. It's possible you just need a phandle, but experience on other
-  subsystems suggests that it helps to allow arguments, as we do for
-  clocks, dmas, mailboxes, etc.
+> @@ -500,6 +501,9 @@ void ahci_save_initial_config(struct device *dev,
+>  	hpriv->cap = cap;
+>  	hpriv->cap2 = cap2;
+>  	hpriv->port_map = port_map;
+> +
+> +	if (!hpriv->start_engine)
+> +		hpriv->start_engine = ahci_start_engine;
 
-* Draft a generic binding that can work on all platforms
+Please update the function comment accordingly.
 
-* Implement support for the generic binding in the platform independent
-  code.
+> -void ahci_start_engine(struct ata_port *ap)
+> +static void ahci_start_engine(struct ata_port *ap)
+>  {
+>  	void __iomem *port_mmio = ahci_port_base(ap);
+>  	u32 tmp;
+> @@ -576,7 +580,6 @@ void ahci_start_engine(struct ata_port *ap)
+>  	writel(tmp, port_mmio + PORT_CMD);
+>  	readl(port_mmio + PORT_CMD); /* flush */
+>  }
+> -EXPORT_SYMBOL_GPL(ahci_start_engine);
 
-* Add a specific binding for your hardware.
+Why are we making ahci_start_engine() static?  Wouldn't there likely
+be users who would do more things before or after ahci_start_engine()?
+Also, why is there no explanation of this change in the patch
+description?
 
-* Implement support for your hardware binding on top of the generic
-  code.
+Thanks.
 
-* Get everyone involved to Ack the generic binding and implementation.
-
-	Arnd
+-- 
+tejun
