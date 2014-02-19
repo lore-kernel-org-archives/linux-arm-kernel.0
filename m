@@ -1,68 +1,119 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Feb 2014 15:25:40 +0000
-Subject: [PATCH v3 3/3] PCI: ARM: add support for generic PCI host
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Wed, 19 Feb 2014 15:30:44 +0000
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
  controller
-In-Reply-To: <2724033.O0vxCdfViQ@wuerfel>
-References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
- <20140218191023.GG2010@mudshark.cambridge.arm.com>
- <20140219110718.GD28173@mudshark.cambridge.arm.com>
- <2724033.O0vxCdfViQ@wuerfel>
-Message-ID: <20140219152540.GF28173@mudshark.cambridge.arm.com>
+In-Reply-To: <2734695.F6QKszum67@wuerfel>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <1948942.cIbLaKDEOa@wuerfel>
+ <20140219113755.GD5394@bart.dudau.co.uk>
+ <2734695.F6QKszum67@wuerfel>
+Message-ID: <20140219153044.GE5394@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Wed, Feb 19, 2014 at 02:17:56PM +0000, Arnd Bergmann wrote:
-> On Wednesday 19 February 2014 11:07:19 Will Deacon wrote:
-> > I've probably just confused myself, but passing the pci_addr to
-> > pci_ioremap_io doesn't make sense to me. 
-> 
-> I think the confusion is that there are two different things we call
-> offset here. The calculation of the offset you pass into
-> pci_ioremap_io() is correct AFAICT now, but it's not what you are
-> supposed to pass into pci_add_resource_offset() or what we normally
-> put into pci_host_bridge_window->offset.
-> 
-> > My understanding is that:
+On Wed, Feb 19, 2014 at 02:26:10PM +0100, Arnd Bergmann wrote:
+> On Wednesday 19 February 2014 11:37:55 Liviu Dudau wrote:
 > > 
-> >   cpu = bus + offset
-> 
-> Right. This would be the case for mem_offset.
-> 
-> > In the case of I/O, the offset is really:
+> > > Right, this needs to be changed when moving the domain into pci_host_bridge.
 > > 
-> >   offset = (PCI_IO_VIRT_BASE - bus) + window
+> > Yes, if only I understood what the intent was here. Unfortunately, the history
+> > of the file stops (for my git tree) at Linus' first commit from v2.6.0, so
+> > I need to dig deeper. What I am looking to understand is the answer to this
+> > question: "When you want to create a new bus and you want to make sure it
+> > is not duplicated, do you go across all domains or pick the current domain
+> > and allow for same bus number in different domains?"
 > 
-> I can't seem to make sense of this calculation. PCI_IO_VIRT_BASE
-> is a pointer to the start of the virtual window. You can add offsets
-> to the pointer, but subtracting a number from it is not a well-defined
-> operation.
+> I suspect this is for some large IA64 machines where you can see the same
+> domain at different addresses, depending on which CPU you are on, or
+> something similarly fancy.
 > 
-> > where window is determined by the simple allocator I wrote.
+> Another explanation would be that you can have different ways to describe
+> the same hardware: On a PC you can assume that the PCI bus is discoverable
+> on I/O port 0x0cf8. At the same time, you may see it in ACPI with an
+> mmconfig method.
 > 
-> And your allocator calls it offset, which is what confused me.
+> In any case, you definitely need to allow the same bus numbers on each domain,
+> since the most important use case of domains is to get around the 256 bus
+> limit.
 > 
-> > Now, the __io macro takes care of PCI_IO_VIRT_BASE so we don't actually care
-> > about that when adding the PCI I/O resources, instead we'll just pass:
+> > To give some context: I'm looking at drivers/pci/probe.c, pci_create_root_bus().
+> > Specifically, this code:
 > > 
-> >   offset = window - bus
+> >         b = pci_alloc_bus();
+> >         if (!b)
+> >                 return NULL;
+> > 
+> >         b->sysdata = sysdata;
+> >         b->ops = ops;
+> >         b->number = b->busn_res.start = bus;
+> >         b2 = pci_find_bus(pci_domain_nr(b), bus);
+> >         if (b2) {
+> >                 /* If we already got to this bus through a different bridge, ignore it */
+> >                 dev_dbg(&b2->dev, "bus already known\n");
+> >                 goto err_out;
+> >         }
+> > 
+> >         bridge = pci_alloc_host_bridge(b);
+> >         if (!bridge)
+> >                 goto err_out;
+> > 
+> > 
+> > If you look at the comment after pci_find_bus, you can see that the intent was
+> > to try to find duplicate busses covered by different bridges (but in the same
+> > domain? maybe, because there used to be only one domain at the beginning, but
+> > then why use pci_domain_nr() here?). Problems I see here:
 > 
-> Yes, this would be the io_offset that you pass into pci_add_resource_offset().
+> Definitely duplicate buses in the same domain, as mentioned above.
 > 
-> > and then pci_ioremap_io will just want the window offset, since that's added
-> > directly on to PCI_IO_VIRT_BASE for the ioremap_page_range.
+> >   - code is trying to get the domain number of a bus that it just created but not
+> >     plugged yet in the hierarchy
 > 
-> Yes.
-> 
-> > If I call pci_ioremap_io(range->pci_addr, ...) then I'm going to trip a BUG_ON
-> > unless the pci_addr is within IO_SPACE_LIMIT.
-> 
-> range->pci_addr is what you call 'bus' above. Since you want 'window', you
-> have to pass 'bus'+'offset', or 'range->pci_addr + io_offset'. Normally, one
-> of the two would be zero, while the other is equal to 'window'.
+> The sysdata is already assigned, and all architectures either assume there is
+> only one domain, or they get the domain number out of the sysdata that is
+> filled out prior to calling pci_create_root_bus.
 
-Good, so we're in agreement! The issue indeed seems to be that there are
-multiple names for the same things :)
+Arnd, the question is not how it does it, the question is what is the correct answer?
+It's a new bus, does that mean that all new busses get created in the current domain?
+If that is the case, then fine, things start to make more sense, with the caveat
+that the domain # depends heavily on what the architecture uses for counting.
 
-Will
+> 
+> >   - pci_find_bus tries to find a bus in the global list of busses that has the
+> >     same domain number and bus number as the parameters of the function. But
+> >     the domain number was plucked out of thin air and all architectures seem to
+> >     actually give you the current active domain number, not the one that actually
+> >     covers the bus (and host_bridge) that you are trying to create.
+> 
+> Not sure what you mean with 'current active domain number': They clearly look at
+> b->sysdata here, which is a local structure describing what we are currently
+> probing.
+
+Yes, but that definition of locality is not common to all architectures. arm for
+example stores it in the domain member of pci_sys_data, but that gets initialised
+every time someone calls pcibios_init_hw (or pci_common_init_dev) with the domain
+value held in struct hw_pci. But the host controllers don't talk to each other,
+so if you want to instantiate two different drivers that use hw_pci they likely
+use an individual count that starts at zero.
+
+Anyway, I don't think that using your suggestion is going to be a problem, so once
+I get out of this god forsaken task of bringing up a board I will post an updated
+patch.
+
+Best regards,
+Liviu
+
+> 
+> 	Arnd
+> 
+
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
