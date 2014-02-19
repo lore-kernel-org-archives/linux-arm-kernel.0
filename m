@@ -1,148 +1,82 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 19 Feb 2014 13:39:01 +0100
-Subject: [PATCH v3 3/6] drivers: of: implement reserved-memory handling for
- dma
-In-Reply-To: <20140218165815.C7661C40517@trevor.secretlab.ca>
-References: <1392730681-14695-1-git-send-email-m.szyprowski@samsung.com>
- <1392730681-14695-4-git-send-email-m.szyprowski@samsung.com>
- <20140218165815.C7661C40517@trevor.secretlab.ca>
-Message-ID: <5304A5E5.40706@samsung.com>
+From: klightspeed@killerwolves.net (klightspeed at killerwolves.net)
+Date: Wed, 19 Feb 2014 22:49:09 +1000
+Subject: [PATCH v5 0/5] DT support for kirkwood based Synology NAS boxes
+Message-ID: <1392814154-11284-1-git-send-email-klightspeed@killerwolves.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patchset adds support for around 30 kirkwood bases Synology NAS
+boxes. Patch #1 documents vendor prefixes. Patch #2 generalizes the qnap
+power off driver so that it can also be used for Synology devices.
+Patch #3 and #4 fix i2c trivial device and qnap vendor prefixes.
+Patch #5 adds the synology DT files.
 
-On 2014-02-18 17:58, Grant Likely wrote:
-> On Tue, 18 Feb 2014 14:37:58 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> > From: Josh Cartwright <joshc@codeaurora.org>
-> >
-> > Add support for handling 'shared-dma-pool' reserved-memory nodes using
-> > dma exclusive driver (dma_alloc_coherent()).
-> >
-> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > ---
-> >  drivers/of/Kconfig               |    7 ++++
-> >  drivers/of/Makefile              |    1 +
-> >  drivers/of/of_reserved_mem_dma.c |   65 ++++++++++++++++++++++++++++++++++++++
->
-> I don't see any reason to have this separate from of_reserved_mem.c
+v2:
+Typo fix in qnap-poweroff.c
+Use ricoy stock ticker instead of ricoh
+Describe the lego structure of the hardware
 
-Some architectures don't have support for dma_declare_coherent_memory()
-(CONFIG_HAVE_GENERIC_DMA_COHERENT), good examples are arc, c6x, metag 
-and extensa.
-This code will not work for them.
+v3:
+Merge synology dtsi files into a single dtsi file
 
-> >  3 files changed, 73 insertions(+)
-> >  create mode 100644 drivers/of/of_reserved_mem_dma.c
-> >
-> > diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> > index f25931dfc6db..7f00b801bcd2 100644
-> > --- a/drivers/of/Kconfig
-> > +++ b/drivers/of/Kconfig
-> > @@ -80,4 +80,11 @@ config OF_RESERVED_MEM
-> >  	help
-> >  	  Helpers to allow for reservation of memory regions
-> >
-> > +config OF_RESERVED_MEM_DMA
-> > +	depends on OF_RESERVED_MEM
-> > +	depends on HAVE_GENERIC_DMA_COHERENT
-> > +	def_bool y
-> > +	help
-> > +	  Helpers for reserving memory regions for DMA use
-> > +
-> >  endmenu # OF
-> > diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-> > index ed9660adad77..6142227ca854 100644
-> > --- a/drivers/of/Makefile
-> > +++ b/drivers/of/Makefile
-> > @@ -10,3 +10,4 @@ obj-$(CONFIG_OF_PCI)	+= of_pci.o
-> >  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
-> >  obj-$(CONFIG_OF_MTD)	+= of_mtd.o
-> >  obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
-> > +obj-$(CONFIG_OF_RESERVED_MEM_DMA) += of_reserved_mem_dma.o
-> > diff --git a/drivers/of/of_reserved_mem_dma.c b/drivers/of/of_reserved_mem_dma.c
-> > new file mode 100644
-> > index 000000000000..a3e596d1091d
-> > --- /dev/null
-> > +++ b/drivers/of/of_reserved_mem_dma.c
-> > @@ -0,0 +1,65 @@
-> > +/*
-> > + * Device tree based initialization code for DMA reserved regions.
-> > + *
-> > + * Copyright (c) 2013, The Linux Foundation. All Rights Reserved.
-> > + * Copyright (c) 2013,2014 Samsung Electronics Co., Ltd.
-> > + *		http://www.samsung.com
-> > + * Author: Marek Szyprowski <m.szyprowski@samsung.com>
-> > + * Author: Josh Cartwright <joshc@codeaurora.org>
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > + * modify it under the terms of the GNU General Public License as
-> > + * published by the Free Software Foundation; either version 2 of the
-> > + * License or (at your optional) any later version of the license.
-> > + */
-> > +#include <linux/memblock.h>
-> > +#include <linux/err.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_fdt.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/mm.h>
-> > +#include <linux/sizes.h>
-> > +#include <linux/mm_types.h>
-> > +#include <linux/dma-mapping.h>
-> > +#include <linux/of_reserved_mem.h>
-> > +
-> > +static void rmem_dma_device_init(struct reserved_mem *rmem,
-> > +				 struct device *dev,
-> > +				 struct of_phandle_args *args)
-> > +{
-> > +	dma_declare_coherent_memory(dev, rmem->base, rmem->base,
-> > +		rmem->size, DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
-> > +}
-> > +
-> > +static void rmem_dma_device_release(struct reserved_mem *rmem,
-> > +				    struct device *dev)
-> > +{
-> > +	dma_release_declared_memory(dev);
-> > +}
-> > +
-> > +static const struct reserved_mem_ops rmem_dma_ops = {
-> > +	.device_init	= rmem_dma_device_init,
-> > +	.device_release	= rmem_dma_device_release,
-> > +};
-> > +
-> > +static int __init rmem_dma_setup(struct reserved_mem *rmem,
-> > +				 unsigned long node,
-> > +				 const char *uname)
-> > +{
-> > +	int err;
-> > +
-> > +	if (of_get_flat_dt_prop(node, "reusable", NULL))
-> > +		return -EINVAL;
-> > +
-> > +	err = memblock_remove(rmem->base, rmem->size);
->
-> Isn't the memblock_remove() now handled by the core code? Or am I
-> mis-reading it?
+v4:
+Various minor fixes to synology dtsi file
 
-I forgot to remove it...
+v5:
+Fix typos in commit messages
+Remove unnecessary casts in qnap-poweroff.c
+Fix qnap vendor prefix
 
-> > +	if (err == 0) {
-> > +		rmem->ops = &rmem_dma_ops;
-> > +		pr_info("Reserved memory: created DMA memory pool at %pa, size %ld MiB\n",
-> > +			&rmem->base, (unsigned long)rmem->size / SZ_1M);
-> > +	} else {
-> > +		pr_err("Reserved memory: unable to setup '%s' memory region for DMA.\n",
-> > +		       uname);
-> > +	}
-> > +	return err;
-> > +}
-> > +RESERVEDMEM_OF_DECLARE(dma, "shared-dma-pool", rmem_dma_setup);
-> > --
-> > 1.7.9.5
-> >
+Andrew Lunn (3):
+  DT: Vendor prefixes: Add ricoh, qnap, sii and synology
+  Power: Reset: Generalize qnap-poweroff to work on Synology devices.
+  DT: i2c: Trivial: Add sii, s35390a, fix ricoh vendor prefix
 
-Best regards
+Ben Peddell (2):
+  ARM: Kirkwood: Fix qnap vendor prefix
+  ARM: Kirkwood: Add support for many Synology NAS devices
+
+ .../devicetree/bindings/i2c/trivial-devices.txt    |   3 +-
+ .../bindings/power_supply/qnap-poweroff.txt        |   5 +-
+ .../devicetree/bindings/vendor-prefixes.txt        |   4 +
+ arch/arm/boot/dts/Makefile                         |  15 +
+ arch/arm/boot/dts/kirkwood-ds109.dts               |  41 +
+ arch/arm/boot/dts/kirkwood-ds110jv10.dts           |  41 +
+ arch/arm/boot/dts/kirkwood-ds111.dts               |  44 ++
+ arch/arm/boot/dts/kirkwood-ds112.dts               |  48 ++
+ arch/arm/boot/dts/kirkwood-ds209.dts               |  44 ++
+ arch/arm/boot/dts/kirkwood-ds210.dts               |  46 ++
+ arch/arm/boot/dts/kirkwood-ds212.dts               |  47 ++
+ arch/arm/boot/dts/kirkwood-ds212j.dts              |  41 +
+ arch/arm/boot/dts/kirkwood-ds409.dts               |  48 ++
+ arch/arm/boot/dts/kirkwood-ds409slim.dts           |  40 +
+ arch/arm/boot/dts/kirkwood-ds411.dts               |  52 ++
+ arch/arm/boot/dts/kirkwood-ds411j.dts              |  48 ++
+ arch/arm/boot/dts/kirkwood-ds411slim.dts           |  48 ++
+ arch/arm/boot/dts/kirkwood-rs212.dts               |  48 ++
+ arch/arm/boot/dts/kirkwood-rs409.dts               |  44 ++
+ arch/arm/boot/dts/kirkwood-rs411.dts               |  44 ++
+ arch/arm/boot/dts/kirkwood-synology.dtsi           | 871 +++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-ts219.dtsi              |   4 +-
+ drivers/power/reset/qnap-poweroff.c                |  49 +-
+ 23 files changed, 1659 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds109.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds110jv10.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds111.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds112.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds209.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds210.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds212.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds212j.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds409.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds409slim.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds411.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds411j.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ds411slim.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rs212.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rs409.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rs411.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-synology.dtsi
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.8.3.2
