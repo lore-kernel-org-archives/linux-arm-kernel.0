@@ -1,70 +1,148 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 19 Feb 2014 13:45:45 +0100
-Subject: [PATCH 1/1] ARM: Exynos: Add generic compatible string
-In-Reply-To: <1392809645-631-1-git-send-email-sachin.kamat@linaro.org>
-References: <1392809645-631-1-git-send-email-sachin.kamat@linaro.org>
-Message-ID: <5304A779.1060702@samsung.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 19 Feb 2014 13:39:01 +0100
+Subject: [PATCH v3 3/6] drivers: of: implement reserved-memory handling for
+ dma
+In-Reply-To: <20140218165815.C7661C40517@trevor.secretlab.ca>
+References: <1392730681-14695-1-git-send-email-m.szyprowski@samsung.com>
+ <1392730681-14695-4-git-send-email-m.szyprowski@samsung.com>
+ <20140218165815.C7661C40517@trevor.secretlab.ca>
+Message-ID: <5304A5E5.40706@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+Hello,
 
-[adding linux-arm-kernel ML to CC list]
-
-On 19.02.2014 12:34, Sachin Kamat wrote:
-> To avoid modifying the kernel every time a new SoC variant
-> comes out.
+On 2014-02-18 17:58, Grant Likely wrote:
+> On Tue, 18 Feb 2014 14:37:58 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > From: Josh Cartwright <joshc@codeaurora.org>
+> >
+> > Add support for handling 'shared-dma-pool' reserved-memory nodes using
+> > dma exclusive driver (dma_alloc_coherent()).
+> >
+> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > ---
+> >  drivers/of/Kconfig               |    7 ++++
+> >  drivers/of/Makefile              |    1 +
+> >  drivers/of/of_reserved_mem_dma.c |   65 ++++++++++++++++++++++++++++++++++++++
 >
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> ---
->   arch/arm/mach-exynos/mach-exynos4-dt.c |    1 +
->   arch/arm/mach-exynos/mach-exynos5-dt.c |    1 +
->   2 files changed, 2 insertions(+)
+> I don't see any reason to have this separate from of_reserved_mem.c
+
+Some architectures don't have support for dma_declare_coherent_memory()
+(CONFIG_HAVE_GENERIC_DMA_COHERENT), good examples are arc, c6x, metag 
+and extensa.
+This code will not work for them.
+
+> >  3 files changed, 73 insertions(+)
+> >  create mode 100644 drivers/of/of_reserved_mem_dma.c
+> >
+> > diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+> > index f25931dfc6db..7f00b801bcd2 100644
+> > --- a/drivers/of/Kconfig
+> > +++ b/drivers/of/Kconfig
+> > @@ -80,4 +80,11 @@ config OF_RESERVED_MEM
+> >  	help
+> >  	  Helpers to allow for reservation of memory regions
+> >
+> > +config OF_RESERVED_MEM_DMA
+> > +	depends on OF_RESERVED_MEM
+> > +	depends on HAVE_GENERIC_DMA_COHERENT
+> > +	def_bool y
+> > +	help
+> > +	  Helpers for reserving memory regions for DMA use
+> > +
+> >  endmenu # OF
+> > diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+> > index ed9660adad77..6142227ca854 100644
+> > --- a/drivers/of/Makefile
+> > +++ b/drivers/of/Makefile
+> > @@ -10,3 +10,4 @@ obj-$(CONFIG_OF_PCI)	+= of_pci.o
+> >  obj-$(CONFIG_OF_PCI_IRQ)  += of_pci_irq.o
+> >  obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+> >  obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
+> > +obj-$(CONFIG_OF_RESERVED_MEM_DMA) += of_reserved_mem_dma.o
+> > diff --git a/drivers/of/of_reserved_mem_dma.c b/drivers/of/of_reserved_mem_dma.c
+> > new file mode 100644
+> > index 000000000000..a3e596d1091d
+> > --- /dev/null
+> > +++ b/drivers/of/of_reserved_mem_dma.c
+> > @@ -0,0 +1,65 @@
+> > +/*
+> > + * Device tree based initialization code for DMA reserved regions.
+> > + *
+> > + * Copyright (c) 2013, The Linux Foundation. All Rights Reserved.
+> > + * Copyright (c) 2013,2014 Samsung Electronics Co., Ltd.
+> > + *		http://www.samsung.com
+> > + * Author: Marek Szyprowski <m.szyprowski@samsung.com>
+> > + * Author: Josh Cartwright <joshc@codeaurora.org>
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation; either version 2 of the
+> > + * License or (at your optional) any later version of the license.
+> > + */
+> > +#include <linux/memblock.h>
+> > +#include <linux/err.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_fdt.h>
+> > +#include <linux/of_platform.h>
+> > +#include <linux/mm.h>
+> > +#include <linux/sizes.h>
+> > +#include <linux/mm_types.h>
+> > +#include <linux/dma-mapping.h>
+> > +#include <linux/of_reserved_mem.h>
+> > +
+> > +static void rmem_dma_device_init(struct reserved_mem *rmem,
+> > +				 struct device *dev,
+> > +				 struct of_phandle_args *args)
+> > +{
+> > +	dma_declare_coherent_memory(dev, rmem->base, rmem->base,
+> > +		rmem->size, DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
+> > +}
+> > +
+> > +static void rmem_dma_device_release(struct reserved_mem *rmem,
+> > +				    struct device *dev)
+> > +{
+> > +	dma_release_declared_memory(dev);
+> > +}
+> > +
+> > +static const struct reserved_mem_ops rmem_dma_ops = {
+> > +	.device_init	= rmem_dma_device_init,
+> > +	.device_release	= rmem_dma_device_release,
+> > +};
+> > +
+> > +static int __init rmem_dma_setup(struct reserved_mem *rmem,
+> > +				 unsigned long node,
+> > +				 const char *uname)
+> > +{
+> > +	int err;
+> > +
+> > +	if (of_get_flat_dt_prop(node, "reusable", NULL))
+> > +		return -EINVAL;
+> > +
+> > +	err = memblock_remove(rmem->base, rmem->size);
 >
-> diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
-> index d3e54b7644d7..5d037b561253 100644
-> --- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-> @@ -28,6 +28,7 @@ static void __init exynos4_dt_machine_init(void)
->   }
->
->   static char const *exynos4_dt_compat[] __initdata = {
-> +	"samsung,exynos4",
->   	"samsung,exynos4210",
->   	"samsung,exynos4212",
->   	"samsung,exynos4412",
-> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> index 37ea261f0f6c..ad0db5a93da8 100644
-> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> @@ -50,6 +50,7 @@ static void __init exynos5_dt_machine_init(void)
->   }
->
->   static char const *exynos5_dt_compat[] __initdata = {
-> +	"samsung,exynos5",
->   	"samsung,exynos5250",
->   	"samsung,exynos5420",
->   	"samsung,exynos5440",
->
+> Isn't the memblock_remove() now handled by the core code? Or am I
+> mis-reading it?
 
-Since all Exynos chips can be easily recognized using dedicated chip ID 
-register, I wonder whether we really need to maintain two distinct board 
-files for Exynos 4 and 5 series, especially when both of them are doing 
-mostly the same set up, which can be simply generalized to cover all the 
-cases.
+I forgot to remove it...
 
-Instead of adding just another level of artificially fine grained 
-compatible strings, I'd rather suggest merging both board files together 
-and adding a single compatible string identifying all SoCs that can be 
-further differentiated by using hardware chip ID register.
+> > +	if (err == 0) {
+> > +		rmem->ops = &rmem_dma_ops;
+> > +		pr_info("Reserved memory: created DMA memory pool at %pa, size %ld MiB\n",
+> > +			&rmem->base, (unsigned long)rmem->size / SZ_1M);
+> > +	} else {
+> > +		pr_err("Reserved memory: unable to setup '%s' memory region for DMA.\n",
+> > +		       uname);
+> > +	}
+> > +	return err;
+> > +}
+> > +RESERVEDMEM_OF_DECLARE(dma, "shared-dma-pool", rmem_dma_setup);
+> > --
+> > 1.7.9.5
+> >
 
-What do you think?
-
-P.S. Please always keep respective subsystem/arch level MLs on CC list, 
-in this case linux-arm-kernel. The linux-samsung-soc ML is just a 
-convenience tool to group all threads about Samsung SoCs, not a way to 
-bypass respective subsystem MLs.
-
-Best regards,
-Tomasz
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
