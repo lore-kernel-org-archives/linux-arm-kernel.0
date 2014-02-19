@@ -1,42 +1,28 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 18 Feb 2014 22:00:51 -0800
-Subject: [PATCH v2 0/2] clk: sunxi: Change compatibles pattern
-In-Reply-To: <1391676958-13883-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1391676958-13883-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140219060051.22529.98735@quantum>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 19 Feb 2014 14:03:12 +0800
+Subject: [PATCH] ARM: dts: imx6sl-evk: Keep VGEN1 regulator always enabled
+In-Reply-To: <20140219011957.GI15716@S2101-09.ap.freescale.net>
+References: <1392752404-524-1-git-send-email-fabio.estevam@freescale.com>
+ <20140219011957.GI15716@S2101-09.ap.freescale.net>
+Message-ID: <20140219060307.GC3010@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2014-02-06 00:55:56)
-> Hi,
+On Wed, Feb 19, 2014 at 09:19:59AM +0800, Shawn Guo wrote:
+> On Tue, Feb 18, 2014 at 04:40:04PM -0300, Fabio Estevam wrote:
+> > On imx6sl-evk board the VGEN1 regulator powers up the NVCC_1.2V domain of the
+> > imx6sl SoC, so we need to keep it always powered.
+> > 
+> > This problem has been observed by the fact that a GPIO connected to an LED could
+> > not work when the PMIC driver was enabled.
+> > 
+> > Keeping VGEN1 regulator always enabled fixes the problem.
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> This is the second version of the clock compatible changes.
-> The only difference with the v1 being that we're now droping the old
-> compatibles, instead of keeping them, since the DT maintainers said it was
-> fine.
+> Applied, thanks.
 
-Both look good to me.
+Since Mark is questioning this is a correct fix, I'm dropping it for
+now.
 
-Regards,
-Mike
-
-> 
-> Thanks,
-> Maxime
-> 
-> Maxime Ripard (2):
->   clk: sunxi: Add new clock compatibles
->   ARM: sunxi: dt: Convert to the new clock compatibles
-> 
->  Documentation/devicetree/bindings/clock/sunxi.txt | 36 +++++++-------
->  arch/arm/boot/dts/sun4i-a10.dtsi                  | 60 +++++++++++------------
->  arch/arm/boot/dts/sun5i-a10s.dtsi                 | 48 +++++++++---------
->  arch/arm/boot/dts/sun5i-a13.dtsi                  | 48 +++++++++---------
->  arch/arm/boot/dts/sun6i-a31.dtsi                  | 10 ++--
->  arch/arm/boot/dts/sun7i-a20.dtsi                  | 54 ++++++++++----------
->  drivers/clk/sunxi/clk-sunxi.c                     | 30 ++++++------
->  7 files changed, 143 insertions(+), 143 deletions(-)
-> 
-> -- 
-> 1.8.4.2
-> 
+Shawn
