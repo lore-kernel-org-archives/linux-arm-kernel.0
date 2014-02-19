@@ -1,59 +1,114 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 19 Feb 2014 12:26:02 -0500
-Subject: [PATCH 3/3] ahci: st: Add support for ST's SATA IP
-In-Reply-To: <20140219163937.GI10504@lee--X1>
-References: <1392641818-23419-1-git-send-email-lee.jones@linaro.org>
- <1392641818-23419-3-git-send-email-lee.jones@linaro.org>
- <20140218233645.GP31892@mtj.dyndns.org>
- <20140219083025.GB10504@lee--X1>
- <20140219140458.GA10134@htj.dyndns.org>
- <20140219150121.GG10504@lee--X1>
- <20140219150654.GH10134@htj.dyndns.org>
- <20140219152336.GH10504@lee--X1>
- <20140219153624.GI10134@htj.dyndns.org>
- <20140219163937.GI10504@lee--X1>
-Message-ID: <20140219172602.GL10134@htj.dyndns.org>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Wed, 19 Feb 2014 18:28:56 +0100
+Subject: [PATCHv2 1/8] ARM: at91: Add at91sam9rl DT SoC support
+In-Reply-To: <20140219170020.GA25079@e106331-lin.cambridge.arm.com>
+References: <1392823951-26053-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1392823951-26053-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20140219170020.GA25079@e106331-lin.cambridge.arm.com>
+Message-ID: <5304E9D8.7090609@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few more things just in case.
+Hi Mark,
 
-On Wed, Feb 19, 2014 at 04:39:37PM +0000, Lee Jones wrote:
-> It tells me that Hans has more spare time than I do.
+On 19/02/2014 18:00, Mark Rutland wrote:
+> On Wed, Feb 19, 2014 at 03:32:24PM +0000, Alexandre Belloni wrote:
+>> This adds preliminary DT support for the at91sam9rl.
+>>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>> ---
+>>   arch/arm/boot/dts/at91sam9rl.dtsi | 628 ++++++++++++++++++++++++++++++++++++++
+>>   arch/arm/mach-at91/at91sam9rl.c   |  16 +
+>>   2 files changed, 644 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/at91sam9rl.dtsi
+>   
+> [...]
+>
+>> +                       tcb0: timer at fffa0000 {
+>> +                               compatible = "atmel,at91rm9200-tcb";
+>> +                               reg = <0xfffa0000 0x100>;
+>> +                               interrupts = <16 IRQ_TYPE_LEVEL_HIGH 0
+>> +                                             17 IRQ_TYPE_LEVEL_HIGH 0
+>> +                                             18 IRQ_TYPE_LEVEL_HIGH 0>;
+>> +                       };
+> Nit: please bracket list entries individually. Also for other list
+> properties like reg and (*-)gpio(s).
+>
+> [...]
+>
+>> +                       adc0: adc at fffd0000 {
+>> +                               compatible = "atmel,at91sam9260-adc";
+>> +                               reg = <0xfffd0000 0x100>;
+>> +                               interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
+>> +                               atmel,adc-use-external-triggers;
+>> +                               atmel,adc-channels-used = <0xf>;
+>> +                               atmel,adc-vref = <3300>;
+>> +                               atmel,adc-num-channels = <4>;
+>> +                               atmel,adc-startup-time = <15>;
+>> +                               atmel,adc-channel-base = <0x30>;
+>> +                               atmel,adc-drdy-mask = <0x10000>;
+>> +                               atmel,adc-status-register = <0x1c>;
+>> +                               atmel,adc-trigger-register = <0x04>;
+>> +                               atmel,adc-res = <8 10>;
+>> +                               atmel,adc-res-names = "lowres", "highres";
+>> +                               atmel,adc-use-res = "highres";
+>> +
+>> +                               trigger at 0 {
+>> +                                       trigger-name = "timer-counter-0";
+>> +                                       trigger-value = <0x1>;
+>> +                               };
+> A unit-address should go with a reg value. Either this needs a reg and
+> the parent node needs #address-cells and #size-cells, or the
+> unit-address should go, and the names made unique through other means.
+>
+> [...]
+>
+>> +                       pinctrl at fffff400 {
+>> +                               #address-cells = <1>;
+>> +                               #size-cells = <1>;
+>> +                               compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
+> NAK. Either this is a atmel,at91rm9200-pinctrl node or a simple-bus. Not
+> both; that doesn't make any sense.
+>
+>> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+>> index 3651517abedf..d6ee8bb47213 100644
+>> --- a/arch/arm/mach-at91/at91sam9rl.c
+>> +++ b/arch/arm/mach-at91/at91sam9rl.c
+>> @@ -196,6 +196,22 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>>          CLKDEV_CON_ID("pioB", &pioB_clk),
+>>          CLKDEV_CON_ID("pioC", &pioC_clk),
+>>          CLKDEV_CON_ID("pioD", &pioD_clk),
+>> +       /* more lookup table for DT entries */
+>> +       CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
+>> +       CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
+>> +       CLKDEV_CON_DEV_ID("usart", "ffffb400.serial", &usart1_clk),
+>> +       CLKDEV_CON_DEV_ID("usart", "ffffb800.serial", &usart2_clk),
+>> +       CLKDEV_CON_DEV_ID("usart", "ffffbc00.serial", &usart3_clk),
+>> +       CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
+>> +       CLKDEV_CON_DEV_ID("t1_clk", "fffa0000.timer", &tc1_clk),
+>> +       CLKDEV_CON_DEV_ID("t2_clk", "fffa0000.timer", &tc2_clk),
+>> +       CLKDEV_CON_DEV_ID("mci_clk", "fffa4000.mmc", &mmc_clk),
+>> +       CLKDEV_CON_DEV_ID(NULL, "fffa8000.i2c", &twi0_clk),
+>> +       CLKDEV_CON_DEV_ID(NULL, "fffac000.i2c", &twi1_clk),
+>> +       CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioA_clk),
+>> +       CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
+>> +       CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
+>> +       CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioD_clk),
+> Why can't these clocks be described in the DT?
 
-This is the crux of the problem, isn't it?  The party who is creating
-load should also partake in and invest resource into making the
-infrastructure for it.  What I can't understand is how one can claim
-"unfairness" at having to contribute to such effort when that is
-clearly the party which is the primary beneficiary of the added load.
-If you have *any* mature sense of fairness, not this childish "it's
-not going my way", the irony should be clear to you.
+They're described in the DT in patch 6/8, but we need these static 
+definitions
+in case the user wants to support both legacy and DT boards.
 
-> This work would even be something I'd be interested in helping out
-> with - even in my own time, but the way you speak to people doesn't
-> exactly inspire them to go out of my way to work with you does it?
+The at91 CCF based implementation is only compatible with DT, and when 
+legacy
+board support is enabled this disables the CCF implementation in favor 
+of the
+old clk implementation.
 
-Given the circumstances, I don't think depending on good wills of the
-involved parties is a viable strategy and wanted to make it clear that
-the responsibility of chipping in for long term maintainability is on
-everyone who wants to make use of the code base.  This is beyond good
-will.  It's the fundamental sharing of responsibility for
-sustainability.  I'd love to have good will but I can't build that on
-top of a notion as rotten as "it's not fair, it's not my
-responsibility".
+Best Regards,
 
-> Again, that's not what I said. It's great that your subsystem is being
-> improved, but insisting that anyone who submits new code to rebase
-> on top of some development patches which only exist in mail form, and
-> refusing to take patches until they do so doesn't seem right to me.
-
-If I apply your patch now, Hans has one more driver to worry about in
-doing the work that he himself isn't directly benefiting from but
-everybody needs.  In what world is that fair?
-
-So, sorry about going f bomb on you, but you shouldn't be thinking
-what you're thinking.  There's some serious misguidance going on
-there.
-
--- 
-tejun
+Boris
+>
+> Cheers,
+> Mark.
