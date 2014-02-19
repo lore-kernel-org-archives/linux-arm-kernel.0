@@ -1,115 +1,184 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Feb 2014 18:11:52 +0000
-Subject: [PATCH v5 2/2] memory: ti-aemif: add bindings for AEMIF driver
-In-Reply-To: <1392817210-14312-3-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1392817210-14312-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1392817210-14312-3-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <20140219181152.GG25079@e106331-lin.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 19 Feb 2014 13:17:05 -0500
+Subject: [Patch v3 10/23] ARM: MM: Add DT binding for Feroceon L2 cache
+In-Reply-To: <1392819174-11634-11-git-send-email-andrew@lunn.ch>
+References: <1392819174-11634-1-git-send-email-andrew@lunn.ch>
+ <1392819174-11634-11-git-send-email-andrew@lunn.ch>
+Message-ID: <20140219181705.GM7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 01:40:10PM +0000, Ivan Khoronzhuk wrote:
-> Add bindings for TI Async External Memory Interface (AEMIF) controller.
+
++ rmk
+
+Russell,
+
+This patch (and two others after it) are necessary for the migration of
+the kirkwood DT board code to mach-mvebu/.  Due to the complexity of the
+move, (concurrent with adding three new SoCs to mach-mvebu), could you
+please review these and provide Acks for us to take them through
+arm-soc?
+
+thx,
+
+Jason.
+
+On Wed, Feb 19, 2014 at 03:12:41PM +0100, Andrew Lunn wrote:
+> Instantiate the L2 cache from DT. Indicate in DT where the cache
+> control register is so that it is possible to enable/disable write
+> through on the CPU.
 > 
-> The Async External Memory Interface (EMIF16/AEMIF) controller is intended to
-> provide a glue-less interface to a variety of asynchronous memory devices like
-> ASRA M, NOR and NAND memory. A total of 256M bytes of any of these memories
-> can be accessed via 4 chip selects with 64M byte access per chip select.
-> 
-> We are not encoding CS number in reg property, it's memory partition number.
-> The CS number is encoded for Davinci NAND node using standalone property
-> "ti,davinci-chipselect" and we need to provide two memory ranges to it,
-> as result we can't encode CS number in "reg" for AEMIF child devices
-> (NAND/NOR/etc), as it will break bindings compatibility.
-> 
-> In this patch, NAND node is used just as an example of child node.
-> 
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> cc: devicetree at vger.kernel.org
 > ---
->  .../bindings/memory-controllers/ti-aemif.txt       | 210 +++++++++++++++++++++
->  1 file changed, 210 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
-
-[...]
-
-> +- ranges:		Contains memory regions. There are two types of
-> +			ranges/partitions:
-> +			- CS-specific partition/range. If continuous, must be
-> +			set up to reflect the memory layout for 4 chipselects,
-> +			if not then additional range/partition can be added and
-> +			child device can select the proper one.
-> +			- control partition which is common for all CS
-> +			interfaces.
-
-This really doesn't sound anything like the typical meaning of ranges on
-a bus.
-
-Why isn't this information encoded in reg properties on the child nodes?
-
-[...]
-
-> +- ti,cs-ss:		enable/disable select strobe mode
-> +				In select strobe mode chip select behaves as
-> +				the strobe and is active only during the strobe
-> +				period. If present then enable.
+> v2:
+> Change compatible strings to follow l2x0 convention
+> Only expect register for kirkwood-cache.
+> Default to write through if no DT node.
+> Rename writethrough to wt-override to follow l2cc binding.
+> Split kirkwood.dtsi change into a patch of its own.
+> v3
+> Remove wt-override from the binding
+> Respect CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
+> ---
+>  .../devicetree/bindings/arm/mrvl/feroceon.txt      | 16 ++++++++
+>  arch/arm/include/asm/hardware/cache-feroceon-l2.h  |  2 +
+>  arch/arm/mach-kirkwood/board-dt.c                  | 18 ++-------
+>  arch/arm/mm/cache-feroceon-l2.c                    | 43 ++++++++++++++++++++++
+>  4 files changed, 64 insertions(+), 15 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/mrvl/feroceon.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/mrvl/feroceon.txt b/Documentation/devicetree/bindings/arm/mrvl/feroceon.txt
+> new file mode 100644
+> index 000000000000..0d244b999d10
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/mrvl/feroceon.txt
+> @@ -0,0 +1,16 @@
+> +* Marvell Feroceon Cache
 > +
-> +- ti,cs-ew:		enable/disable extended wait mode
-> +				if set, the controller monitors the EMIFWAIT pin
-> +				mapped to that chip select to determine if the
-> +				device wants to extend the strobe period. If
-> +				present then enable.
-
-When would you have these two in the DT and when wouldn't you? Why can't
-the driver decide?
-
-These names are also opaque. We can clearly do better.
-
+> +Required properties:
+> +- compatible : Should be either "marvell,feroceon-cache" or
+> +  	       "marvell,kirkwood-cache".
 > +
-> +- ti,cs-ta:		minimum turn around time, ns
-> +				Time between the end of one asynchronous memory
-> +				access and the start of another asynchronous
-> +				memory access. This delay is not incurred
-> +				between a read followed by read or a write
-> +				followed by a write to same chip select.
-
-The name is opaque. How about ti,min-turnaround-time-ns ?
-
+> +Optional properties:
+> +- reg        : Address of the L2 cache control register. Mandatory for
+> +  	       "marvell,kirkwood-cache", not used by "marvell,feroceon-cache"
 > +
-> +- ti,cs-rsetup:		read setup width, ns
-> +				Time between the beginning of a memory cycle
-> +				and the activation of read strobe.
-> +				Minimum value is 1 (0 treated as 1).
 > +
-> +- ti,cs-rstobe:		read strobe width, ns
-> +				Time between the activation and deactivation of
-> +				the read strobe.
-> +				Minimum value is 1 (0 treated as 1).
+> +Example:
+> +		l2: l2-cache at 20128 {
+> +			compatible = "marvell,kirkwood-cache";
+> +			reg = <0x20128 0x4>;
+> +		};
+> diff --git a/arch/arm/include/asm/hardware/cache-feroceon-l2.h b/arch/arm/include/asm/hardware/cache-feroceon-l2.h
+> index 8edd330aabf6..12e1588dc4f1 100644
+> --- a/arch/arm/include/asm/hardware/cache-feroceon-l2.h
+> +++ b/arch/arm/include/asm/hardware/cache-feroceon-l2.h
+> @@ -9,3 +9,5 @@
+>   */
+>  
+>  extern void __init feroceon_l2_init(int l2_wt_override);
+> +extern int __init feroceon_of_init(void);
 > +
-> +- ti,cs-rhold:		read hold width, ns
-> +				Time between the deactivation of the read
-> +				strobe and the end of the cycle (which may be
-> +				either an address change or the deactivation of
-> +				the chip select signal.
-> +				Minimum value is 1 (0 treated as 1).
+> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> index 29c246858d5a..ec0702c02d6c 100644
+> --- a/arch/arm/mach-kirkwood/board-dt.c
+> +++ b/arch/arm/mach-kirkwood/board-dt.c
+> @@ -42,19 +42,6 @@ static void __init kirkwood_map_io(void)
+>  	iotable_init(kirkwood_io_desc, ARRAY_SIZE(kirkwood_io_desc));
+>  }
+>  
+> -static void __init kirkwood_l2_init(void)
+> -{
+> -#ifdef CONFIG_CACHE_FEROCEON_L2
+> -#ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
+> -	writel(readl(L2_CONFIG_REG) | L2_WRITETHROUGH, L2_CONFIG_REG);
+> -	feroceon_l2_init(1);
+> -#else
+> -	writel(readl(L2_CONFIG_REG) & ~L2_WRITETHROUGH, L2_CONFIG_REG);
+> -	feroceon_l2_init(0);
+> -#endif
+> -#endif
+> -}
+> -
+>  static struct resource kirkwood_cpufreq_resources[] = {
+>  	[0] = {
+>  		.start  = CPU_CONTROL_PHYS,
+> @@ -211,8 +198,9 @@ static void __init kirkwood_dt_init(void)
+>  
+>  	BUG_ON(mvebu_mbus_dt_init());
+>  
+> -	kirkwood_l2_init();
+> -
+> +#ifdef CONFIG_CACHE_FEROCEON_L2
+> +	feroceon_of_init();
+> +#endif
+>  	kirkwood_cpufreq_init();
+>  	kirkwood_cpuidle_init();
+>  
+> diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
+> index 898362e7972b..8dc1a2b5a8ed 100644
+> --- a/arch/arm/mm/cache-feroceon-l2.c
+> +++ b/arch/arm/mm/cache-feroceon-l2.c
+> @@ -13,11 +13,16 @@
+>   */
+>  
+>  #include <linux/init.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+>  #include <linux/highmem.h>
+> +#include <linux/io.h>
+>  #include <asm/cacheflush.h>
+>  #include <asm/cp15.h>
+>  #include <asm/hardware/cache-feroceon-l2.h>
+>  
+> +#define L2_WRITETHROUGH_KIRKWOOD	BIT(4)
 > +
-> +- ti,cs-wsetup:		write setup width, ns
-> +				Time between the beginning of a memory cycle
-> +				and the activation of write strobe.
-> +				Minimum value is 1 (0 treated as 1).
+>  /*
+>   * Low-level cache maintenance operations.
+>   *
+> @@ -350,3 +355,41 @@ void __init feroceon_l2_init(int __l2_wt_override)
+>  	printk(KERN_INFO "Feroceon L2: Cache support initialised%s.\n",
+>  			 l2_wt_override ? ", in WT override mode" : "");
+>  }
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id feroceon_ids[] __initconst = {
+> +	{ .compatible = "marvell,kirkwood-cache"},
+> +	{ .compatible = "marvell,feroceon-cache"},
+> +	{}
+> +};
 > +
-> +- ti,cs-wstrobe:	write strobe width, ns
-> +				Time between the activation and deactivation of
-> +				the write strobe.
-> +				Minimum value is 1 (0 treated as 1).
+> +int __init feroceon_of_init(void)
+> +{
+> +	struct device_node *node;
+> +	void __iomem *base;
+> +	bool l2_wt_override = false;
+> +	struct resource res;
 > +
-> +- ti,cs-whold:		write hold width, ns
-> +				Time between the deactivation of the write
-> +				strobe and the end of the cycle (which may be
-> +				either an address change or the deactivation of
-> +				the chip select signal.
-> +				Minimum value is 1 (0 treated as 1).
-
-Likewise I think these can be given more descriptive names.
-
-Thanks,
-Mark.
+> +#if defined(CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH)
+> +	l2_wt_override = true;
+> +#endif
+> +
+> +	node = of_find_matching_node(NULL, feroceon_ids);
+> +	if (node && of_device_is_compatible(node, "marvell,kirkwood-cache")) {
+> +		if (of_address_to_resource(node, 0, &res))
+> +			return -ENODEV;
+> +
+> +		base = ioremap(res.start, resource_size(&res));
+> +		if (!base)
+> +			return -ENOMEM;
+> +
+> +		if (l2_wt_override)
+> +			writel(readl(base) | L2_WRITETHROUGH_KIRKWOOD, base);
+> +		else
+> +			writel(readl(base) & ~L2_WRITETHROUGH_KIRKWOOD, base);
+> +	}
+> +
+> +	feroceon_l2_init(l2_wt_override);
+> +
+> +	return 0;
+> +}
+> +#endif
+> -- 
+> 1.8.5.3
+> 
