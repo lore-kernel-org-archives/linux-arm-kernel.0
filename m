@@ -1,50 +1,86 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 18 Feb 2014 22:40:33 -0500 (EST)
-Subject: [PATCH RFC 03/31] mmc: sdio_irq: rework sdio irq handling
-In-Reply-To: <E1WFmIP-0006li-SO@rmk-PC.arm.linux.org.uk>
-References: <20140218150801.GD21483@n2100.arm.linux.org.uk>
- <E1WFmIP-0006li-SO@rmk-PC.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1402182233590.17677@knanqh.ubzr>
+From: Mohit.KUMAR@st.com (Mohit KUMAR DCG)
+Date: Wed, 19 Feb 2014 12:09:00 +0800
+Subject: [PATCH V5 4/8] phy: st-miphy-40lp: Add skeleton driver
+In-Reply-To: <2CC2A0A4A178534D93D5159BF3BCB66189FD2CAD14@EAPEX1MAIL1.st.com>
+References: <cover.1391871170.git.pratyush.anand@st.com>
+ <201402101654.22187.arnd@arndb.de>
+ <2CC2A0A4A178534D93D5159BF3BCB66189FD2CAA9B@EAPEX1MAIL1.st.com>
+ <10315753.nkNxr0yDnp@wuerfel>
+ <2CC2A0A4A178534D93D5159BF3BCB66189FD2CAD14@EAPEX1MAIL1.st.com>
+Message-ID: <2CC2A0A4A178534D93D5159BF3BCB66189FD40D477@EAPEX1MAIL1.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Feb 2014, Russell King wrote:
+Hello Arnd,
 
-> Rather than the SDIO support spawning it's own thread for handling card
-> interrupts, use the generic IRQ infrastructure for this, triggering it
-> from the host interface's interrupt handling directly.
+> -----Original Message-----
+> From: Mohit KUMAR [mailto:mohit.kumar at st.com]
+> Sent: Wednesday, February 12, 2014 10:22 AM
+> To: Arnd Bergmann
+> Cc: Pratyush ANAND; Kishon Vijay Abraham I; spear-devel; linux-arm-
+> kernel at lists.infradead.org; devicetree at vger.kernel.org; linux-
+> kernel at vger.kernel.org; Lee Jones
+> Subject: RE: [PATCH V5 4/8] phy: st-miphy-40lp: Add skeleton driver
 > 
-> This avoids a race between the parent thread waiting to receive an
-> interrupt response from the card, and the slow startup from the sdio
-> irq thread, which can occur as a result of high system load (eg, while
-> udev is running.)
+> Hello Arnd,
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> =-DO NOT APPLY-=
->  drivers/mmc/core/sdio_irq.c | 41 +++++++++++++++++++++++++++++++----------
->  include/linux/mmc/host.h    |  3 +++
->  2 files changed, 34 insertions(+), 10 deletions(-)
+> > -----Original Message-----
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > Sent: Tuesday, February 11, 2014 8:09 PM
+> > To: Mohit KUMAR DCG
+> > Cc: Pratyush ANAND; Kishon Vijay Abraham I; spear-devel; linux-arm-
+> > kernel at lists.infradead.org; devicetree at vger.kernel.org; linux-
+> > kernel at vger.kernel.org; Lee Jones
+> > Subject: Re: [PATCH V5 4/8] phy: st-miphy-40lp: Add skeleton driver
+> >
+> > On Tuesday 11 February 2014 11:57:46 Mohit KUMAR DCG wrote:
+> > >
+> > > > Maybe mention that this phy is used inside the spear13xx SoC here
+> > > > rather than a standalone phy.
+> > >
+> > > - Yes, for spear13xx its used internally. Do you think that it
+> > > requires to be mentioned here?
+> > > We have few prototype boards that uses this as external phy.
+> >
+> > [adding Lee since he mentioned working on a similar part]
+> >
+> > I'm a bit confused. Is it actually the same IP block that can be used
+> > internally as part of a SoC and as a standalone chip?
+> >
+> > Since some of the settings of the PHY are controlled through the misc
+> > register in case of spear13xx, I assume that part is different on the
+> > standalone version. How do you actually select the mode in that case?
+> >
+> > It would certainly be helpful to explain this somewhere, and the
+> > binding might not be the worst place for this.
+> >
+> > On a related note, the driver in its current shape looks a bit silly
+> > since it doesn't contain any of the miphy specific code but only the
+> > SoC specific parts (as I suggested you do, so I'm not blaming you :-))
+> > and a multiplexer that switches between the two possible
+> implementations.
 > 
-> diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
-> index aaa90460ed23..f23d73993dc6 100644
-> =-DO NOT APPLY-= a/drivers/mmc/core/sdio_irq.c
-> =+DO NOT APPLY+= b/drivers/mmc/core/sdio_irq.c
-> @@ -90,6 +90,15 @@ static int process_sdio_pending_irqs(struct mmc_host *host)
->  	return ret;
->  }
->  
-> =+DO NOT APPLY+=void sdio_run_irqs(struct mmc_host *host)
-> =+DO NOT APPLY+={
-> =+DO NOT APPLY+=	mmc_claim_host(host);
-> =+DO NOT APPLY+=	host->sdio_irq_pending = true;
-> =+DO NOT APPLY+=	process_sdio_pending_irqs(host);
-> =+DO NOT APPLY+=	mmc_release_host(host);
-> =+DO NOT APPLY+=}
-> =+DO NOT APPLY+=EXPORT_SYMBOL_GPL(sdio_run_irqs);
-> =+DO NOT APPLY+=
+> - yes, thats what we were explaining earlier. If it is integrated into some SoC
+> Then there are some soc specific configurations. Actual phy reg settings could
+> also vary for the different SoCs for the best tuning.
+> 
+> However we agreed to your idea as miphy40lp register definitions would
+> remain same across the SoCs.
+> 
+> >
+> > What is your plan for the future, do you intend to add the actual
+> > miphy code soon, or is that something you just want to leave as an
+> > option for the future but have no specific plans to do right now? If
+> > not, the driver would probably look nicer if it were split into two
+> > separate implementations, one for each spear13xx SoC and with a separate
+> set of phy_ops but no multiplexer.
+> 
+> Do you want  it to split the code into two different files like phy-
+> miphyspear1310.c and phy-miphyspear1340.c ?
 
-Could you please dispense with those obnoxious "DO NOT APPLY" strings 
-all over the place?  That makes patch review very annoying.
+- Waiting for your final say about splitting into two different files or any
+ other comment for the  patch series?
 
-
-Nicolas
+Thanks
+Mohit
+ 
