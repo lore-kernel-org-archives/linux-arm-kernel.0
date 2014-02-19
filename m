@@ -1,98 +1,62 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 19 Feb 2014 14:37:49 +0100
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <53047BBB.6040108@keymile.com>
-References: <51DD88A4.1030506@keymile.com> <20130710185706.72b124a4@skate>
- <51DD9A8C.10608@keymile.com> <20130711163220.2b3adf38@skate>
- <53039894.10905@keymile.com> <20140218212751.07c2aeb5@skate>
- <53046D98.6020801@keymile.com> <20140219102658.76eec91e@skate>
- <53047BBB.6040108@keymile.com>
-Message-ID: <20140219143749.65ff3155@skate>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 19 Feb 2014 15:40:08 +0200
+Subject: [PATCH v5 0/2] Introduce AEMIF driver for Davinci/Keystone archs
+Message-ID: <1392817210-14312-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gerlando, Bjorn,
+These patches introduce Async External Memory Interface (EMIF16/AEMIF)
+controller driver for Davinci/Keystone archs.
 
-Bjorn, I added you as the To: because there is a PCI related question
-for you below :)
+For more informations see documentation:
+Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
+OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
+Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
 
-On Wed, 19 Feb 2014 10:39:07 +0100, Gerlando Falauto wrote:
+Based on v3.14-rc3.
 
-> spoiler first: SUCCESS!!!!
+v4..v5:
+- memory: ti-aemif: introduce AEMIF driver
+	deleted DRV_NAME in favour of KBUILD_MODNAME
+	deleted redundant err message in case of memory allocation
+	some cosmetic changes
 
-Awesome :)
+v3..v4:
+	rebased on latest of linux-keystone.git keystone/master
 
-> > I'm obviously interested in seeing the message that gets shown, as well
-> > as the new mvebu-mbus debugfs output.
-> 
-> ----------
-> pci 0000:00:01.0:   bridge window [mem 0xe0000000-0xebffffff]
-> PCIE 0.0: creating window at 0xe0000000, size 0xbffffff rounded up to 
-> 0x10000000
+v2..v3 (https://lkml.org/lkml/2013/12/11/148):
+- memory: ti-aemif: introduce AEMIF driver
+	changed to work with multiple AEMIF controllers
+	corrected "copyright" to "authors" in header
+	changed compatible "ti,omap-L138-aemif" to "ti,da850-aeimf"
+	used NULL in clk_get() instead of "aemif" name
+	driver can be build as loadable module
+	treat all child nodes as cs nodes, it makes code simpler
 
-Right, rounding from 192 MB to 265 MB.
+- memory: ti-aemif: add bindings for AEMIF driver
+	deleted direct link driver/memory/ti-aemif.c
+	clarified description of controller ranges property
+	changed compatible "ti,omap-L138-aemif" to "ti,da850-aeimf"
+	added cs number information in commit log
+	removed compatible property from cs node, it makes code simpler
 
->   cat /sys/kernel/debug/mvebu-mbus/devices
-> [00] disabled
-> [01] disabled
-> [02] disabled
-> [03] disabled
-> [04] 00000000ff000000 - 00000000ff010000 : nand
-> [05] 00000000f4000000 - 00000000f8000000 : vpcie
-> [06] 00000000fe000000 - 00000000fe010000 : dragonite
-> [07] 00000000e0000000 - 00000000f0000000 : pcie0.0
-> 
-> > For good measure, if you could also dump the registers of the PCIe
-> > window. In your case, it was window 7, so dumping 0xf1020070 and
-> > 0xf1020074 would be useful.
-> 
-> Isn't that where the output of debugfs comes from?
+v1..v2 (https://lkml.org/lkml/2013/11/21/170):
+- memory: ti-aemif: introduce AEMIF driver
+- memory: ti-aemif: add bindings for AEMIF driver
+	added ti.cs-chipselect property instead of representing chipselect
+	number in cs node name.
 
-It is, but the mvebu-mbus is interpreting the sequence of 1s and 0s to
-give the real size, and this involves a little bit of magic of bit
-manipulation, which I wanted to check by having a look at the raw
-values of the registers.
+Ivan Khoronzhuk (2):
+  memory: ti-aemif: introduce AEMIF driver
+  memory: ti-aemif: add bindings for AEMIF driver
 
-> > I am not sure, but since we are configuring an invalid memory size,
-> > maybe the MBus behavior is undefined, and we get some completely funky
-> > behavior, where parts of the 192 MB window are actually work, but parts
-> > of it are not.
-> 
-> And... Ladies and gentlemen... it turns out YOU'RE RIGHT!!!
-> With your patch now everything works fine!!!
-> 
-> No words (or quads, for that matter) can express how grateful I am! ;-)
+ .../bindings/memory-controllers/ti-aemif.txt       | 210 ++++++++++
+ drivers/memory/Kconfig                             |  11 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/ti-aemif.c                          | 427 +++++++++++++++++++++
+ 4 files changed, 649 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+ create mode 100644 drivers/memory/ti-aemif.c
 
-Cool. However, I am not sure my fix is really correct, because is you
-had another PCIe device that needed 64 MB of memory space, the PCIe
-core would have allocated addresses 0xec000000 -> 0xf0000000 to it,
-which would have conflicted with the forced "power of 2 up-rounding"
-we've applied on the memory space of the first device.
-
-Therefore, I believe this constraint should be taken into account by
-the PCIe core when allocating the different memory regions for each
-device.
-
-Bjorn, the mvebu PCIe host driver has the constraint that the I/O and
-memory regions associated to each PCIe device of the emulated bridge
-have a size that is a power of 2.
-
-I am currently using the ->align_resource() hook to ensure that the
-start address of the resource matches certain other constraints, but I
-don't see a way of telling the PCI core that I need the resource to
-have its size rounded up to the next power of 2 size. Is there a way of
-doing this?
-
-In the case described by Gerlando, the PCI core has assigned a 192 MB
-region, but the Marvell hardware can only create windows that have a
-power of two size, i.e 256 MB. Therefore, the PCI core should be told
-this constraint, so that it doesn't allocate the next resource right
-after the 192 MB one.
-
-Thanks!
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.8.3.2
