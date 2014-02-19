@@ -1,27 +1,33 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Thu, 20 Feb 2014 00:03:10 +0100
-Subject: I2C dummy adapter driver ?
-Message-ID: <5305382E.9050902@gmail.com>
+From: taras.kondratiuk@linaro.org (Taras Kondratiuk)
+Date: Thu, 20 Feb 2014 00:59:53 +0200
+Subject: [GIT PULL] ARM: kprobes: big-endian support
+In-Reply-To: <52D3D784.2000600@linaro.org>
+References: <52D3D784.2000600@linaro.org>
+Message-ID: <53053769.5090100@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On 01/13/2014 02:09 PM, Taras Kondratiuk wrote:
+> Hi Russell,
+> 
+> Please pull fixes for ARM Kprobes big-endian support.
+> 
+> It is reworked initial Ben's series for big endian support [1].
+> Dropped patches that are not directly related to kprobes.
+> Current set of patches is enough to have functional BE kprobes.
+> 
+> One ARM kprobe test fails on Cortex-A15 boards (TC2 and Keystone2 EVM),
+> while it passes on Pandaboard. The issue is not related to this series
+> and already present in v3.13-rc7.
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg285210.html
+> 
 
-I was wondering whether it would be reasonable to create a generic
-Linux dummy I2C bus controller driver. The rationale behind it is
-there might be hardware configurations where I2C communication is
-handled by firmware but still it is useful to have I2C slave devices
-instantiated by a Linux I2C bus adapter driver.
-It would be useful to have the common devicetree I2C binding scheme
-working regardless of where the I2C communication is handled - in
-firmware or by the host CPU.
+Hi Russell,
 
-Currently we have a somewhat dummy I2C adapter driver at drivers/media/
-platform/exynos4-is/fimc-is-i2c.c. But it is going to be needed by
-multiple SoCs and I thought about separating it or creating a generic
-dummy I2C adapter driver.
+This pull request is based on 3.13-rc8, but it applies cleanly to
+3.14-rc3, because kprobes are not touched since then.
+Do I need to resent a new pull request based on 3.14-rc3 anyway?
 
-Thoughts, suggestions ?
-
-Thanks,
-Sylwester
+-- 
+Taras Kondratiuk
