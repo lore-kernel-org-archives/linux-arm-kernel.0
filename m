@@ -1,43 +1,148 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 18 Feb 2014 23:48:50 -0700
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <20140219024427.GC5394@bart.dudau.co.uk>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <5805232.JrD2FybBlg@wuerfel>
- <20140214220047.GA5394@bart.dudau.co.uk>
- <2312919.pM61KLBcYY@wuerfel>
- <20140218174125.GC29304@obsidianresearch.com>
- <20140219024427.GC5394@bart.dudau.co.uk>
-Message-ID: <20140219064850.GD6186@obsidianresearch.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Wed, 19 Feb 2014 07:51:07 +0100
+Subject: [PATCH 1/2] ALSA: hda/ca0132 - setup/cleanup streams
+In-Reply-To: <1392791227-16810-1-git-send-email-hychao@chromium.org>
+References: <s5hppmztbvl.wl%tiwai@suse.de>
+ <1392791227-16810-1-git-send-email-hychao@chromium.org>
+Message-ID: <s5hy517y4ro.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 02:44:27AM +0000, Liviu Dudau wrote:
- 
-> I wish things were easier!
+At Wed, 19 Feb 2014 14:27:07 +0800,
+Hsin-Yu Chao wrote:
+> 
+> When a HDMI stream is opened with the same stream tag
+> as a following opened stream to ca0132, audio will be
+> heard from two ports simultaneously.
+> Fix this issue by change to use snd_hda_codec_setup_stream
+> and snd_hda_codec_cleanup_stream instead, so that an
+> inactive stream can be marked as 'dirty' when found
+> with a conflict stream tag, and then get purified.
+> 
+> Signed-off-by: Hsin-Yu Chao <hychao@chromium.org>
+> Reviewed-by: Chih-Chung Chang <chihchung@chromium.org>
 
-Yah, I've seen some of this complexity too..
+Thanks, I applied both patches now with Cc to stable.
 
-A thought that crosses my head is to try and leave the entire arch
-support intact and build a separate 'domain-driver-based' support
-that completely replaces the arch support, a domain would use one or
-the other but never both.
 
-So pci_domain_nr could become:
+Takashi
 
-  struct pci_domain_driver *drv = pci_get_domain_driver(bus);
-  if (drv)
-       return drv->domain_nr;
-  else
-       return _arch_pci_domain_nr(bus);
-
-And other funcs would change effectively the same way.
-
-> And if someone has a good idea on how to determine the domain # from
-> DT we can pluck it into the pcibios_root_bridge_prepare() function
-> (either the generic version or the arch specific one).
-
-You can probably start with 'of_alias_get_id'..
-
-Jason
+> ---
+>  sound/pci/hda/patch_ca0132.c | 66 +++++---------------------------------------
+>  1 file changed, 7 insertions(+), 59 deletions(-)
+> 
+> diff --git a/sound/pci/hda/patch_ca0132.c b/sound/pci/hda/patch_ca0132.c
+> index 54d1479..0aa72ee 100644
+> --- a/sound/pci/hda/patch_ca0132.c
+> +++ b/sound/pci/hda/patch_ca0132.c
+> @@ -2662,60 +2662,6 @@ static bool dspload_wait_loaded(struct hda_codec *codec)
+>  }
+>  
+>  /*
+> - * PCM stuffs
+> - */
+> -static void ca0132_setup_stream(struct hda_codec *codec, hda_nid_t nid,
+> -				 u32 stream_tag,
+> -				 int channel_id, int format)
+> -{
+> -	unsigned int oldval, newval;
+> -
+> -	if (!nid)
+> -		return;
+> -
+> -	snd_printdd(
+> -		   "ca0132_setup_stream: NID=0x%x, stream=0x%x, "
+> -		   "channel=%d, format=0x%x\n",
+> -		   nid, stream_tag, channel_id, format);
+> -
+> -	/* update the format-id if changed */
+> -	oldval = snd_hda_codec_read(codec, nid, 0,
+> -				    AC_VERB_GET_STREAM_FORMAT,
+> -				    0);
+> -	if (oldval != format) {
+> -		msleep(20);
+> -		snd_hda_codec_write(codec, nid, 0,
+> -				    AC_VERB_SET_STREAM_FORMAT,
+> -				    format);
+> -	}
+> -
+> -	oldval = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_CONV, 0);
+> -	newval = (stream_tag << 4) | channel_id;
+> -	if (oldval != newval) {
+> -		snd_hda_codec_write(codec, nid, 0,
+> -				    AC_VERB_SET_CHANNEL_STREAMID,
+> -				    newval);
+> -	}
+> -}
+> -
+> -static void ca0132_cleanup_stream(struct hda_codec *codec, hda_nid_t nid)
+> -{
+> -	unsigned int val;
+> -
+> -	if (!nid)
+> -		return;
+> -
+> -	snd_printdd(KERN_INFO "ca0132_cleanup_stream: NID=0x%x\n", nid);
+> -
+> -	val = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_CONV, 0);
+> -	if (!val)
+> -		return;
+> -
+> -	snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_STREAM_FORMAT, 0);
+> -	snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0);
+> -}
+> -
+> -/*
+>   * PCM callbacks
+>   */
+>  static int ca0132_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
+> @@ -2726,7 +2672,7 @@ static int ca0132_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
+>  {
+>  	struct ca0132_spec *spec = codec->spec;
+>  
+> -	ca0132_setup_stream(codec, spec->dacs[0], stream_tag, 0, format);
+> +	snd_hda_codec_setup_stream(codec, spec->dacs[0], stream_tag, 0, format);
+>  
+>  	return 0;
+>  }
+> @@ -2745,7 +2691,7 @@ static int ca0132_playback_pcm_cleanup(struct hda_pcm_stream *hinfo,
+>  	if (spec->effects_switch[PLAY_ENHANCEMENT - EFFECT_START_NID])
+>  		msleep(50);
+>  
+> -	ca0132_cleanup_stream(codec, spec->dacs[0]);
+> +	snd_hda_codec_cleanup_stream(codec, spec->dacs[0]);
+>  
+>  	return 0;
+>  }
+> @@ -2824,8 +2770,8 @@ static int ca0132_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
+>  {
+>  	struct ca0132_spec *spec = codec->spec;
+>  
+> -	ca0132_setup_stream(codec, spec->adcs[substream->number],
+> -			    stream_tag, 0, format);
+> +	snd_hda_codec_setup_stream(codec, spec->adcs[substream->number],
+> +				   stream_tag, 0, format);
+>  
+>  	return 0;
+>  }
+> @@ -2839,7 +2785,7 @@ static int ca0132_capture_pcm_cleanup(struct hda_pcm_stream *hinfo,
+>  	if (spec->dsp_state == DSP_DOWNLOADING)
+>  		return 0;
+>  
+> -	ca0132_cleanup_stream(codec, hinfo->nid);
+> +	snd_hda_codec_cleanup_stream(codec, hinfo->nid);
+>  	return 0;
+>  }
+>  
+> @@ -4742,6 +4688,8 @@ static int patch_ca0132(struct hda_codec *codec)
+>  		return err;
+>  
+>  	codec->patch_ops = ca0132_patch_ops;
+> +	codec->pcm_format_first = 1;
+> +	codec->no_sticky_stream = 1;
+>  
+>  	return 0;
+>  }
+> -- 
+> 1.8.3.2
+> 
