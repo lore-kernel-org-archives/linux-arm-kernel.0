@@ -1,44 +1,54 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 19 Feb 2014 19:22:45 +0000 (UTC)
-Subject: [RFC PATCH] ARM: OMAP2+: clockdomain: Reintroduce SW_SLEEP
- Support (fwd)
-In-Reply-To: <CANacCWy10TTJenrZ6hdTN8bCpAQQjRa5MOBPde7bnn-LM+VFbw@mail.gmail.com>
-References: <alpine.DEB.2.02.1402191824260.8777@utopia.booyaka.com>
- <CANacCWy10TTJenrZ6hdTN8bCpAQQjRa5MOBPde7bnn-LM+VFbw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1402191920040.8777@utopia.booyaka.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 19 Feb 2014 14:23:32 -0500
+Subject: [PATCH v6 3/4] DT: i2c: Trivial: Add sii, s35390a, fix ricoh
+ vendor prefix
+In-Reply-To: <1392836354-28886-4-git-send-email-klightspeed@killerwolves.net>
+References: <1392836354-28886-1-git-send-email-klightspeed@killerwolves.net>
+ <1392836354-28886-4-git-send-email-klightspeed@killerwolves.net>
+Message-ID: <20140219192332.GS7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Feb 2014, Vaibhav Bedia wrote:
-
-> On Wed, Feb 19, 2014 at 1:25 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> >
-> > Just FYI.  Queued for v3.15 unless someone complains.
-> >
+On Thu, Feb 20, 2014 at 04:59:13AM +1000, klightspeed at killerwolves.net wrote:
+> From: Andrew Lunn <andrew@lunn.ch>
 > 
-> No complains but i wanted to point out that with some additional
-> changes it's possible
-> to consolidate AM335x (and AM437x) very nicely with the rest of OMAP4+
-> PRM/CM code.
+> Add the Seiko Instruments Inc S35390a to the list of trivial i2c
+> devices. At the same time, correct the vendor prefix for ricoh, which
+> should be the ticker symbol ricoy.
 > 
-> I had posted a series (which had a similar patch) a while back [1] but
-> that got never
-> got any feedback :/
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> ---
+>  Documentation/devicetree/bindings/i2c/trivial-devices.txt | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> index 1a1ac2e..5f37191 100644
+> --- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> +++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+> @@ -56,8 +56,9 @@ ovti,ov5642		OV5642: Color CMOS QSXGA (5-megapixel) Image Sensor with OmniBSI an
+>  pericom,pt7c4338	Real-time Clock Module
+>  plx,pex8648		48-Lane, 12-Port PCI Express Gen 2 (5.0 GT/s) Switch
+>  ramtron,24c64		i2c serial eeprom  (24cxx)
+> -ricoh,rs5c372a		I2C bus SERIAL INTERFACE REAL-TIME CLOCK IC
+> +ricoy,rs5c372a		I2C bus SERIAL INTERFACE REAL-TIME CLOCK IC
 
-Yeah, to be honest I don't like the consolidation approach.  The reason 
-why is because the hardware seems to be quite different underneath, so the 
-risk of breaking another chip is high.
+Sorry, I should've caught this before.  'ricoh,' has been is use by two
+dts files since at least v3.10.  See:
 
-> If one looks hard enough AM335x/AM437x/TI81xx are not that different 
-> from OMAP4+ :)
+  f236f5aabe8eb ARM: kirkwood: Add support for NETGEAR ReadyNAS Duo v2 using DT
 
-Hmm, it's my understanding that the hardware implementations are quite 
-different between the Wireless and the Catalog parts.  Certainly the 
-Wireless engineers didn't have any knowledge at all of what Catalog folks 
-were doing, and many implementation assumptions that held true across 
-several Wireless parts did not hold up at all when extended to Catalog 
-parts.
+So same as qnap, let's stick with what is already there.
 
+thx,
 
+Jason.
 
-- Paul
+>  samsung,24ad0xd1	S524AD0XF1 (128K/256K-bit Serial EEPROM for Low Power)
+> +sii,s35390a		2-wire CMOS real-time clock
+>  st-micro,24c256		i2c serial eeprom  (24cxx)
+>  stm,m41t00		Serial Access TIMEKEEPER
+>  stm,m41t62		Serial real-time clock (RTC) with alarm
+> -- 
+> 1.8.3.2
+> 
