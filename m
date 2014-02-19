@@ -1,67 +1,98 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Wed, 19 Feb 2014 11:10:31 -0800
-Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
-References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
- <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
- <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
-Message-ID: <530501A7.2030703@ti.com>
+From: vaibhav.bedia@gmail.com (Vaibhav Bedia)
+Date: Wed, 19 Feb 2014 14:17:43 -0500
+Subject: [RFC PATCH] ARM: OMAP2+: clockdomain: Reintroduce SW_SLEEP
+ Support (fwd)
+In-Reply-To: <alpine.DEB.2.02.1402191824260.8777@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1402191824260.8777@utopia.booyaka.com>
+Message-ID: <CANacCWy10TTJenrZ6hdTN8bCpAQQjRa5MOBPde7bnn-LM+VFbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On Wed, Feb 19, 2014 at 1:25 PM, Paul Walmsley <paul@pwsan.com> wrote:
+>
+> Just FYI.  Queued for v3.15 unless someone complains.
+>
 
-On 02/19/2014 08:12 AM, Lorenzo Pieralisi wrote:
+No complains but i wanted to point out that with some additional
+changes it's possible
+to consolidate AM335x (and AM437x) very nicely with the rest of OMAP4+
+PRM/CM code.
 
-+ *  https://patchwork.kernel.org/patch/96442/
+I had posted a series (which had a similar patch) a while back [1] but
+that got never
+got any feedback :/
 
+If one looks hard enough AM335x/AM437x/TI81xx are not that different
+from OMAP4+ :)
 
-I think the idea here is to get the CPU into a state so that later
-when we resume from the resume kernel, the actual CPU state matches
-the state we have in kernel. The main thing flush_thread does is clear
-out any and all FP state.
+Regards,
+Vaibhav
 
-The may be part of the patchset that is OBE.
+[1] http://comments.gmane.org/gmane.linux.ports.arm.omap/100474
 
-
-
-cpu_resume makes many assumptions about the state of the state of the
-CPU, the primary being that the MMU is disabled, but also that all
-caches and IRQs are disabled. soft_restart does all this for us.
-
-
-
-ah, you are saying just return from __swsusp_arch_save_image and allow
-cpu_suspend_abort to be called, placing the result of swsusp_save
-somewhere else. This may work and would reduce the complexity of the
-code slightly.
-
-
-
-This is taken from the previous iteration of the patchset, I think the
-comment is OBE.
-
-
-
-But this is still required to select the right mapping for our copying.
-
-
-
-I don't remember why I needed to prevent gcc from manipulating the
-stack here.
-
-
-
-This is another holdover from previous patch versions that may be OBE.
-
-
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-Comment: Using GnuPG with Thunderbird - http://www.enigmail.net/
-
-iEYEARECAAYFAlMFAaYACgkQfNRrxBinbdsWTwCgowSU7VPqGcM4ks39FtAihsBe
-vfYAn3gxZEu753xyESuye0y1z+wbWJRp
-=JZ1s
------END PGP SIGNATURE-----
+> - Paul
+>
+> ---------- Forwarded message ----------
+> Date: Fri, 7 Feb 2014 16:20:59 -0600
+> From: Dave Gerlach <d-gerlach@ti.com>
+> To: linux-omap at vger.kernel.org
+> Cc: Tony Lindgren <tony@atomide.com>, Paul Walmsley <paul@pwsan.com>,
+>     Rajendra Nayak <rnayak@ti.com>, Nishanth Menon <nm@ti.com>,
+>     Dave Gerlach <d-gerlach@ti.com>
+> Subject: [RFC PATCH] ARM: OMAP2+: clockdomain: Reintroduce SW_SLEEP Support
+>
+> Since commit 65aa94b204d (ARM: OMAP4: clockdomain/CM code: Update supported
+> transition modes), on OMAP4, all CLKDMs support HW_AUTO so this is used
+> instead of SW_SLEEP for the idling of clockdomains. However, additional
+> SoCs now leverage the OMAP4 clockdomain code so update it to use SW_SLEEP
+> if the clockdomain data specifies that the CLKDM has the
+> CLKDM_CAN_FORCE_SLEEP flag set rather than using HW_AUTO for both cases.
+>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
+>  arch/arm/mach-omap2/cminst44xx.c |   18 ++++++++++++++++--
+>  1 file changed, 16 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+> index 731ca13..f5c4731 100644
+> --- a/arch/arm/mach-omap2/cminst44xx.c
+> +++ b/arch/arm/mach-omap2/cminst44xx.c
+> @@ -254,6 +254,11 @@ void omap4_cminst_clkdm_force_wakeup(u8 part, u16 inst, u16 cdoffs)
+>   *
+>   */
+>
+> +void omap4_cminst_clkdm_force_sleep(u8 part, u16 inst, u16 cdoffs)
+> +{
+> +       _clktrctrl_write(OMAP34XX_CLKSTCTRL_FORCE_SLEEP, part, inst, cdoffs);
+> +}
+> +
+>  /**
+>   * omap4_cminst_wait_module_ready - wait for a module to be in 'func' state
+>   * @part: PRCM partition ID that the CM_CLKCTRL register exists in
+> @@ -404,8 +409,17 @@ static int omap4_clkdm_clear_all_wkup_sleep_deps(struct clockdomain *clkdm)
+>
+>  static int omap4_clkdm_sleep(struct clockdomain *clkdm)
+>  {
+> -       omap4_cminst_clkdm_enable_hwsup(clkdm->prcm_partition,
+> -                                       clkdm->cm_inst, clkdm->clkdm_offs);
+> +       if (clkdm->flags & CLKDM_CAN_HWSUP)
+> +               omap4_cminst_clkdm_enable_hwsup(clkdm->prcm_partition,
+> +                                               clkdm->cm_inst,
+> +                                               clkdm->clkdm_offs);
+> +       else if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
+> +               omap4_cminst_clkdm_force_sleep(clkdm->prcm_partition,
+> +                                              clkdm->cm_inst,
+> +                                              clkdm->clkdm_offs);
+> +       else
+> +               return -EINVAL;
+> +
+>         return 0;
+>  }
+>
+> --
+> 1.7.9.5
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
