@@ -1,50 +1,137 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 18 Feb 2014 22:19:59 -0800
-Subject: [PATCH 0/2] clk: keystone: Couple of fixes for 3.14-rcx
-In-Reply-To: <1392064011-11986-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1392064011-11986-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20140219061959.22529.87876@quantum>
+From: hychao@chromium.org (Hsin-Yu Chao)
+Date: Wed, 19 Feb 2014 14:27:07 +0800
+Subject: [PATCH 1/2] ALSA: hda/ca0132 - setup/cleanup streams
+In-Reply-To: <s5hppmztbvl.wl%tiwai@suse.de>
+References: <s5hppmztbvl.wl%tiwai@suse.de>
+Message-ID: <1392791227-16810-1-git-send-email-hychao@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Santosh Shilimkar (2014-02-10 12:26:49)
-> Mike,
-> 
-> Can you please look at these couple of keystone clock fixes ?
-> Without these, we have seen some random kernel crashes. I
-> have included the dts fix since both fixes are related. Do
-> let me know if you prefer dts patch to be sent it via arm-soc tree.
+When a HDMI stream is opened with the same stream tag
+as a following opened stream to ca0132, audio will be
+heard from two ports simultaneously.
+Fix this issue by change to use snd_hda_codec_setup_stream
+and snd_hda_codec_cleanup_stream instead, so that an
+inactive stream can be marked as 'dirty' when found
+with a conflict stream tag, and then get purified.
 
-No problem taking these in as fixes. They go in the next batch.
+Signed-off-by: Hsin-Yu Chao <hychao@chromium.org>
+Reviewed-by: Chih-Chung Chang <chihchung@chromium.org>
+---
+ sound/pci/hda/patch_ca0132.c | 66 +++++---------------------------------------
+ 1 file changed, 7 insertions(+), 59 deletions(-)
 
-Regards,
-Mike
-
-> 
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-> 
->   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git for_3.14-rcx/clk-fixes
-> 
-> for you to fetch changes up to 565bbdcd3b91523b4142587c00206302e091a23e:
-> 
->   ARM: keystone: dts: fix clkvcp3 control register address (2014-02-10 15:17:43 -0500)
-> 
-> ----------------------------------------------------------------
-> Ivan Khoronzhuk (2):
->       clk: keystone: gate: fix clk_init_data initialization
->       ARM: keystone: dts: fix clkvcp3 control register address
-> 
->  arch/arm/boot/dts/keystone-clocks.dtsi |    2 +-
->  drivers/clk/keystone/gate.c            |    1 +
->  2 files changed, 2 insertions(+), 1 deletion(-)
-> 
-> Regards,
-> Santosh
-> 
-> -- 
-> 1.7.9.5
-> 
+diff --git a/sound/pci/hda/patch_ca0132.c b/sound/pci/hda/patch_ca0132.c
+index 54d1479..0aa72ee 100644
+--- a/sound/pci/hda/patch_ca0132.c
++++ b/sound/pci/hda/patch_ca0132.c
+@@ -2662,60 +2662,6 @@ static bool dspload_wait_loaded(struct hda_codec *codec)
+ }
+ 
+ /*
+- * PCM stuffs
+- */
+-static void ca0132_setup_stream(struct hda_codec *codec, hda_nid_t nid,
+-				 u32 stream_tag,
+-				 int channel_id, int format)
+-{
+-	unsigned int oldval, newval;
+-
+-	if (!nid)
+-		return;
+-
+-	snd_printdd(
+-		   "ca0132_setup_stream: NID=0x%x, stream=0x%x, "
+-		   "channel=%d, format=0x%x\n",
+-		   nid, stream_tag, channel_id, format);
+-
+-	/* update the format-id if changed */
+-	oldval = snd_hda_codec_read(codec, nid, 0,
+-				    AC_VERB_GET_STREAM_FORMAT,
+-				    0);
+-	if (oldval != format) {
+-		msleep(20);
+-		snd_hda_codec_write(codec, nid, 0,
+-				    AC_VERB_SET_STREAM_FORMAT,
+-				    format);
+-	}
+-
+-	oldval = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_CONV, 0);
+-	newval = (stream_tag << 4) | channel_id;
+-	if (oldval != newval) {
+-		snd_hda_codec_write(codec, nid, 0,
+-				    AC_VERB_SET_CHANNEL_STREAMID,
+-				    newval);
+-	}
+-}
+-
+-static void ca0132_cleanup_stream(struct hda_codec *codec, hda_nid_t nid)
+-{
+-	unsigned int val;
+-
+-	if (!nid)
+-		return;
+-
+-	snd_printdd(KERN_INFO "ca0132_cleanup_stream: NID=0x%x\n", nid);
+-
+-	val = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_CONV, 0);
+-	if (!val)
+-		return;
+-
+-	snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_STREAM_FORMAT, 0);
+-	snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_CHANNEL_STREAMID, 0);
+-}
+-
+-/*
+  * PCM callbacks
+  */
+ static int ca0132_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
+@@ -2726,7 +2672,7 @@ static int ca0132_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
+ {
+ 	struct ca0132_spec *spec = codec->spec;
+ 
+-	ca0132_setup_stream(codec, spec->dacs[0], stream_tag, 0, format);
++	snd_hda_codec_setup_stream(codec, spec->dacs[0], stream_tag, 0, format);
+ 
+ 	return 0;
+ }
+@@ -2745,7 +2691,7 @@ static int ca0132_playback_pcm_cleanup(struct hda_pcm_stream *hinfo,
+ 	if (spec->effects_switch[PLAY_ENHANCEMENT - EFFECT_START_NID])
+ 		msleep(50);
+ 
+-	ca0132_cleanup_stream(codec, spec->dacs[0]);
++	snd_hda_codec_cleanup_stream(codec, spec->dacs[0]);
+ 
+ 	return 0;
+ }
+@@ -2824,8 +2770,8 @@ static int ca0132_capture_pcm_prepare(struct hda_pcm_stream *hinfo,
+ {
+ 	struct ca0132_spec *spec = codec->spec;
+ 
+-	ca0132_setup_stream(codec, spec->adcs[substream->number],
+-			    stream_tag, 0, format);
++	snd_hda_codec_setup_stream(codec, spec->adcs[substream->number],
++				   stream_tag, 0, format);
+ 
+ 	return 0;
+ }
+@@ -2839,7 +2785,7 @@ static int ca0132_capture_pcm_cleanup(struct hda_pcm_stream *hinfo,
+ 	if (spec->dsp_state == DSP_DOWNLOADING)
+ 		return 0;
+ 
+-	ca0132_cleanup_stream(codec, hinfo->nid);
++	snd_hda_codec_cleanup_stream(codec, hinfo->nid);
+ 	return 0;
+ }
+ 
+@@ -4742,6 +4688,8 @@ static int patch_ca0132(struct hda_codec *codec)
+ 		return err;
+ 
+ 	codec->patch_ops = ca0132_patch_ops;
++	codec->pcm_format_first = 1;
++	codec->no_sticky_stream = 1;
+ 
+ 	return 0;
+ }
+-- 
+1.8.3.2
