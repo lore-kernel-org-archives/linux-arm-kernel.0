@@ -1,57 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Feb 2014 10:58:18 +0100
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <20140219002814.GD8786@google.com>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <2312919.pM61KLBcYY@wuerfel> <20140219002814.GD8786@google.com>
-Message-ID: <2200534.anptP81x7X@wuerfel>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 19 Feb 2014 15:39:35 +0530
+Subject: [PATCH RFC 07/31] mmc: sdhci: push card_tasklet into threaded irq
+ handler
+In-Reply-To: <20140219095212.GT21483@n2100.arm.linux.org.uk>
+References: <20140218150801.GD21483@n2100.arm.linux.org.uk>
+ <E1WFmIk-0006m0-Ah@rmk-PC.arm.linux.org.uk>
+ <20140218175703.GJ21483@n2100.arm.linux.org.uk>
+ <CAKohpoknX=acZHJeydwv6XRKFHTD4DM84xfCJ=56NrRfJnBOOA@mail.gmail.com>
+ <20140219094322.GR21483@n2100.arm.linux.org.uk>
+ <CAKohpomfHxWBF5m4D6iqod4a3gw2BU1W6nXMkEOg+YA+izYr=g@mail.gmail.com>
+ <20140219095212.GT21483@n2100.arm.linux.org.uk>
+Message-ID: <CAKohpo=ZrLRsTyCH86x7TbGE2XJnpXNb1ZDvYyzDUupAwTtS9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 February 2014 17:28:14 Bjorn Helgaas wrote:
-> On Sat, Feb 15, 2014 at 02:03:26PM +0100, Arnd Bergmann wrote:
-> > On Friday 14 February 2014 22:00:47 Liviu Dudau wrote:
-> > 
-> > Can anyone with more experience on the subject than me (Bjorn,
-> > Russell, Jason, ...) think of a reason why we would not want to
-> > just use a new domain for every host bridge we find?
-> 
-> With ACPI on x86 and ia64, we currently use _SEG directly as the Linux
-> PCI domain.  Are you proposing that we make the Linux PCI domain
-> independent of _SEG?
+On 19 February 2014 15:22, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Are you aware that power control to the card is part of the MMC/SD/SDIO
+> spec - and part of the protocol talking to the card?  Hence why the
+> mmc layer has support for its control built-in.
 
-I don't think we should change anything for ACPI.
-The point is that we don't currently have the equivalent of _SEG
-for DT probing. The best two options we have are:
+Yeah, almost everything is part of the protocol and hence handled by core
+sdhci.c layer.. We were handling some board specific issues here, that's it.
 
-a) introduce a 'pci-segment' property with the same meaning as _SEG
-on ACPI, and use that as the domain number
+> If you don't want to use a regulator, then the right way to do this is to
+> use the set_ios callback and check the power field - anything which is not
+> MMC_POWER_OFF should result in power to the card being turned on.
 
-b) don't introduce the segment concept on DT but just give each
-host bridge its own domain.
+I didn't get that completely here.. sorry completely out of touch on
+this driver.
+The power GPIO here is controlling the power to card socket. Once the card
+is inserted, we need to enable power to the socket so that controller can
+read back information from card.
 
-The second one seems a little easier to implement, and I don't
-see what _SEG is used for other than to avoid having domains
-when you don't need them. Is there more to it that I'm missing?
+And this set_ios callback is not available to drivers above sdhci.c, i.e. glues
+like sdhci-pltfm or spear.. so, how we can we get that back in sdhci-spear.c?
 
-> It will look sort of funny to have things like this:
-> 
->   ACPI: PCI Root Bridge [L000] (_SEG 0 domain 0000 [bus 00-1b])
->   ACPI: PCI Root Bridge [L001] (_SEG 0 domain 0001 [bus 1c-37])
->   ACPI: PCI Root Bridge [L002] (_SEG 0 domain 0002 [bus 38-53])
-> 
-> where the firmware had _SEG==0 for all the bridges and assigned
-> non-overlapping bus number ranges, but since nothing in PCI really
-> depends on the domain, I guess it should work.
-
-I would expect that with DT, this would look like
-
-Root bridge 0: domain 0 [bus 0-1b]
-Root bridge 1: domain 1 [bus 0-1b]
-Root bridge 2: domain 2 [bus 0-1b]
-
-Since you wouldn't have a reason to use a bus range starting at
-a nonzero number.
-
-	Arnd
+Again, I can't test any modifications to this code and we need help from
+Pratyush/Mohit on this..
