@@ -1,138 +1,110 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 19 Feb 2014 13:01:50 +0100
-Subject: [PATCH v6 08/18] ahci-platform: "Library-ise" suspend / resume
- functionality
+Date: Wed, 19 Feb 2014 13:01:56 +0100
+Subject: [PATCH v6 14/18] ata: ahci_platform: Add 'struct device' argument to
+ ahci_platform_put_resources()
 In-Reply-To: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
 References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1392811320-3132-9-git-send-email-hdegoede@redhat.com>
+Message-ID: <1392811320-3132-15-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split suspend / resume code into host suspend / resume functionality and
-resource enable / disabling phases, and export the new suspend_ / resume_host
-functions.
+From: Roger Quadros <rogerq@ti.com>
 
+There is no easy way to access 'struct device' from 'struct ahci_host_priv'
+so add an explicit argument for 'struct device'. We will need it
+to call Runtime PM APIs.
+
+Signed-off-by: Roger Quadros <rogerq@ti.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/ata/ahci_platform.c   | 55 +++++++++++++++++++++++++++++++------------
- include/linux/ahci_platform.h |  5 ++++
- 2 files changed, 45 insertions(+), 15 deletions(-)
+ drivers/ata/ahci_imx.c        | 5 +++--
+ drivers/ata/ahci_platform.c   | 7 ++++---
+ drivers/ata/ahci_sunxi.c      | 2 +-
+ include/linux/ahci_platform.h | 3 ++-
+ 4 files changed, 10 insertions(+), 7 deletions(-)
 
+diff --git a/drivers/ata/ahci_imx.c b/drivers/ata/ahci_imx.c
+index 7d51ee2..5cdaf0b 100644
+--- a/drivers/ata/ahci_imx.c
++++ b/drivers/ata/ahci_imx.c
+@@ -276,16 +276,17 @@ static int imx_ahci_probe(struct platform_device *pdev)
+ disable:
+ 	imx_sata_disable(hpriv);
+ put_resources:
+-	ahci_platform_put_resources(hpriv);
++	ahci_platform_put_resources(dev, hpriv);
+ 	return ret;
+ }
+ 
+ static void ahci_imx_host_stop(struct ata_host *host)
+ {
++	struct device *dev = host->dev;
+ 	struct ahci_host_priv *hpriv = host->private_data;
+ 
+ 	imx_sata_disable(hpriv);
+-	ahci_platform_put_resources(hpriv);
++	ahci_platform_put_resources(dev, hpriv);
+ }
+ 
+ static int imx_ahci_suspend(struct device *dev)
 diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index b260ebe..ba93930 100644
+index 073931a..f8ef780 100644
 --- a/drivers/ata/ahci_platform.c
 +++ b/drivers/ata/ahci_platform.c
-@@ -353,14 +353,12 @@ static void ahci_host_stop(struct ata_host *host)
+@@ -243,7 +243,8 @@ free_clk:
+ }
+ EXPORT_SYMBOL_GPL(ahci_platform_get_resources);
+ 
+-void ahci_platform_put_resources(struct ahci_host_priv *hpriv)
++void ahci_platform_put_resources(struct device *dev,
++				 struct ahci_host_priv *hpriv)
+ {
+ 	int c;
+ 
+@@ -375,7 +376,7 @@ pdata_exit:
+ disable_resources:
+ 	ahci_platform_disable_resources(hpriv);
+ put_resources:
+-	ahci_platform_put_resources(hpriv);
++	ahci_platform_put_resources(dev, hpriv);
+ 	return rc;
+ }
+ 
+@@ -389,7 +390,7 @@ static void ahci_host_stop(struct ata_host *host)
+ 		pdata->exit(dev);
+ 
+ 	ahci_platform_disable_resources(hpriv);
+-	ahci_platform_put_resources(hpriv);
++	ahci_platform_put_resources(dev, hpriv);
  }
  
  #ifdef CONFIG_PM_SLEEP
--static int ahci_suspend(struct device *dev)
-+int ahci_platform_suspend_host(struct device *dev)
- {
--	struct ahci_platform_data *pdata = dev_get_platdata(dev);
- 	struct ata_host *host = dev_get_drvdata(dev);
- 	struct ahci_host_priv *hpriv = host->private_data;
- 	void __iomem *mmio = hpriv->mmio;
- 	u32 ctl;
--	int rc;
- 
- 	if (hpriv->flags & AHCI_HFLAG_NO_SUSPEND) {
- 		dev_err(dev, "firmware update required for suspend/resume\n");
-@@ -377,7 +375,37 @@ static int ahci_suspend(struct device *dev)
- 	writel(ctl, mmio + HOST_CTL);
- 	readl(mmio + HOST_CTL); /* flush */
- 
--	rc = ata_host_suspend(host, PMSG_SUSPEND);
-+	return ata_host_suspend(host, PMSG_SUSPEND);
-+}
-+EXPORT_SYMBOL_GPL(ahci_platform_suspend_host);
-+
-+int ahci_platform_resume_host(struct device *dev)
-+{
-+	struct ata_host *host = dev_get_drvdata(dev);
-+	int rc;
-+
-+	if (dev->power.power_state.event == PM_EVENT_SUSPEND) {
-+		rc = ahci_reset_controller(host);
-+		if (rc)
-+			return rc;
-+
-+		ahci_init_controller(host);
-+	}
-+
-+	ata_host_resume(host);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(ahci_platform_resume_host);
-+
-+int ahci_platform_suspend(struct device *dev)
-+{
-+	struct ahci_platform_data *pdata = dev_get_platdata(dev);
-+	struct ata_host *host = dev_get_drvdata(dev);
-+	struct ahci_host_priv *hpriv = host->private_data;
-+	int rc;
-+
-+	rc = ahci_platform_suspend_host(dev);
- 	if (rc)
- 		return rc;
- 
-@@ -388,8 +416,9 @@ static int ahci_suspend(struct device *dev)
- 
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(ahci_platform_suspend);
- 
--static int ahci_resume(struct device *dev)
-+int ahci_platform_resume(struct device *dev)
- {
- 	struct ahci_platform_data *pdata = dev_get_platdata(dev);
- 	struct ata_host *host = dev_get_drvdata(dev);
-@@ -406,15 +435,9 @@ static int ahci_resume(struct device *dev)
- 			goto disable_resources;
- 	}
- 
--	if (dev->power.power_state.event == PM_EVENT_SUSPEND) {
--		rc = ahci_reset_controller(host);
--		if (rc)
--			goto disable_resources;
--
--		ahci_init_controller(host);
--	}
--
--	ata_host_resume(host);
-+	rc = ahci_platform_resume_host(dev);
-+	if (rc)
-+		goto disable_resources;
- 
- 	return 0;
- 
-@@ -423,9 +446,11 @@ disable_resources:
- 
+diff --git a/drivers/ata/ahci_sunxi.c b/drivers/ata/ahci_sunxi.c
+index 568a211..219d77f 100644
+--- a/drivers/ata/ahci_sunxi.c
++++ b/drivers/ata/ahci_sunxi.c
+@@ -194,7 +194,7 @@ static int ahci_sunxi_probe(struct platform_device *pdev)
+ disable_resources:
+ 	ahci_platform_disable_resources(hpriv);
+ put_resources:
+-	ahci_platform_put_resources(hpriv);
++	ahci_platform_put_resources(dev, hpriv);
  	return rc;
  }
-+EXPORT_SYMBOL_GPL(ahci_platform_resume);
- #endif
  
--static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_suspend, ahci_resume);
-+static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_platform_suspend,
-+			 ahci_platform_resume);
- 
- static const struct of_device_id ahci_of_match[] = {
- 	{ .compatible = "snps,spear-ahci", },
 diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
-index 1dc7602..7c683c7 100644
+index 7c683c7..719678c 100644
 --- a/include/linux/ahci_platform.h
 +++ b/include/linux/ahci_platform.h
-@@ -50,4 +50,9 @@ int ahci_platform_init_host(struct platform_device *pdev,
- 			    unsigned int force_port_map,
- 			    unsigned int mask_port_map);
- 
-+int ahci_platform_suspend_host(struct device *dev);
-+int ahci_platform_resume_host(struct device *dev);
-+int ahci_platform_suspend(struct device *dev);
-+int ahci_platform_resume(struct device *dev);
-+
- #endif /* _AHCI_PLATFORM_H */
+@@ -43,7 +43,8 @@ int ahci_platform_enable_resources(struct ahci_host_priv *hpriv);
+ void ahci_platform_disable_resources(struct ahci_host_priv *hpriv);
+ struct ahci_host_priv *ahci_platform_get_resources(
+ 	struct platform_device *pdev);
+-void ahci_platform_put_resources(struct ahci_host_priv *hpriv);
++void ahci_platform_put_resources(struct device *dev,
++				 struct ahci_host_priv *hpriv);
+ int ahci_platform_init_host(struct platform_device *pdev,
+ 			    struct ahci_host_priv *hpriv,
+ 			    const struct ata_port_info *pi_template,
 -- 
 1.8.5.3
