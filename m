@@ -1,51 +1,87 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 19 Feb 2014 23:14:54 +0100
-Subject: [PATCH 0/2] Translate of PCI address without PCI enabled
-Message-ID: <1392848096-17838-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Wed, 19 Feb 2014 23:14:55 +0100
+Subject: [PATCH 1/2] of: Allows to use the PCI translator without the PCI core
+In-Reply-To: <1392848096-17838-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1392848096-17838-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1392848096-17838-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Translating an address from a PCI node of the device-tree into a CPU
+physical address doesn't require the core PCI support. Those
+translations are just related to the device tree itself.
 
-This patch set makes the use of the of PCI address translator less
-restrictive. At the end it will allow to use the mvebu_get_soc_id
-unconditionally.
+The use case to translate an address from a PCI node without actually
+using the PCI core support is when one needs to access the PCI
+controller without accessing any PCI devices.
 
-The mvebu SoC (such as Kirkwood, Dove or Armada XP for instance) come
-with an IP of a PCI controller. The ID and the revision of a SoC are
-stored in the registers of this controller. Being able to get this
-information allows to deals with errata more dynamically.
+Marvell SoCs, such as Kirkwood, Dove or Armada XP for instance, come
+with an IP of a PCI controller. In the registers of this controller
+are stored the ID and the revision of a SoC. With this patch it will
+be possible to read the SoC ID of a board without any PCI device and
+then without the PCI core support.
 
-To manage to read this information, we need to map the registers, and
-for this we need to use the of PCI translator which depend of the PCI
-support.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/of/Kconfig   | 4 ++++
+ drivers/of/address.c | 8 +++++---
+ 2 files changed, 9 insertions(+), 3 deletions(-)
 
-However there are mvebu board without any PCI devices, and where
-selecting the PCI support would be useless.
-
-Moreover translating an address from a PCI node of the device-tree
-into a CPU physical address doesn't require the core PCI
-support. Those translations are just related to the device tree
-itself.
-
-The 1st patch introduces a new config symbol: OF_ADDRESS_PCI, which
-will be selected as soon as PCI will be selected, so we remains in the
-same situation the current code. It should go to the of tree.
-
-The 2nd patch selects OF_ADDRESS_PCI as soon as ARCH_MVEBU will be
-selected. This will make mvebu_get_soc_id available even without the
-PCI support. It should go to the mvebu tree.
-
-Thanks,
-
-Gregory CLEMENT (2):
-  of: Allows to use the PCI translator without the PCI core
-  ARM: mvebu: Allows to get the SoC ID even without PCI enabled
-
- arch/arm/mach-mvebu/Kconfig | 1 +
- drivers/of/Kconfig          | 4 ++++
- drivers/of/address.c        | 8 +++++---
- 3 files changed, 10 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index c6973f101a3e..ffdcb11f75fb 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -44,6 +44,10 @@ config OF_DYNAMIC
+ config OF_ADDRESS
+ 	def_bool y
+ 	depends on !SPARC
++	select OF_ADDRESS_PCI if PCI
++
++config OF_ADDRESS_PCI
++	bool
+ 
+ config OF_IRQ
+ 	def_bool y
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 1a54f1ffaadb..cb4242a69cd5 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -91,7 +91,7 @@ static unsigned int of_bus_default_get_flags(const __be32 *addr)
+ 	return IORESOURCE_MEM;
+ }
+ 
+-#ifdef CONFIG_PCI
++#ifdef CONFIG_OF_ADDRESS_PCI
+ /*
+  * PCI bus specific translator
+  */
+@@ -166,7 +166,9 @@ static int of_bus_pci_translate(__be32 *addr, u64 offset, int na)
+ {
+ 	return of_bus_default_translate(addr + 1, offset, na - 1);
+ }
++#endif /* CONFIG_OF_ADDRESS_PCI */
+ 
++#ifdef CONFIG_PCI
+ const __be32 *of_get_pci_address(struct device_node *dev, int bar_no, u64 *size,
+ 			unsigned int *flags)
+ {
+@@ -356,7 +358,7 @@ static unsigned int of_bus_isa_get_flags(const __be32 *addr)
+  */
+ 
+ static struct of_bus of_busses[] = {
+-#ifdef CONFIG_PCI
++#ifdef CONFIG_OF_ADDRESS_PCI
+ 	/* PCI */
+ 	{
+ 		.name = "pci",
+@@ -367,7 +369,7 @@ static struct of_bus of_busses[] = {
+ 		.translate = of_bus_pci_translate,
+ 		.get_flags = of_bus_pci_get_flags,
+ 	},
+-#endif /* CONFIG_PCI */
++#endif /* CONFIG_OF_ADDRESS_PCI */
+ 	/* ISA */
+ 	{
+ 		.name = "isa",
 -- 
 1.8.1.2
