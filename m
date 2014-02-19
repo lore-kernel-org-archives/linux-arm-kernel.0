@@ -1,34 +1,115 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 19 Feb 2014 19:07:28 +0100
-Subject: [PATCH V4 16/17] i2c: nomadik: Remove busy check for transfers at
- suspend late
-In-Reply-To: <20140219160504.GC13973@katana>
-References: <1392812867-19212-1-git-send-email-ulf.hansson@linaro.org>
- <20140219160504.GC13973@katana>
-Message-ID: <CAPDyKFrA4hSj0b2MGzp48TkcXCrFDY2J_dYZyRYSnjvfBbpMqA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 19 Feb 2014 18:11:52 +0000
+Subject: [PATCH v5 2/2] memory: ti-aemif: add bindings for AEMIF driver
+In-Reply-To: <1392817210-14312-3-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1392817210-14312-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1392817210-14312-3-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <20140219181152.GG25079@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 February 2014 17:05, Wolfram Sang <wsa@the-dreams.de> wrote:
-> On Wed, Feb 19, 2014 at 01:27:47PM +0100, Ulf Hansson wrote:
->> We should never be busy performing transfers at suspend late, thus
->> there are no reason to check for it.
->>
->> Cc: Alessandro Rubini <rubini@unipv.it>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Wolfram Sang <wsa@the-dreams.de>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->
-> Okay applied up to patch 16 in a local branch. Waiting for LinusW to
-> comment on the 100kHz vs 400kHz issue before pushing out. If patch 17
-> can be applied now, please say so. If not, please resend when
-> dependencies are upstream.
->
+On Wed, Feb 19, 2014 at 01:40:10PM +0000, Ivan Khoronzhuk wrote:
+> Add bindings for TI Async External Memory Interface (AEMIF) controller.
+> 
+> The Async External Memory Interface (EMIF16/AEMIF) controller is intended to
+> provide a glue-less interface to a variety of asynchronous memory devices like
+> ASRA M, NOR and NAND memory. A total of 256M bytes of any of these memories
+> can be accessed via 4 chip selects with 64M byte access per chip select.
+> 
+> We are not encoding CS number in reg property, it's memory partition number.
+> The CS number is encoded for Davinci NAND node using standalone property
+> "ti,davinci-chipselect" and we need to provide two memory ranges to it,
+> as result we can't encode CS number in "reg" for AEMIF child devices
+> (NAND/NOR/etc), as it will break bindings compatibility.
+> 
+> In this patch, NAND node is used just as an example of child node.
+> 
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
+>  .../bindings/memory-controllers/ti-aemif.txt       | 210 +++++++++++++++++++++
+>  1 file changed, 210 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
 
-Thanks Wolfram!
+[...]
 
-Again, sorry for screwing up several times. Let's wait with patch 17,
-I will resend later.
+> +- ranges:		Contains memory regions. There are two types of
+> +			ranges/partitions:
+> +			- CS-specific partition/range. If continuous, must be
+> +			set up to reflect the memory layout for 4 chipselects,
+> +			if not then additional range/partition can be added and
+> +			child device can select the proper one.
+> +			- control partition which is common for all CS
+> +			interfaces.
 
-Kind regards
-Uffe
+This really doesn't sound anything like the typical meaning of ranges on
+a bus.
+
+Why isn't this information encoded in reg properties on the child nodes?
+
+[...]
+
+> +- ti,cs-ss:		enable/disable select strobe mode
+> +				In select strobe mode chip select behaves as
+> +				the strobe and is active only during the strobe
+> +				period. If present then enable.
+> +
+> +- ti,cs-ew:		enable/disable extended wait mode
+> +				if set, the controller monitors the EMIFWAIT pin
+> +				mapped to that chip select to determine if the
+> +				device wants to extend the strobe period. If
+> +				present then enable.
+
+When would you have these two in the DT and when wouldn't you? Why can't
+the driver decide?
+
+These names are also opaque. We can clearly do better.
+
+> +
+> +- ti,cs-ta:		minimum turn around time, ns
+> +				Time between the end of one asynchronous memory
+> +				access and the start of another asynchronous
+> +				memory access. This delay is not incurred
+> +				between a read followed by read or a write
+> +				followed by a write to same chip select.
+
+The name is opaque. How about ti,min-turnaround-time-ns ?
+
+> +
+> +- ti,cs-rsetup:		read setup width, ns
+> +				Time between the beginning of a memory cycle
+> +				and the activation of read strobe.
+> +				Minimum value is 1 (0 treated as 1).
+> +
+> +- ti,cs-rstobe:		read strobe width, ns
+> +				Time between the activation and deactivation of
+> +				the read strobe.
+> +				Minimum value is 1 (0 treated as 1).
+> +
+> +- ti,cs-rhold:		read hold width, ns
+> +				Time between the deactivation of the read
+> +				strobe and the end of the cycle (which may be
+> +				either an address change or the deactivation of
+> +				the chip select signal.
+> +				Minimum value is 1 (0 treated as 1).
+> +
+> +- ti,cs-wsetup:		write setup width, ns
+> +				Time between the beginning of a memory cycle
+> +				and the activation of write strobe.
+> +				Minimum value is 1 (0 treated as 1).
+> +
+> +- ti,cs-wstrobe:	write strobe width, ns
+> +				Time between the activation and deactivation of
+> +				the write strobe.
+> +				Minimum value is 1 (0 treated as 1).
+> +
+> +- ti,cs-whold:		write hold width, ns
+> +				Time between the deactivation of the write
+> +				strobe and the end of the cycle (which may be
+> +				either an address change or the deactivation of
+> +				the chip select signal.
+> +				Minimum value is 1 (0 treated as 1).
+
+Likewise I think these can be given more descriptive names.
+
+Thanks,
+Mark.
