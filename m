@@ -1,74 +1,55 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Wed, 19 Feb 2014 13:38:43 +0800
-Subject: [PATCH 4/4] ARM: dts: Add simple-card support for Vybird-TWR board
-In-Reply-To: <1392788323-6092-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1392788323-6092-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1392788323-6092-5-git-send-email-Li.Xiubo@freescale.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 18 Feb 2014 22:41:04 -0800
+Subject: [GIT PULL v2] get rid of <mach/timex.h>
+In-Reply-To: <20140218213736.GA6988@pengutronix.de>
+References: <20140218213736.GA6988@pengutronix.de>
+Message-ID: <20140219064104.GA24381@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds and enables simple-card support in DT node.
+On Tue, Feb 18, 2014 at 10:37:36PM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> the following changes since commit 6a79799d5654bb7800614e8b7a009252be7ff90e:
+> 
+>   ARM: u300: fix timekeeping when periodic mode is used (2013-11-26 21:00:21 +0100)
+> 
+> (which is v3.13-rc1 + 3 commits that were merged into 3.14-rc1)
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/ukl/linux.git tags/dropmachtimexh-v2
+> 
+> for you to fetch changes up to fb3174e4ad2427c6ad90c67093d6ca97f13e8672:
+> 
+>   ARM: ixp4xx: fix timer latch calculation (2014-02-18 21:23:19 +0100)
+> 
+> ----------------------------------------------------------------
+> This cleanup series gets rid of <mach/timex.h> for platforms not using
+> ARCH_MULTIPLATFORM. (For multi-platform code it's already unused since
+> 387798b (ARM: initial multiplatform support).)
+> 
+> To make this work some code out of arch/arm needed to be adapted. The
+> respective changes got acks by their maintainers to be taken via armsoc
+> (with Andrew Morton substituting for Alessandro Zummo as rtc maintainer).
+> 
+> Compared to the previous pull request there was another patch added that
+> fixes a (non-critical) regression on ixp4xx. Olof Johansson asked to not
+> squash this fix into the original commit to save him from the need to
+> reverify the series.
+> 
+> ----------------------------------------------------------------
+> 
+> The series still creates the same merge conflicts when being pulled into
+> linus/master. See
+> http://git.pengutronix.de/?p=ukl/linux.git;a=commitdiff;h=dropmachtimexh-merged
+> for how I resolved for the first pull request.
+> 
+> It would be great to get this merged into v3.15-rc1.
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
----
- arch/arm/boot/dts/vf610-twr.dts | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+Merged in as cleanup/timex-removal into next/cleanup.
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index 29790c9..ff27dce 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -45,6 +45,35 @@
- 			regulator-always-on;
- 		};
- 	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,widgets =
-+			"Microphone", "Microphone Jack",
-+			"Headphone", "Headphone Jack",
-+			"Speaker", "Speaker Ext",
-+			"Line", "Line In Jack";
-+		simple-audio-card,routing =
-+			"MIC_IN", "Microphone Jack",
-+			"Microphone Jack", "Mic Bias",
-+			"LINE_IN", "Line In Jack",
-+			"Headphone Jack", "HP_OUT",
-+			"Speaker Ext", "LINE_OUT";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&sai2>;
-+			master-clkdir-out;
-+			frame-master;
-+			bitclock-master;
-+		};
-+
-+		simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+			frame-master;
-+			bitclock-master;
-+		};
-+	};
- };
- 
- &dspi0 {
-@@ -85,6 +114,7 @@
- 	status = "okay";
- 
- 	codec: sgtl5000 at 0a {
-+	       #sound-dai-cells = <0>;
- 	       compatible = "fsl,sgtl5000";
- 	       reg = <0x0a>;
- 	       VDDA-supply = <&reg_3p3v>;
-@@ -162,6 +192,7 @@
- };
- 
- &sai2 {
-+	#sound-dai-cells = <0>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_sai2>;
- 	status = "okay";
--- 
-1.8.4
+Note that your conflict resolution was incorrect at least for the
+mach-sa1100 case, where the SA1100_LATCH define is still needed.
+
+
+-Olof
