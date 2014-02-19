@@ -1,36 +1,82 @@
-From: klightspeed@killerwolves.net (Ben Peddell)
-Date: Wed, 19 Feb 2014 23:14:16 +1000
-Subject: [PATCH v5 4/5] ARM: Kirkwood: Fix qnap vendor prefix
-In-Reply-To: <20140219130553.GO17984@lunn.ch>
-References: <1392814154-11284-1-git-send-email-klightspeed@killerwolves.net>
- <1392814154-11284-5-git-send-email-klightspeed@killerwolves.net>
- <20140219130553.GO17984@lunn.ch>
-Message-ID: <5304AE28.6030209@killerwolves.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Feb 2014 14:26:10 +0100
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <20140219113755.GD5394@bart.dudau.co.uk>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <1948942.cIbLaKDEOa@wuerfel> <20140219113755.GD5394@bart.dudau.co.uk>
+Message-ID: <2734695.F6QKszum67@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/02/14 23:05, Andrew Lunn wrote:
->> diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
->> index a75db7f..d350ece 100644
->> --- a/drivers/power/reset/qnap-poweroff.c
->> +++ b/drivers/power/reset/qnap-poweroff.c
->> @@ -41,7 +41,7 @@ static const struct power_off_cfg synology_power_off_cfg = {
->>  };
->>  
->>  static const struct of_device_id qnap_power_off_of_match_table[] = {
->> -	{ .compatible = "qnap,power-off",
->> +	{ .compatible = "qnapsz,power-off",
->>  	  .data = &qnap_power_off_cfg,
->>  	},
+On Wednesday 19 February 2014 11:37:55 Liviu Dudau wrote:
 > 
-> Hi Ben
+> > Right, this needs to be changed when moving the domain into pci_host_bridge.
 > 
-> This causes issues for devices using old DT blobs. You need to keep
-> the old entry as well as supporting the new vendor prefix.
-> 
-> We need to consider, is it worth the hassle of changing the prefix,
-> since it has been in use for a long time. I think using the stock
-> ticker is a "rule of thumb" and not a strict requirement.
+> Yes, if only I understood what the intent was here. Unfortunately, the history
+> of the file stops (for my git tree) at Linus' first commit from v2.6.0, so
+> I need to dig deeper. What I am looking to understand is the answer to this
+> question: "When you want to create a new bus and you want to make sure it
+> is not duplicated, do you go across all domains or pick the current domain
+> and allow for same bus number in different domains?"
 
-So, in this case it would be best to change qnapsz back to qnap in 
-patch #1, and completely remove this patch?
+I suspect this is for some large IA64 machines where you can see the same
+domain at different addresses, depending on which CPU you are on, or
+something similarly fancy.
+
+Another explanation would be that you can have different ways to describe
+the same hardware: On a PC you can assume that the PCI bus is discoverable
+on I/O port 0x0cf8. At the same time, you may see it in ACPI with an
+mmconfig method.
+
+In any case, you definitely need to allow the same bus numbers on each domain,
+since the most important use case of domains is to get around the 256 bus
+limit.
+
+> To give some context: I'm looking at drivers/pci/probe.c, pci_create_root_bus().
+> Specifically, this code:
+> 
+>         b = pci_alloc_bus();
+>         if (!b)
+>                 return NULL;
+> 
+>         b->sysdata = sysdata;
+>         b->ops = ops;
+>         b->number = b->busn_res.start = bus;
+>         b2 = pci_find_bus(pci_domain_nr(b), bus);
+>         if (b2) {
+>                 /* If we already got to this bus through a different bridge, ignore it */
+>                 dev_dbg(&b2->dev, "bus already known\n");
+>                 goto err_out;
+>         }
+> 
+>         bridge = pci_alloc_host_bridge(b);
+>         if (!bridge)
+>                 goto err_out;
+> 
+> 
+> If you look at the comment after pci_find_bus, you can see that the intent was
+> to try to find duplicate busses covered by different bridges (but in the same
+> domain? maybe, because there used to be only one domain at the beginning, but
+> then why use pci_domain_nr() here?). Problems I see here:
+
+Definitely duplicate buses in the same domain, as mentioned above.
+
+>   - code is trying to get the domain number of a bus that it just created but not
+>     plugged yet in the hierarchy
+
+The sysdata is already assigned, and all architectures either assume there is
+only one domain, or they get the domain number out of the sysdata that is
+filled out prior to calling pci_create_root_bus.
+
+>   - pci_find_bus tries to find a bus in the global list of busses that has the
+>     same domain number and bus number as the parameters of the function. But
+>     the domain number was plucked out of thin air and all architectures seem to
+>     actually give you the current active domain number, not the one that actually
+>     covers the bus (and host_bridge) that you are trying to create.
+
+Not sure what you mean with 'current active domain number': They clearly look at
+b->sysdata here, which is a local structure describing what we are currently
+probing.
+
+	Arnd
