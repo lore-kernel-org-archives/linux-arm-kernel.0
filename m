@@ -1,53 +1,81 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 19 Feb 2014 14:51:36 +0100
-Subject: [RFC PATCH v2 1/2] mfd: syscon: Support early initialization
-In-Reply-To: <20140219121756.GM2669@sirena.org.uk>
-References: <cover.1392807832.git.michal.simek@xilinx.com>
- <fa3178534fcf4488fc45a9a24e44b2588acb38c6.1392807832.git.michal.simek@xilinx.com>
- <20140219114132.GC10504@lee--X1> <53049932.8020901@monstr.eu>
- <20140219121756.GM2669@sirena.org.uk>
-Message-ID: <5304B6E8.1090508@monstr.eu>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 19 Feb 2014 14:57:29 +0100
+Subject: [PATCH v2 0/6] ARM: STi reset controller support
+In-Reply-To: <52F4D76F.8070301@st.com>
+References: <1389696613-19683-1-git-send-email-srinivas.kandagatla@st.com>		<1391437665-11913-1-git-send-email-srinivas.kandagatla@st.com>	<1391592486.11239.4.camel@pizza.hi.pengutronix.de>
+ <52F4D76F.8070301@st.com>
+Message-ID: <5304B849.2080806@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2014 01:17 PM, Mark Brown wrote:
-> On Wed, Feb 19, 2014 at 12:44:50PM +0100, Michal Simek wrote:
->> On 02/19/2014 12:41 PM, Lee Jones wrote:
-> 
->>> I believe you were waiting for Arnd and/or Mark to comment.
-> 
->> yes on Arnd because Mark already applied that regmap part.
->> But of course any input how to get this done will be helpful.
-> 
-> Like I said I've never seen the user you're adding for the regmap API so
-> I've no particular opinion on it.
+Hi Philipp,
 
-2/2 is the code where I would like to use this when clk subsystem
-start to use better io helper functions then just static inline
-clk_readl/clk_writel.
+On 02/07/2014 01:54 PM, srinivas kandagatla wrote:
+> Hi Philipp,
+> Thankyou for looking at the patches.
+>
+>
+> On 05/02/14 09:28, Philipp Zabel wrote:
+>> Hi Srinivas,
+>>
+> ...
+>>
+>> the patchset looks good to me for the soft resets. But for the powerdown
+>> bits I am wondering whether the reset controller API is the right
+>> abstraction. Depending on whether those bits really just put the IPs
+>> into reset or there is some power gating / sequencing involved,
+>> shouldn't this rather be handled as a set of pm domains?
+>
+> The hardware name of these control signals into the devices is
+> slightly unfortunate and a bit misleading. We do not generally
+> have separate power domains for peripheral devices in our
+> current STB SoCs, in the sense that the voltage cannot actually be
+> removed from individual devices. In the USB case we believe the
+> powerdown signals internally gate off two of the three
+> incoming clocks to most of the USB controller's logic blocks,
+> essentially holding the device in a disabled (enable/disable
+> might have been a better name for the signal) state.
+>
+> The primary requirement to manipulate these signals is to bring
+> the device out of its cold boot default powerdown/disabled/reset
+> (whatever you want to call it) state when the device is probed or
+> after a SoC wide power loss when resuming from PM_SUSPEND_MEM.
+>
+>
+>> I see that for example on STiH415 there are both soft resets and
+>> powerdown bits for USB[012].
+>
+> Our IPs typically have two or sometimes three signals going into
+> them, controlled from outside of the IP block itself (typically using
+> SoC global system configuration registers) that you could view
+> as "reset-a-like"; that is toggling each of the signals puts the IP
+> into a state where it is in some way unusable and then back to
+> being useable again. The reset controller API appeared to be the
+> natural abstraction for the drivers to be given access to such control
+> signals, regardless of the precise effect the signals have on the
+> device's internal state.
+>
+> With regards to sequencing between these signals; it is the case that
+> there is a likely sequencing because at least in the USB case it is
+> thought that the "powerdown" stops the clock going to the reset chain
+> logic. But we did not see that as an issue as the reset controller
+> framework allows for multiple named "reset" lines being defined for
+> a device through its DT attributes. The driver knows which signal
+> is which and what each does, because it asks for them by name;
+> therefore, it knows how to impose any required ordering when changing
+> the state of those signals.
+>
 
-Then my 2/2 driver will be just nicer than current implementation.
+Did Srini's explanations convinced you?
 
-Regarding syscon changes. I think the right question is if this driver
-should be still in drivers/mfd/ or should be moved to somewhere else
-(drivers/base for example).
+If so, could you queue the series for v3.15?
 
 Thanks,
-Michal
+Maxime
 
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140219/05fbfdcf/attachment.sig>
+>
+> Thanks,
+> srini
+>
+>
+> _______________________________________________
