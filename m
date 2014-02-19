@@ -1,27 +1,31 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Wed, 19 Feb 2014 08:04:49 -0800
-Subject: [PATCH RFC v4 3/3] Documentation: arm: define DT idle states
- bindings
-In-Reply-To: <1392724051-11950-4-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1392724051-11950-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1392724051-11950-4-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20140219160449.11460.93660@capellas-linux>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 19 Feb 2014 17:05:04 +0100
+Subject: [PATCH V4 16/17] i2c: nomadik: Remove busy check for transfers
+ at suspend late
+In-Reply-To: <1392812867-19212-1-git-send-email-ulf.hansson@linaro.org>
+References: <1392812867-19212-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20140219160504.GC13973@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lorenzo Pieralisi (2014-02-18 03:47:31)
-> +       - index
-> +               Usage: Required
-> +               Value type: <u32>
-> +               Definition: It represents the idle state index.
-> +                           An increasing index value implies less power
-> +                           consumption. Index must be given a sequential
-> +                           value = {0, 1, ....}, starting from 0.
-One minor comment.  In the example, it can be tricky to see how this is sequential
-since the states interleave.  Not sure if it merits rewording here?
+On Wed, Feb 19, 2014 at 01:27:47PM +0100, Ulf Hansson wrote:
+> We should never be busy performing transfers at suspend late, thus
+> there are no reason to check for it.
+> 
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-These look good to me!
+Okay applied up to patch 16 in a local branch. Waiting for LinusW to
+comment on the 100kHz vs 400kHz issue before pushing out. If patch 17
+can be applied now, please say so. If not, please resend when
+dependencies are upstream.
 
-Thanks!
-
-Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140219/3da5c837/attachment.sig>
