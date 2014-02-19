@@ -1,43 +1,108 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Feb 2014 17:10:45 +0000
-Subject: [PATCH v5 4/5] ARM: Kirkwood: Fix qnap vendor prefix
-In-Reply-To: <5304AE28.6030209@killerwolves.net>
-References: <1392814154-11284-1-git-send-email-klightspeed@killerwolves.net>
- <1392814154-11284-5-git-send-email-klightspeed@killerwolves.net>
- <20140219130553.GO17984@lunn.ch>
- <5304AE28.6030209@killerwolves.net>
-Message-ID: <20140219171045.GC25079@e106331-lin.cambridge.arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 19 Feb 2014 18:18:09 +0100
+Subject: [PATCH v6 00/18] ahci: library-ise ahci_platform, add sunxi driver
+ and cleanup imx driver
+In-Reply-To: <20140219162511.GJ10134@htj.dyndns.org>
+References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
+ <20140219150249.GG10134@htj.dyndns.org> <5304CD33.1080704@redhat.com>
+ <20140219162511.GJ10134@htj.dyndns.org>
+Message-ID: <5304E751.5040608@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 01:14:16PM +0000, Ben Peddell wrote:
-> On 19/02/14 23:05, Andrew Lunn wrote:
-> >> diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
-> >> index a75db7f..d350ece 100644
-> >> --- a/drivers/power/reset/qnap-poweroff.c
-> >> +++ b/drivers/power/reset/qnap-poweroff.c
-> >> @@ -41,7 +41,7 @@ static const struct power_off_cfg synology_power_off_cfg = {
-> >>  };
-> >>  
-> >>  static const struct of_device_id qnap_power_off_of_match_table[] = {
-> >> -	{ .compatible = "qnap,power-off",
-> >> +	{ .compatible = "qnapsz,power-off",
-> >>  	  .data = &qnap_power_off_cfg,
-> >>  	},
-> > 
-> > Hi Ben
-> > 
-> > This causes issues for devices using old DT blobs. You need to keep
-> > the old entry as well as supporting the new vendor prefix.
-> > 
-> > We need to consider, is it worth the hassle of changing the prefix,
-> > since it has been in use for a long time. I think using the stock
-> > ticker is a "rule of thumb" and not a strict requirement.
+Hi,
+
+On 02/19/2014 05:25 PM, Tejun Heo wrote:
+> Hello, Hans.
 > 
-> So, in this case it would be best to change qnapsz back to qnap in 
-> patch #1, and completely remove this patch?
+> On Wed, Feb 19, 2014 at 04:26:43PM +0100, Hans de Goede wrote:
+>> The devres usage are really 2 different issues:
+>>
+>> 1) There is the issue that we're getting clocks by index (this is by design as
+>> clk-names are not generic), but there is no devm_get_clk_by_index (or some
+>> such), this is a shortcoming of the clk-core, which needs a separate patch
+>> to fix. I would rather not delay this patch-set based on getting a patch
+>> into another subsys.
+> 
+> Yes, that'd be my usual preference too.  The only reason I'm hesitant
+> is because nobody seems to be too interested in long term aspect of
+> the code base and the only leverage I have seems to be rejecting
+> drivers until things become right.
+> 
+>> Note that even with devm_get_clk_by_index we can unfortunately not get rid of
+>> ahci_platform_put_resources() as in Roger's follow-up patches it gets used for
+>> putting some runtime pm related resources too.
+>>
+>> I guess this argues for simply turning ahci_platform_get_resources into a
+>> devm_ahci_platform_get_resources doing its own devm handling, and then
+>> making ahci_platform_put_resources a private function called by the devm
+>> framework. If you agree I can do that for the next patch-set.
+> 
+> Note that libata core already does something similar.  Please take a
+> look at ata_host_alloc() for details.  You don't really need to create
+> a separate devm_ prefixed variant.  Just making the function register
+> devres automatically should be enough.  If this is too much work, I'm
+> okay with deferring it until later if you promise to do it soonish.
+> 
 
-If we already have users of the qnap prefix, yes please.
+Ok, I'll try to do this for the next revision.
 
-Thanks,
-Mark.
+>> 2) In some comments you also seem to want devm variants of enable / disable
+>> resources, or at least have ahci_platform_put_resources do the disable
+>> automatically. The problem is that most of the functions called here need to
+>> be balanced, they increment / decrement usage counters in the clk / regulator
+>> subsystems, so we cannot simply unconditional do an ahci_platform_disable_resources
+>> in ahci_platform_put_resources
+>>
+>> Doing the disable automatically requires tracking the enable state, and doing this
+>> per resource, since the whole idea of having a separate ahci_platform_enable_resources
+>> is that some drivers may want to override its behavior doing things in a different
+>> order.
+>>
+>> To ensure proper tracking we would then need to offer ahci_platform_enable_regulator,
+>> etc. functions, and ensure that all drivers using the ahci_platform framework
+>> always go through these, rather then calling directly into the relevant framework.
+>>
+>> This is all doable, and I'm not against doing this but before spending a couple of
+>> hours coding this all up, I would like to hear back from you whether you would like
+>> to see this, or would rather keep things as is.
+> 
+> Yes, in principle, I want every resource used by ahci_platform to be
+> devres managed.  I *think* devres should be flexible enough to handle
+> what you're describing (each devres resource can have data for state
+> tracking and devres resources can be looked up and modified, so the
+> different orders should be okay) but if not I'd be happy to help
+> extend it so that it can.
+
+Most of the resources are already devres managed (I use devm functions
+to get them), the problem is not in freeing our reference to the resources,
+the problem is that we've sequences like this:
+
+devm_get_foo
+enable_foo
+disable_foo
+(automatic release foo)
+
+Where enable / disable can be done repeatedly (ie each suspend / resume).
+
+>From your review comments, I take it that you want the final disable_foo
+on driver release to happen automatically.
+
+My preference for this would be to extend the devres tracking already present
+in the relevant subsystems to keep track of the enable count done through a
+specific reference, to allow automatic disable (if needed) on release.
+
+But thinking more about this, I think that doing this automatically is a bad
+idea, because then we fixate the shutdown sequence to a certain order (the
+order in which we did the _get_foo for the resources) and the correct order may
+be device specific.
+
+So TL;DR: Yes to making things so that ahci_platform_put_resources gets done
+automatically, no to automating the disable calls.
+
+If I don't hear back from you, then I'll respin the patch-set assuming that
+you agree to the above.
+
+Regards,
+
+Hans
