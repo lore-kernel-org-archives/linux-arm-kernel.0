@@ -1,32 +1,25 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 19 Feb 2014 15:28:57 -0600
-Subject: [GIT PULL] ARM: OMAP2+: clock/PRCM/hwmod fixes for v3.14-rc
-In-Reply-To: <alpine.DEB.2.02.1402192120200.8777@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1402192120200.8777@utopia.booyaka.com>
-Message-ID: <53052219.9060109@ti.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Wed, 19 Feb 2014 16:31:27 -0500
+Subject: [PATCH] ARM: dts: remove bcm11351-brt.dts
+In-Reply-To: <53052059.3020105@linaro.org>
+References: <1392840808-28214-1-git-send-email-mporter@linaro.org>
+ <53052059.3020105@linaro.org>
+Message-ID: <20140219213127.GL29906@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
-On 02/19/2014 03:22 PM, Paul Walmsley wrote:
-[...]
+On Wed, Feb 19, 2014 at 03:21:29PM -0600, Alex Elder wrote:
+> On 02/19/2014 02:13 PM, Matt Porter wrote:
+> > The BCM11351 BRT board will never see the light of day. Remove the BRT
+> > dts since it is not maintainable.
+> > 
+> > Signed-off-by: Matt Porter <mporter@linaro.org>
 > 
-> - ----------------------------------------------------------------
-> Illia Smyrnov (1):
->       ARM: OMAP4: hwmod: Fix SOFTRESET logic for OMAP4
+> Please remove the line in the Makefile that refers to this file.
+> Provided you make that change, it looks good to me.
 > 
-> Suman Anna (1):
->       ARM: DRA7: hwmod data: correct the sysc data for spinlock
-> 
-> Tomi Valkeinen (1):
->       ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
-> 
-> Vaibhav Bedia (1):
->       ARM: OMAP5: PRM: Fix reboot handling
-> 
+> Reviewed-by: Alex Elder <elder@linaro.org>
 
-https://patchwork.kernel.org/patch/3585321/ missing?
+Done, thanks.
 
--- 
-Regards,
-Nishanth Menon
+-Matt
