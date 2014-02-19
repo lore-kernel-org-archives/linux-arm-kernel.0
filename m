@@ -1,153 +1,68 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Wed, 19 Feb 2014 11:33:15 -0800
-Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
-References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
- <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
- <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
-Message-ID: <20140219193315.3732.21819@capellas-linux>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Feb 2014 20:47:52 +0100
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <20140219153044.GE5394@bart.dudau.co.uk>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <2734695.F6QKszum67@wuerfel> <20140219153044.GE5394@bart.dudau.co.uk>
+Message-ID: <2490895.sJxhc9aC7d@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lorenzo Pieralisi (2014-02-19 08:12:54)
-> On Wed, Feb 19, 2014 at 01:52:09AM +0000, Sebastian Capella wrote:
-> [...]
-> > diff --git a/arch/arm/kernel/hibernate.c b/arch/arm/kernel/hibernate.c
-> > new file mode 100644
-> > index 0000000..16f406f
-> > --- /dev/null
-> > +++ b/arch/arm/kernel/hibernate.c
-> > +void notrace save_processor_state(void)
-> > +{
-> > +     WARN_ON(num_online_cpus() != 1);
-> > +     flush_thread();
+On Wednesday 19 February 2014 15:30:44 Liviu Dudau wrote:
+> On Wed, Feb 19, 2014 at 02:26:10PM +0100, Arnd Bergmann wrote:
+> > On Wednesday 19 February 2014 11:37:55 Liviu Dudau wrote:
+
+> > >   - code is trying to get the domain number of a bus that it just created but not
+> > >     plugged yet in the hierarchy
+> > 
+> > The sysdata is already assigned, and all architectures either assume there is
+> > only one domain, or they get the domain number out of the sysdata that is
+> > filled out prior to calling pci_create_root_bus.
 > 
-> Can you explain to me please why we need to call flush_thread() here ?
-> At this point in time syscore_suspend() was already called and CPU
-> peripheral state saved through CPU PM notifiers.
+> Arnd, the question is not how it does it, the question is what is the correct answer?
+> It's a new bus, does that mean that all new busses get created in the current domain?
+> If that is the case, then fine, things start to make more sense, with the caveat
+> that the domain # depends heavily on what the architecture uses for counting.
 
-Copying Russ' response here: 
+Here is what each architecture does:
 
-"I think the idea here is to get the CPU into a state so that later
-when we resume from the resume kernel, the actual CPU state matches
-the state we have in kernel. The main thing flush_thread does is clear
-out any and all FP state." - Russ Dill
+Alpha: managed by host bridge driver, counting the hosts or fixed in hardware
+ARM: managed in host bridge driver, counting the hosts or using just one domain
+IA64: taken from firmware (either ACPI or SAL)
+microblaze: managed globally, counting the hosts
+powerpc: managed globally, counting the hosts
+s390: each PCI function has its own domain (!)
+sh: managed in host bridge driver, counting the hosts
+sparc: managed by host bridge driger, counting the hosts
+tile: managed globally, counting the hosts
+x86: managed by ACPI firmware
 
+In each case, we either know the domain from hardware or firmware
+when creating the host bridge, or we pick the next free number.
+
+> > >   - pci_find_bus tries to find a bus in the global list of busses that has the
+> > >     same domain number and bus number as the parameters of the function. But
+> > >     the domain number was plucked out of thin air and all architectures seem to
+> > >     actually give you the current active domain number, not the one that actually
+> > >     covers the bus (and host_bridge) that you are trying to create.
+> > 
+> > Not sure what you mean with 'current active domain number': They clearly look at
+> > b->sysdata here, which is a local structure describing what we are currently
+> > probing.
 > 
-> > +     local_fiq_disable();
-> 
-> To me it looks like we are using this hook to disable fiqs, since it is
-> not done in generic code.
-> 
-> > +
-> > +/*
-> > + * Snapshot kernel memory and reset the system.
-> > + * After resume, the hibernation snapshot is written out.
-> > + */
-> > +static int notrace __swsusp_arch_save_image(unsigned long unused)
-> > +{
-> > +     int ret;
-> > +
-> > +     ret = swsusp_save();
-> > +     if (ret == 0)
-> > +             soft_restart(virt_to_phys(cpu_resume));
-> 
-> By the time the suspend finisher (ie this function) is run, the
-> processor state has been saved and I think that's all you have to do,
-> function can just return after calling swsusp_save(), unless I am missing
-> something.
-> 
-> I do not understand why a soft_restart is required here.
+> Yes, but that definition of locality is not common to all architectures. arm for
+> example stores it in the domain member of pci_sys_data, but that gets initialised
+> every time someone calls pcibios_init_hw (or pci_common_init_dev) with the domain
+> value held in struct hw_pci. But the host controllers don't talk to each other,
+> so if you want to instantiate two different drivers that use hw_pci they likely
+> use an individual count that starts at zero.
 
-Let me try skipping the restart, it sounds like a good idea, thanks!
-I'll let you know.
+The assumption is that whoever calls pci_common_init{_dev} knows about all the
+PCI hosts in the system. As Jason Gunthorpe said, it would be desirable to
+have stable domain numbers, so it's probably best to take the number from
+DT (e.g. the aliases node). It's probably safe to assume that any machine
+using ATAGS for booting falls into the category where it's safe to keep the
+policy local in the host bridge driver.
 
-> On a side note,
-> finisher is called with irqs disabled so, since you added a function for
-> soft restart noirq, it should be used, if needed, but I have to understand
-> why in the first place.
-
-Thanks, will have a look at this also
-
-> > +/*
-> > + * Save the current CPU state before suspend / poweroff.
-> > + */
-> > +int notrace swsusp_arch_suspend(void)
-> > +{
-> > +     return cpu_suspend(0, __swsusp_arch_save_image);
-> 
-> If the goal of soft_restart is to return 0 on success from this call,
-> you can still do that without requiring a soft_restart in the first
-> place. IIUC all you want to achieve is to save processor context
-> registers so that when you resume from image you will actually return
-> from here.
-
-I think you're right, but I need to verify.  Here, we want to snapshot the
-system's suspended state to the hibernation buffer, that way when we restore
-the image, we resume from the saved suspended state.  This state is
-already saved to the buffer after the swsusp_save call in
-__swsusp_arch_save_image.  We resume and then write the saved buffer to
-the resume partition.  Once we're done saving the image to the buffer I
-can't think why we actually need the restart.  There's only one tricky bit
-that I can think of, and that's the use of the nosave area to distinguish
-the path of completing hibernation entry from resume from hibernation,
-but I believe this would be handled correctly without a restart.
-Let me try it out and see.
-
-> > +/*
-> > + * The framework loads the hibernation image into a linked list anchored
-> > + * at restore_pblist, for swsusp_arch_resume() to copy back to the proper
-> > + * destinations.
-> > + *
-> > + * To make this work if resume is triggered from initramfs, the
-> > + * pagetables need to be switched to allow writes to kernel mem.
-> 
-> Can you elaborate a bit more on this please ?
-> 
-> > + */
-> > +static void notrace __swsusp_arch_restore_image(void *unused)
-> > +{
-> > +     struct pbe *pbe;
-> > +
-> > +     cpu_switch_mm(idmap_pgd, &init_mm);
-> 
-> Same here, thanks.
-
-At restore time, we take the save buffer data and restore it to the same
-physical locations used in the previous execution.  This will require having
-write access to all of memory, which may not be generally granted by the
-current mm.  So we switch to 1-1 init_mm to restore memory.
-
-At hibernation entry, the system is writing only to save buffer memory,
-so we don't have this problem.  It has read access to all of the memory,
-and can copy to the save buffer.
-
-Hopefully my comment above addressed this, but please let me know if I
-need to provide more info.
-
-> > +/*
-> > + * Resume from the hibernation image.
-> > + * Due to the kernel heap / data restore, stack contents change underneath
-> > + * and that would make function calls impossible; switch to a temporary
-> > + * stack within the nosave region to avoid that problem.
-> > + */
-> > +int __naked swsusp_arch_resume(void)
-> > +{
-> > +     extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-> 
-> Ok, a function with attribute __naked that still calls C functions, is
-> attr __naked really needed here ?
-
-I will need to look at this more carefully and get back to you.  I can
-
-
-> 
-> > +     cpu_init();     /* get a clean PSR */
-> 
-> cpu_init is called in the cpu_resume path, why is this call needed here ?
-
-I'll look more into this and get back with further comments.
-
-Thanks Lorenzo!
-
-Sebastian
+	Arnd
