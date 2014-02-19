@@ -1,36 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 19 Feb 2014 13:04:19 -0700
-Subject: [PATCH RFC 31/31] mmc: sdhci-tegra: get rid of special
- PRESENT_STATE register handling
-In-Reply-To: <E1WFmKj-0006nv-Py@rmk-PC.arm.linux.org.uk>
-References: <20140218150801.GD21483@n2100.arm.linux.org.uk>
- <E1WFmKj-0006nv-Py@rmk-PC.arm.linux.org.uk>
-Message-ID: <53050E43.3030602@wwwdotorg.org>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 19 Feb 2014 17:05:24 -0300
+Subject: [PATCH 0/2] Make Armada 370/XP and Orion clocksource use atomic I/O
+ API
+Message-ID: <1392840326-29417-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2014 08:11 AM, Russell King wrote:
-> sdhci-tegra provides a get_ro method, which overrides the checking
-> of the write protect bit in the PRESENT_STATE register in sdhci.c:
-> 
->         if (host->flags & SDHCI_DEVICE_DEAD)
->                 is_readonly = 0;
->         else if (host->ops->get_ro)
->                 is_readonly = host->ops->get_ro(host);
->         else
->                 is_readonly = !(sdhci_readl(host, SDHCI_PRESENT_STATE)
->                                 & SDHCI_WRITE_PROTECT);
-> 
-> This means it's pointless detecting accesses to this register and
-> manually setting the SDHCI_WRITE_PROTECT as it has no effect.
-> 
-> This means that the whole of tegra_sdhci_readl() can be removed and
-> we can use the builtin sdhci readl functionality here.
+The orion and armada-370-xp clocksource drivers are used in SoCs that can
+use the orion-watchdog driver.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+On these SoCs, the watchdog and timer blocks are part of the same set of
+registers, and in particular the "control" register is used to enable/disable
+both the watchdog and the timer.
 
-> =-DO NOT APPLY-=
+Therefore, just as was done for orion-watchdog, we need to access the shared
+register using the atomic I/O API.
 
-Is that just because it's an RFC and you want to make sure it doesn't
-get accepted early, or are you explicitly trying to stop people applying
-this, testing it, and giving Tested-by?
+This is v3.15 material, and meant to be merged through the clocksource tree,
+if at all possible.
+
+The first patch was already sent previously, but I'm resending it here to keep
+the two patches together.
+
+Thanks!
+
+Ezequiel Garcia (2):
+  clocksource: orion: Use atomic access for shared registers
+  clocksource: armada-370-xp: Use atomic access for shared registers
+
+ drivers/clocksource/time-armada-370-xp.c | 12 ++++--------
+ drivers/clocksource/time-orion.c         | 28 ++++++++++------------------
+ 2 files changed, 14 insertions(+), 26 deletions(-)
+
+-- 
+1.8.1.5
