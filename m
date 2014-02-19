@@ -1,59 +1,52 @@
-From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Wed, 19 Feb 2014 15:42:30 +0800
-Subject: [PATCH v2 3/4] ARM: dts: vf610-twr: Enable SGTL5000 codec.
-In-Reply-To: <1392795751-13351-1-git-send-email-Li.Xiubo@freescale.com>
-References: <1392795751-13351-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1392795751-13351-4-git-send-email-Li.Xiubo@freescale.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 19 Feb 2014 09:02:34 +0000
+Subject: [PATCH v4 00/12] arm/arm64: KVM: host cache maintenance when
+ guest caches are off
+In-Reply-To: <CAG7+5M3nBfX7qfq9d6Cvrpk2YeoHsy1yG0PjmTspa6zqQvUsXg@mail.gmail.com>
+References: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
+ <CAG7+5M3nBfX7qfq9d6Cvrpk2YeoHsy1yG0PjmTspa6zqQvUsXg@mail.gmail.com>
+Message-ID: <56ae8a2975cd21765b90d98260862af1@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds and enables SGTL5000 codec support.
+On 2014-02-18 20:57, Eric Northup wrote:
+> On Tue, Feb 18, 2014 at 7:27 AM, Marc Zyngier <marc.zyngier@arm.com> 
+> wrote:
+>>
+>> When we run a guest with cache disabled, we don't flush the cache to
+>> the Point of Coherency, hence possibly missing bits of data that 
+>> have
+>> been written in the cache, but have not yet reached memory.
+>>
+>> We also have the opposite issue: when a guest enables its cache,
+>> whatever sits in the cache is suddenly going to become visible,
+>> shadowing whatever the guest has written into RAM.
+>>
+>> There are several approaches to these issues:
+>> - Using the DC bit when caches are off: this breaks guests assuming
+>>   caches off while doing DMA operations. Bootloaders, for example.
+>>   It also breaks the I-D coherency.
+>> - Fetch the memory attributes on translation fault, and flush the
+>>   cache while handling the fault. This relies on using the PAR_EL1
+>>   register to obtain the Stage-1 memory attributes, and tends to be
+>>   slow.
+>> - Detecting the translation faults occuring with MMU off (and
+>>   performing a cache clean), and trapping SCTLR_EL1 to detect the
+>>   moment when the guest is turning its caches on (and performing a
+>>   cache invalidation). Trapping of SCTLR_EL1 is then disabled to
+>>   ensure the best performance.
+>
+> This will preclude noticing the 2nd .. Nth cache off -> on cycles,
+> right?  Will any guests care - doesn't kexec go through a caches-off
+> state?
 
-Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/vf610-twr.dts | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+kexec, bootloaders, and whatever firmware requires to switch caches on 
+and then off. Guest does care, but we don't have an (efficient) 
+architectural solution to that.
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index bcee3bb..0f4bff5 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -34,6 +34,20 @@
- 		};
- 	};
- 
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_3p3v: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "3P3V";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+	};
- };
- 
- &dspi0 {
-@@ -72,6 +86,14 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_i2c0>;
- 	status = "okay";
-+
-+	codec: sgtl5000 at 0a {
-+	       compatible = "fsl,sgtl5000";
-+	       reg = <0x0a>;
-+	       VDDA-supply = <&reg_3p3v>;
-+	       VDDIO-supply = <&reg_3p3v>;
-+	       clocks = <&clks VF610_CLK_SAI2>;
-+       };
- };
- 
- &iomuxc {
+The best I can think of so far is a "switch-the-damned-thing-off" 
+hypercall that would do the above before returning to the guest.
+
+         M.
 -- 
-1.8.4
+Fast, cheap, reliable. Pick two.
