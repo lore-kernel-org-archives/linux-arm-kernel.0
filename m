@@ -1,32 +1,68 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 19 Feb 2014 18:19:08 +0400
-Subject: =?UTF-8?B?UmU6IFtQYXRjaCB2MyAyMC8yM10gQVJNOiBjb25maWc6IEFkZCBhIG11bHRp?=
- =?UTF-8?B?X3Y1X2RlZmNvbmZpZw==?=
-In-Reply-To: <1392819174-11634-21-git-send-email-andrew@lunn.ch>
-References: <1392819174-11634-1-git-send-email-andrew@lunn.ch>
- <1392819174-11634-21-git-send-email-andrew@lunn.ch>
-Message-ID: <1392819548.815735822@f395.i.mail.ru>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 19 Feb 2014 15:20:07 +0100
+Subject: [PATCH 06/17] spi: pl022: Let runtime PM callbacks be available
+ for CONFIG_PM
+In-Reply-To: <1391529538-21685-7-git-send-email-ulf.hansson@linaro.org>
+References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+ <1391529538-21685-7-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAPDyKFombL2-Rt46QpXPNWe5PeGQnOGmQQNfYd5MdYdEePn-4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?????, 19 ??????? 2014, 15:12 +01:00 ?? Andrew Lunn <andrew@lunn.ch>:
-> To allow regression build testing of multi v5 systems, add a
-> multi_v5_defconfig, similar to the multi_v7_defconfig. This is based
-> on kirkwood_defconfig, but with a few other boards added which claim
-> to be MULTI_v5.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+On 4 February 2014 16:58, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> Convert to the SET_PM_RUNTIME_PM macro while defining the runtime PM
+> callbacks. This means the callbacks becomes available for both
+> CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME, which is needed to handle the
+> combinations of these scenarios.
+>
+> Cc: Mark Brown <broonie@kernel.org>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+Mark, any thoughts of this one?
+
+This will be needed no matter of patch 7.
+
+Also note that, Russell has already applied the corresponding part in
+the amba bus (patch 1)
+
+Kind regards
+Uffe
+
 > ---
->  arch/arm/configs/multi_v5_defconfig | 183 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 183 insertions(+)
->  create mode 100644 arch/arm/configs/multi_v5_defconfig
-> 
-> diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-...
-> +CONFIG_DEBUG_LL=y
-> +CONFIG_DEBUG_MVEBU_UART_ALTERNATE=y
-> +CONFIG_DEBUG_UART_VIRT=0xfed12000
-
-Should we disable lowlevel debug for multi-* config?
-
----
+>  drivers/spi/spi-pl022.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+> index 2789b45..70fa907 100644
+> --- a/drivers/spi/spi-pl022.c
+> +++ b/drivers/spi/spi-pl022.c
+> @@ -2288,7 +2288,7 @@ pl022_remove(struct amba_device *adev)
+>         return 0;
+>  }
+>
+> -#if defined(CONFIG_SUSPEND) || defined(CONFIG_PM_RUNTIME)
+> +#ifdef CONFIG_PM
+>  /*
+>   * These two functions are used from both suspend/resume and
+>   * the runtime counterparts to handle external resources like
+> @@ -2354,7 +2354,7 @@ static int pl022_resume(struct device *dev)
+>  }
+>  #endif /* CONFIG_PM */
+>
+> -#ifdef CONFIG_PM_RUNTIME
+> +#ifdef CONFIG_PM
+>  static int pl022_runtime_suspend(struct device *dev)
+>  {
+>         struct pl022 *pl022 = dev_get_drvdata(dev);
+> @@ -2374,7 +2374,7 @@ static int pl022_runtime_resume(struct device *dev)
+>
+>  static const struct dev_pm_ops pl022_dev_pm_ops = {
+>         SET_SYSTEM_SLEEP_PM_OPS(pl022_suspend, pl022_resume)
+> -       SET_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
+> +       SET_PM_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
+>  };
+>
+>  static struct vendor_data vendor_arm = {
+> --
+> 1.7.9.5
+>
