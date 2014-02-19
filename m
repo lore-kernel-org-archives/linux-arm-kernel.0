@@ -1,30 +1,73 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Feb 2014 16:24:46 -0800
-Subject: [GIT PULL] ARM: mvebu: DT fixes for v3.14
-In-Reply-To: <20140218161102.GT7862@titan.lakedaemon.net>
-References: <20140218161102.GT7862@titan.lakedaemon.net>
-Message-ID: <20140219002446.GD25055@quad.lixom.net>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 18 Feb 2014 17:28:14 -0700
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <2312919.pM61KLBcYY@wuerfel>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <5805232.JrD2FybBlg@wuerfel>
+ <20140214220047.GA5394@bart.dudau.co.uk>
+ <2312919.pM61KLBcYY@wuerfel>
+Message-ID: <20140219002814.GD8786@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 11:11:02AM -0500, Jason Cooper wrote:
-> All,
+On Sat, Feb 15, 2014 at 02:03:26PM +0100, Arnd Bergmann wrote:
+> On Friday 14 February 2014 22:00:47 Liviu Dudau wrote:
+> > 
+> > What I'm going to suggest in my v2 patch (hope to send it before Monday)
+> > is a new API in the generic PCI code that will allow you to create a
+> > host bridge in a new domain or in the existing domain, with the management
+> > of the domain number being done in the generic code.
+> > 
+> > Something like:
+> > 
+> >   int create_hostbridge_in_new_domain(....);
+> >   int create_hostbridge(....);
+> > 
+> > with the functions being wrappers around the pci_hostbridge_of_init function
+> > that I'm introducing.
+> > 
+> > What do you think?
 > 
-> I've been sitting on the missing alias for a while waiting for more DT
-> fixes to show up.  Well, finally one did. :(
+> Not sure. It would still keep the decision about whether to use a
+> new domain or not in the host bridge driver, but that doesn't seem
+> like the right place. The same driver might be used in different
+> ways based on what is around it.
 > 
-> Please pull for v3.14.
+> I've also had a look at the MIPS implementation now, which has its
+> own way of dealing with this, see arch/mips/pci/pci.c.
 > 
-> I intend to re-add the dove PMU node once I know for certain the
-> corresponding driver is going in to v3.15 (pull request already sent).
+> There was also an interesting comment in the MIPS header file:
+> 
+>         /* For compatibility with current (as of July 2003) pciutils
+>            and XFree86. Eventually will be removed. */
+>         unsigned int need_domain_info;
+> 
+> This is over ten years old, so I wonder if we can start assuming that
+> domains work out of the box now. All references to problems from 
+> PCI domains are about old code (ca. pre-2007) that doesn't understand
+> nonzero domains and that has since been fixed. I am pretty sure we
+> don't need to ever worry about stuffing multiple host bridges into
+> a domain other than the first one, and I also doubt we have to worry
+> about the problem at all on arm64 as we won't run old binaries on it
+> (or arm32 compat mode binaries that need to manage PCI devices).
+> 
+> Can anyone with more experience on the subject than me (Bjorn,
+> Russell, Jason, ...) think of a reason why we would not want to
+> just use a new domain for every host bridge we find?
 
-I've pulled this, but:
+With ACPI on x86 and ia64, we currently use _SEG directly as the Linux
+PCI domain.  Are you proposing that we make the Linux PCI domain
+independent of _SEG?
 
-> Jason Cooper (1):
->       ARM: dove: dt: revert PMU interrupt controller node
+It will look sort of funny to have things like this:
 
-Hmm. Seems like my dove machine (cubox) still booted. This does fix the
-boot time warning though.
+  ACPI: PCI Root Bridge [L000] (_SEG 0 domain 0000 [bus 00-1b])
+  ACPI: PCI Root Bridge [L001] (_SEG 0 domain 0001 [bus 1c-37])
+  ACPI: PCI Root Bridge [L002] (_SEG 0 domain 0002 [bus 38-53])
 
+where the firmware had _SEG==0 for all the bridges and assigned
+non-overlapping bus number ranges, but since nothing in PCI really
+depends on the domain, I guess it should work.
 
--Olof
+Bjorn
