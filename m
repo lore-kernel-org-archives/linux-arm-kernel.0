@@ -1,67 +1,125 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 19 Feb 2014 10:43:57 +0000
-Subject: [PATCH v4 00/12] arm/arm64: KVM: host cache maintenance when
- guest caches are off
-In-Reply-To: <20140219101246.GD30457@arm.com>
-References: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
- <CAG7+5M3nBfX7qfq9d6Cvrpk2YeoHsy1yG0PjmTspa6zqQvUsXg@mail.gmail.com>
- <56ae8a2975cd21765b90d98260862af1@www.loen.fr>
- <20140219101246.GD30457@arm.com>
-Message-ID: <53048AED.1070308@arm.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 19 Feb 2014 19:46:53 +0900
+Subject: [PATCH v3 1/6] arm64: Add ftrace support
+In-Reply-To: <20140217181209.GF26590@mudshark.cambridge.arm.com>
+References: <1382598488-13511-1-git-send-email-takahiro.akashi@linaro.org>
+ <1391768336-5642-1-git-send-email-takahiro.akashi@linaro.org>
+ <1391768336-5642-2-git-send-email-takahiro.akashi@linaro.org>
+ <20140217181209.GF26590@mudshark.cambridge.arm.com>
+Message-ID: <53048B9D.2050606@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/02/14 10:12, Catalin Marinas wrote:
-> On Wed, Feb 19, 2014 at 09:02:34AM +0000, Marc Zyngier wrote:
->> On 2014-02-18 20:57, Eric Northup wrote:
->>> On Tue, Feb 18, 2014 at 7:27 AM, Marc Zyngier <marc.zyngier@arm.com> 
->>> wrote:
->>>>
->>>> When we run a guest with cache disabled, we don't flush the cache to
->>>> the Point of Coherency, hence possibly missing bits of data that 
->>>> have
->>>> been written in the cache, but have not yet reached memory.
->>>>
->>>> We also have the opposite issue: when a guest enables its cache,
->>>> whatever sits in the cache is suddenly going to become visible,
->>>> shadowing whatever the guest has written into RAM.
->>>>
->>>> There are several approaches to these issues:
->>>> - Using the DC bit when caches are off: this breaks guests assuming
->>>>   caches off while doing DMA operations. Bootloaders, for example.
->>>>   It also breaks the I-D coherency.
->>>> - Fetch the memory attributes on translation fault, and flush the
->>>>   cache while handling the fault. This relies on using the PAR_EL1
->>>>   register to obtain the Stage-1 memory attributes, and tends to be
->>>>   slow.
->>>> - Detecting the translation faults occuring with MMU off (and
->>>>   performing a cache clean), and trapping SCTLR_EL1 to detect the
->>>>   moment when the guest is turning its caches on (and performing a
->>>>   cache invalidation). Trapping of SCTLR_EL1 is then disabled to
->>>>   ensure the best performance.
->>>
->>> This will preclude noticing the 2nd .. Nth cache off -> on cycles,
->>> right?  Will any guests care - doesn't kexec go through a caches-off
->>> state?
+On 02/18/2014 03:12 AM, Will Deacon wrote:
+> On Fri, Feb 07, 2014 at 10:18:51AM +0000, AKASHI Takahiro wrote:
+>> This patch implements arm64 specific part to support function tracers,
+>> such as function (CONFIG_FUNCTION_TRACER), function_graph
+>> (CONFIG_FUNCTION_GRAPH_TRACER) and function profiler
+>> (CONFIG_FUNCTION_PROFILER).
 >>
->> kexec, bootloaders, and whatever firmware requires to switch caches on 
->> and then off. Guest does care, but we don't have an (efficient) 
->> architectural solution to that.
+>> With 'function' tracer, all the functions in the kernel are traced with
+>> timestamps in ${sysfs}/tracing/trace. If function_graph tracer is
+>> specified, call graph is generated.
 >>
->> The best I can think of so far is a "switch-the-damned-thing-off" 
->> hypercall that would do the above before returning to the guest.
-> 
-> We could push for a PSCI extension to cover such cases as well, though
-> even for a host, we may not need to involve the secure world for kexec.
-> 
-> An alternative is to trap the set/way cache flushing and re-activate the
-> MMU trapping in the guest. If the MMU is still on, disable trapping
-> until the next set/way (since that's a normal function on power-down
-> code sequences). But it doesn't look nice ;).
+>> The kernel must be compiled with -pg option so that _mcount() is inserted
+>> at the beginning of functions. This function is called on every function's
+>> entry as long as tracing is enabled.
+>> In addition, function_graph tracer also needs to be able to probe function's
+>> exit. ftrace_graph_caller() & return_to_handler do this by faking link
+>> register's value to intercept function's return path.
+>>
+>> More details on architecture specific requirements are described in
+>> Documentation/trace/ftrace-design.txt.
+>
+> [...]
+>
+>> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+>> new file mode 100644
+>> index 0000000..0d5dfdb
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/ftrace.h
+>> @@ -0,0 +1,23 @@
+>> +/*
+>> + * arch/arm64/include/asm/ftrace.h
+>> + *
+>> + * Copyright (C) 2013 Linaro Limited
+>> + * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +#ifndef __ASM_FTRACE_H
+>> +#define __ASM_FTRACE_H
+>> +
+>> +#ifdef CONFIG_FUNCTION_TRACER
+>> +#define MCOUNT_ADDR            ((unsigned long)_mcount)
+>> +#define MCOUNT_INSN_SIZE       4 /* sizeof mcount call */
+>
+> You can use AARCH64_INSN_SIZE here.
 
-No, it doesn't... I may have a go at it though, and see what breaks. We
-already have all the code ready, just need to throw some glue at it.
+OK, but MCOUNT_INSN_SIZE can't be removed here because it is also used in
+kernel/trace/ftrace.c. So I will redefine it as
+#define MCOUNT_INSN_SIZE AARCH64_INSN_SIZE
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+In this case, I need to add __ASSEMBLY__ in asm/insn.h because
+asm/ftrace.h (and so asm/insn.h) is included in entry-ftrace.S.
+
+Is it OK?
+
+
+>> +#include <linux/linkage.h>
+>> +#include <asm/ftrace.h>
+>> +
+>> +/*
+>> + * Gcc with -pg will put the following code in the beginning of each function:
+>> + *      mov x0, x30
+>> + *      bl _mcount
+>> + *     [function's body ...]
+>> + * "bl _mcount" may be replaced to "bl ftrace_caller" or NOP if dynamic
+>> + * ftrace is enabled.
+>> + *
+>> + * Please note that x0 as an argument will not be used here because we can
+>> + * get lr(x30) of insturmented function at any time by winding up call stack
+>
+> instrumented
+
+I  will fix two occurences of "insturmented" :-)
+Just a question: Is there any better word than "instrument"?
+
+>> + * as long as the kernel is compiled without -fomit-frame-pointer.
+>> + * (or CONFIG_FRAME_POINTER, this is forced on arm64)
+>> + *
+>> + * stack layout after mcount_enter:
+>> + *
+>> + *   0 ---------------------------------------- sp of _mcount()
+>> + *      x29: fp of instrumented function       fp is not winded
+>> + *     --------------------
+>> + *      x30: lr of _mcount() (= instrumented function's pc)
+>> + * +16 ---------------------------------------- sp of instrumented function
+>> + *
+>> + *     ....
+>> + *
+>> + * +xx ---------------------------------------- fp of instrumented function
+>> + *      x29: fp of parent
+>> + *     --------------------
+>> + *      x30: lr of insturmented function (= parent's pc)
+>> + *     --------------------
+>> + *      xxx
+>> + */
+>> +
+>> +       .macro mcount_enter
+>> +       stp     x29, x30, [sp, #-48]!
+>> +       .endm
+>
+> Can you elaborate in your comment about where this 48 comes from please? I
+> can't join it up with your ascii art.
+
+Right. It should be -16 as shown in the stack layout.
+When I removed an operation of saving/restoring x0-x3 at v3 patch, this value
+should also have been changed.
+
+-Takahiro AKASHI
+
+> Will
+>
