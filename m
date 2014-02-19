@@ -1,72 +1,51 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 19 Feb 2014 18:25:06 +0000 (UTC)
-Subject: [RFC PATCH] ARM: OMAP2+: clockdomain: Reintroduce SW_SLEEP Support
- (fwd)
-Message-ID: <alpine.DEB.2.02.1402191824260.8777@utopia.booyaka.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 19 Feb 2014 19:32:11 +0100
+Subject: [PATCH v4 12/13] cpuidle: mvebu: Add initial CPU idle support
+ for Armada 370/XP SoC
+In-Reply-To: <5304E7B7.3040206@free-electrons.com>
+References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
+ <1392312816-17657-13-git-send-email-gregory.clement@free-electrons.com>
+ <20140219175145.4b4fcba5@skate>
+ <5304E7B7.3040206@free-electrons.com>
+Message-ID: <20140219193211.10dd2f22@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Gregory CLEMENT,
 
-Just FYI.  Queued for v3.15 unless someone complains.
+On Wed, 19 Feb 2014 18:19:51 +0100, Gregory CLEMENT wrote:
 
-- Paul
+> > Sorry to bring the naming issue, but it looks like the Armada 38x has a
+> > PMSU that looks almost identical to the Armada XP PMSU, except that it
+> > doesn't have the L2 fabric registers (probably because Armada 38x uses
+> > the PL310 and not the Marvell L2 cache).
+> > 
+> > Therefore, should this cpuidle driver be named Armada 370/XP, or
+> > ARMADA_MVEBU for example?
+> 
+> Well most of the code is related to the coherency and the L2 cache, so
+> a different L2 cache is a significant difference. The CPU are also different
+> for example the PJ4B can  use LDREX/STREX without MMU whereas the Cortex A9
+> can't.
 
----------- Forwarded message ----------
-Date: Fri, 7 Feb 2014 16:20:59 -0600
-From: Dave Gerlach <d-gerlach@ti.com>
-To: linux-omap at vger.kernel.org
-Cc: Tony Lindgren <tony@atomide.com>, Paul Walmsley <paul@pwsan.com>,
-    Rajendra Nayak <rnayak@ti.com>, Nishanth Menon <nm@ti.com>,
-    Dave Gerlach <d-gerlach@ti.com>
-Subject: [RFC PATCH] ARM: OMAP2+: clockdomain: Reintroduce SW_SLEEP Support
+Right, ok.
 
-Since commit 65aa94b204d (ARM: OMAP4: clockdomain/CM code: Update supported
-transition modes), on OMAP4, all CLKDMs support HW_AUTO so this is used
-instead of SW_SLEEP for the idling of clockdomains. However, additional
-SoCs now leverage the OMAP4 clockdomain code so update it to use SW_SLEEP
-if the clockdomain data specifies that the CLKDM has the
-CLKDM_CAN_FORCE_SLEEP flag set rather than using HW_AUTO for both cases.
+> > Also, I'm a bit unsure about your choice of mixing C and assembly here.
+> > This function is already calling ll_clear_cpu_coherent() and
+> > ll_set_cpu_coherent() that are assembly functions implement in
+> > coherency_ll.S. Shouldn't we do the same for this final bit of assembly?
+> 
+> I made several tries when I converted most of the code in C, so I am not
+> sure but I think that using a C function didn't work here. But as Lorenzo
+> pointed they were mistakes in this code, so once I will have fixed them, I
+> will try again.
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- arch/arm/mach-omap2/cminst44xx.c |   18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+Having this is C would certainly be a lot better, but my comment was
+merely to move this tiny bit of assembly somewhere else, but keep it as
+assembly if it's really needed.
 
-diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
-index 731ca13..f5c4731 100644
---- a/arch/arm/mach-omap2/cminst44xx.c
-+++ b/arch/arm/mach-omap2/cminst44xx.c
-@@ -254,6 +254,11 @@ void omap4_cminst_clkdm_force_wakeup(u8 part, u16 inst, u16 cdoffs)
-  *
-  */
- 
-+void omap4_cminst_clkdm_force_sleep(u8 part, u16 inst, u16 cdoffs)
-+{
-+	_clktrctrl_write(OMAP34XX_CLKSTCTRL_FORCE_SLEEP, part, inst, cdoffs);
-+}
-+
- /**
-  * omap4_cminst_wait_module_ready - wait for a module to be in 'func' state
-  * @part: PRCM partition ID that the CM_CLKCTRL register exists in
-@@ -404,8 +409,17 @@ static int omap4_clkdm_clear_all_wkup_sleep_deps(struct clockdomain *clkdm)
- 
- static int omap4_clkdm_sleep(struct clockdomain *clkdm)
- {
--	omap4_cminst_clkdm_enable_hwsup(clkdm->prcm_partition,
--					clkdm->cm_inst, clkdm->clkdm_offs);
-+	if (clkdm->flags & CLKDM_CAN_HWSUP)
-+		omap4_cminst_clkdm_enable_hwsup(clkdm->prcm_partition,
-+						clkdm->cm_inst,
-+						clkdm->clkdm_offs);
-+	else if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
-+		omap4_cminst_clkdm_force_sleep(clkdm->prcm_partition,
-+					       clkdm->cm_inst,
-+					       clkdm->clkdm_offs);
-+	else
-+		return -EINVAL;
-+
- 	return 0;
- }
- 
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
