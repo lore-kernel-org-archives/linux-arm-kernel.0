@@ -1,35 +1,74 @@
 From: klightspeed@killerwolves.net (klightspeed at killerwolves.net)
-Date: Thu, 20 Feb 2014 06:02:36 +1000
-Subject: [PATCH v7 3/4] DT: i2c: Trivial: Add sii,s35390a
+Date: Thu, 20 Feb 2014 06:02:34 +1000
+Subject: [PATCH v7 1/4] DT: Vendor prefixes: Add ricoh, qnap, sii and synology
 In-Reply-To: <1392840157-31072-1-git-send-email-klightspeed@killerwolves.net>
 References: <1392840157-31072-1-git-send-email-klightspeed@killerwolves.net>
-Message-ID: <1392840157-31072-4-git-send-email-klightspeed@killerwolves.net>
+Message-ID: <1392840157-31072-2-git-send-email-klightspeed@killerwolves.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrew Lunn <andrew@lunn.ch>
 
-Add the Seiko Instruments Inc S35390a to the list of trivial i2c
-devices.
+The following patches make use of vendor names:
+* ricoh (Ricoh Co. Ltd.);
+* qnap (QNAP Systems, Inc.);
+* sii (Seiko Instruments, Inc.); and
+* synology (Synology, Inc.)
+
+Add them to the vendor prefix list.
 
 Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Acked-by: Jason Cooper <jason@lakedaemon.net>
 ---
- Documentation/devicetree/bindings/i2c/trivial-devices.txt | 1 +
- 1 file changed, 1 insertions(+)
+v2:
+Use stock ticker for Ricoh as vendor name
+s/Richoh/Ricoh/
 
-diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-index 1a1ac2e..5f37191 100644
---- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-+++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
-@@ -58,6 +58,7 @@ plx,pex8648		48-Lane, 12-Port PCI Express Gen 2 (5.0 GT/s) Switch
- ramtron,24c64		i2c serial eeprom  (24cxx)
- ricoh,rs5c372a		I2C bus SERIAL INTERFACE REAL-TIME CLOCK IC
- samsung,24ad0xd1	S524AD0XF1 (128K/256K-bit Serial EEPROM for Low Power)
-+sii,s35390a		2-wire CMOS real-time clock
- st-micro,24c256		i2c serial eeprom  (24cxx)
- stm,m41t00		Serial Access TIMEKEEPER
- stm,m41t62		Serial real-time clock (RTC) with alarm
+v5:
+Add vendor prefix for QNAP
+
+v6:
+Revert qnap vendor prefix change from v5
+Now properly based on -rc1
+
+v7:
+Revert ricoh vendor prefix change from v2
+
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 3f900cd..4a52fa9 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -65,10 +65,12 @@ picochip	Picochip Ltd
+ powervr	PowerVR (deprecated, use img)
+ qca	Qualcomm Atheros, Inc.
+ qcom	Qualcomm, Inc.
++qnap	QNAP Systems, Inc.
+ ralink	Mediatek/Ralink Technology Corp.
+ ramtron	Ramtron International
+ realtek Realtek Semiconductor Corp.
+ renesas	Renesas Electronics Corporation
++ricoh	Ricoh Co. Ltd.
+ rockchip	Fuzhou Rockchip Electronics Co., Ltd
+ samsung	Samsung Semiconductor
+ sbs	Smart Battery System
+@@ -76,11 +78,13 @@ schindler	Schindler
+ sil	Silicon Image
+ silabs	Silicon Laboratories
+ simtek
++sii	Seiko Instruments, Inc.
+ sirf	SiRF Technology, Inc.
+ snps 	Synopsys, Inc.
+ st	STMicroelectronics
+ ste	ST-Ericsson
+ stericsson	ST-Ericsson
++synology	Synology, Inc.
+ ti	Texas Instruments
+ tlm	Trusted Logic Mobility
+ toshiba	Toshiba Corporation
 -- 
 1.8.3.2
