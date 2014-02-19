@@ -1,45 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Feb 2014 15:54:45 +0100
-Subject: [Patch v3 20/23] ARM: config: Add a multi_v5_defconfig
-In-Reply-To: <1392819548.815735822@f395.i.mail.ru>
-References: <1392819174-11634-1-git-send-email-andrew@lunn.ch>
- <1392819174-11634-21-git-send-email-andrew@lunn.ch>
- <1392819548.815735822@f395.i.mail.ru>
-Message-ID: <2697728.sKu8bCFvXU@wuerfel>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 19 Feb 2014 09:55:41 -0500
+Subject: [PATCH v6 06/18] ahci-platform: Add enable_ / disable_resources
+ helper functions
+In-Reply-To: <1392811320-3132-7-git-send-email-hdegoede@redhat.com>
+References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
+ <1392811320-3132-7-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140219145541.GE10134@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 February 2014 18:19:08 Alexander Shiyan wrote:
-> ?????, 19 ??????? 2014, 15:12 +01:00 ?? Andrew Lunn <andrew@lunn.ch>:
-> > To allow regression build testing of multi v5 systems, add a
-> > multi_v5_defconfig, similar to the multi_v7_defconfig. This is based
-> > on kirkwood_defconfig, but with a few other boards added which claim
-> > to be MULTI_v5.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > ---
-> >  arch/arm/configs/multi_v5_defconfig | 183 ++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 183 insertions(+)
-> >  create mode 100644 arch/arm/configs/multi_v5_defconfig
-> > 
-> > diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-> ...
-> > +CONFIG_DEBUG_LL=y
-> > +CONFIG_DEBUG_MVEBU_UART_ALTERNATE=y
-> > +CONFIG_DEBUG_UART_VIRT=0xfed12000
+On Wed, Feb 19, 2014 at 01:01:48PM +0100, Hans de Goede wrote:
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/ata/ahci_platform.c   | 83 ++++++++++++++++++++++++-------------------
+>  include/linux/ahci_platform.h |  2 ++
+>  2 files changed, 48 insertions(+), 37 deletions(-)
 > 
-> Should we disable lowlevel debug for multi-* config?
+> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> index 2f319e9..1cce7a2 100644
+> --- a/drivers/ata/ahci_platform.c
+> +++ b/drivers/ata/ahci_platform.c
+> @@ -117,6 +117,39 @@ void ahci_platform_disable_clks(struct ahci_host_priv *hpriv)
+>  EXPORT_SYMBOL_GPL(ahci_platform_disable_clks);
+>  
+>  
+> +int ahci_platform_enable_resources(struct ahci_host_priv *hpriv)
+> +{
+> +	int rc;
+> +
+> +	if (hpriv->target_pwr) {
+> +		rc = regulator_enable(hpriv->target_pwr);
+> +		if (rc)
+> +			return rc;
+> +	}
+> +
+> +	rc = ahci_platform_enable_clks(hpriv);
+> +	if (rc)
+> +		goto disable_regulator;
+> +
+> +	return 0;
+> +
+> +disable_regulator:
+> +	if (hpriv->target_pwr)
+> +		regulator_disable(hpriv->target_pwr);
+> +	return rc;
+> +}
+> +EXPORT_SYMBOL_GPL(ahci_platform_enable_resources);
+> +
+> +void ahci_platform_disable_resources(struct ahci_host_priv *hpriv)
+> +{
+> +	ahci_platform_disable_clks(hpriv);
+> +
+> +	if (hpriv->target_pwr)
+> +		regulator_disable(hpriv->target_pwr);
+> +}
+> +EXPORT_SYMBOL_GPL(ahci_platform_disable_resources);
+> +
+> +
 
-Yes, definitely.
+Ditto with comments, double blank lines and devres wrapping.
 
-On a related note, I'd like to add a CONFIG_BROKEN_MULTIPLATFORM Kconfig
-symbol and make all options depend on that which will result in a kernel
-that is not actually multiplatform but can only run on a subset of the
-platforms you can enable together. Aside from DEBUG_LL, this would
-include XIP_KERNEL, !MMU, !ARM_PATCH_PHYS_VIRT, ZBOOT_ROM, !AUTO_ZRELADDR
-and possibly more. A multi_*_defconfig by definition must not enable
-BROKEN_MULTIPLATFORM, but there can be good reasons for individual
-configurations to enable that when you want to build for a specific
-system that happens to be part of ARCH_MULTIPLATFORM.
+Thanks.
 
-	Arnd
+-- 
+tejun
