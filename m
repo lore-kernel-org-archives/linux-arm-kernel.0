@@ -1,40 +1,103 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 19 Feb 2014 10:46:15 +0900
-Subject: [PATCH] regulator: core bugfix: Use normal enable for always_on
- regulators
-In-Reply-To: <20140218214007.GE10590@pengutronix.de>
-References: <1392577256-20475-1-git-send-email-mpa@pengutronix.de>
- <20140218001420.GF2669@sirena.org.uk>
- <20140218214007.GE10590@pengutronix.de>
-Message-ID: <20140219014615.GK2669@sirena.org.uk>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 19 Feb 2014 08:54:02 +0800
+Subject: [PATCH v9 11/12] usb: phy-mxs: Add system suspend/resume API
+In-Reply-To: <20140218165032.GN9878@saruman.home>
+References: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
+ <1388111921-17326-12-git-send-email-peter.chen@freescale.com>
+ <20140218165032.GN9878@saruman.home>
+Message-ID: <20140219005401.GB11878@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 10:40:07PM +0100, Markus Pargmann wrote:
-> On Tue, Feb 18, 2014 at 09:14:20AM +0900, Mark Brown wrote:
+On Tue, Feb 18, 2014 at 10:50:32AM -0600, Felipe Balbi wrote:
+> On Fri, Dec 27, 2013 at 10:38:40AM +0800, Peter Chen wrote:
+> > We need this to keep PHY's power on or off during the system
+> > suspend mode. If we need to enable USB wakeup, then we
+> > must keep PHY's power being on during the system suspend mode.
+> > Otherwise, we need to keep PHY's power being off to save power.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  drivers/usb/phy/phy-mxs-usb.c |   61 +++++++++++++++++++++++++++++++++++++++++
+> >  1 files changed, 61 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
+> > index 96aac05..53b8dad 100644
+> > --- a/drivers/usb/phy/phy-mxs-usb.c
+> > +++ b/drivers/usb/phy/phy-mxs-usb.c
+> > @@ -57,6 +57,10 @@
+> >  #define BM_USBPHY_DEBUG_CLKGATE			BIT(30)
+> >  
+> >  /* Anatop Registers */
+> > +#define ANADIG_ANA_MISC0			0x150
+> > +#define ANADIG_ANA_MISC0_SET			0x154
+> > +#define ANADIG_ANA_MISC0_CLR			0x158
+> > +
+> >  #define ANADIG_USB1_VBUS_DET_STAT		0x1c0
+> >  #define ANADIG_USB2_VBUS_DET_STAT		0x220
+> >  
+> > @@ -65,6 +69,9 @@
+> >  #define ANADIG_USB2_LOOPBACK_SET		0x244
+> >  #define ANADIG_USB2_LOOPBACK_CLR		0x248
+> >  
+> > +#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	BIT(12)
+> > +#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG_SL BIT(11)
+> > +
+> >  #define BM_ANADIG_USB1_VBUS_DET_STAT_VBUS_VALID	BIT(3)
+> >  #define BM_ANADIG_USB2_VBUS_DET_STAT_VBUS_VALID	BIT(3)
+> >  
+> > @@ -134,6 +141,16 @@ struct mxs_phy {
+> >  	int port_id;
+> >  };
+> >  
+> > +static inline bool is_imx6q_phy(struct mxs_phy *mxs_phy)
+> > +{
+> > +	return mxs_phy->data == &imx6q_phy_data;
+> > +}
+> > +
+> > +static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
+> > +{
+> > +	return mxs_phy->data == &imx6sl_phy_data;
+> > +}
+> > +
+> >  static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+> >  {
+> >  	int ret;
+> > @@ -382,6 +399,8 @@ static int mxs_phy_probe(struct platform_device *pdev)
+> >  
+> >  	platform_set_drvdata(pdev, mxs_phy);
+> >  
+> > +	device_set_wakeup_capable(&pdev->dev, true);
+> > +
+> >  	ret = usb_add_phy_dev(&mxs_phy->phy);
+> >  	if (ret)
+> >  		return ret;
+> > @@ -398,6 +417,47 @@ static int mxs_phy_remove(struct platform_device *pdev)
+> >  	return 0;
+> >  }
+> >  
+> > +#ifdef CONFIG_PM_SLEEP
+> 
+> please use CONFIG_PM instead.
+> 
 
-> > I don't understand this.  Why is this called _no_delay() and why don't
-> > we want to delay when applying constraints?  We don't want to ever be in
-> > a position where we think a supply is enabled but it has in fact not
-> > finished ramping, and of course enable() may in fact be blocking anyway.
+No.
 
-> I tried not to modify the current behaviour of the core driver for
-> non-gpio regulators. Before this patch only ops->enable() was called
-> which also didn't have a delay. So I seperated the non-delay enable
-> function to have the same behaviour for normal regulators.
+See kernel/power/Kconfig
 
-No, that's not good.  The fact that it wasn't applying delays is going
-to be a bug - it should've been doing that.
+config PM_SLEEP
+	def_bool y
+	depends on SUSPEND || HIBERNATE_CALLBACKS
+		
+config PM
+	def_bool y
+	depends on PM_SLEEP || PM_RUNTIME
 
-> Also the constraints are applied when registering a new regulator. For
-> "boot-on" we should not delay because this regulator is already on by
-> definition. But I am not sure what to do with always-on regulators?
+Here, we need suspend API for system suspend, if PM_RUNTIME
+is enabled, but PM_SLEEP is disabled, we don't hope
+this function is defined.
 
-I'd just always apply a delay, it's simpler and more robust.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140219/d68d5fd4/attachment.sig>
+-- 
+
+Best Regards,
+Peter Chen
