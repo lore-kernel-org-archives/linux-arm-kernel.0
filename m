@@ -1,30 +1,52 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 19 Feb 2014 09:20:11 -0600
-Subject: [GIT PULL] qcom cleanups for v3.15
-In-Reply-To: <5303F56A.9010107@codeaurora.org>
-References: <alpine.DEB.2.00.1402101722170.12284@galak-ubuntu.qualcomm.com>
- <5303F56A.9010107@codeaurora.org>
-Message-ID: <FE60A8A0-B1C4-46F2-96E8-95FE25503DAF@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 19 Feb 2014 15:23:36 +0000
+Subject: [PATCH 3/3] ahci: st: Add support for ST's SATA IP
+In-Reply-To: <20140219150654.GH10134@htj.dyndns.org>
+References: <1392641818-23419-1-git-send-email-lee.jones@linaro.org>
+ <1392641818-23419-3-git-send-email-lee.jones@linaro.org>
+ <20140218233645.GP31892@mtj.dyndns.org>
+ <20140219083025.GB10504@lee--X1>
+ <20140219140458.GA10134@htj.dyndns.org>
+ <20140219150121.GG10504@lee--X1>
+ <20140219150654.GH10134@htj.dyndns.org>
+Message-ID: <20140219152336.GH10504@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Feb 18, 2014, at 6:06 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-
-> On 02/10/14 15:23, Kumar Gala wrote:
->> 
->> Kumar Gala (6):
->>      ARM: dts: msm: split out msm8660 and msm8960 soc into dts include
->>      ARM: msm: kill off hotplug.c
->>      clocksource: qcom: Move clocksource code out of mach-msm
->>      ARM: qcom: Split Qualcomm support into legacy and multiplatform
+> > I think that's a pretty unfair ask. I could understand if the
+> > patch(es) didn't apply, or were hindered by the new API change, but I
+> > do not believe that is the case?
 > 
-> Sorry to nag, but can you please address my comment on this patch?
+> Let me make it very clear to you.  If you want your code in, you help
+> maintaining the larger code base.  I'm already extremely annoyed about
+> the general behavior of embedded developers where the general attitude
+> seems to be doing whatever to get *my* driver in the tree.  So, fuck
+> you a little bit and if you want to make it happen faster, help Hans'
+> patchset mature.  Unfair my ass.
 
-Which comment?  The copyright one or something else?
+Since when has maintaining core code been the responsibility of the
+leaf driver developers? If you're aware that the core code is
+sub-standard then it's you who should be fixing it.
 
-- k
+I think it's great that forward thinking developers like Hans take on
+challenges to improve subsystems which are lacking in one way or
+another, but holding back other development while this process is
+ongoing is fundamentally wrong. Especially in this case where you're
+still actively reviewing/NACKing the core changes.
+
+Changes to APIs should either support backward-capability or change all
+effected drivers. I haven't been able to apply the patches yet, so I
+can't tell which one of these holds true, but I believe it's the
+former. In which case any new driver using the _current_ (not old)
+API should fold neatly in. I've even offered to convert to the new API
+once it's Mainlined. How can I say fairer than that?
+
+Finally, do try and stay at least a little bit professional on the
+MLs. That sort of disrespectful, rude behaviour may be how you guys do
+it at Redhat, but most will think it's nothing more than childish.
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
