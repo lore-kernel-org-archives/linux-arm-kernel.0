@@ -1,59 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 19 Feb 2014 13:09:21 +0100
-Subject: [PATCH] PM / Sleep: Set pm_generic functions to NULL for
- !CONFIG_PM_SLEEP
-Message-ID: <1392811761-28201-1-git-send-email-ulf.hansson@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 19 Feb 2014 12:14:36 +0000
+Subject: [PATCH 3/3] ahci: st: Add support for ST's SATA IP
+In-Reply-To: <53049B7A.6080404@redhat.com>
+References: <1392641818-23419-1-git-send-email-lee.jones@linaro.org>
+ <1392641818-23419-3-git-send-email-lee.jones@linaro.org>
+ <20140218233645.GP31892@mtj.dyndns.org>
+ <53049B7A.6080404@redhat.com>
+Message-ID: <20140219121436.GE10504@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously only a subset of the functions were defined and set to NULL
-while !CONFIG_PM_SLEEP. Let's make them all available so they can be
-used no matter of CONFIG_PM_SLEEP or not.
+> >> Cc: Tejun Heo <tj@kernel.org>
+> >> Cc: linux-ide at vger.kernel.org
+> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> > Please consider basing it on top of Hans' refactored ahci_platform.
+> > 
+> >  http://www.spinics.net/lists/linux-ide/msg47628.html
+> 
+> Which reminds I must test the version I've rebased on top of 3.14-rc1
+> and then send a v6 so that this can get merged.
+> 
+> Lee, I'll add you to the CC of the v6 I'm about to send.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- include/linux/pm.h |   28 ++++++++++++++++++++--------
- 1 file changed, 20 insertions(+), 8 deletions(-)
+Thanks Hans.
 
-diff --git a/include/linux/pm.h b/include/linux/pm.h
-index db2be5f..a81b558 100644
---- a/include/linux/pm.h
-+++ b/include/linux/pm.h
-@@ -718,14 +718,26 @@ static inline void dpm_for_each_dev(void *data, void (*fn)(struct device *, void
- {
- }
- 
--#define pm_generic_prepare	NULL
--#define pm_generic_suspend	NULL
--#define pm_generic_resume	NULL
--#define pm_generic_freeze	NULL
--#define pm_generic_thaw		NULL
--#define pm_generic_restore	NULL
--#define pm_generic_poweroff	NULL
--#define pm_generic_complete	NULL
-+#define pm_generic_prepare		NULL
-+#define pm_generic_suspend_late		NULL
-+#define pm_generic_suspend_noirq	NULL
-+#define pm_generic_suspend		NULL
-+#define pm_generic_resume_early		NULL
-+#define pm_generic_resume_noirq		NULL
-+#define pm_generic_resume		NULL
-+#define pm_generic_freeze_noirq		NULL
-+#define pm_generic_freeze_late		NULL
-+#define pm_generic_freeze		NULL
-+#define pm_generic_thaw_noirq		NULL
-+#define pm_generic_thaw_early		NULL
-+#define pm_generic_thaw			NULL
-+#define pm_generic_restore_noirq	NULL
-+#define pm_generic_restore_early	NULL
-+#define pm_generic_restore		NULL
-+#define pm_generic_poweroff_noirq	NULL
-+#define pm_generic_poweroff_late	NULL
-+#define pm_generic_poweroff		NULL
-+#define pm_generic_complete		NULL
- #endif /* !CONFIG_PM_SLEEP */
- 
- /* How to reorder dpm_list after device_move() */
+Once Tejun has accepted this driver I will go ahead and rebase on top
+of your work and convert to the new API.
+
 -- 
-1.7.9.5
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
