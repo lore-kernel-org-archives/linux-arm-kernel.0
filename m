@@ -1,27 +1,75 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 19 Feb 2014 21:33:40 +0100
-Subject: [PATCH] ARM: v7m: add trivial suspend support
-Message-ID: <1392842020-16650-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 19 Feb 2014 14:41:39 -0600
+Subject: [PATCH] ARM: qcom: Copyright marking changes
+Message-ID: <1392842499-11200-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Code Aurora Forum (CAF) is part of Linux Foundation Labs.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e25419817791..41266af5dfc8 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2270,7 +2270,7 @@ source "kernel/power/Kconfig"
- config ARCH_SUSPEND_POSSIBLE
- 	depends on !ARCH_S5PC100
- 	depends on CPU_ARM920T || CPU_ARM926T || CPU_FEROCEON || CPU_SA1100 || \
--		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE || CPU_MOHAWK
-+		CPU_V6 || CPU_V6K || CPU_V7 || CPU_V7M || CPU_XSC3 || CPU_XSCALE || CPU_MOHAWK
- 	def_bool y
- 
- config ARM_CPU_SUSPEND
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
+ arch/arm/mach-qcom/platsmp.c  | 3 +--
+ arch/arm/mach-qcom/scm-boot.c | 2 +-
+ arch/arm/mach-qcom/scm-boot.h | 2 +-
+ arch/arm/mach-qcom/scm.c      | 2 +-
+ arch/arm/mach-qcom/scm.h      | 2 +-
+ 5 files changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-qcom/platsmp.c b/arch/arm/mach-qcom/platsmp.c
+index 9c53ea7..ede7f53 100644
+--- a/arch/arm/mach-qcom/platsmp.c
++++ b/arch/arm/mach-qcom/platsmp.c
+@@ -1,8 +1,7 @@
+ /*
+  *  Copyright (C) 2002 ARM Ltd.
+  *  All Rights Reserved
+- *  Copyright (c) 2010, Code Aurora Forum. All rights reserved.
+- *  Copyright (c) 2014 The Linux Foundation. All rights reserved.
++ *  Copyright (c) 2010, 2014 The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+diff --git a/arch/arm/mach-qcom/scm-boot.c b/arch/arm/mach-qcom/scm-boot.c
+index 45cee3e..4f0e1fa 100644
+--- a/arch/arm/mach-qcom/scm-boot.c
++++ b/arch/arm/mach-qcom/scm-boot.c
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++/* Copyright (c) 2010, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/arm/mach-qcom/scm-boot.h b/arch/arm/mach-qcom/scm-boot.h
+index 7be32ff..b8a1aba 100644
+--- a/arch/arm/mach-qcom/scm-boot.h
++++ b/arch/arm/mach-qcom/scm-boot.h
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++/* Copyright (c) 2010, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/arm/mach-qcom/scm.c b/arch/arm/mach-qcom/scm.c
+index c536fd6..21d69c1 100644
+--- a/arch/arm/mach-qcom/scm.c
++++ b/arch/arm/mach-qcom/scm.c
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++/* Copyright (c) 2010, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+diff --git a/arch/arm/mach-qcom/scm.h b/arch/arm/mach-qcom/scm.h
+index 00b31ea..979f549 100644
+--- a/arch/arm/mach-qcom/scm.h
++++ b/arch/arm/mach-qcom/scm.h
+@@ -1,4 +1,4 @@
+-/* Copyright (c) 2010, Code Aurora Forum. All rights reserved.
++/* Copyright (c) 2010, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
 -- 
-1.8.5.2
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
