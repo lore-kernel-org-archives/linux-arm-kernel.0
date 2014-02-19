@@ -1,37 +1,45 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 19 Feb 2014 18:01:18 +0100
-Subject: [PATCH v4 13/13] ARM: mvebu: register the cpuidle driver for
- the Armada XP SoCs
-In-Reply-To: <5304E14F.3020303@free-electrons.com>
-References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
- <1392312816-17657-14-git-send-email-gregory.clement@free-electrons.com>
- <20140219174634.17123478@skate>
- <5304E14F.3020303@free-electrons.com>
-Message-ID: <20140219180118.4915a6db@skate>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 19 Feb 2014 17:02:51 +0000
+Subject: [PATCHv2 3/8] ARM: at91: dt: sam9rl: Device Tree for the
+ at91sam9rlek
+In-Reply-To: <1392823951-26053-4-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1392823951-26053-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1392823951-26053-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20140219170251.GB25079@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
-
-On Wed, 19 Feb 2014 17:52:31 +0100, Gregory CLEMENT wrote:
-
-> > What about putting this in pmsu.c, in an arch_initcall() (or some other
-> > initcall level) ? The cpuidle feature is really tied to the PMSU, so I
-> > believe it makes sense to have the cpuidle-armada-370-xp
-> > platform_device declared and registered in pmsu.c. As an added bonus,
-> > you don't need to expose
-> > armada_370_xp_pmsu_enable_l2_powerdown_onidle() and
-> > armada_370_xp_cpu_pm_init() in a header: they can remain static
-> > functions private to pmsu.c.
+On Wed, Feb 19, 2014 at 03:32:26PM +0000, Alexandre Belloni wrote:
+> Add a device tree for the at91sam9rl-ek. For now it supports:
+>  - MMC
+>  - dbgu
+>  - usart1
+>  - watchdog
+>  - nand
+>  - leds
+>  - buttons
 > 
-> It sounds like a good idea, the tricky part will be to find the accurate
-> initcall level: not too early and not too late.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/Makefile         |   2 +
+>  arch/arm/boot/dts/at91sam9rlek.dts | 151 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 153 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91sam9rlek.dts
 
-Make it an arch_initcall(). This is the point where ->init_machine() is
-called in armada-370-xp.c.
+[...]
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		main_clock: clock at 0 {
+> +			compatible = "atmel,osc", "fixed-clock";
+> +			clock-frequency = <12000000>;
+> +		};
+> +	};
+
+This has no reg. It shouldn't need the unit-address.
+
+Thanks,
+Mark.
