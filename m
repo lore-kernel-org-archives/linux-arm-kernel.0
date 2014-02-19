@@ -1,34 +1,84 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 19 Feb 2014 17:52:53 +0100
-Subject: [PATCH v5 2/5] ACPI / processor_core: Rework _PDC related stuff
- to make it more arch-independent
-In-Reply-To: <530413F0.4050008@linaro.org>
-References: <1392740638-2479-1-git-send-email-hanjun.guo@linaro.org>
- <3459962.GkY99aHQbc@vostro.rjw.lan> <530413F0.4050008@linaro.org>
-Message-ID: <1643739.gIWxXCQHpB@vostro.rjw.lan>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 19 Feb 2014 16:39:37 +0000
+Subject: [PATCH 3/3] ahci: st: Add support for ST's SATA IP
+In-Reply-To: <20140219153624.GI10134@htj.dyndns.org>
+References: <1392641818-23419-1-git-send-email-lee.jones@linaro.org>
+ <1392641818-23419-3-git-send-email-lee.jones@linaro.org>
+ <20140218233645.GP31892@mtj.dyndns.org>
+ <20140219083025.GB10504@lee--X1>
+ <20140219140458.GA10134@htj.dyndns.org>
+ <20140219150121.GG10504@lee--X1>
+ <20140219150654.GH10134@htj.dyndns.org>
+ <20140219152336.GH10504@lee--X1>
+ <20140219153624.GI10134@htj.dyndns.org>
+Message-ID: <20140219163937.GI10504@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 19, 2014 10:16:16 AM Hanjun Guo wrote:
-> On 2014?02?19? 08:50, Rafael J. Wysocki wrote:
-> > On Wednesday, February 19, 2014 12:23:55 AM Hanjun Guo wrote:
-> >> _PDC related stuff in processor_core.c is little bit X86/IA64 dependent,
-> >> rework the code to make it more arch-independent, no functional change
-> >> in this patch.
-> >>
-> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > I've queued up patches [1,3-5/5] from this series for 3.15 (modulo changelog
-> > modifications), but this one should be CCed to the x86 and ia64 maintainers.
+> > Since when has maintaining core code been the responsibility of the
+> > leaf driver developers? If you're aware that the core code is
+> > sub-standard then it's you who should be fixing it.
 > 
-> Thanks! I will resend this patch with Tony and Thomas in cc list, so is 
-> there any chance for this
-> patch to be merged into 3.15 if I get acked from them?
+> No, there isn't this clear divide between core and the leaf
+> developers.  People working on the "core" don't just grow off the
+> ground.  You can't just go around piling mess around claiming that
+> it's not your responsbility and then expect someone else to clean up
+> after you.  How can that be *possibly* sustainable?
 
-If they ack it, then yes, it can.
+That's not what I said was it? You're misinterpreting me.
 
-Thanks!
+I'm more than happy to work on core code and have done in the past.
+However, if every subsystem maintainer I submit patches to forced me
+to undertake some API clean-ups/re-write or convert to another
+future/development API prior to acceptance I wouldn't be able to get
+any of my own work done.
+
+> > I think it's great that forward thinking developers like Hans take on
+> > challenges to improve subsystems which are lacking in one way or
+> 
+> Yeah, which happened only because I pushed back and Hans isn't even
+> paid to do it.  Doesn't that say something?
+
+It tells me that Hans has more spare time than I do.
+
+This work would even be something I'd be interested in helping out
+with - even in my own time, but the way you speak to people doesn't
+exactly inspire them to go out of my way to work with you does it?
+
+> Nobody is actually helping Hans' work.  Not at all, nada, zilch.
+> Just complain when directed towards it.
+
+Again, that's not what I said. It's great that your subsystem is being
+improved, but insisting that anyone who submits new code to rebase
+on top of some development patches which only exist in mail form, and
+refusing to take patches until they do so doesn't seem right to me.
+
+> > another, but holding back other development while this process is
+> > ongoing is fundamentally wrong. Especially in this case where you're
+> > still actively reviewing/NACKing the core changes.
+> > 
+> > Changes to APIs should either support backward-capability or change all
+> > effected drivers. I haven't been able to apply the patches yet, so I
+> > can't tell which one of these holds true, but I believe it's the
+> > former. In which case any new driver using the _current_ (not old)
+> > API should fold neatly in. I've even offered to convert to the new API
+> > once it's Mainlined. How can I say fairer than that?
+> > 
+> > Finally, do try and stay at least a little bit professional on the
+> > MLs. That sort of disrespectful, rude behaviour may be how you guys do
+> > it at Redhat, but most will think it's nothing more than childish.
+> 
+> If you want me to be respectful towards you, don't be a crybaby
+> screaming "it's not fair".  It apparently isn't clear to you that you
+> have to chip in for the whole thing to be maintainable in the long
+> term.  Unfair... lol, that was a good one, really.
+
+It appears you've just regressed into childhood again. Let's continue
+this when you are able to have an adult conversation which other
+grown-ups.
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
