@@ -1,55 +1,70 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 19 Feb 2014 21:29:01 +0100
-Subject: [PATCH v2] ARM: make isa_mode macro more robust and fix for v7-M
-In-Reply-To: <1387186673-7439-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1387186673-7439-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1392841741-16438-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Wed, 19 Feb 2014 21:31:17 +0100
+Subject: [PATCH v2] ARM: show_regs: on v7-M there are no FIQs,
+ different processor modes, ...
+In-Reply-To: <1387187296-7558-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1387187296-7558-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1392841877-16520-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The definition of isa_mode hardcodes the values to shift PSR_J_BIT and
-PSR_T_BIT to move them to bits 1 and 0 respectively. Instead use __ffs to
-calculate the shift from the #define already used for masking.
+no indication about irqs in PSR and only a single ISA. So skip the whole
+decoding and just print the xPSR on v7-M.
 
-This is relevant on v7-M as there PSR_T_BIT is 0x01000000 instead of
-0x00000020 for V7-[AR] and earlier. Because of that isa_mode produced
-values >= 0x80000 which are unsuitable to index into isa_modes[4] there
-and so made __show_regs read from undefined memory which resulted in
-hangs and crashes.
+Also mark two static variables as __maybe_unused to prevent the compiler
+from emitting:
 
-Moreover isa_mode is wrong for v7-M even after this robustness fix as
-there is no J-bit in the PSR register. So hardcode isa_mode to "Thumb"
-for v7-M.
+	arch/arm/kernel/process.c:51:20: warning: 'processor_modes' defined but not used [-Wunused-variable]
+	arch/arm/kernel/process.c:58:20: warning: 'isa_modes' defined but not used [-Wunused-variable]
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
 Changes since (implicit) v1, sent with Message-Id:
-1387186673-7439-1-git-send-email-u.kleine-koenig at pengutronix.de:
+1387187296-7558-1-git-send-email-u.kleine-koenig at pengutronix.de:
 
- - fix !CONFIG_CPU_V7M compilation because of a missing ')'
- 
- arch/arm/include/asm/ptrace.h | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ - add the __maybe_unused annotations and mention that in the commit log.
 
-diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
-index 04c99f36ff7f..627a03ebb987 100644
---- a/arch/arm/include/asm/ptrace.h
-+++ b/arch/arm/include/asm/ptrace.h
-@@ -27,9 +27,13 @@ struct pt_regs {
- #define thumb_mode(regs) (0)
+ arch/arm/kernel/process.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 92f7b15dd221..204f7d273319 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -48,14 +48,14 @@ unsigned long __stack_chk_guard __read_mostly;
+ EXPORT_SYMBOL(__stack_chk_guard);
  #endif
  
-+#ifndef CONFIG_CPU_V7M
- #define isa_mode(regs) \
--	((((regs)->ARM_cpsr & PSR_J_BIT) >> 23) | \
--	 (((regs)->ARM_cpsr & PSR_T_BIT) >> 5))
-+	((((regs)->ARM_cpsr & PSR_J_BIT) >> (__ffs(PSR_J_BIT) - 1)) | \
-+	 (((regs)->ARM_cpsr & PSR_T_BIT) >> (__ffs(PSR_T_BIT))))
-+#else
-+#define isa_mode(regs) 1 /* Thumb */
-+#endif
+-static const char *processor_modes[] = {
++static const char *processor_modes[] __maybe_unused = {
+   "USER_26", "FIQ_26" , "IRQ_26" , "SVC_26" , "UK4_26" , "UK5_26" , "UK6_26" , "UK7_26" ,
+   "UK8_26" , "UK9_26" , "UK10_26", "UK11_26", "UK12_26", "UK13_26", "UK14_26", "UK15_26",
+   "USER_32", "FIQ_32" , "IRQ_32" , "SVC_32" , "UK4_32" , "UK5_32" , "UK6_32" , "ABT_32" ,
+   "UK8_32" , "UK9_32" , "UK10_32", "UND_32" , "UK12_32", "UK13_32", "UK14_32", "SYS_32"
+ };
  
- #define processor_mode(regs) \
- 	((regs)->ARM_cpsr & MODE_MASK)
+-static const char *isa_modes[] = {
++static const char *isa_modes[] __maybe_unused = {
+   "ARM" , "Thumb" , "Jazelle", "ThumbEE"
+ };
+ 
+@@ -276,12 +276,17 @@ void __show_regs(struct pt_regs *regs)
+ 	buf[3] = flags & PSR_V_BIT ? 'V' : 'v';
+ 	buf[4] = '\0';
+ 
++#ifndef CONFIG_CPU_V7M
+ 	printk("Flags: %s  IRQs o%s  FIQs o%s  Mode %s  ISA %s  Segment %s\n",
+ 		buf, interrupts_enabled(regs) ? "n" : "ff",
+ 		fast_interrupts_enabled(regs) ? "n" : "ff",
+ 		processor_modes[processor_mode(regs)],
+ 		isa_modes[isa_mode(regs)],
+ 		get_fs() == get_ds() ? "kernel" : "user");
++#else
++	printk("xPSR: %08lx\n", regs->ARM_cpsr);
++#endif
++
+ #ifdef CONFIG_CPU_CP15
+ 	{
+ 		unsigned int ctrl;
 -- 
 1.8.5.2
