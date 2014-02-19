@@ -1,34 +1,37 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 19 Feb 2014 15:12:35 +0100
-Subject: [Patch v3 04/23] ARM: Kirkwood: Drop printing the SoC type and
- revision
+Date: Wed, 19 Feb 2014 15:12:48 +0100
+Subject: [Patch v3 17/23] ARM: MVEBU: Instantiate system controller in
+ kirkwood.dtsi
 In-Reply-To: <1392819174-11634-1-git-send-email-andrew@lunn.ch>
 References: <1392819174-11634-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1392819174-11634-5-git-send-email-andrew@lunn.ch>
+Message-ID: <1392819174-11634-18-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will be added back using the mach-mvebu equivalent once the move
-has been made.
+Make use of the mvebu system controller, by placing a node into the
+dtsi file.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-kirkwood/board-dt.c | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/boot/dts/kirkwood.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index e74b31aa9736..a0c0ff39788e 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -107,8 +107,6 @@ eth_fixup_skip:
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 02c551ee31e5..ba06124d8f35 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -145,6 +145,11 @@
+ 			reg = <0x20000 0x80>, <0x1500 0x20>;
+ 		};
  
- static void __init kirkwood_dt_init(void)
- {
--	pr_info("Kirkwood: %s.\n", kirkwood_id());
--
- 	/*
- 	 * Disable propagation of mbus errors to the CPU local bus,
- 	 * as this causes mbus errors (which can occur for example
++		system-controller at 20000 {
++			compatible = "marvell,orion-system-controller";
++			reg = <0x20000 0x120>;
++		};
++
+ 		bridge_intc: bridge-interrupt-ctrl at 20110 {
+ 			compatible = "marvell,orion-bridge-intc";
+ 			interrupt-controller;
 -- 
 1.8.5.3
