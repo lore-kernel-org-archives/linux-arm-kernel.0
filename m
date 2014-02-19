@@ -1,186 +1,281 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Feb 2014 11:24:30 +0100
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <20140219024427.GC5394@bart.dudau.co.uk>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <20140218174125.GC29304@obsidianresearch.com>
- <20140219024427.GC5394@bart.dudau.co.uk>
-Message-ID: <1948942.cIbLaKDEOa@wuerfel>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Wed, 19 Feb 2014 12:32:02 +0200
+Subject: [PATCH v4 1/2] memory: ti-aemif: introduce AEMIF driver
+In-Reply-To: <20140218203049.GA18647@kroah.com>
+References: <1391629574-18955-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <1391629574-18955-2-git-send-email-ivan.khoronzhuk@ti.com>
+ <20140218203049.GA18647@kroah.com>
+Message-ID: <53048822.2080307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 February 2014 02:44:27 Liviu Dudau wrote:
-> On Tue, Feb 18, 2014 at 10:41:25AM -0700, Jason Gunthorpe wrote:
-> 
-> > So the Liviu, I would say the API should be similar to what we see in
-> > other OF enabled driver bases subsystems, call the core code with a
-> > platform_device pointer and function_ops pointer and have the core
-> > code create a domain, figure out the domain # from the DT (via
-> > aliases?), and so on.
-> 
-> I wish things were easier!
-> 
-> Lets look at the 'int pci_domain_nr(struct pci_bus *bus);' function. It is
-> used to obtain the domain number of the bus passed as an argument.
-> 
-> - include/linux/pci.h defines it as an inline function returning zero if
->   !CONFIG_PCI || !CONFIG_PCI_DOMAINS. Otherwise it is silent on what the
->   function might look like.
+On 02/18/2014 10:30 PM, Greg KH wrote:
+> On Wed, Feb 05, 2014 at 09:46:13PM +0200, Ivan Khoronzhuk wrote:
+>> Add new AEMIF driver for EMIF16 Texas Instruments controller.
+>> The EMIF16 module is intended to provide a glue-less interface to
+>> a variety of asynchronous memory devices like ASRA M, NOR and NAND
+>> memory. A total of 256M bytes of any of these memories can be
+>> accessed at any given time via 4 chip selects with 64M byte access
+>> per chip select.
+>>
+>> Synchronous memories such as DDR1 SD RAM, SDR SDRAM and Mobile SDR
+>> are not supported.
+>>
+>> This controller is used on SoCs like Davinci, Keysone2
+>>
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com
+>> Signed-off-by: [initial author] Murali Karicheri <m-karicheri2@ti.com>
+> What's this [] stuff?
+>
+> If Murali wrote this, that name needs to be in a "From:" line in the
+> patch to properly attribute it, and drop the [] here.
 
-I think we should come up with a default implementation that works for
-any architecture using DT based probing, and requires PCI_DOMAINS to
-be enabled.
+Ok, I'll delete [] stuff.
 
-> - alpha, ia64, microblaze, mips, powerpc and tile all define it as a cast
->   of bus->sysdata to "struct pci_controller *" and then access a data
->   member from there to get the domain number. But ... the pci_controller
->   structure is different for each architecture, with few more members in
->   addition that might be actually shared with generic framework code.
+>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>> ---
+>>   drivers/memory/Kconfig    |  11 ++
+>>   drivers/memory/Makefile   |   1 +
+>>   drivers/memory/ti-aemif.c | 429 ++++++++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 441 insertions(+)
+>>   create mode 100644 drivers/memory/ti-aemif.c
+>>
+>> diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+>> index 29a11db..7bc3982 100644
+>> --- a/drivers/memory/Kconfig
+>> +++ b/drivers/memory/Kconfig
+>> @@ -7,6 +7,17 @@ menuconfig MEMORY
+>>   
+>>   if MEMORY
+>>   
+>> +config TI_AEMIF
+>> +	tristate "Texas Instruments AEMIF driver"
+>> +	depends on (ARCH_DAVINCI || ARCH_KEYSTONE) && OF
+>> +	help
+>> +	  This driver is for the AEMIF module available in Texas Instruments
+>> +	  SoCs. AEMIF stands for Asynchronous External Memory Interface and
+>> +	  is intended to provide a glue-less interface to a variety of
+>> +	  asynchronuous memory devices like ASRAM, NOR and NAND memory. A total
+>> +	  of 256M bytes of any of these memories can be accessed at a given
+>> +	  time via four chip selects with 64M byte access per chip select.
+>> +
+>>   config TI_EMIF
+>>   	tristate "Texas Instruments EMIF driver"
+>>   	depends on ARCH_OMAP2PLUS
+>> diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
+>> index 969d923..d4e150c 100644
+>> --- a/drivers/memory/Makefile
+>> +++ b/drivers/memory/Makefile
+>> @@ -5,6 +5,7 @@
+>>   ifeq ($(CONFIG_DDR),y)
+>>   obj-$(CONFIG_OF)		+= of_memory.o
+>>   endif
+>> +obj-$(CONFIG_TI_AEMIF)		+= ti-aemif.o
+>>   obj-$(CONFIG_TI_EMIF)		+= emif.o
+>>   obj-$(CONFIG_MVEBU_DEVBUS)	+= mvebu-devbus.o
+>>   obj-$(CONFIG_TEGRA20_MC)	+= tegra20-mc.o
+>> diff --git a/drivers/memory/ti-aemif.c b/drivers/memory/ti-aemif.c
+>> new file mode 100644
+>> index 0000000..8d15d87
+>> --- /dev/null
+>> +++ b/drivers/memory/ti-aemif.c
+>> @@ -0,0 +1,429 @@
+>> +/*
+>> + * TI AEMIF driver
+>> + *
+>> + * Copyright (C) 2010 - 2013 Texas Instruments Incorporated. http://www.ti.com/
+>> + *
+>> + * Authors:
+>> + * Murali Karicheri <m-karicheri2@ti.com>
+>> + * Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/err.h>
+>> +#include <linux/io.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_platform.h>
+>> +#include <linux/platform_device.h>
+>> +
+>> +#define TA_SHIFT	2
+>> +#define RHOLD_SHIFT	4
+>> +#define RSTROBE_SHIFT	7
+>> +#define RSETUP_SHIFT	13
+>> +#define WHOLD_SHIFT	17
+>> +#define WSTROBE_SHIFT	20
+>> +#define WSETUP_SHIFT	26
+>> +#define EW_SHIFT	30
+>> +#define SS_SHIFT	31
+>> +
+>> +#define TA(x)		((x) << TA_SHIFT)
+>> +#define RHOLD(x)	((x) << RHOLD_SHIFT)
+>> +#define RSTROBE(x)	((x) << RSTROBE_SHIFT)
+>> +#define RSETUP(x)	((x) << RSETUP_SHIFT)
+>> +#define WHOLD(x)	((x) << WHOLD_SHIFT)
+>> +#define WSTROBE(x)	((x) << WSTROBE_SHIFT)
+>> +#define WSETUP(x)	((x) << WSETUP_SHIFT)
+>> +#define EW(x)		((x) << EW_SHIFT)
+>> +#define SS(x)		((x) << SS_SHIFT)
+>> +
+>> +#define ASIZE_MAX	0x1
+>> +#define TA_MAX		0x3
+>> +#define RHOLD_MAX	0x7
+>> +#define RSTROBE_MAX	0x3f
+>> +#define RSETUP_MAX	0xf
+>> +#define WHOLD_MAX	0x7
+>> +#define WSTROBE_MAX	0x3f
+>> +#define WSETUP_MAX	0xf
+>> +#define EW_MAX		0x1
+>> +#define SS_MAX		0x1
+>> +#define NUM_CS		4
+>> +
+>> +#define TA_VAL(x)	(((x) & TA(TA_MAX)) >> TA_SHIFT)
+>> +#define RHOLD_VAL(x)	(((x) & RHOLD(RHOLD_MAX)) >> RHOLD_SHIFT)
+>> +#define RSTROBE_VAL(x)	(((x) & RSTROBE(RSTROBE_MAX)) >> RSTROBE_SHIFT)
+>> +#define RSETUP_VAL(x)	(((x) & RSETUP(RSETUP_MAX)) >> RSETUP_SHIFT)
+>> +#define WHOLD_VAL(x)	(((x) & WHOLD(WHOLD_MAX)) >> WHOLD_SHIFT)
+>> +#define WSTROBE_VAL(x)	(((x) & WSTROBE(WSTROBE_MAX)) >> WSTROBE_SHIFT)
+>> +#define WSETUP_VAL(x)	(((x) & WSETUP(WSETUP_MAX)) >> WSETUP_SHIFT)
+>> +#define EW_VAL(x)	(((x) & EW(EW_MAX)) >> EW_SHIFT)
+>> +#define SS_VAL(x)	(((x) & SS(SS_MAX)) >> SS_SHIFT)
+>> +
+>> +#define NRCSR_OFFSET	0x00
+>> +#define AWCCR_OFFSET	0x04
+>> +#define A1CR_OFFSET	0x10
+>> +
+>> +#define ACR_ASIZE_MASK	0x3
+>> +#define ACR_EW_MASK	BIT(30)
+>> +#define ACR_SS_MASK	BIT(31)
+>> +#define ASIZE_16BIT	1
+>> +
+>> +#define CONFIG_MASK	(TA(TA_MAX) | \
+>> +				RHOLD(RHOLD_MAX) | \
+>> +				RSTROBE(RSTROBE_MAX) |	\
+>> +				RSETUP(RSETUP_MAX) | \
+>> +				WHOLD(WHOLD_MAX) | \
+>> +				WSTROBE(WSTROBE_MAX) | \
+>> +				WSETUP(WSETUP_MAX) | \
+>> +				EW(EW_MAX) | SS(SS_MAX) | \
+>> +				ASIZE_MAX)
+>> +
+>> +#define DRV_NAME	"ti-aemif"
+> What's wrong with KBUILD_MODNAME?
 
-We do have the generic 'struct pci_host_bridge'. It would be trivial to
-add a 'domain' field in there and use it in the generic implementation.
+Yes, I'll drop DRV_NAME in favour of KBUILD_MODNAME
 
-> - arm, s390, sparc and x86 have all different names for their sysdata,
->   but they all contain inside a member that is used for giving a domain
->   back. sparc gets an honorary mention here for getting the API wrong
->   and returning -ENXIO in certain conditions (not like the generic code
->   cares).
+>> +static int aemif_probe(struct platform_device *pdev)
+>> +{
+>> +	int ret  = -ENODEV, i;
+> Extra spaces?
+>
+> Split this into two lines?
 
-I would hope that for the generic case, we can actually remove the
-use of 'sysdata' and replace it with common code that just looks
-at pci_host_bridge. Some architectures (s390 in particular) will probably
-need their own data to be added in sysdata, but overall the architectures
-are really trying to do the same thing here. With the work that Bjorn
-and others have done over the past few years, you already need much less
-architecture specific code. I think it's time to get it to a point where
-most architectures can do without any at all.
+Ok.
 
-> That takes care of the implementation. But what about usage?
-> 
-> - drivers/pci/probe.c: pci_create_root_bus allocates a new bus structure,
->   sets up the sysdata and ops member pointers and then goes straight
->   into trying to find if the newly created bus doesn't already exist by
->   using the bus number given as parameter and pci_domain_nr() with the
->   new bus structure as argument. I'm trying really hard to figure out
->   what was the intention here, but from the point of view of someone
->   trying to implement the pci_domain_nr() function I have no idea what
->   to return for a virgin bus structure that is not yet attached to any
->   parent.
+>> +	struct resource *res;
+>> +	struct device *dev = &pdev->dev;
+>> +	struct device_node *np = dev->of_node;
+>> +	struct device_node *child_np;
+>> +	struct aemif_device *aemif;
+>> +
+>> +	if (np == NULL)
+>> +		return 0;
+>> +
+>> +	aemif = devm_kzalloc(dev, sizeof(*aemif), GFP_KERNEL);
+>> +	if (!aemif) {
+>> +		dev_err(dev, "cannot allocate memory for aemif\n");
+> Not needed, you'll get a message from kzalloc about this.\
 
-Right, this needs to be changed when moving the domain into pci_host_bridge.
+Ok.
 
-> So I can see the intent of what Jason is proposing and I'm heading that
-> way myself, but I think I need to cleanup pci_create_root_bus first
-> (change the creation order between bridge and bus). And if someone has
-> a good idea on how to determine the domain # from DT we can pluck it
-> into the pcibios_root_bridge_prepare() function (either the generic
-> version or the arch specific one).
+>
+>> +		return -ENOMEM;
+>> +	}
+>> +
+>> +	platform_set_drvdata(pdev, aemif);
+>> +
+>> +	aemif->clk = devm_clk_get(dev, NULL);
+>> +	if (IS_ERR(aemif->clk)) {
+>> +		dev_err(dev, "cannot get clock 'aemif'\n");
+>> +		return PTR_ERR(aemif->clk);
+> No freeing memory?
 
-How about the change below, to introduce a new pci_scan_domain() function
-as a variant of pci_scan_root_bus()?
+There is no need to free memory explicitly.
+devm_kzalloc is used instead of kzalloc.
 
-	Arnd
+>> +	}
+>> +
+>> +	clk_prepare_enable(aemif->clk);
+>> +	aemif->clk_rate = clk_get_rate(aemif->clk) / MSEC_PER_SEC;
+>> +
+>> +	if (of_device_is_compatible(np, "ti,da850-aemif"))
+>> +		aemif->cs_offset = 2;
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	aemif->base = devm_ioremap_resource(dev, res);
+>> +	if (IS_ERR(aemif->base)) {
+>> +		ret = PTR_ERR(aemif->base);
+>> +		goto error;
+>> +	}
+>> +
+>> +	/*
+>> +	 * For every controller device node, there is a cs device node that
+>> +	 * describe the bus configuration parameters. This functions iterate
+>> +	 * over these nodes and update the cs data array.
+>> +	 */
+>> +	for_each_available_child_of_node(np, child_np) {
+>> +		ret = of_aemif_parse_abus_config(pdev, child_np);
+>> +		if (ret < 0)
+>> +			goto error;
+>> +	}
+>> +
+>> +	for (i = 0; i < aemif->num_cs; i++) {
+>> +		ret = aemif_config_abus(pdev, i);
+>> +		if (ret < 0) {
+>> +			dev_err(dev, "Error configuring chip select %d\n",
+>> +				aemif->cs_data[i].cs);
+>> +			goto error;
+>> +		}
+>> +	}
+>> +
+>> +	/*
+>> +	 * Create a child devices explicitly from here to
+>> +	 * guarantee that the child will be probed after the AEMIF timing
+>> +	 * parameters are set.
+>> +	 */
+>> +	for_each_available_child_of_node(np, child_np) {
+>> +		ret = of_platform_populate(child_np, NULL, NULL, dev);
+>> +		if (ret < 0)
+>> +			goto error;
+>> +	}
+>> +
+>> +	return 0;
+>> +error:
+>> +	clk_disable_unprepare(aemif->clk);
+>> +	return ret;
+> No freeing memory?
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 5094943..9f2ec2f 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1697,8 +1697,9 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
- {
- }
- 
--struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
--		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-+static struct pci_bus *__pci_create_root_bus(struct device *parent,
-+		int domain, int bus, struct pci_ops *ops, void *sysdata,
-+		struct list_head *resources)
- {
- 	int error;
- 	struct pci_host_bridge *bridge;
-@@ -1716,7 +1717,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 	b->sysdata = sysdata;
- 	b->ops = ops;
- 	b->number = b->busn_res.start = bus;
--	b2 = pci_find_bus(pci_domain_nr(b), bus);
-+	b2 = pci_find_bus(domain, bus);
- 	if (b2) {
- 		/* If we already got to this bus through a different bridge, ignore it */
- 		dev_dbg(&b2->dev, "bus already known\n");
-@@ -1727,6 +1728,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 	if (!bridge)
- 		goto err_out;
- 
-+	bridge->domain = domain;
- 	bridge->dev.parent = parent;
- 	bridge->dev.release = pci_release_host_bridge_dev;
- 	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
-@@ -1801,6 +1803,13 @@ err_out:
- 	return NULL;
- }
- 
-+struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-+		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-+{
-+	return __pci_create_root_bus(parent, pci_domain_nr(bus), bus,
-+		ops, sysdata, resources);
-+}
-+
- int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
- {
- 	struct resource *res = &b->busn_res;
-@@ -1899,6 +1908,42 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
- }
- EXPORT_SYMBOL(pci_scan_root_bus);
- 
-+struct pci_bus *pci_scan_domain(struct device *parent, int domain,
-+		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-+{
-+	struct pci_host_bridge_window *window;
-+	bool found = false;
-+	struct pci_bus *b;
-+	int max;
-+
-+	list_for_each_entry(window, resources, list)
-+		if (window->res->flags & IORESOURCE_BUS) {
-+			found = true;
-+			break;
-+		}
-+
-+	if (!found) {
-+		dev_info(&b->dev,
-+			 "No busn resource found for domain %d\n", domain);
-+		return NULL;
-+	}
-+
-+	b = __pci_create_root_bus(parent, domain, window->res->start,
-+				  ops, sysdata, resources);
-+	if (!b)
-+		return NULL;
-+
-+		dev_info(&b->dev,
-+		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
-+			bus);
-+		pci_bus_insert_busn_res(b, bus, 255);
-+	}
-+
-+	max = pci_scan_child_bus(b);
-+
-+	pci_bus_add_devices(b);
-+	return b;
-+}
- /* Deprecated; use pci_scan_root_bus() instead */
- struct pci_bus *pci_scan_bus_parented(struct device *parent,
- 		int bus, struct pci_ops *ops, void *sysdata)
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 1e26fc6..734c016 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -395,6 +395,7 @@ struct pci_host_bridge_window {
- 
- struct pci_host_bridge {
- 	struct device dev;
-+	int domain;
- 	struct pci_bus *bus;		/* root bus */
- 	struct list_head windows;	/* pci_host_bridge_windows */
- 	void (*release_fn)(struct pci_host_bridge *);
+devm_* allocations were used, so no need.
+
+>
+>> +}
+>> +
+>> +static int aemif_remove(struct platform_device *pdev)
+>> +{
+>> +	struct aemif_device *aemif = platform_get_drvdata(pdev);
+>> +	clk_disable_unprepare(aemif->clk);
+> Extra line needed.
+
+Ok
+
+Thanks!
+
+-- 
+Regards,
+Ivan Khoronzhuk
