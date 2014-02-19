@@ -1,38 +1,133 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 19 Feb 2014 13:01:54 +0100
-Subject: [PATCH v6 12/18] ata: ahci_platform: Update DT compatible list
+Date: Wed, 19 Feb 2014 13:01:55 +0100
+Subject: [PATCH v6 13/18] ata: ahci_platform: Manage SATA PHY
 In-Reply-To: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
 References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1392811320-3132-13-git-send-email-hdegoede@redhat.com>
+Message-ID: <1392811320-3132-14-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Roger Quadros <rogerq@ti.com>
 
-The ahci_platform driver supports "snps,dwc-ahci".
-Add this to the DT binding information.
+Some platforms have a PHY hooked up to the
+SATA controller. The PHY needs to be initialized
+and powered up for SATA to work. We do that
+using the PHY framework.
 
+CC: Balaji T K <balajitk@ti.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- Documentation/devicetree/bindings/ata/ahci-platform.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/ata/Kconfig         |  1 +
+ drivers/ata/ahci_platform.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ include/linux/ahci.h        |  2 ++
+ 3 files changed, 43 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index d86e854..48b285f 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -6,8 +6,8 @@ Each SATA controller should have its own node.
- Required properties:
- - compatible        : compatible list, one of "snps,spear-ahci",
-                       "snps,exynos5440-ahci", "ibm,476gtr-ahci",
--                      "allwinner,sun4i-a10-ahci", "fsl,imx53-ahci" or
--                      "fsl,imx6q-ahci"
-+                      "allwinner,sun4i-a10-ahci", "fsl,imx53-ahci"
-+                      "fsl,imx6q-ahci" or "snps,dwc-ahci"
- - interrupts        : <interrupt mapping for SATA IRQ>
- - reg               : <registers mapping>
+diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+index cc67cc0..96176f4 100644
+--- a/drivers/ata/Kconfig
++++ b/drivers/ata/Kconfig
+@@ -91,6 +91,7 @@ config SATA_AHCI
  
+ config SATA_AHCI_PLATFORM
+ 	tristate "Platform AHCI SATA support"
++	depends on GENERIC_PHY || !GENERIC_PHY
+ 	help
+ 	  This option enables support for Platform AHCI Serial ATA
+ 	  controllers.
+diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+index 962ec25..073931a 100644
+--- a/drivers/ata/ahci_platform.c
++++ b/drivers/ata/ahci_platform.c
+@@ -23,6 +23,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/libata.h>
+ #include <linux/ahci_platform.h>
++#include <linux/phy/phy.h>
+ #include "ahci.h"
+ 
+ static void ahci_host_stop(struct ata_host *host);
+@@ -131,8 +132,23 @@ int ahci_platform_enable_resources(struct ahci_host_priv *hpriv)
+ 	if (rc)
+ 		goto disable_regulator;
+ 
++	if (hpriv->phy) {
++		rc = phy_init(hpriv->phy);
++		if (rc)
++			goto disable_clks;
++
++		rc = phy_power_on(hpriv->phy);
++		if (rc) {
++			phy_exit(hpriv->phy);
++			goto disable_clks;
++		}
++	}
++
+ 	return 0;
+ 
++disable_clks:
++	ahci_platform_disable_clks(hpriv);
++
+ disable_regulator:
+ 	if (hpriv->target_pwr)
+ 		regulator_disable(hpriv->target_pwr);
+@@ -142,6 +158,11 @@ EXPORT_SYMBOL_GPL(ahci_platform_enable_resources);
+ 
+ void ahci_platform_disable_resources(struct ahci_host_priv *hpriv)
+ {
++	if (hpriv->phy) {
++		phy_power_off(hpriv->phy);
++		phy_exit(hpriv->phy);
++	}
++
+ 	ahci_platform_disable_clks(hpriv);
+ 
+ 	if (hpriv->target_pwr)
+@@ -194,6 +215,25 @@ struct ahci_host_priv *ahci_platform_get_resources(
+ 		hpriv->clks[i] = clk;
+ 	}
+ 
++	hpriv->phy = devm_phy_get(dev, "sata-phy");
++	if (IS_ERR(hpriv->phy)) {
++		rc = PTR_ERR(hpriv->phy);
++		switch (rc) {
++		case -ENODEV:
++		case -ENOSYS:
++			/* continue normally */
++			hpriv->phy = NULL;
++			break;
++
++		case -EPROBE_DEFER:
++			goto free_clk;
++
++		default:
++			dev_err(dev, "couldn't get sata-phy\n");
++			goto free_clk;
++		}
++	}
++
+ 	return hpriv;
+ 
+ free_clk:
+diff --git a/include/linux/ahci.h b/include/linux/ahci.h
+index ac69cdc..8fbe3d7 100644
+--- a/include/linux/ahci.h
++++ b/include/linux/ahci.h
+@@ -23,6 +23,7 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/phy/phy.h>
+ 
+ #define AHCI_MAX_CLKS		3
+ 
+@@ -42,6 +43,7 @@ struct ahci_host_priv {
+ 	u32			em_msg_type;	/* EM message type */
+ 	struct clk		*clks[AHCI_MAX_CLKS]; /* Optional */
+ 	struct regulator	*target_pwr;	/* Optional */
++	struct phy		*phy;		/* If platform uses phy */
+ 	void			*plat_data;	/* Other platform data */
+ 	/* Optional ahci_start_engine override */
+ 	void			(*start_engine)(struct ata_port *ap);
 -- 
 1.8.5.3
