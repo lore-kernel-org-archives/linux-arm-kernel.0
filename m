@@ -1,74 +1,49 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 19 Feb 2014 16:26:43 +0100
-Subject: [PATCH v6 00/18] ahci: library-ise ahci_platform, add sunxi driver
- and cleanup imx driver
-In-Reply-To: <20140219150249.GG10134@htj.dyndns.org>
-References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
- <20140219150249.GG10134@htj.dyndns.org>
-Message-ID: <5304CD33.1080704@redhat.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 19 Feb 2014 17:09:07 +0100
+Subject: [PATCH v4 03/13] ARM: mvebu: ll_set_cpu_coherent always uses
+ the current CPU
+In-Reply-To: <1392312816-17657-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
+ <1392312816-17657-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140219170907.002941da@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Gregory CLEMENT,
 
-On 02/19/2014 04:02 PM, Tejun Heo wrote:
-> Hello,
+On Thu, 13 Feb 2014 18:33:26 +0100, Gregory CLEMENT wrote:
+> ll_set_cpu_coherent is always used on the current CPU, so instead of
+> passing the CPU id as argument, ll_set_cpu_coherent() can find it by
+> itself.
 > 
-> On Wed, Feb 19, 2014 at 01:01:42PM +0100, Hans de Goede wrote:
->> Here is v6 of my patchset for adding ahci-sunxi support. This has been
->> tested with Allwinner A10, Allwinner A20 and Freeware imx6x SoCs, including
->> suspend / resume. Note that since my last revision the ahci_imx driver has
->> also grown imx53 sata support, it would be good if some-one could test that
->> with this series.
-> 
-> Stopping review here.  I really like where it's headed in general and
-> most review points,
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/coherency.c    | 10 +++++-----
+>  arch/arm/mach-mvebu/coherency.h    |  2 +-
+>  arch/arm/mach-mvebu/coherency_ll.S | 12 ++++++------
+>  arch/arm/mach-mvebu/headsmp.S      |  4 ----
+>  arch/arm/mach-mvebu/platsmp.c      |  2 +-
+>  5 files changed, 13 insertions(+), 17 deletions(-)
 
-Thanks for the review. I'll respin the patchset taking the various remarks into
-account. I hope to have a new version ready at the end of the coming weekend
-at the latest.
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-> except for lack of devres usage, are rather
-> cosmetic.  I'm not completely decided yet whether we can defer devres
-> until later or should go for it in the first round.
+with just one thing I am not entirely sure about:
 
-The devres usage are really 2 different issues:
+>  	/* Create bit by cpu index */
+> -	mov	r3, #(1 << 24)
+> -	lsl	r1, r3, r1
+> -ARM_BE8(rev	r1, r1)
+> +	mrc	15, 0, r1, cr0, cr0, 5
+> +	and	r1, r1, #15
+> +	mov	r2, #(1 << 24)
+> +	lsl	r1, r2, r1
+> +	ARM_BE8(rev	r1, r1)
 
-1) There is the issue that we're getting clocks by index (this is by design as
-clk-names are not generic), but there is no devm_get_clk_by_index (or some
-such), this is a shortcoming of the clk-core, which needs a separate patch
-to fix. I would rather not delay this patch-set based on getting a patch
-into another subsys.
+Have you tested this in a big endian configuration? I'd like to make
+sure we have gotten the ARM_BE8(rev ...) thing correct.
 
-Note that even with devm_get_clk_by_index we can unfortunately not get rid of
-ahci_platform_put_resources() as in Roger's follow-up patches it gets used for
-putting some runtime pm related resources too.
-
-I guess this argues for simply turning ahci_platform_get_resources into a
-devm_ahci_platform_get_resources doing its own devm handling, and then
-making ahci_platform_put_resources a private function called by the devm
-framework. If you agree I can do that for the next patch-set.
-
-2) In some comments you also seem to want devm variants of enable / disable
-resources, or at least have ahci_platform_put_resources do the disable
-automatically. The problem is that most of the functions called here need to
-be balanced, they increment / decrement usage counters in the clk / regulator
-subsystems, so we cannot simply unconditional do an ahci_platform_disable_resources
-in ahci_platform_put_resources
-
-Doing the disable automatically requires tracking the enable state, and doing this
-per resource, since the whole idea of having a separate ahci_platform_enable_resources
-is that some drivers may want to override its behavior doing things in a different
-order.
-
-To ensure proper tracking we would then need to offer ahci_platform_enable_regulator,
-etc. functions, and ensure that all drivers using the ahci_platform framework
-always go through these, rather then calling directly into the relevant framework.
-
-This is all doable, and I'm not against doing this but before spending a couple of
-hours coding this all up, I would like to hear back from you whether you would like
-to see this, or would rather keep things as is.
-
-Regards,
-
-Hans
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
