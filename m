@@ -1,78 +1,38 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Wed, 19 Feb 2014 15:13:28 -0500
-Subject: [PATCH] ARM: dts: remove bcm11351-brt.dts
-Message-ID: <1392840808-28214-1-git-send-email-mporter@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 19 Feb 2014 12:17:03 -0800
+Subject: [PATCH] clk: qcom: Add missing clock at index GCC_XO_CLK for
+ MSM8974
+In-Reply-To: <1392819521-25734-1-git-send-email-iivanov@mm-sol.com>
+References: <1392819521-25734-1-git-send-email-iivanov@mm-sol.com>
+Message-ID: <20140219201703.GG14769@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BCM11351 BRT board will never see the light of day. Remove the BRT
-dts since it is not maintainable.
+On 02/19, Ivan T. Ivanov wrote:
+> From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+> 
+> Accessing GCC on MSM8974 trough <&gcc GCC_XO_CLK> lead to NULL
 
-Signed-off-by: Matt Porter <mporter@linaro.org>
----
- arch/arm/boot/dts/bcm11351-brt.dts | 54 --------------------------------------
- 1 file changed, 54 deletions(-)
- delete mode 100644 arch/arm/boot/dts/bcm11351-brt.dts
+s/trough/through/
 
-diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
-deleted file mode 100644
-index 396b704..0000000
---- a/arch/arm/boot/dts/bcm11351-brt.dts
-+++ /dev/null
-@@ -1,54 +0,0 @@
--/*
-- * Copyright (C) 2012 Broadcom Corporation
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation version 2.
-- *
-- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-- * kind, whether express or implied; without even the implied warranty
-- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--/dts-v1/;
--
--#include "bcm11351.dtsi"
--
--/ {
--	model = "BCM11351 BRT board";
--	compatible = "brcm,bcm11351-brt", "brcm,bcm11351";
--
--	memory {
--		reg = <0x80000000 0x40000000>; /* 1 GB */
--	};
--
--	uart at 3e000000 {
--		status = "okay";
--	};
--
--	sdio1: sdio at 3f180000 {
--		max-frequency = <48000000>;
--		status = "okay";
--	};
--
--	sdio2: sdio at 3f190000 {
--		non-removable;
--		max-frequency = <48000000>;
--		status = "okay";
--	};
--
--	sdio4: sdio at 3f1b0000 {
--		max-frequency = <48000000>;
--		cd-gpios = <&gpio 14 0>;
--		status = "okay";
--	};
--
--	usbotg: usb at 3f120000 {
--		status = "okay";
--	};
--
--	usbphy: usb-phy at 3f130000 {
--		status = "okay";
--	};
--};
+> pointer dereference. Fix this.
+> 
+
+I think you want to get the XO clock from the not yet upstreamed
+RPM clock driver. This #define is for a gate that is internal to
+the SoC sitting between the pin for XO and all downstream users
+of the XO clock within the SoC. Futhermore, linux is not allowed
+to control this gate because it's essential to the entire system.
+
+This patch will work for now but we'll need to change the DTS in
+the future to get the clock from the RPM node and then revert
+this patch.
+
+It may be better to just move the XO and sleep_clk_src clocks to
+DT and make them fixed-rate clocks that get added by
+of_clk_init(). Then when the RPM node is added we can remove the
+XO node and update the usb node at the same time.
+
 -- 
-1.8.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
