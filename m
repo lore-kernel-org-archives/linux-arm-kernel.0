@@ -1,111 +1,136 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 19 Feb 2014 09:54:38 +0100
-Subject: [PATCH] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <CAErSpo5FGPhgnp8Gfy-1_Lk7ckCi7U5+z5pLnPU+jScPxD5yUQ@mail.gmail.com>
-References: <1392564830-5868-1-git-send-email-sthokal@xilinx.com>
- <CAErSpo5FGPhgnp8Gfy-1_Lk7ckCi7U5+z5pLnPU+jScPxD5yUQ@mail.gmail.com>
-Message-ID: <5304714E.7070900@monstr.eu>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 19 Feb 2014 10:26:58 +0100
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <53046D98.6020801@keymile.com>
+References: <51DD88A4.1030506@keymile.com> <20130710185706.72b124a4@skate>
+ <51DD9A8C.10608@keymile.com> <20130711163220.2b3adf38@skate>
+ <53039894.10905@keymile.com> <20140218212751.07c2aeb5@skate>
+ <53046D98.6020801@keymile.com>
+Message-ID: <20140219102658.76eec91e@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2014 10:32 PM, Bjorn Helgaas wrote:
-> [+cc Arnd]
+Dear Gerlando Falauto,
+
+On Wed, 19 Feb 2014 09:38:48 +0100, Gerlando Falauto wrote:
+
+> >> pci 0000:01:00.0: BAR 3: assigned [mem 0xe8000000-0xe87fffff]
+> >> pci 0000:01:00.0: BAR 4: assigned [mem 0xe8800000-0xe8801fff]
+> >> pci 0000:01:00.0: BAR 0: assigned [mem 0xe8802000-0xe8802fff]
+> >> pci 0000:01:00.0: BAR 2: assigned [mem 0xe8803000-0xe8803fff]
+> >> pci 0000:01:00.0: BAR 5: assigned [mem 0xe8804000-0xe8804fff]
+> >
+> > So in total, for the device 0000:01:00, the memory region should go
+> > from 0xe0000000 to 0xe8804fff. This means that a 256 MB window is
+> > needed for this device, because only power of two sizes are possible
+> > for MBus windows.
+> >
+> > Can you give me the output of /sys/kernel/debug/mvebu-mbus/devices ? It
+> > will tell us how the MBus windows are configured, as I suspect the
+> > problem might be here.
 > 
-> On Sun, Feb 16, 2014 at 8:33 AM, Srikanth Thokala <sthokal@xilinx.com> wrote:
->> This is the driver for Xilinx AXI PCIe Host Bridge Soft IP
->>
->> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
->> ---
->> - Rebased on v3.14.0-rc2
->> ---
->>  .../devicetree/bindings/pci/xilinx-pcie.txt        |   43 +
->>  drivers/pci/host/Kconfig                           |    7 +
->>  drivers/pci/host/Makefile                          |    1 +
->>  drivers/pci/host/pci-xilinx.c                      |  985 ++++++++++++++++++++
->>  4 files changed, 1036 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pci/xilinx-pcie.txt
->>  create mode 100644 drivers/pci/host/pci-xilinx.c
->>
->> diff --git a/Documentation/devicetree/bindings/pci/xilinx-pcie.txt b/Documentation/devicetree/bindings/pci/xilinx-pcie.txt
->> new file mode 100644
->> index 0000000..66a2487
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pci/xilinx-pcie.txt
->> @@ -0,0 +1,43 @@
->> +* Xilinx AXI PCIe Root Port Bridge DT description
->> +
->> +Required properties:
->> +- #address-cells: Address representation for root ports, set to <3>
->> +- #size-cells: Size representation for root ports, set to <2>
->> +- compatible: Should contain "xlnx,axi-pcie-1.00.a"
->> +- reg: Should contain AXI PCIe registers location and length
->> +- interrupts: Should contain AXI PCIe interrupt
->> +- ranges: ranges for the PCI memory regions
->> +       Please refer to the standard PCI bus binding document for a more
->> +       detailed explanation
->> +- xlnx,axibar-num: Number of memory regions configured in the hardware,
->> +       maximum being three which is configurable in the hardware.
->> +- xlnx,include-rc: Root Port (=1) or End Point (=0)
->> +- xlnx,pciebar2axibar-0: Translation address from PCIe to AXI
->> +       Only one PCIe BAR is applicable in Root port mode, it can be
->> +       either 32/64-bit. If it is 64-bit BAR, lower 32 bits are present
->> +       in 'xlnx,pciebar2axibar-0' and Upper 32 bits in 'xlnx,pciebar2
->> +       axibar-1'. And if it is 32-bit BAR, only 'xlnx,pciebar2axibar-0'
->> +       is valid
->> +
->> +Optional properties
->> +- xlnx,pciebar-as: PCIe BAR aperture size is 32 (=0) or 64-bit (=1).
->> +- xlnx,pciebar2axibar-1: Translation address from PCIe to AXI, contains
->> +       upper 32 bits if PCIe BAR size is 64-bit. When xlnx,pciebar-as
->> +       is set, this is a required property and should contain a valid
->> +       value (other than FF's)
+> Here it goes:
 > 
-> I hardly know anything about DT, but xlnx,pciebar2axibar-0,
-> xlnx,pciebar-as, and xlnx,pciebar2axibar-1 look strange to me.  Is
-> that really the DT way of dealing with 32/64-bit BARs and host bridge
-> address translation?  I don't see similar things in the other files in
-> Documentation/devicetree/bindings/pci/, even though some of the other
-> drivers/pci/host/*.c files do use pci_add_resource_offset(), which
-> indicates that they support address translation.
+> [00] disabled
+> [01] disabled
+> [02] disabled
+> [03] disabled
+> [04] 00000000ff000000 - 00000000ff010000 : nand
+> [05] 00000000f4000000 - 00000000f8000000 : vpcie
+> [06] 00000000fe000000 - 00000000fe010000 : dragonite
+> [07] 00000000e0000000 - 00000000ec000000 : pcie0.0
+> 
+> So there's something wrong: a 256MB window should go all the way up to 
+> 0xf0000000, and we have 192MB instead and I don't know how that would be 
+> interpreted.
 
-This is how xilinx is describing hardware in design tools.
-And as Arnd already know this is full IP description with all options
-which can be selected.
-If there is any standard way how to describe it we can change it.
+My understanding is that a 192 MB window is illegal, because the window
+size should be encoded as a sequence of 1s followed by a sequence of 0s
+from the LSB to the MSB. To me, this means that only power of two
+window sizes are possible.
 
-> Please also include a MAINTAINERS update for drivers/pci/host/pci-xilinx.c.
+> I couldn't figure out where this range comes from though, as in the 
+> device tree I now have a size of 256MB (I stupidly set it to 192MB at 
+> some point, but I now changed it):
+> 
+> # hexdump -C /proc/device-tree/ocp at f1000000/pcie-controller/ranges
+>   | cut -c1-58
+> 00000000  82 00 00 00 00 00 00 00  00 04 00 00 00 04 00 00
+> 00000010  00 00 00 00 00 00 20 00  82 00 00 00 00 00 00 00
+> 00000020  e0 00 00 00 e0 00 00 00  00 00 00 00 10 00 00 00
+>                                                 ^^^^^^^^^^^
 
-This should be handle by our record that's why MAINTAINERS update is not necessary.
-(N: xilinx below)
+Wow, that's an old DT representation that you have here :)
 
-ARM/ZYNQ ARCHITECTURE
-M:	Michal Simek <michal.simek@xilinx.com>
-L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-W:	http://wiki.xilinx.com
-T:	git git://git.xilinx.com/linux-xlnx.git
-S:	Supported
-F:	arch/arm/mach-zynq/
-F:	drivers/cpuidle/cpuidle-zynq.c
-N:	zynq
-N:	xilinx
-F:	drivers/clocksource/cadence_ttc_timer.c
-F:	drivers/mmc/host/sdhci-of-arasan.c
+But ok, let me try to explain. The 256 MB value that you define in the
+DT is the global PCIe memory aperture: it is the maximum amount of
+memory that we allow the PCIe driver to allocate for PCIe windows. But
+depending on which PCIe devices you have plugged in, and how large
+their BARs are, not necessarily all of these 256 MB will be used.
 
-Thanks,
-Michal
+So, you can very well have a 256 MB global PCIe memory aperture, and
+still have only one 1 MB PCIe memory window for PCIe 0.0 and a 256 KB
+PCIe memory window for PCIe 1.0, and that's it.
 
+Now, the 192 MB comes from the enumeration of your device. Linux
+enumerates the BAR of your device:
+
+pci 0000:01:00.0: BAR 1: assigned [mem 0xe0000000-0xe7ffffff]
+pci 0000:01:00.0: BAR 3: assigned [mem 0xe8000000-0xe87fffff]
+pci 0000:01:00.0: BAR 4: assigned [mem 0xe8800000-0xe8801fff]
+pci 0000:01:00.0: BAR 0: assigned [mem 0xe8802000-0xe8802fff]
+pci 0000:01:00.0: BAR 2: assigned [mem 0xe8803000-0xe8803fff]
+pci 0000:01:00.0: BAR 5: assigned [mem 0xe8804000-0xe8804fff]
+
+and then concludes that at the emulated bridge level, the memory region
+to be created is:
+
+pci 0000:00:01.0:   bridge window [mem 0xe0000000-0xebffffff]
+
+which corresponds to the 192 MB window that we see created.
+
+But I believe a 192 MB memory window cannot work with MBus, it should
+be rounded up to the next power of 2. Can you try the below patch (not
+tested, not even compiled, might need some tweaks to apply to your 3.10
+kernel) :
+
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 13478ec..002229a 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -372,6 +372,11 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+                (((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+                port->memwin_base;
+ 
++       pr_info("PCIE %d.%d: creating window at 0x%x, size 0x%x rounded up to 0x%x\n",
++               port->port, port->lane, port->memwin_base,
++               port->memwin_size, roundup_pow_of_two(port->memwin_size));
++       port->memwin_size = roundup_pow_of_two(port->memwin_size);
++
+        mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
+                                    port->memwin_base, port->memwin_size);
+ }
+
+I'm obviously interested in seeing the message that gets shown, as well
+as the new mvebu-mbus debugfs output.
+
+For good measure, if you could also dump the registers of the PCIe
+window. In your case, it was window 7, so dumping 0xf1020070 and
+0xf1020074 would be useful.
+
+> But apart from that, what I still don't understand is how that could 
+> have anything to do with my problem. The memory area I'm not able to 
+> access starts at 0xe4000000.
+> BAR0, on the other hand, spawns 0xe8802000-0xe8802fff and seems to work 
+> fine.
+
+I am not sure, but since we are configuring an invalid memory size,
+maybe the MBus behavior is undefined, and we get some completely funky
+behavior, where parts of the 192 MB window are actually work, but parts
+of it are not.
+
+Thomas
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140219/dfaa0601/attachment.sig>
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
