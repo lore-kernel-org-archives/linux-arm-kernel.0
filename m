@@ -1,36 +1,57 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 19 Feb 2014 17:05:24 -0300
-Subject: [PATCH 0/2] Make Armada 370/XP and Orion clocksource use atomic I/O
- API
-Message-ID: <1392840326-29417-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Wed, 19 Feb 2014 17:05:26 -0300
+Subject: [PATCH 2/2] clocksource: armada-370-xp: Use atomic access for shared
+ registers
+In-Reply-To: <1392840326-29417-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1392840326-29417-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1392840326-29417-3-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The orion and armada-370-xp clocksource drivers are used in SoCs that can
-use the orion-watchdog driver.
+Replace the driver-specific thread-safe shared register API
+by the recently introduced atomic_io_clear_set().
 
-On these SoCs, the watchdog and timer blocks are part of the same set of
-registers, and in particular the "control" register is used to enable/disable
-both the watchdog and the timer.
-
-Therefore, just as was done for orion-watchdog, we need to access the shared
-register using the atomic I/O API.
-
-This is v3.15 material, and meant to be merged through the clocksource tree,
-if at all possible.
-
-The first patch was already sent previously, but I'm resending it here to keep
-the two patches together.
-
-Thanks!
-
-Ezequiel Garcia (2):
-  clocksource: orion: Use atomic access for shared registers
-  clocksource: armada-370-xp: Use atomic access for shared registers
-
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
  drivers/clocksource/time-armada-370-xp.c | 12 ++++--------
- drivers/clocksource/time-orion.c         | 28 ++++++++++------------------
- 2 files changed, 14 insertions(+), 26 deletions(-)
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
+diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+index ee8691b..0451e62 100644
+--- a/drivers/clocksource/time-armada-370-xp.c
++++ b/drivers/clocksource/time-armada-370-xp.c
+@@ -85,12 +85,6 @@ static u32 ticks_per_jiffy;
+ 
+ static struct clock_event_device __percpu *armada_370_xp_evt;
+ 
+-static void timer_ctrl_clrset(u32 clr, u32 set)
+-{
+-	writel((readl(timer_base + TIMER_CTRL_OFF) & ~clr) | set,
+-		timer_base + TIMER_CTRL_OFF);
+-}
+-
+ static void local_timer_ctrl_clrset(u32 clr, u32 set)
+ {
+ 	writel((readl(local_base + TIMER_CTRL_OFF) & ~clr) | set,
+@@ -245,7 +239,7 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+ 		clr = TIMER0_25MHZ;
+ 		enable_mask = TIMER0_EN | TIMER0_DIV(TIMER_DIVIDER_SHIFT);
+ 	}
+-	timer_ctrl_clrset(clr, set);
++	atomic_io_modify(timer_base + TIMER_CTRL_OFF, clr | set, set);
+ 	local_timer_ctrl_clrset(clr, set);
+ 
+ 	/*
+@@ -263,7 +257,9 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+ 	writel(0xffffffff, timer_base + TIMER0_VAL_OFF);
+ 	writel(0xffffffff, timer_base + TIMER0_RELOAD_OFF);
+ 
+-	timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
++	atomic_io_modify(timer_base + TIMER_CTRL_OFF,
++		TIMER0_RELOAD_EN | enable_mask,
++		TIMER0_RELOAD_EN | enable_mask);
+ 
+ 	/*
+ 	 * Set scale and timer for sched_clock.
 -- 
 1.8.1.5
