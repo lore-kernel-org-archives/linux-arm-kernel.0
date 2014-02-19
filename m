@@ -1,38 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Feb 2014 13:58:29 +0800
-Subject: [PATCH v3 1/4] Phytec phyFLEX-i.MX6 : Added USB_OTG Support
-In-Reply-To: <20140219022307.GL15716@S2101-09.ap.freescale.net>
-References: <1392731185-4885-1-git-send-email-ashutosh.s@phytec.in>
- <20140219022307.GL15716@S2101-09.ap.freescale.net>
-Message-ID: <20140219055824.GB3010@S2101-09.ap.freescale.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 18 Feb 2014 22:00:51 -0800
+Subject: [PATCH v2 0/2] clk: sunxi: Change compatibles pattern
+In-Reply-To: <1391676958-13883-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1391676958-13883-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140219060051.22529.98735@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 10:23:09AM +0800, Shawn Guo wrote:
-> > @@ -18,6 +18,14 @@
-> >  	memory {
-> >  		reg = <0x10000000 0x80000000>;
-> >  	};
-> > +
-> > +	reg_usb_otg_vbus: regulator at 0 {
+Quoting Maxime Ripard (2014-02-06 00:55:56)
+> Hi,
 > 
-> You do not have a 'reg' property in the node, so you shouldn't have
-> '@num' in node name.  You may want to name it 'regulator-0'.
+> This is the second version of the clock compatible changes.
+> The only difference with the v1 being that we're now droping the old
+> compatibles, instead of keeping them, since the DT maintainers said it was
+> fine.
 
-I just saw the talk between Stephen and Mark [1], and I'm with Stephen
-that neither regulator-0 nor regulator_0 is a good name.  Since Mark is
-giving up the argument on the container, please follow the way we do in
-other IMX dts today.
+Both look good to me.
 
-Shawn
-
-[1] http://thread.gmane.org/gmane.linux.drivers.devicetree/61894/focus=62405
+Regards,
+Mike
 
 > 
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "usb_otg_vbus";
-> > +		regulator-min-microvolt = <5000000>;
-> > +		regulator-max-microvolt = <5000000>;
-> > +		gpio = <&gpio4 15 0>;
-> > +	};
-> >  };
+> Thanks,
+> Maxime
+> 
+> Maxime Ripard (2):
+>   clk: sunxi: Add new clock compatibles
+>   ARM: sunxi: dt: Convert to the new clock compatibles
+> 
+>  Documentation/devicetree/bindings/clock/sunxi.txt | 36 +++++++-------
+>  arch/arm/boot/dts/sun4i-a10.dtsi                  | 60 +++++++++++------------
+>  arch/arm/boot/dts/sun5i-a10s.dtsi                 | 48 +++++++++---------
+>  arch/arm/boot/dts/sun5i-a13.dtsi                  | 48 +++++++++---------
+>  arch/arm/boot/dts/sun6i-a31.dtsi                  | 10 ++--
+>  arch/arm/boot/dts/sun7i-a20.dtsi                  | 54 ++++++++++----------
+>  drivers/clk/sunxi/clk-sunxi.c                     | 30 ++++++------
+>  7 files changed, 143 insertions(+), 143 deletions(-)
+> 
+> -- 
+> 1.8.4.2
+> 
