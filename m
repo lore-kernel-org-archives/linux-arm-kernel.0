@@ -1,43 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 19 Feb 2014 16:41:25 +0000
-Subject: [PATCH 1/2] arm64: Add seccomp support
-In-Reply-To: <530497DD.2020806@linaro.org>
-References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
- <1391767892-5395-2-git-send-email-takahiro.akashi@linaro.org>
- <20140218153856.GB904@localhost> <530497DD.2020806@linaro.org>
-Message-ID: <20140219164125.GD22252@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 19 Feb 2014 17:42:32 +0100
+Subject: [Patch v3 20/23] ARM: config: Add a multi_v5_defconfig
+In-Reply-To: <1392825573.346096924@f191.i.mail.ru>
+References: <1392819174-11634-1-git-send-email-andrew@lunn.ch>
+ <1392822524.597155607@f84.i.mail.ru> <2242951.MozLvvuPx0@wuerfel>
+ <1392825573.346096924@f191.i.mail.ru>
+Message-ID: <20140219164232.GB11878@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 11:39:09AM +0000, AKASHI Takahiro wrote:
-> On 02/19/2014 12:38 AM, Catalin Marinas wrote:
-> > On Fri, Feb 07, 2014 at 10:11:31AM +0000, AKASHI Takahiro wrote:
-> >> --- a/arch/arm64/kernel/ptrace.c
-> >> +++ b/arch/arm64/kernel/ptrace.c
-> >> @@ -26,6 +26,7 @@
-> >>   #include <linux/smp.h>
-> >>   #include <linux/ptrace.h>
-> >>   #include <linux/user.h>
-> >> +#include <linux/seccomp.h>
-> >>   #include <linux/security.h>
-> >>   #include <linux/init.h>
-> >>   #include <linux/signal.h>
-> >> @@ -1064,6 +1065,10 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
-> >>   {
-> >>   	unsigned long saved_reg;
-> >>
-> >> +	if (!dir && secure_computing((int)regs->syscallno))
-> >> +		/* seccomp failures shouldn't expose any additional code. */
-> >> +		return -1;
-> >
-> > That's only restricted to the arm64 code but could we use a more
-> > meaningful error number?
+On Wed, Feb 19, 2014 at 07:59:33PM +0400, Alexander Shiyan wrote:
+> ?????, 19 ??????? 2014, 16:54 +01:00 ?? Arnd Bergmann <arnd@arndb.de>:
+> > On Wednesday 19 February 2014 19:08:44 Alexander Shiyan wrote:
+> > > ?????, 19 ??????? 2014, 15:54 +01:00 ?? Arnd Bergmann <arnd@arndb.de>:
+> > > > On Wednesday 19 February 2014 18:19:08 Alexander Shiyan wrote:
+> > 
+> > > > > Should we disable lowlevel debug for multi-* config?
+> > > > 
+> > > > Yes, definitely.
+> > > > 
+> > > > On a related note, I'd like to add a CONFIG_BROKEN_MULTIPLATFORM Kconfig
+> > > > symbol and make all options depend on that which will result in a kernel
+> > > >
+> > > 
+> > > config DEBUG_LL
+> > >   depends on! ARCH_MULTIPLATFORM
+> > > 
+> > > is not enough for this?
+> > 
+> > No, because that means you can no longer enable DEBUG_LL for any
+> > kernel on MVEBU, IMX or any platform that depends on ARCH_MULTIPLATFORM.
 > 
-> Other architectures, including arm, also return just -1 in syscall_trace_enter(),
-> but of course, we can use another value, say, -EPERM or -ENOSYS?
+> Case when I chose multiplatform but I know exactly what machine/platform I use?
+> OK. Understood.
 
-Actually we have another case of setting regs->syscallno = ~0UL in the
-same function, so we could do the same (also in line with entry.S).
+Correct. This is how these options got in there. I selected the
+specific configuration for my board, and forgot to remove them again
+after fixing my crash. So they got exported as part of "make savedefconfig".
 
--- 
-Catalin
+      Andrew
