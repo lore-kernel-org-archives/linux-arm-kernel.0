@@ -1,33 +1,28 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 19 Feb 2014 12:04:03 +0100
-Subject: [RFC PATCH v2 0/2] Syscon early initialization
-Message-ID: <cover.1392807832.git.michal.simek@xilinx.com>
+Date: Wed, 19 Feb 2014 12:04:04 +0100
+Subject: [RFC PATCH v2 1/2] mfd: syscon: Support early initialization
+In-Reply-To: <cover.1392807832.git.michal.simek@xilinx.com>
+References: <cover.1392807832.git.michal.simek@xilinx.com>
+Message-ID: <fa3178534fcf4488fc45a9a24e44b2588acb38c6.1392807832.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Some platforms need to get system controller
+ready as soon as possible.
+The patch provides early_syscon_initialization
+which create early mapping for all syscon compatible
+devices in early_syscon_probe.
+Regmap is get via syscon_early_regmap_lookup_by_phandle()
 
-this series come from my discussion with Arnd at KS and then
-on some other threads/IRCs(Arnd and Mark) that SoC vendors
-are more and more try to add misc functionality to
-one memory region. For this purpose syscon driver is in the kernel.
-But regular syscon driver is initialized too late
-and platforms are trying to create specific code to handle it.
+Regular device probes attach device to regmap
+via regmap_attach_dev().
 
-For this purpose the series have been created to provide
-early syscon initialization and regmap creation first
-and then attaching device.
+For early syscon initialization is necessary to extend
+struct syscon and provide remove function
+which unmap all early init structures.
 
-The last patch is zynq specific patch to clear slcr driver
-and clock driver can profit from it too when clk regmap is ready.
-
-Also moving syscon driver from mfs should be consider.
-
-Mark already applied the first part to his regmap repo
-git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git tags/nodev
-
-Thanks for your comments,
-Michal
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
 Changes in v2:
 - Fix bad logic in early_syscon_probe
@@ -35,18 +30,222 @@ Changes in v2:
 - Regmap change available here
   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regmap.git tags/nodev
 
-Michal Simek (2):
-  mfd: syscon: Support early initialization
-  ARM: zynq: Use early syscon initialization
+ drivers/mfd/syscon.c       | 128 +++++++++++++++++++++++++++++++++++++++------
+ include/linux/mfd/syscon.h |  11 ++++
+ 2 files changed, 122 insertions(+), 17 deletions(-)
 
- arch/arm/boot/dts/zynq-7000.dtsi |   1 +
- arch/arm/mach-zynq/common.c      |   6 +-
- arch/arm/mach-zynq/slcr.c        |  42 +------------
- drivers/clk/zynq/clkc.c          |  57 ++++++-----------
- drivers/mfd/syscon.c             | 128 +++++++++++++++++++++++++++++++++------
- include/linux/mfd/syscon.h       |  11 ++++
- 6 files changed, 145 insertions(+), 100 deletions(-)
+diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+index 71841f9..8e6c611 100644
+--- a/drivers/mfd/syscon.c
++++ b/drivers/mfd/syscon.c
+@@ -20,12 +20,15 @@
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
++#include <linux/slab.h>
+ #include <linux/mfd/syscon.h>
 
+ static struct platform_driver syscon_driver;
+
+ struct syscon {
++	void __iomem *base;
+ 	struct regmap *regmap;
++	struct resource res;
+ };
+
+ static int syscon_match_node(struct device *dev, void *data)
+@@ -95,6 +98,24 @@ struct regmap *syscon_regmap_lookup_by_pdevname(const char *s)
+ }
+ EXPORT_SYMBOL_GPL(syscon_regmap_lookup_by_pdevname);
+
++struct regmap *syscon_early_regmap_lookup_by_phandle(struct device_node *np,
++						     const char *property)
++{
++	struct device_node *syscon_np;
++	struct syscon *syscon;
++
++	syscon_np = of_parse_phandle(np, property, 0);
++	if (!syscon_np)
++		return ERR_PTR(-ENODEV);
++
++	syscon = syscon_np->data;
++
++	of_node_put(syscon_np);
++
++	return syscon->regmap;
++}
++EXPORT_SYMBOL_GPL(syscon_early_regmap_lookup_by_phandle);
++
+ struct regmap *syscon_regmap_lookup_by_phandle(struct device_node *np,
+ 					const char *property)
+ {
+@@ -128,40 +149,112 @@ static int syscon_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct syscon *syscon;
+ 	struct resource *res;
+-	void __iomem *base;
+
+-	syscon = devm_kzalloc(dev, sizeof(*syscon), GFP_KERNEL);
++	/* Early syscon init */
++	if (pdev->dev.of_node && pdev->dev.of_node->data) {
++		syscon = pdev->dev.of_node->data;
++		res = &syscon->res;
++		regmap_attach_dev(dev, syscon->regmap, &syscon_regmap_config);
++	} else {
++
++		syscon = devm_kzalloc(dev, sizeof(*syscon), GFP_KERNEL);
++		if (!syscon)
++			return -ENOMEM;
++
++		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++		if (!res)
++			return -ENOENT;
++
++		syscon->base = devm_ioremap(dev, res->start,
++					    resource_size(res));
++		if (!syscon->base)
++			return -ENOMEM;
++
++		syscon_regmap_config.max_register = res->end - res->start - 3;
++		syscon->regmap = devm_regmap_init_mmio(dev, syscon->base,
++						&syscon_regmap_config);
++		if (IS_ERR(syscon->regmap)) {
++			dev_err(dev, "regmap init failed\n");
++			return PTR_ERR(syscon->regmap);
++		}
++	}
++
++	platform_set_drvdata(pdev, syscon);
++
++	dev_info(dev, "regmap %pR registered\n", res);
++
++	return 0;
++}
++
++static const struct platform_device_id syscon_ids[] = {
++	{ "syscon", },
++	{ }
++};
++
++static int syscon_remove(struct platform_device *pdev)
++{
++	struct syscon *syscon = platform_get_drvdata(pdev);
++
++	if (pdev->dev.of_node && pdev->dev.of_node->data) {
++		iounmap(syscon->base);
++		kfree(syscon);
++	}
++
++	return 0;
++}
++
++#ifdef CONFIG_OF
++static int early_syscon_probe(struct device_node *np)
++{
++	struct syscon *syscon;
++
++	syscon = kzalloc(sizeof(*syscon), GFP_KERNEL);
+ 	if (!syscon)
+ 		return -ENOMEM;
+
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!res)
+-		return -ENOENT;
++	if (of_address_to_resource(np, 0, &syscon->res))
++		return -EINVAL;
+
+-	base = devm_ioremap(dev, res->start, resource_size(res));
+-	if (!base)
+-		return -ENOMEM;
++	syscon->base = ioremap(syscon->res.start, resource_size(&syscon->res));
++	if (!syscon->base) {
++		pr_err("%s: Unable to map I/O memory\n", __func__);
++		return PTR_ERR(syscon->base);
++	}
+
+-	syscon_regmap_config.max_register = res->end - res->start - 3;
+-	syscon->regmap = devm_regmap_init_mmio(dev, base,
+-					&syscon_regmap_config);
++	syscon_regmap_config.max_register = syscon->res.end -
++					    syscon->res.start - 3;
++	syscon->regmap = regmap_init_mmio(NULL, syscon->base,
++					  &syscon_regmap_config);
+ 	if (IS_ERR(syscon->regmap)) {
+-		dev_err(dev, "regmap init failed\n");
++		pr_err("regmap init failed\n");
+ 		return PTR_ERR(syscon->regmap);
+ 	}
+
+-	platform_set_drvdata(pdev, syscon);
++	np->data = syscon;
+
+-	dev_info(dev, "regmap %pR registered\n", res);
++	of_node_put(np);
++
++	pr_info("%s: regmap %pR registered\n", np->full_name, &syscon->res);
+
+ 	return 0;
+ }
+
+-static const struct platform_device_id syscon_ids[] = {
+-	{ "syscon", },
+-	{ }
++static struct of_device_id of_syscon_ids[] = {
++	{ .compatible = "syscon" },
++	{},
+ };
+
++void __init early_syscon_init(void)
++{
++	struct device_node *np;
++
++	for_each_matching_node_and_match(np, of_syscon_ids, NULL) {
++		if (early_syscon_probe(np))
++			BUG();
++	}
++}
++#endif
++
+ static struct platform_driver syscon_driver = {
+ 	.driver = {
+ 		.name = "syscon",
+@@ -169,6 +262,7 @@ static struct platform_driver syscon_driver = {
+ 		.of_match_table = of_syscon_match,
+ 	},
+ 	.probe		= syscon_probe,
++	.remove		= syscon_remove,
+ 	.id_table	= syscon_ids,
+ };
+
+diff --git a/include/linux/mfd/syscon.h b/include/linux/mfd/syscon.h
+index 8789fa3..465c092 100644
+--- a/include/linux/mfd/syscon.h
++++ b/include/linux/mfd/syscon.h
+@@ -24,6 +24,10 @@ extern struct regmap *syscon_regmap_lookup_by_pdevname(const char *s);
+ extern struct regmap *syscon_regmap_lookup_by_phandle(
+ 					struct device_node *np,
+ 					const char *property);
++extern struct regmap *syscon_early_regmap_lookup_by_phandle(
++					struct device_node *np,
++					const char *property);
++extern void early_syscon_init(void);
+ #else
+ static inline struct regmap *syscon_node_to_regmap(struct device_node *np)
+ {
+@@ -46,6 +50,13 @@ static inline struct regmap *syscon_regmap_lookup_by_phandle(
+ {
+ 	return ERR_PTR(-ENOSYS);
+ }
++
++static struct regmap *syscon_early_regmap_lookup_by_phandle(
++					struct device_node *np,
++					const char *property)
++{
++	return ERR_PTR(-ENOSYS);
++}
+ #endif
+
+ #endif /* __LINUX_MFD_SYSCON_H__ */
 --
 1.8.2.3
 
@@ -56,4 +255,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140219/87c965c7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140219/f9a07fb5/attachment-0001.sig>
