@@ -1,81 +1,86 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 19 Feb 2014 15:17:48 -0600
-Subject: [PATCH v7 1/4] DT: Vendor prefixes: Add ricoh, qnap,
- sii and synology
-In-Reply-To: <1392840157-31072-2-git-send-email-klightspeed@killerwolves.net>
-References: <1392840157-31072-1-git-send-email-klightspeed@killerwolves.net>
- <1392840157-31072-2-git-send-email-klightspeed@killerwolves.net>
-Message-ID: <CAL_JsqLR4efVwHL4KCHqqLfj64Uf+TefwDrpKjTpQE5uS6HPTA@mail.gmail.com>
+From: elder@linaro.org (Alex Elder)
+Date: Wed, 19 Feb 2014 15:21:29 -0600
+Subject: [PATCH] ARM: dts: remove bcm11351-brt.dts
+In-Reply-To: <1392840808-28214-1-git-send-email-mporter@linaro.org>
+References: <1392840808-28214-1-git-send-email-mporter@linaro.org>
+Message-ID: <53052059.3020105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 2:02 PM,  <klightspeed@killerwolves.net> wrote:
-> From: Andrew Lunn <andrew@lunn.ch>
->
-> The following patches make use of vendor names:
-> * ricoh (Ricoh Co. Ltd.);
-> * qnap (QNAP Systems, Inc.);
-> * sii (Seiko Instruments, Inc.); and
-> * synology (Synology, Inc.)
->
-> Add them to the vendor prefix list.
->
-> Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
+On 02/19/2014 02:13 PM, Matt Porter wrote:
+> The BCM11351 BRT board will never see the light of day. Remove the BRT
+> dts since it is not maintainable.
+> 
+> Signed-off-by: Matt Porter <mporter@linaro.org>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Please remove the line in the Makefile that refers to this file.
+Provided you make that change, it looks good to me.
+
+Reviewed-by: Alex Elder <elder@linaro.org>
 
 > ---
-> v2:
-> Use stock ticker for Ricoh as vendor name
-> s/Richoh/Ricoh/
->
-> v5:
-> Add vendor prefix for QNAP
->
-> v6:
-> Revert qnap vendor prefix change from v5
-> Now properly based on -rc1
->
-> v7:
-> Revert ricoh vendor prefix change from v2
->
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 3f900cd..4a52fa9 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -65,10 +65,12 @@ picochip    Picochip Ltd
->  powervr        PowerVR (deprecated, use img)
->  qca    Qualcomm Atheros, Inc.
->  qcom   Qualcomm, Inc.
-> +qnap   QNAP Systems, Inc.
->  ralink Mediatek/Ralink Technology Corp.
->  ramtron        Ramtron International
->  realtek Realtek Semiconductor Corp.
->  renesas        Renesas Electronics Corporation
-> +ricoh  Ricoh Co. Ltd.
->  rockchip       Fuzhou Rockchip Electronics Co., Ltd
->  samsung        Samsung Semiconductor
->  sbs    Smart Battery System
-> @@ -76,11 +78,13 @@ schindler   Schindler
->  sil    Silicon Image
->  silabs Silicon Laboratories
->  simtek
-> +sii    Seiko Instruments, Inc.
->  sirf   SiRF Technology, Inc.
->  snps   Synopsys, Inc.
->  st     STMicroelectronics
->  ste    ST-Ericsson
->  stericsson     ST-Ericsson
-> +synology       Synology, Inc.
->  ti     Texas Instruments
->  tlm    Trusted Logic Mobility
->  toshiba        Toshiba Corporation
-> --
-> 1.8.3.2
->
+>  arch/arm/boot/dts/bcm11351-brt.dts | 54 --------------------------------------
+>  1 file changed, 54 deletions(-)
+>  delete mode 100644 arch/arm/boot/dts/bcm11351-brt.dts
+> 
+> diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
+> deleted file mode 100644
+> index 396b704..0000000
+> --- a/arch/arm/boot/dts/bcm11351-brt.dts
+> +++ /dev/null
+> @@ -1,54 +0,0 @@
+> -/*
+> - * Copyright (C) 2012 Broadcom Corporation
+> - *
+> - * This program is free software; you can redistribute it and/or
+> - * modify it under the terms of the GNU General Public License as
+> - * published by the Free Software Foundation version 2.
+> - *
+> - * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> - * kind, whether express or implied; without even the implied warranty
+> - * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - */
+> -
+> -/dts-v1/;
+> -
+> -#include "bcm11351.dtsi"
+> -
+> -/ {
+> -	model = "BCM11351 BRT board";
+> -	compatible = "brcm,bcm11351-brt", "brcm,bcm11351";
+> -
+> -	memory {
+> -		reg = <0x80000000 0x40000000>; /* 1 GB */
+> -	};
+> -
+> -	uart at 3e000000 {
+> -		status = "okay";
+> -	};
+> -
+> -	sdio1: sdio at 3f180000 {
+> -		max-frequency = <48000000>;
+> -		status = "okay";
+> -	};
+> -
+> -	sdio2: sdio at 3f190000 {
+> -		non-removable;
+> -		max-frequency = <48000000>;
+> -		status = "okay";
+> -	};
+> -
+> -	sdio4: sdio at 3f1b0000 {
+> -		max-frequency = <48000000>;
+> -		cd-gpios = <&gpio 14 0>;
+> -		status = "okay";
+> -	};
+> -
+> -	usbotg: usb at 3f120000 {
+> -		status = "okay";
+> -	};
+> -
+> -	usbphy: usb-phy at 3f130000 {
+> -		status = "okay";
+> -	};
+> -};
+> 
