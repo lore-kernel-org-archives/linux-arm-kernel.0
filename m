@@ -1,63 +1,20 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 19 Feb 2014 23:24:38 +0100
-Subject: [PATCH v2 01/19] serial: sh-sci: Enable the driver on all ARM
- platforms
-In-Reply-To: <20140219205446.GD6988@pengutronix.de>
-References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383086274-11049-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20140219205446.GD6988@pengutronix.de>
-Message-ID: <1609898.QTd44x6TTB@avalon>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 20 Feb 2014 02:24:59 +0300
+Subject: [PATCH v2 0/2] Add Ether DT support for R8A7791/Koelsch reference
+ board
+Message-ID: <201402200225.00598.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hello.
 
-On Wednesday 19 February 2014 21:54:46 Uwe Kleine-K?nig wrote:
-> On Tue, Oct 29, 2013 at 11:37:36PM +0100, Laurent Pinchart wrote:
-> > Renesas ARM platforms are transitioning from single-platform to
-> > multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-> > driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-> > and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
-> > COMPILE_TEST.
-> > 
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: linux-serial at vger.kernel.org
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> > 
-> >  drivers/tty/serial/Kconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> > index febd45c..9a5a8ef 100644
-> > --- a/drivers/tty/serial/Kconfig
-> > +++ b/drivers/tty/serial/Kconfig
-> > @@ -709,7 +709,7 @@ config SERIAL_IP22_ZILOG_CONSOLE
-> > 
-> >  config SERIAL_SH_SCI
-> >  
-> >  	tristate "SuperH SCI(F) serial port support"
-> > 
-> > -	depends on HAVE_CLK && (SUPERH || ARCH_SHMOBILE)
-> > +	depends on HAVE_CLK && (SUPERH || ARM || COMPILE_TEST)
-> > 
-> >  	select SERIAL_CORE
-> 
-> This patch is in mainline as d4f9e7b3d12e92ede642f6f4fc7d959f06da8ccc
-> since v3.13-rc1. I wonder if
-> 
-> 	depends on HAVE_CLK && (SUPERH || ARCH_SHMOBILE || COMPILE_TEST)
-> 
-> isn't the better option. (Since bf98c1eac1d4a6bcf00532e4fa41d8126cd6c187
-> ARCH_SHMOBILE is enabled for both multi-platform and legacy shmobile
-> configs.) Or do you plan to deprecate ARCH_SHMOBILE?
+   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-v3.14-rc3-20140218' tag. Here we add the Ether device tree
+support on the R8A7791/Koelsch reference board. The patchset requires
+the 'sh_eth' driver device tree support just merged to the 'net-next.git' repo
+in order to work.
 
-We don't plan to deprecate ARCH_SHMOBILE. I've posted a patch to fix this, 
-please see http://www.spinics.net/lists/linux-sh/msg28296.html ("[PATCH 1/2] 
-serial: sh-sci: Restrict non-COMPILE_TEST compilation").
+[1/2] ARM: shmobile: r8a7791: add Ether DT support
+[2/2] ARM: shmobile: koelsch: add Ether DT support
 
--- 
-Regards,
-
-Laurent Pinchart
+WBR, Sergei
