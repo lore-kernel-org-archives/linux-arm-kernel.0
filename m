@@ -1,37 +1,25 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 19 Feb 2014 15:24:47 +0100
-Subject: [Patch v3 20/23] ARM: config: Add a multi_v5_defconfig
-In-Reply-To: <1392819548.815735822@f395.i.mail.ru>
-References: <1392819174-11634-1-git-send-email-andrew@lunn.ch>
- <1392819174-11634-21-git-send-email-andrew@lunn.ch>
- <1392819548.815735822@f395.i.mail.ru>
-Message-ID: <20140219142447.GA11878@lunn.ch>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 19 Feb 2014 09:26:58 -0500
+Subject: [PATCH 0/2] clk: keystone: Couple of fixes for 3.14-rcx
+In-Reply-To: <20140219061959.22529.87876@quantum>
+References: <1392064011-11986-1-git-send-email-santosh.shilimkar@ti.com>
+ <20140219061959.22529.87876@quantum>
+Message-ID: <5304BF32.6060403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 06:19:08PM +0400, Alexander Shiyan wrote:
-> ?????, 19 ??????? 2014, 15:12 +01:00 ?? Andrew Lunn <andrew@lunn.ch>:
-> > To allow regression build testing of multi v5 systems, add a
-> > multi_v5_defconfig, similar to the multi_v7_defconfig. This is based
-> > on kirkwood_defconfig, but with a few other boards added which claim
-> > to be MULTI_v5.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > ---
-> >  arch/arm/configs/multi_v5_defconfig | 183 ++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 183 insertions(+)
-> >  create mode 100644 arch/arm/configs/multi_v5_defconfig
-> > 
-> > diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-> ...
-> > +CONFIG_DEBUG_LL=y
-> > +CONFIG_DEBUG_MVEBU_UART_ALTERNATE=y
-> > +CONFIG_DEBUG_UART_VIRT=0xfed12000
+On Wednesday 19 February 2014 01:19 AM, Mike Turquette wrote:
+> Quoting Santosh Shilimkar (2014-02-10 12:26:49)
+>> Mike,
+>>
+>> Can you please look at these couple of keystone clock fixes ?
+>> Without these, we have seen some random kernel crashes. I
+>> have included the dts fix since both fixes are related. Do
+>> let me know if you prefer dts patch to be sent it via arm-soc tree.
 > 
-> Should we disable lowlevel debug for multi-* config?
+> No problem taking these in as fixes. They go in the next batch.
+> 
+Thanks Mike !!
 
-Yes. Otherwise we get silent crashes on anything but this specific
-hardware. I will fix this in the next version.
-
-Thanks
-	  Andrew
+Regards,
+Santosh
