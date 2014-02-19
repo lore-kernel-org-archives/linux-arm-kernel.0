@@ -1,107 +1,66 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 19 Feb 2014 10:33:38 +0000
-Subject: [PATCH] irqchip:gic: change access of gicc_ctrl register to read
- modify write.
-In-Reply-To: <1392761550-11662-1-git-send-email-fkan@apm.com>
-References: <1392761550-11662-1-git-send-email-fkan@apm.com>
-Message-ID: <53048882.9070706@arm.com>
+Date: Wed, 19 Feb 2014 10:43:57 +0000
+Subject: [PATCH v4 00/12] arm/arm64: KVM: host cache maintenance when
+ guest caches are off
+In-Reply-To: <20140219101246.GD30457@arm.com>
+References: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
+ <CAG7+5M3nBfX7qfq9d6Cvrpk2YeoHsy1yG0PjmTspa6zqQvUsXg@mail.gmail.com>
+ <56ae8a2975cd21765b90d98260862af1@www.loen.fr>
+ <20140219101246.GD30457@arm.com>
+Message-ID: <53048AED.1070308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Feng,
-
-On 18/02/14 22:12, Feng Kan wrote:
-> This change is made to preserve the GIC v2 releated bits in the
-> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
-> The original code only set the enable/disable group bit in this register.
-> This code will preserve all other bits configured by the bootload except
-
-This "all other bits" in itself is a major problem, see below.
-
-> the enable/disable bit. The main reason for this change is to allow the
-> bypass bits specified in the v2 spec to remain untouched by the current
-> GIC code. In the X-Gene platform, the bypass functionality is not used
-> and bypass must be disabled at all time.
+On 19/02/14 10:12, Catalin Marinas wrote:
+> On Wed, Feb 19, 2014 at 09:02:34AM +0000, Marc Zyngier wrote:
+>> On 2014-02-18 20:57, Eric Northup wrote:
+>>> On Tue, Feb 18, 2014 at 7:27 AM, Marc Zyngier <marc.zyngier@arm.com> 
+>>> wrote:
+>>>>
+>>>> When we run a guest with cache disabled, we don't flush the cache to
+>>>> the Point of Coherency, hence possibly missing bits of data that 
+>>>> have
+>>>> been written in the cache, but have not yet reached memory.
+>>>>
+>>>> We also have the opposite issue: when a guest enables its cache,
+>>>> whatever sits in the cache is suddenly going to become visible,
+>>>> shadowing whatever the guest has written into RAM.
+>>>>
+>>>> There are several approaches to these issues:
+>>>> - Using the DC bit when caches are off: this breaks guests assuming
+>>>>   caches off while doing DMA operations. Bootloaders, for example.
+>>>>   It also breaks the I-D coherency.
+>>>> - Fetch the memory attributes on translation fault, and flush the
+>>>>   cache while handling the fault. This relies on using the PAR_EL1
+>>>>   register to obtain the Stage-1 memory attributes, and tends to be
+>>>>   slow.
+>>>> - Detecting the translation faults occuring with MMU off (and
+>>>>   performing a cache clean), and trapping SCTLR_EL1 to detect the
+>>>>   moment when the guest is turning its caches on (and performing a
+>>>>   cache invalidation). Trapping of SCTLR_EL1 is then disabled to
+>>>>   ensure the best performance.
+>>>
+>>> This will preclude noticing the 2nd .. Nth cache off -> on cycles,
+>>> right?  Will any guests care - doesn't kexec go through a caches-off
+>>> state?
+>>
+>> kexec, bootloaders, and whatever firmware requires to switch caches on 
+>> and then off. Guest does care, but we don't have an (efficient) 
+>> architectural solution to that.
+>>
+>> The best I can think of so far is a "switch-the-damned-thing-off" 
+>> hypercall that would do the above before returning to the guest.
 > 
-> Signed-off-by: Vinayak Kale <vkale@apm.com>
-> Acked-by: Anup Patel <apatel@apm.com>
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
->  drivers/irqchip/irq-gic.c | 18 +++++++++++++++---
->  1 file changed, 15 insertions(+), 3 deletions(-)
+> We could push for a PSCI extension to cover such cases as well, though
+> even for a host, we may not need to involve the secure world for kexec.
 > 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 341c601..9adc3e1 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->  	void __iomem *dist_base = gic_data_dist_base(gic);
->  	void __iomem *base = gic_data_cpu_base(gic);
->  	unsigned int cpu_mask, cpu = smp_processor_id();
-> +	unsigned int ctrl_mask;
->  	int i;
->  
->  	/*
-> @@ -449,13 +450,20 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->  		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
->  
->  	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
-> -	writel_relaxed(1, base + GIC_CPU_CTRL);
-> +
-> +	ctrl_mask = readl(base + GIC_CPU_CTRL);
-> +	ctrl_mask |= 0x1;
-> +	writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
+> An alternative is to trap the set/way cache flushing and re-activate the
+> MMU trapping in the guest. If the MMU is still on, disable trapping
+> until the next set/way (since that's a normal function on power-down
+> code sequences). But it doesn't look nice ;).
 
-So what if the firmware used a different EOImode? We would end up in a
-situation where we don't deactivate the interrupts anymore. Not good.
-
-You should only preserve the bits that actually matter, and that won't
-have an impact with the way the kernel works.
-
->  }
->  
->  void gic_cpu_if_down(void)
->  {
-> +	unsigned int ctrl_mask;
->  	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
-> -	writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
-> +
-> +	ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
-> +	ctrl_mask &= 0xfffffffe;
-
-nit: use
-
-	ctlr_mask &= ~1;
-
-in order to be consistent with the rest of the code.
-
-> +	writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
->  }
->  
->  #ifdef CONFIG_CPU_PM
-> @@ -566,6 +574,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
->  {
->  	int i;
->  	u32 *ptr;
-> +	unsigned int ctrl_mask;
->  	void __iomem *dist_base;
->  	void __iomem *cpu_base;
->  
-> @@ -590,7 +599,10 @@ static void gic_cpu_restore(unsigned int gic_nr)
->  		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
->  
->  	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
-> -	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
-> +
-> +	ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
-> +	ctrl_mask |= 0x1;
-> +	writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
->  }
->  
->  static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
-> 
-
-Thanks,
+No, it doesn't... I may have a go at it though, and see what breaks. We
+already have all the code ready, just need to throw some glue at it.
 
 	M.
 -- 
