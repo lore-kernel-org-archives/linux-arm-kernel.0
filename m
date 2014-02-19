@@ -1,62 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Feb 2014 16:12:37 +0000
-Subject: [PATCH v9 1/6] arm64: Add macros to manage processor debug state
-In-Reply-To: <20140219160359.GB22252@arm.com>
-References: <1390908022-10287-1-git-send-email-vijay.kilari@gmail.com>
- <1390908022-10287-2-git-send-email-vijay.kilari@gmail.com>
- <20140129105546.GC26622@mudshark.cambridge.arm.com>
- <CALicx6uw3En92GhrKpAoavzwwNKWR8C8hHcS5B+eyLX_dC0LBA@mail.gmail.com>
- <20140217130149.GA5856@arm.com>
- <CALicx6uHqyJ-n+b-zfua6P=UsJ+a2_2h-H6krx-DBJYWfF=7jg@mail.gmail.com>
- <20140218120249.GD11049@arm.com>
- <CALicx6v6=WdRPoZ-vcxf7zusooB5r1V9WnjBf3QjOiO7yik3sw@mail.gmail.com>
- <20140219113157.GG30457@arm.com> <20140219160359.GB22252@arm.com>
-Message-ID: <20140219161236.GG28173@mudshark.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 19 Feb 2014 17:17:40 +0100
+Subject: [PATCH v4 03/13] ARM: mvebu: ll_set_cpu_coherent always uses
+ the current CPU
+In-Reply-To: <20140219170907.002941da@skate>
+References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>	<1392312816-17657-4-git-send-email-gregory.clement@free-electrons.com>
+ <20140219170907.002941da@skate>
+Message-ID: <5304D924.2000208@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 04:03:59PM +0000, Catalin Marinas wrote:
-> On Wed, Feb 19, 2014 at 11:31:57AM +0000, Catalin Marinas wrote:
-> > BUG: scheduling while atomic: kworker/u8:0/6/0x00000002
-> > Modules linked in:
-> > CPU: 1 PID: 6 Comm: kworker/u8:0 Not tainted 3.14.0-rc3+ #306
-> > Workqueue: khelper __call_usermodehelper
-> > Call trace:
-> > [<ffffffc000087dbc>] dump_backtrace+0x0/0x12c
-> > [<ffffffc000087efc>] show_stack+0x14/0x1c
-> > [<ffffffc00043c224>] dump_stack+0x78/0xc4
-> > [<ffffffc000439b48>] __schedule_bug+0x40/0x54
-> > [<ffffffc00043d67c>] __schedule+0x514/0x604
-> > [<ffffffc00043d794>] schedule+0x28/0x78
-> > [<ffffffc00043cc90>] schedule_timeout+0x170/0x1bc
-> > [<ffffffc00043e16c>] wait_for_common+0xc0/0x14c
-> > [<ffffffc00043e280>] wait_for_completion_killable+0x14/0x28
-> > [<ffffffc0000942f8>] do_fork+0x158/0x2a8
-> > [<ffffffc000094478>] kernel_thread+0x30/0x38
-> > [<ffffffc0000a842c>] __call_usermodehelper+0x34/0xa8
-> > [<ffffffc0000ab300>] process_one_work+0x118/0x354
-> > [<ffffffc0000abfcc>] worker_thread+0x13c/0x3c0
-> > [<ffffffc0000b1e84>] kthread+0xd4/0xe8
-> > 
-> > 
-> > It gets much worse if I run with two CPUs and CONFIG_KGDB_KDB enabled
-> > (but fine with a single CPU).
-> > 
-> > So no need to post another series for now but please check the multi-CPU
-> > case as well and send a separate fix. I'll dig a bit on my side as well.
+On 19/02/2014 17:09, Thomas Petazzoni wrote:
+> Dear Gregory CLEMENT,
 > 
-> So far I'm done with the investigation. It looks to me like one of the
-> kgdb tests, kgdb core or the arm64 back-end (or maybe more than one) is
-> not SMP safe. The errors either appear or disappear based on the printks
-> I put through the kgdb test or other config options which I enable.
+> On Thu, 13 Feb 2014 18:33:26 +0100, Gregory CLEMENT wrote:
+>> ll_set_cpu_coherent is always used on the current CPU, so instead of
+>> passing the CPU id as argument, ll_set_cpu_coherent() can find it by
+>> itself.
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  arch/arm/mach-mvebu/coherency.c    | 10 +++++-----
+>>  arch/arm/mach-mvebu/coherency.h    |  2 +-
+>>  arch/arm/mach-mvebu/coherency_ll.S | 12 ++++++------
+>>  arch/arm/mach-mvebu/headsmp.S      |  4 ----
+>>  arch/arm/mach-mvebu/platsmp.c      |  2 +-
+>>  5 files changed, 13 insertions(+), 17 deletions(-)
 > 
-> Could you please look into making the kgdb back-end SMP-safe?
+> Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> 
+> with just one thing I am not entirely sure about:
+> 
+>>  	/* Create bit by cpu index */
+>> -	mov	r3, #(1 << 24)
+>> -	lsl	r1, r3, r1
+>> -ARM_BE8(rev	r1, r1)
+>> +	mrc	15, 0, r1, cr0, cr0, 5
+>> +	and	r1, r1, #15
+>> +	mov	r2, #(1 << 24)
+>> +	lsl	r1, r2, r1
+>> +	ARM_BE8(rev	r1, r1)
+> 
+> Have you tested this in a big endian configuration? I'd like to make
+> sure we have gotten the ARM_BE8(rev ...) thing correct.
 
-There are certainly potential SMP problems in the back-end, which I asked
-about in the initial series:
+No I didn't test it in BE. This change is really similar of
+what have been done before so I am quite confident that it works in
+BE as well as after the commit "bca028e7c253 ARM: mvebu: support
+running big-endian". As you have a BE setup maybe you could check
+it and add your Tested-by.
 
-  http://lkml.kernel.org/r/CALicx6v1eGHRwWPrjzihzBZxCu8t1vpMoq-YfutSm4mRmP6gEQ at mail.gmail.com
 
-The reply from Vijay suggested that everything is confined to a single CPU.
+Thanks,
 
-Will
+Gregory
+
+
+> 
+> Thomas
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
