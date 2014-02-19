@@ -1,107 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Feb 2014 21:48:48 +0100
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <CAErSpo5PCTyZ5jzumJxD=CCN+-t-Z31Cw+9ejT_oTQ4fFQePag@mail.gmail.com>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <3312083.odPX4th7oi@wuerfel>
- <CAErSpo5PCTyZ5jzumJxD=CCN+-t-Z31Cw+9ejT_oTQ4fFQePag@mail.gmail.com>
-Message-ID: <3905203.TvF8RmfLsz@wuerfel>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 19 Feb 2014 21:54:46 +0100
+Subject: [PATCH v2 01/19] serial: sh-sci: Enable the driver on all ARM
+ platforms
+In-Reply-To: <1383086274-11049-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383086274-11049-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20140219205446.GD6988@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 February 2014 13:18:24 Bjorn Helgaas wrote:
-> >
-> > Right, this is an interesting case indeed, and I think we haven't
-> > considered it in the binding so far. We already encode a "bus-range"
-> > in DT, so we can easily partition the ECAM config space, but it
-> > still violates one of the two assumptions:
-> > a) that the register ranges for the two host bridge devices are
-> >    non-overlapping in DT
-> > b) that the ECAM register range as specified in DT starts at bus
-> >    0 and is a power-of-two size.
-> > Since the binding is not fixed that, we could change the definition to
-> > say that the ECAM register range in the "reg" property must match
-> > the buses listed in the "bus-range" property.
+On Tue, Oct 29, 2013 at 11:37:36PM +0100, Laurent Pinchart wrote:
+> Renesas ARM platforms are transitioning from single-platform to
+> multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
+> driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
+> and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
+> COMPILE_TEST.
 > 
-> Addresses in the ACPI MCFG table correspond to bus number 0, but the
-> MCFG also provides start & end bus numbers, so the valid range does
-> not necessarily start with bus 0 and need not be power-of-two in size.
->  Something similar sounds like a good idea for DT.
-
-Hmm, we'll have to think about that. From a DT perspective, we try
-to keep things local to the node using it, so listing only the
-registers we are allowed to access is more natural.
-
-Another option would be to have a separate device node for the ECAM
-registers and point to that from the host controller node, which
-would describe this cleanly but also add a bit of complexity that
-will rarely be used.
-
-> > I still want to make sure I understand exactly what this case is about
-> > though, i.e. what is shared and what is separate if you have two host
-> > bridges with a common ECAM region:
-> >
-> > * I assume I/O space is always shared on x86, but probably separate
-> >   elsewhere.
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: linux-serial at vger.kernel.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  drivers/tty/serial/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> I think x86 *could* support multiple I/O spaces, but user-mode
-> inb/outb could only reach the 0-64K space.  I think ia64 has the same
-> limitation on user code, but it supports many spaces in the kernel.
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index febd45c..9a5a8ef 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -709,7 +709,7 @@ config SERIAL_IP22_ZILOG_CONSOLE
+>  
+>  config SERIAL_SH_SCI
+>  	tristate "SuperH SCI(F) serial port support"
+> -	depends on HAVE_CLK && (SUPERH || ARCH_SHMOBILE)
+> +	depends on HAVE_CLK && (SUPERH || ARM || COMPILE_TEST)
+>  	select SERIAL_CORE
+This patch is in mainline as d4f9e7b3d12e92ede642f6f4fc7d959f06da8ccc
+since v3.13-rc1. I wonder if
 
-Ok.
+	depends on HAVE_CLK && (SUPERH || ARCH_SHMOBILE || COMPILE_TEST)
 
-> > * Each host would always have a fixed memory space aperture, right?
-> 
-> The ACPI _CRS/_PRS/_SRS mechanism theoretically allows changes to the
-> bus number, I/O space, and memory space apertures of host bridges.
-> But we don't do any of those changes today, and I don't know if any
-> BIOSes actually allow it.
+isn't the better option. (Since bf98c1eac1d4a6bcf00532e4fa41d8126cd6c187
+ARCH_SHMOBILE is enabled for both multi-platform and legacy shmobile
+configs.) Or do you plan to deprecate ARCH_SHMOBILE?
 
-I mean non-overlapping apertures in particular. We also have
-cases where the aperture that we list in DT is just programmed
-into hardware registers by the host driver and could be arbitrary,
-but you can't normally have the same MMIO address go to two
-devices on internal buses (or not in a sensible way).
+Best regards
+Uwe
 
-> > * From what I understand from your description, the hardware does
-> >   not enforce specific bus numbers for each host. How does the
-> >   host bridge know its root bus number then?
-> 
-> I don't know details of any specific hardware.  I'm just saying that
-> ACPI provides a mechanism for the OS to manipulate the bus number
-> range below a host bridge.  Of course, a BIOS is free to omit _PRS and
-> _SRS, and in that case, the bus/IO/memory apertures reported by _CRS
-> are fixed and can't be changed.  We learn the root bus number from the
-> host bridge _CRS (but I'm sure you knew that, so maybe I missed the
-> point of your question).
-
-I guess the answer then is that the host bridge can have a register
-for programming the root bus number, but it's not standardized and
-therefore the access is hidden in the _PRS/_SRS methods. If we have
-the same on DT and want to reprogram the bus numbers, we'd need to
-have a kernel driver for the nonstandard registers of the host bridge.
-
-> > * Should I expect one IOMMU per host bridge or one ECAM region,
-> >   or can either be possible?
-> 
-> It's possible to have multiple IOMMUs per host bridge, and I think
-> they can even be buried down in the PCIe hierarchy.
-
-Oh, I didn't know that. So how do you actually find the IOMMU for
-a given domain/bus/device/function combination?
-
-> > * The IntA-IntB IRQ numbers are always per host bridge I assume.
-> 
-> For conventional PCI, INTx are just wires that could go anywhere, so
-> there's no connection between them and a host bridge.  You have to
-> have a _PRT or similar to make sense out of them.  For PCIe, a Root
-> Complex maps INTx emulation messages to system interrupts in an
-> implementation-specific way, so we need a _PRT there, too.  I don't
-> think there's a requirement that these IRQ numbers be per-host bridge.
-
-Right, makes sense.
-
-Thanks for the detailed explanations!
-
-	Arnd
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
