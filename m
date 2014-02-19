@@ -1,42 +1,72 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 19 Feb 2014 19:21:01 +0100
-Subject: [PATCH v4 07/13] ARM: dts: mvebu: Add a new set of registers to
- the PMSU node
-In-Reply-To: <5304EE99.7000102@free-electrons.com>
-References: <1392312816-17657-1-git-send-email-gregory.clement@free-electrons.com>
- <1392312816-17657-8-git-send-email-gregory.clement@free-electrons.com>
- <20140219170033.4ca8343b@skate>
- <5304EE99.7000102@free-electrons.com>
-Message-ID: <20140219192101.4d92fa01@skate>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 19 Feb 2014 18:25:06 +0000 (UTC)
+Subject: [RFC PATCH] ARM: OMAP2+: clockdomain: Reintroduce SW_SLEEP Support
+ (fwd)
+Message-ID: <alpine.DEB.2.02.1402191824260.8777@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gregory CLEMENT,
 
-On Wed, 19 Feb 2014 18:49:13 +0100, Gregory CLEMENT wrote:
+Just FYI.  Queued for v3.15 unless someone complains.
 
-> I agree to use something like:
-> 
-> armada-370-xp-pmsu at 22000 {
-> 	compatible = "marvell,armada-xp-pmsu"; /* new compatible string */
+- Paul
 
-But this PMSU is identical on 370, no? So the marvell,armada-xp-pmsu
-compatible string is maybe not the most appropriate one?
+---------- Forwarded message ----------
+Date: Fri, 7 Feb 2014 16:20:59 -0600
+From: Dave Gerlach <d-gerlach@ti.com>
+To: linux-omap at vger.kernel.org
+Cc: Tony Lindgren <tony@atomide.com>, Paul Walmsley <paul@pwsan.com>,
+    Rajendra Nayak <rnayak@ti.com>, Nishanth Menon <nm@ti.com>,
+    Dave Gerlach <d-gerlach@ti.com>
+Subject: [RFC PATCH] ARM: OMAP2+: clockdomain: Reintroduce SW_SLEEP Support
 
-> 	reg = <0x22000 0x1000>;
-> 	};
-> 
-> 
-> and I think the best option would be to introduce a new compatible string
-> for this. In the same time we continue to support the old compatible string
-> but we print a big warning during the kernel boot that this compatible string
-> is deprecated, and we will finally remove it a few release.
+Since commit 65aa94b204d (ARM: OMAP4: clockdomain/CM code: Update supported
+transition modes), on OMAP4, all CLKDMs support HW_AUTO so this is used
+instead of SW_SLEEP for the idling of clockdomains. However, additional
+SoCs now leverage the OMAP4 clockdomain code so update it to use SW_SLEEP
+if the clockdomain data specifies that the CLKDM has the
+CLKDM_CAN_FORCE_SLEEP flag set rather than using HW_AUTO for both cases.
 
-How do you support the new features of the L2 stuff with the old
-compatible string? By substracting 0x100 to the register base address?
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/mach-omap2/cminst44xx.c |   18 ++++++++++++++++--
+ 1 file changed, 16 insertions(+), 2 deletions(-)
 
-Thomas
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+index 731ca13..f5c4731 100644
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -254,6 +254,11 @@ void omap4_cminst_clkdm_force_wakeup(u8 part, u16 inst, u16 cdoffs)
+  *
+  */
+ 
++void omap4_cminst_clkdm_force_sleep(u8 part, u16 inst, u16 cdoffs)
++{
++	_clktrctrl_write(OMAP34XX_CLKSTCTRL_FORCE_SLEEP, part, inst, cdoffs);
++}
++
+ /**
+  * omap4_cminst_wait_module_ready - wait for a module to be in 'func' state
+  * @part: PRCM partition ID that the CM_CLKCTRL register exists in
+@@ -404,8 +409,17 @@ static int omap4_clkdm_clear_all_wkup_sleep_deps(struct clockdomain *clkdm)
+ 
+ static int omap4_clkdm_sleep(struct clockdomain *clkdm)
+ {
+-	omap4_cminst_clkdm_enable_hwsup(clkdm->prcm_partition,
+-					clkdm->cm_inst, clkdm->clkdm_offs);
++	if (clkdm->flags & CLKDM_CAN_HWSUP)
++		omap4_cminst_clkdm_enable_hwsup(clkdm->prcm_partition,
++						clkdm->cm_inst,
++						clkdm->clkdm_offs);
++	else if (clkdm->flags & CLKDM_CAN_FORCE_SLEEP)
++		omap4_cminst_clkdm_force_sleep(clkdm->prcm_partition,
++					       clkdm->cm_inst,
++					       clkdm->clkdm_offs);
++	else
++		return -EINVAL;
++
+ 	return 0;
+ }
+ 
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.9.5
