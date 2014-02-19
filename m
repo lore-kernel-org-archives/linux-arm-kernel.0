@@ -1,92 +1,110 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Feb 2014 10:50:11 +0000
-Subject: [PATCH RFC 07/31] mmc: sdhci: push card_tasklet into threaded
- irq handler
-In-Reply-To: <CAKohpo=ZrLRsTyCH86x7TbGE2XJnpXNb1ZDvYyzDUupAwTtS9Q@mail.gmail.com>
-References: <20140218150801.GD21483@n2100.arm.linux.org.uk>
- <E1WFmIk-0006m0-Ah@rmk-PC.arm.linux.org.uk>
- <20140218175703.GJ21483@n2100.arm.linux.org.uk>
- <CAKohpoknX=acZHJeydwv6XRKFHTD4DM84xfCJ=56NrRfJnBOOA@mail.gmail.com>
- <20140219094322.GR21483@n2100.arm.linux.org.uk>
- <CAKohpomfHxWBF5m4D6iqod4a3gw2BU1W6nXMkEOg+YA+izYr=g@mail.gmail.com>
- <20140219095212.GT21483@n2100.arm.linux.org.uk>
- <CAKohpo=ZrLRsTyCH86x7TbGE2XJnpXNb1ZDvYyzDUupAwTtS9Q@mail.gmail.com>
-Message-ID: <20140219105011.GU21483@n2100.arm.linux.org.uk>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Wed, 19 Feb 2014 11:41:35 +0100
+Subject: [PATCH] ARM: OMAP2+: Use pdata quirks for wl12xx on the AM335x EV-MSK
+Message-ID: <1392806495-4874-1-git-send-email-kaloz@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 03:39:35PM +0530, Viresh Kumar wrote:
-> On 19 February 2014 15:22, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > If you don't want to use a regulator, then the right way to do this is to
-> > use the set_ios callback and check the power field - anything which is not
-> > MMC_POWER_OFF should result in power to the card being turned on.
-> 
-> I didn't get that completely here.. sorry completely out of touch on
-> this driver.
-> The power GPIO here is controlling the power to card socket. Once the card
-> is inserted, we need to enable power to the socket so that controller can
-> read back information from card.
+Enable the WiLink6 connected to mmc2.
 
-Yes, and how is this different from any other implementation where power
-to the socket is controlled?
+Signed-off-by: Imre Kaloz <kaloz at openwrt.org
+---
+ arch/arm/boot/dts/am335x-evmsk.dts |   40 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/pdata-quirks.c |   10 +++++++++
+ 2 files changed, 50 insertions(+)
 
-This is what happens:
-- You detect a card insertion/removal event
-- You tell the mmc core about it via mmc_detect_change()
-- The mmc core looks at the current state, and if the socket is powered down,
-  it first goes through the power up sequence:
-  - Apply power to the socket
-    (a call to set_ios with MMC_POWER_UP and zero clock)
-  - Apply clock to the socket
-    (a call to set_ios with MMC_POWER_ON and non-zero clock)
-  - Wait 74 clock cycles (as required by the spec)
-- Start the detection by sending commands to the cards
-- If no cards are detected, power down the socket
-
-> And this set_ios callback is not available to drivers above sdhci.c, i.e.
-> glues like sdhci-pltfm or spear.. so, how we can we get that back in
-> sdhci-spear.c?
-
-This is the crux of the issue which this patch set tries to address.  sdhci
-has become - as I've now described it several times - "a patchwork quilt of
-hacks all cooperating to give the impression of a working driver".
-
-This is just another such hack, because rather than fixing sdhci.c properly,
-you've hacked around it, thereby making sdhci.c worse.
-
-What you could have done is turned the power control code in sdhci.c into
-a library function, and sdhci_do_set_ios() calls a method in the sdhci_ops
-to control the power.  What this means is that:
-
-- if you use the standard sdhci power control support, then you can just
-  hook the standard function in there.
-- if you need to do something extra, you can place your function there
-  to do your own stuff, and call the standard function to do the standard
-  bits.
-- if you don't need the standard functionality, then you can handle the
-  power control entirely within your driver.
-
-Not only does this result in a much cleaner implementation, it means that
-going forward, any other such quirky stuff can be handled in the same way
-by the "glues" rather than having to augment the horrid quirk/quirk2 stuff,
-or coming up with hacks like sdhci-spear.c
-
-If you have a look through this patch set, I've already done that with a
-number of these methods - set_clock, set_uhs_signaling and reset.
-
-Moreover, you don't end up fiddling with sdhci internals (such as the
-card_tasklet) which then impact on attempts to clean that code up, which
-is exactly why we're discussing this. :)
-
-> Again, I can't test any modifications to this code and we need help from
-> Pratyush/Mohit on this..
-
-The important thing is we understand why the code is the way it is today,
-and work out some way of cleaning this up.  Do you think the above will
-work?
-
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index 4718ec4..a544fc4 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -45,6 +45,18 @@
+ 		regulator-boot-on;
+ 	};
+ 
++	wl12xx_vmmc: fixedregulator@2 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&wl12xx_gpio>;
++		compatible = "regulator-fixed";
++		regulator-name = "vwl1271";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&gpio1 29 0>;
++		startup-delay-us = <70000>;
++		enable-active-high;
++	};
++
+ 	leds {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&user_leds_s0>;
+@@ -264,6 +276,24 @@
+ 			0x144 (PIN_INPUT_PULLDOWN | MUX_MODE4) /* rmii1_ref_clk.mcasp1_axr3 */
+ 		>;
+ 	};
++
++	mmc2_pins: pinmux_mmc2_pins {
++		pinctrl-single,pins = <
++			0x74 (PIN_INPUT_PULLUP | MUX_MODE7) /* gpmc_wpn.gpio0_31 */
++			0x80 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn1.mmc1_clk */
++			0x84 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn2.mmc1_cmd */
++			0x00 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad0.mmc1_dat0 */
++			0x04 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad1.mmc1_dat1 */
++			0x08 (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad2.mmc1_dat2 */
++			0x0c (PIN_INPUT_PULLUP | MUX_MODE1) /* gpmc_ad3.mmc1_dat3 */
++		>;
++	};
++
++	wl12xx_gpio: pinmux_wl12xx_gpio {
++		pinctrl-single,pins = <
++			0x7c (PIN_OUTPUT_PULLUP | MUX_MODE7) /* gpmc_csn0.gpio1_29 */
++		>;
++	};
+ };
+ 
+ &uart0 {
+@@ -470,6 +500,16 @@
+ 	ti,no-reset-on-init;
+ };
+ 
++&mmc2 {
++	status = "okay";
++	vmmc-supply = <&wl12xx_vmmc>;
++	ti,non-removable;
++	bus-width = <4>;
++	cap-power-off-card;
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins>;
++};
++
+ &mcasp1 {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&mcasp1_pins>;
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 3d5b24d..a92acdb 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -187,6 +187,13 @@ static void __init omap4_panda_legacy_init(void)
+ }
+ #endif
+ 
++#ifdef CONFIG_SOC_AM33XX
++static void __init am335x_evmsk_legacy_init(void)
++{
++	legacy_init_wl12xx(WL12XX_REFCLOCK_24, 0, 31);
++}
++#endif
++
+ #ifdef CONFIG_SOC_OMAP5
+ static void __init omap5_uevm_legacy_init(void)
+ {
+@@ -271,6 +278,9 @@ static struct pdata_init pdata_quirks[] __initdata = {
+ 	{ "ti,omap4-sdp", omap4_sdp_legacy_init, },
+ 	{ "ti,omap4-panda", omap4_panda_legacy_init, },
+ #endif
++#ifdef CONFIG_SOC_AM33XX
++	{ "ti,am335x-evmsk", am335x_evmsk_legacy_init, },
++#endif
+ #ifdef CONFIG_SOC_OMAP5
+ 	{ "ti,omap5-uevm", omap5_uevm_legacy_init, },
+ #endif
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.7.10.4
