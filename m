@@ -1,79 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Feb 2014 20:06:25 +0100
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <CAErSpo7JNyqK3NZgP++OWkQYQzZ1_BdR3GrK3vOd8c=_YAX7nA@mail.gmail.com>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <2200534.anptP81x7X@wuerfel>
- <CAErSpo7JNyqK3NZgP++OWkQYQzZ1_BdR3GrK3vOd8c=_YAX7nA@mail.gmail.com>
-Message-ID: <3312083.odPX4th7oi@wuerfel>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 19 Feb 2014 19:09:10 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
+In-Reply-To: <1391080640-23370-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1391080640-23370-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <alpine.DEB.2.02.1402191908520.8777@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 February 2014 11:20:19 Bjorn Helgaas wrote:
-> On Wed, Feb 19, 2014 at 2:58 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 18 February 2014 17:28:14 Bjorn Helgaas wrote:
+On Thu, 30 Jan 2014, Tomi Valkeinen wrote:
 
-> > The second one seems a little easier to implement, and I don't
-> > see what _SEG is used for other than to avoid having domains
-> > when you don't need them. Is there more to it that I'm missing?
+> If CLK_SET_RATE_PARENT is set for a clkoutx2 clock, calling
+> clk_set_rate() on the clock "skips" the x2 multiplier as there are no
+> set_rate and round_rate functions defined for the clkoutx2.
 > 
-> Not really, but I do have a question related to OS management of host
-> bridge bus number apertures.  Currently, Linux never changes a host
-> bridge's bus number range, but it's conceivable that we could in some
-> hotplug scenario.  ACPI does provide a mechanism to do so (_PRS,
-> _SRS), and other host bridge drivers could also do this by programming
-> CSRs to change the bus number range.  The PCI domain is the logical
-> place to manage allocation of the 00-ff range of bus numbers.
+> This results in getting double the requested clock rates, breaking the
+> display on omap3430 based devices. This got broken when
+> d0f58bd3bba3877fb1af4664c4e33273d36f00e4 and related patches were merged
+> for v3.14, as omapdss driver now relies more on the clk-framework and
+> CLK_SET_RATE_PARENT.
 > 
-> 1) x86 platforms may have constraints because PCIBIOS and the 0xcf8
-> config access mechanism are unaware of segments.  If a platform has to
-> support legacy OSes that use those, it can't reuse bus numbers even in
-> different segment groups.  The platform might have to use multiple
-> segments to allow multiple ECAM regions, but use _PRS/_SRS to prevent
-> bus number overlaps to keep legacy config access working.  Obviously
-> this is only an issue if there are non-segment aware config access
-> methods.
+> This patch implements set_rate and round_rate for clkoutx2.
+> 
+> Tested on OMAP3430, OMAP3630, OMAP4460.
+> 
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-Right, I don't think this will be an issue outside of x86/ia64/alpha,
-since on all other architectures I'm aware of you have no PCIBIOS
-and each host controller would also have its own config space.
-Even host controllers using 0xfc8 would be fine because each host
-bridge normally has its own I/O space.
+Thanks, queued for v3.14-rc with Tero's ack.
 
-> 2) If two host bridges share an ECAM region, I think we're forced to
-> put them in the same domain: if we put them in different domains,
-> Linux might assign [bus 00-ff] to both bridges, and ECAM config
-> accesses would only work for one of the bridges.  This is quite common
-> on x86 and is a potential issue for any architecture.
 
-Right, this is an interesting case indeed, and I think we haven't
-considered it in the binding so far. We already encode a "bus-range"
-in DT, so we can easily partition the ECAM config space, but it
-still violates one of the two assumptions:
-a) that the register ranges for the two host bridge devices are
-   non-overlapping in DT
-b) that the ECAM register range as specified in DT starts at bus
-   0 and is a power-of-two size.
-Since the binding is not fixed that, we could change the definition to
-say that the ECAM register range in the "reg" property must match
-the buses listed in the "bus-range" property.
-
-I still want to make sure I understand exactly what this case is about
-though, i.e. what is shared and what is separate if you have two host
-bridges with a common ECAM region:
-
-* I assume I/O space is always shared on x86, but probably separate
-  elsewhere.
-* Each host would always have a fixed memory space aperture, right?
-* From what I understand from your description, the hardware does
-  not enforce specific bus numbers for each host. How does the
-  host bridge know its root bus number then?
-* Should I expect one IOMMU per host bridge or one ECAM region,
-  or can either be possible?
-* The IntA-IntB IRQ numbers are always per host bridge I assume.
-* Memory space on one host bridge is visible to bus master DMA
-  from a device on another host bridge on x86, right? I assume
-  this won't normally be the case on other architectures.
-
-	Arnd
+- Paul
