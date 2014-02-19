@@ -1,130 +1,59 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 19 Feb 2014 13:02:00 +0100
-Subject: [PATCH v6 18/18] ARM: sun7i: dt: Add ahci / sata support
-In-Reply-To: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
-References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1392811320-3132-19-git-send-email-hdegoede@redhat.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 19 Feb 2014 13:09:21 +0100
+Subject: [PATCH] PM / Sleep: Set pm_generic functions to NULL for
+ !CONFIG_PM_SLEEP
+Message-ID: <1392811761-28201-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds sunxi sata support to A20 boards that have such a connector.
-Some boards also feature a regulator via a GPIO and support for this is also
-added.
+Previously only a subset of the functions were defined and set to NULL
+while !CONFIG_PM_SLEEP. Let's make them all available so they can be
+used no matter of CONFIG_PM_SLEEP or not.
 
-Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     |  6 ++++++
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts      | 18 ++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts |  6 ++++++
- arch/arm/boot/dts/sun7i-a20.dtsi                |  8 ++++++++
- 4 files changed, 38 insertions(+)
+ include/linux/pm.h |   28 ++++++++++++++++++++--------
+ 1 file changed, 20 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-index 7bf4935..07823c2 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
-@@ -13,12 +13,18 @@
+diff --git a/include/linux/pm.h b/include/linux/pm.h
+index db2be5f..a81b558 100644
+--- a/include/linux/pm.h
++++ b/include/linux/pm.h
+@@ -718,14 +718,26 @@ static inline void dpm_for_each_dev(void *data, void (*fn)(struct device *, void
+ {
+ }
  
- /dts-v1/;
- /include/ "sun7i-a20.dtsi"
-+/include/ "sunxi-ahci-reg.dtsi"
+-#define pm_generic_prepare	NULL
+-#define pm_generic_suspend	NULL
+-#define pm_generic_resume	NULL
+-#define pm_generic_freeze	NULL
+-#define pm_generic_thaw		NULL
+-#define pm_generic_restore	NULL
+-#define pm_generic_poweroff	NULL
+-#define pm_generic_complete	NULL
++#define pm_generic_prepare		NULL
++#define pm_generic_suspend_late		NULL
++#define pm_generic_suspend_noirq	NULL
++#define pm_generic_suspend		NULL
++#define pm_generic_resume_early		NULL
++#define pm_generic_resume_noirq		NULL
++#define pm_generic_resume		NULL
++#define pm_generic_freeze_noirq		NULL
++#define pm_generic_freeze_late		NULL
++#define pm_generic_freeze		NULL
++#define pm_generic_thaw_noirq		NULL
++#define pm_generic_thaw_early		NULL
++#define pm_generic_thaw			NULL
++#define pm_generic_restore_noirq	NULL
++#define pm_generic_restore_early	NULL
++#define pm_generic_restore		NULL
++#define pm_generic_poweroff_noirq	NULL
++#define pm_generic_poweroff_late	NULL
++#define pm_generic_poweroff		NULL
++#define pm_generic_complete		NULL
+ #endif /* !CONFIG_PM_SLEEP */
  
- / {
- 	model = "Cubietech Cubieboard2";
- 	compatible = "cubietech,cubieboard2", "allwinner,sun7i-a20";
- 
- 	soc at 01c00000 {
-+		ahci: sata at 01c18000 {
-+			target-supply = <&reg_ahci_5v>;
-+			status = "okay";
-+		};
-+
- 		pinctrl at 01c20800 {
- 			led_pins_cubieboard2: led_pins at 0 {
- 				allwinner,pins = "PH20", "PH21";
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index 025ce52..403bd2e 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -13,13 +13,26 @@
- 
- /dts-v1/;
- /include/ "sun7i-a20.dtsi"
-+/include/ "sunxi-ahci-reg.dtsi"
- 
- / {
- 	model = "Cubietech Cubietruck";
- 	compatible = "cubietech,cubietruck", "allwinner,sun7i-a20";
- 
- 	soc at 01c00000 {
-+		ahci: sata at 01c18000 {
-+			target-supply = <&reg_ahci_5v>;
-+			status = "okay";
-+		};
-+
- 		pinctrl at 01c20800 {
-+			ahci_pwr_pin_cubietruck: ahci_pwr_pin at 1 {
-+				allwinner,pins = "PH12";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
- 			led_pins_cubietruck: led_pins at 0 {
- 				allwinner,pins = "PH7", "PH11", "PH20", "PH21";
- 				allwinner,function = "gpio_out";
-@@ -90,4 +103,9 @@
- 			gpios = <&pio 7 7 0>;
- 		};
- 	};
-+
-+	reg_ahci_5v: ahci-5v {
-+		pinctrl-0 = <&ahci_pwr_pin_cubietruck>;
-+		gpio = <&pio 7 12 0>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index b02a796..d5c6799 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -13,12 +13,18 @@
- 
- /dts-v1/;
- /include/ "sun7i-a20.dtsi"
-+/include/ "sunxi-ahci-reg.dtsi"
- 
- / {
- 	model = "Olimex A20-Olinuxino Micro";
- 	compatible = "olimex,a20-olinuxino-micro", "allwinner,sun7i-a20";
- 
- 	soc at 01c00000 {
-+		ahci: sata at 01c18000 {
-+			target-supply = <&reg_ahci_5v>;
-+			status = "okay";
-+		};
-+
- 		pinctrl at 01c20800 {
- 			led_pins_olinuxino: led_pins at 0 {
- 				allwinner,pins = "PH2";
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index daaafd0..3385994 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -392,6 +392,14 @@
- 			#size-cells = <0>;
- 		};
- 
-+		ahci: sata at 01c18000 {
-+			compatible = "allwinner,sun4i-a10-ahci";
-+			reg = <0x01c18000 0x1000>;
-+			interrupts = <0 56 4>;
-+			clocks = <&pll6 0>, <&ahb_gates 25>;
-+			status = "disabled";
-+		};
-+
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun7i-a20-pinctrl";
- 			reg = <0x01c20800 0x400>;
+ /* How to reorder dpm_list after device_move() */
 -- 
-1.8.5.3
+1.7.9.5
