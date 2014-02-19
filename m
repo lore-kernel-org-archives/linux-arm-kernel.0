@@ -1,85 +1,67 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 19 Feb 2014 15:14:44 -0800
-Subject: [PATCH v4 4/4] arm: zynq: Add support for cpufreq
-In-Reply-To: <1392851684-29950-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1392851684-29950-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1392851684-29950-5-git-send-email-soren.brinkmann@xilinx.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Feb 2014 23:22:53 +0000
+Subject: [PATCH RFC 31/31] mmc: sdhci-tegra: get rid of special
+ PRESENT_STATE register handling
+In-Reply-To: <53050E43.3030602@wwwdotorg.org>
+References: <20140218150801.GD21483@n2100.arm.linux.org.uk>
+ <E1WFmKj-0006nv-Py@rmk-PC.arm.linux.org.uk> <53050E43.3030602@wwwdotorg.org>
+Message-ID: <20140219232253.GW21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic cpufreq-cpu0 driver can scale the CPU frequency on Zynq
-SOCs. Add the required platform device to the BSP and appropriate
-OPPs to the dts.
+On Wed, Feb 19, 2014 at 01:04:19PM -0700, Stephen Warren wrote:
+> On 02/18/2014 08:11 AM, Russell King wrote:
+> > sdhci-tegra provides a get_ro method, which overrides the checking
+> > of the write protect bit in the PRESENT_STATE register in sdhci.c:
+> > 
+> >         if (host->flags & SDHCI_DEVICE_DEAD)
+> >                 is_readonly = 0;
+> >         else if (host->ops->get_ro)
+> >                 is_readonly = host->ops->get_ro(host);
+> >         else
+> >                 is_readonly = !(sdhci_readl(host, SDHCI_PRESENT_STATE)
+> >                                 & SDHCI_WRITE_PROTECT);
+> > 
+> > This means it's pointless detecting accesses to this register and
+> > manually setting the SDHCI_WRITE_PROTECT as it has no effect.
+> > 
+> > This means that the whole of tegra_sdhci_readl() can be removed and
+> > we can use the builtin sdhci readl functionality here.
+> 
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-v4:
- - no change
-v3:
- - change lowest frequency to 222223 (F_max / 3)
----
- arch/arm/boot/dts/zynq-7000.dtsi | 6 ++++++
- arch/arm/mach-zynq/Kconfig       | 2 ++
- arch/arm/mach-zynq/common.c      | 3 +++
- 3 files changed, 11 insertions(+)
+Thanks.
 
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index 8b67b19392ec..789d0bacc110 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -24,6 +24,12 @@
- 			device_type = "cpu";
- 			reg = <0>;
- 			clocks = <&clkc 3>;
-+			operating-points = <
-+				/* kHz    uV */
-+				666667  1000000
-+				333334  1000000
-+				222223  1000000
-+			>;
- 		};
- 
- 		cpu at 1 {
-diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
-index f84fab14f0b7..f03e75bd0b2b 100644
---- a/arch/arm/mach-zynq/Kconfig
-+++ b/arch/arm/mach-zynq/Kconfig
-@@ -2,6 +2,8 @@ config ARCH_ZYNQ
- 	bool "Xilinx Zynq ARM Cortex A9 Platform" if ARCH_MULTI_V7
- 	select ARM_AMBA
- 	select ARM_GIC
-+	select ARCH_HAS_CPUFREQ
-+	select ARCH_HAS_OPP
- 	select COMMON_CLK
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 1db2a5ca9ab8..644468151c04 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -51,6 +51,8 @@ static struct platform_device zynq_cpuidle_device = {
-  */
- static void __init zynq_init_machine(void)
- {
-+	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
-+
- 	/*
- 	 * 64KB way size, 8-way associativity, parity disabled
- 	 */
-@@ -59,6 +61,7 @@ static void __init zynq_init_machine(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
- 	platform_device_register(&zynq_cpuidle_device);
-+	platform_device_register_full(&devinfo);
- }
- 
- static void __init zynq_timer_init(void)
+> > =-DO NOT APPLY-=
+> 
+> Is that just because it's an RFC and you want to make sure it doesn't
+> get accepted early, or are you explicitly trying to stop people applying
+> this, testing it, and giving Tested-by?
+
+The script was a little too over-zealous.  It was just supposed to do
+the following transformation:
+
+--- => =-DO NOT APPLY-=
++++ => =+DO NOT APPLY+=
+
+which would've made it reversible with a trivial sed expression - but I
+cocked up because of the utterly random nature of regexp flavours, and
+instead gave sed this:
+
+	sed -i 's/^---/=-DO NOT APPLY-=/;s/^\+\+\+/=+DO NOT APPLY+=/'
+
+The escaped '+' ends up causing sed to match a single + at the beginning
+of a line.  (Other regexp flavours require you to escape the '+' otherwise
+it's interpreted as "one or more".)
+
+I had added that mode to my script a few months ago, and I just assumed
+I'd fully tested it when I used it yesterday... clearly not so.
+
+So... yes it was designed to stop it being _accepted_ but it should have
+also been completely reversible for those who wished to apply it via
+the obvious reversed sed expression.
+
 -- 
-1.9.0.1.g4196000
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
