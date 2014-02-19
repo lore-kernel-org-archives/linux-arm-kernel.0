@@ -1,56 +1,65 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 19 Feb 2014 16:06:14 +0000
-Subject: [PATCH RFC/RFT v3 7/9] ARM64: kernel: add support for cpu cache
+Date: Wed, 19 Feb 2014 16:06:15 +0000
+Subject: [PATCH RFC/RFT v3 8/9] ARM: kernel: add support for cpu cache
  information
 In-Reply-To: <1392825976-17633-1-git-send-email-sudeep.holla@arm.com>
 References: <1392825976-17633-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1392825976-17633-8-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1392825976-17633-9-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep Holla <sudeep.holla@arm.com>
 
-This patch adds support for cacheinfo on ARM64.
+This patch adds support for cacheinfo on ARM platforms.
 
-On ARMv8, the cache hierarchy can be identified through Cache Level ID
-(CLIDR) register while the cache geometry is provided by Cache Size ID
-(CCSIDR) register.
+On ARMv7, the cache hierarchy can be identified through Cache Level ID
+register(CLIDR) while the cache geometry is provided by Cache Size ID
+register(CCSIDR).
+
+On architecture versions before ARMv7, CLIDR and CCSIDR is not
+implemented. The cache type register(CTR) provides both cache hierarchy
+and geometry if implemented. For implementations that doesn't support
+CTR, we need to list the probable value of CTR if it was implemented
+along with the cpuid for the sake of simplicity to handle them.
 
 Since the architecture doesn't provide any way of detecting the cpus
-sharing particular cache, device tree is used for the same purpose.
+sharing particular cache, device tree is used fo the same purpose.
+On non-DT platforms, first level caches are per-cpu while higher level
+caches are assumed system-wide.
 
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Will Deacon <will.deacon@arm.com>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm64/kernel/Makefile    |   2 +-
- arch/arm64/kernel/cacheinfo.c | 134 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 135 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/kernel/cacheinfo.c
+ arch/arm/kernel/Makefile    |   1 +
+ arch/arm/kernel/cacheinfo.c | 228 ++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/Kconfig         |  13 +++
+ 3 files changed, 242 insertions(+)
+ create mode 100644 arch/arm/kernel/cacheinfo.c
 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 2d4554b..7d94a51 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -9,7 +9,7 @@ AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
- arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
- 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
- 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
--			   hyp-stub.o psci.o cpu_ops.o insn.o
-+			   hyp-stub.o psci.o cpu_ops.o insn.o cacheinfo.o
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index a30fc9b..f86a4ff 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -29,6 +29,7 @@ obj-y		+= entry-v7m.o v7m.o
+ else
+ obj-y		+= entry-armv.o
+ endif
++obj-$(CONFIG_CPU_HAS_CACHE) += cacheinfo.o
  
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o
-diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
+ obj-$(CONFIG_OC_ETM)		+= etm.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+diff --git a/arch/arm/kernel/cacheinfo.c b/arch/arm/kernel/cacheinfo.c
 new file mode 100644
-index 0000000..5d8b840
+index 0000000..10045b7
 --- /dev/null
-+++ b/arch/arm64/kernel/cacheinfo.c
-@@ -0,0 +1,134 @@
++++ b/arch/arm/kernel/cacheinfo.c
+@@ -0,0 +1,228 @@
 +/*
-+ *  ARM64 cacheinfo support
++ *  ARM cacheinfo support
 + *
 + *  Copyright (C) 2014 ARM Ltd.
 + *  All Rights Reserved
@@ -66,7 +75,92 @@ index 0000000..5d8b840
 +#include <linux/compiler.h>
 +#include <linux/of.h>
 +
++#include <asm/cputype.h>
 +#include <asm/processor.h>
++
++#if __LINUX_ARM_ARCH__ < 7 /* pre ARMv7 */
++
++#define MAX_CACHE_LEVEL		1	/* Only 1 level supported */
++#define CTR_CTYPE_SHIFT		24
++#define CTR_CTYPE_MASK		(1 << CTR_CTYPE_SHIFT)
++
++struct ctr_info {
++	unsigned int cpuid_id;
++	unsigned int ctr;
++};
++
++static struct ctr_info cache_ctr_list[] = {
++};
++
++static int get_unimplemented_ctr(unsigned int *ctr)
++{
++	int i, cpuid_id = read_cpuid_id();
++	for (i = 0; i < ARRAY_SIZE(cache_ctr_list); i++)
++		if (cache_ctr_list[i].cpuid_id == cpuid_id) {
++			*ctr = cache_ctr_list[i].ctr;
++			return 0;
++		}
++	return -ENOENT;
++}
++
++static unsigned int get_ctr(void)
++{
++	unsigned int ctr;
++	if (get_unimplemented_ctr(&ctr))
++		asm volatile ("mrc p15, 0, %0, c0, c0, 1" : "=r" (ctr));
++	return ctr;
++}
++
++static enum cache_type get_cache_type(int level)
++{
++	if (level > MAX_CACHE_LEVEL)
++		return CACHE_TYPE_NOCACHE;
++	return get_ctr() & CTR_CTYPE_MASK ?
++		CACHE_TYPE_SEPARATE : CACHE_TYPE_UNIFIED;
++}
++
++/*
++ *  +---------------------------------+
++ *  | 9  8  7  6 | 5  4  3 | 2 | 1  0 |
++ *  +---------------------------------+
++ *  |    size    |  assoc  | m |  len |
++ *  +---------------------------------+
++ * linelen        = 1 << (len + 3)
++ * multiplier     = 2 + m
++ * nsets          = 1 << (size + 6 - assoc - len)
++ * associativity  = multiplier << (assoc - 1)
++ * cache_size     = multiplier << (size + 8)
++ */
++#define CTR_LINESIZE_MASK	0x3
++#define CTR_MULTIPLIER_SHIFT	2
++#define CTR_MULTIPLIER_MASK	0x1
++#define CTR_ASSOCIAT_SHIFT	3
++#define CTR_ASSOCIAT_MASK	0x7
++#define CTR_SIZE_SHIFT		6
++#define CTR_SIZE_MASK		0xF
++#define CTR_DCACHE_SHIFT	12
++
++static void __ci_leaf_init(enum cache_type type,
++				  struct cache_info *this_leaf)
++{
++	unsigned int size, multiplier, assoc, len, tmp = get_ctr();
++
++	if (type == CACHE_TYPE_DATA)
++		tmp >>= CTR_DCACHE_SHIFT;
++
++	len = tmp & CTR_LINESIZE_MASK;
++	size = (tmp >> CTR_SIZE_SHIFT) & CTR_SIZE_MASK;
++	assoc = (tmp >> CTR_ASSOCIAT_SHIFT) & CTR_ASSOCIAT_MASK;
++	multiplier = ((tmp >> CTR_MULTIPLIER_SHIFT) & CTR_MULTIPLIER_MASK) + 2;
++
++	this_leaf->type = type;
++	this_leaf->coherency_line_size = 1 << (len + 3);
++	this_leaf->number_of_sets = 1 << (size + 6 - assoc - len);
++	this_leaf->ways_of_associativity = multiplier << (assoc - 1);
++	this_leaf->size = multiplier << (size + 8);
++}
++
++#else /* ARMv7 */
 +
 +#define MAX_CACHE_LEVEL			7	/* Max 7 level supported */
 +/* Ctypen, bits[3(n - 1) + 2 : 3(n - 1)], for n = 1 to 7 */
@@ -80,7 +174,7 @@ index 0000000..5d8b840
 +	unsigned int clidr;
 +	if (level > MAX_CACHE_LEVEL)
 +		return CACHE_TYPE_NOCACHE;
-+	asm volatile ("mrs     %0, clidr_el1" : "=r" (clidr));
++	asm volatile ("mrc p15, 1, %0, c0, c0, 1" : "=r" (clidr));
 +	return CLIDR_CTYPE(clidr, level);
 +}
 +
@@ -109,21 +203,20 @@ index 0000000..5d8b840
 +	u32 ccsidr;
 +
 +	/* Put value into CSSELR */
-+	asm volatile("msr csselr_el1, %x0" : : "r" (csselr));
++	asm volatile ("mcr p15, 2, %0, c0, c0, 0" : : "r" (csselr));
 +	isb();
 +	/* Read result out of CCSIDR */
-+	asm volatile("mrs %0, ccsidr_el1" : "=r" (ccsidr));
++	asm volatile ("mrc p15, 1, %0, c0, c0, 0" : "=r" (ccsidr));
 +
 +	return ccsidr;
 +}
 +
-+static void ci_leaf_init(struct cache_info *this_leaf,
-+			 enum cache_type type, unsigned int level)
++static void __ci_leaf_init(enum cache_type type,
++				  struct cache_info *this_leaf)
 +{
 +	bool is_instr_cache = type & CACHE_TYPE_INST;
-+	u32 tmp = get_ccsidr((level - 1) << 1 | is_instr_cache);
++	u32 tmp = get_ccsidr((this_leaf->level - 1) << 1 | is_instr_cache);
 +
-+	this_leaf->level = level;
 +	this_leaf->type = type;
 +	this_leaf->coherency_line_size =
 +	    (1 << ((tmp & CCSIDR_LINESIZE_MASK) + 2)) * 4;
@@ -138,6 +231,15 @@ index 0000000..5d8b840
 +		((tmp & CCSIDR_WRITE_BACK) ? CACHE_WRITE_BACK : 0) |
 +		((tmp & CCSIDR_READ_ALLOCATE) ? CACHE_READ_ALLOCATE : 0) |
 +		((tmp & CCSIDR_WRITE_ALLOCATE) ? CACHE_WRITE_ALLOCATE : 0);
++}
++
++#endif
++
++static void ci_leaf_init(struct cache_info *this_leaf,
++			 enum cache_type type, unsigned int level)
++{
++	this_leaf->level = level;
++	__ci_leaf_init(type, this_leaf);
 +}
 +
 +int init_cache_level(unsigned int cpu)
@@ -158,6 +260,7 @@ index 0000000..5d8b840
 +
 +	this_cpu_ci->num_levels = level - 1;
 +	this_cpu_ci->num_leaves = leaves;
++
 +	return 0;
 +}
 +
@@ -183,5 +286,60 @@ index 0000000..5d8b840
 +	}
 +	return 0;
 +}
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 1f8fed9..c4abb89 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -495,30 +495,42 @@ config CPU_PABRT_V7
+ # The cache model
+ config CPU_CACHE_V4
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_V4WT
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_V4WB
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_V6
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_V7
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_NOP
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_VIVT
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_VIPT
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config CPU_CACHE_FA
+ 	bool
++	select CPU_HAS_CACHE
++
++config CPU_HAS_CACHE
++	bool
+ 
+ if MMU
+ # The copy-page model
+@@ -846,6 +858,7 @@ config DMA_CACHE_RWFO
+ 
+ config OUTER_CACHE
+ 	bool
++	select CPU_HAS_CACHE
+ 
+ config OUTER_CACHE_SYNC
+ 	bool
 -- 
 1.8.3.2
