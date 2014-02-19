@@ -1,34 +1,48 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Wed, 19 Feb 2014 10:00:44 -0500
-Subject: [PATCH v8 0/4] ARM: BCM5301X: initial support for the
- BCM5301X/BCM470X SoCs with ARM CPU
-In-Reply-To: <1391468506-5800-1-git-send-email-hauke@hauke-m.de>
-References: <1391468506-5800-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <20140219150044.GG29906@beef>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 19 Feb 2014 15:01:21 +0000
+Subject: [PATCH 3/3] ahci: st: Add support for ST's SATA IP
+In-Reply-To: <20140219140458.GA10134@htj.dyndns.org>
+References: <1392641818-23419-1-git-send-email-lee.jones@linaro.org>
+ <1392641818-23419-3-git-send-email-lee.jones@linaro.org>
+ <20140218233645.GP31892@mtj.dyndns.org>
+ <20140219083025.GB10504@lee--X1>
+ <20140219140458.GA10134@htj.dyndns.org>
+Message-ID: <20140219150121.GG10504@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 04, 2014 at 12:01:42AM +0100, Hauke Mehrtens wrote:
-> This adds initial support for Broadcom network SoC from the BCM5301X 
-> and BCM470X line.
+> > Can I do this as a subsequent patch though? The current patch fits
+> > neatly onto our internal stable kernel (currently v3.10). The added
+> > work will require back-porting Hans' patch-set, which has not yet
+> > reached Mainline.
 > 
-> I do not have any documentation, only the vendor source code published 
-> by Asus and Netgear to conform with the GPL, it would be nice to get 
-> some documentation for this Soc like this
-> https://www.broadcom.com/collateral/pg/440X-PG02-R.pdf
-> for the Broadcom BCM440X Ethernet controller.
-> 
-> With some additional patches I got Ethernet working with ~250 MBit/s.
-> 
-> A bootlog can be found here:
-> http://hauke-m.de/files/openwrt/devices/R6250/openwrt-boot-2014-01-05.txt
-> 
-> This is based on 3.14-rc1.
-> 
-> Christian Daudt could you please take these patches.
+> Hmm.... I'll apply Hans' patchset pretty soon and we still have some
+> time in this devel cycle so I'd much prefer applying the final patch.
 
-Applied for 3.15
+I think that's a pretty unfair ask. I could understand if the
+patch(es) didn't apply, or were hindered by the new API change, but I
+do not believe that is the case?
 
-Note: our tree is now git://git.github.com/broadcom/mach-bcm
+FWIW, I have tried to apply the patches Hans send me, but they don't
+seem to apply cleanly.
 
--Matt
+Base is v3.14-rc1:
+
+Applying: ahci-platform: Add support for devices with more then 1 clock
+fatal: sha1 information is lacking or useless (drivers/ata/ahci_platform.c).
+Repository lacks necessary blobs to fall back on 3-way merge.
+Cannot fall back to three-way merge.
+Patch failed at 0001 ahci-platform: Add support for devices with more then 1 clock
+The copy of the patch that failed is found in:
+   .git/rebase-apply/patch
+When you have resolved this problem, run "git am --resolved".
+If you prefer to skip this patch, run "git am --skip" instead.
+To restore the original branch and stop patching, run "git am --abort".
+
+Any ideas?
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
