@@ -1,57 +1,45 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 19 Feb 2014 10:36:24 -0500
-Subject: [PATCH 3/3] ahci: st: Add support for ST's SATA IP
-In-Reply-To: <20140219152336.GH10504@lee--X1>
-References: <1392641818-23419-1-git-send-email-lee.jones@linaro.org>
- <1392641818-23419-3-git-send-email-lee.jones@linaro.org>
- <20140218233645.GP31892@mtj.dyndns.org>
- <20140219083025.GB10504@lee--X1>
- <20140219140458.GA10134@htj.dyndns.org>
- <20140219150121.GG10504@lee--X1>
- <20140219150654.GH10134@htj.dyndns.org>
- <20140219152336.GH10504@lee--X1>
-Message-ID: <20140219153624.GI10134@htj.dyndns.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 19 Feb 2014 10:43:41 -0500
+Subject: [GIT PULL] ARM: mvebu: DT fixes for v3.14
+In-Reply-To: <20140219002446.GD25055@quad.lixom.net>
+References: <20140218161102.GT7862@titan.lakedaemon.net>
+ <20140219002446.GD25055@quad.lixom.net>
+Message-ID: <20140219154341.GK7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 03:23:36PM +0000, Lee Jones wrote:
-> Since when has maintaining core code been the responsibility of the
-> leaf driver developers? If you're aware that the core code is
-> sub-standard then it's you who should be fixing it.
-
-No, there isn't this clear divide between core and the leaf
-developers.  People working on the "core" don't just grow off the
-ground.  You can't just go around piling mess around claiming that
-it's not your responsbility and then expect someone else to clean up
-after you.  How can that be *possibly* sustainable?
-
-> I think it's great that forward thinking developers like Hans take on
-> challenges to improve subsystems which are lacking in one way or
-
-Yeah, which happened only because I pushed back and Hans isn't even
-paid to do it.  Doesn't that say something?  Nobody is actually
-helping Hans' work.  Not at all, nada, zilch.  Just complain when
-directed towards it.
-
-> another, but holding back other development while this process is
-> ongoing is fundamentally wrong. Especially in this case where you're
-> still actively reviewing/NACKing the core changes.
+On Tue, Feb 18, 2014 at 04:24:46PM -0800, Olof Johansson wrote:
+> On Tue, Feb 18, 2014 at 11:11:02AM -0500, Jason Cooper wrote:
+> > All,
+> > 
+> > I've been sitting on the missing alias for a while waiting for more DT
+> > fixes to show up.  Well, finally one did. :(
+> > 
+> > Please pull for v3.14.
+> > 
+> > I intend to re-add the dove PMU node once I know for certain the
+> > corresponding driver is going in to v3.15 (pull request already sent).
 > 
-> Changes to APIs should either support backward-capability or change all
-> effected drivers. I haven't been able to apply the patches yet, so I
-> can't tell which one of these holds true, but I believe it's the
-> former. In which case any new driver using the _current_ (not old)
-> API should fold neatly in. I've even offered to convert to the new API
-> once it's Mainlined. How can I say fairer than that?
+> I've pulled this, but:
 > 
-> Finally, do try and stay at least a little bit professional on the
-> MLs. That sort of disrespectful, rude behaviour may be how you guys do
-> it at Redhat, but most will think it's nothing more than childish.
+> > Jason Cooper (1):
+> >       ARM: dove: dt: revert PMU interrupt controller node
+> 
+> Hmm. Seems like my dove machine (cubox) still booted. This does fix the
+> boot time warning though.
 
-If you want me to be respectful towards you, don't be a crybaby
-screaming "it's not fair".  It apparently isn't clear to you that you
-have to chip in for the whole thing to be maintainable in the long
-term.  Unfair... lol, that was a good one, really.
+ok, this was a compound error on my part.  The reported WARN_ON kernel
+logs stopped after the WARN_ON output.  I assumed the board hung at that
+point.  Second, I've been too focused on the d*mn phy failures in the
+bootfarm I haven't even looked at the cubox booting successfully.
 
--- 
-tejun
+At any rate, it does remove the warning for v3.14, and the driver is
+slated for v3.15, So I'll re-add the node for v3.15.
+
+Unfortunately, this creates a dependency on mvebu/dt-fixes by mvebu/dt.
+Or, I could just add the node to fixes-non-critical for v3.15 to avoid
+the dependency.  Which do you prefer?
+
+thx,
+
+Jason.
