@@ -1,37 +1,36 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 19 Feb 2014 15:14:43 -0800
-Subject: [PATCH v4 3/4] arm: zynq: Don't use arm_global_timer with cpufreq
-In-Reply-To: <1392851684-29950-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1392851684-29950-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1392851684-29950-4-git-send-email-soren.brinkmann@xilinx.com>
+Date: Wed, 19 Feb 2014 15:14:40 -0800
+Subject: [PATCH v4 0/4] ARM: zynq: cpufreq support
+Message-ID: <1392851684-29950-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer frequency of the arm_global_timer depends on the CPU
-frequency. With cpufreq altering that frequency the arm_global_timer
-does not maintain a stable time base. Therefore don't enable that timer
-in case cpufreq is enabled.
+Hi,
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-v4:
- - no change
+another iteration of this series. The patches are the same as in v3, but
+the series shrank a bit. I rebased this series on tip/timers/core, hence
+the two patches for the clockevent core fell out, since Thomas already
+applied those.
+Additionally I removed the patch 'clocksource/cadence_ttc: Use only one
+counter'. Thomas brought up some questions regarding that patch which
+need to be investigated. Since it is not required for the rest of this
+series, I just dropped it for now.
 
- arch/arm/mach-zynq/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+	Thanks,
+	S?ren
 
-diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/mach-zynq/Kconfig
-index 6b04260aa142..f84fab14f0b7 100644
---- a/arch/arm/mach-zynq/Kconfig
-+++ b/arch/arm/mach-zynq/Kconfig
-@@ -13,6 +13,6 @@ config ARCH_ZYNQ
- 	select HAVE_SMP
- 	select SPARSE_IRQ
- 	select CADENCE_TTC_TIMER
--	select ARM_GLOBAL_TIMER
-+	select ARM_GLOBAL_TIMER if !CPU_FREQ
- 	help
- 	  Support for Xilinx Zynq ARM Cortex A9 Platform
+Soren Brinkmann (4):
+  clocksource/cadence_ttc: Call clockevents_update_freq() with IRQs
+    enabled
+  clocksource/cadence_ttc: Overhaul clocksource frequency adjustment
+  arm: zynq: Don't use arm_global_timer with cpufreq
+  arm: zynq: Add support for cpufreq
+
+ arch/arm/boot/dts/zynq-7000.dtsi        |   6 ++
+ arch/arm/mach-zynq/Kconfig              |   4 +-
+ arch/arm/mach-zynq/common.c             |   3 +
+ drivers/clocksource/cadence_ttc_timer.c | 121 +++++++++++++++++++++++---------
+ 4 files changed, 98 insertions(+), 36 deletions(-)
+
 -- 
 1.9.0.1.g4196000
