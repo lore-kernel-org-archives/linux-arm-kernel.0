@@ -1,75 +1,63 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 20 Feb 2014 02:22:31 +0300
-Subject: [PATCH v2 2/2] ARM: shmobile: lager: add Ether DT support
-In-Reply-To: <201402200218.23099.sergei.shtylyov@cogentembedded.com>
-References: <201402200218.23099.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201402200222.32265.sergei.shtylyov@cogentembedded.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 19 Feb 2014 23:24:38 +0100
+Subject: [PATCH v2 01/19] serial: sh-sci: Enable the driver on all ARM
+ platforms
+In-Reply-To: <20140219205446.GD6988@pengutronix.de>
+References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1383086274-11049-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20140219205446.GD6988@pengutronix.de>
+Message-ID: <1609898.QTd44x6TTB@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the Lager board dependent part of the Ether device node. 
+Hi Uwe,
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Wednesday 19 February 2014 21:54:46 Uwe Kleine-K?nig wrote:
+> On Tue, Oct 29, 2013 at 11:37:36PM +0100, Laurent Pinchart wrote:
+> > Renesas ARM platforms are transitioning from single-platform to
+> > multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
+> > driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
+> > and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
+> > COMPILE_TEST.
+> > 
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Cc: linux-serial at vger.kernel.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  drivers/tty/serial/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> > index febd45c..9a5a8ef 100644
+> > --- a/drivers/tty/serial/Kconfig
+> > +++ b/drivers/tty/serial/Kconfig
+> > @@ -709,7 +709,7 @@ config SERIAL_IP22_ZILOG_CONSOLE
+> > 
+> >  config SERIAL_SH_SCI
+> >  
+> >  	tristate "SuperH SCI(F) serial port support"
+> > 
+> > -	depends on HAVE_CLK && (SUPERH || ARCH_SHMOBILE)
+> > +	depends on HAVE_CLK && (SUPERH || ARM || COMPILE_TEST)
+> > 
+> >  	select SERIAL_CORE
+> 
+> This patch is in mainline as d4f9e7b3d12e92ede642f6f4fc7d959f06da8ccc
+> since v3.13-rc1. I wonder if
+> 
+> 	depends on HAVE_CLK && (SUPERH || ARCH_SHMOBILE || COMPILE_TEST)
+> 
+> isn't the better option. (Since bf98c1eac1d4a6bcf00532e4fa41d8126cd6c187
+> ARCH_SHMOBILE is enabled for both multi-platform and legacy shmobile
+> configs.) Or do you plan to deprecate ARCH_SHMOBILE?
 
----
-Changes in version 2:
-- moved PHY pin node phandle from PHY device node to the Ether device node, thus
-  removing all pin control properties from the PHY node;
-- resolved reject.
+We don't plan to deprecate ARCH_SHMOBILE. I've posted a patch to fix this, 
+please see http://www.spinics.net/lists/linux-sh/msg28296.html ("[PATCH 1/2] 
+serial: sh-sci: Restrict non-COMPILE_TEST compilation").
 
- arch/arm/boot/dts/r8a7790-lager.dts |   28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+-- 
+Regards,
 
-Index: renesas/arch/arm/boot/dts/r8a7790-lager.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7790-lager.dts
-+++ renesas/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -1,7 +1,8 @@
- /*
-  * Device Tree Source for the Lager board
-  *
-- * Copyright (C) 2013 Renesas Solutions Corp.
-+ * Copyright (C) 2013-2014 Renesas Solutions Corp.
-+ * Copyright (C) 2014 Cogent Embedded, Inc.
-  *
-  * This file is licensed under the terms of the GNU General Public License
-  * version 2.  This program is licensed "as is" without any warranty of any
-@@ -124,6 +125,16 @@
- 		renesas,function = "scif0";
- 	};
- 
-+	ether_pins: ether {
-+		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
-+		renesas,function = "eth";
-+	};
-+
-+	phy1_pins: phy1 {
-+		renesas,groups = "intc_irq0";
-+		renesas,function = "intc";
-+	};
-+
- 	scif1_pins: serial1 {
- 		renesas,groups = "scif1_data";
- 		renesas,function = "scif1";
-@@ -150,6 +161,21 @@
- 	};
- };
- 
-+&ether {
-+	pinctrl-0 = <&ether_pins &phy1_pins>;
-+	pinctrl-names = "default";
-+
-+	phy-handle = <&phy1>;
-+	renesas,ether-link-active-low;
-+	status = "ok";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+		interrupt-parent = <&irqc0>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
- &mmcif1 {
- 	pinctrl-0 = <&mmc1_pins>;
- 	pinctrl-names = "default";
+Laurent Pinchart
