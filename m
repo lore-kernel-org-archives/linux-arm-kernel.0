@@ -1,51 +1,56 @@
 From: Li.Xiubo@freescale.com (Xiubo Li)
-Date: Wed, 19 Feb 2014 13:38:41 +0800
-Subject: [PATCH 2/4] ARM: dts: Enable SAI ALSA SoC DAI device for Vybrid VF610
- TOWER board.
+Date: Wed, 19 Feb 2014 13:38:42 +0800
+Subject: [PATCH 3/4] ARM: dts: Enable SGTL5000 codec based audio driver node
+ for VF610 TOWER.
 In-Reply-To: <1392788323-6092-1-git-send-email-Li.Xiubo@freescale.com>
 References: <1392788323-6092-1-git-send-email-Li.Xiubo@freescale.com>
-Message-ID: <1392788323-6092-3-git-send-email-Li.Xiubo@freescale.com>
+Message-ID: <1392788323-6092-4-git-send-email-Li.Xiubo@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds and enables the SAI device.
+This patch adds and enables SGTL5000 codec support.
 
 Signed-off-by: Xiubo Li <Li.Xiubo@freescale.com>
 ---
- arch/arm/boot/dts/vf610-twr.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/vf610-twr.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
 diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index e3a3805..8217854 100644
+index 8217854..29790c9 100644
 --- a/arch/arm/boot/dts/vf610-twr.dts
 +++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -127,9 +127,27 @@
- 				VF610_PAD_PTB5__UART1_RX		0x21a1
- 			>;
+@@ -34,6 +34,17 @@
  		};
-+
-+		pinctrl_sai2: sai2grp {
-+		      fsl,pins = <
-+			      VF610_PAD_PTA16__SAI2_TX_BCLK   0x02ed
-+			      VF610_PAD_PTA18__SAI2_TX_DATA   0x02ee
-+			      VF610_PAD_PTA19__SAI2_TX_SYNC   0x02ed
-+			      VF610_PAD_PTA21__SAI2_RX_BCLK   0x02ed
-+			      VF610_PAD_PTA22__SAI2_RX_DATA   0x02ed
-+			      VF610_PAD_PTA23__SAI2_RX_SYNC   0x02ed
-+			      VF610_PAD_PTB18__EXT_AUDIO_MCLK 0x02ed
-+			>;
-+		};
  	};
+ 
++	regulators {
++		compatible = "simple-bus";
++
++		reg_3p3v: 3p3v {
++			compatible = "regulator-fixed";
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++	};
  };
  
-+&sai2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sai2>;
-+	status = "okay";
-+};
-+
- &uart1 {
+ &dspi0 {
+@@ -72,6 +83,14 @@
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
+ 	pinctrl-0 = <&pinctrl_i2c0>;
+ 	status = "okay";
++
++	codec: sgtl5000 at 0a {
++	       compatible = "fsl,sgtl5000";
++	       reg = <0x0a>;
++	       VDDA-supply = <&reg_3p3v>;
++	       VDDIO-supply = <&reg_3p3v>;
++	       clocks = <&clks VF610_CLK_SAI2>;
++       };
+ };
+ 
+ &iomuxc {
 -- 
 1.8.4
