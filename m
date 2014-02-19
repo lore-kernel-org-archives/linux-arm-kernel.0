@@ -1,45 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 19 Feb 2014 10:43:41 -0500
-Subject: [GIT PULL] ARM: mvebu: DT fixes for v3.14
-In-Reply-To: <20140219002446.GD25055@quad.lixom.net>
-References: <20140218161102.GT7862@titan.lakedaemon.net>
- <20140219002446.GD25055@quad.lixom.net>
-Message-ID: <20140219154341.GK7862@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Feb 2014 16:54:54 +0100
+Subject: [Patch v3 20/23] ARM: config: Add a multi_v5_defconfig
+In-Reply-To: <1392822524.597155607@f84.i.mail.ru>
+References: <1392819174-11634-1-git-send-email-andrew@lunn.ch>
+ <2697728.sKu8bCFvXU@wuerfel> <1392822524.597155607@f84.i.mail.ru>
+Message-ID: <2242951.MozLvvuPx0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 04:24:46PM -0800, Olof Johansson wrote:
-> On Tue, Feb 18, 2014 at 11:11:02AM -0500, Jason Cooper wrote:
-> > All,
+On Wednesday 19 February 2014 19:08:44 Alexander Shiyan wrote:
+> ?????, 19 ??????? 2014, 15:54 +01:00 ?? Arnd Bergmann <arnd@arndb.de>:
+> > On Wednesday 19 February 2014 18:19:08 Alexander Shiyan wrote:
+
+> > > Should we disable lowlevel debug for multi-* config?
 > > 
-> > I've been sitting on the missing alias for a while waiting for more DT
-> > fixes to show up.  Well, finally one did. :(
+> > Yes, definitely.
 > > 
-> > Please pull for v3.14.
-> > 
-> > I intend to re-add the dove PMU node once I know for certain the
-> > corresponding driver is going in to v3.15 (pull request already sent).
+> > On a related note, I'd like to add a CONFIG_BROKEN_MULTIPLATFORM Kconfig
+> > symbol and make all options depend on that which will result in a kernel
+> >
 > 
-> I've pulled this, but:
+> config DEBUG_LL
+>   depends on! ARCH_MULTIPLATFORM
 > 
-> > Jason Cooper (1):
-> >       ARM: dove: dt: revert PMU interrupt controller node
-> 
-> Hmm. Seems like my dove machine (cubox) still booted. This does fix the
-> boot time warning though.
+> is not enough for this?
 
-ok, this was a compound error on my part.  The reported WARN_ON kernel
-logs stopped after the WARN_ON output.  I assumed the board hung at that
-point.  Second, I've been too focused on the d*mn phy failures in the
-bootfarm I haven't even looked at the cubox booting successfully.
+No, because that means you can no longer enable DEBUG_LL for any
+kernel on MVEBU, IMX or any platform that depends on ARCH_MULTIPLATFORM.
 
-At any rate, it does remove the warning for v3.14, and the driver is
-slated for v3.15, So I'll re-add the node for v3.15.
-
-Unfortunately, this creates a dependency on mvebu/dt-fixes by mvebu/dt.
-Or, I could just add the node to fixes-non-critical for v3.15 to avoid
-the dependency.  Which do you prefer?
-
-thx,
-
-Jason.
+	Arnd 
