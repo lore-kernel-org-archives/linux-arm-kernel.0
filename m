@@ -1,168 +1,62 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 19 Feb 2014 16:12:54 +0000
-Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
-In-Reply-To: <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
-References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
- <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Feb 2014 16:12:37 +0000
+Subject: [PATCH v9 1/6] arm64: Add macros to manage processor debug state
+In-Reply-To: <20140219160359.GB22252@arm.com>
+References: <1390908022-10287-1-git-send-email-vijay.kilari@gmail.com>
+ <1390908022-10287-2-git-send-email-vijay.kilari@gmail.com>
+ <20140129105546.GC26622@mudshark.cambridge.arm.com>
+ <CALicx6uw3En92GhrKpAoavzwwNKWR8C8hHcS5B+eyLX_dC0LBA@mail.gmail.com>
+ <20140217130149.GA5856@arm.com>
+ <CALicx6uHqyJ-n+b-zfua6P=UsJ+a2_2h-H6krx-DBJYWfF=7jg@mail.gmail.com>
+ <20140218120249.GD11049@arm.com>
+ <CALicx6v6=WdRPoZ-vcxf7zusooB5r1V9WnjBf3QjOiO7yik3sw@mail.gmail.com>
+ <20140219113157.GG30457@arm.com> <20140219160359.GB22252@arm.com>
+Message-ID: <20140219161236.GG28173@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 01:52:09AM +0000, Sebastian Capella wrote:
+On Wed, Feb 19, 2014 at 04:03:59PM +0000, Catalin Marinas wrote:
+> On Wed, Feb 19, 2014 at 11:31:57AM +0000, Catalin Marinas wrote:
+> > BUG: scheduling while atomic: kworker/u8:0/6/0x00000002
+> > Modules linked in:
+> > CPU: 1 PID: 6 Comm: kworker/u8:0 Not tainted 3.14.0-rc3+ #306
+> > Workqueue: khelper __call_usermodehelper
+> > Call trace:
+> > [<ffffffc000087dbc>] dump_backtrace+0x0/0x12c
+> > [<ffffffc000087efc>] show_stack+0x14/0x1c
+> > [<ffffffc00043c224>] dump_stack+0x78/0xc4
+> > [<ffffffc000439b48>] __schedule_bug+0x40/0x54
+> > [<ffffffc00043d67c>] __schedule+0x514/0x604
+> > [<ffffffc00043d794>] schedule+0x28/0x78
+> > [<ffffffc00043cc90>] schedule_timeout+0x170/0x1bc
+> > [<ffffffc00043e16c>] wait_for_common+0xc0/0x14c
+> > [<ffffffc00043e280>] wait_for_completion_killable+0x14/0x28
+> > [<ffffffc0000942f8>] do_fork+0x158/0x2a8
+> > [<ffffffc000094478>] kernel_thread+0x30/0x38
+> > [<ffffffc0000a842c>] __call_usermodehelper+0x34/0xa8
+> > [<ffffffc0000ab300>] process_one_work+0x118/0x354
+> > [<ffffffc0000abfcc>] worker_thread+0x13c/0x3c0
+> > [<ffffffc0000b1e84>] kthread+0xd4/0xe8
+> > 
+> > 
+> > It gets much worse if I run with two CPUs and CONFIG_KGDB_KDB enabled
+> > (but fine with a single CPU).
+> > 
+> > So no need to post another series for now but please check the multi-CPU
+> > case as well and send a separate fix. I'll dig a bit on my side as well.
+> 
+> So far I'm done with the investigation. It looks to me like one of the
+> kgdb tests, kgdb core or the arm64 back-end (or maybe more than one) is
+> not SMP safe. The errors either appear or disappear based on the printks
+> I put through the kgdb test or other config options which I enable.
+> 
+> Could you please look into making the kgdb back-end SMP-safe?
 
-[...]
+There are certainly potential SMP problems in the back-end, which I asked
+about in the initial series:
 
-> diff --git a/arch/arm/kernel/hibernate.c b/arch/arm/kernel/hibernate.c
-> new file mode 100644
-> index 0000000..16f406f
-> --- /dev/null
-> +++ b/arch/arm/kernel/hibernate.c
-> @@ -0,0 +1,106 @@
-> +/*
-> + * Hibernation support specific for ARM
-> + *
-> + * Derived from work on ARM hibernation support by:
-> + *
-> + * Ubuntu project, hibernation support for mach-dove
-> + * Copyright (C) 2010 Nokia Corporation (Hiroshi Doyu)
-> + * Copyright (C) 2010 Texas Instruments, Inc. (Teerth Reddy et al.)
-> + *  https://lkml.org/lkml/2010/6/18/4
-> + *  https://lists.linux-foundation.org/pipermail/linux-pm/2010-June/027422.html
-> + *  https://patchwork.kernel.org/patch/96442/
-> + *
-> + * Copyright (C) 2006 Rafael J. Wysocki <rjw@sisk.pl>
-> + *
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +
-> +#include <linux/mm.h>
-> +#include <linux/suspend.h>
-> +#include <asm/tlbflush.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/system_misc.h>
-> +#include <asm/idmap.h>
-> +#include <asm/suspend.h>
-> +
-> +extern const void __nosave_begin, __nosave_end;
-> +
-> +int pfn_is_nosave(unsigned long pfn)
-> +{
-> +	unsigned long nosave_begin_pfn =
-> +			__pa_symbol(&__nosave_begin) >> PAGE_SHIFT;
-> +	unsigned long nosave_end_pfn =
-> +			PAGE_ALIGN(__pa_symbol(&__nosave_end)) >> PAGE_SHIFT;
-> +
-> +	return (pfn >= nosave_begin_pfn) && (pfn < nosave_end_pfn);
-> +}
-> +
-> +void notrace save_processor_state(void)
-> +{
-> +	WARN_ON(num_online_cpus() != 1);
-> +	flush_thread();
+  http://lkml.kernel.org/r/CALicx6v1eGHRwWPrjzihzBZxCu8t1vpMoq-YfutSm4mRmP6gEQ at mail.gmail.com
 
-Can you explain to me please why we need to call flush_thread() here ?
-At this point in time syscore_suspend() was already called and CPU
-peripheral state saved through CPU PM notifiers.
+The reply from Vijay suggested that everything is confined to a single CPU.
 
-> +	local_fiq_disable();
-
-To me it looks like we are using this hook to disable fiqs, since it is
-not done in generic code.
-
-> +}
-> +
-> +void notrace restore_processor_state(void)
-> +{
-> +	local_fiq_enable();
-> +}
-> +
-> +/*
-> + * Snapshot kernel memory and reset the system.
-> + * After resume, the hibernation snapshot is written out.
-> + */
-> +static int notrace __swsusp_arch_save_image(unsigned long unused)
-> +{
-> +	int ret;
-> +
-> +	ret = swsusp_save();
-> +	if (ret == 0)
-> +		soft_restart(virt_to_phys(cpu_resume));
-
-By the time the suspend finisher (ie this function) is run, the
-processor state has been saved and I think that's all you have to do,
-function can just return after calling swsusp_save(), unless I am missing
-something.
-
-I do not understand why a soft_restart is required here. On a side note,
-finisher is called with irqs disabled so, since you added a function for
-soft restart noirq, it should be used, if needed, but I have to understand
-why in the first place.
-
-> +	return ret;
-> +}
-> +
-> +/*
-> + * Save the current CPU state before suspend / poweroff.
-> + */
-> +int notrace swsusp_arch_suspend(void)
-> +{
-> +	return cpu_suspend(0, __swsusp_arch_save_image);
-
-If the goal of soft_restart is to return 0 on success from this call,
-you can still do that without requiring a soft_restart in the first
-place. IIUC all you want to achieve is to save processor context
-registers so that when you resume from image you will actually return
-from here.
-
-> +}
-> +
-> +/*
-> + * The framework loads the hibernation image into a linked list anchored
-> + * at restore_pblist, for swsusp_arch_resume() to copy back to the proper
-> + * destinations.
-> + *
-> + * To make this work if resume is triggered from initramfs, the
-> + * pagetables need to be switched to allow writes to kernel mem.
-
-Can you elaborate a bit more on this please ?
-
-> + */
-> +static void notrace __swsusp_arch_restore_image(void *unused)
-> +{
-> +	struct pbe *pbe;
-> +
-> +	cpu_switch_mm(idmap_pgd, &init_mm);
-
-Same here, thanks.
-
-> +	for (pbe = restore_pblist; pbe; pbe = pbe->next)
-> +		copy_page(pbe->orig_address, pbe->address);
-> +
-> +	soft_restart_noirq(virt_to_phys(cpu_resume));
-
-This soft_restart is justified so that you resume from the context saved
-when creating the image.
-
-> +}
-> +
-> +static u8 __swsusp_resume_stk[PAGE_SIZE/2] __nosavedata;
-> +
-> +/*
-> + * Resume from the hibernation image.
-> + * Due to the kernel heap / data restore, stack contents change underneath
-> + * and that would make function calls impossible; switch to a temporary
-> + * stack within the nosave region to avoid that problem.
-> + */
-> +int __naked swsusp_arch_resume(void)
-> +{
-> +	extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-
-Ok, a function with attribute __naked that still calls C functions, is
-attr __naked really needed here ?
-
-> +	cpu_init();	/* get a clean PSR */
-
-cpu_init is called in the cpu_resume path, why is this call needed here ?
-
-Thanks,
-Lorenzo
+Will
