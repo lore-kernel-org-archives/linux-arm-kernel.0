@@ -1,28 +1,40 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 19 Feb 2014 18:38:03 +0000 (UTC)
-Subject: [PATCH] ARM: AM43x: hwmod data: register spinlock OCP
- interface
-In-Reply-To: <1389397464-13345-1-git-send-email-s-anna@ti.com>
-References: <1389397464-13345-1-git-send-email-s-anna@ti.com>
-Message-ID: <alpine.DEB.2.02.1402191837340.8777@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Feb 2014 18:53:15 +0000
+Subject: [PATCH RESEND v3] clk: return probe defer when DT clock not
+ yet ready
+In-Reply-To: <20140219190305.788e537d@armhf>
+References: <20140208132446.2A26694003E@smtp1-g21.free.fr>
+ <20140219190305.788e537d@armhf>
+Message-ID: <20140219185315.GV21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Jan 2014, Suman Anna wrote:
-
-> AM43xx has a spinlock module which is identical to the
-> one present on AM33xx. Register the spinlock ocp_if link
-> so that the spinlock hwmod and associated omap_device can
-> be instantiated, and the runtime pm API could be used by
-> the OMAP hwspinlock driver.
+On Wed, Feb 19, 2014 at 07:03:05PM +0100, Jean-Francois Moine wrote:
+> On Mon, 25 Nov 2013 19:47:04 +0100
+> Jean-Francois Moine <moinejf@free.fr> wrote:
 > 
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
+> > At probe time, a clock device may not be ready when some other device
+> > wants to use it.
+> > 
+> > This patch lets the functions clk_get/devm_clk_get return a probe defer
+> > when the clock is defined in the DT but not yet available.
+> 
+> Hi Mike,
+> 
+> Any news about this patch?
 
-Thanks, queued for v3.15.
+Mike,
 
-Please remember to cc the linux-arm-kernel mailing list on all OMAP 
-patches.  I've added it to this message.
+Can you please have a look at this patch so that either you or I can take
+this.  It /is/ required so that subsystems can correctly identify whether
+a clock is missing because it's not specified in DT, or whether the clock
+is missing because it's specified in DT but doesn't yet exist.
 
+This patch has been hanging around for ages and deserves some attention.
 
-- Paul
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
