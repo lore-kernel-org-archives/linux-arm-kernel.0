@@ -1,61 +1,87 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 19 Feb 2014 10:12:46 +0000
-Subject: [PATCH v4 00/12] arm/arm64: KVM: host cache maintenance when
- guest caches are off
-In-Reply-To: <56ae8a2975cd21765b90d98260862af1@www.loen.fr>
-References: <1392737253-10480-1-git-send-email-marc.zyngier@arm.com>
- <CAG7+5M3nBfX7qfq9d6Cvrpk2YeoHsy1yG0PjmTspa6zqQvUsXg@mail.gmail.com>
- <56ae8a2975cd21765b90d98260862af1@www.loen.fr>
-Message-ID: <20140219101246.GD30457@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 19 Feb 2014 11:20:21 +0100
+Subject: [GIT PULL] clk: mvebu: fixes for v3.14
+In-Reply-To: <20140219054245.8345.72570@quantum>
+References: <20140208173154.GL8533@titan.lakedaemon.net>
+ <20140219054245.8345.72570@quantum>
+Message-ID: <53048565.4080105@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 09:02:34AM +0000, Marc Zyngier wrote:
-> On 2014-02-18 20:57, Eric Northup wrote:
-> > On Tue, Feb 18, 2014 at 7:27 AM, Marc Zyngier <marc.zyngier@arm.com> 
-> > wrote:
-> >>
-> >> When we run a guest with cache disabled, we don't flush the cache to
-> >> the Point of Coherency, hence possibly missing bits of data that 
-> >> have
-> >> been written in the cache, but have not yet reached memory.
-> >>
-> >> We also have the opposite issue: when a guest enables its cache,
-> >> whatever sits in the cache is suddenly going to become visible,
-> >> shadowing whatever the guest has written into RAM.
-> >>
-> >> There are several approaches to these issues:
-> >> - Using the DC bit when caches are off: this breaks guests assuming
-> >>   caches off while doing DMA operations. Bootloaders, for example.
-> >>   It also breaks the I-D coherency.
-> >> - Fetch the memory attributes on translation fault, and flush the
-> >>   cache while handling the fault. This relies on using the PAR_EL1
-> >>   register to obtain the Stage-1 memory attributes, and tends to be
-> >>   slow.
-> >> - Detecting the translation faults occuring with MMU off (and
-> >>   performing a cache clean), and trapping SCTLR_EL1 to detect the
-> >>   moment when the guest is turning its caches on (and performing a
-> >>   cache invalidation). Trapping of SCTLR_EL1 is then disabled to
-> >>   ensure the best performance.
-> >
-> > This will preclude noticing the 2nd .. Nth cache off -> on cycles,
-> > right?  Will any guests care - doesn't kexec go through a caches-off
-> > state?
+On 19/02/2014 06:42, Mike Turquette wrote:
+> Quoting Jason Cooper (2014-02-08 09:31:54)
+>> Mike,
+>>
+>> Here's a round of fixes I've had in -next for several days.  It's not
+>> the ideal solution, but a short term one while we hash out a proper
+>> solution for v3.15+.
 > 
-> kexec, bootloaders, and whatever firmware requires to switch caches on 
-> and then off. Guest does care, but we don't have an (efficient) 
-> architectural solution to that.
+> Taken into clk-fixes.
+
+Hi Mike,
+
+we will have the same kind of issue with Armada 375 and Armada38x.
+Are you going to take the patch "clk: respect the clock dependencies
+in of_clk_init"
+See the V2 here http://www.spinics.net/lists/arm-kernel/msg306442.html
+
+My intent is not to put a pressure on you to take this patch, but as
+I explained Armada 375 and Armada38x will be in the same situation of
+the other mvebu were. The patch I mentioned is a solution to fix it
+and if it won't be merged, than we need an other solution. This alternate
+solution is easy to find, it will be the same as this patch set.
+
+
+Thanks,
+
+Gregory
+
+
+
 > 
-> The best I can think of so far is a "switch-the-damned-thing-off" 
-> hypercall that would do the above before returning to the guest.
+> Thanks!
+> Mike
+> 
+>>
+>> thx,
+>>
+>> Jason.
+>>
+>> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+>>
+>>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.infradead.org/linux-mvebu.git tags/mvebu-clk-fixes-3.14
+>>
+>> for you to fetch changes up to 58d516ae95cbf7eed44f85a01cdfad41f17b4197:
+>>
+>>   clk: mvebu: kirkwood: maintain clock init order (2014-02-06 18:07:01 +0000)
+>>
+>> ----------------------------------------------------------------
+>> mvebu clock fixes for v3.14
+>>
+>>  - kirkwood, dove, armada-xp, armada-370
+>>     - force clock init order broken by sorting DT ocp nodes by address
+>>     - fixes boot failures on affected platforms
+>>
+>> ----------------------------------------------------------------
+>> Sebastian Hesselbarth (4):
+>>       clk: mvebu: armada-370: maintain clock init order
+>>       clk: mvebu: armada-xp: maintain clock init order
+>>       clk: mvebu: dove: maintain clock init order
+>>       clk: mvebu: kirkwood: maintain clock init order
+>>
+>>  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
+>>  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
+>>  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
+>>  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
+>>  4 files changed, 44 insertions(+), 50 deletions(-)
 
-We could push for a PSCI extension to cover such cases as well, though
-even for a host, we may not need to involve the secure world for kexec.
-
-An alternative is to trap the set/way cache flushing and re-activate the
-MMU trapping in the guest. If the MMU is still on, disable trapping
-until the next set/way (since that's a normal function on power-down
-code sequences). But it doesn't look nice ;).
 
 -- 
-Catalin
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
