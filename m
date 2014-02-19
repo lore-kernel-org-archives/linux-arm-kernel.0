@@ -1,124 +1,45 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 19 Feb 2014 13:18:24 -0700
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <3312083.odPX4th7oi@wuerfel>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <2200534.anptP81x7X@wuerfel>
- <CAErSpo7JNyqK3NZgP++OWkQYQzZ1_BdR3GrK3vOd8c=_YAX7nA@mail.gmail.com>
- <3312083.odPX4th7oi@wuerfel>
-Message-ID: <CAErSpo5PCTyZ5jzumJxD=CCN+-t-Z31Cw+9ejT_oTQ4fFQePag@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 19 Feb 2014 21:19:50 +0100
+Subject: [GIT PULL] efm32 cleanups for next
+Message-ID: <20140219201950.GC6988@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 12:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 19 February 2014 11:20:19 Bjorn Helgaas wrote:
->> On Wed, Feb 19, 2014 at 2:58 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Tuesday 18 February 2014 17:28:14 Bjorn Helgaas wrote:
->
->> > The second one seems a little easier to implement, and I don't
->> > see what _SEG is used for other than to avoid having domains
->> > when you don't need them. Is there more to it that I'm missing?
->>
->> Not really, but I do have a question related to OS management of host
->> bridge bus number apertures.  Currently, Linux never changes a host
->> bridge's bus number range, but it's conceivable that we could in some
->> hotplug scenario.  ACPI does provide a mechanism to do so (_PRS,
->> _SRS), and other host bridge drivers could also do this by programming
->> CSRs to change the bus number range.  The PCI domain is the logical
->> place to manage allocation of the 00-ff range of bus numbers.
->>
->> 1) x86 platforms may have constraints because PCIBIOS and the 0xcf8
->> config access mechanism are unaware of segments.  If a platform has to
->> support legacy OSes that use those, it can't reuse bus numbers even in
->> different segment groups.  The platform might have to use multiple
->> segments to allow multiple ECAM regions, but use _PRS/_SRS to prevent
->> bus number overlaps to keep legacy config access working.  Obviously
->> this is only an issue if there are non-segment aware config access
->> methods.
->
-> Right, I don't think this will be an issue outside of x86/ia64/alpha,
-> since on all other architectures I'm aware of you have no PCIBIOS
-> and each host controller would also have its own config space.
-> Even host controllers using 0xfc8 would be fine because each host
-> bridge normally has its own I/O space.
->
->> 2) If two host bridges share an ECAM region, I think we're forced to
->> put them in the same domain: if we put them in different domains,
->> Linux might assign [bus 00-ff] to both bridges, and ECAM config
->> accesses would only work for one of the bridges.  This is quite common
->> on x86 and is a potential issue for any architecture.
->
-> Right, this is an interesting case indeed, and I think we haven't
-> considered it in the binding so far. We already encode a "bus-range"
-> in DT, so we can easily partition the ECAM config space, but it
-> still violates one of the two assumptions:
-> a) that the register ranges for the two host bridge devices are
->    non-overlapping in DT
-> b) that the ECAM register range as specified in DT starts at bus
->    0 and is a power-of-two size.
-> Since the binding is not fixed that, we could change the definition to
-> say that the ECAM register range in the "reg" property must match
-> the buses listed in the "bus-range" property.
+Hello,
 
-Addresses in the ACPI MCFG table correspond to bus number 0, but the
-MCFG also provides start & end bus numbers, so the valid range does
-not necessarily start with bus 0 and need not be power-of-two in size.
- Something similar sounds like a good idea for DT.
+the following changes since commit 11d73c56b96b4297bd96273e9a22b7c72d13f1fa:
 
-> I still want to make sure I understand exactly what this case is about
-> though, i.e. what is shared and what is separate if you have two host
-> bridges with a common ECAM region:
->
-> * I assume I/O space is always shared on x86, but probably separate
->   elsewhere.
+  Merge tag 'dropmachtimexh-v2' of git://git.pengutronix.de/git/ukl/linux into next/cleanup (2014-02-18 22:19:33 -0800)
 
-I think x86 *could* support multiple I/O spaces, but user-mode
-inb/outb could only reach the 0-64K space.  I think ia64 has the same
-limitation on user code, but it supports many spaces in the kernel.
+are available in the git repository at:
 
-> * Each host would always have a fixed memory space aperture, right?
+  git://git.pengutronix.de/git/ukl/linux.git tags/efm32-next
 
-The ACPI _CRS/_PRS/_SRS mechanism theoretically allows changes to the
-bus number, I/O space, and memory space apertures of host bridges.
-But we don't do any of those changes today, and I don't know if any
-BIOSes actually allow it.
+for you to fetch changes up to c72b549182841e3ce3e4849cd7c9b178615f8224:
 
-> * From what I understand from your description, the hardware does
->   not enforce specific bus numbers for each host. How does the
->   host bridge know its root bus number then?
+  ARM: efm32: drop unused file <mach/timex.h> (2014-02-19 11:50:52 +0100)
 
-I don't know details of any specific hardware.  I'm just saying that
-ACPI provides a mechanism for the OS to manipulate the bus number
-range below a host bridge.  Of course, a BIOS is free to omit _PRS and
-_SRS, and in that case, the bus/IO/memory apertures reported by _CRS
-are fixed and can't be changed.  We learn the root bus number from the
-host bridge _CRS (but I'm sure you knew that, so maybe I missed the
-point of your question).
+----------------------------------------------------------------
+Just two simple cleanups for efm32 removing two now unused files.
 
-> * Should I expect one IOMMU per host bridge or one ECAM region,
->   or can either be possible?
+----------------------------------------------------------------
+Uwe Kleine-K?nig (2):
+      ARM: efm32: drop unused file entry-macro.S
+      ARM: efm32: drop unused file <mach/timex.h>
 
-It's possible to have multiple IOMMUs per host bridge, and I think
-they can even be buried down in the PCIe hierarchy.
+These changes are trivial enough that I don't expect any opposition, 
+so they come at once in the form of a pull request. I will send the two
+patches as reply to this mail anyhow.
 
-> * The IntA-IntB IRQ numbers are always per host bridge I assume.
+Best regards
+Uwe
 
-For conventional PCI, INTx are just wires that could go anywhere, so
-there's no connection between them and a host bridge.  You have to
-have a _PRT or similar to make sense out of them.  For PCIe, a Root
-Complex maps INTx emulation messages to system interrupts in an
-implementation-specific way, so we need a _PRT there, too.  I don't
-think there's a requirement that these IRQ numbers be per-host bridge.
+ arch/arm/mach-efm32/include/mach/entry-macro.S | 4 ----
+ arch/arm/mach-efm32/include/mach/timex.h       | 3 ---
+ 2 files changed, 7 deletions(-)
+ delete mode 100644 arch/arm/mach-efm32/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-efm32/include/mach/timex.h
 
-> * Memory space on one host bridge is visible to bus master DMA
->   from a device on another host bridge on x86, right? I assume
->   this won't normally be the case on other architectures.
-
-I think this is also implementation dependent, and I'm not aware of an
-ACPI or other generic way to learn what a particular platform does.
-It seems like this was an issue for MPS configuration, where
-peer-to-peer DMA is a problem because we don't really know how Root
-Complexes handle peer-to-peer transactions.
-
-Bjorn
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
