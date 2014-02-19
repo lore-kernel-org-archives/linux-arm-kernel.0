@@ -1,82 +1,98 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Feb 2014 14:26:10 +0100
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <20140219113755.GD5394@bart.dudau.co.uk>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <1948942.cIbLaKDEOa@wuerfel> <20140219113755.GD5394@bart.dudau.co.uk>
-Message-ID: <2734695.F6QKszum67@wuerfel>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 19 Feb 2014 14:37:49 +0100
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <53047BBB.6040108@keymile.com>
+References: <51DD88A4.1030506@keymile.com> <20130710185706.72b124a4@skate>
+ <51DD9A8C.10608@keymile.com> <20130711163220.2b3adf38@skate>
+ <53039894.10905@keymile.com> <20140218212751.07c2aeb5@skate>
+ <53046D98.6020801@keymile.com> <20140219102658.76eec91e@skate>
+ <53047BBB.6040108@keymile.com>
+Message-ID: <20140219143749.65ff3155@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 February 2014 11:37:55 Liviu Dudau wrote:
+Gerlando, Bjorn,
+
+Bjorn, I added you as the To: because there is a PCI related question
+for you below :)
+
+On Wed, 19 Feb 2014 10:39:07 +0100, Gerlando Falauto wrote:
+
+> spoiler first: SUCCESS!!!!
+
+Awesome :)
+
+> > I'm obviously interested in seeing the message that gets shown, as well
+> > as the new mvebu-mbus debugfs output.
 > 
-> > Right, this needs to be changed when moving the domain into pci_host_bridge.
+> ----------
+> pci 0000:00:01.0:   bridge window [mem 0xe0000000-0xebffffff]
+> PCIE 0.0: creating window at 0xe0000000, size 0xbffffff rounded up to 
+> 0x10000000
+
+Right, rounding from 192 MB to 265 MB.
+
+>   cat /sys/kernel/debug/mvebu-mbus/devices
+> [00] disabled
+> [01] disabled
+> [02] disabled
+> [03] disabled
+> [04] 00000000ff000000 - 00000000ff010000 : nand
+> [05] 00000000f4000000 - 00000000f8000000 : vpcie
+> [06] 00000000fe000000 - 00000000fe010000 : dragonite
+> [07] 00000000e0000000 - 00000000f0000000 : pcie0.0
 > 
-> Yes, if only I understood what the intent was here. Unfortunately, the history
-> of the file stops (for my git tree) at Linus' first commit from v2.6.0, so
-> I need to dig deeper. What I am looking to understand is the answer to this
-> question: "When you want to create a new bus and you want to make sure it
-> is not duplicated, do you go across all domains or pick the current domain
-> and allow for same bus number in different domains?"
-
-I suspect this is for some large IA64 machines where you can see the same
-domain at different addresses, depending on which CPU you are on, or
-something similarly fancy.
-
-Another explanation would be that you can have different ways to describe
-the same hardware: On a PC you can assume that the PCI bus is discoverable
-on I/O port 0x0cf8. At the same time, you may see it in ACPI with an
-mmconfig method.
-
-In any case, you definitely need to allow the same bus numbers on each domain,
-since the most important use case of domains is to get around the 256 bus
-limit.
-
-> To give some context: I'm looking at drivers/pci/probe.c, pci_create_root_bus().
-> Specifically, this code:
+> > For good measure, if you could also dump the registers of the PCIe
+> > window. In your case, it was window 7, so dumping 0xf1020070 and
+> > 0xf1020074 would be useful.
 > 
->         b = pci_alloc_bus();
->         if (!b)
->                 return NULL;
+> Isn't that where the output of debugfs comes from?
+
+It is, but the mvebu-mbus is interpreting the sequence of 1s and 0s to
+give the real size, and this involves a little bit of magic of bit
+manipulation, which I wanted to check by having a look at the raw
+values of the registers.
+
+> > I am not sure, but since we are configuring an invalid memory size,
+> > maybe the MBus behavior is undefined, and we get some completely funky
+> > behavior, where parts of the 192 MB window are actually work, but parts
+> > of it are not.
 > 
->         b->sysdata = sysdata;
->         b->ops = ops;
->         b->number = b->busn_res.start = bus;
->         b2 = pci_find_bus(pci_domain_nr(b), bus);
->         if (b2) {
->                 /* If we already got to this bus through a different bridge, ignore it */
->                 dev_dbg(&b2->dev, "bus already known\n");
->                 goto err_out;
->         }
+> And... Ladies and gentlemen... it turns out YOU'RE RIGHT!!!
+> With your patch now everything works fine!!!
 > 
->         bridge = pci_alloc_host_bridge(b);
->         if (!bridge)
->                 goto err_out;
-> 
-> 
-> If you look at the comment after pci_find_bus, you can see that the intent was
-> to try to find duplicate busses covered by different bridges (but in the same
-> domain? maybe, because there used to be only one domain at the beginning, but
-> then why use pci_domain_nr() here?). Problems I see here:
+> No words (or quads, for that matter) can express how grateful I am! ;-)
 
-Definitely duplicate buses in the same domain, as mentioned above.
+Cool. However, I am not sure my fix is really correct, because is you
+had another PCIe device that needed 64 MB of memory space, the PCIe
+core would have allocated addresses 0xec000000 -> 0xf0000000 to it,
+which would have conflicted with the forced "power of 2 up-rounding"
+we've applied on the memory space of the first device.
 
->   - code is trying to get the domain number of a bus that it just created but not
->     plugged yet in the hierarchy
+Therefore, I believe this constraint should be taken into account by
+the PCIe core when allocating the different memory regions for each
+device.
 
-The sysdata is already assigned, and all architectures either assume there is
-only one domain, or they get the domain number out of the sysdata that is
-filled out prior to calling pci_create_root_bus.
+Bjorn, the mvebu PCIe host driver has the constraint that the I/O and
+memory regions associated to each PCIe device of the emulated bridge
+have a size that is a power of 2.
 
->   - pci_find_bus tries to find a bus in the global list of busses that has the
->     same domain number and bus number as the parameters of the function. But
->     the domain number was plucked out of thin air and all architectures seem to
->     actually give you the current active domain number, not the one that actually
->     covers the bus (and host_bridge) that you are trying to create.
+I am currently using the ->align_resource() hook to ensure that the
+start address of the resource matches certain other constraints, but I
+don't see a way of telling the PCI core that I need the resource to
+have its size rounded up to the next power of 2 size. Is there a way of
+doing this?
 
-Not sure what you mean with 'current active domain number': They clearly look at
-b->sysdata here, which is a local structure describing what we are currently
-probing.
+In the case described by Gerlando, the PCI core has assigned a 192 MB
+region, but the Marvell hardware can only create windows that have a
+power of two size, i.e 256 MB. Therefore, the PCI core should be told
+this constraint, so that it doesn't allocate the next resource right
+after the 192 MB one.
 
-	Arnd
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
