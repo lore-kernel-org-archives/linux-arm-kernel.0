@@ -1,35 +1,37 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 19 Feb 2014 20:26:43 +0100
-Subject: [PATCH v2 0/2] ARM: OMAP4: Fix gpmc_fck clock
-In-Reply-To: <5304DA2C.3030605@ti.com>
-References: <1392801305-1698-1-git-send-email-florian.vaussard@epfl.ch>
- <5304DA2C.3030605@ti.com>
-Message-ID: <53050573.8090506@epfl.ch>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Wed, 19 Feb 2014 13:30:45 -0600
+Subject: [GIT PULL] qcom cleanups for v3.15
+In-Reply-To: <5304FE4B.1020408@codeaurora.org>
+References: <alpine.DEB.2.00.1402101722170.12284@galak-ubuntu.qualcomm.com>
+ <5303F56A.9010107@codeaurora.org>
+ <FE60A8A0-B1C4-46F2-96E8-95FE25503DAF@codeaurora.org>
+ <5304FE4B.1020408@codeaurora.org>
+Message-ID: <E25A5939-BFC3-44AF-9A7D-C7E8013720A6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 02/19/2014 05:22 PM, Tero Kristo wrote:
-> On 02/19/2014 11:15 AM, Florian Vaussard wrote:
->> Hello,
->>
->> Trying to get my SMSC9221 working on OMAP4 with DT,
->> I faced a misconfigured gpmc_fck (dummy clock set to 0)
->> resulting in serveral division-by-zero, misconfigured
->> timings and driver lost in the La La Land.
->>
->> To solve this, patch 1 removes gpmc_fck from the dummy
->> clocks, and patch 2 adds the gpmc_fck DT node and
->> reference it from the gpmc node.
->>
->> Tested on DuoVero/Parlor (OMAP4430) with SMSC9221.
-> 
-> I can't test GPMC myself, but other than that, this set looks good to go.
-> 
+On Feb 19, 2014, at 12:56 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-Thank you. Would you like more test coverage by other people? I would
-like to see this in -rc if possible, as it is needed to boot my OMAP4
-system.
+> On 02/19/14 07:20, Kumar Gala wrote:
+>> On Feb 18, 2014, at 6:06 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> 
+>>> On 02/10/14 15:23, Kumar Gala wrote:
+>>>> Kumar Gala (6):
+>>>>     ARM: dts: msm: split out msm8660 and msm8960 soc into dts include
+>>>>     ARM: msm: kill off hotplug.c
+>>>>     clocksource: qcom: Move clocksource code out of mach-msm
+>>>>     ARM: qcom: Split Qualcomm support into legacy and multiplatform
+>>> Sorry to nag, but can you please address my comment on this patch?
+>> Which comment?  The copyright one or something else?
+>> 
+> 
+> Yes the copyright one.
 
-Regards,
-Florian
+Was going to send that as a separate patch.  So no reason to hold up this pull request on it.
+
+- k
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
