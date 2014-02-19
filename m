@@ -1,39 +1,40 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 19 Feb 2014 08:44:12 +0800
-Subject: [PATCH v9 01/12] usb: doc: phy-mxs: Add more compatible strings
-In-Reply-To: <20140219012419.GB30027@saruman.home>
-References: <1388111921-17326-1-git-send-email-peter.chen@freescale.com>
- <1388111921-17326-2-git-send-email-peter.chen@freescale.com>
- <20140218164924.GM9878@saruman.home>
- <20140219011247.GH15716@S2101-09.ap.freescale.net>
- <20140219012419.GB30027@saruman.home>
-Message-ID: <20140219004408.GA11878@shlinux1.ap.freescale.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 19 Feb 2014 10:46:15 +0900
+Subject: [PATCH] regulator: core bugfix: Use normal enable for always_on
+ regulators
+In-Reply-To: <20140218214007.GE10590@pengutronix.de>
+References: <1392577256-20475-1-git-send-email-mpa@pengutronix.de>
+ <20140218001420.GF2669@sirena.org.uk>
+ <20140218214007.GE10590@pengutronix.de>
+Message-ID: <20140219014615.GK2669@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 07:24:19PM -0600, Felipe Balbi wrote:
-> On Wed, Feb 19, 2014 at 09:12:49AM +0800, Shawn Guo wrote:
-> > On Tue, Feb 18, 2014 at 10:49:24AM -0600, Felipe Balbi wrote:
-> > > On Fri, Dec 27, 2013 at 10:38:30AM +0800, Peter Chen wrote:
-> > > > Add "fsl,imx6q-usbphy" for imx6dq and imx6dl, add
-> > > > "fsl,imx6sl-usbphy" for imx6sl.
-> > > > 
-> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > 
-> > > anybody from DT to give me an Acked-by ?
-> > 
-> > Unfortunately, the DT maintainers and list are not on copy.
-> 
-> Then we need this series to be resent. I'll drop from my queue for now.
-> 
-> -- 
-> balbi
+On Tue, Feb 18, 2014 at 10:40:07PM +0100, Markus Pargmann wrote:
+> On Tue, Feb 18, 2014 at 09:14:20AM +0900, Mark Brown wrote:
 
-Oh, I had thought it was ok that shawn has applied dts change.
-Do we really need dts maintainer's ack for doc if dts has already
-applied?
+> > I don't understand this.  Why is this called _no_delay() and why don't
+> > we want to delay when applying constraints?  We don't want to ever be in
+> > a position where we think a supply is enabled but it has in fact not
+> > finished ramping, and of course enable() may in fact be blocking anyway.
 
--- 
+> I tried not to modify the current behaviour of the core driver for
+> non-gpio regulators. Before this patch only ops->enable() was called
+> which also didn't have a delay. So I seperated the non-delay enable
+> function to have the same behaviour for normal regulators.
 
-Best Regards,
-Peter Chen
+No, that's not good.  The fact that it wasn't applying delays is going
+to be a bug - it should've been doing that.
+
+> Also the constraints are applied when registering a new regulator. For
+> "boot-on" we should not delay because this regulator is already on by
+> definition. But I am not sure what to do with always-on regulators?
+
+I'd just always apply a delay, it's simpler and more robust.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140219/d68d5fd4/attachment.sig>
