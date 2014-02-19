@@ -1,53 +1,47 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Wed, 19 Feb 2014 10:07:44 +0800
-Subject: [PATCH v2 2/2] USB: at91: using USBA_NR_DMAS for DMA channels
-In-Reply-To: <1392775664-16404-1-git-send-email-voice.shen@atmel.com>
-References: <1392775664-16404-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1392775664-16404-2-git-send-email-voice.shen@atmel.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 19 Feb 2014 10:10:43 +0800
+Subject: [PATCH] net: ethernet: remove unneeded dependency of mvneta and
+ update help text
+In-Reply-To: <20140218141303.77c77272@skate>
+References: <1392719391-8851-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140218122952.GM7862@titan.lakedaemon.net>
+ <20140218134532.7607a616@skate>
+ <20140218125206.GN7862@titan.lakedaemon.net>
+ <20140218141303.77c77272@skate>
+Message-ID: <20140219101043.5d403398@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoCs earlier than sama5d3, they have the same number endpoints
-and DMA channels. In driver code, they use the same definition
-USBA_NR_ENDPOINTS for both endpoints and dma channels. However,
-in sama5d3, it has different number for endpoints and DMA channels.
-So, define a new micro USBA_NR_DMAs for DMA channels. And the
-USBA_NR_ENDPOINS is not used anymore, remove it at the same time.
+Dear Thomas,
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
-Changes in v2:
-  - Make the commit message more clearer.
+On Tue, 18 Feb 2014 05:13:03 -0800
+Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
- drivers/usb/gadget/atmel_usba_udc.c | 2 +-
- drivers/usb/gadget/atmel_usba_udc.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+> Dear Jason Cooper,
+> 
+> On Tue, 18 Feb 2014 07:52:06 -0500, Jason Cooper wrote:
+> 
+> > > No, I haven't tested all the build scenarios of course. If you feel
+> > > that this is too dangerous, I can resend a patch that replaces 'depends
+> > > on ARMADA_370_XP' by 'depends on PLAT_ORION'. Would this be OK for you?
+> > 
+> > I'm fine either way.  I'm definitely a "What's in the box?" kind of guy.
+> > But I do like being prepared.
+> 
+> And it's all in your honour!
+> 
+> > The real question is: Do you think this IP block will ever be found on
+> > anything other than Marvell Armada boards?  If so, stick with this
+> > version and build test the crap out of it.  Otherwise, let's save
+> > opening the box for another day.
+> 
+> At this point, I don't expect to see this IP in any other SOCs than
+> Marvell Armada EBU, so I'll resend with a "depends on PLAT_ORION", as I
 
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index 7e67a81..5cded1c 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -1661,7 +1661,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 	if (dma_status) {
- 		int i;
- 
--		for (i = 1; i < USBA_NR_ENDPOINTS; i++)
-+		for (i = 1; i < USBA_NR_DMAS; i++)
- 			if (dma_status & (1 << i))
- 				usba_dma_irq(udc, &udc->usba_ep[i]);
- 	}
-diff --git a/drivers/usb/gadget/atmel_usba_udc.h b/drivers/usb/gadget/atmel_usba_udc.h
-index 2922db5..a70706e 100644
---- a/drivers/usb/gadget/atmel_usba_udc.h
-+++ b/drivers/usb/gadget/atmel_usba_udc.h
-@@ -210,7 +210,7 @@
- #define USBA_FIFO_BASE(x)	((x) << 16)
- 
- /* Synth parameters */
--#define USBA_NR_ENDPOINTS	7
-+#define USBA_NR_DMAS		7
- 
- #define EP0_FIFO_SIZE		64
- #define EP0_EPT_SIZE		USBA_EPT_SIZE_64
--- 
-1.8.5.2
+This IP is used in Marvell Berlin SoCs too ;)
+
+But Berlin SoC doesn't have a mbus concept. Currently, we just hack the
+mvneta to configure the mbus window.
+
+Thanks,
+Jisheng
