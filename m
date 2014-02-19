@@ -1,68 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Feb 2014 20:47:52 +0100
-Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
- controller
-In-Reply-To: <20140219153044.GE5394@bart.dudau.co.uk>
-References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
- <2734695.F6QKszum67@wuerfel> <20140219153044.GE5394@bart.dudau.co.uk>
-Message-ID: <2490895.sJxhc9aC7d@wuerfel>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 19 Feb 2014 19:49:19 +0000 (UTC)
+Subject: [PATCH 2/2] ARM: OMAP2+: fix dpll round_rate() to actually round
+In-Reply-To: <1389944699-27962-3-git-send-email-tomi.valkeinen@ti.com>
+References: <1389944699-27962-1-git-send-email-tomi.valkeinen@ti.com>
+ <1389944699-27962-3-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <alpine.DEB.2.02.1402191928480.8777@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 February 2014 15:30:44 Liviu Dudau wrote:
-> On Wed, Feb 19, 2014 at 02:26:10PM +0100, Arnd Bergmann wrote:
-> > On Wednesday 19 February 2014 11:37:55 Liviu Dudau wrote:
+On Fri, 17 Jan 2014, Tomi Valkeinen wrote:
 
-> > >   - code is trying to get the domain number of a bus that it just created but not
-> > >     plugged yet in the hierarchy
-> > 
-> > The sysdata is already assigned, and all architectures either assume there is
-> > only one domain, or they get the domain number out of the sysdata that is
-> > filled out prior to calling pci_create_root_bus.
-> 
-> Arnd, the question is not how it does it, the question is what is the correct answer?
-> It's a new bus, does that mean that all new busses get created in the current domain?
-> If that is the case, then fine, things start to make more sense, with the caveat
-> that the domain # depends heavily on what the architecture uses for counting.
+> omap2_dpll_round_rate() doesn't actually round the given rate, even if
+> the name and the description so hints. Instead it only tries to find an
+> exact rate match, or if that fails, return ~0 as an error.
 
-Here is what each architecture does:
+In the past, we had "rate tolerance" code, which allowed the clock code to 
+return an approximate rate within some margin.  See for example commit 
+241d3a8dca239610d3d991bf58d4fe38c2d86fd5 ("OMAP2+: clock: remove the DPLL 
+rate tolerance code").  The rate tolerance was set at compile-time, but it 
+was set on a per-PLL basis, which in theory allowed PLLs responsible for 
+audio, etc. to have a very low rate tolerance, but PLLs that only drove 
+internal functional blocks to have a high rate tolerance.  
 
-Alpha: managed by host bridge driver, counting the hosts or fixed in hardware
-ARM: managed in host bridge driver, counting the hosts or using just one domain
-IA64: taken from firmware (either ACPI or SAL)
-microblaze: managed globally, counting the hosts
-powerpc: managed globally, counting the hosts
-s390: each PCI function has its own domain (!)
-sh: managed in host bridge driver, counting the hosts
-sparc: managed by host bridge driger, counting the hosts
-tile: managed globally, counting the hosts
-x86: managed by ACPI firmware
+Part of the reason why this was removed is because some of the TI hardware 
+guys didn't want any PLL rates used that were not explicitly 
+characterized.
 
-In each case, we either know the domain from hardware or firmware
-when creating the host bridge, or we pick the next free number.
+> What this basically means is that the user of the clock needs to know
+> what rates the dpll can support, which obviously isn't right.
 
-> > >   - pci_find_bus tries to find a bus in the global list of busses that has the
-> > >     same domain number and bus number as the parameters of the function. But
-> > >     the domain number was plucked out of thin air and all architectures seem to
-> > >     actually give you the current active domain number, not the one that actually
-> > >     covers the bus (and host_bridge) that you are trying to create.
-> > 
-> > Not sure what you mean with 'current active domain number': They clearly look at
-> > b->sysdata here, which is a local structure describing what we are currently
-> > probing.
-> 
-> Yes, but that definition of locality is not common to all architectures. arm for
-> example stores it in the domain member of pci_sys_data, but that gets initialised
-> every time someone calls pcibios_init_hw (or pci_common_init_dev) with the domain
-> value held in struct hw_pci. But the host controllers don't talk to each other,
-> so if you want to instantiate two different drivers that use hw_pci they likely
-> use an individual count that starts at zero.
+In principle I agree with you, but I'm not sure that this rate rounding 
+function is the solution.
 
-The assumption is that whoever calls pci_common_init{_dev} knows about all the
-PCI hosts in the system. As Jason Gunthorpe said, it would be desirable to
-have stable domain numbers, so it's probably best to take the number from
-DT (e.g. the aliases node). It's probably safe to assume that any machine
-using ATAGS for booting falls into the category where it's safe to keep the
-policy local in the host bridge driver.
+> This patch adds a simple method of rounding: during the iteration, the 
+> code keeps track of the closest rate match. If no exact match is found, 
+> the closest is returned.
 
-	Arnd
+So that's one possible rounding policy; maybe it works fine for a display 
+interface PLL, at least for some values of "closest rate".  But another 
+might be "only allow a selection from a set of pre-determined rates 
+characterized by the silicon validation team".  Or another rounding 
+function might need to select a more distant rate that minimizes jitter, 
+EMI, or power consumption.  
+
+Seems to me that there needs to be some way for a clock user to 
+communicate its requirements along these lines to the clock framework for 
+use by the rate rounding code.  At the very least, some kind of [min, max] 
+interval seems appropriate.
+
+Also I've often thought that it would be useful for your purposes to be 
+able to query a clock to return a list or some other parametric 
+description of the rates that it can provide. 
+
+
+- Paul
