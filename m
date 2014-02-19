@@ -1,52 +1,81 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Feb 2014 08:25:15 -0800
-Subject: [GIT PULL] ARM: mvebu: DT fixes for v3.14
-In-Reply-To: <20140219154341.GK7862@titan.lakedaemon.net>
-References: <20140218161102.GT7862@titan.lakedaemon.net>
- <20140219002446.GD25055@quad.lixom.net>
- <20140219154341.GK7862@titan.lakedaemon.net>
-Message-ID: <CAOesGMjwgGKRPA_nDrBzf+z-hvswuGrZE2TQUqXeWR6HijRQuA@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 19 Feb 2014 11:25:11 -0500
+Subject: [PATCH v6 00/18] ahci: library-ise ahci_platform, add sunxi
+ driver and cleanup imx driver
+In-Reply-To: <5304CD33.1080704@redhat.com>
+References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
+ <20140219150249.GG10134@htj.dyndns.org>
+ <5304CD33.1080704@redhat.com>
+Message-ID: <20140219162511.GJ10134@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 7:43 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-> On Tue, Feb 18, 2014 at 04:24:46PM -0800, Olof Johansson wrote:
->> On Tue, Feb 18, 2014 at 11:11:02AM -0500, Jason Cooper wrote:
->> > All,
->> >
->> > I've been sitting on the missing alias for a while waiting for more DT
->> > fixes to show up.  Well, finally one did. :(
->> >
->> > Please pull for v3.14.
->> >
->> > I intend to re-add the dove PMU node once I know for certain the
->> > corresponding driver is going in to v3.15 (pull request already sent).
->>
->> I've pulled this, but:
->>
->> > Jason Cooper (1):
->> >       ARM: dove: dt: revert PMU interrupt controller node
->>
->> Hmm. Seems like my dove machine (cubox) still booted. This does fix the
->> boot time warning though.
->
-> ok, this was a compound error on my part.  The reported WARN_ON kernel
-> logs stopped after the WARN_ON output.  I assumed the board hung at that
-> point.  Second, I've been too focused on the d*mn phy failures in the
-> bootfarm I haven't even looked at the cubox booting successfully.
+Hello, Hans.
 
-No worries.
+On Wed, Feb 19, 2014 at 04:26:43PM +0100, Hans de Goede wrote:
+> The devres usage are really 2 different issues:
+> 
+> 1) There is the issue that we're getting clocks by index (this is by design as
+> clk-names are not generic), but there is no devm_get_clk_by_index (or some
+> such), this is a shortcoming of the clk-core, which needs a separate patch
+> to fix. I would rather not delay this patch-set based on getting a patch
+> into another subsys.
 
-> At any rate, it does remove the warning for v3.14, and the driver is
-> slated for v3.15, So I'll re-add the node for v3.15.
->
-> Unfortunately, this creates a dependency on mvebu/dt-fixes by mvebu/dt.
-> Or, I could just add the node to fixes-non-critical for v3.15 to avoid
-> the dependency.  Which do you prefer?
+Yes, that'd be my usual preference too.  The only reason I'm hesitant
+is because nobody seems to be too interested in long term aspect of
+the code base and the only leverage I have seems to be rejecting
+drivers until things become right.
 
-Just base mvebu/dt on top of dt-fixes, alternatively merge dt-fixes
-into dt before you have to apply the conflicting patches -- that
-should take care of it. Or am I missing something here?
+> Note that even with devm_get_clk_by_index we can unfortunately not get rid of
+> ahci_platform_put_resources() as in Roger's follow-up patches it gets used for
+> putting some runtime pm related resources too.
+> 
+> I guess this argues for simply turning ahci_platform_get_resources into a
+> devm_ahci_platform_get_resources doing its own devm handling, and then
+> making ahci_platform_put_resources a private function called by the devm
+> framework. If you agree I can do that for the next patch-set.
 
+Note that libata core already does something similar.  Please take a
+look at ata_host_alloc() for details.  You don't really need to create
+a separate devm_ prefixed variant.  Just making the function register
+devres automatically should be enough.  If this is too much work, I'm
+okay with deferring it until later if you promise to do it soonish.
 
--Olof
+> 2) In some comments you also seem to want devm variants of enable / disable
+> resources, or at least have ahci_platform_put_resources do the disable
+> automatically. The problem is that most of the functions called here need to
+> be balanced, they increment / decrement usage counters in the clk / regulator
+> subsystems, so we cannot simply unconditional do an ahci_platform_disable_resources
+> in ahci_platform_put_resources
+> 
+> Doing the disable automatically requires tracking the enable state, and doing this
+> per resource, since the whole idea of having a separate ahci_platform_enable_resources
+> is that some drivers may want to override its behavior doing things in a different
+> order.
+> 
+> To ensure proper tracking we would then need to offer ahci_platform_enable_regulator,
+> etc. functions, and ensure that all drivers using the ahci_platform framework
+> always go through these, rather then calling directly into the relevant framework.
+> 
+> This is all doable, and I'm not against doing this but before spending a couple of
+> hours coding this all up, I would like to hear back from you whether you would like
+> to see this, or would rather keep things as is.
+
+Yes, in principle, I want every resource used by ahci_platform to be
+devres managed.  I *think* devres should be flexible enough to handle
+what you're describing (each devres resource can have data for state
+tracking and devres resources can be looked up and modified, so the
+different orders should be okay) but if not I'd be happy to help
+extend it so that it can.
+
+I'm not sure how many more ahci_platform drivers we'll get but the
+rate seems pretty high in recent months, so I think it's worthwhile to
+provide full devres coverage even if that complicates ahci_platform a
+bit if it can simplify leaf drivers.  Again, if you commit to doing it
+in the foreseeable future, I'm okay with proceeding as-is, but it
+needs to happen one way or another.
+
+Thanks.
+
+-- 
+tejun
