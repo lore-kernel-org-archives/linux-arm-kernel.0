@@ -1,31 +1,26 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 19 Feb 2014 13:01:33 -0500
-Subject: [GIT PULL] ARM: mvebu: DT fixes for v3.14
-In-Reply-To: <CAOesGMjwgGKRPA_nDrBzf+z-hvswuGrZE2TQUqXeWR6HijRQuA@mail.gmail.com>
-References: <20140218161102.GT7862@titan.lakedaemon.net>
- <20140219002446.GD25055@quad.lixom.net>
- <20140219154341.GK7862@titan.lakedaemon.net>
- <CAOesGMjwgGKRPA_nDrBzf+z-hvswuGrZE2TQUqXeWR6HijRQuA@mail.gmail.com>
-Message-ID: <20140219180133.GL7862@titan.lakedaemon.net>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Wed, 19 Feb 2014 19:03:05 +0100
+Subject: [PATCH RESEND v3] clk: return probe defer when DT clock not yet
+ ready
+In-Reply-To: <20140208132446.2A26694003E@smtp1-g21.free.fr>
+References: <20140208132446.2A26694003E@smtp1-g21.free.fr>
+Message-ID: <20140219190305.788e537d@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 08:25:15AM -0800, Olof Johansson wrote:
-> On Wed, Feb 19, 2014 at 7:43 AM, Jason Cooper <jason@lakedaemon.net> wrote:
-...
-> > At any rate, it does remove the warning for v3.14, and the driver is
-> > slated for v3.15, So I'll re-add the node for v3.15.
-> >
-> > Unfortunately, this creates a dependency on mvebu/dt-fixes by mvebu/dt.
-> > Or, I could just add the node to fixes-non-critical for v3.15 to avoid
-> > the dependency.  Which do you prefer?
+On Mon, 25 Nov 2013 19:47:04 +0100
+Jean-Francois Moine <moinejf@free.fr> wrote:
+
+> At probe time, a clock device may not be ready when some other device
+> wants to use it.
 > 
-> Just base mvebu/dt on top of dt-fixes, alternatively merge dt-fixes
-> into dt before you have to apply the conflicting patches -- that
-> should take care of it. Or am I missing something here?
+> This patch lets the functions clk_get/devm_clk_get return a probe defer
+> when the clock is defined in the DT but not yet available.
 
-Nope, I've just gotten really good at avoiding dependencies if I can. :)
+Hi Mike,
 
-thx,
+Any news about this patch?
 
-Jason.
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
