@@ -1,88 +1,165 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 19 Feb 2014 09:39:19 +0100
-Subject: [PATCH 2/2] ARM: DTS: OMAP4: Add gpmc_fck clock node
-In-Reply-To: <53030B7D.6010004@ti.com>
-References: <1392636465-31459-1-git-send-email-florian.vaussard@epfl.ch>
- <1392636465-31459-3-git-send-email-florian.vaussard@epfl.ch>
- <530200B9.8090407@ti.com> <5302353E.7090506@epfl.ch>
- <53030B7D.6010004@ti.com>
-Message-ID: <53046DB7.4080908@epfl.ch>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Feb 2014 09:36:06 +0100
+Subject: [PATCH v7 2/8] clk: sunxi: Implement MMC phase control
+In-Reply-To: <20140219052125.8345.70717@quantum>
+References: <20140217095907.15040.81893.stgit@pagira.o2s.ch>
+ <20140217100221.15040.47203.stgit@pagira.o2s.ch>
+ <20140218141532.GH3142@lukather>
+ <20140219052125.8345.70717@quantum>
+Message-ID: <20140219083606.GR3142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/18/2014 08:27 AM, Tero Kristo wrote:
-> On 02/17/2014 06:13 PM, Florian Vaussard wrote:
->> Hi,
->>
->> On 02/17/2014 01:29 PM, Tero Kristo wrote:
->>> On 02/17/2014 01:27 PM, Florian Vaussard wrote:
->>>> Add the gpmc_fck clock, derived from l3_ick, and reference it from
->>>> the GPMC node to get it correctly working.
->>>>
->>>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->>>> ---
->>>>    arch/arm/boot/dts/omap4.dtsi           | 2 ++
->>>>    arch/arm/boot/dts/omap44xx-clocks.dtsi | 6 ++++++
->>>>    2 files changed, 8 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/omap4.dtsi
->>>> b/arch/arm/boot/dts/omap4.dtsi
->>>> index d3f8a6e..8a0cc71 100644
->>>> --- a/arch/arm/boot/dts/omap4.dtsi
->>>> +++ b/arch/arm/boot/dts/omap4.dtsi
->>>> @@ -275,6 +275,8 @@
->>>>                gpmc,num-waitpins = <4>;
->>>>                ti,hwmods = "gpmc";
->>>>                ti,no-idle-on-init;
->>>> +            clocks = <&gpmc_fck>;
->>>> +            clock-names = "fck";
->>>>            };
->>>>
->>>>            uart1: serial at 4806a000 {
->>>> diff --git a/arch/arm/boot/dts/omap44xx-clocks.dtsi
->>>> b/arch/arm/boot/dts/omap44xx-clocks.dtsi
->>>> index c821ff5..ae2c441 100644
->>>> --- a/arch/arm/boot/dts/omap44xx-clocks.dtsi
->>>> +++ b/arch/arm/boot/dts/omap44xx-clocks.dtsi
->>>> @@ -1036,6 +1036,12 @@
->>>>            ti,index-power-of-two;
->>>>        };
->>>>
->>>> +    gpmc_fck: gpmc_fck {
->>>> +        #clock-cells = <0>;
->>>> +        compatible = "ti,clkdm-gate-clock";
->>>> +        clocks = <&l3_div_ck>;
->>>> +    };
->>>> +
->>>
->>> Why not implement a proper gate clock for CM_L3_2_GPMC_CLKCTRL? The
->>> approach you have taken looks good to me otherwise.
->>>
->>
->> So something like:
->>
->>          gpmc_fck: gpmc_fck {
->>                  #clock-cells = <0>;
->>                  compatible = "ti,gate-clock";
->>                  clocks = <&l3_div_ck>;
->>                  reg = <(CM_L3_2_GPMC_CLKCTRL)>;
->>                  ti,bit-shift = <0>;
->>          };
->>
->> ? I was not sure for gate-clock, as setting the bit will enable the
->> clock only if the corresponding clock domain (CD_L3_2) is enabled as
->> well.
-> 
-> Actually you may want not to add a gate clock for this, as this would
-> result in duplicate control to the same bits... hwmod is already
-> controlling this. Do you need the clkdm control for something? If not,
-> you could just link the gpmc node directly to use l3_div_ck as the
-> provider for its clock rate. Looking at the driver, I think you don't
-> need it for anything else.
-> 
+Hi Mike,
 
-I missed the hwmod bit. So your solution seems the most reasonable for
-now. I will send a v2 shortly. Thanks for your help.
+On Tue, Feb 18, 2014 at 09:21:25PM -0800, Mike Turquette wrote:
+> Quoting Maxime Ripard (2014-02-18 06:15:32)
+> > Hi,
+> > 
+> > On Mon, Feb 17, 2014 at 11:02:21AM +0100, David Lanzend?rfer wrote:
+> > > From: Emilio L?pez <emilio@elopez.com.ar>
+> > > 
+> > > Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> > 
+> > You're missing your Signed-off-by here too.  Remember, for every patch
+> > you send, your Signed-off-by must be there, regardless wether you're
+> > the author or not.
+> > 
+> > A commit log would be very much welcome too.
+> > 
+> > Now, down to the patch itself, I remember Mike saying that he would
+> > prefer adding a function in the framework instead of hardcoding
+> > it. Mike, what's your feeling on this? Would merging this seem
+> > reasonnable to you as is, or do you want to take this to the
+> > framework?
+> 
+> Hi Maxime & Emilio,
+> 
+> Maybe something like the following RFC? If it seems sufficient for this
+> case then I will post to the wider list with an eye towards merging it
+> for 3.15. I've Cc'd Dinh since this came up on the socfpga thread as
+> well.
+> 
+> Regards,
+> Mike
+> 
+> 
+> 
+> From 56fa297591be5c5e22df6d2ca43fccf285a45636 Mon Sep 17 00:00:00 2001
+> From: Mike Turquette <mturquette@linaro.org>
+> Date: Tue, 18 Feb 2014 20:33:50 -0800
+> Subject: [PATCH] clk: introduce clk_set_phase function & callback
+> 
+> A common operation for a clock signal generator is to shift the phase of
+> that signal. This patch introduces a new function to the clk.h API to
+> dynamically adjust the phase of a clock signal. Additionally this patch
+> introduces support for the new function in the common clock framework
+> via the .set_phase call back in struct clk_ops.
+> 
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> ---
+> This patch is totally untested. It may make your board burst into
+> flames.
+> 
+>  drivers/clk/clk.c            | 84 +++++++++++++++++++++++++++++++++++++++++---
+>  include/linux/clk-private.h  |  1 +
+>  include/linux/clk-provider.h |  5 +++
+>  include/linux/clk.h          | 29 +++++++++++++++
+>  4 files changed, 115 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index ea2ca9f..635170a 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -106,11 +106,11 @@ static void clk_summary_show_one(struct seq_file *s, struct clk *c, int level)
+>  	if (!c)
+>  		return;
+>  
+> -	seq_printf(s, "%*s%-*s %-11d %-12d %-10lu %-11lu",
+> +	seq_printf(s, "%*s%-*s %-11d %-12d %-10lu %-11lu %-3d",
+>  		   level * 3 + 1, "",
+>  		   30 - level * 3, c->name,
+>  		   c->enable_count, c->prepare_count, clk_get_rate(c),
+> -		   clk_get_accuracy(c));
+> +		   clk_get_accuracy(c), clk_get_phase(c));
+>  	seq_printf(s, "\n");
+>  }
+>  
+> @@ -132,8 +132,8 @@ static int clk_summary_show(struct seq_file *s, void *data)
+>  {
+>  	struct clk *c;
+>  
+> -	seq_printf(s, "   clock                        enable_cnt  prepare_cnt  rate        accuracy\n");
+> -	seq_printf(s, "---------------------------------------------------------------------------------\n");
+> +	seq_printf(s, "   clock                        enable_cnt  prepare_cnt  rate        accuracy   phase\n");
+> +	seq_printf(s, "-----------------------------------------------------------------------------------------\n");
+>  
+>  	clk_prepare_lock();
+>  
+> @@ -171,6 +171,7 @@ static void clk_dump_one(struct seq_file *s, struct clk *c, int level)
+>  	seq_printf(s, "\"prepare_count\": %d,", c->prepare_count);
+>  	seq_printf(s, "\"rate\": %lu", clk_get_rate(c));
+>  	seq_printf(s, "\"accuracy\": %lu", clk_get_accuracy(c));
+> +	seq_printf(s, "\"phase\": %d", clk_get_phase(c));
+>  }
+>  
+>  static void clk_dump_subtree(struct seq_file *s, struct clk *c, int level)
+> @@ -257,6 +258,11 @@ static int clk_debug_create_one(struct clk *clk, struct dentry *pdentry)
+>  	if (!d)
+>  		goto err_out;
+>  
+> +	d = debugfs_create_u32("clk_phase", S_IRUGO, clk->dentry,
+> +			(u32 *)&clk->phase);
+> +	if (!d)
+> +		goto err_out;
+> +
+>  	d = debugfs_create_x32("clk_flags", S_IRUGO, clk->dentry,
+>  			(u32 *)&clk->flags);
+>  	if (!d)
+> @@ -1766,6 +1772,76 @@ out:
+>  EXPORT_SYMBOL_GPL(clk_set_parent);
+>  
+>  /**
+> + * clk_set_phase - adjust the phase shift of a clock signal
+> + * @clk: clock signal source
+> + * @degrees: number of degrees the signal is shifted
+> + *
+> + * Shifts the phase of a clock signal by the specified degrees. Returns 0 on
+> + * success, -EERROR otherwise.
+> + *
+> + * This function makes no distiction about the input or reference signal that
+> + * we adjust the clock signal phase against. For example phase locked-loop
+> + * clock signal generators we may shift phase with respect to feedback clock
+> + * signal input, but for other cases the clock phase may be shifted with
+> + * respect to some other, unspecified signal.
+> + *
+> + * Additionally the concept of phase shift does not propagate through the clock
+> + * tree hierarchy, which sets it appart from clock rates and clock accuracy. A
+> + * parent clock phase attribute does not have an impact on the phase attribute
+> + * of a child clock.
+> + */
+> +int clk_set_phase(struct clk *clk, int degrees)
 
-Regards,
-Florian
+Actually, while this is what I had in mind too, we'd need a bit more
+control here. We have two phases to control (namely, input and
+sample).
+
+Maybe passing an additional enum to tell which phase we want to
+adjust, that could easily be extended by new drivers need would fit
+our need here?
+
+Thanks!
+Maxime
+
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140219/09ea0ba2/attachment-0001.sig>
