@@ -1,32 +1,37 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Wed, 19 Feb 2014 16:18:41 +0200
-Subject: [PATCH] clk: qcom: Add missing clock at index GCC_XO_CLK for MSM8974
-Message-ID: <1392819521-25734-1-git-send-email-iivanov@mm-sol.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 19 Feb 2014 15:24:47 +0100
+Subject: [Patch v3 20/23] ARM: config: Add a multi_v5_defconfig
+In-Reply-To: <1392819548.815735822@f395.i.mail.ru>
+References: <1392819174-11634-1-git-send-email-andrew@lunn.ch>
+ <1392819174-11634-21-git-send-email-andrew@lunn.ch>
+ <1392819548.815735822@f395.i.mail.ru>
+Message-ID: <20140219142447.GA11878@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+On Wed, Feb 19, 2014 at 06:19:08PM +0400, Alexander Shiyan wrote:
+> ?????, 19 ??????? 2014, 15:12 +01:00 ?? Andrew Lunn <andrew@lunn.ch>:
+> > To allow regression build testing of multi v5 systems, add a
+> > multi_v5_defconfig, similar to the multi_v7_defconfig. This is based
+> > on kirkwood_defconfig, but with a few other boards added which claim
+> > to be MULTI_v5.
+> > 
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > ---
+> >  arch/arm/configs/multi_v5_defconfig | 183 ++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 183 insertions(+)
+> >  create mode 100644 arch/arm/configs/multi_v5_defconfig
+> > 
+> > diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
+> ...
+> > +CONFIG_DEBUG_LL=y
+> > +CONFIG_DEBUG_MVEBU_UART_ALTERNATE=y
+> > +CONFIG_DEBUG_UART_VIRT=0xfed12000
+> 
+> Should we disable lowlevel debug for multi-* config?
 
-Accessing GCC on MSM8974 trough <&gcc GCC_XO_CLK> lead to NULL
-pointer dereference. Fix this.
+Yes. Otherwise we get silent crashes on anything but this specific
+hardware. I will fix this in the next version.
 
-Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
----
- drivers/clk/qcom/gcc-msm8974.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/clk/qcom/gcc-msm8974.c b/drivers/clk/qcom/gcc-msm8974.c
-index 51d457e..98be7ea 100644
---- a/drivers/clk/qcom/gcc-msm8974.c
-+++ b/drivers/clk/qcom/gcc-msm8974.c
-@@ -2625,6 +2625,8 @@ static int gcc_msm8974_probe(struct platform_device *pdev)
- 	if (IS_ERR(clk))
- 		return PTR_ERR(clk);
- 
-+	clks[GCC_XO_CLK] = clk;
-+
- 	/* Should move to DT node? */
- 	clk = clk_register_fixed_rate(dev, "sleep_clk_src", NULL,
- 				      CLK_IS_ROOT, 32768);
--- 
-1.7.9.5
+Thanks
+	  Andrew
