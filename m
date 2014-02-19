@@ -1,43 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 19 Feb 2014 16:27:51 +0800
-Subject: [PATCH] PCI: imx6: Fix link_up detection
-In-Reply-To: <20140214064153.GE17250@pengutronix.de>
-References: <1392190075-23204-1-git-send-email-s.hauer@pengutronix.de>
- <201402120836.16221.marex@denx.de>
- <52FD0F1A.4000208@boundarydevices.com>
- <20140214064153.GE17250@pengutronix.de>
-Message-ID: <20140219082748.GI3010@S2101-09.ap.freescale.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 19 Feb 2014 08:30:25 +0000
+Subject: [PATCH 3/3] ahci: st: Add support for ST's SATA IP
+In-Reply-To: <20140218233645.GP31892@mtj.dyndns.org>
+References: <1392641818-23419-1-git-send-email-lee.jones@linaro.org>
+ <1392641818-23419-3-git-send-email-lee.jones@linaro.org>
+ <20140218233645.GP31892@mtj.dyndns.org>
+Message-ID: <20140219083025.GB10504@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 07:41:53AM +0100, Sascha Hauer wrote:
-> On Thu, Feb 13, 2014 at 11:29:46AM -0700, Troy Kisky wrote:
-> > On 2/12/2014 12:36 AM, Marek Vasut wrote:
-> > >On Wednesday, February 12, 2014 at 08:27:55 AM, Sascha Hauer wrote:
-> > >
-> > >+CC Troy Kisky, since I think he submitted something similar some time ago
-> > >already.
-> > >
-> > >Otherwise I agree this happens.
-> > >
-> > Sorry, I haven't submitted this yet, but was planning to today. Here's
-> > what would have been sent.
-> > 
-> > From 32c560d33fe2c3945d69f3396689f0abb76f7e1f Mon Sep 17 00:00:00 2001
-> > From: Marek Vasut <marex@denx.de>
-> > Date: Sat, 25 Jan 2014 14:22:48 -0700
-> > Subject: [PATCH 1/1] pci-imx6.c: wait for retraining
-> > 
-> > This patch handles the case where the PCIe link is up and running, yet drops
-> > into the LTSSM training mode. The link spends short time in the LTSSM training
-> > mode, but the current code can misinterpret it as the link being stalled.
-> > Waiting for the LTSSM training to complete fixes the issue.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Tested-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> > Cc: Tejun Heo <tj@kernel.org>
+> > Cc: linux-ide at vger.kernel.org
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> Thanks, that works.
+> Please consider basing it on top of Hans' refactored ahci_platform.
 > 
-> Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
+>  http://www.spinics.net/lists/linux-ide/msg47628.html
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Okay, looks reasonable. I'm happy to do the extra work.
+
+Can I do this as a subsequent patch though? The current patch fits
+neatly onto our internal stable kernel (currently v3.10). The added
+work will require back-porting Hans' patch-set, which has not yet
+reached Mainline.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
