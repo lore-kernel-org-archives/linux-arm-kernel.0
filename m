@@ -1,103 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 19 Feb 2014 15:15:38 +0100
-Subject: [PATCH] ARM: let dumping page tables depend on MMU
-Message-ID: <1392819338-393-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Feb 2014 15:17:56 +0100
+Subject: [PATCH v3 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <20140219110718.GD28173@mudshark.cambridge.arm.com>
+References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
+ <20140218191023.GG2010@mudshark.cambridge.arm.com>
+ <20140219110718.GD28173@mudshark.cambridge.arm.com>
+Message-ID: <2724033.O0vxCdfViQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On no-MMU there are no page tables, so ARM_PTDUMP doesn't make sense on
-these platforms. Further this fixes the following compilation errors on
-efm32_defconfig + CONFIG_ARM_PTDUMP=y:
+On Wednesday 19 February 2014 11:07:19 Will Deacon wrote:
+> On Tue, Feb 18, 2014 at 07:10:23PM +0000, Will Deacon wrote:
+> > On Tue, Feb 18, 2014 at 01:46:44PM +0000, Arnd Bergmann wrote:
+> > > On Tuesday 18 February 2014 12:20:43 Will Deacon wrote:
+> > > > + /* Register our I/O and Memory resources */
+> > > > + res_valid = 0;
+> > > > + list_for_each_entry(win, &pci->host.windows, list) {
+> > > > +         struct resource *parent;
+> > > > +
+> > > > +         if (resource_type(win->res) == IORESOURCE_IO) {
+> > > > +                 parent = &ioport_resource;
+> > > > +                 err = pci_ioremap_io(win->offset, win->res->start);
+> > > 
+> > > and consequently pass the pci_addr rather than the offset here. How about
+> > > moving the pci_ioremap_io() call into gen_pci_alloc_io_offset()?
+> 
+> I've probably just confused myself, but passing the pci_addr to
+> pci_ioremap_io doesn't make sense to me. 
 
-	arch/arm/mm/dump.c:56:11: error: 'L_PTE_USER' undeclared here (not in a function)
-	arch/arm/mm/dump.c:61:11: error: 'L_PTE_RDONLY' undeclared here (not in a function)
-	arch/arm/mm/dump.c:66:11: error: 'L_PTE_XN' undeclared here (not in a function)
-	arch/arm/mm/dump.c:71:11: error: 'L_PTE_SHARED' undeclared here (not in a function)
-	arch/arm/mm/dump.c:76:11: error: 'L_PTE_MT_MASK' undeclared here (not in a function)
-	arch/arm/mm/dump.c:77:10: error: 'L_PTE_MT_UNCACHED' undeclared here (not in a function)
-	arch/arm/mm/dump.c:81:10: error: 'L_PTE_MT_BUFFERABLE' undeclared here (not in a function)
-	arch/arm/mm/dump.c:85:10: error: 'L_PTE_MT_WRITETHROUGH' undeclared here (not in a function)
-	arch/arm/mm/dump.c:89:10: error: 'L_PTE_MT_WRITEBACK' undeclared here (not in a function)
-	arch/arm/mm/dump.c:94:10: error: 'L_PTE_MT_MINICACHE' undeclared here (not in a function)
-	arch/arm/mm/dump.c:99:10: error: 'L_PTE_MT_WRITEALLOC' undeclared here (not in a function)
-	arch/arm/mm/dump.c:103:10: error: 'L_PTE_MT_DEV_SHARED' undeclared here (not in a function)
-	arch/arm/mm/dump.c:108:10: error: 'L_PTE_MT_DEV_NONSHARED' undeclared here (not in a function)
-	arch/arm/mm/dump.c:113:10: error: 'L_PTE_MT_DEV_WC' undeclared here (not in a function)
-	arch/arm/mm/dump.c:117:10: error: 'L_PTE_MT_DEV_CACHED' undeclared here (not in a function)
-	arch/arm/mm/dump.c:126:11: error: 'PMD_SECT_AP_READ' undeclared here (not in a function)
-	arch/arm/mm/dump.c:126:30: error: 'PMD_SECT_AP_WRITE' undeclared here (not in a function)
-	arch/arm/mm/dump.c:126:28: error: invalid operands to binary | (have 'const struct prot_bits *' and 'const struct prot_bits *')
-	arch/arm/mm/dump.c:126:3: error: initializer element is not constant
-	arch/arm/mm/dump.c:126:3: error: (near initialization for 'section_bits[0].mask')
-	arch/arm/mm/dump.c:130:28: error: invalid operands to binary | (have 'const struct prot_bits *' and 'const struct prot_bits *')
-	arch/arm/mm/dump.c:130:3: error: initializer element is not constant
-	arch/arm/mm/dump.c:130:3: error: (near initialization for 'section_bits[1].mask')
-	arch/arm/mm/dump.c:131:3: error: initializer element is not constant
-	arch/arm/mm/dump.c:131:3: error: (near initialization for 'section_bits[1].val')
-	arch/arm/mm/dump.c:134:28: error: invalid operands to binary | (have 'const struct prot_bits *' and 'const struct prot_bits *')
-	arch/arm/mm/dump.c:134:3: error: initializer element is not constant
-	arch/arm/mm/dump.c:134:3: error: (near initialization for 'section_bits[2].mask')
-	arch/arm/mm/dump.c:135:3: error: initializer element is not constant
-	arch/arm/mm/dump.c:135:3: error: (near initialization for 'section_bits[2].val')
-	arch/arm/mm/dump.c:138:28: error: invalid operands to binary | (have 'const struct prot_bits *' and 'const struct prot_bits *')
-	arch/arm/mm/dump.c:138:3: error: initializer element is not constant
-	arch/arm/mm/dump.c:138:3: error: (near initialization for 'section_bits[3].mask')
-	arch/arm/mm/dump.c:139:27: error: invalid operands to binary | (have 'const struct prot_bits *' and 'const struct prot_bits *')
-	arch/arm/mm/dump.c:139:3: error: initializer element is not constant
-	arch/arm/mm/dump.c:139:3: error: (near initialization for 'section_bits[3].val')
-	arch/arm/mm/dump.c:153:11: error: 'PMD_SECT_XN' undeclared here (not in a function)
-	arch/arm/mm/dump.c:153:3: error: initializer element is not constant
-	arch/arm/mm/dump.c:153:3: error: (near initialization for 'section_bits[4].mask')
-	arch/arm/mm/dump.c:154:3: error: initializer element is not constant
-	arch/arm/mm/dump.c:154:3: error: (near initialization for 'section_bits[4].val')
-	arch/arm/mm/dump.c:158:11: error: 'PMD_SECT_S' undeclared here (not in a function)
-	arch/arm/mm/dump.c:158:3: error: initializer element is not constant
-	arch/arm/mm/dump.c:158:3: error: (near initialization for 'section_bits[5].mask')
-	arch/arm/mm/dump.c:159:3: error: initializer element is not constant
-	arch/arm/mm/dump.c:159:3: error: (near initialization for 'section_bits[5].val')
-	arch/arm/mm/dump.c: In function 'note_page':
-	arch/arm/mm/dump.c:206:13: error: 'USER_PGTABLES_CEILING' undeclared (first use in this function)
-	arch/arm/mm/dump.c:206:13: note: each undeclared identifier is reported only once for each function it appears in
-	arch/arm/mm/dump.c:206:11: warning: comparison between pointer and integer [enabled by default]
-	arch/arm/mm/dump.c: In function 'walk_pte':
-	arch/arm/mm/dump.c:245:2: error: implicit declaration of function 'pte_offset_kernel' [-Werror=implicit-function-declaration]
-	arch/arm/mm/dump.c:245:15: warning: initialization makes pointer from integer without a cast [enabled by default]
-	arch/arm/mm/dump.c:249:18: error: 'PTRS_PER_PTE' undeclared (first use in this function)
-	arch/arm/mm/dump.c:249:16: warning: comparison between pointer and integer [enabled by default]
-	arch/arm/mm/dump.c: In function 'walk_pmd':
-	arch/arm/mm/dump.c:261:18: error: 'PTRS_PER_PMD' undeclared (first use in this function)
-	arch/arm/mm/dump.c:261:16: warning: comparison between pointer and integer [enabled by default]
-	arch/arm/mm/dump.c:262:22: error: 'PMD_SIZE' undeclared (first use in this function)
-	arch/arm/mm/dump.c:262:20: error: invalid operands to binary * (have 'unsigned int' and 'const struct prot_bits *')
-	arch/arm/mm/dump.c:262:8: warning: assignment makes integer from pointer without a cast [enabled by default]
-	arch/arm/mm/dump.c:263:3: error: implicit declaration of function 'pmd_none' [-Werror=implicit-function-declaration]
-	arch/arm/mm/dump.c:263:3: error: implicit declaration of function 'pmd_large' [-Werror=implicit-function-declaration]
-	arch/arm/mm/dump.c:263:3: error: implicit declaration of function 'pmd_present' [-Werror=implicit-function-declaration]
-	arch/arm/mm/dump.c: In function 'walk_pgd':
-	arch/arm/mm/dump.c:291:23: error: 'USER_PGTABLES_CEILING' undeclared (first use in this function)
-	arch/arm/mm/dump.c:291:45: error: invalid operands to binary / (have 'const struct prot_bits *' and 'long unsigned int')
-	arch/arm/mm/dump.c:291:23: warning: initialization makes integer from pointer without a cast [enabled by default]
-	arch/arm/mm/dump.c:299:23: error: 'PTRS_PER_PGD' undeclared (first use in this function)
-	arch/arm/mm/dump.c:299:21: warning: comparison between pointer and integer [enabled by default]
+I think the confusion is that there are two different things we call
+offset here. The calculation of the offset you pass into
+pci_ioremap_io() is correct AFAICT now, but it's not what you are
+supposed to pass into pci_add_resource_offset() or what we normally
+put into pci_host_bridge_window->offset.
 
-Fixes: 1fd15b879d00 ("ARM: add support to dump the kernel page tables")
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/Kconfig.debug | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> My understanding is that:
+> 
+>   cpu = bus + offset
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 0531da8e5216..a43b0cbd2e15 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -4,7 +4,7 @@ source "lib/Kconfig.debug"
- 
- config ARM_PTDUMP
- 	bool "Export kernel pagetable layout to userspace via debugfs"
--	depends on DEBUG_KERNEL
-+	depends on DEBUG_KERNEL && MMU
- 	select DEBUG_FS
- 	---help---
- 	  Say Y here if you want to show the kernel pagetable layout in a
--- 
-1.8.5.3
+Right. This would be the case for mem_offset.
+
+> In the case of I/O, the offset is really:
+> 
+>   offset = (PCI_IO_VIRT_BASE - bus) + window
+
+I can't seem to make sense of this calculation. PCI_IO_VIRT_BASE
+is a pointer to the start of the virtual window. You can add offsets
+to the pointer, but subtracting a number from it is not a well-defined
+operation.
+
+> where window is determined by the simple allocator I wrote.
+
+And your allocator calls it offset, which is what confused me.
+
+> Now, the __io macro takes care of PCI_IO_VIRT_BASE so we don't actually care
+> about that when adding the PCI I/O resources, instead we'll just pass:
+> 
+>   offset = window - bus
+
+Yes, this would be the io_offset that you pass into pci_add_resource_offset().
+
+> and then pci_ioremap_io will just want the window offset, since that's added
+> directly on to PCI_IO_VIRT_BASE for the ioremap_page_range.
+
+Yes.
+
+> If I call pci_ioremap_io(range->pci_addr, ...) then I'm going to trip a BUG_ON
+> unless the pci_addr is within IO_SPACE_LIMIT.
+
+range->pci_addr is what you call 'bus' above. Since you want 'window', you
+have to pass 'bus'+'offset', or 'range->pci_addr + io_offset'. Normally, one
+of the two would be zero, while the other is equal to 'window'.
+
+	Arnd
