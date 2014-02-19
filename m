@@ -1,75 +1,138 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 19 Feb 2014 13:01:57 +0100
-Subject: [PATCH v6 15/18] ata: ahci_platform: runtime resume the device before
- use
+Date: Wed, 19 Feb 2014 13:01:50 +0100
+Subject: [PATCH v6 08/18] ahci-platform: "Library-ise" suspend / resume
+ functionality
 In-Reply-To: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
 References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1392811320-3132-16-git-send-email-hdegoede@redhat.com>
+Message-ID: <1392811320-3132-9-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roger Quadros <rogerq@ti.com>
+Split suspend / resume code into host suspend / resume functionality and
+resource enable / disabling phases, and export the new suspend_ / resume_host
+functions.
 
-On OMAP platforms the device needs to be runtime resumed before
-it can be accessed. The OMAP HWMOD framework takes care of
-enabling the module and its resources based on the
-device's runtime PM state.
-
-In this patch we runtime resume during .probe() and runtime suspend
-during .remove() (i.e. ahci_host_stop()).
-
-We also update the runtime PM state during .resume().
-
-CC: Balaji T K <balajitk@ti.com>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/ata/ahci_platform.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/ata/ahci_platform.c   | 55 +++++++++++++++++++++++++++++++------------
+ include/linux/ahci_platform.h |  5 ++++
+ 2 files changed, 45 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index f8ef780..bb2e7ab 100644
+index b260ebe..ba93930 100644
 --- a/drivers/ata/ahci_platform.c
 +++ b/drivers/ata/ahci_platform.c
-@@ -24,6 +24,7 @@
- #include <linux/libata.h>
- #include <linux/ahci_platform.h>
- #include <linux/phy/phy.h>
-+#include <linux/pm_runtime.h>
- #include "ahci.h"
+@@ -353,14 +353,12 @@ static void ahci_host_stop(struct ata_host *host)
+ }
  
- static void ahci_host_stop(struct ata_host *host);
-@@ -234,6 +235,9 @@ struct ahci_host_priv *ahci_platform_get_resources(
- 		}
+ #ifdef CONFIG_PM_SLEEP
+-static int ahci_suspend(struct device *dev)
++int ahci_platform_suspend_host(struct device *dev)
+ {
+-	struct ahci_platform_data *pdata = dev_get_platdata(dev);
+ 	struct ata_host *host = dev_get_drvdata(dev);
+ 	struct ahci_host_priv *hpriv = host->private_data;
+ 	void __iomem *mmio = hpriv->mmio;
+ 	u32 ctl;
+-	int rc;
+ 
+ 	if (hpriv->flags & AHCI_HFLAG_NO_SUSPEND) {
+ 		dev_err(dev, "firmware update required for suspend/resume\n");
+@@ -377,7 +375,37 @@ static int ahci_suspend(struct device *dev)
+ 	writel(ctl, mmio + HOST_CTL);
+ 	readl(mmio + HOST_CTL); /* flush */
+ 
+-	rc = ata_host_suspend(host, PMSG_SUSPEND);
++	return ata_host_suspend(host, PMSG_SUSPEND);
++}
++EXPORT_SYMBOL_GPL(ahci_platform_suspend_host);
++
++int ahci_platform_resume_host(struct device *dev)
++{
++	struct ata_host *host = dev_get_drvdata(dev);
++	int rc;
++
++	if (dev->power.power_state.event == PM_EVENT_SUSPEND) {
++		rc = ahci_reset_controller(host);
++		if (rc)
++			return rc;
++
++		ahci_init_controller(host);
++	}
++
++	ata_host_resume(host);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(ahci_platform_resume_host);
++
++int ahci_platform_suspend(struct device *dev)
++{
++	struct ahci_platform_data *pdata = dev_get_platdata(dev);
++	struct ata_host *host = dev_get_drvdata(dev);
++	struct ahci_host_priv *hpriv = host->private_data;
++	int rc;
++
++	rc = ahci_platform_suspend_host(dev);
+ 	if (rc)
+ 		return rc;
+ 
+@@ -388,8 +416,9 @@ static int ahci_suspend(struct device *dev)
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(ahci_platform_suspend);
+ 
+-static int ahci_resume(struct device *dev)
++int ahci_platform_resume(struct device *dev)
+ {
+ 	struct ahci_platform_data *pdata = dev_get_platdata(dev);
+ 	struct ata_host *host = dev_get_drvdata(dev);
+@@ -406,15 +435,9 @@ static int ahci_resume(struct device *dev)
+ 			goto disable_resources;
  	}
  
-+	pm_runtime_enable(dev);
-+	pm_runtime_get_sync(dev);
-+
- 	return hpriv;
+-	if (dev->power.power_state.event == PM_EVENT_SUSPEND) {
+-		rc = ahci_reset_controller(host);
+-		if (rc)
+-			goto disable_resources;
+-
+-		ahci_init_controller(host);
+-	}
+-
+-	ata_host_resume(host);
++	rc = ahci_platform_resume_host(dev);
++	if (rc)
++		goto disable_resources;
  
- free_clk:
-@@ -248,6 +252,9 @@ void ahci_platform_put_resources(struct device *dev,
- {
- 	int c;
- 
-+	pm_runtime_put_sync(dev);
-+	pm_runtime_disable(dev);
-+
- 	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++)
- 		clk_put(hpriv->clks[c]);
- }
-@@ -480,6 +487,11 @@ int ahci_platform_resume(struct device *dev)
- 	if (rc)
- 		goto disable_resources;
- 
-+	/* We resumed so update PM runtime state */
-+	pm_runtime_disable(dev);
-+	pm_runtime_set_active(dev);
-+	pm_runtime_enable(dev);
-+
  	return 0;
  
- disable_resources:
+@@ -423,9 +446,11 @@ disable_resources:
+ 
+ 	return rc;
+ }
++EXPORT_SYMBOL_GPL(ahci_platform_resume);
+ #endif
+ 
+-static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_suspend, ahci_resume);
++static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_platform_suspend,
++			 ahci_platform_resume);
+ 
+ static const struct of_device_id ahci_of_match[] = {
+ 	{ .compatible = "snps,spear-ahci", },
+diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
+index 1dc7602..7c683c7 100644
+--- a/include/linux/ahci_platform.h
++++ b/include/linux/ahci_platform.h
+@@ -50,4 +50,9 @@ int ahci_platform_init_host(struct platform_device *pdev,
+ 			    unsigned int force_port_map,
+ 			    unsigned int mask_port_map);
+ 
++int ahci_platform_suspend_host(struct device *dev);
++int ahci_platform_resume_host(struct device *dev);
++int ahci_platform_suspend(struct device *dev);
++int ahci_platform_resume(struct device *dev);
++
+ #endif /* _AHCI_PLATFORM_H */
 -- 
 1.8.5.3
