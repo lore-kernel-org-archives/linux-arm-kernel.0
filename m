@@ -1,86 +1,86 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 19 Feb 2014 15:11:12 -0600
-Subject: [PATCH 3/3] dts: socfpga: Update clock entry to support multiple
- parents
+Date: Wed, 19 Feb 2014 15:11:11 -0600
+Subject: [PATCH 2/3] clk: socfpga: Support multiple parents for the pll clocks
 In-Reply-To: <1392844273-11918-1-git-send-email-dinguyen@altera.com>
 References: <1392844273-11918-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1392844273-11918-3-git-send-email-dinguyen@altera.com>
+Message-ID: <1392844273-11918-2-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-The periph_pll and sdram_pll can have multiple parents. Update the device tree
-to list all the possible parents for the PLLs. Add an entry for the the
-f2s_sdram_ref_clk, which is a possible parent for the sdram_pll.
-
-Also remove the clock-frequency entry in the f2s_periph_ref_clk, as this
-property should be placed in dts file.
+The PLLs can be from 3 different sources: osc1, osc2, or the f2s_ref_clk.
+Update the clock driver to be able to get the correct parent.
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
- arch/arm/boot/dts/socfpga.dtsi |   19 ++++++++++++++-----
- 1 file changed, 14 insertions(+), 5 deletions(-)
+ drivers/clk/socfpga/clk-pll.c |   26 ++++++++++++++++++++++----
+ 1 file changed, 22 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 7752d7c..6d7eaa4 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -92,7 +92,12 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
+diff --git a/drivers/clk/socfpga/clk-pll.c b/drivers/clk/socfpga/clk-pll.c
+index 834b6e9..88dafb5 100644
+--- a/drivers/clk/socfpga/clk-pll.c
++++ b/drivers/clk/socfpga/clk-pll.c
+@@ -38,6 +38,9 @@
+ #define SOCFPGA_PLL_DIVQ_MASK		0x003F0000
+ #define SOCFPGA_PLL_DIVQ_SHIFT		16
  
--					osc: osc1 {
-+					osc1: osc1 {
-+						#clock-cells = <0>;
-+						compatible = "fixed-clock";
-+					};
++#define CLK_MGR_PLL_CLK_SRC_SHIFT	22
++#define CLK_MGR_PLL_CLK_SRC_MASK	0x3
 +
-+					osc2: osc2 {
- 						#clock-cells = <0>;
- 						compatible = "fixed-clock";
- 					};
-@@ -100,7 +105,11 @@
- 					f2s_periph_ref_clk: f2s_periph_ref_clk {
- 						#clock-cells = <0>;
- 						compatible = "fixed-clock";
--						clock-frequency = <10000000>;
-+					};
+ #define to_socfpga_clk(p) container_of(p, struct socfpga_pll, hw.hw)
+ 
+ static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
+@@ -60,8 +63,19 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
+ 	return (unsigned long)vco_freq;
+ }
+ 
++static u8 clk_pll_get_parent(struct clk_hw *hwclk)
++{
++	u32 pll_src;
++	struct socfpga_pll *socfpgaclk = to_socfpga_clk(hwclk);
 +
-+					f2s_sdram_ref_clk: f2s_sdram_ref_clk {
-+						#clock-cells = <0>;
-+						compatible = "fixed-clock";
- 					};
++	pll_src = readl(socfpgaclk->hw.reg);
++	return (pll_src >> CLK_MGR_PLL_CLK_SRC_SHIFT) &
++			CLK_MGR_PLL_CLK_SRC_MASK;
++}
++
+ static struct clk_ops clk_pll_ops = {
+ 	.recalc_rate = clk_pll_recalc_rate,
++	.get_parent = clk_pll_get_parent,
+ };
  
- 					main_pll: main_pll {
-@@ -108,7 +117,7 @@
- 						#size-cells = <0>;
- 						#clock-cells = <0>;
- 						compatible = "altr,socfpga-pll-clock";
--						clocks = <&osc>;
-+						clocks = <&osc1>;
- 						reg = <0x40>;
+ static __init struct clk *__socfpga_pll_init(struct device_node *node,
+@@ -71,9 +85,10 @@ static __init struct clk *__socfpga_pll_init(struct device_node *node,
+ 	struct clk *clk;
+ 	struct socfpga_pll *pll_clk;
+ 	const char *clk_name = node->name;
+-	const char *parent_name;
++	const char *parent_name[SOCFPGA_MAX_PARENTS];
+ 	struct clk_init_data init;
+ 	int rc;
++	int i = 0;
  
- 						mpuclk: mpuclk {
-@@ -162,7 +171,7 @@
- 						#size-cells = <0>;
- 						#clock-cells = <0>;
- 						compatible = "altr,socfpga-pll-clock";
--						clocks = <&osc>;
-+						clocks = <&osc1>, <&osc2>, <&f2s_periph_ref_clk>;
- 						reg = <0x80>;
+ 	of_property_read_u32(node, "reg", &reg);
  
- 						emac0_clk: emac0_clk {
-@@ -213,7 +222,7 @@
- 						#size-cells = <0>;
- 						#clock-cells = <0>;
- 						compatible = "altr,socfpga-pll-clock";
--						clocks = <&osc>;
-+						clocks = <&osc1>, <&osc2>, <&f2s_sdram_ref_clk>;
- 						reg = <0xC0>;
+@@ -88,10 +103,13 @@ static __init struct clk *__socfpga_pll_init(struct device_node *node,
+ 	init.name = clk_name;
+ 	init.ops = ops;
+ 	init.flags = 0;
+-	parent_name = of_clk_get_parent_name(node, 0);
+-	init.parent_names = parent_name ? &parent_name : NULL;
+-	init.num_parents = parent_name ? 1 : 0;
  
- 						ddr_dqs_clk: ddr_dqs_clk {
++	while (i < SOCFPGA_MAX_PARENTS && (parent_name[i] =
++			of_clk_get_parent_name(node, i)) != NULL)
++		i++;
++
++	init.num_parents = i;
++	init.parent_names = parent_name;
+ 	pll_clk->hw.hw.init = &init;
+ 
+ 	pll_clk->hw.bit_idx = SOCFPGA_PLL_EXT_ENA;
 -- 
 1.7.9.5
