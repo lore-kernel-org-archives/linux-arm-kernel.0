@@ -1,55 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Feb 2014 22:41:04 -0800
-Subject: [GIT PULL v2] get rid of <mach/timex.h>
-In-Reply-To: <20140218213736.GA6988@pengutronix.de>
-References: <20140218213736.GA6988@pengutronix.de>
-Message-ID: <20140219064104.GA24381@quad.lixom.net>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 18 Feb 2014 23:48:50 -0700
+Subject: [PATCH v2 3/3] PCI: ARM: add support for generic PCI host
+ controller
+In-Reply-To: <20140219024427.GC5394@bart.dudau.co.uk>
+References: <1392236171-10512-1-git-send-email-will.deacon@arm.com>
+ <5805232.JrD2FybBlg@wuerfel>
+ <20140214220047.GA5394@bart.dudau.co.uk>
+ <2312919.pM61KLBcYY@wuerfel>
+ <20140218174125.GC29304@obsidianresearch.com>
+ <20140219024427.GC5394@bart.dudau.co.uk>
+Message-ID: <20140219064850.GD6186@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 10:37:36PM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> the following changes since commit 6a79799d5654bb7800614e8b7a009252be7ff90e:
-> 
->   ARM: u300: fix timekeeping when periodic mode is used (2013-11-26 21:00:21 +0100)
-> 
-> (which is v3.13-rc1 + 3 commits that were merged into 3.14-rc1)
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/ukl/linux.git tags/dropmachtimexh-v2
-> 
-> for you to fetch changes up to fb3174e4ad2427c6ad90c67093d6ca97f13e8672:
-> 
->   ARM: ixp4xx: fix timer latch calculation (2014-02-18 21:23:19 +0100)
-> 
-> ----------------------------------------------------------------
-> This cleanup series gets rid of <mach/timex.h> for platforms not using
-> ARCH_MULTIPLATFORM. (For multi-platform code it's already unused since
-> 387798b (ARM: initial multiplatform support).)
-> 
-> To make this work some code out of arch/arm needed to be adapted. The
-> respective changes got acks by their maintainers to be taken via armsoc
-> (with Andrew Morton substituting for Alessandro Zummo as rtc maintainer).
-> 
-> Compared to the previous pull request there was another patch added that
-> fixes a (non-critical) regression on ixp4xx. Olof Johansson asked to not
-> squash this fix into the original commit to save him from the need to
-> reverify the series.
-> 
-> ----------------------------------------------------------------
-> 
-> The series still creates the same merge conflicts when being pulled into
-> linus/master. See
-> http://git.pengutronix.de/?p=ukl/linux.git;a=commitdiff;h=dropmachtimexh-merged
-> for how I resolved for the first pull request.
-> 
-> It would be great to get this merged into v3.15-rc1.
+On Wed, Feb 19, 2014 at 02:44:27AM +0000, Liviu Dudau wrote:
+ 
+> I wish things were easier!
 
-Merged in as cleanup/timex-removal into next/cleanup.
+Yah, I've seen some of this complexity too..
 
-Note that your conflict resolution was incorrect at least for the
-mach-sa1100 case, where the SA1100_LATCH define is still needed.
+A thought that crosses my head is to try and leave the entire arch
+support intact and build a separate 'domain-driver-based' support
+that completely replaces the arch support, a domain would use one or
+the other but never both.
 
+So pci_domain_nr could become:
 
--Olof
+  struct pci_domain_driver *drv = pci_get_domain_driver(bus);
+  if (drv)
+       return drv->domain_nr;
+  else
+       return _arch_pci_domain_nr(bus);
+
+And other funcs would change effectively the same way.
+
+> And if someone has a good idea on how to determine the domain # from
+> DT we can pluck it into the pcibios_root_bridge_prepare() function
+> (either the generic version or the arch specific one).
+
+You can probably start with 'of_alias_get_id'..
+
+Jason
