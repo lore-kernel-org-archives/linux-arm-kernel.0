@@ -1,51 +1,31 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 19 Feb 2014 17:49:35 +0100
-Subject: [Linaro-acpi] [PATCH v4 5/5] ACPI: Replace printk with pr_* in
- tables.c
-In-Reply-To: <5304DCA2.5080906@arm.com>
-References: <1392731700-10992-1-git-send-email-hanjun.guo@linaro.org>
- <1392731700-10992-6-git-send-email-hanjun.guo@linaro.org>
- <5304DCA2.5080906@arm.com>
-Message-ID: <2341500.Z47JjkFCMP@vostro.rjw.lan>
+Date: Wed, 19 Feb 2014 17:52:53 +0100
+Subject: [PATCH v5 2/5] ACPI / processor_core: Rework _PDC related stuff
+ to make it more arch-independent
+In-Reply-To: <530413F0.4050008@linaro.org>
+References: <1392740638-2479-1-git-send-email-hanjun.guo@linaro.org>
+ <3459962.GkY99aHQbc@vostro.rjw.lan> <530413F0.4050008@linaro.org>
+Message-ID: <1643739.gIWxXCQHpB@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 19, 2014 04:32:34 PM Sudeep Holla wrote:
-> On 18/02/14 13:55, Hanjun Guo wrote:
-> > This patch just do some clean up to replace printk with pr_*,
-> > no functional change.
-> > 
-> Any particular reason for choosing just this file in this series ?
-> It seems but off-topic in this series. The printk format is same in almost all
-> other acpi files and it's better to change all or none for consistency.
-
-Well, it's fine, I can put it into a different branch in any case. :-)
-
-> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > ---
-> >  drivers/acpi/tables.c |   51 +++++++++++++++++++------------------------------
-> >  1 file changed, 20 insertions(+), 31 deletions(-)
-> > 
-> > diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-> > index 5837f85..97bc6df 100644
-> > --- a/drivers/acpi/tables.c
-> > +++ b/drivers/acpi/tables.c
-> > @@ -55,8 +55,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
-> >  		{
-> >  			struct acpi_madt_local_apic *p =
-> >  			    (struct acpi_madt_local_apic *)header;
-> > -			printk(KERN_INFO PREFIX
-> > -			       "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
-> > +			pr_info(PREFIX "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+On Wednesday, February 19, 2014 10:16:16 AM Hanjun Guo wrote:
+> On 2014?02?19? 08:50, Rafael J. Wysocki wrote:
+> > On Wednesday, February 19, 2014 12:23:55 AM Hanjun Guo wrote:
+> >> _PDC related stuff in processor_core.c is little bit X86/IA64 dependent,
+> >> rework the code to make it more arch-independent, no functional change
+> >> in this patch.
+> >>
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> > I've queued up patches [1,3-5/5] from this series for 3.15 (modulo changelog
+> > modifications), but this one should be CCed to the x86 and ia64 maintainers.
 > 
-> You can even get rid of PREFIX by defining pr_fmt instead.
+> Thanks! I will resend this patch with Tony and Thomas in cc list, so is 
+> there any chance for this
+> patch to be merged into 3.15 if I get acked from them?
 
-But this is a good point.
-
-> If the intention is to move to pr_* format it's better to have this as separate
-> patch and convert all of them.
-
-Well, not really.  One file at a time is OK too.
+If they ack it, then yes, it can.
 
 Thanks!
 
