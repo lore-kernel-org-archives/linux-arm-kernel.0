@@ -1,85 +1,106 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 20 Feb 2014 16:26:50 +0100
-Subject: [GIT PULL] Xilinx Zynq changes for v3.15
-Message-ID: <53061EBA.1080002@monstr.eu>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Feb 2014 15:26:54 +0000
+Subject: [PATCH] arm/arm64: KVM: detect CPU reset on CPU_PM_EXIT
+Message-ID: <1392910014-15495-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Commit 1fcf7ce0c602 (arm: kvm: implement CPU PM notifier) added
+support for CPU power-management, using a cpu_nofigier to re-init
+KVM on a CPU that entered CPU idle.
 
-please pull these changes to your arm-soc tree. This branch is based
-on zynq/dt branch from the second pull request.
-I have kept OCM patch in this branch because it depends on slcr changes
-done here. If you want to send another pull request just for this OCM
-patch based on this branch, please let me know.
+The code assumed that a CPU entering idle would actually be powered
+off, loosing its state entierely, and would then need to be
+reinitialized. It turns out that this is not always the case, and
+some HW performs CPU PM without actually killing the core. In this
+case, we try to reinitialize KVM while it still live. It ends up
+badly, as reported by Andre Przywara (using a Calxeda Midway):
 
-Thanks,
-Michal
+[    3.663897] Kernel panic - not syncing: unexpected prefetch abort in Hyp mode at: 0x685760
+[    3.663897] unexpected data abort in Hyp mode at: 0xc067d150
+[    3.663897] unexpected HVC/SVC trap in Hyp mode at: 0xc0901dd0
 
-The following changes since commit 3795e91d2abb25164dda5687ca680a7ab940c447:
+The trick here is to detect if we've been through a full re-init or
+not by looking at HVBAR (VBAR_EL2 on arm64). This involves
+implementing the backend for __hyp_get_vectors in the main KVM HYP
+code (rather small), and checking the return value against the
+default one when the CPU notifier is called on CPU_PM_EXIT.
 
-  arm: dt: zynq: Add fclk-enable property to clkc node (2014-02-03 17:00:24 +0100)
+Reported-by: Andre Przywara <osp@andrep.de>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Rob Herring <rob.herring@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/arm.c        | 3 ++-
+ arch/arm/kvm/interrupts.S | 7 ++++++-
+ arch/arm64/kvm/hyp.S      | 9 +++++++--
+ 3 files changed, 15 insertions(+), 4 deletions(-)
 
-are available in the git repository at:
-
-  git://git-dev/group/ssw/linux-xlnx.git tags/zynq-cleanup-for-3.15
-
-for you to fetch changes up to e9aa3e3a5bb2d64515648537100e5cf9b863e01a:
-
-  ARM: zynq: Add support for SOC_BUS (2014-02-20 16:08:47 +0100)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq cleanup patches for v3.15
-
-- Redesign SLCR initialization to enable
-  driver developing which targets SLCR space
-- Add OCM driver
-- Add SOC_BUS support
-
-----------------------------------------------------------------
-Michal Simek (8):
-      ARM: zynq: Split slcr in two parts
-      ARM: zynq: Map I/O memory on clkc init
-      ARM: zynq: Add and use zynq_slcr_read/write() helper functions
-      ARM: zynq: Introduce zynq_slcr_unlock()
-      ARM: zynq: Add OCM driver
-      ARM: zynq: Move of_clk_init from clock driver
-      ARM: zynq: Add waituart implementation
-      ARM: zynq: Add support for SOC_BUS
-
-Steffen Trumtrar (3):
-      ARM: zynq: Move clock_init from slcr to common
-      ARM: zynq: Hang iomapped slcr address on device_node
-      ARM: zynq: Make zynq_slcr_base static
-
- Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt |  17 +++++
- Documentation/devicetree/bindings/clock/zynq-7000.txt        |   4 +-
- arch/arm/boot/dts/zynq-7000.dtsi                             |  56 +++++++++------
- arch/arm/include/debug/zynq.S                                |   3 +
- arch/arm/mach-zynq/Kconfig                                   |   3 +
- arch/arm/mach-zynq/Makefile                                  |   2 +-
- arch/arm/mach-zynq/common.c                                  |  80 ++++++++++++++++++++-
- arch/arm/mach-zynq/common.h                                  |   4 +-
- arch/arm/mach-zynq/slcr.c                                    | 138 ++++++++++++++++++++++++++++++++----
- arch/arm/mach-zynq/zynq_ocm.c                                | 243 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/zynq/clkc.c                                      |  89 ++++++++++++++++--------
- include/linux/clk/zynq.h                                     |   2 +-
- 12 files changed, 570 insertions(+), 71 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt
- create mode 100644 arch/arm/mach-zynq/zynq_ocm.c
-
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 1d8248e..bd18bb8 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -878,7 +878,8 @@ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
+ 				    unsigned long cmd,
+ 				    void *v)
+ {
+-	if (cmd == CPU_PM_EXIT) {
++	if (cmd == CPU_PM_EXIT &&
++	    __hyp_get_vectors() == hyp_default_vectors) {
+ 		cpu_init_hyp_mode(NULL);
+ 		return NOTIFY_OK;
+ 	}
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index ddc1553..9b0ff68 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -363,6 +363,11 @@ hyp_hvc:
+ host_switch_to_hyp:
+ 	pop	{r0, r1, r2}
+ 
++	/* Check for __hyp_get_vectors */
++	cmp	r0, #-1
++	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
++	beq	1f
++
+ 	push	{lr}
+ 	mrs	lr, SPSR
+ 	push	{lr}
+@@ -378,7 +383,7 @@ THUMB(	orr	lr, #1)
+ 	pop	{lr}
+ 	msr	SPSR_csxf, lr
+ 	pop	{lr}
+-	eret
++1:	eret
+ 
+ guest_trap:
+ 	load_vcpu			@ Load VCPU pointer to r0
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 3b47c36..f1cbabe 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -737,7 +737,12 @@ el1_sync:					// Guest trapped into EL2
+ 	pop	x2, x3
+ 	pop	x0, x1
+ 
+-	push	lr, xzr
++	/* Check for __hyp_get_vectors */
++	cbnz	x0, 1f
++	mrs	x0, vbar_el2
++	b	2f
++
++1:	push	lr, xzr
+ 
+ 	/*
+ 	 * Compute the function address in EL2, and shuffle the parameters.
+@@ -750,7 +755,7 @@ el1_sync:					// Guest trapped into EL2
+ 	blr	lr
+ 
+ 	pop	lr, xzr
+-	eret
++2:	eret
+ 
+ el1_trap:
+ 	/*
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140220/940fef14/attachment.sig>
+1.8.3.4
