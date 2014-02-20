@@ -1,27 +1,111 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Thu, 20 Feb 2014 16:35:59 +0000
-Subject: [PATCH 2/2] arm/xen: Don't use xen DMA ops when the device is
- protected by an IOMMU
-In-Reply-To: <1392913301-25524-1-git-send-email-julien.grall@linaro.org>
-References: <1392913301-25524-1-git-send-email-julien.grall@linaro.org>
-Message-ID: <1392914159.32657.18.camel@kazak.uk.xensource.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 20 Feb 2014 10:36:11 -0600
+Subject: [PATCH 3/4] ARM: dts: OMAP5: Add device nodes for ABB
+In-Reply-To: <1391039177-25284-4-git-send-email-nm@ti.com>
+References: <1391039177-25284-1-git-send-email-nm@ti.com>
+ <1391039177-25284-4-git-send-email-nm@ti.com>
+Message-ID: <53062EFB.3080501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-02-20 at 16:21 +0000, Julien Grall wrote:
-> Only Xen is able to know if a device can safely avoid to use xen-swiotlb.
-> This patch introduce a new property "protected-devices" for the hypervisor
-> node which list device which the IOMMU are been correctly programmed by Xen.
+On 01/29/2014 05:46 PM, Nishanth Menon wrote:
+> From: "Andrii.Tseglytskyi" <andrii.tseglytskyi@ti.com>
 > 
-> During Linux boot, Xen specific code will create an hash table which
-> contains all these devices. The hash table will be used in need_xen_dma_ops
-> to check if the Xen DMA ops needs to be used for the current device.
+> Add ABB device nodes for OMAP5 family of devices. Data is based on
+> OMAP543x Technical Reference Manual revision U (April 2013).
+> NOTE: clock node has been disabled in this patch due to the lack of
+> OMAP5 clock data.
+> 
+> [nm at ti.com: co-developer]
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Andrii.Tseglytskyi <andrii.tseglytskyi@ti.com>
+> ---
 
-Is it out of the question to find a field within struct device itself to
-store this e.g. in struct device_dma_parameters perhaps and avoid the
-need for a hashtable lookup.
+I have been informed that there is an fix in TI official documentation
+which is due end of this month. So, I have to drop this patch from the
+series for the time being - I will refresh this along with necessary
+OMAP5 updates once the official documentation is available.
 
-device->iommu_group might be another option, if we can create our own
-group?
+>  arch/arm/boot/dts/omap5.dtsi |   63 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 63 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+> index a72813a..6159f20 100644
+> --- a/arch/arm/boot/dts/omap5.dtsi
+> +++ b/arch/arm/boot/dts/omap5.dtsi
+> @@ -801,6 +801,69 @@
+>  
+>  			#thermal-sensor-cells = <1>;
+>  		};
+> +
+> +		abb_mpu: regulator-abb-mpu {
+> +			compatible = "ti,abb-v2";
+> +			regulator-name = "abb_mpu";
+> +			#address-cells = <0>;
+> +			#size-cells = <0>;
+> +			clocks = <&sys_clkin>;
+> +			ti,settling-time = <50>;
+> +			ti,clock-cycles = <16>;
+> +
+> +			reg = <0x4ae07cdc 0x8>, <0x4ae06014 0x4>,
+> +			      <0x4a0021ac 0x18>, <0x4ae0C318 0x4>;
+> +			reg-names = "base-address", "int-address",
+> +				    "efuse-address", "ldo-address";
+> +			ti,tranxdone-status-mask = <0x80>;
+> +			/* LDOVBBMPU_MUX_CTRL */
+> +			ti,ldovbb-override-mask = <0x400>;
+> +			/* LDOVBBMPU_VSET_OUT */
+> +			ti,ldovbb-vset-mask = <0x1F>;
+> +
+> +			/*
+> +			 * NOTE: only FBB mode used but actual vset will
+> +			 * determine final biasing
+> +			 */
+> +			ti,abb_info = <
+> +			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
+> +			880000		0	0x4	0 0x20000000 0x1F000000
+> +			1060000		0	0x8	0 0x20000000 0x1F000000
+> +			1250000		0	0x10	0 0x20000000 0x1F000000
+> +			1260000		1	0x14	0 0x20000000 0x1F000000
+> +			>;
+> +		};
+> +
+> +		abb_mm: regulator-abb-mm {
+> +			compatible = "ti,abb-v2";
+> +			regulator-name = "abb_mm";
+> +			#address-cells = <0>;
+> +			#size-cells = <0>;
+> +			clocks = <&sys_clkin>;
+> +			ti,settling-time = <50>;
+> +			ti,clock-cycles = <16>;
+> +
+> +			reg = <0x4ae07ce4 0x8>, <0x4ae06010 0x4>,
+> +			      <0x4a002194 0x14>, <0x4ae0C314 0x4>;
+> +			reg-names = "base-address", "int-address",
+> +				    "efuse-address", "ldo-address";
+> +			ti,tranxdone-status-mask = <0x80000000>;
+> +			/* LDOVBBMM_MUX_CTRL */
+> +			ti,ldovbb-override-mask = <0x400>;
+> +			/* LDOVBBMM_VSET_OUT */
+> +			ti,ldovbb-vset-mask = <0x1F>;
+> +
+> +			/*
+> +			 * NOTE: only FBB mode used but actual vset will
+> +			 * determine final biasing
+> +			 */
+> +			ti,abb_info = <
+> +			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
+> +			880000		0	0x4	0 0x20000000 0x1F000000
+> +			1025000		0	0x8	0 0x20000000 0x1F000000
+> +			1120000		1	0x10	0 0x20000000 0x1F000000
+> +			>;
+> +		};
+>  	};
+>  };
+>  
+> 
 
-Ian.
+
+-- 
+Regards,
+Nishanth Menon
