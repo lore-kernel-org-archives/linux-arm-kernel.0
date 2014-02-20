@@ -1,89 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Feb 2014 11:42:22 +0000
-Subject: [PATCH v9 1/6] arm64: Add macros to manage processor debug state
-In-Reply-To: <CALicx6t7RSS_Zo9RGr76LMnNth1gQ7pukUtAmDY4gWRN5KGVKQ@mail.gmail.com>
-References: <20140129105546.GC26622@mudshark.cambridge.arm.com>
- <CALicx6uw3En92GhrKpAoavzwwNKWR8C8hHcS5B+eyLX_dC0LBA@mail.gmail.com>
- <20140217130149.GA5856@arm.com>
- <CALicx6uHqyJ-n+b-zfua6P=UsJ+a2_2h-H6krx-DBJYWfF=7jg@mail.gmail.com>
- <20140218120249.GD11049@arm.com>
- <CALicx6v6=WdRPoZ-vcxf7zusooB5r1V9WnjBf3QjOiO7yik3sw@mail.gmail.com>
- <20140219113157.GG30457@arm.com> <20140219160359.GB22252@arm.com>
- <20140219161236.GG28173@mudshark.cambridge.arm.com>
- <CALicx6t7RSS_Zo9RGr76LMnNth1gQ7pukUtAmDY4gWRN5KGVKQ@mail.gmail.com>
-Message-ID: <20140220114222.GG3615@mudshark.cambridge.arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 20 Feb 2014 16:48:58 +0530
+Subject: [PATCH RFC 07/31] mmc: sdhci: push card_tasklet into threaded irq
+ handler
+In-Reply-To: <20140220105903.GY21483@n2100.arm.linux.org.uk>
+References: <20140218150801.GD21483@n2100.arm.linux.org.uk>
+ <E1WFmIk-0006m0-Ah@rmk-PC.arm.linux.org.uk>
+ <20140218175703.GJ21483@n2100.arm.linux.org.uk>
+ <CAKohpoknX=acZHJeydwv6XRKFHTD4DM84xfCJ=56NrRfJnBOOA@mail.gmail.com>
+ <20140219094322.GR21483@n2100.arm.linux.org.uk>
+ <CAKohpomfHxWBF5m4D6iqod4a3gw2BU1W6nXMkEOg+YA+izYr=g@mail.gmail.com>
+ <20140219095212.GT21483@n2100.arm.linux.org.uk>
+ <CAKohpo=ZrLRsTyCH86x7TbGE2XJnpXNb1ZDvYyzDUupAwTtS9Q@mail.gmail.com>
+ <20140219105011.GU21483@n2100.arm.linux.org.uk>
+ <CAKohpokBf_fJhiUJ53c+=6v+GMcjaDKd7+fwib99=sLMdkjQQQ@mail.gmail.com>
+ <20140220105903.GY21483@n2100.arm.linux.org.uk>
+Message-ID: <CAKohpo=FTk9SGCMJGBdOUheUg71WsG7qaeE9rwQRqd5dP4O8FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 06:58:25AM +0000, Vijay Kilari wrote:
-> Hi Will,
+On 20 February 2014 16:29, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> I'll send a few patches in a moment.  First through, I've just found this
+> gem:
 
-Hi Vijay,
+Yeah, 'gem' is the real word for this precious code :)
 
-> On Wed, Feb 19, 2014 at 9:42 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > The reply from Vijay suggested that everything is confined to a single CPU.
-> 
->   This issue is seen only when kgdb test is triggered on secondary cpu's.
-> when executed on cpu0 issue is not seen. Though cpu0 triggers kgdb tests
-> the do_fork test might trigger debug exception on other cpu's as well,
-> which fails.
-> 
-> For the patch 1 you suggested me to call local_dbg_enable() from
-> clear_os_mask() function
-> as below
-> 
-> static void clear_os_lock(void *unused)
+> static int sdhci_probe(struct platform_device *pdev)
 > {
->         asm volatile("msr oslar_el1, %0" : : "r" (0));
->         isb();
->         local_dbg_enable();
-> }
-> 
-> This is an SMP call. So when more than one core is enabled, this
-> local_dbg_enable() is called
-> from SMP call context, which is el1_irq context for secondary cpu's.
-> So PSTATE.D flag is unmasked
-> only in irq context but not in normal context.
-
-Aha, well spotted!
-
-> For CPU0 this clear_os_lock() is not called from smp call. it is
-> directly called in debug_monitors_init()
-> call. So PSTATE.D is unmasked for CPU0 and hence kgdb tests passed
-> when triggered only on
-> cpu0.
-> 
-> static int debug_monitors_init(void)
+> ...
+>         sdhci = devm_kzalloc(&pdev->dev, sizeof(*sdhci), GFP_KERNEL);
+> ...
+>         if (np) {
+> ...
+>         } else {
+>                 sdhci->data = dev_get_platdata(&pdev->dev);
+>         }
+>
+>         pdev->dev.platform_data = sdhci;
+> ...
+>         ... some paths which can cause probe to return an error code ...
+> ...
+> static int sdhci_remove(struct platform_device *pdev)
 > {
->         /* Clear the OS lock. */
->         smp_call_function(clear_os_lock, NULL, 1);
->         clear_os_lock(NULL);
-> 
->         /* Register hotplug handler. */
->         register_cpu_notifier(&os_lock_nb);
->         return 0;
-> }
-> 
-> When I made below patch it works. I have tested with 4 cores on foundation model
+>         struct sdhci_host *host = platform_get_drvdata(pdev);
+>         struct spear_sdhci *sdhci = dev_get_platdata(&pdev->dev);
+> ...
+>         clk_disable_unprepare(sdhci->clk);
+>         clk_put(sdhci->clk);
+>
+> So, what happens if we hit an error such as -EPROBEDEFER after that
+> assignment to pdev->dev.platform_data, and then re-probe the driver
+> later?
 
-The main change here is that we enable debug exceptions before we unlock the
-os lock. That should be fine, since everything apart from software
-breakpoint exceptions are masked when the lock is locked.
+BANG BANG!! :)
 
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -160,6 +160,8 @@ asmlinkage void secondary_start_kernel(void)
->         set_cpu_online(cpu, true);
->         complete(&cpu_running);
-> 
-> +       local_dbg_enable();
->         local_irq_enable();
->         local_async_enable();
+> This is just horribly broken.
+>
+> What's wrong with using the facilities in sdhci to allow you to have
+> your own private data after the sdhci_host structure?
 
-The only thing to add then moving the isb(); local_dbg_enable() out of
-clear_os_lock and into debug_monitors_init. You can probably make the
-smp_call_function an on_each_cpu too.
+Nothing wrong in that, only right.. Do you want me to float a patch for
+this or you can get that done along with your series?
 
-Does that make sense?
+Thanks again..
 
-Will
+--
+viresh
