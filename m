@@ -1,32 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 20 Feb 2014 13:07:31 +0100
-Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
-In-Reply-To: <20140220112248.GC32456@localhost>
-References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
- <CAOesGMjSjzZ4iX3NVA6eS4LHJF2MQQ=KJpNgKWikJb6YkQxNpQ@mail.gmail.com>
- <20140220112248.GC32456@localhost>
-Message-ID: <116078520.5VTDQYu7BE@wuerfel>
+Date: Thu, 20 Feb 2014 13:09:44 +0100
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <20140220105854.GL11878@lunn.ch>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1392892217.23342.18.camel@kazak.uk.xensource.com>
+ <20140220105854.GL11878@lunn.ch>
+Message-ID: <2309805.FlfIt1u0R7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 February 2014 11:22:48 Catalin Marinas wrote:
+On Thursday 20 February 2014 11:58:54 Andrew Lunn wrote:
 > 
-> I'm fine with this. Do we still need something for ARMv8 server
-> platforms like ARCH_ARM_SBSA? The only advantage would be to make it
-> easier for mobile targeted kernel builds to disable server features but
-> I'm not sure there are so many such features, people can trim the
-> .config manually.
-
-I think in particular for SBSA compliant platforms we should not
-have per-platform options at all the way we do for embedded,
-as they will be much more homogenous.
-
-> Two additional points:
+> > I still need to figure out how to distinguish the variations, but I
+> > think I have a plan there (via which PCI buses are present, which is a
+> > bit skanky but seems like the most workable solution).
 > 
-> 1. Single arm64 defconfig file covering everything
-> 2. Modules rather than built-in by default where possible (especially
->    for server platforms)
+> Having the SoC ID available via lspci for systems using the new PCI
+> driver might be in 3.14. It was considered a regression so might get
+> merged into an rc. If not, it will be in 3.15.
+> 
+> We have also talked about putting the SOC version and revision into
+> /proc/cpuinfo, in the Revision field. However this has not happened
+> yet.
 
-+1
+Another option would be to use the soc bus to provide that information
+in /sys/devices/soc, and put the rest of the devices under that
+node.
 
 	Arnd
