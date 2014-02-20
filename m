@@ -1,35 +1,35 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 20 Feb 2014 13:40:05 +0200
-Subject: [PATCH v8 10/14] ARM: dts: omap4-panda: Provide USB PHY clock
+Date: Thu, 20 Feb 2014 13:40:06 +0200
+Subject: [PATCH v8 11/14] ARM: dts: omap5-uevm: Provide USB PHY clock
 In-Reply-To: <1392896409-5101-1-git-send-email-rogerq@ti.com>
 References: <1392896409-5101-1-git-send-email-rogerq@ti.com>
-Message-ID: <1392896409-5101-11-git-send-email-rogerq@ti.com>
+Message-ID: <1392896409-5101-12-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB PHY gets its clock from AUXCLK3. Provide this
+The HS USB 2 PHY gets its clock from AUXCLK1. Provide this
 information.
 
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap4-panda-common.dtsi | 8 ++------
+ arch/arm/boot/dts/omap5-uevm.dts | 8 ++------
  1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index 88c6a05..50b72966 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -83,12 +83,8 @@
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index 002fa70..3b99ec2 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -31,12 +31,8 @@
+ 	hsusb2_phy: hsusb2_phy {
  		compatible = "usb-nop-xceiv";
- 		reset-gpios = <&gpio2 30 GPIO_ACTIVE_LOW>;   /* gpio_62 */
- 		vcc-supply = <&hsusb1_power>;
+ 		reset-gpios = <&gpio3 16 GPIO_ACTIVE_LOW>; /* gpio3_80 HUB_NRESET */
 -	/**
--	 * FIXME:
--	 * put the right clock phandle here when available
--	 *	clocks = <&auxclk3>;
--	 *	clock-names = "main_clk";
--	 */
-+		clocks = <&auxclk3_ck>;
+-	  * FIXME
+-	  * Put the right clock phandle here when available
+-	  *	clocks = <&auxclk1>;
+-	  *	clock-names = "main_clk";
+-	  */
++		clocks = <&auxclk1_ck>;
 +		clock-names = "main_clk";
  		clock-frequency = <19200000>;
  	};
