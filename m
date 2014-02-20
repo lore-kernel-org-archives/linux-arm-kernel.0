@@ -1,68 +1,36 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 20 Feb 2014 16:48:58 +0530
-Subject: [PATCH RFC 07/31] mmc: sdhci: push card_tasklet into threaded irq
- handler
-In-Reply-To: <20140220105903.GY21483@n2100.arm.linux.org.uk>
-References: <20140218150801.GD21483@n2100.arm.linux.org.uk>
- <E1WFmIk-0006m0-Ah@rmk-PC.arm.linux.org.uk>
- <20140218175703.GJ21483@n2100.arm.linux.org.uk>
- <CAKohpoknX=acZHJeydwv6XRKFHTD4DM84xfCJ=56NrRfJnBOOA@mail.gmail.com>
- <20140219094322.GR21483@n2100.arm.linux.org.uk>
- <CAKohpomfHxWBF5m4D6iqod4a3gw2BU1W6nXMkEOg+YA+izYr=g@mail.gmail.com>
- <20140219095212.GT21483@n2100.arm.linux.org.uk>
- <CAKohpo=ZrLRsTyCH86x7TbGE2XJnpXNb1ZDvYyzDUupAwTtS9Q@mail.gmail.com>
- <20140219105011.GU21483@n2100.arm.linux.org.uk>
- <CAKohpokBf_fJhiUJ53c+=6v+GMcjaDKd7+fwib99=sLMdkjQQQ@mail.gmail.com>
- <20140220105903.GY21483@n2100.arm.linux.org.uk>
-Message-ID: <CAKohpo=FTk9SGCMJGBdOUheUg71WsG7qaeE9rwQRqd5dP4O8FQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 20 Feb 2014 11:52:06 +0000
+Subject: [PATCH v9 1/6] arm64: Add macros to manage processor debug state
+In-Reply-To: <CALicx6t7RSS_Zo9RGr76LMnNth1gQ7pukUtAmDY4gWRN5KGVKQ@mail.gmail.com>
+References: <20140129105546.GC26622@mudshark.cambridge.arm.com>
+ <CALicx6uw3En92GhrKpAoavzwwNKWR8C8hHcS5B+eyLX_dC0LBA@mail.gmail.com>
+ <20140217130149.GA5856@arm.com>
+ <CALicx6uHqyJ-n+b-zfua6P=UsJ+a2_2h-H6krx-DBJYWfF=7jg@mail.gmail.com>
+ <20140218120249.GD11049@arm.com>
+ <CALicx6v6=WdRPoZ-vcxf7zusooB5r1V9WnjBf3QjOiO7yik3sw@mail.gmail.com>
+ <20140219113157.GG30457@arm.com> <20140219160359.GB22252@arm.com>
+ <20140219161236.GG28173@mudshark.cambridge.arm.com>
+ <CALicx6t7RSS_Zo9RGr76LMnNth1gQ7pukUtAmDY4gWRN5KGVKQ@mail.gmail.com>
+Message-ID: <20140220115206.GD32456@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 February 2014 16:29, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> I'll send a few patches in a moment.  First through, I've just found this
-> gem:
+On Thu, Feb 20, 2014 at 06:58:25AM +0000, Vijay Kilari wrote:
+> When I made below patch it works. I have tested with 4 cores on foundation model
+> 
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -160,6 +160,8 @@ asmlinkage void secondary_start_kernel(void)
+>         set_cpu_online(cpu, true);
+>         complete(&cpu_running);
+> 
+> +       local_dbg_enable();
+>         local_irq_enable();
+>         local_async_enable();
 
-Yeah, 'gem' is the real word for this precious code :)
+I tested this as well and seems to work fine. I'll let Will comment on
+whether this fix is enough and if yes, I'll fold it into one of your
+patches (or push it on top of them).
 
-> static int sdhci_probe(struct platform_device *pdev)
-> {
-> ...
->         sdhci = devm_kzalloc(&pdev->dev, sizeof(*sdhci), GFP_KERNEL);
-> ...
->         if (np) {
-> ...
->         } else {
->                 sdhci->data = dev_get_platdata(&pdev->dev);
->         }
->
->         pdev->dev.platform_data = sdhci;
-> ...
->         ... some paths which can cause probe to return an error code ...
-> ...
-> static int sdhci_remove(struct platform_device *pdev)
-> {
->         struct sdhci_host *host = platform_get_drvdata(pdev);
->         struct spear_sdhci *sdhci = dev_get_platdata(&pdev->dev);
-> ...
->         clk_disable_unprepare(sdhci->clk);
->         clk_put(sdhci->clk);
->
-> So, what happens if we hit an error such as -EPROBEDEFER after that
-> assignment to pdev->dev.platform_data, and then re-probe the driver
-> later?
-
-BANG BANG!! :)
-
-> This is just horribly broken.
->
-> What's wrong with using the facilities in sdhci to allow you to have
-> your own private data after the sdhci_host structure?
-
-Nothing wrong in that, only right.. Do you want me to float a patch for
-this or you can get that done along with your series?
-
-Thanks again..
-
---
-viresh
+-- 
+Catalin
