@@ -1,84 +1,110 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 20 Feb 2014 09:55:48 +0100
-Subject: [PATCH] arm64: add workaround for ambiguous C99 stdint.h types
-In-Reply-To: <CAKv+Gu-rV5mvfegjqGUb+nET8FLsB2Xx0DdXjnNU0BCUUOYBTA@mail.gmail.com>
-References: <1390768248-1688-1-git-send-email-ard.biesheuvel@linaro.org>
- <20140217122334.GA19102@arm.com>
- <CAKv+Gu_=kgP1LS-HN6n+QfHMyi142aNpGR0roqRo2tinYXdxPw@mail.gmail.com>
- <20140217174247.GA8361@arm.com>
- <CAKv+Gu-RmZ4h=6+h_Fn+NQbDN81FNZHhnVd7Nfspx_LynJ1w6Q@mail.gmail.com>
- <20140217180237.GC8361@arm.com>
- <CAKv+Gu-rV5mvfegjqGUb+nET8FLsB2Xx0DdXjnNU0BCUUOYBTA@mail.gmail.com>
-Message-ID: <CAKv+Gu9OncmiWL5VCQgo_W7ndgMQfOb5VCE+kj-HcDxKWAn3FQ@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 20 Feb 2014 09:55:46 +0100
+Subject: [PATCH] clk: zynq: Use clk_readl/clk_writel helper function
+Message-ID: <fcff6030d4dd07c43482a551cf1bc79545fbb55d.1392886522.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 February 2014 19:17, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 17 February 2014 19:02, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Mon, Feb 17, 2014 at 05:57:22PM +0000, Ard Biesheuvel wrote:
->>> On 17 February 2014 18:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
-[...]
->>> > For other intrinsics that we use like __builtin_ctzl(), do we need to
->>> > explicitly include gcc headers? I don't think we do and I really don't
->>> > like such arm_neon.h include which brings in other user headers. Don't
->>> > we have any work around this?
->>>
->>> Well, I talked to the toolchain guys at the time and they really
->>> disliked the idea of coding directly against the __builtins because
->>> they are not considered a stable interface, especially because the
->>> interface that /is/ considered stable (arm_neon.h) is supported both
->>> on ARM and on arm64.
->>
->> Than we don't use the Neon __builtins in the kernel.
->>
->>> > My inbox only has some discussion in May last year on the linaro-kernel
->>> > list without any clear conclusion (it could be that I deleted other
->>> > emails).
->>>
->>> There was some discussion, indeed, but for ARM, with the conclusion
->>> being the fix I mentioned in the patch: 09096f6a0ee2 ("ARM: 7822/1:
->>> add workaround
->>> for ambiguous C99 stdint.h types"), only in that case, the ambiguity
->>> is (unsurprisingly) about the 32 bit types, not the 64 bit ones.
->>
->> My worry is that some future toolchain may include something else in
->> this file and get other type conflicts. It really looks fragile.
->>
->
-> Well, the GCC folks are quite careful not to depend on arbitrary user
-> headers when the -ffreestanding option is set. Also, the real problem
-> is the fact that Linux defines C99 types, but does so in an
-> incompatible way. (I.e., one could also argue that the Linux typedefs
-> should be based on GCC's builtin #defines of __INT64_TYPE,
-> __UINT64_TYPE, etc if defined). So the chances of something similar
-> reappearing all of a sudden are quite slim imo.
->
+Do not use readl/writel directly because the whole
+clk subsystem is using clk_readl/clk_writel functions.
 
-Perhaps this alternative approach would be better?
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Acked-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
 
-diff --git a/include/linux/types.h b/include/linux/types.h
-index 4d118ba11349..78344874fff0 100644
---- a/include/linux/types.h
-+++ b/include/linux/types.h
-@@ -108,9 +108,9 @@ typedef             __u16           uint16_t;
- typedef                __u32           uint32_t;
+ drivers/clk/zynq/clkc.c |  4 ++--
+ drivers/clk/zynq/pll.c  | 18 +++++++++---------
+ 2 files changed, 11 insertions(+), 11 deletions(-)
 
- #if defined(__GNUC__)
--typedef                __u64           uint64_t;
--typedef                __u64           u_int64_t;
--typedef                __s64           int64_t;
-+typedef                __UINT64_TYPE__ uint64_t;
-+typedef                __UINT64_TYPE__ u_int64_t;
-+typedef                __INT64_TYPE__  int64_t;
- #endif
+diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
+index 09dd017..e726c1b 100644
+--- a/drivers/clk/zynq/clkc.c
++++ b/drivers/clk/zynq/clkc.c
+@@ -148,7 +148,7 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
+ 	clks[fclk] = clk_register_gate(NULL, clk_name,
+ 			div1_name, CLK_SET_RATE_PARENT, fclk_gate_reg,
+ 			0, CLK_GATE_SET_TO_DISABLE, fclk_gate_lock);
+-	enable_reg = readl(fclk_gate_reg) & 1;
++	enable_reg = clk_readl(fclk_gate_reg) & 1;
+ 	if (enable && !enable_reg) {
+ 		if (clk_prepare_enable(clks[fclk]))
+ 			pr_warn("%s: FCLK%u enable failed\n", __func__,
+@@ -277,7 +277,7 @@ static void __init zynq_clk_setup(struct device_node *np)
+ 			SLCR_IOPLL_CTRL, 4, 1, 0, &iopll_lock);
 
-I mean, we are already depending explicitly on __GNUC__, and GNUC
-tells us exactly which types it thinks should be used for typedef'ing
-[u]int64_t.
+ 	/* CPU clocks */
+-	tmp = readl(SLCR_621_TRUE) & 1;
++	tmp = clk_readl(SLCR_621_TRUE) & 1;
+ 	clk = clk_register_mux(NULL, "cpu_mux", cpu_parents, 4,
+ 			CLK_SET_RATE_NO_REPARENT, SLCR_ARM_CLK_CTRL, 4, 2, 0,
+ 			&armclk_lock);
+diff --git a/drivers/clk/zynq/pll.c b/drivers/clk/zynq/pll.c
+index 3226f54..cec9759 100644
+--- a/drivers/clk/zynq/pll.c
++++ b/drivers/clk/zynq/pll.c
+@@ -90,7 +90,7 @@ static unsigned long zynq_pll_recalc_rate(struct clk_hw *hw,
+ 	 * makes probably sense to redundantly save fbdiv in the struct
+ 	 * zynq_pll to save the IO access.
+ 	 */
+-	fbdiv = (readl(clk->pll_ctrl) & PLLCTRL_FBDIV_MASK) >>
++	fbdiv = (clk_readl(clk->pll_ctrl) & PLLCTRL_FBDIV_MASK) >>
+ 			PLLCTRL_FBDIV_SHIFT;
 
-Anyway, I am perfectly happy to park this until a real use case shows
-up. I have some crypto coded up in intrinsics, but we won't know if
-it's fast enough until I manage to run it on actual hardware.
+ 	return parent_rate * fbdiv;
+@@ -112,7 +112,7 @@ static int zynq_pll_is_enabled(struct clk_hw *hw)
 
-Regards,
-Ard.
+ 	spin_lock_irqsave(clk->lock, flags);
+
+-	reg = readl(clk->pll_ctrl);
++	reg = clk_readl(clk->pll_ctrl);
+
+ 	spin_unlock_irqrestore(clk->lock, flags);
+
+@@ -138,10 +138,10 @@ static int zynq_pll_enable(struct clk_hw *hw)
+ 	/* Power up PLL and wait for lock */
+ 	spin_lock_irqsave(clk->lock, flags);
+
+-	reg = readl(clk->pll_ctrl);
++	reg = clk_readl(clk->pll_ctrl);
+ 	reg &= ~(PLLCTRL_RESET_MASK | PLLCTRL_PWRDWN_MASK);
+-	writel(reg, clk->pll_ctrl);
+-	while (!(readl(clk->pll_status) & (1 << clk->lockbit)))
++	clk_writel(reg, clk->pll_ctrl);
++	while (!(clk_readl(clk->pll_status) & (1 << clk->lockbit)))
+ 		;
+
+ 	spin_unlock_irqrestore(clk->lock, flags);
+@@ -168,9 +168,9 @@ static void zynq_pll_disable(struct clk_hw *hw)
+ 	/* shut down PLL */
+ 	spin_lock_irqsave(clk->lock, flags);
+
+-	reg = readl(clk->pll_ctrl);
++	reg = clk_readl(clk->pll_ctrl);
+ 	reg |= PLLCTRL_RESET_MASK | PLLCTRL_PWRDWN_MASK;
+-	writel(reg, clk->pll_ctrl);
++	clk_writel(reg, clk->pll_ctrl);
+
+ 	spin_unlock_irqrestore(clk->lock, flags);
+ }
+@@ -225,9 +225,9 @@ struct clk *clk_register_zynq_pll(const char *name, const char *parent,
+
+ 	spin_lock_irqsave(pll->lock, flags);
+
+-	reg = readl(pll->pll_ctrl);
++	reg = clk_readl(pll->pll_ctrl);
+ 	reg &= ~PLLCTRL_BPQUAL_MASK;
+-	writel(reg, pll->pll_ctrl);
++	clk_writel(reg, pll->pll_ctrl);
+
+ 	spin_unlock_irqrestore(pll->lock, flags);
+
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140220/e838f2ab/attachment-0001.sig>
