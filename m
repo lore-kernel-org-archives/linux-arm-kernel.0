@@ -1,40 +1,72 @@
 From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 20 Feb 2014 16:26:37 +0100
-Subject: [GIT PULL] Xilinx Zynq dt changes for v3.15
-Message-ID: <53061EAD.9000000@monstr.eu>
+Date: Thu, 20 Feb 2014 16:26:50 +0100
+Subject: [GIT PULL] Xilinx Zynq changes for v3.15
+Message-ID: <53061EBA.1080002@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-please pull this patch to your arm-soc tree.
+please pull these changes to your arm-soc tree. This branch is based
+on zynq/dt branch from the second pull request.
+I have kept OCM patch in this branch because it depends on slcr changes
+done here. If you want to send another pull request just for this OCM
+patch based on this branch, please let me know.
 
 Thanks,
 Michal
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-
-are available in the git repository at:
-
-  git://git-dev/group/ssw/linux-xlnx.git tags/zynq-dt-for-3.15
-
-for you to fetch changes up to 3795e91d2abb25164dda5687ca680a7ab940c447:
+The following changes since commit 3795e91d2abb25164dda5687ca680a7ab940c447:
 
   arm: dt: zynq: Add fclk-enable property to clkc node (2014-02-03 17:00:24 +0100)
 
+are available in the git repository at:
+
+  git://git-dev/group/ssw/linux-xlnx.git tags/zynq-cleanup-for-3.15
+
+for you to fetch changes up to e9aa3e3a5bb2d64515648537100e5cf9b863e01a:
+
+  ARM: zynq: Add support for SOC_BUS (2014-02-20 16:08:47 +0100)
+
 ----------------------------------------------------------------
-arm: Xilinx Zynq dt patches for v3.15
+arm: Xilinx Zynq cleanup patches for v3.15
 
-- Define fclk-enable property
+- Redesign SLCR initialization to enable
+  driver developing which targets SLCR space
+- Add OCM driver
+- Add SOC_BUS support
 
 ----------------------------------------------------------------
-Soren Brinkmann (1):
-      arm: dt: zynq: Add fclk-enable property to clkc node
+Michal Simek (8):
+      ARM: zynq: Split slcr in two parts
+      ARM: zynq: Map I/O memory on clkc init
+      ARM: zynq: Add and use zynq_slcr_read/write() helper functions
+      ARM: zynq: Introduce zynq_slcr_unlock()
+      ARM: zynq: Add OCM driver
+      ARM: zynq: Move of_clk_init from clock driver
+      ARM: zynq: Add waituart implementation
+      ARM: zynq: Add support for SOC_BUS
 
- arch/arm/boot/dts/zynq-7000.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+Steffen Trumtrar (3):
+      ARM: zynq: Move clock_init from slcr to common
+      ARM: zynq: Hang iomapped slcr address on device_node
+      ARM: zynq: Make zynq_slcr_base static
+
+ Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt |  17 +++++
+ Documentation/devicetree/bindings/clock/zynq-7000.txt        |   4 +-
+ arch/arm/boot/dts/zynq-7000.dtsi                             |  56 +++++++++------
+ arch/arm/include/debug/zynq.S                                |   3 +
+ arch/arm/mach-zynq/Kconfig                                   |   3 +
+ arch/arm/mach-zynq/Makefile                                  |   2 +-
+ arch/arm/mach-zynq/common.c                                  |  80 ++++++++++++++++++++-
+ arch/arm/mach-zynq/common.h                                  |   4 +-
+ arch/arm/mach-zynq/slcr.c                                    | 138 ++++++++++++++++++++++++++++++++----
+ arch/arm/mach-zynq/zynq_ocm.c                                | 243 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/zynq/clkc.c                                      |  89 ++++++++++++++++--------
+ include/linux/clk/zynq.h                                     |   2 +-
+ 12 files changed, 570 insertions(+), 71 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt
+ create mode 100644 arch/arm/mach-zynq/zynq_ocm.c
 
 -- 
 Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
@@ -50,4 +82,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 263 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140220/aaff48c5/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140220/940fef14/attachment.sig>
