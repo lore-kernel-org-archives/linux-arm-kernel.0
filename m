@@ -1,94 +1,59 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Thu, 20 Feb 2014 14:38:29 +0000
-Subject: [PATCH] arm64: Add architecture support for PCI
-In-Reply-To: <5302FED1.80903@huawei.com>
-References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
- <1391453028-23191-2-git-send-email-Liviu.Dudau@arm.com>
- <5302FED1.80903@huawei.com>
-Message-ID: <20140220143829.GA1556@bart.dudau.co.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 20 Feb 2014 15:49:39 +0100
+Subject: [PATCH 11/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
+In-Reply-To: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
+References: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1392907779-22053-12-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 02:33:53PM +0800, Yijing Wang wrote:
-> > +#include <linux/init.h>
-> > +#include <linux/io.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/mm.h>
-> > +#include <linux/of_pci.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/slab.h>
-> > +
-> > +#include <asm/pci-bridge.h>
-> > +
-> > +
-> > +/*
-> > + * Return the domain number for this bus
-> > + */
-> > +int pci_domain_nr(struct pci_bus *bus)
-> > +{
-> > +	struct pci_host_bridge *bridge = to_pci_host_bridge(bus->bridge);
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Hi Yijing,
+Add pinctrl and SPI device for MSIOF on Koelsch.
+On this board, only MSIOF0 is in use. Its bus contains a single device
+(a Renesas R2A11302FT PMIC), for which no bindings are defined yet.
 
-> 
-> Here bus is specific to root bus ? or, what about use find_pci_host_bridge() to get the pci_host_bridge
-> instead.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Cc: devicetree at vger.kernel.org
+---
+ arch/arm/boot/dts/r8a7791-koelsch.dts |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-Yes, the call should be to find_pci_host_bridge(). I sort of implied that the
-bus is always the root bus, which is obviously not correct. Thanks for pointing it out.
-
-> 
-> > +
-> > +	if (bridge)
-> > +		return bridge->domain_nr;
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +int pci_proc_domain(struct pci_bus *bus)
-> > +{
-> > +	return pci_domain_nr(bus);
-> > +}
-> > +
-> > +/*
-> > + * Called after each bus is probed, but before its children are examined
-> > + */
-> > +void pcibios_fixup_bus(struct pci_bus *bus)
-> > +{
-> > +	struct pci_dev *dev;
-> > +	struct resource *res;
-> > +	int i;
-> > +
-> > +	if (bus->self != NULL) {
-> 
-> What about use !pci_is_root_bus() ?
-
-Again, good call, will change.
-
-> 
-> > +		pci_read_bridge_bases(bus);
-> > +
-> > +		pci_bus_for_each_resource(bus, res, i) {
-> > +			if (!res || !res->flags || res->parent)
-> > +				continue;
-> > +
-> > +			/*
-> > +			 * If we are going to reassign everything, we can
-> > +			 * shrink the P2P resource to have zero size to
-> > +			 * save space
-> > +			 */
-> > +			if (pci_has_flag(PCI_REASSIGN_ALL_RSRC)) {
-> > +				res->flags |= IORESOURCE_UNSET;
-> > +				res->start = 0;
-> > +				res->end = -1;
-> > +				continue;
-> > +			}
-> > +		}
-> > +	}
-> > +
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index cc6e63914f7c..b29ca85b248f 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -150,6 +150,12 @@
+ 		renesas,groups = "qspi_ctrl", "qspi_data4";
+ 		renesas,function = "qspi";
+ 	};
++
++	msiof0_pins: spi1 {
++		renesas,groups = "msiof0_clk", "msiof0_sync", "msiof0_rx",
++				 "msiof0_tx";
++		renesas,function = "msiof0";
++	};
+ };
+ 
+ &sata0 {
+@@ -186,3 +192,18 @@
+ 		};
+ 	};
+ };
++
++&msiof0 {
++	pinctrl-0 = <&msiof0_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++
++	pmic: pmic at 0 {
++		compatible = "renesas,r2a11302ft";
++		reg = <0>;
++		spi-max-frequency = <6000000>;
++		spi-cpol;
++		spi-cpha;
++	};
++};
+-- 
+1.7.9.5
