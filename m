@@ -1,63 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 20 Feb 2014 10:59:03 +0000
-Subject: [PATCH RFC 07/31] mmc: sdhci: push card_tasklet into threaded
- irq handler
-In-Reply-To: <CAKohpokBf_fJhiUJ53c+=6v+GMcjaDKd7+fwib99=sLMdkjQQQ@mail.gmail.com>
-References: <20140218150801.GD21483@n2100.arm.linux.org.uk>
- <E1WFmIk-0006m0-Ah@rmk-PC.arm.linux.org.uk>
- <20140218175703.GJ21483@n2100.arm.linux.org.uk>
- <CAKohpoknX=acZHJeydwv6XRKFHTD4DM84xfCJ=56NrRfJnBOOA@mail.gmail.com>
- <20140219094322.GR21483@n2100.arm.linux.org.uk>
- <CAKohpomfHxWBF5m4D6iqod4a3gw2BU1W6nXMkEOg+YA+izYr=g@mail.gmail.com>
- <20140219095212.GT21483@n2100.arm.linux.org.uk>
- <CAKohpo=ZrLRsTyCH86x7TbGE2XJnpXNb1ZDvYyzDUupAwTtS9Q@mail.gmail.com>
- <20140219105011.GU21483@n2100.arm.linux.org.uk>
- <CAKohpokBf_fJhiUJ53c+=6v+GMcjaDKd7+fwib99=sLMdkjQQQ@mail.gmail.com>
-Message-ID: <20140220105903.GY21483@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 20 Feb 2014 11:58:54 +0100
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <1392892217.23342.18.camel@kazak.uk.xensource.com>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1391730137-14814-22-git-send-email-andrew@lunn.ch>
+ <52F51922.6030502@gmail.com>
+ <1392892217.23342.18.camel@kazak.uk.xensource.com>
+Message-ID: <20140220105854.GL11878@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 04:25:12PM +0530, Viresh Kumar wrote:
-> Absolutely, it will work.
+On Thu, Feb 20, 2014 at 10:30:17AM +0000, Ian Campbell wrote:
+> On Fri, 2014-02-07 at 18:34 +0100, Sebastian Hesselbarth wrote:
+> > On 02/07/2014 12:42 AM, Andrew Lunn wrote:
+> > > Now that all the device tree support is in mach-mvebu, remove it from
+> > > mach-kirkwood.
+> > >
+> > > Regenerate kirkwood_defconfig, removing all DT support, and a couple
 > 
-> Thanks for your efforts in cleaning up this stuff..
+> s/DT/board-file/?
 
-I'll send a few patches in a moment.  First through, I've just found this
-gem:
+We keep any system using -setup.c files, and remove the ability to
+boot systems with a DT description. Thus mach-kirkwood becomes legacy,
+and you should now be trying to only use mach-mvebu, compiled for v5
+systems and a second compile for v7 systems.
 
-static int sdhci_probe(struct platform_device *pdev)
-{
-...
-        sdhci = devm_kzalloc(&pdev->dev, sizeof(*sdhci), GFP_KERNEL);
-...
-        if (np) {
-...
-        } else {
-                sdhci->data = dev_get_platdata(&pdev->dev);
-        }
+There are four systems left in mach-kirkwood which don't have DT
+equivalent. These are LaCie 2Big and 5Big, HP t5325 thin client and
+Marvell OpenRD machines. I'm working on t5325 and Openrd. The sticking
+point is audio support, which no other board has done with DT yet.
+The two LeCie boards have a custom LED driver which needs a DT
+binding. My gut feeling is that we won't get these four converted to
+DT in time for 3.15.
+ 
+> > > of other redundent options have been removed in the process.
+> > >
+> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > > ---
+> > 
+> > Hmm, I wonder what Ian thinks of removing this so quickly again...
+> 
+> I don't want to stand in the way of progress. What version is this
+> targeting so I can setup our tooling to DTRT and append a DTB under the
+> correct circumstances.
 
-        pdev->dev.platform_data = sdhci;
-...
-	... some paths which can cause probe to return an error code ...
-...
-static int sdhci_remove(struct platform_device *pdev)
-{
-        struct sdhci_host *host = platform_get_drvdata(pdev);
-        struct spear_sdhci *sdhci = dev_get_platdata(&pdev->dev);
-...
-        clk_disable_unprepare(sdhci->clk);
-        clk_put(sdhci->clk);
+My aim is 3.15. Most patches have been Acked now, so i think we are on
+track for that.
 
-So, what happens if we hit an error such as -EPROBEDEFER after that
-assignment to pdev->dev.platform_data, and then re-probe the driver
-later?
+ 
+> I still need to figure out how to distinguish the variations, but I
+> think I have a plan there (via which PCI buses are present, which is a
+> bit skanky but seems like the most workable solution).
 
-This is just horribly broken.
+Having the SoC ID available via lspci for systems using the new PCI
+driver might be in 3.14. It was considered a regression so might get
+merged into an rc. If not, it will be in 3.15.
 
-What's wrong with using the facilities in sdhci to allow you to have
-your own private data after the sdhci_host structure?
+We have also talked about putting the SOC version and revision into
+/proc/cpuinfo, in the Revision field. However this has not happened
+yet.
 
--- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+	Andrew
