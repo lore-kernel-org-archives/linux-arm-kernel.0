@@ -1,110 +1,104 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 20 Feb 2014 09:55:46 +0100
-Subject: [PATCH] clk: zynq: Use clk_readl/clk_writel helper function
-Message-ID: <fcff6030d4dd07c43482a551cf1bc79545fbb55d.1392886522.git.michal.simek@xilinx.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu, 20 Feb 2014 09:59:23 +0100
+Subject: [PATCHv2 1/8] ARM: at91: Add at91sam9rl DT SoC support
+In-Reply-To: <20140219175409.GF25079@e106331-lin.cambridge.arm.com>
+References: <1392823951-26053-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1392823951-26053-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20140219170020.GA25079@e106331-lin.cambridge.arm.com>
+ <20140219173141.GB3038@piout.net>
+ <20140219175409.GF25079@e106331-lin.cambridge.arm.com>
+Message-ID: <5305C3EB.5080107@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not use readl/writel directly because the whole
-clk subsystem is using clk_readl/clk_writel functions.
+Hi Mark,
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-Acked-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
+On 19/02/2014 18:54, Mark Rutland wrote:
+> On Wed, Feb 19, 2014 at 05:31:42PM +0000, Alexandre Belloni wrote:
+>> On 19/02/2014 at 17:00:20 +0000, Mark Rutland wrote :
+>>> On Wed, Feb 19, 2014 at 03:32:24PM +0000, Alexandre Belloni wrote:
+>>>> This adds preliminary DT support for the at91sam9rl.
+>>>>
+>>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>>> ---
+>>>>   arch/arm/boot/dts/at91sam9rl.dtsi | 628 ++++++++++++++++++++++++++++++++++++++
+>>>>   arch/arm/mach-at91/at91sam9rl.c   |  16 +
+>>>>   2 files changed, 644 insertions(+)
+>>>>   create mode 100644 arch/arm/boot/dts/at91sam9rl.dtsi
+>>>   
+>>> [...]
+>>>
+>>>> +                       tcb0: timer at fffa0000 {
+>>>> +                               compatible = "atmel,at91rm9200-tcb";
+>>>> +                               reg = <0xfffa0000 0x100>;
+>>>> +                               interrupts = <16 IRQ_TYPE_LEVEL_HIGH 0
+>>>> +                                             17 IRQ_TYPE_LEVEL_HIGH 0
+>>>> +                                             18 IRQ_TYPE_LEVEL_HIGH 0>;
+>>>> +                       };
+>>> Nit: please bracket list entries individually. Also for other list
+>>> properties like reg and (*-)gpio(s).
+>>>
+>> OK.
+>>
+>>> [...]
+>>>
+>>>> +                       adc0: adc at fffd0000 {
+>>>> +                               compatible = "atmel,at91sam9260-adc";
+>>>> +                               reg = <0xfffd0000 0x100>;
+>>>> +                               interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
+>>>> +                               atmel,adc-use-external-triggers;
+>>>> +                               atmel,adc-channels-used = <0xf>;
+>>>> +                               atmel,adc-vref = <3300>;
+>>>> +                               atmel,adc-num-channels = <4>;
+>>>> +                               atmel,adc-startup-time = <15>;
+>>>> +                               atmel,adc-channel-base = <0x30>;
+>>>> +                               atmel,adc-drdy-mask = <0x10000>;
+>>>> +                               atmel,adc-status-register = <0x1c>;
+>>>> +                               atmel,adc-trigger-register = <0x04>;
+>>>> +                               atmel,adc-res = <8 10>;
+>>>> +                               atmel,adc-res-names = "lowres", "highres";
+>>>> +                               atmel,adc-use-res = "highres";
+>>>> +
+>>>> +                               trigger at 0 {
+>>>> +                                       trigger-name = "timer-counter-0";
+>>>> +                                       trigger-value = <0x1>;
+>>>> +                               };
+>>> A unit-address should go with a reg value. Either this needs a reg and
+>>> the parent node needs #address-cells and #size-cells, or the
+>>> unit-address should go, and the names made unique through other means.
+>>>
+>> OK, I guess I'll have to fix
+>> Documentation/devicetree/bindings/arm/atmel-adc.txt too.
+> Yes please.
+>
+>>> [...]
+>>>
+>>>> +                       pinctrl at fffff400 {
+>>>> +                               #address-cells = <1>;
+>>>> +                               #size-cells = <1>;
+>>>> +                               compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
+>>> NAK. Either this is a atmel,at91rm9200-pinctrl node or a simple-bus. Not
+>>> both; that doesn't make any sense.
+>>>
+>> Simply a copy paste, I'll fix that here and also the 6 other atmel
+>> dtsi includes.
+>>
+>> What is your preference for those using:
+>> compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus"; ?
+> A node should by either a bus or a pinctrl node.
+>
+> If it has chidren then the simple-bus should be separated out into a
+> separate node. If there are no children simple-bus should go.
 
- drivers/clk/zynq/clkc.c |  4 ++--
- drivers/clk/zynq/pll.c  | 18 +++++++++---------
- 2 files changed, 11 insertions(+), 11 deletions(-)
+Doing this clearly break backward compatibility (the current pinctrl 
+drivers relies on
+gpio controller being subnodes of the pinctrl node), but I'm interested 
+in how you would
+have represented this.
 
-diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
-index 09dd017..e726c1b 100644
---- a/drivers/clk/zynq/clkc.c
-+++ b/drivers/clk/zynq/clkc.c
-@@ -148,7 +148,7 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
- 	clks[fclk] = clk_register_gate(NULL, clk_name,
- 			div1_name, CLK_SET_RATE_PARENT, fclk_gate_reg,
- 			0, CLK_GATE_SET_TO_DISABLE, fclk_gate_lock);
--	enable_reg = readl(fclk_gate_reg) & 1;
-+	enable_reg = clk_readl(fclk_gate_reg) & 1;
- 	if (enable && !enable_reg) {
- 		if (clk_prepare_enable(clks[fclk]))
- 			pr_warn("%s: FCLK%u enable failed\n", __func__,
-@@ -277,7 +277,7 @@ static void __init zynq_clk_setup(struct device_node *np)
- 			SLCR_IOPLL_CTRL, 4, 1, 0, &iopll_lock);
+Could you give us an example ?
 
- 	/* CPU clocks */
--	tmp = readl(SLCR_621_TRUE) & 1;
-+	tmp = clk_readl(SLCR_621_TRUE) & 1;
- 	clk = clk_register_mux(NULL, "cpu_mux", cpu_parents, 4,
- 			CLK_SET_RATE_NO_REPARENT, SLCR_ARM_CLK_CTRL, 4, 2, 0,
- 			&armclk_lock);
-diff --git a/drivers/clk/zynq/pll.c b/drivers/clk/zynq/pll.c
-index 3226f54..cec9759 100644
---- a/drivers/clk/zynq/pll.c
-+++ b/drivers/clk/zynq/pll.c
-@@ -90,7 +90,7 @@ static unsigned long zynq_pll_recalc_rate(struct clk_hw *hw,
- 	 * makes probably sense to redundantly save fbdiv in the struct
- 	 * zynq_pll to save the IO access.
- 	 */
--	fbdiv = (readl(clk->pll_ctrl) & PLLCTRL_FBDIV_MASK) >>
-+	fbdiv = (clk_readl(clk->pll_ctrl) & PLLCTRL_FBDIV_MASK) >>
- 			PLLCTRL_FBDIV_SHIFT;
 
- 	return parent_rate * fbdiv;
-@@ -112,7 +112,7 @@ static int zynq_pll_is_enabled(struct clk_hw *hw)
-
- 	spin_lock_irqsave(clk->lock, flags);
-
--	reg = readl(clk->pll_ctrl);
-+	reg = clk_readl(clk->pll_ctrl);
-
- 	spin_unlock_irqrestore(clk->lock, flags);
-
-@@ -138,10 +138,10 @@ static int zynq_pll_enable(struct clk_hw *hw)
- 	/* Power up PLL and wait for lock */
- 	spin_lock_irqsave(clk->lock, flags);
-
--	reg = readl(clk->pll_ctrl);
-+	reg = clk_readl(clk->pll_ctrl);
- 	reg &= ~(PLLCTRL_RESET_MASK | PLLCTRL_PWRDWN_MASK);
--	writel(reg, clk->pll_ctrl);
--	while (!(readl(clk->pll_status) & (1 << clk->lockbit)))
-+	clk_writel(reg, clk->pll_ctrl);
-+	while (!(clk_readl(clk->pll_status) & (1 << clk->lockbit)))
- 		;
-
- 	spin_unlock_irqrestore(clk->lock, flags);
-@@ -168,9 +168,9 @@ static void zynq_pll_disable(struct clk_hw *hw)
- 	/* shut down PLL */
- 	spin_lock_irqsave(clk->lock, flags);
-
--	reg = readl(clk->pll_ctrl);
-+	reg = clk_readl(clk->pll_ctrl);
- 	reg |= PLLCTRL_RESET_MASK | PLLCTRL_PWRDWN_MASK;
--	writel(reg, clk->pll_ctrl);
-+	clk_writel(reg, clk->pll_ctrl);
-
- 	spin_unlock_irqrestore(clk->lock, flags);
- }
-@@ -225,9 +225,9 @@ struct clk *clk_register_zynq_pll(const char *name, const char *parent,
-
- 	spin_lock_irqsave(pll->lock, flags);
-
--	reg = readl(pll->pll_ctrl);
-+	reg = clk_readl(pll->pll_ctrl);
- 	reg &= ~PLLCTRL_BPQUAL_MASK;
--	writel(reg, pll->pll_ctrl);
-+	clk_writel(reg, pll->pll_ctrl);
-
- 	spin_unlock_irqrestore(pll->lock, flags);
-
---
-1.8.2.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140220/e838f2ab/attachment-0001.sig>
+>
+> Cheers,
+> Mark.
