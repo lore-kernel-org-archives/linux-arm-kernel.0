@@ -1,42 +1,84 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 20 Feb 2014 21:09:40 +0100
-Subject: [GIT PULL] v7m patches for next
-Message-ID: <20140220200940.GL6988@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 20 Feb 2014 21:29:14 +0100
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <20140220173518.GA19893@obsidianresearch.com>
+References: <51DD9A8C.10608@keymile.com> <20130711163220.2b3adf38@skate>
+ <53039894.10905@keymile.com> <20140218212751.07c2aeb5@skate>
+ <53046D98.6020801@keymile.com> <20140219102658.76eec91e@skate>
+ <53047BBB.6040108@keymile.com> <20140219143749.65ff3155@skate>
+ <CAErSpo4=6VgJazaErcx=ztKhZ_62xBrQ6K1eN_dVpvV4R0T2ag@mail.gmail.com>
+ <20140220095518.7ca36f0a@skate>
+ <20140220173518.GA19893@obsidianresearch.com>
+Message-ID: <20140220212914.29ddc031@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Dear Jason Gunthorpe,
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+On Thu, 20 Feb 2014 10:35:18 -0700, Jason Gunthorpe wrote:
+> On Thu, Feb 20, 2014 at 09:55:18AM +0100, Thomas Petazzoni wrote:
+> 
+> > Does that make sense? Keep in mind that I'm still not completely
+> > familiar with the PCI terminology, so maybe the above explanation does
+> > not use the right terms.
+> 
+> Stated another way, the Marvel PCI-E to PCI-E bridge config space has
+> a quirk that requires the window BARs to be aligned on their size and
+> sized to a power of 2.
 
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+Correct.
 
-are available in the git repository at:
+> The first requirement is already being handled by hooking through
+> ARM's 'align_resource' callback.
 
-  git://git.pengutronix.de/git/ukl/linux.git tags/v7m-next
+Absolutely.
 
-for you to fetch changes up to f0d7515372ff0ea53fd66099533d3c8e0464cbbf:
+> One avenue would be to have mvebu_pcie_align_resource return a struct
+> resource and manipulate the size as well. Assuming the PCI core will
+> accommodate that.
 
-  ARM: v7m: add trivial suspend support (2014-02-03 17:30:45 +0100)
+That would effectively be the easiest solution from the point of view
+of the PCIe driver.
 
-----------------------------------------------------------------
-Two bugfixes and trivial suspend support for v7m.
+In practice, the story is a little bit more subtle than that: the PCIe
+driver may want to decide to either tell the PCI core to enlarge the
+window BAR up to the next power of two size, or to dedicate two windows
+to it.
 
-----------------------------------------------------------------
-Given that the bugfixes are only relevant when an oops is in progress
-and admitting that there are not so many v7m users I don't see an urge
-to include the bugfixes in 3.14 and so target 3.15-rc1 for this pull
-request.
+For example:
 
-Uwe Kleine-K?nig (3):
-      ARM: make isa_mode macro more robust and fix for v7-M
-      ARM: show_regs: on v7-M there are no FIQs, different processor modes, ...
-      ARM: v7m: add trivial suspend support
+ * If the PCI core allocates a 96 KB BAR, we clearly want it to be
+   enlarged to 128 KB, so that we have to create a single window for it.
 
- arch/arm/Kconfig              | 2 +-
- arch/arm/include/asm/ptrace.h | 8 ++++++--
- arch/arm/kernel/process.c     | 9 +++++++--
- 3 files changed, 14 insertions(+), 5 deletions(-)
+ * However, if the PCI core allocates a 192 MB BAR, we may want to
+   instead create two windows: a first one of 128 MB and a second one
+   of 64 MB. This consumes two windows, but saves 64 MB of physical
+   address space.
+
+(Note that I haven't tested myself the creation of two windows for the
+same target device, but I was told by Lior that it should work).
+
+As you can see from the two examples above, we may not necessarily want
+to enforce this power-of-two constraint in all cases. We may want to
+accept a non-power-of-2 size in the case of the 192 MB BAR, and let the
+mvebu-mbus driver figure out that it should allocate several
+consecutive windows to cover these 192 MB.
+
+But to begin with, rounding up all window BARs up to the next power of
+two size would be perfectly OK.
+
+Jason, would you mind maybe replying to Bjorn Helgaas email (Thu, 20
+Feb 2014 12:18:42 -0700) ? I believe that a lot of the misunderstanding
+between Bjorn and me is due to the fact that I don't use the correct
+PCI terminology to describe how the Marvell hardware works, and how the
+Marvell PCIe driver copes with it. I'm sure you would explain it in a
+way that would be more easily understood by someone very familiar with
+the PCI terminology such as Bjorn. Thanks a lot!
+
+Best regards,
+
+Thomas
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
