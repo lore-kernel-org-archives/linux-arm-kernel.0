@@ -1,54 +1,60 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 20 Feb 2014 13:14:38 +0800
-Subject: [PATCH v10 09/15] usb: phy: Add set_wakeup API
+Date: Thu, 20 Feb 2014 13:14:43 +0800
+Subject: [PATCH v10 14/15] ARM: dts: imx6: add anatop phandle for usbphy
 In-Reply-To: <1392873284-9386-1-git-send-email-peter.chen@freescale.com>
 References: <1392873284-9386-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1392873284-9386-10-git-send-email-peter.chen@freescale.com>
+Message-ID: <1392873284-9386-15-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This API is used to set wakeup enable at PHY registers, in that
-case, the PHY can be waken up from suspend due to external events,
-like vbus change, dp/dm change and id change.
+Add anatop phandle for usbphy
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- include/linux/usb/phy.h |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
+ arch/arm/boot/dts/imx6sl.dtsi  |    2 ++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-index 6c0b1c5..c2c6f49 100644
---- a/include/linux/usb/phy.h
-+++ b/include/linux/usb/phy.h
-@@ -111,6 +111,13 @@ struct usb_phy {
- 	int	(*set_suspend)(struct usb_phy *x,
- 				int suspend);
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index fb28b2e..047b147 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -557,6 +557,7 @@
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+ 				clocks = <&clks 182>;
++				fsl,anatop = <&anatop>;
+ 			};
  
-+	/*
-+	 * Set wakeup enable for PHY, in that case, the PHY can be
-+	 * waken up from suspend status due to external events,
-+	 * like vbus change, dp/dm change and id.
-+	 */
-+	int	(*set_wakeup)(struct usb_phy *x, bool enabled);
-+
- 	/* notify phy connect status change */
- 	int	(*notify_connect)(struct usb_phy *x,
- 			enum usb_device_speed speed);
-@@ -265,6 +272,15 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
- }
+ 			usbphy2: usbphy at 020ca000 {
+@@ -564,6 +565,7 @@
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+ 				clocks = <&clks 183>;
++				fsl,anatop = <&anatop>;
+ 			};
  
- static inline int
-+usb_phy_set_wakeup(struct usb_phy *x, bool enabled)
-+{
-+	if (x && x->set_wakeup)
-+		return x->set_wakeup(x, enabled);
-+	else
-+		return 0;
-+}
-+
-+static inline int
- usb_phy_notify_connect(struct usb_phy *x, enum usb_device_speed speed)
- {
- 	if (x && x->notify_connect)
+ 			snvs at 020cc000 {
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 28558f1..30322b5 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -489,6 +489,7 @@
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+ 				clocks = <&clks IMX6SL_CLK_USBPHY1>;
++				fsl,anatop = <&anatop>;
+ 			};
+ 
+ 			usbphy2: usbphy at 020ca000 {
+@@ -496,6 +497,7 @@
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+ 				clocks = <&clks IMX6SL_CLK_USBPHY2>;
++				fsl,anatop = <&anatop>;
+ 			};
+ 
+ 			snvs at 020cc000 {
 -- 
 1.7.8
