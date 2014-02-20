@@ -1,79 +1,40 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 20 Feb 2014 20:26:11 +0100
-Subject: [PATCH 0/6] mmc: sdhci-s3c: Fix base clock source management
-In-Reply-To: <52F4AE40.9050907@gmail.com>
-References: <1389476346-20396-1-git-send-email-tomasz.figa@gmail.com>
- <52F4AE40.9050907@gmail.com>
-Message-ID: <530656D3.7010709@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 20 Feb 2014 19:30:08 +0000 (UTC)
+Subject: [PATCH 2/2] ARM: OMAP2+: fix dpll round_rate() to actually round
+In-Reply-To: <alpine.DEB.2.02.1402191928480.8777@utopia.booyaka.com>
+References: <1389944699-27962-1-git-send-email-tomi.valkeinen@ti.com>
+ <1389944699-27962-3-git-send-email-tomi.valkeinen@ti.com>
+ <alpine.DEB.2.02.1402191928480.8777@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.02.1402201927280.10791@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+On Wed, 19 Feb 2014, Paul Walmsley wrote:
 
-On 07.02.2014 10:58, Tomasz Figa wrote:
-> Hi Chris,
->
-> On 11.01.2014 22:39, Tomasz Figa wrote:
->> On platforms prior to Exynos the SDHCI block used internal clock
->> divider controlled by SELFREQ field of CLKCON register to divide base
->> clock selected from several external clocks fed to the block by
->> SELBASECLK bitfield of CONTROL2 register. Depending on wanted clock
->> frequency, different external clock may be the best choice and so
->> the driver needs to switch the SELBASECLK mux on the fly.
->>
->> However the selection logic has been broken for quite some time leaving
->> the controller using always clock 0, which is not always the right
->> source and leading to suboptimal performance of the SDHCI block on
->> affected platforms.
->>
->> This series intends to fix the problems mentioned above and also clean-up
->> clock management code slightly.
->>
->> Tested on S3C6410-based Mini6410 board, with following performance
->> figures:
->>
->> * Before this series (133 MHz HCLK always selected, leading to at most
->>    33 MHz card clock):
->>
->> root at tiny6410:~# hdparm -t /dev/mmcblk0
->>
->> /dev/mmcblk0:
->>   Timing buffered disk reads:  42 MB in  3.10 seconds =  13.54 MB/sec
->> root at tiny6410:~# hdparm -t /dev/mmcblk0
->>
->> /dev/mmcblk0:
->>   Timing buffered disk reads:  44 MB in  3.11 seconds =  14.14 MB/sec
->> root at tiny6410:~#
->>
->> * After this series (48 MHz EPLL clock selected, leading to 48 MHz card
->>    clock):
->>
->> root at tiny6410:~# hdparm -t /dev/mmcblk0
->>
->> /dev/mmcblk0:
->>   Timing buffered disk reads:  56 MB in  3.04 seconds =  18.41 MB/sec
->> root at tiny6410:~# hdparm -t /dev/mmcblk0
->>
->> /dev/mmcblk0:
->>   Timing buffered disk reads:  60 MB in  3.06 seconds =  19.63 MB/sec
->> root at tiny6410:~#
->>
->> Tomasz Figa (6):
->>    mmc: sdhci-s3c: Use shifts to divide by powers of two
->>    mmc: sdhci-s3c: Cache bus clock rates
->>    mmc: sdhci-s3c: Use correct condition to check for clock presence
->>    mmc: sdhci-s3c: Simplify min/max clock calculation
->>    mmc: sdhci-s3c: Fix handling of bus clock switching
->>    mmc: sdhci-s3c: Do not allow frequencies higher than requested
->>
->>   drivers/mmc/host/sdhci-s3c.c | 170
->> ++++++++++++++++++++-----------------------
->>   1 file changed, 77 insertions(+), 93 deletions(-)
->>
->
-> What do you think about this series?
+> On Fri, 17 Jan 2014, Tomi Valkeinen wrote:
+> 
+> > This patch adds a simple method of rounding: during the iteration, the 
+> > code keeps track of the closest rate match. If no exact match is found, 
+> > the closest is returned.
+> 
+> So that's one possible rounding policy; maybe it works fine for a display 
+> interface PLL, at least for some values of "closest rate".  But another 
+> might be "only allow a selection from a set of pre-determined rates 
+> characterized by the silicon validation team".  Or another rounding 
+> function might need to select a more distant rate that minimizes jitter, 
+> EMI, or power consumption.  
 
-Could you take this series for 3.15?
+Thought about this some more.  Do you only need this for the DSS PLL, or 
+do you need it for one of the core OMAP PLLs?
 
-Best regards,
-Tomasz
+If the former, then how about modifying your patch to create a separate 
+round_rate function that's only used for the DSS PLL that implements the 
+behavior that you want?
+
+That would eliminate any risk of impacting other users on the system.  And 
+would also allow this change to get into the codebase much faster, since 
+there's no need for clk API changes, etc.
+
+
+
+- Paul
