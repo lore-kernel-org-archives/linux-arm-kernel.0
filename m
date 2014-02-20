@@ -1,53 +1,36 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 20 Feb 2014 13:40:01 +0200
-Subject: [PATCH v8 06/14] CLK: TI: OMAP3: Get rid of unused USB Host dummy
- clocks
+Date: Thu, 20 Feb 2014 13:40:04 +0200
+Subject: [PATCH v8 09/14] ARM: dts: omap5: Update omap-usb-host node
 In-Reply-To: <1392896409-5101-1-git-send-email-rogerq@ti.com>
 References: <1392896409-5101-1-git-send-email-rogerq@ti.com>
-Message-ID: <1392896409-5101-7-git-send-email-rogerq@ti.com>
+Message-ID: <1392896409-5101-10-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP USB Host MFD driver no longer expects these non-existing
-clocks from the OMAP3 platform, so get rid of them.
+The omap-usb-host driver expects a certain name for internal
+and external reference clocks. Provide these clocks.
 
-CC: Tero Kristo <t-kristo@ti.com>
-CC: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/mach-omap2/cclock3xxx_data.c | 4 ----
- drivers/clk/ti/clk-3xxx.c             | 4 ----
- 2 files changed, 8 deletions(-)
+ arch/arm/boot/dts/omap5.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
-index 3b05aea..4299a55 100644
---- a/arch/arm/mach-omap2/cclock3xxx_data.c
-+++ b/arch/arm/mach-omap2/cclock3xxx_data.c
-@@ -3495,10 +3495,6 @@ static struct omap_clk omap3xxx_clks[] = {
- 	CLK(NULL,	"dss_tv_fck",	&dss_tv_fck),
- 	CLK(NULL,	"dss_96m_fck",	&dss_96m_fck),
- 	CLK(NULL,	"dss2_alwon_fck",	&dss2_alwon_fck),
--	CLK(NULL,	"utmi_p1_gfclk",	&dummy_ck),
--	CLK(NULL,	"utmi_p2_gfclk",	&dummy_ck),
--	CLK(NULL,	"xclk60mhsp1_ck",	&dummy_ck),
--	CLK(NULL,	"xclk60mhsp2_ck",	&dummy_ck),
- 	CLK(NULL,	"init_60m_fclk",	&dummy_ck),
- 	CLK(NULL,	"gpt1_fck",	&gpt1_fck),
- 	CLK(NULL,	"aes2_ick",	&aes2_ick),
-diff --git a/drivers/clk/ti/clk-3xxx.c b/drivers/clk/ti/clk-3xxx.c
-index d323023..0d1750a 100644
---- a/drivers/clk/ti/clk-3xxx.c
-+++ b/drivers/clk/ti/clk-3xxx.c
-@@ -130,10 +130,6 @@ static struct ti_dt_clk omap3xxx_clks[] = {
- 	DT_CLK(NULL, "dss_tv_fck", "dss_tv_fck"),
- 	DT_CLK(NULL, "dss_96m_fck", "dss_96m_fck"),
- 	DT_CLK(NULL, "dss2_alwon_fck", "dss2_alwon_fck"),
--	DT_CLK(NULL, "utmi_p1_gfclk", "dummy_ck"),
--	DT_CLK(NULL, "utmi_p2_gfclk", "dummy_ck"),
--	DT_CLK(NULL, "xclk60mhsp1_ck", "dummy_ck"),
--	DT_CLK(NULL, "xclk60mhsp2_ck", "dummy_ck"),
- 	DT_CLK(NULL, "init_60m_fclk", "dummy_ck"),
- 	DT_CLK(NULL, "gpt1_fck", "gpt1_fck"),
- 	DT_CLK(NULL, "aes2_ick", "aes2_ick"),
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index a72813a..d4dae48 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -775,6 +775,12 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges;
++			clocks = <&l3init_60m_fclk>,
++				 <&xclk60mhsp1_ck>,
++				 <&xclk60mhsp2_ck>;
++			clock-names = "refclk_60m_int",
++				      "refclk_60m_ext_p1",
++				      "refclk_60m_ext_p2";
+ 
+ 			usbhsohci: ohci at 4a064800 {
+ 				compatible = "ti,ohci-omap3", "usb-ohci";
 -- 
 1.8.3.2
