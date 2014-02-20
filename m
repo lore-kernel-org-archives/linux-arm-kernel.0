@@ -1,172 +1,52 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 20 Feb 2014 11:52:44 +0100
-Subject: [PATCH v4 4/7] of: document bindings for reserved-memory nodes
+Date: Thu, 20 Feb 2014 11:52:46 +0100
+Subject: [PATCH v4 6/7] arm64: add support for reserved memory defined by
+ device tree
 In-Reply-To: <1392893567-31623-1-git-send-email-m.szyprowski@samsung.com>
 References: <1392893567-31623-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1392893567-31623-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1392893567-31623-7-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grant Likely <grant.likely@linaro.org>
+Enable reserved memory initialization from device tree.
 
-Reserved memory nodes allow for the reservation of static (fixed
-address) regions, or dynamically allocated regions for a specific
-purpose.
-
-Signed-off-by: Grant Likely <grant.likely@linaro.org>
-[joshc: Based on binding document proposed (in non-patch form) here:
- http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
- adapted to support #memory-region-cells]
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- .../bindings/reserved-memory/reserved-memory.txt   |  138 ++++++++++++++++++++
- 1 file changed, 138 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+ arch/arm64/Kconfig   |    1 +
+ arch/arm64/mm/init.c |    2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-new file mode 100644
-index 000000000000..a606ce90c9c4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-@@ -0,0 +1,138 @@
-+*** Reserved memory regions ***
-+
-+Reserved memory is specified as a node under the /reserved-memory node.
-+The operating system shall exclude reserved memory from normal usage
-+one can create child nodes describing particular reserved (excluded from
-+normal use) memory regions. Such memory regions are usually designed for
-+the special usage by various device drivers.
-+
-+Parameters for each memory region can be encoded into the device tree
-+with the following nodes:
-+
-+/reserved-memory node
-+---------------------
-+#address-cells, #size-cells (required) - standard definition
-+    - Should use the same values as the root node
-+#memory-region-cells (required) - dictates number of cells used in the child
-+                                  nodes memory-region specifier
-+ranges (required) - standard definition
-+    - Should be empty
-+
-+/reserved-memory/ child nodes
-+-----------------------------
-+Each child of the reserved-memory node specifies one or more regions of
-+reserved memory. Each child node may either use a 'reg' property to
-+specify a specific range of reserved memory, or a 'size' property with
-+optional constraints to request a dynamically allocated block of memory.
-+
-+Following the generic-names recommended practice, node names should
-+reflect the purpose of the node (ie. "framebuffer" or "dma-pool"). Unit
-+address (@<address>) should be appended to the name if the node is a
-+static allocation.
-+
-+Properties:
-+Requires either a) or b) below.
-+a) static allocation
-+   reg (required) - standard definition
-+b) dynamic allocation
-+   size (required) - length based on parent's #size-cells
-+                   - Size in bytes of memory to reserve.
-+   alignment (optional) - length based on parent's #size-cells
-+                        - Address boundary for alignment of allocation.
-+   alloc-ranges (optional) - prop-encoded-array (address, length pairs).
-+                           - Specifies regions of memory that are
-+                             acceptable to allocate from.
-+
-+If both reg and size are present, then the reg property takes precedence
-+and size is ignored.
-+
-+Additional properties:
-+compatible (optional) - standard definition
-+    - may contain the following strings:
-+        - shared-dma-pool: This indicates a region of memory meant to be
-+          used as a shared pool of DMA buffers for a set of devices. It can
-+          be used by an operating system to instanciate the necessary pool
-+          management subsystem if necessary.
-+        - vendor specific string in the form <vendor>,[<device>-]<usage>
-+no-map (optional) - empty property
-+    - Indicates the operating system must not create a virtual mapping
-+      of the region as part of its standard mapping of system memory,
-+      nor permit speculative access to it under any circumstances other
-+      than under the control of the device driver using the region.
-+reusable (optional) - empty property
-+    - The operating system can use the memory in this region with the
-+      limitation that the device driver(s) owning the region need to be
-+      able to reclaim it back. Typically that means that the operating
-+      system can use that region to store volatile or cached data that
-+      can be otherwise regenerated or migrated elsewhere.
-+
-+Linux implementation note:
-+- If a "linux,cma-default" property is present, then Linux will use the
-+  region for the default pool of the contiguous memory allocator.
-+
-+Device node references to reserved memory
-+-----------------------------------------
-+Regions in the /reserved-memory node may be referenced by other device
-+nodes by adding a memory-region property to the device node.
-+
-+memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
-+
-+Example
-+-------
-+This example defines 3 contiguous regions are defined for Linux kernel:
-+one default of all device drivers (named linux,cma at 72000000 and 64MiB in size),
-+one dedicated to the framebuffer device (named framebuffer at 78000000, 8MiB), and
-+one for multimedia processing (named multimedia-memory at 77000000, 64MiB).
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	memory {
-+		reg = <0x40000000 0x40000000>;
-+	};
-+
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		/* global autoconfigured region for contiguous allocations */
-+		linux,cma {
-+			compatible = "shared-dma-pool";
-+			reusable;
-+			#memory-region-cells = <0>;
-+			size = <0x4000000>;
-+			alignment = <0x2000>;
-+			linux,cma-default;
-+		};
-+
-+		display_reserved: framebuffer at 78000000 {
-+			#memory-region-cells = <0>;
-+			reg = <0x78000000 0x800000>;
-+		};
-+
-+		multimedia_reserved: multimedia at 77000000 {
-+			compatible = "acme,multimedia-memory";
-+			#memory-region-cells = <1>;
-+			reg = <0x77000000 0x4000000>;
-+		};
-+	};
-+
-+	/* ... */
-+
-+	fb0: video at 12300000 {
-+		memory-region = <&display_reserved>;
-+		/* ... */
-+	};
-+
-+	scaler: scaler at 12500000 {
-+		memory-region = <&multimedia_reserved 0xdeadbeef>;
-+		/* ... */
-+	};
-+
-+	codec: codec at 12600000 {
-+		memory-region = <&multimedia_reserved 0xfeebdaed>;
-+		/* ... */
-+	};
-+};
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 27bbcfc7202a..6abf15407dca 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -43,6 +43,7 @@ config ARM64
+ 	select NO_BOOTMEM
+ 	select OF
+ 	select OF_EARLY_FLATTREE
++	select OF_RESERVED_MEM
+ 	select PERF_USE_VMALLOC
+ 	select POWER_RESET
+ 	select POWER_SUPPLY
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index d0b4c2efda90..447550d6bd9b 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -30,6 +30,7 @@
+ #include <linux/memblock.h>
+ #include <linux/sort.h>
+ #include <linux/of_fdt.h>
++#include <linux/of_reserved_mem.h>
+ #include <linux/dma-contiguous.h>
+ 
+ #include <asm/sections.h>
+@@ -160,6 +161,7 @@ void __init arm64_memblock_init(void)
+ 		memblock_reserve(base, size);
+ 	}
+ 
++	early_init_fdt_scan_reserved_mem();
+ 	dma_contiguous_reserve(0);
+ 
+ 	memblock_allow_resize();
 -- 
 1.7.9.5
