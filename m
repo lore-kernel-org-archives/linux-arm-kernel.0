@@ -1,35 +1,19 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Thu, 20 Feb 2014 18:48:52 +0200
-Subject: [PATCH RESEND] ARM: dts: qcom-msm8974: Add RNG device tree node
-Message-ID: <1392914932-23145-1-git-send-email-svarbanov@mm-sol.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 20 Feb 2014 09:59:16 -0700
+Subject: [PATCH] clk: tegra124: remove gr2d and gr3d clocks
+In-Reply-To: <1392904448-11939-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1392904448-11939-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <53063464.2020602@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary DT node to probe the rng driver on
-msm8974 platforms.
+On 02/20/2014 06:54 AM, Peter De Schrijver wrote:
+> Tegra124 does not have gr2d and gr3d clocks. They have been replaced by the
+> vic03 and gpu clocks respectively.
 
-Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/boot/dts/qcom-msm8974.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+I think you need to remove the DT #defines from
+include/dt-bindings/clock/tegra124-car.h too.
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 9e5dadb101eb..ada0e8216c22 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -117,5 +117,12 @@
- 			clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
- 			clock-names = "core", "iface";
- 		};
-+
-+		rng at f9bff000 {
-+			compatible = "qcom,prng";
-+			reg = <0xf9bff000 0x200>;
-+			clocks = <&gcc GCC_PRNG_AHB_CLK>;
-+			clock-names = "core";
-+		};
- 	};
- };
--- 
-1.8.4.4
+With that change made,
+Acked-by: Stephen Warren <swarren@nvidia.com>
+(I assume this will be sent as a fix for 3.14)
