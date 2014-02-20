@@ -1,51 +1,63 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 20 Feb 2014 10:45:03 -0700
-Subject: [PATCH] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <CA+mB=1KSxkN+mKce5k1n93pmAA_FnWYaqNweWzxd4GD3Mo4PZA@mail.gmail.com>
-References: <1392564830-5868-1-git-send-email-sthokal@xilinx.com>
- <CAErSpo5FGPhgnp8Gfy-1_Lk7ckCi7U5+z5pLnPU+jScPxD5yUQ@mail.gmail.com>
- <20140219003523.GJ29304@obsidianresearch.com>
- <CA+mB=1KSxkN+mKce5k1n93pmAA_FnWYaqNweWzxd4GD3Mo4PZA@mail.gmail.com>
-Message-ID: <20140220174503.GB19893@obsidianresearch.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Feb 2014 18:48:25 +0100
+Subject: [PATCH 1/1] ARM: Exynos: Add generic compatible string
+In-Reply-To: <53063C9F.4060307@samsung.com>
+References: <1392809645-631-1-git-send-email-sachin.kamat@linaro.org>
+ <201402201800.49425.arnd@arndb.de> <53063C9F.4060307@samsung.com>
+Message-ID: <16785833.BhsvfRuRRo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 12:39:48PM +0530, Srikanth Thokala wrote:
-
-> > These should use the standard ranges mechanism for translations and
-> > apertures.
+On Thursday 20 February 2014 18:34:23 Tomasz Figa wrote:
+> On 20.02.2014 18:00, Arnd Bergmann wrote:
+> >> Of course nothing stops you from retaining more specific compatible
+> >> strings. In fact, this is probably the most appropriate solution,
+> >> because in future you might find out that certain SoCs need some special
+> >> differentiation, e.g. same ID value on two SoCs.
+> >>
+> >> So, to apply this to our case, our Exynos 5250 based Arndale board would
+> >> be changed from
+> >>
+> >> compatible = "insignal,arndale", "samsung,exynos5260";
+> >>
+> >> to
+> >>
+> >> compatible = "insignal,arndale", "samsung,exynos5260", "samsung,exynos";
+> >
+> > Right, this would make sense.
+> >
+> >> Now, the board file will be able to match simply by "samsung,exynos"
+> >> compatible string and SoC-specific code in mach-exynos (hopefully none
+> >> after it gets cleaned up fully) will use soc_is_exynos*() macros (what
+> >> AFAIK it is already doing at the moment).
+> >
+> > On principle, I would not take things out of the match list, if that
+> > would break booting with old DT file that don't list "samsung,exynos"
+> > as compatible. But for new SoCs that would work.
 > 
-> This AXI PCIe bridge IP do have two kind of BARs AXI-to-PCIe BAR and
-> PCIe-to-AXI BAR.  The former specifies the AXI Base address and are the
-> memory windows, these are listed in the 'ranges' DT property.  The latter
-> BAR specifies the addresses that PCI Express should respond to/is
+> My proposal was about simply adding a fully generic string, without 
+> removing the specific ones. For already supported SoCs this is pretty 
+> obvious, as existing DTBs would not have this generic string listed. But 
+> the specific strings should be also present in DTSes of new SoCs, even 
+> if not recognized by the kernel, to make sure that in future any 
+> SoC-specific quirks could be easily handled.
 
-The PCIe-to-AXI window should be setup by the driver automatically to
-span all system memory, it doesn't need to be in DT.
+Yes, that's ideal.
 
-The AXI-to-PCIe is the host bridge aperture and it should be in the DT
-ranges.
-
-> tallowed to write to and these addresses written to configuration space
-> during the initialization.
-
-Hopefully this was done in a conformant way, please provide a lspci
--vv next round please..
-
-> > Also, IMHO, only root ports should be supported in a host bridge
-> > driver. A PCI end point is something entirely different.
+> > Using soc_is_exynos*() too much of course also isn't good. A lot of
+> > the things tested for should probably be checked from individual DT
+> > properties, but again we have to find the right balance. I wouldn't
+> > mind getting rid of the soc_is_exynos*() macros completely, because
+> > a) we can't use them in device drivers
+> > b) all platform code is supposed to be in drivers
+> > c) both rules are enforced for arm64
 > 
-> We are not supporting end point in this driver.  This is a soft IP
-> and can be configurable as a Root Port/End point while creating a HW
-> design in the FPGA.  So, the driver use this DT property to first
-> check if it is configured for Root Port and bail out if it is not.
+> I fully agree. As I said, after cleaning up mach-exynos/ there should be 
+> no more code left using soc_is_*() macros. Ideally, the whole 
+> mach-exynos/ should collapse into a single, trivial file, with 
+> everything done in dedicated drivers.
 
-This is something that should be handled via the compatible string, not
-special properties. Root port and End port will have different
-drivers, so they must have different compatible strings.
+Right.
 
-There is nothing wrong with dumping core generator configuration
-properties into the DT (as a form of documentation), but you must
-still use the standard techniques and properties whenever possible.
 
-Jason
+	Arnd
