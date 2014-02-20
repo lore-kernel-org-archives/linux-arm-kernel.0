@@ -1,63 +1,61 @@
-From: mandar.nandale@mindteck.com (Mandar Nandale)
-Date: Thu, 20 Feb 2014 08:02:34 +0000 (UTC)
-Subject: [PATCH RFC 0/2] watchdog  boot status
-References: <1327317188-14782-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <loom.20140220T090204-808@post.gmane.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Feb 2014 09:09:55 +0100
+Subject: [PATCHv2 1/8] ARM: at91: Add at91sam9rl DT SoC support
+In-Reply-To: <20140219170020.GA25079@e106331-lin.cambridge.arm.com>
+References: <1392823951-26053-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1392823951-26053-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20140219170020.GA25079@e106331-lin.cambridge.arm.com>
+Message-ID: <20140220080955.GA3142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shubhrajyoti D <shubhrajyoti <at> ti.com> writes:
+Hi Mark,
 
+On Wed, Feb 19, 2014 at 05:00:20PM +0000, Mark Rutland wrote:
+> > +                       adc0: adc at fffd0000 {
+> > +                               compatible = "atmel,at91sam9260-adc";
+> > +                               reg = <0xfffd0000 0x100>;
+> > +                               interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
+> > +                               atmel,adc-use-external-triggers;
+> > +                               atmel,adc-channels-used = <0xf>;
+> > +                               atmel,adc-vref = <3300>;
+> > +                               atmel,adc-num-channels = <4>;
+> > +                               atmel,adc-startup-time = <15>;
+> > +                               atmel,adc-channel-base = <0x30>;
+> > +                               atmel,adc-drdy-mask = <0x10000>;
+> > +                               atmel,adc-status-register = <0x1c>;
+> > +                               atmel,adc-trigger-register = <0x04>;
+> > +                               atmel,adc-res = <8 10>;
+> > +                               atmel,adc-res-names = "lowres", "highres";
+> > +                               atmel,adc-use-res = "highres";
+> > +
+> > +                               trigger at 0 {
+> > +                                       trigger-name = "timer-counter-0";
+> > +                                       trigger-value = <0x1>;
+> > +                               };
 > 
-> This patch series does the following
-> Patch 1:
-> Fixes the omap_prcm_get_reset_sources() for omap3/4
-> 
-> Patch 2:
-> Extends the WDIOC_GETBOOTSTATUS to support omap3/4.
-> 
-> Tested on omap3sdp and omap4sdp.
-> 
-> Rajendra Nayak (1):
->   ARM: omap: Fix omap_prcm_get_reset_sources() for omap3/4
-> 
-> Shubhrajyoti D (1):
->   watchdog : omap_wdt : Implement WDIOC_GETBOOTSTATUS for omap3+
-> 
->  arch/arm/mach-omap2/prcm.c    |   13 ++++++++-----
->  arch/arm/mach-omap2/prm44xx.h |    3 ---
->  drivers/watchdog/omap_wdt.c   |    2 +-
->  3 files changed, 9 insertions(+), 9 deletions(-)
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo <at> vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-Hi , 
+> A unit-address should go with a reg value. Either this needs a reg and
+> the parent node needs #address-cells and #size-cells, or the
+> unit-address should go, and the names made unique through other means.
 
-    I am trying to get a last reboot reason using WDIOC_GETBOOTSTATUS ioctl
-call from application. Previously before applying this patch it was always
-returning me non-zero value no matter reboot is caused by watchdog or power
-on reset, so i applied this patch and added some prink statements to
-omap_wdt.c file and now after applying patch : 
-if (cpu_is_omap24xx() || cpu_is_omap34xx() || cpu_is_omap44xx()) this
-condition is successfull and omap_prcm_get_reset_sources() function is
-getting called and everytime i am getting 0 for ioctl call thus even if
-reboot is caused by watchdog it will return me 0 (Power-On-Reset). 
-What may be the reasons behind this kind of behaviour?
+What do you suggest to make the name unique then?
 
-This is the omap_prcm_get_reset_sources() function from
-arch/arm/mach-omap2/prcm.c file in my kernel source :
+The ePAPR is pretty clear that the above is the way to go, so I'm
+unclear on what you have in mind here.
 
-u32 omap_prcm_get_reset_sources(void)
-{
-        /* XXX This presumably needs modification for 34XX */
-        if (cpu_is_omap24xx() || cpu_is_omap34xx())
-                return omap2_prm_read_mod_reg(WKUP_MOD, OMAP2_RM_RSTST) & 0x7f;
-        if (cpu_is_omap44xx())
-                return omap2_prm_read_mod_reg(WKUP_MOD, OMAP4_RM_RSTST) & 0x7f;
+Plus, I haven't seen anywhere that reg was actually mandatory.
 
-        return 0;
-}
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140220/9ed94870/attachment.sig>
