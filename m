@@ -1,29 +1,65 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 20 Feb 2014 09:40:36 +0800
-Subject: [PATCH v2] ARM: dts: imx6sl-evk: Keep VGEN1 regulator always
- enabled
-In-Reply-To: <1392808428-26143-1-git-send-email-festevam@gmail.com>
-References: <1392808428-26143-1-git-send-email-festevam@gmail.com>
-Message-ID: <20140220014034.GN3010@S2101-09.ap.freescale.net>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 20 Feb 2014 10:10:49 +0800
+Subject: [Linaro-acpi] [PATCH v4 5/5] ACPI: Replace printk with pr_* in
+ tables.c
+In-Reply-To: <1624648.FYgVXnCCsW@vostro.rjw.lan>
+References: <1392731700-10992-1-git-send-email-hanjun.guo@linaro.org>
+ <2341500.Z47JjkFCMP@vostro.rjw.lan> <5304DFDB.6020202@arm.com>
+ <1624648.FYgVXnCCsW@vostro.rjw.lan>
+Message-ID: <53056429.8030705@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 08:13:48AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> On imx6sl-evk board the VGEN1 regulator powers up the NVCC_1P2V domain of the
-> imx6sl SoC, so we need to keep it always powered.
-> 
-> According to imx6sl datasheet the GPIO block has three supplies:
-> NVCC33_IO, NVCC18_IO and NVCC_1P2V and it states that:
-> "All digital I/O supplies (NVCC_xxxx) must be powered under normal conditions
-> whether the associated I/O pins are in use or not"
-> 
-> This problem has been observed by the fact that a GPIO connected to an LED could
-> not work when the PMIC driver was enabled.
-> 
-> Keeping VGEN1 regulator always enabled fixes the problem.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On 2014?02?20? 08:37, Rafael J. Wysocki wrote:
+> On Wednesday, February 19, 2014 04:46:19 PM Sudeep Holla wrote:
+>> On 19/02/14 16:49, Rafael J. Wysocki wrote:
+>>> On Wednesday, February 19, 2014 04:32:34 PM Sudeep Holla wrote:
+>>>> On 18/02/14 13:55, Hanjun Guo wrote:
+>>>>> This patch just do some clean up to replace printk with pr_*,
+>>>>> no functional change.
+>>>>>
+>>>> Any particular reason for choosing just this file in this series ?
 
-Applied, thanks.
+Yes, the reason is that I will update this file in my next patch set 
+(ARM64 ACPI core) with
+pr_*, in order to keep  consistency, I updated them all in this file first.
+
+>>>> It seems but off-topic in this series. The printk format is same in almost all
+>>>> other acpi files and it's better to change all or none for consistency.
+>>> Well, it's fine, I can put it into a different branch in any case. :-)
+>>>
+>>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>> ---
+>>>>>   drivers/acpi/tables.c |   51 +++++++++++++++++++------------------------------
+>>>>>   1 file changed, 20 insertions(+), 31 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+>>>>> index 5837f85..97bc6df 100644
+>>>>> --- a/drivers/acpi/tables.c
+>>>>> +++ b/drivers/acpi/tables.c
+>>>>> @@ -55,8 +55,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>>>>>   		{
+>>>>>   			struct acpi_madt_local_apic *p =
+>>>>>   			    (struct acpi_madt_local_apic *)header;
+>>>>> -			printk(KERN_INFO PREFIX
+>>>>> -			       "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+>>>>> +			pr_info(PREFIX "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+>>>> You can even get rid of PREFIX by defining pr_fmt instead.
+>>> But this is a good point.
+>>>
+>>>> If the intention is to move to pr_* format it's better to have this as separate
+>>>> patch and convert all of them.
+>>> Well, not really.  One file at a time is OK too.
+>>>
+>> No what I meant was to convert all for consistency, not in a single patch.
+>> As I was playing with regex for few minutes, with few patterns was able to fix
+>> most(not all) of them. It even compiles :) for x86. But turns out to be a big
+>> churn :( [43 files changed, 253 insertions(+), 329 deletions(-)]
+> Well, precisely.  That's why I'd prefer doing that gradually.
+>
+> That said I'll just drop the patch for now due to the PREFIX thing.
+
+I will update this patch accordingly and send it out soon.
+
+Thanks
+Hanjun
