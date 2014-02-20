@@ -1,27 +1,51 @@
-From: kyle@redhat.com (Kyle McMartin)
-Date: Thu, 20 Feb 2014 12:44:23 -0500
-Subject: [PATCH] arm/Kconfig.debug: CONFIG_DEBUG_SET_MODULE_RONX and insn
- patching are mutually exclusive
-Message-ID: <20140220174422.GA27412@redacted.bos.redhat.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 20 Feb 2014 10:45:03 -0700
+Subject: [PATCH] pcie: Add Xilinx PCIe Host Bridge IP driver
+In-Reply-To: <CA+mB=1KSxkN+mKce5k1n93pmAA_FnWYaqNweWzxd4GD3Mo4PZA@mail.gmail.com>
+References: <1392564830-5868-1-git-send-email-sthokal@xilinx.com>
+ <CAErSpo5FGPhgnp8Gfy-1_Lk7ckCi7U5+z5pLnPU+jScPxD5yUQ@mail.gmail.com>
+ <20140219003523.GJ29304@obsidianresearch.com>
+ <CA+mB=1KSxkN+mKce5k1n93pmAA_FnWYaqNweWzxd4GD3Mo4PZA@mail.gmail.com>
+Message-ID: <20140220174503.GB19893@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With both options set, we're seeing an Oops while loading bridge.ko, as
-netfilter is trying to use jump labels on the module .text after it's
-been marked read-only. I'll cook up a patch to do what X86 does and
-remap the page read-write while it's being patched, but for 3.14, we
-should mark them as exclusive so others don't hit this crash.
+On Thu, Feb 20, 2014 at 12:39:48PM +0530, Srikanth Thokala wrote:
 
-Signed-off-by: Kyle McMartin <kyle@redhat.com>
+> > These should use the standard ranges mechanism for translations and
+> > apertures.
+> 
+> This AXI PCIe bridge IP do have two kind of BARs AXI-to-PCIe BAR and
+> PCIe-to-AXI BAR.  The former specifies the AXI Base address and are the
+> memory windows, these are listed in the 'ranges' DT property.  The latter
+> BAR specifies the addresses that PCI Express should respond to/is
 
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1197,7 +1197,7 @@ config PID_IN_CONTEXTIDR
- 
- config DEBUG_SET_MODULE_RONX
- 	bool "Set loadable kernel module data as NX and text as RO"
--	depends on MODULES
-+	depends on MODULES && !(JUMP_LABEL || KPROBES)
- 	---help---
- 	  This option helps catch unintended modifications to loadable
- 	  kernel module's text and read-only data. It also prevents execution
+The PCIe-to-AXI window should be setup by the driver automatically to
+span all system memory, it doesn't need to be in DT.
+
+The AXI-to-PCIe is the host bridge aperture and it should be in the DT
+ranges.
+
+> tallowed to write to and these addresses written to configuration space
+> during the initialization.
+
+Hopefully this was done in a conformant way, please provide a lspci
+-vv next round please..
+
+> > Also, IMHO, only root ports should be supported in a host bridge
+> > driver. A PCI end point is something entirely different.
+> 
+> We are not supporting end point in this driver.  This is a soft IP
+> and can be configurable as a Root Port/End point while creating a HW
+> design in the FPGA.  So, the driver use this DT property to first
+> check if it is configured for Root Port and bail out if it is not.
+
+This is something that should be handled via the compatible string, not
+special properties. Root port and End port will have different
+drivers, so they must have different compatible strings.
+
+There is nothing wrong with dumping core generator configuration
+properties into the DT (as a form of documentation), but you must
+still use the standard techniques and properties whenever possible.
+
+Jason
