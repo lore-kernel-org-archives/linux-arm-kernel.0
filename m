@@ -1,195 +1,149 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 20 Feb 2014 14:17:33 -0300
-Subject: [PATCH 1/3] mfd: fsl imx25 Touchscreen ADC driver
-In-Reply-To: <1392913312-9030-2-git-send-email-mpa@pengutronix.de>
-References: <1392913312-9030-1-git-send-email-mpa@pengutronix.de>
- <1392913312-9030-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <CAOMZO5BDyyvXs9CxJQOkuEpxZ8fqamCPB67sNhJxES+XU2XkXQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Feb 2014 17:22:22 +0000
+Subject: [RFC PATCH 1/2] arm: mm: Switch back to L_PTE_WRITE
+In-Reply-To: <1392396913-13570-2-git-send-email-steve.capper@linaro.org>
+References: <1392396913-13570-1-git-send-email-steve.capper@linaro.org>
+ <1392396913-13570-2-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140220172222.GL3615@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+Hi Steve,
 
-On Thu, Feb 20, 2014 at 1:21 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> This is the core driver for imx25 touchscreen/adc driver. The module
-> has one shared ADC and two different conversion queues which use the
-> ADC. The two queues are identical. Both can be used for general purpose
-> ADC but one is meant to be used for touchscreens.
->
-> This driver is the core which manages the central components and
-> registers of the TSC/ADC unit. It manages the IRQs and forwards them to
-> the correct components.
->
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+On Fri, Feb 14, 2014 at 04:55:12PM +0000, Steve Capper wrote:
+> For LPAE, we have the following means for encoding writable or dirty
+> ptes:
+>                               L_PTE_DIRTY       L_PTE_RDONLY
+>     !pte_dirty && !pte_write        0               1
+>     !pte_dirty && pte_write         0               1
+>     pte_dirty && !pte_write         1               1
+>     pte_dirty && pte_write          1               0
+> 
+> So we can't distinguish between writable clean ptes and read only
+> ptes. This can cause problems with ptes being incorrectly flagged as
+> read only when they are writable but not dirty.
+> 
+> This patch re-introduces the L_PTE_WRITE bit for both short descriptors
+> and long descriptors, by reverting:
+>   36bb94b ARM: pgtable: provide RDONLY page table bit rather than WRITE bit
+> 
+> For short descriptors the L_PTE_RDONLY bit is renamed to L_PTE_WRITE
+> and the pertinent logic changed. For long descriptors, L_PTE_WRITE is
+> implemented as a new software bit and L_PTE_RDONLY is renamed to
+> PTE_RDONLY to highlight the fact that it is a hardware bit.
 
-That's great :-) Nice work!
+This would be a lot easier to review if it was a true revert, but I guess
+that doesn't apply cleanly to mainline?
 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
 > ---
->  .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    |  46 ++++
->  drivers/mfd/Kconfig                                |   9 +
->  drivers/mfd/Makefile                               |   2 +
->  drivers/mfd/fsl-imx25-tsadc.c                      | 234 +++++++++++++++++++++
->  include/linux/mfd/imx25-tsadc.h                    | 138 ++++++++++++
->  5 files changed, 429 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
->  create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
->  create mode 100644 include/linux/mfd/imx25-tsadc.h
->
-> diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-> new file mode 100644
-> index 0000000..a857af0e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-> @@ -0,0 +1,46 @@
-> +Freescale mx25 ADC/TSC multifunction device
-> +
-> +This device combines two general purpose conversion queues one used for general
-> +ADC and the other used for touchscreens.
-> +
-> +Required properties:
-> + - compatible: Should be "fsl,imx25-tsadc".
-> + - reg: Memory range of the device.
-> + - interrupts: Interrupt for this device as described in
-> +   interrupts/interrupts.txt
-> + - clocks: An 'ipg' clock defined as described in clocks/clock.txt
-> + - interrupt-controller: This device is an interrupt controller. It controls
-> +   the interrupts of both conversion queues.
-> + - #interrupt-cells: Should be '<1>'.
-> + - #address-cells: Should be '<1>'.
-> + - #size-cells: Should be '<1>'.
-> + - ranges
-> +
-> +This device includes two conversion queues which can be added as subnodes.
-> +The first queue is for the touchscreen, the second for general purpose ADC.
-> +
-> +Example:
-> +       tscadc: tscadc at 50030000 {
-> +               compatible = "fsl,imx25-tsadc";
-> +               reg = <0x50030000 0xc>;
-> +               interrupts = <46>;
-> +               clocks = <&clks 119>;
-> +               clock-names = "ipg";
-> +               interrupt-controller;
-> +               #interrupt-cells = <1>;
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               ranges;
-> +
-> +               tsc: tcq at 50030400 {
-> +                       compatible = "fsl,imx25-tcq";
-> +                       reg = <0x50030400 0x60>;
-> +                       ...
-> +               };
-> +
-> +               adc: gcq at 50030800 {
-> +                       compatible = "fsl,imx25-gcq";
-> +                       reg = <0x50030800 0x60>;
-> +                       ...
-> +               };
-> +       };
+>  arch/arm/include/asm/pgtable-2level.h |  2 +-
+>  arch/arm/include/asm/pgtable-3level.h |  4 ++--
+>  arch/arm/include/asm/pgtable.h        | 36 +++++++++++++++++------------------
+>  arch/arm/mm/dump.c                    |  8 ++++----
+>  arch/arm/mm/mmu.c                     | 25 ++++++++++++------------
+>  arch/arm/mm/proc-macros.S             | 16 ++++++++--------
+>  arch/arm/mm/proc-v7-2level.S          |  6 +++---
+>  arch/arm/mm/proc-v7-3level.S          |  6 ++++--
+>  arch/arm/mm/proc-xscale.S             |  4 ++--
+>  9 files changed, 55 insertions(+), 52 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
+> index dfff709..ca43b84 100644
+> --- a/arch/arm/include/asm/pgtable-2level.h
+> +++ b/arch/arm/include/asm/pgtable-2level.h
+> @@ -120,7 +120,7 @@
+>  #define L_PTE_YOUNG            (_AT(pteval_t, 1) << 1)
+>  #define L_PTE_FILE             (_AT(pteval_t, 1) << 2) /* only when !PRESENT */
+>  #define L_PTE_DIRTY            (_AT(pteval_t, 1) << 6)
+> -#define L_PTE_RDONLY           (_AT(pteval_t, 1) << 7)
+> +#define L_PTE_WRITE            (_AT(pteval_t, 1) << 7)
+>  #define L_PTE_USER             (_AT(pteval_t, 1) << 8)
+>  #define L_PTE_XN               (_AT(pteval_t, 1) << 9)
+>  #define L_PTE_SHARED           (_AT(pteval_t, 1) << 10)        /* shared(v6), coherent(xsc3) */
+> diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+> index 03243f7..8a392ef 100644
+> --- a/arch/arm/include/asm/pgtable-3level.h
+> +++ b/arch/arm/include/asm/pgtable-3level.h
+> @@ -79,12 +79,12 @@
+>  #define L_PTE_PRESENT          (_AT(pteval_t, 3) << 0)         /* Present */
+>  #define L_PTE_FILE             (_AT(pteval_t, 1) << 2)         /* only when !PRESENT */
+>  #define L_PTE_USER             (_AT(pteval_t, 1) << 6)         /* AP[1] */
+> -#define L_PTE_RDONLY           (_AT(pteval_t, 1) << 7)         /* AP[2] */
+> +#define PTE_RDONLY             (_AT(pteval_t, 1) << 7)         /* AP[2] */
 
-The meaning of 'tcq' and 'gcq' acronyms are not obvious. Could they be
-written more explicitily?
+Why? I think we're just using L_ for consistency here, rather than to
+distinguish between h/w and Linux bits (e.g. L_PTE_XN).
 
-Also, what does the '...' mean?
+>  #define L_PTE_SHARED           (_AT(pteval_t, 3) << 8)         /* SH[1:0], inner shareable */
+>  #define L_PTE_YOUNG            (_AT(pteval_t, 1) << 10)        /* AF */
+>  #define L_PTE_XN               (_AT(pteval_t, 1) << 54)        /* XN */
+>  #define L_PTE_DIRTY            (_AT(pteval_t, 1) << 55)        /* unused */
+> -#define L_PTE_SPECIAL          (_AT(pteval_t, 1) << 56)        /* unused */
+> +#define L_PTE_WRITE            (_AT(pteval_t, 1) << 56)
 
-> +static int mx25_tsadc_domain_map(struct irq_domain *d, unsigned int irq,
-> +                            irq_hw_number_t hwirq)
-> +{
-> +       struct mx25_tsadc_priv *priv = d->host_data;
-> +
-> +       irq_set_chip_data(irq, priv);
-> +       irq_set_chip_and_handler(irq, &mx25_tsadc_irq_chip,
-> +                                handle_level_irq);
-> +
-> +#ifdef CONFIG_ARM
-> +       set_irq_flags(irq, IRQF_VALID);
-> +#else
-> +       irq_set_noprobe(irq);
-> +#endif
+Why have you killed L_PTE_SPECIAL? We could actually use that for LPAE...
 
-Do we really need these ifdef's? Can't we just assume that CONFIG_ARM
-is always selected for this driver?
+>  #define L_PTE_NONE             (_AT(pteval_t, 1) << 57)        /* PROT_NONE */
+> 
+>  #define PMD_SECT_VALID         (_AT(pmdval_t, 1) << 0)
+> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+> index e3c48a3..c62fd89 100644
+> --- a/arch/arm/mm/proc-macros.S
+> +++ b/arch/arm/mm/proc-macros.S
+> @@ -97,7 +97,7 @@
+>  #error PTE shared bit mismatch
+>  #endif
+>  #if !defined (CONFIG_ARM_LPAE) && \
+> -       (L_PTE_XN+L_PTE_USER+L_PTE_RDONLY+L_PTE_DIRTY+L_PTE_YOUNG+\
+> +       (L_PTE_XN+L_PTE_USER+L_PTE_WRITE+L_PTE_DIRTY+L_PTE_YOUNG+\
+>          L_PTE_FILE+L_PTE_PRESENT) > L_PTE_SHARED
+>  #error Invalid Linux PTE bit settings
+>  #endif
+> @@ -152,9 +152,9 @@
+>         and     r2, r1, #L_PTE_MT_MASK
+>         ldr     r2, [ip, r2]
+> 
+> -       eor     r1, r1, #L_PTE_DIRTY
+> -       tst     r1, #L_PTE_DIRTY|L_PTE_RDONLY
+> -       orrne   r3, r3, #PTE_EXT_APX
+> +       tst     r1, #L_PTE_WRITE
+> +       tstne   r1, #L_PTE_DIRTY
+> +       orreq   r3, r3, #PTE_EXT_APX
 
-> +static int mx25_tsadc_probe(struct platform_device *pdev)
-> +{
-> +       struct device *dev = &pdev->dev;
-> +       struct device_node *np = dev->of_node;
-> +       struct mx25_tsadc_priv *priv;
-> +       struct resource *iores;
-> +       int ret;
-> +       void __iomem *iomem;
-> +
-> +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +       if (!priv)
-> +               return -ENOMEM;
-> +
-> +       iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       iomem = devm_ioremap_resource(dev, iores);
-> +       if (IS_ERR(iomem)) {
-> +               dev_err(dev, "Failed to remap iomem\n");
-> +               return PTR_ERR(iomem);
-> +       }
-> +
-> +       priv->regs = regmap_init_mmio(dev, iomem, &mx25_tsadc);
-> +       if (IS_ERR(priv->regs)) {
-> +               dev_err(dev, "Failed to initialize regmap\n");
-> +               return PTR_ERR(priv->regs);
-> +       }
-> +
-> +       priv->clk = devm_clk_get(dev, "ipg");
-> +       if (IS_ERR(priv->clk)) {
-> +               dev_err(dev, "Failed to get ipg clock\n");
-> +               return PTR_ERR(priv->clk);
-> +       }
-> +
-> +       /* Enable clock and reset the component */
-> +       regmap_update_bits(priv->regs, MX25_TSC_TGCR, MX25_TGCR_CLK_EN,
-> +                       MX25_TGCR_CLK_EN);
-> +       regmap_update_bits(priv->regs, MX25_TSC_TGCR, MX25_TGCR_TSC_RST,
-> +                       MX25_TGCR_TSC_RST);
-> +
-> +       /* Setup powersaving mode, but enable internal reference voltage */
-> +       regmap_update_bits(priv->regs, MX25_TSC_TGCR, MX25_TGCR_POWERMODE_MASK,
-> +                       MX25_TGCR_POWERMODE_SAVE);
-> +       regmap_update_bits(priv->regs, MX25_TSC_TGCR, MX25_TGCR_INTREFEN,
-> +                       MX25_TGCR_INTREFEN);
-> +
-> +       ret = mx25_tsadc_setup_irq(pdev, priv);
-> +       if (ret) {
-> +               dev_err(dev, "Failed to setup irqs\n");
-> +               return ret;
-> +       }
-> +
-> +       platform_set_drvdata(pdev, priv);
-> +
-> +       of_platform_populate(np, NULL, NULL, dev);
-> +
-> +       dev_info(dev, "i.MX25/25 Touchscreen and ADC core driver loaded\n");
+Hehe, I have a patch pending in this macro which is sitting in -next. Take a
+look at b6ccb9803e90 ("ARM: 7954/1: mm: remove remaining domain support
+from ARMv6"), since this will probably conflict in horrible ways.
 
-You could remove the double '25/25'.
+> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+> index bdd3be4..297fccf 100644
+> --- a/arch/arm/mm/proc-v7-2level.S
+> +++ b/arch/arm/mm/proc-v7-2level.S
+> @@ -84,9 +84,9 @@ ENTRY(cpu_v7_set_pte_ext)
+>         tst     r1, #1 << 4
+>         orrne   r3, r3, #PTE_EXT_TEX(1)
+> 
+> -       eor     r1, r1, #L_PTE_DIRTY
+> -       tst     r1, #L_PTE_RDONLY | L_PTE_DIRTY
+> -       orrne   r3, r3, #PTE_EXT_APX
+> +       tst     r1, #L_PTE_WRITE
+> +       tstne   r1, #L_PTE_DIRTY
+> +       orreq   r3, r3, #PTE_EXT_APX
+> 
+>         tst     r1, #L_PTE_USER
+>         orrne   r3, r3, #PTE_EXT_AP1
+> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+> index 01a719e..7793b2e 100644
+> --- a/arch/arm/mm/proc-v7-3level.S
+> +++ b/arch/arm/mm/proc-v7-3level.S
+> @@ -78,8 +78,10 @@ ENTRY(cpu_v7_set_pte_ext)
+>         tst     r3, #1 << (57 - 32)             @ L_PTE_NONE
+>         bicne   r2, #L_PTE_VALID
+>         bne     1f
+> -       tst     r3, #1 << (55 - 32)             @ L_PTE_DIRTY
+> -       orreq   r2, #L_PTE_RDONLY
+> +       bic     r2, #PTE_RDONLY
 
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id mx25_tsadc_ids[] = {
-> +       { .compatible = "fsl,imx25-tsadc", },
-> +       { /* Sentinel */ }
-> +};
-> +
-> +static struct platform_driver mx25_tsadc_driver = {
-> +       .driver         = {
-> +               .name   = "mx25-tsadc",
-> +               .owner  = THIS_MODULE,
-> +               .of_match_table = mx25_tsadc_ids,
-> +       },
-> +       .probe          = mx25_tsadc_probe,
-> +};
-> +module_platform_driver(mx25_tsadc_driver);
-> +
-> +MODULE_DESCRIPTION("MFD for ADC/TSC for Freescale mx25");
-> +MODULE_AUTHOR("Markus Pargmann <mpa@pengutronix.de>");
-> +MODULE_LICENSE("GPL v2");
+Why do you need this bic?
 
-MODULE_ALIAS() as well?
+Will
