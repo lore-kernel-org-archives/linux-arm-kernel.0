@@ -1,180 +1,105 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 20 Feb 2014 14:09:28 +0000
-Subject: [PATCH RFC v1 3/3] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <1392829124-25705-4-git-send-email-s.nawrocki@samsung.com>
-References: <1392829124-25705-1-git-send-email-s.nawrocki@samsung.com> <
- 1392829124-25705-4-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20140220140928.27132C4050F@trevor.secretlab.ca>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Thu, 20 Feb 2014 14:21:10 +0000
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <2127012.W6WnQnXmRo@wuerfel>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <20140220121821.GO11878@lunn.ch>
+ <1392900664.23342.60.camel@kazak.uk.xensource.com>
+ <2127012.W6WnQnXmRo@wuerfel>
+Message-ID: <1392906070.30563.11.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Feb 2014 17:58:44 +0100, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
-> This function adds a notifier callback run before a driver is bound to
-> its driver. It will configure parent clock and clock frequencies based
-> on [clk-name]-clk-parent and [clk-name]-clk-rate' DT properties.
+On Thu, 2014-02-20 at 14:53 +0100, Arnd Bergmann wrote:
+> On Thursday 20 February 2014 12:51:04 Ian Campbell wrote:
+> > On Thu, 2014-02-20 at 13:18 +0100, Andrew Lunn wrote:
+> > > On Thu, Feb 20, 2014 at 11:34:36AM +0000, Ian Campbell wrote:
+> > Debian has a single v7 flavour, armmp which uses the multi platform
+> > stuff. (actually there is a second armmp-lpae, but lets ignore that)
+> > 
+> > I'm only really concerned about the v5 stuff here. Debian has multiple
+> > v5 flavours: ixp4xx, kirkwood, mv78xx0, orion5x and versatile.
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  .../devicetree/bindings/clock/clock-bindings.txt   |   24 +++++
->  drivers/clk/clk.c                                  |   92 ++++++++++++++++++++
->  2 files changed, 116 insertions(+)
+> Unfortunately, this selection include multiple platforms that
+> we don't plan to (ever) support in a multiplatform kernel, while
+> a lot of platforms you don't currently support are already enabled
+> or will be at some point.
+
+That's ok, Debian is happy to stick with separate flavours for v5 if
+necessary for the existing ones, although I think we'd prefer to avoid
+adding any new ones.
+
+(for v7 we have gone multiplatform only already)
+
+> * ixp4xx is too different from the others and I don't think it's
+>   possible to turn it over to multiplatform.
+> * I see a iop32x_defconfig in svn that you didn't mention here,
+>   but it's basically the same problem as ixp4xx.
+
+This is only in Wheezy and not in trunk (which will become Jessie). AIUI
+support for these has been dropped for the next version of Debian so
+Wheezy is the last one and we don't need to worry about upgrade for
+these.
+
+TBH I'm not sure that ixp4xx isn't in the same boat, I suppose we'll
+see.
+
+> * kirkwood/mv78xx0/orion5x are essentially one platform and work
+>   in progress.
+> * versatile is easy to do as multiplatform, I just haven't gotten
+>   around to do it.
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> index 7c52c29..d618498 100644
-> --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> @@ -115,3 +115,27 @@ clock signal, and a UART.
->    ("pll" and "pll-switched").
->  * The UART has its baud clock connected the external oscillator and its
->    register clock connected to the PLL clock (the "pll-switched" signal)
-> +
-> +==Static initial configuration of clock parent and clock frequency==
-> +
-> +Some platforms require static configuration of (parts of) the clock controller
-> +often determined by the board design. Such a configuration can be specified in
-> +a clock consumer node through [clk-name]-clk-parent and [clk-name]-clk-rate DT
-> +properties. The former should contain phandle and clock specifier of the parent
-> +clock, the latter the required clock's frequency value (one cell). "clk-name"
-> +should be listed in the clock-names property and a phandle and a clock specifier
-> +pair corresponding to it should be present in the clocks property.
-> +
-> +    uart at a000 {
-> +        compatible = "fsl,imx-uart";
-> +        reg = <0xa000 0x1000>;
-> +	...
-> +        clocks = <&clkcon 0>, <&clkcon 3>;
-> +        clock-names = "baud", "mux";
-> +
-> +	mux-clk-parent = <&pll 1>;
-> +	baud-clk-rate = <460800>;
-
-This mixes patterns for references to clocks. Plus it requires composing
-property names which is a little painful. I'd rather see a list of
-tuples to match the existing pattern already in use
-
-	clocks = <&clkcon 0>, <&clkcon 3>;
-	clock-names = "baud", "mux";
-	clock-parents = <0> <&pll 1>;
-	clock-rates = <0> <460800>;
-
-g.
-
-> +    };
-> +
-> +In this example the pll is set as parent of "mux" clock and frequency of "baud"
-> +clock is specified as 460800 Hz.
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 19f6f3f..9238e08 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -19,6 +19,7 @@
->  #include <linux/of.h>
->  #include <linux/device.h>
->  #include <linux/init.h>
-> +#include <linux/platform_device.h>
->  #include <linux/sched.h>
->  
->  #include "clk.h"
-> @@ -2527,6 +2528,97 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
->  }
->  EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
->  
-> +static void __of_clk_assigned_config_set(struct clk *clk, struct clk *pclk,
-> +					 u32 rate)
-> +{
-> +	int rc;
-> +
-> +	if (rate) {
-> +		rc = clk_set_rate(clk, rate);
-> +		if (rc < 0)
-> +			pr_err("clk: couldn't set rate of clock %s (%d)\n",
-> +			       __clk_get_name(clk), rc);
-> +		else
-> +			pr_debug("clk: set rate of clock %s to %u\n",
-> +				 __clk_get_name(clk), rate);
-> +	}
-> +
-> +	if (!IS_ERR(pclk)) {
-> +		rc = clk_set_parent(clk, pclk);
-> +		if (rc < 0)
-> +			pr_err("clk: couldn't set %s as parent of %s (%d)\n",
-> +			       __clk_get_name(pclk), __clk_get_name(clk), rc);
-> +		else
-> +			pr_debug("clk: set %s as parent of %s\n",
-> +				 __clk_get_name(pclk), __clk_get_name(clk));
-> +	}
-> +}
-> +
-> +static void of_clk_assigned_config_parse(struct device_node *node)
-> +{
-> +	char prop_name[OF_PROP_NAME_MAXLEN];
-> +	struct property *prop;
-> +	const char *clk_name;
-> +	int rc, index = 0;
-> +
-> +	of_property_for_each_string(node, "clock-names", prop, clk_name) {
-> +		struct clk *clk, *pclk;
-> +		u32 rate = 0;
-> +
-> +		snprintf(prop_name, OF_PROP_NAME_MAXLEN,
-> +					"%s-clk-parent", clk_name);
-> +		pclk = of_clk_get_list_entry(node, prop_name, 0);
-> +
-> +		snprintf(prop_name, OF_PROP_NAME_MAXLEN,
-> +					"%s-clk-rate", clk_name);
-> +		rc = of_property_read_u32(node, prop_name, &rate);
-> +
-> +		if (!rc || !IS_ERR(pclk)) {
-> +			/*
-> +			 * Assuming here of_property_for_each_string() returns
-> +			 * consecutive values of a DT property in ascending
-> +			 * index order.
-> +			 */
-> +			clk = of_clk_get(node, index);
-> +
-> +			if (!IS_ERR(clk))
-> +				__of_clk_assigned_config_set(clk, pclk, rate);
-> +			else
-> +				pr_err("clk: couldn't get clk %s\n", clk_name);
-> +		}
-> +		index++;
-> +	}
-> +}
-> +
-> +
-> +static int of_clk_setup_notifier_call(struct notifier_block *nb,
-> +					unsigned long event, void *data)
-> +{
-> +	struct device *dev = data;
-> +
-> +	if (!dev->of_node)
-> +		return NOTIFY_DONE;
-> +
-> +	switch (event) {
-> +	case BUS_NOTIFY_BIND_DRIVER:
-> +		/* Parse and configure DT assigned clock parents and rates */
-> +		of_clk_assigned_config_parse(dev->of_node);
-> +		break;
-> +	}
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static struct notifier_block of_clk_setup_nb = {
-> +	.notifier_call = of_clk_setup_notifier_call,
-> +};
-> +
-> +int __init of_clk_setup_notifier_init(void)
-> +{
-> +	return bus_register_notifier(&platform_bus_type, &of_clk_setup_nb);
-> +}
-> +subsys_initcall(of_clk_setup_notifier_init);
-> +
->  /**
->   * of_clk_init() - Scan and init clock providers from the DT
->   * @matches: array of compatible values and init functions for providers.
-> -- 
-> 1.7.9.5
+> ARMv5 platforms that are already working with ARCH_MULTIPLATFORM:
+> * freescale mxc (i.mx21 and i.mx25)
+> * freescale mxs (i.mx23 and i.mx28)
+> * st-ericsson Nomadik
+> * st-ericsson u300
+> * st spear3xx
+> * st spear6xx
+> * TI NSpire
+> * VIA/Wondermedia vt85xx/wm85xx/wm86xx
 > 
+> The embedded mxs family is probably most interesting among these,
+> but there is also a community around the wondermedia stuff, which is
+> used in cheap tablets and laptops.
+
+Interesting. I don't know how many of these are supported by Debian --
+mostly these things get added when someone acquires one and scratches
+that itch.
+
+I suppose if we could remove at least one existing flavour in favour of
+a v5 multiplatform config then there probably wouldn't be many
+objections to doing that.
+
+> > > What this patchset does is also make mach-mvebu part of the multi v5
+> > > kernel. So you just need one kernel for all ARM v5 machines which are
+> > > part of multi v5. The long term goal is that you need just two 32 ARM
+> > > kernels, multi v5 and multi v7. However orion5x and mv76xx0 are not
+> > > yet part of theses, so we are not there yet.
+> > 
+> > So in answer to my question, on v5 ARCH_KIRKWOOD and ARCH_MVEBU *cannot*
+> > coexist in the same binary?
+> 
+> That has been the plan for the kirkwood migration for the last few
+> years, yes. The idea is that every kirkwood machine that anyone is
+> interested in should be supported by ARCH_MVEBU, and we can keep
+> ARCH_KIRKWOOD for the ones we don't care about until it is just
+> dropped.
+> 
+> Same for orion5x, dove and mv78xx0, just a different schedule
+> for moving them over.
+> 
+> Now in theory, we could have them supported in a multiplatform kernel,
+> but that would mean extra work that we planned to avoid by converting
+> them to DT first.
+> 
+> As I said, it may be useful to do multiplatform support for MACH_ORION5x,
+> but for MACH_KIRKWOOD, we have come too far now to turn back.
+
+Understood. It sounds like mach-kirkwood is very close to being
+removable altogether though (by migrating the last few boards to
+mach-mvebu), which would make distro upgrades much simpler, since we can
+just do a straight swap rather than trying to figure out which one we
+need.
+
+Ian.
