@@ -1,70 +1,63 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 20 Feb 2014 16:27:55 +0000
-Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140219193315.3732.21819@capellas-linux>
-References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
- <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
- <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
- <20140219193315.3732.21819@capellas-linux>
-Message-ID: <20140220162754.GC15994@e102568-lin.cambridge.arm.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Thu, 20 Feb 2014 10:28:21 -0600
+Subject: [PATCH 1/8] PM / Runtime: Fetch runtime PM callbacks using a macro
+In-Reply-To: <1392910280-12891-2-git-send-email-ulf.hansson@linaro.org>
+References: <1392910280-12891-1-git-send-email-ulf.hansson@linaro.org>
+ <1392910280-12891-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20140220162821.GD31820@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
-
-On Wed, Feb 19, 2014 at 07:33:15PM +0000, Sebastian Capella wrote:
-> Quoting Lorenzo Pieralisi (2014-02-19 08:12:54)
-> > On Wed, Feb 19, 2014 at 01:52:09AM +0000, Sebastian Capella wrote:
-> > [...]
-> > > diff --git a/arch/arm/kernel/hibernate.c b/arch/arm/kernel/hibernate.c
-> > > new file mode 100644
-> > > index 0000000..16f406f
-> > > --- /dev/null
-> > > +++ b/arch/arm/kernel/hibernate.c
-> > > +void notrace save_processor_state(void)
-> > > +{
-> > > +     WARN_ON(num_online_cpus() != 1);
-> > > +     flush_thread();
-> > 
-> > Can you explain to me please why we need to call flush_thread() here ?
-> > At this point in time syscore_suspend() was already called and CPU
-> > peripheral state saved through CPU PM notifiers.
+On Thu, Feb 20, 2014 at 04:31:13PM +0100, Ulf Hansson wrote:
+> While fetching the proper runtime PM callback, we walk the hierarchy of
+> device's power domains, subsystems and drivers.
 > 
-> Copying Russ' response here: 
+> This is common for rpm_suspend(), rpm_idle() and rpm_resume(). Let's
+> clean up the code by using a macro that handles this.
 > 
-> "I think the idea here is to get the CPU into a state so that later
-> when we resume from the resume kernel, the actual CPU state matches
-> the state we have in kernel. The main thing flush_thread does is clear
-> out any and all FP state." - Russ Dill
-
-See my reply to Russ.
-
-[...]
-
-> > > +static void notrace __swsusp_arch_restore_image(void *unused)
-> > > +{
-> > > +     struct pbe *pbe;
-> > > +
-> > > +     cpu_switch_mm(idmap_pgd, &init_mm);
-> > 
-> > Same here, thanks.
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/base/power/runtime.c |   59 ++++++++++++++----------------------------
+>  1 file changed, 20 insertions(+), 39 deletions(-)
 > 
-> At restore time, we take the save buffer data and restore it to the same
-> physical locations used in the previous execution.  This will require having
-> write access to all of memory, which may not be generally granted by the
-> current mm.  So we switch to 1-1 init_mm to restore memory.
+> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+> index 72e00e6..dedbd64 100644
+> --- a/drivers/base/power/runtime.c
+> +++ b/drivers/base/power/runtime.c
+> @@ -13,6 +13,23 @@
+>  #include <trace/events/rpm.h>
+>  #include "power.h"
+>  
+> +#define RPM_GET_CALLBACK(dev, cb)				\
+> +({								\
+> +	if (dev->pm_domain)					\
+> +		callback = dev->pm_domain->ops.cb;		\
+> +	else if (dev->type && dev->type->pm)			\
+> +		callback = dev->type->pm->cb;			\
+> +	else if (dev->class && dev->class->pm)			\
+> +		callback = dev->class->pm->cb;			\
+> +	else if (dev->bus && dev->bus->pm)			\
+> +		callback = dev->bus->pm->cb;			\
+> +	else							\
+> +		callback = NULL;				\
+> +								\
+> +	if (!callback && dev->driver && dev->driver->pm)	\
+> +		callback = dev->driver->pm->cb;			\
 
-I still do not understand why switching to idmap, which is a clone of
-init_mm + 1:1 kernel mappings is required here. Why idmap ?
+Just a matter of style, but toying with the caller's 'callback' variable
+is a bit ugly, I'm wondering if it would be cleaner to rework the
+statement expression to "return" the callback, which would be used like:
 
-And while at it, can't the idmap be overwritten _while_ copying back the
-resume kernel ? Is it safe to use idmap page tables while copying ?
+	callback = rpm_get_callback(dev, runtime_idle);
 
-I had a look at x86 and there idmap page tables used to resume are created
-on the fly using safe pages, on ARM idmap is created at boot.
-
-I am grokking the code to understand what is really needed here, will get
-back to you asap but I would like things to be clarified in the interim.
-
-Thanks,
-Lorenzo
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
