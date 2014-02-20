@@ -1,67 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Feb 2014 09:09:59 -0800
-Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
-In-Reply-To: <20140220112248.GC32456@localhost>
-References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
- <5302B306.8090503@samsung.com>
- <CAOesGMhnUDcUL7hREV=EYEGr5YG-ZLL6v9NiGcrBr6477WfdyQ@mail.gmail.com>
- <6032891.ndY8FikAMY@wuerfel>
- <CALAqxLX6STNqUeVO2G18bm_HKabpoRxZTa3uK6i-JP97zEYVZg@mail.gmail.com>
- <CAOesGMjLR3PGXeyJPAvGwam4yK97+vnDfq5MVutJz75aKPX8gw@mail.gmail.com>
- <CALAqxLU7ehHfvQa58HpdzojRU-2zhNpEgkr9KEJ3cf550WcnWw@mail.gmail.com>
- <CAOesGMjSjzZ4iX3NVA6eS4LHJF2MQQ=KJpNgKWikJb6YkQxNpQ@mail.gmail.com>
- <20140220112248.GC32456@localhost>
-Message-ID: <CAOesGMhfhdqqb4hJ0hC5HbSWWMQc0FDaaZYO0rZ1cdFtuRgdig@mail.gmail.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Thu, 20 Feb 2014 17:13:21 +0000
+Subject: [PATCH 2/2] arm/xen: Don't use xen DMA ops when the device is
+ protected by an IOMMU
+In-Reply-To: <1392913301-25524-1-git-send-email-julien.grall@linaro.org>
+References: <1392913301-25524-1-git-send-email-julien.grall@linaro.org>
+Message-ID: <1392916401.32657.31.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 3:22 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Feb 20, 2014 at 09:03:30AM +0000, Olof Johansson wrote:
->> So, after giving this some more thought (and getting my hands dirty in
->> some of this code), I think I'm going to change my mind on this. For
->> mobile platforms I think it might make sense to bring over the
->> toplevel platform Kconfig from arch/arm, to simplify dependencies
->> without tearing up the driver subtree with churn like this.
->>
->> This, of course, only holds true for v8 mobile platforms. Samsung
->> isn't saying if GH7 is a server platform and not, and they don't have
->> to tell us. But I think we should consider only enabling and bringing
->> over the mobile ones (and ideally try to avoid even that, but it might
->> make sense to do some of them at least initially -- it does provide
->> some convenient ways to enable larger subsets of default drivers per
->> platform/vendor family).
->>
->> I.e. I'd be OK with an
->> ARCH_EXYNOS/ARCH_TEGRA/ARCH_IMX/ARCH_<whatever>, but I don't think we
->> should add more finegrained options than that globally on ARM64, at
->> least not until truly proven to be needed. We're trying to push back
->> against new per-SoC Kconfig entries on 32-bit as well right now.
->
-> I'm fine with this. Do we still need something for ARMv8 server
-> platforms like ARCH_ARM_SBSA? The only advantage would be to make it
-> easier for mobile targeted kernel builds to disable server features but
-> I'm not sure there are so many such features, people can trim the
-> .config manually.
+Adding the -spec list for the generic IOMMU binding question.
 
-I don't think there's all that much that's unique to SBSA for a
-Kconfig entry. If anything it could be useful to describe dependencies
-(i.e. you very likely don't want to turn off the standardized UART
-driver, etc). But doing that through Kconfig is a bit clumsy, we might
-be better off doing it through example defconfigs. I'm not sure we
-want to do it through selects.
+On Thu, 2014-02-20 at 16:21 +0000, Julien Grall wrote:
+> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+> index 0f7b9c2..ee25a57 100644
+> --- a/Documentation/devicetree/bindings/arm/xen.txt
+> +++ b/Documentation/devicetree/bindings/arm/xen.txt
+> @@ -15,6 +15,8 @@ the following properties:
+>  - interrupts: the interrupt used by Xen to inject event notifications.
+>    A GIC node is also required.
+>  
+> +- protected-devices: (optional) List of phandles to device node where the
+> +IOMMU has been programmed by Xen. 
 
-> Two additional points:
->
-> 1. Single arm64 defconfig file covering everything
-> 2. Modules rather than built-in by default where possible (especially
->    for server platforms)
+Is there some common/generic IOMMU binding which we can reuse here?
+Although this isn't exactly an IOMMU it certainly has some similarities
+-- it is providing IOMMU like functionality (albeit a very inflexible
+IOMMU which you don't need to/can't actually program).
 
-Sounds good to me. Are you also willing to pick up one defconfig per
-vendor (but not more)? I think it's been useful to have those on arm,
-even on multiplatform kernels. We used them on powerpc as well, where
-we had a two-layer approach (ppc64_defconfig and per-platform configs,
-pseries/iseries/pasemi/g5/cell).
+I'd far rather we followed existing patterns rather than invent our own
+things.
 
+I'm wondering if perhaps we didn't ought to integrate this as an actual
+IOMMU driver, although I'm not convinced this would make sense.
 
--Olof
+I'm also not sure about shovelling everything as properties under a
+single Xen node, should this not be its own node with compatible =
+"xen,(pv)iommu"?
+
+Ian.
