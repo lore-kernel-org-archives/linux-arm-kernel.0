@@ -1,238 +1,96 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Thu, 20 Feb 2014 15:30:42 +0000
-Subject: [PATCH] dt: platform driver: Fill the resources before probe and
- defer if needed
-In-Reply-To: <1392285429-9325-1-git-send-email-jjhiblot@traphandler.com>
-References: <1392285429-9325-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <20140220153042.DF053C4050F@trevor.secretlab.ca>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 21 Feb 2014 00:48:06 +0900
+Subject: [PATCH 04/11] ARM: shmobile: lager legacy: Add MSIOF support
+In-Reply-To: <1392907779-22053-5-git-send-email-geert@linux-m68k.org>
+References: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
+ <1392907779-22053-5-git-send-email-geert@linux-m68k.org>
+Message-ID: <CANqRtoQQ9cn55Ct7pva2Bo7461WbZG0=Y5f9zLwfKhyU2=QFZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Feb 2014 10:57:09 +0100, Jean-Jacques Hiblot <jjhiblot@traphandler.com> wrote:
-> The goal of this patch is to allow drivers to be probed even if at the time of
-> the DT parsing some of their ressources are not available yet.
-> 
-> In the current situation, the resource of a platform device are filled from the
-> DT at the time the device is created (of_device_alloc()). The drawbackof this
-> is that a device sitting close to the top of the DT (ahb for example) but
-> depending on ressources that are initialized later (IRQ domain dynamically
-> created for example)  will fail to probe because the ressources don't exist
-> at this time.
-> 
-> This patch fills the resource structure only before the device is probed and
-> will defer the probe if the resource are not available yet.
-> 
-> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Hi Geert,
 
-Hi Jean-Jacques. Thanks for looking at this, it is a longstanding
-problem. However, I'm leary of this approach because it makes failed
-probes (which are intended to be cheap) into an expensive operation. If
-a device goes through multiple rounds of deferred probe, then every time
-it will attempt to decode the needed resources. Parsing 'reg' isn't too
-bad, but parsing the interrupts may not be. I think it needs to be more
-nuanced and only recalculate the resources that failed in previous
-attempts...
-
-...however, the other argument that correctness is more important than
-efficiency here and it would be better to completely teardown the
-resources table, or at least the interrupt entries, after a failed
-probe or driver removal to handle the case where the interrupt
-controller is re-bound to its driver and gets a new set of interrupt
-numbers...
-
-I think this patch can be reworked into something better though...
-
+On Thu, Feb 20, 2014 at 11:49 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+>
+> Add MSIOF resources, platform data, platform device, pinctrl, and SPI
+> child device.
+>
+>   - Platform device numbering is 1-based for compatibility with the BSP,
+>     as QSPI uses zero.
+>   - Only MSIOF1 is in use, and thus registered. Its bus contains a single
+>     device (a Renesas R2A11302FT PMIC).
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 > ---
->  drivers/base/platform.c     |  6 ++++
->  drivers/of/platform.c       | 71 +++++++++++++++++++++++++++++----------------
->  include/linux/of_platform.h | 10 +++++++
->  3 files changed, 62 insertions(+), 25 deletions(-)
-> 
-> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> index bc78848..8e37d8b 100644
-> --- a/drivers/base/platform.c
-> +++ b/drivers/base/platform.c
-> @@ -481,6 +481,12 @@ static int platform_drv_probe(struct device *_dev)
->  	struct platform_device *dev = to_platform_device(_dev);
->  	int ret;
->  
-> +	if (_dev->of_node) {
-> +		ret = of_platform_device_populate_resources(dev);
-> +		if (ret < 0)
-> +			return drv->prevent_deferred_probe ? ret : -EPROBE_DEFER;
-> +	}
+>  arch/arm/mach-shmobile/board-lager.c |   64 ++++++++++++++++++++++++++++++----
+>  1 file changed, 58 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+> index f0104bfe544e..6062bcbda366 100644
+> --- a/arch/arm/mach-shmobile/board-lager.c
+> +++ b/arch/arm/mach-shmobile/board-lager.c
+> @@ -55,6 +55,7 @@
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/spi/flash.h>
+>  #include <linux/spi/rspi.h>
+> +#include <linux/spi/sh_msiof.h>
+>  #include <linux/spi/spi.h>
+>  #include <sound/rcar_snd.h>
+>  #include <sound/simple_card.h>
+> @@ -287,6 +288,40 @@ static const struct platform_device_info ether_info __initconst = {
+>         .dma_mask       = DMA_BIT_MASK(32),
+>  };
+>
+> +/* MSIOF */
+> +static const struct resource sh_msiof0_resources[] __initconst = {
+> +       DEFINE_RES_MEM(0xe6e20000, 0x0064),
+> +       DEFINE_RES_IRQ(gic_spi(156)),
+> +};
 > +
-
-Get rid of the _dev->of_node() test. It should be embedded in the
-function. Also, rename it to: of_platform_device_prepare()
-
->  	if (ACPI_HANDLE(_dev))
->  		acpi_dev_pm_attach(_dev, true);
->  
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 404d1da..64a8eb8 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -141,36 +141,11 @@ struct platform_device *of_device_alloc(struct device_node *np,
->  				  struct device *parent)
->  {
->  	struct platform_device *dev;
-> -	int rc, i, num_reg = 0, num_irq;
-> -	struct resource *res, temp_res;
->  
->  	dev = platform_device_alloc("", -1);
->  	if (!dev)
->  		return NULL;
->  
-> -	/* count the io and irq resources */
-> -	if (of_can_translate_address(np))
-> -		while (of_address_to_resource(np, num_reg, &temp_res) == 0)
-> -			num_reg++;
-> -	num_irq = of_irq_count(np);
-> -
-> -	/* Populate the resource table */
-> -	if (num_irq || num_reg) {
-> -		res = kzalloc(sizeof(*res) * (num_irq + num_reg), GFP_KERNEL);
-> -		if (!res) {
-> -			platform_device_put(dev);
-> -			return NULL;
-> -		}
-> -
-> -		dev->num_resources = num_reg + num_irq;
-> -		dev->resource = res;
-> -		for (i = 0; i < num_reg; i++, res++) {
-> -			rc = of_address_to_resource(np, i, res);
-> -			WARN_ON(rc);
-> -		}
-> -		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
-> -	}
-> -
->  	dev->dev.of_node = of_node_get(np);
->  #if defined(CONFIG_MICROBLAZE)
->  	dev->dev.dma_mask = &dev->archdata.dma_mask;
-> @@ -233,6 +208,52 @@ static struct platform_device *of_platform_device_create_pdata(
->  	return dev;
->  }
->  
-> +int of_platform_device_populate_resources(struct platform_device *dev)
-> +{
-> +	struct device_node *np;
-> +	int rc = 0, i, nreg = 0, nirq;
+> +static const struct resource sh_msiof1_resources[] __initconst = {
+> +       DEFINE_RES_MEM(0xe6e10000, 0x0064),
+> +       DEFINE_RES_IRQ(gic_spi(157)),
+> +};
 > +
-> +	np = dev->dev.of_node;
+> +static const struct resource sh_msiof2_resources[] __initconst = {
+> +       DEFINE_RES_MEM(0xe6e00000, 0x0064),
+> +       DEFINE_RES_IRQ(gic_spi(158)),
+> +};
 > +
-> +	/* count the io and irq resources */
-> +	if (of_can_translate_address(np)) {
-> +		struct resource temp_res;
-> +		while (of_address_to_resource(np, nreg, &temp_res) == 0)
-> +			nreg++;
-> +	}
-
-The above snippet should be encapsulated in an of_reg_count() helper function.
-
-> +	nirq = of_irq_count(np);
+> +static const struct resource sh_msiof3_resources[] __initconst = {
+> +       DEFINE_RES_MEM(0xe6c90000, 0x0064),
+> +       DEFINE_RES_IRQ(gic_spi(159)),
+> +};
 > +
-> +	/* Populate the resource table */
-> +	if (nirq || nreg) {
-> +		struct resource *res;
+> +static const struct sh_msiof_spi_info sh_msiof_info __initconst = {
+> +       .rx_fifo_override       = 256,
+> +       .num_chipselect         = 1,
+> +};
 > +
-> +		res = krealloc(dev->resource, sizeof(*res) * (nirq + nreg),
-> +			       GFP_KERNEL);
-> +		if (!res) {
-> +			kfree(dev->resource);
-> +			dev->resource = NULL;
-> +			return -ENOMEM;
-> +		}
-> +		memset(res, 0, sizeof(*res) * (nirq + nreg));
-> +		dev->resource = res;
-> +		dev->num_resources = nreg + nirq;
-> +
-> +		if (!rc && of_irq_to_resource_table(np, res, nirq) != nirq) {
-> +			rc = -ENOENT;
-> +			WARN_ON(rc);
-> +		}
-> +	}
-> +	return rc;
-> +}
+> +#define r8a7790_register_msiof(idx)                                    \
+> +       platform_device_register_resndata(&platform_bus,                \
+> +                               "spi_r8a7790_msiof",                    \
+> +                               (idx+1), sh_msiof##idx##_resources,     \
+> +                               ARRAY_SIZE(sh_msiof##idx##_resources),  \
+> +                               &sh_msiof_info,                         \
+> +                               sizeof(struct sh_msiof_spi_info))
 
-Reallocation is not necessary. We can know exactly how many tuples are
-in the reg and interrupts properties. Once allocated the array will be
-the right size. (may need to fix of_irq_count() though).
+Hi Geert,
 
-Also, the reg resources will always be correct. They don't need to be
-recalculated each time through. IRQs however are the problem area. A
-simplistic implementation which is still better than current mainline
-would be the following:
+That for your efforts - it's good to see the MSIOF being integrated as
+well! I have one comment on this legacy board integration code.
 
-	if (!nirq && !nreg)
-		return 0;
+Since only MSIOF1 is used on Lager (correct me if i'm wrong), isn't it
+best to omit the unused resources from above? In case of DT I think it
+makes sense to define all channels in the SoC.dtsi and let the
+SoC-board.dts just enable the channels that are used. But in this case
+with legacy code  I think we should keep thing simple and small and
+just enable the bits that are used on the particular board.
 
-	if (!dev->resource) {
-		res = kzalloc(dev->resource, sizeof(*res) * (nirq + nreg),
-			       GFP_KERNEL);
-		if (!res)
-			return -ENOMEM;
-
-		for (i = 0; i < nreg; i++, res++) {
-			rc = of_address_to_resource(np, i, res);
-			if (WARN_ON(rc)) {
-				/* THIS IS BAD; don't try to defer probing */
-				kfree(res);
-				return rc;
-			}
-		}
-
-		dev->resource = res;
-		dev->num_resources = nreg + nirq;
-
-		if (of_irq_to_resource_table(np, dev->resource, nirq) != nirq)
-			return -EPROBE_DEFER;
-
-		return 0;
-	}
-
-	/* See which IRQ resources need to be redone */
-	for (i = 0, res = &dev->resource[nreg]; i < nirq; i++, res++)
-		if (!res->flags && !of_irq_to_resource(np, i, res))
-			return -EPROBE_DEFER;
-
-	return 0;
-
-It isn't optimal because it cannot handle irq controllers being
-replugged, but still better than the current code.
-
-Can you respin and let me know if the above works for you?
+The same obviously applies to the Koelsch legacy code as well. =)
 
 Thanks,
-g.
 
-> +EXPORT_SYMBOL(of_platform_device_populate_resources);
-> +
->  /**
->   * of_platform_device_create - Alloc, initialize and register an of_device
->   * @np: pointer to node to create device for
-> diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-> index 05cb4a9..315e1e3 100644
-> --- a/include/linux/of_platform.h
-> +++ b/include/linux/of_platform.h
-> @@ -53,6 +53,16 @@ struct of_dev_auxdata {
->  
->  extern const struct of_device_id of_default_bus_match_table[];
->  
-> +/* Populate the resource for a platform device */
-> +#ifdef CONFIG_OF
-> +int of_platform_device_populate_resources(struct platform_device *dev);
-> +#else
-> +static inline int of_platform_device_populate_resources(
-> +	struct platform_device *)
-> +{
-> +	return -ENOSYS;
-> +}
-> +#endif
->  /* Platform drivers register/unregister */
->  extern struct platform_device *of_device_alloc(struct device_node *np,
->  					 const char *bus_id,
-> -- 
-> 1.8.5.3
-> 
+/ magnus
