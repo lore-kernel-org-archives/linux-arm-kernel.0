@@ -1,44 +1,67 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Feb 2014 00:37:28 -0800
-Subject: [GIT PULL 00/13] Renesas ARM Based SoC Updates for v3.15
-In-Reply-To: <cover.1391666228.git.horms+renesas@verge.net.au>
-References: <cover.1391666228.git.horms+renesas@verge.net.au>
-Message-ID: <20140220083728.GI19089@quad.lixom.net>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 20 Feb 2014 09:43:37 +0100
+Subject: [PATCH v3 14/15] charger: max14577: Configure battery-dependent
+ settings from DTS
+In-Reply-To: <20140220063031.GC2498@jenny-desktop>
+References: <1392627950-26927-1-git-send-email-k.kozlowski@samsung.com>
+ <1392627950-26927-15-git-send-email-k.kozlowski@samsung.com>
+ <20140220063031.GC2498@jenny-desktop>
+Message-ID: <1392885817.3648.8.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 06, 2014 at 03:21:05PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Thu, 2014-02-20 at 12:00 +0530, Jenny Tc wrote:
+> On Mon, Feb 17, 2014 at 10:05:49AM +0100, Krzysztof Kozlowski wrote:
+> > +static inline int max14577_init_eoc(struct max14577_charger *chg,
+> > +		unsigned int uamp)
+> > +{
+> > +	unsigned int current_bits = 0xf;
+> > +	u8 reg_data;
+> > +
+> > +	switch (chg->maxim_core->dev_type) {
+> > +	case MAXIM_DEVICE_TYPE_MAX77836:
+> > +		if (uamp < 5000)
+> > +			return -EINVAL; /* Requested current is too low */
+> > +
+> > +		if (uamp == 7500)
+> > +			current_bits = 0x0;
 > 
-> please consider these Renesas ARM based SoC updates for v3.15.
-> 
-> This pull request is based on "Renesas CPG update for v3.15",
-> tagged as renesas-cpg-for-v3.15, which I am also sending a pull request for
-> today. The reason for the dependency is to provide driver support for
-> the "Wait for status on selected MSTP clocks" patches in this pull-request.
-> These are correctness fixes.
-> 
-> 
-> The following changes since commit a028c6da34d434e35ba8322568c756ea97ff3c18:
-> 
->   ARM: shmobile: wait for MSTP clock status to toggle, when enabling it (2014-02-04 10:22:39 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.15
-> 
-> for you to fetch changes up to 012a7069b5a10a0851584d71a1facdc40a972319:
-> 
->   ARM: shmobile: r8a7790: Add PCI USB host clock support (2014-02-04 10:25:03 +0900)
+> if (uamp <= 7500) ?
 
-I've merged this in, not doing a separate branch for the clk patches.
+(uamp < 7500) will be mapped to 5000 uA (0x1) so it will be OK. It is
+safer to use lower current. The register description looks like:
+0000 - 7.5 mA
+0001 -  5 mA
+0010 - 10 mA
+0011 - 15 mA
+...
+1010 - 50 mA
+1011 - 60 mA
+1111 - 100 mA
 
-I've merged this in under next/drivers, since the clock tables that are changed
-are hopefully finding their way into drivers/clk in the not too distant future.
-
-Let me know if this will add complications w.r.t. merge dependencies and we can
-bring this back into next/soc, but unless you also change clock code in later
-soc branches, they can just be independent of this.
+However for value between <7501, 9999> this function will return 0x1
+(5000 uA) which is not perfect. Better is to return 0x0 (7500 uA).
+I'll fix this in next version of patch.
 
 
--Olof
+> 
+> > +	/* Initialize Overvoltage-Protection Threshold */
+> > +	switch (chg->pdata->ovp_uvolt) {
+> > +	case 7500000:
+> > +		reg_data = 0x0;
+> > +		break;
+> > +	case 6000000:
+> > +	case 6500000:
+> > +	case 7000000:
+> > +		reg_data = 0x1 + (chg->pdata->ovp_uvolt - 6000000) / 500000;
+> > +		break;
+> 
+> Is it battery OVP or charger source OVP? If it's battery OVP, then  minimum
+> level as 6V seems to be unsafe even for 4.4V batteries.
+
+It is on charger (input). Anyway only these 4 values are supported (6.0,
+6.5, 7.0, 7.5 volts).
+
+
+Best regards,
+Krzysztof
