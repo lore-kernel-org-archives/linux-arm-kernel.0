@@ -1,103 +1,49 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 20 Feb 2014 12:07:52 +0100
-Subject: [PATCH v2 2/2] regulator: core: Replace direct ops->disable usage
-In-Reply-To: <1392894472-11956-1-git-send-email-mpa@pengutronix.de>
-References: <1392894472-11956-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1392894472-11956-3-git-send-email-mpa@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 20 Feb 2014 12:11:29 +0100
+Subject: [PATCH 1/3] ARM: mvebu: use C preprocessor include for Armada 375/38x
+ DTs
+In-Reply-To: <1392894691-26837-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1392894691-26837-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1392894691-26837-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are many places where ops->disable is called directly. Instead we
-should use _regulator_do_disable() which also handles gpio regulators.
+Some of the Armada 375/38x DTs that were recently submitted were still
+using the old-style /include/ instead of the new-style, C-preprocessor
+based #include. Since we are going to start including more headers,
+switching to the C-preprocessor based includes is important.
 
-Cc: <stable@vger.kernel.org> # 3.10+
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/regulator/core.c | 32 +++++++++++++-------------------
- 1 file changed, 13 insertions(+), 19 deletions(-)
+ arch/arm/boot/dts/armada-375.dtsi | 2 +-
+ arch/arm/boot/dts/armada-380.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 017f5cb..a0c916f 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -1908,8 +1908,6 @@ static int _regulator_do_disable(struct regulator_dev *rdev)
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index 9f5cb51..c89fee4 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -11,7 +11,7 @@
+  * warranty of any kind, whether express or implied.
+  */
  
- 	trace_regulator_disable_complete(rdev_get_name(rdev));
+-/include/ "skeleton.dtsi"
++#include "skeleton.dtsi"
  
--	_notifier_call_chain(rdev, REGULATOR_EVENT_DISABLE,
--			     NULL);
- 	return 0;
- }
+ #define MBUS_ID(target,attributes) (((target) << 24) | ((attributes) << 16))
  
-@@ -1933,6 +1931,8 @@ static int _regulator_disable(struct regulator_dev *rdev)
- 				rdev_err(rdev, "failed to disable\n");
- 				return ret;
- 			}
-+			_notifier_call_chain(rdev, REGULATOR_EVENT_DISABLE,
-+					NULL);
- 		}
+diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
+index 5a46ec7..82b3347 100644
+--- a/arch/arm/boot/dts/armada-380.dtsi
++++ b/arch/arm/boot/dts/armada-380.dtsi
+@@ -12,7 +12,7 @@
+  * warranty of any kind, whether express or implied.
+  */
  
- 		rdev->use_count = 0;
-@@ -1985,20 +1985,16 @@ static int _regulator_force_disable(struct regulator_dev *rdev)
- {
- 	int ret = 0;
+-/include/ "armada-38x.dtsi"
++#include "armada-38x.dtsi"
  
--	/* force disable */
--	if (rdev->desc->ops->disable) {
--		/* ah well, who wants to live forever... */
--		ret = rdev->desc->ops->disable(rdev);
--		if (ret < 0) {
--			rdev_err(rdev, "failed to force disable\n");
--			return ret;
--		}
--		/* notify other consumers that power has been forced off */
--		_notifier_call_chain(rdev, REGULATOR_EVENT_FORCE_DISABLE |
--			REGULATOR_EVENT_DISABLE, NULL);
-+	ret = _regulator_do_disable(rdev);
-+	if (ret < 0) {
-+		rdev_err(rdev, "failed to force disable\n");
-+		return ret;
- 	}
- 
--	return ret;
-+	_notifier_call_chain(rdev, REGULATOR_EVENT_FORCE_DISABLE |
-+			REGULATOR_EVENT_DISABLE, NULL);
-+
-+	return 0;
- }
- 
- /**
-@@ -3641,12 +3637,10 @@ int regulator_suspend_finish(void)
- 		} else {
- 			if (!have_full_constraints())
- 				goto unlock;
--			if (!ops->disable)
--				goto unlock;
- 			if (!_regulator_is_enabled(rdev))
- 				goto unlock;
- 
--			error = ops->disable(rdev);
-+			error = _regulator_do_disable(rdev);
- 			if (error)
- 				ret = error;
- 		}
-@@ -3820,7 +3814,7 @@ static int __init regulator_init_complete(void)
- 		ops = rdev->desc->ops;
- 		c = rdev->constraints;
- 
--		if (!ops->disable || (c && c->always_on))
-+		if (c && c->always_on)
- 			continue;
- 
- 		mutex_lock(&rdev->mutex);
-@@ -3841,7 +3835,7 @@ static int __init regulator_init_complete(void)
- 			/* We log since this may kill the system if it
- 			 * goes wrong. */
- 			rdev_info(rdev, "disabling\n");
--			ret = ops->disable(rdev);
-+			ret = _regulator_do_disable(rdev);
- 			if (ret != 0)
- 				rdev_err(rdev, "couldn't disable: %d\n", ret);
- 		} else {
+ / {
+ 	model = "Marvell Armada 380 family SoC";
 -- 
-1.8.5.3
+1.8.3.2
