@@ -1,40 +1,153 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 20 Feb 2014 19:30:08 +0000 (UTC)
-Subject: [PATCH 2/2] ARM: OMAP2+: fix dpll round_rate() to actually round
-In-Reply-To: <alpine.DEB.2.02.1402191928480.8777@utopia.booyaka.com>
-References: <1389944699-27962-1-git-send-email-tomi.valkeinen@ti.com>
- <1389944699-27962-3-git-send-email-tomi.valkeinen@ti.com>
- <alpine.DEB.2.02.1402191928480.8777@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1402201927280.10791@utopia.booyaka.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 20 Feb 2014 12:39:16 -0700
+Subject: [PATCH v3 2/3] ARM: bios32: use pci_enable_resource to enable PCI
+ resources
+In-Reply-To: <20140220111238.GD3615@mudshark.cambridge.arm.com>
+References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
+ <1392726043-31088-3-git-send-email-will.deacon@arm.com>
+ <20140218154139.GF21483@n2100.arm.linux.org.uk>
+ <20140220111238.GD3615@mudshark.cambridge.arm.com>
+Message-ID: <CAErSpo4KEGh7GAfEv-prj-UdJETCN9M5sEtdNF0NARa6-03HYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Feb 2014, Paul Walmsley wrote:
+On Thu, Feb 20, 2014 at 4:12 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Feb 18, 2014 at 03:41:39PM +0000, Russell King - ARM Linux wrote:
+>> On Tue, Feb 18, 2014 at 12:20:42PM +0000, Will Deacon wrote:
+>> > This patch moves bios32 over to using the generic code for enabling PCI
+>> > resources. Since the core code takes care of bridge resources too, we
+>> > can also drop the explicit IO and MEMORY enabling for them in the arch
+>> > code.
+>> >
+>> > A side-effect of this change is that we no longer explicitly enable
+>> > devices when running in PCI_PROBE_ONLY mode. This stays closer to the
+>> > meaning of the option and prevents us from trying to enable devices
+>> > without any assigned resources (the core code refuses to enable
+>> > resources without parents).
+>> >
+>> > Tested-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+>> > Tested-by: Jingoo Han <jg1.han@samsung.com>
+>> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+>>
+>> Tested acceptably fine here with crudbus-from-hell.
+>>
+>> Tested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>
+> Damn, I just found a problem with this patch when PCI_PROBE_ONLY is set.
+>
+> The problem is that bios32.c won't create a resource hierarchy for the
+> firmware-initialised resources, so we have a bunch of orphaned resources
+> that we can't pass to pci_enable_resources (since it checks r->parent).
+>
+> This means that, unless firmware *enables* all of the resources, Linux won't
+> be able to enable them. I think this is stronger than simply not
+> re-assigning devices like the PCI_PROBE_ONLY flag intends.
 
-> On Fri, 17 Jan 2014, Tomi Valkeinen wrote:
-> 
-> > This patch adds a simple method of rounding: during the iteration, the 
-> > code keeps track of the closest rate match. If no exact match is found, 
-> > the closest is returned.
-> 
-> So that's one possible rounding policy; maybe it works fine for a display 
-> interface PLL, at least for some values of "closest rate".  But another 
-> might be "only allow a selection from a set of pre-determined rates 
-> characterized by the silicon validation team".  Or another rounding 
-> function might need to select a more distant rate that minimizes jitter, 
-> EMI, or power consumption.  
+By "firmware enabling resources," do you mean firmware assigning
+addresses in the BARs and turning on the PCI_COMMAND_MEMORY (or _IO)
+bits?
 
-Thought about this some more.  Do you only need this for the DSS PLL, or 
-do you need it for one of the core OMAP PLLs?
+I'd like to make the generic code ignore BAR values if
+PCI_COMMAND_MEMORY (or _IO) is cleared.  When those bits are cleared,
+I don't think there's a good way to determine whether the address in a
+BAR is valid.
 
-If the former, then how about modifying your patch to create a separate 
-round_rate function that's only used for the DSS PLL that implements the 
-behavior that you want?
+It sounds like you want PCI_PROBE_ONLY to mean that we should try to
+use the existing BAR contents even if PCI_COMMAND_MEMORY is cleared.
+Is that right?  Maybe we could try to use the existing BAR address if
+we can actually claim it, i.e., if it is inside one of the upstream
+bridge windows.
 
-That would eliminate any risk of impacting other users on the system.  And 
-would also allow this change to get into the codebase much faster, since 
-there's no need for clk API changes, etc.
+> I can see two solutions:
+>
+>   (1) Just drop this patch and stick with the old code (which doesn't check
+>       r->parent). The downside is we still don't have any resource
+>       hierarchy, so /proc/iomem doesn't contain bus information.
+>
+>   (2) Walk over the bus claiming the resources that we find. Patch below.
+>
+> Any thoughts?
 
+I really want to nuke all the arch-specific "claim resource" code
+because it isn't arch-dependent.
 
-
-- Paul
+> commit 802062290eee961362d3090a50cf851412a63314
+> Author: Will Deacon <will.deacon@arm.com>
+> Date:   Wed Feb 19 23:29:30 2014 +0000
+>
+>     ARM: bios32: claim firmware-initialised resources when PCI_PROBE_ONLY
+>
+>     When initialising a PCI bus with the PCI_PROBE_ONLY flag set, we don't
+>     (re-)assign any firmware-initialised resources, leading to an incomplete
+>     resource hierarchy and devices with orphaned resources.
+>
+>     If we try to enable these orphaned resources using pci_enable_resources,
+>     we will get back -EINVAL since a valid ->parent pointer is required.
+>     Consequently, pcibios_enable_device doesn't attempt to enable devices
+>     when PCI_PROBE_ONLY is set. This has the unfortunate effect of requiring
+>     the firmware to *enable* all of the devices!
+>
+>     This patch fixes the problem by building up a resource hierarchy from
+>     the firmware-initialised resources when PCI_PROBE_ONLY is set.
+>
+>     Signed-off-by: Will Deacon <will.deacon@arm.com>
+>
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index 91f48804e3bb..d65c76a4d7ad 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -514,6 +514,35 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>         }
+>  }
+>
+> +static void pcibios_claim_one_bus(struct pci_bus *bus)
+> +{
+> +       struct pci_dev *dev;
+> +       struct pci_bus *child_bus;
+> +
+> +       list_for_each_entry(dev, &bus->devices, bus_list) {
+> +               int i;
+> +
+> +               for (i = 0; i < PCI_NUM_RESOURCES; i++) {
+> +                       struct resource *r = &dev->resource[i];
+> +
+> +                       if (r->parent || !r->start || !r->flags)
+> +                               continue;
+> +
+> +                       pr_debug("PCI: Claiming %s: "
+> +                                "Resource %d: %016llx..%016llx [%x]\n",
+> +                                pci_name(dev), i,
+> +                                (unsigned long long)r->start,
+> +                                (unsigned long long)r->end,
+> +                                (unsigned int)r->flags);
+> +
+> +                       pci_claim_resource(dev, i);
+> +               }
+> +       }
+> +
+> +       list_for_each_entry(child_bus, &bus->children, node)
+> +               pcibios_claim_one_bus(child_bus);
+> +}
+> +
+>  void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+>  {
+>         struct pci_sys_data *sys;
+> @@ -541,6 +570,8 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+>                          * Assign resources.
+>                          */
+>                         pci_bus_assign_resources(bus);
+> +               } else {
+> +                       pcibios_claim_one_bus(bus);
+>                 }
+>
+>                 /*
+> @@ -608,9 +639,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>   */
+>  int pcibios_enable_device(struct pci_dev *dev, int mask)
+>  {
+> -       if (pci_has_flag(PCI_PROBE_ONLY))
+> -               return 0;
+> -
+>         return pci_enable_resources(dev, mask);
+>  }
+>
