@@ -1,96 +1,191 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 21 Feb 2014 00:48:06 +0900
-Subject: [PATCH 04/11] ARM: shmobile: lager legacy: Add MSIOF support
-In-Reply-To: <1392907779-22053-5-git-send-email-geert@linux-m68k.org>
-References: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
- <1392907779-22053-5-git-send-email-geert@linux-m68k.org>
-Message-ID: <CANqRtoQQ9cn55Ct7pva2Bo7461WbZG0=Y5f9zLwfKhyU2=QFZw@mail.gmail.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Thu, 20 Feb 2014 17:49:49 +0200
+Subject: [PATCH v5 2/2] memory: ti-aemif: add bindings for AEMIF driver
+In-Reply-To: <CAL_JsqJ5hoQ3vWaQTo8--jiPPQ64OW_b4zKTe7aPLXN0td4DrA@mail.gmail.com>
+References: <1392817210-14312-1-git-send-email-ivan.khoronzhuk@ti.com>	<1392817210-14312-3-git-send-email-ivan.khoronzhuk@ti.com>	<20140219181152.GG25079@e106331-lin.cambridge.arm.com>	<5305F898.6020401@ti.com>
+ <CAL_JsqJ5hoQ3vWaQTo8--jiPPQ64OW_b4zKTe7aPLXN0td4DrA@mail.gmail.com>
+Message-ID: <5306241D.1030108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
 
-On Thu, Feb 20, 2014 at 11:49 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+On 02/20/2014 03:44 PM, Rob Herring wrote:
+> On Thu, Feb 20, 2014 at 6:44 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
+>> On 02/19/2014 08:11 PM, Mark Rutland wrote:
+>>> On Wed, Feb 19, 2014 at 01:40:10PM +0000, Ivan Khoronzhuk wrote:
+>>>> Add bindings for TI Async External Memory Interface (AEMIF) controller.
+>>>>
+>>>> The Async External Memory Interface (EMIF16/AEMIF) controller is intended
+>>>> to
+>>>> provide a glue-less interface to a variety of asynchronous memory devices
+>>>> like
+>>>> ASRA M, NOR and NAND memory. A total of 256M bytes of any of these
+>>>> memories
+>>>> can be accessed via 4 chip selects with 64M byte access per chip select.
+>>>>
+>>>> We are not encoding CS number in reg property, it's memory partition
+>>>> number.
+>>>> The CS number is encoded for Davinci NAND node using standalone property
+>>>> "ti,davinci-chipselect" and we need to provide two memory ranges to it,
+>>>> as result we can't encode CS number in "reg" for AEMIF child devices
+>>>> (NAND/NOR/etc), as it will break bindings compatibility.
+>>>>
+>>>> In this patch, NAND node is used just as an example of child node.
+>>>>
+>>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>>> ---
+>>>>    .../bindings/memory-controllers/ti-aemif.txt       | 210
+>>>> +++++++++++++++++++++
+>>>>    1 file changed, 210 insertions(+)
+>>>>    create mode 100644
+>>>> Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+>>> [...]
+>>>
+>>>> +- ranges:              Contains memory regions. There are two types of
+>>>> +                       ranges/partitions:
+>>>> +                       - CS-specific partition/range. If continuous,
+>>>> must be
+>>>> +                       set up to reflect the memory layout for 4
+>>>> chipselects,
+>>>> +                       if not then additional range/partition can be
+>>>> added and
+>>>> +                       child device can select the proper one.
+>>>> +                       - control partition which is common for all CS
+>>>> +                       interfaces.
+>>> This really doesn't sound anything like the typical meaning of ranges on
+>>> a bus.
+>>>
+>>> Why isn't this information encoded in reg properties on the child nodes?
+>>>
+>>> [...]
+>>
+>> Note that we do not introduce NAND device bindings here.
+>> The Davinci NAND bindings was introduced and accepted more then one year
+>> ago.
+>> And the CS number is encoded for Davinci NAND node using standalone property
+>>
+>> "ti,davinci-chipselect" and we need to provide two memory ranges to it,
+>> as result we can't encode CS number in "reg" for AEMIF child devices
+>> (NAND/NOR/etc),
+>> as it will break bindings compatibility.
+>>
+>> In this document, NAND node is used just as an example of child node.
+>>
+>>
+>>>> +- ti,cs-ss:            enable/disable select strobe mode
+>>>> +                               In select strobe mode chip select behaves
+>>>> as
+>>>> +                               the strobe and is active only during the
+>>>> strobe
+>>>> +                               period. If present then enable.
+>>>> +
+>>>> +- ti,cs-ew:            enable/disable extended wait mode
+>>>> +                               if set, the controller monitors the
+>>>> EMIFWAIT pin
+>>>> +                               mapped to that chip select to determine
+>>>> if the
+>>>> +                               device wants to extend the strobe period.
+>>>> If
+>>>> +                               present then enable.
+>>> When would you have these two in the DT and when wouldn't you? Why can't
+>>> the driver decide?
+>>
+>> These are properties of cs node, not the driver itself.
+>> The driver cannot know what child device you are going to attach to cs node
+>> , as result it cannot decide what settings you are using for particular cs
+>> node.
+>>
+>>
+>>> These names are also opaque. We can clearly do better.
+>>
+>> I propose the following names?:
+>>
+>> ti,cs-ss  --> ti,cs-select-strobe-mode
+>> ti,cs-ew --> ti,cs-extended-waite-mode
+>>
+>> Are you OK with it?
+>>
+>>
+>>>> +
+>>>> +- ti,cs-ta:            minimum turn around time, ns
+>>>> +                               Time between the end of one asynchronous
+>>>> memory
+>>>> +                               access and the start of another
+>>>> asynchronous
+>>>> +                               memory access. This delay is not incurred
+>>>> +                               between a read followed by read or a
+>>>> write
+>>>> +                               followed by a write to same chip select.
+>>> The name is opaque. How about ti,min-turnaround-time-ns ?
+>>
+>> I like without -ns suffix and with cs- prefix:
+>> ti,cs-ta --> ti,cs-min-turnaround-time
+>>
+>> Is it OK?
+>>
+>>
+>>>> +
+>>>> +- ti,cs-rsetup:                read setup width, ns
+>>>> +                               Time between the beginning of a memory
+>>>> cycle
+>>>> +                               and the activation of read strobe.
+>>>> +                               Minimum value is 1 (0 treated as 1).
+>>>> +
+>>>> +- ti,cs-rstobe:                read strobe width, ns
+>>>> +                               Time between the activation and
+>>>> deactivation of
+>>>> +                               the read strobe.
+>>>> +                               Minimum value is 1 (0 treated as 1).
+>>>> +
+>>>> +- ti,cs-rhold:         read hold width, ns
+>>>> +                               Time between the deactivation of the read
+>>>> +                               strobe and the end of the cycle (which
+>>>> may be
+>>>> +                               either an address change or the
+>>>> deactivation of
+>>>> +                               the chip select signal.
+>>>> +                               Minimum value is 1 (0 treated as 1).
+>>>> +
+>>>> +- ti,cs-wsetup:                write setup width, ns
+>>>> +                               Time between the beginning of a memory
+>>>> cycle
+>>>> +                               and the activation of write strobe.
+>>>> +                               Minimum value is 1 (0 treated as 1).
+>>>> +
+>>>> +- ti,cs-wstrobe:       write strobe width, ns
+>>>> +                               Time between the activation and
+>>>> deactivation of
+>>>> +                               the write strobe.
+>>>> +                               Minimum value is 1 (0 treated as 1).
+>>>> +
+>>>> +- ti,cs-whold:         write hold width, ns
+>>>> +                               Time between the deactivation of the
+>>>> write
+>>>> +                               strobe and the end of the cycle (which
+>>>> may be
+>>>> +                               either an address change or the
+>>>> deactivation of
+>>>> +                               the chip select signal.
+>>>> +                               Minimum value is 1 (0 treated as 1).
+>>> Likewise I think these can be given more descriptive names.
+>>
+>> Ok. How about:
+>>
+>> ti,cs-rsetup --> ti,cs-read-setup-time
+>> ti,cs-rstobe --> ti,cs-read-strobe-time
+>> ti,cs-rhold  --> ti,cs-read-hold-time
+>> ti,cs-wsetup --> ti,cs-write-setup-time
+>> ti,cs-wstrobe --> ti,cs-write-strobe-time
+>> ti,cs-whold --> ti,cs-write-hold-time
+> Properties that have a unit of measure should have that unit in the
+> name. So replace "time" with "ns".
 >
-> Add MSIOF resources, platform data, platform device, pinctrl, and SPI
-> child device.
->
->   - Platform device numbering is 1-based for compatibility with the BSP,
->     as QSPI uses zero.
->   - Only MSIOF1 is in use, and thus registered. Its bus contains a single
->     device (a Renesas R2A11302FT PMIC).
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-> ---
->  arch/arm/mach-shmobile/board-lager.c |   64 ++++++++++++++++++++++++++++++----
->  1 file changed, 58 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-> index f0104bfe544e..6062bcbda366 100644
-> --- a/arch/arm/mach-shmobile/board-lager.c
-> +++ b/arch/arm/mach-shmobile/board-lager.c
-> @@ -55,6 +55,7 @@
->  #include <linux/mtd/mtd.h>
->  #include <linux/spi/flash.h>
->  #include <linux/spi/rspi.h>
-> +#include <linux/spi/sh_msiof.h>
->  #include <linux/spi/spi.h>
->  #include <sound/rcar_snd.h>
->  #include <sound/simple_card.h>
-> @@ -287,6 +288,40 @@ static const struct platform_device_info ether_info __initconst = {
->         .dma_mask       = DMA_BIT_MASK(32),
->  };
->
-> +/* MSIOF */
-> +static const struct resource sh_msiof0_resources[] __initconst = {
-> +       DEFINE_RES_MEM(0xe6e20000, 0x0064),
-> +       DEFINE_RES_IRQ(gic_spi(156)),
-> +};
-> +
-> +static const struct resource sh_msiof1_resources[] __initconst = {
-> +       DEFINE_RES_MEM(0xe6e10000, 0x0064),
-> +       DEFINE_RES_IRQ(gic_spi(157)),
-> +};
-> +
-> +static const struct resource sh_msiof2_resources[] __initconst = {
-> +       DEFINE_RES_MEM(0xe6e00000, 0x0064),
-> +       DEFINE_RES_IRQ(gic_spi(158)),
-> +};
-> +
-> +static const struct resource sh_msiof3_resources[] __initconst = {
-> +       DEFINE_RES_MEM(0xe6c90000, 0x0064),
-> +       DEFINE_RES_IRQ(gic_spi(159)),
-> +};
-> +
-> +static const struct sh_msiof_spi_info sh_msiof_info __initconst = {
-> +       .rx_fifo_override       = 256,
-> +       .num_chipselect         = 1,
-> +};
-> +
-> +#define r8a7790_register_msiof(idx)                                    \
-> +       platform_device_register_resndata(&platform_bus,                \
-> +                               "spi_r8a7790_msiof",                    \
-> +                               (idx+1), sh_msiof##idx##_resources,     \
-> +                               ARRAY_SIZE(sh_msiof##idx##_resources),  \
-> +                               &sh_msiof_info,                         \
-> +                               sizeof(struct sh_msiof_spi_info))
+> Rob
 
-Hi Geert,
+Ok, I will replace
 
-That for your efforts - it's good to see the MSIOF being integrated as
-well! I have one comment on this legacy board integration code.
+Thanks!
 
-Since only MSIOF1 is used on Lager (correct me if i'm wrong), isn't it
-best to omit the unused resources from above? In case of DT I think it
-makes sense to define all channels in the SoC.dtsi and let the
-SoC-board.dts just enable the channels that are used. But in this case
-with legacy code  I think we should keep thing simple and small and
-just enable the bits that are used on the particular board.
-
-The same obviously applies to the Koelsch legacy code as well. =)
-
-Thanks,
-
-/ magnus
+-- 
+Regards,
+Ivan Khoronzhuk
