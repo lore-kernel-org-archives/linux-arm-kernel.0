@@ -1,8 +1,10 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 20 Feb 2014 20:40:26 +0100
+Date: Thu, 20 Feb 2014 20:40:27 +0100
 Subject: [PATCH v4 00/10] Add device tree support for Exynos4 SoC camera
  subsystem
-Message-ID: <1392925237-31394-1-git-send-email-s.nawrocki@samsung.com>
+In-Reply-To: <1392925237-31394-1-git-send-email-s.nawrocki@samsung.com>
+References: <1392925237-31394-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1392925237-31394-2-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,7 +13,7 @@ the Exynos4412 SoC Trats2 board. It converts related drivers to use
 the v4l2-async API. The SoC output clocks are provided to external image
 image sensors through the common clock API.
 
-I'd appreciate a DT binding maintainer reviewed patches 2/10, 3/10.
+I'd appreciate a DT binding maintainer reviewed patches 2/11, 3/11.
 With an Ack I could finally push these things upstream.
 
 Sylwester Nawrocki (10):
