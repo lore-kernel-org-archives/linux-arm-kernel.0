@@ -1,50 +1,36 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 20 Feb 2014 18:24:38 -0500
+Date: Thu, 20 Feb 2014 18:26:49 -0500
 Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
-In-Reply-To: <20140220105854.GL11878@lunn.ch>
+In-Reply-To: <1392896356.23342.40.camel@kazak.uk.xensource.com>
 References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
  <1391730137-14814-22-git-send-email-andrew@lunn.ch>
  <52F51922.6030502@gmail.com>
  <1392892217.23342.18.camel@kazak.uk.xensource.com>
  <20140220105854.GL11878@lunn.ch>
-Message-ID: <20140220232438.GT7862@titan.lakedaemon.net>
+ <20140220111913.GZ21483@n2100.arm.linux.org.uk>
+ <1392896356.23342.40.camel@kazak.uk.xensource.com>
+Message-ID: <20140220232649.GU7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 11:58:54AM +0100, Andrew Lunn wrote:
-> On Thu, Feb 20, 2014 at 10:30:17AM +0000, Ian Campbell wrote:
-> > On Fri, 2014-02-07 at 18:34 +0100, Sebastian Hesselbarth wrote:
-> > > On 02/07/2014 12:42 AM, Andrew Lunn wrote:
-> > > > Now that all the device tree support is in mach-mvebu, remove it from
-> > > > mach-kirkwood.
-> > > >
-> > > > Regenerate kirkwood_defconfig, removing all DT support, and a couple
-> > 
-> > s/DT/board-file/?
+On Thu, Feb 20, 2014 at 11:39:16AM +0000, Ian Campbell wrote:
+> On Thu, 2014-02-20 at 11:19 +0000, Russell King - ARM Linux wrote:
+> > What's wrong with the soc subsystem (drivers/base/soc.c).  This
+> > provides a way to export SoC through standardised interfaces. 
 > 
-> We keep any system using -setup.c files, and remove the ability to
-> boot systems with a DT description. Thus mach-kirkwood becomes legacy,
-> and you should now be trying to only use mach-mvebu, compiled for v5
-> systems and a second compile for v7 systems.
+> It looks like the thing to use to me.
 > 
-> There are four systems left in mach-kirkwood which don't have DT
-> equivalent. These are LaCie 2Big and 5Big, HP t5325 thin client and
-> Marvell OpenRD machines. I'm working on t5325 and Openrd. The sticking
-> point is audio support, which no other board has done with DT yet.
-> The two LeCie boards have a custom LED driver which needs a DT
-> binding. My gut feeling is that we won't get these four converted to
-> DT in time for 3.15.
+> It seems to have been around only since v3.3 though, which makes it a
+> bit tricky to use when upgrading from running board-file based v3.2
+> system (Debian Wheezy) to a newer DTB based kernel, we need to select
+> the new DTB while running the old system.
+> 
+> I'd prefer to use this thing as the primary mechanism but it seems like
+> I'd have to implement some sort of fallback at least for one Debian
+> release cycle. I'm sure it is doable...
 
-Why not do like we did when we started the kirkwood dt conversion?
-Create dts files for the remaining boards, and do
-
-if (of_machine_is_compatible(...))
-	legacy_audio_init()
-
-in board-v5.c?
-
-I suspect audio is going to take time to sort out.  I'd hate to delay
-this just for that.
+back in v3.2, lspci should still work.  Would that given you the
+information you need?
 
 thx,
 
