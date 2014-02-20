@@ -1,46 +1,56 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 20 Feb 2014 13:40:02 +0200
-Subject: [PATCH v8 07/14] ARM: OMAP3: hwmod data: Remove optional clock from
- usb_host_hs module
+Date: Thu, 20 Feb 2014 13:39:59 +0200
+Subject: [PATCH v8 04/14] mfd: omap-usb-host: Update DT clock binding
+ information
 In-Reply-To: <1392896409-5101-1-git-send-email-rogerq@ti.com>
 References: <1392896409-5101-1-git-send-email-rogerq@ti.com>
-Message-ID: <1392896409-5101-8-git-send-email-rogerq@ti.com>
+Message-ID: <1392896409-5101-5-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB Host driver manages this clock so no need to have it in
-the hwmod data. We also get rid of the 'ehci_logic_fck' alias
-for 'usbhost_120m_fck' clock.
+The omap-usb-host driver expects certained named clocks.
+Add this information to the DT binding document.
 
-CC: Paul Walmsley <paul@pwsan.com>
+CC: Lee Jones <lee.jones@linaro.org>
+CC: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 6 ------
- 1 file changed, 6 deletions(-)
+ .../devicetree/bindings/mfd/omap-usb-host.txt      | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 4c3b1e6..ad87f46 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -1955,10 +1955,6 @@ static struct omap_hwmod_class omap3xxx_usb_host_hs_hwmod_class = {
- 	.sysc = &omap3xxx_usb_host_hs_sysc,
- };
+diff --git a/Documentation/devicetree/bindings/mfd/omap-usb-host.txt b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
+index b381fa6..4721b2d 100644
+--- a/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
++++ b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
+@@ -32,6 +32,29 @@ Optional properties:
+ - single-ulpi-bypass: Must be present if the controller contains a single
+   ULPI bypass control bit. e.g. OMAP3 silicon <= ES2.1
  
--static struct omap_hwmod_opt_clk omap3xxx_usb_host_hs_opt_clks[] = {
--	  { .role = "ehci_logic_fck", .clk = "usbhost_120m_fck", },
--};
--
- static struct omap_hwmod_irq_info omap3xxx_usb_host_hs_irqs[] = {
- 	{ .name = "ohci-irq", .irq = 76 + OMAP_INTC_START, },
- 	{ .name = "ehci-irq", .irq = 77 + OMAP_INTC_START, },
-@@ -1981,8 +1977,6 @@ static struct omap_hwmod omap3xxx_usb_host_hs_hwmod = {
- 			.idlest_stdby_bit = OMAP3430ES2_ST_USBHOST_STDBY_SHIFT,
- 		},
- 	},
--	.opt_clks	= omap3xxx_usb_host_hs_opt_clks,
--	.opt_clks_cnt	= ARRAY_SIZE(omap3xxx_usb_host_hs_opt_clks),
++- clocks: a list of phandles and clock-specifier pairs, one for each entry in
++  clock-names.
++
++- clock-names: should include:
++  For OMAP3
++  * "usbhost_120m_fck" - 120MHz Functional clock.
++
++  For OMAP4+
++  * "refclk_60m_int" - 60MHz internal reference clock for UTMI clock mux
++  * "refclk_60m_ext_p1" - 60MHz external ref. clock for Port 1's UTMI clock mux.
++  * "refclk_60m_ext_p2" - 60MHz external ref. clock for Port 2's UTMI clock mux
++  * "utmi_p1_gfclk" - Port 1 UTMI clock mux.
++  * "utmi_p2_gfclk" - Port 2 UTMI clock mux.
++  * "usb_host_hs_utmi_p1_clk" - Port 1 UTMI clock gate.
++  * "usb_host_hs_utmi_p2_clk" - Port 2 UTMI clock gate.
++  * "usb_host_hs_utmi_p3_clk" - Port 3 UTMI clock gate.
++  * "usb_host_hs_hsic480m_p1_clk" - Port 1 480MHz HSIC clock gate.
++  * "usb_host_hs_hsic480m_p2_clk" - Port 2 480MHz HSIC clock gate.
++  * "usb_host_hs_hsic480m_p3_clk" - Port 3 480MHz HSIC clock gate.
++  * "usb_host_hs_hsic60m_p1_clk" - Port 1 60MHz HSIC clock gate.
++  * "usb_host_hs_hsic60m_p2_clk" - Port 2 60MHz HSIC clock gate.
++  * "usb_host_hs_hsic60m_p3_clk" - Port 3 60MHz HSIC clock gate.
++
+ Required properties if child node exists:
  
- 	/*
- 	 * Errata: USBHOST Configured In Smart-Idle Can Lead To a Deadlock
+ - #address-cells: Must be 1
 -- 
 1.8.3.2
