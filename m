@@ -1,184 +1,58 @@
-From: julien.grall@linaro.org (Julien Grall)
-Date: Thu, 20 Feb 2014 16:21:41 +0000
-Subject: [PATCH 2/2] arm/xen: Don't use xen DMA ops when the device is
- protected by an IOMMU
-Message-ID: <1392913301-25524-1-git-send-email-julien.grall@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 20 Feb 2014 17:21:49 +0100
+Subject: [PATCH 0/3] arm imx25 touchscreen/ADC drivers
+Message-ID: <1392913312-9030-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only Xen is able to know if a device can safely avoid to use xen-swiotlb.
-This patch introduce a new property "protected-devices" for the hypervisor
-node which list device which the IOMMU are been correctly programmed by Xen.
+Hi,
 
-During Linux boot, Xen specific code will create an hash table which
-contains all these devices. The hash table will be used in need_xen_dma_ops
-to check if the Xen DMA ops needs to be used for the current device.
+This series adds 3 drivers to support the i.MX25 Touchscreen/ADC device.
+The device has 3 parts. The core controls some generic functions of the
+complete device, including the clock and IRQs. A touchscreen specific
+conversion queue that works with the central ADC to detect and convert touch
+positions. And a generic conversion queue which is the same hardware as the
+touchscreen conversion queue but is supposed to be used for generic ADC
+conversions.
 
-Signed-off-by: Julien Grall <julien.grall@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Rob Landley <rob@landley.net>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: devicetree at vger.kernel.org
----
- Documentation/devicetree/bindings/arm/xen.txt |    2 +
- arch/arm/include/asm/xen/dma-mapping.h        |   11 +++-
- arch/arm/xen/enlighten.c                      |   75 +++++++++++++++++++++++++
- 3 files changed, 87 insertions(+), 1 deletion(-)
+There are 3 drivers to support all parts. fsl-imx25-tsadc is a MFD driver which
+controls the core. fsl-imx25-tcq is the touchscreen conversion queue driver
+which registers a touchscreen input device. fsl-imx25-gcq is the generic
+conversion queue driver that registers a iio device for all inputs available.
 
-diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-index 0f7b9c2..ee25a57 100644
---- a/Documentation/devicetree/bindings/arm/xen.txt
-+++ b/Documentation/devicetree/bindings/arm/xen.txt
-@@ -15,6 +15,8 @@ the following properties:
- - interrupts: the interrupt used by Xen to inject event notifications.
-   A GIC node is also required.
- 
-+- protected-devices: (optional) List of phandles to device node where the
-+IOMMU has been programmed by Xen.
- 
- Example (assuming #address-cells = <2> and #size-cells = <2>):
- 
-diff --git a/arch/arm/include/asm/xen/dma-mapping.h b/arch/arm/include/asm/xen/dma-mapping.h
-index 002fc57..da8e4fe 100644
---- a/arch/arm/include/asm/xen/dma-mapping.h
-+++ b/arch/arm/include/asm/xen/dma-mapping.h
-@@ -5,9 +5,18 @@
- 
- extern struct dma_map_ops *xen_dma_ops;
- 
-+#ifdef CONFIG_XEN
-+bool xen_is_protected_device(const struct device *dev);
-+#else
-+static inline bool xen_is_protected_device(const struct device *dev)
-+{
-+	return 0;
-+}
-+#endif
-+
- static inline bool need_xen_dma_ops(struct device *dev)
- {
--	return xen_initial_domain();
-+	return xen_initial_domain() && !xen_is_protected_device(dev);
- }
- 
- #endif /* _ASM_ARM_XEN_DMA_MAPPING_H */
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index b96723e..f124c8c 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -24,6 +24,7 @@
- #include <linux/cpuidle.h>
- #include <linux/cpufreq.h>
- #include <linux/cpu.h>
-+#include <linux/hashtable.h>
- 
- #include <linux/mm.h>
- 
-@@ -53,6 +54,42 @@ EXPORT_SYMBOL_GPL(xen_platform_pci_unplug);
- 
- static __read_mostly int xen_events_irq = -1;
- 
-+/* Hash table for list of devices protected by an IOMMU in Xen */
-+#define DEV_HASH_BITS	4
-+#define DEV_HASH_SIZE	(1 << DEV_HASH_BITS)
-+
-+static struct hlist_head *protected_devices;
-+
-+struct protected_device
-+{
-+	struct hlist_node hlist;
-+	struct device_node *node;
-+};
-+
-+static unsigned long pdev_hash(const struct device_node *node)
-+{
-+	return (node->phandle % DEV_HASH_SIZE);
-+}
-+
-+bool xen_is_protected_device(const struct device *dev)
-+{
-+	const struct device_node *node = dev->of_node;
-+	unsigned long hash;
-+	const struct protected_device *pdev;
-+
-+	if (!node->phandle)
-+		return 0;
-+
-+	hash = pdev_hash(node);
-+
-+	hlist_for_each_entry(pdev, &protected_devices[hash], hlist) {
-+		if (node == pdev->node)
-+			return 1;
-+	}
-+
-+	return 0;
-+}
-+
- /* map fgmfn of domid to lpfn in the current domain */
- static int map_foreign_page(unsigned long lpfn, unsigned long fgmfn,
- 			    unsigned int domid)
-@@ -235,6 +272,8 @@ static int __init xen_guest_init(void)
- 	const char *xen_prefix = "xen,xen-";
- 	struct resource res;
- 	phys_addr_t grant_frames;
-+	int i = 0;
-+	struct device_node *dev;
- 
- 	node = of_find_compatible_node(NULL, NULL, "xen,xen");
- 	if (!node) {
-@@ -259,6 +298,31 @@ static int __init xen_guest_init(void)
- 	if (xen_events_irq < 0)
- 		return -ENODEV;
- 
-+	protected_devices = kmalloc(DEV_HASH_SIZE * sizeof (*protected_devices),
-+				    GFP_KERNEL);
-+	if (!protected_devices)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < DEV_HASH_SIZE; i++)
-+		INIT_HLIST_HEAD(&protected_devices[i]);
-+
-+	pr_info("List of protected devices:\n");
-+	i = 0;
-+	while ((dev = of_parse_phandle(node, "protected-devices", i))) {
-+		struct protected_device *pdev;
-+		unsigned long hash;
-+
-+		pr_info(" - %s\n", of_node_full_name(dev));
-+		pdev = kmalloc(sizeof (*pdev), GFP_KERNEL);
-+		if (!pdev)
-+			goto free_hash;
-+
-+		pdev->node = dev;
-+		hash = pdev_hash(dev);
-+		hlist_add_head(&pdev->hlist, &protected_devices[hash]);
-+		i++;
-+	}
-+
- 	xen_domain_type = XEN_HVM_DOMAIN;
- 
- 	xen_setup_features();
-@@ -324,6 +388,17 @@ static int __init xen_guest_init(void)
- 	register_cpu_notifier(&xen_cpu_notifier);
- 
- 	return 0;
-+free_hash:
-+	for (i = 0; i < DEV_HASH_SIZE; i++) {
-+		struct protected_device *pdev;
-+		struct hlist_node *next;
-+
-+		hlist_for_each_entry_safe(pdev, next, &protected_devices[i],
-+					  hlist)
-+			kfree(pdev);
-+	}
-+	kfree(protected_devices);
-+	return -ENOMEM;
- }
- early_initcall(xen_guest_init);
- 
+All drivers are initialized using devicetree bindings.
+
+Regards,
+
+Markus Pargmann
+
+
+Markus Pargmann (3):
+  mfd: fsl imx25 Touchscreen ADC driver
+  input: touchscreen: imx25 tcq driver
+  iio: adc: fsl,imx25-gcq driver
+
+ .../devicetree/bindings/iio/adc/fsl,imx25-gcq.txt  |  54 ++
+ .../bindings/input/touchscreen/fsl-mx25-tcq.txt    |  29 +
+ .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    |  46 ++
+ drivers/iio/adc/Kconfig                            |   7 +
+ drivers/iio/adc/Makefile                           |   1 +
+ drivers/iio/adc/fsl-imx25-gcq.c                    | 325 ++++++++++++
+ drivers/input/touchscreen/Kconfig                  |   6 +
+ drivers/input/touchscreen/Makefile                 |   1 +
+ drivers/input/touchscreen/fsl-imx25-tcq.c          | 589 +++++++++++++++++++++
+ drivers/mfd/Kconfig                                |   9 +
+ drivers/mfd/Makefile                               |   2 +
+ drivers/mfd/fsl-imx25-tsadc.c                      | 234 ++++++++
+ include/linux/mfd/imx25-tsadc.h                    | 138 +++++
+ 13 files changed, 1441 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+ create mode 100644 drivers/iio/adc/fsl-imx25-gcq.c
+ create mode 100644 drivers/input/touchscreen/fsl-imx25-tcq.c
+ create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
+ create mode 100644 include/linux/mfd/imx25-tsadc.h
+
 -- 
-1.7.10.4
+1.8.5.3
