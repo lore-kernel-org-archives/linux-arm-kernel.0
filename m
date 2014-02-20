@@ -1,187 +1,321 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 20 Feb 2014 19:06:51 +0100
-Subject: [PATCH RFC 5/5] Add sample DTS and DTSS schema
+Date: Thu, 20 Feb 2014 19:06:48 +0100
+Subject: [PATCH RFC 2/5] dtc: livetree: Add more tree parsing helpers
 In-Reply-To: <1392919611-10746-1-git-send-email-t.figa@samsung.com>
 References: <1392919611-10746-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1392919611-10746-6-git-send-email-t.figa@samsung.com>
+Message-ID: <1392919611-10746-3-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch extends the set of parsing helpers available in dtc with
+string and phandle parsing.
+
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- sample.dts  | 70 +++++++++++++++++++++++++++++++++++++++++++++++++
- schema.dtss | 86 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 156 insertions(+)
- create mode 100644 sample.dts
- create mode 100644 schema.dtss
+ dtc.h      |  28 ++++++++
+ livetree.c | 230 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 258 insertions(+)
 
-diff --git a/sample.dts b/sample.dts
-new file mode 100644
-index 0000000..f962051
---- /dev/null
-+++ b/sample.dts
-@@ -0,0 +1,70 @@
-+/dts-v1/;
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	interrupt-parent = <&gic>;
-+	compatible = "foo,bar";
-+	model = "Foo Bar board";
-+
-+	chosen {
-+		bootargs = "console=ttySAC2,115200N8";
-+	};
-+
-+	aliases {
-+		i2c0 = &i2c_0;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x40000000 0x40000000>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		gic: interrupt-controller at 10490000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x10490000 0x1000>, <0x10480000 0x100>;
-+			cpu-offset = <0x4000>;
-+		};
-+
-+		i2c_0: i2c at 13860000 {
-+			compatible = "nvidia,tegra20-i2c";
-+			reg = <0x13860000 0x100>;
-+			interrupts = <0 57 0>;
-+			clocks = <&clocks 43>, <&clocks 28>;
-+			clock-names = "div-clk", "fast-clk";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			audio-codec at 33 {
-+				compatible = "wlf,wm8903";
-+				reg = <0x33>;
-+				gpio-controller;
-+				#gpio-cells = <1>;
-+			};
-+		};
-+
-+		gpio: pinctrl at 11400000 {
-+			compatible = "foo,bar-gpio";
-+			reg = <0x11400000 0x1000>;
-+			interrupts = <0 47 0>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+
-+		clocks: clock-controller at 15440000 {
-+			compatible = "foo,bar-clocks";
-+			reg = <0x15440000 0x1000>;
-+			#clock-cells = <1>;
-+		};
-+	};
-+};
-diff --git a/schema.dtss b/schema.dtss
-new file mode 100644
-index 0000000..7a819fe
---- /dev/null
-+++ b/schema.dtss
-@@ -0,0 +1,86 @@
-+/*
-+ * schema.dtss - Sample Device Tree schema file.
-+ *
-+ * Copyright (C) 2013 Samsung Electronics Co., Ltd.
-+ * Author: Tomasz Figa <t.figa@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/dtss-v1/;
-+
-+root-node {
-+	/match/ path = "/";
-+	/require/ mmio-bus;
-+
-+	compatible;
-+	/optional/ model;
+diff --git a/dtc.h b/dtc.h
+index e95bed7..9ce9d12 100644
+--- a/dtc.h
++++ b/dtc.h
+@@ -163,6 +163,13 @@ struct node {
+ 	struct label *labels;
+ };
+ 
++#define MAX_PHANDLE_ARGS 16
++struct of_phandle_args {
++	struct node *np;
++	int args_count;
++	uint32_t args[MAX_PHANDLE_ARGS];
 +};
 +
-+wlf,wm8903 {
-+	/match/ compatible = "wlf,wm8903";
+ #define for_each_label_withdel(l0, l) \
+ 	for ((l) = (l0); (l); (l) = (l)->next)
+ 
+@@ -184,6 +191,11 @@ struct node {
+ 	for_each_child_withdel(n, c) \
+ 		if (!(c)->deleted)
+ 
++#define for_each_propval_string(p, s)	\
++	for (s = propval_next_string(p, NULL);		\
++		s;					\
++		s = propval_next_string(p, s))
 +
-+	/optional/ micdet-cfg;
-+	/optional/ micdet-delay;
-+	/optional/ gpio-cfg;
+ void add_label(struct label **labels, char *label);
+ void delete_labels(struct label **labels);
+ 
+@@ -208,6 +220,22 @@ void delete_node(struct node *node);
+ const char *get_unitname(struct node *node);
+ struct property *get_property(struct node *node, const char *propname);
+ cell_t propval_cell(struct property *prop);
++int propval_string_count(struct node *np, struct property *prop);
++const char *propval_next_string(struct property *prop, const char *cur);
++int propval_match_string(struct property *prop, const char *string);
++struct node *propval_parse_phandle(struct node *root,
++				     struct property *prop, int index);
++int propval_parse_phandle_with_args(struct node *root,
++				    struct property *prop,
++				    const char *cells_name, int index,
++				    struct of_phandle_args *out_args);
++int propval_parse_phandle_with_fixed_args(struct node *root,
++					  struct property *prop, int cell_count,
++					  int index,
++					  struct of_phandle_args *out_args);
++int propval_count_phandle_with_args(struct node *root,
++				    struct property *prop,
++				    const char *cells_name);
+ struct property *get_property_by_label(struct node *tree, const char *label,
+ 				       struct node **node);
+ struct marker *get_marker_label(struct node *tree, const char *label,
+diff --git a/livetree.c b/livetree.c
+index b61465f..015ed06 100644
+--- a/livetree.c
++++ b/livetree.c
+@@ -377,6 +377,230 @@ cell_t propval_cell(struct property *prop)
+ 	return fdt32_to_cpu(*((cell_t *)prop->val.val));
+ }
+ 
++int propval_string_count(struct node *np, struct property *prop)
++{
++	int i = 0;
++	size_t l = 0, total = 0;
++	const char *p;
 +
-+	/require/ i2c-device;
++	if (!prop)
++		return -EINVAL;
++	if (!prop->val.val)
++		return -ENODATA;
++	if (strnlen(prop->val.val, prop->val.len) >= prop->val.len)
++		return -EILSEQ;
 +
-+	/require/ gpio-provider {
-+		cells = <1>;
-+	};
++	p = prop->val.val;
 +
-+	/use/ interrupts {
-+		count = <1>;
-+	};
-+};
++	for (i = 0; total < prop->val.len; total += l, p += l, i++)
++		l = strlen(p) + 1;
 +
-+nvidia,tegra20-i2c {
-+	/match/ compatible = "nvidia,tegra20-i2c", "nvidia,tegra30-i2c";
++	return i;
++}
 +
-+	resets;
-+	reset-names;
-+	dmas;
-+	dma-names;
++const char *propval_next_string(struct property *prop, const char *cur)
++{
++	const char *curv = cur;
 +
-+	/require/ i2c-bus;
++	if (!prop)
++		return NULL;
 +
-+	/require/ mmio-device {
-+		reg-count = <1>;
-+	};
++	if (!cur)
++		return prop->val.val;
 +
-+	/require/ interrupts {
-+		count = <1>;
-+	};
++	curv += strlen(cur) + 1;
++	if (curv >= prop->val.val + prop->val.len)
++		return NULL;
 +
-+	/require/ clocks {
-+		names = "div-clk", "fast-clk";
-+	};
-+};
++	return curv;
++}
 +
-+foo,bar-gpio {
-+	/match/ compatible = "foo,bar-gpio";
++int propval_match_string(struct property *prop, const char *string)
++{
++	size_t l;
++	int i;
++	const char *p, *end;
 +
-+	/require/ interrupts {
-+		count = <1>;
-+	};
++	if (!prop)
++		return -EINVAL;
++	if (!prop->val.val)
++		return -ENODATA;
 +
-+	/require/ mmio-device {
-+		reg-count = <1>;
-+	};
++	p = prop->val.val;
++	end = p + prop->val.len;
 +
-+	/require/ gpio-provider {
-+		cells = <2>;
-+	};
++	for (i = 0; p < end; i++, p += l) {
++		l = strlen(p) + 1;
++		if (p + l > end)
++			return -EILSEQ;
++		if (strcmp(string, p) == 0)
++			return i; /* Found it; return index */
++	}
++	return -ENODATA;
++}
 +
-+	/require/ interrupt-controller {
-+		cells = <2>;
-+	};
-+};
++static int parse_phandle_with_args(struct node *root,
++					struct property *prop,
++					const char *cells_name,
++					int cell_count, int index,
++					struct of_phandle_args *out_args)
++{
++	const cell_t *list, *list_end;
++	int rc = 0, size, cur_index = 0;
++	uint32_t count = 0;
++	struct node *node = NULL;
++	cell_t phandle;
++
++	/* Retrieve the phandle list property */
++	size = prop->val.len;
++	list = (const cell_t *)prop->val.val;
++	if (!list)
++		return -ENOENT;
++	list_end = list + size / sizeof(*list);
++
++	/* Loop over the phandles until all the requested entry is found */
++	while (list < list_end) {
++		rc = -EINVAL;
++		count = 0;
++
++		/*
++		 * If phandle is 0, then it is an empty entry with no
++		 * arguments.  Skip forward to the next entry.
++		 */
++		phandle = fdt32_to_cpu(*list++);
++		if (phandle) {
++			/*
++			 * Find the provider node and parse the #*-cells
++			 * property to determine the argument length.
++			 *
++			 * This is not needed if the cell count is hard-coded
++			 * (i.e. cells_name not set, but cell_count is set),
++			 * except when we're going to return the found node
++			 * below.
++			 */
++			if (cells_name || cur_index == index) {
++				node = get_node_by_phandle(root, phandle);
++				if (!node) {
++					pr_err("could not find phandle %u\n",
++						phandle);
++					goto err;
++				}
++			}
++
++			if (cells_name) {
++				struct property *cells_prop;
++
++				cells_prop = get_property(node, cells_name);
++				if (!cells_prop) {
++					pr_err("could not get %s for %s\n",
++						cells_name,
++						node->fullpath);
++					goto err;
++				}
++
++				count = propval_cell(cells_prop);
++			} else {
++				count = cell_count;
++			}
++
++			/*
++			 * Make sure that the arguments actually fit in the
++			 * remaining property data length
++			 */
++			if (list + count > list_end) {
++				pr_err("arguments longer than property\n");
++				goto err;
++			}
++		}
++
++		/*
++		 * All of the error cases above bail out of the loop, so at
++		 * this point, the parsing is successful. If the requested
++		 * index matches, then fill the out_args structure and return,
++		 * or return -ENOENT for an empty entry.
++		 */
++		rc = -ENOENT;
++		if (cur_index == index) {
++			if (!phandle)
++				goto err;
++
++			if (out_args) {
++				int i;
++				if (count > MAX_PHANDLE_ARGS) {
++					pr_warn("argument count higher than MAX_PHANDLE_ARGS\n");
++					count = MAX_PHANDLE_ARGS;
++				}
++				out_args->np = node;
++				out_args->args_count = count;
++				for (i = 0; i < count; i++)
++					out_args->args[i] = fdt32_to_cpu(*list++);
++			}
++
++			/* Found it! return success */
++			return 0;
++		}
++
++		node = NULL;
++		list += count;
++		cur_index++;
++	}
++
++	/*
++	 * Unlock node before returning result; will be one of:
++	 * -ENOENT : index is for empty phandle
++	 * -EINVAL : parsing error on data
++	 * [1..n]  : Number of phandle (count mode; when index = -1)
++	 */
++	rc = index < 0 ? cur_index : -ENOENT;
++ err:
++	return rc;
++}
++
++struct node *propval_parse_phandle(struct node *root,
++				     struct property *prop, int index)
++{
++	struct of_phandle_args args;
++
++	if (index < 0)
++		return NULL;
++
++	if (parse_phandle_with_args(root, prop, NULL, 0,
++					 index, &args))
++		return NULL;
++
++	return args.np;
++}
++
++int propval_parse_phandle_with_args(struct node *root,
++				    struct property *prop,
++				    const char *cells_name, int index,
++				    struct of_phandle_args *out_args)
++{
++	if (index < 0)
++		return -EINVAL;
++	return parse_phandle_with_args(root, prop, cells_name, 0,
++						index, out_args);
++}
++
++int propval_parse_phandle_with_fixed_args(struct node *root,
++					  struct property *prop, int cell_count,
++					  int index,
++					  struct of_phandle_args *out_args)
++{
++	if (index < 0)
++		return -EINVAL;
++	return parse_phandle_with_args(root, prop, NULL, cell_count,
++					   index, out_args);
++}
++
++int propval_count_phandle_with_args(struct node *root,
++				    struct property *prop,
++				    const char *cells_name)
++{
++	return parse_phandle_with_args(root, prop, cells_name, 0, -1,
++						NULL);
++}
++
+ struct property *get_property_by_label(struct node *tree, const char *label,
+ 				       struct node **node)
+ {
+@@ -456,6 +680,12 @@ struct node *get_node_by_path(struct node *tree, const char *path)
+ 	while (path[0] == '/')
+ 		path++;
+ 
++	if (!(*path)) {
++		if (tree->deleted)
++			return NULL;
++		return tree;
++	}
++
+ 	p = strchr(path, '/');
+ 
+ 	for_each_child(tree, child) {
 -- 
 1.8.5.2
