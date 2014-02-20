@@ -1,67 +1,67 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 20 Feb 2014 01:00:43 +0100
-Subject: [PATCH v2 01/19] serial: sh-sci: Enable the driver on all ARM
- platforms
-In-Reply-To: <1609898.QTd44x6TTB@avalon>
-References: <1383086274-11049-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1383086274-11049-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20140219205446.GD6988@pengutronix.de> <1609898.QTd44x6TTB@avalon>
-Message-ID: <20140220000043.GE6988@pengutronix.de>
+From: elder@linaro.org (Alex Elder)
+Date: Wed, 19 Feb 2014 18:12:50 -0600
+Subject: [PATCH 00/12] clk: bcm281xx: updates for 3.14
+Message-ID: <1392855182-21155-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 11:24:38PM +0100, Laurent Pinchart wrote:
-> Hi Uwe,
-> 
-> On Wednesday 19 February 2014 21:54:46 Uwe Kleine-K?nig wrote:
-> > On Tue, Oct 29, 2013 at 11:37:36PM +0100, Laurent Pinchart wrote:
-> > > Renesas ARM platforms are transitioning from single-platform to
-> > > multi-platform kernels using the new ARCH_SHMOBILE_MULTI. Make the
-> > > driver available on all ARM platforms to enable it on both ARCH_SHMOBILE
-> > > and ARCH_SHMOBILE_MULTI, and increase build testing coverage with
-> > > COMPILE_TEST.
-> > > 
-> > > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > > Cc: linux-serial at vger.kernel.org
-> > > Signed-off-by: Laurent Pinchart
-> > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > ---
-> > > 
-> > >  drivers/tty/serial/Kconfig | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> > > index febd45c..9a5a8ef 100644
-> > > --- a/drivers/tty/serial/Kconfig
-> > > +++ b/drivers/tty/serial/Kconfig
-> > > @@ -709,7 +709,7 @@ config SERIAL_IP22_ZILOG_CONSOLE
-> > > 
-> > >  config SERIAL_SH_SCI
-> > >  
-> > >  	tristate "SuperH SCI(F) serial port support"
-> > > 
-> > > -	depends on HAVE_CLK && (SUPERH || ARCH_SHMOBILE)
-> > > +	depends on HAVE_CLK && (SUPERH || ARM || COMPILE_TEST)
-> > > 
-> > >  	select SERIAL_CORE
-> > 
-> > This patch is in mainline as d4f9e7b3d12e92ede642f6f4fc7d959f06da8ccc
-> > since v3.13-rc1. I wonder if
-> > 
-> > 	depends on HAVE_CLK && (SUPERH || ARCH_SHMOBILE || COMPILE_TEST)
-> > 
-> > isn't the better option. (Since bf98c1eac1d4a6bcf00532e4fa41d8126cd6c187
-> > ARCH_SHMOBILE is enabled for both multi-platform and legacy shmobile
-> > configs.) Or do you plan to deprecate ARCH_SHMOBILE?
-> 
-> We don't plan to deprecate ARCH_SHMOBILE. I've posted a patch to fix this, 
-> please see http://www.spinics.net/lists/linux-sh/msg28296.html ("[PATCH 1/2] 
-> serial: sh-sci: Restrict non-COMPILE_TEST compilation").
-Ah, this is equivalent. So you can consider my suggestion as an Ack.
+This series includes updates for the bcm281xx clock code to be 
+considered for kernel 3.14.  I've held off posting this because
+a mixup caused the code to which this applies to be dropped at
+the last minute from the 3.13 release, and I wanted to make sure
+the dust had settled on getting that resolved.  The patches are
+available here:
+    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+    Branch review/bcm-clk-next
 
-Best regards
-Uwe
+These are based on three patches that implement the baseline
+bcm281xx clock functionality, which I re-posted last week.
+    https://lkml.org/lkml/2014/2/14/449
+    https://lkml.org/lkml/2014/2/14/456
+    https://lkml.org/lkml/2014/2/14/451
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I've grouped them, and offer a little explanation of each of the
+groups below.
+
+					-Alex
+
+Alex Elder (12):
+  clk: bcm281xx: warn if ccu_wait_bit() fails
+  clk: bcm281xx: use init_data.name for clock name
+       Two small improvements to the code.
+
+  clk: bcm281xx: change some symbol names
+  mach-bcm: bcm281xx: more symbol cleanup
+	Improve clarity by using "281xx" rather than "11351" in
+	symbols; support for the bcm11351 board is going away, and
+	in these cases there's no reason not to use "281xx" instead.
+
+  clk: bcm281xx: initialize CCU structures statically
+  clk: bcm281xx: define CCU clock data statically
+  	This rearranges the way CCUs and the clocks they provide are
+	defined, so that they're defined statically to the extent
+	possible rather than allocating and initializing things
+	at runtime.
+
+  clk: bcm281xx: add clock policy support
+  clk: bcm281xx: add clock hysteresis support
+  clk: bcm281xx: add an initialized flag
+  clk: bcm281xx: implement prerequisite clocks
+  clk: bcm281xx: add bus clock support
+  clk: bcm281xx: define a bus clock
+  	This series adds a few new features, ultimately for the
+	purpose of adding support for another type of Kona clock.
+	Currently only peripheral clocks are supported; this adds
+	the ability to define and control bus clocks.  In addition,
+	support is added for clocks to identify a prerequisite
+	clock; a clock won't be initialized until after its
+	prerequisite has been.
+
+ arch/arm/boot/dts/bcm11351.dtsi      |    3 +-
+ arch/arm/mach-bcm/board_bcm281xx.c   |    9 +-
+ drivers/clk/bcm/clk-bcm281xx.c       |  254 ++++++++++++--------------
+ drivers/clk/bcm/clk-kona-setup.c     |  331 +++++++++++++++++++++++++++-------
+ drivers/clk/bcm/clk-kona.c           |  331 ++++++++++++++++++++++++++++++++--
+ drivers/clk/bcm/clk-kona.h           |  189 ++++++++++++++++---
+ include/dt-bindings/clock/bcm281xx.h |    3 +-
+ 7 files changed, 878 insertions(+), 242 deletions(-)
