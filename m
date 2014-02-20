@@ -1,44 +1,36 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 20 Feb 2014 15:49:28 +0100
-Subject: [PATCH 00/11] ARM: shmobile: MSIOF integration on r8a7790/lager and
- r8a7791/koelsch
-Message-ID: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
+Date: Thu, 20 Feb 2014 15:49:29 +0100
+Subject: [PATCH 01/11] ARM: shmobile: r8a7791 dtsi: Fix typo in msiof2 clock
+ output name
+In-Reply-To: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
+References: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1392907779-22053-2-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-This patch series integrates support for the MSIOF module in the Renesas
-R-Car H2 (r8a7790) and M2 (r8a7791) SoCs on the Lager and Koelsch
-development boards. 
+Introduced in commit cded80f869aef94853e056ab9c21e305b0c26138 ("ARM:
+shmobile: r8a7791: Add MSIOF clocks in device tree").
 
-It was tested on Lager and Koelsch, both legacy and DT, using a dummy
-driver for the Renesas r2a11302ft PMIC that reads out the PMIC's version
-ID.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+ arch/arm/boot/dts/r8a7791.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-  [01/11] ARM: shmobile: r8a7791 dtsi: Fix typo in msiof2 clock output name
-  [02/11] ARM: shmobile: r8a7790: Add MSIOF clocks
-  [03/11] ARM: shmobile: r8a7791: Add MSIOF clocks
-  [04/11] ARM: shmobile: lager legacy: Add MSIOF support
-  [05/11] ARM: shmobile: koelsch legacy: Add MSIOF support
-  [06/11] ARM: shmobile: r8a7790/lager dts: Rename label spi to qspi, add
-	  spi0 alias
-  [07/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi to qspi, add
-	  spi0 alias
-  [08/11] ARM: shmobile: r8a7790 dtsi: Add MSIOF nodes and aliases
-  [09/11] ARM: shmobile: r8a7791 dtsi: Add MSIOF nodes and aliases
-  [10/11] ARM: shmobile: lager dts: Add MSIOF nodes
-  [11/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 1ab4f3d5a8c2..224f4a7ee52a 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -667,7 +667,7 @@
+ 				R8A7791_CLK_MSIOF1 R8A7791_CLK_SCIFB2
+ 			>;
+ 			clock-output-names =
+-				"scifa2", "scifa1", "scifa0", "misof2", "scifb0",
++				"scifa2", "scifa1", "scifa0", "msiof2", "scifb0",
+ 				"scifb1", "msiof1", "scifb2";
+ 		};
+ 		mstp3_clks: mstp3_clks at e615013c {
+-- 
+1.7.9.5
