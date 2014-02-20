@@ -1,41 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 20 Feb 2014 14:37:20 -0700
-Subject: [PATCH] ARM: tegra: add LED options back into tegra_defconfig
-Message-ID: <1392932240-14480-1-git-send-email-swarren@wwwdotorg.org>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 20 Feb 2014 15:54:35 -0600
+Subject: [PATCH v2] hwrng: msm: switch Kconfig to ARCH_QCOM depends
+In-Reply-To: <53064C89.4060206@codeaurora.org>
+References: <1392912542-5349-1-git-send-email-galak@codeaurora.org>
+ <53064C89.4060206@codeaurora.org>
+Message-ID: <D66229C0-8768-42BD-87DA-83FAA2328E40@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
 
-The last time tegra_defconfig was rebuilt, various LEDs options were
-somehow selected by other options, and hence their entries in
-tegra_defconfig were removed by "make savedefconfig". However, for some
-reason this is no longer happening, so we need to add the entries back
-into tegra_defconfig so the they are enabled in .config.
+On Feb 20, 2014, at 12:42 PM, Christopher Covington <cov@codeaurora.org> wrote:
 
-Fixes: db079b1811d1 ("ARM: tegra: rebuild tegra_defconfig to add DEBUG_FS)"
-Reported-by: Marc Dietrich <marvin24@gmx.de>
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-Another fix for 3.14.
+> On 02/20/2014 11:09 AM, Kumar Gala wrote:
+>> We've split Qualcomm MSM support into legacy and multiplatform.  The RNG
+>> driver is only relevant on the multiplatform supported SoCs so switch the
+>> Kconfig depends to ARCH_QCOM.
+>> 
+>> CC: Herbert Xu <herbert@gondor.apana.org.au>
+>> CC: Stanimir Varbanov <svarbanov@mm-sol.com>
+>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>> ---
+>> 
+>> Herbert,
+>> 
+>> If you can ack this I'll send it via linux-qcom/arm-soc tree's
+>> 
+>> thanks
+>> 
+>> v2:
+>> * Updated help text to remove MSM references, made more generic
+>> 
+>> drivers/char/hw_random/Kconfig | 6 +++---
+>> 1 file changed, 3 insertions(+), 3 deletions(-)
+>> 
+>> diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+>> index 2f2b084..f2b9f8c 100644
+>> --- a/drivers/char/hw_random/Kconfig
+>> +++ b/drivers/char/hw_random/Kconfig
+>> @@ -342,11 +342,11 @@ config HW_RANDOM_TPM
+>> 	  If unsure, say Y.
+>> 
+>> config HW_RANDOM_MSM
+>> -	tristate "Qualcomm MSM Random Number Generator support"
+> 
+>> +	tristate "Qualcomm ARM SoCs Random Number Generator support"
+> 
+> Can the Hexagon use the PRNG, at least theoretically? If so maybe it'd be
+> clearest to leave ARM off.
+> 
+> Christopher
 
- arch/arm/configs/tegra_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Fair point.
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index 00fe9e9710fd..27d69b558c5d 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -204,7 +204,10 @@ CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_TEGRA=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_TIMER=y
- CONFIG_LEDS_TRIGGER_ONESHOT=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+- k
+
+
 -- 
-1.8.1.5
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
