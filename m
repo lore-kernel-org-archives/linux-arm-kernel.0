@@ -1,51 +1,80 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 20 Feb 2014 09:34:00 +0900
-Subject: [PATCH 1/2] arm64: Add seccomp support
-In-Reply-To: <20140219164125.GD22252@arm.com>
-References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
- <1391767892-5395-2-git-send-email-takahiro.akashi@linaro.org>
- <20140218153856.GB904@localhost> <530497DD.2020806@linaro.org>
- <20140219164125.GD22252@arm.com>
-Message-ID: <53054D78.9090000@linaro.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 20 Feb 2014 11:42:42 +1100
+Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
+Message-ID: <20140220114242.b3ce4d77b677544d2feebd3e@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2014 01:41 AM, Catalin Marinas wrote:
-> On Wed, Feb 19, 2014 at 11:39:09AM +0000, AKASHI Takahiro wrote:
->> On 02/19/2014 12:38 AM, Catalin Marinas wrote:
->>> On Fri, Feb 07, 2014 at 10:11:31AM +0000, AKASHI Takahiro wrote:
->>>> --- a/arch/arm64/kernel/ptrace.c
->>>> +++ b/arch/arm64/kernel/ptrace.c
->>>> @@ -26,6 +26,7 @@
->>>>    #include <linux/smp.h>
->>>>    #include <linux/ptrace.h>
->>>>    #include <linux/user.h>
->>>> +#include <linux/seccomp.h>
->>>>    #include <linux/security.h>
->>>>    #include <linux/init.h>
->>>>    #include <linux/signal.h>
->>>> @@ -1064,6 +1065,10 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
->>>>    {
->>>>    	unsigned long saved_reg;
->>>>
->>>> +	if (!dir && secure_computing((int)regs->syscallno))
->>>> +		/* seccomp failures shouldn't expose any additional code. */
->>>> +		return -1;
->>>
->>> That's only restricted to the arm64 code but could we use a more
->>> meaningful error number?
->>
->> Other architectures, including arm, also return just -1 in syscall_trace_enter(),
->> but of course, we can use another value, say, -EPERM or -ENOSYS?
->
-> Actually we have another case of setting regs->syscallno = ~0UL in the
-> same function, so we could do the same (also in line with entry.S).
+Hi Shawn,
 
-I believe that I got you now, but we need to distinguish failure case of
-seccomp and the existing (~0UL) case. In former case, depending on a bpf
-rule loaded into the kernel, errno may be assigned to any arbitrary number
-(not necessarily ENOSYS).
-So I will use another value for this specific seccomp case.
+Today's linux-next merge of the imx-mxs tree got conflicts in
+arch/arm/mach-imx/Makefile and arch/arm/mach-imx/common.h between commit
+28a9f3b078c5 ("ARM: imx6: build pm-imx6q.c independently of CONFIG_PM")
+from the arm-soc tree and commits 8dd751932545 ("ARM: imx: add suspend in
+ocram support for i.mx6q") and 79a8eef47d12 ("RM: imx: add suspend in
+ocram support for i.mx6sl") from the imx-mxs tree.
 
-Thanks,
--Takahiro AKASHI
+I fixed it up (I think, see below) and can carry the fix as necessary (no
+action is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-imx/Makefile
+index ec419649320f,02cbb48c1d0a..000000000000
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@@ -101,10 -102,13 +102,17 @@@ obj-$(CONFIG_HOTPLUG_CPU) += hotplug.
+  obj-$(CONFIG_SOC_IMX6Q) += clk-imx6q.o mach-imx6q.o
+  obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
+  
+ +obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
+ +# i.MX6SL reuses i.MX6Q code
+ +obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o
+ +
++ ifeq ($(CONFIG_PM),y)
++ AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+ -obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o suspend-imx6.o
+++obj-$(CONFIG_SOC_IMX6Q) += suspend-imx6.o
++ # i.MX6SL reuses i.MX6Q code
+ -obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o suspend-imx6.o
+++obj-$(CONFIG_SOC_IMX6SL) += suspend-imx6.o
++ endif
++ 
+  # i.MX5 based machines
+  obj-$(CONFIG_MACH_MX51_BABBAGE) += mach-mx51_babbage.o
+  obj-$(CONFIG_MACH_EUKREA_CPUIMX51SD) += mach-cpuimx51sd.o
+diff --cc arch/arm/mach-imx/common.h
+index baf439dc22d8,4dd932af708c..000000000000
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@@ -144,11 -145,19 +145,17 @@@ void imx6sl_set_wait_clk(bool enter)
+  void imx_cpu_die(unsigned int cpu);
+  int imx_cpu_kill(unsigned int cpu);
+  
+ +void imx6q_pm_init(void);
+ +void imx6q_pm_set_ccm_base(void __iomem *base);
+  #ifdef CONFIG_PM
++ void imx6_suspend(void __iomem *ocram_vbase);
+ -void imx6q_pm_init(void);
++ void imx6dl_pm_init(void);
++ void imx6sl_pm_init(void);
+ -void imx6q_pm_set_ccm_base(void __iomem *base);
+  void imx5_pm_init(void);
+  #else
++ static inline void imx6_suspend(void __iomem *ocram_vbase) {}
+ -static inline void imx6q_pm_init(void) {}
++ static inline void imx6dl_pm_init(void) {}
++ static inline void imx6sl_pm_init(void) {}
+ -static inline void imx6q_pm_set_ccm_base(void __iomem *base) {}
+  static inline void imx5_pm_init(void) {}
+  #endif
+  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140220/6369c240/attachment.sig>
