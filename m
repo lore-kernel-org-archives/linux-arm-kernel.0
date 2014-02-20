@@ -1,28 +1,21 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 20 Feb 2014 22:17:45 +0900
-Subject: [PATCH v2 2/2] regulator: core: Replace direct ops->disable usage
-In-Reply-To: <20140220130108.GD21048@pengutronix.de>
-References: <1392894472-11956-1-git-send-email-mpa@pengutronix.de>
- <1392894472-11956-3-git-send-email-mpa@pengutronix.de>
- <20140220125130.GQ2669@sirena.org.uk>
- <20140220130108.GD21048@pengutronix.de>
-Message-ID: <20140220131744.GR2669@sirena.org.uk>
+From: balajitk@ti.com (Balaji T K)
+Date: Thu, 20 Feb 2014 18:51:45 +0530
+Subject: [PATCH V2 2/2] ARM: dts: omap3-ldp: fix mmc configuration
+In-Reply-To: <1392356749-32091-3-git-send-email-nm@ti.com>
+References: <1392356749-32091-1-git-send-email-nm@ti.com>
+ <1392356749-32091-3-git-send-email-nm@ti.com>
+Message-ID: <53060169.2050207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 02:01:08PM +0100, Markus Pargmann wrote:
+On Friday 14 February 2014 11:15 AM, Nishanth Menon wrote:
+> MMC1 is the only MMC interface available on the platform. Further,
+> since the platform is based on older revision of SoC which is not
+> capable of doing multi-block reads, mark it with compatibility for the
+> same and add pinmux to ensure that all relevant pins are configured
+> for non-MMC boot mode.
+>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-> I am using this function from _regulator_force_disable(), which calls
-> _notifier_call_chain() with one additional flag
-> "REGULATOR_EVENT_FORCE_DISABLE". To prevent calling
-> _notifier_call_chain() twice for the force_disable case, I moved that
-> function call out of _regulator_do_disable().
-
-OK, put that in the changelog please.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140220/c13b83e8/attachment.sig>
+looks good to me
+Acked-by: Balaji T K <balajitk@ti.com>
