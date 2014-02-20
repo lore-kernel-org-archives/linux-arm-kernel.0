@@ -1,60 +1,38 @@
-From: vikas.sajjan@linaro.org (Vikas Sajjan)
-Date: Thu, 20 Feb 2014 15:36:01 +0545
-Subject: [PATCH] rtc: rtc-s3c: Fix incorrect way of save/restore of
- S3C2410_TICNT for TYPE_S3C64XX
-Message-ID: <1392889861-5044-1-git-send-email-vikas.sajjan@linaro.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 20 Feb 2014 11:51:41 +0200
+Subject: [PATCH v2 0/2] ARM: OMAP4: Fix gpmc_fck clock
+In-Reply-To: <53050573.8090506@epfl.ch>
+References: <1392801305-1698-1-git-send-email-florian.vaussard@epfl.ch>
+ <5304DA2C.3030605@ti.com> <53050573.8090506@epfl.ch>
+Message-ID: <5305D02D.5020702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On exynos5250, exynos5420 and exynos5260 it was observed that, after 1 cycle
-of S2R, the rtc-tick occurs at a very fast rate as compared to the rtc-tick
-occuring before S2R.
+On 02/19/2014 09:26 PM, Florian Vaussard wrote:
+>
+> On 02/19/2014 05:22 PM, Tero Kristo wrote:
+>> On 02/19/2014 11:15 AM, Florian Vaussard wrote:
+>>> Hello,
+>>>
+>>> Trying to get my SMSC9221 working on OMAP4 with DT,
+>>> I faced a misconfigured gpmc_fck (dummy clock set to 0)
+>>> resulting in serveral division-by-zero, misconfigured
+>>> timings and driver lost in the La La Land.
+>>>
+>>> To solve this, patch 1 removes gpmc_fck from the dummy
+>>> clocks, and patch 2 adds the gpmc_fck DT node and
+>>> reference it from the gpmc node.
+>>>
+>>> Tested on DuoVero/Parlor (OMAP4430) with SMSC9221.
+>>
+>> I can't test GPMC myself, but other than that, this set looks good to go.
+>>
+>
+> Thank you. Would you like more test coverage by other people? I would
+> like to see this in -rc if possible, as it is needed to boot my OMAP4
+> system.
 
-This patch fixes the above issue by correcting the wrong way of save/restore
-of S3C2410_TICNT for TYPE_S3C64XX.
+Well, I just think the driver clock change should be acked by someone 
+who knows gpmc better than me.
 
-Signed-off-by: Vikas Sajjan <vikas.sajjan@samsung.com>
----
- drivers/rtc/rtc-s3c.c |   17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-index 7afd373..c4cde9c 100644
---- a/drivers/rtc/rtc-s3c.c
-+++ b/drivers/rtc/rtc-s3c.c
-@@ -580,10 +580,12 @@ static int s3c_rtc_suspend(struct device *dev)
- 
- 	clk_enable(rtc_clk);
- 	/* save TICNT for anyone using periodic interrupts */
--	ticnt_save = readb(s3c_rtc_base + S3C2410_TICNT);
- 	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
- 		ticnt_en_save = readw(s3c_rtc_base + S3C2410_RTCCON);
- 		ticnt_en_save &= S3C64XX_RTCCON_TICEN;
-+		ticnt_save = readl(s3c_rtc_base + S3C2410_TICNT);
-+	} else {
-+		ticnt_save = readb(s3c_rtc_base + S3C2410_TICNT);
- 	}
- 	s3c_rtc_enable(pdev, 0);
- 
-@@ -605,10 +607,15 @@ static int s3c_rtc_resume(struct device *dev)
- 
- 	clk_enable(rtc_clk);
- 	s3c_rtc_enable(pdev, 1);
--	writeb(ticnt_save, s3c_rtc_base + S3C2410_TICNT);
--	if (s3c_rtc_cpu_type == TYPE_S3C64XX && ticnt_en_save) {
--		tmp = readw(s3c_rtc_base + S3C2410_RTCCON);
--		writew(tmp | ticnt_en_save, s3c_rtc_base + S3C2410_RTCCON);
-+	if (s3c_rtc_cpu_type == TYPE_S3C64XX) {
-+		writel(ticnt_save, s3c_rtc_base + S3C2410_TICNT);
-+		if (ticnt_en_save) {
-+			tmp = readw(s3c_rtc_base + S3C2410_RTCCON);
-+			writew(tmp | ticnt_en_save,
-+					s3c_rtc_base + S3C2410_RTCCON);
-+		}
-+	} else {
-+		writeb(ticnt_save, s3c_rtc_base + S3C2410_TICNT);
- 	}
- 
- 	if (device_may_wakeup(dev) && wake_en) {
--- 
-1.7.9.5
+-Tero
