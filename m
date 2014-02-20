@@ -1,32 +1,35 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 20 Feb 2014 10:35:18 -0700
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <20140220095518.7ca36f0a@skate>
-References: <51DD9A8C.10608@keymile.com> <20130711163220.2b3adf38@skate>
- <53039894.10905@keymile.com> <20140218212751.07c2aeb5@skate>
- <53046D98.6020801@keymile.com> <20140219102658.76eec91e@skate>
- <53047BBB.6040108@keymile.com> <20140219143749.65ff3155@skate>
- <CAErSpo4=6VgJazaErcx=ztKhZ_62xBrQ6K1eN_dVpvV4R0T2ag@mail.gmail.com>
- <20140220095518.7ca36f0a@skate>
-Message-ID: <20140220173518.GA19893@obsidianresearch.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 20 Feb 2014 14:38:14 -0300
+Subject: [RFC/PATCH] ARM: mvebu: Rename the ARCH_MVEBU menu option
+Message-ID: <1392917894-3444-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 09:55:18AM +0100, Thomas Petazzoni wrote:
+The previous name "Marvell SOCs with Device Tree support" is a bit
+ambiguous and not too informative for users. Instead, use a more
+appropriate name.
 
-> Does that make sense? Keep in mind that I'm still not completely
-> familiar with the PCI terminology, so maybe the above explanation does
-> not use the right terms.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+Hi everyone,
 
-Stated another way, the Marvel PCI-E to PCI-E bridge config space has
-a quirk that requires the window BARs to be aligned on their size and
-sized to a power of 2.
+The previous name is clearly misleading and has been bothering me since
+a long time. Here's my proposal, mostly meant to just to kick-start the
+discussion.
 
-The first requirement is already being handled by hooking through
-ARM's 'align_resource' callback.
+ arch/arm/mach-mvebu/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-One avenue would be to have mvebu_pcie_align_resource return a struct
-resource and manipulate the size as well. Assuming the PCI core will
-accommodate that.
-
-Jason
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 5e269d7..b9ba634 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_MVEBU
+-	bool "Marvell SOCs with Device Tree support" if ARCH_MULTI_V7
++	bool "Marvell Engineering Business Unit (MVEBU) SoCs" if ARCH_MULTI_V7
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select CLKSRC_MMIO
+ 	select COMMON_CLK
+-- 
+1.8.1.5
