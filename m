@@ -1,40 +1,195 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Thu, 20 Feb 2014 17:13:21 +0000
-Subject: [PATCH 2/2] arm/xen: Don't use xen DMA ops when the device is
- protected by an IOMMU
-In-Reply-To: <1392913301-25524-1-git-send-email-julien.grall@linaro.org>
-References: <1392913301-25524-1-git-send-email-julien.grall@linaro.org>
-Message-ID: <1392916401.32657.31.camel@kazak.uk.xensource.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 20 Feb 2014 14:17:33 -0300
+Subject: [PATCH 1/3] mfd: fsl imx25 Touchscreen ADC driver
+In-Reply-To: <1392913312-9030-2-git-send-email-mpa@pengutronix.de>
+References: <1392913312-9030-1-git-send-email-mpa@pengutronix.de>
+ <1392913312-9030-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <CAOMZO5BDyyvXs9CxJQOkuEpxZ8fqamCPB67sNhJxES+XU2XkXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the -spec list for the generic IOMMU binding question.
+Hi Markus,
 
-On Thu, 2014-02-20 at 16:21 +0000, Julien Grall wrote:
-> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-> index 0f7b9c2..ee25a57 100644
-> --- a/Documentation/devicetree/bindings/arm/xen.txt
-> +++ b/Documentation/devicetree/bindings/arm/xen.txt
-> @@ -15,6 +15,8 @@ the following properties:
->  - interrupts: the interrupt used by Xen to inject event notifications.
->    A GIC node is also required.
->  
-> +- protected-devices: (optional) List of phandles to device node where the
-> +IOMMU has been programmed by Xen. 
+On Thu, Feb 20, 2014 at 1:21 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> This is the core driver for imx25 touchscreen/adc driver. The module
+> has one shared ADC and two different conversion queues which use the
+> ADC. The two queues are identical. Both can be used for general purpose
+> ADC but one is meant to be used for touchscreens.
+>
+> This driver is the core which manages the central components and
+> registers of the TSC/ADC unit. It manages the IRQs and forwards them to
+> the correct components.
+>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-Is there some common/generic IOMMU binding which we can reuse here?
-Although this isn't exactly an IOMMU it certainly has some similarities
--- it is providing IOMMU like functionality (albeit a very inflexible
-IOMMU which you don't need to/can't actually program).
+That's great :-) Nice work!
 
-I'd far rather we followed existing patterns rather than invent our own
-things.
+> ---
+>  .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    |  46 ++++
+>  drivers/mfd/Kconfig                                |   9 +
+>  drivers/mfd/Makefile                               |   2 +
+>  drivers/mfd/fsl-imx25-tsadc.c                      | 234 +++++++++++++++++++++
+>  include/linux/mfd/imx25-tsadc.h                    | 138 ++++++++++++
+>  5 files changed, 429 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+>  create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
+>  create mode 100644 include/linux/mfd/imx25-tsadc.h
+>
+> diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+> new file mode 100644
+> index 0000000..a857af0e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+> @@ -0,0 +1,46 @@
+> +Freescale mx25 ADC/TSC multifunction device
+> +
+> +This device combines two general purpose conversion queues one used for general
+> +ADC and the other used for touchscreens.
+> +
+> +Required properties:
+> + - compatible: Should be "fsl,imx25-tsadc".
+> + - reg: Memory range of the device.
+> + - interrupts: Interrupt for this device as described in
+> +   interrupts/interrupts.txt
+> + - clocks: An 'ipg' clock defined as described in clocks/clock.txt
+> + - interrupt-controller: This device is an interrupt controller. It controls
+> +   the interrupts of both conversion queues.
+> + - #interrupt-cells: Should be '<1>'.
+> + - #address-cells: Should be '<1>'.
+> + - #size-cells: Should be '<1>'.
+> + - ranges
+> +
+> +This device includes two conversion queues which can be added as subnodes.
+> +The first queue is for the touchscreen, the second for general purpose ADC.
+> +
+> +Example:
+> +       tscadc: tscadc at 50030000 {
+> +               compatible = "fsl,imx25-tsadc";
+> +               reg = <0x50030000 0xc>;
+> +               interrupts = <46>;
+> +               clocks = <&clks 119>;
+> +               clock-names = "ipg";
+> +               interrupt-controller;
+> +               #interrupt-cells = <1>;
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges;
+> +
+> +               tsc: tcq at 50030400 {
+> +                       compatible = "fsl,imx25-tcq";
+> +                       reg = <0x50030400 0x60>;
+> +                       ...
+> +               };
+> +
+> +               adc: gcq at 50030800 {
+> +                       compatible = "fsl,imx25-gcq";
+> +                       reg = <0x50030800 0x60>;
+> +                       ...
+> +               };
+> +       };
 
-I'm wondering if perhaps we didn't ought to integrate this as an actual
-IOMMU driver, although I'm not convinced this would make sense.
+The meaning of 'tcq' and 'gcq' acronyms are not obvious. Could they be
+written more explicitily?
 
-I'm also not sure about shovelling everything as properties under a
-single Xen node, should this not be its own node with compatible =
-"xen,(pv)iommu"?
+Also, what does the '...' mean?
 
-Ian.
+> +static int mx25_tsadc_domain_map(struct irq_domain *d, unsigned int irq,
+> +                            irq_hw_number_t hwirq)
+> +{
+> +       struct mx25_tsadc_priv *priv = d->host_data;
+> +
+> +       irq_set_chip_data(irq, priv);
+> +       irq_set_chip_and_handler(irq, &mx25_tsadc_irq_chip,
+> +                                handle_level_irq);
+> +
+> +#ifdef CONFIG_ARM
+> +       set_irq_flags(irq, IRQF_VALID);
+> +#else
+> +       irq_set_noprobe(irq);
+> +#endif
+
+Do we really need these ifdef's? Can't we just assume that CONFIG_ARM
+is always selected for this driver?
+
+> +static int mx25_tsadc_probe(struct platform_device *pdev)
+> +{
+> +       struct device *dev = &pdev->dev;
+> +       struct device_node *np = dev->of_node;
+> +       struct mx25_tsadc_priv *priv;
+> +       struct resource *iores;
+> +       int ret;
+> +       void __iomem *iomem;
+> +
+> +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +       if (!priv)
+> +               return -ENOMEM;
+> +
+> +       iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       iomem = devm_ioremap_resource(dev, iores);
+> +       if (IS_ERR(iomem)) {
+> +               dev_err(dev, "Failed to remap iomem\n");
+> +               return PTR_ERR(iomem);
+> +       }
+> +
+> +       priv->regs = regmap_init_mmio(dev, iomem, &mx25_tsadc);
+> +       if (IS_ERR(priv->regs)) {
+> +               dev_err(dev, "Failed to initialize regmap\n");
+> +               return PTR_ERR(priv->regs);
+> +       }
+> +
+> +       priv->clk = devm_clk_get(dev, "ipg");
+> +       if (IS_ERR(priv->clk)) {
+> +               dev_err(dev, "Failed to get ipg clock\n");
+> +               return PTR_ERR(priv->clk);
+> +       }
+> +
+> +       /* Enable clock and reset the component */
+> +       regmap_update_bits(priv->regs, MX25_TSC_TGCR, MX25_TGCR_CLK_EN,
+> +                       MX25_TGCR_CLK_EN);
+> +       regmap_update_bits(priv->regs, MX25_TSC_TGCR, MX25_TGCR_TSC_RST,
+> +                       MX25_TGCR_TSC_RST);
+> +
+> +       /* Setup powersaving mode, but enable internal reference voltage */
+> +       regmap_update_bits(priv->regs, MX25_TSC_TGCR, MX25_TGCR_POWERMODE_MASK,
+> +                       MX25_TGCR_POWERMODE_SAVE);
+> +       regmap_update_bits(priv->regs, MX25_TSC_TGCR, MX25_TGCR_INTREFEN,
+> +                       MX25_TGCR_INTREFEN);
+> +
+> +       ret = mx25_tsadc_setup_irq(pdev, priv);
+> +       if (ret) {
+> +               dev_err(dev, "Failed to setup irqs\n");
+> +               return ret;
+> +       }
+> +
+> +       platform_set_drvdata(pdev, priv);
+> +
+> +       of_platform_populate(np, NULL, NULL, dev);
+> +
+> +       dev_info(dev, "i.MX25/25 Touchscreen and ADC core driver loaded\n");
+
+You could remove the double '25/25'.
+
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id mx25_tsadc_ids[] = {
+> +       { .compatible = "fsl,imx25-tsadc", },
+> +       { /* Sentinel */ }
+> +};
+> +
+> +static struct platform_driver mx25_tsadc_driver = {
+> +       .driver         = {
+> +               .name   = "mx25-tsadc",
+> +               .owner  = THIS_MODULE,
+> +               .of_match_table = mx25_tsadc_ids,
+> +       },
+> +       .probe          = mx25_tsadc_probe,
+> +};
+> +module_platform_driver(mx25_tsadc_driver);
+> +
+> +MODULE_DESCRIPTION("MFD for ADC/TSC for Freescale mx25");
+> +MODULE_AUTHOR("Markus Pargmann <mpa@pengutronix.de>");
+> +MODULE_LICENSE("GPL v2");
+
+MODULE_ALIAS() as well?
