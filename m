@@ -1,72 +1,27 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 19 Feb 2014 21:50:28 -0300
-Subject: [PATCH 0/2] Translate of PCI address without PCI enabled
-In-Reply-To: <1392848096-17838-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1392848096-17838-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140220005027.GA5721@localhost>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 20 Feb 2014 09:30:54 +0800
+Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
+In-Reply-To: <20140220114242.b3ce4d77b677544d2feebd3e@canb.auug.org.au>
+References: <20140220114242.b3ce4d77b677544d2feebd3e@canb.auug.org.au>
+Message-ID: <20140220013051.GK3010@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 11:14:54PM +0100, Gregory CLEMENT wrote:
-> Hello,
+On Thu, Feb 20, 2014 at 11:42:42AM +1100, Stephen Rothwell wrote:
+> Hi Shawn,
 > 
-> This patch set makes the use of the of PCI address translator less
-> restrictive. At the end it will allow to use the mvebu_get_soc_id
-> unconditionally.
+> Today's linux-next merge of the imx-mxs tree got conflicts in
+> arch/arm/mach-imx/Makefile and arch/arm/mach-imx/common.h between commit
+> 28a9f3b078c5 ("ARM: imx6: build pm-imx6q.c independently of CONFIG_PM")
+> from the arm-soc tree and commits 8dd751932545 ("ARM: imx: add suspend in
+> ocram support for i.mx6q") and 79a8eef47d12 ("RM: imx: add suspend in
+> ocram support for i.mx6sl") from the imx-mxs tree.
 > 
-> The mvebu SoC (such as Kirkwood, Dove or Armada XP for instance) come
-> with an IP of a PCI controller. The ID and the revision of a SoC are
-> stored in the registers of this controller. Being able to get this
-> information allows to deals with errata more dynamically.
-> 
-> To manage to read this information, we need to map the registers, and
-> for this we need to use the of PCI translator which depend of the PCI
-> support.
-> 
-> However there are mvebu board without any PCI devices, and where
-> selecting the PCI support would be useless.
-> 
-> Moreover translating an address from a PCI node of the device-tree
-> into a CPU physical address doesn't require the core PCI
-> support. Those translations are just related to the device tree
-> itself.
-> 
-> The 1st patch introduces a new config symbol: OF_ADDRESS_PCI, which
-> will be selected as soon as PCI will be selected, so we remains in the
-> same situation the current code. It should go to the of tree.
-> 
-> The 2nd patch selects OF_ADDRESS_PCI as soon as ARCH_MVEBU will be
-> selected. This will make mvebu_get_soc_id available even without the
-> PCI support. It should go to the mvebu tree.
-> 
-> Thanks,
-> 
-> Gregory CLEMENT (2):
->   of: Allows to use the PCI translator without the PCI core
->   ARM: mvebu: Allows to get the SoC ID even without PCI enabled
-> 
->  arch/arm/mach-mvebu/Kconfig | 1 +
->  drivers/of/Kconfig          | 4 ++++
->  drivers/of/address.c        | 8 +++++---
->  3 files changed, 10 insertions(+), 3 deletions(-)
-> 
-> -- 
-> 1.8.1.2
-> 
+> I fixed it up (I think, see below) and can carry the fix as necessary (no
+> action is required).
 
-On XP GP and CONFIG_PCI=n, without the patches I get this:
+Thanks, Stephen.  Once "ARM: imx6: build pm-imx6q.c independently of
+CONFIG_PM" hits mainline, I will rebase my branch against the latest -rc
+to get rid of the conflicts.
 
-  mvebu-soc-id: cannot map registers
-
-and after applying the patches I have:
-
-  mvebu-soc-id: MVEBU SoC ID=0x7846, Rev=0x2
-
-Tested-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Reviewed-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-
-Thanks for taking care of this.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Shawn
