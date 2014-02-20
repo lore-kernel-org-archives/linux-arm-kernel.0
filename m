@@ -1,81 +1,56 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Thu, 20 Feb 2014 11:25:24 -0600
-Subject: [PATCH 3/8] spi: pl022: Let runtime PM callbacks be available
- for CONFIG_PM
-In-Reply-To: <1392910280-12891-4-git-send-email-ulf.hansson@linaro.org>
-References: <1392910280-12891-1-git-send-email-ulf.hansson@linaro.org>
- <1392910280-12891-4-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <20140220172523.GE31820@joshc.qualcomm.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 20 Feb 2014 19:27:44 +0200
+Subject: Tegra clockframework fixes for 3.14
+Message-ID: <20140220172744.GA4378@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(comments below only marginally related to this change)
+Hi Mike,
 
-On Thu, Feb 20, 2014 at 04:31:15PM +0100, Ulf Hansson wrote:
-> Convert to the SET_PM_RUNTIME_PM macro while defining the runtime PM
-> callbacks. This means the callbacks becomes available for both
-> CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME, which is needed to handle the
-> combinations of these scenarios.
-> 
-> Cc: Mark Brown <broonie@kernel.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/spi/spi-pl022.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> index 74a0729..6dfcabf 100644
-> --- a/drivers/spi/spi-pl022.c
-> +++ b/drivers/spi/spi-pl022.c
-> @@ -2277,7 +2277,7 @@ pl022_remove(struct amba_device *adev)
->  	return 0;
->  }
->  
-> -#if defined(CONFIG_SUSPEND) || defined(CONFIG_PM_RUNTIME)
-> +#ifdef CONFIG_PM
+Could you merge these fixes still for 3.14?
 
-I wish we could get rid of PM-related #ifdefery in drivers...
+Thanks,
 
-For what it's worth, while working on another project, I discovered that
-using a ternary operator in initializers might actually be able to help
-out a bit:
+Peter.
 
-	/*
-	 * Intended for use in static object initializers,
-	 * assign_if(const_expr, function) evaluates to 'function' if
-	 * 'const_expr', otherwise NULL.
-	 *
-	 * The type of the assign_if() expression is typeof(function),
-	 * and therefore can provide typechecking regardless of
-	 * 'const_expr'.
-	 *
-	 * gcc considers 'function' to be used and will not generate a
-	 * 'defined but not used' when not 'const_expr', however, gcc is
-	 * smart enough to eliminate 'function' if assign_if() is the
-	 * only reference.
-	 */
-	#define assign_if(const_expr, function)			\
-		((const_expr) ? function : NULL)
+The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
 
-	#define assign_if_enabled(option, function)		\
-		assign_if(IS_ENABLED(option), function)
+  Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
 
-	#define assign_if_rpm(function)				\
-		assign_if_enabled(CONFIG_PM_RUNTIME, function)
+are available in the git repository at:
+  git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git clk-tegra-more-fixes-3.14
 
-	static int foo_runtime_suspend(struct device *dev)
-	{
-		return 0;
-	}
+Andrew Bresticker (3):
+      clk: tegra: fix sdmmc clks on Tegra1x4
+      clk: tegra: cclk_lp has a pllx/2 divider
+      clk: tegra: use max divider if divider overflows
 
-	static struct dev_pm_ops foo_pm_ops = {
-		.runtime_suspend	= assign_if_rpm(foo_runtime_suspend),
-	};
+David Ung (1):
+      clk: tegra: PLLD2 fixes for hdmi
 
-So, in this example, wrapping the definition of foo_runtime_suspend in
-#ifdef CONFIG_PM_RUNTIME is unnecessary, as gcc will not emit it if
-!CONFIG_PM_RUNTIME is not set (at least from my experiments).
+Gabe Black (1):
+      clk: tegra: Fix PLLP rate table
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Mark Zhang (1):
+      clk: tegra: fix host1x clock on Tegra124
+
+Peter De Schrijver (3):
+      clk: tegra: Add missing Tegra20 fuse clks
+      clk: tegra: Fix vic03 mux index
+      clk: tegra124: remove gr2d and gr3d clocks
+
+Rhyland Klein (1):
+      clk: tegra: Fix PLLD mnp table
+
+Thierry Reding (1):
+      clk: tegra: Correct clock number for UARTE
+
+ drivers/clk/tegra/clk-divider.c          |    2 +-
+ drivers/clk/tegra/clk-id.h               |    4 ++
+ drivers/clk/tegra/clk-tegra-periph.c     |   10 ++++--
+ drivers/clk/tegra/clk-tegra-super-gen4.c |    2 +-
+ drivers/clk/tegra/clk-tegra114.c         |    8 ++--
+ drivers/clk/tegra/clk-tegra124.c         |   48 +++++++++++++++++-------------
+ drivers/clk/tegra/clk-tegra20.c          |    2 +
+ include/dt-bindings/clock/tegra124-car.h |    4 +-
+ 8 files changed, 47 insertions(+), 33 deletions(-)
