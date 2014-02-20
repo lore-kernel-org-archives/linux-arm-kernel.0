@@ -1,35 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 20 Feb 2014 00:55:05 -0800
-Subject: [GIT PULL] Ux500 AB8500 DT conversion
-In-Reply-To: <CACRpkdZcH8gmvsH_P79mtq=ws-+9aoPe6QgXPL7GW5jAjLvrhg@mail.gmail.com>
-References: <CACRpkdZcH8gmvsH_P79mtq=ws-+9aoPe6QgXPL7GW5jAjLvrhg@mail.gmail.com>
-Message-ID: <20140220085505.GM19089@quad.lixom.net>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 20 Feb 2014 09:55:14 +0100
+Subject: [PATCH] ARM: efm32: drop selecting CLKSRC_MMIO
+Message-ID: <1392886514-6577-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 11, 2014 at 10:24:12AM +0100, Linus Walleij wrote:
-> Hi ARM SoC folks,
-> 
-> the following converts the AB8500 pin configuration from board
-> file to device tree and removes the final pin settings board file
-> config.
-> 
-> Please pull it into an apropriate Ux500 device tree branch, I'll
-> possibly send more Ux500 DT stuff on top of this.
-> 
-> Yours,
-> Linus Walleij
-> 
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-> 
->   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ab8500-dt-for-arm-soc
+CLKSRC_MMIO is needed on efm32 because the clocksource driver
+(CLKSRC_EFM32) uses clocksource_mmio_init() and
+clocksource_mmio_readl_up(). Since commit 09ca27579ee5 (clocksource:
+time-efm32: Select CLKSRC_MMIO) CLKSRC_EFM32 does the necessary select
+itself and ARCH_EFM32 doesn't need to select it explicitly any more.
 
-Merged in as ux500/dt into next/dt. Thanks!
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/Kconfig | 3 ---
+ 1 file changed, 3 deletions(-)
 
-
--Olof
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c5e0fa693fbd..44881c07883b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -421,9 +421,6 @@ config ARCH_EFM32
+ 	depends on !MMU
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_NVIC
+-	# CLKSRC_MMIO is wrong here, but needed until a proper fix is merged,
+-	# i.e. CLKSRC_EFM32 selecting CLKSRC_MMIO
+-	select CLKSRC_MMIO
+ 	select CLKSRC_OF
+ 	select COMMON_CLK
+ 	select CPU_V7M
+-- 
+1.8.5.2
