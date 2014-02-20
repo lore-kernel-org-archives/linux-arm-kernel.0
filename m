@@ -1,31 +1,67 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 20 Feb 2014 15:54:52 +0200
-Subject: [PATCH] clk: tegra: Fix vic03 mux index
-Message-ID: <1392904492-11979-1-git-send-email-pdeschrijver@nvidia.com>
+From: elder@linaro.org (Alex Elder)
+Date: Thu, 20 Feb 2014 07:58:55 -0600
+Subject: [PATCH RESEND AGAIN] clk: support hardware-specific debugfs entries
+Message-ID: <1392904735-23026-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vic03 mux uses a linear mapping.
+Add a new clk_ops->debug_init method to allow a clock hardware
+driver to populate the clock's debugfs directory with entries
+beyond those common for every clock.
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+Signed-off-by: Alex Elder <elder@linaro.org>
 ---
- drivers/clk/tegra/clk-tegra-periph.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+ drivers/clk/clk.c            |    4 ++++
+ include/linux/clk-provider.h |    8 ++++++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/drivers/clk/tegra/clk-tegra-periph.c b/drivers/clk/tegra/clk-tegra-periph.c
-index f5376a3..1fa5c3f 100644
---- a/drivers/clk/tegra/clk-tegra-periph.c
-+++ b/drivers/clk/tegra/clk-tegra-periph.c
-@@ -371,9 +371,7 @@ static const char *mux_pllp3_pllc_clkm[] = {
- static const char *mux_pllm_pllc_pllp_plla_pllc2_c3_clkm[] = {
- 	"pll_m", "pll_c", "pll_p", "pll_a", "pll_c2", "pll_c3", "clk_m"
- };
--static u32 mux_pllm_pllc_pllp_plla_pllc2_c3_clkm_idx[] = {
--	[0] = 0, [1] = 1, [2] = 2, [3] = 3, [4] = 4, [5] = 6,
--};
-+#define mux_pllm_pllc_pllp_plla_pllc2_c3_clkm_idx NULL
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 5517944..64b579a 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -277,6 +277,10 @@ static int clk_debug_create_one(struct clk *clk, struct dentry *pdentry)
+ 	if (!d)
+ 		goto err_out;
  
- static const char *mux_pllm_pllc2_c_c3_pllp_plla_pllc4[] = {
- 	"pll_m", "pll_c2", "pll_c", "pll_c3", "pll_p", "pll_a_out0", "pll_c4",
++	if (clk->ops->debug_init)
++		if (clk->ops->debug_init(clk->hw, clk->dentry))
++			goto err_out;
++
+ 	ret = 0;
+ 	goto out;
+ 
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 939533d..5119174 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -32,6 +32,7 @@
+ #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
+ 
+ struct clk_hw;
++struct dentry;
+ 
+ /**
+  * struct clk_ops -  Callback operations for hardware clocks; these are to
+@@ -127,6 +128,12 @@ struct clk_hw;
+  *		separately via calls to .set_parent and .set_rate.
+  *		Returns 0 on success, -EERROR otherwise.
+  *
++ * @debug_init:	Set up type-specific debugfs entries for this clock.  This
++ *		is called once, after the debugfs directory entry for this
++ *		clock has been created.  The dentry pointer representing that
++ *		directory is provided as an argument.  Called with
++ *		prepare_lock held.  Returns 0 on success, -EERROR otherwise.
++ *
+  *
+  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
+  * implementations to split any work between atomic (enable) and sleepable
+@@ -165,6 +172,7 @@ struct clk_ops {
+ 	unsigned long	(*recalc_accuracy)(struct clk_hw *hw,
+ 					   unsigned long parent_accuracy);
+ 	void		(*init)(struct clk_hw *hw);
++	int		(*debug_init)(struct clk_hw *hw, struct dentry *dentry);
+ };
+ 
+ /**
 -- 
-1.7.7.rc0.72.g4b5ea.dirty
+1.7.9.5
