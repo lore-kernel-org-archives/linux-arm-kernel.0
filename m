@@ -1,111 +1,31 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 20 Feb 2014 10:36:11 -0600
-Subject: [PATCH 3/4] ARM: dts: OMAP5: Add device nodes for ABB
-In-Reply-To: <1391039177-25284-4-git-send-email-nm@ti.com>
-References: <1391039177-25284-1-git-send-email-nm@ti.com>
- <1391039177-25284-4-git-send-email-nm@ti.com>
-Message-ID: <53062EFB.3080501@ti.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 20 Feb 2014 17:36:02 +0100
+Subject: [PATCH v3 0/2] regulator: core: Fix ops->enable/disable usage
+Message-ID: <1392914164-28596-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/2014 05:46 PM, Nishanth Menon wrote:
-> From: "Andrii.Tseglytskyi" <andrii.tseglytskyi@ti.com>
-> 
-> Add ABB device nodes for OMAP5 family of devices. Data is based on
-> OMAP543x Technical Reference Manual revision U (April 2013).
-> NOTE: clock node has been disabled in this patch due to the lack of
-> OMAP5 clock data.
-> 
-> [nm at ti.com: co-developer]
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Andrii.Tseglytskyi <andrii.tseglytskyi@ti.com>
-> ---
+Hi,
 
-I have been informed that there is an fix in TI official documentation
-which is due end of this month. So, I have to drop this patch from the
-series for the time being - I will refresh this along with necessary
-OMAP5 updates once the official documentation is available.
+These two patches replace all ops->enable/disable by
+_regulator_do_disable/enable function calls. These wrappers also handle gpio
+regulators.
 
->  arch/arm/boot/dts/omap5.dtsi |   63 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 63 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index a72813a..6159f20 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -801,6 +801,69 @@
->  
->  			#thermal-sensor-cells = <1>;
->  		};
-> +
-> +		abb_mpu: regulator-abb-mpu {
-> +			compatible = "ti,abb-v2";
-> +			regulator-name = "abb_mpu";
-> +			#address-cells = <0>;
-> +			#size-cells = <0>;
-> +			clocks = <&sys_clkin>;
-> +			ti,settling-time = <50>;
-> +			ti,clock-cycles = <16>;
-> +
-> +			reg = <0x4ae07cdc 0x8>, <0x4ae06014 0x4>,
-> +			      <0x4a0021ac 0x18>, <0x4ae0C318 0x4>;
-> +			reg-names = "base-address", "int-address",
-> +				    "efuse-address", "ldo-address";
-> +			ti,tranxdone-status-mask = <0x80>;
-> +			/* LDOVBBMPU_MUX_CTRL */
-> +			ti,ldovbb-override-mask = <0x400>;
-> +			/* LDOVBBMPU_VSET_OUT */
-> +			ti,ldovbb-vset-mask = <0x1F>;
-> +
-> +			/*
-> +			 * NOTE: only FBB mode used but actual vset will
-> +			 * determine final biasing
-> +			 */
-> +			ti,abb_info = <
-> +			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
-> +			880000		0	0x4	0 0x20000000 0x1F000000
-> +			1060000		0	0x8	0 0x20000000 0x1F000000
-> +			1250000		0	0x10	0 0x20000000 0x1F000000
-> +			1260000		1	0x14	0 0x20000000 0x1F000000
-> +			>;
-> +		};
-> +
-> +		abb_mm: regulator-abb-mm {
-> +			compatible = "ti,abb-v2";
-> +			regulator-name = "abb_mm";
-> +			#address-cells = <0>;
-> +			#size-cells = <0>;
-> +			clocks = <&sys_clkin>;
-> +			ti,settling-time = <50>;
-> +			ti,clock-cycles = <16>;
-> +
-> +			reg = <0x4ae07ce4 0x8>, <0x4ae06010 0x4>,
-> +			      <0x4a002194 0x14>, <0x4ae0C314 0x4>;
-> +			reg-names = "base-address", "int-address",
-> +				    "efuse-address", "ldo-address";
-> +			ti,tranxdone-status-mask = <0x80000000>;
-> +			/* LDOVBBMM_MUX_CTRL */
-> +			ti,ldovbb-override-mask = <0x400>;
-> +			/* LDOVBBMM_VSET_OUT */
-> +			ti,ldovbb-vset-mask = <0x1F>;
-> +
-> +			/*
-> +			 * NOTE: only FBB mode used but actual vset will
-> +			 * determine final biasing
-> +			 */
-> +			ti,abb_info = <
-> +			/*uV		ABB	efuse	rbb_m fbb_m	vset_m*/
-> +			880000		0	0x4	0 0x20000000 0x1F000000
-> +			1025000		0	0x8	0 0x20000000 0x1F000000
-> +			1120000		1	0x10	0 0x20000000 0x1F000000
-> +			>;
-> +		};
->  	};
->  };
->  
-> 
+v3 adds a comment about the moved _notifier_call_chain() function calls and
+removes a unused variable from the core driver in patch 2
+(Replace direct ops->disable usage).
 
+Regards,
+
+Markus
+
+
+Markus Pargmann (2):
+  regulator: core: Replace direct ops->enable usage
+  regulator: core: Replace direct ops->disable usage
+
+ drivers/regulator/core.c | 46 +++++++++++++++++++---------------------------
+ 1 file changed, 19 insertions(+), 27 deletions(-)
 
 -- 
-Regards,
-Nishanth Menon
+1.8.5.3
