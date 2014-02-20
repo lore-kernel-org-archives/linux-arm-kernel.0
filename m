@@ -1,50 +1,76 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 20 Feb 2014 10:09:02 -0600
-Subject: [PATCH v2] hwrng: msm: switch Kconfig to ARCH_QCOM depends
-Message-ID: <1392912542-5349-1-git-send-email-galak@codeaurora.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 20 Feb 2014 17:18:43 +0100
+Subject: [PATCH 04/11] ARM: shmobile: lager legacy: Add MSIOF support
+In-Reply-To: <CANqRtoQQ9cn55Ct7pva2Bo7461WbZG0=Y5f9zLwfKhyU2=QFZw@mail.gmail.com>
+References: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
+ <1392907779-22053-5-git-send-email-geert@linux-m68k.org>
+ <CANqRtoQQ9cn55Ct7pva2Bo7461WbZG0=Y5f9zLwfKhyU2=QFZw@mail.gmail.com>
+Message-ID: <CAMuHMdWMJFpV_uvi4mNZYc9R8qVWqQf3QGRhdPyc+hj=6XMoJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've split Qualcomm MSM support into legacy and multiplatform.  The RNG
-driver is only relevant on the multiplatform supported SoCs so switch the
-Kconfig depends to ARCH_QCOM.
+Hi Magnus,
 
-CC: Herbert Xu <herbert@gondor.apana.org.au>
-CC: Stanimir Varbanov <svarbanov@mm-sol.com>
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
+On Thu, Feb 20, 2014 at 4:48 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>> +/* MSIOF */
+>> +static const struct resource sh_msiof0_resources[] __initconst = {
+>> +       DEFINE_RES_MEM(0xe6e20000, 0x0064),
+>> +       DEFINE_RES_IRQ(gic_spi(156)),
+>> +};
+>> +
+>> +static const struct resource sh_msiof1_resources[] __initconst = {
+>> +       DEFINE_RES_MEM(0xe6e10000, 0x0064),
+>> +       DEFINE_RES_IRQ(gic_spi(157)),
+>> +};
+>> +
+>> +static const struct resource sh_msiof2_resources[] __initconst = {
+>> +       DEFINE_RES_MEM(0xe6e00000, 0x0064),
+>> +       DEFINE_RES_IRQ(gic_spi(158)),
+>> +};
+>> +
+>> +static const struct resource sh_msiof3_resources[] __initconst = {
+>> +       DEFINE_RES_MEM(0xe6c90000, 0x0064),
+>> +       DEFINE_RES_IRQ(gic_spi(159)),
+>> +};
+>> +
+>> +static const struct sh_msiof_spi_info sh_msiof_info __initconst = {
+>> +       .rx_fifo_override       = 256,
+>> +       .num_chipselect         = 1,
+>> +};
+>> +
+>> +#define r8a7790_register_msiof(idx)                                    \
+>> +       platform_device_register_resndata(&platform_bus,                \
+>> +                               "spi_r8a7790_msiof",                    \
+>> +                               (idx+1), sh_msiof##idx##_resources,     \
+>> +                               ARRAY_SIZE(sh_msiof##idx##_resources),  \
+>> +                               &sh_msiof_info,                         \
+>> +                               sizeof(struct sh_msiof_spi_info))
+>
+> That for your efforts - it's good to see the MSIOF being integrated as
+> well! I have one comment on this legacy board integration code.
+>
+> Since only MSIOF1 is used on Lager (correct me if i'm wrong), isn't it
+> best to omit the unused resources from above? In case of DT I think it
+> makes sense to define all channels in the SoC.dtsi and let the
+> SoC-board.dts just enable the channels that are used. But in this case
+> with legacy code  I think we should keep thing simple and small and
+> just enable the bits that are used on the particular board.
+>
+> The same obviously applies to the Koelsch legacy code as well. =)
 
-Herbert,
+Note that while all resources are present, only MSIOF1 is registered on
+Lager (MSIOF0 on Koelsch). This is similar to i2c on Koelsch, which also
+has all resources, but only registers active devices.
 
-If you can ack this I'll send it via linux-qcom/arm-soc tree's
+It's your preference, though, so I can adapt if you want.
 
-thanks
+Gr{oetje,eeting}s,
 
-v2:
-* Updated help text to remove MSM references, made more generic
+                        Geert
 
- drivers/char/hw_random/Kconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-index 2f2b084..f2b9f8c 100644
---- a/drivers/char/hw_random/Kconfig
-+++ b/drivers/char/hw_random/Kconfig
-@@ -342,11 +342,11 @@ config HW_RANDOM_TPM
- 	  If unsure, say Y.
- 
- config HW_RANDOM_MSM
--	tristate "Qualcomm MSM Random Number Generator support"
--	depends on HW_RANDOM && ARCH_MSM
-+	tristate "Qualcomm ARM SoCs Random Number Generator support"
-+	depends on HW_RANDOM && ARCH_QCOM
- 	---help---
- 	  This driver provides kernel-side support for the Random Number
--	  Generator hardware found on Qualcomm MSM SoCs.
-+	  Generator hardware found on Qualcomm ARM SoCs.
- 
- 	  To compile this driver as a module, choose M here. the
- 	  module will be called msm-rng.
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
