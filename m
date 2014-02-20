@@ -1,48 +1,53 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Thu, 20 Feb 2014 15:56:15 -0500
-Subject: [PATCH v2 2/3] clk: bcm281xx: don't disable unused peripheral
- clocks
-In-Reply-To: <1392402560-12929-3-git-send-email-elder@linaro.org>
-References: <1392402560-12929-1-git-send-email-elder@linaro.org>
- <1392402560-12929-3-git-send-email-elder@linaro.org>
-Message-ID: <20140220205615.GF5038@beef>
+From: dashie@sigpipe.me (Dashie)
+Date: Thu, 20 Feb 2014 22:22:35 +0100
+Subject: Stuck getting DTS working for a new kirkwood board
+Message-ID: <5306721B.7020403@sigpipe.me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 12:29:19PM -0600, Alex Elder wrote:
-> Add the CLK_IGNORE_UNUSED flag when setting up a peripheral clock.
-> This prevents unused clocks from getting disabled, and by doing
-> this we can use the common clock code even before we've resolved
-> all the spots that need to get a reference to their clock.
-> 
-> Signed-off-by: Alex Elder <elder@linaro.org>
-> Reviewed-by: Matt Porter <mporter@linaro.org>
+Hi all,
 
-Mike: if you'll provide your ack on this patch, we would like to take
-the entire series through arm-soc for 3.15 as we originally agreed
-for 3.14. Patches 1 and 3 are the original two you acked for 3.14
-but had to be dropped late in the merge window.
+I'm a very beginner in the DTS and ARM kernel world and trying to get a
+DTS working for my new toy.
 
-Thanks,
-Matt
+I've done some tests using mainlineLinux and arcNumber and i remember to
+got some things working (PCI-e, Intel eth) but only two drives and no
+fan/sensor using arcNumber for "00000b1e    HP t5325 Thin Client       
+                        2846".
 
-> ---
->  drivers/clk/bcm/clk-kona-setup.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/bcm/clk-kona-setup.c b/drivers/clk/bcm/clk-kona-setup.c
-> index f1e88fe..c7607fe 100644
-> --- a/drivers/clk/bcm/clk-kona-setup.c
-> +++ b/drivers/clk/bcm/clk-kona-setup.c
-> @@ -579,7 +579,7 @@ static int peri_clk_setup(struct ccu_data *ccu, struct peri_clk_data *data,
->  			struct clk_init_data *init_data)
->  {
->  	init_data->ops = &kona_peri_clk_ops;
-> -	init_data->flags = 0;
-> +	init_data->flags = CLK_IGNORE_UNUSED;
->  
->  	return clk_sel_setup(data->clocks, &data->sel, init_data);
->  }
-> -- 
-> 1.7.9.5
-> 
+I've since started to use a DTS, copied the guruplug-server-plus (IIRC)
+and done some changes, actually i can get working :
+    - temp sensor
+    - fan control (off, middle, full)
+    - integrated marvell eth
+    - the four disks are detected and seems working
+
+But can't get the PCI-e working (and then the intel ethernet), also
+sensor path seems to change every reboot (i need to do more tests).
+Also i've SATA power reg enabled in the DTS but it doesn't seems to have
+any (to be confirmed, the original firmware seems to have the ability to
+shutdown unaccessed drives) and i will remove them, anyway i don't know
+the GPIO, if any.
+
+I still miss some GPIOS for : Led (r/g) power, func led, the four sata
+leds, maybe some triggers for hdds, and the power and func buttons.
+(already tried gpio export and out direction and "1" in value, but
+nothing blink)
+Reset button sends things in /dev/input/input0 so it seems to works.
+
+The current DTS is joined to this mail, i've actually the NAS with me
+and can test things. I can provide too : original dmesg (from original
+firmware), current dmesg using DTS, lspci -vvv (from kernel with arcNumber).
+
+I'm currently using a stock 3.12.9 debian kernel and doesn't have
+anymore access to the original firmware.
+
+Regards,
+Dashie.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: kirkwood-verbatim-powerbay.dts
+Type: audio/vnd.dts
+Size: 5323 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140220/e2cc16f6/attachment-0001.dts>
