@@ -1,58 +1,32 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 20 Feb 2014 13:03:40 +0100
-Subject: [PATCH v2 2/2] regulator: core: Replace direct ops->disable usage
-In-Reply-To: <1392894472-11956-3-git-send-email-mpa@pengutronix.de>
-References: <1392894472-11956-1-git-send-email-mpa@pengutronix.de>
- <1392894472-11956-3-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140220120340.GB21048@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Feb 2014 13:07:31 +0100
+Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
+In-Reply-To: <20140220112248.GC32456@localhost>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <CAOesGMjSjzZ4iX3NVA6eS4LHJF2MQQ=KJpNgKWikJb6YkQxNpQ@mail.gmail.com>
+ <20140220112248.GC32456@localhost>
+Message-ID: <116078520.5VTDQYu7BE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 12:07:52PM +0100, Markus Pargmann wrote:
-> There are many places where ops->disable is called directly. Instead we
-> should use _regulator_do_disable() which also handles gpio regulators.
+On Thursday 20 February 2014 11:22:48 Catalin Marinas wrote:
 > 
-> Cc: <stable@vger.kernel.org> # 3.10+
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  drivers/regulator/core.c | 32 +++++++++++++-------------------
->  1 file changed, 13 insertions(+), 19 deletions(-)
+> I'm fine with this. Do we still need something for ARMv8 server
+> platforms like ARCH_ARM_SBSA? The only advantage would be to make it
+> easier for mobile targeted kernel builds to disable server features but
+> I'm not sure there are so many such features, people can trim the
+> .config manually.
+
+I think in particular for SBSA compliant platforms we should not
+have per-platform options at all the way we do for embedded,
+as they will be much more homogenous.
+
+> Two additional points:
 > 
-> diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-> index 017f5cb..a0c916f 100644
-> --- a/drivers/regulator/core.c
-> +++ b/drivers/regulator/core.c
+> 1. Single arm64 defconfig file covering everything
+> 2. Modules rather than built-in by default where possible (especially
+>    for server platforms)
 
-...
++1
 
-> @@ -3641,12 +3637,10 @@ int regulator_suspend_finish(void)
->  		} else {
->  			if (!have_full_constraints())
->  				goto unlock;
-> -			if (!ops->disable)
-> -				goto unlock;
->  			if (!_regulator_is_enabled(rdev))
->  				goto unlock;
->  
-> -			error = ops->disable(rdev);
-> +			error = _regulator_do_disable(rdev);
-
-ops is unused and creates a compile warning. I will resend later with
-the 'ops' variable removed from the function.
-
-Regards,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140220/5e70776e/attachment.sig>
+	Arnd
