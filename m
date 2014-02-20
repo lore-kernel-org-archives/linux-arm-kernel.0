@@ -1,71 +1,53 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 20 Feb 2014 11:52:42 +0100
-Subject: [PATCH v4 2/7] drivers: dma-coherent: add initialization from device
+Date: Thu, 20 Feb 2014 11:52:45 +0100
+Subject: [PATCH v4 5/7] arm: add support for reserved memory defined by device
  tree
 In-Reply-To: <1392893567-31623-1-git-send-email-m.szyprowski@samsung.com>
 References: <1392893567-31623-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1392893567-31623-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1392893567-31623-6-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for handling 'shared-dma-pool' reserved-memory device tree
-nodes.
-
-Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
+Enable reserved memory initialization from device tree.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/base/dma-coherent.c |   41 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ arch/arm/Kconfig   |    1 +
+ arch/arm/mm/init.c |    3 +++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-index bc256b641027..2343ba5d6d43 100644
---- a/drivers/base/dma-coherent.c
-+++ b/drivers/base/dma-coherent.c
-@@ -218,3 +218,44 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
- 	return 0;
- }
- EXPORT_SYMBOL(dma_mmap_from_coherent);
-+
-+/*
-+ * Support for reserved memory regions defined in device tree
-+ */
-+#ifdef CONFIG_OF_RESERVED_MEM
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e25419817791..d0262bea8020 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1918,6 +1918,7 @@ config USE_OF
+ 	select IRQ_DOMAIN
+ 	select OF
+ 	select OF_EARLY_FLATTREE
++	select OF_RESERVED_MEM
+ 	help
+ 	  Include support for flattened device tree machine descriptions.
+ 
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 804d61566a53..eee55d75bbfa 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -17,6 +17,7 @@
+ #include <linux/nodemask.h>
+ #include <linux/initrd.h>
+ #include <linux/of_fdt.h>
 +#include <linux/of_reserved_mem.h>
+ #include <linux/highmem.h>
+ #include <linux/gfp.h>
+ #include <linux/memblock.h>
+@@ -323,6 +324,8 @@ void __init arm_memblock_init(struct meminfo *mi,
+ 	if (mdesc->reserve)
+ 		mdesc->reserve();
+ 
++	early_init_fdt_scan_reserved_mem();
 +
-+static void rmem_dma_device_init(struct reserved_mem *rmem,
-+			struct device *dev, struct of_phandle_args *args)
-+{
-+	dma_declare_coherent_memory(dev, rmem->base, rmem->base,
-+		rmem->size, DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE);
-+}
-+
-+static void rmem_dma_device_release(struct reserved_mem *rmem,
-+				    struct device *dev)
-+{
-+	dma_release_declared_memory(dev);
-+}
-+
-+static const struct reserved_mem_ops rmem_dma_ops = {
-+	.device_init	= rmem_dma_device_init,
-+	.device_release	= rmem_dma_device_release,
-+};
-+
-+static int __init rmem_dma_setup(struct reserved_mem *rmem,
-+				 unsigned long node,
-+				 const char *uname)
-+{
-+	if (of_get_flat_dt_prop(node, "reusable", NULL))
-+		return -EINVAL;
-+
-+	rmem->ops = &rmem_dma_ops;
-+	pr_info("Reserved memory: created DMA memory pool at %pa, size %ld MiB\n",
-+		&rmem->base, (unsigned long)rmem->size / SZ_1M);
-+	return 0;
-+}
-+RESERVEDMEM_OF_DECLARE(dma, "shared-dma-pool", rmem_dma_setup);
-+#endif
+ 	/*
+ 	 * reserve memory for DMA contigouos allocations,
+ 	 * must come from DMA area inside low memory
 -- 
 1.7.9.5
