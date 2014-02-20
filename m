@@ -1,68 +1,129 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 20 Feb 2014 16:12:53 +0100
-Subject: [PATCH 1/3] ARM: mvebu: use C preprocessor include for Armada
- 375/38x DTs
-In-Reply-To: <1392894691-26837-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1392894691-26837-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1392894691-26837-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <53061B75.1040802@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 20 Feb 2014 15:49:32 +0100
+Subject: [PATCH 04/11] ARM: shmobile: lager legacy: Add MSIOF support
+In-Reply-To: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
+References: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1392907779-22053-5-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-On 20/02/2014 12:11, Thomas Petazzoni wrote:
-> Some of the Armada 375/38x DTs that were recently submitted were still
-> using the old-style /include/ instead of the new-style, C-preprocessor
-> based #include. Since we are going to start including more headers,
-> switching to the C-preprocessor based includes is important.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Add MSIOF resources, platform data, platform device, pinctrl, and SPI
+child device.
 
+  - Platform device numbering is 1-based for compatibility with the BSP,
+    as QSPI uses zero.
+  - Only MSIOF1 is in use, and thus registered. Its bus contains a single
+    device (a Renesas R2A11302FT PMIC).
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+---
+ arch/arm/mach-shmobile/board-lager.c |   64 ++++++++++++++++++++++++++++++----
+ 1 file changed, 58 insertions(+), 6 deletions(-)
 
-
-Thanks,
-
-Gregory
-
-> ---
->  arch/arm/boot/dts/armada-375.dtsi | 2 +-
->  arch/arm/boot/dts/armada-380.dtsi | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-> index 9f5cb51..c89fee4 100644
-> --- a/arch/arm/boot/dts/armada-375.dtsi
-> +++ b/arch/arm/boot/dts/armada-375.dtsi
-> @@ -11,7 +11,7 @@
->   * warranty of any kind, whether express or implied.
->   */
->  
-> -/include/ "skeleton.dtsi"
-> +#include "skeleton.dtsi"
->  
->  #define MBUS_ID(target,attributes) (((target) << 24) | ((attributes) << 16))
->  
-> diff --git a/arch/arm/boot/dts/armada-380.dtsi b/arch/arm/boot/dts/armada-380.dtsi
-> index 5a46ec7..82b3347 100644
-> --- a/arch/arm/boot/dts/armada-380.dtsi
-> +++ b/arch/arm/boot/dts/armada-380.dtsi
-> @@ -12,7 +12,7 @@
->   * warranty of any kind, whether express or implied.
->   */
->  
-> -/include/ "armada-38x.dtsi"
-> +#include "armada-38x.dtsi"
->  
->  / {
->  	model = "Marvell Armada 380 family SoC";
-> 
-
-
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index f0104bfe544e..6062bcbda366 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -55,6 +55,7 @@
+ #include <linux/mtd/mtd.h>
+ #include <linux/spi/flash.h>
+ #include <linux/spi/rspi.h>
++#include <linux/spi/sh_msiof.h>
+ #include <linux/spi/spi.h>
+ #include <sound/rcar_snd.h>
+ #include <sound/simple_card.h>
+@@ -287,6 +288,40 @@ static const struct platform_device_info ether_info __initconst = {
+ 	.dma_mask	= DMA_BIT_MASK(32),
+ };
+ 
++/* MSIOF */
++static const struct resource sh_msiof0_resources[] __initconst = {
++	DEFINE_RES_MEM(0xe6e20000, 0x0064),
++	DEFINE_RES_IRQ(gic_spi(156)),
++};
++
++static const struct resource sh_msiof1_resources[] __initconst = {
++	DEFINE_RES_MEM(0xe6e10000, 0x0064),
++	DEFINE_RES_IRQ(gic_spi(157)),
++};
++
++static const struct resource sh_msiof2_resources[] __initconst = {
++	DEFINE_RES_MEM(0xe6e00000, 0x0064),
++	DEFINE_RES_IRQ(gic_spi(158)),
++};
++
++static const struct resource sh_msiof3_resources[] __initconst = {
++	DEFINE_RES_MEM(0xe6c90000, 0x0064),
++	DEFINE_RES_IRQ(gic_spi(159)),
++};
++
++static const struct sh_msiof_spi_info sh_msiof_info __initconst = {
++	.rx_fifo_override	= 256,
++	.num_chipselect		= 1,
++};
++
++#define r8a7790_register_msiof(idx)					\
++	platform_device_register_resndata(&platform_bus,		\
++				"spi_r8a7790_msiof",			\
++				(idx+1), sh_msiof##idx##_resources,	\
++				ARRAY_SIZE(sh_msiof##idx##_resources),	\
++				&sh_msiof_info,				\
++				sizeof(struct sh_msiof_spi_info))
++
+ /* SPI Flash memory (Spansion S25FL512SAGMFIG11 64Mb) */
+ static struct mtd_partition spi_flash_part[] = {
+ 	/* Reserved for user loader program, read-only */
+@@ -325,12 +360,19 @@ static const struct rspi_plat_data qspi_pdata __initconst = {
+ 
+ static const struct spi_board_info spi_info[] __initconst = {
+ 	{
+-		.modalias               = "m25p80",
+-		.platform_data          = &spi_flash_data,
+-		.mode                   = SPI_MODE_0,
+-		.max_speed_hz           = 30000000,
+-		.bus_num                = 0,
+-		.chip_select            = 0,
++		.modalias	 = "m25p80",
++		.platform_data	 = &spi_flash_data,
++		.mode		 = SPI_MODE_0,
++		.max_speed_hz	 = 30000000,
++		.bus_num	 = 0,
++		.chip_select	 = 0,
++	}, {
++		.modalias	 = "r2a1130x",
++		.max_speed_hz	 = 6000000,
++		.chip_select	 = 0,
++		.bus_num	 = 2,
++		.mode		 = SPI_MODE_3,
++		.controller_data = (void *)-ENOENT, /* HW controlled CS */
+ 	},
+ };
+ 
+@@ -703,6 +745,15 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
+ 	/* I2C2 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar.2", "pfc-r8a7790",
+ 				  "i2c2", "i2c2"),
++	/* MSIOF1 */
++	PIN_MAP_MUX_GROUP_DEFAULT("spi_r8a7790_msiof.2", "pfc-r8a7790",
++				  "msiof1_clk", "msiof1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("spi_r8a7790_msiof.2", "pfc-r8a7790",
++				  "msiof1_sync", "msiof1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("spi_r8a7790_msiof.2", "pfc-r8a7790",
++				  "msiof1_rx", "msiof1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("spi_r8a7790_msiof.2", "pfc-r8a7790",
++				  "msiof1_tx", "msiof1"),
+ 	/* QSPI */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("qspi.0", "pfc-r8a7790",
+ 				  "qspi_ctrl", "qspi"),
+@@ -811,6 +862,7 @@ static void __init lager_add_standard_devices(void)
+ 					  qspi_resources,
+ 					  ARRAY_SIZE(qspi_resources),
+ 					  &qspi_pdata, sizeof(qspi_pdata));
++	r8a7790_register_msiof(1);
+ 	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
+ 
+ 	platform_device_register_data(&platform_bus, "reg-fixed-voltage", fixed_regulator_idx++,
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
