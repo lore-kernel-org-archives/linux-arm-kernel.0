@@ -1,93 +1,133 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 20 Feb 2014 13:18:21 +0100
-Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
-In-Reply-To: <1392896076.23342.37.camel@kazak.uk.xensource.com>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-22-git-send-email-andrew@lunn.ch>
- <52F51922.6030502@gmail.com>
- <1392892217.23342.18.camel@kazak.uk.xensource.com>
- <20140220105854.GL11878@lunn.ch>
- <1392896076.23342.37.camel@kazak.uk.xensource.com>
-Message-ID: <20140220121821.GO11878@lunn.ch>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Thu, 20 Feb 2014 17:52:14 +0530
+Subject: [PATCH v9 1/6] arm64: Add macros to manage processor debug state
+In-Reply-To: <20140220114222.GG3615@mudshark.cambridge.arm.com>
+References: <20140129105546.GC26622@mudshark.cambridge.arm.com>
+ <CALicx6uw3En92GhrKpAoavzwwNKWR8C8hHcS5B+eyLX_dC0LBA@mail.gmail.com>
+ <20140217130149.GA5856@arm.com>
+ <CALicx6uHqyJ-n+b-zfua6P=UsJ+a2_2h-H6krx-DBJYWfF=7jg@mail.gmail.com>
+ <20140218120249.GD11049@arm.com>
+ <CALicx6v6=WdRPoZ-vcxf7zusooB5r1V9WnjBf3QjOiO7yik3sw@mail.gmail.com>
+ <20140219113157.GG30457@arm.com> <20140219160359.GB22252@arm.com>
+ <20140219161236.GG28173@mudshark.cambridge.arm.com>
+ <CALicx6t7RSS_Zo9RGr76LMnNth1gQ7pukUtAmDY4gWRN5KGVKQ@mail.gmail.com>
+ <20140220114222.GG3615@mudshark.cambridge.arm.com>
+Message-ID: <CALicx6sB-tucxv=-0J9LKw5E3wA1hmYyYN_z99ugnpmxvZTMng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 11:34:36AM +0000, Ian Campbell wrote:
-> (adding debian-arm/-kernel)
-> On Thu, 2014-02-20 at 11:58 +0100, Andrew Lunn wrote:
-> > On Thu, Feb 20, 2014 at 10:30:17AM +0000, Ian Campbell wrote:
-> > > On Fri, 2014-02-07 at 18:34 +0100, Sebastian Hesselbarth wrote:
-> > > > On 02/07/2014 12:42 AM, Andrew Lunn wrote:
-> > > > > Now that all the device tree support is in mach-mvebu, remove it from
-> > > > > mach-kirkwood.
-> > > > >
-> > > > > Regenerate kirkwood_defconfig, removing all DT support, and a couple
-> > > 
-> > > s/DT/board-file/?
-> > 
-> > We keep any system using -setup.c files, and remove the ability to
-> > boot systems with a DT description. Thus mach-kirkwood becomes legacy,
-> > and you should now be trying to only use mach-mvebu, compiled for v5
-> > systems and a second compile for v7 systems.
-> 
-> Just to check I've got it: The majority of the systems previously
-> supported by mach-kirkwood (either board file or DTB based) are now
-> supported by mach-mvebu.
+On Thu, Feb 20, 2014 at 5:12 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Feb 20, 2014 at 06:58:25AM +0000, Vijay Kilari wrote:
+>> Hi Will,
+>
+> Hi Vijay,
+>
+>> On Wed, Feb 19, 2014 at 9:42 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > The reply from Vijay suggested that everything is confined to a single CPU.
+>>
+>>   This issue is seen only when kgdb test is triggered on secondary cpu's.
+>> when executed on cpu0 issue is not seen. Though cpu0 triggers kgdb tests
+>> the do_fork test might trigger debug exception on other cpu's as well,
+>> which fails.
+>>
+>> For the patch 1 you suggested me to call local_dbg_enable() from
+>> clear_os_mask() function
+>> as below
+>>
+>> static void clear_os_lock(void *unused)
+>> {
+>>         asm volatile("msr oslar_el1, %0" : : "r" (0));
+>>         isb();
+>>         local_dbg_enable();
+>> }
+>>
+>> This is an SMP call. So when more than one core is enabled, this
+>> local_dbg_enable() is called
+>> from SMP call context, which is el1_irq context for secondary cpu's.
+>> So PSTATE.D flag is unmasked
+>> only in irq context but not in normal context.
+>
+> Aha, well spotted!
+>
+>> For CPU0 this clear_os_lock() is not called from smp call. it is
+>> directly called in debug_monitors_init()
+>> call. So PSTATE.D is unmasked for CPU0 and hence kgdb tests passed
+>> when triggered only on
+>> cpu0.
+>>
+>> static int debug_monitors_init(void)
+>> {
+>>         /* Clear the OS lock. */
+>>         smp_call_function(clear_os_lock, NULL, 1);
+>>         clear_os_lock(NULL);
+>>
+>>         /* Register hotplug handler. */
+>>         register_cpu_notifier(&os_lock_nb);
+>>         return 0;
+>> }
+>>
+>> When I made below patch it works. I have tested with 4 cores on foundation model
+>
+> The main change here is that we enable debug exceptions before we unlock the
+> os lock. That should be fine, since everything apart from software
+> breakpoint exceptions are masked when the lock is locked.
+>
+>> --- a/arch/arm64/kernel/smp.c
+>> +++ b/arch/arm64/kernel/smp.c
+>> @@ -160,6 +160,8 @@ asmlinkage void secondary_start_kernel(void)
+>>         set_cpu_online(cpu, true);
+>>         complete(&cpu_running);
+>>
+>> +       local_dbg_enable();
+>>         local_irq_enable();
+>>         local_async_enable();
+>
+> The only thing to add then moving the isb(); local_dbg_enable() out of
+> clear_os_lock and into debug_monitors_init. You can probably make the
+> smp_call_function an on_each_cpu too.
+>
+> Does that make sense?
 
-We plan to move all kirkwood systems which are DT to mach-mvebu. Any
-systems which are not DT will get left in mach-kirkwood.
+Its ok for me.  Isn't require to have isb() after clearing os lock for
+every cpu?
+Just having isb on cpu0 after clearing os lock is enough?
 
-What would be interesting to know is, if any of the systems left
-behind are supported by debian. So LaCie 2Big and 5Big, HP t5325 thin
-client and Marvell OpenRD machines? If you don't support any of these,
-you can drop mach-kirkwood.
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -137,8 +137,6 @@ void disable_debug_monitors(enum debug_el el)
+ static void clear_os_lock(void *unused)
+ {
+        asm volatile("msr oslar_el1, %0" : : "r" (0));
+-       isb();
+-       local_dbg_enable();
+ }
 
-> Is it possible to have both ARCH_KIRKWOOD and ARCH_MVEBU in the same
-> v5 .config?
+ static int os_lock_notify(struct notifier_block *self,
+@@ -157,8 +155,9 @@ static struct notifier_block os_lock_nb = {
+ static int debug_monitors_init(void)
+ {
+        /* Clear the OS lock. */
+-       smp_call_function(clear_os_lock, NULL, 1);
+-       clear_os_lock(NULL);
++       on_each_cpu(clear_os_lock, NULL, 1);
++       isb();
++       local_dbg_enable();
 
-Armada XP, 370, and the new SoCs going in this cycle all use ARM v7
-CPUs. Dove also uses an ARM v7 cpu and we intent to move it from
-mach-dove into mach-mvebu.
+        /* Register hotplug handler. */
+        register_cpu_notifier(&os_lock_nb);
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 7cfb92a..5070dc3 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -160,6 +160,7 @@ asmlinkage void secondary_start_kernel(void)
+        set_cpu_online(cpu, true);
+        complete(&cpu_running);
 
-Now ARM v7 cpu and ARM v5 CPUs are mutually incompatible. You cannot
-combine them into one kernel. Do you currently build mach-mvebu as
-part of a multi v7 kernel. That is, you have one kernel which boots on
-all v7 machines?
++       local_dbg_enable();
+        local_irq_enable();
+        local_async_enable();
 
-What this patchset does is also make mach-mvebu part of the multi v5
-kernel. So you just need one kernel for all ARM v5 machines which are
-part of multi v5. The long term goal is that you need just two 32 ARM
-kernels, multi v5 and multi v7. However orion5x and mv76xx0 are not
-yet part of theses, so we are not there yet.
+Is this ok?
 
-> IOW that all of the platforms currently supported by the
-> Debian kirkwood flavour remain supportable in the same binary after this
-> change. It looks like it should be to me, but I'm not 100% sure.
-
-If you don't support LaCie 2Big and 5Big, HP t5325 thin client and
-Marvell OpenRD then yes, you have one binary. That binary could
-potentially support over v5 machines, but i have no idea what ARM
-machines Debian actually supports. Is there a list somewhere?
- 
-> Is there a tree I can pull to see what is going into v3.15 in this
-> area?
-
-At the moment there is not a tree with all the different parts.  I
-have a tree with these specific patches. There are other trees which
-contain new DT descriptions for new devices, like Bubba B3, and
-systems which have been converted to DT, like the QNAP T4xx.
-
-> > My aim is 3.15. Most patches have been Acked now, so i think we are on
-> > track for that.
-> 
-> If kirkwood and mvebu are mutually exclusive on v5 then this sounds like
-> it might end up being more complicated than just setting Append-DTB-From
-> in the flash-kernel db. In that case if we could hold off on pulling the
-> existing kirkwood support until there is a transition plan here I'd be
-> very grateful.
-
-Lets make sure we are all on the same page with v5, v7, kirkwood,
-mvebu, multi, and what kernels Debian currently builds and how
-flash-kernel works etc. We can then discuss transition plans.
-
-     Andrew
+>
+> Will
