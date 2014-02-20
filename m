@@ -1,86 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Feb 2014 15:56:00 +0000
-Subject: [PATCH v9 1/6] arm64: Add macros to manage processor debug state
-In-Reply-To: <CALicx6sB-tucxv=-0J9LKw5E3wA1hmYyYN_z99ugnpmxvZTMng@mail.gmail.com>
-References: <20140217130149.GA5856@arm.com>
- <CALicx6uHqyJ-n+b-zfua6P=UsJ+a2_2h-H6krx-DBJYWfF=7jg@mail.gmail.com>
- <20140218120249.GD11049@arm.com>
- <CALicx6v6=WdRPoZ-vcxf7zusooB5r1V9WnjBf3QjOiO7yik3sw@mail.gmail.com>
- <20140219113157.GG30457@arm.com> <20140219160359.GB22252@arm.com>
- <20140219161236.GG28173@mudshark.cambridge.arm.com>
- <CALicx6t7RSS_Zo9RGr76LMnNth1gQ7pukUtAmDY4gWRN5KGVKQ@mail.gmail.com>
- <20140220114222.GG3615@mudshark.cambridge.arm.com>
- <CALicx6sB-tucxv=-0J9LKw5E3wA1hmYyYN_z99ugnpmxvZTMng@mail.gmail.com>
-Message-ID: <20140220155600.GJ3615@mudshark.cambridge.arm.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 20 Feb 2014 10:09:02 -0600
+Subject: [PATCH v2] hwrng: msm: switch Kconfig to ARCH_QCOM depends
+Message-ID: <1392912542-5349-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 12:22:14PM +0000, Vijay Kilari wrote:
-> On Thu, Feb 20, 2014 at 5:12 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Feb 20, 2014 at 06:58:25AM +0000, Vijay Kilari wrote:
-> >> --- a/arch/arm64/kernel/smp.c
-> >> +++ b/arch/arm64/kernel/smp.c
-> >> @@ -160,6 +160,8 @@ asmlinkage void secondary_start_kernel(void)
-> >>         set_cpu_online(cpu, true);
-> >>         complete(&cpu_running);
-> >>
-> >> +       local_dbg_enable();
-> >>         local_irq_enable();
-> >>         local_async_enable();
-> >
-> > The only thing to add then moving the isb(); local_dbg_enable() out of
-> > clear_os_lock and into debug_monitors_init. You can probably make the
-> > smp_call_function an on_each_cpu too.
-> >
-> > Does that make sense?
-> 
-> Its ok for me.  Isn't require to have isb() after clearing os lock for
-> every cpu?
-> Just having isb on cpu0 after clearing os lock is enough?
+We've split Qualcomm MSM support into legacy and multiplatform.  The RNG
+driver is only relevant on the multiplatform supported SoCs so switch the
+Kconfig depends to ARCH_QCOM.
 
-They'll synchronise on return from the IPI.
+CC: Herbert Xu <herbert@gondor.apana.org.au>
+CC: Stanimir Varbanov <svarbanov@mm-sol.com>
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+---
 
-> --- a/arch/arm64/kernel/debug-monitors.c
-> +++ b/arch/arm64/kernel/debug-monitors.c
-> @@ -137,8 +137,6 @@ void disable_debug_monitors(enum debug_el el)
->  static void clear_os_lock(void *unused)
->  {
->         asm volatile("msr oslar_el1, %0" : : "r" (0));
-> -       isb();
-> -       local_dbg_enable();
->  }
-> 
->  static int os_lock_notify(struct notifier_block *self,
-> @@ -157,8 +155,9 @@ static struct notifier_block os_lock_nb = {
->  static int debug_monitors_init(void)
->  {
->         /* Clear the OS lock. */
-> -       smp_call_function(clear_os_lock, NULL, 1);
-> -       clear_os_lock(NULL);
-> +       on_each_cpu(clear_os_lock, NULL, 1);
-> +       isb();
-> +       local_dbg_enable();
-> 
->         /* Register hotplug handler. */
->         register_cpu_notifier(&os_lock_nb);
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 7cfb92a..5070dc3 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -160,6 +160,7 @@ asmlinkage void secondary_start_kernel(void)
->         set_cpu_online(cpu, true);
->         complete(&cpu_running);
-> 
-> +       local_dbg_enable();
->         local_irq_enable();
->         local_async_enable();
-> 
-> Is this ok?
+Herbert,
 
-Looks good to me:
+If you can ack this I'll send it via linux-qcom/arm-soc tree's
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+thanks
 
-Thanks,
+v2:
+* Updated help text to remove MSM references, made more generic
 
-Will
+ drivers/char/hw_random/Kconfig | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+index 2f2b084..f2b9f8c 100644
+--- a/drivers/char/hw_random/Kconfig
++++ b/drivers/char/hw_random/Kconfig
+@@ -342,11 +342,11 @@ config HW_RANDOM_TPM
+ 	  If unsure, say Y.
+ 
+ config HW_RANDOM_MSM
+-	tristate "Qualcomm MSM Random Number Generator support"
+-	depends on HW_RANDOM && ARCH_MSM
++	tristate "Qualcomm ARM SoCs Random Number Generator support"
++	depends on HW_RANDOM && ARCH_QCOM
+ 	---help---
+ 	  This driver provides kernel-side support for the Random Number
+-	  Generator hardware found on Qualcomm MSM SoCs.
++	  Generator hardware found on Qualcomm ARM SoCs.
+ 
+ 	  To compile this driver as a module, choose M here. the
+ 	  module will be called msm-rng.
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
