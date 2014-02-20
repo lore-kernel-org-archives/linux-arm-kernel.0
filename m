@@ -1,126 +1,44 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 20 Feb 2014 15:49:33 +0100
-Subject: [PATCH 05/11] ARM: shmobile: koelsch legacy: Add MSIOF support
-In-Reply-To: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
-References: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1392907779-22053-6-git-send-email-geert@linux-m68k.org>
+Date: Thu, 20 Feb 2014 15:49:28 +0100
+Subject: [PATCH 00/11] ARM: shmobile: MSIOF integration on r8a7790/lager and
+ r8a7791/koelsch
+Message-ID: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+	Hi Simon, Magnus,
 
-Add MSIOF resources, platform data, platform device, pinctrl, and SPI
-child device.
+This patch series integrates support for the MSIOF module in the Renesas
+R-Car H2 (r8a7790) and M2 (r8a7791) SoCs on the Lager and Koelsch
+development boards. 
 
-  - Platform device numbering is 1-based for compatibility with the BSP,
-    as QSPI uses zero.
-  - Only MSIOF0 is in use, and thus registered. Its bus contains a single
-    device (a Renesas R2A11302FT PMIC).
+It was tested on Lager and Koelsch, both legacy and DT, using a dummy
+driver for the Renesas r2a11302ft PMIC that reads out the PMIC's version
+ID.
 
-Based on patches from Takashi Yoshii <takasi-y@ops.dti.ne.jp>
+  [01/11] ARM: shmobile: r8a7791 dtsi: Fix typo in msiof2 clock output name
+  [02/11] ARM: shmobile: r8a7790: Add MSIOF clocks
+  [03/11] ARM: shmobile: r8a7791: Add MSIOF clocks
+  [04/11] ARM: shmobile: lager legacy: Add MSIOF support
+  [05/11] ARM: shmobile: koelsch legacy: Add MSIOF support
+  [06/11] ARM: shmobile: r8a7790/lager dts: Rename label spi to qspi, add
+	  spi0 alias
+  [07/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi to qspi, add
+	  spi0 alias
+  [08/11] ARM: shmobile: r8a7790 dtsi: Add MSIOF nodes and aliases
+  [09/11] ARM: shmobile: r8a7791 dtsi: Add MSIOF nodes and aliases
+  [10/11] ARM: shmobile: lager dts: Add MSIOF nodes
+  [11/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
----
- arch/arm/mach-shmobile/board-koelsch.c |   59 ++++++++++++++++++++++++++++----
- 1 file changed, 53 insertions(+), 6 deletions(-)
+Thanks!
 
-diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
-index 5a034ff405d0..47bf588fc5ce 100644
---- a/arch/arm/mach-shmobile/board-koelsch.c
-+++ b/arch/arm/mach-shmobile/board-koelsch.c
-@@ -44,6 +44,7 @@
- #include <linux/sh_eth.h>
- #include <linux/spi/flash.h>
- #include <linux/spi/rspi.h>
-+#include <linux/spi/sh_msiof.h>
- #include <linux/spi/spi.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
-@@ -184,6 +185,35 @@ static const struct rspi_plat_data qspi_pdata __initconst = {
- 	.num_chipselect = 1,
- };
- 
-+/* MSIOF */
-+static const struct resource sh_msiof0_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xe6e20000, 0x0064),
-+	DEFINE_RES_IRQ(gic_spi(156)),
-+};
-+
-+static const struct resource sh_msiof1_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xe6e10000, 0x0064),
-+	DEFINE_RES_IRQ(gic_spi(157)),
-+};
-+
-+static const struct resource sh_msiof2_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xe6e00000, 0x0064),
-+	DEFINE_RES_IRQ(gic_spi(158)),
-+};
-+
-+static const struct sh_msiof_spi_info sh_msiof_info __initconst = {
-+	.rx_fifo_override	= 256,
-+	.num_chipselect		= 1,
-+};
-+
-+#define r8a7791_register_msiof(idx)					\
-+	platform_device_register_resndata(&platform_bus,		\
-+				"spi_r8a7791_msiof",			\
-+				(idx+1), sh_msiof##idx##_resources,	\
-+				ARRAY_SIZE(sh_msiof##idx##_resources),	\
-+				&sh_msiof_info,				\
-+				sizeof(struct sh_msiof_spi_info))
-+
- /* SPI Flash memory (Spansion S25FL512SAGMFIG11 64 MiB) */
- static struct mtd_partition spi_flash_part[] = {
- 	{
-@@ -214,12 +244,19 @@ static const struct flash_platform_data spi_flash_data = {
- 
- static const struct spi_board_info spi_info[] __initconst = {
- 	{
--		.modalias	= "m25p80",
--		.platform_data	= &spi_flash_data,
--		.mode		= SPI_MODE_0,
--		.max_speed_hz	= 30000000,
--		.bus_num	= 0,
--		.chip_select	= 0,
-+		.modalias	 = "m25p80",
-+		.platform_data	 = &spi_flash_data,
-+		.mode		 = SPI_MODE_0,
-+		.max_speed_hz	 = 30000000,
-+		.bus_num	 = 0,
-+		.chip_select	 = 0,
-+	}, {
-+		.modalias	 = "r2a1130x",
-+		.max_speed_hz	 = 6000000,
-+		.chip_select	 = 0,
-+		.bus_num	 = 1,
-+		.mode		 = SPI_MODE_3,
-+		.controller_data = (void *)-ENOENT, /* HW controlled CS */
- 	},
- };
- 
-@@ -384,6 +421,15 @@ static const struct pinctrl_map koelsch_pinctrl_map[] = {
- 				  "eth_rmii", "eth"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("r8a7791-ether", "pfc-r8a7791",
- 				  "intc_irq0", "intc"),
-+	/* MSIOF0 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("spi_r8a7791_msiof.1", "pfc-r8a7791",
-+				  "msiof0_clk", "msiof0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("spi_r8a7791_msiof.1", "pfc-r8a7791",
-+				  "msiof0_sync", "msiof0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("spi_r8a7791_msiof.1", "pfc-r8a7791",
-+				  "msiof0_rx", "msiof0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("spi_r8a7791_msiof.1", "pfc-r8a7791",
-+				  "msiof0_tx", "msiof0"),
- 	/* QSPI */
- 	PIN_MAP_MUX_GROUP_DEFAULT("qspi.0", "pfc-r8a7791",
- 				  "qspi_ctrl", "qspi"),
-@@ -449,6 +495,7 @@ static void __init koelsch_add_standard_devices(void)
- 					  qspi_resources,
- 					  ARRAY_SIZE(qspi_resources),
- 					  &qspi_pdata, sizeof(qspi_pdata));
-+	r8a7791_register_msiof(0);
- 	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
- 
- 	koelsch_add_du_device();
--- 
-1.7.9.5
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
