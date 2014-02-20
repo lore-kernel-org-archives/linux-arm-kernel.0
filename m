@@ -1,45 +1,53 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 20 Feb 2014 09:21:05 -0600
-Subject: [GIT PULL] ARM: OMAP2+: clock/PRCM/hwmod fixes for v3.14-rc
-In-Reply-To: <alpine.DEB.2.02.1402200257060.25798@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1402192120200.8777@utopia.booyaka.com>
- <53052219.9060109@ti.com>
- <alpine.DEB.2.02.1402200257060.25798@utopia.booyaka.com>
-Message-ID: <53061D61.6000105@ti.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 20 Feb 2014 16:26:37 +0100
+Subject: [GIT PULL] Xilinx Zynq dt changes for v3.15
+Message-ID: <53061EAD.9000000@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2014 08:58 PM, Paul Walmsley wrote:
-> On Wed, 19 Feb 2014, Nishanth Menon wrote:
-> 
->> Paul,
->> On 02/19/2014 03:22 PM, Paul Walmsley wrote:
->> [...]
->>>
->>> - ----------------------------------------------------------------
->>> Illia Smyrnov (1):
->>>       ARM: OMAP4: hwmod: Fix SOFTRESET logic for OMAP4
->>>
->>> Suman Anna (1):
->>>       ARM: DRA7: hwmod data: correct the sysc data for spinlock
->>>
->>> Tomi Valkeinen (1):
->>>       ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
->>>
->>> Vaibhav Bedia (1):
->>>       ARM: OMAP5: PRM: Fix reboot handling
->>>
->>
->> https://patchwork.kernel.org/patch/3585321/ missing?
-> 
-> If that fixes a bug, then that should be documented in the commit 
-> description.
-> 
-> Otherwise it's 3.15 material.
-Fair enough, this'd be something that might be called an optimization,
-thanks for queueing it.
+Hi,
 
+please pull this patch to your arm-soc tree.
+
+Thanks,
+Michal
+
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git-dev/group/ssw/linux-xlnx.git tags/zynq-dt-for-3.15
+
+for you to fetch changes up to 3795e91d2abb25164dda5687ca680a7ab940c447:
+
+  arm: dt: zynq: Add fclk-enable property to clkc node (2014-02-03 17:00:24 +0100)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq dt patches for v3.15
+
+- Define fclk-enable property
+
+----------------------------------------------------------------
+Soren Brinkmann (1):
+      arm: dt: zynq: Add fclk-enable property to clkc node
+
+ arch/arm/boot/dts/zynq-7000.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
 -- 
-Regards,
-Nishanth Menon
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140220/aaff48c5/attachment.sig>
