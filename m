@@ -1,59 +1,41 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 20 Feb 2014 14:01:08 +0100
-Subject: [PATCH v2 2/2] regulator: core: Replace direct ops->disable usage
-In-Reply-To: <20140220125130.GQ2669@sirena.org.uk>
-References: <1392894472-11956-1-git-send-email-mpa@pengutronix.de>
- <1392894472-11956-3-git-send-email-mpa@pengutronix.de>
- <20140220125130.GQ2669@sirena.org.uk>
-Message-ID: <20140220130108.GD21048@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Feb 2014 14:04:12 +0100
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <20140220121821.GO11878@lunn.ch>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1392896076.23342.37.camel@kazak.uk.xensource.com>
+ <20140220121821.GO11878@lunn.ch>
+Message-ID: <11515265.X2qOAjvHY6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 09:51:30PM +0900, Mark Brown wrote:
-> On Thu, Feb 20, 2014 at 12:07:52PM +0100, Markus Pargmann wrote:
+On Thursday 20 February 2014 13:18:21 Andrew Lunn wrote:
 > 
-> > --- a/drivers/regulator/core.c
-> > +++ b/drivers/regulator/core.c
-> > @@ -1908,8 +1908,6 @@ static int _regulator_do_disable(struct regulator_dev *rdev)
-> >  
-> >  	trace_regulator_disable_complete(rdev_get_name(rdev));
-> >  
-> > -	_notifier_call_chain(rdev, REGULATOR_EVENT_DISABLE,
-> > -			     NULL);
-> >  	return 0;
-> >  }
-> >  
-> > @@ -1933,6 +1931,8 @@ static int _regulator_disable(struct regulator_dev *rdev)
-> >  				rdev_err(rdev, "failed to disable\n");
-> >  				return ret;
-> >  			}
-> > +			_notifier_call_chain(rdev, REGULATOR_EVENT_DISABLE,
-> > +					NULL);
-> >  		}
-> >  
-> >  		rdev->use_count = 0;
+> What this patchset does is also make mach-mvebu part of the multi v5
+> kernel. So you just need one kernel for all ARM v5 machines which are
+> part of multi v5. The long term goal is that you need just two 32 ARM
+> kernels, multi v5 and multi v7. However orion5x and mv76xx0 are not
+> yet part of theses, so we are not there yet.
+
+BTW, if converting enough of orion5x to DT takes too long to
+deprecate that platform any time soon, I'd prefer moving it
+over to multiplatform while keeping the legacy board files
+in there. That should get substantially easier once
+mv78xx0, kirkwood and dove have been dealt with and we can
+collapse plat-orion and mach-orion5x into one directory.
+
+> > IOW that all of the platforms currently supported by the
+> > Debian kirkwood flavour remain supportable in the same binary after this
+> > change. It looks like it should be to me, but I'm not 100% sure.
 > 
-> This change doesn't seem obviously related?
+> If you don't support LaCie 2Big and 5Big, HP t5325 thin client and
+> Marvell OpenRD then yes, you have one binary. That binary could
+> potentially support over v5 machines, but i have no idea what ARM
+> machines Debian actually supports. Is there a list somewhere?
 
-I am using this function from _regulator_force_disable(), which calls
-_notifier_call_chain() with one additional flag
-"REGULATOR_EVENT_FORCE_DISABLE". To prevent calling
-_notifier_call_chain() twice for the force_disable case, I moved that
-function call out of _regulator_do_disable().
+http://anonscm.debian.org/viewvc/kernel/releases/linux/3.12.9-1/debian/config/armel/config.kirkwood?view=markup
 
-Regards,
+just lists all kirkwood machines as enabled, but that of course
+doesn't meant they are actually working or supported.
 
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140220/e35c4719/attachment.sig>
+	Arnd
