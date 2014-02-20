@@ -1,42 +1,69 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Thu, 20 Feb 2014 10:30:17 +0000
-Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
-In-Reply-To: <52F51922.6030502@gmail.com>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-22-git-send-email-andrew@lunn.ch>
- <52F51922.6030502@gmail.com>
-Message-ID: <1392892217.23342.18.camel@kazak.uk.xensource.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 20 Feb 2014 10:37:31 +0000
+Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
+In-Reply-To: <530501A7.2030703@ti.com>
+References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
+ <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
+ <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
+ <530501A7.2030703@ti.com>
+Message-ID: <20140220103731.GB15994@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-02-07 at 18:34 +0100, Sebastian Hesselbarth wrote:
-> On 02/07/2014 12:42 AM, Andrew Lunn wrote:
-> > Now that all the device tree support is in mach-mvebu, remove it from
-> > mach-kirkwood.
-> >
-> > Regenerate kirkwood_defconfig, removing all DT support, and a couple
-
-s/DT/board-file/?
-
-> > of other redundent options have been removed in the process.
-> >
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > ---
+On Wed, Feb 19, 2014 at 07:10:31PM +0000, Russ Dill wrote:
+> -----BEGIN PGP SIGNED MESSAGE-----
+> Hash: SHA1
 > 
-> Hmm, I wonder what Ian thinks of removing this so quickly again...
-
-I don't want to stand in the way of progress. What version is this
-targeting so I can setup our tooling to DTRT and append a DTB under the
-correct circumstances.
-
-I still need to figure out how to distinguish the variations, but I
-think I have a plan there (via which PCI buses are present, which is a
-bit skanky but seems like the most workable solution).
-
-Ian.
-
-> Maybe let it rot for 1-2 kernel versions?
+> On 02/19/2014 08:12 AM, Lorenzo Pieralisi wrote:
 > 
-> Sebastian
+> + *  https://patchwork.kernel.org/patch/96442/
+> 
+
+I am guessing the snippets of code your comments refer to.
+
+> I think the idea here is to get the CPU into a state so that later
+> when we resume from the resume kernel, the actual CPU state matches
+> the state we have in kernel. The main thing flush_thread does is clear
+> out any and all FP state.
+
+Which has already been saved through syscore_suspend()....
+
+> The may be part of the patchset that is OBE.
+
+It has to be updated then.
+
+> cpu_resume makes many assumptions about the state of the state of the
+> CPU, the primary being that the MMU is disabled, but also that all
+> caches and IRQs are disabled. soft_restart does all this for us.
 > 
 > 
+> 
+> ah, you are saying just return from __swsusp_arch_save_image and allow
+> cpu_suspend_abort to be called, placing the result of swsusp_save
+> somewhere else. This may work and would reduce the complexity of the
+> code slightly.
+
+Yes. Basically you are doing a soft reboot just to return 0.
+
+> This is taken from the previous iteration of the patchset, I think the
+> comment is OBE.
+
+Updated it please then.
+
+> But this is still required to select the right mapping for our copying.
+
+/me confused. Please describe what switching to idmap is meant to
+achieve. In the patch above the copied swapper pgdir is not even used, I
+would like to understand why this is done.
+
+> I don't remember why I needed to prevent gcc from manipulating the
+> stack here.
+
+That's not a good reason to mark a function with attr __naked. If it is
+needed we leave it there, if it is not it has to go.
+
+> This is another holdover from previous patch versions that may be OBE.
+
+See above.
+
+Lorenzo
