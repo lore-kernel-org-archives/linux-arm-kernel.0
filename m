@@ -1,37 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 20 Feb 2014 18:26:49 -0500
-Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
-In-Reply-To: <1392896356.23342.40.camel@kazak.uk.xensource.com>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-22-git-send-email-andrew@lunn.ch>
- <52F51922.6030502@gmail.com>
- <1392892217.23342.18.camel@kazak.uk.xensource.com>
- <20140220105854.GL11878@lunn.ch>
- <20140220111913.GZ21483@n2100.arm.linux.org.uk>
- <1392896356.23342.40.camel@kazak.uk.xensource.com>
-Message-ID: <20140220232649.GU7862@titan.lakedaemon.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 21 Feb 2014 08:27:34 +0900
+Subject: [GIT PULL 00/12] Second Round of Renesas ARM Based SoC Updates
+ for v3.15
+In-Reply-To: <20140220094324.GR19089@quad.lixom.net>
+References: <cover.1392277789.git.horms+renesas@verge.net.au>
+ <20140220094324.GR19089@quad.lixom.net>
+Message-ID: <20140220232734.GB6775@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 11:39:16AM +0000, Ian Campbell wrote:
-> On Thu, 2014-02-20 at 11:19 +0000, Russell King - ARM Linux wrote:
-> > What's wrong with the soc subsystem (drivers/base/soc.c).  This
-> > provides a way to export SoC through standardised interfaces. 
+On Thu, Feb 20, 2014 at 01:43:24AM -0800, Olof Johansson wrote:
+> On Thu, Feb 13, 2014 at 05:04:56PM +0900, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > please consider this second round of Renesas ARM Based SoC updates for v3.15.
+> > 
+> > This pull-request is based on the first round of such changes,
+> > tagged as renesas-soc-for-v3.15, which I have previously sent a
+> > pull-request for.
+> > 
+> > 
+> > The following changes since commit 012a7069b5a10a0851584d71a1facdc40a972319:
+> > 
+> >   ARM: shmobile: r8a7790: Add PCI USB host clock support (2014-02-04 10:25:03 +0900)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.15
 > 
-> It looks like the thing to use to me.
+> Hi,
 > 
-> It seems to have been around only since v3.3 though, which makes it a
-> bit tricky to use when upgrading from running board-file based v3.2
-> system (Debian Wheezy) to a newer DTB based kernel, we need to select
-> the new DTB while running the old system.
-> 
-> I'd prefer to use this thing as the primary mechanism but it seems like
-> I'd have to implement some sort of fallback at least for one Debian
-> release cycle. I'm sure it is doable...
+> I'm stopping my merges for the night here, so I haven't merged this but I'll
+> likely do it tomorrow. I did have comments on one of the patches though (that
+> adds a new include/mach file that's not really needed). Fixing that can be done
+> incrementally though, especially if you have downstream users of this branch.
 
-back in v3.2, lspci should still work.  Would that given you the
-information you need?
+Thanks.
 
-thx,
-
-Jason.
+I have another round of SoC updates ready to go. So I plan to send them
+and then address your feedback in a subsequent pull-request (once a patch
+is ready:).
