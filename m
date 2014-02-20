@@ -1,53 +1,189 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 20 Feb 2014 11:52:47 +0100
-Subject: [PATCH v4 7/7] powerpc: add support for reserved memory defined by
- device tree
+Date: Thu, 20 Feb 2014 11:52:43 +0100
+Subject: [PATCH v4 3/7] drivers: dma-contiguous: add initialization from device
+ tree
 In-Reply-To: <1392893567-31623-1-git-send-email-m.szyprowski@samsung.com>
 References: <1392893567-31623-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1392893567-31623-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1392893567-31623-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable reserved memory initialization from device tree.
+Refactor internal dma_contiguous_init_reserved_mem() function, which
+creates CMA area from previously reserved memory region and add support
+for handling 'shared-dma-pool' reserved-memory device tree nodes.
+
+Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/powerpc/Kconfig       |    1 +
- arch/powerpc/kernel/prom.c |    3 +++
- 2 files changed, 4 insertions(+)
+ drivers/base/dma-contiguous.c |  130 ++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 108 insertions(+), 22 deletions(-)
 
-diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index 957bf344c0f5..3b6617fed8fc 100644
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -90,6 +90,7 @@ config PPC
- 	select BINFMT_ELF
- 	select OF
- 	select OF_EARLY_FLATTREE
-+	select OF_RESERVED_MEM
- 	select HAVE_FTRACE_MCOUNT_RECORD
- 	select HAVE_DYNAMIC_FTRACE
- 	select HAVE_FUNCTION_TRACER
-diff --git a/arch/powerpc/kernel/prom.c b/arch/powerpc/kernel/prom.c
-index f58c0d3aaeb4..b814262a2048 100644
---- a/arch/powerpc/kernel/prom.c
-+++ b/arch/powerpc/kernel/prom.c
-@@ -33,6 +33,7 @@
- #include <linux/irq.h>
- #include <linux/memblock.h>
- #include <linux/of.h>
-+#include <linux/of_reserved_mem.h>
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index 165c2c299e57..5dfcc3743d9b 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -182,6 +182,49 @@ static int __init cma_init_reserved_areas(void)
+ core_initcall(cma_init_reserved_areas);
  
- #include <asm/prom.h>
- #include <asm/rtas.h>
-@@ -588,6 +589,8 @@ static void __init early_reserve_mem_dt(void)
- 			memblock_reserve(base, size);
+ /**
++ * dma_contiguous_init_reserved_mem() - reserve custom contiguous area
++ * @size: Size of the reserved area (in bytes),
++ * @base: Base address of the reserved area optional, use 0 for any
++ * @limit: End address of the reserved memory (optional, 0 for any).
++ * @res_cma: Pointer to store the created cma region.
++ *
++ * This function reserves memory from early allocator. It should be
++ * called by arch specific code once the early allocator (memblock or bootmem)
++ * has been activated and all other subsystems have already allocated/reserved
++ * memory. This function allows to create custom reserved areas for specific
++ * devices.
++ */
++static int __init dma_contiguous_init_reserved_mem(phys_addr_t size,
++					phys_addr_t base, struct cma **res_cma)
++{
++	struct cma *cma = &cma_areas[cma_area_count];
++	phys_addr_t alignment;
++
++	/* Sanity checks */
++	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
++		pr_err("Not enough slots for CMA reserved regions!\n");
++		return -ENOSPC;
++	}
++
++	if (!size || !memblock_is_region_reserved(base, size))
++		return -EINVAL;
++
++	/* Sanitise input arguments */
++	alignment = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
++	if (ALIGN(base, alignment) != base || ALIGN(size, alignment) != size)
++		return -EINVAL;
++
++	cma->base_pfn = PFN_DOWN(base);
++	cma->count = size >> PAGE_SHIFT;
++	*res_cma = cma;
++	cma_area_count++;
++
++	/* Architecture specific contiguous memory fixup. */
++	dma_contiguous_early_fixup(base, size);
++	return 0;
++}
++
++/**
+  * dma_contiguous_reserve_area() - reserve custom contiguous area
+  * @size: Size of the reserved area (in bytes),
+  * @base: Base address of the reserved area optional, use 0 for any
+@@ -197,7 +240,6 @@ core_initcall(cma_init_reserved_areas);
+ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+ 				       phys_addr_t limit, struct cma **res_cma)
+ {
+-	struct cma *cma = &cma_areas[cma_area_count];
+ 	phys_addr_t alignment;
+ 	int ret = 0;
+ 
+@@ -205,12 +247,6 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+ 		 (unsigned long)size, (unsigned long)base,
+ 		 (unsigned long)limit);
+ 
+-	/* Sanity checks */
+-	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
+-		pr_err("Not enough slots for CMA reserved regions!\n");
+-		return -ENOSPC;
+-	}
+-
+ 	if (!size)
+ 		return -EINVAL;
+ 
+@@ -241,21 +277,12 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
  		}
  	}
-+
-+	early_init_fdt_scan_reserved_mem();
- }
  
- static void __init early_reserve_mem(void)
+-	/*
+-	 * Each reserved area must be initialised later, when more kernel
+-	 * subsystems (like slab allocator) are available.
+-	 */
+-	cma->base_pfn = PFN_DOWN(base);
+-	cma->count = size >> PAGE_SHIFT;
+-	*res_cma = cma;
+-	cma_area_count++;
+-
+-	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
+-		(unsigned long)base);
+-
+-	/* Architecture specific contiguous memory fixup. */
+-	dma_contiguous_early_fixup(base, size);
+-	return 0;
++	ret = dma_contiguous_init_reserved_mem(size, base, res_cma);
++	if (ret == 0) {
++		pr_info("CMA: reserved %ld MiB at %08lx\n",
++			(unsigned long)size / SZ_1M, (unsigned long)base);
++		return 0;
++	}
+ err:
+ 	pr_err("CMA: failed to reserve %ld MiB\n", (unsigned long)size / SZ_1M);
+ 	return ret;
+@@ -357,3 +384,62 @@ bool dma_release_from_contiguous(struct device *dev, struct page *pages,
+ 
+ 	return true;
+ }
++
++/*
++ * Support for reserved memory regions defined in device tree
++ */
++#ifdef CONFIG_OF_RESERVED_MEM
++#include <linux/of.h>
++#include <linux/of_fdt.h>
++#include <linux/of_reserved_mem.h>
++
++#undef pr_fmt
++#define pr_fmt(fmt) fmt
++
++static void rmem_cma_device_init(struct reserved_mem *rmem,
++			 struct device *dev, struct of_phandle_args *args)
++{
++	struct cma *cma = rmem->priv;
++	dev_set_cma_area(dev, cma);
++}
++
++static const struct reserved_mem_ops rmem_cma_ops = {
++	.device_init	= rmem_cma_device_init,
++};
++
++static int __init rmem_cma_setup(struct reserved_mem *rmem,
++				 unsigned long node,
++				 const char *uname)
++{
++	phys_addr_t align = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
++	phys_addr_t mask = align - 1;
++	struct cma *cma;
++	int err;
++
++	if (!of_get_flat_dt_prop(node, "reusable", NULL))
++		return -EINVAL;
++
++	if ((rmem->base & mask) || (rmem->size & mask)) {
++		pr_err("Reserved memory: incorrect alignment of CMA region\n");
++		return -EINVAL;
++	}
++
++	err = dma_contiguous_init_reserved_mem(rmem->size, rmem->base, &cma);
++	if (err) {
++		pr_err("Reserved memory: unable to setup CMA region\n");
++		return err;
++	}
++
++	if (of_get_flat_dt_prop(node, "linux,cma-default", NULL))
++		dma_contiguous_set_default(cma);
++
++	rmem->ops = &rmem_cma_ops;
++	rmem->priv = cma;
++
++	pr_info("Reserved memory: created CMA memory pool at %pa, size %ld MiB\n",
++		&rmem->base, (unsigned long)rmem->size / SZ_1M);
++
++	return 0;
++}
++RESERVEDMEM_OF_DECLARE(cma, "shared-dma-pool", rmem_cma_setup);
++#endif
 -- 
 1.7.9.5
