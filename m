@@ -1,88 +1,81 @@
 From: ashutosh.s@phytec.in (Ashutosh singh)
-Date: Thu, 20 Feb 2014 11:20:15 +0530
-Subject: [PATCH v4 1/4] ARM: dts: imx6q-phytec: Added USB_OTG Support
-Message-ID: <1392875418-9034-1-git-send-email-ashutosh.s@phytec.in>
+Date: Thu, 20 Feb 2014 11:20:17 +0530
+Subject: [PATCH v3 3/4] ARM: dts: imx6q-phytec: Added GPMI-NAND Support
+In-Reply-To: <1392875418-9034-1-git-send-email-ashutosh.s@phytec.in>
+References: <1392875418-9034-1-git-send-email-ashutosh.s@phytec.in>
+Message-ID: <1392875418-9034-3-git-send-email-ashutosh.s@phytec.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for USB_OTG on Phytec phyFLEX-i.MX6 Quad module.
+This patch adds support for GPMI-NAND on Phytec phyFLEX-i.MX6 Quad module.
 
 Signed-off-by: Ashutosh singh <ashutosh.s@phytec.in>
 ---
  arch/arm/boot/dts/imx6q-phytec-pbab01.dts  |    4 ++++
- arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi |   31 ++++++++++++++++++++++++++++
- 2 files changed, 35 insertions(+)
+ arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi |   29 ++++++++++++++++++++++++++++
+ 2 files changed, 33 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
-index 7d37ec6..87c3702 100644
+index 91aecba..21c8b37 100644
 --- a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
 +++ b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
-@@ -25,6 +25,10 @@
+@@ -21,6 +21,10 @@
  	status = "okay";
  };
  
-+&usbotg {
++&gpmi {
 +	status = "okay";
 +};
 +
- &usdhc2 {
+ &uart4 {
  	status = "okay";
  };
 diff --git a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-index 0dd5d3b..ee07896 100644
+index b1a78a0..324f155 100644
 --- a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
 +++ b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-@@ -18,6 +18,21 @@
- 	memory {
- 		reg = <0x10000000 0x80000000>;
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_usb_otg_vbus: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "usb_otg_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio4 15 0>;
-+		};
-+	};
- };
- 
- &ecspi3 {
-@@ -180,6 +195,14 @@
+@@ -190,6 +190,28 @@
  			>;
  		};
  
-+		pinctrl_usbotg: usbotggrp {
++		pinctrl_gpmi_nand: gpminandgrp {
 +			fsl,pins = <
-+				MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x17059
-+				MX6QDL_PAD_KEY_COL4__USB_OTG_OC		0x1b0b0
-+				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x80000000
++				MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
++				MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
++				MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
++				MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
++				MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
++				MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
++				MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
++				MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
++				MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
++				MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
++				MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
++				MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
++				MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
++				MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
++				MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
++				MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
++				MX6QDL_PAD_SD4_DAT0__NAND_DQS		0x00b1
 +			>;
 +		};
 +
- 		pinctrl_usdhc2: usdhc2grp {
+ 		pinctrl_i2c1: i2c1grp {
  			fsl,pins = <
- 				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
-@@ -225,6 +248,14 @@
+ 				MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
+@@ -257,6 +279,13 @@
  	status = "disabled";
  };
  
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
++&gpmi {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	disable-over-current;
++	pinctrl-0 = <&pinctrl_gpmi_nand>;
++	nand-on-flash-bbt;
 +	status = "disabled";
 +};
 +
- &usdhc2 {
+ &uart4 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc2>;
+ 	pinctrl-0 = <&pinctrl_uart4>;
 -- 
 1.7.9.5
