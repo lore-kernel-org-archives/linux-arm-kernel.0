@@ -1,42 +1,37 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Thu, 20 Feb 2014 10:37:58 +0100
-Subject: machine_desc->nr_irqs question
-Message-ID: <m3vbwaqg3t.fsf@t19.piap.pl>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 20 Feb 2014 01:43:24 -0800
+Subject: [GIT PULL 00/12] Second Round of Renesas ARM Based SoC Updates
+ for v3.15
+In-Reply-To: <cover.1392277789.git.horms+renesas@verge.net.au>
+References: <cover.1392277789.git.horms+renesas@verge.net.au>
+Message-ID: <20140220094324.GR19089@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Feb 13, 2014 at 05:04:56PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> please consider this second round of Renesas ARM Based SoC updates for v3.15.
+> 
+> This pull-request is based on the first round of such changes,
+> tagged as renesas-soc-for-v3.15, which I have previously sent a
+> pull-request for.
+> 
+> 
+> The following changes since commit 012a7069b5a10a0851584d71a1facdc40a972319:
+> 
+>   ARM: shmobile: r8a7790: Add PCI USB host clock support (2014-02-04 10:25:03 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.15
+
 Hi,
 
-I'm having problems understanding how is machine_desc->nr_irqs supposed
-to work with CONFIG_ARM_GIC.
-Assuming CONFIG_SPARSE_IRQ is set. The CPU is, in this case, cns3xxx.
+I'm stopping my merges for the night here, so I haven't merged this but I'll
+likely do it tomorrow. I did have comments on one of the patches though (that
+adds a new include/mach file that's not really needed). Fixing that can be done
+incrementally though, especially if you have downstream users of this branch.
 
-Cns3xxx machine_desc->nr_irqs is set to NR_IRQS_CNS3XXX =
-IRQ_TC11MP_GIC_START + 64 = 32 + 64 = 96.
 
-At start, machine_desc->nr_irqs are pre-allocated via
-start_kernel() -> early_irq_init().
-
-Then, gic_init(0, 29, ...) ->  gic_init_bases(0, 29, ...) tries this
-(and fails):
-
-	/*
-	 * For primary GICs, skip over SGIs.
-	 * For secondary GICs, skip over PPIs, too.
-	 */
-	irq_start = (effectively) 16;
-
-	irq_base = irq_alloc_descs(irq_start, 16, gic_irqs, numa_node_id());
-	if (IS_ERR_VALUE(irq_base)) {
-		WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
-		     irq_start);
-
-Does this mean machine_desc->nr_irqs is to be kept at 16
-(NR_IRQS_LEGACY) or less, so it doesn't conflict with gic_init()?
-
-Or perhaps gic_init() shouldn't warn about this?
--- 
-Krzysztof Halasa
-
-Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+-Olof
