@@ -1,34 +1,35 @@
 From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Thu, 20 Feb 2014 18:49:02 +0200
-Subject: [PATCH RESEND] ARM: dts: qcom-msm8960-cdp: Add RNG device tree node
-Message-ID: <1392914942-23191-1-git-send-email-svarbanov@mm-sol.com>
+Date: Thu, 20 Feb 2014 18:48:52 +0200
+Subject: [PATCH RESEND] ARM: dts: qcom-msm8974: Add RNG device tree node
+Message-ID: <1392914932-23145-1-git-send-email-svarbanov@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Add the necessary DT node to probe the rng driver on
-msm8960-cdp platform.
+msm8974 platforms.
 
 Signed-off-by: Stanimir Varbanov <svarbanov@mm-sol.com>
-Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-msm8960-cdp.dts | 7 +++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 7 +++++++
  1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8960-cdp.dts b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
-index 7c30de4fa302..8fda9c90ba97 100644
---- a/arch/arm/boot/dts/qcom-msm8960-cdp.dts
-+++ b/arch/arm/boot/dts/qcom-msm8960-cdp.dts
-@@ -67,4 +67,11 @@
- 		reg = <0x500000 0x1000>;
- 		qcom,controller-type = "pmic-arbiter";
- 	};
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 9e5dadb101eb..ada0e8216c22 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -117,5 +117,12 @@
+ 			clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
+ 			clock-names = "core", "iface";
+ 		};
 +
-+	rng at 1a500000 {
-+		compatible = "qcom,prng";
-+		reg = <0x1a500000 0x200>;
-+		clocks = <&gcc PRNG_CLK>;
-+		clock-names = "core";
-+	};
++		rng at f9bff000 {
++			compatible = "qcom,prng";
++			reg = <0xf9bff000 0x200>;
++			clocks = <&gcc GCC_PRNG_AHB_CLK>;
++			clock-names = "core";
++		};
+ 	};
  };
 -- 
 1.8.4.4
