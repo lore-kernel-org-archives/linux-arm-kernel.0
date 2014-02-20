@@ -1,30 +1,88 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Thu, 20 Feb 2014 11:39:16 +0000
-Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
-In-Reply-To: <20140220111913.GZ21483@n2100.arm.linux.org.uk>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-22-git-send-email-andrew@lunn.ch>
- <52F51922.6030502@gmail.com>
- <1392892217.23342.18.camel@kazak.uk.xensource.com>
- <20140220105854.GL11878@lunn.ch>
- <20140220111913.GZ21483@n2100.arm.linux.org.uk>
-Message-ID: <1392896356.23342.40.camel@kazak.uk.xensource.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 20 Feb 2014 13:39:55 +0200
+Subject: [PATCH v8 00/14] USB Host support for OMAP5 uEVM
+Message-ID: <1392896409-5101-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-02-20 at 11:19 +0000, Russell King - ARM Linux wrote:
-> What's wrong with the soc subsystem (drivers/base/soc.c).  This
-> provides a way to export SoC through standardised interfaces. 
+Hi Benoit, Tony & Lee,
 
-It looks like the thing to use to me.
+This patchset brings up USB Host ports and Ethernet port on
+the OMAP5 uEVM board.
 
-It seems to have been around only since v3.3 though, which makes it a
-bit tricky to use when upgrading from running board-file based v3.2
-system (Debian Wheezy) to a newer DTB based kernel, we need to select
-the new DTB while running the old system.
+It also does some cleanup with respect to DT clock binding
+for the mfd/omap-usb-host driver.
 
-I'd prefer to use this thing as the primary mechanism but it seems like
-I'd have to implement some sort of fallback at least for one Debian
-release cycle. I'm sure it is doable...
+Please queue these for -next.
 
-Ian.
+Tested on:
+ - OMAP5 uEVM
+ - Pandaboard ES Rev. B1
+ - Beagleboard-XM Rev C2 (DT + Legacy)
+ - Beagleboard Rev C4 (DT + Legacy)
+
+Changelog:
+
+v8:
+- Addressed review comments and split patch
+  "mfd: omap-usb-host: Get clocks based on hardware revision"
+- Removed unnecessary usb host dummy clocks on OMAP3
+- Removed unnecessary clock alias "ehci_logic_fck" for OMAP3
+- Rebased on 3.14-rc3
+
+v7:
+- Rebased on 3.14-rc2
+- Removed incompatible ids from DT files and examples
+
+v6:
+- Initialized clocks to -ENODEV and split patch 3.
+
+v5:
+- Expose all clocks in the DT binding document for mfd:omap-usb-host
+and mfd:omap-usb-tll
+
+v4:
+- Updated DT binding document for clock binding
+
+v3:
+- Rebased on top of 3.13-rc7
+
+cheers,
+-roger
+
+---
+Roger Quadros (14):
+  mfd: omap-usb-host: Get clocks based on hardware revision
+  mfd: omap-usb-host: Always fail on clk_get() error
+  mfd: omap-usb-host: Use clock names as per function for reference
+    clocks
+  mfd: omap-usb-host: Update DT clock binding information
+  mfd: omap-usb-tll: Update DT clock binding information
+  CLK: TI: OMAP3: Get rid of unused USB Host dummy clocks
+  ARM: OMAP3: hwmod data: Remove optional clock from usb_host_hs module
+  ARM: dts: omap4: Update omap-usb-host node
+  ARM: dts: omap5: Update omap-usb-host node
+  ARM: dts: omap4-panda: Provide USB PHY clock
+  ARM: dts: omap5-uevm: Provide USB PHY clock
+  ARM: OMAP2+: Remove legacy_init_ehci_clk()
+  ARM: dts: OMAP2+: Get rid of incompatible ids for USB host nodes
+  usb: omap: dts: Update DT binding example usage
+
+ .../devicetree/bindings/mfd/omap-usb-host.txt      |  23 ++++
+ .../devicetree/bindings/mfd/omap-usb-tll.txt       |  10 ++
+ .../devicetree/bindings/usb/ehci-omap.txt          |   2 +-
+ .../devicetree/bindings/usb/ohci-omap3.txt         |   2 +-
+ arch/arm/boot/dts/omap3.dtsi                       |   4 +-
+ arch/arm/boot/dts/omap4-panda-common.dtsi          |   8 +-
+ arch/arm/boot/dts/omap4.dtsi                       |  10 +-
+ arch/arm/boot/dts/omap5-uevm.dts                   |   8 +-
+ arch/arm/boot/dts/omap5.dtsi                       |  10 +-
+ arch/arm/mach-omap2/cclock3xxx_data.c              |   4 -
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   6 --
+ arch/arm/mach-omap2/pdata-quirks.c                 |  16 ---
+ drivers/clk/ti/clk-3xxx.c                          |   4 -
+ drivers/mfd/omap-usb-host.c                        | 116 ++++++++++++++-------
+ 14 files changed, 135 insertions(+), 88 deletions(-)
+
+-- 
+1.8.3.2
