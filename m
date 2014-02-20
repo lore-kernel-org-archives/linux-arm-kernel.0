@@ -1,28 +1,94 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Thu, 20 Feb 2014 15:30:12 +0100
-Subject: [PATCH] pinctrl: imx: Fix pin name in debug message.
-Message-ID: <20140220143012.23570.63407.stgit@localhost>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Thu, 20 Feb 2014 14:38:29 +0000
+Subject: [PATCH] arm64: Add architecture support for PCI
+In-Reply-To: <5302FED1.80903@huawei.com>
+References: <1391453028-23191-1-git-send-email-Liviu.Dudau@arm.com>
+ <1391453028-23191-2-git-send-email-Liviu.Dudau@arm.com>
+ <5302FED1.80903@huawei.com>
+Message-ID: <20140220143829.GA1556@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The wrong index counter was being used, causing the debug message
-to show an incorrect pin name.
+On Tue, Feb 18, 2014 at 02:33:53PM +0800, Yijing Wang wrote:
+> > +#include <linux/init.h>
+> > +#include <linux/io.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/mm.h>
+> > +#include <linux/of_pci.h>
+> > +#include <linux/of_platform.h>
+> > +#include <linux/slab.h>
+> > +
+> > +#include <asm/pci-bridge.h>
+> > +
+> > +
+> > +/*
+> > + * Return the domain number for this bus
+> > + */
+> > +int pci_domain_nr(struct pci_bus *bus)
+> > +{
+> > +	struct pci_host_bridge *bridge = to_pci_host_bridge(bus->bridge);
 
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
----
- drivers/pinctrl/pinctrl-imx.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Hi Yijing,
 
-diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
-index 4779b8e..e118fb1 100644
---- a/drivers/pinctrl/pinctrl-imx.c
-+++ b/drivers/pinctrl/pinctrl-imx.c
-@@ -491,7 +491,7 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
- 			pin->mux_mode |= IOMUXC_CONFIG_SION;
- 		pin->config = config & ~IMX_PAD_SION;
- 
--		dev_dbg(info->dev, "%s: %d 0x%08lx", info->pins[i].name,
-+		dev_dbg(info->dev, "%s: %d 0x%08lx", info->pins[pin_id].name,
- 				pin->mux_mode, pin->config);
- 	}
- 
+> 
+> Here bus is specific to root bus ? or, what about use find_pci_host_bridge() to get the pci_host_bridge
+> instead.
+
+Yes, the call should be to find_pci_host_bridge(). I sort of implied that the
+bus is always the root bus, which is obviously not correct. Thanks for pointing it out.
+
+> 
+> > +
+> > +	if (bridge)
+> > +		return bridge->domain_nr;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +int pci_proc_domain(struct pci_bus *bus)
+> > +{
+> > +	return pci_domain_nr(bus);
+> > +}
+> > +
+> > +/*
+> > + * Called after each bus is probed, but before its children are examined
+> > + */
+> > +void pcibios_fixup_bus(struct pci_bus *bus)
+> > +{
+> > +	struct pci_dev *dev;
+> > +	struct resource *res;
+> > +	int i;
+> > +
+> > +	if (bus->self != NULL) {
+> 
+> What about use !pci_is_root_bus() ?
+
+Again, good call, will change.
+
+> 
+> > +		pci_read_bridge_bases(bus);
+> > +
+> > +		pci_bus_for_each_resource(bus, res, i) {
+> > +			if (!res || !res->flags || res->parent)
+> > +				continue;
+> > +
+> > +			/*
+> > +			 * If we are going to reassign everything, we can
+> > +			 * shrink the P2P resource to have zero size to
+> > +			 * save space
+> > +			 */
+> > +			if (pci_has_flag(PCI_REASSIGN_ALL_RSRC)) {
+> > +				res->flags |= IORESOURCE_UNSET;
+> > +				res->start = 0;
+> > +				res->end = -1;
+> > +				continue;
+> > +			}
+> > +		}
+> > +	}
+> > +
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
