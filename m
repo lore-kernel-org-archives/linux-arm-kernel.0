@@ -1,104 +1,103 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu, 20 Feb 2014 09:59:23 +0100
-Subject: [PATCHv2 1/8] ARM: at91: Add at91sam9rl DT SoC support
-In-Reply-To: <20140219175409.GF25079@e106331-lin.cambridge.arm.com>
-References: <1392823951-26053-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1392823951-26053-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20140219170020.GA25079@e106331-lin.cambridge.arm.com>
- <20140219173141.GB3038@piout.net>
- <20140219175409.GF25079@e106331-lin.cambridge.arm.com>
-Message-ID: <5305C3EB.5080107@overkiz.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 20 Feb 2014 01:03:30 -0800
+Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
+In-Reply-To: <CALAqxLU7ehHfvQa58HpdzojRU-2zhNpEgkr9KEJ3cf550WcnWw@mail.gmail.com>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <5302B306.8090503@samsung.com>
+ <CAOesGMhnUDcUL7hREV=EYEGr5YG-ZLL6v9NiGcrBr6477WfdyQ@mail.gmail.com>
+ <6032891.ndY8FikAMY@wuerfel>
+ <CALAqxLX6STNqUeVO2G18bm_HKabpoRxZTa3uK6i-JP97zEYVZg@mail.gmail.com>
+ <CAOesGMjLR3PGXeyJPAvGwam4yK97+vnDfq5MVutJz75aKPX8gw@mail.gmail.com>
+ <CALAqxLU7ehHfvQa58HpdzojRU-2zhNpEgkr9KEJ3cf550WcnWw@mail.gmail.com>
+Message-ID: <CAOesGMjSjzZ4iX3NVA6eS4LHJF2MQQ=KJpNgKWikJb6YkQxNpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 19/02/2014 18:54, Mark Rutland wrote:
-> On Wed, Feb 19, 2014 at 05:31:42PM +0000, Alexandre Belloni wrote:
->> On 19/02/2014 at 17:00:20 +0000, Mark Rutland wrote :
->>> On Wed, Feb 19, 2014 at 03:32:24PM +0000, Alexandre Belloni wrote:
->>>> This adds preliminary DT support for the at91sam9rl.
+On Tue, Feb 18, 2014 at 12:06 PM, John Stultz <john.stultz@linaro.org> wrote:
+> On Tue, Feb 18, 2014 at 12:00 PM, Olof Johansson <olof@lixom.net> wrote:
+>> On Tue, Feb 18, 2014 at 11:52 AM, John Stultz <john.stultz@linaro.org> wrote:
+>>> On Tue, Feb 18, 2014 at 10:13 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> On Tuesday 18 February 2014 08:16:13 Olof Johansson wrote:
+>>>>> On Mon, Feb 17, 2014 at 5:10 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>>>>> > On 02/15/14 02:06, Arnd Bergmann wrote:
+>>>>> >> My feeling is that we don't need to use the levels for Kconfig, although
+>>>>> >> we might want to use them DT compatible strings, even if it ends up
+>>>>> >> looking
+>>>>> >> a little funny when you do
+>>>>> >>
+>>>>> >>         compatible = "arm,sbsa-l3", "arm,sbsa-l2", "arm,sbsa-l1";
+>>>>> >>
+>>>>> >>> What kind of features are you expecting though? More IP
+>>>>> >>> blocks/devices? Those are just kernel config options to enable,
+>>>>> >>> ideally as modules.
+>>>>> >>
+>>>>> >>
+>>>>> >> Right, I think we can just put them into defconfig. No need to
+>>>>> >> "select" them from Kconfig since the extra options wouldn't be
+>>>>> >> required for booting or using the system.
+>>>>> >>
+>>>>> > As I commented above, how about MCT? Samsung has a plan to use MCT on ARMv8,
+>>>>> > it is not for used for GH7 though...
+>>>>>
+>>>>> It looks like the clocksource drivers are all based around being
+>>>>> enabled based on platforms instead of individually selectable. That
+>>>>> causes a problem here. I think we should change the clocksource
+>>>>> Kconfig instead. Then it's just a matter of making sure your defconfig
+>>>>> has the needed driver enabled.
+>>>>>
+>>>>> (Adding Daniel and Thomas in case they have objections to that approach)
 >>>>
->>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>>> ---
->>>>   arch/arm/boot/dts/at91sam9rl.dtsi | 628 ++++++++++++++++++++++++++++++++++++++
->>>>   arch/arm/mach-at91/at91sam9rl.c   |  16 +
->>>>   2 files changed, 644 insertions(+)
->>>>   create mode 100644 arch/arm/boot/dts/at91sam9rl.dtsi
->>>   
->>> [...]
+>>>> +John Stultz
+>>>>
+>>>> IIRC it was John who insisted on doing it the current way, although
+>>>> I can't remember his reasoning.
 >>>
->>>> +                       tcb0: timer at fffa0000 {
->>>> +                               compatible = "atmel,at91rm9200-tcb";
->>>> +                               reg = <0xfffa0000 0x100>;
->>>> +                               interrupts = <16 IRQ_TYPE_LEVEL_HIGH 0
->>>> +                                             17 IRQ_TYPE_LEVEL_HIGH 0
->>>> +                                             18 IRQ_TYPE_LEVEL_HIGH 0>;
->>>> +                       };
->>> Nit: please bracket list entries individually. Also for other list
->>> properties like reg and (*-)gpio(s).
->>>
->> OK.
+>>> Are we really expecting there to be SoC specific clocksources here? I
+>>> thought we were getting away from that sort of stuff with the
+>>> architecture timer?
 >>
->>> [...]
->>>
->>>> +                       adc0: adc at fffd0000 {
->>>> +                               compatible = "atmel,at91sam9260-adc";
->>>> +                               reg = <0xfffd0000 0x100>;
->>>> +                               interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
->>>> +                               atmel,adc-use-external-triggers;
->>>> +                               atmel,adc-channels-used = <0xf>;
->>>> +                               atmel,adc-vref = <3300>;
->>>> +                               atmel,adc-num-channels = <4>;
->>>> +                               atmel,adc-startup-time = <15>;
->>>> +                               atmel,adc-channel-base = <0x30>;
->>>> +                               atmel,adc-drdy-mask = <0x10000>;
->>>> +                               atmel,adc-status-register = <0x1c>;
->>>> +                               atmel,adc-trigger-register = <0x04>;
->>>> +                               atmel,adc-res = <8 10>;
->>>> +                               atmel,adc-res-names = "lowres", "highres";
->>>> +                               atmel,adc-use-res = "highres";
->>>> +
->>>> +                               trigger at 0 {
->>>> +                                       trigger-name = "timer-counter-0";
->>>> +                                       trigger-value = <0x1>;
->>>> +                               };
->>> A unit-address should go with a reg value. Either this needs a reg and
->>> the parent node needs #address-cells and #size-cells, or the
->>> unit-address should go, and the names made unique through other means.
->>>
->> OK, I guess I'll have to fix
->> Documentation/devicetree/bindings/arm/atmel-adc.txt too.
-> Yes please.
->
->>> [...]
->>>
->>>> +                       pinctrl at fffff400 {
->>>> +                               #address-cells = <1>;
->>>> +                               #size-cells = <1>;
->>>> +                               compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
->>> NAK. Either this is a atmel,at91rm9200-pinctrl node or a simple-bus. Not
->>> both; that doesn't make any sense.
->>>
->> Simply a copy paste, I'll fix that here and also the 6 other atmel
->> dtsi includes.
+>> Unfortunately vendors can do crazy stuff if they want to. But we also
+>> have an option to choose to enable it. Maybe the answer here is to say
+>> no to MCT on 64-bit, they get to use the arch timers like everybody
+>> else. Or at least motivate why they're not good enough.
 >>
->> What is your preference for those using:
->> compatible = "atmel,at91sam9x5-pinctrl", "atmel,at91rm9200-pinctrl", "simple-bus"; ?
-> A node should by either a bus or a pinctrl node.
+>>> I'm fine with clocksources being selected by other functionality
+>>> options (ie: on x86 ACPI PM timer clocksource doesn't have a prompt,
+>>> but depends on the ACPI option). I just don't want to force users to
+>>> have to navigate through tons of deep menus to select clocksource
+>>> options that logically duplicate other selections already made.
+>>>
+>>> But again, I handed this maintainership over to Daniel, so I can be
+>>> considered just a crank yelling from the sidelines :)
+>>
+>> I think you have a good point. Until we hear why MCT is needed this is
+>> mostly speculation, so let's see what Kukjin says about that.
 >
-> If it has chidren then the simple-bus should be separated out into a
-> separate node. If there are no children simple-bus should go.
+> Yea. And on x86 (well, i386 actually) there are system specific
+> clocksources as well, such as the cyclone timer used by "summit" based
+> x440 and similar NUMA systems, but those systems had more general
+> config options that had to be enabled which the cyclone clocksource
+> depended on.
 
-Doing this clearly break backward compatibility (the current pinctrl 
-drivers relies on
-gpio controller being subnodes of the pinctrl node), but I'm interested 
-in how you would
-have represented this.
+So, after giving this some more thought (and getting my hands dirty in
+some of this code), I think I'm going to change my mind on this. For
+mobile platforms I think it might make sense to bring over the
+toplevel platform Kconfig from arch/arm, to simplify dependencies
+without tearing up the driver subtree with churn like this.
 
-Could you give us an example ?
+This, of course, only holds true for v8 mobile platforms. Samsung
+isn't saying if GH7 is a server platform and not, and they don't have
+to tell us. But I think we should consider only enabling and bringing
+over the mobile ones (and ideally try to avoid even that, but it might
+make sense to do some of them at least initially -- it does provide
+some convenient ways to enable larger subsets of default drivers per
+platform/vendor family).
+
+I.e. I'd be OK with an
+ARCH_EXYNOS/ARCH_TEGRA/ARCH_IMX/ARCH_<whatever>, but I don't think we
+should add more finegrained options than that globally on ARM64, at
+least not until truly proven to be needed. We're trying to push back
+against new per-SoC Kconfig entries on 32-bit as well right now.
 
 
->
-> Cheers,
-> Mark.
+-Olof
