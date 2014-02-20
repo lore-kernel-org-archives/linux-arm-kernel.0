@@ -1,65 +1,38 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 20 Feb 2014 10:10:49 +0800
-Subject: [Linaro-acpi] [PATCH v4 5/5] ACPI: Replace printk with pr_* in
- tables.c
-In-Reply-To: <1624648.FYgVXnCCsW@vostro.rjw.lan>
-References: <1392731700-10992-1-git-send-email-hanjun.guo@linaro.org>
- <2341500.Z47JjkFCMP@vostro.rjw.lan> <5304DFDB.6020202@arm.com>
- <1624648.FYgVXnCCsW@vostro.rjw.lan>
-Message-ID: <53056429.8030705@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 20 Feb 2014 02:58:29 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: clock/PRCM/hwmod fixes for v3.14-rc
+In-Reply-To: <53052219.9060109@ti.com>
+References: <alpine.DEB.2.02.1402192120200.8777@utopia.booyaka.com>
+ <53052219.9060109@ti.com>
+Message-ID: <alpine.DEB.2.02.1402200257060.25798@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014?02?20? 08:37, Rafael J. Wysocki wrote:
-> On Wednesday, February 19, 2014 04:46:19 PM Sudeep Holla wrote:
->> On 19/02/14 16:49, Rafael J. Wysocki wrote:
->>> On Wednesday, February 19, 2014 04:32:34 PM Sudeep Holla wrote:
->>>> On 18/02/14 13:55, Hanjun Guo wrote:
->>>>> This patch just do some clean up to replace printk with pr_*,
->>>>> no functional change.
->>>>>
->>>> Any particular reason for choosing just this file in this series ?
+On Wed, 19 Feb 2014, Nishanth Menon wrote:
 
-Yes, the reason is that I will update this file in my next patch set 
-(ARM64 ACPI core) with
-pr_*, in order to keep  consistency, I updated them all in this file first.
+> Paul,
+> On 02/19/2014 03:22 PM, Paul Walmsley wrote:
+> [...]
+> > 
+> > - ----------------------------------------------------------------
+> > Illia Smyrnov (1):
+> >       ARM: OMAP4: hwmod: Fix SOFTRESET logic for OMAP4
+> > 
+> > Suman Anna (1):
+> >       ARM: DRA7: hwmod data: correct the sysc data for spinlock
+> > 
+> > Tomi Valkeinen (1):
+> >       ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
+> > 
+> > Vaibhav Bedia (1):
+> >       ARM: OMAP5: PRM: Fix reboot handling
+> > 
+> 
+> https://patchwork.kernel.org/patch/3585321/ missing?
 
->>>> It seems but off-topic in this series. The printk format is same in almost all
->>>> other acpi files and it's better to change all or none for consistency.
->>> Well, it's fine, I can put it into a different branch in any case. :-)
->>>
->>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>> ---
->>>>>   drivers/acpi/tables.c |   51 +++++++++++++++++++------------------------------
->>>>>   1 file changed, 20 insertions(+), 31 deletions(-)
->>>>>
->>>>> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
->>>>> index 5837f85..97bc6df 100644
->>>>> --- a/drivers/acpi/tables.c
->>>>> +++ b/drivers/acpi/tables.c
->>>>> @@ -55,8 +55,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
->>>>>   		{
->>>>>   			struct acpi_madt_local_apic *p =
->>>>>   			    (struct acpi_madt_local_apic *)header;
->>>>> -			printk(KERN_INFO PREFIX
->>>>> -			       "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
->>>>> +			pr_info(PREFIX "LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
->>>> You can even get rid of PREFIX by defining pr_fmt instead.
->>> But this is a good point.
->>>
->>>> If the intention is to move to pr_* format it's better to have this as separate
->>>> patch and convert all of them.
->>> Well, not really.  One file at a time is OK too.
->>>
->> No what I meant was to convert all for consistency, not in a single patch.
->> As I was playing with regex for few minutes, with few patterns was able to fix
->> most(not all) of them. It even compiles :) for x86. But turns out to be a big
->> churn :( [43 files changed, 253 insertions(+), 329 deletions(-)]
-> Well, precisely.  That's why I'd prefer doing that gradually.
->
-> That said I'll just drop the patch for now due to the PREFIX thing.
+If that fixes a bug, then that should be documented in the commit 
+description.
 
-I will update this patch accordingly and send it out soon.
+Otherwise it's 3.15 material.
 
-Thanks
-Hanjun
+- Paul
