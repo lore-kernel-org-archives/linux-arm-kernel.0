@@ -1,25 +1,129 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 20 Feb 2014 10:18:45 +0100
-Subject: [PATCH v7 0/4] DT support for kirkwood based Synology NAS boxes
-In-Reply-To: <1392840157-31072-1-git-send-email-klightspeed@killerwolves.net>
-References: <1392840157-31072-1-git-send-email-klightspeed@killerwolves.net>
-Message-ID: <20140220091845.GH11878@lunn.ch>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Thu, 20 Feb 2014 14:54:45 +0530
+Subject: [PATCH v3 1/3] dma: Support multiple interleaved frames with
+ non-contiguous memory
+In-Reply-To: <CAJe_ZhfedP7Paf3Zq9chL0WUeLJrsy_DJL05sSbfqnfTtji=HQ@mail.gmail.com>
+References: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
+ <1392465619-27614-2-git-send-email-sthokal@xilinx.com>
+ <CAJe_Zhc_GNNSDWNFuk+cMHEqxfSCJB_ey=Bf+SwJK-nS=u9ceg@mail.gmail.com>
+ <CA+mB=1KdZZpTmpA0Xp_c4mhgFbjRZ6urYrCwdvoTCmcugQMDUA@mail.gmail.com>
+ <CAJe_ZhdOmu3k9gbPdQzPteyzwsMA8OzWHdhHnXudbF=X7JMhVQ@mail.gmail.com>
+ <CA+mB=1K43MDZj0Rx3q=ETQMaFsG1j7TXsH6v-7a26JdtqTJkbw@mail.gmail.com>
+ <CAJe_ZhfedP7Paf3Zq9chL0WUeLJrsy_DJL05sSbfqnfTtji=HQ@mail.gmail.com>
+Message-ID: <CA+mB=1LK+aVbvh741+PMnpj_mwZRvJZzR5Fh=hf72UWQvxUiVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 06:02:33AM +1000, klightspeed at killerwolves.net wrote:
-> This patchset adds support for around 30 kirkwood bases Synology NAS
-> boxes. Patch #1 documents vendor prefixes. Patch #2 generalizes the qnap
-> power off driver so that it can also be used for Synology devices.
-> Patch #3 adds sii,s35390a to i2c trivial devices. Patch #4 adds the 
-> synology DT files.
+On Wed, Feb 19, 2014 at 12:33 AM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+> On 18 February 2014 23:16, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>> On Tue, Feb 18, 2014 at 10:20 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+>>> On 18 February 2014 16:58, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>>>> On Mon, Feb 17, 2014 at 3:27 PM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+>>>>> On 15 February 2014 17:30, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>>>>>> The current implementation of interleaved DMA API support multiple
+>>>>>> frames only when the memory is contiguous by incrementing src_start/
+>>>>>> dst_start members of interleaved template.
+>>>>>>
+>>>>>> But, when the memory is non-contiguous it will restrict slave device
+>>>>>> to not submit multiple frames in a batch.  This patch handles this
+>>>>>> issue by allowing the slave device to send array of interleaved dma
+>>>>>> templates each having a different memory location.
+>>>>>>
+>>>>> How fragmented could be memory in your case? Is it inefficient to
+>>>>> submit separate transfers for each segment/frame?
+>>>>> It will help if you could give a typical example (chunk size and gap
+>>>>> in bytes) of what you worry about.
+>>>>
+>>>> With scatter-gather engine feature in the hardware, submitting separate
+>>>> transfers for each frame look inefficient. As an example, our DMA engine
+>>>> supports up to 16 video frames, with each frame (a typical video frame
+>>>> size) being contiguous in memory but frames are scattered into different
+>>>> locations. We could not definitely submit frame by frame as it would be
+>>>> software overhead (HW interrupting for each frame) resulting in video lags.
+>>>>
+>>> IIUIC, it is 30fps and one dma interrupt per frame ... it doesn't seem
+>>> inefficient at all. Even poor-latency audio would generate a higher
+>>> interrupt-rate. So the "inefficiency concern" doesn't seem valid to
+>>> me.
+>>>
+>>> Not to mean we shouldn't strive to reduce the interrupt-rate further.
+>>> Another option is to emulate the ring-buffer scheme of ALSA.... which
+>>> should be possible since for a session of video playback the frame
+>>> buffers' locations wouldn't change.
+>>>
+>>> Yet another option is to use the full potential of the
+>>> interleaved-xfer api as such. It seems you confuse a 'video frame'
+>>> with the interleaved-xfer api's 'frame'. They are different.
+>>>
+>>> Assuming your one video frame is F bytes long and Gk is the gap in
+>>> bytes between end of frame [k] and start of frame [k+1] and  Gi != Gj
+>>> for i!=j
+>>> In the context of interleaved-xfer api, you have just 1 Frame of 16
+>>> chunks. Each chunk is Fbytes and the inter-chunk-gap(ICG) is Gk  where
+>>> 0<=k<15
+>>> So for your use-case .....
+>>>   dma_interleaved_template.numf = 1   /* just 1 frame */
+>>>   dma_interleaved_template.frame_size = 16  /* containing 16 chunks */
+>>>    ...... //other parameters
+>>>
+>>> You have 3 options to choose from and all should work just as fine.
+>>> Otherwise please state your problem in real numbers (video-frames'
+>>> size, count & gap in bytes).
+>>
+>> Initially I interpreted interleaved template the same.  But, Lars corrected me
+>> in the subsequent discussion and let me put it here briefly,
+>>
+>> In the interleaved template, each frame represents a line of size denoted by
+>> chunk.size and the stride by icg.  'numf' represent number of frames i.e.
+>> number of lines.
+>>
+>> In video frame context,
+>> chunk.size -> hsize
+>> chunk.icg -> stride
+>> numf -> vsize
+>> and frame_size is always 1 as it will have only one chunk in a line.
+>>
+> But you said in your last post
+>   "with each frame (a typical video frame size) being contiguous in memory"
+>  ... which is not true from what you write above. Anyways, my first 2
+> suggestions still hold.
 
-Hi Ben
+Yes, each video frame is contiguous and they can be scattered.
 
-Thanks for finishing this.
+>
+>> So, the API would not allow to pass multiple frames and we came up with a
+>> resolution to pass an array of interleaved template structs to handle this.
+>>
+> Yeah the API doesn't allow such xfers that don't fall into any
+> 'regular expression' of a transfer and also because no controller
+> natively supports such xfers -- your controller will break your
+> request up into 16 transfers and program them individually, right?
 
-Whole series:
+No, it will not program individually.  It has a scatter-gather engine where we
+could update the current pointer to the first frame and tail pointer to the last
+frame and hardware does the transfer and raise an interrupt when all the frames
+are completed (ie. when current reaches tail).
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+>    BTW if you insist you could still express the 16 video frames as 1
+> interleaved-xfer frame with frame_size = (vsize + 1) * 16   ;)
+>
+> Again, I would suggest you implement ring-buffer type scheme. Say
+> prepare 16 interleaved xfer templates and queue them. Upon each
+> xfer-done callback (i.e frame rendered), update the data and queue it
+> back. It might be much simpler for your actual case. At 30fps, 33ms to
+> queue a dma request should _not_ result in any frame-drop.
 
-	  Andrew
+The driver has similar implementation, where each desc (handling 16 frames)
+is pushed to pending queue and then to done queue.  Slave device still can
+add desc's to the pending queue and whenever the transfer of 16 frames is
+completed we move each desc to done list.
+
+Srikanth
+
+>
+> -Jassi
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
