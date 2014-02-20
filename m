@@ -1,197 +1,74 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 20 Feb 2014 07:44:48 -0600
-Subject: [PATCH v5 2/2] memory: ti-aemif: add bindings for AEMIF driver
-In-Reply-To: <5305F898.6020401@ti.com>
-References: <1392817210-14312-1-git-send-email-ivan.khoronzhuk@ti.com>
- <1392817210-14312-3-git-send-email-ivan.khoronzhuk@ti.com>
- <20140219181152.GG25079@e106331-lin.cambridge.arm.com>
- <5305F898.6020401@ti.com>
-Message-ID: <CAL_JsqJ5hoQ3vWaQTo8--jiPPQ64OW_b4zKTe7aPLXN0td4DrA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 20 Feb 2014 14:53:02 +0100
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <1392900664.23342.60.camel@kazak.uk.xensource.com>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <20140220121821.GO11878@lunn.ch>
+ <1392900664.23342.60.camel@kazak.uk.xensource.com>
+Message-ID: <2127012.W6WnQnXmRo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 6:44 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
->
-> On 02/19/2014 08:11 PM, Mark Rutland wrote:
->>
->> On Wed, Feb 19, 2014 at 01:40:10PM +0000, Ivan Khoronzhuk wrote:
->>>
->>> Add bindings for TI Async External Memory Interface (AEMIF) controller.
->>>
->>> The Async External Memory Interface (EMIF16/AEMIF) controller is intended
->>> to
->>> provide a glue-less interface to a variety of asynchronous memory devices
->>> like
->>> ASRA M, NOR and NAND memory. A total of 256M bytes of any of these
->>> memories
->>> can be accessed via 4 chip selects with 64M byte access per chip select.
->>>
->>> We are not encoding CS number in reg property, it's memory partition
->>> number.
->>> The CS number is encoded for Davinci NAND node using standalone property
->>> "ti,davinci-chipselect" and we need to provide two memory ranges to it,
->>> as result we can't encode CS number in "reg" for AEMIF child devices
->>> (NAND/NOR/etc), as it will break bindings compatibility.
->>>
->>> In this patch, NAND node is used just as an example of child node.
->>>
->>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> ---
->>>   .../bindings/memory-controllers/ti-aemif.txt       | 210
->>> +++++++++++++++++++++
->>>   1 file changed, 210 insertions(+)
->>>   create mode 100644
->>> Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
->>
->> [...]
->>
->>> +- ranges:              Contains memory regions. There are two types of
->>> +                       ranges/partitions:
->>> +                       - CS-specific partition/range. If continuous,
->>> must be
->>> +                       set up to reflect the memory layout for 4
->>> chipselects,
->>> +                       if not then additional range/partition can be
->>> added and
->>> +                       child device can select the proper one.
->>> +                       - control partition which is common for all CS
->>> +                       interfaces.
->>
->> This really doesn't sound anything like the typical meaning of ranges on
->> a bus.
->>
->> Why isn't this information encoded in reg properties on the child nodes?
->>
->> [...]
->
->
-> Note that we do not introduce NAND device bindings here.
-> The Davinci NAND bindings was introduced and accepted more then one year
-> ago.
-> And the CS number is encoded for Davinci NAND node using standalone property
->
-> "ti,davinci-chipselect" and we need to provide two memory ranges to it,
-> as result we can't encode CS number in "reg" for AEMIF child devices
-> (NAND/NOR/etc),
-> as it will break bindings compatibility.
->
-> In this document, NAND node is used just as an example of child node.
->
->
->>> +- ti,cs-ss:            enable/disable select strobe mode
->>> +                               In select strobe mode chip select behaves
->>> as
->>> +                               the strobe and is active only during the
->>> strobe
->>> +                               period. If present then enable.
->>> +
->>> +- ti,cs-ew:            enable/disable extended wait mode
->>> +                               if set, the controller monitors the
->>> EMIFWAIT pin
->>> +                               mapped to that chip select to determine
->>> if the
->>> +                               device wants to extend the strobe period.
->>> If
->>> +                               present then enable.
->>
->> When would you have these two in the DT and when wouldn't you? Why can't
->> the driver decide?
->
->
-> These are properties of cs node, not the driver itself.
-> The driver cannot know what child device you are going to attach to cs node
-> , as result it cannot decide what settings you are using for particular cs
-> node.
->
->
->> These names are also opaque. We can clearly do better.
->
->
-> I propose the following names?:
->
-> ti,cs-ss  --> ti,cs-select-strobe-mode
-> ti,cs-ew --> ti,cs-extended-waite-mode
->
-> Are you OK with it?
->
->
->>> +
->>> +- ti,cs-ta:            minimum turn around time, ns
->>> +                               Time between the end of one asynchronous
->>> memory
->>> +                               access and the start of another
->>> asynchronous
->>> +                               memory access. This delay is not incurred
->>> +                               between a read followed by read or a
->>> write
->>> +                               followed by a write to same chip select.
->>
->> The name is opaque. How about ti,min-turnaround-time-ns ?
->
->
-> I like without -ns suffix and with cs- prefix:
-> ti,cs-ta --> ti,cs-min-turnaround-time
->
-> Is it OK?
->
->
->>> +
->>> +- ti,cs-rsetup:                read setup width, ns
->>> +                               Time between the beginning of a memory
->>> cycle
->>> +                               and the activation of read strobe.
->>> +                               Minimum value is 1 (0 treated as 1).
->>> +
->>> +- ti,cs-rstobe:                read strobe width, ns
->>> +                               Time between the activation and
->>> deactivation of
->>> +                               the read strobe.
->>> +                               Minimum value is 1 (0 treated as 1).
->>> +
->>> +- ti,cs-rhold:         read hold width, ns
->>> +                               Time between the deactivation of the read
->>> +                               strobe and the end of the cycle (which
->>> may be
->>> +                               either an address change or the
->>> deactivation of
->>> +                               the chip select signal.
->>> +                               Minimum value is 1 (0 treated as 1).
->>> +
->>> +- ti,cs-wsetup:                write setup width, ns
->>> +                               Time between the beginning of a memory
->>> cycle
->>> +                               and the activation of write strobe.
->>> +                               Minimum value is 1 (0 treated as 1).
->>> +
->>> +- ti,cs-wstrobe:       write strobe width, ns
->>> +                               Time between the activation and
->>> deactivation of
->>> +                               the write strobe.
->>> +                               Minimum value is 1 (0 treated as 1).
->>> +
->>> +- ti,cs-whold:         write hold width, ns
->>> +                               Time between the deactivation of the
->>> write
->>> +                               strobe and the end of the cycle (which
->>> may be
->>> +                               either an address change or the
->>> deactivation of
->>> +                               the chip select signal.
->>> +                               Minimum value is 1 (0 treated as 1).
->>
->> Likewise I think these can be given more descriptive names.
->
->
-> Ok. How about:
->
-> ti,cs-rsetup --> ti,cs-read-setup-time
-> ti,cs-rstobe --> ti,cs-read-strobe-time
-> ti,cs-rhold  --> ti,cs-read-hold-time
-> ti,cs-wsetup --> ti,cs-write-setup-time
-> ti,cs-wstrobe --> ti,cs-write-strobe-time
-> ti,cs-whold --> ti,cs-write-hold-time
+On Thursday 20 February 2014 12:51:04 Ian Campbell wrote:
+> On Thu, 2014-02-20 at 13:18 +0100, Andrew Lunn wrote:
+> > On Thu, Feb 20, 2014 at 11:34:36AM +0000, Ian Campbell wrote:
+> Debian has a single v7 flavour, armmp which uses the multi platform
+> stuff. (actually there is a second armmp-lpae, but lets ignore that)
+> 
+> I'm only really concerned about the v5 stuff here. Debian has multiple
+> v5 flavours: ixp4xx, kirkwood, mv78xx0, orion5x and versatile.
 
-Properties that have a unit of measure should have that unit in the
-name. So replace "time" with "ns".
+Unfortunately, this selection include multiple platforms that
+we don't plan to (ever) support in a multiplatform kernel, while
+a lot of platforms you don't currently support are already enabled
+or will be at some point.
 
-Rob
+* ixp4xx is too different from the others and I don't think it's
+  possible to turn it over to multiplatform.
+* I see a iop32x_defconfig in svn that you didn't mention here,
+  but it's basically the same problem as ixp4xx.
+* kirkwood/mv78xx0/orion5x are essentially one platform and work
+  in progress.
+* versatile is easy to do as multiplatform, I just haven't gotten
+  around to do it.
+
+ARMv5 platforms that are already working with ARCH_MULTIPLATFORM:
+* freescale mxc (i.mx21 and i.mx25)
+* freescale mxs (i.mx23 and i.mx28)
+* st-ericsson Nomadik
+* st-ericsson u300
+* st spear3xx
+* st spear6xx
+* TI NSpire
+* VIA/Wondermedia vt85xx/wm85xx/wm86xx
+
+The embedded mxs family is probably most interesting among these,
+but there is also a community around the wondermedia stuff, which is
+used in cheap tablets and laptops.
+
+> > What this patchset does is also make mach-mvebu part of the multi v5
+> > kernel. So you just need one kernel for all ARM v5 machines which are
+> > part of multi v5. The long term goal is that you need just two 32 ARM
+> > kernels, multi v5 and multi v7. However orion5x and mv76xx0 are not
+> > yet part of theses, so we are not there yet.
+> 
+> So in answer to my question, on v5 ARCH_KIRKWOOD and ARCH_MVEBU *cannot*
+> coexist in the same binary?
+
+That has been the plan for the kirkwood migration for the last few
+years, yes. The idea is that every kirkwood machine that anyone is
+interested in should be supported by ARCH_MVEBU, and we can keep
+ARCH_KIRKWOOD for the ones we don't care about until it is just
+dropped.
+
+Same for orion5x, dove and mv78xx0, just a different schedule
+for moving them over.
+
+Now in theory, we could have them supported in a multiplatform kernel,
+but that would mean extra work that we planned to avoid by converting
+them to DT first.
+
+As I said, it may be useful to do multiplatform support for MACH_ORION5x,
+but for MACH_KIRKWOOD, we have come too far now to turn back.
+
+	Arnd
