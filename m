@@ -1,54 +1,67 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 20 Feb 2014 16:31:15 +0100
-Subject: [PATCH 3/8] spi: pl022: Let runtime PM callbacks be available for
- CONFIG_PM
+Date: Thu, 20 Feb 2014 16:31:17 +0100
+Subject: [PATCH 5/8] i2c: nomadik: Fixup system suspend
 In-Reply-To: <1392910280-12891-1-git-send-email-ulf.hansson@linaro.org>
 References: <1392910280-12891-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1392910280-12891-4-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1392910280-12891-6-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert to the SET_PM_RUNTIME_PM macro while defining the runtime PM
-callbacks. This means the callbacks becomes available for both
-CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME, which is needed to handle the
-combinations of these scenarios.
+For !CONFIG_PM_RUNTIME, the device were never put back into active
+state while resuming.
 
-Cc: Mark Brown <broonie@kernel.org>
+For CONFIG_PM_RUNTIME, we blindly trusted the device to be inactive
+while we were about to handle it at suspend late, which is just too
+optimistic.
+
+Even if the driver uses pm_runtime_put_sync() after each tranfer to
+return it's runtime PM resources, there are no guarantees this will
+actually mean the device will inactivated. The reason is that the PM
+core will prevent runtime suspend during system suspend, and thus when
+a transfer occurs during the early phases of system suspend the device
+will be kept active after the transfer.
+
+To handle both issues above, use pm_runtime_force_suspend|resume() from
+the system suspend|resume callbacks.
+
+Cc: Alessandro Rubini <rubini@unipv.it>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Wolfram Sang <wsa@the-dreams.de>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/spi/spi-pl022.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/i2c/busses/i2c-nomadik.c |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 74a0729..6dfcabf 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2277,7 +2277,7 @@ pl022_remove(struct amba_device *adev)
+diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+index 8082f5c..519f5b8 100644
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@ -879,19 +879,19 @@ static irqreturn_t i2c_irq_handler(int irq, void *arg)
+ #ifdef CONFIG_PM_SLEEP
+ static int nmk_i2c_suspend_late(struct device *dev)
+ {
+-	pinctrl_pm_select_sleep_state(dev);
++	int ret;
+ 
++	ret = pm_runtime_force_suspend(dev);
++	if (ret)
++		return ret;
++
++	pinctrl_pm_select_sleep_state(dev);
  	return 0;
  }
  
--#if defined(CONFIG_SUSPEND) || defined(CONFIG_PM_RUNTIME)
-+#ifdef CONFIG_PM
- /*
-  * These two functions are used from both suspend/resume and
-  * the runtime counterparts to handle external resources like
-@@ -2343,7 +2343,7 @@ static int pl022_resume(struct device *dev)
- }
- #endif	/* CONFIG_PM */
- 
--#ifdef CONFIG_PM_RUNTIME
-+#ifdef CONFIG_PM
- static int pl022_runtime_suspend(struct device *dev)
+ static int nmk_i2c_resume_early(struct device *dev)
  {
- 	struct pl022 *pl022 = dev_get_drvdata(dev);
-@@ -2363,7 +2363,7 @@ static int pl022_runtime_resume(struct device *dev)
+-	/* First go to the default state */
+-	pinctrl_pm_select_default_state(dev);
+-	/* Then let's idle the pins until the next transfer happens */
+-	pinctrl_pm_select_idle_state(dev);
+-
+-	return 0;
++	return pm_runtime_force_resume(dev);
+ }
+ #endif
  
- static const struct dev_pm_ops pl022_dev_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(pl022_suspend, pl022_resume)
--	SET_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
-+	SET_PM_RUNTIME_PM_OPS(pl022_runtime_suspend, pl022_runtime_resume, NULL)
- };
- 
- static struct vendor_data vendor_arm = {
 -- 
 1.7.9.5
