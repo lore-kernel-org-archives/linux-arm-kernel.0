@@ -1,191 +1,86 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Thu, 20 Feb 2014 17:49:49 +0200
-Subject: [PATCH v5 2/2] memory: ti-aemif: add bindings for AEMIF driver
-In-Reply-To: <CAL_JsqJ5hoQ3vWaQTo8--jiPPQ64OW_b4zKTe7aPLXN0td4DrA@mail.gmail.com>
-References: <1392817210-14312-1-git-send-email-ivan.khoronzhuk@ti.com>	<1392817210-14312-3-git-send-email-ivan.khoronzhuk@ti.com>	<20140219181152.GG25079@e106331-lin.cambridge.arm.com>	<5305F898.6020401@ti.com>
- <CAL_JsqJ5hoQ3vWaQTo8--jiPPQ64OW_b4zKTe7aPLXN0td4DrA@mail.gmail.com>
-Message-ID: <5306241D.1030108@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Feb 2014 15:56:00 +0000
+Subject: [PATCH v9 1/6] arm64: Add macros to manage processor debug state
+In-Reply-To: <CALicx6sB-tucxv=-0J9LKw5E3wA1hmYyYN_z99ugnpmxvZTMng@mail.gmail.com>
+References: <20140217130149.GA5856@arm.com>
+ <CALicx6uHqyJ-n+b-zfua6P=UsJ+a2_2h-H6krx-DBJYWfF=7jg@mail.gmail.com>
+ <20140218120249.GD11049@arm.com>
+ <CALicx6v6=WdRPoZ-vcxf7zusooB5r1V9WnjBf3QjOiO7yik3sw@mail.gmail.com>
+ <20140219113157.GG30457@arm.com> <20140219160359.GB22252@arm.com>
+ <20140219161236.GG28173@mudshark.cambridge.arm.com>
+ <CALicx6t7RSS_Zo9RGr76LMnNth1gQ7pukUtAmDY4gWRN5KGVKQ@mail.gmail.com>
+ <20140220114222.GG3615@mudshark.cambridge.arm.com>
+ <CALicx6sB-tucxv=-0J9LKw5E3wA1hmYyYN_z99ugnpmxvZTMng@mail.gmail.com>
+Message-ID: <20140220155600.GJ3615@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Feb 20, 2014 at 12:22:14PM +0000, Vijay Kilari wrote:
+> On Thu, Feb 20, 2014 at 5:12 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Feb 20, 2014 at 06:58:25AM +0000, Vijay Kilari wrote:
+> >> --- a/arch/arm64/kernel/smp.c
+> >> +++ b/arch/arm64/kernel/smp.c
+> >> @@ -160,6 +160,8 @@ asmlinkage void secondary_start_kernel(void)
+> >>         set_cpu_online(cpu, true);
+> >>         complete(&cpu_running);
+> >>
+> >> +       local_dbg_enable();
+> >>         local_irq_enable();
+> >>         local_async_enable();
+> >
+> > The only thing to add then moving the isb(); local_dbg_enable() out of
+> > clear_os_lock and into debug_monitors_init. You can probably make the
+> > smp_call_function an on_each_cpu too.
+> >
+> > Does that make sense?
+> 
+> Its ok for me.  Isn't require to have isb() after clearing os lock for
+> every cpu?
+> Just having isb on cpu0 after clearing os lock is enough?
 
-On 02/20/2014 03:44 PM, Rob Herring wrote:
-> On Thu, Feb 20, 2014 at 6:44 AM, Ivan Khoronzhuk <ivan.khoronzhuk@ti.com> wrote:
->> On 02/19/2014 08:11 PM, Mark Rutland wrote:
->>> On Wed, Feb 19, 2014 at 01:40:10PM +0000, Ivan Khoronzhuk wrote:
->>>> Add bindings for TI Async External Memory Interface (AEMIF) controller.
->>>>
->>>> The Async External Memory Interface (EMIF16/AEMIF) controller is intended
->>>> to
->>>> provide a glue-less interface to a variety of asynchronous memory devices
->>>> like
->>>> ASRA M, NOR and NAND memory. A total of 256M bytes of any of these
->>>> memories
->>>> can be accessed via 4 chip selects with 64M byte access per chip select.
->>>>
->>>> We are not encoding CS number in reg property, it's memory partition
->>>> number.
->>>> The CS number is encoded for Davinci NAND node using standalone property
->>>> "ti,davinci-chipselect" and we need to provide two memory ranges to it,
->>>> as result we can't encode CS number in "reg" for AEMIF child devices
->>>> (NAND/NOR/etc), as it will break bindings compatibility.
->>>>
->>>> In this patch, NAND node is used just as an example of child node.
->>>>
->>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>> ---
->>>>    .../bindings/memory-controllers/ti-aemif.txt       | 210
->>>> +++++++++++++++++++++
->>>>    1 file changed, 210 insertions(+)
->>>>    create mode 100644
->>>> Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
->>> [...]
->>>
->>>> +- ranges:              Contains memory regions. There are two types of
->>>> +                       ranges/partitions:
->>>> +                       - CS-specific partition/range. If continuous,
->>>> must be
->>>> +                       set up to reflect the memory layout for 4
->>>> chipselects,
->>>> +                       if not then additional range/partition can be
->>>> added and
->>>> +                       child device can select the proper one.
->>>> +                       - control partition which is common for all CS
->>>> +                       interfaces.
->>> This really doesn't sound anything like the typical meaning of ranges on
->>> a bus.
->>>
->>> Why isn't this information encoded in reg properties on the child nodes?
->>>
->>> [...]
->>
->> Note that we do not introduce NAND device bindings here.
->> The Davinci NAND bindings was introduced and accepted more then one year
->> ago.
->> And the CS number is encoded for Davinci NAND node using standalone property
->>
->> "ti,davinci-chipselect" and we need to provide two memory ranges to it,
->> as result we can't encode CS number in "reg" for AEMIF child devices
->> (NAND/NOR/etc),
->> as it will break bindings compatibility.
->>
->> In this document, NAND node is used just as an example of child node.
->>
->>
->>>> +- ti,cs-ss:            enable/disable select strobe mode
->>>> +                               In select strobe mode chip select behaves
->>>> as
->>>> +                               the strobe and is active only during the
->>>> strobe
->>>> +                               period. If present then enable.
->>>> +
->>>> +- ti,cs-ew:            enable/disable extended wait mode
->>>> +                               if set, the controller monitors the
->>>> EMIFWAIT pin
->>>> +                               mapped to that chip select to determine
->>>> if the
->>>> +                               device wants to extend the strobe period.
->>>> If
->>>> +                               present then enable.
->>> When would you have these two in the DT and when wouldn't you? Why can't
->>> the driver decide?
->>
->> These are properties of cs node, not the driver itself.
->> The driver cannot know what child device you are going to attach to cs node
->> , as result it cannot decide what settings you are using for particular cs
->> node.
->>
->>
->>> These names are also opaque. We can clearly do better.
->>
->> I propose the following names?:
->>
->> ti,cs-ss  --> ti,cs-select-strobe-mode
->> ti,cs-ew --> ti,cs-extended-waite-mode
->>
->> Are you OK with it?
->>
->>
->>>> +
->>>> +- ti,cs-ta:            minimum turn around time, ns
->>>> +                               Time between the end of one asynchronous
->>>> memory
->>>> +                               access and the start of another
->>>> asynchronous
->>>> +                               memory access. This delay is not incurred
->>>> +                               between a read followed by read or a
->>>> write
->>>> +                               followed by a write to same chip select.
->>> The name is opaque. How about ti,min-turnaround-time-ns ?
->>
->> I like without -ns suffix and with cs- prefix:
->> ti,cs-ta --> ti,cs-min-turnaround-time
->>
->> Is it OK?
->>
->>
->>>> +
->>>> +- ti,cs-rsetup:                read setup width, ns
->>>> +                               Time between the beginning of a memory
->>>> cycle
->>>> +                               and the activation of read strobe.
->>>> +                               Minimum value is 1 (0 treated as 1).
->>>> +
->>>> +- ti,cs-rstobe:                read strobe width, ns
->>>> +                               Time between the activation and
->>>> deactivation of
->>>> +                               the read strobe.
->>>> +                               Minimum value is 1 (0 treated as 1).
->>>> +
->>>> +- ti,cs-rhold:         read hold width, ns
->>>> +                               Time between the deactivation of the read
->>>> +                               strobe and the end of the cycle (which
->>>> may be
->>>> +                               either an address change or the
->>>> deactivation of
->>>> +                               the chip select signal.
->>>> +                               Minimum value is 1 (0 treated as 1).
->>>> +
->>>> +- ti,cs-wsetup:                write setup width, ns
->>>> +                               Time between the beginning of a memory
->>>> cycle
->>>> +                               and the activation of write strobe.
->>>> +                               Minimum value is 1 (0 treated as 1).
->>>> +
->>>> +- ti,cs-wstrobe:       write strobe width, ns
->>>> +                               Time between the activation and
->>>> deactivation of
->>>> +                               the write strobe.
->>>> +                               Minimum value is 1 (0 treated as 1).
->>>> +
->>>> +- ti,cs-whold:         write hold width, ns
->>>> +                               Time between the deactivation of the
->>>> write
->>>> +                               strobe and the end of the cycle (which
->>>> may be
->>>> +                               either an address change or the
->>>> deactivation of
->>>> +                               the chip select signal.
->>>> +                               Minimum value is 1 (0 treated as 1).
->>> Likewise I think these can be given more descriptive names.
->>
->> Ok. How about:
->>
->> ti,cs-rsetup --> ti,cs-read-setup-time
->> ti,cs-rstobe --> ti,cs-read-strobe-time
->> ti,cs-rhold  --> ti,cs-read-hold-time
->> ti,cs-wsetup --> ti,cs-write-setup-time
->> ti,cs-wstrobe --> ti,cs-write-strobe-time
->> ti,cs-whold --> ti,cs-write-hold-time
-> Properties that have a unit of measure should have that unit in the
-> name. So replace "time" with "ns".
->
-> Rob
+They'll synchronise on return from the IPI.
 
-Ok, I will replace
+> --- a/arch/arm64/kernel/debug-monitors.c
+> +++ b/arch/arm64/kernel/debug-monitors.c
+> @@ -137,8 +137,6 @@ void disable_debug_monitors(enum debug_el el)
+>  static void clear_os_lock(void *unused)
+>  {
+>         asm volatile("msr oslar_el1, %0" : : "r" (0));
+> -       isb();
+> -       local_dbg_enable();
+>  }
+> 
+>  static int os_lock_notify(struct notifier_block *self,
+> @@ -157,8 +155,9 @@ static struct notifier_block os_lock_nb = {
+>  static int debug_monitors_init(void)
+>  {
+>         /* Clear the OS lock. */
+> -       smp_call_function(clear_os_lock, NULL, 1);
+> -       clear_os_lock(NULL);
+> +       on_each_cpu(clear_os_lock, NULL, 1);
+> +       isb();
+> +       local_dbg_enable();
+> 
+>         /* Register hotplug handler. */
+>         register_cpu_notifier(&os_lock_nb);
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 7cfb92a..5070dc3 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -160,6 +160,7 @@ asmlinkage void secondary_start_kernel(void)
+>         set_cpu_online(cpu, true);
+>         complete(&cpu_running);
+> 
+> +       local_dbg_enable();
+>         local_irq_enable();
+>         local_async_enable();
+> 
+> Is this ok?
 
-Thanks!
+Looks good to me:
 
--- 
-Regards,
-Ivan Khoronzhuk
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thanks,
+
+Will
