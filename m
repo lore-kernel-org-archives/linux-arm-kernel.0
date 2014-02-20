@@ -1,53 +1,63 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 20 Feb 2014 11:52:45 +0100
-Subject: [PATCH v4 5/7] arm: add support for reserved memory defined by device
- tree
-In-Reply-To: <1392893567-31623-1-git-send-email-m.szyprowski@samsung.com>
-References: <1392893567-31623-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1392893567-31623-6-git-send-email-m.szyprowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Feb 2014 10:59:03 +0000
+Subject: [PATCH RFC 07/31] mmc: sdhci: push card_tasklet into threaded
+ irq handler
+In-Reply-To: <CAKohpokBf_fJhiUJ53c+=6v+GMcjaDKd7+fwib99=sLMdkjQQQ@mail.gmail.com>
+References: <20140218150801.GD21483@n2100.arm.linux.org.uk>
+ <E1WFmIk-0006m0-Ah@rmk-PC.arm.linux.org.uk>
+ <20140218175703.GJ21483@n2100.arm.linux.org.uk>
+ <CAKohpoknX=acZHJeydwv6XRKFHTD4DM84xfCJ=56NrRfJnBOOA@mail.gmail.com>
+ <20140219094322.GR21483@n2100.arm.linux.org.uk>
+ <CAKohpomfHxWBF5m4D6iqod4a3gw2BU1W6nXMkEOg+YA+izYr=g@mail.gmail.com>
+ <20140219095212.GT21483@n2100.arm.linux.org.uk>
+ <CAKohpo=ZrLRsTyCH86x7TbGE2XJnpXNb1ZDvYyzDUupAwTtS9Q@mail.gmail.com>
+ <20140219105011.GU21483@n2100.arm.linux.org.uk>
+ <CAKohpokBf_fJhiUJ53c+=6v+GMcjaDKd7+fwib99=sLMdkjQQQ@mail.gmail.com>
+Message-ID: <20140220105903.GY21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable reserved memory initialization from device tree.
+On Wed, Feb 19, 2014 at 04:25:12PM +0530, Viresh Kumar wrote:
+> Absolutely, it will work.
+> 
+> Thanks for your efforts in cleaning up this stuff..
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/Kconfig   |    1 +
- arch/arm/mm/init.c |    3 +++
- 2 files changed, 4 insertions(+)
+I'll send a few patches in a moment.  First through, I've just found this
+gem:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e25419817791..d0262bea8020 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1918,6 +1918,7 @@ config USE_OF
- 	select IRQ_DOMAIN
- 	select OF
- 	select OF_EARLY_FLATTREE
-+	select OF_RESERVED_MEM
- 	help
- 	  Include support for flattened device tree machine descriptions.
- 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 804d61566a53..eee55d75bbfa 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -17,6 +17,7 @@
- #include <linux/nodemask.h>
- #include <linux/initrd.h>
- #include <linux/of_fdt.h>
-+#include <linux/of_reserved_mem.h>
- #include <linux/highmem.h>
- #include <linux/gfp.h>
- #include <linux/memblock.h>
-@@ -323,6 +324,8 @@ void __init arm_memblock_init(struct meminfo *mi,
- 	if (mdesc->reserve)
- 		mdesc->reserve();
- 
-+	early_init_fdt_scan_reserved_mem();
-+
- 	/*
- 	 * reserve memory for DMA contigouos allocations,
- 	 * must come from DMA area inside low memory
+static int sdhci_probe(struct platform_device *pdev)
+{
+...
+        sdhci = devm_kzalloc(&pdev->dev, sizeof(*sdhci), GFP_KERNEL);
+...
+        if (np) {
+...
+        } else {
+                sdhci->data = dev_get_platdata(&pdev->dev);
+        }
+
+        pdev->dev.platform_data = sdhci;
+...
+	... some paths which can cause probe to return an error code ...
+...
+static int sdhci_remove(struct platform_device *pdev)
+{
+        struct sdhci_host *host = platform_get_drvdata(pdev);
+        struct spear_sdhci *sdhci = dev_get_platdata(&pdev->dev);
+...
+        clk_disable_unprepare(sdhci->clk);
+        clk_put(sdhci->clk);
+
+So, what happens if we hit an error such as -EPROBEDEFER after that
+assignment to pdev->dev.platform_data, and then re-probe the driver
+later?
+
+This is just horribly broken.
+
+What's wrong with using the facilities in sdhci to allow you to have
+your own private data after the sdhci_host structure?
+
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
