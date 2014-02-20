@@ -1,78 +1,121 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 20 Feb 2014 16:31:12 +0100
-Subject: [PATCH 0/8] PM / Sleep / Runtime: Fixup some driver's system suspend
-Message-ID: <1392910280-12891-1-git-send-email-ulf.hansson@linaro.org>
+Date: Thu, 20 Feb 2014 16:31:13 +0100
+Subject: [PATCH 1/8] PM / Runtime: Fetch runtime PM callbacks using a macro
+In-Reply-To: <1392910280-12891-1-git-send-email-ulf.hansson@linaro.org>
+References: <1392910280-12891-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1392910280-12891-2-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 1 -> 2:
-These patches provides two new runtime PM helper functions which intend to be
-used from system suspend/resume callbacks, to make sure devices are put into low
-power state during system suspend and brought back to full power at system
-resume.
+While fetching the proper runtime PM callback, we walk the hierarchy of
+device's power domains, subsystems and drivers.
 
-The prerequisite is to have all levels of a device's runtime PM callbacks to be
-defined through the SET_PM_RUNTIME_PM_OPS macro, which means these are available
-for CONFIG_PM.
+This is common for rpm_suspend(), rpm_idle() and rpm_resume(). Let's
+clean up the code by using a macro that handles this.
 
-By using the new runtime PM helper functions especially the two scenarios below
-will be addressed.
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: Alessandro Rubini <rubini@unipv.it>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/base/power/runtime.c |   59 ++++++++++++++----------------------------
+ 1 file changed, 20 insertions(+), 39 deletions(-)
 
-1) The PM core prevents .runtime_suspend callbacks from being invoked during
-system suspend. That means even for a runtime PM centric subsystem and driver,
-the device needs to be put into low power state from a system suspend callback.
-Otherwise it may very well be left in full power state (runtime resumed) while
-the system is suspended. By using the new helper functions, we make sure to walk
-the hierarchy of a device's power domain, subsystem and driver.
-
-2) Subsystems and drivers need to cope with all the combinations of
-CONFIG_PM_SLEEP and CONFIG_PM_RUNTIME. The two new helper functions smothly
-addresses this.
-
-Patch 3 -> 4:
-Fixup system suspend for spi-pl022 driver, by using the new runtime PM helper
-functions.
-
-These patches is based upon the latest next-branch for spi-pl022 driver. They
-will not apply to Rafael's linux-pm tree, but are included in this patchset for
-reference and to receive comments/acks.
-
-Patch 5:
-Fixup system suspend for i2c-nomadik driver, by using the new runtime PM helper
-functions.
-
-This patch is based upon the latest next-branch for the i2c-nomadik driver. They
-will not apply to Rafael's linux-pm tree, but are included in this patchset for
-reference and to receive comments/acks.
-
-Patch 6 -> 8:
-Fixup system suspend for mmci driver, by using the new runtime PM helper
-functions.
-
-
-A final note, the amba bus has converted to use the SET_PM_RUNTIME_PM_OPS
-which is needed for these patches to work with only CONFIG_PM_SLEEP and not
-CONFIG_PM_RUNTIME. Anyway, the patches for the amba bus have recently been
-applied by Russell and resides in his ARM tree.
-
-
-Ulf Hansson (8):
-  PM / Runtime: Fetch runtime PM callbacks using a macro
-  PM / Sleep / Runtime: Add pm_runtime_suspend|resume_force functions
-  spi: pl022: Let runtime PM callbacks be available for CONFIG_PM
-  spi: pl022: Don't ignore power domain and amba bus at system suspend
-  i2c: nomadik: Fixup system suspend
-  mmc: mmci: Mask IRQs for all variants during runtime suspend
-  mmc: mmci: Let runtime PM callbacks be available for CONFIG_PM
-  mmc: mmci: Put the device into low power state at system suspend
-
- drivers/base/power/Makefile      |    3 +-
- drivers/base/power/runtime.c     |  143 +++++++++++++++++++++++++++-----------
- drivers/i2c/busses/i2c-nomadik.c |   14 ++--
- drivers/mmc/host/mmci.c          |   60 ++++------------
- drivers/spi/spi-pl022.c          |   58 ++++++----------
- include/linux/pm_runtime.h       |    4 ++
- 6 files changed, 151 insertions(+), 131 deletions(-)
-
+diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+index 72e00e6..dedbd64 100644
+--- a/drivers/base/power/runtime.c
++++ b/drivers/base/power/runtime.c
+@@ -13,6 +13,23 @@
+ #include <trace/events/rpm.h>
+ #include "power.h"
+ 
++#define RPM_GET_CALLBACK(dev, cb)				\
++({								\
++	if (dev->pm_domain)					\
++		callback = dev->pm_domain->ops.cb;		\
++	else if (dev->type && dev->type->pm)			\
++		callback = dev->type->pm->cb;			\
++	else if (dev->class && dev->class->pm)			\
++		callback = dev->class->pm->cb;			\
++	else if (dev->bus && dev->bus->pm)			\
++		callback = dev->bus->pm->cb;			\
++	else							\
++		callback = NULL;				\
++								\
++	if (!callback && dev->driver && dev->driver->pm)	\
++		callback = dev->driver->pm->cb;			\
++})
++
+ static int rpm_resume(struct device *dev, int rpmflags);
+ static int rpm_suspend(struct device *dev, int rpmflags);
+ 
+@@ -310,19 +327,7 @@ static int rpm_idle(struct device *dev, int rpmflags)
+ 
+ 	dev->power.idle_notification = true;
+ 
+-	if (dev->pm_domain)
+-		callback = dev->pm_domain->ops.runtime_idle;
+-	else if (dev->type && dev->type->pm)
+-		callback = dev->type->pm->runtime_idle;
+-	else if (dev->class && dev->class->pm)
+-		callback = dev->class->pm->runtime_idle;
+-	else if (dev->bus && dev->bus->pm)
+-		callback = dev->bus->pm->runtime_idle;
+-	else
+-		callback = NULL;
+-
+-	if (!callback && dev->driver && dev->driver->pm)
+-		callback = dev->driver->pm->runtime_idle;
++	RPM_GET_CALLBACK(dev, runtime_idle);
+ 
+ 	if (callback)
+ 		retval = __rpm_callback(callback, dev);
+@@ -492,19 +497,7 @@ static int rpm_suspend(struct device *dev, int rpmflags)
+ 
+ 	__update_runtime_status(dev, RPM_SUSPENDING);
+ 
+-	if (dev->pm_domain)
+-		callback = dev->pm_domain->ops.runtime_suspend;
+-	else if (dev->type && dev->type->pm)
+-		callback = dev->type->pm->runtime_suspend;
+-	else if (dev->class && dev->class->pm)
+-		callback = dev->class->pm->runtime_suspend;
+-	else if (dev->bus && dev->bus->pm)
+-		callback = dev->bus->pm->runtime_suspend;
+-	else
+-		callback = NULL;
+-
+-	if (!callback && dev->driver && dev->driver->pm)
+-		callback = dev->driver->pm->runtime_suspend;
++	RPM_GET_CALLBACK(dev, runtime_suspend);
+ 
+ 	retval = rpm_callback(callback, dev);
+ 	if (retval)
+@@ -724,19 +717,7 @@ static int rpm_resume(struct device *dev, int rpmflags)
+ 
+ 	__update_runtime_status(dev, RPM_RESUMING);
+ 
+-	if (dev->pm_domain)
+-		callback = dev->pm_domain->ops.runtime_resume;
+-	else if (dev->type && dev->type->pm)
+-		callback = dev->type->pm->runtime_resume;
+-	else if (dev->class && dev->class->pm)
+-		callback = dev->class->pm->runtime_resume;
+-	else if (dev->bus && dev->bus->pm)
+-		callback = dev->bus->pm->runtime_resume;
+-	else
+-		callback = NULL;
+-
+-	if (!callback && dev->driver && dev->driver->pm)
+-		callback = dev->driver->pm->runtime_resume;
++	RPM_GET_CALLBACK(dev, runtime_resume);
+ 
+ 	retval = rpm_callback(callback, dev);
+ 	if (retval) {
 -- 
 1.7.9.5
