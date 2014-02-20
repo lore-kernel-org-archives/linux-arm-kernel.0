@@ -1,28 +1,67 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 20 Feb 2014 09:02:18 +0100
+Date: Thu, 20 Feb 2014 08:59:34 +0100
 Subject: [PATCH 2/2] clocksource: armada-370-xp: Use atomic access for
  shared registers
-In-Reply-To: <5305B5E6.2060906@linaro.org>
+In-Reply-To: <1392840326-29417-3-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1392840326-29417-1-git-send-email-ezequiel.garcia@free-electrons.com>
  <1392840326-29417-3-git-send-email-ezequiel.garcia@free-electrons.com>
- <5305B5E6.2060906@linaro.org>
-Message-ID: <5305B68A.3050709@linaro.org>
+Message-ID: <5305B5E6.2060906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2014 08:59 AM, Daniel Lezcano wrote:
-> On 02/19/2014 09:05 PM, Ezequiel Garcia wrote:
->> Replace the driver-specific thread-safe shared register API
->> by the recently introduced atomic_io_clear_set().
->
-> Hi Ezequiel,
->
-> AFAICS, the code is lockless, your change adds a lock.
->
-> What race is it supposed to fix ?
+On 02/19/2014 09:05 PM, Ezequiel Garcia wrote:
+> Replace the driver-specific thread-safe shared register API
+> by the recently introduced atomic_io_clear_set().
 
-Nevermind, I just noticed it is related to the watchdog driver.
+Hi Ezequiel,
 
+AFAICS, the code is lockless, your change adds a lock.
+
+What race is it supposed to fix ?
+
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> ---
+>   drivers/clocksource/time-armada-370-xp.c | 12 ++++--------
+>   1 file changed, 4 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+> index ee8691b..0451e62 100644
+> --- a/drivers/clocksource/time-armada-370-xp.c
+> +++ b/drivers/clocksource/time-armada-370-xp.c
+> @@ -85,12 +85,6 @@ static u32 ticks_per_jiffy;
+>
+>   static struct clock_event_device __percpu *armada_370_xp_evt;
+>
+> -static void timer_ctrl_clrset(u32 clr, u32 set)
+> -{
+> -	writel((readl(timer_base + TIMER_CTRL_OFF) & ~clr) | set,
+> -		timer_base + TIMER_CTRL_OFF);
+> -}
+> -
+>   static void local_timer_ctrl_clrset(u32 clr, u32 set)
+>   {
+>   	writel((readl(local_base + TIMER_CTRL_OFF) & ~clr) | set,
+> @@ -245,7 +239,7 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+>   		clr = TIMER0_25MHZ;
+>   		enable_mask = TIMER0_EN | TIMER0_DIV(TIMER_DIVIDER_SHIFT);
+>   	}
+> -	timer_ctrl_clrset(clr, set);
+> +	atomic_io_modify(timer_base + TIMER_CTRL_OFF, clr | set, set);
+>   	local_timer_ctrl_clrset(clr, set);
+>
+>   	/*
+> @@ -263,7 +257,9 @@ static void __init armada_370_xp_timer_common_init(struct device_node *np)
+>   	writel(0xffffffff, timer_base + TIMER0_VAL_OFF);
+>   	writel(0xffffffff, timer_base + TIMER0_RELOAD_OFF);
+>
+> -	timer_ctrl_clrset(0, TIMER0_RELOAD_EN | enable_mask);
+> +	atomic_io_modify(timer_base + TIMER_CTRL_OFF,
+> +		TIMER0_RELOAD_EN | enable_mask,
+> +		TIMER0_RELOAD_EN | enable_mask);
+>
+>   	/*
+>   	 * Set scale and timer for sched_clock.
+>
 
 
 -- 
