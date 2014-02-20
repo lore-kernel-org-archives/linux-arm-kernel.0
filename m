@@ -1,91 +1,70 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 20 Feb 2014 16:27:10 +0000
-Subject: [PATCH v9 1/6] arm64: Add macros to manage processor debug state
-In-Reply-To: <20140220155600.GJ3615@mudshark.cambridge.arm.com>
-References: <CALicx6uHqyJ-n+b-zfua6P=UsJ+a2_2h-H6krx-DBJYWfF=7jg@mail.gmail.com>
- <20140218120249.GD11049@arm.com>
- <CALicx6v6=WdRPoZ-vcxf7zusooB5r1V9WnjBf3QjOiO7yik3sw@mail.gmail.com>
- <20140219113157.GG30457@arm.com> <20140219160359.GB22252@arm.com>
- <20140219161236.GG28173@mudshark.cambridge.arm.com>
- <CALicx6t7RSS_Zo9RGr76LMnNth1gQ7pukUtAmDY4gWRN5KGVKQ@mail.gmail.com>
- <20140220114222.GG3615@mudshark.cambridge.arm.com>
- <CALicx6sB-tucxv=-0J9LKw5E3wA1hmYyYN_z99ugnpmxvZTMng@mail.gmail.com>
- <20140220155600.GJ3615@mudshark.cambridge.arm.com>
-Message-ID: <20140220162710.GA7651@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 20 Feb 2014 16:27:55 +0000
+Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
+In-Reply-To: <20140219193315.3732.21819@capellas-linux>
+References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
+ <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
+ <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
+ <20140219193315.3732.21819@capellas-linux>
+Message-ID: <20140220162754.GC15994@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 03:56:00PM +0000, Will Deacon wrote:
-> On Thu, Feb 20, 2014 at 12:22:14PM +0000, Vijay Kilari wrote:
-> > On Thu, Feb 20, 2014 at 5:12 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Thu, Feb 20, 2014 at 06:58:25AM +0000, Vijay Kilari wrote:
-> > >> --- a/arch/arm64/kernel/smp.c
-> > >> +++ b/arch/arm64/kernel/smp.c
-> > >> @@ -160,6 +160,8 @@ asmlinkage void secondary_start_kernel(void)
-> > >>         set_cpu_online(cpu, true);
-> > >>         complete(&cpu_running);
-> > >>
-> > >> +       local_dbg_enable();
-> > >>         local_irq_enable();
-> > >>         local_async_enable();
-> > >
-> > > The only thing to add then moving the isb(); local_dbg_enable() out of
-> > > clear_os_lock and into debug_monitors_init. You can probably make the
-> > > smp_call_function an on_each_cpu too.
-> > >
-> > > Does that make sense?
-> > 
-> > Its ok for me.  Isn't require to have isb() after clearing os lock for
-> > every cpu?
-> > Just having isb on cpu0 after clearing os lock is enough?
-> 
-> They'll synchronise on return from the IPI.
-> 
-> > --- a/arch/arm64/kernel/debug-monitors.c
-> > +++ b/arch/arm64/kernel/debug-monitors.c
-> > @@ -137,8 +137,6 @@ void disable_debug_monitors(enum debug_el el)
-> >  static void clear_os_lock(void *unused)
-> >  {
-> >         asm volatile("msr oslar_el1, %0" : : "r" (0));
-> > -       isb();
-> > -       local_dbg_enable();
-> >  }
-> > 
-> >  static int os_lock_notify(struct notifier_block *self,
-> > @@ -157,8 +155,9 @@ static struct notifier_block os_lock_nb = {
-> >  static int debug_monitors_init(void)
-> >  {
-> >         /* Clear the OS lock. */
-> > -       smp_call_function(clear_os_lock, NULL, 1);
-> > -       clear_os_lock(NULL);
-> > +       on_each_cpu(clear_os_lock, NULL, 1);
-> > +       isb();
-> > +       local_dbg_enable();
-> > 
-> >         /* Register hotplug handler. */
-> >         register_cpu_notifier(&os_lock_nb);
-> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> > index 7cfb92a..5070dc3 100644
-> > --- a/arch/arm64/kernel/smp.c
-> > +++ b/arch/arm64/kernel/smp.c
-> > @@ -160,6 +160,7 @@ asmlinkage void secondary_start_kernel(void)
-> >         set_cpu_online(cpu, true);
-> >         complete(&cpu_running);
-> > 
-> > +       local_dbg_enable();
-> >         local_irq_enable();
-> >         local_async_enable();
-> > 
-> > Is this ok?
-> 
-> Looks good to me:
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
+Hi Sebastian,
 
-Vijay, could you please post a commit log together with the above patch
-(and Will's ack) so that I can merge it on top of your other patches?
+On Wed, Feb 19, 2014 at 07:33:15PM +0000, Sebastian Capella wrote:
+> Quoting Lorenzo Pieralisi (2014-02-19 08:12:54)
+> > On Wed, Feb 19, 2014 at 01:52:09AM +0000, Sebastian Capella wrote:
+> > [...]
+> > > diff --git a/arch/arm/kernel/hibernate.c b/arch/arm/kernel/hibernate.c
+> > > new file mode 100644
+> > > index 0000000..16f406f
+> > > --- /dev/null
+> > > +++ b/arch/arm/kernel/hibernate.c
+> > > +void notrace save_processor_state(void)
+> > > +{
+> > > +     WARN_ON(num_online_cpus() != 1);
+> > > +     flush_thread();
+> > 
+> > Can you explain to me please why we need to call flush_thread() here ?
+> > At this point in time syscore_suspend() was already called and CPU
+> > peripheral state saved through CPU PM notifiers.
+> 
+> Copying Russ' response here: 
+> 
+> "I think the idea here is to get the CPU into a state so that later
+> when we resume from the resume kernel, the actual CPU state matches
+> the state we have in kernel. The main thing flush_thread does is clear
+> out any and all FP state." - Russ Dill
 
-Thanks.
+See my reply to Russ.
 
--- 
-Catalin
+[...]
+
+> > > +static void notrace __swsusp_arch_restore_image(void *unused)
+> > > +{
+> > > +     struct pbe *pbe;
+> > > +
+> > > +     cpu_switch_mm(idmap_pgd, &init_mm);
+> > 
+> > Same here, thanks.
+> 
+> At restore time, we take the save buffer data and restore it to the same
+> physical locations used in the previous execution.  This will require having
+> write access to all of memory, which may not be generally granted by the
+> current mm.  So we switch to 1-1 init_mm to restore memory.
+
+I still do not understand why switching to idmap, which is a clone of
+init_mm + 1:1 kernel mappings is required here. Why idmap ?
+
+And while at it, can't the idmap be overwritten _while_ copying back the
+resume kernel ? Is it safe to use idmap page tables while copying ?
+
+I had a look at x86 and there idmap page tables used to resume are created
+on the fly using safe pages, on ARM idmap is created at boot.
+
+I am grokking the code to understand what is really needed here, will get
+back to you asap but I would like things to be clarified in the interim.
+
+Thanks,
+Lorenzo
