@@ -1,126 +1,60 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 20 Feb 2014 13:14:31 +0800
-Subject: [PATCH v10 02/15] usb: phy-mxs: Add platform judgement code
+Date: Thu, 20 Feb 2014 13:14:32 +0800
+Subject: [PATCH v10 03/15] usb: phy-mxs: Add auto clock and power setting
 In-Reply-To: <1392873284-9386-1-git-send-email-peter.chen@freescale.com>
 References: <1392873284-9386-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1392873284-9386-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <1392873284-9386-4-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxs-phy has several bugs and features at different
-versions, the driver code can get it through of_device_id.data.
+The auto setting is used to open related power and clocks
+automatically after receiving wakeup signal.
+
+With this feature, the PHY's clock and power can be recovered
+correctly from low power mode, it is guaranteed by IC logic.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/phy/phy-mxs-usb.c |   58 ++++++++++++++++++++++++++++++++++------
- 1 files changed, 49 insertions(+), 9 deletions(-)
+ drivers/usb/phy/phy-mxs-usb.c |   20 +++++++++++++++++---
+ 1 files changed, 17 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index b42897b..cf58d8e 100644
+index cf58d8e..d7adca3 100644
 --- a/drivers/usb/phy/phy-mxs-usb.c
 +++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2012-2013 Freescale Semiconductor, Inc.
-  * Copyright (C) 2012 Marek Vasut <marex@denx.de>
-  * on behalf of DENX Software Engineering GmbH
-  *
-@@ -20,6 +20,7 @@
- #include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/io.h>
-+#include <linux/of_device.h>
+@@ -31,6 +31,11 @@
  
- #define DRIVER_NAME "mxs_phy"
- 
-@@ -34,13 +35,55 @@
+ #define BM_USBPHY_CTRL_SFTRST			BIT(31)
+ #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
++#define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
++#define BM_USBPHY_CTRL_ENAUTOCLR_USBCLKGATE	BIT(25)
++#define BM_USBPHY_CTRL_ENAUTOCLR_PHY_PWD	BIT(20)
++#define BM_USBPHY_CTRL_ENAUTOCLR_CLKGATE	BIT(19)
++#define BM_USBPHY_CTRL_ENAUTO_PWRON_PLL		BIT(18)
+ #define BM_USBPHY_CTRL_ENUTMILEVEL3		BIT(15)
  #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
  #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
+@@ -96,9 +101,18 @@ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
+ 	/* Power up the PHY */
+ 	writel(0, base + HW_USBPHY_PWD);
  
-+#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
-+
-+/* Do disconnection between PHY and controller without vbus */
-+#define MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS	BIT(0)
-+
-+/*
-+ * The PHY will be in messy if there is a wakeup after putting
-+ * bus to suspend (set portsc.suspendM) but before setting PHY to low
-+ * power mode (set portsc.phcd).
-+ */
-+#define MXS_PHY_ABNORMAL_IN_SUSPEND		BIT(1)
-+
-+/*
-+ * The SOF sends too fast after resuming, it will cause disconnection
-+ * between host and high speed device.
-+ */
-+#define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
-+
-+struct mxs_phy_data {
-+	unsigned int flags;
-+};
-+
-+static const struct mxs_phy_data imx23_phy_data = {
-+	.flags = MXS_PHY_ABNORMAL_IN_SUSPEND | MXS_PHY_SENDING_SOF_TOO_FAST,
-+};
-+
-+static const struct mxs_phy_data imx6q_phy_data = {
-+	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
-+		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
-+};
-+
-+static const struct mxs_phy_data imx6sl_phy_data = {
-+	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
-+};
-+
-+static const struct of_device_id mxs_phy_dt_ids[] = {
-+	{ .compatible = "fsl,imx6sl-usbphy", .data = &imx6sl_phy_data, },
-+	{ .compatible = "fsl,imx6q-usbphy", .data = &imx6q_phy_data, },
-+	{ .compatible = "fsl,imx23-usbphy", .data = &imx23_phy_data, },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
-+
- struct mxs_phy {
- 	struct usb_phy phy;
- 	struct clk *clk;
-+	const struct mxs_phy_data *data;
- };
+-	/* enable FS/LS device */
+-	writel(BM_USBPHY_CTRL_ENUTMILEVEL2 |
+-	       BM_USBPHY_CTRL_ENUTMILEVEL3,
++	/*
++	 * USB PHY Ctrl Setting
++	 * - Auto clock/power on
++	 * - Enable full/low speed support
++	 */
++	writel(BM_USBPHY_CTRL_ENAUTOSET_USBCLKS |
++		BM_USBPHY_CTRL_ENAUTOCLR_USBCLKGATE |
++		BM_USBPHY_CTRL_ENAUTOCLR_PHY_PWD |
++		BM_USBPHY_CTRL_ENAUTOCLR_CLKGATE |
++		BM_USBPHY_CTRL_ENAUTO_PWRON_PLL |
++		BM_USBPHY_CTRL_ENUTMILEVEL2 |
++		BM_USBPHY_CTRL_ENUTMILEVEL3,
+ 	       base + HW_USBPHY_CTRL_SET);
  
--#define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
--
- static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
- {
- 	int ret;
-@@ -138,6 +181,8 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 	struct clk *clk;
- 	struct mxs_phy *mxs_phy;
- 	int ret;
-+	const struct of_device_id *of_id =
-+			of_match_device(mxs_phy_dt_ids, &pdev->dev);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	base = devm_ioremap_resource(&pdev->dev, res);
-@@ -168,6 +213,7 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 	mxs_phy->phy.type		= USB_PHY_TYPE_USB2;
- 
- 	mxs_phy->clk = clk;
-+	mxs_phy->data = of_id->data;
- 
- 	platform_set_drvdata(pdev, mxs_phy);
- 
-@@ -187,12 +233,6 @@ static int mxs_phy_remove(struct platform_device *pdev)
  	return 0;
- }
- 
--static const struct of_device_id mxs_phy_dt_ids[] = {
--	{ .compatible = "fsl,imx23-usbphy", },
--	{ /* sentinel */ }
--};
--MODULE_DEVICE_TABLE(of, mxs_phy_dt_ids);
--
- static struct platform_driver mxs_phy_driver = {
- 	.probe = mxs_phy_probe,
- 	.remove = mxs_phy_remove,
 -- 
 1.7.8
