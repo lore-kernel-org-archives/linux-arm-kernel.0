@@ -1,52 +1,38 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Thu, 20 Feb 2014 13:42:17 -0500
-Subject: [PATCH v2] hwrng: msm: switch Kconfig to ARCH_QCOM depends
-In-Reply-To: <1392912542-5349-1-git-send-email-galak@codeaurora.org>
-References: <1392912542-5349-1-git-send-email-galak@codeaurora.org>
-Message-ID: <53064C89.4060206@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 20 Feb 2014 18:58:05 +0000
+Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
+In-Reply-To: <CAOesGMhfhdqqb4hJ0hC5HbSWWMQc0FDaaZYO0rZ1cdFtuRgdig@mail.gmail.com>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <5302B306.8090503@samsung.com>
+ <CAOesGMhnUDcUL7hREV=EYEGr5YG-ZLL6v9NiGcrBr6477WfdyQ@mail.gmail.com>
+ <6032891.ndY8FikAMY@wuerfel>
+ <CALAqxLX6STNqUeVO2G18bm_HKabpoRxZTa3uK6i-JP97zEYVZg@mail.gmail.com>
+ <CAOesGMjLR3PGXeyJPAvGwam4yK97+vnDfq5MVutJz75aKPX8gw@mail.gmail.com>
+ <CALAqxLU7ehHfvQa58HpdzojRU-2zhNpEgkr9KEJ3cf550WcnWw@mail.gmail.com>
+ <CAOesGMjSjzZ4iX3NVA6eS4LHJF2MQQ=KJpNgKWikJb6YkQxNpQ@mail.gmail.com>
+ <20140220112248.GC32456@localhost>
+ <CAOesGMhfhdqqb4hJ0hC5HbSWWMQc0FDaaZYO0rZ1cdFtuRgdig@mail.gmail.com>
+Message-ID: <20140220185805.GI7651@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2014 11:09 AM, Kumar Gala wrote:
-> We've split Qualcomm MSM support into legacy and multiplatform.  The RNG
-> driver is only relevant on the multiplatform supported SoCs so switch the
-> Kconfig depends to ARCH_QCOM.
+On Thu, Feb 20, 2014 at 05:09:59PM +0000, Olof Johansson wrote:
+> On Thu, Feb 20, 2014 at 3:22 AM, Catalin Marinas
+> > Two additional points:
+> >
+> > 1. Single arm64 defconfig file covering everything
+> > 2. Modules rather than built-in by default where possible (especially
+> >    for server platforms)
 > 
-> CC: Herbert Xu <herbert@gondor.apana.org.au>
-> CC: Stanimir Varbanov <svarbanov@mm-sol.com>
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
-> ---
-> 
-> Herbert,
-> 
-> If you can ack this I'll send it via linux-qcom/arm-soc tree's
-> 
-> thanks
-> 
-> v2:
-> * Updated help text to remove MSM references, made more generic
-> 
->  drivers/char/hw_random/Kconfig | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-> index 2f2b084..f2b9f8c 100644
-> --- a/drivers/char/hw_random/Kconfig
-> +++ b/drivers/char/hw_random/Kconfig
-> @@ -342,11 +342,11 @@ config HW_RANDOM_TPM
->  	  If unsure, say Y.
->  
->  config HW_RANDOM_MSM
-> -	tristate "Qualcomm MSM Random Number Generator support"
+> Sounds good to me. Are you also willing to pick up one defconfig per
+> vendor (but not more)? I think it's been useful to have those on arm,
+> even on multiplatform kernels. We used them on powerpc as well, where
+> we had a two-layer approach (ppc64_defconfig and per-platform configs,
+> pseries/iseries/pasemi/g5/cell).
 
-> +	tristate "Qualcomm ARM SoCs Random Number Generator support"
-
-Can the Hexagon use the PRNG, at least theoretically? If so maybe it'd be
-clearest to leave ARM off.
-
-Christopher
+Initially I would keep a single defconfig with everything just to get
+wider coverage of single Image. Later on, if just deselecting config
+entries doesn't work, we can revisit per-vendor defconfigs.
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Catalin
