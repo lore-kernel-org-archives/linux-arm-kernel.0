@@ -1,137 +1,147 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Thu, 20 Feb 2014 16:16:11 -0800
-Subject: [PATCH] ARM: bcm2835: Move to mach-bcm directory
-Message-ID: <1392941771-15774-1-git-send-email-markus.mayer@linaro.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 20 Feb 2014 17:24:38 -0700
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <CAErSpo5pG3eOG58MiCCOHgr_jQReH0uBnWQFvzQYg3qrOGpZEw@mail.gmail.com>
+References: <20130711163220.2b3adf38@skate> <53039894.10905@keymile.com>
+ <20140218212751.07c2aeb5@skate> <53046D98.6020801@keymile.com>
+ <20140219102658.76eec91e@skate> <53047BBB.6040108@keymile.com>
+ <20140219143749.65ff3155@skate>
+ <CAErSpo4=6VgJazaErcx=ztKhZ_62xBrQ6K1eN_dVpvV4R0T2ag@mail.gmail.com>
+ <20140220095518.7ca36f0a@skate>
+ <CAErSpo5pG3eOG58MiCCOHgr_jQReH0uBnWQFvzQYg3qrOGpZEw@mail.gmail.com>
+Message-ID: <20140221002438.GE19893@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the bcm2835 board file into the mach-bcm directory. This allows us
-to get rid of the mach-bcm2835 directory with the associated Kconfig
-and Makefile.
+On Thu, Feb 20, 2014 at 12:18:42PM -0700, Bjorn Helgaas wrote:
 
-Signed-off-by: Markus Mayer <markus.mayer@linaro.org>
----
- MAINTAINERS                                        |    2 +-
- arch/arm/Kconfig                                   |    2 --
- arch/arm/Makefile                                  |    1 -
- arch/arm/mach-bcm/Kconfig                          |   16 ++++++++++++++++
- arch/arm/mach-bcm/Makefile                         |    2 ++
- .../bcm2835.c => mach-bcm/board_bcm2835.c}         |    0
- arch/arm/mach-bcm2835/Kconfig                      |   15 ---------------
- arch/arm/mach-bcm2835/Makefile                     |    1 -
- 8 files changed, 19 insertions(+), 20 deletions(-)
- rename arch/arm/{mach-bcm2835/bcm2835.c => mach-bcm/board_bcm2835.c} (100%)
- delete mode 100644 arch/arm/mach-bcm2835/Kconfig
- delete mode 100644 arch/arm/mach-bcm2835/Makefile
+> > On Marvell hardware, the physical address space layout is configurable,
+> > through the use of "MBus windows". A "MBus window" is defined by a base
+> > address, a size, and a target device. So if the CPU needs to access a
+> > given device (such as PCIe 0.0 for example), then we need to create a
+> > "MBus window" whose size and target device match PCIe 0.0.
+> 
+> I was assuming "PCIe 0.0" was a host bridge, but it sounds like maybe
+> that's not true.  Is it really a PCIe root port?  That would mean the
+> MBus windows are some non-PCIe-compliant thing between the root
+> complex and the root ports, I guess.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index fb08dce..6e94e26 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1875,7 +1875,7 @@ M:	Stephen Warren <swarren@wwwdotorg.org>
- L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git
- S:	Maintained
--F:	arch/arm/mach-bcm2835/
-+F:	arch/arm/mach-bcm/board_bcm2835.c
- F:	arch/arm/boot/dts/bcm2835*
- F:	arch/arm/configs/bcm2835_defconfig
- F:	drivers/*/*bcm2835*
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e254198..bde2237 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -936,8 +936,6 @@ source "arch/arm/mach-at91/Kconfig"
- 
- source "arch/arm/mach-bcm/Kconfig"
- 
--source "arch/arm/mach-bcm2835/Kconfig"
--
- source "arch/arm/mach-berlin/Kconfig"
- 
- source "arch/arm/mach-clps711x/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 08a9ef5..7743fb9 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -143,7 +143,6 @@ textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
- # by CONFIG_* macro name.
- machine-$(CONFIG_ARCH_AT91)		+= at91
- machine-$(CONFIG_ARCH_BCM)		+= bcm
--machine-$(CONFIG_ARCH_BCM2835)		+= bcm2835
- machine-$(CONFIG_ARCH_BERLIN)		+= berlin
- machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
- machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index b1aa6a9..4e466e9 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -32,6 +32,22 @@ config ARCH_BCM_MOBILE
- 	  BCM11130, BCM11140, BCM11351, BCM28145 and
- 	  BCM28155 variants.
- 
-+config ARCH_BCM2835
-+	bool "Broadcom BCM2835 family" if ARCH_MULTI_V6
-+	select ARCH_REQUIRE_GPIOLIB
-+	select ARM_AMBA
-+	select ARM_ERRATA_411920
-+	select ARM_TIMER_SP804
-+	select CLKDEV_LOOKUP
-+	select CLKSRC_OF
-+	select CPU_V6
-+	select GENERIC_CLOCKEVENTS
-+	select PINCTRL
-+	select PINCTRL_BCM2835
-+	help
-+	  This enables support for the Broadcom BCM2835 SoC. This SoC is
-+	  used in the Raspberry Pi and Roku 2 devices.
-+
- endmenu
- 
- endif
-diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-index c2ccd5a..0ad2938 100644
---- a/arch/arm/mach-bcm/Makefile
-+++ b/arch/arm/mach-bcm/Makefile
-@@ -11,5 +11,7 @@
- # GNU General Public License for more details.
- 
- obj-$(CONFIG_ARCH_BCM_MOBILE)	:= board_bcm281xx.o bcm_kona_smc.o bcm_kona_smc_asm.o kona.o
-+obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
-+
- plus_sec := $(call as-instr,.arch_extension sec,+sec)
- AFLAGS_bcm_kona_smc_asm.o	:=-Wa,-march=armv7-a$(plus_sec)
-diff --git a/arch/arm/mach-bcm2835/bcm2835.c b/arch/arm/mach-bcm/board_bcm2835.c
-similarity index 100%
-rename from arch/arm/mach-bcm2835/bcm2835.c
-rename to arch/arm/mach-bcm/board_bcm2835.c
-diff --git a/arch/arm/mach-bcm2835/Kconfig b/arch/arm/mach-bcm2835/Kconfig
-deleted file mode 100644
-index d1f9612..0000000
---- a/arch/arm/mach-bcm2835/Kconfig
-+++ /dev/null
-@@ -1,15 +0,0 @@
--config ARCH_BCM2835
--	bool "Broadcom BCM2835 family" if ARCH_MULTI_V6
--	select ARCH_REQUIRE_GPIOLIB
--	select ARM_AMBA
--	select ARM_ERRATA_411920
--	select ARM_TIMER_SP804
--	select CLKDEV_LOOKUP
--	select CLKSRC_OF
--	select CPU_V6
--	select GENERIC_CLOCKEVENTS
--	select PINCTRL
--	select PINCTRL_BCM2835
--	help
--	  This enables support for the Broadcom BCM2835 SoC. This SoC is
--	  used in the Raspberry Pi and Roku 2 devices.
-diff --git a/arch/arm/mach-bcm2835/Makefile b/arch/arm/mach-bcm2835/Makefile
-deleted file mode 100644
-index 4c3892f..0000000
---- a/arch/arm/mach-bcm2835/Makefile
-+++ /dev/null
-@@ -1 +0,0 @@
--obj-y += bcm2835.o
--- 
-1.7.9.5
+It really is a root port. The hardware acts like a root port at the
+TLP level. It has all the root port specific stuff in some format but
+critically, completely lacks a compliant config space for a root
+port bridge.
+
+So the driver creates a 'compliant' config space for the root
+port. Building the config space requires harmonizing registers related
+to the PCI-E and registers related to internal routing and dealing
+with the mismatch between what the hardware can actualy provide and
+what the PCI spec requires it provide.
+
+The only mismatch that gets exposed to the PCI core we know about is
+the bridge window address alignment restrictions.
+
+This is what Thomas has been asking about.
+
+> > Since Armada XP has 10 PCIe interfaces, we cannot just statically
+> > create as many MBus windows as there are PCIe interfaces: it would both
+> > exhaust the number of MBus windows available, and also exhaust the
+> > physical address space, because we would have to create very large
+> > windows, just in case the PCIe device plugged behind this interface
+> > needs large BARs.
+> 
+> Everybody else in the world *does* statically configure host bridge
+> apertures before enumerating the devices below the bridge.  
+
+The original PCI-E driver for this hardware did use a 1 root port per
+host bridge model, with static host bridge aperture allocation and so
+forth.
+
+It works fine, just like everyone else in the world, as long as you
+have only 1 or 2 ports. The XP hardware had *10* ports on a single
+32 bit machine. You run out of address space, you run out of
+HW routing resources, it just doesn't work acceptably.
+
+> I see why you want to know what devices are there before deciding
+> whether and how large to make an MBus window.  But that is new
+> functionality that we don't have today, and the general idea is not
+
+Well, in general, it isn't new core functionality, it is functionality
+that already exists to support PCI bridges.
+
+Choosing to use a one host bridge to N root port bridge model lets the
+driver use all that functionality and the only wrinkle that becomes
+visible to the PCI core as a whole is the non-compliant alignment
+restriction on the bridge window BAR.
+
+This also puts the driver in alignment with the PCI-E specs for root
+complexes, which means user space can actually see things like the
+PCI-E root port link capability block and makes it hot plug work
+properly (I am actively using hot plug with this driver)
+
+I personaly think this is a reasonable way to support this highly
+flexible HW.
+
+> I'm still not sure I understand what's going on here.  It sounds like
+> your emulated bridge basically wraps the host bridge and makes it look
+> like a PCI-PCI bridge.  But I assume the host bridge itself is also
+> visible, and has apertures (I guess these are the MBus windows?)  
+
+No, there is only one bridge, it is a per-physical-port MBUS / PCI-E
+bridge. It performs an identical function to the root port bridge
+described in PCI-E. MBUS serves as the root-complex internal bus 0.
+
+There isn't 2 levels of bridging, so the MBUS / PCI-E bridge can
+claim any system address and there is no such thing as a 'host
+bridge'.
+
+What Linux calls 'the host bridge aperture' is simply a wack of
+otherwise unused physical address space, it has no special properties.
+
+> It'd be nice if dmesg mentioned the host bridge explicitly as we do on
+> other architectures; maybe that would help understand what's going on
+> under the covers.  Maybe a longer excerpt would already have this; you
+> already use pci_add_resource_offset(), which is used when creating the
+> root bus, so you must have some sort of aperture before enumerating.
+
+Well, /proc/iomem looks like this:
+
+e0000000-efffffff : PCI MEM 0000
+  e0000000-e00fffff : PCI Bus 0000:01
+    e0000000-e001ffff : 0000:01:00.0
+
+'PCI MEM 0000' is the 'host bridge aperture' it is an arbitary
+range of address space that doesn't overlap anything.
+
+'PCI Bus 0000:01' is the MBUS / PCI-E root port bridge for physical
+port 0
+
+'0000:01:00.0' is BAR 0 of an an off-chip device.
+
+> If 01:00.0 is a PCIe endpoint, it must have a root port above it, so
+> that means 00:01.0 must be the root port.  But I think you're saying
+> that 00:01.0 is actually *emulated* and isn't PCIe-compliant, e.g., it
+> has extra window alignment restrictions.  
+
+It is important to understand that the emulation is only of the root
+port bridge configuration space. The underlying TLP processing is done
+in HW and is compliant.
+
+> I'm scared about what other non-PCIe-compliant things there might
+> be.  What happens when the PCI core configures MPS, ASPM, etc.,
+
+As the TLP processing and the underlying PHY are all compliant these
+things are all supported in HW.
+
+MPS is supported directly by the HW
+
+ASPM is supported by the HW, as is the entire link capability and
+status block.
+
+AER is supported directly by the HW
+
+But here is the thing, without the software emulated config space
+there would be no sane way for the Linux PCI core to access these
+features. The HW simply does not present them in a way that the core
+code can understand without a SW intervention of some kind.
+
+Jason
