@@ -1,79 +1,41 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 21 Feb 2014 16:50:01 +0100
-Subject: [PATCHv7][ 4/7] staging: imx-drm: Use de-active and
- pixelclk-active display-timings.
-In-Reply-To: <1392991205-25371-4-git-send-email-denis@eukrea.com>
-References: <1392991205-25371-1-git-send-email-denis@eukrea.com>
- <1392991205-25371-4-git-send-email-denis@eukrea.com>
-Message-ID: <20140221165001.2e7c7e08@ipc1.ka-ro>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 21 Feb 2014 16:50:02 +0100
+Subject: [PATCH v2 2/2] phy: Select PHY_EXYNOS_DP_VIDEO by default for
+ ARCH_EXYNOS
+In-Reply-To: <1392997802-29050-1-git-send-email-s.nawrocki@samsung.com>
+References: <1392997802-29050-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1392997802-29050-2-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Instead of requiring user to figure out when PHY_EXYNOS_DP_VIDEO needs
+to be selected select it by default for Exynos SoCs. Also enable it
+when COMPILE_TEST is selected. If required the display port PHY driver
+can be then disabled or compiled in as module.
 
-Denis Carikli wrote:
-> If de-active and/or pixelclk-active properties were set in the
-> display-timings DT node, they were not used.
-> 
-> Instead the data-enable and the pixel data clock polarity
-> were hardcoded.
-> 
-> This change is needed for making the eukrea-cpuimx51
->   QVGA display work.
-> 
-> Cc: Eric B?nard <eric@eukrea.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: devel at driverdev.osuosl.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
-> ---
-> ChangeLog v6->v7:
-> - Shrinked even more the Cc list.
-> - Rebased the patch
-> - val is now initialized in imx_pd_connector_get_modes
-> 
-> ChangeLog v5->v6:
-> - Remove people not concerned by this patch from the Cc list.
-> - Removed wrong coments from the code.
-> - Corrected the code style of the "if (!!val)"
-> 
-> ChangeLog v3->v4:
-> - The old patch was named "staging: imx-drm: ipuv3-crtc: don't harcode some mode".
-> - Reworked the patch entierly: we now takes the mode flags from the device tree.
-> 
-> ChangeLog v2->v3:
-> - Added some interested people in the Cc list.
-> - Ajusted the flags to match the changes in "drm: Add the lacking
->   DRM_MODE_FLAG_* for matching the DISPLAY_FLAGS_*"
-> ---
->  drivers/staging/imx-drm/imx-drm.h          |    3 +++
->  drivers/staging/imx-drm/ipuv3-crtc.c       |    8 ++++++--
->  drivers/staging/imx-drm/parallel-display.c |   27 +++++++++++++++++++++++++++
->  3 files changed, 36 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/staging/imx-drm/imx-drm.h b/drivers/staging/imx-drm/imx-drm.h
-> index ae90c9c..dfdc180 100644
-> --- a/drivers/staging/imx-drm/imx-drm.h
-> +++ b/drivers/staging/imx-drm/imx-drm.h
-> @@ -5,6 +5,9 @@
->  
->  #define IPU_PIX_FMT_GBR24	v4l2_fourcc('G', 'B', 'R', '3')
->  
-> +#define IMXDRM_MODE_FLAG_DE_HIGH		(1<<0)
-> +#define IMXDRM_MODE_FLAG_PIXDATA_POSEDGE	(1<<1)
-> +
-CodingStyle: spaces around operators...?
+Cc: Jingoo Han <jg1.han@samsung.com>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+Changes since first version:
+ - use ARCH_EXYNOS instead of "ARCH_EXYNOS4 || ARCH_EXYNOS5"
+ - add dependency on COMPILE_TEST
+---
+ drivers/phy/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-
-Lothar Wa?mann
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index ebd455c..4218c99 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -57,6 +57,8 @@ config TWL4030_USB
+ config PHY_EXYNOS_DP_VIDEO
+ 	tristate "EXYNOS SoC series Display Port PHY driver"
+ 	depends on OF
++	depends on ARCH_EXYNOS || COMPILE_TEST
++	default y
+ 	select GENERIC_PHY
+ 	help
+ 	  Support for Display Port PHY found on Samsung EXYNOS SoCs.
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.9.5
