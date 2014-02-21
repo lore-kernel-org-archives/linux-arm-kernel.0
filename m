@@ -1,9 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Feb 2014 15:12:52 +0900
-Subject: [PATCH 11/13] ARM: shmobile: r8a7791: add i2c2 bus to koelsch dt
+Date: Fri, 21 Feb 2014 15:12:53 +0900
+Subject: [PATCH 12/13] ARM: shmobile: r7s72100: add nodes for i2c controllers
+ to dtsi
 In-Reply-To: <cover.1392961872.git.horms+renesas@verge.net.au>
 References: <cover.1392961872.git.horms+renesas@verge.net.au>
-Message-ID: <38c53516729925d2123ed800e5f4182d77e450a6.1392961872.git.horms+renesas@verge.net.au>
+Message-ID: <c81a4d3dfd33e097d3eef89e4eb830effb8b8d31.1392961872.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,45 +12,100 @@ From: Wolfram Sang <wsa@sang-engineering.com>
 
 Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
 Acked-by: Magnus Damm <damm@opensource.se>
-[horms+renesas at verge.net.au: resolved conflict]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/r7s72100.dtsi | 72 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 72 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index f67d2d0..bf6ba0c 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -108,10 +108,29 @@
- 	clock-frequency = <20000000>;
- };
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index 9be67a1..ee70071 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -17,6 +17,10 @@
+ 	#size-cells = <1>;
  
-+&i2c2 {
-+	pinctrl-0 = <&i2c2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	eeprom at 50 {
-+		compatible = "renesas,24c02";
-+		reg = <0x50>;
-+		pagesize = <16>;
-+	};
-+};
-+
- &pfc {
- 	pinctrl-0 = <&du_pins &scif0_pins &scif1_pins>;
- 	pinctrl-names = "default";
+ 	aliases {
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
++		i2c2 = &i2c2;
++		i2c3 = &i2c3;
+ 		spi0 = &spi0;
+ 		spi1 = &spi1;
+ 		spi2 = &spi2;
+@@ -44,6 +48,74 @@
+ 			<0xe8202000 0x1000>;
+ 	};
  
-+	i2c2_pins: i2c {
-+		renesas,groups = "i2c2";
-+		renesas,function = "i2c2";
++	i2c0: i2c at fcfee000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,riic-r7s72100", "renesas,riic-rz";
++		reg = <0xfcfee000 0x44>;
++		interrupts = <0 157 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 158 IRQ_TYPE_EDGE_RISING>,
++			     <0 159 IRQ_TYPE_EDGE_RISING>,
++			     <0 160 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 161 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 162 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 163 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 164 IRQ_TYPE_LEVEL_HIGH>;
++		clock-frequency = <100000>;
++		status = "disabled";
 +	};
 +
- 	du_pins: du {
- 		renesas,groups = "du_rgb666", "du_sync", "du_clk_out_0";
- 		renesas,function = "du";
++	i2c1: i2c at fcfee400 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,riic-r7s72100", "renesas,riic-rz";
++		reg = <0xfcfee400 0x44>;
++		interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 166 IRQ_TYPE_EDGE_RISING>,
++			     <0 167 IRQ_TYPE_EDGE_RISING>,
++			     <0 168 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 169 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 170 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 171 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 172 IRQ_TYPE_LEVEL_HIGH>;
++		clock-frequency = <100000>;
++		status = "disabled";
++	};
++
++	i2c2: i2c at fcfee800 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,riic-r7s72100", "renesas,riic-rz";
++		reg = <0xfcfee800 0x44>;
++		interrupts = <0 173 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 174 IRQ_TYPE_EDGE_RISING>,
++			     <0 175 IRQ_TYPE_EDGE_RISING>,
++			     <0 176 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 177 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 178 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 179 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 180 IRQ_TYPE_LEVEL_HIGH>;
++		clock-frequency = <100000>;
++		status = "disabled";
++	};
++
++	i2c3: i2c at fcfeec00 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,riic-r7s72100", "renesas,riic-rz";
++		reg = <0xfcfeec00 0x44>;
++		interrupts = <0 181 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 182 IRQ_TYPE_EDGE_RISING>,
++			     <0 183 IRQ_TYPE_EDGE_RISING>,
++			     <0 184 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 185 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 186 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 187 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 188 IRQ_TYPE_LEVEL_HIGH>;
++		clock-frequency = <100000>;
++		status = "disabled";
++	};
++
+ 	spi0: spi at e800c800 {
+ 		compatible = "renesas,rspi-r7s72100", "renesas,rspi-rz";
+ 		reg = <0xe800c800 0x24>;
 -- 
 1.8.5.2
