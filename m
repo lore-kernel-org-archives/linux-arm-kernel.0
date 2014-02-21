@@ -1,41 +1,89 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Feb 2014 09:21:27 +0000
-Subject: [PATCH v10 10/15] usb: phy-mxs: Add implementation of set_wakeup
-In-Reply-To: <1392873284-9386-11-git-send-email-peter.chen@freescale.com>
-References: <1392873284-9386-1-git-send-email-peter.chen@freescale.com>
- <1392873284-9386-11-git-send-email-peter.chen@freescale.com>
-Message-ID: <20140221092127.GC7541@e106331-lin.cambridge.arm.com>
+Date: Fri, 21 Feb 2014 09:26:57 +0000
+Subject: [Patch v6 1/2] dmaengine: qcom_bam_dma: Add device tree binding
+In-Reply-To: <1392964986-5207-2-git-send-email-agross@codeaurora.org>
+References: <1392964986-5207-1-git-send-email-agross@codeaurora.org>
+ <1392964986-5207-2-git-send-email-agross@codeaurora.org>
+Message-ID: <20140221092657.GD7541@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 05:14:39AM +0000, Peter Chen wrote:
-> When we need the PHY can be waken up by external signals,
-> we can call this API. Besides, we call mxs_phy_disconnect_line
-> at this API to close the connection between USB PHY and
-> controller, after that, the line state from controller is SE0.
-> Once the PHY is out of power, without calling mxs_phy_disconnect_line,
-> there are unknown wakeups due to dp/dm floating at device mode.
+On Fri, Feb 21, 2014 at 06:43:04AM +0000, Andy Gross wrote:
+> Add device tree binding support for the QCOM BAM DMA driver.
 > 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> Acked-by: Kumar Gala <galak@codeaurora.org>
+> Signed-off-by: Andy Gross <agross@codeaurora.org>
 > ---
->  drivers/usb/phy/phy-mxs-usb.c |  116 +++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 116 insertions(+), 0 deletions(-)
-
-[...]
-
-> +static void mxs_phy_disconnect_line(struct mxs_phy *mxs_phy, bool on)
-> +{
-> +	bool vbus_is_on = false;
+>  .../devicetree/bindings/dma/qcom_bam_dma.txt       |   48 ++++++++++++++++++++
+>  1 file changed, 48 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt b/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+> new file mode 100644
+> index 0000000..86344f1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+> @@ -0,0 +1,48 @@
+> +QCOM BAM DMA controller
 > +
-> +	/* If the SoCs don't need to disconnect line without vbus, quit */
-> +	if (!(mxs_phy->data->flags & MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS))
-> +		return;
-> +
-> +	/* If the SoCs don't have anatop, quit */
-> +	if (!mxs_phy->regmap_anatop)
-> +		return;
+> +Required properties:
+> +- compatible:	Must be "qcom,bam-v1.4.0" for MSM8974 V1
+> +		Must be "qcom,bam-v1.4.1" for MSM8974 V2
 
-So it looks like fsl,anatop is truly optional.
+This looks a bit odd. How about:
+
+- compatible: must contain:
+  * "qcom,bam-v1.4.0" for MSM8974 V1
+  * "qcom,bam-v1.4.1" for MSM8974 V2
+
+> +- reg: Address range for DMA registers
+> +- interrupts: single interrupt for this controller
+
+This device only has a single interrupt? Or there's only one we care
+about at the moment?
+
+> +- #dma-cells: must be <1>
+> +- clocks: required clock
+> +- clock-names: name of clock
+
+Either describe the _exact_ name this binding expects for any clocks
+input, or get rid of clock-names. I would prefer the former.
+
+> +- qcom,ee : indicates the active Execution Environment identifier (0-7)
+> +
+> +Example:
+> +
+> +	uart-bam: dma at f9984000 = {
+> +		compatible = "qcom,bam-v1.4.1";
+> +		reg = <0xf9984000 0x15000>;
+> +		interrupts = <0 94 0>;
+> +		clocks = <&gcc GCC_BAM_DMA_AHB_CLK>;
+> +		clock-names = "bam_clk";
+> +		#dma-cells = <1>;
+> +		qcom,ee = <0>;
+> +	};
+> +
+> +Client:
+> +Required properties:
+> +- dmas: List of dma channel requests
+> +- dma-names: Names of aforementioned requested channels
+
+Do we really need to describe the client binding? Do we not have a
+generic DMA binding doc we can refer to?
+
+> +
+> +Clients must use the format described in the dma.txt file, using a two cell
+> +specifier for each channel.
+> +
+> +The three cells in order are:
+> +  1. A phandle pointing to the DMA controller
+> +  2. The channel number
+
+s/three/two/
+
+I think this can go if we refer to a generic document for the client
+binding and state in the #dma-cells description that the single dma cell
+is the channel number.
 
 Thanks,
 Mark.
