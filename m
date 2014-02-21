@@ -1,70 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Feb 2014 15:12:39 +0900
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Defconfig Updates for
- v3.15
-Message-ID: <cover.1392962286.git.horms+renesas@verge.net.au>
+Date: Fri, 21 Feb 2014 15:12:40 +0900
+Subject: [PATCH 4/5] ARM: shmobile: koelsch: Enable SDHI,
+ GPIO and regulators in defconfig
+In-Reply-To: <cover.1392962286.git.horms+renesas@verge.net.au>
+References: <cover.1392962286.git.horms+renesas@verge.net.au>
+Message-ID: <62f95adf45722e14338d80d2bcfce2e00ad86026.1392962286.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+Enable the following:
+* regulators (needed for SDHI)
+* SDHI
+* GPIO
+* GPIO keys
+* GPIO LEDs
 
-Please consider this third round of Renesas ARM based SoC defconfig
-updates for v3.15.
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/koelsch_defconfig | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-defconfig2-for-v3.15,
-which I have already sent a pull-request for.
-
-
-The following changes since commit 8f33d31ee270f2a6bcc661815a520f76565674c3:
-
-  ARM: shmobile: genmai defconfig: Enable RSPI (2014-02-06 20:53:59 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig3-for-v3.15
-
-for you to fetch changes up to 7573e89ba1fcbe492c52d5b1e72fcf5d23da21d1:
-
-  ARM: shmobile: r7s72100: update defconfig for I2C usage (2014-02-18 11:36:33 +0900)
-
-----------------------------------------------------------------
-Third Round of Renesas ARM Based SoC Defconfig Updates for v3.15
-
-* r7s72100 (RZ/A1H) based Genmai board
-  - update defconfig for I2C usage
-
-* r8a7791 (R-Car M2) based Koelsch board
-  - Enable SDHI, GPIO and regulators in defconfig
-
-* r8a7790 (R-Car H2) based Lager board
-  - Enable RSPI and MTD_M25P80
-
-* emev2 (Emma Mobile) based KZM9D board
-  - Remove legacy KZM9D defconfig
-
-* Multiplatform
-  - Add defconfig for shmobile multiplatform
-
-----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      ARM: shmobile: lager defconfig: Enable RSPI and MTD_M25P80
-
-Magnus Damm (1):
-      ARM: shmobile: Get rid of legacy KZM9D defconfig
-
-Simon Horman (2):
-      ARM: shmobile: Add defconfig for shmobile multiplatform
-      ARM: shmobile: koelsch: Enable SDHI, GPIO and regulators in defconfig
-
-Wolfram Sang (1):
-      ARM: shmobile: r7s72100: update defconfig for I2C usage
-
- arch/arm/configs/genmai_defconfig   |   4 +-
- arch/arm/configs/koelsch_defconfig  |   9 +++
- arch/arm/configs/kzm9d_defconfig    |  91 -------------------------
- arch/arm/configs/lager_defconfig    |   4 ++
- arch/arm/configs/shmobile_defconfig | 129 ++++++++++++++++++++++++++++++++++++
- 5 files changed, 145 insertions(+), 92 deletions(-)
- delete mode 100644 arch/arm/configs/kzm9d_defconfig
- create mode 100644 arch/arm/configs/shmobile_defconfig
+diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+index 9561139..86faab5 100644
+--- a/arch/arm/configs/koelsch_defconfig
++++ b/arch/arm/configs/koelsch_defconfig
+@@ -59,6 +59,7 @@ CONFIG_SH_ETH=y
+ # CONFIG_NET_VENDOR_VIA is not set
+ # CONFIG_NET_VENDOR_WIZNET is not set
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
++CONFIG_KEYBOARD_GPIO=y
+ # CONFIG_INPUT_MOUSE is not set
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_SERIAL_SH_SCI=y
+@@ -68,13 +69,21 @@ CONFIG_I2C=y
+ CONFIG_I2C_RCAR=y
+ CONFIG_SPI=y
+ CONFIG_SPI_RSPI=y
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_RCAR=y
+ # CONFIG_HWMON is not set
+ CONFIG_THERMAL=y
+ CONFIG_RCAR_THERMAL=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_REGULATOR_GPIO=y
+ # CONFIG_HID is not set
+ # CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_SDHI=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ # CONFIG_DNOTIFY is not set
+ CONFIG_TMPFS=y
+-- 
+1.8.5.2
