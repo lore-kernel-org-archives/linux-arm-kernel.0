@@ -1,47 +1,122 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Fri, 21 Feb 2014 19:29:20 +0100
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <2321496.TUNdngb8sx@wuerfel>
-References: <20140221003227.GF19893@obsidianresearch.com>
- <20140221180508.7ed6cfaf@skate> <20140221173105.GA17611@obsidianresearch.com>
- <2321496.TUNdngb8sx@wuerfel>
-Message-ID: <53079B00.2050604@keymile.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 21 Feb 2014 19:33:44 +0100
+Subject: [PATCH v2 2/4] arm64: defer reloading a task's FPSIMD state to
+ userland resume
+In-Reply-To: <20140221174855.GD25351@arm.com>
+References: <1391620418-3999-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1391620418-3999-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20140221174855.GD25351@arm.com>
+Message-ID: <CAKv+Gu_JKXZKnOvxRHiqH12jRUsA4AHkFrpMFAtqxPzyM1HyAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/21/2014 07:05 PM, Arnd Bergmann wrote:
-> On Friday 21 February 2014 10:31:05 Jason Gunthorpe wrote:
->> On Fri, Feb 21, 2014 at 06:05:08PM +0100, Thomas Petazzoni wrote:
->>
->>> Now I have another question: our mvebu_pcie_align_resource() function
->>> makes sure that the base address of the BAR is aligned on its size,
->>> because it is a requirement of MBus windows. However, if you later
->>> split the BAR into multiple windows, will this continue to work out?
->>
->> No, you must align to (1 << log2_round_down(size)) - that will always
->> be the largest mbus window created and thus the highest starting
->> alignment requirement.
+On 21 February 2014 18:48, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, Feb 05, 2014 at 05:13:36PM +0000, Ard Biesheuvel wrote:
+>> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+>> index 7807974b49ee..f7e70f3f1eb7 100644
+>> --- a/arch/arm64/include/asm/fpsimd.h
+>> +++ b/arch/arm64/include/asm/fpsimd.h
+>> @@ -37,6 +37,8 @@ struct fpsimd_state {
+>>                       u32 fpcr;
+>>               };
+>>       };
+>> +     /* the id of the last cpu to have restored this state */
+>> +     unsigned int last_cpu;
 >
-> Unless you allow reordering the two windows. If you want a 96MB
-> window, you only need 32MB alignment because you can either put
-> the actual 64MB window first if you have 64MB alignment, or you
-> put the 32MB window first if you don't and then the following
-> 64MB will be aligned.
+> Just "cpu" is enough.
 >
-> It gets more complicated if you want to allow a 72MB window
-> (16MB+64MB), as that could either be 64MB aligned or start 16MB
-> before the next multiple of 64MB.
->
-> I don't think there is any reason why code anywhere should align
-> the window to a multiple of the size though if the size is not
-> power-of-two, such as aligning to multiples of 96MB. That wouldn't
-> help anyone.
 
-I also don't see why in the world there would be a requirement of having 
-a given "oddly-sized" range (e.g. 96MB) aligned to a multiple of its 
-size. In the end, AFAIK aligment requirements' only purpose is to make 
-hardware simpler. Cant'see how aligning to an "odd" number would help 
-achieving this purpose. But that's just me, of course.
+OK
 
-Thanks guys!
-Gerlando
+[...]
+
+>>  /*
+>> + * In order to reduce the number of times the fpsimd state is needlessly saved
+>> + * and restored, keep track here of which task's userland owns the current state
+>> + * of the FPSIMD register file.
+>> + *
+>> + * This percpu variable points to the fpsimd_state.last_cpu field of the task
+>> + * whose FPSIMD state was most recently loaded onto this cpu. The last_cpu field
+>> + * itself contains the id of the cpu onto which the task's FPSIMD state was
+>> + * loaded most recently. So, to decide whether we can skip reloading the FPSIMD
+>> + * state, we need to check
+>> + * (a) whether this task was the last one to have its FPSIMD state loaded onto
+>> + *     this cpu
+>> + * (b) whether this task may have manipulated its FPSIMD state on another cpu in
+>> + *     the meantime
+>> + */
+>> +static DEFINE_PER_CPU(unsigned int *, fpsimd_last_task);
+>
+> This can simply be struct fpsimd_state * to avoid &st->last_cpu. Also
+> rename to fpsimd_state_last.
+>
+
+OK
+
+>> +
+>> +/*
+>>   * Trapped FP/ASIMD access.
+>>   */
+>>  void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
+>> @@ -76,36 +93,84 @@ void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
+>>
+>>  void fpsimd_thread_switch(struct task_struct *next)
+>>  {
+>> -     /* check if not kernel threads */
+>> -     if (current->mm)
+>> +     /*
+>> +      * The thread flag TIF_FOREIGN_FPSTATE conveys that the userland FPSIMD
+>> +      * state belonging to the current task is not present in the registers
+>> +      * but has (already) been saved to memory in order for the kernel to be
+>> +      * able to go off and use the registers for something else. Therefore,
+>> +      * we must not (re)save the register contents if this flag is set.
+>> +      */
+>> +     if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
+>>               fpsimd_save_state(&current->thread.fpsimd_state);
+>> -     if (next->mm)
+>> -             fpsimd_load_state(&next->thread.fpsimd_state);
+>> +
+>> +     if (next->mm) {
+>> +             /*
+>> +              * If we are switching to a task whose most recent userland
+>> +              * FPSIMD contents are already in the registers of *this* cpu,
+>> +              * we can skip loading the state from memory. Otherwise, set
+>> +              * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
+>> +              * upon the next entry of userland.
+>
+> I would say "return" instead of "entry" (we enter the kernel and return
+> to user space ;)).
+>
+
+OK
+
+>> +              */
+>> +             struct fpsimd_state *st = &next->thread.fpsimd_state;
+>> +
+>> +             if (__get_cpu_var(fpsimd_last_task) == &st->last_cpu
+>> +                 && st->last_cpu == smp_processor_id())
+>> +                     clear_ti_thread_flag(task_thread_info(next),
+>> +                                          TIF_FOREIGN_FPSTATE);
+>> +             else
+>> +                     set_ti_thread_flag(task_thread_info(next),
+>> +                                        TIF_FOREIGN_FPSTATE);
+>> +     }
+>>  }
+>
+> I'm still trying to get my head around why we have 3 different type of
+> checks for this (fpsimd_last_task, last_cpu and TIF). The code seems
+> correct but I wonder whether we can reduce this to 2 checks?
+>
+
+Well, I suppose using the TIF flag is somewhat redundant, it is
+basically a shorthand for expressing that the following does /not/
+hold
+
+__get_cpu_var(fpsimd_last_state) == &current->thread.fpsimd_state &&
+current->thread.fpsimd_state.cpu == smp_processor_id()
+
+I suppose that the test at resume can tolerate the overhead, so I can
+rework the code to get rid of it.
+
+Regards,
+Ard.
