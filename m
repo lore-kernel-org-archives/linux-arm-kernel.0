@@ -1,32 +1,61 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 20 Feb 2014 21:56:33 -0700
-Subject: [PATCH] ARM: bcm2835: fix defconfig to select ARCH_BCM
-Message-ID: <1392958593-11910-1-git-send-email-swarren@wwwdotorg.org>
+From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
+Date: Fri, 21 Feb 2014 10:43:49 +0530
+Subject: [PATCH 1/1] arm64: enable processor debug state for secondary cpus
+Message-ID: <1392959630-31314-1-git-send-email-vijay.kilari@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this, ARCH_BCM2835 is no longer available, and hence the kernel
-won't boot!
+From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 
-Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+processor debug state PSTATE.D is unmasked in smp call
+clear_os_lock for secondary cpus. So debug state is still
+masked in normal kernel context.  With this patch, unmask
+debug state on secondary boot for the cpus in normal kernel
+context. Now kgdb tests passed with multicore.
+
+Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
 ---
-I'd expect this to be squashed into "ARM: bcm2835: Move to mach-bcm
-directory".
+ arch/arm64/kernel/debug-monitors.c |    7 +++----
+ arch/arm64/kernel/smp.c            |    1 +
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
- arch/arm/configs/bcm2835_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index 04dda1e..a442269 100644
---- a/arch/arm/configs/bcm2835_defconfig
-+++ b/arch/arm/configs/bcm2835_defconfig
-@@ -31,6 +31,7 @@ CONFIG_OPROFILE=y
- CONFIG_JUMP_LABEL=y
- CONFIG_ARCH_MULTI_V6=y
- # CONFIG_ARCH_MULTI_V7 is not set
-+CONFIG_ARCH_BCM=y
- CONFIG_ARCH_BCM2835=y
- CONFIG_PREEMPT_VOLUNTARY=y
- CONFIG_AEABI=y
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index 1a8127d..13f87de 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -137,8 +137,6 @@ void disable_debug_monitors(enum debug_el el)
+ static void clear_os_lock(void *unused)
+ {
+ 	asm volatile("msr oslar_el1, %0" : : "r" (0));
+-	isb();
+-	local_dbg_enable();
+ }
+ 
+ static int os_lock_notify(struct notifier_block *self,
+@@ -157,8 +155,9 @@ static struct notifier_block os_lock_nb = {
+ static int debug_monitors_init(void)
+ {
+ 	/* Clear the OS lock. */
+-	smp_call_function(clear_os_lock, NULL, 1);
+-	clear_os_lock(NULL);
++	on_each_cpu(clear_os_lock, NULL, 1);
++	isb();
++	local_dbg_enable();
+ 
+ 	/* Register hotplug handler. */
+ 	register_cpu_notifier(&os_lock_nb);
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 7cfb92a..5070dc3 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -160,6 +160,7 @@ asmlinkage void secondary_start_kernel(void)
+ 	set_cpu_online(cpu, true);
+ 	complete(&cpu_running);
+ 
++	local_dbg_enable();
+ 	local_irq_enable();
+ 	local_async_enable();
+ 
 -- 
-1.8.3.2
+1.7.9.5
