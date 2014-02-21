@@ -1,14 +1,18 @@
 From: denis@eukrea.com (Denis Carikli)
-Date: Fri, 21 Feb 2014 15:00:04 +0100
-Subject: [PATCHv7][ 7/7] ARM: dts: mbimx51sd: Add CMO-QVGA backlight support.
+Date: Fri, 21 Feb 2014 14:59:59 +0100
+Subject: [PATCHv7][ 2/7] staging: imx-drm: Add RGB666 support for parallel
+ display.
 In-Reply-To: <1392991205-25371-1-git-send-email-denis@eukrea.com>
 References: <1392991205-25371-1-git-send-email-denis@eukrea.com>
-Message-ID: <1392991205-25371-7-git-send-email-denis@eukrea.com>
+Message-ID: <1392991205-25371-2-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Cc: Eric B?nard <eric@eukrea.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Marek Vasut <marex@denx.de>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: devel at driverdev.osuosl.org
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
@@ -16,39 +20,82 @@ ChangeLog v6->v7:
 - Shrinked even more the Cc list.
 
 ChangeLog v5->v6:
-- Reordered the Cc list.
+- Remove people not concerned by this patch from the Cc list.
 
 ChangeLog v3->v5:
-- Updated to the new GPIO defines.
+- Use the correct RGB order.
 
 ChangeLog v2->v3:
-- Splitted out from the patch that added support for the cpuimx51/mbimxsd51 boards.
-- This patch now only adds backlight support.
-- Added some interested people in the Cc list, and removed some people that
-  might be annoyed by the receiving of that patch which is unrelated to their
-  subsystem.
+- Added some interested people in the Cc list.
+- Removed the commit message long desciption that was just a copy of the short
+  description.
+- Rebased the patch.
+- Fixed a copy-paste error in the ipu_dc_map_clear parameter.
 ---
- .../imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts  |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    2 +-
+ drivers/staging/imx-drm/ipu-v3/ipu-dc.c            |    9 +++++++++
+ drivers/staging/imx-drm/parallel-display.c         |    2 ++
+ 3 files changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-index f37d65b..f8f5abe 100644
---- a/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-+++ b/arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard-cmo-qvga.dts
-@@ -17,6 +17,14 @@
- 	model = "Eukrea MBIMXSD51 with the CMO-QVGA Display";
- 	compatible = "eukrea,mbimxsd51-baseboard-cmo-qvga", "eukrea,mbimxsd51-baseboard", "eukrea,cpuimx51", "fsl,imx51";
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+index b876d49..2d24425 100644
+--- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
++++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+@@ -29,7 +29,7 @@ Required properties:
+ - crtc: the crtc this display is connected to, see below
+ Optional properties:
+ - interface_pix_fmt: How this display is connected to the
+-  crtc. Currently supported types: "rgb24", "rgb565", "bgr666"
++  crtc. Currently supported types: "rgb24", "rgb565", "bgr666", "rgb666"
+ - edid: verbatim EDID data block describing attached display.
+ - ddc: phandle describing the i2c bus handling the display data
+   channel
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+index d0e3bc3..617e65b 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+@@ -92,6 +92,7 @@ enum ipu_dc_map {
+ 	IPU_DC_MAP_GBR24, /* TVEv2 */
+ 	IPU_DC_MAP_BGR666,
+ 	IPU_DC_MAP_BGR24,
++	IPU_DC_MAP_RGB666,
+ };
  
-+	backlight {
-+		compatible = "gpio-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_backlight_1>;
-+		gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
-+		default-brightness-level = <1>;
-+	};
+ struct ipu_dc {
+@@ -155,6 +156,8 @@ static int ipu_pixfmt_to_map(u32 fmt)
+ 		return IPU_DC_MAP_BGR666;
+ 	case V4L2_PIX_FMT_BGR24:
+ 		return IPU_DC_MAP_BGR24;
++	case V4L2_PIX_FMT_RGB666:
++		return IPU_DC_MAP_RGB666;
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -404,6 +407,12 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 1, 15, 0xff); /* green */
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 0, 23, 0xff); /* blue */
+ 
++	/* rgb666 */
++	ipu_dc_map_clear(priv, IPU_DC_MAP_RGB666);
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 0, 5, 0xfc); /* blue */
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 1, 11, 0xfc); /* green */
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 2, 17, 0xfc); /* red */
 +
- 	reg_lcd_3v3: lcd-en {
- 		compatible = "regulator-fixed";
- 		pinctrl-names = "default";
+ 	return 0;
+ }
+ 
+diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
+index 351d61d..bc2946e 100644
+--- a/drivers/staging/imx-drm/parallel-display.c
++++ b/drivers/staging/imx-drm/parallel-display.c
+@@ -223,6 +223,8 @@ static int imx_pd_probe(struct platform_device *pdev)
+ 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB565;
+ 		else if (!strcmp(fmt, "bgr666"))
+ 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_BGR666;
++		else if (!strcmp(fmt, "rgb666"))
++			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB666;
+ 	}
+ 
+ 	imxpd->dev = &pdev->dev;
 -- 
 1.7.9.5
