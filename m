@@ -1,32 +1,35 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 21 Feb 2014 17:50:44 +0100
-Subject: [PATCH v2 2/2] phy: Select PHY_EXYNOS_DP_VIDEO by default for
- ARCH_EXYNOS
-In-Reply-To: <1888663.ccFYmJ9QJl@wuerfel>
-References: <1392997802-29050-1-git-send-email-s.nawrocki@samsung.com>
- <1753680.KKj0Q1erxA@wuerfel> <53077DE0.7080108@samsung.com>
- <1888663.ccFYmJ9QJl@wuerfel>
-Message-ID: <530783E4.6090206@samsung.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Fri, 21 Feb 2014 11:54:21 -0500
+Subject: [PATCH v6 0/8] ARM: brcmstb: Add Broadcom STB SoC support
+In-Reply-To: <CAGVrzcZTHZYaB7sEDxFrP3PzZh0y-daS0gqg2Z4PUzuWGFeiSw@mail.gmail.com>
+References: <1391463041-15241-1-git-send-email-marc.ceeeee@gmail.com>
+ <CAGVrzcZTHZYaB7sEDxFrP3PzZh0y-daS0gqg2Z4PUzuWGFeiSw@mail.gmail.com>
+Message-ID: <20140221165421.GM5038@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/02/14 17:41, Arnd Bergmann wrote:
-> On Friday 21 February 2014 17:25:04 Sylwester Nawrocki wrote:
->> > 
->> > Hmm, good point, I will modify it that way.
->> > 
->> > For patch 1/2 I guess it should be:
->> > 
->> > "default ARCH_S5PV210 || ARCH_EXYNOS"
->> > 
->> > or rather
->> > 
->> > "default y if ARCH_S5PV210 || ARCH_EXYNOS" ?
->
-> Right. I'd probably use the first syntax, but it doesn't really matter.
+On Thu, Feb 20, 2014 at 04:41:32PM -0800, Florian Fainelli wrote:
+> Matt,
+> 
+> 2014-02-03 13:30 GMT-08:00 Marc Carino <marc.ceeeee@gmail.com>:
+> > This patchset contains the board support package for the
+> > Broadcom BCM7445 ARM-based SoC [1]. These changes contain a
+> > minimal set of code needed for a BCM7445-based board to boot
+> > the Linux kernel.
+> 
+> If you are happy with this round of changes, can you also carry those
+> patches in your tree for 3.15?
 
-Oops, I've already sent patch using the second one, as it seemed
-more common.
+I had to add a couple trivial comments on the dts that I missed back in
+v2.
 
-Thanks,
-Sylwester
+More importantly, you'll need to collect some acks on various pieces. In
+particular the power/reset driver needs a maintainer ack to go in via
+arm-soc. I'd also like to see an ack from Arnd since he provided a lot
+of the comments. Also, we need Russell's ack on the debug and proc-v7.S
+patches.
+
+I'll note that the drivers/power maintainers aren't cced on this posting
+so they probably didn't notice that driver.
+
+-Matt
