@@ -1,121 +1,85 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Feb 2014 15:12:39 +0900
-Subject: [PATCH 3/5] ARM: shmobile: Get rid of legacy KZM9D defconfig
-In-Reply-To: <cover.1392962286.git.horms+renesas@verge.net.au>
-References: <cover.1392962286.git.horms+renesas@verge.net.au>
-Message-ID: <30023bb4fae3eb30106c5f8986fc7ac87387aebc.1392962286.git.horms+renesas@verge.net.au>
+Date: Fri, 21 Feb 2014 15:12:51 +0900
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Updates for v3.15
+Message-ID: <cover.1392961872.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Get rid of the kzm9d_defconfig. The KZM9D is now supported
-as DT only in case of EMEV2 is selected in the kernel
-configuration.
+Please consider this third round of Renesas ARM based SoC DT updates for v3.15.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/kzm9d_defconfig | 91 ----------------------------------------
- 1 file changed, 91 deletions(-)
- delete mode 100644 arch/arm/configs/kzm9d_defconfig
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt2-for-v3.15,
+which I have already sent a pull-request for.
 
-diff --git a/arch/arm/configs/kzm9d_defconfig b/arch/arm/configs/kzm9d_defconfig
-deleted file mode 100644
-index 1cc330b..0000000
---- a/arch/arm/configs/kzm9d_defconfig
-+++ /dev/null
-@@ -1,91 +0,0 @@
--# CONFIG_ARM_PATCH_PHYS_VIRT is not set
--CONFIG_EXPERIMENTAL=y
--CONFIG_SYSVIPC=y
--CONFIG_NO_HZ=y
--CONFIG_IKCONFIG=y
--CONFIG_IKCONFIG_PROC=y
--CONFIG_LOG_BUF_SHIFT=16
--CONFIG_CC_OPTIMIZE_FOR_SIZE=y
--CONFIG_SYSCTL_SYSCALL=y
--CONFIG_EMBEDDED=y
--CONFIG_PERF_EVENTS=y
--CONFIG_SLAB=y
--# CONFIG_BLK_DEV_BSG is not set
--# CONFIG_IOSCHED_DEADLINE is not set
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_SHMOBILE_LEGACY=y
--CONFIG_ARCH_EMEV2=y
--CONFIG_MACH_KZM9D=y
--CONFIG_MEMORY_START=0x40000000
--CONFIG_MEMORY_SIZE=0x10000000
--# CONFIG_SH_TIMER_TMU is not set
--# CONFIG_SWP_EMULATE is not set
--# CONFIG_CACHE_L2X0 is not set
--CONFIG_SMP=y
--CONFIG_NR_CPUS=2
--CONFIG_HOTPLUG_CPU=y
--# CONFIG_LOCAL_TIMERS is not set
--CONFIG_AEABI=y
--# CONFIG_OABI_COMPAT is not set
--# CONFIG_CROSS_MEMORY_ATTACH is not set
--CONFIG_FORCE_MAX_ZONEORDER=13
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_ARM_APPENDED_DTB=y
--CONFIG_AUTO_ZRELADDR=y
--CONFIG_VFP=y
--# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--CONFIG_PM_RUNTIME=y
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--CONFIG_IP_PNP=y
--CONFIG_IP_PNP_DHCP=y
--# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
--# CONFIG_INET_XFRM_MODE_TUNNEL is not set
--# CONFIG_INET_XFRM_MODE_BEET is not set
--# CONFIG_INET_LRO is not set
--# CONFIG_INET_DIAG is not set
--# CONFIG_IPV6 is not set
--# CONFIG_WIRELESS is not set
--CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
--CONFIG_DEVTMPFS=y
--CONFIG_DEVTMPFS_MOUNT=y
--# CONFIG_BLK_DEV is not set
--CONFIG_NETDEVICES=y
--# CONFIG_NET_VENDOR_BROADCOM is not set
--# CONFIG_NET_VENDOR_CHELSIO is not set
--# CONFIG_NET_VENDOR_CIRRUS is not set
--# CONFIG_NET_VENDOR_FARADAY is not set
--# CONFIG_NET_VENDOR_INTEL is not set
--# CONFIG_NET_VENDOR_MARVELL is not set
--# CONFIG_NET_VENDOR_MICREL is not set
--# CONFIG_NET_VENDOR_NATSEMI is not set
--# CONFIG_NET_VENDOR_SEEQ is not set
--CONFIG_SMSC911X=y
--# CONFIG_NET_VENDOR_STMICRO is not set
--# CONFIG_NET_VENDOR_WIZNET is not set
--# CONFIG_WLAN is not set
--# CONFIG_INPUT_MOUSEDEV is not set
--# CONFIG_INPUT_KEYBOARD is not set
--# CONFIG_INPUT_MOUSE is not set
--# CONFIG_SERIO is not set
--# CONFIG_LEGACY_PTYS is not set
--# CONFIG_DEVKMEM is not set
--CONFIG_SERIAL_8250=y
--CONFIG_SERIAL_8250_CONSOLE=y
--CONFIG_SERIAL_8250_EM=y
--# CONFIG_HW_RANDOM is not set
--CONFIG_GPIOLIB=y
--CONFIG_GPIO_EM=y
--# CONFIG_HWMON is not set
--# CONFIG_HID_SUPPORT is not set
--# CONFIG_USB_SUPPORT is not set
--# CONFIG_IOMMU_SUPPORT is not set
--# CONFIG_DNOTIFY is not set
--CONFIG_TMPFS=y
--# CONFIG_MISC_FILESYSTEMS is not set
--CONFIG_NFS_FS=y
--CONFIG_ROOT_NFS=y
--# CONFIG_FTRACE is not set
--- 
-1.8.5.2
+
+The following changes since commit e02ee513eed4bb780848a5cedbd4b39afb395d3e:
+
+  ARM: shmobile: koelsch dts: Add QSPI nodes (2014-02-06 20:36:12 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v3.15
+
+for you to fetch changes up to 367aaaea1d6c6496695ffd06b49590b8cfcb8aa5:
+
+  ARM: shmobile: genmai: adapt dts to use native i2c driver (2014-02-18 11:35:30 +0900)
+
+----------------------------------------------------------------
+Third Round of Renesas ARM Based SoC DT Updates for v3.15
+
+* r7s72100 SoC (RZ/A1H)
+  - Add nodes for i2c controllers to DT
+
+* r7s72100 (RZ/A1H) based Genmai board
+  - genmai: adapt dts to use native i2c driver
+
+* r8a7791 SoC (R-Car M2)
+  - Remove superfluous interrupt-parents
+
+* r8a7791 (R-Car M2) based Koelsch board
+  - Add i2c2 bus to DT
+  - Add DU device to DT
+
+* r8a7790 SoC (R-Car H2)
+  - Add i2c aliases
+  - Remove superfluous interrupt-parents
+  - Add QSPI node
+
+* r8a7790 SoC (R-Car M2) based Lager
+  - Add DU, SDHI0/1 and QSPI to DT
+
+* r8a7778 SoC (R-Car M1)
+  - Remove duplicate i2c nodes
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      ARM: shmobile: r8a7790 dtsi: Add QSPI node
+      ARM: shmobile: lager dts: Add QSPI nodes
+      ARM: shmobile: r8a7778 dtsi: Remove duplicate i2c nodes
+
+Kuninori Morimoto (1):
+      ARM: shmobile: lager: add SDHI0/2 support on DTS
+
+Laurent Pinchart (2):
+      ARM: shmobile: lager: Add DU device to DTS
+      ARM: shmobile: koelsch-reference: Add DU device to DTS
+
+Wolfram Sang (7):
+      ARM: shmobile: r8a7791: remove superfluous interrupt-parents
+      ARM: shmobile: r8a7790: remove superfluous interrupt-parents
+      ARM: shmobile: r8a7790: add i2c aliases to dtsi
+      ARM: shmobile: r8a7791: add i2c master nodes to dtsi
+      ARM: shmobile: r8a7791: add i2c2 bus to koelsch dt
+      ARM: shmobile: r7s72100: add nodes for i2c controllers to dtsi
+      ARM: shmobile: genmai: adapt dts to use native i2c driver
+
+ arch/arm/boot/dts/r7s72100-genmai-reference.dts |  11 +++
+ arch/arm/boot/dts/r7s72100.dtsi                 |  72 ++++++++++++++
+ arch/arm/boot/dts/r8a7778.dtsi                  |  40 --------
+ arch/arm/boot/dts/r8a7790-lager.dts             | 121 +++++++++++++++++++++++-
+ arch/arm/boot/dts/r8a7790.dtsi                  |  48 ++++------
+ arch/arm/boot/dts/r8a7791-koelsch.dts           |  26 ++++-
+ arch/arm/boot/dts/r8a7791.dtsi                  | 100 ++++++++++++++------
+ 7 files changed, 315 insertions(+), 103 deletions(-)
