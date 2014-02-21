@@ -1,95 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Feb 2014 10:39:36 +0100
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <53071970.1040400@keymile.com>
-References: <53039894.10905@keymile.com> <20140218212751.07c2aeb5@skate>
- <53046D98.6020801@keymile.com> <20140219102658.76eec91e@skate>
- <53047BBB.6040108@keymile.com> <20140219143749.65ff3155@skate>
- <CAErSpo4=6VgJazaErcx=ztKhZ_62xBrQ6K1eN_dVpvV4R0T2ag@mail.gmail.com>
- <20140220095518.7ca36f0a@skate>
- <20140220173518.GA19893@obsidianresearch.com>
- <20140220212914.29ddc031@skate>
- <20140221003227.GF19893@obsidianresearch.com>
- <20140221093444.35870a73@skate> <5307152D.3020804@keymile.com>
- <20140221101218.45766e8a@skate> <53071970.1040400@keymile.com>
-Message-ID: <20140221103936.56b3d9f8@skate>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Fri, 21 Feb 2014 09:40:29 +0000
+Subject: [PATCH v10 01/15] usb: doc: phy-mxs: Add more compatible strings
+In-Reply-To: <20140221091345.GA7541@e106331-lin.cambridge.arm.com>
+References: <1392873284-9386-1-git-send-email-peter.chen@freescale.com>
+ <1392873284-9386-2-git-send-email-peter.chen@freescale.com>
+ <20140221091345.GA7541@e106331-lin.cambridge.arm.com>
+Message-ID: <5e4d795b507a4ea7b9faa69dd05148c4@BL2PR03MB226.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gerlando Falauto,
-
-On Fri, 21 Feb 2014 10:16:32 +0100, Gerlando Falauto wrote:
-
-> > Sure, but whichever choice we make, the Linux PCI core must know by how
-> > much we've enlarge the bridge window BAR, otherwise the Linux PCI core
-> > may allocate for the next bridge window BAR a range of addresses that
-> > doesn't overlap with what it has allocate for the previous bridge
-> > window BAR, but that ends up overlapping due to us "extending" the
-> > previous bridge window BAR to match the MBus requirements.
+ 
 > >
-> > Gerlando, would you be able to test a quick hack that creates 2 windows
-> > to cover exactly 128 MB + 64 MB ? This would at least allow us to
-> > confirm that the strategy of splitting in multiple windows is usable.
+> >  Required properties:
+> > -- compatible: Should be "fsl,imx23-usbphy"
+> > +- compatible: "fsl,imx23-usbphy" for imx23 and imx28, "fsl,imx6q-
+> usbphy"
+> > +  for imx6dq and imx6dl, "fsl,imx6sl-usbphy" for imx6sl
 > 
-> Sure, though probably not until next week.
+> Minor nit, but could we restructure this as something like the following,
+> with each string on a new line:
+> 
+> - compatible: should contain:
+>     * "fsl,imx23-usbphy" for imx23 and imx28
+>     * "fsl,imx6q-usbphy" for imx6dq and imx6dl
+>     * "fsl,imx6sl-usbphy" for imx6sl
+> 
+> It makes it a bit easier to read.
 
-No problem at all.
+Thanks, will change like above.
 
-> I guess it would then also be useful to restore my previous setup, where 
-> the total PCIe aperture is 192MB, right?
+> 
+> I see the existing "fsl,imx23-usbphy" is used as a fallback for
+> "fsl,imx28-usbphy", "fsl,imx6q-usbphy", and "fsl,imx6sl-usbphy" in
+> existing DTs.
+> 
+> Is this expected going forward? It might be worth mentioning.
+> 
 
-Yes, that's the case I'm interested in at the moment. If you could try
-the above (ugly) patch, and see if you can access all your device BARs,
-it would be interesting. It would tell us if two separate windows
-having the same target/attribute and consecutive placement in the
-physical address space can actually work to address a given PCIe
-device. As you will see, the patch makes a very ugly special case for
-192 MB :-)
+These SoCs used the same FSL imx PHY, but different versions.
+imx23/imx28 are the first version, more improvements are at
+later SoCs (like imx6x) version. Keep "fsl,imx23-usbphy" at
+imx6 dts will be user know it is from imx23's. If you think
+it does not need, I can delete "fsl,imx23-usbphy" from imx6 dts.
 
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index 2394e97..f763ecc 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -223,11 +223,13 @@ static int mvebu_mbus_window_conflicts(struct mvebu_mbus_state *mbus,
-                if ((u64)base < wend && end > wbase)
-                        return 0;
- 
-+#if 0
-                /*
-                 * Check if target/attribute conflicts
-                 */
-                if (target == wtarget && attr == wattr)
-                        return 0;
-+#endif
-        }
- 
-        return 1;
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 2aa7b77c..67fe6df 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -361,8 +361,15 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
-                (((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
-                port->memwin_base;
- 
--       mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
--                                   port->memwin_base, port->memwin_size);
-+       if (port->memwin_size == (SZ_128M + SZ_64M)) {
-+               mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
-+                                           port->memwin_base, SZ_128M);
-+               mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
-+                                           port->memwin_base + SZ_128M, SZ_64M);
-+       } else {
-+               mvebu_mbus_add_window_by_id(port->mem_target, port->mem_attr,
-+                                           port->memwin_base, port->memwin_size);
-+       }
- }
- 
- /*
-
-
-
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Peter
