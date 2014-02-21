@@ -1,189 +1,172 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 21 Feb 2014 13:25:24 +0100
-Subject: [PATCH v5 08/11] drivers: dma-contiguous: add initialization from
- device tree
+Date: Fri, 21 Feb 2014 13:25:17 +0100
+Subject: [PATCH v5 01/11] of: document bindings for reserved-memory nodes
 In-Reply-To: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com>
 References: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1392985527-6260-9-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1392985527-6260-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refactor internal dma_contiguous_init_reserved_mem() function, which
-creates CMA area from previously reserved memory region and add support
-for handling 'shared-dma-pool' reserved-memory device tree nodes.
+From: Grant Likely <grant.likely@linaro.org>
 
-Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
+Reserved memory nodes allow for the reservation of static (fixed
+address) regions, or dynamically allocated regions for a specific
+purpose.
 
+Signed-off-by: Grant Likely <grant.likely@linaro.org>
+[joshc: Based on binding document proposed (in non-patch form) here:
+ http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
+ adapted to support #memory-region-cells]
+Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/base/dma-contiguous.c |  130 ++++++++++++++++++++++++++++++++++-------
- 1 file changed, 108 insertions(+), 22 deletions(-)
+ .../bindings/reserved-memory/reserved-memory.txt   |  138 ++++++++++++++++++++
+ 1 file changed, 138 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
 
-diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-index 165c2c299e57..5dfcc3743d9b 100644
---- a/drivers/base/dma-contiguous.c
-+++ b/drivers/base/dma-contiguous.c
-@@ -182,6 +182,49 @@ static int __init cma_init_reserved_areas(void)
- core_initcall(cma_init_reserved_areas);
- 
- /**
-+ * dma_contiguous_init_reserved_mem() - reserve custom contiguous area
-+ * @size: Size of the reserved area (in bytes),
-+ * @base: Base address of the reserved area optional, use 0 for any
-+ * @limit: End address of the reserved memory (optional, 0 for any).
-+ * @res_cma: Pointer to store the created cma region.
-+ *
-+ * This function reserves memory from early allocator. It should be
-+ * called by arch specific code once the early allocator (memblock or bootmem)
-+ * has been activated and all other subsystems have already allocated/reserved
-+ * memory. This function allows to create custom reserved areas for specific
-+ * devices.
-+ */
-+static int __init dma_contiguous_init_reserved_mem(phys_addr_t size,
-+					phys_addr_t base, struct cma **res_cma)
-+{
-+	struct cma *cma = &cma_areas[cma_area_count];
-+	phys_addr_t alignment;
+diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+new file mode 100644
+index 000000000000..a606ce90c9c4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+@@ -0,0 +1,138 @@
++*** Reserved memory regions ***
 +
-+	/* Sanity checks */
-+	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
-+		pr_err("Not enough slots for CMA reserved regions!\n");
-+		return -ENOSPC;
-+	}
++Reserved memory is specified as a node under the /reserved-memory node.
++The operating system shall exclude reserved memory from normal usage
++one can create child nodes describing particular reserved (excluded from
++normal use) memory regions. Such memory regions are usually designed for
++the special usage by various device drivers.
 +
-+	if (!size || !memblock_is_region_reserved(base, size))
-+		return -EINVAL;
++Parameters for each memory region can be encoded into the device tree
++with the following nodes:
 +
-+	/* Sanitise input arguments */
-+	alignment = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
-+	if (ALIGN(base, alignment) != base || ALIGN(size, alignment) != size)
-+		return -EINVAL;
++/reserved-memory node
++---------------------
++#address-cells, #size-cells (required) - standard definition
++    - Should use the same values as the root node
++#memory-region-cells (required) - dictates number of cells used in the child
++                                  nodes memory-region specifier
++ranges (required) - standard definition
++    - Should be empty
 +
-+	cma->base_pfn = PFN_DOWN(base);
-+	cma->count = size >> PAGE_SHIFT;
-+	*res_cma = cma;
-+	cma_area_count++;
++/reserved-memory/ child nodes
++-----------------------------
++Each child of the reserved-memory node specifies one or more regions of
++reserved memory. Each child node may either use a 'reg' property to
++specify a specific range of reserved memory, or a 'size' property with
++optional constraints to request a dynamically allocated block of memory.
 +
-+	/* Architecture specific contiguous memory fixup. */
-+	dma_contiguous_early_fixup(base, size);
-+	return 0;
-+}
++Following the generic-names recommended practice, node names should
++reflect the purpose of the node (ie. "framebuffer" or "dma-pool"). Unit
++address (@<address>) should be appended to the name if the node is a
++static allocation.
 +
-+/**
-  * dma_contiguous_reserve_area() - reserve custom contiguous area
-  * @size: Size of the reserved area (in bytes),
-  * @base: Base address of the reserved area optional, use 0 for any
-@@ -197,7 +240,6 @@ core_initcall(cma_init_reserved_areas);
- int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
- 				       phys_addr_t limit, struct cma **res_cma)
- {
--	struct cma *cma = &cma_areas[cma_area_count];
- 	phys_addr_t alignment;
- 	int ret = 0;
- 
-@@ -205,12 +247,6 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
- 		 (unsigned long)size, (unsigned long)base,
- 		 (unsigned long)limit);
- 
--	/* Sanity checks */
--	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
--		pr_err("Not enough slots for CMA reserved regions!\n");
--		return -ENOSPC;
--	}
--
- 	if (!size)
- 		return -EINVAL;
- 
-@@ -241,21 +277,12 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
- 		}
- 	}
- 
--	/*
--	 * Each reserved area must be initialised later, when more kernel
--	 * subsystems (like slab allocator) are available.
--	 */
--	cma->base_pfn = PFN_DOWN(base);
--	cma->count = size >> PAGE_SHIFT;
--	*res_cma = cma;
--	cma_area_count++;
--
--	pr_info("CMA: reserved %ld MiB at %08lx\n", (unsigned long)size / SZ_1M,
--		(unsigned long)base);
--
--	/* Architecture specific contiguous memory fixup. */
--	dma_contiguous_early_fixup(base, size);
--	return 0;
-+	ret = dma_contiguous_init_reserved_mem(size, base, res_cma);
-+	if (ret == 0) {
-+		pr_info("CMA: reserved %ld MiB at %08lx\n",
-+			(unsigned long)size / SZ_1M, (unsigned long)base);
-+		return 0;
-+	}
- err:
- 	pr_err("CMA: failed to reserve %ld MiB\n", (unsigned long)size / SZ_1M);
- 	return ret;
-@@ -357,3 +384,62 @@ bool dma_release_from_contiguous(struct device *dev, struct page *pages,
- 
- 	return true;
- }
++Properties:
++Requires either a) or b) below.
++a) static allocation
++   reg (required) - standard definition
++b) dynamic allocation
++   size (required) - length based on parent's #size-cells
++                   - Size in bytes of memory to reserve.
++   alignment (optional) - length based on parent's #size-cells
++                        - Address boundary for alignment of allocation.
++   alloc-ranges (optional) - prop-encoded-array (address, length pairs).
++                           - Specifies regions of memory that are
++                             acceptable to allocate from.
 +
-+/*
-+ * Support for reserved memory regions defined in device tree
-+ */
-+#ifdef CONFIG_OF_RESERVED_MEM
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
-+#include <linux/of_reserved_mem.h>
++If both reg and size are present, then the reg property takes precedence
++and size is ignored.
 +
-+#undef pr_fmt
-+#define pr_fmt(fmt) fmt
++Additional properties:
++compatible (optional) - standard definition
++    - may contain the following strings:
++        - shared-dma-pool: This indicates a region of memory meant to be
++          used as a shared pool of DMA buffers for a set of devices. It can
++          be used by an operating system to instanciate the necessary pool
++          management subsystem if necessary.
++        - vendor specific string in the form <vendor>,[<device>-]<usage>
++no-map (optional) - empty property
++    - Indicates the operating system must not create a virtual mapping
++      of the region as part of its standard mapping of system memory,
++      nor permit speculative access to it under any circumstances other
++      than under the control of the device driver using the region.
++reusable (optional) - empty property
++    - The operating system can use the memory in this region with the
++      limitation that the device driver(s) owning the region need to be
++      able to reclaim it back. Typically that means that the operating
++      system can use that region to store volatile or cached data that
++      can be otherwise regenerated or migrated elsewhere.
 +
-+static void rmem_cma_device_init(struct reserved_mem *rmem,
-+			 struct device *dev, struct of_phandle_args *args)
-+{
-+	struct cma *cma = rmem->priv;
-+	dev_set_cma_area(dev, cma);
-+}
++Linux implementation note:
++- If a "linux,cma-default" property is present, then Linux will use the
++  region for the default pool of the contiguous memory allocator.
 +
-+static const struct reserved_mem_ops rmem_cma_ops = {
-+	.device_init	= rmem_cma_device_init,
++Device node references to reserved memory
++-----------------------------------------
++Regions in the /reserved-memory node may be referenced by other device
++nodes by adding a memory-region property to the device node.
++
++memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
++
++Example
++-------
++This example defines 3 contiguous regions are defined for Linux kernel:
++one default of all device drivers (named linux,cma at 72000000 and 64MiB in size),
++one dedicated to the framebuffer device (named framebuffer at 78000000, 8MiB), and
++one for multimedia processing (named multimedia-memory at 77000000, 64MiB).
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	memory {
++		reg = <0x40000000 0x40000000>;
++	};
++
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		/* global autoconfigured region for contiguous allocations */
++		linux,cma {
++			compatible = "shared-dma-pool";
++			reusable;
++			#memory-region-cells = <0>;
++			size = <0x4000000>;
++			alignment = <0x2000>;
++			linux,cma-default;
++		};
++
++		display_reserved: framebuffer at 78000000 {
++			#memory-region-cells = <0>;
++			reg = <0x78000000 0x800000>;
++		};
++
++		multimedia_reserved: multimedia at 77000000 {
++			compatible = "acme,multimedia-memory";
++			#memory-region-cells = <1>;
++			reg = <0x77000000 0x4000000>;
++		};
++	};
++
++	/* ... */
++
++	fb0: video at 12300000 {
++		memory-region = <&display_reserved>;
++		/* ... */
++	};
++
++	scaler: scaler at 12500000 {
++		memory-region = <&multimedia_reserved 0xdeadbeef>;
++		/* ... */
++	};
++
++	codec: codec at 12600000 {
++		memory-region = <&multimedia_reserved 0xfeebdaed>;
++		/* ... */
++	};
 +};
-+
-+static int __init rmem_cma_setup(struct reserved_mem *rmem,
-+				 unsigned long node,
-+				 const char *uname)
-+{
-+	phys_addr_t align = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
-+	phys_addr_t mask = align - 1;
-+	struct cma *cma;
-+	int err;
-+
-+	if (!of_get_flat_dt_prop(node, "reusable", NULL))
-+		return -EINVAL;
-+
-+	if ((rmem->base & mask) || (rmem->size & mask)) {
-+		pr_err("Reserved memory: incorrect alignment of CMA region\n");
-+		return -EINVAL;
-+	}
-+
-+	err = dma_contiguous_init_reserved_mem(rmem->size, rmem->base, &cma);
-+	if (err) {
-+		pr_err("Reserved memory: unable to setup CMA region\n");
-+		return err;
-+	}
-+
-+	if (of_get_flat_dt_prop(node, "linux,cma-default", NULL))
-+		dma_contiguous_set_default(cma);
-+
-+	rmem->ops = &rmem_cma_ops;
-+	rmem->priv = cma;
-+
-+	pr_info("Reserved memory: created CMA memory pool at %pa, size %ld MiB\n",
-+		&rmem->base, (unsigned long)rmem->size / SZ_1M);
-+
-+	return 0;
-+}
-+RESERVEDMEM_OF_DECLARE(cma, "shared-dma-pool", rmem_cma_setup);
-+#endif
 -- 
 1.7.9.5
