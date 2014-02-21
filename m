@@ -1,28 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 21 Feb 2014 15:17:15 -0800
-Subject: [PATCH 1/1] ARM: OMAP: Kill warning in CPUIDLE code with
- !CONFIG_SMP
-In-Reply-To: <1392623575-4884-1-git-send-email-mugunthanvnm@ti.com>
-References: <1392623575-4884-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <20140221231714.GC5342@atomide.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 22 Feb 2014 00:35:02 +0100
+Subject: [PATCH v5 2/5] ACPI / processor_core: Rework _PDC related stuff
+ to make it more arch-independent
+In-Reply-To: <20140221182424.GA5751@arm.com>
+References: <1392740638-2479-1-git-send-email-hanjun.guo@linaro.org>
+ <3459962.GkY99aHQbc@vostro.rjw.lan> <20140221182424.GA5751@arm.com>
+Message-ID: <1408521.4TEdKhuRp5@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mugunthan V N <mugunthanvnm@ti.com> [140216 23:56]:
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Friday, February 21, 2014 06:24:24 PM Catalin Marinas wrote:
+> Hi Rafael,
 > 
-> for non SMP build, NR_CPUS is 1 and hence the code complains with below
-> warnings.
+> On Wed, Feb 19, 2014 at 01:50:22AM +0100, Rafael J. Wysocki wrote:
+> > On Wednesday, February 19, 2014 12:23:55 AM Hanjun Guo wrote:
+> > > _PDC related stuff in processor_core.c is little bit X86/IA64 dependent,
+> > > rework the code to make it more arch-independent, no functional change
+> > > in this patch.
+> > > 
+> > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > > Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> > 
+> > I've queued up patches [1,3-5/5] from this series for 3.15 (modulo changelog
+> > modifications), but this one should be CCed to the x86 and ia64 maintainers.
 > 
-> arch/arm/mach-omap2/cpuidle44xx.c:207:8: warning: array subscript is above array bounds [-Warray-bounds]
-> arch/arm/mach-omap2/cpuidle44xx.c:212:11: warning: array subscript is above array bounds [-Warray-bounds]
-> 
-> Kill it by making array size fixed.
-> 
-> Acked-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+> Thanks for taking these patches. I would however hold onto patch 3/5 as
+> this is still under discussion. Basically for patches specific to ARM
+> ACPI I would really like to see more acks before being merged as that's
+> a new thing for us.
 
-Thanks applying into omap-for-v3.14/fixes.
+OK, I'll drop [3/5] for now, then.
 
-Tony
+I'm wondering, though, whose ACKs I should be waiting for before applying those
+patches?
+
+Rafael
