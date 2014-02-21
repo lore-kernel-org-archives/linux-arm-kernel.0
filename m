@@ -1,48 +1,38 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 21 Feb 2014 21:57:37 +0300
-Subject: [PATCH 3/5] documentation/iommu: update description of ARM System
- MMU binding
-In-Reply-To: <1393002992-24561-4-git-send-email-will.deacon@arm.com>
-References: <1393002992-24561-1-git-send-email-will.deacon@arm.com>
- <1393002992-24561-4-git-send-email-will.deacon@arm.com>
-Message-ID: <5307A1A1.7070601@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Feb 2014 19:05:32 +0100
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <20140221173105.GA17611@obsidianresearch.com>
+References: <20140221003227.GF19893@obsidianresearch.com>
+ <20140221180508.7ed6cfaf@skate> <20140221173105.GA17611@obsidianresearch.com>
+Message-ID: <2321496.TUNdngb8sx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Friday 21 February 2014 10:31:05 Jason Gunthorpe wrote:
+> On Fri, Feb 21, 2014 at 06:05:08PM +0100, Thomas Petazzoni wrote:
+>  
+> > Now I have another question: our mvebu_pcie_align_resource() function
+> > makes sure that the base address of the BAR is aligned on its size,
+> > because it is a requirement of MBus windows. However, if you later
+> > split the BAR into multiple windows, will this continue to work out?
+> 
+> No, you must align to (1 << log2_round_down(size)) - that will always
+> be the largest mbus window created and thus the highest starting
+> alignment requirement.
 
-On 02/21/2014 08:16 PM, Will Deacon wrote:
+Unless you allow reordering the two windows. If you want a 96MB
+window, you only need 32MB alignment because you can either put
+the actual 64MB window first if you have 64MB alignment, or you
+put the 32MB window first if you don't and then the following
+64MB will be aligned.
 
-> From: Andreas Herrmann <andreas.herrmann@calxeda.com>
+It gets more complicated if you want to allow a 72MB window
+(16MB+64MB), as that could either be 64MB aligned or start 16MB
+before the next multiple of 64MB.
 
-> This patch adds descriptions for new properties of the device tree
-> binding for the ARM SMMU architecture. These properties control
-> arm-smmu driver options.
+I don't think there is any reason why code anywhere should align
+the window to a multiple of the size though if the size is not
+power-of-two, such as aligning to multiples of 96MB. That wouldn't
+help anyone.
 
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-> [will: removed device isolation property, as this has been dropped]
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->   Documentation/devicetree/bindings/iommu/arm,smmu.txt | 6 ++++++
->   1 file changed, 6 insertions(+)
-
-> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> index e34c6cdd8ba8..d6d2f6dd437a 100644
-> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> @@ -48,6 +48,12 @@ conditions.
->                     from the mmu-masters towards memory) node for this
->                     SMMU.
->
-> +- calxeda,smmu-secure-config-access : Enable proper handling of buggy
-> +                  implementations that always use secure access to
-> +                  SMMU configuration registers. In this case non-secure
-> +		  aliases of secure registers have to be used during
-> +		  SMMU configuration.
-
-    Could you indent the text uniformly, in this case probably with spaces 
-only (looking at the above property)?
-
-WBR, Sergei
+	Arnd
