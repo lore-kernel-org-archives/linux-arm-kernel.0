@@ -1,46 +1,65 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Fri, 21 Feb 2014 09:40:29 +0000
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 21 Feb 2014 10:46:41 +0100
 Subject: [PATCH v10 01/15] usb: doc: phy-mxs: Add more compatible strings
-In-Reply-To: <20140221091345.GA7541@e106331-lin.cambridge.arm.com>
+In-Reply-To: <5e4d795b507a4ea7b9faa69dd05148c4@BL2PR03MB226.namprd03.prod.outlook.com>
 References: <1392873284-9386-1-git-send-email-peter.chen@freescale.com>
  <1392873284-9386-2-git-send-email-peter.chen@freescale.com>
  <20140221091345.GA7541@e106331-lin.cambridge.arm.com>
-Message-ID: <5e4d795b507a4ea7b9faa69dd05148c4@BL2PR03MB226.namprd03.prod.outlook.com>
+ <5e4d795b507a4ea7b9faa69dd05148c4@BL2PR03MB226.namprd03.prod.outlook.com>
+Message-ID: <53072081.2000407@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> >
-> >  Required properties:
-> > -- compatible: Should be "fsl,imx23-usbphy"
-> > +- compatible: "fsl,imx23-usbphy" for imx23 and imx28, "fsl,imx6q-
-> usbphy"
-> > +  for imx6dq and imx6dl, "fsl,imx6sl-usbphy" for imx6sl
+On 02/21/2014 10:40 AM, Peter Chen wrote:
+>  
+>>>
+>>>  Required properties:
+>>> -- compatible: Should be "fsl,imx23-usbphy"
+>>> +- compatible: "fsl,imx23-usbphy" for imx23 and imx28, "fsl,imx6q-
+>> usbphy"
+>>> +  for imx6dq and imx6dl, "fsl,imx6sl-usbphy" for imx6sl
+>>
+>> Minor nit, but could we restructure this as something like the following,
+>> with each string on a new line:
+>>
+>> - compatible: should contain:
+>>     * "fsl,imx23-usbphy" for imx23 and imx28
+>>     * "fsl,imx6q-usbphy" for imx6dq and imx6dl
+>>     * "fsl,imx6sl-usbphy" for imx6sl
+>>
+>> It makes it a bit easier to read.
 > 
-> Minor nit, but could we restructure this as something like the following,
-> with each string on a new line:
+> Thanks, will change like above.
 > 
-> - compatible: should contain:
->     * "fsl,imx23-usbphy" for imx23 and imx28
->     * "fsl,imx6q-usbphy" for imx6dq and imx6dl
->     * "fsl,imx6sl-usbphy" for imx6sl
+>>
+>> I see the existing "fsl,imx23-usbphy" is used as a fallback for
+>> "fsl,imx28-usbphy", "fsl,imx6q-usbphy", and "fsl,imx6sl-usbphy" in
+>> existing DTs.
+>>
+>> Is this expected going forward? It might be worth mentioning.
+>>
 > 
-> It makes it a bit easier to read.
+> These SoCs used the same FSL imx PHY, but different versions.
+> imx23/imx28 are the first version, more improvements are at
+> later SoCs (like imx6x) version. Keep "fsl,imx23-usbphy" at
+> imx6 dts will be user know it is from imx23's. If you think
+> it does not need, I can delete "fsl,imx23-usbphy" from imx6 dts.
 
-Thanks, will change like above.
+You should go after compatibility here. List (all) phys that are
+comaptible, start with most specific end with most generic.
 
-> 
-> I see the existing "fsl,imx23-usbphy" is used as a fallback for
-> "fsl,imx28-usbphy", "fsl,imx6q-usbphy", and "fsl,imx6sl-usbphy" in
-> existing DTs.
-> 
-> Is this expected going forward? It might be worth mentioning.
-> 
+Marc
 
-These SoCs used the same FSL imx PHY, but different versions.
-imx23/imx28 are the first version, more improvements are at
-later SoCs (like imx6x) version. Keep "fsl,imx23-usbphy" at
-imx6 dts will be user know it is from imx23's. If you think
-it does not need, I can delete "fsl,imx23-usbphy" from imx6 dts.
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Peter
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 242 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140221/aa654202/attachment-0001.sig>
