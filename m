@@ -1,125 +1,32 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Fri, 21 Feb 2014 11:39:23 -0500
-Subject: [PATCH v6 8/8] ARM: brcmstb: dts: add a reference DTS for
- Broadcom 7445
-In-Reply-To: <1391463041-15241-9-git-send-email-marc.ceeeee@gmail.com>
-References: <1391463041-15241-1-git-send-email-marc.ceeeee@gmail.com>
- <1391463041-15241-9-git-send-email-marc.ceeeee@gmail.com>
-Message-ID: <20140221163923.GL5038@beef>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 21 Feb 2014 17:50:44 +0100
+Subject: [PATCH v2 2/2] phy: Select PHY_EXYNOS_DP_VIDEO by default for
+ ARCH_EXYNOS
+In-Reply-To: <1888663.ccFYmJ9QJl@wuerfel>
+References: <1392997802-29050-1-git-send-email-s.nawrocki@samsung.com>
+ <1753680.KKj0Q1erxA@wuerfel> <53077DE0.7080108@samsung.com>
+ <1888663.ccFYmJ9QJl@wuerfel>
+Message-ID: <530783E4.6090206@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 03, 2014 at 01:30:41PM -0800, Marc Carino wrote:
-> Add a sample DTS which will allow bootup of a board populated
-> with the BCM7445 chip.
-> 
-> Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
-> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  arch/arm/boot/dts/bcm7445.dts |  111 +++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 111 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/bcm7445.dts
+On 21/02/14 17:41, Arnd Bergmann wrote:
+> On Friday 21 February 2014 17:25:04 Sylwester Nawrocki wrote:
+>> > 
+>> > Hmm, good point, I will modify it that way.
+>> > 
+>> > For patch 1/2 I guess it should be:
+>> > 
+>> > "default ARCH_S5PV210 || ARCH_EXYNOS"
+>> > 
+>> > or rather
+>> > 
+>> > "default y if ARCH_S5PV210 || ARCH_EXYNOS" ?
+>
+> Right. I'd probably use the first syntax, but it doesn't really matter.
 
-Looking forward, I suspect you are going to have to move to a
-bcm7445.dtsi with your board specific implementations in something like
-bcm7445-myrefbrd.dts. It's probably better to split this now to
-encourage inclusion of the common SoC nodes from the board specific
-dts. Since it's not abstracted this way it'll encourage people to just
-copy the entire bcm7445.dts for their board.
+Oops, I've already sent patch using the second one, as it seemed
+more common.
 
-> diff --git a/arch/arm/boot/dts/bcm7445.dts b/arch/arm/boot/dts/bcm7445.dts
-> new file mode 100644
-> index 0000000..ffa3305
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/bcm7445.dts
-> @@ -0,0 +1,111 @@
-> +/dts-v1/;
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +	model = "Broadcom STB (bcm7445)";
-> +	compatible = "brcm,bcm7445", "brcm,brcmstb";
-> +	interrupt-parent = <&gic>;
-> +
-> +	chosen {};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00 0x00000000 0x00 0x40000000>,
-> +		      <0x00 0x40000000 0x00 0x40000000>,
-> +		      <0x00 0x80000000 0x00 0x40000000>;
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			compatible = "brcm,brahma-b15";
-> +			device_type = "cpu";
-> +			reg = <0>;
-> +		};
-> +
-> +		cpu at 1 {
-> +			compatible = "brcm,brahma-b15";
-> +			device_type = "cpu";
-> +			reg = <1>;
-> +		};
-> +
-> +		cpu at 2 {
-> +			compatible = "brcm,brahma-b15";
-> +			device_type = "cpu";
-> +			reg = <2>;
-> +		};
-> +
-> +		cpu at 3 {
-> +			compatible = "brcm,brahma-b15";
-> +			device_type = "cpu";
-> +			reg = <3>;
-> +		};
-> +	};
-> +
-> +	gic: interrupt-controller at ffd00000 {
-> +		compatible = "brcm,brahma-b15-gic", "arm,cortex-a15-gic";
-> +		reg = <0x00 0xffd01000 0x00 0x1000>,
-> +		      <0x00 0xffd02000 0x00 0x2000>,
-> +		      <0x00 0xffd04000 0x00 0x2000>,
-> +		      <0x00 0xffd06000 0x00 0x2000>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv7-timer";
-> +		interrupts = <1 13 0xf08>,
-> +			     <1 14 0xf08>,
-> +			     <1 11 0xf08>,
-> +			     <1 10 0xf08>;
-
-These should leverage the preprocessor defines that are available
-e.g.
-		interrupts = <GIC_PPI 13 GIC_CPU_MASK_RAW(15)|IRQ_TYPE_LEVEL_LOW>,
-		...
-
-> +	};
-> +
-> +	rdb {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "simple-bus";
-> +		ranges = <0 0x00 0xf0000000 0x1000000>;
-> +
-> +		serial at 406b00 {
-> +			compatible = "ns16550a";
-> +			reg = <0x406b00 0x20>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			interrupts = <0 75 0x4>;
-
-same here:
-
-			interrupt = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-
--Matt
+Thanks,
+Sylwester
