@@ -1,50 +1,61 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Fri, 21 Feb 2014 15:13:09 +0900
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Updates for v3.15
-Message-ID: <cover.1392961497.git.horms+renesas@verge.net.au>
+Subject: [PATCH 2/3] ARM: shmobile: Remove legacy r8a7790 DT clocks
+In-Reply-To: <cover.1392961497.git.horms+renesas@verge.net.au>
+References: <cover.1392961497.git.horms+renesas@verge.net.au>
+Message-ID: <074e25ac68b40603345a257504de0f4a125326e7.1392961497.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Magnus Damm <damm@opensource.se>
 
-Please consider this third round of Renesas ARM based SoC updates for v3.15.
+The DT device case is handled by CCF these days, so get
+rid of DT devices from the legacy clocks for r8a7790.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc2-for-v3.15,
-which I have already sent a pull-request for.
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a7790.c | 11 -----------
+ 1 file changed, 11 deletions(-)
 
-
-The following changes since commit 74b9ba5f35fbd071f313781498a9e244bcc6f03e:
-
-  ARM: shmobile: r8a7790: Correct SYS DMAC clock defines (2014-02-07 09:24:07 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc3-for-v3.15
-
-for you to fetch changes up to db47204b32dd0d72454b4f841d0f7e33c44ee2b8:
-
-  ARM: shmobile: Remove __init from rcar_gen2_read_mode_pins() (2014-02-18 13:25:09 +0900)
-
-----------------------------------------------------------------
-Third Round of Renesas ARM Based SoC Updates for v3.15
-
-* R-Car Gen2 SoCs: r8a7791 (R-Car M2) and r8a7790 (R-Car H2)
-  - Remove __init from rcar_gen2_read_mode_pins()
-
-* r8a7791 SoC (R-Car M2)
-  - Add r8a7791 legacy SDHI clocks
-
-* r8a7790 SoC (R-Car M2)
-  - Remove legacy DT clocks
-
-----------------------------------------------------------------
-Magnus Damm (3):
-      ARM: shmobile: Add r8a7791 legacy SDHI clocks
-      ARM: shmobile: Remove legacy r8a7790 DT clocks
-      ARM: shmobile: Remove __init from rcar_gen2_read_mode_pins()
-
- arch/arm/mach-shmobile/clock-r8a7790.c   | 11 -------
- arch/arm/mach-shmobile/clock-r8a7791.c   | 51 ++++++++++++++++++++++++++++++--
- arch/arm/mach-shmobile/setup-rcar-gen2.c |  2 +-
- 3 files changed, 50 insertions(+), 14 deletions(-)
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index 08a2803..02b94036 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -328,34 +328,23 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
+ 	CLKDEV_DEV_ID("sh-sci.8", &mstp_clks[MSTP717]),
+ 	CLKDEV_DEV_ID("sh-sci.9", &mstp_clks[MSTP716]),
+-	CLKDEV_DEV_ID("e6508000.i2c", &mstp_clks[MSTP931]),
+ 	CLKDEV_DEV_ID("i2c-rcar_gen2.0", &mstp_clks[MSTP931]),
+-	CLKDEV_DEV_ID("e6518000.i2c", &mstp_clks[MSTP930]),
+ 	CLKDEV_DEV_ID("i2c-rcar_gen2.1", &mstp_clks[MSTP930]),
+-	CLKDEV_DEV_ID("e6530000.i2c", &mstp_clks[MSTP929]),
+ 	CLKDEV_DEV_ID("i2c-rcar_gen2.2", &mstp_clks[MSTP929]),
+-	CLKDEV_DEV_ID("e6540000.i2c", &mstp_clks[MSTP928]),
+ 	CLKDEV_DEV_ID("i2c-rcar_gen2.3", &mstp_clks[MSTP928]),
+ 	CLKDEV_DEV_ID("r8a7790-ether", &mstp_clks[MSTP813]),
+ 	CLKDEV_DEV_ID("r8a7790-vin.0", &mstp_clks[MSTP811]),
+ 	CLKDEV_DEV_ID("r8a7790-vin.1", &mstp_clks[MSTP810]),
+ 	CLKDEV_DEV_ID("r8a7790-vin.2", &mstp_clks[MSTP809]),
+ 	CLKDEV_DEV_ID("r8a7790-vin.3", &mstp_clks[MSTP808]),
+-	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("rcar_thermal", &mstp_clks[MSTP522]),
+ 	CLKDEV_DEV_ID("sh-dma-engine.0", &mstp_clks[MSTP502]),
+ 	CLKDEV_DEV_ID("sh-dma-engine.1", &mstp_clks[MSTP501]),
+-	CLKDEV_DEV_ID("ee200000.mmc", &mstp_clks[MSTP315]),
+ 	CLKDEV_DEV_ID("sh_mmcif.0", &mstp_clks[MSTP315]),
+-	CLKDEV_DEV_ID("ee100000.sd", &mstp_clks[MSTP314]),
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]),
+-	CLKDEV_DEV_ID("ee120000.sd", &mstp_clks[MSTP313]),
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP313]),
+-	CLKDEV_DEV_ID("ee140000.sd", &mstp_clks[MSTP312]),
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP312]),
+-	CLKDEV_DEV_ID("ee160000.sd", &mstp_clks[MSTP311]),
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.3", &mstp_clks[MSTP311]),
+-	CLKDEV_DEV_ID("ee220000.mmc", &mstp_clks[MSTP305]),
+ 	CLKDEV_DEV_ID("sh_mmcif.1", &mstp_clks[MSTP305]),
+ 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
+ 	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
+-- 
+1.8.5.2
