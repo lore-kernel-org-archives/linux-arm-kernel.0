@@ -1,80 +1,28 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Fri, 21 Feb 2014 15:00:00 +0100
-Subject: [PATCHv7][ 3/7] staging: imx-drm: Correct BGR666 and the board's dts
- that use them.
-In-Reply-To: <1392991205-25371-1-git-send-email-denis@eukrea.com>
-References: <1392991205-25371-1-git-send-email-denis@eukrea.com>
-Message-ID: <1392991205-25371-3-git-send-email-denis@eukrea.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Fri, 21 Feb 2014 09:09:58 -0500
+Subject: [PATCH] ARM: bcm2835: Move to mach-bcm directory
+In-Reply-To: <5306DBE4.8090106@wwwdotorg.org>
+References: <1392941771-15774-1-git-send-email-markus.mayer@linaro.org>
+ <5306DBE4.8090106@wwwdotorg.org>
+Message-ID: <20140221140958.GK5038@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current BGR666 is not consistent with the other color mapings like BGR24.
-BGR666 should be in the same byte order than BGR24.
+On Thu, Feb 20, 2014 at 09:53:56PM -0700, Stephen Warren wrote:
+> On 02/20/2014 05:16 PM, Markus Mayer wrote:
+> > Move the bcm2835 board file into the mach-bcm directory. This allows us
+> > to get rid of the mach-bcm2835 directory with the associated Kconfig
+> > and Makefile.
+> 
+> This looks fine, although it needs a small patch to bcm2835_defconfig
+> squashed in, which I'll post in a second.
+> 
+> Do you want me to take it through the bcm2835 tree? That's probably
+> easiest to avoid conflicts with any other bcm2835 patches, not that it's
+> too likely there will be any to the board file.
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Eric B?nard <eric@eukrea.com>
-Cc: Marek Vasut <marex@denx.de>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: devel at driverdev.osuosl.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
-ChangeLog v6->v7:
-- Shrinked even more the Cc list.
+That's ok with me. Be aware that we may have minor Kconfig/Makefile
+conflicts between the bcm2835 tree and the mach-bcm tree since we just
+queued the bcm5301x support.
 
-ChangeLog v5->v6:
-- Remove people not concerned by this patch from the Cc list.
-- Added a better explanation of the change.
-
-ChangeLog v5:
-- New patch.
----
- arch/arm/boot/dts/imx51-apf51dev.dts    |    2 +-
- arch/arm/boot/dts/imx53-m53evk.dts      |    2 +-
- drivers/staging/imx-drm/ipu-v3/ipu-dc.c |    4 ++--
- 3 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
-index c29cfa9..bff3201 100644
---- a/arch/arm/boot/dts/imx51-apf51dev.dts
-+++ b/arch/arm/boot/dts/imx51-apf51dev.dts
-@@ -19,7 +19,7 @@
- 	display at di1 {
- 		compatible = "fsl,imx-parallel-display";
- 		crtcs = <&ipu 0>;
--		interface-pix-fmt = "bgr666";
-+		interface-pix-fmt = "rgb666";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_ipu_disp1>;
- 
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index e8d11e2..a984498 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -24,7 +24,7 @@
- 		display at di1 {
- 			compatible = "fsl,imx-parallel-display";
- 			crtcs = <&ipu 1>;
--			interface-pix-fmt = "bgr666";
-+			interface-pix-fmt = "rgb666";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_ipu_disp1>;
- 
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-index 617e65b..b11a2aa 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
-@@ -397,9 +397,9 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
- 
- 	/* bgr666 */
- 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR666);
--	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 5, 0xfc); /* blue */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 0, 17, 0xfc); /* blue */
- 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /* green */
--	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
-+	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 5, 0xfc); /* red */
- 
- 	/* bgr24 */
- 	ipu_dc_map_clear(priv, IPU_DC_MAP_BGR24);
--- 
-1.7.9.5
+-Matt
