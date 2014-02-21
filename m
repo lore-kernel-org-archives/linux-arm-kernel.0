@@ -1,15 +1,77 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 21 Feb 2014 10:14:42 +0800
-Subject: [PATCH v4 1/4] ARM: dts: imx6q-phytec: Added USB_OTG Support
-In-Reply-To: <1392875418-9034-1-git-send-email-ashutosh.s@phytec.in>
-References: <1392875418-9034-1-git-send-email-ashutosh.s@phytec.in>
-Message-ID: <20140221021440.GQ3010@S2101-09.ap.freescale.net>
+Date: Fri, 21 Feb 2014 10:19:49 +0800
+Subject: [RFC PATCH 2/2] ARM: imx6q: Mark VPU and IPU AXI transfers as
+ cacheable, increase IPU priority
+In-Reply-To: <1392896673-13627-2-git-send-email-p.zabel@pengutronix.de>
+References: <1392896673-13627-1-git-send-email-p.zabel@pengutronix.de>
+ <1392896673-13627-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20140221021947.GR3010@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 11:20:15AM +0530, Ashutosh singh wrote:
-> This patch adds support for USB_OTG on Phytec phyFLEX-i.MX6 Quad module.
+On Thu, Feb 20, 2014 at 12:44:33PM +0100, Philipp Zabel wrote:
+> This is needed so that the IPU framebuffer scanout cannot be
+> starved by VPU or GPU activity.
+> Some boards like the SabreLite and SabreSD seem to set this in
+> the DCD already, but the documented register reset values do not
+> contain the necessary settings.
 > 
-> Signed-off-by: Ashutosh singh <ashutosh.s@phytec.in>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-Applied all 4, thanks.
+I'm fine with the patches, but not sure if I should just apply them
+since you add 'RFC' tag in there.
+
+Shawn
+
+> ---
+>  arch/arm/mach-imx/mach-imx6q.c | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 76e5db4..f094bd3 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -194,6 +194,32 @@ static void __init imx6q_1588_init(void)
+>  
+>  }
+>  
+> +static void __init imx6q_axi_init(void)
+> +{
+> +	struct regmap *gpr;
+> +
+> +	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+> +	if (!IS_ERR(gpr)) {
+> +		/* Enable the cacheable attribute of VPU and IPU AXI transactions */
+> +		regmap_update_bits(gpr, IOMUXC_GPR4,
+> +				IMX6Q_GPR4_VPU_WR_CACHE_SEL | IMX6Q_GPR4_VPU_RD_CACHE_SEL |
+> +				IMX6Q_GPR4_VPU_P_WR_CACHE_VAL | IMX6Q_GPR4_VPU_P_RD_CACHE_VAL_MASK |
+> +				IMX6Q_GPR4_IPU_WR_CACHE_CTL | IMX6Q_GPR4_IPU_RD_CACHE_CTL,
+> +				IMX6Q_GPR4_VPU_WR_CACHE_SEL | IMX6Q_GPR4_VPU_RD_CACHE_SEL |
+> +				IMX6Q_GPR4_VPU_P_WR_CACHE_VAL | IMX6Q_GPR4_VPU_P_RD_CACHE_VAL_MASK |
+> +				IMX6Q_GPR4_IPU_WR_CACHE_CTL | IMX6Q_GPR4_IPU_RD_CACHE_CTL);
+> +		/* Increase IPU read QoS priority */
+> +		regmap_update_bits(gpr, IOMUXC_GPR6,
+> +				IMX6Q_GPR6_IPU1_ID00_RD_QOS_MASK | IMX6Q_GPR6_IPU1_ID01_RD_QOS_MASK,
+> +				(0xf << 16) | (0x7 << 20));
+> +		regmap_update_bits(gpr, IOMUXC_GPR7,
+> +				IMX6Q_GPR7_IPU2_ID00_RD_QOS_MASK | IMX6Q_GPR7_IPU2_ID01_RD_QOS_MASK,
+> +				(0xf << 16) | (0x7 << 20));
+> +	} else {
+> +		pr_warn("failed to find fsl,imx6q-iomuxc-gpr regmap\n");
+> +	}
+> +}
+> +
+>  static void __init imx6q_init_machine(void)
+>  {
+>  	struct device *parent;
+> @@ -214,6 +240,7 @@ static void __init imx6q_init_machine(void)
+>  	imx_anatop_init();
+>  	imx6q_pm_init();
+>  	imx6q_1588_init();
+> +	imx6q_axi_init();
+>  }
+>  
+>  #define OCOTP_CFG3			0x440
+> -- 
+> 1.8.5.3
+> 
