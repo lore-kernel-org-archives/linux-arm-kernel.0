@@ -1,44 +1,37 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 21 Feb 2014 17:16:30 +0000
-Subject: [PATCH 3/5] documentation/iommu: update description of ARM System MMU
- binding
+Date: Fri, 21 Feb 2014 17:16:28 +0000
+Subject: [PATCH 1/5] iommu/arm-smmu: set MAX_MASTER_STREAMIDS to
+ MAX_PHANDLE_ARGS
 In-Reply-To: <1393002992-24561-1-git-send-email-will.deacon@arm.com>
 References: <1393002992-24561-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1393002992-24561-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1393002992-24561-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andreas Herrmann <andreas.herrmann@calxeda.com>
 
-This patch adds descriptions for new properties of the device tree
-binding for the ARM SMMU architecture. These properties control
-arm-smmu driver options.
+The DT parsing code that determines stream IDs uses
+of_parse_phandle_with_args and thus MAX_MASTER_STREAMIDS
+is always bound by MAX_PHANDLE_ARGS.
 
-Cc: Grant Likely <grant.likely@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Andreas Herrmann <andreas.herrmann@calxeda.com>
-[will: removed device isolation property, as this has been dropped]
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- Documentation/devicetree/bindings/iommu/arm,smmu.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/iommu/arm-smmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index e34c6cdd8ba8..d6d2f6dd437a 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -48,6 +48,12 @@ conditions.
-                   from the mmu-masters towards memory) node for this
-                   SMMU.
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 1d9ab39af29f..a3ce60887efa 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -48,7 +48,7 @@
+ #include <asm/pgalloc.h>
  
-+- calxeda,smmu-secure-config-access : Enable proper handling of buggy
-+                  implementations that always use secure access to
-+                  SMMU configuration registers. In this case non-secure
-+		  aliases of secure registers have to be used during
-+		  SMMU configuration.
-+
- Example:
+ /* Maximum number of stream IDs assigned to a single device */
+-#define MAX_MASTER_STREAMIDS		8
++#define MAX_MASTER_STREAMIDS		MAX_PHANDLE_ARGS
  
-         smmu {
+ /* Maximum number of context banks per SMMU */
+ #define ARM_SMMU_MAX_CBS		128
 -- 
 1.8.2.2
