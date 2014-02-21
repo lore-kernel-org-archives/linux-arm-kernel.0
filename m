@@ -1,40 +1,46 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 21 Feb 2014 08:39:56 +0000
-Subject: [RFC PATCH 2/2] arm: mm: Double logical invert for LPAE
- pte_write(), pte_dirty()
-In-Reply-To: <20140220172651.GM3615@mudshark.cambridge.arm.com>
-References: <1392396913-13570-1-git-send-email-steve.capper@linaro.org>
- <1392396913-13570-3-git-send-email-steve.capper@linaro.org>
- <20140220172651.GM3615@mudshark.cambridge.arm.com>
-Message-ID: <20140221083955.GB2383@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 21 Feb 2014 09:40:20 +0100
+Subject: [PATCH] arm: removed compiler warning
+In-Reply-To: <20140217043834.GA7563@vega.jjdev.com>
+References: <20140217043834.GA7563@vega.jjdev.com>
+Message-ID: <530710F4.6060804@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 05:26:51PM +0000, Will Deacon wrote:
-> On Fri, Feb 14, 2014 at 04:55:13PM +0000, Steve Capper wrote:
-> > On LPAE, L_PTE_WRITE and L_PTE_DIRTY are in the upper 32-bits.
-> > Unfortunately, results from pte_write() and pte_dirty() are downcast
-> > to 32-bits by core code:
-> >   o gather_stats
-> >   o huge_pte_dirty
-> >   o huge_pte_write
-> >   o make_migration_entry
-> > 
-> > This patch adds a double logical invert to pte_write() and pte_dirty()
-> > for LPAE to ensure that the lower 32-bits are set if true.
+On 17/02/2014 05:38, John de la Garza wrote:
+> Removed this compiler warning for arch/arm/boot/compressed/atags_to_fdt.c.
+> The warning was: 'memsize' may be used uninitialized in this function.
 > 
-> Yikes, this sounds like something we should put in -stable, no? If so,
-> better make it patch 1 of this series.
 
-Yeah, it makes sense to have this as the first patch. It probably
-should go through stable, I will mark the next version of this patch
-for stable.
+Indeed it was an error, thanks to have fixed it.
 
+> Signed-off-by: John de la Garza <john@jjdev.com>
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+> ---
+>  arch/arm/boot/compressed/atags_to_fdt.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
->   Reviewed-by: Will Deacon <will.deacon@arm.com>
+> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+> index d1153c8..75b64da 100644
+> --- a/arch/arm/boot/compressed/atags_to_fdt.c
+> +++ b/arch/arm/boot/compressed/atags_to_fdt.c
+> @@ -110,7 +110,8 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+>  	 * address and size for each bank */
+>  	uint32_t mem_reg_property[2 * 2 * NR_BANKS];
+>  	int memcount = 0;
+> -	int ret, memsize;
+> +	int memsize = 0;
+> +	int ret;
+>  
+>  	/* make sure we've got an aligned pointer */
+>  	if ((u32)atag_list & 0x3)
+> 
 
-Thanks Will.
 
-Cheers,
---
-Steve
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
