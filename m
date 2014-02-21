@@ -1,74 +1,206 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 21 Feb 2014 14:39:51 +0000
-Subject: [PATCH] arm/arm64: KVM: detect CPU reset on CPU_PM_EXIT
-In-Reply-To: <53073696.5080005@arm.com>
-References: <1392910014-15495-1-git-send-email-marc.zyngier@arm.com>
- <20140220233543.1836e2d5@slackpad> <53073696.5080005@arm.com>
-Message-ID: <20140221143951.GA6315@e102568-lin.cambridge.arm.com>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Fri, 21 Feb 2014 20:18:00 +0530
+Subject: [PATCH] pcie: Add Xilinx PCIe Host Bridge IP driver
+In-Reply-To: <20140220174503.GB19893@obsidianresearch.com>
+References: <1392564830-5868-1-git-send-email-sthokal@xilinx.com>
+ <CAErSpo5FGPhgnp8Gfy-1_Lk7ckCi7U5+z5pLnPU+jScPxD5yUQ@mail.gmail.com>
+ <20140219003523.GJ29304@obsidianresearch.com>
+ <CA+mB=1KSxkN+mKce5k1n93pmAA_FnWYaqNweWzxd4GD3Mo4PZA@mail.gmail.com>
+ <20140220174503.GB19893@obsidianresearch.com>
+Message-ID: <CA+mB=1L+QM2cKq==mwYesp=E7S2N-xTiN7AoBvbzAO2UMn0qVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 11:20:54AM +0000, Marc Zyngier wrote:
-> On 20/02/14 22:35, Andre Przywara wrote:
-> > On Thu, 20 Feb 2014 15:26:54 +0000
-> > Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > 
-> >> Commit 1fcf7ce0c602 (arm: kvm: implement CPU PM notifier) added
-> >> support for CPU power-management, using a cpu_nofigier to re-init
-> >> KVM on a CPU that entered CPU idle.
-> >>
-> >> The code assumed that a CPU entering idle would actually be powered
-> >> off, loosing its state entierely, and would then need to be
-> >> reinitialized. It turns out that this is not always the case, and
-> >> some HW performs CPU PM without actually killing the core. In this
-> >> case, we try to reinitialize KVM while it still live. It ends up
-> >> badly, as reported by Andre Przywara (using a Calxeda Midway):
-> >>
-> >> [    3.663897] Kernel panic - not syncing: unexpected prefetch abort
-> >> in Hyp mode at: 0x685760 [    3.663897] unexpected data abort in Hyp
-> >> mode at: 0xc067d150 [    3.663897] unexpected HVC/SVC trap in Hyp
-> >> mode at: 0xc0901dd0
-> >>
-> >> The trick here is to detect if we've been through a full re-init or
-> >> not by looking at HVBAR (VBAR_EL2 on arm64). This involves
-> >> implementing the backend for __hyp_get_vectors in the main KVM HYP
-> >> code (rather small), and checking the return value against the
-> >> default one when the CPU notifier is called on CPU_PM_EXIT.
-> >>
-> >> Reported-by: Andre Przywara <osp@andrep.de>
-> >> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >> Cc: Rob Herring <rob.herring@linaro.org>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > 
-> > Tested-by: Andre Przywara <osp@andrep.de>
-> 
-> Thanks!
-> 
-> > (there seems to be a typo in the second line of the commit message)
-> 
-> Ah, good katsh! ;-)
-> 
-> > Marc,
-> > 
-> > thanks a lot for this quick and perfectly working patch! I still
-> > believe it is actually the firmware that needs to be fixed, but this is
-> > rather unlikely in this special case ...
-> 
-> Well, that is completely debatable. This is a valid (if minimal)
-> implementation of cpu idle, and the KVM code *must* be robust enough to
-> deal with that kind of implementation.
+On Thu, Feb 20, 2014 at 11:15 PM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> On Thu, Feb 20, 2014 at 12:39:48PM +0530, Srikanth Thokala wrote:
+>
+>> > These should use the standard ranges mechanism for translations and
+>> > apertures.
+>>
+>> This AXI PCIe bridge IP do have two kind of BARs AXI-to-PCIe BAR and
+>> PCIe-to-AXI BAR.  The former specifies the AXI Base address and are the
+>> memory windows, these are listed in the 'ranges' DT property.  The latter
+>> BAR specifies the addresses that PCI Express should respond to/is
+>
+> The PCIe-to-AXI window should be setup by the driver automatically to
+> span all system memory, it doesn't need to be in DT.
+>
+> The AXI-to-PCIe is the host bridge aperture and it should be in the DT
+> ranges.
 
-I definitely agree with Marc, and thanks for the fix.
+Ok.
 
-I have to say though, off-topic, that having a C-state that just calls
-PSCI to do wfi is not ideal (since it is called from cpu_suspend, which
-expects the CPU to lose context), since CPU enters that state by saving
-context and flushing L1 just to execute wfi. Power down can fail in
-general, and that's why this patch makes perfect sense, the question is
-why should we leave a C-state in the Calxeda idle driver that just cripples
-performance and burns more power instead of saving it.
+>
+>> tallowed to write to and these addresses written to configuration space
+>> during the initialization.
+>
+> Hopefully this was done in a conformant way, please provide a lspci
+> -vv next round please..
 
-At least for testing and doing KVM development you should disable the
-PSCI based C-state.
+Here is the information,
 
-Lorenzo
+# /opt/lspci  -vv
+00:00.0 Class 0604: Device 10ee:7081
+        Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop-
+ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort-
+<TAbort- <MAbort- >SERR- <PERR- INTx-
+        Latency: 0, Cache Line Size: 64 bytes
+        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+        I/O behind bridge: 00000000-00000fff
+        Memory behind bridge: 00000000-000fffff
+        Prefetchable memory behind bridge: 00000000-000fffff
+        Secondary status: 66MHz- FastB2B- ParErr- DEVSEL=fast >TAbort-
+<TAbort- <MAbort- <SERR- <PERR-
+        BridgeCtl: Parity+ SERR- NoISA- VGA- MAbort- >Reset- FastB2B-
+                PriDiscTmr- SecDiscTmr- DiscTmrStat- DiscTmrSERREn-
+        Capabilities: [40] Power Management version 3
+                Flags: PMEClk- DSI+ D1- D2- AuxCurrent=0mA
+PME(D0-,D1-,D2-,D3hot-,D3cold-)
+                Status: D0 NoSoftRst+ PME-Enable- DSel=0 DScale=0 PME-
+        Capabilities: [48] MSI: Enable- Count=1/1 Maskable+ 64bit+
+                Address: 0000000000000000  Data: 0000
+                Masking: 00000000  Pending: 00000000
+        Capabilities: [60] Express (v2) Root Port (Slot+), MSI 00
+                DevCap: MaxPayload 256 bytes, PhantFunc 1
+                        ExtTag+ RBE+
+                DevCtl: Report errors: Correctable- Non-Fatal- Fatal-
+Unsupported-
+                        RlxdOrd+ ExtTag- PhantFunc- AuxPwr- NoSnoop+
+                        MaxPayload 128 bytes, MaxReadReq 512 bytes
+                DevSta: CorrErr- UncorrErr- FatalErr- UnsuppReq-
+AuxPwr- TransPend-
+                LnkCap: Port #0, Speed 2.5GT/s, Width x8, ASPM L0s,
+Exit Latency L0s unlimited, L1 unlimited
+                        ClockPM- Surprise- LLActRep- BwNot+
+                LnkCtl: ASPM Disabled; RCB 64 bytes Disabled- CommClk-
+                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+                LnkSta: Speed 2.5GT/s, Width x1, TrErr- Train-
+SlotClk+ DLActive- BWMgmt- ABWMgmt-
+                SltCap: AttnBtn- PwrCtrl- MRL- AttnInd- PwrInd-
+HotPlug- Surprise-
+                        Slot #0, PowerLimit 0.000W; Interlock- NoCompl-
+                SltCtl: Enable: AttnBtn- PwrFlt- MRL- PresDet-
+CmdCplt- HPIrq- LinkChg-
+                        Control: AttnInd Off, PwrInd Off, Power- Interlock-
+                SltSta: Status: AttnBtn- PowerFlt- MRL- CmdCplt-
+PresDet- Interlock-
+                        Changed: MRL- PresDet- LinkState-
+                RootCtl: ErrCorrectable- ErrNon-Fatal- ErrFatal-
+PMEIntEna- CRSVisible-
+                RootCap: CRSVisible-
+                RootSta: PME ReqID 0000, PMEStatus- PMEPending-
+                DevCap2: Completion Timeout: Not Supported,
+TimeoutDis-, LTR-, OBFF Not Supported ARIFwd-
+                DevCtl2: Completion Timeout: 50us to 50ms,
+TimeoutDis-, LTR-, OBFF Disabled ARIFwd-
+                LnkCtl2: Target Link Speed: 2.5GT/s, EnterCompliance- SpeedDis-
+                         Transmit Margin: Normal Operating Range,
+EnterModifiedCompliance- ComplianceSOS-
+                         Compliance De-emphasis: -6dB
+                LnkSta2: Current De-emphasis Level: -3.5dB,
+EqualizationComplete-, EqualizationPhase1-
+                         EqualizationPhase2-, EqualizationPhase3-,
+LinkEqualizationRequest-
+        Capabilities: [100 v1] Device Serial Number 00-00-00-00-00-00-00-00
+        Capabilities: [128 v1] Vendor Specific Information: ID=0001
+Rev=0 Len=038 <?>
+        Capabilities: [200 v1] Vendor Specific Information: ID=0002
+Rev=0 Len=038 <?>
+
+01:00.0 Class 0200: Device 14e4:1677 (rev 11)
+        Subsystem: Device 14e4:1677
+        Control: I/O- Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop-
+ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort-
+<TAbort- <MAbort- >SERR- <PERR- INTx-
+        Latency: 0, Cache Line Size: 64 bytes
+        Interrupt: pin A routed to IRQ 91
+        Region 0: Memory at 60000000 (64-bit, non-prefetchable) [size=64K]
+        Expansion ROM@60010000 [disabled] [size=64K]
+        Capabilities: [48] Power Management version 2
+                Flags: PMEClk- DSI- D1- D2- AuxCurrent=0mA
+PME(D0-,D1-,D2-,D3hot+,D3cold-)
+                Status: D0 NoSoftRst- PME-Enable- DSel=0 DScale=1 PME-
+        Capabilities: [50] Vital Product Data
+                Product Name: HPQ 10/100/1000 Copper Based Gigabit Adapter
+                Read-only fields:
+                        [PN] Part number: BCM95751A519
+                        [EC] Engineering changes: 112791-10
+                        [SN] Serial number: 0123456789
+                        [MN] Manufacture ID: 31 34 65 34
+                        [RV] Reserved: checksum good, 26 byte(s) reserved
+                Read/write fields:
+                        [YA] Asset tag: XYZ01234567
+                        [RW] Read-write area: 107 byte(s) free
+                End
+        Capabilities: [58] MSI: Enable- Count=1/8 Maskable- 64bit+
+                Address: 08b2110000004608  Data: 5e08
+        Capabilities: [d0] Express (v1) Endpoint, MSI 00
+                DevCap: MaxPayload 128 bytes, PhantFunc 0, Latency L0s
+<4us, L1 unlimited
+                        ExtTag+ AttnBtn- AttnInd- PwrInd- RBE- FLReset-
+                DevCtl: Report errors: Correctable- Non-Fatal- Fatal-
+Unsupported-
+                        RlxdOrd- ExtTag- PhantFunc- AuxPwr- NoSnoop-
+                        MaxPayload 128 bytes, MaxReadReq 512 bytes
+                DevSta: CorrErr- UncorrErr- FatalErr- UnsuppReq-
+AuxPwr+ TransPend-
+                LnkCap: Port #0, Speed 2.5GT/s, Width x1, ASPM L0s,
+Exit Latency L0s <2us, L1 <64us
+                        ClockPM- Surprise- LLActRep- BwNot-
+                LnkCtl: ASPM Disabled; RCB 64 bytes Disabled- CommClk-
+                        ExtSynch- ClockPM- AutWidDis- BWInt- AutBWInt-
+                LnkSta: Speed 2.5GT/s, Width x1, TrErr- Train-
+SlotClk+ DLActive- BWMgmt- ABWMgmt-
+        Capabilities: [100 v1] Advanced Error Reporting
+                UESta:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt-
+UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UEMsk:  DLP- SDES- TLP- FCP- CmpltTO- CmpltAbrt-
+UnxCmplt- RxOF- MalfTLP- ECRC- UnsupReq- ACSViol-
+                UESvrt: DLP+ SDES- TLP- FCP+ CmpltTO- CmpltAbrt-
+UnxCmplt- RxOF+ MalfTLP+ ECRC- UnsupReq- ACSViol-
+                CESta:  RxErr+ BadTLP- BadDLLP+ Rollover- Timeout- NonFatalErr-
+                CEMsk:  RxErr- BadTLP- BadDLLP- Rollover- Timeout- NonFatalErr-
+                AERCap: First Error Pointer: 00, GenCap+ CGenEn- ChkCap+ ChkEn-
+        Capabilities: [13c v1] Virtual Channel
+                Caps:   LPEVC=0 RefClk=100ns PATEntryBits=1
+                Arb:    Fixed- WRR32- WRR64- WRR128-
+                Ctrl:   ArbSelect=Fixed
+                Status: InProgress-
+                VC0:    Caps:   PATOffset=00 MaxTimeSlots=1 RejSnoopTrans-
+                        Arb:    Fixed- WRR32- WRR64- WRR128- TWRR128- WRR256-
+                        Ctrl:   Enable+ ID=0 ArbSelect=Fixed TC/VC=ff
+                        Status: NegoPending- InProgress-
+        Kernel driver in use: tg3
+
+>
+>> > Also, IMHO, only root ports should be supported in a host bridge
+>> > driver. A PCI end point is something entirely different.
+>>
+>> We are not supporting end point in this driver.  This is a soft IP
+>> and can be configurable as a Root Port/End point while creating a HW
+>> design in the FPGA.  So, the driver use this DT property to first
+>> check if it is configured for Root Port and bail out if it is not.
+>
+> This is something that should be handled via the compatible string, not
+> special properties. Root port and End port will have different
+> drivers, so they must have different compatible strings.
+>
+> There is nothing wrong with dumping core generator configuration
+> properties into the DT (as a form of documentation), but you must
+> still use the standard techniques and properties whenever possible.
+
+Ok, I agree and will correct them in my next version.
+
+Thanks
+Srikanth
+
+>
+> Jason
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
