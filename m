@@ -1,40 +1,36 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 21 Feb 2014 11:27:43 +0530
-Subject: I2C dummy adapter driver ?
-In-Reply-To: <5305382E.9050902@gmail.com>
-References: <5305382E.9050902@gmail.com>
-Message-ID: <CAJe_ZhcMMVRTErH3ctbnZyn30_cp9XXjEfUZXdWaVWUHqs4CRw@mail.gmail.com>
+From: fugang.duan@freescale.com (fugang.duan at freescale.com)
+Date: Fri, 21 Feb 2014 06:06:28 +0000
+Subject: [PATCH v5 1/3] ARM: dts: vf610-twr: Add ADC support
+In-Reply-To: <20140221053834.GT3010@S2101-09.ap.freescale.net>
+References: <1390714773-23066-1-git-send-email-B38611@freescale.com>
+ <1390714773-23066-2-git-send-email-B38611@freescale.com>
+ <20140216074850.GA2946@S2101-09.ap.freescale.net>
+ <20140219050716.GA3010@S2101-09.ap.freescale.net>
+ <da1f0ce0784e434d8a384aa34e271a18@BLUPR03MB373.namprd03.prod.outlook.com>
+ <20140221053834.GT3010@S2101-09.ap.freescale.net>
+Message-ID: <83f633db31fb4591a9e7b0ffddc179b0@BLUPR03MB373.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 February 2014 04:33, Sylwester Nawrocki
-<sylvester.nawrocki@gmail.com> wrote:
-> Hi All,
->
-> I was wondering whether it would be reasonable to create a generic
-> Linux dummy I2C bus controller driver. The rationale behind it is
-> there might be hardware configurations where I2C communication is
-> handled by firmware but still it is useful to have I2C slave devices
-> instantiated by a Linux I2C bus adapter driver.
-> It would be useful to have the common devicetree I2C binding scheme
-> working regardless of where the I2C communication is handled - in
-> firmware or by the host CPU.
->
-> Currently we have a somewhat dummy I2C adapter driver at drivers/media/
-> platform/exynos4-is/fimc-is-i2c.c.
->
-The driver does seem 'dummy' because it doesn't implement the
-i2c_algorithm.master_xfer()
-Perhaps your remote f/w contains the client driver for the slave chip
-and it abstracts out the controls for you over mailbox? If so, I think
-you can do even without this dummy driver.
+From: Shawn Guo <shawn.guo@linaro.org>
+Data: Friday, February 21, 2014 1:39 PM + 0800
 
-OTOH if the remote doesn't know how to drive the slave and it simply
-read/write the registers over i2c just as you ask it over mailbox,
-then we do need a 'virtual pass-through' driver that maps Linux I2C
-API onto remote's api in the i2c_algorithm.master_xfer()  Such a
-virtual driver may indeed be shared across platforms but if it works
-over some common mailbox api. (my platform will share that with yours)
+>To: Duan Fugang-B38611
+>Cc: jic23 at kernel.org; sachin.kamat at linaro.org; pmeerw at pmeerw.net;
+>lars at metafoo.de; mark.rutland at arm.com; linux-iio at vger.kernel.org; Rob Herring;
+>Grant Likely; Pawel Moll; Ian Campbell; Kumar Gala; devicetree at vger.kernel.org;
+>linux-arm-kernel at lists.infradead.org
+>Subject: Re: [PATCH v5 1/3] ARM: dts: vf610-twr: Add ADC support
+>
+>On Fri, Feb 21, 2014 at 05:17:20AM +0000, fugang.duan at freescale.com wrote:
+>> So, you apply the original patch ? Do I need to resend it again ?
+>
+>You still need to rebase it against my for-next branch to resolve my comment on
+>pinctrl setting.
+>
+>Shawn
 
-Cheers,
-Jassi
+I send the patch to you after moving pinctrl setting to board dts.
+
+Thanks,
+Andy
