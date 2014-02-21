@@ -1,77 +1,73 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 20 Feb 2014 20:41:41 -0500
-Subject: [GIT PULL] mvebu: irqchip driver for v3.15
-In-Reply-To: <20140217204450.GB7862@titan.lakedaemon.net>
-References: <20140217204450.GB7862@titan.lakedaemon.net>
-Message-ID: <20140221014141.GY7862@titan.lakedaemon.net>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Fri, 21 Feb 2014 01:47:31 +0000
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <35719313.JyFlzSVKnx@wuerfel>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <2127012.W6WnQnXmRo@wuerfel>
+ <1392906070.30563.11.camel@kazak.uk.xensource.com>
+ <35719313.JyFlzSVKnx@wuerfel>
+Message-ID: <1392947251.15717.28.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Happiness and Joy!
+On Thu, 2014-02-20 at 16:19 +0100, Arnd Bergmann wrote:
+> On Thursday 20 February 2014 14:21:10 Ian Campbell wrote:
+> > On Thu, 2014-02-20 at 14:53 +0100, Arnd Bergmann wrote:
+> > > On Thursday 20 February 2014 12:51:04 Ian Campbell wrote:
+> > > * ixp4xx is too different from the others and I don't think it's
+> > >   possible to turn it over to multiplatform.
+> > > * I see a iop32x_defconfig in svn that you didn't mention here,
+> > >   but it's basically the same problem as ixp4xx.
+> > 
+> > This is only in Wheezy and not in trunk (which will become Jessie). AIUI
+> > support for these has been dropped for the next version of Debian so
+> > Wheezy is the last one and we don't need to worry about upgrade for
+> > these.
+> 
+> Ok, I see.
+>
+> > TBH I'm not sure that ixp4xx isn't in the same boat, I suppose we'll
+> > see.
+> 
+> For all I know, the only interesting ixp4xx platforms are the consumer
+> products listed on http://www.nslu2-linux.org/, the other ones you support
+> are development boards that tend to exist only in very small quantities.
+> 
+> The main limitation would be the amount of installed RAM, which is
+> either 32MB or 64MB depending on the machine for these. Running a
+> modern Debian with these constraints is probably possible but
+> doesn't sound like fun. ;-)
 
-Thomas has taken this into his core branch for v3.15.  Also, I've
-achieved new status in the kernel community.  I've made Thomas'
-whitelist!  this should prevent problems in the future.
+Our most pressing constraint has actually been the size of the kernel
+partition in flash, which is only ~1.4 MB on some of the iop32x and
+ixp4xx machines (and ~1.5 MB on one of the orion5x machines).  We've
+modularised as much as possible and turned off some of the features that
+are otherwise standard across all Debian architectures.
 
-Please disregard the below pull request.
+But I got fed up with trying to make it fit, and no-one else stepped up
+to maintain the reduced configurations, so the last time iop32x went
+over the limit I removed it.  As Ian hinted, ixp4xx might follow.
 
-thx,
+> Also, the upstream kernel port isn't that well maintained, a lot
+> the development seems to have happened in OpenWRT and not mainlined,
+> including a dozen new machines that were already ported in 2009.
+> 
+> Then again, Martin Michlmayr has instructions for running Wheezy
+> on the 32MB nslu2, and I guess as long as he's interested in the
+> hardware, new versions of Debian will keep running on it.
+[...]
 
-Jason.
+Martin is not currently active in Debian kernel maintenance.
 
-On Mon, Feb 17, 2014 at 03:44:50PM -0500, Jason Cooper wrote:
-> Guys,
-> 
-> Yes, the below is correct.  The original pull request was sent to Thomas
-> at the beginning of December.  We emailed back a forth several times,
-> with no objection from him.  He just didn't have time to get to it.
-> I've replied to the original thread letting him know I was going to go
-> ahead and take it through mvebu/arm-soc.  Regrettably, I have to assume
-> silence is consent.  I've included him in the Cc: in case he objects.
-> 
-> We have an arrangement where I put together the mvebu patches for
-> irqchip into a branch and send them to him.  Unfortunately, we haven't
-> quite worked out what to do when this process fails.
-> 
-> Obviously, this driver has been in -next for a _long_ time :)  So there
-> shouldn't be any hiccups.  I've left it based on v3.13 since that is how
-> it's been tested.  Please let me know if that's not ok.
-> 
-> Despite the tag title, this is now intended for v3.15.
-> 
-> thx,
-> 
-> Jason.
-> 
-> The following changes since commit 6ce4eac1f600b34f2f7f58f9cd8f0503d79e42ae:
-> 
->   Linux 3.13-rc1 (2013-11-22 11:30:55 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-irqchip-3.14
-> 
-> for you to fetch changes up to 40b367d95fb3d60fc1edb9ba8f6ef52272e48936:
-> 
->   irqchip: irq-dove: Add PMU interrupt controller. (2013-11-26 15:04:53 +0000)
-> 
-> ----------------------------------------------------------------
-> mvebu irqchip changes for v3.14
-> 
->  - add Dove PMU interrupt controller
-> 
-> ----------------------------------------------------------------
-> Andrew Lunn (1):
->       irqchip: irq-dove: Add PMU interrupt controller.
-> 
->  .../interrupt-controller/marvell,dove-pmu-intc.txt |  17 +++
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-dove.c                         | 126 +++++++++++++++++++++
->  3 files changed, 144 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,dove-pmu-intc.txt
->  create mode 100644 drivers/irqchip/irq-dove.c
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Ben.
+
+-- 
+Ben Hutchings
+A free society is one where it is safe to be unpopular. - Adlai Stevenson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 811 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140221/27dba2db/attachment.sig>
