@@ -1,28 +1,53 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Fri, 21 Feb 2014 09:09:58 -0500
-Subject: [PATCH] ARM: bcm2835: Move to mach-bcm directory
-In-Reply-To: <5306DBE4.8090106@wwwdotorg.org>
-References: <1392941771-15774-1-git-send-email-markus.mayer@linaro.org>
- <5306DBE4.8090106@wwwdotorg.org>
-Message-ID: <20140221140958.GK5038@beef>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 21 Feb 2014 15:15:07 +0100
+Subject: [PATCH 0/3] leds/pwm: don't call pwm_disable when setting
+ brightness
+In-Reply-To: <1385412225-29740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1385412225-29740-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20140221141507.GB12555@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 09:53:56PM -0700, Stephen Warren wrote:
-> On 02/20/2014 05:16 PM, Markus Mayer wrote:
-> > Move the bcm2835 board file into the mach-bcm directory. This allows us
-> > to get rid of the mach-bcm2835 directory with the associated Kconfig
-> > and Makefile.
+On Mon, Nov 25, 2013 at 09:43:42PM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> This looks fine, although it needs a small patch to bcm2835_defconfig
-> squashed in, which I'll post in a second.
+> some time ago I pointed out a problem with leds-pwm on i.MX28, because
+> on this SoC it can happen that after:
 > 
-> Do you want me to take it through the bcm2835 tree? That's probably
-> easiest to avoid conflicts with any other bcm2835 patches, not that it's
-> too likely there will be any to the board file.
+> 	pwm_config(pwm, 0, period);
+> 	pwm_disable(pwm);
+> 
+> the connected LED stays on. The mail thread is available at
+> 
+> 	http://thread.gmane.org/gmane.linux.kernel/1381289
+> 
+> This series implements the outcome that didn't get any opposition, i.e.
+> the pin state is explicitly undefined after pwm_disable. The first patch
+> adds this fact to the general pwm docs, the second patch fixes the
+> leds-pwm driver accordingly. The third patch is just a trivial fix that
+> I noticed while patching the leds-pwm driver and not really related to
+> any problem.
+> 
+> Best regards
+> Uwe
+Ping. Even if patches 1 and 2 are maybe controversal, patch 3 should be
+ok.
 
-That's ok with me. Be aware that we may have minor Kconfig/Makefile
-conflicts between the bcm2835 tree and the mach-bcm tree since we just
-queued the bcm5301x support.
+Do you still have the problem addressed by the first two patches on your
+radar?
 
--Matt
+Best regards
+Uwe
+ 
+> Uwe Kleine-K?nig (3):
+>   pwm/doc: Clearify that the pin state after pwm_disable is undefined
+>   leds/pwm: Don't disable pwm when setting brightness to 0
+>   leds/pwm: fix driver description and make license match the header
+> 
+>  Documentation/pwm.txt   |  5 +++++
+>  drivers/leds/leds-pwm.c | 14 +++++++-------
+>  2 files changed, 12 insertions(+), 7 deletions(-)
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
