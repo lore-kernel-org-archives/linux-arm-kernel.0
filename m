@@ -1,230 +1,41 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 21 Feb 2014 10:18:44 +0100
-Subject: [PATCH 1/3] mfd: fsl imx25 Touchscreen ADC driver
-In-Reply-To: <CAOMZO5BDyyvXs9CxJQOkuEpxZ8fqamCPB67sNhJxES+XU2XkXQ@mail.gmail.com>
-References: <1392913312-9030-1-git-send-email-mpa@pengutronix.de>
- <1392913312-9030-2-git-send-email-mpa@pengutronix.de>
- <CAOMZO5BDyyvXs9CxJQOkuEpxZ8fqamCPB67sNhJxES+XU2XkXQ@mail.gmail.com>
-Message-ID: <20140221091844.GB24758@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 21 Feb 2014 09:21:27 +0000
+Subject: [PATCH v10 10/15] usb: phy-mxs: Add implementation of set_wakeup
+In-Reply-To: <1392873284-9386-11-git-send-email-peter.chen@freescale.com>
+References: <1392873284-9386-1-git-send-email-peter.chen@freescale.com>
+ <1392873284-9386-11-git-send-email-peter.chen@freescale.com>
+Message-ID: <20140221092127.GC7541@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-On Thu, Feb 20, 2014 at 02:17:33PM -0300, Fabio Estevam wrote:
-> Hi Markus,
+On Thu, Feb 20, 2014 at 05:14:39AM +0000, Peter Chen wrote:
+> When we need the PHY can be waken up by external signals,
+> we can call this API. Besides, we call mxs_phy_disconnect_line
+> at this API to close the connection between USB PHY and
+> controller, after that, the line state from controller is SE0.
+> Once the PHY is out of power, without calling mxs_phy_disconnect_line,
+> there are unknown wakeups due to dp/dm floating at device mode.
 > 
-> On Thu, Feb 20, 2014 at 1:21 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> > This is the core driver for imx25 touchscreen/adc driver. The module
-> > has one shared ADC and two different conversion queues which use the
-> > ADC. The two queues are identical. Both can be used for general purpose
-> > ADC but one is meant to be used for touchscreens.
-> >
-> > This driver is the core which manages the central components and
-> > registers of the TSC/ADC unit. It manages the IRQs and forwards them to
-> > the correct components.
-> >
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> 
-> That's great :-) Nice work!
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  drivers/usb/phy/phy-mxs-usb.c |  116 +++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 116 insertions(+), 0 deletions(-)
 
-Thanks :)
+[...]
 
-> > ---
-> >  .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    |  46 ++++
-> >  drivers/mfd/Kconfig                                |   9 +
-> >  drivers/mfd/Makefile                               |   2 +
-> >  drivers/mfd/fsl-imx25-tsadc.c                      | 234 +++++++++++++++++++++
-> >  include/linux/mfd/imx25-tsadc.h                    | 138 ++++++++++++
-> >  5 files changed, 429 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-> >  create mode 100644 drivers/mfd/fsl-imx25-tsadc.c
-> >  create mode 100644 include/linux/mfd/imx25-tsadc.h
-> >
-> > diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-> > new file mode 100644
-> > index 0000000..a857af0e
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-> > @@ -0,0 +1,46 @@
-> > +Freescale mx25 ADC/TSC multifunction device
-> > +
-> > +This device combines two general purpose conversion queues one used for general
-> > +ADC and the other used for touchscreens.
-> > +
-> > +Required properties:
-> > + - compatible: Should be "fsl,imx25-tsadc".
-> > + - reg: Memory range of the device.
-> > + - interrupts: Interrupt for this device as described in
-> > +   interrupts/interrupts.txt
-> > + - clocks: An 'ipg' clock defined as described in clocks/clock.txt
-> > + - interrupt-controller: This device is an interrupt controller. It controls
-> > +   the interrupts of both conversion queues.
-> > + - #interrupt-cells: Should be '<1>'.
-> > + - #address-cells: Should be '<1>'.
-> > + - #size-cells: Should be '<1>'.
-> > + - ranges
-> > +
-> > +This device includes two conversion queues which can be added as subnodes.
-> > +The first queue is for the touchscreen, the second for general purpose ADC.
-> > +
-> > +Example:
-> > +       tscadc: tscadc at 50030000 {
-> > +               compatible = "fsl,imx25-tsadc";
-> > +               reg = <0x50030000 0xc>;
-> > +               interrupts = <46>;
-> > +               clocks = <&clks 119>;
-> > +               clock-names = "ipg";
-> > +               interrupt-controller;
-> > +               #interrupt-cells = <1>;
-> > +               #address-cells = <1>;
-> > +               #size-cells = <1>;
-> > +               ranges;
-> > +
-> > +               tsc: tcq at 50030400 {
-> > +                       compatible = "fsl,imx25-tcq";
-> > +                       reg = <0x50030400 0x60>;
-> > +                       ...
-> > +               };
-> > +
-> > +               adc: gcq at 50030800 {
-> > +                       compatible = "fsl,imx25-gcq";
-> > +                       reg = <0x50030800 0x60>;
-> > +                       ...
-> > +               };
-> > +       };
-> 
-> The meaning of 'tcq' and 'gcq' acronyms are not obvious. Could they be
-> written more explicitily?
+> +static void mxs_phy_disconnect_line(struct mxs_phy *mxs_phy, bool on)
+> +{
+> +	bool vbus_is_on = false;
+> +
+> +	/* If the SoCs don't need to disconnect line without vbus, quit */
+> +	if (!(mxs_phy->data->flags & MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS))
+> +		return;
+> +
+> +	/* If the SoCs don't have anatop, quit */
+> +	if (!mxs_phy->regmap_anatop)
+> +		return;
 
-I assume you mean the node names? Perhaps something like 'adcqueue'?
-
-> 
-> Also, what does the '...' mean?
-> 
-> > +static int mx25_tsadc_domain_map(struct irq_domain *d, unsigned int irq,
-> > +                            irq_hw_number_t hwirq)
-> > +{
-> > +       struct mx25_tsadc_priv *priv = d->host_data;
-> > +
-> > +       irq_set_chip_data(irq, priv);
-> > +       irq_set_chip_and_handler(irq, &mx25_tsadc_irq_chip,
-> > +                                handle_level_irq);
-> > +
-> > +#ifdef CONFIG_ARM
-> > +       set_irq_flags(irq, IRQF_VALID);
-> > +#else
-> > +       irq_set_noprobe(irq);
-> > +#endif
-> 
-> Do we really need these ifdef's? Can't we just assume that CONFIG_ARM
-> is always selected for this driver?
-
-Yes right, this is not necessary here.
-
-> 
-> > +static int mx25_tsadc_probe(struct platform_device *pdev)
-> > +{
-> > +       struct device *dev = &pdev->dev;
-> > +       struct device_node *np = dev->of_node;
-> > +       struct mx25_tsadc_priv *priv;
-> > +       struct resource *iores;
-> > +       int ret;
-> > +       void __iomem *iomem;
-> > +
-> > +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> > +       if (!priv)
-> > +               return -ENOMEM;
-> > +
-> > +       iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +       iomem = devm_ioremap_resource(dev, iores);
-> > +       if (IS_ERR(iomem)) {
-> > +               dev_err(dev, "Failed to remap iomem\n");
-> > +               return PTR_ERR(iomem);
-> > +       }
-> > +
-> > +       priv->regs = regmap_init_mmio(dev, iomem, &mx25_tsadc);
-> > +       if (IS_ERR(priv->regs)) {
-> > +               dev_err(dev, "Failed to initialize regmap\n");
-> > +               return PTR_ERR(priv->regs);
-> > +       }
-> > +
-> > +       priv->clk = devm_clk_get(dev, "ipg");
-> > +       if (IS_ERR(priv->clk)) {
-> > +               dev_err(dev, "Failed to get ipg clock\n");
-> > +               return PTR_ERR(priv->clk);
-> > +       }
-> > +
-> > +       /* Enable clock and reset the component */
-> > +       regmap_update_bits(priv->regs, MX25_TSC_TGCR, MX25_TGCR_CLK_EN,
-> > +                       MX25_TGCR_CLK_EN);
-> > +       regmap_update_bits(priv->regs, MX25_TSC_TGCR, MX25_TGCR_TSC_RST,
-> > +                       MX25_TGCR_TSC_RST);
-> > +
-> > +       /* Setup powersaving mode, but enable internal reference voltage */
-> > +       regmap_update_bits(priv->regs, MX25_TSC_TGCR, MX25_TGCR_POWERMODE_MASK,
-> > +                       MX25_TGCR_POWERMODE_SAVE);
-> > +       regmap_update_bits(priv->regs, MX25_TSC_TGCR, MX25_TGCR_INTREFEN,
-> > +                       MX25_TGCR_INTREFEN);
-> > +
-> > +       ret = mx25_tsadc_setup_irq(pdev, priv);
-> > +       if (ret) {
-> > +               dev_err(dev, "Failed to setup irqs\n");
-> > +               return ret;
-> > +       }
-> > +
-> > +       platform_set_drvdata(pdev, priv);
-> > +
-> > +       of_platform_populate(np, NULL, NULL, dev);
-> > +
-> > +       dev_info(dev, "i.MX25/25 Touchscreen and ADC core driver loaded\n");
-> 
-> You could remove the double '25/25'.
-
-Yes, fixed.
-
-> 
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static const struct of_device_id mx25_tsadc_ids[] = {
-> > +       { .compatible = "fsl,imx25-tsadc", },
-> > +       { /* Sentinel */ }
-> > +};
-> > +
-> > +static struct platform_driver mx25_tsadc_driver = {
-> > +       .driver         = {
-> > +               .name   = "mx25-tsadc",
-> > +               .owner  = THIS_MODULE,
-> > +               .of_match_table = mx25_tsadc_ids,
-> > +       },
-> > +       .probe          = mx25_tsadc_probe,
-> > +};
-> > +module_platform_driver(mx25_tsadc_driver);
-> > +
-> > +MODULE_DESCRIPTION("MFD for ADC/TSC for Freescale mx25");
-> > +MODULE_AUTHOR("Markus Pargmann <mpa@pengutronix.de>");
-> > +MODULE_LICENSE("GPL v2");
-> 
-> MODULE_ALIAS() as well?
-
-I am not sure if this is necessary, but I added
-MODULE_ALIAS("platform:mx25-tsadc")
+So it looks like fsl,anatop is truly optional.
 
 Thanks,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140221/1033be41/attachment.sig>
+Mark.
