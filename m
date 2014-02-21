@@ -1,51 +1,51 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Feb 2014 09:13:46 +0000
-Subject: [PATCH v10 01/15] usb: doc: phy-mxs: Add more compatible strings
-In-Reply-To: <1392873284-9386-2-git-send-email-peter.chen@freescale.com>
+Date: Fri, 21 Feb 2014 09:14:44 +0000
+Subject: [PATCH v10 04/15] usb: doc: phy-mxs: update binding for adding
+ anatop phandle
+In-Reply-To: <1392873284-9386-5-git-send-email-peter.chen@freescale.com>
 References: <1392873284-9386-1-git-send-email-peter.chen@freescale.com>
- <1392873284-9386-2-git-send-email-peter.chen@freescale.com>
-Message-ID: <20140221091345.GA7541@e106331-lin.cambridge.arm.com>
+ <1392873284-9386-5-git-send-email-peter.chen@freescale.com>
+Message-ID: <20140221091444.GB7541@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 05:14:30AM +0000, Peter Chen wrote:
-> Add "fsl,imx6q-usbphy" for imx6dq and imx6dl, add
-> "fsl,imx6sl-usbphy" for imx6sl.
+On Thu, Feb 20, 2014 at 05:14:33AM +0000, Peter Chen wrote:
+> Add anatop phandle which is used to access anatop registers to
+> control PHY's power and other USB operations.
 > 
 > Signed-off-by: Peter Chen <peter.chen@freescale.com>
 > ---
->  Documentation/devicetree/bindings/usb/mxs-phy.txt |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
+>  Documentation/devicetree/bindings/usb/mxs-phy.txt |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
 > diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> index 5835b27..b43d4c9e 100644
+> index b43d4c9e..fc6659d 100644
 > --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
 > +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
-> @@ -1,7 +1,8 @@
->  * Freescale MXS USB Phy Device
->  
->  Required properties:
-> -- compatible: Should be "fsl,imx23-usbphy"
-> +- compatible: "fsl,imx23-usbphy" for imx23 and imx28, "fsl,imx6q-usbphy"
-> +  for imx6dq and imx6dl, "fsl,imx6sl-usbphy" for imx6sl
+> @@ -5,10 +5,12 @@ Required properties:
+>    for imx6dq and imx6dl, "fsl,imx6sl-usbphy" for imx6sl
+>  - reg: Should contain registers location and length
+>  - interrupts: Should contain phy interrupt
+> +- fsl,anatop: phandle for anatop register, it is only for imx6 SoC series
 
-Minor nit, but could we restructure this as something like the
-following, with each string on a new line:
+This is now required?
 
-- compatible: should contain:
-    * "fsl,imx23-usbphy" for imx23 and imx28
-    * "fsl,imx6q-usbphy" for imx6dq and imx6dl
-    * "fsl,imx6sl-usbphy" for imx6sl
-
-It makes it a bit easier to read.
-
-I see the existing "fsl,imx23-usbphy" is used as a fallback for
-"fsl,imx28-usbphy", "fsl,imx6q-usbphy", and "fsl,imx6sl-usbphy" in
-existing DTs.
-
-Is this expected going forward? It might be worth mentioning.
-
-Otherwise this looks fine to me.
+What happens to those existing DTBs that claim compatibility with
+"fsl,imx6q-usbphy" but don't have an fsl,anatop property?
 
 Thanks,
 Mark.
+
+>  
+>  Example:
+>  usbphy1: usbphy at 020c9000 {
+>  	compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+>  	reg = <0x020c9000 0x1000>;
+>  	interrupts = <0 44 0x04>;
+> +	fsl,anatop = <&anatop>;
+>  };
+> -- 
+> 1.7.8
+> 
+> 
+> 
