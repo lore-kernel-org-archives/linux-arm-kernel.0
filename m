@@ -1,62 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Feb 2014 11:42:50 -0500
-Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
-In-Reply-To: <1563594.ZI2UdY7FPy@wuerfel>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <20140220232438.GT7862@titan.lakedaemon.net>
- <20140221165252.6eb12cbd@skate> <1563594.ZI2UdY7FPy@wuerfel>
-Message-ID: <20140221164250.GF7862@titan.lakedaemon.net>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 21 Feb 2014 17:44:01 +0100
+Subject: [PATCH v3 1/2] phy: Select PHY_EXYNOS_MIPI_VIDEO by default for
+ ARCH_EXYNOS
+Message-ID: <1393001042-5951-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 05:36:47PM +0100, Arnd Bergmann wrote:
-> On Friday 21 February 2014 16:52:52 Thomas Petazzoni wrote:
-> > On Thu, 20 Feb 2014 18:24:38 -0500, Jason Cooper wrote:
-> > 
-> > > > We keep any system using -setup.c files, and remove the ability to
-> > > > boot systems with a DT description. Thus mach-kirkwood becomes legacy,
-> > > > and you should now be trying to only use mach-mvebu, compiled for v5
-> > > > systems and a second compile for v7 systems.
-> > > > 
-> > > > There are four systems left in mach-kirkwood which don't have DT
-> > > > equivalent. These are LaCie 2Big and 5Big, HP t5325 thin client and
-> > > > Marvell OpenRD machines. I'm working on t5325 and Openrd. The sticking
-> > > > point is audio support, which no other board has done with DT yet.
-> > > > The two LeCie boards have a custom LED driver which needs a DT
-> > > > binding. My gut feeling is that we won't get these four converted to
-> > > > DT in time for 3.15.
-> > > 
-> > > Why not do like we did when we started the kirkwood dt conversion?
-> > > Create dts files for the remaining boards, and do
-> > > 
-> > > if (of_machine_is_compatible(...))
-> > >       legacy_audio_init()
-> > > 
-> > > in board-v5.c?
-> > > 
-> > > I suspect audio is going to take time to sort out.  I'd hate to delay
-> > > this just for that.
-> > 
-> > Yes, I believe it's a good plan. Convert as much as possible to DT, and
-> > only keep those few devices (audio and leds) probe in an old-style
-> > fashion.
-> > 
-> > This way, we can progressively add the necessary missing DT bindings.
-> 
-> Makes sense.
-> 
-> I'm also adding Simon Guinot to Cc here. He contributed both the kernel
-> support and the Debian support for the LaCie 2Big/5Big. He might also be
-> able to verify that they work after the DT conversion, or even help
-> implementing it. Since there is already someone who is looking into
-> t5325, that would just leave the OpenRD reference design, right?
+Instead of requiring user to figure out when PHY_EXYNOS_MIPI_VIDEO needs
+to be selected select it by default for Exynos SoCs. Also enable it when
+COMPILE_TEST is selected. If required the MIPI CSIS/DPHY driver can be
+then disabled or compiled in as module.
 
-Yes.  Although we are running short on time.  I'd prefer not to rush
-Dashie, as he's brand new to the community.  Also, Andrew has a Makefile
-solution he's working on to keep life manageable for debian for v3.15.
-We can take it out after the boards are converted with the above
-solution.  It might even be fixes-non-critical for v3.16.
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+Changes since v2:
+ - s/default y/default y if ARCH_S5PV210 || ARCH_EXYNOS
 
-thx,
+Changes since first version:
+ - use ARCH_EXYNOS instead of "ARCH_EXYNOS4 || ARCH_EXYNOS5"
+ - add dependency on COMPILE_TEST, and ARCH_S5PV210 for
+   PHY_EXYNOS_MIPI_VIDEO
+---
+ drivers/phy/Kconfig |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Jason.
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index afa2354..d71be95 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -16,8 +16,11 @@ config GENERIC_PHY
+ 	  framework should select this config.
+ 
+ config PHY_EXYNOS_MIPI_VIDEO
+-	depends on HAS_IOMEM
+ 	tristate "S5P/EXYNOS SoC series MIPI CSI-2/DSI PHY driver"
++	depends on HAS_IOMEM
++	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
++	select GENERIC_PHY
++	default y if ARCH_S5PV210 || ARCH_EXYNOS
+ 	help
+ 	  Support for MIPI CSI-2 and MIPI DSI DPHY found on Samsung S5P
+ 	  and EXYNOS SoCs.
+-- 
+1.7.9.5
