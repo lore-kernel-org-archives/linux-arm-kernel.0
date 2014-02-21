@@ -1,69 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Feb 2014 15:12:25 +0900
-Subject: [PATCH 13/16] ARM: shmobile: Genmai: set proper DMA masks for Ether
- device
+Date: Fri, 21 Feb 2014 15:12:27 +0900
+Subject: [PATCH 15/16] ARM: shmobile: Remove Koelsch DT reference legacy clock
+ bits
 In-Reply-To: <cover.1392960310.git.horms+renesas@verge.net.au>
 References: <cover.1392960310.git.horms+renesas@verge.net.au>
-Message-ID: <583e2448629cc9fb3b1a0c850ddbe06819421d3e.1392960310.git.horms+renesas@verge.net.au>
+Message-ID: <34b6a241de1d965b1c047a97fad602687218a866.1392960310.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Magnus Damm <damm@opensource.se>
 
-Ether MAC is a DMA-capable device and so should have 'dev.dma_mask' and
-'dev.coherent_dma_mask' fields set properly, to reflect 32-bit DMA addressing
-ability.
+Koelsch DT reference is these days built for multiplatform
+only which means that CCF comes with the package. Remove
+unused legacy code ifdefs to clean up the code.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-genmai.c | 19 ++++++++++++++-----
- 1 file changed, 14 insertions(+), 5 deletions(-)
+ arch/arm/mach-shmobile/board-koelsch-reference.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-genmai.c b/arch/arm/mach-shmobile/board-genmai.c
-index e240980..6c328d6 100644
---- a/arch/arm/mach-shmobile/board-genmai.c
-+++ b/arch/arm/mach-shmobile/board-genmai.c
-@@ -1,8 +1,9 @@
- /*
-  * Genmai board support
-  *
-- * Copyright (C) 2013  Renesas Solutions Corp.
-+ * Copyright (C) 2013-2014  Renesas Solutions Corp.
-  * Copyright (C) 2013  Magnus Damm
-+ * Copyright (C) 2014  Cogent Embedded, Inc.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -43,6 +44,17 @@ static const struct resource ether_resources[] __initconst = {
- 	DEFINE_RES_IRQ(gic_iid(359)),
- };
+diff --git a/arch/arm/mach-shmobile/board-koelsch-reference.c b/arch/arm/mach-shmobile/board-koelsch-reference.c
+index 267fe83..a3fd302 100644
+--- a/arch/arm/mach-shmobile/board-koelsch-reference.c
++++ b/arch/arm/mach-shmobile/board-koelsch-reference.c
+@@ -84,7 +84,6 @@ static void __init koelsch_add_du_device(void)
  
-+static const struct platform_device_info ether_info __initconst = {
-+	.parent		= &platform_bus,
-+	.name		= "r7s72100-ether",
-+	.id		= -1,
-+	.res		= ether_resources,
-+	.num_res	= ARRAY_SIZE(ether_resources),
-+	.data		= &ether_pdata,
-+	.size_data	= sizeof(ether_pdata),
-+	.dma_mask	= DMA_BIT_MASK(32),
-+};
+ static void __init koelsch_add_standard_devices(void)
+ {
+-#ifdef CONFIG_COMMON_CLK
+ 	/*
+ 	 * This is a really crude hack to provide clkdev support to the CMT and
+ 	 * DU devices until they get moved to DT.
+@@ -125,9 +124,7 @@ static void __init koelsch_add_standard_devices(void)
+ 			clk_put(clk);
+ 		}
+ 	}
+-#else
+-	r8a7791_clock_init();
+-#endif
 +
- /* RSPI */
- #define RSPI_RESOURCE(idx, baseaddr, irq)				\
- static const struct resource rspi##idx##_resources[] __initconst = {	\
-@@ -82,10 +94,7 @@ static void __init genmai_add_standard_devices(void)
- 	r7s72100_clock_init();
- 	r7s72100_add_dt_devices();
+ 	r8a7791_add_dt_devices();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
  
--	platform_device_register_resndata(&platform_bus, "r7s72100-ether", -1,
--					  ether_resources,
--					  ARRAY_SIZE(ether_resources),
--					  &ether_pdata, sizeof(ether_pdata));
-+	platform_device_register_full(&ether_info);
- 
- 	r7s72100_register_rspi(0);
- 	r7s72100_register_rspi(1);
 -- 
 1.8.5.2
