@@ -1,43 +1,48 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 20 Feb 2014 17:32:27 -0700
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <20140220212914.29ddc031@skate>
-References: <53039894.10905@keymile.com> <20140218212751.07c2aeb5@skate>
- <53046D98.6020801@keymile.com> <20140219102658.76eec91e@skate>
- <53047BBB.6040108@keymile.com> <20140219143749.65ff3155@skate>
- <CAErSpo4=6VgJazaErcx=ztKhZ_62xBrQ6K1eN_dVpvV4R0T2ag@mail.gmail.com>
- <20140220095518.7ca36f0a@skate>
- <20140220173518.GA19893@obsidianresearch.com>
- <20140220212914.29ddc031@skate>
-Message-ID: <20140221003227.GF19893@obsidianresearch.com>
+Date: Thu, 20 Feb 2014 17:36:19 -0700
+Subject: [PATCH v3 2/3] ARM: bios32: use pci_enable_resource to enable
+ PCI resources
+In-Reply-To: <CAErSpo4KEGh7GAfEv-prj-UdJETCN9M5sEtdNF0NARa6-03HYA@mail.gmail.com>
+References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
+ <1392726043-31088-3-git-send-email-will.deacon@arm.com>
+ <20140218154139.GF21483@n2100.arm.linux.org.uk>
+ <20140220111238.GD3615@mudshark.cambridge.arm.com>
+ <CAErSpo4KEGh7GAfEv-prj-UdJETCN9M5sEtdNF0NARa6-03HYA@mail.gmail.com>
+Message-ID: <20140221003619.GG19893@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 09:29:14PM +0100, Thomas Petazzoni wrote:
+On Thu, Feb 20, 2014 at 12:39:16PM -0700, Bjorn Helgaas wrote:
+> > Damn, I just found a problem with this patch when PCI_PROBE_ONLY is set.
+> >
+> > The problem is that bios32.c won't create a resource hierarchy for the
+> > firmware-initialised resources, so we have a bunch of orphaned resources
+> > that we can't pass to pci_enable_resources (since it checks r->parent).
+> >
+> > This means that, unless firmware *enables* all of the resources, Linux won't
+> > be able to enable them. I think this is stronger than simply not
+> > re-assigning devices like the PCI_PROBE_ONLY flag intends.
+> 
+> By "firmware enabling resources," do you mean firmware assigning
+> addresses in the BARs and turning on the PCI_COMMAND_MEMORY (or _IO)
+> bits?
+> 
+> I'd like to make the generic code ignore BAR values if
+> PCI_COMMAND_MEMORY (or _IO) is cleared.  When those bits are cleared,
+> I don't think there's a good way to determine whether the address in a
+> BAR is valid.
 
-> In practice, the story is a little bit more subtle than that: the PCIe
-> driver may want to decide to either tell the PCI core to enlarge the
-> window BAR up to the next power of two size, or to dedicate two windows
-> to it.
+I think this is pretty smart, PROBE_ONLY really should mean
+'everything is perfect, do not touch it' and if the device isn't
+enabled, well.. It isn't enabled, the firmware should have done it.
 
-That is a smart, easy solution! Maybe that is the least invasive way
-to proceed for now?
+Will, this if for kvmtool right? Keeping the patch as is and instead
+changing kvmtool to enable the devices seems like a good option?
 
-I have no idea how you decide when to round up and when to allocate
-more windows, that feels like a fairly complex optimization problem!
+Alternatively, there are OF ways to communicate the BAR assignment
+through the DT. I actually have no idea how this information is used
+by the core code, but it might let you avoid the probe_only by
+specifying the desired BAR value through the DT.
 
-Alternatively, I suspect you can use the PCI quirk mechanism to alter
-the resource sizing on a bridge?
-
-> Jason, would you mind maybe replying to Bjorn Helgaas email (Thu, 20
-> Feb 2014 12:18:42 -0700) ? I believe that a lot of the misunderstanding
-> between Bjorn and me is due to the fact that I don't use the correct
-> PCI terminology to describe how the Marvell hardware works, and how the
-> Marvell PCIe driver copes with it. I'm sure you would explain it in a
-> way that would be more easily understood by someone very familiar with
-> the PCI terminology such as Bjorn. Thanks a lot!
-
-Done!
-
-Hope it helps,
+Regards,
 Jason
