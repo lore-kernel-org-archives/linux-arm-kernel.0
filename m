@@ -1,110 +1,74 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Feb 2014 14:25:15 +0000
-Subject: [PATCH v2 1/4] arm64: add abstractions for FPSIMD state
- manipulation
-In-Reply-To: <1391620418-3999-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1391620418-3999-1-git-send-email-ard.biesheuvel@linaro.org>
- <1391620418-3999-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20140221142515.GC25351@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 21 Feb 2014 14:39:51 +0000
+Subject: [PATCH] arm/arm64: KVM: detect CPU reset on CPU_PM_EXIT
+In-Reply-To: <53073696.5080005@arm.com>
+References: <1392910014-15495-1-git-send-email-marc.zyngier@arm.com>
+ <20140220233543.1836e2d5@slackpad> <53073696.5080005@arm.com>
+Message-ID: <20140221143951.GA6315@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 05, 2014 at 05:13:35PM +0000, Ard Biesheuvel wrote:
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 4aef42a04bdc..eeb003f54ad0 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -34,6 +34,10 @@
->  #define FPEXC_IXF	(1 << 4)
->  #define FPEXC_IDF	(1 << 7)
->  
-> +/* defined in entry-fpsimd.S but only used in this unit */
-> +void fpsimd_save_state(struct fpsimd_state *state);
-> +void fpsimd_load_state(struct fpsimd_state *state);
+On Fri, Feb 21, 2014 at 11:20:54AM +0000, Marc Zyngier wrote:
+> On 20/02/14 22:35, Andre Przywara wrote:
+> > On Thu, 20 Feb 2014 15:26:54 +0000
+> > Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > 
+> >> Commit 1fcf7ce0c602 (arm: kvm: implement CPU PM notifier) added
+> >> support for CPU power-management, using a cpu_nofigier to re-init
+> >> KVM on a CPU that entered CPU idle.
+> >>
+> >> The code assumed that a CPU entering idle would actually be powered
+> >> off, loosing its state entierely, and would then need to be
+> >> reinitialized. It turns out that this is not always the case, and
+> >> some HW performs CPU PM without actually killing the core. In this
+> >> case, we try to reinitialize KVM while it still live. It ends up
+> >> badly, as reported by Andre Przywara (using a Calxeda Midway):
+> >>
+> >> [    3.663897] Kernel panic - not syncing: unexpected prefetch abort
+> >> in Hyp mode at: 0x685760 [    3.663897] unexpected data abort in Hyp
+> >> mode at: 0xc067d150 [    3.663897] unexpected HVC/SVC trap in Hyp
+> >> mode at: 0xc0901dd0
+> >>
+> >> The trick here is to detect if we've been through a full re-init or
+> >> not by looking at HVBAR (VBAR_EL2 on arm64). This involves
+> >> implementing the backend for __hyp_get_vectors in the main KVM HYP
+> >> code (rather small), and checking the return value against the
+> >> default one when the CPU notifier is called on CPU_PM_EXIT.
+> >>
+> >> Reported-by: Andre Przywara <osp@andrep.de>
+> >> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> Cc: Rob Herring <rob.herring@linaro.org>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > 
+> > Tested-by: Andre Przywara <osp@andrep.de>
+> 
+> Thanks!
+> 
+> > (there seems to be a typo in the second line of the commit message)
+> 
+> Ah, good katsh! ;-)
+> 
+> > Marc,
+> > 
+> > thanks a lot for this quick and perfectly working patch! I still
+> > believe it is actually the firmware that needs to be fixed, but this is
+> > rather unlikely in this special case ...
+> 
+> Well, that is completely debatable. This is a valid (if minimal)
+> implementation of cpu idle, and the KVM code *must* be robust enough to
+> deal with that kind of implementation.
 
-This functions still make sense for some situations where
-fpsimd_get_task_state() is confusing.
+I definitely agree with Marc, and thanks for the fix.
 
-> +
->  /*
->   * Trapped FP/ASIMD access.
->   */
-> @@ -87,6 +91,33 @@ void fpsimd_flush_thread(void)
->  	preempt_enable();
->  }
->  
-> +/*
-> + * Sync the saved FPSIMD context with the FPSIMD register file
-> + */
-> +struct fpsimd_state *fpsimd_get_task_state(void)
-> +{
-> +	fpsimd_save_state(&current->thread.fpsimd_state);
-> +	return &current->thread.fpsimd_state;
-> +}
-> +
-> +/*
-> + * Load a new FPSIMD state into the FPSIMD register file.
-> + */
-> +void fpsimd_set_task_state(struct fpsimd_state *state)
-> +{
-> +	fpsimd_load_state(state);
-> +}
+I have to say though, off-topic, that having a C-state that just calls
+PSCI to do wfi is not ideal (since it is called from cpu_suspend, which
+expects the CPU to lose context), since CPU enters that state by saving
+context and flushing L1 just to execute wfi. Power down can fail in
+general, and that's why this patch makes perfect sense, the question is
+why should we leave a C-state in the Calxeda idle driver that just cripples
+performance and burns more power instead of saving it.
 
-Maybe s/task/current/. But in general I see a "get" function as not
-having side-effects while here it populates the fpsimd_state. I don't
-think the code gets clearer.
+At least for testing and doing KVM development you should disable the
+PSCI based C-state.
 
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 1c0a9be2ffa8..bfa8214f92d1 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -199,7 +199,7 @@ void release_thread(struct task_struct *dead_task)
->  
->  int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
->  {
-> -	fpsimd_save_state(&current->thread.fpsimd_state);
-> +	fpsimd_get_task_state();
-
-That's where get vs save looks strange to me.
-
-> @@ -746,24 +745,29 @@ static int compat_vfp_set(struct task_struct *target,
->  			  unsigned int pos, unsigned int count,
->  			  const void *kbuf, const void __user *ubuf)
->  {
-> -	struct user_fpsimd_state *uregs;
-> +	struct user_fpsimd_state newstate;
->  	compat_ulong_t fpscr;
->  	int ret;
->  
->  	if (pos + count > VFP_STATE_SIZE)
->  		return -EIO;
->  
-> -	uregs = &target->thread.fpsimd_state.user_fpsimd;
-> +	/*
-> +	 * We will not overwrite the entire FPSIMD state, so we need to
-> +	 * initialize 'newstate' with sane values.
-> +	 */
-> +	newstate = *fpsimd_get_user_state(target);
->  
-> -	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, uregs, 0,
-> +	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &newstate, 0,
->  				 VFP_STATE_SIZE - sizeof(compat_ulong_t));
->  
->  	if (count && !ret) {
->  		ret = get_user(fpscr, (compat_ulong_t *)ubuf);
-> -		uregs->fpsr = fpscr & VFP_FPSCR_STAT_MASK;
-> -		uregs->fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
-> +		newstate.fpsr = fpscr & VFP_FPSCR_STAT_MASK;
-> +		newstate.fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
->  	}
->  
-> +	fpsimd_set_user_state(target, &newstate);
->  	return ret;
->  }
-
-What's the reason for this change? The patch is aimed at adding
-abstractions but it does some more. Now you save half KB on the stack as
-user_fpsimd_state. What if at some point we grow this structure?
-
--- 
-Catalin
+Lorenzo
