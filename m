@@ -1,43 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Feb 2014 14:47:06 -0800
-Subject: [GIT PULL] integrator base patches for v3.15
-In-Reply-To: <CACRpkdYeaMqTNUTqBSg6vNa9=VucjpFFkx3diHJJNgZTg+iq1w@mail.gmail.com>
-References: <CACRpkdYeaMqTNUTqBSg6vNa9=VucjpFFkx3diHJJNgZTg+iq1w@mail.gmail.com>
-Message-ID: <20140221224706.GC13233@quad.lixom.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 21 Feb 2014 15:03:01 -0800
+Subject: [GIT PULL] ARM: OMAP2+: clock/PRCM/hwmod fixes for v3.14-rc
+In-Reply-To: <53061D61.6000105@ti.com>
+References: <alpine.DEB.2.02.1402192120200.8777@utopia.booyaka.com>
+ <53052219.9060109@ti.com>
+ <alpine.DEB.2.02.1402200257060.25798@utopia.booyaka.com>
+ <53061D61.6000105@ti.com>
+Message-ID: <20140221230300.GA5342@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 13, 2014 at 01:35:38PM +0100, Linus Walleij wrote:
-> Hi ARM SoC folks,
-> 
-> this is a set of patches I have sent for review and failed to get
-> ACKs from the proper subsystem maintainers after repeated
-> pings. However I now need to have this rotated in linux-next
-> as a base for multiplatform, so please pull it in, it is all ARM
-> drivers anyway. Russell pointed out some things and these
-> have been fixed and iterated in this series.
-> 
-> Yours,
-> Linus Walleij
-> 
-> The following changes since commit b28a960c42fcd9cfc987441fa6d1c1a471f0f9ed:
-> 
->   Linux 3.14-rc2 (2014-02-09 18:15:47 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/integrator-for-v3.15-1
-> 
-> for you to fetch changes up to 29525484cd2524a31ee0924831ab43b46ea6ebe1:
-> 
->   ARM: integrator: select GPIO block (2014-02-13 11:21:37 +0100)
+* Nishanth Menon <nm@ti.com> [140220 07:24]:
+> On 02/19/2014 08:58 PM, Paul Walmsley wrote:
+> > On Wed, 19 Feb 2014, Nishanth Menon wrote:
+> > 
+> >> Paul,
+> >> On 02/19/2014 03:22 PM, Paul Walmsley wrote:
+> >> [...]
+> >>>
+> >>> - ----------------------------------------------------------------
+> >>> Illia Smyrnov (1):
+> >>>       ARM: OMAP4: hwmod: Fix SOFTRESET logic for OMAP4
+> >>>
+> >>> Suman Anna (1):
+> >>>       ARM: DRA7: hwmod data: correct the sysc data for spinlock
+> >>>
+> >>> Tomi Valkeinen (1):
+> >>>       ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
+> >>>
+> >>> Vaibhav Bedia (1):
+> >>>       ARM: OMAP5: PRM: Fix reboot handling
+> >>>
+> >>
+> >> https://patchwork.kernel.org/patch/3585321/ missing?
+> > 
+> > If that fixes a bug, then that should be documented in the commit 
+> > description.
+> > 
+> > Otherwise it's 3.15 material.
+> Fair enough, this'd be something that might be called an optimization,
+> thanks for queueing it.
 
-These patches are a little all over the place -- some is new dt bindings, some
-are driver cleanups, etc. I ended up merging it into next/drivers since that's
-what the bulk of the changes were in this time.
+Thanks pulling this into omap-for-v3.14/fixes.
 
-So, pulled. Thanks.
-
-
--Olof
+Tony
