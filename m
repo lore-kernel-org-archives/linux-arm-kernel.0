@@ -1,53 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Feb 2014 12:38:31 +0000
-Subject: [PATCH v10 01/15] usb: doc: phy-mxs: Add more compatible strings
-In-Reply-To: <5e4d795b507a4ea7b9faa69dd05148c4@BL2PR03MB226.namprd03.prod.outlook.com>
-References: <1392873284-9386-1-git-send-email-peter.chen@freescale.com>
- <1392873284-9386-2-git-send-email-peter.chen@freescale.com>
- <20140221091345.GA7541@e106331-lin.cambridge.arm.com>
- <5e4d795b507a4ea7b9faa69dd05148c4@BL2PR03MB226.namprd03.prod.outlook.com>
-Message-ID: <20140221123831.GG8783@e106331-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Feb 2014 14:07:40 +0100
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <1392947251.15717.28.camel@deadeye.wl.decadent.org.uk>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <35719313.JyFlzSVKnx@wuerfel>
+ <1392947251.15717.28.camel@deadeye.wl.decadent.org.uk>
+Message-ID: <1725547.sbei6Aef3A@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 09:40:29AM +0000, Peter Chen wrote:
->  
-> > >
-> > >  Required properties:
-> > > -- compatible: Should be "fsl,imx23-usbphy"
-> > > +- compatible: "fsl,imx23-usbphy" for imx23 and imx28, "fsl,imx6q-
-> > usbphy"
-> > > +  for imx6dq and imx6dl, "fsl,imx6sl-usbphy" for imx6sl
+On Friday 21 February 2014 01:47:31 Ben Hutchings wrote:
+> On Thu, 2014-02-20 at 16:19 +0100, Arnd Bergmann wrote:
+> > On Thursday 20 February 2014 14:21:10 Ian Campbell wrote:
+>
+> > For all I know, the only interesting ixp4xx platforms are the consumer
+> > products listed on http://www.nslu2-linux.org/, the other ones you support
+> > are development boards that tend to exist only in very small quantities.
 > > 
-> > Minor nit, but could we restructure this as something like the following,
-> > with each string on a new line:
-> > 
-> > - compatible: should contain:
-> >     * "fsl,imx23-usbphy" for imx23 and imx28
-> >     * "fsl,imx6q-usbphy" for imx6dq and imx6dl
-> >     * "fsl,imx6sl-usbphy" for imx6sl
-> > 
-> > It makes it a bit easier to read.
+> > The main limitation would be the amount of installed RAM, which is
+> > either 32MB or 64MB depending on the machine for these. Running a
+> > modern Debian with these constraints is probably possible but
+> > doesn't sound like fun. 
 > 
-> Thanks, will change like above.
-> 
-> > 
-> > I see the existing "fsl,imx23-usbphy" is used as a fallback for
-> > "fsl,imx28-usbphy", "fsl,imx6q-usbphy", and "fsl,imx6sl-usbphy" in
-> > existing DTs.
-> > 
-> > Is this expected going forward? It might be worth mentioning.
-> > 
-> 
-> These SoCs used the same FSL imx PHY, but different versions.
-> imx23/imx28 are the first version, more improvements are at
-> later SoCs (like imx6x) version. Keep "fsl,imx23-usbphy" at
-> imx6 dts will be user know it is from imx23's. If you think
-> it does not need, I can delete "fsl,imx23-usbphy" from imx6 dts.
+> Our most pressing constraint has actually been the size of the kernel
+> partition in flash, which is only ~1.4 MB on some of the iop32x and
+> ixp4xx machines (and ~1.5 MB on one of the orion5x machines).  We've
+> modularised as much as possible and turned off some of the features that
+> are otherwise standard across all Debian architectures.
 
-I'm not arguing to remove it, I'm suggesting it might be worth
-mentioning that it's not mutually exclusive, and can be a fallback for
-the other strings.
+Makes sense. I'm impressed you actually manage to get a modern kernel
+in 1.5MB and have it boot up a (mostly) full distro. I think we have
+in the past dropped a subarchitecture from the kernel when it turned
+out its defconfig could no longer fit within the 2MB of flash it
+has.
 
-Cheers,
-Mark.
+> But I got fed up with trying to make it fit, and no-one else stepped up
+> to maintain the reduced configurations, so the last time iop32x went
+> over the limit I removed it.  As Ian hinted, ixp4xx might follow.
+
+Ok. As I mentioned, I believe OpenWRT is really the playground for
+the remaining ixp4xx users that are doing new installs.
+
+	Arnd
