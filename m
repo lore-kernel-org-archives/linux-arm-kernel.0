@@ -1,66 +1,77 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Thu, 20 Feb 2014 16:38:08 -0800
-Subject: [PATCH v3 0/2] Qualcomm Universal Peripheral (QUP) I2C controller
-Message-ID: <1392943090-30556-1-git-send-email-bjorn.andersson@sonymobile.com>
+Date: Thu, 20 Feb 2014 16:38:09 -0800
+Subject: [PATCH v3 1/2] i2c: qup: Add device tree bindings information
+In-Reply-To: <1392943090-30556-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1392943090-30556-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1392943090-30556-2-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This third revision of the QUP I2C driver series comes with quite a bit of
-cleanup and corrections. Most notably is the removal of the "magic" delay loops
-and bug fixes related to larger than 32 byte reads and writes.
+From: "Ivan T. Ivanov" <iivanov@mm-sol.com>
 
-Special thanks to Andy Gross for helping answering questions regarding the
-inner working of this block.
+The Qualcomm Universal Peripherial (QUP) wraps I2C mini-core and
+provide input and output FIFO's for it. I2C controller can operate
+as master with supported bus speeds of 100Kbps and 400Kbps.
 
-Regards,
-Bjorn
-
-Changes from v3:
- - Simplified interrupt handler
- - Corrected the state transition poll timeout
- - Refactored state transition code
- - Refactored the polling functions waiting for transfers to finish
- - Made the write fifo fill function care if there's space
- - Corrected programmed length on writes
- - Made block read and block write work
- - Removed data duplicates from qup_i2c_dev
- - Changed timeout to HZ, to give room for clock stretching
- - Properly reject reads over 256 bytes, as limited by HW
- - Dropped reinitialization of completions
- - Made sure to not re-initiate reads for every block read
- - Added QUP version number to compatible
-
-Changes from v2:
- - Removed unused variables and includes
- - Corrected read logic in irq handler
- - Made the polling loop in qup_i2c_poll_state() less arbitrary
- - Only building suspend/resume if CONFIG_PM_SLEEP
-
-Changes from v1:
- - Cleaned up device tree binding example.
- - Refrased device tree bindings.
- - Following changes in the i2c framework.
- - Use the core clock to calculate divider for the bus clock, instead of
-   explicitly setting it.
- - Remove explicit pinctrl settting.
- - Split/renamed qup_i2c_enable(bool) into enable/disable functions.
- - Return value was overwritten on error in write_one/read_one.
- - Initialize the i2c core every time, so that we actually can execute
-   more than 1 transmission per xfer.
-
-Bjorn Andersson (1):
-  i2c: New bus driver for the Qualcomm QUP I2C controller
-
-Ivan T. Ivanov (1):
-  i2c: qup: Add device tree bindings information
-
- .../devicetree/bindings/i2c/qcom,i2c-qup.txt       |   44 ++
- drivers/i2c/busses/Kconfig                         |   10 +
- drivers/i2c/busses/Makefile                        |    1 +
- drivers/i2c/busses/i2c-qup.c                       |  772 ++++++++++++++++++++
- 4 files changed, 827 insertions(+)
+Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+[bjorn: reformulated part of binding description
+        added version to compatible
+        cleaned up example]
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
+ .../devicetree/bindings/i2c/qcom,i2c-qup.txt       |   44 ++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
- create mode 100644 drivers/i2c/busses/i2c-qup.c
 
+diff --git a/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt b/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
+new file mode 100644
+index 0000000..38d505f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/qcom,i2c-qup.txt
+@@ -0,0 +1,44 @@
++Qualcomm Universal Peripheral (QUP) I2C controller
++
++Required properties:
++ - compatible: Should be
++		"qcom,i2c-qup-v1.1.1" for 8660, 8960 and 8064.
++		"qcom,i2c-qup-v2.1.1" for 8974 v1.
++		"qcom,i2c-qup-v2.2.1" for 8974 v2 and later.
++ - reg: Should contain QUP register address and length.
++ - interrupts: Should contain I2C interrupt.
++
++ - clocks: Should contain the core clock and the AHB clock.
++ - clock-names: Should be "core" for the core clock and "iface" for the
++                AHB clock.
++
++ - #address-cells: Should be <1> Address cells for i2c device address
++ - #size-cells: Should be <0> as i2c addresses have no size component
++
++Optional properties:
++ - clock-frequency: Should specify the desired i2c bus clock frequency in Hz,
++                    defaults to 100kHz if omitted.
++
++Child nodes should conform to i2c bus binding.
++
++Example:
++
++ i2c at f9924000 {
++ 	compatible = "qcom,i2c-qup-v2.2.1";
++ 	reg = <0xf9924000 0x1000>;
++ 	interrupts = <0 96 0>;
++
++ 	clocks = <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
++ 	clock-names = "core", "iface";
++
++ 	clock-frequency = <355000>;
++
++ 	#address-cells = <1>;
++ 	#size-cells = <0>;
++
++ 	dummy at 60 {
++ 		compatible = "dummy";
++ 		reg = <0x60>;
++ 	};
++ };
++
 -- 
 1.7.9.5
