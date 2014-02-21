@@ -1,51 +1,53 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Feb 2014 14:29:47 -0800
-Subject: [GIT PULL] bcm pinctrl rename
-In-Reply-To: <CAEPRUYpCVpV7HwuO6c95ybk3yp1teJgW-9qwyHnjKbs03C9bgQ@mail.gmail.com>
-References: <CAEPRUYpCVpV7HwuO6c95ybk3yp1teJgW-9qwyHnjKbs03C9bgQ@mail.gmail.com>
-Message-ID: <20140221222947.GB13233@quad.lixom.net>
+Date: Fri, 21 Feb 2014 14:25:44 -0800
+Subject: [GIT PULL 00/12] Second Round of Renesas ARM Based SoC Updates
+ for v3.15
+In-Reply-To: <20140220094324.GR19089@quad.lixom.net>
+References: <cover.1392277789.git.horms+renesas@verge.net.au>
+ <20140220094324.GR19089@quad.lixom.net>
+Message-ID: <20140221222544.GA13233@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 09:20:13AM -0800, Christian Daudt wrote:
-> The following changes since commit b28a960c42fcd9cfc987441fa6d1c1a471f0f9ed:
+On Thu, Feb 20, 2014 at 01:43:24AM -0800, Olof Johansson wrote:
+> On Thu, Feb 13, 2014 at 05:04:56PM +0900, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > please consider this second round of Renesas ARM Based SoC updates for v3.15.
+> > 
+> > This pull-request is based on the first round of such changes,
+> > tagged as renesas-soc-for-v3.15, which I have previously sent a
+> > pull-request for.
+> > 
+> > 
+> > The following changes since commit 012a7069b5a10a0851584d71a1facdc40a972319:
+> > 
+> >   ARM: shmobile: r8a7790: Add PCI USB host clock support (2014-02-04 10:25:03 +0900)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.15
 > 
->   Linux 3.14-rc2 (2014-02-09 18:15:47 -0800)
+> Hi,
 > 
-> are available in the git repository at:
-> 
->   git://github.com/broadcom/bcm11351.git tags/bcm-for-3.14-pinctrl-rename
-> 
-> for you to fetch changes up to f5310a1712b68c7f83539fce6ebbfb6f0f510f5b:
-> 
->   Update dtsi with new pinctrl compatible string (2014-02-12 09:06:53 -0800)
-> 
-> ----------------------------------------------------------------
-> Renaming pinctrl code to keep in line with rest of bcm mobile
-> 
-> Given that this driver has been in the works for a while, it
-> was written prior to the code standardizing on bcm-based naming.
-> this patchset brings it in line with the remainder of the code.
-> 
-> ----------------------------------------------------------------
-> Sherman Yin (4):
->       pinctrl: Rename Broadcom Capri pinctrl binding
->       pinctrl: Rename Broadcom Capri pinctrl driver
->       Update bcm_defconfig with new pinctrl CONFIG
->       Update dtsi with new pinctrl compatible string
+> I'm stopping my merges for the night here, so I haven't merged this but I'll
+> likely do it tomorrow. I did have comments on one of the patches though (that
+> adds a new include/mach file that's not really needed). Fixing that can be done
+> incrementally though, especially if you have downstream users of this branch.
 
-Hi,
+Simon,
 
-(As per irc discussion). The rename isn't the right thing to do at this
-time in the release, but the binding needs to be tweaked before it ships
-in a full release, or we'll always need to live with it.
+I think it'd fit our workflow better if you kept all the clock changes in
+a topic branch this release, instead of mingling them with the SoC code.
+There is enough of them that it's not just a silly short branch, and there's
+little overlap with the rest of the soc code changes you have (i.e. it makes
+more sense for us to merge in with a drivers branch instead of keeping it all
+with soc).
 
-So, I'll be happy to take the bindings piece and the dtsi piece (and the
-small edit to the driver to change the compatible string match table),
-but the file rename and Kconfig entry edit is 3.15 material.
-
-Please send new pull request with just that (or, if you prefer, just send the
-patches and we can apply them too).
+Would you mind respinning and sorting that out to a separate topic? Since
+I've already merged the first soc branch (but treated it like a clock
+branch), feel free to keep that as a base for the new clock branch
+(but not for the new soc branch, ideally).
 
 
 -Olof
