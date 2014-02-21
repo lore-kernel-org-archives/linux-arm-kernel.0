@@ -1,98 +1,217 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Feb 2014 15:12:16 +0900
-Subject: [PATCH 04/16] ARM: shmobile: lager: Add internal USB PCI support
+Date: Fri, 21 Feb 2014 15:12:13 +0900
+Subject: [PATCH 01/16] ARM: shmobile: Add SDHI devices for legacy Koelsch
 In-Reply-To: <cover.1392960310.git.horms+renesas@verge.net.au>
 References: <cover.1392960310.git.horms+renesas@verge.net.au>
-Message-ID: <849f7b6c10d8016b55e13b7ad2e9f299e2da817b.1392960310.git.horms+renesas@verge.net.au>
+Message-ID: <d12e699f44b8277b7b72b546c69948a2f20514f8.1392960310.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Valentine Barshak <valentine.barshak@cogentembedded.com>
+From: Magnus Damm <damm@opensource.se>
 
-This adds internal PCI USB host devices to R-Car H2 Lager board.
+Add SDHI0, SDHI1 and SDHI2 as platform devices to the
+legacy Koelsch board code. Also include regulators that
+are needed to control VCCQ and VDD.
 
-Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
-[damm at opensource.se: Rebased and reworked to only include USB1 and USB2]
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager.c | 50 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+ arch/arm/mach-shmobile/board-koelsch.c | 155 +++++++++++++++++++++++++++++++++
+ 1 file changed, 155 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 72886af..193dff0 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -638,6 +638,48 @@ static struct resource sdhi2_resources[] __initdata = {
- 	DEFINE_RES_IRQ(gic_spi(167)),
+diff --git a/arch/arm/mach-shmobile/board-koelsch.c b/arch/arm/mach-shmobile/board-koelsch.c
+index d42637d..893d47c 100644
+--- a/arch/arm/mach-shmobile/board-koelsch.c
++++ b/arch/arm/mach-shmobile/board-koelsch.c
+@@ -26,6 +26,9 @@
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/leds.h>
++#include <linux/mfd/tmio.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/phy.h>
+@@ -33,6 +36,10 @@
+ #include <linux/platform_data/gpio-rcar.h>
+ #include <linux/platform_data/rcar-du.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/driver.h>
++#include <linux/regulator/fixed.h>
++#include <linux/regulator/gpio-regulator.h>
++#include <linux/regulator/machine.h>
+ #include <linux/sh_eth.h>
+ #include <linux/spi/flash.h>
+ #include <linux/spi/rspi.h>
+@@ -251,6 +258,103 @@ static void __init koelsch_add_i2c(unsigned idx)
+ 					i2c_resources + res_idx, 2);
+ }
+ 
++#define SDHI_REGULATOR(idx, vdd_pin, vccq_pin)				\
++static struct regulator_consumer_supply vcc_sdhi##idx##_consumer =	\
++	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi." #idx);		\
++									\
++static struct regulator_init_data vcc_sdhi##idx##_init_data = {		\
++	.constraints = {						\
++		.valid_ops_mask = REGULATOR_CHANGE_STATUS,		\
++	},								\
++	.consumer_supplies	= &vcc_sdhi##idx##_consumer,		\
++	.num_consumer_supplies	= 1,					\
++};									\
++									\
++static const struct fixed_voltage_config vcc_sdhi##idx##_info __initconst = {\
++	.supply_name	= "SDHI" #idx "Vcc",				\
++	.microvolts	= 3300000,					\
++	.gpio		= vdd_pin,					\
++	.enable_high	= 1,						\
++	.init_data	= &vcc_sdhi##idx##_init_data,			\
++};									\
++									\
++static struct regulator_consumer_supply vccq_sdhi##idx##_consumer =	\
++	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi." #idx);		\
++									\
++static struct regulator_init_data vccq_sdhi##idx##_init_data = {	\
++	.constraints = {						\
++		.input_uV	= 3300000,				\
++		.min_uV		= 1800000,				\
++		.max_uV		= 3300000,				\
++		.valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |		\
++				  REGULATOR_CHANGE_STATUS,		\
++	},								\
++	.consumer_supplies	= &vccq_sdhi##idx##_consumer,		\
++	.num_consumer_supplies	= 1,					\
++};									\
++									\
++static struct gpio vccq_sdhi##idx##_gpio =				\
++	{ vccq_pin, GPIOF_OUT_INIT_HIGH, "vccq-sdhi" #idx };		\
++									\
++static struct gpio_regulator_state vccq_sdhi##idx##_states[] = {	\
++	{ .value = 1800000, .gpios = 0 },				\
++	{ .value = 3300000, .gpios = 1 },				\
++};									\
++									\
++static const struct gpio_regulator_config vccq_sdhi##idx##_info __initconst = {\
++	.supply_name	= "vqmmc",					\
++	.gpios		= &vccq_sdhi##idx##_gpio,			\
++	.nr_gpios	= 1,						\
++	.states		= vccq_sdhi##idx##_states,			\
++	.nr_states	= ARRAY_SIZE(vccq_sdhi##idx##_states),		\
++	.type		= REGULATOR_VOLTAGE,				\
++	.init_data	= &vccq_sdhi##idx##_init_data,			\
++};
++
++SDHI_REGULATOR(0, RCAR_GP_PIN(7, 17), RCAR_GP_PIN(2, 12));
++SDHI_REGULATOR(1, RCAR_GP_PIN(7, 18), RCAR_GP_PIN(2, 13));
++SDHI_REGULATOR(2, RCAR_GP_PIN(7, 19), RCAR_GP_PIN(2, 26));
++
++/* SDHI0 */
++static struct sh_mobile_sdhi_info sdhi0_info __initdata = {
++	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
++			  MMC_CAP_POWER_OFF_CARD,
++	.tmio_caps2	= MMC_CAP2_NO_MULTI_READ,
++	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
++};
++
++static struct resource sdhi0_resources[] __initdata = {
++	DEFINE_RES_MEM(0xee100000, 0x200),
++	DEFINE_RES_IRQ(gic_spi(165)),
++};
++
++/* SDHI1 */
++static struct sh_mobile_sdhi_info sdhi1_info __initdata = {
++	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
++			  MMC_CAP_POWER_OFF_CARD,
++	.tmio_caps2	= MMC_CAP2_NO_MULTI_READ,
++	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
++};
++
++static struct resource sdhi1_resources[] __initdata = {
++	DEFINE_RES_MEM(0xee140000, 0x100),
++	DEFINE_RES_IRQ(gic_spi(167)),
++};
++
++/* SDHI2 */
++static struct sh_mobile_sdhi_info sdhi2_info __initdata = {
++	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
++			  MMC_CAP_POWER_OFF_CARD,
++	.tmio_caps2	= MMC_CAP2_NO_MULTI_READ,
++	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT |
++			  TMIO_MMC_WRPROTECT_DISABLE,
++};
++
++static struct resource sdhi2_resources[] __initdata = {
++	DEFINE_RES_MEM(0xee160000, 0x100),
++	DEFINE_RES_IRQ(gic_spi(168)),
++};
++
+ static const struct pinctrl_map koelsch_pinctrl_map[] = {
+ 	/* DU */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7791", "pfc-r8a7791",
+@@ -288,6 +392,31 @@ static const struct pinctrl_map koelsch_pinctrl_map[] = {
+ 	/* I2C4 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar_gen2.4", "pfc-r8a7791",
+ 				  "i2c4_c", "i2c4"),
++	/* SDHI0 */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7791",
++				  "sdhi0_data4", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7791",
++				  "sdhi0_ctrl", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7791",
++				  "sdhi0_cd", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7791",
++				  "sdhi0_wp", "sdhi0"),
++	/* SDHI2 */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7791",
++				  "sdhi1_data4", "sdhi1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7791",
++				  "sdhi1_ctrl", "sdhi1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7791",
++				  "sdhi1_cd", "sdhi1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-r8a7791",
++				  "sdhi1_wp", "sdhi1"),
++	/* SDHI2 */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-r8a7791",
++				  "sdhi2_data4", "sdhi2"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-r8a7791",
++				  "sdhi2_ctrl", "sdhi2"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-r8a7791",
++				  "sdhi2_cd", "sdhi2"),
  };
  
-+/* Internal PCI1 */
-+static const struct resource pci1_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xee0b0000, 0x10000),	/* CFG */
-+	DEFINE_RES_MEM(0xee0a0000, 0x10000),	/* MEM */
-+	DEFINE_RES_IRQ(gic_spi(112)),
-+};
+ static void __init koelsch_add_standard_devices(void)
+@@ -321,6 +450,32 @@ static void __init koelsch_add_standard_devices(void)
+ 	koelsch_add_i2c(2);
+ 	koelsch_add_i2c(4);
+ 	koelsch_add_i2c(5);
 +
-+static const struct platform_device_info pci1_info __initconst = {
-+	.parent		= &platform_bus,
-+	.name		= "pci-rcar-gen2",
-+	.id		= 1,
-+	.res		= pci1_resources,
-+	.num_res	= ARRAY_SIZE(pci1_resources),
-+	.dma_mask	= DMA_BIT_MASK(32),
-+};
++	platform_device_register_data(&platform_bus, "reg-fixed-voltage", 0,
++				      &vcc_sdhi0_info, sizeof(struct fixed_voltage_config));
++	platform_device_register_data(&platform_bus, "reg-fixed-voltage", 1,
++				      &vcc_sdhi1_info, sizeof(struct fixed_voltage_config));
++	platform_device_register_data(&platform_bus, "reg-fixed-voltage", 2,
++				      &vcc_sdhi2_info, sizeof(struct fixed_voltage_config));
++	platform_device_register_data(&platform_bus, "gpio-regulator", 0,
++				      &vccq_sdhi0_info, sizeof(struct gpio_regulator_config));
++	platform_device_register_data(&platform_bus, "gpio-regulator", 1,
++				      &vccq_sdhi1_info, sizeof(struct gpio_regulator_config));
++	platform_device_register_data(&platform_bus, "gpio-regulator", 2,
++				      &vccq_sdhi2_info, sizeof(struct gpio_regulator_config));
 +
-+static void __init lager_add_usb1_device(void)
-+{
-+	platform_device_register_full(&pci1_info);
-+}
++	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 0,
++					  sdhi0_resources, ARRAY_SIZE(sdhi0_resources),
++					  &sdhi0_info, sizeof(struct sh_mobile_sdhi_info));
 +
-+/* Internal PCI2 */
-+static const struct resource pci2_resources[] __initconst = {
-+	DEFINE_RES_MEM(0xee0d0000, 0x10000),	/* CFG */
-+	DEFINE_RES_MEM(0xee0c0000, 0x10000),	/* MEM */
-+	DEFINE_RES_IRQ(gic_spi(113)),
-+};
++	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 1,
++					  sdhi1_resources, ARRAY_SIZE(sdhi1_resources),
++					  &sdhi1_info, sizeof(struct sh_mobile_sdhi_info));
 +
-+static const struct platform_device_info pci2_info __initconst = {
-+	.parent		= &platform_bus,
-+	.name		= "pci-rcar-gen2",
-+	.id		= 2,
-+	.res		= pci2_resources,
-+	.num_res	= ARRAY_SIZE(pci2_resources),
-+	.dma_mask	= DMA_BIT_MASK(32),
-+};
++	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 2,
++					  sdhi2_resources, ARRAY_SIZE(sdhi2_resources),
++					  &sdhi2_info, sizeof(struct sh_mobile_sdhi_info));
 +
-+static void __init lager_add_usb2_device(void)
-+{
-+	platform_device_register_full(&pci2_info);
-+}
-+
- static const struct pinctrl_map lager_pinctrl_map[] = {
- 	/* DU (CN10: ARGB0, CN13: LVDS) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
-@@ -716,6 +758,12 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
- 	/* USB0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs", "pfc-r8a7790",
- 				  "usb0_ovc_vbus", "usb0"),
-+	/* USB1 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("pci-rcar-gen2.1", "pfc-r8a7790",
-+				  "usb1", "usb1"),
-+	/* USB2 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("pci-rcar-gen2.2", "pfc-r8a7790",
-+				  "usb2", "usb2"),
- };
+ }
  
- static void __init lager_add_standard_devices(void)
-@@ -776,6 +824,8 @@ static void __init lager_add_standard_devices(void)
- 					  &usbhs_phy_pdata,
- 					  sizeof(usbhs_phy_pdata));
- 	lager_register_usbhs();
-+	lager_add_usb1_device();
-+	lager_add_usb2_device();
- 
- 	lager_add_rsnd_device();
- 
+ /*
 -- 
 1.8.5.2
