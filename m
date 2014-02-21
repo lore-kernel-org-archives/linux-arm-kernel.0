@@ -1,76 +1,97 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Feb 2014 19:45:02 +0100
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <53079871.8080801@keymile.com>
-References: <53039894.10905@keymile.com> <20140218212751.07c2aeb5@skate>
- <53046D98.6020801@keymile.com> <20140219102658.76eec91e@skate>
- <53047BBB.6040108@keymile.com> <20140219143749.65ff3155@skate>
- <CAErSpo4=6VgJazaErcx=ztKhZ_62xBrQ6K1eN_dVpvV4R0T2ag@mail.gmail.com>
- <20140220095518.7ca36f0a@skate>
- <20140220173518.GA19893@obsidianresearch.com>
- <20140220212914.29ddc031@skate>
- <20140221003227.GF19893@obsidianresearch.com>
- <20140221093444.35870a73@skate> <5307152D.3020804@keymile.com>
- <20140221101218.45766e8a@skate> <53071970.1040400@keymile.com>
- <20140221103936.56b3d9f8@skate> <53074584.5010202@keymile.com>
- <20140221144708.48559045@skate> <53079871.8080801@keymile.com>
-Message-ID: <20140221194502.42d3742d@skate>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Fri, 21 Feb 2014 10:39:56 -0800
+Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
+In-Reply-To: <20140220162754.GC15994@e102568-lin.cambridge.arm.com>
+References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
+ <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
+ <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
+ <20140219193315.3732.21819@capellas-linux>
+ <20140220162754.GC15994@e102568-lin.cambridge.arm.com>
+Message-ID: <20140221183956.29890.80931@capellas-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gerlando Falauto,
-
-On Fri, 21 Feb 2014 19:18:25 +0100, Gerlando Falauto wrote:
-
-> > Hum, right. This is a bit weird, maybe I should change that, I don't
-> > think the mvebu-mbus driver should accept 1-byte offset sizes.
+Quoting Lorenzo Pieralisi (2014-02-20 08:27:55)
+> Hi Sebastian,
 > 
-> I don't know anything about this, I only know the size dumped is of the 
-> form 0x...ffff, that's all.
+> On Wed, Feb 19, 2014 at 07:33:15PM +0000, Sebastian Capella wrote:
+> > Quoting Lorenzo Pieralisi (2014-02-19 08:12:54)
+> > > On Wed, Feb 19, 2014 at 01:52:09AM +0000, Sebastian Capella wrote:
+> > > > +static void notrace __swsusp_arch_restore_image(void *unused)
+> > > > +{
+> > > > +     struct pbe *pbe;
+> > > > +
+> > > > +     cpu_switch_mm(idmap_pgd, &init_mm);
+> > 
+> > At restore time, we take the save buffer data and restore it to the same
+> > physical locations used in the previous execution.  This will require having
+> > write access to all of memory, which may not be generally granted by the
+> > current mm.  So we switch to 1-1 init_mm to restore memory.
 
-I'll have to look into this.
+I can try removing it and seeing if there are side effects.
 
-> >> # cat /sys/kernel/debug/mvebu-mbus/devices
-> >> [00] 00000000e8000000 - 00000000ec000000 : pcie0.0 (remap 00000000e8000000)
-> >> [01] disabled
-> >> [02] disabled
-> >> [03] disabled
-> >> [04] 00000000ff000000 - 00000000ff010000 : nand
-> >> [05] 00000000f4000000 - 00000000f8000000 : vpcie
-> >> [06] 00000000fe000000 - 00000000fe010000 : dragonite
-> >> [07] 00000000e0000000 - 00000000e8000000 : pcie0.0
-> >
-> > This seems correct: we have two windows pointing to the same device,
-> > and they have consecutive addresses.
 > 
-> I don't know how to interpret the (remap ... ) bit, but yes, this looks 
-> right to me as well. I just don't know why mbus window 7 gets picked 
-> before 0, but apart from that, it looks nice.
+> I still do not understand why switching to idmap, which is a clone of
+> init_mm + 1:1 kernel mappings is required here. Why idmap ?
+> And while at it, can't the idmap be overwritten _while_ copying back the
+> resume kernel ? Is it safe to use idmap page tables while copying ?
 
-Basically, some windows have an additional capability: they are
-"remappable". On Kirkwood, the first 4 windows are remappable, and the
-last 4 are not. Therefore, unless you request a remappable window, we
-allocate a non-remappable one, which is why window 4 to 7 get used
-first. And then, even though we don't need the remappable feature for
-the last window, there are no more non-remappable windows available, so
-window 0 gets allocated for our second PCIe window.
+Thanks for finding this!  I'm concerned about this now.  I still
+haven't seen where this is handled.  I think we do need to switch
+to a page table in safe memory, or at least make sure we're not going to
+overwrite the page tables we're using.  I'll focus on this today
 
-It matches fine with the expected behavior of the mvebu-mbus driver.
+> I had a look at x86 and there idmap page tables used to resume are created
+> on the fly using safe pages, on ARM idmap is created at boot.
 
-> > Did you check that what you read from BAR0 (which is mapped on the new
-> > MBUS window) is really what you expect, and not just the same thing as
-> > BAR1 accessible for the big window? I just want to make sure that the
-> > hardware indeed properly handles two windows for the same device.
-> 
-> Yes, there's no way the two BARs could be aliased. It's a fairly complex 
-> FPGA design, where BAR1 is the huge address space for a PCI-to-localbus 
-> bridge (whose connected devices are recognized correctly) and BAR0 is 
-> the control BAR (and its registers are read and written without a problem).
+After looking more at the arm code here's what I see:
+- swsusp_read, will restore all hibernation pages to the same physical
+  pages occupied pre-hibernation if the physical page is free. (get_buffer)
+  - Since the page is free, nothing is dependent on it, it's writable
+    and available, so we directly save to it, and it's ready for our
+    restore.
+  - if the original page is not free, we save the page to a different
+    physical page that was not part of the physical page set
+    pre-hibernation(safe_pages).  These pages are added to the
+    restore_pblist along with the original intended physical address
+    of the page.
+- highmem is handled separately (pages that were not free are swapped
+  and the memory map updated) (restore_himem)  Not sure if this affects
+  anything, but I thought I'd mention it JIC.
+- once we've read all of the hibernation image off of flash, we have a
+  bunch of pages that are in the wrong place, linked at restore_pblist.
+  We enter the restore image finisher, where everything is frozen,
+  irq/fiq disabled and we're ready to suspend, and now we have to copy
+  the pages in the wrong places back to their original physical pages.
 
-Great, so it means that it really works!
+In this state I believe:
+  - our stack is safe because it's in nosave.
+  - userspace is frozen, those pages are 'don't care', as we're
+    discarding its state.
+  - our instructions and globals are ok, because they're in the
+    same place as last boot and are not getting restored.  None are in
+    modules.
+     - Globals: restore_pblist, idmap_pgd, init_mm, swapper_pg_dir
+  - restore_pblist chain is allocated from "safe pages"
+  - idmap_pgd table is allocated from freepages without worring about
+    safe pages -- this is where there may be concern.  Also, not sure
+    about 2nd or 3rd level pages if needed.  I'll look into this more.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+static void notrace __swsusp_arch_restore_image(void *unused)
+{
+        struct pbe *pbe;    
+
+        cpu_switch_mm(idmap_pgd, &init_mm);
+        for (pbe = restore_pblist; pbe; pbe = pbe->next)
+                copy_page(pbe->orig_address, pbe->address);
+        
+        soft_restart_noirq(virt_to_phys(cpu_resume));
+}
+
+As far as I see, where we are in swsusp_arch_init, the remaining risk
+area is this page table.  Everything else looks ok?  Do you see any
+more gaps?
+
+Thanks Lorenzo!!
+
+Sebastian
