@@ -1,20 +1,32 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 20 Feb 2014 21:53:56 -0700
-Subject: [PATCH] ARM: bcm2835: Move to mach-bcm directory
-In-Reply-To: <1392941771-15774-1-git-send-email-markus.mayer@linaro.org>
-References: <1392941771-15774-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <5306DBE4.8090106@wwwdotorg.org>
+Date: Thu, 20 Feb 2014 21:56:33 -0700
+Subject: [PATCH] ARM: bcm2835: fix defconfig to select ARCH_BCM
+Message-ID: <1392958593-11910-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2014 05:16 PM, Markus Mayer wrote:
-> Move the bcm2835 board file into the mach-bcm directory. This allows us
-> to get rid of the mach-bcm2835 directory with the associated Kconfig
-> and Makefile.
+Without this, ARCH_BCM2835 is no longer available, and hence the kernel
+won't boot!
 
-This looks fine, although it needs a small patch to bcm2835_defconfig
-squashed in, which I'll post in a second.
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+I'd expect this to be squashed into "ARM: bcm2835: Move to mach-bcm
+directory".
 
-Do you want me to take it through the bcm2835 tree? That's probably
-easiest to avoid conflicts with any other bcm2835 patches, not that it's
-too likely there will be any to the board file.
+ arch/arm/configs/bcm2835_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index 04dda1e..a442269 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -31,6 +31,7 @@ CONFIG_OPROFILE=y
+ CONFIG_JUMP_LABEL=y
+ CONFIG_ARCH_MULTI_V6=y
+ # CONFIG_ARCH_MULTI_V7 is not set
++CONFIG_ARCH_BCM=y
+ CONFIG_ARCH_BCM2835=y
+ CONFIG_PREEMPT_VOLUNTARY=y
+ CONFIG_AEABI=y
+-- 
+1.8.3.2
