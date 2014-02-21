@@ -1,43 +1,43 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 21 Feb 2014 09:12:16 -0800
-Subject: [PATCH v2] arm/arm64: KVM: detect CPU reset on CPU_PM_EXIT
-In-Reply-To: <1392983216-368-1-git-send-email-marc.zyngier@arm.com>
-References: <1392983216-368-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20140221171216.GA22447@cbox>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 21 Feb 2014 17:16:27 +0000
+Subject: [PATCH 0/5] iommu/arm-smmu: updates for 3.15
+Message-ID: <1393002992-24561-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 11:46:56AM +0000, Marc Zyngier wrote:
-> Commit 1fcf7ce0c602 (arm: kvm: implement CPU PM notifier) added
-> support for CPU power-management, using a cpu_notifier to re-init
-> KVM on a CPU that entered CPU idle.
-> 
-> The code assumed that a CPU entering idle would actually be powered
-> off, loosing its state entierely, and would then need to be
-> reinitialized. It turns out that this is not always the case, and
-> some HW performs CPU PM without actually killing the core. In this
-> case, we try to reinitialize KVM while it is still live. It ends up
-> badly, as reported by Andre Przywara (using a Calxeda Midway):
-> 
-> [    3.663897] Kernel panic - not syncing: unexpected prefetch abort in Hyp mode at: 0x685760
-> [    3.663897] unexpected data abort in Hyp mode at: 0xc067d150
-> [    3.663897] unexpected HVC/SVC trap in Hyp mode at: 0xc0901dd0
-> 
-> The trick here is to detect if we've been through a full re-init or
-> not by looking at HVBAR (VBAR_EL2 on arm64). This involves
-> implementing the backend for __hyp_get_vectors in the main KVM HYP
-> code (rather small), and checking the return value against the
-> default one when the CPU notifier is called on CPU_PM_EXIT.
-> 
-> Reported-by: Andre Przywara <osp@andrep.de>
-> Tested-by: Andre Przywara <osp@andrep.de>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Rob Herring <rob.herring@linaro.org>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Hello,
 
-Thanks!
+These are the arm-smmu updates I have queued for 3.15 and plan to send to
+Joerg sometime next week.
 
-Looks good.
+The main parts are for accessing the buggy Calxeda SMMU, which is wired
+as secure despite being non-secure. Unfortunately, the apparent demise
+of Calxeda means that Andreas is no longer working on this, so I had to
+extract what I could from a larger patchset (which wasn't yet ready for
+merging).
 
--Christoffer
+On my side, there's some cosmetic changes after Joerg fixed some locks
+to use spin_lock_irq{save,restore} and also an optimisation to restrict
+the scope of our barrier when publishing page tables (now that ARM64 can
+accept the option).
+
+Feedback welcome,
+
+Will
+
+
+Andreas Herrmann (3):
+  iommu/arm-smmu: set MAX_MASTER_STREAMIDS to MAX_PHANDLE_ARGS
+  iommu/arm-smmu: support buggy implementations with secure cfg accesses
+  documentation/iommu: update description of ARM System MMU binding
+
+Will Deacon (2):
+  iommu/arm-smmu: clean up use of `flags' in page table handling code
+  iommu/arm-smmu: provide option to dsb macro when publishing tables
+
+ .../devicetree/bindings/iommu/arm,smmu.txt         |   6 ++
+ drivers/iommu/arm-smmu.c                           | 100 ++++++++++++++-------
+ 2 files changed, 75 insertions(+), 31 deletions(-)
+
+-- 
+1.8.2.2
