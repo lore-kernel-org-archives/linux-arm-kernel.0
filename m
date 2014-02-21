@@ -1,97 +1,165 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Fri, 21 Feb 2014 10:39:56 -0800
-Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140220162754.GC15994@e102568-lin.cambridge.arm.com>
-References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
- <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
- <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
- <20140219193315.3732.21819@capellas-linux>
- <20140220162754.GC15994@e102568-lin.cambridge.arm.com>
-Message-ID: <20140221183956.29890.80931@capellas-linux>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 21 Feb 2014 19:54:15 +0100
+Subject: [PATCH v7 5/8] ARM: dts: sun7i: Add support for mmc
+In-Reply-To: <530377EE.8010909@redhat.com>
+References: <20140217095907.15040.81893.stgit@pagira.o2s.ch>
+ <20140217100241.15040.24836.stgit@pagira.o2s.ch>
+ <20140218142221.GJ3142@lukather> <530377EE.8010909@redhat.com>
+Message-ID: <20140221185415.GD3931@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lorenzo Pieralisi (2014-02-20 08:27:55)
-> Hi Sebastian,
+On Tue, Feb 18, 2014 at 04:10:38PM +0100, Hans de Goede wrote:
+> Hi,
 > 
-> On Wed, Feb 19, 2014 at 07:33:15PM +0000, Sebastian Capella wrote:
-> > Quoting Lorenzo Pieralisi (2014-02-19 08:12:54)
-> > > On Wed, Feb 19, 2014 at 01:52:09AM +0000, Sebastian Capella wrote:
-> > > > +static void notrace __swsusp_arch_restore_image(void *unused)
-> > > > +{
-> > > > +     struct pbe *pbe;
-> > > > +
-> > > > +     cpu_switch_mm(idmap_pgd, &init_mm);
-> > 
-> > At restore time, we take the save buffer data and restore it to the same
-> > physical locations used in the previous execution.  This will require having
-> > write access to all of memory, which may not be generally granted by the
-> > current mm.  So we switch to 1-1 init_mm to restore memory.
-
-I can try removing it and seeing if there are side effects.
-
+> On 02/18/2014 03:22 PM, Maxime Ripard wrote:
+> >On Mon, Feb 17, 2014 at 11:02:41AM +0100, David Lanzend?rfer wrote:
+> >>Signed-off-by: David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >>  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts     |    8 +++
+> >>  arch/arm/boot/dts/sun7i-a20-cubietruck.dts      |    8 +++
+> >>  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts |   23 +++++++++
+> >>  arch/arm/boot/dts/sun7i-a20.dtsi                |   61 +++++++++++++++++++++++
+> >>  4 files changed, 100 insertions(+)
+> >>
+> >
+> >I'd prefer to have three patches here:
+> >    - One that add the controllers
+> >    - One that add the pin muxing options
+> >    - One that enable the controllers on the various boards.
+> >
+> >>diff --git a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> >>index 5c51cb8..ae800b6 100644
+> >>--- a/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> >>+++ b/arch/arm/boot/dts/sun7i-a20-cubieboard2.dts
+> >>@@ -34,6 +34,14 @@
+> >>  			};
+> >>  		};
+> >>
+> >>+		mmc0: mmc at 01c0f000 {
+> >>+			pinctrl-names = "default", "default";
+> >>+			pinctrl-0 = <&mmc0_pins_a>;
+> >>+			pinctrl-1 = <&mmc0_cd_pin_reference_design>;
+> >
+> >This can be made a single pinctrl group, you don't need the pinctrl-1
+> >stuff, it only complicates the node.
 > 
-> I still do not understand why switching to idmap, which is a clone of
-> init_mm + 1:1 kernel mappings is required here. Why idmap ?
-> And while at it, can't the idmap be overwritten _while_ copying back the
-> resume kernel ? Is it safe to use idmap page tables while copying ?
+> Then how do we deal with boards which use a different gpio for card-detect ?
+> 
+> In that case we don't want to change the mux setting of the reference
+> design cd pin. IOW I believe that having 2 separate pinctrl settings for
+> this is the rigt thing todo. I would prefer using just mmc0_cd_pin_a instead
+> of _reference_design though.
+> 
+> Oh wait, you're probably talking about using:
+> 			pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
+> 
+> Yes that would be better.
 
-Thanks for finding this!  I'm concerned about this now.  I still
-haven't seen where this is handled.  I think we do need to switch
-to a page table in safe memory, or at least make sure we're not going to
-overwrite the page tables we're using.  I'll focus on this today
+Yep, exactly :)
 
-> I had a look at x86 and there idmap page tables used to resume are created
-> on the fly using safe pages, on ARM idmap is created at boot.
+> >
+> >>+			cd-gpios = <&pio 7 1 0>; /* PH1 */
+> >>+			status = "okay";
+> >>+		};
+> >>+
+> >>  		pinctrl at 01c20800 {
+> >>  			led_pins_cubieboard2: led_pins at 0 {
+> >>  				allwinner,pins = "PH20", "PH21";
+> >>diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> >>index f9dcb61..370cef84 100644
+> >>--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> >>+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+> >>@@ -19,6 +19,14 @@
+> >>  	compatible = "cubietech,cubietruck", "allwinner,sun7i-a20";
+> >>
+> >>  	soc at 01c00000 {
+> >>+		mmc0: mmc at 01c0f000 {
+> >>+			pinctrl-names = "default", "default";
+> >>+			pinctrl-0 = <&mmc0_pins_a>;
+> >>+			pinctrl-1 = <&mmc0_cd_pin_reference_design>;
+> >>+			cd-gpios = <&pio 7 1 0>; /* PH1 */
+> >>+			status = "okay";
+> >>+		};
+> >>+
+> >>  		pinctrl at 01c20800 {
+> >>  			led_pins_cubietruck: led_pins at 0 {
+> >>  				allwinner,pins = "PH7", "PH11", "PH20", "PH21";
+> >>diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+> >>index ead3013..685ec06 100644
+> >>--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+> >>+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+> >>@@ -34,7 +34,30 @@
+> >>  			};
+> >>  		};
+> >>
+> >>+		mmc0: mmc at 01c0f000 {
+> >>+			pinctrl-names = "default", "default";
+> >>+			pinctrl-0 = <&mmc0_pins_a>;
+> >>+			pinctrl-1 = <&mmc0_cd_pin_reference_design>;
+> >>+			cd-gpios = <&pio 7 1 0>; /* PH1 */
+> >>+			status = "okay";
+> >>+		};
+> >>+
+> >>+		mmc3: mmc at 01c12000 {
+> >>+			pinctrl-names = "default", "default";
+> >>+			pinctrl-0 = <&mmc3_pins_a>;
+> >>+			pinctrl-1 = <&mmc3_cd_pin_olinuxinom>;
+> >>+			cd-gpios = <&pio 7 11 0>; /* PH11 */
+> >>+			status = "okay";
+> >>+		};
+> >>+
+> >>  		pinctrl at 01c20800 {
+> >>+			mmc3_cd_pin_olinuxinom: mmc3_cd_pin at 0 {
+> >>+				allwinner,pins = "PH11";
+> >>+				allwinner,function = "gpio_in";
+> >>+				allwinner,drive = <0>;
+> >>+				allwinner,pull = <1>;
+> >>+			};
+> >>+
+> >>  			led_pins_olinuxino: led_pins at 0 {
+> >>  				allwinner,pins = "PH2";
+> >>  				allwinner,function = "gpio_out";
+> >>diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> >>index 9ff0948..5b55414 100644
+> >>--- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> >>+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> >>@@ -355,6 +355,46 @@
+> >>  			#size-cells = <0>;
+> >>  		};
+> >>
+> >>+		mmc0: mmc at 01c0f000 {
+> >>+			compatible = "allwinner,sun5i-a13-mmc";
+> >>+			reg = <0x01c0f000 0x1000>;
+> >>+			clocks = <&ahb_gates 8>, <&mmc0_clk>;
+> >>+			clock-names = "ahb", "mod";
+> >>+			interrupts = <0 32 4>;
+> >>+			bus-width = <4>;
+> >
+> >This belongs to the board, the controller itself is able to handle
+> >several bus width.
+> 
+> I believe that providing some form of default in the dtsi makes sense
+> here and all boards we've seen sofar always use 4 bits, we can always
+> override this from the dts file itself.
 
-After looking more at the arm code here's what I see:
-- swsusp_read, will restore all hibernation pages to the same physical
-  pages occupied pre-hibernation if the physical page is free. (get_buffer)
-  - Since the page is free, nothing is dependent on it, it's writable
-    and available, so we directly save to it, and it's ready for our
-    restore.
-  - if the original page is not free, we save the page to a different
-    physical page that was not part of the physical page set
-    pre-hibernation(safe_pages).  These pages are added to the
-    restore_pblist along with the original intended physical address
-    of the page.
-- highmem is handled separately (pages that were not free are swapped
-  and the memory map updated) (restore_himem)  Not sure if this affects
-  anything, but I thought I'd mention it JIC.
-- once we've read all of the hibernation image off of flash, we have a
-  bunch of pages that are in the wrong place, linked at restore_pblist.
-  We enter the restore image finisher, where everything is frozen,
-  irq/fiq disabled and we're ready to suspend, and now we have to copy
-  the pages in the wrong places back to their original physical pages.
+There's already a documented default that is 1. Plus, I still believe
+in a strict separation between what's in the SoC being in the DTSI and
+what's in the board being in the DTS.
 
-In this state I believe:
-  - our stack is safe because it's in nosave.
-  - userspace is frozen, those pages are 'don't care', as we're
-    discarding its state.
-  - our instructions and globals are ok, because they're in the
-    same place as last boot and are not getting restored.  None are in
-    modules.
-     - Globals: restore_pblist, idmap_pgd, init_mm, swapper_pg_dir
-  - restore_pblist chain is allocated from "safe pages"
-  - idmap_pgd table is allocated from freepages without worring about
-    safe pages -- this is where there may be concern.  Also, not sure
-    about 2nd or 3rd level pages if needed.  I'll look into this more.
+Apart from being more rigorous, it also has the advantage of being
+*much* clearer whenever your read a board DTS, since you don't have to
+actually open several DTS(I) to get what's going on.
 
-static void notrace __swsusp_arch_restore_image(void *unused)
-{
-        struct pbe *pbe;    
-
-        cpu_switch_mm(idmap_pgd, &init_mm);
-        for (pbe = restore_pblist; pbe; pbe = pbe->next)
-                copy_page(pbe->orig_address, pbe->address);
-        
-        soft_restart_noirq(virt_to_phys(cpu_resume));
-}
-
-As far as I see, where we are in swsusp_arch_init, the remaining risk
-area is this page table.  Everything else looks ok?  Do you see any
-more gaps?
-
-Thanks Lorenzo!!
-
-Sebastian
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140221/36901c53/attachment-0001.sig>
