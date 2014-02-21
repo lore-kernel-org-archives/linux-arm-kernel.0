@@ -1,247 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 21 Feb 2014 16:54:33 +0000
-Subject: [PATCH 3/3] ARM: perf: add support for the Cortex-A12 PMU
-In-Reply-To: <1393001673-8589-1-git-send-email-will.deacon@arm.com>
-References: <1393001673-8589-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1393001673-8589-4-git-send-email-will.deacon@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 21 Feb 2014 18:05:08 +0100
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <20140221163902.GB4706@obsidianresearch.com>
+References: <20140220173518.GA19893@obsidianresearch.com>
+ <20140220212914.29ddc031@skate>
+ <20140221003227.GF19893@obsidianresearch.com>
+ <20140221093444.35870a73@skate> <5307152D.3020804@keymile.com>
+ <20140221101218.45766e8a@skate> <53071970.1040400@keymile.com>
+ <20140221103936.56b3d9f8@skate> <53074584.5010202@keymile.com>
+ <20140221144708.48559045@skate>
+ <20140221163902.GB4706@obsidianresearch.com>
+Message-ID: <20140221180508.7ed6cfaf@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Albin Tonnerre <albin.tonnerre@arm.com>
+Dear Jason Gunthorpe,
 
-Cortex-A12 implements Performance Monitors compliant with the PMUv2
-architecture.
+On Fri, 21 Feb 2014 09:39:02 -0700, Jason Gunthorpe wrote:
+> On Fri, Feb 21, 2014 at 02:47:08PM +0100, Thomas Petazzoni wrote:
+> >  *) I don't know if the algorithm to split the BAR into multiple
+> >     windows is going to be trivial.
+> 
+> physaddr_t base,size;
+> 
+> while (size != 0) {
+>    physaddr_t window_size = 1 << log2_round_down(size);
+>    create_window(base,window_size);
+>    base += window_size;
+>    size -= window_size;
+> }
+> 
+> At the very worst log2_round_down is approxmiately
+> 
+> unsigned int log2_round_down(unsigned int val)
+> {
+> 	unsigned int res = 0;
+> 	while ((1<<res) <= val)
+> 		res++;
+> 	return res - 1;
+> }
+> 
+> Minimum PCI required alignment for windows is 1MB so it will always
+> work out into some number of mbus windows..
 
-This patch adds support for the Cortex-A12 PMU to the ARM perf backend.
+Interesting! Thanks!
 
-Signed-off-by: Albin Tonnerre <albin.tonnerre@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- Documentation/devicetree/bindings/arm/pmu.txt |   1 +
- arch/arm/kernel/perf_event_cpu.c              |   1 +
- arch/arm/kernel/perf_event_v7.c               | 158 ++++++++++++++++++++++++++
- 3 files changed, 160 insertions(+)
+Now I have another question: our mvebu_pcie_align_resource() function
+makes sure that the base address of the BAR is aligned on its size,
+because it is a requirement of MBus windows. However, if you later
+split the BAR into multiple windows, will this continue to work out?
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-index ce731441e64f..fe5cef8976cb 100644
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/pmu.txt
-@@ -9,6 +9,7 @@ Required properties:
- - compatible : should be one of
- 	"arm,armv8-pmuv3"
- 	"arm,cortex-a15-pmu"
-+	"arm,cortex-a12-pmu"
- 	"arm,cortex-a9-pmu"
- 	"arm,cortex-a8-pmu"
- 	"arm,cortex-a7-pmu"
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 326cb58de2f8..51798d7854ac 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -222,6 +222,7 @@ static struct notifier_block cpu_pmu_hotplug_notifier = {
-  */
- static struct of_device_id cpu_pmu_of_device_ids[] = {
- 	{.compatible = "arm,cortex-a15-pmu",	.data = armv7_a15_pmu_init},
-+	{.compatible = "arm,cortex-a12-pmu",	.data = armv7_a12_pmu_init},
- 	{.compatible = "arm,cortex-a9-pmu",	.data = armv7_a9_pmu_init},
- 	{.compatible = "arm,cortex-a8-pmu",	.data = armv7_a8_pmu_init},
- 	{.compatible = "arm,cortex-a7-pmu",	.data = armv7_a7_pmu_init},
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 2fce4751f4c0..f4ef3981ed02 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -113,6 +113,19 @@ enum armv7_a15_perf_types {
- 	ARMV7_A15_PERFCTR_PC_WRITE_SPEC			= 0x76,
- };
- 
-+/* ARMv7 Cortex-A12 specific event types */
-+enum armv7_a12_perf_types {
-+	ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_READ		= 0x40,
-+	ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_WRITE	= 0x41,
-+
-+	ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_READ		= 0x50,
-+	ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_WRITE		= 0x51,
-+
-+	ARMV7_A12_PERFCTR_PC_WRITE_SPEC			= 0x76,
-+
-+	ARMV7_A12_PERFCTR_PF_TLB_REFILL			= 0xe7,
-+};
-+
- /* ARMv7 Krait specific event types */
- enum krait_perf_types {
- 	KRAIT_PMRESR0_GROUP0				= 0xcc,
-@@ -750,6 +763,130 @@ static const unsigned armv7_a7_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- };
- 
- /*
-+ * Cortex-A12 HW events mapping
-+ */
-+static const unsigned armv7_a12_perf_map[PERF_COUNT_HW_MAX] = {
-+	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV7_PERFCTR_CPU_CYCLES,
-+	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV7_PERFCTR_INSTR_EXECUTED,
-+	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV7_PERFCTR_L1_DCACHE_ACCESS,
-+	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV7_A12_PERFCTR_PC_WRITE_SPEC,
-+	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
-+	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV7_PERFCTR_BUS_CYCLES,
-+	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= HW_OP_UNSUPPORTED,
-+	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= HW_OP_UNSUPPORTED,
-+};
-+
-+static const unsigned armv7_a12_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
-+					[PERF_COUNT_HW_CACHE_OP_MAX]
-+					[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
-+	[C(L1D)] = {
-+		[C(OP_READ)] = {
-+			[C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_READ,
-+			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+		},
-+		[C(OP_WRITE)] = {
-+			[C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_WRITE,
-+			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_DCACHE_REFILL,
-+		},
-+		[C(OP_PREFETCH)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+	},
-+	[C(L1I)] = {
-+		/*
-+		 * Not all performance counters differentiate between read
-+		 * and write accesses/misses so we're not always strictly
-+		 * correct, but it's the best we can do. Writes and reads get
-+		 * combined in these cases.
-+		 */
-+		[C(OP_READ)] = {
-+			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_L1_ICACHE_ACCESS,
-+			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L1_ICACHE_REFILL,
-+		},
-+		[C(OP_WRITE)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+		[C(OP_PREFETCH)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+	},
-+	[C(LL)] = {
-+		[C(OP_READ)] = {
-+			[C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_READ,
-+			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L2_CACHE_REFILL,
-+		},
-+		[C(OP_WRITE)] = {
-+			[C(RESULT_ACCESS)]	= ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_WRITE,
-+			[C(RESULT_MISS)]	= ARMV7_PERFCTR_L2_CACHE_REFILL,
-+		},
-+		[C(OP_PREFETCH)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+	},
-+	[C(DTLB)] = {
-+		[C(OP_READ)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
-+		},
-+		[C(OP_WRITE)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
-+		},
-+		[C(OP_PREFETCH)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= ARMV7_A12_PERFCTR_PF_TLB_REFILL,
-+		},
-+	},
-+	[C(ITLB)] = {
-+		[C(OP_READ)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+		},
-+		[C(OP_WRITE)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= ARMV7_PERFCTR_ITLB_REFILL,
-+		},
-+		[C(OP_PREFETCH)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+	},
-+	[C(BPU)] = {
-+		[C(OP_READ)] = {
-+			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
-+		},
-+		[C(OP_WRITE)] = {
-+			[C(RESULT_ACCESS)]	= ARMV7_PERFCTR_PC_BRANCH_PRED,
-+			[C(RESULT_MISS)]	= ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
-+		},
-+		[C(OP_PREFETCH)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+	},
-+	[C(NODE)] = {
-+		[C(OP_READ)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+		[C(OP_WRITE)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+		[C(OP_PREFETCH)] = {
-+			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
-+			[C(RESULT_MISS)]	= CACHE_OP_UNSUPPORTED,
-+		},
-+	},
-+};
-+
-+/*
-  * Krait HW events mapping
-  */
- static const unsigned krait_perf_map[PERF_COUNT_HW_MAX] = {
-@@ -1362,6 +1499,12 @@ static int armv7_a7_map_event(struct perf_event *event)
- 				&armv7_a7_perf_cache_map, 0xFF);
- }
- 
-+static int armv7_a12_map_event(struct perf_event *event)
-+{
-+	return armpmu_map_event(event, &armv7_a12_perf_map,
-+				&armv7_a12_perf_cache_map, 0xFF);
-+}
-+
- static int krait_map_event(struct perf_event *event)
- {
- 	return armpmu_map_event(event, &krait_perf_map,
-@@ -1446,6 +1589,16 @@ static int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
- 	return 0;
- }
- 
-+static int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
-+{
-+	armv7pmu_init(cpu_pmu);
-+	cpu_pmu->name		= "ARMv7 Cortex-A12";
-+	cpu_pmu->map_event	= armv7_a12_map_event;
-+	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
-+	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
-+	return 0;
-+}
-+
- /*
-  * Krait Performance Monitor Region Event Selection Register (PMRESRn)
-  *
-@@ -1863,6 +2016,11 @@ static inline int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
- 	return -ENODEV;
- }
- 
-+static inline int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
-+{
-+	return -ENODEV;
-+}
-+
- static inline int krait_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	return -ENODEV;
+Let's take an example: a 96 MB BAR. If it gets put at 0xe0000000, then
+no problem: we create one 64 MB window at 0xe0000000 and a 32 MB window
+at 0xe4000000. Both base addresses are aligned on the size of the
+window.
+
+However, if the 96 MB BAR gets put at 0xea000000 (which is aligned on a
+96 MB boundary, as required by our mvebu_pcie_align_resource). We
+create one 64 MB window at 0xea000000, and one 32 MB window at
+0xee000000. Unfortunately, while 0xea000000 is aligned on a 96 MB
+boundary, it is not aligned on a 64 MB boundary, so the 64 MB window we
+have created is wrong.
+
+Which also makes me think that our mvebu_pcie_align_resource()
+function uses round_up(start, size), which most likely doesn't work with
+non power-of-two sizes.
+
+Thomas
 -- 
-1.8.2.2
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
