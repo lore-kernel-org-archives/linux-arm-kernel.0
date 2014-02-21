@@ -1,35 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Feb 2014 10:37:10 +0000
-Subject: [PATCH RFC 07/31] mmc: sdhci: push card_tasklet into threaded
- irq handler
-In-Reply-To: <CAKohpo=FTk9SGCMJGBdOUheUg71WsG7qaeE9rwQRqd5dP4O8FQ@mail.gmail.com>
-References: <20140218175703.GJ21483@n2100.arm.linux.org.uk>
- <CAKohpoknX=acZHJeydwv6XRKFHTD4DM84xfCJ=56NrRfJnBOOA@mail.gmail.com>
- <20140219094322.GR21483@n2100.arm.linux.org.uk>
- <CAKohpomfHxWBF5m4D6iqod4a3gw2BU1W6nXMkEOg+YA+izYr=g@mail.gmail.com>
- <20140219095212.GT21483@n2100.arm.linux.org.uk>
- <CAKohpo=ZrLRsTyCH86x7TbGE2XJnpXNb1ZDvYyzDUupAwTtS9Q@mail.gmail.com>
- <20140219105011.GU21483@n2100.arm.linux.org.uk>
- <CAKohpokBf_fJhiUJ53c+=6v+GMcjaDKd7+fwib99=sLMdkjQQQ@mail.gmail.com>
- <20140220105903.GY21483@n2100.arm.linux.org.uk>
- <CAKohpo=FTk9SGCMJGBdOUheUg71WsG7qaeE9rwQRqd5dP4O8FQ@mail.gmail.com>
-Message-ID: <20140221103710.GB21483@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 21 Feb 2014 10:41:17 +0000
+Subject: [PATCH 3/5] mmc: sdhci-spear: simplify resource handling
+In-Reply-To: <20140221103710.GB21483@n2100.arm.linux.org.uk>
+References: <20140221103710.GB21483@n2100.arm.linux.org.uk>
+Message-ID: <E1WGnXh-0007Jo-Pr@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 04:48:58PM +0530, Viresh Kumar wrote:
-> Nothing wrong in that, only right.. Do you want me to float a patch for
-> this or you can get that done along with your series?
+Use devm_ioremap_resource() to simplify iomem resource handling in the
+probe path.
 
-I'll send a follow-up mini-series of five patches for it.  It shouldn't
-depend all that much on the bigger series - and I think the first two
-patches could well do with going into -rc.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/mmc/host/sdhci-spear.c | 40 +++++++++++++---------------------------
+ 1 file changed, 13 insertions(+), 27 deletions(-)
 
- drivers/mmc/host/sdhci-spear.c  | 190 +++++++++-------------------------------
- include/linux/mmc/sdhci-spear.h |   8 --
- 2 files changed, 43 insertions(+), 155 deletions(-)
-
+diff --git a/drivers/mmc/host/sdhci-spear.c b/drivers/mmc/host/sdhci-spear.c
+index ca1cb9776ea2..f879b27e59b1 100644
+--- a/drivers/mmc/host/sdhci-spear.c
++++ b/drivers/mmc/host/sdhci-spear.c
+@@ -113,20 +113,6 @@ static int sdhci_probe(struct platform_device *pdev)
+ 	struct device *dev;
+ 	int ret;
+ 
+-	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!iomem) {
+-		ret = -ENOMEM;
+-		dev_dbg(&pdev->dev, "memory resource not defined\n");
+-		goto err;
+-	}
+-
+-	if (!devm_request_mem_region(&pdev->dev, iomem->start,
+-				resource_size(iomem), "spear-sdhci")) {
+-		ret = -EBUSY;
+-		dev_dbg(&pdev->dev, "cannot request region\n");
+-		goto err;
+-	}
+-
+ 	dev = pdev->dev.parent ? pdev->dev.parent : &pdev->dev;
+ 	host = sdhci_alloc_host(dev, sizeof(*sdhci));
+ 	if (IS_ERR(host)) {
+@@ -135,6 +121,19 @@ static int sdhci_probe(struct platform_device *pdev)
+ 		goto err;
+ 	}
+ 
++	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	host->ioaddr = devm_ioremap_resource(&pdev->dev, iomem);
++	if (IS_ERR(host->ioaddr)) {
++		ret = PTR_ERR(host->ioaddr);
++		dev_dbg(&pdev->dev, "unable to map iomem: %d\n", ret);
++		goto err_host;
++	}
++
++	host->hw_name = "sdhci";
++	host->ops = &sdhci_pltfm_ops;
++	host->irq = platform_get_irq(pdev, 0);
++	host->quirks = SDHCI_QUIRK_BROKEN_ADMA;
++
+ 	sdhci = sdhci_priv(host);
+ 
+ 	/* clk enable */
+@@ -166,19 +165,6 @@ static int sdhci_probe(struct platform_device *pdev)
+ 		sdhci->data = dev_get_platdata(&pdev->dev);
+ 	}
+ 
+-	host->hw_name = "sdhci";
+-	host->ops = &sdhci_pltfm_ops;
+-	host->irq = platform_get_irq(pdev, 0);
+-	host->quirks = SDHCI_QUIRK_BROKEN_ADMA;
+-
+-	host->ioaddr = devm_ioremap(&pdev->dev, iomem->start,
+-			resource_size(iomem));
+-	if (!host->ioaddr) {
+-		ret = -ENOMEM;
+-		dev_dbg(&pdev->dev, "failed to remap registers\n");
+-		goto disable_clk;
+-	}
+-
+ 	ret = sdhci_add_host(host);
+ 	if (ret) {
+ 		dev_dbg(&pdev->dev, "error adding host\n");
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.8.3.1
