@@ -1,55 +1,60 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 21 Feb 2014 09:33:53 -0600
-Subject: [PATCH] gpio: msm: switch Kconfig to ARCH_QCOM depends
-In-Reply-To: <1392150132-21877-1-git-send-email-galak@codeaurora.org>
-References: <1392150132-21877-1-git-send-email-galak@codeaurora.org>
-Message-ID: <E44A8A90-550C-438C-9EA0-61E033BB988E@codeaurora.org>
+Date: Fri, 21 Feb 2014 09:35:57 -0600
+Subject: [PATCH v3 2/2] i2c: New bus driver for the Qualcomm QUP I2C
+ controller
+In-Reply-To: <1392943090-30556-3-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1392943090-30556-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1392943090-30556-3-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <92B0AE30-5CDF-43FC-8588-EEF0C5F86266@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On Feb 11, 2014, at 2:22 PM, Kumar Gala <galak@codeaurora.org> wrote:
+On Feb 20, 2014, at 6:38 PM, Bjorn Andersson <bjorn.andersson@sonymobile.com> wrote:
 
-> We've split Qualcomm MSM support into legacy and multiplatform.  The gpio
-> msm-v2 driver is only relevant on the multiplatform supported SoCs so
-> switch the Kconfig depends to ARCH_QCOM.
+> This bus driver supports the QUP i2c hardware controller in the Qualcomm SOCs.
+> The Qualcomm Universal Peripheral Engine (QUP) is a general purpose data path
+> engine with input/output FIFOs and an embedded i2c mini-core. The driver
+> supports FIFO mode (for low bandwidth applications) and block mode (interrupt
+> generated for each block-size data transfer).
 > 
-> CC: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> Cc: Andy Gross <agross@codeaurora.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 > ---
-> Linus,
+> drivers/i2c/busses/Kconfig   |   10 +
+> drivers/i2c/busses/Makefile  |    1 +
+> drivers/i2c/busses/i2c-qup.c |  772 ++++++++++++++++++++++++++++++++++++++++++
+> 3 files changed, 783 insertions(+)
+> create mode 100644 drivers/i2c/busses/i2c-qup.c
 > 
-> If you can ack this I'll send it via linux-qcom/arm-soc tree's
+> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> index f5ed031..403e196 100644
+> --- a/drivers/i2c/busses/Kconfig
+> +++ b/drivers/i2c/busses/Kconfig
+> @@ -648,6 +648,16 @@ config I2C_PXA_SLAVE
+> 	  is necessary for systems where the PXA may be a target on the
+> 	  I2C bus.
 > 
-> thanks
-> 
-> - k
+> +config I2C_QUP
+> +	tristate "Qualcomm QUP based I2C controller"
+> +	depends on ARCH_MSM
 
-ping.
+ARCH_QCOM
+
+> +	help
+> +	  If you say yes to this option, support will be included for the
+> +	  built-in I2C interface on the Qualcomm SoCs.
+> +
+> +	  This driver can also be built as a module.  If so, the module
+> +	  will be called i2c-qup.
+> +
+> config I2C_RIIC
+> 	tristate "Renesas RIIC adapter"
+> 	depends on ARCH_SHMOBILE || COMPILE_TEST
 
 - k
-
-> 
-> drivers/gpio/Kconfig | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index 6973387..aa74949 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -192,7 +192,7 @@ config GPIO_MSM_V1
-> 
-> config GPIO_MSM_V2
-> 	tristate "Qualcomm MSM GPIO v2"
-> -	depends on GPIOLIB && OF && ARCH_MSM
-> +	depends on GPIOLIB && OF && ARCH_QCOM
-> 	help
-> 	  Say yes here to support the GPIO interface on ARM v7 based
-> 	  Qualcomm MSM chips.  Most of the pins on the MSM can be
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
 
 -- 
 Employee of Qualcomm Innovation Center, Inc.
