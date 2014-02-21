@@ -1,82 +1,75 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 21 Feb 2014 12:55:42 -0500
-Subject: [PATCH v12 2/3] ata: Add APM X-Gene SoC AHCI SATA host
- controller driver
-In-Reply-To: <1393004853-25994-3-git-send-email-lho@apm.com>
-References: <1393004853-25994-1-git-send-email-lho@apm.com>
- <1393004853-25994-2-git-send-email-lho@apm.com>
- <1393004853-25994-3-git-send-email-lho@apm.com>
-Message-ID: <20140221175542.GA12830@htj.dyndns.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 21 Feb 2014 10:57:50 -0700
+Subject: [PATCH v2 00/23] Move DT kirkwood into mach-mvebu
+In-Reply-To: <20140221031927.GA2654@localhost>
+References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
+ <20140218185703.GI29304@obsidianresearch.com>
+ <20140218190212.GE7862@titan.lakedaemon.net>
+ <20140219222103.GB17826@obsidianresearch.com>
+ <20140221031927.GA2654@localhost>
+Message-ID: <20140221175750.GB17611@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Loc.
+On Fri, Feb 21, 2014 at 12:19:28AM -0300, Ezequiel Garcia wrote:
+> > Thanks, I tested v3 of the patchset.
+> > 
+> > It boots, but I can't do very much because the watchdog driver doesn't
+> > build and my system is configured to watchdog timeout if there is no
+> > watchdog driver.
+> > 
+> > Presumably the watchdog patchset needs to be a dependency for this? Is
+> > there a git URL for it?
+> > 
+> 
+> Andrew's v3 and the mvebu/watchdog branch merges without any conflicts:
+> 
+> https://github.com/lunn/linux/tree/v3.14-rc1-mvebu-v3
+> 
+> http://git.infradead.org/linux-mvebu.git/shortlog/refs/heads/mvebu/watchdog
+> 
+> And multi v5 works great here!
 
-On Fri, Feb 21, 2014 at 10:47:32AM -0700, Loc Ho wrote:
-> +/**
-> + * Custom Query ID command
-> + *
-> + * Due to HW errata, we must stop and re-start the port state machine after
-> + * read ID command. Also disable support for DEVSLP as hardware don't support
-> + * it.
-> + */
+It is working now for me as well, I haven't noticed any strangeness at
+least..
 
-Sorry about not being clear before but /** function comment means
-something like
+Ezequiel, after I applied your watchdog branch the .dtsi files
+lacked the new 2nd register:
 
-/**
- * ata_scsi_port_error_handler - recover the port after the commands
- * @host: SCSI host containing the port
- * @ap: the ATA port
- *
- * Handle the recovery of the port @ap after all the commands have
- * been recovered.
- */
+                wdt: watchdog-timer at 20300 {
+                        compatible = "marvell,orion-wdt";
+                        reg = <0x20300 0x28>;
+                        interrupt-parent = <&bridge_intc>;
+                        interrupts = <3>;
+                        clocks = <&gate_clk 7>;
+                        status = "okay";
+                };
 
-> +static int xgene_ahci_do_hardreset(struct ata_link *link,
-> +				   unsigned long deadline, bool *online)
-> +{
-> +	const unsigned long *timing = sata_ehc_deb_timing(&link->eh_context);
-> +	struct ata_port *ap = link->ap;
-> +	struct ahci_host_priv *hpriv = ap->host->private_data;
-> +	struct xgene_ahci_context *ctx = pdata_to_ctx(hpriv->plat_data);
-> +	struct ahci_port_priv *pp = ap->private_data;
-> +	u8 *d2h_fis = pp->rx_fis + RX_FIS_D2H_REG;
-> +	void __iomem *port_mmio = ahci_port_base(ap);
-> +	struct ata_taskfile tf;
-> +	int first_time = 1;
-> +	int rc;
-> +	u32 val;
-> +	int i;
-> +
-> +hardreset_retry:
-> +	/* clear D2H reception area to properly wait for D2H FIS */
-> +	ata_tf_init(link->device, &tf);
-> +	tf.command = ATA_BUSY;
-> +	ata_tf_to_fis(&tf, 0, 0, d2h_fis);
-> +	rc = sata_link_hardreset(link, timing, deadline, online,
-> +				 ahci_check_ready);
-> +
-> +	if (*online) {
-> +		/* Check to ensure that the disk comes up in matching speed */
-> +		if (first_time) {
-> +			u32 gen_speed;
-> +
-> +			first_time = 0;
-> +			sata_scr_read(link, SCR_STATUS, &gen_speed);
-> +			gen_speed = (gen_speed >> 4) & 0xf;
-> +			if (gen_speed == 1 || gen_speed == 2) {
-> +				/*
-> +				 * For Gen2/1 and first time, let's check again
-> +				 * with Gen2/1 PHY to ensure actual Gen2/1 disk.
-> +				 */
+Which creates a nasty warn-on during boot - is that expected?
 
-Can you please go back two reviews and re-read what I requested?
-Also, if you're unsure, please don't hesitate to ask back.  It's
-usually a lot easier for both parties than iterating through patchsets
-without properly understanding each other.
+BTW, for both patche sets:
+Tested-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com> (on kirkwood)
 
-Thanks.
+Also, there seems to be some missing request_region in drivers (can
+be fixedup later)
 
--- 
-tejun
+f1001418-f100141b : kirkwood_cpuidle
+f1001500-f100151f : /mbus/internal at f1000000/mbus-controller at 20000
+f1010030-f1010033 : /mbus/internal at f1000000/core-clocks at 10030
+f1020000-f102007f : /mbus/internal at f1000000/mbus-controller at 20000
+f1020104-f1020107 : kirkwood-cpufreq
+f1020108-f102010b : /mbus/internal at f1000000/wdt at 20300
+f102011c-f102011f : /mbus/internal at f1000000/clock-gating-control at 2011c
+f1020128-f102012b : /mbus/internal at f1000000/l2-cache at 20128
+f1020300-f102031f : /mbus/internal at f1000000/timer at 20300
+f1040000-f1041fff : /mbus/pex at e0000000/pcie at 1,0
+f1072000-f1075fff : /mbus/internal at f1000000/egiga0
+  f1072004-f1072087 : /mbus/internal at f1000000/mdio at 72000
+f4000000-f40003ff : /mbus/nand at f4000000/nand at 0
+
+In general it should be:
+
+f1012100-f10121ff : /mbus/internal at f1000000/serial at 12100  (<-- OF stanza)
+  f1012100-f101211f : serial    (<-- Driver request region)
+
+Jason
