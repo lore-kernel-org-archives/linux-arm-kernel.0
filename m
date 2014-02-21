@@ -1,32 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 21 Feb 2014 11:28:12 +0000
-Subject: [RFC PATCH 2/2] arm: mm: Double logical invert for LPAE
- pte_write(), pte_dirty()
-In-Reply-To: <1392396913-13570-3-git-send-email-steve.capper@linaro.org>
-References: <1392396913-13570-1-git-send-email-steve.capper@linaro.org>
- <1392396913-13570-3-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140221112812.GC21483@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Feb 2014 11:36:52 +0000
+Subject: [PATCH 1/1] arm64: enable processor debug state for secondary cpus
+In-Reply-To: <1392959630-31314-1-git-send-email-vijay.kilari@gmail.com>
+References: <1392959630-31314-1-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <20140221113652.GE5747@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 04:55:13PM +0000, Steve Capper wrote:
-> On LPAE, L_PTE_WRITE and L_PTE_DIRTY are in the upper 32-bits.
-> Unfortunately, results from pte_write() and pte_dirty() are downcast
-> to 32-bits by core code:
->   o gather_stats
->   o huge_pte_dirty
->   o huge_pte_write
->   o make_migration_entry
+On Fri, Feb 21, 2014 at 05:13:49AM +0000, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
 > 
-> This patch adds a double logical invert to pte_write() and pte_dirty()
-> for LPAE to ensure that the lower 32-bits are set if true.
+> processor debug state PSTATE.D is unmasked in smp call
+> clear_os_lock for secondary cpus. So debug state is still
+> masked in normal kernel context.  With this patch, unmask
+> debug state on secondary boot for the cpus in normal kernel
+> context. Now kgdb tests passed with multicore.
+> 
+> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@caviumnetworks.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-We should ensure all those functions return something which is compatible
-with "int" correctly.  It didn't matter for non-LPAE as the PTEs fit in
-32-bit, but with LPAE, that really needs fixing independently of your
-other patch.
+Thanks. Applied.
+
+The whole series should appear in -next sometime after -rc4.
 
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+Catalin
