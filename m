@@ -1,101 +1,109 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Feb 2014 16:05:05 +0000
-Subject: [PATCH v4 07/10] exynos4-is: Add clock provider for the
- SCLK_CAM clock outputs
-In-Reply-To: <1392925237-31394-9-git-send-email-s.nawrocki@samsung.com>
-References: <1392925237-31394-1-git-send-email-s.nawrocki@samsung.com>
- <1392925237-31394-9-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20140221160504.GG20449@e106331-lin.cambridge.arm.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 21 Feb 2014 11:06:19 -0500
+Subject: [PATCH v11 2/3] ata: Add APM X-Gene SoC AHCI SATA host
+ controller driver
+In-Reply-To: <1392621433-5566-3-git-send-email-lho@apm.com>
+References: <1392621433-5566-1-git-send-email-lho@apm.com>
+ <1392621433-5566-2-git-send-email-lho@apm.com>
+ <1392621433-5566-3-git-send-email-lho@apm.com>
+Message-ID: <20140221160619.GC460@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 07:40:34PM +0000, Sylwester Nawrocki wrote:
-> This patch adds clock provider so the the SCLK_CAM0/1 output clocks
-> can be accessed by image sensor devices through the clk API.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> Changes since v3:
->  - use clock-output-names DT property instead of hard coding names
->    of registered clocks in the driver; first two entries of the
->    clock-names property value are used to specify parent clocks of
->    cam_{a,b}_clkout clocks, rather than hard coding it to sclk_cam{0,1}
->    in the driver.
->  - addressed issues pointed out in review by Mauro.
-> 
-> Changes since v2:
->  - use 'camera' DT node drirectly as clock provider node, rather than
->   creating additional clock-controller child node.
->  - DT binding documentation moved to a separate patch.
-> ---
->  drivers/media/platform/exynos4-is/media-dev.c |  110 +++++++++++++++++++++++++
->  drivers/media/platform/exynos4-is/media-dev.h |   19 ++++-
->  2 files changed, 128 insertions(+), 1 deletion(-)
+Hello, Loc.
 
-[...]
-
-> +static int fimc_md_register_clk_provider(struct fimc_md *fmd)
+On Mon, Feb 17, 2014 at 12:17:12AM -0700, Loc Ho wrote:
+...
+> +static int xgene_ahci_get_channel(struct ata_host *host, struct ata_port *port)
 > +{
-> +	struct cam_clk_provider *cp = &fmd->clk_provider;
-> +	struct device *dev = &fmd->pdev->dev;
-> +	int i, ret;
+> +	int i;
+> +	for (i = 0; i < host->n_ports; i++)
+> +		if (host->ports[i] == port)
+> +			return i;
+> +	return -1;
+> +}
+
+Didn't I ask you why you weren't using ap->port_no?
+
+> +/*
+> + * Custom Query ID command
+> + *
+> + * Due to HW errata, we must stop and re-start the port state machine after
+> + * read ID command. Also disable support for DEVSLP as hardware don't support
+> + * it.
+> + */
+
+Please use /** function comment style.
+
+> +static unsigned int xgene_ahci_read_id(struct ata_device *dev,
+> +				       struct ata_taskfile *tf, u16 *id)
+> +{
+> +	u32 err_mask;
+> +	void __iomem *port_mmio = ahci_port_base(dev->link->ap);
 > +
-> +	for (i = 0; i < ARRAY_SIZE(cp->clks); i++) {
-> +		struct cam_clk *camclk = &cp->camclk[i];
-> +		struct clk_init_data init;
+> +	err_mask = ata_do_dev_read_id(dev, tf, id);
+> +	if (err_mask)
+> +		return err_mask;
 > +
-> +		ret = of_property_read_string_index(dev->of_node,
-> +					"clock-output-names", i, &init.name);
+> +	/* Mask reserved area. Bit78 spec of Link Power Management
 
-Are there not well-defined names for the clock outputs of the block?
+Another review point which hasn't been addressed.  Please use
+fully-winged comments for multiline comments.
 
-> +		if (ret < 0)
-> +			break;
+> +	 * bit15-8: reserved
+> +	 * bit7: NCQ autosence
+> +	 * bit6: Software settings preservation supported
+> +	 * bit5: reserved
+> +	 * bit4: In-order sata delivery supported
+> +	 * bit3: DIPM requests supported
+> +	 * bit2: DMA Setup FIS Auto-Activate optimization supported
+> +	 * bit1: DMA Setup FIX non-Zero buffer offsets supported
+> +	 * bit0: Reserved
+> +	 *
+> +	 * Clear reserved bit (DEVSLP bit) as we don't support DEVSLP
+> +	 */
+> +	id[78] &= 0x00FF;
 > +
-> +		ret = of_property_read_string_index(dev->of_node,
-> +					"clock-names", i, init.parent_names);
-
-This shouldn't be a parent name. It should be the input line name.
-
-I don't think this makes sense.
-
-Why do you need the name of the parent clock?
-
-> +		if (ret < 0)
-> +			break;
-> +
-> +		init.num_parents = 1;
-> +		init.ops = &cam_clk_ops;
-> +		init.flags = CLK_SET_RATE_PARENT;
-> +		camclk->hw.init = &init;
-> +		camclk->fmd = fmd;
-> +
-> +		cp->clks[i] = clk_register(NULL, &camclk->hw);
-> +		if (IS_ERR(cp->clks[i])) {
-> +			dev_err(dev, "failed to register clock: %s (%ld)\n",
-> +					init.name, PTR_ERR(cp->clks[i]));
-> +			ret = PTR_ERR(cp->clks[i]);
-> +			goto err;
-> +		}
-> +		cp->num_clocks++;
+> +	/* Restart the port if required due to HW errata */
+> +	if (!readl(port_mmio + PORT_CMD_ISSUE)) {
+> +		writel(PORT_CMD_FIS_RX, port_mmio + PORT_CMD);
+> +		readl(port_mmio + PORT_CMD);	/* Force a barrier */
+> +		writel(PORT_CMD_FIS_RX | PORT_CMD_START, port_mmio + PORT_CMD);
+> +		readl(port_mmio + PORT_CMD);	/* Force a barrier */
 > +	}
+> +	return 0;
+> +}
+...
+> +static int xgene_ahci_do_hardreset(struct ata_link *link,
+> +				   unsigned long deadline, bool *online)
+> +{
+...
+> +hardreset_retry:
+> +	/* clear D2H reception area to properly wait for D2H FIS */
+> +	ata_tf_init(link->device, &tf);
+> +	tf.command = ATA_BUSY;
+> +	ata_tf_to_fis(&tf, 0, 0, d2h_fis);
+> +	rc = sata_link_hardreset(link, timing, deadline, online,
+> +				 ahci_check_ready);
 > +
-> +	if (cp->num_clocks == 0) {
-> +		dev_warn(dev, "clk provider not registered\n");
-> +		return 0;
-> +	}
+> +	if (*online) {
+> +		int chan = xgene_ahci_get_channel(ap->host, ap);
 > +
-> +	cp->clk_data.clks = cp->clks;
-> +	cp->clk_data.clk_num = cp->num_clocks;
-> +	cp->of_node = dev->of_node;
-> +	ret = of_clk_add_provider(dev->of_node, of_clk_src_onecell_get,
-> +				  &cp->clk_data);
+> +		/* Check to ensure that the disk comes up in matching speed */
+> +		if (first_time) {
+> +			u32 gen_speed;
+> +
+> +			first_time = 0;
+> +			sata_scr_read(link, SCR_STATUS, &gen_speed);
+> +			gen_speed = (gen_speed >> 4) & 0xf;
+> +			if (gen_speed == 1 || gen_speed == 2) {
+> +				/* For Gen2/1 and first time, let's check again
+> +				 * with Gen2/1 PHY to ensure actual Gen2/1 disk.
+> +				 */
 
-Are _all_ of the input clock lines available to children in hardware?
+Another review point not addressed.
 
-The binding and commit message(s) implied only two clocks were, so
-what's the point in exporting clocks which aren't available?
+Thanks.
 
-Thanks,
-Mark.
+-- 
+tejun
