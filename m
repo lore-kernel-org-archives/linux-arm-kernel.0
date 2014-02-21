@@ -1,126 +1,98 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Feb 2014 15:12:14 +0900
-Subject: [PATCH 02/16] ARM: shmobile: lager: add SDHI0/2 support
+Date: Fri, 21 Feb 2014 15:12:16 +0900
+Subject: [PATCH 04/16] ARM: shmobile: lager: Add internal USB PCI support
 In-Reply-To: <cover.1392960310.git.horms+renesas@verge.net.au>
 References: <cover.1392960310.git.horms+renesas@verge.net.au>
-Message-ID: <40e6a51e0cf44e944eed29697eb849140bf8258f.1392960310.git.horms+renesas@verge.net.au>
+Message-ID: <849f7b6c10d8016b55e13b7ad2e9f299e2da817b.1392960310.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Valentine Barshak <valentine.barshak@cogentembedded.com>
 
-SDHI0 (CN8) needs JP/SW settings
+This adds internal PCI USB host devices to R-Car H2 Lager board.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Valentine Barshak <valentine.barshak@cogentembedded.com>
+[damm at opensource.se: Rebased and reworked to only include USB1 and USB2]
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager.c | 64 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+ arch/arm/mach-shmobile/board-lager.c | 50 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
 diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 3175748..90d7e81 100644
+index 72886af..193dff0 100644
 --- a/arch/arm/mach-shmobile/board-lager.c
 +++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -26,8 +26,10 @@
- #include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/leds.h>
-+#include <linux/mfd/tmio.h>
- #include <linux/mmc/host.h>
- #include <linux/mmc/sh_mmcif.h>
-+#include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/pinctrl/machine.h>
- #include <linux/platform_data/camera-rcar.h>
- #include <linux/platform_data/gpio-rcar.h>
-@@ -68,6 +70,19 @@
-  * # amixer set "LINEOUT Mixer DACL" on
-  */
+@@ -638,6 +638,48 @@ static struct resource sdhi2_resources[] __initdata = {
+ 	DEFINE_RES_IRQ(gic_spi(167)),
+ };
  
-+/*
-+ * SDHI0 (CN8)
-+ *
-+ * JP3:  pin1
-+ * SW20: pin1
-+
-+ * GP5_24:	1:  VDD  3.3V (defult)
-+ *		0:  VDD  0.0V
-+ * GP5_29:	1:  VccQ 3.3V (defult)
-+ *		0:  VccQ 1.8V
-+ *
-+ */
-+
- /* DU */
- static struct rcar_du_encoder_data lager_du_encoders[] = {
- 	{
-@@ -595,6 +610,34 @@ static void __init lager_add_rsnd_device(void)
- 	platform_device_register_full(&cardinfo);
- }
- 
-+/* SDHI0 */
-+static struct sh_mobile_sdhi_info sdhi0_info __initdata = {
-+	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
-+			  MMC_CAP_POWER_OFF_CARD,
-+	.tmio_caps2	= MMC_CAP2_NO_MULTI_READ,
-+	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT |
-+			  TMIO_MMC_WRPROTECT_DISABLE,
++/* Internal PCI1 */
++static const struct resource pci1_resources[] __initconst = {
++	DEFINE_RES_MEM(0xee0b0000, 0x10000),	/* CFG */
++	DEFINE_RES_MEM(0xee0a0000, 0x10000),	/* MEM */
++	DEFINE_RES_IRQ(gic_spi(112)),
 +};
 +
-+static struct resource sdhi0_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xee100000, 0x200),
-+	DEFINE_RES_IRQ(gic_spi(165)),
++static const struct platform_device_info pci1_info __initconst = {
++	.parent		= &platform_bus,
++	.name		= "pci-rcar-gen2",
++	.id		= 1,
++	.res		= pci1_resources,
++	.num_res	= ARRAY_SIZE(pci1_resources),
++	.dma_mask	= DMA_BIT_MASK(32),
 +};
 +
-+/* SDHI2 */
-+static struct sh_mobile_sdhi_info sdhi2_info __initdata = {
-+	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
-+			  MMC_CAP_POWER_OFF_CARD,
-+	.tmio_caps2	= MMC_CAP2_NO_MULTI_READ,
-+	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT |
-+			  TMIO_MMC_WRPROTECT_DISABLE,
++static void __init lager_add_usb1_device(void)
++{
++	platform_device_register_full(&pci1_info);
++}
++
++/* Internal PCI2 */
++static const struct resource pci2_resources[] __initconst = {
++	DEFINE_RES_MEM(0xee0d0000, 0x10000),	/* CFG */
++	DEFINE_RES_MEM(0xee0c0000, 0x10000),	/* MEM */
++	DEFINE_RES_IRQ(gic_spi(113)),
 +};
 +
-+static struct resource sdhi2_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xee140000, 0x100),
-+	DEFINE_RES_IRQ(gic_spi(167)),
++static const struct platform_device_info pci2_info __initconst = {
++	.parent		= &platform_bus,
++	.name		= "pci-rcar-gen2",
++	.id		= 2,
++	.res		= pci2_resources,
++	.num_res	= ARRAY_SIZE(pci2_resources),
++	.dma_mask	= DMA_BIT_MASK(32),
 +};
++
++static void __init lager_add_usb2_device(void)
++{
++	platform_device_register_full(&pci2_info);
++}
 +
  static const struct pinctrl_map lager_pinctrl_map[] = {
  	/* DU (CN10: ARGB0, CN13: LVDS) */
  	PIN_MAP_MUX_GROUP_DEFAULT("rcar-du-r8a7790", "pfc-r8a7790",
-@@ -612,6 +655,20 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
- 	/* SCIF1 (CN20: DEBUG SERIAL1) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.7", "pfc-r8a7790",
- 				  "scif1_data", "scif1"),
-+	/* SDHI0 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7790",
-+				  "sdhi0_data4", "sdhi0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7790",
-+				  "sdhi0_ctrl", "sdhi0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7790",
-+				  "sdhi0_cd", "sdhi0"),
-+	/* SDHI2 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-r8a7790",
-+				  "sdhi2_data4", "sdhi2"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-r8a7790",
-+				  "sdhi2_ctrl", "sdhi2"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.2", "pfc-r8a7790",
-+				  "sdhi2_cd", "sdhi2"),
- 	/* SSI (CN17: sound) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("rcar_sound", "pfc-r8a7790",
- 				  "ssi0129_ctrl", "ssi"),
-@@ -716,6 +773,13 @@ static void __init lager_add_standard_devices(void)
+@@ -716,6 +758,12 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
+ 	/* USB0 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs", "pfc-r8a7790",
+ 				  "usb0_ovc_vbus", "usb0"),
++	/* USB1 */
++	PIN_MAP_MUX_GROUP_DEFAULT("pci-rcar-gen2.1", "pfc-r8a7790",
++				  "usb1", "usb1"),
++	/* USB2 */
++	PIN_MAP_MUX_GROUP_DEFAULT("pci-rcar-gen2.2", "pfc-r8a7790",
++				  "usb2", "usb2"),
+ };
+ 
+ static void __init lager_add_standard_devices(void)
+@@ -776,6 +824,8 @@ static void __init lager_add_standard_devices(void)
+ 					  &usbhs_phy_pdata,
+ 					  sizeof(usbhs_phy_pdata));
  	lager_register_usbhs();
++	lager_add_usb1_device();
++	lager_add_usb2_device();
  
  	lager_add_rsnd_device();
-+
-+	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 0,
-+					  sdhi0_resources, ARRAY_SIZE(sdhi0_resources),
-+					  &sdhi0_info, sizeof(struct sh_mobile_sdhi_info));
-+	platform_device_register_resndata(&platform_bus, "sh_mobile_sdhi", 2,
-+					  sdhi2_resources, ARRAY_SIZE(sdhi2_resources),
-+					  &sdhi2_info, sizeof(struct sh_mobile_sdhi_info));
- }
  
- /*
 -- 
 1.8.5.2
