@@ -1,42 +1,67 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 21 Feb 2014 09:28:24 -0700
-Subject: [PATCH] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <CA+mB=1L+QM2cKq==mwYesp=E7S2N-xTiN7AoBvbzAO2UMn0qVQ@mail.gmail.com>
-References: <1392564830-5868-1-git-send-email-sthokal@xilinx.com>
- <CAErSpo5FGPhgnp8Gfy-1_Lk7ckCi7U5+z5pLnPU+jScPxD5yUQ@mail.gmail.com>
- <20140219003523.GJ29304@obsidianresearch.com>
- <CA+mB=1KSxkN+mKce5k1n93pmAA_FnWYaqNweWzxd4GD3Mo4PZA@mail.gmail.com>
- <20140220174503.GB19893@obsidianresearch.com>
- <CA+mB=1L+QM2cKq==mwYesp=E7S2N-xTiN7AoBvbzAO2UMn0qVQ@mail.gmail.com>
-Message-ID: <20140221162824.GA4706@obsidianresearch.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 21 Feb 2014 10:30:53 -0600
+Subject: [Patch v6 1/2] dmaengine: qcom_bam_dma: Add device tree binding
+In-Reply-To: <20140221092657.GD7541@e106331-lin.cambridge.arm.com>
+References: <1392964986-5207-1-git-send-email-agross@codeaurora.org>
+ <1392964986-5207-2-git-send-email-agross@codeaurora.org>
+ <20140221092657.GD7541@e106331-lin.cambridge.arm.com>
+Message-ID: <20140221163053.GA3102@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 08:18:00PM +0530, Srikanth Thokala wrote:
+On Fri, Feb 21, 2014 at 09:26:57AM +0000, Mark Rutland wrote:
+> On Fri, Feb 21, 2014 at 06:43:04AM +0000, Andy Gross wrote:
+> > Add device tree binding support for the QCOM BAM DMA driver.
+> > 
+[snip]
+> > +Required properties:
+> > +- compatible:	Must be "qcom,bam-v1.4.0" for MSM8974 V1
+> > +		Must be "qcom,bam-v1.4.1" for MSM8974 V2
+> 
+> This looks a bit odd. How about:
+> 
+> - compatible: must contain:
+>   * "qcom,bam-v1.4.0" for MSM8974 V1
+>   * "qcom,bam-v1.4.1" for MSM8974 V2
+> 
 
-> 00:00.0 Class 0604: Device 10ee:7081
+Agreed.  I'll fix that.
 
-So this is great, a root port bridge is exactly correct - I would
-recommend using device 1 for this (device 0 is the host bridge in most
-cases), but I don't think that has any functional impact.
+> > +- reg: Address range for DMA registers
+> > +- interrupts: single interrupt for this controller
+> 
+> This device only has a single interrupt? Or there's only one we care
+> about at the moment?
+> 
 
->         Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop-
-> ParErr+ Stepping- SERR+ FastB2B- DisINTx-
->         Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort-
-> <TAbort- <MAbort- >SERR- <PERR- INTx-
->         Latency: 0, Cache Line Size: 64 bytes
->         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
->         I/O behind bridge: 00000000-00000fff
->         Memory behind bridge: 00000000-000fffff
->         Prefetchable memory behind bridge: 00000000-000fffff
+Yes only a single interrupt.  I can remove the s.
 
-What is going on here?  These ranges should match the MMIO aperture and
-critically must enclose the downstream bars:
+> > +- #dma-cells: must be <1>
+> > +- clocks: required clock
+> > +- clock-names: name of clock
+> 
+> Either describe the _exact_ name this binding expects for any clocks
+> input, or get rid of clock-names. I would prefer the former.
 
-> 01:00.0 Class 0200: Device 14e4:1677 (rev 11)
->         Region 0: Memory at 60000000 (64-bit, non-prefetchable) [size=64K]
->         Expansion ROM at 60010000 [disabled] [size=64K]
+So then I'd use the full name in the driver file.  That's fine.
 
-So one of those two is not right..
+[snip]
+> > +Client:
+> > +Required properties:
+> > +- dmas: List of dma channel requests
+> > +- dma-names: Names of aforementioned requested channels
+> 
+> Do we really need to describe the client binding? Do we not have a
+> generic DMA binding doc we can refer to?
+> 
 
-Jason
+Originally there was more information in the entry.  It was pared down over time
+and I didn't go back to referencing the generic doc.  I'll do this and that'll
+fix this and your next comment.
+
+[snip]
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
