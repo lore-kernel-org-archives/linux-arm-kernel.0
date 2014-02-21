@@ -1,122 +1,76 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 21 Feb 2014 19:33:44 +0100
-Subject: [PATCH v2 2/4] arm64: defer reloading a task's FPSIMD state to
- userland resume
-In-Reply-To: <20140221174855.GD25351@arm.com>
-References: <1391620418-3999-1-git-send-email-ard.biesheuvel@linaro.org>
- <1391620418-3999-3-git-send-email-ard.biesheuvel@linaro.org>
- <20140221174855.GD25351@arm.com>
-Message-ID: <CAKv+Gu_JKXZKnOvxRHiqH12jRUsA4AHkFrpMFAtqxPzyM1HyAQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 21 Feb 2014 19:45:02 +0100
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <53079871.8080801@keymile.com>
+References: <53039894.10905@keymile.com> <20140218212751.07c2aeb5@skate>
+ <53046D98.6020801@keymile.com> <20140219102658.76eec91e@skate>
+ <53047BBB.6040108@keymile.com> <20140219143749.65ff3155@skate>
+ <CAErSpo4=6VgJazaErcx=ztKhZ_62xBrQ6K1eN_dVpvV4R0T2ag@mail.gmail.com>
+ <20140220095518.7ca36f0a@skate>
+ <20140220173518.GA19893@obsidianresearch.com>
+ <20140220212914.29ddc031@skate>
+ <20140221003227.GF19893@obsidianresearch.com>
+ <20140221093444.35870a73@skate> <5307152D.3020804@keymile.com>
+ <20140221101218.45766e8a@skate> <53071970.1040400@keymile.com>
+ <20140221103936.56b3d9f8@skate> <53074584.5010202@keymile.com>
+ <20140221144708.48559045@skate> <53079871.8080801@keymile.com>
+Message-ID: <20140221194502.42d3742d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 February 2014 18:48, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Feb 05, 2014 at 05:13:36PM +0000, Ard Biesheuvel wrote:
->> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
->> index 7807974b49ee..f7e70f3f1eb7 100644
->> --- a/arch/arm64/include/asm/fpsimd.h
->> +++ b/arch/arm64/include/asm/fpsimd.h
->> @@ -37,6 +37,8 @@ struct fpsimd_state {
->>                       u32 fpcr;
->>               };
->>       };
->> +     /* the id of the last cpu to have restored this state */
->> +     unsigned int last_cpu;
->
-> Just "cpu" is enough.
->
+Dear Gerlando Falauto,
 
-OK
+On Fri, 21 Feb 2014 19:18:25 +0100, Gerlando Falauto wrote:
 
-[...]
+> > Hum, right. This is a bit weird, maybe I should change that, I don't
+> > think the mvebu-mbus driver should accept 1-byte offset sizes.
+> 
+> I don't know anything about this, I only know the size dumped is of the 
+> form 0x...ffff, that's all.
 
->>  /*
->> + * In order to reduce the number of times the fpsimd state is needlessly saved
->> + * and restored, keep track here of which task's userland owns the current state
->> + * of the FPSIMD register file.
->> + *
->> + * This percpu variable points to the fpsimd_state.last_cpu field of the task
->> + * whose FPSIMD state was most recently loaded onto this cpu. The last_cpu field
->> + * itself contains the id of the cpu onto which the task's FPSIMD state was
->> + * loaded most recently. So, to decide whether we can skip reloading the FPSIMD
->> + * state, we need to check
->> + * (a) whether this task was the last one to have its FPSIMD state loaded onto
->> + *     this cpu
->> + * (b) whether this task may have manipulated its FPSIMD state on another cpu in
->> + *     the meantime
->> + */
->> +static DEFINE_PER_CPU(unsigned int *, fpsimd_last_task);
->
-> This can simply be struct fpsimd_state * to avoid &st->last_cpu. Also
-> rename to fpsimd_state_last.
->
+I'll have to look into this.
 
-OK
+> >> # cat /sys/kernel/debug/mvebu-mbus/devices
+> >> [00] 00000000e8000000 - 00000000ec000000 : pcie0.0 (remap 00000000e8000000)
+> >> [01] disabled
+> >> [02] disabled
+> >> [03] disabled
+> >> [04] 00000000ff000000 - 00000000ff010000 : nand
+> >> [05] 00000000f4000000 - 00000000f8000000 : vpcie
+> >> [06] 00000000fe000000 - 00000000fe010000 : dragonite
+> >> [07] 00000000e0000000 - 00000000e8000000 : pcie0.0
+> >
+> > This seems correct: we have two windows pointing to the same device,
+> > and they have consecutive addresses.
+> 
+> I don't know how to interpret the (remap ... ) bit, but yes, this looks 
+> right to me as well. I just don't know why mbus window 7 gets picked 
+> before 0, but apart from that, it looks nice.
 
->> +
->> +/*
->>   * Trapped FP/ASIMD access.
->>   */
->>  void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
->> @@ -76,36 +93,84 @@ void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
->>
->>  void fpsimd_thread_switch(struct task_struct *next)
->>  {
->> -     /* check if not kernel threads */
->> -     if (current->mm)
->> +     /*
->> +      * The thread flag TIF_FOREIGN_FPSTATE conveys that the userland FPSIMD
->> +      * state belonging to the current task is not present in the registers
->> +      * but has (already) been saved to memory in order for the kernel to be
->> +      * able to go off and use the registers for something else. Therefore,
->> +      * we must not (re)save the register contents if this flag is set.
->> +      */
->> +     if (current->mm && !test_thread_flag(TIF_FOREIGN_FPSTATE))
->>               fpsimd_save_state(&current->thread.fpsimd_state);
->> -     if (next->mm)
->> -             fpsimd_load_state(&next->thread.fpsimd_state);
->> +
->> +     if (next->mm) {
->> +             /*
->> +              * If we are switching to a task whose most recent userland
->> +              * FPSIMD contents are already in the registers of *this* cpu,
->> +              * we can skip loading the state from memory. Otherwise, set
->> +              * the TIF_FOREIGN_FPSTATE flag so the state will be loaded
->> +              * upon the next entry of userland.
->
-> I would say "return" instead of "entry" (we enter the kernel and return
-> to user space ;)).
->
+Basically, some windows have an additional capability: they are
+"remappable". On Kirkwood, the first 4 windows are remappable, and the
+last 4 are not. Therefore, unless you request a remappable window, we
+allocate a non-remappable one, which is why window 4 to 7 get used
+first. And then, even though we don't need the remappable feature for
+the last window, there are no more non-remappable windows available, so
+window 0 gets allocated for our second PCIe window.
 
-OK
+It matches fine with the expected behavior of the mvebu-mbus driver.
 
->> +              */
->> +             struct fpsimd_state *st = &next->thread.fpsimd_state;
->> +
->> +             if (__get_cpu_var(fpsimd_last_task) == &st->last_cpu
->> +                 && st->last_cpu == smp_processor_id())
->> +                     clear_ti_thread_flag(task_thread_info(next),
->> +                                          TIF_FOREIGN_FPSTATE);
->> +             else
->> +                     set_ti_thread_flag(task_thread_info(next),
->> +                                        TIF_FOREIGN_FPSTATE);
->> +     }
->>  }
->
-> I'm still trying to get my head around why we have 3 different type of
-> checks for this (fpsimd_last_task, last_cpu and TIF). The code seems
-> correct but I wonder whether we can reduce this to 2 checks?
->
+> > Did you check that what you read from BAR0 (which is mapped on the new
+> > MBUS window) is really what you expect, and not just the same thing as
+> > BAR1 accessible for the big window? I just want to make sure that the
+> > hardware indeed properly handles two windows for the same device.
+> 
+> Yes, there's no way the two BARs could be aliased. It's a fairly complex 
+> FPGA design, where BAR1 is the huge address space for a PCI-to-localbus 
+> bridge (whose connected devices are recognized correctly) and BAR0 is 
+> the control BAR (and its registers are read and written without a problem).
 
-Well, I suppose using the TIF flag is somewhat redundant, it is
-basically a shorthand for expressing that the following does /not/
-hold
+Great, so it means that it really works!
 
-__get_cpu_var(fpsimd_last_state) == &current->thread.fpsimd_state &&
-current->thread.fpsimd_state.cpu == smp_processor_id()
-
-I suppose that the test at resume can tolerate the overhead, so I can
-rework the code to get rid of it.
-
-Regards,
-Ard.
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
