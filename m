@@ -1,41 +1,162 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 21 Feb 2014 11:51:45 +0000
-Subject: [RFC PATCH 2/2] arm: mm: Double logical invert for LPAE
- pte_write(), pte_dirty()
-In-Reply-To: <20140221112812.GC21483@n2100.arm.linux.org.uk>
-References: <1392396913-13570-1-git-send-email-steve.capper@linaro.org>
- <1392396913-13570-3-git-send-email-steve.capper@linaro.org>
- <20140221112812.GC21483@n2100.arm.linux.org.uk>
-Message-ID: <20140221115145.GA7591@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 21 Feb 2014 12:15:48 +0000
+Subject: [PATCH] ARM: EDMA: Use platform_get_resource functions for DT
+In-Reply-To: <1392956661-28787-1-git-send-email-joelf@ti.com>
+References: <1392956661-28787-1-git-send-email-joelf@ti.com>
+Message-ID: <20140221121548.GF8783@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 11:28:12AM +0000, Russell King - ARM Linux wrote:
-> On Fri, Feb 14, 2014 at 04:55:13PM +0000, Steve Capper wrote:
-> > On LPAE, L_PTE_WRITE and L_PTE_DIRTY are in the upper 32-bits.
-> > Unfortunately, results from pte_write() and pte_dirty() are downcast
-> > to 32-bits by core code:
-> >   o gather_stats
-> >   o huge_pte_dirty
-> >   o huge_pte_write
-> >   o make_migration_entry
-> > 
-> > This patch adds a double logical invert to pte_write() and pte_dirty()
-> > for LPAE to ensure that the lower 32-bits are set if true.
-> 
-> We should ensure all those functions return something which is compatible
-> with "int" correctly.  It didn't matter for non-LPAE as the PTEs fit in
-> 32-bit, but with LPAE, that really needs fixing independently of your
-> other patch.
+On Fri, Feb 21, 2014 at 04:24:21AM +0000, Joel Fernandes wrote:
+> Currently, EDMA driver uses of_address_to_resource for getting Channel
+> controller and x-bar register resources. Use platform_get_resource_by_name
+> instead regardless of whether its DT-boot or not, document the new reg-names
+> properties.
 
-Agreed, I'm getting that written/tested now for arm and arm64.
+Doesn't this break existing DTBs?
+
+> 
+> Also, while at it get rid of the assumption in the code that "CC" is at reg
+> index 0 in the DT and xbar is at offset 1. Instead use reg-names to get the
+> memory resource in concern keeping things much cleaner and simpler. This also
+> makes it possible to have multiple channel controllers.
+
+While this is nice I think we have to have a fallback to the existing
+behaviour if there's no reg-names property present, unless we know for
+certain no-one is possibly using an existing DTB.
 
 Cheers,
--- 
-Steve
+Mark.
 
 > 
+> Signed-off-by: Joel Fernandes <joelf@ti.com>
+> ---
+>  Documentation/devicetree/bindings/dma/ti-edma.txt |    7 ++++++
+>  arch/arm/boot/dts/am33xx.dtsi                     |    1 +
+>  arch/arm/boot/dts/am4372.dtsi                     |    1 +
+>  arch/arm/common/edma.c                            |   28 ++++++++++-----------
+>  4 files changed, 22 insertions(+), 15 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
+> index 9fbbdb7..176e42b 100644
+> --- a/Documentation/devicetree/bindings/dma/ti-edma.txt
+> +++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
+> @@ -8,6 +8,12 @@ Required properties:
+>                Clients should use a single channel number per DMA request.
+>  - dma-channels: Specify total DMA channels per CC
+>  - reg: Memory map for accessing module
+> +- reg-names: Since there can be different memory regions, each reg
+> +  entry should correspond to one of the following reg-names (X being 0 to N):
+> +	edma_ccX: memory map for Xth Channel Controller
+> +	edma_tcX: memory map for Xth Transfer Controller
+> +	Additionally there can be a memory map for xbar (in control module):
+> +		edma_xbar: memory map for xbar access.
+>  - interrupt-parent: Interrupt controller the interrupt is routed through
+>  - interrupts: Exactly 3 interrupts need to be specified in the order:
+>                1. Transfer completion interrupt.
+> @@ -21,6 +27,7 @@ Example:
+>  
+>  edma: edma at 49000000 {
+>  	reg = <0x49000000 0x10000>;
+> +	reg-names = "edma_cc0";
+>  	interrupt-parent = <&intc>;
+>  	interrupts = <12 13 14>;
+>  	compatible = "ti,edma3";
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 2b66e67..55f5723 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -123,6 +123,7 @@
+>  			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+>  			reg =	<0x49000000 0x10000>,
+>  				<0x44e10f90 0x10>;
+> +			reg-names = "edma_cc0", "edma_xbar";
+>  			interrupts = <12 13 14>;
+>  			#dma-cells = <1>;
+>  			dma-channels = <64>;
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index babdc84..1323a97 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -100,6 +100,7 @@
+>  			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
+>  			reg =	<0x49000000 0x10000>,
+>  				<0x44e10f90 0x10>;
+> +			reg-names = "edma_cc0", "edma_xbar";
+>  			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
+>  					<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
+>  					<GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index dc95efc..ae0ccae 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
+> @@ -1458,10 +1458,11 @@ static int edma_xbar_event_map(struct device *dev,
+>  			       struct edma_soc_info *pdata, int len)
+>  {
+>  	int ret, i;
+> -	struct resource res;
+> +	struct resource *res;
+>  	void __iomem *xbar;
+>  	const s16 (*xbar_chans)[2];
+>  	u32 shift, offset, mux;
+> +	struct platform_device *pdev;
+>  
+>  	xbar_chans = devm_kzalloc(dev,
+>  				  len/sizeof(s16) + 2*sizeof(s16),
+> @@ -1469,11 +1470,14 @@ static int edma_xbar_event_map(struct device *dev,
+>  	if (!xbar_chans)
+>  		return -ENOMEM;
+>  
+> -	ret = of_address_to_resource(node, 1, &res);
+> -	if (ret)
+> +	pdev = to_platform_device(dev);
+> +	res = platform_get_resource_byname(pdev,
+> +					   IORESOURCE_MEM,
+> +					   "edma_xbar");
+> +	if (!res)
+>  		return -EIO;
+>  
+> -	xbar = devm_ioremap(dev, res.start, resource_size(&res));
+> +	xbar = devm_ioremap(dev, res->start, resource_size(res));
+>  	if (!xbar)
+>  		return -ENOMEM;
+>  
+> @@ -1614,7 +1618,6 @@ static int edma_probe(struct platform_device *pdev)
+>  	int			irq[EDMA_MAX_CC] = {0, 0};
+>  	int			err_irq[EDMA_MAX_CC] = {0, 0};
+>  	struct resource		*r[EDMA_MAX_CC] = {NULL};
+> -	struct resource		res[EDMA_MAX_CC];
+>  	char			res_name[10];
+>  	char			irq_name[10];
+>  	struct device_node	*node = pdev->dev.of_node;
+> @@ -1653,16 +1656,11 @@ static int edma_probe(struct platform_device *pdev)
+>  				return -ENODEV;
+>  			break;
+>  		}
+> -		if (node) {
+> -			ret = of_address_to_resource(node, j, &res[j]);
+> -			if (!ret)
+> -				r[j] = &res[j];
+> -		} else {
+> -			sprintf(res_name, "edma_cc%d", j);
+> -			r[j] = platform_get_resource_byname(pdev,
+> -						IORESOURCE_MEM,
+> -						res_name);
+> -		}
+> +
+> +		sprintf(res_name, "edma_cc%d", j);
+> +		r[j] = platform_get_resource_byname(pdev,
+> +					IORESOURCE_MEM,
+> +					res_name);
+>  		if (!r[j]) {
+>  			if (found)
+>  				break;
 > -- 
-> FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-> in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-> Estimate before purchase was "up to 13.2Mbit".
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
