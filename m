@@ -1,131 +1,197 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 21 Feb 2014 17:55:01 +0530
-Subject: [PATCH 1/2] usb: dwc3: core: continue probing if usb phy library
- returns -ENODEV/-ENXIO
-In-Reply-To: <5304A58C.2030306@ti.com>
-References: <1385373690-12170-1-git-send-email-kishon@ti.com>
- <1390299099-14764-1-git-send-email-kishon@ti.com>
- <20140121144725.GF30451@saruman.home> <20140127150855.GA17928@xps8300>
- <20140127160458.GF13268@saruman.home> <20140128153230.GA20991@xps8300>
- <20140128163036.GD28546@saruman.home> <20140129144659.GA22152@xps8300>
- <52FB42DE.4090203@ti.com> <5304A58C.2030306@ti.com>
-Message-ID: <5307459D.9080707@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 21 Feb 2014 13:25:18 +0100
+Subject: [PATCH v5 02/11] drivers: of: add initialization code for static
+ reserved memory
+In-Reply-To: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com>
+References: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1392985527-6260-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+This patch adds support for static (defined by 'reg' property) reserved
+memory regions declared in device tree.
 
-On Wednesday 19 February 2014 06:07 PM, Roger Quadros wrote:
-> Hi,
-> 
-> On 02/12/2014 11:46 AM, Kishon Vijay Abraham I wrote:
->> On Wednesday 29 January 2014 08:17 PM, Heikki Krogerus wrote:
->>> Hi,
->>>
->>> On Tue, Jan 28, 2014 at 10:30:36AM -0600, Felipe Balbi wrote:
->>>> On Tue, Jan 28, 2014 at 05:32:30PM +0200, Heikki Krogerus wrote:
->>>>> On Mon, Jan 27, 2014 at 10:05:20AM -0600, Felipe Balbi wrote:
->>>>> For the controller drivers the PHYs are just a resource like any
->>>>> other. The controller drivers can't have any responsibility of
->>>>> them. They should not care if PHY drivers are available for them or
->>>>> not, or even if the PHY framework is available or not.
->>>>
->>>> huh? If memory isn't available you don't continue probing, right ? If
->>>> your IORESOURCE_MEM is missing, you also don't continue probing, if your
->>>> IRQ line is missing, you bail too. Those are also nothing but resources
->>>> to the driver, what you're asking here is to treat PHY as a _different_
->>>> resource; which might be fine, but we need to make sure we don't
->>>> continue probing when a PHY is missing in a platform that certainly
->>>> needs a PHY.
->>>
->>> Yes, true. In my head I was comparing the PHY only to resources like
->>> gpios, clocks, dma channels, etc. that are often optional to the
->>> drivers.
->>>
->>>>>>>> But I really want to see the argument against using no-op. As far as I
->>>>>>>> could see, everybody needs a PHY driver one way or another, some
->>>>>>>> platforms just haven't sent any PHY driver upstream and have their own
->>>>>>>> hacked up solution to avoid using the PHY layer.
->>>>>>>
->>>>>>> Not true in our case. Platforms using Intel's SoCs and chip sets may
->>>>>>> or may not have controllable USB PHY. Quite often they don't. The
->>>>>>> Baytrails have usually ULPI PHY for USB2, but that does not mean they
->>>>>>> provide any vendor specific functions or any need for a driver in any
->>>>>>> case.
->>>>>>
->>>>>> that's different from what I heard.
->>>>>
->>>>> I don't know where you got that impression, but it's not true. The
->>>>> Baytrail SoCs for example don't have internal USB PHYs, which means
->>>>> the manufacturers using it can select what they want. So we have
->>>>> boards where PHY driver(s) is needed and boards where it isn't.
->>>>
->>>> alright, that explains it ;-) So you have external USB2 and USB3 PHYs ?
->>>> You have an external PIPE3 interface ? That's quite an achievement,
->>>> kudos to your HW designers. Getting timing closure on PIPE3 is a
->>>> difficult task.
->>>
->>> No, only the USB2 PHY is external. I'm giving you wrong information,
->>> I'm sorry about that. Need to concentrate on what I'm writing.
->>>
->>> <snip>
->>>
->>>>> This is really good to get. We have some projects where we are dealing
->>>>> with more embedded environments, like IVI, where the kernel should be
->>>>> stripped of everything useless. Since the PHYs are autonomous, we
->>>>> should be able to disable the PHY libraries/frameworks.
->>>>
->>>> hmmm, in that case it's a lot easier to treat. We can use
->>>> ERR_PTR(-ENXIO) as an indication that the framework is disabled, or
->>>> something like that.
->>>>
->>>> The difficult is really reliably supporting e.g. OMAP5 (which won't work
->>>> without a PHY) and your BayTrail with autonomous PHYs. What can we use
->>>> as an indication ?
->>>
->>> OMAP has it's own glue driver, so shouldn't it depend on the PHY
->>> layer?
->>
->> right, but the PHY is connected to the dwc3 core and not to the glue.
->>>
->>>> I mean, I need to know that a particular platform depends on a PHY
->>>> driver before I decide to return -EPROBE_DEFER or just assume the PHY
->>>> isn't needed ;-)
->>>
->>> I don't think dwc3 (core) should care about that. The PHY layer needs
->>> to tell us that. If the PHY driver that the platform depends is not
->>> available yet, the PHY layer returns -EPROBE_DEFER and dwc3 ends up
->>> returning -EPROBE_DEFER.
->>
->> I don't think the PHY layer can 'reliably' tell if PHY driver is available or
->> not. Consider when the phy_provider_register fails, there is no way to know if
->> PHY driver is available or not. There are a few cases where PHY layer returns
->> -EPROBE_DEFER but none of them can tell for sure that PHY driver is either
->> available and failed or not available at all. It would be best for us to leave
->> that to the platforms if we want to be sure if the platform needs a PHY or not.
->>
-> 
-> Just to summarize this thread on what we need
+Memory blocks can be reliably reserved only during early boot. This must
+happen before the whole memory management subsystem is initialized,
+because we need to ensure that the given contiguous blocks are not yet
+allocated by kernel. Also it must happen before kernel mappings for the
+whole low memory are created, to ensure that there will be no mappings
+(for reserved blocks). Typically, all this happens before device tree
+structures are unflattened, so we need to get reserved memory layout
+directly from fdt.
 
-Thanks for summarizing.
-> 
-> 1) dwc3 core shouldn't worry about platform specific stuff i.e. PHY needed or not.
-> It should be as generic as possible.
-> 
-> 2) dwc3 core should continue probe even if PHY layer is not enabled, as not all platforms need it.
-> 
-> 3) dwc3 core should continue probe if PHY device is not available. (-ENODEV?)
-> 
-> 4) dwc3 core should error out on any error condition if PHY device is available and caused some error,
-> e.g. init error.
-> 
-> 5) dwc3 core should return EPROBE_DEFER if PHY device is available but device driver is not yet loaded.
-> 
-> 6) platform glue should do the necessary sanity checks for availability of all resources like PHY device, PHY layer, etc, before populating the dwc3 device. e.g. in OMAP5 case we could check if both usb2 and usb3 PHY
-> nodes are available in the DT and PHY layer is enabled, from dwc3-omap.c? In J6 case we could check that at least usb2 phy node is there for the High-Speed only controller, and so on.
+Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
 
-The PHY is connected to the dwc3 core. So I'm not sure if we should be doing
-checks for PHY in the glue layer.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ drivers/of/fdt.c       |  125 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of_fdt.h |    3 ++
+ 2 files changed, 128 insertions(+)
 
-Thanks
-Kishon
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 758b4f8b30b7..12809e20ef71 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -440,6 +440,113 @@ struct boot_param_header *initial_boot_params;
+ #ifdef CONFIG_OF_EARLY_FLATTREE
+ 
+ /**
++ * res_mem_reserve_reg() - reserve all memory described in 'reg' property
++ */
++static int __init __reserved_mem_reserve_reg(unsigned long node,
++					     const char *uname)
++{
++	int t_len = (dt_root_addr_cells + dt_root_size_cells) * sizeof(__be32);
++	phys_addr_t base, size;
++	unsigned long len;
++	__be32 *prop;
++	int nomap;
++
++	prop = of_get_flat_dt_prop(node, "reg", &len);
++	if (!prop)
++		return -ENOENT;
++
++	if (len && len % t_len != 0) {
++		pr_err("Reserved memory: invalid reg property in '%s', skipping node.\n",
++		       uname);
++		return -EINVAL;
++	}
++
++	nomap = of_get_flat_dt_prop(node, "no-map", NULL) != NULL;
++
++	while (len > 0) {
++		base = dt_mem_next_cell(dt_root_addr_cells, &prop);
++		size = dt_mem_next_cell(dt_root_size_cells, &prop);
++
++		if (base && size &&
++		    early_init_dt_reserve_memory_arch(base, size, nomap) == 0)
++			pr_debug("Reserved memory: reserved region for node '%s': base %pa, size %ld MiB\n",
++				uname, &base, (unsigned long)size / SZ_1M);
++		else
++			pr_info("Reserved memory: failed to reserve memory for node '%s': base %pa, size %ld MiB\n",
++				uname, &base, (unsigned long)size / SZ_1M);
++
++		len -= t_len;
++	}
++	return 0;
++}
++
++static int __reserved_mem_check_root(unsigned long node)
++{
++	__be32 *prop;
++
++	prop = of_get_flat_dt_prop(node, "#size-cells", NULL);
++	if (prop && be32_to_cpup(prop) != dt_root_size_cells)
++		return -EINVAL;
++
++	prop = of_get_flat_dt_prop(node, "#address-cells", NULL);
++	if (prop && be32_to_cpup(prop) != dt_root_addr_cells)
++		return -EINVAL;
++
++	prop = of_get_flat_dt_prop(node, "ranges", NULL);
++	if (!prop)
++		return -EINVAL;
++	return 0;
++}
++
++/**
++ * fdt_scan_reserved_mem() - scan a single FDT node for reserved memory
++ */
++static int __init __fdt_scan_reserved_mem(unsigned long node, const char *uname,
++					  int depth, void *data)
++{
++	static int found;
++	const char *status;
++
++	if (!found && depth == 1 && strcmp(uname, "reserved-memory") == 0) {
++		if (__reserved_mem_check_root(node) != 0) {
++			pr_err("Reserved memory: unsupported node format, ignoring\n");
++			/* break scan */
++			return 1;
++		}
++		found = 1;
++		/* scan next node */
++		return 0;
++	} else if (!found) {
++		/* scan next node */
++		return 0;
++	} else if (found && depth < 2) {
++		/* scanning of /reserved-memory has been finished */
++		return 1;
++	}
++
++	status = of_get_flat_dt_prop(node, "status", NULL);
++	if (status && strcmp(status, "okay") != 0 && strcmp(status, "ok") != 0)
++		return 0;
++
++	__reserved_mem_reserve_reg(node, uname);
++
++	/* scan next node */
++	return 0;
++}
++
++/**
++ * early_init_fdt_scan_reserved_mem() - create reserved memory regions
++ *
++ * This function grabs memory from early allocator for device exclusive use
++ * defined in device tree structures. It should be called by arch specific code
++ * once the early allocator (i.e. memblock) has been fully activated.
++ */
++void __init early_init_fdt_scan_reserved_mem(void)
++{
++	of_scan_flat_dt(__fdt_scan_reserved_mem, NULL);
++}
++
++/**
+  * of_scan_flat_dt - scan flattened tree blob and call callback on each.
+  * @it: callback function
+  * @data: context data pointer
+@@ -856,6 +963,16 @@ void __init __weak early_init_dt_add_memory_arch(u64 base, u64 size)
+ 	memblock_add(base, size);
+ }
+ 
++int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
++					phys_addr_t size, bool nomap)
++{
++	if (memblock_is_region_reserved(base, size))
++		return -EBUSY;
++	if (nomap)
++		return memblock_remove(base, size);
++	return memblock_reserve(base, size);
++}
++
+ /*
+  * called from unflatten_device_tree() to bootstrap devicetree itself
+  * Architectures can override this definition if memblock isn't used
+@@ -864,6 +981,14 @@ void * __init __weak early_init_dt_alloc_memory_arch(u64 size, u64 align)
+ {
+ 	return __va(memblock_alloc(size, align));
+ }
++#else
++int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
++					phys_addr_t size, bool nomap)
++{
++	pr_error("Reserved memory not supported, ignoring range 0x%llx - 0x%llx%s\n",
++		  base, size, nomap ? " (nomap)" : "");
++	return -ENOSYS;
++}
+ #endif
+ 
+ bool __init early_init_dt_scan(void *params)
+diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+index 2b77058a7335..8610ad8d77d2 100644
+--- a/include/linux/of_fdt.h
++++ b/include/linux/of_fdt.h
+@@ -98,7 +98,10 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
+ 				     int depth, void *data);
+ extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
+ 				     int depth, void *data);
++extern void early_init_fdt_scan_reserved_mem(void);
+ extern void early_init_dt_add_memory_arch(u64 base, u64 size);
++extern int early_init_dt_reserve_memory_arch(phys_addr_t base, phys_addr_t size,
++					     bool no_map);
+ extern void * early_init_dt_alloc_memory_arch(u64 size, u64 align);
+ extern u64 dt_mem_next_cell(int s, __be32 **cellp);
+ 
+-- 
+1.7.9.5
