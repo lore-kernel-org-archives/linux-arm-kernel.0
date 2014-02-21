@@ -1,35 +1,37 @@
-From: mporter@linaro.org (Matt Porter)
-Date: Fri, 21 Feb 2014 11:54:21 -0500
-Subject: [PATCH v6 0/8] ARM: brcmstb: Add Broadcom STB SoC support
-In-Reply-To: <CAGVrzcZTHZYaB7sEDxFrP3PzZh0y-daS0gqg2Z4PUzuWGFeiSw@mail.gmail.com>
-References: <1391463041-15241-1-git-send-email-marc.ceeeee@gmail.com>
- <CAGVrzcZTHZYaB7sEDxFrP3PzZh0y-daS0gqg2Z4PUzuWGFeiSw@mail.gmail.com>
-Message-ID: <20140221165421.GM5038@beef>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 21 Feb 2014 16:54:30 +0000
+Subject: [PATCH 0/3] ARM: perf: updates for 3.15
+Message-ID: <1393001673-8589-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 04:41:32PM -0800, Florian Fainelli wrote:
-> Matt,
-> 
-> 2014-02-03 13:30 GMT-08:00 Marc Carino <marc.ceeeee@gmail.com>:
-> > This patchset contains the board support package for the
-> > Broadcom BCM7445 ARM-based SoC [1]. These changes contain a
-> > minimal set of code needed for a BCM7445-based board to boot
-> > the Linux kernel.
-> 
-> If you are happy with this round of changes, can you also carry those
-> patches in your tree for 3.15?
+Hello,
 
-I had to add a couple trivial comments on the dts that I missed back in
-v2.
+Here is a handful of ARM perf patches that I plan to push for 3.15 that
+I don't think have previously been on the list. I've also got Stephen
+Boyd's series adding support for Krait, but they've already been reviewed
+here.
 
-More importantly, you'll need to collect some acks on various pieces. In
-particular the power/reset driver needs a maintainer ack to go in via
-arm-soc. I'd also like to see an ack from Arnd since he provided a lot
-of the comments. Also, we need Russell's ack on the debug and proc-v7.S
-patches.
+Cheers,
 
-I'll note that the drivers/power maintainers aren't cced on this posting
-so they probably didn't notice that driver.
+Will
 
--Matt
+--->8
+
+Albin Tonnerre (1):
+  ARM: perf: add support for the Cortex-A12 PMU
+
+Mark Rutland (1):
+  ARM: perf: remove unused PMU probing code
+
+Will Deacon (1):
+  ARM: perf: hook up perf_sample_event_took around pmu irq handling
+
+ Documentation/devicetree/bindings/arm/pmu.txt |   1 +
+ arch/arm/kernel/perf_event.c                  |  11 +-
+ arch/arm/kernel/perf_event_cpu.c              |  10 +-
+ arch/arm/kernel/perf_event_v7.c               | 158 ++++++++++++++++++++++++++
+ 4 files changed, 169 insertions(+), 11 deletions(-)
+
+-- 
+1.8.2.2
