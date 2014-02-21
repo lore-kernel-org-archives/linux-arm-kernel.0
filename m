@@ -1,45 +1,70 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Feb 2014 15:12:37 +0900
-Subject: [PATCH 1/5] ARM: shmobile: lager defconfig: Enable RSPI and MTD_M25P80
-In-Reply-To: <cover.1392962286.git.horms+renesas@verge.net.au>
-References: <cover.1392962286.git.horms+renesas@verge.net.au>
-Message-ID: <917163578a3dcfa3bfc05cc3bfc2653e2994971b.1392962286.git.horms+renesas@verge.net.au>
+Date: Fri, 21 Feb 2014 15:12:39 +0900
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Defconfig Updates for
+ v3.15
+Message-ID: <cover.1392962286.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-This enables support for the Spansion s25fl512s SPI FLASH on QSPI.
+Please consider this third round of Renesas ARM based SoC defconfig
+updates for v3.15.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-Acked-by: Magnus Damm <damm@opensource.se>
-[horms+renesas at verge.net.au: resolved conflict]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/lager_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+This pull request is based on the previous round of
+such requests, tagged as renesas-defconfig2-for-v3.15,
+which I have already sent a pull-request for.
 
-diff --git a/arch/arm/configs/lager_defconfig b/arch/arm/configs/lager_defconfig
-index b17f487..5870244 100644
---- a/arch/arm/configs/lager_defconfig
-+++ b/arch/arm/configs/lager_defconfig
-@@ -51,6 +51,8 @@ CONFIG_IP_PNP_DHCP=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_MTD=y
-+CONFIG_MTD_M25P80=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_ATA=y
- CONFIG_SATA_RCAR=y
-@@ -86,6 +88,8 @@ CONFIG_SERIAL_SH_SCI_CONSOLE=y
- CONFIG_I2C=y
- CONFIG_I2C_GPIO=y
- CONFIG_I2C_RCAR=y
-+CONFIG_SPI=y
-+CONFIG_SPI_RSPI=y
- CONFIG_GPIO_SH_PFC=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_RCAR=y
--- 
-1.8.5.2
+
+The following changes since commit 8f33d31ee270f2a6bcc661815a520f76565674c3:
+
+  ARM: shmobile: genmai defconfig: Enable RSPI (2014-02-06 20:53:59 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig3-for-v3.15
+
+for you to fetch changes up to 7573e89ba1fcbe492c52d5b1e72fcf5d23da21d1:
+
+  ARM: shmobile: r7s72100: update defconfig for I2C usage (2014-02-18 11:36:33 +0900)
+
+----------------------------------------------------------------
+Third Round of Renesas ARM Based SoC Defconfig Updates for v3.15
+
+* r7s72100 (RZ/A1H) based Genmai board
+  - update defconfig for I2C usage
+
+* r8a7791 (R-Car M2) based Koelsch board
+  - Enable SDHI, GPIO and regulators in defconfig
+
+* r8a7790 (R-Car H2) based Lager board
+  - Enable RSPI and MTD_M25P80
+
+* emev2 (Emma Mobile) based KZM9D board
+  - Remove legacy KZM9D defconfig
+
+* Multiplatform
+  - Add defconfig for shmobile multiplatform
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: lager defconfig: Enable RSPI and MTD_M25P80
+
+Magnus Damm (1):
+      ARM: shmobile: Get rid of legacy KZM9D defconfig
+
+Simon Horman (2):
+      ARM: shmobile: Add defconfig for shmobile multiplatform
+      ARM: shmobile: koelsch: Enable SDHI, GPIO and regulators in defconfig
+
+Wolfram Sang (1):
+      ARM: shmobile: r7s72100: update defconfig for I2C usage
+
+ arch/arm/configs/genmai_defconfig   |   4 +-
+ arch/arm/configs/koelsch_defconfig  |   9 +++
+ arch/arm/configs/kzm9d_defconfig    |  91 -------------------------
+ arch/arm/configs/lager_defconfig    |   4 ++
+ arch/arm/configs/shmobile_defconfig | 129 ++++++++++++++++++++++++++++++++++++
+ 5 files changed, 145 insertions(+), 92 deletions(-)
+ delete mode 100644 arch/arm/configs/kzm9d_defconfig
+ create mode 100644 arch/arm/configs/shmobile_defconfig
