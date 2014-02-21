@@ -1,162 +1,120 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Feb 2014 12:15:48 +0000
-Subject: [PATCH] ARM: EDMA: Use platform_get_resource functions for DT
-In-Reply-To: <1392956661-28787-1-git-send-email-joelf@ti.com>
-References: <1392956661-28787-1-git-send-email-joelf@ti.com>
-Message-ID: <20140221121548.GF8783@e106331-lin.cambridge.arm.com>
+From: gerlando.falauto@keymile.com (Gerlando Falauto)
+Date: Fri, 21 Feb 2014 13:24:36 +0100
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <20140221103936.56b3d9f8@skate>
+References: <53039894.10905@keymile.com>	<20140218212751.07c2aeb5@skate>	<53046D98.6020801@keymile.com>	<20140219102658.76eec91e@skate>	<53047BBB.6040108@keymile.com>	<20140219143749.65ff3155@skate>	<CAErSpo4=6VgJazaErcx=ztKhZ_62xBrQ6K1eN_dVpvV4R0T2ag@mail.gmail.com>	<20140220095518.7ca36f0a@skate>	<20140220173518.GA19893@obsidianresearch.com>	<20140220212914.29ddc031@skate>	<20140221003227.GF19893@obsidianresearch.com>	<20140221093444.35870a73@skate>	<5307152D.3020804@keymile.com>	<20140221101218.45766e8a@skate>	<53071970.1040400@keymile.com>
+ <20140221103936.56b3d9f8@skate>
+Message-ID: <53074584.5010202@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 04:24:21AM +0000, Joel Fernandes wrote:
-> Currently, EDMA driver uses of_address_to_resource for getting Channel
-> controller and x-bar register resources. Use platform_get_resource_by_name
-> instead regardless of whether its DT-boot or not, document the new reg-names
-> properties.
+Hi Thomas,
 
-Doesn't this break existing DTBs?
+On 02/21/2014 10:39 AM, Thomas Petazzoni wrote:
+> Dear Gerlando Falauto,
 
-> 
-> Also, while at it get rid of the assumption in the code that "CC" is at reg
-> index 0 in the DT and xbar is at offset 1. Instead use reg-names to get the
-> memory resource in concern keeping things much cleaner and simpler. This also
-> makes it possible to have multiple channel controllers.
+[...]
 
-While this is nice I think we have to have a fallback to the existing
-behaviour if there's no reg-names property present, unless we know for
-certain no-one is possibly using an existing DTB.
+>> I guess it would then also be useful to restore my previous setup, where
+>> the total PCIe aperture is 192MB, right?
+>
+> Yes, that's the case I'm interested in at the moment. If you could try
+> the above (ugly) patch, and see if you can access all your device BARs,
+> it would be interesting. It would tell us if two separate windows
+> having the same target/attribute and consecutive placement in the
+> physical address space can actually work to address a given PCIe
+> device. As you will see, the patch makes a very ugly special case for
+> 192 MB :-)
+>
 
-Cheers,
-Mark.
+So I restored the total aperture size to 192MB.
+I had to rework your patch a bit because:
 
-> 
-> Signed-off-by: Joel Fernandes <joelf@ti.com>
-> ---
->  Documentation/devicetree/bindings/dma/ti-edma.txt |    7 ++++++
->  arch/arm/boot/dts/am33xx.dtsi                     |    1 +
->  arch/arm/boot/dts/am4372.dtsi                     |    1 +
->  arch/arm/common/edma.c                            |   28 ++++++++++-----------
->  4 files changed, 22 insertions(+), 15 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> index 9fbbdb7..176e42b 100644
-> --- a/Documentation/devicetree/bindings/dma/ti-edma.txt
-> +++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> @@ -8,6 +8,12 @@ Required properties:
->                Clients should use a single channel number per DMA request.
->  - dma-channels: Specify total DMA channels per CC
->  - reg: Memory map for accessing module
-> +- reg-names: Since there can be different memory regions, each reg
-> +  entry should correspond to one of the following reg-names (X being 0 to N):
-> +	edma_ccX: memory map for Xth Channel Controller
-> +	edma_tcX: memory map for Xth Transfer Controller
-> +	Additionally there can be a memory map for xbar (in control module):
-> +		edma_xbar: memory map for xbar access.
->  - interrupt-parent: Interrupt controller the interrupt is routed through
->  - interrupts: Exactly 3 interrupts need to be specified in the order:
->                1. Transfer completion interrupt.
-> @@ -21,6 +27,7 @@ Example:
->  
->  edma: edma at 49000000 {
->  	reg = <0x49000000 0x10000>;
-> +	reg-names = "edma_cc0";
->  	interrupt-parent = <&intc>;
->  	interrupts = <12 13 14>;
->  	compatible = "ti,edma3";
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 2b66e67..55f5723 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -123,6 +123,7 @@
->  			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
->  			reg =	<0x49000000 0x10000>,
->  				<0x44e10f90 0x10>;
-> +			reg-names = "edma_cc0", "edma_xbar";
->  			interrupts = <12 13 14>;
->  			#dma-cells = <1>;
->  			dma-channels = <64>;
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> index babdc84..1323a97 100644
-> --- a/arch/arm/boot/dts/am4372.dtsi
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -100,6 +100,7 @@
->  			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
->  			reg =	<0x49000000 0x10000>,
->  				<0x44e10f90 0x10>;
-> +			reg-names = "edma_cc0", "edma_xbar";
->  			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
->  					<GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
->  					<GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-> index dc95efc..ae0ccae 100644
-> --- a/arch/arm/common/edma.c
-> +++ b/arch/arm/common/edma.c
-> @@ -1458,10 +1458,11 @@ static int edma_xbar_event_map(struct device *dev,
->  			       struct edma_soc_info *pdata, int len)
->  {
->  	int ret, i;
-> -	struct resource res;
-> +	struct resource *res;
->  	void __iomem *xbar;
->  	const s16 (*xbar_chans)[2];
->  	u32 shift, offset, mux;
-> +	struct platform_device *pdev;
->  
->  	xbar_chans = devm_kzalloc(dev,
->  				  len/sizeof(s16) + 2*sizeof(s16),
-> @@ -1469,11 +1470,14 @@ static int edma_xbar_event_map(struct device *dev,
->  	if (!xbar_chans)
->  		return -ENOMEM;
->  
-> -	ret = of_address_to_resource(node, 1, &res);
-> -	if (ret)
-> +	pdev = to_platform_device(dev);
-> +	res = platform_get_resource_byname(pdev,
-> +					   IORESOURCE_MEM,
-> +					   "edma_xbar");
-> +	if (!res)
->  		return -EIO;
->  
-> -	xbar = devm_ioremap(dev, res.start, resource_size(&res));
-> +	xbar = devm_ioremap(dev, res->start, resource_size(res));
->  	if (!xbar)
->  		return -ENOMEM;
->  
-> @@ -1614,7 +1618,6 @@ static int edma_probe(struct platform_device *pdev)
->  	int			irq[EDMA_MAX_CC] = {0, 0};
->  	int			err_irq[EDMA_MAX_CC] = {0, 0};
->  	struct resource		*r[EDMA_MAX_CC] = {NULL};
-> -	struct resource		res[EDMA_MAX_CC];
->  	char			res_name[10];
->  	char			irq_name[10];
->  	struct device_node	*node = pdev->dev.of_node;
-> @@ -1653,16 +1656,11 @@ static int edma_probe(struct platform_device *pdev)
->  				return -ENODEV;
->  			break;
->  		}
-> -		if (node) {
-> -			ret = of_address_to_resource(node, j, &res[j]);
-> -			if (!ret)
-> -				r[j] = &res[j];
-> -		} else {
-> -			sprintf(res_name, "edma_cc%d", j);
-> -			r[j] = platform_get_resource_byname(pdev,
-> -						IORESOURCE_MEM,
-> -						res_name);
-> -		}
-> +
-> +		sprintf(res_name, "edma_cc%d", j);
-> +		r[j] = platform_get_resource_byname(pdev,
-> +					IORESOURCE_MEM,
-> +					res_name);
->  		if (!r[j]) {
->  			if (found)
->  				break;
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+a) I'm running an older kernel and driver
+b) sizes are actually 1-byte offset
+
+So here it is:
+
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index dd4445f..27fe162 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -251,11 +251,13 @@ static int mvebu_mbus_window_conflicts(struct 
+mvebu_mbus_state *mbus,
+  		if ((u64)base < wend && end > wbase)
+  			return 0;
+
++#if 0
+  		/*
+  		 * Check if target/attribute conflicts
+  		 */
+  		if (target == wtarget && attr == wattr)
+  			return 0;
++#endif
+  	}
+
+  	return 1;
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index c8397c4..120a822 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -332,10 +332,21 @@ static void 
+mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+  		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+  		port->memwin_base;
+
+-	mvebu_mbus_add_window_remap_flags(port->name, port->memwin_base,
+-					  port->memwin_size,
+-					  MVEBU_MBUS_NO_REMAP,
+-					  MVEBU_MBUS_PCI_MEM);
++	if (port->memwin_size + 1 == (SZ_128M + SZ_64M)) {
++		mvebu_mbus_add_window_remap_flags(port->name, port->memwin_base,
++						  SZ_128M - 1,
++						  MVEBU_MBUS_NO_REMAP,
++						  MVEBU_MBUS_PCI_MEM);
++		mvebu_mbus_add_window_remap_flags(port->name, port->memwin_base + 
+SZ_128M,
++						  SZ_64M - 1,
++						  MVEBU_MBUS_NO_REMAP,
++						  MVEBU_MBUS_PCI_MEM);
++	} else {
++		mvebu_mbus_add_window_remap_flags(port->name, port->memwin_base,
++						  port->memwin_size,
++						  MVEBU_MBUS_NO_REMAP,
++						  MVEBU_MBUS_PCI_MEM);
++	}
+  }
+
+  /*
+
+
+Here's the assignment (same as before):
+
+pci 0000:00:01.0: BAR 8: assigned [mem 0xe0000000-0xebffffff]
+pci 0000:01:00.0: BAR 1: assigned [mem 0xe0000000-0xe7ffffff]
+pci 0000:01:00.0: BAR 3: assigned [mem 0xe8000000-0xe87fffff]
+pci 0000:01:00.0: BAR 4: assigned [mem 0xe8800000-0xe8801fff]
+pci 0000:01:00.0: BAR 0: assigned [mem 0xe8802000-0xe8802fff]
+pci 0000:01:00.0: BAR 2: assigned [mem 0xe8803000-0xe8803fff]
+pci 0000:01:00.0: BAR 5: assigned [mem 0xe8804000-0xe8804fff]
+
+And here's the output I get from:
+
+# cat /sys/kernel/debug/mvebu-mbus/devices
+[00] 00000000e8000000 - 00000000ec000000 : pcie0.0 (remap 00000000e8000000)
+[01] disabled
+[02] disabled
+[03] disabled
+[04] 00000000ff000000 - 00000000ff010000 : nand
+[05] 00000000f4000000 - 00000000f8000000 : vpcie
+[06] 00000000fe000000 - 00000000fe010000 : dragonite
+[07] 00000000e0000000 - 00000000e8000000 : pcie0.0
+
+I did not get to test the whole address space thoroughly, but all the 
+BARs are still accessible (mainly BAR0 which contains the control space 
+and is mapped on the "new" MBUS window, and BAR1 which is the "big" 
+one). So at least, the issues we had before are now gone.
+So I'd say this looks like a very promising approach. :-)
+
+Thank you,
+Gerlando
