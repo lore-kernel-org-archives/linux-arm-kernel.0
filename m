@@ -1,109 +1,81 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 21 Feb 2014 14:51:03 +0800
-Subject: [PATCH 0/3] mtd: gpmi: add subpage read support
-In-Reply-To: <1388718102-26097-1-git-send-email-b32955@freescale.com>
-References: <a>
- <1388718102-26097-1-git-send-email-b32955@freescale.com>
-Message-ID: <20140221065101.GB29360@shlinux2.ap.freescale.net>
+From: dashie@sigpipe.me (Dashie)
+Date: Fri, 21 Feb 2014 08:39:08 +0100
+Subject: Stuck getting DTS working for a new kirkwood board
+In-Reply-To: <20140221013407.GX7862@titan.lakedaemon.net>
+References: <5306721B.7020403@sigpipe.me>
+ <20140221013407.GX7862@titan.lakedaemon.net>
+Message-ID: <5307029C.20006@sigpipe.me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 03, 2014 at 11:01:39AM +0800, Huang Shijie wrote:
-> 1) Why add the subpage read support?
->   The page size of the nand chip becomes larger and larger, the imx6 has to
->   supports the 16K page or even bigger page. But sometimes, the upper layer only
->   needs a small part of the page, such as 512 bytes or less.
-> 
->   For example, ubiattach may only read 64 bytes per page.
-> 
-> 2) We only enable the subpage read support when it meets the conditions:
->    <1> the chip is imx6 (or later chips) which can supports large nand page.
->    <2> the size of ECC parity is byte aligned.
->        If the size of ECC parity is not byte aligned, the calling of NAND_CMD_RNDOUT
->        will fail.
-> 
-> 3) What does this patch set do?
->    patch 1: add a new argument for read_subpage hook
->    patch 2: do not use the mtd->writesize. 
->    patch 3: This patch will fake a virtual small page for the subpage read,
->             and call the gpmi_ecc_read_page() to do the real work.
->             In order to fake a virtual small page, the patch changes
-> 	    the BCH registers and the bch_geometry{}. After the subpage read
-> 	    finished, we will restore them back.
-> 
-> 4) Performace:
->     4.1) Tested with Toshiba TC58NVG2S0F(4096 + 224) with the following command:
->          #ubiattach /dev/ubi_ctrl -m 4
-> 
->        The detail information of /dev/mtd4 shows below:
->        --------------------------------------------------------------
->        #mtdinfo /dev/mtd4
->         mtd4
->         Name:                           test
->         Type:                           nand
->         Eraseblock size:                262144 bytes, 256.0 KiB
->         Amount of eraseblocks:          1856 (486539264 bytes, 464.0 MiB)
->         Minimum input/output unit size: 4096 bytes
->         Sub-page size:                  4096 bytes
->         OOB size:                       224 bytes
->         Character device major/minor:   90:8
->         Bad blocks are allowed:         true
->         Device is writable:             true
->        --------------------------------------------------------------
-> 
->     4.2) Before this patch:
->        --------------------------------------------------------------
->        [   94.530495] UBI: attaching mtd4 to ubi0
->        [   98.928850] UBI: scanning is finished
->        [   98.953594] UBI: attached mtd4 (name "test", size 464 MiB) to ubi0
->        [   98.958562] UBI: PEB size: 262144 bytes (256 KiB), LEB size: 253952 bytes
->        [   98.964076] UBI: min./max. I/O unit sizes: 4096/4096, sub-page size 4096
->        [   98.969518] UBI: VID header offset: 4096 (aligned 4096), data offset: 8192
->        [   98.975128] UBI: good PEBs: 1856, bad PEBs: 0, corrupted PEBs: 0
->        [   98.979843] UBI: user volume: 1, internal volumes: 1, max. volumes count: 128
->        [   98.985878] UBI: max/mean erase counter: 2/1, WL threshold: 4096, image sequence number: 2024916145
->        [   98.993635] UBI: available PEBs: 0, total reserved PEBs: 1856, PEBs reserved for bad PEB handling: 40
->        [   99.001807] UBI: background thread "ubi_bgt0d" started, PID 831
->        --------------------------------------------------------------
->        The attach time is about 98.9 - 94.5 = 4.4s
-> 
->     4.3) After this patch:
->        --------------------------------------------------------------
->        [  286.464906] UBI: attaching mtd4 to ubi0
->        [  289.186129] UBI: scanning is finished
->        [  289.211416] UBI: attached mtd4 (name "test", size 464 MiB) to ubi0
->        [  289.216360] UBI: PEB size: 262144 bytes (256 KiB), LEB size: 253952 bytes
->        [  289.221858] UBI: min./max. I/O unit sizes: 4096/4096, sub-page size 4096
->        [  289.227293] UBI: VID header offset: 4096 (aligned 4096), data offset: 8192
->        [  289.232878] UBI: good PEBs: 1856, bad PEBs: 0, corrupted PEBs: 0
->        [  289.237628] UBI: user volume: 0, internal volumes: 1, max. volumes count: 128
->        [  289.243553] UBI: max/mean erase counter: 1/1, WL threshold: 4096, image sequence number: 2024916145
->        [  289.251348] UBI: available PEBs: 1812, total reserved PEBs: 44, PEBs reserved for bad PEB handling: 40
->        [  289.259417] UBI: background thread "ubi_bgt0d" started, PID 847
->        --------------------------------------------------------------
->        The attach time is about 289.18 - 286.46 = 2.7s
-> 
->      4.4) The conclusion:
->        We achieve (4.4 - 2.7) / 4.4 = 38.6% faster in the ubiattach.
-> 
->  5) This patch depends on the following patch:
->     http://lists.infradead.org/pipermail/linux-mtd/2013-December/051091.html
-> 
-> Huang Shijie (3):
->   mtd: nand: add "page" argument for read_subpage hook
->   mtd: gpmi: do not use the mtd->writesize
->   mtd: gpmi: add subpage read support
-> 
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |  102 +++++++++++++++++++++++++++++++-
->  drivers/mtd/nand/nand_base.c           |    7 ++-
->  include/linux/mtd/nand.h               |    2 +-
->  3 files changed, 105 insertions(+), 6 deletions(-)
-> 
-> -- 
-> 1.7.2.rc3
-> 
-> 
-just a ping.
 
-Best Regards
-Huang Shijie
+On 02/21/2014 02:34 AM, Jason Cooper wrote:
+> Dashie,
+>
+> + other mvebu maintainers.  Please Cc us in the future.
+>
+> Your timing is fortuitous.  :)  We were just discussing this board and
+> the few others that haven't been converted yet.
+That's exactly what motivated me to post ;)
+
+>
+> On Thu, Feb 20, 2014 at 10:22:35PM +0100, Dashie wrote:
+>> Hi all,
+>>
+>> I'm a very beginner in the DTS and ARM kernel world and trying to get a
+>> DTS working for my new toy.
+> I was there a couple years ago.  No problem.
+>
+>> I've done some tests using mainlineLinux and arcNumber and i remember to
+>> got some things working (PCI-e, Intel eth) but only two drives and no
+>> fan/sensor using arcNumber for "00000b1e    HP t5325 Thin Client       
+>>                         2846".
+> Let's focus on converting this board file to devicetree.  which means
+> you'll be setting mainlineLinux to true and arcNumber to 0xffffffff.
+> (means booting via devicetree).
+Actually i've unset mainlineLinux and arcNumber, so the DTB is used.
+In fact the t5325 device is the only one which the pci-e works, but it
+use old -setup.c files and then i'm lost with that.
+
+>
+>> I've since started to use a DTS, copied the guruplug-server-plus (IIRC)
+>> and done some changes, actually i can get working :
+>>     - temp sensor
+>>     - fan control (off, middle, full)
+>>     - integrated marvell eth
+>>     - the four disks are detected and seems working
+> That's a good start.
+>
+>> But can't get the PCI-e working (and then the intel ethernet), also
+>> sensor path seems to change every reboot (i need to do more tests).
+>> Also i've SATA power reg enabled in the DTS but it doesn't seems to have
+>> any (to be confirmed, the original firmware seems to have the ability to
+>> shutdown unaccessed drives) and i will remove them, anyway i don't know
+>> the GPIO, if any.
+>>
+>> I still miss some GPIOS for : Led (r/g) power, func led, the four sata
+>> leds, maybe some triggers for hdds, and the power and func buttons.
+>> (already tried gpio export and out direction and "1" in value, but
+>> nothing blink)
+>> Reset button sends things in /dev/input/input0 so it seems to works.
+>>
+>> The current DTS is joined to this mail, i've actually the NAS with me
+>> and can test things. I can provide too : original dmesg (from original
+>> firmware), current dmesg using DTS, lspci -vvv (from kernel with arcNumber).
+>>
+>> I'm currently using a stock 3.12.9 debian kernel and doesn't have
+>> anymore access to the original firmware.
+> It would be helpful if you could build a kernel from the git repos.
+> Have you done that before?
+I've built a kernel from the 3.12.9 debian sources but can't get it to
+boot, i got nothing after "Uncompressing Linux... done, booting the
+kernel.".
+I've used the debian's kernel config file, but i can try the
+kirkwood_defconfig make target and checking everything is activated (DTB
+append, SATA PMP, etc.)
+Which git repos i could try to build then ?
+
+>
+> thx,
+>
+> Jason.
