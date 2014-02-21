@@ -1,152 +1,110 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 21 Feb 2014 09:18:26 -0500
-Subject: [RESEND][PATCH v4] gpio: davinci: reuse for keystone soc
-In-Reply-To: <1392307125-27927-1-git-send-email-grygorii.strashko@ti.com>
-References: <52FBB6BC.2060801@ti.com>
- <1392307125-27927-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <53076032.5080202@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Feb 2014 14:25:15 +0000
+Subject: [PATCH v2 1/4] arm64: add abstractions for FPSIMD state
+ manipulation
+In-Reply-To: <1391620418-3999-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1391620418-3999-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1391620418-3999-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140221142515.GC25351@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+On Wed, Feb 05, 2014 at 05:13:35PM +0000, Ard Biesheuvel wrote:
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 4aef42a04bdc..eeb003f54ad0 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -34,6 +34,10 @@
+>  #define FPEXC_IXF	(1 << 4)
+>  #define FPEXC_IDF	(1 << 7)
+>  
+> +/* defined in entry-fpsimd.S but only used in this unit */
+> +void fpsimd_save_state(struct fpsimd_state *state);
+> +void fpsimd_load_state(struct fpsimd_state *state);
 
-On Thursday 13 February 2014 10:58 AM, Grygorii Strashko wrote:
-> The similar GPIO HW block is used by keystone SoCs as
-> in Davinci SoCs.
-> Hence, reuse Davinci GPIO driver for Keystone taking into
-> account that Keystone contains ARM GIC IRQ controller which
-> is implemented using IRQ Chip.
-> 
-> Documentation:
-> 	http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
-> 
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
-> - rebased on top of git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git
->   branch: devel
->   top commit: ef70bbe gpio: make gpiod_direction_output take a logical value
-> 
-Can you please pick this one ? Its rebased as per your suggestion.
+This functions still make sense for some situations where
+fpsimd_get_task_state() is confusing.
 
->  .../devicetree/bindings/gpio/gpio-davinci.txt      |    4 +-
->  drivers/gpio/gpio-davinci.c                        |   48 ++++++++++++++++----
->  2 files changed, 42 insertions(+), 10 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-> index a2e839d..4ce9862 100644
-> --- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-> @@ -1,7 +1,7 @@
-> -Davinci GPIO controller bindings
-> +Davinci/Keystone GPIO controller bindings
->  
->  Required Properties:
-> -- compatible: should be "ti,dm6441-gpio"
-> +- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
->  
->  - reg: Physical base address of the controller and the size of memory mapped
->         registers.
-> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-> index 7629b4f..d0f135d 100644
-> --- a/drivers/gpio/gpio-davinci.c
-> +++ b/drivers/gpio/gpio-davinci.c
-> @@ -37,6 +37,8 @@ struct davinci_gpio_regs {
->  	u32	intstat;
->  };
->  
-> +typedef struct irq_chip *(*gpio_get_irq_chip_cb_t)(unsigned int irq);
-> +
->  #define BINTEN	0x8 /* GPIO Interrupt Per-Bank Enable Register */
->  
->  #define chip2controller(chip)	\
-> @@ -413,6 +415,26 @@ static const struct irq_domain_ops davinci_gpio_irq_ops = {
->  	.xlate = irq_domain_xlate_onetwocell,
->  };
->  
-> +static struct irq_chip *davinci_gpio_get_irq_chip(unsigned int irq)
-> +{
-> +	static struct irq_chip_type gpio_unbanked;
-> +
-> +	gpio_unbanked = *container_of(irq_get_chip(irq),
-> +				      struct irq_chip_type, chip);
-> +
-> +	return &gpio_unbanked.chip;
-> +};
-> +
-> +static struct irq_chip *keystone_gpio_get_irq_chip(unsigned int irq)
-> +{
-> +	static struct irq_chip gpio_unbanked;
-> +
-> +	gpio_unbanked = *irq_get_chip(irq);
-> +	return &gpio_unbanked;
-> +};
-> +
-> +static const struct of_device_id davinci_gpio_ids[];
 > +
 >  /*
->   * NOTE:  for suspend/resume, probably best to make a platform_device with
->   * suspend_late/resume_resume calls hooking into results of the set_wake()
-> @@ -433,6 +455,18 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->  	struct davinci_gpio_platform_data *pdata = dev->platform_data;
->  	struct davinci_gpio_regs __iomem *g;
->  	struct irq_domain	*irq_domain = NULL;
-> +	const struct of_device_id *match;
-> +	struct irq_chip *irq_chip;
-> +	gpio_get_irq_chip_cb_t gpio_get_irq_chip;
+>   * Trapped FP/ASIMD access.
+>   */
+> @@ -87,6 +91,33 @@ void fpsimd_flush_thread(void)
+>  	preempt_enable();
+>  }
+>  
+> +/*
+> + * Sync the saved FPSIMD context with the FPSIMD register file
+> + */
+> +struct fpsimd_state *fpsimd_get_task_state(void)
+> +{
+> +	fpsimd_save_state(&current->thread.fpsimd_state);
+> +	return &current->thread.fpsimd_state;
+> +}
 > +
+> +/*
+> + * Load a new FPSIMD state into the FPSIMD register file.
+> + */
+> +void fpsimd_set_task_state(struct fpsimd_state *state)
+> +{
+> +	fpsimd_load_state(state);
+> +}
+
+Maybe s/task/current/. But in general I see a "get" function as not
+having side-effects while here it populates the fpsimd_state. I don't
+think the code gets clearer.
+
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 1c0a9be2ffa8..bfa8214f92d1 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -199,7 +199,7 @@ void release_thread(struct task_struct *dead_task)
+>  
+>  int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
+>  {
+> -	fpsimd_save_state(&current->thread.fpsimd_state);
+> +	fpsimd_get_task_state();
+
+That's where get vs save looks strange to me.
+
+> @@ -746,24 +745,29 @@ static int compat_vfp_set(struct task_struct *target,
+>  			  unsigned int pos, unsigned int count,
+>  			  const void *kbuf, const void __user *ubuf)
+>  {
+> -	struct user_fpsimd_state *uregs;
+> +	struct user_fpsimd_state newstate;
+>  	compat_ulong_t fpscr;
+>  	int ret;
+>  
+>  	if (pos + count > VFP_STATE_SIZE)
+>  		return -EIO;
+>  
+> -	uregs = &target->thread.fpsimd_state.user_fpsimd;
 > +	/*
-> +	 * Use davinci_gpio_get_irq_chip by default to handle non DT cases
+> +	 * We will not overwrite the entire FPSIMD state, so we need to
+> +	 * initialize 'newstate' with sane values.
 > +	 */
-> +	gpio_get_irq_chip = davinci_gpio_get_irq_chip;
-> +	match = of_match_device(of_match_ptr(davinci_gpio_ids),
-> +				dev);
-> +	if (match)
-> +		gpio_get_irq_chip = (gpio_get_irq_chip_cb_t)match->data;
+> +	newstate = *fpsimd_get_user_state(target);
 >  
->  	ngpio = pdata->ngpio;
->  	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> @@ -489,8 +523,6 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->  	 * IRQ mux conflicts; gpio_irq_type_unbanked() is only for GPIOs.
->  	 */
->  	if (pdata->gpio_unbanked) {
-> -		static struct irq_chip_type gpio_unbanked;
-> -
->  		/* pass "bank 0" GPIO IRQs to AINTC */
->  		chips[0].chip.to_irq = gpio_to_irq_unbanked;
->  		chips[0].gpio_irq = bank_irq;
-> @@ -499,10 +531,9 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
+> -	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, uregs, 0,
+> +	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &newstate, 0,
+>  				 VFP_STATE_SIZE - sizeof(compat_ulong_t));
 >  
->  		/* AINTC handles mask/unmask; GPIO handles triggering */
->  		irq = bank_irq;
-> -		gpio_unbanked = *container_of(irq_get_chip(irq),
-> -					      struct irq_chip_type, chip);
-> -		gpio_unbanked.chip.name = "GPIO-AINTC";
-> -		gpio_unbanked.chip.irq_set_type = gpio_irq_type_unbanked;
-> +		irq_chip = gpio_get_irq_chip(irq);
-> +		irq_chip->name = "GPIO-AINTC";
-> +		irq_chip->irq_set_type = gpio_irq_type_unbanked;
+>  	if (count && !ret) {
+>  		ret = get_user(fpscr, (compat_ulong_t *)ubuf);
+> -		uregs->fpsr = fpscr & VFP_FPSCR_STAT_MASK;
+> -		uregs->fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
+> +		newstate.fpsr = fpscr & VFP_FPSCR_STAT_MASK;
+> +		newstate.fpcr = fpscr & VFP_FPSCR_CTRL_MASK;
+>  	}
 >  
->  		/* default trigger: both edges */
->  		g = gpio2regs(0);
-> @@ -511,7 +542,7 @@ static int davinci_gpio_irq_setup(struct platform_device *pdev)
->  
->  		/* set the direct IRQs up to use that irqchip */
->  		for (gpio = 0; gpio < pdata->gpio_unbanked; gpio++, irq++) {
-> -			irq_set_chip(irq, &gpio_unbanked.chip);
-> +			irq_set_chip(irq, irq_chip);
->  			irq_set_handler_data(irq, &chips[gpio / 32]);
->  			irq_set_status_flags(irq, IRQ_TYPE_EDGE_BOTH);
->  		}
-> @@ -554,7 +585,8 @@ done:
->  
->  #if IS_ENABLED(CONFIG_OF)
->  static const struct of_device_id davinci_gpio_ids[] = {
-> -	{ .compatible = "ti,dm6441-gpio", },
-> +	{ .compatible = "ti,keystone-gpio", keystone_gpio_get_irq_chip},
-> +	{ .compatible = "ti,dm6441-gpio", davinci_gpio_get_irq_chip},
->  	{ /* sentinel */ },
->  };
->  MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
-> 
+> +	fpsimd_set_user_state(target, &newstate);
+>  	return ret;
+>  }
+
+What's the reason for this change? The patch is aimed at adding
+abstractions but it does some more. Now you save half KB on the stack as
+user_fpsimd_state. What if at some point we grow this structure?
+
+-- 
+Catalin
