@@ -1,113 +1,34 @@
-From: lho@apm.com (Loc Ho)
-Date: Fri, 21 Feb 2014 10:47:33 -0700
-Subject: [PATCH v12 3/3] arm64: Add APM X-Gene SoC AHCI SATA host controller
- DTS entries
-In-Reply-To: <1393004853-25994-3-git-send-email-lho@apm.com>
-References: <1393004853-25994-1-git-send-email-lho@apm.com>
- <1393004853-25994-2-git-send-email-lho@apm.com>
- <1393004853-25994-3-git-send-email-lho@apm.com>
-Message-ID: <1393004853-25994-4-git-send-email-lho@apm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 21 Feb 2014 10:48:35 -0700
+Subject: [PATCH] ARM: bcm2835: Move to mach-bcm directory
+In-Reply-To: <CAPdLdqmX7xYwHse4y9+2_-491pw0ODcjxou6_ZC9=aoiR72-MQ@mail.gmail.com>
+References: <1392941771-15774-1-git-send-email-markus.mayer@linaro.org>	<5306DBE4.8090106@wwwdotorg.org>	<20140221140958.GK5038@beef>
+ <CAPdLdqmX7xYwHse4y9+2_-491pw0ODcjxou6_ZC9=aoiR72-MQ@mail.gmail.com>
+Message-ID: <53079173.3030305@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
-Signed-off-by: Suman Tripathi <stripathi@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |   75 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 75 insertions(+), 0 deletions(-)
+On 02/21/2014 10:41 AM, Markus Mayer wrote:
+> On 21 February 2014 06:09, Matt Porter <mporter@linaro.org> wrote:
+>> On Thu, Feb 20, 2014 at 09:53:56PM -0700, Stephen Warren wrote:
+>>> On 02/20/2014 05:16 PM, Markus Mayer wrote:
+>>>> Move the bcm2835 board file into the mach-bcm directory. This allows us
+>>>> to get rid of the mach-bcm2835 directory with the associated Kconfig
+>>>> and Makefile.
+>>>
+>>> This looks fine, although it needs a small patch to bcm2835_defconfig
+>>> squashed in, which I'll post in a second.
+>>>
+>>> Do you want me to take it through the bcm2835 tree? That's probably
+>>> easiest to avoid conflicts with any other bcm2835 patches, not that it's
+>>> too likely there will be any to the board file.
+>>
+>> That's ok with me. Be aware that we may have minor Kconfig/Makefile
+>> conflicts between the bcm2835 tree and the mach-bcm tree since we just
+>> queued the bcm5301x support.
+> 
+> Matt, will you squash Stephen's patch into mine when you take the
+> patches or should I submit a v2 of the patch that combines both?
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index c78ddcf..57b0770 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -221,6 +221,48 @@
- 				enable-offset = <0x0>;
- 				enable-mask = <0x06>;
- 			};
-+
-+			sata01clk: sata01clk at 1f21c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f21c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata01clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata23clk: sata23clk at 1f22c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f22c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata23clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata45clk: sata45clk at 1f23c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f23c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata45clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
- 		};
- 
- 		serial0: serial at 1c020000 {
-@@ -262,5 +304,38 @@
- 			apm,tx-boost-gain = <31 31 31 31 31 31>;
- 			apm,tx-eye-tuning = <2 10 10 2 10 10>;
- 		};
-+
-+		sata1: sata at 1a000000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a000000 0x0 0x1000>,
-+			      <0x0 0x1f210000 0x0 0x10000>;
-+			interrupts = <0x0 0x86 0x4>;
-+			status = "disabled";
-+			clocks = <&sata01clk 0>;
-+			phys = <&phy1 0>;
-+			phy-names = "sata-6g";
-+		};
-+
-+		sata2: sata at 1a400000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a400000 0x0 0x1000>,
-+			      <0x0 0x1f220000 0x0 0x10000>;
-+			interrupts = <0x0 0x87 0x4>;
-+			status = "ok";
-+			clocks = <&sata23clk 0>;
-+			phys = <&phy2 0>;
-+			phy-names = "sata-6g";
-+		};
-+
-+		sata3: sata at 1a800000 {
-+			compatible = "apm,xgene-ahci-pcie";
-+			reg = <0x0 0x1a800000 0x0 0x1000>,
-+			      <0x0 0x1f230000 0x0 0x10000>;
-+			interrupts = <0x0 0x88 0x4>;
-+			status = "ok";
-+			clocks = <&sata45clk 0>;
-+			phys = <&phy3 0>;
-+			phy-names = "sata-6g";
-+		};
- 	};
- };
--- 
-1.5.5
+I think Matt said it was OK to take them through the bcm2835 tree. I'll
+squash them together; no need to repost.
