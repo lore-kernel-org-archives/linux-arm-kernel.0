@@ -1,74 +1,44 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Fri, 21 Feb 2014 11:38:08 +0530
-Subject: [PATCH 1/1] ARM: Exynos: Add generic compatible string
-In-Reply-To: <16785833.BhsvfRuRRo@wuerfel>
-References: <1392809645-631-1-git-send-email-sachin.kamat@linaro.org>
- <201402201800.49425.arnd@arndb.de> <53063C9F.4060307@samsung.com>
- <16785833.BhsvfRuRRo@wuerfel>
-Message-ID: <CAK9yfHyWG1ac6isTRSB3VWfxER9cSuDJHwY3b7svyEk9EozpWQ@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 21 Feb 2014 15:11:58 +0900
+Subject: [GIT PULL] Renesas intc Updates for v3.15
+Message-ID: <cover.1392962498.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 February 2014 23:18, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 20 February 2014 18:34:23 Tomasz Figa wrote:
->> On 20.02.2014 18:00, Arnd Bergmann wrote:
->> >> Of course nothing stops you from retaining more specific compatible
->> >> strings. In fact, this is probably the most appropriate solution,
->> >> because in future you might find out that certain SoCs need some special
->> >> differentiation, e.g. same ID value on two SoCs.
->> >>
->> >> So, to apply this to our case, our Exynos 5250 based Arndale board would
->> >> be changed from
->> >>
->> >> compatible = "insignal,arndale", "samsung,exynos5260";
->> >>
->> >> to
->> >>
->> >> compatible = "insignal,arndale", "samsung,exynos5260", "samsung,exynos";
->> >
->> > Right, this would make sense.
->> >
->> >> Now, the board file will be able to match simply by "samsung,exynos"
->> >> compatible string and SoC-specific code in mach-exynos (hopefully none
->> >> after it gets cleaned up fully) will use soc_is_exynos*() macros (what
->> >> AFAIK it is already doing at the moment).
->> >
->> > On principle, I would not take things out of the match list, if that
->> > would break booting with old DT file that don't list "samsung,exynos"
->> > as compatible. But for new SoCs that would work.
->>
->> My proposal was about simply adding a fully generic string, without
->> removing the specific ones. For already supported SoCs this is pretty
->> obvious, as existing DTBs would not have this generic string listed. But
->> the specific strings should be also present in DTSes of new SoCs, even
->> if not recognized by the kernel, to make sure that in future any
->> SoC-specific quirks could be easily handled.
->
-> Yes, that's ideal.
->
->> > Using soc_is_exynos*() too much of course also isn't good. A lot of
->> > the things tested for should probably be checked from individual DT
->> > properties, but again we have to find the right balance. I wouldn't
->> > mind getting rid of the soc_is_exynos*() macros completely, because
->> > a) we can't use them in device drivers
->> > b) all platform code is supposed to be in drivers
->> > c) both rules are enforced for arm64
->>
->> I fully agree. As I said, after cleaning up mach-exynos/ there should be
->> no more code left using soc_is_*() macros. Ideally, the whole
->> mach-exynos/ should collapse into a single, trivial file, with
->> everything done in dedicated drivers.
->
-> Right.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Now that we have a broader agreement on this, I think we can go ahead with the
-following steps as an initial approach:
-1. Have a common machine file for both exynos4 and 5 files, mach-exynos-dt.c.
-2. Introduce a generic compatible string "samsung,exynos".
-3. Append this to the compatible property list for existing boards.
+Please consider this Renesas ARM based SoC intc updates for v3.15.
 
-If this plan looks OK, I can send across patches doing this.
+Previously merging code for this driver was handled Paul Mundt
+as part of his maintenance of SUPERH. However, SUPERH is in
+the process of being orphaned. And as this driver is also listed
+as being maintained by Magnus and myself as part of ARM/SHMOBILE ARM
+I have picked up this patch.
 
--- 
-With warm regards,
-Sachin
+If you would prefer not to handle this that is quite fine by me but in that
+case I would appreciate advice on where I should send pull-requests.
+
+
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-intc-for-v3.15
+
+for you to fetch changes up to 4f3068f60503e08bc9e729528d9e54289980fa96:
+
+  sh: intc: Enable driver compilation with COMPILE_TEST (2014-02-18 09:22:21 +0900)
+
+----------------------------------------------------------------
+Renesas intc Updates for v3.15
+
+* Enable driver compilation with COMPILE_TEST
+
+----------------------------------------------------------------
+Laurent Pinchart (1):
+      sh: intc: Enable driver compilation with COMPILE_TEST
+
+ drivers/sh/intc/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
