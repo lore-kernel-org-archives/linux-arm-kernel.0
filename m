@@ -1,65 +1,51 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 21 Feb 2014 10:46:41 +0100
-Subject: [PATCH v10 01/15] usb: doc: phy-mxs: Add more compatible strings
-In-Reply-To: <5e4d795b507a4ea7b9faa69dd05148c4@BL2PR03MB226.namprd03.prod.outlook.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 21 Feb 2014 16:57:11 +0800
+Subject: [PATCH v10 04/15] usb: doc: phy-mxs: update binding for adding
+ anatop phandle
+In-Reply-To: <20140221091444.GB7541@e106331-lin.cambridge.arm.com>
 References: <1392873284-9386-1-git-send-email-peter.chen@freescale.com>
- <1392873284-9386-2-git-send-email-peter.chen@freescale.com>
- <20140221091345.GA7541@e106331-lin.cambridge.arm.com>
- <5e4d795b507a4ea7b9faa69dd05148c4@BL2PR03MB226.namprd03.prod.outlook.com>
-Message-ID: <53072081.2000407@pengutronix.de>
+ <1392873284-9386-5-git-send-email-peter.chen@freescale.com>
+ <20140221091444.GB7541@e106331-lin.cambridge.arm.com>
+Message-ID: <20140221085710.GA13483@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/21/2014 10:40 AM, Peter Chen wrote:
->  
->>>
->>>  Required properties:
->>> -- compatible: Should be "fsl,imx23-usbphy"
->>> +- compatible: "fsl,imx23-usbphy" for imx23 and imx28, "fsl,imx6q-
->> usbphy"
->>> +  for imx6dq and imx6dl, "fsl,imx6sl-usbphy" for imx6sl
->>
->> Minor nit, but could we restructure this as something like the following,
->> with each string on a new line:
->>
->> - compatible: should contain:
->>     * "fsl,imx23-usbphy" for imx23 and imx28
->>     * "fsl,imx6q-usbphy" for imx6dq and imx6dl
->>     * "fsl,imx6sl-usbphy" for imx6sl
->>
->> It makes it a bit easier to read.
+On Fri, Feb 21, 2014 at 09:14:44AM +0000, Mark Rutland wrote:
+> On Thu, Feb 20, 2014 at 05:14:33AM +0000, Peter Chen wrote:
+> > Add anatop phandle which is used to access anatop registers to
+> > control PHY's power and other USB operations.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  Documentation/devicetree/bindings/usb/mxs-phy.txt |    2 ++
+> >  1 files changed, 2 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/mxs-phy.txt b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> > index b43d4c9e..fc6659d 100644
+> > --- a/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> > +++ b/Documentation/devicetree/bindings/usb/mxs-phy.txt
+> > @@ -5,10 +5,12 @@ Required properties:
+> >    for imx6dq and imx6dl, "fsl,imx6sl-usbphy" for imx6sl
+> >  - reg: Should contain registers location and length
+> >  - interrupts: Should contain phy interrupt
+> > +- fsl,anatop: phandle for anatop register, it is only for imx6 SoC series
 > 
-> Thanks, will change like above.
-> 
->>
->> I see the existing "fsl,imx23-usbphy" is used as a fallback for
->> "fsl,imx28-usbphy", "fsl,imx6q-usbphy", and "fsl,imx6sl-usbphy" in
->> existing DTs.
->>
->> Is this expected going forward? It might be worth mentioning.
->>
-> 
-> These SoCs used the same FSL imx PHY, but different versions.
-> imx23/imx28 are the first version, more improvements are at
-> later SoCs (like imx6x) version. Keep "fsl,imx23-usbphy" at
-> imx6 dts will be user know it is from imx23's. If you think
-> it does not need, I can delete "fsl,imx23-usbphy" from imx6 dts.
+> This is now required?
 
-You should go after compatibility here. List (all) phys that are
-comaptible, start with most specific end with most generic.
+Yes, it is required.
 
-Marc
+> 
+> What happens to those existing DTBs that claim compatibility with
+> "fsl,imx6q-usbphy" but don't have an fsl,anatop property?
+> 
+
+The flag stands for the SoC has anatop will be 0, no anatop operation
+will be done, the old-version dts can work with update driver, but less
+features and one or two bug exists.
+
+Peter
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140221/aa654202/attachment-0001.sig>
+Best Regards,
+Peter Chen
