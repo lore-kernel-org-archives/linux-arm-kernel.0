@@ -1,85 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 21 Feb 2014 14:47:08 +0100
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <53074584.5010202@keymile.com>
-References: <53039894.10905@keymile.com> <20140218212751.07c2aeb5@skate>
- <53046D98.6020801@keymile.com> <20140219102658.76eec91e@skate>
- <53047BBB.6040108@keymile.com> <20140219143749.65ff3155@skate>
- <CAErSpo4=6VgJazaErcx=ztKhZ_62xBrQ6K1eN_dVpvV4R0T2ag@mail.gmail.com>
- <20140220095518.7ca36f0a@skate>
- <20140220173518.GA19893@obsidianresearch.com>
- <20140220212914.29ddc031@skate>
- <20140221003227.GF19893@obsidianresearch.com>
- <20140221093444.35870a73@skate> <5307152D.3020804@keymile.com>
- <20140221101218.45766e8a@skate> <53071970.1040400@keymile.com>
- <20140221103936.56b3d9f8@skate> <53074584.5010202@keymile.com>
-Message-ID: <20140221144708.48559045@skate>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 21 Feb 2014 13:49:16 +0000
+Subject: [PATCH v3 2/3] ARM: bios32: use pci_enable_resource to enable
+ PCI resources
+In-Reply-To: <20140221003619.GG19893@obsidianresearch.com>
+References: <1392726043-31088-1-git-send-email-will.deacon@arm.com>
+ <1392726043-31088-3-git-send-email-will.deacon@arm.com>
+ <20140218154139.GF21483@n2100.arm.linux.org.uk>
+ <20140220111238.GD3615@mudshark.cambridge.arm.com>
+ <CAErSpo4KEGh7GAfEv-prj-UdJETCN9M5sEtdNF0NARa6-03HYA@mail.gmail.com>
+ <20140221003619.GG19893@obsidianresearch.com>
+Message-ID: <20140221134916.GH8731@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gerlando Falauto,
+Hi Jason, Bjorn,
 
-On Fri, 21 Feb 2014 13:24:36 +0100, Gerlando Falauto wrote:
+Thanks for the comments.
 
-> So I restored the total aperture size to 192MB.
-> I had to rework your patch a bit because:
+On Fri, Feb 21, 2014 at 12:36:19AM +0000, Jason Gunthorpe wrote:
+> On Thu, Feb 20, 2014 at 12:39:16PM -0700, Bjorn Helgaas wrote:
+> > > Damn, I just found a problem with this patch when PCI_PROBE_ONLY is set.
+> > >
+> > > The problem is that bios32.c won't create a resource hierarchy for the
+> > > firmware-initialised resources, so we have a bunch of orphaned resources
+> > > that we can't pass to pci_enable_resources (since it checks r->parent).
+> > >
+> > > This means that, unless firmware *enables* all of the resources, Linux won't
+> > > be able to enable them. I think this is stronger than simply not
+> > > re-assigning devices like the PCI_PROBE_ONLY flag intends.
+> > 
+> > By "firmware enabling resources," do you mean firmware assigning
+> > addresses in the BARs and turning on the PCI_COMMAND_MEMORY (or _IO)
+> > bits?
+> > 
+> > I'd like to make the generic code ignore BAR values if
+> > PCI_COMMAND_MEMORY (or _IO) is cleared.  When those bits are cleared,
+> > I don't think there's a good way to determine whether the address in a
+> > BAR is valid.
 > 
-> a) I'm running an older kernel and driver
-> b) sizes are actually 1-byte offset
+> I think this is pretty smart, PROBE_ONLY really should mean
+> 'everything is perfect, do not touch it' and if the device isn't
+> enabled, well.. It isn't enabled, the firmware should have done it.
 
-Hum, right. This is a bit weird, maybe I should change that, I don't
-think the mvebu-mbus driver should accept 1-byte offset sizes.
+Yes, that's one (sane) interpretation of the PROBE_ONLY flag and I'm happy
+to run with it if we all agree. We'll need some extra code paths to assign
+disabled resources when PROBE_ONLY is passed, but that can come later.
 
-> Here's the assignment (same as before):
-> 
-> pci 0000:00:01.0: BAR 8: assigned [mem 0xe0000000-0xebffffff]
-> pci 0000:01:00.0: BAR 1: assigned [mem 0xe0000000-0xe7ffffff]
-> pci 0000:01:00.0: BAR 3: assigned [mem 0xe8000000-0xe87fffff]
-> pci 0000:01:00.0: BAR 4: assigned [mem 0xe8800000-0xe8801fff]
-> pci 0000:01:00.0: BAR 0: assigned [mem 0xe8802000-0xe8802fff]
-> pci 0000:01:00.0: BAR 2: assigned [mem 0xe8803000-0xe8803fff]
-> pci 0000:01:00.0: BAR 5: assigned [mem 0xe8804000-0xe8804fff]
-> 
-> And here's the output I get from:
-> 
-> # cat /sys/kernel/debug/mvebu-mbus/devices
-> [00] 00000000e8000000 - 00000000ec000000 : pcie0.0 (remap 00000000e8000000)
-> [01] disabled
-> [02] disabled
-> [03] disabled
-> [04] 00000000ff000000 - 00000000ff010000 : nand
-> [05] 00000000f4000000 - 00000000f8000000 : vpcie
-> [06] 00000000fe000000 - 00000000fe010000 : dragonite
-> [07] 00000000e0000000 - 00000000e8000000 : pcie0.0
+> Will, this if for kvmtool right? Keeping the patch as is and instead
+> changing kvmtool to enable the devices seems like a good option?
 
-This seems correct: we have two windows pointing to the same device,
-and they have consecutive addresses.
+Sure, I can do that easily enough. I just wanted to make sure that we agree
+on PROBE_ONLY before I start hacking kvmtool. I'll drop this additional
+patch.
 
-> I did not get to test the whole address space thoroughly, but all the 
-> BARs are still accessible (mainly BAR0 which contains the control space 
-> and is mapped on the "new" MBUS window, and BAR1 which is the "big" 
-> one). So at least, the issues we had before are now gone.
+Cheers,
 
-Did you check that what you read from BAR0 (which is mapped on the new
-MBUS window) is really what you expect, and not just the same thing as
-BAR1 accessible for the big window? I just want to make sure that the
-hardware indeed properly handles two windows for the same device.
-
-> So I'd say this looks like a very promising approach. :-)
-
-Indeed. However, I don't think this approach solves the entire problem,
-for two reasons:
-
- *) For small BARs that are not power-of-two sized, we may not want to
-    consume two windows, but instead consume a little bit more address
-    space. Using two windows to map a 96 KB BAR would be a waste of
-    windows: using a single 128 KB window is much more efficient.
-
- *) I don't know if the algorithm to split the BAR into multiple
-    windows is going to be trivial.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Will
