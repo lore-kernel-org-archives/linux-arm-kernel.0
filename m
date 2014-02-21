@@ -1,53 +1,159 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 21 Feb 2014 13:25:27 +0100
-Subject: [PATCH v5 11/11] powerpc: add support for reserved memory defined by
- device tree
+Date: Fri, 21 Feb 2014 13:25:20 +0100
+Subject: [PATCH v5 04/11] drivers: of: add support for custom reserved memory
+ drivers
 In-Reply-To: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com>
 References: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1392985527-6260-12-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1392985527-6260-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable reserved memory initialization from device tree.
+Add support for custom reserved memory drivers. Call their init() function
+for each reserved region and prepare for using operations provided by them
+with by the reserved_mem->ops array.
+
+Based on previous code provided by Josh Cartwright <joshc@codeaurora.org>
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- arch/powerpc/Kconfig       |    1 +
- arch/powerpc/kernel/prom.c |    3 +++
- 2 files changed, 4 insertions(+)
+ drivers/of/of_reserved_mem.c      |   29 +++++++++++++++++++++++++++++
+ include/asm-generic/vmlinux.lds.h |   11 +++++++++++
+ include/linux/of_reserved_mem.h   |   33 +++++++++++++++++++++++++++++++++
+ 3 files changed, 73 insertions(+)
 
-diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index 957bf344c0f5..3b6617fed8fc 100644
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -90,6 +90,7 @@ config PPC
- 	select BINFMT_ELF
- 	select OF
- 	select OF_EARLY_FLATTREE
-+	select OF_RESERVED_MEM
- 	select HAVE_FTRACE_MCOUNT_RECORD
- 	select HAVE_DYNAMIC_FTRACE
- 	select HAVE_FUNCTION_TRACER
-diff --git a/arch/powerpc/kernel/prom.c b/arch/powerpc/kernel/prom.c
-index f58c0d3aaeb4..591986215801 100644
---- a/arch/powerpc/kernel/prom.c
-+++ b/arch/powerpc/kernel/prom.c
-@@ -33,6 +33,7 @@
- #include <linux/irq.h>
- #include <linux/memblock.h>
- #include <linux/of.h>
-+#include <linux/of_fdt.h>
- 
- #include <asm/prom.h>
- #include <asm/rtas.h>
-@@ -588,6 +589,8 @@ static void __init early_reserve_mem_dt(void)
- 			memblock_reserve(base, size);
- 		}
- 	}
-+
-+	early_init_fdt_scan_reserved_mem();
+diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+index c7ca6a4a42d1..97de6f882f85 100644
+--- a/drivers/of/of_reserved_mem.c
++++ b/drivers/of/of_reserved_mem.c
+@@ -170,6 +170,33 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
+ 	return 0;
  }
  
- static void __init early_reserve_mem(void)
++static const struct of_device_id __rmem_of_table_sentinel
++	__used __section(__reservedmem_of_table_end);
++
++/**
++ * res_mem_init_node() - call region specific reserved memory init code
++ */
++static int __init __reserved_mem_init_node(struct reserved_mem *rmem)
++{
++	extern const struct of_device_id __reservedmem_of_table[];
++	const struct of_device_id *i;
++
++	for (i = __reservedmem_of_table; i < &__rmem_of_table_sentinel; i++) {
++		reservedmem_of_init_fn initfn = i->data;
++		const char *compat = i->compatible;
++
++		if (!of_flat_dt_is_compatible(rmem->fdt_node, compat))
++			continue;
++
++		if (initfn(rmem, rmem->fdt_node, rmem->name) == 0) {
++			pr_info("Reserved memory: initialized node %s, compatible id %s\n",
++				rmem->name, compat);
++			return 0;
++		}
++	}
++	return -ENOENT;
++}
++
+ /**
+  * fdt_init_reserved_mem - allocate and init all saved reserved memory regions
+  */
+@@ -184,5 +211,7 @@ void __init fdt_init_reserved_mem(void)
+ 		if (rmem->size == 0)
+ 			err = __reserved_mem_alloc_size(node, rmem->name,
+ 						 &rmem->base, &rmem->size);
++		if (err == 0)
++			__reserved_mem_init_node(rmem);
+ 	}
+ }
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index bc2121fa9132..f10f64fcc815 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -167,6 +167,16 @@
+ #define CLK_OF_TABLES()
+ #endif
+ 
++#ifdef CONFIG_OF_RESERVED_MEM
++#define RESERVEDMEM_OF_TABLES()				\
++	. = ALIGN(8);					\
++	VMLINUX_SYMBOL(__reservedmem_of_table) = .;	\
++	*(__reservedmem_of_table)			\
++	*(__reservedmem_of_table_end)
++#else
++#define RESERVEDMEM_OF_TABLES()
++#endif
++
+ #define KERNEL_DTB()							\
+ 	STRUCT_ALIGN();							\
+ 	VMLINUX_SYMBOL(__dtb_start) = .;				\
+@@ -490,6 +500,7 @@
+ 	TRACE_SYSCALLS()						\
+ 	MEM_DISCARD(init.rodata)					\
+ 	CLK_OF_TABLES()							\
++	RESERVEDMEM_OF_TABLES()						\
+ 	CLKSRC_OF_TABLES()						\
+ 	KERNEL_DTB()							\
+ 	IRQCHIP_OF_MATCH_TABLE()
+diff --git a/include/linux/of_reserved_mem.h b/include/linux/of_reserved_mem.h
+index 89226ed7d954..f707176619a3 100644
+--- a/include/linux/of_reserved_mem.h
++++ b/include/linux/of_reserved_mem.h
+@@ -1,21 +1,54 @@
+ #ifndef __OF_RESERVED_MEM_H
+ #define __OF_RESERVED_MEM_H
+ 
++struct device;
++struct of_phandle_args;
++struct reserved_mem_ops;
++
+ struct reserved_mem {
+ 	const char			*name;
+ 	unsigned long			fdt_node;
++	const struct reserved_mem_ops	*ops;
+ 	phys_addr_t			base;
+ 	phys_addr_t			size;
++	void				*priv;
++};
++
++struct reserved_mem_ops {
++	void	(*device_init)(struct reserved_mem *rmem,
++			       struct device *dev,
++			       struct of_phandle_args *args);
++	void	(*device_release)(struct reserved_mem *rmem,
++				  struct device *dev);
+ };
+ 
++typedef int (*reservedmem_of_init_fn)(struct reserved_mem *rmem,
++				      unsigned long node, const char *uname);
++
+ #ifdef CONFIG_OF_RESERVED_MEM
+ void fdt_init_reserved_mem(void);
+ void fdt_reserved_mem_save_node(unsigned long node, const char *uname,
+ 			       phys_addr_t base, phys_addr_t size);
++
++#define RESERVEDMEM_OF_DECLARE(name, compat, init)			\
++	static const struct of_device_id __reservedmem_of_table_##name	\
++		__used __section(__reservedmem_of_table)		\
++		 = { .compatible = compat,				\
++		     .data = (init == (reservedmem_of_init_fn)NULL) ?	\
++				init : init }
++
+ #else
+ static inline void fdt_init_reserved_mem(void) { }
+ static inline void fdt_reserved_mem_save_node(unsigned long node,
+ 		const char *uname, phys_addr_t base, phys_addr_t size) { }
++
++#define RESERVEDMEM_OF_DECLARE(name, compat, init)			\
++	static const struct of_device_id __reservedmem_of_table_##name	\
++		__attribute__((unused))					\
++		 = { .compatible = compat,				\
++		     .data = (init == (reservedmem_of_init_fn)NULL) ?	\
++				init : init }
++
+ #endif
+ 
+ #endif /* __OF_RESERVED_MEM_H */
 -- 
 1.7.9.5
