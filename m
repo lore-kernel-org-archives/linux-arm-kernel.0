@@ -1,74 +1,120 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Feb 2014 15:12:43 +0900
-Subject: [PATCH 02/13] ARM: shmobile: lager dts: Add QSPI nodes
+Date: Fri, 21 Feb 2014 15:12:44 +0900
+Subject: [PATCH 03/13] ARM: shmobile: lager: add SDHI0/2 support on DTS
 In-Reply-To: <cover.1392961872.git.horms+renesas@verge.net.au>
 References: <cover.1392961872.git.horms+renesas@verge.net.au>
-Message-ID: <9fe7c4f810a7e82c4a1a9765017f9cb2c2b40a65.1392961872.git.horms+renesas@verge.net.au>
+Message-ID: <c6119944a421c416818a9ff11f8bd77aa4d683a5.1392961872.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add pinctrl and SPI devices for QSPI on Lager.
-Add Spansion s25fl512s SPI FLASH and MTD partitions.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ arch/arm/boot/dts/r8a7790-lager.dts | 78 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 1081c5e..adff2dc 100644
+index adff2dc..5466fe4 100644
 --- a/arch/arm/boot/dts/r8a7790-lager.dts
 +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -80,6 +80,11 @@
- 		renesas,groups = "mmc1_data8", "mmc1_ctrl";
- 		renesas,function = "mmc1";
+@@ -56,6 +56,54 @@
+ 		regulator-boot-on;
+ 		regulator-always-on;
  	};
 +
-+	qspi_pins: spi {
-+		renesas,groups = "qspi_ctrl", "qspi_data4";
-+		renesas,function = "qspi";
++	vcc_sdhi0: regulator at 1 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI0 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&gpio5 24 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	vccq_sdhi0: regulator at 2 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI0 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio5 29 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
++	};
++
++	vcc_sdhi2: regulator at 3 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "SDHI2 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpio = <&gpio5 25 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	vccq_sdhi2: regulator at 4 {
++		compatible = "regulator-gpio";
++
++		regulator-name = "SDHI2 VccQ";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++
++		gpios = <&gpio5 30 GPIO_ACTIVE_HIGH>;
++		gpios-states = <1>;
++		states = <3300000 1
++			  1800000 0>;
 +	};
  };
  
- &mmcif1 {
-@@ -95,3 +100,34 @@
- &sata1 {
- 	status = "okay";
+ &extal_clk {
+@@ -76,6 +124,16 @@
+ 		renesas,function = "scif1";
+ 	};
+ 
++	sdhi0_pins: sd0 {
++		renesas,gpios = "sdhi0_data4", "sdhi0_ctrl";
++		renesas,function = "sdhi0";
++	};
++
++	sdhi2_pins: sd2 {
++		renesas,gpios = "sdhi2_data4", "sdhi2_ctrl";
++		renesas,function = "sdhi2";
++	};
++
+ 	mmc1_pins: mmc1 {
+ 		renesas,groups = "mmc1_data8", "mmc1_ctrl";
+ 		renesas,function = "mmc1";
+@@ -131,3 +189,23 @@
+ 		};
+ 	};
  };
 +
-+&spi {
-+	pinctrl-0 = <&qspi_pins>;
++&sdhi0 {
++	pinctrl-0 = <&sdhi0_pins>;
 +	pinctrl-names = "default";
 +
++	vmmc-supply = <&vcc_sdhi0>;
++	vqmmc-supply = <&vccq_sdhi0>;
++	cd-gpios = <&gpio3 6 GPIO_ACTIVE_LOW>;
 +	status = "okay";
++};
 +
-+	flash: flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "spansion,s25fl512s";
-+		reg = <0>;
-+		spi-max-frequency = <30000000>;
-+		m25p,fast-read;
++&sdhi2 {
++	pinctrl-0 = <&sdhi2_pins>;
++	pinctrl-names = "default";
 +
-+		partition at 0 {
-+			label = "loader";
-+			reg = <0x00000000 0x00040000>;
-+			read-only;
-+		};
-+		partition at 40000 {
-+			label = "user";
-+			reg = <0x00040000 0x00400000>;
-+			read-only;
-+		};
-+		partition at 440000 {
-+			label = "flash";
-+			reg = <0x00440000 0x03bc0000>;
-+		};
-+	};
++	vmmc-supply = <&vcc_sdhi2>;
++	vqmmc-supply = <&vccq_sdhi2>;
++	cd-gpios = <&gpio3 22 GPIO_ACTIVE_LOW>;
++	status = "okay";
 +};
 -- 
 1.8.5.2
