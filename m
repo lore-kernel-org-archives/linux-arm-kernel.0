@@ -1,38 +1,75 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Feb 2014 15:13:10 +0900
-Subject: [PATCH 3/3] ARM: shmobile: Remove __init from
- rcar_gen2_read_mode_pins()
-In-Reply-To: <cover.1392961497.git.horms+renesas@verge.net.au>
-References: <cover.1392961497.git.horms+renesas@verge.net.au>
-Message-ID: <db47204b32dd0d72454b4f841d0f7e33c44ee2b8.1392961497.git.horms+renesas@verge.net.au>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 21 Feb 2014 00:43:04 -0600
+Subject: [Patch v6 1/2] dmaengine: qcom_bam_dma: Add device tree binding
+In-Reply-To: <1392964986-5207-1-git-send-email-agross@codeaurora.org>
+References: <1392964986-5207-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1392964986-5207-2-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Add device tree binding support for the QCOM BAM DMA driver.
 
-Remove __init from rcar_gen2_read_mode_pins() to allow
-it to be used after boot. For instance the R-Car Gen2
-MD21 check is needed even in the case of CPU Hotplug.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Kumar Gala <galak@codeaurora.org>
+Signed-off-by: Andy Gross <agross@codeaurora.org>
 ---
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../devicetree/bindings/dma/qcom_bam_dma.txt       |   48 ++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
 
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index 69ccc6c..1060448 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -28,7 +28,7 @@
- 
- #define MODEMR 0xe6160060
- 
--u32 __init rcar_gen2_read_mode_pins(void)
-+u32 rcar_gen2_read_mode_pins(void)
- {
- 	void __iomem *modemr = ioremap_nocache(MODEMR, 4);
- 	u32 mode;
+diff --git a/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt b/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+new file mode 100644
+index 0000000..86344f1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/qcom_bam_dma.txt
+@@ -0,0 +1,48 @@
++QCOM BAM DMA controller
++
++Required properties:
++- compatible:	Must be "qcom,bam-v1.4.0" for MSM8974 V1
++		Must be "qcom,bam-v1.4.1" for MSM8974 V2
++- reg: Address range for DMA registers
++- interrupts: single interrupt for this controller
++- #dma-cells: must be <1>
++- clocks: required clock
++- clock-names: name of clock
++- qcom,ee : indicates the active Execution Environment identifier (0-7)
++
++Example:
++
++	uart-bam: dma at f9984000 = {
++		compatible = "qcom,bam-v1.4.1";
++		reg = <0xf9984000 0x15000>;
++		interrupts = <0 94 0>;
++		clocks = <&gcc GCC_BAM_DMA_AHB_CLK>;
++		clock-names = "bam_clk";
++		#dma-cells = <1>;
++		qcom,ee = <0>;
++	};
++
++Client:
++Required properties:
++- dmas: List of dma channel requests
++- dma-names: Names of aforementioned requested channels
++
++Clients must use the format described in the dma.txt file, using a two cell
++specifier for each channel.
++
++The three cells in order are:
++  1. A phandle pointing to the DMA controller
++  2. The channel number
++
++Example:
++	serial at f991e000 {
++		compatible = "qcom,msm-uart";
++		reg = <0xf991e000 0x1000>
++			<0xf9944000 0x19000>;
++		interrupts = <0 108 0>;
++		clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
++		clock-names = "core", "iface";
++
++		dmas = <&uart-bam 0>, <&uart-bam 1>;
++		dma-names = "rx", "tx";
++	};
 -- 
-1.8.5.2
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
