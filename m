@@ -1,39 +1,32 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 21 Feb 2014 12:26:43 +0100
-Subject: I2C dummy adapter driver ?
-In-Reply-To: <5306322C.8030703@wwwdotorg.org>
-References: <5305382E.9050902@gmail.com> <5306322C.8030703@wwwdotorg.org>
-Message-ID: <530737F3.5050102@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 Feb 2014 11:28:12 +0000
+Subject: [RFC PATCH 2/2] arm: mm: Double logical invert for LPAE
+ pte_write(), pte_dirty()
+In-Reply-To: <1392396913-13570-3-git-send-email-steve.capper@linaro.org>
+References: <1392396913-13570-1-git-send-email-steve.capper@linaro.org>
+ <1392396913-13570-3-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140221112812.GC21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/02/14 17:49, Stephen Warren wrote:
-> On 02/19/2014 04:03 PM, Sylwester Nawrocki wrote:
-[...]
->> I was wondering whether it would be reasonable to create a generic
->> Linux dummy I2C bus controller driver. The rationale behind it is
->> there might be hardware configurations where I2C communication is
->> handled by firmware but still it is useful to have I2C slave devices
->              ^^^^^^^^
+On Fri, Feb 14, 2014 at 04:55:13PM +0000, Steve Capper wrote:
+> On LPAE, L_PTE_WRITE and L_PTE_DIRTY are in the upper 32-bits.
+> Unfortunately, results from pte_write() and pte_dirty() are downcast
+> to 32-bits by core code:
+>   o gather_stats
+>   o huge_pte_dirty
+>   o huge_pte_write
+>   o make_migration_entry
 > 
-> That doesn't sound like a dummy driver. Rather, it sounds like a driver
-> for the firmware(?) interface that's used to do the I2C transactions.
+> This patch adds a double logical invert to pte_write() and pte_dirty()
+> for LPAE to ensure that the lower 32-bits are set if true.
 
-Hmm, I think you're right. Just to clarify a bit, as the I2C slave device
-is part of a more complex data processing chain, it is not exposed by
-the firmware on a I2C read/write like command interface.
-So the only thing the Linux I2C client does currently is to enable some
-voltage regulators and driver reset pin through a GPIO. 
+We should ensure all those functions return something which is compatible
+with "int" correctly.  It didn't matter for non-LPAE as the PTEs fit in
+32-bit, but with LPAE, that really needs fixing independently of your
+other patch.
 
-However it depends on the firmware for the MCU controlling the whole
-camera data processing chain, currently the I2C slave control transactions
-are being handled in an opaque way by the firmware, it just exposes (very 
-few) high level commands specifically related to the I2C slave.
-It could be also that the firmware leaves out the I2C bus controller and
-I2C slave handling solely to the host CPU. In such case a regular I2C
-bus controller driver is needed. Hence the exact role of the I2C bus 
-controller driver highly depends on the firmware loaded.
-
-I assume the "driver for the firmware interface" is a good definition.
-I'm just not sure what best location of such an I2C bus driver, supposedly
-drivers/media/i2c would be a good fit, rather than drivers/i2c/busses.
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
