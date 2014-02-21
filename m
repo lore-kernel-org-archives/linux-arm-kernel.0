@@ -1,115 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 21 Feb 2014 19:15:19 +0100
-Subject: [PATCH v6 17/18] ARM: sun4i: dt: Add ahci / sata support
-In-Reply-To: <1392811320-3132-18-git-send-email-hdegoede@redhat.com>
-References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
- <1392811320-3132-18-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140221181519.GC3931@lukather>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Feb 2014 18:24:24 +0000
+Subject: [PATCH v5 2/5] ACPI / processor_core: Rework _PDC related
+ stuff to make it more arch-independent
+In-Reply-To: <3459962.GkY99aHQbc@vostro.rjw.lan>
+References: <1392740638-2479-1-git-send-email-hanjun.guo@linaro.org>
+ <1392740638-2479-3-git-send-email-hanjun.guo@linaro.org>
+ <3459962.GkY99aHQbc@vostro.rjw.lan>
+Message-ID: <20140221182424.GA5751@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Hi Rafael,
 
-On Wed, Feb 19, 2014 at 01:01:59PM +0100, Hans de Goede wrote:
-> From: Oliver Schinagl <oliver@schinagl.nl>
+On Wed, Feb 19, 2014 at 01:50:22AM +0100, Rafael J. Wysocki wrote:
+> On Wednesday, February 19, 2014 12:23:55 AM Hanjun Guo wrote:
+> > _PDC related stuff in processor_core.c is little bit X86/IA64 dependent,
+> > rework the code to make it more arch-independent, no functional change
+> > in this patch.
+> > 
+> > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
 > 
-> This patch adds sunxi sata support to A10 boards that have such a connector.
-> Some boards also feature a regulator via a GPIO and support for this is also
-> added.
-> 
-> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sun4i-a10-a1000.dts      |  4 ++++
->  arch/arm/boot/dts/sun4i-a10-cubieboard.dts |  6 +++++
->  arch/arm/boot/dts/sun4i-a10.dtsi           |  8 +++++++
->  arch/arm/boot/dts/sunxi-ahci-reg.dtsi      | 36 ++++++++++++++++++++++++++++++
->  4 files changed, 54 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sunxi-ahci-reg.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-> index cbd2e13..d6ec839 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-> @@ -35,6 +35,10 @@
->  			};
->  		};
->  
-> +		ahci: sata at 01c18000 {
-> +			status = "okay";
-> +		};
-> +
->  		pinctrl at 01c20800 {
->  			emac_power_pin_a1000: emac_power_pin at 0 {
->  				allwinner,pins = "PH15";
-> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> index b139ee6..6df237d8 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> @@ -12,6 +12,7 @@
->  
->  /dts-v1/;
->  /include/ "sun4i-a10.dtsi"
-> +/include/ "sunxi-ahci-reg.dtsi"
->  
->  / {
->  	model = "Cubietech Cubieboard";
-> @@ -33,6 +34,11 @@
->  			};
->  		};
->  
-> +		ahci: sata at 01c18000 {
-> +			target-supply = <&reg_ahci_5v>;
-> +			status = "okay";
-> +		};
-> +
->  		pinctrl at 01c20800 {
->  			led_pins_cubieboard: led_pins at 0 {
->  				allwinner,pins = "PH20", "PH21";
-> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-> index 336dbec..454077a 100644
-> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
-> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-> @@ -338,6 +338,14 @@
->  			#size-cells = <0>;
->  		};
->  
-> +		ahci: sata at 01c18000 {
-> +			compatible = "allwinner,sun4i-a10-ahci";
-> +			reg = <0x01c18000 0x1000>;
-> +			interrupts = <56>;
-> +			clocks = <&pll6 0>, <&ahb_gates 25>;
-> +			status = "disabled";
-> +		};
-> +
->  		intc: interrupt-controller at 01c20400 {
->  			compatible = "allwinner,sun4i-ic";
->  			reg = <0x01c20400 0x400>;
-> diff --git a/arch/arm/boot/dts/sunxi-ahci-reg.dtsi b/arch/arm/boot/dts/sunxi-ahci-reg.dtsi
-> new file mode 100644
-> index 0000000..7072af1
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sunxi-ahci-reg.dtsi
-> @@ -0,0 +1,36 @@
-> +/*
-> + * sunxi boards sata target power supply common code
+> I've queued up patches [1,3-5/5] from this series for 3.15 (modulo changelog
+> modifications), but this one should be CCed to the x86 and ia64 maintainers.
 
+Thanks for taking these patches. I would however hold onto patch 3/5 as
+this is still under discussion. Basically for patches specific to ARM
+ACPI I would really like to see more acks before being merged as that's
+a new thing for us.
 
-Since IIRC we have pretty much the same needs for the USB, can't we
-just drop the SATA specific mention and use it as the common DTSI for
-the usual regulators?
-
-Thanks!
-Maxime
+Thanks.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140221/e4884b34/attachment.sig>
+Catalin
