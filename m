@@ -1,26 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Feb 2014 17:41:35 +0100
-Subject: [PATCH v2 2/2] phy: Select PHY_EXYNOS_DP_VIDEO by default for
- ARCH_EXYNOS
-In-Reply-To: <53077DE0.7080108@samsung.com>
-References: <1392997802-29050-1-git-send-email-s.nawrocki@samsung.com>
- <1753680.KKj0Q1erxA@wuerfel> <53077DE0.7080108@samsung.com>
-Message-ID: <1888663.ccFYmJ9QJl@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 21 Feb 2014 17:41:25 +0100
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <1563594.ZI2UdY7FPy@wuerfel>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <20140220232438.GT7862@titan.lakedaemon.net>
+ <20140221165252.6eb12cbd@skate> <1563594.ZI2UdY7FPy@wuerfel>
+Message-ID: <20140221164125.GZ11878@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 February 2014 17:25:04 Sylwester Nawrocki wrote:
-> 
-> Hmm, good point, I will modify it that way.
-> 
-> For patch 1/2 I guess it should be:
-> 
-> "default ARCH_S5PV210 || ARCH_EXYNOS"
-> 
-> or rather
-> 
-> "default y if ARCH_S5PV210 || ARCH_EXYNOS" ?
+> I'm also adding Simon Guinot to Cc here. He contributed both the kernel
+> support and the Debian support for the LaCie 2Big/5Big. He might also be
+> able to verify that they work after the DT conversion, or even help
+> implementing it. Since there is already someone who is looking into
+> t5325, that would just leave the OpenRD reference design, right?
 
-Right. I'd probably use the first syntax, but it doesn't really matter.
+I'm onto both t5325 and OpenRD.
 
-	Arnd
+Thomas provided me with a basic t5325 DTS file from around kernel
+version v3.5 which i have brought up to date. I'm now trying to get my
+head around ASOC and simple-card, i.e. do it properly using DT.
+
+OpenRD i'm at the same stage, just audio left, although i suspect i
+will get some interesting comments for how i handled command line
+parsing and enabling devices. I have a volunteer testing it, but
+feedback is slow.
+
+	 Andrew
