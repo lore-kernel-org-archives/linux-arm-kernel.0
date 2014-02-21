@@ -1,64 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Feb 2014 11:20:54 +0000
-Subject: [PATCH] arm/arm64: KVM: detect CPU reset on CPU_PM_EXIT
-In-Reply-To: <20140220233543.1836e2d5@slackpad>
-References: <1392910014-15495-1-git-send-email-marc.zyngier@arm.com>
- <20140220233543.1836e2d5@slackpad>
-Message-ID: <53073696.5080005@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 21 Feb 2014 12:26:43 +0100
+Subject: I2C dummy adapter driver ?
+In-Reply-To: <5306322C.8030703@wwwdotorg.org>
+References: <5305382E.9050902@gmail.com> <5306322C.8030703@wwwdotorg.org>
+Message-ID: <530737F3.5050102@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/02/14 22:35, Andre Przywara wrote:
-> On Thu, 20 Feb 2014 15:26:54 +0000
-> Marc Zyngier <marc.zyngier@arm.com> wrote:
+On 20/02/14 17:49, Stephen Warren wrote:
+> On 02/19/2014 04:03 PM, Sylwester Nawrocki wrote:
+[...]
+>> I was wondering whether it would be reasonable to create a generic
+>> Linux dummy I2C bus controller driver. The rationale behind it is
+>> there might be hardware configurations where I2C communication is
+>> handled by firmware but still it is useful to have I2C slave devices
+>              ^^^^^^^^
 > 
->> Commit 1fcf7ce0c602 (arm: kvm: implement CPU PM notifier) added
->> support for CPU power-management, using a cpu_nofigier to re-init
->> KVM on a CPU that entered CPU idle.
->>
->> The code assumed that a CPU entering idle would actually be powered
->> off, loosing its state entierely, and would then need to be
->> reinitialized. It turns out that this is not always the case, and
->> some HW performs CPU PM without actually killing the core. In this
->> case, we try to reinitialize KVM while it still live. It ends up
->> badly, as reported by Andre Przywara (using a Calxeda Midway):
->>
->> [    3.663897] Kernel panic - not syncing: unexpected prefetch abort
->> in Hyp mode at: 0x685760 [    3.663897] unexpected data abort in Hyp
->> mode at: 0xc067d150 [    3.663897] unexpected HVC/SVC trap in Hyp
->> mode at: 0xc0901dd0
->>
->> The trick here is to detect if we've been through a full re-init or
->> not by looking at HVBAR (VBAR_EL2 on arm64). This involves
->> implementing the backend for __hyp_get_vectors in the main KVM HYP
->> code (rather small), and checking the return value against the
->> default one when the CPU notifier is called on CPU_PM_EXIT.
->>
->> Reported-by: Andre Przywara <osp@andrep.de>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Rob Herring <rob.herring@linaro.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Tested-by: Andre Przywara <osp@andrep.de>
+> That doesn't sound like a dummy driver. Rather, it sounds like a driver
+> for the firmware(?) interface that's used to do the I2C transactions.
 
-Thanks!
+Hmm, I think you're right. Just to clarify a bit, as the I2C slave device
+is part of a more complex data processing chain, it is not exposed by
+the firmware on a I2C read/write like command interface.
+So the only thing the Linux I2C client does currently is to enable some
+voltage regulators and driver reset pin through a GPIO. 
 
-> (there seems to be a typo in the second line of the commit message)
+However it depends on the firmware for the MCU controlling the whole
+camera data processing chain, currently the I2C slave control transactions
+are being handled in an opaque way by the firmware, it just exposes (very 
+few) high level commands specifically related to the I2C slave.
+It could be also that the firmware leaves out the I2C bus controller and
+I2C slave handling solely to the host CPU. In such case a regular I2C
+bus controller driver is needed. Hence the exact role of the I2C bus 
+controller driver highly depends on the firmware loaded.
 
-Ah, good katsh! ;-)
-
-> Marc,
-> 
-> thanks a lot for this quick and perfectly working patch! I still
-> believe it is actually the firmware that needs to be fixed, but this is
-> rather unlikely in this special case ...
-
-Well, that is completely debatable. This is a valid (if minimal)
-implementation of cpu idle, and the KVM code *must* be robust enough to
-deal with that kind of implementation.
-
-Cheers,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I assume the "driver for the firmware interface" is a good definition.
+I'm just not sure what best location of such an I2C bus driver, supposedly
+drivers/media/i2c would be a good fit, rather than drivers/i2c/busses.
