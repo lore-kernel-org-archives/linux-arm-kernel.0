@@ -1,150 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Feb 2014 15:42:41 +0000
-Subject: [PATCH v4 02/10] Documentation: dt: Add DT binding
- documentation for S5C73M3 camera
-In-Reply-To: <1392925237-31394-4-git-send-email-s.nawrocki@samsung.com>
-References: <1392925237-31394-1-git-send-email-s.nawrocki@samsung.com>
- <1392925237-31394-4-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20140221154240.GE20449@e106331-lin.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 21 Feb 2014 16:50:01 +0100
+Subject: [PATCH v2 1/2] phy: Select PHY_EXYNOS_MIPI_VIDEO by default for
+ ARCH_EXYNOS
+Message-ID: <1392997802-29050-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 07:40:29PM +0000, Sylwester Nawrocki wrote:
-> This adds DT binding documentation for Samsung S5C73M3 camera sensor
-> with an embedded ISP.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
-> Changes since v3:
->  - DT binding documentation separated into this patch;
-> 
-> Changes since v2:
->  - rephrased 'clocks' and 'clock-names' properties' description;
-> ---
->  .../devicetree/bindings/media/samsung-s5c73m3.txt  |   97 ++++++++++++++++++++
->  1 file changed, 97 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/samsung-s5c73m3.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/samsung-s5c73m3.txt b/Documentation/devicetree/bindings/media/samsung-s5c73m3.txt
-> new file mode 100644
-> index 0000000..4dd3776
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/samsung-s5c73m3.txt
-> @@ -0,0 +1,97 @@
-> +Samsung S5C73M3 8Mp camera ISP
-> +------------------------------
-> +
-> +The S5C73M3 camera ISP supports MIPI CSI-2 and parallel (ITU-R BT.656) video
-> +data busses. The I2C bus is the main control bus and additionally the SPI bus
-> +is used, mostly for transferring the firmware to and from the device. Two
-> +slave device nodes corresponding to these control bus interfaces are required
-> +and should be placed under respective bus controller nodes.
+Instead of requiring user to figure out when PHY_EXYNOS_MIPI_VIDEO needs
+to be selected select it by default for Exynos SoCs. Also enable it when
+COMPILE_TEST is selected. If required the MIPI CSIS/DPHY driver can be
+then disabled or compiled in as module.
 
-So this has both an I2C interface and an SPI interface that are used at
-the same time?
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+Changes since first version:
+ - use ARCH_EXYNOS instead of "ARCH_EXYNOS4 || ARCH_EXYNOS5"
+ - add dependency on COMPILE_TEST, and ARCH_S5PV210 for
+   PHY_EXYNOS_MIPI_VIDEO
+---
+ drivers/phy/Kconfig |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-> +
-> +I2C slave device node
-> +---------------------
-> +
-> +Required properties:
-> +
-> +- compatible	    : "samsung,s5c73m3";
-> +- reg		    : I2C slave address of the sensor;
-> +- vdd-int-supply    : digital power supply (1.2V);
-> +- vdda-supply	    : analog power supply (1.2V);
-> +- vdd-reg-supply    : regulator input power supply (2.8V);
-> +- vddio-host-supply : host I/O power supply (1.8V to 2.8V);
-> +- vddio-cis-supply  : CIS I/O power supply (1.2V to 1.8V);
-> +- vdd-af-supply     : lens power supply (2.8V);
-> +- xshutdown-gpios   : specifier of GPIO connected to the XSHUTDOWN pin;
-> +- standby-gpios     : specifier of GPIO connected to the STANDBY pin;
-> +- clocks	    : should contain list of phandle and clock specifier pairs
-> +		      according to common clock bindings for the clocks described
-> +		      in the clock-names property;
-> +- clock-names	    : should contain "cis_extclk" entry for the CIS_EXTCLK clock;
-> +
-> +Optional properties:
-> +
-> +- clock-frequency   : the frequency at which the "cis_extclk" clock should be
-> +		      configured to operate, in Hz; if this property is not
-> +		      specified default 24 MHz value will be used.
-> +
-> +The common video interfaces bindings (see video-interfaces.txt) should be used
-> +to specify link from the S5C73M3 to an external image data receiver. The S5C73M3
-> +device node should contain one 'port' child node with an 'endpoint' subnode for
-> +this purpose. The data link from a raw image sensor to the S5C73M3 can be
-> +similarly specified, but it is optional since the S5C73M3 ISP and a raw image
-> +sensor are usually inseparable and form a hybrid module.
-> +
-> +Following properties are valid for the endpoint node(s):
-> +
-> +endpoint subnode
-> +----------------
-> +
-> +- data-lanes : (optional) specifies MIPI CSI-2 data lanes as covered in
-> +  video-interfaces.txt. This sensor doesn't support data lane remapping
-> +  and physical lane indexes in subsequent elements of the array should
-> +  be only consecutive ascending values.
-> +
-> +SPI device node
-> +---------------
-> +
-> +Required properties:
-> +
-> +- compatible	    : "samsung,s5c73m3";
-
-It might make sense to explicitly link these two nodes somehow, in case
-multiple instances appear somewhere. However, that can come later in the
-case of a multi-instance device, and isn't necessary now.
-
-> +
-> +For more details see description of the SPI busses bindings
-> +(../spi/spi-bus.txt) and bindings of a specific bus controller.
-> +
-> +Example:
-> +
-> +i2c at 138A000000 {
-> +	...
-> +	s5c73m3 at 3c {
-> +		compatible = "samsung,s5c73m3";
-> +		reg = <0x3c>;
-> +		vdd-int-supply = <&buck9_reg>;
-> +		vdda-supply = <&ldo17_reg>;
-> +		vdd-reg-supply = <&cam_io_reg>;
-> +		vddio-host-supply = <&ldo18_reg>;
-> +		vddio-cis-supply = <&ldo9_reg>;
-> +		vdd-af-supply = <&cam_af_reg>;
-> +		clock-frequency = <24000000>;
-> +		clocks = <&clk 0>;
-> +		clock-names = "cis_extclk";
-> +		reset-gpios = <&gpf1 3 1>;
-> +		standby-gpios = <&gpm0 1 1>;
-> +		port {
-> +			s5c73m3_ep: endpoint {
-> +				remote-endpoint = <&csis0_ep>;
-> +				data-lanes = <1 2 3 4>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +spi at 1392000 {
-> +	...
-> +	s5c73m3_spi: s5c73m3 {
-
-Nit: this should have a 0 unit-address to match the reg.
-
-> +		compatible = "samsung,s5c73m3";
-> +		reg = <0>;
-> +		...
-> +	};
-> +};
-
-Otherwise I don't see anything problematic about the binding.
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Cheers,
-Mark.
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index afa2354..ebd455c 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -16,8 +16,11 @@ config GENERIC_PHY
+ 	  framework should select this config.
+ 
+ config PHY_EXYNOS_MIPI_VIDEO
+-	depends on HAS_IOMEM
+ 	tristate "S5P/EXYNOS SoC series MIPI CSI-2/DSI PHY driver"
++	depends on HAS_IOMEM
++	depends on ARCH_S5PV210 || ARCH_EXYNOS || COMPILE_TEST
++	select GENERIC_PHY
++	default y
+ 	help
+ 	  Support for MIPI CSI-2 and MIPI DSI DPHY found on Samsung S5P
+ 	  and EXYNOS SoCs.
+-- 
+1.7.9.5
