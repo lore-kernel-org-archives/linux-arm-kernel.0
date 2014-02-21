@@ -1,56 +1,33 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 21 Feb 2014 11:22:06 -0600
-Subject: [Patch v6 2/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <20140221093352.GE7541@e106331-lin.cambridge.arm.com>
-References: <1392964986-5207-1-git-send-email-agross@codeaurora.org>
- <1392964986-5207-3-git-send-email-agross@codeaurora.org>
- <20140221093352.GE7541@e106331-lin.cambridge.arm.com>
-Message-ID: <20140221172206.GB3102@qualcomm.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 21 Feb 2014 10:31:05 -0700
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <20140221180508.7ed6cfaf@skate>
+References: <20140221003227.GF19893@obsidianresearch.com>
+ <20140221093444.35870a73@skate> <5307152D.3020804@keymile.com>
+ <20140221101218.45766e8a@skate> <53071970.1040400@keymile.com>
+ <20140221103936.56b3d9f8@skate> <53074584.5010202@keymile.com>
+ <20140221144708.48559045@skate>
+ <20140221163902.GB4706@obsidianresearch.com>
+ <20140221180508.7ed6cfaf@skate>
+Message-ID: <20140221173105.GA17611@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 09:33:52AM +0000, Mark Rutland wrote:
-> On Fri, Feb 21, 2014 at 06:43:05AM +0000, Andy Gross wrote:
+On Fri, Feb 21, 2014 at 06:05:08PM +0100, Thomas Petazzoni wrote:
+ 
+> Now I have another question: our mvebu_pcie_align_resource() function
+> makes sure that the base address of the BAR is aligned on its size,
+> because it is a requirement of MBus windows. However, if you later
+> split the BAR into multiple windows, will this continue to work out?
 
-[snip]
-> > +       bdev->bamclk = devm_clk_get(bdev->dev, "bam_clk");
-> 
-> The binding document should describe the "bam_clk" string in the
-> clock-names description.
-> 
+No, you must align to (1 << log2_round_down(size)) - that will always
+be the largest mbus window created and thus the highest starting
+alignment requirement.
 
-OK.
+I looked for a bit to see if I could find why the core is rounding up
+to 196MB and it wasn't clear to me either.
 
-> > +       ret = of_property_read_u32(pdev->dev.of_node, "qcom,ee", &bdev->ee);
-> > +       if (ret) {
-> > +               dev_err(bdev->dev, "EE unspecified\n");
-> 
-> It would be nice to expand EE to what it stands for, at least in the
-> error but possibly the binding too.
+Gerlando, if you instrument the code in setup-bus.c, particularly
+pbus_size_mem, you will probably find out.
 
-I can expand it to execution environment.  This is a trustzone thing and is
-required from a security perspective.
-
-> > +static const struct of_device_id bam_of_match[] = {
-> > +       { .compatible = "qcom,bam-v1.4.0", },
-> > +       { .compatible = "qcom,bam-v1.4.1", },
-> 
-> What are the differences between the two?
-> 
-> Is v1.4.1 an extension of v1.4.0?
-
-On second look, the 1.4.1 has hardware fixes.  So the software API is the same.
-I thought there were some configuration changes, but that isn't the case.
-
-> Could you have the following in DTs:
-> 
->   compatible = "qcom,bam-v1.4.1", "qcom,bam-v1.4.0";
-> 
-> Then you'd only need the v1.4.0 string in the driver for now.
-
-Good point.  That's easy to change.
-
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Jason
