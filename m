@@ -1,254 +1,146 @@
-From: sr@denx.de (Stefan Roese)
-Date: Fri, 21 Feb 2014 13:36:05 +0100
-Subject: [PATCH] arm: dts: Add support for Compulab sbc-t3530 with cm-t35
-Message-ID: <1392986165-12238-1-git-send-email-sr@denx.de>
+From: Sudeep.Holla@arm.com (Sudeep Holla)
+Date: Fri, 21 Feb 2014 12:37:19 +0000
+Subject: [PATCH v5 3/5] ACPI / processor: Introduce map_gic_id() to get
+ apic id from MADT or _MAT method
+In-Reply-To: <53057DA9.3010307@linaro.org>
+References: <1392740638-2479-1-git-send-email-hanjun.guo@linaro.org>
+ <1392740638-2479-4-git-send-email-hanjun.guo@linaro.org>
+ <5304C0C4.3080601@arm.com> <53057DA9.3010307@linaro.org>
+Message-ID: <5307487F.6000308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cm-t3530 SOM is equipped with the OMAP3530 and does not boot with
-the cm-t3730 dts file as it used the omap36xx.dtsi. Add a separate
-dts/dtsi for this board to support it correctly.
+Hi Hanjun,
 
-I moved some common parts into omap3-cm-t3x30.dtsi. And removed
-the SDIO/WLAN support for now. As I don't know exactly how this
-should be done. Perhaps somebody else might jump in here...
+(Adding MarcZ for his views on GIC)
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Igor Grinberg <grinberg@compulab.co.il>
-Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/Makefile            |  1 +
- arch/arm/boot/dts/omap3-cm-t3530.dts  | 29 +++++++++++++++++++
- arch/arm/boot/dts/omap3-cm-t3730.dts  | 54 ++++-------------------------------
- arch/arm/boot/dts/omap3-cm-t3x30.dtsi | 44 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap3-sbc-t3530.dts | 30 +++++++++++++++++++
- 5 files changed, 110 insertions(+), 48 deletions(-)
- create mode 100644 arch/arm/boot/dts/omap3-cm-t3530.dts
- create mode 100644 arch/arm/boot/dts/omap3-sbc-t3530.dts
+On 20/02/14 03:59, Hanjun Guo wrote:
+> Hi Sudeep,
+> 
+> Thanks for your comments, please refer to the replies below. :)
+> 
+> On 2014?02?19? 22:33, Sudeep Holla wrote:
+>> Hi Hanjun,
+>>
+>> On 18/02/14 16:23, Hanjun Guo wrote:
+>>> Get apic id from MADT or _MAT method is not implemented on arm/arm64,
+>>> and ACPI 5.0 introduces GIC Structure for it, so this patch introduces
+>>> map_gic_id() to get apic id followed the ACPI 5.0 spec.
+>>>
+>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>> ---
+>>>   drivers/acpi/processor_core.c |   26 ++++++++++++++++++++++++++
+>>>   1 file changed, 26 insertions(+)
+>>>
+>>> diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+>>> index 4dcf776..d316d9b 100644
+>>> --- a/drivers/acpi/processor_core.c
+>>> +++ b/drivers/acpi/processor_core.c
+>>> @@ -71,6 +71,27 @@ static int map_lsapic_id(struct acpi_subtable_header *entry,
+>>>   	return 0;
+>>>   }
+>>>   
+>>> +static int map_gic_id(struct acpi_subtable_header *entry,
+>>> +		int device_declaration, u32 acpi_id, int *apic_id)
+>>> +{
+>>> +	struct acpi_madt_generic_interrupt *gic =
+>>> +		(struct acpi_madt_generic_interrupt *)entry;
+>>> +
+>>> +	if (!(gic->flags & ACPI_MADT_ENABLED))
+>>> +		return -ENODEV;
+>>> +
+>>> +	/* In the GIC interrupt model, logical processors are
+>>> +	 * required to have a Processor Device object in the DSDT,
+>>> +	 * so we should check device_declaration here
+>>> +	 */
+>>> +	if (device_declaration && (gic->uid == acpi_id)) {
+>>> +		*apic_id = gic->gic_id;
+>> I have mentioned this earlier, it's not clear yet to me how does this work ?
+>> It needs more clarity in the form of comment here at-least as the ACPIv5.0 is
+>> also not so clear or explicit on how to handle this.
+> 
+> Yes, I noticed your comments and had a reply for that, after a
+> long consideration for this, I would withdraw my previous comments
+> before, please refer to the comments below.
+> 
+>>
+>> Here you are expecting gic->uid = acpi_id which is fine, while acpi_map_cpuid
+>> matches apic_id with cpu_physical_id(which must be MPIDR in ARM{32,64}). The
+>> latter imposes restriction that gic->gic_id has to be MPIDR. Does that mean we
+>> are imposing restriction on GIC ID to be MPIDR ? If so please document it here
+>> and please explain the reason behind that choice.
+> 
+> On x86 and IA64, APIC/SAPIC ID is the hardware id of the logical
+> processor, and UID is just a unique ID to identify the processor in DSDT, it
+> can be any value, and even can be strings defined in ASL if I remember
+> that correctly.
+> 
+OK, but that's not the case on ARM{32,64}. My main concern here is if we don't
+make this definitions clear enough, the vendors might produce ACPI tables with
+whatever suits them and we may end up supporting them. Since we are starting
+with clean slate, we can avoid getting into such situations. I will be to be
+more elaborate this time.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 6d1e43d..6fd1b34 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -200,6 +200,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap3430-sdp.dtb \
- 	omap3-beagle.dtb \
- 	omap3-cm-t3730.dtb \
-+	omap3-sbc-t3530.dtb \
- 	omap3-sbc-t3730.dtb \
- 	omap3-devkit8000.dtb \
- 	omap3-beagle-xm.dtb \
-diff --git a/arch/arm/boot/dts/omap3-cm-t3530.dts b/arch/arm/boot/dts/omap3-cm-t3530.dts
-new file mode 100644
-index 0000000..35a1fc2
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-cm-t3530.dts
-@@ -0,0 +1,29 @@
-+/*
-+ * Support for CompuLab CM-T3530
-+ */
-+/dts-v1/;
-+
-+#include "omap34xx-hs.dtsi"
-+#include "omap3-cm-t3x30.dtsi"
-+
-+/ {
-+	model = "CompuLab CM-T3530";
-+	compatible = "compulab,omap3-cm-t3530", "ti,omap34xx", "ti,omap3";
-+};
-+
-+&mmc1 {
-+	vmmc-supply = <&vmmc1>;
-+	bus-width = <4>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+};
-+
-+&smsc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&smsc1_pins>;
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins>;
-+};
-diff --git a/arch/arm/boot/dts/omap3-cm-t3730.dts b/arch/arm/boot/dts/omap3-cm-t3730.dts
-index 486f4d6..3e05b11 100644
---- a/arch/arm/boot/dts/omap3-cm-t3730.dts
-+++ b/arch/arm/boot/dts/omap3-cm-t3730.dts
-@@ -32,39 +32,14 @@
- };
- 
- &omap3_pmx_core {
--	mmc1_pins: pinmux_mmc1_pins {
--		pinctrl-single,pins = <
--			0x114 (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* sdmmc1_clk.sdmmc1_clk */
--			0x116 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_cmd.sdmmc1_cmd */
--			0x118 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat0.sdmmc1_dat0 */
--			0x11a (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat1.sdmmc1_dat1 */
--			0x11c (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat2.sdmmc1_dat2 */
--			0x11e (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat3.sdmmc1_dat3 */
--		>;
--	};
--
- 	mmc2_pins: pinmux_mmc2_pins {
- 		pinctrl-single,pins = <
--			0x128 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_clk.sdmmc2_clk */
--			0x12a (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_cmd.sdmmc2_cmd */
--			0x12c (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat0.sdmmc2_dat0 */
--			0x12e (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat1.sdmmc2_dat1 */
--			0x130 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat2.sdmmc2_dat2 */
--			0x132 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat3.sdmmc2_dat3 */
--		>;
--	};
--
--	smsc1_pins: pinmux_smsc1_pins {
--		pinctrl-single,pins = <
--			0x88 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_ncs5.gpmc_ncs5 */
--			0x16a (PIN_INPUT_PULLUP | MUX_MODE4)	/* uart3_cts_rctx.gpio_163 */
--		>;
--	};
--
--	uart3_pins: pinmux_uart3_pins {
--		pinctrl-single,pins = <
--			0x16e (PIN_INPUT | MUX_MODE0)		/* uart3_rx_irrx.uart3_rx_irrx */
--			0x170 (PIN_OUTPUT | MUX_MODE0)		/* uart3_tx_irtx.uart3_tx_irtx */
-+			0x128 (PIN_INPUT_PULLUP | MUX_MODE0)    /* sdmmc2_clk.sdmmc2_clk */
-+			0x12a (PIN_INPUT_PULLUP | MUX_MODE0)    /* sdmmc2_cmd.sdmmc2_cmd */
-+			0x12c (PIN_INPUT_PULLUP | MUX_MODE0)    /* sdmmc2_dat0.sdmmc2_dat0 */
-+			0x12e (PIN_INPUT_PULLUP | MUX_MODE0)    /* sdmmc2_dat1.sdmmc2_dat1 */
-+			0x130 (PIN_INPUT_PULLUP | MUX_MODE0)    /* sdmmc2_dat2.sdmmc2_dat2 */
-+			0x132 (PIN_INPUT_PULLUP | MUX_MODE0)    /* sdmmc2_dat3.sdmmc2_dat3 */
- 		>;
- 	};
- 
-@@ -76,13 +51,6 @@
- 	};
- };
- 
--&mmc1 {
--	vmmc-supply = <&vmmc1>;
--	bus-width = <4>;
--	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins>;
--};
--
- &mmc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_pins>;
-@@ -92,13 +60,3 @@
- 	bus-width = <4>;
- 	cap-power-off-card;
- };
--
--&smsc1 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&smsc1_pins>;
--};
--
--&uart3 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&uart3_pins>;
--};
-diff --git a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-index 3a9f004..0eadd4a 100644
---- a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-+++ b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-@@ -36,6 +36,33 @@
- 	};
- };
- 
-+&omap3_pmx_core {
-+	mmc1_pins: pinmux_mmc1_pins {
-+		pinctrl-single,pins = <
-+			0x114 (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* sdmmc1_clk.sdmmc1_clk */
-+			0x116 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_cmd.sdmmc1_cmd */
-+			0x118 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat0.sdmmc1_dat0 */
-+			0x11a (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat1.sdmmc1_dat1 */
-+			0x11c (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat2.sdmmc1_dat2 */
-+			0x11e (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat3.sdmmc1_dat3 */
-+		>;
-+	};
-+
-+	smsc1_pins: pinmux_smsc1_pins {
-+		pinctrl-single,pins = <
-+			0x88 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_ncs5.gpmc_ncs5 */
-+			0x16a (PIN_INPUT_PULLUP | MUX_MODE4)	/* uart3_cts_rctx.gpio_163 */
-+		>;
-+	};
-+
-+	uart3_pins: pinmux_uart3_pins {
-+		pinctrl-single,pins = <
-+			0x16e (PIN_INPUT | MUX_MODE0)		/* uart3_rx_irrx.uart3_rx_irrx */
-+			0x170 (PIN_OUTPUT | MUX_MODE0)		/* uart3_tx_irtx.uart3_tx_irtx */
-+		>;
-+	};
-+};
-+
- &gpmc {
- 	ranges = <5 0 0x2c000000 0x01000000>;
- 
-@@ -83,6 +110,23 @@
- 	};
- };
- 
-+&mmc1 {
-+	vmmc-supply = <&vmmc1>;
-+	bus-width = <4>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+};
-+
-+&smsc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&smsc1_pins>;
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins>;
-+};
-+
- #include "twl4030.dtsi"
- #include "twl4030_omap3.dtsi"
- 
-diff --git a/arch/arm/boot/dts/omap3-sbc-t3530.dts b/arch/arm/boot/dts/omap3-sbc-t3530.dts
-new file mode 100644
-index 0000000..b548343
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-sbc-t3530.dts
-@@ -0,0 +1,30 @@
-+/*
-+ * Support for CompuLab SBC-T3530 with CM-T3530
-+ */
-+
-+#include "omap3-cm-t3530.dts"
-+#include "omap3-sb-t35.dtsi"
-+
-+/ {
-+	model = "CompuLab SBC-T3530 with CM-T3530";
-+	compatible = "compulab,omap3-sbc-t3530", "compulab,omap3-cm-t3530", "ti,omap34xx", "ti,omap3";
-+};
-+
-+&gpmc {
-+	ranges = <5 0 0x2c000000 0x01000000>,
-+		 <4 0 0x2d000000 0x01000000>;
-+};
-+
-+&smsc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&smsc2_pins>;
-+};
-+
-+&omap3_pmx_core {
-+	smsc2_pins: pinmux_smsc2_pins {
-+		pinctrl-single,pins = <
-+			0x86 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_ncs4.gpmc_ncs4 */
-+			0xa2 (PIN_INPUT_PULLUP | MUX_MODE4)	/* gpmc_wait3.gpio_65 */
-+		>;
-+	};
-+};
--- 
-1.8.5.5
+The GIC ID is referred as the local GIC?s hardware ID in ACPIv5.0.
+IIUC, since GICC is per-cpu entry, it has to GIC CPU interface ID.
+
+Now how does it differ from MPIDR ? e.g. ARM TC2(multi cluster system)
+	GIC ID		MPIDR			Comment
+	0		0x000			CA15_0
+	1		0x001			CA15_1
+	2		0x100			CA7_0
+	3		0x101			CA7_1
+	4		0x102			CA7_2
+
+> The processor driver also follows that guidance now, and GIC structure 
+> in MADT
+> actually represents a processor (GICC) in the system, so I would let
+> gic->gic_id as MPIDR(processor hardware ID) for now to avoid confusions
+> and keep consistency with current ACPI driver.
+> 
+
+Yes that's my worry "... so I would let gic->gic_id as MPIDR(processor hardware
+ID)" as it contradicts the definition.
+
+1. Yes today GIC CPU ID is enumerated in the code and we don't need it, but
+   that doesn't mean the GICC contain whatever(of vendor choice). IMO it should
+   be CPU interface ID as per the definition.
+
+2. It's better you post this patch as part of ARM64 port for easier
+   understanding on how this gets used as its ARM specific anyway.
+   That gives better/complete picture at least for review purposes.
+
+> UID can be any value and it depends on implementation, so it can be MPIDR
+> also, it will not conflict with GIC ID and can works fine in acpi processor
+> driver now.
+> 
+
+Agreed UID can be anything, but your initial ARM64 APCI patches were assuming it
+to be MPIDR. Since MPIDR is not specified anywhere else in the ACPI tables and
+it is required for some boot methods like PSCI and may be others, I am for
+mandating _UID in processor object to be MPIDR. If you agree please make it
+explicit in the comments.
+
+>>
+>> I would expect _UID to be MPIDR rather than GIC ID but you may have some reasons
+>> for this choice.
+> 
+> I think they both can be MPIDR for now, is this ok to you?
+> 
+
+Yes for _UID and no for GIC ID, they need to represent the hardware. We can see
+how to manage in this in ACPI. Initially I went by the name "cpu_physical_id"
+in acpi_map_cpuid but it looks like it's cpuid->apicid mapping on x86. So that
+should not be problem.
+
+> we can update the code when the new ACPI spec is coming out if there
+> is a clear explanation for GIC ID and UID in GIC structures, does this make
+> sense to you?
+
+Yes, that's for next version of ACPI but we don't know that yet. IIUC you are
+trying to implement ACPI port for ARM64 based on ACPIv5.0 through these patches
+right ? Hence I pushing you to be more explicit through comments as ACPIv5.0 is
+not clear enough.
+
+Regards,
+Sudeep
