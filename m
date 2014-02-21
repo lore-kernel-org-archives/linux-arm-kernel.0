@@ -1,40 +1,51 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 21 Feb 2014 15:01:40 +0000
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <1392037324-5069-1-git-send-email-broonie@kernel.org>
-References: <1392037324-5069-1-git-send-email-broonie@kernel.org>
-Message-ID: <20140221150140.GB495@e102568-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Feb 2014 16:05:16 +0100
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <20140221144708.48559045@skate>
+References: <53039894.10905@keymile.com> <53074584.5010202@keymile.com>
+ <20140221144708.48559045@skate>
+Message-ID: <2193926.ls2teBqnfK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 10, 2014 at 01:02:01PM +0000, Mark Brown wrote:
+On Friday 21 February 2014 14:47:08 Thomas Petazzoni wrote:
+> 
+> > So I'd say this looks like a very promising approach. 
+> 
+> Indeed. However, I don't think this approach solves the entire problem,
+> for two reasons:
+> 
+>  *) For small BARs that are not power-of-two sized, we may not want to
+>     consume two windows, but instead consume a little bit more address
+>     space. Using two windows to map a 96 KB BAR would be a waste of
+>     windows: using a single 128 KB window is much more efficient.
 
-[...]
+definitely.
+ 
+>  *) I don't know if the algorithm to split the BAR into multiple
+>     windows is going to be trivial.
 
-> +void store_cpu_topology(unsigned int cpuid)
-> +{
-> +	struct cpu_topology *cpuid_topo = &cpu_topology[cpuid];
-> +
-> +	/* DT should have been parsed by the time we get here */
-> +	if (cpuid_topo->core_id == -1)
-> +		pr_info("CPU%u: No topology information configured\n", cpuid);
-> +	else
-> +		update_siblings_masks(cpuid);
+The easiest solution would be to special case 'size is between
+128MB+1 and 192MB' if that turns out to be the most interesting
+case. It's easy enough to make the second window smaller than 64MB
+if we want.
 
-If the DT does not contain a proper topology the scheduler seem to go for a
-toss. I tried to track it down and it seems it expects topology cpumasks to be
-initialized regardless (eg to possible mask), they cannot be left empty.
+If we want things to be a little fancier, we could use:
 
-Either update_siblings_masks is called regardless or possible mask must
-be copied to the topology masks.
+	switch (size) {
+		case (SZ_32M+1) ... (SZ_32M+SZ_16M):
+			size2 = size - SZ_32M;
+			size -= SZ_32M;
+			break;
+		case (SZ_64M+1) ... (SZ_64M+SZ_32M):
+			size2 = size - SZ_64M;
+			size -= SZ_64M;
+			break;
+		case (SZ_128M+1) ... (SZ_128M+SZ_64M):
+			size2 = size - SZ_128M;
+			size -= SZ_128M;
+			break;
+	};
 
-I will have a thorough look to check if the scheduler has a fall-back
-mechanism.
 
-On top of that, the pr_info message is quite annoying and should be
-probably downgraded or removed altogether.
-
-Furthermore leaving core_id as -1 should be fine, but I have to have a
-proper look into the scheduler topology code to countercheck that.
-
-Lorenzo
+	Arnd
