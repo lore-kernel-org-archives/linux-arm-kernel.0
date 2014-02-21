@@ -1,37 +1,50 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 22 Feb 2014 00:35:02 +0100
-Subject: [PATCH v5 2/5] ACPI / processor_core: Rework _PDC related stuff
- to make it more arch-independent
-In-Reply-To: <20140221182424.GA5751@arm.com>
-References: <1392740638-2479-1-git-send-email-hanjun.guo@linaro.org>
- <3459962.GkY99aHQbc@vostro.rjw.lan> <20140221182424.GA5751@arm.com>
-Message-ID: <1408521.4TEdKhuRp5@vostro.rjw.lan>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 21 Feb 2014 15:23:23 -0800
+Subject: [PATCH v2 0/2] ARM: OMAP4: Fix gpmc_fck clock
+In-Reply-To: <5305D02D.5020702@ti.com>
+References: <1392801305-1698-1-git-send-email-florian.vaussard@epfl.ch>
+ <5304DA2C.3030605@ti.com> <53050573.8090506@epfl.ch>
+ <5305D02D.5020702@ti.com>
+Message-ID: <20140221232323.GD5342@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, February 21, 2014 06:24:24 PM Catalin Marinas wrote:
-> Hi Rafael,
+* Tero Kristo <t-kristo@ti.com> [140220 01:54]:
+> On 02/19/2014 09:26 PM, Florian Vaussard wrote:
+> >
+> >On 02/19/2014 05:22 PM, Tero Kristo wrote:
+> >>On 02/19/2014 11:15 AM, Florian Vaussard wrote:
+> >>>Hello,
+> >>>
+> >>>Trying to get my SMSC9221 working on OMAP4 with DT,
+> >>>I faced a misconfigured gpmc_fck (dummy clock set to 0)
+> >>>resulting in serveral division-by-zero, misconfigured
+> >>>timings and driver lost in the La La Land.
+> >>>
+> >>>To solve this, patch 1 removes gpmc_fck from the dummy
+> >>>clocks, and patch 2 adds the gpmc_fck DT node and
+> >>>reference it from the gpmc node.
+> >>>
+> >>>Tested on DuoVero/Parlor (OMAP4430) with SMSC9221.
+> >>
+> >>I can't test GPMC myself, but other than that, this set looks good to go.
+> >>
+> >
+> >Thank you. Would you like more test coverage by other people? I would
+> >like to see this in -rc if possible, as it is needed to boot my OMAP4
+> >system.
 > 
-> On Wed, Feb 19, 2014 at 01:50:22AM +0100, Rafael J. Wysocki wrote:
-> > On Wednesday, February 19, 2014 12:23:55 AM Hanjun Guo wrote:
-> > > _PDC related stuff in processor_core.c is little bit X86/IA64 dependent,
-> > > rework the code to make it more arch-independent, no functional change
-> > > in this patch.
-> > > 
-> > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > > Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> > 
-> > I've queued up patches [1,3-5/5] from this series for 3.15 (modulo changelog
-> > modifications), but this one should be CCed to the x86 and ia64 maintainers.
-> 
-> Thanks for taking these patches. I would however hold onto patch 3/5 as
-> this is still under discussion. Basically for patches specific to ARM
-> ACPI I would really like to see more acks before being merged as that's
-> a new thing for us.
+> Well, I just think the driver clock change should be acked by
+> someone who knows gpmc better than me.
 
-OK, I'll drop [3/5] for now, then.
+Hmm do we also need to fix this for other omaps? We at least have
+the following refrerences:
 
-I'm wondering, though, whose ACKs I should be waiting for before applying those
-patches?
+$ git grep dummy_ck drivers/ | grep -i gpmc
+drivers/clk/ti/clk-44xx.c:      DT_CLK("50000000.gpmc", "fck", "dummy_ck"),
+drivers/clk/ti/clk-54xx.c:      DT_CLK(NULL, "gpmc_ck", "dummy_ck"),
+drivers/clk/ti/clk-7xx.c:       DT_CLK(NULL, "gpmc_ck", "dummy_ck"),
 
-Rafael
+Regards,
+
+Tony
