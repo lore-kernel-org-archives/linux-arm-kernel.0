@@ -1,57 +1,65 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 21 Feb 2014 09:31:12 +0100
-Subject: [PATCH] ARM: shmobile: koelsch/lager/multi defconfig: Enable MSIOF
-Message-ID: <1392971472-21679-1-git-send-email-geert@linux-m68k.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 21 Feb 2014 09:34:44 +0100
+Subject: pci-mvebu driver on km_kirkwood
+In-Reply-To: <20140221003227.GF19893@obsidianresearch.com>
+References: <53039894.10905@keymile.com> <20140218212751.07c2aeb5@skate>
+ <53046D98.6020801@keymile.com> <20140219102658.76eec91e@skate>
+ <53047BBB.6040108@keymile.com> <20140219143749.65ff3155@skate>
+ <CAErSpo4=6VgJazaErcx=ztKhZ_62xBrQ6K1eN_dVpvV4R0T2ag@mail.gmail.com>
+ <20140220095518.7ca36f0a@skate>
+ <20140220173518.GA19893@obsidianresearch.com>
+ <20140220212914.29ddc031@skate>
+ <20140221003227.GF19893@obsidianresearch.com>
+Message-ID: <20140221093444.35870a73@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Dear Jason Gunthorpe,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
----
-This should have been part of the series "[PATCH 00/11] ARM: shmobile:
-MSIOF integration on r8a7790/lager and r8a7791/koelsch"
+On Thu, 20 Feb 2014 17:32:27 -0700, Jason Gunthorpe wrote:
 
- arch/arm/configs/koelsch_defconfig  |    1 +
- arch/arm/configs/lager_defconfig    |    1 +
- arch/arm/configs/shmobile_defconfig |    1 +
- 3 files changed, 3 insertions(+)
+> > In practice, the story is a little bit more subtle than that: the PCIe
+> > driver may want to decide to either tell the PCI core to enlarge the
+> > window BAR up to the next power of two size, or to dedicate two windows
+> > to it.
+> 
+> That is a smart, easy solution! Maybe that is the least invasive way
+> to proceed for now?
 
-diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
-index 93919e8c92ce..0c3709e81842 100644
---- a/arch/arm/configs/koelsch_defconfig
-+++ b/arch/arm/configs/koelsch_defconfig
-@@ -69,6 +69,7 @@ CONFIG_I2C=y
- CONFIG_I2C_RCAR=y
- CONFIG_SPI=y
- CONFIG_SPI_RSPI=y
-+CONFIG_SPI_SH_MSIOF=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_RCAR=y
- # CONFIG_HWMON is not set
-diff --git a/arch/arm/configs/lager_defconfig b/arch/arm/configs/lager_defconfig
-index b17fc23ae676..dfb0c21fb767 100644
---- a/arch/arm/configs/lager_defconfig
-+++ b/arch/arm/configs/lager_defconfig
-@@ -90,6 +90,7 @@ CONFIG_I2C_GPIO=y
- CONFIG_I2C_RCAR=y
- CONFIG_SPI=y
- CONFIG_SPI_RSPI=y
-+CONFIG_SPI_SH_MSIOF=y
- CONFIG_GPIO_SH_PFC=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_RCAR=y
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 83b07258a385..2a27d4622cc9 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -78,6 +78,7 @@ CONFIG_I2C_GPIO=y
- CONFIG_I2C_RCAR=y
- CONFIG_SPI=y
- CONFIG_SPI_RSPI=y
-+CONFIG_SPI_SH_MSIOF=y
- CONFIG_GPIO_EM=y
- CONFIG_GPIO_RCAR=y
- # CONFIG_HWMON is not set
+So you suggest that the mvebu-mbus driver should accept a
+non power-of-two window size, and do internally the job of cutting that
+into several power-of-two sized areas and creating the corresponding
+windows?
+
+> I have no idea how you decide when to round up and when to allocate
+> more windows, that feels like a fairly complex optimization problem!
+
+Yes, it is a fairly complex problem. I was thinking of a threshold of
+"lost space". Below this threshold, it's better to enlarge the window,
+above the threshold it's better to create two windows. But not easy.
+
+> Alternatively, I suspect you can use the PCI quirk mechanism to alter
+> the resource sizing on a bridge?
+
+Can you give more details about this mechanism, and how it could be
+used to alter the size of resources on a bridge?
+
+> > Jason, would you mind maybe replying to Bjorn Helgaas email (Thu, 20
+> > Feb 2014 12:18:42 -0700) ? I believe that a lot of the misunderstanding
+> > between Bjorn and me is due to the fact that I don't use the correct
+> > PCI terminology to describe how the Marvell hardware works, and how the
+> > Marvell PCIe driver copes with it. I'm sure you would explain it in a
+> > way that would be more easily understood by someone very familiar with
+> > the PCI terminology such as Bjorn. Thanks a lot!
+> 
+> Done!
+
+Thanks a lot! Really appreciated.
+
+Best regards,
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
