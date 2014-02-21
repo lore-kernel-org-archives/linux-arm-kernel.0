@@ -1,94 +1,103 @@
-From: fugang.duan@freescale.com (fugang.duan at freescale.com)
-Date: Fri, 21 Feb 2014 05:17:20 +0000
-Subject: [PATCH v5 1/3] ARM: dts: vf610-twr: Add ADC support
-In-Reply-To: <20140219050716.GA3010@S2101-09.ap.freescale.net>
-References: <1390714773-23066-1-git-send-email-B38611@freescale.com>
- <1390714773-23066-2-git-send-email-B38611@freescale.com>
- <20140216074850.GA2946@S2101-09.ap.freescale.net>
- <20140219050716.GA3010@S2101-09.ap.freescale.net>
-Message-ID: <da1f0ce0784e434d8a384aa34e271a18@BLUPR03MB373.namprd03.prod.outlook.com>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Fri, 21 Feb 2014 10:49:25 +0530
+Subject: [PATCH v9 1/6] arm64: Add macros to manage processor debug state
+In-Reply-To: <20140220162710.GA7651@arm.com>
+References: <CALicx6uHqyJ-n+b-zfua6P=UsJ+a2_2h-H6krx-DBJYWfF=7jg@mail.gmail.com>
+ <20140218120249.GD11049@arm.com>
+ <CALicx6v6=WdRPoZ-vcxf7zusooB5r1V9WnjBf3QjOiO7yik3sw@mail.gmail.com>
+ <20140219113157.GG30457@arm.com> <20140219160359.GB22252@arm.com>
+ <20140219161236.GG28173@mudshark.cambridge.arm.com>
+ <CALicx6t7RSS_Zo9RGr76LMnNth1gQ7pukUtAmDY4gWRN5KGVKQ@mail.gmail.com>
+ <20140220114222.GG3615@mudshark.cambridge.arm.com>
+ <CALicx6sB-tucxv=-0J9LKw5E3wA1hmYyYN_z99ugnpmxvZTMng@mail.gmail.com>
+ <20140220155600.GJ3615@mudshark.cambridge.arm.com>
+ <20140220162710.GA7651@arm.com>
+Message-ID: <CALicx6vTyv7=GQuEmveqNVG8TDL_eHqz+ZzknpwBTWq8m_D+=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
-Data: Wednesday, February 19, 2014 1:07 PM + 0800
+Hi Catalin,
 
->To: Duan Fugang-B38611
->Cc: jic23 at kernel.org; sachin.kamat at linaro.org; pmeerw at pmeerw.net;
->lars at metafoo.de; mark.rutland at arm.com; linux-iio at vger.kernel.org; Rob Herring;
->Grant Likely; Pawel Moll; Ian Campbell; Kumar Gala; devicetree at vger.kernel.org;
->linux-arm-kernel at lists.infradead.org
->Subject: Re: [PATCH v5 1/3] ARM: dts: vf610-twr: Add ADC support
+On Thu, Feb 20, 2014 at 9:57 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Thu, Feb 20, 2014 at 03:56:00PM +0000, Will Deacon wrote:
+>> On Thu, Feb 20, 2014 at 12:22:14PM +0000, Vijay Kilari wrote:
+>> > On Thu, Feb 20, 2014 at 5:12 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> > > On Thu, Feb 20, 2014 at 06:58:25AM +0000, Vijay Kilari wrote:
+>> > >> --- a/arch/arm64/kernel/smp.c
+>> > >> +++ b/arch/arm64/kernel/smp.c
+>> > >> @@ -160,6 +160,8 @@ asmlinkage void secondary_start_kernel(void)
+>> > >>         set_cpu_online(cpu, true);
+>> > >>         complete(&cpu_running);
+>> > >>
+>> > >> +       local_dbg_enable();
+>> > >>         local_irq_enable();
+>> > >>         local_async_enable();
+>> > >
+>> > > The only thing to add then moving the isb(); local_dbg_enable() out of
+>> > > clear_os_lock and into debug_monitors_init. You can probably make the
+>> > > smp_call_function an on_each_cpu too.
+>> > >
+>> > > Does that make sense?
+>> >
+>> > Its ok for me.  Isn't require to have isb() after clearing os lock for
+>> > every cpu?
+>> > Just having isb on cpu0 after clearing os lock is enough?
+>>
+>> They'll synchronise on return from the IPI.
+>>
+>> > --- a/arch/arm64/kernel/debug-monitors.c
+>> > +++ b/arch/arm64/kernel/debug-monitors.c
+>> > @@ -137,8 +137,6 @@ void disable_debug_monitors(enum debug_el el)
+>> >  static void clear_os_lock(void *unused)
+>> >  {
+>> >         asm volatile("msr oslar_el1, %0" : : "r" (0));
+>> > -       isb();
+>> > -       local_dbg_enable();
+>> >  }
+>> >
+>> >  static int os_lock_notify(struct notifier_block *self,
+>> > @@ -157,8 +155,9 @@ static struct notifier_block os_lock_nb = {
+>> >  static int debug_monitors_init(void)
+>> >  {
+>> >         /* Clear the OS lock. */
+>> > -       smp_call_function(clear_os_lock, NULL, 1);
+>> > -       clear_os_lock(NULL);
+>> > +       on_each_cpu(clear_os_lock, NULL, 1);
+>> > +       isb();
+>> > +       local_dbg_enable();
+>> >
+>> >         /* Register hotplug handler. */
+>> >         register_cpu_notifier(&os_lock_nb);
+>> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>> > index 7cfb92a..5070dc3 100644
+>> > --- a/arch/arm64/kernel/smp.c
+>> > +++ b/arch/arm64/kernel/smp.c
+>> > @@ -160,6 +160,7 @@ asmlinkage void secondary_start_kernel(void)
+>> >         set_cpu_online(cpu, true);
+>> >         complete(&cpu_running);
+>> >
+>> > +       local_dbg_enable();
+>> >         local_irq_enable();
+>> >         local_async_enable();
+>> >
+>> > Is this ok?
+>>
+>> Looks good to me:
+>>
+>>   Acked-by: Will Deacon <will.deacon@arm.com>
 >
->On Sun, Feb 16, 2014 at 03:48:53PM +0800, Shawn Guo wrote:
->> Copy more DT folks and lists, as I want to make sure everyone agrees
->> on how the fixed regulators should organized in the device tree
->> sources, before I apply the patch.
->>
->> On Sun, Jan 26, 2014 at 01:39:31PM +0800, Fugang Duan wrote:
->> > vf610 has two ADC controllers, and vf610-twr board ADC0_SE5 pin
->> > connect to sliding rheostat for ADC test, other ADC pins connect to
->> > connectors for future use.
->> >
->> > Add support for ADC0_SE5.
->> >
->> > CC: Shawn Guo <shawn.guo@linaro.org>
->> > CC: Jonathan Cameron <jic23@kernel.org>
->> > CC: Mark Rutland <mark.rutland@arm.com>
->> > CC: Otavio Salvador <otavio@ossystems.com.br>
->> > CC: Peter Meerwald <pmeerw@pmeerw.net>
->> > CC: Lars-Peter Clausen <lars@metafoo.de>
->> > Signed-off-by: Fugang Duan <B38611@freescale.com>
->> > ---
->> >  arch/arm/boot/dts/vf610-twr.dts |   21 +++++++++++++++++++++
->> >  arch/arm/boot/dts/vf610.dtsi    |   26 ++++++++++++++++++++++++++
->> >  2 files changed, 47 insertions(+), 0 deletions(-)
->> >
->> > diff --git a/arch/arm/boot/dts/vf610-twr.dts
->> > b/arch/arm/boot/dts/vf610-twr.dts index c8047ca..d867be3 100644
->> > --- a/arch/arm/boot/dts/vf610-twr.dts
->> > +++ b/arch/arm/boot/dts/vf610-twr.dts
->> > @@ -34,6 +34,27 @@
->> >  		};
->> >  	};
->> >
->> > +	regulators {
->> > +		compatible = "simple-bus";
->> > +		#address-cells = <1>;
->> > +		#size-cells = <0>;
->> > +
->> > +		reg_vcc_3v3_mcu: regulator at 0 {
->> > +			compatible = "regulator-fixed";
->> > +			reg = <0>;
->> > +			regulator-name = "vcc_3v3_mcu";
->> > +			regulator-min-microvolt = <3300000>;
->> > +			regulator-max-microvolt = <3300000>;
->> > +		};
->> > +	};
->>
->> Per discussion [1], Mark Rutland suggests that instead of organizing
->> the fixed regulator nodes in a simple-bus container, it should be put
->> under root node directly like below.
->>
->> / {
->> 	reg_vcc_3v3_mcu: regulator_0 {
->> 		compatible = "regulator-fixed";
->> 		regulator-name = "vcc_3v3_mcu";
->> 		regulator-min-microvolt = <3300000>;
->> 		regulator-max-microvolt = <3300000>;
->> 	};
->> };
->>
->> Is this what all DT folks agree on?  At least the node name should be
->> 'regulator-0' since it's more idiomatic to use '-' than '_' in node
->> name?
+> Vijay, could you please post a commit log together with the above patch
+> (and Will's ack) so that I can merge it on top of your other patches?
 >
->It looks that Mark is giving up [1].  And we're fine with the original code
->then.
->
->Shawn
 
-So, you apply the original patch ? Do I need to resend it again ?
+  I have sent a patch for this fix named, " [PATCH 1/1] arm64: enable processor
+debug state for secondary cpus".
+Please apply this on top of other patches.
 
-Thanks,
-Andy
+Thanks
+- Vijay
+> Thanks.
+>
+> --
+> Catalin
