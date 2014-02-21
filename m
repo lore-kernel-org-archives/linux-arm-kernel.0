@@ -1,44 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 21 Feb 2014 15:11:58 +0900
-Subject: [GIT PULL] Renesas intc Updates for v3.15
-Message-ID: <cover.1392962498.git.horms+renesas@verge.net.au>
+Date: Fri, 21 Feb 2014 15:12:01 +0900
+Subject: [PATCH] sh: intc: Enable driver compilation with COMPILE_TEST
+In-Reply-To: <cover.1392962498.git.horms+renesas@verge.net.au>
+References: <cover.1392962498.git.horms+renesas@verge.net.au>
+Message-ID: <4f3068f60503e08bc9e729528d9e54289980fa96.1392962498.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Please consider this Renesas ARM based SoC intc updates for v3.15.
+This helps increasing build testing coverage.
 
-Previously merging code for this driver was handled Paul Mundt
-as part of his maintenance of SUPERH. However, SUPERH is in
-the process of being orphaned. And as this driver is also listed
-as being maintained by Magnus and myself as part of ARM/SHMOBILE ARM
-I have picked up this patch.
-
-If you would prefer not to handle this that is quite fine by me but in that
-case I would appreciate advice on where I should send pull-requests.
-
-
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-intc-for-v3.15
-
-for you to fetch changes up to 4f3068f60503e08bc9e729528d9e54289980fa96:
-
-  sh: intc: Enable driver compilation with COMPILE_TEST (2014-02-18 09:22:21 +0900)
-
-----------------------------------------------------------------
-Renesas intc Updates for v3.15
-
-* Enable driver compilation with COMPILE_TEST
-
-----------------------------------------------------------------
-Laurent Pinchart (1):
-      sh: intc: Enable driver compilation with COMPILE_TEST
-
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  drivers/sh/intc/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/sh/intc/Kconfig b/drivers/sh/intc/Kconfig
+index a305731..f7d9061 100644
+--- a/drivers/sh/intc/Kconfig
++++ b/drivers/sh/intc/Kconfig
+@@ -6,7 +6,7 @@ comment "Interrupt controller options"
+ 
+ config INTC_USERIMASK
+ 	bool "Userspace interrupt masking support"
+-	depends on ARCH_SHMOBILE || (SUPERH && CPU_SH4A)
++	depends on ARCH_SHMOBILE || (SUPERH && CPU_SH4A) || COMPILE_TEST
+ 	help
+ 	  This enables support for hardware-assisted userspace hardirq
+ 	  masking.
+-- 
+1.8.5.2
