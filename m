@@ -1,47 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Feb 2014 16:20:45 +0100
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <20140221161108.50a4c932@skate>
-References: <53039894.10905@keymile.com> <2193926.ls2teBqnfK@wuerfel>
- <20140221161108.50a4c932@skate>
-Message-ID: <2344852.BKudsNuPXM@wuerfel>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 21 Feb 2014 16:21:36 +0100
+Subject: [PATCH 1/1] ARM: Exynos: Add generic compatible string
+In-Reply-To: <2200834.G3JJLYQl5i@wuerfel>
+References: <1392809645-631-1-git-send-email-sachin.kamat@linaro.org>
+ <CAK9yfHyWG1ac6isTRSB3VWfxER9cSuDJHwY3b7svyEk9EozpWQ@mail.gmail.com>
+ <53075239.4010603@samsung.com> <2200834.G3JJLYQl5i@wuerfel>
+Message-ID: <53076F00.7000001@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 21 February 2014 16:11:08 Thomas Petazzoni wrote:
-> On Fri, 21 Feb 2014 16:05:16 +0100, Arnd Bergmann wrote:
-> 
-> > >  *) I don't know if the algorithm to split the BAR into multiple
-> > >     windows is going to be trivial.
-> > 
-> > The easiest solution would be to special case 'size is between
-> > 128MB+1 and 192MB' if that turns out to be the most interesting
-> > case. It's easy enough to make the second window smaller than 64MB
-> > if we want.
-> > 
-> > If we want things to be a little fancier, we could use:
-> > 
-> >       switch (size) {
-> >               case (SZ_32M+1) ... (SZ_32M+SZ_16M):
-> >                       size2 = size - SZ_32M;
-> >                       size -= SZ_32M;
-> >                       break;
-> >               case (SZ_64M+1) ... (SZ_64M+SZ_32M):
-> >                       size2 = size - SZ_64M;
-> >                       size -= SZ_64M;
-> >                       break;
-> >               case (SZ_128M+1) ... (SZ_128M+SZ_64M):
-> >                       size2 = size - SZ_128M;
-> >                       size -= SZ_128M;
-> >                       break;
-> >       };
-> 
-> What if the size of your BAR is 128 MB + 64 MB + 32 MB ? Then you need
-> three windows, and your algorithm doesn't work 
+On 21.02.2014 15:48, Arnd Bergmann wrote:
+> On Friday 21 February 2014 14:18:49 Tomasz Figa wrote:
+>>
+>>> Now that we have a broader agreement on this, I think we can go ahead with the
+>>> following steps as an initial approach:
+>>> 1. Have a common machine file for both exynos4 and 5 files, mach-exynos-dt.c.
+>>> 2. Introduce a generic compatible string "samsung,exynos".
+>>> 3. Append this to the compatible property list for existing boards.
+>>>
+>>> If this plan looks OK, I can send across patches doing this.
+>>>
+>>
+>> Looks good. I would also merge common.c with this resulting
+>> mach-exynos-dt.c, as it would be the only user of the code there.
+>
+> Sounds good. While the naming is not important, I would just call the
+> file 'exynos.c', in line with some of the other platforms we have.
+> Both the 'mach-' and the '-dt' part of the file name are redundant.
+>
+> Alternatively, you could merge it all into common.c.
 
-I was hoping we could avoid using more than two windows.
-With the algorithm above we would round up to 256MB and
-fail if that doesn't fit, which is the same thing that
-happens when you run out of space.
+exynos.c sounds good to me.
 
-	Arnd
+Best regards,
+Tomasz
