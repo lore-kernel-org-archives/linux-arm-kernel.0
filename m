@@ -1,41 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Feb 2014 11:20:25 +0000
-Subject: [RFC PATCH 2/2] arm: mm: Double logical invert for LPAE
- pte_write(), pte_dirty()
-In-Reply-To: <20140220172651.GM3615@mudshark.cambridge.arm.com>
-References: <1392396913-13570-1-git-send-email-steve.capper@linaro.org>
- <1392396913-13570-3-git-send-email-steve.capper@linaro.org>
- <20140220172651.GM3615@mudshark.cambridge.arm.com>
-Message-ID: <20140221112025.GB5747@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 21 Feb 2014 11:20:54 +0000
+Subject: [PATCH] arm/arm64: KVM: detect CPU reset on CPU_PM_EXIT
+In-Reply-To: <20140220233543.1836e2d5@slackpad>
+References: <1392910014-15495-1-git-send-email-marc.zyngier@arm.com>
+ <20140220233543.1836e2d5@slackpad>
+Message-ID: <53073696.5080005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 05:26:51PM +0000, Will Deacon wrote:
-> On Fri, Feb 14, 2014 at 04:55:13PM +0000, Steve Capper wrote:
-> > On LPAE, L_PTE_WRITE and L_PTE_DIRTY are in the upper 32-bits.
-> > Unfortunately, results from pte_write() and pte_dirty() are downcast
-> > to 32-bits by core code:
-> >   o gather_stats
-> >   o huge_pte_dirty
-> >   o huge_pte_write
-> >   o make_migration_entry
-> > 
-> > This patch adds a double logical invert to pte_write() and pte_dirty()
-> > for LPAE to ensure that the lower 32-bits are set if true.
+On 20/02/14 22:35, Andre Przywara wrote:
+> On Thu, 20 Feb 2014 15:26:54 +0000
+> Marc Zyngier <marc.zyngier@arm.com> wrote:
 > 
-> Yikes, this sounds like something we should put in -stable, no? If so,
-> better make it patch 1 of this series.
+>> Commit 1fcf7ce0c602 (arm: kvm: implement CPU PM notifier) added
+>> support for CPU power-management, using a cpu_nofigier to re-init
+>> KVM on a CPU that entered CPU idle.
+>>
+>> The code assumed that a CPU entering idle would actually be powered
+>> off, loosing its state entierely, and would then need to be
+>> reinitialized. It turns out that this is not always the case, and
+>> some HW performs CPU PM without actually killing the core. In this
+>> case, we try to reinitialize KVM while it still live. It ends up
+>> badly, as reported by Andre Przywara (using a Calxeda Midway):
+>>
+>> [    3.663897] Kernel panic - not syncing: unexpected prefetch abort
+>> in Hyp mode at: 0x685760 [    3.663897] unexpected data abort in Hyp
+>> mode at: 0xc067d150 [    3.663897] unexpected HVC/SVC trap in Hyp
+>> mode at: 0xc0901dd0
+>>
+>> The trick here is to detect if we've been through a full re-init or
+>> not by looking at HVBAR (VBAR_EL2 on arm64). This involves
+>> implementing the backend for __hyp_get_vectors in the main KVM HYP
+>> code (rather small), and checking the return value against the
+>> default one when the CPU notifier is called on CPU_PM_EXIT.
+>>
+>> Reported-by: Andre Przywara <osp@andrep.de>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Rob Herring <rob.herring@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Tested-by: Andre Przywara <osp@andrep.de>
 
-That's a bug on arm64 as well since functions like gather_stats() take
-an int as argument.
+Thanks!
 
-However, my preference is for a static inline function instead of "!!"
-on arm64.
+> (there seems to be a typo in the second line of the commit message)
 
-Steve, would you send a patch for arm64? If not, I can do it (with your
-reported-by).
+Ah, good katsh! ;-)
 
-Thanks.
+> Marc,
+> 
+> thanks a lot for this quick and perfectly working patch! I still
+> believe it is actually the firmware that needs to be fixed, but this is
+> rather unlikely in this special case ...
 
+Well, that is completely debatable. This is a valid (if minimal)
+implementation of cpu idle, and the KVM code *must* be robust enough to
+deal with that kind of implementation.
+
+Cheers,
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
