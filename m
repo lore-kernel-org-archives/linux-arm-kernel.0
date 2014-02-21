@@ -1,28 +1,36 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 21 Feb 2014 20:48:58 +0100
-Subject: [PATCHv3 9/9] ARM: at91: switch sam9rl to common clock framework
+Date: Fri, 21 Feb 2014 20:48:57 +0100
+Subject: [PATCHv3 8/9] ARM: at91/dt: define main clk frequency of at91sam9rlek
 In-Reply-To: <1393012138-17255-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1393012138-17255-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1393012138-17255-10-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1393012138-17255-9-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Define the main clock frequency for the new main clock node in
+at91sam9rlek.dts
+
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/at91sam9rlek.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 4f0e800e7e71..7013b7b66a1e 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -137,7 +137,6 @@ config SOC_AT91SAM9RL
- 	select HAVE_AT91_DBGU0
- 	select HAVE_FB_ATMEL
- 	select SOC_AT91SAM9
--	select AT91_USE_OLD_CLK
- 	select HAVE_AT91_UTMI
+diff --git a/arch/arm/boot/dts/at91sam9rlek.dts b/arch/arm/boot/dts/at91sam9rlek.dts
+index 04510135f2a0..cb75b8ae07ec 100644
+--- a/arch/arm/boot/dts/at91sam9rlek.dts
++++ b/arch/arm/boot/dts/at91sam9rlek.dts
+@@ -68,6 +68,12 @@
+ 				};
+ 			};
  
- config SOC_AT91SAM9G45
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <12000000>;
++				};
++			};
++
+ 			watchdog at fffffd40 {
+ 				status = "okay";
+ 			};
 -- 
 1.8.3.2
