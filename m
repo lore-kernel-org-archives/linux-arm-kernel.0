@@ -1,67 +1,52 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 21 Feb 2014 10:30:53 -0600
-Subject: [Patch v6 1/2] dmaengine: qcom_bam_dma: Add device tree binding
-In-Reply-To: <20140221092657.GD7541@e106331-lin.cambridge.arm.com>
-References: <1392964986-5207-1-git-send-email-agross@codeaurora.org>
- <1392964986-5207-2-git-send-email-agross@codeaurora.org>
- <20140221092657.GD7541@e106331-lin.cambridge.arm.com>
-Message-ID: <20140221163053.GA3102@qualcomm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Feb 2014 17:36:47 +0100
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <20140221165252.6eb12cbd@skate>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <20140220232438.GT7862@titan.lakedaemon.net> <20140221165252.6eb12cbd@skate>
+Message-ID: <1563594.ZI2UdY7FPy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 09:26:57AM +0000, Mark Rutland wrote:
-> On Fri, Feb 21, 2014 at 06:43:04AM +0000, Andy Gross wrote:
-> > Add device tree binding support for the QCOM BAM DMA driver.
+On Friday 21 February 2014 16:52:52 Thomas Petazzoni wrote:
+> On Thu, 20 Feb 2014 18:24:38 -0500, Jason Cooper wrote:
+> 
+> > > We keep any system using -setup.c files, and remove the ability to
+> > > boot systems with a DT description. Thus mach-kirkwood becomes legacy,
+> > > and you should now be trying to only use mach-mvebu, compiled for v5
+> > > systems and a second compile for v7 systems.
+> > > 
+> > > There are four systems left in mach-kirkwood which don't have DT
+> > > equivalent. These are LaCie 2Big and 5Big, HP t5325 thin client and
+> > > Marvell OpenRD machines. I'm working on t5325 and Openrd. The sticking
+> > > point is audio support, which no other board has done with DT yet.
+> > > The two LeCie boards have a custom LED driver which needs a DT
+> > > binding. My gut feeling is that we won't get these four converted to
+> > > DT in time for 3.15.
 > > 
-[snip]
-> > +Required properties:
-> > +- compatible:	Must be "qcom,bam-v1.4.0" for MSM8974 V1
-> > +		Must be "qcom,bam-v1.4.1" for MSM8974 V2
+> > Why not do like we did when we started the kirkwood dt conversion?
+> > Create dts files for the remaining boards, and do
+> > 
+> > if (of_machine_is_compatible(...))
+> >       legacy_audio_init()
+> > 
+> > in board-v5.c?
+> > 
+> > I suspect audio is going to take time to sort out.  I'd hate to delay
+> > this just for that.
 > 
-> This looks a bit odd. How about:
+> Yes, I believe it's a good plan. Convert as much as possible to DT, and
+> only keep those few devices (audio and leds) probe in an old-style
+> fashion.
 > 
-> - compatible: must contain:
->   * "qcom,bam-v1.4.0" for MSM8974 V1
->   * "qcom,bam-v1.4.1" for MSM8974 V2
-> 
+> This way, we can progressively add the necessary missing DT bindings.
 
-Agreed.  I'll fix that.
+Makes sense.
 
-> > +- reg: Address range for DMA registers
-> > +- interrupts: single interrupt for this controller
-> 
-> This device only has a single interrupt? Or there's only one we care
-> about at the moment?
-> 
+I'm also adding Simon Guinot to Cc here. He contributed both the kernel
+support and the Debian support for the LaCie 2Big/5Big. He might also be
+able to verify that they work after the DT conversion, or even help
+implementing it. Since there is already someone who is looking into
+t5325, that would just leave the OpenRD reference design, right?
 
-Yes only a single interrupt.  I can remove the s.
-
-> > +- #dma-cells: must be <1>
-> > +- clocks: required clock
-> > +- clock-names: name of clock
-> 
-> Either describe the _exact_ name this binding expects for any clocks
-> input, or get rid of clock-names. I would prefer the former.
-
-So then I'd use the full name in the driver file.  That's fine.
-
-[snip]
-> > +Client:
-> > +Required properties:
-> > +- dmas: List of dma channel requests
-> > +- dma-names: Names of aforementioned requested channels
-> 
-> Do we really need to describe the client binding? Do we not have a
-> generic DMA binding doc we can refer to?
-> 
-
-Originally there was more information in the entry.  It was pared down over time
-and I didn't go back to referencing the generic doc.  I'll do this and that'll
-fix this and your next comment.
-
-[snip]
-
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+	Arnd
