@@ -1,74 +1,127 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 22 Feb 2014 20:14:49 +0100
-Subject: [PATCH v4 07/22] ARM: Kirkwood: ioremap memory control register
+Date: Sat, 22 Feb 2014 20:14:51 +0100
+Subject: [PATCH v4 09/22] ARM: Orion: Move cache-feroceon-l2.h out of
+ plat-orion
 In-Reply-To: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
 References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1393096504-11844-8-git-send-email-andrew@lunn.ch>
+Message-ID: <1393096504-11844-10-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow removal of the global map of registers, make the pm code
-ioremap the registers it needs.
+With the gradual move to DT, kirkwood has become a lot less dependent
+on plat-orion. cache-feroceon-l2.h is the last dependency. Move it out
+so we can drop plat-orion when building DT only kirkwood boards.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 ---
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h | 1 +
- arch/arm/mach-kirkwood/pm.c                       | 9 ++++++---
- 2 files changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/hardware/cache-feroceon-l2.h    | 11 +++++++++++
+ arch/arm/mach-kirkwood/board-dt.c                    |  2 +-
+ arch/arm/mach-kirkwood/common.c                      |  2 +-
+ arch/arm/mach-mv78xx0/common.c                       |  2 +-
+ arch/arm/mm/cache-feroceon-l2.c                      |  2 +-
+ arch/arm/plat-orion/include/plat/cache-feroceon-l2.h | 11 -----------
+ 6 files changed, 15 insertions(+), 15 deletions(-)
+ create mode 100644 arch/arm/include/asm/hardware/cache-feroceon-l2.h
+ delete mode 100644 arch/arm/plat-orion/include/plat/cache-feroceon-l2.h
 
-diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-index 2bd12fde1781..6e5077e2ec26 100644
---- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-+++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
-@@ -80,5 +80,6 @@
- #define CGC_RESERVED		(0x6 << 21)
- 
- #define MEMORY_PM_CTRL		(BRIDGE_VIRT_BASE + 0x118)
-+#define MEMORY_PM_CTRL_PHYS	(BRIDGE_PHYS_BASE + 0x118)
- 
- #endif
-diff --git a/arch/arm/mach-kirkwood/pm.c b/arch/arm/mach-kirkwood/pm.c
-index c6ab8d9303a5..8e5e0329d04c 100644
---- a/arch/arm/mach-kirkwood/pm.c
-+++ b/arch/arm/mach-kirkwood/pm.c
-@@ -21,15 +21,16 @@
- #include "common.h"
- 
- static void __iomem *ddr_operation_base;
-+static void __iomem *memory_pm_ctrl;
- 
- static void kirkwood_low_power(void)
- {
- 	u32 mem_pm_ctrl;
- 
--	mem_pm_ctrl = readl(MEMORY_PM_CTRL);
-+	mem_pm_ctrl = readl(memory_pm_ctrl);
- 
- 	/* Set peripherals to low-power mode */
--	writel_relaxed(~0, MEMORY_PM_CTRL);
-+	writel_relaxed(~0, memory_pm_ctrl);
- 
- 	/* Set DDR in self-refresh */
- 	writel_relaxed(0x7, ddr_operation_base);
-@@ -41,7 +42,7 @@ static void kirkwood_low_power(void)
- 	 */
- 	cpu_do_idle();
- 
--	writel_relaxed(mem_pm_ctrl, MEMORY_PM_CTRL);
-+	writel_relaxed(mem_pm_ctrl, memory_pm_ctrl);
- }
- 
- static int kirkwood_suspend_enter(suspend_state_t state)
-@@ -69,5 +70,7 @@ static const struct platform_suspend_ops kirkwood_suspend_ops = {
- void __init kirkwood_pm_init(void)
- {
- 	ddr_operation_base = ioremap(DDR_OPERATION_BASE, 4);
-+	memory_pm_ctrl = ioremap(MEMORY_PM_CTRL_PHYS, 4);
+diff --git a/arch/arm/include/asm/hardware/cache-feroceon-l2.h b/arch/arm/include/asm/hardware/cache-feroceon-l2.h
+new file mode 100644
+index 000000000000..8edd330aabf6
+--- /dev/null
++++ b/arch/arm/include/asm/hardware/cache-feroceon-l2.h
+@@ -0,0 +1,11 @@
++/*
++ * arch/arm/include/asm/hardware/cache-feroceon-l2.h
++ *
++ * Copyright (C) 2008 Marvell Semiconductor
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
- 	suspend_set_ops(&kirkwood_suspend_ops);
- }
++extern void __init feroceon_l2_init(int l2_wt_override);
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index d5d8f4996722..29c246858d5a 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -20,11 +20,11 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/irqchip.h>
+ #include <linux/kexec.h>
++#include <asm/hardware/cache-feroceon-l2.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <mach/bridge-regs.h>
+ #include <plat/common.h>
+-#include <plat/cache-feroceon-l2.h>
+ #include <plat/pcie.h>
+ #include "pm.h"
+ 
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index 52aca25432a7..255f33a3903c 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -25,10 +25,10 @@
+ #include <asm/page.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
++#include <asm/hardware/cache-feroceon-l2.h>
+ #include <mach/kirkwood.h>
+ #include <mach/bridge-regs.h>
+ #include <linux/platform_data/asoc-kirkwood.h>
+-#include <plat/cache-feroceon-l2.h>
+ #include <linux/platform_data/mmc-mvsdio.h>
+ #include <linux/platform_data/mtd-orion_nand.h>
+ #include <linux/platform_data/usb-ehci-orion.h>
+diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
+index 75062eff2494..e6ac679bece9 100644
+--- a/arch/arm/mach-mv78xx0/common.c
++++ b/arch/arm/mach-mv78xx0/common.c
+@@ -15,11 +15,11 @@
+ #include <linux/ata_platform.h>
+ #include <linux/clk-provider.h>
+ #include <linux/ethtool.h>
++#include <asm/hardware/cache-feroceon-l2.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ #include <mach/mv78xx0.h>
+ #include <mach/bridge-regs.h>
+-#include <plat/cache-feroceon-l2.h>
+ #include <linux/platform_data/usb-ehci-orion.h>
+ #include <linux/platform_data/mtd-orion_nand.h>
+ #include <plat/time.h>
+diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
+index 48bc3c0a87ce..898362e7972b 100644
+--- a/arch/arm/mm/cache-feroceon-l2.c
++++ b/arch/arm/mm/cache-feroceon-l2.c
+@@ -16,7 +16,7 @@
+ #include <linux/highmem.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+-#include <plat/cache-feroceon-l2.h>
++#include <asm/hardware/cache-feroceon-l2.h>
+ 
+ /*
+  * Low-level cache maintenance operations.
+diff --git a/arch/arm/plat-orion/include/plat/cache-feroceon-l2.h b/arch/arm/plat-orion/include/plat/cache-feroceon-l2.h
+deleted file mode 100644
+index 06f982d55697..000000000000
+--- a/arch/arm/plat-orion/include/plat/cache-feroceon-l2.h
++++ /dev/null
+@@ -1,11 +0,0 @@
+-/*
+- * arch/arm/plat-orion/include/plat/cache-feroceon-l2.h
+- *
+- * Copyright (C) 2008 Marvell Semiconductor
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2. This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+- */
+-
+-extern void __init feroceon_l2_init(int l2_wt_override);
 -- 
 1.8.5.3
