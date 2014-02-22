@@ -1,63 +1,33 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 22 Feb 2014 20:14:55 +0100
-Subject: [PATCH v4 13/22] ARM: Fix MULTI_TLB for feroceon
+Date: Sat, 22 Feb 2014 20:15:01 +0100
+Subject: [PATCH v4 19/22] ARM: MVEBU: Enable mvebu-soc-id on Kirkwood
 In-Reply-To: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
 References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1393096504-11844-14-git-send-email-andrew@lunn.ch>
+Message-ID: <1393096504-11844-20-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Feroceon has the same flush operations as v4wbi, but has an additional
-flag, TLB_L2CLEAN_FR. When building with MULTI_TLB this flag is placed
-into cpu_tlb.tlb_flags, so there needs to be a cpu_tlb specifically
-for feroceon, rather than sharing the v4wbi.
+Add the Kirkwood PCIe compatibility string to mvebu-soc-id, so that it
+can get the SoC ID and revision from the PCIe endpoints.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Cc: Russell King <linux@arm.linux.org.uk>
 ---
- arch/arm/mm/proc-feroceon.S | 2 +-
- arch/arm/mm/tlb-v4wbi.S     | 3 +++
- 2 files changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mach-mvebu/mvebu-soc-id.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
-index db79b62c92fb..b76c2706cb02 100644
---- a/arch/arm/mm/proc-feroceon.S
-+++ b/arch/arm/mm/proc-feroceon.S
-@@ -607,7 +607,7 @@ __\name\()_proc_info:
- 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
- 	.long	\cpu_name
- 	.long	feroceon_processor_functions
--	.long	v4wbi_tlb_fns
-+	.long	fr_tlb_fns
- 	.long	feroceon_user_fns
- 	.long	\cache
- 	 .size	__\name\()_proc_info, . - __\name\()_proc_info
-diff --git a/arch/arm/mm/tlb-v4wbi.S b/arch/arm/mm/tlb-v4wbi.S
-index 1f6062b6c1c1..4e053fef3487 100644
---- a/arch/arm/mm/tlb-v4wbi.S
-+++ b/arch/arm/mm/tlb-v4wbi.S
-@@ -28,6 +28,7 @@
-  *	- mm    - mm_struct describing address space
-  */
- 	.align	5
-+ENTRY(fr_flush_user_tlb_range)
- ENTRY(v4wbi_flush_user_tlb_range)
- 	vma_vm_mm ip, r2
- 	act_mm	r3				@ get current->active_mm
-@@ -46,6 +47,7 @@ ENTRY(v4wbi_flush_user_tlb_range)
- 	blo	1b
- 	mov	pc, lr
+diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
+index f3b325f6cbd4..f3d4cf53f746 100644
+--- a/arch/arm/mach-mvebu/mvebu-soc-id.c
++++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
+@@ -38,6 +38,7 @@ static bool is_id_valid;
+ static const struct of_device_id mvebu_pcie_of_match_table[] = {
+ 	{ .compatible = "marvell,armada-xp-pcie", },
+ 	{ .compatible = "marvell,armada-370-pcie", },
++	{ .compatible = "marvell,kirkwood-pcie" },
+ 	{},
+ };
  
-+ENTRY(fr_flush_kern_tlb_range)
- ENTRY(v4wbi_flush_kern_tlb_range)
- 	mov	r3, #0
- 	mcr	p15, 0, r3, c7, c10, 4		@ drain WB
-@@ -62,3 +64,4 @@ ENTRY(v4wbi_flush_kern_tlb_range)
- 
- 	/* define struct cpu_tlb_fns (see <asm/tlbflush.h> and proc-macros.S) */
- 	define_tlb_functions v4wbi, v4wbi_tlb_flags
-+	define_tlb_functions fr, fr_tlb_flags
 -- 
 1.8.5.3
