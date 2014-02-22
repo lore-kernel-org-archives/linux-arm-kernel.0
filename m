@@ -1,37 +1,45 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Sat, 22 Feb 2014 12:13:15 +0000
-Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140222101655.GE21483@n2100.arm.linux.org.uk>
-References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
- <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
- <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
- <20140219193315.3732.21819@capellas-linux>
- <20140220162754.GC15994@e102568-lin.cambridge.arm.com>
- <20140222101655.GE21483@n2100.arm.linux.org.uk>
-Message-ID: <20140222121315.GB9012@e102568-lin.cambridge.arm.com>
+Date: Sat, 22 Feb 2014 12:26:48 +0000
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20140222020602.GG25940@sirena.org.uk>
+References: <1392037324-5069-1-git-send-email-broonie@kernel.org>
+ <20140221150140.GB495@e102568-lin.cambridge.arm.com>
+ <20140222020602.GG25940@sirena.org.uk>
+Message-ID: <20140222122647.GC9012@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 22, 2014 at 10:16:55AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Feb 20, 2014 at 04:27:55PM +0000, Lorenzo Pieralisi wrote:
-> > I still do not understand why switching to idmap, which is a clone of
-> > init_mm + 1:1 kernel mappings is required here. Why idmap ?
-> > 
-> > And while at it, can't the idmap be overwritten _while_ copying back the
-> > resume kernel ? Is it safe to use idmap page tables while copying ?
-> > 
-> > I had a look at x86 and there idmap page tables used to resume are created
-> > on the fly using safe pages, on ARM idmap is created at boot.
+On Sat, Feb 22, 2014 at 02:06:02AM +0000, Mark Brown wrote:
+> On Fri, Feb 21, 2014 at 03:01:40PM +0000, Lorenzo Pieralisi wrote:
 > 
-> That's fine.
+> > If the DT does not contain a proper topology the scheduler seem to go for a
+> > toss. I tried to track it down and it seems it expects topology cpumasks to be
+> > initialized regardless (eg to possible mask), they cannot be left empty.
 > 
-> Remember, you're required to boot exactly the same kernel image when
-> resuming as the kernel which created the suspend image.  Unless you
-> have random allocations going on, you should get the same layout for
-> the idmap stuff at each boot.
+> Could you be more specific please?  I didn't notice anything particular
+> in my testing but then the fact that it's a model does obscure a lot of
+> things.
 
-Thanks Russell, now that's clear. We do need a copy of page tables
-that are not tampered with while copying, and idmap works well for
-that.
+I will send you a backtrace, config file, commit.
 
+Problem is hit when CONFIG_SCHED_SMT is on and there is no cpu-map in
+the dts.
+
+What's a model ? And if you mean the processor model, what can it possibly
+obscure as long as this patch is concerned ?
+
+> > On top of that, the pr_info message is quite annoying and should be
+> > probably downgraded or removed altogether.
+> 
+> This was deliberate - since we are not willing to use the MPIDR
+> information to discover the topology we need to get the information into
+> the DT bindings in order to discover it.  Even in a SMP system there is
+> a difference in how closely attached the cores are so it seems like we
+> should be expecting a description of the topology.
+
+We have to make a decision. Either we rely on MPIDR_EL1 as a fallback or
+we barf on missing topology nodes (or we just set-up a flat topology if
+the cpu-map is missing and do not log anything).
+
+Thanks,
 Lorenzo
