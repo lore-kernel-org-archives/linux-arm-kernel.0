@@ -1,32 +1,60 @@
-From: dashie@sigpipe.me (Dashie)
-Date: Sat, 22 Feb 2014 20:00:04 +0100
-Subject: Stuck getting DTS working for a new kirkwood board
-In-Reply-To: <20140221200855.GM7862@titan.lakedaemon.net>
-References: <5306721B.7020403@sigpipe.me>
- <20140221013407.GX7862@titan.lakedaemon.net> <5307029C.20006@sigpipe.me>
- <20140221151530.GZ7862@titan.lakedaemon.net> <5307A727.9080508@sigpipe.me>
- <20140221200855.GM7862@titan.lakedaemon.net>
-Message-ID: <5308F3B4.6010409@sigpipe.me>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 22 Feb 2014 19:05:36 +0000
+Subject: [PATCH RFC 07/31] mmc: sdhci: push card_tasklet into threaded
+ irq handler
+In-Reply-To: <8638jbvw91.fsf@void.printf.net>
+References: <20140219094322.GR21483@n2100.arm.linux.org.uk>
+ <CAKohpomfHxWBF5m4D6iqod4a3gw2BU1W6nXMkEOg+YA+izYr=g@mail.gmail.com>
+ <20140219095212.GT21483@n2100.arm.linux.org.uk>
+ <CAKohpo=ZrLRsTyCH86x7TbGE2XJnpXNb1ZDvYyzDUupAwTtS9Q@mail.gmail.com>
+ <20140219105011.GU21483@n2100.arm.linux.org.uk>
+ <CAKohpokBf_fJhiUJ53c+=6v+GMcjaDKd7+fwib99=sLMdkjQQQ@mail.gmail.com>
+ <20140220105903.GY21483@n2100.arm.linux.org.uk>
+ <CAKohpo=FTk9SGCMJGBdOUheUg71WsG7qaeE9rwQRqd5dP4O8FQ@mail.gmail.com>
+ <20140221103710.GB21483@n2100.arm.linux.org.uk>
+ <8638jbvw91.fsf@void.printf.net>
+Message-ID: <20140222190536.GI21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Feb 22, 2014 at 06:27:06PM +0000, Chris Ball wrote:
+> Hi,
+> 
+> On Fri, Feb 21 2014, Russell King - ARM Linux wrote:
+> > On Thu, Feb 20, 2014 at 04:48:58PM +0530, Viresh Kumar wrote:
+> >> Nothing wrong in that, only right.. Do you want me to float a patch for
+> >> this or you can get that done along with your series?
+> >
+> > I'll send a follow-up mini-series of five patches for it.  It shouldn't
+> > depend all that much on the bigger series - and I think the first two
+> > patches could well do with going into -rc.
+> 
+> Thanks.  Since testing resources might be scarce, and it looks like
+> Viresh is in favor of the series, any objections to putting these in
+> mmc-next straight away rather than waiting for test results to come in?
 
-On 02/21/2014 09:08 PM, Jason Cooper wrote:
->> Well, with kirkwood_defconfig it doesn't find the SATA PHY and panic.
->> So i've used my debian config, make oldconfig, built and ... the toy is
->> booting.
-> Yes, this is a known issue.  You worked around it by enabling generic
-> phy support (it's most likely in the other configs).
-Well, i've done some more tests and found that i've commented the
-sata at 80000 {} part of the DTS, but does not remember if that was after
-trying "debian config".
+The series needs to be re-ordered to avoid patch 7 breaking sdhci-spear.
+I'll send out a new series appropriately ordered.  I'm continuing to do
+more to this driver as time permits.
 
-If i uncomment it, i got the kernel panic with "sata_mv f1080000.sata:
-unable to find phy".
+One thing which I've toyed with is passing a "changes" field in struct
+mmc_ios, so that host drivers can know what's changed and avoid resetting
+the power, clocks, etc on every set_ios call.  Another thing I've toyed
+with is the idea of splitting set_ios up into several sub-calls which
+the core only calls with the various changes.
 
-About generic phy, is it CONFIG_GENERIC_PHY ? I't already to =y in my
-.config actually.
-I have CONFIG_PHY_MVEBU_SATA=y and CONFIG_SATA_MV=y too.
+One of my reasonings for the second idea is that with the variability
+in hosts, particularly with how they deal with the application of power,
+it would be a good idea to allow hosts which do the "turn power on,
+send 74 clocks" automonously avoid having to deal with the power_up
+transition.
 
-Dashie.
+It also means that hosts aren't having to work out if the timings have
+changed, or the clocks, or anything else.
+
+What are your thoughts on that?
+
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
