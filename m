@@ -1,70 +1,38 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 22 Feb 2014 20:14:58 +0100
-Subject: [PATCH v4 16/22] ARM: MVEBU: Let kirkwood use the system controller
- for restart
+Date: Sat, 22 Feb 2014 20:14:59 +0100
+Subject: [PATCH v4 17/22] ARM: MVEBU: Instantiate system controller in
+ kirkwood.dtsi
 In-Reply-To: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
 References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1393096504-11844-17-git-send-email-andrew@lunn.ch>
+Message-ID: <1393096504-11844-18-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvebu system controller already supports restarting orion
-systems. Remove all the C code which will be replaced by the system
-controller.
+Make use of the mvebu system controller, by placing a node into the
+dtsi file.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 ---
-v2
-Split the patch into two, DT goes into a new patch
----
- arch/arm/mach-mvebu/kirkwood.c | 20 ++------------------
- 1 file changed, 2 insertions(+), 18 deletions(-)
+ arch/arm/boot/dts/kirkwood.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/kirkwood.c b/arch/arm/mach-mvebu/kirkwood.c
-index 6e754a38f418..4c7bbec11b1a 100644
---- a/arch/arm/mach-mvebu/kirkwood.c
-+++ b/arch/arm/mach-mvebu/kirkwood.c
-@@ -27,6 +27,7 @@
- #include <plat/common.h>
- #include <plat/pcie.h>
- #include "kirkwood-pm.h"
-+#include "common.h"
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 02c551ee31e5..ba06124d8f35 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -145,6 +145,11 @@
+ 			reg = <0x20000 0x80>, <0x1500 0x20>;
+ 		};
  
- static struct resource kirkwood_cpufreq_resources[] = {
- 	[0] = {
-@@ -68,23 +69,6 @@ static void __init kirkwood_cpuidle_init(void)
- 	platform_device_register(&kirkwood_cpuidle);
- }
- 
--/* Temporary here since mach-mvebu has a function we can use */
--static void kirkwood_restart(enum reboot_mode mode, const char *cmd)
--{
--	/*
--	 * Enable soft reset to assert RSTOUTn.
--	 */
--	writel(SOFT_RESET_OUT_EN, RSTOUTn_MASK);
--
--	/*
--	 * Assert soft reset.
--	 */
--	writel(SOFT_RESET, SYSTEM_SOFT_RESET);
--
--	while (1)
--		;
--}
--
- #define MV643XX_ETH_MAC_ADDR_LOW	0x0414
- #define MV643XX_ETH_MAC_ADDR_HIGH	0x0418
- 
-@@ -204,6 +188,6 @@ static const char * const kirkwood_dt_board_compat[] = {
- DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)")
- 	/* Maintainer: Jason Cooper <jason@lakedaemon.net> */
- 	.init_machine	= kirkwood_dt_init,
--	.restart	= kirkwood_restart,
-+	.restart	= mvebu_restart,
- 	.dt_compat	= kirkwood_dt_board_compat,
- MACHINE_END
++		system-controller at 20000 {
++			compatible = "marvell,orion-system-controller";
++			reg = <0x20000 0x120>;
++		};
++
+ 		bridge_intc: bridge-interrupt-ctrl at 20110 {
+ 			compatible = "marvell,orion-bridge-intc";
+ 			interrupt-controller;
 -- 
 1.8.5.3
