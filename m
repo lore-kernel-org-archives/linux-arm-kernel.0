@@ -1,33 +1,34 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 22 Feb 2014 20:15:01 +0100
-Subject: [PATCH v4 19/22] ARM: MVEBU: Enable mvebu-soc-id on Kirkwood
+Date: Sat, 22 Feb 2014 20:14:54 +0100
+Subject: [PATCH v4 12/22] ARM: Fix default CPU selection for ARCH_MULTI_V5
 In-Reply-To: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
 References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1393096504-11844-20-git-send-email-andrew@lunn.ch>
+Message-ID: <1393096504-11844-13-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the Kirkwood PCIe compatibility string to mvebu-soc-id, so that it
-can get the SoC ID and revision from the PCIe endpoints.
+CPU_ARM926T should be selected if no other CPU is. Put the ! in the
+right place so this works.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 ---
- arch/arm/mach-mvebu/mvebu-soc-id.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mvebu/mvebu-soc-id.c b/arch/arm/mach-mvebu/mvebu-soc-id.c
-index f3b325f6cbd4..f3d4cf53f746 100644
---- a/arch/arm/mach-mvebu/mvebu-soc-id.c
-+++ b/arch/arm/mach-mvebu/mvebu-soc-id.c
-@@ -38,6 +38,7 @@ static bool is_id_valid;
- static const struct of_device_id mvebu_pcie_of_match_table[] = {
- 	{ .compatible = "marvell,armada-xp-pcie", },
- 	{ .compatible = "marvell,armada-370-pcie", },
-+	{ .compatible = "marvell,kirkwood-pcie" },
- 	{},
- };
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e25419817791..beba369d74de 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -898,7 +898,7 @@ config ARCH_MULTI_V5
+ 	bool "ARMv5 based platforms (ARM926T, XSCALE, PJ1, ...)"
+ 	depends on !ARCH_MULTI_V6_V7
+ 	select ARCH_MULTI_V4_V5
+-	select CPU_ARM926T if (!CPU_ARM946E || CPU_ARM1020 || \
++	select CPU_ARM926T if !(CPU_ARM946E || CPU_ARM1020 || \
+ 		CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || \
+ 		CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_FEROCEON)
  
 -- 
 1.8.5.3
