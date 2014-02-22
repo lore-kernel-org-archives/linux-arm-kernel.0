@@ -1,61 +1,49 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Sat, 22 Feb 2014 10:59:36 -0300
-Subject: [PATCH 1/1] ARM: dts: omap3-igep: fix boot fail due wrong compatible
- match
-Message-ID: <1393077576-25730-1-git-send-email-javier.martinez@collabora.co.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 22 Feb 2014 15:11:52 +0100
+Subject: [PATCH v2] ARM: mach-imx: Kconfig: Remove
+ IMX_HAVE_PLATFORM_IMX2_WDT from SOC_IMX53
+In-Reply-To: <1393021300-5964-1-git-send-email-festevam@gmail.com>
+References: <1393021300-5964-1-git-send-email-festevam@gmail.com>
+Message-ID: <20140222141152.GQ6988@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is based on commit:
+On Fri, Feb 21, 2014 at 07:21:40PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> SOC_IMX53 is a device-tree only platform, so we don't need 
+> IMX_HAVE_PLATFORM_IMX2_WDT at all because this symbol only provides some code 
+> to help register imx2-wdt platform devices.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-016c12d2 ("ARM: OMAP3: Fix hardware detection for omap3630 when booted with device tree")
+thanks
+Uwe
+> ---
+> Changes since v1:
+> - Improve commit log as per Uwe's suggestion
+> 
+>  arch/arm/mach-imx/Kconfig | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 04aa1de..d75d168 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -780,7 +780,6 @@ config	SOC_IMX50
+>  config	SOC_IMX53
+>  	bool "i.MX53 support"
+>  	select HAVE_IMX_SRC
+> -	select IMX_HAVE_PLATFORM_IMX2_WDT
+>  	select PINCTRL_IMX53
+>  	select SOC_IMX5
+>  
+> -- 
+> 1.8.1.2
+> 
+> 
 
-and fixes a boot hang due the IGEP board being wrongly initialized
-as an OMAP3430 platform instead of an OMAP3630.
-
-Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
----
-
-Tony and Benoit,
-
-Sorry for posting this patch this late on the -rc cycle but I just didn't
-have time before to test IGEP boards against 3.14.
-
-I hope this fix can still make it to 3.14 since is a very big issue
-(board not even booting).
-
-Thanks a lot and best regards,
-Javier
-
- arch/arm/boot/dts/omap3-igep0020.dts | 2 +-
- arch/arm/boot/dts/omap3-igep0030.dts | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
-index 25a2b5f..f2779ac 100644
---- a/arch/arm/boot/dts/omap3-igep0020.dts
-+++ b/arch/arm/boot/dts/omap3-igep0020.dts
-@@ -14,7 +14,7 @@
- 
- / {
- 	model = "IGEPv2 (TI OMAP AM/DM37x)";
--	compatible = "isee,omap3-igep0020", "ti,omap3";
-+	compatible = "isee,omap3-igep0020", "ti,omap36xx", "ti,omap3";
- 
- 	leds {
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
-index 145c58c..2793749 100644
---- a/arch/arm/boot/dts/omap3-igep0030.dts
-+++ b/arch/arm/boot/dts/omap3-igep0030.dts
-@@ -13,7 +13,7 @@
- 
- / {
- 	model = "IGEP COM MODULE (TI OMAP AM/DM37x)";
--	compatible = "isee,omap3-igep0030", "ti,omap3";
-+	compatible = "isee,omap3-igep0030", "ti,omap36xx", "ti,omap3";
- 
- 	leds {
- 		pinctrl-names = "default";
 -- 
-1.8.5.3
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
