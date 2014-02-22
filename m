@@ -1,87 +1,97 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sat, 22 Feb 2014 23:52:50 +0100
-Subject: [PATCH v4 03/10] Documentation: devicetree: Update Samsung FIMC
- DT binding
-In-Reply-To: <5309241B.5000702@gmail.com>
-References: <1392925237-31394-1-git-send-email-s.nawrocki@samsung.com>
- <1392925237-31394-5-git-send-email-s.nawrocki@samsung.com>
- <20140221155023.GF20449@e106331-lin.cambridge.arm.com>
- <53091E72.3090107@gmail.com> <5309241B.5000702@gmail.com>
-Message-ID: <53092A42.2000407@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 22 Feb 2014 15:18:16 -0800
+Subject: [PATCH v3 07/11] watchdog: xilinx: Use of_property_read_u32
+In-Reply-To: <53094A15.1080708@udio.cujae.edu.cu>
+References: <cover.1392212059.git.michal.simek@xilinx.com>
+ <7cbb10853a343c9d488346596f604909ab0668b9.1392212059.git.michal.simek@xilinx.com>
+ <20140212171509.GB20012@roeck-us.net>
+ <20140222184604.GB21504@spo001.leaseweb.com>
+ <53094A15.1080708@udio.cujae.edu.cu>
+Message-ID: <53093038.6000604@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2014 11:26 PM, Tomasz Figa wrote:
-> [Ccing Mike]
->
-> On 22.02.2014 23:02, Sylwester Nawrocki wrote:
->> On 02/21/2014 04:50 PM, Mark Rutland wrote:
->>> On Thu, Feb 20, 2014 at 07:40:30PM +0000, Sylwester Nawrocki wrote:
->>>> +- #clock-cells: from the common clock bindings
->>>> (../clock/clock-bindings.txt),
->>>> + must be 1. A clock provider is associated with the 'camera' node
->>>> and it should
->>>> + be referenced by external sensors that use clocks provided by the
->>>> SoC on
->>>> + CAM_*_CLKOUT pins. The clock specifier cell stores an index of a
->>>> clock.
->>>> + The indices are 0, 1 for CAM_A_CLKOUT, CAM_B_CLKOUT clocks
->>>> respectively.
->>>> +
->>>> +- clock-output-names: from the common clock bindings, should contain
->>>> names of
->>>> + clocks registered by the camera subsystem corresponding to
->>>> CAM_A_CLKOUT,
->>>> + CAM_B_CLKOUT output clocks, in this order. Parent clock of these
->>>> clocks are
->>>> + specified be first two entries of the clock-names property.
+On 02/22/2014 05:08 PM, Alejandro Cabrera wrote:
+> On 22/2/2014 10:46 AM, Wim Van Sebroeck wrote:
+>> Hi All,
+>>
+>>> Hi Michal,
 >>>
->>> Do you need this?
->>
->> All right, that might have been a bad idea, it mixes names of clocks
->> registered
->> by the main clock controller with names of clock input lines at the
->> device.
->> It's a mistake I have been usually sensitive to and now made it
->> myself. :/
->>
->> My intention was to maintain the clock tree, since the camera block
->> doesn't
->> generate the clock itself, it merely passes through the clocks from the
->> SoC main
->> clock controller (CMU). So clk parents need to be properly set and since
->> there is no clock-output-names property at the CMU DT node,
->> of_clk_get_parent_name() cannot be used.
->>
->> So presumably the DT binding would be only specifying that the sclk_cam0,
->> sclk_cam1 clock input entries are associated with output clocks named as
->> in clock-output-names property.
->>
->> And the driver could either:
->> 1) hard code those (well defined) CMU clock (clk parent) names,
+>>> On Wed, Feb 12, 2014 at 02:41:21PM +0100, Michal Simek wrote:
+>>>> Use of_property_read_u32 functions to clean probe function.
+>>>>
+>>>> Signed-off-by: Michal Simek<michal.simek@xilinx.com>
+>>>> Reviewed-by: Guenter Roeck<linux@roeck-us.net>
+>>>> ---
+>>>>
+>>>> Changes in v3:
+>>>> - Remove one if checking and use variable directly
+>>>>
+>>> Looks good.
+>>>
+>>> Another comment/remark.
+>>>
+>>>> -    pfreq = (u32 *)of_get_property(pdev->dev.of_node,
+>>>> -                    "clock-frequency", NULL);
+>>>> -
+>>>> -    if (pfreq == NULL) {
+>>>> +    rc = of_property_read_u32(pdev->dev.of_node, "clock-frequency",&pfreq);
+>>>> +    if (rc) {
+>>>>           dev_warn(&pdev->dev,
+>>>>                "The watchdog clock frequency cannot be obtained\n");
+>>>>           no_timeout = true;
+>>>>       }
+>>>>
+>>>> -    tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+>>>> -                    "xlnx,wdt-interval", NULL);
+>>>> -    if (tmptr == NULL) {
+>>>> +    rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-interval",
+>>>> +                &xdev->wdt_interval);
+>>>> +    if (rc) {
+>>>>           dev_warn(&pdev->dev,
+>>>>                "Parameter \"xlnx,wdt-interval\" not found\n");
+>>>>           no_timeout = true;
+>>>> -    } else {
+>>>> -        xdev->wdt_interval = *tmptr;
+>>>>       }
+>>>>
+>>>> -    tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+>>>> -                    "xlnx,wdt-enable-once", NULL);
+>>>> -    if (tmptr == NULL) {
+>>>> +    rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-enable-once",
+>>>> +                &enable_once);
+>>>> +    if (rc)
+>>>>           dev_warn(&pdev->dev,
+>>>>                "Parameter \"xlnx,wdt-enable-once\" not found\n");
+>>>> -        watchdog_set_nowayout(xilinx_wdt_wdd, true);
+>>>> -    }
+>>> All the above properties are optional. Is a warning really
+>>> warranted in this case ? I usually associate a warning with
+>>> something that is wrong, which is not the case here.
+>>>
+>>> I would encourage you to drop those warnings, but that should be
+>>> a separate patch.
+>> I agree with Guenter: these are not really warnings. Seperate patch is thus welcome.
+> Hi
 >
-> I don't think this would be a good idea, as those CMU clock names may
-> vary between SoCs.
-
-For the record, I'm not in favour of this approach, even though these clock
-names happen to be same for all relevant SoCs.
-
->> 2) clk_get() its input clock, retrieve name with __clk_get_name() and
->> pass
->> it as parent name to clk_register() - it sounds a bit hacky though.
+> I support Michal intention, I think it is a warning because device tree blob must have the "xlnx,wdt-enable-once" property specified in order to allow the system to be sure of the real value of this property. In addition to, this warning can be helpful to detect a wrong device tree specification.
 >
-> This looks fine, at least until proper interface is added to CCF. Exynos
-> audio subsystem clock driver does exactly the same.
 
-Hmm, I looked at this driver and somehow missed that.
+The dt documentation states that the properties are optional.
 
-> However, the right thing would be to make it possible to use pointers to
-> struct clk instead of strings to list parent(s). This could be done by
-> adding .parents field (struct clk **) to clk_init_data struct and make
-> clk_register() use it if available.
+Optional properties:
+- clock-frequency       : Frequency of clock in Hz
+- xlnx,wdt-enable-once  : 0 - Watchdog can be restarted
+                           1 - Watchdog can be enabled just once
+- xlnx,wdt-interval     : Watchdog timeout interval in 2^<val> clock cycles,
+                           <val> is integer from 8 to 31.
 
-We would just need to ensure the locking is done properly.
+This clearly conflicts with your statement. An optional property
+is just that, optional. If it warrants a warning, it must
+not be optional. If you claim that not providing the properties
+would be "wrong", why are they defined as optional ?
+What is your definition of "wrong" and "must have" ?
+How do you expect anyone to know that omitting those
+"optional" properties is by some definition "wrong" ?
 
---
-Regards,
-Sylwester
+Guenter
