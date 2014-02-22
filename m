@@ -1,49 +1,86 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 22 Feb 2014 15:11:52 +0100
-Subject: [PATCH v2] ARM: mach-imx: Kconfig: Remove
- IMX_HAVE_PLATFORM_IMX2_WDT from SOC_IMX53
-In-Reply-To: <1393021300-5964-1-git-send-email-festevam@gmail.com>
-References: <1393021300-5964-1-git-send-email-festevam@gmail.com>
-Message-ID: <20140222141152.GQ6988@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 22 Feb 2014 14:15:25 +0000
+Subject: randconfig build error
+In-Reply-To: <20140221155452.GH31902@saruman.home>
+References: <20140221155452.GH31902@saruman.home>
+Message-ID: <20140222141525.GT27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 07:21:40PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Feb 21, 2014 at 09:55:13AM -0600, Felipe Balbi wrote:
+> Here's the error I found:
 > 
-> SOC_IMX53 is a device-tree only platform, so we don't need 
-> IMX_HAVE_PLATFORM_IMX2_WDT at all because this symbol only provides some code 
-> to help register imx2-wdt platform devices.
+> warning: (ARCH_HI3xxx && SOC_OMAP5 && ARCH_SHMOBILE_MULTI) selects HAVE_ARM_TWD which has unmet direct dependencies (SMP)
+> warning: (ARCH_HI3xxx && SOC_OMAP5 && ARCH_SHMOBILE_MULTI) selects HAVE_ARM_TWD which has unmet direct dependencies (SMP)
+> arch/arm/mach-prima2/common.c:23:20: warning: ?sirfsoc_map_io? defined but not used [-Wunused-function]
+>  static __init void sirfsoc_map_io(void)
+>                     ^
+> arch/arm/kernel/smp_twd.c: In function ?twd_local_timer_of_register?:
+> arch/arm/kernel/smp_twd.c:391:20: error: ?setup_max_cpus? undeclared (first use in this function)
+>   if (!is_smp() || !setup_max_cpus)
+>                     ^
+> arch/arm/kernel/smp_twd.c:391:20: note: each undeclared identifier is reported only once for each function it appears in
+> make[1]: *** [arch/arm/kernel/smp_twd.o] Error 1
+> make[1]: *** Waiting for unfinished jobs....
+> make: *** [arch/arm/kernel] Error 2
+> make: *** Waiting for unfinished jobs....
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> The funny part of that is that SOC_OMAP5, ARCH_SHMOBILE_MULTI, and
+> ARCH_HI3xxx have:
+> 
+> 	select HAVE_ARM_TWD if SMP
+> 
+> so how come we still select it if CONFIG_SMP=n on that particular
+> randconfig ?
 
-thanks
-Uwe
-> ---
-> Changes since v1:
-> - Improve commit log as per Uwe's suggestion
-> 
->  arch/arm/mach-imx/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 04aa1de..d75d168 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -780,7 +780,6 @@ config	SOC_IMX50
->  config	SOC_IMX53
->  	bool "i.MX53 support"
->  	select HAVE_IMX_SRC
-> -	select IMX_HAVE_PLATFORM_IMX2_WDT
->  	select PINCTRL_IMX53
->  	select SOC_IMX5
->  
-> -- 
-> 1.8.1.2
-> 
-> 
+Are you entirely certian which kernel version you're building?  v3.14-rc1
+to my tip has this:
+
+diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+index 8f4649b301b2..1abae5f6a418 100644
+--- a/arch/arm/mach-hisi/Kconfig
++++ b/arch/arm/mach-hisi/Kconfig
+@@ -8,7 +8,7 @@ config ARCH_HI3xxx
+        select CLKSRC_OF
+        select GENERIC_CLOCKEVENTS
+        select HAVE_ARM_SCU
+-       select HAVE_ARM_TWD
++       select HAVE_ARM_TWD if SMP
+        select HAVE_SMP
+        select PINCTRL
+        select PINCTRL_SINGLE
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 653b489479e0..e2ce4f8366a7 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -54,7 +54,7 @@ config SOC_OMAP5
+        select ARM_GIC
+        select CPU_V7
+        select HAVE_ARM_SCU if SMP
+-       select HAVE_ARM_TWD if LOCAL_TIMERS
++       select HAVE_ARM_TWD if SMP
+        select HAVE_SMP
+        select HAVE_ARM_ARCH_TIMER
+        select ARM_ERRATA_798181 if SMP
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 338640631e08..05fa505df585 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -8,7 +8,7 @@ config ARCH_SHMOBILE_MULTI
+        select CPU_V7
+        select GENERIC_CLOCKEVENTS
+        select HAVE_ARM_SCU if SMP
+-       select HAVE_ARM_TWD if LOCAL_TIMERS
++       select HAVE_ARM_TWD if SMP
+        select HAVE_SMP
+        select ARM_GIC
+        select MIGHT_HAVE_CACHE_L2X0
+
+The relevant bits are the "-" lines, which indicate that with v3.14-rc1,
+ARCH_HI3xxx would select HAVE_ARM_TWD without SMP set, and indeed, your
+config you attached has ARCH_HI3xxx set.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
