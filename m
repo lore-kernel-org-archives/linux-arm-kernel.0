@@ -1,127 +1,63 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 22 Feb 2014 20:15:00 +0100
-Subject: [PATCH v4 18/22] drivers: Enable building of Kirkwood drivers for
- mach-mvebu
+Date: Sat, 22 Feb 2014 20:14:55 +0100
+Subject: [PATCH v4 13/22] ARM: Fix MULTI_TLB for feroceon
 In-Reply-To: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
 References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1393096504-11844-19-git-send-email-andrew@lunn.ch>
+Message-ID: <1393096504-11844-14-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the move of kirkwood into mach-mvebu, drivers Kconfig need
-tweeking to allow the kirkwood specific drivers to be built.
+Feroceon has the same flush operations as v4wbi, but has an additional
+flag, TLB_L2CLEAN_FR. When building with MULTI_TLB this flag is placed
+into cpu_tlb.tlb_flags, so there needs to be a cpu_tlb specifically
+for feroceon, rather than sharing the v4wbi.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Mark Brown <broonie@linaro.org>
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-Cc: Richard Purdie <rpurdie@rpsys.net>
-Cc: Bryan Wu <cooloney@gmail.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <eduardo.valentin@ti.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 ---
-v2
-Simplify cpufreq/Kconfig.arm
+ arch/arm/mm/proc-feroceon.S | 2 +-
+ arch/arm/mm/tlb-v4wbi.S     | 3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-Still needs ACKs from cpufreq, led and thermal maintainers.
----
- drivers/cpufreq/Kconfig.arm | 2 +-
- drivers/cpuidle/Kconfig.arm | 2 +-
- drivers/leds/Kconfig        | 4 ++--
- drivers/phy/Kconfig         | 2 +-
- drivers/thermal/Kconfig     | 2 +-
- sound/soc/kirkwood/Kconfig  | 2 +-
- 6 files changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 31297499a60a..077db3aa985b 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -113,7 +113,7 @@ config ARM_INTEGRATOR
- 	  If in doubt, say Y.
+diff --git a/arch/arm/mm/proc-feroceon.S b/arch/arm/mm/proc-feroceon.S
+index db79b62c92fb..b76c2706cb02 100644
+--- a/arch/arm/mm/proc-feroceon.S
++++ b/arch/arm/mm/proc-feroceon.S
+@@ -607,7 +607,7 @@ __\name\()_proc_info:
+ 	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+ 	.long	\cpu_name
+ 	.long	feroceon_processor_functions
+-	.long	v4wbi_tlb_fns
++	.long	fr_tlb_fns
+ 	.long	feroceon_user_fns
+ 	.long	\cache
+ 	 .size	__\name\()_proc_info, . - __\name\()_proc_info
+diff --git a/arch/arm/mm/tlb-v4wbi.S b/arch/arm/mm/tlb-v4wbi.S
+index 1f6062b6c1c1..4e053fef3487 100644
+--- a/arch/arm/mm/tlb-v4wbi.S
++++ b/arch/arm/mm/tlb-v4wbi.S
+@@ -28,6 +28,7 @@
+  *	- mm    - mm_struct describing address space
+  */
+ 	.align	5
++ENTRY(fr_flush_user_tlb_range)
+ ENTRY(v4wbi_flush_user_tlb_range)
+ 	vma_vm_mm ip, r2
+ 	act_mm	r3				@ get current->active_mm
+@@ -46,6 +47,7 @@ ENTRY(v4wbi_flush_user_tlb_range)
+ 	blo	1b
+ 	mov	pc, lr
  
- config ARM_KIRKWOOD_CPUFREQ
--	def_bool ARCH_KIRKWOOD && OF
-+	def_bool MACH_KIRKWOOD
- 	help
- 	  This adds the CPUFreq driver for Marvell Kirkwood
- 	  SoCs.
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index d988948a89a0..97ccc31dbdd8 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -22,7 +22,7 @@ config ARM_HIGHBANK_CPUIDLE
++ENTRY(fr_flush_kern_tlb_range)
+ ENTRY(v4wbi_flush_kern_tlb_range)
+ 	mov	r3, #0
+ 	mcr	p15, 0, r3, c7, c10, 4		@ drain WB
+@@ -62,3 +64,4 @@ ENTRY(v4wbi_flush_kern_tlb_range)
  
- config ARM_KIRKWOOD_CPUIDLE
- 	bool "CPU Idle Driver for Marvell Kirkwood SoCs"
--	depends on ARCH_KIRKWOOD
-+	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
- 	help
- 	  This adds the CPU Idle driver for Marvell Kirkwood SoCs.
- 
-diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index 72156c123033..44c358ecf5a1 100644
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -421,7 +421,7 @@ config LEDS_MC13783
- config LEDS_NS2
- 	tristate "LED support for Network Space v2 GPIO LEDs"
- 	depends on LEDS_CLASS
--	depends on ARCH_KIRKWOOD
-+	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
- 	default y
- 	help
- 	  This option enable support for the dual-GPIO LED found on the
-@@ -431,7 +431,7 @@ config LEDS_NS2
- config LEDS_NETXBIG
- 	tristate "LED support for Big Network series LEDs"
- 	depends on LEDS_CLASS
--	depends on ARCH_KIRKWOOD
-+	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
- 	default y
- 	help
- 	  This option enable support for LEDs found on the LaCie 2Big
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index afa2354f6600..5e6b33f9c294 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -24,7 +24,7 @@ config PHY_EXYNOS_MIPI_VIDEO
- 
- config PHY_MVEBU_SATA
- 	def_bool y
--	depends on ARCH_KIRKWOOD || ARCH_DOVE
-+	depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD
- 	depends on OF
- 	select GENERIC_PHY
- 
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index 35c066489a19..1bc9cbc4f1b8 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -142,7 +142,7 @@ config RCAR_THERMAL
- 
- config KIRKWOOD_THERMAL
- 	tristate "Temperature sensor on Marvell Kirkwood SoCs"
--	depends on ARCH_KIRKWOOD
-+	depends on ARCH_KIRKWOOD || MACH_KIRKWOOD
- 	depends on OF
- 	help
- 	  Support for the Kirkwood thermal sensor driver into the Linux thermal
-diff --git a/sound/soc/kirkwood/Kconfig b/sound/soc/kirkwood/Kconfig
-index 78ed4a42ad21..106e2e22fed2 100644
---- a/sound/soc/kirkwood/Kconfig
-+++ b/sound/soc/kirkwood/Kconfig
-@@ -1,6 +1,6 @@
- config SND_KIRKWOOD_SOC
- 	tristate "SoC Audio for the Marvell Kirkwood and Dove chips"
--	depends on ARCH_KIRKWOOD || ARCH_DOVE || COMPILE_TEST
-+	depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD || COMPILE_TEST
- 	help
- 	  Say Y or M if you want to add support for codecs attached to
- 	  the Kirkwood I2S interface. You will also need to select the
+ 	/* define struct cpu_tlb_fns (see <asm/tlbflush.h> and proc-macros.S) */
+ 	define_tlb_functions v4wbi, v4wbi_tlb_flags
++	define_tlb_functions fr, fr_tlb_flags
 -- 
 1.8.5.3
