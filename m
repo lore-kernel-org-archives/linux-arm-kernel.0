@@ -1,48 +1,20 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 22 Feb 2014 15:23:02 -0500
-Subject: [PATCH v4 03/22] ARM: Kirkwood: Convert mv88f6281gtw_ge switch
- setup to DT
-In-Reply-To: <20140222202031.GH6667@lunn.ch>
-References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
- <1393096504-11844-4-git-send-email-andrew@lunn.ch>
- <20140222195016.GD7862@titan.lakedaemon.net>
- <20140222202031.GH6667@lunn.ch>
-Message-ID: <20140222202302.GH7862@titan.lakedaemon.net>
+From: tj@kernel.org (Tejun Heo)
+Date: Sat, 22 Feb 2014 15:37:17 -0500
+Subject: [PATCH v7 00/15] ahci: library-ise ahci_platform, add sunxi
+ driver and cleanup imx driver
+In-Reply-To: <5308CFC8.4020400@redhat.com>
+References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
+ <5308CFC8.4020400@redhat.com>
+Message-ID: <20140222203717.GA16272@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 22, 2014 at 09:20:31PM +0100, Andrew Lunn wrote:
-> On Sat, Feb 22, 2014 at 02:50:16PM -0500, Jason Cooper wrote:
-> > On Sat, Feb 22, 2014 at 08:14:45PM +0100, Andrew Lunn wrote:
-> > > The mv88f6281gtw_ge has a ethernet switch connected to the ethernet
-> > > port of the SoC. Convert the platform device instantiation to a DT
-> > > instantiation.
-> > > 
-> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > > Cc: florian at openwrt.org
-> > > ---
-> > > v2
-> > > Remove the spurius Module.symvers
-> > > Really do describe the switch in DT.
-> > > ---
-> > >  arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 62 ++++++++++++++++++++++++++
-> > >  arch/arm/mach-kirkwood/Kconfig                 |  7 ---
-> > >  arch/arm/mach-kirkwood/Makefile                |  1 -
-> > >  arch/arm/mach-kirkwood/board-dt.c              |  3 --
-> > >  arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c | 50 ---------------------
-> > >  arch/arm/mach-kirkwood/common.h                |  7 ---
-> > >  6 files changed, 62 insertions(+), 68 deletions(-)
-> > >  delete mode 100644 arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c
-> > 
-> > You know, I think this is the last time we'll have to tie code changes
-> > and dts file changes together...
-> 
-> Humm, if we part convert T5325 and OpenRD it won't be.
+On Sat, Feb 22, 2014 at 05:26:48PM +0100, Hans de Goede wrote:
+> Tejun, can you please add patches 1-12 to your ata tree for 3.15 ?
 
-Depends on how critical we think audio and leds are to those boards...
+Applied 1-12 to libata/for-3.15 with comment format slightly updated.
 
-thx,
+Thanks.
 
-Jason.
+-- 
+tejun
