@@ -1,51 +1,66 @@
-From: dashie@sigpipe.me (Dashie)
-Date: Sat, 22 Feb 2014 09:54:33 +0100
-Subject: Stuck getting DTS working for a new kirkwood board
-In-Reply-To: <20140221221251.GH11878@lunn.ch>
-References: <5306721B.7020403@sigpipe.me>
- <20140221013407.GX7862@titan.lakedaemon.net> <5307029C.20006@sigpipe.me>
- <20140221151530.GZ7862@titan.lakedaemon.net> <5307A727.9080508@sigpipe.me>
- <20140221200855.GM7862@titan.lakedaemon.net> <5307CCCD.5010505@sigpipe.me>
- <20140221221251.GH11878@lunn.ch>
-Message-ID: <530865C9.6000704@sigpipe.me>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 22 Feb 2014 13:32:35 +0400
+Subject: [PATCH 3/3] ARM: dts: imx27-phytec-phycore-som: Add USBOTG node
+In-Reply-To: <1393061555-26707-1-git-send-email-shc_work@mail.ru>
+References: <1393061555-26707-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1393061555-26707-3-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/21/2014 11:12 PM, Andrew Lunn wrote:
-> Hi Dashie
->
-> A few more tips for you
-Hi, thanks.
->> Kernel command line: mtdparts=orion_nand:0x000e0000 at 0x00000000(u-boot)ro,0x1d73c0 at 0x000e0000(uImage),0x86cb58 at 0x2b73c0(uInitrd),- at 0xb23f18(rootfs) console=ttyS0,115200n8 verbose mem=256M root=/dev/sda2 rootdelay=8 ip=off earlyprintk
-> You seem to be missing nand in your DT. You should be able to work out
-> the partition sizes from the information above.
-Yes, I have manually removed nand partitions from my DTS, i don't use
-the default ones (except u-boot part) and don't have the rights offsets
-atm.
->> rtc-mv f1010300.rtc: internal RTC not ticking
-> This suggests there is a different RTC on the board than the built in
-> one. It is probably on i2c. You can probably get the address using the
-> i2cdetect program. If you have boot logs from the vendor kernel it
-> will probably tell you what device it is.
->
->      Andrew
-I looked at my photos of the PCB and found a M41T80 "Serial access
-real-time clock with alarm", it seems to be at 0x0c, then added :
-        i2c at 11000 {
-[snip]
-                        rtc: rtc at 0c {
-                                compatible = "stm,m41t80";
-                                reg = <0x0c>;
-                        };
-        };
+This patch adds USBOTG devicetree node of Phytec PCM038 module.
 
-And got:
-root at debian:~# dmesg|grep -i rtc
-rtc-mv f1010300.rtc: internal RTC not ticking
-rtc-m41t80 0-000c: chip found, driver version 0.05
-rtc-m41t80 0-000c: rtc core: registered m41t80 as rtc0
-rtc-m41t80 0-000c: hctosys: unable to read the hardware clock
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi | 30 +++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-The chip seems to register but nothing else.
-i2cdetect also shown the LM75 (working) and another i2c peripherial i
-have no ideas what is it.
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+index 05b0ecd..cefaa69 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
+@@ -250,6 +250,23 @@
+ 				MX27_PAD_NFWE_B__NFWE_B 0x0
+ 			>;
+ 		};
++
++		pinctrl_usbotg: usbotggrp {
++			fsl,pins = <
++				MX27_PAD_USBOTG_CLK__USBOTG_CLK 0x0
++				MX27_PAD_USBOTG_DIR__USBOTG_DIR 0x0
++				MX27_PAD_USBOTG_NXT__USBOTG_NXT 0x0
++				MX27_PAD_USBOTG_STP__USBOTG_STP 0x0
++				MX27_PAD_USBOTG_DATA0__USBOTG_DATA0 0x0
++				MX27_PAD_USBOTG_DATA1__USBOTG_DATA1 0x0
++				MX27_PAD_USBOTG_DATA2__USBOTG_DATA2 0x0
++				MX27_PAD_USBOTG_DATA3__USBOTG_DATA3 0x0
++				MX27_PAD_USBOTG_DATA4__USBOTG_DATA4 0x0
++				MX27_PAD_USBOTG_DATA5__USBOTG_DATA5 0x0
++				MX27_PAD_USBOTG_DATA6__USBOTG_DATA6 0x0
++				MX27_PAD_USBOTG_DATA7__USBOTG_DATA7 0x0
++			>;
++		};
+ 	};
+ };
+ 
+@@ -262,6 +279,19 @@
+ 	status = "okay";
+ };
+ 
++&usbotg {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	dr_mode = "otg";
++	phy_type = "ulpi";
++	vbus-supply = <&sw3_reg>;
++	status = "okay";
++};
++
++&usbphy0 {
++	vcc-supply = <&sw3_reg>;
++};
++
+ &weim {
+ 	status = "okay";
+ 
+-- 
+1.8.3.2
