@@ -1,36 +1,75 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 22 Feb 2014 20:14:56 +0100
-Subject: [PATCH v4 14/22] ARM: MM Enable building Feroceon L2 cache controller
- with ARCH_MVEBU
+Date: Sat, 22 Feb 2014 20:14:48 +0100
+Subject: [PATCH v4 06/22] ARM: Kirkwood: ioremap the cpu_config register
+ before using it.
 In-Reply-To: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
 References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1393096504-11844-15-git-send-email-andrew@lunn.ch>
+Message-ID: <1393096504-11844-7-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kirkwood, which uses the Feroceon L2 cache controller will soon be
-moving into mach-mvebu. Allow the cache controller to be built in this
-situation.
+With the move to mach-mvebu and MULTI_V5, the global iomap for all
+registers will be going away. So explicitly map the CPU configuration
+register before using it.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 ---
- arch/arm/mm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+v3:
+Make static __init.
+Unmap the region when finished.
+---
+ arch/arm/mach-kirkwood/board-dt.c                 | 22 +++++++++++++++-------
+ arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  1 +
+ 2 files changed, 16 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 1f8fed94c2a4..dccd7e177653 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -855,7 +855,7 @@ config OUTER_CACHE_SYNC
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 64151a4a378f..d5d8f4996722 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -191,15 +191,23 @@ eth_fixup_skip:
+ 	}
+ }
  
- config CACHE_FEROCEON_L2
- 	bool "Enable the Feroceon L2 cache controller"
--	depends on ARCH_KIRKWOOD || ARCH_MV78XX0
-+	depends on ARCH_KIRKWOOD || ARCH_MV78XX0 || ARCH_MVEBU
- 	default y
- 	select OUTER_CACHE
- 	help
++/*
++ * Disable propagation of mbus errors to the CPU local bus, as this
++ * causes mbus errors (which can occur for example for PCI aborts) to
++ * throw CPU aborts, which we're not set up to deal with.
++ */
++static void __init kirkwood_disable_mbus_error_propagation(void)
++{
++	void __iomem *cpu_config;
++
++	cpu_config = ioremap(CPU_CONFIG_PHYS, 4);
++	writel(readl(cpu_config) & ~CPU_CONFIG_ERROR_PROP, cpu_config);
++	iounmap(cpu_config);
++}
++
+ static void __init kirkwood_dt_init(void)
+ {
+-	/*
+-	 * Disable propagation of mbus errors to the CPU local bus,
+-	 * as this causes mbus errors (which can occur for example
+-	 * for PCI aborts) to throw CPU aborts, which we're not set
+-	 * up to deal with.
+-	 */
+-	writel(readl(CPU_CONFIG) & ~CPU_CONFIG_ERROR_PROP, CPU_CONFIG);
++	kirkwood_disable_mbus_error_propagation();
+ 
+ 	BUG_ON(mvebu_mbus_dt_init());
+ 
+diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+index 8b9d1c9ff199..2bd12fde1781 100644
+--- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
++++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+@@ -14,6 +14,7 @@
+ #include <mach/kirkwood.h>
+ 
+ #define CPU_CONFIG		(BRIDGE_VIRT_BASE + 0x0100)
++#define CPU_CONFIG_PHYS		(BRIDGE_PHYS_BASE + 0x0100)
+ #define CPU_CONFIG_ERROR_PROP	0x00000004
+ 
+ #define CPU_CONTROL		(BRIDGE_VIRT_BASE + 0x0104)
 -- 
 1.8.5.3
