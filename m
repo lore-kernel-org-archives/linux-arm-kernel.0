@@ -1,61 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 22 Feb 2014 10:33:25 +0000
-Subject: [PATCH v5 2/5] ACPI / processor_core: Rework _PDC related stuff
- to make it more arch-independent
-In-Reply-To: <1408521.4TEdKhuRp5@vostro.rjw.lan>
-References: <1392740638-2479-1-git-send-email-hanjun.guo@linaro.org>
- <3459962.GkY99aHQbc@vostro.rjw.lan> <20140221182424.GA5751@arm.com>
- <1408521.4TEdKhuRp5@vostro.rjw.lan>
-Message-ID: <F980FA86-6705-4A71-956C-EA2DBD787199@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 22 Feb 2014 10:38:40 +0000
+Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
+In-Reply-To: <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
+References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
+ <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
+ <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
+Message-ID: <20140222103840.GH21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 Feb 2014, at 23:35, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Friday, February 21, 2014 06:24:24 PM Catalin Marinas wrote:
->> On Wed, Feb 19, 2014 at 01:50:22AM +0100, Rafael J. Wysocki wrote:
->>> On Wednesday, February 19, 2014 12:23:55 AM Hanjun Guo wrote:
->>>> _PDC related stuff in processor_core.c is little bit X86/IA64 dependent,
->>>> rework the code to make it more arch-independent, no functional change
->>>> in this patch.
->>>> 
->>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
->>> 
->>> I've queued up patches [1,3-5/5] from this series for 3.15 (modulo changelog
->>> modifications), but this one should be CCed to the x86 and ia64 maintainers.
->> 
->> Thanks for taking these patches. I would however hold onto patch 3/5 as
->> this is still under discussion. Basically for patches specific to ARM
->> ACPI I would really like to see more acks before being merged as that's
->> a new thing for us.
+On Wed, Feb 19, 2014 at 04:12:54PM +0000, Lorenzo Pieralisi wrote:
+> On Wed, Feb 19, 2014 at 01:52:09AM +0000, Sebastian Capella wrote:
+> > +/*
+> > + * Snapshot kernel memory and reset the system.
+> > + * After resume, the hibernation snapshot is written out.
+> > + */
+> > +static int notrace __swsusp_arch_save_image(unsigned long unused)
+> > +{
+> > +	int ret;
+> > +
+> > +	ret = swsusp_save();
+> > +	if (ret == 0)
+> > +		soft_restart(virt_to_phys(cpu_resume));
 > 
-> OK, I'll drop [3/5] for now, then.
+> By the time the suspend finisher (ie this function) is run, the
+> processor state has been saved and I think that's all you have to do,
+> function can just return after calling swsusp_save(), unless I am missing
+> something.
+> 
+> I do not understand why a soft_restart is required here. On a side note,
+> finisher is called with irqs disabled so, since you added a function for
+> soft restart noirq, it should be used, if needed, but I have to understand
+> why in the first place.
 
-Thanks (it?s only temporary ;)).
+It's required because you can't just return from the finisher.  A normal
+return from the finisher will always be interpreted as an abort rather
+than success (because the state has to be unwound.)
 
-> I'm wondering, though, whose ACKs I should be waiting for before applying those
-> patches?
+This is the only way to get a zero return from cpu_suspend().
 
-Good question ;). In this particular case, there is an ongoing
-discussion between Hanjun and Sudeep. While there isn?t anything
-major, I would like to see some agreement and potentially an Ack from
-the other party involved in the discussion (Sudeep).
+> > +/*
+> > + * The framework loads the hibernation image into a linked list anchored
+> > + * at restore_pblist, for swsusp_arch_resume() to copy back to the proper
+> > + * destinations.
+> > + *
+> > + * To make this work if resume is triggered from initramfs, the
+> > + * pagetables need to be switched to allow writes to kernel mem.
+> 
+> Can you elaborate a bit more on this please ?
+> 
+> > + */
+> > +static void notrace __swsusp_arch_restore_image(void *unused)
+> > +{
+> > +	struct pbe *pbe;
+> > +
+> > +	cpu_switch_mm(idmap_pgd, &init_mm);
+> 
+> Same here, thanks.
+> 
+> > +	for (pbe = restore_pblist; pbe; pbe = pbe->next)
+> > +		copy_page(pbe->orig_address, pbe->address);
+> > +
+> > +	soft_restart_noirq(virt_to_phys(cpu_resume));
+> 
+> This soft_restart is justified so that you resume from the context saved
+> when creating the image.
 
-There are other patches that are not specific to ARM, so it?s
-really your decision. As for the general ARM(64) ACPI case, I don?t
-think we have anyone in charge with deciding what?s correct or not
-(BTW, who are the people active both in the _ARM_ Linux kernel community
-and the ACPI standardisation forum?).
+You need the idmap_pgd in place to call cpu_resume at it's physical
+address.  Other page tables just won't do here.  It's well established
+that this page table must be in place for the resume paths to work.
 
-In the mean-time, I would like to see at least an ack from the arm-soc
-team (Arnd and Olof) or them collecting those ARM-specific patches and
-sending pull request to you. My biggest worry is how the ACPI standard
-is interpreted by vendors and how (non-standard) features get into the 
-Linux kernel.
+So yes, the comments above the function are wrong.  idmap_pgd must be
+in place for cpu_resume() to work.
 
-Anyway, I?ll meet the Linaro guys in a week time and we?ll agree on
-a way forward.
-
-Thanks,
-
-Catalin
+-- 
+FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
+in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
+Estimate before purchase was "up to 13.2Mbit".
