@@ -1,46 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Feb 2014 16:38:53 -0800
-Subject: [GIT PULL v2] efm32 cleanups for next
-In-Reply-To: <20140220195452.GK6988@pengutronix.de>
-References: <20140219201950.GC6988@pengutronix.de>
- <20140220195452.GK6988@pengutronix.de>
-Message-ID: <20140222003853.GG13233@quad.lixom.net>
+Date: Fri, 21 Feb 2014 16:46:04 -0800
+Subject: linux-next: manual merge of the arm-soc tree with the arm-perf
+ tree
+In-Reply-To: <20140221110950.GB8731@mudshark.cambridge.arm.com>
+References: <20140221115857.3ea3d7277d03c5b6b4d26488@canb.auug.org.au>
+ <CAOesGMimJxYLor11EQ-Cn9BnZGg60VrOFC8ZqBdC+wNunptm8w@mail.gmail.com>
+ <20140221110950.GB8731@mudshark.cambridge.arm.com>
+Message-ID: <CAOesGMi6p5LPQ0P2p9MtJEXJP4+5eU-7shze3EB2Gy3BuPv_wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 08:54:52PM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> this pull request superseeds the earlier request this mail is a reply
-> to. Compared to the original one I added another cleanup. Here come the
-> full details:
-> 
-> The following changes since commit 11d73c56b96b4297bd96273e9a22b7c72d13f1fa:
-> 
->   Merge tag 'dropmachtimexh-v2' of git://git.pengutronix.de/git/ukl/linux into next/cleanup (2014-02-18 22:19:33 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/ukl/linux.git tags/efm32-next
-> 
-> for you to fetch changes up to f41b0482d5c1fc05234d54d58931a606ec7a97a2:
-> 
->   ARM: efm32: drop selecting CLKSRC_MMIO (2014-02-20 09:56:18 +0100)
-> 
-> ----------------------------------------------------------------
-> Just three simple cleanups for efm32 removing two now unused files and a
-> superflous select by ARCH_EFM32.
-> 
-> ----------------------------------------------------------------
-> BTW, I based this on armsoc/cleanup because this is the first commit
-> that allows to remove efm32's <mach/timex.h> (which is the last one in
-> the tree).
+On Fri, Feb 21, 2014 at 3:09 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Feb 21, 2014 at 01:02:47AM +0000, Olof Johansson wrote:
+>> On Thu, Feb 20, 2014 at 4:58 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>> > Today's linux-next merge of the arm-soc tree got a conflict in
+>> > arch/arm/boot/dts/qcom-msm8960-cdp.dts between commit a1d711938959 ("ARM:
+>> > dts: msm: Add krait-pmu to platforms with Krait CPUs") from the arm-perf
+>> > tree and commit cc60a1a4d47a ("ARM: dts: msm: split out msm8660 and
+>> > msm8960 soc into dts include") from the arm-soc tree.
+>> >
+>> > I fixed it up (probably not the best way ... see below) and can carry the
+>> > fix as necessary (no action is required).
+>>
+>> Will, I think we'll be better off taking dts changes through arm-soc,
+>> unless there's a good reason to take them through other trees (such as
+>> the perf tree in this case). Is there, or should we move them over?
+>
+> Sure, I can drop that from my tree (it came as part of the series adding
+> Krait PMU support).
+>
+> I've included the original patch below so you can put it into arm-soc.
 
-We ask you to never base your branches on top of our next/* contents, since it
-happens that it will be rebuilt. Instead you should base your branch on top of
-the topic branch in question, i.e. your timex-removal branch.
-
-Please respin.
+Thanks, I've applied it now (with the fixups to move to the dtsi).
 
 
 -Olof
