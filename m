@@ -1,91 +1,259 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 22 Feb 2014 16:53:29 +0100
-Subject: No subject
-Message-ID: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
+Date: Sat, 22 Feb 2014 16:53:31 +0100
+Subject: [PATCH v7 02/15] ahci-platform: Add support for devices with more
+ then 1 clock
+In-Reply-To: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
+References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1393084424-31099-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The allwinner-sun4i AHCI controller needs 2 clocks to be enabled and the
+imx AHCI controller needs 3 clocks to be enabled.
 
-Here is v7 of my patchset for adding ahci-sunxi support. This is hopefully
-the final final version of this set :)
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ .../devicetree/bindings/ata/ahci-platform.txt      |   1 +
+ drivers/ata/ahci.h                                 |   3 +-
+ drivers/ata/ahci_platform.c                        | 119 ++++++++++++++++-----
+ include/linux/ahci_platform.h                      |   4 +
+ 4 files changed, 99 insertions(+), 28 deletions(-)
 
-Note I'm going on vacation for a week starting Monday, so if I'm not responding
-that is why. Tejun if you feel some small cleanups are still necessary and
-you don't want to wait for me to get back feel free to squash in any cleanups
-you deem necessary.
-
-This has been tested with Allwinner A10, Allwinner A20 and Freeware imx6x SoCs,
-including suspend / resume. Note that the ahci_imx driver now also has imx53
-sata support, it would be good if someone could test that with this series.
-
-
-History:
-
-v1, by Olliver Schinagl:
-This was using the approach of having a platform device which probe method
-creates a new child platform device which gets driven by ahci_platform.c,
-as done by ahci_imx.c .
-
-v2, by Hans de Goede:
-Stand-alone platform driver based on Olliver's work
-
-v3, by Hans de Goede:
-patch-series, with 4 different parts
-a) Make ahci_platform.c more generic, handle more then 1 clk, target pwr
-   regulator
-b) New ahci-sunxi code only populating ahci_platform_data, passed to
-   ahci_platform.c to of_device_id matching.
-c) Refactor ahci-imx code to work the same as the new ahci-sunxi code, this
-   is the reason why v3 is an RFC, I'm waiting for the wandboard I ordered to
-   arrive so that I can actually test this.
-d) dts bindings for the sunxi ahci parts
-
-v4, by Hans de Goede:
-patch-series, with 5 different parts:
-a) Make ahci_platform.c more generic, handle more then 1 clk, target pwr
-   regulator
-b) Turn parts of ahci_platform.c into a library for use by other drivers
-c) New ahci-sunxi driver using the ahci_platform.c library functionality
-d) Refactor ahci-imx code to work the same as the new ahci-sunxi code
-e) dts bindings for the sunxi ahci parts
-
-v5:
-v4 + the following changes:
-1) fsl,imx6q driver is now tested
-2) fixed suspend / resume on fsl,imx6q
-3) Modifed devicetree node naming to match dt spec
-4) Reworked the busy waiting code in the sunxi-phy handling as suggested by
-   Russell King
-
-v6:
-v5 rebased on top of 3.14-rc3 + the following changes
-1) Added Roger Quadros' generic phy support series
-2) Added a "ARM: sun4i: dt: Remove grouping + simple-bus for regulators" dts
-   patch
-
-v7:
-v6 + the following changes:
-1) Addressed all Tejun's review remarks:
-  * Added function header comments to all exported ahci_platform functions
-  * Added comments in some other places
-  * Removed use of 2 empty lines to separate functions in some cases
-  * Use devres to automatically call ahci_platform_put_resources on
-    get_resource failure, probe failure and regular device remove
-2) Dropped patches to move ahci_host_priv struct declaration to include/linux,
-  this was a left-over from v3 and is no longer necessary
-3) Updated Roger's "ata: ahci_platform: Manage SATA PHY" patch:
-  * Update function header comments for the changes this makes
-  * Drop the Kconfig PHY requires hack, my patch for the phy-core to always be
-    built-in has been queued in Greg KH's tree, so this is no longer necessary.
-4) Dropped Roger's "ata: ahci_platform: Add 'struct device' argument to ahci_platform_put_resources()"
-  patch, ahci_platform_put_resources already has a device argument as result
-  of it being changed into a devres release function
-
-Tejun, can you please add patches 1-12 to your ata tree for 3.15 ?
-
-Maxime, can you please add patch 13-15 to your dts tree for 3.15 ?
-
-Thanks & Regards,
-
-Hans
+diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+index 89de156..3ced07d 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+@@ -10,6 +10,7 @@ Required properties:
+ 
+ Optional properties:
+ - dma-coherent      : Present if dma operations are coherent
++- clocks            : a list of phandle + clock specifier pairs
+ 
+ Example:
+         sata at ffe08000 {
+diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+index 64d1a99..c12862b 100644
+--- a/drivers/ata/ahci.h
++++ b/drivers/ata/ahci.h
+@@ -51,6 +51,7 @@
+ 
+ enum {
+ 	AHCI_MAX_PORTS		= 32,
++	AHCI_MAX_CLKS		= 3,
+ 	AHCI_MAX_SG		= 168, /* hardware max is 64K */
+ 	AHCI_DMA_BOUNDARY	= 0xffffffff,
+ 	AHCI_MAX_CMDS		= 32,
+@@ -321,7 +322,7 @@ struct ahci_host_priv {
+ 	u32 			em_loc; /* enclosure management location */
+ 	u32			em_buf_sz;	/* EM buffer size in byte */
+ 	u32			em_msg_type;	/* EM message type */
+-	struct clk		*clk;		/* Only for platforms supporting clk */
++	struct clk		*clks[AHCI_MAX_CLKS]; /* Optional */
+ 	void			*plat_data;	/* Other platform data */
+ 	/*
+ 	 * Optional ahci_start_engine override, if not set this gets set to the
+diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+index 4b231ba..609975d 100644
+--- a/drivers/ata/ahci_platform.c
++++ b/drivers/ata/ahci_platform.c
+@@ -87,6 +87,66 @@ static struct scsi_host_template ahci_platform_sht = {
+ 	AHCI_SHT("ahci_platform"),
+ };
+ 
++/**
++ *	ahci_platform_enable_clks - Enable platform clocks
++ *	@hpriv: host private area to store config values
++ *
++ *	This function enables all the clks found in hpriv->clks, starting
++ *	at index 0. If any clk fails to enable it disables all the clks
++ *	already enabled in reverse order, and then returns an error.
++ *
++ *	LOCKING:
++ *	None.
++ *
++ *	RETURNS:
++ *	0 on success otherwise a negative error code
++ */
++int ahci_platform_enable_clks(struct ahci_host_priv *hpriv)
++{
++	int c, rc;
++
++	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++) {
++		rc = clk_prepare_enable(hpriv->clks[c]);
++		if (rc)
++			goto disable_unprepare_clk;
++	}
++	return 0;
++
++disable_unprepare_clk:
++	while (--c >= 0)
++		clk_disable_unprepare(hpriv->clks[c]);
++	return rc;
++}
++EXPORT_SYMBOL_GPL(ahci_platform_enable_clks);
++
++/**
++ *	ahci_platform_disable_clks - Disable platform clocks
++ *	@hpriv: host private area to store config values
++ *
++ *	This function disables all the clks found in hpriv->clks, in reverse
++ *	order of ahci_platform_enable_clks (starting at the end of the array).
++ *
++ *	LOCKING:
++ *	None.
++ */
++void ahci_platform_disable_clks(struct ahci_host_priv *hpriv)
++{
++	int c;
++
++	for (c = AHCI_MAX_CLKS - 1; c >= 0; c--)
++		if (hpriv->clks[c])
++			clk_disable_unprepare(hpriv->clks[c]);
++}
++EXPORT_SYMBOL_GPL(ahci_platform_disable_clks);
++
++static void ahci_put_clks(struct ahci_host_priv *hpriv)
++{
++	int c;
++
++	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++)
++		clk_put(hpriv->clks[c]);
++}
++
+ static int ahci_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -97,6 +157,7 @@ static int ahci_probe(struct platform_device *pdev)
+ 	struct ahci_host_priv *hpriv;
+ 	struct ata_host *host;
+ 	struct resource *mem;
++	struct clk *clk;
+ 	int irq;
+ 	int n_ports;
+ 	int i;
+@@ -131,17 +192,31 @@ static int ahci_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
+-	hpriv->clk = clk_get(dev, NULL);
+-	if (IS_ERR(hpriv->clk)) {
+-		dev_err(dev, "can't get clock\n");
+-	} else {
+-		rc = clk_prepare_enable(hpriv->clk);
+-		if (rc) {
+-			dev_err(dev, "clock prepare enable failed");
+-			goto free_clk;
++	for (i = 0; i < AHCI_MAX_CLKS; i++) {
++		/*
++		 * For now we must use clk_get(dev, NULL) for the first clock,
++		 * because some platforms (da850, spear13xx) are not yet
++		 * converted to use devicetree for clocks.  For new platforms
++		 * this is equivalent to of_clk_get(dev->of_node, 0).
++		 */
++		if (i == 0)
++			clk = clk_get(dev, NULL);
++		else
++			clk = of_clk_get(dev->of_node, i);
++
++		if (IS_ERR(clk)) {
++			rc = PTR_ERR(clk);
++			if (rc == -EPROBE_DEFER)
++				goto free_clk;
++			break;
+ 		}
++		hpriv->clks[i] = clk;
+ 	}
+ 
++	rc = ahci_enable_clks(dev, hpriv);
++	if (rc)
++		goto free_clk;
++
+ 	/*
+ 	 * Some platforms might need to prepare for mmio region access,
+ 	 * which could be done in the following init call. So, the mmio
+@@ -222,11 +297,9 @@ pdata_exit:
+ 	if (pdata && pdata->exit)
+ 		pdata->exit(dev);
+ disable_unprepare_clk:
+-	if (!IS_ERR(hpriv->clk))
+-		clk_disable_unprepare(hpriv->clk);
++	ahci_disable_clks(hpriv);
+ free_clk:
+-	if (!IS_ERR(hpriv->clk))
+-		clk_put(hpriv->clk);
++	ahci_put_clks(hpriv);
+ 	return rc;
+ }
+ 
+@@ -239,10 +312,8 @@ static void ahci_host_stop(struct ata_host *host)
+ 	if (pdata && pdata->exit)
+ 		pdata->exit(dev);
+ 
+-	if (!IS_ERR(hpriv->clk)) {
+-		clk_disable_unprepare(hpriv->clk);
+-		clk_put(hpriv->clk);
+-	}
++	ahci_disable_clks(hpriv);
++	ahci_put_clks(hpriv);
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
+@@ -277,8 +348,7 @@ static int ahci_suspend(struct device *dev)
+ 	if (pdata && pdata->suspend)
+ 		return pdata->suspend(dev);
+ 
+-	if (!IS_ERR(hpriv->clk))
+-		clk_disable_unprepare(hpriv->clk);
++	ahci_disable_clks(hpriv);
+ 
+ 	return 0;
+ }
+@@ -290,13 +360,9 @@ static int ahci_resume(struct device *dev)
+ 	struct ahci_host_priv *hpriv = host->private_data;
+ 	int rc;
+ 
+-	if (!IS_ERR(hpriv->clk)) {
+-		rc = clk_prepare_enable(hpriv->clk);
+-		if (rc) {
+-			dev_err(dev, "clock prepare enable failed");
+-			return rc;
+-		}
+-	}
++	rc = ahci_enable_clks(dev, hpriv);
++	if (rc)
++		return rc;
+ 
+ 	if (pdata && pdata->resume) {
+ 		rc = pdata->resume(dev);
+@@ -317,8 +383,7 @@ static int ahci_resume(struct device *dev)
+ 	return 0;
+ 
+ disable_unprepare_clk:
+-	if (!IS_ERR(hpriv->clk))
+-		clk_disable_unprepare(hpriv->clk);
++	ahci_disable_clks(hpriv);
+ 
+ 	return rc;
+ }
+diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
+index 73a2500..769d065 100644
+--- a/include/linux/ahci_platform.h
++++ b/include/linux/ahci_platform.h
+@@ -19,6 +19,7 @@
+ 
+ struct device;
+ struct ata_port_info;
++struct ahci_host_priv;
+ 
+ struct ahci_platform_data {
+ 	int (*init)(struct device *dev, void __iomem *addr);
+@@ -30,4 +31,7 @@ struct ahci_platform_data {
+ 	unsigned int mask_port_map;
+ };
+ 
++int ahci_platform_enable_clks(struct ahci_host_priv *hpriv);
++void ahci_platform_disable_clks(struct ahci_host_priv *hpriv);
++
+ #endif /* _AHCI_PLATFORM_H */
+-- 
+1.9.0
