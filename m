@@ -1,60 +1,72 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 22 Feb 2014 10:41:32 +0900
-Subject: [GIT PULL 00/12] Second Round of Renesas ARM Based SoC Updates
- for v3.15
-In-Reply-To: <20140221222544.GA13233@quad.lixom.net>
-References: <cover.1392277789.git.horms+renesas@verge.net.au>
- <20140220094324.GR19089@quad.lixom.net>
- <20140221222544.GA13233@quad.lixom.net>
-Message-ID: <20140222014132.GA5393@verge.net.au>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Fri, 21 Feb 2014 22:51:14 -0300
+Subject: [PATCH v2 00/23] Move DT kirkwood into mach-mvebu
+In-Reply-To: <20140221175750.GB17611@obsidianresearch.com>
+References: <1392459621-24003-1-git-send-email-andrew@lunn.ch>
+ <20140218185703.GI29304@obsidianresearch.com>
+ <20140218190212.GE7862@titan.lakedaemon.net>
+ <20140219222103.GB17826@obsidianresearch.com>
+ <20140221031927.GA2654@localhost>
+ <20140221175750.GB17611@obsidianresearch.com>
+Message-ID: <20140222015113.GA2438@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 02:25:44PM -0800, Olof Johansson wrote:
-> On Thu, Feb 20, 2014 at 01:43:24AM -0800, Olof Johansson wrote:
-> > On Thu, Feb 13, 2014 at 05:04:56PM +0900, Simon Horman wrote:
-> > > Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, Feb 21, 2014 at 10:57:50AM -0700, Jason Gunthorpe wrote:
+> On Fri, Feb 21, 2014 at 12:19:28AM -0300, Ezequiel Garcia wrote:
+> > > Thanks, I tested v3 of the patchset.
 > > > 
-> > > please consider this second round of Renesas ARM Based SoC updates for v3.15.
+> > > It boots, but I can't do very much because the watchdog driver doesn't
+> > > build and my system is configured to watchdog timeout if there is no
+> > > watchdog driver.
 > > > 
-> > > This pull-request is based on the first round of such changes,
-> > > tagged as renesas-soc-for-v3.15, which I have previously sent a
-> > > pull-request for.
+> > > Presumably the watchdog patchset needs to be a dependency for this? Is
+> > > there a git URL for it?
 > > > 
-> > > 
-> > > The following changes since commit 012a7069b5a10a0851584d71a1facdc40a972319:
-> > > 
-> > >   ARM: shmobile: r8a7790: Add PCI USB host clock support (2014-02-04 10:25:03 +0900)
-> > > 
-> > > are available in the git repository at:
-> > > 
-> > >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.15
 > > 
-> > Hi,
+> > Andrew's v3 and the mvebu/watchdog branch merges without any conflicts:
 > > 
-> > I'm stopping my merges for the night here, so I haven't merged this but I'll
-> > likely do it tomorrow. I did have comments on one of the patches though (that
-> > adds a new include/mach file that's not really needed). Fixing that can be done
-> > incrementally though, especially if you have downstream users of this branch.
+> > https://github.com/lunn/linux/tree/v3.14-rc1-mvebu-v3
+> > 
+> > http://git.infradead.org/linux-mvebu.git/shortlog/refs/heads/mvebu/watchdog
+> > 
+> > And multi v5 works great here!
 > 
-> Simon,
+> It is working now for me as well, I haven't noticed any strangeness at
+> least..
 > 
-> I think it'd fit our workflow better if you kept all the clock changes in
-> a topic branch this release, instead of mingling them with the SoC code.
-> There is enough of them that it's not just a silly short branch, and there's
-> little overlap with the rest of the soc code changes you have (i.e. it makes
-> more sense for us to merge in with a drivers branch instead of keeping it all
-> with soc).
+> Ezequiel, after I applied your watchdog branch the .dtsi files
+> lacked the new 2nd register:
 > 
-> Would you mind respinning and sorting that out to a separate topic? Since
-> I've already merged the first soc branch (but treated it like a clock
-> branch), feel free to keep that as a base for the new clock branch
-> (but not for the new soc branch, ideally).
+>                 wdt: watchdog-timer at 20300 {
+>                         compatible = "marvell,orion-wdt";
+>                         reg = <0x20300 0x28>;
+>                         interrupt-parent = <&bridge_intc>;
+>                         interrupts = <3>;
+>                         clocks = <&gate_clk 7>;
+>                         status = "okay";
+>                 };
+> 
+> Which creates a nasty warn-on during boot - is that expected?
+>
 
-Sure, I will see about doing that.
+Yup, that's expected. It avoids any backwards compatibility issues.
+The watchdog patchset has been pulled by Jason Cooper in two branches;
+if my memory doesn't fail me, they are: mvebu/watchdog and mvebu/dt.
 
-In the mean time, please disregard "Third Round of Renesas ARM Based SoC
-Updates", which I sent before I saw this email.
+However, the mvebu/dt branch seemed to conflict with Andrew's multi-v5
+work, so I haven't advised you to merge it as well. And since the watchdog
+can work with the old DT, it's not a big issue.
 
-I think that all the other pull-request that I sent yesterday
-should be unaffected by this change.
+Just remember to update your DTB.
+
+> BTW, for both patche sets:
+> Tested-By: Jason Gunthorpe <jgunthorpe@obsidianresearch.com> (on kirkwood)
+> 
+
+Thanks! The watchdog work is already merged, but maybe Jason Cooper can take
+care of adding your tested-by.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
