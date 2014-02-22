@@ -1,51 +1,75 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Fri, 21 Feb 2014 22:46:59 -0800
-Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140222043714.19852.67450@capellas-linux>
-References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
- <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
- <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
- <20140219193315.3732.21819@capellas-linux>
- <20140220162754.GC15994@e102568-lin.cambridge.arm.com>
- <20140221183956.29890.80931@capellas-linux>
- <20140221235911.14777.13919@capellas-linux>
- <20140222043714.19852.67450@capellas-linux>
-Message-ID: <530847E3.4070401@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 22 Feb 2014 01:47:48 -0500
+Subject: [GIT PULL] ARM: mvebu: new SoC support for v3.15
+Message-ID: <20140222064748.GZ7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/21/2014 08:37 PM, Sebastian Capella wrote:
-> Quoting Sebastian Capella (2014-02-21 15:59:11)
->> - Cyril Chemparathy as his email is bouncing back to me. 
->>
->> Quoting Sebastian Capella (2014-02-21 10:39:56)
->>> Quoting Lorenzo Pieralisi (2014-02-20 08:27:55)
->>>>>>> +     cpu_switch_mm(idmap_pgd, &init_mm);
->>   [ ... ]
->>> I can try removing it and seeing if there are side effects.
->>
->> FYI, It's definitely hanging with this removed, still looking.
-> 
-> I see when we reach this call, the 1st level page table @ TTBR0 is located
-> at different memory locations each run (expected).  If we omit the
-> cpu_switch_mm we're corrupting the page table causing the observed
-> intermittent failures.  I believe these match the corruption you expected.
-> 
-> The reason this doesn't happen when I leave the call is that idmap_pgd
-> is always at the same memory location.  I expect this is because it's
-> allocated during init.  I've seen the same address 50/50 times for
-> idmap_pgd.  I don't think it is correct to rely on this behavior.
-> 
-> Would it be appropriate to use the swapper_pg_dir directly in place
-> of idmap_pgd?
->   - I do not see any modification to the swapper_pg_dir contents in the
->     code that would change from init time.
->   - swapper_pg_dir is always at the same offset.
-> 
-> Ideally we should have no issue with overwriting it with identical data.
-> 
-> I've run a couple hundred test loops using swapper_pg_dir and so far
-> there are no failures.
+Guys,
 
-If there is worry about this, you could setup a page mapping in a
-__nosave region, preventing it from being overwritten.
+Here's a cool one.  :)  We're adding support for three new Marvell SoCs
+as the chips are made available to customers.  A big thanks to Marvell
+and Free-electrons for making this happen.
+
+The new SoCs are the Armada 375, 380, and the 385.
+
+These patches have been in -next for at least four days and the series
+depends on the branch mvebu/soc up to tags/mvebu-soc-3.15.  I did this
+to resolve a hidden conflict.  In mvebu/soc we deleted the map_io
+handler, but when this branch renames the file to board-v7.c, it gets
+added back in.  So I've resolved this internally and added the dep.
+
+Please pull.
+
+thx,
+
+Jason.
+
+
+The following changes since commit d181e69c91718a3c7b727596cb06ce0fb39b41d1:
+
+  Merge tag 'tags/mvebu-soc-3.15' into mvebu/soc-3xx (2014-02-22 00:34:01 +0000)
+
+are available in the git repository at:
+
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3xx-3.15
+
+for you to fetch changes up to bc81526f379c78607e042ec15ebbe7e04c9950d5:
+
+  Documentation: arm: update Marvell documentation about Armada 375/38x (2014-02-22 00:44:00 +0000)
+
+----------------------------------------------------------------
+mvebu new SoCs for v3.15
+
+ - mvebu
+    - initial support for Armada 375, 380, and 385
+
+Depends:
+ - tags/mvebu-soc-3.15 (resolves delete/rename hidden conflict)
+
+----------------------------------------------------------------
+Gregory CLEMENT (1):
+      ARM: mvebu: add initial support for the Armada 375 SOCs
+
+Thomas Petazzoni (7):
+      ARM: mvebu: rename armada-370-xp.c to board-v7.c
+      ARM: mvebu: rename DT machine structure for Armada 370/XP
+      ARM: mvebu: make CPU_PJ4B selection a per-SoC choice
+      ARM: mvebu: add Armada 375 support to the system-controller driver
+      ARM: mvebu: add workaround for data abort issue on Armada 375
+      ARM: mvebu: add initial support for the Armada 380/385 SOCs
+      Documentation: arm: update Marvell documentation about Armada 375/38x
+
+ Documentation/arm/Marvell/README                   | 12 ++++-
+ .../devicetree/bindings/arm/armada-375.txt         |  9 ++++
+ .../devicetree/bindings/arm/armada-38x.txt         | 10 ++++
+ .../bindings/arm/mvebu-system-controller.txt       |  3 +-
+ arch/arm/mach-mvebu/Kconfig                        | 37 ++++++++++++--
+ arch/arm/mach-mvebu/Makefile                       |  5 +-
+ .../arm/mach-mvebu/{armada-370-xp.c => board-v7.c} | 58 ++++++++++++++++++++--
+ arch/arm/mach-mvebu/system-controller.c            | 14 +++++-
+ 8 files changed, 133 insertions(+), 15 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-375.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-38x.txt
+ rename arch/arm/mach-mvebu/{armada-370-xp.c => board-v7.c} (58%)
