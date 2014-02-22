@@ -1,37 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Feb 2014 16:46:04 -0800
-Subject: linux-next: manual merge of the arm-soc tree with the arm-perf
- tree
-In-Reply-To: <20140221110950.GB8731@mudshark.cambridge.arm.com>
-References: <20140221115857.3ea3d7277d03c5b6b4d26488@canb.auug.org.au>
- <CAOesGMimJxYLor11EQ-Cn9BnZGg60VrOFC8ZqBdC+wNunptm8w@mail.gmail.com>
- <20140221110950.GB8731@mudshark.cambridge.arm.com>
-Message-ID: <CAOesGMi6p5LPQ0P2p9MtJEXJP4+5eU-7shze3EB2Gy3BuPv_wg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 21 Feb 2014 19:59:00 -0500
+Subject: [GIT PULL] ARM: mvebu soc changes for v3.15
+In-Reply-To: <20140222003415.GE13233@quad.lixom.net>
+References: <20140218163628.GW7862@titan.lakedaemon.net>
+ <20140222003415.GE13233@quad.lixom.net>
+Message-ID: <20140222005900.GP7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 3:09 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Feb 21, 2014 at 01:02:47AM +0000, Olof Johansson wrote:
->> On Thu, Feb 20, 2014 at 4:58 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->> > Today's linux-next merge of the arm-soc tree got a conflict in
->> > arch/arm/boot/dts/qcom-msm8960-cdp.dts between commit a1d711938959 ("ARM:
->> > dts: msm: Add krait-pmu to platforms with Krait CPUs") from the arm-perf
->> > tree and commit cc60a1a4d47a ("ARM: dts: msm: split out msm8660 and
->> > msm8960 soc into dts include") from the arm-soc tree.
->> >
->> > I fixed it up (probably not the best way ... see below) and can carry the
->> > fix as necessary (no action is required).
->>
->> Will, I think we'll be better off taking dts changes through arm-soc,
->> unless there's a good reason to take them through other trees (such as
->> the perf tree in this case). Is there, or should we move them over?
->
-> Sure, I can drop that from my tree (it came as part of the series adding
-> Krait PMU support).
->
-> I've included the original patch below so you can put it into arm-soc.
+On Fri, Feb 21, 2014 at 04:34:15PM -0800, Olof Johansson wrote:
+> On Tue, Feb 18, 2014 at 11:36:28AM -0500, Jason Cooper wrote:
+> > All,
+> > 
+> > A small round of changes that have been sitting in -next for a week or
+> > so.  Please pull.
+> > 
+> > thx,
+> > 
+> > Jason.
+> > 
+> > 
+> > The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+> > 
+> >   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.15
+> > 
+> > for you to fetch changes up to 08bb3adfd3adeb4653095e7968b6a46cef940404:
+> > 
+> >   ARM: mvebu: remove unneeded ->map_io field for Armada 370/XP (2014-02-11 19:33:04 +0000)
+> 
+> Thanks, merged into next/cleanup.
 
-Thanks, I've applied it now (with the fixups to move to the dtsi).
+Heads up:  I'm currently basing mvebu/soc-3xx on top of this work to
+avoid keeping track of a tricky modify/rename merge.  Namely, removing
+map_io in the above, and the mvebu/soc-3xx branch renames the same file.
 
+As long as you don't mind having a branch depending on next/cleanup, all
+should be good.  No action required.
 
--Olof
+I'd've mentioned it in the pull request, but we just discovered it today
+and I did the rebase 5 minutes ago. :)
+
+thx,
+
+Jason.
