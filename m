@@ -1,58 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 22 Feb 2014 09:37:18 +0100
-Subject: [PATCH v7 8/8] ARM: sunxi: Add documentation for driver for
- SD/MMC hosts found on Allwinner sunxi SoCs
-In-Reply-To: <1559221.mEv19UvCzF@pagira.o2s.ch>
-References: <20140217095907.15040.81893.stgit@pagira.o2s.ch>
- <20140217100302.15040.56273.stgit@pagira.o2s.ch>
- <20140218154212.GL3142@lukather> <1559221.mEv19UvCzF@pagira.o2s.ch>
-Message-ID: <20140222083718.GI3931@lukather>
+From: dashie@sigpipe.me (Dashie)
+Date: Sat, 22 Feb 2014 09:54:33 +0100
+Subject: Stuck getting DTS working for a new kirkwood board
+In-Reply-To: <20140221221251.GH11878@lunn.ch>
+References: <5306721B.7020403@sigpipe.me>
+ <20140221013407.GX7862@titan.lakedaemon.net> <5307029C.20006@sigpipe.me>
+ <20140221151530.GZ7862@titan.lakedaemon.net> <5307A727.9080508@sigpipe.me>
+ <20140221200855.GM7862@titan.lakedaemon.net> <5307CCCD.5010505@sigpipe.me>
+ <20140221221251.GH11878@lunn.ch>
+Message-ID: <530865C9.6000704@sigpipe.me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-
-On Sat, Feb 22, 2014 at 08:32:03AM +0100, David Lanzend?rfer wrote:
-> > Ditto. Plus, this is not a mod0 clock.
-> Yes it is! But maybe the formulation hasn't been clear enough...
-
-Technically, it's not, it has this phase controls features a mod0
-clock doesn't have.
-
-> > You never talked about the clock-names property, and which clocks
-> > were supposed to be provided.
+On 02/21/2014 11:12 PM, Andrew Lunn wrote:
+> Hi Dashie
 >
-> Yes I did? But I expanded the text a little bit further...
+> A few more tips for you
+Hi, thanks.
+>> Kernel command line: mtdparts=orion_nand:0x000e0000 at 0x00000000(u-boot)ro,0x1d73c0 at 0x000e0000(uImage),0x86cb58 at 0x2b73c0(uInitrd),- at 0xb23f18(rootfs) console=ttyS0,115200n8 verbose mem=256M root=/dev/sda2 rootdelay=8 ip=off earlyprintk
+> You seem to be missing nand in your DT. You should be able to work out
+> the partition sizes from the information above.
+Yes, I have manually removed nand partitions from my DTS, i don't use
+the default ones (except u-boot part) and don't have the rights offsets
+atm.
+>> rtc-mv f1010300.rtc: internal RTC not ticking
+> This suggests there is a different RTC on the board than the built in
+> one. It is probably on i2c. You can probably get the address using the
+> i2cdetect program. If you have boot logs from the vendor kernel it
+> will probably tell you what device it is.
+>
+>      Andrew
+I looked at my photos of the PCB and found a M41T80 "Serial access
+real-time clock with alarm", it seems to be at 0x0c, then added :
+        i2c at 11000 {
+[snip]
+                        rtc: rtc at 0c {
+                                compatible = "stm,m41t80";
+                                reg = <0x0c>;
+                        };
+        };
 
-I can't see any reference to the fact that clock-names should be set,
-and what values should it hold.
+And got:
+root at debian:~# dmesg|grep -i rtc
+rtc-mv f1010300.rtc: internal RTC not ticking
+rtc-m41t80 0-000c: chip found, driver version 0.05
+rtc-m41t80 0-000c: rtc core: registered m41t80 as rtc0
+rtc-m41t80 0-000c: hctosys: unable to read the hardware clock
 
-Something like that:
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-pmc.txt#n11
-
-> > > +	interrupts = <0 32 4>;
-> > > +	bus-width = <4>;
-> > And you never talked about bus-width either.
-> I can throw in a line for refering to the mmc slot gpio lib docs.
-
-Yes, that would be great :)
-
-> > Isn't the cd-gpios property requested too?
-> I can refer to the docs there as well if you like... :-)
-
-That would be great too :)
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140222/1840615a/attachment.sig>
+The chip seems to register but nothing else.
+i2cdetect also shown the LM75 (working) and another i2c peripherial i
+have no ideas what is it.
