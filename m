@@ -1,83 +1,46 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Feb 2014 16:36:41 -0800
-Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.15
-In-Reply-To: <20140218164639.GX7862@titan.lakedaemon.net>
-References: <20140218164639.GX7862@titan.lakedaemon.net>
-Message-ID: <20140222003641.GF13233@quad.lixom.net>
+Date: Fri, 21 Feb 2014 16:38:53 -0800
+Subject: [GIT PULL v2] efm32 cleanups for next
+In-Reply-To: <20140220195452.GK6988@pengutronix.de>
+References: <20140219201950.GC6988@pengutronix.de>
+ <20140220195452.GK6988@pengutronix.de>
+Message-ID: <20140222003853.GG13233@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 11:46:39AM -0500, Jason Cooper wrote:
-> All,
+On Thu, Feb 20, 2014 at 08:54:52PM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> Heads up!  This branch changes the name of mvebu_defconfig to
-> mvebu_v7_defconfig to make room for kirkwood (mvebu_v5) in mach-mvebu/.
-> Olof and Kevin's build/boot farm will need to be tweaked.  I did warn
-> about this :)
+> this pull request superseeds the earlier request this mail is a reply
+> to. Compared to the original one I added another cleanup. Here come the
+> full details:
 > 
-> Other than that, pretty quiet.
+> The following changes since commit 11d73c56b96b4297bd96273e9a22b7c72d13f1fa:
 > 
-> Since these are defconfig changes, and oldconfig will remove unused
-> symbols, I've gone ahead and sent the whole branch, including the
-> changes for the new Armada 375 and 38x SoCs.
-> 
-> Please pull.
-> 
-> thx,
-> 
-> Jason.
-> 
-> 
-> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-> 
->   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+>   Merge tag 'dropmachtimexh-v2' of git://git.pengutronix.de/git/ukl/linux into next/cleanup (2014-02-18 22:19:33 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-3.15
+>   git://git.pengutronix.de/git/ukl/linux.git tags/efm32-next
 > 
-> for you to fetch changes up to dd1d03afe8a0825d718f5d74225ad57978599a89:
+> for you to fetch changes up to f41b0482d5c1fc05234d54d58931a606ec7a97a2:
 > 
->   ARM: mvebu: update defconfigs for Armada 375 and 38x (2014-02-17 22:48:39 +0000)
-> 
-> ----------------------------------------------------------------
-> mvebu defconfig changes for v3.15
-> 
->  - dove
->     - remove UBI support
->     - enable watchdog
-> 
->  - mvebu
->     - rename mvebu_defconfig mvebu_v7_defconfig
->     - enable audio
->     - enable watchdog
->     - add Armada 375 and 38x
+>   ARM: efm32: drop selecting CLKSRC_MMIO (2014-02-20 09:56:18 +0100)
 > 
 > ----------------------------------------------------------------
-> Ezequiel Garcia (3):
->       ARM: dove: Remove UBI support from defconfig
->       ARM: mvebu: Enable watchdog support in defconfig
->       ARM: dove: Enable watchdog support in the defconfig
+> Just three simple cleanups for efm32 removing two now unused files and a
+> superflous select by ARCH_EFM32.
 > 
-> Thomas Petazzoni (3):
->       ARM: mvebu: rename mvebu_defconfig to mvebu_v7_defconfig
->       ARM: mvebu: enable audio options in mvebu_defconfig
->       ARM: mvebu: update defconfigs for Armada 375 and 38x
-> 
->  arch/arm/configs/dove_defconfig                          | 3 ++-
->  arch/arm/configs/multi_v7_defconfig                      | 4 ++++
->  arch/arm/configs/{mvebu_defconfig => mvebu_v7_defconfig} | 9 +++++++++
->  3 files changed, 15 insertions(+), 1 deletion(-)
->  rename arch/arm/configs/{mvebu_defconfig => mvebu_v7_defconfig} (91%)
+> ----------------------------------------------------------------
+> BTW, I based this on armsoc/cleanup because this is the first commit
+> that allows to remove efm32's <mach/timex.h> (which is the last one in
+> the tree).
 
-Jason,
+We ask you to never base your branches on top of our next/* contents, since it
+happens that it will be rebuilt. Instead you should base your branch on top of
+the topic branch in question, i.e. your timex-removal branch.
 
-multi_v7_defconfig updates get messy, and we ask that people send them as
-patches instead of in branches. Still, in this case it's a whole branch of just
-defconfig updates so I think we'll be OK. Be mindful of it in the future
-though, please.
-
-Branch has been merged into next/boards.
+Please respin.
 
 
 -Olof
