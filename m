@@ -1,97 +1,73 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 22 Feb 2014 15:18:16 -0800
-Subject: [PATCH v3 07/11] watchdog: xilinx: Use of_property_read_u32
-In-Reply-To: <53094A15.1080708@udio.cujae.edu.cu>
-References: <cover.1392212059.git.michal.simek@xilinx.com>
- <7cbb10853a343c9d488346596f604909ab0668b9.1392212059.git.michal.simek@xilinx.com>
- <20140212171509.GB20012@roeck-us.net>
- <20140222184604.GB21504@spo001.leaseweb.com>
- <53094A15.1080708@udio.cujae.edu.cu>
-Message-ID: <53093038.6000604@roeck-us.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 23 Feb 2014 00:49:56 +0100
+Subject: [PATCH v2 0/5] ARM: S3C24XX: convert s3c2412 to common clock
+ framework
+In-Reply-To: <1835515.oOiOlPWUhB@phil>
+References: <1835515.oOiOlPWUhB@phil>
+Message-ID: <530937A4.3010301@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2014 05:08 PM, Alejandro Cabrera wrote:
-> On 22/2/2014 10:46 AM, Wim Van Sebroeck wrote:
->> Hi All,
->>
->>> Hi Michal,
->>>
->>> On Wed, Feb 12, 2014 at 02:41:21PM +0100, Michal Simek wrote:
->>>> Use of_property_read_u32 functions to clean probe function.
->>>>
->>>> Signed-off-by: Michal Simek<michal.simek@xilinx.com>
->>>> Reviewed-by: Guenter Roeck<linux@roeck-us.net>
->>>> ---
->>>>
->>>> Changes in v3:
->>>> - Remove one if checking and use variable directly
->>>>
->>> Looks good.
->>>
->>> Another comment/remark.
->>>
->>>> -    pfreq = (u32 *)of_get_property(pdev->dev.of_node,
->>>> -                    "clock-frequency", NULL);
->>>> -
->>>> -    if (pfreq == NULL) {
->>>> +    rc = of_property_read_u32(pdev->dev.of_node, "clock-frequency",&pfreq);
->>>> +    if (rc) {
->>>>           dev_warn(&pdev->dev,
->>>>                "The watchdog clock frequency cannot be obtained\n");
->>>>           no_timeout = true;
->>>>       }
->>>>
->>>> -    tmptr = (u32 *)of_get_property(pdev->dev.of_node,
->>>> -                    "xlnx,wdt-interval", NULL);
->>>> -    if (tmptr == NULL) {
->>>> +    rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-interval",
->>>> +                &xdev->wdt_interval);
->>>> +    if (rc) {
->>>>           dev_warn(&pdev->dev,
->>>>                "Parameter \"xlnx,wdt-interval\" not found\n");
->>>>           no_timeout = true;
->>>> -    } else {
->>>> -        xdev->wdt_interval = *tmptr;
->>>>       }
->>>>
->>>> -    tmptr = (u32 *)of_get_property(pdev->dev.of_node,
->>>> -                    "xlnx,wdt-enable-once", NULL);
->>>> -    if (tmptr == NULL) {
->>>> +    rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-enable-once",
->>>> +                &enable_once);
->>>> +    if (rc)
->>>>           dev_warn(&pdev->dev,
->>>>                "Parameter \"xlnx,wdt-enable-once\" not found\n");
->>>> -        watchdog_set_nowayout(xilinx_wdt_wdd, true);
->>>> -    }
->>> All the above properties are optional. Is a warning really
->>> warranted in this case ? I usually associate a warning with
->>> something that is wrong, which is not the case here.
->>>
->>> I would encourage you to drop those warnings, but that should be
->>> a separate patch.
->> I agree with Guenter: these are not really warnings. Seperate patch is thus welcome.
-> Hi
+Hi,
+
+On 22.02.2014 23:45, Heiko St?bner wrote:
+> Second incarnation of the series converting s3c2412/s3c2413 to the common
+> clock framework. As before the conversion is done by a mix of datasheet
+> data and the pre-existing clock code and as this time I have no hardware
+> of this type, it is compile-tested only. So hopefully somebody with s3c2412
+> hw will be able to test it for real.
 >
-> I support Michal intention, I think it is a warning because device tree blob must have the "xlnx,wdt-enable-once" property specified in order to allow the system to be sure of the real value of this property. In addition to, this warning can be helpful to detect a wrong device tree specification.
+> The conversion of s3c2412 now moved in front of the s3c2410/s3c2440/s3c2442
+> one, as I'll need a bit more time for the clockout changes suggested by
+> Tomasz Figa.
+>
+> This series builds on top of the previous submitted s3c2443/s3c2416 series.
+>
+>
+> Changes since v1:
+> - move in front of s3c2410 conversion, therefore move 2 necessary patches
+>    that also got ACKs, from there into this series
+> - adapt to Samsung clock pm rework from Tomasz Figa
+> - apply some changes suggested by Tomasz Figa in the s3c2410 clock driver
+>    that also apply to this driver.
+>
+> Heiko Stuebner (5):
+>    ARM: S3C24XX: only store clock registers when old clock code is active
+>    clk: samsung: add plls used by the early s3c24xx cpus
+>    dt-bindings: add documentation for s3c2412 clock controller
+>    clk: samsung: add clock controller driver for s3c2412
+>    ARM: S3C24XX: convert s3c2412 to common clock framework
+>
+>   .../bindings/clock/samsung,s3c2412-clock.txt       |  50 ++
+>   arch/arm/mach-s3c24xx/Kconfig                      |   8 +-
+>   arch/arm/mach-s3c24xx/Makefile                     |   2 +-
+>   arch/arm/mach-s3c24xx/clock-s3c2412.c              | 761 ---------------------
+>   arch/arm/mach-s3c24xx/common.c                     |   9 +-
+>   arch/arm/mach-s3c24xx/common.h                     |   4 +
+>   arch/arm/mach-s3c24xx/mach-jive.c                  |   9 +-
+>   arch/arm/mach-s3c24xx/mach-smdk2413.c              |   9 +-
+>   arch/arm/mach-s3c24xx/mach-vstms.c                 |   9 +-
+>   arch/arm/mach-s3c24xx/pm.c                         |  13 +-
+>   arch/arm/mach-s3c24xx/s3c2412.c                    |  43 --
+>   drivers/clk/samsung/Makefile                       |   1 +
+>   drivers/clk/samsung/clk-pll.c                      | 182 +++++
+>   drivers/clk/samsung/clk-pll.h                      |   3 +
+>   drivers/clk/samsung/clk-s3c2412.c                  | 268 ++++++++
+>   include/dt-bindings/clock/s3c2412.h                |  73 ++
+>   16 files changed, 627 insertions(+), 817 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c2412-clock.txt
+>   delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2412.c
+>   create mode 100644 drivers/clk/samsung/clk-s3c2412.c
+>   create mode 100644 include/dt-bindings/clock/s3c2412.h
 >
 
-The dt documentation states that the properties are optional.
+For mach and DT patches:
 
-Optional properties:
-- clock-frequency       : Frequency of clock in Hz
-- xlnx,wdt-enable-once  : 0 - Watchdog can be restarted
-                           1 - Watchdog can be enabled just once
-- xlnx,wdt-interval     : Watchdog timeout interval in 2^<val> clock cycles,
-                           <val> is integer from 8 to 31.
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 
-This clearly conflicts with your statement. An optional property
-is just that, optional. If it warrants a warning, it must
-not be optional. If you claim that not providing the properties
-would be "wrong", why are they defined as optional ?
-What is your definition of "wrong" and "must have" ?
-How do you expect anyone to know that omitting those
-"optional" properties is by some definition "wrong" ?
+Kukjin, I'll take binding and clock patches to Samsung clock tree as 
+soon as DT bindings get acked by one of DT maintainers. I will prepare a 
+branch for you to apply mach patches on top. Is it fine for you?
 
-Guenter
+Best regards,
+Tomasz
