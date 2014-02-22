@@ -1,66 +1,91 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 22 Feb 2014 13:32:35 +0400
-Subject: [PATCH 3/3] ARM: dts: imx27-phytec-phycore-som: Add USBOTG node
-In-Reply-To: <1393061555-26707-1-git-send-email-shc_work@mail.ru>
-References: <1393061555-26707-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1393061555-26707-3-git-send-email-shc_work@mail.ru>
+Date: Sat, 22 Feb 2014 13:32:33 +0400
+Subject: [PATCH 1/3] ARM: dts: i.MX27: Add USB nodes
+Message-ID: <1393061555-26707-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds USBOTG devicetree node of Phytec PCM038 module.
+This patch adds the missing (Universal serial bus) USB devicetree
+nodes for i.MX27 CPUs.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi | 30 +++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/imx27.dtsi | 56 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-index 05b0ecd..cefaa69 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-@@ -250,6 +250,23 @@
- 				MX27_PAD_NFWE_B__NFWE_B 0x0
- 			>;
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 2763cae..6279e0b 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -70,6 +70,26 @@
  		};
-+
-+		pinctrl_usbotg: usbotggrp {
-+			fsl,pins = <
-+				MX27_PAD_USBOTG_CLK__USBOTG_CLK 0x0
-+				MX27_PAD_USBOTG_DIR__USBOTG_DIR 0x0
-+				MX27_PAD_USBOTG_NXT__USBOTG_NXT 0x0
-+				MX27_PAD_USBOTG_STP__USBOTG_STP 0x0
-+				MX27_PAD_USBOTG_DATA0__USBOTG_DATA0 0x0
-+				MX27_PAD_USBOTG_DATA1__USBOTG_DATA1 0x0
-+				MX27_PAD_USBOTG_DATA2__USBOTG_DATA2 0x0
-+				MX27_PAD_USBOTG_DATA3__USBOTG_DATA3 0x0
-+				MX27_PAD_USBOTG_DATA4__USBOTG_DATA4 0x0
-+				MX27_PAD_USBOTG_DATA5__USBOTG_DATA5 0x0
-+				MX27_PAD_USBOTG_DATA6__USBOTG_DATA6 0x0
-+				MX27_PAD_USBOTG_DATA7__USBOTG_DATA7 0x0
-+			>;
-+		};
  	};
- };
  
-@@ -262,6 +279,19 @@
- 	status = "okay";
- };
- 
-+&usbotg {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	dr_mode = "otg";
-+	phy_type = "ulpi";
-+	vbus-supply = <&sw3_reg>;
-+	status = "okay";
-+};
++	usbphy {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+&usbphy0 {
-+	vcc-supply = <&sw3_reg>;
-+};
++		usbphy0: usbphy at 0 {
++			compatible = "usb-nop-xceiv";
++			reg = <0>;
++			clocks = <&clks 75>;
++			clock-names = "main_clk";
++		};
 +
- &weim {
- 	status = "okay";
++		usbphy2: usbphy at 2 {
++			compatible = "usb-nop-xceiv";
++			reg = <2>;
++			clocks = <&clks 75>;
++			clock-names = "main_clk";
++		};
++	};
++
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -439,6 +459,42 @@
+ 				iram = <&iram>;
+ 			};
  
++			usbotg: usb at 10024000 {
++				compatible = "fsl,imx27-usb";
++				reg = <0x10024000 0x200>;
++				interrupts = <56>;
++				clocks = <&clks 15>;
++				fsl,usbmisc = <&usbmisc 0>;
++				fsl,usbphy = <&usbphy0>;
++				status = "disabled";
++			};
++
++			usbh1: usb at 10024200 {
++				compatible = "fsl,imx27-usb";
++				reg = <0x10024200 0x200>;
++				interrupts = <54>;
++				clocks = <&clks 15>;
++				fsl,usbmisc = <&usbmisc 1>;
++				status = "disabled";
++			};
++
++			usbh2: usb at 10024400 {
++				compatible = "fsl,imx27-usb";
++				reg = <0x10024400 0x200>;
++				interrupts = <55>;
++				clocks = <&clks 15>;
++				fsl,usbmisc = <&usbmisc 2>;
++				fsl,usbphy = <&usbphy2>;
++				status = "disabled";
++			};
++
++			usbmisc: usbmisc at 10024600 {
++				#index-cells = <1>;
++				compatible = "fsl,imx27-usbmisc";
++				reg = <0x10024600 0x200>;
++				clocks = <&clks 62>;
++			};
++
+ 			sahara2: sahara at 10025000 {
+ 				compatible = "fsl,imx27-sahara";
+ 				reg = <0x10025000 0x1000>;
 -- 
 1.8.3.2
