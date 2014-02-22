@@ -1,181 +1,71 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 22 Feb 2014 16:53:34 +0100
-Subject: [PATCH v7 05/15] ahci-platform: "Library-ise" ahci_probe functionality
+Date: Sat, 22 Feb 2014 16:53:35 +0100
+Subject: [PATCH v7 06/15] ahci-platform: "Library-ise" suspend / resume
+ functionality
 In-Reply-To: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
 References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1393084424-31099-6-git-send-email-hdegoede@redhat.com>
+Message-ID: <1393084424-31099-7-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ahci_probe consists of 3 steps:
-1) Get resources (get mmio, clks, regulator)
-2) Enable resources, handled by ahci_platform_enable_resouces
-3) The more or less standard ahci-host controller init sequence
-
-This commit refactors step 1 and 3 into separate functions, so the platform
-drivers for AHCI implementations which need a specific order in step 2,
-and / or need to do some custom register poking at some time, can re-use
-ahci-platform.c code without needing to copy and paste it.
-
-Note that ahci_platform_init_host's prototype takes the 3 non function
-members of ahci_platform_data as arguments, the idea is that drivers using
-the new exported utility functions will not use ahci_platform_data at all,
-and hopefully in the future ahci_platform_data can go away entirely.
+Split suspend / resume code into host suspend / resume functionality and
+resource enable / disabling phases, and export the new suspend_ / resume_host
+functions.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/ata/ahci_platform.c   | 195 ++++++++++++++++++++++++++++--------------
- include/linux/ahci_platform.h |  14 +++
- 2 files changed, 144 insertions(+), 65 deletions(-)
+ drivers/ata/ahci_platform.c   | 109 ++++++++++++++++++++++++++++++++++++------
+ include/linux/ahci_platform.h |   5 ++
+ 2 files changed, 99 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index 6ebbc17..7f3f2ac 100644
+index 7f3f2ac..bdadec1 100644
 --- a/drivers/ata/ahci_platform.c
 +++ b/drivers/ata/ahci_platform.c
-@@ -201,64 +201,64 @@ void ahci_platform_disable_resources(struct ahci_host_priv *hpriv)
- }
- EXPORT_SYMBOL_GPL(ahci_platform_disable_resources);
- 
--static void ahci_put_clks(struct ahci_host_priv *hpriv)
-+static void ahci_platform_put_resources(struct device *dev, void *res)
- {
-+	struct ahci_host_priv *hpriv = res;
- 	int c;
- 
- 	for (c = 0; c < AHCI_MAX_CLKS && hpriv->clks[c]; c++)
- 		clk_put(hpriv->clks[c]);
+@@ -452,14 +452,26 @@ static void ahci_host_stop(struct ata_host *host)
  }
  
--static int ahci_probe(struct platform_device *pdev)
+ #ifdef CONFIG_PM_SLEEP
+-static int ahci_suspend(struct device *dev)
 +/**
-+ *	ahci_platform_get_resources - Get platform resources
-+ *	@pdev: platform device to get resources for
++ *	ahci_platform_suspend_host - Suspend an ahci-platform host
++ *	@dev: device pointer for the host
 + *
-+ *	This function allocates an ahci_host_priv struct, and gets the
-+ *	following resources, storing a reference to them inside the returned
-+ *	struct:
-+ *
-+ *	1) mmio registers (IORESOURCE_MEM 0, mandatory)
-+ *	2) regulator for controlling the targets power (optional)
-+ *	3) 0 - AHCI_MAX_CLKS clocks, as specified in the devs devicetree node,
-+ *	   or for non devicetree enabled platforms a single clock
++ *	This function does all the usual steps needed to suspend an
++ *	ahci-platform host, note any necessary resources (ie clks, phy, etc.)
++ *	must be disabled after calling this.
 + *
 + *	LOCKING:
 + *	None.
 + *
 + *	RETURNS:
-+ *	The allocated ahci_host_priv on success, otherwise an ERR_PTR value
++ *	0 on success otherwise a negative error code
 + */
-+struct ahci_host_priv *ahci_platform_get_resources(
-+	struct platform_device *pdev)
++int ahci_platform_suspend_host(struct device *dev)
  {
- 	struct device *dev = &pdev->dev;
 -	struct ahci_platform_data *pdata = dev_get_platdata(dev);
--	const struct platform_device_id *id = platform_get_device_id(pdev);
--	struct ata_port_info pi = ahci_port_info[id ? id->driver_data : 0];
--	const struct ata_port_info *ppi[] = { &pi, NULL };
- 	struct ahci_host_priv *hpriv;
--	struct ata_host *host;
--	struct resource *mem;
- 	struct clk *clk;
--	int irq;
--	int n_ports;
--	int i;
+ 	struct ata_host *host = dev_get_drvdata(dev);
+ 	struct ahci_host_priv *hpriv = host->private_data;
+ 	void __iomem *mmio = hpriv->mmio;
+ 	u32 ctl;
 -	int rc;
-+	int i, rc = -ENOMEM;
  
--	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!mem) {
--		dev_err(dev, "no mmio space\n");
--		return -EINVAL;
--	}
-+	if (!devres_open_group(dev, NULL, GFP_KERNEL))
-+		return ERR_PTR(-ENOMEM);
+ 	if (hpriv->flags & AHCI_HFLAG_NO_SUSPEND) {
+ 		dev_err(dev, "firmware update required for suspend/resume\n");
+@@ -476,7 +488,64 @@ static int ahci_suspend(struct device *dev)
+ 	writel(ctl, mmio + HOST_CTL);
+ 	readl(mmio + HOST_CTL); /* flush */
  
--	irq = platform_get_irq(pdev, 0);
--	if (irq <= 0) {
--		dev_err(dev, "no irq\n");
--		return -EINVAL;
--	}
-+	hpriv = devres_alloc(ahci_platform_put_resources, sizeof(*hpriv),
-+			     GFP_KERNEL);
-+	if (!hpriv)
-+		goto err_out;
- 
--	if (pdata && pdata->ata_port_info)
--		pi = *pdata->ata_port_info;
-+	devres_add(dev, hpriv);
- 
--	hpriv = devm_kzalloc(dev, sizeof(*hpriv), GFP_KERNEL);
--	if (!hpriv) {
--		dev_err(dev, "can't alloc ahci_host_priv\n");
--		return -ENOMEM;
--	}
--
--	hpriv->flags |= (unsigned long)pi.private_data;
--
--	hpriv->mmio = devm_ioremap(dev, mem->start, resource_size(mem));
-+	hpriv->mmio = devm_ioremap_resource(dev,
-+			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
- 	if (!hpriv->mmio) {
--		dev_err(dev, "can't map %pR\n", mem);
--		return -ENOMEM;
-+		dev_err(dev, "no mmio space\n");
-+		goto err_out;
- 	}
- 
- 	hpriv->target_pwr = devm_regulator_get_optional(dev, "target");
- 	if (IS_ERR(hpriv->target_pwr)) {
- 		rc = PTR_ERR(hpriv->target_pwr);
- 		if (rc == -EPROBE_DEFER)
--			return -EPROBE_DEFER;
-+			goto err_out;
- 		hpriv->target_pwr = NULL;
- 	}
- 
-@@ -277,33 +277,62 @@ static int ahci_probe(struct platform_device *pdev)
- 		if (IS_ERR(clk)) {
- 			rc = PTR_ERR(clk);
- 			if (rc == -EPROBE_DEFER)
--				goto free_clk;
-+				goto err_out;
- 			break;
- 		}
- 		hpriv->clks[i] = clk;
- 	}
- 
--	rc = ahci_platform_enable_resources(hpriv);
--	if (rc)
--		goto free_clk;
-+	devres_remove_group(dev, NULL);
-+	return hpriv;
- 
--	/*
--	 * Some platforms might need to prepare for mmio region access,
--	 * which could be done in the following init call. So, the mmio
--	 * region shouldn't be accessed before init (if provided) has
--	 * returned successfully.
--	 */
--	if (pdata && pdata->init) {
--		rc = pdata->init(dev, hpriv->mmio);
--		if (rc)
--			goto disable_resources;
--	}
-+err_out:
-+	devres_release_group(dev, NULL);
-+	return ERR_PTR(rc);
+-	rc = ata_host_suspend(host, PMSG_SUSPEND);
++	return ata_host_suspend(host, PMSG_SUSPEND);
 +}
-+EXPORT_SYMBOL_GPL(ahci_platform_get_resources);
++EXPORT_SYMBOL_GPL(ahci_platform_suspend_host);
 +
 +/**
-+ *	ahci_platform_init_host - Bring up an ahci-platform host
-+ *	@pdev: platform device pointer for the host
-+ *	@hpriv: ahci-host private data for the host
-+ *	@pi_template: template for the ata_port_info to use
-+ *	@force_port_map: param passed to ahci_save_initial_config
-+ *	@mask_port_map: param passed to ahci_save_initial_config
++ *	ahci_platform_resume_host - Resume an ahci-platform host
++ *	@dev: device pointer for the host
 + *
-+ *	This function does all the usual steps needed to bring up an
++ *	This function does all the usual steps needed to resume an
 + *	ahci-platform host, note any necessary resources (ie clks, phy, etc.)
 + *	must be initialized / enabled before calling this.
 + *
@@ -185,163 +75,118 @@ index 6ebbc17..7f3f2ac 100644
 + *	RETURNS:
 + *	0 on success otherwise a negative error code
 + */
-+int ahci_platform_init_host(struct platform_device *pdev,
-+			    struct ahci_host_priv *hpriv,
-+			    const struct ata_port_info *pi_template,
-+			    unsigned int force_port_map,
-+			    unsigned int mask_port_map)
++int ahci_platform_resume_host(struct device *dev)
 +{
-+	struct device *dev = &pdev->dev;
-+	struct ata_port_info pi = *pi_template;
-+	const struct ata_port_info *ppi[] = { &pi, NULL };
-+	struct ata_host *host;
-+	int i, irq, n_ports, rc;
- 
--	ahci_save_initial_config(dev, hpriv,
--		pdata ? pdata->force_port_map : 0,
--		pdata ? pdata->mask_port_map  : 0);
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq <= 0) {
-+		dev_err(dev, "no irq\n");
-+		return -EINVAL;
-+	}
- 
- 	/* prepare host */
-+	hpriv->flags |= (unsigned long)pi.private_data;
-+
-+	ahci_save_initial_config(dev, hpriv, force_port_map, mask_port_map);
-+
- 	if (hpriv->cap & HOST_CAP_NCQ)
- 		pi.flags |= ATA_FLAG_NCQ;
- 
-@@ -320,10 +349,8 @@ static int ahci_probe(struct platform_device *pdev)
- 	n_ports = max(ahci_nr_ports(hpriv->cap), fls(hpriv->port_map));
- 
- 	host = ata_host_alloc_pinfo(dev, ppi, n_ports);
--	if (!host) {
--		rc = -ENOMEM;
--		goto pdata_exit;
--	}
-+	if (!host)
-+		return -ENOMEM;
- 
- 	host->private_data = hpriv;
- 
-@@ -338,7 +365,8 @@ static int ahci_probe(struct platform_device *pdev)
- 	for (i = 0; i < host->n_ports; i++) {
- 		struct ata_port *ap = host->ports[i];
- 
--		ata_port_desc(ap, "mmio %pR", mem);
-+		ata_port_desc(ap, "mmio %pR",
-+			      platform_get_resource(pdev, IORESOURCE_MEM, 0));
- 		ata_port_desc(ap, "port 0x%x", 0x100 + ap->port_no * 0x80);
- 
- 		/* set enclosure management message type */
-@@ -352,13 +380,53 @@ static int ahci_probe(struct platform_device *pdev)
- 
- 	rc = ahci_reset_controller(host);
- 	if (rc)
--		goto pdata_exit;
-+		return rc;
- 
- 	ahci_init_controller(host);
- 	ahci_print_info(host, "platform");
- 
--	rc = ata_host_activate(host, irq, ahci_interrupt, IRQF_SHARED,
--			       &ahci_platform_sht);
-+	return ata_host_activate(host, irq, ahci_interrupt, IRQF_SHARED,
-+				 &ahci_platform_sht);
-+}
-+EXPORT_SYMBOL_GPL(ahci_platform_init_host);
-+
-+static int ahci_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct ahci_platform_data *pdata = dev_get_platdata(dev);
-+	const struct platform_device_id *id = platform_get_device_id(pdev);
-+	const struct ata_port_info *pi_template;
-+	struct ahci_host_priv *hpriv;
++	struct ata_host *host = dev_get_drvdata(dev);
 +	int rc;
 +
-+	hpriv = ahci_platform_get_resources(pdev);
-+	if (IS_ERR(hpriv))
-+		return PTR_ERR(hpriv);
-+
-+	rc = ahci_platform_enable_resources(hpriv);
-+	if (rc)
-+		return rc;
-+
-+	/*
-+	 * Some platforms might need to prepare for mmio region access,
-+	 * which could be done in the following init call. So, the mmio
-+	 * region shouldn't be accessed before init (if provided) has
-+	 * returned successfully.
-+	 */
-+	if (pdata && pdata->init) {
-+		rc = pdata->init(dev, hpriv->mmio);
++	if (dev->power.power_state.event == PM_EVENT_SUSPEND) {
++		rc = ahci_reset_controller(host);
 +		if (rc)
-+			goto disable_resources;
++			return rc;
++
++		ahci_init_controller(host);
 +	}
 +
-+	if (pdata && pdata->ata_port_info)
-+		pi_template = pdata->ata_port_info;
-+	else
-+		pi_template = &ahci_port_info[id ? id->driver_data : 0];
++	ata_host_resume(host);
 +
-+	rc = ahci_platform_init_host(pdev, hpriv, pi_template,
-+				     pdata ? pdata->force_port_map : 0,
-+				     pdata ? pdata->mask_port_map  : 0);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(ahci_platform_resume_host);
++
++/**
++ *	ahci_platform_suspend - Suspend an ahci-platform device
++ *	@dev: the platform device to suspend
++ *
++ *	This function suspends the host associated with the device, followed
++ *	by disabling all the resources of the device.
++ *
++ *	LOCKING:
++ *	None.
++ *
++ *	RETURNS:
++ *	0 on success otherwise a negative error code
++ */
++int ahci_platform_suspend(struct device *dev)
++{
++	struct ahci_platform_data *pdata = dev_get_platdata(dev);
++	struct ata_host *host = dev_get_drvdata(dev);
++	struct ahci_host_priv *hpriv = host->private_data;
++	int rc;
++
++	rc = ahci_platform_suspend_host(dev);
  	if (rc)
- 		goto pdata_exit;
+ 		return rc;
  
-@@ -368,8 +436,6 @@ pdata_exit:
- 		pdata->exit(dev);
- disable_resources:
- 	ahci_platform_disable_resources(hpriv);
--free_clk:
--	ahci_put_clks(hpriv);
+@@ -487,8 +556,22 @@ static int ahci_suspend(struct device *dev)
+ 
+ 	return 0;
+ }
++EXPORT_SYMBOL_GPL(ahci_platform_suspend);
+ 
+-static int ahci_resume(struct device *dev)
++/**
++ *	ahci_platform_resume - Resume an ahci-platform device
++ *	@dev: the platform device to resume
++ *
++ *	This function enables all the resources of the device followed by
++ *	resuming the host associated with the device.
++ *
++ *	LOCKING:
++ *	None.
++ *
++ *	RETURNS:
++ *	0 on success otherwise a negative error code
++ */
++int ahci_platform_resume(struct device *dev)
+ {
+ 	struct ahci_platform_data *pdata = dev_get_platdata(dev);
+ 	struct ata_host *host = dev_get_drvdata(dev);
+@@ -505,15 +588,9 @@ static int ahci_resume(struct device *dev)
+ 			goto disable_resources;
+ 	}
+ 
+-	if (dev->power.power_state.event == PM_EVENT_SUSPEND) {
+-		rc = ahci_reset_controller(host);
+-		if (rc)
+-			goto disable_resources;
+-
+-		ahci_init_controller(host);
+-	}
+-
+-	ata_host_resume(host);
++	rc = ahci_platform_resume_host(dev);
++	if (rc)
++		goto disable_resources;
+ 
+ 	return 0;
+ 
+@@ -522,9 +599,11 @@ disable_resources:
+ 
  	return rc;
  }
++EXPORT_SYMBOL_GPL(ahci_platform_resume);
+ #endif
  
-@@ -383,7 +449,6 @@ static void ahci_host_stop(struct ata_host *host)
- 		pdata->exit(dev);
+-static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_suspend, ahci_resume);
++static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_platform_suspend,
++			 ahci_platform_resume);
  
- 	ahci_platform_disable_resources(hpriv);
--	ahci_put_clks(hpriv);
- }
- 
- #ifdef CONFIG_PM_SLEEP
+ static const struct of_device_id ahci_of_match[] = {
+ 	{ .compatible = "snps,spear-ahci", },
 diff --git a/include/linux/ahci_platform.h b/include/linux/ahci_platform.h
-index b674b01..b80c51c 100644
+index b80c51c..542f268 100644
 --- a/include/linux/ahci_platform.h
 +++ b/include/linux/ahci_platform.h
-@@ -20,7 +20,14 @@
- struct device;
- struct ata_port_info;
- struct ahci_host_priv;
-+struct platform_device;
+@@ -50,4 +50,9 @@ int ahci_platform_init_host(struct platform_device *pdev,
+ 			    unsigned int force_port_map,
+ 			    unsigned int mask_port_map);
  
-+/*
-+ * Note ahci_platform_data is deprecated, it is only kept around for use
-+ * by the old da850 and spear13xx ahci code.
-+ * New drivers should instead declare their own platform_driver struct, and
-+ * use ahci_platform* functions in their own probe, suspend and resume methods.
-+ */
- struct ahci_platform_data {
- 	int (*init)(struct device *dev, void __iomem *addr);
- 	void (*exit)(struct device *dev);
-@@ -35,5 +42,12 @@ int ahci_platform_enable_clks(struct ahci_host_priv *hpriv);
- void ahci_platform_disable_clks(struct ahci_host_priv *hpriv);
- int ahci_platform_enable_resources(struct ahci_host_priv *hpriv);
- void ahci_platform_disable_resources(struct ahci_host_priv *hpriv);
-+struct ahci_host_priv *ahci_platform_get_resources(
-+	struct platform_device *pdev);
-+int ahci_platform_init_host(struct platform_device *pdev,
-+			    struct ahci_host_priv *hpriv,
-+			    const struct ata_port_info *pi_template,
-+			    unsigned int force_port_map,
-+			    unsigned int mask_port_map);
- 
++int ahci_platform_suspend_host(struct device *dev);
++int ahci_platform_resume_host(struct device *dev);
++int ahci_platform_suspend(struct device *dev);
++int ahci_platform_resume(struct device *dev);
++
  #endif /* _AHCI_PLATFORM_H */
 -- 
 1.9.0
