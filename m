@@ -1,17 +1,17 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 21 Feb 2014 16:33:03 -0800
-Subject: [GIT PULL] ARM: mvebu: DT changes for v3.15
-In-Reply-To: <20140218163007.GV7862@titan.lakedaemon.net>
-References: <20140218163007.GV7862@titan.lakedaemon.net>
-Message-ID: <20140222003303.GD13233@quad.lixom.net>
+Date: Fri, 21 Feb 2014 16:34:15 -0800
+Subject: [GIT PULL] ARM: mvebu soc changes for v3.15
+In-Reply-To: <20140218163628.GW7862@titan.lakedaemon.net>
+References: <20140218163628.GW7862@titan.lakedaemon.net>
+Message-ID: <20140222003415.GE13233@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 11:30:07AM -0500, Jason Cooper wrote:
+On Tue, Feb 18, 2014 at 11:36:28AM -0500, Jason Cooper wrote:
 > All,
 > 
-> Nothing special here.  These have been in next at least a week (the
-> kirkwood boards much longer).  Please pull.
+> A small round of changes that have been sitting in -next for a week or
+> so.  Please pull.
 > 
 > thx,
 > 
@@ -24,22 +24,13 @@ On Tue, Feb 18, 2014 at 11:30:07AM -0500, Jason Cooper wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.15
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-3.15
 > 
-> for you to fetch changes up to 5c0169d1c503aab2d62ee6f6e342a78e2ea9e3ed:
+> for you to fetch changes up to 08bb3adfd3adeb4653095e7968b6a46cef940404:
 > 
->   ARM: mvebu: use input DT defines in Armada 370/XP boards (2014-02-11 19:35:39 +0000)
-> 
-> ----------------------------------------------------------------
-> mvebu DT changes for v3.15
-> 
->  - kirkwood
->     - new board QNAP 419
->     - new board Excito Bubba B3
-> 
->  - mvebu
->     - use gpio and input defines for Armada 370/XP boards
+>   ARM: mvebu: remove unneeded ->map_io field for Armada 370/XP (2014-02-11 19:33:04 +0000)
 
-Merged, thanks.
+Thanks, merged into next/cleanup.
+
 
 -Olof
