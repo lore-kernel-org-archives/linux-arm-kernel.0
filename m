@@ -1,135 +1,95 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 22 Feb 2014 11:30:25 +0000
-Subject: [PATCH v5 3/5] ACPI / processor: Introduce
- =?UTF-8?Q?map=5Fgic=5Fid=28=29=20to=20get=20apic=20id=20from=20MADT=20or?=
- =?UTF-8?Q?=20=5FMAT=20method?=
-In-Reply-To: <53087A0F.6010302@linaro.org>
-References: <1392740638-2479-1-git-send-email-hanjun.guo@linaro.org>
- <1392740638-2479-4-git-send-email-hanjun.guo@linaro.org>
- <5304C0C4.3080601@arm.com> <53057DA9.3010307@linaro.org>
- <5307487F.6000308@arm.com> <53087A0F.6010302@linaro.org>
-Message-ID: <d2ad8ee5d9a7875fe121a30beb8d2e8c@www.loen.fr>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Sat, 22 Feb 2014 12:09:10 +0000
+Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
+In-Reply-To: <20140222103840.GH21483@n2100.arm.linux.org.uk>
+References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
+ <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
+ <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
+ <20140222103840.GH21483@n2100.arm.linux.org.uk>
+Message-ID: <20140222120910.GA9012@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2014-02-22 10:21, Hanjun Guo wrote:
-> On 2014-2-21 20:37, Sudeep Holla wrote:
->> Hi Hanjun,
->>
->> (Adding MarcZ for his views on GIC)
->>
->> On 20/02/14 03:59, Hanjun Guo wrote:
->>> Hi Sudeep,
->>>
->>> Thanks for your comments, please refer to the replies below. :)
->>>
->>> On 2014?02?19? 22:33, Sudeep Holla wrote:
->>>> Hi Hanjun,
->>>>
->>>> On 18/02/14 16:23, Hanjun Guo wrote:
->>>>> Get apic id from MADT or _MAT method is not implemented on 
->>>>> arm/arm64,
->>>>> and ACPI 5.0 introduces GIC Structure for it, so this patch 
->>>>> introduces
->>>>> map_gic_id() to get apic id followed the ACPI 5.0 spec.
->>>>>
->>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>> ---
->>>>>   drivers/acpi/processor_core.c |   26 ++++++++++++++++++++++++++
->>>>>   1 file changed, 26 insertions(+)
->>>>>
->>>>> diff --git a/drivers/acpi/processor_core.c 
->>>>> b/drivers/acpi/processor_core.c
->>>>> index 4dcf776..d316d9b 100644
->>>>> --- a/drivers/acpi/processor_core.c
->>>>> +++ b/drivers/acpi/processor_core.c
->>>>> @@ -71,6 +71,27 @@ static int map_lsapic_id(struct 
->>>>> acpi_subtable_header *entry,
->>>>>   	return 0;
->>>>>   }
->>>>>
->>>>> +static int map_gic_id(struct acpi_subtable_header *entry,
->>>>> +		int device_declaration, u32 acpi_id, int *apic_id)
->>>>> +{
->>>>> +	struct acpi_madt_generic_interrupt *gic =
->>>>> +		(struct acpi_madt_generic_interrupt *)entry;
->>>>> +
->>>>> +	if (!(gic->flags & ACPI_MADT_ENABLED))
->>>>> +		return -ENODEV;
->>>>> +
->>>>> +	/* In the GIC interrupt model, logical processors are
->>>>> +	 * required to have a Processor Device object in the DSDT,
->>>>> +	 * so we should check device_declaration here
->>>>> +	 */
->>>>> +	if (device_declaration && (gic->uid == acpi_id)) {
->>>>> +		*apic_id = gic->gic_id;
->>>> I have mentioned this earlier, it's not clear yet to me how does 
->>>> this work ?
->>>> It needs more clarity in the form of comment here at-least as the 
->>>> ACPIv5.0 is
->>>> also not so clear or explicit on how to handle this.
->>>
->>> Yes, I noticed your comments and had a reply for that, after a
->>> long consideration for this, I would withdraw my previous comments
->>> before, please refer to the comments below.
->>>
->>>>
->>>> Here you are expecting gic->uid = acpi_id which is fine, while 
->>>> acpi_map_cpuid
->>>> matches apic_id with cpu_physical_id(which must be MPIDR in 
->>>> ARM{32,64}). The
->>>> latter imposes restriction that gic->gic_id has to be MPIDR. Does 
->>>> that mean we
->>>> are imposing restriction on GIC ID to be MPIDR ? If so please 
->>>> document it here
->>>> and please explain the reason behind that choice.
->>>
->>> On x86 and IA64, APIC/SAPIC ID is the hardware id of the logical
->>> processor, and UID is just a unique ID to identify the processor in 
->>> DSDT, it
->>> can be any value, and even can be strings defined in ASL if I 
->>> remember
->>> that correctly.
->>>
->> OK, but that's not the case on ARM{32,64}. My main concern here is 
->> if we don't
->> make this definitions clear enough, the vendors might produce ACPI 
->> tables with
->> whatever suits them and we may end up supporting them. Since we are 
->> starting
->> with clean slate, we can avoid getting into such situations. I will 
->> be to be
->> more elaborate this time.
->
-> I agree.
->
->>
->> The GIC ID is referred as the local GIC?s hardware ID in ACPIv5.0.
->> IIUC, since GICC is per-cpu entry, it has to GIC CPU interface ID.
->>
->> Now how does it differ from MPIDR ? e.g. ARM TC2(multi cluster 
->> system)
->> 	GIC ID		MPIDR			Comment
->> 	0		0x000			CA15_0
->> 	1		0x001			CA15_1
->> 	2		0x100			CA7_0
->> 	3		0x101			CA7_1
->> 	4		0x102			CA7_2
->
-> Yes, obvious different. I know GIC ID can matche the bit index of the
-> associated processor
-> in the distributor's GICD_ITARGETSR register, and it a clear
-> statement in GICv1/GICv2, my
-> question is that is this consistent in GICv3/v4 too? this will have
-> some impact on the
-> code implementation.
+On Sat, Feb 22, 2014 at 10:38:40AM +0000, Russell King - ARM Linux wrote:
+> On Wed, Feb 19, 2014 at 04:12:54PM +0000, Lorenzo Pieralisi wrote:
+> > On Wed, Feb 19, 2014 at 01:52:09AM +0000, Sebastian Capella wrote:
+> > > +/*
+> > > + * Snapshot kernel memory and reset the system.
+> > > + * After resume, the hibernation snapshot is written out.
+> > > + */
+> > > +static int notrace __swsusp_arch_save_image(unsigned long unused)
+> > > +{
+> > > +	int ret;
+> > > +
+> > > +	ret = swsusp_save();
+> > > +	if (ret == 0)
+> > > +		soft_restart(virt_to_phys(cpu_resume));
+> > 
+> > By the time the suspend finisher (ie this function) is run, the
+> > processor state has been saved and I think that's all you have to do,
+> > function can just return after calling swsusp_save(), unless I am missing
+> > something.
+> > 
+> > I do not understand why a soft_restart is required here. On a side note,
+> > finisher is called with irqs disabled so, since you added a function for
+> > soft restart noirq, it should be used, if needed, but I have to understand
+> > why in the first place.
+> 
+> It's required because you can't just return from the finisher.  A normal
+> return from the finisher will always be interpreted as an abort rather
+> than success (because the state has to be unwound.)
+> 
+> This is the only way to get a zero return from cpu_suspend().
 
-For GICv3/v4, the only way you can match a CPU with its local 
-redistributor is by using the CPU MPIDR. The GIC CPU ID is an 
-implementation choice that may not exist (it doesn't in a distributed 
-implementation), so anything that relies on a GIC CPU ID is broken for 
-GICv3.
+Yes, that's the only reason why this code is jumping to cpu_resume, since
+all it is needed is to snapshot the CPU context and by the time the
+finisher is called that's done. Wanted to say that soft reboot is not
+useful (cache flushing and resume with MMU off), but what you are saying
+is correct. We might be saving swsusp_save return value in a global
+variable and just return from the finisher, but that's horrible and
+given the amount of time it takes to snapshot the image to disk the
+cost of this soft reboot will be dwarfed by that.
 
-         M.
--- 
-Fast, cheap, reliable. Pick two.
+I wanted to ask and clarify why the code was written like this though, given
+its complexity.
+
+> > > +/*
+> > > + * The framework loads the hibernation image into a linked list anchored
+> > > + * at restore_pblist, for swsusp_arch_resume() to copy back to the proper
+> > > + * destinations.
+> > > + *
+> > > + * To make this work if resume is triggered from initramfs, the
+> > > + * pagetables need to be switched to allow writes to kernel mem.
+> > 
+> > Can you elaborate a bit more on this please ?
+> > 
+> > > + */
+> > > +static void notrace __swsusp_arch_restore_image(void *unused)
+> > > +{
+> > > +	struct pbe *pbe;
+> > > +
+> > > +	cpu_switch_mm(idmap_pgd, &init_mm);
+> > 
+> > Same here, thanks.
+> > 
+> > > +	for (pbe = restore_pblist; pbe; pbe = pbe->next)
+> > > +		copy_page(pbe->orig_address, pbe->address);
+> > > +
+> > > +	soft_restart_noirq(virt_to_phys(cpu_resume));
+> > 
+> > This soft_restart is justified so that you resume from the context saved
+> > when creating the image.
+> 
+> You need the idmap_pgd in place to call cpu_resume at it's physical
+> address.  Other page tables just won't do here.  It's well established
+> that this page table must be in place for the resume paths to work.
+
+Well, we do not need idmap page tables for copying the restore_pblist,
+but we do need a set of tables that won't be corrupted by the copy and
+idmap does the trick (I was confused because 1:1 mappings are not needed
+for the copy itself).
+
+The switch to idmap is done for us in soft_reboot anyway before jumping to
+cpu_resume and that's required, as you said.
+
+Lorenzo
