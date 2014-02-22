@@ -1,89 +1,118 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 22 Feb 2014 13:32:34 +0400
-Subject: [PATCH 2/3] ARM: dts: imx27-phytec-phycore-rdk: Add USBH2 node
-In-Reply-To: <1393061555-26707-1-git-send-email-shc_work@mail.ru>
-References: <1393061555-26707-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1393061555-26707-2-git-send-email-shc_work@mail.ru>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 22 Feb 2014 11:09:25 +0100
+Subject: [PATCH v6 17/18] ARM: sun4i: dt: Add ahci / sata support
+In-Reply-To: <20140221181519.GC3931@lukather>
+References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
+ <1392811320-3132-18-git-send-email-hdegoede@redhat.com>
+ <20140221181519.GC3931@lukather>
+Message-ID: <53087755.3090608@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds USBH2 devicetree node of Phytec PCM970 RDK.
-Additionally, adds fixed regulator to provide functionality
-without dummy-regulator in the kernel.
+Hi Maxime,
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts  | 31 +++++++++++++++++++++++++
- arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi |  8 +++++++
- 2 files changed, 39 insertions(+)
+On 02/21/2014 07:15 PM, Maxime Ripard wrote:
+> Hi Hans,
+>
+> On Wed, Feb 19, 2014 at 01:01:59PM +0100, Hans de Goede wrote:
+>> From: Oliver Schinagl <oliver@schinagl.nl>
+>>
+>> This patch adds sunxi sata support to A10 boards that have such a connector.
+>> Some boards also feature a regulator via a GPIO and support for this is also
+>> added.
+>>
+>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   arch/arm/boot/dts/sun4i-a10-a1000.dts      |  4 ++++
+>>   arch/arm/boot/dts/sun4i-a10-cubieboard.dts |  6 +++++
+>>   arch/arm/boot/dts/sun4i-a10.dtsi           |  8 +++++++
+>>   arch/arm/boot/dts/sunxi-ahci-reg.dtsi      | 36 ++++++++++++++++++++++++++++++
+>>   4 files changed, 54 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/sunxi-ahci-reg.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+>> index cbd2e13..d6ec839 100644
+>> --- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
+>> +++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+>> @@ -35,6 +35,10 @@
+>>   			};
+>>   		};
+>>
+>> +		ahci: sata at 01c18000 {
+>> +			status = "okay";
+>> +		};
+>> +
+>>   		pinctrl at 01c20800 {
+>>   			emac_power_pin_a1000: emac_power_pin at 0 {
+>>   				allwinner,pins = "PH15";
+>> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+>> index b139ee6..6df237d8 100644
+>> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+>> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+>> @@ -12,6 +12,7 @@
+>>
+>>   /dts-v1/;
+>>   /include/ "sun4i-a10.dtsi"
+>> +/include/ "sunxi-ahci-reg.dtsi"
+>>
+>>   / {
+>>   	model = "Cubietech Cubieboard";
+>> @@ -33,6 +34,11 @@
+>>   			};
+>>   		};
+>>
+>> +		ahci: sata at 01c18000 {
+>> +			target-supply = <&reg_ahci_5v>;
+>> +			status = "okay";
+>> +		};
+>> +
+>>   		pinctrl at 01c20800 {
+>>   			led_pins_cubieboard: led_pins at 0 {
+>>   				allwinner,pins = "PH20", "PH21";
+>> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+>> index 336dbec..454077a 100644
+>> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+>> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+>> @@ -338,6 +338,14 @@
+>>   			#size-cells = <0>;
+>>   		};
+>>
+>> +		ahci: sata at 01c18000 {
+>> +			compatible = "allwinner,sun4i-a10-ahci";
+>> +			reg = <0x01c18000 0x1000>;
+>> +			interrupts = <56>;
+>> +			clocks = <&pll6 0>, <&ahb_gates 25>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>>   		intc: interrupt-controller at 01c20400 {
+>>   			compatible = "allwinner,sun4i-ic";
+>>   			reg = <0x01c20400 0x400>;
+>> diff --git a/arch/arm/boot/dts/sunxi-ahci-reg.dtsi b/arch/arm/boot/dts/sunxi-ahci-reg.dtsi
+>> new file mode 100644
+>> index 0000000..7072af1
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/sunxi-ahci-reg.dtsi
+>> @@ -0,0 +1,36 @@
+>> +/*
+>> + * sunxi boards sata target power supply common code
+>
+>
+> Since IIRC we have pretty much the same needs for the USB, can't we
+> just drop the SATA specific mention and use it as the common DTSI for
+> the usual regulators?
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-index 9a07543..df3b2e7 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-@@ -81,6 +81,23 @@
- 			>;
- 		};
- 
-+		pinctrl_usbh2: usbh2grp {
-+			fsl,pins = <
-+				MX27_PAD_USBH2_CLK__USBH2_CLK 0x0
-+				MX27_PAD_USBH2_DIR__USBH2_DIR 0x0
-+				MX27_PAD_USBH2_NXT__USBH2_NXT 0x0
-+				MX27_PAD_USBH2_STP__USBH2_STP 0x0
-+				MX27_PAD_CSPI2_SCLK__USBH2_DATA0 0x0
-+				MX27_PAD_CSPI2_MOSI__USBH2_DATA1 0x0
-+				MX27_PAD_CSPI2_MISO__USBH2_DATA2 0x0
-+				MX27_PAD_CSPI2_SS1__USBH2_DATA3 0x0
-+				MX27_PAD_CSPI2_SS2__USBH2_DATA4 0x0
-+				MX27_PAD_CSPI1_SS2__USBH2_DATA5 0x0
-+				MX27_PAD_CSPI2_SS0__USBH2_DATA6 0x0
-+				MX27_PAD_USBH2_DATA7__USBH2_DATA7 0x0
-+			>;
-+		};
-+
- 		pinctrl_weim: weimgrp {
- 			fsl,pins = <
- 				MX27_PAD_CS4_B__CS4_B		0x0 /* CS4 */
-@@ -170,6 +187,20 @@
- 	status = "okay";
- };
- 
-+&usbh2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbh2>;
-+	dr_mode = "host";
-+	phy_type = "ulpi";
-+	vbus-supply = <&reg_5v0>;
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usbphy2 {
-+	vcc-supply = <&reg_5v0>;
-+};
-+
- &weim {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_weim>;
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-index 258eafa..05b0ecd 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-som.dtsi
-@@ -32,6 +32,14 @@
- 			regulator-min-microvolt = <3300000>;
- 			regulator-max-microvolt = <3300000>;
- 		};
-+
-+		reg_5v0: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "5V0";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+		};
- 	};
- };
- 
--- 
-1.8.3.2
+On most boards with sata, there will also be 1 or 2 usb regulators,
+so we need differently named regulator nodes for all 3 of ahci,
+usb1 and usb2 vbus. On some boards how ever we may only need the
+usb regulators. So if you look in my current personal sunxi-devel
+tree you will see separate dtsi files for both ahci and usb regulators,
+another advantage of having these separate is that the gpio controlling
+the regulator can be pre-populated with the reference design gpio which
+is used in most boards, so that the ahci specific code in the dts
+becomes only the ahci: sata at ... node.
+
+Regards,
+
+Hans
