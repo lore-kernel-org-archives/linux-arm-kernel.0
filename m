@@ -1,45 +1,61 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Sat, 22 Feb 2014 12:26:48 +0000
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <20140222020602.GG25940@sirena.org.uk>
-References: <1392037324-5069-1-git-send-email-broonie@kernel.org>
- <20140221150140.GB495@e102568-lin.cambridge.arm.com>
- <20140222020602.GG25940@sirena.org.uk>
-Message-ID: <20140222122647.GC9012@e102568-lin.cambridge.arm.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sat, 22 Feb 2014 10:59:36 -0300
+Subject: [PATCH 1/1] ARM: dts: omap3-igep: fix boot fail due wrong compatible
+ match
+Message-ID: <1393077576-25730-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 22, 2014 at 02:06:02AM +0000, Mark Brown wrote:
-> On Fri, Feb 21, 2014 at 03:01:40PM +0000, Lorenzo Pieralisi wrote:
-> 
-> > If the DT does not contain a proper topology the scheduler seem to go for a
-> > toss. I tried to track it down and it seems it expects topology cpumasks to be
-> > initialized regardless (eg to possible mask), they cannot be left empty.
-> 
-> Could you be more specific please?  I didn't notice anything particular
-> in my testing but then the fact that it's a model does obscure a lot of
-> things.
+This patch is based on commit:
 
-I will send you a backtrace, config file, commit.
+016c12d2 ("ARM: OMAP3: Fix hardware detection for omap3630 when booted with device tree")
 
-Problem is hit when CONFIG_SCHED_SMT is on and there is no cpu-map in
-the dts.
+and fixes a boot hang due the IGEP board being wrongly initialized
+as an OMAP3430 platform instead of an OMAP3630.
 
-What's a model ? And if you mean the processor model, what can it possibly
-obscure as long as this patch is concerned ?
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
 
-> > On top of that, the pr_info message is quite annoying and should be
-> > probably downgraded or removed altogether.
-> 
-> This was deliberate - since we are not willing to use the MPIDR
-> information to discover the topology we need to get the information into
-> the DT bindings in order to discover it.  Even in a SMP system there is
-> a difference in how closely attached the cores are so it seems like we
-> should be expecting a description of the topology.
+Tony and Benoit,
 
-We have to make a decision. Either we rely on MPIDR_EL1 as a fallback or
-we barf on missing topology nodes (or we just set-up a flat topology if
-the cpu-map is missing and do not log anything).
+Sorry for posting this patch this late on the -rc cycle but I just didn't
+have time before to test IGEP boards against 3.14.
 
-Thanks,
-Lorenzo
+I hope this fix can still make it to 3.14 since is a very big issue
+(board not even booting).
+
+Thanks a lot and best regards,
+Javier
+
+ arch/arm/boot/dts/omap3-igep0020.dts | 2 +-
+ arch/arm/boot/dts/omap3-igep0030.dts | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
+index 25a2b5f..f2779ac 100644
+--- a/arch/arm/boot/dts/omap3-igep0020.dts
++++ b/arch/arm/boot/dts/omap3-igep0020.dts
+@@ -14,7 +14,7 @@
+ 
+ / {
+ 	model = "IGEPv2 (TI OMAP AM/DM37x)";
+-	compatible = "isee,omap3-igep0020", "ti,omap3";
++	compatible = "isee,omap3-igep0020", "ti,omap36xx", "ti,omap3";
+ 
+ 	leds {
+ 		pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
+index 145c58c..2793749 100644
+--- a/arch/arm/boot/dts/omap3-igep0030.dts
++++ b/arch/arm/boot/dts/omap3-igep0030.dts
+@@ -13,7 +13,7 @@
+ 
+ / {
+ 	model = "IGEP COM MODULE (TI OMAP AM/DM37x)";
+-	compatible = "isee,omap3-igep0030", "ti,omap3";
++	compatible = "isee,omap3-igep0030", "ti,omap36xx", "ti,omap3";
+ 
+ 	leds {
+ 		pinctrl-names = "default";
+-- 
+1.8.5.3
