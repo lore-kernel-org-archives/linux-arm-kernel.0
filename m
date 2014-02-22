@@ -1,31 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Feb 2014 23:20:07 -0500
-Subject: [RFC/PATCH v2] ARM: mvebu: Rename the ARCH_MVEBU menu option
-In-Reply-To: <1392920614-4372-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1392920614-4372-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140222042007.GV7862@titan.lakedaemon.net>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Fri, 21 Feb 2014 20:37:14 -0800
+Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
+In-Reply-To: <20140221235911.14777.13919@capellas-linux>
+References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
+ <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
+ <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
+ <20140219193315.3732.21819@capellas-linux>
+ <20140220162754.GC15994@e102568-lin.cambridge.arm.com>
+ <20140221183956.29890.80931@capellas-linux>
+ <20140221235911.14777.13919@capellas-linux>
+Message-ID: <20140222043714.19852.67450@capellas-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 03:23:34PM -0300, Ezequiel Garcia wrote:
-> The previous name "Marvell SOCs with Device Tree support" is a bit
-> ambiguous and not too informative for users. Instead, use a more
-> appropriate name.
+Quoting Sebastian Capella (2014-02-21 15:59:11)
+> - Cyril Chemparathy as his email is bouncing back to me. 
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
-> Here's a second attempt, changing also the variant menu,
-> which I forgot in v1. This (as v1) is mostly inspired in the Berlin
-> menu config, so to keep some consistency.
+> Quoting Sebastian Capella (2014-02-21 10:39:56)
+> > Quoting Lorenzo Pieralisi (2014-02-20 08:27:55)
+> > > > > > +     cpu_switch_mm(idmap_pgd, &init_mm);
+>   [ ... ]
+> > I can try removing it and seeing if there are side effects.
 > 
-> Andrew: I didn't add your Acked-by, in case you don't agree with
-> the new change. Feel free to ack or comment.
-> 
->  arch/arm/mach-mvebu/Kconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> FYI, It's definitely hanging with this removed, still looking.
 
-Applied to mvebu/soc
+I see when we reach this call, the 1st level page table @ TTBR0 is located
+at different memory locations each run (expected).  If we omit the
+cpu_switch_mm we're corrupting the page table causing the observed
+intermittent failures.  I believe these match the corruption you expected.
 
-thx,
+The reason this doesn't happen when I leave the call is that idmap_pgd
+is always at the same memory location.  I expect this is because it's
+allocated during init.  I've seen the same address 50/50 times for
+idmap_pgd.  I don't think it is correct to rely on this behavior.
 
-Jason.
+Would it be appropriate to use the swapper_pg_dir directly in place
+of idmap_pgd?
+  - I do not see any modification to the swapper_pg_dir contents in the
+    code that would change from init time.
+  - swapper_pg_dir is always at the same offset.
+
+Ideally we should have no issue with overwriting it with identical data.
+
+I've run a couple hundred test loops using swapper_pg_dir and so far
+there are no failures.
+
+Thanks,
+
+Sebastian
