@@ -1,67 +1,135 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 22 Feb 2014 12:19:07 +0100
-Subject: [PATCH v7 4/8] ARM: sunxi: Add driver for SD/MMC hosts found
- on Allwinner sunxi SoCs
-In-Reply-To: <20140222083128.GH3931@lukather>
-References: <20140217095907.15040.81893.stgit@pagira.o2s.ch>
- <20140217100234.15040.84232.stgit@pagira.o2s.ch>
- <20140218153731.GK3142@lukather> <5303C751.5090809@redhat.com>
- <20140219094615.GT3142@lukather> <5304A042.7090903@redhat.com>
- <20140222083128.GH3931@lukather>
-Message-ID: <530887AB.1030805@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 22 Feb 2014 11:30:25 +0000
+Subject: [PATCH v5 3/5] ACPI / processor: Introduce
+ =?UTF-8?Q?map=5Fgic=5Fid=28=29=20to=20get=20apic=20id=20from=20MADT=20or?=
+ =?UTF-8?Q?=20=5FMAT=20method?=
+In-Reply-To: <53087A0F.6010302@linaro.org>
+References: <1392740638-2479-1-git-send-email-hanjun.guo@linaro.org>
+ <1392740638-2479-4-git-send-email-hanjun.guo@linaro.org>
+ <5304C0C4.3080601@arm.com> <53057DA9.3010307@linaro.org>
+ <5307487F.6000308@arm.com> <53087A0F.6010302@linaro.org>
+Message-ID: <d2ad8ee5d9a7875fe121a30beb8d2e8c@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 02/22/2014 09:31 AM, Maxime Ripard wrote:
-
-<snip>
-
->>>>> This should be before the registration. Otherwise, you're racy.
->>>>
->>>> Nope, we only need this to get the data on sunxi_mmc_remove,
->>>> everywhere else the data is found through the mmc-host struct.
->>>
->>> Still, if anyone makes a following patch using the platform_device
->>> for some reason, we will have a race condition, without any way to
->>> notice it.
->>>
->>> Plus, you're doing all the other bits of initialization of your
->>> structures much earlier, why not be consistent and having all of
->>> them at the same place?
+On 2014-02-22 10:21, Hanjun Guo wrote:
+> On 2014-2-21 20:37, Sudeep Holla wrote:
+>> Hi Hanjun,
 >>
->> Most platform drivers I've worked on do platform_set_drvdata as late
->> as possible, so that the drvdata does not get set and never cleared
->> in error paths.
+>> (Adding MarcZ for his views on GIC)
+>>
+>> On 20/02/14 03:59, Hanjun Guo wrote:
+>>> Hi Sudeep,
+>>>
+>>> Thanks for your comments, please refer to the replies below. :)
+>>>
+>>> On 2014?02?19? 22:33, Sudeep Holla wrote:
+>>>> Hi Hanjun,
+>>>>
+>>>> On 18/02/14 16:23, Hanjun Guo wrote:
+>>>>> Get apic id from MADT or _MAT method is not implemented on 
+>>>>> arm/arm64,
+>>>>> and ACPI 5.0 introduces GIC Structure for it, so this patch 
+>>>>> introduces
+>>>>> map_gic_id() to get apic id followed the ACPI 5.0 spec.
+>>>>>
+>>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>> ---
+>>>>>   drivers/acpi/processor_core.c |   26 ++++++++++++++++++++++++++
+>>>>>   1 file changed, 26 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/acpi/processor_core.c 
+>>>>> b/drivers/acpi/processor_core.c
+>>>>> index 4dcf776..d316d9b 100644
+>>>>> --- a/drivers/acpi/processor_core.c
+>>>>> +++ b/drivers/acpi/processor_core.c
+>>>>> @@ -71,6 +71,27 @@ static int map_lsapic_id(struct 
+>>>>> acpi_subtable_header *entry,
+>>>>>   	return 0;
+>>>>>   }
+>>>>>
+>>>>> +static int map_gic_id(struct acpi_subtable_header *entry,
+>>>>> +		int device_declaration, u32 acpi_id, int *apic_id)
+>>>>> +{
+>>>>> +	struct acpi_madt_generic_interrupt *gic =
+>>>>> +		(struct acpi_madt_generic_interrupt *)entry;
+>>>>> +
+>>>>> +	if (!(gic->flags & ACPI_MADT_ENABLED))
+>>>>> +		return -ENODEV;
+>>>>> +
+>>>>> +	/* In the GIC interrupt model, logical processors are
+>>>>> +	 * required to have a Processor Device object in the DSDT,
+>>>>> +	 * so we should check device_declaration here
+>>>>> +	 */
+>>>>> +	if (device_declaration && (gic->uid == acpi_id)) {
+>>>>> +		*apic_id = gic->gic_id;
+>>>> I have mentioned this earlier, it's not clear yet to me how does 
+>>>> this work ?
+>>>> It needs more clarity in the form of comment here at-least as the 
+>>>> ACPIv5.0 is
+>>>> also not so clear or explicit on how to handle this.
+>>>
+>>> Yes, I noticed your comments and had a reply for that, after a
+>>> long consideration for this, I would withdraw my previous comments
+>>> before, please refer to the comments below.
+>>>
+>>>>
+>>>> Here you are expecting gic->uid = acpi_id which is fine, while 
+>>>> acpi_map_cpuid
+>>>> matches apic_id with cpu_physical_id(which must be MPIDR in 
+>>>> ARM{32,64}). The
+>>>> latter imposes restriction that gic->gic_id has to be MPIDR. Does 
+>>>> that mean we
+>>>> are imposing restriction on GIC ID to be MPIDR ? If so please 
+>>>> document it here
+>>>> and please explain the reason behind that choice.
+>>>
+>>> On x86 and IA64, APIC/SAPIC ID is the hardware id of the logical
+>>> processor, and UID is just a unique ID to identify the processor in 
+>>> DSDT, it
+>>> can be any value, and even can be strings defined in ASL if I 
+>>> remember
+>>> that correctly.
+>>>
+>> OK, but that's not the case on ARM{32,64}. My main concern here is 
+>> if we don't
+>> make this definitions clear enough, the vendors might produce ACPI 
+>> tables with
+>> whatever suits them and we may end up supporting them. Since we are 
+>> starting
+>> with clean slate, we can avoid getting into such situations. I will 
+>> be to be
+>> more elaborate this time.
 >
-> You don't actually have to clear it,
+> I agree.
+>
+>>
+>> The GIC ID is referred as the local GIC?s hardware ID in ACPIv5.0.
+>> IIUC, since GICC is per-cpu entry, it has to GIC CPU interface ID.
+>>
+>> Now how does it differ from MPIDR ? e.g. ARM TC2(multi cluster 
+>> system)
+>> 	GIC ID		MPIDR			Comment
+>> 	0		0x000			CA15_0
+>> 	1		0x001			CA15_1
+>> 	2		0x100			CA7_0
+>> 	3		0x101			CA7_1
+>> 	4		0x102			CA7_2
+>
+> Yes, obvious different. I know GIC ID can matche the bit index of the
+> associated processor
+> in the distributor's GICD_ITARGETSR register, and it a clear
+> statement in GICv1/GICv2, my
+> question is that is this consistent in GICv3/v4 too? this will have
+> some impact on the
+> code implementation.
 
-Erm, yes and no, you used to have to manually clear it, so as to not
-leave a dangling pointer in there, which may confuse things later.
+For GICv3/v4, the only way you can match a CPU with its local 
+redistributor is by using the CPU MPIDR. The GIC CPU ID is an 
+implementation choice that may not exist (it doesn't in a distributed 
+implementation), so anything that relies on a GIC CPU ID is broken for 
+GICv3.
 
-But since a few kernel releases, the driver core will explicitly
-clear it on probe failure, since many many drivers got this wrong.
-I know this because I wrote the driver core patch doing the clearing :)
-
-So in drivers which used to get it right, you will see the
-platform_set_drvdata call quite late and it being so late
-in the sunxi-mmc.c driver is old habits dying hard.
-
-But you're right that this is no longer needed, still I see little
-reason to move it up, but if you really want it to be moved up,
-I'm fine with that.
-
-> and some frameworks actually require you to call dev_set_drvdata before registration, so that
-> statement looks quite odd to me.
-
-And the proper thing to do when using those frameworks was to
-manually clear drvdata again on probe failure. Anyways this is
-all handled in the driver core now, so this whole discussion
-is moot anyways. I was merely trying to explain where my
-preference for doing the dev_set_drvdata call as late as
-possible comes from.
-
-Regards,
-
-Hans
+         M.
+-- 
+Fast, cheap, reliable. Pick two.
