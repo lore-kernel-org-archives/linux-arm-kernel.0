@@ -1,15 +1,19 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 22 Feb 2014 01:03:00 -0500
-Subject: [GIT PULL] ARM: mvebu: dt changes for v3.15 (round 2)
-Message-ID: <20140222060300.GX7862@titan.lakedaemon.net>
+Date: Sat, 22 Feb 2014 01:32:28 -0500
+Subject: [GIT PULL] irqchip: armada-370-xp changes for v3.15
+Message-ID: <20140222063228.GY7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+Thomas,
 
-Here's another round of changes for v3.15.  They've been in -next for
-several days and this is an incremental pull from tags/mvebu-dt-3.15 in
-the mvebu/dt branch.
+This is a small round of changes intended for v3.15.  Despite the commit
+date these have been in -next for almost a week.  I needed to rebase the
+branch on v3.14-rc1 instead of merging it.  When I originally added
+these patches, the dove PMU hadn't been pulled from this branch yet.
+
+At any rate, these patches depend on the tag mvebu-irqchip-fixes-3.13
+which you've already pulled in.  They need the MSI fix from that series.
 
 Please pull.
 
@@ -18,61 +22,31 @@ thx,
 Jason.
 
 
-The following changes since commit 5c0169d1c503aab2d62ee6f6e342a78e2ea9e3ed:
+The following changes since commit 3efca1d15656fe7e3f57c1f5f21e596967355200:
 
-  ARM: mvebu: use input DT defines in Armada 370/XP boards (2014-02-11 19:35:39 +0000)
+  Merge tag 'tags/mvebu-irqchip-fixes-3.13' into mvebu/irqchip (2014-02-22 06:11:45 +0000)
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.15-2
 
-for you to fetch changes up to 7a5b293f2086cfc17519e586bd8f89be72a2fc4e:
+  git://git.infradead.org/linux-mvebu.git tags/irqchip-mvebu-3.15
 
-  ARM: dove: Enable Dove watchdog in the devicetree (2014-02-17 21:44:09 +0000)
+for you to fetch changes up to bc69b8adfe221def02ea10f7b9ab32e80195334c:
 
-----------------------------------------------------------------
-mvebu dt changes for v3.15 (incremental round #2)
-
- - mvebu
-    - add audio for Armada 370 DB
-    - enable Armada 370/XP watchdog
-
- - kirkwood
-    - convert board rd88f6281
-    - add board rd88f6192
-
- - dove
-    enable watchdog
+  irqchip: armada-370-xp: Setup a chained handler for the MPIC (2014-02-22 06:12:29 +0000)
 
 ----------------------------------------------------------------
-Andrew Lunn (2):
-      ARM: Kirkwood: Add DT description of rd88f6192.
-      ARM: Kirkwood: convert rd88f6281-setup.c to DT.
+irqchip mvebu changes for v3.15
 
-Ezequiel Garcia (3):
-      ARM: mvebu: Enable Armada 370/XP watchdog in the devicetree
-      ARM: kirkwood: Add RSTOUT 'reg' entry to devicetree
-      ARM: dove: Enable Dove watchdog in the devicetree
+ - armada-370-xp
+    - add MSI helper
+    - MPIC chained handler
 
-Thomas Petazzoni (4):
-      ARM: mvebu: add audio I2S controller to Armada 370 Device Tree
-      ARM: mvebu: add I2C0 muxing option for Armada 370 SoC
-      ARM: mvebu: add audio support to Armada 370 DB
-      ARM: mvebu: enable S/PDIF audio in Armada 370 DB Device Tree
+----------------------------------------------------------------
+Ezequiel Garcia (2):
+      irqchip: armada-370-xp: Add helper for the MSI IRQ handling
+      irqchip: armada-370-xp: Setup a chained handler for the MPIC
 
- arch/arm/boot/dts/Makefile                  |   3 +
- arch/arm/boot/dts/armada-370-db.dts         |  56 ++++++++++
- arch/arm/boot/dts/armada-370-xp.dtsi        |   4 +
- arch/arm/boot/dts/armada-370.dtsi           |  33 ++++++
- arch/arm/boot/dts/armada-xp.dtsi            |   6 ++
- arch/arm/boot/dts/dove.dtsi                 |   8 ++
- arch/arm/boot/dts/kirkwood-rd88f6192.dts    | 112 ++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-rd88f6281-a0.dts |  26 +++++
- arch/arm/boot/dts/kirkwood-rd88f6281-a1.dts |  31 ++++++
- arch/arm/boot/dts/kirkwood-rd88f6281.dtsi   | 152 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/kirkwood.dtsi             |   2 +-
- 11 files changed, 432 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6192.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281-a0.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281-a1.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
+ .../devicetree/bindings/arm/armada-370-xp-mpic.txt |  8 +-
+ drivers/irqchip/irq-armada-370-xp.c                | 96 ++++++++++++++++------
+ 2 files changed, 76 insertions(+), 28 deletions(-)
