@@ -1,46 +1,87 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Sat, 22 Feb 2014 15:40:29 -0500
-Subject: [PATCH v7 07/15] ARM: sunxi: Add support for Allwinner SUNXi
- SoCs sata to ahci_platform
-In-Reply-To: <1393084424-31099-8-git-send-email-hdegoede@redhat.com>
-References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
- <1393084424-31099-8-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140222204029.GB16272@mtj.dyndns.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 22 Feb 2014 12:42:23 -0800
+Subject: [PATCH v3 10/11] watchdog: xilinx: Enable this driver for Zynq
+In-Reply-To: <20140222184419.GA21504@spo001.leaseweb.com>
+References: <cover.1392212059.git.michal.simek@xilinx.com>
+ <a978b8d0511748e4558f5169896da44c742a49f3.1392212059.git.michal.simek@xilinx.com>
+ <20140222184419.GA21504@spo001.leaseweb.com>
+Message-ID: <53090BAF.3080806@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 22, 2014 at 04:53:36PM +0100, Hans de Goede wrote:
-...
-> +static int ahci_sunxi_phy_init(struct device *dev, void __iomem *reg_base)
-> +{
-> +	u32 reg_val;
-> +	int timeout;
-> +
-> +	/* This magic is from the original code */
-> +	writel(0, reg_base + AHCI_RWCR);
-> +	mdelay(5);
-> +
-> +	sunxi_setbits(reg_base + AHCI_PHYCS1R, BIT(19));
-> +	sunxi_clrsetbits(reg_base + AHCI_PHYCS0R,
-> +			 (0x7 << 24),
-> +			 (0x5 << 24) | BIT(23) | BIT(18));
-> +	sunxi_clrsetbits(reg_base + AHCI_PHYCS1R,
-> +			 (0x3 << 16) | (0x1f << 8) | (0x3 << 6),
-> +			 (0x2 << 16) | (0x6 << 8) | (0x2 << 6));
-> +	sunxi_setbits(reg_base + AHCI_PHYCS1R, BIT(28) | BIT(15));
-> +	sunxi_clrbits(reg_base + AHCI_PHYCS1R, BIT(19));
-> +	sunxi_clrsetbits(reg_base + AHCI_PHYCS0R,
-> +			 (0x7 << 20), (0x3 << 20));
-> +	sunxi_clrsetbits(reg_base + AHCI_PHYCS2R,
-> +			 (0x1f << 5), (0x19 << 5));
-> +	mdelay(5);
+On 02/22/2014 10:44 AM, Wim Van Sebroeck wrote:
+> Hi Michal,
+>
+>> Enable this driver for Zynq.
+>> Move it to architecture independent Kconfig part.
+>>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>> ---
+>>
+>> Changes in v3: None
+>> Changes in v2: None
+>>
+>> Build tested by zero day testing system.
+>> ---
+>>   drivers/watchdog/Kconfig | 22 +++++++++-------------
+>>   1 file changed, 9 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+>> index 9db5d3c..6120403 100644
+>> --- a/drivers/watchdog/Kconfig
+>> +++ b/drivers/watchdog/Kconfig
+>> @@ -111,6 +111,15 @@ config WM8350_WATCHDOG
+>>   	  Support for the watchdog in the WM8350 AudioPlus PMIC.  When
+>>   	  the watchdog triggers the system will be reset.
+>>
+>> +config XILINX_WATCHDOG
+>> +	tristate "Xilinx Watchdog timer"
+>> +	select WATCHDOG_CORE
+>> +	help
+>> +	  Watchdog driver for the xps_timebase_wdt ip core.
+>> +
+>> +	  To compile this driver as a module, choose M here: the
+>> +	  module will be called of_xilinx_wdt.
+>> +
+>>   # ALPHA Architecture
+>>
+>>   # ARM Architecture
+>> @@ -1022,19 +1031,6 @@ config M54xx_WATCHDOG
+>>
+>>   # MicroBlaze Architecture
+>>
+>> -config XILINX_WATCHDOG
+>> -	tristate "Xilinx Watchdog timer"
+>> -	depends on MICROBLAZE
+>> -	select WATCHDOG_CORE
+>> -	---help---
+>> -	  Watchdog driver for the xps_timebase_wdt ip core.
+>> -
+>> -	  IMPORTANT: The xps_timebase_wdt parent must have the property
+>> -	  "clock-frequency" at device tree.
+>> -
+>> -	  To compile this driver as a module, choose M here: the
+>> -	  module will be called of_xilinx_wdt.
+>> -
+>>   # MIPS Architecture
+>>
+>>   config ATH79_WDT
+>> --
+>> 1.8.2.3
+>>
+>
+> Are we sure that we don't need an additional dependancy (like depends on HAS_IOMEM) to not have issues with other architectures?
+>
 
-Please use msleep() instead.  This is called with full process
-context.  mdelay() is almost always wrong.  Even if the hardware is
-broken enough to require millisec level breather, the better thing to
-do would be using threaded handler and using msleep(), not mdelay().
+Hi Wim,
 
-Thanks.
+Doesn't look like it. I have the series in my build test and did not
+see any failures because of it. See http://server.roeck-us.net:8010/builders,
+branch watchdog-next.
 
--- 
-tejun
+Which reminds me that I wanted to reparent the branch to 3.14-rc3.
+I just did that; you should be able to see build results in a couple
+of hours.
+
+Guenter
