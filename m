@@ -1,86 +1,91 @@
-From: acabrera@udio.cujae.edu.cu (Alejandro Cabrera)
-Date: Sat, 22 Feb 2014 17:08:37 -0800
-Subject: [PATCH v3 07/11] watchdog: xilinx: Use of_property_read_u32
-In-Reply-To: <20140222184604.GB21504@spo001.leaseweb.com>
-References: <cover.1392212059.git.michal.simek@xilinx.com>
- <7cbb10853a343c9d488346596f604909ab0668b9.1392212059.git.michal.simek@xilinx.com>
- <20140212171509.GB20012@roeck-us.net>
- <20140222184604.GB21504@spo001.leaseweb.com>
-Message-ID: <53094A15.1080708@udio.cujae.edu.cu>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 22 Feb 2014 17:16:19 -0500
+Subject: [PATCH v4 00/22] Move DT kirkwood into mach-mvebu
+In-Reply-To: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
+References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20140222221619.GL7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/2/2014 10:46 AM, Wim Van Sebroeck wrote:
-> Hi All,
->
->> Hi Michal,
->>
->> On Wed, Feb 12, 2014 at 02:41:21PM +0100, Michal Simek wrote:
->>> Use of_property_read_u32 functions to clean probe function.
->>>
->>> Signed-off-by: Michal Simek<michal.simek@xilinx.com>
->>> Reviewed-by: Guenter Roeck<linux@roeck-us.net>
->>> ---
->>>
->>> Changes in v3:
->>> - Remove one if checking and use variable directly
->>>
->> Looks good.
->>
->> Another comment/remark.
->>
->>> -	pfreq = (u32 *)of_get_property(pdev->dev.of_node,
->>> -					"clock-frequency", NULL);
->>> -
->>> -	if (pfreq == NULL) {
->>> +	rc = of_property_read_u32(pdev->dev.of_node, "clock-frequency",&pfreq);
->>> +	if (rc) {
->>>   		dev_warn(&pdev->dev,
->>>   			 "The watchdog clock frequency cannot be obtained\n");
->>>   		no_timeout = true;
->>>   	}
->>>
->>> -	tmptr = (u32 *)of_get_property(pdev->dev.of_node,
->>> -					"xlnx,wdt-interval", NULL);
->>> -	if (tmptr == NULL) {
->>> +	rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-interval",
->>> +				&xdev->wdt_interval);
->>> +	if (rc) {
->>>   		dev_warn(&pdev->dev,
->>>   			 "Parameter \"xlnx,wdt-interval\" not found\n");
->>>   		no_timeout = true;
->>> -	} else {
->>> -		xdev->wdt_interval = *tmptr;
->>>   	}
->>>
->>> -	tmptr = (u32 *)of_get_property(pdev->dev.of_node,
->>> -					"xlnx,wdt-enable-once", NULL);
->>> -	if (tmptr == NULL) {
->>> +	rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-enable-once",
->>> +				&enable_once);
->>> +	if (rc)
->>>   		dev_warn(&pdev->dev,
->>>   			 "Parameter \"xlnx,wdt-enable-once\" not found\n");
->>> -		watchdog_set_nowayout(xilinx_wdt_wdd, true);
->>> -	}
->> All the above properties are optional. Is a warning really
->> warranted in this case ? I usually associate a warning with
->> something that is wrong, which is not the case here.
->>
->> I would encourage you to drop those warnings, but that should be
->> a separate patch.
-> I agree with Guenter: these are not really warnings. Seperate patch is thus welcome.
-Hi
+Andrew,
 
-I support Michal intention, I think it is a warning because device tree 
-blob must have the "xlnx,wdt-enable-once" property specified in order to 
-allow the system to be sure of the real value of this property. In 
-addition to, this warning can be helpful to detect a wrong device tree 
-specification.
+I've tentatively pulled this in as detailed below.  The only outlier is
+an Ack from rmk on one patch.
 
-Best regards
-Alejandro
+On Sat, Feb 22, 2014 at 08:14:42PM +0100, Andrew Lunn wrote:
+> The process of making most kirkwood boards boot using DT is nearly
+> complete. We can now move these boards into mach-mvebu, freeing them
+> of the legacy code needed for none-DT systems. At the same time, they
+> can become part of ARCH_MULTI_V5.
+> 
+...
+> Andrew Lunn (22):
+>   ARM: Kirkwood: Give pm.c its own header file.
 
+applied to mvebu/soc-kw
 
+>   irqchip: Orion: Fix getting generic chip pointer.
 
-50 Aniversario de la Cujae. Inaugurada por Fidel el 2 de diciembre de 1964  http://cujae.edu.cu
+in mvebu/irqchip-fixes and already taken by tglx
+
+>   ARM: Kirkwood: Convert mv88f6281gtw_ge switch setup to DT
+>   ARM: Kirkwood: Drop printing the SoC type and revision
+>   ARM: Kirkwood: Seperate board-dt from common and pcie code.
+>   ARM: Kirkwood: ioremap the cpu_config register before using it.
+>   ARM: Kirkwood: ioremap memory control register
+>   ARM: MVEBU: Add ARCH_MULTI_V7 to SoCs
+>   ARM: Orion: Move cache-feroceon-l2.h out of plat-orion
+
+applied to mvebu/soc-kw
+
+>   ARM: MM: Add DT binding for Feroceon L2 cache
+
+applied to mvebu/soc-kw (needs Ack from rmk)
+
+>   ARM: Kirkwood: Instantiate L2 cache from DT.
+
+applied to mvebu/dt
+
+>   ARM: Fix default CPU selection for ARCH_MULTI_V5
+
+applied to mvebu/soc-kw
+
+>   ARM: Fix MULTI_TLB for feroceon
+
+for rmk's patch tracker
+
+>   ARM: MM Enable building Feroceon L2 cache controller with ARCH_MVEBU
+>   ARM: Move kirkwood DT boards into mach-mvebu
+>   ARM: MVEBU: Let kirkwood use the system controller for restart
+
+applied to mvebu/soc-kw
+
+>   ARM: MVEBU: Instantiate system controller in kirkwood.dtsi
+
+applied to mvebu/dt
+
+>   drivers: Enable building of Kirkwood drivers for mach-mvebu
+
+applied to mvebu/drivers
+
+>   ARM: MVEBU: Enable mvebu-soc-id on Kirkwood
+
+applied to mvebu/soc-kw
+
+>   ARM: config: Add a multi_v5_defconfig
+
+applied to mvebu/defconfig
+
+>   ARM: MVEBU: Simplifiy headers and make local
+
+applied to mvebu/soc-kw
+
+>   ARM: config: Add mvebu_v5_defconfig
+
+applied to mvebu/defconfig
+
+Great work Andrew!
+
+thx,
+
+Jason.
