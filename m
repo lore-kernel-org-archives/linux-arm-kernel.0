@@ -1,101 +1,143 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 22 Feb 2014 17:26:48 +0100
-Subject: [PATCH v7 00/15] ahci: library-ise ahci_platform, add sunxi driver
- and cleanup imx driver
-In-Reply-To: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
-References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <5308CFC8.4020400@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 22 Feb 2014 18:15:16 +0100
+Subject: [PATCH v6 17/18] ARM: sun4i: dt: Add ahci / sata support
+In-Reply-To: <53087755.3090608@redhat.com>
+References: <1392811320-3132-1-git-send-email-hdegoede@redhat.com>
+ <1392811320-3132-18-git-send-email-hdegoede@redhat.com>
+ <20140221181519.GC3931@lukather> <53087755.3090608@redhat.com>
+Message-ID: <20140222171516.GA3610@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<resend of cover-letter with a proper subject, sorry about that>
+On Sat, Feb 22, 2014 at 11:09:25AM +0100, Hans de Goede wrote:
+> Hi Maxime,
+> 
+> On 02/21/2014 07:15 PM, Maxime Ripard wrote:
+> >Hi Hans,
+> >
+> >On Wed, Feb 19, 2014 at 01:01:59PM +0100, Hans de Goede wrote:
+> >>From: Oliver Schinagl <oliver@schinagl.nl>
+> >>
+> >>This patch adds sunxi sata support to A10 boards that have such a connector.
+> >>Some boards also feature a regulator via a GPIO and support for this is also
+> >>added.
+> >>
+> >>Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >>  arch/arm/boot/dts/sun4i-a10-a1000.dts      |  4 ++++
+> >>  arch/arm/boot/dts/sun4i-a10-cubieboard.dts |  6 +++++
+> >>  arch/arm/boot/dts/sun4i-a10.dtsi           |  8 +++++++
+> >>  arch/arm/boot/dts/sunxi-ahci-reg.dtsi      | 36 ++++++++++++++++++++++++++++++
+> >>  4 files changed, 54 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/sunxi-ahci-reg.dtsi
+> >>
+> >>diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> >>index cbd2e13..d6ec839 100644
+> >>--- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> >>+++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+> >>@@ -35,6 +35,10 @@
+> >>  			};
+> >>  		};
+> >>
+> >>+		ahci: sata at 01c18000 {
+> >>+			status = "okay";
+> >>+		};
+> >>+
+> >>  		pinctrl at 01c20800 {
+> >>  			emac_power_pin_a1000: emac_power_pin at 0 {
+> >>  				allwinner,pins = "PH15";
+> >>diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+> >>index b139ee6..6df237d8 100644
+> >>--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+> >>+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+> >>@@ -12,6 +12,7 @@
+> >>
+> >>  /dts-v1/;
+> >>  /include/ "sun4i-a10.dtsi"
+> >>+/include/ "sunxi-ahci-reg.dtsi"
+> >>
+> >>  / {
+> >>  	model = "Cubietech Cubieboard";
+> >>@@ -33,6 +34,11 @@
+> >>  			};
+> >>  		};
+> >>
+> >>+		ahci: sata at 01c18000 {
+> >>+			target-supply = <&reg_ahci_5v>;
+> >>+			status = "okay";
+> >>+		};
+> >>+
+> >>  		pinctrl at 01c20800 {
+> >>  			led_pins_cubieboard: led_pins at 0 {
+> >>  				allwinner,pins = "PH20", "PH21";
+> >>diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> >>index 336dbec..454077a 100644
+> >>--- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> >>+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> >>@@ -338,6 +338,14 @@
+> >>  			#size-cells = <0>;
+> >>  		};
+> >>
+> >>+		ahci: sata at 01c18000 {
+> >>+			compatible = "allwinner,sun4i-a10-ahci";
+> >>+			reg = <0x01c18000 0x1000>;
+> >>+			interrupts = <56>;
+> >>+			clocks = <&pll6 0>, <&ahb_gates 25>;
+> >>+			status = "disabled";
+> >>+		};
+> >>+
+> >>  		intc: interrupt-controller at 01c20400 {
+> >>  			compatible = "allwinner,sun4i-ic";
+> >>  			reg = <0x01c20400 0x400>;
+> >>diff --git a/arch/arm/boot/dts/sunxi-ahci-reg.dtsi b/arch/arm/boot/dts/sunxi-ahci-reg.dtsi
+> >>new file mode 100644
+> >>index 0000000..7072af1
+> >>--- /dev/null
+> >>+++ b/arch/arm/boot/dts/sunxi-ahci-reg.dtsi
+> >>@@ -0,0 +1,36 @@
+> >>+/*
+> >>+ * sunxi boards sata target power supply common code
+> >
+> >
+> >Since IIRC we have pretty much the same needs for the USB, can't we
+> >just drop the SATA specific mention and use it as the common DTSI for
+> >the usual regulators?
+> 
+> On most boards with sata, there will also be 1 or 2 usb regulators,
+> so we need differently named regulator nodes for all 3 of ahci,
+> usb1 and usb2 vbus. On some boards how ever we may only need the
+> usb regulators.
 
-Hi all,
+Yes, obviously...
 
-Here is v7 of my patchset for adding ahci-sunxi support. This is hopefully
-the final final version of this set :)
+> So if you look in my current personal sunxi-devel tree you will see
+> separate dtsi files for both ahci and usb regulators,
 
-Note I'm going on vacation for a week starting Monday, so if I'm not responding
-that is why. Tejun if you feel some small cleanups are still necessary and
-you don't want to wait for me to get back feel free to squash in any cleanups
-you deem necessary.
+And this is precisely what I don't understand. Why do you *need*
+different DTSI files. If there's common regulators, that are used on
+most boards, fine, create a common regulators files. But why do you
+have to create a DTSI to define only one regulator.
 
-This has been tested with Allwinner A10, Allwinner A20 and Freeware imx6x SoCs,
-including suspend / resume. Note that the ahci_imx driver now also has imx53
-sata support, it would be good if someone could test that with this series.
+> another advantage of having these separate is that the gpio controlling
+> the regulator can be pre-populated with the reference design gpio which
+> is used in most boards, so that the ahci specific code in the dts
+> becomes only the ahci: sata at ... node.
 
+I understand very well the advantages of what having a reference
+regulators bring. What I don't understand is the benefits of having
+"topics" regulators DTSI.
 
-History:
-
-v1, by Olliver Schinagl:
-This was using the approach of having a platform device which probe method
-creates a new child platform device which gets driven by ahci_platform.c,
-as done by ahci_imx.c .
-
-v2, by Hans de Goede:
-Stand-alone platform driver based on Olliver's work
-
-v3, by Hans de Goede:
-patch-series, with 4 different parts
-a) Make ahci_platform.c more generic, handle more then 1 clk, target pwr
-   regulator
-b) New ahci-sunxi code only populating ahci_platform_data, passed to
-   ahci_platform.c to of_device_id matching.
-c) Refactor ahci-imx code to work the same as the new ahci-sunxi code, this
-   is the reason why v3 is an RFC, I'm waiting for the wandboard I ordered to
-   arrive so that I can actually test this.
-d) dts bindings for the sunxi ahci parts
-
-v4, by Hans de Goede:
-patch-series, with 5 different parts:
-a) Make ahci_platform.c more generic, handle more then 1 clk, target pwr
-   regulator
-b) Turn parts of ahci_platform.c into a library for use by other drivers
-c) New ahci-sunxi driver using the ahci_platform.c library functionality
-d) Refactor ahci-imx code to work the same as the new ahci-sunxi code
-e) dts bindings for the sunxi ahci parts
-
-v5:
-v4 + the following changes:
-1) fsl,imx6q driver is now tested
-2) fixed suspend / resume on fsl,imx6q
-3) Modifed devicetree node naming to match dt spec
-4) Reworked the busy waiting code in the sunxi-phy handling as suggested by
-   Russell King
-
-v6:
-v5 rebased on top of 3.14-rc3 + the following changes
-1) Added Roger Quadros' generic phy support series
-2) Added a "ARM: sun4i: dt: Remove grouping + simple-bus for regulators" dts
-   patch
-
-v7:
-v6 + the following changes:
-1) Addressed all Tejun's review remarks:
-  * Added function header comments to all exported ahci_platform functions
-  * Added comments in some other places
-  * Removed use of 2 empty lines to separate functions in some cases
-  * Use devres to automatically call ahci_platform_put_resources on
-    get_resource failure, probe failure and regular device remove
-2) Dropped patches to move ahci_host_priv struct declaration to include/linux,
-  this was a left-over from v3 and is no longer necessary
-3) Updated Roger's "ata: ahci_platform: Manage SATA PHY" patch:
-  * Update function header comments for the changes this makes
-  * Drop the Kconfig PHY requires hack, my patch for the phy-core to always be
-    built-in has been queued in Greg KH's tree, so this is no longer necessary.
-4) Dropped Roger's "ata: ahci_platform: Add 'struct device' argument to ahci_platform_put_resources()"
-  patch, ahci_platform_put_resources already has a device argument as result
-  of it being changed into a devres release function
-
-Tejun, can you please add patches 1-12 to your ata tree for 3.15 ?
-
-Maxime, can you please add patch 13-15 to your dts tree for 3.15 ?
-
-Thanks & Regards,
-
-Hans
+Maxime
 
 -- 
-You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-For more options, visit https://groups.google.com/groups/opt_out.
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140222/216c9a7e/attachment.sig>
