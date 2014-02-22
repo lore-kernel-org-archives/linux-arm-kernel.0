@@ -1,159 +1,60 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 21 Feb 2014 20:39:54 -0500
-Subject: [PATCH v7 2/4] Power: Reset: Generalize qnap-poweroff to work
- on Synology devices.
-In-Reply-To: <1392840157-31072-3-git-send-email-klightspeed@killerwolves.net>
-References: <1392840157-31072-1-git-send-email-klightspeed@killerwolves.net>
- <1392840157-31072-3-git-send-email-klightspeed@killerwolves.net>
-Message-ID: <20140222013954.GR7862@titan.lakedaemon.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 22 Feb 2014 10:41:32 +0900
+Subject: [GIT PULL 00/12] Second Round of Renesas ARM Based SoC Updates
+ for v3.15
+In-Reply-To: <20140221222544.GA13233@quad.lixom.net>
+References: <cover.1392277789.git.horms+renesas@verge.net.au>
+ <20140220094324.GR19089@quad.lixom.net>
+ <20140221222544.GA13233@quad.lixom.net>
+Message-ID: <20140222014132.GA5393@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dmitry, David,
-
-On Thu, Feb 20, 2014 at 06:02:35AM +1000, klightspeed at killerwolves.net wrote:
-> From: Andrew Lunn <andrew@lunn.ch>
+On Fri, Feb 21, 2014 at 02:25:44PM -0800, Olof Johansson wrote:
+> On Thu, Feb 20, 2014 at 01:43:24AM -0800, Olof Johansson wrote:
+> > On Thu, Feb 13, 2014 at 05:04:56PM +0900, Simon Horman wrote:
+> > > Hi Olof, Hi Kevin, Hi Arnd,
+> > > 
+> > > please consider this second round of Renesas ARM Based SoC updates for v3.15.
+> > > 
+> > > This pull-request is based on the first round of such changes,
+> > > tagged as renesas-soc-for-v3.15, which I have previously sent a
+> > > pull-request for.
+> > > 
+> > > 
+> > > The following changes since commit 012a7069b5a10a0851584d71a1facdc40a972319:
+> > > 
+> > >   ARM: shmobile: r8a7790: Add PCI USB host clock support (2014-02-04 10:25:03 +0900)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.15
+> > 
+> > Hi,
+> > 
+> > I'm stopping my merges for the night here, so I haven't merged this but I'll
+> > likely do it tomorrow. I did have comments on one of the patches though (that
+> > adds a new include/mach file that's not really needed). Fixing that can be done
+> > incrementally though, especially if you have downstream users of this branch.
 > 
-> The Synology NAS devices use a very similar mechanism to QNAP NAS
-> devices to power off. Both send a single charactor command to a PIC,
-> over the second serial port. However the baud rate and the command
-> differ. Generalize the driver to support this.
+> Simon,
 > 
-> Signed-off-by: Ben Peddell <klightspeed@killerwolves.net>
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> Cc: Anton Vorontsov <anton@enomsg.org>
-> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> Cc: David Woodhouse <dwmw2@infradead.org>
-> ---
->  .../bindings/power_supply/qnap-poweroff.txt        |  5 ++-
->  drivers/power/reset/qnap-poweroff.c                | 49 ++++++++++++++++------
->  2 files changed, 41 insertions(+), 13 deletions(-)
-
-Do you guys want to take this, or me?  I'm fine either way, there's no
-dependencies.
-
-thx,
-
-Jason.
-
-> diff --git a/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt b/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
-> index 0347d83..af25e77 100644
-> --- a/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
-> +++ b/Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
-> @@ -6,8 +6,11 @@ Orion5x SoCs. Sending the character 'A', at 19200 baud, tells the
->  microcontroller to turn the power off. This driver adds a handler to
->  pm_power_off which is called to turn the power off.
->  
-> +Synology NAS devices use a similar scheme, but a different baud rate,
-> +9600, and a different character, '1'.
-> +
->  Required Properties:
-> -- compatible: Should be "qnap,power-off"
-> +- compatible: Should be "qnap,power-off" or "synology,power-off"
->  
->  - reg: Address and length of the register set for UART1
->  - clocks: tclk clock
-> diff --git a/drivers/power/reset/qnap-poweroff.c b/drivers/power/reset/qnap-poweroff.c
-> index 37f56f7..a75db7f 100644
-> --- a/drivers/power/reset/qnap-poweroff.c
-> +++ b/drivers/power/reset/qnap-poweroff.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * QNAP Turbo NAS Board power off
-> + * QNAP Turbo NAS Board power off. Can also be used on Synology devices.
->   *
->   * Copyright (C) 2012 Andrew Lunn <andrew@lunn.ch>
->   *
-> @@ -25,17 +25,43 @@
->  
->  #define UART1_REG(x)	(base + ((UART_##x) << 2))
->  
-> +struct power_off_cfg {
-> +	u32 baud;
-> +	char cmd;
-> +};
-> +
-> +static const struct power_off_cfg qnap_power_off_cfg = {
-> +	.baud = 19200,
-> +	.cmd = 'A',
-> +};
-> +
-> +static const struct power_off_cfg synology_power_off_cfg = {
-> +	.baud = 9600,
-> +	.cmd = '1',
-> +};
-> +
-> +static const struct of_device_id qnap_power_off_of_match_table[] = {
-> +	{ .compatible = "qnap,power-off",
-> +	  .data = &qnap_power_off_cfg,
-> +	},
-> +	{ .compatible = "synology,power-off",
-> +	  .data = &synology_power_off_cfg,
-> +	},
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, qnap_power_off_of_match_table);
-> +
->  static void __iomem *base;
->  static unsigned long tclk;
-> +static const struct power_off_cfg *cfg;
->  
->  static void qnap_power_off(void)
->  {
-> -	/* 19200 baud divisor */
-> -	const unsigned divisor = ((tclk + (8 * 19200)) / (16 * 19200));
-> +	const unsigned divisor = ((tclk + (8 * cfg->baud)) / (16 * cfg->baud));
->  
->  	pr_err("%s: triggering power-off...\n", __func__);
->  
-> -	/* hijack UART1 and reset into sane state (19200,8n1) */
-> +	/* hijack UART1 and reset into sane state */
->  	writel(0x83, UART1_REG(LCR));
->  	writel(divisor & 0xff, UART1_REG(DLL));
->  	writel((divisor >> 8) & 0xff, UART1_REG(DLM));
-> @@ -44,16 +70,21 @@ static void qnap_power_off(void)
->  	writel(0x00, UART1_REG(FCR));
->  	writel(0x00, UART1_REG(MCR));
->  
-> -	/* send the power-off command 'A' to PIC */
-> -	writel('A', UART1_REG(TX));
-> +	/* send the power-off command to PIC */
-> +	writel(cfg->cmd, UART1_REG(TX));
->  }
->  
->  static int qnap_power_off_probe(struct platform_device *pdev)
->  {
-> +	struct device_node *np = pdev->dev.of_node;
->  	struct resource *res;
->  	struct clk *clk;
->  	char symname[KSYM_NAME_LEN];
->  
-> +	const struct of_device_id *match =
-> +		of_match_node(qnap_power_off_of_match_table, np);
-> +	cfg = match->data;
-> +
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (!res) {
->  		dev_err(&pdev->dev, "Missing resource");
-> @@ -94,12 +125,6 @@ static int qnap_power_off_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static const struct of_device_id qnap_power_off_of_match_table[] = {
-> -	{ .compatible = "qnap,power-off", },
-> -	{}
-> -};
-> -MODULE_DEVICE_TABLE(of, qnap_power_off_of_match_table);
-> -
->  static struct platform_driver qnap_power_off_driver = {
->  	.probe	= qnap_power_off_probe,
->  	.remove	= qnap_power_off_remove,
-> -- 
-> 1.8.3.2
+> I think it'd fit our workflow better if you kept all the clock changes in
+> a topic branch this release, instead of mingling them with the SoC code.
+> There is enough of them that it's not just a silly short branch, and there's
+> little overlap with the rest of the soc code changes you have (i.e. it makes
+> more sense for us to merge in with a drivers branch instead of keeping it all
+> with soc).
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Would you mind respinning and sorting that out to a separate topic? Since
+> I've already merged the first soc branch (but treated it like a clock
+> branch), feel free to keep that as a base for the new clock branch
+> (but not for the new soc branch, ideally).
+
+Sure, I will see about doing that.
+
+In the mean time, please disregard "Third Round of Renesas ARM Based SoC
+Updates", which I sent before I saw this email.
+
+I think that all the other pull-request that I sent yesterday
+should be unaffected by this change.
