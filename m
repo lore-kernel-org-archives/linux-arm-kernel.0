@@ -1,60 +1,111 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 22 Feb 2014 23:25:41 +0100
-Subject: Stuck getting DTS working for a new kirkwood board
-In-Reply-To: <5308FE07.5070809@sigpipe.me>
-References: <20140221013407.GX7862@titan.lakedaemon.net>
- <5307029C.20006@sigpipe.me> <20140221151530.GZ7862@titan.lakedaemon.net>
- <5307A727.9080508@sigpipe.me> <20140221200855.GM7862@titan.lakedaemon.net>
- <5307CCCD.5010505@sigpipe.me> <20140221221251.GH11878@lunn.ch>
- <530865C9.6000704@sigpipe.me> <20140222184119.GF6667@lunn.ch>
- <5308F16C.1070207@sigpipe.me> <20140222193031.GG6667@lunn.ch>
- <5308FE07.5070809@sigpipe.me>
-Message-ID: <530923E5.7090901@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 22 Feb 2014 23:26:35 +0100
+Subject: [PATCH v4 03/10] Documentation: devicetree: Update Samsung FIMC
+ DT binding
+In-Reply-To: <53091E72.3090107@gmail.com>
+References: <1392925237-31394-1-git-send-email-s.nawrocki@samsung.com>
+ <1392925237-31394-5-git-send-email-s.nawrocki@samsung.com>
+ <20140221155023.GF20449@e106331-lin.cambridge.arm.com>
+ <53091E72.3090107@gmail.com>
+Message-ID: <5309241B.5000702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/22/2014 08:44 PM, Dashie wrote:
-> On 02/22/2014 08:30 PM, Andrew Lunn wrote:
->>> root at debian:~# i2cdetect 0
->>> WARNING! This program can confuse your I2C bus, cause data loss and worse!
->>> I will probe file /dev/i2c-0.
->>> I will probe address range 0x03-0x77.
->>> Continue? [Y/n]
->>>      0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
->>> 00:          -- -- -- -- -- -- -- -- -- UU -- -- --
->>> 10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
->>> 20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
->>> 30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
->>> 40: -- -- -- -- -- -- -- -- -- UU -- -- -- -- -- --
->>> 50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
->>> 60: -- -- -- -- 64 -- -- -- -- -- -- -- -- -- -- --
->>> 70: -- -- -- -- -- -- -- --
->> The datasheet for M41TC8025 says it uses 0x64.
+[Ccing Mike]
+
+On 22.02.2014 23:02, Sylwester Nawrocki wrote:
+> On 02/21/2014 04:50 PM, Mark Rutland wrote:
+>> On Thu, Feb 20, 2014 at 07:40:30PM +0000, Sylwester Nawrocki wrote:
+>>> +- #clock-cells: from the common clock bindings
+>>> (../clock/clock-bindings.txt),
+>>> +  must be 1. A clock provider is associated with the 'camera' node
+>>> and it should
+>>> +  be referenced by external sensors that use clocks provided by the
+>>> SoC on
+>>> +  CAM_*_CLKOUT pins. The clock specifier cell stores an index of a
+>>> clock.
+>>> +  The indices are 0, 1 for CAM_A_CLKOUT, CAM_B_CLKOUT clocks
+>>> respectively.
+>>> +
+>>> +- clock-output-names: from the common clock bindings, should contain
+>>> names of
+>>> +  clocks registered by the camera subsystem corresponding to
+>>> CAM_A_CLKOUT,
+>>> +  CAM_B_CLKOUT output clocks, in this order. Parent clock of these
+>>> clocks are
+>>> +  specified be first two entries of the clock-names property.
 >>
->> Could you of read the part wrong from the photo?
->>
->>        Andrew
-> The only readings on the chip is :
-> "M41T80
-> ST(logo) E9927"
+>> Do you need this?
 >
-> I have a picture here :
-> http://wiki.sigpipe.me/lib/exe/fetch.php?media=hacking:img_3329.jpg
+> All right, that might have been a bad idea, it mixes names of clocks
+> registered
+> by the main clock controller with names of clock input lines at the device.
+> It's a mistake I have been usually sensitive to and now made it myself. :/
 >
+> My intention was to maintain the clock tree, since the camera block doesn't
+> generate the clock itself, it merely passes through the clocks from the
+> SoC main
+> clock controller (CMU). So clk parents need to be properly set and since
+> there
+> is no clock-output-names property at the CMU DT node,
+> of_clk_get_parent_name()
+> cannot be used.
+>
+> So presumably the DT binding would be only specifying that the sclk_cam0,
+> sclk_cam1 clock input entries are associated with output clocks named as
+> in clock-output-names property.
+>
+> And the driver could either:
+>   1) hard code those (well defined) CMU clock (clk parent) names,
 
-Looking at the picture, I can see M41T80 and an Atmel i2c eeprom above
-it. Given to M41T80 datasheet its i2c address is fixed at 0x68 as
-Gerhard also noted. The eeprom is coded to 0x50 - you can see that all
-right pins are connected to GND which is on pin 4, the white arrow
-points to pin 1. You should see both devices but none is in the above
-i2cdetect output.
+I don't think this would be a good idea, as those CMU clock names may 
+vary between SoCs.
 
-Kirkwood only has one i2c controller, so my guess is that the devices
-you are looking for are either connected to some i2c switch or mux, are
-on a gpio bitbang i2c, or not connected to the SoC but some
-microcontroller instead.
+>   2) clk_get() its input clock, retrieve name with __clk_get_name() and
+> pass
+>     it as parent name to clk_register() - it sounds a bit hacky though.
 
- From the wiki link above, you say there is an NXP 8051-compatible uC..
-that would be my guess then.
+This looks fine, at least until proper interface is added to CCF. Exynos 
+audio subsystem clock driver does exactly the same.
 
-Sebastian
+However, the right thing would be to make it possible to use pointers to 
+struct clk instead of strings to list parent(s). This could be done by 
+adding .parents field (struct clk **) to clk_init_data struct and make 
+clk_register() use it if available.
+
+>
+> The output clock names could be also well defined by the binding per the
+> IP's
+> compatible. Nevertheless using clock-output-names seems cleaner to me than
+> defining character strings in the driver.
+>
+> What do you think ?
+
+<RANT>
+
+Personally, I don't like clock-output-names at all. The idea of having a 
+global namespace for all clock providers looks flawed to me. This 
+property only tries to work around the not-quite-right design by giving 
+device tree the right to force CCF to use particular internal clock 
+identifiers and avoid collisions if two providers happen to have the 
+same internal clock names.
+
+I believe there should be completely no need for clock-output-names, 
+(other than a textual label for debugging purposes, analogically to 
+regulator-name). If one clock provider needs a clock from another, then 
+you should list it using clock bindings in node of the former, not rely 
+on some static name assignments.
+
+Then, after eliminating the need to use static names anymore, the 
+namespace could be split into per-provider namespaces and we would have 
+no collision issue anymore.
+
+Of course it's probably to late already for such changes, as there are 
+already systems relying on clock-output-names (i.e. without inter-IP 
+clock dependencies listed using clock bindings) and we would have to 
+keep backwards compatibility anyway...
+
+</RANT>
+
+Best regards,
+Tomasz
