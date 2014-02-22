@@ -1,25 +1,25 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 22 Feb 2014 22:35:57 +0100
-Subject: [PATCH 5/7] ARM: dt: sun5i: Add A13 SPI controller nodes
+Date: Sat, 22 Feb 2014 22:35:56 +0100
+Subject: [PATCH 4/7] ARM: dt: sun5i: Add A10s SPI controller nodes
 In-Reply-To: <1393104959-12831-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1393104959-12831-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1393104959-12831-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1393104959-12831-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A13 has 3 SPI controllers compatible with the one found in the A10. Add
+The A10s has 3 SPI controllers compatible with the one found in the A10. Add
 them in the DT.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-a13.dtsi | 33 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 33 +++++++++++++++++++++++++++++++++
  1 file changed, 33 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 24cd86cb..7102d12 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -298,6 +298,39 @@
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index df90a29..b2cb5dc 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -300,6 +300,28 @@
  		#size-cells = <1>;
  		ranges;
  
@@ -45,6 +45,13 @@ index 24cd86cb..7102d12 100644
 +			#size-cells = <0>;
 +		};
 +
+ 		emac: ethernet at 01c0b000 {
+ 			compatible = "allwinner,sun4i-a10-emac";
+ 			reg = <0x01c0b000 0x1000>;
+@@ -316,6 +338,17 @@
+ 			#size-cells = <0>;
+ 		};
+ 
 +		spi2: spi at 01c17000 {
 +			compatible = "allwinner,sun4i-a10-spi";
 +			reg = <0x01c17000 0x1000>;
