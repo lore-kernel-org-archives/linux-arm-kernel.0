@@ -1,25 +1,101 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 22 Feb 2014 17:22:52 +0100
-Subject: [RFC 0/3] ahci_platform: drop support for a bunch of obsolete
- platform device types
-Message-ID: <1393086175-6383-1-git-send-email-hdegoede@redhat.com>
+Date: Sat, 22 Feb 2014 17:26:48 +0100
+Subject: [PATCH v7 00/15] ahci: library-ise ahci_platform, add sunxi driver
+ and cleanup imx driver
+In-Reply-To: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
+References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <5308CFC8.4020400@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun, Marek,
+<resend of cover-letter with a proper subject, sorry about that>
 
-This series, which is to be applied on top of my ahci_platform restructering
-series,  mostly speaks for itself.
+Hi all,
 
-I've some doubts about the 2nd patch, which removes the imx53-ahci platform
-device support from ahci_platform.c. I'm pretty sure this is obsolete and
-replaced by Marek's ahci_imx.c work, but not 100%, which is why this series
-is marked as RFC. Marek can you confirm that the code the 2nd patch removes
-is inded dead code?
+Here is v7 of my patchset for adding ahci-sunxi support. This is hopefully
+the final final version of this set :)
 
-Tejun, if Marek confirms this is indeed dead code feel free to apply this
-despite the RFC marking.
+Note I'm going on vacation for a week starting Monday, so if I'm not responding
+that is why. Tejun if you feel some small cleanups are still necessary and
+you don't want to wait for me to get back feel free to squash in any cleanups
+you deem necessary.
+
+This has been tested with Allwinner A10, Allwinner A20 and Freeware imx6x SoCs,
+including suspend / resume. Note that the ahci_imx driver now also has imx53
+sata support, it would be good if someone could test that with this series.
+
+
+History:
+
+v1, by Olliver Schinagl:
+This was using the approach of having a platform device which probe method
+creates a new child platform device which gets driven by ahci_platform.c,
+as done by ahci_imx.c .
+
+v2, by Hans de Goede:
+Stand-alone platform driver based on Olliver's work
+
+v3, by Hans de Goede:
+patch-series, with 4 different parts
+a) Make ahci_platform.c more generic, handle more then 1 clk, target pwr
+   regulator
+b) New ahci-sunxi code only populating ahci_platform_data, passed to
+   ahci_platform.c to of_device_id matching.
+c) Refactor ahci-imx code to work the same as the new ahci-sunxi code, this
+   is the reason why v3 is an RFC, I'm waiting for the wandboard I ordered to
+   arrive so that I can actually test this.
+d) dts bindings for the sunxi ahci parts
+
+v4, by Hans de Goede:
+patch-series, with 5 different parts:
+a) Make ahci_platform.c more generic, handle more then 1 clk, target pwr
+   regulator
+b) Turn parts of ahci_platform.c into a library for use by other drivers
+c) New ahci-sunxi driver using the ahci_platform.c library functionality
+d) Refactor ahci-imx code to work the same as the new ahci-sunxi code
+e) dts bindings for the sunxi ahci parts
+
+v5:
+v4 + the following changes:
+1) fsl,imx6q driver is now tested
+2) fixed suspend / resume on fsl,imx6q
+3) Modifed devicetree node naming to match dt spec
+4) Reworked the busy waiting code in the sunxi-phy handling as suggested by
+   Russell King
+
+v6:
+v5 rebased on top of 3.14-rc3 + the following changes
+1) Added Roger Quadros' generic phy support series
+2) Added a "ARM: sun4i: dt: Remove grouping + simple-bus for regulators" dts
+   patch
+
+v7:
+v6 + the following changes:
+1) Addressed all Tejun's review remarks:
+  * Added function header comments to all exported ahci_platform functions
+  * Added comments in some other places
+  * Removed use of 2 empty lines to separate functions in some cases
+  * Use devres to automatically call ahci_platform_put_resources on
+    get_resource failure, probe failure and regular device remove
+2) Dropped patches to move ahci_host_priv struct declaration to include/linux,
+  this was a left-over from v3 and is no longer necessary
+3) Updated Roger's "ata: ahci_platform: Manage SATA PHY" patch:
+  * Update function header comments for the changes this makes
+  * Drop the Kconfig PHY requires hack, my patch for the phy-core to always be
+    built-in has been queued in Greg KH's tree, so this is no longer necessary.
+4) Dropped Roger's "ata: ahci_platform: Add 'struct device' argument to ahci_platform_put_resources()"
+  patch, ahci_platform_put_resources already has a device argument as result
+  of it being changed into a devres release function
+
+Tejun, can you please add patches 1-12 to your ata tree for 3.15 ?
+
+Maxime, can you please add patch 13-15 to your dts tree for 3.15 ?
 
 Thanks & Regards,
 
 Hans
+
+-- 
+You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+For more options, visit https://groups.google.com/groups/opt_out.
