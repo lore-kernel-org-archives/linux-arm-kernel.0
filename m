@@ -1,67 +1,78 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 22 Feb 2014 00:45:13 -0500
-Subject: [GIT PULL] clk: mvebu driver changes for v3.15
-Message-ID: <20140222054513.GW7862@titan.lakedaemon.net>
+Date: Sat, 22 Feb 2014 01:03:00 -0500
+Subject: [GIT PULL] ARM: mvebu: dt changes for v3.15 (round 2)
+Message-ID: <20140222060300.GX7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+Guys,
 
-Here's some driver changes/additions for the v3.15 window.  Marvell,
-through free-electrons, is adding support for their new line of SoCs.
-The Armada 375, 380, and the 385.
+Here's another round of changes for v3.15.  They've been in -next for
+several days and this is an incremental pull from tags/mvebu-dt-3.15 in
+the mvebu/dt branch.
 
-This pull request adds support for the corediv, core, and gating
-clocks.
-
-These changes have been in -next for several days.  Please pull.
+Please pull.
 
 thx,
 
 Jason.
 
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+The following changes since commit 5c0169d1c503aab2d62ee6f6e342a78e2ea9e3ed:
 
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+  ARM: mvebu: use input DT defines in Armada 370/XP boards (2014-02-11 19:35:39 +0000)
 
 are available in the git repository at:
 
-  git://git.infradead.org/linux-mvebu.git tags/clk-mvebu-3xx-3.15
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-3.15-2
 
-for you to fetch changes up to e9646fe1169de0162d461472df7ed19e0c729b61:
+for you to fetch changes up to 7a5b293f2086cfc17519e586bd8f89be72a2fc4e:
 
-  dt: Update binding information for mvebu gating clocks with Armada 380/385 (2014-02-17 02:34:08 +0000)
-
-----------------------------------------------------------------
-clock: mvebu new SoC changes for v3.15
-
- - mvebu (Armada 375/380/385)
-    - extend corediv clock driver to support new SoCs
-    - add core and gating clock drivers for new SoCs
+  ARM: dove: Enable Dove watchdog in the devicetree (2014-02-17 21:44:09 +0000)
 
 ----------------------------------------------------------------
-Gregory CLEMENT (4):
-      clk: mvebu: add clock support for Armada 375
-      dt: Update binding information for mvebu core clocks with Armada 375
-      dt: Update binding information for mvebu gating clocks with Armada 375
-      clk: mvebu: add clock support for Armada 380/385
+mvebu dt changes for v3.15 (incremental round #2)
 
-Thomas Petazzoni (6):
-      clk: mvebu: do not copy the contents of clk_corediv_desc
-      clk: mvebu: add a little bit of documentation about data structures
-      clk: mvebu: refactor corediv driver to support more SoC
-      clk: mvebu: add Armada 375 support to the corediv clock driver
-      dt: Update binding information for mvebu core clocks with Armada 380/385
-      dt: Update binding information for mvebu gating clocks with Armada 380/385
+ - mvebu
+    - add audio for Armada 370 DB
+    - enable Armada 370/XP watchdog
 
- .../devicetree/bindings/clock/mvebu-core-clock.txt |  14 ++
- .../bindings/clock/mvebu-gated-clock.txt           |  65 +++++++-
- drivers/clk/mvebu/Kconfig                          |   8 +
- drivers/clk/mvebu/Makefile                         |   2 +
- drivers/clk/mvebu/armada-375.c                     | 184 +++++++++++++++++++++
- drivers/clk/mvebu/armada-38x.c                     | 167 +++++++++++++++++++
- drivers/clk/mvebu/clk-corediv.c                    | 131 +++++++++++----
- 7 files changed, 536 insertions(+), 35 deletions(-)
- create mode 100644 drivers/clk/mvebu/armada-375.c
- create mode 100644 drivers/clk/mvebu/armada-38x.c
+ - kirkwood
+    - convert board rd88f6281
+    - add board rd88f6192
+
+ - dove
+    enable watchdog
+
+----------------------------------------------------------------
+Andrew Lunn (2):
+      ARM: Kirkwood: Add DT description of rd88f6192.
+      ARM: Kirkwood: convert rd88f6281-setup.c to DT.
+
+Ezequiel Garcia (3):
+      ARM: mvebu: Enable Armada 370/XP watchdog in the devicetree
+      ARM: kirkwood: Add RSTOUT 'reg' entry to devicetree
+      ARM: dove: Enable Dove watchdog in the devicetree
+
+Thomas Petazzoni (4):
+      ARM: mvebu: add audio I2S controller to Armada 370 Device Tree
+      ARM: mvebu: add I2C0 muxing option for Armada 370 SoC
+      ARM: mvebu: add audio support to Armada 370 DB
+      ARM: mvebu: enable S/PDIF audio in Armada 370 DB Device Tree
+
+ arch/arm/boot/dts/Makefile                  |   3 +
+ arch/arm/boot/dts/armada-370-db.dts         |  56 ++++++++++
+ arch/arm/boot/dts/armada-370-xp.dtsi        |   4 +
+ arch/arm/boot/dts/armada-370.dtsi           |  33 ++++++
+ arch/arm/boot/dts/armada-xp.dtsi            |   6 ++
+ arch/arm/boot/dts/dove.dtsi                 |   8 ++
+ arch/arm/boot/dts/kirkwood-rd88f6192.dts    | 112 ++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-rd88f6281-a0.dts |  26 +++++
+ arch/arm/boot/dts/kirkwood-rd88f6281-a1.dts |  31 ++++++
+ arch/arm/boot/dts/kirkwood-rd88f6281.dtsi   | 152 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood.dtsi             |   2 +-
+ 11 files changed, 432 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6192.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281-a0.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281-a1.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
