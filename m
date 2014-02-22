@@ -1,116 +1,103 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 22 Feb 2014 20:14:42 +0100
-Subject: [PATCH v4 00/22] Move DT kirkwood into mach-mvebu
-Message-ID: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
+Date: Sat, 22 Feb 2014 20:14:43 +0100
+Subject: [PATCH v4 01/22] ARM: Kirkwood: Give pm.c its own header file.
+In-Reply-To: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
+References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1393096504-11844-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The process of making most kirkwood boards boot using DT is nearly
-complete. We can now move these boards into mach-mvebu, freeing them
-of the legacy code needed for none-DT systems. At the same time, they
-can become part of ARCH_MULTI_V5.
+The pm code needs to be separated from common.h in order to split DT
+and non-DT systems apart. Move the declarations into a header file of
+its own and include it where needed.
 
-This patchset can also be found in:
-
-https://github.com/lunn/linux.git v3.14-rc1-mvebu-v4
-
-Since v3:
-Dropped the last patch removing DT support from mach-kirkwood.  This
-will help Debian until we complete moving all boards to DT and into
-mach-mvebu. Also allow the DTB files to be compiled for both.
-Added back the watchdog to the *_config files.
-Added Tested-by's and Acked-by's
-
-Since v2:
-The L2 Cache binding has been re-written again. No more wt-override in
-the binding, respect CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
-Fixed a few typos in changelogs
-Added a few Cc: for maintainers outside of the ARM world.
-Added Acked-by:s
-
-Since v1:
-mv88f6281gtw_ge switch really does now use DT.
-The L2 Cache binding has been re-written.
-kirkwood.dtsi changes have been placed into there own patch.
-Added mvebu_v5_defconfig
-Fixed a few typos in changelogs
-Added a few Cc:s
-
-
-
-Andrew Lunn (22):
-  ARM: Kirkwood: Give pm.c its own header file.
-  irqchip: Orion: Fix getting generic chip pointer.
-  ARM: Kirkwood: Convert mv88f6281gtw_ge switch setup to DT
-  ARM: Kirkwood: Drop printing the SoC type and revision
-  ARM: Kirkwood: Seperate board-dt from common and pcie code.
-  ARM: Kirkwood: ioremap the cpu_config register before using it.
-  ARM: Kirkwood: ioremap memory control register
-  ARM: MVEBU: Add ARCH_MULTI_V7 to SoCs
-  ARM: Orion: Move cache-feroceon-l2.h out of plat-orion
-  ARM: MM: Add DT binding for Feroceon L2 cache
-  ARM: Kirkwood: Instantiate L2 cache from DT.
-  ARM: Fix default CPU selection for ARCH_MULTI_V5
-  ARM: Fix MULTI_TLB for feroceon
-  ARM: MM Enable building Feroceon L2 cache controller with ARCH_MVEBU
-  ARM: Move kirkwood DT boards into mach-mvebu
-  ARM: MVEBU: Let kirkwood use the system controller for restart
-  ARM: MVEBU: Instantiate system controller in kirkwood.dtsi
-  drivers: Enable building of Kirkwood drivers for mach-mvebu
-  ARM: MVEBU: Enable mvebu-soc-id on Kirkwood
-  ARM: config: Add a multi_v5_defconfig
-  ARM: MVEBU: Simplifiy headers and make local
-  ARM: config: Add mvebu_v5_defconfig
-
- .../devicetree/bindings/arm/mrvl/feroceon.txt      |  16 ++
- arch/arm/Kconfig                                   |   2 +-
- arch/arm/boot/dts/Makefile                         |   9 +-
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts     |  62 +++++++
- arch/arm/boot/dts/kirkwood.dtsi                    |  10 ++
- arch/arm/configs/multi_v5_defconfig                | 185 ++++++++++++++++++++
- arch/arm/configs/mvebu_v5_defconfig                | 172 +++++++++++++++++++
- arch/arm/include/asm/hardware/cache-feroceon-l2.h  |  13 ++
- arch/arm/mach-kirkwood/Kconfig                     |   7 -
- arch/arm/mach-kirkwood/Makefile                    |   4 +-
- arch/arm/mach-kirkwood/board-dt.c                  | 108 ++++++++++--
- arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c     |  50 ------
- arch/arm/mach-kirkwood/common.c                    |   3 +-
- arch/arm/mach-kirkwood/common.h                    |  13 --
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h  |   2 +
- arch/arm/mach-kirkwood/pm.c                        |   9 +-
- arch/arm/mach-kirkwood/pm.h                        |  26 +++
- arch/arm/mach-mv78xx0/common.c                     |   2 +-
- arch/arm/mach-mvebu/Kconfig                        |  23 ++-
- arch/arm/mach-mvebu/Makefile                       |   1 +
- arch/arm/mach-mvebu/kirkwood-pm.c                  |  76 +++++++++
- arch/arm/mach-mvebu/kirkwood-pm.h                  |  26 +++
- arch/arm/mach-mvebu/kirkwood.c                     | 190 +++++++++++++++++++++
- arch/arm/mach-mvebu/kirkwood.h                     |  22 +++
- arch/arm/mach-mvebu/mvebu-soc-id.c                 |   1 +
- arch/arm/mm/Kconfig                                |   2 +-
- arch/arm/mm/cache-feroceon-l2.c                    |  45 ++++-
- arch/arm/mm/proc-feroceon.S                        |   2 +-
- arch/arm/mm/tlb-v4wbi.S                            |   3 +
- .../plat-orion/include/plat/cache-feroceon-l2.h    |  11 --
- drivers/cpufreq/Kconfig.arm                        |   2 +-
- drivers/cpuidle/Kconfig.arm                        |   2 +-
- drivers/irqchip/irq-orion.c                        |   3 +-
- drivers/leds/Kconfig                               |   4 +-
- drivers/phy/Kconfig                                |   2 +-
- drivers/thermal/Kconfig                            |   2 +-
- sound/soc/kirkwood/Kconfig                         |   2 +-
- 37 files changed, 990 insertions(+), 122 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mrvl/feroceon.txt
- create mode 100644 arch/arm/configs/multi_v5_defconfig
- create mode 100644 arch/arm/configs/mvebu_v5_defconfig
- create mode 100644 arch/arm/include/asm/hardware/cache-feroceon-l2.h
- delete mode 100644 arch/arm/mach-kirkwood/board-mv88f6281gtw_ge.c
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com> (on kirkwood)
+---
+v3:
+s/seperated/separated
+---
+ arch/arm/mach-kirkwood/board-dt.c |  1 +
+ arch/arm/mach-kirkwood/common.c   |  1 +
+ arch/arm/mach-kirkwood/common.h   |  6 ------
+ arch/arm/mach-kirkwood/pm.h       | 26 ++++++++++++++++++++++++++
+ 4 files changed, 28 insertions(+), 6 deletions(-)
  create mode 100644 arch/arm/mach-kirkwood/pm.h
- create mode 100644 arch/arm/mach-mvebu/kirkwood-pm.c
- create mode 100644 arch/arm/mach-mvebu/kirkwood-pm.h
- create mode 100644 arch/arm/mach-mvebu/kirkwood.c
- create mode 100644 arch/arm/mach-mvebu/kirkwood.h
- delete mode 100644 arch/arm/plat-orion/include/plat/cache-feroceon-l2.h
 
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 78188159484d..ceffdc8ffbbd 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -24,6 +24,7 @@
+ #include <mach/bridge-regs.h>
+ #include <plat/common.h>
+ #include "common.h"
++#include "pm.h"
+ 
+ #define MV643XX_ETH_MAC_ADDR_LOW	0x0414
+ #define MV643XX_ETH_MAC_ADDR_HIGH	0x0418
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index f3407a5db216..52aca25432a7 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -36,6 +36,7 @@
+ #include <plat/time.h>
+ #include <linux/platform_data/dma-mv_xor.h>
+ #include "common.h"
++#include "pm.h"
+ 
+ /* These can go away once Kirkwood uses the mvebu-mbus DT binding */
+ #define KIRKWOOD_MBUS_NAND_TARGET 0x01
+diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+index 05fd648df543..1296de94febf 100644
+--- a/arch/arm/mach-kirkwood/common.h
++++ b/arch/arm/mach-kirkwood/common.h
+@@ -58,12 +58,6 @@ void kirkwood_cpufreq_init(void);
+ void kirkwood_restart(enum reboot_mode, const char *);
+ void kirkwood_clk_init(void);
+ 
+-#ifdef CONFIG_PM
+-void kirkwood_pm_init(void);
+-#else
+-static inline void kirkwood_pm_init(void) {};
+-#endif
+-
+ /* board init functions for boards not fully converted to fdt */
+ #ifdef CONFIG_MACH_MV88F6281GTW_GE_DT
+ void mv88f6281gtw_ge_init(void);
+diff --git a/arch/arm/mach-kirkwood/pm.h b/arch/arm/mach-kirkwood/pm.h
+new file mode 100644
+index 000000000000..21e7530f368b
+--- /dev/null
++++ b/arch/arm/mach-kirkwood/pm.h
+@@ -0,0 +1,26 @@
++/*
++ * Power Management driver for Marvell Kirkwood SoCs
++ *
++ * Copyright (C) 2013 Ezequiel Garcia <ezequiel@free-electrons.com>
++ * Copyright (C) 2010 Simon Guinot <sguinot@lacie.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License,
++ * version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __ARCH_KIRKWOOD_PM_H
++#define __ARCH_KIRKWOOD_PM_H
++
++#ifdef CONFIG_PM
++void kirkwood_pm_init(void);
++#else
++static inline void kirkwood_pm_init(void) {};
++#endif
++
++#endif
 -- 
 1.8.5.3
