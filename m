@@ -1,86 +1,144 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 22 Feb 2014 14:15:25 +0000
-Subject: randconfig build error
-In-Reply-To: <20140221155452.GH31902@saruman.home>
-References: <20140221155452.GH31902@saruman.home>
-Message-ID: <20140222141525.GT27282@n2100.arm.linux.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 22 Feb 2014 16:53:32 +0100
+Subject: [PATCH v7 03/15] ahci-platform: Add support for an optional regulator
+ for sata-target power
+In-Reply-To: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
+References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1393084424-31099-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 09:55:13AM -0600, Felipe Balbi wrote:
-> Here's the error I found:
-> 
-> warning: (ARCH_HI3xxx && SOC_OMAP5 && ARCH_SHMOBILE_MULTI) selects HAVE_ARM_TWD which has unmet direct dependencies (SMP)
-> warning: (ARCH_HI3xxx && SOC_OMAP5 && ARCH_SHMOBILE_MULTI) selects HAVE_ARM_TWD which has unmet direct dependencies (SMP)
-> arch/arm/mach-prima2/common.c:23:20: warning: ?sirfsoc_map_io? defined but not used [-Wunused-function]
->  static __init void sirfsoc_map_io(void)
->                     ^
-> arch/arm/kernel/smp_twd.c: In function ?twd_local_timer_of_register?:
-> arch/arm/kernel/smp_twd.c:391:20: error: ?setup_max_cpus? undeclared (first use in this function)
->   if (!is_smp() || !setup_max_cpus)
->                     ^
-> arch/arm/kernel/smp_twd.c:391:20: note: each undeclared identifier is reported only once for each function it appears in
-> make[1]: *** [arch/arm/kernel/smp_twd.o] Error 1
-> make[1]: *** Waiting for unfinished jobs....
-> make: *** [arch/arm/kernel] Error 2
-> make: *** Waiting for unfinished jobs....
-> 
-> The funny part of that is that SOC_OMAP5, ARCH_SHMOBILE_MULTI, and
-> ARCH_HI3xxx have:
-> 
-> 	select HAVE_ARM_TWD if SMP
-> 
-> so how come we still select it if CONFIG_SMP=n on that particular
-> randconfig ?
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ .../devicetree/bindings/ata/ahci-platform.txt      |  1 +
+ drivers/ata/ahci.h                                 |  2 ++
+ drivers/ata/ahci_platform.c                        | 36 ++++++++++++++++++++--
+ 3 files changed, 37 insertions(+), 2 deletions(-)
 
-Are you entirely certian which kernel version you're building?  v3.14-rc1
-to my tip has this:
-
-diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-index 8f4649b301b2..1abae5f6a418 100644
---- a/arch/arm/mach-hisi/Kconfig
-+++ b/arch/arm/mach-hisi/Kconfig
-@@ -8,7 +8,7 @@ config ARCH_HI3xxx
-        select CLKSRC_OF
-        select GENERIC_CLOCKEVENTS
-        select HAVE_ARM_SCU
--       select HAVE_ARM_TWD
-+       select HAVE_ARM_TWD if SMP
-        select HAVE_SMP
-        select PINCTRL
-        select PINCTRL_SINGLE
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 653b489479e0..e2ce4f8366a7 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -54,7 +54,7 @@ config SOC_OMAP5
-        select ARM_GIC
-        select CPU_V7
-        select HAVE_ARM_SCU if SMP
--       select HAVE_ARM_TWD if LOCAL_TIMERS
-+       select HAVE_ARM_TWD if SMP
-        select HAVE_SMP
-        select HAVE_ARM_ARCH_TIMER
-        select ARM_ERRATA_798181 if SMP
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 338640631e08..05fa505df585 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -8,7 +8,7 @@ config ARCH_SHMOBILE_MULTI
-        select CPU_V7
-        select GENERIC_CLOCKEVENTS
-        select HAVE_ARM_SCU if SMP
--       select HAVE_ARM_TWD if LOCAL_TIMERS
-+       select HAVE_ARM_TWD if SMP
-        select HAVE_SMP
-        select ARM_GIC
-        select MIGHT_HAVE_CACHE_L2X0
-
-The relevant bits are the "-" lines, which indicate that with v3.14-rc1,
-ARCH_HI3xxx would select HAVE_ARM_TWD without SMP set, and indeed, your
-config you attached has ARCH_HI3xxx set.
-
+diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+index 3ced07d..1ac807f 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+@@ -11,6 +11,7 @@ Required properties:
+ Optional properties:
+ - dma-coherent      : Present if dma operations are coherent
+ - clocks            : a list of phandle + clock specifier pairs
++- target-supply     : regulator for SATA target power
+ 
+ Example:
+         sata at ffe08000 {
+diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+index c12862b..bf8100c 100644
+--- a/drivers/ata/ahci.h
++++ b/drivers/ata/ahci.h
+@@ -37,6 +37,7 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/libata.h>
++#include <linux/regulator/consumer.h>
+ 
+ /* Enclosure Management Control */
+ #define EM_CTRL_MSG_TYPE              0x000f0000
+@@ -323,6 +324,7 @@ struct ahci_host_priv {
+ 	u32			em_buf_sz;	/* EM buffer size in byte */
+ 	u32			em_msg_type;	/* EM message type */
+ 	struct clk		*clks[AHCI_MAX_CLKS]; /* Optional */
++	struct regulator	*target_pwr;	/* Optional */
+ 	void			*plat_data;	/* Other platform data */
+ 	/*
+ 	 * Optional ahci_start_engine override, if not set this gets set to the
+diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+index 609975d..907c076 100644
+--- a/drivers/ata/ahci_platform.c
++++ b/drivers/ata/ahci_platform.c
+@@ -192,6 +192,14 @@ static int ahci_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	hpriv->target_pwr = devm_regulator_get_optional(dev, "target");
++	if (IS_ERR(hpriv->target_pwr)) {
++		rc = PTR_ERR(hpriv->target_pwr);
++		if (rc == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		hpriv->target_pwr = NULL;
++	}
++
+ 	for (i = 0; i < AHCI_MAX_CLKS; i++) {
+ 		/*
+ 		 * For now we must use clk_get(dev, NULL) for the first clock,
+@@ -213,9 +221,15 @@ static int ahci_probe(struct platform_device *pdev)
+ 		hpriv->clks[i] = clk;
+ 	}
+ 
++	if (hpriv->target_pwr) {
++		rc = regulator_enable(hpriv->target_pwr);
++		if (rc)
++			goto free_clk;
++	}
++
+ 	rc = ahci_enable_clks(dev, hpriv);
+ 	if (rc)
+-		goto free_clk;
++		goto disable_regulator;
+ 
+ 	/*
+ 	 * Some platforms might need to prepare for mmio region access,
+@@ -298,6 +312,9 @@ pdata_exit:
+ 		pdata->exit(dev);
+ disable_unprepare_clk:
+ 	ahci_disable_clks(hpriv);
++disable_regulator:
++	if (hpriv->target_pwr)
++		regulator_disable(hpriv->target_pwr);
+ free_clk:
+ 	ahci_put_clks(hpriv);
+ 	return rc;
+@@ -314,6 +331,9 @@ static void ahci_host_stop(struct ata_host *host)
+ 
+ 	ahci_disable_clks(hpriv);
+ 	ahci_put_clks(hpriv);
++
++	if (hpriv->target_pwr)
++		regulator_disable(hpriv->target_pwr);
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
+@@ -350,6 +370,9 @@ static int ahci_suspend(struct device *dev)
+ 
+ 	ahci_disable_clks(hpriv);
+ 
++	if (hpriv->target_pwr)
++		regulator_disable(hpriv->target_pwr);
++
+ 	return 0;
+ }
+ 
+@@ -360,9 +383,15 @@ static int ahci_resume(struct device *dev)
+ 	struct ahci_host_priv *hpriv = host->private_data;
+ 	int rc;
+ 
++	if (hpriv->target_pwr) {
++		rc = regulator_enable(hpriv->target_pwr);
++		if (rc)
++			return rc;
++	}
++
+ 	rc = ahci_enable_clks(dev, hpriv);
+ 	if (rc)
+-		return rc;
++		goto disable_regulator;
+ 
+ 	if (pdata && pdata->resume) {
+ 		rc = pdata->resume(dev);
+@@ -384,6 +413,9 @@ static int ahci_resume(struct device *dev)
+ 
+ disable_unprepare_clk:
+ 	ahci_disable_clks(hpriv);
++disable_regulator:
++	if (hpriv->target_pwr)
++		regulator_disable(hpriv->target_pwr);
+ 
+ 	return rc;
+ }
 -- 
-FTTC broadband for 0.8mile line: 5.8Mbps down 500kbps up.  Estimation
-in database were 13.1 to 19Mbit for a good line, about 7.5+ for a bad.
-Estimate before purchase was "up to 13.2Mbit".
+1.9.0
