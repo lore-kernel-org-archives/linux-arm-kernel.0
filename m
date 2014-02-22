@@ -1,50 +1,67 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Fri, 21 Feb 2014 20:37:14 -0800
-Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140221235911.14777.13919@capellas-linux>
-References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
- <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
- <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
- <20140219193315.3732.21819@capellas-linux>
- <20140220162754.GC15994@e102568-lin.cambridge.arm.com>
- <20140221183956.29890.80931@capellas-linux>
- <20140221235911.14777.13919@capellas-linux>
-Message-ID: <20140222043714.19852.67450@capellas-linux>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 22 Feb 2014 00:45:13 -0500
+Subject: [GIT PULL] clk: mvebu driver changes for v3.15
+Message-ID: <20140222054513.GW7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sebastian Capella (2014-02-21 15:59:11)
-> - Cyril Chemparathy as his email is bouncing back to me. 
-> 
-> Quoting Sebastian Capella (2014-02-21 10:39:56)
-> > Quoting Lorenzo Pieralisi (2014-02-20 08:27:55)
-> > > > > > +     cpu_switch_mm(idmap_pgd, &init_mm);
->   [ ... ]
-> > I can try removing it and seeing if there are side effects.
-> 
-> FYI, It's definitely hanging with this removed, still looking.
+Mike,
 
-I see when we reach this call, the 1st level page table @ TTBR0 is located
-at different memory locations each run (expected).  If we omit the
-cpu_switch_mm we're corrupting the page table causing the observed
-intermittent failures.  I believe these match the corruption you expected.
+Here's some driver changes/additions for the v3.15 window.  Marvell,
+through free-electrons, is adding support for their new line of SoCs.
+The Armada 375, 380, and the 385.
 
-The reason this doesn't happen when I leave the call is that idmap_pgd
-is always at the same memory location.  I expect this is because it's
-allocated during init.  I've seen the same address 50/50 times for
-idmap_pgd.  I don't think it is correct to rely on this behavior.
+This pull request adds support for the corediv, core, and gating
+clocks.
 
-Would it be appropriate to use the swapper_pg_dir directly in place
-of idmap_pgd?
-  - I do not see any modification to the swapper_pg_dir contents in the
-    code that would change from init time.
-  - swapper_pg_dir is always at the same offset.
+These changes have been in -next for several days.  Please pull.
 
-Ideally we should have no issue with overwriting it with identical data.
+thx,
 
-I've run a couple hundred test loops using swapper_pg_dir and so far
-there are no failures.
+Jason.
 
-Thanks,
 
-Sebastian
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/clk-mvebu-3xx-3.15
+
+for you to fetch changes up to e9646fe1169de0162d461472df7ed19e0c729b61:
+
+  dt: Update binding information for mvebu gating clocks with Armada 380/385 (2014-02-17 02:34:08 +0000)
+
+----------------------------------------------------------------
+clock: mvebu new SoC changes for v3.15
+
+ - mvebu (Armada 375/380/385)
+    - extend corediv clock driver to support new SoCs
+    - add core and gating clock drivers for new SoCs
+
+----------------------------------------------------------------
+Gregory CLEMENT (4):
+      clk: mvebu: add clock support for Armada 375
+      dt: Update binding information for mvebu core clocks with Armada 375
+      dt: Update binding information for mvebu gating clocks with Armada 375
+      clk: mvebu: add clock support for Armada 380/385
+
+Thomas Petazzoni (6):
+      clk: mvebu: do not copy the contents of clk_corediv_desc
+      clk: mvebu: add a little bit of documentation about data structures
+      clk: mvebu: refactor corediv driver to support more SoC
+      clk: mvebu: add Armada 375 support to the corediv clock driver
+      dt: Update binding information for mvebu core clocks with Armada 380/385
+      dt: Update binding information for mvebu gating clocks with Armada 380/385
+
+ .../devicetree/bindings/clock/mvebu-core-clock.txt |  14 ++
+ .../bindings/clock/mvebu-gated-clock.txt           |  65 +++++++-
+ drivers/clk/mvebu/Kconfig                          |   8 +
+ drivers/clk/mvebu/Makefile                         |   2 +
+ drivers/clk/mvebu/armada-375.c                     | 184 +++++++++++++++++++++
+ drivers/clk/mvebu/armada-38x.c                     | 167 +++++++++++++++++++
+ drivers/clk/mvebu/clk-corediv.c                    | 131 +++++++++++----
+ 7 files changed, 536 insertions(+), 35 deletions(-)
+ create mode 100644 drivers/clk/mvebu/armada-375.c
+ create mode 100644 drivers/clk/mvebu/armada-38x.c
