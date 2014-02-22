@@ -1,127 +1,25 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 22 Feb 2014 16:53:43 +0100
-Subject: [PATCH v7 14/15] ARM: sun4i: dt: Add ahci / sata support
-In-Reply-To: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
-References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1393084424-31099-15-git-send-email-hdegoede@redhat.com>
+Date: Sat, 22 Feb 2014 17:22:52 +0100
+Subject: [RFC 0/3] ahci_platform: drop support for a bunch of obsolete
+ platform device types
+Message-ID: <1393086175-6383-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oliver Schinagl <oliver@schinagl.nl>
+Hi Tejun, Marek,
 
-This patch adds sunxi sata support to A10 boards that have such a connector.
-Some boards also feature a regulator via a GPIO and support for this is also
-added.
+This series, which is to be applied on top of my ahci_platform restructering
+series,  mostly speaks for itself.
 
-Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun4i-a10-a1000.dts      |  4 ++++
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts |  6 +++++
- arch/arm/boot/dts/sun4i-a10.dtsi           |  8 +++++++
- arch/arm/boot/dts/sunxi-ahci-reg.dtsi      | 36 ++++++++++++++++++++++++++++++
- 4 files changed, 54 insertions(+)
- create mode 100644 arch/arm/boot/dts/sunxi-ahci-reg.dtsi
+I've some doubts about the 2nd patch, which removes the imx53-ahci platform
+device support from ahci_platform.c. I'm pretty sure this is obsolete and
+replaced by Marek's ahci_imx.c work, but not 100%, which is why this series
+is marked as RFC. Marek can you confirm that the code the 2nd patch removes
+is inded dead code?
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-index cbd2e13..d6ec839 100644
---- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-@@ -35,6 +35,10 @@
- 			};
- 		};
- 
-+		ahci: sata at 01c18000 {
-+			status = "okay";
-+		};
-+
- 		pinctrl at 01c20800 {
- 			emac_power_pin_a1000: emac_power_pin at 0 {
- 				allwinner,pins = "PH15";
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index b139ee6..6df237d8 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -12,6 +12,7 @@
- 
- /dts-v1/;
- /include/ "sun4i-a10.dtsi"
-+/include/ "sunxi-ahci-reg.dtsi"
- 
- / {
- 	model = "Cubietech Cubieboard";
-@@ -33,6 +34,11 @@
- 			};
- 		};
- 
-+		ahci: sata at 01c18000 {
-+			target-supply = <&reg_ahci_5v>;
-+			status = "okay";
-+		};
-+
- 		pinctrl at 01c20800 {
- 			led_pins_cubieboard: led_pins at 0 {
- 				allwinner,pins = "PH20", "PH21";
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 336dbec..454077a 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -338,6 +338,14 @@
- 			#size-cells = <0>;
- 		};
- 
-+		ahci: sata at 01c18000 {
-+			compatible = "allwinner,sun4i-a10-ahci";
-+			reg = <0x01c18000 0x1000>;
-+			interrupts = <56>;
-+			clocks = <&pll6 0>, <&ahb_gates 25>;
-+			status = "disabled";
-+		};
-+
- 		intc: interrupt-controller at 01c20400 {
- 			compatible = "allwinner,sun4i-ic";
- 			reg = <0x01c20400 0x400>;
-diff --git a/arch/arm/boot/dts/sunxi-ahci-reg.dtsi b/arch/arm/boot/dts/sunxi-ahci-reg.dtsi
-new file mode 100644
-index 0000000..7072af1
---- /dev/null
-+++ b/arch/arm/boot/dts/sunxi-ahci-reg.dtsi
-@@ -0,0 +1,36 @@
-+/*
-+ * sunxi boards sata target power supply common code
-+ *
-+ * Copyright 2014 - Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/ {
-+	soc at 01c00000 {
-+		pio: pinctrl at 01c20800 {
-+			ahci_pwr_pin_a: ahci_pwr_pin at 0 {
-+				allwinner,pins = "PB8";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+	};
-+
-+	reg_ahci_5v: ahci-5v {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&ahci_pwr_pin_a>;
-+		regulator-name = "ahci-5v";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		gpio = <&pio 1 8 0>;
-+	};
-+};
--- 
-1.9.0
+Tejun, if Marek confirms this is indeed dead code feel free to apply this
+despite the RFC marking.
+
+Thanks & Regards,
+
+Hans
