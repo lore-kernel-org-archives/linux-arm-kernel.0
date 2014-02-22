@@ -1,207 +1,43 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 22 Feb 2014 20:15:04 +0100
-Subject: [PATCH v4 22/22] ARM: config: Add mvebu_v5_defconfig
-In-Reply-To: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
-References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1393096504-11844-23-git-send-email-andrew@lunn.ch>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 22 Feb 2014 14:30:08 -0500
+Subject: Stuck getting DTS working for a new kirkwood board
+In-Reply-To: <5308F3B4.6010409@sigpipe.me>
+References: <5306721B.7020403@sigpipe.me>
+ <20140221013407.GX7862@titan.lakedaemon.net>
+ <5307029C.20006@sigpipe.me>
+ <20140221151530.GZ7862@titan.lakedaemon.net>
+ <5307A727.9080508@sigpipe.me>
+ <20140221200855.GM7862@titan.lakedaemon.net>
+ <5308F3B4.6010409@sigpipe.me>
+Message-ID: <20140222193008.GB7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that there is both v5 and v7 systems in mach-mvebu, the
-mvebu_defconfig is not sufficient, since these systems cannot be
-combined. Add a v5 defconfig which is based on kirkwood_defconfig,
-but purely DT.
+On Sat, Feb 22, 2014 at 08:00:04PM +0100, Dashie wrote:
+> Hi,
+> 
+> On 02/21/2014 09:08 PM, Jason Cooper wrote:
+> >> Well, with kirkwood_defconfig it doesn't find the SATA PHY and panic.
+> >> So i've used my debian config, make oldconfig, built and ... the toy is
+> >> booting.
+> > Yes, this is a known issue.  You worked around it by enabling generic
+> > phy support (it's most likely in the other configs).
+> Well, i've done some more tests and found that i've commented the
+> sata at 80000 {} part of the DTS, but does not remember if that was after
+> trying "debian config".
+> 
+> If i uncomment it, i got the kernel panic with "sata_mv f1080000.sata:
+> unable to find phy".
+> 
+> About generic phy, is it CONFIG_GENERIC_PHY ? I't already to =y in my
+> .config actually.
+> I have CONFIG_PHY_MVEBU_SATA=y and CONFIG_SATA_MV=y too.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
-v4
-Disable low level debug
-Enable drivers needed by boards
-Ensure ORION_WATCHDOG is enabled
----
- arch/arm/configs/mvebu_v5_defconfig | 172 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 172 insertions(+)
- create mode 100644 arch/arm/configs/mvebu_v5_defconfig
+Ok.  Don't worry about that for the moment.  There's a fix making it's
+way to mainline for this issue.  Once we get everything else sorted for
+your board, we'll have you try Linus' current master to confirm sata
+works on your board.
 
-diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
-new file mode 100644
-index 000000000000..2844636c0cf2
---- /dev/null
-+++ b/arch/arm/configs/mvebu_v5_defconfig
-@@ -0,0 +1,172 @@
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_LOG_BUF_SHIFT=19
-+CONFIG_PROFILING=y
-+CONFIG_OPROFILE=y
-+CONFIG_KPROBES=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_ARCH_MULTI_V7 is not set
-+CONFIG_ARCH_MVEBU=y
-+CONFIG_MACH_KIRKWOOD=y
-+# CONFIG_CPU_FEROCEON_OLD_ID is not set
-+CONFIG_PCI_MVEBU=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_HIGHMEM=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_STAT_DETAILS=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_CPU_IDLE=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_MULTICAST=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+# CONFIG_IPV6 is not set
-+CONFIG_NET_PKTGEN=m
-+CONFIG_CFG80211=y
-+CONFIG_MAC80211=y
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_JEDECPROBE=y
-+CONFIG_MTD_CFI_ADV_OPTIONS=y
-+CONFIG_MTD_CFI_GEOMETRY=y
-+# CONFIG_MTD_MAP_BANK_WIDTH_4 is not set
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_STAA=y
-+CONFIG_MTD_PHYSMAP=y
-+CONFIG_MTD_M25P80=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_ORION=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_EEPROM_AT24=y
-+# CONFIG_SCSI_PROC_FS is not set
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_BLK_DEV_SR=m
-+CONFIG_CHR_DEV_SG=m
-+CONFIG_ATA=y
-+CONFIG_SATA_AHCI=y
-+CONFIG_SATA_MV=y
-+CONFIG_NETDEVICES=y
-+CONFIG_NET_DSA_MV88E6123_61_65=y
-+CONFIG_MV643XX_ETH=y
-+CONFIG_R8169=y
-+CONFIG_MARVELL_PHY=y
-+CONFIG_LIBERTAS=y
-+CONFIG_LIBERTAS_SDIO=y
-+CONFIG_INPUT_EVDEV=y
-+CONFIG_KEYBOARD_GPIO=y
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_LEGACY_PTY_COUNT=16
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=2
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+# CONFIG_I2C_COMPAT is not set
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_MV64XXX=y
-+CONFIG_SPI=y
-+CONFIG_SPI_ORION=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_POWER_SUPPLY=y
-+CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_GPIO=y
-+CONFIG_POWER_RESET_QNAP=y
-+CONFIG_SENSORS_ADT7475=y
-+CONFIG_SENSORS_LM63=y
-+CONFIG_SENSORS_LM75=y
-+CONFIG_SENSORS_LM85=y
-+CONFIG_THERMAL=y
-+CONFIG_WATCHDOG=y
-+CONFIG_ORION_WATCHDOG=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_HID_DRAGONRISE=y
-+CONFIG_HID_GYRATION=y
-+CONFIG_HID_TWINHAN=y
-+CONFIG_HID_NTRIG=y
-+CONFIG_HID_PANTHERLORD=y
-+CONFIG_HID_PETALYNX=y
-+CONFIG_HID_SAMSUNG=y
-+CONFIG_HID_SONY=y
-+CONFIG_HID_SUNPLUS=y
-+CONFIG_HID_GREENASIA=y
-+CONFIG_HID_SMARTJOYPLUS=y
-+CONFIG_HID_TOPSEED=y
-+CONFIG_HID_THRUSTMASTER=y
-+CONFIG_HID_ZEROPLUS=y
-+CONFIG_USB=y
-+CONFIG_USB_XHCI_HCD=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_ROOT_HUB_TT=y
-+CONFIG_USB_PRINTER=m
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_STORAGE_DATAFAB=y
-+CONFIG_USB_STORAGE_FREECOM=y
-+CONFIG_USB_STORAGE_SDDR09=y
-+CONFIG_USB_STORAGE_SDDR55=y
-+CONFIG_USB_STORAGE_JUMPSHOT=y
-+CONFIG_MMC=y
-+CONFIG_SDIO_UART=y
-+CONFIG_MMC_MVSDIO=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_RS5C372=y
-+CONFIG_RTC_DRV_PCF8563=y
-+CONFIG_RTC_DRV_S35390A=y
-+CONFIG_RTC_DRV_MV=y
-+CONFIG_DMADEVICES=y
-+CONFIG_MV_XOR=y
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_FS_XATTR is not set
-+CONFIG_EXT4_FS=y
-+CONFIG_ISO9660_FS=m
-+CONFIG_JOLIET=y
-+CONFIG_UDF_FS=m
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_CRAMFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_CODEPAGE_850=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_ISO8859_2=y
-+CONFIG_NLS_UTF8=y
-+CONFIG_DEBUG_INFO=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_SCHED_DEBUG is not set
-+# CONFIG_DEBUG_PREEMPT is not set
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_CRYPTO_CBC=m
-+CONFIG_CRYPTO_PCBC=m
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+CONFIG_CRYPTO_DEV_MV_CESA=y
-+CONFIG_CRC_CCITT=y
-+CONFIG_LIBCRC32C=y
--- 
-1.8.5.3
+thx,
+
+Jason.
