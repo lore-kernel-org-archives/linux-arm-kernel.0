@@ -1,144 +1,91 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 22 Feb 2014 16:53:32 +0100
-Subject: [PATCH v7 03/15] ahci-platform: Add support for an optional regulator
- for sata-target power
-In-Reply-To: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
-References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1393084424-31099-4-git-send-email-hdegoede@redhat.com>
+Date: Sat, 22 Feb 2014 16:53:29 +0100
+Subject: No subject
+Message-ID: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- .../devicetree/bindings/ata/ahci-platform.txt      |  1 +
- drivers/ata/ahci.h                                 |  2 ++
- drivers/ata/ahci_platform.c                        | 36 ++++++++++++++++++++--
- 3 files changed, 37 insertions(+), 2 deletions(-)
+Hi all,
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index 3ced07d..1ac807f 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -11,6 +11,7 @@ Required properties:
- Optional properties:
- - dma-coherent      : Present if dma operations are coherent
- - clocks            : a list of phandle + clock specifier pairs
-+- target-supply     : regulator for SATA target power
- 
- Example:
-         sata at ffe08000 {
-diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-index c12862b..bf8100c 100644
---- a/drivers/ata/ahci.h
-+++ b/drivers/ata/ahci.h
-@@ -37,6 +37,7 @@
- 
- #include <linux/clk.h>
- #include <linux/libata.h>
-+#include <linux/regulator/consumer.h>
- 
- /* Enclosure Management Control */
- #define EM_CTRL_MSG_TYPE              0x000f0000
-@@ -323,6 +324,7 @@ struct ahci_host_priv {
- 	u32			em_buf_sz;	/* EM buffer size in byte */
- 	u32			em_msg_type;	/* EM message type */
- 	struct clk		*clks[AHCI_MAX_CLKS]; /* Optional */
-+	struct regulator	*target_pwr;	/* Optional */
- 	void			*plat_data;	/* Other platform data */
- 	/*
- 	 * Optional ahci_start_engine override, if not set this gets set to the
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index 609975d..907c076 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -192,6 +192,14 @@ static int ahci_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
-+	hpriv->target_pwr = devm_regulator_get_optional(dev, "target");
-+	if (IS_ERR(hpriv->target_pwr)) {
-+		rc = PTR_ERR(hpriv->target_pwr);
-+		if (rc == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		hpriv->target_pwr = NULL;
-+	}
-+
- 	for (i = 0; i < AHCI_MAX_CLKS; i++) {
- 		/*
- 		 * For now we must use clk_get(dev, NULL) for the first clock,
-@@ -213,9 +221,15 @@ static int ahci_probe(struct platform_device *pdev)
- 		hpriv->clks[i] = clk;
- 	}
- 
-+	if (hpriv->target_pwr) {
-+		rc = regulator_enable(hpriv->target_pwr);
-+		if (rc)
-+			goto free_clk;
-+	}
-+
- 	rc = ahci_enable_clks(dev, hpriv);
- 	if (rc)
--		goto free_clk;
-+		goto disable_regulator;
- 
- 	/*
- 	 * Some platforms might need to prepare for mmio region access,
-@@ -298,6 +312,9 @@ pdata_exit:
- 		pdata->exit(dev);
- disable_unprepare_clk:
- 	ahci_disable_clks(hpriv);
-+disable_regulator:
-+	if (hpriv->target_pwr)
-+		regulator_disable(hpriv->target_pwr);
- free_clk:
- 	ahci_put_clks(hpriv);
- 	return rc;
-@@ -314,6 +331,9 @@ static void ahci_host_stop(struct ata_host *host)
- 
- 	ahci_disable_clks(hpriv);
- 	ahci_put_clks(hpriv);
-+
-+	if (hpriv->target_pwr)
-+		regulator_disable(hpriv->target_pwr);
- }
- 
- #ifdef CONFIG_PM_SLEEP
-@@ -350,6 +370,9 @@ static int ahci_suspend(struct device *dev)
- 
- 	ahci_disable_clks(hpriv);
- 
-+	if (hpriv->target_pwr)
-+		regulator_disable(hpriv->target_pwr);
-+
- 	return 0;
- }
- 
-@@ -360,9 +383,15 @@ static int ahci_resume(struct device *dev)
- 	struct ahci_host_priv *hpriv = host->private_data;
- 	int rc;
- 
-+	if (hpriv->target_pwr) {
-+		rc = regulator_enable(hpriv->target_pwr);
-+		if (rc)
-+			return rc;
-+	}
-+
- 	rc = ahci_enable_clks(dev, hpriv);
- 	if (rc)
--		return rc;
-+		goto disable_regulator;
- 
- 	if (pdata && pdata->resume) {
- 		rc = pdata->resume(dev);
-@@ -384,6 +413,9 @@ static int ahci_resume(struct device *dev)
- 
- disable_unprepare_clk:
- 	ahci_disable_clks(hpriv);
-+disable_regulator:
-+	if (hpriv->target_pwr)
-+		regulator_disable(hpriv->target_pwr);
- 
- 	return rc;
- }
--- 
-1.9.0
+Here is v7 of my patchset for adding ahci-sunxi support. This is hopefully
+the final final version of this set :)
+
+Note I'm going on vacation for a week starting Monday, so if I'm not responding
+that is why. Tejun if you feel some small cleanups are still necessary and
+you don't want to wait for me to get back feel free to squash in any cleanups
+you deem necessary.
+
+This has been tested with Allwinner A10, Allwinner A20 and Freeware imx6x SoCs,
+including suspend / resume. Note that the ahci_imx driver now also has imx53
+sata support, it would be good if someone could test that with this series.
+
+
+History:
+
+v1, by Olliver Schinagl:
+This was using the approach of having a platform device which probe method
+creates a new child platform device which gets driven by ahci_platform.c,
+as done by ahci_imx.c .
+
+v2, by Hans de Goede:
+Stand-alone platform driver based on Olliver's work
+
+v3, by Hans de Goede:
+patch-series, with 4 different parts
+a) Make ahci_platform.c more generic, handle more then 1 clk, target pwr
+   regulator
+b) New ahci-sunxi code only populating ahci_platform_data, passed to
+   ahci_platform.c to of_device_id matching.
+c) Refactor ahci-imx code to work the same as the new ahci-sunxi code, this
+   is the reason why v3 is an RFC, I'm waiting for the wandboard I ordered to
+   arrive so that I can actually test this.
+d) dts bindings for the sunxi ahci parts
+
+v4, by Hans de Goede:
+patch-series, with 5 different parts:
+a) Make ahci_platform.c more generic, handle more then 1 clk, target pwr
+   regulator
+b) Turn parts of ahci_platform.c into a library for use by other drivers
+c) New ahci-sunxi driver using the ahci_platform.c library functionality
+d) Refactor ahci-imx code to work the same as the new ahci-sunxi code
+e) dts bindings for the sunxi ahci parts
+
+v5:
+v4 + the following changes:
+1) fsl,imx6q driver is now tested
+2) fixed suspend / resume on fsl,imx6q
+3) Modifed devicetree node naming to match dt spec
+4) Reworked the busy waiting code in the sunxi-phy handling as suggested by
+   Russell King
+
+v6:
+v5 rebased on top of 3.14-rc3 + the following changes
+1) Added Roger Quadros' generic phy support series
+2) Added a "ARM: sun4i: dt: Remove grouping + simple-bus for regulators" dts
+   patch
+
+v7:
+v6 + the following changes:
+1) Addressed all Tejun's review remarks:
+  * Added function header comments to all exported ahci_platform functions
+  * Added comments in some other places
+  * Removed use of 2 empty lines to separate functions in some cases
+  * Use devres to automatically call ahci_platform_put_resources on
+    get_resource failure, probe failure and regular device remove
+2) Dropped patches to move ahci_host_priv struct declaration to include/linux,
+  this was a left-over from v3 and is no longer necessary
+3) Updated Roger's "ata: ahci_platform: Manage SATA PHY" patch:
+  * Update function header comments for the changes this makes
+  * Drop the Kconfig PHY requires hack, my patch for the phy-core to always be
+    built-in has been queued in Greg KH's tree, so this is no longer necessary.
+4) Dropped Roger's "ata: ahci_platform: Add 'struct device' argument to ahci_platform_put_resources()"
+  patch, ahci_platform_put_resources already has a device argument as result
+  of it being changed into a devres release function
+
+Tejun, can you please add patches 1-12 to your ata tree for 3.15 ?
+
+Maxime, can you please add patch 13-15 to your dts tree for 3.15 ?
+
+Thanks & Regards,
+
+Hans
