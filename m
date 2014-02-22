@@ -1,219 +1,167 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 22 Feb 2014 20:15:02 +0100
-Subject: [PATCH v4 20/22] ARM: config: Add a multi_v5_defconfig
+Date: Sat, 22 Feb 2014 20:14:52 +0100
+Subject: [PATCH v4 10/22] ARM: MM: Add DT binding for Feroceon L2 cache
 In-Reply-To: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
 References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1393096504-11844-21-git-send-email-andrew@lunn.ch>
+Message-ID: <1393096504-11844-11-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow regression build testing of multi v5 systems, add a
-multi_v5_defconfig, similar to the multi_v7_defconfig. This is based
-on kirkwood_defconfig, but with a few other boards added which claim
-to be MULTI_v5.
+Instantiate the L2 cache from DT. Indicate in DT where the cache
+control register is so that it is possible to enable/disable write
+through on the CPU.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+cc: devicetree at vger.kernel.org
 ---
-v4
-Disable low level debug
-Enable more drivers needed by Kirkwood devices.
-Ensure ORION_WATCHDOG is enabled.
+v2:
+Change compatible strings to follow l2x0 convention
+Only expect register for kirkwood-cache.
+Default to write through if no DT node.
+Rename writethrough to wt-override to follow l2cc binding.
+Split kirkwood.dtsi change into a patch of its own.
+v3
+Remove wt-override from the binding
+Respect CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
 ---
- arch/arm/configs/multi_v5_defconfig | 185 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 185 insertions(+)
- create mode 100644 arch/arm/configs/multi_v5_defconfig
+ .../devicetree/bindings/arm/mrvl/feroceon.txt      | 16 ++++++++
+ arch/arm/include/asm/hardware/cache-feroceon-l2.h  |  2 +
+ arch/arm/mach-kirkwood/board-dt.c                  | 18 ++-------
+ arch/arm/mm/cache-feroceon-l2.c                    | 43 ++++++++++++++++++++++
+ 4 files changed, 64 insertions(+), 15 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mrvl/feroceon.txt
 
-diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
+diff --git a/Documentation/devicetree/bindings/arm/mrvl/feroceon.txt b/Documentation/devicetree/bindings/arm/mrvl/feroceon.txt
 new file mode 100644
-index 000000000000..2bc1e1707930
+index 000000000000..0d244b999d10
 --- /dev/null
-+++ b/arch/arm/configs/multi_v5_defconfig
-@@ -0,0 +1,185 @@
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_LOG_BUF_SHIFT=19
-+CONFIG_PROFILING=y
-+CONFIG_OPROFILE=y
-+CONFIG_KPROBES=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_ARCH_MULTI_V7 is not set
-+CONFIG_ARCH_MVEBU=y
-+CONFIG_MACH_KIRKWOOD=y
-+CONFIG_ARCH_MXC=y
-+CONFIG_MACH_IMX25_DT=y
-+CONFIG_MACH_IMX27_DT=y
-+CONFIG_ARCH_U300=y
-+CONFIG_PCI_MVEBU=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_HIGHMEM=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_STAT_DETAILS=y
-+CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_CPU_IDLE=y
-+CONFIG_ARM_KIRKWOOD_CPUIDLE=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_MULTICAST=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+# CONFIG_IPV6 is not set
-+CONFIG_NET_PKTGEN=m
-+CONFIG_CFG80211=y
-+CONFIG_MAC80211=y
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_JEDECPROBE=y
-+CONFIG_MTD_CFI_ADV_OPTIONS=y
-+CONFIG_MTD_CFI_GEOMETRY=y
-+# CONFIG_MTD_MAP_BANK_WIDTH_4 is not set
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_STAA=y
-+CONFIG_MTD_PHYSMAP=y
-+CONFIG_MTD_M25P80=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_ORION=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_EEPROM_AT24=y
-+# CONFIG_SCSI_PROC_FS is not set
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_BLK_DEV_SR=m
-+CONFIG_CHR_DEV_SG=m
-+CONFIG_ATA=y
-+CONFIG_SATA_AHCI=y
-+CONFIG_SATA_MV=y
-+CONFIG_NETDEVICES=y
-+CONFIG_NET_DSA_MV88E6123_61_65=y
-+CONFIG_MV643XX_ETH=y
-+CONFIG_R8169=y
-+CONFIG_MARVELL_PHY=y
-+CONFIG_LIBERTAS=y
-+CONFIG_LIBERTAS_SDIO=y
-+CONFIG_INPUT_EVDEV=y
-+CONFIG_KEYBOARD_GPIO=y
-+# CONFIG_INPUT_MOUSE is not set
-+CONFIG_LEGACY_PTY_COUNT=16
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=2
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+# CONFIG_I2C_COMPAT is not set
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_MV64XXX=y
-+CONFIG_I2C_NOMADIK=y
-+CONFIG_SPI=y
-+CONFIG_SPI_ORION=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_POWER_SUPPLY=y
-+CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_GPIO=y
-+CONFIG_POWER_RESET_QNAP=y
-+CONFIG_SENSORS_ADT7475=y
-+CONFIG_SENSORS_LM63=y
-+CONFIG_SENSORS_LM75=y
-+CONFIG_SENSORS_LM85=y
-+CONFIG_THERMAL=y
-+CONFIG_KIRKWOOD_THERMAL=y
-+CONFIG_WATCHDOG=y
-+CONFIG_ORION_WATCHDOG=y
-+# CONFIG_ABX500_CORE is not set
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_SOC=y
-+CONFIG_SND_KIRKWOOD_SOC=y
-+CONFIG_HID_DRAGONRISE=y
-+CONFIG_HID_GYRATION=y
-+CONFIG_HID_TWINHAN=y
-+CONFIG_HID_NTRIG=y
-+CONFIG_HID_PANTHERLORD=y
-+CONFIG_HID_PETALYNX=y
-+CONFIG_HID_SAMSUNG=y
-+CONFIG_HID_SONY=y
-+CONFIG_HID_SUNPLUS=y
-+CONFIG_HID_GREENASIA=y
-+CONFIG_HID_SMARTJOYPLUS=y
-+CONFIG_HID_TOPSEED=y
-+CONFIG_HID_THRUSTMASTER=y
-+CONFIG_HID_ZEROPLUS=y
-+CONFIG_USB=y
-+CONFIG_USB_XHCI_HCD=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_ROOT_HUB_TT=y
-+CONFIG_USB_PRINTER=m
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_STORAGE_DATAFAB=y
-+CONFIG_USB_STORAGE_FREECOM=y
-+CONFIG_USB_STORAGE_SDDR09=y
-+CONFIG_USB_STORAGE_SDDR55=y
-+CONFIG_USB_STORAGE_JUMPSHOT=y
-+CONFIG_MMC=y
-+CONFIG_SDIO_UART=y
-+CONFIG_MMC_MVSDIO=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_TIMER=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_RS5C372=y
-+CONFIG_RTC_DRV_PCF8563=y
-+CONFIG_RTC_DRV_S35390A=y
-+CONFIG_RTC_DRV_MV=y
-+CONFIG_DMADEVICES=y
-+CONFIG_MV_XOR=y
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_FS_XATTR is not set
-+CONFIG_EXT4_FS=y
-+CONFIG_ISO9660_FS=m
-+CONFIG_JOLIET=y
-+CONFIG_UDF_FS=m
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_JFFS2_FS=y
-+CONFIG_CRAMFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_CODEPAGE_850=y
-+CONFIG_NLS_ISO8859_1=y
-+CONFIG_NLS_ISO8859_2=y
-+CONFIG_NLS_UTF8=y
-+CONFIG_DEBUG_INFO=y
-+CONFIG_DEBUG_FS=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_DEBUG_KERNEL=y
-+# CONFIG_SCHED_DEBUG is not set
-+# CONFIG_DEBUG_PREEMPT is not set
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_CRYPTO_CBC=m
-+CONFIG_CRYPTO_PCBC=m
-+# CONFIG_CRYPTO_ANSI_CPRNG is not set
-+CONFIG_CRYPTO_DEV_MV_CESA=y
-+CONFIG_CRC_CCITT=y
-+CONFIG_LIBCRC32C=y
++++ b/Documentation/devicetree/bindings/arm/mrvl/feroceon.txt
+@@ -0,0 +1,16 @@
++* Marvell Feroceon Cache
++
++Required properties:
++- compatible : Should be either "marvell,feroceon-cache" or
++  	       "marvell,kirkwood-cache".
++
++Optional properties:
++- reg        : Address of the L2 cache control register. Mandatory for
++  	       "marvell,kirkwood-cache", not used by "marvell,feroceon-cache"
++
++
++Example:
++		l2: l2-cache at 20128 {
++			compatible = "marvell,kirkwood-cache";
++			reg = <0x20128 0x4>;
++		};
+diff --git a/arch/arm/include/asm/hardware/cache-feroceon-l2.h b/arch/arm/include/asm/hardware/cache-feroceon-l2.h
+index 8edd330aabf6..12e1588dc4f1 100644
+--- a/arch/arm/include/asm/hardware/cache-feroceon-l2.h
++++ b/arch/arm/include/asm/hardware/cache-feroceon-l2.h
+@@ -9,3 +9,5 @@
+  */
+ 
+ extern void __init feroceon_l2_init(int l2_wt_override);
++extern int __init feroceon_of_init(void);
++
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 29c246858d5a..ec0702c02d6c 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -42,19 +42,6 @@ static void __init kirkwood_map_io(void)
+ 	iotable_init(kirkwood_io_desc, ARRAY_SIZE(kirkwood_io_desc));
+ }
+ 
+-static void __init kirkwood_l2_init(void)
+-{
+-#ifdef CONFIG_CACHE_FEROCEON_L2
+-#ifdef CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH
+-	writel(readl(L2_CONFIG_REG) | L2_WRITETHROUGH, L2_CONFIG_REG);
+-	feroceon_l2_init(1);
+-#else
+-	writel(readl(L2_CONFIG_REG) & ~L2_WRITETHROUGH, L2_CONFIG_REG);
+-	feroceon_l2_init(0);
+-#endif
+-#endif
+-}
+-
+ static struct resource kirkwood_cpufreq_resources[] = {
+ 	[0] = {
+ 		.start  = CPU_CONTROL_PHYS,
+@@ -211,8 +198,9 @@ static void __init kirkwood_dt_init(void)
+ 
+ 	BUG_ON(mvebu_mbus_dt_init());
+ 
+-	kirkwood_l2_init();
+-
++#ifdef CONFIG_CACHE_FEROCEON_L2
++	feroceon_of_init();
++#endif
+ 	kirkwood_cpufreq_init();
+ 	kirkwood_cpuidle_init();
+ 
+diff --git a/arch/arm/mm/cache-feroceon-l2.c b/arch/arm/mm/cache-feroceon-l2.c
+index 898362e7972b..8dc1a2b5a8ed 100644
+--- a/arch/arm/mm/cache-feroceon-l2.c
++++ b/arch/arm/mm/cache-feroceon-l2.c
+@@ -13,11 +13,16 @@
+  */
+ 
+ #include <linux/init.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/highmem.h>
++#include <linux/io.h>
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+ #include <asm/hardware/cache-feroceon-l2.h>
+ 
++#define L2_WRITETHROUGH_KIRKWOOD	BIT(4)
++
+ /*
+  * Low-level cache maintenance operations.
+  *
+@@ -350,3 +355,41 @@ void __init feroceon_l2_init(int __l2_wt_override)
+ 	printk(KERN_INFO "Feroceon L2: Cache support initialised%s.\n",
+ 			 l2_wt_override ? ", in WT override mode" : "");
+ }
++#ifdef CONFIG_OF
++static const struct of_device_id feroceon_ids[] __initconst = {
++	{ .compatible = "marvell,kirkwood-cache"},
++	{ .compatible = "marvell,feroceon-cache"},
++	{}
++};
++
++int __init feroceon_of_init(void)
++{
++	struct device_node *node;
++	void __iomem *base;
++	bool l2_wt_override = false;
++	struct resource res;
++
++#if defined(CONFIG_CACHE_FEROCEON_L2_WRITETHROUGH)
++	l2_wt_override = true;
++#endif
++
++	node = of_find_matching_node(NULL, feroceon_ids);
++	if (node && of_device_is_compatible(node, "marvell,kirkwood-cache")) {
++		if (of_address_to_resource(node, 0, &res))
++			return -ENODEV;
++
++		base = ioremap(res.start, resource_size(&res));
++		if (!base)
++			return -ENOMEM;
++
++		if (l2_wt_override)
++			writel(readl(base) | L2_WRITETHROUGH_KIRKWOOD, base);
++		else
++			writel(readl(base) & ~L2_WRITETHROUGH_KIRKWOOD, base);
++	}
++
++	feroceon_l2_init(l2_wt_override);
++
++	return 0;
++}
++#endif
 -- 
 1.8.5.3
