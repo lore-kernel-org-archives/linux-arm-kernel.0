@@ -1,58 +1,81 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Sun, 23 Feb 2014 21:36:12 +0100
-Subject: [PATCH v2 0/2] ARM: OMAP4: Fix gpmc_fck clock
-In-Reply-To: <20140221232323.GD5342@atomide.com>
-References: <1392801305-1698-1-git-send-email-florian.vaussard@epfl.ch>
- <5304DA2C.3030605@ti.com> <53050573.8090506@epfl.ch>
- <5305D02D.5020702@ti.com> <20140221232323.GD5342@atomide.com>
-Message-ID: <530A5BBC.90009@epfl.ch>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 23 Feb 2014 16:10:32 -0500
+Subject: [PATCH 0/2] Marvell Armada 375 and 38x pinctrl drivers
+In-Reply-To: <20140217164406.17d3f59e@skate>
+References: <1392051896-19178-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20140217164406.17d3f59e@skate>
+Message-ID: <20140223211032.GR7862@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Linus,
 
-On 02/22/2014 12:23 AM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [140220 01:54]:
->> On 02/19/2014 09:26 PM, Florian Vaussard wrote:
->>>
->>> On 02/19/2014 05:22 PM, Tero Kristo wrote:
->>>> On 02/19/2014 11:15 AM, Florian Vaussard wrote:
->>>>> Hello,
->>>>>
->>>>> Trying to get my SMSC9221 working on OMAP4 with DT,
->>>>> I faced a misconfigured gpmc_fck (dummy clock set to 0)
->>>>> resulting in serveral division-by-zero, misconfigured
->>>>> timings and driver lost in the La La Land.
->>>>>
->>>>> To solve this, patch 1 removes gpmc_fck from the dummy
->>>>> clocks, and patch 2 adds the gpmc_fck DT node and
->>>>> reference it from the gpmc node.
->>>>>
->>>>> Tested on DuoVero/Parlor (OMAP4430) with SMSC9221.
->>>>
->>>> I can't test GPMC myself, but other than that, this set looks good to go.
->>>>
->>>
->>> Thank you. Would you like more test coverage by other people? I would
->>> like to see this in -rc if possible, as it is needed to boot my OMAP4
->>> system.
->>
->> Well, I just think the driver clock change should be acked by
->> someone who knows gpmc better than me.
+On Mon, Feb 17, 2014 at 04:44:06PM +0100, Thomas Petazzoni wrote:
+> Linus,
 > 
-> Hmm do we also need to fix this for other omaps? We at least have
-> the following refrerences:
+> Do you intend to integrate the following patches for 3.15 ? They have
+> been Acked-by Jason Cooper, one of the mvebu maintainer, and are just
+> additions of simple mvebu pinctrl drivers that follow the existing
+> mvebu pinctrl common logic with nothing fancy.
 > 
-> $ git grep dummy_ck drivers/ | grep -i gpmc
-> drivers/clk/ti/clk-44xx.c:      DT_CLK("50000000.gpmc", "fck", "dummy_ck"),
-> drivers/clk/ti/clk-54xx.c:      DT_CLK(NULL, "gpmc_ck", "dummy_ck"),
-> drivers/clk/ti/clk-7xx.c:       DT_CLK(NULL, "gpmc_ck", "dummy_ck"),
+> We have agreed with Sebastian Hesselbarth, who is doing a more serious
+> rework of the pinctrl mvebu stuff, that those two patches should go in
+> first, so that they don't miss 3.15.
+
+v4 of Sebastian's rework now depends on this series.  As you've
+expressed consent with Sebastian's series going through mvebu/arm-soc,
+I'm going to go ahead and pull this into a topic branch as well.
+
+If you'd like the mvebu pinctrl branches to go through your tree, just
+let me know and I'll send you a pull request for them.
+
+thx,
+
+Jason.
+
+> On Mon, 10 Feb 2014 18:04:54 +0100, Thomas Petazzoni wrote:
+> > Linus,
+> > 
+> > Here are two patches that add the pinctrl drivers for two new Marvell
+> > ARM SOCs that belong to the mach-mvebu family: the Armada 375 and the
+> > Armada 380/385. They are based on Cortex-A9 CPU cores, and share a
+> > number of peripherals with their predecessors in the mach-mvebu
+> > family. pinctrl-wise, they have a completely similar register layout
+> > than Armada 370/XP, so only a list of pins and functions has to be
+> > introduced, and therefore the drivers are straightforward.
+> > 
+> > The core support (arch/arm/mach-mvebu) for these SOCs will be posted
+> > shortly, and we're aiming at having this merged for 3.15 if possible.
+> > 
+> > Thanks!
+> > 
+> > Thomas
+> > 
+> > Thomas Petazzoni (2):
+> >   pinctrl: mvebu: add pin-muxing driver for the Marvell Armada 375
+> >   pinctrl: mvebu: add pin-muxing driver for the Marvell Armada 380/385
+> > 
+> >  .../pinctrl/marvell,armada-375-pinctrl.txt         |  81 ++++
+> >  .../pinctrl/marvell,armada-38x-pinctrl.txt         |  79 ++++
+> >  drivers/pinctrl/mvebu/Kconfig                      |   8 +
+> >  drivers/pinctrl/mvebu/Makefile                     |   2 +
+> >  drivers/pinctrl/mvebu/pinctrl-armada-375.c         | 441 ++++++++++++++++++++
+> >  drivers/pinctrl/mvebu/pinctrl-armada-38x.c         | 445 +++++++++++++++++++++
+> >  6 files changed, 1056 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
+> >  create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
+> >  create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-375.c
+> >  create mode 100644 drivers/pinctrl/mvebu/pinctrl-armada-38x.c
+> > 
 > 
-
-Yes, the same applies to OMAP5 and DRA7. For OMAP5, gpmc_fclk is
-connected to L3MAIN2_L3_GICLK, which is a gated l3_iclk. For DRA7, I
-have no idea, as the TRM is not public. Someone from  TI?
-
-And I have no way to test this.
-
-Cheers,
-Florian
+> 
+> 
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
