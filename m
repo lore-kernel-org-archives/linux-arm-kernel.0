@@ -1,38 +1,45 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 23 Feb 2014 18:19:39 +0100
-Subject: [PATCH 1/4] ARM: Kirkwood: Add audio node to kirkwood.dtsi
+Date: Sun, 23 Feb 2014 18:19:40 +0100
+Subject: [PATCH 2/4] ARM: mvebu: Add i2c alias so setting bus number
 In-Reply-To: <1393175982-18516-1-git-send-email-andrew@lunn.ch>
 References: <1393175982-18516-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1393175982-18516-2-git-send-email-andrew@lunn.ch>
+Message-ID: <1393175982-18516-3-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The binding has existed for a while, so add the missing node so it can
-be used by devices.
+When using platform_driver instantiation, the i2c bus was given bus
+number 0. The kirkwood-t5325 audio driver has this bus number hard
+coded for the address of the codec. However by default device tree i2c
+busses are dynamically allocated a bus number, starting from 1. Thus
+the kirkwood-t5325 cannot find its audio codec. By adding an alias in
+the DT file we can control the bus number and set it to 0. The codec
+can then be found.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/kirkwood.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 7b921b30cfcb..841ca3affbf5 100644
+index 841ca3affbf5..ae63c7ad751e 100644
 --- a/arch/arm/boot/dts/kirkwood.dtsi
 +++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -310,5 +310,14 @@
- 			#phy-cells = <0>;
- 			status = "ok";
- 		};
-+
-+                audio0: audio-controller at a0000 {
-+			compatible = "marvell,kirkwood-audio";
-+                        reg = <0xa0000 0x2210>;
-+                        interrupts = <24>;
-+                        clocks = <&gate_clk 9>;
-+                        clock-names = "internal";
-+                        status = "disabled";
-+                };
+@@ -24,6 +24,7 @@
+ 	aliases {
+ 	       gpio0 = &gpio0;
+ 	       gpio1 = &gpio1;
++	       i2c0 = &i2c0;
  	};
- };
+ 
+ 	mbus {
+@@ -111,7 +112,7 @@
+ 			clocks = <&gate_clk 7>;
+ 		};
+ 
+-		i2c at 11000 {
++		i2c0: i2c at 11000 {
+ 			compatible = "marvell,mv64xxx-i2c";
+ 			reg = <0x11000 0x20>;
+ 			#address-cells = <1>;
 -- 
 1.8.5.3
