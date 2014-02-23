@@ -1,28 +1,21 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 23 Feb 2014 15:21:08 +0100
-Subject: [PATCH v4 10/16] pinctrl: mvebu: armada-375: provide generic mpp
- callbacks
+Date: Sun, 23 Feb 2014 15:21:11 +0100
+Subject: [PATCH v4 13/16] pinctrl: mvebu: remove common get/set functions
 In-Reply-To: <1393165274-32492-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1393165274-32492-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1393165274-32492-11-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1393165274-32492-14-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+With every SoC always providing its own get/set callbacks, we can now
+remove the generic ones, remove the obsolete base address, and always
+use the provided callbacks.
 
-We want to get rid of passing register addresses to common pinctrl
-driver, so provide set/get callbacks that use generic mpp pins helper
-and will be used later.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
-Changelog:
-v3->v4:
-- also take care of new Armada 375 pinctrl driver
-- use generic mpp helpers (Suggested by Thomas Petazzoni)
-
 Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
@@ -32,31 +25,89 @@ Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/pinctrl/mvebu/pinctrl-armada-375.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c | 49 ++---------------------------------
+ 1 file changed, 2 insertions(+), 47 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-375.c b/drivers/pinctrl/mvebu/pinctrl-armada-375.c
-index c741a347e3d8..30958873cd9b 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-375.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-375.c
-@@ -23,6 +23,18 @@
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+index 45e99e80502f..9908374f8f92 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+@@ -50,7 +50,6 @@ struct mvebu_pinctrl {
+ 	struct device *dev;
+ 	struct pinctrl_dev *pctldev;
+ 	struct pinctrl_desc desc;
+-	void __iomem *base;
+ 	struct mvebu_pinctrl_group *groups;
+ 	unsigned num_groups;
+ 	struct mvebu_pinctrl_function *functions;
+@@ -138,43 +137,6 @@ static struct mvebu_pinctrl_function *mvebu_pinctrl_find_function_by_name(
+ 	return NULL;
+ }
  
- #include "pinctrl-mvebu.h"
+-/*
+- * Common mpp pin configuration registers on MVEBU are
+- * registers of eight 4-bit values for each mpp setting.
+- * Register offset and bit mask are calculated accordingly below.
+- */
+-static int mvebu_common_mpp_get(struct mvebu_pinctrl *pctl,
+-				struct mvebu_pinctrl_group *grp,
+-				unsigned long *config)
+-{
+-	unsigned pin = grp->gid;
+-	unsigned off = (pin / MPPS_PER_REG) * MPP_BITS;
+-	unsigned shift = (pin % MPPS_PER_REG) * MPP_BITS;
+-
+-	*config = readl(pctl->base + off);
+-	*config >>= shift;
+-	*config &= MPP_MASK;
+-
+-	return 0;
+-}
+-
+-static int mvebu_common_mpp_set(struct mvebu_pinctrl *pctl,
+-				struct mvebu_pinctrl_group *grp,
+-				unsigned long config)
+-{
+-	unsigned pin = grp->gid;
+-	unsigned off = (pin / MPPS_PER_REG) * MPP_BITS;
+-	unsigned shift = (pin % MPPS_PER_REG) * MPP_BITS;
+-	unsigned long reg;
+-
+-	reg = readl(pctl->base + off);
+-	reg &= ~(MPP_MASK << shift);
+-	reg |= (config << shift);
+-	writel(reg, pctl->base + off);
+-
+-	return 0;
+-}
+-
+ static int mvebu_pinconf_group_get(struct pinctrl_dev *pctldev,
+ 				unsigned gid, unsigned long *config)
+ {
+@@ -184,10 +146,7 @@ static int mvebu_pinconf_group_get(struct pinctrl_dev *pctldev,
+ 	if (!grp->ctrl)
+ 		return -EINVAL;
  
-+static void __iomem *mpp_base;
-+
-+static int armada_375_mpp_ctrl_get(unsigned pid, unsigned long *config)
-+{
-+	return default_mpp_ctrl_get(mpp_base, pid, config);
-+}
-+
-+static int armada_375_mpp_ctrl_set(unsigned pid, unsigned long config)
-+{
-+	return default_mpp_ctrl_set(mpp_base, pid, config);
-+}
-+
- static struct mvebu_mpp_mode mv88f6720_mpp_modes[] = {
- 	MPP_MODE(0,
- 		 MPP_FUNCTION(0x0, "gpio", NULL),
+-	if (grp->ctrl->mpp_get)
+-		return grp->ctrl->mpp_get(grp->pins[0], config);
+-
+-	return mvebu_common_mpp_get(pctl, grp, config);
++	return grp->ctrl->mpp_get(grp->pins[0], config);
+ }
+ 
+ static int mvebu_pinconf_group_set(struct pinctrl_dev *pctldev,
+@@ -202,11 +161,7 @@ static int mvebu_pinconf_group_set(struct pinctrl_dev *pctldev,
+ 		return -EINVAL;
+ 
+ 	for (i = 0; i < num_configs; i++) {
+-		if (grp->ctrl->mpp_set)
+-			ret = grp->ctrl->mpp_set(grp->pins[0], configs[i]);
+-		else
+-			ret = mvebu_common_mpp_set(pctl, grp, configs[i]);
+-
++		ret = grp->ctrl->mpp_set(grp->pins[0], configs[i]);
+ 		if (ret)
+ 			return ret;
+ 	} /* for each config */
 -- 
 1.8.5.3
