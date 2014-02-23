@@ -1,38 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 23 Feb 2014 18:34:17 +0100
-Subject: [PATCH 3/4] ARM: mvebu: Add HP T5325 thin client
-In-Reply-To: <1393175982-18516-4-git-send-email-andrew@lunn.ch>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 23 Feb 2014 21:34:22 +0400
+Subject: [PATCH 1/4] ARM: Kirkwood: Add audio node to kirkwood.dtsi
+In-Reply-To: <1393175982-18516-2-git-send-email-andrew@lunn.ch>
 References: <1393175982-18516-1-git-send-email-andrew@lunn.ch>
- <1393175982-18516-4-git-send-email-andrew@lunn.ch>
-Message-ID: <20140223183417.306e17e6@skate>
+ <1393175982-18516-2-git-send-email-andrew@lunn.ch>
+Message-ID: <530A311E.4080407@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+Hello.
 
-Sorry, I'm in a nitpick mood it seems :)
+On 23-02-2014 21:19, Andrew Lunn wrote:
 
-On Sun, 23 Feb 2014 18:19:41 +0100, Andrew Lunn wrote:
+> The binding has existed for a while, so add the missing node so it can
+> be used by devices.
 
-> +		button at 1 {
-> +			label = "Power Button";
-> +			linux,code = < KEY_POWER >;
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>   arch/arm/boot/dts/kirkwood.dtsi | 9 +++++++++
+>   1 file changed, 9 insertions(+)
 
-Why spaces before and after KEY_POWER ?
+> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> index 7b921b30cfcb..841ca3affbf5 100644
+> --- a/arch/arm/boot/dts/kirkwood.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> @@ -310,5 +310,14 @@
+>   			#phy-cells = <0>;
+>   			status = "ok";
+>   		};
+> +
+> +                audio0: audio-controller at a0000 {
+> +			compatible = "marvell,kirkwood-audio";
+> +                        reg = <0xa0000 0x2210>;
+> +                        interrupts = <24>;
+> +                        clocks = <&gate_clk 9>;
+> +                        clock-names = "internal";
+> +                        status = "disabled";
+> +                };
 
-> +config MACH_T5325
-> +	bool "HP T5325 thin client"
-> +	depends on MACH_KIRKWOOD
-> +	help
-> +	 Say 'Y' here if you want your kernel to support the
-> +	 HP T5325 Thin client
+     Could you uniformly indent the node with tabs (like at least the one 
+above it)?
 
-Indentation for help text should be one tab and two spaces.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+WBR, Sergei
