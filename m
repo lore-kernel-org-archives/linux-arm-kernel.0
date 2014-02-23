@@ -1,44 +1,55 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sun, 23 Feb 2014 20:41:51 -0300
-Subject: [PATCH v2] clk: respect the clock dependencies in of_clk_init
-In-Reply-To: <20140223212040.22529.18650@quantum>
-References: <1392054179-28830-1-git-send-email-gregory.clement@free-electrons.com>
- <530A420B.5050207@gmail.com> <20140223212040.22529.18650@quantum>
-Message-ID: <20140223234150.GA5343@localhost>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 23 Feb 2014 15:43:57 -0800
+Subject: [PATCH 2/2] clk: ux500: Staticize ux500_twocell_get
+In-Reply-To: <CAPDyKFqJyx7bCF0bYeBPawNBJORPiMBXtg7hyr33UK=JxPGWaA@mail.gmail.com>
+References: <1389764606-14102-1-git-send-email-sachin.kamat@linaro.org>
+ <1389764606-14102-2-git-send-email-sachin.kamat@linaro.org>
+ <20140115073631.GD11820@lee--X1>
+ <CAPDyKFro5Zf-WoCANshvwSRCkwMKp26tCuatUzp2TvMEh1Qhxg@mail.gmail.com>
+ <CAPDyKFqJyx7bCF0bYeBPawNBJORPiMBXtg7hyr33UK=JxPGWaA@mail.gmail.com>
+Message-ID: <20140223234357.22529.40501@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz, Mike:
-
-On Sun, Feb 23, 2014 at 01:20:40PM -0800, Mike Turquette wrote:
-> Quoting Tomasz Figa (2014-02-23 10:46:35)
-> > On 10.02.2014 18:42, Gregory CLEMENT wrote:
-> > > Until now the clock providers were initialized in the order found in
-> > > the device tree. This led to have the dependencies between the clocks
-> > > not respected: children clocks could be initialized before their
-> > > parent clocks.
-> > >
-> > > Instead of forcing each platform to manage its own initialization order,
-> > > this patch adds this work inside the framework itself.
-> > >
-> > > Using the data of the device tree the of_clk_init function now delayed
-> > > the initialization of a clock provider if its parent provider was not
-> > > ready yet.
-> > 
-> > In general this is really great. It's a first step towards sorting out 
-> > dependencies between clock providers correctly. I have some comments 
-> > inline, though.
+Quoting Ulf Hansson (2014-02-23 07:39:11)
+> On 20 January 2014 12:45, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> > On 15 January 2014 08:36, Lee Jones <lee.jones@linaro.org> wrote:
+> >>> ux500_twocell_get is a local symbol.
+> >>>
+> >>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+> >>> Cc: Lee Jones <lee.jones@linaro.org>
+> >>> ---
+> >>>  drivers/clk/ux500/u8500_of_clk.c |    3 ++-
+> >>>  1 file changed, 2 insertions(+), 1 deletion(-)
+> >>
+> >> Acked-by: Lee Jones <lee.jones@linaro.org>
+> >>
+> >
+> > Thanks! Pushed to my clk-next-ux500 branch.
 > 
-> Just to add in here, I think the approach is good but agree with Tomasz'
-> review comments.
+> Mike, would you be kind to pick this patch with my ack? Currently I
+> have no more than this one for ux500 for 3.15.
+
+No problem. Merged to clk-next with your and Lee's Ack.
+
+Regards,
+Mike
+
 > 
-
-I'm wondering if any of you has followed the discussion that Greg,
-Emilio and I had about the need of this change.
-
-If so, can you point out *why* we need to sort out registration
-dependency?
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+> Kind regards
+> Ulf Hansson
+> 
+> >
+> > Kind regards
+> > Ulf Hansson
+> >
+> >> --
+> >> Lee Jones
+> >> Linaro STMicroelectronics Landing Team Lead
+> >> Linaro.org ? Open source software for ARM SoCs
+> >> Follow Linaro: Facebook | Twitter | Blog
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
