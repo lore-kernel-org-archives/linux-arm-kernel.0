@@ -1,267 +1,172 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 23 Feb 2014 14:33:53 +0200
-Subject: [PATCH] arm: dts: Add support for Compulab sbc-t3530 with cm-t35
-In-Reply-To: <1392986165-12238-1-git-send-email-sr@denx.de>
-References: <1392986165-12238-1-git-send-email-sr@denx.de>
-Message-ID: <5309EAB1.8000903@compulab.co.il>
+From: acabrera@udio.cujae.edu.cu (Alejandro Cabrera)
+Date: Sun, 23 Feb 2014 08:25:17 -0800
+Subject: [PATCH v3 07/11] watchdog: xilinx: Use of_property_read_u32
+In-Reply-To: <53096E8D.50202@roeck-us.net>
+References: <cover.1392212059.git.michal.simek@xilinx.com>
+ <7cbb10853a343c9d488346596f604909ab0668b9.1392212059.git.michal.simek@xilinx.com>
+ <20140212171509.GB20012@roeck-us.net>
+ <20140222184604.GB21504@spo001.leaseweb.com>
+ <53094A15.1080708@udio.cujae.edu.cu> <53093038.6000604@roeck-us.net>
+ <53097091.50204@udio.cujae.edu.cu> <530950A1.40302@roeck-us.net>
+ <530991AA.9040201@udio.cujae.edu.cu> <53096E8D.50202@roeck-us.net>
+Message-ID: <530A20ED.3070505@udio.cujae.edu.cu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On 22/2/2014 7:44 PM, Guenter Roeck wrote:
+> On 02/22/2014 10:14 PM, Alejandro Cabrera wrote:
+>> On 22/2/2014 5:36 PM, Guenter Roeck wrote:
+>>> On 02/22/2014 07:52 PM, Alejandro Cabrera wrote:
+>>>> On 22/2/2014 3:18 PM, Guenter Roeck wrote:
+>>>>> On 02/22/2014 05:08 PM, Alejandro Cabrera wrote:
+>>>>>> On 22/2/2014 10:46 AM, Wim Van Sebroeck wrote:
+>>>>>>> Hi All,
+>>>>>>>
+>>>>>>>> Hi Michal,
+>>>>>>>>
+>>>>>>>> On Wed, Feb 12, 2014 at 02:41:21PM +0100, Michal Simek wrote:
+>>>>>>>>> Use of_property_read_u32 functions to clean probe function.
+>>>>>>>>>
+>>>>>>>>> Signed-off-by: Michal Simek<michal.simek@xilinx.com>
+>>>>>>>>> Reviewed-by: Guenter Roeck<linux@roeck-us.net>
+>>>>>>>>> ---
+>>>>>>>>>
+>>>>>>>>> Changes in v3:
+>>>>>>>>> - Remove one if checking and use variable directly
+>>>>>>>>>
+>>>>>>>> Looks good.
+>>>>>>>>
+>>>>>>>> Another comment/remark.
+>>>>>>>>
+>>>>>>>>> -    pfreq = (u32 *)of_get_property(pdev->dev.of_node,
+>>>>>>>>> -                    "clock-frequency", NULL);
+>>>>>>>>> -
+>>>>>>>>> -    if (pfreq == NULL) {
+>>>>>>>>> +    rc = of_property_read_u32(pdev->dev.of_node, 
+>>>>>>>>> "clock-frequency",&pfreq);
+>>>>>>>>> +    if (rc) {
+>>>>>>>>>           dev_warn(&pdev->dev,
+>>>>>>>>>                "The watchdog clock frequency cannot be 
+>>>>>>>>> obtained\n");
+>>>>>>>>>           no_timeout = true;
+>>>>>>>>>       }
+>>>>>>>>>
+>>>>>>>>> -    tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+>>>>>>>>> -                    "xlnx,wdt-interval", NULL);
+>>>>>>>>> -    if (tmptr == NULL) {
+>>>>>>>>> +    rc = of_property_read_u32(pdev->dev.of_node, 
+>>>>>>>>> "xlnx,wdt-interval",
+>>>>>>>>> + &xdev->wdt_interval);
+>>>>>>>>> +    if (rc) {
+>>>>>>>>>           dev_warn(&pdev->dev,
+>>>>>>>>>                "Parameter \"xlnx,wdt-interval\" not found\n");
+>>>>>>>>>           no_timeout = true;
+>>>>>>>>> -    } else {
+>>>>>>>>> -        xdev->wdt_interval = *tmptr;
+>>>>>>>>>       }
+>>>>>>>>>
+>>>>>>>>> -    tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+>>>>>>>>> -                    "xlnx,wdt-enable-once", NULL);
+>>>>>>>>> -    if (tmptr == NULL) {
+>>>>>>>>> +    rc = of_property_read_u32(pdev->dev.of_node, 
+>>>>>>>>> "xlnx,wdt-enable-once",
+>>>>>>>>> + &enable_once);
+>>>>>>>>> +    if (rc)
+>>>>>>>>>           dev_warn(&pdev->dev,
+>>>>>>>>>                "Parameter \"xlnx,wdt-enable-once\" not found\n");
+>>>>>>>>> -        watchdog_set_nowayout(xilinx_wdt_wdd, true);
+>>>>>>>>> -    }
+>>>>>>>> All the above properties are optional. Is a warning really
+>>>>>>>> warranted in this case ? I usually associate a warning with
+>>>>>>>> something that is wrong, which is not the case here.
+>>>>>>>>
+>>>>>>>> I would encourage you to drop those warnings, but that should be
+>>>>>>>> a separate patch.
+>>>>>>> I agree with Guenter: these are not really warnings. Seperate 
+>>>>>>> patch is thus welcome.
+>>>>>> Hi
+>>>>>>
+>>>>>> I support Michal intention, I think it is a warning because 
+>>>>>> device tree blob must have the "xlnx,wdt-enable-once" property 
+>>>>>> specified in order to allow the system to be sure of the real 
+>>>>>> value of this property. In addition to, this warning can be 
+>>>>>> helpful to detect a wrong device tree specification.
+>>>>>>
+>>>>>
+>>>>> The dt documentation states that the properties are optional.
+>>>>>
+>>>>> Optional properties:
+>>>>> - clock-frequency       : Frequency of clock in Hz
+>>>>> - xlnx,wdt-enable-once  : 0 - Watchdog can be restarted
+>>>>>                           1 - Watchdog can be enabled just once
+>>>>> - xlnx,wdt-interval     : Watchdog timeout interval in 2^<val> 
+>>>>> clock cycles,
+>>>>> <val> is integer from 8 to 31.
+>>>>>
+>>>>> This clearly conflicts with your statement. An optional property
+>>>>> is just that, optional. If it warrants a warning, it must
+>>>>> not be optional. If you claim that not providing the properties
+>>>>> would be "wrong", why are they defined as optional ?
+>>>> Hi Guenter
+>>>>
+>>>> I didn't know that these properties was classified as optional...
+>>>> I think that they should not be, because all xilinx watchog devices 
+>>>> (at least for microblaze processor)
+>>>> have these properties defined in theirs MPD files and theirs values 
+>>>> can be obtained during the
+>>>> hardware specification to device tree conversion.
+>>>>> What is your definition of "wrong" and "must have" ?
+>>>> what I mean for "must have" is: if these properties can be obtained
+>>>> for all xilinx watchdog devices they must be present in the device 
+>>>> tree because they allows
+>>>> the system (linux/user) to know exactly how a watchdog device is 
+>>>> configured.
+>>>> Because these properties always can be obtained from hardware 
+>>>> design there is no
+>>>> reason to leave them out from the device tree. This is why I 
+>>>> consider that a device tree without
+>>>> these properties should be considered as "wrong" device tree.
+>>>>> How do you expect anyone to know that omitting those
+>>>>> "optional" properties is by some definition "wrong" ?
+>>>> I'm agree with you.
+>>>> Maybe these properties shouldn't be optional.
+>>>> For example suppose that "xlnx,wdt-enable-once" is missing in the 
+>>>> device tree,
+>>>> when a watchdog daemon ask for this property what is the obtained 
+>>>> value ?
+>>>> Independently of this value, why do not warn the user about this 
+>>>> missing property
+>>>> when it can always be in the device tree ?
+>>>>
+>>>
+>>> Really, this line of argument doesn't make any sense to me.
+>>> "xlnx,wdt-enable-once", for example, is a boolean and means
+>>> that the watchdog, when enabled, can not be stopped. It defaults
+>>> to false, and thus is inherently optional. Making it mandatory
+>>> doesn't really add any value.
+>>>
+>>
+>> If the device has been configured with wdt-enable-once=true
+>> and the device tree doesn't have this property then a watchdog daemon
+>> would see it as "false" because it is the default making the system 
+>> to misbehave...
+>> A warning during driver loading could help user to identify the problem.
+>>
+>
+> All this would give you is a false sense of safety. The property could
+> just as well be there and be wrong (eg be configured as = <0> when it
+> should be 1, or with a wrong frequency. 
+These issues "cannot" be detected but the missing properties yes.
+> Following your logic, every driver
+> would need to warn about everything, just to be sure.
+Every driver should warn about anything that it considers weird and let 
+the user to decide if it matters or not.
+I think that an example of weird could be the lack of an expected property.
 
-Have you seen the series sent by Dmitry on 12-Jan-2014?
-It is called "ARM: dts: sbc-t3x: add support for more boards",
-or you can check it out here:
-http://www.spinics.net/lists/arm-kernel/msg300078.html
+Alejandro
 
-On 02/21/14 14:36, Stefan Roese wrote:
-> The cm-t3530 SOM is equipped with the OMAP3530 and does not boot with
-> the cm-t3730 dts file as it used the omap36xx.dtsi. Add a separate
-> dts/dtsi for this board to support it correctly.
-> 
-> I moved some common parts into omap3-cm-t3x30.dtsi. And removed
-> the SDIO/WLAN support for now. As I don't know exactly how this
-> should be done. Perhaps somebody else might jump in here...
-> 
-> Signed-off-by: Stefan Roese <sr@denx.de>
-> Cc: Igor Grinberg <grinberg@compulab.co.il>
-> Cc: Dmitry Lifshitz <lifshitz@compulab.co.il>
-> Cc: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/boot/dts/Makefile            |  1 +
->  arch/arm/boot/dts/omap3-cm-t3530.dts  | 29 +++++++++++++++++++
->  arch/arm/boot/dts/omap3-cm-t3730.dts  | 54 ++++-------------------------------
->  arch/arm/boot/dts/omap3-cm-t3x30.dtsi | 44 ++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap3-sbc-t3530.dts | 30 +++++++++++++++++++
->  5 files changed, 110 insertions(+), 48 deletions(-)
->  create mode 100644 arch/arm/boot/dts/omap3-cm-t3530.dts
->  create mode 100644 arch/arm/boot/dts/omap3-sbc-t3530.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 6d1e43d..6fd1b34 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -200,6 +200,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
->  	omap3430-sdp.dtb \
->  	omap3-beagle.dtb \
->  	omap3-cm-t3730.dtb \
-> +	omap3-sbc-t3530.dtb \
->  	omap3-sbc-t3730.dtb \
->  	omap3-devkit8000.dtb \
->  	omap3-beagle-xm.dtb \
-> diff --git a/arch/arm/boot/dts/omap3-cm-t3530.dts b/arch/arm/boot/dts/omap3-cm-t3530.dts
-> new file mode 100644
-> index 0000000..35a1fc2
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-cm-t3530.dts
-> @@ -0,0 +1,29 @@
-> +/*
-> + * Support for CompuLab CM-T3530
-> + */
-> +/dts-v1/;
-> +
-> +#include "omap34xx-hs.dtsi"
-> +#include "omap3-cm-t3x30.dtsi"
-> +
-> +/ {
-> +	model = "CompuLab CM-T3530";
-> +	compatible = "compulab,omap3-cm-t3530", "ti,omap34xx", "ti,omap3";
-> +};
-> +
-> +&mmc1 {
-> +	vmmc-supply = <&vmmc1>;
-> +	bus-width = <4>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc1_pins>;
-> +};
-> +
-> +&smsc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&smsc1_pins>;
-> +};
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart3_pins>;
-> +};
-> diff --git a/arch/arm/boot/dts/omap3-cm-t3730.dts b/arch/arm/boot/dts/omap3-cm-t3730.dts
-> index 486f4d6..3e05b11 100644
-> --- a/arch/arm/boot/dts/omap3-cm-t3730.dts
-> +++ b/arch/arm/boot/dts/omap3-cm-t3730.dts
-> @@ -32,39 +32,14 @@
->  };
->  
->  &omap3_pmx_core {
-> -	mmc1_pins: pinmux_mmc1_pins {
-> -		pinctrl-single,pins = <
-> -			0x114 (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* sdmmc1_clk.sdmmc1_clk */
-> -			0x116 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_cmd.sdmmc1_cmd */
-> -			0x118 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat0.sdmmc1_dat0 */
-> -			0x11a (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat1.sdmmc1_dat1 */
-> -			0x11c (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat2.sdmmc1_dat2 */
-> -			0x11e (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat3.sdmmc1_dat3 */
-> -		>;
-> -	};
-> -
->  	mmc2_pins: pinmux_mmc2_pins {
->  		pinctrl-single,pins = <
-> -			0x128 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_clk.sdmmc2_clk */
-> -			0x12a (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_cmd.sdmmc2_cmd */
-> -			0x12c (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat0.sdmmc2_dat0 */
-> -			0x12e (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat1.sdmmc2_dat1 */
-> -			0x130 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat2.sdmmc2_dat2 */
-> -			0x132 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc2_dat3.sdmmc2_dat3 */
-> -		>;
-> -	};
-> -
-> -	smsc1_pins: pinmux_smsc1_pins {
-> -		pinctrl-single,pins = <
-> -			0x88 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_ncs5.gpmc_ncs5 */
-> -			0x16a (PIN_INPUT_PULLUP | MUX_MODE4)	/* uart3_cts_rctx.gpio_163 */
-> -		>;
-> -	};
-> -
-> -	uart3_pins: pinmux_uart3_pins {
-> -		pinctrl-single,pins = <
-> -			0x16e (PIN_INPUT | MUX_MODE0)		/* uart3_rx_irrx.uart3_rx_irrx */
-> -			0x170 (PIN_OUTPUT | MUX_MODE0)		/* uart3_tx_irtx.uart3_tx_irtx */
-> +			0x128 (PIN_INPUT_PULLUP | MUX_MODE0)    /* sdmmc2_clk.sdmmc2_clk */
-> +			0x12a (PIN_INPUT_PULLUP | MUX_MODE0)    /* sdmmc2_cmd.sdmmc2_cmd */
-> +			0x12c (PIN_INPUT_PULLUP | MUX_MODE0)    /* sdmmc2_dat0.sdmmc2_dat0 */
-> +			0x12e (PIN_INPUT_PULLUP | MUX_MODE0)    /* sdmmc2_dat1.sdmmc2_dat1 */
-> +			0x130 (PIN_INPUT_PULLUP | MUX_MODE0)    /* sdmmc2_dat2.sdmmc2_dat2 */
-> +			0x132 (PIN_INPUT_PULLUP | MUX_MODE0)    /* sdmmc2_dat3.sdmmc2_dat3 */
->  		>;
->  	};
->  
-> @@ -76,13 +51,6 @@
->  	};
->  };
->  
-> -&mmc1 {
-> -	vmmc-supply = <&vmmc1>;
-> -	bus-width = <4>;
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&mmc1_pins>;
-> -};
-> -
->  &mmc2 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&mmc2_pins>;
-> @@ -92,13 +60,3 @@
->  	bus-width = <4>;
->  	cap-power-off-card;
->  };
-> -
-> -&smsc1 {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&smsc1_pins>;
-> -};
-> -
-> -&uart3 {
-> -	pinctrl-names = "default";
-> -	pinctrl-0 = <&uart3_pins>;
-> -};
-> diff --git a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-> index 3a9f004..0eadd4a 100644
-> --- a/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-> +++ b/arch/arm/boot/dts/omap3-cm-t3x30.dtsi
-> @@ -36,6 +36,33 @@
->  	};
->  };
->  
-> +&omap3_pmx_core {
-> +	mmc1_pins: pinmux_mmc1_pins {
-> +		pinctrl-single,pins = <
-> +			0x114 (PIN_OUTPUT_PULLUP | MUX_MODE0)	/* sdmmc1_clk.sdmmc1_clk */
-> +			0x116 (PIN_INPUT_PULLUP | MUX_MODE0)	/* sdmmc1_cmd.sdmmc1_cmd */
-> +			0x118 (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat0.sdmmc1_dat0 */
-> +			0x11a (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat1.sdmmc1_dat1 */
-> +			0x11c (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat2.sdmmc1_dat2 */
-> +			0x11e (PIN_INPUT_PULLUP | MUX_MODE0) 	/* sdmmc1_dat3.sdmmc1_dat3 */
-> +		>;
-> +	};
-> +
-> +	smsc1_pins: pinmux_smsc1_pins {
-> +		pinctrl-single,pins = <
-> +			0x88 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_ncs5.gpmc_ncs5 */
-> +			0x16a (PIN_INPUT_PULLUP | MUX_MODE4)	/* uart3_cts_rctx.gpio_163 */
-> +		>;
-> +	};
-> +
-> +	uart3_pins: pinmux_uart3_pins {
-> +		pinctrl-single,pins = <
-> +			0x16e (PIN_INPUT | MUX_MODE0)		/* uart3_rx_irrx.uart3_rx_irrx */
-> +			0x170 (PIN_OUTPUT | MUX_MODE0)		/* uart3_tx_irtx.uart3_tx_irtx */
-> +		>;
-> +	};
-> +};
-> +
->  &gpmc {
->  	ranges = <5 0 0x2c000000 0x01000000>;
->  
-> @@ -83,6 +110,23 @@
->  	};
->  };
->  
-> +&mmc1 {
-> +	vmmc-supply = <&vmmc1>;
-> +	bus-width = <4>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc1_pins>;
-> +};
-> +
-> +&smsc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&smsc1_pins>;
-> +};
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart3_pins>;
-> +};
-> +
->  #include "twl4030.dtsi"
->  #include "twl4030_omap3.dtsi"
->  
-> diff --git a/arch/arm/boot/dts/omap3-sbc-t3530.dts b/arch/arm/boot/dts/omap3-sbc-t3530.dts
-> new file mode 100644
-> index 0000000..b548343
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap3-sbc-t3530.dts
-> @@ -0,0 +1,30 @@
-> +/*
-> + * Support for CompuLab SBC-T3530 with CM-T3530
-> + */
-> +
-> +#include "omap3-cm-t3530.dts"
-> +#include "omap3-sb-t35.dtsi"
-> +
-> +/ {
-> +	model = "CompuLab SBC-T3530 with CM-T3530";
-> +	compatible = "compulab,omap3-sbc-t3530", "compulab,omap3-cm-t3530", "ti,omap34xx", "ti,omap3";
-> +};
-> +
-> +&gpmc {
-> +	ranges = <5 0 0x2c000000 0x01000000>,
-> +		 <4 0 0x2d000000 0x01000000>;
-> +};
-> +
-> +&smsc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&smsc2_pins>;
-> +};
-> +
-> +&omap3_pmx_core {
-> +	smsc2_pins: pinmux_smsc2_pins {
-> +		pinctrl-single,pins = <
-> +			0x86 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_ncs4.gpmc_ncs4 */
-> +			0xa2 (PIN_INPUT_PULLUP | MUX_MODE4)	/* gpmc_wait3.gpio_65 */
-> +		>;
-> +	};
-> +};
-> 
 
--- 
-Regards,
-Igor.
+
+
+
+50 Aniversario de la Cujae. Inaugurada por Fidel el 2 de diciembre de 1964  http://cujae.edu.cu
