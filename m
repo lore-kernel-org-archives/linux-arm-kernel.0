@@ -1,50 +1,101 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 23 Feb 2014 17:25:45 -0500
-Subject: [PATCH v4 00/16] pinctrl: mvebu: restructure resource allocation
-In-Reply-To: <530A7252.9070200@gmail.com>
-References: <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1393165274-32492-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140223220610.GA14250@titan.lakedaemon.net>
- <530A7252.9070200@gmail.com>
-Message-ID: <20140223222545.GB14250@titan.lakedaemon.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 23 Feb 2014 15:04:06 -0800
+Subject: [GIT PULL] clk: mvebu: fixes for v3.14
+In-Reply-To: <53048565.4080105@free-electrons.com>
+References: <20140208173154.GL8533@titan.lakedaemon.net>
+ <20140219054245.8345.72570@quantum> <53048565.4080105@free-electrons.com>
+Message-ID: <20140223230406.22529.52931@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 23, 2014 at 11:12:34PM +0100, Sebastian Hesselbarth wrote:
-> On 02/23/2014 11:06 PM, Jason Cooper wrote:
-> >On Sun, Feb 23, 2014 at 03:20:58PM +0100, Sebastian Hesselbarth wrote:
-> >>This patch set restructures the common pinctrl driver part of mvebu
-> >>to allow SoC specific controls to handle their own resources. Currently,
-> >>the common driver maps a single resource passed by DT while the SoC
-> >>specific controls cannot access that resource. To achieve the removal
-> >>of knowledge of resources in the common driver, we first need to rework
-> >>how SoC specific and common get/set callbacks are handled.
+Quoting Gregory CLEMENT (2014-02-19 02:20:21)
+> On 19/02/2014 06:42, Mike Turquette wrote:
+> > Quoting Jason Cooper (2014-02-08 09:31:54)
+> >> Mike,
 > >>
-> >>The patch set is based on three patch sets sent earlier [1][2][3] but drops
-> >>any Dove specific removal of hardcoded addresses. This allows to have
-> >>a clear view on the structural changes now and Dove specific changes
-> >>later on. The Dove specific patches will be re-sent on top of this one,
-> >>as soon as we are all happy with the resource allcation restruturing.
-> >>
-> >>Also, in the meantime, pinctrl driver stubs for new Armada 375/38x have
-> >>been posted [4]. Compared to v3, this patch set now also takes care of
-> >>the new pinctrl stubs for Armada 375/38x. Those patches have been provided
-> >>by Thomas Petazzoni and make this patches depend on them. We have no stable
-> >>branch for the Armada 375/38x pinctrl patches but I guess Jason will provide
-> >>one soon.
-> >
-> >Ok, I've applied this to mvebu/pinctrl with a dependency on
-> >mvebu/pinctrl-3xx.  So this'll be in -next tonight and hopefully we'll
-> >have an ideal in a few days which tree we'll send it through.
+> >> Here's a round of fixes I've had in -next for several days.  It's not
+> >> the ideal solution, but a short term one while we hash out a proper
+> >> solution for v3.15+.
+> > 
+> > Taken into clk-fixes.
 > 
-> Great, thanks! I'll prepare Dove cleanup on top tomorrow. Unfortunately,
-> Dove-to-mvebu progress will also depend on it. If you are unhappy
-> with the triple dependency we can postpone it for v3.16 but I think it
-> should be relatively easy to handle.
+> Hi Mike,
+> 
+> we will have the same kind of issue with Armada 375 and Armada38x.
+> Are you going to take the patch "clk: respect the clock dependencies
+> in of_clk_init"
+> See the V2 here http://www.spinics.net/lists/arm-kernel/msg306442.html
+> 
+> My intent is not to put a pressure on you to take this patch, but as
+> I explained Armada 375 and Armada38x will be in the same situation of
+> the other mvebu were. The patch I mentioned is a solution to fix it
+> and if it won't be merged, than we need an other solution. This alternate
+> solution is easy to find, it will be the same as this patch set.
 
-I'm inclined towards v3.16, we have quite a bit going on this time
-around.  But let's take a look at it and see what we think.
+Hi Gregory,
 
-thx,
+The clock dependencies patch is not without controversy. I've looked
+through V2 and it looks OK, but I need to think on it a bit more. I'll
+make a call later this week, so you'll know what to do for Armada.
 
-Jason.
+Either way I won't take that patch in as a fix for the current -rc's. It
+will land in 3.15.
+
+Regards,
+Mike
+
+> 
+> 
+> Thanks,
+> 
+> Gregory
+> 
+> 
+> 
+> > 
+> > Thanks!
+> > Mike
+> > 
+> >>
+> >> thx,
+> >>
+> >> Jason.
+> >>
+> >> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+> >>
+> >>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://git.infradead.org/linux-mvebu.git tags/mvebu-clk-fixes-3.14
+> >>
+> >> for you to fetch changes up to 58d516ae95cbf7eed44f85a01cdfad41f17b4197:
+> >>
+> >>   clk: mvebu: kirkwood: maintain clock init order (2014-02-06 18:07:01 +0000)
+> >>
+> >> ----------------------------------------------------------------
+> >> mvebu clock fixes for v3.14
+> >>
+> >>  - kirkwood, dove, armada-xp, armada-370
+> >>     - force clock init order broken by sorting DT ocp nodes by address
+> >>     - fixes boot failures on affected platforms
+> >>
+> >> ----------------------------------------------------------------
+> >> Sebastian Hesselbarth (4):
+> >>       clk: mvebu: armada-370: maintain clock init order
+> >>       clk: mvebu: armada-xp: maintain clock init order
+> >>       clk: mvebu: dove: maintain clock init order
+> >>       clk: mvebu: kirkwood: maintain clock init order
+> >>
+> >>  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
+> >>  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
+> >>  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
+> >>  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
+> >>  4 files changed, 44 insertions(+), 50 deletions(-)
+> 
+> 
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
