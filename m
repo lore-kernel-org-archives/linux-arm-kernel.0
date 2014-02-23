@@ -1,44 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 23 Feb 2014 05:57:25 -0800
-Subject: [PATCH v2] MAINTAINERS: add additional ARM BCM281xx/BCM11xxx
- maintainer
-In-Reply-To: <CAEPRUYqxHwSYVPV-1Td3dHsBydDybJh5YLY0+GoN+vnakGaTtw@mail.gmail.com>
-References: <1392390903-19826-1-git-send-email-mporter@linaro.org>
- <CAEPRUYqxHwSYVPV-1Td3dHsBydDybJh5YLY0+GoN+vnakGaTtw@mail.gmail.com>
-Message-ID: <20140223135725.GA10833@quad.lixom.net>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Sun, 23 Feb 2014 16:39:11 +0100
+Subject: [PATCH 2/2] clk: ux500: Staticize ux500_twocell_get
+In-Reply-To: <CAPDyKFro5Zf-WoCANshvwSRCkwMKp26tCuatUzp2TvMEh1Qhxg@mail.gmail.com>
+References: <1389764606-14102-1-git-send-email-sachin.kamat@linaro.org>
+ <1389764606-14102-2-git-send-email-sachin.kamat@linaro.org>
+ <20140115073631.GD11820@lee--X1>
+ <CAPDyKFro5Zf-WoCANshvwSRCkwMKp26tCuatUzp2TvMEh1Qhxg@mail.gmail.com>
+Message-ID: <CAPDyKFqJyx7bCF0bYeBPawNBJORPiMBXtg7hyr33UK=JxPGWaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 14, 2014 at 08:37:41AM -0800, Christian Daudt wrote:
-> On Fri, Feb 14, 2014 at 7:15 AM, Matt Porter <mporter@linaro.org> wrote:
-> > Add myself as an additional maintainer for the Broadcom mobile
-> > SoCs.
-> >
-> > Signed-off-by: Matt Porter <mporter@linaro.org>
-> > ---
-> > Since v1: put back my missing SOB
-> >
-> >  MAINTAINERS | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/MAINTAINERS b/MAINTAINERS
-> > index b2cf5cf..9d6fbfd 100644
-> > --- a/MAINTAINERS
-> > +++ b/MAINTAINERS
-> > @@ -1860,6 +1860,7 @@ F:        drivers/net/ethernet/broadcom/bnx2x/
-> >
-> >  BROADCOM BCM281XX/BCM11XXX ARM ARCHITECTURE
-> >  M:     Christian Daudt <bcm@fixthebug.org>
-> > +M:     Matt Porter <mporter@linaro.org>
-> >  L:     bcm-kernel-feedback-list at broadcom.com
-> >  T:     git git://git.github.com/broadcom/bcm11351
-> >  S:     Maintained
-> > --
-> > 1.8.4
-> >
-> Acked-by: Christian Daudt <bcm@fixthebug.org>
+On 20 January 2014 12:45, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 15 January 2014 08:36, Lee Jones <lee.jones@linaro.org> wrote:
+>>> ux500_twocell_get is a local symbol.
+>>>
+>>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>>> Cc: Lee Jones <lee.jones@linaro.org>
+>>> ---
+>>>  drivers/clk/ux500/u8500_of_clk.c |    3 ++-
+>>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>
+>
+> Thanks! Pushed to my clk-next-ux500 branch.
 
-Applied to fixes, thanks.
+Mike, would you be kind to pick this patch with my ack? Currently I
+have no more than this one for ux500 for 3.15.
 
+Kind regards
+Ulf Hansson
 
--Olof
+>
+> Kind regards
+> Ulf Hansson
+>
+>> --
+>> Lee Jones
+>> Linaro STMicroelectronics Landing Team Lead
+>> Linaro.org ? Open source software for ARM SoCs
+>> Follow Linaro: Facebook | Twitter | Blog
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
