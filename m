@@ -1,35 +1,86 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 22 Feb 2014 23:04:11 +0100
-Subject: [RFC 0/3] ahci_platform: drop support for a bunch of obsolete
- platform device types
-In-Reply-To: <1393086175-6383-1-git-send-email-hdegoede@redhat.com>
-References: <1393086175-6383-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <201402222304.11652.marex@denx.de>
+From: acabrera@udio.cujae.edu.cu (Alejandro Cabrera)
+Date: Sat, 22 Feb 2014 17:08:37 -0800
+Subject: [PATCH v3 07/11] watchdog: xilinx: Use of_property_read_u32
+In-Reply-To: <20140222184604.GB21504@spo001.leaseweb.com>
+References: <cover.1392212059.git.michal.simek@xilinx.com>
+ <7cbb10853a343c9d488346596f604909ab0668b9.1392212059.git.michal.simek@xilinx.com>
+ <20140212171509.GB20012@roeck-us.net>
+ <20140222184604.GB21504@spo001.leaseweb.com>
+Message-ID: <53094A15.1080708@udio.cujae.edu.cu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, February 22, 2014 at 05:22:52 PM, Hans de Goede wrote:
-> Hi Tejun, Marek,
-> 
-> This series, which is to be applied on top of my ahci_platform
-> restructering series,  mostly speaks for itself.
-> 
-> I've some doubts about the 2nd patch, which removes the imx53-ahci platform
-> device support from ahci_platform.c. I'm pretty sure this is obsolete and
-> replaced by Marek's ahci_imx.c work, but not 100%, which is why this series
-> is marked as RFC. Marek can you confirm that the code the 2nd patch removes
-> is inded dead code?
+On 22/2/2014 10:46 AM, Wim Van Sebroeck wrote:
+> Hi All,
+>
+>> Hi Michal,
+>>
+>> On Wed, Feb 12, 2014 at 02:41:21PM +0100, Michal Simek wrote:
+>>> Use of_property_read_u32 functions to clean probe function.
+>>>
+>>> Signed-off-by: Michal Simek<michal.simek@xilinx.com>
+>>> Reviewed-by: Guenter Roeck<linux@roeck-us.net>
+>>> ---
+>>>
+>>> Changes in v3:
+>>> - Remove one if checking and use variable directly
+>>>
+>> Looks good.
+>>
+>> Another comment/remark.
+>>
+>>> -	pfreq = (u32 *)of_get_property(pdev->dev.of_node,
+>>> -					"clock-frequency", NULL);
+>>> -
+>>> -	if (pfreq == NULL) {
+>>> +	rc = of_property_read_u32(pdev->dev.of_node, "clock-frequency",&pfreq);
+>>> +	if (rc) {
+>>>   		dev_warn(&pdev->dev,
+>>>   			 "The watchdog clock frequency cannot be obtained\n");
+>>>   		no_timeout = true;
+>>>   	}
+>>>
+>>> -	tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+>>> -					"xlnx,wdt-interval", NULL);
+>>> -	if (tmptr == NULL) {
+>>> +	rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-interval",
+>>> +				&xdev->wdt_interval);
+>>> +	if (rc) {
+>>>   		dev_warn(&pdev->dev,
+>>>   			 "Parameter \"xlnx,wdt-interval\" not found\n");
+>>>   		no_timeout = true;
+>>> -	} else {
+>>> -		xdev->wdt_interval = *tmptr;
+>>>   	}
+>>>
+>>> -	tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+>>> -					"xlnx,wdt-enable-once", NULL);
+>>> -	if (tmptr == NULL) {
+>>> +	rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-enable-once",
+>>> +				&enable_once);
+>>> +	if (rc)
+>>>   		dev_warn(&pdev->dev,
+>>>   			 "Parameter \"xlnx,wdt-enable-once\" not found\n");
+>>> -		watchdog_set_nowayout(xilinx_wdt_wdd, true);
+>>> -	}
+>> All the above properties are optional. Is a warning really
+>> warranted in this case ? I usually associate a warning with
+>> something that is wrong, which is not the case here.
+>>
+>> I would encourage you to drop those warnings, but that should be
+>> a separate patch.
+> I agree with Guenter: these are not really warnings. Seperate patch is thus welcome.
+Hi
 
-I can confirm that with your sunxi 15-patch patchset + these three patches , the 
-SATA port still works on i.MX53 DENX M53EVK board. The behavior from the user's 
-point of view is unchanged.
+I support Michal intention, I think it is a warning because device tree 
+blob must have the "xlnx,wdt-enable-once" property specified in order to 
+allow the system to be sure of the real value of this property. In 
+addition to, this warning can be helpful to detect a wrong device tree 
+specification.
 
-> Tejun, if Marek confirms this is indeed dead code feel free to apply this
-> despite the RFC marking.
-> 
-> Thanks & Regards,
-> 
-> Hans
+Best regards
+Alejandro
 
-Best regards,
-Marek Vasut
+
+
+50 Aniversario de la Cujae. Inaugurada por Fidel el 2 de diciembre de 1964  http://cujae.edu.cu
