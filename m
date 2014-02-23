@@ -1,79 +1,172 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Sun, 23 Feb 2014 12:02:08 -0800
-Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140222120910.GA9012@e102568-lin.cambridge.arm.com>
-References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
- <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
- <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
- <20140222103840.GH21483@n2100.arm.linux.org.uk>
- <20140222120910.GA9012@e102568-lin.cambridge.arm.com>
-Message-ID: <20140223200208.12998.47604@capellas-linux>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sun, 23 Feb 2014 12:31:43 -0800
+Subject: [PATCH v7 2/8] clk: sunxi: Implement MMC phase control
+In-Reply-To: <20140219083606.GR3142@lukather>
+References: <20140217095907.15040.81893.stgit@pagira.o2s.ch>
+ <20140217100221.15040.47203.stgit@pagira.o2s.ch>
+ <20140218141532.GH3142@lukather> <20140219052125.8345.70717@quantum>
+ <20140219083606.GR3142@lukather>
+Message-ID: <20140223203143.22529.81640@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lorenzo Pieralisi (2014-02-22 04:09:10)
-> On Sat, Feb 22, 2014 at 10:38:40AM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Feb 19, 2014 at 04:12:54PM +0000, Lorenzo Pieralisi wrote:
-> > > On Wed, Feb 19, 2014 at 01:52:09AM +0000, Sebastian Capella wrote:
-> > > > +/*
-> > > > + * Snapshot kernel memory and reset the system.
-> > > > + * After resume, the hibernation snapshot is written out.
-> > > > + */
-> > > > +static int notrace __swsusp_arch_save_image(unsigned long unused)
-> > > > +{
-> > > > + int ret;
-> > > > +
-> > > > + ret = swsusp_save();
-> > > > + if (ret == 0)
-> > > > +         soft_restart(virt_to_phys(cpu_resume));
-> > > 
-> > > By the time the suspend finisher (ie this function) is run, the
-> > > processor state has been saved and I think that's all you have to do,
-> > > function can just return after calling swsusp_save(), unless I am missing
-> > > something.
-> > > 
-> > > I do not understand why a soft_restart is required here. On a side note,
-> > > finisher is called with irqs disabled so, since you added a function for
-> > > soft restart noirq, it should be used, if needed, but I have to understand
-> > > why in the first place.
-> > 
-> > It's required because you can't just return from the finisher.  A normal
-> > return from the finisher will always be interpreted as an abort rather
-> > than success (because the state has to be unwound.)
-> > 
-> > This is the only way to get a zero return from cpu_suspend().
+Quoting Maxime Ripard (2014-02-19 00:36:06)
+> Hi Mike,
 > 
-> Yes, that's the only reason why this code is jumping to cpu_resume, since
-> all it is needed is to snapshot the CPU context and by the time the
-> finisher is called that's done. Wanted to say that soft reboot is not
-> useful (cache flushing and resume with MMU off), but what you are saying
-> is correct. We might be saving swsusp_save return value in a global
-> variable and just return from the finisher, but that's horrible and
-> given the amount of time it takes to snapshot the image to disk the
-> cost of this soft reboot will be dwarfed by that.
+> On Tue, Feb 18, 2014 at 09:21:25PM -0800, Mike Turquette wrote:
+> > Quoting Maxime Ripard (2014-02-18 06:15:32)
+> > > Hi,
+> > > 
+> > > On Mon, Feb 17, 2014 at 11:02:21AM +0100, David Lanzend?rfer wrote:
+> > > > From: Emilio L?pez <emilio@elopez.com.ar>
+> > > > 
+> > > > Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> > > 
+> > > You're missing your Signed-off-by here too.  Remember, for every patch
+> > > you send, your Signed-off-by must be there, regardless wether you're
+> > > the author or not.
+> > > 
+> > > A commit log would be very much welcome too.
+> > > 
+> > > Now, down to the patch itself, I remember Mike saying that he would
+> > > prefer adding a function in the framework instead of hardcoding
+> > > it. Mike, what's your feeling on this? Would merging this seem
+> > > reasonnable to you as is, or do you want to take this to the
+> > > framework?
+> > 
+> > Hi Maxime & Emilio,
+> > 
+> > Maybe something like the following RFC? If it seems sufficient for this
+> > case then I will post to the wider list with an eye towards merging it
+> > for 3.15. I've Cc'd Dinh since this came up on the socfpga thread as
+> > well.
+> > 
+> > Regards,
+> > Mike
+> > 
+> > 
+> > 
+> > From 56fa297591be5c5e22df6d2ca43fccf285a45636 Mon Sep 17 00:00:00 2001
+> > From: Mike Turquette <mturquette@linaro.org>
+> > Date: Tue, 18 Feb 2014 20:33:50 -0800
+> > Subject: [PATCH] clk: introduce clk_set_phase function & callback
+> > 
+> > A common operation for a clock signal generator is to shift the phase of
+> > that signal. This patch introduces a new function to the clk.h API to
+> > dynamically adjust the phase of a clock signal. Additionally this patch
+> > introduces support for the new function in the common clock framework
+> > via the .set_phase call back in struct clk_ops.
+> > 
+> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> > ---
+> > This patch is totally untested. It may make your board burst into
+> > flames.
+> > 
+> >  drivers/clk/clk.c            | 84 +++++++++++++++++++++++++++++++++++++++++---
+> >  include/linux/clk-private.h  |  1 +
+> >  include/linux/clk-provider.h |  5 +++
+> >  include/linux/clk.h          | 29 +++++++++++++++
+> >  4 files changed, 115 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index ea2ca9f..635170a 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -106,11 +106,11 @@ static void clk_summary_show_one(struct seq_file *s, struct clk *c, int level)
+> >       if (!c)
+> >               return;
+> >  
+> > -     seq_printf(s, "%*s%-*s %-11d %-12d %-10lu %-11lu",
+> > +     seq_printf(s, "%*s%-*s %-11d %-12d %-10lu %-11lu %-3d",
+> >                  level * 3 + 1, "",
+> >                  30 - level * 3, c->name,
+> >                  c->enable_count, c->prepare_count, clk_get_rate(c),
+> > -                clk_get_accuracy(c));
+> > +                clk_get_accuracy(c), clk_get_phase(c));
+> >       seq_printf(s, "\n");
+> >  }
+> >  
+> > @@ -132,8 +132,8 @@ static int clk_summary_show(struct seq_file *s, void *data)
+> >  {
+> >       struct clk *c;
+> >  
+> > -     seq_printf(s, "   clock                        enable_cnt  prepare_cnt  rate        accuracy\n");
+> > -     seq_printf(s, "---------------------------------------------------------------------------------\n");
+> > +     seq_printf(s, "   clock                        enable_cnt  prepare_cnt  rate        accuracy   phase\n");
+> > +     seq_printf(s, "-----------------------------------------------------------------------------------------\n");
+> >  
+> >       clk_prepare_lock();
+> >  
+> > @@ -171,6 +171,7 @@ static void clk_dump_one(struct seq_file *s, struct clk *c, int level)
+> >       seq_printf(s, "\"prepare_count\": %d,", c->prepare_count);
+> >       seq_printf(s, "\"rate\": %lu", clk_get_rate(c));
+> >       seq_printf(s, "\"accuracy\": %lu", clk_get_accuracy(c));
+> > +     seq_printf(s, "\"phase\": %d", clk_get_phase(c));
+> >  }
+> >  
+> >  static void clk_dump_subtree(struct seq_file *s, struct clk *c, int level)
+> > @@ -257,6 +258,11 @@ static int clk_debug_create_one(struct clk *clk, struct dentry *pdentry)
+> >       if (!d)
+> >               goto err_out;
+> >  
+> > +     d = debugfs_create_u32("clk_phase", S_IRUGO, clk->dentry,
+> > +                     (u32 *)&clk->phase);
+> > +     if (!d)
+> > +             goto err_out;
+> > +
+> >       d = debugfs_create_x32("clk_flags", S_IRUGO, clk->dentry,
+> >                       (u32 *)&clk->flags);
+> >       if (!d)
+> > @@ -1766,6 +1772,76 @@ out:
+> >  EXPORT_SYMBOL_GPL(clk_set_parent);
+> >  
+> >  /**
+> > + * clk_set_phase - adjust the phase shift of a clock signal
+> > + * @clk: clock signal source
+> > + * @degrees: number of degrees the signal is shifted
+> > + *
+> > + * Shifts the phase of a clock signal by the specified degrees. Returns 0 on
+> > + * success, -EERROR otherwise.
+> > + *
+> > + * This function makes no distiction about the input or reference signal that
+> > + * we adjust the clock signal phase against. For example phase locked-loop
+> > + * clock signal generators we may shift phase with respect to feedback clock
+> > + * signal input, but for other cases the clock phase may be shifted with
+> > + * respect to some other, unspecified signal.
+> > + *
+> > + * Additionally the concept of phase shift does not propagate through the clock
+> > + * tree hierarchy, which sets it appart from clock rates and clock accuracy. A
+> > + * parent clock phase attribute does not have an impact on the phase attribute
+> > + * of a child clock.
+> > + */
+> > +int clk_set_phase(struct clk *clk, int degrees)
 > 
-> I wanted to ask and clarify why the code was written like this though, given
-> its complexity.
+> Actually, while this is what I had in mind too, we'd need a bit more
+> control here. We have two phases to control (namely, input and
+> sample).
+> 
+> Maybe passing an additional enum to tell which phase we want to
+> adjust, that could easily be extended by new drivers need would fit
+> our need here?
 
-We could also return a constant > 1.  __cpu_suspend code will replace
-a 0 return with 1 for paths exiting suspend, but will not change return
-values != 0.  
+Maxime,
 
-cpu_suspend_abort:
-        ldmia   sp!, {r1 - r3}          @ pop phys pgd, virt SP, phys
-	resume fn
-	teq     r0, #0
-	moveq   r0, #1                  @ force non-zero value
-	mov     sp, r2
-	ldmfd   sp!, {r4 - r11, pc}
+Do you have any documentation you could share with me on your
+requirements? I'd like to better understand them so we can get the API
+right.
 
-We could take advantage of that if we wanted, but Lorenzo pointed out
-also that the relative benefit is very low since the cost of
-resuming is >> soft_restart. 
+Shifting phase with respect to an input signal makes a lot of sense to
+me, but I don't really understand "sample".
 
-I'll go with leaving the soft_restart as is unless someone feels
-strongly against.
+Thanks,
+Mike
 
-Thanks!
-
-Sebastian
+> 
+> Thanks!
+> Maxime
+> 
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
