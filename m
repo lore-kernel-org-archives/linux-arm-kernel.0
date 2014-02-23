@@ -1,46 +1,65 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 23 Feb 2014 16:47:10 +0000
-Subject: [PATCH] ARM: mvebu: Armada 375/38x depend on MULTI_V7
-Message-ID: <1393174030-10549-1-git-send-email-jason@lakedaemon.net>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 23 Feb 2014 17:58:39 +0100
+Subject: [PATCH] net: phy: add suspend_halted module param
+Message-ID: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During this release cycle, we're adding the new Armada 375, 380, and 385
-SoCs.  We're also migrating DT kirkwood boards into mach-mvebu.  The
-kirkwood changes make the different SoCs in mach-mvebu/ depend on
-MULTI_V7 or MULTI_V5 as appropriate.
+commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
+  ("net: phy: resume/suspend PHYs on attach/detach")
+introduced a feature to suspend PHYs when entering halted state.
 
-We add this dependency to the new SoCs so that when the branches are
-merged, everything is as it should be.
+Unfortunately, not all bootloaders properly power-up PHYs on reset
+and fail to access ethernet because the PHY is still powered down.
 
-Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+Therefore, we add a boolean module parameter suspend_halted with
+default value of true. Disabling that parameter prevents PHYs from
+being suspended when entering halted state.
+
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Reported-by: Andrew Lunn <andrew@lunn.ch>
 ---
-Adding this to mvebu/soc-3xx
+Andrew, can you please re-test if disabling the feature does work on
+your board? I tried a bunch of mine, but none failed to power-up the
+PHY in u-boot.
 
- arch/arm/mach-mvebu/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Cc: David Miller <davem@davemloft.net>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: netdev at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/net/phy/phy_device.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 884b275ab056..00dc4a6ace6e 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -38,7 +38,7 @@ config MACH_ARMADA_370
- 	  on the Marvell Armada 370 SoC with device tree.
+diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
+index 4b03e63639b7..671eea0eb5db 100644
+--- a/drivers/net/phy/phy_device.c
++++ b/drivers/net/phy/phy_device.c
+@@ -40,6 +40,10 @@ MODULE_DESCRIPTION("PHY library");
+ MODULE_AUTHOR("Andy Fleming");
+ MODULE_LICENSE("GPL");
  
- config MACH_ARMADA_375
--	bool "Marvell Armada 375 boards"
-+	bool "Marvell Armada 375 boards" if ARCH_MULTI_V7
- 	select ARM_ERRATA_720789
- 	select ARM_ERRATA_753970
- 	select ARM_GIC
-@@ -52,7 +52,7 @@ config MACH_ARMADA_375
- 	  on the Marvell Armada 375 SoC with device tree.
++static bool suspend_halted = true;
++module_param(suspend_halted, bool, 0644);
++MODULE_PARM_DESC(suspend_halted, "Suspend PHYs when entering halted state.");
++
+ void phy_device_free(struct phy_device *phydev)
+ {
+ 	put_device(&phydev->dev);
+@@ -685,6 +689,12 @@ int phy_suspend(struct phy_device *phydev)
+ 	struct phy_driver *phydrv = to_phy_driver(phydev->dev.driver);
+ 	struct ethtool_wolinfo wol;
  
- config MACH_ARMADA_38X
--	bool "Marvell Armada 380/385 boards"
-+	bool "Marvell Armada 380/385 boards" if ARCH_MULTI_V7
- 	select ARM_ERRATA_720789
- 	select ARM_ERRATA_753970
- 	select ARM_GIC
++	/* Some bootloaders do not power-up PHYs properly after reset,
++	 * allow to disable the suspend halted PHYs feature.
++	 */
++	if (!suspend_halted)
++		return -ENOSYS;
++
+ 	/* If the device has WOL enabled, we cannot suspend the PHY */
+ 	wol.cmd = ETHTOOL_GWOL;
+ 	phy_ethtool_get_wol(phydev, &wol);
 -- 
-1.9.0
+1.8.5.3
