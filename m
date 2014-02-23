@@ -1,20 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 23 Feb 2014 12:14:03 +0100
-Subject: [PATCH v4 00/22] Move DT kirkwood into mach-mvebu
-In-Reply-To: <20140222221619.GL7862@titan.lakedaemon.net>
-References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
- <20140222221619.GL7862@titan.lakedaemon.net>
-Message-ID: <20140223111403.GG14255@lunn.ch>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 23 Feb 2014 12:52:41 +0100
+Subject: [PATCH] ahci_sunxi: Use msleep instead of mdelay
+Message-ID: <1393156361-18414-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 22, 2014 at 05:16:19PM -0500, Jason Cooper wrote:
-> Andrew,
-> 
-> I've tentatively pulled this in as detailed below.  The only outlier is
-> an Ack from rmk on one patch.
+ahci_sunxi_phy_init is called from the probe and resume code paths, and
+sleeping is safe in both, so use msleep instead of mdelay.
 
-Thanks for pulling. I just built mvebu/for-next with
-mvebu_v5_defconfig and booted it on my QNAP. Looks good.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/ata/ahci_sunxi.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-   Andrew
+diff --git a/drivers/ata/ahci_sunxi.c b/drivers/ata/ahci_sunxi.c
+index 001f7dfc..d1bf3f7 100644
+--- a/drivers/ata/ahci_sunxi.c
++++ b/drivers/ata/ahci_sunxi.c
+@@ -90,7 +90,7 @@ static int ahci_sunxi_phy_init(struct device *dev, void __iomem *reg_base)
+ 
+ 	/* This magic is from the original code */
+ 	writel(0, reg_base + AHCI_RWCR);
+-	mdelay(5);
++	msleep(5);
+ 
+ 	sunxi_setbits(reg_base + AHCI_PHYCS1R, BIT(19));
+ 	sunxi_clrsetbits(reg_base + AHCI_PHYCS0R,
+@@ -105,7 +105,7 @@ static int ahci_sunxi_phy_init(struct device *dev, void __iomem *reg_base)
+ 			 (0x7 << 20), (0x3 << 20));
+ 	sunxi_clrsetbits(reg_base + AHCI_PHYCS2R,
+ 			 (0x1f << 5), (0x19 << 5));
+-	mdelay(5);
++	msleep(5);
+ 
+ 	sunxi_setbits(reg_base + AHCI_PHYCS0R, (0x1 << 19));
+ 
+@@ -137,7 +137,7 @@ static int ahci_sunxi_phy_init(struct device *dev, void __iomem *reg_base)
+ 		udelay(1);
+ 	} while (1);
+ 
+-	mdelay(15);
++	msleep(15);
+ 
+ 	writel(0x7, reg_base + AHCI_RWCR);
+ 
+-- 
+1.9.0
