@@ -1,152 +1,136 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 23 Feb 2014 02:16:11 +0100
-Subject: [PATCH v3 4/5] clk/exynos5260: add macros and documentation for
- exynos5260
-In-Reply-To: <1392724570-27977-5-git-send-email-rahul.sharma@samsung.com>
-References: <1392724570-27977-1-git-send-email-rahul.sharma@samsung.com>
- <1392724570-27977-5-git-send-email-rahul.sharma@samsung.com>
-Message-ID: <53094BDB.4040406@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 22 Feb 2014 17:36:33 -0800
+Subject: [PATCH v3 07/11] watchdog: xilinx: Use of_property_read_u32
+In-Reply-To: <53097091.50204@udio.cujae.edu.cu>
+References: <cover.1392212059.git.michal.simek@xilinx.com>
+ <7cbb10853a343c9d488346596f604909ab0668b9.1392212059.git.michal.simek@xilinx.com>
+ <20140212171509.GB20012@roeck-us.net>
+ <20140222184604.GB21504@spo001.leaseweb.com>
+ <53094A15.1080708@udio.cujae.edu.cu> <53093038.6000604@roeck-us.net>
+ <53097091.50204@udio.cujae.edu.cu>
+Message-ID: <530950A1.40302@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rahul,
-
-On 18.02.2014 12:56, Rahul Sharma wrote:
-> Add macros which are used as Clock IDs in DT and clock file.
-> It also adds the documentation for the exynos5260 clocks.
+On 02/22/2014 07:52 PM, Alejandro Cabrera wrote:
+> On 22/2/2014 3:18 PM, Guenter Roeck wrote:
+>> On 02/22/2014 05:08 PM, Alejandro Cabrera wrote:
+>>> On 22/2/2014 10:46 AM, Wim Van Sebroeck wrote:
+>>>> Hi All,
+>>>>
+>>>>> Hi Michal,
+>>>>>
+>>>>> On Wed, Feb 12, 2014 at 02:41:21PM +0100, Michal Simek wrote:
+>>>>>> Use of_property_read_u32 functions to clean probe function.
+>>>>>>
+>>>>>> Signed-off-by: Michal Simek<michal.simek@xilinx.com>
+>>>>>> Reviewed-by: Guenter Roeck<linux@roeck-us.net>
+>>>>>> ---
+>>>>>>
+>>>>>> Changes in v3:
+>>>>>> - Remove one if checking and use variable directly
+>>>>>>
+>>>>> Looks good.
+>>>>>
+>>>>> Another comment/remark.
+>>>>>
+>>>>>> -    pfreq = (u32 *)of_get_property(pdev->dev.of_node,
+>>>>>> -                    "clock-frequency", NULL);
+>>>>>> -
+>>>>>> -    if (pfreq == NULL) {
+>>>>>> +    rc = of_property_read_u32(pdev->dev.of_node, "clock-frequency",&pfreq);
+>>>>>> +    if (rc) {
+>>>>>>           dev_warn(&pdev->dev,
+>>>>>>                "The watchdog clock frequency cannot be obtained\n");
+>>>>>>           no_timeout = true;
+>>>>>>       }
+>>>>>>
+>>>>>> -    tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+>>>>>> -                    "xlnx,wdt-interval", NULL);
+>>>>>> -    if (tmptr == NULL) {
+>>>>>> +    rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-interval",
+>>>>>> + &xdev->wdt_interval);
+>>>>>> +    if (rc) {
+>>>>>>           dev_warn(&pdev->dev,
+>>>>>>                "Parameter \"xlnx,wdt-interval\" not found\n");
+>>>>>>           no_timeout = true;
+>>>>>> -    } else {
+>>>>>> -        xdev->wdt_interval = *tmptr;
+>>>>>>       }
+>>>>>>
+>>>>>> -    tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+>>>>>> -                    "xlnx,wdt-enable-once", NULL);
+>>>>>> -    if (tmptr == NULL) {
+>>>>>> +    rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-enable-once",
+>>>>>> + &enable_once);
+>>>>>> +    if (rc)
+>>>>>>           dev_warn(&pdev->dev,
+>>>>>>                "Parameter \"xlnx,wdt-enable-once\" not found\n");
+>>>>>> -        watchdog_set_nowayout(xilinx_wdt_wdd, true);
+>>>>>> -    }
+>>>>> All the above properties are optional. Is a warning really
+>>>>> warranted in this case ? I usually associate a warning with
+>>>>> something that is wrong, which is not the case here.
+>>>>>
+>>>>> I would encourage you to drop those warnings, but that should be
+>>>>> a separate patch.
+>>>> I agree with Guenter: these are not really warnings. Seperate patch is thus welcome.
+>>> Hi
+>>>
+>>> I support Michal intention, I think it is a warning because device tree blob must have the "xlnx,wdt-enable-once" property specified in order to allow the system to be sure of the real value of this property. In addition to, this warning can be helpful to detect a wrong device tree specification.
+>>>
+>>
+>> The dt documentation states that the properties are optional.
+>>
+>> Optional properties:
+>> - clock-frequency       : Frequency of clock in Hz
+>> - xlnx,wdt-enable-once  : 0 - Watchdog can be restarted
+>>                           1 - Watchdog can be enabled just once
+>> - xlnx,wdt-interval     : Watchdog timeout interval in 2^<val> clock cycles,
+>> <val> is integer from 8 to 31.
+>>
+>> This clearly conflicts with your statement. An optional property
+>> is just that, optional. If it warrants a warning, it must
+>> not be optional. If you claim that not providing the properties
+>> would be "wrong", why are they defined as optional ?
+> Hi Guenter
 >
-> Signed-off-by: Rahul Sharma <rahul.sharma@samsung.com>
-> ---
->   .../devicetree/bindings/clock/exynos5260-clock.txt |  299 ++++++++++++++++++++
->   include/dt-bindings/clk/exynos5260-clk.h           |  234 +++++++++++++++
->   2 files changed, 533 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/clock/exynos5260-clock.txt
->   create mode 100644 include/dt-bindings/clk/exynos5260-clk.h
+> I didn't know that these properties was classified as optional...
+> I think that they should not be, because all xilinx watchog devices (at least for microblaze processor)
+> have these properties defined in theirs MPD files and theirs values can be obtained during the
+> hardware specification to device tree conversion.
+>> What is your definition of "wrong" and "must have" ?
+> what I mean for "must have" is: if these properties can be obtained
+> for all xilinx watchdog devices they must be present in the device tree because they allows
+> the system (linux/user) to know exactly how a watchdog device is configured.
+> Because these properties always can be obtained from hardware design there is no
+> reason to leave them out from the device tree. This is why I consider that a device tree without
+> these properties should be considered as "wrong" device tree.
+>> How do you expect anyone to know that omitting those
+>> "optional" properties is by some definition "wrong" ?
+> I'm agree with you.
+> Maybe these properties shouldn't be optional.
+> For example suppose that "xlnx,wdt-enable-once" is missing in the device tree,
+> when a watchdog daemon ask for this property what is the obtained value ?
+> Independently of this value, why do not warn the user about this missing property
+> when it can always be in the device tree ?
 >
-> diff --git a/Documentation/devicetree/bindings/clock/exynos5260-clock.txt b/Documentation/devicetree/bindings/clock/exynos5260-clock.txt
-> new file mode 100644
-> index 0000000..ec180c0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/exynos5260-clock.txt
-> @@ -0,0 +1,299 @@
-> +* Samsung Exynos5260 Clock Controller
-> +
-> +The Exynos5260 clock controller encalsulate all CMUs which are
-> +instantiaited independently from the device-tree. As a whole,
-> +these CMUs generates and supplies clocks to various controllers
-> +within the Exynos5260 SoC.
-> +
-> +Required Properties:
-> +
-> +- compatible: should be one of the following.
-> +  - First compatible should be one of the following
-> +		"exynos5260-cmu-top"
-> +		"exynos5260-cmu-peri"
-> +		"exynos5260-cmu-egl"
-> +		"exynos5260-cmu-kfc"
-> +		"exynos5260-cmu-g2d"
-> +		"exynos5260-cmu-mif"
-> +		"exynos5260-cmu-mfc"
-> +		"exynos5260-cmu-g3d"
-> +		"exynos5260-cmu-fsys"
-> +		"exynos5260-cmu-aud"
-> +		"exynos5260-cmu-isp"
-> +		"exynos5260-cmu-gscl"
-> +		"exynos5260-cmu-disp"
-> +  - Second compatible should be "samsung,exynos5260-clock".
 
-This is no longer true, as we have decided to remove the second compatible.
+Really, this line of argument doesn't make any sense to me.
+"xlnx,wdt-enable-once", for example, is a boolean and means
+that the watchdog, when enabled, can not be stopped. It defaults
+to false, and thus is inherently optional. Making it mandatory
+doesn't really add any value.
 
-> +
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +
-> +- #clock-cells: should be 1.
-> +
-> +The following is the list of clocks generated by the each controller. Each
-> +clock is assigned a MACRO constant. These constants are defined in
-> +"dt-bindings/clk/exynos5260-clk.h". DT client nodes use this MACRO to specify
-> +the clock which they consume.
+Similar, the driver choses defaults for the other values.
+If that is incorrect, it should not do it.
 
-There is no need to list all the macros in this file, if there is a 
-reference to the header where they are defined.
+Really, something is very fishy here. Either the properties are
+optional or they are not. If they are optional, the driver should
+accept the fact silently. If they are mandatory, the driver should
+act accordingly and bail out if the attributes are not there.
 
-> +
-> +-----------------------
-> +  CMU_TOP clocks
-> +-----------------------
-> +
-> +  FIN_PLL
-> +  TOP_FOUT_DISP_PLL
-> +  TOP_FOUT_AUD_PLL
-> +  TOP_SCLK_MMC0
+You can not have it both ways. I am close to recommending
+that Wim should not accept this driver until that is sorted out.
 
-[snip]
-
-> +  ISP_SCLK_SPI0_EXT
-> +  ISP_SCLK_SPI1_EXT
-> +  ISP_SCLK_UART_EXT
-> +
-> +
-> +Example 1: An example of a clock controller node is listed below.
-> +
-> +	cmu_disp: clock-controller at 0x14550000 {
-> +		compatible = "exynos5260-cmu-disp", "samsung,exynos5260-clock";
-
-Forgot to remove second compatible?
-
-> +		reg = <0x14550000 0x10000>;
-> +		#clock-cells = <1>;
-> +	};
-> +
-> +Example 2: UART controller node that consumes the clock generated by the
-> +		peri clock controller. Refer to the standard clock bindings for
-> +		information about 'clocks' and 'clock-names' property.
-> +
-> +	serial at 12C00000 {
-> +		compatible = "samsung,exynos4210-uart";
-> +		reg = <0x12C00000 0x100>;
-> +		interrupts = <0 146 0>;
-> +		clocks = <&cmu_peri PERI_PCLK_UART0>, <&cmu_peri PERI_SCLK_UART0>;
-> +		clock-names = "uart", "clk_uart_baud0";
-> +		status = "disabled";
-> +	};
-> +
-> diff --git a/include/dt-bindings/clk/exynos5260-clk.h b/include/dt-bindings/clk/exynos5260-clk.h
-> new file mode 100644
-> index 0000000..d2fb7fa
-> --- /dev/null
-> +++ b/include/dt-bindings/clk/exynos5260-clk.h
-> @@ -0,0 +1,234 @@
-> +/*
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * Provides Constants for Exynos5260 clocks.
-> +*/
-> +
-> +#ifndef _DT_BINDINGS_CLK_EXYNOS5260_H
-> +#define _DT_BINDINGS_CLK_EXYNOS5260_H
-> +
-> +#define	ID_NONE		0
-
-This is not a part of DT binding and should not be defined here. 
-Furthermore, the driver should simply use 0 directly.
-
-> +
-> +/*
-> + * Clock names: XXXXXX_YYYYY_ZZZZZ
-> + *                    |------| |----| |----|
-> + *                       cmu       type      IP
-> +*/
-> +
-> +/* list of clocks for CMU_TOP */
-> +#define	FIN_PLL			1
-
-Hmm, isn't this an external clock?
-
-Best regards,
-Tomasz
+Guenter
