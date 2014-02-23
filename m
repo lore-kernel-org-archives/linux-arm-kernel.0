@@ -1,108 +1,87 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 23 Feb 2014 13:09:11 +0100
-Subject: [PATCH v3 3/4] ARM: sun5i: dt: Add USB host bindings
-In-Reply-To: <1393157352-21104-1-git-send-email-hdegoede@redhat.com>
-References: <1393157352-21104-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1393157352-21104-4-git-send-email-hdegoede@redhat.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun, 23 Feb 2014 14:30:38 +0200
+Subject: [PATCH 00/11] ARM: dts: sbc-t3x: add support for more boards
+In-Reply-To: <52FB6B2E.9070106@compulab.co.il>
+References: <1389532975-28281-1-git-send-email-lifshitz@compulab.co.il>
+ <52FB6B2E.9070106@compulab.co.il>
+Message-ID: <5309E9EE.2040705@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roman Byshko <rbyshko@gmail.com>
+ping x2!
 
-Add nodes for the usb-phy and ehci- and ohci-usb-host controllers.
+On 02/12/14 14:38, Igor Grinberg wrote:
+> ping!
+> 
+> On 01/12/14 15:22, Dmitry Lifshitz wrote:
+>> Add support for CompuLab SBC-T3530 and SBC-T3517 boards:
+>>
+>> https://compulab.co.il/products/sbcs/sbc-t3530/
+>> https://compulab.co.il/products/sbcs/sbc-t3517/
+>>
+>> along with respective CoMs - CM-T3530 and CM-T3517:
+>>
+>> https://compulab.co.il/products/computer-on-modules/cm-t3530/
+>> https://compulab.co.il/products/computer-on-modules/cm-t3517/
+>>
+>> The device tree files have the following structure:
+>>
+>> omap3-cm-t3x.dtsi
+>>  |
+>>  |<-- omap3-cm-t3x30.dtsi
+>>  |     |
+>>  |     |
+>>  |     |     -----                  -------          ------------
+>>  |     |    | CoM |                | Board |        | Base board |
+>>  |     |     -----                  -------          ------------
+>>  |     |                                            omap3-sb-t35.dtsi
+>>  |     |                                                  |
+>>  |     |<-- omap3-cm-t3730.dts <-- omap3-sbc-t3730.dts -->|
+>>  |     |                                                  |
+>>  |     |<-- omap3-cm-t3530.dts <-- omap3-sbc-t3530.dts -->|
+>>  |                                                        |
+>>  |<-------- omap3-cm-t3517.dts <-- omap3-sbc-t3517.dts -->|
+>>
+>>
+>> where omap3-cm-t3730.dts, omap3-cm-t3530.dts, omap3-cm-t3517.dts
+>> contain CoMs specific data, while omap3-sbc-t3730.dts, omap3-sbc-t3530.dts,
+>> omap3-sbc-t3517.dts represent eval boards with respective core modules.
+>>
+>> This series is based on Tony's omap-for-v3.14/dt branch
+>>
+>> Dmitry Lifshitz (11):
+>>   ARM: dts: sbc-t3x: refactor DT support
+>>   ARM: dts: sbc-t3x: disable mmc3
+>>   ARM: dts: sb-t35: fix Ethernet power supply
+>>   ARM: dts: cm-t3x: add gpio-led pinmux
+>>   ARM: dts: cm-t3x30: add twl4030 gpio pullups
+>>   ARM: dts: cm-t3x30: add HS USB Host support
+>>   ARM: dts: sbc-t3730: add pinmux for usb hub reset
+>>   ARM: dts: cm-t3x30: add USB OTG support
+>>   ARM: dts: sbc-t3530: add support for sbc-t3530
+>>   ARM: dts: sbc-t3517: add support for sbc-t3517
+>>   ARM: OMAP2+: make reset pulse for sbc-t3x usb hubs
+>>
+>>  arch/arm/boot/dts/Makefile            |    4 +
+>>  arch/arm/boot/dts/omap3-cm-t3517.dts  |  137 +++++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/omap3-cm-t3530.dts  |   13 +++
+>>  arch/arm/boot/dts/omap3-cm-t3730.dts  |   40 ----------
+>>  arch/arm/boot/dts/omap3-cm-t3x.dtsi   |  112 +++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/omap3-cm-t3x30.dtsi |   74 +++++++++++++-----
+>>  arch/arm/boot/dts/omap3-sb-t35.dtsi   |   30 +++++++-
+>>  arch/arm/boot/dts/omap3-sbc-t3517.dts |   44 +++++++++++
+>>  arch/arm/boot/dts/omap3-sbc-t3530.dts |   37 +++++++++
+>>  arch/arm/boot/dts/omap3-sbc-t3730.dts |   24 +++---
+>>  arch/arm/mach-omap2/pdata-quirks.c    |   67 ++++++++++++++++-
+>>  11 files changed, 506 insertions(+), 76 deletions(-)
+>>  create mode 100644 arch/arm/boot/dts/omap3-cm-t3517.dts
+>>  create mode 100644 arch/arm/boot/dts/omap3-cm-t3530.dts
+>>  create mode 100644 arch/arm/boot/dts/omap3-cm-t3x.dtsi
+>>  create mode 100644 arch/arm/boot/dts/omap3-sbc-t3517.dts
+>>  create mode 100644 arch/arm/boot/dts/omap3-sbc-t3530.dts
+>>
+> 
 
-Signed-off-by: Roman Byshko <rbyshko@gmail.com>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun5i-a10s.dtsi | 32 ++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/sun5i-a13.dtsi  | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 64 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 0565040..a5431ed 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -341,6 +341,38 @@
- 			status = "disabled";
- 		};
- 
-+		usbphy: phy at 01c13400 {
-+			#phy-cells = <1>;
-+			compatible = "allwinner,sun5i-a13-usb-phy";
-+			reg = <0x01c13400 0x10 0x01c14800 0x4>;
-+			reg-names = "phy_ctrl", "pmu1";
-+			clocks = <&usb_clk 8>;
-+			clock-names = "usb_phy";
-+			resets = <&usb_clk 1>;
-+			reset-names = "usb1_reset";
-+			status = "disabled";
-+		};
-+
-+		ehci0: usb at 01c14000 {
-+			compatible = "allwinner,sun5i-a10s-ehci", "generic-ehci";
-+			reg = <0x01c14000 0x100>;
-+			interrupts = <39>;
-+			clocks = <&ahb_gates 1>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
-+
-+		ohci0: usb at 01c14400 {
-+			compatible = "allwinner,sun5i-a10s-ohci", "generic-ohci";
-+			reg = <0x01c14400 0x100>;
-+			interrupts = <40>;
-+			clocks = <&usb_clk 6>, <&ahb_gates 2>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
-+
- 		intc: interrupt-controller at 01c20400 {
- 			compatible = "allwinner,sun4i-ic";
- 			reg = <0x01c20400 0x400>;
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 785dea5..7fe9cdc 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -312,6 +312,38 @@
- 			status = "disabled";
- 		};
- 
-+		usbphy: phy at 01c13400 {
-+			#phy-cells = <1>;
-+			compatible = "allwinner,sun5i-a13-usb-phy";
-+			reg = <0x01c13400 0x10 0x01c14800 0x4>;
-+			reg-names = "phy_ctrl", "pmu1";
-+			clocks = <&usb_clk 8>;
-+			clock-names = "usb_phy";
-+			resets = <&usb_clk 1>;
-+			reset-names = "usb1_reset";
-+			status = "disabled";
-+		};
-+
-+		ehci0: usb at 01c14000 {
-+			compatible = "allwinner,sun5i-a13-ehci", "generic-ehci";
-+			reg = <0x01c14000 0x100>;
-+			interrupts = <39>;
-+			clocks = <&ahb_gates 1>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
-+
-+		ohci0: usb at 01c14400 {
-+			compatible = "allwinner,sun5i-a13-ohci", "generic-ohci";
-+			reg = <0x01c14400 0x100>;
-+			interrupts = <40>;
-+			clocks = <&usb_clk 6>, <&ahb_gates 2>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
-+
- 		intc: interrupt-controller at 01c20400 {
- 			compatible = "allwinner,sun4i-ic";
- 			reg = <0x01c20400 0x400>;
 -- 
-1.9.0
+Regards,
+Igor.
