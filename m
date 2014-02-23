@@ -1,23 +1,24 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 23 Feb 2014 15:21:12 +0100
-Subject: [PATCH v4 14/16] pinctrl: mvebu: remove MPP_REG_CTRL macro
+Date: Sun, 23 Feb 2014 15:21:04 +0100
+Subject: [PATCH v4 06/16] pinctrl: mvebu: dove: provide generic mpp callbacks
 In-Reply-To: <1393165274-32492-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1393165274-32492-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1393165274-32492-15-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1393165274-32492-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+We want to get rid of passing register addresses to common pinctrl
+driver, so provide set/get callbacks that use generic mpp pins helper
+and will be used later. While at it, also make use of globally defined
+MPP macros.
 
-Now that each per-SoC pinctrl driver must implement its own get/set
-functions, there is no point in keeping the MPP_REG_CTRL macro, whose
-purpose was to let the core pinctrl mvebu driver use default get/set
-functions. While at it also update the comment about mvebu_mpp_ctrl.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
+Changelog:
+v3->v4:
+- use generic mpp helpers (Suggested by Thomas Petazzoni)
+
 Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
@@ -27,45 +28,83 @@ Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/pinctrl/mvebu/pinctrl-mvebu.h | 19 +++----------------
- 1 file changed, 3 insertions(+), 16 deletions(-)
+ drivers/pinctrl/mvebu/pinctrl-dove.c | 36 ++++++++++++++++++++++--------------
+ 1 file changed, 22 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.h b/drivers/pinctrl/mvebu/pinctrl-mvebu.h
-index c73f4eea62ac..65a98e6f7265 100644
---- a/drivers/pinctrl/mvebu/pinctrl-mvebu.h
-+++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.h
-@@ -28,10 +28,9 @@
-  * between two or more different settings, e.g. assign mpp pin 13 to
-  * uart1 or sata.
-  *
-- * If optional mpp_get/_set functions are set these are used to get/set
-- * a specific mode. Otherwise it is assumed that the mpp control is based
-- * on 4-bit groups in subsequent registers. The optional mpp_gpio_req/_dir
-- * functions can be used to allow pin settings with varying gpio pins.
-+ * The mpp_get/_set functions are mandatory and are used to get/set a
-+ * specific mode. The optional mpp_gpio_req/_dir functions can be used
-+ * to allow pin settings with varying gpio pins.
-  */
- struct mvebu_mpp_ctrl {
- 	const char *name;
-@@ -114,18 +113,6 @@ struct mvebu_pinctrl_soc_info {
- 	int ngpioranges;
- };
+diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
+index c7d365f9009c..0a4afe4bc97e 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-dove.c
++++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
+@@ -49,48 +49,56 @@
+ #define  DOVE_SD1_GPIO_SEL		BIT(1)
+ #define  DOVE_SD0_GPIO_SEL		BIT(0)
  
--#define MPP_REG_CTRL(_idl, _idh)				\
--	{							\
--		.name = NULL,					\
--		.pid = _idl,					\
--		.npins = _idh - _idl + 1,			\
--		.pins = (unsigned[_idh - _idl + 1]) { },	\
--		.mpp_get = NULL,				\
--		.mpp_set = NULL,				\
--		.mpp_gpio_req = NULL,				\
--		.mpp_gpio_dir = NULL,				\
--	}
+-#define MPPS_PER_REG	8
+-#define MPP_BITS	4
+-#define MPP_MASK	0xf
 -
- #define MPP_FUNC_CTRL(_idl, _idh, _name, _func)			\
- 	{							\
- 		.name = _name,					\
+ #define CONFIG_PMU	BIT(4)
+ 
++static void __iomem *mpp_base;
++
++static int dove_mpp_ctrl_get(unsigned pid, unsigned long *config)
++{
++	return default_mpp_ctrl_get(mpp_base, pid, config);
++}
++
++static int dove_mpp_ctrl_set(unsigned pid, unsigned long config)
++{
++	return default_mpp_ctrl_set(mpp_base, pid, config);
++}
++
+ static int dove_pmu_mpp_ctrl_get(unsigned pid, unsigned long *config)
+ {
+-	unsigned off = (pid / MPPS_PER_REG) * MPP_BITS;
+-	unsigned shift = (pid % MPPS_PER_REG) * MPP_BITS;
++	unsigned off = (pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
++	unsigned shift = (pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+ 	unsigned long pmu = readl(DOVE_PMU_MPP_GENERAL_CTRL);
+ 	unsigned long func;
+ 
+ 	if (pmu & (1 << pid)) {
+ 		func = readl(DOVE_PMU_SIGNAL_SELECT_0 + off);
+-		*config = (func >> shift) & MPP_MASK;
++		*config = (func >> shift) & MVEBU_MPP_MASK;
+ 		*config |= CONFIG_PMU;
+ 	} else {
+ 		func = readl(DOVE_MPP_VIRT_BASE + off);
+-		*config = (func >> shift) & MPP_MASK;
++		*config = (func >> shift) & MVEBU_MPP_MASK;
+ 	}
+ 	return 0;
+ }
+ 
+ static int dove_pmu_mpp_ctrl_set(unsigned pid, unsigned long config)
+ {
+-	unsigned off = (pid / MPPS_PER_REG) * MPP_BITS;
+-	unsigned shift = (pid % MPPS_PER_REG) * MPP_BITS;
++	unsigned off = (pid / MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
++	unsigned shift = (pid % MVEBU_MPPS_PER_REG) * MVEBU_MPP_BITS;
+ 	unsigned long pmu = readl(DOVE_PMU_MPP_GENERAL_CTRL);
+ 	unsigned long func;
+ 
+ 	if (config & CONFIG_PMU) {
+ 		writel(pmu | (1 << pid), DOVE_PMU_MPP_GENERAL_CTRL);
+ 		func = readl(DOVE_PMU_SIGNAL_SELECT_0 + off);
+-		func &= ~(MPP_MASK << shift);
+-		func |= (config & MPP_MASK) << shift;
++		func &= ~(MVEBU_MPP_MASK << shift);
++		func |= (config & MVEBU_MPP_MASK) << shift;
+ 		writel(func, DOVE_PMU_SIGNAL_SELECT_0 + off);
+ 	} else {
+ 		writel(pmu & ~(1 << pid), DOVE_PMU_MPP_GENERAL_CTRL);
+ 		func = readl(DOVE_MPP_VIRT_BASE + off);
+-		func &= ~(MPP_MASK << shift);
+-		func |= (config & MPP_MASK) << shift;
++		func &= ~(MVEBU_MPP_MASK << shift);
++		func |= (config & MVEBU_MPP_MASK) << shift;
+ 		writel(func, DOVE_MPP_VIRT_BASE + off);
+ 	}
+ 	return 0;
 -- 
 1.8.5.3
