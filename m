@@ -1,93 +1,86 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 23 Feb 2014 05:51:51 -0800
-Subject: [GIT PULL v2] efm32 cleanups for next
-In-Reply-To: <20140222185802.GS6988@pengutronix.de>
-References: <20140219201950.GC6988@pengutronix.de>
- <20140220195452.GK6988@pengutronix.de>
- <20140222003853.GG13233@quad.lixom.net>
- <20140222185802.GS6988@pengutronix.de>
-Message-ID: <CAOesGMh16Jqsczaagr9C2niiwu29kd7e8JrWYRZech9kJ2wVRQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 23 Feb 2014 15:21:01 +0100
+Subject: [PATCH v4 03/16] pinctrl: mvebu: identify generic controls by name
+In-Reply-To: <1393165274-32492-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393165274-32492-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1393165274-32492-4-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 22, 2014 at 10:58 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello Olof,
->
-> On Fri, Feb 21, 2014 at 04:38:53PM -0800, Olof Johansson wrote:
->> On Thu, Feb 20, 2014 at 08:54:52PM +0100, Uwe Kleine-K?nig wrote:
->> > Hello,
->> >
->> > this pull request superseeds the earlier request this mail is a reply
->> > to. Compared to the original one I added another cleanup. Here come the
->> > full details:
->> >
->> > The following changes since commit 11d73c56b96b4297bd96273e9a22b7c72d13f1fa:
->> >
->> >   Merge tag 'dropmachtimexh-v2' of git://git.pengutronix.de/git/ukl/linux into next/cleanup (2014-02-18 22:19:33 -0800)
->> >
->> > are available in the git repository at:
->> >
->> >   git://git.pengutronix.de/git/ukl/linux.git tags/efm32-next
->> >
->> > for you to fetch changes up to f41b0482d5c1fc05234d54d58931a606ec7a97a2:
->> >
->> >   ARM: efm32: drop selecting CLKSRC_MMIO (2014-02-20 09:56:18 +0100)
->> >
->> > ----------------------------------------------------------------
->> > Just three simple cleanups for efm32 removing two now unused files and a
->> > superflous select by ARCH_EFM32.
->> >
->> > ----------------------------------------------------------------
->> > BTW, I based this on armsoc/cleanup because this is the first commit
->> > that allows to remove efm32's <mach/timex.h> (which is the last one in
->> > the tree).
->>
->> We ask you to never base your branches on top of our next/* contents, since it
->> happens that it will be rebuilt. Instead you should base your branch on top of
->> the topic branch in question, i.e. your timex-removal branch.
-> my timex-removal branch isn't enough, because it bases on v3.13-rc1
-> which does neither have arch/arm/mach-efm32 nor the commits that allow
-> to drop the select CLKSRC_MMIO nor the commit that allows to drop
-> <mach/entry-macro.S>.
->
-> That's why I wrote that armsoc/[next/]cleanup is the first commit that
-> makes my cleanups possible.
->
-> The only options I see are:
->  1) merge v3.14-rc1 into my timex-series myself and base on that;
->  2) wait until my timex-series enters a tree with >= 3.14-rc1 that is
->     stable; or
->  3) drop commit "ARM: efm32: drop unused file <mach/timex.h>" for now
->     and base the rest on top of 3.14-rc1.
->
-> I did 2) assuming that next/cleanup is stable. Actually this isn't much
-> different from 1) because the commit I based my changes on is just
-> 3.14-rc1 + your merge of my series. So even if you want to redo
-> next/cleanup throwing out some merges different than mine it shouldn't
-> be too hard to keep the merge you did.
->
-> The details are:
->
->  - "ARM: efm32: drop selecting CLKSRC_MMIO" depends on
->         09ca27579ee5 (clocksource: time-efm32: Select CLKSRC_MMIO)
->    which is in v3.13-rc5;
->  - "ARM: efm32: drop unused file <mach/timex.h>" depends on
->         79f08d9ed217 (ARM: drop <mach/timex.h> for !ARCH_MULTIPLATFORM, too)
->         6d85e2b0b6be (ARM: new platform for Energy Micro's EFM32 Cortex-M3 SoCs)
->    so I need v3.14-rc1 + dropmachtimexh-v2 for it;
->  - "ARM: efm32: drop unused file entry-macro.S" depends on
->         e6d159cdf9f7 (ARM: 7890/1: v7-M: drop using mach/entry-macro.S)
->    which is in v3.14-rc1.
->
-> Please advice,
+We treat unnamed controls as generic mvebu mpp register controls but
+we identify them by not being special controls. Flip the logic and
+use the name pointer as identification instead. While at it, add some
+comments explaining the not so obvious treatment.
 
-Ok, it's probably easiest to just apply the patches directly for us,
-so I'll do that.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ drivers/pinctrl/mvebu/pinctrl-mvebu.c | 30 ++++++++++++++++--------------
+ 1 file changed, 16 insertions(+), 14 deletions(-)
 
-If your branch is in linux-next through your own tree then you should
-drop it once the patches hit our tree. I'll likely do this later today
-at some point.
-
-
--Olof
+diff --git a/drivers/pinctrl/mvebu/pinctrl-mvebu.c b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+index c0e27e4f8953..2be432444124 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-mvebu.c
++++ b/drivers/pinctrl/mvebu/pinctrl-mvebu.c
+@@ -638,23 +638,21 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 		struct mvebu_mpp_ctrl *ctrl = &soc->controls[n];
+ 
+ 		pctl->desc.npins += ctrl->npins;
+-		/* initial control pins */
++		/* initialize control's pins[] array */
+ 		for (k = 0; k < ctrl->npins; k++)
+ 			ctrl->pins[k] = ctrl->pid + k;
+ 
+-		/* special soc specific control */
+-		if (ctrl->mpp_get || ctrl->mpp_set) {
+-			if (!ctrl->name || !ctrl->mpp_get || !ctrl->mpp_set) {
+-				dev_err(&pdev->dev, "wrong soc control info\n");
+-				return -EINVAL;
+-			}
++		/*
++		 * We allow to pass controls with NULL name that we treat
++		 * as a range of one-pin groups with generic mvebu register
++		 * controls.
++		 */
++		if (!ctrl->name) {
++			pctl->num_groups += ctrl->npins;
++			noname += ctrl->npins;
++		} else {
+ 			pctl->num_groups += 1;
+-			continue;
+ 		}
+-
+-		/* generic mvebu register control */
+-		pctl->num_groups += ctrl->npins;
+-		noname += ctrl->npins;
+ 	}
+ 
+ 	pdesc = devm_kzalloc(&pdev->dev, pctl->desc.npins *
+@@ -690,8 +688,12 @@ int mvebu_pinctrl_probe(struct platform_device *pdev)
+ 		pctl->groups[gid].pins = ctrl->pins;
+ 		pctl->groups[gid].npins = ctrl->npins;
+ 
+-		/* generic mvebu register control maps to a number of groups */
+-		if (!ctrl->mpp_get && !ctrl->mpp_set) {
++		/*
++		 * We treat unnamed controls as a range of one-pin groups
++		 * with generic mvebu register controls. Use one group for
++		 * each in this range and assign a default group name.
++		 */
++		if (!ctrl->name) {
+ 			pctl->groups[gid].name = noname_buf;
+ 			pctl->groups[gid].npins = 1;
+ 			sprintf(noname_buf, "mpp%d", ctrl->pid+0);
+-- 
+1.8.5.3
