@@ -1,37 +1,140 @@
-From: shangw@linux.vnet.ibm.com (Gavin Shan)
-Date: Sun, 23 Feb 2014 11:43:27 +0800
-Subject: pci-mvebu driver on km_kirkwood
-In-Reply-To: <1393012403.6771.89.camel@pasglop>
-References: <53046D98.6020801@keymile.com> <20140219102658.76eec91e@skate>
- <53047BBB.6040108@keymile.com> <20140219143749.65ff3155@skate>
- <CAErSpo4=6VgJazaErcx=ztKhZ_62xBrQ6K1eN_dVpvV4R0T2ag@mail.gmail.com>
- <20140220095518.7ca36f0a@skate>
- <CAErSpo5pG3eOG58MiCCOHgr_jQReH0uBnWQFvzQYg3qrOGpZEw@mail.gmail.com>
- <20140221002438.GE19893@obsidianresearch.com>
- <CAErSpo5c=iMHM_uATxsiUthaHtt-UvX6ySQx2pVgfJT4ABuWGQ@mail.gmail.com>
- <1393012403.6771.89.camel@pasglop>
-Message-ID: <20140223034327.GA13040@shangw.(null)>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 22 Feb 2014 19:44:13 -0800
+Subject: [PATCH v3 07/11] watchdog: xilinx: Use of_property_read_u32
+In-Reply-To: <530991AA.9040201@udio.cujae.edu.cu>
+References: <cover.1392212059.git.michal.simek@xilinx.com>
+ <7cbb10853a343c9d488346596f604909ab0668b9.1392212059.git.michal.simek@xilinx.com>
+ <20140212171509.GB20012@roeck-us.net>
+ <20140222184604.GB21504@spo001.leaseweb.com>
+ <53094A15.1080708@udio.cujae.edu.cu> <53093038.6000604@roeck-us.net>
+ <53097091.50204@udio.cujae.edu.cu> <530950A1.40302@roeck-us.net>
+ <530991AA.9040201@udio.cujae.edu.cu>
+Message-ID: <53096E8D.50202@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 22, 2014 at 06:53:23AM +1100, Benjamin Herrenschmidt wrote:
->On Fri, 2014-02-21 at 12:05 -0700, Bjorn Helgaas wrote:
->> But I wonder if powerpc has a similar issue here: I think EEH might
->> need, for example 16MB bridge window alignment.  Since
->> pcibios_window_alignment() only affects the *starting* address, could
->> the core assign a 9MB window whose starting address is 16MB-aligned?
->> Could EEH deal with that?  What if the PCI core assigned the space
->> right after the 9MB window to another device?
+On 02/22/2014 10:14 PM, Alejandro Cabrera wrote:
+> On 22/2/2014 5:36 PM, Guenter Roeck wrote:
+>> On 02/22/2014 07:52 PM, Alejandro Cabrera wrote:
+>>> On 22/2/2014 3:18 PM, Guenter Roeck wrote:
+>>>> On 02/22/2014 05:08 PM, Alejandro Cabrera wrote:
+>>>>> On 22/2/2014 10:46 AM, Wim Van Sebroeck wrote:
+>>>>>> Hi All,
+>>>>>>
+>>>>>>> Hi Michal,
+>>>>>>>
+>>>>>>> On Wed, Feb 12, 2014 at 02:41:21PM +0100, Michal Simek wrote:
+>>>>>>>> Use of_property_read_u32 functions to clean probe function.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Michal Simek<michal.simek@xilinx.com>
+>>>>>>>> Reviewed-by: Guenter Roeck<linux@roeck-us.net>
+>>>>>>>> ---
+>>>>>>>>
+>>>>>>>> Changes in v3:
+>>>>>>>> - Remove one if checking and use variable directly
+>>>>>>>>
+>>>>>>> Looks good.
+>>>>>>>
+>>>>>>> Another comment/remark.
+>>>>>>>
+>>>>>>>> -    pfreq = (u32 *)of_get_property(pdev->dev.of_node,
+>>>>>>>> -                    "clock-frequency", NULL);
+>>>>>>>> -
+>>>>>>>> -    if (pfreq == NULL) {
+>>>>>>>> +    rc = of_property_read_u32(pdev->dev.of_node, "clock-frequency",&pfreq);
+>>>>>>>> +    if (rc) {
+>>>>>>>>           dev_warn(&pdev->dev,
+>>>>>>>>                "The watchdog clock frequency cannot be obtained\n");
+>>>>>>>>           no_timeout = true;
+>>>>>>>>       }
+>>>>>>>>
+>>>>>>>> -    tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+>>>>>>>> -                    "xlnx,wdt-interval", NULL);
+>>>>>>>> -    if (tmptr == NULL) {
+>>>>>>>> +    rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-interval",
+>>>>>>>> + &xdev->wdt_interval);
+>>>>>>>> +    if (rc) {
+>>>>>>>>           dev_warn(&pdev->dev,
+>>>>>>>>                "Parameter \"xlnx,wdt-interval\" not found\n");
+>>>>>>>>           no_timeout = true;
+>>>>>>>> -    } else {
+>>>>>>>> -        xdev->wdt_interval = *tmptr;
+>>>>>>>>       }
+>>>>>>>>
+>>>>>>>> -    tmptr = (u32 *)of_get_property(pdev->dev.of_node,
+>>>>>>>> -                    "xlnx,wdt-enable-once", NULL);
+>>>>>>>> -    if (tmptr == NULL) {
+>>>>>>>> +    rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-enable-once",
+>>>>>>>> + &enable_once);
+>>>>>>>> +    if (rc)
+>>>>>>>>           dev_warn(&pdev->dev,
+>>>>>>>>                "Parameter \"xlnx,wdt-enable-once\" not found\n");
+>>>>>>>> -        watchdog_set_nowayout(xilinx_wdt_wdd, true);
+>>>>>>>> -    }
+>>>>>>> All the above properties are optional. Is a warning really
+>>>>>>> warranted in this case ? I usually associate a warning with
+>>>>>>> something that is wrong, which is not the case here.
+>>>>>>>
+>>>>>>> I would encourage you to drop those warnings, but that should be
+>>>>>>> a separate patch.
+>>>>>> I agree with Guenter: these are not really warnings. Seperate patch is thus welcome.
+>>>>> Hi
+>>>>>
+>>>>> I support Michal intention, I think it is a warning because device tree blob must have the "xlnx,wdt-enable-once" property specified in order to allow the system to be sure of the real value of this property. In addition to, this warning can be helpful to detect a wrong device tree specification.
+>>>>>
+>>>>
+>>>> The dt documentation states that the properties are optional.
+>>>>
+>>>> Optional properties:
+>>>> - clock-frequency       : Frequency of clock in Hz
+>>>> - xlnx,wdt-enable-once  : 0 - Watchdog can be restarted
+>>>>                           1 - Watchdog can be enabled just once
+>>>> - xlnx,wdt-interval     : Watchdog timeout interval in 2^<val> clock cycles,
+>>>> <val> is integer from 8 to 31.
+>>>>
+>>>> This clearly conflicts with your statement. An optional property
+>>>> is just that, optional. If it warrants a warning, it must
+>>>> not be optional. If you claim that not providing the properties
+>>>> would be "wrong", why are they defined as optional ?
+>>> Hi Guenter
+>>>
+>>> I didn't know that these properties was classified as optional...
+>>> I think that they should not be, because all xilinx watchog devices (at least for microblaze processor)
+>>> have these properties defined in theirs MPD files and theirs values can be obtained during the
+>>> hardware specification to device tree conversion.
+>>>> What is your definition of "wrong" and "must have" ?
+>>> what I mean for "must have" is: if these properties can be obtained
+>>> for all xilinx watchdog devices they must be present in the device tree because they allows
+>>> the system (linux/user) to know exactly how a watchdog device is configured.
+>>> Because these properties always can be obtained from hardware design there is no
+>>> reason to leave them out from the device tree. This is why I consider that a device tree without
+>>> these properties should be considered as "wrong" device tree.
+>>>> How do you expect anyone to know that omitting those
+>>>> "optional" properties is by some definition "wrong" ?
+>>> I'm agree with you.
+>>> Maybe these properties shouldn't be optional.
+>>> For example suppose that "xlnx,wdt-enable-once" is missing in the device tree,
+>>> when a watchdog daemon ask for this property what is the obtained value ?
+>>> Independently of this value, why do not warn the user about this missing property
+>>> when it can always be in the device tree ?
+>>>
+>>
+>> Really, this line of argument doesn't make any sense to me.
+>> "xlnx,wdt-enable-once", for example, is a boolean and means
+>> that the watchdog, when enabled, can not be stopped. It defaults
+>> to false, and thus is inherently optional. Making it mandatory
+>> doesn't really add any value.
+>>
 >
->Gavin, did you guys deal with that at all ? Are we aligning the size as
->well somewhat ?
+> If the device has been configured with wdt-enable-once=true
+> and the device tree doesn't have this property then a watchdog daemon
+> would see it as "false" because it is the default making the system to misbehave...
+> A warning during driver loading could help user to identify the problem.
 >
 
-Yeah, we can handle it well because pcibios_window_alignment() affects
-both starting address and size of PCI bridge window. More details could
-be found in pci/drivers/setup-bus.c::pbus_size_mem(): starting address,
-"size0", "size1", "size1-size0" are aligned to "min_align", which is
-coming from pcibios_window_alignment() (16MB as mentioned).
+All this would give you is a false sense of safety. The property could
+just as well be there and be wrong (eg be configured as = <0> when it
+should be 1, or with a wrong frequency. Following your logic, every driver
+would need to warn about everything, just to be sure.
 
-Thanks,
-Gavin
+Guenter
