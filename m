@@ -1,40 +1,90 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Mon, 24 Feb 2014 14:50:28 -0600
-Subject: Ideas/suggestions to avoid repeated locking and reducing too
- many lists with dmaengine?
-In-Reply-To: <530B9784.5060904@ti.com>
-References: <530B9784.5060904@ti.com>
-Message-ID: <20140224205028.GA24339@qualcomm.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 24 Feb 2014 21:50:58 +0100
+Subject: [PATCH v3 0/2] regulator: core: Fix ops->enable/disable usage
+In-Reply-To: <CAOMZO5BPvCcx_f09Khuw8MVxrR18fnv9e1xeuJ0c_8G22AR53g@mail.gmail.com>
+References: <1392914164-28596-1-git-send-email-mpa@pengutronix.de>
+ <20140223051209.GK25940@sirena.org.uk>
+ <CAOMZO5BPvCcx_f09Khuw8MVxrR18fnv9e1xeuJ0c_8G22AR53g@mail.gmail.com>
+Message-ID: <20140224205058.GA18317@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 01:03:32PM -0600, Joel Fernandes wrote:
-> Hi folks,
+Hi Fabio,
+
+On Mon, Feb 24, 2014 at 02:23:50PM -0300, Fabio Estevam wrote:
+> On Sun, Feb 23, 2014 at 2:12 AM, Mark Brown <broonie@kernel.org> wrote:
+> > On Thu, Feb 20, 2014 at 05:36:02PM +0100, Markus Pargmann wrote:
+> >> Hi,
+> >>
+> >> These two patches replace all ops->enable/disable by
+> >> _regulator_do_disable/enable function calls. These wrappers also handle gpio
+> >> regulators.
+> >
+> > Applied both, thanks.
 > 
-> Just wanted your thoughts/suggestions on how we can avoid overhead in the EDMA
-> dmaengine driver. I am seeing a lots of performance drop specially for small
-> transfers with EDMA versus before raw EDMA was moved to DMAEngine framework
-> (atleast 25%).
+> With these two patches applied I get the following error on
+> mx6qsabresd running today's linux-next:
+> 
+> vdd1p1: failed to enable
+> anatop_regulator regulator-1p1.2: failed to register vdd1p1
+> anatop_regulator: probe of regulator-1p1.2 failed with error -22
+> vdd3p0: failed to enable
+> anatop_regulator regulator-3p0.3: failed to register vdd3p0
+> anatop_regulator: probe of regulator-3p0.3 failed with error -22
+> vdd2p5: failed to enable
+> anatop_regulator regulator-2p5.4: failed to register vdd2p5
+> anatop_regulator: probe of regulator-2p5.4 failed with error -22
+> vddarm: 725 <--> 1450 mV at 1100 mV
+> vddpu: 725 <--> 1450 mV at 1100 mV
+> vddsoc: 725 <--> 1450 mV at 1175 mV
+> ....
+> 
+> pfuze100-regulator 1-0008: Full layer: 1, Metal layer: 0
+> pfuze100-regulator 1-0008: FAB: 0, FIN: 0
+> SW1AB: failed to enable
+> pfuze100-regulator 1-0008: register regulatorSW1AB failed
+> pfuze100-regulator: probe of 1-0008 failed with error -22
+> 
+> 
+> Reverting these two patches the regulators probe successfully.
+> 
+> Any ideas?
 
-I've seen roughly the same drop in my testing.  In my case it had to do with the
-nature of how work is done using virt-dma.  The virt-dma is predicated on only
-letting one transaction be active at a time and it increases the latency for
-getting the next transaction off.  For large transactions, it's negligible.  But
-for small transactions, it is pretty evident.
+Thanks, I just searched for the reason and found it. My patches do not
+handle dummy regulators correctly:
 
+_regulator_do_enable() line 1764:
+        if (rdev->ena_pin) {
+                ret = regulator_ena_gpio_ctrl(rdev, true);
+                if (ret < 0)
+                        return ret;
+                rdev->ena_gpio_state = 1;
+        } else if (rdev->desc->ops->enable) {
+                ret = rdev->desc->ops->enable(rdev);
+                if (ret < 0)
+                        return ret;
+        } else {
+                return -EINVAL;
+        }
 
-> One of the things I am thinking about is the repeated (spin) locking/unlocking
-> of the virt_dma_chan->lock or vc->lock. In many cases, there's only 1 user or
-> thread requiring to do a DMA, so I feel the locking is unnecessary and potential
-> overhead. If there's a sane way to detect this an avoid locking altogether, that
-> would be great.
+The only situation where this returns -EINVAL is a dummy regulator that
+is not always_on. As it doesn't make sense to have a dummy regulator
+that is not always_on, I will add a check for exactly this situation to
+the regulator_register function and drop the "return -EINVAL" above.
 
-I'd expect the locking to not be the source of the problem, especially with
-your use case.
+Regards,
 
-[snip]
+Markus
 
 -- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/22a14332/attachment.sig>
