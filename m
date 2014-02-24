@@ -1,71 +1,110 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 23 Feb 2014 16:01:53 -0800
-Subject: [PATCH v2] clk: respect the clock dependencies in of_clk_init
-In-Reply-To: <20140223234150.GA5343@localhost>
-References: <1392054179-28830-1-git-send-email-gregory.clement@free-electrons.com>
- <530A420B.5050207@gmail.com> <20140223212040.22529.18650@quantum>
- <20140223234150.GA5343@localhost>
-Message-ID: <20140224000153.22529.70067@quantum>
+Date: Sun, 23 Feb 2014 16:06:03 -0800
+Subject: [PATCH v2 0/5] ARM: S3C24XX: convert s3c2412 to common clock
+ framework
+In-Reply-To: <5309456D.3040805@gmail.com>
+References: <1835515.oOiOlPWUhB@phil> <530937A4.3010301@gmail.com>
+ <2112473.9LIChJWDSQ@phil> <5309456D.3040805@gmail.com>
+Message-ID: <20140224000603.22529.1282@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ezequiel Garcia (2014-02-23 15:41:51)
-> Tomasz, Mike:
+Quoting Tomasz Figa (2014-02-22 16:48:45)
+> On 23.02.2014 01:29, Heiko St?bner wrote:
+> > Hi Tomasz,
+> >
+> > Am Sonntag, 23. Februar 2014, 00:49:56 schrieb Tomasz Figa:
+> >> Hi,
+> >>
+> >> On 22.02.2014 23:45, Heiko St?bner wrote:
+> >>> Second incarnation of the series converting s3c2412/s3c2413 to the common
+> >>> clock framework. As before the conversion is done by a mix of datasheet
+> >>> data and the pre-existing clock code and as this time I have no hardware
+> >>> of this type, it is compile-tested only. So hopefully somebody with
+> >>> s3c2412
+> >>> hw will be able to test it for real.
+> >>>
+> >>> The conversion of s3c2412 now moved in front of the
+> >>> s3c2410/s3c2440/s3c2442
+> >>> one, as I'll need a bit more time for the clockout changes suggested by
+> >>> Tomasz Figa.
+> >>>
+> >>> This series builds on top of the previous submitted s3c2443/s3c2416
+> >>> series.
+> >>>
+> >>>
+> >>> Changes since v1:
+> >>> - move in front of s3c2410 conversion, therefore move 2 necessary patches
+> >>>
+> >>>     that also got ACKs, from there into this series
+> >>>
+> >>> - adapt to Samsung clock pm rework from Tomasz Figa
+> >>> - apply some changes suggested by Tomasz Figa in the s3c2410 clock driver
+> >>>
+> >>>     that also apply to this driver.
+> >>>
+> >>> Heiko Stuebner (5):
+> >>>     ARM: S3C24XX: only store clock registers when old clock code is active
+> >>>     clk: samsung: add plls used by the early s3c24xx cpus
+> >>>     dt-bindings: add documentation for s3c2412 clock controller
+> >>>     clk: samsung: add clock controller driver for s3c2412
+> >>>     ARM: S3C24XX: convert s3c2412 to common clock framework
+> >>>
+> >>>    .../bindings/clock/samsung,s3c2412-clock.txt       |  50 ++
+> >>>    arch/arm/mach-s3c24xx/Kconfig                      |   8 +-
+> >>>    arch/arm/mach-s3c24xx/Makefile                     |   2 +-
+> >>>    arch/arm/mach-s3c24xx/clock-s3c2412.c              | 761
+> >>>    --------------------- arch/arm/mach-s3c24xx/common.c
+> >>>     |   9 +-
+> >>>    arch/arm/mach-s3c24xx/common.h                     |   4 +
+> >>>    arch/arm/mach-s3c24xx/mach-jive.c                  |   9 +-
+> >>>    arch/arm/mach-s3c24xx/mach-smdk2413.c              |   9 +-
+> >>>    arch/arm/mach-s3c24xx/mach-vstms.c                 |   9 +-
+> >>>    arch/arm/mach-s3c24xx/pm.c                         |  13 +-
+> >>>    arch/arm/mach-s3c24xx/s3c2412.c                    |  43 --
+> >>>    drivers/clk/samsung/Makefile                       |   1 +
+> >>>    drivers/clk/samsung/clk-pll.c                      | 182 +++++
+> >>>    drivers/clk/samsung/clk-pll.h                      |   3 +
+> >>>    drivers/clk/samsung/clk-s3c2412.c                  | 268 ++++++++
+> >>>    include/dt-bindings/clock/s3c2412.h                |  73 ++
+> >>>    16 files changed, 627 insertions(+), 817 deletions(-)
+> >>>    create mode 100644
+> >>>    Documentation/devicetree/bindings/clock/samsung,s3c2412-clock.txt
+> >>>    delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2412.c
+> >>>    create mode 100644 drivers/clk/samsung/clk-s3c2412.c
+> >>>    create mode 100644 include/dt-bindings/clock/s3c2412.h
+> >>
+> >> For mach and DT patches:
+> >>
+> >> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> >>
+> >> Kukjin, I'll take binding and clock patches to Samsung clock tree as
+> >> soon as DT bindings get acked by one of DT maintainers. I will prepare a
+> >> branch for you to apply mach patches on top. Is it fine for you?
+> >
+> > I think Kukjin already applied the s3c2416/s3c2443 series on top of your
+> > clock-pm-changes in the linux-samsung tree [1], so it might be best to just
+> > pile this series on top of it.
 > 
-> On Sun, Feb 23, 2014 at 01:20:40PM -0800, Mike Turquette wrote:
-> > Quoting Tomasz Figa (2014-02-23 10:46:35)
-> > > On 10.02.2014 18:42, Gregory CLEMENT wrote:
-> > > > Until now the clock providers were initialized in the order found in
-> > > > the device tree. This led to have the dependencies between the clocks
-> > > > not respected: children clocks could be initialized before their
-> > > > parent clocks.
-> > > >
-> > > > Instead of forcing each platform to manage its own initialization order,
-> > > > this patch adds this work inside the framework itself.
-> > > >
-> > > > Using the data of the device tree the of_clk_init function now delayed
-> > > > the initialization of a clock provider if its parent provider was not
-> > > > ready yet.
-> > > 
-> > > In general this is really great. It's a first step towards sorting out 
-> > > dependencies between clock providers correctly. I have some comments 
-> > > inline, though.
-> > 
-> > Just to add in here, I think the approach is good but agree with Tomasz'
-> > review comments.
-> > 
+> I'm aware of this, but I'm afraid this might cause conflicts with 
+> remaining patches that I might have to apply in this release cycle.
 > 
-> I'm wondering if any of you has followed the discussion that Greg,
-> Emilio and I had about the need of this change.
+> Patch clk/samsung: add support for multiple clock providers[1] is mostly 
+> what I have in my mind, but there is also at least one patch that is 
+> based on top of PM rework floating on the list.
 > 
-> If so, can you point out *why* we need to sort out registration
-> dependency?
+> I'd try to sort this out first with Kukjin and if we fail we will have 
+> to fall back to merging any clock patches through Samsung tree for this 
+> release cycle.
 
-I went through the V1 thread and the "[PATCH 0/4] clk: mvebu: fix clk
-init order" thread, and I agree that the driver does create something
-like a false dependency by calling of_clk_get() against the parent in
-mvebu_clk_gating_setup().
-
-However, there have been issues with clk registration order before. The
-orphan list helped out with some but sometimes it is just easier to
-enforce registration order. The mvebu and armada problems that surfaced
-this merge window may not be the best reason to merge this feature in,
-but I do believe it's just going to keep coming up later, if not sooner.
-
-Additionally, I fscking hate the use of strings to link children to
-their parents in the core clock code. This was designed by me before DT
-came to the ARM world and I took some hints from clkdev, but I shouldn't
-have done it that way... This patch helps to reduce the dependency on
-the orphan list mechanism (with its evil strcmp) for the DT case at
-least.
-
-Please let me know if you still disagree or if I have interpreted the
-usefulness of the patch incorrectly.
+Better if we can sort it out, but if these patches must go through the
+samsung tree then please add my Ack.
 
 Regards,
 Mike
 
-> -- 
-> Ezequiel Garc?a, Free Electrons
-> Embedded Linux, Kernel and Android Engineering
-> http://free-electrons.com
+> 
+> [1] http://www.spinics.net/lists/linux-samsung-soc/msg26695.html
+> 
+> Best regards,
+> Tomasz
