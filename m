@@ -1,47 +1,39 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 24 Feb 2014 14:49:07 +0900
-Subject: [PATCH] ARM: shmobile: Make use of r8a7790_add_standard_devices()
-Message-ID: <20140224054907.1803.88038.sendpatchset@w520>
+Date: Mon, 24 Feb 2014 14:52:12 +0900
+Subject: [PATCH] ARM: shmobile: Move SYSC base variable to inside ifdefs
+Message-ID: <20140224055212.1822.52295.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Move non-PFC and non-GPIO devices off from r8a7790_pinmux_init()
-and into r8a7790_add_standard_devices() which is the normal place
-to keep regular devices in the legacy case.
+Move the rcar_sysc_base variable to inside #ifdefs to avoid
+triggering build warnings in case PM or SMP is not selected.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/mach-shmobile/setup-r8a7790.c |   12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ Depends on "[PATCH 00/12] ARM: shmobile: Rework include path for SoC files"
 
---- 0009/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ work/arch/arm/mach-shmobile/setup-r8a7790.c	2014-02-24 14:15:51.000000000 +0900
-@@ -185,12 +185,6 @@ void __init r8a7790_pinmux_init(void)
- 	r8a7790_register_gpio(3);
- 	r8a7790_register_gpio(4);
- 	r8a7790_register_gpio(5);
--	r8a7790_register_i2c(0);
--	r8a7790_register_i2c(1);
--	r8a7790_register_i2c(2);
--	r8a7790_register_i2c(3);
--	r8a7790_register_audio_dmac(0);
--	r8a7790_register_audio_dmac(1);
- }
+ arch/arm/mach-shmobile/pm-rcar.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+--- 0013/arch/arm/mach-shmobile/pm-rcar.c
++++ work/arch/arm/mach-shmobile/pm-rcar.c	2014-02-24 14:09:44.000000000 +0900
+@@ -15,8 +15,6 @@
+ #include <asm/io.h>
+ #include "pm-rcar.h"
  
- #define __R8A7790_SCIF(scif_type, _scscr, index, baseaddr, irq)		\
-@@ -308,6 +302,12 @@ void __init r8a7790_add_standard_devices
- 	r8a7790_add_dt_devices();
- 	r8a7790_register_irqc(0);
- 	r8a7790_register_thermal();
-+	r8a7790_register_i2c(0);
-+	r8a7790_register_i2c(1);
-+	r8a7790_register_i2c(2);
-+	r8a7790_register_i2c(3);
-+	r8a7790_register_audio_dmac(0);
-+	r8a7790_register_audio_dmac(1);
- }
+-static void __iomem *rcar_sysc_base;
+-
+ /* SYSC */
+ #define SYSCSR 0x00
+ #define SYSCISR 0x04
+@@ -35,6 +33,7 @@ static void __iomem *rcar_sysc_base;
  
- void __init r8a7790_init_early(void)
+ #if defined(CONFIG_PM) || defined(CONFIG_SMP)
+ 
++static void __iomem *rcar_sysc_base;
+ static DEFINE_SPINLOCK(rcar_sysc_lock); /* SMP CPUs + I/O devices */
+ 
+ static int rcar_sysc_pwr_on_off(struct rcar_sysc_ch *sysc_ch,
