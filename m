@@ -1,46 +1,48 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 24 Feb 2014 18:05:10 -0500 (EST)
-Subject: [PATCH] net: phy: add suspend_halted module param
-In-Reply-To: <CAGVrzcadYTYQEvPxqdMf2f741y5sAgnOYm3EC=f7SOkr8SK2WQ@mail.gmail.com>
-References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <CAGVrzcadYTYQEvPxqdMf2f741y5sAgnOYm3EC=f7SOkr8SK2WQ@mail.gmail.com>
-Message-ID: <20140224.180510.103916219115440711.davem@davemloft.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 24 Feb 2014 15:05:32 -0800
+Subject: ccf: where to put constraints?
+In-Reply-To: <8e8ce023-b9a4-41a5-b06c-0f6d934f22e6@VA3EHSMHS020.ehs.local>
+References: <20140224201046.GA13155@katana>
+ <8e8ce023-b9a4-41a5-b06c-0f6d934f22e6@VA3EHSMHS020.ehs.local>
+Message-ID: <20140224230532.22529.7958@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Fainelli <f.fainelli@gmail.com>
-Date: Mon, 24 Feb 2014 10:20:10 -0800
-
-> Hi Sebastian,
+Quoting S?ren Brinkmann (2014-02-24 13:21:58)
+> Hi Wolfram,
 > 
-> 2014-02-23 8:58 GMT-08:00 Sebastian Hesselbarth
-> <sebastian.hesselbarth@gmail.com>:
->> commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
->>   ("net: phy: resume/suspend PHYs on attach/detach")
->> introduced a feature to suspend PHYs when entering halted state.
->>
->> Unfortunately, not all bootloaders properly power-up PHYs on reset
->> and fail to access ethernet because the PHY is still powered down.
->>
->> Therefore, we add a boolean module parameter suspend_halted with
->> default value of true. Disabling that parameter prevents PHYs from
->> being suspended when entering halted state.
->>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->> Reported-by: Andrew Lunn <andrew@lunn.ch>
->> ---
->> Andrew, can you please re-test if disabling the feature does work on
->> your board? I tried a bunch of mine, but none failed to power-up the
->> PHY in u-boot.
+> On Mon, 2014-02-24 at 09:10PM +0100, Wolfram Sang wrote:
+> > Hi,
+> > 
+> > Where do I put constraints when using the CCF? I have a CPU and GPU
+> > clock derived from the same PLL. Both clocks have their own divider.
+> > Now, there is the additional constraint that the CPU clock must not be
+> > lower than the GPU clock. Do I add checks in the set_rate functions?
+> > Feels like the wrong layer, but not checking it and blindly relying on
+> > somebody else does not feel correct, too. How to do it best?
 > 
-> Would be good to get Andrew's testing on this just to make sure it
-> solves his problem. Otherwise:
+> I don't know if it's the best or only way, but so far, I did things like
+> that with clock notifiers.
 > 
-> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+> I.e. when a clock consumer needs to be notified about its input clock
+> being changed it registers a clock notifier. In that notifier callback
+> it then can react to the rate change. E.g. adjust dividers to stay
+> within legal limits or reject the change completely.
 
-I disagree with using a module parameter for this.
+Yes, this is why the notifiers were created. A nice side effect of this
+is that the code can live outside your clock driver. Often times the
+clocks are quite capable of running at these speeds, but the problem is
+the IP blocks (CPU & GPU in Wolfram's case) would be out of spec. It is
+arguable that this logic does not belong in the clock driver but instead
+in some cpufreq driver or something like it.
 
-Figure out the devices that cannot do this properly, and add
-an internal flag that this driver sets.
+The clock notifiers make it easy to put this logic wherever you like and
+you can even veto clock rate changes.
 
-Module parameters are terrible.
+Regards,
+Mike
+
+> 
+>         S?ren
+> 
+> 
