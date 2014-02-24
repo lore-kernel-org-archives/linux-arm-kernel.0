@@ -1,38 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Feb 2014 15:52:21 +0000
-Subject: [RFC PATCH v3 2/9] staging: imx-drm: Add temporary copies of
- v4l2-of parsing functions
-In-Reply-To: <1392723370-4772-3-git-send-email-p.zabel@pengutronix.de>
-References: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
- <1392723370-4772-3-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20140224155221.GM21483@n2100.arm.linux.org.uk>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Mon, 24 Feb 2014 16:00:30 +0000
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <20140220232649.GU7862@titan.lakedaemon.net>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1391730137-14814-22-git-send-email-andrew@lunn.ch>
+ <52F51922.6030502@gmail.com>
+ <1392892217.23342.18.camel@kazak.uk.xensource.com>
+ <20140220105854.GL11878@lunn.ch>
+ <20140220111913.GZ21483@n2100.arm.linux.org.uk>
+ <1392896356.23342.40.camel@kazak.uk.xensource.com>
+ <20140220232649.GU7862@titan.lakedaemon.net>
+Message-ID: <1393257630.16570.95.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 12:36:03PM +0100, Philipp Zabel wrote:
-> From: Philipp Zabel <philipp.zabel@gmail.com>
+On Thu, 2014-02-20 at 18:26 -0500, Jason Cooper wrote:
+> On Thu, Feb 20, 2014 at 11:39:16AM +0000, Ian Campbell wrote:
+> > On Thu, 2014-02-20 at 11:19 +0000, Russell King - ARM Linux wrote:
+> > > What's wrong with the soc subsystem (drivers/base/soc.c).  This
+> > > provides a way to export SoC through standardised interfaces. 
+> > 
+> > It looks like the thing to use to me.
+> > 
+> > It seems to have been around only since v3.3 though, which makes it a
+> > bit tricky to use when upgrading from running board-file based v3.2
+> > system (Debian Wheezy) to a newer DTB based kernel, we need to select
+> > the new DTB while running the old system.
+> > 
+> > I'd prefer to use this thing as the primary mechanism but it seems like
+> > I'd have to implement some sort of fallback at least for one Debian
+> > release cycle. I'm sure it is doable...
 > 
-> The existing v4l2-of parser functions for the video interface bindings
-> described in Documentation/device-tree/bindings/media/video-interfaces.txt
-> are useful for DRM drivers, too. They will be moved to drivers/media
-> so they can be used by drm drivers, too. Until then, duplicate the
-> v4l2-of parser functions temporarily.
-> 
-> Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+> back in v3.2, lspci should still work.  Would that given you the
+> information you need?
 
-Ergh.  So, because we can't get agreement on where to put the common
-helpers, we have to put up with adding duplicate helpers into the
-staging directory, inflating not only the kernel source code size
-but also the binary size as well.
+I expect it will, yes.
 
-Come on people, get agreement on how to deal with this.  Staging may
-be a dumping ground for drivers which aren't ready to be merged as
-proper drivers, but this is no reason to ignore proper process.
-
-Do we, or do we not want to get imx-drm out of drivers/staging?  If
-we do, the only way that's going to happen is if we stop throwing in
-this kind of stuff.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Ian.
