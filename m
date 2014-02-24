@@ -1,33 +1,98 @@
-From: jbe@pengutronix.de (Juergen Beisert)
-Date: Mon, 24 Feb 2014 15:39:53 +0100
-Subject: [PATCH] staging/iio/adc/MXS/LRADC: fix touchscreen statemachine
-In-Reply-To: <20140224133316.GI26722@mwanda>
-References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
- <201402241416.24270.jbe@pengutronix.de> <20140224133316.GI26722@mwanda>
-Message-ID: <201402241539.53707.jbe@pengutronix.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 24 Feb 2014 08:38:07 -0600
+Subject: [RFC PATCH 3/6] PM / Voltagedomain: introduce voltage domain
+ driver support
+In-Reply-To: <20140224015826.GU25940@sirena.org.uk>
+References: <1392755543-28335-1-git-send-email-nm@ti.com>
+ <1392755543-28335-4-git-send-email-nm@ti.com>
+ <20140224015826.GU25940@sirena.org.uk>
+Message-ID: <530B594F.2030500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Releasing the touchscreen lets the internal statemachine left in a wrong state.
-Due to this the release coordinate will be reported again by accident when the next
-touchscreen event happens. This change sets up the correct state when waiting
-for the next touchscreen event.
-    
-Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+On 02/23/2014 07:58 PM, Mark Brown wrote:
+> On Tue, Feb 18, 2014 at 02:32:20PM -0600, Nishanth Menon wrote:
+> 
+>> The current regulator model provides the basic building blocks for the
+>> transitions, however SoC drivers specific to each of these devices, be
+>> it cpufreq/devfreq have to replicate the logic for functionality.
+> 
+>> To simply the logic, we can hence introduce a layer that takes care
+>> of the mundane transition logic, registration mechanisms to provide
+>> the "user drivers" such as cpufreq/devfreq a generic interface, whose
+>> details are abstracted by the device tree description for the SoC on
+>> which the driver operates on.
+> 
+> This doesn't really provide a picture of what the generic interface
+> that's being offered is and...
+I should have probably picked up part of the cover letter[1] and
+elaborated further in the commit message here.
 
-diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-index 7fc66a6..514844e 100644
---- a/drivers/staging/iio/adc/mxs-lradc.c
-+++ b/drivers/staging/iio/adc/mxs-lradc.c
-@@ -757,6 +757,7 @@ static void mxs_lradc_finish_touch_event(struct mxs_lradc *lradc, bool valid)
- 	}
- 
- 	/* if it is released, wait for the next touch via IRQ */
-+	lradc->cur_plate = LRADC_TOUCH;
- 	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ, LRADC_CTRL1);
- 	mxs_lradc_reg_set(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ_EN, LRADC_CTRL1);
- }
+Intent here is to allow drivers such as cpufreq-cpu0 to be reused on
+platforms such as TI's OMAP derivatives, and other SoCs which differ
+only by the sequence involved in voltage scale operations. So, this
+patch provides a framework for registering the underlying
+implementation of the SoC specific voltage change methodology.
 
+Overall the sequence takes place after this patch is as follows:
+a) voltage domain drivers such as those of TI or others register with
+voltage domain with devm_voltdm_register.
+b) cpufreq-cpu0/devfreq drivers:
+of_pm_voltdm_notifier_register(introduced as part of patch #1) to
+register notifiers around clk of interest. This request is linked to
+the specific voltage domain using phandle in device tree.
+c) when cpufreq-cpu0/devfreq does a clk_set_rate, the common clock
+framework triggers notifiers in voltage domain core which in turn,
+invokes the corresponding handlers for the voltage domain driver
+ensuring the right dvfs sequence specific to the SoC is triggered.
+
+With this patch, the logic for a SoC specific voltage domain
+intricacies can now be abstracted out to the voltage domain layer.
+This allows reuse of the logic by multiple drivers such as
+devfreq/cpufreq and allows these to remain consistent with very
+minimal SoC(if any at all) specific implementations in them.
+
+Among the other obvious alternatives to this approach are:
+a) To duplicate the logic multiple times for various drivers such as
+devfreq/cpufreq and try to ensure the logic sequences are proper.
+basically, create cpufreq-abb-omap, cpufreq-avs-omap,
+devfreq-abb-omap, devfreq-avs-omap etc..
+b) introduce a specific API for voltage change (something like
+pm_dev_scale_opp_frequency or the equivalent).
+
+
+> 
+>>  drivers/power/voltdm/Kconfig                  |    5 +
+>>  drivers/power/voltdm/Makefile                 |    3 +
+>>  drivers/power/voltdm/core.c                   |  347 +++++++++++++++++++++++--
+>>  drivers/power/voltdm/voltage_domain_private.h |   86 ++++++
+>>  4 files changed, 424 insertions(+), 17 deletions(-)
+> 
+> ...the diffstat doesn't make it obvious what the external interface is
+> either.  It would be much easier to review this with a clearer picture
+> of what it's aiming to implement.
+
+The drivers such as cpufreq/devfreq has the same interface introduced
+by patch #1 in this series of_pm_voltdm_notifier_register/unregister
+which is exposed by include/linux/pm_voltage_domain.h
+
+Underlying implementation of the SoC specific voltage change
+methodology can now be isolated by voltage domain driver using
+voltage_domain_private.h and services provided by core.c
+
+> 
+>> +	voltdm_np = of_parse_phandle(np, prop_name, 0);
+>> +	if (voltdm_np) {
+>> +		ret = of_parse_phandle_with_args(np, prop_name, "#voltdm-cells",
+>> +						 0, args);
+>> +		if (ret)
+>> +			return ERR_PTR(ret);
+> 
+> There seems to be some DT stuff going on here, is the interface DT only?
+> 
+yes. i will make that clear in the documentation.
+
+[1] http://marc.info/?l=linux-kernel&m=139275560531711&w=2
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+Regards,
+Nishanth Menon
