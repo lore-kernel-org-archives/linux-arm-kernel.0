@@ -1,54 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Feb 2014 16:30:35 +0000
-Subject: [PATCH 1/5] clk: sun6i: Protect CPU clock
-In-Reply-To: <1393258967-4843-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1393258967-4843-1-git-send-email-maxime.ripard@free-electrons.com>
- <1393258967-4843-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20140224163034.GN21483@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 24 Feb 2014 11:34:42 -0500
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <1393259176.16570.102.camel@kazak.uk.xensource.com>
+References: <1391730137-14814-22-git-send-email-andrew@lunn.ch>
+ <52F51922.6030502@gmail.com>
+ <1392892217.23342.18.camel@kazak.uk.xensource.com>
+ <20140220105854.GL11878@lunn.ch>
+ <20140220111913.GZ21483@n2100.arm.linux.org.uk>
+ <1392896356.23342.40.camel@kazak.uk.xensource.com>
+ <20140220232649.GU7862@titan.lakedaemon.net>
+ <1393257630.16570.95.camel@kazak.uk.xensource.com>
+ <20140224162413.GE18601@lunn.ch>
+ <1393259176.16570.102.camel@kazak.uk.xensource.com>
+Message-ID: <20140224163442.GF14250@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 05:22:43PM +0100, Maxime Ripard wrote:
-> Right now, AHB is an indirect child clock of the CPU clock. If that happens to
-> change, since the CPU clock has no other consumers declared in Linux, it would
-> be shut down, which is not really a good idea.
+On Mon, Feb 24, 2014 at 04:26:16PM +0000, Ian Campbell wrote:
+> On Mon, 2014-02-24 at 17:24 +0100, Andrew Lunn wrote:
+> > > > > > What's wrong with the soc subsystem (drivers/base/soc.c).  This
+> > > > > > provides a way to export SoC through standardised interfaces. 
+> > > > > 
+> > > > > It looks like the thing to use to me.
+> > > > > 
+> > > > > It seems to have been around only since v3.3 though, which makes it a
+> > > > > bit tricky to use when upgrading from running board-file based v3.2
+> > > > > system (Debian Wheezy) to a newer DTB based kernel, we need to select
+> > > > > the new DTB while running the old system.
+> > > > > 
+> > > > > I'd prefer to use this thing as the primary mechanism but it seems like
+> > > > > I'd have to implement some sort of fallback at least for one Debian
+> > > > > release cycle. I'm sure it is doable...
+> > > > 
+> > > > back in v3.2, lspci should still work.  Would that given you the
+> > > > information you need?
+> > > 
+> > > I expect it will, yes.
+> > 
+> > 3.14 with the new PCIe driver will also work. The patch was accepted
+> > and considered a regression so made it into one of the -rc's.
 > 
-> Prevent this by forcing it enabled.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi/clk-sunxi.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 23baad9..cedaf4b 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -1301,6 +1301,14 @@ static void __init sunxi_clock_protect(void)
->  		clk_prepare_enable(clk);
->  		clk_put(clk);
->  	}
-> +
-> +	/* CPU clocks - sun6i */
-> +	clk = clk_get(NULL, "cpu");
-> +	if (!IS_ERR(clk)) {
-> +		clk_prepare_enable(clk);
-> +		clk_put(clk);
-> +	}
+> Great! Thanks.
 
-This is broken.  I'm not sure what's difficult to grasp about the concept
-of "while a clock is in use, you should keep a reference to that clock".
+fyi:
 
-That implies that if you get a clock, and then enable it, you don't
-put the clock until you've disabled it.
+  322a8e91844f PCI: mvebu: Use Device ID and revision from underlying endpoint
 
-The only reason the core doesn't check for this kind of thing is that
-a clock may be shared, so it's entirely possible for a correctly written
-driver to have a clock which is still enabled at put time - but enabled
-by an entirely different driver.
+It's in -rc4 and it's flagged for stable from v3.11 on up.  v3.11 is
+when the pcie driver was introduced (and thus, the regression).
 
-However, that's no excuse for this kind of sloppiness.
+hth,
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Jason.
