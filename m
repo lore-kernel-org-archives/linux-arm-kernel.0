@@ -1,244 +1,62 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 24 Feb 2014 11:10:34 +0100
-Subject: [PATCH v4 09/16] extcon: max14577: Add support for max77836
+Date: Mon, 24 Feb 2014 11:10:26 +0100
+Subject: [PATCH v4 01/16] extcon: max14577: Change extcon name instead of
+ static name according to device type
 In-Reply-To: <1393236641-14977-1-git-send-email-k.kozlowski@samsung.com>
 References: <1393236641-14977-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1393236641-14977-10-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1393236641-14977-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for MAX77836 chipset to the max14577 extcon driver. The
-MAX77836 MUIC has additional interrupts (VIDRM, ADC1K) so IRQ handling
-is split up into two functions: max14577_parse_irq() and
-max77836_parse_irq().
+From: Chanwoo Choi <cw00.choi@samsung.com>
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+This patch use device name to make sysfs path according to device type:
+
+max14577-muic
+- /sys/class/extcon/max14577-muic/
+max77836-muic
+- /sys/class/extcon/max77836-muic/
+
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Cc: Kyungmin Park <kyungmin.park@samsung.com>
 Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
 Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/extcon/extcon-max14577.c     |  109 ++++++++++++++++++++++++++++------
- drivers/mfd/max14577.c               |    1 +
- include/linux/mfd/max14577-private.h |    3 +
- 3 files changed, 94 insertions(+), 19 deletions(-)
+ drivers/extcon/extcon-max14577.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/extcon/extcon-max14577.c b/drivers/extcon/extcon-max14577.c
-index e986a9b92b60..82ac6b0fb1bc 100644
+index 3846941801b8..59f084fee4f3 100644
 --- a/drivers/extcon/extcon-max14577.c
 +++ b/drivers/extcon/extcon-max14577.c
-@@ -1,8 +1,9 @@
- /*
-- * extcon-max14577.c - MAX14577 extcon driver to support MAX14577 MUIC
-+ * extcon-max14577.c - MAX14577/77836 extcon driver to support MUIC
-  *
-- * Copyright (C) 2013 Samsung Electrnoics
-+ * Copyright (C) 2013,2014 Samsung Electrnoics
-  * Chanwoo Choi <cw00.choi@samsung.com>
-+ * Krzysztof Kozlowski <k.kozlowski@samsung.com>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -62,6 +63,19 @@ static struct max14577_muic_irq max14577_muic_irqs[] = {
- 	{ MAXIM_IRQ_INT2_VBVOLT,	"muic-VBVOLT" },
- };
+@@ -24,7 +24,6 @@
+ #include <linux/mfd/max14577-private.h>
+ #include <linux/extcon.h>
  
-+static struct max14577_muic_irq max77836_muic_irqs[] = {
-+	{ MAXIM_IRQ_INT1_ADC,		"muic-ADC" },
-+	{ MAXIM_IRQ_INT1_ADCLOW,	"muic-ADCLOW" },
-+	{ MAXIM_IRQ_INT1_ADCERR,	"muic-ADCError" },
-+	{ MAX77836_IRQ_INT1_ADC1K,	"muic-ADC1K" },
-+	{ MAXIM_IRQ_INT2_CHGTYP,	"muic-CHGTYP" },
-+	{ MAXIM_IRQ_INT2_CHGDETRUN,	"muic-CHGDETRUN" },
-+	{ MAXIM_IRQ_INT2_DCDTMR,	"muic-DCDTMR" },
-+	{ MAXIM_IRQ_INT2_DBCHG,		"muic-DBCHG" },
-+	{ MAXIM_IRQ_INT2_VBVOLT,	"muic-VBVOLT" },
-+	{ MAX77836_IRQ_INT2_VIDRM,	"muic-VIDRM" },
-+};
-+
- struct max14577_muic_info {
- 	struct device *dev;
- 	struct maxim_core *maxim_core;
-@@ -532,21 +546,12 @@ static void max14577_muic_irq_work(struct work_struct *work)
- 	return;
- }
+-#define	DEV_NAME			"max14577-muic"
+ #define	DELAY_MS_DEFAULT		17000		/* unit: millisecond */
  
--static irqreturn_t max14577_muic_irq_handler(int irq, void *data)
-+/*
-+ * Sets irq_adc or irq_chg in max14577_muic_info and returns 1.
-+ * Returns 0 if irq_type does not match registered IRQ for this device type.
-+ */
-+static int max14577_parse_irq(struct max14577_muic_info *info, int irq_type)
- {
--	struct max14577_muic_info *info = data;
--	int i, irq_type = -1;
--
--	/*
--	 * We may be called multiple times for different nested IRQ-s.
--	 * Including changes in INT1_ADC and INT2_CGHTYP at once.
--	 * However we only need to know whether it was ADC, charger
--	 * or both interrupts so decode IRQ and turn on proper flags.
--	 */
--	for (i = 0; i < info->muic_irqs_num; i++)
--		if (irq == info->muic_irqs[i].virq)
--			irq_type = info->muic_irqs[i].irq;
--
- 	switch (irq_type) {
- 	case MAXIM_IRQ_INT1_ADC:
- 	case MAXIM_IRQ_INT1_ADCLOW:
-@@ -554,7 +559,7 @@ static irqreturn_t max14577_muic_irq_handler(int irq, void *data)
- 		/* Handle all of accessory except for
- 		   type of charger accessory */
- 		info->irq_adc = true;
--		break;
-+		return 1;
- 	case MAXIM_IRQ_INT2_CHGTYP:
- 	case MAXIM_IRQ_INT2_CHGDETRUN:
- 	case MAXIM_IRQ_INT2_DCDTMR:
-@@ -562,8 +567,62 @@ static irqreturn_t max14577_muic_irq_handler(int irq, void *data)
- 	case MAXIM_IRQ_INT2_VBVOLT:
- 		/* Handle charger accessory */
- 		info->irq_chg = true;
-+		return 1;
-+	default:
-+		return 0;
-+	}
-+}
+ enum max14577_muic_adc_debounce_time {
+@@ -673,7 +672,8 @@ static int max14577_muic_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "failed to allocate memory for extcon\n");
+ 		return -ENOMEM;
+ 	}
+-	info->edev->name = DEV_NAME;
 +
-+/*
-+ * Sets irq_adc or irq_chg in max14577_muic_info and returns 1.
-+ * Returns 0 if irq_type does not match registered IRQ for this device type.
-+ */
-+static int max77836_parse_irq(struct max14577_muic_info *info, int irq_type)
-+{
-+	/* First check common max14577 interrupts */
-+	if (max14577_parse_irq(info, irq_type))
-+		return 1;
-+
-+	switch (irq_type) {
-+	case MAX77836_IRQ_INT1_ADC1K:
-+		info->irq_adc = true;
-+		return 1;
-+	case MAX77836_IRQ_INT2_VIDRM:
-+		/* Handle charger accessory */
-+		info->irq_chg = true;
-+		return 1;
-+	default:
-+		return 0;
-+	}
-+}
-+
-+static irqreturn_t max14577_muic_irq_handler(int irq, void *data)
-+{
-+	struct max14577_muic_info *info = data;
-+	int i, irq_type = -1;
-+	bool irq_parsed;
-+
-+	/*
-+	 * We may be called multiple times for different nested IRQ-s.
-+	 * Including changes in INT1_ADC and INT2_CGHTYP at once.
-+	 * However we only need to know whether it was ADC, charger
-+	 * or both interrupts so decode IRQ and turn on proper flags.
-+	 */
-+	for (i = 0; i < info->muic_irqs_num; i++)
-+		if (irq == info->muic_irqs[i].virq)
-+			irq_type = info->muic_irqs[i].irq;
-+
-+	switch (info->maxim_core->dev_type) {
-+	case MAXIM_DEVICE_TYPE_MAX77836:
-+		irq_parsed = max77836_parse_irq(info, irq_type);
- 		break;
-+	case MAXIM_DEVICE_TYPE_MAX14577:
- 	default:
-+		irq_parsed = max14577_parse_irq(info, irq_type);
-+		break;
-+	}
-+
-+	if (!irq_parsed) {
- 		dev_err(info->dev, "muic interrupt: irq %d occurred, skipped\n",
- 				irq_type);
- 		return IRQ_HANDLED;
-@@ -649,6 +708,10 @@ static int max14577_muic_probe(struct platform_device *pdev)
- 	INIT_WORK(&info->irq_work, max14577_muic_irq_work);
++	info->edev->name = dev_name(&pdev->dev);
+ 	info->edev->supported_cable = max14577_extcon_cable;
+ 	ret = extcon_dev_register(info->edev);
+ 	if (ret) {
+@@ -737,7 +737,7 @@ static int max14577_muic_remove(struct platform_device *pdev)
  
- 	switch (maxim_core->dev_type) {
-+	case MAXIM_DEVICE_TYPE_MAX77836:
-+		info->muic_irqs = max77836_muic_irqs;
-+		info->muic_irqs_num = ARRAY_SIZE(max77836_muic_irqs);
-+		break;
- 	case MAXIM_DEVICE_TYPE_MAX14577:
- 	default:
- 		info->muic_irqs = max14577_muic_irqs;
-@@ -748,6 +811,13 @@ static int max14577_muic_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct platform_device_id max14577_muic_id[] = {
-+	{ "max14577-muic", MAXIM_DEVICE_TYPE_MAX14577, },
-+	{ "max77836-muic", MAXIM_DEVICE_TYPE_MAX77836, },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(platform, max14577_muic_id);
-+
  static struct platform_driver max14577_muic_driver = {
  	.driver		= {
- 		.name	= "max14577-muic",
-@@ -755,11 +825,12 @@ static struct platform_driver max14577_muic_driver = {
+-		.name	= DEV_NAME,
++		.name	= "max14577-muic",
+ 		.owner	= THIS_MODULE,
  	},
  	.probe		= max14577_muic_probe,
- 	.remove		= max14577_muic_remove,
-+	.id_table	= max14577_muic_id,
- };
- 
- module_platform_driver(max14577_muic_driver);
- 
--MODULE_DESCRIPTION("MAXIM 14577 Extcon driver");
--MODULE_AUTHOR("Chanwoo Choi <cw00.choi@samsung.com>");
-+MODULE_DESCRIPTION("Maxim 14577/77836 Extcon driver");
-+MODULE_AUTHOR("Chanwoo Choi <cw00.choi@samsung.com>, Krzysztof Kozlowski <k.kozlowski@samsung.com>");
- MODULE_LICENSE("GPL");
- MODULE_ALIAS("platform:extcon-max14577");
-diff --git a/drivers/mfd/max14577.c b/drivers/mfd/max14577.c
-index e5cbefed5f5f..b2bd963f9e0c 100644
---- a/drivers/mfd/max14577.c
-+++ b/drivers/mfd/max14577.c
-@@ -146,6 +146,7 @@ static const struct regmap_irq max77836_muic_irqs[] = {
- 	{ .reg_offset = 0, .mask = MAXIM_INT1_ADC_MASK, },
- 	{ .reg_offset = 0, .mask = MAXIM_INT1_ADCLOW_MASK, },
- 	{ .reg_offset = 0, .mask = MAXIM_INT1_ADCERR_MASK, },
-+	{ .reg_offset = 0, .mask = MAX77836_INT1_ADC1K_MASK, },
- 	/* INT2 interrupts */
- 	{ .reg_offset = 1, .mask = MAXIM_INT2_CHGTYP_MASK, },
- 	{ .reg_offset = 1, .mask = MAXIM_INT2_CHGDETRUN_MASK, },
-diff --git a/include/linux/mfd/max14577-private.h b/include/linux/mfd/max14577-private.h
-index 472d5780ca50..aae9382a41cb 100644
---- a/include/linux/mfd/max14577-private.h
-+++ b/include/linux/mfd/max14577-private.h
-@@ -77,6 +77,7 @@ enum maxim_muic_charger_type {
- #define MAXIM_INT1_ADC_MASK		BIT(0)
- #define MAXIM_INT1_ADCLOW_MASK		BIT(1)
- #define MAXIM_INT1_ADCERR_MASK		BIT(2)
-+#define MAX77836_INT1_ADC1K_MASK	BIT(3)
- 
- #define MAXIM_INT2_CHGTYP_MASK		BIT(0)
- #define MAXIM_INT2_CHGDETRUN_MASK	BIT(1)
-@@ -309,6 +310,7 @@ enum maxim_irq {
- 	MAXIM_IRQ_INT1_ADC,
- 	MAXIM_IRQ_INT1_ADCLOW,
- 	MAXIM_IRQ_INT1_ADCERR,
-+	MAX77836_IRQ_INT1_ADC1K,
- 
- 	/* INT2 */
- 	MAXIM_IRQ_INT2_CHGTYP,
-@@ -316,6 +318,7 @@ enum maxim_irq {
- 	MAXIM_IRQ_INT2_DCDTMR,
- 	MAXIM_IRQ_INT2_DBCHG,
- 	MAXIM_IRQ_INT2_VBVOLT,
-+	MAX77836_IRQ_INT2_VIDRM,
- 
- 	/* INT3 */
- 	MAXIM_IRQ_INT3_EOC,
 -- 
 1.7.9.5
