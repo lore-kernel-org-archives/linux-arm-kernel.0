@@ -1,32 +1,129 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Feb 2014 11:22:51 +0100
-Subject: [PATCH v4 00/16] pinctrl: mvebu: restructure resource allocation
-In-Reply-To: <20140223154053.GN7862@titan.lakedaemon.net>
-References: <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1393165274-32492-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140223154053.GN7862@titan.lakedaemon.net>
-Message-ID: <CACRpkdZFwcFtZiDH792awhyrQ6wtEsJMMN9K_ypCbqLqZo9LLw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 24 Feb 2014 11:22:48 +0100
+Subject: [PATCH V2 1/8] PM / Runtime: Fetch runtime PM callbacks using a macro
+Message-ID: <1393237368-15500-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 23, 2014 at 4:40 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+While fetching the proper runtime PM callback, we walk the hierarchy of
+device's power domains, subsystems and drivers.
 
-> I certainly don't want to assume we can take this, and you've been quiet
-> on the previous versions of this series.  We have a lot of moving pieces
-> for getting the Armada 375/380/385 support added to the kernel.  It's a
-> huge help to us if we can create a topic branch for you with the pinctrl
-> changes in it.
+This is common for rpm_suspend(), rpm_idle() and rpm_resume(). Let's
+clean up the code by using a macro that handles this.
 
-I understand, sorry I was on a short vacation.
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: Alessandro Rubini <rubini@unipv.it>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
 
-I've applied Thomas' two new SoC drivers and started queueing
-Sebastians series but it's a bit messy. Right now I'm not finding
-patch 06/21 v4....
+Changes in v2:
+	Updated the macro to return a callback instead.
+	Suggested by Josh Cartwright.
 
->> https://github.com/shesselba/linux-dove.git unstable/mvebu-pinctrl-v3.14_v4
+---
+ drivers/base/power/runtime.c |   63 ++++++++++++++++--------------------------
+ 1 file changed, 24 insertions(+), 39 deletions(-)
 
-Should I just pull this in instead, as it contains both Thomas' and Sebastians
-patches, and then you can send me more stuff on top of that?
-
-Yours,
-Linus Walleij
+diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+index 72e00e6..cc7d1ed 100644
+--- a/drivers/base/power/runtime.c
++++ b/drivers/base/power/runtime.c
+@@ -13,6 +13,27 @@
+ #include <trace/events/rpm.h>
+ #include "power.h"
+ 
++#define RPM_GET_CALLBACK(dev, cb)				\
++({								\
++	int (*__rpm_cb)(struct device *__d);			\
++								\
++	if (dev->pm_domain)					\
++		__rpm_cb = dev->pm_domain->ops.cb;		\
++	else if (dev->type && dev->type->pm)			\
++		__rpm_cb = dev->type->pm->cb;			\
++	else if (dev->class && dev->class->pm)			\
++		__rpm_cb = dev->class->pm->cb;			\
++	else if (dev->bus && dev->bus->pm)			\
++		__rpm_cb = dev->bus->pm->cb;			\
++	else							\
++		__rpm_cb = NULL;				\
++								\
++	if (!__rpm_cb && dev->driver && dev->driver->pm)	\
++		__rpm_cb = dev->driver->pm->cb;			\
++								\
++	__rpm_cb;						\
++})
++
+ static int rpm_resume(struct device *dev, int rpmflags);
+ static int rpm_suspend(struct device *dev, int rpmflags);
+ 
+@@ -310,19 +331,7 @@ static int rpm_idle(struct device *dev, int rpmflags)
+ 
+ 	dev->power.idle_notification = true;
+ 
+-	if (dev->pm_domain)
+-		callback = dev->pm_domain->ops.runtime_idle;
+-	else if (dev->type && dev->type->pm)
+-		callback = dev->type->pm->runtime_idle;
+-	else if (dev->class && dev->class->pm)
+-		callback = dev->class->pm->runtime_idle;
+-	else if (dev->bus && dev->bus->pm)
+-		callback = dev->bus->pm->runtime_idle;
+-	else
+-		callback = NULL;
+-
+-	if (!callback && dev->driver && dev->driver->pm)
+-		callback = dev->driver->pm->runtime_idle;
++	callback = RPM_GET_CALLBACK(dev, runtime_idle);
+ 
+ 	if (callback)
+ 		retval = __rpm_callback(callback, dev);
+@@ -492,19 +501,7 @@ static int rpm_suspend(struct device *dev, int rpmflags)
+ 
+ 	__update_runtime_status(dev, RPM_SUSPENDING);
+ 
+-	if (dev->pm_domain)
+-		callback = dev->pm_domain->ops.runtime_suspend;
+-	else if (dev->type && dev->type->pm)
+-		callback = dev->type->pm->runtime_suspend;
+-	else if (dev->class && dev->class->pm)
+-		callback = dev->class->pm->runtime_suspend;
+-	else if (dev->bus && dev->bus->pm)
+-		callback = dev->bus->pm->runtime_suspend;
+-	else
+-		callback = NULL;
+-
+-	if (!callback && dev->driver && dev->driver->pm)
+-		callback = dev->driver->pm->runtime_suspend;
++	callback = RPM_GET_CALLBACK(dev, runtime_suspend);
+ 
+ 	retval = rpm_callback(callback, dev);
+ 	if (retval)
+@@ -724,19 +721,7 @@ static int rpm_resume(struct device *dev, int rpmflags)
+ 
+ 	__update_runtime_status(dev, RPM_RESUMING);
+ 
+-	if (dev->pm_domain)
+-		callback = dev->pm_domain->ops.runtime_resume;
+-	else if (dev->type && dev->type->pm)
+-		callback = dev->type->pm->runtime_resume;
+-	else if (dev->class && dev->class->pm)
+-		callback = dev->class->pm->runtime_resume;
+-	else if (dev->bus && dev->bus->pm)
+-		callback = dev->bus->pm->runtime_resume;
+-	else
+-		callback = NULL;
+-
+-	if (!callback && dev->driver && dev->driver->pm)
+-		callback = dev->driver->pm->runtime_resume;
++	callback = RPM_GET_CALLBACK(dev, runtime_resume);
+ 
+ 	retval = rpm_callback(callback, dev);
+ 	if (retval) {
+-- 
+1.7.9.5
