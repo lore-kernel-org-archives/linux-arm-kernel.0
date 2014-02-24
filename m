@@ -1,50 +1,43 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 24 Feb 2014 21:38:38 +0200
-Subject: [PATCH v5 04/10] V4L: Add driver for s5k6a3 image sensor
-In-Reply-To: <1393263322-28215-5-git-send-email-s.nawrocki@samsung.com>
-References: <1393263322-28215-1-git-send-email-s.nawrocki@samsung.com>
- <1393263322-28215-5-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20140224193838.GL4869@tarshish>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 24 Feb 2014 20:39:39 +0100
+Subject: [PATCH] net: phy: add suspend_halted module param
+In-Reply-To: <CAGVrzcaOSMQWJ69KHJ7TH0_BN9D-O4uoL=fLWDoE=xFdV4RJ4w@mail.gmail.com>
+References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140224191554.GC29288@lunn.ch>
+ <CAGVrzcaOSMQWJ69KHJ7TH0_BN9D-O4uoL=fLWDoE=xFdV4RJ4w@mail.gmail.com>
+Message-ID: <20140224193939.GD29288@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
-
-On Mon, Feb 24, 2014 at 06:35:16PM +0100, Sylwester Nawrocki wrote:
-> This patch adds subdev driver for Samsung S5K6A3 raw image sensor.
-> As it is intended at the moment to be used only with the Exynos
-> FIMC-IS (camera ISP) subsystem it is pretty minimal subdev driver.
-> It doesn't do any I2C communication since the sensor is controlled
-> by the ISP and its own firmware.
-> This driver, if needed, can be updated in future into a regular
-> subdev driver where the main CPU communicates with the sensor
-> directly.
+On Mon, Feb 24, 2014 at 11:37:15AM -0800, Florian Fainelli wrote:
+> 2014-02-24 11:15 GMT-08:00 Andrew Lunn <andrew@lunn.ch>:
+> > On Sun, Feb 23, 2014 at 05:58:39PM +0100, Sebastian Hesselbarth wrote:
+> >> commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
+> >>   ("net: phy: resume/suspend PHYs on attach/detach")
+> >> introduced a feature to suspend PHYs when entering halted state.
+> >>
+> >> Unfortunately, not all bootloaders properly power-up PHYs on reset
+> >> and fail to access ethernet because the PHY is still powered down.
+> >>
+> >> Therefore, we add a boolean module parameter suspend_halted with
+> >> default value of true. Disabling that parameter prevents PHYs from
+> >> being suspended when entering halted state.
+> >
+> > Hi Sebastian
+> >
+> > Am i doing something silly here?
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Could the PHY be already suspended during your initial boot?
 
-[...]
+No. I tftpboot.
 
-> +static int s5k6a3_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
-> +{
-> +	struct v4l2_mbus_framefmt *format = v4l2_subdev_get_try_format(fh, 0);
-> +
-> +	*format		= s5k6a3_formats[0];
-> +	format->width	= S5K6A3_DEFAULT_WIDTH;
-> +	format->height	= S5K6A3_DEFAULT_HEIGHT;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct v4l2_subdev_internal_ops s5k6a3_sd_internal_ops = {
-> +	.open = s5k6a3_open,
-> +};
+> If that
+> is the case, the first time we all phy_suspend() the flag is true, we
+> suspend it, and we never wake it again despite changing
+> suspend_halted. Does it work better if you specify this module
+> parameter on the initial kernel boot command-line?
 
-Where is this used?
+I tried that as well, after i emailed. Makes no difference, no working
+Ethernet.
 
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+	Andrew
