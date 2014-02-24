@@ -1,25 +1,36 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Feb 2014 12:50:46 +0100
-Subject: [PATCH 00/10] pinctrl: mvebu: remove hard-coded addresses from
- Dove pinctrl
-In-Reply-To: <530B1CF4.2060208@gmail.com>
-References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkdZ1JR82m46YV5m=b6e3E3OYcNCka_8EiT2VcSPU=ZVLdQ@mail.gmail.com>
- <530B1CF4.2060208@gmail.com>
-Message-ID: <CACRpkdYptvexfwASCA3Y84oSpidGF6n9WLTEL2GtRQL9fLYsUg@mail.gmail.com>
+Date: Mon, 24 Feb 2014 12:53:03 +0100
+Subject: [GIT PULL] integrator base patches for v3.15
+In-Reply-To: <201402241117.48617.arnd@arndb.de>
+References: <CACRpkdYeaMqTNUTqBSg6vNa9=VucjpFFkx3diHJJNgZTg+iq1w@mail.gmail.com>
+ <201402241117.48617.arnd@arndb.de>
+Message-ID: <CACRpkdbtv2ZQbt0=7QhBZSRRAdONgKeKCO9yj=UwWRAU2WOWwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 11:20 AM, Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com> wrote:
+On Mon, Feb 24, 2014 at 11:17 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 13 February 2014, Linus Walleij wrote:
+>>       irqchip: vic: update the base IRQ member correctly
+>>       irqchip: support cascaded VICs
+>>       ARM: integrator: register the IM-PD1 VIC
+>
+> I got a randconfig build error for CONFIG_IMPD1=m. Ok to apply this
+> fix on top?
 
-> Although, I guess instead of applying them separately, it would have
-> been better to pull them from Jason's stable topic branch. But that is
-> also up to you and Jason may give valuable hints on how to proceed in
-> the future.
+Sure sorry for missing this ...
 
-Yeah I concluded that I should take a branch pull instead, so I'm
-just waiting for an indication of which branch to pull in.
+> 8<---
+>
+> irqchip: VIC: export vic_init_cascaded
+>
+> vic_init_cascaded is called by integrator impd1 code that can
+> be a loadable module, so the function has to be exported.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Can either of you pls apply this directly to the ARM SoC tree?
 
 Yours,
 Linus Walleij
