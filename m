@@ -1,37 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Feb 2014 10:27:43 +0100
-Subject: [PATCH v3 1/4] ARM: sunxi: Add driver for sunxi usb phy
-In-Reply-To: <1393157352-21104-2-git-send-email-hdegoede@redhat.com>
-References: <1393157352-21104-1-git-send-email-hdegoede@redhat.com>
- <1393157352-21104-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20140224092743.GF3468@lukather>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 24 Feb 2014 10:32:13 +0100
+Subject: [PATCH v2 1/2] ARM: imx6q: Add GPR6 and GPR7 register definitions for
+ iomuxc gpr
+Message-ID: <1393234334-14795-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Masks for IPU AXI transaction QoS settings
 
-On Sun, Feb 23, 2014 at 01:09:09PM +0100, Hans de Goede wrote:
-> The Allwinner A1x / A2x SoCs have 2 or 3 usb phys which are all accessed
-> through a single set of registers. Besides this there are also some other
-> phy related bits which need poking, which are per phy, but shared between the
-> ohci and ehci controllers, so these are also controlled from this new phy
-> driver.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Thanks!
-Maxime
-
+diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+index 866e355..ff44374 100644
+--- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
++++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+@@ -242,6 +242,24 @@
+ 
+ #define IMX6Q_GPR5_L2_CLK_STOP			BIT(8)
+ 
++#define IMX6Q_GPR6_IPU1_ID00_WR_QOS_MASK	(0xf << 0)
++#define IMX6Q_GPR6_IPU1_ID01_WR_QOS_MASK	(0xf << 4)
++#define IMX6Q_GPR6_IPU1_ID10_WR_QOS_MASK	(0xf << 8)
++#define IMX6Q_GPR6_IPU1_ID11_WR_QOS_MASK	(0xf << 12)
++#define IMX6Q_GPR6_IPU1_ID00_RD_QOS_MASK	(0xf << 16)
++#define IMX6Q_GPR6_IPU1_ID01_RD_QOS_MASK	(0xf << 20)
++#define IMX6Q_GPR6_IPU1_ID10_RD_QOS_MASK	(0xf << 24)
++#define IMX6Q_GPR6_IPU1_ID11_RD_QOS_MASK	(0xf << 28)
++
++#define IMX6Q_GPR7_IPU2_ID00_WR_QOS_MASK	(0xf << 0)
++#define IMX6Q_GPR7_IPU2_ID01_WR_QOS_MASK	(0xf << 4)
++#define IMX6Q_GPR7_IPU2_ID10_WR_QOS_MASK	(0xf << 8)
++#define IMX6Q_GPR7_IPU2_ID11_WR_QOS_MASK	(0xf << 12)
++#define IMX6Q_GPR7_IPU2_ID00_RD_QOS_MASK	(0xf << 16)
++#define IMX6Q_GPR7_IPU2_ID01_RD_QOS_MASK	(0xf << 20)
++#define IMX6Q_GPR7_IPU2_ID10_RD_QOS_MASK	(0xf << 24)
++#define IMX6Q_GPR7_IPU2_ID11_RD_QOS_MASK	(0xf << 28)
++
+ #define IMX6Q_GPR8_TX_SWING_LOW			(0x7f << 25)
+ #define IMX6Q_GPR8_TX_SWING_FULL		(0x7f << 18)
+ #define IMX6Q_GPR8_TX_DEEMPH_GEN2_6DB		(0x3f << 12)
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/e447a37e/attachment.sig>
+1.8.5.3
