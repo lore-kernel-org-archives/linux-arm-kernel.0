@@ -1,86 +1,59 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 24 Feb 2014 10:20:59 +0800
-Subject: [PATCH v11 07/15] usb: phy-mxs: Enable IC fixes for related SoCs
-In-Reply-To: <1393208467-6355-1-git-send-email-peter.chen@freescale.com>
-References: <1393208467-6355-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1393208467-6355-8-git-send-email-peter.chen@freescale.com>
+From: t.dakhran@samsung.com (Tarek Dakhran)
+Date: Mon, 24 Feb 2014 12:43:52 +0900
+Subject: [PATCH v7 0/3] Exynos 5410 support
+Message-ID: <1393213435-20863-1-git-send-email-t.dakhran@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two PHY bugs are fixed by IC logic, but these bits are not
-enabled by default, so we enable them at driver.
-The two bugs are: MXS_PHY_ABNORMAL_IN_SUSPEND and MXS_PHY_SENDING_SOF_TOO_FAST
-which are described at code.
+The series of patches represent support of Exynos 5410 SoC
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/phy/phy-mxs-usb.c |   23 +++++++++++++++++++++--
- 1 files changed, 21 insertions(+), 2 deletions(-)
+The Exynos 5410 is the first Samsung SoC based on bigLITTLE architecture
 
-diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 1663a66..cb71135 100644
---- a/drivers/usb/phy/phy-mxs-usb.c
-+++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -31,6 +31,10 @@
- #define HW_USBPHY_CTRL_SET			0x34
- #define HW_USBPHY_CTRL_CLR			0x38
- 
-+#define HW_USBPHY_IP				0x90
-+#define HW_USBPHY_IP_SET			0x94
-+#define HW_USBPHY_IP_CLR			0x98
-+
- #define BM_USBPHY_CTRL_SFTRST			BIT(31)
- #define BM_USBPHY_CTRL_CLKGATE			BIT(30)
- #define BM_USBPHY_CTRL_ENAUTOSET_USBCLKS	BIT(26)
-@@ -42,6 +46,8 @@
- #define BM_USBPHY_CTRL_ENUTMILEVEL2		BIT(14)
- #define BM_USBPHY_CTRL_ENHOSTDISCONDETECT	BIT(1)
- 
-+#define BM_USBPHY_IP_FIX                       (BIT(17) | BIT(18))
-+
- #define to_mxs_phy(p) container_of((p), struct mxs_phy, phy)
- 
- /* Do disconnection between PHY and controller without vbus */
-@@ -60,6 +66,14 @@
-  */
- #define MXS_PHY_SENDING_SOF_TOO_FAST		BIT(2)
- 
-+/*
-+ * IC has bug fixes logic, they include
-+ * MXS_PHY_ABNORMAL_IN_SUSPEND and MXS_PHY_SENDING_SOF_TOO_FAST
-+ * which are described at above flags, the RTL will handle it
-+ * according to different versions.
-+ */
-+#define MXS_PHY_NEED_IP_FIX			BIT(3)
-+
- struct mxs_phy_data {
- 	unsigned int flags;
- };
-@@ -70,11 +84,13 @@ static const struct mxs_phy_data imx23_phy_data = {
- 
- static const struct mxs_phy_data imx6q_phy_data = {
- 	.flags = MXS_PHY_SENDING_SOF_TOO_FAST |
--		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
-+		MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
-+		MXS_PHY_NEED_IP_FIX,
- };
- 
- static const struct mxs_phy_data imx6sl_phy_data = {
--	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS,
-+	.flags = MXS_PHY_DISCONNECT_LINE_WITHOUT_VBUS |
-+		MXS_PHY_NEED_IP_FIX,
- };
- 
- static const struct of_device_id mxs_phy_dt_ids[] = {
-@@ -118,6 +134,9 @@ static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
- 		BM_USBPHY_CTRL_ENUTMILEVEL3,
- 	       base + HW_USBPHY_CTRL_SET);
- 
-+	if (mxs_phy->data->flags & MXS_PHY_NEED_IP_FIX)
-+		writel(BM_USBPHY_IP_FIX, base + HW_USBPHY_IP_SET);
-+
- 	return 0;
- }
- 
+Patches add new platform description, support of clock controller and device 
+tree for Exynos 5410.
+
+Has been build on Linux Kernel v3.14-rc1 (Samsung kernel,
+	for-next branch,
+	commit aaeeda6f57833c7c0e16fef3d76205f36882c21b,
+	"Merge branch 'v3.15-next/cleanup-samsung' into for-next")
+Has been tested on Exynos 5410 reference board (exynos_defconfig)
+
+I hope, this is enough clean and hasn't any dependencies to go through 
+Samsung tree.
+
+Tarek.
+
+Changelog:
+
+v7:
+	small changes for resolving conflicts related to changes in 
+	Samsung tree.
+
+Tarek Dakhran (3):
+  ARM: EXYNOS: Add support for EXYNOS5410 SoC
+  clk: exynos5410: register clocks using common clock framework
+  ARM: dts: Add initial device tree support for EXYNOS5410
+
+ .../devicetree/bindings/clock/exynos5410-clock.txt |   54 +++++
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          |   72 +++++++
+ arch/arm/boot/dts/exynos5410.dtsi                  |  140 +++++++++++++
+ arch/arm/mach-exynos/Kconfig                       |   10 +
+ arch/arm/mach-exynos/common.c                      |   18 ++
+ arch/arm/mach-exynos/include/mach/map.h            |    1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |    1 +
+ arch/arm/mach-exynos/platsmp.c                     |    2 +
+ arch/arm/plat-samsung/include/plat/cpu.h           |    8 +
+ arch/arm/plat-samsung/include/plat/map-s5p.h       |    3 +
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-exynos5410.c               |  208 ++++++++++++++++++++
+ include/dt-bindings/clock/exynos5410.h             |   32 +++
+ 14 files changed, 551 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/exynos5410-clock.txt
+ create mode 100644 arch/arm/boot/dts/exynos5410-smdk5410.dts
+ create mode 100644 arch/arm/boot/dts/exynos5410.dtsi
+ create mode 100644 drivers/clk/samsung/clk-exynos5410.c
+ create mode 100644 include/dt-bindings/clock/exynos5410.h
+
 -- 
-1.7.8
+1.7.10.4
