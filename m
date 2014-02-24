@@ -1,47 +1,56 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Mon, 24 Feb 2014 11:40:21 -0600
-Subject: [PATCH v3 2/2] i2c: New bus driver for the Qualcomm QUP I2C
- controller
-In-Reply-To: <1393237990.6481.15.camel@iivanov-dev>
-References: <1392943090-30556-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1392943090-30556-3-git-send-email-bjorn.andersson@sonymobile.com>
- <92B0AE30-5CDF-43FC-8588-EEF0C5F86266@codeaurora.org>
- <1393237990.6481.15.camel@iivanov-dev>
-Message-ID: <20140224174021.GA18563@joshc.qualcomm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 24 Feb 2014 17:43:18 +0000
+Subject: [RFC PATCH 0/2] Introduce pte_isset for arm and arm64
+In-Reply-To: <20140224173624.GH2553@mudshark.cambridge.arm.com>
+References: <1393256005-2206-1-git-send-email-steve.capper@linaro.org>
+ <20140224173624.GH2553@mudshark.cambridge.arm.com>
+Message-ID: <CAPvkgC20N9Z6_zu0KgPaU_XwotU=KMGgVOYNadz5r0BSZsWEzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 12:33:10PM +0200, Ivan T. Ivanov wrote:
-> On Fri, 2014-02-21 at 09:35 -0600, Kumar Gala wrote: 
-> > On Feb 20, 2014, at 6:38 PM, Bjorn Andersson <bjorn.andersson@sonymobile.com> wrote:
-> > 
-> > > This bus driver supports the QUP i2c hardware controller in the Qualcomm SOCs.
-> > > The Qualcomm Universal Peripheral Engine (QUP) is a general purpose data path
-> > > engine with input/output FIFOs and an embedded i2c mini-core. The driver
-> > > supports FIFO mode (for low bandwidth applications) and block mode (interrupt
-> > > generated for each block-size data transfer).
-> > > 
-> > > Cc: Andy Gross <agross@codeaurora.org>
-> > > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > > Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
-> > > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> > > ---
-> > > +config I2C_QUP
-> > > +	tristate "Qualcomm QUP based I2C controller"
-> > > +	depends on ARCH_MSM
-> > 
-> > ARCH_QCOM
-> 
-> There is no such symbol, still.
+On 24 February 2014 17:36, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Steve,
 
-For what it's worth, the rename/split is in linux-next, and will land in
-3.15 (as part of arm-soc cleanups).
+Hey Will,
 
-Is the (short-term) problem of the lack of the symbol a problem?  Worse
-case, this driver lands before the ARCH_QCOM rename lands, and the
-driver is just not selectable.  Only when both are in place can the
-driver be selected.
+>
+> On Mon, Feb 24, 2014 at 03:33:23PM +0000, Steve Capper wrote:
+>> Long descriptors on ARM and all ptes on ARM64 are 64 bits. Some pte
+>> attribute test functions such as pte_dirty return the bitwise-and of a
+>> flag with the pte value. If the flag to be tested resides in the
+>> upper 32 bits of the pte, then we run into the danger of the result
+>> being dropped if downcast.
+>>
+>> For example:
+>>       gather_stats(page, md, pte_dirty(*pte), 1);
+>> where pte_dirty(*pte) is downcast to an int.
+>>
+>> Under ARM with LPAE, functions such as huge_pte_write also perform a
+>> downcast to unsigned long (which is 32 bits).
+>>
+>> This series introduces a new macro pte_isset which performs the bitwise
+>> and, then performs a double logical invert to ensure predictable
+>> downcasting.
+>>
+>> The reasoning behind a new macro was that it creates an obvious
+>> pattern which can be followed by future changes to the pte functions.
+>> Rather than target specific pte functions, I opted to wrap all of them
+>> with this macro for the sake of simplicity (also the flags may move in
+>> future).
+>>
+>> I was toying with using (bool), but decided that the !! looked slightly
+>> better. Under testing (with an Arndale and the Fast Model on 3.14-rc4)
+>> both strategies worked as expected.
+>
+> Ok, but I still don't understand why this is needed over your previous
+> series. Just inlining the '!!' into the existing accessors should be fine,
+> no? Basically, I don't see what the new macro gains us.
+>
 
+I thought it would be slightly easier to read, but it probably is
+somewhat superfluous. I will just expand out to !! for all the
+accessors that don't have a logical inverse already.
+
+Cheers,
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Steve
