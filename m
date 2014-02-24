@@ -1,95 +1,30 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 24 Feb 2014 09:37:35 -0600
-Subject: randconfig build error
-In-Reply-To: <20140222141525.GT27282@n2100.arm.linux.org.uk>
-References: <20140221155452.GH31902@saruman.home>
- <20140222141525.GT27282@n2100.arm.linux.org.uk>
-Message-ID: <20140224153735.GB31636@saruman.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Feb 2014 15:49:19 +0000
+Subject: [RFC PATCH v3 1/9] staging: imx-drm-core: don't request probe
+ deferral in imx_drm_encoder_parse_of
+In-Reply-To: <1392723370-4772-2-git-send-email-p.zabel@pengutronix.de>
+References: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
+ <1392723370-4772-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20140224154919.GL21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 22, 2014 at 02:15:25PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Feb 21, 2014 at 09:55:13AM -0600, Felipe Balbi wrote:
-> > Here's the error I found:
-> > 
-> > warning: (ARCH_HI3xxx && SOC_OMAP5 && ARCH_SHMOBILE_MULTI) selects HAVE_ARM_TWD which has unmet direct dependencies (SMP)
-> > warning: (ARCH_HI3xxx && SOC_OMAP5 && ARCH_SHMOBILE_MULTI) selects HAVE_ARM_TWD which has unmet direct dependencies (SMP)
-> > arch/arm/mach-prima2/common.c:23:20: warning: ?sirfsoc_map_io? defined but not used [-Wunused-function]
-> >  static __init void sirfsoc_map_io(void)
-> >                     ^
-> > arch/arm/kernel/smp_twd.c: In function ?twd_local_timer_of_register?:
-> > arch/arm/kernel/smp_twd.c:391:20: error: ?setup_max_cpus? undeclared (first use in this function)
-> >   if (!is_smp() || !setup_max_cpus)
-> >                     ^
-> > arch/arm/kernel/smp_twd.c:391:20: note: each undeclared identifier is reported only once for each function it appears in
-> > make[1]: *** [arch/arm/kernel/smp_twd.o] Error 1
-> > make[1]: *** Waiting for unfinished jobs....
-> > make: *** [arch/arm/kernel] Error 2
-> > make: *** Waiting for unfinished jobs....
-> > 
-> > The funny part of that is that SOC_OMAP5, ARCH_SHMOBILE_MULTI, and
-> > ARCH_HI3xxx have:
-> > 
-> > 	select HAVE_ARM_TWD if SMP
-> > 
-> > so how come we still select it if CONFIG_SMP=n on that particular
-> > randconfig ?
+On Tue, Feb 18, 2014 at 12:36:02PM +0100, Philipp Zabel wrote:
+> From: Lucas Stach <l.stach@pengutronix.de>
 > 
-> Are you entirely certian which kernel version you're building?  v3.14-rc1
-> to my tip has this:
-> 
-> diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-> index 8f4649b301b2..1abae5f6a418 100644
-> --- a/arch/arm/mach-hisi/Kconfig
-> +++ b/arch/arm/mach-hisi/Kconfig
-> @@ -8,7 +8,7 @@ config ARCH_HI3xxx
->         select CLKSRC_OF
->         select GENERIC_CLOCKEVENTS
->         select HAVE_ARM_SCU
-> -       select HAVE_ARM_TWD
-> +       select HAVE_ARM_TWD if SMP
->         select HAVE_SMP
->         select PINCTRL
->         select PINCTRL_SINGLE
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 653b489479e0..e2ce4f8366a7 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -54,7 +54,7 @@ config SOC_OMAP5
->         select ARM_GIC
->         select CPU_V7
->         select HAVE_ARM_SCU if SMP
-> -       select HAVE_ARM_TWD if LOCAL_TIMERS
-> +       select HAVE_ARM_TWD if SMP
->         select HAVE_SMP
->         select HAVE_ARM_ARCH_TIMER
->         select ARM_ERRATA_798181 if SMP
-> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> index 338640631e08..05fa505df585 100644
-> --- a/arch/arm/mach-shmobile/Kconfig
-> +++ b/arch/arm/mach-shmobile/Kconfig
-> @@ -8,7 +8,7 @@ config ARCH_SHMOBILE_MULTI
->         select CPU_V7
->         select GENERIC_CLOCKEVENTS
->         select HAVE_ARM_SCU if SMP
-> -       select HAVE_ARM_TWD if LOCAL_TIMERS
-> +       select HAVE_ARM_TWD if SMP
->         select HAVE_SMP
->         select ARM_GIC
->         select MIGHT_HAVE_CACHE_L2X0
-> 
-> The relevant bits are the "-" lines, which indicate that with v3.14-rc1,
-> ARCH_HI3xxx would select HAVE_ARM_TWD without SMP set, and indeed, your
-> config you attached has ARCH_HI3xxx set.
+> Since imx_drm_encoder_parse_of is called from the encoder bind callbacks,
+> it is too late to request probe deferral. Rather the core should make sure
+> that the crtcs are bound before the encoders, after all needed components
+> are probed.
 
-yeah, just checked that it builds just fine on -rc3. Thanks
+Why is it too late?  -EPROBE_DEFER from this point will cause the driver
+initialisation to correctly unwind and return -EPROBE_DEFER to the
+last-to-be-added component.
+
+> This fixes probe failure when using the LDB on i.MX6.
+
+More details please.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/e0b761c9/attachment.sig>
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
