@@ -1,55 +1,44 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 24 Feb 2014 18:35:12 +0100
-Subject: [PATCH v5 00/10] Add device tree support for Exynos4 camera interface
-Message-ID: <1393263322-28215-1-git-send-email-s.nawrocki@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Feb 2014 17:36:24 +0000
+Subject: [RFC PATCH 0/2] Introduce pte_isset for arm and arm64
+In-Reply-To: <1393256005-2206-1-git-send-email-steve.capper@linaro.org>
+References: <1393256005-2206-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140224173624.GH2553@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds devicetree support for the front and rear camera of
-the Exynos4412 SoC Trats2 board. It converts related drivers to use
-the v4l2-async API. The SoC output clocks are provided to external image
-image sensors through the common clock API.
+Hi Steve,
 
-This iteration includes mostly further changes to the clock provider DT 
-binding.
+On Mon, Feb 24, 2014 at 03:33:23PM +0000, Steve Capper wrote:
+> Long descriptors on ARM and all ptes on ARM64 are 64 bits. Some pte
+> attribute test functions such as pte_dirty return the bitwise-and of a
+> flag with the pte value. If the flag to be tested resides in the
+> upper 32 bits of the pte, then we run into the danger of the result
+> being dropped if downcast.
+> 
+> For example:
+> 	gather_stats(page, md, pte_dirty(*pte), 1);
+> where pte_dirty(*pte) is downcast to an int.
+> 
+> Under ARM with LPAE, functions such as huge_pte_write also perform a
+> downcast to unsigned long (which is 32 bits). 
+> 
+> This series introduces a new macro pte_isset which performs the bitwise
+> and, then performs a double logical invert to ensure predictable
+> downcasting.
+> 
+> The reasoning behind a new macro was that it creates an obvious
+> pattern which can be followed by future changes to the pte functions.
+> Rather than target specific pte functions, I opted to wrap all of them
+> with this macro for the sake of simplicity (also the flags may move in
+> future).
+> 
+> I was toying with using (bool), but decided that the !! looked slightly
+> better. Under testing (with an Arndale and the Fast Model on 3.14-rc4)
+> both strategies worked as expected.
 
-My test branch can be found at:
-http://git.linuxtv.org/snawrocki/samsung.git/v3.14-rc2-trats2-camera-v5
+Ok, but I still don't understand why this is needed over your previous
+series. Just inlining the '!!' into the existing accessors should be fine,
+no? Basically, I don't see what the new macro gains us.
 
-Sylwester Nawrocki (10):
-  Documentation: dt: Add binding documentation for S5K6A3 image sensor
-  Documentation: dt: Add binding documentation for S5C73M3 camera
-  Documentation: devicetree: Update Samsung FIMC DT binding
-  V4L: Add driver for s5k6a3 image sensor
-  V4L: s5c73m3: Add device tree support
-  exynos4-is: Use external s5k6a3 sensor driver
-  exynos4-is: Add clock provider for the SCLK_CAM clock outputs
-  exynos4-is: Add support for asynchronous subdevices registration
-  ARM: dts: Add rear camera nodes for Exynos4412 TRATS2 board
-  ARM: dts: exynos4: Update camera clk provider and s5k6a3 sensor node
-
- .../devicetree/bindings/media/samsung-fimc.txt     |   34 +-
- .../devicetree/bindings/media/samsung-s5c73m3.txt  |   97 +++++
- .../devicetree/bindings/media/samsung-s5k6a3.txt   |   33 ++
- arch/arm/boot/dts/exynos4.dtsi                     |    6 +-
- arch/arm/boot/dts/exynos4412-trats2.dts            |   86 ++++-
- drivers/media/i2c/Kconfig                          |    8 +
- drivers/media/i2c/Makefile                         |    1 +
- drivers/media/i2c/s5c73m3/s5c73m3-core.c           |  207 ++++++++---
- drivers/media/i2c/s5c73m3/s5c73m3-spi.c            |    6 +
- drivers/media/i2c/s5c73m3/s5c73m3.h                |    4 +
- drivers/media/i2c/s5k6a3.c                         |  388 ++++++++++++++++++++
- drivers/media/platform/exynos4-is/fimc-is-regs.c   |    2 +-
- drivers/media/platform/exynos4-is/fimc-is-sensor.c |  285 +-------------
- drivers/media/platform/exynos4-is/fimc-is-sensor.h |   49 +--
- drivers/media/platform/exynos4-is/fimc-is.c        |   97 ++---
- drivers/media/platform/exynos4-is/fimc-is.h        |    4 +-
- drivers/media/platform/exynos4-is/media-dev.c      |  331 ++++++++++++-----
- drivers/media/platform/exynos4-is/media-dev.h      |   32 +-
- 18 files changed, 1127 insertions(+), 543 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/media/samsung-s5c73m3.txt
- create mode 100644 Documentation/devicetree/bindings/media/samsung-s5k6a3.txt
- create mode 100644 drivers/media/i2c/s5k6a3.c
-
--- 
-1.7.9.5
+Will
