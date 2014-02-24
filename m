@@ -1,39 +1,49 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 24 Feb 2014 15:43:19 +0200
-Subject: Tegra clockframework fixes for 3.14
-In-Reply-To: <20140224010211.22529.99924@quantum>
-References: <20140220172744.GA4378@tbergstrom-lnx.Nvidia.com>
- <20140224010211.22529.99924@quantum>
-Message-ID: <20140224134319.GG19389@tbergstrom-lnx.Nvidia.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 24 Feb 2014 14:52:24 +0100
+Subject: [PATCH v2 2/2] ARM i.MX6q: Mark VPU and IPU AXI transfers as
+ cacheable, increase IPU priority
+In-Reply-To: <1393234334-14795-2-git-send-email-p.zabel@pengutronix.de>
+References: <1393234334-14795-1-git-send-email-p.zabel@pengutronix.de>
+ <1393234334-14795-2-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1393249944.3091.29.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 02:02:11AM +0100, Mike Turquette wrote:
-> Quoting Peter De Schrijver (2014-02-20 09:27:44)
-> > Hi Mike,
-> > 
-> > Could you merge these fixes still for 3.14?
+Am Montag, den 24.02.2014, 10:32 +0100 schrieb Philipp Zabel:
+> This is needed so that the IPU framebuffer scanout cannot be
+> starved by VPU or GPU activity.
+> Some boards like the SabreLite and SabreSD seem to set this in
+> the DCD already, but the documented register reset values do not
+> contain the necessary settings.
 > 
-> No problem, but can you provide a list of the regressions fixed? I'll
-> add those to my merge commit message. No need for you to respin
-> anything. Next time if you could submit a signed tag with the
-> regressions listed in the message it would be a great help.
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+> Changes since v1:
+>  - Limited to 80 char lines
+>  - Rebased onto Shawn's for-next
+> ---
+>  arch/arm/mach-imx/mach-imx6q.c | 34 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
 > 
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 1e12685..66bd498 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -228,6 +228,39 @@ put_node:
+>  	of_node_put(np);
+>  }
+>  
+> +static void __init imx6q_axi_init(void)
+> +{
+> +	struct regmap *gpr;
+> +	unsigned int mask;
+> +
+> +	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+> +	if (!IS_ERR(gpr)) {
+> +		/*
+> +		/* Enable the cacheable attribute of VPU and IPU
+  		^^
+Sorry about that, please ignore this version.
 
-This fixes the following issues:
-
-clk: tegra124: remove gr2d and gr3d clocks - accesses to undefined registers
-clk: tegra: Fix vic03 mux index - wrong parent when PLLC3 is selected (because clk_m is actually selected)
-clk: tegra: use max divider if divider overflows - make tegra fractional divider match the clk-div.c behaviour
-clk: tegra: cclk_lp has a pllx/2 divider - pllx runs at half the programmed rate
-clk: tegra: fix sdmmc clks on Tegra1x4 - wrong parent selection
-clk: tegra: fix host1x clock on Tegra124 - wrong parent selection
-clk: tegra: PLLD2 fixes for hdmi - PLL runs at wrong rate
-clk: tegra: Fix PLLD mnp table - PLL runs at wrong rate
-clk: tegra: Fix PLLP rate table - kernel panic when using coreboot
-clk: tegra: Correct clock number for UARTE - wrong clock when using UARTE
-clk: tegra: Add missing Tegra20 fuse clks - fuse driver broken
-
-Cheers,
-
-Peter.
+regards
+Philipp
