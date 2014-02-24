@@ -1,51 +1,111 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 24 Feb 2014 09:42:56 +0100
-Subject: [PATCH 04/10] ARM: dove: add global-config register node
+Date: Mon, 24 Feb 2014 09:42:57 +0100
+Subject: [PATCH 05/10] pinctrl: mvebu: dove: request additional resources
 In-Reply-To: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1393231382-11078-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1393231382-11078-6-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We share global config registers by syscon node, add it to dove.dtsi.
+Dove pinctrl also requires additional registers to control all pins.
+This patch requests resources for mpp4 and pmu-mpp register ranges.
+As this changes DT to driver requirements, fallback to hardcoded
+resources, if the corresponding DT regs have not been set.
+Also, WARN about old DT binding usage to encourage users to update
+their DTBs.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Rob Landley <rob@landley.net>
 Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/dove.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/pinctrl/mvebu/pinctrl-dove.c | 45 +++++++++++++++++++++++++++++++++---
+ 1 file changed, 42 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index c5e90f0287b9..eeb08edb67ac 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -616,6 +616,12 @@
- 				interrupts = <5>;
- 			};
+diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
+index da9ca26360fd..8d57d4bc1f0c 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-dove.c
++++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
+@@ -22,6 +22,11 @@
  
-+			gconf: global-config at e802c {
-+				compatible = "marvell,dove-global-config",
-+				             "syscon";
-+				reg = <0xe802c 0x14>;
-+			};
+ #include "pinctrl-mvebu.h"
+ 
++/* Internal registers can be configured at any 1 MiB aligned address */
++#define INT_REGS_MASK		~(SZ_1M - 1)
++#define MPP4_REGS_OFFS		0xd0440
++#define PMU_REGS_OFFS		0xd802c
 +
- 			gpio2: gpio-ctrl at e8400 {
- 				compatible = "marvell,orion-gpio";
- 				#gpio-cells = <2>;
+ #define DOVE_SB_REGS_VIRT_BASE		IOMEM(0xfde00000)
+ #define DOVE_MPP_VIRT_BASE		(DOVE_SB_REGS_VIRT_BASE + 0xd0200)
+ #define DOVE_PMU_MPP_GENERAL_CTRL	(DOVE_MPP_VIRT_BASE + 0x10)
+@@ -52,6 +57,8 @@
+ #define CONFIG_PMU	BIT(4)
+ 
+ static void __iomem *mpp_base;
++static void __iomem *mpp4_base;
++static void __iomem *pmu_base;
+ 
+ static int dove_mpp_ctrl_get(unsigned pid, unsigned long *config)
+ {
+@@ -751,7 +758,8 @@ static struct of_device_id dove_pinctrl_of_match[] = {
+ 
+ static int dove_pinctrl_probe(struct platform_device *pdev)
+ {
+-	struct resource *res;
++	struct resource *res, *mpp_res;
++	struct resource fb_res;
+ 	const struct of_device_id *match =
+ 		of_match_device(dove_pinctrl_of_match, &pdev->dev);
+ 	pdev->dev.platform_data = (void *)match->data;
+@@ -767,11 +775,42 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
+ 	}
+ 	clk_prepare_enable(clk);
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	mpp_base = devm_ioremap_resource(&pdev->dev, res);
++	mpp_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	mpp_base = devm_ioremap_resource(&pdev->dev, mpp_res);
+ 	if (IS_ERR(mpp_base))
+ 		return PTR_ERR(mpp_base);
+ 
++	/* prepare fallback resource */
++	memcpy(&fb_res, mpp_res, sizeof(struct resource));
++	fb_res.start = 0;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!res) {
++		dev_warn(&pdev->dev, "falling back to hardcoded MPP4 resource\n");
++		adjust_resource(&fb_res,
++			(mpp_res->start & INT_REGS_MASK) + MPP4_REGS_OFFS, 0x4);
++		res = &fb_res;
++	}
++
++	mpp4_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(mpp4_base))
++		return PTR_ERR(mpp4_base);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
++	if (!res) {
++		dev_warn(&pdev->dev, "falling back to hardcoded PMU resource\n");
++		adjust_resource(&fb_res,
++			(mpp_res->start & INT_REGS_MASK) + PMU_REGS_OFFS, 0x8);
++		res = &fb_res;
++	}
++
++	pmu_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(pmu_base))
++		return PTR_ERR(pmu_base);
++
++	/* Warn on any missing DT resource */
++	WARN(fb_res.start, FW_BUG "Missing pinctrl regs in DTB. Please update your firmware.\n");
++
+ 	return mvebu_pinctrl_probe(pdev);
+ }
+ 
 -- 
 1.8.5.3
