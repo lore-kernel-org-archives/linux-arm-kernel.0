@@ -1,58 +1,19 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 24 Feb 2014 15:26:58 +0100
-Subject: [PATCHv6] staging/iio/adc: change the MXS touchscreen driver
- implementation
-In-Reply-To: <201402241416.24270.jbe@pengutronix.de>
-References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
- <52CEA4AA.8050503@free-electrons.com>
- <201401100955.45885.jbe@pengutronix.de>
- <201402241416.24270.jbe@pengutronix.de>
-Message-ID: <20140224142658.GD4436@piout.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Feb 2014 15:35:13 +0100
+Subject: [PATCH v2] arm/smp: Absorb boot_secondary()
+In-Reply-To: <1393247328-23163-1-git-send-email-geert@linux-m68k.org>
+References: <1393247328-23163-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <201402241535.13873.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juergen,
-
-On 24/02/2014 at 14:16:24 +0100, Juergen Beisert wrote :
-> Hi Alexandre,
+On Monday 24 February 2014, Geert Uytterhoeven wrote:
+> From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 > 
-> > While I don't have much experience with the TS part of the code but I
-> > can investigate if you don't have any idea.
+> After becoming a mandatory function, boot_secondary() is no longer used
+> outside arch/arm/kernel/smp.c. Hence remove its public prototype, and,
+> as suggested by Arnd, let it be absorbed by its single caller.
 > 
-> can you please test the following patch?
-> After releasing the touchscreen the internal state machine was left in a
-> wrong state.
-> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-This seems to solve the issue. You can send the patch with my Tested-by.
-
-It is probably worth trying to get it in 3.14.
-
-Thanks !
-
-> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-> index e2dd783..558a76c 100644
-> --- a/drivers/staging/iio/adc/mxs-lradc.c
-> +++ b/drivers/staging/iio/adc/mxs-lradc.c
-> @@ -698,6 +698,7 @@ static void mxs_lradc_finish_touch_event(struct mxs_lradc *lradc, bool valid)
->         }
-> 
->         /* if it is released, wait for the next touch via IRQ */
-> +       lradc->cur_plate = LRADC_TOUCH;
->         mxs_lradc_reg_clear(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ, LRADC_CTRL1);
->         mxs_lradc_reg_set(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ_EN, LRADC_CTRL1);
->  }
-> 
-> Regards,
-> Juergen
-> 
-> -- 
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-> Linux Solutions for Science and Industry ? ? ?| Phone: +49-5121-206917-5128 |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany ? ?| Fax: ? +49-5121-206917-5555 |
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? ? ?| http://www.pengutronix.de/ ?|
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Acked-by: Arnd Bergmann <arnd@arndb.de>
