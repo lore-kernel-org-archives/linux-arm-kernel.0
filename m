@@ -1,56 +1,33 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 24 Feb 2014 14:03:36 -0500
-Subject: [PATCH v2 1/5] ARM: Kirkwood: Add audio node to kirkwood.dtsi
-In-Reply-To: <1393264898-28939-2-git-send-email-andrew@lunn.ch>
-References: <1393264898-28939-1-git-send-email-andrew@lunn.ch>
- <1393264898-28939-2-git-send-email-andrew@lunn.ch>
-Message-ID: <20140224190336.GC1010@titan.lakedaemon.net>
+From: joelf@ti.com (Joel Fernandes)
+Date: Mon, 24 Feb 2014 13:03:32 -0600
+Subject: Ideas/suggestions to avoid repeated locking and reducing too many
+ lists with dmaengine?
+Message-ID: <530B9784.5060904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 07:01:34PM +0100, Andrew Lunn wrote:
-> The binding has existed for a while, so add the missing node so it can
-> be used by devices.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
-> v2:
-> Tabify
-> ---
->  arch/arm/boot/dts/kirkwood.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-> index 7b921b30cfcb..180dc69ff742 100644
-> --- a/arch/arm/boot/dts/kirkwood.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood.dtsi
-> @@ -310,5 +310,14 @@
->  			#phy-cells = <0>;
->  			status = "ok";
->  		};
-> +
-> +		audio0: audio-controller at a0000 {
-> +			compatible = "marvell,kirkwood-audio";
-> +			reg = <0xa0000 0x2210>;
-> +			interrupts = <24>;
-> +			clocks = <&gate_clk 9>;
-> +			clock-names = "internal";
-> +			status = "disabled";
-> +                };
+Hi folks,
 
-leading whitespace before brace.
+Just wanted your thoughts/suggestions on how we can avoid overhead in the EDMA
+dmaengine driver. I am seeing a lots of performance drop specially for small
+transfers with EDMA versus before raw EDMA was moved to DMAEngine framework
+(atleast 25%).
 
-thx,
+One of the things I am thinking about is the repeated (spin) locking/unlocking
+of the virt_dma_chan->lock or vc->lock. In many cases, there's only 1 user or
+thread requiring to do a DMA, so I feel the locking is unnecessary and potential
+overhead. If there's a sane way to detect this an avoid locking altogether, that
+would be great.
 
-Jason.
+ Also with respect to virt_dma (which is used by edma to manage all the
+descriptors and lists) there are too many lists: submitted, issued, completed
+etc and the descriptor moves from one to the other. I am thinking if there is a
+way we can avoid using so many lists and just have 2 lists and move the desc
+from one list to the other, That could avoid using the intermediate list
+altogether and classify dma requests as "done" or "not done".
 
->  	};
->  };
-> -- 
-> 1.8.5.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Since this involves discussing concurrency primitives, copying linux-rt-users as
+well.
+
+Thanks,
+-Joel
