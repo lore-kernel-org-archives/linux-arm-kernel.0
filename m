@@ -1,73 +1,41 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 24 Feb 2014 12:09:36 -0600
-Subject: [PATCHv2 03/16] Documentation: dt: add OMAP iommu bindings
-In-Reply-To: <530B41AD.2030608@epfl.ch>
-References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
- <1392315347-32967-4-git-send-email-s-anna@ti.com> <530B41AD.2030608@epfl.ch>
-Message-ID: <530B8AE0.9020301@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 24 Feb 2014 19:09:24 +0100
+Subject: [PATCH] ARM: Kirkwood: Remove redundant kexec code
+Message-ID: <1393265364-29241-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark, Kumar, Rob,
+The PCIe driver has been fully clock aware for quite a while.  Remove
+the kexec code to enable the PCIe clock, since the PCIe driver will do
+the right thing.
 
-> On 02/13/2014 07:15 PM, Suman Anna wrote:
->> From: Florian Vaussard <florian.vaussard@epfl.ch>
->>
->> This patch adds the iommu bindings for all OMAP2+ SoCs. Apart from
->> the standard bindings used by OMAP peripherals, this patch uses a
->> 'dma-window' (already used by Tegra SMMU) and adds two OMAP custom
->> bindings - 'ti,#tlb-entries' and 'ti,iommu-bus-err-back'.
->>
->> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->> [s-anna at ti.com: split bindings document, add dra7 and bus error back]
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> ---
->>   .../devicetree/bindings/iommu/ti,omap-iommu.txt    | 28 ++++++++++++++++++++++
->>   1 file changed, 28 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
->>
->> diff --git a/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
->> new file mode 100644
->> index 0000000..116492d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
->> @@ -0,0 +1,28 @@
->> +OMAP2+ IOMMU
->> +
->> +Required properties:
->> +- compatible : Should be one of,
->> +		"ti,omap2-iommu" for OMAP2/OMAP3 IOMMU instances
->> +		"ti,omap4-iommu" for OMAP4/OMAP5 IOMMU instances
->> +		"ti,dra7-iommu" for DRA7xx IOMMU instances
->> +- ti,hwmods  : Name of the hwmod associated with the IOMMU instance
->> +- reg        : Address space for the configuration registers
->> +- interrupts : Interrupt specifier for the IOMMU instance
->> +- dma-window : IOVA start address and length
->> +
->> +Optional properties:
->> +- ti,#tlb-entries : Number of entries in the translation look-aside buffer.
->> +                    Should be either 8 or 32 (default: 32)
->> +- ti,iommu-bus-err-back : Indicates the IOMMU instance supports throwing
->> +		          back a bus error response on MMU faults.
->> +
->> +Example:
->> +	/* OMAP3 ISP MMU */
->> +	mmu_isp: mmu at 480bd400 {
->> +		compatible = "ti,omap2-iommu";
->> +		reg = <0x480bd400 0x80>;
->> +		interrupts = <24>;
->> +		ti,hwmods = "mmu_isp";
->> +		ti,#tlb-entries = <8>;
->> +		dma-window = <0 0xfffff000>;
->> +	};
->>
->
-> Any comments on this binding?
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/mach-kirkwood/board-dt.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-Can one of you look through this binding and ack/suggest changes?
-As I mentioned in the cover letter, the optional properties usually 
-apply only to specific subsystems, so do let me know if this should be 
-handled using compatible string per subsystem per SoC rather than per SoC.
-
-regards
-Suman
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index ec0702c02d6c..2801da49e2a3 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -19,7 +19,6 @@
+ #include <linux/of_platform.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/irqchip.h>
+-#include <linux/kexec.h>
+ #include <asm/hardware/cache-feroceon-l2.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -207,10 +206,6 @@ static void __init kirkwood_dt_init(void)
+ 	kirkwood_pm_init();
+ 	kirkwood_dt_eth_fixup();
+ 
+-#ifdef CONFIG_KEXEC
+-	kexec_reinit = kirkwood_enable_pcie;
+-#endif
+-
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-- 
+1.8.5.3
