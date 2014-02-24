@@ -1,27 +1,61 @@
-From: chris@printf.net (Chris Ball)
-Date: Mon, 24 Feb 2014 19:40:35 +0000
-Subject: [PATCH v4 5/8] mmc: sdhci-bcm-kona: Add basic use of clocks
-In-Reply-To: <20140224193301.GW5038@beef> (Matt Porter's message of "Mon, 24
- Feb 2014 14:33:01 -0500")
-References: <1386271244-3927-1-git-send-email-tim.kryger@linaro.org>
- <1386271244-3927-6-git-send-email-tim.kryger@linaro.org>
- <CAEPRUYrPXf7QNzput0bz_UPfytRy1eYgyOJYnH5v2v4DCEKSNA@mail.gmail.com>
- <CAAYSxhoCrveHd5Wkc7Z0qzpGr41qG6-neYSSsuHQuC7AcuJmZQ@mail.gmail.com>
- <CAAYSxhrBSv8_Z1SfB-b3iGgq218Gttny4FEgYJnLtSFhJd2UFg@mail.gmail.com>
- <20140224193301.GW5038@beef>
-Message-ID: <86ha7os3ik.fsf@void.printf.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 24 Feb 2014 11:37:15 -0800
+Subject: [PATCH] net: phy: add suspend_halted module param
+In-Reply-To: <20140224191554.GC29288@lunn.ch>
+References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140224191554.GC29288@lunn.ch>
+Message-ID: <CAGVrzcaOSMQWJ69KHJ7TH0_BN9D-O4uoL=fLWDoE=xFdV4RJ4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2014-02-24 11:15 GMT-08:00 Andrew Lunn <andrew@lunn.ch>:
+> On Sun, Feb 23, 2014 at 05:58:39PM +0100, Sebastian Hesselbarth wrote:
+>> commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
+>>   ("net: phy: resume/suspend PHYs on attach/detach")
+>> introduced a feature to suspend PHYs when entering halted state.
+>>
+>> Unfortunately, not all bootloaders properly power-up PHYs on reset
+>> and fail to access ethernet because the PHY is still powered down.
+>>
+>> Therefore, we add a boolean module parameter suspend_halted with
+>> default value of true. Disabling that parameter prevents PHYs from
+>> being suspended when entering halted state.
+>
+> Hi Sebastian
+>
+> Am i doing something silly here?
 
-On Mon, Feb 24 2014, Matt Porter wrote:
-> Chris: we no longer need this to be taken through arm-soc since removing
-> the dependency. Could you please take this patch through your tree for
-> 3.15?
+Could the PHY be already suspended during your initial boot? If that
+is the case, the first time we all phy_suspend() the flag is true, we
+suspend it, and we never wake it again despite changing
+suspend_halted. Does it work better if you specify this module
+parameter on the initial kernel boot command-line?
 
-Thanks, pushed to mmc-next for 3.15.
+>
+> root at qnap:/sys/module/libphy/parameters# cat suspend_halted
+> Y
+> root at qnap:/sys/module/libphy/parameters# echo N > suspend_halted
+> root at qnap:/sys/module/libphy/parameters# cat suspend_halted
+> N
+> root at qnap:/sys/module/libphy/parameters# reboot
+> ...
+> ...
+>
+> Net:   egiga0 [PRIME]
+> Hit any key to stop autoboot:  0
+> Send Cmd : 0x68 to UART1
+> egiga0 no link
+> Using egiga0 device
+> TFTP from server 10.0.0.1; our IP address is 10.0.0.2
+> Filename 'uImage-qnap'.
+> Load address: 0x800000
+> Loading: T T
+>
+> Does not seem to work.
+>
+>      Andrew
 
-- Chris.
+
+
 -- 
-Chris Ball   <chris@printf.net>   <http://printf.net/>
+Florian
