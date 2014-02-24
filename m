@@ -1,40 +1,39 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Mon, 24 Feb 2014 16:33:16 +0300
-Subject: [PATCHv6] staging/iio/adc: change the MXS touchscreen driver
- implementation
-In-Reply-To: <201402241416.24270.jbe@pengutronix.de>
-References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
- <52CEA4AA.8050503@free-electrons.com>
- <201401100955.45885.jbe@pengutronix.de>
- <201402241416.24270.jbe@pengutronix.de>
-Message-ID: <20140224133316.GI26722@mwanda>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 24 Feb 2014 15:43:19 +0200
+Subject: Tegra clockframework fixes for 3.14
+In-Reply-To: <20140224010211.22529.99924@quantum>
+References: <20140220172744.GA4378@tbergstrom-lnx.Nvidia.com>
+ <20140224010211.22529.99924@quantum>
+Message-ID: <20140224134319.GG19389@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 02:16:24PM +0100, Juergen Beisert wrote:
-> Hi Alexandre,
+On Mon, Feb 24, 2014 at 02:02:11AM +0100, Mike Turquette wrote:
+> Quoting Peter De Schrijver (2014-02-20 09:27:44)
+> > Hi Mike,
+> > 
+> > Could you merge these fixes still for 3.14?
 > 
-> > While I don't have much experience with the TS part of the code but I
-> > can investigate if you don't have any idea.
+> No problem, but can you provide a list of the regressions fixed? I'll
+> add those to my merge commit message. No need for you to respin
+> anything. Next time if you could submit a signed tag with the
+> regressions listed in the message it would be a great help.
 > 
-> can you please test the following patch?
-> After releasing the touchscreen the internal state machine was left in a
-> wrong state.
-> 
-> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-> index e2dd783..558a76c 100644
-> --- a/drivers/staging/iio/adc/mxs-lradc.c
-> +++ b/drivers/staging/iio/adc/mxs-lradc.c
-> @@ -698,6 +698,7 @@ static void mxs_lradc_finish_touch_event(struct mxs_lradc *lradc, bool valid)
->         }
-> 
->         /* if it is released, wait for the next touch via IRQ */
-> +       lradc->cur_plate = LRADC_TOUCH;
->         mxs_lradc_reg_clear(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ, LRADC_CTRL1);
->         mxs_lradc_reg_set(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ_EN, LRADC_CTRL1);
->  }
 
-I am confused.  Why don't you send this like a normal patch?
+This fixes the following issues:
 
-regards,
-dan carpenter
+clk: tegra124: remove gr2d and gr3d clocks - accesses to undefined registers
+clk: tegra: Fix vic03 mux index - wrong parent when PLLC3 is selected (because clk_m is actually selected)
+clk: tegra: use max divider if divider overflows - make tegra fractional divider match the clk-div.c behaviour
+clk: tegra: cclk_lp has a pllx/2 divider - pllx runs at half the programmed rate
+clk: tegra: fix sdmmc clks on Tegra1x4 - wrong parent selection
+clk: tegra: fix host1x clock on Tegra124 - wrong parent selection
+clk: tegra: PLLD2 fixes for hdmi - PLL runs at wrong rate
+clk: tegra: Fix PLLD mnp table - PLL runs at wrong rate
+clk: tegra: Fix PLLP rate table - kernel panic when using coreboot
+clk: tegra: Correct clock number for UARTE - wrong clock when using UARTE
+clk: tegra: Add missing Tegra20 fuse clks - fuse driver broken
+
+Cheers,
+
+Peter.
