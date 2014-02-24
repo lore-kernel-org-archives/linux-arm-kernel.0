@@ -1,87 +1,46 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 24 Feb 2014 11:33:08 +0100
-Subject: [PATCH v2 0/6] ARM: STi reset controller support
-In-Reply-To: <5304B849.2080806@st.com>
-References: <1389696613-19683-1-git-send-email-srinivas.kandagatla@st.com>
- <1391437665-11913-1-git-send-email-srinivas.kandagatla@st.com>
- <1391592486.11239.4.camel@pizza.hi.pengutronix.de>
- <52F4D76F.8070301@st.com> <5304B849.2080806@st.com>
-Message-ID: <1393237988.3091.14.camel@pizza.hi.pengutronix.de>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Mon, 24 Feb 2014 12:33:10 +0200
+Subject: [PATCH v3 2/2] i2c: New bus driver for the Qualcomm QUP I2C
+ controller
+In-Reply-To: <92B0AE30-5CDF-43FC-8588-EEF0C5F86266@codeaurora.org>
+References: <1392943090-30556-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1392943090-30556-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <92B0AE30-5CDF-43FC-8588-EEF0C5F86266@codeaurora.org>
+Message-ID: <1393237990.6481.15.camel@iivanov-dev>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi, 
 
-Am Mittwoch, den 19.02.2014, 14:57 +0100 schrieb Maxime Coquelin:
-> Hi Philipp,
+On Fri, 2014-02-21 at 09:35 -0600, Kumar Gala wrote: 
+> On Feb 20, 2014, at 6:38 PM, Bjorn Andersson <bjorn.andersson@sonymobile.com> wrote:
 > 
-> On 02/07/2014 01:54 PM, srinivas kandagatla wrote:
-> > Hi Philipp,
-> > Thankyou for looking at the patches.
-> >
-> >
-> > On 05/02/14 09:28, Philipp Zabel wrote:
-> >> Hi Srinivas,
-> >>
-> > ...
-> >>
-> >> the patchset looks good to me for the soft resets. But for the powerdown
-> >> bits I am wondering whether the reset controller API is the right
-> >> abstraction. Depending on whether those bits really just put the IPs
-> >> into reset or there is some power gating / sequencing involved,
-> >> shouldn't this rather be handled as a set of pm domains?
-> >
-> > The hardware name of these control signals into the devices is
-> > slightly unfortunate and a bit misleading. We do not generally
-> > have separate power domains for peripheral devices in our
-> > current STB SoCs, in the sense that the voltage cannot actually be
-> > removed from individual devices. In the USB case we believe the
-> > powerdown signals internally gate off two of the three
-> > incoming clocks to most of the USB controller's logic blocks,
-> > essentially holding the device in a disabled (enable/disable
-> > might have been a better name for the signal) state.
-> >
-> > The primary requirement to manipulate these signals is to bring
-> > the device out of its cold boot default powerdown/disabled/reset
-> > (whatever you want to call it) state when the device is probed or
-> > after a SoC wide power loss when resuming from PM_SUSPEND_MEM.
-> >
-> >
-> >> I see that for example on STiH415 there are both soft resets and
-> >> powerdown bits for USB[012].
-> >
-> > Our IPs typically have two or sometimes three signals going into
-> > them, controlled from outside of the IP block itself (typically using
-> > SoC global system configuration registers) that you could view
-> > as "reset-a-like"; that is toggling each of the signals puts the IP
-> > into a state where it is in some way unusable and then back to
-> > being useable again. The reset controller API appeared to be the
-> > natural abstraction for the drivers to be given access to such control
-> > signals, regardless of the precise effect the signals have on the
-> > device's internal state.
-> >
-> > With regards to sequencing between these signals; it is the case that
-> > there is a likely sequencing because at least in the USB case it is
-> > thought that the "powerdown" stops the clock going to the reset chain
-> > logic. But we did not see that as an issue as the reset controller
-> > framework allows for multiple named "reset" lines being defined for
-> > a device through its DT attributes. The driver knows which signal
-> > is which and what each does, because it asks for them by name;
-> > therefore, it knows how to impose any required ordering when changing
-> > the state of those signals.
-> >
-> 
-> Did Srini's explanations convinced you?
-> 
-> If so, could you queue the series for v3.15?
+> > This bus driver supports the QUP i2c hardware controller in the Qualcomm SOCs.
+> > The Qualcomm Universal Peripheral Engine (QUP) is a general purpose data path
+> > engine with input/output FIFOs and an embedded i2c mini-core. The driver
+> > supports FIFO mode (for low bandwidth applications) and block mode (interrupt
+> > generated for each block-size data transfer).
+> > 
+> > Cc: Andy Gross <agross@codeaurora.org>
+> > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
+> > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> > ---
 
-to be honest, I'm not comfortable with this explanation. If the
-"powerdown" bits only gate the clocks to those modules, calling it a
-reset control is clearly the wrong abstraction. If that is the case,
-couldn't you handle those bits via the clock framework?
-If on the other hand these powerdown bits also trigger reset machinery,
-such that asserting and deasserting that bit will change the module's
-internal state, I could be convinced to queue them like this.
+<snip>
 
-regards
-Philipp
+> > 
+> > +config I2C_QUP
+> > +	tristate "Qualcomm QUP based I2C controller"
+> > +	depends on ARCH_MSM
+> 
+> ARCH_QCOM
+
+There is no such symbol, still.
+
+Regards,
+Ivan 
+
+
+> - k
+> 
