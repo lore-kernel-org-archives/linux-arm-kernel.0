@@ -1,68 +1,53 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 23 Feb 2014 17:02:11 -0800
-Subject: Tegra clockframework fixes for 3.14
-In-Reply-To: <20140220172744.GA4378@tbergstrom-lnx.Nvidia.com>
-References: <20140220172744.GA4378@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20140224010211.22529.99924@quantum>
+Date: Sun, 23 Feb 2014 17:13:35 -0800
+Subject: [PATCH v2 2/3] clk: bcm281xx: don't disable unused peripheral
+ clocks
+In-Reply-To: <20140220205615.GF5038@beef>
+References: <1392402560-12929-1-git-send-email-elder@linaro.org>
+ <1392402560-12929-3-git-send-email-elder@linaro.org>
+ <20140220205615.GF5038@beef>
+Message-ID: <20140224011335.22529.77418@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter De Schrijver (2014-02-20 09:27:44)
-> Hi Mike,
+Quoting Matt Porter (2014-02-20 12:56:15)
+> On Fri, Feb 14, 2014 at 12:29:19PM -0600, Alex Elder wrote:
+> > Add the CLK_IGNORE_UNUSED flag when setting up a peripheral clock.
+> > This prevents unused clocks from getting disabled, and by doing
+> > this we can use the common clock code even before we've resolved
+> > all the spots that need to get a reference to their clock.
+> > 
+> > Signed-off-by: Alex Elder <elder@linaro.org>
+> > Reviewed-by: Matt Porter <mporter@linaro.org>
 > 
-> Could you merge these fixes still for 3.14?
+> Mike: if you'll provide your ack on this patch, we would like to take
+> the entire series through arm-soc for 3.15 as we originally agreed
+> for 3.14. Patches 1 and 3 are the original two you acked for 3.14
+> but had to be dropped late in the merge window.
 
-No problem, but can you provide a list of the regressions fixed? I'll
-add those to my merge commit message. No need for you to respin
-anything. Next time if you could submit a signed tag with the
-regressions listed in the message it would be a great help.
-
-Thanks!
-Mike
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
 > 
 > Thanks,
+> Matt
 > 
-> Peter.
-> 
-> The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
-> 
->   Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
-> 
-> are available in the git repository at:
->   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git clk-tegra-more-fixes-3.14
-> 
-> Andrew Bresticker (3):
->       clk: tegra: fix sdmmc clks on Tegra1x4
->       clk: tegra: cclk_lp has a pllx/2 divider
->       clk: tegra: use max divider if divider overflows
-> 
-> David Ung (1):
->       clk: tegra: PLLD2 fixes for hdmi
-> 
-> Gabe Black (1):
->       clk: tegra: Fix PLLP rate table
-> 
-> Mark Zhang (1):
->       clk: tegra: fix host1x clock on Tegra124
-> 
-> Peter De Schrijver (3):
->       clk: tegra: Add missing Tegra20 fuse clks
->       clk: tegra: Fix vic03 mux index
->       clk: tegra124: remove gr2d and gr3d clocks
-> 
-> Rhyland Klein (1):
->       clk: tegra: Fix PLLD mnp table
-> 
-> Thierry Reding (1):
->       clk: tegra: Correct clock number for UARTE
-> 
->  drivers/clk/tegra/clk-divider.c          |    2 +-
->  drivers/clk/tegra/clk-id.h               |    4 ++
->  drivers/clk/tegra/clk-tegra-periph.c     |   10 ++++--
->  drivers/clk/tegra/clk-tegra-super-gen4.c |    2 +-
->  drivers/clk/tegra/clk-tegra114.c         |    8 ++--
->  drivers/clk/tegra/clk-tegra124.c         |   48 +++++++++++++++++-------------
->  drivers/clk/tegra/clk-tegra20.c          |    2 +
->  include/dt-bindings/clock/tegra124-car.h |    4 +-
->  8 files changed, 47 insertions(+), 33 deletions(-)
+> > ---
+> >  drivers/clk/bcm/clk-kona-setup.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/clk/bcm/clk-kona-setup.c b/drivers/clk/bcm/clk-kona-setup.c
+> > index f1e88fe..c7607fe 100644
+> > --- a/drivers/clk/bcm/clk-kona-setup.c
+> > +++ b/drivers/clk/bcm/clk-kona-setup.c
+> > @@ -579,7 +579,7 @@ static int peri_clk_setup(struct ccu_data *ccu, struct peri_clk_data *data,
+> >                       struct clk_init_data *init_data)
+> >  {
+> >       init_data->ops = &kona_peri_clk_ops;
+> > -     init_data->flags = 0;
+> > +     init_data->flags = CLK_IGNORE_UNUSED;
+> >  
+> >       return clk_sel_setup(data->clocks, &data->sel, init_data);
+> >  }
+> > -- 
+> > 1.7.9.5
+> > 
