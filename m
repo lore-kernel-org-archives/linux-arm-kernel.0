@@ -1,19 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Feb 2014 11:00:51 +0100
-Subject: [PATCH] pinctrl: sirf: update copyright years to 2014
-In-Reply-To: <1392213287-2669-1-git-send-email-21cnbao@gmail.com>
-References: <1392213287-2669-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <CACRpkdbuHi0xx3HawBfBOwnsOrp5z5Yy5vUh_Ruh=exMb3a5=g@mail.gmail.com>
+Date: Mon, 24 Feb 2014 11:04:23 +0100
+Subject: [PATCH v4 01/16] pinctrl: mvebu: count unnamed controls and
+ allocate name buffer
+In-Reply-To: <1393165274-32492-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393165274-32492-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393165274-32492-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CACRpkdZAZL3_DEgEHmN+cCwbQaM3OU+xfDU35HiMuyc7zyky_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 2:54 PM, Barry Song <21cnbao@gmail.com> wrote:
+On Sun, Feb 23, 2014 at 3:20 PM, Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com> wrote:
 
-> From: Barry Song <Baohua.Song@csr.com>
+> pinctrl-mvebu allows SoCs to pass unnamed controls that will get an
+> auto-generated name of "mpp<PIN#>". Currently, we are allocating name
+> buffers on a per-control basis while looping over passed controls.
+> This counts the total number of unnamed controls and allocates a
+> global name buffer instead. The new buffer is then used while assigning
+> controls to pinctrl groups later.
 >
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Tested-by: Andrew Lunn <andrew@lunn.ch>
+> Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-OK, patch applied.
+This v4 version applied.
 
 Yours,
 Linus Walleij
