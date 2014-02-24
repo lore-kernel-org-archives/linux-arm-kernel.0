@@ -1,44 +1,62 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 24 Feb 2014 10:32:29 +0100
-Subject: [RFC PATCH 2/2] ARM: imx6q: Mark VPU and IPU AXI transfers as
- cacheable, increase IPU priority
-In-Reply-To: <20140224020306.GA25011@S2101-09.ap.freescale.net>
-References: <1392896673-13627-1-git-send-email-p.zabel@pengutronix.de>
- <1392896673-13627-2-git-send-email-p.zabel@pengutronix.de>
- <20140221021947.GR3010@S2101-09.ap.freescale.net>
- <1392978496.3091.9.camel@pizza.hi.pengutronix.de>
- <20140224020306.GA25011@S2101-09.ap.freescale.net>
-Message-ID: <1393234349.3091.5.camel@pizza.hi.pengutronix.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 24 Feb 2014 15:04:57 +0530
+Subject: [PATCH v3 0/4] ARM: sunxi: Add driver for sunxi usb phy + usb
+ dts bindings
+In-Reply-To: <1393157352-21104-1-git-send-email-hdegoede@redhat.com>
+References: <1393157352-21104-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <530B1241.1000202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 24.02.2014, 10:03 +0800 schrieb Shawn Guo:
-> On Fri, Feb 21, 2014 at 11:28:16AM +0100, Philipp Zabel wrote:
-> > Hi Shawn,
-> > 
-> > Am Freitag, den 21.02.2014, 10:19 +0800 schrieb Shawn Guo:
-> > > On Thu, Feb 20, 2014 at 12:44:33PM +0100, Philipp Zabel wrote:
-> > > > This is needed so that the IPU framebuffer scanout cannot be
-> > > > starved by VPU or GPU activity.
-> > > > Some boards like the SabreLite and SabreSD seem to set this in
-> > > > the DCD already, but the documented register reset values do not
-> > > > contain the necessary settings.
-> > > > 
-> > > > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > > 
-> > > I'm fine with the patches, but not sure if I should just apply them
-> > > since you add 'RFC' tag in there.
-> > 
-> > I'm not sure whether this specific fixed QoS configuration should be
-> > imposed on everyone. OTOH, following the principle of least surprise,
-> > it's probably better to have this here, out in the open, than included
-> > hidden in bootloader DCD tables (or not, depending on the board).
-> > So if nobody objects, feel free to apply them.
+Hi,
+
+On Sunday 23 February 2014 05:39 PM, Hans de Goede wrote:
+> Hi Kishon, Maxime,
 > 
-> Okay.  But can you please fix those unnecessary line-over-80-columns
-> warnings?
+> Here is v3 of my sunxi-usb-phy driver it addresses all review remarks made
+> in response to v2, and as such this should be the final version, changes:
+> 
+> -Fix check for wrong variable in error handling path pointed out by wens
+> -Switch to using reg-names to differentiate between the different register
+>  ranges needed
+> 
+> Kishon, can you please queue up the 1st patch of this series for 3.15 ?
 
-Ok, resent without RFC and with short lines.
+huh.. maybe I failed to notice that before but the $subject for that patch
+should be 'PHY: sunxi...' and not 'ARM: sunxi..'. Can you fix that up?
 
-regards
-Philipp
+Thanks
+Kishon
+
+> 
+> Maxime, can you please add patches 2-4 to your dt-for-3.15 branch? Note these
+> are only the dtsi bits.
+> 
+> I'm holding back all the board .dts patches until it is clear how we want to
+> deal with the ahci + usb regulator bits. Specifically I'm waiting for an answer
+> to this question:
+> 
+> "I hope this helps explain my reasoning, as said I'm fine with
+> either way, if you want to change over to a single file +
+> explicit enabling, let me know and I'll respin the ahci dts
+> patches.  Note I'm going on vacation for a week starting Monday,
+> so you likely won't get a new version until next weekend."
+> 
+> In my last reply to "[PATCH v6 17/18] ARM: sun4i: dt: Add ahci / sata support"
+> 
+> I've a feeling you (Maxime) want me to rework things in to a single dtsi
+> for all common regulators + explicit enabling, which works for me, but before
+> doing the necessary refactoring I would like to hear that this is what you
+> want from you.
+> 
+> Regards,
+> 
+> Hans
+> 
+> 
+> p.s.
+> 
+> I'm going on vacation for 5 days leaving tomorrow, so I won't send the
+> (refactored) board .dts file patches until next weekend.
+> 
+> 
