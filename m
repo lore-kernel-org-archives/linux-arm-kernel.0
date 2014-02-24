@@ -1,40 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Feb 2014 11:25:58 +0100
-Subject: [PATCH 0/2] Marvell Armada 375 and 38x pinctrl drivers
-In-Reply-To: <20140223211032.GR7862@titan.lakedaemon.net>
-References: <1392051896-19178-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20140217164406.17d3f59e@skate>
- <20140223211032.GR7862@titan.lakedaemon.net>
-Message-ID: <CACRpkdaR25oNOaZ0RYZWZOe-pjcv8esp-gg23QJXZ+nqASZzUA@mail.gmail.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Mon, 24 Feb 2014 11:25:56 +0100
+Subject: [PATCH 2/3] dts: mpc512x: adjust clock specs for FEC nodes
+In-Reply-To: <1393237557-31406-1-git-send-email-gsi@denx.de>
+References: <1393237557-31406-1-git-send-email-gsi@denx.de>
+Message-ID: <1393237557-31406-2-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 23, 2014 at 10:10 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+a recent FEC binding document update that was motivated by i.MX
+development revealed that ARM and PowerPC implementations in Linux
+did not agree on the clock names to use for the FEC nodes
 
-> v4 of Sebastian's rework now depends on this series.
+change clock names from "per" to "ipg" in the FEC nodes of the
+mpc5121.dtsi include file such that the .dts specs comply with
+the common FEC binding
 
-Yeah I figured so much :-)
+this "incompatible" change does not break operation, because
+- COMMON_CLK support for MPC5121/23/25 and adjusted .dts files
+  were only introduced in Linux v3.14-rc1, no mainline release
+  provided these specs before
+- if this change won't make it for v3.14, the MPC512x CCF support
+  provides full backwards compability, and keeps operating with
+  device trees which lack clock specs or don't match in the names
 
->  As you've
-> expressed consent with Sebastian's series going through mvebu/arm-soc,
-> I'm going to go ahead and pull this into a topic branch as well.
+Signed-off-by: Gerhard Sittig <gsi@denx.de>
+---
+ arch/powerpc/boot/dts/mpc5121.dtsi |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-I think it's better if I pull this massive set of pinctrl changes
-into the pinctrl tree, and then create an immutable branch for
-you to pull (and forward to ARM SoC).
-
-> If you'd like the mvebu pinctrl branches to go through your tree, just
-> let me know and I'll send you a pull request for them.
-
-That's better, so hit me with this!
-
-I'll dequeue the stuff I queued so far and wait for this.
-
-The reason I want this in the pinctrl tree is that people
-tend to start sending small fixes on top and it creates
-a mess routing those patches. And it blocks us from
-major refactorings. So better keep it in my
-tree.
-
-Yours,
-Linus Walleij
+diff --git a/arch/powerpc/boot/dts/mpc5121.dtsi b/arch/powerpc/boot/dts/mpc5121.dtsi
+index 2c0e1552d20b..a5a375598ed8 100644
+--- a/arch/powerpc/boot/dts/mpc5121.dtsi
++++ b/arch/powerpc/boot/dts/mpc5121.dtsi
+@@ -281,7 +281,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			clocks = <&clks MPC512x_CLK_FEC>;
+-			clock-names = "per";
++			clock-names = "ipg";
+ 		};
+ 
+ 		eth0: ethernet at 2800 {
+@@ -291,7 +291,7 @@
+ 			local-mac-address = [ 00 00 00 00 00 00 ];
+ 			interrupts = <4 0x8>;
+ 			clocks = <&clks MPC512x_CLK_FEC>;
+-			clock-names = "per";
++			clock-names = "ipg";
+ 		};
+ 
+ 		/* USB1 using external ULPI PHY */
+-- 
+1.7.10.4
