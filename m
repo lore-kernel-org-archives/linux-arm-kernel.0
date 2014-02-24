@@ -1,39 +1,73 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 24 Feb 2014 19:02:44 +0100
-Subject: [PATCH] ARM: dts: mxs: Fix the RTC compatible prop on M28EVK
-In-Reply-To: <20140221033102.GS3010@S2101-09.ap.freescale.net>
-References: <1390519416-6760-1-git-send-email-marex@denx.de>
- <201402210414.00167.marex@denx.de>
- <20140221033102.GS3010@S2101-09.ap.freescale.net>
-Message-ID: <201402241902.45058.marex@denx.de>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 24 Feb 2014 12:09:36 -0600
+Subject: [PATCHv2 03/16] Documentation: dt: add OMAP iommu bindings
+In-Reply-To: <530B41AD.2030608@epfl.ch>
+References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
+ <1392315347-32967-4-git-send-email-s-anna@ti.com> <530B41AD.2030608@epfl.ch>
+Message-ID: <530B8AE0.9020301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, February 21, 2014 at 04:31:06 AM, Shawn Guo wrote:
-> On Fri, Feb 21, 2014 at 04:14:00AM +0100, Marek Vasut wrote:
-> > On Friday, February 21, 2014 at 03:09:16 AM, Shawn Guo wrote:
-> > > On Thu, Feb 20, 2014 at 01:31:37PM +0100, Marek Vasut wrote:
-> > > > On Friday, January 24, 2014 at 12:23:36 AM, Marek Vasut wrote:
-> > > > > The compatible property should be m41t62, not mt41t62, so fix this.
-> > > > > 
-> > > > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > > > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > > > 
-> > > > Bump ?
-> > > 
-> > > Applied.  Sorry for the delay.
-> > 
-> > Sure, no problem. Thanks. Shall I submit this for -stable too ?
-> 
-> Oh, at this time which already passes -rc3, I didn't categorize it as a
-> critical fix (build error, kernel dumps, system hang) that we should
-> send right away for 3.14 and -stable.  If you do, you can try to resend
-> it to arm-soc folks with my ACK.
+Mark, Kumar, Rob,
 
-So this will go for 3.15 ? I will submit it for stable once it hits mainline, 
-it's not critical.
+> On 02/13/2014 07:15 PM, Suman Anna wrote:
+>> From: Florian Vaussard <florian.vaussard@epfl.ch>
+>>
+>> This patch adds the iommu bindings for all OMAP2+ SoCs. Apart from
+>> the standard bindings used by OMAP peripherals, this patch uses a
+>> 'dma-window' (already used by Tegra SMMU) and adds two OMAP custom
+>> bindings - 'ti,#tlb-entries' and 'ti,iommu-bus-err-back'.
+>>
+>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>> [s-anna at ti.com: split bindings document, add dra7 and bus error back]
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> ---
+>>   .../devicetree/bindings/iommu/ti,omap-iommu.txt    | 28 ++++++++++++++++++++++
+>>   1 file changed, 28 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+>> new file mode 100644
+>> index 0000000..116492d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+>> @@ -0,0 +1,28 @@
+>> +OMAP2+ IOMMU
+>> +
+>> +Required properties:
+>> +- compatible : Should be one of,
+>> +		"ti,omap2-iommu" for OMAP2/OMAP3 IOMMU instances
+>> +		"ti,omap4-iommu" for OMAP4/OMAP5 IOMMU instances
+>> +		"ti,dra7-iommu" for DRA7xx IOMMU instances
+>> +- ti,hwmods  : Name of the hwmod associated with the IOMMU instance
+>> +- reg        : Address space for the configuration registers
+>> +- interrupts : Interrupt specifier for the IOMMU instance
+>> +- dma-window : IOVA start address and length
+>> +
+>> +Optional properties:
+>> +- ti,#tlb-entries : Number of entries in the translation look-aside buffer.
+>> +                    Should be either 8 or 32 (default: 32)
+>> +- ti,iommu-bus-err-back : Indicates the IOMMU instance supports throwing
+>> +		          back a bus error response on MMU faults.
+>> +
+>> +Example:
+>> +	/* OMAP3 ISP MMU */
+>> +	mmu_isp: mmu at 480bd400 {
+>> +		compatible = "ti,omap2-iommu";
+>> +		reg = <0x480bd400 0x80>;
+>> +		interrupts = <24>;
+>> +		ti,hwmods = "mmu_isp";
+>> +		ti,#tlb-entries = <8>;
+>> +		dma-window = <0 0xfffff000>;
+>> +	};
+>>
+>
+> Any comments on this binding?
 
-Thanks!
+Can one of you look through this binding and ack/suggest changes?
+As I mentioned in the cover letter, the optional properties usually 
+apply only to specific subsystems, so do let me know if this should be 
+handled using compatible string per subsystem per SoC rather than per SoC.
 
-Best regards,
-Marek Vasut
+regards
+Suman
