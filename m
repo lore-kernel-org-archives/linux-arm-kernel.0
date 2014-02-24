@@ -1,147 +1,118 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 24 Feb 2014 15:53:55 -0500
-Subject: [PATCH 4/4] ARM: keystone: Use dma-ranges for dma_pfn_offset
- configuration
+Date: Mon, 24 Feb 2014 15:53:53 -0500
+Subject: [PATCH 2/4] ARM: mm: Remove unsed dma_to_virt()
 In-Reply-To: <1393275235-1087-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1393275235-1087-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1393275235-1087-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1393275235-1087-3-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Keystone platforms have their physical memory mapped at an address
-outside the 32-bit physical range.  A Keystone machine with 16G of RAM
-would find its memory at 0x0800000000 - 0x0bffffffff.
-The system interconnect allows to perform DMA transfers from first 2G of
-physical memory (0x08 0000 0000 to 08 7FFF FFFF) which aliased in
-hardware to the 32-bit addressable space (0x80000000 - 0xffffffff),
-because DMA HW supports only 32-bits addressing.
-
-Get DMA range configuration from DT and use it to configure per
-device dma_pfn_offset. DMA addresses translation will be performed
-as following:
- _dev->archdata.dma_pfn_offset = PFN_DOWN(<DMA addr> - <CPU addr>);
- DMA->PFN:
-     __bus_to_pfn(addr) + dev->archdata.dma_pfn_offset
- PFN->DMA:
-     __pfn_to_bus(pfn - dev->archdata.dma_pfn_offset)
+Remove dma_to_virt() as there are no in-tree users of it.
 
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Olof Johansson <olof@lixom.net>
+Cc: Greg Ungerer <gerg@uclinux.org>
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-keystone/keystone.c |   76 +++++++++++++++++++++++++++++++++++--
- 1 file changed, 73 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/dma-mapping.h          |   14 +-------------
+ arch/arm/mach-iop13xx/include/mach/memory.h |   11 -----------
+ arch/arm/mach-ks8695/include/mach/memory.h  |    2 --
+ arch/arm/mach-omap1/include/mach/memory.h   |    4 ----
+ 4 files changed, 1 insertion(+), 30 deletions(-)
 
-diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
-index e735555..ebe0a66 100644
---- a/arch/arm/mach-keystone/keystone.c
-+++ b/arch/arm/mach-keystone/keystone.c
-@@ -33,6 +33,7 @@
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index 247ed72..e365158 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -51,7 +51,7 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
+ #endif
  
- static void __iomem *keystone_rstctrl;
- static struct notifier_block platform_nb;
-+static unsigned long keystone_dma_pfn_offset __read_mostly;
- 
- static bool is_coherent(struct device *dev)
- {
-@@ -48,15 +49,82 @@ static bool is_coherent(struct device *dev)
- 	return false;
+ /*
+- * dma_to_pfn/pfn_to_dma/dma_to_virt/virt_to_dma are architecture private
++ * dma_to_pfn/pfn_to_dma/virt_to_dma are architecture private
+  * functions used internally by the DMA-mapping API to provide DMA
+  * addresses. They must not be used by drivers.
+  */
+@@ -70,13 +70,6 @@ static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+ 	return __bus_to_pfn(addr) + dev->archdata.dma_pfn_offset;
  }
  
-+static unsigned long get_dma_pfn_offset(struct device *dev)
-+{
-+	struct device_node *node = of_node_get(dev->of_node);
-+	const u32 *ranges = NULL;
-+	int len, naddr, nsize, pna;
-+	dma_addr_t dma_addr;
-+	phys_addr_t cpu_addr, size;
-+	unsigned long dma_pfn_offset = 0;
-+
-+	if (!node)
-+		return 0;
-+
-+	while (1) {
-+		naddr = of_n_addr_cells(node);
-+		nsize = of_n_size_cells(node);
-+		node = of_get_next_parent(node);
-+		if (!node)
-+			break;
-+
-+		ranges = of_get_property(node, "dma-ranges", &len);
-+
-+		/* Ignore empty ranges, they imply no translation required */
-+		if (ranges && len > 0)
-+			break;
-+	}
-+
-+	if (!ranges) {
-+		dev_dbg(dev, "no dma-ranges found\n");
-+		goto out;
-+	}
-+
-+	/*
-+	 * dma-ranges format:
-+	 * DMA addr	: naddr cells
-+	 * CPU addr	: pna cells
-+	 * size		: nsize cells
-+	 */
-+	len /= sizeof(u32);
-+	pna = of_n_addr_cells(node);
-+	dma_addr = of_read_number(ranges, nsize);
-+	cpu_addr = of_translate_dma_address(dev->of_node, ranges);
-+	size = of_read_number(ranges + naddr + pna, nsize);
-+	dma_pfn_offset = PFN_DOWN(cpu_addr - dma_addr);
-+
-+	dev_dbg(dev, "%s: naddr-%u nsize-%u pna-%u len-%u\n",
-+				node->name, naddr, nsize, pna, len);
-+	dev_dbg(dev, "dma_addr-%08x cpu_addr-%pa size-%pa dma_pfn_offset-%08lx\n",
-+				dma_addr, &cpu_addr, &size, dma_pfn_offset);
-+
-+out:
-+	of_node_put(node);
-+	return dma_pfn_offset;
-+}
-+
- static int keystone_platform_notifier(struct notifier_block *nb,
- 				      unsigned long event, void *dev)
+-static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+-{
+-	if (!dev)
+-		return NULL;
+-	return (void *)__bus_to_virt(__pfn_to_bus(dma_to_pfn(dev, addr)));
+-}
+-
+ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
  {
-+	struct device *_dev = dev;
-+
- 	if (event != BUS_NOTIFY_ADD_DEVICE)
- 		return NOTIFY_DONE;
+ 	if (!dev)
+@@ -96,11 +89,6 @@ static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+ 	return __arch_dma_to_pfn(dev, addr);
+ }
  
--	if (is_coherent(dev)) {
--		set_dma_ops(dev, &arm_coherent_dma_ops);
--		pr_info("\t\t%s: keystone device is coherent\n", dev_name(dev));
-+	if (!_dev)
-+		return NOTIFY_BAD;
-+
-+	if (!_dev->of_node)
-+		_dev->archdata.dma_pfn_offset = keystone_dma_pfn_offset;
-+	else
-+		_dev->archdata.dma_pfn_offset = get_dma_pfn_offset(_dev);
-+
-+	dev_dbg(_dev, "set dma_pfn_offset %08lx\n",
-+				_dev->archdata.dma_pfn_offset);
-+
-+	if (is_coherent(_dev)) {
-+		set_dma_ops(_dev, &arm_coherent_dma_ops);
-+		dev_info(_dev, "keystone device is coherent\n");
- 	}
+-static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+-{
+-	return __arch_dma_to_virt(dev, addr);
+-}
+-
+ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+ {
+ 	return __arch_virt_to_dma(dev, addr);
+diff --git a/arch/arm/mach-iop13xx/include/mach/memory.h b/arch/arm/mach-iop13xx/include/mach/memory.h
+index 7c032d0..1223c85 100644
+--- a/arch/arm/mach-iop13xx/include/mach/memory.h
++++ b/arch/arm/mach-iop13xx/include/mach/memory.h
+@@ -36,17 +36,6 @@ static inline void __iomem *__lbus_to_virt(dma_addr_t x)
+ #define is_lbus_device(dev) 				\
+ 	(dev && strncmp(dev->bus->name, "platform", 8) == 0)
  
- 	return NOTIFY_OK;
-@@ -120,6 +188,8 @@ static void __init keystone_init_meminfo(void)
+-#define __arch_dma_to_virt(dev, addr)					\
+-	({								\
+-		void * __virt;						\
+-		dma_addr_t __dma = addr;				\
+-		if (is_lbus_device(dev) && __is_lbus_dma(__dma))	\
+-			__virt = __lbus_to_virt(__dma);			\
+-		else							\
+-			__virt = (void *)__phys_to_virt(__dma);		\
+-		__virt;							\
+-	})
+-
+ #define __arch_virt_to_dma(dev, addr)					\
+ 	({								\
+ 		void * __virt = addr;					\
+diff --git a/arch/arm/mach-ks8695/include/mach/memory.h b/arch/arm/mach-ks8695/include/mach/memory.h
+index 95e731a..f42477c 100644
+--- a/arch/arm/mach-ks8695/include/mach/memory.h
++++ b/arch/arm/mach-ks8695/include/mach/memory.h
+@@ -31,8 +31,6 @@
+ /* Platform-bus mapping */
+ extern struct bus_type platform_bus_type;
+ #define is_lbus_device(dev)		(dev && dev->bus == &platform_bus_type)
+-#define __arch_dma_to_virt(dev, x)	({ (void *) (is_lbus_device(dev) ? \
+-					__phys_to_virt(x) : __bus_to_virt(x)); })
+ #define __arch_virt_to_dma(dev, x)	({ is_lbus_device(dev) ? \
+ 					(dma_addr_t)__virt_to_phys((unsigned long)x) \
+ 					: (dma_addr_t)__virt_to_bus(x); })
+diff --git a/arch/arm/mach-omap1/include/mach/memory.h b/arch/arm/mach-omap1/include/mach/memory.h
+index 3c25305..73f86db 100644
+--- a/arch/arm/mach-omap1/include/mach/memory.h
++++ b/arch/arm/mach-omap1/include/mach/memory.h
+@@ -43,10 +43,6 @@
+ 	   __phys_to_pfn(__dma);				\
+ 	})
  
- 	/* Populate the arch idmap hook */
- 	arch_virt_to_idmap = keystone_virt_to_idmap;
-+	keystone_dma_pfn_offset = PFN_DOWN(KEYSTONE_HIGH_PHYS_START -
-+						KEYSTONE_LOW_PHYS_START);
- 
- 	platform_nb.notifier_call = keystone_platform_notifier;
- 
+-#define __arch_dma_to_virt(dev, addr)	({ (void *) (is_lbus_device(dev) ? \
+-						lbus_to_virt(addr) : \
+-						__phys_to_virt(addr)); })
+-
+ #define __arch_virt_to_dma(dev, addr)	({ unsigned long __addr = (unsigned long)(addr); \
+ 					   (dma_addr_t) (is_lbus_device(dev) ? \
+ 						virt_to_lbus(__addr) : \
 -- 
 1.7.9.5
