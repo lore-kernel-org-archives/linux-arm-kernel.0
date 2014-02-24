@@ -1,176 +1,127 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 24 Feb 2014 09:43:00 +0100
-Subject: [PATCH 08/10] pinctrl: mvebu: dove: use remapped mpp4 register
+Date: Mon, 24 Feb 2014 09:42:54 +0100
+Subject: [PATCH 02/10] devicetree: bindings: update MVEBU pinctrl binding
+ documentation
 In-Reply-To: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1393231382-11078-9-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1393231382-11078-3-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have an ioremapped mpp4 register, get rid of hardcoded
-physical addresses. While at it, also remove DOVE_ prefix from those
-macros.
+Dove pinctrl binding now requires three different reg properties. This
+updates corresponding binding and example accordingly. While at it, also
+document reg property as required for the other MVEBU SoC pinctrl nodes.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Rob Landley <rob@landley.net>
 Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/pinctrl/mvebu/pinctrl-dove.c | 53 ++++++++++++++++++------------------
- 1 file changed, 27 insertions(+), 26 deletions(-)
+ .../devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt          | 1 +
+ .../devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt          | 1 +
+ .../devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt          | 1 +
+ Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt | 1 +
+ Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt      | 1 +
+ Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt  | 1 +
+ Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt     | 2 +-
+ 7 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
-index 902c18f11b94..d48db53957e0 100644
---- a/drivers/pinctrl/mvebu/pinctrl-dove.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
-@@ -46,18 +46,19 @@
- #define  DOVE_AU1_SPDIFO_GPIO_EN	BIT(1)
- #define  DOVE_NAND_GPIO_EN		BIT(0)
- #define DOVE_GPIO_LO_VIRT_BASE		(DOVE_SB_REGS_VIRT_BASE + 0xd0400)
--#define DOVE_MPP_CTRL4_VIRT_BASE	(DOVE_GPIO_LO_VIRT_BASE + 0x40)
--#define  DOVE_SPI_GPIO_SEL		BIT(5)
--#define  DOVE_UART1_GPIO_SEL		BIT(4)
--#define  DOVE_AU1_GPIO_SEL		BIT(3)
--#define  DOVE_CAM_GPIO_SEL		BIT(2)
--#define  DOVE_SD1_GPIO_SEL		BIT(1)
--#define  DOVE_SD0_GPIO_SEL		BIT(0)
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
+index 01ef408e205f..adda2a8d1d52 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-370-pinctrl.txt
+@@ -5,6 +5,7 @@ part and usage.
  
- /* MPP Base registers */
- #define PMU_MPP_GENERAL_CTRL	0x10
- #define  AU0_AC97_SEL		BIT(16)
+ Required properties:
+ - compatible: "marvell,88f6710-pinctrl"
++- reg: register specifier of MPP registers
  
-+/* MPP Control 4 register */
-+#define SPI_GPIO_SEL		BIT(5)
-+#define UART1_GPIO_SEL		BIT(4)
-+#define AU1_GPIO_SEL		BIT(3)
-+#define CAM_GPIO_SEL		BIT(2)
-+#define SD1_GPIO_SEL		BIT(1)
-+#define SD0_GPIO_SEL		BIT(0)
-+
- #define CONFIG_PMU	BIT(4)
+ Available mpp pins/groups and functions:
+ Note: brackets (x) are not part of the mpp name for marvell,function and given
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
+index 2ede59dffe1b..7de0cda4a379 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-375-pinctrl.txt
+@@ -5,6 +5,7 @@ part and usage.
  
- static void __iomem *mpp_base;
-@@ -115,24 +116,24 @@ static int dove_pmu_mpp_ctrl_set(unsigned pid, unsigned long config)
+ Required properties:
+ - compatible: "marvell,88f6720-pinctrl"
++- reg: register specifier of MPP registers
  
- static int dove_mpp4_ctrl_get(unsigned pid, unsigned long *config)
- {
--	unsigned long mpp4 = readl(DOVE_MPP_CTRL4_VIRT_BASE);
-+	unsigned long mpp4 = readl(mpp4_base);
- 	unsigned long mask;
+ Available mpp pins/groups and functions:
+ Note: brackets (x) are not part of the mpp name for marvell,function and given
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
+index 1d45f9d62346..b17c96849fc9 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-38x-pinctrl.txt
+@@ -7,6 +7,7 @@ Required properties:
+ - compatible: "marvell,88f6810-pinctrl", "marvell,88f6820-pinctrl" or
+   "marvell,88f6828-pinctrl" depending on the specific variant of the
+   SoC being used.
++- reg: register specifier of MPP registers
  
- 	switch (pid) {
- 	case 24: /* mpp_camera */
--		mask = DOVE_CAM_GPIO_SEL;
-+		mask = CAM_GPIO_SEL;
- 		break;
- 	case 40: /* mpp_sdio0 */
--		mask = DOVE_SD0_GPIO_SEL;
-+		mask = SD0_GPIO_SEL;
- 		break;
- 	case 46: /* mpp_sdio1 */
--		mask = DOVE_SD1_GPIO_SEL;
-+		mask = SD1_GPIO_SEL;
- 		break;
- 	case 58: /* mpp_spi0 */
--		mask = DOVE_SPI_GPIO_SEL;
-+		mask = SPI_GPIO_SEL;
- 		break;
- 	case 62: /* mpp_uart1 */
--		mask = DOVE_UART1_GPIO_SEL;
-+		mask = UART1_GPIO_SEL;
- 		break;
- 	default:
- 		return -EINVAL;
-@@ -145,24 +146,24 @@ static int dove_mpp4_ctrl_get(unsigned pid, unsigned long *config)
+ Available mpp pins/groups and functions:
+ Note: brackets (x) are not part of the mpp name for marvell,function and given
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
+index bfa0a2e5e0cb..373dbccd7ab0 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-xp-pinctrl.txt
+@@ -6,6 +6,7 @@ part and usage.
+ Required properties:
+ - compatible: "marvell,mv78230-pinctrl", "marvell,mv78260-pinctrl",
+               "marvell,mv78460-pinctrl"
++- reg: register specifier of MPP registers
  
- static int dove_mpp4_ctrl_set(unsigned pid, unsigned long config)
- {
--	unsigned long mpp4 = readl(DOVE_MPP_CTRL4_VIRT_BASE);
-+	unsigned long mpp4 = readl(mpp4_base);
- 	unsigned long mask;
+ This driver supports all Armada XP variants, i.e. mv78230, mv78260, and mv78460.
  
- 	switch (pid) {
- 	case 24: /* mpp_camera */
--		mask = DOVE_CAM_GPIO_SEL;
-+		mask = CAM_GPIO_SEL;
- 		break;
- 	case 40: /* mpp_sdio0 */
--		mask = DOVE_SD0_GPIO_SEL;
-+		mask = SD0_GPIO_SEL;
- 		break;
- 	case 46: /* mpp_sdio1 */
--		mask = DOVE_SD1_GPIO_SEL;
-+		mask = SD1_GPIO_SEL;
- 		break;
- 	case 58: /* mpp_spi0 */
--		mask = DOVE_SPI_GPIO_SEL;
-+		mask = SPI_GPIO_SEL;
- 		break;
- 	case 62: /* mpp_uart1 */
--		mask = DOVE_UART1_GPIO_SEL;
-+		mask = UART1_GPIO_SEL;
- 		break;
- 	default:
- 		return -EINVAL;
-@@ -172,7 +173,7 @@ static int dove_mpp4_ctrl_set(unsigned pid, unsigned long config)
- 	if (config)
- 		mpp4 |= mask;
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt
+index 50ec3512a292..cf52477cc7ee 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,dove-pinctrl.txt
+@@ -6,6 +6,7 @@ part and usage.
+ Required properties:
+ - compatible: "marvell,dove-pinctrl"
+ - clocks: (optional) phandle of pdma clock
++- reg: register specifiers of MPP, MPP4, and PMU MPP registers
  
--	writel(mpp4, DOVE_MPP_CTRL4_VIRT_BASE);
-+	writel(mpp4, mpp4_base);
+ Available mpp pins/groups and functions:
+ Note: brackets (x) are not part of the mpp name for marvell,function and given
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt
+index 95daf6335c37..730444a9a4de 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,kirkwood-pinctrl.txt
+@@ -8,6 +8,7 @@ Required properties:
+               "marvell,88f6190-pinctrl", "marvell,88f6192-pinctrl",
+               "marvell,88f6281-pinctrl", "marvell,88f6282-pinctrl"
+               "marvell,98dx4122-pinctrl"
++- reg: register specifier of MPP registers
  
- 	return 0;
- }
-@@ -222,13 +223,13 @@ static int dove_audio0_ctrl_set(unsigned pid, unsigned long config)
+ This driver supports all kirkwood variants, i.e. 88f6180, 88f619x, and 88f628x.
+ It also support the 88f6281-based variant in the 98dx412x Bobcat SoCs.
+diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt
+index 0a26c3aa4e6d..0c09f4eb2af0 100644
+--- a/Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/marvell,mvebu-pinctrl.txt
+@@ -37,7 +37,7 @@ uart1: serial at 12100 {
  
- static int dove_audio1_ctrl_get(unsigned pid, unsigned long *config)
- {
--	unsigned long mpp4 = readl(DOVE_MPP_CTRL4_VIRT_BASE);
-+	unsigned int mpp4 = readl(mpp4_base);
- 	unsigned long sspc1 = readl(DOVE_SSP_CTRL_STATUS_1);
- 	unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
- 	unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
+ pinctrl: pinctrl at d0200 {
+ 	compatible = "marvell,dove-pinctrl";
+-	reg = <0xd0200 0x20>;
++	reg = <0xd0200 0x14>, <0xd0440 0x04>, <0xd802c 0x08>;
  
- 	*config = 0;
--	if (mpp4 & DOVE_AU1_GPIO_SEL)
-+	if (mpp4 & AU1_GPIO_SEL)
- 		*config |= BIT(3);
- 	if (sspc1 & DOVE_SSP_ON_AU1)
- 		*config |= BIT(2);
-@@ -248,7 +249,7 @@ static int dove_audio1_ctrl_get(unsigned pid, unsigned long *config)
- 
- static int dove_audio1_ctrl_set(unsigned pid, unsigned long config)
- {
--	unsigned long mpp4 = readl(DOVE_MPP_CTRL4_VIRT_BASE);
-+	unsigned int mpp4 = readl(mpp4_base);
- 	unsigned long sspc1 = readl(DOVE_SSP_CTRL_STATUS_1);
- 	unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
- 	unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
-@@ -259,7 +260,7 @@ static int dove_audio1_ctrl_set(unsigned pid, unsigned long config)
- 	gcfg2 &= ~DOVE_TWSI_OPTION3_GPIO;
- 	gmpp &= ~DOVE_AU1_SPDIFO_GPIO_EN;
- 	sspc1 &= ~DOVE_SSP_ON_AU1;
--	mpp4 &= ~DOVE_AU1_GPIO_SEL;
-+	mpp4 &= ~AU1_GPIO_SEL;
- 
- 	if (config & BIT(0))
- 		gcfg2 |= DOVE_TWSI_OPTION3_GPIO;
-@@ -268,9 +269,9 @@ static int dove_audio1_ctrl_set(unsigned pid, unsigned long config)
- 	if (config & BIT(2))
- 		sspc1 |= DOVE_SSP_ON_AU1;
- 	if (config & BIT(3))
--		mpp4 |= DOVE_AU1_GPIO_SEL;
-+		mpp4 |= AU1_GPIO_SEL;
- 
--	writel(mpp4, DOVE_MPP_CTRL4_VIRT_BASE);
-+	writel(mpp4, mpp4_base);
- 	writel(sspc1, DOVE_SSP_CTRL_STATUS_1);
- 	writel(gmpp, DOVE_MPP_GENERAL_VIRT_BASE);
- 	writel(gcfg2, DOVE_GLOBAL_CONFIG_2);
+ 	pmx_uart1_sw: pmx-uart1-sw {
+ 		marvell,pins = "mpp_uart1";
 -- 
 1.8.5.3
