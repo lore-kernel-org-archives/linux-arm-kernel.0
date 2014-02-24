@@ -1,79 +1,56 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 24 Feb 2014 11:56:19 +0100
-Subject: [PATCH RFC 04/10] base: power: Add generic OF-based power
- domain look-up
-In-Reply-To: <530A2ADF.902@gmail.com>
-References: <1389469372-17199-1-git-send-email-tomasz.figa@gmail.com>
- <1389469372-17199-5-git-send-email-tomasz.figa@gmail.com>
- <1392828827.3445.54.camel@pizza.hi.pengutronix.de> <530A2ADF.902@gmail.com>
-Message-ID: <1393239379.3091.26.camel@pizza.hi.pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Feb 2014 12:00:21 +0100
+Subject: DMABOUNCE in pci-rcar
+Message-ID: <201402241200.21944.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi Magnus,
 
-Am Sonntag, den 23.02.2014, 18:07 +0100 schrieb Tomasz Figa:
-> Hi Philipp,
-> 
-> On 19.02.2014 17:53, Philipp Zabel wrote:
-> > Am Samstag, den 11.01.2014, 20:42 +0100 schrieb Tomasz Figa:
-> 
-> [snip]
-> 
-> >> +	pd = of_genpd_get_from_provider(&pd_args);
-> >> +	if (IS_ERR(pd))
-> >> +		return PTR_ERR(pd);
-> >> +
-> >> +	dev_dbg(dev, "adding to power domain %s\n", pd->name);
-> >> +
-> >> +	while (1) {
-> >> +		ret = pm_genpd_add_device(pd, dev);
-> >
-> > Since pm_genpd_add_device is used here, no gpd_timing_data can be
-> > provided. Do you have a plan to solve this? Should the timing data be
-> > provided from the device tree?
-> 
-> Hmm, a quick grep over kernel sources for genpd_.*_add_device
-> gives just a single user of __pm_genpd_name_add_device(), with custom 
-> timing data:
+I noticed during randconfig testing that you enabled DMABOUNCE for the
+pci-rcar-gen2 driver as posted in this patch https://lkml.org/lkml/2014/2/5/30
 
-I had added this to my work progress i.MX patches to silence the noisy
-"... latency exceeded, new value ..." warnings emitted by the power
-domain framework: http://patchwork.ozlabs.org/patch/320084/
+I didn't see the original post unfortunately, but I fear we have to
+revert it and come up with a better solution, as your approach seems
+wrong on a number of levels:
 
-[...]
-> Moreover the timings used there are just defaults, which makes me wonder 
-> if there is any reason to specify them explicitly. Even more interesting 
-> is the fact that genpd code can measure those latencies itself.
-> 
-> Do you have a particular use case for those timing data or just 
-> wondering? I don't think we need to implement support for them right 
-> away, if there is no real need to do so. The code and bindings can be 
-> extended later to handle them, if needed.
+* We really don't want any new users of DMABOUNCE on ARM but instead leave
+  it to the PXA/IXP/SA1100 based platforms using it today.
 
-You are right, this is just superficial.
+* If your SoCs have an IOMMU, you should really use it, as that would
+  give you much better performance than bounce buffers anyway
 
-> As for whether DT is appropriate place to define them, I'm not quite 
-> sure. Stop and start latencies look like hardware parameters, but state 
-> save and restore are likely to be driver-specific, as it depends on 
-> driver code how much time it takes to save and restore needed state 
-> (e.g. driver with register cache will not need to do any state save), if 
-> I understand these timing data correctly.
+* If the hardware is so screwed up that you have to use bounce buffers,
+  use the SWIOTLB code that is reasonably modern.
 
-I have one more, on i.MX6 I manually need to enable the clocks of
-devices in the power domain during the power-up sequence so that the
-reset signals can propagate.
-So far, I have implemented this by registering the device clocks of
-devices in the power domain with pm_clk_add and then let the genpd
-power_on callback temporarily enable them using pm_clk_resume:
+* The window base and size in the driver should not be hardcoded, as
+  this is likely not a device specific property but rather an artifact of
+  how it's connected. Use the standard "dma-ranges" property.
 
-http://patchwork.ozlabs.org/patch/320085/
+* You should not need your own dma_map_ops in the driver. What you
+  do there isn't really specific to your host but should live in some
+  place where it can be shared with other drivers.
 
-Whether this is needed seems to me to be a property of the power domain.
-Do you think this is something we could add to of_genpd_add_to_domain,
-depending on some flag set in struct generic_pm_domain?
-I'd like to avoid having to register my own bus notifier and to deal
-with ordering issues between that and of_genpd_notifier_call.
+* The implementation of the dma_map_ops is wrong: at the very least,
+  you cannot use the dma_mask of the pci host when translating
+  calls from the device, since each pci device can have a different
+  dma mask that is set by the driver if it needs larger or smaller
+  than 32-bit DMA space.
 
-regards
-Philipp
+* The block bounce code can't be enabled if CONFIG_BLOCK is disabled,
+  this is how I noticed your changes.
+
+* The block layer assumes that it will bounce any highmem pages,
+  but that isn't necessarily what you want here: if you have 2GB
+  of lowmem space (CONFIG_VMSPLIT_2G) or more, you will also have
+  lowmem pages that need bouncing.
+
+* (completely unrelated, I noticed you set up a bogus I/O space
+  window. Don't do that, you will get get a panic if a device happens
+  to use it. Not providing an resource should work fine though)
+
+On the bright side, your other changes in the same series all look
+good. Thanks especially for sorting out the probe() function, I was
+already wondering if we could change that the way you did.
+
+	Arnd
