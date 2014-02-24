@@ -1,35 +1,38 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 24 Feb 2014 20:11:08 +0100
-Subject: [PATCH v2 2/5] ARM: mvebu: Add i2c alias so setting bus number
-In-Reply-To: <20140224190509.GD1010@titan.lakedaemon.net>
+Date: Mon, 24 Feb 2014 20:12:21 +0100
+Subject: [PATCH v2 3/5] ARM: mvebu: Add HP T5325 thin client
+In-Reply-To: <20140224191014.GE1010@titan.lakedaemon.net>
 References: <1393264898-28939-1-git-send-email-andrew@lunn.ch>
- <1393264898-28939-3-git-send-email-andrew@lunn.ch>
- <20140224190509.GD1010@titan.lakedaemon.net>
-Message-ID: <20140224191108.GA29288@lunn.ch>
+ <1393264898-28939-4-git-send-email-andrew@lunn.ch>
+ <20140224191014.GE1010@titan.lakedaemon.net>
+Message-ID: <20140224191221.GB29288@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 02:05:09PM -0500, Jason Cooper wrote:
+On Mon, Feb 24, 2014 at 02:10:14PM -0500, Jason Cooper wrote:
 > Subject should be "ARM: kirkwood: ..."
 
-Humm, why?
+I disagree, but lets discuss that with the other patch.
 
-linux/arch/arm/boot/dts$ git log --oneline armada-370.dtsi 
-a095b1c78a35 ARM: mvebu: sort DT nodes by address
-d4fa99417a07 ARM: mvebu: link PCIe controllers to the MSI controller
-238493e34d3f ARM: dts: mvebu: Update with the new compatible string for mv64xxx-
-6cbe0e1feaf8 Merge tag 'dt-3.12' of git://git.infradead.org/linux-mvebu into nex
-5d3b88307176 ARM: mvebu: Fix the Armada 370/XP timer compatible strings
-ca60985c0042 ARM: mvebu: use correct #interrupt-cells instead of #interrupts-cel
-14fd8ed0a7fd ARM: mvebu: Relocate Armada 370/XP PCIe device tree nodes
-0cd3754a8317 ARM: mvebu: Add BootROM to Armada 370/XP device tree
-5e12a613ce39 ARM: mvebu: Add MBus to Armada 370/XP device tree
-38149887ef8b ARM: mvebu: Use the preprocessor on Armada 370/XP device tree files
-9214cbe50fe7 Merge tag 'dt-3.11-5' of git://git.infradead.org/users/jcooper/linu
-83735101959e ARM: mvebu: Remove device tree unused properties on A370
-489e138eec96 ARM: dts: mvebu: Fix wrong the address reg value for the L2-cache n
-8eed481e6fe2 arm: mvebu: fix the 'ranges' property to handle PCIe
+> 
+> On Mon, Feb 24, 2014 at 07:01:36PM +0100, Andrew Lunn wrote:
+> > Convert the kirkwood t5325-setup.c to mostly device tree for
+> > mach-mvebu. Part of the audio setup needs to remain in C for the
+> > moment until suitable bindings are designed and implemented. So add
+> > board code, triggered by the compatibility string.
+> > 
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > ---
+> > v2:
+> > Remove spaces around KEY_POWER
+> > Correct indentation of help text in Kconfig.
+> > Put dts file into a patch of its own.
+> > ---
+> >  arch/arm/boot/dts/Makefile        |  1 +
+> 
+> This Makefile change should be in the same patch as the one adding the
+> dts file.
 
-Seems to me, now that it is part of mach-mvebu, ARM: mvebu is correct.
+Agreed. Will fix.
 
-      Andrew
+	Andrew
