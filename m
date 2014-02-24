@@ -1,112 +1,51 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 24 Feb 2014 09:42:58 +0100
-Subject: [PATCH 06/10] pinctrl: mvebu: dove: request syscon regmap for global
- registers
+Date: Mon, 24 Feb 2014 09:42:56 +0100
+Subject: [PATCH 04/10] ARM: dove: add global-config register node
 In-Reply-To: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1393231382-11078-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1393231382-11078-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dove pinctrl uses some global config registers to control pins.
-This patch requests a syscon regmap for those registers. As this
-changes DT to driver requirements, fallback to a self-registered
-regmap with hardcoded resources, if the corresponding syscon DT
-node is missing. Also, WARN about old DT binding usage to encourage
-users to update their DTBs.
+We share global config registers by syscon node, add it to dove.dtsi.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Rob Landley <rob@landley.net>
 Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- drivers/pinctrl/mvebu/Kconfig        |  1 +
- drivers/pinctrl/mvebu/pinctrl-dove.c | 27 +++++++++++++++++++++++++++
- 2 files changed, 28 insertions(+)
+ arch/arm/boot/dts/dove.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/pinctrl/mvebu/Kconfig b/drivers/pinctrl/mvebu/Kconfig
-index a22b0302922d..cc298fade93a 100644
---- a/drivers/pinctrl/mvebu/Kconfig
-+++ b/drivers/pinctrl/mvebu/Kconfig
-@@ -8,6 +8,7 @@ config PINCTRL_MVEBU
- config PINCTRL_DOVE
- 	bool
- 	select PINCTRL_MVEBU
-+	select MFD_SYSCON
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index c5e90f0287b9..eeb08edb67ac 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -616,6 +616,12 @@
+ 				interrupts = <5>;
+ 			};
  
- config PINCTRL_KIRKWOOD
- 	bool
-diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
-index 8d57d4bc1f0c..e4f954a78b15 100644
---- a/drivers/pinctrl/mvebu/pinctrl-dove.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
-@@ -18,7 +18,9 @@
- #include <linux/clk.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/pinctrl/pinctrl.h>
-+#include <linux/regmap.h>
- 
- #include "pinctrl-mvebu.h"
- 
-@@ -26,6 +28,7 @@
- #define INT_REGS_MASK		~(SZ_1M - 1)
- #define MPP4_REGS_OFFS		0xd0440
- #define PMU_REGS_OFFS		0xd802c
-+#define GC_REGS_OFFS		0xe802c
- 
- #define DOVE_SB_REGS_VIRT_BASE		IOMEM(0xfde00000)
- #define DOVE_MPP_VIRT_BASE		(DOVE_SB_REGS_VIRT_BASE + 0xd0200)
-@@ -59,6 +62,7 @@
- static void __iomem *mpp_base;
- static void __iomem *mpp4_base;
- static void __iomem *pmu_base;
-+static struct regmap *gconfmap;
- 
- static int dove_mpp_ctrl_get(unsigned pid, unsigned long *config)
- {
-@@ -756,6 +760,13 @@ static struct of_device_id dove_pinctrl_of_match[] = {
- 	{ }
- };
- 
-+static struct regmap_config gc_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+	.max_register = 5,
-+};
++			gconf: global-config at e802c {
++				compatible = "marvell,dove-global-config",
++				             "syscon";
++				reg = <0xe802c 0x14>;
++			};
 +
- static int dove_pinctrl_probe(struct platform_device *pdev)
- {
- 	struct resource *res, *mpp_res;
-@@ -808,6 +819,22 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
- 	if (IS_ERR(pmu_base))
- 		return PTR_ERR(pmu_base);
- 
-+	gconfmap = syscon_regmap_lookup_by_compatible("marvell,dove-global-config");
-+	if (IS_ERR(gconfmap)) {
-+		void __iomem *gc_base;
-+
-+		dev_warn(&pdev->dev, "falling back to hardcoded global registers\n");
-+		adjust_resource(&fb_res,
-+			(mpp_res->start & INT_REGS_MASK) + GC_REGS_OFFS, 0x14);
-+		gc_base = devm_ioremap_resource(&pdev->dev, &fb_res);
-+		if (IS_ERR(gc_base))
-+			return PTR_ERR(gc_base);
-+		gconfmap = devm_regmap_init_mmio(&pdev->dev,
-+						 gc_base, &gc_regmap_config);
-+		if (IS_ERR(gconfmap))
-+			return PTR_ERR(gconfmap);
-+	}
-+
- 	/* Warn on any missing DT resource */
- 	WARN(fb_res.start, FW_BUG "Missing pinctrl regs in DTB. Please update your firmware.\n");
- 
+ 			gpio2: gpio-ctrl at e8400 {
+ 				compatible = "marvell,orion-gpio";
+ 				#gpio-cells = <2>;
 -- 
 1.8.5.3
