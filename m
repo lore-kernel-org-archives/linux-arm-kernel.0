@@ -1,30 +1,55 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Mon, 24 Feb 2014 15:09:38 +0800
-Subject: [PATCH RFC v1 2/3] Fix hibernation restore hang in
- freeze_processes
-In-Reply-To: <1392774729-3235-3-git-send-email-sebastian.capella@linaro.org>
-References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
- <1392774729-3235-3-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <CACVXFVMN_uijYRj9CCKHbnM40YVyp8ar7mp4g=s70gv8YmFCLA@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Sun, 23 Feb 2014 23:15:00 -0800
+Subject: [PATCH] PM / devfreq: Fix out of bounds access of transition table
+ array
+Message-ID: <1393226100-18428-1-git-send-email-skannan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 19, 2014 at 9:52 AM, Sebastian Capella
-<sebastian.capella@linaro.org> wrote:
-> During restore, pm_notifier chain are called with
-> PM_RESTORE_PREPARE.  The firmware_class driver handler
-> fw_pm_notify does not have a handler for this.  As a result,
-> it keeps a reader on the kmod.c umhelper_sem.  During
-> freeze_processes, the call to __usermodehelper_disable tries to
-> take a write lock on this semaphore and hangs waiting.
->
-> Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-> Cc: Russ Dill <Russ.Dill@ti.com>
-> Cc: Ming Lei <ming.lei@canonical.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+The previous_freq value for a device could be an invalid frequency that
+results in a error value being returned from devfreq_get_freq_level().
+Check for an error value before using that to index into the transition
+table.
 
-Acked-by: Ming Lei <ming.lei@canonical.com>
+Not doing this check will result in memory corruption when previous_freq is
+not a valid frequency.
 
-Thanks,
---
-Ming Lei
+Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+---
+ drivers/devfreq/devfreq.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+index a0b2f7e..f91ea29 100644
+--- a/drivers/devfreq/devfreq.c
++++ b/drivers/devfreq/devfreq.c
+@@ -101,14 +101,20 @@ static int devfreq_update_status(struct devfreq *devfreq, unsigned long freq)
+ 	cur_time = jiffies;
+ 	devfreq->time_in_state[lev] +=
+ 			 cur_time - devfreq->last_stat_updated;
+-	if (freq != devfreq->previous_freq) {
+-		prev_lev = devfreq_get_freq_level(devfreq,
+-						devfreq->previous_freq);
++	devfreq->last_stat_updated = cur_time;
++
++	if (freq == devfreq->previous_freq)
++		return 0;
++
++	prev_lev = devfreq_get_freq_level(devfreq, devfreq->previous_freq);
++	if (prev_lev < 0)
++		return 0;
++
++	if (lev != prev_lev) {
+ 		devfreq->trans_table[(prev_lev *
+ 				devfreq->profile->max_state) + lev]++;
+ 		devfreq->total_trans++;
+ 	}
+-	devfreq->last_stat_updated = cur_time;
+ 
+ 	return 0;
+ }
+-- 
+1.8.2.1
+
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
