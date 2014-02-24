@@ -1,44 +1,52 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 24 Feb 2014 17:48:17 +0100
-Subject: [PATCH] staging/iio/adc/MXS/LRADC: fix touchscreen statemachine
-In-Reply-To: <201402241539.53707.jbe@pengutronix.de>
-References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
- <201402241416.24270.jbe@pengutronix.de>
- <20140224133316.GI26722@mwanda>
- <201402241539.53707.jbe@pengutronix.de>
-Message-ID: <20140224164817.GE4436@piout.net>
+From: kvalo@qca.qualcomm.com (Kalle Valo)
+Date: Mon, 24 Feb 2014 18:52:53 +0200
+Subject: [BISECTED] ssh - Received disconnect from x.x.x.x: 2: Bad packet
+ length 3149594624
+In-Reply-To: <20140214162458.GF21986@mudshark.cambridge.arm.com> (Will
+ Deacon's message of "Fri, 14 Feb 2014 16:24:58 +0000")
+References: <52FD08D1.3030405@gmail.com>
+ <20140213182105.GN13576@mudshark.cambridge.arm.com>
+ <52FD1243.9040706@gmail.com>
+ <20140213192909.GO13576@mudshark.cambridge.arm.com>
+ <52FE407C.3080002@gmail.com>
+ <20140214162458.GF21986@mudshark.cambridge.arm.com>
+Message-ID: <877g8ktpui.fsf@kamboji.qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/2014 at 15:39:53 +0100, Juergen Beisert wrote :
-> Releasing the touchscreen lets the internal statemachine left in a wrong state.
-> Due to this the release coordinate will be reported again by accident when the next
-> touchscreen event happens. This change sets up the correct state when waiting
-> for the next touchscreen event.
->     
-> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> 
+Will Deacon <will.deacon@arm.com> writes:
+> Well, we probably need a bit more to go on, because I doubt that this code
+> is to blame. More likely, the issue is in the caller.
+> Looking at drivers/net/wireless/ti/wl1251/rx.c:182
+>
+>         /* The actual length doesn't include the target's alignment */
+>         skb->len = desc->length  - PLCP_HEADER_LENGTH;
+>
+>         fc = (u16 *)skb->data;
+>
+>         if ((*fc & IEEE80211_FCTL_STYPE) == IEEE80211_STYPE_BEACON)
+>                 beacon = 1;
+>
+>         wl1251_rx_status(wl, desc, &status, beacon);
+>
+>         wl1251_debug(DEBUG_RX, "rx skb 0x%p: %d B %s", skb, skb->len,
+>                      beacon ? "beacon" : "");
+>
+>         memcpy(IEEE80211_SKB_RXCB(skb), &status, sizeof(status));
+>         ieee80211_rx_ni(wl->hw, skb);
+>
+> I wonder whether that first line (with the comment about alignment) is
+> assuming some behaviour from the mac80211 layer.
+>
+> You could try putting back the UNALIGNED_ACCESS in net/mac80211/rx.c and
+> commenting out the skb->len = desc->length  - PLCP_HEADER_LENGTH;  line
+> above.
+>
+> Adding the original author (I think) and John Linville, since I'm well out
+> of my depth in this code!
 
-Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
-> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-> index 7fc66a6..514844e 100644
-> --- a/drivers/staging/iio/adc/mxs-lradc.c
-> +++ b/drivers/staging/iio/adc/mxs-lradc.c
-> @@ -757,6 +757,7 @@ static void mxs_lradc_finish_touch_event(struct mxs_lradc *lradc, bool valid)
->  	}
->  
->  	/* if it is released, wait for the next touch via IRQ */
-> +	lradc->cur_plate = LRADC_TOUCH;
->  	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ, LRADC_CTRL1);
->  	mxs_lradc_reg_set(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ_EN, LRADC_CTRL1);
->  }
-> 
-> -- 
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
-> Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
+I haven't touched wl1251 for years. You should send questions to
+linux-wireless list and CC people who have worked on it recently.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Kalle Valo
