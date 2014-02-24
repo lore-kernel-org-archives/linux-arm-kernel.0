@@ -1,113 +1,80 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 24 Feb 2014 16:30:06 +0900
-Subject: [PATCH 03/03] ARM: shmobile: Use shmobile_clk_workaround() on Koelsch
-In-Reply-To: <20140224072921.3522.55023.sendpatchset@w520>
-References: <20140224072921.3522.55023.sendpatchset@w520>
-Message-ID: <20140224073006.3522.95891.sendpatchset@w520>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 24 Feb 2014 08:39:50 +0100
+Subject: [PATCH] dt/bindings: update fsl-fec regarding compatible and
+ clocks
+In-Reply-To: <20140222182806.GF3327@book.gsilab.sittig.org>
+References: <1392033008-20752-1-git-send-email-shawn.guo@linaro.org>
+ <20140217212439.GZ4524@book.gsilab.sittig.org>
+ <20140218020901.GA15716@S2101-09.ap.freescale.net>
+ <20140218134430.GC4524@book.gsilab.sittig.org>
+ <20140218144652.GG15716@S2101-09.ap.freescale.net>
+ <20140222182806.GF3327@book.gsilab.sittig.org>
+Message-ID: <20140224073950.GM17250@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Sat, Feb 22, 2014 at 07:28:06PM +0100, Gerhard Sittig wrote:
+> On Tue, Feb 18, 2014 at 22:46 +0800, Shawn Guo wrote:
+> > 
+> > On Tue, Feb 18, 2014 at 02:44:30PM +0100, Gerhard Sittig wrote:
+> > > [ ... ]
+> > 
+> > > > > >  - reg : Address and length of the register set for the device
+> > > > > >  - interrupts : Should contain fec interrupt
+> > > > > > +- clocks: phandle to the clocks feeding the FEC controller and phy. The
+> > > > > > +  following two are required:
+> > > > > > +   - "ipg": the peripheral access clock
+> > > > > > +   - "ahb": the bus clock for MAC
+> > > > > > +  The following two are optional:
+> > > > > > +   - "ptp": the sampling clock for PTP (IEEE 1588).  On SoC like i.MX6Q,
+> > > > > > +     the clock could come from either the internal clock control module
+> > > > > > +     or external oscillator via pad depending on board design.
+> > > > > > +   - "enet_out": the phy reference clock provided by SoC via pad, which
+> > > > > > +     is available on SoC like i.MX28.
+> > > > > > +- clock-names: Must contain the clock names described just above
+> > > > > > +
+> > > > > 
+> > > > > Listing 'clocks' under the "required properties" all of a sudden
+> > > > > invalidates existing device trees, if they don't carry the
+> > > > > property which before the change was not required, not even
+> > > > > documented.
+> > > > 
+> > > > Since the day we move to device tree clock lookup, the driver fec_main
+> > > > does not probe at all if the property is absent.
+> > > 
+> > > That's an implementation detail.  It's not what the spec says,
+> > > and neither is what the spec is to blindly follow after the / a
+> > > driver created the fact.  Instead, a binding gets designed, and
+> > > the software follows.
+> > > 
+> > > In reality, the doc may be behind as developers are more
+> > > concerned about the code.  But still when you "update" the
+> > > binding, don't break compatibility!  Even if you'd adjust all
+> > > drivers you can spot, it's still only Linux and not all device
+> > > tree users.
+> > 
+> > So what's your suggestion?  Add the properties as the optional?
+> 
+> Have there been i.MX device trees in mainline releases which lack
+> the clock specs?  If so, making the clock specs mandatory breaks
+> backwards compatibility for these existing device trees as well.
+> 
+> I assume that listing the clocks as optional keeps the binding
+> most compatible.  You might as well list them as recommended, if
+> optional is "too weak" for you.
 
-Convert the Koelsch DT reference code to use the newly introduced
-function shmobile_clk_workaround().
+Why should we keep the binding compatible when the driver requires the
+clocks? The clocks are not at all optional for the driver. We made the
+clocks mandatory at a time when the bindings didn't make any promises
+about stability, so Shawn only documents what the driver requires
+anyway.
+If anything, we should doument that this binding is not valid for the
+PowerPC variants of the FEC.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+Sascha
 
- arch/arm/mach-shmobile/board-koelsch-reference.c |   71 ++++++++--------------
- 1 file changed, 28 insertions(+), 43 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/board-koelsch-reference.c
-+++ work/arch/arm/mach-shmobile/board-koelsch-reference.c	2014-02-24 15:50:57.000000000 +0900
-@@ -19,12 +19,11 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  */
- 
--#include <linux/clk.h>
--#include <linux/clkdev.h>
- #include <linux/dma-mapping.h>
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/platform_data/rcar-du.h>
-+#include <mach/clock.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/rcar-gen2.h>
-@@ -82,49 +81,35 @@ static void __init koelsch_add_du_device
- 	platform_device_register_full(&info);
- }
- 
-+/*
-+ * This is a really crude hack to provide clkdev support to platform
-+ * devices until they get moved to DT.
-+ */
-+static const struct clk_name clk_names[] = {
-+	{ "cmt0", NULL, "sh_cmt.0" },
-+	{ "scifa0", NULL, "sh-sci.0" },
-+	{ "scifa1", NULL, "sh-sci.1" },
-+	{ "scifb0", NULL, "sh-sci.2" },
-+	{ "scifb1", NULL, "sh-sci.3" },
-+	{ "scifb2", NULL, "sh-sci.4" },
-+	{ "scifa2", NULL, "sh-sci.5" },
-+	{ "scif0", NULL, "sh-sci.6" },
-+	{ "scif1", NULL, "sh-sci.7" },
-+	{ "scif2", NULL, "sh-sci.8" },
-+	{ "scif3", NULL, "sh-sci.9" },
-+	{ "scif4", NULL, "sh-sci.10" },
-+	{ "scif5", NULL, "sh-sci.11" },
-+	{ "scifa3", NULL, "sh-sci.12" },
-+	{ "scifa4", NULL, "sh-sci.13" },
-+	{ "scifa5", NULL, "sh-sci.14" },
-+	{ "du0", "du.0", "rcar-du-r8a7791" },
-+	{ "du1", "du.1", "rcar-du-r8a7791" },
-+	{ "lvds0", "lvds.0", "rcar-du-r8a7791" },
-+};
-+
- static void __init koelsch_add_standard_devices(void)
- {
--	/*
--	 * This is a really crude hack to provide clkdev support to the CMT and
--	 * DU devices until they get moved to DT.
--	 */
--	static const struct clk_name {
--		const char *clk;
--		const char *con_id;
--		const char *dev_id;
--	} clk_names[] = {
--		{ "cmt0", NULL, "sh_cmt.0" },
--		{ "scifa0", NULL, "sh-sci.0" },
--		{ "scifa1", NULL, "sh-sci.1" },
--		{ "scifb0", NULL, "sh-sci.2" },
--		{ "scifb1", NULL, "sh-sci.3" },
--		{ "scifb2", NULL, "sh-sci.4" },
--		{ "scifa2", NULL, "sh-sci.5" },
--		{ "scif0", NULL, "sh-sci.6" },
--		{ "scif1", NULL, "sh-sci.7" },
--		{ "scif2", NULL, "sh-sci.8" },
--		{ "scif3", NULL, "sh-sci.9" },
--		{ "scif4", NULL, "sh-sci.10" },
--		{ "scif5", NULL, "sh-sci.11" },
--		{ "scifa3", NULL, "sh-sci.12" },
--		{ "scifa4", NULL, "sh-sci.13" },
--		{ "scifa5", NULL, "sh-sci.14" },
--		{ "du0", "du.0", "rcar-du-r8a7791" },
--		{ "du1", "du.1", "rcar-du-r8a7791" },
--		{ "lvds0", "lvds.0", "rcar-du-r8a7791" },
--	};
--	struct clk *clk;
--	unsigned int i;
--
--	for (i = 0; i < ARRAY_SIZE(clk_names); ++i) {
--		clk = clk_get(NULL, clk_names[i].clk);
--		if (!IS_ERR(clk)) {
--			clk_register_clkdev(clk, clk_names[i].con_id,
--					    clk_names[i].dev_id);
--			clk_put(clk);
--		}
--	}
--
-+	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), false);
- 	r8a7791_add_dt_devices();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
