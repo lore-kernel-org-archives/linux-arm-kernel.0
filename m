@@ -1,34 +1,43 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 24 Feb 2014 19:26:44 +0530
-Subject: [PATCH V8 1/2] PHY: Exynos: Add Exynos5250 SATA PHY driver
-In-Reply-To: <1393248775-3283-2-git-send-email-yuvaraj.cd@samsung.com>
-References: <1393248775-3283-1-git-send-email-yuvaraj.cd@samsung.com>
- <1393248775-3283-2-git-send-email-yuvaraj.cd@samsung.com>
-Message-ID: <530B4F9C.2050302@ti.com>
+From: srinivas.kandagatla@st.com (srinivas kandagatla)
+Date: Mon, 24 Feb 2014 14:03:54 +0000
+Subject: [PATCH v2 0/6] ARM: STi reset controller support
+In-Reply-To: <1393237988.3091.14.camel@pizza.hi.pengutronix.de>
+References: <1389696613-19683-1-git-send-email-srinivas.kandagatla@st.com>			<1391437665-11913-1-git-send-email-srinivas.kandagatla@st.com>		<1391592486.11239.4.camel@pizza.hi.pengutronix.de>	
+ <52F4D76F.8070301@st.com> <5304B849.2080806@st.com>
+ <1393237988.3091.14.camel@pizza.hi.pengutronix.de>
+Message-ID: <530B514A.4070209@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thanks Philipp for your comments,
 
-On Monday 24 February 2014 07:02 PM, Yuvaraj Kumar C D wrote:
-> This patch adds the SATA PHY driver for Exynos5250.Exynos5250 SATA
-> PHY comprises of CMU and TRSV blocks which are of I2C register Map.
-> So this patch also adds a i2c client driver, which is used configure
+On 24/02/14 10:33, Philipp Zabel wrote:
+>> > Did Srini's explanations convinced you?
+>> > 
+>> > If so, could you queue the series for v3.15?
+> to be honest, I'm not comfortable with this explanation. If the
+> "powerdown" bits only gate the clocks to those modules, calling it a
+> reset control is clearly the wrong abstraction. If that is the case,
+> couldn't you handle those bits via the clock framework?
+I just had a re-look at the IPs specs for more information on where
+these power-down signals are actually terminating on the IP side.
 
-We no longer have i2c client driver here.
-> the CMU and TRSV block of exynos5250 SATA PHY.
-> 
-> This patch incorporates the generic PHY framework to deal with SATA
-> PHY.
+For example: ST-Synopsis Ethernet GMAC IP has two pins
+power_down_req[IN] and power_down_ack[OUT]. power_down_req is used by
+the software to either put the IP in powerdown or bring it out of
+powerdown state.
 
-It should be rephrased to have *uses* generic PHY framework. However I feel we
-can do away with this line.
-> 
-> This patch depends on the below patch for the sata functionality
-> 	[1].ata: ahci_platform: Manage SATA PHY
-> 		by Roger Quadros <rogerq@ti.com>
+The IP itself drives power_down_ack to indicate when the power down
+request is successfully finished. For power_down/power_up request the IP
+will change the internal state accordingly including powering up/down
+its internal blocks and/or clock gating.
 
-hasn't this patch merged yet?
+> If on the other hand these powerdown bits also trigger reset machinery,
+> such that asserting and deasserting that bit will change the module's
+> internal state, I could be convinced to queue them like this.
+This is true with ST IPs, these lines change the state of the IP as
+described above. Reset framework seems to fits in very well with this
+behavior rather than power-domains or clock framework.
 
-Thanks
-Kishon
+Thanks,
+srini
