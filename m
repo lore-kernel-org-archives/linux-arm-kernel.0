@@ -1,28 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 24 Feb 2014 15:09:05 +0900
-Subject: Linux-3.13.5/Samsung S3C6410/Mini6410: What does this warning
- mean?
-In-Reply-To: <201402231202.06468.juergen@kreuzholzen.de>
-References: <201402231202.06468.juergen@kreuzholzen.de>
-Message-ID: <20140224060905.GD25940@sirena.org.uk>
+From: pratyush.anand@st.com (Pratyush Anand)
+Date: Mon, 24 Feb 2014 11:41:48 +0530
+Subject: [PATCH 5/5] mmc: sdhci-spear: use generic card detection gpio
+ support
+In-Reply-To: <E1WGnXs-0007Jw-0M@rmk-PC.arm.linux.org.uk>
+References: <20140221103710.GB21483@n2100.arm.linux.org.uk>
+ <E1WGnXs-0007Jw-0M@rmk-PC.arm.linux.org.uk>
+Message-ID: <20140224061148.GB3905@pratyush-vbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 23, 2014 at 12:02:06PM +0100, Juergen Beisert wrote:
+Hi Russell,
 
-> WARNING: CPU: 0 PID: 1 at drivers/clk/clk.c:883 __clk_enable+0x24/0x9c()
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper Not tainted 3.13.5-ptx-master #9
+On Fri, Feb 21, 2014 at 06:41:28PM +0800, Russell King wrote:
+> sdhci has support for using GPIOs for card detection.  If we have a
+> GPIO specified, we can use that directly, without needing our own
+> interrupt handler.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/mmc/host/sdhci-spear.c | 78 +++++++++---------------------------------
+>  1 file changed, 16 insertions(+), 62 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-spear.c b/drivers/mmc/host/sdhci-spear.c
+> index 00a73b1a6444..af3338fb0762 100644
+> --- a/drivers/mmc/host/sdhci-spear.c
+> +++ b/drivers/mmc/host/sdhci-spear.c
 
-> [<c0018e04>] (s3c_adc_probe+0x11c/0x194) from [<c0190ecc>] (platform_drv_probe+0x18/0x48)
+To get mmc_gpio_request_cd declaration 
 
-> Any idea what is means?
+#include <linux/mmc/slot-gpio.h>
 
-The ADC driver needs to be converted to clk_prepare_enable().
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/ee308b9a/attachment.sig>
+is needed.
+
+Regards
+Pratyush
