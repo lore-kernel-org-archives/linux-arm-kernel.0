@@ -1,128 +1,54 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 24 Feb 2014 10:21:03 +0800
-Subject: [PATCH v11 11/15] usb: phy-mxs: Add system suspend/resume API
+Date: Mon, 24 Feb 2014 10:21:01 +0800
+Subject: [PATCH v11 09/15] usb: phy: Add set_wakeup API
 In-Reply-To: <1393208467-6355-1-git-send-email-peter.chen@freescale.com>
 References: <1393208467-6355-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1393208467-6355-12-git-send-email-peter.chen@freescale.com>
+Message-ID: <1393208467-6355-10-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need this to keep PHY's power on or off during the system
-suspend mode. If we need to enable USB wakeup, then we
-must keep PHY's power being on during the system suspend mode.
-Otherwise, we need to keep PHY's power being off to save power.
+This API is used to set wakeup enable at PHY registers, in that
+case, the PHY can be waken up from suspend due to external events,
+like vbus change, dp/dm change and id change.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/phy/phy-mxs-usb.c |   61 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 61 insertions(+), 0 deletions(-)
+ include/linux/usb/phy.h |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index da2eb6c..31ef59f 100644
---- a/drivers/usb/phy/phy-mxs-usb.c
-+++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -57,6 +57,10 @@
- #define BM_USBPHY_DEBUG_CLKGATE			BIT(30)
+diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+index 6c0b1c5..c2c6f49 100644
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -111,6 +111,13 @@ struct usb_phy {
+ 	int	(*set_suspend)(struct usb_phy *x,
+ 				int suspend);
  
- /* Anatop Registers */
-+#define ANADIG_ANA_MISC0			0x150
-+#define ANADIG_ANA_MISC0_SET			0x154
-+#define ANADIG_ANA_MISC0_CLR			0x158
++	/*
++	 * Set wakeup enable for PHY, in that case, the PHY can be
++	 * waken up from suspend status due to external events,
++	 * like vbus change, dp/dm change and id.
++	 */
++	int	(*set_wakeup)(struct usb_phy *x, bool enabled);
 +
- #define ANADIG_USB1_VBUS_DET_STAT		0x1c0
- #define ANADIG_USB2_VBUS_DET_STAT		0x220
- 
-@@ -65,6 +69,9 @@
- #define ANADIG_USB2_LOOPBACK_SET		0x244
- #define ANADIG_USB2_LOOPBACK_CLR		0x248
- 
-+#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG	BIT(12)
-+#define BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG_SL BIT(11)
-+
- #define BM_ANADIG_USB1_VBUS_DET_STAT_VBUS_VALID	BIT(3)
- #define BM_ANADIG_USB2_VBUS_DET_STAT_VBUS_VALID	BIT(3)
- 
-@@ -134,6 +141,16 @@ struct mxs_phy {
- 	int port_id;
- };
- 
-+static inline bool is_imx6q_phy(struct mxs_phy *mxs_phy)
-+{
-+	return mxs_phy->data == &imx6q_phy_data;
-+}
-+
-+static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
-+{
-+	return mxs_phy->data == &imx6sl_phy_data;
-+}
-+
- static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
- {
- 	int ret;
-@@ -387,6 +404,8 @@ static int mxs_phy_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, mxs_phy);
- 
-+	device_set_wakeup_capable(&pdev->dev, true);
-+
- 	ret = usb_add_phy_dev(&mxs_phy->phy);
- 	if (ret)
- 		return ret;
-@@ -403,6 +422,47 @@ static int mxs_phy_remove(struct platform_device *pdev)
- 	return 0;
+ 	/* notify phy connect status change */
+ 	int	(*notify_connect)(struct usb_phy *x,
+ 			enum usb_device_speed speed);
+@@ -265,6 +272,15 @@ usb_phy_set_suspend(struct usb_phy *x, int suspend)
  }
  
-+#ifdef CONFIG_PM_SLEEP
-+static void mxs_phy_enable_ldo_in_suspend(struct mxs_phy *mxs_phy, bool on)
+ static inline int
++usb_phy_set_wakeup(struct usb_phy *x, bool enabled)
 +{
-+	unsigned int reg = on ? ANADIG_ANA_MISC0_SET : ANADIG_ANA_MISC0_CLR;
-+
-+	/* If the SoCs don't have anatop, quit */
-+	if (!mxs_phy->regmap_anatop)
-+		return;
-+
-+	if (is_imx6q_phy(mxs_phy))
-+		regmap_write(mxs_phy->regmap_anatop, reg,
-+			BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG);
-+	else if (is_imx6sl_phy(mxs_phy))
-+		regmap_write(mxs_phy->regmap_anatop,
-+			reg, BM_ANADIG_ANA_MISC0_STOP_MODE_CONFIG_SL);
++	if (x && x->set_wakeup)
++		return x->set_wakeup(x, enabled);
++	else
++		return 0;
 +}
 +
-+static int mxs_phy_system_suspend(struct device *dev)
-+{
-+	struct mxs_phy *mxs_phy = dev_get_drvdata(dev);
-+
-+	if (device_may_wakeup(dev))
-+		mxs_phy_enable_ldo_in_suspend(mxs_phy, true);
-+
-+	return 0;
-+}
-+
-+static int mxs_phy_system_resume(struct device *dev)
-+{
-+	struct mxs_phy *mxs_phy = dev_get_drvdata(dev);
-+
-+	if (device_may_wakeup(dev))
-+		mxs_phy_enable_ldo_in_suspend(mxs_phy, false);
-+
-+	return 0;
-+}
-+#endif /* CONFIG_PM_SLEEP */
-+
-+static SIMPLE_DEV_PM_OPS(mxs_phy_pm, mxs_phy_system_suspend,
-+		mxs_phy_system_resume);
-+
- static struct platform_driver mxs_phy_driver = {
- 	.probe = mxs_phy_probe,
- 	.remove = mxs_phy_remove,
-@@ -410,6 +470,7 @@ static struct platform_driver mxs_phy_driver = {
- 		.name = DRIVER_NAME,
- 		.owner	= THIS_MODULE,
- 		.of_match_table = mxs_phy_dt_ids,
-+		.pm = &mxs_phy_pm,
- 	 },
- };
- 
++static inline int
+ usb_phy_notify_connect(struct usb_phy *x, enum usb_device_speed speed)
+ {
+ 	if (x && x->notify_connect)
 -- 
 1.7.8
