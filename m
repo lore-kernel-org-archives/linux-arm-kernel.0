@@ -1,97 +1,23 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 24 Feb 2014 19:11:18 +0100
-Subject: [PATCH RFC v1 3/3] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <20140224004826.22529.87768@quantum>
-References: <1392829124-25705-1-git-send-email-s.nawrocki@samsung.com>
- <1392829124-25705-4-git-send-email-s.nawrocki@samsung.com>
- <20140220140928.27132C4050F@trevor.secretlab.ca>
- <53072C9D.5040303@samsung.com> <20140224004826.22529.87768@quantum>
-Message-ID: <530B8B46.6060003@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Feb 2014 19:12:01 +0100
+Subject: [PATCH] ARM: Kirkwood: Remove redundant kexec code
+In-Reply-To: <1393265364-29241-1-git-send-email-andrew@lunn.ch>
+References: <1393265364-29241-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1778543.yhKrLGS8zF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/14 01:48, Mike Turquette wrote:
-> Quoting Sylwester Nawrocki (2014-02-21 02:38:21)
->> > On 20/02/14 15:09, Grant Likely wrote:
->> > [...]
->>>>> > >> > diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
->>>>> > >> > index 7c52c29..d618498 100644
->>>>> > >> > --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
->>>>> > >> > +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
->>>>> > >> > @@ -115,3 +115,27 @@ clock signal, and a UART.
->>>>> > >> >    ("pll" and "pll-switched").
->>>>> > >> >  * The UART has its baud clock connected the external oscillator and its
->>>>> > >> >    register clock connected to the PLL clock (the "pll-switched" signal)
->>>>> > >> > +
->>>>> > >> > +==Static initial configuration of clock parent and clock frequency==
->>>>> > >> > +
->>>>> > >> > +Some platforms require static configuration of (parts of) the clock controller
->>>>> > >> > +often determined by the board design. Such a configuration can be specified in
->>>>> > >> > +a clock consumer node through [clk-name]-clk-parent and [clk-name]-clk-rate DT
->>>>> > >> > +properties. The former should contain phandle and clock specifier of the parent
->>>>> > >> > +clock, the latter the required clock's frequency value (one cell). "clk-name"
->>>>> > >> > +should be listed in the clock-names property and a phandle and a clock specifier
->>>>> > >> > +pair corresponding to it should be present in the clocks property.
->>>>> > >> > +
->>>>> > >> > +    uart at a000 {
->>>>> > >> > +        compatible = "fsl,imx-uart";
->>>>> > >> > +        reg = <0xa000 0x1000>;
->>>>> > >> > +  ...
->>>>> > >> > +        clocks = <&clkcon 0>, <&clkcon 3>;
->>>>> > >> > +        clock-names = "baud", "mux";
->>>>> > >> > +
->>>>> > >> > +  mux-clk-parent = <&pll 1>;
->>>>> > >> > +  baud-clk-rate = <460800>;
->>> > >
->>> > > This mixes patterns for references to clocks. Plus it requires composing
->>> > > property names which is a little painful. I'd rather see a list of
->>> > > tuples to match the existing pattern already in use
->>> > > 
->>> > >       clocks = <&clkcon 0>, <&clkcon 3>;
->>> > >       clock-names = "baud", "mux";
->>> > >       clock-parents = <0> <&pll 1>;
->>> > >       clock-rates = <0> <460800>;
->> > 
->> > Thank you for the review. This looks much better to me. My bad, I wasn't 
->> > aware 0 can be used to denote an empty phandle like this. ePAPR seems not 
->> > to be specifying exact meaning of the 'phandle' property values, except 
->> > they be unique. Anyway, it seems to be clearly documented within the
->> > __of_parse_phandle_with_args() function. 
->> > 
->> > I'll try this modified binding instead, presumably it would be useful to 
->> > have a variant of __of_parse_phandle_with_args() function which would 
->> > accept a context data containing result of previous call within an iteration, 
->> > similarly as of_property_next_string() is written. So we don't iterate 
->> > from beginning of the list with each __of_parse_phandle_with_args() call. 
->> > But it's an optimization issue that could be considered separately I guess.
->
-> I was always partial to the regulator style of blahblah-supply but
-> Grant's suggestion is much cleaner with respect to the rest of the clock
-> binding.
+On Monday 24 February 2014 19:09:24 Andrew Lunn wrote:
+> The PCIe driver has been fully clock aware for quite a while.  Remove
+> the kexec code to enable the PCIe clock, since the PCIe driver will do
+> the right thing.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-I don't have a strong opinion, I'm slightly inclined towards Grant's suggestion,
-which doesn't have a problem of limiting effective clk name to 21 characters.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Also DT property names with underscores coming from the clock names are a bit
-incorrect and it might be not immediately obvious which part of name is a 
-canonical property's name and which is clock's name. Let's consider property 
-names like:
+It's probably worth mentioning in the changelog that this fixes a
+build error for the case when CONFIG_KEXEC is enabled but
+KIRKWOOD_LEGACY is not.
 
-mux-clk-parent, divider-clk-rate, sclk_mmc0-clk-parent, sclk_uart_baud0-clk-parent,
-etc.
-
-> I guess it will be a bit ugly if a very long array is needed with a
-> sparse attribute. E.g. 20 clocks specified in the 'clocks' property and
-> only a single clock needs to have its parent or rate specified.
-
-It was also concerning me, but this inconvenience could be mitigated by 
-reordering content of clocks/clock-names properties so that the clocks for
-which parents and/or rates are being assigned are first on the list.
-Then number of padding zeros is minimized.
-
-> Is there a reason not to support both methods?
-
---
-Regards,
-Sylwester
+	Arnd
