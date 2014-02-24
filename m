@@ -1,83 +1,35 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 24 Feb 2014 10:20:10 -0800
-Subject: [PATCH] net: phy: add suspend_halted module param
-In-Reply-To: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <CAGVrzcadYTYQEvPxqdMf2f741y5sAgnOYm3EC=f7SOkr8SK2WQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 24 Feb 2014 18:28:15 +0000
+Subject: [PATCH 0/2] CCI PMU update
+In-Reply-To: <1392812223-29274-1-git-send-email-punit.agrawal@arm.com>
+References: <1392812223-29274-1-git-send-email-punit.agrawal@arm.com>
+Message-ID: <20140224182815.GA1198@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
+[adding Olof and arm at kernel.org]
 
-2014-02-23 8:58 GMT-08:00 Sebastian Hesselbarth
-<sebastian.hesselbarth@gmail.com>:
-> commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
->   ("net: phy: resume/suspend PHYs on attach/detach")
-> introduced a feature to suspend PHYs when entering halted state.
->
-> Unfortunately, not all bootloaders properly power-up PHYs on reset
-> and fail to access ethernet because the PHY is still powered down.
->
-> Therefore, we add a boolean module parameter suspend_halted with
-> default value of true. Disabling that parameter prevents PHYs from
-> being suspended when entering halted state.
->
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Reported-by: Andrew Lunn <andrew@lunn.ch>
-> ---
-> Andrew, can you please re-test if disabling the feature does work on
-> your board? I tried a bunch of mine, but none failed to power-up the
-> PHY in u-boot.
+On Wed, Feb 19, 2014 at 12:17:01PM +0000, Punit Agrawal wrote:
+> Here are a short couple of patches to update the CCI PMU perf backend
+> to better support IP updates.
+> 
+> The first patch simplifies version checking to assume that event
+> numbering doesn't change for > r1p0 (it changed between r0 and r1).
+> This change should help reduce code churn when IP version is bumped up
+> without any changes to event numbering.
+> 
+> The second patch exports the PMU version to userspace (via the PMU
+> name) to allow tooling to deal with event numbering differences.
+> 
+> I'd appreciate any feedback on the changes.
+> 
+> The patches are based on top of 3.14-rc3 and can hopefully make it for
+> 3.15.
 
-Would be good to get Andrew's testing on this just to make sure it
-solves his problem. Otherwise:
+Since these patches [1] are small and trivial, would the arm-soc folk be
+happy picking them directly? I can put together a branch and pull request if
+necessary, but it seems a bit OTT for this.
 
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+Will
 
->
-> Cc: David Miller <davem@davemloft.net>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: netdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/net/phy/phy_device.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
-> index 4b03e63639b7..671eea0eb5db 100644
-> --- a/drivers/net/phy/phy_device.c
-> +++ b/drivers/net/phy/phy_device.c
-> @@ -40,6 +40,10 @@ MODULE_DESCRIPTION("PHY library");
->  MODULE_AUTHOR("Andy Fleming");
->  MODULE_LICENSE("GPL");
->
-> +static bool suspend_halted = true;
-> +module_param(suspend_halted, bool, 0644);
-> +MODULE_PARM_DESC(suspend_halted, "Suspend PHYs when entering halted state.");
-> +
->  void phy_device_free(struct phy_device *phydev)
->  {
->         put_device(&phydev->dev);
-> @@ -685,6 +689,12 @@ int phy_suspend(struct phy_device *phydev)
->         struct phy_driver *phydrv = to_phy_driver(phydev->dev.driver);
->         struct ethtool_wolinfo wol;
->
-> +       /* Some bootloaders do not power-up PHYs properly after reset,
-> +        * allow to disable the suspend halted PHYs feature.
-> +        */
-> +       if (!suspend_halted)
-> +               return -ENOSYS;
-> +
->         /* If the device has WOL enabled, we cannot suspend the PHY */
->         wol.cmd = ETHTOOL_GWOL;
->         phy_ethtool_get_wol(phydev, &wol);
-> --
-> 1.8.5.3
->
-
-
-
--- 
-Florian
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/234041.html
