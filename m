@@ -1,99 +1,53 @@
-From: annulen@yandex.ru (Konstantin Tokarev)
-Date: Mon, 24 Feb 2014 19:17:16 +0400
-Subject: [PATCH v5 4/8] Documentation: add the document for the SPI NOR
- framework
-In-Reply-To: <1393238262-8622-5-git-send-email-b32955@freescale.com>
-References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
- <1393238262-8622-5-git-send-email-b32955@freescale.com>
-Message-ID: <203101393255036@web29h.yandex.ru>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 24 Feb 2014 15:33:24 +0000
+Subject: [RFC PATCH 1/2] arm: mm: Introduce pte_isset(pte,flag)
+In-Reply-To: <1393256005-2206-1-git-send-email-steve.capper@linaro.org>
+References: <1393256005-2206-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1393256005-2206-2-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Long descriptors on ARM are 64 bits, and some pte functions such as
+pte_dirty return a bitwise-and of a flag with the pte value. If the
+flag to be tested resides in the upper 32 bits of the pte, then we run
+into the danger of the result being dropped if downcast.
 
+For example:
+	gather_stats(page, md, pte_dirty(*pte), 1);
+where pte_dirty(*pte) is downcast to an int.
 
-24.02.2014, 15:26, "Huang Shijie" <b32955@freescale.com>:
-> This patch adds the document for the SPI NOR framework.
->
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
-> ?Documentation/mtd/spi-nor.txt | ??59 +++++++++++++++++++++++++++++++++++++++++
-> ?1 files changed, 59 insertions(+), 0 deletions(-)
-> ?create mode 100644 Documentation/mtd/spi-nor.txt
->
-> diff --git a/Documentation/mtd/spi-nor.txt b/Documentation/mtd/spi-nor.txt
-> new file mode 100644
-> index 0000000..b9585f8
-> --- /dev/null
-> +++ b/Documentation/mtd/spi-nor.txt
-> @@ -0,0 +1,59 @@
-> + ?????????????????????????SPI NOR framework
-> + ??????????????============================================
-> +
-> +Part I - why we need this framework?
-> +-------------------------------------
-> +
-> +The SPI bus controller only deals with the byte stream.
-> +Some controller does not works like a SPI bus controller, it works
-> +like a SPI NOR controller instead, such as the Freescale's QuadSPI controller.
-> +
-> +The Freescale's QuadSPI controller should knows the NOR commands to
-> +find the right LUT sequence. Unfortunately, the old code can not meet
-> +this requirement.
+This patch introduces a new macro pte_isset which performs the bitwise
+and, then performs a double logical invert to ensure predictable
+downcasting.
 
-should know
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm/include/asm/pgtable.h | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-> +
-> +Part II - How does the framework work?
-> +-------------------------------------
-> +
-> +This framework just adds a new layer between the MTD and the SPI bus driver.
-> +With this new layer, the SPI NOR controller driver does not depend on the
-> +m25p80 code anymore.
-> +
-> + ??Before this framework, the layer is like:
-> +
-> + ??????????????????MTD
-> + ????????------------------------
-> + ?????????????????m25p80
-> + ????????------------------------
-> + ??????SPI bus driver
-> + ????????------------------------
-> + ???????SPI NOR chip
-> +
-> + ??After this framework, the layer is like:
-> + ??????????????????MTD
-> + ????????------------------------
-> + ?????????????SPI NOR framework
-> + ????????------------------------
-> + ?????????????????m25p80
-> + ????????------------------------
-> + ??????SPI bus driver
-> + ????????------------------------
-> + ??????SPI NOR chip
-> +
-> + ?With the SPI NOR controller driver(Freescale QuadSPI), it looks like:
-> + ??????????????????MTD
-> + ????????------------------------
-> + ?????????????SPI NOR framework
-> + ????????------------------------
-> + ???????????????fsl-quadSPI
-> + ????????------------------------
-> + ??????SPI NOR chip
-> +
-> +Part III - How can the drivers use the framework
-> +-------------------------------------
-> +
-> +The main API is the spi_nor_scan(). Before you call the hook, you should
-> +initialize the necessary fields for spi_nor{}.
-> +Please see the drivers/mtd/spi-nor/spi-nor.c for detail.
-> +Please also reference to the fsl-quadspi.c when you want to write a new driver
-> +for a SPI NOR controller.
-> --
-> 1.7.2.rc3
->
-> ______________________________________________________
-> Linux MTD discussion mailing list
-> http://lists.infradead.org/mailman/listinfo/linux-mtd/
-
-Regards,
-Konstantin
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 7d59b52..13626b8 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -214,12 +214,14 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ 
+ #define pte_clear(mm,addr,ptep)	set_pte_ext(ptep, __pte(0), 0)
+ 
++#define pte_isset(pte, val)	(!!(pte_val(pte) & (val)))
++
+ #define pte_none(pte)		(!pte_val(pte))
+-#define pte_present(pte)	(pte_val(pte) & L_PTE_PRESENT)
+-#define pte_write(pte)		(!(pte_val(pte) & L_PTE_RDONLY))
+-#define pte_dirty(pte)		(pte_val(pte) & L_PTE_DIRTY)
+-#define pte_young(pte)		(pte_val(pte) & L_PTE_YOUNG)
+-#define pte_exec(pte)		(!(pte_val(pte) & L_PTE_XN))
++#define pte_present(pte)	(pte_isset((pte), L_PTE_PRESENT))
++#define pte_write(pte)		(!pte_isset((pte), L_PTE_RDONLY))
++#define pte_dirty(pte)		(pte_isset((pte), L_PTE_DIRTY))
++#define pte_young(pte)		(pte_isset((pte), L_PTE_YOUNG))
++#define pte_exec(pte)		(!pte_isset((pte), L_PTE_XN))
+ #define pte_special(pte)	(0)
+ 
+ #define pte_present_user(pte)  (pte_present(pte) && (pte_val(pte) & L_PTE_USER))
+-- 
+1.8.1.4
