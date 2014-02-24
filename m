@@ -1,43 +1,83 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 24 Feb 2014 12:14:24 -0600
-Subject: [PATCHv4 0/7] omap hwspinlock dt support
-In-Reply-To: <52F9282B.5000702@ti.com>
-References: <1389658764-39199-1-git-send-email-s-anna@ti.com>
- <52F9282B.5000702@ti.com>
-Message-ID: <530B8C00.8020001@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 24 Feb 2014 10:20:10 -0800
+Subject: [PATCH] net: phy: add suspend_halted module param
+In-Reply-To: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <CAGVrzcadYTYQEvPxqdMf2f741y5sAgnOYm3EC=f7SOkr8SK2WQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark, Ohad,
+Hi Sebastian,
 
-On 02/10/2014 01:27 PM, Suman Anna wrote:
-> Mark,
+2014-02-23 8:58 GMT-08:00 Sebastian Hesselbarth
+<sebastian.hesselbarth@gmail.com>:
+> commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
+>   ("net: phy: resume/suspend PHYs on attach/detach")
+> introduced a feature to suspend PHYs when entering halted state.
 >
-> On 01/13/2014 06:19 PM, Suman Anna wrote:
->> Hi,
->>
->> This is an updated series mainly addressing Mark Rutland's comments
->> about hwlock specifier being always one-cell. The series adds the
->> support for #hwlock-cells property and adds a simple default OF
->> translate function.
->>
->> The DTS patches from previous series have already been merged, and
->> needs this property to be added. This is handled in a separate series
->> that only deals with OMAP hwspinlock DTS patches.
->>
->> The series, along with the DTS patches, is tested on top of v3.13-rc8
->> plus Tero's v13 clock DT series and Tony's 3.14 staged branches. The
->> validation on OMAP5, DRA7, AM437 requires Tero's series with couple of
->> additional base patches for AM43xx. AM43xx functionality needs a hwmod
->> fix [1] for creating the associated omap_device as well.
->>
+> Unfortunately, not all bootloaders properly power-up PHYs on reset
+> and fail to access ethernet because the PHY is still powered down.
 >
-> Can you please take a look at this series and give your ack on the
-> bindings if you do not have any further comments? The only comments so
-> far are from Bjorn on the OF helpers.
+> Therefore, we add a boolean module parameter suspend_halted with
+> default value of true. Disabling that parameter prevents PHYs from
+> being suspended when entering halted state.
+>
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Reported-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+> Andrew, can you please re-test if disabling the feature does work on
+> your board? I tried a bunch of mine, but none failed to power-up the
+> PHY in u-boot.
+
+Would be good to get Andrew's testing on this just to make sure it
+solves his problem. Otherwise:
+
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+
+>
+> Cc: David Miller <davem@davemloft.net>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/net/phy/phy_device.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
+> index 4b03e63639b7..671eea0eb5db 100644
+> --- a/drivers/net/phy/phy_device.c
+> +++ b/drivers/net/phy/phy_device.c
+> @@ -40,6 +40,10 @@ MODULE_DESCRIPTION("PHY library");
+>  MODULE_AUTHOR("Andy Fleming");
+>  MODULE_LICENSE("GPL");
+>
+> +static bool suspend_halted = true;
+> +module_param(suspend_halted, bool, 0644);
+> +MODULE_PARM_DESC(suspend_halted, "Suspend PHYs when entering halted state.");
+> +
+>  void phy_device_free(struct phy_device *phydev)
+>  {
+>         put_device(&phydev->dev);
+> @@ -685,6 +689,12 @@ int phy_suspend(struct phy_device *phydev)
+>         struct phy_driver *phydrv = to_phy_driver(phydev->dev.driver);
+>         struct ethtool_wolinfo wol;
+>
+> +       /* Some bootloaders do not power-up PHYs properly after reset,
+> +        * allow to disable the suspend halted PHYs feature.
+> +        */
+> +       if (!suspend_halted)
+> +               return -ENOSYS;
+> +
+>         /* If the device has WOL enabled, we cannot suspend the PHY */
+>         wol.cmd = ETHTOOL_GWOL;
+>         phy_ethtool_get_wol(phydev, &wol);
+> --
+> 1.8.5.3
 >
 
-Gentle reminder, can you provide your acks/comments?
 
-regards
-Suman
+
+-- 
+Florian
