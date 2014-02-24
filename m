@@ -1,47 +1,56 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 24 Feb 2014 20:15:54 +0100
-Subject: [PATCH] net: phy: add suspend_halted module param
-In-Reply-To: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140224191554.GC29288@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Feb 2014 19:21:52 +0000
+Subject: Ideas/suggestions to avoid repeated locking and reducing too
+ many lists with dmaengine?
+In-Reply-To: <530B9784.5060904@ti.com>
+References: <530B9784.5060904@ti.com>
+Message-ID: <20140224192152.GV27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 23, 2014 at 05:58:39PM +0100, Sebastian Hesselbarth wrote:
-> commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
->   ("net: phy: resume/suspend PHYs on attach/detach")
-> introduced a feature to suspend PHYs when entering halted state.
+Wrapping... (I've had to manually edit this.)
+
+On Mon, Feb 24, 2014 at 01:03:32PM -0600, Joel Fernandes wrote:
+> Just wanted your thoughts/suggestions on how we can avoid overhead in
+> the EDMA dmaengine driver. I am seeing a lots of performance drop
+> specially for small transfers with EDMA versus before raw EDMA was
+> moved to DMAEngine framework (atleast 25%).
 > 
-> Unfortunately, not all bootloaders properly power-up PHYs on reset
-> and fail to access ethernet because the PHY is still powered down.
-> 
-> Therefore, we add a boolean module parameter suspend_halted with
-> default value of true. Disabling that parameter prevents PHYs from
-> being suspended when entering halted state.
+> One of the things I am thinking about is the repeated (spin)
+> locking/unlocking of the virt_dma_chan->lock or vc->lock. In many
+> cases, there's only 1 user or thread requiring to do a DMA, so I
+> feel the locking is unnecessary and potential overhead. If there's
+> a sane way to detect this an avoid locking altogether, that
+> would be great.
 
-Hi Sebastian
+For the case where there's no contention, spinlocks /should/ be light.
+What will make them more expensive is if you have things like lockdep
+enabled, which adds much more code into those paths to do state tracking.
+It's a known side effect of using that debug.
 
-Am i doing something silly here?
+So, if you're developing, then you should always have turned lockdep on.
+If you're testing for performance, you should have lockdep and spinlock
+debugging turned off.
 
-root at qnap:/sys/module/libphy/parameters# cat suspend_halted 
-Y
-root at qnap:/sys/module/libphy/parameters# echo N > suspend_halted 
-root at qnap:/sys/module/libphy/parameters# cat suspend_halted 
-N
-root at qnap:/sys/module/libphy/parameters# reboot
-...
-...
+>  Also with respect to virt_dma (which is used by edma to manage all the
+> descriptors and lists) there are too many lists: submitted, issued,
+> completed etc and the descriptor moves from one to the other. I am
+> thinking if there is a way we can avoid using so many lists and just
+> have 2 lists and move the desc from one list to the other, That could
+> avoid using the intermediate list altogether and classify dma requests
+> as "done" or "not done".
 
-Net:   egiga0 [PRIME]
-Hit any key to stop autoboot:  0 
-Send Cmd : 0x68 to UART1
-egiga0 no link
-Using egiga0 device
-TFTP from server 10.0.0.1; our IP address is 10.0.0.2
-Filename 'uImage-qnap'.
-Load address: 0x800000
-Loading: T T 
+The reason I created separate submitted and issued lists is that it's
+much easier to manage than having everything on a single list.
 
-Does not seem to work.
+We could deal with the submitted vs issued list, and that's to have the
+channel store the cookie for the last issued descriptor - but I wonder
+if it's worth the effort.
 
-     Andrew
+What I'd suggest is to try some profiling, and post some profiling
+results which show where the problems are, rather than pointing at
+bits of code you might not particularly like.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
