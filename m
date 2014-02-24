@@ -1,141 +1,75 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 24 Feb 2014 11:10:41 +0100
-Subject: [PATCH v4 16/16] regulator: max14577: Implement SUSPEND mode for
- MAX77836 LDO-s
-In-Reply-To: <1393236641-14977-1-git-send-email-k.kozlowski@samsung.com>
-References: <1393236641-14977-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1393236641-14977-17-git-send-email-k.kozlowski@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 24 Feb 2014 10:14:23 +0000
+Subject: [PATCH v2 2/4] arm64: defer reloading a task's FPSIMD state to
+ userland resume
+In-Reply-To: <CAKv+Gu_JKXZKnOvxRHiqH12jRUsA4AHkFrpMFAtqxPzyM1HyAQ@mail.gmail.com>
+References: <1391620418-3999-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1391620418-3999-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20140221174855.GD25351@arm.com>
+ <CAKv+Gu_JKXZKnOvxRHiqH12jRUsA4AHkFrpMFAtqxPzyM1HyAQ@mail.gmail.com>
+Message-ID: <989E532E-41BA-41CB-A8C6-2A277FD86416@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MAX77836 LDO regulators support low power mode. In this mode the
-maximum load current is 5 mA and the quiescent supply current is 1.5 uA.
+On 21 Feb 2014, at 18:33, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 21 February 2014 18:48, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> On Wed, Feb 05, 2014 at 05:13:36PM +0000, Ard Biesheuvel wrote:
+>>> +              */
+>>> +             struct fpsimd_state *st = &next->thread.fpsimd_state;
+>>> +
+>>> +             if (__get_cpu_var(fpsimd_last_task) == &st->last_cpu
+>>> +                 && st->last_cpu == smp_processor_id())
+>>> +                     clear_ti_thread_flag(task_thread_info(next),
+>>> +                                          TIF_FOREIGN_FPSTATE);
+>>> +             else
+>>> +                     set_ti_thread_flag(task_thread_info(next),
+>>> +                                        TIF_FOREIGN_FPSTATE);
+>>> +     }
+>>> }
+>> 
+>> I'm still trying to get my head around why we have 3 different type of
+>> checks for this (fpsimd_last_task, last_cpu and TIF). The code seems
+>> correct but I wonder whether we can reduce this to 2 checks?
+> 
+> Well, I suppose using the TIF flag is somewhat redundant, it is
+> basically a shorthand for expressing that the following does /not/
+> hold
+> 
+> __get_cpu_var(fpsimd_last_state) == &current->thread.fpsimd_state &&
+> current->thread.fpsimd_state.cpu == smp_processor_id()
 
-This patch adds support for mode REGULATOR_MODE_STANDBY (and NORMAL) to
-LDO regulators by implementing the set_mode() and get_mode() operations.
-However the necessary regulator constraints (valid modes) are not parsed
-by of_regulator_match() so the driver adds them manually.
+OK, it starts to make more sense now ;).
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/regulator/max14577.c         |   61 ++++++++++++++++++++++++++++++++--
- include/linux/mfd/max14577-private.h |    2 ++
- 2 files changed, 61 insertions(+), 2 deletions(-)
+Basically, if we only cared about context switching (rather than Neon in
+the kernel), we would have to always save the state of the scheduled out
+task but restore it only if the current hw state is different. A way to
+check this is fpsimd_last_state && cpu (I can?t really think of a
+better way).
 
-diff --git a/drivers/regulator/max14577.c b/drivers/regulator/max14577.c
-index 6547cb3146e3..79981af198bf 100644
---- a/drivers/regulator/max14577.c
-+++ b/drivers/regulator/max14577.c
-@@ -18,9 +18,10 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/regulator/driver.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/of_regulator.h>
- #include <linux/mfd/max14577.h>
- #include <linux/mfd/max14577-private.h>
--#include <linux/regulator/of_regulator.h>
- 
- static int max14577_reg_is_enabled(struct regulator_dev *rdev)
- {
-@@ -85,6 +86,45 @@ static int max14577_reg_set_current_limit(struct regulator_dev *rdev,
- 			reg_data);
- }
- 
-+static unsigned int max77836_reg_ldo_get_mode(struct regulator_dev *rdev)
-+{
-+	u8 reg_data;
-+	int err;
-+
-+	err = max14577_read_reg(rdev->regmap, rdev->desc->enable_reg,
-+			&reg_data);
-+	if (err) {
-+		dev_err(rdev_get_dev(rdev),
-+				"Error reading control register for %d: %d\n",
-+				rdev_get_id(rdev), err);
-+		return REGULATOR_MODE_NORMAL;
-+	}
-+
-+	reg_data &= rdev->desc->enable_mask;
-+
-+	if (reg_data == MAX77836_CNFG1_LDO_PWRMD_LOW_POWER)
-+		return REGULATOR_MODE_STANDBY;
-+
-+	return REGULATOR_MODE_NORMAL;
-+}
-+
-+static int max77836_reg_ldo_set_mode(struct regulator_dev *rdev,
-+		unsigned int mode)
-+{
-+	switch (mode) {
-+	case REGULATOR_MODE_STANDBY:
-+		return max14577_update_reg(rdev->regmap,
-+				rdev->desc->enable_reg, rdev->desc->enable_mask,
-+				MAX77836_CNFG1_LDO_PWRMD_LOW_POWER);
-+
-+	case REGULATOR_MODE_NORMAL:
-+		return regulator_enable_regmap(rdev);
-+
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
- static struct regulator_ops max14577_safeout_ops = {
- 	.is_enabled		= regulator_is_enabled_regmap,
- 	.enable			= regulator_enable_regmap,
-@@ -131,7 +171,8 @@ static struct regulator_ops max77836_ldo_ops = {
- 	.map_voltage		= regulator_map_voltage_linear,
- 	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
- 	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
--	/* TODO: add .set_suspend_mode */
-+	.get_mode		= max77836_reg_ldo_get_mode,
-+	.set_mode		= max77836_reg_ldo_set_mode,
- };
- 
- static const struct regulator_desc max77836_supported_regulators[] = {
-@@ -198,6 +239,19 @@ static struct of_regulator_match max77836_regulator_matches[] = {
- 	{ .name = "LDO2", },
- };
- 
-+static void
-+max77836_regulator_init_constraints(struct of_regulator_match *matches)
-+{
-+	int i;
-+	struct regulation_constraints *c;
-+
-+	for (i = MAX77836_LDO1; i <= MAX77836_LDO2; i++) {
-+		c = &matches[i].init_data->constraints;
-+		c->valid_modes_mask = REGULATOR_MODE_NORMAL
-+			| REGULATOR_MODE_STANDBY;
-+	}
-+}
-+
- static int max14577_regulator_dt_parse_pdata(struct platform_device *pdev,
- 		enum maxim_device_type dev_type)
- {
-@@ -232,6 +286,9 @@ static int max14577_regulator_dt_parse_pdata(struct platform_device *pdev,
- 
- 	of_node_put(np);
- 
-+	if (dev_type == MAXIM_DEVICE_TYPE_MAX77836)
-+		max77836_regulator_init_constraints(regulator_matches);
-+
- 	return ret;
- }
- 
-diff --git a/include/linux/mfd/max14577-private.h b/include/linux/mfd/max14577-private.h
-index 33700662fbb4..5eb164d91625 100644
---- a/include/linux/mfd/max14577-private.h
-+++ b/include/linux/mfd/max14577-private.h
-@@ -333,6 +333,8 @@ enum max77836_pmic_reg {
- #define MAX77836_CNFG1_LDO_TV_SHIFT		0
- #define MAX77836_CNFG1_LDO_PWRMD_MASK		(0x3 << MAX77836_CNFG1_LDO_PWRMD_SHIFT)
- #define MAX77836_CNFG1_LDO_TV_MASK		(0x3f << MAX77836_CNFG1_LDO_TV_SHIFT)
-+/* Value to write to CONFIG1/PWRMD field for enabling low power mode */
-+#define MAX77836_CNFG1_LDO_PWRMD_LOW_POWER	BIT(MAX77836_CNFG1_LDO_PWRMD_SHIFT)
- 
- /* LDO1/LDO2 CONFIG2 register */
- #define MAX77836_CNFG2_LDO_OVCLMPEN_SHIFT	7
--- 
-1.7.9.5
+With the addition of kernel_neon_begin/end(), we want to optimise this
+further by (a) only saving the state at context switch if it hasn?t
+been saved already (by kernel_neon_begin) and (b) defer the restoring to
+user space to avoid re-saving/restoring of the state.
+
+Case (a) is when Neon is used between the syscall entry and switch_to()
+for a given thread. Case (b) is for scenarios where Neon is used between
+switch_to() and return to user. Are both of these likely? I think they are
+(e.g. sending->waiting->receiving).
+
+> I suppose that the test at resume can tolerate the overhead, so I can
+> rework the code to get rid of it.
+
+It may not be that simple since we need per-CPU variables retrieved in
+assembly. So we end up with a function call plus per-CPU variable
+checking and this must be done on the return from interrupt path as
+well. In which case the TIF flag is quicker as an optimisation. If I 
+have any better idea I?ll let you know.
+
+In the meantime, I think it?s ok to keep all three checks for
+different scenarios but please add some more explanation in the fpsimd.c
+file so that in a year time we still remember the logic (documenting the
+scenarios and when we check which TIF flag, per-CPU variable etc.).
+
+Thanks,
+
+Catalin
