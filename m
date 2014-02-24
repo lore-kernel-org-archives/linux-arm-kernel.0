@@ -1,36 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Feb 2014 12:53:03 +0100
-Subject: [GIT PULL] integrator base patches for v3.15
-In-Reply-To: <201402241117.48617.arnd@arndb.de>
-References: <CACRpkdYeaMqTNUTqBSg6vNa9=VucjpFFkx3diHJJNgZTg+iq1w@mail.gmail.com>
- <201402241117.48617.arnd@arndb.de>
-Message-ID: <CACRpkdbtv2ZQbt0=7QhBZSRRAdONgKeKCO9yj=UwWRAU2WOWwA@mail.gmail.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Mon, 24 Feb 2014 17:32:53 +0530
+Subject: [PATCH 1/1] ARM: Exynos: Add generic compatible string
+In-Reply-To: <53076F00.7000001@samsung.com>
+References: <1392809645-631-1-git-send-email-sachin.kamat@linaro.org>
+ <CAK9yfHyWG1ac6isTRSB3VWfxER9cSuDJHwY3b7svyEk9EozpWQ@mail.gmail.com>
+ <53075239.4010603@samsung.com> <2200834.G3JJLYQl5i@wuerfel>
+ <53076F00.7000001@samsung.com>
+Message-ID: <CAK9yfHxcpX9eMpFHdJcjVas9u_4MtVLr6Pc9JrVOjM2YrZemiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 11:17 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 13 February 2014, Linus Walleij wrote:
->>       irqchip: vic: update the base IRQ member correctly
->>       irqchip: support cascaded VICs
->>       ARM: integrator: register the IM-PD1 VIC
+On 21 February 2014 20:51, Tomasz Figa <t.figa@samsung.com> wrote:
+> On 21.02.2014 15:48, Arnd Bergmann wrote:
+>>
+>> On Friday 21 February 2014 14:18:49 Tomasz Figa wrote:
+>>>
+>>>
+>>>> Now that we have a broader agreement on this, I think we can go ahead
+>>>> with the
+>>>> following steps as an initial approach:
+>>>> 1. Have a common machine file for both exynos4 and 5 files,
+>>>> mach-exynos-dt.c.
+>>>> 2. Introduce a generic compatible string "samsung,exynos".
+>>>> 3. Append this to the compatible property list for existing boards.
+>>>>
+>>>> If this plan looks OK, I can send across patches doing this.
+>>>>
+>>>
+>>> Looks good. I would also merge common.c with this resulting
+>>> mach-exynos-dt.c, as it would be the only user of the code there.
+>>
+>>
+>> Sounds good. While the naming is not important, I would just call the
+>> file 'exynos.c', in line with some of the other platforms we have.
+>> Both the 'mach-' and the '-dt' part of the file name are redundant.
+>>
+>> Alternatively, you could merge it all into common.c.
 >
-> I got a randconfig build error for CONFIG_IMPD1=m. Ok to apply this
-> fix on top?
-
-Sure sorry for missing this ...
-
-> 8<---
 >
-> irqchip: VIC: export vic_init_cascaded
->
-> vic_init_cascaded is called by integrator impd1 code that can
-> be a loadable module, so the function has to be exported.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> exynos.c sounds good to me.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Sounds good to me too.
 
-Can either of you pls apply this directly to the ARM SoC tree?
-
-Yours,
-Linus Walleij
+-- 
+With warm regards,
+Sachin
