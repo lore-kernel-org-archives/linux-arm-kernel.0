@@ -1,121 +1,93 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 24 Feb 2014 13:41:24 +0530
-Subject: [PATCH] cpufreq: Set policy to non-NULL only after all hotplug
- online work is done
-In-Reply-To: <530AF7E4.5080806@linux.vnet.ibm.com>
-References: <1393225072-3997-1-git-send-email-skannan@codeaurora.org>
- <530AF7E4.5080806@linux.vnet.ibm.com>
-Message-ID: <CAKohpok-8_JV8hRDiWnRLYqEqyvD60cyn5Hs1HcZTSEPZjLvOQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 24 Feb 2014 09:25:08 +0100
+Subject: [PATCH 04/11] ARM: shmobile: lager legacy: Add MSIOF support
+In-Reply-To: <CANqRtoRLcac3x55N+VHK+n6RvcgT0v9==9mt1rhVda-zwCYTCg@mail.gmail.com>
+References: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
+ <1392907779-22053-5-git-send-email-geert@linux-m68k.org>
+ <CANqRtoQQ9cn55Ct7pva2Bo7461WbZG0=Y5f9zLwfKhyU2=QFZw@mail.gmail.com>
+ <CAMuHMdWMJFpV_uvi4mNZYc9R8qVWqQf3QGRhdPyc+hj=6XMoJw@mail.gmail.com>
+ <CANqRtoRLcac3x55N+VHK+n6RvcgT0v9==9mt1rhVda-zwCYTCg@mail.gmail.com>
+Message-ID: <CAMuHMdWDtDqmarg-p+LFv4ZtzF7Rv=KzLQA3rnSa_dS2PkVmfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 February 2014 13:12, Srivatsa S. Bhat
-<srivatsa.bhat@linux.vnet.ibm.com> wrote:
-> On 02/24/2014 12:27 PM, Saravana Kannan wrote:
->> The existing code sets the per CPU policy to a non-NULL value before all
->> the steps performed during the hotplug online path is done. Specifically,
->> this is done before the policy min/max, governors, etc are initialized for
->> the policy.  This in turn means that calls to cpufreq_cpu_get() return a
->> non-NULL policy before the policy/CPU is ready to be used.
+Hi Magnus,
+
+On Mon, Feb 24, 2014 at 3:09 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> On Fri, Feb 21, 2014 at 1:18 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> On Thu, Feb 20, 2014 at 4:48 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>>> Since only MSIOF1 is used on Lager (correct me if i'm wrong), isn't it
+>>> best to omit the unused resources from above? In case of DT I think it
+>>> makes sense to define all channels in the SoC.dtsi and let the
+>>> SoC-board.dts just enable the channels that are used. But in this case
+>>> with legacy code  I think we should keep thing simple and small and
+>>> just enable the bits that are used on the particular board.
+>>>
+>>> The same obviously applies to the Koelsch legacy code as well. =)
 >>
->> To fix this, move the update of per CPU policy to a valid value after all
->> the initialization steps for the policy are completed.
->>
->> Example kernel panic without this fix:
->> [  512.146185] Unable to handle kernel NULL pointer dereference at virtual address 00000020
->> [  512.146195] pgd = c0003000
->> [  512.146213] [00000020] *pgd=80000000004003, *pmd=00000000
->> [  512.146228] Internal error: Oops: 206 [#1] PREEMPT SMP ARM
->> <snip>
->> [  512.146297] PC is at __cpufreq_governor+0x10/0x1ac
->> [  512.146312] LR is at cpufreq_update_policy+0x114/0x150
->> <snip>
->> [  512.149740] ---[ end trace f23a8defea6cd706 ]---
->> [  512.149761] Kernel panic - not syncing: Fatal exception
->> [  513.152016] CPU0: stopping
->> [  513.154710] CPU: 0 PID: 7136 Comm: mpdecision Tainted: G      D W    3.10.0-gd727407-00074-g979ede8 #396
->> <snip>
->> [  513.317224] [<c0afe180>] (notifier_call_chain+0x40/0x68) from [<c02a23ac>] (__blocking_notifier_call_chain+0x40/0x58)
->> [  513.327809] [<c02a23ac>] (__blocking_notifier_call_chain+0x40/0x58) from [<c02a23d8>] (blocking_notifier_call_chain+0x14/0x1c)
->> [  513.339182] [<c02a23d8>] (blocking_notifier_call_chain+0x14/0x1c) from [<c0803c68>] (cpufreq_set_policy+0xd4/0x2b8)
->> [  513.349594] [<c0803c68>] (cpufreq_set_policy+0xd4/0x2b8) from [<c0803e7c>] (cpufreq_init_policy+0x30/0x98)
->> [  513.359231] [<c0803e7c>] (cpufreq_init_policy+0x30/0x98) from [<c0805a18>] (__cpufreq_add_dev.isra.17+0x4dc/0x7a4)
->> [  513.369560] [<c0805a18>] (__cpufreq_add_dev.isra.17+0x4dc/0x7a4) from [<c0805d38>] (cpufreq_cpu_callback+0x58/0x84)
->> [  513.379978] [<c0805d38>] (cpufreq_cpu_callback+0x58/0x84) from [<c0afe180>] (notifier_call_chain+0x40/0x68)
->> [  513.389704] [<c0afe180>] (notifier_call_chain+0x40/0x68) from [<c02812dc>] (__cpu_notify+0x28/0x44)
->> [  513.398728] [<c02812dc>] (__cpu_notify+0x28/0x44) from [<c0aeed90>] (_cpu_up+0xf4/0x1dc)
->> [  513.406797] [<c0aeed90>] (_cpu_up+0xf4/0x1dc) from [<c0aeeed4>] (cpu_up+0x5c/0x78)
->> [  513.414357] [<c0aeeed4>] (cpu_up+0x5c/0x78) from [<c0aec808>] (store_online+0x44/0x74)
->> [  513.422253] [<c0aec808>] (store_online+0x44/0x74) from [<c03a40f4>] (sysfs_write_file+0x108/0x14c)
->> [  513.431195] [<c03a40f4>] (sysfs_write_file+0x108/0x14c) from [<c03517d4>] (vfs_write+0xd0/0x180)
->> [  513.439958] [<c03517d4>] (vfs_write+0xd0/0x180) from [<c0351ca8>] (SyS_write+0x38/0x68)
->> [  513.447947] [<c0351ca8>] (SyS_write+0x38/0x68) from [<c0205de0>] (ret_fast_syscall+0x0/0x30)
->>
->> In this specific case, CPU0 set's CPU1's policy->governor in
->> cpufreq_init_policy() to NULL while CPU1 is using the policy->governor in
->> __cpufreq_governor().
->>
+>> Note that while all resources are present, only MSIOF1 is registered on
+>> Lager (MSIOF0 on Koelsch). This is similar to i2c on Koelsch, which also
+>> has all resources, but only registers active devices.
 >
-> Whoa! That's horrible! Can you please explain how exactly you
-> triggered this? I'm curious...
-
-:)
-
-Actually I didn't understood his problem very well until now. I couldn't
-get from his trace that which pointer was actually set to NULL here?
-And hence what caused this crash?
-
-Also, what Saravana just wrote here didn't looked like relevant at all.
-i.e.:  policy->governor being set to NULL.
-
-So what? It was set to NULL with a reason and it shouldn't cause
-any crashes I hope. And also its sort of wrong to say that CPU0
-has set governor for CPU1, as governor was set for a policy and
-both CPUs were part of the same policy.
-
->> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
->> ---
->>  drivers/cpufreq/cpufreq.c | 10 +++++-----
->>  1 file changed, 5 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
->> index cb003a6..d5ceb43 100644
->> --- a/drivers/cpufreq/cpufreq.c
->> +++ b/drivers/cpufreq/cpufreq.c
->> @@ -1109,11 +1109,6 @@ static int __cpufreq_add_dev(struct device *dev, struct subsys_interface *sif,
->>               goto err_set_policy_cpu;
->>       }
->>
->> -     write_lock_irqsave(&cpufreq_driver_lock, flags);
->> -     for_each_cpu(j, policy->cpus)
->> -             per_cpu(cpufreq_cpu_data, j) = policy;
->> -     write_unlock_irqrestore(&cpufreq_driver_lock, flags);
->> -
->>       if (cpufreq_driver->get) {
->>               policy->cur = cpufreq_driver->get(policy->cpu);
+> Ok, I understand. Thanks for brining this to my attention.
 >
-> If you move the per-cpu init further down, then what happens to the
-> cpufreq_generic_get() that gets invoked here by some of the drivers?
-> It will almost always fail (because policy will be NULL) and hence
-> CPU online will be unsuccessful
-
-Thanks, I was about to point that as well.
-
-> (though you wont observe it because
-> the error code is not bubbled up to the CPU hotplug core; perhaps we
-> should).
-
-Don't know :)
-
-> IMHO, we should fix the synchronization in cpufreq_init_policy().
-> I notice cpufreq_update_policy() as well as __cpufreq_governor() in
-> your stack trace, which means cpufreq_set_policy() was involved.
-> cpufreq_update_policy() takes the policy->rwsem for write, whereas
-> cpufreq_init_policy() doesn't take that lock at all, which is clearly
-> wrong.
+> I'd like to avoid having unused resources so I'll cook up a patch to
+> rework that myself.
 >
-> My guess is that, if we fix that locking, everything will be fine and
-> you won't hit the bug. Would you like to give that a shot?
+>> It's your preference, though, so I can adapt if you want.
+>
+> Thanks.
+>
+> Please rework this patch to only register a single MSIOF channel. I
+> think it makes sense to only enable hardware that is being used.
 
-I am not sure about that guess as well. I first want to know what
-went bad exactly..
+Ehrm, I already register a single MSIOF channel only.
+Perhaps you mean't "remove the unused resources"?
+
+> Another question: How about "bus_num" and the platform device id
+> mapping? I'd like them to be the same if possible, but you are having
+> this "(idx+1)" bit in your code which I assume is to add offset for
+> the QSPI bus.
+
+"bus_num" is the SPI-specific numbering of SPI masters, which is filled
+in by spi-sh-msiof.c based on platform_device.id (i.e. the numeric suffix
+of e.g. "spi_r8a7790_msiof.1").
+It's used for matching SPI slaves in spi_board_info with SPI masters.
+As QSPI ("qspi.0") has SPI bus_num 0, the MSIOF SPI masters use
+bus_num 1 to 4, hence the "idx+1", and the platform device names
+"spi_r8a7790_msiof.1" to "spi_r8a7790_msiof.4".
+
+(Can't spi-sh-msiof.c use "bus_num = pdev->id + 1", so we can have
+ MSIOF0 as "spi_r8a7790_msiof.0"? No, as that would impact numbering
+ on all SoCs with MSIOF.)
+
+With DT, all of this doesn't matter, and life is easier, as the SPI slaves
+are child nodes of the SPI masters and thus don't need numerical bus
+references. So MSIOF0 can be called "msiof0" there.
+We still have the offsets in the "spi%u" aliases, though.
+
+> Regarding the PFC configuration, can you please double check that the
+> PIN_MAP_MUX_GROUP_DEFAULT() is in sync with the platform device id? Is
+> it the "bus_num" or the platform device id that is being used in case
+> of SPI?
+
+"bus_num" is SPI-specific. Pinctrl uses the actual device's name:
+
+/**
+ * struct pinctrl_map - boards/machines shall provide this map for devices
+ * @dev_name: the name of the device using this specific mapping, the name
+ *      must be the same as in your struct device*. If this name is set to the
+ *      same name as the pin controllers own dev_name(), the map entry will be
+ *      hogged by the driver itself upon registration
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
