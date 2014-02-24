@@ -1,39 +1,24 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 24 Feb 2014 14:52:12 +0900
-Subject: [PATCH] ARM: shmobile: Move SYSC base variable to inside ifdefs
-Message-ID: <20140224055212.1822.52295.sendpatchset@w520>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 24 Feb 2014 14:54:16 +0900
+Subject: linux-next: manual merge of the sound-asoc tree with the mvebu
+ tree
+In-Reply-To: <20140224133752.bc1ffffa4e81edb76a76e555@canb.auug.org.au>
+References: <20140224133752.bc1ffffa4e81edb76a76e555@canb.auug.org.au>
+Message-ID: <20140224055416.GB25940@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Mon, Feb 24, 2014 at 01:37:52PM +1100, Stephen Rothwell wrote:
 
-Move the rcar_sysc_base variable to inside #ifdefs to avoid
-triggering build warnings in case PM or SMP is not selected.
+> I fixed it up (Probably incorrectly - see below) and can carry the fix as
+> necessary (no action is required).
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
-
- Depends on "[PATCH 00/12] ARM: shmobile: Rework include path for SoC files"
-
- arch/arm/mach-shmobile/pm-rcar.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
---- 0013/arch/arm/mach-shmobile/pm-rcar.c
-+++ work/arch/arm/mach-shmobile/pm-rcar.c	2014-02-24 14:09:44.000000000 +0900
-@@ -15,8 +15,6 @@
- #include <asm/io.h>
- #include "pm-rcar.h"
- 
--static void __iomem *rcar_sysc_base;
--
- /* SYSC */
- #define SYSCSR 0x00
- #define SYSCISR 0x04
-@@ -35,6 +33,7 @@ static void __iomem *rcar_sysc_base;
- 
- #if defined(CONFIG_PM) || defined(CONFIG_SMP)
- 
-+static void __iomem *rcar_sysc_base;
- static DEFINE_SPINLOCK(rcar_sysc_lock); /* SMP CPUs + I/O devices */
- 
- static int rcar_sysc_pwr_on_off(struct rcar_sysc_ch *sysc_ch,
+That looks right (or at least like it won't do any harm or cause
+bisection problems), thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/96551577/attachment.sig>
