@@ -1,40 +1,95 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 24 Feb 2014 17:15:12 -0500
-Subject: [PATCH v2 2/5] ARM: mvebu: Add i2c alias so setting bus number
-In-Reply-To: <201402242232.20851.arnd@arndb.de>
-References: <1393264898-28939-1-git-send-email-andrew@lunn.ch>
- <20140224191108.GA29288@lunn.ch>
- <20140224193050.GG1010@titan.lakedaemon.net>
- <201402242232.20851.arnd@arndb.de>
-Message-ID: <20140224221512.GH1010@titan.lakedaemon.net>
+From: joelf@ti.com (Joel Fernandes)
+Date: Mon, 24 Feb 2014 16:38:48 -0600
+Subject: Ideas/suggestions to avoid repeated locking and reducing too
+ many lists with dmaengine?
+In-Reply-To: <20140224192152.GV27282@n2100.arm.linux.org.uk>
+References: <530B9784.5060904@ti.com>
+ <20140224192152.GV27282@n2100.arm.linux.org.uk>
+Message-ID: <530BC9F8.2040402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 10:32:20PM +0100, Arnd Bergmann wrote:
-> On Monday 24 February 2014, Jason Cooper wrote:
+Hi Russell,
+
+Firstly, thanks for your quick reply.
+
+On 02/24/2014 01:21 PM, Russell King - ARM Linux wrote:
+> Wrapping... (I've had to manually edit this.)
 > 
-> > 
-> > ex: What changed from v3.15 to v3.16 for kirkwood?
-> > 
-> > $ git log --oneline v3.15..v3.16 -- arch/arm/mach-mvebu | \
-> >         grep -i 'ARM: kirkwood'
-> > 
-> > This seems to be new territory for us (mvebu), perhaps one of the
-> > arm-soc maintainers has a preference?  I'll add them to this reply.
+> On Mon, Feb 24, 2014 at 01:03:32PM -0600, Joel Fernandes wrote:
+>> Just wanted your thoughts/suggestions on how we can avoid overhead in
+>> the EDMA dmaengine driver. I am seeing a lots of performance drop
+>> specially for small transfers with EDMA versus before raw EDMA was
+>> moved to DMAEngine framework (atleast 25%).
+>>
+>> One of the things I am thinking about is the repeated (spin)
+>> locking/unlocking of the virt_dma_chan->lock or vc->lock. In many
+>> cases, there's only 1 user or thread requiring to do a DMA, so I
+>> feel the locking is unnecessary and potential overhead. If there's
+>> a sane way to detect this an avoid locking altogether, that
+>> would be great.
 > 
-> I don't care, as long as you decide on something that works for you.
+> For the case where there's no contention, spinlocks /should/ be light.
+> What will make them more expensive is if you have things like lockdep
+> enabled, which adds much more code into those paths to do state tracking.
+> It's a known side effect of using that debug.
+> 
+> So, if you're developing, then you should always have turned lockdep on.
+> If you're testing for performance, you should have lockdep and spinlock
+> debugging turned off.
 
-Ok, we'll wait till we have an actual problem ;-)  Seriously though,
-once dove and kirkwood are both migrated, we'll sit down and hash out
-how to handle it (if needed at all).
+Thanks, indeed I had to turn them off.
 
-> While you're transitioning, it probably makes little sense to
-> enforce either one too strictly.
+> 
+>>  Also with respect to virt_dma (which is used by edma to manage all the
+>> descriptors and lists) there are too many lists: submitted, issued,
+>> completed etc and the descriptor moves from one to the other. I am
+>> thinking if there is a way we can avoid using so many lists and just
+>> have 2 lists and move the desc from one list to the other, That could
+>> avoid using the intermediate list altogether and classify dma requests
+>> as "done" or "not done".
+> 
+> The reason I created separate submitted and issued lists is that it's
+> much easier to manage than having everything on a single list.
+> 
+> We could deal with the submitted vs issued list, and that's to have the
+> channel store the cookie for the last issued descriptor - but I wonder
+> if it's worth the effort.
+> 
+> What I'd suggest is to try some profiling, and post some profiling
+> results which show where the problems are, rather than pointing at
+> bits of code you might not particularly like.
+> 
 
-Agreed.  Andrew, let's stick with the previous pseudo-file/path standard
-for now.  If you're inclined, please change the dts patches to kirkwood.
-If you don't feel like it, I'll only twitch a little bit.  :)
+Actually I did do some tracing earlier before I posted this thread- and
+notice there was excessive traces of locking/unlocking. It is very light
+though as you pointed and lighter without debug options. The only other
+notable difference is the fact that we are now going through the dmaengine
+framework in the newer kernel vs the faster one.
 
-thx,
+One more thing in my trace is omap_dma_sync repeatedly call in memcpy_to_io
+for every barrier call which is not necessary. I am working on a fix this.
 
-Jason.
+On turning off DEBUG_KERNEL and running more tests, I do see some
+improvements however the throughput reduction is still =~ 10%
+
+With a modified openssl speed test app, I sent 16-byte sized block
+repeatedly to the AES crypto hardware accelerator using EDMA:
+
+On v3.13.5 kernel:
+root at am335x-evm:~# openssl speed -evp aes-128-cbc -engine cryptodev
+engine "cryptodev" set.
+Doing aes-128-cbc for 3s on 16 size blocks: 79902 aes-128-cbc's
+
+With v3.2 kernel,
+Doing aes-128-cbc for 3s on 16 size blocks: 92314 aes-128-cbc's
+
+So we're able to encrypt around 13k more ops, or around 4.5k ops/second
+with 3.13.5
+
+As such, I do see this as a problem but difference is much lesser for
+larger blocks so its not a very big alarm. We should just be using PIO mode
+for small blocks.
+
+regards,
+-Joel
