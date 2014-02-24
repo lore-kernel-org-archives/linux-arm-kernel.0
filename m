@@ -1,185 +1,217 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 24 Feb 2014 10:04:59 +0800
-Subject: [PATCH v5] bus: imx-weim: support CS GPR configuration
-In-Reply-To: <1392705666-10995-1-git-send-email-shawn.guo@linaro.org>
-References: <1392705666-10995-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20140224020455.GA25457@S2101-09.ap.freescale.net>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Mon, 24 Feb 2014 11:09:44 +0900
+Subject: [PATCH v3 1/3] dma: Support multiple interleaved frames with
+ non-contiguous memory
+In-Reply-To: <CA+mB=1KqP=KgNZ_hYGbhin5TqokA+nCRPAA4Qa2R_2OWwv4yVw@mail.gmail.com>
+References: <1392465619-27614-1-git-send-email-sthokal@xilinx.com>
+ <1392465619-27614-2-git-send-email-sthokal@xilinx.com>
+ <CAJe_Zhc_GNNSDWNFuk+cMHEqxfSCJB_ey=Bf+SwJK-nS=u9ceg@mail.gmail.com>
+ <CA+mB=1KdZZpTmpA0Xp_c4mhgFbjRZ6urYrCwdvoTCmcugQMDUA@mail.gmail.com>
+ <CAJe_ZhdOmu3k9gbPdQzPteyzwsMA8OzWHdhHnXudbF=X7JMhVQ@mail.gmail.com>
+ <CA+mB=1K43MDZj0Rx3q=ETQMaFsG1j7TXsH6v-7a26JdtqTJkbw@mail.gmail.com>
+ <CAJe_ZhfedP7Paf3Zq9chL0WUeLJrsy_DJL05sSbfqnfTtji=HQ@mail.gmail.com>
+ <CA+mB=1LK+aVbvh741+PMnpj_mwZRvJZzR5Fh=hf72UWQvxUiVQ@mail.gmail.com>
+ <CAJe_ZheGP-9f659tOdCHEMrbh73MDi7VjoieFhdQbvjVwiEbJQ@mail.gmail.com>
+ <CA+mB=1KqP=KgNZ_hYGbhin5TqokA+nCRPAA4Qa2R_2OWwv4yVw@mail.gmail.com>
+Message-ID: <CAJe_ZhfSknzwMUo3nu14Hz5sr_hA6KojB=u4BvyT3byh5ViwXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 02:41:06PM +0800, Shawn Guo wrote:
-> For imx50-weim and imx6q-weim type of devices, there might a WEIM CS
-> space configuration register in General Purpose Register controller,
-> e.g. IOMUXC_GPR1 on i.MX6Q.
-> 
-> Depending on which configuration of the following 4 is chosen for given
-> system, IOMUXC_GPR1[11:0] should be set up as 05, 033, 0113 or 01111
-> correspondingly.
-> 
-> 	CS0(128M) CS1(0M)  CS2(0M)  CS3(0M)
-> 	CS0(64M)  CS1(64M) CS2(0M)  CS3(0M)
-> 	CS0(64M)  CS1(32M) CS2(32M) CS3(0M)
-> 	CS0(32M)  CS1(32M) CS2(32M) CS3(32M)
-> 
-> The patch creates a function for such type of devices, which scans
-> 'ranges' property of WEIM node and build the GPR value incrementally.
-> Thus the WEIM CS GPR can be set up automatically at boot time.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On 21 February 2014 23:37, Srikanth Thokala <sthokal@xilinx.com> wrote:
+> On Thu, Feb 20, 2014 at 3:23 PM, Jassi Brar <jaswinder.singh@linaro.org>
+> wrote:
+>> On 20 February 2014 14:54, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>>> On Wed, Feb 19, 2014 at 12:33 AM, Jassi Brar <jaswinder.singh@linaro.org>
+>>> wrote:
+>>>> On 18 February 2014 23:16, Srikanth Thokala <sthokal@xilinx.com> wrote:
+>>>>> On Tue, Feb 18, 2014 at 10:20 PM, Jassi Brar
+>>>>> <jaswinder.singh@linaro.org> wrote:
+>>>>>> On 18 February 2014 16:58, Srikanth Thokala <sthokal@xilinx.com>
+>>>>>> wrote:
+>>>>>>> On Mon, Feb 17, 2014 at 3:27 PM, Jassi Brar
+>>>>>>> <jaswinder.singh@linaro.org> wrote:
+>>>>>>>> On 15 February 2014 17:30, Srikanth Thokala <sthokal@xilinx.com>
+>>>>>>>> wrote:
+>>>>>>>>> The current implementation of interleaved DMA API support multiple
+>>>>>>>>> frames only when the memory is contiguous by incrementing
+>>>>>>>>> src_start/
+>>>>>>>>> dst_start members of interleaved template.
+>>>>>>>>>
+>>>>>>>>> But, when the memory is non-contiguous it will restrict slave
+>>>>>>>>> device
+>>>>>>>>> to not submit multiple frames in a batch.  This patch handles this
+>>>>>>>>> issue by allowing the slave device to send array of interleaved dma
+>>>>>>>>> templates each having a different memory location.
+>>>>>>>>>
+>>>>>>>> How fragmented could be memory in your case? Is it inefficient to
+>>>>>>>> submit separate transfers for each segment/frame?
+>>>>>>>> It will help if you could give a typical example (chunk size and gap
+>>>>>>>> in bytes) of what you worry about.
+>>>>>>>
+>>>>>>> With scatter-gather engine feature in the hardware, submitting
+>>>>>>> separate
+>>>>>>> transfers for each frame look inefficient. As an example, our DMA
+>>>>>>> engine
+>>>>>>> supports up to 16 video frames, with each frame (a typical video
+>>>>>>> frame
+>>>>>>> size) being contiguous in memory but frames are scattered into
+>>>>>>> different
+>>>>>>> locations. We could not definitely submit frame by frame as it would
+>>>>>>> be
+>>>>>>> software overhead (HW interrupting for each frame) resulting in video
+>>>>>>> lags.
+>>>>>>>
+>>>>>> IIUIC, it is 30fps and one dma interrupt per frame ... it doesn't seem
+>>>>>> inefficient at all. Even poor-latency audio would generate a higher
+>>>>>> interrupt-rate. So the "inefficiency concern" doesn't seem valid to
+>>>>>> me.
+>>>>>>
+>>>>>> Not to mean we shouldn't strive to reduce the interrupt-rate further.
+>>>>>> Another option is to emulate the ring-buffer scheme of ALSA.... which
+>>>>>> should be possible since for a session of video playback the frame
+>>>>>> buffers' locations wouldn't change.
+>>>>>>
+>>>>>> Yet another option is to use the full potential of the
+>>>>>> interleaved-xfer api as such. It seems you confuse a 'video frame'
+>>>>>> with the interleaved-xfer api's 'frame'. They are different.
+>>>>>>
+>>>>>> Assuming your one video frame is F bytes long and Gk is the gap in
+>>>>>> bytes between end of frame [k] and start of frame [k+1] and  Gi != Gj
+>>>>>> for i!=j
+>>>>>> In the context of interleaved-xfer api, you have just 1 Frame of 16
+>>>>>> chunks. Each chunk is Fbytes and the inter-chunk-gap(ICG) is Gk  where
+>>>>>> 0<=k<15
+>>>>>> So for your use-case .....
+>>>>>>   dma_interleaved_template.numf = 1   /* just 1 frame */
+>>>>>>   dma_interleaved_template.frame_size = 16  /* containing 16 chunks */
+>>>>>>    ...... //other parameters
+>>>>>>
+>>>>>> You have 3 options to choose from and all should work just as fine.
+>>>>>> Otherwise please state your problem in real numbers (video-frames'
+>>>>>> size, count & gap in bytes).
+>>>>>
+>>>>> Initially I interpreted interleaved template the same.  But, Lars
+>>>>> corrected me
+>>>>> in the subsequent discussion and let me put it here briefly,
+>>>>>
+>>>>> In the interleaved template, each frame represents a line of size
+>>>>> denoted by
+>>>>> chunk.size and the stride by icg.  'numf' represent number of frames
+>>>>> i.e.
+>>>>> number of lines.
+>>>>>
+>>>>> In video frame context,
+>>>>> chunk.size -> hsize
+>>>>> chunk.icg -> stride
+>>>>> numf -> vsize
+>>>>> and frame_size is always 1 as it will have only one chunk in a line.
+>>>>>
+>>>> But you said in your last post
+>>>>   "with each frame (a typical video frame size) being contiguous in
+>>>> memory"
+>>>>  ... which is not true from what you write above. Anyways, my first 2
+>>>> suggestions still hold.
+>>>
+>>> Yes, each video frame is contiguous and they can be scattered.
+>>>
+>> I assume by contiguous frame you mean as in framebuffer?  Which is an
+>> array of bytes.
+>> If yes, then you should do as I suggest first,  frame_size=16  and numf=1.
+>
+> I think am confusing you.  I would like to explain with an example.  Lets
+> say
+> each video frame is 4k size starting at address 0x10004000 (-0x10005000) and
+> other frame at 0x20002000 (-0x20003000), and so on.
+>
+As I said plz dont confuse video frame with DMA frame.... in video
+frame the stride is constant(zero or not) whereas in DMA context the
+stride must be zero for the frame to be called contiguous.
 
-Philippe,
+> So, the frames are
+> scattered in memory and as the template doesnt allow multiple src_start/
+> dst_start we could not use single template to fill the HW descriptors (of
+> frames).  So, I feel your suggestion might not work if the frames are
+> scattered.
+> Also, how could we get 'vsize' value in your approach?
+>
+The client driver(video driver) should know the frame parameters.
+Practically you'll have to populate 16 transfer templates (frame
+attributes and locations won't change for a session) and submit to be
+transferred _cyclically_.
 
-Any further comments?  Or can I have your Reviewed-by or Tested-by tag?
+>  More importantly,
+> we are overriding the semantics of interleaved template members.
+>
+Not at all. Interleaved-dma isn't meant for only constant stride/icg
+transfers. Rather it's for identical frames with random strides.
 
-Shawn
+>
+>>
+>> If no, then it seems you are already doing the right thing.... the
+>> ring-buffer scheme. Please share some stats how the current api is
+>> causing you overhead because that is a very common case (many
+>> controllers support LLI) and you have 467ms (@30fps with 16-frames
+>> ring-buffer) to queue in before you see any frame drop.
+>
+> As I mentioned earlier in the thread, our hardware has a SG engine where by
+> we could send multiple frames in a batch.  Using the original implementation
+> of interleaved API, we have three options to transfer.
+>
+> One is to send frame by frame to the hardware.  We get a async_tx desc for
+> each frame and then we submit it to hardware triggering it to transfer this
+> BD.
+> We queue the next descriptor on the pending queue and whenever there is
+> a completion interrupt we submit the next BD on this queue to hardware. In
+> this implementation we are not efficiently using the SG engine in the
+> hardware
+> as we transferring frame by frame even HW allows us to transfer multiple
+> frames.
+>
+Sending one frame at a time will likely cause jitters. That shouldn't be done.
 
-> ---
-> Changes since v4:
->  - Fix a typo in comment
->  - Add fsl,weim-cs-gpr in the binding example
->  - Check return of imx_weim_gpr_setup()
-> 
->  Documentation/devicetree/bindings/bus/imx-weim.txt |   28 +++++++++-
->  drivers/bus/imx-weim.c                             |   58 ++++++++++++++++++++
->  2 files changed, 85 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
-> index 0fd76c4..6630d84 100644
-> --- a/Documentation/devicetree/bindings/bus/imx-weim.txt
-> +++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
-> @@ -8,7 +8,12 @@ The actual devices are instantiated from the child nodes of a WEIM node.
->  
->  Required properties:
->  
-> - - compatible:		Should be set to "fsl,<soc>-weim"
-> + - compatible:		Should contain one of the following:
-> +			  "fsl,imx1-weim"
-> +			  "fsl,imx27-weim"
-> +			  "fsl,imx51-weim"
-> +			  "fsl,imx50-weim"
-> +			  "fsl,imx6q-weim"
->   - reg:			A resource specifier for the register space
->  			(see the example below)
->   - clocks:		the clock, see the example below.
-> @@ -19,6 +24,26 @@ Required properties:
->  
->  			   <cs-number> 0 <physical address of mapping> <size>
->  
-> +Optional properties:
-> +
-> + - fsl,weim-cs-gpr:	For "fsl,imx50-weim" and "fsl,imx6q-weim" type of
-> +			devices, it should be the phandle to the system General
-> +			Purpose Register controller that contains WEIM CS GPR
-> +			register, e.g. IOMUXC_GPR1 on i.MX6Q.  IOMUXC_GPR1[11:0]
-> +			should be set up as one of the following 4 possible
-> +			values depending on the CS space configuration.
-> +
-> +			IOMUXC_GPR1[11:0]    CS0    CS1    CS2    CS3
-> +			---------------------------------------------
-> +				05	    128M     0M     0M     0M
-> +				033          64M    64M     0M     0M
-> +				0113         64M    32M    32M     0M
-> +				01111        32M    32M    32M    32M
-> +
-> +			In case that the property is absent, the reset value or
-> +			what bootloader sets up in IOMUXC_GPR1[11:0] will be
-> +			used.
-> +
->  Timing property for child nodes. It is mandatory, not optional.
->  
->   - fsl,weim-cs-timing:	The timing array, contains timing values for the
-> @@ -43,6 +68,7 @@ Example for an imx6q-sabreauto board, the NOR flash connected to the WEIM:
->  		#address-cells = <2>;
->  		#size-cells = <1>;
->  		ranges = <0 0 0x08000000 0x08000000>;
-> +		fsl,weim-cs-gpr = <&gpr>;
->  
->  		nor at 0,0 {
->  			compatible = "cfi-flash";
-> diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-> index 3ef58c8..f8ee13c 100644
-> --- a/drivers/bus/imx-weim.c
-> +++ b/drivers/bus/imx-weim.c
-> @@ -11,6 +11,9 @@
->  #include <linux/clk.h>
->  #include <linux/io.h>
->  #include <linux/of_device.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
-> +#include <linux/regmap.h>
->  
->  struct imx_weim_devtype {
->  	unsigned int	cs_count;
-> @@ -56,6 +59,55 @@ static const struct of_device_id weim_id_table[] = {
->  };
->  MODULE_DEVICE_TABLE(of, weim_id_table);
->  
-> +static int __init imx_weim_gpr_setup(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct property *prop;
-> +	const __be32 *p;
-> +	struct regmap *gpr;
-> +	u32 gprvals[4] = {
-> +		05,	/* CS0(128M) CS1(0M)  CS2(0M)  CS3(0M)  */
-> +		033,	/* CS0(64M)  CS1(64M) CS2(0M)  CS3(0M)  */
-> +		0113,	/* CS0(64M)  CS1(32M) CS2(32M) CS3(0M)  */
-> +		01111,	/* CS0(32M)  CS1(32M) CS2(32M) CS3(32M) */
-> +	};
-> +	u32 gprval = 0;
-> +	u32 val;
-> +	int cs = 0;
-> +	int i = 0;
-> +
-> +	gpr = syscon_regmap_lookup_by_phandle(np, "fsl,weim-cs-gpr");
-> +	if (IS_ERR(gpr)) {
-> +		dev_dbg(&pdev->dev, "failed to find weim-cs-gpr\n");
-> +		return 0;
-> +	}
-> +
-> +	of_property_for_each_u32(np, "ranges", prop, p, val) {
-> +		if (i % 4 == 0) {
-> +			cs = val;
-> +		} else if (i % 4 == 3 && val) {
-> +			val = (val / SZ_32M) | 1;
-> +			gprval |= val << cs * 3;
-> +		}
-> +		i++;
-> +	}
-> +
-> +	if (i == 0 || i % 4)
-> +		goto err;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(gprvals); i++) {
-> +		if (gprval == gprvals[i]) {
-> +			/* Found it. Set up IOMUXC_GPR1[11:0] with it. */
-> +			regmap_update_bits(gpr, IOMUXC_GPR1, 0xfff, gprval);
-> +			return 0;
-> +		}
-> +	}
-> +
-> +err:
-> +	dev_err(&pdev->dev, "Invalid 'ranges' configuration\n");
-> +	return -EINVAL;
-> +}
-> +
->  /* Parse and set the timing for this device. */
->  static int __init weim_timing_setup(struct device_node *np, void __iomem *base,
->  				    const struct imx_weim_devtype *devtype)
-> @@ -92,6 +144,12 @@ static int __init weim_parse_dt(struct platform_device *pdev,
->  	struct device_node *child;
->  	int ret;
->  
-> +	if (devtype == &imx50_weim_devtype) {
-> +		ret = imx_weim_gpr_setup(pdev);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
->  	for_each_child_of_node(pdev->dev.of_node, child) {
->  		if (!child->name)
->  			continue;
-> -- 
-> 1.7.9.5
-> 
-> 
+> The second option is to queue all the BDs until the maximum frames that HW
+> is
+> capable to transfer in a batch and then submit to SG engine in the HW.  With
+> this approach I feel there will be additional software overhead to track the
+> number
+> of maximum transfers and few additional cycles to release the cookie of each
+> desc.
+> Here, each desc represents a frame.
+>
+APIs are written for the gcd of h/w. We should optimize only for
+majority and here isn't even anything gained after changing the api.
+What you want to 'optimize' has been there since ever. Nobody
+considers that overhead. BTW you don't even want to spend a few 'extra
+cycles' but what about every other platform that doesn't support this
+and will have to scan for such transfer requests?
+
+> The last option is the current implementation of the driver along with this
+> change in
+> API.  It will allow us to send array of interleaved templates wherein we
+> could allocate
+> a single async desc which will handle multiple frames (or segments) and just
+> submit
+> this desc to HW.  Then we program the current to first frame, tail to last
+> frame and
+> HW will complete this transfer.  Here, each desc represents multiple frames.
+>
+> My point here is the driver should use hardware resources efficiently and I
+> feel the
+> driver will be inefficient if we dont use them.
+>
+I am afraid you are getting carried away by the 'awesomeness' of your
+hardware. RingBuffers/Cyclic transfers  are meant for cases just like
+yours.
+Consider the following ... if you queue 16 frames and don't care to
+track before all are transmitted, you'll have very high latency. Video
+seeks will take unacceptably long and give the impression of a slow
+system. Whereas if you get callbacks for each frame rendered, you
+could updates frames from the next one thereby having very quick
+response time.
+
+Anyways there are already ways to achieve what you want (however a bad
+idea that might be). So I am not convinced the change to api is any
+useful (your hardware won't run any more efficiently with the change).
+
+Regards,
+Jassi
