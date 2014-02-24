@@ -1,33 +1,59 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 24 Feb 2014 13:03:32 -0600
-Subject: Ideas/suggestions to avoid repeated locking and reducing too many
- lists with dmaengine?
-Message-ID: <530B9784.5060904@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 24 Feb 2014 14:05:09 -0500
+Subject: [PATCH v2 2/5] ARM: mvebu: Add i2c alias so setting bus number
+In-Reply-To: <1393264898-28939-3-git-send-email-andrew@lunn.ch>
+References: <1393264898-28939-1-git-send-email-andrew@lunn.ch>
+ <1393264898-28939-3-git-send-email-andrew@lunn.ch>
+Message-ID: <20140224190509.GD1010@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi folks,
+Subject should be "ARM: kirkwood: ..."
 
-Just wanted your thoughts/suggestions on how we can avoid overhead in the EDMA
-dmaengine driver. I am seeing a lots of performance drop specially for small
-transfers with EDMA versus before raw EDMA was moved to DMAEngine framework
-(atleast 25%).
+thx,
 
-One of the things I am thinking about is the repeated (spin) locking/unlocking
-of the virt_dma_chan->lock or vc->lock. In many cases, there's only 1 user or
-thread requiring to do a DMA, so I feel the locking is unnecessary and potential
-overhead. If there's a sane way to detect this an avoid locking altogether, that
-would be great.
+Jason.
 
- Also with respect to virt_dma (which is used by edma to manage all the
-descriptors and lists) there are too many lists: submitted, issued, completed
-etc and the descriptor moves from one to the other. I am thinking if there is a
-way we can avoid using so many lists and just have 2 lists and move the desc
-from one list to the other, That could avoid using the intermediate list
-altogether and classify dma requests as "done" or "not done".
-
-Since this involves discussing concurrency primitives, copying linux-rt-users as
-well.
-
-Thanks,
--Joel
+On Mon, Feb 24, 2014 at 07:01:35PM +0100, Andrew Lunn wrote:
+> When using platform_driver instantiation, the i2c bus was given bus
+> number 0. The kirkwood-t5325 audio driver has this bus number hard
+> coded for the address of the codec. However by default device tree i2c
+> busses are dynamically allocated a bus number, starting from 1. Thus
+> the kirkwood-t5325 cannot find its audio codec. By adding an alias in
+> the DT file we can control the bus number and set it to 0. The codec
+> can then be found.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/boot/dts/kirkwood.dtsi | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+> index 180dc69ff742..d8e34fab835b 100644
+> --- a/arch/arm/boot/dts/kirkwood.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi
+> @@ -24,6 +24,7 @@
+>  	aliases {
+>  	       gpio0 = &gpio0;
+>  	       gpio1 = &gpio1;
+> +	       i2c0 = &i2c0;
+>  	};
+>  
+>  	mbus {
+> @@ -111,7 +112,7 @@
+>  			clocks = <&gate_clk 7>;
+>  		};
+>  
+> -		i2c at 11000 {
+> +		i2c0: i2c at 11000 {
+>  			compatible = "marvell,mv64xxx-i2c";
+>  			reg = <0x11000 0x20>;
+>  			#address-cells = <1>;
+> -- 
+> 1.8.5.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
