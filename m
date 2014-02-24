@@ -1,52 +1,38 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 24 Feb 2014 10:10:18 -0500
-Subject: linux-next: manual merge of the sound-asoc tree with the mvebu
- tree
-In-Reply-To: <20140224133752.bc1ffffa4e81edb76a76e555@canb.auug.org.au>
-References: <20140224133752.bc1ffffa4e81edb76a76e555@canb.auug.org.au>
-Message-ID: <20140224151018.GE14250@titan.lakedaemon.net>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Mon, 24 Feb 2014 07:16:36 -0800
+Subject: [PATCH 2/2] arm/xen: Don't use xen DMA ops when the device is
+ protected by an IOMMU
+In-Reply-To: <alpine.DEB.2.02.1402241214570.4471@kaball.uk.xensource.com>
+References: <1392913301-25524-1-git-send-email-julien.grall@linaro.org>
+ <1392914159.32657.18.camel@kazak.uk.xensource.com>
+ <alpine.DEB.2.02.1402241214570.4471@kaball.uk.xensource.com>
+Message-ID: <20140224151636.GA13489@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
-
-On Mon, Feb 24, 2014 at 01:37:52PM +1100, Stephen Rothwell wrote:
-> Hi all,
+On Mon, Feb 24, 2014 at 12:19:11PM +0000, Stefano Stabellini wrote:
+> CC'ing Greg.
 > 
-> Today's linux-next merge of the sound-asoc tree got a conflict in
-> sound/soc/kirkwood/Kconfig between commit cd34edc2eab2 ("drivers: Enable
-> building of Kirkwood drivers for mach-mvebu") from the  tree and commit
-> 9a0d5113ac0e ("ASoC: kirkwood: enable Kirkwood driver for mvebu
-> platforms") from the sound-asoc tree.
+> On Thu, 20 Feb 2014, Ian Campbell wrote:
+> > On Thu, 2014-02-20 at 16:21 +0000, Julien Grall wrote:
+> > > Only Xen is able to know if a device can safely avoid to use xen-swiotlb.
+> > > This patch introduce a new property "protected-devices" for the hypervisor
+> > > node which list device which the IOMMU are been correctly programmed by Xen.
+> > > 
+> > > During Linux boot, Xen specific code will create an hash table which
+> > > contains all these devices. The hash table will be used in need_xen_dma_ops
+> > > to check if the Xen DMA ops needs to be used for the current device.
+> > 
+> > Is it out of the question to find a field within struct device itself to
+> > store this e.g. in struct device_dma_parameters perhaps and avoid the
+> > need for a hashtable lookup.
+> > 
+> > device->iommu_group might be another option, if we can create our own
+> > group?
 > 
-> I fixed it up (Probably incorrectly - see below) and can carry the fix as
-> necessary (no action is required).
+> I agree that a field in struct device would be ideal.
+> Greg, get_maintainer.pl points at you as main maintainer of device.h, do
+> you have an opinion on this?
 
-Yes, sorry this isn't ideal.  We're moving all DT support from
-mach-kirkwood to mach-mvebu and having to keep legacy support for a
-cycle.  Hence the confusing config symbols.
-
-This resolution is correct.
-
-thx,
-
-Jason.
-
-> 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc sound/soc/kirkwood/Kconfig
-> index 106e2e22fed2,2dc3ecf34801..000000000000
-> --- a/sound/soc/kirkwood/Kconfig
-> +++ b/sound/soc/kirkwood/Kconfig
-> @@@ -1,6 -1,6 +1,6 @@@
->   config SND_KIRKWOOD_SOC
->   	tristate "SoC Audio for the Marvell Kirkwood and Dove chips"
-> - 	depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD || COMPILE_TEST
->  -	depends on ARCH_KIRKWOOD || ARCH_DOVE || ARCH_MVEBU || COMPILE_TEST
-> ++	depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_KIRKWOOD || ARCH_MVEBU || COMPILE_TEST
->   	help
->   	  Say Y or M if you want to add support for codecs attached to
->   	  the Kirkwood I2S interface. You will also need to select the
+I need a whole lot more context here please.  With a patch would be even
+better so that I know exactly what you are referring to...
