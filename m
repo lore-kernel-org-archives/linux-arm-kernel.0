@@ -1,23 +1,26 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 24 Feb 2014 09:33:06 +0900
-Subject: [PATCH v2 0/2] Add Ether DT support for R8A7791/Koelsch
- reference board
-In-Reply-To: <201402200225.00598.sergei.shtylyov@cogentembedded.com>
-References: <201402200225.00598.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20140224003305.GD3898@verge.net.au>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 24 Feb 2014 09:39:53 +0900
+Subject: [PATCH 1/2] ARM: Exynos: Use generic uncompress.h
+In-Reply-To: <201401061649.36364.arnd@arndb.de>
+References: <1388998975-32362-1-git-send-email-sachin.kamat@linaro.org>
+ <201401061649.36364.arnd@arndb.de>
+Message-ID: <530A94D9.1060500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 02:24:59AM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
->    Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-> 'renesas-devel-v3.14-rc3-20140218' tag. Here we add the Ether device tree
-> support on the R8A7791/Koelsch reference board. The patchset requires
-> the 'sh_eth' driver device tree support just merged to the 'net-next.git' repo
-> in order to work.
-> 
-> [1/2] ARM: shmobile: r8a7791: add Ether DT support
-> [2/2] ARM: shmobile: koelsch: add Ether DT support
+On 01/07/14 00:49, Arnd Bergmann wrote:
+> On Monday 06 January 2014, Sachin Kamat wrote:
+>> As a pre-requisite step towards enabling multi-platform support
+>> for Exynos, enable it to use generic uncompress.h instead of the
+>> one provided in machine code.
+>>
+>> Signed-off-by: Sachin Kamat<sachin.kamat@linaro.org>
+>
+> Both patches
+>
+> Acked-by: Arnd Bergmann<arnd@arndb.de>
+>
+Applied both.
 
-Thanks, I have queued these up.
+Thanks,
+Kukjin
