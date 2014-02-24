@@ -1,53 +1,39 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 23 Feb 2014 17:13:35 -0800
-Subject: [PATCH v2 2/3] clk: bcm281xx: don't disable unused peripheral
- clocks
-In-Reply-To: <20140220205615.GF5038@beef>
-References: <1392402560-12929-1-git-send-email-elder@linaro.org>
- <1392402560-12929-3-git-send-email-elder@linaro.org>
- <20140220205615.GF5038@beef>
-Message-ID: <20140224011335.22529.77418@quantum>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 24 Feb 2014 10:03:09 +0800
+Subject: [RFC PATCH 2/2] ARM: imx6q: Mark VPU and IPU AXI transfers as
+ cacheable, increase IPU priority
+In-Reply-To: <1392978496.3091.9.camel@pizza.hi.pengutronix.de>
+References: <1392896673-13627-1-git-send-email-p.zabel@pengutronix.de>
+ <1392896673-13627-2-git-send-email-p.zabel@pengutronix.de>
+ <20140221021947.GR3010@S2101-09.ap.freescale.net>
+ <1392978496.3091.9.camel@pizza.hi.pengutronix.de>
+Message-ID: <20140224020306.GA25011@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Matt Porter (2014-02-20 12:56:15)
-> On Fri, Feb 14, 2014 at 12:29:19PM -0600, Alex Elder wrote:
-> > Add the CLK_IGNORE_UNUSED flag when setting up a peripheral clock.
-> > This prevents unused clocks from getting disabled, and by doing
-> > this we can use the common clock code even before we've resolved
-> > all the spots that need to get a reference to their clock.
-> > 
-> > Signed-off-by: Alex Elder <elder@linaro.org>
-> > Reviewed-by: Matt Porter <mporter@linaro.org>
+On Fri, Feb 21, 2014 at 11:28:16AM +0100, Philipp Zabel wrote:
+> Hi Shawn,
 > 
-> Mike: if you'll provide your ack on this patch, we would like to take
-> the entire series through arm-soc for 3.15 as we originally agreed
-> for 3.14. Patches 1 and 3 are the original two you acked for 3.14
-> but had to be dropped late in the merge window.
+> Am Freitag, den 21.02.2014, 10:19 +0800 schrieb Shawn Guo:
+> > On Thu, Feb 20, 2014 at 12:44:33PM +0100, Philipp Zabel wrote:
+> > > This is needed so that the IPU framebuffer scanout cannot be
+> > > starved by VPU or GPU activity.
+> > > Some boards like the SabreLite and SabreSD seem to set this in
+> > > the DCD already, but the documented register reset values do not
+> > > contain the necessary settings.
+> > > 
+> > > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > 
+> > I'm fine with the patches, but not sure if I should just apply them
+> > since you add 'RFC' tag in there.
+> 
+> I'm not sure whether this specific fixed QoS configuration should be
+> imposed on everyone. OTOH, following the principle of least surprise,
+> it's probably better to have this here, out in the open, than included
+> hidden in bootloader DCD tables (or not, depending on the board).
+> So if nobody objects, feel free to apply them.
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+Okay.  But can you please fix those unnecessary line-over-80-columns
+warnings?
 
-> 
-> Thanks,
-> Matt
-> 
-> > ---
-> >  drivers/clk/bcm/clk-kona-setup.c |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/clk/bcm/clk-kona-setup.c b/drivers/clk/bcm/clk-kona-setup.c
-> > index f1e88fe..c7607fe 100644
-> > --- a/drivers/clk/bcm/clk-kona-setup.c
-> > +++ b/drivers/clk/bcm/clk-kona-setup.c
-> > @@ -579,7 +579,7 @@ static int peri_clk_setup(struct ccu_data *ccu, struct peri_clk_data *data,
-> >                       struct clk_init_data *init_data)
-> >  {
-> >       init_data->ops = &kona_peri_clk_ops;
-> > -     init_data->flags = 0;
-> > +     init_data->flags = CLK_IGNORE_UNUSED;
-> >  
-> >       return clk_sel_setup(data->clocks, &data->sel, init_data);
-> >  }
-> > -- 
-> > 1.7.9.5
-> > 
+Shawn
