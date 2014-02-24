@@ -1,25 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 24 Feb 2014 13:54:21 -0500
-Subject: [PATCH] ARM: Kirkwood: Remove redundant kexec code
-In-Reply-To: <1393265364-29241-1-git-send-email-andrew@lunn.ch>
-References: <1393265364-29241-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20140224185421.GB1010@titan.lakedaemon.net>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Mon, 24 Feb 2014 20:56:27 +0200
+Subject: [PATCH] ARM: keystone_defconfig: enable AEMIF/NAND support
+Message-ID: <1393268187-15801-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 07:09:24PM +0100, Andrew Lunn wrote:
-> The PCIe driver has been fully clock aware for quite a while.  Remove
-> the kexec code to enable the PCIe clock, since the PCIe driver will do
-> the right thing.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/mach-kirkwood/board-dt.c | 5 -----
->  1 file changed, 5 deletions(-)
+Keystone SoC uses the same NAND driver as Davinci, so enable
+Davinci NAND and AEIMF that provides interface for it.
 
-Applied to mvebu/soc-kw with Arnd's Ack.  Also, added the comment to the
-commit log regarding the build error it was fixing.
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
 
-thx,
+Based on
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+keystone/master
 
-Jason.
+ arch/arm/configs/keystone_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+index 7056ef4..ec9a41d 100644
+--- a/arch/arm/configs/keystone_defconfig
++++ b/arch/arm/configs/keystone_defconfig
+@@ -111,6 +111,7 @@ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_PLATRAM=y
+ CONFIG_MTD_M25P80=y
+ CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_DAVINCI=y
+ CONFIG_MTD_UBI=y
+ CONFIG_PROC_DEVICETREE=y
+ CONFIG_BLK_DEV_LOOP=y
+@@ -147,6 +148,7 @@ CONFIG_DMADEVICES=y
+ CONFIG_TI_EDMA=y
+ CONFIG_COMMON_CLK_DEBUG=y
+ CONFIG_MEMORY=y
++CONFIG_TI_AEMIF=y
+ CONFIG_EXT4_FS=y
+ CONFIG_EXT4_FS_POSIX_ACL=y
+ CONFIG_MSDOS_FS=y
+-- 
+1.8.3.2
