@@ -1,52 +1,39 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 24 Feb 2014 10:05:54 -0800
-Subject: [PATCH v3 2/2] i2c: New bus driver for the Qualcomm QUP I2C
- controller
-In-Reply-To: <20140224174021.GA18563@joshc.qualcomm.com>
-References: <1392943090-30556-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1392943090-30556-3-git-send-email-bjorn.andersson@sonymobile.com>
- <92B0AE30-5CDF-43FC-8588-EEF0C5F86266@codeaurora.org>
- <1393237990.6481.15.camel@iivanov-dev>
- <20140224174021.GA18563@joshc.qualcomm.com>
-Message-ID: <20140224180554.GE32621@sonymobile.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 24 Feb 2014 19:02:44 +0100
+Subject: [PATCH] ARM: dts: mxs: Fix the RTC compatible prop on M28EVK
+In-Reply-To: <20140221033102.GS3010@S2101-09.ap.freescale.net>
+References: <1390519416-6760-1-git-send-email-marex@denx.de>
+ <201402210414.00167.marex@denx.de>
+ <20140221033102.GS3010@S2101-09.ap.freescale.net>
+Message-ID: <201402241902.45058.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 24 Feb 09:40 PST 2014, Josh Cartwright wrote:
-
-> On Mon, Feb 24, 2014 at 12:33:10PM +0200, Ivan T. Ivanov wrote:
-> > On Fri, 2014-02-21 at 09:35 -0600, Kumar Gala wrote: 
-> > > On Feb 20, 2014, at 6:38 PM, Bjorn Andersson <bjorn.andersson@sonymobile.com> wrote:
-> > > 
-> > > > This bus driver supports the QUP i2c hardware controller in the Qualcomm SOCs.
-> > > > The Qualcomm Universal Peripheral Engine (QUP) is a general purpose data path
-> > > > engine with input/output FIFOs and an embedded i2c mini-core. The driver
-> > > > supports FIFO mode (for low bandwidth applications) and block mode (interrupt
-> > > > generated for each block-size data transfer).
+On Friday, February 21, 2014 at 04:31:06 AM, Shawn Guo wrote:
+> On Fri, Feb 21, 2014 at 04:14:00AM +0100, Marek Vasut wrote:
+> > On Friday, February 21, 2014 at 03:09:16 AM, Shawn Guo wrote:
+> > > On Thu, Feb 20, 2014 at 01:31:37PM +0100, Marek Vasut wrote:
+> > > > On Friday, January 24, 2014 at 12:23:36 AM, Marek Vasut wrote:
+> > > > > The compatible property should be m41t62, not mt41t62, so fix this.
+> > > > > 
+> > > > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > > > Cc: Shawn Guo <shawn.guo@linaro.org>
 > > > > 
-> > > > Cc: Andy Gross <agross@codeaurora.org>
-> > > > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > > > Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
-> > > > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> > > > ---
-> > > > +config I2C_QUP
-> > > > +	tristate "Qualcomm QUP based I2C controller"
-> > > > +	depends on ARCH_MSM
+> > > > Bump ?
 > > > 
-> > > ARCH_QCOM
+> > > Applied.  Sorry for the delay.
 > > 
-> > There is no such symbol, still.
+> > Sure, no problem. Thanks. Shall I submit this for -stable too ?
 > 
-> For what it's worth, the rename/split is in linux-next, and will land in
-> 3.15 (as part of arm-soc cleanups).
-> 
-> Is the (short-term) problem of the lack of the symbol a problem?  Worse
-> case, this driver lands before the ARCH_QCOM rename lands, and the
-> driver is just not selectable.  Only when both are in place can the
-> driver be selected.
+> Oh, at this time which already passes -rc3, I didn't categorize it as a
+> critical fix (build error, kernel dumps, system hang) that we should
+> send right away for 3.14 and -stable.  If you do, you can try to resend
+> it to arm-soc folks with my ACK.
 
-As it's best case that this driver lands at the same time as that cleanup I do
-agree. I'll "rebase" this ontop of Kumar's series for the next revision.
+So this will go for 3.15 ? I will submit it for stable once it hits mainline, 
+it's not critical.
 
-Regards,
-Bjorn
+Thanks!
+
+Best regards,
+Marek Vasut
