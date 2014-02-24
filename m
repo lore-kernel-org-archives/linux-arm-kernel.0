@@ -1,69 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Mon, 24 Feb 2014 17:58:57 +0100
-Subject: [PATCH RESEND] mtd: fix bug in partition size calculation related to
- MTDPART_OFS_RETAIN
-Message-ID: <1393261137-12088-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 24 Feb 2014 18:03:58 +0100
+Subject: [RFC PATCH v3 1/9] staging: imx-drm-core: don't request probe
+ deferral in imx_drm_encoder_parse_of
+In-Reply-To: <1393260998.3091.63.camel@pizza.hi.pengutronix.de>
+References: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
+ <1392723370-4772-2-git-send-email-p.zabel@pengutronix.de>
+ <20140224154919.GL21483@n2100.arm.linux.org.uk>
+ <1393260998.3091.63.camel@pizza.hi.pengutronix.de>
+Message-ID: <1393261438.3091.67.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the remaining space is exactly what should still be available after
-the partition in question is added slave->mtd.size was set to zero
-instead of erroring out. In the next code block this was then
-interpreted as MTDPART_SIZ_FULL filling the rest of the partition
-instead of keeping it free for the next partition.
+Am Montag, den 24.02.2014, 17:56 +0100 schrieb Philipp Zabel:
+> Am Montag, den 24.02.2014, 15:49 +0000 schrieb Russell King - ARM Linux:
+> > On Tue, Feb 18, 2014 at 12:36:02PM +0100, Philipp Zabel wrote:
+> > > From: Lucas Stach <l.stach@pengutronix.de>
+> > > 
+> > > Since imx_drm_encoder_parse_of is called from the encoder bind callbacks,
+> > > it is too late to request probe deferral. Rather the core should make sure
+> > > that the crtcs are bound before the encoders, after all needed components
+> > > are probed.
+> > 
+> > Why is it too late?  -EPROBE_DEFER from this point will cause the driver
+> > initialisation to correctly unwind and return -EPROBE_DEFER to the
+> > last-to-be-added component.
+> 
+> Hmm, you are right. I have conflated two separate issues here. I'll back
+> that out.
+> 
+> > > This fixes probe failure when using the LDB on i.MX6.
+> > 
+> > More details please.
+> 
+> One issue was that the DT parsing code would try to add the imx-ldb
+> component right after the first crtc, and then its bind would fail
+> in imx_drm_encoder_parse_of because the three remaining crtcs were
+> not yet registered. This is already fixed by adding the crtc
+> components first.
 
-This problem existed since the MTDPART_OFS_RETAIN feature was introduced
-for 3.2-rc1.
+On second thought, now that the crtcs are all bound before the encoders,
+we'll never even reach this point until all crtcs are available.
 
-Fixes: 1a31368bf92e ("mtd: add a flags for partitions which should just leave smth. after them")
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
-
-resending with the correct email address of Artem.
-
-This MTDPART_OFS_RETAIN feature looks very special, and there is only a single
-user (arch/arm/mach-ep93xx/ts72xx.c). Moreover I didn't understand its purpose
-from reading the documentation in include/linux/mtd/partitions.h:
-
-	offset: absolute starting position within the master MTD device; [...]
-	if [defined as] MTDPART_OFS_RETAIN, consume as much as possible,
-	leaving size after the end of partition.
-
-But maybe it's only me.
-
-Anyhow I wonder if this feature is still considered valuable and if it's maybe
-better to just drop support for MTDPART_OFS_RETAIN. A more intuive replacement
-could be to specify start and end(+1) of partitions and interpret .start =
--0x100000 as 1 MiB before the end of the device.
-
-Best regards
-Uwe
-
- drivers/mtd/mtdpart.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/mtd/mtdpart.c b/drivers/mtd/mtdpart.c
-index 6e732c3820c1..3ca9d7fbf126 100644
---- a/drivers/mtd/mtdpart.c
-+++ b/drivers/mtd/mtdpart.c
-@@ -442,16 +442,16 @@ static struct mtd_part *allocate_partition(struct mtd_info *master,
- 	}
- 	if (slave->offset == MTDPART_OFS_RETAIN) {
- 		slave->offset = cur_offset;
--		if (master->size - slave->offset >= slave->mtd.size) {
-+		if (master->size - slave->offset > slave->mtd.size) {
- 			slave->mtd.size = master->size - slave->offset
- 							- slave->mtd.size;
- 		} else {
- 			printk(KERN_ERR "mtd partition \"%s\" doesn't have enough space: %#llx < %#llx, disabled\n",
- 				part->name, master->size - slave->offset,
- 				slave->mtd.size);
- 			/* register to preserve ordering */
- 			goto out_register;
- 		}
- 	}
- 	if (slave->mtd.size == MTDPART_SIZ_FULL)
- 		slave->mtd.size = master->size - slave->offset;
--- 
-1.9.0
+regards
+Philipp
