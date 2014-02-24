@@ -1,56 +1,272 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 24 Feb 2014 17:43:18 +0000
-Subject: [RFC PATCH 0/2] Introduce pte_isset for arm and arm64
-In-Reply-To: <20140224173624.GH2553@mudshark.cambridge.arm.com>
-References: <1393256005-2206-1-git-send-email-steve.capper@linaro.org>
- <20140224173624.GH2553@mudshark.cambridge.arm.com>
-Message-ID: <CAPvkgC20N9Z6_zu0KgPaU_XwotU=KMGgVOYNadz5r0BSZsWEzg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 24 Feb 2014 18:49:27 +0100
+Subject: [PATCH v2] clk: respect the clock dependencies in of_clk_init
+In-Reply-To: <530A420B.5050207@gmail.com>
+References: <1392054179-28830-1-git-send-email-gregory.clement@free-electrons.com>
+ <530A420B.5050207@gmail.com>
+Message-ID: <530B8627.4020705@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 February 2014 17:36, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Steve,
+Hi Tomasz,
 
-Hey Will,
+On 23/02/2014 19:46, Tomasz Figa wrote:
+> Hi Gregory,
+> 
+> On 10.02.2014 18:42, Gregory CLEMENT wrote:
+>> Until now the clock providers were initialized in the order found in
+>> the device tree. This led to have the dependencies between the clocks
+>> not respected: children clocks could be initialized before their
+>> parent clocks.
+>>
+>> Instead of forcing each platform to manage its own initialization order,
+>> this patch adds this work inside the framework itself.
+>>
+>> Using the data of the device tree the of_clk_init function now delayed
+>> the initialization of a clock provider if its parent provider was not
+>> ready yet.
+> 
+> In general this is really great. It's a first step towards sorting out 
+> dependencies between clock providers correctly. I have some comments 
+> inline, though.
+> 
+>>
+>> The strict dependency check (all parents of a given clk must be
+>> initialized) was added by Boris BREZILLON
+> 
+> Shouldn't this be reflected by a tag of this patch? If you squash a 
+> patch signed off by someone then I believe their sign-off tag should be 
+> added to the base patch. Correct me if I'm wrong, though.
 
->
-> On Mon, Feb 24, 2014 at 03:33:23PM +0000, Steve Capper wrote:
->> Long descriptors on ARM and all ptes on ARM64 are 64 bits. Some pte
->> attribute test functions such as pte_dirty return the bitwise-and of a
->> flag with the pte value. If the flag to be tested resides in the
->> upper 32 bits of the pte, then we run into the danger of the result
->> being dropped if downcast.
->>
->> For example:
->>       gather_stats(page, md, pte_dirty(*pte), 1);
->> where pte_dirty(*pte) is downcast to an int.
->>
->> Under ARM with LPAE, functions such as huge_pte_write also perform a
->> downcast to unsigned long (which is 32 bits).
->>
->> This series introduces a new macro pte_isset which performs the bitwise
->> and, then performs a double logical invert to ensure predictable
->> downcasting.
->>
->> The reasoning behind a new macro was that it creates an obvious
->> pattern which can be followed by future changes to the pte functions.
->> Rather than target specific pte functions, I opted to wrap all of them
->> with this macro for the sake of simplicity (also the flags may move in
->> future).
->>
->> I was toying with using (bool), but decided that the !! looked slightly
->> better. Under testing (with an Arndale and the Fast Model on 3.14-rc4)
->> both strategies worked as expected.
->
-> Ok, but I still don't understand why this is needed over your previous
-> series. Just inlining the '!!' into the existing accessors should be fine,
-> no? Basically, I don't see what the new macro gains us.
->
+It was not really obvious for me to know how to deal with code merged from
+someone else, but indeed adding a sign-off tag seems to be sensible.
 
-I thought it would be slightly easier to read, but it probably is
-somewhat superfluous. I will just expand out to !! for all the
-accessors that don't have a logical inverse already.
+> 
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>
+>> Since the v1, I have merged the  strict dependency check from Boris.
+>> And of course tested on my Armada 370 and Armada XP based board
+>>
+>>   drivers/clk/clk.c | 109 ++++++++++++++++++++++++++++++++++++++++++++++++++++--
+>>   1 file changed, 106 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index 5517944495d8..684976993297 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -2526,24 +2526,127 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
+>>   }
+>>   EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
+>>
+>> +struct clock_provider {
+> 
+> The name is a bit too generic and slightly misleading. IMHO struct 
+> deferred_clk_provider (and deferred_clk_providers for the list) would be 
+> better.
 
-Cheers,
+right
+
+> 
+>> +	of_clk_init_cb_t clk_init_cb;
+>> +	struct device_node *np;
+>> +	struct list_head node;
+>> +};
+>> +
+>> +static LIST_HEAD(clk_provider_list);
+>> +
+>> +/*
+>> + * This function looks for a parent clock. If there is one, then it
+>> + * checks that the provider for this parent clock was initialized, in
+>> + * this case the parent clock will be ready.
+>> + */
+>> +static int parent_ready(struct device_node *np)
+>> +{
+>> +	struct of_phandle_args clkspec;
+>> +	struct of_clk_provider *provider;
+>> +	int num_parents;
+>> +	bool found;
+>> +	int i;
+>> +
+>> +	/*
+>> +	 * If there is no clock parent, no need to wait for them, then
+>> +	 * we can consider their absence as being ready
+>> +	 */
+>> +	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
+>> +	if (num_parents <= 0)
+>> +		return 1;
+> 
+> of_clk_get_parent_count() can be used here...
+
+right
+
+> 
+>> +
+>> +	for (i = 0; i < num_parents; i++) {
+>> +		if (of_parse_phandle_with_args(np, "clocks", "#clock-cells", i,
+>> +					       &clkspec))
+>> +			return 1;
+>> +
+>> +		/* Check if we have such a provider in our array */
+>> +		found = false;
+>> +		list_for_each_entry(provider, &of_clk_providers, link) {
+>> +			if (provider->node == clkspec.np) {
+>> +				found = true;
+>> +				break;
+>> +			}
+>> +		}
+>> +
+>> +		if (!found)
+>> +			return 0;
+>> +	}
+> 
+> ...or even better, __of_clk_get_from_provider() could modified to return
+> -EPROBE_DEFER if requested provider is not registered and you could 
+
+There is already a patch sent for this "clk: return probe defer when DT clock
+not yet ready": http://article.gmane.org/gmane.linux.kernel/1643466
+
+Mike will you take it?
+
+Then I can use it to implement the suggestion made by Tomasz.
+
+> simply call of_clk_get(np, i) and handle its return value appropriately:
+> 
+> - on !IS_ERR(clk) call clk_put() and continue with iterations,
+> - on IS_ERR(clk) && PTR_ERR(clk) == -EPROBE_DEFER return 0 immediately,
+> - in any other case end the loop (end of clock specifiers).
+
+So here we make the assumption that the device tree is written correctly. I think
+it should be acceptable because here we only try to deal with the order
+of the clocks providers not the accuracy of the device tree. If the device
+tree is wrong then it should trig errors message in other part of the kernel.
+
+> 
+> This would make CCF even closer to proper handling of provider ordering, 
+> with a nice side effect of handling deferred probe for platform devices.
+> 
+>> +
+>> +	return 1;
+>> +}
+>> +
+>>   /**
+>>    * of_clk_init() - Scan and init clock providers from the DT
+>>    * @matches: array of compatible values and init functions for providers.
+>>    *
+>> - * This function scans the device tree for matching clock providers and
+>> - * calls their initialization functions
+>> + * This function scans the device tree for matching clock providers
+>> + * and calls their initialization functions. It also do it by trying
+>> + * to follow the dependencies.
+>>    */
+>>   void __init of_clk_init(const struct of_device_id *matches)
+>>   {
+>>   	const struct of_device_id *match;
+>>   	struct device_node *np;
+>> +	struct clock_provider *clk_provider, *next;
+>> +	bool is_init_done;
+>>
+>>   	if (!matches)
+>>   		matches = &__clk_of_table;
+>>
+>>   	for_each_matching_node_and_match(np, matches, &match) {
+>>   		of_clk_init_cb_t clk_init_cb = match->data;
+>> -		clk_init_cb(np);
+>> +
+>> +
+>> +		if (parent_ready(np)) {
+>> +			/*
+>> +			 * The parent clock is ready or there is no
+>> +			 * clock parent at all, in this case the
+>> +			 * provider can be initialize immediately.
+>> +			 */
+>> +			clk_init_cb(np);
+>> +		} else {
+>> +			/*
+>> +			 * The parent clock is not ready, this
+>> +			 * provider is moved to a list to be
+>> +			 * initialized later
+>> +			 */
+>> +			struct clock_provider *parent = kzalloc(sizeof(struct clock_provider),
+>> +							GFP_KERNEL);
+>> +
+>> +			parent->clk_init_cb = match->data;
+>> +			parent->np = np;
+>> +			list_add(&parent->node, &clk_provider_list);
+>> +		}
+>> +	}
+> 
+> I wonder if this couldn't be replaced with simply adding all the 
+> providers to the list first and then proceeding with the loop below to 
+> handle the registrations.
+
+Yes you're right
+
+> 
+>> +
+>> +	while (!list_empty(&clk_provider_list)) {
+>> +		is_init_done = false;
+>> +		list_for_each_entry_safe(clk_provider, next,
+>> +					&clk_provider_list, node) {
+>> +			if (parent_ready(clk_provider->np)) {
+>> +				clk_provider->clk_init_cb(clk_provider->np);
+>> +				list_del(&clk_provider->node);
+>> +				kfree(clk_provider);
+>> +				is_init_done = true;
+>> +			}
+>> +		}
+>> +
+>> +		if (!is_init_done) {
+>> +			/*
+>> +			 * We didn't managed to initialize any of the
+>> +			 * remaining providers during the last loop,
+>> +			 * so now we initialize all the remaining ones
+>> +			 * unconditionally in case the clock parent
+>> +			 * was not mandatory
+>> +			 */
+>> +			list_for_each_entry_safe(clk_provider, next,
+>> +						&clk_provider_list, node) {
+>> +				clk_provider->clk_init_cb(clk_provider->np);
+>> +				list_del(&clk_provider->node);
+>> +				kfree(clk_provider);
+> 
+> Hmm, this is basically the code above repeated without the if. What 
+> about something like the code snippet below?
+> 
+> bool force = false;
+> while (!list_empty(&clk_provider_list)) {
+> 	is_init_done = false;
+> 	list_for_each_entry_safe(clk_provider, next,
+> 				&clk_provider_list, node) {
+> 		if (force || parent_ready(clk_provider->np)) {
+> 			clk_provider->clk_init_cb(clk_provider->np);
+> 			list_del(&clk_provider->node);
+> 			kfree(clk_provider);
+> 			is_init_done = true;
+> 		}
+> 	}
+> 
+> 	if (!is_init_done)
+> 		force = true;
+> }
+
+indeed it's better.
+
+
+Thanks for your review,
+
+Gregory
+
+
+> 
+> Best regards,
+> Tomasz
+> 
+
+
 -- 
-Steve
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
