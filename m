@@ -1,93 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 24 Feb 2014 09:25:08 +0100
-Subject: [PATCH 04/11] ARM: shmobile: lager legacy: Add MSIOF support
-In-Reply-To: <CANqRtoRLcac3x55N+VHK+n6RvcgT0v9==9mt1rhVda-zwCYTCg@mail.gmail.com>
-References: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
- <1392907779-22053-5-git-send-email-geert@linux-m68k.org>
- <CANqRtoQQ9cn55Ct7pva2Bo7461WbZG0=Y5f9zLwfKhyU2=QFZw@mail.gmail.com>
- <CAMuHMdWMJFpV_uvi4mNZYc9R8qVWqQf3QGRhdPyc+hj=6XMoJw@mail.gmail.com>
- <CANqRtoRLcac3x55N+VHK+n6RvcgT0v9==9mt1rhVda-zwCYTCg@mail.gmail.com>
-Message-ID: <CAMuHMdWDtDqmarg-p+LFv4ZtzF7Rv=KzLQA3rnSa_dS2PkVmfA@mail.gmail.com>
+From: phdm@macq.eu (Philippe De Muyter)
+Date: Mon, 24 Feb 2014 09:25:23 +0100
+Subject: [PATCH v5] bus: imx-weim: support CS GPR configuration
+In-Reply-To: <20140224020455.GA25457@S2101-09.ap.freescale.net>
+References: <1392705666-10995-1-git-send-email-shawn.guo@linaro.org>
+ <20140224020455.GA25457@S2101-09.ap.freescale.net>
+Message-ID: <20140224082523.GA14927@frolo.macqel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+On Mon, Feb 24, 2014 at 10:04:59AM +0800, Shawn Guo wrote:
+> On Tue, Feb 18, 2014 at 02:41:06PM +0800, Shawn Guo wrote:
+> > For imx50-weim and imx6q-weim type of devices, there might a WEIM CS
+> > space configuration register in General Purpose Register controller,
+> > e.g. IOMUXC_GPR1 on i.MX6Q.
+> > 
+> > Depending on which configuration of the following 4 is chosen for given
+> > system, IOMUXC_GPR1[11:0] should be set up as 05, 033, 0113 or 01111
+> > correspondingly.
+> > 
+> > 	CS0(128M) CS1(0M)  CS2(0M)  CS3(0M)
+> > 	CS0(64M)  CS1(64M) CS2(0M)  CS3(0M)
+> > 	CS0(64M)  CS1(32M) CS2(32M) CS3(0M)
+> > 	CS0(32M)  CS1(32M) CS2(32M) CS3(32M)
+> > 
+> > The patch creates a function for such type of devices, which scans
+> > 'ranges' property of WEIM node and build the GPR value incrementally.
+> > Thus the WEIM CS GPR can be set up automatically at boot time.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> Philippe,
+> 
+> Any further comments?  Or can I have your Reviewed-by or Tested-by tag?
 
-On Mon, Feb 24, 2014 at 3:09 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> On Fri, Feb 21, 2014 at 1:18 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Thu, Feb 20, 2014 at 4:48 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>> Since only MSIOF1 is used on Lager (correct me if i'm wrong), isn't it
->>> best to omit the unused resources from above? In case of DT I think it
->>> makes sense to define all channels in the SoC.dtsi and let the
->>> SoC-board.dts just enable the channels that are used. But in this case
->>> with legacy code  I think we should keep thing simple and small and
->>> just enable the bits that are used on the particular board.
->>>
->>> The same obviously applies to the Koelsch legacy code as well. =)
->>
->> Note that while all resources are present, only MSIOF1 is registered on
->> Lager (MSIOF0 on Koelsch). This is similar to i2c on Koelsch, which also
->> has all resources, but only registers active devices.
->
-> Ok, I understand. Thanks for brining this to my attention.
->
-> I'd like to avoid having unused resources so I'll cook up a patch to
-> rework that myself.
->
->> It's your preference, though, so I can adapt if you want.
->
-> Thanks.
->
-> Please rework this patch to only register a single MSIOF channel. I
-> think it makes sense to only enable hardware that is being used.
+Yep, sorry. of course :
 
-Ehrm, I already register a single MSIOF channel only.
-Perhaps you mean't "remove the unused resources"?
+Reviewed-by: Philippe De Muyter <phdm@macqel.be>
+Tested-by: Philippe De Muyter <phdm@macqel.be>
 
-> Another question: How about "bus_num" and the platform device id
-> mapping? I'd like them to be the same if possible, but you are having
-> this "(idx+1)" bit in your code which I assume is to add offset for
-> the QSPI bus.
+And also a 'thank you, Shawn'
 
-"bus_num" is the SPI-specific numbering of SPI masters, which is filled
-in by spi-sh-msiof.c based on platform_device.id (i.e. the numeric suffix
-of e.g. "spi_r8a7790_msiof.1").
-It's used for matching SPI slaves in spi_board_info with SPI masters.
-As QSPI ("qspi.0") has SPI bus_num 0, the MSIOF SPI masters use
-bus_num 1 to 4, hence the "idx+1", and the platform device names
-"spi_r8a7790_msiof.1" to "spi_r8a7790_msiof.4".
+Philippe
 
-(Can't spi-sh-msiof.c use "bus_num = pdev->id + 1", so we can have
- MSIOF0 as "spi_r8a7790_msiof.0"? No, as that would impact numbering
- on all SoCs with MSIOF.)
-
-With DT, all of this doesn't matter, and life is easier, as the SPI slaves
-are child nodes of the SPI masters and thus don't need numerical bus
-references. So MSIOF0 can be called "msiof0" there.
-We still have the offsets in the "spi%u" aliases, though.
-
-> Regarding the PFC configuration, can you please double check that the
-> PIN_MAP_MUX_GROUP_DEFAULT() is in sync with the platform device id? Is
-> it the "bus_num" or the platform device id that is being used in case
-> of SPI?
-
-"bus_num" is SPI-specific. Pinctrl uses the actual device's name:
-
-/**
- * struct pinctrl_map - boards/machines shall provide this map for devices
- * @dev_name: the name of the device using this specific mapping, the name
- *      must be the same as in your struct device*. If this name is set to the
- *      same name as the pin controllers own dev_name(), the map entry will be
- *      hogged by the driver itself upon registration
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
