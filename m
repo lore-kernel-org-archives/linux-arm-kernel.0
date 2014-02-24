@@ -1,36 +1,68 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Mon, 24 Feb 2014 11:22:00 -0600
-Subject: [PATCH] ARM: boot: compressed: ignore bswapsdi2.S
-In-Reply-To: <alpine.LFD.2.11.1402201530022.17677@knanqh.ubzr>
-References: <1392899163-25846-1-git-send-email-mark.rutland@arm.com>
- <alpine.LFD.2.11.1402201530022.17677@knanqh.ubzr>
-Message-ID: <20140224112200.6d917e21d2f6502b6076aa9b@freescale.com>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Mon, 24 Feb 2014 19:26:10 +0200
+Subject: [PATCH v6 0/2]  Introduce AEMIF driver for Davinci/Keystone archs
+Message-ID: <1393262772-24442-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Feb 2014 15:30:31 -0500
-Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+These patches introduce Async External Memory Interface (EMIF16/AEMIF)
+controller driver for Davinci/Keystone archs.
 
-> On Thu, 20 Feb 2014, Mark Rutland wrote:
-> 
-> > Commit 017f161a55b4 (ARM: 7877/1: use built-in byte swap function) added
-> > bswapsdi2.{o,S}  to arch/arm/boot/compress/Makefile, but didn't update
-> > the .gitignore. Thus after a build git status shows bswapsdi2.S as a new
-> > file, which is a little annoying.
-> > 
-> > This patch updates arch/arm/boot/compress/.gitignore to ignore
-> > bswapsdi2.S, as we already do for ashldi3.S and others.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Kim Phillips <kim.phillips@freescale.com>
-> > Cc: Nicolas Pitre <nico@linaro.org>
-> > Cc: David Woodhouse <David.Woodhouse@intel.com>
-> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+For more informations see documentation:
+Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
+OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
+Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
 
-Acked-by: Kim Phillips <kim.phillips@freescale.com>
+Based on v3.14-rc4
 
-Thanks,
+v5..v6:
+- memory: ti-aemif: introduce AEMIF driver
+- memory: ti-aemif: add bindings for AEMIF driver
+	changed opaque names for cs node properties
 
-Kim
+v4..v5:
+- memory: ti-aemif: introduce AEMIF driver
+	deleted DRV_NAME in favour of KBUILD_MODNAME
+	deleted redundant err message in case of memory allocation
+	some cosmetic changes
+
+v3..v4:
+	rebased on latest of linux-keystone.git keystone/master
+
+v2..v3 (https://lkml.org/lkml/2013/12/11/148):
+- memory: ti-aemif: introduce AEMIF driver
+	changed to work with multiple AEMIF controllers
+	corrected "copyright" to "authors" in header
+	changed compatible "ti,omap-L138-aemif" to "ti,da850-aeimf"
+	used NULL in clk_get() instead of "aemif" name
+	driver can be build as loadable module
+	treat all child nodes as cs nodes, it makes code simpler
+
+- memory: ti-aemif: add bindings for AEMIF driver
+	deleted direct link driver/memory/ti-aemif.c
+	clarified description of controller ranges property
+	changed compatible "ti,omap-L138-aemif" to "ti,da850-aeimf"
+	added cs number information in commit log
+	removed compatible property from cs node, it makes code simpler
+
+v1..v2 (https://lkml.org/lkml/2013/11/21/170):
+- memory: ti-aemif: introduce AEMIF driver
+- memory: ti-aemif: add bindings for AEMIF driver
+	added ti.cs-chipselect property instead of representing chipselect
+	number in cs node name.
+
+
+Ivan Khoronzhuk (2):
+  memory: ti-aemif: introduce AEMIF driver
+  memory: ti-aemif: add bindings for AEMIF driver
+
+ .../bindings/memory-controllers/ti-aemif.txt       | 210 ++++++++++
+ drivers/memory/Kconfig                             |  11 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/ti-aemif.c                          | 427 +++++++++++++++++++++
+ 4 files changed, 649 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-aemif.txt
+ create mode 100644 drivers/memory/ti-aemif.c
+
+-- 
+1.8.3.2
