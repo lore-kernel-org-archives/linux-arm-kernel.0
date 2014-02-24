@@ -1,22 +1,19 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Feb 2014 10:59:40 +0100
-Subject: [PATCH 2/2] pinctrl: nomadik: Convert to modern pm_ops
-In-Reply-To: <1392209979-31636-2-git-send-email-ulf.hansson@linaro.org>
-References: <1392209979-31636-1-git-send-email-ulf.hansson@linaro.org>
- <1392209979-31636-2-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CACRpkdbY82BLa6CdfLS5cc5wAf96oiBnK=vjOCy=_6mR3zaqpQ@mail.gmail.com>
+Date: Mon, 24 Feb 2014 11:00:51 +0100
+Subject: [PATCH] pinctrl: sirf: update copyright years to 2014
+In-Reply-To: <1392213287-2669-1-git-send-email-21cnbao@gmail.com>
+References: <1392213287-2669-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CACRpkdbuHi0xx3HawBfBOwnsOrp5z5Yy5vUh_Ruh=exMb3a5=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 1:59 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+On Wed, Feb 12, 2014 at 2:54 PM, Barry Song <21cnbao@gmail.com> wrote:
 
-> Use the SIMPLE_DEV_PM_OPS macro and convert to the modern pm ops.
+> From: Barry Song <Baohua.Song@csr.com>
 >
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-Yep this is what we want to do!
-
-Patch applied.
+OK, patch applied.
 
 Yours,
 Linus Walleij
