@@ -1,56 +1,56 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 24 Feb 2014 14:43:23 +0800
-Subject: [patch 09/26] arm: mmp: Remove pointless fiddling with irq
- internals
-In-Reply-To: <CADApbeiyGoSAF9n5-+Ys1H4VDgN+d727E6ARWFGj4EixqeP79w@mail.gmail.com>
-References: <20140223212703.511977310@linutronix.de>
- <20140223212737.214342433@linutronix.de>
- <20140223231755.GA27579@pengutronix.de>
- <CADApbeiyGoSAF9n5-+Ys1H4VDgN+d727E6ARWFGj4EixqeP79w@mail.gmail.com>
-Message-ID: <CAN1soZy_TfzNigfn4y6kF2qe4K+AQsagd-1KWYrz1VEavMO4bA@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 24 Feb 2014 14:57:05 +0800
+Subject: [PATCH v5 2/5] ACPI / processor_core: Rework _PDC related stuff
+ to make it more arch-independent
+In-Reply-To: <F980FA86-6705-4A71-956C-EA2DBD787199@arm.com>
+References: <1392740638-2479-1-git-send-email-hanjun.guo@linaro.org>
+ <3459962.GkY99aHQbc@vostro.rjw.lan> <20140221182424.GA5751@arm.com>
+ <1408521.4TEdKhuRp5@vostro.rjw.lan>
+ <F980FA86-6705-4A71-956C-EA2DBD787199@arm.com>
+Message-ID: <530AED41.4060407@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 2:07 PM, Chao Xie <xiechao.mail@gmail.com> wrote:
-> On Mon, Feb 24, 2014 at 7:17 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
->> Hi Thomas,
->>
->> On Sun, Feb 23, 2014 at 09:40:13PM -0000, Thomas Gleixner wrote:
->>> The pm-mmp2 and pm-pxa910 power management related irq_set_wake
->>> callbacks fiddle pointlessly with the irq actions for no reason except
->>> for lack of understanding how the wakeup mechanism works.
+On 2014-2-22 18:33, Catalin Marinas wrote:
+> On 21 Feb 2014, at 23:35, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> On Friday, February 21, 2014 06:24:24 PM Catalin Marinas wrote:
+>>> On Wed, Feb 19, 2014 at 01:50:22AM +0100, Rafael J. Wysocki wrote:
+>>>> On Wednesday, February 19, 2014 12:23:55 AM Hanjun Guo wrote:
+>>>>> _PDC related stuff in processor_core.c is little bit X86/IA64 dependent,
+>>>>> rework the code to make it more arch-independent, no functional change
+>>>>> in this patch.
+>>>>>
+>>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>>>>
+>>>> I've queued up patches [1,3-5/5] from this series for 3.15 (modulo changelog
+>>>> modifications), but this one should be CCed to the x86 and ia64 maintainers.
 >>>
->>> On supsend the core disables all interrupts lazily, i.e. it does not
->>> mask them at the irq controller level. So any interrupt which is
->>> firing during supsend will mark the corresponding interrupt line as
->> s/supsend/suspend/ twice
->>> pending. Just before the core powers down it checks whether there are
->>> interrupts pending from interrupt lines which are marked as wakeup
->>> sources and if so it aborts the resume and resends the interrupts.
->> It's the suspend that is aborted, not the resume.
+>>> Thanks for taking these patches. I would however hold onto patch 3/5 as
+>>> this is still under discussion. Basically for patches specific to ARM
+>>> ACPI I would really like to see more acks before being merged as that's
+>>> a new thing for us.
 >>
->> Other than that your change looks fine.
->>
-> For pxa910 and MMP2, wake up source only wake up the AP subsystem.
-> The AP subsystem includes the APMU(AP Power Mangament Unit) and cores.
-> Now the core is still powered down. APMU will check the interrupt
-> lines, and find
-> that there are interrupt pending, it will power on the cores.
-> So if the irq is disabled, even wake up source can wake up AP subsystem, but the
-> core is still powered down. It will not be powered up by APMU.
->
+>> OK, I'll drop [3/5] for now, then.
+> 
+> Thanks (it?s only temporary ;)).
+> 
+>> I'm wondering, though, whose ACKs I should be waiting for before applying those
+>> patches?
+> 
+> Good question ;). In this particular case, there is an ongoing
+> discussion between Hanjun and Sudeep. While there isn?t anything
+> major, I would like to see some agreement and potentially an Ack from
+> the other party involved in the discussion (Sudeep).
+> 
+> There are other patches that are not specific to ARM, so it?s
+> really your decision. As for the general ARM(64) ACPI case, I don?t
+> think we have anyone in charge with deciding what?s correct or not
+> (BTW, who are the people active both in the _ARM_ Linux kernel community
+> and the ACPI standardisation forum?).
 
-Yes, suspend/resume can't work if the above code is removed.
+I'm in ASWG (ACPI spec working group) under UEFI, and Al Stone and Charles
+(+cc Charles) are also in this forum.
 
-Interrupt source (logic AND with interrupt mask register) is connected
-to MPMU as
-wakeup source. If the interrupt is disabled, there's no wakeup source event.
-
-And APMU is waken up by MPMU.
-
-So please don't remove the above code. We must keep these interrupt lines active
-to wake up the whole system.
-
-Regards
-Haojian
+Thanks
+Hanjun
