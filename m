@@ -1,33 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Feb 2014 13:57:18 +0100
-Subject: [PATCH 2/2] ARM: u300: switch SSP/SPI clock name to "SSPCLK"
-Message-ID: <1393246638-16236-1-git-send-email-linus.walleij@linaro.org>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 24 Feb 2014 13:57:17 +0100
+Subject: [PATCHv2 03/16] Documentation: dt: add OMAP iommu bindings
+In-Reply-To: <1392315347-32967-4-git-send-email-s-anna@ti.com>
+References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
+ <1392315347-32967-4-git-send-email-s-anna@ti.com>
+Message-ID: <530B41AD.2030608@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As noted in recent discussions the name of the core clock for
-the PL022 derived SPI blocks is erroneously named in the
-U300 device tree. The kernel doesn't currently use the name,
-but may do so soon so let use rename all these clocks in
-accordance with the name given in the PL022 TRM (ARM DDI 0194G).
+Hi,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-u300.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 02/13/2014 07:15 PM, Suman Anna wrote:
+> From: Florian Vaussard <florian.vaussard@epfl.ch>
+> 
+> This patch adds the iommu bindings for all OMAP2+ SoCs. Apart from
+> the standard bindings used by OMAP peripherals, this patch uses a
+> 'dma-window' (already used by Tegra SMMU) and adds two OMAP custom
+> bindings - 'ti,#tlb-entries' and 'ti,iommu-bus-err-back'.
+> 
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> [s-anna at ti.com: split bindings document, add dra7 and bus error back]
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+>  .../devicetree/bindings/iommu/ti,omap-iommu.txt    | 28 ++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+> new file mode 100644
+> index 0000000..116492d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+> @@ -0,0 +1,28 @@
+> +OMAP2+ IOMMU
+> +
+> +Required properties:
+> +- compatible : Should be one of,
+> +		"ti,omap2-iommu" for OMAP2/OMAP3 IOMMU instances
+> +		"ti,omap4-iommu" for OMAP4/OMAP5 IOMMU instances
+> +		"ti,dra7-iommu" for DRA7xx IOMMU instances
+> +- ti,hwmods  : Name of the hwmod associated with the IOMMU instance
+> +- reg        : Address space for the configuration registers
+> +- interrupts : Interrupt specifier for the IOMMU instance
+> +- dma-window : IOVA start address and length
+> +
+> +Optional properties:
+> +- ti,#tlb-entries : Number of entries in the translation look-aside buffer.
+> +                    Should be either 8 or 32 (default: 32)
+> +- ti,iommu-bus-err-back : Indicates the IOMMU instance supports throwing
+> +		          back a bus error response on MMU faults.
+> +
+> +Example:
+> +	/* OMAP3 ISP MMU */
+> +	mmu_isp: mmu at 480bd400 {
+> +		compatible = "ti,omap2-iommu";
+> +		reg = <0x480bd400 0x80>;
+> +		interrupts = <24>;
+> +		ti,hwmods = "mmu_isp";
+> +		ti,#tlb-entries = <8>;
+> +		dma-window = <0 0xfffff000>;
+> +	};
+> 
 
-diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
-index a9da4800daf0..6fe688e9e4da 100644
---- a/arch/arm/boot/dts/ste-u300.dts
-+++ b/arch/arm/boot/dts/ste-u300.dts
-@@ -457,7 +457,7 @@
- 			interrupt-parent = <&vica>;
- 			interrupts = <23>;
- 			clocks = <&spi_clk>, <&spi_clk>;
--			clock-names = "apb_pclk", "spi_clk";
-+			clock-names = "SSPCLK", "apb_pclk";
- 			dmas = <&dmac 27 &dmac 28>;
- 			dma-names = "tx", "rx";
- 			num-cs = <3>;
--- 
-1.8.5.3
+Any comments on this binding?
+
+Regards,
+Florian
