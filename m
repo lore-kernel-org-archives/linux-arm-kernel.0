@@ -1,27 +1,25 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Feb 2014 10:14:13 +0100
-Subject: [PATCH v7 13/15] ARM: sun4i: dt: Remove grouping + simple-bus
- compatible for regulators
-In-Reply-To: <5309AB64.7010603@redhat.com>
-References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
- <1393084424-31099-14-git-send-email-hdegoede@redhat.com>
- <20140222214421.GC3610@lukather> <5309AB64.7010603@redhat.com>
-Message-ID: <20140224091413.GD3468@lukather>
+Date: Mon, 24 Feb 2014 10:27:43 +0100
+Subject: [PATCH v3 1/4] ARM: sunxi: Add driver for sunxi usb phy
+In-Reply-To: <1393157352-21104-2-git-send-email-hdegoede@redhat.com>
+References: <1393157352-21104-1-git-send-email-hdegoede@redhat.com>
+ <1393157352-21104-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140224092743.GF3468@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 23, 2014 at 09:03:48AM +0100, Hans de Goede wrote:
-> Thanks, I assume this only applies to this patch, since we were still
-> discussing the common regulator bits of the ahci enablement dts patches ?
+Hi,
 
-Yes.
-
-> I'm not seeing any of your recent merges here:
-> https://github.com/mripard/linux/commits/sunxi/dt-for-3.15
+On Sun, Feb 23, 2014 at 01:09:09PM +0100, Hans de Goede wrote:
+> The Allwinner A1x / A2x SoCs have 2 or 3 usb phys which are all accessed
+> through a single set of registers. Besides this there are also some other
+> phy related bits which need poking, which are per phy, but shared between the
+> ohci and ehci controllers, so these are also controlled from this new phy
+> driver.
 > 
-> Did you not push them, or am I looking at the wrong tree ?
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-I forgot to push it. It's fixed now.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
 Thanks!
 Maxime
@@ -36,4 +34,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/4941aa27/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/e447a37e/attachment.sig>
