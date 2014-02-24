@@ -1,84 +1,68 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 23 Feb 2014 16:48:26 -0800
-Subject: [PATCH RFC v1 3/3] clk: Add handling of clk parent and rate
- assigned from DT
-In-Reply-To: <53072C9D.5040303@samsung.com>
-References: <1392829124-25705-1-git-send-email-s.nawrocki@samsung.com>
- <1392829124-25705-4-git-send-email-s.nawrocki@samsung.com>
- <20140220140928.27132C4050F@trevor.secretlab.ca>
- <53072C9D.5040303@samsung.com>
-Message-ID: <20140224004826.22529.87768@quantum>
+Date: Sun, 23 Feb 2014 17:02:11 -0800
+Subject: Tegra clockframework fixes for 3.14
+In-Reply-To: <20140220172744.GA4378@tbergstrom-lnx.Nvidia.com>
+References: <20140220172744.GA4378@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20140224010211.22529.99924@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2014-02-21 02:38:21)
-> On 20/02/14 15:09, Grant Likely wrote:
-> [...]
-> >> > diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> >> > index 7c52c29..d618498 100644
-> >> > --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> >> > +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> >> > @@ -115,3 +115,27 @@ clock signal, and a UART.
-> >> >    ("pll" and "pll-switched").
-> >> >  * The UART has its baud clock connected the external oscillator and its
-> >> >    register clock connected to the PLL clock (the "pll-switched" signal)
-> >> > +
-> >> > +==Static initial configuration of clock parent and clock frequency==
-> >> > +
-> >> > +Some platforms require static configuration of (parts of) the clock controller
-> >> > +often determined by the board design. Such a configuration can be specified in
-> >> > +a clock consumer node through [clk-name]-clk-parent and [clk-name]-clk-rate DT
-> >> > +properties. The former should contain phandle and clock specifier of the parent
-> >> > +clock, the latter the required clock's frequency value (one cell). "clk-name"
-> >> > +should be listed in the clock-names property and a phandle and a clock specifier
-> >> > +pair corresponding to it should be present in the clocks property.
-> >> > +
-> >> > +    uart at a000 {
-> >> > +        compatible = "fsl,imx-uart";
-> >> > +        reg = <0xa000 0x1000>;
-> >> > +  ...
-> >> > +        clocks = <&clkcon 0>, <&clkcon 3>;
-> >> > +        clock-names = "baud", "mux";
-> >> > +
-> >> > +  mux-clk-parent = <&pll 1>;
-> >> > +  baud-clk-rate = <460800>;
-> >
-> > This mixes patterns for references to clocks. Plus it requires composing
-> > property names which is a little painful. I'd rather see a list of
-> > tuples to match the existing pattern already in use
-> > 
-> >       clocks = <&clkcon 0>, <&clkcon 3>;
-> >       clock-names = "baud", "mux";
-> >       clock-parents = <0> <&pll 1>;
-> >       clock-rates = <0> <460800>;
+Quoting Peter De Schrijver (2014-02-20 09:27:44)
+> Hi Mike,
 > 
-> Thank you for the review. This looks much better to me. My bad, I wasn't 
-> aware 0 can be used to denote an empty phandle like this. ePAPR seems not 
-> to be specifying exact meaning of the 'phandle' property values, except 
-> they be unique. Anyway, it seems to be clearly documented within the
-> __of_parse_phandle_with_args() function. 
-> 
-> I'll try this modified binding instead, presumably it would be useful to 
-> have a variant of __of_parse_phandle_with_args() function which would 
-> accept a context data containing result of previous call within an iteration, 
-> similarly as of_property_next_string() is written. So we don't iterate 
-> from beginning of the list with each __of_parse_phandle_with_args() call. 
-> But it's an optimization issue that could be considered separately I guess.
+> Could you merge these fixes still for 3.14?
 
-I was always partial to the regulator style of blahblah-supply but
-Grant's suggestion is much cleaner with respect to the rest of the clock
-binding.
+No problem, but can you provide a list of the regressions fixed? I'll
+add those to my merge commit message. No need for you to respin
+anything. Next time if you could submit a signed tag with the
+regressions listed in the message it would be a great help.
 
-I guess it will be a bit ugly if a very long array is needed with a
-sparse attribute. E.g. 20 clocks specified in the 'clocks' property and
-only a single clock needs to have its parent or rate specified.
-
-Is there a reason not to support both methods?
-
-Regards,
+Thanks!
 Mike
 
 > 
-> --
 > Thanks,
-> Sylwester
+> 
+> Peter.
+> 
+> The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
+> 
+>   Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
+> 
+> are available in the git repository at:
+>   git://nv-tegra.nvidia.com/user/pdeschrijver/linux.git clk-tegra-more-fixes-3.14
+> 
+> Andrew Bresticker (3):
+>       clk: tegra: fix sdmmc clks on Tegra1x4
+>       clk: tegra: cclk_lp has a pllx/2 divider
+>       clk: tegra: use max divider if divider overflows
+> 
+> David Ung (1):
+>       clk: tegra: PLLD2 fixes for hdmi
+> 
+> Gabe Black (1):
+>       clk: tegra: Fix PLLP rate table
+> 
+> Mark Zhang (1):
+>       clk: tegra: fix host1x clock on Tegra124
+> 
+> Peter De Schrijver (3):
+>       clk: tegra: Add missing Tegra20 fuse clks
+>       clk: tegra: Fix vic03 mux index
+>       clk: tegra124: remove gr2d and gr3d clocks
+> 
+> Rhyland Klein (1):
+>       clk: tegra: Fix PLLD mnp table
+> 
+> Thierry Reding (1):
+>       clk: tegra: Correct clock number for UARTE
+> 
+>  drivers/clk/tegra/clk-divider.c          |    2 +-
+>  drivers/clk/tegra/clk-id.h               |    4 ++
+>  drivers/clk/tegra/clk-tegra-periph.c     |   10 ++++--
+>  drivers/clk/tegra/clk-tegra-super-gen4.c |    2 +-
+>  drivers/clk/tegra/clk-tegra114.c         |    8 ++--
+>  drivers/clk/tegra/clk-tegra124.c         |   48 +++++++++++++++++-------------
+>  drivers/clk/tegra/clk-tegra20.c          |    2 +
+>  include/dt-bindings/clock/tegra124-car.h |    4 +-
+>  8 files changed, 47 insertions(+), 33 deletions(-)
