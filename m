@@ -1,35 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 24 Feb 2014 17:06:53 +0000
-Subject: [RFC PATCH v3 1/9] staging: imx-drm-core: don't request probe
- deferral in imx_drm_encoder_parse_of
-In-Reply-To: <1393260998.3091.63.camel@pizza.hi.pengutronix.de>
-References: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
- <1392723370-4772-2-git-send-email-p.zabel@pengutronix.de>
- <20140224154919.GL21483@n2100.arm.linux.org.uk>
- <1393260998.3091.63.camel@pizza.hi.pengutronix.de>
-Message-ID: <20140224170653.GO21483@n2100.arm.linux.org.uk>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Mon, 24 Feb 2014 18:07:47 +0100
+Subject: [PATCH 0/2] ARM: dts: OMAP4: Add support for DuoVero/Parlor
+Message-ID: <1393261669-32039-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 05:56:38PM +0100, Philipp Zabel wrote:
-> Am Montag, den 24.02.2014, 15:49 +0000 schrieb Russell King - ARM Linux:
-> One issue was that the DT parsing code would try to add the imx-ldb
-> component right after the first crtc, and then its bind would fail
-> in imx_drm_encoder_parse_of because the three remaining crtcs were
-> not yet registered. This is already fixed by adding the crtc
-> components first.
+Hi Benoit, Tony,
 
-That's what happens anyway - we add /all/ the CRTCs first before we
-start adding the connectors.
+Here is a device tree to support the OMAP4430-based Gumstix DuoVero
+with the Parlor expansion boards. All peripherals should be working
+with current 3.14-rc4, except:
 
-That means the CRTCs will be bound before the connectors (ldb).
+- GPMC ethernet (needs patches [1])
+- TWL6040 init may fail (will send a bug report to ML)
+- The HDMI output depends on Tomi's DSS series [2] (not yet merged)
 
-What you're probably missing is that with what's in my branch, if you
-want both CRTCs or the second CRTC in the IPU pair, you must specify
-both in the "crtcs" property - iow "crtcs = <&ipuX 0>, <&ipuX 1>".
-The reason is there's no way to differentiate the individual platform
-devices there without delving into the platform data.
+I split the HDMI part into a second patch, so it can be merged with the DSS
+series, even if the nodes could be merged independently.
+
+Regards,
+Florian
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/110662
+[2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/295881
+
+
+Florian Vaussard (2):
+  ARM: dts: Add support for OMAP4 Gumstix DuoVero/Parlor
+  ARM: dts: duovero-parlor: Add HDMI output
+
+ .../devicetree/bindings/arm/omap/omap.txt          |   3 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/omap4-duovero-parlor.dts         | 182 +++++++++++++++
+ arch/arm/boot/dts/omap4-duovero.dtsi               | 252 +++++++++++++++++++++
+ 4 files changed, 438 insertions(+)
+ create mode 100644 arch/arm/boot/dts/omap4-duovero-parlor.dts
+ create mode 100644 arch/arm/boot/dts/omap4-duovero.dtsi
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.1.2
