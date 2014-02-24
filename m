@@ -1,47 +1,44 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 24 Feb 2014 18:31:30 +0100
-Subject: [RFC PATCH v3 2/9] staging: imx-drm: Add temporary copies of
- v4l2-of parsing functions
-In-Reply-To: <20140224155221.GM21483@n2100.arm.linux.org.uk>
-References: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
- <1392723370-4772-3-git-send-email-p.zabel@pengutronix.de>
- <20140224155221.GM21483@n2100.arm.linux.org.uk>
-Message-ID: <1393263090.3091.78.camel@pizza.hi.pengutronix.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 24 Feb 2014 12:32:35 -0500
+Subject: [PATCH v4 18/22] drivers: Enable building of Kirkwood drivers
+ for mach-mvebu
+In-Reply-To: <CAKohpo=V6QfinW83L3ohHCijdaMu7PR4bZs=2hrf2GYDfKn1cA@mail.gmail.com>
+References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
+ <1393096504-11844-19-git-send-email-andrew@lunn.ch>
+ <CAKohpo=V6QfinW83L3ohHCijdaMu7PR4bZs=2hrf2GYDfKn1cA@mail.gmail.com>
+Message-ID: <20140224173235.GG14250@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 24.02.2014, 15:52 +0000 schrieb Russell King - ARM Linux:
-> On Tue, Feb 18, 2014 at 12:36:03PM +0100, Philipp Zabel wrote:
-> > From: Philipp Zabel <philipp.zabel@gmail.com>
-> > 
-> > The existing v4l2-of parser functions for the video interface bindings
-> > described in Documentation/device-tree/bindings/media/video-interfaces.txt
-> > are useful for DRM drivers, too. They will be moved to drivers/media
-> > so they can be used by drm drivers, too. Until then, duplicate the
-> > v4l2-of parser functions temporarily.
-> > 
-> > Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+On Mon, Feb 24, 2014 at 11:07:35AM +0530, Viresh Kumar wrote:
+> On 23 February 2014 00:45, Andrew Lunn <andrew@lunn.ch> wrote:
+> > With the move of kirkwood into mach-mvebu, drivers Kconfig need
+> > tweeking to allow the kirkwood specific drivers to be built.
+> >
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > Acked-by: Mark Brown <broonie@linaro.org>
+> > Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
+> > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> > Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> > Cc: Richard Purdie <rpurdie@rpsys.net>
+> > Cc: Bryan Wu <cooloney@gmail.com>
+> > Cc: Zhang Rui <rui.zhang@intel.com>
+> > Cc: Eduardo Valentin <eduardo.valentin@ti.com>
+> > ---
+> > v2
+> > Simplify cpufreq/Kconfig.arm
+> >
+> > Still needs ACKs from cpufreq, led and thermal maintainers.
+> > ---
+> >  drivers/cpufreq/Kconfig.arm | 2 +-
 > 
-> Ergh.  So, because we can't get agreement on where to put the common
-> helpers, we have to put up with adding duplicate helpers into the
-> staging directory, inflating not only the kernel source code size
-> but also the binary size as well.
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-This part is only for the convenience of prospective reviewers/testers.
-I hope I don't have exhausted your patience at this patch, because the
-real changes start at 3/9.
+Added and pushed, thanks Viresh.
 
-This is one reason why I still didn't drop the RFC. Basically, with so
-many moving parts, I didn't feel like telling people to fetch three
-different series just to make sense of this one.
+thx,
 
-> Come on people, get agreement on how to deal with this.  Staging may
-> be a dumping ground for drivers which aren't ready to be merged as
-> proper drivers, but this is no reason to ignore proper process.
-> 
-> Do we, or do we not want to get imx-drm out of drivers/staging?  If
-> we do, the only way that's going to happen is if we stop throwing in
-> this kind of stuff.
-
-regards
-Philipp
+Jason.
