@@ -1,39 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Feb 2014 18:29:31 +0000
-Subject: [PATCH] irqchip: gic: use dmb ishst instead of dsb when raising
- a softirq
-In-Reply-To: <1392918127-1430-1-git-send-email-will.deacon@arm.com>
-References: <1392918127-1430-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20140224182931.GB1198@mudshark.cambridge.arm.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 24 Feb 2014 13:31:29 -0500
+Subject: [PATCH v13 2/3] ata: Add APM X-Gene SoC AHCI SATA host
+ controller driver
+In-Reply-To: <1393221265-13057-3-git-send-email-lho@apm.com>
+References: <1393221265-13057-1-git-send-email-lho@apm.com>
+ <1393221265-13057-2-git-send-email-lho@apm.com>
+ <1393221265-13057-3-git-send-email-lho@apm.com>
+Message-ID: <20140224183129.GA2522@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 20, 2014 at 05:42:07PM +0000, Will Deacon wrote:
-> When sending an SGI to another CPU, we require a barrier to ensure that
-> any pending stores to normal memory are made visible to the recipient
-> before the interrupt arrives.
-> 
-> Rather than use a vanilla dsb() (which will soon cause an assembly error
-> on arm64) before the writel_relaxed, we can instead use dsb(ishst),
-> since we just need to ensure that any pending normal writes are visible
-> within the inner-shareable domain before we poke the GIC.
-> 
-> With this observation, we can then further weaken the barrier to a
-> dmb(ishst), since other CPUs in the inner-shareable domain must observe
-> the write to the distributor before the SGI is generated.
-> 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
-> 
-> Hi Olof,
-> 
-> Please can you take this via arm-soc for 3.15? That will let me activate
-> the new barrier options for arm64 at the end of the next merge window
-> (in the meantime, you can pass them but they are ignored).
+Hello, Loc.
 
-I still can't see this in -next, any chance you could queue it please?
+Almost there.  Just one more thing.
 
-Will
+On Sun, Feb 23, 2014 at 10:54:24PM -0700, Loc Ho wrote:
+....
+> +static int xgene_ahci_init_memram(struct xgene_ahci_context *ctx)
+> +{
+> +	void __iomem *diagcsr = ctx->csr_base + SATA_DIAG_OFFSET;
+> +	int try;
+> +	u32 val;
+> +
+> +	val = readl(diagcsr + CFG_MEM_RAM_SHUTDOWN);
+> +	if (val == 0) {
+> +		dev_dbg(ctx->dev, "memory already released from shutdown\n");
+> +		return 0;
+> +	}
+> +	dev_dbg(ctx->dev, "Release memory from shutdown\n");
+> +	/* SATA controller memory in shutdown. Remove from shutdown. */
+> +	writel(0x0, diagcsr + CFG_MEM_RAM_SHUTDOWN);
+> +	readl(diagcsr + CFG_MEM_RAM_SHUTDOWN); /* Force a barrier */
+> +
+> +	/* Check for at least ~1ms */
+> +	try = 1000;
+> +	do {
+> +		val = readl(diagcsr + BLOCK_MEM_RDY);
+> +		if (val != 0xFFFFFFFF)
+> +			usleep_range(1, 100);
+> +	} while (val != 0xFFFFFFFF && try-- > 0);
+> +	if (try <= 0) {
+> +		dev_err(ctx->dev, "failed to release memory from shutdown\n");
+> +		return -ENODEV;
+> +	}
+> +	return 0;
+> +}
+
+Hmm... ISTR raising this issue before but the above is way more
+elaborate than necessary.  This isn't in any sense a hot path and 1ms
+is short enough to handle it simply.  If the only thing being
+addressed here is that the init may take upto 1ms, you might as well
+just do
+
+	writel(0x0, diagcsr + CFG_MEM_RAM_SHUTDOWN);
+	readl(diagcsr + CFG_MEM_RAM_SHUTDOWN); /* Force a barrier */
+	msleep(1);	/* reset may take upto 1ms */
+	if (readl(diagcsr + BLOCK_MEM_RDY) != 0xFFFFFFFF) {
+		dev_err(...);
+		return -ENODEV;
+	}
+	return 0;
+
+Thanks.
+
+-- 
+tejun
