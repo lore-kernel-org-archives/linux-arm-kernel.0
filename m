@@ -1,57 +1,78 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 24 Feb 2014 13:31:15 +0100
-Subject: [PATCH] ARM: mvebu: Armada 375/38x depend on MULTI_V7
-In-Reply-To: <1393174030-10549-1-git-send-email-jason@lakedaemon.net>
-References: <1393174030-10549-1-git-send-email-jason@lakedaemon.net>
-Message-ID: <20140224123115.GC18601@lunn.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Feb 2014 13:56:53 +0100
+Subject: [PATCH 1/2] ARM: ux500: switch SSP/SPI clock name to "SSPCLK"
+Message-ID: <1393246613-16197-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 23, 2014 at 04:47:10PM +0000, Jason Cooper wrote:
-> During this release cycle, we're adding the new Armada 375, 380, and 385
-> SoCs.  We're also migrating DT kirkwood boards into mach-mvebu.  The
-> kirkwood changes make the different SoCs in mach-mvebu/ depend on
-> MULTI_V7 or MULTI_V5 as appropriate.
-> 
-> We add this dependency to the new SoCs so that when the branches are
-> merged, everything is as it should be.
-> 
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+As noted in recent discussions the name of the core clock for
+the PL022 derived SPI blocks is erroneously named in the
+Ux500 device trees. The kernel doesn't currently use the name,
+but may do so soon so let use rename all these clocks in
+accordance with the name given in the PL022 TRM (ARM DDI 0194G).
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-Thanks Jason,
-
-       Andrew
-
-> ---
-> Adding this to mvebu/soc-3xx
-> 
->  arch/arm/mach-mvebu/Kconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> index 884b275ab056..00dc4a6ace6e 100644
-> --- a/arch/arm/mach-mvebu/Kconfig
-> +++ b/arch/arm/mach-mvebu/Kconfig
-> @@ -38,7 +38,7 @@ config MACH_ARMADA_370
->  	  on the Marvell Armada 370 SoC with device tree.
->  
->  config MACH_ARMADA_375
-> -	bool "Marvell Armada 375 boards"
-> +	bool "Marvell Armada 375 boards" if ARCH_MULTI_V7
->  	select ARM_ERRATA_720789
->  	select ARM_ERRATA_753970
->  	select ARM_GIC
-> @@ -52,7 +52,7 @@ config MACH_ARMADA_375
->  	  on the Marvell Armada 375 SoC with device tree.
->  
->  config MACH_ARMADA_38X
-> -	bool "Marvell Armada 380/385 boards"
-> +	bool "Marvell Armada 380/385 boards" if ARCH_MULTI_V7
->  	select ARM_ERRATA_720789
->  	select ARM_ERRATA_753970
->  	select ARM_GIC
-> -- 
-> 1.9.0
-> 
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index e0853ea02df2..e41eedca3ce3 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -705,7 +705,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			clocks = <&prcc_kclk 3 1>, <&prcc_pclk 3 1>;
+-			clock-names = "ssp0clk", "apb_pclk";
++			clock-names = "SSPCLK", "apb_pclk";
+ 			dmas = <&dma 8 0 0x2>, /* Logical - DevToMem */
+ 			       <&dma 8 0 0x0>; /* Logical - MemToDev */
+ 			dma-names = "rx", "tx";
+@@ -718,7 +718,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			clocks = <&prcc_kclk 3 2>, <&prcc_pclk 3 2>;
+-			clock-names = "ssp1clk", "apb_pclk";
++			clock-names = "SSPCLK", "apb_pclk";
+ 			dmas = <&dma 9 0 0x2>, /* Logical - DevToMem */
+ 			       <&dma 9 0 0x0>; /* Logical - MemToDev */
+ 			dma-names = "rx", "tx";
+@@ -732,7 +732,7 @@
+ 			#size-cells = <0>;
+ 			/* Same clock wired to kernel and pclk */
+ 			clocks = <&prcc_pclk 2 8>, <&prcc_pclk 2 8>;
+-			clock-names = "spi0clk", "apb_pclk";
++			clock-names = "SSPCLK", "apb_pclk";
+ 			dmas = <&dma 0 0 0x2>, /* Logical - DevToMem */
+ 			       <&dma 0 0 0x0>; /* Logical - MemToDev */
+ 			dma-names = "rx", "tx";
+@@ -746,7 +746,7 @@
+ 			#size-cells = <0>;
+ 			/* Same clock wired to kernel and pclk */
+ 			clocks = <&prcc_pclk 2 2>, <&prcc_pclk 2 2>;
+-			clock-names = "spi1clk", "apb_pclk";
++			clock-names = "SSPCLK", "apb_pclk";
+ 			dmas = <&dma 35 0 0x2>, /* Logical - DevToMem */
+ 			       <&dma 35 0 0x0>; /* Logical - MemToDev */
+ 			dma-names = "rx", "tx";
+@@ -760,7 +760,7 @@
+ 			#size-cells = <0>;
+ 			/* Same clock wired to kernel and pclk */
+ 			clocks = <&prcc_pclk 2 1>, <&prcc_pclk 2 1>;
+-			clock-names = "spi2clk", "apb_pclk";
++			clock-names = "SSPCLK", "apb_pclk";
+ 			dmas = <&dma 33 0 0x2>, /* Logical - DevToMem */
+ 			       <&dma 33 0 0x0>; /* Logical - MemToDev */
+ 			dma-names = "rx", "tx";
+@@ -774,7 +774,7 @@
+ 			#size-cells = <0>;
+ 			/* Same clock wired to kernel and pclk */
+ 			clocks = <&prcc_pclk 1 7>, <&prcc_pclk 1 7>;
+-			clock-names = "spi3clk", "apb_pclk";
++			clock-names = "SSPCLK", "apb_pclk";
+ 			dmas = <&dma 40 0 0x2>, /* Logical - DevToMem */
+ 			       <&dma 40 0 0x0>; /* Logical - MemToDev */
+ 			dma-names = "rx", "tx";
+-- 
+1.8.5.3
