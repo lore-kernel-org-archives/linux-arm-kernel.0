@@ -1,85 +1,64 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 24 Feb 2014 18:37:38 +0800
-Subject: [PATCH v5 4/8] Documentation: add the document for the SPI NOR
- framework
+Date: Mon, 24 Feb 2014 18:37:40 +0800
+Subject: [PATCH v5 6/8] mtd: spi-nor: add a helper to find the spi_device_id
 In-Reply-To: <1393238262-8622-1-git-send-email-b32955@freescale.com>
 References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
-Message-ID: <1393238262-8622-5-git-send-email-b32955@freescale.com>
+Message-ID: <1393238262-8622-7-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the document for the SPI NOR framework.
+Add the spi_nor_match_id() to find the proper spi_device_id with the
+NOR flash's name in the spi_nor_ids table.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- Documentation/mtd/spi-nor.txt |   59 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 59 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/mtd/spi-nor.txt
+ drivers/mtd/spi-nor/spi-nor.c |   12 ++++++++++++
+ include/linux/mtd/spi-nor.h   |   12 ++++++++++++
+ 2 files changed, 24 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/mtd/spi-nor.txt b/Documentation/mtd/spi-nor.txt
-new file mode 100644
-index 0000000..b9585f8
---- /dev/null
-+++ b/Documentation/mtd/spi-nor.txt
-@@ -0,0 +1,59 @@
-+                          SPI NOR framework
-+               ============================================
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index a840e88..6c8fd01 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -1081,6 +1081,18 @@ int spi_nor_scan(struct spi_nor *nor, const struct spi_device_id *id,
+ 	return 0;
+ }
+ 
++const struct spi_device_id *spi_nor_match_id(char *name)
++{
++	const struct spi_device_id *id = spi_nor_ids;
 +
-+Part I - why we need this framework?
-+-------------------------------------
++	while (id->name[0]) {
++		if (!strcmp(name, id->name))
++			return id;
++		id++;
++	}
++	return NULL;
++}
 +
-+The SPI bus controller only deals with the byte stream.
-+Some controller does not works like a SPI bus controller, it works
-+like a SPI NOR controller instead, such as the Freescale's QuadSPI controller.
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Huang Shijie <shijie8@gmail.com>");
+ MODULE_AUTHOR("Mike Lavender");
+diff --git a/include/linux/mtd/spi-nor.h b/include/linux/mtd/spi-nor.h
+index 16d8409..41dae78 100644
+--- a/include/linux/mtd/spi-nor.h
++++ b/include/linux/mtd/spi-nor.h
+@@ -182,4 +182,16 @@ int spi_nor_scan(struct spi_nor *nor, const struct spi_device_id *id,
+ 			enum read_mode mode);
+ extern const struct spi_device_id spi_nor_ids[];
+ 
++/**
++ * spi_nor_match_id() - find the spi_device_id by the name
++ * @name:	the name of the spi_device_id
++ *
++ * The drivers use this function to find the spi_device_id
++ * specified by the @name.
++ *
++ * Return: returns the right spi_device_id pointer on success,
++ *         and returns NULL on failure.
++ */
++const struct spi_device_id *spi_nor_match_id(char *name);
 +
-+The Freescale's QuadSPI controller should knows the NOR commands to
-+find the right LUT sequence. Unfortunately, the old code can not meet
-+this requirement.
-+
-+Part II - How does the framework work?
-+-------------------------------------
-+
-+This framework just adds a new layer between the MTD and the SPI bus driver.
-+With this new layer, the SPI NOR controller driver does not depend on the
-+m25p80 code anymore.
-+
-+   Before this framework, the layer is like:
-+
-+                   MTD
-+         ------------------------
-+                  m25p80
-+         ------------------------
-+	       SPI bus driver
-+         ------------------------
-+	        SPI NOR chip
-+
-+   After this framework, the layer is like:
-+                   MTD
-+         ------------------------
-+              SPI NOR framework
-+         ------------------------
-+                  m25p80
-+         ------------------------
-+	       SPI bus driver
-+         ------------------------
-+	       SPI NOR chip
-+
-+  With the SPI NOR controller driver(Freescale QuadSPI), it looks like:
-+                   MTD
-+         ------------------------
-+              SPI NOR framework
-+         ------------------------
-+                fsl-quadSPI
-+         ------------------------
-+	       SPI NOR chip
-+
-+Part III - How can the drivers use the framework
-+-------------------------------------
-+
-+The main API is the spi_nor_scan(). Before you call the hook, you should
-+initialize the necessary fields for spi_nor{}.
-+Please see the drivers/mtd/spi-nor/spi-nor.c for detail.
-+Please also reference to the fsl-quadspi.c when you want to write a new driver
-+for a SPI NOR controller.
+ #endif
 -- 
 1.7.2.rc3
