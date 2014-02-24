@@ -1,62 +1,70 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 24 Feb 2014 15:04:57 +0530
-Subject: [PATCH v3 0/4] ARM: sunxi: Add driver for sunxi usb phy + usb
- dts bindings
-In-Reply-To: <1393157352-21104-1-git-send-email-hdegoede@redhat.com>
-References: <1393157352-21104-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <530B1241.1000202@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 24 Feb 2014 10:36:53 +0100
+Subject: [GIT PULL v3] efm32 cleanups for next
+In-Reply-To: <CAOesGMh16Jqsczaagr9C2niiwu29kd7e8JrWYRZech9kJ2wVRQ@mail.gmail.com>
+References: <20140219201950.GC6988@pengutronix.de>
+ <20140220195452.GK6988@pengutronix.de>
+ <20140222003853.GG13233@quad.lixom.net>
+ <20140222185802.GS6988@pengutronix.de>
+ <CAOesGMh16Jqsczaagr9C2niiwu29kd7e8JrWYRZech9kJ2wVRQ@mail.gmail.com>
+Message-ID: <20140224093653.GD27579@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Olof,
 
-On Sunday 23 February 2014 05:39 PM, Hans de Goede wrote:
-> Hi Kishon, Maxime,
+On Sun, Feb 23, 2014 at 05:51:51AM -0800, Olof Johansson wrote:
+> Ok, it's probably easiest to just apply the patches directly for us,
+> so I'll do that.
 > 
-> Here is v3 of my sunxi-usb-phy driver it addresses all review remarks made
-> in response to v2, and as such this should be the final version, changes:
-> 
-> -Fix check for wrong variable in error handling path pointed out by wens
-> -Switch to using reg-names to differentiate between the different register
->  ranges needed
-> 
-> Kishon, can you please queue up the 1st patch of this series for 3.15 ?
+> If your branch is in linux-next through your own tree then you should
+> drop it once the patches hit our tree. I'll likely do this later today
+> at some point.
+It seems you didn't come around doing that yet. So I prepared a new pull
+request in the hope to make it easier for you.
 
-huh.. maybe I failed to notice that before but the $subject for that patch
-should be 'PHY: sunxi...' and not 'ARM: sunxi..'. Can you fix that up?
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 
-Thanks
-Kishon
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 
-> 
-> Maxime, can you please add patches 2-4 to your dt-for-3.15 branch? Note these
-> are only the dtsi bits.
-> 
-> I'm holding back all the board .dts patches until it is clear how we want to
-> deal with the ahci + usb regulator bits. Specifically I'm waiting for an answer
-> to this question:
-> 
-> "I hope this helps explain my reasoning, as said I'm fine with
-> either way, if you want to change over to a single file +
-> explicit enabling, let me know and I'll respin the ahci dts
-> patches.  Note I'm going on vacation for a week starting Monday,
-> so you likely won't get a new version until next weekend."
-> 
-> In my last reply to "[PATCH v6 17/18] ARM: sun4i: dt: Add ahci / sata support"
-> 
-> I've a feeling you (Maxime) want me to rework things in to a single dtsi
-> for all common regulators + explicit enabling, which works for me, but before
-> doing the necessary refactoring I would like to hear that this is what you
-> want from you.
-> 
-> Regards,
-> 
-> Hans
-> 
-> 
-> p.s.
-> 
-> I'm going on vacation for 5 days leaving tomorrow, so I won't send the
-> (refactored) board .dts file patches until next weekend.
-> 
-> 
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/ukl/linux.git tags/efm32-next
+
+for you to fetch changes up to d5d5ce952a66c32abf36a6fdf2a1ba6cb8da9b93:
+
+  ARM: efm32: drop unused file <mach/timex.h> (2014-02-24 10:07:27 +0100)
+
+----------------------------------------------------------------
+Just three simple cleanups for efm32 removing two now unused files and a
+superflous select by ARCH_EFM32.
+
+As these cleanups have dependencies on both v3.14-rc1 and my timex.h cleanup
+(which is based on v3.13-rc1) this pull request also included a merge of my
+cleanup tag which is already in armsoc/next/cleanup.
+
+----------------------------------------------------------------
+Uwe Kleine-K?nig (4):
+      ARM: efm32: drop unused file entry-macro.S
+      ARM: efm32: drop selecting CLKSRC_MMIO
+      Merge tag 'dropmachtimexh-v2' of git://git.pengutronix.de/git/ukl/linux
+      ARM: efm32: drop unused file <mach/timex.h>
+
+plus the changes you already have in armsoc/next/cleanup that come in
+with my dropmachtimexh-v2 series.
+
+The diffstat was trimmed by hand to skip the dropmachtimexh-v2 tag
+because I didn't find the right invokation to git-request-pull to do
+the right thing:
+
+ arch/arm/Kconfig                                   |  3 --
+ arch/arm/mach-efm32/include/mach/entry-macro.S     |  4 --
+ arch/arm/mach-efm32/include/mach/timex.h           |  3 --
+ 3 files changed, 10 deletions(-)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
