@@ -1,44 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Feb 2014 17:36:24 +0000
-Subject: [RFC PATCH 0/2] Introduce pte_isset for arm and arm64
-In-Reply-To: <1393256005-2206-1-git-send-email-steve.capper@linaro.org>
-References: <1393256005-2206-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140224173624.GH2553@mudshark.cambridge.arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 24 Feb 2014 18:35:13 +0100
+Subject: [PATCH v5 01/10] Documentation: dt: Add binding documentation for
+ S5K6A3 image sensor
+In-Reply-To: <1393263322-28215-1-git-send-email-s.nawrocki@samsung.com>
+References: <1393263322-28215-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1393263322-28215-2-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+This patch adds binding documentation for the Samsung S5K6A3(YX)
+raw image sensor.
 
-On Mon, Feb 24, 2014 at 03:33:23PM +0000, Steve Capper wrote:
-> Long descriptors on ARM and all ptes on ARM64 are 64 bits. Some pte
-> attribute test functions such as pte_dirty return the bitwise-and of a
-> flag with the pte value. If the flag to be tested resides in the
-> upper 32 bits of the pte, then we run into the danger of the result
-> being dropped if downcast.
-> 
-> For example:
-> 	gather_stats(page, md, pte_dirty(*pte), 1);
-> where pte_dirty(*pte) is downcast to an int.
-> 
-> Under ARM with LPAE, functions such as huge_pte_write also perform a
-> downcast to unsigned long (which is 32 bits). 
-> 
-> This series introduces a new macro pte_isset which performs the bitwise
-> and, then performs a double logical invert to ensure predictable
-> downcasting.
-> 
-> The reasoning behind a new macro was that it creates an obvious
-> pattern which can be followed by future changes to the pte functions.
-> Rather than target specific pte functions, I opted to wrap all of them
-> with this macro for the sake of simplicity (also the flags may move in
-> future).
-> 
-> I was toying with using (bool), but decided that the !! looked slightly
-> better. Under testing (with an Arndale and the Fast Model on 3.14-rc4)
-> both strategies worked as expected.
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+---
+Changes since v4:
+  - none.
 
-Ok, but I still don't understand why this is needed over your previous
-series. Just inlining the '!!' into the existing accessors should be fine,
-no? Basically, I don't see what the new macro gains us.
+Changes since v2:
+ - rephrased 'clocks' and 'clock-names' properties' description;
+---
+ .../devicetree/bindings/media/samsung-s5k6a3.txt   |   33 ++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/samsung-s5k6a3.txt
 
-Will
+diff --git a/Documentation/devicetree/bindings/media/samsung-s5k6a3.txt b/Documentation/devicetree/bindings/media/samsung-s5k6a3.txt
+new file mode 100644
+index 0000000..cce01e8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/samsung-s5k6a3.txt
+@@ -0,0 +1,33 @@
++Samsung S5K6A3(YX) raw image sensor
++---------------------------------
++
++S5K6A3(YX) is a raw image sensor with MIPI CSI-2 and CCP2 image data interfaces
++and CCI (I2C compatible) control bus.
++
++Required properties:
++
++- compatible	: "samsung,s5k6a3";
++- reg		: I2C slave address of the sensor;
++- svdda-supply	: core voltage supply;
++- svddio-supply	: I/O voltage supply;
++- afvdd-supply	: AF (actuator) voltage supply;
++- gpios		: specifier of a GPIO connected to the RESET pin;
++- clocks	: should contain list of phandle and clock specifier pairs
++		  according to common clock bindings for the clocks described
++		  in the clock-names property;
++- clock-names	: should contain "extclk" entry for the sensor's EXTCLK clock;
++
++Optional properties:
++
++- clock-frequency : the frequency at which the "extclk" clock should be
++		    configured to operate, in Hz; if this property is not
++		    specified default 24 MHz value will be used.
++
++The common video interfaces bindings (see video-interfaces.txt) should be
++used to specify link to the image data receiver. The S5K6A3(YX) device
++node should contain one 'port' child node with an 'endpoint' subnode.
++
++Following properties are valid for the endpoint node:
++
++- data-lanes : (optional) specifies MIPI CSI-2 data lanes as covered in
++  video-interfaces.txt.  The sensor supports only one data lane.
+-- 
+1.7.9.5
