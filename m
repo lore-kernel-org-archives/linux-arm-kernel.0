@@ -1,80 +1,113 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 24 Feb 2014 08:39:50 +0100
-Subject: [PATCH] dt/bindings: update fsl-fec regarding compatible and
- clocks
-In-Reply-To: <20140222182806.GF3327@book.gsilab.sittig.org>
-References: <1392033008-20752-1-git-send-email-shawn.guo@linaro.org>
- <20140217212439.GZ4524@book.gsilab.sittig.org>
- <20140218020901.GA15716@S2101-09.ap.freescale.net>
- <20140218134430.GC4524@book.gsilab.sittig.org>
- <20140218144652.GG15716@S2101-09.ap.freescale.net>
- <20140222182806.GF3327@book.gsilab.sittig.org>
-Message-ID: <20140224073950.GM17250@pengutronix.de>
+From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
+Date: Mon, 24 Feb 2014 13:12:28 +0530
+Subject: [PATCH] cpufreq: Set policy to non-NULL only after all hotplug
+ online work is done
+In-Reply-To: <1393225072-3997-1-git-send-email-skannan@codeaurora.org>
+References: <1393225072-3997-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <530AF7E4.5080806@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 22, 2014 at 07:28:06PM +0100, Gerhard Sittig wrote:
-> On Tue, Feb 18, 2014 at 22:46 +0800, Shawn Guo wrote:
-> > 
-> > On Tue, Feb 18, 2014 at 02:44:30PM +0100, Gerhard Sittig wrote:
-> > > [ ... ]
-> > 
-> > > > > >  - reg : Address and length of the register set for the device
-> > > > > >  - interrupts : Should contain fec interrupt
-> > > > > > +- clocks: phandle to the clocks feeding the FEC controller and phy. The
-> > > > > > +  following two are required:
-> > > > > > +   - "ipg": the peripheral access clock
-> > > > > > +   - "ahb": the bus clock for MAC
-> > > > > > +  The following two are optional:
-> > > > > > +   - "ptp": the sampling clock for PTP (IEEE 1588).  On SoC like i.MX6Q,
-> > > > > > +     the clock could come from either the internal clock control module
-> > > > > > +     or external oscillator via pad depending on board design.
-> > > > > > +   - "enet_out": the phy reference clock provided by SoC via pad, which
-> > > > > > +     is available on SoC like i.MX28.
-> > > > > > +- clock-names: Must contain the clock names described just above
-> > > > > > +
-> > > > > 
-> > > > > Listing 'clocks' under the "required properties" all of a sudden
-> > > > > invalidates existing device trees, if they don't carry the
-> > > > > property which before the change was not required, not even
-> > > > > documented.
-> > > > 
-> > > > Since the day we move to device tree clock lookup, the driver fec_main
-> > > > does not probe at all if the property is absent.
-> > > 
-> > > That's an implementation detail.  It's not what the spec says,
-> > > and neither is what the spec is to blindly follow after the / a
-> > > driver created the fact.  Instead, a binding gets designed, and
-> > > the software follows.
-> > > 
-> > > In reality, the doc may be behind as developers are more
-> > > concerned about the code.  But still when you "update" the
-> > > binding, don't break compatibility!  Even if you'd adjust all
-> > > drivers you can spot, it's still only Linux and not all device
-> > > tree users.
-> > 
-> > So what's your suggestion?  Add the properties as the optional?
+On 02/24/2014 12:27 PM, Saravana Kannan wrote:
+> The existing code sets the per CPU policy to a non-NULL value before all
+> the steps performed during the hotplug online path is done. Specifically,
+> this is done before the policy min/max, governors, etc are initialized for
+> the policy.  This in turn means that calls to cpufreq_cpu_get() return a
+> non-NULL policy before the policy/CPU is ready to be used.
 > 
-> Have there been i.MX device trees in mainline releases which lack
-> the clock specs?  If so, making the clock specs mandatory breaks
-> backwards compatibility for these existing device trees as well.
+> To fix this, move the update of per CPU policy to a valid value after all
+> the initialization steps for the policy are completed.
 > 
-> I assume that listing the clocks as optional keeps the binding
-> most compatible.  You might as well list them as recommended, if
-> optional is "too weak" for you.
+> Example kernel panic without this fix:
+> [  512.146185] Unable to handle kernel NULL pointer dereference at virtual address 00000020
+> [  512.146195] pgd = c0003000
+> [  512.146213] [00000020] *pgd=80000000004003, *pmd=00000000
+> [  512.146228] Internal error: Oops: 206 [#1] PREEMPT SMP ARM
+> <snip>
+> [  512.146297] PC is at __cpufreq_governor+0x10/0x1ac
+> [  512.146312] LR is at cpufreq_update_policy+0x114/0x150
+> <snip>
+> [  512.149740] ---[ end trace f23a8defea6cd706 ]---
+> [  512.149761] Kernel panic - not syncing: Fatal exception
+> [  513.152016] CPU0: stopping
+> [  513.154710] CPU: 0 PID: 7136 Comm: mpdecision Tainted: G      D W    3.10.0-gd727407-00074-g979ede8 #396
+> <snip>
+> [  513.317224] [<c0afe180>] (notifier_call_chain+0x40/0x68) from [<c02a23ac>] (__blocking_notifier_call_chain+0x40/0x58)
+> [  513.327809] [<c02a23ac>] (__blocking_notifier_call_chain+0x40/0x58) from [<c02a23d8>] (blocking_notifier_call_chain+0x14/0x1c)
+> [  513.339182] [<c02a23d8>] (blocking_notifier_call_chain+0x14/0x1c) from [<c0803c68>] (cpufreq_set_policy+0xd4/0x2b8)
+> [  513.349594] [<c0803c68>] (cpufreq_set_policy+0xd4/0x2b8) from [<c0803e7c>] (cpufreq_init_policy+0x30/0x98)
+> [  513.359231] [<c0803e7c>] (cpufreq_init_policy+0x30/0x98) from [<c0805a18>] (__cpufreq_add_dev.isra.17+0x4dc/0x7a4)
+> [  513.369560] [<c0805a18>] (__cpufreq_add_dev.isra.17+0x4dc/0x7a4) from [<c0805d38>] (cpufreq_cpu_callback+0x58/0x84)
+> [  513.379978] [<c0805d38>] (cpufreq_cpu_callback+0x58/0x84) from [<c0afe180>] (notifier_call_chain+0x40/0x68)
+> [  513.389704] [<c0afe180>] (notifier_call_chain+0x40/0x68) from [<c02812dc>] (__cpu_notify+0x28/0x44)
+> [  513.398728] [<c02812dc>] (__cpu_notify+0x28/0x44) from [<c0aeed90>] (_cpu_up+0xf4/0x1dc)
+> [  513.406797] [<c0aeed90>] (_cpu_up+0xf4/0x1dc) from [<c0aeeed4>] (cpu_up+0x5c/0x78)
+> [  513.414357] [<c0aeeed4>] (cpu_up+0x5c/0x78) from [<c0aec808>] (store_online+0x44/0x74)
+> [  513.422253] [<c0aec808>] (store_online+0x44/0x74) from [<c03a40f4>] (sysfs_write_file+0x108/0x14c)
+> [  513.431195] [<c03a40f4>] (sysfs_write_file+0x108/0x14c) from [<c03517d4>] (vfs_write+0xd0/0x180)
+> [  513.439958] [<c03517d4>] (vfs_write+0xd0/0x180) from [<c0351ca8>] (SyS_write+0x38/0x68)
+> [  513.447947] [<c0351ca8>] (SyS_write+0x38/0x68) from [<c0205de0>] (ret_fast_syscall+0x0/0x30)
+> 
+> In this specific case, CPU0 set's CPU1's policy->governor in
+> cpufreq_init_policy() to NULL while CPU1 is using the policy->governor in
+> __cpufreq_governor().
+> 
 
-Why should we keep the binding compatible when the driver requires the
-clocks? The clocks are not at all optional for the driver. We made the
-clocks mandatory at a time when the bindings didn't make any promises
-about stability, so Shawn only documents what the driver requires
-anyway.
-If anything, we should doument that this binding is not valid for the
-PowerPC variants of the FEC.
+Whoa! That's horrible! Can you please explain how exactly you
+triggered this? I'm curious...
 
-Sascha
+> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+> ---
+>  drivers/cpufreq/cpufreq.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+> index cb003a6..d5ceb43 100644
+> --- a/drivers/cpufreq/cpufreq.c
+> +++ b/drivers/cpufreq/cpufreq.c
+> @@ -1109,11 +1109,6 @@ static int __cpufreq_add_dev(struct device *dev, struct subsys_interface *sif,
+>  		goto err_set_policy_cpu;
+>  	}
+> 
+> -	write_lock_irqsave(&cpufreq_driver_lock, flags);
+> -	for_each_cpu(j, policy->cpus)
+> -		per_cpu(cpufreq_cpu_data, j) = policy;
+> -	write_unlock_irqrestore(&cpufreq_driver_lock, flags);
+> -
+>  	if (cpufreq_driver->get) {
+>  		policy->cur = cpufreq_driver->get(policy->cpu);
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+If you move the per-cpu init further down, then what happens to the
+cpufreq_generic_get() that gets invoked here by some of the drivers?
+It will almost always fail (because policy will be NULL) and hence
+CPU online will be unsuccessful (though you wont observe it because
+the error code is not bubbled up to the CPU hotplug core; perhaps we
+should).
+
+
+IMHO, we should fix the synchronization in cpufreq_init_policy().
+I notice cpufreq_update_policy() as well as __cpufreq_governor() in
+your stack trace, which means cpufreq_set_policy() was involved.
+cpufreq_update_policy() takes the policy->rwsem for write, whereas
+cpufreq_init_policy() doesn't take that lock at all, which is clearly
+wrong.
+
+My guess is that, if we fix that locking, everything will be fine and
+you won't hit the bug. Would you like to give that a shot?
+
+Regards,
+Srivatsa S. Bhat
+
+>  		if (!policy->cur) {
+> @@ -1207,6 +1202,11 @@ static int __cpufreq_add_dev(struct device *dev, struct subsys_interface *sif,
+>  		policy->user_policy.governor = policy->governor;
+>  	}
+> 
+> +	write_lock_irqsave(&cpufreq_driver_lock, flags);
+> +	for_each_cpu(j, policy->cpus)
+> +		per_cpu(cpufreq_cpu_data, j) = policy;
+> +	write_unlock_irqrestore(&cpufreq_driver_lock, flags);
+> +
+>  	kobject_uevent(&policy->kobj, KOBJ_ADD);
+>  	up_read(&cpufreq_rwsem);
+> 
