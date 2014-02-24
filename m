@@ -1,35 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 24 Feb 2014 18:28:15 +0000
-Subject: [PATCH 0/2] CCI PMU update
-In-Reply-To: <1392812223-29274-1-git-send-email-punit.agrawal@arm.com>
-References: <1392812223-29274-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20140224182815.GA1198@mudshark.cambridge.arm.com>
+From: mporter@linaro.org (Matt Porter)
+Date: Mon, 24 Feb 2014 13:29:36 -0500
+Subject: [GIT PULL] bcm pinctrl rename
+In-Reply-To: <CAEPRUYqnGwRCzGPP8ouEguj8gWrJKic7XyNHu+B_aJ=K0=MZYg@mail.gmail.com>
+References: <CAEPRUYpCVpV7HwuO6c95ybk3yp1teJgW-9qwyHnjKbs03C9bgQ@mail.gmail.com>
+ <20140221222947.GB13233@quad.lixom.net>
+ <CAEPRUYqnGwRCzGPP8ouEguj8gWrJKic7XyNHu+B_aJ=K0=MZYg@mail.gmail.com>
+Message-ID: <20140224182936.GU5038@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding Olof and arm at kernel.org]
-
-On Wed, Feb 19, 2014 at 12:17:01PM +0000, Punit Agrawal wrote:
-> Here are a short couple of patches to update the CCI PMU perf backend
-> to better support IP updates.
+On Mon, Feb 24, 2014 at 09:32:47AM -0800, Christian Daudt wrote:
+> On Fri, Feb 21, 2014 at 2:29 PM, Olof Johansson <olof@lixom.net> wrote:
+> > On Wed, Feb 12, 2014 at 09:20:13AM -0800, Christian Daudt wrote:
+> >> The following changes since commit b28a960c42fcd9cfc987441fa6d1c1a471f0f9ed:
+> >>
+> >>   Linux 3.14-rc2 (2014-02-09 18:15:47 -0800)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://github.com/broadcom/bcm11351.git tags/bcm-for-3.14-pinctrl-rename
+> >>
+> >> for you to fetch changes up to f5310a1712b68c7f83539fce6ebbfb6f0f510f5b:
+> >>
+> >>   Update dtsi with new pinctrl compatible string (2014-02-12 09:06:53 -0800)
+> >>
+> >> ----------------------------------------------------------------
+> >> Renaming pinctrl code to keep in line with rest of bcm mobile
+> >>
+> >> Given that this driver has been in the works for a while, it
+> >> was written prior to the code standardizing on bcm-based naming.
+> >> this patchset brings it in line with the remainder of the code.
+> >>
+> >> ----------------------------------------------------------------
+> >> Sherman Yin (4):
+> >>       pinctrl: Rename Broadcom Capri pinctrl binding
+> >>       pinctrl: Rename Broadcom Capri pinctrl driver
+> >>       Update bcm_defconfig with new pinctrl CONFIG
+> >>       Update dtsi with new pinctrl compatible string
+> >
+> > Hi,
+> >
+> > (As per irc discussion). The rename isn't the right thing to do at this
+> > time in the release, but the binding needs to be tweaked before it ships
+> > in a full release, or we'll always need to live with it.
+> >
+> > So, I'll be happy to take the bindings piece and the dtsi piece (and the
+> > small edit to the driver to change the compatible string match table),
+> > but the file rename and Kconfig entry edit is 3.15 material.
+> >
+> > Please send new pull request with just that (or, if you prefer, just send the
+> > patches and we can apply them too).
+> >
+> >
+> > -Olof
 > 
-> The first patch simplifies version checking to assume that event
-> numbering doesn't change for > r1p0 (it changed between r0 and r1).
-> This change should help reduce code churn when IP version is bumped up
-> without any changes to event numbering.
+> Ok, I have this ready to go, just need an ack for this patch (which
+> will replace "pinctrl: Rename Broadcom Capri pinctrl driver"):
+> Subject: [PATCH] pinctrl: refer to updated dt binding string.
 > 
-> The second patch exports the PMU version to userspace (via the PMU
-> name) to allow tooling to deal with event numbering differences.
+> Bring the driver in line with the bcm-based dt name for pinctrl.
+> This is being done to keep consistency with other Broadcom mobile
+> SoC drivers.
 > 
-> I'd appreciate any feedback on the changes.
+> Signed-off-by: Christian Daudt <bcm@fixthebug.org>
 > 
-> The patches are based on top of 3.14-rc3 and can hopefully make it for
-> 3.15.
+> diff --git a/drivers/pinctrl/pinctrl-capri.c b/drivers/pinctrl/pinctrl-capri.c
+> index 4669c53..eb25002 100644
+> --- a/drivers/pinctrl/pinctrl-capri.c
+> +++ b/drivers/pinctrl/pinctrl-capri.c
+> @@ -1435,7 +1435,7 @@ int __init capri_pinctrl_probe(struct
+> platform_device *pdev)
+>  }
+> 
+>  static struct of_device_id capri_pinctrl_of_match[] = {
+> -       { .compatible = "brcm,capri-pinctrl", },
+> +       { .compatible = "brcm,bcm11351-pinctrl", },
+>         { },
+>  };
 
-Since these patches [1] are small and trivial, would the arm-soc folk be
-happy picking them directly? I can put together a branch and pull request if
-necessary, but it seems a bit OTT for this.
 
-Will
+Looks good. Does the binding rename patch stay as is?
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/234041.html
+Reviewed-by: Matt Porter <mporter@linaro.org>
