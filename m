@@ -1,47 +1,54 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Mon, 24 Feb 2014 17:47:17 +0300
-Subject: [PATCHv6] staging/iio/adc: change the MXS touchscreen driver
- implementation
-In-Reply-To: <201402241538.26530.jbe@pengutronix.de>
-References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
- <201402241416.24270.jbe@pengutronix.de>
- <20140224133316.GI26722@mwanda>
- <201402241538.26530.jbe@pengutronix.de>
-Message-ID: <20140224144717.GP26776@mwanda>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Feb 2014 15:54:10 +0100
+Subject: [PATCH 03/17] mmc: mmci: Mask IRQs for all variants during
+ runtime suspend
+In-Reply-To: <CAPDyKFq3uAoo7p-7hZgBmMJ4jf9A7dC0aUZJYUE0z1Qq5W=0bw@mail.gmail.com>
+References: <1391529538-21685-1-git-send-email-ulf.hansson@linaro.org>
+ <1391529538-21685-4-git-send-email-ulf.hansson@linaro.org>
+ <20140218160542.GH21483@n2100.arm.linux.org.uk>
+ <CAPDyKFq3uAoo7p-7hZgBmMJ4jf9A7dC0aUZJYUE0z1Qq5W=0bw@mail.gmail.com>
+Message-ID: <CACRpkdYF4sR4SJ_jZsVLY2tNV0xDfR2GG63bF5e=bkthpDsDGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 03:38:26PM +0100, Juergen Beisert wrote:
-> Hi Dan,
-> 
-> On Monday 24 February 2014 14:33:16 Dan Carpenter wrote:
-> > On Mon, Feb 24, 2014 at 02:16:24PM +0100, Juergen Beisert wrote:
-> > > > While I don't have much experience with the TS part of the code but I
-> > > > can investigate if you don't have any idea.
-> > >
-> > > can you please test the following patch?
-> > > After releasing the touchscreen the internal state machine was left in a
-> > > wrong state.
-> > >
-> > > diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-> > > index e2dd783..558a76c 100644
-> > > --- a/drivers/staging/iio/adc/mxs-lradc.c  
-> > > +++ b/drivers/staging/iio/adc/mxs-lradc.c
-> > > @@ -698,6 +698,7 @@ static void mxs_lradc_finish_touch_event(struct
-> > > mxs_lradc *lradc, bool valid) }
-> > >
-> > >         /* if it is released, wait for the next touch via IRQ */
-> > > +       lradc->cur_plate = LRADC_TOUCH;
-> > >         mxs_lradc_reg_clear(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ, LRADC_CTRL1);
-> > >         mxs_lradc_reg_set(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ_EN, LRADC_CTRL1);
-> > >         } 
-> >
-> > I am confused.  Why don't you send this like a normal patch?
-> 
-> For testing fist. But you are right, patch will follow.
-> 
+On Tue, Feb 18, 2014 at 5:36 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 18 February 2014 17:05, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Tue, Feb 04, 2014 at 04:58:44PM +0100, Ulf Hansson wrote:
+>>> In runtime suspended state, we are not expecting IRQs and thus we can
+>>> safely mask them, not only for pwrreg_nopower variants but for all.
+>>>
+>>> Obviously we then also need to make sure we restore the IRQ mask while
+>>> becoming runtime resumed.
+>>
+>> So, what happens when this patch is applied, and a SDIO card is attached
+>> which expects to receive interrupts at any moment?
+>
+> Currently, no variant implements SDIO irq.
+>
+> The SDIO irq polling mode from the sdio core will still be functional,
+> as of today. So, this patch will not break SDIO.
+>
+>>
+>> Given that I've run into this during the last week with a SDHCI controller,
+>> I'm not that thrilled with other interfaces doing the same broken thing.
+>
+> If we add SDIO irq support to mmci in future; parts of that
+> implementation includes a re-route of DAT1 to a GPIO irq when entering
+> runtime suspend state. The mmci HW will in runtime suspend state, not
+> be responsible for handling irqs, which is the same as of today.
 
-Never mind, I suck at reading.
+[Just smalltalk]
 
-regards,
-dan carpenter
+Switching DAT1 to "gpio mode" (which is something of a fallacy, see
+explanation in Documentation/pinctrl.txt) is not at all possible in all
+implementations of the PL18x, as it depends on exploiting properties
+on an assumed pin controller.
+
+Systems that don't have such wakeup features on their pins are
+unlikely to support deepsleep in any capacity, and if they do they are
+ill-designed from the top level as this needs to be taken into account
+when devising the hardware :-/
+
+Yours,
+Linus Walleij
