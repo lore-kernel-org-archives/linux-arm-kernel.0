@@ -1,61 +1,61 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 25 Feb 2014 00:34:38 +0100
-Subject: [PATCH] net: phy: add suspend_halted module param
-In-Reply-To: <20140224.180510.103916219115440711.davem@davemloft.net>
-References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <CAGVrzcadYTYQEvPxqdMf2f741y5sAgnOYm3EC=f7SOkr8SK2WQ@mail.gmail.com>
- <20140224.180510.103916219115440711.davem@davemloft.net>
-Message-ID: <530BD70E.3000206@gmail.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Mon, 24 Feb 2014 20:38:44 -0300
+Subject: [PATCH 1/5] clk: sun6i: Protect CPU clock
+In-Reply-To: <20140224163034.GN21483@n2100.arm.linux.org.uk>
+References: <1393258967-4843-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1393258967-4843-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140224163034.GN21483@n2100.arm.linux.org.uk>
+Message-ID: <530BD804.5090806@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2014 12:05 AM, David Miller wrote:
-> From: Florian Fainelli <f.fainelli@gmail.com>
-> Date: Mon, 24 Feb 2014 10:20:10 -0800
->
->> Hi Sebastian,
+Hello Russell,
+
+El 24/02/14 13:30, Russell King - ARM Linux escribi?:
+> On Mon, Feb 24, 2014 at 05:22:43PM +0100, Maxime Ripard wrote:
+>> Right now, AHB is an indirect child clock of the CPU clock. If that happens to
+>> change, since the CPU clock has no other consumers declared in Linux, it would
+>> be shut down, which is not really a good idea.
 >>
->> 2014-02-23 8:58 GMT-08:00 Sebastian Hesselbarth
->> <sebastian.hesselbarth@gmail.com>:
->>> commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
->>>    ("net: phy: resume/suspend PHYs on attach/detach")
->>> introduced a feature to suspend PHYs when entering halted state.
->>>
->>> Unfortunately, not all bootloaders properly power-up PHYs on reset
->>> and fail to access ethernet because the PHY is still powered down.
->>>
->>> Therefore, we add a boolean module parameter suspend_halted with
->>> default value of true. Disabling that parameter prevents PHYs from
->>> being suspended when entering halted state.
->>>
->>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>> Reported-by: Andrew Lunn <andrew@lunn.ch>
->>> ---
->>> Andrew, can you please re-test if disabling the feature does work on
->>> your board? I tried a bunch of mine, but none failed to power-up the
->>> PHY in u-boot.
+>> Prevent this by forcing it enabled.
 >>
->> Would be good to get Andrew's testing on this just to make sure it
->> solves his problem. Otherwise:
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> ---
+>>   drivers/clk/sunxi/clk-sunxi.c | 8 ++++++++
+>>   1 file changed, 8 insertions(+)
 >>
->> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+>> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+>> index 23baad9..cedaf4b 100644
+>> --- a/drivers/clk/sunxi/clk-sunxi.c
+>> +++ b/drivers/clk/sunxi/clk-sunxi.c
+>> @@ -1301,6 +1301,14 @@ static void __init sunxi_clock_protect(void)
+>>   		clk_prepare_enable(clk);
+>>   		clk_put(clk);
+>>   	}
+>> +
+>> +	/* CPU clocks - sun6i */
+>> +	clk = clk_get(NULL, "cpu");
+>> +	if (!IS_ERR(clk)) {
+>> +		clk_prepare_enable(clk);
+>> +		clk_put(clk);
+>> +	}
 >
-> I disagree with using a module parameter for this.
+> This is broken.  I'm not sure what's difficult to grasp about the concept
+> of "while a clock is in use, you should keep a reference to that clock".
 >
-> Figure out the devices that cannot do this properly, and add
-> an internal flag that this driver sets.
+> That implies that if you get a clock, and then enable it, you don't
+> put the clock until you've disabled it.
 
-Hmm, as it seems to be a bootloader issue, it will be quite
-impossible to determine if a board is affected or not.
+Why is this so? Can't a clock be left enabled while nobody has a 
+reference to it? I have looked around in Documentation/ (rather quickly 
+I must say) and have not found any explicit mention that it is required 
+to keep a reference to the clock while it's enabled. I'd appreciate it 
+if you could explain this a bit more verbosely or point me to the 
+relevant documents.
 
-I am still trying to get any of my boards to mis-behave the same
-way to figure out what is really causing it.
+For what it's worth, I've seen this same pattern on 
+enable/disable_clock() on drivers/base/power/clock_ops.c as well.
 
-We do still have 2-3 weeks to find a proper fix, don't we?
+Cheers,
 
-> Module parameters are terrible.
-
-Maybe. If you prefer, I can remove the module param and leave
-the sysfs entry?
-
-Sebastian
+Emilio
