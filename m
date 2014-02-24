@@ -1,46 +1,37 @@
-From: skannan@codeaurora.org (skannan at codeaurora.org)
-Date: Mon, 24 Feb 2014 09:00:03 -0000
-Subject: [PATCH] cpufreq: Set policy to non-NULL only after all hotplug
- online work is done
-In-Reply-To: <CAKohpok2rbepUS_7quZ0AThPckvVnAZybVpsV0ctiDWZmxTdRw@mail.gmail.com>
-References: <1393225072-3997-1-git-send-email-skannan@codeaurora.org>
- <530AF7E4.5080806@linux.vnet.ibm.com>
- <CAKohpok-8_JV8hRDiWnRLYqEqyvD60cyn5Hs1HcZTSEPZjLvOQ@mail.gmail.com>
- <a7536f7b5a03fe287aaf1974db74ba64.squirrel@www.codeaurora.org>
- <CAKohpomRqboKjHRF8ev9erJ6MdRWcsX2jO7A=g47gMmewm_ZiQ@mail.gmail.com>
- <b59f4a49af4ebd12c2d61e58dfb27a39.squirrel@www.codeaurora.org>
- <CAKohpok2rbepUS_7quZ0AThPckvVnAZybVpsV0ctiDWZmxTdRw@mail.gmail.com>
-Message-ID: <d7272b91c74148c56de5f1c27dc7b7c7.squirrel@www.codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Feb 2014 09:59:57 +0100
+Subject: [PATCH 1/7] spi: sunxi: Add Allwinner A10 SPI controller driver
+In-Reply-To: <20140223021530.GD25940@sirena.org.uk>
+References: <1393104959-12831-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1393104959-12831-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20140223021530.GD25940@sirena.org.uk>
+Message-ID: <20140224085957.GB3468@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Viresh Kumar wrote:
-> On 24 February 2014 14:17,  <skannan@codeaurora.org> wrote:
->> Sorry, not sure I understand what you mean.
->>
->> I agree, wording in my commit text might be unclear. I'll fix it after
->> we
->> agree on the code fix. In the MSM case, each CPU has it's own policy.
->>
->> I'm assuming your original complaint was about my confusing wording.
->> Maybe
->> that's not what you were pointing out?
->
-> In your case each CPU has a separate policy structure as they have
-> separately
-> controllable clocks. But you also said that CPU0 is setting CPU1's
-> governor to
-> NULL. I don't see that happening. Each CPU sets its own governor to NULL
-> on
-> init().
+On Sun, Feb 23, 2014 at 11:15:30AM +0900, Mark Brown wrote:
+> On Sat, Feb 22, 2014 at 10:35:53PM +0100, Maxime Ripard wrote:
+> > The older Allwinner SoCs (A10, A13, A10s and A20) all have the
+> > same SPI controller.
+> 
+> Applied, thanks.  Please differentiate between these two devices in
+> the subject line when sending patches for example by using "sun6i"
+> and "sun4i".
 
-When I said "CPU0 is setting CPU1's governor to NULL", I meant
-thread/context running in CPU0 is setting CPU1's governor as part of
-CPU1's ONLINE notifier.
-
--Saravana
+Ok, will do.
+Thanks!
+Maxime
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/08c9267d/attachment.sig>
