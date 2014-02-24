@@ -1,54 +1,44 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 24 Feb 2014 11:34:42 -0500
-Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
-In-Reply-To: <1393259176.16570.102.camel@kazak.uk.xensource.com>
-References: <1391730137-14814-22-git-send-email-andrew@lunn.ch>
- <52F51922.6030502@gmail.com>
- <1392892217.23342.18.camel@kazak.uk.xensource.com>
- <20140220105854.GL11878@lunn.ch>
- <20140220111913.GZ21483@n2100.arm.linux.org.uk>
- <1392896356.23342.40.camel@kazak.uk.xensource.com>
- <20140220232649.GU7862@titan.lakedaemon.net>
- <1393257630.16570.95.camel@kazak.uk.xensource.com>
- <20140224162413.GE18601@lunn.ch>
- <1393259176.16570.102.camel@kazak.uk.xensource.com>
-Message-ID: <20140224163442.GF14250@titan.lakedaemon.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 24 Feb 2014 17:48:17 +0100
+Subject: [PATCH] staging/iio/adc/MXS/LRADC: fix touchscreen statemachine
+In-Reply-To: <201402241539.53707.jbe@pengutronix.de>
+References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+ <201402241416.24270.jbe@pengutronix.de>
+ <20140224133316.GI26722@mwanda>
+ <201402241539.53707.jbe@pengutronix.de>
+Message-ID: <20140224164817.GE4436@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 04:26:16PM +0000, Ian Campbell wrote:
-> On Mon, 2014-02-24 at 17:24 +0100, Andrew Lunn wrote:
-> > > > > > What's wrong with the soc subsystem (drivers/base/soc.c).  This
-> > > > > > provides a way to export SoC through standardised interfaces. 
-> > > > > 
-> > > > > It looks like the thing to use to me.
-> > > > > 
-> > > > > It seems to have been around only since v3.3 though, which makes it a
-> > > > > bit tricky to use when upgrading from running board-file based v3.2
-> > > > > system (Debian Wheezy) to a newer DTB based kernel, we need to select
-> > > > > the new DTB while running the old system.
-> > > > > 
-> > > > > I'd prefer to use this thing as the primary mechanism but it seems like
-> > > > > I'd have to implement some sort of fallback at least for one Debian
-> > > > > release cycle. I'm sure it is doable...
-> > > > 
-> > > > back in v3.2, lspci should still work.  Would that given you the
-> > > > information you need?
-> > > 
-> > > I expect it will, yes.
-> > 
-> > 3.14 with the new PCIe driver will also work. The patch was accepted
-> > and considered a regression so made it into one of the -rc's.
+On 24/02/2014 at 15:39:53 +0100, Juergen Beisert wrote :
+> Releasing the touchscreen lets the internal statemachine left in a wrong state.
+> Due to this the release coordinate will be reported again by accident when the next
+> touchscreen event happens. This change sets up the correct state when waiting
+> for the next touchscreen event.
+>     
+> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
 > 
-> Great! Thanks.
 
-fyi:
+Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-  322a8e91844f PCI: mvebu: Use Device ID and revision from underlying endpoint
+> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
+> index 7fc66a6..514844e 100644
+> --- a/drivers/staging/iio/adc/mxs-lradc.c
+> +++ b/drivers/staging/iio/adc/mxs-lradc.c
+> @@ -757,6 +757,7 @@ static void mxs_lradc_finish_touch_event(struct mxs_lradc *lradc, bool valid)
+>  	}
+>  
+>  	/* if it is released, wait for the next touch via IRQ */
+> +	lradc->cur_plate = LRADC_TOUCH;
+>  	mxs_lradc_reg_clear(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ, LRADC_CTRL1);
+>  	mxs_lradc_reg_set(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ_EN, LRADC_CTRL1);
+>  }
+> 
+> -- 
+> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Beisert ? ? ? ? ? ? |
+> Linux Solutions for Science and Industry ? ? ?| http://www.pengutronix.de/  |
 
-It's in -rc4 and it's flagged for stable from v3.11 on up.  v3.11 is
-when the pcie driver was introduced (and thus, the regression).
-
-hth,
-
-Jason.
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
