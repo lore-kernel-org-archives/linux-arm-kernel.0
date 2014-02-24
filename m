@@ -1,101 +1,57 @@
-From: dhowells@redhat.com (David Howells)
-Date: Mon, 24 Feb 2014 15:48:26 +0000
-Subject: [PATCH] ARM: Delete asm/system.h
-Message-ID: <20140224154826.15682.825.stgit@warthog.procyon.org.uk>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Mon, 24 Feb 2014 10:00:41 -0800
+Subject: [PATCH v3 2/2] i2c: New bus driver for the Qualcomm QUP I2C
+ controller
+In-Reply-To: <5306BFC4.5000005@elopez.com.ar>
+References: <1392943090-30556-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1392943090-30556-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <5306BFC4.5000005@elopez.com.ar>
+Message-ID: <20140224180040.GC32621@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Delete ARM's asm/system.h.  It's the last holdout and should be got rid of.
+On Thu 20 Feb 18:53 PST 2014, Emilio L?pez wrote:
 
-This builds for defconfig, lpc32xx_defconfig, exynos_defconfig + XEN, the
-previous changed to a Gemini system and an omap3 config with TI_DAVINCI_EMAC.
+> Hi Bjorn,
+> 
+> El 20/02/14 21:38, Bjorn Andersson escribi?:
+[...]
+> > +	clk_freq = 100000;
+> > +	if (!of_property_read_u32(node, "clock-frequency", &val))
+> > +		clk_freq = val;
+> 
+> val will be modified only if no error occurs, so you may rewrite this 
+> bit as
+> 
+> +	u32 clk_freq = 100000;
+> ...
+> +	of_property_read_u32(node, "clock-frequency", &clk_freq)
 
-Signed-off-by: David Howells <dhowells@redhat.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-cc: Russell King <linux@arm.linux.org.uk>
-cc: linux-arm-kernel at lists.infradead.org
----
+Seems the two conventions used in the kernel is either your proposal or "if
+fail the assign default". So I'll change this.
 
- arch/arm/include/asm/jump_label.h  |    1 -
- arch/arm/include/asm/sync_bitops.h |    1 -
- arch/arm/include/asm/system.h      |    7 -------
- arch/arm/mach-gemini/idle.c        |    2 +-
- arch/arm/mach-omap2/am35xx-emac.c  |    1 -
- drivers/usb/gadget/lpc32xx_udc.c   |    1 -
- 6 files changed, 1 insertion(+), 12 deletions(-)
- delete mode 100644 arch/arm/include/asm/system.h
+> 
+> > +
+> > +	/* We support frequencies up to FAST Mode (400KHz) */
+> > +	if (clk_freq <= 0 || clk_freq > 400000) {
+> 
+> And you can drop the < check when it's unsigned.
 
-diff --git a/arch/arm/include/asm/jump_label.h b/arch/arm/include/asm/jump_label.h
-index 863c892..70f9b9b 100644
---- a/arch/arm/include/asm/jump_label.h
-+++ b/arch/arm/include/asm/jump_label.h
-@@ -4,7 +4,6 @@
- #ifdef __KERNEL__
- 
- #include <linux/types.h>
--#include <asm/system.h>
- 
- #define JUMP_LABEL_NOP_SIZE 4
- 
-diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
-index 63479ee..9732b8e 100644
---- a/arch/arm/include/asm/sync_bitops.h
-+++ b/arch/arm/include/asm/sync_bitops.h
-@@ -2,7 +2,6 @@
- #define __ASM_SYNC_BITOPS_H__
- 
- #include <asm/bitops.h>
--#include <asm/system.h>
- 
- /* sync_bitops functions are equivalent to the SMP implementation of the
-  * original functions, independently from CONFIG_SMP being defined.
-diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
-deleted file mode 100644
-index 368165e..0000000
---- a/arch/arm/include/asm/system.h
-+++ /dev/null
-@@ -1,7 +0,0 @@
--/* FILE TO BE DELETED. DO NOT ADD STUFF HERE! */
--#include <asm/barrier.h>
--#include <asm/compiler.h>
--#include <asm/cmpxchg.h>
--#include <asm/switch_to.h>
--#include <asm/system_info.h>
--#include <asm/system_misc.h>
-diff --git a/arch/arm/mach-gemini/idle.c b/arch/arm/mach-gemini/idle.c
-index 87dff4f..ddf8ec9 100644
---- a/arch/arm/mach-gemini/idle.c
-+++ b/arch/arm/mach-gemini/idle.c
-@@ -3,7 +3,7 @@
-  */
- 
- #include <linux/init.h>
--#include <asm/system.h>
-+#include <asm/system_misc.h>
- #include <asm/proc-fns.h>
- 
- static void gemini_idle(void)
-diff --git a/arch/arm/mach-omap2/am35xx-emac.c b/arch/arm/mach-omap2/am35xx-emac.c
-index 25b79a2..6a6935c 100644
---- a/arch/arm/mach-omap2/am35xx-emac.c
-+++ b/arch/arm/mach-omap2/am35xx-emac.c
-@@ -17,7 +17,6 @@
- 
- #include <linux/err.h>
- #include <linux/davinci_emac.h>
--#include <asm/system.h>
- #include "omap_device.h"
- #include "am35xx.h"
- #include "control.h"
-diff --git a/drivers/usb/gadget/lpc32xx_udc.c b/drivers/usb/gadget/lpc32xx_udc.c
-index 049ebab..a94bb10 100644
---- a/drivers/usb/gadget/lpc32xx_udc.c
-+++ b/drivers/usb/gadget/lpc32xx_udc.c
-@@ -55,7 +55,6 @@
- #include <mach/hardware.h>
- #include <linux/io.h>
- #include <asm/irq.h>
--#include <asm/system.h>
- 
- #include <mach/platform.h>
- #include <mach/irqs.h>
+Indeed!
+
+> 
+> > +		dev_err(qup->dev, "clock frequency not supported %d\n",
+> > +			clk_freq);
+> > +		return -EIO;
+> 
+> EIO?
+
+EINVAL
+
+> 
+> Cheers,
+> 
+> Emilio
+
+Thanks,
+Bjorn
