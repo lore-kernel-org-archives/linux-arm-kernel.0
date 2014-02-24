@@ -1,272 +1,49 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 24 Feb 2014 18:49:27 +0100
-Subject: [PATCH v2] clk: respect the clock dependencies in of_clk_init
-In-Reply-To: <530A420B.5050207@gmail.com>
-References: <1392054179-28830-1-git-send-email-gregory.clement@free-electrons.com>
- <530A420B.5050207@gmail.com>
-Message-ID: <530B8627.4020705@free-electrons.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Mon, 24 Feb 2014 09:51:52 -0800
+Subject: [PATCH v3 2/2] i2c: New bus driver for the Qualcomm QUP I2C
+ controller
+In-Reply-To: <1392943934.2594.14.camel@joe-AO722>
+References: <1392943090-30556-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1392943090-30556-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <1392943934.2594.14.camel@joe-AO722>
+Message-ID: <20140224175152.GB32621@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Thu 20 Feb 16:52 PST 2014, Joe Perches wrote:
 
-On 23/02/2014 19:46, Tomasz Figa wrote:
-> Hi Gregory,
+> On Thu, 2014-02-20 at 16:38 -0800, Bjorn Andersson wrote:
+> > This bus driver supports the QUP i2c hardware controller in the Qualcomm SOCs.
+> > The Qualcomm Universal Peripheral Engine (QUP) is a general purpose data path
+> > engine with input/output FIFOs and an embedded i2c mini-core. The driver
+> > supports FIFO mode (for low bandwidth applications) and block mode (interrupt
+> > generated for each block-size data transfer).
 > 
-> On 10.02.2014 18:42, Gregory CLEMENT wrote:
->> Until now the clock providers were initialized in the order found in
->> the device tree. This led to have the dependencies between the clocks
->> not respected: children clocks could be initialized before their
->> parent clocks.
->>
->> Instead of forcing each platform to manage its own initialization order,
->> this patch adds this work inside the framework itself.
->>
->> Using the data of the device tree the of_clk_init function now delayed
->> the initialization of a clock provider if its parent provider was not
->> ready yet.
+> trivia:
 > 
-> In general this is really great. It's a first step towards sorting out 
-> dependencies between clock providers correctly. I have some comments 
-> inline, though.
+> > diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+> []
+> > +#ifdef CONFIG_PM_SLEEP
+> > +static int qup_i2c_suspend(struct device *device)
+> > +{
+> > +	dev_dbg(device, "system suspend");
+> > +	qup_i2c_pm_suspend_runtime(device);
+> > +	return 0;
+> > +}
+> > +
+> > +static int qup_i2c_resume(struct device *device)
+> > +{
+> > +	dev_dbg(device, "system resume");
+> > +	qup_i2c_pm_resume_runtime(device);
+> > +	pm_runtime_mark_last_busy(device);
+> > +	pm_request_autosuspend(device);
+> > +	return 0;
+> > +}
+> > +#endif
 > 
->>
->> The strict dependency check (all parents of a given clk must be
->> initialized) was added by Boris BREZILLON
-> 
-> Shouldn't this be reflected by a tag of this patch? If you squash a 
-> patch signed off by someone then I believe their sign-off tag should be 
-> added to the base patch. Correct me if I'm wrong, though.
+> Missing terminating newlines for dev_dbg statements.
 
-It was not really obvious for me to know how to deal with code merged from
-someone else, but indeed adding a sign-off tag seems to be sensible.
+Thanks Joe, missed those.
 
-> 
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>
->> Since the v1, I have merged the  strict dependency check from Boris.
->> And of course tested on my Armada 370 and Armada XP based board
->>
->>   drivers/clk/clk.c | 109 ++++++++++++++++++++++++++++++++++++++++++++++++++++--
->>   1 file changed, 106 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index 5517944495d8..684976993297 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -2526,24 +2526,127 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
->>   }
->>   EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
->>
->> +struct clock_provider {
-> 
-> The name is a bit too generic and slightly misleading. IMHO struct 
-> deferred_clk_provider (and deferred_clk_providers for the list) would be 
-> better.
-
-right
-
-> 
->> +	of_clk_init_cb_t clk_init_cb;
->> +	struct device_node *np;
->> +	struct list_head node;
->> +};
->> +
->> +static LIST_HEAD(clk_provider_list);
->> +
->> +/*
->> + * This function looks for a parent clock. If there is one, then it
->> + * checks that the provider for this parent clock was initialized, in
->> + * this case the parent clock will be ready.
->> + */
->> +static int parent_ready(struct device_node *np)
->> +{
->> +	struct of_phandle_args clkspec;
->> +	struct of_clk_provider *provider;
->> +	int num_parents;
->> +	bool found;
->> +	int i;
->> +
->> +	/*
->> +	 * If there is no clock parent, no need to wait for them, then
->> +	 * we can consider their absence as being ready
->> +	 */
->> +	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
->> +	if (num_parents <= 0)
->> +		return 1;
-> 
-> of_clk_get_parent_count() can be used here...
-
-right
-
-> 
->> +
->> +	for (i = 0; i < num_parents; i++) {
->> +		if (of_parse_phandle_with_args(np, "clocks", "#clock-cells", i,
->> +					       &clkspec))
->> +			return 1;
->> +
->> +		/* Check if we have such a provider in our array */
->> +		found = false;
->> +		list_for_each_entry(provider, &of_clk_providers, link) {
->> +			if (provider->node == clkspec.np) {
->> +				found = true;
->> +				break;
->> +			}
->> +		}
->> +
->> +		if (!found)
->> +			return 0;
->> +	}
-> 
-> ...or even better, __of_clk_get_from_provider() could modified to return
-> -EPROBE_DEFER if requested provider is not registered and you could 
-
-There is already a patch sent for this "clk: return probe defer when DT clock
-not yet ready": http://article.gmane.org/gmane.linux.kernel/1643466
-
-Mike will you take it?
-
-Then I can use it to implement the suggestion made by Tomasz.
-
-> simply call of_clk_get(np, i) and handle its return value appropriately:
-> 
-> - on !IS_ERR(clk) call clk_put() and continue with iterations,
-> - on IS_ERR(clk) && PTR_ERR(clk) == -EPROBE_DEFER return 0 immediately,
-> - in any other case end the loop (end of clock specifiers).
-
-So here we make the assumption that the device tree is written correctly. I think
-it should be acceptable because here we only try to deal with the order
-of the clocks providers not the accuracy of the device tree. If the device
-tree is wrong then it should trig errors message in other part of the kernel.
-
-> 
-> This would make CCF even closer to proper handling of provider ordering, 
-> with a nice side effect of handling deferred probe for platform devices.
-> 
->> +
->> +	return 1;
->> +}
->> +
->>   /**
->>    * of_clk_init() - Scan and init clock providers from the DT
->>    * @matches: array of compatible values and init functions for providers.
->>    *
->> - * This function scans the device tree for matching clock providers and
->> - * calls their initialization functions
->> + * This function scans the device tree for matching clock providers
->> + * and calls their initialization functions. It also do it by trying
->> + * to follow the dependencies.
->>    */
->>   void __init of_clk_init(const struct of_device_id *matches)
->>   {
->>   	const struct of_device_id *match;
->>   	struct device_node *np;
->> +	struct clock_provider *clk_provider, *next;
->> +	bool is_init_done;
->>
->>   	if (!matches)
->>   		matches = &__clk_of_table;
->>
->>   	for_each_matching_node_and_match(np, matches, &match) {
->>   		of_clk_init_cb_t clk_init_cb = match->data;
->> -		clk_init_cb(np);
->> +
->> +
->> +		if (parent_ready(np)) {
->> +			/*
->> +			 * The parent clock is ready or there is no
->> +			 * clock parent at all, in this case the
->> +			 * provider can be initialize immediately.
->> +			 */
->> +			clk_init_cb(np);
->> +		} else {
->> +			/*
->> +			 * The parent clock is not ready, this
->> +			 * provider is moved to a list to be
->> +			 * initialized later
->> +			 */
->> +			struct clock_provider *parent = kzalloc(sizeof(struct clock_provider),
->> +							GFP_KERNEL);
->> +
->> +			parent->clk_init_cb = match->data;
->> +			parent->np = np;
->> +			list_add(&parent->node, &clk_provider_list);
->> +		}
->> +	}
-> 
-> I wonder if this couldn't be replaced with simply adding all the 
-> providers to the list first and then proceeding with the loop below to 
-> handle the registrations.
-
-Yes you're right
-
-> 
->> +
->> +	while (!list_empty(&clk_provider_list)) {
->> +		is_init_done = false;
->> +		list_for_each_entry_safe(clk_provider, next,
->> +					&clk_provider_list, node) {
->> +			if (parent_ready(clk_provider->np)) {
->> +				clk_provider->clk_init_cb(clk_provider->np);
->> +				list_del(&clk_provider->node);
->> +				kfree(clk_provider);
->> +				is_init_done = true;
->> +			}
->> +		}
->> +
->> +		if (!is_init_done) {
->> +			/*
->> +			 * We didn't managed to initialize any of the
->> +			 * remaining providers during the last loop,
->> +			 * so now we initialize all the remaining ones
->> +			 * unconditionally in case the clock parent
->> +			 * was not mandatory
->> +			 */
->> +			list_for_each_entry_safe(clk_provider, next,
->> +						&clk_provider_list, node) {
->> +				clk_provider->clk_init_cb(clk_provider->np);
->> +				list_del(&clk_provider->node);
->> +				kfree(clk_provider);
-> 
-> Hmm, this is basically the code above repeated without the if. What 
-> about something like the code snippet below?
-> 
-> bool force = false;
-> while (!list_empty(&clk_provider_list)) {
-> 	is_init_done = false;
-> 	list_for_each_entry_safe(clk_provider, next,
-> 				&clk_provider_list, node) {
-> 		if (force || parent_ready(clk_provider->np)) {
-> 			clk_provider->clk_init_cb(clk_provider->np);
-> 			list_del(&clk_provider->node);
-> 			kfree(clk_provider);
-> 			is_init_done = true;
-> 		}
-> 	}
-> 
-> 	if (!is_init_done)
-> 		force = true;
-> }
-
-indeed it's better.
-
-
-Thanks for your review,
-
-Gregory
-
-
-> 
-> Best regards,
-> Tomasz
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Bjorn
