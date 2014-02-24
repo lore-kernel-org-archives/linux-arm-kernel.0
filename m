@@ -1,56 +1,99 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 24 Feb 2014 16:16:22 +0100
-Subject: [PATCH v2 0/6] ARM: STi reset controller support
-In-Reply-To: <530B514A.4070209@st.com>
-References: <1389696613-19683-1-git-send-email-srinivas.kandagatla@st.com>
- <1391437665-11913-1-git-send-email-srinivas.kandagatla@st.com>
- <1391592486.11239.4.camel@pizza.hi.pengutronix.de>
- <52F4D76F.8070301@st.com> <5304B849.2080806@st.com>
- <1393237988.3091.14.camel@pizza.hi.pengutronix.de>
- <530B514A.4070209@st.com>
-Message-ID: <1393254982.3091.44.camel@pizza.hi.pengutronix.de>
+From: annulen@yandex.ru (Konstantin Tokarev)
+Date: Mon, 24 Feb 2014 19:17:16 +0400
+Subject: [PATCH v5 4/8] Documentation: add the document for the SPI NOR
+ framework
+In-Reply-To: <1393238262-8622-5-git-send-email-b32955@freescale.com>
+References: <1393238262-8622-1-git-send-email-b32955@freescale.com>
+ <1393238262-8622-5-git-send-email-b32955@freescale.com>
+Message-ID: <203101393255036@web29h.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
 
-Am Montag, den 24.02.2014, 14:03 +0000 schrieb srinivas kandagatla:
-> Thanks Philipp for your comments,
-> 
-> On 24/02/14 10:33, Philipp Zabel wrote:
-> >> > Did Srini's explanations convinced you?
-> >> > 
-> >> > If so, could you queue the series for v3.15?
-> > to be honest, I'm not comfortable with this explanation. If the
-> > "powerdown" bits only gate the clocks to those modules, calling it a
-> > reset control is clearly the wrong abstraction. If that is the case,
-> > couldn't you handle those bits via the clock framework?
-> I just had a re-look at the IPs specs for more information on where
-> these power-down signals are actually terminating on the IP side.
-> 
-> For example: ST-Synopsis Ethernet GMAC IP has two pins
-> power_down_req[IN] and power_down_ack[OUT]. power_down_req is used by
-> the software to either put the IP in powerdown or bring it out of
-> powerdown state.
 
-Now I'm a bit confused. There is no mention of GMAC in your patches,
-and for ETH[01] they contain only the SOFTRESET bits. I have no issue
-with the SOFTRESETs.
+24.02.2014, 15:26, "Huang Shijie" <b32955@freescale.com>:
+> This patch adds the document for the SPI NOR framework.
+>
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+> ?Documentation/mtd/spi-nor.txt | ??59 +++++++++++++++++++++++++++++++++++++++++
+> ?1 files changed, 59 insertions(+), 0 deletions(-)
+> ?create mode 100644 Documentation/mtd/spi-nor.txt
+>
+> diff --git a/Documentation/mtd/spi-nor.txt b/Documentation/mtd/spi-nor.txt
+> new file mode 100644
+> index 0000000..b9585f8
+> --- /dev/null
+> +++ b/Documentation/mtd/spi-nor.txt
+> @@ -0,0 +1,59 @@
+> + ?????????????????????????SPI NOR framework
+> + ??????????????============================================
+> +
+> +Part I - why we need this framework?
+> +-------------------------------------
+> +
+> +The SPI bus controller only deals with the byte stream.
+> +Some controller does not works like a SPI bus controller, it works
+> +like a SPI NOR controller instead, such as the Freescale's QuadSPI controller.
+> +
+> +The Freescale's QuadSPI controller should knows the NOR commands to
+> +find the right LUT sequence. Unfortunately, the old code can not meet
+> +this requirement.
 
-> The IP itself drives power_down_ack to indicate when the power down
-> request is successfully finished. For power_down/power_up request the IP
-> will change the internal state accordingly including powering up/down
-> its internal blocks and/or clock gating.
-> 
-> > If on the other hand these powerdown bits also trigger reset machinery,
-> > such that asserting and deasserting that bit will change the module's
-> > internal state, I could be convinced to queue them like this.
-> This is true with ST IPs, these lines change the state of the IP as
-> described above. Reset framework seems to fits in very well with this
-> behavior rather than power-domains or clock framework.
+should know
 
-If you put the IP in power down when it is idle, and then power it up
-again, will the IP registers have kept their previous state?
+> +
+> +Part II - How does the framework work?
+> +-------------------------------------
+> +
+> +This framework just adds a new layer between the MTD and the SPI bus driver.
+> +With this new layer, the SPI NOR controller driver does not depend on the
+> +m25p80 code anymore.
+> +
+> + ??Before this framework, the layer is like:
+> +
+> + ??????????????????MTD
+> + ????????------------------------
+> + ?????????????????m25p80
+> + ????????------------------------
+> + ??????SPI bus driver
+> + ????????------------------------
+> + ???????SPI NOR chip
+> +
+> + ??After this framework, the layer is like:
+> + ??????????????????MTD
+> + ????????------------------------
+> + ?????????????SPI NOR framework
+> + ????????------------------------
+> + ?????????????????m25p80
+> + ????????------------------------
+> + ??????SPI bus driver
+> + ????????------------------------
+> + ??????SPI NOR chip
+> +
+> + ?With the SPI NOR controller driver(Freescale QuadSPI), it looks like:
+> + ??????????????????MTD
+> + ????????------------------------
+> + ?????????????SPI NOR framework
+> + ????????------------------------
+> + ???????????????fsl-quadSPI
+> + ????????------------------------
+> + ??????SPI NOR chip
+> +
+> +Part III - How can the drivers use the framework
+> +-------------------------------------
+> +
+> +The main API is the spi_nor_scan(). Before you call the hook, you should
+> +initialize the necessary fields for spi_nor{}.
+> +Please see the drivers/mtd/spi-nor/spi-nor.c for detail.
+> +Please also reference to the fsl-quadspi.c when you want to write a new driver
+> +for a SPI NOR controller.
+> --
+> 1.7.2.rc3
+>
+> ______________________________________________________
+> Linux MTD discussion mailing list
+> http://lists.infradead.org/mailman/listinfo/linux-mtd/
 
-regards
-Philipp
+Regards,
+Konstantin
