@@ -1,30 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Feb 2014 13:26:48 +0100
-Subject: [PATCH 4/7] spi: pl022: attempt to get sspclk by name
-In-Reply-To: <12776368.fUp5TWIUAS@wuerfel>
-References: <1392118632-11312-1-git-send-email-mark.rutland@arm.com>
- <1786282.mNUF0ZaUg2@wuerfel>
- <20140212161206.GD25957@e106331-lin.cambridge.arm.com>
- <12776368.fUp5TWIUAS@wuerfel>
-Message-ID: <CACRpkdYKOTn9+6c6hJaoUq8pCJBpZrC_JF1AZJyt=Gt67WE4Vw@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 24 Feb 2014 13:31:15 +0100
+Subject: [PATCH] ARM: mvebu: Armada 375/38x depend on MULTI_V7
+In-Reply-To: <1393174030-10549-1-git-send-email-jason@lakedaemon.net>
+References: <1393174030-10549-1-git-send-email-jason@lakedaemon.net>
+Message-ID: <20140224123115.GC18601@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 12, 2014 at 5:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Sun, Feb 23, 2014 at 04:47:10PM +0000, Jason Cooper wrote:
+> During this release cycle, we're adding the new Armada 375, 380, and 385
+> SoCs.  We're also migrating DT kirkwood boards into mach-mvebu.  The
+> kirkwood changes make the different SoCs in mach-mvebu/ depend on
+> MULTI_V7 or MULTI_V5 as appropriate.
+> 
+> We add this dependency to the new SoCs so that when the branches are
+> merged, everything is as it should be.
+> 
+> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 
-> Ok. Both ssp{0,1}clk and spi{0,1,2,3}clk /only/ appear in
-> arch/arm/boot/dts/ste-dbx5x0.dtsi and are clearly a bug, so unless
-> Linus Walleij has objections, I'd declare those to be bugs that
-> should be fixed by changing the DT file to spi_clk.
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-OK I'll fix. But didn't Mark just say that the preferred name should be
-SSPCLK?
+Thanks Jason,
 
-Here is the PL022 TRM:
-http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0194g/index.html
+       Andrew
 
-The clock name on the silicon side is clearly "SSPCLK" so let's
-stick with this.
-
-Yours,
-Linus Walleij
+> ---
+> Adding this to mvebu/soc-3xx
+> 
+>  arch/arm/mach-mvebu/Kconfig | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+> index 884b275ab056..00dc4a6ace6e 100644
+> --- a/arch/arm/mach-mvebu/Kconfig
+> +++ b/arch/arm/mach-mvebu/Kconfig
+> @@ -38,7 +38,7 @@ config MACH_ARMADA_370
+>  	  on the Marvell Armada 370 SoC with device tree.
+>  
+>  config MACH_ARMADA_375
+> -	bool "Marvell Armada 375 boards"
+> +	bool "Marvell Armada 375 boards" if ARCH_MULTI_V7
+>  	select ARM_ERRATA_720789
+>  	select ARM_ERRATA_753970
+>  	select ARM_GIC
+> @@ -52,7 +52,7 @@ config MACH_ARMADA_375
+>  	  on the Marvell Armada 375 SoC with device tree.
+>  
+>  config MACH_ARMADA_38X
+> -	bool "Marvell Armada 380/385 boards"
+> +	bool "Marvell Armada 380/385 boards" if ARCH_MULTI_V7
+>  	select ARM_ERRATA_720789
+>  	select ARM_ERRATA_753970
+>  	select ARM_GIC
+> -- 
+> 1.9.0
+> 
