@@ -1,38 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Feb 2014 17:22:42 +0100
-Subject: [PATCH 0/5] Add support for the Allwinner A31 DMA Controller
-Message-ID: <1393258967-4843-1-git-send-email-maxime.ripard@free-electrons.com>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Mon, 24 Feb 2014 16:26:16 +0000
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <20140224162413.GE18601@lunn.ch>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1391730137-14814-22-git-send-email-andrew@lunn.ch>
+ <52F51922.6030502@gmail.com>
+ <1392892217.23342.18.camel@kazak.uk.xensource.com>
+ <20140220105854.GL11878@lunn.ch>
+ <20140220111913.GZ21483@n2100.arm.linux.org.uk>
+ <1392896356.23342.40.camel@kazak.uk.xensource.com>
+ <20140220232649.GU7862@titan.lakedaemon.net>
+ <1393257630.16570.95.camel@kazak.uk.xensource.com>
+ <20140224162413.GE18601@lunn.ch>
+Message-ID: <1393259176.16570.102.camel@kazak.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 2014-02-24 at 17:24 +0100, Andrew Lunn wrote:
+> > > > > What's wrong with the soc subsystem (drivers/base/soc.c).  This
+> > > > > provides a way to export SoC through standardised interfaces. 
+> > > > 
+> > > > It looks like the thing to use to me.
+> > > > 
+> > > > It seems to have been around only since v3.3 though, which makes it a
+> > > > bit tricky to use when upgrading from running board-file based v3.2
+> > > > system (Debian Wheezy) to a newer DTB based kernel, we need to select
+> > > > the new DTB while running the old system.
+> > > > 
+> > > > I'd prefer to use this thing as the primary mechanism but it seems like
+> > > > I'd have to implement some sort of fallback at least for one Debian
+> > > > release cycle. I'm sure it is doable...
+> > > 
+> > > back in v3.2, lspci should still work.  Would that given you the
+> > > information you need?
+> > 
+> > I expect it will, yes.
+> 
+> 3.14 with the new PCIe driver will also work. The patch was accepted
+> and considered a regression so made it into one of the -rc's.
 
-This patchset adds support for the DMA controller found in the
-Allwinner A31 and A23 SoCs.
+Great! Thanks.
 
-This has been tested using the newly introduced SPI driver on an A31
-EVK. Support for DMA-driven SPI transfers will be the subject of
-another patch serie.
-
-Thanks,
-Maxime
-
-Maxime Ripard (5):
-  clk: sun6i: Protect CPU clock
-  clk: sun6i: Reparent AHB clock on PLL6
-  clk: sun6i: Protect SDRAM gating bit
-  DMA: sun6i: Add driver for the Allwinner A31 DMA controller
-  ARM: sun6i: dt: Add A31 DMA controller to DTSI
-
- .../devicetree/bindings/dma/sun6i-dma.txt          |  45 +
- arch/arm/boot/dts/sun6i-a31.dtsi                   |  29 +
- drivers/clk/sunxi/clk-sunxi.c                      |  33 +-
- drivers/dma/Kconfig                                |   8 +
- drivers/dma/Makefile                               |   1 +
- drivers/dma/sun6i-dma.c                            | 960 +++++++++++++++++++++
- 6 files changed, 1075 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/dma/sun6i-dma.txt
- create mode 100644 drivers/dma/sun6i-dma.c
-
--- 
-1.9.0
+Ian.
