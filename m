@@ -1,7 +1,9 @@
 From: gsi@denx.de (Gerhard Sittig)
-Date: Mon, 24 Feb 2014 11:25:55 +0100
-Subject: [PATCH 1/3] fs_enet: update clock names to comply with FEC binding
-Message-ID: <1393237557-31406-1-git-send-email-gsi@denx.de>
+Date: Mon, 24 Feb 2014 11:25:57 +0100
+Subject: [PATCH 3/3] dt/bindings: fsl-fec: add "per" to clock properties
+In-Reply-To: <1393237557-31406-1-git-send-email-gsi@denx.de>
+References: <1393237557-31406-1-git-send-email-gsi@denx.de>
+Message-ID: <1393237557-31406-3-git-send-email-gsi@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,41 +11,34 @@ a recent FEC binding document update that was motivated by i.MX
 development revealed that ARM and PowerPC implementations in Linux
 did not agree on the clock names to use for the FEC nodes
 
-change the OF clock lookup to prefer "ipg" over "per", which
-improves compliance with the binding, and keeps compatibility
-with former device trees
+update the FEC (fast ethernet controller) binding to document the
+"per" clock name as an obsolete alias for "ipg"
 
 Signed-off-by: Gerhard Sittig <gsi@denx.de>
 ---
- drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c |   13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c b/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-index 62f042d4aaa9..ce20184b96cb 100644
---- a/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-+++ b/drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c
-@@ -1037,11 +1037,20 @@ static int fs_enet_probe(struct platform_device *ofdev)
- 			fpi->use_rmii = 1;
- 	}
+this patch depends on "dt/bindings: fsl-fec: add clock properties"
+by Shawn Guo which introduces the context of this patch
+
+the patch only is necessary if the MPC5121 .dtsi update (switch
+FEC nodes from "per" to "ipg") won't make it for v3.14
+
+---
+ Documentation/devicetree/bindings/net/fsl-fec.txt |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
+index 468736d4323d..f59b58e29da6 100644
+--- a/Documentation/devicetree/bindings/net/fsl-fec.txt
++++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
+@@ -24,6 +24,8 @@ Optional properties:
+      or external oscillator via pad depending on board design.
+    - "enet_out": the phy reference clock provided by SoC via pad, which
+      is available on SoC like i.MX28.
++   - "per": obsolete alias for "ipg" for compatibility with early
++     MPC5121 implementations, not recommended for new .dts files
+ - clock-names: Must contain the clock names described just above
  
--	/* make clock lookup non-fatal (the driver is shared among platforms),
-+	/* the driver is shared across several PowerPC platforms, not all
-+	 * of them provide COMMON_CLK support, and newer kernels are supposed
-+	 * to keep working with older DT blobs, so clock lookup is non-fatal
-+	 *
- 	 * but require enable to succeed when a clock was specified/found,
- 	 * keep a reference to the clock upon successful acquisition
-+	 *
-+	 * the FEC binding is shared with ARM platforms, so we lookup several
-+	 * clock names to prefer the common naming convention yet support
-+	 * names that were used before unification
- 	 */
--	clk = devm_clk_get(&ofdev->dev, "per");
-+	clk = devm_clk_get(&ofdev->dev, "ipg");
-+	if (IS_ERR(clk))
-+		clk = devm_clk_get(&ofdev->dev, "per");
- 	if (!IS_ERR(clk)) {
- 		err = clk_prepare_enable(clk);
- 		if (err) {
+ Example:
 -- 
 1.7.10.4
