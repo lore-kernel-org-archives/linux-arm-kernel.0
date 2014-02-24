@@ -1,44 +1,57 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Mon, 24 Feb 2014 16:26:16 +0000
-Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
-In-Reply-To: <20140224162413.GE18601@lunn.ch>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1391730137-14814-22-git-send-email-andrew@lunn.ch>
- <52F51922.6030502@gmail.com>
- <1392892217.23342.18.camel@kazak.uk.xensource.com>
- <20140220105854.GL11878@lunn.ch>
- <20140220111913.GZ21483@n2100.arm.linux.org.uk>
- <1392896356.23342.40.camel@kazak.uk.xensource.com>
- <20140220232649.GU7862@titan.lakedaemon.net>
- <1393257630.16570.95.camel@kazak.uk.xensource.com>
- <20140224162413.GE18601@lunn.ch>
-Message-ID: <1393259176.16570.102.camel@kazak.uk.xensource.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Feb 2014 17:29:06 +0100
+Subject: [PATCH] ARM: sun6i: dt: Fix mod0 compatible
+Message-ID: <1393259346-6074-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2014-02-24 at 17:24 +0100, Andrew Lunn wrote:
-> > > > > What's wrong with the soc subsystem (drivers/base/soc.c).  This
-> > > > > provides a way to export SoC through standardised interfaces. 
-> > > > 
-> > > > It looks like the thing to use to me.
-> > > > 
-> > > > It seems to have been around only since v3.3 though, which makes it a
-> > > > bit tricky to use when upgrading from running board-file based v3.2
-> > > > system (Debian Wheezy) to a newer DTB based kernel, we need to select
-> > > > the new DTB while running the old system.
-> > > > 
-> > > > I'd prefer to use this thing as the primary mechanism but it seems like
-> > > > I'd have to implement some sort of fallback at least for one Debian
-> > > > release cycle. I'm sure it is doable...
-> > > 
-> > > back in v3.2, lspci should still work.  Would that given you the
-> > > information you need?
-> > 
-> > I expect it will, yes.
-> 
-> 3.14 with the new PCIe driver will also work. The patch was accepted
-> and considered a regression so made it into one of the -rc's.
+The module 0 clock compatibles were changed between the time the patch was sent
+and it was merged. Update the compatibles.
 
-Great! Thanks.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Ian.
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index af6f87c..42f310a 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -200,7 +200,7 @@
+ 
+ 		spi0_clk: clk at 01c200a0 {
+ 			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-mod0-clk";
++			compatible = "allwinner,sun4i-a10-mod0-clk";
+ 			reg = <0x01c200a0 0x4>;
+ 			clocks = <&osc24M>, <&pll6>;
+ 			clock-output-names = "spi0";
+@@ -208,7 +208,7 @@
+ 
+ 		spi1_clk: clk at 01c200a4 {
+ 			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-mod0-clk";
++			compatible = "allwinner,sun4i-a10-mod0-clk";
+ 			reg = <0x01c200a4 0x4>;
+ 			clocks = <&osc24M>, <&pll6>;
+ 			clock-output-names = "spi1";
+@@ -216,7 +216,7 @@
+ 
+ 		spi2_clk: clk at 01c200a8 {
+ 			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-mod0-clk";
++			compatible = "allwinner,sun4i-a10-mod0-clk";
+ 			reg = <0x01c200a8 0x4>;
+ 			clocks = <&osc24M>, <&pll6>;
+ 			clock-output-names = "spi2";
+@@ -224,7 +224,7 @@
+ 
+ 		spi3_clk: clk at 01c200ac {
+ 			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-mod0-clk";
++			compatible = "allwinner,sun4i-a10-mod0-clk";
+ 			reg = <0x01c200ac 0x4>;
+ 			clocks = <&osc24M>, <&pll6>;
+ 			clock-output-names = "spi3";
+-- 
+1.9.0
