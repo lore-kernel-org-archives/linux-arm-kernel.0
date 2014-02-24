@@ -1,21 +1,17 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 24 Feb 2014 18:35:16 +0100
-Subject: [PATCH v5 04/10] V4L: Add driver for s5k6a3 image sensor
+Date: Mon, 24 Feb 2014 18:35:17 +0100
+Subject: [PATCH v5 05/10] V4L: s5c73m3: Add device tree support
 In-Reply-To: <1393263322-28215-1-git-send-email-s.nawrocki@samsung.com>
 References: <1393263322-28215-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1393263322-28215-5-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1393263322-28215-6-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds subdev driver for Samsung S5K6A3 raw image sensor.
-As it is intended at the moment to be used only with the Exynos
-FIMC-IS (camera ISP) subsystem it is pretty minimal subdev driver.
-It doesn't do any I2C communication since the sensor is controlled
-by the ISP and its own firmware.
-This driver, if needed, can be updated in future into a regular
-subdev driver where the main CPU communicates with the sensor
-directly.
+This patch adds the V4L2 asynchronous subdev registration and
+device tree support. Common clock API is used to control the
+sensor master clock from within the subdev.
 
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
@@ -23,454 +19,422 @@ Changes since v4:
   - none.
 
 Changes since v3:
- - clk_get() called moved from s_power() to driver probe() callback.
+ - move clk_get from subdev s_power() to driver probe() callback and
+   make it devm_clk_get(),
+ - pass any errors from dev_clk_get() through, rather than overwriting
+   with EPROBE_DEFER. Patch [1] is required for things to work correctly
+   after this change.
 
-Changes since v1:
- - added missing pm_runtime_disable(),
- - removed subdev name overriding,
- - s/S5K6A3_DEF_PIX/S5K6A3_DEFAULT_,
- - merged patch adding v4l2-async API support,
- - clock-frequency property is now optional and a default frequency
-   value will be used when it is missing, rather than bailing out,
- - reset GPIO made mandatory as it is required for proper power
-   on/off sequences and all known boards use it,
- - maximum image size is now 1412x1412 pixels, as specified in
-   in the S5K6A3YX datasheet.
- - regulator_enable()/disable() used instead of the regulator bulk
-   API to ensure proper regulators enable/disable sequences.
-
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+   [1] http://www.spinics.net/lists/arm-kernel/msg306072.html
 ---
- drivers/media/i2c/Kconfig  |    8 +
- drivers/media/i2c/Makefile |    1 +
- drivers/media/i2c/s5k6a3.c |  388 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 397 insertions(+)
- create mode 100644 drivers/media/i2c/s5k6a3.c
+ drivers/media/i2c/s5c73m3/s5c73m3-core.c |  207 ++++++++++++++++++++++--------
+ drivers/media/i2c/s5c73m3/s5c73m3-spi.c  |    6 +
+ drivers/media/i2c/s5c73m3/s5c73m3.h      |    4 +
+ 3 files changed, 167 insertions(+), 50 deletions(-)
 
-diff --git a/drivers/media/i2c/Kconfig b/drivers/media/i2c/Kconfig
-index 4aa9c531..ac2d5b7 100644
---- a/drivers/media/i2c/Kconfig
-+++ b/drivers/media/i2c/Kconfig
-@@ -579,6 +579,14 @@ config VIDEO_S5K6AA
- 	  This is a V4L2 sensor-level driver for Samsung S5K6AA(FX) 1.3M
- 	  camera sensor with an embedded SoC image signal processor.
+diff --git a/drivers/media/i2c/s5c73m3/s5c73m3-core.c b/drivers/media/i2c/s5c73m3/s5c73m3-core.c
+index e7f555c..a445930 100644
+--- a/drivers/media/i2c/s5c73m3/s5c73m3-core.c
++++ b/drivers/media/i2c/s5c73m3/s5c73m3-core.c
+@@ -15,7 +15,7 @@
+  * GNU General Public License for more details.
+  */
  
-+config VIDEO_S5K6A3
-+	tristate "Samsung S5K6A3 sensor support"
-+	depends on MEDIA_CAMERA_SUPPORT
-+	depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && OF
-+	---help---
-+	  This is a V4L2 sensor-level driver for Samsung S5K6A3 raw
-+	  camera sensor.
-+
- config VIDEO_S5K4ECGX
-         tristate "Samsung S5K4ECGX sensor support"
-         depends on I2C && VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API
-diff --git a/drivers/media/i2c/Makefile b/drivers/media/i2c/Makefile
-index 48888ae..ab5aa34 100644
---- a/drivers/media/i2c/Makefile
-+++ b/drivers/media/i2c/Makefile
-@@ -66,6 +66,7 @@ obj-$(CONFIG_VIDEO_MT9V032) += mt9v032.o
- obj-$(CONFIG_VIDEO_SR030PC30)	+= sr030pc30.o
- obj-$(CONFIG_VIDEO_NOON010PC30)	+= noon010pc30.o
- obj-$(CONFIG_VIDEO_S5K6AA)	+= s5k6aa.o
-+obj-$(CONFIG_VIDEO_S5K6A3)	+= s5k6a3.o
- obj-$(CONFIG_VIDEO_S5K4ECGX)	+= s5k4ecgx.o
- obj-$(CONFIG_VIDEO_S5K5BAF)	+= s5k5baf.o
- obj-$(CONFIG_VIDEO_S5C73M3)	+= s5c73m3/
-diff --git a/drivers/media/i2c/s5k6a3.c b/drivers/media/i2c/s5k6a3.c
-new file mode 100644
-index 0000000..d0b52cd
---- /dev/null
-+++ b/drivers/media/i2c/s5k6a3.c
-@@ -0,0 +1,388 @@
-+/*
-+ * Samsung S5K6A3 image sensor driver
-+ *
-+ * Copyright (C) 2013 Samsung Electronics Co., Ltd.
-+ * Author: Sylwester Nawrocki <s.nawrocki@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
+-#include <linux/sizes.h>
 +#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/device.h>
-+#include <linux/errno.h>
-+#include <linux/gpio.h>
-+#include <linux/i2c.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
+ #include <linux/delay.h>
+ #include <linux/firmware.h>
+ #include <linux/gpio.h>
+@@ -23,7 +23,9 @@
+ #include <linux/init.h>
+ #include <linux/media.h>
+ #include <linux/module.h>
 +#include <linux/of_gpio.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/slab.h>
-+#include <linux/videodev2.h>
-+#include <media/v4l2-async.h>
-+#include <media/v4l2-subdev.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/sizes.h>
+ #include <linux/slab.h>
+ #include <linux/spi/spi.h>
+ #include <linux/videodev2.h>
+@@ -33,6 +35,7 @@
+ #include <media/v4l2-subdev.h>
+ #include <media/v4l2-mediabus.h>
+ #include <media/s5c73m3.h>
++#include <media/v4l2-of.h>
+ 
+ #include "s5c73m3.h"
+ 
+@@ -46,6 +49,8 @@ static int update_fw;
+ module_param(update_fw, int, 0644);
+ 
+ #define S5C73M3_EMBEDDED_DATA_MAXLEN	SZ_4K
++#define S5C73M3_MIPI_DATA_LANES		4
++#define S5C73M3_CLK_NAME		"cis_extclk"
+ 
+ static const char * const s5c73m3_supply_names[S5C73M3_MAX_SUPPLIES] = {
+ 	"vdd-int",	/* Digital Core supply (1.2V), CAM_ISP_CORE_1.2V */
+@@ -1355,9 +1360,20 @@ static int __s5c73m3_power_on(struct s5c73m3 *state)
+ 	for (i = 0; i < S5C73M3_MAX_SUPPLIES; i++) {
+ 		ret = regulator_enable(state->supplies[i].consumer);
+ 		if (ret)
+-			goto err;
++			goto err_reg_dis;
+ 	}
+ 
++	ret = clk_set_rate(state->clock, state->mclk_frequency);
++	if (ret < 0)
++		goto err_reg_dis;
 +
-+#define S5K6A3_SENSOR_MAX_WIDTH		1412
-+#define S5K6A3_SENSOR_MAX_HEIGHT	1412
-+#define S5K6A3_SENSOR_MIN_WIDTH		32
-+#define S5K6A3_SENSOR_MIN_HEIGHT	32
++	ret = clk_prepare_enable(state->clock);
++	if (ret < 0)
++		goto err_reg_dis;
 +
-+#define S5K6A3_DEFAULT_WIDTH		1296
-+#define S5K6A3_DEFAULT_HEIGHT		732
++	v4l2_dbg(1, s5c73m3_dbg, &state->oif_sd, "clock frequency: %ld\n",
++					clk_get_rate(state->clock));
 +
-+#define S5K6A3_DRV_NAME			"S5K6A3"
-+#define S5K6A3_CLK_NAME			"extclk"
-+#define S5K6A3_DEFAULT_CLK_FREQ		24000000U
+ 	s5c73m3_gpio_deassert(state, STBY);
+ 	usleep_range(100, 200);
+ 
+@@ -1365,7 +1381,8 @@ static int __s5c73m3_power_on(struct s5c73m3 *state)
+ 	usleep_range(50, 100);
+ 
+ 	return 0;
+-err:
 +
-+enum {
-+	S5K6A3_SUPP_VDDA,
-+	S5K6A3_SUPP_VDDIO,
-+	S5K6A3_SUPP_AFVDD,
-+	S5K6A3_NUM_SUPPLIES,
-+};
++err_reg_dis:
+ 	for (--i; i >= 0; i--)
+ 		regulator_disable(state->supplies[i].consumer);
+ 	return ret;
+@@ -1380,6 +1397,9 @@ static int __s5c73m3_power_off(struct s5c73m3 *state)
+ 
+ 	if (s5c73m3_gpio_assert(state, STBY))
+ 		usleep_range(100, 200);
 +
-+/**
-+ * struct s5k6a3 - fimc-is sensor data structure
-+ * @dev: pointer to this I2C client device structure
-+ * @subdev: the image sensor's v4l2 subdev
-+ * @pad: subdev media source pad
-+ * @supplies: image sensor's voltage regulator supplies
-+ * @gpio_reset: GPIO connected to the sensor's reset pin
-+ * @lock: mutex protecting the structure's members below
-+ * @format: media bus format at the sensor's source pad
-+ */
-+struct s5k6a3 {
-+	struct device *dev;
-+	struct v4l2_subdev subdev;
-+	struct media_pad pad;
-+	struct regulator_bulk_data supplies[S5K6A3_NUM_SUPPLIES];
-+	int gpio_reset;
-+	struct mutex lock;
-+	struct v4l2_mbus_framefmt format;
-+	struct clk *clock;
-+	u32 clock_frequency;
-+	int power_count;
-+};
++	clk_disable_unprepare(state->clock);
 +
-+static const char * const s5k6a3_supply_names[] = {
-+	[S5K6A3_SUPP_VDDA]	= "svdda",
-+	[S5K6A3_SUPP_VDDIO]	= "svddio",
-+	[S5K6A3_SUPP_AFVDD]	= "afvdd",
-+};
+ 	state->streaming = 0;
+ 	state->isp_ready = 0;
+ 
+@@ -1388,6 +1408,7 @@ static int __s5c73m3_power_off(struct s5c73m3 *state)
+ 		if (ret)
+ 			goto err;
+ 	}
 +
-+static inline struct s5k6a3 *sd_to_s5k6a3(struct v4l2_subdev *sd)
+ 	return 0;
+ err:
+ 	for (++i; i < S5C73M3_MAX_SUPPLIES; i++) {
+@@ -1396,6 +1417,8 @@ err:
+ 			v4l2_err(&state->oif_sd, "Failed to reenable %s: %d\n",
+ 				 state->supplies[i].supply, r);
+ 	}
++
++	clk_prepare_enable(state->clock);
+ 	return ret;
+ }
+ 
+@@ -1451,17 +1474,6 @@ static int s5c73m3_oif_registered(struct v4l2_subdev *sd)
+ 			S5C73M3_JPEG_PAD, &state->oif_sd.entity, OIF_JPEG_PAD,
+ 			MEDIA_LNK_FL_IMMUTABLE | MEDIA_LNK_FL_ENABLED);
+ 
+-	mutex_lock(&state->lock);
+-	ret = __s5c73m3_power_on(state);
+-	if (ret == 0)
+-		s5c73m3_get_fw_version(state);
+-
+-	__s5c73m3_power_off(state);
+-	mutex_unlock(&state->lock);
+-
+-	v4l2_dbg(1, s5c73m3_dbg, sd, "%s: Booting %s (%d)\n",
+-		 __func__, ret ? "failed" : "succeeded", ret);
+-
+ 	return ret;
+ }
+ 
+@@ -1519,41 +1531,112 @@ static const struct v4l2_subdev_ops oif_subdev_ops = {
+ 	.video	= &s5c73m3_oif_video_ops,
+ };
+ 
+-static int s5c73m3_configure_gpios(struct s5c73m3 *state,
+-				   const struct s5c73m3_platform_data *pdata)
++static int s5c73m3_configure_gpios(struct s5c73m3 *state)
 +{
-+	return container_of(sd, struct s5k6a3, subdev);
-+}
++	static const char * const gpio_names[] = {
++		"S5C73M3_STBY", "S5C73M3_RST"
++	};
++	struct i2c_client *c = state->i2c_client;
++	struct s5c73m3_gpio *g = state->gpio;
++	int ret, i;
 +
-+static const struct v4l2_mbus_framefmt s5k6a3_formats[] = {
-+	{
-+		.code = V4L2_MBUS_FMT_SGRBG10_1X10,
-+		.colorspace = V4L2_COLORSPACE_SRGB,
-+		.field = V4L2_FIELD_NONE,
-+	}
-+};
-+
-+static const struct v4l2_mbus_framefmt *find_sensor_format(
-+	struct v4l2_mbus_framefmt *mf)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(s5k6a3_formats); i++)
-+		if (mf->code == s5k6a3_formats[i].code)
-+			return &s5k6a3_formats[i];
-+
-+	return &s5k6a3_formats[0];
-+}
-+
-+static int s5k6a3_enum_mbus_code(struct v4l2_subdev *sd,
-+				  struct v4l2_subdev_fh *fh,
-+				  struct v4l2_subdev_mbus_code_enum *code)
-+{
-+	if (code->index >= ARRAY_SIZE(s5k6a3_formats))
-+		return -EINVAL;
-+
-+	code->code = s5k6a3_formats[code->index].code;
-+	return 0;
-+}
-+
-+static void s5k6a3_try_format(struct v4l2_mbus_framefmt *mf)
-+{
-+	const struct v4l2_mbus_framefmt *fmt;
-+
-+	fmt = find_sensor_format(mf);
-+	mf->code = fmt->code;
-+	v4l_bound_align_image(&mf->width, S5K6A3_SENSOR_MIN_WIDTH,
-+			      S5K6A3_SENSOR_MAX_WIDTH, 0,
-+			      &mf->height, S5K6A3_SENSOR_MIN_HEIGHT,
-+			      S5K6A3_SENSOR_MAX_HEIGHT, 0, 0);
-+}
-+
-+static struct v4l2_mbus_framefmt *__s5k6a3_get_format(
-+		struct s5k6a3 *sensor, struct v4l2_subdev_fh *fh,
-+		u32 pad, enum v4l2_subdev_format_whence which)
-+{
-+	if (which == V4L2_SUBDEV_FORMAT_TRY)
-+		return fh ? v4l2_subdev_get_try_format(fh, pad) : NULL;
-+
-+	return &sensor->format;
-+}
-+
-+static int s5k6a3_set_fmt(struct v4l2_subdev *sd,
-+				  struct v4l2_subdev_fh *fh,
-+				  struct v4l2_subdev_format *fmt)
-+{
-+	struct s5k6a3 *sensor = sd_to_s5k6a3(sd);
-+	struct v4l2_mbus_framefmt *mf;
-+
-+	s5k6a3_try_format(&fmt->format);
-+
-+	mf = __s5k6a3_get_format(sensor, fh, fmt->pad, fmt->which);
-+	if (mf) {
-+		mutex_lock(&sensor->lock);
-+		if (fmt->which == V4L2_SUBDEV_FORMAT_ACTIVE)
-+			*mf = fmt->format;
-+		mutex_unlock(&sensor->lock);
++	for (i = 0; i < GPIO_NUM; ++i) {
++		unsigned int flags = GPIOF_DIR_OUT;
++		if (g[i].level)
++			flags |= GPIOF_INIT_HIGH;
++		ret = devm_gpio_request_one(&c->dev, g[i].gpio, flags,
++					    gpio_names[i]);
++		if (ret) {
++			v4l2_err(c, "failed to request gpio %s\n",
++				 gpio_names[i]);
++			return ret;
++		}
 +	}
 +	return 0;
 +}
 +
-+static int s5k6a3_get_fmt(struct v4l2_subdev *sd,
-+				  struct v4l2_subdev_fh *fh,
-+				  struct v4l2_subdev_format *fmt)
++static int s5c73m3_parse_gpios(struct s5c73m3 *state)
 +{
-+	struct s5k6a3 *sensor = sd_to_s5k6a3(sd);
-+	struct v4l2_mbus_framefmt *mf;
++	static const char * const prop_names[] = {
++		"standby-gpios", "xshutdown-gpios",
++	};
++	struct device *dev = &state->i2c_client->dev;
++	struct device_node *node = dev->of_node;
++	int ret, i;
 +
-+	mf = __s5k6a3_get_format(sensor, fh, fmt->pad, fmt->which);
++	for (i = 0; i < GPIO_NUM; ++i) {
++		enum of_gpio_flags of_flags;
 +
-+	mutex_lock(&sensor->lock);
-+	fmt->format = *mf;
-+	mutex_unlock(&sensor->lock);
++		ret = of_get_named_gpio_flags(node, prop_names[i],
++					      0, &of_flags);
++		if (ret < 0) {
++			dev_err(dev, "failed to parse %s DT property\n",
++				prop_names[i]);
++			return -EINVAL;
++		}
++		state->gpio[i].gpio = ret;
++		state->gpio[i].level = !(of_flags & OF_GPIO_ACTIVE_LOW);
++	}
 +	return 0;
 +}
 +
-+static struct v4l2_subdev_pad_ops s5k6a3_pad_ops = {
-+	.enum_mbus_code	= s5k6a3_enum_mbus_code,
-+	.get_fmt	= s5k6a3_get_fmt,
-+	.set_fmt	= s5k6a3_set_fmt,
-+};
-+
-+static int s5k6a3_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
-+{
-+	struct v4l2_mbus_framefmt *format = v4l2_subdev_get_try_format(fh, 0);
-+
-+	*format		= s5k6a3_formats[0];
-+	format->width	= S5K6A3_DEFAULT_WIDTH;
-+	format->height	= S5K6A3_DEFAULT_HEIGHT;
-+
-+	return 0;
-+}
-+
-+static const struct v4l2_subdev_internal_ops s5k6a3_sd_internal_ops = {
-+	.open = s5k6a3_open,
-+};
-+
-+static int __s5k6a3_power_on(struct s5k6a3 *sensor)
-+{
-+	int i = S5K6A3_SUPP_VDDA;
-+	int ret;
-+
-+	ret = clk_set_rate(sensor->clock, sensor->clock_frequency);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = pm_runtime_get(sensor->dev);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = regulator_enable(sensor->supplies[i].consumer);
-+	if (ret < 0)
-+		goto error_rpm_put;
-+
-+	ret = clk_prepare_enable(sensor->clock);
-+	if (ret < 0)
-+		goto error_reg_dis;
-+
-+	for (i++; i < S5K6A3_NUM_SUPPLIES; i++) {
-+		ret = regulator_enable(sensor->supplies[i].consumer);
-+		if (ret < 0)
-+			goto error_reg_dis;
++static int s5c73m3_get_platform_data(struct s5c73m3 *state)
+ {
+ 	struct device *dev = &state->i2c_client->dev;
+-	const struct s5c73m3_gpio *gpio;
+-	unsigned long flags;
++	const struct s5c73m3_platform_data *pdata = dev->platform_data;
++	struct device_node *node = dev->of_node;
++	struct device_node *node_ep;
++	struct v4l2_of_endpoint ep;
+ 	int ret;
+ 
+-	state->gpio[STBY].gpio = -EINVAL;
+-	state->gpio[RST].gpio  = -EINVAL;
++	if (!node) {
++		if (!pdata) {
++			dev_err(dev, "Platform data not specified\n");
++			return -EINVAL;
++		}
+ 
+-	gpio = &pdata->gpio_stby;
+-	if (gpio_is_valid(gpio->gpio)) {
+-		flags = (gpio->level ? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW)
+-		      | GPIOF_EXPORT;
+-		ret = devm_gpio_request_one(dev, gpio->gpio, flags,
+-					    "S5C73M3_STBY");
+-		if (ret < 0)
+-			return ret;
++		state->mclk_frequency = pdata->mclk_frequency;
++		state->gpio[STBY] = pdata->gpio_stby;
++		state->gpio[RST] = pdata->gpio_reset;
++		return 0;
 +	}
 +
-+	gpio_set_value(sensor->gpio_reset, 1);
-+	usleep_range(600, 800);
-+	gpio_set_value(sensor->gpio_reset, 0);
-+	usleep_range(600, 800);
-+	gpio_set_value(sensor->gpio_reset, 1);
-+
-+	/* Delay needed for the sensor initialization */
-+	msleep(20);
-+	return 0;
-+
-+error_reg_dis:
-+	for (--i; i >= 0; --i)
-+		regulator_disable(sensor->supplies[i].consumer);
-+error_rpm_put:
-+	pm_runtime_put(sensor->dev);
-+	return ret;
-+}
-+
-+static int __s5k6a3_power_off(struct s5k6a3 *sensor)
-+{
-+	int i;
-+
-+	gpio_set_value(sensor->gpio_reset, 0);
-+
-+	for (i = S5K6A3_NUM_SUPPLIES - 1; i >= 0; i--)
-+		regulator_disable(sensor->supplies[i].consumer);
-+
-+	clk_disable_unprepare(sensor->clock);
-+	pm_runtime_put(sensor->dev);
-+	return 0;
-+}
-+
-+static int s5k6a3_s_power(struct v4l2_subdev *sd, int on)
-+{
-+	struct s5k6a3 *sensor = sd_to_s5k6a3(sd);
-+	int ret = 0;
-+
-+	mutex_lock(&sensor->lock);
-+
-+	if (sensor->power_count == !on) {
-+		if (on)
-+			ret = __s5k6a3_power_on(sensor);
-+		else
-+			ret = __s5k6a3_power_off(sensor);
-+
-+		if (ret == 0)
-+			sensor->power_count += on ? 1 : -1;
-+	}
-+
-+	mutex_unlock(&sensor->lock);
-+	return ret;
-+}
-+
-+static struct v4l2_subdev_core_ops s5k6a3_core_ops = {
-+	.s_power = s5k6a3_s_power,
-+};
-+
-+static struct v4l2_subdev_ops s5k6a3_subdev_ops = {
-+	.core = &s5k6a3_core_ops,
-+	.pad = &s5k6a3_pad_ops,
-+};
-+
-+static int s5k6a3_probe(struct i2c_client *client,
-+				const struct i2c_device_id *id)
-+{
-+	struct device *dev = &client->dev;
-+	struct s5k6a3 *sensor;
-+	struct v4l2_subdev *sd;
-+	int gpio, i, ret;
-+
-+	sensor = devm_kzalloc(dev, sizeof(*sensor), GFP_KERNEL);
-+	if (!sensor)
-+		return -ENOMEM;
-+
-+	mutex_init(&sensor->lock);
-+	sensor->gpio_reset = -EINVAL;
-+	sensor->clock = ERR_PTR(-EINVAL);
-+	sensor->dev = dev;
-+
-+	sensor->clock = devm_clk_get(sensor->dev, S5K6A3_CLK_NAME);
-+	if (IS_ERR(sensor->clock))
-+		return PTR_ERR(sensor->clock);
-+
-+	gpio = of_get_gpio_flags(dev->of_node, 0, NULL);
-+	if (!gpio_is_valid(gpio))
-+		return gpio;
-+
-+	ret = devm_gpio_request_one(dev, gpio, GPIOF_OUT_INIT_LOW,
-+						S5K6A3_DRV_NAME);
-+	if (ret < 0)
-+		return ret;
-+
-+	sensor->gpio_reset = gpio;
-+
-+	if (of_property_read_u32(dev->of_node, "clock-frequency",
-+				 &sensor->clock_frequency)) {
-+		sensor->clock_frequency = S5K6A3_DEFAULT_CLK_FREQ;
++	state->clock = devm_clk_get(dev, S5C73M3_CLK_NAME);
++	if (IS_ERR(state->clock))
++		return PTR_ERR(state->clock);
+ 
+-		state->gpio[STBY] = *gpio;
++	if (of_property_read_u32(node, "clock-frequency",
++				 &state->mclk_frequency)) {
++		state->mclk_frequency = S5C73M3_DEFAULT_MCLK_FREQ;
 +		dev_info(dev, "using default %u Hz clock frequency\n",
-+					sensor->clock_frequency);
++					state->mclk_frequency);
+ 	}
+ 
+-	gpio = &pdata->gpio_reset;
+-	if (gpio_is_valid(gpio->gpio)) {
+-		flags = (gpio->level ? GPIOF_OUT_INIT_HIGH : GPIOF_OUT_INIT_LOW)
+-		      | GPIOF_EXPORT;
+-		ret = devm_gpio_request_one(dev, gpio->gpio, flags,
+-					    "S5C73M3_RST");
+-		if (ret < 0)
+-			return ret;
++	ret = s5c73m3_parse_gpios(state);
++	if (ret < 0)
++		return -EINVAL;
+ 
+-		state->gpio[RST] = *gpio;
++	node_ep = v4l2_of_get_next_endpoint(node, NULL);
++	if (!node_ep) {
++		dev_warn(dev, "no endpoint defined for node: %s\n",
++						node->full_name);
++		return 0;
+ 	}
+ 
++	v4l2_of_parse_endpoint(node_ep, &ep);
++	of_node_put(node_ep);
++
++	if (ep.bus_type != V4L2_MBUS_CSI2) {
++		dev_err(dev, "unsupported bus type\n");
++		return -EINVAL;
 +	}
++	/*
++	 * Number of MIPI CSI-2 data lanes is currently not configurable,
++	 * always a default value of 4 lanes is used.
++	 */
++	if (ep.bus.mipi_csi2.num_data_lanes != S5C73M3_MIPI_DATA_LANES)
++		dev_info(dev, "falling back to 4 MIPI CSI-2 data lanes\n");
 +
-+	for (i = 0; i < S5K6A3_NUM_SUPPLIES; i++)
-+		sensor->supplies[i].supply = s5k6a3_supply_names[i];
-+
-+	ret = devm_regulator_bulk_get(&client->dev, S5K6A3_NUM_SUPPLIES,
-+				      sensor->supplies);
+ 	return 0;
+ }
+ 
+@@ -1561,21 +1644,20 @@ static int s5c73m3_probe(struct i2c_client *client,
+ 				const struct i2c_device_id *id)
+ {
+ 	struct device *dev = &client->dev;
+-	const struct s5c73m3_platform_data *pdata = client->dev.platform_data;
+ 	struct v4l2_subdev *sd;
+ 	struct v4l2_subdev *oif_sd;
+ 	struct s5c73m3 *state;
+ 	int ret, i;
+ 
+-	if (pdata == NULL) {
+-		dev_err(&client->dev, "Platform data not specified\n");
+-		return -EINVAL;
+-	}
+-
+ 	state = devm_kzalloc(dev, sizeof(*state), GFP_KERNEL);
+ 	if (!state)
+ 		return -ENOMEM;
+ 
++	state->i2c_client = client;
++	ret = s5c73m3_get_platform_data(state);
 +	if (ret < 0)
 +		return ret;
 +
-+	sd = &sensor->subdev;
-+	v4l2_i2c_subdev_init(sd, client, &s5k6a3_subdev_ops);
-+	sensor->subdev.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
+ 	mutex_init(&state->lock);
+ 	sd = &state->sensor_sd;
+ 	oif_sd = &state->oif_sd;
+@@ -1613,11 +1695,7 @@ static int s5c73m3_probe(struct i2c_client *client,
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	state->mclk_frequency = pdata->mclk_frequency;
+-	state->bus_type = pdata->bus_type;
+-	state->i2c_client = client;
+-
+-	ret = s5c73m3_configure_gpios(state, pdata);
++	ret = s5c73m3_configure_gpios(state);
+ 	if (ret)
+ 		goto out_err;
+ 
+@@ -1651,9 +1729,29 @@ static int s5c73m3_probe(struct i2c_client *client,
+ 	if (ret < 0)
+ 		goto out_err;
+ 
++	oif_sd->dev = dev;
 +
-+	sensor->format.code = s5k6a3_formats[0].code;
-+	sensor->format.width = S5K6A3_DEFAULT_WIDTH;
-+	sensor->format.height = S5K6A3_DEFAULT_HEIGHT;
-+
-+	sensor->pad.flags = MEDIA_PAD_FL_SOURCE;
-+	ret = media_entity_init(&sd->entity, 1, &sensor->pad, 0);
++	ret = __s5c73m3_power_on(state);
 +	if (ret < 0)
-+		return ret;
++		goto out_err1;
 +
-+	pm_runtime_no_callbacks(dev);
-+	pm_runtime_enable(dev);
-+
-+	ret = v4l2_async_register_subdev(sd);
++	ret = s5c73m3_get_fw_version(state);
++	__s5c73m3_power_off(state);
 +
 +	if (ret < 0) {
-+		pm_runtime_disable(&client->dev);
-+		media_entity_cleanup(&sd->entity);
++		dev_err(dev, "Device detection failed: %d\n", ret);
++		goto out_err1;
 +	}
 +
-+	return ret;
-+}
++	ret = v4l2_async_register_subdev(oif_sd);
++	if (ret < 0)
++		goto out_err1;
 +
-+static int s5k6a3_remove(struct i2c_client *client)
-+{
-+	struct v4l2_subdev *sd = i2c_get_clientdata(client);
+ 	v4l2_info(sd, "%s: completed successfully\n", __func__);
+ 	return 0;
+ 
++out_err1:
++	s5c73m3_unregister_spi_driver(state);
+ out_err:
+ 	media_entity_cleanup(&sd->entity);
+ 	return ret;
+@@ -1665,7 +1763,7 @@ static int s5c73m3_remove(struct i2c_client *client)
+ 	struct s5c73m3 *state = oif_sd_to_s5c73m3(oif_sd);
+ 	struct v4l2_subdev *sensor_sd = &state->sensor_sd;
+ 
+-	v4l2_device_unregister_subdev(oif_sd);
++	v4l2_async_unregister_subdev(oif_sd);
+ 
+ 	v4l2_ctrl_handler_free(oif_sd->ctrl_handler);
+ 	media_entity_cleanup(&oif_sd->entity);
+@@ -1684,8 +1782,17 @@ static const struct i2c_device_id s5c73m3_id[] = {
+ };
+ MODULE_DEVICE_TABLE(i2c, s5c73m3_id);
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id s5c73m3_of_match[] = {
++	{ .compatible = "samsung,s5c73m3" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, s5c73m3_of_match);
++#endif
 +
-+	pm_runtime_disable(&client->dev);
-+	v4l2_async_unregister_subdev(sd);
-+	media_entity_cleanup(&sd->entity);
-+	return 0;
-+}
-+
-+static const struct i2c_device_id s5k6a3_ids[] = {
+ static struct i2c_driver s5c73m3_i2c_driver = {
+ 	.driver = {
++		.of_match_table = of_match_ptr(s5c73m3_of_match),
+ 		.name	= DRIVER_NAME,
+ 	},
+ 	.probe		= s5c73m3_probe,
+diff --git a/drivers/media/i2c/s5c73m3/s5c73m3-spi.c b/drivers/media/i2c/s5c73m3/s5c73m3-spi.c
+index 8079e26..f60b265 100644
+--- a/drivers/media/i2c/s5c73m3/s5c73m3-spi.c
++++ b/drivers/media/i2c/s5c73m3/s5c73m3-spi.c
+@@ -27,6 +27,11 @@
+ 
+ #define S5C73M3_SPI_DRV_NAME "S5C73M3-SPI"
+ 
++static const struct of_device_id s5c73m3_spi_ids[] = {
++	{ .compatible = "samsung,s5c73m3" },
 +	{ }
 +};
 +
-+#ifdef CONFIG_OF
-+static const struct of_device_id s5k6a3_of_match[] = {
-+	{ .compatible = "samsung,s5k6a3" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, s5k6a3_of_match);
-+#endif
+ enum spi_direction {
+ 	SPI_DIR_RX,
+ 	SPI_DIR_TX
+@@ -146,6 +151,7 @@ int s5c73m3_register_spi_driver(struct s5c73m3 *state)
+ 	spidrv->driver.name = S5C73M3_SPI_DRV_NAME;
+ 	spidrv->driver.bus = &spi_bus_type;
+ 	spidrv->driver.owner = THIS_MODULE;
++	spidrv->driver.of_match_table = s5c73m3_spi_ids;
+ 
+ 	return spi_register_driver(spidrv);
+ }
+diff --git a/drivers/media/i2c/s5c73m3/s5c73m3.h b/drivers/media/i2c/s5c73m3/s5c73m3.h
+index 9dfa516..9656b67 100644
+--- a/drivers/media/i2c/s5c73m3/s5c73m3.h
++++ b/drivers/media/i2c/s5c73m3/s5c73m3.h
+@@ -17,6 +17,7 @@
+ #ifndef S5C73M3_H_
+ #define S5C73M3_H_
+ 
++#include <linux/clk.h>
+ #include <linux/kernel.h>
+ #include <linux/regulator/consumer.h>
+ #include <media/v4l2-common.h>
+@@ -321,6 +322,7 @@ enum s5c73m3_oif_pads {
+ 
+ 
+ #define S5C73M3_MAX_SUPPLIES			6
++#define S5C73M3_DEFAULT_MCLK_FREQ		24000000U
+ 
+ struct s5c73m3_ctrls {
+ 	struct v4l2_ctrl_handler handler;
+@@ -391,6 +393,8 @@ struct s5c73m3 {
+ 	struct regulator_bulk_data supplies[S5C73M3_MAX_SUPPLIES];
+ 	struct s5c73m3_gpio gpio[GPIO_NUM];
+ 
++	struct clk *clock;
 +
-+static struct i2c_driver s5k6a3_driver = {
-+	.driver = {
-+		.of_match_table	= of_match_ptr(s5k6a3_of_match),
-+		.name		= S5K6A3_DRV_NAME,
-+		.owner		= THIS_MODULE,
-+	},
-+	.probe		= s5k6a3_probe,
-+	.remove		= s5k6a3_remove,
-+	.id_table	= s5k6a3_ids,
-+};
-+
-+module_i2c_driver(s5k6a3_driver);
-+
-+MODULE_DESCRIPTION("S5K6A3 image sensor subdev driver");
-+MODULE_AUTHOR("Sylwester Nawrocki <s.nawrocki@samsung.com>");
-+MODULE_LICENSE("GPL v2");
+ 	/* External master clock frequency */
+ 	u32 mclk_frequency;
+ 	/* Video bus type - MIPI-CSI2/parallel */
 -- 
 1.7.9.5
