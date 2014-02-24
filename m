@@ -1,65 +1,46 @@
-From: joelf@ti.com (Joel Fernandes)
-Date: Mon, 24 Feb 2014 16:53:33 -0600
-Subject: Ideas/suggestions to avoid repeated locking and reducing too
- many lists with dmaengine?
-In-Reply-To: <530BC9F8.2040402@ti.com>
-References: <530B9784.5060904@ti.com>
- <20140224192152.GV27282@n2100.arm.linux.org.uk> <530BC9F8.2040402@ti.com>
-Message-ID: <530BCD6D.9010208@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 24 Feb 2014 18:05:10 -0500 (EST)
+Subject: [PATCH] net: phy: add suspend_halted module param
+In-Reply-To: <CAGVrzcadYTYQEvPxqdMf2f741y5sAgnOYm3EC=f7SOkr8SK2WQ@mail.gmail.com>
+References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CAGVrzcadYTYQEvPxqdMf2f741y5sAgnOYm3EC=f7SOkr8SK2WQ@mail.gmail.com>
+Message-ID: <20140224.180510.103916219115440711.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correcting myself from an earlier post..
+From: Florian Fainelli <f.fainelli@gmail.com>
+Date: Mon, 24 Feb 2014 10:20:10 -0800
 
-On 02/24/2014 04:38 PM, Joel Fernandes wrote:
->>>  Also with respect to virt_dma (which is used by edma to manage all the
->>> descriptors and lists) there are too many lists: submitted, issued,
->>> completed etc and the descriptor moves from one to the other. I am
->>> thinking if there is a way we can avoid using so many lists and just
->>> have 2 lists and move the desc from one list to the other, That could
->>> avoid using the intermediate list altogether and classify dma requests
->>> as "done" or "not done".
+> Hi Sebastian,
+> 
+> 2014-02-23 8:58 GMT-08:00 Sebastian Hesselbarth
+> <sebastian.hesselbarth@gmail.com>:
+>> commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
+>>   ("net: phy: resume/suspend PHYs on attach/detach")
+>> introduced a feature to suspend PHYs when entering halted state.
 >>
->> The reason I created separate submitted and issued lists is that it's
->> much easier to manage than having everything on a single list.
+>> Unfortunately, not all bootloaders properly power-up PHYs on reset
+>> and fail to access ethernet because the PHY is still powered down.
 >>
->> We could deal with the submitted vs issued list, and that's to have the
->> channel store the cookie for the last issued descriptor - but I wonder
->> if it's worth the effort.
+>> Therefore, we add a boolean module parameter suspend_halted with
+>> default value of true. Disabling that parameter prevents PHYs from
+>> being suspended when entering halted state.
 >>
->> What I'd suggest is to try some profiling, and post some profiling
->> results which show where the problems are, rather than pointing at
->> bits of code you might not particularly like.
->>
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> Reported-by: Andrew Lunn <andrew@lunn.ch>
+>> ---
+>> Andrew, can you please re-test if disabling the feature does work on
+>> your board? I tried a bunch of mine, but none failed to power-up the
+>> PHY in u-boot.
 > 
-> Actually I did do some tracing earlier before I posted this thread- and
-> notice there was excessive traces of locking/unlocking. It is very light
-> though as you pointed and lighter without debug options. The only other
-> notable difference is the fact that we are now going through the dmaengine
-> framework in the newer kernel vs the faster one.
+> Would be good to get Andrew's testing on this just to make sure it
+> solves his problem. Otherwise:
 > 
-> One more thing in my trace is omap_dma_sync repeatedly call in memcpy_to_io
-> for every barrier call which is not necessary. I am working on a fix this.
-> 
-> On turning off DEBUG_KERNEL and running more tests, I do see some
-> improvements however the throughput reduction is still =~ 10%
-> 
-> With a modified openssl speed test app, I sent 16-byte sized block
-> repeatedly to the AES crypto hardware accelerator using EDMA:
-> 
-> On v3.13.5 kernel:
-> root at am335x-evm:~# openssl speed -evp aes-128-cbc -engine cryptodev
-> engine "cryptodev" set.
-> Doing aes-128-cbc for 3s on 16 size blocks: 79902 aes-128-cbc's
-> 
-> With v3.2 kernel,
-> Doing aes-128-cbc for 3s on 16 size blocks: 92314 aes-128-cbc's
-> 
-> So we're able to encrypt around 13k more ops, or around 4.5k ops/second
-> with 3.13.5
+> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 
-We're able to encrypt around 13k more ops, or around 4.5k ops/second
-with the older 3.2 kernel that didn't use DMAEngine.
+I disagree with using a module parameter for this.
 
-Regards,
--Joel
+Figure out the devices that cannot do this properly, and add
+an internal flag that this driver sets.
+
+Module parameters are terrible.
