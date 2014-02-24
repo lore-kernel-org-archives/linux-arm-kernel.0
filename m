@@ -1,93 +1,95 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 24 Feb 2014 16:36:37 +0100
-Subject: [RFC PATCH v3 0/9] imx-drm dt bindings
-In-Reply-To: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
-References: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1393256197.3091.49.camel@pizza.hi.pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 24 Feb 2014 09:37:35 -0600
+Subject: randconfig build error
+In-Reply-To: <20140222141525.GT27282@n2100.arm.linux.org.uk>
+References: <20140221155452.GH31902@saruman.home>
+ <20140222141525.GT27282@n2100.arm.linux.org.uk>
+Message-ID: <20140224153735.GB31636@saruman.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 18.02.2014, 12:36 +0100 schrieb Philipp Zabel:
-> Hi,
+On Sat, Feb 22, 2014 at 02:15:25PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 21, 2014 at 09:55:13AM -0600, Felipe Balbi wrote:
+> > Here's the error I found:
+> > 
+> > warning: (ARCH_HI3xxx && SOC_OMAP5 && ARCH_SHMOBILE_MULTI) selects HAVE_ARM_TWD which has unmet direct dependencies (SMP)
+> > warning: (ARCH_HI3xxx && SOC_OMAP5 && ARCH_SHMOBILE_MULTI) selects HAVE_ARM_TWD which has unmet direct dependencies (SMP)
+> > arch/arm/mach-prima2/common.c:23:20: warning: ?sirfsoc_map_io? defined but not used [-Wunused-function]
+> >  static __init void sirfsoc_map_io(void)
+> >                     ^
+> > arch/arm/kernel/smp_twd.c: In function ?twd_local_timer_of_register?:
+> > arch/arm/kernel/smp_twd.c:391:20: error: ?setup_max_cpus? undeclared (first use in this function)
+> >   if (!is_smp() || !setup_max_cpus)
+> >                     ^
+> > arch/arm/kernel/smp_twd.c:391:20: note: each undeclared identifier is reported only once for each function it appears in
+> > make[1]: *** [arch/arm/kernel/smp_twd.o] Error 1
+> > make[1]: *** Waiting for unfinished jobs....
+> > make: *** [arch/arm/kernel] Error 2
+> > make: *** Waiting for unfinished jobs....
+> > 
+> > The funny part of that is that SOC_OMAP5, ARCH_SHMOBILE_MULTI, and
+> > ARCH_HI3xxx have:
+> > 
+> > 	select HAVE_ARM_TWD if SMP
+> > 
+> > so how come we still select it if CONFIG_SMP=n on that particular
+> > randconfig ?
 > 
-> here is an updated and more complete version of the imx-drm DT binding
-> series. These patches apply on top of Russell's second preview of the
-> imx-drm cleanup series on v3.14-rc2. I have added device tree bindings
-> between IPU and the encoders as documented in
-> Documentation/devicetree/bindings/media/video-interfaces.txt
-> and used those to determine the possible_crtcs and mux_id.
+> Are you entirely certian which kernel version you're building?  v3.14-rc1
+> to my tip has this:
 > 
-> The crtc cookie is replaced with a the port device tree node,
-> which is unique and therefore allows to get rid of the di_id
-> comparison. Storing the multiplexer input numbers in the device
-> tree removes the need to know the ipu_id. This should also allow
-> to replace IPU2 with LCDIF on i.MX6 Solo more easily.
+> diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+> index 8f4649b301b2..1abae5f6a418 100644
+> --- a/arch/arm/mach-hisi/Kconfig
+> +++ b/arch/arm/mach-hisi/Kconfig
+> @@ -8,7 +8,7 @@ config ARCH_HI3xxx
+>         select CLKSRC_OF
+>         select GENERIC_CLOCKEVENTS
+>         select HAVE_ARM_SCU
+> -       select HAVE_ARM_TWD
+> +       select HAVE_ARM_TWD if SMP
+>         select HAVE_SMP
+>         select PINCTRL
+>         select PINCTRL_SINGLE
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 653b489479e0..e2ce4f8366a7 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -54,7 +54,7 @@ config SOC_OMAP5
+>         select ARM_GIC
+>         select CPU_V7
+>         select HAVE_ARM_SCU if SMP
+> -       select HAVE_ARM_TWD if LOCAL_TIMERS
+> +       select HAVE_ARM_TWD if SMP
+>         select HAVE_SMP
+>         select HAVE_ARM_ARCH_TIMER
+>         select ARM_ERRATA_798181 if SMP
+> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> index 338640631e08..05fa505df585 100644
+> --- a/arch/arm/mach-shmobile/Kconfig
+> +++ b/arch/arm/mach-shmobile/Kconfig
+> @@ -8,7 +8,7 @@ config ARCH_SHMOBILE_MULTI
+>         select CPU_V7
+>         select GENERIC_CLOCKEVENTS
+>         select HAVE_ARM_SCU if SMP
+> -       select HAVE_ARM_TWD if LOCAL_TIMERS
+> +       select HAVE_ARM_TWD if SMP
+>         select HAVE_SMP
+>         select ARM_GIC
+>         select MIGHT_HAVE_CACHE_L2X0
 > 
-> In v3 also connections between display interface ports and encoders are
-> used to find all necessary components, so that only the display interfaces
-> have to be configured in the imx-drm node. This allows to move the imx-drm
-> node into the SoC level dtsi. I've also updated the existing i.MX51 and
-> i.MX53 device trees this time and updated/added the devicetree binding
-> documentation.
-> 
-> Patch 2/9 adds a temporary copy of the v4l2_of parser functions. Those
-> are going to be moved to some place where they can be used by drm drivers,
-> eventually, so those local copies can be dropped again.
+> The relevant bits are the "-" lines, which indicate that with v3.14-rc1,
+> ARCH_HI3xxx would select HAVE_ARM_TWD without SMP set, and indeed, your
+> config you attached has ARCH_HI3xxx set.
 
-Russell has sent a pull request for the imx-drm component support series
-now, and we're at v3.13-rc4 already. This patch series still applies on
-top of
-git://ftp.arm.linux.org.uk/~rmk/linux-arm.git imx-drm-staging
-I'd appreciate some feedback on this. Or shall I resend without the RFC?
+yeah, just checked that it builds just fine on -rc3. Thanks
 
-regards
-Philipp
-
-> regards
-> Philipp
-> 
-> Lucas Stach (1):
->   staging: imx-drm-core: don't request probe deferral in
->     imx_drm_encoder_parse_of
-> 
-> Philipp Zabel (8):
->   staging: imx-drm: Add temporary copies of v4l2-of parsing functions
->   staging: imx-drm-core: Use OF graph to find components and connections
->     between encoder and crtcs
->   staging: imx-drm: Document updated imx-drm device tree bindings
->   staging: imx-drm: Document imx-hdmi device tree bindings
->   ARM: dts: imx51: Add IPU ports and endpoints, move imx-drm node to
->     dtsi
->   ARM: dts: imx53: Add IPU DI ports and endpoints, move imx-drm node to
->     dtsi
->   ARM: dts: imx6qdl: Add IPU DI ports and endpoints, move imx-drm node
->     to dtsi
->   staging: imx-drm: Update TODO
-> 
->  .../bindings/staging/imx-drm/fsl-imx-drm.txt       |  48 ++++-
->  .../devicetree/bindings/staging/imx-drm/hdmi.txt   |  53 +++++
->  .../devicetree/bindings/staging/imx-drm/ldb.txt    |  20 +-
->  arch/arm/boot/dts/imx51-apf51dev.dts               |  11 +-
->  arch/arm/boot/dts/imx51-babbage.dts                |  28 ++-
->  arch/arm/boot/dts/imx51.dtsi                       |  22 ++-
->  arch/arm/boot/dts/imx53-m53evk.dts                 |  17 +-
->  arch/arm/boot/dts/imx53-mba53.dts                  |  15 +-
->  arch/arm/boot/dts/imx53-qsb.dts                    |  17 +-
->  arch/arm/boot/dts/imx53.dtsi                       |  64 +++++-
->  arch/arm/boot/dts/imx6dl.dtsi                      |  22 +--
->  arch/arm/boot/dts/imx6q-sabresd.dts                |   4 -
->  arch/arm/boot/dts/imx6q.dtsi                       | 124 +++++++++++-
->  arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |   6 -
->  arch/arm/boot/dts/imx6qdl.dtsi                     | 138 ++++++++++++-
->  drivers/staging/imx-drm/Makefile                   |   2 +-
->  drivers/staging/imx-drm/TODO                       |   5 -
->  drivers/staging/imx-drm/imx-drm-core.c             | 217 ++++++++++++++-------
->  drivers/staging/imx-drm/imx-drm-of.c               | 132 +++++++++++++
->  drivers/staging/imx-drm/imx-drm.h                  |  11 +-
->  drivers/staging/imx-drm/imx-hdmi.c                 |   2 +-
->  drivers/staging/imx-drm/imx-ldb.c                  |   4 +-
->  drivers/staging/imx-drm/ipuv3-crtc.c               |  47 ++++-
->  23 files changed, 842 insertions(+), 167 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
->  create mode 100644 drivers/staging/imx-drm/imx-drm-of.c
-> 
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/e0b761c9/attachment.sig>
