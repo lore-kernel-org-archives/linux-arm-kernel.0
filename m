@@ -1,57 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Feb 2014 17:29:06 +0100
-Subject: [PATCH] ARM: sun6i: dt: Fix mod0 compatible
-Message-ID: <1393259346-6074-1-git-send-email-maxime.ripard@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 24 Feb 2014 16:30:35 +0000
+Subject: [PATCH 1/5] clk: sun6i: Protect CPU clock
+In-Reply-To: <1393258967-4843-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1393258967-4843-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1393258967-4843-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20140224163034.GN21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The module 0 clock compatibles were changed between the time the patch was sent
-and it was merged. Update the compatibles.
+On Mon, Feb 24, 2014 at 05:22:43PM +0100, Maxime Ripard wrote:
+> Right now, AHB is an indirect child clock of the CPU clock. If that happens to
+> change, since the CPU clock has no other consumers declared in Linux, it would
+> be shut down, which is not really a good idea.
+> 
+> Prevent this by forcing it enabled.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/clk/sunxi/clk-sunxi.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 23baad9..cedaf4b 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -1301,6 +1301,14 @@ static void __init sunxi_clock_protect(void)
+>  		clk_prepare_enable(clk);
+>  		clk_put(clk);
+>  	}
+> +
+> +	/* CPU clocks - sun6i */
+> +	clk = clk_get(NULL, "cpu");
+> +	if (!IS_ERR(clk)) {
+> +		clk_prepare_enable(clk);
+> +		clk_put(clk);
+> +	}
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+This is broken.  I'm not sure what's difficult to grasp about the concept
+of "while a clock is in use, you should keep a reference to that clock".
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index af6f87c..42f310a 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -200,7 +200,7 @@
- 
- 		spi0_clk: clk at 01c200a0 {
- 			#clock-cells = <0>;
--			compatible = "allwinner,sun4i-mod0-clk";
-+			compatible = "allwinner,sun4i-a10-mod0-clk";
- 			reg = <0x01c200a0 0x4>;
- 			clocks = <&osc24M>, <&pll6>;
- 			clock-output-names = "spi0";
-@@ -208,7 +208,7 @@
- 
- 		spi1_clk: clk at 01c200a4 {
- 			#clock-cells = <0>;
--			compatible = "allwinner,sun4i-mod0-clk";
-+			compatible = "allwinner,sun4i-a10-mod0-clk";
- 			reg = <0x01c200a4 0x4>;
- 			clocks = <&osc24M>, <&pll6>;
- 			clock-output-names = "spi1";
-@@ -216,7 +216,7 @@
- 
- 		spi2_clk: clk at 01c200a8 {
- 			#clock-cells = <0>;
--			compatible = "allwinner,sun4i-mod0-clk";
-+			compatible = "allwinner,sun4i-a10-mod0-clk";
- 			reg = <0x01c200a8 0x4>;
- 			clocks = <&osc24M>, <&pll6>;
- 			clock-output-names = "spi2";
-@@ -224,7 +224,7 @@
- 
- 		spi3_clk: clk at 01c200ac {
- 			#clock-cells = <0>;
--			compatible = "allwinner,sun4i-mod0-clk";
-+			compatible = "allwinner,sun4i-a10-mod0-clk";
- 			reg = <0x01c200ac 0x4>;
- 			clocks = <&osc24M>, <&pll6>;
- 			clock-output-names = "spi3";
+That implies that if you get a clock, and then enable it, you don't
+put the clock until you've disabled it.
+
+The only reason the core doesn't check for this kind of thing is that
+a clock may be shared, so it's entirely possible for a correctly written
+driver to have a clock which is still enabled at put time - but enabled
+by an entirely different driver.
+
+However, that's no excuse for this kind of sloppiness.
+
 -- 
-1.9.0
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
