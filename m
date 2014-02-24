@@ -1,111 +1,24 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 24 Feb 2014 09:42:57 +0100
-Subject: [PATCH 05/10] pinctrl: mvebu: dove: request additional resources
-In-Reply-To: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1393231382-11078-6-git-send-email-sebastian.hesselbarth@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 24 Feb 2014 14:13:22 +0530
+Subject: [PATCH] cpufreq: Set policy to non-NULL only after all hotplug
+ online work is done
+In-Reply-To: <a7536f7b5a03fe287aaf1974db74ba64.squirrel@www.codeaurora.org>
+References: <1393225072-3997-1-git-send-email-skannan@codeaurora.org>
+ <530AF7E4.5080806@linux.vnet.ibm.com>
+ <CAKohpok-8_JV8hRDiWnRLYqEqyvD60cyn5Hs1HcZTSEPZjLvOQ@mail.gmail.com>
+ <a7536f7b5a03fe287aaf1974db74ba64.squirrel@www.codeaurora.org>
+Message-ID: <CAKohpomRqboKjHRF8ev9erJ6MdRWcsX2jO7A=g47gMmewm_ZiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dove pinctrl also requires additional registers to control all pins.
-This patch requests resources for mpp4 and pmu-mpp register ranges.
-As this changes DT to driver requirements, fallback to hardcoded
-resources, if the corresponding DT regs have not been set.
-Also, WARN about old DT binding usage to encourage users to update
-their DTBs.
+On 24 February 2014 14:11,  <skannan@codeaurora.org> wrote:
+> I just replied to the other email. I think I answered both your questions
+> there. Sorry about mixing up CPU and policy. In my case, each CPU is
+> independently scalable -- so for now take CPU == policy. I'll fix it up
+> once we agree on the fix.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/pinctrl/mvebu/pinctrl-dove.c | 45 +++++++++++++++++++++++++++++++++---
- 1 file changed, 42 insertions(+), 3 deletions(-)
+But why do you say this then?
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
-index da9ca26360fd..8d57d4bc1f0c 100644
---- a/drivers/pinctrl/mvebu/pinctrl-dove.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
-@@ -22,6 +22,11 @@
- 
- #include "pinctrl-mvebu.h"
- 
-+/* Internal registers can be configured at any 1 MiB aligned address */
-+#define INT_REGS_MASK		~(SZ_1M - 1)
-+#define MPP4_REGS_OFFS		0xd0440
-+#define PMU_REGS_OFFS		0xd802c
-+
- #define DOVE_SB_REGS_VIRT_BASE		IOMEM(0xfde00000)
- #define DOVE_MPP_VIRT_BASE		(DOVE_SB_REGS_VIRT_BASE + 0xd0200)
- #define DOVE_PMU_MPP_GENERAL_CTRL	(DOVE_MPP_VIRT_BASE + 0x10)
-@@ -52,6 +57,8 @@
- #define CONFIG_PMU	BIT(4)
- 
- static void __iomem *mpp_base;
-+static void __iomem *mpp4_base;
-+static void __iomem *pmu_base;
- 
- static int dove_mpp_ctrl_get(unsigned pid, unsigned long *config)
- {
-@@ -751,7 +758,8 @@ static struct of_device_id dove_pinctrl_of_match[] = {
- 
- static int dove_pinctrl_probe(struct platform_device *pdev)
- {
--	struct resource *res;
-+	struct resource *res, *mpp_res;
-+	struct resource fb_res;
- 	const struct of_device_id *match =
- 		of_match_device(dove_pinctrl_of_match, &pdev->dev);
- 	pdev->dev.platform_data = (void *)match->data;
-@@ -767,11 +775,42 @@ static int dove_pinctrl_probe(struct platform_device *pdev)
- 	}
- 	clk_prepare_enable(clk);
- 
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	mpp_base = devm_ioremap_resource(&pdev->dev, res);
-+	mpp_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mpp_base = devm_ioremap_resource(&pdev->dev, mpp_res);
- 	if (IS_ERR(mpp_base))
- 		return PTR_ERR(mpp_base);
- 
-+	/* prepare fallback resource */
-+	memcpy(&fb_res, mpp_res, sizeof(struct resource));
-+	fb_res.start = 0;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (!res) {
-+		dev_warn(&pdev->dev, "falling back to hardcoded MPP4 resource\n");
-+		adjust_resource(&fb_res,
-+			(mpp_res->start & INT_REGS_MASK) + MPP4_REGS_OFFS, 0x4);
-+		res = &fb_res;
-+	}
-+
-+	mpp4_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(mpp4_base))
-+		return PTR_ERR(mpp4_base);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-+	if (!res) {
-+		dev_warn(&pdev->dev, "falling back to hardcoded PMU resource\n");
-+		adjust_resource(&fb_res,
-+			(mpp_res->start & INT_REGS_MASK) + PMU_REGS_OFFS, 0x8);
-+		res = &fb_res;
-+	}
-+
-+	pmu_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(pmu_base))
-+		return PTR_ERR(pmu_base);
-+
-+	/* Warn on any missing DT resource */
-+	WARN(fb_res.start, FW_BUG "Missing pinctrl regs in DTB. Please update your firmware.\n");
-+
- 	return mvebu_pinctrl_probe(pdev);
- }
- 
--- 
-1.8.5.3
+>>> In this specific case, CPU0 set's CPU1's policy->governor in
+>>> cpufreq_init_policy() to NULL while CPU1 is using the policy->governor
+>>> in __cpufreq_governor().
