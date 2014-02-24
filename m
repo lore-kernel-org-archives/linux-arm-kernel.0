@@ -1,45 +1,32 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 24 Feb 2014 11:20:36 +0100
-Subject: [PATCH 00/10] pinctrl: mvebu: remove hard-coded addresses from
- Dove pinctrl
-In-Reply-To: <CACRpkdZ1JR82m46YV5m=b6e3E3OYcNCka_8EiT2VcSPU=ZVLdQ@mail.gmail.com>
-References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <CACRpkdZ1JR82m46YV5m=b6e3E3OYcNCka_8EiT2VcSPU=ZVLdQ@mail.gmail.com>
-Message-ID: <530B1CF4.2060208@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Feb 2014 11:22:51 +0100
+Subject: [PATCH v4 00/16] pinctrl: mvebu: restructure resource allocation
+In-Reply-To: <20140223154053.GN7862@titan.lakedaemon.net>
+References: <1392220776-30851-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393165274-32492-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140223154053.GN7862@titan.lakedaemon.net>
+Message-ID: <CACRpkdZFwcFtZiDH792awhyrQ6wtEsJMMN9K_ypCbqLqZo9LLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/14 11:17, Linus Walleij wrote:
-> On Mon, Feb 24, 2014 at 9:42 AM, Sebastian Hesselbarth
-> <sebastian.hesselbarth@gmail.com> wrote:
->
->> This is a patches separated from one sent earlier [1] with just the
->> removal of any hard-coded reg addresses from Dove pinctrl stub.
->
-> OK let's queue this a while later on top of the other stuff (that I'm working
-> on applying right now).
+On Sun, Feb 23, 2014 at 4:40 PM, Jason Cooper <jason@lakedaemon.net> wrote:
 
-Ok.
+> I certainly don't want to assume we can take this, and you've been quiet
+> on the previous versions of this series.  We have a lot of moving pieces
+> for getting the Armada 375/380/385 support added to the kernel.  It's a
+> huge help to us if we can create a topic branch for you with the pinctrl
+> changes in it.
 
->> In the meantime, support for new Armada 375/38x was added that also
->> contain patches for pinctrl [2].
->
-> I applied these first. Please look at the result once I push out the
-> pinctrl tree with the 375/38x + your v4 series in combination
-> (let's see how big mess it will be...)
->
-> I'm sorry for not applying the nice patches earlier, forcing you to work
-> on many parallel series like this, hopefully I'll be able to attend to
-> them this week.
+I understand, sorry I was on a short vacation.
 
-It's okay, I don't expect you to jump on every patch set we sent
-immediately.
+I've applied Thomas' two new SoC drivers and started queueing
+Sebastians series but it's a bit messy. Right now I'm not finding
+patch 06/21 v4....
 
-Although, I guess instead of applying them separately, it would have
-been better to pull them from Jason's stable topic branch. But that is
-also up to you and Jason may give valuable hints on how to proceed in
-the future.
+>> https://github.com/shesselba/linux-dove.git unstable/mvebu-pinctrl-v3.14_v4
 
-Thanks anyway!
+Should I just pull this in instead, as it contains both Thomas' and Sebastians
+patches, and then you can send me more stuff on top of that?
 
-Sebastian
+Yours,
+Linus Walleij
