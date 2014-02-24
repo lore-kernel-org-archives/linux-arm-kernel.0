@@ -1,55 +1,31 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Sun, 23 Feb 2014 23:15:00 -0800
-Subject: [PATCH] PM / devfreq: Fix out of bounds access of transition table
- array
-Message-ID: <1393226100-18428-1-git-send-email-skannan@codeaurora.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 24 Feb 2014 16:29:21 +0900
+Subject: [PATCH 00/03] ARM: shmobile: Break out and extend clock workaround
+Message-ID: <20140224072921.3522.55023.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The previous_freq value for a device could be an invalid frequency that
-results in a error value being returned from devfreq_get_freq_level().
-Check for an error value before using that to index into the transition
-table.
+ARM: shmobile: Break out and extend clock workaround
 
-Not doing this check will result in memory corruption when previous_freq is
-not a valid frequency.
+[PATCH 01/03] ARM: shmobile: Introduce shmobile_clk_workaround()
+[PATCH 02/03] ARM: shmobile: Use shmobile_clk_workaround() on Lager
+[PATCH 03/03] ARM: shmobile: Use shmobile_clk_workaround() on Koelsch
 
-Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+These patches consolidates the clkdev workaround present in the DT
+reference version of board code for Lager and Koelsch, and it also
+extends it to allow static enablement of a selected set of clocks
+during boot. The latter is needed for USB PCI support patches that
+will be posted shortly.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
- drivers/devfreq/devfreq.c | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
-index a0b2f7e..f91ea29 100644
---- a/drivers/devfreq/devfreq.c
-+++ b/drivers/devfreq/devfreq.c
-@@ -101,14 +101,20 @@ static int devfreq_update_status(struct devfreq *devfreq, unsigned long freq)
- 	cur_time = jiffies;
- 	devfreq->time_in_state[lev] +=
- 			 cur_time - devfreq->last_stat_updated;
--	if (freq != devfreq->previous_freq) {
--		prev_lev = devfreq_get_freq_level(devfreq,
--						devfreq->previous_freq);
-+	devfreq->last_stat_updated = cur_time;
-+
-+	if (freq == devfreq->previous_freq)
-+		return 0;
-+
-+	prev_lev = devfreq_get_freq_level(devfreq, devfreq->previous_freq);
-+	if (prev_lev < 0)
-+		return 0;
-+
-+	if (lev != prev_lev) {
- 		devfreq->trans_table[(prev_lev *
- 				devfreq->profile->max_state) + lev]++;
- 		devfreq->total_trans++;
- 	}
--	devfreq->last_stat_updated = cur_time;
- 
- 	return 0;
- }
--- 
-1.8.2.1
+ Written against renesas.git tag renesas-devel-v3.14-rc3-20140224
+ on top of "[PATCH 00/12] ARM: shmobile: Rework include path for SoC files"
 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+ arch/arm/mach-shmobile/Makefile                  |    2 
+ arch/arm/mach-shmobile/board-koelsch-reference.c |   71 ++++++++--------------
+ arch/arm/mach-shmobile/board-lager-reference.c   |   65 +++++++-------------
+ arch/arm/mach-shmobile/clock.c                   |   29 ++++++++
+ arch/arm/mach-shmobile/include/mach/clock.h      |   16 ++++
+ 5 files changed, 99 insertions(+), 84 deletions(-)
