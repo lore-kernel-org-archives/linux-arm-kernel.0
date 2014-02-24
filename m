@@ -1,118 +1,107 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 24 Feb 2014 15:53:53 -0500
-Subject: [PATCH 2/4] ARM: mm: Remove unsed dma_to_virt()
-In-Reply-To: <1393275235-1087-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1393275235-1087-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1393275235-1087-3-git-send-email-santosh.shilimkar@ti.com>
+Date: Mon, 24 Feb 2014 16:10:57 -0500
+Subject: [PATCH] ARM: dts: keystone: add AEMIF/NAND device entry
+In-Reply-To: <1393267976-15709-1-git-send-email-ivan.khoronzhuk@ti.com>
+References: <1393267976-15709-1-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <530BB561.8010104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
+On Monday 24 February 2014 01:52 PM, Ivan Khoronzhuk wrote:
+> Add AEMIF/NAND device entry.
+> 
+> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+> ---
+>
+Once the driver is in Greg's queue, I will pick this up and defconfig
+patch. 
 
-Remove dma_to_virt() as there are no in-tree users of it.
-
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Greg Ungerer <gerg@uclinux.org>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/include/asm/dma-mapping.h          |   14 +-------------
- arch/arm/mach-iop13xx/include/mach/memory.h |   11 -----------
- arch/arm/mach-ks8695/include/mach/memory.h  |    2 --
- arch/arm/mach-omap1/include/mach/memory.h   |    4 ----
- 4 files changed, 1 insertion(+), 30 deletions(-)
-
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 247ed72..e365158 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -51,7 +51,7 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
- #endif
- 
- /*
-- * dma_to_pfn/pfn_to_dma/dma_to_virt/virt_to_dma are architecture private
-+ * dma_to_pfn/pfn_to_dma/virt_to_dma are architecture private
-  * functions used internally by the DMA-mapping API to provide DMA
-  * addresses. They must not be used by drivers.
-  */
-@@ -70,13 +70,6 @@ static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
- 	return __bus_to_pfn(addr) + dev->archdata.dma_pfn_offset;
- }
- 
--static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
--{
--	if (!dev)
--		return NULL;
--	return (void *)__bus_to_virt(__pfn_to_bus(dma_to_pfn(dev, addr)));
--}
--
- static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
- {
- 	if (!dev)
-@@ -96,11 +89,6 @@ static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
- 	return __arch_dma_to_pfn(dev, addr);
- }
- 
--static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
--{
--	return __arch_dma_to_virt(dev, addr);
--}
--
- static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
- {
- 	return __arch_virt_to_dma(dev, addr);
-diff --git a/arch/arm/mach-iop13xx/include/mach/memory.h b/arch/arm/mach-iop13xx/include/mach/memory.h
-index 7c032d0..1223c85 100644
---- a/arch/arm/mach-iop13xx/include/mach/memory.h
-+++ b/arch/arm/mach-iop13xx/include/mach/memory.h
-@@ -36,17 +36,6 @@ static inline void __iomem *__lbus_to_virt(dma_addr_t x)
- #define is_lbus_device(dev) 				\
- 	(dev && strncmp(dev->bus->name, "platform", 8) == 0)
- 
--#define __arch_dma_to_virt(dev, addr)					\
--	({								\
--		void * __virt;						\
--		dma_addr_t __dma = addr;				\
--		if (is_lbus_device(dev) && __is_lbus_dma(__dma))	\
--			__virt = __lbus_to_virt(__dma);			\
--		else							\
--			__virt = (void *)__phys_to_virt(__dma);		\
--		__virt;							\
--	})
--
- #define __arch_virt_to_dma(dev, addr)					\
- 	({								\
- 		void * __virt = addr;					\
-diff --git a/arch/arm/mach-ks8695/include/mach/memory.h b/arch/arm/mach-ks8695/include/mach/memory.h
-index 95e731a..f42477c 100644
---- a/arch/arm/mach-ks8695/include/mach/memory.h
-+++ b/arch/arm/mach-ks8695/include/mach/memory.h
-@@ -31,8 +31,6 @@
- /* Platform-bus mapping */
- extern struct bus_type platform_bus_type;
- #define is_lbus_device(dev)		(dev && dev->bus == &platform_bus_type)
--#define __arch_dma_to_virt(dev, x)	({ (void *) (is_lbus_device(dev) ? \
--					__phys_to_virt(x) : __bus_to_virt(x)); })
- #define __arch_virt_to_dma(dev, x)	({ is_lbus_device(dev) ? \
- 					(dma_addr_t)__virt_to_phys((unsigned long)x) \
- 					: (dma_addr_t)__virt_to_bus(x); })
-diff --git a/arch/arm/mach-omap1/include/mach/memory.h b/arch/arm/mach-omap1/include/mach/memory.h
-index 3c25305..73f86db 100644
---- a/arch/arm/mach-omap1/include/mach/memory.h
-+++ b/arch/arm/mach-omap1/include/mach/memory.h
-@@ -43,10 +43,6 @@
- 	   __phys_to_pfn(__dma);				\
- 	})
- 
--#define __arch_dma_to_virt(dev, addr)	({ (void *) (is_lbus_device(dev) ? \
--						lbus_to_virt(addr) : \
--						__phys_to_virt(addr)); })
--
- #define __arch_virt_to_dma(dev, addr)	({ unsigned long __addr = (unsigned long)(addr); \
- 					   (dma_addr_t) (is_lbus_device(dev) ? \
- 						virt_to_lbus(__addr) : \
--- 
-1.7.9.5
+> 
+>  arch/arm/boot/dts/k2hk-evm.dts  | 52 +++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/keystone.dtsi | 13 +++++++++++
+>  2 files changed, 65 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/k2hk-evm.dts b/arch/arm/boot/dts/k2hk-evm.dts
+> index 1d8ea6e..a08581b 100644
+> --- a/arch/arm/boot/dts/k2hk-evm.dts
+> +++ b/arch/arm/boot/dts/k2hk-evm.dts
+> @@ -84,3 +84,55 @@
+>  &usb {
+>  	status = "okay";
+>  };
+> +
+> +&aemif {
+> +	cs0 {
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +		clock-ranges;
+> +		ranges;
+> +
+> +		ti,cs-chipselect = <0>;
+> +		/* all timings in nanoseconds */
+> +		ti,cs-min-turnaround-ns = <12>;
+> +		ti,cs-read-hold-ns = <6>;
+> +		ti,cs-read-strobe-ns = <23>;
+> +		ti,cs-read-setup-ns = <9>;
+> +		ti,cs-write-hold-ns = <8>;
+> +		ti,cs-write-strobe-ns = <23>;
+> +		ti,cs-write-setup-ns = <8>;
+> +
+> +		nand at 0,0 {
+> +			compatible = "ti,keystone-nand","ti,davinci-nand";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			reg = <0 0 0x4000000
+> +			       1 0 0x0000100>;
+> +
+> +			ti,davinci-chipselect = <0>;
+> +			ti,davinci-mask-ale = <0x2000>;
+> +			ti,davinci-mask-cle = <0x4000>;
+> +			ti,davinci-mask-chipsel = <0>;
+> +			nand-ecc-mode = "hw";
+> +			ti,davinci-ecc-bits = <4>;
+> +			nand-on-flash-bbt;
+> +
+> +			partition at 0 {
+> +				label = "u-boot";
+> +				reg = <0x0 0x100000>;
+> +				read-only;
+> +			};
+> +
+> +			partition at 100000 {
+> +				label = "params";
+> +				reg = <0x100000 0x80000>;
+> +				read-only;
+> +			};
+> +
+> +			partition at 180000 {
+> +				label = "ubifs";
+> +				reg = <0x180000 0x7E80000>;
+> +			};
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+> index 4eceb46..af80cb2 100644
+> --- a/arch/arm/boot/dts/keystone.dtsi
+> +++ b/arch/arm/boot/dts/keystone.dtsi
+> @@ -266,5 +266,18 @@
+>  			ti,ngpio = <32>;
+>  			ti,davinci-gpio-unbanked = <32>;
+>  		};
+> +
+> +		aemif: aemif at 21000A00 {
+> +			compatible = "ti,keystone-aemif", "ti,davinci-aemif";
+> +			#address-cells = <2>;
+> +			#size-cells = <1>;
+> +			clocks = <&clkaemif>;
+> +			clock-names = "aemif";
+> +			clock-ranges;
+> +
+> +			reg = <0x21000A00 0x00000100>;
+> +			ranges = <0 0 0x30000000 0x10000000
+> +				  1 0 0x21000A00 0x00000100>;
+> +		};
+>  	};
+>  };
+> 
