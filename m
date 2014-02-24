@@ -1,30 +1,26 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 24 Feb 2014 13:21:58 -0800
-Subject: ccf: where to put constraints?
-In-Reply-To: <20140224201046.GA13155@katana>
-References: <20140224201046.GA13155@katana>
-Message-ID: <8e8ce023-b9a4-41a5-b06c-0f6d934f22e6@VA3EHSMHS020.ehs.local>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Feb 2014 22:32:20 +0100
+Subject: [PATCH v2 2/5] ARM: mvebu: Add i2c alias so setting bus number
+In-Reply-To: <20140224193050.GG1010@titan.lakedaemon.net>
+References: <1393264898-28939-1-git-send-email-andrew@lunn.ch>
+ <20140224191108.GA29288@lunn.ch> <20140224193050.GG1010@titan.lakedaemon.net>
+Message-ID: <201402242232.20851.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On Monday 24 February 2014, Jason Cooper wrote:
 
-On Mon, 2014-02-24 at 09:10PM +0100, Wolfram Sang wrote:
-> Hi,
 > 
-> Where do I put constraints when using the CCF? I have a CPU and GPU
-> clock derived from the same PLL. Both clocks have their own divider.
-> Now, there is the additional constraint that the CPU clock must not be
-> lower than the GPU clock. Do I add checks in the set_rate functions?
-> Feels like the wrong layer, but not checking it and blindly relying on
-> somebody else does not feel correct, too. How to do it best?
+> ex: What changed from v3.15 to v3.16 for kirkwood?
+> 
+> $ git log --oneline v3.15..v3.16 -- arch/arm/mach-mvebu | \
+>         grep -i 'ARM: kirkwood'
+> 
+> This seems to be new territory for us (mvebu), perhaps one of the
+> arm-soc maintainers has a preference?  I'll add them to this reply.
 
-I don't know if it's the best or only way, but so far, I did things like
-that with clock notifiers.
+I don't care, as long as you decide on something that works for you.
+While you're transitioning, it probably makes little sense to
+enforce either one too strictly.
 
-I.e. when a clock consumer needs to be notified about its input clock
-being changed it registers a clock notifier. In that notifier callback
-it then can react to the rate change. E.g. adjust dividers to stay
-within legal limits or reject the change completely.
-
-	S?ren
+	Arnd
