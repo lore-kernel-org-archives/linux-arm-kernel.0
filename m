@@ -1,47 +1,72 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 24 Feb 2014 20:59:49 +0100
-Subject: [PATCH] clk: shmobile: div6: use proper description in kernel doc
-In-Reply-To: <1393271848-13313-1-git-send-email-wsa@the-dreams.de>
-References: <1393271848-13313-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1592414.PQLaxVPFpz@avalon>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Mon, 24 Feb 2014 20:09:40 +0000
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <1393257795.16570.98.camel@kazak.uk.xensource.com>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1391730137-14814-22-git-send-email-andrew@lunn.ch>
+ <52F51922.6030502@gmail.com>
+ <1392892217.23342.18.camel@kazak.uk.xensource.com>
+ <20140220105854.GL11878@lunn.ch>
+ <1392896076.23342.37.camel@kazak.uk.xensource.com>
+ <20140220121821.GO11878@lunn.ch>
+ <1392900664.23342.60.camel@kazak.uk.xensource.com>
+ <20140220132320.GP11878@lunn.ch>
+ <1392906273.30563.14.camel@kazak.uk.xensource.com>
+ <1392948027.15717.36.camel@deadeye.wl.decadent.org.uk>
+ <1393257795.16570.98.camel@kazak.uk.xensource.com>
+Message-ID: <1393272580.6823.90.camel@deadeye.wl.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
-
-Thank you for the patch.
-
-On Monday 24 February 2014 20:57:11 Wolfram Sang wrote:
-> From: Wolfram Sang <wsa@sang-engineering.com>
+On Mon, 2014-02-24 at 16:03 +0000, Ian Campbell wrote:
+> On Fri, 2014-02-21 at 02:00 +0000, Ben Hutchings wrote:
+> > On Thu, 2014-02-20 at 14:24 +0000, Ian Campbell wrote:
+> > > On Thu, 2014-02-20 at 14:23 +0100, Andrew Lunn wrote:
+> > [...]
+> > > > What i suspect we will end up doing it dropping the last patch for the
+> > > > moment and ensuring ARCH_KIRKWOOD still supports all the DT machines.
+> > > > I think that just needs care with arch/arm/boot/dts/Makefile.
+> > > > 
+> > > > Once we have the last four converted over to DT, you can then do a
+> > > > straight swap, mach-kirkwood for mach-mvebu.
+> > > 
+> > > That sounds like a good plan, thanks!
+> > > 
+> > > If we are going to do a straight swap I suppose it might as go for a v5
+> > > multiplatform flavour instead of a mvebu specific one.
+> > [...]
+> > 
+> > I would love it if we could do that.
+> > 
+> > By the way, we still have the problem that at least one supported
+> > orion5x machine (D-Link DNS-323) only has a ~1.5 MB kernel partition.
+> > So we would probably have to keep a reduced orion5x config for those
+> > machines, alongside the mvebu or multiplatform kernel.
 > 
-> These variable clocks have nothing to do with MSTP gating, probably a
-> copy&paste leftover.
+> Sure. I think at worst we should aim to end up with as many flavour as
+> we have today, in reality I expect we should be able to end up with
+> fewer (even if only -= 1).
 > 
-> Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+> BTW, someone (I forget who) at Debconf in Cambridge last year floated
+> the idea of putting a stage 2 loader in flash to pull the real kernel
+> from some larger storage. I don't know if that is realistic here, and in
+> any case I don't intend to work on it myself.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+I do remember that, and I like it.  But in order to rely on this, I
+think we would need to provide a mostly automatic and safe upgrade path
+in Debian.  Unless someone is prepared to spend the (possibly
+substantial) effort to do that, we're stuck with that limitation.
 
-Mike, could you please pick this up for v3.15 ?
-
-> ---
->  drivers/clk/shmobile/clk-div6.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/shmobile/clk-div6.c
-> b/drivers/clk/shmobile/clk-div6.c index aac4756..f065f69 100644
-> --- a/drivers/clk/shmobile/clk-div6.c
-> +++ b/drivers/clk/shmobile/clk-div6.c
-> @@ -23,7 +23,7 @@
->  #define CPG_DIV6_DIV_MASK	0x3f
-> 
->  /**
-> - * struct div6_clock - MSTP gating clock
-> + * struct div6_clock - CPG 6 bit divider clock
->   * @hw: handle between common and hardware-specific interfaces
->   * @reg: IO-remapped register
->   * @div: divisor value (1-64)
+Ben.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Ben Hutchings
+Beware of bugs in the above code;
+I have only proved it correct, not tried it. - Donald Knuth
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 811 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/cad41ce6/attachment.sig>
