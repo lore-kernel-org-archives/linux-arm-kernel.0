@@ -1,19 +1,16 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 24 Feb 2014 10:55:41 +0800
-Subject: [patch 08/26] arm: Replace various irq_desc accesses
-In-Reply-To: <20140223212737.099151500@linutronix.de>
-References: <20140223212703.511977310@linutronix.de>
- <20140223212737.099151500@linutronix.de>
-Message-ID: <20140224025539.GE25011@S2101-09.ap.freescale.net>
+Date: Mon, 24 Feb 2014 11:05:29 +0800
+Subject: [PATCH 1/3] ARM: dts: i.MX27: Add USB nodes
+In-Reply-To: <1393061555-26707-1-git-send-email-shc_work@mail.ru>
+References: <1393061555-26707-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20140224030527.GF25011@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 23, 2014 at 09:40:12PM -0000, Thomas Gleixner wrote:
-> Use the proper functions. There is no need to fiddle with irq_desc.
+On Sat, Feb 22, 2014 at 01:32:33PM +0400, Alexander Shiyan wrote:
+> This patch adds the missing (Universal serial bus) USB devicetree
+> nodes for i.MX27 CPUs.
 > 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-...
->  arch/arm/mach-imx/pm-imx6q.c        |    7 +++----
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Applied all 3, thanks.
