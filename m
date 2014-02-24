@@ -1,49 +1,101 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 24 Feb 2014 09:51:52 -0800
-Subject: [PATCH v3 2/2] i2c: New bus driver for the Qualcomm QUP I2C
- controller
-In-Reply-To: <1392943934.2594.14.camel@joe-AO722>
-References: <1392943090-30556-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1392943090-30556-3-git-send-email-bjorn.andersson@sonymobile.com>
- <1392943934.2594.14.camel@joe-AO722>
-Message-ID: <20140224175152.GB32621@sonymobile.com>
+From: dhowells@redhat.com (David Howells)
+Date: Mon, 24 Feb 2014 15:48:26 +0000
+Subject: [PATCH] ARM: Delete asm/system.h
+Message-ID: <20140224154826.15682.825.stgit@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 20 Feb 16:52 PST 2014, Joe Perches wrote:
+Delete ARM's asm/system.h.  It's the last holdout and should be got rid of.
 
-> On Thu, 2014-02-20 at 16:38 -0800, Bjorn Andersson wrote:
-> > This bus driver supports the QUP i2c hardware controller in the Qualcomm SOCs.
-> > The Qualcomm Universal Peripheral Engine (QUP) is a general purpose data path
-> > engine with input/output FIFOs and an embedded i2c mini-core. The driver
-> > supports FIFO mode (for low bandwidth applications) and block mode (interrupt
-> > generated for each block-size data transfer).
-> 
-> trivia:
-> 
-> > diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
-> []
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int qup_i2c_suspend(struct device *device)
-> > +{
-> > +	dev_dbg(device, "system suspend");
-> > +	qup_i2c_pm_suspend_runtime(device);
-> > +	return 0;
-> > +}
-> > +
-> > +static int qup_i2c_resume(struct device *device)
-> > +{
-> > +	dev_dbg(device, "system resume");
-> > +	qup_i2c_pm_resume_runtime(device);
-> > +	pm_runtime_mark_last_busy(device);
-> > +	pm_request_autosuspend(device);
-> > +	return 0;
-> > +}
-> > +#endif
-> 
-> Missing terminating newlines for dev_dbg statements.
+This builds for defconfig, lpc32xx_defconfig, exynos_defconfig + XEN, the
+previous changed to a Gemini system and an omap3 config with TI_DAVINCI_EMAC.
 
-Thanks Joe, missed those.
+Signed-off-by: David Howells <dhowells@redhat.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+cc: Russell King <linux@arm.linux.org.uk>
+cc: linux-arm-kernel at lists.infradead.org
+---
 
-Regards,
-Bjorn
+ arch/arm/include/asm/jump_label.h  |    1 -
+ arch/arm/include/asm/sync_bitops.h |    1 -
+ arch/arm/include/asm/system.h      |    7 -------
+ arch/arm/mach-gemini/idle.c        |    2 +-
+ arch/arm/mach-omap2/am35xx-emac.c  |    1 -
+ drivers/usb/gadget/lpc32xx_udc.c   |    1 -
+ 6 files changed, 1 insertion(+), 12 deletions(-)
+ delete mode 100644 arch/arm/include/asm/system.h
+
+diff --git a/arch/arm/include/asm/jump_label.h b/arch/arm/include/asm/jump_label.h
+index 863c892..70f9b9b 100644
+--- a/arch/arm/include/asm/jump_label.h
++++ b/arch/arm/include/asm/jump_label.h
+@@ -4,7 +4,6 @@
+ #ifdef __KERNEL__
+ 
+ #include <linux/types.h>
+-#include <asm/system.h>
+ 
+ #define JUMP_LABEL_NOP_SIZE 4
+ 
+diff --git a/arch/arm/include/asm/sync_bitops.h b/arch/arm/include/asm/sync_bitops.h
+index 63479ee..9732b8e 100644
+--- a/arch/arm/include/asm/sync_bitops.h
++++ b/arch/arm/include/asm/sync_bitops.h
+@@ -2,7 +2,6 @@
+ #define __ASM_SYNC_BITOPS_H__
+ 
+ #include <asm/bitops.h>
+-#include <asm/system.h>
+ 
+ /* sync_bitops functions are equivalent to the SMP implementation of the
+  * original functions, independently from CONFIG_SMP being defined.
+diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+deleted file mode 100644
+index 368165e..0000000
+--- a/arch/arm/include/asm/system.h
++++ /dev/null
+@@ -1,7 +0,0 @@
+-/* FILE TO BE DELETED. DO NOT ADD STUFF HERE! */
+-#include <asm/barrier.h>
+-#include <asm/compiler.h>
+-#include <asm/cmpxchg.h>
+-#include <asm/switch_to.h>
+-#include <asm/system_info.h>
+-#include <asm/system_misc.h>
+diff --git a/arch/arm/mach-gemini/idle.c b/arch/arm/mach-gemini/idle.c
+index 87dff4f..ddf8ec9 100644
+--- a/arch/arm/mach-gemini/idle.c
++++ b/arch/arm/mach-gemini/idle.c
+@@ -3,7 +3,7 @@
+  */
+ 
+ #include <linux/init.h>
+-#include <asm/system.h>
++#include <asm/system_misc.h>
+ #include <asm/proc-fns.h>
+ 
+ static void gemini_idle(void)
+diff --git a/arch/arm/mach-omap2/am35xx-emac.c b/arch/arm/mach-omap2/am35xx-emac.c
+index 25b79a2..6a6935c 100644
+--- a/arch/arm/mach-omap2/am35xx-emac.c
++++ b/arch/arm/mach-omap2/am35xx-emac.c
+@@ -17,7 +17,6 @@
+ 
+ #include <linux/err.h>
+ #include <linux/davinci_emac.h>
+-#include <asm/system.h>
+ #include "omap_device.h"
+ #include "am35xx.h"
+ #include "control.h"
+diff --git a/drivers/usb/gadget/lpc32xx_udc.c b/drivers/usb/gadget/lpc32xx_udc.c
+index 049ebab..a94bb10 100644
+--- a/drivers/usb/gadget/lpc32xx_udc.c
++++ b/drivers/usb/gadget/lpc32xx_udc.c
+@@ -55,7 +55,6 @@
+ #include <mach/hardware.h>
+ #include <linux/io.h>
+ #include <asm/irq.h>
+-#include <asm/system.h>
+ 
+ #include <mach/platform.h>
+ #include <mach/irqs.h>
