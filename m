@@ -1,47 +1,56 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon, 24 Feb 2014 06:44:25 +0100
-Subject: [PATCH v2 0/2] ARM: OMAP4: Fix gpmc_fck clock
-In-Reply-To: <20140223212309.22529.75068@quantum>
-References: <1392801305-1698-1-git-send-email-florian.vaussard@epfl.ch>
- <5304DA2C.3030605@ti.com> <53050573.8090506@epfl.ch>
- <20140223212309.22529.75068@quantum>
-Message-ID: <530ADC39.1010300@epfl.ch>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 24 Feb 2014 14:43:23 +0800
+Subject: [patch 09/26] arm: mmp: Remove pointless fiddling with irq
+ internals
+In-Reply-To: <CADApbeiyGoSAF9n5-+Ys1H4VDgN+d727E6ARWFGj4EixqeP79w@mail.gmail.com>
+References: <20140223212703.511977310@linutronix.de>
+ <20140223212737.214342433@linutronix.de>
+ <20140223231755.GA27579@pengutronix.de>
+ <CADApbeiyGoSAF9n5-+Ys1H4VDgN+d727E6ARWFGj4EixqeP79w@mail.gmail.com>
+Message-ID: <CAN1soZy_TfzNigfn4y6kF2qe4K+AQsagd-1KWYrz1VEavMO4bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/23/2014 10:23 PM, Mike Turquette wrote:
-> Quoting Florian Vaussard (2014-02-19 11:26:43)
+On Mon, Feb 24, 2014 at 2:07 PM, Chao Xie <xiechao.mail@gmail.com> wrote:
+> On Mon, Feb 24, 2014 at 7:17 AM, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+>> Hi Thomas,
 >>
->> On 02/19/2014 05:22 PM, Tero Kristo wrote:
->>> On 02/19/2014 11:15 AM, Florian Vaussard wrote:
->>>> Hello,
->>>>
->>>> Trying to get my SMSC9221 working on OMAP4 with DT,
->>>> I faced a misconfigured gpmc_fck (dummy clock set to 0)
->>>> resulting in serveral division-by-zero, misconfigured
->>>> timings and driver lost in the La La Land.
->>>>
->>>> To solve this, patch 1 removes gpmc_fck from the dummy
->>>> clocks, and patch 2 adds the gpmc_fck DT node and
->>>> reference it from the gpmc node.
->>>>
->>>> Tested on DuoVero/Parlor (OMAP4430) with SMSC9221.
+>> On Sun, Feb 23, 2014 at 09:40:13PM -0000, Thomas Gleixner wrote:
+>>> The pm-mmp2 and pm-pxa910 power management related irq_set_wake
+>>> callbacks fiddle pointlessly with the irq actions for no reason except
+>>> for lack of understanding how the wakeup mechanism works.
 >>>
->>> I can't test GPMC myself, but other than that, this set looks good to go.
->>>
+>>> On supsend the core disables all interrupts lazily, i.e. it does not
+>>> mask them at the irq controller level. So any interrupt which is
+>>> firing during supsend will mark the corresponding interrupt line as
+>> s/supsend/suspend/ twice
+>>> pending. Just before the core powers down it checks whether there are
+>>> interrupts pending from interrupt lines which are marked as wakeup
+>>> sources and if so it aborts the resume and resends the interrupts.
+>> It's the suspend that is aborted, not the resume.
 >>
->> Thank you. Would you like more test coverage by other people? I would
->> like to see this in -rc if possible, as it is needed to boot my OMAP4
->> system.
-> 
-> What OMAP4 system is this? Is this a regression for board that already
-> has support merged into mainline?
-> 
+>> Other than that your change looks fine.
+>>
+> For pxa910 and MMP2, wake up source only wake up the AP subsystem.
+> The AP subsystem includes the APMU(AP Power Mangament Unit) and cores.
+> Now the core is still powered down. APMU will check the interrupt
+> lines, and find
+> that there are interrupt pending, it will power on the cores.
+> So if the irq is disabled, even wake up source can wake up AP subsystem, but the
+> core is still powered down. It will not be powered up by APMU.
+>
 
-No, it is not yet merged into mainline. I was planning to post the DTS
-this week, when most issues are cleared. Looking at the current mainline
-boards, no one seems to use the GPMC, so I am just the first one to hit
-this issue.
+Yes, suspend/resume can't work if the above code is removed.
 
-Regards,
-Florian
+Interrupt source (logic AND with interrupt mask register) is connected
+to MPMU as
+wakeup source. If the interrupt is disabled, there's no wakeup source event.
+
+And APMU is waken up by MPMU.
+
+So please don't remove the above code. We must keep these interrupt lines active
+to wake up the whole system.
+
+Regards
+Haojian
