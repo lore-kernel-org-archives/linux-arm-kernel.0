@@ -1,51 +1,36 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 24 Feb 2014 14:23:50 -0300
-Subject: [PATCH v3 0/2] regulator: core: Fix ops->enable/disable usage
-In-Reply-To: <20140223051209.GK25940@sirena.org.uk>
-References: <1392914164-28596-1-git-send-email-mpa@pengutronix.de>
- <20140223051209.GK25940@sirena.org.uk>
-Message-ID: <CAOMZO5BPvCcx_f09Khuw8MVxrR18fnv9e1xeuJ0c_8G22AR53g@mail.gmail.com>
+From: kim.phillips@freescale.com (Kim Phillips)
+Date: Mon, 24 Feb 2014 11:22:00 -0600
+Subject: [PATCH] ARM: boot: compressed: ignore bswapsdi2.S
+In-Reply-To: <alpine.LFD.2.11.1402201530022.17677@knanqh.ubzr>
+References: <1392899163-25846-1-git-send-email-mark.rutland@arm.com>
+ <alpine.LFD.2.11.1402201530022.17677@knanqh.ubzr>
+Message-ID: <20140224112200.6d917e21d2f6502b6076aa9b@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 23, 2014 at 2:12 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Feb 20, 2014 at 05:36:02PM +0100, Markus Pargmann wrote:
->> Hi,
->>
->> These two patches replace all ops->enable/disable by
->> _regulator_do_disable/enable function calls. These wrappers also handle gpio
->> regulators.
->
-> Applied both, thanks.
+On Thu, 20 Feb 2014 15:30:31 -0500
+Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
 
-With these two patches applied I get the following error on
-mx6qsabresd running today's linux-next:
+> On Thu, 20 Feb 2014, Mark Rutland wrote:
+> 
+> > Commit 017f161a55b4 (ARM: 7877/1: use built-in byte swap function) added
+> > bswapsdi2.{o,S}  to arch/arm/boot/compress/Makefile, but didn't update
+> > the .gitignore. Thus after a build git status shows bswapsdi2.S as a new
+> > file, which is a little annoying.
+> > 
+> > This patch updates arch/arm/boot/compress/.gitignore to ignore
+> > bswapsdi2.S, as we already do for ashldi3.S and others.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Kim Phillips <kim.phillips@freescale.com>
+> > Cc: Nicolas Pitre <nico@linaro.org>
+> > Cc: David Woodhouse <David.Woodhouse@intel.com>
+> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Acked-by: Nicolas Pitre <nico@linaro.org>
 
-vdd1p1: failed to enable
-anatop_regulator regulator-1p1.2: failed to register vdd1p1
-anatop_regulator: probe of regulator-1p1.2 failed with error -22
-vdd3p0: failed to enable
-anatop_regulator regulator-3p0.3: failed to register vdd3p0
-anatop_regulator: probe of regulator-3p0.3 failed with error -22
-vdd2p5: failed to enable
-anatop_regulator regulator-2p5.4: failed to register vdd2p5
-anatop_regulator: probe of regulator-2p5.4 failed with error -22
-vddarm: 725 <--> 1450 mV at 1100 mV
-vddpu: 725 <--> 1450 mV at 1100 mV
-vddsoc: 725 <--> 1450 mV at 1175 mV
-....
+Acked-by: Kim Phillips <kim.phillips@freescale.com>
 
-pfuze100-regulator 1-0008: Full layer: 1, Metal layer: 0
-pfuze100-regulator 1-0008: FAB: 0, FIN: 0
-SW1AB: failed to enable
-pfuze100-regulator 1-0008: register regulatorSW1AB failed
-pfuze100-regulator: probe of 1-0008 failed with error -22
+Thanks,
 
-
-Reverting these two patches the regulators probe successfully.
-
-Any ideas?
-
-Regards,
-
-Fabio Estevam
+Kim
