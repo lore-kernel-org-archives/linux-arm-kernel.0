@@ -1,59 +1,48 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 24 Feb 2014 14:41:34 +0900
-Subject: [PATCH 04/12] ARM: shmobile: Rework include path for EMEV2
-In-Reply-To: <20140224054058.1143.14096.sendpatchset@w520>
-References: <20140224054058.1143.14096.sendpatchset@w520>
-Message-ID: <20140224054134.1143.15635.sendpatchset@w520>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 24 Feb 2014 11:10:10 +0530
+Subject: [GIT PULL] DaVinci NAND update for v3.15
+Message-ID: <530ADB3A.1070302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi,
 
-Convert EMEV2 SoC code use of include files from 
-the style <mach/something.h> to "something.h".
+Can you please pull the following change for v3.15? The mtd
+changes are acked by Brian. We agreed to take this through ARM-SoC
+because of the number of changes to mach-davinci.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+I based this on -rc3 since I saw that ARM-SoC is on -rc3 anyway.
 
- arch/arm/mach-shmobile/clock-emev2.c |    2 +-
- arch/arm/mach-shmobile/setup-emev2.c |    4 ++--
- arch/arm/mach-shmobile/smp-emev2.c   |    4 ++--
- 3 files changed, 5 insertions(+), 5 deletions(-)
+Thanks,
+Sekhar
 
---- 0001/arch/arm/mach-shmobile/clock-emev2.c
-+++ work/arch/arm/mach-shmobile/clock-emev2.c	2014-02-24 13:28:21.000000000 +0900
-@@ -21,7 +21,7 @@
- #include <linux/io.h>
- #include <linux/sh_clk.h>
- #include <linux/clkdev.h>
--#include <mach/common.h>
-+#include "common.h"
- 
- #define EMEV2_SMU_BASE 0xe0110000
- 
---- 0001/arch/arm/mach-shmobile/setup-emev2.c
-+++ work/arch/arm/mach-shmobile/setup-emev2.c	2014-02-24 13:28:37.000000000 +0900
-@@ -20,8 +20,8 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/of_platform.h>
--#include <mach/common.h>
--#include <mach/emev2.h>
-+#include "common.h"
-+#include "emev2.h"
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
---- 0001/arch/arm/mach-shmobile/smp-emev2.c
-+++ work/arch/arm/mach-shmobile/smp-emev2.c	2014-02-24 13:28:58.000000000 +0900
-@@ -23,8 +23,8 @@
- #include <linux/spinlock.h>
- #include <linux/io.h>
- #include <linux/delay.h>
--#include <mach/common.h>
--#include <mach/emev2.h>
-+#include "common.h"
-+#include "emev2.h"
- #include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
- 
+The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
+
+  Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.15/nand
+
+for you to fetch changes up to 67f5185cad24b3c3d9ab07508dfcab55cdab02de:
+
+  ARM: davinci: aemif: get rid of davinci-nand driver dependency on aemif (2014-02-23 20:33:18 +0530)
+
+----------------------------------------------------------------
+A patch to break dependency of DaVinci NAND
+driver with mach-davinci. Required for reuse
+of driver on other platforms (keystone).
+
+----------------------------------------------------------------
+Ivan Khoronzhuk (1):
+      ARM: davinci: aemif: get rid of davinci-nand driver dependency on aemif
+
+ arch/arm/mach-davinci/aemif.c                   |  107 ++++++++++++++++++++---
+ arch/arm/mach-davinci/board-da830-evm.c         |    3 +
+ arch/arm/mach-davinci/board-da850-evm.c         |    3 +
+ arch/arm/mach-davinci/board-dm644x-evm.c        |    5 ++
+ arch/arm/mach-davinci/board-dm646x-evm.c        |    3 +
+ arch/arm/mach-davinci/board-mityomapl138.c      |    4 +
+ drivers/mtd/nand/davinci_nand.c                 |   22 -----
+ include/linux/platform_data/mtd-davinci-aemif.h |    5 +-
+ 8 files changed, 117 insertions(+), 35 deletions(-)
