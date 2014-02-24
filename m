@@ -1,53 +1,57 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Mon, 24 Feb 2014 13:54:43 -0800
-Subject: [linux-pm] ARM hibernation / suspend-to-disk
-In-Reply-To: <loom.20140216T140206-196@post.gmane.org>
-References: <20130529081005.GA25561@hal> <51A6399D.4090606@ti.com>
- <20140128141458.GD8713@xo-6d-61-c0.localdomain>
- <20140128182245.18840.51279@capellas-linux>
- <loom.20140216T140206-196@post.gmane.org>
-Message-ID: <20140224215443.9748.65580@capellas-linux>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 24 Feb 2014 22:04:21 +0000
+Subject: [PATCH] staging/iio/adc/MXS/LRADC: fix touchscreen statemachine
+In-Reply-To: <530BB63D.4050200@kernel.org>
+References: <1379946998-23041-1-git-send-email-jbe@pengutronix.de>
+ <201402241416.24270.jbe@pengutronix.de> <20140224133316.GI26722@mwanda>
+ <201402241539.53707.jbe@pengutronix.de> <20140224164817.GE4436@piout.net>
+ <530BB63D.4050200@kernel.org>
+Message-ID: <530BC1E5.40906@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting TonyHo (2014-02-16 05:11:47)
-> Hi Sebastian ,Pavel ,Russ:
->  I want to build the kernel https://github.com/russdill/linux/commits/arm-
-> hibernation-am33xx-v3.12 to be used in BeagleBone black too, after I clone 
-> and checkout the branch, I'm not sure whether my opration is right, can 
-> someone help me to comfirm?
-> Below is my operation:
-> 1. make ARCH=arm CROSS_COMPILE=/media/work/BBB/tools/arm-2010.09/bin/arm-
-> none-linux-gnueabi- omap2plus_defconfig . Is the omap2plus_defconfig is 
-> right configuration file?
-> 2. russdill says his board is BeagleBone(http://www.youtube.com/watch?
-> v=3hdbH-Ur-hE), so if there would be some modificaiton to be done before 
-> compile this source code? 
-> 3. Is there any intructions about using and compiling the hibernation source 
-> code?
+On 24/02/14 21:14, Jonathan Cameron wrote:
+> On 24/02/14 16:48, Alexandre Belloni wrote:
+>> On 24/02/2014 at 15:39:53 +0100, Juergen Beisert wrote :
+>>> Releasing the touchscreen lets the internal statemachine left in a wrong state.
+>>> Due to this the release coordinate will be reported again by accident when the next
+>>> touchscreen event happens. This change sets up the correct state when waiting
+>>> for the next touchscreen event.
+>>>
+>>> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+>>>
+>>
+>> Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Applied to the fixes-togreg branch of iio.git  Thanks
+I just forced an update to the tree having realised that I'd not
+marked it for stable (the change went into the 3.13 tree) and that
+a few more details were needed to explain the effects of the problem
+and where it came from. Will let it sit overnight then send on to
+Greg sometime in the next few days.  Good to have this one cleared up.
 
-Hi Tony,
-
-I use omap2plus_defconfig.  
-
-I have been working with BeagleBone Black (bbb) for hibernation on this branch:
-
-http://git.linaro.org/git-ro/people/sebastian.capella/linux.git hibernation_3.13_russMerge
-
-I ran into a few minor issues on Russ' branch for bbb that I had to work
-around.  In the end it worked fine, but I know I had to add some entries
-in the dts files at least for it to work.
-
-On bbb I'm resuming from initramfs by echoing the hibernation
-swap device onto /sys/power/resume during my initscript, but before
-remounting the partitions.  You may need to do similar.
-
-You will have to change power managemennt -> hibernation to on in
-menuconfig.
-
-I can help more, please let me know what you have and how you'd like to
-set it up.
-
-Thanks!
-
-Sebastian
+Jonathan
+>
+> Jonathan
+>>
+>>> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
+>>> index 7fc66a6..514844e 100644
+>>> --- a/drivers/staging/iio/adc/mxs-lradc.c
+>>> +++ b/drivers/staging/iio/adc/mxs-lradc.c
+>>> @@ -757,6 +757,7 @@ static void mxs_lradc_finish_touch_event(struct mxs_lradc *lradc, bool valid)
+>>>       }
+>>>
+>>>       /* if it is released, wait for the next touch via IRQ */
+>>> +    lradc->cur_plate = LRADC_TOUCH;
+>>>       mxs_lradc_reg_clear(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ, LRADC_CTRL1);
+>>>       mxs_lradc_reg_set(lradc, LRADC_CTRL1_TOUCH_DETECT_IRQ_EN, LRADC_CTRL1);
+>>>   }
+>>>
+>>> --
+>>> Pengutronix e.K.                              | Juergen Beisert             |
+>>> Linux Solutions for Science and Industry      | http://www.pengutronix.de/  |
+>>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
