@@ -1,39 +1,61 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Mon, 24 Feb 2014 15:13:45 -0800
-Subject: [PATCH RFC v1 1/3] ARM: Add irq disabled version of soft_restart.
-In-Reply-To: <20140222102616.GG21483@n2100.arm.linux.org.uk>
-References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
- <1392774729-3235-2-git-send-email-sebastian.capella@linaro.org>
- <20140222102616.GG21483@n2100.arm.linux.org.uk>
-Message-ID: <20140224231345.10580.62916@capellas-linux>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 25 Feb 2014 00:34:38 +0100
+Subject: [PATCH] net: phy: add suspend_halted module param
+In-Reply-To: <20140224.180510.103916219115440711.davem@davemloft.net>
+References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <CAGVrzcadYTYQEvPxqdMf2f741y5sAgnOYm3EC=f7SOkr8SK2WQ@mail.gmail.com>
+ <20140224.180510.103916219115440711.davem@davemloft.net>
+Message-ID: <530BD70E.3000206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Russell King - ARM Linux (2014-02-22 02:26:17)
-> On Tue, Feb 18, 2014 at 05:52:07PM -0800, Sebastian Capella wrote:
-> > From: Russ Dill <Russ.Dill@ti.com>
-> > 
-> > This adds the ability to run soft_restart with local_irq/fiq_disable
-> > already called. This is helpful for the hibernation code paths.
-> 
-> I'd rather keep this simple.  There's no problem with calling soft_restart
-> with interrupts already disabled.  local_irq_disable()/local_fiq_disable()
-> there should be harmless.
+On 02/25/2014 12:05 AM, David Miller wrote:
+> From: Florian Fainelli <f.fainelli@gmail.com>
+> Date: Mon, 24 Feb 2014 10:20:10 -0800
+>
+>> Hi Sebastian,
+>>
+>> 2014-02-23 8:58 GMT-08:00 Sebastian Hesselbarth
+>> <sebastian.hesselbarth@gmail.com>:
+>>> commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
+>>>    ("net: phy: resume/suspend PHYs on attach/detach")
+>>> introduced a feature to suspend PHYs when entering halted state.
+>>>
+>>> Unfortunately, not all bootloaders properly power-up PHYs on reset
+>>> and fail to access ethernet because the PHY is still powered down.
+>>>
+>>> Therefore, we add a boolean module parameter suspend_halted with
+>>> default value of true. Disabling that parameter prevents PHYs from
+>>> being suspended when entering halted state.
+>>>
+>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> Reported-by: Andrew Lunn <andrew@lunn.ch>
+>>> ---
+>>> Andrew, can you please re-test if disabling the feature does work on
+>>> your board? I tried a bunch of mine, but none failed to power-up the
+>>> PHY in u-boot.
+>>
+>> Would be good to get Andrew's testing on this just to make sure it
+>> solves his problem. Otherwise:
+>>
+>> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+>
+> I disagree with using a module parameter for this.
+>
+> Figure out the devices that cannot do this properly, and add
+> an internal flag that this driver sets.
 
-Hi Russell,
+Hmm, as it seems to be a bootloader issue, it will be quite
+impossible to determine if a board is affected or not.
 
-I'm observing a data abort loop when I replace this call:
+I am still trying to get any of my boards to mis-behave the same
+way to figure out what is really causing it.
 
-In the local_irq_disable, it ends up calling trace_hardirqs_off
-(CONFIG_TRACE_IRQFLAGS_SUPPORT is enabled), which calls
-trace_hardirqs_off_caller which checks lockdep_recursion in the
-current task, but we've switched to a temporary stack with the
-call_with_stack, and get_current is returning NULL.  This
-triggers a data abort, which calls trace_hardirqs_off
-again and so on.
+We do still have 2-3 weeks to find a proper fix, don't we?
 
-Do you have any suggestions here?
+> Module parameters are terrible.
 
-Thanks,
+Maybe. If you prefer, I can remove the module param and leave
+the sysfs entry?
 
 Sebastian
