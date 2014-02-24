@@ -1,99 +1,54 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 23 Feb 2014 16:43:35 -0800
-Subject: [PATCH RFC v1 1/3] clk: Add function to parse an arbitrary clocks
- list property
-In-Reply-To: <1392829124-25705-2-git-send-email-s.nawrocki@samsung.com>
-References: <1392829124-25705-1-git-send-email-s.nawrocki@samsung.com>
- <1392829124-25705-2-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20140224004335.22529.74369@quantum>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 24 Feb 2014 11:48:10 +1100
+Subject: linux-next: manual merge of the mvebu tree with Linus' tree
+Message-ID: <20140224114810.468d0db355553fc15629592d@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2014-02-19 08:58:42)
-> The of_clk_get_list_entry() function is like of_clk_get() except it allows
-> to pass name of a DT property containing list of phandles and clock specifiers.
-> For of_clk_get() it has been hard coded to "clocks".
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/clk/clk.h    |    3 +++
->  drivers/clk/clkdev.c |   25 +++++++++++++++++++++----
->  2 files changed, 24 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.h b/drivers/clk/clk.h
-> index 795cc9f..dd9def1 100644
-> --- a/drivers/clk/clk.h
-> +++ b/drivers/clk/clk.h
-> @@ -10,7 +10,10 @@
->   */
-> 
->  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-> +
->  struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec);
->  void of_clk_lock(void);
->  void of_clk_unlock(void);
-> +struct clk *of_clk_get_list_entry(struct device_node *np,
-> +                                 const char *list_name, int index);
->  #endif
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index a360b2e..465662e 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -27,17 +27,28 @@ static LIST_HEAD(clocks);
->  static DEFINE_MUTEX(clocks_mutex);
-> 
->  #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
-> -struct clk *of_clk_get(struct device_node *np, int index)
-> +/**
-> + * of_clk_get_list_entry() - Parse and lookup a clock referenced by a device node
-> + * @np: pointer to clock consumer node
-> + * @list_name: name of the clock list property
-> + * @index: index to the clock list
-> + *
-> + * This function parses the @list_name property and together with @index
-> + * value indicating an entry of the list uses it to look up the struct clk
-> + * from the registered list of clock providers.
-> + */
-> +struct clk *of_clk_get_list_entry(struct device_node *np,
-> +                                 const char *list_name, int index)
+Hi all,
 
-Bikeshed alert: how about of_clk_get_by_property or of_clk_get_by_prop?
+Today's linux-next merge of the mvebu tree got a conflict in
+Documentation/devicetree/bindings/vendor-prefixes.txt between commit
+d5f93b8ad01e ("of: Update qcom vendor prefix description") from Linus'
+tree and commit f7f2ea9f49b0 ("DT: Vendor prefixes: Add ricoh, qnap, sii
+and synology") from the mvebu tree.
 
-No strong opinion on the topic though.
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-Regards,
-Mike
+-- 
+Cheers,
+Stephen Rothwell <sfr@canb.auug.org.au>
 
->  {
->         struct of_phandle_args clkspec;
->         struct clk *clk;
->         int rc;
-> 
-> -       if (index < 0)
-> +       if (index < 0 || !list_name)
->                 return ERR_PTR(-EINVAL);
-> 
-> -       rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
-> -                                       &clkspec);
-> +       rc = of_parse_phandle_with_args(np, list_name, "#clock-cells",
-> +                                       index, &clkspec);
->         if (rc)
->                 return ERR_PTR(rc);
-> 
-> @@ -51,6 +62,12 @@ struct clk *of_clk_get(struct device_node *np, int index)
->         of_node_put(clkspec.np);
->         return clk;
->  }
-> +EXPORT_SYMBOL(of_clk_get_list_entry);
-> +
-> +struct clk *of_clk_get(struct device_node *np, int index)
-> +{
-> +       return of_clk_get_list_entry(np, "clocks", index);
-> +}
->  EXPORT_SYMBOL(of_clk_get);
-> 
->  /**
-> --
-> 1.7.9.5
-> 
+diff --cc Documentation/devicetree/bindings/vendor-prefixes.txt
+index e9d19e2b359b,c73b435f58f5..000000000000
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@@ -69,7 -64,8 +69,8 @@@ phytec	PHYTEC Messtechnik Gmb
+  picochip	Picochip Ltd
+  powervr	PowerVR (deprecated, use img)
+  qca	Qualcomm Atheros, Inc.
+ -qcom	Qualcomm, Inc.
+ +qcom	Qualcomm Technologies, Inc
++ qnap	QNAP Systems, Inc.
+  ralink	Mediatek/Ralink Technology Corp.
+  ramtron	Ramtron International
+  realtek Realtek Semiconductor Corp.
+@@@ -81,9 -78,9 +83,10 @@@ schindler	Schindle
+  sil	Silicon Image
+  silabs	Silicon Laboratories
+  simtek
++ sii	Seiko Instruments, Inc.
+  sirf	SiRF Technology, Inc.
+  snps 	Synopsys, Inc.
+ +spansion	Spansion Inc.
+  st	STMicroelectronics
+  ste	ST-Ericsson
+  stericsson	ST-Ericsson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/3de9b684/attachment.sig>
