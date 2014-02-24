@@ -1,56 +1,60 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 24 Feb 2014 10:21:04 +0800
-Subject: [PATCH v11 12/15] usb: phy-mxs: Add sync time after controller clear
- phcd
+Date: Mon, 24 Feb 2014 10:21:06 +0800
+Subject: [PATCH v11 14/15] ARM: dts: imx6: add anatop phandle for usbphy
 In-Reply-To: <1393208467-6355-1-git-send-email-peter.chen@freescale.com>
 References: <1393208467-6355-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1393208467-6355-13-git-send-email-peter.chen@freescale.com>
+Message-ID: <1393208467-6355-15-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After clear portsc.phcd, PHY needs 200us stable time for switch
-32K clock to AHB clock.
+Add anatop phandle for usbphy
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/usb/phy/phy-mxs-usb.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi |    2 ++
+ arch/arm/boot/dts/imx6sl.dtsi  |    2 ++
+ 2 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/phy/phy-mxs-usb.c b/drivers/usb/phy/phy-mxs-usb.c
-index 31ef59f..c42bdf0 100644
---- a/drivers/usb/phy/phy-mxs-usb.c
-+++ b/drivers/usb/phy/phy-mxs-usb.c
-@@ -151,6 +151,15 @@ static inline bool is_imx6sl_phy(struct mxs_phy *mxs_phy)
- 	return mxs_phy->data == &imx6sl_phy_data;
- }
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index fb28b2e..047b147 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -557,6 +557,7 @@
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+ 				clocks = <&clks 182>;
++				fsl,anatop = <&anatop>;
+ 			};
  
-+/*
-+ * PHY needs some 32K cycles to switch from 32K clock to
-+ * bus (such as AHB/AXI, etc) clock.
-+ */
-+static void mxs_phy_clock_switch_delay(void)
-+{
-+	usleep_range(300, 400);
-+}
-+
- static int mxs_phy_hw_init(struct mxs_phy *mxs_phy)
- {
- 	int ret;
-@@ -261,6 +270,7 @@ static int mxs_phy_init(struct usb_phy *phy)
- 	int ret;
- 	struct mxs_phy *mxs_phy = to_mxs_phy(phy);
+ 			usbphy2: usbphy at 020ca000 {
+@@ -564,6 +565,7 @@
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+ 				clocks = <&clks 183>;
++				fsl,anatop = <&anatop>;
+ 			};
  
-+	mxs_phy_clock_switch_delay();
- 	ret = clk_prepare_enable(mxs_phy->clk);
- 	if (ret)
- 		return ret;
-@@ -289,6 +299,7 @@ static int mxs_phy_suspend(struct usb_phy *x, int suspend)
- 		       x->io_priv + HW_USBPHY_CTRL_SET);
- 		clk_disable_unprepare(mxs_phy->clk);
- 	} else {
-+		mxs_phy_clock_switch_delay();
- 		ret = clk_prepare_enable(mxs_phy->clk);
- 		if (ret)
- 			return ret;
+ 			snvs at 020cc000 {
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 28558f1..30322b5 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -489,6 +489,7 @@
+ 				reg = <0x020c9000 0x1000>;
+ 				interrupts = <0 44 0x04>;
+ 				clocks = <&clks IMX6SL_CLK_USBPHY1>;
++				fsl,anatop = <&anatop>;
+ 			};
+ 
+ 			usbphy2: usbphy at 020ca000 {
+@@ -496,6 +497,7 @@
+ 				reg = <0x020ca000 0x1000>;
+ 				interrupts = <0 45 0x04>;
+ 				clocks = <&clks IMX6SL_CLK_USBPHY2>;
++				fsl,anatop = <&anatop>;
+ 			};
+ 
+ 			snvs at 020cc000 {
 -- 
 1.7.8
