@@ -1,44 +1,84 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 24 Feb 2014 12:32:35 -0500
-Subject: [PATCH v4 18/22] drivers: Enable building of Kirkwood drivers
- for mach-mvebu
-In-Reply-To: <CAKohpo=V6QfinW83L3ohHCijdaMu7PR4bZs=2hrf2GYDfKn1cA@mail.gmail.com>
-References: <1393096504-11844-1-git-send-email-andrew@lunn.ch>
- <1393096504-11844-19-git-send-email-andrew@lunn.ch>
- <CAKohpo=V6QfinW83L3ohHCijdaMu7PR4bZs=2hrf2GYDfKn1cA@mail.gmail.com>
-Message-ID: <20140224173235.GG14250@titan.lakedaemon.net>
+From: bcm@fixthebug.org (Christian Daudt)
+Date: Mon, 24 Feb 2014 09:32:47 -0800
+Subject: [GIT PULL] bcm pinctrl rename
+In-Reply-To: <20140221222947.GB13233@quad.lixom.net>
+References: <CAEPRUYpCVpV7HwuO6c95ybk3yp1teJgW-9qwyHnjKbs03C9bgQ@mail.gmail.com>
+ <20140221222947.GB13233@quad.lixom.net>
+Message-ID: <CAEPRUYqnGwRCzGPP8ouEguj8gWrJKic7XyNHu+B_aJ=K0=MZYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 11:07:35AM +0530, Viresh Kumar wrote:
-> On 23 February 2014 00:45, Andrew Lunn <andrew@lunn.ch> wrote:
-> > With the move of kirkwood into mach-mvebu, drivers Kconfig need
-> > tweeking to allow the kirkwood specific drivers to be built.
-> >
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > Acked-by: Mark Brown <broonie@linaro.org>
-> > Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Tested-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> > Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> > Cc: Richard Purdie <rpurdie@rpsys.net>
-> > Cc: Bryan Wu <cooloney@gmail.com>
-> > Cc: Zhang Rui <rui.zhang@intel.com>
-> > Cc: Eduardo Valentin <eduardo.valentin@ti.com>
-> > ---
-> > v2
-> > Simplify cpufreq/Kconfig.arm
-> >
-> > Still needs ACKs from cpufreq, led and thermal maintainers.
-> > ---
-> >  drivers/cpufreq/Kconfig.arm | 2 +-
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+On Fri, Feb 21, 2014 at 2:29 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Wed, Feb 12, 2014 at 09:20:13AM -0800, Christian Daudt wrote:
+>> The following changes since commit b28a960c42fcd9cfc987441fa6d1c1a471f0f9ed:
+>>
+>>   Linux 3.14-rc2 (2014-02-09 18:15:47 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/broadcom/bcm11351.git tags/bcm-for-3.14-pinctrl-rename
+>>
+>> for you to fetch changes up to f5310a1712b68c7f83539fce6ebbfb6f0f510f5b:
+>>
+>>   Update dtsi with new pinctrl compatible string (2014-02-12 09:06:53 -0800)
+>>
+>> ----------------------------------------------------------------
+>> Renaming pinctrl code to keep in line with rest of bcm mobile
+>>
+>> Given that this driver has been in the works for a while, it
+>> was written prior to the code standardizing on bcm-based naming.
+>> this patchset brings it in line with the remainder of the code.
+>>
+>> ----------------------------------------------------------------
+>> Sherman Yin (4):
+>>       pinctrl: Rename Broadcom Capri pinctrl binding
+>>       pinctrl: Rename Broadcom Capri pinctrl driver
+>>       Update bcm_defconfig with new pinctrl CONFIG
+>>       Update dtsi with new pinctrl compatible string
+>
+> Hi,
+>
+> (As per irc discussion). The rename isn't the right thing to do at this
+> time in the release, but the binding needs to be tweaked before it ships
+> in a full release, or we'll always need to live with it.
+>
+> So, I'll be happy to take the bindings piece and the dtsi piece (and the
+> small edit to the driver to change the compatible string match table),
+> but the file rename and Kconfig entry edit is 3.15 material.
+>
+> Please send new pull request with just that (or, if you prefer, just send the
+> patches and we can apply them too).
+>
+>
+> -Olof
 
-Added and pushed, thanks Viresh.
+Ok, I have this ready to go, just need an ack for this patch (which
+will replace "pinctrl: Rename Broadcom Capri pinctrl driver"):
+Subject: [PATCH] pinctrl: refer to updated dt binding string.
 
-thx,
+Bring the driver in line with the bcm-based dt name for pinctrl.
+This is being done to keep consistency with other Broadcom mobile
+SoC drivers.
 
-Jason.
+Signed-off-by: Christian Daudt <bcm@fixthebug.org>
+
+diff --git a/drivers/pinctrl/pinctrl-capri.c b/drivers/pinctrl/pinctrl-capri.c
+index 4669c53..eb25002 100644
+--- a/drivers/pinctrl/pinctrl-capri.c
++++ b/drivers/pinctrl/pinctrl-capri.c
+@@ -1435,7 +1435,7 @@ int __init capri_pinctrl_probe(struct
+platform_device *pdev)
+ }
+
+ static struct of_device_id capri_pinctrl_of_match[] = {
+-       { .compatible = "brcm,capri-pinctrl", },
++       { .compatible = "brcm,bcm11351-pinctrl", },
+        { },
+ };
+
+-- 
+1.8.3.2
+
+
+Thanks,
+   csd
