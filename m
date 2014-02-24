@@ -1,45 +1,54 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 24 Feb 2014 18:03:58 +0100
-Subject: [RFC PATCH v3 1/9] staging: imx-drm-core: don't request probe
- deferral in imx_drm_encoder_parse_of
-In-Reply-To: <1393260998.3091.63.camel@pizza.hi.pengutronix.de>
-References: <1392723370-4772-1-git-send-email-p.zabel@pengutronix.de>
- <1392723370-4772-2-git-send-email-p.zabel@pengutronix.de>
- <20140224154919.GL21483@n2100.arm.linux.org.uk>
- <1393260998.3091.63.camel@pizza.hi.pengutronix.de>
-Message-ID: <1393261438.3091.67.camel@pizza.hi.pengutronix.de>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 24 Feb 2014 11:06:18 -0600
+Subject: [GIT PULL] ARM: OMAP2+: clock/PRCM/hwmod fixes for v3.14-rc
+In-Reply-To: <20140221230300.GA5342@atomide.com>
+References: <alpine.DEB.2.02.1402192120200.8777@utopia.booyaka.com>
+ <53052219.9060109@ti.com>
+ <alpine.DEB.2.02.1402200257060.25798@utopia.booyaka.com>
+ <53061D61.6000105@ti.com> <20140221230300.GA5342@atomide.com>
+Message-ID: <530B7C0A.2020002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 24.02.2014, 17:56 +0100 schrieb Philipp Zabel:
-> Am Montag, den 24.02.2014, 15:49 +0000 schrieb Russell King - ARM Linux:
-> > On Tue, Feb 18, 2014 at 12:36:02PM +0100, Philipp Zabel wrote:
-> > > From: Lucas Stach <l.stach@pengutronix.de>
-> > > 
-> > > Since imx_drm_encoder_parse_of is called from the encoder bind callbacks,
-> > > it is too late to request probe deferral. Rather the core should make sure
-> > > that the crtcs are bound before the encoders, after all needed components
-> > > are probed.
-> > 
-> > Why is it too late?  -EPROBE_DEFER from this point will cause the driver
-> > initialisation to correctly unwind and return -EPROBE_DEFER to the
-> > last-to-be-added component.
-> 
-> Hmm, you are right. I have conflated two separate issues here. I'll back
-> that out.
-> 
-> > > This fixes probe failure when using the LDB on i.MX6.
-> > 
-> > More details please.
-> 
-> One issue was that the DT parsing code would try to add the imx-ldb
-> component right after the first crtc, and then its bind would fail
-> in imx_drm_encoder_parse_of because the three remaining crtcs were
-> not yet registered. This is already fixed by adding the crtc
-> components first.
+Tony,
 
-On second thought, now that the crtcs are all bound before the encoders,
-we'll never even reach this point until all crtcs are available.
+On 02/21/2014 05:03 PM, Tony Lindgren wrote:
+> * Nishanth Menon <nm@ti.com> [140220 07:24]:
+>> On 02/19/2014 08:58 PM, Paul Walmsley wrote:
+>>> On Wed, 19 Feb 2014, Nishanth Menon wrote:
+>>>
+>>>> Paul,
+>>>> On 02/19/2014 03:22 PM, Paul Walmsley wrote:
+>>>> [...]
+>>>>>
+>>>>> - ----------------------------------------------------------------
+>>>>> Illia Smyrnov (1):
+>>>>>        ARM: OMAP4: hwmod: Fix SOFTRESET logic for OMAP4
+>>>>>
+>>>>> Suman Anna (1):
+>>>>>        ARM: DRA7: hwmod data: correct the sysc data for spinlock
+>>>>>
+>>>>> Tomi Valkeinen (1):
+>>>>>        ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
+>>>>>
+>>>>> Vaibhav Bedia (1):
+>>>>>        ARM: OMAP5: PRM: Fix reboot handling
+>>>>>
+>>>>
+>>>> https://patchwork.kernel.org/patch/3585321/ missing?
+>>>
+>>> If that fixes a bug, then that should be documented in the commit
+>>> description.
+>>>
+>>> Otherwise it's 3.15 material.
+>> Fair enough, this'd be something that might be called an optimization,
+>> thanks for queueing it.
+>
+
+Can you also pull in the following fix for OMAP4 that is similar to the 
+one that Paul already pulled in for DRA7
+
+https://patchwork.kernel.org/patch/3399021/
 
 regards
-Philipp
+Suman
