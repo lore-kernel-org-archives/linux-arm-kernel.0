@@ -1,28 +1,27 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Feb 2014 09:59:57 +0100
-Subject: [PATCH 1/7] spi: sunxi: Add Allwinner A10 SPI controller driver
-In-Reply-To: <20140223021530.GD25940@sirena.org.uk>
+Date: Mon, 24 Feb 2014 10:04:24 +0100
+Subject: [PATCH 0/7] Add Allwinner A10 SPI Controller Driver
+In-Reply-To: <1393104959-12831-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1393104959-12831-1-git-send-email-maxime.ripard@free-electrons.com>
- <1393104959-12831-2-git-send-email-maxime.ripard@free-electrons.com>
- <20140223021530.GD25940@sirena.org.uk>
-Message-ID: <20140224085957.GB3468@lukather>
+Message-ID: <20140224090424.GC3468@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Feb 23, 2014 at 11:15:30AM +0900, Mark Brown wrote:
-> On Sat, Feb 22, 2014 at 10:35:53PM +0100, Maxime Ripard wrote:
-> > The older Allwinner SoCs (A10, A13, A10s and A20) all have the
-> > same SPI controller.
+On Sat, Feb 22, 2014 at 10:35:52PM +0100, Maxime Ripard wrote:
+> Hi,
 > 
-> Applied, thanks.  Please differentiate between these two devices in
-> the subject line when sending patches for example by using "sun6i"
-> and "sun4i".
+> This patchset brings support for the SPI controller found in the
+> Allwinner A10 and derived SoCs.
+> 
+> Even though the controller supports DMA, the driver only supports PIO
+> mode for now. This driver will be used to bring up and test DMA on the
+> SoC, so support for the DMA will come eventually.
+> 
+> It doesn't support transfer larger than the FIFO size (64 bytes) for
+> now, It's one of the things that will be fixed whenever we will have
+> DMA support.
 
-Ok, will do.
-Thanks!
-Maxime
+Applied patches 2-7 to sunxi/dt-for-3.15
 
 -- 
 Maxime Ripard, Free Electrons
@@ -34,4 +33,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/08c9267d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/e722acc5/attachment.sig>
