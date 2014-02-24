@@ -1,79 +1,53 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 24 Feb 2014 14:51:50 +0100
-Subject: [PATCH v3 2/2] ARM i.MX6q: Mark VPU and IPU AXI transfers as
- cacheable, increase IPU priority
-In-Reply-To: <1393249910-11723-1-git-send-email-p.zabel@pengutronix.de>
-References: <1393249910-11723-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1393249910-11723-2-git-send-email-p.zabel@pengutronix.de>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Mon, 24 Feb 2014 13:52:49 +0000
+Subject: [PATCH] asm-generic: add sched_setattr/sched_getattr syscalls
+In-Reply-To: <20140217184435.GD8361@arm.com>
+References: <1391441617-21518-1-git-send-email-james.hogan@imgtec.com>
+ <20140217184435.GD8361@arm.com>
+Message-ID: <530B4EB1.9000907@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is needed so that the IPU framebuffer scanout cannot be
-starved by VPU or GPU activity.
-Some boards like the SabreLite and SabreSD seem to set this in
-the DCD already, but the documented register reset values do not
-contain the necessary settings.
+On 17/02/14 18:44, Catalin Marinas wrote:
+> On Mon, Feb 03, 2014 at 03:33:37PM +0000, James Hogan wrote:
+>> Add the sched_setattr and sched_getattr syscalls to the generic syscall
+>> list, which is used by the following architectures: arc, arm64, c6x,
+>> hexagon, metag, openrisc, score, tile, unicore32.
+>>
+>> Signed-off-by: James Hogan <james.hogan@imgtec.com>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: linux-arch at vger.kernel.org
+>> Cc: Vineet Gupta <vgupta@synopsys.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: Mark Salter <msalter@redhat.com>
+>> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
+>> Cc: linux-c6x-dev at linux-c6x.org
+>> Cc: Richard Kuo <rkuo@codeaurora.org>
+>> Cc: linux-hexagon at vger.kernel.org
+>> Cc: linux-metag at vger.kernel.org
+>> Cc: Jonas Bonn <jonas@southpole.se>
+>> Cc: linux at lists.openrisc.net
+>> Cc: Chen Liqin <liqin.linux@gmail.com>
+>> Cc: Lennox Wu <lennox.wu@gmail.com>
+>> Cc: Chris Metcalf <cmetcalf@tilera.com>
+>> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+> 
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
-Changes since v1:
- - Limited to 80 char lines
- - Rebased onto Shawn's for-next
----
- arch/arm/mach-imx/mach-imx6q.c | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+Thanks,
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 1e12685..e60456d 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -228,6 +228,39 @@ put_node:
- 	of_node_put(np);
- }
- 
-+static void __init imx6q_axi_init(void)
-+{
-+	struct regmap *gpr;
-+	unsigned int mask;
-+
-+	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
-+	if (!IS_ERR(gpr)) {
-+		/*
-+		 * Enable the cacheable attribute of VPU and IPU
-+		 * AXI transactions.
-+		 */
-+		mask = IMX6Q_GPR4_VPU_WR_CACHE_SEL |
-+			IMX6Q_GPR4_VPU_RD_CACHE_SEL |
-+			IMX6Q_GPR4_VPU_P_WR_CACHE_VAL |
-+			IMX6Q_GPR4_VPU_P_RD_CACHE_VAL_MASK |
-+			IMX6Q_GPR4_IPU_WR_CACHE_CTL |
-+			IMX6Q_GPR4_IPU_RD_CACHE_CTL;
-+		regmap_update_bits(gpr, IOMUXC_GPR4, mask, mask);
-+
-+		/* Increase IPU read QoS priority */
-+		regmap_update_bits(gpr, IOMUXC_GPR6,
-+				IMX6Q_GPR6_IPU1_ID00_RD_QOS_MASK |
-+				IMX6Q_GPR6_IPU1_ID01_RD_QOS_MASK,
-+				(0xf << 16) | (0x7 << 20));
-+		regmap_update_bits(gpr, IOMUXC_GPR7,
-+				IMX6Q_GPR7_IPU2_ID00_RD_QOS_MASK |
-+				IMX6Q_GPR7_IPU2_ID01_RD_QOS_MASK,
-+				(0xf << 16) | (0x7 << 20));
-+	} else {
-+		pr_warn("failed to find fsl,imx6q-iomuxc-gpr regmap\n");
-+	}
-+}
-+
- static void __init imx6q_init_machine(void)
- {
- 	struct device *parent;
-@@ -248,6 +281,7 @@ static void __init imx6q_init_machine(void)
- 	imx_anatop_init();
- 	cpu_is_imx6q() ?  imx6q_pm_init() : imx6dl_pm_init();
- 	imx6q_1588_init();
-+	imx6q_axi_init();
- }
- 
- #define OCOTP_CFG3			0x440
--- 
-1.8.5.3
+FYI I've applied to my fixes branch which is included in linux-next,
+I'll send Linus the pull request in a few days.
+
+Cheers
+James
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/0939184a/attachment.sig>
