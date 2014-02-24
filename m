@@ -1,38 +1,56 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Mon, 24 Feb 2014 07:16:36 -0800
-Subject: [PATCH 2/2] arm/xen: Don't use xen DMA ops when the device is
- protected by an IOMMU
-In-Reply-To: <alpine.DEB.2.02.1402241214570.4471@kaball.uk.xensource.com>
-References: <1392913301-25524-1-git-send-email-julien.grall@linaro.org>
- <1392914159.32657.18.camel@kazak.uk.xensource.com>
- <alpine.DEB.2.02.1402241214570.4471@kaball.uk.xensource.com>
-Message-ID: <20140224151636.GA13489@kroah.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 24 Feb 2014 16:16:22 +0100
+Subject: [PATCH v2 0/6] ARM: STi reset controller support
+In-Reply-To: <530B514A.4070209@st.com>
+References: <1389696613-19683-1-git-send-email-srinivas.kandagatla@st.com>
+ <1391437665-11913-1-git-send-email-srinivas.kandagatla@st.com>
+ <1391592486.11239.4.camel@pizza.hi.pengutronix.de>
+ <52F4D76F.8070301@st.com> <5304B849.2080806@st.com>
+ <1393237988.3091.14.camel@pizza.hi.pengutronix.de>
+ <530B514A.4070209@st.com>
+Message-ID: <1393254982.3091.44.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 12:19:11PM +0000, Stefano Stabellini wrote:
-> CC'ing Greg.
-> 
-> On Thu, 20 Feb 2014, Ian Campbell wrote:
-> > On Thu, 2014-02-20 at 16:21 +0000, Julien Grall wrote:
-> > > Only Xen is able to know if a device can safely avoid to use xen-swiotlb.
-> > > This patch introduce a new property "protected-devices" for the hypervisor
-> > > node which list device which the IOMMU are been correctly programmed by Xen.
-> > > 
-> > > During Linux boot, Xen specific code will create an hash table which
-> > > contains all these devices. The hash table will be used in need_xen_dma_ops
-> > > to check if the Xen DMA ops needs to be used for the current device.
-> > 
-> > Is it out of the question to find a field within struct device itself to
-> > store this e.g. in struct device_dma_parameters perhaps and avoid the
-> > need for a hashtable lookup.
-> > 
-> > device->iommu_group might be another option, if we can create our own
-> > group?
-> 
-> I agree that a field in struct device would be ideal.
-> Greg, get_maintainer.pl points at you as main maintainer of device.h, do
-> you have an opinion on this?
+Hi Srinivas,
 
-I need a whole lot more context here please.  With a patch would be even
-better so that I know exactly what you are referring to...
+Am Montag, den 24.02.2014, 14:03 +0000 schrieb srinivas kandagatla:
+> Thanks Philipp for your comments,
+> 
+> On 24/02/14 10:33, Philipp Zabel wrote:
+> >> > Did Srini's explanations convinced you?
+> >> > 
+> >> > If so, could you queue the series for v3.15?
+> > to be honest, I'm not comfortable with this explanation. If the
+> > "powerdown" bits only gate the clocks to those modules, calling it a
+> > reset control is clearly the wrong abstraction. If that is the case,
+> > couldn't you handle those bits via the clock framework?
+> I just had a re-look at the IPs specs for more information on where
+> these power-down signals are actually terminating on the IP side.
+> 
+> For example: ST-Synopsis Ethernet GMAC IP has two pins
+> power_down_req[IN] and power_down_ack[OUT]. power_down_req is used by
+> the software to either put the IP in powerdown or bring it out of
+> powerdown state.
+
+Now I'm a bit confused. There is no mention of GMAC in your patches,
+and for ETH[01] they contain only the SOFTRESET bits. I have no issue
+with the SOFTRESETs.
+
+> The IP itself drives power_down_ack to indicate when the power down
+> request is successfully finished. For power_down/power_up request the IP
+> will change the internal state accordingly including powering up/down
+> its internal blocks and/or clock gating.
+> 
+> > If on the other hand these powerdown bits also trigger reset machinery,
+> > such that asserting and deasserting that bit will change the module's
+> > internal state, I could be convinced to queue them like this.
+> This is true with ST IPs, these lines change the state of the IP as
+> described above. Reset framework seems to fits in very well with this
+> behavior rather than power-domains or clock framework.
+
+If you put the IP in power down when it is idle, and then power it up
+again, will the IP registers have kept their previous state?
+
+regards
+Philipp
