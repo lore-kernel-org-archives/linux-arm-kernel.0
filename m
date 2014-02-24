@@ -1,127 +1,81 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 24 Feb 2014 10:06:43 +0100
-Subject: [GIT PULL] clk: mvebu: fixes for v3.14
-In-Reply-To: <20140223230406.22529.52931@quantum>
-References: <20140208173154.GL8533@titan.lakedaemon.net>
- <20140219054245.8345.72570@quantum> <53048565.4080105@free-electrons.com>
- <20140223230406.22529.52931@quantum>
-Message-ID: <530B0BA3.4060204@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 24 Feb 2014 10:07:17 +0100
+Subject: [PATCH 04/11] ARM: shmobile: lager legacy: Add MSIOF support
+In-Reply-To: <CANqRtoQ9ZuAhqmaKU5NLsJBNc0iN7uNdQMS6uCrp0enkFUzrqQ@mail.gmail.com>
+References: <1392907779-22053-1-git-send-email-geert@linux-m68k.org>
+ <1392907779-22053-5-git-send-email-geert@linux-m68k.org>
+ <CANqRtoQQ9cn55Ct7pva2Bo7461WbZG0=Y5f9zLwfKhyU2=QFZw@mail.gmail.com>
+ <CAMuHMdWMJFpV_uvi4mNZYc9R8qVWqQf3QGRhdPyc+hj=6XMoJw@mail.gmail.com>
+ <CANqRtoRLcac3x55N+VHK+n6RvcgT0v9==9mt1rhVda-zwCYTCg@mail.gmail.com>
+ <CAMuHMdWDtDqmarg-p+LFv4ZtzF7Rv=KzLQA3rnSa_dS2PkVmfA@mail.gmail.com>
+ <CANqRtoQ9ZuAhqmaKU5NLsJBNc0iN7uNdQMS6uCrp0enkFUzrqQ@mail.gmail.com>
+Message-ID: <CAMuHMdXZx+J8=MDni+QzqiXCO61ThBQAdCxETm9p74nkc0f+hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/2014 00:04, Mike Turquette wrote:
-> Quoting Gregory CLEMENT (2014-02-19 02:20:21)
->> On 19/02/2014 06:42, Mike Turquette wrote:
->>> Quoting Jason Cooper (2014-02-08 09:31:54)
->>>> Mike,
->>>>
->>>> Here's a round of fixes I've had in -next for several days.  It's not
->>>> the ideal solution, but a short term one while we hash out a proper
->>>> solution for v3.15+.
->>>
->>> Taken into clk-fixes.
+Hi Magnus,
+
+On Mon, Feb 24, 2014 at 9:44 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>>> Another question: How about "bus_num" and the platform device id
+>>> mapping? I'd like them to be the same if possible, but you are having
+>>> this "(idx+1)" bit in your code which I assume is to add offset for
+>>> the QSPI bus.
 >>
->> Hi Mike,
+>> "bus_num" is the SPI-specific numbering of SPI masters, which is filled
+>> in by spi-sh-msiof.c based on platform_device.id (i.e. the numeric suffix
+>> of e.g. "spi_r8a7790_msiof.1").
+>> It's used for matching SPI slaves in spi_board_info with SPI masters.
+>> As QSPI ("qspi.0") has SPI bus_num 0, the MSIOF SPI masters use
+>> bus_num 1 to 4, hence the "idx+1", and the platform device names
+>> "spi_r8a7790_msiof.1" to "spi_r8a7790_msiof.4".
 >>
->> we will have the same kind of issue with Armada 375 and Armada38x.
->> Are you going to take the patch "clk: respect the clock dependencies
->> in of_clk_init"
->> See the V2 here http://www.spinics.net/lists/arm-kernel/msg306442.html
->>
->> My intent is not to put a pressure on you to take this patch, but as
->> I explained Armada 375 and Armada38x will be in the same situation of
->> the other mvebu were. The patch I mentioned is a solution to fix it
->> and if it won't be merged, than we need an other solution. This alternate
->> solution is easy to find, it will be the same as this patch set.
-> 
-Hi Mike,
+>> (Can't spi-sh-msiof.c use "bus_num = pdev->id + 1", so we can have
+>>  MSIOF0 as "spi_r8a7790_msiof.0"? No, as that would impact numbering
+>>  on all SoCs with MSIOF.)
+>
+> Yeah, the bus number that is commonly used for SPI and I2C behaves
+> like that so I agree with what you're saying. I guess historically we
+> usually only have one I2C master and one SPI master which makes it
+> easy to use direct mapping between bus num and pdev->id.
+>
+> Now on Lager we have multiple SPI masters (both QSPI and MSIOF unless
+> I'm mistaken), so the question is how to allocate the ranges of
+> bus_num for each SPI master. I believe your current allocation works
+> well but I'm a bit confused by it I must confess.
+>
+> I'm used to one of the two schemes:
+> 1) single master with pdev->id equals bus_num
+> 2) compact board specific bus allocation
+>
+> I believe you introduce something similar to 1) but for two SPI
+> masters which is totally fine! For some unknown reason I expected 2)
+> with bus_num 0 for QSPI and bus_num 1 for MSIOF1, but I think your
+> allocation scheme is reusable across multiple boards with the same SoC
+> so I think your current code is better when I think about it a bit
+> more.
 
+On our specific boards, we now have a sparse SPI bus numbering,
+but that's just because some MSIOF channels are not used. On other
+boards with the same SoC that may be different.
 
+> Right. I was just confused seeing the pdev->id set to 2 on MSIOF1, but
+> I now understand that it is your intentional design to have bus_num 0
+> as QSPI, bus_num1 as unused MSIOF0 and bus_num 2 as MSIOF1.
 
-> Hi Gregory,
-> 
-> The clock dependencies patch is not without controversy. I've looked
+Actually that's too much credit for me: the bus numbering came from the
+BSP through Yoshii-san.
 
-I know, that's why I waited for your opinion.
+> It just takes some time for me to grasp. =)
 
-> through V2 and it looks OK, but I need to think on it a bit more. I'll
-> make a call later this week, so you'll know what to do for Armada.
-> 
-> Either way I won't take that patch in as a fix for the current -rc's. It
-> will land in 3.15.
+Yes, we're too used to having one single type of each hardware type :-)
 
-Yes of course, for 3.14 Sebastian's patch set fixes the issue we had. The
-clocks driver for Armada 375 and Armada 38x, which will have this issue,
-are planed to be merged in 3.15 so it will be ok.
+Gr{oetje,eeting}s,
 
-Thanks,
+                        Geert
 
-Gregory
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-
-> 
-> Regards,
-> Mike
-> 
->>
->>
->> Thanks,
->>
->> Gregory
->>
->>
->>
->>>
->>> Thanks!
->>> Mike
->>>
->>>>
->>>> thx,
->>>>
->>>> Jason.
->>>>
->>>> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
->>>>
->>>>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   git://git.infradead.org/linux-mvebu.git tags/mvebu-clk-fixes-3.14
->>>>
->>>> for you to fetch changes up to 58d516ae95cbf7eed44f85a01cdfad41f17b4197:
->>>>
->>>>   clk: mvebu: kirkwood: maintain clock init order (2014-02-06 18:07:01 +0000)
->>>>
->>>> ----------------------------------------------------------------
->>>> mvebu clock fixes for v3.14
->>>>
->>>>  - kirkwood, dove, armada-xp, armada-370
->>>>     - force clock init order broken by sorting DT ocp nodes by address
->>>>     - fixes boot failures on affected platforms
->>>>
->>>> ----------------------------------------------------------------
->>>> Sebastian Hesselbarth (4):
->>>>       clk: mvebu: armada-370: maintain clock init order
->>>>       clk: mvebu: armada-xp: maintain clock init order
->>>>       clk: mvebu: dove: maintain clock init order
->>>>       clk: mvebu: kirkwood: maintain clock init order
->>>>
->>>>  drivers/clk/mvebu/armada-370.c | 21 ++++++++++-----------
->>>>  drivers/clk/mvebu/armada-xp.c  | 20 +++++++++-----------
->>>>  drivers/clk/mvebu/dove.c       | 19 +++++++++----------
->>>>  drivers/clk/mvebu/kirkwood.c   | 34 ++++++++++++++++------------------
->>>>  4 files changed, 44 insertions(+), 50 deletions(-)
->>
->>
->> -- 
->> Gregory Clement, Free Electrons
->> Kernel, drivers, real-time and embedded Linux
->> development, consulting, training and support.
->> http://free-electrons.com
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
