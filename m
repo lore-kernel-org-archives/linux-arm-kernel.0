@@ -1,85 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Feb 2014 14:19:30 +0100
-Subject: [PATCH v8 1/6] dt-bindings: sram: describe option to reserve
- parts of the memory
-In-Reply-To: <126672712.tufE5adZWC@phil>
-References: <21117503.1c6iOkvYSr@phil> <126672712.tufE5adZWC@phil>
-Message-ID: <201402251419.31151.arnd@arndb.de>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 25 Feb 2014 16:14:12 +0200
+Subject: [PATCH 4/4] ARM: keystone: Use dma-ranges for dma_pfn_offset
+ configuration
+In-Reply-To: <530BBBB8.3020607@ti.com>
+References: <1393275235-1087-1-git-send-email-santosh.shilimkar@ti.com>
+ <1393275235-1087-5-git-send-email-santosh.shilimkar@ti.com>
+ <5593544.ET3nngKczF@wuerfel> <530BBBB8.3020607@ti.com>
+Message-ID: <530CA534.9080001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 February 2014, Heiko St?bner wrote:
-> Some SoCs need parts of their sram for special purposes. So while being part
-> of the peripheral, it should not be part of the genpool controlling the sram.
+Hi Arnd,
+
+On 02/24/2014 11:38 PM, Santosh Shilimkar wrote:
+> On Monday 24 February 2014 04:11 PM, Arnd Bergmann wrote:
+>> On Monday 24 February 2014 15:53:55 Santosh Shilimkar wrote:
+>>> From: Grygorii Strashko <grygorii.strashko@ti.com>
+>>>   }
+>>>   
+>>> +static unsigned long get_dma_pfn_offset(struct device *dev)
+>>> +{
+>>> +	struct device_node *node = of_node_get(dev->of_node);
+>>> +	const u32 *ranges = NULL;
+>>> +	int len, naddr, nsize, pna;
+>>> +	dma_addr_t dma_addr;
+>>> +	phys_addr_t cpu_addr, size;
+>>> +	unsigned long dma_pfn_offset = 0;
+>>> +
+>>> +	if (!node)
+>>> +		return 0;
+>>
+>> Hmm, isn't this function the same as of_translate_dma_address()?
+>>
+>> I think we should have the implementation in common code, not hidden
+>> in the keystone platform, to avoid duplication. If of_translate_dma_address
+>> doesn't work, what is the problem, and can you fix it there?
+>>
+> Will have a look at it and get back. At least it makes sense to
+> use/update the common function.
+
+This function isn't the same as of_translate_dma_address(), more over
+it calls of_translate_dma_address() to get CPU address.
+
+To calculate DMA bus offset we need to know the first DMA address explicitly,
+so then we can translate it to the corresponding CPU address.
+
+get_dma_pfn_offset() function does:
+- traverse DT and look for the first "dma-ranges" prop;
+- reads the first DMA address of the range;
+- translates it in CPU address using of_translate_dma_address();
+- calculates DMA bus offset as PFN_DOWN(cpu_addr - dma_addr);
+
+Also, I've investigated all places in Kernel were "dma-ranges" is used:
+- cell_iommu_get_fixed_address() - arch/powerpc/platforms/cell/iommu.c
+- ppc4xx_parse_dma_ranges() - arch/powerpc/sysdev/ppc4xx_pci.c
+
+As result, I see no reasons to modify of_translate_dma_address()
+(which actually is just wrapper for common __of_translate_address()).
+
+Of course, possibly I've not fully got your point. :)
+
 > 
-> Therefore add the option to define reserved regions as subnodes of the
-> sram-node similar to defining reserved global memory regions.
-
-[adding Sachin Kamat to Cc, he just had the same issue]
-
-> Originally
-> Suggested-by: Rob Herring <robherring2@gmail.com>
+>>>   static int keystone_platform_notifier(struct notifier_block *nb,
+>>>   				      unsigned long event, void *dev)
+>>>   {
+>>> +	struct device *_dev = dev;
+>>> +
+>>>   	if (event != BUS_NOTIFY_ADD_DEVICE)
+>>>   		return NOTIFY_DONE;
+>>
+>> Style: it would be nicer to name the local variable 'dev' and the
+>> argument something else like 'p' or 'data'.
+>>
+> Agree. Will update that.
+>   
+>> I also wonder if this shouldn't be in ARM architecture wide code
+>> rather than platform code. Unfortunately it can't be in drivers/base
+>> since the offset is stored in an ARM specific location.
+>>
+> Notifier callback is in mach code mainly because platform's might have to
+> do custom things here. Like setting up the coherent masters,
+> populating the dma_pfn_offset or populating custom dma_ops etc.
+> As such the in these callbacks is not much and I see only
+> couple of machines using it.
 > 
-> Using subnodes for reserved regions
-> Suggested-by: Grant Likely <grant.likely@linaro.org>
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
-> ---
->  Documentation/devicetree/bindings/misc/sram.txt | 33 +++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
-> index 4d0a00e..2d83758 100644
-> --- a/Documentation/devicetree/bindings/misc/sram.txt
-> +++ b/Documentation/devicetree/bindings/misc/sram.txt
-> @@ -8,9 +8,42 @@ Required properties:
->  
->  - reg : SRAM iomem address range
->  
-> +Reserving sram areas:
-> +---------------------
-> +
-> +Each child of the sram node specifies a region of reserved memory. Each
-> +child node should use a 'reg' property to specify a specific range of
-> +reserved memory.
-> +
-> +Following the generic-names recommended practice, node names should
-> +reflect the purpose of the node. Unit address (@<address>) should be
-> +appended to the name.
-> +
-> +Required properties in the sram node:
-> +
-> +- #address-cells, #size-cells : should use the same values as the root node
-> +- ranges : standard definition, should be empty
 
-I think we should rather define the 'ranges' property to translate from
-addresses within the sram to bus addresses.
+Thanks for your comments.
 
-> +Required properties in the area nodes:
-> +
-> +- reg : iomem address range
-> +
-> +Optional properties in the area nodes:
-> +
-> +- compatible : standard definition
-> +
-
-Is this enough? Normally we should define a list of "compatible" strings
-that people can add to, but not have an anything-allowed option.
-
->  Example:
->  
->  sram: sram at 5c000000 {
->  	compatible = "mmio-sram";
->  	reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
-> +
-> +	#adress-cells = <1>;
-> +	#size-cells = <1>;
-> +	ranges;
-> +
-> +	smp-sram at 5c000100 {
-> +		compatible = "socvendor,smp-sram";
-> +		reg = <0x5c000100 0x50>;
-> +	};
->  };
+Regards,
+-grygorii
+ 
