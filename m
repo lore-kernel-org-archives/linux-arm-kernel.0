@@ -1,119 +1,51 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 25 Feb 2014 11:37:20 +0100
-Subject: [PATCH v3 2/3] ARM: shmobile: r8a7778/r8a7779 dtsi: Improve and
- correct HSPI nodes
-Message-ID: <1393324641-3690-1-git-send-email-geert@linux-m68k.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 25 Feb 2014 11:44:44 +0100
+Subject: [BISECTED] ssh - Received disconnect from x.x.x.x: 2: Bad
+ packet length 3149594624
+In-Reply-To: <530A46BF.4000107@gmail.com>
+References: <52FD08D1.3030405@gmail.com>
+ <20140213182105.GN13576@mudshark.cambridge.arm.com>
+ <52FD1243.9040706@gmail.com>
+ <20140213192909.GO13576@mudshark.cambridge.arm.com>
+ <52FE407C.3080002@gmail.com>
+ <20140214162458.GF21986@mudshark.cambridge.arm.com>
+ <52FE4E3F.6020407@gmail.com> <530A46BF.4000107@gmail.com>
+Message-ID: <20140225104444.GA5563@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+Hi!
 
-  - Add "renesas,hspi-r8a7778" resp. "renesas,hspi-r8a7779" compatible
-    values,
-  - Correct reference to parent interrupt controller
-    (use "interrupt-parent" instead of "interrupt-controller"),
-  - Add missing "#address-cells" and "#size-cells" properties, which are
-    needed when populating the SPI buses.
+> >>You could try putting back the UNALIGNED_ACCESS in net/mac80211/rx.c and
+> >>commenting out the skb->len = desc->length  - PLCP_HEADER_LENGTH;  line
+> >>above.
+> >
+> >This seems to fix the issue too, but I am afraid there is more to be
+> >done, as I see
+> >
+> >Feb 14 18:33:46 Nokia-N900 kernel: [   88.599853] wlan0: authenticate
+> >with 00:23:cd:17:86:d0
+> >Feb 14 18:33:46 Nokia-N900 kernel: [   88.781860] wlan0: send auth to
+> >00:23:cd:17:86:d0 (try 1/3)
+> >Feb 14 18:33:46 Nokia-N900 kernel: [   88.799804] wlan0: authenticated
+> >Feb 14 18:33:46 Nokia-N900 kernel: [   88.806243] wlan0: associating
+> >with AP with corrupt probe response
+> >Feb 14 18:33:46 Nokia-N900 kernel: [   88.814544] wlan0: associate with
+> >00:23:cd:17:86:d0 (try 1/3)
+> >Feb 14 18:33:46 Nokia-N900 kernel: [   88.826416] wlan0: RX AssocResp
+> >from 00:23:cd:17:86:d0 (capab=0x431 status=0 aid=2)
+> >
+> >spit in dmesg log. AFAIR this is the first time I see "associating with
+> >AP with corrupt probe response" in dmesg, no matter of the kernel
+> >version. Despite of that error message, wlan seems to work as it should,
+> >so far. I guess we need the driver's author saying on the issue.
+> 
+> ping?
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
-Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com> [HSPI/BockW]
----
-v3:
-  - Split in two patches: bindings and dtsi updates
-v2:
-  - Add Tested-by
-  - List full example compatible properties with soctypes instead of just
-    the soctypes, so checkpatch can validate DTSes.
-
- arch/arm/boot/dts/r8a7778.dtsi |   18 ++++++++++++------
- arch/arm/boot/dts/r8a7779.dtsi |   18 ++++++++++++------
- 2 files changed, 24 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
-index 85c5b3b99f5e..3c6fab5c9702 100644
---- a/arch/arm/boot/dts/r8a7778.dtsi
-+++ b/arch/arm/boot/dts/r8a7778.dtsi
-@@ -204,26 +204,32 @@
- 	};
- 
- 	hspi0: spi at fffc7000 {
--		compatible = "renesas,hspi";
-+		compatible = "renesas,hspi-r8a7778", "renesas,hspi";
- 		reg = <0xfffc7000 0x18>;
--		interrupt-controller = <&gic>;
-+		interrupt-parent = <&gic>;
- 		interrupts = <0 63 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 		status = "disabled";
- 	};
- 
- 	hspi1: spi at fffc8000 {
--		compatible = "renesas,hspi";
-+		compatible = "renesas,hspi-r8a7778", "renesas,hspi";
- 		reg = <0xfffc8000 0x18>;
--		interrupt-controller = <&gic>;
-+		interrupt-parent = <&gic>;
- 		interrupts = <0 84 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 		status = "disabled";
- 	};
- 
- 	hspi2: spi at fffc6000 {
--		compatible = "renesas,hspi";
-+		compatible = "renesas,hspi-r8a7778", "renesas,hspi";
- 		reg = <0xfffc6000 0x18>;
--		interrupt-controller = <&gic>;
-+		interrupt-parent = <&gic>;
- 		interrupts = <0 85 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 		status = "disabled";
- 	};
- };
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index d0561d4c7c46..8b1a336ee401 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -256,26 +256,32 @@
- 	};
- 
- 	hspi0: spi at fffc7000 {
--		compatible = "renesas,hspi";
-+		compatible = "renesas,hspi-r8a7779", "renesas,hspi";
- 		reg = <0xfffc7000 0x18>;
--		interrupt-controller = <&gic>;
-+		interrupt-parent = <&gic>;
- 		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 		status = "disabled";
- 	};
- 
- 	hspi1: spi at fffc8000 {
--		compatible = "renesas,hspi";
-+		compatible = "renesas,hspi-r8a7779", "renesas,hspi";
- 		reg = <0xfffc8000 0x18>;
--		interrupt-controller = <&gic>;
-+		interrupt-parent = <&gic>;
- 		interrupts = <0 74 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 		status = "disabled";
- 	};
- 
- 	hspi2: spi at fffc6000 {
--		compatible = "renesas,hspi";
-+		compatible = "renesas,hspi-r8a7779", "renesas,hspi";
- 		reg = <0xfffc6000 0x18>;
--		interrupt-controller = <&gic>;
-+		interrupt-parent = <&gic>;
- 		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 		status = "disabled";
- 	};
- };
+If Will does not respond, we should simply revert
+dce5c9e35bc4085bd33eccdb8c9ec5a643507a14 . Regressions are not
+acceptable.
+									Pavel
 -- 
-1.7.9.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
