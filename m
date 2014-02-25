@@ -1,47 +1,55 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 24 Feb 2014 17:03:47 -0800
-Subject: [PATCH v2] clk: respect the clock dependencies in of_clk_init
-In-Reply-To: <530B8627.4020705@free-electrons.com>
-References: <1392054179-28830-1-git-send-email-gregory.clement@free-electrons.com>
- <530A420B.5050207@gmail.com> <530B8627.4020705@free-electrons.com>
-Message-ID: <20140225010347.22529.41519@quantum>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 25 Feb 2014 10:34:24 +0900
+Subject: [PATCH v3 0/2] regulator: core: Fix ops->enable/disable usage
+In-Reply-To: <20140224205058.GA18317@pengutronix.de>
+References: <1392914164-28596-1-git-send-email-mpa@pengutronix.de>
+ <20140223051209.GK25940@sirena.org.uk>
+ <CAOMZO5BPvCcx_f09Khuw8MVxrR18fnv9e1xeuJ0c_8G22AR53g@mail.gmail.com>
+ <20140224205058.GA18317@pengutronix.de>
+Message-ID: <20140225013424.GL25940@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2014-02-24 09:49:27)
-> On 23/02/2014 19:46, Tomasz Figa wrote:
-> > On 10.02.2014 18:42, Gregory CLEMENT wrote:
-> >> +
-> >> +    for (i = 0; i < num_parents; i++) {
-> >> +            if (of_parse_phandle_with_args(np, "clocks", "#clock-cells", i,
-> >> +                                           &clkspec))
-> >> +                    return 1;
-> >> +
-> >> +            /* Check if we have such a provider in our array */
-> >> +            found = false;
-> >> +            list_for_each_entry(provider, &of_clk_providers, link) {
-> >> +                    if (provider->node == clkspec.np) {
-> >> +                            found = true;
-> >> +                            break;
-> >> +                    }
-> >> +            }
-> >> +
-> >> +            if (!found)
-> >> +                    return 0;
-> >> +    }
-> > 
-> > ...or even better, __of_clk_get_from_provider() could modified to return
-> > -EPROBE_DEFER if requested provider is not registered and you could 
-> 
-> There is already a patch sent for this "clk: return probe defer when DT clock
-> not yet ready": http://article.gmane.org/gmane.linux.kernel/1643466
-> 
-> Mike will you take it?
-> 
-> Then I can use it to implement the suggestion made by Tomasz.
+On Mon, Feb 24, 2014 at 09:50:58PM +0100, Markus Pargmann wrote:
 
-I have just merged it to clk-next. I'll push out an updated clk-next
-branch later tonight.
+> The only situation where this returns -EINVAL is a dummy regulator that
+> is not always_on. As it doesn't make sense to have a dummy regulator
+> that is not always_on, I will add a check for exactly this situation to
+> the regulator_register function and drop the "return -EINVAL" above.
 
-Regards,
-Mike
+I've squashed the following fix in today:
+
+>From 937635aa9c667b90b76505de91c5693da6a5c120 Mon Sep 17 00:00:00 2001
+From: Mark Brown <broonie@linaro.org>
+Date: Tue, 25 Feb 2014 10:24:55 +0900
+Subject: [PATCH] regulator: Handle invalid enable operation for always/boot on
+ regulators
+
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ drivers/regulator/core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 8cbc7d7..9a09f3c 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -1017,7 +1017,7 @@ static int set_machine_constraints(struct regulator_dev *rdev,
+ 	 */
+ 	if (rdev->constraints->always_on || rdev->constraints->boot_on) {
+ 		ret = _regulator_do_enable(rdev);
+-		if (ret < 0) {
++		if (ret < 0 && ret != -EINVAL) {
+ 			rdev_err(rdev, "failed to enable\n");
+ 			goto out;
+ 		}
+-- 
+1.9.0.rc3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140225/08164a1a/attachment.sig>
