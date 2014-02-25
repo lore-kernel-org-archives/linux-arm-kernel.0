@@ -1,54 +1,53 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 25 Feb 2014 12:09:48 -0300
-Subject: [PATCH] watchdog: orion_wdt: Use %pa to print 'phys_addr_t'
-In-Reply-To: <20140224203352.GA21204@spo001.leaseweb.com>
-References: <1392726234-16977-1-git-send-email-fabio.estevam@freescale.com>
- <20140224203352.GA21204@spo001.leaseweb.com>
-Message-ID: <20140225150947.GA22740@localhost>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 25 Feb 2014 18:05:56 +0200
+Subject: [PATCH 4/4] ARM: keystone: Use dma-ranges for dma_pfn_offset
+ configuration
+In-Reply-To: <5443441.XzmmNp2M6v@wuerfel>
+References: <1393275235-1087-1-git-send-email-santosh.shilimkar@ti.com>
+ <201402251437.06400.arnd@arndb.de> <530CB49F.9060505@ti.com>
+ <5443441.XzmmNp2M6v@wuerfel>
+Message-ID: <530CBF64.3080407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+On 02/25/2014 04:37 PM, Arnd Bergmann wrote:
+> On Tuesday 25 February 2014 17:19:59 Grygorii Strashko wrote:
+>> The Keystone can work in two modes:
+>> - LPAE disabled: In this case Platform bus notifier will not be called at all
+>> and DMA range == MEM range (32 bits mode)
+>
+> The hardware setting doesn't change here, just the available memory, right?
 
-On Mon, Feb 24, 2014 at 09:33:52PM +0100, Wim Van Sebroeck wrote:
-> > When building an ARM multi_v7_defconfig with LPAE option selected we get the
-> > following build warning:
-> > 
-> > drivers/watchdog/orion_wdt.c:272:2: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'phys_addr_t' [-Wformat=]
-> > 
-> > Fix it by using %pa to print 'phys_addr_t'.
-> > 
-> > Reported-by: Olof's autobuilder <build@lixom.net>
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> >  drivers/watchdog/orion_wdt.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-> > index 15321aa..6f9b4c6 100644
-> > --- a/drivers/watchdog/orion_wdt.c
-> > +++ b/drivers/watchdog/orion_wdt.c
-> > @@ -269,7 +269,7 @@ static void __iomem *orion_wdt_ioremap_rstout(struct platform_device *pdev,
-> >  
-> >  	rstout = internal_regs + ORION_RSTOUT_MASK_OFFSET;
-> >  
-> > -	WARN(1, FW_BUG "falling back to harcoded RSTOUT reg 0x%x\n", rstout);
-> > +	WARN(1, FW_BUG "falling back to harcoded RSTOUT reg %pa\n", &rstout);
-> >  	return devm_ioremap(&pdev->dev, rstout, 0x4);
-> >  }
-> >  
-> > -- 
-> > 1.8.1.2
-> > 
-> > 
-> 
-> Acked-by me also, but can this also go via the mvebu tree (since the patch that introduces this is also there??
-> 
+Yes. The accessible RAM will be 0x8000 0000 - 0xFFFF FFFF -
+the same as DMA range. But coherent DMA will not be supported.
 
-Can you pull this too? It's been acked by Wim and me.
+So, no DMA bus offset required and actions in Platform bus notifier.
 
-Thanks,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+>
+>> - LPAE enabled: In this case, I'll update code to treat absence of "dam-ranges"
+>> property as "no dma possible" and clean up DMA mask. Is it ok?
+>> In this mode "dam-ranges" prop has to be defined always to enable DMA.
+>
+> Ok, sounds good.
+>
+>> Empty "dma-ranges" can't be treated as "no translation required" because it is used
+>> to move one level up while traversing DT to find the valid "dma-ranges" prop.
+>> Used to handle child devices like:
+>>
+>>   bus {
+>>          dma-ranges = <...>;
+>>
+>>          Dev A {
+>>                  dma-ranges;
+>>
+>>                  child_dev_A1 { }
+>>                  child_dev_A2 { }
+>>
+>> This is standard behavior for "[dma-]ranges".
+>
+> That is what I meant: "no translation required at this level". You still
+> have to go up to the root in order to know the full translation.
+>
+
+Regards,
+-grygorii
