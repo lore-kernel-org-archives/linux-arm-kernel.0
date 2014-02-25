@@ -1,38 +1,37 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 25 Feb 2014 08:56:32 -0800
-Subject: linux-next: manual merge of the staging tree with the arm-soc tree
-In-Reply-To: <CAOesGMiTZN3z441d3bOaCcF8Zsss4WZv6YkH9CJpZtTBGxadWw@mail.gmail.com>
-References: <20140225170944.d322d9868871bc2f669b92e5@canb.auug.org.au>
- <20140225164921.GA4458@kroah.com>
- <CAOesGMiTZN3z441d3bOaCcF8Zsss4WZv6YkH9CJpZtTBGxadWw@mail.gmail.com>
-Message-ID: <20140225165632.GA4672@kroah.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 25 Feb 2014 10:56:07 -0600
+Subject: [PATCH v3 2/2] i2c: New bus driver for the Qualcomm QUP I2C
+ controller
+In-Reply-To: <CAJAp7OhGkr04smJv3iizBBjz7k4Oik=uxUdC_JD2+0D6VDSybg@mail.gmail.com>
+References: <1392943090-30556-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1392943090-30556-3-git-send-email-bjorn.andersson@sonymobile.com>
+ <20140221110637.GG7541@e106331-lin.cambridge.arm.com>
+ <CAJAp7OhGkr04smJv3iizBBjz7k4Oik=uxUdC_JD2+0D6VDSybg@mail.gmail.com>
+Message-ID: <20140225165607.GA5723@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 08:51:37AM -0800, Olof Johansson wrote:
-> On Tue, Feb 25, 2014 at 8:49 AM, Greg KH <greg@kroah.com> wrote:
-> > On Tue, Feb 25, 2014 at 05:09:44PM +1100, Stephen Rothwell wrote:
-> >> Hi Greg,
-> >>
-> >> Today's linux-next merge of the staging tree got a conflict in
-> >> arch/arm/boot/dts/imx53-qsb.dts between commit d5eb195f26fa ("ARM: dts:
-> >> i.MX53: move common QSB nodes to new file") from the arm-soc tree and
-> >> commit 17b5001b5143 ("imx-drm: convert to componentised device support")
-> >> from the staging tree.
-> >>
-> >> I fixed it up (see at bottom) and can carry the fix as necessary (no
-> >> action is required).  I also added the following fix up patch:
-> >
-> > I think it's right, but I really have no idea about any of these.  I'll
-> > defer to Russell to ensure they are correct.
-> 
-> We normally merge all dts changes through arm-soc to avoid these kind
-> of conflicts. Since your tree is a stable one there isn't much to do
-> about it, but I'd appreciate it if we just got those parts of the
-> patch series in the future to avoid these situations. We've been bit
-> by it before.
+On Tue, Feb 25, 2014 at 08:07:13AM -0800, Bjorn Andersson wrote:
 
-I can revert these patches, but for some reason Russell said they should
-go through this one, so I took them...
+[snip]
 
-Russell, thoughts?
+> The v2 model will get BAM (DMAEngine) support soon, v1 uses an
+> older DMA core. So there's a difference. I'm not aware what differences
+> there are between 2.1.1 and 2.2.1.
+
+Difference between 2.1.1 and 2.2.1:
+ - high speed support, up to 3.4MHz
+ - reconfiguration during run state
+ - READ_AND_NACK, STOP tag support
+ - some h/w bug fixes that don't involve software changes.
+
+ 
+> Question is if next change will be called v3, as we then could skip the
+> reset of the version.
+
+Next version is 2.4.
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
