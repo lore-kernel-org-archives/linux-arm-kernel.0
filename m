@@ -1,23 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Feb 2014 20:11:01 +0100
-Subject: [PATCH resend] pwm: Remove obsolete HAVE_PWM Kconfig symbol
-In-Reply-To: <20140210102017.GA20143@ulmo.nvidia.com>
-References: <1390550056-5924-1-git-send-email-s.hauer@pengutronix.de>
- <20140210102017.GA20143@ulmo.nvidia.com>
-Message-ID: <201402252011.01902.arnd@arndb.de>
+Date: Tue, 25 Feb 2014 20:18:33 +0100
+Subject: [GIT PULL] bcm pinctrl rename
+In-Reply-To: <CAEPRUYqUNxOT=KnhSmbXbL2e2tCs=jAhQqKLiVVc13okpBxHnw@mail.gmail.com>
+References: <CAEPRUYpCVpV7HwuO6c95ybk3yp1teJgW-9qwyHnjKbs03C9bgQ@mail.gmail.com>
+ <20140221222947.GB13233@quad.lixom.net>
+ <CAEPRUYqUNxOT=KnhSmbXbL2e2tCs=jAhQqKLiVVc13okpBxHnw@mail.gmail.com>
+Message-ID: <201402252018.34109.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 February 2014, Thierry Reding wrote:
-> On Fri, Jan 24, 2014 at 08:54:16AM +0100, Sascha Hauer wrote:
+On Tuesday 25 February 2014, Christian Daudt wrote:
+> Can you please pull the patches below. Note that if you wanto to
+> absolutely reduce this to the bone, you can drop the last patch in the
+> series titled "pinctrl: Rename Broadcom Capri pinctrl binding". That
+> is the documentation fixup, so the binding doc will be wrong until
+> 3.15. But that will reduce the change to just 2 lines :)
 
-> > Thierry as PWM maintainer has agreed to take this patch. Would be nice
-> > to get some Acks from affected architectures. Russell, Ralf?
-> 
-> No replies for over two weeks and this looks simple enough, so I just
-> went ahead and applied it. Thanks,
-
-Am I looking in the wrong place, or have you not pushed this for linux-next yet?
-I still see all the HAVE_PWM symbols in today's -next.
+I've gone through the remaining pull requests today but didn't touch
+this one. Since Olof asked for the changes, I'm expecting him to
+look at the new version first. I don't have an opinion on the contents
+myself.
 
 	Arnd
