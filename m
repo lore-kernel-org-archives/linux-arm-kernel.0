@@ -1,113 +1,55 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon, 24 Feb 2014 22:28:07 -0700
-Subject: [PATCH v14 3/3] arm64: Add APM X-Gene SoC AHCI SATA host controller
- DTS entries
-In-Reply-To: <1393306087-2875-3-git-send-email-lho@apm.com>
-References: <1393306087-2875-1-git-send-email-lho@apm.com>
- <1393306087-2875-2-git-send-email-lho@apm.com>
- <1393306087-2875-3-git-send-email-lho@apm.com>
-Message-ID: <1393306087-2875-4-git-send-email-lho@apm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 24 Feb 2014 21:51:42 -0800
+Subject: [RFC PATCH 1/6] PM / Voltagedomain: Add generic clk notifier
+ handler for regulator based dynamic voltage scaling
+In-Reply-To: <1392755543-28335-2-git-send-email-nm@ti.com>
+References: <1392755543-28335-1-git-send-email-nm@ti.com>
+ <1392755543-28335-2-git-send-email-nm@ti.com>
+Message-ID: <20140225055142.22529.21814@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
-Signed-off-by: Suman Tripathi <stripathi@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |   75 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 75 insertions(+), 0 deletions(-)
+Quoting Nishanth Menon (2014-02-18 12:32:18)
+> From: Mike Turquette <mturquette@linaro.org>
+> 
+> This patch provides helper functions for drivers that wish to scale
+> voltage through the clock rate-change notifiers. The approach taken
+> is that the user-driver(cpufreq/devfreq) do not care about the
+> details of the OPP table, nor does it care about handling the voltage
+> regulator directly.
+> 
+> By using the clk notifier flags, we are able to sequence the operations
+> in the right order. The current logic is heavily influenced by
+> implementation done in cpufreq-cpu0.
+> 
+> [nm at ti.com: Fixes in logic, and broken out from clk to allow building
+> a generic voltagedomain solution independent of cpufreq]
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index c78ddcf..57b0770 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -221,6 +221,48 @@
- 				enable-offset = <0x0>;
- 				enable-mask = <0x06>;
- 			};
-+
-+			sata01clk: sata01clk at 1f21c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f21c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata01clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata23clk: sata23clk at 1f22c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f22c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata23clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
-+
-+			sata45clk: sata45clk at 1f23c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f23c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sata45clk";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x05>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x39>;
-+			};
- 		};
- 
- 		serial0: serial at 1c020000 {
-@@ -262,5 +304,38 @@
- 			apm,tx-boost-gain = <31 31 31 31 31 31>;
- 			apm,tx-eye-tuning = <2 10 10 2 10 10>;
- 		};
-+
-+		sata1: sata at 1a000000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a000000 0x0 0x1000>,
-+			      <0x0 0x1f210000 0x0 0x10000>;
-+			interrupts = <0x0 0x86 0x4>;
-+			status = "disabled";
-+			clocks = <&sata01clk 0>;
-+			phys = <&phy1 0>;
-+			phy-names = "sata-6g";
-+		};
-+
-+		sata2: sata at 1a400000 {
-+			compatible = "apm,xgene-ahci-sgmii";
-+			reg = <0x0 0x1a400000 0x0 0x1000>,
-+			      <0x0 0x1f220000 0x0 0x10000>;
-+			interrupts = <0x0 0x87 0x4>;
-+			status = "ok";
-+			clocks = <&sata23clk 0>;
-+			phys = <&phy2 0>;
-+			phy-names = "sata-6g";
-+		};
-+
-+		sata3: sata at 1a800000 {
-+			compatible = "apm,xgene-ahci-pcie";
-+			reg = <0x0 0x1a800000 0x0 0x1000>,
-+			      <0x0 0x1f230000 0x0 0x10000>;
-+			interrupts = <0x0 0x88 0x4>;
-+			status = "ok";
-+			clocks = <&sata45clk 0>;
-+			phys = <&phy3 0>;
-+			phy-names = "sata-6g";
-+		};
- 	};
- };
--- 
-1.5.5
+Not-signed-off-by: Mike Turquette <mturquette@linaro.org>
+
+I haven't reviewed this series and it is a pretty big deviation from my
+original RFC. You can have authorship of the patches if you want.
+
+I'm not sure about trying to capture the "voltdm" as a core concept. It
+feels a bit unwieldy to me. I have wondered about making an abstract
+"performance domain" which is the dvfs analogue to generic power
+domains. This a reasonable split since gpd are good for idle power
+savings (e.g. clock gate, power gate, sleep state, etc) and "perf
+domains" would be good for active power savings (dvfs).
+
+Having a generic container for performance domains might make a good
+place to stuff all of this glue logic that we keep running into (e.g.
+CPU and GPU max frequencies that are related), and it might make another
+nice knob for the thermal folks to use.
+
+For the case of the OMAP voltage domains, it would be a place to stuff
+all of the VC/VP -> ABB -> Smart Reflex AVS stuff.
+
+Anyways, I don't have a real proposal. I just don't want my name on
+these patches since they are really yours now. I might resurrect them
+some day in a different context.
+
+Regards,
+Mike
