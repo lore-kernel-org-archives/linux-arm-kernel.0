@@ -1,67 +1,37 @@
-From: sthokal@xilinx.com (Srikanth Thokala)
-Date: Tue, 25 Feb 2014 17:57:37 +0530
-Subject: [PATCH] pcie: Add Xilinx PCIe Host Bridge IP driver
-In-Reply-To: <20140221162824.GA4706@obsidianresearch.com>
-References: <1392564830-5868-1-git-send-email-sthokal@xilinx.com>
- <CAErSpo5FGPhgnp8Gfy-1_Lk7ckCi7U5+z5pLnPU+jScPxD5yUQ@mail.gmail.com>
- <20140219003523.GJ29304@obsidianresearch.com>
- <CA+mB=1KSxkN+mKce5k1n93pmAA_FnWYaqNweWzxd4GD3Mo4PZA@mail.gmail.com>
- <20140220174503.GB19893@obsidianresearch.com>
- <CA+mB=1L+QM2cKq==mwYesp=E7S2N-xTiN7AoBvbzAO2UMn0qVQ@mail.gmail.com>
- <20140221162824.GA4706@obsidianresearch.com>
-Message-ID: <CA+mB=1Jner0G2cyKrGom8-mKrRpvwO6bj2Xob5BbtJMKbMLkuQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Feb 2014 12:29:16 +0000
+Subject: Ideas/suggestions to avoid repeated locking and reducing too
+ many lists with dmaengine?
+In-Reply-To: <530BC9F8.2040402@ti.com>
+References: <530B9784.5060904@ti.com>
+ <20140224192152.GV27282@n2100.arm.linux.org.uk> <530BC9F8.2040402@ti.com>
+Message-ID: <20140225122916.GX27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+On Mon, Feb 24, 2014 at 04:38:48PM -0600, Joel Fernandes wrote:
+> Actually I did do some tracing earlier before I posted this thread- and
+> notice there was excessive traces of locking/unlocking. It is very light
+> though as you pointed and lighter without debug options. The only other
+> notable difference is the fact that we are now going through the dmaengine
+> framework in the newer kernel vs the faster one.
 
-On Fri, Feb 21, 2014 at 9:58 PM, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> On Fri, Feb 21, 2014 at 08:18:00PM +0530, Srikanth Thokala wrote:
->
->> 00:00.0 Class 0604: Device 10ee:7081
->
-> So this is great, a root port bridge is exactly correct - I would
-> recommend using device 1 for this (device 0 is the host bridge in most
-> cases), but I don't think that has any functional impact.
->
->>         Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop-
->> ParErr+ Stepping- SERR+ FastB2B- DisINTx-
->>         Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort-
->> <TAbort- <MAbort- >SERR- <PERR- INTx-
->>         Latency: 0, Cache Line Size: 64 bytes
->>         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
->>         I/O behind bridge: 00000000-00000fff
->>         Memory behind bridge: 00000000-000fffff
->>         Prefetchable memory behind bridge: 00000000-000fffff
->
-> What is going on here?  These ranges should match the MMIO aperture and
-> critically must enclose the downstream bars:
->
->> 01:00.0 Class 0200: Device 14e4:1677 (rev 11)
->>         Region 0: Memory at 60000000 (64-bit, non-prefetchable) [size=64K]
->>         Expansion ROM at 60010000 [disabled] [size=64K]
->
-> So one of those two is not right..
+Okay, for OMAP, there's additional latency caused by the tasklet which
+starts a transaction when there's no previous transaction running -
+that will be your biggest problem.
 
-Sorry for the delay in response.  Thanks for pointing this.
-I have series of conversations with my IP team and it is giving back
-zero's when Type1 Header
-Memory Base offset is read even the pcie stack writes the valid
-addresses.  HW team is working on
-this and they will take their own time to give a fix.  As there is no
-functional impact, I believe there
-is no issue with driver and should work on mainlining the driver.
-Please suggest me on how to
-proceed and accordingly I will send a v2 patch fixing the DT comments
-pointed by you and Bjorn.
+I do want to move omap-dma away from having a fixed binding between
+claimed channels and the logical channels since that's too wasteful,
+and that's what the tasklet will eventually be doing - but with
+omap-dma being divorsed from the old code, this tasklet may not be
+necessary anymore (since we no longer have to operate in process
+context for that bit.)
 
-Thanks
-Srikanth
+There's a huge pile of patches I have queued up for the next merge
+window in linux-next - I'd rather get these into mainline before
+trying to do any restructuring, otherwise we're going to get into
+a hell of a problem with merge conflicts.
 
->
-> Jason
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
