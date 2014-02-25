@@ -1,42 +1,36 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Tue, 25 Feb 2014 14:22:30 +0200
-Subject: [PATCHv2 5/5] net: rfkill: gpio: add ACPI IDs for a Broadcom
- bluetooth chip
-In-Reply-To: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>
-References: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>
-Message-ID: <1393330950-7283-6-git-send-email-heikki.krogerus@linux.intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 25 Feb 2014 12:24:24 +0000
+Subject: Ideas/suggestions to avoid repeated locking and reducing too
+ many lists with dmaengine?
+In-Reply-To: <20140224205028.GA24339@qualcomm.com>
+References: <530B9784.5060904@ti.com> <20140224205028.GA24339@qualcomm.com>
+Message-ID: <20140225122424.GW27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds ACPI IDs for Broadcom bluetooth chip BCM43241 used
-on various Baytrail based boards such as Lenovo Miix 2 and
-Asus Transformer Book T100TA.
+On Mon, Feb 24, 2014 at 02:50:28PM -0600, Andy Gross wrote:
+> On Mon, Feb 24, 2014 at 01:03:32PM -0600, Joel Fernandes wrote:
+> > Hi folks,
+> > 
+> > Just wanted your thoughts/suggestions on how we can avoid overhead in the EDMA
+> > dmaengine driver. I am seeing a lots of performance drop specially for small
+> > transfers with EDMA versus before raw EDMA was moved to DMAEngine framework
+> > (atleast 25%).
+> 
+> I've seen roughly the same drop in my testing.  In my case it had to do
+> with the nature of how work is done using virt-dma.  The virt-dma is
+> predicated on only letting one transaction be active at a time and it
+> increases the latency for getting the next transaction off.  For large
+> transactions, it's negligible.  But for small transactions, it is pretty
+> evident.
 
-Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
----
- net/rfkill/rfkill-gpio.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Wrong.  virt-dma allows you to fire off the next transaction in the queue
+immediately that the previous transaction has finished.  I know this,
+because sa11x0-dma does exactly that.
 
-diff --git a/net/rfkill/rfkill-gpio.c b/net/rfkill/rfkill-gpio.c
-index ec38884..c4d7c6b 100644
---- a/net/rfkill/rfkill-gpio.c
-+++ b/net/rfkill/rfkill-gpio.c
-@@ -156,11 +156,16 @@ static int rfkill_gpio_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
- static const struct acpi_device_id rfkill_acpi_match[] = {
-+	{ "BCM2E1A", RFKILL_TYPE_BLUETOOTH },
-+	{ "BCM2E39", RFKILL_TYPE_BLUETOOTH },
-+	{ "BCM2E3D", RFKILL_TYPE_BLUETOOTH },
- 	{ "BCM4752", RFKILL_TYPE_GPS },
- 	{ "LNV4752", RFKILL_TYPE_GPS },
- 	{ },
- };
-+#endif
- 
- static struct platform_driver rfkill_gpio_driver = {
- 	.probe = rfkill_gpio_probe,
+You don't need to wait for the tasklet to be called before starting the
+next transaction.
+
 -- 
-1.9.0.rc3
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
