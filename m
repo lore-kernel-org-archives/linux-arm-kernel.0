@@ -1,59 +1,98 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 25 Feb 2014 11:05:04 -0800
-Subject: [RESEND PATCH] ARM: mvebu: select dtbs from MACH_ARMADA_*
-In-Reply-To: <1393351902-19151-1-git-send-email-jason@lakedaemon.net> (Jason
- Cooper's message of "Tue, 25 Feb 2014 18:11:42 +0000")
-References: <1393350967-18819-1-git-send-email-jason@lakedaemon.net>
- <1393351902-19151-1-git-send-email-jason@lakedaemon.net>
-Message-ID: <7h1tyr2eu7.fsf@paris.lan>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 25 Feb 2014 20:05:41 +0100
+Subject: =?UTF-8?q?=5BPATCH=201/2=5D=20of=3A=20Add=20vendor=20prefixes=20used=20by=20Kirkwood=20devices?=
+Message-ID: <1393355142-7811-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason Cooper <jason@lakedaemon.net> writes:
+Add a number of vendor prefixes by kirkwood devices. These are not all
+stock tickers, but have been in use for a while so changing would not
+be easy.
 
-> With kirkwood migrating into mach-mvebu, mvebu_v5_defconfig needs to
-> select ARCH_MVEBU.  Unfortunately, this means that when building a v5
-> kernel, we unnecessarily build dtbs for the armada v7 boards.
->
-> To fix this, we instead select based on MACH_ARMADA_* on a per SoC basis.
->
-> Reported-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Jason Cooper <jason@lakedaemon.net>
-> ---
-> Sorry, forgot to include Kevin in the To:
->
-> If there are no complaints, I'll be applying this to mvebu/dt
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-For both:
-
-Acked-by: Kevin Hilman <khilman@linaro.org>
-
->  arch/arm/boot/dts/Makefile | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 46c54a2dac71..1e6dbde1724e 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -142,13 +142,17 @@ dtb-$(CONFIG_ARCH_MOXART) += moxart-uc7112lx.dtb
->  dtb-$(CONFIG_ARCH_MSM) += qcom-msm8660-surf.dtb \
->  	qcom-msm8960-cdp.dtb \
->  	qcom-apq8074-dragonboard.dtb
-> -dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
-> +dtb-$(CONFIG_MACH_ARMADA_370) += \
-> +	armada-370-db.dtb \
->  	armada-370-mirabox.dtb \
->  	armada-370-netgear-rn102.dtb \
->  	armada-370-netgear-rn104.dtb \
-> -	armada-370-rd.dtb \
-> -	armada-375-db.dtb \
-> -	armada-385-db.dtb \
-> +	armada-370-rd.dtb
-> +dtb-$(CONFIG_MACH_ARMADA_375) += \
-> +	armada-375-db.dtb
-> +dtb-$(CONFIG_MACH_ARMADA_38X) += \
-> +	armada-385-db.dtb
-> +dtb-$(CONFIG_MACH_ARMADA_XP) += \
->  	armada-xp-axpwifiap.dtb \
->  	armada-xp-db.dtb \
->  	armada-xp-gp.dtb \
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index c73b435f58f5..860c467374fe 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -18,6 +18,7 @@ auo	AU Optronics Corporation
+ avago	Avago Technologies
+ bosch	Bosch Sensortec GmbH
+ brcm	Broadcom Corporation
++buffalo	Buffalo, Inc.
+ capella	Capella Microsystems, Inc
+ cavium	Cavium, Inc.
+ cdns	Cadence Design Systems Inc.
+@@ -28,25 +29,31 @@ cortina	Cortina Systems, Inc.
+ dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
+ davicom	DAVICOM Semiconductor, Inc.
+ denx	Denx Software Engineering
++dlink	D-Link Corporation
+ edt	Emerging Display Technologies
+ emmicro	EM Microelectronic
+ epfl	Ecole Polytechnique F?d?rale de Lausanne
+ epson	Seiko Epson Corp.
+ est	ESTeem Wireless Modems
++excito	Excito
+ fsl	Freescale Semiconductor
+ GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ gmt	Global Mixed-mode Technology, Inc.
++globalscale	GlobalScale Technologies, Inc.
+ gumstix	Gumstix, Inc.
+ haoyu	Haoyu Microelectronic Co. Ltd.
+ hisilicon	Hisilicon Limited.
+ hp	Hewlett Packard
+ ibm	International Business Machines (IBM)
+ idt	Integrated Device Technologies, Inc.
++iom	Iomega Corporation
+ img	Imagination Technologies Ltd.
+ intercontrol	Inter Control Group
+ isl	Intersil
+ karo	Ka-Ro electronics GmbH
++keymile	Keymile GmbH
++lacie	LaCie
+ lg	LG Corporation
+ linux	Linux-specific binding
+ lsi	LSI Corp. (LSI Logic)
+@@ -54,7 +61,9 @@ marvell	Marvell Technology Group Ltd.
+ maxim	Maxim Integrated Products
+ microchip	Microchip Technology Inc.
+ mosaixtech	Mosaix Technologies, Inc.
++mpl	MPL AG
+ national	National Semiconductor
++netgear	Netgear, Inc.
+ nintendo	Nintendo
+ nvidia	NVIDIA
+ nxp	NXP Semiconductors
+@@ -62,10 +71,12 @@ onnn	ON Semiconductor Corp.
+ panasonic	Panasonic Corporation
+ phytec	PHYTEC Messtechnik GmbH
+ picochip	Picochip Ltd
++plathome	Plat'Home Co., Ltd.
+ powervr	PowerVR (deprecated, use img)
+ qca	Qualcomm Atheros, Inc.
+ qcom	Qualcomm, Inc.
+ qnap	QNAP Systems, Inc.
++raidsonic	RaidSonic Technology GmbH
+ ralink	Mediatek/Ralink Technology Corp.
+ ramtron	Ramtron International
+ realtek Realtek Semiconductor Corp.
+@@ -75,6 +86,7 @@ rockchip	Fuzhou Rockchip Electronics Co., Ltd
+ samsung	Samsung Semiconductor
+ sbs	Smart Battery System
+ schindler	Schindler
++seagate	Seagate Technology PLC
+ sil	Silicon Image
+ silabs	Silicon Laboratories
+ simtek
+@@ -95,3 +107,4 @@ winbond Winbond Electronics corp.
+ wlf	Wolfson Microelectronics
+ wm	Wondermedia Technologies, Inc.
+ xlnx	Xilinx
++zyxel	ZyXEL Communications Corp.
+-- 
+1.8.5.3
