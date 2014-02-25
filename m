@@ -1,36 +1,84 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 24 Feb 2014 18:09:13 -0600
-Subject: [Patch v7 2/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <1393283500-18599-3-git-send-email-agross@codeaurora.org>
-References: <1393283500-18599-1-git-send-email-agross@codeaurora.org>
- <1393283500-18599-3-git-send-email-agross@codeaurora.org>
-Message-ID: <20140225000913.GA10801@saruman.home>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 25 Feb 2014 09:10:35 +0900
+Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
+In-Reply-To: <CAOesGMjLR3PGXeyJPAvGwam4yK97+vnDfq5MVutJz75aKPX8gw@mail.gmail.com>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <5302B306.8090503@samsung.com>
+ <CAOesGMhnUDcUL7hREV=EYEGr5YG-ZLL6v9NiGcrBr6477WfdyQ@mail.gmail.com>
+ <6032891.ndY8FikAMY@wuerfel>
+ <CALAqxLX6STNqUeVO2G18bm_HKabpoRxZTa3uK6i-JP97zEYVZg@mail.gmail.com>
+ <CAOesGMjLR3PGXeyJPAvGwam4yK97+vnDfq5MVutJz75aKPX8gw@mail.gmail.com>
+Message-ID: <530BDF7B.5030707@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 02/19/14 05:00, Olof Johansson wrote:
+> On Tue, Feb 18, 2014 at 11:52 AM, John Stultz<john.stultz@linaro.org>  wrote:
+>> On Tue, Feb 18, 2014 at 10:13 AM, Arnd Bergmann<arnd@arndb.de>  wrote:
+>>> On Tuesday 18 February 2014 08:16:13 Olof Johansson wrote:
+>>>> On Mon, Feb 17, 2014 at 5:10 PM, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>>>>> On 02/15/14 02:06, Arnd Bergmann wrote:
+>>>>>> My feeling is that we don't need to use the levels for Kconfig, although
+>>>>>> we might want to use them DT compatible strings, even if it ends up
+>>>>>> looking
+>>>>>> a little funny when you do
+>>>>>>
+>>>>>>          compatible = "arm,sbsa-l3", "arm,sbsa-l2", "arm,sbsa-l1";
+>>>>>>
+>>>>>>> What kind of features are you expecting though? More IP
+>>>>>>> blocks/devices? Those are just kernel config options to enable,
+>>>>>>> ideally as modules.
+>>>>>>
+>>>>>>
+>>>>>> Right, I think we can just put them into defconfig. No need to
+>>>>>> "select" them from Kconfig since the extra options wouldn't be
+>>>>>> required for booting or using the system.
+>>>>>>
+>>>>> As I commented above, how about MCT? Samsung has a plan to use MCT on ARMv8,
+>>>>> it is not for used for GH7 though...
+>>>>
+>>>> It looks like the clocksource drivers are all based around being
+>>>> enabled based on platforms instead of individually selectable. That
+>>>> causes a problem here. I think we should change the clocksource
+>>>> Kconfig instead. Then it's just a matter of making sure your defconfig
+>>>> has the needed driver enabled.
+>>>>
+>>>> (Adding Daniel and Thomas in case they have objections to that approach)
+>>>
+>>> +John Stultz
+>>>
+>>> IIRC it was John who insisted on doing it the current way, although
+>>> I can't remember his reasoning.
+>>
+>> Are we really expecting there to be SoC specific clocksources here? I
+>> thought we were getting away from that sort of stuff with the
+>> architecture timer?
+>
+> Unfortunately vendors can do crazy stuff if they want to. But we also
+> have an option to choose to enable it. Maybe the answer here is to say
+> no to MCT on 64-bit, they get to use the arch timers like everybody
+> else. Or at least motivate why they're not good enough.
+>
+>> I'm fine with clocksources being selected by other functionality
+>> options (ie: on x86 ACPI PM timer clocksource doesn't have a prompt,
+>> but depends on the ACPI option). I just don't want to force users to
+>> have to navigate through tons of deep menus to select clocksource
+>> options that logically duplicate other selections already made.
+>>
+>> But again, I handed this maintainership over to Daniel, so I can be
+>> considered just a crank yelling from the sidelines :)
+>
+> I think you have a good point. Until we hear why MCT is needed this is
+> mostly speculation, so let's see what Kukjin says about that.
+>
 
-On Mon, Feb 24, 2014 at 05:11:40PM -0600, Andy Gross wrote:
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index 605b016..f87cef9 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -401,4 +401,13 @@ config DMATEST
->  config DMA_ENGINE_RAID
->  	bool
->  
-> +config QCOM_BAM_DMA
-> +	tristate "QCOM BAM DMA support"
-> +	depends on ARCH_QCOM || (COMPILE_TEST && OF && ARM)
+Using MCT on ARMv8 is an example, it's true on some Samsung ARMv8 SoC 
+though. I don't want to argue what's the benefit of MCT in this thread, 
+but just possibility. As you know, generally ARM SoC vendor is open to 
+use any IPs...So I'd like to say we need to consider the situation.
 
-do you really want to make it depend on ARM even when COMPILE_TEST=y ?
+Anyway, basically I agree with you guys suggestion to use common CONFIG 
+on ARMv8 like multiplatform supporting on arm32.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140224/0908738e/attachment.sig>
+Thanks,
+Kukji
