@@ -1,36 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Feb 2014 10:34:33 +0100
-Subject: [PATCH v3 6/7] pinctrl: at91: implement get_direction
-In-Reply-To: <CACQ1gAi+rSvuRzCQiyV4QT0V75CccwH7iSEBRMyDdF_1W63OKA@mail.gmail.com>
-References: <1392656247-3351-1-git-send-email-richard.genoud@gmail.com>
- <1392656247-3351-7-git-send-email-richard.genoud@gmail.com>
- <CACRpkdZN_fT05+1JCJ2bemN3KfpfFFWu__HQcL9Sz7n2M9gCnw@mail.gmail.com>
- <CACQ1gAi+rSvuRzCQiyV4QT0V75CccwH7iSEBRMyDdF_1W63OKA@mail.gmail.com>
-Message-ID: <CACRpkdaOhJr2=uiR6KeEFBNT4ChPF6T42Q2v5oLwZrZLBgS=6A@mail.gmail.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Tue, 25 Feb 2014 10:35:50 +0100
+Subject: [PATCH v4 2/8] at91: pinctrl: don't request GPIOs used for
+ interrupts but lock them as IRQ
+In-Reply-To: <CACRpkdb8BUkLcF8=oEXsGemgFAQk6pyaX0j8t3v1xjymJsM=VQ@mail.gmail.com>
+References: <1392199607-27452-1-git-send-email-jjhiblot@traphandler.com>
+ <1392199607-27452-3-git-send-email-jjhiblot@traphandler.com>
+ <CACRpkdb8BUkLcF8=oEXsGemgFAQk6pyaX0j8t3v1xjymJsM=VQ@mail.gmail.com>
+Message-ID: <CACh+v5Mz43dcuDh7PQV+LgNxMOV+CpamNGR69f_6TTiEB5SVJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 3:56 PM, Richard Genoud
-<richard.genoud@gmail.com> wrote:
-> 2014-02-24 15:44 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
->> On Mon, Feb 17, 2014 at 5:57 PM, Richard Genoud
->> <richard.genoud@gmail.com> wrote:
->>
->>> This is needed for gpiod_get_direction().
->>> Otherwise, it returns -EINVAL.
->>>
->>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->>
->> Can I apply this directly to the pinctrl tree or do you want it to
->> go through AT91 ARM SoC with the rest of these patches
->> or something?
+Hi Linus,
+
+2014-02-24 14:25 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Wed, Feb 12, 2014 at 11:06 AM, Jean-Jacques Hiblot
+> <jjhiblot@traphandler.com> wrote:
 >
-> Well, I guess you can apply it on pinctrl tree.
+>> During the xlate stage of the DT interrupt parsing, the at91 pinctrl driver
+>> requests the GPIOs that are described as interrupt sources. This prevents a
+>> driver to request the gpio later to get its electrical value.
+>> This patch replaces the gpio_request with a gpio_lock_as_irq to prevent the
+>> gpio to be set as an ouput while allowing a subsequent gpio_request to succeed
+>>
+>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+>
+> OK, but is this really correct:
+>
+>> @@ -1478,18 +1478,17 @@ static int at91_gpio_irq_domain_xlate(struct irq_domain *d,
+>>  {
+>>         struct at91_gpio_chip *at91_gpio = d->host_data;
+>>         int ret;
+>> -       int pin = at91_gpio->chip.base + intspec[0];
+>>
+>>         if (WARN_ON(intsize < 2))
+>>                 return -EINVAL;
+>>         *out_hwirq = intspec[0];
+>>         *out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
+>>
+>> -       ret = gpio_request(pin, ctrlr->full_name);
+>> +       ret = gpio_lock_as_irq(&at91_gpio->chip, intspec[0]);
+>
+> So when resolving an IRQ resource, we take for granted that it will be used
+> for IRQs and IRQs only? Is it not possible that this resolution is done
+> and then the driver using it unloads or whatever and it is still marked
+> as IRQ?
+No, once it's reserved for irq, it'll be for irq only.
+>
+> I don't think the xlate function should have such side effects on
+> the gpio_chip internal state. I think it should just translate.
 
-OK patch applied tentatively unless Nicolas or Jean-Christophe
-has objections.
+I agree but I choose to only replace the gpio_request by a
+lock_as_irq(), not rework the whole thing. It seemed it would have
+more chance to be accepted this way. IMO the right time to do this is
+at the time of the request_irq()
+>
+> The line is locked for IRQ the moment its startup() callback is
+> called, is it not?
+>
+>> -       ret = gpio_direction_input(pin);
+>> +       ret = at91_gpio_direction_input(&at91_gpio->chip, intspec[0]);
+>
+> I actually don't like this either. This kind of thing was causing
+> problems in the OMAP driver like hell.
+But calling gpio_direction_input() defeats the purpose of removing the
+gpio_request() because it ensures that the gpio is requested.
+>
+> I think this should be deleted from xlate and at91_gpio_direction_input()
+> be called from the irqchip's .startup() or even .unmask() function
+> instead.
+irq_startup and irq_shutdown seem the right place for this because
+they're called when requesting and freeing the interrupt. It'll
+require a change to __setup_irq() though to check the return value of
+irq_startup.
 
-Yours,
-Linus Walleij
+Jean-Jacques
+>
+> Yours,
+> Linus Walleij
