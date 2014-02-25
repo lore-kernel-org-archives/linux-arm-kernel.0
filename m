@@ -1,75 +1,47 @@
-From: sre@ring0.de (Sebastian Reichel)
-Date: Tue, 25 Feb 2014 14:41:48 +0100
-Subject: [PATCH 2/2] ARM: dts: duovero-parlor: Add HDMI output
-In-Reply-To: <20140225123921.GY27282@n2100.arm.linux.org.uk>
-References: <1393261669-32039-1-git-send-email-florian.vaussard@epfl.ch>
- <1393261669-32039-3-git-send-email-florian.vaussard@epfl.ch>
- <20140224180336.GU27282@n2100.arm.linux.org.uk>
- <CABxcv=kKxidVJWcMrueB+edW=g_6gcucvi6=7p=EZ_WooCpbMA@mail.gmail.com>
- <20140225123921.GY27282@n2100.arm.linux.org.uk>
-Message-ID: <20140225134139.GA23898@earth.universe>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 25 Feb 2014 14:05:23 +0100
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <201402251344.23958.arnd@arndb.de>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <1563594.ZI2UdY7FPy@wuerfel> <20140223214447.GC3793@kw.sim.vm.gnt>
+ <201402251344.23958.arnd@arndb.de>
+Message-ID: <20140225130523.GE3793@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Feb 25, 2014 at 12:39:21PM +0000, Russell King - ARM Linux wrote:
-> > That compatible string is correct according to the latest series
-> > posted by Tomi Valkeinen to add DT bindings for the OMAP Display
-> > SubSystem (DSS) [0].
+On Tue, Feb 25, 2014 at 01:44:23PM +0100, Arnd Bergmann wrote:
+> On Sunday 23 February 2014, Simon Guinot wrote:
+> > I am quite busy this days but as soon I get some free time I will take
+> > care of the DT conversion for the Lacie boards.
+> > 
+> > Basically, we need to fix some minor issues with the Thomas patches:
+> > 
+> > ARM: kirkwood: convert d2net_v2 to DT
+> > ARM: kirkwood: convert LaCie Net{2, 5}Big v2 platforms to DT
+> > 
+> > And also a DT binding must be added to the LED driver leds-netxbig.
 > 
-> in which case:
+> I just took a brief look at the LED driver. I think it would be
+> reasonable to move almost all of the platform_data into the driver
+> itself and associate the two versions with distinct "compatible"
+> strings. That works in this particular case because while the driver
+> is generic enough to handle other cases, I also wouldn't expect
+> it to ever get used again on another platform.
+
+Actually, this driver is also used by the Atom-based LaCie NASes.
+Mainline support for this platforms should be provided soon.
+
 > 
-> N    N   AA     CCCC  K  K
-> NN   N  A  A   C    C K K
-> N N  N A    A C       KK
-> N  N N AAAAAA C       KK
-> N   NN A    A  C    C K K
-> N    N A    A   CCCC  K  K
-> 
-> Yes, that's a very big nack.  Two things:
-> 
-> 1. OMAP really doesn't have the right to define a compatible string which
->    is as generic as "hdmi-connector".
+> The main change to the driver would be to add support for a binding
+> that gets the seven gpio numbers out of the DT then.
 
-AFAIK the idea was to have "hdmi-connector" as part of the common
-display framework [1]. It's not really platform specific, since it's
-just a connector.
+Unfortunately not, we have to pass the whole thing through DT.
 
-Since omapdss does not yet implement the common display framework,
-but wants to keep a stable DT API it rewrites "hdmi-connector" to
-"omapdss,hdmi-connector" for now.
-
-> 2. Even with "omapdss," before it, the convention that DT people have adopted
->    is for the prefix to be "companyname," and not a subsystem.
->
-> I'm not the only one with this concern - I discussed it with Arnd last
-> night and his comments were about it being "obviously bogus".
-> 
-> > The property is added on this patch [1] and as far as I understood the
-> > idea is that it could be a generic DT binding that can be used by
-> > platform specific HDMI connectors like the omap dss HDMI connector [2].
-> 
-> Why do the physical connectors need a DT binding?
-
-This is the termination of the video bus and useful information for
-xrandr.
-
-> Surely what needs the DT binding is the HDMI encoder - and that
-> certainly should no way be a generic name, because there's no such
-> thing as a generic HDMI encoder chip.
-
-The HDMI encoder and companion chips are described separatly and
-properly prefixed [0].
-
-[0] http://www.spinics.net/lists/linux-omap/msg102522.html
-[1] https://lwn.net/Articles/563157/
-
--- Sebastian
+Simon
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
+Size: 181 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140225/958a98e6/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140225/f3fc48f7/attachment.sig>
