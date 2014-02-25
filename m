@@ -1,113 +1,70 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 25 Feb 2014 09:45:51 +0900
-Subject: [PATCH v2 0/5] ARM: S3C24XX: convert s3c2412 to common clock
- framework
-In-Reply-To: <20140224000603.22529.1282@quantum>
-References: <1835515.oOiOlPWUhB@phil> <530937A4.3010301@gmail.com>
- <2112473.9LIChJWDSQ@phil> <5309456D.3040805@gmail.com>
- <20140224000603.22529.1282@quantum>
-Message-ID: <530BE7BF.7060306@samsung.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 25 Feb 2014 01:52:15 +0100
+Subject: [PATCH 1/1] ARM: Exynos: Add generic compatible string
+In-Reply-To: <530BE557.20106@samsung.com>
+References: <1392809645-631-1-git-send-email-sachin.kamat@linaro.org>	<CAK9yfHyWG1ac6isTRSB3VWfxER9cSuDJHwY3b7svyEk9EozpWQ@mail.gmail.com>	<53075239.4010603@samsung.com>	<2200834.G3JJLYQl5i@wuerfel>	<53076F00.7000001@samsung.com>	<53077160.5030202@samsung.com>
+ <CAK9yfHxiHkrf1xmSFbfoKqFFSCU6w4QqwPnQNdv1m1PGtrwsLQ@mail.gmail.com>
+ <530BE557.20106@samsung.com>
+Message-ID: <530BE93F.2070904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/14 09:06, Mike Turquette wrote:
-> Quoting Tomasz Figa (2014-02-22 16:48:45)
->> On 23.02.2014 01:29, Heiko St?bner wrote:
->>> Hi Tomasz,
->>>
->>> Am Sonntag, 23. Februar 2014, 00:49:56 schrieb Tomasz Figa:
->>>> Hi,
+On 25.02.2014 01:35, Kukjin Kim wrote:
+> On 02/24/14 21:03, Sachin Kamat wrote:
+>> On 21 February 2014 21:01, Tomasz Figa<t.figa@samsung.com>  wrote:
+>>> On 21.02.2014 16:21, Tomasz Figa wrote:
 >>>>
->>>> On 22.02.2014 23:45, Heiko St?bner wrote:
->>>>> Second incarnation of the series converting s3c2412/s3c2413 to the common
->>>>> clock framework. As before the conversion is done by a mix of datasheet
->>>>> data and the pre-existing clock code and as this time I have no hardware
->>>>> of this type, it is compile-tested only. So hopefully somebody with
->>>>> s3c2412
->>>>> hw will be able to test it for real.
+>>>> On 21.02.2014 15:48, Arnd Bergmann wrote:
 >>>>>
->>>>> The conversion of s3c2412 now moved in front of the
->>>>> s3c2410/s3c2440/s3c2442
->>>>> one, as I'll need a bit more time for the clockout changes suggested by
->>>>> Tomasz Figa.
->>>>>
->>>>> This series builds on top of the previous submitted s3c2443/s3c2416
->>>>> series.
->>>>>
->>>>>
->>>>> Changes since v1:
->>>>> - move in front of s3c2410 conversion, therefore move 2 necessary patches
->>>>>
->>>>>      that also got ACKs, from there into this series
->>>>>
->>>>> - adapt to Samsung clock pm rework from Tomasz Figa
->>>>> - apply some changes suggested by Tomasz Figa in the s3c2410 clock driver
->>>>>
->>>>>      that also apply to this driver.
->>>>>
->>>>> Heiko Stuebner (5):
->>>>>      ARM: S3C24XX: only store clock registers when old clock code is active
->>>>>      clk: samsung: add plls used by the early s3c24xx cpus
->>>>>      dt-bindings: add documentation for s3c2412 clock controller
->>>>>      clk: samsung: add clock controller driver for s3c2412
->>>>>      ARM: S3C24XX: convert s3c2412 to common clock framework
->>>>>
->>>>>     .../bindings/clock/samsung,s3c2412-clock.txt       |  50 ++
->>>>>     arch/arm/mach-s3c24xx/Kconfig                      |   8 +-
->>>>>     arch/arm/mach-s3c24xx/Makefile                     |   2 +-
->>>>>     arch/arm/mach-s3c24xx/clock-s3c2412.c              | 761
->>>>>     --------------------- arch/arm/mach-s3c24xx/common.c
->>>>>      |   9 +-
->>>>>     arch/arm/mach-s3c24xx/common.h                     |   4 +
->>>>>     arch/arm/mach-s3c24xx/mach-jive.c                  |   9 +-
->>>>>     arch/arm/mach-s3c24xx/mach-smdk2413.c              |   9 +-
->>>>>     arch/arm/mach-s3c24xx/mach-vstms.c                 |   9 +-
->>>>>     arch/arm/mach-s3c24xx/pm.c                         |  13 +-
->>>>>     arch/arm/mach-s3c24xx/s3c2412.c                    |  43 --
->>>>>     drivers/clk/samsung/Makefile                       |   1 +
->>>>>     drivers/clk/samsung/clk-pll.c                      | 182 +++++
->>>>>     drivers/clk/samsung/clk-pll.h                      |   3 +
->>>>>     drivers/clk/samsung/clk-s3c2412.c                  | 268 ++++++++
->>>>>     include/dt-bindings/clock/s3c2412.h                |  73 ++
->>>>>     16 files changed, 627 insertions(+), 817 deletions(-)
->>>>>     create mode 100644
->>>>>     Documentation/devicetree/bindings/clock/samsung,s3c2412-clock.txt
->>>>>     delete mode 100644 arch/arm/mach-s3c24xx/clock-s3c2412.c
->>>>>     create mode 100644 drivers/clk/samsung/clk-s3c2412.c
->>>>>     create mode 100644 include/dt-bindings/clock/s3c2412.h
->>>>
->>>> For mach and DT patches:
->>>>
->>>> Reviewed-by: Tomasz Figa<t.figa@samsung.com>
->>>>
->>>> Kukjin, I'll take binding and clock patches to Samsung clock tree as
->>>> soon as DT bindings get acked by one of DT maintainers. I will prepare a
->>>> branch for you to apply mach patches on top. Is it fine for you?
->>>
->>> I think Kukjin already applied the s3c2416/s3c2443 series on top of your
->>> clock-pm-changes in the linux-samsung tree [1], so it might be best to just
->>> pile this series on top of it.
->>
->> I'm aware of this, but I'm afraid this might cause conflicts with
->> remaining patches that I might have to apply in this release cycle.
->>
->> Patch clk/samsung: add support for multiple clock providers[1] is mostly
->> what I have in my mind, but there is also at least one patch that is
->> based on top of PM rework floating on the list.
->>
->> I'd try to sort this out first with Kukjin and if we fail we will have
->> to fall back to merging any clock patches through Samsung tree for this
->> release cycle.
+>>>>> On Friday 21 February 2014 14:18:49 Tomasz Figa wrote:
+>>>>>>
+>>>>>>
+>>>>>>> Now that we have a broader agreement on this, I think we can go
+>>>>>>> ahead with the
+>>>>>>> following steps as an initial approach:
+>>>>>>> 1. Have a common machine file for both exynos4 and 5 files,
+>>>>>>> mach-exynos-dt.c.
+>>>>>>> 2. Introduce a generic compatible string "samsung,exynos".
 >
-YES!
+> Well, I think, we need to consider to use compatible string
+> "samsung,exynos" again because "exynos" name can be used on ARMv8 as
+> well and I don't want to say that generic/common something is always
+> good. So IMHO still using exynos4 and exynos5 would be better.
 
-> Better if we can sort it out, but if these patches must go through the
-> samsung tree then please add my Ack.
+You can create a new compatible string (e.g. "samsung,exynos-armv8") for 
+ARMv8 Exynos if support for one in mainline shows up and/or simply use 
+another name for ARMv7 Exynos (e.g. "samsung,exynos-armv7").
+
+>>>>>>> 3. Append this to the compatible property list for existing boards.
+>>>>>>>
+>>>>>>> If this plan looks OK, I can send across patches doing this.
+>>>>>>>
+>>>>>>
+>>>>>> Looks good. I would also merge common.c with this resulting
+>>>>>> mach-exynos-dt.c, as it would be the only user of the code there.
+>>>>>
+>>>>>
+>>>>> Sounds good. While the naming is not important, I would just call the
+>>>>> file 'exynos.c', in line with some of the other platforms we have.
+>>>>> Both the 'mach-' and the '-dt' part of the file name are redundant.
+>>>>>
+>>>>> Alternatively, you could merge it all into common.c.
+>>>>
+>>>>
+>>>> exynos.c sounds good to me.
+>>>
 >
-Agreed and thanks.
+> Well, let me see common.c and mach-exynos.c, one is for SoC specific
+> stuff and the other is for Board specific so I think, keeping current
+> file would be good, we can change the file name mach-exynos.c or
+> board-exynos.c though.
 
-Tomasz, I'll take this series with you and Mike's ack then if required, 
-can you please merge the branch "v3.15-next/clk-s3c24xx" into your clk 
-branch?
+There is no board specific stuff in mach-exynos/ with DT, so there is no 
+need to keep those file separate, especially when stuff from common.c is 
+constantly being (re)moved.
 
-- Kukjin
+Also I'd rather stick to what other platforms use, which would be 
+exynos.c (like tegra.c), as Arnd proposed.
+
+Best regards,
+Tomasz
