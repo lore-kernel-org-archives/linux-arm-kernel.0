@@ -1,42 +1,85 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Tue, 25 Feb 2014 14:06:45 +0100
-Subject: [PATCHv2 1/5] ARM: tegra: remove obsolete gpio entries
-In-Reply-To: <1393330950-7283-2-git-send-email-heikki.krogerus@linux.intel.com>
-References: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>
- <1393330950-7283-2-git-send-email-heikki.krogerus@linux.intel.com>
-Message-ID: <5570705.i8uRb6OetD@fb07-iapwap2>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Feb 2014 14:19:30 +0100
+Subject: [PATCH v8 1/6] dt-bindings: sram: describe option to reserve
+ parts of the memory
+In-Reply-To: <126672712.tufE5adZWC@phil>
+References: <21117503.1c6iOkvYSr@phil> <126672712.tufE5adZWC@phil>
+Message-ID: <201402251419.31151.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heikki,
-
-Am Dienstag, 25. Februar 2014, 14:22:26 schrieb Heikki Krogerus:
-> After moving to description based gpio interface in
-> rfkill-gpio, the gpio numbers are not used any more.
+On Tuesday 25 February 2014, Heiko St?bner wrote:
+> Some SoCs need parts of their sram for special purposes. So while being part
+> of the peripheral, it should not be part of the genpool controlling the sram.
 > 
-> Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> Therefore add the option to define reserved regions as subnodes of the
+> sram-node similar to defining reserved global memory regions.
 
-Reviewed-by: Marc Dietrich <marvin24@gmx.de>
+[adding Sachin Kamat to Cc, he just had the same issue]
 
-Thanks for taking care!
-
-Marc
-
+> Originally
+> Suggested-by: Rob Herring <robherring2@gmail.com>
+> 
+> Using subnodes for reserved regions
+> Suggested-by: Grant Likely <grant.likely@linaro.org>
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
 > ---
->  arch/arm/mach-tegra/board-paz00.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+>  Documentation/devicetree/bindings/misc/sram.txt | 33 +++++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
 > 
-> diff --git a/arch/arm/mach-tegra/board-paz00.c
-> b/arch/arm/mach-tegra/board-paz00.c index e4dec9f..9c6029b 100644
-> --- a/arch/arm/mach-tegra/board-paz00.c
-> +++ b/arch/arm/mach-tegra/board-paz00.c
-> @@ -23,9 +23,7 @@
->  #include "board.h"
-> 
->  static struct rfkill_gpio_platform_data wifi_rfkill_platform_data = {
-> -	.name		= "wifi_rfkill",
-> -	.reset_gpio	= 25, /* PD1 */
-> -	.shutdown_gpio	= 85, /* PK5 */
-> +	.name	= "wifi_rfkill",
->  	.type	= RFKILL_TYPE_WLAN,
+> diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
+> index 4d0a00e..2d83758 100644
+> --- a/Documentation/devicetree/bindings/misc/sram.txt
+> +++ b/Documentation/devicetree/bindings/misc/sram.txt
+> @@ -8,9 +8,42 @@ Required properties:
+>  
+>  - reg : SRAM iomem address range
+>  
+> +Reserving sram areas:
+> +---------------------
+> +
+> +Each child of the sram node specifies a region of reserved memory. Each
+> +child node should use a 'reg' property to specify a specific range of
+> +reserved memory.
+> +
+> +Following the generic-names recommended practice, node names should
+> +reflect the purpose of the node. Unit address (@<address>) should be
+> +appended to the name.
+> +
+> +Required properties in the sram node:
+> +
+> +- #address-cells, #size-cells : should use the same values as the root node
+> +- ranges : standard definition, should be empty
+
+I think we should rather define the 'ranges' property to translate from
+addresses within the sram to bus addresses.
+
+> +Required properties in the area nodes:
+> +
+> +- reg : iomem address range
+> +
+> +Optional properties in the area nodes:
+> +
+> +- compatible : standard definition
+> +
+
+Is this enough? Normally we should define a list of "compatible" strings
+that people can add to, but not have an anything-allowed option.
+
+>  Example:
+>  
+>  sram: sram at 5c000000 {
+>  	compatible = "mmio-sram";
+>  	reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
+> +
+> +	#adress-cells = <1>;
+> +	#size-cells = <1>;
+> +	ranges;
+> +
+> +	smp-sram at 5c000100 {
+> +		compatible = "socvendor,smp-sram";
+> +		reg = <0x5c000100 0x50>;
+> +	};
 >  };
