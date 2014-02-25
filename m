@@ -1,36 +1,73 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Tue, 25 Feb 2014 11:42:22 -0800
-Subject: [PATCH v4 0/6] generic early_ioremap support
-In-Reply-To: <1393353942.26583.10.camel@deneb.redhat.com>
-References: <1392238575-10000-1-git-send-email-msalter@redhat.com>	
- <1393337404.7307.51.camel@deneb.redhat.com>	
- <20140225183012.GA27164@mudshark.cambridge.arm.com>
- <1393353942.26583.10.camel@deneb.redhat.com>
-Message-ID: <530CF21E.1020603@zytor.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Feb 2014 20:46:03 +0100
+Subject: [PATCH RESEND] ARM: imx6: build pm-imx6q.c independently of
+ CONFIG_PM
+In-Reply-To: <1392690905-16839-1-git-send-email-shawn.guo@linaro.org>
+References: <1392690905-16839-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201402252046.04144.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2014 10:45 AM, Mark Salter wrote:
-> On Tue, 2014-02-25 at 18:30 +0000, Will Deacon wrote:
->> I'd suggest spitting the core part out from the arch-specific parts. That
->> way, the core part can merged independently and architectures can move over
->> as they see fit. It also signals (at least to me) that, "hey, I should
->> probably review this" whilst my current stance is "there's a whole load of
->> stuff under mm/ that needs to be acked first".
->>
->> If you put the whole thing into next, you just run the risk of conflicts
->> with all the arch trees.
-> 
-> I've been thinking of breaking out the common bits and x86 bits and just
-> going with that for now. There's no point in just doing the common bits
-> because it won't get tested without at least one architecture using it.
+On Tuesday 18 February 2014, Shawn Guo wrote:
+> When building a kernel image with only CONFIG_CPU_IDLE but no CONFIG_PM,
+> we will get the following link error.
 > 
 
-If you think it makes sense we could take the common bits + x86 and put
-them through the -tip tree.  The other option would be to put the whole
-thread in linux-next with Acks.
+I seem to need more changes on top of this, to allow building with neither
+CPU_IDLE nor PM enabled. Can you verify that?
 
-As far as x86 is concerned it looks like it is mostly just code
-movement, so I'm happy giving my:
+	Arnd
 
-Acked-by: H. Peter Anvin <hpa@linux.intel.com>
+commit 6a434aea44d8a250f8ee2205be9bc429b140b663
+Author: Arnd Bergmann <arnd@arndb.de>
+Date:   Mon Feb 24 22:19:50 2014 +0100
+
+    ARM: imx: more CONFIG_PM fixes
+    
+    This lets us build the imx code in more configurations.
+    
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index a3fcd9c..a367675 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -147,15 +147,13 @@ int imx_cpu_kill(unsigned int cpu);
+ 
+ void imx6q_pm_init(void);
+ void imx6q_pm_set_ccm_base(void __iomem *base);
+-#ifdef CONFIG_PM
+-void imx6_suspend(void __iomem *ocram_vbase);
+ void imx6dl_pm_init(void);
+ void imx6sl_pm_init(void);
++#ifdef CONFIG_PM
++void imx6_suspend(void __iomem *ocram_vbase);
+ void imx5_pm_init(void);
+ #else
+ static inline void imx6_suspend(void __iomem *ocram_vbase) {}
+-static inline void imx6dl_pm_init(void) {}
+-static inline void imx6sl_pm_init(void) {}
+ static inline void imx5_pm_init(void) {}
+ #endif
+ 
+diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
+index bb69943..5fea999 100644
+--- a/arch/arm/mach-imx/pm-imx6q.c
++++ b/arch/arm/mach-imx/pm-imx6q.c
+@@ -521,10 +521,12 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
+ 
+ 	WARN_ON(!ccm_base);
+ 
+-	ret = imx6q_ocram_suspend_init(socdata);
+-	if (ret)
+-		pr_warn("%s: failed to initialize ocram suspend %d!\n",
+-			__func__, ret);
++	if (IS_ENABLED(CONFIG_ARM_CPU_SUSPEND)) {
++		ret = imx6q_ocram_suspend_init(socdata);
++		if (ret)
++			pr_warn("%s: failed to initialize ocram suspend %d!\n",
++				__func__, ret);
++	}
+ 
+ 	/*
+ 	 * This is for SW workaround step #1 of ERR007265, see comments
