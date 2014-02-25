@@ -1,74 +1,44 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 25 Feb 2014 16:30:45 +0100
-Subject: [PATCH 00/10] pinctrl: mvebu: remove hard-coded addresses from
- Dove pinctrl
-In-Reply-To: <20140225151656.GI1010@titan.lakedaemon.net>
-References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140224181023.GA1010@titan.lakedaemon.net>
- <CACRpkdZ+YGTyDj6i8c198MdRtz3GY-YBmVO9LysPCcmT4EC0cg@mail.gmail.com>
- <20140225151656.GI1010@titan.lakedaemon.net>
-Message-ID: <530CB725.5070904@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Feb 2014 16:36:14 +0100
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <20140225130523.GE3793@kw.sim.vm.gnt>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <201402251344.23958.arnd@arndb.de> <20140225130523.GE3793@kw.sim.vm.gnt>
+Message-ID: <201402251636.15257.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/14 16:16, Jason Cooper wrote:
-> On Tue, Feb 25, 2014 at 10:36:54AM +0100, Linus Walleij wrote:
->> On Mon, Feb 24, 2014 at 7:10 PM, Jason Cooper <jason@lakedaemon.net> wrote:
->>> I've now created mvebu/pinctrl-dove for this series.  It's based on
->>> v3.14-rc1, and depends on mvebu/pinctrl (which depends on
->>> mvebu/pinctrl-3xx).
->>>
->>> I've kept this series in a separate branch in case we encounter an
->>> unforeseen problem with something in here.  Then this branch can be
->>> dropped, and /pinctrl-3xx and /pinctrl will still make it in.
->>>
->>> So, all patches except 3 and 4 are in mvebu/pinctrl-dove.  3 and 4 are
->>> in mvebu/dt.
->>
->> OK so what should I be pulling in first now?
->
-> Of course I woke up this morning not happy with this :-/  Here's what it
-> looks like currently:
->
->    /v3.14-rc1
->    |
-> --+---+---+---+---+ mvebu/pinctrl-3xx
->    |               \
->    |---+---+---+---+---+---+---+ mvebu/pinctrl
->    \                           \
->     \---------------------------+---+---+---+ mvebu/pinctrl-dove
->
-> Not to scale.
->
->
-> I would prefer to do:
->
->    /v3.14-rc1
->    |
-> --+---+---+---+---+ mvebu/pinctrl-cleanup
->    |               \
->    |----------------+--+---+---+ mvebu/pinctrl-3xx
->    \                \
->     \----------------+---+---+--+---+---+---+ mvebu/pinctrl-dove
->
-> But this would mean moving some patches to branches other than what they
-> were sent with.  The advantage is that /pinctrl-3xx and /pinctrl-dove
-> don't depend on each other, and only depend on -cleanup.  Which is great
-> if there is something wrong in either branch.
->
-> Sebastian, I can cherry-pick the patches around, but you know the code
-> better than any of us, do you foresee any problems with this scenario?
+On Tuesday 25 February 2014, Simon Guinot wrote:
+> On Tue, Feb 25, 2014 at 01:44:23PM +0100, Arnd Bergmann wrote:
+> > On Sunday 23 February 2014, Simon Guinot wrote:
+> > > I am quite busy this days but as soon I get some free time I will take
+> > > care of the DT conversion for the Lacie boards.
+> > > 
+> > > Basically, we need to fix some minor issues with the Thomas patches:
+> > > 
+> > > ARM: kirkwood: convert d2net_v2 to DT
+> > > ARM: kirkwood: convert LaCie Net{2, 5}Big v2 platforms to DT
+> > > 
+> > > And also a DT binding must be added to the LED driver leds-netxbig.
+> > 
+> > I just took a brief look at the LED driver. I think it would be
+> > reasonable to move almost all of the platform_data into the driver
+> > itself and associate the two versions with distinct "compatible"
+> > strings. That works in this particular case because while the driver
+> > is generic enough to handle other cases, I also wouldn't expect
+> > it to ever get used again on another platform.
+> 
+> Actually, this driver is also used by the Atom-based LaCie NASes.
+> Mainline support for this platforms should be provided soon.
 
-If Thomas agrees, I can rework Armada 375/38x pinctrl stubs to fit on
-mvebu/pinctrl. That should allow you to have mvebu/pinctrl-dove
-independent of mvebu/pinctrl-3xx.
+Do you use DT for those machines as well, or how do you get the
+data into the driver there?
 
-Not a big deal, I'd just pick 375/38x patches from mvebu/pinctrl and 
-squash them into mvebu/pinctrl-3xx. The only "issue" is that DT
-documentation update patches from mvebu/pinctrl-dove have to be split
-too.
+> > The main change to the driver would be to add support for a binding
+> > that gets the seven gpio numbers out of the DT then.
+> 
+> Unfortunately not, we have to pass the whole thing through DT.
 
-I'll prepare the three new branches for you and Thomas to look at
-today.
+Ok :(
 
-Sebastian
+	Arnd
