@@ -1,84 +1,114 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 25 Feb 2014 11:30:09 +0100
-Subject: [PATCH v2 01/11] ARM: shmobile: r8a7790: Add MSIOF clocks
+Date: Tue, 25 Feb 2014 11:30:11 +0100
+Subject: [PATCH v2 03/11] ARM: shmobile: lager legacy: Add MSIOF support
 In-Reply-To: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
 References: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1393324219-3317-2-git-send-email-geert@linux-m68k.org>
+Message-ID: <1393324219-3317-4-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Add clocks for MSIOF0, 1, 2, and 3.
-DEV_ID is 1-based for compatibility with the BSP, as QSPI uses zero.
+Add MSIOF resources, platform data, platform device, pinctrl, and SPI
+child device.
+
+  - Only MSIOF1 is in use, and thus registered. Its bus contains a single
+    device (a Renesas R2A11302FT PMIC).
+  - Platform device numbering is 1-based for compatibility with the BSP,
+    as QSPI uses zero, so MSIOF1's device name is "spi_r8a7790_msiof.2".
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 ---
 v2:
-  - No changes
+  - Removed resources for unused MSIOF channels.
 
- arch/arm/mach-shmobile/clock-r8a7790.c |   14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/board-lager.c |   46 +++++++++++++++++++++++++++++-----
+ 1 file changed, 40 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index 3f93503f5b96..a6089a6ceabd 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -46,6 +46,7 @@
- #define CPG_BASE	0xe6150000
- #define CPG_LEN		0x1000
- 
-+#define SMSTPCR0	0xe6150130
- #define SMSTPCR1	0xe6150134
- #define SMSTPCR2	0xe6150138
- #define SMSTPCR3	0xe615013c
-@@ -55,6 +56,7 @@
- #define SMSTPCR9	0xe6150994
- #define SMSTPCR10	0xe6150998
- 
-+#define MSTPSR0		IOMEM(0xe6150030)
- #define MSTPSR1		IOMEM(0xe6150038)
- #define MSTPSR2		IOMEM(0xe6150040)
- #define MSTPSR3		IOMEM(0xe6150048)
-@@ -221,8 +223,10 @@ enum {
- 	MSTP522,
- 	MSTP502, MSTP501,
- 	MSTP315, MSTP314, MSTP313, MSTP312, MSTP311, MSTP305, MSTP304,
--	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202,
-+	MSTP216, MSTP215, MSTP208, MSTP207, MSTP206, MSTP205, MSTP204, MSTP203,
-+	MSTP202,
- 	MSTP124,
-+	MSTP000,
- 	MSTP_NR
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index f0104bfe544e..9d2d3b03af99 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -55,6 +55,7 @@
+ #include <linux/mtd/mtd.h>
+ #include <linux/spi/flash.h>
+ #include <linux/spi/rspi.h>
++#include <linux/spi/sh_msiof.h>
+ #include <linux/spi/spi.h>
+ #include <sound/rcar_snd.h>
+ #include <sound/simple_card.h>
+@@ -287,6 +288,17 @@ static const struct platform_device_info ether_info __initconst = {
+ 	.dma_mask	= DMA_BIT_MASK(32),
  };
  
-@@ -283,12 +287,16 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP305] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_MMC1], SMSTPCR3, 5, MSTPSR3, 0), /* MMC1 */
- 	[MSTP304] = SH_CLK_MSTP32_STS(&cp_clk, SMSTPCR3, 4, MSTPSR3, 0), /* TPU0 */
- 	[MSTP216] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 16, MSTPSR2, 0), /* SCIFB2 */
-+	[MSTP215] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 15, MSTPSR2, 0), /* MSIOF3 */
-+	[MSTP208] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 8, MSTPSR2, 0), /* MSIOF1 */
- 	[MSTP207] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 7, MSTPSR2, 0), /* SCIFB1 */
- 	[MSTP206] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 6, MSTPSR2, 0), /* SCIFB0 */
-+	[MSTP205] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 5, MSTPSR2, 0), /* MSIOF2 */
- 	[MSTP204] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 4, MSTPSR2, 0), /* SCIFA0 */
- 	[MSTP203] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 3, MSTPSR2, 0), /* SCIFA1 */
- 	[MSTP202] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 2, MSTPSR2, 0), /* SCIFA2 */
- 	[MSTP124] = SH_CLK_MSTP32_STS(&rclk_clk, SMSTPCR1, 24, MSTPSR1, 0), /* CMT0 */
-+	[MSTP000] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR0, 0, MSTPSR0, 0), /* MSIOF0 */
++/* MSIOF1 */
++static const struct resource sh_msiof1_resources[] __initconst = {
++	DEFINE_RES_MEM(0xe6e10000, 0x0064),
++	DEFINE_RES_IRQ(gic_spi(157)),
++};
++
++static const struct sh_msiof_spi_info sh_msiof_info __initconst = {
++	.rx_fifo_override	= 256,
++	.num_chipselect		= 1,
++};
++
+ /* SPI Flash memory (Spansion S25FL512SAGMFIG11 64Mb) */
+ static struct mtd_partition spi_flash_part[] = {
+ 	/* Reserved for user loader program, read-only */
+@@ -325,12 +337,19 @@ static const struct rspi_plat_data qspi_pdata __initconst = {
+ 
+ static const struct spi_board_info spi_info[] __initconst = {
+ 	{
+-		.modalias               = "m25p80",
+-		.platform_data          = &spi_flash_data,
+-		.mode                   = SPI_MODE_0,
+-		.max_speed_hz           = 30000000,
+-		.bus_num                = 0,
+-		.chip_select            = 0,
++		.modalias	 = "m25p80",
++		.platform_data	 = &spi_flash_data,
++		.mode		 = SPI_MODE_0,
++		.max_speed_hz	 = 30000000,
++		.bus_num	 = 0,
++		.chip_select	 = 0,
++	}, {
++		.modalias	 = "r2a1130x",
++		.max_speed_hz	 = 6000000,
++		.chip_select	 = 0,
++		.bus_num	 = 2,
++		.mode		 = SPI_MODE_3,
++		.controller_data = (void *)-ENOENT, /* HW controlled CS */
+ 	},
  };
  
- static struct clk_lookup lookups[] = {
-@@ -363,6 +371,10 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_mmcif.1", &mstp_clks[MSTP305]),
- 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
- 	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
-+	CLKDEV_DEV_ID("spi_r8a7790_msiof.1", &mstp_clks[MSTP000]),
-+	CLKDEV_DEV_ID("spi_r8a7790_msiof.2", &mstp_clks[MSTP208]),
-+	CLKDEV_DEV_ID("spi_r8a7790_msiof.3", &mstp_clks[MSTP205]),
-+	CLKDEV_DEV_ID("spi_r8a7790_msiof.4", &mstp_clks[MSTP215]),
- 	CLKDEV_DEV_ID("renesas_usbhs", &mstp_clks[MSTP704]),
- 	CLKDEV_DEV_ID("pci-rcar-gen2.0", &mstp_clks[MSTP703]),
- 	CLKDEV_DEV_ID("pci-rcar-gen2.1", &mstp_clks[MSTP703]),
+@@ -703,6 +722,15 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
+ 	/* I2C2 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("i2c-rcar.2", "pfc-r8a7790",
+ 				  "i2c2", "i2c2"),
++	/* MSIOF1 */
++	PIN_MAP_MUX_GROUP_DEFAULT("spi_r8a7790_msiof.2", "pfc-r8a7790",
++				  "msiof1_clk", "msiof1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("spi_r8a7790_msiof.2", "pfc-r8a7790",
++				  "msiof1_sync", "msiof1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("spi_r8a7790_msiof.2", "pfc-r8a7790",
++				  "msiof1_rx", "msiof1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("spi_r8a7790_msiof.2", "pfc-r8a7790",
++				  "msiof1_tx", "msiof1"),
+ 	/* QSPI */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("qspi.0", "pfc-r8a7790",
+ 				  "qspi_ctrl", "qspi"),
+@@ -811,6 +839,12 @@ static void __init lager_add_standard_devices(void)
+ 					  qspi_resources,
+ 					  ARRAY_SIZE(qspi_resources),
+ 					  &qspi_pdata, sizeof(qspi_pdata));
++	platform_device_register_resndata(&platform_bus, "spi_r8a7790_msiof",
++					  1 + 1, sh_msiof1_resources,
++					  ARRAY_SIZE(sh_msiof1_resources),
++					  &sh_msiof_info,
++					  sizeof(struct sh_msiof_spi_info));
++
+ 	spi_register_board_info(spi_info, ARRAY_SIZE(spi_info));
+ 
+ 	platform_device_register_data(&platform_bus, "reg-fixed-voltage", fixed_regulator_idx++,
 -- 
 1.7.9.5
