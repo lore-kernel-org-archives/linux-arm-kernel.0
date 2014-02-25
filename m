@@ -1,24 +1,95 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Feb 2014 20:18:33 +0100
-Subject: [GIT PULL] bcm pinctrl rename
-In-Reply-To: <CAEPRUYqUNxOT=KnhSmbXbL2e2tCs=jAhQqKLiVVc13okpBxHnw@mail.gmail.com>
-References: <CAEPRUYpCVpV7HwuO6c95ybk3yp1teJgW-9qwyHnjKbs03C9bgQ@mail.gmail.com>
- <20140221222947.GB13233@quad.lixom.net>
- <CAEPRUYqUNxOT=KnhSmbXbL2e2tCs=jAhQqKLiVVc13okpBxHnw@mail.gmail.com>
-Message-ID: <201402252018.34109.arnd@arndb.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 25 Feb 2014 20:23:35 +0100
+Subject: [PATCH 00/10] pinctrl: mvebu: remove hard-coded addresses from
+ Dove pinctrl
+In-Reply-To: <20140225154347.GJ1010@titan.lakedaemon.net>
+References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140224181023.GA1010@titan.lakedaemon.net>
+ <CACRpkdZ+YGTyDj6i8c198MdRtz3GY-YBmVO9LysPCcmT4EC0cg@mail.gmail.com>
+ <20140225151656.GI1010@titan.lakedaemon.net> <530CB725.5070904@gmail.com>
+ <20140225154347.GJ1010@titan.lakedaemon.net>
+Message-ID: <530CEDB7.2070103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 February 2014, Christian Daudt wrote:
-> Can you please pull the patches below. Note that if you wanto to
-> absolutely reduce this to the bone, you can drop the last patch in the
-> series titled "pinctrl: Rename Broadcom Capri pinctrl binding". That
-> is the documentation fixup, so the binding doc will be wrong until
-> 3.15. But that will reduce the change to just 2 lines :)
+[Cooked down Cc list to relevant people and added Ezequiel who agreed
+to test on Armada 375/38x.]
 
-I've gone through the remaining pull requests today but didn't touch
-this one. Since Olof asked for the changes, I'm expecting him to
-look at the new version first. I don't have an opinion on the contents
-myself.
+On 02/25/2014 04:43 PM, Jason Cooper wrote:
+> On Tue, Feb 25, 2014 at 04:30:45PM +0100, Sebastian Hesselbarth wrote:
+>> On 02/25/14 16:16, Jason Cooper wrote:
+>>> On Tue, Feb 25, 2014 at 10:36:54AM +0100, Linus Walleij wrote:
+>>>> On Mon, Feb 24, 2014 at 7:10 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+>>>>> I've now created mvebu/pinctrl-dove for this series.  It's based on
+>>>>> v3.14-rc1, and depends on mvebu/pinctrl (which depends on
+>>>>> mvebu/pinctrl-3xx).
+>>>>>
+>>>>> I've kept this series in a separate branch in case we encounter an
+>>>>> unforeseen problem with something in here.  Then this branch can be
+>>>>> dropped, and /pinctrl-3xx and /pinctrl will still make it in.
+>>>>>
+>>>>> So, all patches except 3 and 4 are in mvebu/pinctrl-dove.  3 and 4 are
+>>>>> in mvebu/dt.
+>>>>
+>>>> OK so what should I be pulling in first now?
+>>>
+>>> Of course I woke up this morning not happy with this :-/  Here's what it
+>>> looks like currently:
+>>>
+>>>    /v3.14-rc1
+>>>    |
+>>> --+---+---+---+---+ mvebu/pinctrl-3xx
+>>>    |               \
+>>>    |---+---+---+---+---+---+---+ mvebu/pinctrl
+>>>    \                           \
+>>>     \---------------------------+---+---+---+ mvebu/pinctrl-dove
+>>>
+>>> Not to scale.
+>>>
+>>>
+>>> I would prefer to do:
+>>>
+>>>    /v3.14-rc1
+>>>    |
+>>> --+---+---+---+---+ mvebu/pinctrl-cleanup
+>>>    |               \
+>>>    |----------------+--+---+---+ mvebu/pinctrl-3xx
+>>>    \                \
+>>>     \----------------+---+---+--+---+---+---+ mvebu/pinctrl-dove
+>>>
+>>> But this would mean moving some patches to branches other than what they
+>>> were sent with.  The advantage is that /pinctrl-3xx and /pinctrl-dove
+>>> don't depend on each other, and only depend on -cleanup.  Which is great
+>>> if there is something wrong in either branch.
+>>>
+>>> Sebastian, I can cherry-pick the patches around, but you know the code
+>>> better than any of us, do you foresee any problems with this scenario?
+>>
+>> If Thomas agrees, I can rework Armada 375/38x pinctrl stubs to fit on
+>> mvebu/pinctrl. That should allow you to have mvebu/pinctrl-dove
+>> independent of mvebu/pinctrl-3xx.
+>>
+>> Not a big deal, I'd just pick 375/38x patches from mvebu/pinctrl and
+>> squash them into mvebu/pinctrl-3xx. The only "issue" is that DT
+>> documentation update patches from mvebu/pinctrl-dove have to be split
+>> too.
+>>
+>> I'll prepare the three new branches for you and Thomas to look at
+>> today.
+>
+> Ok, great.  Thanks Sebastian!
 
-	Arnd
+Ok, branches based on v3.14-rc1 with above dependencies can be found on:
+
+https://github.com/shesselba/linux-dove.git for-mvebu/pinctrl-cleanup
+https://github.com/shesselba/linux-dove.git for-mvebu/pinctrl-3xx
+https://github.com/shesselba/linux-dove.git for-mvebu/pinctrl-dove
+
+and an a-i-o branch to ease testing:
+
+https://github.com/shesselba/linux-dove.git for-mvebu/all-merged-in
+
+@Jason: I guess we should resend all three branches as individual
+patches on list somehow.
+
+Sebastian
