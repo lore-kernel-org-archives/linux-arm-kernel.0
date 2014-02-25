@@ -1,79 +1,43 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 25 Feb 2014 18:34:01 +0100
-Subject: [PATCH] clk: Correct handling of NULL clk in __clk_{get, put}
-In-Reply-To: <20140225061614.22529.61524@quantum>
-References: <1389096223-23934-1-git-send-email-s.nawrocki@samsung.com>
- <20140225061614.22529.61524@quantum>
-Message-ID: <530CD409.80000@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 25 Feb 2014 18:33:59 +0100
+Subject: [PATCH v3 1/5] ARM: kirkwood: Add audio node to kirkwood.dtsi
+In-Reply-To: <1393349643-6652-1-git-send-email-andrew@lunn.ch>
+References: <1393349643-6652-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1393349643-6652-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+The binding has existed for a while, so add the missing node so it can
+be used by devices.
 
-On 25.02.2014 07:16, Mike Turquette wrote:
-> Quoting Sylwester Nawrocki (2014-01-07 04:03:43)
->> Ensure clk->kref is dereferenced only when clk is not NULL.
->>
->> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->
-> Taken into clk-fixes toward -rc5.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+v2:
+Tabify
+v3:
+More tabification
+---
+ arch/arm/boot/dts/kirkwood.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Thanks! \o/
-
-Best regards,
-Tomasz
-
->
-> Thanks!
-> Mike
->
->> ---
->> Hi Sachin,
->>
->> please try if this patch fixes the exyno5420 boot crash.
->>
->> Thanks,
->> Sylwester
->>
->>   drivers/clk/clk.c |   13 +++++++------
->>   1 file changed, 7 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index e3e0327..a1fe86f 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -2179,24 +2179,25 @@ EXPORT_SYMBOL_GPL(devm_clk_unregister);
->>    */
->>   int __clk_get(struct clk *clk)
->>   {
->> -       if (clk && !try_module_get(clk->owner))
->> -               return 0;
->> +       if (clk) {
->> +               if (!try_module_get(clk->owner))
->> +                       return 0;
->>
->> -       kref_get(&clk->ref);
->> +               kref_get(&clk->ref);
->> +       }
->>          return 1;
->>   }
->>
->>   void __clk_put(struct clk *clk)
->>   {
->> -       if (WARN_ON_ONCE(IS_ERR(clk)))
->> +       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
->>                  return;
->>
->>          clk_prepare_lock();
->>          kref_put(&clk->ref, __clk_release);
->>          clk_prepare_unlock();
->>
->> -       if (clk)
->> -               module_put(clk->owner);
->> +       module_put(clk->owner);
->>   }
->>
->>   /***        clk rate change notifiers        ***/
->> --
->> 1.7.9.5
->>
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 7b921b30cfcb..5a86fa820e12 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -310,5 +310,14 @@
+ 			#phy-cells = <0>;
+ 			status = "ok";
+ 		};
++
++		audio0: audio-controller at a0000 {
++			compatible = "marvell,kirkwood-audio";
++			reg = <0xa0000 0x2210>;
++			interrupts = <24>;
++			clocks = <&gate_clk 9>;
++			clock-names = "internal";
++			status = "disabled";
++		};
+ 	};
+ };
+-- 
+1.8.5.3
