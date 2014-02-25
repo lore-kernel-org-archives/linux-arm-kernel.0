@@ -1,59 +1,47 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 25 Feb 2014 11:30:11 +0100
-Subject: TWL6040 fails to initialize
-Message-ID: <530C70B3.4010103@epfl.ch>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 25 Feb 2014 11:30:08 +0100
+Subject: [PATCH v2 00/11] ARM: shmobile: MSIOF integration on r8a7790/lager
+ and r8a7791/koelsch
+Message-ID: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+        Hi Simon, Magnus,
 
-I got recently to work on the DT support for an OMAP4 board [1], and I
-encountered some troubles with the probe of the twl6040 audio codec on
-3.14-rc kernels. On 3.13, things were working correctly. So I somewhat
-managed to bisect this down to [c7f9129 mfd: twl6040: reg_defaults
-support for regmap]. But looking more into it, things are less obvious.
+This patch series integrates support for the MSIOF module in the Renesas
+R-Car H2 (r8a7790) and M2 (r8a7791) SoCs on the Lager and Koelsch
+development boards.
 
-When the init fails, here is what happens:
+It was tested on Lager and Koelsch, both legacy and DT, using a dummy
+driver for the Renesas r2a11302ft PMIC that reads out the PMIC's version
+ID.
 
-[    2.455749] twl6040 0-004b: Looking up vio-supply from device tree
-[    2.456359] twl6040 0-004b: Looking up v2v1-supply from device tree
-[    2.457061] twl6040 0-004b: Failed to set masks in 0x4: -121
-[    2.463043] twl6040: probe of 0-004b failed with error -121
+    [01/11] ARM: shmobile: r8a7790: Add MSIOF clocks
+    [02/11] ARM: shmobile: r8a7791: Add MSIOF clocks
+    [03/11] ARM: shmobile: lager legacy: Add MSIOF support
+    [04/11] ARM: shmobile: koelsch legacy: Add MSIOF support
+    [05/11] ARM: shmobile: r8a7790/lager dts: Rename label spi to qspi, add
+    	    spi0 alias
+    [06/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi to qspi,
+    	    add spi0 alias
+    [07/11] ARM: shmobile: r8a7790 dtsi: Add MSIOF nodes and aliases
+    [08/11] ARM: shmobile: r8a7791 dtsi: Add MSIOF nodes and aliases
+    [09/11] ARM: shmobile: lager dts: Add MSIOF nodes
+    [10/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
+    [11/11] ARM: shmobile: koelsch/lager/multi defconfig: Enable MSIOF
 
-logically resulting in
+These are (reworked versions of) the remaining patches not taken from v1.
+Changelogs are available in the individual patches.
 
-[    2.770050] omap-abe-twl6040 sound.4: ASoC: CODEC twl6040-codec not
-registered
-[    2.777770] omap-abe-twl6040 sound.4: snd_soc_register_card() failed:
--517
-[    2.785095] platform sound.4: Driver omap-abe-twl6040 requests probe
-deferral
+Thanks!
 
-We get a EREMOTEIO when calling regmap_add_irq_chip() from
-twl6040_probe(). regmap_add_irq_chip() will try to perform non-cached
-i2c writes, where the omap-i2c driver get a NACK from the remote chip.
-Strange enough, the non-cached read just before (i.e.
-twl6040_reg_read(twl6040, TWL6040_REG_ASICREV)) succeeds.
+Gr{oetje,eeting}s,
 
-After some fiddling around, I could find that delaying the call to
-regmap_add_irq_chip(), let's say by msleep(1), will "solve" the problem.
+						Geert
 
-As the TRM for TWL6040 is not public, and I cannot physically access the
-i2c bus on the board, I ran out of hypothesis. I first suspected a
-concurrent access from the McPDM bus, but the mcpdm driver does not seem
-to perform command (write) access.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-As the regulators are enabled just before, could it be the twl6040 IP
-which is not yet initialized, and NACK'ing writes but not reads? The
-commit c7f9129 changed the regmap logic by reducing the number of
-non-cached accesses, and thus changed the access timings, so it may have
-trigged this behaviour. But this is pure supposition, as I cannot hack
-the i2c bus :( And adding any kind of tracing before
-regmap_add_irq_chip() usually delays enough to make the probe succeeds.
-
-Any ideas?
-
-Regards,
-Florian
-
-[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/110801
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
