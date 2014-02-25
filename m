@@ -1,98 +1,124 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 25 Feb 2014 20:05:41 +0100
-Subject: =?UTF-8?q?=5BPATCH=201/2=5D=20of=3A=20Add=20vendor=20prefixes=20used=20by=20Kirkwood=20devices?=
-Message-ID: <1393355142-7811-1-git-send-email-andrew@lunn.ch>
+Date: Tue, 25 Feb 2014 20:05:42 +0100
+Subject: [PATCH 2/2] devicetree: bindings: add missing Marvell Kirkwood SoC
+ documentation
+In-Reply-To: <1393355142-7811-1-git-send-email-andrew@lunn.ch>
+References: <1393355142-7811-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1393355142-7811-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a number of vendor prefixes by kirkwood devices. These are not all
-stock tickers, but have been in use for a while so changing would not
-be easy.
+Marvell Dove SoC binding was not documented, yet. Add the
+documentation including the supported SoCs and boards.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ .../devicetree/bindings/arm/marvell,kirkwood.txt   | 97 ++++++++++++++++++++++
+ 1 file changed, 97 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index c73b435f58f5..860c467374fe 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -18,6 +18,7 @@ auo	AU Optronics Corporation
- avago	Avago Technologies
- bosch	Bosch Sensortec GmbH
- brcm	Broadcom Corporation
-+buffalo	Buffalo, Inc.
- capella	Capella Microsystems, Inc
- cavium	Cavium, Inc.
- cdns	Cadence Design Systems Inc.
-@@ -28,25 +29,31 @@ cortina	Cortina Systems, Inc.
- dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
- davicom	DAVICOM Semiconductor, Inc.
- denx	Denx Software Engineering
-+dlink	D-Link Corporation
- edt	Emerging Display Technologies
- emmicro	EM Microelectronic
- epfl	Ecole Polytechnique F?d?rale de Lausanne
- epson	Seiko Epson Corp.
- est	ESTeem Wireless Modems
-+excito	Excito
- fsl	Freescale Semiconductor
- GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
- gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
- gmt	Global Mixed-mode Technology, Inc.
-+globalscale	GlobalScale Technologies, Inc.
- gumstix	Gumstix, Inc.
- haoyu	Haoyu Microelectronic Co. Ltd.
- hisilicon	Hisilicon Limited.
- hp	Hewlett Packard
- ibm	International Business Machines (IBM)
- idt	Integrated Device Technologies, Inc.
-+iom	Iomega Corporation
- img	Imagination Technologies Ltd.
- intercontrol	Inter Control Group
- isl	Intersil
- karo	Ka-Ro electronics GmbH
-+keymile	Keymile GmbH
-+lacie	LaCie
- lg	LG Corporation
- linux	Linux-specific binding
- lsi	LSI Corp. (LSI Logic)
-@@ -54,7 +61,9 @@ marvell	Marvell Technology Group Ltd.
- maxim	Maxim Integrated Products
- microchip	Microchip Technology Inc.
- mosaixtech	Mosaix Technologies, Inc.
-+mpl	MPL AG
- national	National Semiconductor
-+netgear	Netgear, Inc.
- nintendo	Nintendo
- nvidia	NVIDIA
- nxp	NXP Semiconductors
-@@ -62,10 +71,12 @@ onnn	ON Semiconductor Corp.
- panasonic	Panasonic Corporation
- phytec	PHYTEC Messtechnik GmbH
- picochip	Picochip Ltd
-+plathome	Plat'Home Co., Ltd.
- powervr	PowerVR (deprecated, use img)
- qca	Qualcomm Atheros, Inc.
- qcom	Qualcomm, Inc.
- qnap	QNAP Systems, Inc.
-+raidsonic	RaidSonic Technology GmbH
- ralink	Mediatek/Ralink Technology Corp.
- ramtron	Ramtron International
- realtek Realtek Semiconductor Corp.
-@@ -75,6 +86,7 @@ rockchip	Fuzhou Rockchip Electronics Co., Ltd
- samsung	Samsung Semiconductor
- sbs	Smart Battery System
- schindler	Schindler
-+seagate	Seagate Technology PLC
- sil	Silicon Image
- silabs	Silicon Laboratories
- simtek
-@@ -95,3 +107,4 @@ winbond Winbond Electronics corp.
- wlf	Wolfson Microelectronics
- wm	Wondermedia Technologies, Inc.
- xlnx	Xilinx
-+zyxel	ZyXEL Communications Corp.
+diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+new file mode 100644
+index 000000000000..925ecbf6e7b7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+@@ -0,0 +1,97 @@
++Marvell Kirkwood SoC Family Device Tree Bindings
++------------------------------------------------
++
++Boards with a SoC of the Marvell Kirkwook family, eg 88f6281
++
++* Required root node properties:
++compatible: must contain "marvell,kirkwood"
++
++In addition, the above compatible shall be extended with the specific
++SoC. Currently known SoC compatibles are:
++
++"marvell,kirkwood-88f6192"
++"marvell,kirkwood-88f6281"
++"marvell,kirkwood-88f6282"
++"marvell,kirkwood-88f6283"
++"marvell,kirkwood-88f6702"
++"marvell,kirkwood-98DX4122"
++
++And in addition, the compatible shall be extended with the specific
++board. Currently known boards are:
++
++"buffalo,lschlv2"
++"buffalo,lsxhl"
++"buffalo,lsxl"
++"dlink,dns-320"
++"dlink,dns-320-a1"
++"dlink,dns-325"
++"dlink,dns-325-a1"
++"dlink,dns-kirkwood"
++"excito,b3"
++"globalscale,dreamplug-003-ds2001"
++"globalscale,guruplug"
++"globalscale,guruplug-server-plus"
++"globalscale,sheevaplug"
++"globalscale,sheevaplug"
++"globalscale,sheevaplug-esata"
++"globalscale,sheevaplug-esata-rev13"
++"iom,iconnect"
++"iom,iconnect-1.1"
++"iom,ix2-200"
++"keymile,km_kirkwood"
++"lacie,cloudbox"
++"lacie,inetspace_v2"
++"lacie,laplug"
++"lacie,netspace_lite_v2"
++"lacie,netspace_max_v2"
++"lacie,netspace_mini_v2"
++"lacie,netspace_v2"
++"marvell,db-88f6281-bp"
++"marvell,db-88f6282-bp"
++"marvell,mv88f6281gtw-ge"
++"marvell,rd88f6281"
++"marvell,rd88f6281"
++"marvell,rd88f6281-a0"
++"marvell,rd88f6281-a1"
++"mpl,cec4"
++"mpl,cec4-10"
++"netgear,readynas"
++"netgear,readynas"
++"netgear,readynas-duo-v2"
++"netgear,readynas-nv+-v2"
++"plathome,openblocks-a6"
++"plathome,openblocks-a7"
++"raidsonic,ib-nas6210"
++"raidsonic,ib-nas6210-b"
++"raidsonic,ib-nas6220"
++"raidsonic,ib-nas6220-b"
++"raidsonic,ib-nas62x0"
++"seagate,dockstar"
++"seagate,goflexnet"
++"synology,ds109"
++"synology,ds110jv10"
++"synology,ds110jv20"
++"synology,ds110jv30"
++"synology,ds111"
++"synology,ds209"
++"synology,ds210jv10"
++"synology,ds210jv20"
++"synology,ds212"
++"synology,ds212jv10"
++"synology,ds212jv20"
++"synology,ds212pv10"
++"synology,ds409"
++"synology,ds409slim"
++"synology,ds410j"
++"synology,ds411"
++"synology,ds411j"
++"synology,ds411slim"
++"synology,ds413jv10"
++"synology,rs212"
++"synology,rs409"
++"synology,rs411"
++"synology,rs812"
++"usi,topkick"
++"usi,topkick-1281P2"
++"zyxel,nsa310"
++"zyxel,nsa310a"
 -- 
 1.8.5.3
