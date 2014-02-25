@@ -1,59 +1,85 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 25 Feb 2014 11:10:01 -0500
-Subject: [PATCH] watchdog: orion_wdt: Use %pa to print 'phys_addr_t'
-In-Reply-To: <20140225150947.GA22740@localhost>
-References: <1392726234-16977-1-git-send-email-fabio.estevam@freescale.com>
- <20140224203352.GA21204@spo001.leaseweb.com>
- <20140225150947.GA22740@localhost>
-Message-ID: <20140225161001.GL1010@titan.lakedaemon.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 25 Feb 2014 10:22:45 -0600
+Subject: [PATCH] ARM: EDMA: Use platform_get_resource functions for DT
+In-Reply-To: <53078E9B.5010806@ti.com>
+References: <1392956661-28787-1-git-send-email-joelf@ti.com>
+ <20140221121548.GF8783@e106331-lin.cambridge.arm.com>
+ <53078E9B.5010806@ti.com>
+Message-ID: <CAL_JsqKedQu30rX=k8U5Harzki1jAzKhG3OyPT75y=K+by7pVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio,
+On Fri, Feb 21, 2014 at 11:36 AM, Joel Fernandes <joelf@ti.com> wrote:
+> On 02/21/2014 06:15 AM, Mark Rutland wrote:
+>>> Also, while at it get rid of the assumption in the code that "CC" is at reg
+>>> index 0 in the DT and xbar is at offset 1. Instead use reg-names to get the
+>>> memory resource in concern keeping things much cleaner and simpler. This also
+>>> makes it possible to have multiple channel controllers.
+>>
+>> While this is nice I think we have to have a fallback to the existing
+>> behaviour if there's no reg-names property present, unless we know for
+>> certain no-one is possibly using an existing DTB.
+>
+> Yes, its true it break existing DTBs but currently only 2 TI SoCs use EDMA this
+> way, the vast majority of EDMA users are yet to follow where we can do it right.
+>  Further, the old bindings are really limiting specially the 2 CC case and if
+> additionally memory maps are used in the future. So keeping the old binding is
+> limiting in this regard.
+>
+> Here is what the platform_data used to look like when used by mach-davinci:
+>
+> static struct resource da850_edma_resources[] = {
+>         {
+>                 .name   = "edma_cc0",
+>                 .start  = DA8XX_TPCC_BASE,
+>                 .end    = DA8XX_TPCC_BASE + SZ_32K - 1,
+>                 .flags  = IORESOURCE_MEM,
+>         },
+>         {
+>                 .name   = "edma_tc0",
+>                 .start  = DA8XX_TPTC0_BASE,
+>                 .end    = DA8XX_TPTC0_BASE + SZ_1K - 1,
+>                 .flags  = IORESOURCE_MEM,
+>         },
+>         {
+>                 .name   = "edma_tc1",
+>                 .start  = DA8XX_TPTC1_BASE,
+>                 .end    = DA8XX_TPTC1_BASE + SZ_1K - 1,
+>                 .flags  = IORESOURCE_MEM,
+>         },
+>         {
+>                 .name   = "edma_cc1",
+>                 .start  = DA850_TPCC1_BASE,
+>                 .end    = DA850_TPCC1_BASE + SZ_32K - 1,
+>                 .flags  = IORESOURCE_MEM,
+>         },
+>
+> As you can see, there are several memory maps and different interpretations.
+> Considering this, IMO- it makes sense to pay a small price to keep the semantics
+> sane.
 
-On Tue, Feb 25, 2014 at 12:09:48PM -0300, Ezequiel Garcia wrote:
-> Jason,
-> 
-> On Mon, Feb 24, 2014 at 09:33:52PM +0100, Wim Van Sebroeck wrote:
-> > > When building an ARM multi_v7_defconfig with LPAE option selected we get the
-> > > following build warning:
-> > > 
-> > > drivers/watchdog/orion_wdt.c:272:2: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'phys_addr_t' [-Wformat=]
-> > > 
-> > > Fix it by using %pa to print 'phys_addr_t'.
-> > > 
-> > > Reported-by: Olof's autobuilder <build@lixom.net>
-> > > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > > ---
-> > >  drivers/watchdog/orion_wdt.c | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-> > > index 15321aa..6f9b4c6 100644
-> > > --- a/drivers/watchdog/orion_wdt.c
-> > > +++ b/drivers/watchdog/orion_wdt.c
-> > > @@ -269,7 +269,7 @@ static void __iomem *orion_wdt_ioremap_rstout(struct platform_device *pdev,
-> > >  
-> > >  	rstout = internal_regs + ORION_RSTOUT_MASK_OFFSET;
-> > >  
-> > > -	WARN(1, FW_BUG "falling back to harcoded RSTOUT reg 0x%x\n", rstout);
-> > > +	WARN(1, FW_BUG "falling back to harcoded RSTOUT reg %pa\n", &rstout);
-> > >  	return devm_ioremap(&pdev->dev, rstout, 0x4);
-> > >  }
-> > >  
-> > > -- 
-> > > 1.8.1.2
-> > > 
-> > > 
-> > 
-> > Acked-by me also, but can this also go via the mvebu tree (since the patch that introduces this is also there??
-> > 
-> 
-> Can you pull this too? It's been acked by Wim and me.
+Then do 1 compatible string per interpretation. That can then define
+the number of CCs and TCs.
 
-I don't have a local archive of the watchdog ML, could you resend the
-patch to me?
+>
+> On the other hand, the other 2 options are:
+> 1. We add a fallback if reg-names look up fails.
 
-thx,
+reg-names is supposed to be optional, so you should already have that fallback.
 
-Jason.
+Rob
+
+> 2. We inject reg-names property into edma DT nodes that don't have them, and
+> make sure all future dtsi with edma nodes mention the reg-names property.
+>
+> These 2 are a bit error prone though, for example if someone deliberately
+> forgets to mention reg-names, and the code still works, but misbehaves in some way.
+>
+> Regards,
+> -Joel
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
