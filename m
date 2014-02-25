@@ -1,69 +1,112 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 24 Feb 2014 22:16:14 -0800
-Subject: [PATCH] clk: Correct handling of NULL clk in __clk_{get, put}
-In-Reply-To: <1389096223-23934-1-git-send-email-s.nawrocki@samsung.com>
-References: <1389096223-23934-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20140225061614.22529.61524@quantum>
+From: lho@apm.com (Loc Ho)
+Date: Mon, 24 Feb 2014 23:16:47 -0700
+Subject: [PATCH RESEND v10 4/4] arm64: Add APM X-Gene SoC 15Gbps Multi-purpose
+ PHY DTS entries
+Message-ID: <1393309007-4012-1-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sylwester Nawrocki (2014-01-07 04:03:43)
-> Ensure clk->kref is dereferenced only when clk is not NULL.
-> 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+This patch adds the DTS entries for the APM X-Gene SoC 15Gbps Multi-purpose
+PHY driver. The PHY for SATA controller 2 and 3 are enabled by default.
 
-Taken into clk-fixes toward -rc5.
+Signed-off-by: Loc Ho <lho@apm.com>
+Signed-off-by: Tuan Phan <tphan@apm.com>
+Signed-off-by: Suman Tripathi <stripathi@apm.com>
+---
+ arch/arm64/boot/dts/apm-storm.dtsi |   75 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 75 insertions(+), 0 deletions(-)
 
-Thanks!
-Mike
-
-> ---
-> Hi Sachin,
-> 
-> please try if this patch fixes the exyno5420 boot crash.
-> 
-> Thanks,
-> Sylwester
-> 
->  drivers/clk/clk.c |   13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index e3e0327..a1fe86f 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -2179,24 +2179,25 @@ EXPORT_SYMBOL_GPL(devm_clk_unregister);
->   */
->  int __clk_get(struct clk *clk)
->  {
-> -       if (clk && !try_module_get(clk->owner))
-> -               return 0;
-> +       if (clk) {
-> +               if (!try_module_get(clk->owner))
-> +                       return 0;
-> 
-> -       kref_get(&clk->ref);
-> +               kref_get(&clk->ref);
-> +       }
->         return 1;
->  }
-> 
->  void __clk_put(struct clk *clk)
->  {
-> -       if (WARN_ON_ONCE(IS_ERR(clk)))
-> +       if (!clk || WARN_ON_ONCE(IS_ERR(clk)))
->                 return;
-> 
->         clk_prepare_lock();
->         kref_put(&clk->ref, __clk_release);
->         clk_prepare_unlock();
-> 
-> -       if (clk)
-> -               module_put(clk->owner);
-> +       module_put(clk->owner);
->  }
-> 
->  /***        clk rate change notifiers        ***/
-> --
-> 1.7.9.5
-> 
+diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+index d37d736..c78ddcf 100644
+--- a/arch/arm64/boot/dts/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm-storm.dtsi
+@@ -176,6 +176,51 @@
+ 				reg-names = "csr-reg";
+ 				clock-output-names = "eth8clk";
+ 			};
++
++			sataphy1clk: sataphy1clk at 1f21c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "socplldiv2";
++				reg = <0x0 0x1f21c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "sataphy1clk";
++				status = "disabled";
++				csr-offset = <0x4>;
++				csr-mask = <0x00>;
++				enable-offset = <0x0>;
++				enable-mask = <0x06>;
++			};
++
++			sataphy2clk: sataphy1clk at 1f22c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "socplldiv2";
++				reg = <0x0 0x1f22c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "sataphy2clk";
++				status = "ok";
++				csr-offset = <0x4>;
++				csr-mask = <0x3a>;
++				enable-offset = <0x0>;
++				enable-mask = <0x06>;
++			};
++
++			sataphy3clk: sataphy1clk at 1f23c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				clock-names = "socplldiv2";
++				reg = <0x0 0x1f23c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "sataphy3clk";
++				status = "ok";
++				csr-offset = <0x4>;
++				csr-mask = <0x3a>;
++				enable-offset = <0x0>;
++				enable-mask = <0x06>;
++			};
+ 		};
+ 
+ 		serial0: serial at 1c020000 {
+@@ -187,5 +232,35 @@
+ 			interrupt-parent = <&gic>;
+ 			interrupts = <0x0 0x4c 0x4>;
+ 		};
++
++		phy1: phy at 1f21a000 {
++			compatible = "apm,xgene-phy";
++			reg = <0x0 0x1f21a000 0x0 0x100>;
++			#phy-cells = <1>;
++			clocks = <&sataphy1clk 0>;
++			status = "disabled";
++			apm,tx-boost-gain = <30 30 30 30 30 30>;
++			apm,tx-eye-tuning = <2 10 10 2 10 10>;
++		};
++
++		phy2: phy at 1f22a000 {
++			compatible = "apm,xgene-phy";
++			reg = <0x0 0x1f22a000 0x0 0x100>;
++			#phy-cells = <1>;
++			clocks = <&sataphy2clk 0>;
++			status = "ok";
++			apm,tx-boost-gain = <30 30 30 30 30 30>;
++			apm,tx-eye-tuning = <1 10 10 2 10 10>;
++		};
++
++		phy3: phy at 1f23a000 {
++			compatible = "apm,xgene-phy";
++			reg = <0x0 0x1f23a000 0x0 0x100>;
++			#phy-cells = <1>;
++			clocks = <&sataphy3clk 0>;
++			status = "ok";
++			apm,tx-boost-gain = <31 31 31 31 31 31>;
++			apm,tx-eye-tuning = <2 10 10 2 10 10>;
++		};
+ 	};
+ };
+-- 
+1.5.5
