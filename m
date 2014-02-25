@@ -1,40 +1,23 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 25 Feb 2014 00:24:11 -0800
-Subject: [PATCH 1/2] clk: ti: am335x: remove unecessary cpu0 clk node
-In-Reply-To: <1391019557-22313-2-git-send-email-nm@ti.com>
-References: <1391019557-22313-1-git-send-email-nm@ti.com>
- <1391019557-22313-2-git-send-email-nm@ti.com>
-Message-ID: <20140225082411.22529.21466@quantum>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 25 Feb 2014 09:31:52 +0100
+Subject: [PATCH 1/4] pinctrl-sunxi: Fix sun5i-a13 port F multiplexing
+In-Reply-To: <1392671984-29872-2-git-send-email-hdegoede@redhat.com>
+References: <1392671984-29872-1-git-send-email-hdegoede@redhat.com>
+ <1392671984-29872-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <CACRpkdbVC6cGH-5pvGEyH7FfFryEbobe3pXBb=qra-z=mnQcoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Nishanth Menon (2014-01-29 10:19:16)
-> cpu0 clock node has no functionality, since cpufreq-cpu0 is already
-> capable of picking up the clock from dts.
-> 
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+On Mon, Feb 17, 2014 at 10:19 PM, Hans de Goede <hdegoede@redhat.com> wrote:
 
-Taken into clk-next!
+> The correct value for selecting the mmc0 function on port F pins is 2 not 4,
+> as per the data-sheet:
+> http://dl.linux-sunxi.org/A13/A13%20Datasheet%20-%20v1.12%20%282012-03-29%29.pdf
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Regards,
-Mike
+Patch applied.
 
-> ---
->  drivers/clk/ti/clk-33xx.c |    1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
-> index 776ee45..028b337 100644
-> --- a/drivers/clk/ti/clk-33xx.c
-> +++ b/drivers/clk/ti/clk-33xx.c
-> @@ -34,7 +34,6 @@ static struct ti_dt_clk am33xx_clks[] = {
->         DT_CLK(NULL, "dpll_core_m5_ck", "dpll_core_m5_ck"),
->         DT_CLK(NULL, "dpll_core_m6_ck", "dpll_core_m6_ck"),
->         DT_CLK(NULL, "dpll_mpu_ck", "dpll_mpu_ck"),
-> -       DT_CLK("cpu0", NULL, "dpll_mpu_ck"),
->         DT_CLK(NULL, "dpll_mpu_m2_ck", "dpll_mpu_m2_ck"),
->         DT_CLK(NULL, "dpll_ddr_ck", "dpll_ddr_ck"),
->         DT_CLK(NULL, "dpll_ddr_m2_ck", "dpll_ddr_m2_ck"),
-> -- 
-> 1.7.9.5
-> 
+Yours,
+Linus Walleij
