@@ -1,28 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Feb 2014 18:03:08 +0100
-Subject: [GIT PULL] integrator base patches for v3.15
-In-Reply-To: <CACRpkdbtv2ZQbt0=7QhBZSRRAdONgKeKCO9yj=UwWRAU2WOWwA@mail.gmail.com>
-References: <CACRpkdYeaMqTNUTqBSg6vNa9=VucjpFFkx3diHJJNgZTg+iq1w@mail.gmail.com>
- <201402241117.48617.arnd@arndb.de>
- <CACRpkdbtv2ZQbt0=7QhBZSRRAdONgKeKCO9yj=UwWRAU2WOWwA@mail.gmail.com>
-Message-ID: <201402251803.08685.arnd@arndb.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 25 Feb 2014 14:07:16 -0300
+Subject: [RFC/PATCH 1/2] ARM: mvebu: Enable Armada 375 watchdog in the
+ devicetree
+Message-ID: <1393348037-2932-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 February 2014, Linus Walleij wrote:
-> >
-> > irqchip: VIC: export vic_init_cascaded
-> >
-> > vic_init_cascaded is called by integrator impd1 code that can
-> > be a loadable module, so the function has to be exported.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Can either of you pls apply this directly to the ARM SoC tree?
-> 
+Add the DT nodes to enable the watchdog support available on
+Armada 375 SoC.
 
-Applied on next/drivers now.
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-375.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-	ARnd
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index 3877693f..a4e4116 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -320,6 +320,13 @@
+ 				clocks = <&coreclk 0>;
+ 			};
+ 
++			watchdog at 20300 {
++				compatible = "marvell,armada-375-wdt", "marvell,armada-370-wdt";
++				reg = <0x20300 0x34>, <0x20704 0x4>;
++				clocks = <&coreclk 0>;
++				timeout-sec = <10>;
++			};
++
+ 			xor at 60800 {
+ 				compatible = "marvell,orion-xor";
+ 				reg = <0x60800 0x100
+-- 
+1.8.1.5
