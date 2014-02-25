@@ -1,16 +1,14 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 24 Feb 2014 19:49:24 -0700
-Subject: [PATCH] ARM: bcm2835: Move to mach-bcm directory
-In-Reply-To: <1392941771-15774-1-git-send-email-markus.mayer@linaro.org>
-References: <1392941771-15774-1-git-send-email-markus.mayer@linaro.org>
-Message-ID: <530C04B4.9020204@wwwdotorg.org>
+Date: Mon, 24 Feb 2014 19:49:39 -0700
+Subject: [PATCH] ARM: bcm2835: fix defconfig to select ARCH_BCM
+In-Reply-To: <1392958593-11910-1-git-send-email-swarren@wwwdotorg.org>
+References: <1392958593-11910-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <530C04C3.9000305@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2014 05:16 PM, Markus Mayer wrote:
-> Move the bcm2835 board file into the mach-bcm directory. This allows us
-> to get rid of the mach-bcm2835 directory with the associated Kconfig
-> and Makefile.
+On 02/20/2014 09:56 PM, Stephen Warren wrote:
+> Without this, ARCH_BCM2835 is no longer available, and hence the kernel
+> won't boot!
 
-I've applied this to bcm2835's for-3.15/soc branch (and squashed the
-defconfig fix into it).
+I've squashed this into bcm2835's for-3.15/soc branch.
