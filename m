@@ -1,13 +1,15 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 25 Feb 2014 11:07:30 -0500
+Date: Tue, 25 Feb 2014 11:10:01 -0500
 Subject: [PATCH] watchdog: orion_wdt: Use %pa to print 'phys_addr_t'
 In-Reply-To: <20140225150947.GA22740@localhost>
 References: <1392726234-16977-1-git-send-email-fabio.estevam@freescale.com>
  <20140224203352.GA21204@spo001.leaseweb.com>
  <20140225150947.GA22740@localhost>
-Message-ID: <20140225160729.GK1010@titan.lakedaemon.net>
+Message-ID: <20140225161001.GL1010@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Fabio,
 
 On Tue, Feb 25, 2014 at 12:09:48PM -0300, Ezequiel Garcia wrote:
 > Jason,
@@ -49,7 +51,8 @@ On Tue, Feb 25, 2014 at 12:09:48PM -0300, Ezequiel Garcia wrote:
 > 
 > Can you pull this too? It's been acked by Wim and me.
 
-Yep, I'll add it onto the stack.
+I don't have a local archive of the watchdog ML, could you resend the
+patch to me?
 
 thx,
 
