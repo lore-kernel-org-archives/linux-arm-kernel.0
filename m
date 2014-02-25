@@ -1,8 +1,9 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 25 Feb 2014 11:41:19 +0000
-Subject: [PATCH v2 1/3] ata: ahci_st: Provide DT bindings for ST's SATA
- implementation
-Message-ID: <1393328481-7251-1-git-send-email-lee.jones@linaro.org>
+Date: Tue, 25 Feb 2014 11:41:20 +0000
+Subject: [PATCH v2 2/3] ARM: DT: STi: Add DT node for ST's SATA device
+In-Reply-To: <1393328481-7251-1-git-send-email-lee.jones@linaro.org>
+References: <1393328481-7251-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1393328481-7251-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,46 +12,64 @@ Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/ata/ahci-st.txt | 31 +++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/ata/ahci-st.txt
+ arch/arm/boot/dts/stih416-b2020-revE.dts |  4 ++++
+ arch/arm/boot/dts/stih416-b2020.dts      |  4 ++++
+ arch/arm/boot/dts/stih416.dtsi           | 16 ++++++++++++++++
+ 3 files changed, 24 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-st.txt b/Documentation/devicetree/bindings/ata/ahci-st.txt
-new file mode 100644
-index 0000000..1b69fa9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/ata/ahci-st.txt
-@@ -0,0 +1,31 @@
-+STMicroelectronics STi SATA controller
+diff --git a/arch/arm/boot/dts/stih416-b2020-revE.dts b/arch/arm/boot/dts/stih416-b2020-revE.dts
+index 693d0ec..7350a86 100644
+--- a/arch/arm/boot/dts/stih416-b2020-revE.dts
++++ b/arch/arm/boot/dts/stih416-b2020-revE.dts
+@@ -37,5 +37,9 @@
+ 			st,pcie-tx-pol-inv;
+ 			st,sata-gen = <3>;
+ 		};
 +
-+This binding describes a SATA device.
++		sata0: sata at fe380000{
++			status = "okay";
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/stih416-b2020.dts b/arch/arm/boot/dts/stih416-b2020.dts
+index fd9cbad..ebd784b 100644
+--- a/arch/arm/boot/dts/stih416-b2020.dts
++++ b/arch/arm/boot/dts/stih416-b2020.dts
+@@ -18,5 +18,9 @@
+ 			st,pcie_tx_pol_inv = <1>;
+ 			st,sata_gen = "gen3";
+ 		};
 +
-+Required properties:
-+ - compatible	   : Must be "st,ahci"
-+ - reg		   : Physical base addresses and length of register sets
-+ - interrupts	   : Interrupt associated with the SATA device
-+ - interrupt-names :   Associated name must be; "hostc"
-+ - resets	   : The power-down and soft-reset lines of SATA IP
-+ - reset-names	   :   Associated names must be; "pwr-dwn" and "sw-rst"
-+ - clocks	   : The phandle for the clock
-+ - clock-names	   :   Associated name must be; "ahci_clk"
-+ - phys		   : The phandle for the PHY device
-+ - phy-names	   :   Associated name must be; "ahci_phy"
++		sata0: sata at fe380000{
++			status = "okay";
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index 0d3f59c..313d4fd 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -205,5 +205,21 @@
+ 			#phy-cells 	= <2>;
+ 			st,syscfg  	= <&syscfg_rear>;
+ 		};
 +
-+Example:
++		sata0: sata at fe380000 {
++			compatible      = "st,ahci";
++			reg             = <0xfe380000 0x1000>;
++			interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
++			interrupt-names = "hostc";
++			phys	        = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
++			phy-names       = "sata-phy";
++			resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
++					  <&softreset STIH416_SATA0_SOFTRESET>;
++			reset-names     = "pwr-dwn", "sw-rst";
++			clock-names     = "ahci_clk";
++			clocks	        = <&CLK_S_ICN_REG_0>;
 +
-+	sata0: sata at fe380000 {
-+		compatible      = "st,ahci";
-+		reg             = <0xfe380000 0x1000>;
-+		interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
-+		interrupt-names = "hostc";
-+		phys	        = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
-+		phy-names       = "ahci_phy";
-+		resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
-+				  <&softreset STIH416_SATA0_SOFTRESET>;
-+		reset-names     = "pwr-dwn", "sw-rst";
-+		clocks	        = <&CLK_S_ICN_REG_0>;
-+		clock-names     = "ahci_clk";
-+	};
++			status	        = "disabled";
++		};
+ 	};
+ };
 -- 
 1.8.3.2
