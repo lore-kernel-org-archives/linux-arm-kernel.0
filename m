@@ -1,34 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Feb 2014 16:44:01 +0100
-Subject: DMABOUNCE in pci-rcar
-In-Reply-To: <CANqRtoSsra-NQF_4dz1iBjzEvdaUco9o3gbPi_6rEgswV=maCw@mail.gmail.com>
-References: <201402241200.21944.arnd@arndb.de>
- <20140225001748.GS21483@n2100.arm.linux.org.uk>
- <CANqRtoSsra-NQF_4dz1iBjzEvdaUco9o3gbPi_6rEgswV=maCw@mail.gmail.com>
-Message-ID: <201402251644.01463.arnd@arndb.de>
+From: johannes@sipsolutions.net (Johannes Berg)
+Date: Tue, 25 Feb 2014 16:15:42 +0100
+Subject: [PATCHv2 1/5] ARM: tegra: remove obsolete gpio entries
+In-Reply-To: <1393330950-7283-2-git-send-email-heikki.krogerus@linux.intel.com>
+References: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>
+ <1393330950-7283-2-git-send-email-heikki.krogerus@linux.intel.com>
+Message-ID: <1393341342.4170.9.camel@jlt4.sipsolutions.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 February 2014, Magnus Damm wrote:
-> And the DMABOUNCE code does not support HIGHMEM, so because of that
-> the block layer BOUNCE is also used.
+On Tue, 2014-02-25 at 14:22 +0200, Heikki Krogerus wrote:
+> After moving to description based gpio interface in
+> rfkill-gpio, the gpio numbers are not used any more.
+> 
+> Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> ---
+>  arch/arm/mach-tegra/board-paz00.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 
-Ah, I misunderstood this part previously. I understand better what's
-going on now, but this also enforces the impression that both BOUNCE
-and DMABOUNCE are not what you should be doing here.
+Hm, ok, I'm not sure I should take a tegra patch through the mac80211 ->
+wireless -> networking trees. OTOH, I suppose that the second patch
+depends on this. I can take it all I suppose, Thierry? Stephen?
 
-On a related note, I've had some more discussions with Santosh on IRC,
-and I think he's in the exact same position on mach-keystone, so we
-should make sure that whatever solution either of you comes up with
-also works for the other one.
-
-The situation on keystone may be a little worse even, because all their
-DMA masters have a 2GB limit, but it's also possible that the same
-is true for you. Which categories of DMA masters do you have on R-Car?
-
-a) less than 32-bit mask, with IOMMU
-b) less than 32-bit mask, without IOMMU
-c) 32-bit mask
-d) 64-bit mask
-
-	Arnd
+johannes
