@@ -1,35 +1,48 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 24 Feb 2014 20:40:48 -0500
-Subject: [PATCH v13 2/3] ata: Add APM X-Gene SoC AHCI SATA host
- controller driver
-In-Reply-To: <CAPw-ZT=VHj+fO-7+G6Zdx+T+osJhXaR9AYHbx_TbWFWHBiDKYg@mail.gmail.com>
-References: <1393221265-13057-1-git-send-email-lho@apm.com>
- <1393221265-13057-2-git-send-email-lho@apm.com>
- <1393221265-13057-3-git-send-email-lho@apm.com>
- <20140224183129.GA2522@htj.dyndns.org>
- <CAPw-ZT=VHj+fO-7+G6Zdx+T+osJhXaR9AYHbx_TbWFWHBiDKYg@mail.gmail.com>
-Message-ID: <20140225014048.GA3450@htj.dyndns.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 25 Feb 2014 10:54:48 +0900
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7778/r8a7779 dtsi: Improve and
+ correct HSPI bindings
+In-Reply-To: <20140224002837.GA3898@verge.net.au>
+References: <1392908239-22645-1-git-send-email-geert@linux-m68k.org>
+ <20140224002837.GA3898@verge.net.au>
+Message-ID: <20140225015445.GA8995@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey,
+On Mon, Feb 24, 2014 at 09:28:40AM +0900, Simon Horman wrote:
+> On Thu, Feb 20, 2014 at 03:57:18PM +0100, Geert Uytterhoeven wrote:
+> > From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> > 
+> > Binding documentation:
+> >   - Add future-proof "renesas,hspi-<soctype>" compatible values,
+> >   - Add "interrupt-parent", "#address-cells" and "#size-cells" properties,
+> >   - Add reference to pinctrl documentation,
+> >   - Add example bindings.
+> > 
+> > r8a7778 and r8a7779 dtsi:
+> >   - Add "renesas,hspi-r8a7778" resp. "renesas,hspi-r8a7779" compatible
+> >     values,
+> >   - Correct reference to parent interrupt controller
+> >     (use "interrupt-parent" instead of "interrupt-controller"),
+> >   - Add missing "#address-cells" and "#size-cells" properties, which are
+> >     needed when populating the SPI buses.
+> > 
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+> > Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com> [HSPI/BockW]
+> > Cc: Mark Brown <broonie@linaro.org>
+> > ---
+> > v2:
+> >   - Add Tested-by
+> >   - List full example compatible properties with soctypes instead of just
+> >     the soctypes, so checkpatch can validate DTSes.
+> 
+> Thanks, I have queued this up.
 
-On Mon, Feb 24, 2014 at 05:02:52PM -0800, Loc Ho wrote:
-> The completion of the RAM removal from shutdown is quite fast. As per
-> spec, the max time is 1ms but from the run-time code, it only take one
-> (1us) or two (2us) read for this to completed. An 1 ms hard delay is more
-> than 100 time slower. The code isn't that complex. If you strongly advise
-> that I should remove the while loop and use 1 ms, then okay. Otherwise, I
-> would prefer to keep the original code.
+I have dropped this patch and because it updates both driver documentation
+and shmobile code.
 
-The code is rather silly because as it's written the delay may be upto
-100ms.  If it's sitting in the hot path, using things like
-usleep_range() makes sense.  In probe / shutdown paths, it's just an
-unnecessary distraction.  If the timeout is as short as 1ms, it
-doesn't really matter whether the hardware can do it faster or not.
-It's just irrelevant.  Please just write simple code.
+Please split the patch into two, one to be taken by the driver maintainer,
+Mark Brown. And one to be taken by me. Thanks
 
-Thanks.
-
--- 
-tejun
+I have also dropped the second patch of this series, which depends on this
+patch.
