@@ -1,21 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Feb 2014 09:38:32 +0100
-Subject: [PATCH 4/4] pinctrl-sunxi: Fix interrupt register offset
- calculation
-In-Reply-To: <1392671984-29872-5-git-send-email-hdegoede@redhat.com>
-References: <1392671984-29872-1-git-send-email-hdegoede@redhat.com>
- <1392671984-29872-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <CACRpkdZj+h0RkGK_a-iVTt6ZmmzkfXOU40rLEPaeszgUadZ_Xg@mail.gmail.com>
+Date: Tue, 25 Feb 2014 09:43:31 +0100
+Subject: [PATCH] pinctrl: add pinctrl driver for imx6sx
+In-Reply-To: <dda7bce900ca4b358d1ed6f167f60940@BY2PR03MB315.namprd03.prod.outlook.com>
+References: <1392793619-16767-1-git-send-email-b20788@freescale.com>
+ <20140219083920.GJ3010@S2101-09.ap.freescale.net>
+ <dda7bce900ca4b358d1ed6f167f60940@BY2PR03MB315.namprd03.prod.outlook.com>
+Message-ID: <CACRpkdaYAH+WfSm-0UoxCU5m86g8Q6M3qROs8j2u0EAi8vUqeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 17, 2014 at 10:19 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+On Wed, Feb 19, 2014 at 9:43 AM, Anson.Huang at freescale.com
+<Anson.Huang@freescale.com> wrote:
 
-> This fixing setting the interrupt type for eints >= 8.
+> Hi, Shawn
 >
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>         OK, I will hold on these patches until Freescale announce this SOC, please ignore the dts patches as well.
 
-Patch applied with Maxime's ACK.
+OK just don't hold back stuff for too long, usually this kind of infrastructure
+needs to go in as early as possible (with clocks and regulators...)
 
 Yours,
 Linus Walleij
