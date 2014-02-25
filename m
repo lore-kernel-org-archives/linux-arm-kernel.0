@@ -1,80 +1,181 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 25 Feb 2014 15:23:19 +0100
-Subject: [RFC PATCH v4 4/8] staging: imx-drm: Document imx-hdmi device tree
- bindings
+Date: Tue, 25 Feb 2014 15:23:20 +0100
+Subject: [RFC PATCH v4 5/8] ARM: dts: imx51: Add IPU ports and endpoints,
+ move imx-drm node to dtsi
 In-Reply-To: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>
 References: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1393338203-25051-5-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1393338203-25051-6-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree binding documentation for the HDMI transmitter
-on i.MX6.
+This patch connects IPU and and parallel display device tree
+nodes using the OF graph bindings described in
+Documentation/devicetree/bindings/media/video-interfaces.txt
+
+The IPU ports correspond to the two display interfaces. The
+order of endpoints in the ports is arbitrary.
+
+Since the imx-drm node now only needs to contain links to the
+display interfaces, it can be moved to the SoC dtsi level. At
+the board level, only connections between the display interface
+ports and panels have to be added.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- .../devicetree/bindings/staging/imx-drm/hdmi.txt   | 53 ++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+ arch/arm/boot/dts/imx51-apf51dev.dts | 11 ++++++++++-
+ arch/arm/boot/dts/imx51-babbage.dts  | 28 ++++++++++++++++++++--------
+ arch/arm/boot/dts/imx51.dtsi         | 22 +++++++++++++++++++++-
+ 3 files changed, 51 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-new file mode 100644
-index 0000000..7dcd673a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
-@@ -0,0 +1,53 @@
-+Device-Tree bindings for HDMI Transmitter
+diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
+index 5a7f552..d3f9814 100644
+--- a/arch/arm/boot/dts/imx51-apf51dev.dts
++++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+@@ -18,7 +18,6 @@
+ 
+ 	display at di1 {
+ 		compatible = "fsl,imx-parallel-display";
+-		crtcs = <&ipu 0>;
+ 		interface-pix-fmt = "bgr666";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_ipu_disp1_1>;
+@@ -41,6 +40,12 @@
+ 				pixelclk-active = <0>;
+ 			};
+ 		};
 +
-+HDMI Transmitter
-+================
++		port {
++			display_in: endpoint {
++				remote-endpoint = <&ipu_di0_disp0>;
++			};
++		};
+ 	};
+ 
+ 	gpio-keys {
+@@ -122,3 +127,7 @@
+ 		};
+ 	};
+ };
 +
-+The LVDS Display Bridge device tree node contains up to two lvds-channel
-+nodes describing each of the two LVDS encoder channels of the bridge.
++&ipu_di0_disp0 {
++	remote-endpoint = <&display_in>;
++};
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index 6ff15a0..6719271 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -23,7 +23,6 @@
+ 
+ 	display0: display at di0 {
+ 		compatible = "fsl,imx-parallel-display";
+-		crtcs = <&ipu 0>;
+ 		interface-pix-fmt = "rgb24";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_ipu_disp1_1>;
+@@ -41,11 +40,16 @@
+ 				vsync-len = <10>;
+ 			};
+ 		};
 +
-+Required properties:
-+ - #address-cells : should be <1>
-+ - #size-cells : should be <0>
-+ - compatible : should be "fsl,imx6q-hdmi" or "fsl,imx6dl-hdmi".
-+ - gpr : should be <&gpr>.
-+   The phandle points to the iomuxc-gpr region containing the HDMI
-+   multiplexer control register.
-+ - clocks, clock-names : phandles to the HDMI iahb and isrf clocks, as described
-+   in Documentation/devicetree/bindings/clock/clock-bindings.txt and
-+   Documentation/devicetree/bindings/clock/imx6q-clock.txt.
-+ - port@[0-4]: Up to four port nodes with endpoint definitions as defined in
-+   Documentation/devicetree/bindings/media/video-interfaces.txt,
-+   corresponding to the four inputs to the HDMI multiplexer.
++		port {
++			display0_in: endpoint {
++				remote-endpoint = <&ipu_di0_disp0>;
++			};
++		};
+ 	};
+ 
+ 	display1: display at di1 {
+ 		compatible = "fsl,imx-parallel-display";
+-		crtcs = <&ipu 1>;
+ 		interface-pix-fmt = "rgb565";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_ipu_disp2_1>;
+@@ -68,6 +72,12 @@
+ 				pixelclk-active = <0>;
+ 			};
+ 		};
 +
-+example:
++		port {
++			display1_in: endpoint {
++				remote-endpoint = <&ipu_di1_disp1>;
++			};
++		};
+ 	};
+ 
+ 	gpio-keys {
+@@ -81,12 +91,6 @@
+ 		};
+ 	};
+ 
+-	imx-drm {
+-		compatible = "fsl,imx-drm";
+-		crtcs = <&ipu 0>, <&ipu 1>;
+-		connectors = <&display0>, <&display1>;
+-	};
+-
+ 	sound {
+ 		compatible = "fsl,imx51-babbage-sgtl5000",
+ 			     "fsl,imx-audio-sgtl5000";
+@@ -264,6 +268,14 @@
+ 	};
+ };
+ 
++&ipu_di0_disp0 {
++	remote-endpoint = <&display0_in>;
++};
 +
-+	gpr: iomuxc-gpr at 020e0000 {
-+		/* ... */
++&ipu_di1_disp1 {
++	remote-endpoint = <&display1_in>;
++};
++
+ &ssi2 {
+ 	fsl,mode = "i2s-slave";
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 4bcdd3a..536644c 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -79,6 +79,11 @@
+ 		};
+ 	};
+ 
++	imx-drm {
++		compatible = "fsl,imx-drm";
++		ports = <&ipu_di0>, <&ipu_di1>;
 +	};
 +
-+        hdmi: hdmi at 0120000 {
-+                #address-cells = <1>;
-+                #size-cells = <0>;
-+                reg = <0x00120000 0x9000>;
-+                interrupts = <0 115 0x04>;
-+                gpr = <&gpr>;
-+                clocks = <&clks 123>, <&clks 124>;
-+                clock-names = "iahb", "isfr";
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -92,13 +97,28 @@
+ 		};
+ 
+ 		ipu: ipu at 40000000 {
+-			#crtc-cells = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 			compatible = "fsl,imx51-ipu";
+ 			reg = <0x40000000 0x20000000>;
+ 			interrupts = <11 10>;
+ 			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
+ 			clock-names = "bus", "di0", "di1";
+ 			resets = <&src 2>;
 +
-+                port at 0 {
-+                        reg = <0>;
++			ipu_di0: port at 2 {
++				reg = <2>;
 +
-+                        hdmi_mux_0: endpoint {
-+                                remote-endpoint = <&ipu1_di0_hdmi>;
-+                        };
-+                };
++				ipu_di0_disp0: endpoint {
++				};
++			};
 +
-+                port at 1 {
-+                        reg = <1>;
++			ipu_di1: port at 3 {
++				reg = <3>;
 +
-+                        hdmi_mux_1: endpoint {
-+                                remote-endpoint = <&ipu1_di1_hdmi>;
-+                        };
-+                };
-+        };
++				ipu_di1_disp1: endpoint {
++				};
++			};
+ 		};
+ 
+ 		aips at 70000000 { /* AIPS1 */
 -- 
 1.8.5.3
