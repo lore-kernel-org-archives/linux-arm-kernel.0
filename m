@@ -1,70 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 25 Feb 2014 09:08:30 +0000
-Subject: [PATCH 1/3] Documentation:spi:fsl-dspi:add DSPI dma transfer
- support
-In-Reply-To: <1393311258-14380-1-git-send-email-b44548@freescale.com>
-References: <1393311258-14380-1-git-send-email-b44548@freescale.com>
-Message-ID: <20140225090830.GO28555@e106331-lin.cambridge.arm.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 25 Feb 2014 17:08:35 +0800
+Subject: [RFC PATCH] arm64: add support for AES in CCM mode using Crypto
+ Extensions
+In-Reply-To: <CAKv+Gu_A_04P=nOoPfxhJMC3bbEPTcpgZO0Ldw2H4BV7T_gTbw@mail.gmail.com>
+References: <1392106905-28709-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140225070252.GB9934@gondor.apana.org.au>
+ <CAKv+Gu-HnTk5RCLRoCnae7-HH7C-Tq2YJF57Nc-hOEykdY52XA@mail.gmail.com>
+ <20140225071626.GA10524@gondor.apana.org.au>
+ <CAKv+Gu_A_04P=nOoPfxhJMC3bbEPTcpgZO0Ldw2H4BV7T_gTbw@mail.gmail.com>
+Message-ID: <20140225090835.GA11135@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 06:54:16AM +0000, Chao Fu wrote:
-> From: Chao Fu <B44548@freescale.com>
+On Tue, Feb 25, 2014 at 08:21:22AM +0100, Ard Biesheuvel wrote:
 > 
-> Add bool value use-dma.
-> The bool will determine whether DSPI use dma channel transfer data
-> in a platform.
-> 
-> Add dmas and dma-names for describing dma channels of DSPI.
-> 
-> Signed-off-by: Chao Fu      <b44548@freescale.com>
-> ---
->  Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
-> index 5376de4..76a1039 100644
-> --- a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
-> +++ b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
-> @@ -11,6 +11,11 @@ Required properties:
->  - spi-num-chipselects : the number of the chipselect signals.
->  - bus-num : the slave chip chipselect signal number.
->  - big-endian : if DSPI modudle is big endian, the bool will be set in node.
-> +- use-dma: the bool decide if use dma method in DSPI transfering.
+> For the authenticate-only data, this is manageable as you are only
+> dealing with input, but when dealing with both in- and output, as in
+> the core of CCM, it becomes very tedious.
+> So instead, I have opted for an inner blkcipher instance which takes
+> care of all of that. Could you suggest another approach that if
+> preferable?
 
-Why can the OS not decide this based on the presence of dmas which it
-can use?
+I don't think the walk helper actually needs the tfm apart from
+getting a couple of parameters out of it, so perhaps we can just
+change the helper to not depend on a tfm.
 
-Is there ever a case that there would be dmas present but it would be in
-the interests of the OS to not use them?
-
-Mark.
-
-> +- dmas: List of DMA specifiers with the controller specific format
-> +	as described in the generic DMA client binding. A tx and rx
-> +	specifier is required for each chip select.
-> +- dma-names: Should be named "tx" and "rx".
->  Example:
->  
->  dspi0 at 4002c000 {
-> @@ -26,6 +31,10 @@ dspi0 at 4002c000 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_dspi0_1>;
->  	big-endian;
-> +	use-dma;
-> +	dmas = <&edma0 0 12>,
-> +		<&edma0 0 13>;
-> +	dma-names = "rx", "tx";
->  	status = "okay";
->  
->  	sflash: at26df081a at 0 {
-> -- 
-> 1.8.4
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
