@@ -1,80 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Feb 2014 00:17:48 +0000
-Subject: DMABOUNCE in pci-rcar
-In-Reply-To: <CANqRtoTLUfK7bjhmUbTdBi7r7OzrmwdAg_wnRbGHN7EUjGtouQ@mail.gmail.com>
-References: <201402241200.21944.arnd@arndb.de>
- <CANqRtoTLUfK7bjhmUbTdBi7r7OzrmwdAg_wnRbGHN7EUjGtouQ@mail.gmail.com>
-Message-ID: <20140225001748.GS21483@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 25 Feb 2014 09:19:42 +0900
+Subject: [PATCH 2/3] arm64: Add Kconfig option for Samsung GH7 SoC family
+In-Reply-To: <20140220185805.GI7651@arm.com>
+References: <1392100183-30930-1-git-send-email-kgene.kim@samsung.com>
+ <5302B306.8090503@samsung.com>
+ <CAOesGMhnUDcUL7hREV=EYEGr5YG-ZLL6v9NiGcrBr6477WfdyQ@mail.gmail.com>
+ <6032891.ndY8FikAMY@wuerfel>
+ <CALAqxLX6STNqUeVO2G18bm_HKabpoRxZTa3uK6i-JP97zEYVZg@mail.gmail.com>
+ <CAOesGMjLR3PGXeyJPAvGwam4yK97+vnDfq5MVutJz75aKPX8gw@mail.gmail.com>
+ <CALAqxLU7ehHfvQa58HpdzojRU-2zhNpEgkr9KEJ3cf550WcnWw@mail.gmail.com>
+ <CAOesGMjSjzZ4iX3NVA6eS4LHJF2MQQ=KJpNgKWikJb6YkQxNpQ@mail.gmail.com>
+ <20140220112248.GC32456@localhost>
+ <CAOesGMhfhdqqb4hJ0hC5HbSWWMQc0FDaaZYO0rZ1cdFtuRgdig@mail.gmail.com>
+ <20140220185805.GI7651@arm.com>
+Message-ID: <530BE19E.2060004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 08:49:28AM +0900, Magnus Damm wrote:
-> On Mon, Feb 24, 2014 at 8:00 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >From my point of view we need some kind of bounce buffer unless we
-> have IOMMU support. I understand that an IOMMU would be much better
-> than a software-based implementation. If it is possible to use an
-> IOMMU with these devices remain to be seen.
-> 
-> I didn't know about the SWIOTLB code, neither did I know that
-> DMABOUNCE was supposed to be avoided. Now I do!
+On 02/21/14 03:58, Catalin Marinas wrote:
+> On Thu, Feb 20, 2014 at 05:09:59PM +0000, Olof Johansson wrote:
+>> On Thu, Feb 20, 2014 at 3:22 AM, Catalin Marinas
+>>> Two additional points:
+>>>
+>>> 1. Single arm64 defconfig file covering everything
+>>> 2. Modules rather than built-in by default where possible (especially
+>>>     for server platforms)
+>>
+>> Sounds good to me. Are you also willing to pick up one defconfig per
+>> vendor (but not more)? I think it's been useful to have those on arm,
+>> even on multiplatform kernels. We used them on powerpc as well, where
+>> we had a two-layer approach (ppc64_defconfig and per-platform configs,
+>> pseries/iseries/pasemi/g5/cell).
+>
+> Initially I would keep a single defconfig with everything just to get
+> wider coverage of single Image. Later on, if just deselecting config
+> entries doesn't work, we can revisit per-vendor defconfigs.
+>
+OK, agreed with single defconfig on ARMv8 for now. And as Olof said, 
+it's expected that each vendor maybe needs to use per-vendor defconfig 
+soon and agreed too :-)
 
-The reason DMABOUNCE should be avoided is because it is a known source
-of OOMs, and that has never been investigated and fixed.  You can read
-about some of the kinds of problems this code creates here:
-
-http://webcache.googleusercontent.com/search?q=cache:jwl4g8hqWa8J:comments.gmane.org/gmane.linux.ports.arm.kernel/15850+&cd=2&hl=en&ct=clnk&gl=uk&client=firefox-a
-
-That was never got to the bottom of.  I could harp on about not having
-the hardware, the people with the hardware not being capable of debugging
-it, or not willing to litter their kernels with printks when they've
-found a reproducable way to trigger it, etc - but none of that really
-matters.
-
-What matters is the end result is nothing was ever done to investigate
-the causes, so it remains "unsafe" to use.
-
-> I do realize that my following patches madly mix potential bus code
-> and actual device support, however..
-> 
-> [PATCH v2 06/08] PCI: rcar: Add DMABOUNCE support
-> [PATCH 07/08] PCI: rcar: Enable BOUNCE in case of HIGHMEM
-> 
-> .. without my patches the driver does not handle CONFIG_BOUNCE and
-> CONFIG_VMSPLIT_2G.
-
-Can we please kill the idea that CONFIG_VMSPLIT_* has something to do
-with DMA?  It doesn't.  VMSPLIT sets where the boundary between userspace
-and kernel space is placed in virtual memory.  It doesn't really change
-which memory is DMA-able.
-
-There is the BLK_BOUNCE_HIGH option, but that's more to do with drivers
-saying "I don't handle highmem pages because I'm old and no one's updated
-me".
-
-The same is true of highmem vs bouncing for DMA.  Highmem is purely a
-virtual memory concept and has /nothing/ to do with whether the memory
-can be DMA'd to.
-
-Let's take an extreme example.  Let's say I set a 3G VM split, so kernel
-memory starts at 0xc0000000.  I then set the vmalloc space to be 1024M -
-but the kernel strinks that down to the maximum that can be accomodated,
-which leaves something like 16MB of lowmem.  Let's say I have 512MB of
-RAM in the machine.
-
-Now let's consider I do the same thing, but with a 2G VM split.  Has the
-memory pages which can be DMA'd to changed at all?  Yes, the CPU's view
-of pages has changed, but the DMA engine's view hasn't changed /one/ /bit/.
-
-Now consider when vmalloc space isn't expanded to maximum and all that
-RAM is mapped into the kernel direct mapped region.  Again, any
-difference as far as the DMA engine goes?  No there isn't.
-
-So, the idea that highmem or vmsplit has any kind of impact on whether
-memory can be DMA'd to by the hardware is absolutely absurd.
-
-VMsplit and highmem are a CPU visible concept, and has very little to do
-with whether the memory is DMA-able.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Thanks,
+Kukjin
