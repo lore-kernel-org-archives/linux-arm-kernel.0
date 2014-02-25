@@ -1,16 +1,17 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 25 Feb 2014 11:30:14 +0100
-Subject: [PATCH v2 06/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi
- to qspi, add spi0 alias
+Date: Tue, 25 Feb 2014 11:30:17 +0100
+Subject: [PATCH v2 09/11] ARM: shmobile: lager dts: Add MSIOF nodes
 In-Reply-To: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
 References: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <1393324219-3317-7-git-send-email-geert@linux-m68k.org>
+Message-ID: <1393324219-3317-10-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-Prepare for the advent of MSIOF SPI, which will be spi1 to spi3.
+Add pinctrl and SPI device for MSIOF on Lager.
+On this board, only MSIOF1 is in use. Its bus contains a single device
+(a Renesas R2A11302FT PMIC), for which no bindings are defined yet.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 Cc: devicetree at vger.kernel.org
@@ -18,52 +19,48 @@ Cc: devicetree at vger.kernel.org
 v2:
   - No changes
 
- arch/arm/boot/dts/r8a7791-koelsch.dts |    4 ++--
- arch/arm/boot/dts/r8a7791.dtsi        |    3 ++-
- 2 files changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7790-lager.dts |   22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 603af8caae5b..03508cc73e8b 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -157,7 +157,7 @@
- 		renesas,function = "intc";
- 	};
- 
--	qspi_pins: spi {
-+	qspi_pins: spi0 {
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 86dbdc10fe9c..cdec1af99be1 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -159,6 +159,12 @@
  		renesas,groups = "qspi_ctrl", "qspi_data4";
  		renesas,function = "qspi";
  	};
-@@ -182,7 +182,7 @@
- 	status = "okay";
++
++	msiof1_pins: spi2 {
++		renesas,groups = "msiof1_clk", "msiof1_sync", "msiof1_rx",
++				 "msiof1_tx";
++		renesas,function = "msiof1";
++	};
  };
  
--&spi {
-+&qspi {
- 	pinctrl-0 = <&qspi_pins>;
+ &ether {
+@@ -221,6 +227,22 @@
+ 	};
+ };
+ 
++&msiof1 {
++	pinctrl-0 = <&msiof1_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++
++	pmic: pmic at 0 {
++		compatible = "renesas,r2a11302ft";
++		reg = <0>;
++		spi-max-frequency = <6000000>;
++		spi-cpol;
++		spi-cpha;
++	};
++
++};
++
+ &sdhi0 {
+ 	pinctrl-0 = <&sdhi0_pins>;
  	pinctrl-names = "default";
- 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index cde7bc486f22..3bc4546fa9c5 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -27,6 +27,7 @@
- 		i2c3 = &i2c3;
- 		i2c4 = &i2c4;
- 		i2c5 = &i2c5;
-+		spi0 = &qspi;
- 	};
- 
- 	cpus {
-@@ -762,7 +763,7 @@
- 		};
- 	};
- 
--	spi: spi at e6b10000 {
-+	qspi: spi at e6b10000 {
- 		compatible = "renesas,qspi-r8a7791", "renesas,qspi";
- 		reg = <0 0xe6b10000 0 0x2c>;
- 		interrupts = <0 184 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 1.7.9.5
