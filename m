@@ -1,251 +1,90 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 25 Feb 2014 18:34:02 +0100
-Subject: [PATCH v3 4/5] ARM: kirkwood: Add dts file describing HP T5325 thin
- client
+Date: Tue, 25 Feb 2014 18:34:03 +0100
+Subject: [PATCH v3 5/5] ARM: kirkwood: Add HP T5325 devices to
+ {multi|mvebu}_v5_defconfig
 In-Reply-To: <1393349643-6652-1-git-send-email-andrew@lunn.ch>
 References: <1393349643-6652-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1393349643-6652-5-git-send-email-andrew@lunn.ch>
+Message-ID: <1393349643-6652-6-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the T5325 using device tree properties, where possible.  The
-first version of this file was produced by Thomas Petazzoni.
+The HP T5325 has a PCI based VGA controller. Add the frame buffer
+driver, and frame buffer support to the defconfig's. Additionally
+add the soc audio framework and the necessary codec.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
-v3:
-Makefile hunk.
----
- arch/arm/boot/dts/Makefile           |   1 +
- arch/arm/boot/dts/kirkwood-t5325.dts | 208 +++++++++++++++++++++++++++++++++++
- 2 files changed, 209 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-t5325.dts
+ arch/arm/configs/multi_v5_defconfig | 9 +++++++++
+ arch/arm/configs/mvebu_v5_defconfig | 9 +++++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 436cc381db4a..20c152faa800 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -132,6 +132,7 @@ kirkwood := \
- 	kirkwood-rs411.dtb \
- 	kirkwood-sheevaplug.dtb \
- 	kirkwood-sheevaplug-esata.dtb \
-+	kirkwood-t5325.dtb \
- 	kirkwood-topkick.dtb \
- 	kirkwood-ts219-6281.dtb \
- 	kirkwood-ts219-6282.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-t5325.dts b/arch/arm/boot/dts/kirkwood-t5325.dts
-new file mode 100644
-index 000000000000..7d1c7677a18f
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-t5325.dts
-@@ -0,0 +1,208 @@
-+/*
-+ * Device Tree file for HP t5325 Thin Client"
-+ *
-+ * Copyright (C) 2014
-+ *
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ * Andrew Lunn <andrew@lunn.ch>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+*/
-+
-+/dts-v1/;
-+
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
-+
-+/ {
-+	model = "HP t5325 Thin Client";
-+	compatible = "hp,t5325", "marvell,kirkwood-88f6281", "marvell,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8";
-+	};
-+
-+	mbus {
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+			pinctrl-0 = <&pmx_i2s &pmx_sysrst>;
-+			pinctrl-names = "default";
-+
-+			pmx_button_power: pmx-button_power {
-+				marvell,pins = "mpp45";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_power_off: pmx-power-off {
-+				marvell,pins = "mpp48";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_led: pmx-led {
-+				marvell,pins = "mpp21";
-+				marvell,function = "gpio";
-+			};
-+
-+			pmx_usb_sata_power_enable: pmx-usb-sata-power-enable {
-+				marvell,pins = "mpp44";
-+				marvell,function = "gpio";
-+			};
-+
-+			/*
-+			 * Redefined from kirkwood-6281.dtsi, because
-+			 * we don't use SPI CS on MPP0, but on MPP7.
-+			 */
-+			pmx_spi: pmx-spi {
-+				marvell,pins = "mpp1", "mpp2", "mpp3", "mpp7";
-+				marvell,function = "spi";
-+			};
-+
-+			pmx_sysrst: pmx-sysrst {
-+				marvell,pins = "mpp6";
-+				marvell,function = "sysrst";
-+			};
-+
-+			pmx_i2s: pmx-i2s {
-+				marvell,pins = "mpp39", "mpp40", "mpp41", "mpp42",
-+					       "mpp43";
-+				marvell,function = "audio";
-+			};
-+		};
-+
-+		spi at 10600 {
-+			pinctrl-0 = <&pmx_spi>;
-+			pinctrl-names = "default";
-+			status = "okay";
-+
-+			flash at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "st,m25p80";
-+				spi-max-frequency = <86000000>;
-+				reg = <0>;
-+				mode = <0>;
-+
-+				partition at 0 {
-+					reg = <0x0 0x80000>;
-+					label = "u-boot";
-+				};
-+
-+				partition at 1 {
-+					reg = <0x80000 0x40000>;
-+					label = "SSD firmware";
-+				};
-+
-+				partition at 2 {
-+					reg = <0xc0000 0x10000>;
-+					label = "u-boot env";
-+				};
-+
-+				partition at 3 {
-+					reg = <0xd0000 0x10000>;
-+					label = "permanent u-boot env";
-+				};
-+
-+				partition at 4 {
-+					reg = <0xd0000 0x10000>;
-+					label = "permanent u-boot env";
-+				};
-+			};
-+		};
-+
-+		i2c at 11000 {
-+			status = "okay";
-+
-+			alc5621: alc5621 at 1a {
-+				compatible = "realtek,alc5621";
-+				reg = <0x1a>;
-+			};
-+		};
-+
-+		serial at 12000 {
-+			status = "okay";
-+		};
-+
-+		sata at 80000 {
-+			status = "okay";
-+			nr-ports = <2>;
-+		};
-+
-+		audio: audio-controller at a0000 {
-+			status = "okay";
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_usb_sata_power_enable>;
-+		pinctrl-names = "default";
-+
-+		usb_power: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "USB-SATA Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_button_power>;
-+		pinctrl-names = "default";
-+
-+		button at 1 {
-+			label = "Power Button";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	gpio_poweroff {
-+		compatible = "gpio-poweroff";
-+		pinctrl-0 = <&pmx_power_off>;
-+		pinctrl-names = "default";
-+		gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+};
-+
-+&mdio {
-+	status = "okay";
-+
-+	ethphy0: ethernet-phy {
-+		device_type = "ethernet-phy";
-+		reg = <8>;
-+	};
-+};
-+
-+&eth0 {
-+	status = "okay";
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
-+	};
-+};
+diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
+index 2bc1e1707930..84ba24a0ead7 100644
+--- a/arch/arm/configs/multi_v5_defconfig
++++ b/arch/arm/configs/multi_v5_defconfig
+@@ -11,6 +11,7 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_KIRKWOOD=y
++CONFIG_MACH_T5325=y
+ CONFIG_ARCH_MXC=y
+ CONFIG_MACH_IMX25_DT=y
+ CONFIG_MACH_IMX27_DT=y
+@@ -101,6 +102,12 @@ CONFIG_THERMAL=y
+ CONFIG_KIRKWOOD_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
++CONFIG_FB=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SOC=y
++CONFIG_SND_KIRKWOOD_SOC=y
++CONFIG_SND_KIRKWOOD_SOC_T5325=y
+ # CONFIG_ABX500_CORE is not set
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+@@ -150,6 +157,8 @@ CONFIG_RTC_DRV_S35390A=y
+ CONFIG_RTC_DRV_MV=y
+ CONFIG_DMADEVICES=y
+ CONFIG_MV_XOR=y
++CONFIG_STAGING=y
++CONFIG_FB_XGI=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ # CONFIG_EXT3_FS_XATTR is not set
+diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
+index 2844636c0cf2..36484a37a1ca 100644
+--- a/arch/arm/configs/mvebu_v5_defconfig
++++ b/arch/arm/configs/mvebu_v5_defconfig
+@@ -11,6 +11,7 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_KIRKWOOD=y
++CONFIG_MACH_T5325=y
+ # CONFIG_CPU_FEROCEON_OLD_ID is not set
+ CONFIG_PCI_MVEBU=y
+ CONFIG_PREEMPT=y
+@@ -93,6 +94,12 @@ CONFIG_SENSORS_LM85=y
+ CONFIG_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
++CONFIG_FB=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_SOC=y
++CONFIG_SND_KIRKWOOD_SOC=y
++CONFIG_SND_KIRKWOOD_SOC_T5325=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_HID_DRAGONRISE=y
+@@ -137,6 +144,8 @@ CONFIG_RTC_DRV_S35390A=y
+ CONFIG_RTC_DRV_MV=y
+ CONFIG_DMADEVICES=y
+ CONFIG_MV_XOR=y
++CONFIG_STAGING=y
++CONFIG_FB_XGI=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ # CONFIG_EXT3_FS_XATTR is not set
 -- 
 1.8.5.3
