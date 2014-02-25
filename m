@@ -1,66 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Feb 2014 22:10:02 +0100
-Subject: [PATCH] ARM: move __fixup_smp out of init section
-In-Reply-To: <CAL_Jsq+8p+p0wuRf9z01EKDcnGA95CmLvrDwDZzVETLe+SqpGg@mail.gmail.com>
-References: <1393352193-31717-1-git-send-email-robherring2@gmail.com>
- <22591791.dKqiiVNNOv@wuerfel>
- <CAL_Jsq+8p+p0wuRf9z01EKDcnGA95CmLvrDwDZzVETLe+SqpGg@mail.gmail.com>
-Message-ID: <5546770.Bku2iJMdOj@wuerfel>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 25 Feb 2014 13:11:27 -0800
+Subject: [PATCH] cpufreq: Set policy to non-NULL only after all hotplug
+ online work is done
+In-Reply-To: <15001517.xLHO8lGdWr@vostro.rjw.lan>
+References: <1393225072-3997-1-git-send-email-skannan@codeaurora.org>
+ <530BAA31.4050701@codeaurora.org>
+ <CAKohpo=0CgzjCgKnDxUMcN6-CgbQ2ML=Tx-K8fS7=VJJYOD0eg@mail.gmail.com>
+ <15001517.xLHO8lGdWr@vostro.rjw.lan>
+Message-ID: <530D06FF.201@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 February 2014 15:05:01 Rob Herring wrote:
-> On Tue, Feb 25, 2014 at 12:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 25 February 2014 12:16:33 Rob Herring wrote:
-> >> From: Rob Herring <robh@kernel.org>
-> >>
-> >> With large kernel builds such as allyesconfig exceeding maximum relative
-> >> branch offsets, the init section will be too far away to branch to
-> >> directly. This causes veneers to be added by the compiler, but veneers
-> >> don't work before the MMU is enabled. Fix this by moving __fixup_smp to
-> >> the .head.text section as it is not very big.
-> >>
-> >> Signed-off-by: Rob Herring <robh@kernel.org>
-> >
-> > This looks good to me, but I have some related questions:
-> >
-> > * I needed to use -mlong-calls for large kernels. Did you manage without?
-> 
-> Yes, but I started with allyesconfig and then disabled things until it
-> would link. This was mainly PCI, various debug, and filesystems. This
-> particular failure you don't see until you try to boot.
-> 
-> I also saw intermittent inconsistent kallsym errors which
-> KALLSYMS_EXTRA_PASS=1 did not fix.
+On 02/25/2014 05:04 AM, Rafael J. Wysocki wrote:
+> On Tuesday, February 25, 2014 02:20:57 PM Viresh Kumar wrote:
+>> On 25 February 2014 01:53, Saravana Kannan <skannan@codeaurora.org> wrote:
+>>> I was simplifying the scenario that causes it. We change the min/max using
+>>> ADJUST notifiers for multiple reasons -- thermal being one of them.
+>>>
+>>> thermal/cpu_cooling is one example of it.
+>>
+>> Just to understand the clear picture, you are actually hitting this bug? Or
+>> is this only a theoretical bug?
+>>
+This is a real bug. But the actual caller of cpufreq_update_policy() is 
+a driver that's local to our tree. I'm just giving examples of upstream 
+code that act in a similar way.
 
-Yes, I saw those too. With XIP_KERNEL enabled, I've seen a randconfig case
-that needed 12 extra passes before converging. Without that option,
-it's much better but there are still cases that need more than 3 passes
-and I haven't gotten to the bottom of that. It seems to be the same
-configuration that refuses to link at all with ld.gold.
+>>> So, cpufreq_update_policy() can be called on any CPU. If that races with
+>>> someone offlining a CPU and onlining it, you'll get this crash.
+>>
+>> Then shouldn't that be fixed by locks? I think yes. That makes me agree with
+>> Srivatsa more here.
+>>
+>> Though I would say that your argument was also valid that 'policy' shouldn't be
+>> up for sale unless it is prepared to. And for that reason only I
+>> floated that question
+>> earlier: What exactly we need to make sure is initialized in policy? Because
+>> policy might keep changing in future as well and that needs locks to protect
+>> that stuff. Like min/max/governor/ etc..
+>
+> Well, that depends on what the current users expect it to look like initially.
+> It should be initialized to the point in which all of them can handle it
+> correctly.
 
-> > * Do you (or anyone) know how to force the use of a veneer? I see a problem
-> >   with some driver calling __do_div_asm from IIRC an init section, and that
-> >   creates a link error when the kernel gets too big
-> 
-> That is surprising given that I saw veneers be inserted for some asm
-> to asm calls. Maybe it is something I turned off or something to do
-> with the types of sections.
-> 
-> > * If FUNCTION_TRACER is enabled, we get calls from every function using
-> >  'bl __gnu_mcount_nc'. Do you think it's possible to fix those?
-> 
-> Put it in the middle of the image? ;)
-> 
-> > * Same thing but simpler for svc_preempt calling preempt_schedule_irq
-> >   and lookup_processor_type calling __lookup_processor_type. In those
-> >   cases I guess we should be able to trivially rewrite the assembly
-> >   to jump through an extra register.
-> 
-> I did see that lookup_processor_type had a veneer in my build.
+Yes, so let's not make it available until all of it is initialized. I 
+don't like the piece meal check. 6 months down the lane someone making 
+changes might not remember this. The problem also applies for drivers 
+that might not be upstreamed, etc.
 
-Strange. Could it be that -mlong-calls turns off veneers?
+>> So, probably a solution here might be a mix of both. Initialize policy to this
+>> minimum level and then make sure locking is used correctly..
+>
+> Yes.
 
-Which gcc and binutils version do you use?
+Rafael, It's not clear what you mean by the yes. Do you want to 
+initialize it partly and make it available. I think that's always wrong.
 
-	Arnd
+>>> The idea would exist, but we can just call cpufreq_generic_get() and pass it
+>>> policy->clk if it is not NULL. Does that work for you?
+>>
+>> No. Not all drivers implement clk interface. And so clk doesn't look to be the
+>> right parameter. I thought maybe 'policy' can be the right parameter and
+>> then people can get use policy->cpu to get cpu id out of it.
+>>
+>> But even that doesn't look to be a great idea. X86 drivers may share policy
+>> structure for CPUs that don't actually share a clock line. And so they do need
+>> right CPU number as parameter instead of policy. As they might be doing
+>> some tricky stuff there. Also, we need to make sure that ->get() returns
+>> the frequency at which CPU x is running.
+>
+> That's not going to work in at least some cases anyway, because for some types
+> of HW we simply can't retrieve the current frequency in a non-racy way.
+
+I think there's been a misunderstanding of what I'm proposing. The 
+reference to policy->clk is only to get rid of the dependency that 
+cpufreq_generic_get() has on the per cpu policy variable being filled. 
+You can do that by just removing calls to get _IF_ clk is filled in.
+
+Viresh,
+
+I'll look at the patches later today and respond. Although, I would have 
+been nice you had helped me fix any issues with my patch than coming up 
+with new ones. Kinda removes to motivation for submitting patches upstream.
+
+Regards,
+Saravana
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
