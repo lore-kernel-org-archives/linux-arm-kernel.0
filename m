@@ -1,46 +1,111 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 25 Feb 2014 19:20:46 +0530
-Subject: [PATCH RESEND v10 1/4] PHY: Add function set_speed to generic
- PHY framework
-In-Reply-To: <20140225134517.GA26189@htj.dyndns.org>
+Date: Tue, 25 Feb 2014 19:21:45 +0530
+Subject: [PATCH RESEND v10 2/4] Documentation: Add APM X-Gene SoC 15Gbps
+ Multi-purpose PHY driver binding documentation
+In-Reply-To: <1393308882-3964-3-git-send-email-lho@apm.com>
 References: <1393308882-3964-1-git-send-email-lho@apm.com>
- <1393308882-3964-2-git-send-email-lho@apm.com> <530C8711.4000600@ti.com>
- <20140225134517.GA26189@htj.dyndns.org>
-Message-ID: <530C9FB6.9070600@ti.com>
+ <1393308882-3964-2-git-send-email-lho@apm.com>
+ <1393308882-3964-3-git-send-email-lho@apm.com>
+Message-ID: <530C9FF1.3060409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 February 2014 07:15 PM, Tejun Heo wrote:
-> On Tue, Feb 25, 2014 at 05:35:37PM +0530, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> On Tuesday 25 February 2014 11:44 AM, Loc Ho wrote:
->>> This patch adds function set_speed to the generic PHY framework operation
->>> structure. This function can be called to instruct the PHY underlying layer
->>> at specified lane to configure for specified speed in hertz.
->>>
->>> Signed-off-by: Loc Ho <lho@apm.com>
->>> ---
->>>  drivers/phy/phy-core.c  |   21 +++++++++++++++++++++
->>>  include/linux/phy/phy.h |    8 ++++++++
->>>  2 files changed, 29 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
->>> index 645c867..44f2f63 100644
->>> --- a/drivers/phy/phy-core.c
->>> +++ b/drivers/phy/phy-core.c
->>> @@ -257,6 +257,27 @@ int phy_power_off(struct phy *phy)
->>>  }
->>>  EXPORT_SYMBOL_GPL(phy_power_off);
->>>  
->>
->> missing function comment :-s
+On Tuesday 25 February 2014 11:44 AM, Loc Ho wrote:
+
+missing commit log..
+
+-Kishon
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Tuan Phan <tphan@apm.com>
+> Signed-off-by: Suman Tripathi <stripathi@apm.com>
+> ---
+>  .../devicetree/bindings/phy/apm-xgene-phy.txt      |   79 ++++++++++++++++++++
+>  1 files changed, 79 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
 > 
-> Can you please let me know when this series goes in?  I'll pull in the
-> phy tree into libata and then apply the ata patches on top.
-
-I'll send the final pull request for 3.15 merge window by next weekend to Greg
-kh. Before that I'd like to have my comments addressed in this patch series.
-
-Thanks
-Kishon
+> diff --git a/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt b/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
+> new file mode 100644
+> index 0000000..5f3a65a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/apm-xgene-phy.txt
+> @@ -0,0 +1,79 @@
+> +* APM X-Gene 15Gbps Multi-purpose PHY nodes
+> +
+> +PHY nodes are defined to describe on-chip 15Gbps Multi-purpose PHY. Each
+> +PHY (pair of lanes) has its own node.
+> +
+> +Required properties:
+> +- compatible		: Shall be "apm,xgene-phy".
+> +- reg			: PHY memory resource is the SDS PHY access resource.
+> +- #phy-cells		: Shall be 1 as it expects one argument for setting
+> +			  the mode of the PHY. Possible values are 0 (SATA),
+> +			  1 (SGMII), 2 (PCIe), 3 (USB), and 4 (XFI).
+> +
+> +Optional properties:
+> +- status		: Shall be "ok" if enabled or "disabled" if disabled.
+> +			  Default is "ok".
+> +- clocks		: Reference to the clock entry.
+> +- apm,tx-eye-tuning	: Manual control to fine tune the capture of the serial
+> +			  bit lines from the automatic calibrated position.
+> +			  Two set of 3-tuple setting for each (up to 3)
+> +			  supported link speed on the host. Range from 0 to
+> +			  127 in unit of one bit period. Default is 10.
+> +- apm,tx-eye-direction	: Eye tuning manual control direction. 0 means sample
+> +			  data earlier than the nominal sampling point. 1 means
+> +			  sample data later than the nominal sampling point.
+> +			  Two set of 3-tuple setting for each (up to 3)
+> +			  supported link speed on the host. Default is 0.
+> +- apm,tx-boost-gain	: Frequency boost AC (LSB 3-bit) and DC (2-bit)
+> +			  gain control. Two set of 3-tuple setting for each
+> +			  (up to 3) supported link speed on the host. Range is
+> +			  between 0 to 31 in unit of dB. Default is 3.
+> +- apm,tx-amplitude	: Amplitude control. Two set of 3-tuple setting for
+> +			  each (up to 3) supported link speed on the host.
+> +			  Range is between 0 to 199500 in unit of uV.
+> +			  Default is 199500 uV.
+> +- apm,tx-pre-cursor1	: 1st pre-cursor emphasis taps control. Two set of
+> +			  3-tuple setting for each (up to 3) supported link
+> +			  speed on the host. Range is 0 to 273000 in unit of
+> +			  uV. Default is 0.
+> +- apm,tx-pre-cursor2	: 2st pre-cursor emphasis taps control. Two set of
+> +			  3-tuple setting for each (up to 3) supported link
+> +			  speed on the host. Range is 0 to 127400 in unit uV.
+> +			  Default is 0x0.
+> +- apm,tx-post-cursor	: Post-cursor emphasis taps control. Two set of
+> +			  3-tuple setting for Gen1, Gen2, and Gen3. Range is
+> +			  between 0 to 0x1f in unit of 18.2mV. Default is 0xf.
+> +- apm,tx-speed		: Tx operating speed. One set of 3-tuple for each
+> +			  supported link speed on the host.
+> +			   0 = 1-2Gbps
+> +			   1 = 2-4Gbps (1st tuple default)
+> +			   2 = 4-8Gbps
+> +			   3 = 8-15Gbps (2nd tuple default)
+> +			   4 = 2.5-4Gbps
+> +			   5 = 4-5Gbps
+> +			   6 = 5-6Gbps
+> +			   7 = 6-16Gbps (3rd tuple default)
+> +
+> +NOTE: PHY override parameters are board specific setting.
+> +
+> +Example:
+> +		phy1: phy at 1f21a000 {
+> +			compatible = "apm,xgene-phy";
+> +			reg = <0x0 0x1f21a000 0x0 0x100>;
+> +			#phy-cells = <1>;
+> +			status = "disabled";
+> +		};
+> +
+> +		phy2: phy at 1f22a000 {
+> +			compatible = "apm,xgene-phy";
+> +			reg = <0x0 0x1f22a000 0x0 0x100>;
+> +			#phy-cells = <1>;
+> +			status = "ok";
+> +		};
+> +
+> +		phy3: phy at 1f23a000 {
+> +			compatible = "apm,xgene-phy";
+> +			reg = <0x0 0x1f23a000 0x0 0x100>;
+> +			#phy-cells = <1>;
+> +			status = "ok";
+> +		};
+> 
