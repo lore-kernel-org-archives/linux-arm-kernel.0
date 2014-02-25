@@ -1,61 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 25 Feb 2014 12:39:21 +0000
-Subject: [PATCH 2/2] ARM: dts: duovero-parlor: Add HDMI output
-In-Reply-To: <CABxcv=kKxidVJWcMrueB+edW=g_6gcucvi6=7p=EZ_WooCpbMA@mail.gmail.com>
-References: <1393261669-32039-1-git-send-email-florian.vaussard@epfl.ch>
- <1393261669-32039-3-git-send-email-florian.vaussard@epfl.ch>
- <20140224180336.GU27282@n2100.arm.linux.org.uk>
- <CABxcv=kKxidVJWcMrueB+edW=g_6gcucvi6=7p=EZ_WooCpbMA@mail.gmail.com>
-Message-ID: <20140225123921.GY27282@n2100.arm.linux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 25 Feb 2014 13:42:19 +0100
+Subject: [PATCH 0/2] arm: dma-mapping: add dynamic resize of IOVA bitmap
+Message-ID: <1393332141-17781-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 05:22:27PM -0300, Javier Martinez Canillas wrote:
-> Hi Russell,
-> 
-> On Mon, Feb 24, 2014 at 3:03 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Feb 24, 2014 at 06:07:49PM +0100, Florian Vaussard wrote:
-> >> +     hdmi0: connector at 0 {
-> >> +             compatible = "hdmi-connector";
-> >
-> > This looks way to generic a compatible string.  Are you sure it's
-> > correct?
-> >
-> 
-> That compatible string is correct according to the latest series
-> posted by Tomi Valkeinen to add DT bindings for the OMAP Display
-> SubSystem (DSS) [0].
+Hello,
 
-in which case:
+This patchset is a continuation of the work started by Andreas Herrmann
+to add support for dynamically resized bitmaps for IOMMU based
+DMA-mapping implementation for ARM architecture. Some more discussion
+and rationale has been discussed in the following thread:
+http://www.spinics.net/lists/arm-kernel/msg303732.html
 
-N    N   AA     CCCC  K  K
-NN   N  A  A   C    C K K
-N N  N A    A C       KK
-N  N N AAAAAA C       KK
-N   NN A    A  C    C K K
-N    N A    A   CCCC  K  K
+The first patch adds support for on-demand extending IO address space
+bitmap. It is based on the original work by Andreas Herrmann, but I
+decided to drop arm_iommu_create_mapping() api change part. The second
+patch removes the 'order' hack, which was used to reduce the size of a
+bitmap. The first patch solved the problem of too large io address space
+bitmaps, so the 'order' hack is no longer needed. The parameters of the
+arm_iommu_create_mapping() function can be then simplified by dropping
+'order' parameter without any functional change of the whole subsystem.
+This parameter was already a bit misunderstood, so the overall result is
+also a little improvement of the API.
 
-Yes, that's a very big nack.  Two things:
+Best regards
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
 
-1. OMAP really doesn't have the right to define a compatible string which
-   is as generic as "hdmi-connector".
+Andreas Herrmann (1):
+  arm: dma-mapping: Add support to extend DMA IOMMU mappings
 
-2. Even with "omapdss," before it, the convention that DT people have adopted
-   is for the prefix to be "companyname," and not a subsystem.
+Marek Szyprowski (1):
+  arm: dma-mapping: remove order parameter from
+    arm_iommu_create_mapping()
 
-I'm not the only one with this concern - I discussed it with Arnd last
-night and his comments were about it being "obviously bogus".
-
-> The property is added on this patch [1] and as far as I understood the
-> idea is that it could be a generic DT binding that can be used by
-> platform specific HDMI connectors like the omap dss HDMI connector [2].
-
-Why do the physical connectors need a DT binding?  Surely what needs the
-DT binding is the HDMI encoder - and that certainly should no way be a
-generic name, because there's no such thing as a generic HDMI encoder
-chip.
+ arch/arm/include/asm/dma-iommu.h          |   12 ++-
+ arch/arm/mm/dma-mapping.c                 |  144 +++++++++++++++++++++++------
+ drivers/gpu/drm/exynos/exynos_drm_drv.h   |    2 -
+ drivers/gpu/drm/exynos/exynos_drm_iommu.c |    6 +-
+ drivers/gpu/drm/exynos/exynos_drm_iommu.h |    1 -
+ drivers/iommu/shmobile-iommu.c            |    2 +-
+ 6 files changed, 124 insertions(+), 43 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.7.9.5
