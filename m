@@ -1,30 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Feb 2014 20:28:00 +0100
-Subject: [GIT PULL v3] efm32 cleanups for next
-In-Reply-To: <20140224093653.GD27579@pengutronix.de>
-References: <20140219201950.GC6988@pengutronix.de>
- <CAOesGMh16Jqsczaagr9C2niiwu29kd7e8JrWYRZech9kJ2wVRQ@mail.gmail.com>
- <20140224093653.GD27579@pengutronix.de>
-Message-ID: <201402252028.00414.arnd@arndb.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 25 Feb 2014 20:36:48 +0100
+Subject: [PATCH v2 0/2] ARM: SAMSUNG: remove the rest of local uncompress.h
+ files
+Message-ID: <6973248.vNO4T7GhE6@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 February 2014, Uwe Kleine-K?nig wrote:
-> Just three simple cleanups for efm32 removing two now unused files and a
-> superflous select by ARCH_EFM32.
-> 
-> As these cleanups have dependencies on both v3.14-rc1 and my timex.h cleanup
-> (which is based on v3.13-rc1) this pull request also included a merge of my
-> cleanup tag which is already in armsoc/next/cleanup.
-> 
+Two patches from Sachin Kamat already removed the Exynos-uncompress.h .
+But in fact all Samsung platforms can use the generic uncompress code
+without needing local implementation.
+
+Therefore this two-part series removes the rest of the uncompress.h files
+from all Samsung platforms.
+
+Tested on a s3c2416 and s3c2442 based machine.
+
+The patches should be applied on top of the patches from Sachin Kamat in
+the v3.15-next/cleanup-samsung branch in the linux-samsung.git
 
 
-Pulled into next/cleanup,
+Heiko Stuebner (2):
+  ARM: SAMSUNG: use generic uncompress.h
+  ARM: SAMSUNG: remove all custom uncompress.h
 
-Thanks.
+ arch/arm/Kconfig.debug                          |   4 +-
+ arch/arm/mach-s3c24xx/include/mach/uncompress.h |  57 --------
+ arch/arm/mach-s3c64xx/include/mach/uncompress.h |  31 -----
+ arch/arm/mach-s5p64x0/include/mach/uncompress.h |  34 -----
+ arch/arm/mach-s5pc100/include/mach/uncompress.h |  30 ----
+ arch/arm/mach-s5pv210/include/mach/uncompress.h |  28 ----
+ arch/arm/plat-samsung/include/plat/uncompress.h | 175 ------------------------
+ 7 files changed, 2 insertions(+), 357 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c24xx/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-s3c64xx/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-s5p64x0/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-s5pc100/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-s5pv210/include/mach/uncompress.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/uncompress.h
 
-FWIW, I have a number of small efm32 bug fixes, most of them related to something
-breaking with ARMv7-M in combination with random Kconfig options. I hope to get
-around to sending them to you for testing soon.
-
-	Arnd
+-- 
+1.8.5.3
