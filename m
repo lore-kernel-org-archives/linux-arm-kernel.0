@@ -1,36 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 25 Feb 2014 11:11:21 +0100
-Subject: [RFC PATCH] arm64: add support for AES in CCM mode using Crypto
- Extensions
-In-Reply-To: <20140225090835.GA11135@gondor.apana.org.au>
-References: <1392106905-28709-1-git-send-email-ard.biesheuvel@linaro.org>
- <20140225070252.GB9934@gondor.apana.org.au>
- <CAKv+Gu-HnTk5RCLRoCnae7-HH7C-Tq2YJF57Nc-hOEykdY52XA@mail.gmail.com>
- <20140225071626.GA10524@gondor.apana.org.au>
- <CAKv+Gu_A_04P=nOoPfxhJMC3bbEPTcpgZO0Ldw2H4BV7T_gTbw@mail.gmail.com>
- <20140225090835.GA11135@gondor.apana.org.au>
-Message-ID: <CAKv+Gu97c46dxQK2vhbHUgD8i7x3OA5BhXbS=AdobB8_2ViTEg@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 25 Feb 2014 11:27:52 +0100 (CET)
+Subject: [PATCH RFC v1 1/3] ARM: Add irq disabled version of soft_restart.
+In-Reply-To: <530C4CAE.5000202@ti.com>
+References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
+ <1392774729-3235-2-git-send-email-sebastian.capella@linaro.org>
+ <20140222102616.GG21483@n2100.arm.linux.org.uk>
+ <20140224231345.10580.62916@capellas-linux>
+ <530C4CAE.5000202@ti.com>
+Message-ID: <alpine.DEB.2.02.1402251125500.21251@ionos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 February 2014 10:08, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Tue, Feb 25, 2014 at 08:21:22AM +0100, Ard Biesheuvel wrote:
->>
->> For the authenticate-only data, this is manageable as you are only
->> dealing with input, but when dealing with both in- and output, as in
->> the core of CCM, it becomes very tedious.
->> So instead, I have opted for an inner blkcipher instance which takes
->> care of all of that. Could you suggest another approach that if
->> preferable?
->
-> I don't think the walk helper actually needs the tfm apart from
-> getting a couple of parameters out of it, so perhaps we can just
-> change the helper to not depend on a tfm.
->
+On Mon, 24 Feb 2014, Russ Dill wrote:
+> On 02/24/2014 03:13 PM, Sebastian Capella wrote:
+> > Quoting Russell King - ARM Linux (2014-02-22 02:26:17)
+> >> On Tue, Feb 18, 2014 at 05:52:07PM -0800, Sebastian Capella wrote:
+> >>> From: Russ Dill <Russ.Dill@ti.com>
+> >>>
+> >>> This adds the ability to run soft_restart with local_irq/fiq_disable
+> >>> already called. This is helpful for the hibernation code paths.
+> >>
+> >> I'd rather keep this simple.  There's no problem with calling soft_restart
+> >> with interrupts already disabled.  local_irq_disable()/local_fiq_disable()
+> >> there should be harmless.
+> > 
+> > Hi Russell,
+> > 
+> > I'm observing a data abort loop when I replace this call:
+> > 
+> > In the local_irq_disable, it ends up calling trace_hardirqs_off
+> > (CONFIG_TRACE_IRQFLAGS_SUPPORT is enabled), which calls
+> > trace_hardirqs_off_caller which checks lockdep_recursion in the
+> > current task, but we've switched to a temporary stack with the
+> > call_with_stack, and get_current is returning NULL.  This
+> > triggers a data abort, which calls trace_hardirqs_off
+> > again and so on.
+> > 
+> > Do you have any suggestions here?
+> > 
+> > Thanks,
+> > 
+> > Sebastian
+> > 
+> 
+> So the alternative is to have a version of the call that calls a special
+> no trace version of local_irq_disable()/local_fiq_disable(). Which would
+> be preferable? Having a noirq version of soft_restart seems much simpler
+> to me.
 
-That seems like a less hacky approach.
+If you want escape the tracer and in that case you really want it
+being on a different stack, use raw_local_irq_* which are not traced.
 
-I'll cook something up and put it on the list.
+Thanks,
 
-Cheers,
-Ard.
+	tglx
