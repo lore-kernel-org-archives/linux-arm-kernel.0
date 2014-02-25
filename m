@@ -1,42 +1,89 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Feb 2014 12:42:30 +0100
-Subject: [PATCH 1/1] ARM: Exynos: Add generic compatible string
-In-Reply-To: <CAOesGMiZXKRbrbmvKs4pF7HiXM1hsGjzbFUQmJ-n5-nar5uMBw@mail.gmail.com>
-References: <1392809645-631-1-git-send-email-sachin.kamat@linaro.org>
- <CAK9yfHxXTbNmgTYqFH1Mm-X_sN2GpfLPp0MKixU=g2bKxz8e=g@mail.gmail.com>
- <CAOesGMiZXKRbrbmvKs4pF7HiXM1hsGjzbFUQmJ-n5-nar5uMBw@mail.gmail.com>
-Message-ID: <201402251242.30654.arnd@arndb.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 25 Feb 2014 12:44:59 +0100
+Subject: [PATCH v8 0/6] ARM: rockchip: add smp functionality
+Message-ID: <21117503.1c6iOkvYSr@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 February 2014, Olof Johansson wrote:
-> I disagree. I don't know what Samsung has in mind, but the revision of
-> the CPU doesn't have all that much to do with the rest of the SoC.
-> It's quite likely that some vendors (maybe not Samsung, but the same
-> concept applies) will ship 64-bit SoCs that are very similar to their
-> preceding 32-bit ones, same IP, similar busses, etc. I'm pretty sure
-> at least some vendors will do very close to that.
+This series enables the use of the additional cores on Rockchip
+Cortex-A9 SoCs.
 
-Right.
+To achieve this, add the scu, the needed sram and power-management-unit.
 
-> So, if EXYNOS4 and EXYNOS5 can share a compatible value when they use
-> different CPUs, then there's no reason that whatever future 64-bit
-> ones can also share it.
+Tested on both a BQ Curie2 (rk3066a / dual core) and
+on a Radxa Rock (rk3188 / quad core).
 
-How about putting both 'samsung,exynos' and 'samsung,exynos4' in DT then
-and having the platform code match exynos4 and exynos5 but not exynos?
+As this version again involves bigger changes to the way reserved sram-
+regions are handled, I've dropped the ACKs I had for binding and driver
+changes again and therefore would be very happy if I could get new ones
+if applicable (dt-maintainers and Philipp Zabel for sram.c).
 
-That way, I think we are consistent and future-proof. Any code that needs
-to know if it's running on some exynos version can just check for the
-'samsung,exynos' compatible value and that will work on both arm32 and
-arm64. Also, if we ever decide we want to run a 32-bit kernel on a 64-bit
-exynos, we can just add 'samsung,exynos6' (or whatever number that will
-be) to the list.
 
-My usual disclaimer for this: You should never ever consider actually
-running a 32-bit kernel on a 64-bit CPU, but at the same time there
-shouldn't be any reason why it won't work either, given that we require
-arm64 based systems to have all SoC specific code in drivers and we
-can use the same drivers on arm32.
+changes since v7:
+- move reserved sram regions to be described through subnodes, similar
+  to the general memory-reserve bindings, as suggested by Grant Likely.
 
-	Arnd
+changes since v6:
+- address comments from Mark Rutland
+  - using of_property_read_u32_index instead of parsing the list manually
+  - include v4 of "of: add functions to count number of elements in a property"
+    to not have to count property-elements manually anymore
+
+changes since v5:
+- Grant Likely liked it better to "specify reserved regions of the
+  memory instead of the valid ranges", so go back to the mmio-sram-reserved
+  property originally suggested by Rob Herring
+
+changes since v4:
+- rebase on top of the recent rk3188 board support
+- implement suggestion from Matt Sealey in moving the sram-limit from
+  marking reserved regions to marking available regions - hopefully
+  I got the usage right 
+- remove __CPUINIT as suggested by Fabio Estevam
+
+changes since v3:
+- address comments from Rob Herring:
+  - split the gathering of the reserve-data into a separate loop
+  - spelling and style fixes
+- first patch only included for reference, already part of the
+  char-misc git tree
+
+changes since v2:
+- rework the sram allocation following the suggestion from Philipp Zabel
+
+changes since v1:
+- add reserved block feature for mmio-sram, to not use two logical
+  sram nodes
+- the sram content is kept intact while the device is running, so
+  copying the trampoline is only needed once
+
+Heiko Stuebner (6):
+  dt-bindings: sram: describe option to reserve parts of the memory
+  misc: sram: implement reserved sram areas
+  ARM: rockchip: add snoop-control-unit
+  ARM: rockchip: add sram dt nodes and documentation
+  ARM: rockchip: add power-management-unit
+  ARM: rockchip: add smp bringup code
+
+ .../devicetree/bindings/arm/rockchip/pmu.txt       |  16 ++
+ .../devicetree/bindings/arm/rockchip/smp-sram.txt  |  30 ++++
+ Documentation/devicetree/bindings/misc/sram.txt    |  33 ++++
+ arch/arm/boot/dts/rk3066a.dtsi                     |  13 ++
+ arch/arm/boot/dts/rk3188.dtsi                      |  13 ++
+ arch/arm/boot/dts/rk3xxx.dtsi                      |  10 ++
+ arch/arm/mach-rockchip/Kconfig                     |   1 +
+ arch/arm/mach-rockchip/Makefile                    |   1 +
+ arch/arm/mach-rockchip/core.h                      |  22 +++
+ arch/arm/mach-rockchip/headsmp.S                   |  30 ++++
+ arch/arm/mach-rockchip/platsmp.c                   | 184 +++++++++++++++++++++
+ arch/arm/mach-rockchip/rockchip.c                  |   2 +
+ drivers/misc/sram.c                                | 125 +++++++++++++-
+ 13 files changed, 473 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
+ create mode 100644 arch/arm/mach-rockchip/core.h
+ create mode 100644 arch/arm/mach-rockchip/headsmp.S
+ create mode 100644 arch/arm/mach-rockchip/platsmp.c
+
+-- 
+1.8.5.3
