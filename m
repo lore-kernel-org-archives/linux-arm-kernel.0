@@ -1,88 +1,36 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 25 Feb 2014 11:03:47 +0100
-Subject: [PATCH 2/2] regulator: core: Error on not always_on dummy regulators
-In-Reply-To: <1393322627-26543-1-git-send-email-mpa@pengutronix.de>
-References: <1393322627-26543-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1393322627-26543-3-git-send-email-mpa@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 25 Feb 2014 11:11:21 +0100
+Subject: [RFC PATCH] arm64: add support for AES in CCM mode using Crypto
+ Extensions
+In-Reply-To: <20140225090835.GA11135@gondor.apana.org.au>
+References: <1392106905-28709-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20140225070252.GB9934@gondor.apana.org.au>
+ <CAKv+Gu-HnTk5RCLRoCnae7-HH7C-Tq2YJF57Nc-hOEykdY52XA@mail.gmail.com>
+ <20140225071626.GA10524@gondor.apana.org.au>
+ <CAKv+Gu_A_04P=nOoPfxhJMC3bbEPTcpgZO0Ldw2H4BV7T_gTbw@mail.gmail.com>
+ <20140225090835.GA11135@gondor.apana.org.au>
+Message-ID: <CAKv+Gu97c46dxQK2vhbHUgD8i7x3OA5BhXbS=AdobB8_2ViTEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It does not make sense to have dummy/fixed regulators that are not
-always_on. This patch adds a check in the set_machine_constraints
-function for this case and returns -EINVAL if such a regulator is
-registered.
+On 25 February 2014 10:08, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> On Tue, Feb 25, 2014 at 08:21:22AM +0100, Ard Biesheuvel wrote:
+>>
+>> For the authenticate-only data, this is manageable as you are only
+>> dealing with input, but when dealing with both in- and output, as in
+>> the core of CCM, it becomes very tedious.
+>> So instead, I have opted for an inner blkcipher instance which takes
+>> care of all of that. Could you suggest another approach that if
+>> preferable?
+>
+> I don't think the walk helper actually needs the tfm apart from
+> getting a couple of parameters out of it, so perhaps we can just
+> change the helper to not depend on a tfm.
+>
 
-This also removes the return -EINVAL from _regulator_do_enable() if the
-regulator can not be enabled.
+That seems like a less hacky approach.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/regulator/core.c | 27 ++++++++++++++++++++++++---
- 1 file changed, 24 insertions(+), 3 deletions(-)
+I'll cook something up and put it on the list.
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 6f71985..cb10faf 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -954,6 +954,7 @@ static int machine_constraints_current(struct regulator_dev *rdev,
- }
- 
- static int _regulator_do_enable(struct regulator_dev *rdev);
-+static bool regulator_can_enable(struct regulator_dev *rdev);
- 
- /**
-  * set_machine_constraints - sets regulator constraints
-@@ -1012,12 +1013,19 @@ static int set_machine_constraints(struct regulator_dev *rdev,
- 		}
- 	}
- 
-+	if (!rdev->constraints->always_on && !regulator_can_enable(rdev))
-+	{
-+		rdev_err(rdev, "dummy regulator without always_on constraints is not valid\n");
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
- 	/* If the constraints say the regulator should be on at this point
- 	 * and we have control then make sure it is enabled.
- 	 */
- 	if (rdev->constraints->always_on || rdev->constraints->boot_on) {
- 		ret = _regulator_do_enable(rdev);
--		if (ret < 0 && ret != -EINVAL) {
-+		if (ret) {
- 			rdev_err(rdev, "failed to enable\n");
- 			goto out;
- 		}
-@@ -1739,6 +1747,21 @@ static int regulator_ena_gpio_ctrl(struct regulator_dev *rdev, bool enable)
- 	return 0;
- }
- 
-+/*
-+ * Returns true if the regulator can be enabled through ops->enable or
-+ * enable gpios.
-+ */
-+static bool regulator_can_enable(struct regulator_dev *rdev)
-+{
-+	if (rdev->desc->ops->enable)
-+		return true;
-+
-+	if (rdev->ena_pin)
-+		return true;
-+
-+	return false;
-+}
-+
- static int _regulator_do_enable(struct regulator_dev *rdev)
- {
- 	int ret, delay;
-@@ -1763,8 +1786,6 @@ static int _regulator_do_enable(struct regulator_dev *rdev)
- 		ret = rdev->desc->ops->enable(rdev);
- 		if (ret < 0)
- 			return ret;
--	} else {
--		return -EINVAL;
- 	}
- 
- 	/* Allow the regulator to ramp; it would be useful to extend
--- 
-1.8.5.3
+Cheers,
+Ard.
