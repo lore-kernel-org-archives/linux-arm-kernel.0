@@ -1,49 +1,120 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 25 Feb 2014 10:00:08 +0000
-Subject: [PATCH v2] arm/arm64: KVM: detect CPU reset on CPU_PM_EXIT
-In-Reply-To: <20140221171216.GA22447@cbox>
-References: <1392983216-368-1-git-send-email-marc.zyngier@arm.com>
- <20140221171216.GA22447@cbox>
-Message-ID: <530C69A8.20800@arm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 25 Feb 2014 10:02:13 +0000
+Subject: [PATCH V2] arm64: mm: Route pmd thp functions through pte equivalents
+Message-ID: <1393322533-23725-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/02/14 17:12, Christoffer Dall wrote:
-> On Fri, Feb 21, 2014 at 11:46:56AM +0000, Marc Zyngier wrote:
->> Commit 1fcf7ce0c602 (arm: kvm: implement CPU PM notifier) added
->> support for CPU power-management, using a cpu_notifier to re-init
->> KVM on a CPU that entered CPU idle.
->>
->> The code assumed that a CPU entering idle would actually be powered
->> off, loosing its state entierely, and would then need to be
->> reinitialized. It turns out that this is not always the case, and
->> some HW performs CPU PM without actually killing the core. In this
->> case, we try to reinitialize KVM while it is still live. It ends up
->> badly, as reported by Andre Przywara (using a Calxeda Midway):
->>
->> [    3.663897] Kernel panic - not syncing: unexpected prefetch abort in Hyp mode at: 0x685760
->> [    3.663897] unexpected data abort in Hyp mode at: 0xc067d150
->> [    3.663897] unexpected HVC/SVC trap in Hyp mode at: 0xc0901dd0
->>
->> The trick here is to detect if we've been through a full re-init or
->> not by looking at HVBAR (VBAR_EL2 on arm64). This involves
->> implementing the backend for __hyp_get_vectors in the main KVM HYP
->> code (rather small), and checking the return value against the
->> default one when the CPU notifier is called on CPU_PM_EXIT.
->>
->> Reported-by: Andre Przywara <osp@andrep.de>
->> Tested-by: Andre Przywara <osp@andrep.de>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Rob Herring <rob.herring@linaro.org>
->> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Thanks!
-> 
-> Looks good.
+Rather than have separate hugetlb and transparent huge page pmd
+manipulation functions, re-wire our thp functions to simply call the
+pte equivalents.
 
-Thanks. I'm thinking of pushing this to 3.14 as a fix. Any objection?
+This allows THP to take advantage of the new PTE_WRITE logic introduced
+in:
+  c2c93e5 arm64: mm: Introduce PTE_WRITE
 
-	M.
+To represent splitting THPs we use the PTE_SPECIAL bit as this is not
+used for pmds.
+
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+Changed in V2: pte_pmd and pmd_pte are introduced and thp functions
+are #defined in terms of these rather than expanded out.
+
+pmd_mknotpresent logic retained as it was before V1 of the series, as
+it is safer. (We want the pmd to generate a fault and return true for
+pmd_trans_huge).
+---
+ arch/arm64/include/asm/pgtable.h | 52 +++++++++++++++++++---------------------
+ 1 file changed, 24 insertions(+), 28 deletions(-)
+
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index b524dcd..5bac741 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -227,36 +227,36 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+ 
+ #define __HAVE_ARCH_PTE_SPECIAL
+ 
+-/*
+- * Software PMD bits for THP
+- */
++static inline pte_t pmd_pte(pmd_t pmd)
++{
++	return __pte(pmd_val(pmd));
++}
+ 
+-#define PMD_SECT_DIRTY		(_AT(pmdval_t, 1) << 55)
+-#define PMD_SECT_SPLITTING	(_AT(pmdval_t, 1) << 57)
++static inline pmd_t pte_pmd(pte_t pte)
++{
++	return __pmd(pte_val(pte));
++}
+ 
+ /*
+  * THP definitions.
+  */
+-#define pmd_young(pmd)		(pmd_val(pmd) & PMD_SECT_AF)
+-
+-#define __HAVE_ARCH_PMD_WRITE
+-#define pmd_write(pmd)		(!(pmd_val(pmd) & PMD_SECT_RDONLY))
+ 
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+ #define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
+-#define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
++#define pmd_trans_splitting(pmd)	pte_special(pmd_pte(pmd))
+ #endif
+ 
+-#define PMD_BIT_FUNC(fn,op) \
+-static inline pmd_t pmd_##fn(pmd_t pmd) { pmd_val(pmd) op; return pmd; }
++#define pmd_young(pmd)		pte_young(pmd_pte(pmd))
++#define pmd_wrprotect(pmd)	pte_pmd(pte_wrprotect(pmd_pte(pmd)))
++#define pmd_mksplitting(pmd)	pte_pmd(pte_mkspecial(pmd_pte(pmd)))
++#define pmd_mkold(pmd)		pte_pmd(pte_mkold(pmd_pte(pmd)))
++#define pmd_mkwrite(pmd)	pte_pmd(pte_mkwrite(pmd_pte(pmd)))
++#define pmd_mkdirty(pmd)	pte_pmd(pte_mkdirty(pmd_pte(pmd)))
++#define pmd_mkyoung(pmd)	pte_pmd(pte_mkyoung(pmd_pte(pmd)))
++#define pmd_mknotpresent(pmd)	(__pmd(pmd_val(pmd) &= ~PMD_TYPE_MASK))
+ 
+-PMD_BIT_FUNC(wrprotect,	|= PMD_SECT_RDONLY);
+-PMD_BIT_FUNC(mkold,	&= ~PMD_SECT_AF);
+-PMD_BIT_FUNC(mksplitting, |= PMD_SECT_SPLITTING);
+-PMD_BIT_FUNC(mkwrite,   &= ~PMD_SECT_RDONLY);
+-PMD_BIT_FUNC(mkdirty,   |= PMD_SECT_DIRTY);
+-PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
+-PMD_BIT_FUNC(mknotpresent, &= ~PMD_TYPE_MASK);
++#define __HAVE_ARCH_PMD_WRITE
++#define pmd_write(pmd)		pte_write(pmd_pte(pmd))
+ 
+ #define pmd_mkhuge(pmd)		(__pmd(pmd_val(pmd) & ~PMD_TABLE_BIT))
+ 
+@@ -266,15 +266,6 @@ PMD_BIT_FUNC(mknotpresent, &= ~PMD_TYPE_MASK);
+ 
+ #define pmd_page(pmd)           pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
+ 
+-static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
+-{
+-	const pmdval_t mask = PMD_SECT_USER | PMD_SECT_PXN | PMD_SECT_UXN |
+-			      PMD_SECT_RDONLY | PMD_SECT_PROT_NONE |
+-			      PMD_SECT_VALID;
+-	pmd_val(pmd) = (pmd_val(pmd) & ~mask) | (pgprot_val(newprot) & mask);
+-	return pmd;
+-}
+-
+ #define set_pmd_at(mm, addr, pmdp, pmd)	set_pmd(pmdp, pmd)
+ 
+ static inline int has_transparent_hugepage(void)
+@@ -383,6 +374,11 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+ 	return pte;
+ }
+ 
++static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
++{
++	return pte_pmd(pte_modify(pmd_pte(pmd), newprot));
++}
++
+ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+ extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
+ 
 -- 
-Jazz is not dead. It just smells funny...
+1.8.1.4
