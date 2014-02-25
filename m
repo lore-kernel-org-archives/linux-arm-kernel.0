@@ -1,47 +1,44 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 25 Feb 2014 14:05:23 +0100
-Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
-In-Reply-To: <201402251344.23958.arnd@arndb.de>
-References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
- <1563594.ZI2UdY7FPy@wuerfel> <20140223214447.GC3793@kw.sim.vm.gnt>
- <201402251344.23958.arnd@arndb.de>
-Message-ID: <20140225130523.GE3793@kw.sim.vm.gnt>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 25 Feb 2014 08:45:17 -0500
+Subject: [PATCH RESEND v10 1/4] PHY: Add function set_speed to generic
+ PHY framework
+In-Reply-To: <530C8711.4000600@ti.com>
+References: <1393308882-3964-1-git-send-email-lho@apm.com>
+ <1393308882-3964-2-git-send-email-lho@apm.com>
+ <530C8711.4000600@ti.com>
+Message-ID: <20140225134517.GA26189@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 01:44:23PM +0100, Arnd Bergmann wrote:
-> On Sunday 23 February 2014, Simon Guinot wrote:
-> > I am quite busy this days but as soon I get some free time I will take
-> > care of the DT conversion for the Lacie boards.
-> > 
-> > Basically, we need to fix some minor issues with the Thomas patches:
-> > 
-> > ARM: kirkwood: convert d2net_v2 to DT
-> > ARM: kirkwood: convert LaCie Net{2, 5}Big v2 platforms to DT
-> > 
-> > And also a DT binding must be added to the LED driver leds-netxbig.
+On Tue, Feb 25, 2014 at 05:35:37PM +0530, Kishon Vijay Abraham I wrote:
+> Hi,
 > 
-> I just took a brief look at the LED driver. I think it would be
-> reasonable to move almost all of the platform_data into the driver
-> itself and associate the two versions with distinct "compatible"
-> strings. That works in this particular case because while the driver
-> is generic enough to handle other cases, I also wouldn't expect
-> it to ever get used again on another platform.
-
-Actually, this driver is also used by the Atom-based LaCie NASes.
-Mainline support for this platforms should be provided soon.
-
+> On Tuesday 25 February 2014 11:44 AM, Loc Ho wrote:
+> > This patch adds function set_speed to the generic PHY framework operation
+> > structure. This function can be called to instruct the PHY underlying layer
+> > at specified lane to configure for specified speed in hertz.
+> > 
+> > Signed-off-by: Loc Ho <lho@apm.com>
+> > ---
+> >  drivers/phy/phy-core.c  |   21 +++++++++++++++++++++
+> >  include/linux/phy/phy.h |    8 ++++++++
+> >  2 files changed, 29 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> > index 645c867..44f2f63 100644
+> > --- a/drivers/phy/phy-core.c
+> > +++ b/drivers/phy/phy-core.c
+> > @@ -257,6 +257,27 @@ int phy_power_off(struct phy *phy)
+> >  }
+> >  EXPORT_SYMBOL_GPL(phy_power_off);
+> >  
 > 
-> The main change to the driver would be to add support for a binding
-> that gets the seven gpio numbers out of the DT then.
+> missing function comment :-s
 
-Unfortunately not, we have to pass the whole thing through DT.
+Can you please let me know when this series goes in?  I'll pull in the
+phy tree into libata and then apply the ata patches on top.
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140225/f3fc48f7/attachment.sig>
+Thanks.
+
+-- 
+tejun
