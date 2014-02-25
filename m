@@ -1,83 +1,40 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 25 Feb 2014 15:59:19 +0400
-Subject: [PATCH] ARM: pxa: add gpio keys information
-Message-ID: <1393329559-25320-1-git-send-email-dbaryshkov@gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 25 Feb 2014 17:35:37 +0530
+Subject: [PATCH RESEND v10 1/4] PHY: Add function set_speed to generic
+ PHY framework
+In-Reply-To: <1393308882-3964-2-git-send-email-lho@apm.com>
+References: <1393308882-3964-1-git-send-email-lho@apm.com>
+ <1393308882-3964-2-git-send-email-lho@apm.com>
+Message-ID: <530C8711.4000600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switching from corgikbd to matrixkbd corgi has lost support for few switches.
-Readd them through gpio-keys-polled device (-polled, since scoop does
-not provide IRQ for GPIO).
+Hi,
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-pxa/corgi.c | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+On Tuesday 25 February 2014 11:44 AM, Loc Ho wrote:
+> This patch adds function set_speed to the generic PHY framework operation
+> structure. This function can be called to instruct the PHY underlying layer
+> at specified lane to configure for specified speed in hertz.
+> 
+> Signed-off-by: Loc Ho <lho@apm.com>
+> ---
+>  drivers/phy/phy-core.c  |   21 +++++++++++++++++++++
+>  include/linux/phy/phy.h |    8 ++++++++
+>  2 files changed, 29 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> index 645c867..44f2f63 100644
+> --- a/drivers/phy/phy-core.c
+> +++ b/drivers/phy/phy-core.c
+> @@ -257,6 +257,27 @@ int phy_power_off(struct phy *phy)
+>  }
+>  EXPORT_SYMBOL_GPL(phy_power_off);
+>  
 
-diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-index f162f1b..57d6054 100644
---- a/arch/arm/mach-pxa/corgi.c
-+++ b/arch/arm/mach-pxa/corgi.c
-@@ -32,6 +32,7 @@
- #include <linux/spi/pxa2xx_spi.h>
- #include <linux/mtd/sharpsl.h>
- #include <linux/input/matrix_keypad.h>
-+#include <linux/gpio_keys.h>
- #include <linux/module.h>
- #include <video/w100fb.h>
- 
-@@ -405,6 +406,44 @@ static struct platform_device corgikbd_device = {
- 	},
- };
- 
-+static struct gpio_keys_button corgi_gpio_keys[] = {
-+	{
-+		.type	= EV_SW,
-+		.code	= SW_LID,
-+		.gpio	= CORGI_GPIO_SWA,
-+		.desc	= "Lid close switch",
-+		.debounce_interval = 500,
-+	},
-+	{
-+		.type	= EV_SW,
-+		.code	= SW_TABLET_MODE,
-+		.gpio	= CORGI_GPIO_SWB,
-+		.desc	= "Tablet mode switch",
-+		.debounce_interval = 500,
-+	},
-+	{
-+		.type	= EV_SW,
-+		.code	= SW_HEADPHONE_INSERT,
-+		.gpio	= CORGI_GPIO_AK_INT,
-+		.desc	= "HeadPhone insert",
-+		.debounce_interval = 500,
-+	},
-+};
-+
-+static struct gpio_keys_platform_data corgi_gpio_keys_platform_data = {
-+	.buttons	= corgi_gpio_keys,
-+	.nbuttons	= ARRAY_SIZE(corgi_gpio_keys),
-+	.poll_interval	= 250,
-+};
-+
-+static struct platform_device corgi_gpio_keys_device = {
-+	.name	= "gpio-keys-polled",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data	= &corgi_gpio_keys_platform_data,
-+	},
-+};
-+
- /*
-  * Corgi LEDs
-  */
-@@ -646,6 +685,7 @@ static struct platform_device sharpsl_rom_device = {
- static struct platform_device *devices[] __initdata = {
- 	&corgiscoop_device,
- 	&corgifb_device,
-+	&corgi_gpio_keys_device,
- 	&corgikbd_device,
- 	&corgiled_device,
- 	&corgi_audio_device,
--- 
-1.8.5.3
+missing function comment :-s
+
+> +int phy_set_speed(struct phy *phy, int lane, u64 speed)
+> +{
+
+Thanks
+Kishon
