@@ -1,43 +1,32 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue, 25 Feb 2014 19:20:29 +0400
-Subject: [PATCH v2 RESEND 0/3] ARM: clps711x: IRQCHIP driver
-In-Reply-To: <1391328580-31001-1-git-send-email-shc_work@mail.ru>
-References: <1391328580-31001-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20140225192029.0a12ecd6275c89cd3033f57d@mail.ru>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 25 Feb 2014 15:22:36 +0000
+Subject: [PATCH V2 0/3] PTE fixes for arm and arm64
+In-Reply-To: <1393328334-27285-1-git-send-email-steve.capper@linaro.org>
+References: <1393328334-27285-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <20140225152236.GE23136@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun,  2 Feb 2014 12:09:40 +0400
-Alexander Shiyan <shc_work@mail.ru> wrote:
-
-> This series is devoted to new CLPS711X irqchip driver.
-> The driver designed for booting from ATAGS and devicetree.
+On Tue, Feb 25, 2014 at 11:38:51AM +0000, Steve Capper wrote:
+> This series fixes a couple of problems that I have come across:
+>  1) Some pte accessors for arm and arm64 can have their results
+>     cancelled out by a downcast. This is addressed by the first two
+>     patches.
 > 
-> Alexander Shiyan (3):
->   ARM: clps711x: Add CLPS711X irqchip driver
->   ARM: dts: clps711x: Add bindings documentation for CLPS711X irqchip
->     driver
->   ARM: clps711x: Migrate CLPS711X subarch to the new irqchip driver
+>  2) On arm with LPAE it is impossible to distinguish between clean
+>     writable ptes and read only ptes. This is addressed by the third
+>     patch.
 > 
->  .../interrupt-controller/cirrus,clps711x-intc.txt  |  41 ++++
->  arch/arm/Kconfig                                   |   2 -
->  arch/arm/mach-clps711x/board-autcpu12.c            |   2 -
->  arch/arm/mach-clps711x/board-cdb89712.c            |   2 -
->  arch/arm/mach-clps711x/board-clep7312.c            |   2 -
->  arch/arm/mach-clps711x/board-edb7211.c             |   2 -
->  arch/arm/mach-clps711x/board-p720t.c               |   2 -
->  arch/arm/mach-clps711x/common.c                    | 201 +----------------
->  arch/arm/mach-clps711x/common.h                    |   5 +-
->  arch/arm/mach-clps711x/include/mach/clps711x.h     |  16 --
->  drivers/irqchip/Kconfig                            |   8 +
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-clps711x.c                     | 243 +++++++++++++++++++++
->  13 files changed, 299 insertions(+), 228 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
->  create mode 100644 drivers/irqchip/irq-clps711x.c
+> As the third patch depends on the first patch, all three patches are
+> bundled together in the same series.
+> 
+> I have reviewed Will and Russell's patch:
+>  b6ccb9803e90 ("ARM: 7954/1: mm: remove remaining domain support
+> 	from ARMv6")
+> And I believe that the L_PTE_WRITE logic should be compatible with this
+> patch. It applies cleanly and compiles; but I would be greatful if
+> someone could please give it a test.
 
-Arnd, if I'll rebase irqchip part to arch/arm/mach-clp711x, can this helps to
-pull this patchset into the kernel?
+There's an 1136 on my desk with your name on it :)
 
--- 
-Alexander Shiyan <shc_work@mail.ru>
+Will
