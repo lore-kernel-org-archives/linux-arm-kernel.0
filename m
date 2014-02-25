@@ -1,22 +1,28 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Tue, 25 Feb 2014 15:05:30 -0800
-Subject: [PATCH v4 0/6] generic early_ioremap support
-In-Reply-To: <5D4B48CE-46BA-44E8-BCDE-AEACAC9973AF@arm.com>
-References: <1392238575-10000-1-git-send-email-msalter@redhat.com>
- <1393337404.7307.51.camel@deneb.redhat.com>
- <20140225183012.GA27164@mudshark.cambridge.arm.com>
- <1393353942.26583.10.camel@deneb.redhat.com> <530CF21E.1020603@zytor.com>
- <5D4B48CE-46BA-44E8-BCDE-AEACAC9973AF@arm.com>
-Message-ID: <530D21BA.8030108@zytor.com>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Tue, 25 Feb 2014 15:24:09 -0800
+Subject: [PATCH RFC v1 1/3] ARM: Add irq disabled version of soft_restart.
+In-Reply-To: <530CCFB5.5030205@ti.com>
+References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
+ <1392774729-3235-2-git-send-email-sebastian.capella@linaro.org>
+ <20140222102616.GG21483@n2100.arm.linux.org.uk>
+ <20140224231345.10580.62916@capellas-linux> <530C4CAE.5000202@ti.com>
+ <alpine.DEB.2.02.1402251125500.21251@ionos.tec.linutronix.de>
+ <530CCFB5.5030205@ti.com>
+Message-ID: <20140225232409.18229.4284@capellas-linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2014 03:04 PM, Catalin Marinas wrote:
+Quoting Russ Dill (2014-02-25 09:15:33)
+> On 02/25/2014 02:27 AM, Thomas Gleixner wrote:
+> > If you want escape the tracer and in that case you really want it 
+> > being on a different stack, use raw_local_irq_* which are not
+> > traced.
 > 
-> I think the series still need an ack from rmk at least on the arm patch
-> (4/6).
-> 
+> So it might make sense to change soft_restart to use the
+> raw_local_irq_* calls.
 
-OK.  Russell?
+I've added this change.  So far it's working well.
 
-	-hpa
+Thanks!
+
+Sebastian
