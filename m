@@ -1,36 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Feb 2014 18:14:43 +0100
-Subject: [GIT PULL] qcom driver changes for v3.15
-In-Reply-To: <alpine.DEB.2.00.1402250926210.17163@galak-ubuntu.qualcomm.com>
-References: <alpine.DEB.2.00.1402250926210.17163@galak-ubuntu.qualcomm.com>
-Message-ID: <201402251814.43712.arnd@arndb.de>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Tue, 25 Feb 2014 09:15:33 -0800
+Subject: [PATCH RFC v1 1/3] ARM: Add irq disabled version of soft_restart.
+In-Reply-To: <alpine.DEB.2.02.1402251125500.21251@ionos.tec.linutronix.de>
+References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
+ <1392774729-3235-2-git-send-email-sebastian.capella@linaro.org>
+ <20140222102616.GG21483@n2100.arm.linux.org.uk>
+ <20140224231345.10580.62916@capellas-linux> <530C4CAE.5000202@ti.com>
+ <alpine.DEB.2.02.1402251125500.21251@ionos.tec.linutronix.de>
+Message-ID: <530CCFB5.5030205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 February 2014, Kumar Gala wrote:
-> The following changes since commit cf1e8f0cd665e2a9966d2bee4e11ecc0938ff166:
+On 02/25/2014 02:27 AM, Thomas Gleixner wrote:
+> On Mon, 24 Feb 2014, Russ Dill wrote:
+>> On 02/24/2014 03:13 PM, Sebastian Capella wrote:
+>>> Quoting Russell King - ARM Linux (2014-02-22 02:26:17)
+>>>> On Tue, Feb 18, 2014 at 05:52:07PM -0800, Sebastian Capella
+>>>> wrote:
+>>>>> From: Russ Dill <Russ.Dill@ti.com>
+>>>>> 
+>>>>> This adds the ability to run soft_restart with
+>>>>> local_irq/fiq_disable already called. This is helpful for
+>>>>> the hibernation code paths.
+>>>> 
+>>>> I'd rather keep this simple.  There's no problem with calling
+>>>> soft_restart with interrupts already disabled.
+>>>> local_irq_disable()/local_fiq_disable() there should be
+>>>> harmless.
+>>> 
+>>> Hi Russell,
+>>> 
+>>> I'm observing a data abort loop when I replace this call:
+>>> 
+>>> In the local_irq_disable, it ends up calling
+>>> trace_hardirqs_off (CONFIG_TRACE_IRQFLAGS_SUPPORT is enabled),
+>>> which calls trace_hardirqs_off_caller which checks
+>>> lockdep_recursion in the current task, but we've switched to a
+>>> temporary stack with the call_with_stack, and get_current is
+>>> returning NULL.  This triggers a data abort, which calls
+>>> trace_hardirqs_off again and so on.
+>>> 
+>>> Do you have any suggestions here?
+>>> 
+>>> Thanks,
+>>> 
+>>> Sebastian
+>>> 
+>> 
+>> So the alternative is to have a version of the call that calls a
+>> special no trace version of
+>> local_irq_disable()/local_fiq_disable(). Which would be
+>> preferable? Having a noirq version of soft_restart seems much
+>> simpler to me.
 > 
->    ARM: qcom: Rename various msm prefixed functions to qcom (2014-02-06 16:20:41 -0600)
-> 
-> are available in the git repository at:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-drivers-for-3.15
-> 
-> for you to fetch changes up to add798a40aec3a768165055477ba8bfee21e06fc:
-> 
->    gpio: msm: switch Kconfig to ARCH_QCOM depends (2014-02-25 09:22:10 -0600)
-> 
+> If you want escape the tracer and in that case you really want it 
+> being on a different stack, use raw_local_irq_* which are not
+> traced.
 
-Applied to the next/drivers branch now, and added a merge description
-that I adapted from your patch changelogs:
-
-    Merge "qcom driver changes for v3.15" from Kumar Gala:
-    
-    We've split Qualcomm MSM support into legacy and multiplatform.  These
-    drivers are only relevant on the multiplatform supported SoCs so switch the
-    Kconfig depends to ARCH_QCOM.
-    
-It would be helpful if you can in the future always add a description
-yourself when creating the tag.
-
-	Arnd
+So it might make sense to change soft_restart to use the
+raw_local_irq_* calls.
