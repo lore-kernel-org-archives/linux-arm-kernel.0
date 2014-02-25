@@ -1,44 +1,26 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 25 Feb 2014 15:25:48 +1100
-Subject: linux-next: manual merge of the watchdog tree with the mvebu tree
-Message-ID: <20140225152548.65ba8372349800898f109fb2@canb.auug.org.au>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 25 Feb 2014 13:25:41 +0900
+Subject: [PATCH 0/4] arm64: topology: CPU topology support
+Message-ID: <1393302345-18253-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wim,
+This revision of the series places any otherwise unmapped CPUs into a
+cluster in order to avoid confusing the scheduler if no topology
+information is provided.  This means that we should never bring up a CPU
+with no topology information so while the warning is still present and
+has been upgraded it should never triger unless there is a genuine bug
+(as opposed to missing information).
 
-Today's linux-next merge of the watchdog tree got a conflict in
-drivers/watchdog/orion_wdt.c between commit e97662e1e28d ("watchdog:
-orion: Handle the interrupt so it's properly acked") from the mvebu tree
-and commit 2e9a2ff49520 ("watchdog: delete non-required instances of
-include <linux/init.h>") from the watchdog tree.
+Mark Brown (4):
+      arm64: topology: Implement basic CPU topology support
+      arm64: topology: Add support for topology DT bindings
+      arm64: topology: Tell the scheduler about the relative power of cores
+      arm64: topology: Provide relative power numbers for cores
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc drivers/watchdog/orion_wdt.c
-index 15321aa0bb94,498163497c1c..000000000000
---- a/drivers/watchdog/orion_wdt.c
-+++ b/drivers/watchdog/orion_wdt.c
-@@@ -18,9 -18,8 +18,8 @@@
-  #include <linux/kernel.h>
-  #include <linux/platform_device.h>
-  #include <linux/watchdog.h>
-- #include <linux/init.h>
- +#include <linux/interrupt.h>
-  #include <linux/io.h>
- -#include <linux/spinlock.h>
-  #include <linux/clk.h>
-  #include <linux/err.h>
-  #include <linux/of.h>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140225/cf37f45b/attachment.sig>
+ arch/arm64/Kconfig                |  24 +++
+ arch/arm64/include/asm/topology.h |  39 ++++
+ arch/arm64/kernel/Makefile        |   1 +
+ arch/arm64/kernel/smp.c           |  11 ++
+ arch/arm64/kernel/topology.c      | 388 ++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 463 insertions(+)
