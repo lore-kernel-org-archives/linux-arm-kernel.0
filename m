@@ -1,30 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Feb 2014 10:36:54 +0100
-Subject: [PATCH 00/10] pinctrl: mvebu: remove hard-coded addresses from
- Dove pinctrl
-In-Reply-To: <20140224181023.GA1010@titan.lakedaemon.net>
-References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140224181023.GA1010@titan.lakedaemon.net>
-Message-ID: <CACRpkdZ+YGTyDj6i8c198MdRtz3GY-YBmVO9LysPCcmT4EC0cg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 25 Feb 2014 09:37:59 +0000
+Subject: [PATCH v8 01/14] mfd: omap-usb-host: Get clocks based on
+ hardware revision
+In-Reply-To: <1392896409-5101-2-git-send-email-rogerq@ti.com>
+References: <1392896409-5101-1-git-send-email-rogerq@ti.com>
+ <1392896409-5101-2-git-send-email-rogerq@ti.com>
+Message-ID: <20140225093759.GA22755@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 7:10 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> Not all revisions have all the clocks so get the necessary clocks
+> based on hardware revision.
+> 
+> This should avoid un-necessary clk_get failure messages that were
+> observed earlier.
+> 
+> CC: Lee Jones <lee.jones@linaro.org>
+> CC: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>  drivers/mfd/omap-usb-host.c | 43 ++++++++++++++++++++++++++++++++-----------
+>  1 file changed, 32 insertions(+), 11 deletions(-)
 
-> Sebastian, Linus,
->
-> I've now created mvebu/pinctrl-dove for this series.  It's based on
-> v3.14-rc1, and depends on mvebu/pinctrl (which depends on
-> mvebu/pinctrl-3xx).
->
-> I've kept this series in a separate branch in case we encounter an
-> unforeseen problem with something in here.  Then this branch can be
-> dropped, and /pinctrl-3xx and /pinctrl will still make it in.
->
-> So, all patches except 3 and 4 are in mvebu/pinctrl-dove.  3 and 4 are
-> in mvebu/dt.
+What about patches 1 and 2. Are these safe to go in alone?
 
-OK so what should I be pulling in first now?
-
-Yours,
-Linus Walleij
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
