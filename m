@@ -1,68 +1,71 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 25 Feb 2014 09:35:35 +0900
-Subject: [PATCH 1/1] ARM: Exynos: Add generic compatible string
-In-Reply-To: <CAK9yfHxiHkrf1xmSFbfoKqFFSCU6w4QqwPnQNdv1m1PGtrwsLQ@mail.gmail.com>
-References: <1392809645-631-1-git-send-email-sachin.kamat@linaro.org>	<CAK9yfHyWG1ac6isTRSB3VWfxER9cSuDJHwY3b7svyEk9EozpWQ@mail.gmail.com>	<53075239.4010603@samsung.com>	<2200834.G3JJLYQl5i@wuerfel>	<53076F00.7000001@samsung.com>	<53077160.5030202@samsung.com>
- <CAK9yfHxiHkrf1xmSFbfoKqFFSCU6w4QqwPnQNdv1m1PGtrwsLQ@mail.gmail.com>
-Message-ID: <530BE557.20106@samsung.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 24 Feb 2014 16:43:31 -0800
+Subject: ccf: where to put constraints?
+In-Reply-To: <20140225002214.22529.23643@quantum>
+References: <20140224201046.GA13155@katana>
+ <8e8ce023-b9a4-41a5-b06c-0f6d934f22e6@VA3EHSMHS020.ehs.local>
+ <20140224230532.22529.7958@quantum>
+ <32a83aee-624b-47ef-a13e-1a9d993005c0@CH1EHSMHS039.ehs.local>
+ <20140225002214.22529.23643@quantum>
+Message-ID: <982cbb23-d1e4-4048-bf7f-3c1909bf766c@TX2EHSMHS023.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/14 21:03, Sachin Kamat wrote:
-> On 21 February 2014 21:01, Tomasz Figa<t.figa@samsung.com>  wrote:
->> On 21.02.2014 16:21, Tomasz Figa wrote:
->>>
->>> On 21.02.2014 15:48, Arnd Bergmann wrote:
->>>>
->>>> On Friday 21 February 2014 14:18:49 Tomasz Figa wrote:
->>>>>
->>>>>
->>>>>> Now that we have a broader agreement on this, I think we can go
->>>>>> ahead with the
->>>>>> following steps as an initial approach:
->>>>>> 1. Have a common machine file for both exynos4 and 5 files,
->>>>>> mach-exynos-dt.c.
->>>>>> 2. Introduce a generic compatible string "samsung,exynos".
+On Mon, 2014-02-24 at 04:22PM -0800, Mike Turquette wrote:
+> Quoting S?ren Brinkmann (2014-02-24 15:11:55)
+> > On Mon, 2014-02-24 at 03:05PM -0800, Mike Turquette wrote:
+> > > Quoting S?ren Brinkmann (2014-02-24 13:21:58)
+> > > > Hi Wolfram,
+> > > > 
+> > > > On Mon, 2014-02-24 at 09:10PM +0100, Wolfram Sang wrote:
+> > > > > Hi,
+> > > > > 
+> > > > > Where do I put constraints when using the CCF? I have a CPU and GPU
+> > > > > clock derived from the same PLL. Both clocks have their own divider.
+> > > > > Now, there is the additional constraint that the CPU clock must not be
+> > > > > lower than the GPU clock. Do I add checks in the set_rate functions?
+> > > > > Feels like the wrong layer, but not checking it and blindly relying on
+> > > > > somebody else does not feel correct, too. How to do it best?
+> > > > 
+> > > > I don't know if it's the best or only way, but so far, I did things like
+> > > > that with clock notifiers.
+> > > > 
+> > > > I.e. when a clock consumer needs to be notified about its input clock
+> > > > being changed it registers a clock notifier. In that notifier callback
+> > > > it then can react to the rate change. E.g. adjust dividers to stay
+> > > > within legal limits or reject the change completely.
+> > > 
+> > > Yes, this is why the notifiers were created. A nice side effect of this
+> > > is that the code can live outside your clock driver. Often times the
+> > > clocks are quite capable of running at these speeds, but the problem is
+> > > the IP blocks (CPU & GPU in Wolfram's case) would be out of spec. It is
+> > > arguable that this logic does not belong in the clock driver but instead
+> > > in some cpufreq driver or something like it.
+> > > 
+> > > The clock notifiers make it easy to put this logic wherever you like and
+> > > you can even veto clock rate changes.
+> > 
+> > Right, that's how I have it. If a device driver needs to enforce some
+> > policy on its clock, it implements a clock notifier callback.
+> > 
+> > The drawback though, as I see it, it makes interactions hard to
+> > understand. With such a scheme, rate changes may fail and the cause is
+> > not always obvious - often hidden really well. Usually all you get is a
+> > message from the CCF that the rate change for clock <name> failed, but
+> > if your notifier callback isn't verbose, you can search forever for the
+> > cause of that failure.
+> > 
+> > On our internal repo I had it a few times that "bugs" get assigned to the
+> > wrong piece. E.g. cpufreq, even though that works perfectly well and
+> > correct on its own, but some other device enforced some policy through a
+> > notifier.
+> 
+> Yes, debugging across notifiers is notoriously annoying. How about
+> something like the following patch?
 
-Well, I think, we need to consider to use compatible string 
-"samsung,exynos" again because "exynos" name can be used on ARMv8 as 
-well and I don't want to say that generic/common something is always 
-good. So IMHO still using exynos4 and exynos5 would be better.
+Good idea. Now I should just follow that advice and my life may become a
+lot easier :)
+ACK
 
->>>>>> 3. Append this to the compatible property list for existing boards.
->>>>>>
->>>>>> If this plan looks OK, I can send across patches doing this.
->>>>>>
->>>>>
->>>>> Looks good. I would also merge common.c with this resulting
->>>>> mach-exynos-dt.c, as it would be the only user of the code there.
->>>>
->>>>
->>>> Sounds good. While the naming is not important, I would just call the
->>>> file 'exynos.c', in line with some of the other platforms we have.
->>>> Both the 'mach-' and the '-dt' part of the file name are redundant.
->>>>
->>>> Alternatively, you could merge it all into common.c.
->>>
->>>
->>> exynos.c sounds good to me.
->>
-
-Well, let me see common.c and mach-exynos.c, one is for SoC specific 
-stuff and the other is for Board specific so I think, keeping current 
-file would be good, we can change the file name mach-exynos.c or 
-board-exynos.c though.
-
-Thanks,
-Kukjin
-
->>
->> One minor thing. It might be a good idea to base on top of my PM
->> consolidation part 2 series, to avoid merge conflicts:
->>
->> http://thread.gmane.org/gmane.linux.ports.arm.kernel/299340
->>
->> It should hit Kgene's tree this weekend.
->
-> Sure.
->
+	Thanks,
+	S?ren
