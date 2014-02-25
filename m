@@ -1,76 +1,70 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 25 Feb 2014 11:02:33 +0200
-Subject: [PATCH v8 03/14] mfd: omap-usb-host: Use clock names as per
- function for reference clocks
-In-Reply-To: <20140225085234.GB19099@lee--X1>
-References: <1392896409-5101-1-git-send-email-rogerq@ti.com>
- <1392896409-5101-4-git-send-email-rogerq@ti.com>
- <20140225085234.GB19099@lee--X1>
-Message-ID: <530C5C29.1090503@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 25 Feb 2014 09:08:30 +0000
+Subject: [PATCH 1/3] Documentation:spi:fsl-dspi:add DSPI dma transfer
+ support
+In-Reply-To: <1393311258-14380-1-git-send-email-b44548@freescale.com>
+References: <1393311258-14380-1-git-send-email-b44548@freescale.com>
+Message-ID: <20140225090830.GO28555@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 02/25/2014 10:52 AM, Lee Jones wrote:
->> Use a meaningful name for the reference clocks so that it indicates the function.
->>
->> CC: Lee Jones <lee.jones@linaro.org>
->> CC: Samuel Ortiz <sameo@linux.intel.com>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
->>  drivers/mfd/omap-usb-host.c | 12 ++++++------
->>  1 file changed, 6 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
->> index 865c276..651e249 100644
->> --- a/drivers/mfd/omap-usb-host.c
->> +++ b/drivers/mfd/omap-usb-host.c
->> @@ -718,24 +718,24 @@ static int usbhs_omap_probe(struct platform_device *pdev)
->>  		goto err_mem;
->>  	}
->>  
->> -	omap->xclk60mhsp1_ck = devm_clk_get(dev, "xclk60mhsp1_ck");
->> +	omap->xclk60mhsp1_ck = devm_clk_get(dev, "refclk_60m_ext_p1");
->>  	if (IS_ERR(omap->xclk60mhsp1_ck)) {
->>  		ret = PTR_ERR(omap->xclk60mhsp1_ck);
->> -		dev_err(dev, "xclk60mhsp1_ck failed error:%d\n", ret);
->> +		dev_err(dev, "refclk_60m_ext_p1 failed error:%d\n", ret);
->>  		goto err_mem;
->>  	}
+On Tue, Feb 25, 2014 at 06:54:16AM +0000, Chao Fu wrote:
+> From: Chao Fu <B44548@freescale.com>
 > 
-> Will anything break if I were to apply the MFD patches seperately?
+> Add bool value use-dma.
+> The bool will determine whether DSPI use dma channel transfer data
+> in a platform.
 > 
+> Add dmas and dma-names for describing dma channels of DSPI.
+> 
+> Signed-off-by: Chao Fu      <b44548@freescale.com>
+> ---
+>  Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
+> index 5376de4..76a1039 100644
+> --- a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
+> +++ b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
+> @@ -11,6 +11,11 @@ Required properties:
+>  - spi-num-chipselects : the number of the chipselect signals.
+>  - bus-num : the slave chip chipselect signal number.
+>  - big-endian : if DSPI modudle is big endian, the bool will be set in node.
+> +- use-dma: the bool decide if use dma method in DSPI transfering.
 
-Nothing will break for OMAP3, but OMAP4 USB host will break (e.g. Panda board).
-OMAP5 USB host was never working so it doesn't matter there.
+Why can the OS not decide this based on the presence of dmas which it
+can use?
 
-To make sure nothing breaks, we need at least these 2 patches to go in together with mfd changes.
+Is there ever a case that there would be dmas present but it would be in
+the interests of the OS to not use them?
 
-[PATCH v8 08/14] ARM: dts: omap4: Update omap-usb-host node
-[PATCH v8 09/14] ARM: dts: omap5: Update omap-usb-host node
+Mark.
 
-Any suggestions about how we can proceed?
-
-cheers,
--roger
-
->> -	omap->xclk60mhsp2_ck = devm_clk_get(dev, "xclk60mhsp2_ck");
->> +	omap->xclk60mhsp2_ck = devm_clk_get(dev, "refclk_60m_ext_p2");
->>  	if (IS_ERR(omap->xclk60mhsp2_ck)) {
->>  		ret = PTR_ERR(omap->xclk60mhsp2_ck);
->> -		dev_err(dev, "xclk60mhsp2_ck failed error:%d\n", ret);
->> +		dev_err(dev, "refclk_60m_ext_p2 failed error:%d\n", ret);
->>  		goto err_mem;
->>  	}
->>  
->> -	omap->init_60m_fclk = devm_clk_get(dev, "init_60m_fclk");
->> +	omap->init_60m_fclk = devm_clk_get(dev, "refclk_60m_int");
->>  	if (IS_ERR(omap->init_60m_fclk)) {
->>  		ret = PTR_ERR(omap->init_60m_fclk);
->> -		dev_err(dev, "init_60m_fclk failed error:%d\n", ret);
->> +		dev_err(dev, "refclk_60m_int failed error:%d\n", ret);
->>  		goto err_mem;
->>  	}
->>  
+> +- dmas: List of DMA specifiers with the controller specific format
+> +	as described in the generic DMA client binding. A tx and rx
+> +	specifier is required for each chip select.
+> +- dma-names: Should be named "tx" and "rx".
+>  Example:
+>  
+>  dspi0 at 4002c000 {
+> @@ -26,6 +31,10 @@ dspi0 at 4002c000 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_dspi0_1>;
+>  	big-endian;
+> +	use-dma;
+> +	dmas = <&edma0 0 12>,
+> +		<&edma0 0 13>;
+> +	dma-names = "rx", "tx";
+>  	status = "okay";
+>  
+>  	sflash: at26df081a at 0 {
+> -- 
+> 1.8.4
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
