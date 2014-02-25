@@ -1,33 +1,51 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 25 Feb 2014 10:00:49 +0900
-Subject: [PATCH 1/1] ARM: Exynos: Add generic compatible string
-In-Reply-To: <530BE93F.2070904@gmail.com>
-References: <1392809645-631-1-git-send-email-sachin.kamat@linaro.org>	<CAK9yfHyWG1ac6isTRSB3VWfxER9cSuDJHwY3b7svyEk9EozpWQ@mail.gmail.com>	<53075239.4010603@samsung.com>	<2200834.G3JJLYQl5i@wuerfel>	<53076F00.7000001@samsung.com>	<53077160.5030202@samsung.com>
- <CAK9yfHxiHkrf1xmSFbfoKqFFSCU6w4QqwPnQNdv1m1PGtrwsLQ@mail.gmail.com>
- <530BE557.20106@samsung.com> <530BE93F.2070904@gmail.com>
-Message-ID: <530BEB41.5070107@samsung.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 24 Feb 2014 17:02:00 -0800
+Subject: [PATCH RESEND v3] clk: return probe defer when DT clock not yet
+ ready
+In-Reply-To: <20140219185315.GV21483@n2100.arm.linux.org.uk>
+References: <20140208132446.2A26694003E@smtp1-g21.free.fr>
+ <20140219190305.788e537d@armhf>
+ <20140219185315.GV21483@n2100.arm.linux.org.uk>
+Message-ID: <20140225010200.22529.17490@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/14 09:52, Tomasz Figa wrote:
-> On 25.02.2014 01:35, Kukjin Kim wrote:
+Quoting Russell King - ARM Linux (2014-02-19 10:53:15)
+> On Wed, Feb 19, 2014 at 07:03:05PM +0100, Jean-Francois Moine wrote:
+> > On Mon, 25 Nov 2013 19:47:04 +0100
+> > Jean-Francois Moine <moinejf@free.fr> wrote:
+> > 
+> > > At probe time, a clock device may not be ready when some other device
+> > > wants to use it.
+> > > 
+> > > This patch lets the functions clk_get/devm_clk_get return a probe defer
+> > > when the clock is defined in the DT but not yet available.
+> > 
+> > Hi Mike,
+> > 
+> > Any news about this patch?
+> 
+> Mike,
+> 
+> Can you please have a look at this patch so that either you or I can take
+> this.  It /is/ required so that subsystems can correctly identify whether
+> a clock is missing because it's not specified in DT, or whether the clock
+> is missing because it's specified in DT but doesn't yet exist.
+> 
+> This patch has been hanging around for ages and deserves some attention.
 
-[...]
+I only saw this patch now thanks to another thread. I have some
+aggressive mail filtering going on and I guess maybe the original ASoC
+subject had something to do with that?
 
->> Well, let me see common.c and mach-exynos.c, one is for SoC specific
->> stuff and the other is for Board specific so I think, keeping current
->> file would be good, we can change the file name mach-exynos.c or
->> board-exynos.c though.
->
-> There is no board specific stuff in mach-exynos/ with DT, so there is no
-> need to keep those file separate, especially when stuff from common.c is
-> constantly being (re)moved.
->
-OK.
+Oh well. I've pull this patch into clk-next for testing. I'll see if
+anything goes boom.
 
-> Also I'd rather stick to what other platforms use, which would be
-> exynos.c (like tegra.c), as Arnd proposed.
->
-agreed. OK.
+Thanks for the patch and longsuffering patience!
 
-- Kukjin
+Regards,
+Mike
+
+> 
+> Thanks.
+> 
