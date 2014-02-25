@@ -1,26 +1,50 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 25 Feb 2014 13:25:41 +0900
-Subject: [PATCH 0/4] arm64: topology: CPU topology support
-Message-ID: <1393302345-18253-1-git-send-email-broonie@kernel.org>
+Date: Tue, 25 Feb 2014 13:25:45 +0900
+Subject: [PATCH 4/4] arm64: topology: Provide relative power numbers for cores
+In-Reply-To: <1393302345-18253-1-git-send-email-broonie@kernel.org>
+References: <1393302345-18253-1-git-send-email-broonie@kernel.org>
+Message-ID: <1393302345-18253-5-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This revision of the series places any otherwise unmapped CPUs into a
-cluster in order to avoid confusing the scheduler if no topology
-information is provided.  This means that we should never bring up a CPU
-with no topology information so while the warning is still present and
-has been upgraded it should never triger unless there is a genuine bug
-(as opposed to missing information).
+From: Mark Brown <broonie@linaro.org>
 
-Mark Brown (4):
-      arm64: topology: Implement basic CPU topology support
-      arm64: topology: Add support for topology DT bindings
-      arm64: topology: Tell the scheduler about the relative power of cores
-      arm64: topology: Provide relative power numbers for cores
+Provide performance numbers to the scheduler to help it fill the cores in
+the system on big.LITTLE systems. With the current scheduler this may
+perform poorly for applications that try to do OpenMP style work over all
+cores but should help for more common workloads. The current 32 bit ARM
+implementation provides a similar estimate so this helps ensure that
+work to improve big.LITTLE systems on ARMv7 systems performs similarly
+on ARMv8 systems.
 
- arch/arm64/Kconfig                |  24 +++
- arch/arm64/include/asm/topology.h |  39 ++++
- arch/arm64/kernel/Makefile        |   1 +
- arch/arm64/kernel/smp.c           |  11 ++
- arch/arm64/kernel/topology.c      | 388 ++++++++++++++++++++++++++++++++++++++
- 5 files changed, 463 insertions(+)
+The power numbers are the same as for ARMv7 since it seems that the
+expected differential between the big and little cores is very similar on
+both ARMv7 and ARMv8.  In both ARMv7 and ARMv8 cases the numbers were
+based on the published DMIPS numbers.
+
+These numbers are just an initial and basic approximation for use with
+the current scheduler, it is likely that both experience with silicon
+and ongoing work on improving the scheduler will lead to further tuning
+or will tune automatically at runtime and so make the specific choice of
+numbers here less critical.
+
+Signed-off-by: Mark Brown <broonie@linaro.org>
+---
+ arch/arm64/kernel/topology.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+index b330e79..e85560a 100644
+--- a/arch/arm64/kernel/topology.c
++++ b/arch/arm64/kernel/topology.c
+@@ -177,6 +177,8 @@ struct cpu_efficiency {
+  * use the default SCHED_POWER_SCALE value for cpu_scale.
+  */
+ static const struct cpu_efficiency table_efficiency[] = {
++	{ "arm,cortex-a57", 3891 },
++	{ "arm,cortex-a53", 2048 },
+ 	{ NULL, },
+ };
+ 
+-- 
+1.9.0.rc3
