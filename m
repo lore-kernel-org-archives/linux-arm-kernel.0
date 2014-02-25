@@ -1,39 +1,64 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 25 Feb 2014 18:23:16 +0900
-Subject: [PATCH v4 7/7] arm64: add __ASSEMBLY__ in asm/insn.h
-In-Reply-To: <1393320196-2942-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1391768336-5642-1-git-send-email-takahiro.akashi@linaro.org>
- <1393320196-2942-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1393320196-2942-8-git-send-email-takahiro.akashi@linaro.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 25 Feb 2014 11:25:48 +0200
+Subject: [PATCH v8 03/14] mfd: omap-usb-host: Use clock names as per
+ function for reference clocks
+In-Reply-To: <20140225091839.GE19099@lee--X1>
+References: <1392896409-5101-1-git-send-email-rogerq@ti.com>
+ <1392896409-5101-4-git-send-email-rogerq@ti.com>
+ <20140225085234.GB19099@lee--X1> <530C5C29.1090503@ti.com>
+ <20140225091839.GE19099@lee--X1>
+Message-ID: <530C619C.9050303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since insn.h is indirectly included in asm/entry-ftrace.S,
-we need to exclude some declarations by __ASSEMBLY__.
+On 02/25/2014 11:18 AM, Lee Jones wrote:
+>>>> Use a meaningful name for the reference clocks so that it indicates the function.
+>>>>
+>>>> CC: Lee Jones <lee.jones@linaro.org>
+>>>> CC: Samuel Ortiz <sameo@linux.intel.com>
+>>>> Signed-off-by: Roger Quadros <rogerq@ti.com>
+>>>> ---
+>>>>  drivers/mfd/omap-usb-host.c | 12 ++++++------
+>>>>  1 file changed, 6 insertions(+), 6 deletions(-)
+>>>>
+>>>> diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
+>>>> index 865c276..651e249 100644
+>>>> --- a/drivers/mfd/omap-usb-host.c
+>>>> +++ b/drivers/mfd/omap-usb-host.c
+>>>> @@ -718,24 +718,24 @@ static int usbhs_omap_probe(struct platform_device *pdev)
+>>>>  		goto err_mem;
+>>>>  	}
+>>>>  
+>>>> -	omap->xclk60mhsp1_ck = devm_clk_get(dev, "xclk60mhsp1_ck");
+>>>> +	omap->xclk60mhsp1_ck = devm_clk_get(dev, "refclk_60m_ext_p1");
+>>>>  	if (IS_ERR(omap->xclk60mhsp1_ck)) {
+>>>>  		ret = PTR_ERR(omap->xclk60mhsp1_ck);
+>>>> -		dev_err(dev, "xclk60mhsp1_ck failed error:%d\n", ret);
+>>>> +		dev_err(dev, "refclk_60m_ext_p1 failed error:%d\n", ret);
+>>>>  		goto err_mem;
+>>>>  	}
+>>>
+>>> Will anything break if I were to apply the MFD patches seperately?
+>>>
+>>
+>> Nothing will break for OMAP3, but OMAP4 USB host will break (e.g. Panda board).
+>> OMAP5 USB host was never working so it doesn't matter there.
+>>
+>> To make sure nothing breaks, we need at least these 2 patches to go in together with mfd changes.
+>>
+>> [PATCH v8 08/14] ARM: dts: omap4: Update omap-usb-host node
+>> [PATCH v8 09/14] ARM: dts: omap5: Update omap-usb-host node
+>>
+>> Any suggestions about how we can proceed?
+> 
+> Yes, unfortunately you have to squash each of the patches into one
+> patch. Applying a patch which breaks a build, then applying another one
+> immediately after which subsequently fixes the break is not an acceptable
+> way of working I'm afraid. What would happen if we were to fall into
+> the middle of the two patches when bisecting?
+> 
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/include/asm/insn.h |    2 ++
- 1 file changed, 2 insertions(+)
+OK, I'll squash patches 8 and 9 into patch 3.
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index c44ad39..dc1f73b 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -21,6 +21,7 @@
- /* A64 instructions are always 32 bits. */
- #define	AARCH64_INSN_SIZE		4
- 
-+#ifndef __ASSEMBLY__
- /*
-  * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
-  * Section C3.1 "A64 instruction index by encoding":
-@@ -104,5 +105,6 @@ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
- int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
- int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
- int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
-+#endif /* __ASSEMBLY__ */
- 
- #endif	/* __ASM_INSN_H */
--- 
-1.7.9.5
+cheers,
+-roger
