@@ -1,88 +1,76 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Tue, 25 Feb 2014 10:47:27 +0100
-Subject: [PATCH v4 2/8] at91: pinctrl: don't request GPIOs used for
- interrupts but lock them as IRQ
-In-Reply-To: <CACh+v5Mz43dcuDh7PQV+LgNxMOV+CpamNGR69f_6TTiEB5SVJw@mail.gmail.com>
-References: <1392199607-27452-1-git-send-email-jjhiblot@traphandler.com>
- <1392199607-27452-3-git-send-email-jjhiblot@traphandler.com>
- <CACRpkdb8BUkLcF8=oEXsGemgFAQk6pyaX0j8t3v1xjymJsM=VQ@mail.gmail.com>
- <CACh+v5Mz43dcuDh7PQV+LgNxMOV+CpamNGR69f_6TTiEB5SVJw@mail.gmail.com>
-Message-ID: <CACh+v5MjNt5EmPOWLjtDHboZ0dXLU7eKgQuWSWPB+Ydy3P_6-A@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 25 Feb 2014 10:47:41 +0100
+Subject: [PATCH v2 0/6] ARM: STi reset controller support
+In-Reply-To: <530C5D8C.1080809@st.com>
+References: <1389696613-19683-1-git-send-email-srinivas.kandagatla@st.com>
+ <1391437665-11913-1-git-send-email-srinivas.kandagatla@st.com>
+ <1391592486.11239.4.camel@pizza.hi.pengutronix.de>
+ <52F4D76F.8070301@st.com> <5304B849.2080806@st.com>
+ <1393237988.3091.14.camel@pizza.hi.pengutronix.de>
+ <530B514A.4070209@st.com>
+ <1393254982.3091.44.camel@pizza.hi.pengutronix.de>
+ <530C5D8C.1080809@st.com>
+Message-ID: <1393321661.4156.2.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-02-25 10:35 GMT+01:00 Jean-Jacques Hiblot <jjhiblot@traphandler.com>:
-> Hi Linus,
->
-> 2014-02-24 14:25 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
->> On Wed, Feb 12, 2014 at 11:06 AM, Jean-Jacques Hiblot
->> <jjhiblot@traphandler.com> wrote:
->>
->>> During the xlate stage of the DT interrupt parsing, the at91 pinctrl driver
->>> requests the GPIOs that are described as interrupt sources. This prevents a
->>> driver to request the gpio later to get its electrical value.
->>> This patch replaces the gpio_request with a gpio_lock_as_irq to prevent the
->>> gpio to be set as an ouput while allowing a subsequent gpio_request to succeed
->>>
->>> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->>
->> OK, but is this really correct:
->>
->>> @@ -1478,18 +1478,17 @@ static int at91_gpio_irq_domain_xlate(struct irq_domain *d,
->>>  {
->>>         struct at91_gpio_chip *at91_gpio = d->host_data;
->>>         int ret;
->>> -       int pin = at91_gpio->chip.base + intspec[0];
->>>
->>>         if (WARN_ON(intsize < 2))
->>>                 return -EINVAL;
->>>         *out_hwirq = intspec[0];
->>>         *out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
->>>
->>> -       ret = gpio_request(pin, ctrlr->full_name);
->>> +       ret = gpio_lock_as_irq(&at91_gpio->chip, intspec[0]);
->>
->> So when resolving an IRQ resource, we take for granted that it will be used
->> for IRQs and IRQs only? Is it not possible that this resolution is done
->> and then the driver using it unloads or whatever and it is still marked
->> as IRQ?
-> No, once it's reserved for irq, it'll be for irq only.
->>
->> I don't think the xlate function should have such side effects on
->> the gpio_chip internal state. I think it should just translate.
->
-> I agree but I choose to only replace the gpio_request by a
-> lock_as_irq(), not rework the whole thing. It seemed it would have
-> more chance to be accepted this way. IMO the right time to do this is
-> at the time of the request_irq()
->>
->> The line is locked for IRQ the moment its startup() callback is
->> called, is it not?
->>
->>> -       ret = gpio_direction_input(pin);
->>> +       ret = at91_gpio_direction_input(&at91_gpio->chip, intspec[0]);
->>
->> I actually don't like this either. This kind of thing was causing
->> problems in the OMAP driver like hell.
-> But calling gpio_direction_input() defeats the purpose of removing the
-> gpio_request() because it ensures that the gpio is requested.
->>
->> I think this should be deleted from xlate and at91_gpio_direction_input()
->> be called from the irqchip's .startup() or even .unmask() function
->> instead.
-> irq_startup and irq_shutdown seem the right place for this because
-> they're called when requesting and freeing the interrupt. It'll
-> require a change to __setup_irq() though to check the return value of
-> irq_startup.
+Hi Srinivas,
 
-Linux,
+Am Dienstag, den 25.02.2014, 09:08 +0000 schrieb srinivas kandagatla:
+> On 24/02/14 15:16, Philipp Zabel wrote:
+> > Hi Srinivas,
+> > 
+> > Am Montag, den 24.02.2014, 14:03 +0000 schrieb srinivas kandagatla:
+> >> Thanks Philipp for your comments,
+> >>
+> >> On 24/02/14 10:33, Philipp Zabel wrote:
+> >>>>> Did Srini's explanations convinced you?
+> >>>>>
+> >>>>> If so, could you queue the series for v3.15?
+> >>> to be honest, I'm not comfortable with this explanation. If the
+> >>> "powerdown" bits only gate the clocks to those modules, calling it a
+> >>> reset control is clearly the wrong abstraction. If that is the case,
+> >>> couldn't you handle those bits via the clock framework?
+> >> I just had a re-look at the IPs specs for more information on where
+> >> these power-down signals are actually terminating on the IP side.
+> >>
+> >> For example: ST-Synopsis Ethernet GMAC IP has two pins
+> >> power_down_req[IN] and power_down_ack[OUT]. power_down_req is used by
+> >> the software to either put the IP in powerdown or bring it out of
+> >> powerdown state.
+> > 
+> > Now I'm a bit confused. There is no mention of GMAC in your patches,
+> > and for ETH[01] they contain only the SOFTRESET bits. I have no issue
+> > with the SOFTRESETs.
+> Yes, GMAC was a bad example indeed. However this same logic applies to
+> the USB IP as well.
+> 
+> GMAC power-down-reset can be added to the power-down-reset list for
+> consistency.
+> 
+> We did not define the power-down-reset for GMAC because the reset state
+> of GMAC will not be in power down. softreset should be enough to bring
+> the IP in to a usable state. So the software never drives the power
+> down-request but instead uses softreset in this particular case.
+> 
+> > 
+> >> The IP itself drives power_down_ack to indicate when the power down
+> >> request is successfully finished. For power_down/power_up request the IP
+> >> will change the internal state accordingly including powering up/down
+> >> its internal blocks and/or clock gating.
+> >>
+> >>> If on the other hand these powerdown bits also trigger reset machinery,
+> >>> such that asserting and deasserting that bit will change the module's
+> >>> internal state, I could be convinced to queue them like this.
+> >> This is true with ST IPs, these lines change the state of the IP as
+> >> described above. Reset framework seems to fits in very well with this
+> >> behavior rather than power-domains or clock framework.
+> > 
+> > If you put the IP in power down when it is idle, and then power it up
+> > again, will the IP registers have kept their previous state?
+> No, the context is lost, the IP needs re-initialization.
 
-Sorry, for the noise. You can forget this proposed patch and my
-previous email. I just saw that the patch where this was done in
-startup and shutdown was applied. I thought it had been rejected . I'm
-sorry for the confusion.
+alright then, I'll add them to the queue.
 
-Jean-Jacques
->>
->> Yours,
->> Linus Walleij
+thanks
+Philipp
