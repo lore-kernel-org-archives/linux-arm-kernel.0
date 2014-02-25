@@ -1,112 +1,46 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon, 24 Feb 2014 23:16:47 -0700
-Subject: [PATCH RESEND v10 4/4] arm64: Add APM X-Gene SoC 15Gbps Multi-purpose
- PHY DTS entries
-Message-ID: <1393309007-4012-1-git-send-email-lho@apm.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 25 Feb 2014 15:02:52 +0800
+Subject: [RFC PATCH] arm64: add support for AES in CCM mode using Crypto
+ Extensions
+In-Reply-To: <1392106905-28709-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1392106905-28709-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20140225070252.GB9934@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DTS entries for the APM X-Gene SoC 15Gbps Multi-purpose
-PHY driver. The PHY for SATA controller 2 and 3 are enabled by default.
+On Tue, Feb 11, 2014 at 09:21:45AM +0100, Ard Biesheuvel wrote:
+> This adds support for a synchronous implementation of AES in CCM mode
+> using ARMv8 Crypto Extensions, using NEON registers q0 - q5.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> Hi all,
+> 
+> I am posting this for review/RFC. The main topic for feedback is the way
+> I have used an inner blkcipher instance to process the encrypted + authenticated
+> data.
+> 
+> The point of having a dedicated module for synchronous ccm(aes) is the fact that
+> mac80211 uses it for WPA2 CCMP en-/decryption, where it runs entirely in soft
+> IRQ context. In this case, the performance improvement offered by dedicated AES
+> instructions is likely wasted on stacking and unstacking the NEON register file,
+> as the generic CCM operates on a single AES block at a time.
+> 
+> Instead, this implementation interleaves the CTR and CBC modes at the round
+> level, eliminating 50% of both the input and round key loads and (hopefully)
+> eliminating pipeline stalls by operating on two AES blocks at a time.
+> 
+> Tested with tcrypt, no performance numbers yet.
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
-Signed-off-by: Suman Tripathi <stripathi@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |   75 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 75 insertions(+), 0 deletions(-)
+I think your idea definitely make sense, since we do the same
+thing in aesni-intel.
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index d37d736..c78ddcf 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -176,6 +176,51 @@
- 				reg-names = "csr-reg";
- 				clock-output-names = "eth8clk";
- 			};
-+
-+			sataphy1clk: sataphy1clk at 1f21c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f21c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sataphy1clk";
-+				status = "disabled";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x00>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x06>;
-+			};
-+
-+			sataphy2clk: sataphy1clk at 1f22c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f22c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sataphy2clk";
-+				status = "ok";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x3a>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x06>;
-+			};
-+
-+			sataphy3clk: sataphy1clk at 1f23c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f23c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sataphy3clk";
-+				status = "ok";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x3a>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x06>;
-+			};
- 		};
- 
- 		serial0: serial at 1c020000 {
-@@ -187,5 +232,35 @@
- 			interrupt-parent = <&gic>;
- 			interrupts = <0x0 0x4c 0x4>;
- 		};
-+
-+		phy1: phy at 1f21a000 {
-+			compatible = "apm,xgene-phy";
-+			reg = <0x0 0x1f21a000 0x0 0x100>;
-+			#phy-cells = <1>;
-+			clocks = <&sataphy1clk 0>;
-+			status = "disabled";
-+			apm,tx-boost-gain = <30 30 30 30 30 30>;
-+			apm,tx-eye-tuning = <2 10 10 2 10 10>;
-+		};
-+
-+		phy2: phy at 1f22a000 {
-+			compatible = "apm,xgene-phy";
-+			reg = <0x0 0x1f22a000 0x0 0x100>;
-+			#phy-cells = <1>;
-+			clocks = <&sataphy2clk 0>;
-+			status = "ok";
-+			apm,tx-boost-gain = <30 30 30 30 30 30>;
-+			apm,tx-eye-tuning = <1 10 10 2 10 10>;
-+		};
-+
-+		phy3: phy at 1f23a000 {
-+			compatible = "apm,xgene-phy";
-+			reg = <0x0 0x1f23a000 0x0 0x100>;
-+			#phy-cells = <1>;
-+			clocks = <&sataphy3clk 0>;
-+			status = "ok";
-+			apm,tx-boost-gain = <31 31 31 31 31 31>;
-+			apm,tx-eye-tuning = <2 10 10 2 10 10>;
-+		};
- 	};
- };
+It'll be interesting to see some numbers, especially if we could
+compare this against the generic version that we talked about
+earlier.
+
+Thanks,
 -- 
-1.5.5
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
