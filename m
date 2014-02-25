@@ -1,55 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 25 Feb 2014 10:34:24 +0900
-Subject: [PATCH v3 0/2] regulator: core: Fix ops->enable/disable usage
-In-Reply-To: <20140224205058.GA18317@pengutronix.de>
-References: <1392914164-28596-1-git-send-email-mpa@pengutronix.de>
- <20140223051209.GK25940@sirena.org.uk>
- <CAOMZO5BPvCcx_f09Khuw8MVxrR18fnv9e1xeuJ0c_8G22AR53g@mail.gmail.com>
- <20140224205058.GA18317@pengutronix.de>
-Message-ID: <20140225013424.GL25940@sirena.org.uk>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 24 Feb 2014 20:40:48 -0500
+Subject: [PATCH v13 2/3] ata: Add APM X-Gene SoC AHCI SATA host
+ controller driver
+In-Reply-To: <CAPw-ZT=VHj+fO-7+G6Zdx+T+osJhXaR9AYHbx_TbWFWHBiDKYg@mail.gmail.com>
+References: <1393221265-13057-1-git-send-email-lho@apm.com>
+ <1393221265-13057-2-git-send-email-lho@apm.com>
+ <1393221265-13057-3-git-send-email-lho@apm.com>
+ <20140224183129.GA2522@htj.dyndns.org>
+ <CAPw-ZT=VHj+fO-7+G6Zdx+T+osJhXaR9AYHbx_TbWFWHBiDKYg@mail.gmail.com>
+Message-ID: <20140225014048.GA3450@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 09:50:58PM +0100, Markus Pargmann wrote:
+Hey,
 
-> The only situation where this returns -EINVAL is a dummy regulator that
-> is not always_on. As it doesn't make sense to have a dummy regulator
-> that is not always_on, I will add a check for exactly this situation to
-> the regulator_register function and drop the "return -EINVAL" above.
+On Mon, Feb 24, 2014 at 05:02:52PM -0800, Loc Ho wrote:
+> The completion of the RAM removal from shutdown is quite fast. As per
+> spec, the max time is 1ms but from the run-time code, it only take one
+> (1us) or two (2us) read for this to completed. An 1 ms hard delay is more
+> than 100 time slower. The code isn't that complex. If you strongly advise
+> that I should remove the while loop and use 1 ms, then okay. Otherwise, I
+> would prefer to keep the original code.
 
-I've squashed the following fix in today:
+The code is rather silly because as it's written the delay may be upto
+100ms.  If it's sitting in the hot path, using things like
+usleep_range() makes sense.  In probe / shutdown paths, it's just an
+unnecessary distraction.  If the timeout is as short as 1ms, it
+doesn't really matter whether the hardware can do it faster or not.
+It's just irrelevant.  Please just write simple code.
 
->From 937635aa9c667b90b76505de91c5693da6a5c120 Mon Sep 17 00:00:00 2001
-From: Mark Brown <broonie@linaro.org>
-Date: Tue, 25 Feb 2014 10:24:55 +0900
-Subject: [PATCH] regulator: Handle invalid enable operation for always/boot on
- regulators
+Thanks.
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- drivers/regulator/core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index 8cbc7d7..9a09f3c 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -1017,7 +1017,7 @@ static int set_machine_constraints(struct regulator_dev *rdev,
- 	 */
- 	if (rdev->constraints->always_on || rdev->constraints->boot_on) {
- 		ret = _regulator_do_enable(rdev);
--		if (ret < 0) {
-+		if (ret < 0 && ret != -EINVAL) {
- 			rdev_err(rdev, "failed to enable\n");
- 			goto out;
- 		}
 -- 
-1.9.0.rc3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140225/08164a1a/attachment.sig>
+tejun
