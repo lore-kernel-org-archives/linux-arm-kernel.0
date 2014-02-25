@@ -1,39 +1,80 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 25 Feb 2014 15:23:23 +0100
-Subject: [RFC PATCH v4 8/8] staging: imx-drm: Update TODO
+Date: Tue, 25 Feb 2014 15:23:19 +0100
+Subject: [RFC PATCH v4 4/8] staging: imx-drm: Document imx-hdmi device tree
+ bindings
 In-Reply-To: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>
 References: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1393338203-25051-9-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1393338203-25051-5-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device tree bindings are updated regardless of the common display
-framework and in the meantime the HDMI driver was included.
+This patch adds device tree binding documentation for the HDMI transmitter
+on i.MX6.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/staging/imx-drm/TODO | 5 -----
- 1 file changed, 5 deletions(-)
+ .../devicetree/bindings/staging/imx-drm/hdmi.txt   | 53 ++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
 
-diff --git a/drivers/staging/imx-drm/TODO b/drivers/staging/imx-drm/TODO
-index 6a9da94..29636fb 100644
---- a/drivers/staging/imx-drm/TODO
-+++ b/drivers/staging/imx-drm/TODO
-@@ -1,15 +1,10 @@
- TODO:
- - get DRM Maintainer review for this code
--- Wait for common display framework to hit mainline and update the IPU
--  driver to use it. This will most probably make changes to the devicetree
--  bindings necessary.
--- Factor out more code to common helper functions
- - decide where to put the base driver. It is not specific to a subsystem
-   and would be used by DRM/KMS and media/V4L2
- 
- Missing features (not necessarily for moving out of staging):
- 
--- Add i.MX6 HDMI support
- - Add support for IC (Image converter)
- - Add support for CSI (CMOS Sensor interface)
- - Add support for VDIC (Video Deinterlacer)
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+new file mode 100644
+index 0000000..7dcd673a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+@@ -0,0 +1,53 @@
++Device-Tree bindings for HDMI Transmitter
++
++HDMI Transmitter
++================
++
++The LVDS Display Bridge device tree node contains up to two lvds-channel
++nodes describing each of the two LVDS encoder channels of the bridge.
++
++Required properties:
++ - #address-cells : should be <1>
++ - #size-cells : should be <0>
++ - compatible : should be "fsl,imx6q-hdmi" or "fsl,imx6dl-hdmi".
++ - gpr : should be <&gpr>.
++   The phandle points to the iomuxc-gpr region containing the HDMI
++   multiplexer control register.
++ - clocks, clock-names : phandles to the HDMI iahb and isrf clocks, as described
++   in Documentation/devicetree/bindings/clock/clock-bindings.txt and
++   Documentation/devicetree/bindings/clock/imx6q-clock.txt.
++ - port@[0-4]: Up to four port nodes with endpoint definitions as defined in
++   Documentation/devicetree/bindings/media/video-interfaces.txt,
++   corresponding to the four inputs to the HDMI multiplexer.
++
++example:
++
++	gpr: iomuxc-gpr at 020e0000 {
++		/* ... */
++	};
++
++        hdmi: hdmi at 0120000 {
++                #address-cells = <1>;
++                #size-cells = <0>;
++                reg = <0x00120000 0x9000>;
++                interrupts = <0 115 0x04>;
++                gpr = <&gpr>;
++                clocks = <&clks 123>, <&clks 124>;
++                clock-names = "iahb", "isfr";
++
++                port at 0 {
++                        reg = <0>;
++
++                        hdmi_mux_0: endpoint {
++                                remote-endpoint = <&ipu1_di0_hdmi>;
++                        };
++                };
++
++                port at 1 {
++                        reg = <1>;
++
++                        hdmi_mux_1: endpoint {
++                                remote-endpoint = <&ipu1_di1_hdmi>;
++                        };
++                };
++        };
 -- 
 1.8.5.3
