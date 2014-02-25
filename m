@@ -1,65 +1,43 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 25 Feb 2014 10:16:56 -0500
-Subject: [PATCH 00/10] pinctrl: mvebu: remove hard-coded addresses from
- Dove pinctrl
-In-Reply-To: <CACRpkdZ+YGTyDj6i8c198MdRtz3GY-YBmVO9LysPCcmT4EC0cg@mail.gmail.com>
-References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140224181023.GA1010@titan.lakedaemon.net>
- <CACRpkdZ+YGTyDj6i8c198MdRtz3GY-YBmVO9LysPCcmT4EC0cg@mail.gmail.com>
-Message-ID: <20140225151656.GI1010@titan.lakedaemon.net>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue, 25 Feb 2014 19:20:29 +0400
+Subject: [PATCH v2 RESEND 0/3] ARM: clps711x: IRQCHIP driver
+In-Reply-To: <1391328580-31001-1-git-send-email-shc_work@mail.ru>
+References: <1391328580-31001-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20140225192029.0a12ecd6275c89cd3033f57d@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 10:36:54AM +0100, Linus Walleij wrote:
-> On Mon, Feb 24, 2014 at 7:10 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+On Sun,  2 Feb 2014 12:09:40 +0400
+Alexander Shiyan <shc_work@mail.ru> wrote:
+
+> This series is devoted to new CLPS711X irqchip driver.
+> The driver designed for booting from ATAGS and devicetree.
 > 
-> > Sebastian, Linus,
-> >
-> > I've now created mvebu/pinctrl-dove for this series.  It's based on
-> > v3.14-rc1, and depends on mvebu/pinctrl (which depends on
-> > mvebu/pinctrl-3xx).
-> >
-> > I've kept this series in a separate branch in case we encounter an
-> > unforeseen problem with something in here.  Then this branch can be
-> > dropped, and /pinctrl-3xx and /pinctrl will still make it in.
-> >
-> > So, all patches except 3 and 4 are in mvebu/pinctrl-dove.  3 and 4 are
-> > in mvebu/dt.
+> Alexander Shiyan (3):
+>   ARM: clps711x: Add CLPS711X irqchip driver
+>   ARM: dts: clps711x: Add bindings documentation for CLPS711X irqchip
+>     driver
+>   ARM: clps711x: Migrate CLPS711X subarch to the new irqchip driver
 > 
-> OK so what should I be pulling in first now?
+>  .../interrupt-controller/cirrus,clps711x-intc.txt  |  41 ++++
+>  arch/arm/Kconfig                                   |   2 -
+>  arch/arm/mach-clps711x/board-autcpu12.c            |   2 -
+>  arch/arm/mach-clps711x/board-cdb89712.c            |   2 -
+>  arch/arm/mach-clps711x/board-clep7312.c            |   2 -
+>  arch/arm/mach-clps711x/board-edb7211.c             |   2 -
+>  arch/arm/mach-clps711x/board-p720t.c               |   2 -
+>  arch/arm/mach-clps711x/common.c                    | 201 +----------------
+>  arch/arm/mach-clps711x/common.h                    |   5 +-
+>  arch/arm/mach-clps711x/include/mach/clps711x.h     |  16 --
+>  drivers/irqchip/Kconfig                            |   8 +
+>  drivers/irqchip/Makefile                           |   1 +
+>  drivers/irqchip/irq-clps711x.c                     | 243 +++++++++++++++++++++
+>  13 files changed, 299 insertions(+), 228 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
+>  create mode 100644 drivers/irqchip/irq-clps711x.c
 
-Of course I woke up this morning not happy with this :-/  Here's what it
-looks like currently:
+Arnd, if I'll rebase irqchip part to arch/arm/mach-clp711x, can this helps to
+pull this patchset into the kernel?
 
-  /v3.14-rc1
-  |
---+---+---+---+---+ mvebu/pinctrl-3xx
-  |               \
-  |---+---+---+---+---+---+---+ mvebu/pinctrl
-  \                           \
-   \---------------------------+---+---+---+ mvebu/pinctrl-dove
-
-Not to scale.
-
-
-I would prefer to do:
-
-  /v3.14-rc1
-  |
---+---+---+---+---+ mvebu/pinctrl-cleanup
-  |               \
-  |----------------+--+---+---+ mvebu/pinctrl-3xx
-  \                \
-   \----------------+---+---+--+---+---+---+ mvebu/pinctrl-dove
-
-But this would mean moving some patches to branches other than what they
-were sent with.  The advantage is that /pinctrl-3xx and /pinctrl-dove
-don't depend on each other, and only depend on -cleanup.  Which is great
-if there is something wrong in either branch.
-
-Sebastian, I can cherry-pick the patches around, but you know the code
-better than any of us, do you foresee any problems with this scenario?
-
-thx,
-
-Jason.
+-- 
+Alexander Shiyan <shc_work@mail.ru>
