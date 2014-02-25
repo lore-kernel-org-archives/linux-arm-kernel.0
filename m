@@ -1,54 +1,123 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 25 Feb 2014 15:05:01 -0600
-Subject: [PATCH] ARM: move __fixup_smp out of init section
-In-Reply-To: <22591791.dKqiiVNNOv@wuerfel>
-References: <1393352193-31717-1-git-send-email-robherring2@gmail.com>
- <22591791.dKqiiVNNOv@wuerfel>
-Message-ID: <CAL_Jsq+8p+p0wuRf9z01EKDcnGA95CmLvrDwDZzVETLe+SqpGg@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 25 Feb 2014 22:10:46 +0100
+Subject: [PATCHv2 01/16] iommu/omap: convert to devm_* interfaces
+In-Reply-To: <1392315347-32967-2-git-send-email-s-anna@ti.com>
+References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
+ <1392315347-32967-2-git-send-email-s-anna@ti.com>
+Message-ID: <11064948.xVKxJB3hrL@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 12:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 25 February 2014 12:16:33 Rob Herring wrote:
->> From: Rob Herring <robh@kernel.org>
->>
->> With large kernel builds such as allyesconfig exceeding maximum relative
->> branch offsets, the init section will be too far away to branch to
->> directly. This causes veneers to be added by the compiler, but veneers
->> don't work before the MMU is enabled. Fix this by moving __fixup_smp to
->> the .head.text section as it is not very big.
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->
-> This looks good to me, but I have some related questions:
->
-> * I needed to use -mlong-calls for large kernels. Did you manage without?
+Hi Suman,
 
-Yes, but I started with allyesconfig and then disabled things until it
-would link. This was mainly PCI, various debug, and filesystems. This
-particular failure you don't see until you try to boot.
+Thank you for the patch.
 
-I also saw intermittent inconsistent kallsym errors which
-KALLSYMS_EXTRA_PASS=1 did not fix.
+On Thursday 13 February 2014 12:15:32 Suman Anna wrote:
+> Use the various devm_ interfaces to simplify the cleanup in
+> probe and remove functions.
+> 
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
 
-> * Do you (or anyone) know how to force the use of a veneer? I see a problem
->   with some driver calling __do_div_asm from IIRC an init section, and that
->   creates a link error when the kernel gets too big
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-That is surprising given that I saw veneers be inserted for some asm
-to asm calls. Maybe it is something I turned off or something to do
-with the types of sections.
+> ---
+>  drivers/iommu/omap-iommu.c | 52  ++++++++----------------------------------
+>  1 file changed, 10 insertions(+), 42 deletions(-)
+> 
+> diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+> index bcd78a7..fff2ffd 100644
+> --- a/drivers/iommu/omap-iommu.c
+> +++ b/drivers/iommu/omap-iommu.c
+> @@ -941,7 +941,7 @@ static int omap_iommu_probe(struct platform_device
+> *pdev) struct resource *res;
+>  	struct iommu_platform_data *pdata = pdev->dev.platform_data;
+> 
+> -	obj = kzalloc(sizeof(*obj) + MMU_REG_SIZE, GFP_KERNEL);
+> +	obj = devm_kzalloc(&pdev->dev, sizeof(*obj) + MMU_REG_SIZE, GFP_KERNEL);
+>  	if (!obj)
+>  		return -ENOMEM;
+> 
+> @@ -958,33 +958,18 @@ static int omap_iommu_probe(struct platform_device
+> *pdev) INIT_LIST_HEAD(&obj->mmap);
+> 
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (!res) {
+> -		err = -ENODEV;
+> -		goto err_mem;
+> -	}
+> -
+> -	res = request_mem_region(res->start, resource_size(res),
+> -				 dev_name(&pdev->dev));
+> -	if (!res) {
+> -		err = -EIO;
+> -		goto err_mem;
+> -	}
+> -
+> -	obj->regbase = ioremap(res->start, resource_size(res));
+> -	if (!obj->regbase) {
+> -		err = -ENOMEM;
+> -		goto err_ioremap;
+> -	}
+> +	obj->regbase = devm_ioremap_resource(obj->dev, res);
+> +	if (IS_ERR(obj->regbase))
+> +		return PTR_ERR(obj->regbase);
+> 
+>  	irq = platform_get_irq(pdev, 0);
+> -	if (irq < 0) {
+> -		err = -ENODEV;
+> -		goto err_irq;
+> -	}
+> -	err = request_irq(irq, iommu_fault_handler, IRQF_SHARED,
+> -			  dev_name(&pdev->dev), obj);
+> +	if (irq < 0)
+> +		return -ENODEV;
+> +
+> +	err = devm_request_irq(obj->dev, irq, iommu_fault_handler, IRQF_SHARED,
+> +			       dev_name(obj->dev), obj);
+>  	if (err < 0)
+> -		goto err_irq;
+> +		return err;
+>  	platform_set_drvdata(pdev, obj);
+> 
+>  	pm_runtime_irq_safe(obj->dev);
+> @@ -992,34 +977,17 @@ static int omap_iommu_probe(struct platform_device
+> *pdev)
+> 
+>  	dev_info(&pdev->dev, "%s registered\n", obj->name);
+>  	return 0;
+> -
+> -err_irq:
+> -	iounmap(obj->regbase);
+> -err_ioremap:
+> -	release_mem_region(res->start, resource_size(res));
+> -err_mem:
+> -	kfree(obj);
+> -	return err;
+>  }
+> 
+>  static int omap_iommu_remove(struct platform_device *pdev)
+>  {
+> -	int irq;
+> -	struct resource *res;
+>  	struct omap_iommu *obj = platform_get_drvdata(pdev);
+> 
+>  	iopgtable_clear_entry_all(obj);
+> 
+> -	irq = platform_get_irq(pdev, 0);
+> -	free_irq(irq, obj);
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	release_mem_region(res->start, resource_size(res));
+> -	iounmap(obj->regbase);
+> -
+>  	pm_runtime_disable(obj->dev);
+> 
+>  	dev_info(&pdev->dev, "%s removed\n", obj->name);
+> -	kfree(obj);
+>  	return 0;
+>  }
 
-> * If FUNCTION_TRACER is enabled, we get calls from every function using
->  'bl __gnu_mcount_nc'. Do you think it's possible to fix those?
+-- 
+Regards,
 
-Put it in the middle of the image? ;)
-
-> * Same thing but simpler for svc_preempt calling preempt_schedule_irq
->   and lookup_processor_type calling __lookup_processor_type. In those
->   cases I guess we should be able to trivially rewrite the assembly
->   to jump through an extra register.
-
-I did see that lookup_processor_type had a veneer in my build.
-
-Rob
+Laurent Pinchart
