@@ -1,83 +1,54 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 25 Feb 2014 14:56:52 -0600
-Subject: [RFC PATCH 1/6] PM / Voltagedomain: Add generic clk notifier
- handler for regulator based dynamic voltage scaling
-In-Reply-To: <20140225055142.22529.21814@quantum>
-References: <1392755543-28335-1-git-send-email-nm@ti.com>
- <1392755543-28335-2-git-send-email-nm@ti.com>
- <20140225055142.22529.21814@quantum>
-Message-ID: <530D0394.4020208@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 25 Feb 2014 15:05:01 -0600
+Subject: [PATCH] ARM: move __fixup_smp out of init section
+In-Reply-To: <22591791.dKqiiVNNOv@wuerfel>
+References: <1393352193-31717-1-git-send-email-robherring2@gmail.com>
+ <22591791.dKqiiVNNOv@wuerfel>
+Message-ID: <CAL_Jsq+8p+p0wuRf9z01EKDcnGA95CmLvrDwDZzVETLe+SqpGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-On 02/24/2014 11:51 PM, Mike Turquette wrote:
-> Quoting Nishanth Menon (2014-02-18 12:32:18)
->> From: Mike Turquette <mturquette@linaro.org>
+On Tue, Feb 25, 2014 at 12:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 25 February 2014 12:16:33 Rob Herring wrote:
+>> From: Rob Herring <robh@kernel.org>
 >>
->> This patch provides helper functions for drivers that wish to scale
->> voltage through the clock rate-change notifiers. The approach taken
->> is that the user-driver(cpufreq/devfreq) do not care about the
->> details of the OPP table, nor does it care about handling the voltage
->> regulator directly.
+>> With large kernel builds such as allyesconfig exceeding maximum relative
+>> branch offsets, the init section will be too far away to branch to
+>> directly. This causes veneers to be added by the compiler, but veneers
+>> don't work before the MMU is enabled. Fix this by moving __fixup_smp to
+>> the .head.text section as it is not very big.
 >>
->> By using the clk notifier flags, we are able to sequence the operations
->> in the right order. The current logic is heavily influenced by
->> implementation done in cpufreq-cpu0.
->>
->> [nm at ti.com: Fixes in logic, and broken out from clk to allow building
->> a generic voltagedomain solution independent of cpufreq]
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> 
-> Not-signed-off-by: Mike Turquette <mturquette@linaro.org>
-> 
-> I haven't reviewed this series and it is a pretty big deviation from my
-> original RFC. You can have authorship of the patches if you want.
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>
+> This looks good to me, but I have some related questions:
+>
+> * I needed to use -mlong-calls for large kernels. Did you manage without?
 
-Sure, I had send a private note requesting clarification about the
-authorship, but I guess I can take this as the response :).
+Yes, but I started with allyesconfig and then disabled things until it
+would link. This was mainly PCI, various debug, and filesystems. This
+particular failure you don't see until you try to boot.
 
-> 
-> I'm not sure about trying to capture the "voltdm" as a core concept. It
-> feels a bit unwieldy to me.
+I also saw intermittent inconsistent kallsym errors which
+KALLSYMS_EXTRA_PASS=1 did not fix.
 
-Considering it is a simple collation of regulators and SoC specific
-"magic" which have to be operated in tandem to clock operation, Why
-does it seem unwieldy? Usage of multiple voltage planes in a single
-voltage domain concept does not seem unique to TI processors either:
-For example, imx6q-cpufreq.c uses 3 regulators (arm, pu, soc),
-s5pv210-cpufreq.c uses two regulators (vddarm, vddint), ideally OMAP
-implementation would use two (vdd_mpu, vbb_mpu).
+> * Do you (or anyone) know how to force the use of a veneer? I see a problem
+>   with some driver calling __do_div_asm from IIRC an init section, and that
+>   creates a link error when the kernel gets too big
 
-> I have wondered about making an abstract
-> "performance domain" which is the dvfs analogue to generic power
-> domains. This a reasonable split since gpd are good for idle power
-> savings (e.g. clock gate, power gate, sleep state, etc) and "perf
-> domains" would be good for active power savings (dvfs).
-> 
-> Having a generic container for performance domains might make a good
-> place to stuff all of this glue logic that we keep running into (e.g.
-> CPU and GPU max frequencies that are related), and it might make another
-> nice knob for the thermal folks to use.
+That is surprising given that I saw veneers be inserted for some asm
+to asm calls. Maybe it is something I turned off or something to do
+with the types of sections.
 
-This sounds like one level higher abstraction that we are speaking of
-here? I was'nt intending to solve the bigger picture problem here -
-just an abstraction level that might allow reusablity for multiple
-SoCs. In fact, having an abstraction away for voltage domain(which may
-consist of multiple regulators and any SoC specific magic) purely
-allows us to move towards a direction you mention here.
+> * If FUNCTION_TRACER is enabled, we get calls from every function using
+>  'bl __gnu_mcount_nc'. Do you think it's possible to fix those?
 
-> 
-> For the case of the OMAP voltage domains, it would be a place to stuff
-> all of the VC/VP -> ABB -> Smart Reflex AVS stuff.
-> 
+Put it in the middle of the image? ;)
 
-Unfortunately, I dont completely comprehend objection we have to this
-approach (other than an higher level abstraction is needed) and if we
-do have an objection, what is the alternate approach should be for
-representing hardware which this series attempts to present.
+> * Same thing but simpler for svc_preempt calling preempt_schedule_irq
+>   and lookup_processor_type calling __lookup_processor_type. In those
+>   cases I guess we should be able to trivially rewrite the assembly
+>   to jump through an extra register.
 
--- 
-Regards,
-Nishanth Menon
+I did see that lookup_processor_type had a veneer in my build.
+
+Rob
