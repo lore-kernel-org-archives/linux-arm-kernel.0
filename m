@@ -1,46 +1,73 @@
-From: lho@apm.com (Loc Ho)
-Date: Mon, 24 Feb 2014 22:08:57 -0800
-Subject: [PATCH v13 3/3] arm64: Add APM X-Gene SoC AHCI SATA host
- controller DTS entries
-In-Reply-To: <530C302A.5070809@ti.com>
-References: <1393221265-13057-1-git-send-email-lho@apm.com>
- <1393221265-13057-2-git-send-email-lho@apm.com>
- <1393221265-13057-3-git-send-email-lho@apm.com>
- <1393221265-13057-4-git-send-email-lho@apm.com>
- <20140224183218.GB2522@htj.dyndns.org>
- <CAPw-ZT=CNdGn_iPp+jJbymvgBTNpXe1nCLeNwPWBdD3AAnHE6A@mail.gmail.com>
- <530C302A.5070809@ti.com>
-Message-ID: <CAPw-ZTmM0G4-RXBMwxCXh32v8WpEv94A5+QdsQs40tmBy6DRkQ@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 25 Feb 2014 17:09:53 +1100
+Subject: linux-next: manual merge of the staging tree with the arm-soc tree
+Message-ID: <20140225170953.673cf5073d5682a54c1a1771@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon/Tejun,
+Hi Greg,
 
->>     > Signed-off-by: Loc Ho <lho at apm.com <mailto:lho@apm.com>>
->>     > Signed-off-by: Tuan Phan <tphan at apm.com <mailto:tphan@apm.com>>
->>     > Signed-off-by: Suman Tripathi <stripathi at apm.com <mailto:stripathi@apm.com>>
->>
->>     This doesn't apply cleanly to libata/for-3.15.  How should this be
->>     routed?
->>
->>
->> You need to apply the corresponding PHY driver as well. Are you taken the
->> corresponding PHY driver into your libata tree? If not, we will need to route
->> to Kishon generic PHY framework tree. I include Kishon Vijay Abraham to this
->> email thread.
->
-> I prefer dt entry go via dt maintainer. However I can add my Acked-by for the
-> dt patches if you can copy me in those patches.
+Today's linux-next merge of the staging tree got a conflict in
+arch/arm/boot/dts/imx53-mba53.dts between commit a4a2aa9b038c ("ARM: dts:
+imx53-mba53: create a container for fixed regulators") from the arm-soc
+tree and commit 17b5001b5143 ("imx-drm: convert to componentised device
+support") from the staging tree.
 
-The dt email is cc'ed in the patch. Do I need to do anything more here?
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
->> Kishon,
->>
->> Do I need to re-send my SATA PHY driver to you as I had being posting them to
->> the scsi/arm mailing list?
->
-> Yes please.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-Okay... I will re-post the PHY to you and linux-kernel at vger.kernel.org.
-
--Loc
+diff --cc arch/arm/boot/dts/imx53-mba53.dts
+index 55af11037a00,9b6e76980a74..000000000000
+--- a/arch/arm/boot/dts/imx53-mba53.dts
++++ b/arch/arm/boot/dts/imx53-mba53.dts
+@@@ -35,27 -43,18 +35,33 @@@
+  		status = "disabled";
+  	};
+  
++ 	imx-drm {
++ 		compatible = "fsl,imx-drm";
++ 		crtcs = <&ipu 1>;
++ 		connectors = <&disp1>, <&tve>;
++ 	};
++ 
+ -	reg_3p2v: 3p2v {
+ -		compatible = "regulator-fixed";
+ -		regulator-name = "3P2V";
+ -		regulator-min-microvolt = <3200000>;
+ -		regulator-max-microvolt = <3200000>;
+ -		regulator-always-on;
+ +	regulators {
+ +		compatible = "simple-bus";
+ +		#address-cells = <1>;
+ +		#size-cells = <0>;
+ +
+ +		reg_backlight: regulator at 0 {
+ +			compatible = "regulator-fixed";
+ +			reg = <0>;
+ +			regulator-name = "lcd-supply";
+ +			gpio = <&gpio2 5 0>;
+ +			startup-delay-us = <5000>;
+ +		};
+ +
+ +		reg_3p2v: regulator at 1 {
+ +			compatible = "regulator-fixed";
+ +			reg = <1>;
+ +			regulator-name = "3P2V";
+ +			regulator-min-microvolt = <3200000>;
+ +			regulator-max-microvolt = <3200000>;
+ +			regulator-always-on;
+ +		};
+  	};
+  
+  	sound {
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140225/7a9ed161/attachment-0001.sig>
