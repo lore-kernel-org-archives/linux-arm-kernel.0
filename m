@@ -1,79 +1,31 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 25 Feb 2014 19:54:54 +0100
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 25 Feb 2014 15:57:31 -0300
 Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Add HDMI support
-In-Reply-To: <1393352531-30793-1-git-send-email-fabio.estevam@freescale.com>
+In-Reply-To: <1393354494.12604.4.camel@pizza.hi.pengutronix.de>
 References: <1393352531-30793-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1393354494.12604.4.camel@pizza.hi.pengutronix.de>
+ <1393354494.12604.4.camel@pizza.hi.pengutronix.de>
+Message-ID: <CAOMZO5AW3Tx5HnX885DWAx3QJwJxi-GOmrxN2Zn23728Hi32oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hi Philipp,
 
-Am Dienstag, den 25.02.2014, 15:22 -0300 schrieb Fabio Estevam:
-> Add device tree support for HDMI.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Shawn,
-> 
-> Not sure if it is too early to submit this.
-> 
-> I have just tested against linux-next which contains Russell's latest patches
-> for imx-drm.
+On Tue, Feb 25, 2014 at 3:54 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Hi Fabio,
+>
+> Am Dienstag, den 25.02.2014, 15:22 -0300 schrieb Fabio Estevam:
+>> Add device tree support for HDMI.
+>>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>> ---
+>> Shawn,
+>>
+>> Not sure if it is too early to submit this.
+>>
+>> I have just tested against linux-next which contains Russell's latest patches
+>> for imx-drm.
+>
+> I would prefer to hold this back until the dt-binding patches are
+> accepted, too.
 
-I would prefer to hold this back until the dt-binding patches are
-accepted, too.
-
->  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 17 ++++++++++++++++-
->  1 file changed, 16 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> index 04487cb..0757c86 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> @@ -82,7 +82,7 @@
->  	imx_drm: imx-drm {
->  		compatible = "fsl,imx-drm";
->  		crtcs = <&ipu1 0>, <&ipu1 1>;
-> -		connectors = <&ldb>;
-> +		connectors = <&ldb>, <&hdmi>;
->  	};
-
-Then this node would just have vanished into the dtsi, ...
-
->  	sound {
-> @@ -143,6 +143,14 @@
->  	status = "okay";
->  };
->  
-> +&hdmi {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_sabresd_hdmi>;
-> +	ddc = <&i2c2>;
-> +	status = "okay";
-> +	crtcs = <&ipu1 1>;
-
-... and here there would be no need for the crtcs property.
-
-> +};
-> +
->  &i2c1 {
->  	clock-frequency = <100000>;
->  	pinctrl-names = "default";
-> @@ -385,6 +393,13 @@
->  			>;
->  		};
->  
-> +
-> +		pinctrl_sabresd_hdmi: sabresd-hdmi {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE 0x1f8b0
-> +			>;
-> +		};
-> +
->  		pinctrl_uart1: uart1grp {
->  			fsl,pins = <
->  				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
-
-regards
-Philipp
+Ok, understood. Thanks
