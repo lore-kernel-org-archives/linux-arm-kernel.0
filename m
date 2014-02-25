@@ -1,181 +1,169 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 25 Feb 2014 15:23:20 +0100
-Subject: [RFC PATCH v4 5/8] ARM: dts: imx51: Add IPU ports and endpoints,
- move imx-drm node to dtsi
+Date: Tue, 25 Feb 2014 15:23:18 +0100
+Subject: [RFC PATCH v4 3/8] staging: imx-drm: Document updated imx-drm device
+ tree bindings
 In-Reply-To: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>
 References: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1393338203-25051-6-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1393338203-25051-4-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch connects IPU and and parallel display device tree
-nodes using the OF graph bindings described in
-Documentation/devicetree/bindings/media/video-interfaces.txt
-
-The IPU ports correspond to the two display interfaces. The
-order of endpoints in the ports is arbitrary.
-
-Since the imx-drm node now only needs to contain links to the
-display interfaces, it can be moved to the SoC dtsi level. At
-the board level, only connections between the display interface
-ports and panels have to be added.
+This patch updates the device tree binding documentation for i.MX IPU/display
+nodes using the OF graph bindings documented in
+Documentation/devicetree/bindings/media/video-interfaces.txt.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- arch/arm/boot/dts/imx51-apf51dev.dts | 11 ++++++++++-
- arch/arm/boot/dts/imx51-babbage.dts  | 28 ++++++++++++++++++++--------
- arch/arm/boot/dts/imx51.dtsi         | 22 +++++++++++++++++++++-
- 3 files changed, 51 insertions(+), 10 deletions(-)
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       | 48 +++++++++++++++++++---
+ .../devicetree/bindings/staging/imx-drm/ldb.txt    | 20 +++++++--
+ 2 files changed, 59 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
-index 5a7f552..d3f9814 100644
---- a/arch/arm/boot/dts/imx51-apf51dev.dts
-+++ b/arch/arm/boot/dts/imx51-apf51dev.dts
-@@ -18,7 +18,6 @@
- 
- 	display at di1 {
- 		compatible = "fsl,imx-parallel-display";
--		crtcs = <&ipu 0>;
- 		interface-pix-fmt = "bgr666";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_ipu_disp1_1>;
-@@ -41,6 +40,12 @@
- 				pixelclk-active = <0>;
- 			};
- 		};
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+index b876d49..bfa19a4 100644
+--- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
++++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+@@ -1,3 +1,22 @@
++Freescale i.MX DRM master device
++================================
 +
-+		port {
-+			display_in: endpoint {
-+				remote-endpoint = <&ipu_di0_disp0>;
-+			};
-+		};
- 	};
- 
- 	gpio-keys {
-@@ -122,3 +127,7 @@
- 		};
- 	};
- };
++The freescale i.MX DRM master device is a virtual device needed to list all
++IPU or other display interface nodes that comprise the graphics subsystem.
 +
-+&ipu_di0_disp0 {
-+	remote-endpoint = <&display_in>;
-+};
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index 6ff15a0..6719271 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -23,7 +23,6 @@
- 
- 	display0: display at di0 {
- 		compatible = "fsl,imx-parallel-display";
--		crtcs = <&ipu 0>;
- 		interface-pix-fmt = "rgb24";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_ipu_disp1_1>;
-@@ -41,11 +40,16 @@
- 				vsync-len = <10>;
- 			};
- 		};
++Required properties:
++- compatible: Should be "fsl,imx-drm"
++- ports: Should contain a list of phandles pointing to display interface ports
++  of IPU devices
 +
-+		port {
-+			display0_in: endpoint {
-+				remote-endpoint = <&ipu_di0_disp0>;
-+			};
-+		};
- 	};
- 
- 	display1: display at di1 {
- 		compatible = "fsl,imx-parallel-display";
--		crtcs = <&ipu 1>;
- 		interface-pix-fmt = "rgb565";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_ipu_disp2_1>;
-@@ -68,6 +72,12 @@
- 				pixelclk-active = <0>;
- 			};
- 		};
++example:
 +
-+		port {
-+			display1_in: endpoint {
-+				remote-endpoint = <&ipu_di1_disp1>;
-+			};
-+		};
- 	};
- 
- 	gpio-keys {
-@@ -81,12 +91,6 @@
- 		};
- 	};
- 
--	imx-drm {
--		compatible = "fsl,imx-drm";
--		crtcs = <&ipu 0>, <&ipu 1>;
--		connectors = <&display0>, <&display1>;
--	};
--
- 	sound {
- 		compatible = "fsl,imx51-babbage-sgtl5000",
- 			     "fsl,imx-audio-sgtl5000";
-@@ -264,6 +268,14 @@
- 	};
- };
- 
-+&ipu_di0_disp0 {
-+	remote-endpoint = <&display0_in>;
++imx-drm {
++	compatible = "fsl,imx-drm";
++	ports = <&ipu_di0>;
 +};
 +
-+&ipu_di1_disp1 {
-+	remote-endpoint = <&display1_in>;
-+};
 +
- &ssi2 {
- 	fsl,mode = "i2s-slave";
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 4bcdd3a..536644c 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -79,6 +79,11 @@
- 		};
- 	};
+ Freescale i.MX IPUv3
+ ====================
  
-+	imx-drm {
-+		compatible = "fsl,imx-drm";
-+		ports = <&ipu_di0>, <&ipu_di1>;
+@@ -7,18 +26,31 @@ Required properties:
+   datasheet
+ - interrupts: Should contain sync interrupt and error interrupt,
+   in this order.
+-- #crtc-cells: 1, See below
+ - resets: phandle pointing to the system reset controller and
+           reset line index, see reset/fsl,imx-src.txt for details
++Optional properties:
++- port@[0-3]: Port nodes with endpoint definitions as defined in
++  Documentation/devicetree/bindings/media/video-interfaces.txt.
++  Ports 0 and 1 should correspond to CSI0 and CSI1,
++  ports 2 and 3 should correspond to DI0 and DI1, respectively.
+ 
+ example:
+ 
+ ipu: ipu at 18000000 {
+-	#crtc-cells = <1>;
++	#address-cells = <1>;
++	#size-cells = <0>;
+ 	compatible = "fsl,imx53-ipu";
+ 	reg = <0x18000000 0x080000000>;
+ 	interrupts = <11 10>;
+ 	resets = <&src 2>;
++
++	ipu_di0: port at 2 {
++		reg = <2>;
++
++		ipu_di0_disp0: endpoint {
++			remote-endpoint = <&display_in>;
++		};
 +	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -92,13 +97,28 @@
- 		};
+ };
  
- 		ipu: ipu at 40000000 {
--			#crtc-cells = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 			compatible = "fsl,imx51-ipu";
- 			reg = <0x40000000 0x20000000>;
- 			interrupts = <11 10>;
- 			clocks = <&clks 59>, <&clks 110>, <&clks 61>;
- 			clock-names = "bus", "di0", "di1";
- 			resets = <&src 2>;
-+
-+			ipu_di0: port at 2 {
-+				reg = <2>;
-+
-+				ipu_di0_disp0: endpoint {
-+				};
-+			};
-+
-+			ipu_di1: port at 3 {
-+				reg = <3>;
-+
-+				ipu_di1_disp1: endpoint {
-+				};
-+			};
- 		};
+ Parallel display support
+@@ -26,19 +58,25 @@ Parallel display support
  
- 		aips at 70000000 { /* AIPS1 */
+ Required properties:
+ - compatible: Should be "fsl,imx-parallel-display"
+-- crtc: the crtc this display is connected to, see below
+ Optional properties:
+ - interface_pix_fmt: How this display is connected to the
+-  crtc. Currently supported types: "rgb24", "rgb565", "bgr666"
++  display interface. Currently supported types: "rgb24", "rgb565", "bgr666"
+ - edid: verbatim EDID data block describing attached display.
+ - ddc: phandle describing the i2c bus handling the display data
+   channel
++- port: A port node with endpoint definitions as defined in
++  Documentation/devicetree/bindings/media/video-interfaces.txt.
+ 
+ example:
+ 
+ display at di0 {
+ 	compatible = "fsl,imx-parallel-display";
+ 	edid = [edid-data];
+-	crtc = <&ipu 0>;
+ 	interface-pix-fmt = "rgb24";
++
++	port {
++		display_in: endpoint {
++			remote-endpoint = <&ipu_di0_disp0>;
++		};
++	};
+ };
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt b/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
+index ed93778..578a1fc 100644
+--- a/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
++++ b/Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
+@@ -50,12 +50,14 @@ have a look at Documentation/devicetree/bindings/video/display-timing.txt.
+ 
+ Required properties:
+  - reg : should be <0> or <1>
+- - crtcs : a list of phandles with index pointing to the IPU display interfaces
+-           that can be used as video source for this channel.
+  - fsl,data-mapping : should be "spwg" or "jeida"
+                       This describes how the color bits are laid out in the
+                       serialized LVDS signal.
+  - fsl,data-width : should be <18> or <24>
++ - port: A port node with endpoint definitions as defined in
++   Documentation/devicetree/bindings/media/video-interfaces.txt.
++   On i.MX6, there should be four ports (port@[0-3]) that correspond
++   to the four LVDS multiplexer inputs.
+ 
+ example:
+ 
+@@ -77,23 +79,33 @@ ldb: ldb at 53fa8008 {
+ 
+ 	lvds-channel at 0 {
+ 		reg = <0>;
+-		crtcs = <&ipu 0>;
+ 		fsl,data-mapping = "spwg";
+ 		fsl,data-width = <24>;
+ 
+ 		display-timings {
+ 			/* ... */
+ 		};
++
++		port {
++			lvds0_in: endpoint {
++				remote-endpoint = <&ipu_di0_lvds0>;
++			};
++		};
+ 	};
+ 
+ 	lvds-channel at 1 {
+ 		reg = <1>;
+-		crtcs = <&ipu 1>;
+ 		fsl,data-mapping = "spwg";
+ 		fsl,data-width = <24>;
+ 
+ 		display-timings {
+ 			/* ... */
+ 		};
++
++		port {
++			lvds1_in: endpoint {
++				remote-endpoint = <&ipu_di1_lvds1>;
++			};
++		};
+ 	};
+ };
 -- 
 1.8.5.3
