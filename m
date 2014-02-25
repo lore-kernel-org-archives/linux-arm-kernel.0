@@ -1,21 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 25 Feb 2014 16:00:23 -0700
-Subject: [PATCHv2 1/5] ARM: tegra: remove obsolete gpio entries
-In-Reply-To: <1393330950-7283-2-git-send-email-heikki.krogerus@linux.intel.com>
-References: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>
- <1393330950-7283-2-git-send-email-heikki.krogerus@linux.intel.com>
-Message-ID: <530D2087.1020407@wwwdotorg.org>
+From: elder@linaro.org (Alex Elder)
+Date: Tue, 25 Feb 2014 17:01:45 -0600
+Subject: [PATCH] mach-bcm: bcm281xx: symbol cleanup
+Message-ID: <1393369305-4748-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2014 05:22 AM, Heikki Krogerus wrote:
-> After moving to description based gpio interface in
-> rfkill-gpio, the gpio numbers are not used any more.
+This patch renames a few symbols that needlessly used "11351" rather
+than "281xx" in their names.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Support for the bcm11351 board is being removed from the kernel, and
+the family of boards is more properly referred to as "bcm281xx".
 
-This shouldn't cause any conflicts since I really don't anticipate
-changing board-paz00.c in this kernel cycle other than this patch.
+Signed-off-by: Alex Elder <elder@linaro.org>
+---
+ arch/arm/mach-bcm/board_bcm281xx.c |    9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-If you want though, I can prepare a branch and signed tag in the Tegra
-tree, containing this patch, and you can merge it. I'm fine either way.
+diff --git a/arch/arm/mach-bcm/board_bcm281xx.c b/arch/arm/mach-bcm/board_bcm281xx.c
+index cb3dc36..d8f0b6c 100644
+--- a/arch/arm/mach-bcm/board_bcm281xx.c
++++ b/arch/arm/mach-bcm/board_bcm281xx.c
+@@ -65,10 +65,13 @@ static void __init board_init(void)
+ 	kona_l2_cache_init();
+ }
+ 
+-static const char * const bcm11351_dt_compat[] = { "brcm,bcm11351", NULL, };
++static const char * const bcm281xx_dt_compat[] = {
++	"brcm,bcm11351",	/* Have to use the first number upstreamed */
++	NULL,
++};
+ 
+-DT_MACHINE_START(BCM11351_DT, "BCM281xx Broadcom Application Processor")
++DT_MACHINE_START(BCM281XX_DT, "BCM281xx Broadcom Application Processor")
+ 	.init_machine = board_init,
+ 	.restart = bcm_kona_restart,
+-	.dt_compat = bcm11351_dt_compat,
++	.dt_compat = bcm281xx_dt_compat,
+ MACHINE_END
+-- 
+1.7.9.5
