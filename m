@@ -1,32 +1,63 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 25 Feb 2014 17:08:35 +0800
-Subject: [RFC PATCH] arm64: add support for AES in CCM mode using Crypto
- Extensions
-In-Reply-To: <CAKv+Gu_A_04P=nOoPfxhJMC3bbEPTcpgZO0Ldw2H4BV7T_gTbw@mail.gmail.com>
-References: <1392106905-28709-1-git-send-email-ard.biesheuvel@linaro.org>
- <20140225070252.GB9934@gondor.apana.org.au>
- <CAKv+Gu-HnTk5RCLRoCnae7-HH7C-Tq2YJF57Nc-hOEykdY52XA@mail.gmail.com>
- <20140225071626.GA10524@gondor.apana.org.au>
- <CAKv+Gu_A_04P=nOoPfxhJMC3bbEPTcpgZO0Ldw2H4BV7T_gTbw@mail.gmail.com>
-Message-ID: <20140225090835.GA11135@gondor.apana.org.au>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 25 Feb 2014 09:15:08 +0000
+Subject: [PATCH 3/3] spi:fsl-dspi:add dspi dma transfer support
+In-Reply-To: <1393311258-14380-3-git-send-email-b44548@freescale.com>
+References: <1393311258-14380-1-git-send-email-b44548@freescale.com>
+ <1393311258-14380-3-git-send-email-b44548@freescale.com>
+Message-ID: <20140225091508.GP28555@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 08:21:22AM +0100, Ard Biesheuvel wrote:
+On Tue, Feb 25, 2014 at 06:54:18AM +0000, Chao Fu wrote:
+> From: Chao Fu <B44548@freescale.com>
 > 
-> For the authenticate-only data, this is manageable as you are only
-> dealing with input, but when dealing with both in- and output, as in
-> the core of CCM, it becomes very tedious.
-> So instead, I have opted for an inner blkcipher instance which takes
-> care of all of that. Could you suggest another approach that if
-> preferable?
+> DSPI can transfer data in DMA mode or PIO mode.This patch will add the DMA
+> transfer driver support. Add DMA reference functions and variables to form DMA
+> transfer process.
+> DSPI DMA mode need work with Freescale eDMA module together.
+> 
+> The software will be changed in two transfer methods as followwing:
+>                  DMA                    PIO
+> trigger write:   dspi_tx_dma            dspi_tx_pio
+> write complete:  dspi_dma_tx_complete   irq_handle
+> trigger read:    dspi_receive_dma       dspi_rx_pio
+> read complete:   dspi_rx_dma            none
+> 
+> Remove bitbang:
+> Add DMA funtions, DSPI module need get cs change information in a spi transfer.
+> According cs change, DSPI will give last data the right flag. Bitbang provide
+> cs change behind the last data in a transfer. DSPI can not deal the last data in
+> every transfer properly, so remove the bitbang in driver.
+> 
+> Signed-off-by: Chao Fu      <b44548@freescale.com>
+> ---
+>  drivers/spi/Kconfig        |   1 -
+>  drivers/spi/spi-fsl-dspi.c | 425 ++++++++++++++++++++++++++++++++++++++-------
+>  2 files changed, 360 insertions(+), 66 deletions(-)
 
-I don't think the walk helper actually needs the tfm apart from
-getting a couple of parameters out of it, so perhaps we can just
-change the helper to not depend on a tfm.
+[...]
+
+> @@ -529,10 +816,18 @@ static int dspi_probe(struct platform_device *pdev)
+>         }
+>         clk_prepare_enable(dspi->clk);
+> 
+> +       dspi->use_dma = of_property_read_bool(np, "use-dma");
+> +       if (dspi->use_dma)
+> +               if (dspi_request_dma(dspi)) {
+> +                       dspi->use_dma = 0;
+> +                       dev_err(&pdev->dev, "request dma channel fail\n");
+> +                       dspi_release_dma(dspi);
+> +               }
+
+Why have the use-dma property at all? You already fall back to PIO mode
+if the DMAs are not present, so it's clearly not a requirement to use
+DMA.
+
+Why not always try to request he dmas you need? You already have the
+fallback logic, the only difference would be changing the dev_err to
+better describe the situation:
+
+dev_info(&pdev->dev, "No 'tx' and/or 'rx' DMA(s), using PIO mode\n");
 
 Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Mark.
