@@ -1,29 +1,67 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 25 Feb 2014 21:26:44 +0900
-Subject: [PATCH 2/2] regulator: core: Error on not always_on dummy
- regulators
-In-Reply-To: <1393322627-26543-3-git-send-email-mpa@pengutronix.de>
-References: <1393322627-26543-1-git-send-email-mpa@pengutronix.de>
- <1393322627-26543-3-git-send-email-mpa@pengutronix.de>
-Message-ID: <20140225122644.GC25940@sirena.org.uk>
+From: sthokal@xilinx.com (Srikanth Thokala)
+Date: Tue, 25 Feb 2014 17:57:37 +0530
+Subject: [PATCH] pcie: Add Xilinx PCIe Host Bridge IP driver
+In-Reply-To: <20140221162824.GA4706@obsidianresearch.com>
+References: <1392564830-5868-1-git-send-email-sthokal@xilinx.com>
+ <CAErSpo5FGPhgnp8Gfy-1_Lk7ckCi7U5+z5pLnPU+jScPxD5yUQ@mail.gmail.com>
+ <20140219003523.GJ29304@obsidianresearch.com>
+ <CA+mB=1KSxkN+mKce5k1n93pmAA_FnWYaqNweWzxd4GD3Mo4PZA@mail.gmail.com>
+ <20140220174503.GB19893@obsidianresearch.com>
+ <CA+mB=1L+QM2cKq==mwYesp=E7S2N-xTiN7AoBvbzAO2UMn0qVQ@mail.gmail.com>
+ <20140221162824.GA4706@obsidianresearch.com>
+Message-ID: <CA+mB=1Jner0G2cyKrGom8-mKrRpvwO6bj2Xob5BbtJMKbMLkuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 11:03:47AM +0100, Markus Pargmann wrote:
-> It does not make sense to have dummy/fixed regulators that are not
-> always_on. This patch adds a check in the set_machine_constraints
-> function for this case and returns -EINVAL if such a regulator is
-> registered.
+Hi Jason,
 
-Such a regulator isn't going to be useful in a system but that doesn't
-mean that they shouldn't be registerable since that allows people to
-look at their state.  For example a device might have some GPIO managed
-regulators where the GPIO is tied low if the regulator isn't in use in
-the system.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140225/d7f50849/attachment.sig>
+On Fri, Feb 21, 2014 at 9:58 PM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> On Fri, Feb 21, 2014 at 08:18:00PM +0530, Srikanth Thokala wrote:
+>
+>> 00:00.0 Class 0604: Device 10ee:7081
+>
+> So this is great, a root port bridge is exactly correct - I would
+> recommend using device 1 for this (device 0 is the host bridge in most
+> cases), but I don't think that has any functional impact.
+>
+>>         Control: I/O+ Mem+ BusMaster+ SpecCycle- MemWINV- VGASnoop-
+>> ParErr+ Stepping- SERR+ FastB2B- DisINTx-
+>>         Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort-
+>> <TAbort- <MAbort- >SERR- <PERR- INTx-
+>>         Latency: 0, Cache Line Size: 64 bytes
+>>         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+>>         I/O behind bridge: 00000000-00000fff
+>>         Memory behind bridge: 00000000-000fffff
+>>         Prefetchable memory behind bridge: 00000000-000fffff
+>
+> What is going on here?  These ranges should match the MMIO aperture and
+> critically must enclose the downstream bars:
+>
+>> 01:00.0 Class 0200: Device 14e4:1677 (rev 11)
+>>         Region 0: Memory at 60000000 (64-bit, non-prefetchable) [size=64K]
+>>         Expansion ROM at 60010000 [disabled] [size=64K]
+>
+> So one of those two is not right..
+
+Sorry for the delay in response.  Thanks for pointing this.
+I have series of conversations with my IP team and it is giving back
+zero's when Type1 Header
+Memory Base offset is read even the pcie stack writes the valid
+addresses.  HW team is working on
+this and they will take their own time to give a fix.  As there is no
+functional impact, I believe there
+is no issue with driver and should work on mainlining the driver.
+Please suggest me on how to
+proceed and accordingly I will send a v2 patch fixing the DT comments
+pointed by you and Bjorn.
+
+Thanks
+Srikanth
+
+>
+> Jason
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
