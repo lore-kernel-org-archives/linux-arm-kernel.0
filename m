@@ -1,34 +1,24 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 25 Feb 2014 09:10:04 -0500
-Subject: [PATCH v4 0/6] generic early_ioremap support
-In-Reply-To: <1392238575-10000-1-git-send-email-msalter@redhat.com>
-References: <1392238575-10000-1-git-send-email-msalter@redhat.com>
-Message-ID: <1393337404.7307.51.camel@deneb.redhat.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 25 Feb 2014 20:10:54 +0530
+Subject: [PATCH] cpufreq: Set policy to non-NULL only after all hotplug
+ online work is done
+In-Reply-To: <15001517.xLHO8lGdWr@vostro.rjw.lan>
+References: <1393225072-3997-1-git-send-email-skannan@codeaurora.org>
+ <530BAA31.4050701@codeaurora.org>
+ <CAKohpo=0CgzjCgKnDxUMcN6-CgbQ2ML=Tx-K8fS7=VJJYOD0eg@mail.gmail.com>
+ <15001517.xLHO8lGdWr@vostro.rjw.lan>
+Message-ID: <CAKohponkjccKjc9xBQ3kCjdTMqFtKLCh1-mQXMS579+2_JmTCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-02-12 at 15:56 -0500, Mark Salter wrote:
-> This patch series takes the common bits from the x86 early ioremap
-> implementation and creates a generic implementation which may be used
-> by other architectures. The early ioremap interfaces are intended for
-> situations where boot code needs to make temporary virtual mappings
-> before the normal ioremap interfaces are available. Typically, this
-> means before paging_init() has run.
-> 
-> These patches are layered on top of generic fixmap patches which
-> were pulled into 3.14-rc with the exception of the arm patch:
-> 
->   https://lkml.org/lkml/2013/11/25/477
-> 
-> The arm fixmap patch is currently in the akpm tree and has been
-> part of linux-next for a while.
-> 
-> This is version 4 of the patch series. These patches (and underlying
-> fixmap patches) may be found at:
-> 
->   git://github.com/mosalter/linux.git (early-ioremap-v4 branch)
+On 25 February 2014 18:34, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> Well, that depends on what the current users expect it to look like initially.
+> It should be initialized to the point in which all of them can handle it
+> correctly.
 
-There have been no comments on this patch series over the past
-two weeks. I'd like to get it into linux-next for some wider
-testing and eventually into 3.15. Is there something I can do
-to help it along?
+Exactly.
+
+> That's not going to work in at least some cases anyway, because for some types
+> of HW we simply can't retrieve the current frequency in a non-racy way.
+
+I agree. But this is all that we can guarantee here :)
