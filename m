@@ -1,53 +1,36 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 25 Feb 2014 18:05:56 +0200
-Subject: [PATCH 4/4] ARM: keystone: Use dma-ranges for dma_pfn_offset
- configuration
-In-Reply-To: <5443441.XzmmNp2M6v@wuerfel>
-References: <1393275235-1087-1-git-send-email-santosh.shilimkar@ti.com>
- <201402251437.06400.arnd@arndb.de> <530CB49F.9060505@ti.com>
- <5443441.XzmmNp2M6v@wuerfel>
-Message-ID: <530CBF64.3080407@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 25 Feb 2014 12:13:35 -0300
+Subject: [RFC PATCH v4 4/8] staging: imx-drm: Document imx-hdmi device
+ tree bindings
+In-Reply-To: <1393338203-25051-5-git-send-email-p.zabel@pengutronix.de>
+References: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>
+ <1393338203-25051-5-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <CAOMZO5AnXYEDB5PfQUNW_bY7ng8YkSYGK5y_Em04t6L-Eb2g+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2014 04:37 PM, Arnd Bergmann wrote:
-> On Tuesday 25 February 2014 17:19:59 Grygorii Strashko wrote:
->> The Keystone can work in two modes:
->> - LPAE disabled: In this case Platform bus notifier will not be called at all
->> and DMA range == MEM range (32 bits mode)
+On Tue, Feb 25, 2014 at 11:23 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> This patch adds device tree binding documentation for the HDMI transmitter
+> on i.MX6.
 >
-> The hardware setting doesn't change here, just the available memory, right?
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>  .../devicetree/bindings/staging/imx-drm/hdmi.txt   | 53 ++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+>
+> diff --git a/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+> new file mode 100644
+> index 0000000..7dcd673a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/staging/imx-drm/hdmi.txt
+> @@ -0,0 +1,53 @@
+> +Device-Tree bindings for HDMI Transmitter
+> +
+> +HDMI Transmitter
+> +================
+> +
+> +The LVDS Display Bridge device tree node contains up to two lvds-channel
+> +nodes describing each of the two LVDS encoder channels of the bridge.
 
-Yes. The accessible RAM will be 0x8000 0000 - 0xFFFF FFFF -
-the same as DMA range. But coherent DMA will not be supported.
-
-So, no DMA bus offset required and actions in Platform bus notifier.
-
->
->> - LPAE enabled: In this case, I'll update code to treat absence of "dam-ranges"
->> property as "no dma possible" and clean up DMA mask. Is it ok?
->> In this mode "dam-ranges" prop has to be defined always to enable DMA.
->
-> Ok, sounds good.
->
->> Empty "dma-ranges" can't be treated as "no translation required" because it is used
->> to move one level up while traversing DT to find the valid "dma-ranges" prop.
->> Used to handle child devices like:
->>
->>   bus {
->>          dma-ranges = <...>;
->>
->>          Dev A {
->>                  dma-ranges;
->>
->>                  child_dev_A1 { }
->>                  child_dev_A2 { }
->>
->> This is standard behavior for "[dma-]ranges".
->
-> That is what I meant: "no translation required at this level". You still
-> have to go up to the root in order to know the full translation.
->
-
-Regards,
--grygorii
+Copy and paste error? ;-)
