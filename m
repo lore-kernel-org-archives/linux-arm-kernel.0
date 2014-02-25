@@ -1,99 +1,51 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 25 Feb 2014 17:02:35 -0600
-Subject: [PATCHv2 03/16] Documentation: dt: add OMAP iommu bindings
-In-Reply-To: <13151454.2tbkC7YZsi@avalon>
-References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
- <1392315347-32967-4-git-send-email-s-anna@ti.com>
- <13151454.2tbkC7YZsi@avalon>
-Message-ID: <530D210B.3070602@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 25 Feb 2014 23:04:34 +0000
+Subject: [PATCH v4 0/6] generic early_ioremap support
+In-Reply-To: <530CF21E.1020603@zytor.com>
+References: <1392238575-10000-1-git-send-email-msalter@redhat.com>
+ <1393337404.7307.51.camel@deneb.redhat.com>
+ <20140225183012.GA27164@mudshark.cambridge.arm.com>
+ <1393353942.26583.10.camel@deneb.redhat.com> <530CF21E.1020603@zytor.com>
+Message-ID: <5D4B48CE-46BA-44E8-BCDE-AEACAC9973AF@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On 25 Feb 2014, at 19:42, H. Peter Anvin <hpa@zytor.com> wrote:
+> On 02/25/2014 10:45 AM, Mark Salter wrote:
+>> On Tue, 2014-02-25 at 18:30 +0000, Will Deacon wrote:
+>>> I'd suggest spitting the core part out from the arch-specific parts. That
+>>> way, the core part can merged independently and architectures can move over
+>>> as they see fit. It also signals (at least to me) that, "hey, I should
+>>> probably review this" whilst my current stance is "there's a whole load of
+>>> stuff under mm/ that needs to be acked first".
+>>> 
+>>> If you put the whole thing into next, you just run the risk of conflicts
+>>> with all the arch trees.
+>> 
+>> I've been thinking of breaking out the common bits and x86 bits and just
+>> going with that for now. There's no point in just doing the common bits
+>> because it won't get tested without at least one architecture using it.
+>> 
+> 
+> If you think it makes sense we could take the common bits + x86 and put
+> them through the -tip tree.  
 
-On 02/25/2014 03:26 PM, Laurent Pinchart wrote:
-> Hi Suman,
->
-> Thank you for the patch.
->
-> On Thursday 13 February 2014 12:15:34 Suman Anna wrote:
->> From: Florian Vaussard <florian.vaussard@epfl.ch>
->>
->> This patch adds the iommu bindings for all OMAP2+ SoCs. Apart from
->> the standard bindings used by OMAP peripherals, this patch uses a
->> 'dma-window' (already used by Tegra SMMU) and adds two OMAP custom
->> bindings - 'ti,#tlb-entries' and 'ti,iommu-bus-err-back'.
->>
->> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->> [s-anna at ti.com: split bindings document, add dra7 and bus error back]
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> ---
->>   .../devicetree/bindings/iommu/ti,omap-iommu.txt    | 28 +++++++++++++++++++
->>   1 file changed, 28 insertions(+)
->>   create mode 100644
->>   Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
->>
->> diff --git a/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
->> b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt new file mode
->> 100644
->> index 0000000..116492d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
->> @@ -0,0 +1,28 @@
->> +OMAP2+ IOMMU
->> +
->> +Required properties:
->> +- compatible : Should be one of,
->> +		"ti,omap2-iommu" for OMAP2/OMAP3 IOMMU instances
->> +		"ti,omap4-iommu" for OMAP4/OMAP5 IOMMU instances
->> +		"ti,dra7-iommu" for DRA7xx IOMMU instances
->> +- ti,hwmods  : Name of the hwmod associated with the IOMMU instance
->> +- reg        : Address space for the configuration registers
->> +- interrupts : Interrupt specifier for the IOMMU instance
->> +- dma-window : IOVA start address and length
->
-> Isn't the dma window more of a system configuration property than a hardware
-> property ? How do you expect it to be set?
+I?m ok with the arm64 patches to go through -tip with my ack on all
+patches:
 
-We are setting it based on the addressable range for the MMU. We are 
-reusing the existing defined property and it allows us to get rid of the 
-IOVA start and end addresses defined in the pre-DT OMAP iommu platform data.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
->
->> +Optional properties:
->> +- ti,#tlb-entries : Number of entries in the translation look-aside buffer.
->> +                    Should be either 8 or 32 (default: 32)
->> +- ti,iommu-bus-err-back : Indicates the IOMMU instance supports throwing
->> +		          back a bus error response on MMU faults.
->
-> Do these features vary per IOMMU instance or per IOMMU model ? In the latter
-> case they could be inferred from the compatible string by the driver without
-> requiring them to be explicit in DT (whether you want to do so is left to you
-> though).
+> The other option would be to put the whole
+> thread in linux-next with Acks.
+> 
+> As far as x86 is concerned it looks like it is mostly just code
+> movement, so I'm happy giving my:
+> 
+> Acked-by: H. Peter Anvin <hpa@linux.intel.com>
 
-Well, these are fixed features given an IOMMU instance, like the OMAP3 
-ISP is the only one that has 8 TLB entries, all the remaining ones have 
-32, and the IPU iommu instances are the only ones that support the bus 
-error response back. I have no preference to any particular way, and 
-sure the driver can infer these easily based on unique compatible 
-strings per subsystem per SoC. I just happened to go with defining 
-compatible strings per SoC, with the optional properties differentiating 
-the fixed behavior between different IOMMU instances on that SoC. This 
-is where I was looking for some inputs/guidance from the DT bindings 
-maintainers on what is the preferred method.
+Thanks. Either way works for me.
 
-regards
-Suman
+I think the series still need an ack from rmk at least on the arm patch
+(4/6).
 
->
->> +Example:
->> +	/* OMAP3 ISP MMU */
->> +	mmu_isp: mmu at 480bd400 {
->> +		compatible = "ti,omap2-iommu";
->> +		reg = <0x480bd400 0x80>;
->> +		interrupts = <24>;
->> +		ti,hwmods = "mmu_isp";
->> +		ti,#tlb-entries = <8>;
->> +		dma-window = <0 0xfffff000>;
->> +	};
->
+Catalin
