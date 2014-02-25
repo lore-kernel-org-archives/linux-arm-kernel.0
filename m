@@ -1,46 +1,45 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 25 Feb 2014 18:33:58 +0100
-Subject: [PATCH v3 0/5] mvebu support for kirkwood HP T5325
-Message-ID: <1393349643-6652-1-git-send-email-andrew@lunn.ch>
+Date: Tue, 25 Feb 2014 18:34:00 +0100
+Subject: [PATCH v3 2/5] ARM: kirkwood: Add i2c alias so setting bus number
+In-Reply-To: <1393349643-6652-1-git-send-email-andrew@lunn.ch>
+References: <1393349643-6652-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1393349643-6652-3-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support to mvebu for the HP T5325 thin client.
-This is the first kirkwood device using device tree which supports
-audio. However the audio codec is missing a device tree binding, and
-simple-audio-card does not yet quite support all the properties needed
-for this hardware. So C code is used for the audio devices.
+When using platform_driver instantiation, the i2c bus was given bus
+number 0. The kirkwood-t5325 audio driver has this bus number hard
+coded for the address of the codec. However by default device tree i2c
+busses are dynamically allocated a bus number, starting from 1. Thus
+the kirkwood-t5325 cannot find its audio codec. By adding an alias in
+the DT file we can control the bus number and set it to 0. The codec
+can then be found.
 
-v3:
-More tabification
-Use kirkwood in subject line
-Move Makefile hunk alongside dts file.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/boot/dts/kirkwood.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-v2:
-Indentation fixes, space->tab, extra spaces removed.
-Split DTS into a patch of its own.
-
-Andrew Lunn (5):
-  ARM: kirkwood: Add audio node to kirkwood.dtsi
-  ARM: kirkwood: Add i2c alias so setting bus number
-  ARM: kirkwood: Add HP T5325 thin client
-  ARM: kirkwood: Add dts file describing HP T5325 thin client
-  ARM: kirkwood: Add HP T5325 devices to {multi|mvebu}_v5_defconfig
-
- arch/arm/boot/dts/Makefile           |   1 +
- arch/arm/boot/dts/kirkwood-t5325.dts | 208 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/kirkwood.dtsi      |  12 +-
- arch/arm/configs/multi_v5_defconfig  |   9 ++
- arch/arm/configs/mvebu_v5_defconfig  |   9 ++
- arch/arm/mach-mvebu/Kconfig          |   7 ++
- arch/arm/mach-mvebu/Makefile         |   1 +
- arch/arm/mach-mvebu/board-t5325.c    |  41 +++++++
- arch/arm/mach-mvebu/board.h          |  22 ++++
- arch/arm/mach-mvebu/kirkwood.c       |  11 +-
- 10 files changed, 319 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-t5325.dts
- create mode 100644 arch/arm/mach-mvebu/board-t5325.c
- create mode 100644 arch/arm/mach-mvebu/board.h
-
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 5a86fa820e12..90384587c278 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -24,6 +24,7 @@
+ 	aliases {
+ 	       gpio0 = &gpio0;
+ 	       gpio1 = &gpio1;
++	       i2c0 = &i2c0;
+ 	};
+ 
+ 	mbus {
+@@ -111,7 +112,7 @@
+ 			clocks = <&gate_clk 7>;
+ 		};
+ 
+-		i2c at 11000 {
++		i2c0: i2c at 11000 {
+ 			compatible = "marvell,mv64xxx-i2c";
+ 			reg = <0x11000 0x20>;
+ 			#address-cells = <1>;
 -- 
 1.8.5.3
