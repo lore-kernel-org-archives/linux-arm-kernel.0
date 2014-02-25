@@ -1,48 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Feb 2014 10:57:56 +0000
-Subject: [BISECTED] ssh - Received disconnect from x.x.x.x: 2: Bad packet
- length 3149594624
-In-Reply-To: <530C4C9B.7050104@gmail.com>
-References: <52FD08D1.3030405@gmail.com>
- <20140213182105.GN13576@mudshark.cambridge.arm.com>
- <52FD1243.9040706@gmail.com>
- <20140213192909.GO13576@mudshark.cambridge.arm.com>
- <52FE407C.3080002@gmail.com>
- <20140214162458.GF21986@mudshark.cambridge.arm.com>
- <530C4C9B.7050104@gmail.com>
-Message-ID: <20140225105756.GB22279@mudshark.cambridge.arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 25 Feb 2014 13:52:36 +0200
+Subject: [RESEND][PATCH v4] gpio: davinci: reuse for keystone soc
+In-Reply-To: <53076032.5080202@ti.com>
+References: <52FBB6BC.2060801@ti.com>
+ <1392307125-27927-1-git-send-email-grygorii.strashko@ti.com>
+ <53076032.5080202@ti.com>
+Message-ID: <530C8404.3020302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ivaylo,
+Hi Linus,
 
-On Tue, Feb 25, 2014 at 07:56:11AM +0000, Ivaylo Dimitrov wrote:
-> On 14.02.2014 18:24, Will Deacon wrote:
-> > You could try putting back the UNALIGNED_ACCESS in net/mac80211/rx.c and
-> > commenting out the skb->len = desc->length  - PLCP_HEADER_LENGTH;  line
-> > above.
-> >
-> 
-> the following patch
-> 
-> diff --git a/drivers/net/wireless/ti/wl1251/rx.c 
-> b/drivers/net/wireless/ti/wl1251/rx.c
-> index 123c4bb..cde0eaf 100644
-> --- a/drivers/net/wireless/ti/wl1251/rx.c
-> +++ b/drivers/net/wireless/ti/wl1251/rx.c
-> @@ -180,7 +180,7 @@ static void wl1251_rx_body(struct wl1251 *wl,
->          wl1251_mem_read(wl, rx_packet_ring_addr, rx_buffer, length);
-> 
->          /* The actual length doesn't include the target's alignment */
-> -       skb->len = desc->length  - PLCP_HEADER_LENGTH;
-> +       skb_trim(skb, desc->length - PLCP_HEADER_LENGTH);
-> 
->          fc = (u16 *)skb->data;
-> 
-> seems to fix the issue, including those "corrupt probe response" 
-> messages in dmesg log (I took that 'skb_trim' from the original Nokia 
-> kernel). Will send a properly formatted patch shortly.
+On 02/21/2014 04:18 PM, Santosh Shilimkar wrote:
+> On Thursday 13 February 2014 10:58 AM, Grygorii Strashko wrote:
+>> The similar GPIO HW block is used by keystone SoCs as
+>> in Davinci SoCs.
+>> Hence, reuse Davinci GPIO driver for Keystone taking into
+>> account that Keystone contains ARM GIC IRQ controller which
+>> is implemented using IRQ Chip.
+>>
+>> Documentation:
+>> 	http://www.ti.com/lit/ug/sprugv1/sprugv1.pdf
+>>
+>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> ---
+>> - rebased on top of git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git
+>>    branch: devel
+>>    top commit: ef70bbe gpio: make gpiod_direction_output take a logical value
+>>
+> Can you please pick this one ? Its rebased as per your suggestion.
 
-Good idea -- don't forget to CC linux-wireless, as suggested by Kalle.
+I've just rechecked this patch and it's applied without conflicts
+on top of your "devel" branch.
 
-Will
+Pls, inform me if I need to do anything else for you
+in order to have this patch applied.
+
+[...]
+
+>> @@ -554,7 +585,8 @@ done:
+>>   
+>>   #if IS_ENABLED(CONFIG_OF)
+>>   static const struct of_device_id davinci_gpio_ids[] = {
+>> -	{ .compatible = "ti,dm6441-gpio", },
+>> +	{ .compatible = "ti,keystone-gpio", keystone_gpio_get_irq_chip},
+>> +	{ .compatible = "ti,dm6441-gpio", davinci_gpio_get_irq_chip},
+>>   	{ /* sentinel */ },
+>>   };
+>>   MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
+>>
+> 
+Regards,
+-grygorii
