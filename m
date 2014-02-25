@@ -1,51 +1,45 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 25 Feb 2014 08:54:22 +0100
-Subject: [PATCH 2/2] ARM: dts: duovero-parlor: Add HDMI output
-In-Reply-To: <CABxcv=kKxidVJWcMrueB+edW=g_6gcucvi6=7p=EZ_WooCpbMA@mail.gmail.com>
-References: <1393261669-32039-1-git-send-email-florian.vaussard@epfl.ch>	<1393261669-32039-3-git-send-email-florian.vaussard@epfl.ch>	<20140224180336.GU27282@n2100.arm.linux.org.uk>
- <CABxcv=kKxidVJWcMrueB+edW=g_6gcucvi6=7p=EZ_WooCpbMA@mail.gmail.com>
-Message-ID: <530C4C2E.8040606@epfl.ch>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Tue, 25 Feb 2014 09:56:11 +0200
+Subject: [BISECTED] ssh - Received disconnect from x.x.x.x: 2: Bad packet
+ length 3149594624
+In-Reply-To: <20140214162458.GF21986@mudshark.cambridge.arm.com>
+References: <52FD08D1.3030405@gmail.com>
+ <20140213182105.GN13576@mudshark.cambridge.arm.com>
+ <52FD1243.9040706@gmail.com>
+ <20140213192909.GO13576@mudshark.cambridge.arm.com>
+ <52FE407C.3080002@gmail.com>
+ <20140214162458.GF21986@mudshark.cambridge.arm.com>
+Message-ID: <530C4C9B.7050104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, Javier,
+Hi,
 
-On 02/24/2014 09:22 PM, Javier Martinez Canillas wrote:
-> Hi Russell,
-> 
-> On Mon, Feb 24, 2014 at 3:03 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Mon, Feb 24, 2014 at 06:07:49PM +0100, Florian Vaussard wrote:
->>> +     hdmi0: connector at 0 {
->>> +             compatible = "hdmi-connector";
->>
->> This looks way to generic a compatible string.  Are you sure it's
->> correct?
->>
-> 
-> That compatible string is correct according to the latest series
-> posted by Tomi Valkeinen to add DT bindings for the OMAP Display
-> SubSystem (DSS) [0].
-> 
+On 14.02.2014 18:24, Will Deacon wrote:
+> You could try putting back the UNALIGNED_ACCESS in net/mac80211/rx.c and
+> commenting out the skb->len = desc->length  - PLCP_HEADER_LENGTH;  line
+> above.
+>
 
-Indeed, this compatible string comes from the DSS series.
+the following patch
 
-> The property is added on this patch [1] and as far as I understood the
-> idea is that it could be a generic DT binding that can be used by
-> platform specific HDMI connectors like the omap dss HDMI connector
-> [2].
-> 
+diff --git a/drivers/net/wireless/ti/wl1251/rx.c 
+b/drivers/net/wireless/ti/wl1251/rx.c
+index 123c4bb..cde0eaf 100644
+--- a/drivers/net/wireless/ti/wl1251/rx.c
++++ b/drivers/net/wireless/ti/wl1251/rx.c
+@@ -180,7 +180,7 @@ static void wl1251_rx_body(struct wl1251 *wl,
+         wl1251_mem_read(wl, rx_packet_ring_addr, rx_buffer, length);
 
-On the other side, looking at
-drivers/video/omap2/displays-new/connector-hdmi.c from the DSS series
-[1], the compatible string is "omapdss,hdmi-connector", which makes me
-wonder which one should be used :) BTW, "omapdss" seems a strange
-prefix, isn't it?
+         /* The actual length doesn't include the target's alignment */
+-       skb->len = desc->length  - PLCP_HEADER_LENGTH;
++       skb_trim(skb, desc->length - PLCP_HEADER_LENGTH);
 
-Tomi, any inputs?
+         fc = (u16 *)skb->data;
 
-Regards,
-Florian
+seems to fix the issue, including those "corrupt probe response" 
+messages in dmesg log (I took that 'skb_trim' from the original Nokia 
+kernel). Will send a properly formatted patch shortly.
 
-[1]
-https://git.kernel.org/cgit/linux/kernel/git/tomba/linux.git/tree/drivers/video/omap2/displays-new/connector-hdmi.c?h=work/dss-dt-review-3
+Thanks,
+Ivo
