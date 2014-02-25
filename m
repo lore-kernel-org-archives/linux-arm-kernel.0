@@ -1,25 +1,35 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 25 Feb 2014 20:18:47 +0800
-Subject: [PATCH] crypto: tegra: remove driver
-In-Reply-To: <1392759778-13904-1-git-send-email-swarren@wwwdotorg.org>
-References: <1392759778-13904-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140225121846.GH12216@gondor.apana.org.au>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Tue, 25 Feb 2014 14:22:25 +0200
+Subject: [PATCHv2 0/5] net: rfkill: gpio: cleanup and a few new acpi ids
+Message-ID: <1393330950-7283-1-git-send-email-heikki.krogerus@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 18, 2014 at 02:42:57PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> This driver has never been hooked up in any board file, and cannot be
-> instantiated via device tree. I've been told that, at least on Tegra20,
-> the HW is slower at crypto than the main CPU. I have no test-case for
-> it. Hence, remove it.
-> 
-> Cc: Varun Wadekar <vwadekar@nvidia.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Changes since v1:
+- Removed the gpio entries from arch/arm/mach-tegra/board-paz00.c
 
-Patch applied.
+Hi,
+
+I was waiting for the DT support from Chen-Yu before sending these,
+but decided it makes no difference when I send them. I'm dropping the
+con ID in the second patch because Dan noticed the warning, but of
+course it will mean the "gpios" property can be used with DT.
+
+The two last patches just add ACPI IDs for some new Baytrail based
+boards.
+
+
+Heikki Krogerus (5):
+  ARM: tegra: remove obsolete gpio entries
+  net: rfkill: gpio: remove unused and obsolete platform parameters
+  net: rfkill: gpio: remove gpio names
+  net: rfkill: gpio: add ACPI ID for GPS module on Lenove Miix2
+  net: rfkill: gpio: add ACPI IDs for a Broadcom bluetooth chip
+
+ arch/arm/mach-tegra/board-paz00.c |  4 +---
+ include/linux/rfkill-gpio.h       | 10 ----------
+ net/rfkill/rfkill-gpio.c          | 40 +++++++++------------------------------
+ 3 files changed, 10 insertions(+), 44 deletions(-)
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.9.0.rc3
