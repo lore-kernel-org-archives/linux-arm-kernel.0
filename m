@@ -1,21 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Feb 2014 18:00:47 +0100
-Subject: [GIT PULL] DaVinci NAND update for v3.15
-In-Reply-To: <530ADB3A.1070302@ti.com>
-References: <530ADB3A.1070302@ti.com>
-Message-ID: <201402251800.47950.arnd@arndb.de>
+Date: Tue, 25 Feb 2014 18:03:08 +0100
+Subject: [GIT PULL] integrator base patches for v3.15
+In-Reply-To: <CACRpkdbtv2ZQbt0=7QhBZSRRAdONgKeKCO9yj=UwWRAU2WOWwA@mail.gmail.com>
+References: <CACRpkdYeaMqTNUTqBSg6vNa9=VucjpFFkx3diHJJNgZTg+iq1w@mail.gmail.com>
+ <201402241117.48617.arnd@arndb.de>
+ <CACRpkdbtv2ZQbt0=7QhBZSRRAdONgKeKCO9yj=UwWRAU2WOWwA@mail.gmail.com>
+Message-ID: <201402251803.08685.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 February 2014, Sekhar Nori wrote:
-> Hi,
+On Monday 24 February 2014, Linus Walleij wrote:
+> >
+> > irqchip: VIC: export vic_init_cascaded
+> >
+> > vic_init_cascaded is called by integrator impd1 code that can
+> > be a loadable module, so the function has to be exported.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> Can you please pull the following change for v3.15? The mtd
-> changes are acked by Brian. We agreed to take this through ARM-SoC
-> because of the number of changes to mach-davinci.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> I based this on -rc3 since I saw that ARM-SoC is on -rc3 anyway.
+> Can either of you pls apply this directly to the ARM SoC tree?
+> 
 
-Pulled into next/drivers, thanks!
+Applied on next/drivers now.
 
-	Arnd
+	ARnd
