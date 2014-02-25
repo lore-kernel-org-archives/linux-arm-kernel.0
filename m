@@ -1,26 +1,39 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 25 Feb 2014 15:17:05 +0100
-Subject: [PATCH 0/2] ARM: SAMSUNG: move all arches to generic uncompress.h
-In-Reply-To: <3594365.ORKU4Q2jDp@phil>
-References: <3594365.ORKU4Q2jDp@phil>
-Message-ID: <3158811.UU2ZyPShVi@phil>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 25 Feb 2014 15:23:23 +0100
+Subject: [RFC PATCH v4 8/8] staging: imx-drm: Update TODO
+In-Reply-To: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>
+References: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <1393338203-25051-9-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 16. Februar 2014, 18:32:24 schrieb Heiko St?bner:
-> On 2014-01-06 Sachin Kamat posted two patches converting Exynos to use
-> the generic uncompress.h.
-> 
-> But in fact all Samsung platforms can go this route, as all Samsung
-> uncompress.h files are simply used to set up the serial port.
-> 
-> As the original patches were not yet applied, this series includes the
-> original Exynos-specific change.
-> 
-> Tested on a s3c2416 and s3c2442 based machine.
+The device tree bindings are updated regardless of the common display
+framework and in the meantime the HDMI driver was included.
 
-ping?
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/staging/imx-drm/TODO | 5 -----
+ 1 file changed, 5 deletions(-)
 
-
-Thanks
-Heiko
+diff --git a/drivers/staging/imx-drm/TODO b/drivers/staging/imx-drm/TODO
+index 6a9da94..29636fb 100644
+--- a/drivers/staging/imx-drm/TODO
++++ b/drivers/staging/imx-drm/TODO
+@@ -1,15 +1,10 @@
+ TODO:
+ - get DRM Maintainer review for this code
+-- Wait for common display framework to hit mainline and update the IPU
+-  driver to use it. This will most probably make changes to the devicetree
+-  bindings necessary.
+-- Factor out more code to common helper functions
+ - decide where to put the base driver. It is not specific to a subsystem
+   and would be used by DRM/KMS and media/V4L2
+ 
+ Missing features (not necessarily for moving out of staging):
+ 
+-- Add i.MX6 HDMI support
+ - Add support for IC (Image converter)
+ - Add support for CSI (CMOS Sensor interface)
+ - Add support for VDIC (Video Deinterlacer)
+-- 
+1.8.5.3
