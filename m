@@ -1,85 +1,83 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 25 Feb 2014 10:22:45 -0600
-Subject: [PATCH] ARM: EDMA: Use platform_get_resource functions for DT
-In-Reply-To: <53078E9B.5010806@ti.com>
-References: <1392956661-28787-1-git-send-email-joelf@ti.com>
- <20140221121548.GF8783@e106331-lin.cambridge.arm.com>
- <53078E9B.5010806@ti.com>
-Message-ID: <CAL_JsqKedQu30rX=k8U5Harzki1jAzKhG3OyPT75y=K+by7pVw@mail.gmail.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Tue, 25 Feb 2014 17:28:39 +0100
+Subject: [PATCH] irq: Consider a negative return value of irq_startup() as an
+ error
+Message-ID: <1393345719-3707-1-git-send-email-jjhiblot@traphandler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 21, 2014 at 11:36 AM, Joel Fernandes <joelf@ti.com> wrote:
-> On 02/21/2014 06:15 AM, Mark Rutland wrote:
->>> Also, while at it get rid of the assumption in the code that "CC" is at reg
->>> index 0 in the DT and xbar is at offset 1. Instead use reg-names to get the
->>> memory resource in concern keeping things much cleaner and simpler. This also
->>> makes it possible to have multiple channel controllers.
->>
->> While this is nice I think we have to have a fallback to the existing
->> behaviour if there's no reg-names property present, unless we know for
->> certain no-one is possibly using an existing DTB.
->
-> Yes, its true it break existing DTBs but currently only 2 TI SoCs use EDMA this
-> way, the vast majority of EDMA users are yet to follow where we can do it right.
->  Further, the old bindings are really limiting specially the 2 CC case and if
-> additionally memory maps are used in the future. So keeping the old binding is
-> limiting in this regard.
->
-> Here is what the platform_data used to look like when used by mach-davinci:
->
-> static struct resource da850_edma_resources[] = {
->         {
->                 .name   = "edma_cc0",
->                 .start  = DA8XX_TPCC_BASE,
->                 .end    = DA8XX_TPCC_BASE + SZ_32K - 1,
->                 .flags  = IORESOURCE_MEM,
->         },
->         {
->                 .name   = "edma_tc0",
->                 .start  = DA8XX_TPTC0_BASE,
->                 .end    = DA8XX_TPTC0_BASE + SZ_1K - 1,
->                 .flags  = IORESOURCE_MEM,
->         },
->         {
->                 .name   = "edma_tc1",
->                 .start  = DA8XX_TPTC1_BASE,
->                 .end    = DA8XX_TPTC1_BASE + SZ_1K - 1,
->                 .flags  = IORESOURCE_MEM,
->         },
->         {
->                 .name   = "edma_cc1",
->                 .start  = DA850_TPCC1_BASE,
->                 .end    = DA850_TPCC1_BASE + SZ_32K - 1,
->                 .flags  = IORESOURCE_MEM,
->         },
->
-> As you can see, there are several memory maps and different interpretations.
-> Considering this, IMO- it makes sense to pay a small price to keep the semantics
-> sane.
+The irq_startup() function returns the return value of the irq_startup callback
+of the underlying irq_chip. Currently this value only tells if the interrupt is
+pending, but we can make it also return an error code when it fails.
 
-Then do 1 compatible string per interpretation. That can then define
-the number of CCs and TCs.
+Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+---
 
->
-> On the other hand, the other 2 options are:
-> 1. We add a fallback if reg-names look up fails.
+Hi Thomas,
 
-reg-names is supposed to be optional, so you should already have that fallback.
+This patch updates the semantic of the return value of the irq_startup()
+callback of an irq_chip : a negative value indicates an error. The purpose is
+to make __setup_irq() fail if the irq_chip can't startup the interrupt.
+I checked in the kernel for drivers impacted by this. It turns out that most
+of the implementation of irq_startup() return 0. The only drivers that return
+non-zero values are:
+ * arch/x86/kernel/apic/io_apic.c: returns 1 when an interrupt is pending
+ * drivers/pinctrl/pinctrl-adi2.c: may return -ENODEV.
 
-Rob
+GPIO-based irq_chip could use this feature because an output gpio can't be used
+as an interrupt, and thus a call to irq_startup() is likely to fail. You can
+check out http://www.spinics.net/lists/arm-kernel/msg302713.html for a
+reference.
 
-> 2. We inject reg-names property into edma DT nodes that don't have them, and
-> make sure all future dtsi with edma nodes mention the reg-names property.
->
-> These 2 are a bit error prone though, for example if someone deliberately
-> forgets to mention reg-names, and the code still works, but misbehaves in some way.
->
-> Regards,
-> -Joel
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards,
+
+Jean-Jacques
+
+ include/linux/irq.h    | 2 ++
+ kernel/irq/autoprobe.c | 2 +-
+ kernel/irq/manage.c    | 4 +++-
+ 3 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/irq.h b/include/linux/irq.h
+index 7dc1003..d566855 100644
+--- a/include/linux/irq.h
++++ b/include/linux/irq.h
+@@ -282,6 +282,8 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
+  *
+  * @name:		name for /proc/interrupts
+  * @irq_startup:	start up the interrupt (defaults to ->enable if NULL)
++ *			negative return values indicate an error, otherwise the
++ *			return values indicates if an interrupt is pending
+  * @irq_shutdown:	shut down the interrupt (defaults to ->disable if NULL)
+  * @irq_enable:		enable the interrupt (defaults to chip->unmask if NULL)
+  * @irq_disable:	disable the interrupt
+diff --git a/kernel/irq/autoprobe.c b/kernel/irq/autoprobe.c
+index 0119b9d..64794fa 100644
+--- a/kernel/irq/autoprobe.c
++++ b/kernel/irq/autoprobe.c
+@@ -70,7 +70,7 @@ unsigned long probe_irq_on(void)
+ 		raw_spin_lock_irq(&desc->lock);
+ 		if (!desc->action && irq_settings_can_probe(desc)) {
+ 			desc->istate |= IRQS_AUTODETECT | IRQS_WAITING;
+-			if (irq_startup(desc, false))
++			if (irq_startup(desc, false) > 0)
+ 				desc->istate |= IRQS_PENDING;
+ 		}
+ 		raw_spin_unlock_irq(&desc->lock);
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index 481a13c..58c6be0 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -1116,7 +1116,9 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
+ 			desc->istate |= IRQS_ONESHOT;
+ 
+ 		if (irq_settings_can_autoenable(desc))
+-			irq_startup(desc, true);
++			ret = irq_startup(desc, true);
++			if (ret < 0)
++				goto out_mask;
+ 		else
+ 			/* Undo nested disables: */
+ 			desc->depth = 1;
+-- 
+1.9.0
