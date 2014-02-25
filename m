@@ -1,38 +1,83 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 25 Feb 2014 13:38:57 +0100
-Subject: [PATCH resend 1/3] binfmt_elf: add ELF_HWCAP2 to compat auxv entries
+Date: Tue, 25 Feb 2014 13:38:59 +0100
+Subject: [PATCH resend 3/3] arm64: advertise ARMv8 extensions to 32-bit compat
+ ELF binaries
 In-Reply-To: <1393331939-31289-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1393331939-31289-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1393331939-31289-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1393331939-31289-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ELF_HWCAP2 to the set of auxv entries that is passed to
-a 32-bit ELF program running in 32-bit compat mode under a
-64-bit kernel.
+This adds support for advertising the presence of ARMv8 Crypto
+Extensions in the Aarch32 execution state to 32-bit ELF binaries
+running in 32-bit compat mode under the arm64 kernel.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Andrew Morton <akpm@linux-foundation.org>
 ---
- fs/compat_binfmt_elf.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/include/asm/hwcap.h |  6 ++++++
+ arch/arm64/kernel/setup.c      | 32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+)
 
-diff --git a/fs/compat_binfmt_elf.c b/fs/compat_binfmt_elf.c
-index a81147e2e4ef..4d24d17bcfc1 100644
---- a/fs/compat_binfmt_elf.c
-+++ b/fs/compat_binfmt_elf.c
-@@ -88,6 +88,11 @@ static void cputime_to_compat_timeval(const cputime_t cputime,
- #define	ELF_HWCAP		COMPAT_ELF_HWCAP
- #endif
+diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
+index 9a4cbd60c88e..024c46183c3c 100644
+--- a/arch/arm64/include/asm/hwcap.h
++++ b/arch/arm64/include/asm/hwcap.h
+@@ -32,6 +32,12 @@
+ #define COMPAT_HWCAP_IDIV	(COMPAT_HWCAP_IDIVA|COMPAT_HWCAP_IDIVT)
+ #define COMPAT_HWCAP_EVTSTRM	(1 << 21)
  
-+#ifdef	COMPAT_ELF_HWCAP2
-+#undef	ELF_HWCAP2
-+#define	ELF_HWCAP2		COMPAT_ELF_HWCAP2
-+#endif
++#define COMPAT_HWCAP2_AES	(1 << 0)
++#define COMPAT_HWCAP2_PMULL	(1 << 1)
++#define COMPAT_HWCAP2_SHA1	(1 << 2)
++#define COMPAT_HWCAP2_SHA2	(1 << 3)
++#define COMPAT_HWCAP2_CRC32	(1 << 4)
 +
- #ifdef	COMPAT_ARCH_DLINFO
- #undef	ARCH_DLINFO
- #define	ARCH_DLINFO		COMPAT_ARCH_DLINFO
+ #ifndef __ASSEMBLY__
+ /*
+  * This yields a mask that user programs can use to figure out what
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 349c49260f09..67da30741a1b 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -243,6 +243,38 @@ static void __init setup_processor(void)
+ 	block = (features >> 16) & 0xf;
+ 	if (block && !(block & 0x8))
+ 		elf_hwcap |= HWCAP_CRC32;
++
++#ifdef CONFIG_COMPAT
++	/*
++	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
++	 * the Aarch32 32-bit execution state.
++	 */
++	features = read_cpuid(ID_ISAR5_EL1);
++	block = (features >> 4) & 0xf;
++	if (!(block & 0x8)) {
++		switch (block) {
++		default:
++		case 2:
++			compat_elf_hwcap2 |= COMPAT_HWCAP2_PMULL;
++		case 1:
++			compat_elf_hwcap2 |= COMPAT_HWCAP2_AES;
++		case 0:
++			break;
++		}
++	}
++
++	block = (features >> 8) & 0xf;
++	if (block && !(block & 0x8))
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA1;
++
++	block = (features >> 12) & 0xf;
++	if (block && !(block & 0x8))
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_SHA2;
++
++	block = (features >> 16) & 0xf;
++	if (block && !(block & 0x8))
++		compat_elf_hwcap2 |= COMPAT_HWCAP2_CRC32;
++#endif
+ }
+ 
+ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 -- 
 1.8.3.2
