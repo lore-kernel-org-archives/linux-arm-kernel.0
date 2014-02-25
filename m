@@ -1,124 +1,23 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 25 Feb 2014 20:05:42 +0100
-Subject: [PATCH 2/2] devicetree: bindings: add missing Marvell Kirkwood SoC
- documentation
-In-Reply-To: <1393355142-7811-1-git-send-email-andrew@lunn.ch>
-References: <1393355142-7811-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1393355142-7811-2-git-send-email-andrew@lunn.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Feb 2014 20:11:01 +0100
+Subject: [PATCH resend] pwm: Remove obsolete HAVE_PWM Kconfig symbol
+In-Reply-To: <20140210102017.GA20143@ulmo.nvidia.com>
+References: <1390550056-5924-1-git-send-email-s.hauer@pengutronix.de>
+ <20140210102017.GA20143@ulmo.nvidia.com>
+Message-ID: <201402252011.01902.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell Dove SoC binding was not documented, yet. Add the
-documentation including the supported SoCs and boards.
+On Monday 10 February 2014, Thierry Reding wrote:
+> On Fri, Jan 24, 2014 at 08:54:16AM +0100, Sascha Hauer wrote:
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- .../devicetree/bindings/arm/marvell,kirkwood.txt   | 97 ++++++++++++++++++++++
- 1 file changed, 97 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> > Thierry as PWM maintainer has agreed to take this patch. Would be nice
+> > to get some Acks from affected architectures. Russell, Ralf?
+> 
+> No replies for over two weeks and this looks simple enough, so I just
+> went ahead and applied it. Thanks,
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-new file mode 100644
-index 000000000000..925ecbf6e7b7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-@@ -0,0 +1,97 @@
-+Marvell Kirkwood SoC Family Device Tree Bindings
-+------------------------------------------------
-+
-+Boards with a SoC of the Marvell Kirkwook family, eg 88f6281
-+
-+* Required root node properties:
-+compatible: must contain "marvell,kirkwood"
-+
-+In addition, the above compatible shall be extended with the specific
-+SoC. Currently known SoC compatibles are:
-+
-+"marvell,kirkwood-88f6192"
-+"marvell,kirkwood-88f6281"
-+"marvell,kirkwood-88f6282"
-+"marvell,kirkwood-88f6283"
-+"marvell,kirkwood-88f6702"
-+"marvell,kirkwood-98DX4122"
-+
-+And in addition, the compatible shall be extended with the specific
-+board. Currently known boards are:
-+
-+"buffalo,lschlv2"
-+"buffalo,lsxhl"
-+"buffalo,lsxl"
-+"dlink,dns-320"
-+"dlink,dns-320-a1"
-+"dlink,dns-325"
-+"dlink,dns-325-a1"
-+"dlink,dns-kirkwood"
-+"excito,b3"
-+"globalscale,dreamplug-003-ds2001"
-+"globalscale,guruplug"
-+"globalscale,guruplug-server-plus"
-+"globalscale,sheevaplug"
-+"globalscale,sheevaplug"
-+"globalscale,sheevaplug-esata"
-+"globalscale,sheevaplug-esata-rev13"
-+"iom,iconnect"
-+"iom,iconnect-1.1"
-+"iom,ix2-200"
-+"keymile,km_kirkwood"
-+"lacie,cloudbox"
-+"lacie,inetspace_v2"
-+"lacie,laplug"
-+"lacie,netspace_lite_v2"
-+"lacie,netspace_max_v2"
-+"lacie,netspace_mini_v2"
-+"lacie,netspace_v2"
-+"marvell,db-88f6281-bp"
-+"marvell,db-88f6282-bp"
-+"marvell,mv88f6281gtw-ge"
-+"marvell,rd88f6281"
-+"marvell,rd88f6281"
-+"marvell,rd88f6281-a0"
-+"marvell,rd88f6281-a1"
-+"mpl,cec4"
-+"mpl,cec4-10"
-+"netgear,readynas"
-+"netgear,readynas"
-+"netgear,readynas-duo-v2"
-+"netgear,readynas-nv+-v2"
-+"plathome,openblocks-a6"
-+"plathome,openblocks-a7"
-+"raidsonic,ib-nas6210"
-+"raidsonic,ib-nas6210-b"
-+"raidsonic,ib-nas6220"
-+"raidsonic,ib-nas6220-b"
-+"raidsonic,ib-nas62x0"
-+"seagate,dockstar"
-+"seagate,goflexnet"
-+"synology,ds109"
-+"synology,ds110jv10"
-+"synology,ds110jv20"
-+"synology,ds110jv30"
-+"synology,ds111"
-+"synology,ds209"
-+"synology,ds210jv10"
-+"synology,ds210jv20"
-+"synology,ds212"
-+"synology,ds212jv10"
-+"synology,ds212jv20"
-+"synology,ds212pv10"
-+"synology,ds409"
-+"synology,ds409slim"
-+"synology,ds410j"
-+"synology,ds411"
-+"synology,ds411j"
-+"synology,ds411slim"
-+"synology,ds413jv10"
-+"synology,rs212"
-+"synology,rs409"
-+"synology,rs411"
-+"synology,rs812"
-+"usi,topkick"
-+"usi,topkick-1281P2"
-+"zyxel,nsa310"
-+"zyxel,nsa310a"
--- 
-1.8.5.3
+Am I looking in the wrong place, or have you not pushed this for linux-next yet?
+I still see all the HAVE_PWM symbols in today's -next.
+
+	Arnd
