@@ -1,47 +1,60 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 25 Feb 2014 11:30:08 +0100
-Subject: [PATCH v2 00/11] ARM: shmobile: MSIOF integration on r8a7790/lager
- and r8a7791/koelsch
-Message-ID: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
+Date: Tue, 25 Feb 2014 11:30:19 +0100
+Subject: [PATCH v2 11/11] ARM: shmobile: koelsch/lager/multi defconfig: Enable
+ MSIOF
+In-Reply-To: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
+References: <1393324219-3317-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <1393324219-3317-12-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-        Hi Simon, Magnus,
+From: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
 
-This patch series integrates support for the MSIOF module in the Renesas
-R-Car H2 (r8a7790) and M2 (r8a7791) SoCs on the Lager and Koelsch
-development boards.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@linux-m68k.org>
+---
+v2:
+  - No changes
 
-It was tested on Lager and Koelsch, both legacy and DT, using a dummy
-driver for the Renesas r2a11302ft PMIC that reads out the PMIC's version
-ID.
+ arch/arm/configs/koelsch_defconfig  |    1 +
+ arch/arm/configs/lager_defconfig    |    1 +
+ arch/arm/configs/shmobile_defconfig |    1 +
+ 3 files changed, 3 insertions(+)
 
-    [01/11] ARM: shmobile: r8a7790: Add MSIOF clocks
-    [02/11] ARM: shmobile: r8a7791: Add MSIOF clocks
-    [03/11] ARM: shmobile: lager legacy: Add MSIOF support
-    [04/11] ARM: shmobile: koelsch legacy: Add MSIOF support
-    [05/11] ARM: shmobile: r8a7790/lager dts: Rename label spi to qspi, add
-    	    spi0 alias
-    [06/11] ARM: shmobile: r8a7791/koelsch dts: Rename label spi to qspi,
-    	    add spi0 alias
-    [07/11] ARM: shmobile: r8a7790 dtsi: Add MSIOF nodes and aliases
-    [08/11] ARM: shmobile: r8a7791 dtsi: Add MSIOF nodes and aliases
-    [09/11] ARM: shmobile: lager dts: Add MSIOF nodes
-    [10/11] ARM: shmobile: koelsch dts: Add MSIOF nodes
-    [11/11] ARM: shmobile: koelsch/lager/multi defconfig: Enable MSIOF
-
-These are (reworked versions of) the remaining patches not taken from v1.
-Changelogs are available in the individual patches.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+diff --git a/arch/arm/configs/koelsch_defconfig b/arch/arm/configs/koelsch_defconfig
+index 86faab565a96..f3f08463e2bc 100644
+--- a/arch/arm/configs/koelsch_defconfig
++++ b/arch/arm/configs/koelsch_defconfig
+@@ -69,6 +69,7 @@ CONFIG_I2C=y
+ CONFIG_I2C_RCAR=y
+ CONFIG_SPI=y
+ CONFIG_SPI_RSPI=y
++CONFIG_SPI_SH_MSIOF=y
+ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_RCAR=y
+ # CONFIG_HWMON is not set
+diff --git a/arch/arm/configs/lager_defconfig b/arch/arm/configs/lager_defconfig
+index 58702440472a..5ba857317ca5 100644
+--- a/arch/arm/configs/lager_defconfig
++++ b/arch/arm/configs/lager_defconfig
+@@ -90,6 +90,7 @@ CONFIG_I2C_GPIO=y
+ CONFIG_I2C_RCAR=y
+ CONFIG_SPI=y
+ CONFIG_SPI_RSPI=y
++CONFIG_SPI_SH_MSIOF=y
+ CONFIG_GPIO_SH_PFC=y
+ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_RCAR=y
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 83b07258a385..2a27d4622cc9 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -78,6 +78,7 @@ CONFIG_I2C_GPIO=y
+ CONFIG_I2C_RCAR=y
+ CONFIG_SPI=y
+ CONFIG_SPI_RSPI=y
++CONFIG_SPI_SH_MSIOF=y
+ CONFIG_GPIO_EM=y
+ CONFIG_GPIO_RCAR=y
+ # CONFIG_HWMON is not set
+-- 
+1.7.9.5
