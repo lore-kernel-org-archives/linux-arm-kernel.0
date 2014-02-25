@@ -1,110 +1,84 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 25 Feb 2014 17:19:59 +0200
-Subject: [PATCH 4/4] ARM: keystone: Use dma-ranges for dma_pfn_offset
- configuration
-In-Reply-To: <201402251437.06400.arnd@arndb.de>
-References: <1393275235-1087-1-git-send-email-santosh.shilimkar@ti.com>
- <530BBBB8.3020607@ti.com> <530CA534.9080001@ti.com>
- <201402251437.06400.arnd@arndb.de>
-Message-ID: <530CB49F.9060505@ti.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 25 Feb 2014 16:29:46 +0200
+Subject: TWL6040 fails to initialize
+In-Reply-To: <530C70B3.4010103@epfl.ch>
+References: <530C70B3.4010103@epfl.ch>
+Message-ID: <530CA8DA.8050806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2014 03:37 PM, Arnd Bergmann wrote:
-> On Tuesday 25 February 2014, Grygorii Strashko wrote:
->> On 02/24/2014 11:38 PM, Santosh Shilimkar wrote:
->>> On Monday 24 February 2014 04:11 PM, Arnd Bergmann wrote:
->>>> On Monday 24 February 2014 15:53:55 Santosh Shilimkar wrote:
->>>>> From: Grygorii Strashko <grygorii.strashko@ti.com>
->>
->>>> Hmm, isn't this function the same as of_translate_dma_address()?
->>>>
->>>> I think we should have the implementation in common code, not hidden
->>>> in the keystone platform, to avoid duplication. If of_translate_dma_address
->>>> doesn't work, what is the problem, and can you fix it there?
->>>>
->>> Will have a look at it and get back. At least it makes sense to
->>> use/update the common function.
->>
->> This function isn't the same as of_translate_dma_address(), more over
->> it calls of_translate_dma_address() to get CPU address.
->>
->> To calculate DMA bus offset we need to know the first DMA address explicitly,
->> so then we can translate it to the corresponding CPU address.
-> 
-> Ah, got it. Sorry for being sloppy in my review. You are absolutely right.
-> 
->> get_dma_pfn_offset() function does:
->> - traverse DT and look for the first "dma-ranges" prop;
->> - reads the first DMA address of the range;
->> - translates it in CPU address using of_translate_dma_address();
->> - calculates DMA bus offset as PFN_DOWN(cpu_addr - dma_addr);
-> 
-> I was confused about the first step here and thought you were actually
-> doing the translation there. After a more careful reading, I only
-> have comments on details:
-> 
->> +static unsigned long get_dma_pfn_offset(struct device *dev)
->> +{
->> +       while (1) {
->> +               naddr = of_n_addr_cells(node);
->> +               nsize = of_n_size_cells(node);
->> +               node = of_get_next_parent(node);
->> +               if (!node)
->> +                       break;
->> +
->> +               ranges = of_get_property(node, "dma-ranges", &len);
->> +
->> +               /* Ignore empty ranges, they imply no translation required */
->> +               if (ranges && len > 0)
->> +                       break;
->> +       }
-> 
-> I think we should require an empty "dma-ranges" property to be
-> present to signify "no translation required" and interpret the
-> absence of the property as "no dma possible".
-> 
-> A special case is having no "dma-ranges" at all, which we have
-> on all existing systems, and I  would interpret that as "all
-> devices can do 32-bit DMA, no more but no less".
+Hi Florian,
 
-The Keystone can work in two modes:
-- LPAE disabled: In this case Platform bus notifier will not be called at all
-and DMA range == MEM range (32 bits mode)
-- LPAE enabled: In this case, I'll update code to treat absence of "dam-ranges"
-property as "no dma possible" and clean up DMA mask. Is it ok?
-In this mode "dam-ranges" prop has to be defined always to enable DMA.
+On 02/25/2014 12:30 PM, Florian Vaussard wrote:
+> Hi Peter,
+> 
+> I got recently to work on the DT support for an OMAP4 board [1], and I
+> encountered some troubles with the probe of the twl6040 audio codec on
+> 3.14-rc kernels. On 3.13, things were working correctly. So I somewhat
+> managed to bisect this down to [c7f9129 mfd: twl6040: reg_defaults
+> support for regmap]. But looking more into it, things are less obvious.
 
-Empty "dma-ranges" can't be treated as "no translation required" because it is used
-to move one level up while traversing DT to find the valid "dma-ranges" prop.
-Used to handle child devices like:
+Interesting. I just booted 3.14.0-rc4 with HEAD:
+7472e009a3f1 Merge branch 'for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/jmorris/linux-security
 
- bus {
- 	dma-ranges = <...>;
-	
-	Dev A {
-		dma-ranges;
-
-		child_dev_A1 { }
-		child_dev_A2 { }
-
-This is standard behavior for "[dma-]ranges".
+on my PandaBoard-ES and audio comes up just fine (twl6040).
 
 > 
+> When the init fails, here is what happens:
 > 
->> +       /*
->> +        * dma-ranges format:
->> +        * DMA addr     : naddr cells
->> +        * CPU addr     : pna cells
->> +        * size         : nsize cells
->> +        */
->> +       len /= sizeof(u32);
->> +       pna = of_n_addr_cells(node);
->> +       dma_addr = of_read_number(ranges, nsize);
+> [    2.455749] twl6040 0-004b: Looking up vio-supply from device tree
+> [    2.456359] twl6040 0-004b: Looking up v2v1-supply from device tree
+> [    2.457061] twl6040 0-004b: Failed to set masks in 0x4: -121
+> [    2.463043] twl6040: probe of 0-004b failed with error -121
 > 
-> This should probably use naddr, not nsize.
+> logically resulting in
 
-agree. 
+Do you have the regulators in your dts file? vio and v2v1 is needed by the
+twl6040.
 
-Regards,
--grygorii
+> 
+> [    2.770050] omap-abe-twl6040 sound.4: ASoC: CODEC twl6040-codec not
+> registered
+> [    2.777770] omap-abe-twl6040 sound.4: snd_soc_register_card() failed:
+> -517
+> [    2.785095] platform sound.4: Driver omap-abe-twl6040 requests probe
+> deferral
+> 
+> We get a EREMOTEIO when calling regmap_add_irq_chip() from
+> twl6040_probe(). regmap_add_irq_chip() will try to perform non-cached
+> i2c writes, where the omap-i2c driver get a NACK from the remote chip.
+> Strange enough, the non-cached read just before (i.e.
+> twl6040_reg_read(twl6040, TWL6040_REG_ASICREV)) succeeds.
+
+Power is not enabled? There might be missing 32K clock for twl6040, can you
+check your board's schema against PandaBoard-ES?
+
+> 
+> After some fiddling around, I could find that delaying the call to
+> regmap_add_irq_chip(), let's say by msleep(1), will "solve" the problem.
+> 
+> As the TRM for TWL6040 is not public, and I cannot physically access the
+> i2c bus on the board, I ran out of hypothesis. I first suspected a
+> concurrent access from the McPDM bus, but the mcpdm driver does not seem
+> to perform command (write) access.
+> 
+> As the regulators are enabled just before, could it be the twl6040 IP
+> which is not yet initialized, and NACK'ing writes but not reads? The
+> commit c7f9129 changed the regmap logic by reducing the number of
+> non-cached accesses, and thus changed the access timings, so it may have
+> trigged this behaviour. But this is pure supposition, as I cannot hack
+> the i2c bus :( And adding any kind of tracing before
+> regmap_add_irq_chip() usually delays enough to make the probe succeeds.
+> 
+> Any ideas?
+> 
+> Regards,
+> Florian
+> 
+> [1] http://thread.gmane.org/gmane.linux.ports.arm.omap/110801
+> 
+
+
+-- 
+P?ter
