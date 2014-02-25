@@ -1,36 +1,36 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 25 Feb 2014 16:59:21 +0100
-Subject: [PATCH 0/2] ARM: SAMSUNG: move all arches to generic uncompress.h
-In-Reply-To: <CAK9yfHycc-98YG1ZWD5sB=k8t4CCYmxfRoJxSR_v=Hdm8FPG8g@mail.gmail.com>
-References: <3594365.ORKU4Q2jDp@phil> <3158811.UU2ZyPShVi@phil>
- <CAK9yfHycc-98YG1ZWD5sB=k8t4CCYmxfRoJxSR_v=Hdm8FPG8g@mail.gmail.com>
-Message-ID: <2577208.cj79hmXajC@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Feb 2014 16:59:50 +0100
+Subject: [PATCH 21/21] ARM: Kirkwood: Remove DT support
+In-Reply-To: <20140225150942.GF3793@kw.sim.vm.gnt>
+References: <1391730137-14814-1-git-send-email-andrew@lunn.ch>
+ <201402251636.15257.arnd@arndb.de> <20140225150942.GF3793@kw.sim.vm.gnt>
+Message-ID: <5689865.yp2cJ53QNJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 25. Februar 2014, 21:11:09 schrieb Sachin Kamat:
->  Hi Heiko,
-> 
-> On 25 February 2014 19:47, Heiko St?bner <heiko@sntech.de> wrote:
-> > Am Sonntag, 16. Februar 2014, 18:32:24 schrieb Heiko St?bner:
-> >> On 2014-01-06 Sachin Kamat posted two patches converting Exynos to use
-> >> the generic uncompress.h.
-> >> 
-> >> But in fact all Samsung platforms can go this route, as all Samsung
-> >> uncompress.h files are simply used to set up the serial port.
-> >> 
-> >> As the original patches were not yet applied, this series includes the
-> >> original Exynos-specific change.
-> >> 
-> >> Tested on a s3c2416 and s3c2442 based machine.
+On Tuesday 25 February 2014 16:09:44 Simon Guinot wrote:
+> On Tue, Feb 25, 2014 at 04:36:14PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 25 February 2014, Simon Guinot wrote:
+> > > On Tue, Feb 25, 2014 at 01:44:23PM +0100, Arnd Bergmann wrote:
+> > > > I just took a brief look at the LED driver. I think it would be
+> > > > reasonable to move almost all of the platform_data into the driver
+> > > > itself and associate the two versions with distinct "compatible"
+> > > > strings. That works in this particular case because while the driver
+> > > > is generic enough to handle other cases, I also wouldn't expect
+> > > > it to ever get used again on another platform.
+> > > 
+> > > Actually, this driver is also used by the Atom-based LaCie NASes.
+> > > Mainline support for this platforms should be provided soon.
 > > 
-> > ping?
+> > Do you use DT for those machines as well, or how do you get the
+> > data into the driver there?
 > 
-> Kukjin has already applied my 2 patches doing this for Exynos.
-> You might need to rebase your patches on top of his for-next and re-send.
+> We are using the old fashion platform_device mechanism. The resources
+> are defined in some board-setup files stored in the arch/x86/platform
+> repository.
 
-now I've seen that he applied them yesterday ... will rebase mine as 
-suggested.
+Then better be quick, before the x86 maintainers figure out what kind
+of mess they are getting into, if they want to support lots of embedded
+machines in the future. ;-)
 
-
-Heiko
+	Arnd
