@@ -1,35 +1,23 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 25 Feb 2014 12:16:33 -0600
-Subject: [PATCH] ARM: move __fixup_smp out of init section
-Message-ID: <1393352193-31717-1-git-send-email-robherring2@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Feb 2014 19:19:33 +0100
+Subject: [PATCH v3 5/5] ARM: kirkwood: Add HP T5325 devices to
+ {multi|mvebu}_v5_defconfig
+In-Reply-To: <1393349643-6652-6-git-send-email-andrew@lunn.ch>
+References: <1393349643-6652-1-git-send-email-andrew@lunn.ch>
+ <1393349643-6652-6-git-send-email-andrew@lunn.ch>
+Message-ID: <6144493.7kns7zvPT9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
+On Tuesday 25 February 2014 18:34:03 Andrew Lunn wrote:
+> The HP T5325 has a PCI based VGA controller. Add the frame buffer
+> driver, and frame buffer support to the defconfig's. Additionally
+> add the soc audio framework and the necessary codec.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> 
+Does the VGA console still work with the new PCI driver?
 
-With large kernel builds such as allyesconfig exceeding maximum relative
-branch offsets, the init section will be too far away to branch to
-directly. This causes veneers to be added by the compiler, but veneers
-don't work before the MMU is enabled. Fix this by moving __fixup_smp to
-the .head.text section as it is not very big.
+I noticed we're not setting 'vga_base'.
 
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- arch/arm/kernel/head.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 914616e..78e1443 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -475,7 +475,7 @@ ENDPROC(__turn_mmu_on)
- 
- 
- #ifdef CONFIG_SMP_ON_UP
--	__INIT
-+	__HEAD
- __fixup_smp:
- 	and	r3, r9, #0x000f0000	@ architecture version
- 	teq	r3, #0x000f0000		@ CPU ID supported?
--- 
-1.8.3.2
+	Arnd
