@@ -1,42 +1,84 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 26 Feb 2014 15:48:58 +0000
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <20140226144610.GA2394@sirena.org.uk>
-References: <1393302345-18253-1-git-send-email-broonie@kernel.org>
- <1393302345-18253-2-git-send-email-broonie@kernel.org>
- <20140225165411.GA3883@red-moon>
- <20140226005052.GA31120@sirena.org.uk>
- <20140226123208.GB22839@e102568-lin.cambridge.arm.com>
- <20140226144610.GA2394@sirena.org.uk>
-Message-ID: <20140226154858.GC10246@arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 26 Feb 2014 07:50:03 -0800
+Subject: [PATCH 1/8] PM / Runtime: Fetch runtime PM callbacks using a macro
+In-Reply-To: <1392910280-12891-2-git-send-email-ulf.hansson@linaro.org> (Ulf
+ Hansson's message of "Thu, 20 Feb 2014 16:31:13 +0100")
+References: <1392910280-12891-1-git-send-email-ulf.hansson@linaro.org>
+ <1392910280-12891-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <7htxblyitw.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 02:46:10PM +0000, Mark Brown wrote:
-> On Wed, Feb 26, 2014 at 12:32:08PM +0000, Lorenzo Pieralisi wrote:
-> > On Wed, Feb 26, 2014 at 12:50:52AM +0000, Mark Brown wrote:
-> > > Having said that like I keep saying it seems most sensible to fall back
-> > > to MPIDR if we don't have any better idea; it's guaranteed to be
-> > > available, may well be correct and helps systems that did a good job
-> > > with their hardware.
-> 
-> > You have a point. Unless someone feels strongly against this, I would
-> > suggest falling back to MPIDR_EL1 if there is missing or wrong information in
-> > DT.
-> 
-> Catalin seemed very concerned about any use at all of MPIDR, that's why
-> the code was removed originally.  Catalin?
+Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-My concern is that the MPIDR is just considered a unique ID. The ARMv8
-relaxes the requirement so that it no longer needs to start at 0 and
-increase monotonically. I checked with the architecture guys here and
-they still expect the affinity hierarchy to be described by MPIDR but we
-can have holes in the range for certain levels (i.e. an affinity level
-may not start at 0 and may not even increase monotonically for
-subsequent CPUs).
+> While fetching the proper runtime PM callback, we walk the hierarchy of
+> device's power domains, subsystems and drivers.
+>
+> This is common for rpm_suspend(), rpm_idle() and rpm_resume(). Let's
+> clean up the code by using a macro that handles this.
+>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/base/power/runtime.c |   59 ++++++++++++++----------------------------
+>  1 file changed, 20 insertions(+), 39 deletions(-)
+>
+> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+> index 72e00e6..dedbd64 100644
+> --- a/drivers/base/power/runtime.c
+> +++ b/drivers/base/power/runtime.c
+> @@ -13,6 +13,23 @@
+>  #include <trace/events/rpm.h>
+>  #include "power.h"
+>  
+> +#define RPM_GET_CALLBACK(dev, cb)				\
+> +({								\
+> +	if (dev->pm_domain)					\
+> +		callback = dev->pm_domain->ops.cb;		\
+> +	else if (dev->type && dev->type->pm)			\
+> +		callback = dev->type->pm->cb;			\
+> +	else if (dev->class && dev->class->pm)			\
+> +		callback = dev->class->pm->cb;			\
+> +	else if (dev->bus && dev->bus->pm)			\
+> +		callback = dev->bus->pm->cb;			\
+> +	else							\
+> +		callback = NULL;				\
+> +								\
+> +	if (!callback && dev->driver && dev->driver->pm)	\
+> +		callback = dev->driver->pm->cb;			\
+> +})
+> +
+>  static int rpm_resume(struct device *dev, int rpmflags);
+>  static int rpm_suspend(struct device *dev, int rpmflags);
+>  
+> @@ -310,19 +327,7 @@ static int rpm_idle(struct device *dev, int rpmflags)
+>  
+>  	dev->power.idle_notification = true;
+>  
+> -	if (dev->pm_domain)
+> -		callback = dev->pm_domain->ops.runtime_idle;
+> -	else if (dev->type && dev->type->pm)
+> -		callback = dev->type->pm->runtime_idle;
+> -	else if (dev->class && dev->class->pm)
+> -		callback = dev->class->pm->runtime_idle;
+> -	else if (dev->bus && dev->bus->pm)
+> -		callback = dev->bus->pm->runtime_idle;
+> -	else
+> -		callback = NULL;
+> -
+> -	if (!callback && dev->driver && dev->driver->pm)
+> -		callback = dev->driver->pm->runtime_idle;
+> +	RPM_GET_CALLBACK(dev, runtime_idle);
 
-So we can either add a tolerant MPIDR parsing or we simply assume that
-the topology is _flat_ when DT doesn't provide the information.
+This macro sets the local 'callback' variable, but it's not at all
+obvious when reading the code.  macros with side-effects like this are a
+major readability problem.  Just use a function.
 
--- 
-Catalin
+Kevin
