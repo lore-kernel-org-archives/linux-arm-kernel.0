@@ -1,242 +1,176 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Wed, 26 Feb 2014 11:18:13 -0800
-Subject: [PATCH v4 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <1393441857-15472-3-git-send-email-sebastian.capella@linaro.org>
-References: <1393441857-15472-1-git-send-email-sebastian.capella@linaro.org>
- <1393441857-15472-3-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <530E3DF5.8000309@ti.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 26 Feb 2014 14:27:40 -0500
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <20140226183454.GA14639@cbox>
+References: <20140226183454.GA14639@cbox>
+Message-ID: <530E402C.9040502@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2014 11:10 AM, Sebastian Capella wrote:
-> From: Russ Dill <Russ.Dill@ti.com>
-> 
-> Enable hibernation for ARM architectures and provide ARM
-> architecture specific calls used during hibernation.
-> 
-> The swsusp hibernation framework depends on the
-> platform first having functional suspend/resume.
-> 
-> Then, in order to enable hibernation on a given platform, a
-> platform_hibernation_ops structure may need to be registered with
-> the system in order to save/restore any SoC-specific / cpu specific
-> state needing (re)init over a suspend-to-disk/resume-from-disk cycle.
-> 
-> For example:
-> 
->      - "secure" SoCs that have different sets of control registers
->        and/or different CR reg access patterns.
-> 
->      - SoCs with L2 caches as the activation sequence there is
->        SoC-dependent; a full off-on cycle for L2 is not done
->        by the hibernation support code.
-> 
->      - SoCs requiring steps on wakeup _before_ the "generic" parts
->        done by cpu_suspend / cpu_resume can work correctly.
-> 
->      - SoCs having persistent state which is maintained during suspend
->        and resume, but will be lost during the power off cycle after
->        suspend-to-disk.
-> 
-> This is a rebase/rework of Frank Hofmann's v5 hibernation patchset.
-> 
-> Cc: Russ Dill <Russ.Dill@ti.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Len Brown <len.brown@intel.com>
-> Cc: Pavel Machek <pavel@ucw.cz>
-> Cc: Nicolas Pitre <nico@linaro.org>
-> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Jonathan Austin <jonathan.austin@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: "Uwe Kleine-K?nig" <u.kleine-koenig@pengutronix.de>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Hi Christoffer,
 
-Acked-by: Russ Dill <russ.dill@ti.com>
-
-
-> ---
->  arch/arm/include/asm/memory.h |    1 +
->  arch/arm/kernel/Makefile      |    1 +
->  arch/arm/kernel/hibernate.c   |  113 +++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mm/Kconfig           |    5 ++
->  include/linux/suspend.h       |    2 +
->  5 files changed, 122 insertions(+)
->  create mode 100644 arch/arm/kernel/hibernate.c
+On 02/26/2014 01:34 PM, Christoffer Dall wrote:
+> ARM VM System Specification
+> ===========================
 > 
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 8756e4b..1079ea8 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -291,6 +291,7 @@ static inline void *phys_to_virt(phys_addr_t x)
->   */
->  #define __pa(x)			__virt_to_phys((unsigned long)(x))
->  #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
-> +#define __pa_symbol(x)		__pa(RELOC_HIDE((unsigned long)(x), 0))
->  #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
->  
->  extern phys_addr_t (*arch_virt_to_idmap)(unsigned long x);
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index a30fc9b..8afa848 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -39,6 +39,7 @@ obj-$(CONFIG_ARTHUR)		+= arthur.o
->  obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
->  obj-$(CONFIG_PCI)		+= bios32.o isa.o
->  obj-$(CONFIG_ARM_CPU_SUSPEND)	+= sleep.o suspend.o
-> +obj-$(CONFIG_HIBERNATION)	+= hibernate.o
->  obj-$(CONFIG_SMP)		+= smp.o
->  ifdef CONFIG_MMU
->  obj-$(CONFIG_SMP)		+= smp_tlb.o
-> diff --git a/arch/arm/kernel/hibernate.c b/arch/arm/kernel/hibernate.c
-> new file mode 100644
-> index 0000000..70e17d2
-> --- /dev/null
-> +++ b/arch/arm/kernel/hibernate.c
-> @@ -0,0 +1,113 @@
-> +/*
-> + * Hibernation support specific for ARM
-> + *
-> + * Derived from work on ARM hibernation support by:
-> + *
-> + * Ubuntu project, hibernation support for mach-dove
-> + * Copyright (C) 2010 Nokia Corporation (Hiroshi Doyu)
-> + * Copyright (C) 2010 Texas Instruments, Inc. (Teerth Reddy et al.)
-> + *  https://lkml.org/lkml/2010/6/18/4
-> + *  https://lists.linux-foundation.org/pipermail/linux-pm/2010-June/027422.html
-> + *  https://patchwork.kernel.org/patch/96442/
-> + *
-> + * Copyright (C) 2006 Rafael J. Wysocki <rjw@sisk.pl>
-> + *
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +
-> +#include <linux/mm.h>
-> +#include <linux/suspend.h>
-> +#include <asm/tlbflush.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/system_misc.h>
-> +#include <asm/idmap.h>
-> +#include <asm/suspend.h>
-> +
-> +extern const void __nosave_begin, __nosave_end;
-> +
-> +int pfn_is_nosave(unsigned long pfn)
-> +{
-> +	unsigned long nosave_begin_pfn =
-> +			__pa_symbol(&__nosave_begin) >> PAGE_SHIFT;
-> +	unsigned long nosave_end_pfn =
-> +			PAGE_ALIGN(__pa_symbol(&__nosave_end)) >> PAGE_SHIFT;
-> +
-> +	return (pfn >= nosave_begin_pfn) && (pfn < nosave_end_pfn);
-> +}
-> +
-> +void notrace save_processor_state(void)
-> +{
-> +	WARN_ON(num_online_cpus() != 1);
-> +	local_fiq_disable();
-> +}
-> +
-> +void notrace restore_processor_state(void)
-> +{
-> +	local_fiq_enable();
-> +}
-> +
-> +/*
-> + * Snapshot kernel memory and reset the system.
-> + *
-> + * swsusp_save() is executed in the suspend finisher so that the CPU
-> + * context pointer and memory are part of the saved image, which is
-> + * required by the resume kernel image to restart execution from
-> + * swsusp_arch_suspend().
-> + *
-> + * soft_restart is not technically needed, but is used to get success
-> + * returned from cpu_suspend.
-> + * 
-> + * When soft reboot completes, the hibernation snapshot is written out.
-> + */
-> +static int notrace __swsusp_arch_save_image(unsigned long unused)
-> +{
-> +	int ret;
-> +
-> +	ret = swsusp_save();
-> +	if (ret == 0)
-> +		soft_restart(virt_to_phys(cpu_resume));
-> +	return ret;
-> +}
-> +
-> +/*
-> + * Save the current CPU state before suspend / poweroff.
-> + */
-> +int notrace swsusp_arch_suspend(void)
-> +{
-> +	return cpu_suspend(0, __swsusp_arch_save_image);
-> +}
-> +
-> +/*
-> + * The framework loads the hibernation image into a linked list anchored
-> + * at restore_pblist, for swsusp_arch_resume() to copy back to the proper
-> + * destinations.
-> + *
-> + * To make this work if resume is triggered from initramfs, the
-> + * pagetables need to be switched to allow writes to kernel mem.
-> + */
-> +static void notrace __swsusp_arch_restore_image(void *unused)
-> +{
-> +	struct pbe *pbe;
-> +
-> +	cpu_switch_mm(idmap_pgd, &init_mm);
-> +	for (pbe = restore_pblist; pbe; pbe = pbe->next)
-> +		copy_page(pbe->orig_address, pbe->address);
-> +
-> +	soft_restart(virt_to_phys(cpu_resume));
-> +}
-> +
-> +static u8 __swsusp_resume_stk[PAGE_SIZE/2] __nosavedata;
-> +
-> +/*
-> + * Resume from the hibernation image.
-> + * Due to the kernel heap / data restore, stack contents change underneath
-> + * and that would make function calls impossible; switch to a temporary
-> + * stack within the nosave region to avoid that problem.
-> + */
-> +int swsusp_arch_resume(void)
-> +{
-> +	extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-> +	call_with_stack(__swsusp_arch_restore_image, 0,
-> +		__swsusp_resume_stk + sizeof(__swsusp_resume_stk));
-> +	return 0;
-> +}
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 1f8fed9..83707702 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -611,6 +611,11 @@ config CPU_USE_DOMAINS
->  config IO_36
->  	bool
->  
-> +config ARCH_HIBERNATION_POSSIBLE
-> +	bool
-> +	depends on MMU
-> +	default y if CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || CPU_XSCALE || CPU_XSC3 || CPU_V6 || CPU_V6K || CPU_V7
-> +
->  comment "Processor Features"
->  
->  config ARM_LPAE
-> diff --git a/include/linux/suspend.h b/include/linux/suspend.h
-> index f73cabf..38bbf95 100644
-> --- a/include/linux/suspend.h
-> +++ b/include/linux/suspend.h
-> @@ -320,6 +320,8 @@ extern unsigned long get_safe_page(gfp_t gfp_mask);
->  extern void hibernation_set_ops(const struct platform_hibernation_ops *ops);
->  extern int hibernate(void);
->  extern bool system_entering_hibernation(void);
-> +asmlinkage int swsusp_save(void);
-> +extern struct pbe *restore_pblist;
->  #else /* CONFIG_HIBERNATION */
->  static inline void register_nosave_region(unsigned long b, unsigned long e) {}
->  static inline void register_nosave_region_late(unsigned long b, unsigned long e) {}
+> Goal
+> ----
+> The goal of this spec is to allow suitably-built OS images to run on
+> all ARM virtualization solutions, such as KVM or Xen.
+
+Would you consider including simulators/emulators as well, such as QEMU in TCG
+mode?
+
+> Recommendations in this spec are valid for aarch32 and aarch64 alike, and
+> they aim to be hypervisor agnostic.
 > 
+> Note that simply adhering to the SBSA [2] is not a valid approach,
+> for example because the SBSA mandates EL2, which will not be available
+> for VMs.  Further, the SBSA mandates peripherals like the pl011, which
+> may be controversial for some ARM VM implementations to support.
+> This spec also covers the aarch32 execution mode, not covered in the
+> SBSA.
+> 
+> 
+> Image format
+> ------------
+> The image format, as presented to the VM, needs to be well-defined in
+> order for prepared disk images to be bootable across various
+> virtualization implementations.
+> 
+> The raw disk format as presented to the VM must be partitioned with a
+> GUID Partition Table (GPT).  The bootable software must be placed in the
+> EFI System Partition (ESP), using the UEFI removable media path, and
+> must be an EFI application complying to the UEFI Specification 2.4
+> Revision A [6].
+> 
+> The ESP partition's GPT entry's partition type GUID must be
+> C12A7328-F81F-11D2-BA4B-00A0C93EC93B and the file system must be
+> formatted as FAT32/vfat as per Section 12.3.1.1 in [6].
+> 
+> The removable media path is \EFI\BOOT\BOOTARM.EFI for the aarch32
+> execution state and is \EFI\BOOT\BOOTAA64.EFI for the aarch64 execution
+> state.
+> 
+> This ensures that tools for both Xen and KVM can load a binary UEFI
+> firmware which can read and boot the EFI application in the disk image.
+> 
+> A typical scenario will be GRUB2 packaged as an EFI application, which
+> mounts the system boot partition and boots Linux.
+> 
+> 
+> Virtual Firmware
+> ----------------
+> The VM system must be able to boot the EFI application in the ESP.  It
+> is recommended that this is achieved by loading a UEFI binary as the
+> first software executed by the VM, which then executes the EFI
+> application.  The UEFI implementation should be compliant with UEFI
+> Specification 2.4 Revision A [6] or later.
+> 
+> This document strongly recommends that the VM implementation supports
+> persistent environment storage for virtual firmware implementation in
+> order to ensure probable use cases such as adding additional disk images
+> to a VM or running installers to perform upgrades.
+> 
+> The binary UEFI firmware implementation should not be distributed as
+> part of the VM image, but is specific to the VM implementation.
+
+Can you elaborate on the motivation for requiring that the kernel be stuffed
+into a disk image and for requiring such a heavyweight bootloader/firmware? By
+doing so you would seem to exclude those requiring an optimized boot process.
+
+> Hardware Description
+> --------------------
+> The Linux kernel's proper entry point always takes a pointer to an FDT,
+> regardless of the boot mechanism, firmware, and hardware description
+> method.  Even on real hardware which only supports ACPI and UEFI, the kernel
+> entry point will still receive a pointer to a simple FDT, generated by
+> the Linux kernel UEFI stub, containing a pointer to the UEFI system
+> table.  The kernel can then discover ACPI from the system tables.  The
+> presence of ACPI vs. FDT is therefore always itself discoverable,
+> through the FDT.
+> 
+> Therefore, the VM implementation must provide through its UEFI
+> implementation, either:
+> 
+>   a complete FDT which describes the entire VM system and will boot
+>   mainline kernels driven by device tree alone, or
+> 
+>   no FDT.  In this case, the VM implementation must provide ACPI, and
+>   the OS must be able to locate the ACPI root pointer through the UEFI
+>   system table.
+> 
+> For more information about the arm and arm64 boot conventions, see
+> Documentation/arm/Booting and Documentation/arm64/booting.txt in the
+> Linux kernel source tree.
+> 
+> For more information about UEFI and ACPI booting, see [4] and [5].
+> 
+> 
+> VM Platform
+> -----------
+> The specification does not mandate any specific memory map.  The guest
+> OS must be able to enumerate all processing elements, devices, and
+> memory through HW description data (FDT, ACPI) or a bus-specific
+> mechanism such as PCI.
+> 
+> The virtual platform must support at least one of the following ARM
+> execution states:
+>   (1) aarch32 virtual CPUs on aarch32 physical CPUs
+>   (2) aarch32 virtual CPUs on aarch64 physical CPUs
+>   (3) aarch64 virtual CPUs on aarch64 physical CPUs
+> 
+> It is recommended to support both (2) and (3) on aarch64 capable
+> physical systems.
+> 
+> The virtual hardware platform must provide a number of mandatory
+> peripherals:
+> 
+>   Serial console:  The platform should provide a console,
+>   based on an emulated pl011, a virtio-console, or a Xen PV console.
+> 
+>   An ARM Generic Interrupt Controller v2 (GICv2) [3] or newer.  GICv2
+>   limits the the number of virtual CPUs to 8 cores, newer GIC versions
+>   removes this limitation.
+> 
+>   The ARM virtual timer and counter should be available to the VM as
+>   per the ARM Generic Timers specification in the ARM ARM [1].
+> 
+>   A hotpluggable bus to support hotplug of at least block and network
+>   devices.  Suitable buses include a virtual PCIe bus and the Xen PV
+>   bus.
+
+Is VirtIO hotplug capable? Over PCI or MMIO transports or both?
+
+> We make the following recommendations for the guest OS kernel:
+> 
+>   The guest OS must include support for GICv2 and any available newer
+>   version of the GIC architecture to maintain compatibility with older
+>   VM implementations.
+> 
+>   It is strongly recommended to include support for all available
+>   (block, network, console, balloon) virtio-pci, virtio-mmio, and Xen PV
+>   drivers in the guest OS kernel or initial ramdisk.
+
+I would love to eventually see some defconfigs for this sort of thing.
+
+> Other common peripherals for block devices, networking, and more can
+> (and typically will) be provided, but OS software written and compiled
+> to run on ARM VMs cannot make any assumptions about which variations
+> of these should exist or which implementation they use (e.g. VirtIO or
+> Xen PV).  See "Hardware Description" above.
+> 
+> Note that this platform specification is separate from the Linux kernel
+> concept of mach-virt, which merely specifies a machine model driven
+> purely from device tree, but does not mandate any peripherals or have any
+> mention of ACPI.
+
+Well, the commit message for it said it mandated a GIC and architected timers.
+
+Regards,
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
