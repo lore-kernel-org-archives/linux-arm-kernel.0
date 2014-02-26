@@ -1,86 +1,28 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 26 Feb 2014 12:17:38 -0800
-Subject: [PATCH 3/3] cpufreq: stats: Refactor common code into
- __cpufreq_stats_create_table()
-Message-ID: <1393445858-7062-3-git-send-email-skannan@codeaurora.org>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Wed, 26 Feb 2014 21:19:05 +0100
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <5553754.0b4gMg5OS7@wuerfel>
+References: <20140226183454.GA14639@cbox> <5553754.0b4gMg5OS7@wuerfel>
+Message-ID: <530E4C39.9010804@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpufreq_frequency_get_table() is called from all callers of
-__cpufreq_stats_create_table(). So, move it inside.
+Il 26/02/2014 20:55, Arnd Bergmann ha scritto:
+>> > For more information about UEFI and ACPI booting, see [4] and [5].
+> What's the point of having ACPI in a virtual machine? You wouldn't
+> need to abstract any of the hardware in AML since you already know
+> what the virtual hardware is, so I can't see how this would help
+> anyone.
 
-Suggested-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
----
- drivers/cpufreq/cpufreq_stats.c | 22 +++++++++-------------
- 1 file changed, 9 insertions(+), 13 deletions(-)
+In x86 land it's been certainly helpful to abstract hotplug 
+capabilities.  For ARM it could be the same.  Not so much for PCI (ARM 
+probably can use native PCIe hotplug and standard hotplug controllers; 
+on x86 we started with PCI and also have to deal with Windows's lack of 
+support for SHPC), but it could help for CPU and memory hotplug.
 
-diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
-index c52b440..9d9e366 100644
---- a/drivers/cpufreq/cpufreq_stats.c
-+++ b/drivers/cpufreq/cpufreq_stats.c
-@@ -180,13 +180,18 @@ static void cpufreq_stats_free_table(unsigned int cpu)
- 	cpufreq_cpu_put(policy);
- }
- 
--static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
--		struct cpufreq_frequency_table *table)
-+static int __cpufreq_stats_create_table(struct cpufreq_policy *policy)
- {
- 	unsigned int i, j, count = 0, ret = 0;
- 	struct cpufreq_stats *stat;
- 	unsigned int alloc_size;
- 	unsigned int cpu = policy->cpu;
-+	struct cpufreq_frequency_table *table;
-+
-+	table = cpufreq_frequency_get_table(policy->cpu);
-+	if (unlikely(!table))
-+		return 0;
-+
- 	if (per_cpu(cpufreq_stats_table, cpu))
- 		return -EBUSY;
- 	stat = kzalloc(sizeof(*stat), GFP_KERNEL);
-@@ -248,7 +253,6 @@ error_out:
- static void cpufreq_stats_create_table(unsigned int cpu)
- {
- 	struct cpufreq_policy *policy;
--	struct cpufreq_frequency_table *table;
- 
- 	/*
- 	 * "likely(!policy)" because normally cpufreq_stats will be registered
-@@ -258,9 +262,7 @@ static void cpufreq_stats_create_table(unsigned int cpu)
- 	if (likely(!policy))
- 		return;
- 
--	table = cpufreq_frequency_get_table(policy->cpu);
--	if (likely(table))
--		__cpufreq_stats_create_table(policy, table);
-+	__cpufreq_stats_create_table(policy);
- 
- 	cpufreq_cpu_put(policy);
- }
-@@ -283,20 +285,14 @@ static int cpufreq_stat_notifier_policy(struct notifier_block *nb,
- {
- 	int ret = 0;
- 	struct cpufreq_policy *policy = data;
--	struct cpufreq_frequency_table *table;
--	unsigned int cpu = policy->cpu;
- 
- 	if (val == CPUFREQ_UPDATE_POLICY_CPU) {
- 		cpufreq_stats_update_policy_cpu(policy);
- 		return 0;
- 	}
- 
--	table = cpufreq_frequency_get_table(cpu);
--	if (!table)
--		return 0;
--
- 	if (val == CPUFREQ_CREATE_POLICY)
--		ret = __cpufreq_stats_create_table(policy, table);
-+		ret = __cpufreq_stats_create_table(policy);
- 	else if (val == CPUFREQ_REMOVE_POLICY)
- 		__cpufreq_stats_free_table(policy);
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> Did you notice we are removing mach-virt now? Probably no point
+> mentioning it here.
+
+Peter, do we still want mach-virt support in QEMU then?
+
+Paolo
