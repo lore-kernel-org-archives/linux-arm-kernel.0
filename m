@@ -1,77 +1,48 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 26 Feb 2014 12:56:24 -0800
-Subject: [PATCH v8 06/14] CLK: TI: OMAP3: Get rid of unused USB Host dummy
- clocks
-In-Reply-To: <530C6323.90205@ti.com>
-References: <1392896409-5101-1-git-send-email-rogerq@ti.com>
- <1392896409-5101-7-git-send-email-rogerq@ti.com>
- <20140225084327.22529.86075@quantum> <530C6323.90205@ti.com>
-Message-ID: <20140226205624.12081.67770@quantum>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 26 Feb 2014 14:56:31 -0600
+Subject: [PATCH] ARM: move __fixup_smp out of init section
+In-Reply-To: <20140226122426.GX21483@n2100.arm.linux.org.uk>
+References: <1393352193-31717-1-git-send-email-robherring2@gmail.com>
+ <20140226122426.GX21483@n2100.arm.linux.org.uk>
+Message-ID: <CAL_Jsq+_2J7a0sB9UXmWLt4hX2oo1yUS5vbSQumCFA=yqacdSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Roger Quadros (2014-02-25 01:32:19)
-> Hi Mike,
-> 
-> On 02/25/2014 10:43 AM, Mike Turquette wrote:
-> > Quoting Roger Quadros (2014-02-20 03:40:01)
-> >> The OMAP USB Host MFD driver no longer expects these non-existing
-> >> clocks from the OMAP3 platform, so get rid of them.
-> > 
-> > Looks good to me.
-> 
-> Is it OK if I squash this patch with [1] and take it through the MFD tree?
-> Keeping them separate could break functionality if both don't go in together.
+On Wed, Feb 26, 2014 at 6:24 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Feb 25, 2014 at 12:16:33PM -0600, Rob Herring wrote:
+>> From: Rob Herring <robh@kernel.org>
+>>
+>> With large kernel builds such as allyesconfig exceeding maximum relative
+>> branch offsets, the init section will be too far away to branch to
+>> directly. This causes veneers to be added by the compiler, but veneers
+>
+> Don't you mean the linker?  The compiler isn't involved here.  Can
+> you show the disassembly of the veneer please?
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+Here is the call to fixup_smp:
 
-> 
-> [1] - http://article.gmane.org/gmane.linux.ports.arm.kernel/303266
-> 
-> cheers,
-> -roger
-> 
-> > 
-> >>
-> >> CC: Tero Kristo <t-kristo@ti.com>
-> >> CC: Mike Turquette <mturquette@linaro.org>
-> >> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> >> ---
-> >>  arch/arm/mach-omap2/cclock3xxx_data.c | 4 ----
-> >>  drivers/clk/ti/clk-3xxx.c             | 4 ----
-> >>  2 files changed, 8 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-omap2/cclock3xxx_data.c b/arch/arm/mach-omap2/cclock3xxx_data.c
-> >> index 3b05aea..4299a55 100644
-> >> --- a/arch/arm/mach-omap2/cclock3xxx_data.c
-> >> +++ b/arch/arm/mach-omap2/cclock3xxx_data.c
-> >> @@ -3495,10 +3495,6 @@ static struct omap_clk omap3xxx_clks[] = {
-> >>         CLK(NULL,       "dss_tv_fck",   &dss_tv_fck),
-> >>         CLK(NULL,       "dss_96m_fck",  &dss_96m_fck),
-> >>         CLK(NULL,       "dss2_alwon_fck",       &dss2_alwon_fck),
-> >> -       CLK(NULL,       "utmi_p1_gfclk",        &dummy_ck),
-> >> -       CLK(NULL,       "utmi_p2_gfclk",        &dummy_ck),
-> >> -       CLK(NULL,       "xclk60mhsp1_ck",       &dummy_ck),
-> >> -       CLK(NULL,       "xclk60mhsp2_ck",       &dummy_ck),
-> >>         CLK(NULL,       "init_60m_fclk",        &dummy_ck),
-> >>         CLK(NULL,       "gpt1_fck",     &gpt1_fck),
-> >>         CLK(NULL,       "aes2_ick",     &aes2_ick),
-> >> diff --git a/drivers/clk/ti/clk-3xxx.c b/drivers/clk/ti/clk-3xxx.c
-> >> index d323023..0d1750a 100644
-> >> --- a/drivers/clk/ti/clk-3xxx.c
-> >> +++ b/drivers/clk/ti/clk-3xxx.c
-> >> @@ -130,10 +130,6 @@ static struct ti_dt_clk omap3xxx_clks[] = {
-> >>         DT_CLK(NULL, "dss_tv_fck", "dss_tv_fck"),
-> >>         DT_CLK(NULL, "dss_96m_fck", "dss_96m_fck"),
-> >>         DT_CLK(NULL, "dss2_alwon_fck", "dss2_alwon_fck"),
-> >> -       DT_CLK(NULL, "utmi_p1_gfclk", "dummy_ck"),
-> >> -       DT_CLK(NULL, "utmi_p2_gfclk", "dummy_ck"),
-> >> -       DT_CLK(NULL, "xclk60mhsp1_ck", "dummy_ck"),
-> >> -       DT_CLK(NULL, "xclk60mhsp2_ck", "dummy_ck"),
-> >>         DT_CLK(NULL, "init_60m_fclk", "dummy_ck"),
-> >>         DT_CLK(NULL, "gpt1_fck", "gpt1_fck"),
-> >>         DT_CLK(NULL, "aes2_ick", "aes2_ick"),
-> >> -- 
-> >> 1.8.3.2
-> >>
-> 
+c0008054:       eb000058        bl      c00081bc <__vet_atags>
+c0008058:       eb00006a        bl      c0008208 <____fixup_smp_veneer>
+c000805c:       eb000042        bl      c000816c <__fixup_pv_table>
+c0008060:       eb000007        bl      c0008084 <__create_page_tables>
+
+Here's the veneer:
+
+c0008208 <____fixup_smp_veneer>:
+c0008208:       e51ff004        ldr     pc, [pc, #-4]   ; c000820c
+<____fixup_smp_veneer+0x4>
+c000820c:       c2659260        .word   0xc2659260
+
+>
+> I'm confused why the linker would add a veneer for this, but not for
+> the stuff built by the compiler.
+
+There are 1413 other symbols with veneer in my image. So it is not
+that the linker can't create them, but why it cannot for some as the
+image gets bigger. Does "text" in a section name have any functional
+impact on the linker? It seems veneers between .head.text and and
+init.text are created, but between *.text and .fixup, .proc.info, etc.
+they don't get created.
+
+Rob
