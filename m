@@ -1,45 +1,40 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 26 Feb 2014 11:35:09 -0800
-Subject: [PATCH] net: phy: add suspend_halted module param
-In-Reply-To: <20140226191009.GC14907@lunn.ch>
-References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140224191554.GC29288@lunn.ch> <530D1B7C.2090506@gmail.com>
- <20140226182117.GB14907@lunn.ch>
- <CAGVrzcYUfq84ryVET9qNJvyFCnhFdU4c0fOHbNN4eE8_w6qsAQ@mail.gmail.com>
- <20140226191009.GC14907@lunn.ch>
-Message-ID: <CAGVrzcb5k1JUPo0kvMdPJLCkWHb9qfHfDif08ud5ydKiKBwdHQ@mail.gmail.com>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Wed, 26 Feb 2014 11:38:09 -0800
+Subject: [PATCH v5 1/2] ARM: avoid tracers in soft_restart
+In-Reply-To: <1393443490-18116-1-git-send-email-sebastian.capella@linaro.org>
+References: <1393443490-18116-1-git-send-email-sebastian.capella@linaro.org>
+Message-ID: <1393443490-18116-2-git-send-email-sebastian.capella@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-02-26 11:10 GMT-08:00 Andrew Lunn <andrew@lunn.ch>:
->> > As to the comment from davem about not using a kernel parameter. How
->> > about turning it all around. Put a boolean parameter into DT PHY node
->> > to indicate when it is safe to power down an idle phy?
->>
->> Ah ah, nice try, but I do not think this belongs in DT, this is purely
->> a software issue here, powering up/down the PHY itself works as
->> expected.
->>
->> How about we have this knob a sysfs parameter? This should be easy
->> enough to tweak at runtime and debug in case thing go wrong.
->
-> With a kernel parameter i can place it into the bootargs of the chosen
-> node in DT. Solves the problem for everybody with a QNAP box. Same
-> goes for topkick and any other board which has a broken u-boot. A
-> sysfs parameter needs setting from user space, so it is not something
-> we can solve within the kernel.
+Use of tracers in local_irq_disable is causes recursive aborts when
+called with irqs disabled and using a temporary stack (hibernation).
+Replace local_irq_disable with raw_local_irq_disable instead to
+avoid tracers.
 
-David objected to a module parameter, a kernel parameter is not too
-different right?
+Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Robin Holt <robin.m.holt@gmail.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm/kernel/process.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The only case we need to handle is when the interface is brought down,
-suspend_halted=true will also power down the PHY, you reboot into
-u-boot, and you attempt a network boot right after that, in that case
-the PHY interface is still powered down and this does not work.
-
-That could be worked around by putting the interface up again before
-you reboot into u-boot right, that specific logic being gated by
-reading the board model. Agreed, you need to duplicate that workaround
-in all affected user-space....
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 92f7b15..f58b723 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -100,7 +100,7 @@ void soft_restart(unsigned long addr)
+ 	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
+ 
+ 	/* Disable interrupts first */
+-	local_irq_disable();
++	raw_local_irq_disable();
+ 	local_fiq_disable();
+ 
+ 	/* Disable the L2 if we're the last man standing. */
 -- 
-Florian
+1.7.9.5
