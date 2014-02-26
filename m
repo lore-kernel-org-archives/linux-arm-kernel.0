@@ -1,95 +1,83 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 26 Feb 2014 23:02:52 +0100
-Subject: [PATCH v8.1 1/6] dt-bindings: sram: describe option to reserve parts
- of the memory
-In-Reply-To: <201402251419.31151.arnd@arndb.de>
-References: <21117503.1c6iOkvYSr@phil> <126672712.tufE5adZWC@phil>
- <201402251419.31151.arnd@arndb.de>
-Message-ID: <2574291.evU61mFTUd@phil>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 26 Feb 2014 16:06:50 -0600
+Subject: [PATCH 3/4] ARM: dts: OMAP4: Add IOMMU nodes
+In-Reply-To: <5025565.C2g8cq3k2V@avalon>
+References: <1392315776-33197-1-git-send-email-s-anna@ti.com>
+ <1392315776-33197-4-git-send-email-s-anna@ti.com> <5025565.C2g8cq3k2V@avalon>
+Message-ID: <530E657A.4080600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoCs need parts of their sram for special purposes. So while being part
-of the peripheral, it should not be part of the genpool controlling the sram.
+Hi Laurent,
 
-Therefore add the option to define reserved regions as subnodes of the
-sram-node similar to defining reserved global memory regions.
+On 02/26/2014 03:05 PM, Laurent Pinchart wrote:
+> Hi Suman,
+>
+> Thank you for the patch.
+>
+> On Thursday 13 February 2014 12:22:55 Suman Anna wrote:
+>> From: Florian Vaussard <florian.vaussard@epfl.ch>
+>>
+>> Add the IOMMU nodes for the DSP and IPU subsystems. The external
+>> address space for DSP starts at 0x20000000 in OMAP4 compared to
+>> 0x11000000 in OMAP3, and the addresses beyond 0xE0000000 are
+>> private address space for the Cortex-M3 cores in the IPU subsystem.
+>> The MMU within the IPU sub-system also supports a bus error back
+>> capability, not available on the DSP MMU.
+>>
+>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>> [s-anna at ti.com: dma-window updates and bus error back addition]
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> ---
+>>   arch/arm/boot/dts/omap4.dtsi | 17 +++++++++++++++++
+>>   1 file changed, 17 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+>> index d3f8a6e..1885f90 100644
+>> --- a/arch/arm/boot/dts/omap4.dtsi
+>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>> @@ -461,6 +461,23 @@
+>>   			dma-names = "tx", "rx";
+>>   		};
+>>
+>> +		mmu_dsp: mmu at 4a066000 {
+>> +			compatible = "ti,omap4-iommu";
+>> +			reg = <0x4a066000 0xff>;
+>> +			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+>> +			ti,hwmods = "mmu_dsp";
+>> +			dma-window = <0x20000000 0xdffff000>;
+>> +		};
+>> +
+>> +		mmu_ipu: mmu at 55082000 {
+>> +			compatible = "ti,omap4-iommu";
+>> +			reg = <0x55082000 0xff>;
+>> +			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+>> +			ti,hwmods = "mmu_ipu";
+>> +			dma-window = <0 0xdffff000>;
+>
+> I'm not too familiar with the M3 MPU in the OMAP4, but doesn't its memory map
+> also include other reserved regions, such as 0x55040000- 0x5505ffff to access
+> the ISS ?
 
-Originally
-Suggested-by: Rob Herring <robherring2@gmail.com>
+The MMU integration into the M3 MPU subsystem is actually slightly 
+different to that seen on DSP in OMAP3. The M3 MPU subsystem actually 
+has one additional type of MMU, called the Attribute MMU/Unicache MMU 
+immediately after the M3 processor. It is programmed completely from the 
+M3, and is used mainly for setting the cache attributes and valid 
+address ranges and translations for accessing address ranges like the 
+ISS space. The L2 MMU interprets the remaining addresses, so yes, there 
+are certain other address ranges that never go through the L2MMU. The 
+dma-window values are used by omap-iovmm, but OMAP4 does not make use of 
+omap-iovmm.
 
-Using subnodes for reserved regions
-Suggested-by: Grant Likely <grant.likely@linaro.org>
+regards
+Suman
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
----
-Hi Arnd,
-
-I've changed the range definition as suggested. I've also changed my
-rockchip dt-files accordingly, but will wait with respinning the whole
-series until the direction with this binding is a bit safer.
-
-I've also amended the "compatible"-property for the subnodes. It now
-mimics the text from the generic reserved memory nodes [0],
-which got no complaints from the DT maintainers.
-
-Heiko
-
-
-[0] https://lkml.org/lkml/2014/2/4/172
-
- Documentation/devicetree/bindings/misc/sram.txt | 35 +++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
-index 4d0a00e..36cbe5a 100644
---- a/Documentation/devicetree/bindings/misc/sram.txt
-+++ b/Documentation/devicetree/bindings/misc/sram.txt
-@@ -8,9 +8,44 @@ Required properties:
- 
- - reg : SRAM iomem address range
- 
-+Reserving sram areas:
-+---------------------
-+
-+Each child of the sram node specifies a region of reserved memory. Each
-+child node should use a 'reg' property to specify a specific range of
-+reserved memory.
-+
-+Following the generic-names recommended practice, node names should
-+reflect the purpose of the node. Unit address (@<address>) should be
-+appended to the name.
-+
-+Required properties in the sram node:
-+
-+- #address-cells, #size-cells : should use the same values as the root node
-+- ranges : standard definition, should translate from local addresses
-+           within the sram to bus addresses
-+
-+Required properties in the area nodes:
-+
-+- reg : iomem address range, relative to the SRAM range
-+
-+Optional properties in the area nodes:
-+
-+- compatible : standard definition, should contain a vendor specific string
-+               in the form <vendor>,[<device>-]<usage>
-+
- Example:
- 
- sram: sram at 5c000000 {
- 	compatible = "mmio-sram";
- 	reg = <0x5c000000 0x40000>; /* 256 KiB SRAM at address 0x5c000000 */
-+
-+	#adress-cells = <1>;
-+	#size-cells = <1>;
-+	ranges = <0 0x5c000000 0x40000>;
-+
-+	smp-sram at 100 {
-+		compatible = "socvendor,smp-sram";
-+		reg = <0x100 0x50>;
-+	};
- };
--- 
-1.8.5.3
+>
+>> +			ti,iommu-bus-err-back;
+>> +		};
+>> +
+>>   		wdt2: wdt at 4a314000 {
+>>   			compatible = "ti,omap4-wdt", "ti,omap3-wdt";
+>>   			reg = <0x4a314000 0x80>;
+>
