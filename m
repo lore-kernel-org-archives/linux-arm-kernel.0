@@ -1,84 +1,59 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 26 Feb 2014 07:50:03 -0800
-Subject: [PATCH 1/8] PM / Runtime: Fetch runtime PM callbacks using a macro
-In-Reply-To: <1392910280-12891-2-git-send-email-ulf.hansson@linaro.org> (Ulf
- Hansson's message of "Thu, 20 Feb 2014 16:31:13 +0100")
-References: <1392910280-12891-1-git-send-email-ulf.hansson@linaro.org>
- <1392910280-12891-2-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <7htxblyitw.fsf@paris.lan>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 26 Feb 2014 09:56:24 -0600
+Subject: [PATCH v4 4/6] arm: add early_ioremap support
+In-Reply-To: <1393426760.26583.43.camel@deneb.redhat.com>
+References: <1392238575-10000-1-git-send-email-msalter@redhat.com>
+ <1392238575-10000-5-git-send-email-msalter@redhat.com>
+ <CAL_JsqLi=GhGy7dNf2BiAGd4EtzfqqYfbo0YhRhyhuwEp0w8HQ@mail.gmail.com>
+ <1393426760.26583.43.camel@deneb.redhat.com>
+Message-ID: <CAL_JsqKy3ZFpS_vXGv+wxX60c3=heURamH+gN=zLW9oR2VOkBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
-
-> While fetching the proper runtime PM callback, we walk the hierarchy of
-> device's power domains, subsystems and drivers.
+On Wed, Feb 26, 2014 at 8:59 AM, Mark Salter <msalter@redhat.com> wrote:
+> On Tue, 2014-02-25 at 23:48 -0600, Rob Herring wrote:
+>> > +#define NR_FIX_BTMAPS          32
+>> > +#define FIX_BTMAPS_SLOTS       7
+>> > +#define TOTAL_FIX_BTMAPS       (NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
+>> > +#define FIX_BTMAP_END          FIX_KMAP_BEGIN
+>> > +#define FIX_BTMAP_BEGIN                (FIX_BTMAP_END +
+>> TOTAL_FIX_BTMAPS - 1)
+>>
+>> Why the different logic from arm64? Specifically, it doesn't make
+>> adding a permanent mapping simple.
 >
-> This is common for rpm_suspend(), rpm_idle() and rpm_resume(). Let's
-> clean up the code by using a macro that handles this.
->
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Alessandro Rubini <rubini@unipv.it>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/base/power/runtime.c |   59 ++++++++++++++----------------------------
->  1 file changed, 20 insertions(+), 39 deletions(-)
->
-> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
-> index 72e00e6..dedbd64 100644
-> --- a/drivers/base/power/runtime.c
-> +++ b/drivers/base/power/runtime.c
-> @@ -13,6 +13,23 @@
->  #include <trace/events/rpm.h>
->  #include "power.h"
->  
-> +#define RPM_GET_CALLBACK(dev, cb)				\
-> +({								\
-> +	if (dev->pm_domain)					\
-> +		callback = dev->pm_domain->ops.cb;		\
-> +	else if (dev->type && dev->type->pm)			\
-> +		callback = dev->type->pm->cb;			\
-> +	else if (dev->class && dev->class->pm)			\
-> +		callback = dev->class->pm->cb;			\
-> +	else if (dev->bus && dev->bus->pm)			\
-> +		callback = dev->bus->pm->cb;			\
-> +	else							\
-> +		callback = NULL;				\
-> +								\
-> +	if (!callback && dev->driver && dev->driver->pm)	\
-> +		callback = dev->driver->pm->cb;			\
-> +})
-> +
->  static int rpm_resume(struct device *dev, int rpmflags);
->  static int rpm_suspend(struct device *dev, int rpmflags);
->  
-> @@ -310,19 +327,7 @@ static int rpm_idle(struct device *dev, int rpmflags)
->  
->  	dev->power.idle_notification = true;
->  
-> -	if (dev->pm_domain)
-> -		callback = dev->pm_domain->ops.runtime_idle;
-> -	else if (dev->type && dev->type->pm)
-> -		callback = dev->type->pm->runtime_idle;
-> -	else if (dev->class && dev->class->pm)
-> -		callback = dev->class->pm->runtime_idle;
-> -	else if (dev->bus && dev->bus->pm)
-> -		callback = dev->bus->pm->runtime_idle;
-> -	else
-> -		callback = NULL;
-> -
-> -	if (!callback && dev->driver && dev->driver->pm)
-> -		callback = dev->driver->pm->runtime_idle;
-> +	RPM_GET_CALLBACK(dev, runtime_idle);
+> I looked at adding support for permanent mappings but it was going to
+> take more time than I had. Also on ARM, we have to deal with kmap's
+> needs as well. Working that out was going to take more time than I
+> had. I think getting the patch in now to support early_ioremap is
+> the way to go. Adding support for permanent mappings can be done
+> later with the early console support for which it is needed.
 
-This macro sets the local 'callback' variable, but it's not at all
-obvious when reading the code.  macros with side-effects like this are a
-major readability problem.  Just use a function.
+I'm not saying that you should add permanent mappings, but just align
+the definitions across arches more. So make arm look something like
+this:
 
-Kevin
+enum fixed_addresses {
+       __end_of_permanent_fixed_addresses,
+
+       /*
+        * Temporary boot-time mappings, used by early_ioremap(),
+        * before ioremap() is functional.
+        */
+#define NR_FIX_BTMAPS          32
+#define FIX_BTMAPS_SLOTS       7
+#define TOTAL_FIX_BTMAPS       (NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
+
+      FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
+       FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
+       __end_of_fixed_addresses
+       FIX_KMAP_BEGIN = FIX_BTMAP_END,
+       FIX_KMAP_END = FIX_BTMAP_BEGIN,
+};
+
+These could then go into the generic header:
+
+#define FIXADDR_SIZE   (__end_of_permanent_fixed_addresses << PAGE_SHIFT)
+#define FIXADDR_START  (FIXADDR_TOP - FIXADDR_SIZE)
+
+Rob
