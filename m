@@ -1,64 +1,88 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 26 Feb 2014 10:24:27 +0000
-Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140225175531.18229.77850@capellas-linux>
-References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
- <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
- <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
- <20140222103840.GH21483@n2100.arm.linux.org.uk>
- <20140222120910.GA9012@e102568-lin.cambridge.arm.com>
- <20140223200208.12998.47604@capellas-linux>
- <20140225113251.GB6855@e102568-lin.cambridge.arm.com>
- <20140225175531.18229.77850@capellas-linux>
-Message-ID: <20140226102427.GA22839@e102568-lin.cambridge.arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 26 Feb 2014 11:27:18 +0100
+Subject: [PATCH v2 2/2] PCI: imx6: add support for MSI
+In-Reply-To: <1393410438-28205-1-git-send-email-l.stach@pengutronix.de>
+References: <1393410438-28205-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1393410438-28205-2-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 05:55:31PM +0000, Sebastian Capella wrote:
-> Quoting Lorenzo Pieralisi (2014-02-25 03:32:51)
-> > On Sun, Feb 23, 2014 at 08:02:08PM +0000, Sebastian Capella wrote:
-> > > I'll go with leaving the soft_restart as is unless someone feels
-> > > strongly against.
-> > 
-> > Leaving it as it is is fine for now, but should be commented, because that's
-> > not clear why it is needed by just reading the code.
-> 
-> Hi Lorenzo,
-> 
-> How is something like this?
-> 
-> /*
->  * Snapshot kernel memory and reset the system.
+From: Juergen Beisert <jbe@pengutronix.de>
 
-Please add:
+This patch adds support for Message Signaled Interrupt in the
+imx6q-pcie driver. It is done in a similar way as for the Exynos
+PCIe driver (commit f342d940ee0e3a2b5197fd4fbade1cb6bbc960b7),
+which is also using the Synopsys designware PCIe IP core.
 
-"swsusp_save() is executed in the suspend finisher so that the CPU context
-pointer and memory are part of the saved image, which is required by the
-resume kernel image to restart execution from swsusp_arch_suspend()"
+Signed-off-by: Harro Haan <hrhaan@gmail.com>
+Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+v2: fix typo MCI->MSI
+---
+ drivers/pci/host/pci-imx6.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
->  * soft_restart is not technically needed, but is used
->  * to get success returned from cpu_suspend.
->  * After resume, the hibernation snapshot is written out.
-
-"When soft reboot completes, the hibernation snapshot is written out."
-
-Resume is confusing since this code is resuming twice :D on image saving
-and on kernel image restoration.
-
-Lorenzo
-
->  */
-> static int notrace __swsusp_arch_save_image(unsigned long unused)
-> {
->         int ret;
-> 
->         ret = swsusp_save();
->         if (ret == 0)
->                 soft_restart(virt_to_phys(cpu_resume));
->         return ret;
-> }
-> 
-> Thanks again for all of the feedback!
-> 
-> Sebastian
-> 
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index ee082509b0ba..344a72184307 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -25,6 +25,7 @@
+ #include <linux/resource.h>
+ #include <linux/signal.h>
+ #include <linux/types.h>
++#include <linux/interrupt.h>
+ 
+ #include "pcie-designware.h"
+ 
+@@ -329,6 +330,17 @@ static int imx6_pcie_wait_for_link(struct pcie_port *pp)
+ 	return 0;
+ }
+ 
++/* legacy IRQD/MSI interrupt */
++static irqreturn_t imx6_pcie_irqd_msi_handler(int irq, void *arg)
++{
++	struct pcie_port *pp = arg;
++
++	if (IS_ENABLED(CONFIG_PCI_MSI))
++		dw_handle_msi_irq(pp);
++
++	return IRQ_HANDLED;
++}
++
+ static int imx6_pcie_start_link(struct pcie_port *pp)
+ {
+ 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+@@ -403,6 +415,9 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+ 	dw_pcie_setup_rc(pp);
+ 
+ 	imx6_pcie_start_link(pp);
++
++	if (IS_ENABLED(CONFIG_PCI_MSI))
++		dw_pcie_msi_init(pp);
+ }
+ 
+ static void imx6_pcie_reset_phy(struct pcie_port *pp)
+@@ -498,6 +513,20 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
+ 		return -ENODEV;
+ 	}
+ 
++	if (IS_ENABLED(CONFIG_PCI_MSI)) {
++		pp->msi_irq = platform_get_irq(pdev, 3);
++		if (!pp->msi_irq) {
++			dev_err(&pdev->dev, "failed to get INTD/MSI\n");
++			return -ENODEV;
++		}
++
++		ret = devm_request_irq(&pdev->dev, pp->msi_irq,
++					imx6_pcie_irqd_msi_handler,
++					IRQF_SHARED, "mx6-pcie-msi", pp);
++		if (ret)
++			dev_err(&pdev->dev, "failed to request INTD/MSI irq\n");
++	}
++
+ 	pp->root_bus_nr = -1;
+ 	pp->ops = &imx6_pcie_host_ops;
+ 
+-- 
+1.8.5.3
