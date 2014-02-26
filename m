@@ -1,266 +1,59 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 26 Feb 2014 10:59:59 +0100
-Subject: [PATCHv6][ 5/5] ARM: dts: mbimxsd35 Add video and displays support.
-In-Reply-To: <1393408800-8946-1-git-send-email-denis@eukrea.com>
-References: <1393408800-8946-1-git-send-email-denis@eukrea.com>
-Message-ID: <1393408800-8946-5-git-send-email-denis@eukrea.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 26 Feb 2014 18:59:16 +0900
+Subject: [PATCH] ARM: shmobile: Check r8a7791 MD21 at SMP boot
+Message-ID: <20140226095916.15676.99394.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: Eric B?nard <eric@eukrea.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
+From: Magnus Damm <damm@opensource.se>
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
+On r8a7791 the hardware boot mode bit MD21 indicates if hardware
+debug mode is enabled or not. In case hardware debug mode is enabled
+print a warning and refrain from booting secondary CPU cores.
+
+Without this patch Koelsch with SW8-4 set to OFF will hang at SMP boot.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
-ChangeLog v5->v6:
-- Shrinked the Cc list.
-- Added the targets in the Makefile
-- rebased not to use the now gone pingrp headers.
 
-ChangeLog v4->v5:
-- Added Grant Likely and Shawn Guo in the Cc list.
-- Adapted to the new non-dma ipu bindings.
+ This is a reworked version of the APMU patch previously posted as
+ [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
 
-ChangeLog v3->v4:
-- Shortened the licenses.
-- adapted the dts(i) to the new bindings.
-ChangeLog v2->v3:
-- The dts were adapted to the new DT bindings which looks more like the IPUv3
-  ones.
----
- arch/arm/boot/dts/Makefile                         |    3 +
- arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi       |   28 ++++++++++
- .../imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts  |   58 ++++++++++++++++++++
- .../imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts  |   47 ++++++++++++++++
- .../imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts   |   47 ++++++++++++++++
- 5 files changed, 183 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts
- create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts
- create mode 100644 arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts
+ Written against renesas-devel-v3.14-rc4-20140226
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index c98f343..ad0915e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -167,6 +167,9 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx27-phytec-phycard-s-rdk.dtb \
- 	imx31-bug.dtb \
- 	imx35-eukrea-mbimxsd35-baseboard.dtb \
-+	imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dtb \
-+	imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dtb \
-+	imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dtb \
- 	imx50-evk.dtb \
- 	imx51-apf51.dtb \
- 	imx51-apf51dev.dtb \
-diff --git a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-index 906ae93..6596009 100644
---- a/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-+++ b/arch/arm/boot/dts/imx35-eukrea-cpuimx35.dtsi
-@@ -70,6 +70,34 @@
- 				MX35_PAD_I2C1_DAT__I2C1_SDA		0x80000000
- 			>;
- 		};
-+
-+		pinctrl_ipu_disp0: ipudisp0grp {
-+			fsl,pins = <
-+				MX35_PAD_LD0__IPU_DISPB_DAT_0         0x80000000
-+				MX35_PAD_LD1__IPU_DISPB_DAT_1         0x80000000
-+				MX35_PAD_LD2__IPU_DISPB_DAT_2         0x80000000
-+				MX35_PAD_LD3__IPU_DISPB_DAT_3         0x80000000
-+				MX35_PAD_LD4__IPU_DISPB_DAT_4         0x80000000
-+				MX35_PAD_LD5__IPU_DISPB_DAT_5         0x80000000
-+				MX35_PAD_LD6__IPU_DISPB_DAT_6         0x80000000
-+				MX35_PAD_LD7__IPU_DISPB_DAT_7         0x80000000
-+				MX35_PAD_LD8__IPU_DISPB_DAT_8         0x80000000
-+				MX35_PAD_LD9__IPU_DISPB_DAT_9         0x80000000
-+				MX35_PAD_LD10__IPU_DISPB_DAT_10       0x80000000
-+				MX35_PAD_LD11__IPU_DISPB_DAT_11       0x80000000
-+				MX35_PAD_LD12__IPU_DISPB_DAT_12       0x80000000
-+				MX35_PAD_LD13__IPU_DISPB_DAT_13       0x80000000
-+				MX35_PAD_LD14__IPU_DISPB_DAT_14       0x80000000
-+				MX35_PAD_LD15__IPU_DISPB_DAT_15       0x80000000
-+				MX35_PAD_LD16__IPU_DISPB_DAT_16       0x80000000
-+				MX35_PAD_LD17__IPU_DISPB_DAT_17       0x80000000
-+				MX35_PAD_D3_HSYNC__IPU_DISPB_D3_HSYNC 0x80000000
-+				MX35_PAD_D3_FPSHIFT__IPU_DISPB_D3_CLK 0x80000000
-+				MX35_PAD_D3_DRDY__IPU_DISPB_D3_DRDY   0x80000000
-+				MX35_PAD_D3_VSYNC__IPU_DISPB_D3_VSYNC 0x80000000
-+				MX35_PAD_CONTRAST__IPU_DISPB_CONTR    0x80000000
-+			>;
-+		};
- 	};
- };
+ arch/arm/mach-shmobile/smp-r8a7791.c |   15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+--- 0001/arch/arm/mach-shmobile/smp-r8a7791.c
++++ work/arch/arm/mach-shmobile/smp-r8a7791.c	2014-02-26 18:49:39.000000000 +0900
+@@ -20,6 +20,7 @@
+ #include <asm/smp_plat.h>
+ #include <mach/common.h>
+ #include <mach/r8a7791.h>
++#include <mach/rcar-gen2.h>
  
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts
-new file mode 100644
-index 0000000..345f560
---- /dev/null
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-cmo-qvga.dts
-@@ -0,0 +1,58 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
+ #define RST		0xe6160000
+ #define CA15BAR		0x0020
+@@ -51,9 +52,21 @@ static void __init r8a7791_smp_prepare_c
+ 	iounmap(p);
+ }
+ 
++static int r8a7791_smp_boot_secondary(unsigned int cpu,
++				      struct task_struct *idle)
++{
++	/* Error out when hardware debug mode is enabled */
++	if (rcar_gen2_read_mode_pins() & BIT(21)) {
++		pr_warn("Unable to boot CPU%u when MD21 is set\n", cpu);
++		return -ENOTSUPP;
++	}
 +
-+#include "imx35-eukrea-mbimxsd35-baseboard.dts"
++	return shmobile_smp_apmu_boot_secondary(cpu, idle);
++}
 +
-+/ {
-+	model = "Eukrea MBIMXSD35 with the CMO-QVGA Display";
-+	compatible = "eukrea,mbimxsd35-baseboard-cmo-qvga", "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
-+
-+	cmo_qvga: display at di0 {
-+		compatible = "fsl,mx3-parallel-display";
-+		regulator-name = "lcd";
-+		interface-pix-fmt = "rgb666";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ipu_disp0>;
-+		lcd-supply = <&reg_lcd_3v3>;
-+		model = "CMO-QVGA";
-+		display-timings {
-+			qvga_timings: 320x240 {
-+				clock-frequency = <6500000>;
-+				hactive = <320>;
-+				vactive = <240>;
-+				hback-porch = <68>;
-+				hfront-porch = <20>;
-+				vback-porch = <15>;
-+				vfront-porch = <4>;
-+				hsync-len = <30>;
-+				vsync-len = <3>;
-+			};
-+		};
-+	};
-+
-+	reg_lcd_3v3: lcd-en {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_reg_lcd_3v3>;
-+		regulator-name = "lcd";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio1 4 0>;
-+		enable-active-high;
-+	};
-+};
-+
-+&ipu {
-+	display = <&cmo_qvga>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts
-new file mode 100644
-index 0000000..1a249d0
---- /dev/null
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-svga.dts
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx35-eukrea-mbimxsd35-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD35 with the DVI-SVGA Display";
-+	compatible = "eukrea,mbimxsd35-baseboard-dvi-svga", "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
-+	dvi_svga: display at di0 {
-+		interface-pix-fmt = "rgb666";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ipu_disp0>;
-+		model = "DVI-SVGA";
-+		display-timings {
-+			svga_timings: 800x600 {
-+				clock-frequency = <40000000>;
-+				hactive = <800>;
-+				vactive = <600>;
-+				hback-porch = <75>;
-+				hfront-porch = <75>;
-+				vback-porch = <7>;
-+				vfront-porch = <75>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
-+			};
-+		};
-+	};
-+};
-+
-+&ipu {
-+	display = <&dvi_svga>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts
-new file mode 100644
-index 0000000..44a7616
---- /dev/null
-+++ b/arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard-dvi-vga.dts
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright 2013 Eukr?a Electromatique <denis@eukrea.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "imx35-eukrea-mbimxsd35-baseboard.dts"
-+
-+/ {
-+	model = "Eukrea MBIMXSD35 with the DVI-VGA Display";
-+	compatible = "eukrea,mbimxsd35-baseboard-dvi-vga", "eukrea,mbimxsd35-baseboard", "eukrea,cpuimx35", "fsl,imx35";
-+	dvi_vga: display at di0 {
-+		interface-pix-fmt = "rgb666";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ipu_disp0>;
-+		model = "DVI-VGA";
-+		display-timings {
-+			vga_timings: 640x480 {
-+				clock-frequency = <31250000>;
-+				hactive = <640>;
-+				vactive = <480>;
-+				hback-porch = <100>;
-+				hfront-porch = <100>;
-+				vback-porch = <7>;
-+				vfront-porch = <100>;
-+				hsync-len = <7>;
-+				vsync-len = <7>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
-+			};
-+		};
-+	};
-+};
-+
-+&ipu {
-+	display = <&dvi_vga>;
-+	status = "okay";
-+};
--- 
-1.7.9.5
+ struct smp_operations r8a7791_smp_ops __initdata = {
+ 	.smp_prepare_cpus	= r8a7791_smp_prepare_cpus,
+-	.smp_boot_secondary	= shmobile_smp_apmu_boot_secondary,
++	.smp_boot_secondary	= r8a7791_smp_boot_secondary,
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_disable		= shmobile_smp_cpu_disable,
+ 	.cpu_die		= shmobile_smp_apmu_cpu_die,
