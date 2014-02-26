@@ -1,43 +1,30 @@
-From: mohun106@gmail.com (Radha Mohan)
-Date: Wed, 26 Feb 2014 19:57:12 +0530
-Subject: [RFC PATCH 1/1] arm64: Add support for 48-bit Physical Address
-In-Reply-To: <20140226140821.GD7409@arm.com>
-References: <1393394310-6138-1-git-send-email-mohun106@gmail.com>
- <1393394310-6138-2-git-send-email-mohun106@gmail.com>
- <530DF0FE.3050602@codeaurora.org> <20140226140821.GD7409@arm.com>
-Message-ID: <CAC8NTUVWiAUJFda95dQdyaS39jykARggoPy0ggmuxUp=0orUsw@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 26 Feb 2014 06:22:03 -0800
+Subject: [PATCH 2/4] arm: qcom: Split Qualcomm support into legacy and
+ multiplatform
+In-Reply-To: <1391107002-21470-3-git-send-email-galak@codeaurora.org> (Kumar
+ Gala's message of "Thu, 30 Jan 2014 12:36:40 -0600")
+References: <1391107002-21470-1-git-send-email-galak@codeaurora.org>
+ <1391107002-21470-3-git-send-email-galak@codeaurora.org>
+Message-ID: <7hha7m0x9w.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 7:38 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Wed, Feb 26, 2014 at 01:49:50PM +0000, Christopher Covington wrote:
->> On 02/26/2014 12:58 AM, mohun106 at gmail.com wrote:
->> > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->> >
->> > Added support for ARMv8 platforms that have 48-bit physical address
->> > implemented. There is no change in the VA bits and levels of
->> > translation.
->>
->> Is there benefit to using build-time constants for this information? Why not
->> look up the physical address range at run time, so that a single kernel binary
->> could run on any system?
+Kumar Gala <galak@codeaurora.org> writes:
+
+> Introduce a new mach-qcom that will support SoCs that intend to be
+> multiplatform compatiable while keeping mach-msm to legacy SoC/board
+> support that will not transition over to multiplatform.
 >
-> I agree, we don't need a Kconfig option for this, just check the
-> available (intermediate) physical address bits at boot-time
-> (ID_AA64MMFR0_EL1) and program the TCR_ELx registers accordingly.
+> As part of this, we move support for MSM8X60, MSM8960 and MSM8974 over
+> to mach-qcom.
 >
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
 
-OK, I will redo with the proposed changes.
+Having a closer look at this after seeing the multi_v7_defconfig change,
+I have a minor nit on the new ARCH_QCOM name.
 
-> (for whatever reason, I got the same patches in private and I replied
-> with the same but they haven't been changed before appearing on the
-> list)
->
-Oops, I did miss that mail.
+For new additions, we've been trying to move towards using SOC_foo
+instead of ARCH_foo.  Any reason not to do that here also?
 
-regards,
-Radha
-
-> --
-> Catalin
+Kevin
