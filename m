@@ -1,85 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 26 Feb 2014 15:28:35 +0800
-Subject: [PATCH RESEND] ARM: imx6: build pm-imx6q.c independently of
- CONFIG_PM
-In-Reply-To: <201402252046.04144.arnd@arndb.de>
-References: <1392690905-16839-1-git-send-email-shawn.guo@linaro.org>
- <201402252046.04144.arnd@arndb.de>
-Message-ID: <20140226072833.GA23892@S2101-09.ap.freescale.net>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 26 Feb 2014 16:33:18 +0900
+Subject: [PATCH v3 02/20] clk: shmobile: r8a7779: Add MSTP clock support
+In-Reply-To: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1393400016-23433-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 08:46:03PM +0100, Arnd Bergmann wrote:
-> On Tuesday 18 February 2014, Shawn Guo wrote:
-> > When building a kernel image with only CONFIG_CPU_IDLE but no CONFIG_PM,
-> > we will get the following link error.
-> > 
-> 
-> I seem to need more changes on top of this, to allow building with neither
-> CPU_IDLE nor PM enabled. Can you verify that?
+Add MSTP clock support for the r8a7779 SoC
 
-The error is only seen on the linux-next, and partially caused by the
-resolution for the conflict between this patch and the ones I queued for
-3.15.  I'm rebasing my imx-soc-3.15 branch to 3.14-rc4, so that the
-conflict can be solved on my branch in a cleaner way, which will help
-fix the error here.  So hopefully, in the next build of linux-next, the
-error will disappear.
+The only change required appears to be to note a new
+compatibility string in the bindings.
 
-Shawn
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-> 
-> 	Arnd
-> 
-> commit 6a434aea44d8a250f8ee2205be9bc429b140b663
-> Author: Arnd Bergmann <arnd@arndb.de>
-> Date:   Mon Feb 24 22:19:50 2014 +0100
-> 
->     ARM: imx: more CONFIG_PM fixes
->     
->     This lets us build the imx code in more configurations.
->     
->     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> index a3fcd9c..a367675 100644
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -147,15 +147,13 @@ int imx_cpu_kill(unsigned int cpu);
->  
->  void imx6q_pm_init(void);
->  void imx6q_pm_set_ccm_base(void __iomem *base);
-> -#ifdef CONFIG_PM
-> -void imx6_suspend(void __iomem *ocram_vbase);
->  void imx6dl_pm_init(void);
->  void imx6sl_pm_init(void);
-> +#ifdef CONFIG_PM
-> +void imx6_suspend(void __iomem *ocram_vbase);
->  void imx5_pm_init(void);
->  #else
->  static inline void imx6_suspend(void __iomem *ocram_vbase) {}
-> -static inline void imx6dl_pm_init(void) {}
-> -static inline void imx6sl_pm_init(void) {}
->  static inline void imx5_pm_init(void) {}
->  #endif
->  
-> diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-> index bb69943..5fea999 100644
-> --- a/arch/arm/mach-imx/pm-imx6q.c
-> +++ b/arch/arm/mach-imx/pm-imx6q.c
-> @@ -521,10 +521,12 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
->  
->  	WARN_ON(!ccm_base);
->  
-> -	ret = imx6q_ocram_suspend_init(socdata);
-> -	if (ret)
-> -		pr_warn("%s: failed to initialize ocram suspend %d!\n",
-> -			__func__, ret);
-> +	if (IS_ENABLED(CONFIG_ARM_CPU_SUSPEND)) {
-> +		ret = imx6q_ocram_suspend_init(socdata);
-> +		if (ret)
-> +			pr_warn("%s: failed to initialize ocram suspend %d!\n",
-> +				__func__, ret);
-> +	}
->  
->  	/*
->  	 * This is for SW workaround step #1 of ERR007265, see comments
+---
+v3
+* As suggested by Laurent Pinchart
+  - Add entry in numerical order
+---
+ Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+index a6a352c..f3226ac 100644
+--- a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
++++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+@@ -10,6 +10,7 @@ index in the group, from 0 to 31.
+ Required Properties:
+ 
+   - compatible: Must be one of the following
++    - "renesas,r8a7779-mstp-clocks" for R8A7779 (R-Car H1) MSTP gate clocks
+     - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate clocks
+     - "renesas,r8a7791-mstp-clocks" for R8A7791 (R-Car M2) MSTP gate clocks
+     - "renesas,cpg-mstp-clock" for generic MSTP gate clocks
+-- 
+1.8.5.2
