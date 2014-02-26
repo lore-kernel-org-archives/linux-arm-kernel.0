@@ -1,48 +1,65 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 26 Feb 2014 17:02:17 +0100
-Subject: [PATCH 14/15] ASoC: fsl-ssi: Transmit enable synchronization
+Date: Wed, 26 Feb 2014 17:02:18 +0100
+Subject: [PATCH 15/15] ASoC: fsl-ssi: Update binding documentation
 In-Reply-To: <1393430538-32333-1-git-send-email-mpa@pengutronix.de>
 References: <1393430538-32333-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1393430538-32333-15-git-send-email-mpa@pengutronix.de>
+Message-ID: <1393430538-32333-16-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the fsl-ssi unit is used in i2s slave mode, it is possible that the
-SSI unit starts transmitting data on the wrong channel. This happens
-because the SSI does not synchronize with the left-right-clock by
-default.
-
-This patch enables transmit enable synchronization.
+A lot of bindings where changed without an update of the binding
+documentation. This patch adds those changes to the documentation.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/fsl_ssi.c | 1 +
- sound/soc/fsl/fsl_ssi.h | 1 +
- 2 files changed, 2 insertions(+)
+ Documentation/devicetree/bindings/sound/fsl,ssi.txt | 21 ++++++++++++---------
+ 1 file changed, 12 insertions(+), 9 deletions(-)
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index 56dbd77..3b0dffd 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -615,6 +615,7 @@ static int _fsl_ssi_set_dai_fmt(struct fsl_ssi_private *ssi_private,
- 	regmap_read(regs, CCSR_SSI_SCR, &scr);
- 	scr &= ~(CCSR_SSI_SCR_SYN | CCSR_SSI_SCR_I2S_MODE_MASK);
- 	scr |= CCSR_SSI_SCR_NET;
-+	scr |= CCSR_SSI_SCR_SYNC_TX_FS;
+diff --git a/Documentation/devicetree/bindings/sound/fsl,ssi.txt b/Documentation/devicetree/bindings/sound/fsl,ssi.txt
+index b93e9a9..3aa4a8f 100644
+--- a/Documentation/devicetree/bindings/sound/fsl,ssi.txt
++++ b/Documentation/devicetree/bindings/sound/fsl,ssi.txt
+@@ -20,15 +20,6 @@ Required properties:
+                     have.
+ - interrupt-parent: The phandle for the interrupt controller that
+                     services interrupts for this device.
+-- fsl,mode:         The operating mode for the SSI interface.
+-                    "i2s-slave" - I2S mode, SSI is clock slave
+-                    "i2s-master" - I2S mode, SSI is clock master
+-                    "lj-slave" - left-justified mode, SSI is clock slave
+-                    "lj-master" - l.j. mode, SSI is clock master
+-                    "rj-slave" - right-justified mode, SSI is clock slave
+-                    "rj-master" - r.j., SSI is clock master
+-                    "ac97-slave" - AC97 mode, SSI is clock slave
+-                    "ac97-master" - AC97 mode, SSI is clock master
+ - fsl,playback-dma: Phandle to a node for the DMA channel to use for
+                     playback of audio.  This is typically dictated by SOC
+                     design.  See the notes below.
+@@ -47,6 +38,9 @@ Required properties:
+                     be connected together, and SRFS and STFS be connected
+                     together.  This would still allow different sample sizes,
+                     but not different sample rates.
++ - clocks:          "ipg" - Required clock for the SSI unit
++                    "baud" - Required clock for SSI master mode. Otherwise this
++		      clock is not used
  
- 	mask = CCSR_SSI_STCR_TXBIT0 | CCSR_SSI_STCR_TFDIR | CCSR_SSI_STCR_TXDIR |
- 		CCSR_SSI_STCR_TSCKP | CCSR_SSI_STCR_TFSI | CCSR_SSI_STCR_TFSL |
-diff --git a/sound/soc/fsl/fsl_ssi.h b/sound/soc/fsl/fsl_ssi.h
-index d5b7feb..5065105 100644
---- a/sound/soc/fsl/fsl_ssi.h
-+++ b/sound/soc/fsl/fsl_ssi.h
-@@ -37,6 +37,7 @@
- #define CCSR_SSI_SACCEN			0x54
- #define CCSR_SSI_SACCDIS		0x58
+ Required are also ac97 link bindings if ac97 is used. See
+ Documentation/devicetree/bindings/sound/soc-ac97link.txt for the necessary
+@@ -64,6 +58,15 @@ Optional properties:
+ 		    Documentation/devicetree/bindings/dma/dma.txt.
+ - dma-names:	    Two dmas have to be defined, "tx" and "rx", if fsl,imx-fiq
+ 		    is not defined.
++- fsl,mode:         The operating mode for the SSI interface.
++                    "i2s-slave" - I2S mode, SSI is clock slave
++                    "i2s-master" - I2S mode, SSI is clock master
++                    "lj-slave" - left-justified mode, SSI is clock slave
++                    "lj-master" - l.j. mode, SSI is clock master
++                    "rj-slave" - right-justified mode, SSI is clock slave
++                    "rj-master" - r.j., SSI is clock master
++                    "ac97-slave" - AC97 mode, SSI is clock slave
++                    "ac97-master" - AC97 mode, SSI is clock master
  
-+#define CCSR_SSI_SCR_SYNC_TX_FS		0x00001000
- #define CCSR_SSI_SCR_RFR_CLK_DIS	0x00000800
- #define CCSR_SSI_SCR_TFR_CLK_DIS	0x00000400
- #define CCSR_SSI_SCR_TCH_EN		0x00000100
+ Child 'codec' node required properties:
+ - compatible:       Compatible list, contains the name of the codec
 -- 
 1.8.5.3
