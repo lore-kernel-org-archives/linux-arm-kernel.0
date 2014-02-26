@@ -1,193 +1,102 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 26 Feb 2014 11:51:08 +0000
-Subject: [PATCH v5 01/11] of: document bindings for reserved-memory nodes
-In-Reply-To: <1392985527-6260-2-git-send-email-m.szyprowski@samsung.com>
-References: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com> <
- 1392985527-6260-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20140226115108.211D2C40A89@trevor.secretlab.ca>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 26 Feb 2014 12:01:04 +0000
+Subject: [PATCH v5 2/4] devicetree: bindings: Document Krait CPU/L1 EDAC
+In-Reply-To: <E34E6789-03BC-452C-9053-82CA1D027861@codeaurora.org>
+References: <20140115165623.GJ14405@codeaurora.org>
+ <20140116013840.GA674@codeaurora.org>
+ <20140116113332.GC25540@e102568-lin.cambridge.arm.com>
+ <20140116180505.GA30925@codeaurora.org>
+ <20140116183326.GG25540@e102568-lin.cambridge.arm.com>
+ <20140116192617.GA13785@codeaurora.org>
+ <20140117102109.GA22544@e102568-lin.cambridge.arm.com>
+ <20140219002043.GE14769@codeaurora.org>
+ <20140225111655.GA6855@e102568-lin.cambridge.arm.com>
+ <E34E6789-03BC-452C-9053-82CA1D027861@codeaurora.org>
+Message-ID: <20140226120103.GA25326@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Feb 2014 13:25:17 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> From: Grant Likely <grant.likely@linaro.org>
+On Tue, Feb 25, 2014 at 08:48:38PM +0000, Kumar Gala wrote:
 > 
-> Reserved memory nodes allow for the reservation of static (fixed
-> address) regions, or dynamically allocated regions for a specific
-> purpose.
+> On Feb 25, 2014, at 5:16 AM, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
 > 
-> Signed-off-by: Grant Likely <grant.likely@linaro.org>
-> [joshc: Based on binding document proposed (in non-patch form) here:
->  http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
->  adapted to support #memory-region-cells]
-> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  .../bindings/reserved-memory/reserved-memory.txt   |  138 ++++++++++++++++++++
->  1 file changed, 138 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> > Hi Stephen,
+> > 
+> > On Wed, Feb 19, 2014 at 12:20:43AM +0000, Stephen Boyd wrote:
+> >> (Sorry, this discussion stalled due to merge window + life events)
+> > 
+> > Sorry for the delay in replying on my side too.
+> > 
+> >> On 01/17, Lorenzo Pieralisi wrote:
+> >>> On Thu, Jan 16, 2014 at 07:26:17PM +0000, Stephen Boyd wrote:
+> >>>> On 01/16, Lorenzo Pieralisi wrote:
+> >>>>> On Thu, Jan 16, 2014 at 06:05:05PM +0000, Stephen Boyd wrote:
+> >>>>>> On 01/16, Lorenzo Pieralisi wrote:
+> >>>>>>> Do we really want to do that ? I am not sure. A cpus node is supposed to
+> >>>>>>> be a container node, we should not define this binding just because we
+> >>>>>>> know the kernel creates a platform device for it then.
+> >>>>>> 
+> >>>>>> This is just copying more of the ePAPR spec into this document.
+> >>>>>> It just so happens that having a compatible field here allows a
+> >>>>>> platform device to be created. I don't see why that's a problem.
+> >>>>> 
+> >>>>> I do not see why you cannot define a node like pmu or arch-timer and stick
+> >>>>> a compatible property in there. cpus node does not represent a device, and
+> >>>>> must not be created as a platform device, that's my opinion.
+> >>>>> 
+> >>>> 
+> >>>> I had what you're suggesting before in the original revision of
+> >>>> this patch. Please take a look at the original patch series[1]. I
+> >>>> suppose it could be tweaked slightly to still have a cache node
+> >>>> for the L2 interrupt and the next-level-cache pointer from the
+> >>>> CPUs.
+> >>> 
+> >>> Ok, sorry, we are running around in circles here, basically you moved
+> >>> the node to cpus according to reviews. I still think that treating cpus
+> >>> as a device is not a great idea, even though I am in the same
+> >>> position with C-states and probably will add C-state tables in the cpus
+> >>> node.
+> >>> 
+> >>> http://comments.gmane.org/gmane.linux.power-management.general/41012
+> >>> 
+> >>> I just would like to see under cpus nodes and properties that apply to
+> >>> all ARM systems, and avoid defining properties (eg interrupts) that
+> >>> have different meanings for different ARM cores.
+> >>> 
+> >>> The question related to why the kernel should create a platform device
+> >>> out of cpus is still open. I really do not want to block your series
+> >>> for these simple issues but we have to make a decision and stick to that,
+> >>> I am fine either way if we have a plan.
+> >>> 
+> >> 
+> >> Do you just want a backup plan in case we don't make a platform
+> >> device out of the cpus node? I believe we can always add code
+> >> somewhere to create a platform device at runtime if we detect the
+> >> cpus node has a compatible string equal to "qcom,krait". We could
+> >> probably change this driver's module_init() to scan the DT for
+> >> such a compatible string and create the platform device right
+> >> there. If we get more than one interrupt in the cpus node we can
+> >> add interrupt-names and then have software look for interrupts by
+> >> name instead of number.
+> > 
+> > As I mentioned, I do not like the idea of adding compatible properties
+> > just to force the kernel to create platform devices out of device tree
+> > nodes. On top of that I would avoid adding a compatible property
+> > to the cpus node (after all properties like enable-method are common for all
+> > cpus but still duplicated), my only concern being backward compatibility
+> > here (ie if we do that for interrupts, we should do that also for other
+> > common cpu nodes properties, otherwise we have different rules for
+> > different properties).
+> > 
+> > I think you can then add interrupts to cpu nodes ("qcom,krait" specific),
+> > and as you mentioned create a platform device for that.
+> > 
+> > Thanks,
+> > Lorenzo
 > 
-> diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-> new file mode 100644
-> index 000000000000..a606ce90c9c4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-> @@ -0,0 +1,138 @@
-> +*** Reserved memory regions ***
-> +
-> +Reserved memory is specified as a node under the /reserved-memory node.
-> +The operating system shall exclude reserved memory from normal usage
-> +one can create child nodes describing particular reserved (excluded from
-> +normal use) memory regions. Such memory regions are usually designed for
-> +the special usage by various device drivers.
-> +
-> +Parameters for each memory region can be encoded into the device tree
-> +with the following nodes:
-> +
-> +/reserved-memory node
-> +---------------------
-> +#address-cells, #size-cells (required) - standard definition
-> +    - Should use the same values as the root node
-> +#memory-region-cells (required) - dictates number of cells used in the child
-> +                                  nodes memory-region specifier
+> So I agree with the statement about adding compatibles just to create platform devices is wrong.  However its seems perfectly reasonable for a cpu node to have a compatible property.  I don't see why a CPU is any different from any other device described in a DT.
 
-I still don't like this portion of the binding. I'm not convinced that
-it is necessary in the majority of cases and it is going to be very
-driver specific. I would rather drop it entirely from the common
-binding. If a specific driver needs to do something like the above then
-it can have a driver specific binding. Otherwise I think the default
-should be a simple phandle with no arguments to a single reserved memory
-node.
+I was referring to the /cpus node, not to individual cpu nodes, where
+the compatible property is already present now.
 
-Ben, can you weigh in on the current state of this document. I'm mostly
-happy with it aside from my comment above. Do you think this is ready to
-be merged?
-
-> +ranges (required) - standard definition
-> +    - Should be empty
-> +
-> +/reserved-memory/ child nodes
-> +-----------------------------
-> +Each child of the reserved-memory node specifies one or more regions of
-> +reserved memory. Each child node may either use a 'reg' property to
-> +specify a specific range of reserved memory, or a 'size' property with
-> +optional constraints to request a dynamically allocated block of memory.
-> +
-> +Following the generic-names recommended practice, node names should
-> +reflect the purpose of the node (ie. "framebuffer" or "dma-pool"). Unit
-> +address (@<address>) should be appended to the name if the node is a
-> +static allocation.
-> +
-> +Properties:
-> +Requires either a) or b) below.
-> +a) static allocation
-> +   reg (required) - standard definition
-> +b) dynamic allocation
-> +   size (required) - length based on parent's #size-cells
-> +                   - Size in bytes of memory to reserve.
-> +   alignment (optional) - length based on parent's #size-cells
-> +                        - Address boundary for alignment of allocation.
-> +   alloc-ranges (optional) - prop-encoded-array (address, length pairs).
-> +                           - Specifies regions of memory that are
-> +                             acceptable to allocate from.
-> +
-> +If both reg and size are present, then the reg property takes precedence
-> +and size is ignored.
-> +
-> +Additional properties:
-> +compatible (optional) - standard definition
-> +    - may contain the following strings:
-> +        - shared-dma-pool: This indicates a region of memory meant to be
-> +          used as a shared pool of DMA buffers for a set of devices. It can
-> +          be used by an operating system to instanciate the necessary pool
-> +          management subsystem if necessary.
-> +        - vendor specific string in the form <vendor>,[<device>-]<usage>
-
-Add "Use vendor strings to identify regions dedicates for a specific
-vendor device. For example: 'acme,framebuffer'. Platform code can use vendor
-strings to identify device specific regions"
-
-> +no-map (optional) - empty property
-> +    - Indicates the operating system must not create a virtual mapping
-> +      of the region as part of its standard mapping of system memory,
-> +      nor permit speculative access to it under any circumstances other
-> +      than under the control of the device driver using the region.
-> +reusable (optional) - empty property
-> +    - The operating system can use the memory in this region with the
-> +      limitation that the device driver(s) owning the region need to be
-> +      able to reclaim it back. Typically that means that the operating
-> +      system can use that region to store volatile or cached data that
-> +      can be otherwise regenerated or migrated elsewhere.
-> +
-> +Linux implementation note:
-> +- If a "linux,cma-default" property is present, then Linux will use the
-> +  region for the default pool of the contiguous memory allocator.
-> +
-> +Device node references to reserved memory
-> +-----------------------------------------
-> +Regions in the /reserved-memory node may be referenced by other device
-> +nodes by adding a memory-region property to the device node.
-> +
-> +memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
-> +
-> +Example
-> +-------
-> +This example defines 3 contiguous regions are defined for Linux kernel:
-> +one default of all device drivers (named linux,cma at 72000000 and 64MiB in size),
-> +one dedicated to the framebuffer device (named framebuffer at 78000000, 8MiB), and
-> +one for multimedia processing (named multimedia-memory at 77000000, 64MiB).
-> +
-> +/ {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	memory {
-> +		reg = <0x40000000 0x40000000>;
-> +	};
-> +
-> +	reserved-memory {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		/* global autoconfigured region for contiguous allocations */
-> +		linux,cma {
-> +			compatible = "shared-dma-pool";
-> +			reusable;
-> +			#memory-region-cells = <0>;
-> +			size = <0x4000000>;
-> +			alignment = <0x2000>;
-> +			linux,cma-default;
-> +		};
-> +
-> +		display_reserved: framebuffer at 78000000 {
-> +			#memory-region-cells = <0>;
-> +			reg = <0x78000000 0x800000>;
-> +		};
-> +
-> +		multimedia_reserved: multimedia at 77000000 {
-> +			compatible = "acme,multimedia-memory";
-> +			#memory-region-cells = <1>;
-> +			reg = <0x77000000 0x4000000>;
-> +		};
-> +	};
-> +
-> +	/* ... */
-> +
-> +	fb0: video at 12300000 {
-> +		memory-region = <&display_reserved>;
-> +		/* ... */
-> +	};
-> +
-> +	scaler: scaler at 12500000 {
-> +		memory-region = <&multimedia_reserved 0xdeadbeef>;
-> +		/* ... */
-> +	};
-> +
-> +	codec: codec at 12600000 {
-> +		memory-region = <&multimedia_reserved 0xfeebdaed>;
-> +		/* ... */
-> +	};
-> +};
-> -- 
-> 1.7.9.5
-> 
+Lorenzo
