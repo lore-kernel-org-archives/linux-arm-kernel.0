@@ -1,18 +1,21 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 26 Feb 2014 14:54:03 +0900
-Subject: [PATCH] ARM: shmobile: Move SYSC base variable to inside ifdefs
-In-Reply-To: <20140224055212.1822.52295.sendpatchset@w520>
-References: <20140224055212.1822.52295.sendpatchset@w520>
-Message-ID: <20140226055357.GA6392@verge.net.au>
+From: mohun106@gmail.com (mohun106 at gmail.com)
+Date: Wed, 26 Feb 2014 11:28:29 +0530
+Subject: [RFC PATCH 0/1] arm64: 48-bit Physical Address support
+Message-ID: <1393394310-6138-1-git-send-email-mohun106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 02:52:12PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> Move the rcar_sysc_base variable to inside #ifdefs to avoid
-> triggering build warnings in case PM or SMP is not selected.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
 
-Thanks, I have queued this up.
+This patch adds support for ARMv8 platforms that have 48-bit Physical
+Address implemented. The number of levels for translating VA to PA has
+not changed.
+
+Radha Mohan Chintakuntla (1):
+  arm64: Add support for 48-bit Physical Address
+
+ arch/arm64/Kconfig                     |    3 +++
+ arch/arm64/include/asm/kvm_arm.h       |    9 ++++++++-
+ arch/arm64/include/asm/pgtable-hwdef.h |   15 +++++++++++++++
+ arch/arm64/mm/proc.S                   |    2 +-
+ 4 files changed, 27 insertions(+), 2 deletions(-)
