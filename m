@@ -1,61 +1,104 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 26 Feb 2014 00:53:52 -0800
-Subject: [PATCH 1/2] clk: ti: am335x: remove unecessary cpu0 clk node
-In-Reply-To: <BFF39FC5-A6EA-47D2-9345-6952157D57DD@aol.com>
-References: <20140225082411.22529.21466@quantum>
- <BFF39FC5-A6EA-47D2-9345-6952157D57DD@aol.com>
-Message-ID: <20140226085352.22529.78661@quantum>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 26 Feb 2014 17:55:49 +0900
+Subject: [PATCH v3 04/20] ARM: shmobile: r8a7779: Add clocks
+In-Reply-To: <CAMuHMdWUWeqhH_OeOOFDhTFAGfa3EtTSfMWEkYUrQNV4OT1DLA@mail.gmail.com>
+References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+ <1393400016-23433-5-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWUWeqhH_OeOOFDhTFAGfa3EtTSfMWEkYUrQNV4OT1DLA@mail.gmail.com>
+Message-ID: <20140226085548.GA7720@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kodiak Furr (2014-02-25 16:51:34)
-> Kodiak Furr liked your message with Boxer.
+On Wed, Feb 26, 2014 at 09:13:47AM +0100, Geert Uytterhoeven wrote:
+> On Wed, Feb 26, 2014 at 8:33 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > +               /* Gate clocks */
+> > +               mstp0_clks: mstp0_clks {
+> > +                       compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-clocks";
+> > +                       reg = <0 0xffc80030 0 4>;
+> > +                       clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> > +                                <&cpg_clocks R8A7779_CLK_P>;
+> 
+> Is there any rationale behind the decision to (not) split long lines?
+> The above are really long.
+> 
+> > +                       #clock-cells = <1>;
+> > +                       renesas,clock-indices = <
+> > +                               R8A7779_CLK_HSPI R8A7779_CLK_TMU0 R8A7779_CLK_TMU0
+> > +                               R8A7779_CLK_TMU0 R8A7779_CLK_SCIF5 R8A7779_CLK_SCIF4
+> > +                               R8A7779_CLK_SCIF3 R8A7779_CLK_SCIF2 R8A7779_CLK_SCIF1
+> > +                               R8A7779_CLK_SCIF0 R8A7779_CLK_I2C3 R8A7779_CLK_I2C2
+> > +                               R8A7779_CLK_I2C1 R8A7779_CLK_I2C0
+> 
+> A bit longer than 80 characters (fine for me, though).
+> 
+> > +                       >;
+> > +                       clock-output-names =
+> > +                               "hspi", "tmu00", "tmu01",
+> > +                               "tmu02", "scif5", "scif4",
+> > +                               "scif3", "scif2", "scif1",
+> > +                               "scif0", "i2c3", "i2c2",
+> > +                               "i2c1", "i2c0";
+> 
+> Much shorter than 80 characters (to match the above?).
+> 
+> > +               };
+> > +               mstp1_clks: mstp1_clks {
+> > +                       compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-clocks";
+> > +                       reg = <0 0xffc80034 0 4>, <0 0xffc80044 0 4>;
+> > +                       clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>;
+> > +                       #clock-cells = <1>;
+> > +                       renesas,clock-indices = <
+> > +                               R8A7779_CLK_USB01 R8A7779_CLK_USB01
+> 
+> Fits in 80 characters.
+> 
+> > +                               R8A7779_CLK_USB2 R8A7779_CLK_USB2
+> > +                               R8A7779_CLK_DU R8A7779_CLK_VIN2
+> > +                               R8A7779_CLK_VIN1 R8A7779_CLK_VIN0
+> > +                               R8A7779_CLK_ETHER R8A7779_CLK_SATA
+> > +                               R8A7779_CLK_PCIE R8A7779_CLK_VIN3
+> > +                       >;
+> > +                       clock-output-names =
+> > +                               "ehci0", "ohci0",
+> > +                               "ehci1", "ohci1",
+> > +                               "du", "vin2",
+> > +                               "vin1", "vin0",
+> > +                               "ether", "sata",
+> > +                               "pcie", "vin3";
+> 
+> Reallt short, could be compacted a lot.
 
-Dear Mr. Furr,
+The rationale to have lines in clocks, renesas,clock-indices and
+clock-output-names corresponding with each other. Which I found
+made it easier out weed out inconsistencies.
 
-I don't know what Boxer is, but thanks for the like.
-
-Regards,
-Mike
+But I'm happy to rearrange things as you suggest.
 
 > 
+> > +               };
 > 
-> On February 25, 2014 at 2:24:11 AM CST, Mike Turquette <mturquette@linaro.org>
-> wrote:
+> Gr{oetje,eeting}s,
 > 
->     Quoting Nishanth Menon (2014-01-29 10:19:16)
->     > cpu0 clock node has no functionality, since cpufreq-cpu0 is already
->     > capable of picking up the clock from dts.
->     >
->     > Signed-off-by: Nishanth Menon
+>                         Geert
 > 
->     Taken into clk-next!
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 > 
->     Regards,
->     Mike
-> 
->     > ---
->     > drivers/clk/ti/clk-33xx.c | 1 -
->     > 1 file changed, 1 deletion(-)
->     >
->     > diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
->     > index 776ee45..028b337 100644
->     > --- a/drivers/clk/ti/clk-33xx.c
->     > +++ b/drivers/clk/ti/clk-33xx.c
->     > @@ -34,7 +34,6 @@ static struct ti_dt_clk am33xx_clks[] = {
->     > DT_CLK(NULL, "dpll_core_m5_ck", "dpll_core_m5_ck"),
->     > DT_CLK(NULL, "dpll_core_m6_ck", "dpll_core_m6_ck"),
->     > DT_CLK(NULL, "dpll_mpu_ck", "dpll_mpu_ck"),
->     > - DT_CLK("cpu0", NULL, "dpll_mpu_ck"),
->     > DT_CLK(NULL, "dpll_mpu_m2_ck", "dpll_mpu_m2_ck"),
->     > DT_CLK(NULL, "dpll_ddr_ck", "dpll_ddr_ck"),
->     > DT_CLK(NULL, "dpll_ddr_m2_ck", "dpll_ddr_m2_ck"),
->     > --
->     > 1.7.9.5
->     >
->     --
->     To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->     the body of a message to majordomo at vger.kernel.org
->     More majordomo info at http://vger.kernel.org/majordomo-info.html
->     Please read the FAQ at http://www.tux.org/lkml/
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
