@@ -1,54 +1,66 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 26 Feb 2014 22:00:25 +0100 (CET)
-Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
- componentised subsystems
-In-Reply-To: <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
-References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
- <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
-Message-ID: <Pine.LNX.4.64.1402262144190.10826@axis700.grange>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 26 Feb 2014 22:00:36 +0100
+Subject: [PATCH 1/7] Documentation: dt: iio: improve atmel-adc
+ documentation
+In-Reply-To: <20140226173904.GG607@lukather>
+References: <1393434074-15600-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20140226173904.GG607@lukather>
+Message-ID: <20140226210035.GD20517@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell
+Hi,
 
-(I suspect this my email will be rejected by ALKML too like other my 
-recent emails, but at least other MLs will pick it up and individual CCs 
-too, so, if replying, maybe it would be good to keep my entire reply, all 
-the more that it's going to be very short)
-
-On Thu, 2 Jan 2014, Russell King wrote:
-
-> Subsystems such as ALSA, DRM and others require a single card-level
-> device structure to represent a subsystem.  However, firmware tends to
-> describe the individual devices and the connections between them.
+On 26/02/2014 at 18:39:04 +0100, Maxime Ripard wrote :
+> Hi Alexandre,
 > 
-> Therefore, we need a way to gather up the individual component devices
-> together, and indicate when we have all the component devices.
+> On Wed, Feb 26, 2014 at 06:01:08PM +0100, Alexandre Belloni wrote:
+> > This corrects the example by removing the unit-address, as suggested by Mark
+> > Rutland in
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/234184.html
 > 
-> We do this in DT by providing a "superdevice" node which specifies
-> the components, eg:
+> I still belive that it's wrong, and Mark haven't answered my comments
+> on his statement.
 > 
-> 	imx-drm {
-> 		compatible = "fsl,drm";
-> 		crtcs = <&ipu1>;
-> 		connectors = <&hdmi>;
-> 	};
 
-It is a pity linux-media wasn't CC'ed and apparently V4L developers didn't 
-notice this and other related patches in a "clean up" series, and now this 
-patch is already in the mainline. But at least I'd like to ask whether the 
-bindings, defined in 
-Documentation/devicetree/bindings/media/video-interfaces.txt and 
-implemented in drivers/media/v4l2-core/v4l2-of.c have been considered for 
-this job, and - if so - why have they been found unsuitable? Wouldn't it 
-have been better to use and - if needed - extend them to cover any 
-deficiencies? Even though the implementation is currently located under 
-drivers/media/v4l2-code/ it's pretty generic and should be easily 
-transferable to a more generic location.
+After our discussion, I'll go for the other suggestion, I'll add
+#address-cells, #size-cells and a reg for each trigger.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+> I'd vote for a status-quo, until he gives an answer backed with
+> references to the ePAPR.
+> 
+> > 
+> > Also, it removes the properties that are not used anymore, to stop propagating
+> > them.
+> > 
+> > Finally, fixes a few typos.
+> 
+> I'm fine with the rest.
+> 
+> Maxime
+> 
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+
+
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140226/0202b047/attachment.sig>
