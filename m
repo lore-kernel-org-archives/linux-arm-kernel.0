@@ -1,128 +1,67 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Feb 2014 16:33:24 +0900
-Subject: [PATCH v3 08/20] ARM: shmobile: r8a7779: Reference clocks
+Date: Wed, 26 Feb 2014 16:33:30 +0900
+Subject: [PATCH v3 14/20] ARM: shmobile: marzen-reference: Initialize CPG
+ device
 In-Reply-To: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
 References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1393400016-23433-9-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1393400016-23433-15-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reference clocks using a "clocks" property in all nodes corresponding to
-devices that require a clock.
+On multiplatform kernels clocks are handled by the CCF CPG driver. It
+must be explicitly initialized by a call to r8a7779_clocks_init() with
+the value of the boot mode pins.
 
-Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoC.
+Based on similar work for the Koelsch board by Laurent Pinchart.
 
 Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
 ---
-v3
-* Also update the following nodes which are now present
-  - hspi{0,1,2}
-  - sata: Suggested by Laurent Pinchart
----
- arch/arm/boot/dts/r8a7779.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-shmobile/board-marzen-reference.c | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index 240a03e..7352987 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -166,6 +166,7 @@
- 		reg = <0xffc70000 0x1000>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 79 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp0_clks R8A7779_CLK_I2C0>;
- 		status = "disabled";
- 	};
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+index d3e8319..e261431 100644
+--- a/arch/arm/mach-shmobile/board-marzen-reference.c
++++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+@@ -19,7 +19,8 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
  
-@@ -176,6 +177,7 @@
- 		reg = <0xffc71000 0x1000>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 82 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp0_clks R8A7779_CLK_I2C1>;
- 		status = "disabled";
- 	};
+-#include <linux/clk-provider.h>
++#include <linux/clk/shmobile.h>
++#include <linux/clocksource.h>
+ #include <linux/of_platform.h>
+ #include <mach/r8a7779.h>
+ #include <mach/common.h>
+@@ -27,11 +28,17 @@
+ #include <asm/irq.h>
+ #include <asm/mach/arch.h>
  
-@@ -186,6 +188,7 @@
- 		reg = <0xffc72000 0x1000>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp0_clks R8A7779_CLK_I2C2>;
- 		status = "disabled";
- 	};
- 
-@@ -196,6 +199,7 @@
- 		reg = <0xffc73000 0x1000>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp0_clks R8A7779_CLK_I2C3>;
- 		status = "disabled";
- 	};
- 
-@@ -214,6 +218,7 @@
- 		reg = <0xfc600000 0x2000>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp1_clks R8A7779_CLK_SATA>;
- 	};
- 
- 	sdhi0: sd at ffe4c000 {
-@@ -221,6 +226,7 @@
- 		reg = <0xffe4c000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 104 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7779_CLK_SDHI0>;
- 		cap-sd-highspeed;
- 		cap-sdio-irq;
- 		status = "disabled";
-@@ -231,6 +237,7 @@
- 		reg = <0xffe4d000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7779_CLK_SDHI1>;
- 		cap-sd-highspeed;
- 		cap-sdio-irq;
- 		status = "disabled";
-@@ -241,6 +248,7 @@
- 		reg = <0xffe4e000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7779_CLK_SDHI2>;
- 		cap-sd-highspeed;
- 		cap-sdio-irq;
- 		status = "disabled";
-@@ -251,6 +259,7 @@
- 		reg = <0xffe4f000 0x100>;
- 		interrupt-parent = <&gic>;
- 		interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7779_CLK_SDHI3>;
- 		cap-sd-highspeed;
- 		cap-sdio-irq;
- 		status = "disabled";
-@@ -261,6 +270,7 @@
- 		reg = <0xfffc7000 0x18>;
- 		interrupt-controller = <&gic>;
- 		interrupts = <0 73 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp0_clks R8A7779_CLK_HSPI>;
- 		status = "disabled";
- 	};
- 
-@@ -269,6 +279,7 @@
- 		reg = <0xfffc8000 0x18>;
- 		interrupt-controller = <&gic>;
- 		interrupts = <0 74 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp0_clks R8A7779_CLK_HSPI>;
- 		status = "disabled";
- 	};
- 
-@@ -277,6 +288,7 @@
- 		reg = <0xfffc6000 0x18>;
- 		interrupt-controller = <&gic>;
- 		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp0_clks R8A7779_CLK_HSPI>;
- 		status = "disabled";
- 	};
- 
+-static void __init marzen_init(void)
++static void __init marzen_init_timer(void)
+ {
+ #ifdef CONFIG_COMMON_CLK
+-	of_clk_init(NULL);
+-#else
++	r8a7779_clocks_init(r8a7779_read_mode_pins());
++#endif
++	clocksource_of_init();
++}
++
++static void __init marzen_init(void)
++{
++#ifndef CONFIG_COMMON_CLK
+ 	r8a7779_clock_init();
+ #endif
+ 	r8a7779_add_standard_devices_dt();
+@@ -48,6 +55,7 @@ DT_MACHINE_START(MARZEN, "marzen")
+ 	.smp		= smp_ops(r8a7779_smp_ops),
+ 	.map_io		= r8a7779_map_io,
+ 	.init_early	= r8a7779_init_delay,
++	.init_time	= marzen_init_timer,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_irq	= r8a7779_init_irq_dt,
+ 	.init_machine	= marzen_init,
 -- 
 1.8.5.2
