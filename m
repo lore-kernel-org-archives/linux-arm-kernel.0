@@ -1,152 +1,106 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 26 Feb 2014 16:18:21 -0600
-Subject: [PATCHv2 03/16] Documentation: dt: add OMAP iommu bindings
-In-Reply-To: <1825184.Z7lGjn3qsj@avalon>
-References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
- <8258385.uITvkIdEvn@avalon> <530E4D27.4010205@ti.com>
- <1825184.Z7lGjn3qsj@avalon>
-Message-ID: <530E682D.9070005@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Feb 2014 22:19:39 +0000
+Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
+ componentised subsystems
+In-Reply-To: <Pine.LNX.4.64.1402262144190.10826@axis700.grange>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
+ <Pine.LNX.4.64.1402262144190.10826@axis700.grange>
+Message-ID: <20140226221939.GC21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Wed, Feb 26, 2014 at 10:00:25PM +0100, Guennadi Liakhovetski wrote:
+> Hi Russell
+> 
+> (I suspect this my email will be rejected by ALKML too like other my 
+> recent emails, but at least other MLs will pick it up and individual CCs 
+> too, so, if replying, maybe it would be good to keep my entire reply, all 
+> the more that it's going to be very short)
+> 
+> On Thu, 2 Jan 2014, Russell King wrote:
+> 
+> > Subsystems such as ALSA, DRM and others require a single card-level
+> > device structure to represent a subsystem.  However, firmware tends to
+> > describe the individual devices and the connections between them.
+> > 
+> > Therefore, we need a way to gather up the individual component devices
+> > together, and indicate when we have all the component devices.
+> > 
+> > We do this in DT by providing a "superdevice" node which specifies
+> > the components, eg:
+> > 
+> > 	imx-drm {
+> > 		compatible = "fsl,drm";
+> > 		crtcs = <&ipu1>;
+> > 		connectors = <&hdmi>;
+> > 	};
+> 
+> It is a pity linux-media wasn't CC'ed and apparently V4L developers didn't 
+> notice this and other related patches in a "clean up" series, and now this 
+> patch is already in the mainline. But at least I'd like to ask whether the 
+> bindings, defined in 
+> Documentation/devicetree/bindings/media/video-interfaces.txt and 
+> implemented in drivers/media/v4l2-core/v4l2-of.c have been considered for 
+> this job, and - if so - why have they been found unsuitable? Wouldn't it 
+> have been better to use and - if needed - extend them to cover any 
+> deficiencies? Even though the implementation is currently located under 
+> drivers/media/v4l2-code/ it's pretty generic and should be easily 
+> transferable to a more generic location.
 
-On 02/26/2014 02:36 PM, Laurent Pinchart wrote:
-> Hi Suman,
->
-> On Wednesday 26 February 2014 14:23:03 Suman Anna wrote:
->>> On Wednesday 26 February 2014 11:02:24 Suman Anna wrote:
->>>> On 02/25/2014 08:13 PM, Laurent Pinchart wrote:
->>>>> On Tuesday 25 February 2014 17:02:35 Suman Anna wrote:
->>>>>> On 02/25/2014 03:26 PM, Laurent Pinchart wrote:
->>>>>>> On Thursday 13 February 2014 12:15:34 Suman Anna wrote:
->>>>>>>> From: Florian Vaussard <florian.vaussard@epfl.ch>
->>>>>>>>
->>>>>>>> This patch adds the iommu bindings for all OMAP2+ SoCs. Apart from
->>>>>>>> the standard bindings used by OMAP peripherals, this patch uses a
->>>>>>>> 'dma-window' (already used by Tegra SMMU) and adds two OMAP custom
->>>>>>>> bindings - 'ti,#tlb-entries' and 'ti,iommu-bus-err-back'.
->>>>>>>>
->>>>>>>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->>>>>>>> [s-anna at ti.com: split bindings document, add dra7 and bus error back]
->>>>>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
->>>>>>>> ---
->>>>>>>>
->>>>>>>>   .../devicetree/bindings/iommu/ti,omap-iommu.txt    | 28 ++++++++++++
->>>>>>>>   1 file changed, 28 insertions(+)
->>>>>>>>   create mode 100644
->>>>>>>>   Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
->>>>>>>>
->>>>>>>> diff --git
->>>>>>>> a/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
->>>>>>>> b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt new file
->>>>>>>> mode 100644
->>>>>>>> index 0000000..116492d
->>>>>>>> --- /dev/null
->>>>>>>> +++ b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
->>>>>>>> @@ -0,0 +1,28 @@
->>>>>>>> +OMAP2+ IOMMU
->>>>>>>> +
->>>>>>>> +Required properties:
->>>>>>>> +- compatible : Should be one of,
->>>>>>>> +		"ti,omap2-iommu" for OMAP2/OMAP3 IOMMU instances
->>>>>>>> +		"ti,omap4-iommu" for OMAP4/OMAP5 IOMMU instances
->>>>>>>> +		"ti,dra7-iommu" for DRA7xx IOMMU instances
->>>>>>>> +- ti,hwmods  : Name of the hwmod associated with the IOMMU instance
->>>>>>>> +- reg        : Address space for the configuration registers
->>>>>>>> +- interrupts : Interrupt specifier for the IOMMU instance
->>>>>>>> +- dma-window : IOVA start address and length
->>>>>>>
->>>>>>> Isn't the dma window more of a system configuration property than a
->>>>>>> hardware property ? How do you expect it to be set?
->>>>>>
->>>>>> We are setting it based on the addressable range for the MMU.
->>>>>
->>>>> A quick look at the ISP and IVA IOMMUs in the OMAP3 shows that both
->>>>> support the full 4GB VA space. Why do you need to restrict it ?
->>>>
->>>> I should have rephrased it better when I said addressable range. While
->>>> the MMUs are capable of programming the full 4GB space, there are some
->>>> address ranges that are private from the processor view. This window is
->>>> currently used to set the range for the omap-iovmm driver (which only
->>>> OMAP3 ISP is using atm), and there is no point in allowing the
->>>> omap-iovmm driver the full range when the processor could never
->>>> reach/access those addresses.
->>>
->>> But the IOMMU VA space is from a device point of view, not from a CPU
->>> point of view. Could you point me to where those private ranges are
->>> documented, in order to understand the problem correctly ?
->>
->> Yes, they are indeed from the device perspective. I meant DSP and/or IPU
->> by processor.
->>
->> For example on OMAP3, you can refer to Table 2-9 in section 2.4.5 "DSP
->> Subsystem Memory Space Mapping" of the OMAP36xx TRM, and the external
->> addressable range starts from 0x11000000.
->
-> OK, so it looks more like a property of the IOMMU master than a property of
-> the IOMMU itself. It would be better to express it as such, but I wonder how
-> that could be done, and if it would be worth it in this case.
+The component helpers have nothing to do with DT apart from solving
+the problem of how to deal with subsystems which expect a single device,
+but we have a group of devices and their individual drivers to cope with.
+Subsystems like DRM and ALSA.
 
-This property is currently solely used to configure the range for the 
-omap-iovmm module, which were supplied through platform data in the 
-non-DT case. I am wondering if the way to go here is to use 
-iommu_domain_set_attr() and use the domain geometry values.
+It is completely agnostic to whether you're using platform data, DT or
+even ACPI - this code could *not* care less.  None of that comes anywhere
+near what this patch does.  It merely provides a way to collect up
+individual devices from co-operating drivers, and control their binding
+such that a subsystem like DRM or ALSA can be presented with a "card"
+level view of the hardware rather than a multi-device medusa with all
+the buggy, racy, crap fsckage that people come up to make that kind of
+thing work.
 
-regards
-Suman
+Now, as for the binding above, first, what does "eg" mean... and
+secondly, how would a binding which refers to crtcs and connectors
+have anything to do with ALSA?  Clearly this isn't an example of a
+binding for an ALSA use, which was talked about in the very first
+line of the above commit commentry.  So it's quite clear that what is
+given there is an example of how it /could/ be used.
 
->
-> As not all masters (the OMAP3 ISP doesn't for instance) have restrictions
-> regarding the VA range they can address, should this property be at least made
-> optional ?
->
->>>>>> We are reusing the existing defined property and it allows us to get
->>>>>> rid of the IOVA start and end addresses defined in the pre-DT OMAP
->>>>>> iommu platform data.
->>>>>>
->>>>>>>> +Optional properties:
->>>>>>>> +- ti,#tlb-entries : Number of entries in the translation look-aside
->>>>>>>> buffer. +                    Should be either 8 or 32 (default: 32)
->>>>>>>> +- ti,iommu-bus-err-back : Indicates the IOMMU instance supports
->>>>>>>> throwing
->>>>>>>> +		          back a bus error response on MMU faults.
->>>>>>>
->>>>>>> Do these features vary per IOMMU instance or per IOMMU model ? In the
->>>>>>> latter case they could be inferred from the compatible string by the
->>>>>>> driver without requiring them to be explicit in DT (whether you want
->>>>>>> to do so is left to you though).
->>>>>>
->>>>>> Well, these are fixed features given an IOMMU instance, like the OMAP3
->>>>>> ISP is the only one that has 8 TLB entries, all the remaining ones have
->>>>>> 32, and the IPU iommu instances are the only ones that support the bus
->>>>>> error response back. I have no preference to any particular way, and
->>>>>> sure the driver can infer these easily based on unique compatible
->>>>>> strings per subsystem per SoC. I just happened to go with defining
->>>>>> compatible strings per SoC, with the optional properties
->>>>>> differentiating the fixed behavior between different IOMMU instances on
->>>>>> that SoC. This is where I was looking for some inputs/guidance from the
->>>>>> DT bindings maintainers on what is the preferred method.
->>>>>
->>>>> I think you've made the right choice. I wasn't sure whether those
->>>>> parameters varied across IOMMU instances of compatible devices (from a
->>>>> compatible string point of view) or were constant. As they vary they
->>>>> should be expressed in DT.
->>>>
->>>> Yeah, I wasn't sure if these qualify as features (as per
->>>> Documentation/devicetree/bindings/ABI.txt section II.2).
->>>>
->>>> regards
->>>> Suman
->>>>
->>>>>>>> +Example:
->>>>>>>> +	/* OMAP3 ISP MMU */
->>>>>>>> +	mmu_isp: mmu at 480bd400 {
->>>>>>>> +		compatible = "ti,omap2-iommu";
->>>>>>>> +		reg = <0x480bd400 0x80>;
->>>>>>>> +		interrupts = <24>;
->>>>>>>> +		ti,hwmods = "mmu_isp";
->>>>>>>> +		ti,#tlb-entries = <8>;
->>>>>>>> +		dma-window = <0 0xfffff000>;
->>>>>>>> +	};
->
+I suppose I could have instead turned imx-drm into a completely unusable
+mess by not coming up with some kind of binding, and instead submitted
+a whole pile of completely untested code.  Alternatively, I could've
+used the OF binding as you're suggesting, but that would mean radically
+changing the /existing/ bindings for the IPU as a whole - something
+which others are better suited at as they have a /much/ better
+understanding of the complexities of this hardware than I.
+
+So, what I have done is implemented - for a driver in staging which is
+still subject to ongoing development and non-stable DT bindings -
+something which allows forward progress with a *minimum* of disruption
+to the existing DT bindings for everyone, while still allowing forward
+progress.
+
+Better bindings for imx-drm are currently being worked on.  Philipp
+Zabel of Pengutronix is currently looking at it, and has posted many
+RFC patches on this very subject, including moving the V4L2 OF helpers
+to a more suitable location.  OF people have been involved in that
+discussion over the preceding weeks, and there's a working implementation
+of imx-drm using these helpers from v4l2.
+
+I'm finding people who are working in the same area and trying to get
+everyone talking to each other so that we /do/ end up with a set of
+bindings for the display stuff which are suitable for everyone.  Tomi
+from TI has already expressed his input to this ongoing discussion.
+
+You're welcome to get involved in those discussions too.
+
+I hope this makes it clear, and clears up the confusion.
+
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
