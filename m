@@ -1,96 +1,104 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 26 Feb 2014 14:22:04 +0100
-Subject: [PATCH v4] can: xilinx CAN controller support.
-In-Reply-To: <cd00fb2d-c8a7-423d-8aa0-2b413e9ac101@CO9EHSMHS017.ehs.local>
-References: <74d607e9-ac9c-4a9b-ac49-e84ae49d20c2@TX2EHSMHS031.ehs.local>
- <530D0A9C.5090402@pengutronix.de>
- <cd00fb2d-c8a7-423d-8aa0-2b413e9ac101@CO9EHSMHS017.ehs.local>
-Message-ID: <530DEA7C.6010609@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 26 Feb 2014 14:24:01 +0100
+Subject: [PATCH v3 15/20] ARM: shmobile: marzen-reference: Instantiate
+ clkdevs for SCIF and TMU
+In-Reply-To: <1393400016-23433-16-git-send-email-horms+renesas@verge.net.au>
+References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+ <1393400016-23433-16-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1792922.9Bi30kDKcG@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2014 02:07 PM, Appana Durga Kedareswara Rao wrote:
->> This loop looks broken. Can you explain how it works.
->>
->> What it shoud do is:
->> We have put (priv->tx_head - priv->tx_tail) CAN frames into the FIFO.
->> This means at maximum there could be this amount of CAN frames which
->> have been successfully transmitted. For every cycle in this while loop you
->> should:
->> a) check if a CAN frame has successfully been transmitted
->>    (as this CAN core uses a FIFO it should be "oldest")
->>    A read_reg() of some kind is missing in your loop.
->> b) if needed, remove this event from the FIFO or
->>    mark the interrupt as done. Whatever you hardware needs.
->> c) update your statistics
->> d) Use can_get_echo_skb to push this frame into the networking stack
->> e) As a CAN frame has been transmitted successfully, wake the tx_queue.
->>
->>> +   while (priv->tx_head - priv->tx_tail > 0) {
->>> +           if (isr & XCAN_IXR_TXFLL_MASK) {
->>> +                   priv->write_reg(priv, XCAN_ICR_OFFSET,
->>> +                                   XCAN_IXR_TXFLL_MASK);
->>> +                   netif_stop_queue(ndev);
->>
->> Why do you stop the queue here? A CAN frame has successfully been
->> transmitted, there should be room in the FIFO.
->>
->>> +                   break;
->>> +           }
->>> +           can_get_echo_skb(ndev, priv->tx_tail %
->>> +                                   priv->xcan_echo_skb_max_tx);
->>> +           priv->tx_tail++;
->>> +   }
->>> +
-> 
-> The below are the bit fields available for the Transmit FIFO.
-> 1) In the ISR(interrupt status register)  Tx Ok interrupt and Tx fifo full interrupt.
-> 2) in the SR(Status Register) Tx fifo full condition.
-> 
-> 
-> I am modifying the entire tx interrupt logic to like below.
-> 
-> static void xcan_tx_interrupt(struct net_device *ndev, u32 isr)
-> {
->         struct xcan_priv *priv = netdev_priv(ndev);
->         struct net_device_stats *stats = &ndev->stats;
-> 
->             while (priv->tx_head - priv->tx_tail > 0) {
->                 if (isr & XCAN_IXR_TXFLL_MASK) {
->                         priv->write_reg(priv, XCAN_ICR_OFFSET,
->                                         XCAN_IXR_TXFLL_MASK);
->                           break;
->                 }
->                 can_get_echo_skb(ndev, priv->tx_tail %
->                                         priv->xcan_echo_skb_max_tx);
->                 priv->tx_tail++;
->          stats->tx_packets++;
->         netif_wake_queue(ndev);
->               can_led_event(ndev, CAN_LED_EVENT_TX);
-> 
->         }
+Hi Simon,
 
-You just need to wake the queue once.
+Thank you for the patch.
 
-> }
+On Wednesday 26 February 2014 16:33:31 Simon Horman wrote:
+> Now that the common clock framework is supported, the clock lookup
+> entries in clock-r8a7779.c are not registered anymore. Devices must
+> instead reference their clocks in the device tree. However, SCIF and CMT
+> devices are still instantiated through platform code, and thus need a
+> clock lookup entry.
 > 
+> Retrieve the SCIF and CMT clock entries by name and register clkdevs for
+> the corresponding devices. This will be removed when the SCIF and CMT
+> devices will be instantiated from the device tree.
 > 
-> Are you Ok with the above logic?
+> Based on work for the Koelsch board by Laurent Pinchart.
+> 
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> ---
+> v3
+> * Initialise TMU clocks instead of CMT clocks
+>   - It is TMU that Marzen uses as a clocksource
+> * Refactor clock initialisation hack as per more recent mainline
+>   code for Koelsch
+> * Use IS_ERR to check the return value of clk_get()
+> ---
+>  arch/arm/mach-shmobile/board-marzen-reference.c | 31 +++++++++++++++++++++-
+> 1 file changed, 30 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c
+> b/arch/arm/mach-shmobile/board-marzen-reference.c index e261431..a5974d2
+> 100644
+> --- a/arch/arm/mach-shmobile/board-marzen-reference.c
+> +++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+> @@ -19,7 +19,9 @@
+>   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 
+> USA */
+> 
+> +#include <linux/clk.h>
+>  #include <linux/clk/shmobile.h>
+> +#include <linux/clkdev.h>
+>  #include <linux/clocksource.h>
+>  #include <linux/of_platform.h>
+>  #include <mach/r8a7779.h>
+> @@ -38,7 +40,34 @@ static void __init marzen_init_timer(void)
+> 
+>  static void __init marzen_init(void)
+>  {
+> -#ifndef CONFIG_COMMON_CLK
+> +#ifdef CONFIG_COMMON_CLK
+> +	static const struct clk_name {
+> +		const char *clk;
+> +		const char *con_id;
+> +		const char *dev_id;
+> +	} clk_names[] = {
+> +		{ "scif0", NULL, "sh-sci.0" },
+> +		{ "scif1", NULL, "sh-sci.1" },
+> +		{ "scif2", NULL, "sh-sci.2" },
+> +		{ "scif3", NULL, "sh-sci.3" },
+> +		{ "scif4", NULL, "sh-sci.4" },
+> +		{ "scif5", NULL, "sh-sci.5" },
 
-No, how can you tell how many frames have been transmitted?
+Any chance to switch the board the DT-based SCIF instead ? ;-)
 
-Marc
+> +		{ "tmu00", NULL, "sh_tmu.0" },
+> +		{ "tmu01", NULL, "sh_tmu.1" },
+> +		{ "tmu02", NULL, "sh_tmu.2" },
+
+Those clocks should be tmu0, tmu1 and tmu2.
+
+> +	};
+> +	struct clk *clk;
+> +	unsigned int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(clk_names); ++i) {
+> +		clk = clk_get(NULL, clk_names[i].clk);
+> +		if (!IS_ERR(clk)) {
+> +			clk_register_clkdev(clk, clk_names[i].con_id,
+> +					    clk_names[i].dev_id);
+> +			clk_put(clk);
+> +		}
+> +	}
+> +#else
+>  	r8a7779_clock_init();
+>  #endif
+>  	r8a7779_add_standard_devices_dt();
 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Regards,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 242 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140226/561a8b47/attachment.sig>
+Laurent Pinchart
