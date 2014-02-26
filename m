@@ -1,136 +1,107 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 25 Feb 2014 17:48:36 -0800
-Subject: [PATCH] cpufreq: Set policy to non-NULL only after all hotplug
- online work is done
-In-Reply-To: <1789244.B5CzWbcp6h@vostro.rjw.lan>
-References: <1393225072-3997-1-git-send-email-skannan@codeaurora.org>
- <15001517.xLHO8lGdWr@vostro.rjw.lan> <530D06FF.201@codeaurora.org>
- <1789244.B5CzWbcp6h@vostro.rjw.lan>
-Message-ID: <530D47F4.2010204@codeaurora.org>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Wed, 26 Feb 2014 01:59:18 +0000
+Subject: [PATCH v11 00/15] Add power management support for mxs phy
+In-Reply-To: <1393208467-6355-1-git-send-email-peter.chen@freescale.com>
+References: <1393208467-6355-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <8281a0d328fa4a028784316d45c3c0a7@BL2PR03MB226.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2014 02:41 PM, Rafael J. Wysocki wrote:
-> On Tuesday, February 25, 2014 01:11:27 PM Saravana Kannan wrote:
->> On 02/25/2014 05:04 AM, Rafael J. Wysocki wrote:
->>> On Tuesday, February 25, 2014 02:20:57 PM Viresh Kumar wrote:
->>>> On 25 February 2014 01:53, Saravana Kannan <skannan@codeaurora.org> wrote:
->>>>> I was simplifying the scenario that causes it. We change the min/max using
->>>>> ADJUST notifiers for multiple reasons -- thermal being one of them.
->>>>>
->>>>> thermal/cpu_cooling is one example of it.
->>>>
->>>> Just to understand the clear picture, you are actually hitting this bug? Or
->>>> is this only a theoretical bug?
->>>>
->> This is a real bug. But the actual caller of cpufreq_update_policy() is
->> a driver that's local to our tree. I'm just giving examples of upstream
->> code that act in a similar way.
->>
->>>>> So, cpufreq_update_policy() can be called on any CPU. If that races with
->>>>> someone offlining a CPU and onlining it, you'll get this crash.
->>>>
->>>> Then shouldn't that be fixed by locks? I think yes. That makes me agree with
->>>> Srivatsa more here.
->>>>
->>>> Though I would say that your argument was also valid that 'policy' shouldn't be
->>>> up for sale unless it is prepared to. And for that reason only I
->>>> floated that question
->>>> earlier: What exactly we need to make sure is initialized in policy? Because
->>>> policy might keep changing in future as well and that needs locks to protect
->>>> that stuff. Like min/max/governor/ etc..
->>>
->>> Well, that depends on what the current users expect it to look like initially.
->>> It should be initialized to the point in which all of them can handle it
->>> correctly.
->>
->> Yes, so let's not make it available until all of it is initialized.
->
-> And is "fully initialized" actually well defined?
+ 
+Hi Mark,
 
-The point in add dev/hot plug path after which we will no longer change 
-policy fields without sending further CPUFREQ_UPDATE_POLICY_CPU / 
-CPUFRE_NOTIFY notifiers.
+If you think the dt binding doc (1/15 and 4/15) are ok to push,
+please ack it. In that case, the driver maintainer can queue 
+the driver patches, thanks.
 
-Pretty much the end of __cpufreq_add_dev() so that it's after:
-- cpufreq_init_policy()
-- And the update of userpolicy fields that after thie init call
+Peter
 
->> I don't like the piece meal check. 6 months down the lane someone making
->> changes might not remember this. The problem also applies for drivers
->> that might not be upstreamed, etc.
->
-> Please don't bring up out-of-the-tree drivers argument in mainline discussions,
-> it is meaningless here.
-
-Sure. This also applies to in-tree code. The 6 months down the lane, 
-what fields are being looked at could still change and we might slip up 
-on making sure that the policy is not made available before that field 
-is initialized.
-
->>>> So, probably a solution here might be a mix of both. Initialize policy to this
->>>> minimum level and then make sure locking is used correctly..
->>>
->>> Yes.
->>
->> Rafael, It's not clear what you mean by the yes. Do you want to
->> initialize it partly and make it available. I think that's always wrong.
->
-> So what actually is your porposal?
->
-
-Same as reply to "fully initialized". We make the policy after it's 
-fully initialized. After that point, any changes to the policy can be 
-tracked by registering for CPUFREQ_UPDATE_POLICY_CPU / CPUFREQ_NOTIFY.
-
->>>>> The idea would exist, but we can just call cpufreq_generic_get() and pass it
->>>>> policy->clk if it is not NULL. Does that work for you?
->>>>
->>>> No. Not all drivers implement clk interface. And so clk doesn't look to be the
->>>> right parameter. I thought maybe 'policy' can be the right parameter and
->>>> then people can get use policy->cpu to get cpu id out of it.
->>>>
->>>> But even that doesn't look to be a great idea. X86 drivers may share policy
->>>> structure for CPUs that don't actually share a clock line. And so they do need
->>>> right CPU number as parameter instead of policy. As they might be doing
->>>> some tricky stuff there. Also, we need to make sure that ->get() returns
->>>> the frequency at which CPU x is running.
->>>
->>> That's not going to work in at least some cases anyway, because for some types
->>> of HW we simply can't retrieve the current frequency in a non-racy way.
->>
->> I think there's been a misunderstanding of what I'm proposing. The
->> reference to policy->clk is only to get rid of the dependency that
->> cpufreq_generic_get() has on the per cpu policy variable being filled.
->> You can do that by just removing calls to get _IF_ clk is filled in.
->
-> I still have a little problem understanding what you mean exactly.  At least
-> please explain the last sentence.
-
-Ok, here's some pseudo code to explain it better:
-
-Something like, replace all calls to cpufreq_driver->get with 
-__cpufreq_driver_get() with the fn being something like:
-
-unsigned int __cpufreq_driver_get(cpufreq_policy *policy)
-{
-   if (policy->clk)
-      return clk_get_rate(policy->clk) / 1000;
-   else
-      return cpufreq_driver->get(policy->cpu);
-}
-
-That way, we don't have to depend on cpufreq_cpu_get() to return a 
-policy in cpufreq_generic_get() for the existing add dev code path to 
-complete without an error (after my patch to advertise the policy struct 
-after it's fully initialized)
-
-This also avoid unnecessary function calls to ->get() when we just as 
-well know that it's going to call back into cpufreq_generic_get() and 
-get the clock rate. We can just do that in the framework.
-
--Saravana
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> The serial adds power management support for MXS PHY, it includes:
+> 
+> - Add one PHY API .set_wakeup, and related API implementation at mxs phy
+> driver
+> - misc changes and bug fixes for mxs phy to support low power mode and
+> wakeup.
+> 
+> It is based on the lastest Greg's usb-next, 3.14-rc3.
+> 
+> Changes for v11:
+> - Change the descrition of adding compatible string, and
+>   add mention that "fsl,imx23-usbphy" is still a fallback
+>   for other strings. [1/15]
+> 
+> Changes for v10:
+> - Nothing related with function change.
+> - It adds dt maintainers to To list, and cc devicetree at vger.kernel.org,
+> wait dt-maintainer's ack for 1/15, 4/15.
+> - Add last three dts patches for reference which have already at Shawn's
+> tree.
+> 
+> Changes for v9:
+> - Fix the build warning if CONFIG_SUSPEND is not set
+> 
+> Changes for v8:
+> - Shawn has already applied two dts patches, so delete them at
+>   v8 version, http://marc.info/?l=linux-arm-kernel&m=138785188404939&w=2
+> - Using of_get_property to avoid imx6 fail at probe when using old DTB
+> [5/12]
+> - Do not consider failure if alias id is not existed, it can avoid fail
+>   at probe when using old DTB [8/12]
+> - We don't need more changes for [8/12] change due to we use
+>   "mxs_phy->port_id ==" as condition
+> 
+> Changes for v7:
+> - Fixed indentation problem at binding doc [1/14]
+> - s/ganranteed/guaranteed, and add explanation for "auto setting" [3/14]
+> - add static before SIMPLE_DEV_PM_OPS [13/14]
+> - add one patch to change usb device description [7/14]
+> - Delete the .nofity_suspend and .notify_resume due to Felipe
+>   does not agree to add them as PHY API, will use other ways to implement
+>   them in future.
+> 
+> Changes for v6:
+> - Add description for IC bug fixes logic. [9/15]
+> - Move is_imx6q_phy and is_imx6sl_phy from [9/15] to [14/15]
+> - %s/mxs_phy_clock_switch/mxs_phy_clock_switch_delay to reflect the
+> function meaning more precise [15/15]
+> 
+> Changes for v5:
+> Add Marc and Michael Grzeschik's commnets
+> - typo error at [2/15]
+> - sqhash patches which introducing mxs_phy_disconnect_line and fixed but
+> at this function. [13/15]
+> - Introducing flag MXS_PHY_NEED_IP_FIX who stands for the SoCs who have
+> IC fixes. [2/15, 8/15]
+> - Delete one patch for low speed connection problem at every rare
+> situations due to the root cause has still not found.
+> 
+> Peter Chen (15):
+>   usb: doc: phy-mxs: Add more compatible strings
+>   usb: phy-mxs: Add platform judgement code
+>   usb: phy-mxs: Add auto clock and power setting
+>   usb: doc: phy-mxs: update binding for adding anatop phandle
+>   usb: phy-mxs: Add anatop regmap
+>   usb: phy-mxs: change description of usb device speed
+>   usb: phy-mxs: Enable IC fixes for related SoCs
+>   usb: phy-mxs: add controller id
+>   usb: phy: Add set_wakeup API
+>   usb: phy-mxs: Add implementation of set_wakeup
+>   usb: phy-mxs: Add system suspend/resume API
+>   usb: phy-mxs: Add sync time after controller clear phcd
+>   ARM: dts: mxs: add mxs phy controller id
+>   ARM: dts: imx6: add anatop phandle for usbphy
+>   ARM: dts: imx6: add mxs phy controller id
+> 
+>  Documentation/devicetree/bindings/usb/mxs-phy.txt |    8 +-
+>  arch/arm/boot/dts/imx23.dtsi                      |    1 +
+>  arch/arm/boot/dts/imx28.dtsi                      |    2 +
+>  arch/arm/boot/dts/imx6qdl.dtsi                    |    4 +
+>  arch/arm/boot/dts/imx6sl.dtsi                     |    4 +
+>  drivers/usb/phy/phy-mxs-usb.c                     |  310
+> ++++++++++++++++++++-
+>  include/linux/usb/phy.h                           |   16 +
+>  7 files changed, 330 insertions(+), 15 deletions(-)
+> 
+> --
+> 1.7.8
+> 
