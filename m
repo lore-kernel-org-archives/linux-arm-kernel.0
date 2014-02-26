@@ -1,101 +1,82 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 26 Feb 2014 09:05:05 +0100
-Subject: [PATCH v3 01/20] clk: shmobile: r8a7779: Add clocks support
-In-Reply-To: <1393400016-23433-2-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 26 Feb 2014 09:13:47 +0100
+Subject: [PATCH v3 04/20] ARM: shmobile: r8a7779: Add clocks
+In-Reply-To: <1393400016-23433-5-git-send-email-horms+renesas@verge.net.au>
 References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
- <1393400016-23433-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUy6uj5vJ125Edp8g5NNxcWbG5wmD-j_gp=GgzXYAUAEw@mail.gmail.com>
+ <1393400016-23433-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWUWeqhH_OeOOFDhTFAGfa3EtTSfMWEkYUrQNV4OT1DLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Feb 26, 2014 at 8:33 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> +++ b/Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt
-> @@ -0,0 +1,26 @@
-> +* Renesas R8A7779 Clock Pulse Generator (CPG)
-> +
-> +The CPG generates core clocks for the R8A7779. It includes one PLL and
-> +and several fixed ratio dividers
+> +               /* Gate clocks */
+> +               mstp0_clks: mstp0_clks {
+> +                       compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-clocks";
+> +                       reg = <0 0xffc80030 0 4>;
+> +                       clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +                                <&cpg_clocks R8A7779_CLK_P>;
 
-Double "and"
+Is there any rationale behind the decision to (not) split long lines?
+The above are really long.
 
-> +++ b/drivers/clk/shmobile/clk-r8a7779.c
+> +                       #clock-cells = <1>;
+> +                       renesas,clock-indices = <
+> +                               R8A7779_CLK_HSPI R8A7779_CLK_TMU0 R8A7779_CLK_TMU0
+> +                               R8A7779_CLK_TMU0 R8A7779_CLK_SCIF5 R8A7779_CLK_SCIF4
+> +                               R8A7779_CLK_SCIF3 R8A7779_CLK_SCIF2 R8A7779_CLK_SCIF1
+> +                               R8A7779_CLK_SCIF0 R8A7779_CLK_I2C3 R8A7779_CLK_I2C2
+> +                               R8A7779_CLK_I2C1 R8A7779_CLK_I2C0
 
-> +/*
-> + *             MD1 = 1                 MD1 = 0
-> + *             (PLLA = 1500)           (PLLA = 1600)
-> + *             (MHz)                   (MHz)
-> + *------------------------------------------------+--------------------
-> + * clkz                1000   (2/3)            800   (1/2)
-> + * clkzs        250   (1/6)            200   (1/8)
-> + * clki                 750   (1/2)            800   (1/2)
-> + * clks                 250   (1/6)            200   (1/8)
-> + * clks1        125   (1/12)           100   (1/16)
-> + * clks3        187.5 (1/8)            200   (1/8)
-> + * clks4         93.7 (1/16)           100   (1/16)
-> + * clkp                  62.5 (1/24)            50   (1/32)
-> + * clkg                  62.5 (1/24)            66.6 (1/24)
-> + * clkb, CLKOUT
-> + * (MD2 = 0)     62.5 (1/24)            66.6 (1/24)
-> + * (MD2 = 1)     41.6 (1/36)            50   (1/32)
-> + */
-> +
-> +#define CPG_CLK_CONFIG_INDEX(md)       (((md) & (BIT(1)|BIT(2))) >> 1)
-> +
-> +struct cpg_clk_config {
-> +       unsigned int z_mult;
-> +       unsigned int z_div;
-> +       unsigned int zs_and_s_div;
-> +       unsigned int s1_div;
-> +       unsigned int p_div;
-> +       unsigned int out_div;
-> +};
-> +
-> +static const struct cpg_clk_config cpg_clk_configs[4] __initconst = {
-> +       { 1, 2, 8, 16, 32, 24 },
-> +       { 1, 2, 8, 16, 32, 24 },
-> +       { 2, 3, 6, 12, 24, 36 },
-> +       { 2, 3, 6, 12, 24, 32 },
-> +};
+A bit longer than 80 characters (fine for me, though).
 
-Shouldn't this be
+> +                       >;
+> +                       clock-output-names =
+> +                               "hspi", "tmu00", "tmu01",
+> +                               "tmu02", "scif5", "scif4",
+> +                               "scif3", "scif2", "scif1",
+> +                               "scif0", "i2c3", "i2c2",
+> +                               "i2c1", "i2c0";
 
-+static const struct cpg_clk_config cpg_clk_configs[4] __initconst = {
-+       { 1, 2, 8, 16, 32, 24 },
-+       { 2, 3, 6, 12, 24, 24 },
-+       { 1, 2, 8, 16, 32, 32 },
-+       { 2, 3, 6, 12, 24, 36 },
-+};
+Much shorter than 80 characters (to match the above?).
 
-?
+> +               };
+> +               mstp1_clks: mstp1_clks {
+> +                       compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-clocks";
+> +                       reg = <0 0xffc80034 0 4>, <0 0xffc80044 0 4>;
+> +                       clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>;
+> +                       #clock-cells = <1>;
+> +                       renesas,clock-indices = <
+> +                               R8A7779_CLK_USB01 R8A7779_CLK_USB01
 
-I think you got confused by writing the bitmask as "BIT(1)|BIT(2)" instead
-of "BIT(2)|BIT(1)".
+Fits in 80 characters.
 
-> +/*
-> + *   MD                PLLA Ratio
-> + * 12 11
-> + *------------------------
-> + * 0  0                x42
-> + * 0  1                x48
-> + * 1  0                x56
-> + * 1  1                x64
-> + */
-> +#define CPG_PLL_CONFIG_INDEX(md)       ((((md) & BIT(14)) >> 12) | \
-> +                                        (((md) & BIT(13)) >> 12) | \
-> +                                        (((md) & BIT(19)) >> 19))
-> +struct cpg_pll_config {
-> +       unsigned int extal_div;
-> +       unsigned int pll1_mult;
-> +       unsigned int pll3_mult;
-> +};
+> +                               R8A7779_CLK_USB2 R8A7779_CLK_USB2
+> +                               R8A7779_CLK_DU R8A7779_CLK_VIN2
+> +                               R8A7779_CLK_VIN1 R8A7779_CLK_VIN0
+> +                               R8A7779_CLK_ETHER R8A7779_CLK_SATA
+> +                               R8A7779_CLK_PCIE R8A7779_CLK_VIN3
+> +                       >;
+> +                       clock-output-names =
+> +                               "ehci0", "ohci0",
+> +                               "ehci1", "ohci1",
+> +                               "du", "vin2",
+> +                               "vin1", "vin0",
+> +                               "ether", "sata",
+> +                               "pcie", "vin3";
 
-CPG_PLL_CONFIG_INDEX() and struct cpg_pll_config are unused, and
-disrupt the reading experience for the casual reviewer, as they split the
-section about MD12 and M11 in two.
+Reallt short, could be compacted a lot.
 
-> +
-> +#define CPG_PLLA_MULT_INDEX(md)        (((md) & (BIT(12)|BIT(11))) >> 11)
+> +               };
 
 Gr{oetje,eeting}s,
 
