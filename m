@@ -1,113 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 26 Feb 2014 10:54:35 +0100
-Subject: [PATCH v2 2/5] i2c: mv64xxx: Add support for the Allwinner A31
- I2C driver
-In-Reply-To: <1389609293-2824-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1389609293-2824-1-git-send-email-maxime.ripard@free-electrons.com>
- <1389609293-2824-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <530DB9DB.50606@free-electrons.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 26 Feb 2014 10:59:55 +0100
+Subject: [PATCHv6][ 1/5] video: mx3fb: Use devm_kzalloc
+Message-ID: <1393408800-8946-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Replace kzalloc by devm_kzalloc and remove the kfree() calls.
 
-On 13/01/2014 11:34, Maxime Ripard wrote:
-> The Allwinner A31 I2C controller is almost identical to the one used in the
-> other Allwinner SoCs, except for the fact that it needs to clear the interrupt
-> by setting the INT_FLAGS bit in the control register, instead of clearing it.
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Eric B?nard <eric@eukrea.com>
+Cc: linux-fbdev at vger.kernel.org
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v5->v6:
+ - New patch needed by "video: mx3fb: Add device tree suport."
+---
+ drivers/video/mx3fb.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-This patch doesn't apply on v3.14-rc4. Even by reducing the context the part
-on i2c-mv64xxx.txt failed to be applied. I removed this part and I reduced the
-context to one to be able to apply the part in the driver, it allowed me to
-test it on Armada 370, and then you can also add my:
-
-
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-
-Gregory
-
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt |  9 ++++++---
->  drivers/i2c/busses/i2c-mv64xxx.c                      | 10 ++++++++++
->  2 files changed, 16 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> index 603003a..2763225 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> @@ -4,15 +4,18 @@
->  Required properties :
->  
->   - reg             : Offset and length of the register set for the device
-> - - compatible      : Should be "marvell,mv64xxx-i2c" or "allwinner,sun4i-i2c"
-> -                     or "marvell,mv78230-i2c"
-> + - compatible      : Should be "marvell,mv64xxx-i2c", "allwinner,sun4i-i2c",
-> +                     "marvell,mv78230-i2c" or "allwinner,sun6i-a31-i2c"
->   - interrupts      : The interrupt number
->  
->  Optional properties :
->  
->   - clock-frequency : Desired I2C bus clock frequency in Hz. If not set the
->  default frequency is 100kHz
-> - - resets          : phandle to the parent reset controller
-> +
-> + - resets          : phandle to the parent reset controller. Mandatory
-> +                     whenever you're using the "allwinner,sun6i-a31-i2c"
-> +                     compatible.
->  
->  Examples:
->  
-> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-> index 0f6dde5..12ecf4b 100644
-> --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> @@ -151,6 +151,7 @@ struct mv64xxx_i2c_data {
->  /* 5us delay in order to avoid repeated start timing violation */
->  	bool			errata_delay;
->  	struct reset_control	*rstc;
-> +	bool			irq_clear_inverted;
->  };
->  
->  static struct mv64xxx_i2c_regs mv64xxx_i2c_regs_mv64xxx = {
-> @@ -568,6 +569,11 @@ mv64xxx_i2c_intr(int irq, void *dev_id)
->  		status = readl(drv_data->reg_base + drv_data->reg_offsets.status);
->  		mv64xxx_i2c_fsm(drv_data, status);
->  		mv64xxx_i2c_do_action(drv_data);
-> +
-> +		if (drv_data->irq_clear_inverted)
-> +			writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_IFLG,
-> +			       drv_data->reg_base + drv_data->reg_offsets.control);
-> +
->  		rc = IRQ_HANDLED;
->  	}
->  	spin_unlock_irqrestore(&drv_data->lock, flags);
-> @@ -692,6 +698,7 @@ static const struct i2c_algorithm mv64xxx_i2c_algo = {
->   */
->  static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
->  	{ .compatible = "allwinner,sun4i-i2c", .data = &mv64xxx_i2c_regs_sun4i},
-> +	{ .compatible = "allwinner,sun6i-a31-i2c", .data = &mv64xxx_i2c_regs_sun4i},
->  	{ .compatible = "marvell,mv64xxx-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
->  	{ .compatible = "marvell,mv78230-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
->  	{}
-> @@ -795,6 +802,9 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
->  		drv_data->errata_delay = true;
->  	}
->  
-> +	if (of_device_is_compatible(np, "allwinner,sun6i-a31-i2c"))
-> +		drv_data->irq_clear_inverted = true;
-> +
->  out:
->  	return rc;
->  #endif
-> 
-
-
+diff --git a/drivers/video/mx3fb.c b/drivers/video/mx3fb.c
+index 142e860..ee95de8 100644
+--- a/drivers/video/mx3fb.c
++++ b/drivers/video/mx3fb.c
+@@ -1496,7 +1496,7 @@ static int mx3fb_probe(struct platform_device *pdev)
+ 	if (!sdc_reg)
+ 		return -EINVAL;
+ 
+-	mx3fb = kzalloc(sizeof(*mx3fb), GFP_KERNEL);
++	mx3fb = devm_kzalloc(&pdev->dev, sizeof(*mx3fb), GFP_KERNEL);
+ 	if (!mx3fb)
+ 		return -ENOMEM;
+ 
+@@ -1542,7 +1542,6 @@ ersdc0:
+ 	dmaengine_put();
+ 	iounmap(mx3fb->reg_base);
+ eremap:
+-	kfree(mx3fb);
+ 	dev_err(dev, "mx3fb: failed to register fb\n");
+ 	return ret;
+ }
+@@ -1561,7 +1560,6 @@ static int mx3fb_remove(struct platform_device *dev)
+ 	dmaengine_put();
+ 
+ 	iounmap(mx3fb->reg_base);
+-	kfree(mx3fb);
+ 	return 0;
+ }
+ 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
