@@ -1,77 +1,36 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Wed, 26 Feb 2014 11:05:09 -0800
-Subject: [PATCH v4 0/2] hibernation support on ARM
-Message-ID: <1393441511-15127-1-git-send-email-sebastian.capella@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 26 Feb 2014 11:05:54 -0800
+Subject: [PATCH v3 1/9] Input: pmic8xxx-pwrkey - Migrate to regmap APIs
+In-Reply-To: <1393441562-685-1-git-send-email-sboyd@codeaurora.org>
+References: <1393441562-685-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1393441562-685-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patches adding support for hibernation on ARM
- - ARM hibernation / suspend-to-disk
- - Change soft_restart to use non-tracing raw_local_irq_disable
+Use the regmap APIs for this driver instead of custom pm8xxx
+APIs. This breaks this driver's dependency on the pm8xxx APIs and
+allows us to easily port it to other bus protocols in the future.
 
-Patches based on v3.13 tag, verified hibernation on beaglebone black on a
-branch based on 3.13 merged with initial omap support from Russ Dill which
-can be found here (includes v1 patchset):
-http://git.linaro.org/git-ro/people/sebastian.capella/linux.git hibernation_3.13_russMerge
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ drivers/input/misc/pmic8xxx-pwrkey.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-[PATCH v4 1/2] ARM: avoid tracers in soft_restart
- arch/arm/kernel/process.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
- Use raw_local_irq_disable in place of local_irq_disable to avoid
- infinite abort recursion while tracing. (unchanged since v3)
-
-[PATCH v4 2/2] ARM hibernation / suspend-to-disk
- arch/arm/include/asm/memory.h |    1 +
- arch/arm/kernel/Makefile      |    1 +
- arch/arm/kernel/hibernate.c   |  113 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mm/Kconfig           |    5 ++
- include/linux/suspend.h       |    2 +
- 5 files changed, 122 insertions(+)
-
- Adds support for ARM based hibernation
-
-
-Additional notes:
------------------
-
-There are two checkpatch warnings added by this patch.  These follow
-behavior in existing hibernation implementations on other platforms.
-
-    WARNING: externs should be avoided in .c files
-    #116: FILE: arch/arm/kernel/hibernate.c:26:
-    +extern const void __nosave_begin, __nosave_end;
-
-  This extern is picking up the linker nosave region definitions, only
-  used in hibernate.  Follows same extern line used mips, powerpc, s390,
-  sh, sparc, x86 & unicore32
-
-    WARNING: externs should be avoided in .c files
-    #191: FILE: arch/arm/kernel/hibernate.c:101:
-    +extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-
-  This extern is used in the arch/arm/ in hibernate, process and bL_switcher
-
-
-Changes in v4:
---------------
-* updated comment for soft_restart with review feedback
-* dropped freeze_processes patch which was queued separately 
-  to 3.14 by Rafael Wysocki:
-  https://lkml.org/lkml/2014/2/25/683
-
-Changes in v3:
---------------
-* added comment to use of soft_restart
-* drop irq disable soft_restart patch
-* add patch to avoid tracers in soft_restart by using raw_local_irq_*
-
-Changes in v2:
---------------
-* Removed unneeded flush_thread, use of __naked and cpu_init.
-* dropped Cyril Chemparathy <cyril@ti.com> from Cc: list as 
-  emails are bouncing.
-
-Thanks,
-
-Sebastian Capella
+diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
+index 0e1a05f95858..cf6125dc3b51 100644
+--- a/drivers/input/misc/pmic8xxx-pwrkey.c
++++ b/drivers/input/misc/pmic8xxx-pwrkey.c
+@@ -120,6 +120,10 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	regmap = dev_get_regmap(pdev->dev.parent, NULL);
++	if (!regmap)
++		return -ENODEV;
++
+ 	input_set_capability(pwr, EV_KEY, KEY_POWER);
+ 
+ 	pwr->name = "pmic8xxx_pwrkey";
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
