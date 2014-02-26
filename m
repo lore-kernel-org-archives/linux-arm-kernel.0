@@ -1,158 +1,85 @@
-From: marc.ceeeee@gmail.com (Marc Carino)
-Date: Wed, 26 Feb 2014 02:29:12 -0800
-Subject: [PATCH v7 9/9] ARM: brcmstb: dts: add a reference DTS for Broadcom
- 7445
-In-Reply-To: <1393410552-21497-1-git-send-email-marc.ceeeee@gmail.com>
-References: <1393410552-21497-1-git-send-email-marc.ceeeee@gmail.com>
-Message-ID: <1393410552-21497-10-git-send-email-marc.ceeeee@gmail.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Wed, 26 Feb 2014 11:31:45 +0100
+Subject: TWL6040 fails to initialize
+In-Reply-To: <530DC1D3.8040800@ti.com>
+References: <530C70B3.4010103@epfl.ch> <530CA8DA.8050806@ti.com>
+ <530CB9C6.60806@epfl.ch> <530D972F.805@ti.com> <530DB97E.80309@epfl.ch>
+ <530DC1D3.8040800@ti.com>
+Message-ID: <530DC291.2060708@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a sample DTS which will allow bootup of a board populated
-with the BCM7445 chip.
+On 02/26/2014 11:28 AM, Peter Ujfalusi wrote:
+> On 02/26/2014 11:53 AM, Florian Vaussard wrote:
+>> On 02/26/2014 08:26 AM, Peter Ujfalusi wrote:
+>>> On 02/25/2014 05:41 PM, Florian Vaussard wrote:
+>>>> If the power was not enabled at all, I would be unable to read the
+>>>> revision register, no? And delaying the probe by one millisecond would
+>>>> be of no help in this case IMHO.
+>>>
+>>> One thing which might cause this is that if the audpwron GPIO is set high
+>>> before the twl6040 module is probing. When I request the GPIO I ask it to be
+>>> set to low. If the line was high before this means we initiate the power off
+>>> sequence.
+>>> Can you try something like this:
+>>>
+>>
+>> I statistically checked that the sleep should be placed after the GPIO
+>> request, so indeed this seems to be the problem, and your explanation is
+>> plausible. Can you send a proper patch?
+>>
+>> Now, related to this, I managed to found a part of the datasheet on the
+>> Great Internet. Looking at the "Power-Up Sequence" section, it is written:
+>>
+>> - NRESPWRON goes high -> plug detect and GPO are available
+>> - V2V1 goes high -> hook-detect available by I2C programming (sleep mode)
+>> - AUDPWRON goes high && READYINT -> ready to communicate through I2C and PDM
+>>
+>> So, although there seems to be some contradictions on when it is
+>> possible to access the I2C, shouldn't we enable the AUDPWRON GPIO
+>> _before_ making any I2C access?
+>>
+>> For the twl6040_probe, the following path would seem more correct to me:
+>>
+>> 1) enable regulators
+>> 2) request AUDPWRON
+>> 3) twl6040_power(ON) && regcache_cache_only(false)
+>> 4) wait for READYINT (or sleep if deterministic)
+>> 5) perform all required I2C accesses (read revision, etc.)
+>> 6) twl6040_power(OFF) && regcache_cache_only(true)
+>>
+>> What do you think?
+> 
+> Even when the AUDPWRON signal is low we can access to registers in VIO domain,
+> plug detect and GPO functions. So there's no need to power on the codec just
+> to power it down later.
+> 
 
-Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Matt Porter <mporter@linaro.org>
----
- arch/arm/boot/dts/bcm7445-bcm97445svmb.dts |   14 ++++
- arch/arm/boot/dts/bcm7445.dtsi             |  107 ++++++++++++++++++++++++++++
- 2 files changed, 121 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/bcm7445-bcm97445svmb.dts
- create mode 100644 arch/arm/boot/dts/bcm7445.dtsi
+Ok, if it is safe to do so, I am fine with the current probe. I let you
+post a patch to add a delay after requesting the GPIO.
 
-diff --git a/arch/arm/boot/dts/bcm7445-bcm97445svmb.dts b/arch/arm/boot/dts/bcm7445-bcm97445svmb.dts
-new file mode 100644
-index 0000000..9eec2ac
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm7445-bcm97445svmb.dts
-@@ -0,0 +1,14 @@
-+/dts-v1/;
-+#include "bcm7445.dtsi"
-+
-+/ {
-+	model = "Broadcom STB (bcm7445), SVMB reference board";
-+	compatible = "brcm,bcm7445", "brcm,brcmstb";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00 0x00000000 0x00 0x40000000>,
-+		      <0x00 0x40000000 0x00 0x40000000>,
-+		      <0x00 0x80000000 0x00 0x40000000>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
-new file mode 100644
-index 0000000..f9c9633
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm7445.dtsi
-@@ -0,0 +1,107 @@
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+#include "skeleton.dtsi"
-+
-+/ {
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+	model = "Broadcom STB (bcm7445)";
-+	compatible = "brcm,bcm7445", "brcm,brcmstb";
-+	interrupt-parent = <&gic>;
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "brcm,brahma-b15";
-+			device_type = "cpu";
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			compatible = "brcm,brahma-b15";
-+			device_type = "cpu";
-+			reg = <1>;
-+		};
-+
-+		cpu at 2 {
-+			compatible = "brcm,brahma-b15";
-+			device_type = "cpu";
-+			reg = <2>;
-+		};
-+
-+		cpu at 3 {
-+			compatible = "brcm,brahma-b15";
-+			device_type = "cpu";
-+			reg = <3>;
-+		};
-+	};
-+
-+	gic: interrupt-controller at ffd00000 {
-+		compatible = "brcm,brahma-b15-gic", "arm,cortex-a15-gic";
-+		reg = <0x00 0xffd01000 0x00 0x1000>,
-+		      <0x00 0xffd02000 0x00 0x2000>,
-+		      <0x00 0xffd04000 0x00 0x2000>,
-+		      <0x00 0xffd06000 0x00 0x2000>;
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(15) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_RAW(15) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_RAW(15) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(15) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	rdb {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges = <0 0x00 0xf0000000 0x1000000>;
-+
-+		serial at 406b00 {
-+			compatible = "ns16550a";
-+			reg = <0x406b00 0x20>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+			clock-frequency = <0x4d3f640>;
-+		};
-+
-+		sun_top_ctrl: syscon at 404000 {
-+			compatible = "brcm,bcm7445-sun-top-ctrl",
-+				     "syscon";
-+			reg = <0x404000 0x51c>;
-+		};
-+
-+		hif_cpubiuctrl: syscon at 3e2400 {
-+			compatible = "brcm,bcm7445-hif-cpubiuctrl",
-+				     "syscon";
-+			reg = <0x3e2400 0x5b4>;
-+		};
-+
-+		hif_continuation: syscon at 452000 {
-+			compatible = "brcm,bcm7445-hif-continuation",
-+				     "syscon";
-+			reg = <0x452000 0x100>;
-+		};
-+	};
-+
-+	smpboot {
-+		compatible = "brcm,brcmstb-smpboot";
-+		syscon-cpu = <&hif_cpubiuctrl 0x88 0x178>;
-+		syscon-cont = <&hif_continuation>;
-+	};
-+
-+	reboot {
-+		compatible = "brcm,brcmstb-reboot";
-+		syscon = <&sun_top_ctrl 0x304 0x308>;
-+	};
-+};
--- 
-1.7.1
+Regards,
+Florian
+
+> 
+>> Thanks,
+>> Florian
+>>
+>>> diff --git a/drivers/mfd/twl6040.c b/drivers/mfd/twl6040.c
+>>> index 75316fb33448..d2a0bd1539ae 100644
+>>> --- a/drivers/mfd/twl6040.c
+>>> +++ b/drivers/mfd/twl6040.c
+>>> @@ -674,6 +674,9 @@ static int twl6040_probe(struct i2c_client *client,
+>>>                                             GPIOF_OUT_INIT_LOW, "audpwron");
+>>>                 if (ret)
+>>>                         goto gpio_err;
+>>> +
+>>> +               /* power-down sequence latency */
+>>> +               usleep_range(500, 700);
+>>>         }
+>>>
+>>>         ret = regmap_add_irq_chip(twl6040->regmap, twl6040->irq, IRQF_ONESHOT,
+>>>
+>>>
+> 
+> 
