@@ -1,84 +1,82 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Wed, 26 Feb 2014 16:19:27 +0000 (UTC)
-Subject: [PATCH v3] pwm: add CSR SiRFSoC PWM driver
-References: <1391855002-26098-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <lel46f$q2d$1@ger.gmane.org>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 26 Feb 2014 17:19:43 +0100
+Subject: [PATCH v4 0/5] tty/serial: Add helpers to use GPIOs to control modem
+ lines and implement atmel_serial.c
+Message-ID: <1393431588-25977-1-git-send-email-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Barry,
+The USART controller on sam9x5 chips (and also all AT91/SAMA5 chips
+but at91rm9200) are not capable of handling DTR/DSR/DCD/RI signal.
+Moreover, even if the controller can handle CTS/RTS, the dedicated
+CTS/RTS pins are already muxed for other peripherals (LCDC/EMAC/MMC).
 
-On 2014-02-08, Barry Song <21cnbao@gmail.com> wrote:
-> From: Rongjun Ying <Rongjun.ying@csr.com>
->
-> PWM controller of CSR SiRFSoC can generate 7 independent outputs. Each output
-> duty cycle can be adjusted by setting the corresponding wait & hold registers.
->
-> Supports 7 independent channel output: 6 for external(channel0-5) and 1 for
-> internal(channel6).
->
-> Supports wide frequency range: divide by 2 to 65536*2 of source clock.
->
-> Signed-off-by: Rongjun Ying <Rongjun.ying@csr.com>
-> Signed-off-by: Huayi Li <Huayi.Li@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  -v3:
->  add "depends on" COMPILE_TEST according to Arnd's feedback;
->  move the pwm clock source to dts according to Arnd's feedback;
->  add lost dt-binding document
->
->  Documentation/devicetree/bindings/pwm/pwm-sirf.txt |   17 +
->  arch/arm/boot/dts/atlas6.dtsi                      |    3 +-
->  arch/arm/boot/dts/prima2.dtsi                      |    3 +-
->  drivers/pwm/Kconfig                                |    9 +
->  drivers/pwm/Makefile                               |    1 +
->  drivers/pwm/pwm-sirf.c                             |  308 ++++++++++++++++++++
->  6 files changed, 339 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sirf.txt
->  create mode 100644 drivers/pwm/pwm-sirf.c
->
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-sirf.txt b/Documentation/devicetree/bindings/pwm/pwm-sirf.txt
-> new file mode 100644
-> index 0000000..4b10109
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-sirf.txt
-> @@ -0,0 +1,17 @@
-> +SiRF prima2 & atlas6 PWM drivers
-> +
-> +Required properties:
-> +- compatible: "sirf,prima2-pwm"
-> +- reg: physical base address and length of the controller's registers
-> +- #pwm-cells: should be 2.  The first cell specifies the per-chip index
-> +  of the PWM to use and the second cell is the period in nanoseconds.
-> +- clocks: from common clock binding: the 1st clock is for PWM controller
-> +  the 2nd clock is the source to generate PWM waves
-> +
+So this patchset adds the possibility to control those lines via GPIO,
+as it is done for RTS in the patch "switch atmel serial to use gpiolib"
 
-Describing the clocks this way seems limiting to me.
+As it was suggested by Alexander Shiyan, I made that available for
+every board.
 
-Each output of the PWM controller on SiRFatlasVI and SiRFprimaII can
-independently use one clock among many for signal generation, with
-three PLLs and two external clock inputs available.
+Patch 1 implements the generic helpers to control modem lines via GPIO
+Patches 2 and 3 are just a little tidy up of atmel_serial.c.
+Patch 4 implements modem control lines in atmel_serial atmel_serial.
+Patch 5 implement the interrupts of CTS/DSR/DCD/RI.
 
-If we specify the source clock for the signal generation in the device
-tree as you do here, we will prevent the use of those different input
-clocks when incompatible frequencies are required, such as 32,768 Hz on
-one output line and 44,100 Hz on another one.
+This is based on next-20140226 + [PATCH v3 5/7] ARM: at91: gpio: implement get_direction
+That Nicolas (has/will/might) appl(ied/y) on AT91 tree.
 
-As the clock tree for SiRF SoCs is described in the source files in
-drivers/clk/sirf/*, it does not appear to me that the functional clock
-needs to be configured in the device tree: the names of available clock
-sources can be provided statically by the device tree matching table the
-pwm-sirf.c.  Moreover, this would continue to work with the current
-(undocumented) bindings for SiRFatlasVI and SiRFprimaII.
+Tested on at91sam9g35, with a null modem cable between 2 serial ports,
+one with CTS/RTS controlled by the USART controller, the other via GPIO,
+full duplex transfers.
+Did some tests also with null modem cables on a PC, and with real modems.
 
-Alternatively, to keep the configuration in the device tree, all valid
-inputs for this SoC could be described here, instead of a single one.
+Updates from v3:
+	- add static keyword on struct uart0_gpios_table.
+	- add use an index at the mctrl_gpio_init() function to make it
+	usable by driver that allocates several ports at once.
+	- hide struct gpio_desc from users.
+	- patch "pinctrl: at91: implement get_direction" has been picked by Linus.
+	- patch "ARM: at91: gpio: implement get_direction" has been acked by Linus.
 
-The choice of the clock used for each output can then be selected when
-configuring an output, with a selection algorithm using the best input for
-a given period in of_xlate() and config() callbacks.
+Updates from v2:
+	- remove UART_GPIO_MIN/UART_GPIO_MAX_INPUT and use a direction
+	boolean instead.
+	- implement get_direction in at91 pinctrl and mach-at91/gpio.c.
+	- remove the get_mctrl_gpio_name() function that was used for
+	logs only.
+	- split atmel_serial.c patch in 2.
+	- use a gpio lookup table to declare modem gpios in platform
+	devices boards. So there's no more special case for platform
+	data gpios in atmel_serial.c.
+
+Updates from v1:
+	- Instead of controlling modem signal only on atmel board, the
+	code is now available for every board.
+	- The active low flag from device tree is now used.
+
+Richard Genoud (5):
+  tty/serial: Add GPIOLIB helpers for controlling modem lines
+  tty/serial: at91: use dev_err instead of printk
+  tty/serial: at91: remove unused open/close hooks
+  tty/serial: at91: use mctrl_gpio helpers
+  tty/serial: at91: add interrupts for modem control lines
+
+ Documentation/serial/driver              |  25 +++
+ arch/arm/mach-at91/at91rm9200_devices.c  |  16 +-
+ arch/arm/mach-at91/at91sam9260_devices.c |   7 -
+ arch/arm/mach-at91/at91sam9261_devices.c |   4 -
+ arch/arm/mach-at91/at91sam9263_devices.c |   4 -
+ arch/arm/mach-at91/at91sam9g45_devices.c |   5 -
+ arch/arm/mach-at91/at91sam9rl_devices.c  |   5 -
+ drivers/tty/serial/Kconfig               |   4 +
+ drivers/tty/serial/Makefile              |   3 +
+ drivers/tty/serial/atmel_serial.c        | 259 ++++++++++++++++++++++++-------
+ drivers/tty/serial/serial_mctrl_gpio.c   | 146 +++++++++++++++++
+ drivers/tty/serial/serial_mctrl_gpio.h   | 109 +++++++++++++
+ include/linux/platform_data/atmel.h      |   1 -
+ 13 files changed, 496 insertions(+), 92 deletions(-)
+ create mode 100644 drivers/tty/serial/serial_mctrl_gpio.c
+ create mode 100644 drivers/tty/serial/serial_mctrl_gpio.h
 
 -- 
-Romain Izard
+1.8.5
