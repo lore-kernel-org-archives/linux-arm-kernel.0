@@ -1,229 +1,71 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Tue, 25 Feb 2014 16:02:00 -0800
-Subject: [PATCH v3 3/3] ARM hibernation / suspend-to-disk
-In-Reply-To: <1393372920-3896-1-git-send-email-sebastian.capella@linaro.org>
-References: <1393372920-3896-1-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <1393372920-3896-4-git-send-email-sebastian.capella@linaro.org>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 25 Feb 2014 18:05:29 -0600
+Subject: [PATCH v2 0/2] ARM: OMAP4: Fix gpmc_fck clock
+In-Reply-To: <530C4FED.80403@epfl.ch>
+References: <1392801305-1698-1-git-send-email-florian.vaussard@epfl.ch>
+ <5304DA2C.3030605@ti.com> <53050573.8090506@epfl.ch>
+ <20140223212309.22529.75068@quantum> <530ADC39.1010300@epfl.ch>
+ <20140225062615.22529.88499@quantum> <530C4FED.80403@epfl.ch>
+Message-ID: <530D2FC9.2010800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russ Dill <Russ.Dill@ti.com>
+Florian,
 
-Enable hibernation for ARM architectures and provide ARM
-architecture specific calls used during hibernation.
+On 02/25/2014 02:10 AM, Florian Vaussard wrote:
+> On 02/25/2014 07:26 AM, Mike Turquette wrote:
+>> Quoting Florian Vaussard (2014-02-23 21:44:25)
+>>> On 02/23/2014 10:23 PM, Mike Turquette wrote:
+>>>> Quoting Florian Vaussard (2014-02-19 11:26:43)
+>>>>>
+>>>>> On 02/19/2014 05:22 PM, Tero Kristo wrote:
+>>>>>> On 02/19/2014 11:15 AM, Florian Vaussard wrote:
+>>>>>>> Hello,
+>>>>>>>
+>>>>>>> Trying to get my SMSC9221 working on OMAP4 with DT,
+>>>>>>> I faced a misconfigured gpmc_fck (dummy clock set to 0)
+>>>>>>> resulting in serveral division-by-zero, misconfigured
+>>>>>>> timings and driver lost in the La La Land.
+>>>>>>>
+>>>>>>> To solve this, patch 1 removes gpmc_fck from the dummy
+>>>>>>> clocks, and patch 2 adds the gpmc_fck DT node and
+>>>>>>> reference it from the gpmc node.
+>>>>>>>
+>>>>>>> Tested on DuoVero/Parlor (OMAP4430) with SMSC9221.
+>>>>>>
+>>>>>> I can't test GPMC myself, but other than that, this set looks good to go.
+>>>>>>
+>>>>>
+>>>>> Thank you. Would you like more test coverage by other people? I would
+>>>>> like to see this in -rc if possible, as it is needed to boot my OMAP4
+>>>>> system.
+>>>>
+>>>> What OMAP4 system is this? Is this a regression for board that already
+>>>> has support merged into mainline?
+>>>>
+>>>
+>>> No, it is not yet merged into mainline. I was planning to post the DTS
+>>> this week, when most issues are cleared. Looking at the current mainline
+>>> boards, no one seems to use the GPMC, so I am just the first one to hit
+>>> this issue.
+>>
+>> OK, well typically the later -rc's are for fixing observed regressions.
+>> Since your platform is not yet merged in then it's probably fine to push
+>> this for 3.15.
+>>
+>
+> Fair enough. 3.15 is fine.
+>
+>> This also gives time to test the fix for other OMAP-ish processors.
+>>
+>
+> I can do the v3, including OMAP5 and DRA7. But for DRA7, I will need
+> someone with the TRM telling me where is connected gpmc_fclk (Suman?).
 
-The swsusp hibernation framework depends on the
-platform first having functional suspend/resume.
+For DRA7, GPMC is connected off L3MAIN1_L3_GICLK (compared to 
+L3MAIN2_L3_GICLK on OMAP5), both of which are actually just L3_ICLK.
+This is the l3_iclk_div in both the omap54xx-clocks.dtsi and 
+dra7xx-clocks.dtsi files.
 
-Then, in order to enable hibernation on a given platform, a
-platform_hibernation_ops structure may need to be registered with
-the system in order to save/restore any SoC-specific / cpu specific
-state needing (re)init over a suspend-to-disk/resume-from-disk cycle.
-
-For example:
-
-     - "secure" SoCs that have different sets of control registers
-       and/or different CR reg access patterns.
-
-     - SoCs with L2 caches as the activation sequence there is
-       SoC-dependent; a full off-on cycle for L2 is not done
-       by the hibernation support code.
-
-     - SoCs requiring steps on wakeup _before_ the "generic" parts
-       done by cpu_suspend / cpu_resume can work correctly.
-
-     - SoCs having persistent state which is maintained during suspend
-       and resume, but will be lost during the power off cycle after
-       suspend-to-disk.
-
-This is a rebase/rework of Frank Hofmann's v5 hibernation patchset.
-
-Cc: Russ Dill <Russ.Dill@ti.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Len Brown <len.brown@intel.com>
-Cc: Pavel Machek <pavel@ucw.cz>
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Jonathan Austin <jonathan.austin@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: "Uwe Kleine-K?nig" <u.kleine-koenig@pengutronix.de>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/include/asm/memory.h |    1 +
- arch/arm/kernel/Makefile      |    1 +
- arch/arm/kernel/hibernate.c   |  106 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mm/Kconfig           |    5 ++
- include/linux/suspend.h       |    2 +
- 5 files changed, 115 insertions(+)
- create mode 100644 arch/arm/kernel/hibernate.c
-
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 8756e4b..1079ea8 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -291,6 +291,7 @@ static inline void *phys_to_virt(phys_addr_t x)
-  */
- #define __pa(x)			__virt_to_phys((unsigned long)(x))
- #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
-+#define __pa_symbol(x)		__pa(RELOC_HIDE((unsigned long)(x), 0))
- #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
- 
- extern phys_addr_t (*arch_virt_to_idmap)(unsigned long x);
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index a30fc9b..8afa848 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -39,6 +39,7 @@ obj-$(CONFIG_ARTHUR)		+= arthur.o
- obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
- obj-$(CONFIG_PCI)		+= bios32.o isa.o
- obj-$(CONFIG_ARM_CPU_SUSPEND)	+= sleep.o suspend.o
-+obj-$(CONFIG_HIBERNATION)	+= hibernate.o
- obj-$(CONFIG_SMP)		+= smp.o
- ifdef CONFIG_MMU
- obj-$(CONFIG_SMP)		+= smp_tlb.o
-diff --git a/arch/arm/kernel/hibernate.c b/arch/arm/kernel/hibernate.c
-new file mode 100644
-index 0000000..13dda00
---- /dev/null
-+++ b/arch/arm/kernel/hibernate.c
-@@ -0,0 +1,106 @@
-+/*
-+ * Hibernation support specific for ARM
-+ *
-+ * Derived from work on ARM hibernation support by:
-+ *
-+ * Ubuntu project, hibernation support for mach-dove
-+ * Copyright (C) 2010 Nokia Corporation (Hiroshi Doyu)
-+ * Copyright (C) 2010 Texas Instruments, Inc. (Teerth Reddy et al.)
-+ *  https://lkml.org/lkml/2010/6/18/4
-+ *  https://lists.linux-foundation.org/pipermail/linux-pm/2010-June/027422.html
-+ *  https://patchwork.kernel.org/patch/96442/
-+ *
-+ * Copyright (C) 2006 Rafael J. Wysocki <rjw@sisk.pl>
-+ *
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
-+
-+#include <linux/mm.h>
-+#include <linux/suspend.h>
-+#include <asm/tlbflush.h>
-+#include <asm/cacheflush.h>
-+#include <asm/system_misc.h>
-+#include <asm/idmap.h>
-+#include <asm/suspend.h>
-+
-+extern const void __nosave_begin, __nosave_end;
-+
-+int pfn_is_nosave(unsigned long pfn)
-+{
-+	unsigned long nosave_begin_pfn =
-+			__pa_symbol(&__nosave_begin) >> PAGE_SHIFT;
-+	unsigned long nosave_end_pfn =
-+			PAGE_ALIGN(__pa_symbol(&__nosave_end)) >> PAGE_SHIFT;
-+
-+	return (pfn >= nosave_begin_pfn) && (pfn < nosave_end_pfn);
-+}
-+
-+void notrace save_processor_state(void)
-+{
-+	WARN_ON(num_online_cpus() != 1);
-+	local_fiq_disable();
-+}
-+
-+void notrace restore_processor_state(void)
-+{
-+	local_fiq_enable();
-+}
-+
-+/*
-+ * Snapshot kernel memory and reset the system.
-+ * soft_restart is not technically needed, but is used
-+ * to get success returned from cpu_suspend.
-+ * After resume, the hibernation snapshot is written out.
-+ */
-+static int notrace __swsusp_arch_save_image(unsigned long unused)
-+{
-+	int ret;
-+
-+	ret = swsusp_save();
-+	if (ret == 0)
-+		soft_restart(virt_to_phys(cpu_resume));
-+	return ret;
-+}
-+
-+/*
-+ * Save the current CPU state before suspend / poweroff.
-+ */
-+int notrace swsusp_arch_suspend(void)
-+{
-+	return cpu_suspend(0, __swsusp_arch_save_image);
-+}
-+
-+/*
-+ * The framework loads the hibernation image into a linked list anchored
-+ *@restore_pblist, for swsusp_arch_resume() to copy back to the proper
-+ * destinations.
-+ *
-+ * To make this work if resume is triggered from initramfs, the
-+ * pagetables need to be switched to allow writes to kernel mem.
-+ */
-+static void notrace __swsusp_arch_restore_image(void *unused)
-+{
-+	struct pbe *pbe;
-+
-+	cpu_switch_mm(idmap_pgd, &init_mm);
-+	for (pbe = restore_pblist; pbe; pbe = pbe->next)
-+		copy_page(pbe->orig_address, pbe->address);
-+
-+	soft_restart(virt_to_phys(cpu_resume));
-+}
-+
-+static u8 __swsusp_resume_stk[PAGE_SIZE/2] __nosavedata;
-+
-+/*
-+ * Resume from the hibernation image.
-+ * Due to the kernel heap / data restore, stack contents change underneath
-+ * and that would make function calls impossible; switch to a temporary
-+ * stack within the nosave region to avoid that problem.
-+ */
-+int swsusp_arch_resume(void)
-+{
-+	extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-+	call_with_stack(__swsusp_arch_restore_image, 0,
-+		__swsusp_resume_stk + sizeof(__swsusp_resume_stk));
-+	return 0;
-+}
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 1f8fed9..83707702 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -611,6 +611,11 @@ config CPU_USE_DOMAINS
- config IO_36
- 	bool
- 
-+config ARCH_HIBERNATION_POSSIBLE
-+	bool
-+	depends on MMU
-+	default y if CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || CPU_XSCALE || CPU_XSC3 || CPU_V6 || CPU_V6K || CPU_V7
-+
- comment "Processor Features"
- 
- config ARM_LPAE
-diff --git a/include/linux/suspend.h b/include/linux/suspend.h
-index f73cabf..38bbf95 100644
---- a/include/linux/suspend.h
-+++ b/include/linux/suspend.h
-@@ -320,6 +320,8 @@ extern unsigned long get_safe_page(gfp_t gfp_mask);
- extern void hibernation_set_ops(const struct platform_hibernation_ops *ops);
- extern int hibernate(void);
- extern bool system_entering_hibernation(void);
-+asmlinkage int swsusp_save(void);
-+extern struct pbe *restore_pblist;
- #else /* CONFIG_HIBERNATION */
- static inline void register_nosave_region(unsigned long b, unsigned long e) {}
- static inline void register_nosave_region_late(unsigned long b, unsigned long e) {}
--- 
-1.7.9.5
+regards
+Suman
