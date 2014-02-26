@@ -1,126 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Feb 2014 16:57:35 +0900
-Subject: [PATCH 8/9] ARM: shmobile: Add r8a7791 legacy SDHI clocks
-In-Reply-To: <cover.1393401266.git.horms+renesas@verge.net.au>
-References: <cover.1393401266.git.horms+renesas@verge.net.au>
-Message-ID: <4bfb358b1d6cdeff8c6a13677f01ed78e9696b98.1393401266.git.horms+renesas@verge.net.au>
+Date: Wed, 26 Feb 2014 16:57:51 +0900
+Subject: [GIT PULL v2 0/7] Second Round of Renesas ARM Based SoC Updates for
+ v3.15
+Message-ID: <cover.1393400446.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Add legacy r8a7791 SDHI clocks. This to allow the SDHI devices
-to be used by legacy Koelsch board support.
+please consider this second round of Renesas ARM based SoC updates for v3.15.
+As requested I have broken out clock changes into a separate branch which
+I will send a pull-request for separately.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7791.c | 51 ++++++++++++++++++++++++++++++++--
- 1 file changed, 49 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7791.c b/arch/arm/mach-shmobile/clock-r8a7791.c
-index c8227b3..3e1b6b6 100644
---- a/arch/arm/mach-shmobile/clock-r8a7791.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7791.c
-@@ -61,6 +61,7 @@
- 
- #define MSTPSR1		IOMEM(0xe6150038)
- #define MSTPSR2		IOMEM(0xe6150040)
-+#define MSTPSR3		IOMEM(0xe6150048)
- #define MSTPSR5		IOMEM(0xe615003c)
- #define MSTPSR7		IOMEM(0xe61501c4)
- #define MSTPSR8		IOMEM(0xe61509a0)
-@@ -69,8 +70,8 @@
- 
- #define MODEMR		0xE6160060
- #define SDCKCR		0xE6150074
--#define SD2CKCR		0xE6150078
--#define SD3CKCR		0xE615007C
-+#define SD1CKCR		0xE6150078
-+#define SD2CKCR		0xE615026c
- #define MMC0CKCR	0xE6150240
- #define MMC1CKCR	0xE6150244
- #define SSPCKCR		0xE6150248
-@@ -134,6 +135,39 @@ static struct clk *main_clks[] = {
- 	&zs_clk,
- };
- 
-+/* SDHI (DIV4) clock */
-+static int divisors[] = { 2, 3, 4, 6, 8, 12, 16, 18, 24, 0, 36, 48, 10 };
-+
-+static struct clk_div_mult_table div4_div_mult_table = {
-+	.divisors = divisors,
-+	.nr_divisors = ARRAY_SIZE(divisors),
-+};
-+
-+static struct clk_div4_table div4_table = {
-+	.div_mult_table = &div4_div_mult_table,
-+};
-+
-+enum {
-+	DIV4_SDH, DIV4_SD0,
-+	DIV4_NR
-+};
-+
-+static struct clk div4_clks[DIV4_NR] = {
-+	[DIV4_SDH] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 8, 0x0dff, CLK_ENABLE_ON_INIT),
-+	[DIV4_SD0] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 4, 0x1de0, CLK_ENABLE_ON_INIT),
-+};
-+
-+/* DIV6 clocks */
-+enum {
-+	DIV6_SD1, DIV6_SD2,
-+	DIV6_NR
-+};
-+
-+static struct clk div6_clks[DIV6_NR] = {
-+	[DIV6_SD1]	= SH_CLK_DIV6(&pll1_div2_clk, SD1CKCR, 0),
-+	[DIV6_SD2]	= SH_CLK_DIV6(&pll1_div2_clk, SD2CKCR, 0),
-+};
-+
- /* MSTP */
- enum {
- 	MSTP931, MSTP930, MSTP929, MSTP928, MSTP927, MSTP925,
-@@ -144,6 +178,7 @@ enum {
- 	MSTP726, MSTP724, MSTP723, MSTP721, MSTP720,
- 	MSTP719, MSTP718, MSTP715, MSTP714,
- 	MSTP522,
-+	MSTP314, MSTP312, MSTP311,
- 	MSTP216, MSTP207, MSTP206,
- 	MSTP204, MSTP203, MSTP202, MSTP1105, MSTP1106, MSTP1107,
- 	MSTP124,
-@@ -174,6 +209,9 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP715] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 15, MSTPSR7, 0), /* SCIF4 */
- 	[MSTP714] = SH_CLK_MSTP32_STS(&p_clk, SMSTPCR7, 14, MSTPSR7, 0), /* SCIF5 */
- 	[MSTP522] = SH_CLK_MSTP32_STS(&extal_clk, SMSTPCR5, 22, MSTPSR5, 0), /* Thermal */
-+	[MSTP314] = SH_CLK_MSTP32_STS(&div4_clks[DIV4_SD0], SMSTPCR3, 14, MSTPSR3, 0), /* SDHI0 */
-+	[MSTP312] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD1], SMSTPCR3, 12, MSTPSR3, 0), /* SDHI1 */
-+	[MSTP311] = SH_CLK_MSTP32_STS(&div6_clks[DIV6_SD2], SMSTPCR3, 11, MSTPSR3, 0), /* SDHI2 */
- 	[MSTP216] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 16, MSTPSR2, 0), /* SCIFB2 */
- 	[MSTP207] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 7, MSTPSR2, 0), /* SCIFB1 */
- 	[MSTP206] = SH_CLK_MSTP32_STS(&mp_clk, SMSTPCR2, 6, MSTPSR2, 0), /* SCIFB0 */
-@@ -224,6 +262,9 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.12", &mstp_clks[MSTP1105]), /* SCIFA3 */
- 	CLKDEV_DEV_ID("sh-sci.13", &mstp_clks[MSTP1106]), /* SCIFA4 */
- 	CLKDEV_DEV_ID("sh-sci.14", &mstp_clks[MSTP1107]), /* SCIFA5 */
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP314]),
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP312]),
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP311]),
- 	CLKDEV_DEV_ID("sh_cmt.0", &mstp_clks[MSTP124]),
- 	CLKDEV_DEV_ID("qspi.0", &mstp_clks[MSTP917]),
- 	CLKDEV_DEV_ID("e61f0000.thermal", &mstp_clks[MSTP522]),
-@@ -286,6 +327,12 @@ void __init r8a7791_clock_init(void)
- 		ret = clk_register(main_clks[k]);
- 
- 	if (!ret)
-+		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
-+
-+	if (!ret)
-+		ret = sh_clk_div6_register(div6_clks, DIV6_NR);
-+
-+	if (!ret)
- 		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
- 
- 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
--- 
-1.8.5.2
+The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
+
+  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.15
+
+for you to fetch changes up to c4ca5d80e03559fd95c526ece5ce39fc732a2511:
+
+  ARM: shmobile: Move SYSC base variable to inside ifdefs (2014-02-26 14:53:35 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Updates for v3.15
+
+* R-Car Gen2 SoCs: r8a7791 (R-Car M2) and r8a7790 (R-Car H2)
+  - Remove __init from rcar_gen2_read_mode_pins()
+
+* r8a7791 (R-Car M2)
+  - Use 64-bit dma_addr_t
+
+* r8a7790 (R-Car H2)
+  - Add CA15-SCU, CA7-SCU
+  - Add SYSC setup code
+  - Use 64-bit dma_addr_t
+
+----------------------------------------------------------------
+Gaku Inami (1):
+      ARM: shmobile: r8a7790 CA7-SCU enablement
+
+Hisashi Nakamura (1):
+      ARM: shmobile: r8a7790 SYSC setup code
+
+Keita Kobayashi (1):
+      ARM: shmobile: r8a7790 CA15-SCU enablement
+
+Magnus Damm (4):
+      ARM: shmobile: Use 64-bit dma_addr_t on r8a7790/r8a7791
+      ARM: shmobile: Break out R-Car SYSC PM code
+      ARM: shmobile: Remove __init from rcar_gen2_read_mode_pins()
+      ARM: shmobile: Move SYSC base variable to inside ifdefs
+
+ arch/arm/mach-shmobile/Kconfig                |   3 +
+ arch/arm/mach-shmobile/Makefile               |   3 +-
+ arch/arm/mach-shmobile/include/mach/pm-rcar.h |  15 +++
+ arch/arm/mach-shmobile/include/mach/r8a7779.h |  13 +--
+ arch/arm/mach-shmobile/include/mach/r8a7790.h |   1 +
+ arch/arm/mach-shmobile/pm-r8a7779.c           | 131 ++----------------------
+ arch/arm/mach-shmobile/pm-r8a7790.c           |  45 ++++++++
+ arch/arm/mach-shmobile/pm-rcar.c              | 141 ++++++++++++++++++++++++++
+ arch/arm/mach-shmobile/setup-rcar-gen2.c      |   2 +-
+ arch/arm/mach-shmobile/smp-r8a7779.c          |  17 ++--
+ arch/arm/mach-shmobile/smp-r8a7790.c          |  17 ++++
+ 11 files changed, 244 insertions(+), 144 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/include/mach/pm-rcar.h
+ create mode 100644 arch/arm/mach-shmobile/pm-r8a7790.c
+ create mode 100644 arch/arm/mach-shmobile/pm-rcar.c
