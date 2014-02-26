@@ -1,55 +1,94 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 26 Feb 2014 17:57:05 +0100
-Subject: [PATCH v2 1/2] ARM: dts: imx6: adjust the interrupt list in
- order to support MSI
-In-Reply-To: <20140226163402.GF29659@e106331-lin.cambridge.arm.com>
-References: <1393410438-28205-1-git-send-email-l.stach@pengutronix.de>
- <20140226163402.GF29659@e106331-lin.cambridge.arm.com>
-Message-ID: <1393433825.4692.2.camel@weser.hi.pengutronix.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 26 Feb 2014 18:00:02 +0100
+Subject: [PATCH] ARM: at91: sama5d3: get rid of atmel_tsadcc driver
+In-Reply-To: <1393432190-8799-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1393432190-8799-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20140226170002.GA20517@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 26.02.2014, 16:34 +0000 schrieb Mark Rutland:
-> On Wed, Feb 26, 2014 at 10:27:17AM +0000, Lucas Stach wrote:
-> > From: Juergen Beisert <jbe@pengutronix.de>
-> > 
-> > Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/imx6qdl.dtsi | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> > index fb28b2ecb1db..aeccbb114fc5 100644
-> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> > @@ -126,7 +126,8 @@
-> >  				  0x81000000 0 0          0x01f80000 0 0x00010000 /* downstream I/O */
-> >  				  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
-> >  			num-lanes = <1>;
-> > -			interrupts = <0 123 0x04>;
-> > +			/*               inta          intb         intc         intd/msi */
-> > +			interrupts = <0 123 0x04>, <0 122 0x04>, <0 121 0x04>, <0 120 0x04>;
+On 26/02/2014 at 17:29:50 +0100, Ludovic Desroches wrote :
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
 > 
-> This seems to be a "fsl,imx6q-pcie", "snps,dw-pcie" device.
+> Touchscreen support for at91_adc has been introduced so we can get rid of
+> atmel_tsadcc.
 > 
-> In Documentation/devicetree/bindings/pci/designware-pcie.txt I only see 3
-> interrupts listed.
-> 
-> The fourth interrupt must be documented.
-> 
-> Do the first three correspond to those in the documentation?
-> 
-Urgh, seems Samsung and FSL do all the glue a lot different. The IRQs
-seem to be different and the same holds true for the clocks.
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-I think we should split the Documentation here to avoid further
-confusion. Will send a patch.
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Regards,
-Lucas
+> ---
+>  arch/arm/boot/dts/sama5d3.dtsi    |   14 +-------------
+>  arch/arm/boot/dts/sama5d3xdm.dtsi |    7 +++----
+>  2 files changed, 4 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index 3d5faf8..26d7ed5 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -239,7 +239,7 @@
+>  			};
+>  
+>  			adc0: adc at f8018000 {
+> -				compatible = "atmel,at91sam9260-adc";
+> +				compatible = "atmel,at91sam9x5-adc";
+>  				reg = <0xf8018000 0x100>;
+>  				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
+>  				pinctrl-names = "default";
+> @@ -295,18 +295,6 @@
+>  				};
+>  			};
+>  
+> -			tsadcc: tsadcc at f8018000 {
+> -				compatible = "atmel,at91sam9x5-tsadcc";
+> -				reg = <0xf8018000 0x4000>;
+> -				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
+> -				atmel,tsadcc_clock = <300000>;
+> -				atmel,filtering_average = <0x03>;
+> -				atmel,pendet_debounce = <0x08>;
+> -				atmel,pendet_sensitivity = <0x02>;
+> -				atmel,ts_sample_hold_time = <0x0a>;
+> -				status = "disabled";
+> -			};
+> -
+>  			i2c2: i2c at f801c000 {
+>  				compatible = "atmel,at91sam9x5-i2c";
+>  				reg = <0xf801c000 0x4000>;
+> diff --git a/arch/arm/boot/dts/sama5d3xdm.dtsi b/arch/arm/boot/dts/sama5d3xdm.dtsi
+> index f9bdde5..0b8f5d1 100644
+> --- a/arch/arm/boot/dts/sama5d3xdm.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3xdm.dtsi
+> @@ -23,10 +23,9 @@
+>  			};
+>  
+>  			adc0: adc at f8018000 {
+> -				status = "disabled";
+> -			};
+> -
+> -			tsadcc: tsadcc at f8018000 {
+> +				atmel,adc-clock-rate = <1000000>;
+> +				atmel,adc-ts-wires = <4>;
+> +				atmel,adc-ts-pressure-threshold = <10000>;
+>  				status = "okay";
+>  			};
+>  
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140226/0d60c1dc/attachment.sig>
