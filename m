@@ -1,27 +1,24 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 26 Feb 2014 15:01:59 +1100
-Subject: linux-next: manual merge of the crypto tree with the arm-soc tree
-Message-ID: <20140226150159.7ea5e60285ee9d0193bde811@canb.auug.org.au>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 26 Feb 2014 09:42:37 +0530
+Subject: [PATCH] clk: samsung: remove parentheses from return statements
+In-Reply-To: <1393382688-5429-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1393382688-5429-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <CAK9yfHyjQmFnJaM0v638X-K+jHveofOkf=2bWQ9-cyQ1y39Hmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Herbert,
+Hi Pankaj,
 
-Today's linux-next merge of the crypto tree got a conflict in
-drivers/char/hw_random/Kconfig between commit 2257ffbca73c ("hwrng: msm:
-switch Kconfig to ARCH_QCOM depends") from the arm-soc tree and commit
-f9bee046c915 ("hwrng: msm: switch Kconfig to ARCH_QCOM depends") from the
-crypto tree.
+On 26 February 2014 08:14, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> fixed following checkpatch warning message
+> "return is not a function, parentheses are not required"
+>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-Two version of the same patch ... I just kept the arm-soc version.
+Similar patch has already been submitted:
+http://comments.gmane.org/gmane.linux.ports.arm.kernel/294530
+
 
 -- 
-Cheers,
-Stephen Rothwell <sfr@canb.auug.org.au>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140226/6b2714ce/attachment.sig>
+With warm regards,
+Sachin
