@@ -1,45 +1,80 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 26 Feb 2014 10:41:33 +0530
-Subject: [PATCH 2/3] cpufreq: stats: Fix error handling in
- __cpufreq_stats_create_table()
-In-Reply-To: <1393385915-19138-2-git-send-email-skannan@codeaurora.org>
-References: <1789244.B5CzWbcp6h@vostro.rjw.lan>
- <1393385915-19138-2-git-send-email-skannan@codeaurora.org>
-Message-ID: <CAKohpomZ9VnZOdtEr5HCWTOCUQ-49UZXaUW4qKVF7rwFgTUdjg@mail.gmail.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Wed, 26 Feb 2014 06:11:52 +0100
+Subject: [PATCH v2 0/2] ARM: OMAP4: Fix gpmc_fck clock
+In-Reply-To: <530D2FC9.2010800@ti.com>
+References: <1392801305-1698-1-git-send-email-florian.vaussard@epfl.ch>
+ <5304DA2C.3030605@ti.com> <53050573.8090506@epfl.ch>
+ <20140223212309.22529.75068@quantum> <530ADC39.1010300@epfl.ch>
+ <20140225062615.22529.88499@quantum> <530C4FED.80403@epfl.ch>
+ <530D2FC9.2010800@ti.com>
+Message-ID: <530D7798.8020407@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2014 09:08, Saravana Kannan <skannan@codeaurora.org> wrote:
-> Remove sysfs group if __cpufreq_stats_create_table() fails after creating
-> one.
->
-> Change-Id: Icb0b44424cc4eb6c88be255e2839ef51c3f8779c
-> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
-> ---
->  drivers/cpufreq/cpufreq_stats.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
-> index e4bd27f..c52b440 100644
-> --- a/drivers/cpufreq/cpufreq_stats.c
-> +++ b/drivers/cpufreq/cpufreq_stats.c
-> @@ -216,7 +216,7 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
->         stat->time_in_state = kzalloc(alloc_size, GFP_KERNEL);
->         if (!stat->time_in_state) {
->                 ret = -ENOMEM;
-> -               goto error_out;
-> +               goto error_alloc;
->         }
->         stat->freq_table = (unsigned int *)(stat->time_in_state + count);
->
-> @@ -237,6 +237,8 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
->         stat->last_index = freq_table_get_index(stat, policy->cur);
->         spin_unlock(&cpufreq_stats_lock);
->         return 0;
-> +error_alloc:
-> +       sysfs_remove_group(&policy->kobj, &stats_attr_group);
->  error_out:
->         kfree(stat);
->         per_cpu(cpufreq_stats_table, cpu) = NULL;
+Hi Suman,
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+On 02/26/2014 01:05 AM, Suman Anna wrote:
+> Florian,
+> 
+> On 02/25/2014 02:10 AM, Florian Vaussard wrote:
+>> On 02/25/2014 07:26 AM, Mike Turquette wrote:
+>>> Quoting Florian Vaussard (2014-02-23 21:44:25)
+>>>> On 02/23/2014 10:23 PM, Mike Turquette wrote:
+>>>>> Quoting Florian Vaussard (2014-02-19 11:26:43)
+>>>>>>
+>>>>>> On 02/19/2014 05:22 PM, Tero Kristo wrote:
+>>>>>>> On 02/19/2014 11:15 AM, Florian Vaussard wrote:
+>>>>>>>> Hello,
+>>>>>>>>
+>>>>>>>> Trying to get my SMSC9221 working on OMAP4 with DT,
+>>>>>>>> I faced a misconfigured gpmc_fck (dummy clock set to 0)
+>>>>>>>> resulting in serveral division-by-zero, misconfigured
+>>>>>>>> timings and driver lost in the La La Land.
+>>>>>>>>
+>>>>>>>> To solve this, patch 1 removes gpmc_fck from the dummy
+>>>>>>>> clocks, and patch 2 adds the gpmc_fck DT node and
+>>>>>>>> reference it from the gpmc node.
+>>>>>>>>
+>>>>>>>> Tested on DuoVero/Parlor (OMAP4430) with SMSC9221.
+>>>>>>>
+>>>>>>> I can't test GPMC myself, but other than that, this set looks
+>>>>>>> good to go.
+>>>>>>>
+>>>>>>
+>>>>>> Thank you. Would you like more test coverage by other people? I would
+>>>>>> like to see this in -rc if possible, as it is needed to boot my OMAP4
+>>>>>> system.
+>>>>>
+>>>>> What OMAP4 system is this? Is this a regression for board that already
+>>>>> has support merged into mainline?
+>>>>>
+>>>>
+>>>> No, it is not yet merged into mainline. I was planning to post the DTS
+>>>> this week, when most issues are cleared. Looking at the current
+>>>> mainline
+>>>> boards, no one seems to use the GPMC, so I am just the first one to hit
+>>>> this issue.
+>>>
+>>> OK, well typically the later -rc's are for fixing observed regressions.
+>>> Since your platform is not yet merged in then it's probably fine to push
+>>> this for 3.15.
+>>>
+>>
+>> Fair enough. 3.15 is fine.
+>>
+>>> This also gives time to test the fix for other OMAP-ish processors.
+>>>
+>>
+>> I can do the v3, including OMAP5 and DRA7. But for DRA7, I will need
+>> someone with the TRM telling me where is connected gpmc_fclk (Suman?).
+> 
+> For DRA7, GPMC is connected off L3MAIN1_L3_GICLK (compared to
+> L3MAIN2_L3_GICLK on OMAP5), both of which are actually just L3_ICLK.
+> This is the l3_iclk_div in both the omap54xx-clocks.dtsi and
+> dra7xx-clocks.dtsi files.
+> 
+
+Thank you very much. So I will send a v3 including this.
+
+Regards,
+Florian
