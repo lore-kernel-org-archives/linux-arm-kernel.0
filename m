@@ -1,42 +1,62 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 26 Feb 2014 11:42:13 +0000
-Subject: [PATCH] mmc: sdhci-bcm-kona: fix build errors when built-in
-Message-ID: <E1WIcsP-0003s2-1q@rmk-PC.arm.linux.org.uk>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 26 Feb 2014 13:48:20 +0200
+Subject: [PATCH 2/2] ARM: OMAP2+: fix dpll round_rate() to actually round
+In-Reply-To: <alpine.DEB.2.02.1402201927280.10791@utopia.booyaka.com>
+References: <1389944699-27962-1-git-send-email-tomi.valkeinen@ti.com>
+ <1389944699-27962-3-git-send-email-tomi.valkeinen@ti.com>
+ <alpine.DEB.2.02.1402191928480.8777@utopia.booyaka.com>
+ <alpine.DEB.2.02.1402201927280.10791@utopia.booyaka.com>
+Message-ID: <530DD484.5040703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-`sdhci_bcm_kona_remove' referenced in section `.data' of drivers/built-in.o: defined in discarded section `.exit.text' of drivers/built-in.o
+On 20/02/14 21:30, Paul Walmsley wrote:
+> On Wed, 19 Feb 2014, Paul Walmsley wrote:
+> 
+>> On Fri, 17 Jan 2014, Tomi Valkeinen wrote:
+>>
+>>> This patch adds a simple method of rounding: during the iteration, the 
+>>> code keeps track of the closest rate match. If no exact match is found, 
+>>> the closest is returned.
+>>
+>> So that's one possible rounding policy; maybe it works fine for a display 
+>> interface PLL, at least for some values of "closest rate".  But another 
+>> might be "only allow a selection from a set of pre-determined rates 
+>> characterized by the silicon validation team".  Or another rounding 
+>> function might need to select a more distant rate that minimizes jitter, 
+>> EMI, or power consumption.  
+> 
+> Thought about this some more.  Do you only need this for the DSS PLL, or 
+> do you need it for one of the core OMAP PLLs?
+> 
+> If the former, then how about modifying your patch to create a separate 
+> round_rate function that's only used for the DSS PLL that implements the 
+> behavior that you want?
+> 
+> That would eliminate any risk of impacting other users on the system.  And 
+> would also allow this change to get into the codebase much faster, since 
+> there's no need for clk API changes, etc.
 
-Fixes: 058feb53666f ("mmc: sdhci-bcm-kona: make linker-section warning go away")
-Cc: Markus Mayer <markus.mayer@linaro.org>
-Cc: Christian Daudt <csd@broadcom.com>
-Cc: Matt Porter <matt.porter@linaro.org>
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-Spotted in nightly build testing, this really should not have happened.
-The commit which caused it does more damage than good by changing more
-than it should have to fix the warning it reports to have fixed, by
-turning it into a build error instead.  Please be more careful in
-future when making such changes to fully understand what the section
-mismatch errors mean and more importantly, exactly what they're referring
-to.  Thanks.
+The DSS internal PLLs are handled by the DSS driver, which does all
+kinds of iteration to find good clocks. This patch is for a dedicated
+display PLL, present on, for example, BeagleBoneBlack.
 
- drivers/mmc/host/sdhci-bcm-kona.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+If you think that's better approach, I can take a look how it can be
+done (I'm not too familiar with the clock framework). Or maybe there's a
+possibility to have a flag of some kind, which allows rounded values to
+be returned? That sounds like an easy addition too.
 
-diff --git a/drivers/mmc/host/sdhci-bcm-kona.c b/drivers/mmc/host/sdhci-bcm-kona.c
-index 20096aaf14b4..e05c39e6292f 100644
---- a/drivers/mmc/host/sdhci-bcm-kona.c
-+++ b/drivers/mmc/host/sdhci-bcm-kona.c
-@@ -318,7 +318,7 @@ static int sdhci_bcm_kona_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
--static int __exit sdhci_bcm_kona_remove(struct platform_device *pdev)
-+static int sdhci_bcm_kona_remove(struct platform_device *pdev)
- {
- 	return sdhci_pltfm_unregister(pdev);
- }
--- 
-1.8.3.1
+Note that the same change is needed for DT and non-DT boots. Having
+separate round function would mean create a new clock "driver" (i.e.
+compatibility string), wouldn't it? Adding a flag sounds easier.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140226/75cf370f/attachment.sig>
