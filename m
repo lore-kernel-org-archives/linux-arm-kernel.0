@@ -1,45 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Feb 2014 23:37:44 +0000
-Subject: [PATCH v4 1/2] ARM: avoid tracers in soft_restart
-In-Reply-To: <1393441857-15472-2-git-send-email-sebastian.capella@linaro.org>
-References: <1393441857-15472-1-git-send-email-sebastian.capella@linaro.org>
- <1393441857-15472-2-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <20140226233744.GG21483@n2100.arm.linux.org.uk>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 26 Feb 2014 15:43:31 -0800
+Subject: [PATCH] ARM: qcom: Enable basic support for Qualcomm platforms in
+ multi_v7_defconfig
+References: <1393360445-16923-1-git-send-email-galak@codeaurora.org>
+Message-ID: <7hy50xv3rw.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 11:10:56AM -0800, Sebastian Capella wrote:
-> Use of tracers in local_irq_disable is causes recursive aborts when
-> called with irqs disabled and using a temporary stack (hibernation).
-> Replace local_irq_disable with raw_local_irq_disable instead to
-> avoid tracers.
-> 
-> Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Holt <robin.m.holt@gmail.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Kumar Gala <galak@codeaurora.org> writes:
+
+> Enable support for the MSM8x60, MSM8960, and MSM8974 SoCs, clocks and
+> serial console as part of the standard multi_v7_defconfig.
+>
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
 > ---
->  arch/arm/kernel/process.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 92f7b15..f58b723 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -100,7 +100,7 @@ void soft_restart(unsigned long addr)
->  	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
->  
->  	/* Disable interrupts first */
-> -	local_irq_disable();
-> +	raw_local_irq_disable();
->  	local_fiq_disable();
+>
+> I leave this to the arm-soc guys to apply because of possible conflicts
+> with other updates to multi_v7_defconfig.
 
-Great, I'm happy with this now.  I assume that the plan is to submit this
-to my patch system when everyone's given their fill of acks?
+Seem to be a handful of !qcom changes here, probably resulting from a
+run of 'make savedefconfig' without all the new changes in.
 
+I've thinned this out to only the qcom changes and applied the following
+to next/boards.  I think it's better to do any 'make savedefconfig'
+cleanups as a separate, cleanup-only patch as needed.
+
+Kevin
+
+
+>From 60476e4ad5a1369467ab8a061ae8ce601478646d Mon Sep 17 00:00:00 2001
+From: Kumar Gala <galak@codeaurora.org>
+Date: Tue, 25 Feb 2014 14:34:05 -0600
+Subject: [PATCH] ARM: qcom: Enable basic support for Qualcomm platforms in
+ multi_v7_defconfig
+
+Enable support for the MSM8x60, MSM8960, and MSM8974 SoCs, clocks and
+serial console as part of the standard multi_v7_defconfig.
+
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
+[khilman: removed non-qcom changes]
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ arch/arm/configs/multi_v7_defconfig | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 56549f178fe3..64e850d4896c 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -33,6 +33,10 @@ CONFIG_SOC_OMAP5=y
+ CONFIG_SOC_AM33XX=y
+ CONFIG_SOC_DRA7XX=y
+ CONFIG_SOC_AM43XX=y
++CONFIG_ARCH_QCOM=y
++CONFIG_ARCH_MSM8X60=y
++CONFIG_ARCH_MSM8960=y
++CONFIG_ARCH_MSM8974=y
+ CONFIG_ARCH_ROCKCHIP=y
+ CONFIG_ARCH_SOCFPGA=y
+ CONFIG_PLAT_SPEAR=y
+@@ -148,6 +152,8 @@ CONFIG_SERIAL_SIRFSOC_CONSOLE=y
+ CONFIG_SERIAL_TEGRA=y
+ CONFIG_SERIAL_IMX=y
+ CONFIG_SERIAL_IMX_CONSOLE=y
++CONFIG_SERIAL_MSM=y
++CONFIG_SERIAL_MSM_CONSOLE=y
+ CONFIG_SERIAL_VT8500=y
+ CONFIG_SERIAL_VT8500_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+@@ -298,6 +304,10 @@ CONFIG_MFD_NVEC=y
+ CONFIG_KEYBOARD_NVEC=y
+ CONFIG_SERIO_NVEC_PS2=y
+ CONFIG_NVEC_POWER=y
++CONFIG_COMMON_CLK_QCOM=y
++CONFIG_MSM_GCC_8660=y
++CONFIG_MSM_MMCC_8960=y
++CONFIG_MSM_MMCC_8974=y
+ CONFIG_TEGRA_IOMMU_GART=y
+ CONFIG_TEGRA_IOMMU_SMMU=y
+ CONFIG_MEMORY=y
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.3
