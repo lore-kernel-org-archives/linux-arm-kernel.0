@@ -1,45 +1,51 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 26 Feb 2014 12:16:40 +0200
-Subject: Tegra clockframework fixes for 3.14
-In-Reply-To: <20140224134319.GG19389@tbergstrom-lnx.Nvidia.com>
-References: <20140220172744.GA4378@tbergstrom-lnx.Nvidia.com>
- <20140224010211.22529.99924@quantum>
- <20140224134319.GG19389@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20140226101640.GM19389@tbergstrom-lnx.Nvidia.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 26 Feb 2014 14:20:30 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSHY2XVsgMy81XSB2aWRlbzogbXgzZmI6IEludHJvZHVjZSBy?=
+ =?UTF-8?B?ZWd1bGF0b3Igc3VwcG9ydC4=?=
+In-Reply-To: <1393408800-8946-3-git-send-email-denis@eukrea.com>
+References: <1393408800-8946-1-git-send-email-denis@eukrea.com>
+ <1393408800-8946-3-git-send-email-denis@eukrea.com>
+Message-ID: <1393410030.488354633@f216.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike,
+?????, 26 ??????? 2014, 10:59 +01:00 ?? Denis Carikli <denis@eukrea.com>:
+> This commit is based on the following commit by Fabio Estevam:
+>   4344429 video: mxsfb: Introduce regulator support
+...
+> +++ b/drivers/video/mx3fb.c
+...
+> @@ -1409,6 +1435,9 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
+>  			return -EINVAL;
+>  		}
+>  
+> +		of_property_read_string(display_np, "regulator-name",
+> +					&regulator_name);
+> +
+>  		of_property_read_string(display_np, "interface-pix-fmt",
+>  					&ipu_disp_format);
+>  		if (!ipu_disp_format) {
+> @@ -1526,6 +1555,21 @@ static int init_fb_chan(struct mx3fb_data *mx3fb, struct idmac_channel *ichan)
+>  	if (ret < 0)
+>  		goto esetpar;
+>  
+> +	/* In dt mode,
+> +	 * using devm_regulator_get would require that the proprety referencing
+> +	 * the regulator phandle has to be inside the mx3fb node.
 
-> On Mon, Feb 24, 2014 at 02:02:11AM +0100, Mike Turquette wrote:
-> > Quoting Peter De Schrijver (2014-02-20 09:27:44)
-> > > Hi Mike,
-> > > 
-> > > Could you merge these fixes still for 3.14?
-> > 
-> > No problem, but can you provide a list of the regressions fixed? I'll
-> > add those to my merge commit message. No need for you to respin
-> > anything. Next time if you could submit a signed tag with the
-> > regressions listed in the message it would be a great help.
-> > 
-> 
-> This fixes the following issues:
-> 
-> clk: tegra124: remove gr2d and gr3d clocks - accesses to undefined registers
-> clk: tegra: Fix vic03 mux index - wrong parent when PLLC3 is selected (because clk_m is actually selected)
-> clk: tegra: use max divider if divider overflows - make tegra fractional divider match the clk-div.c behaviour
-> clk: tegra: cclk_lp has a pllx/2 divider - pllx runs at half the programmed rate
-> clk: tegra: fix sdmmc clks on Tegra1x4 - wrong parent selection
-> clk: tegra: fix host1x clock on Tegra124 - wrong parent selection
-> clk: tegra: PLLD2 fixes for hdmi - PLL runs at wrong rate
-> clk: tegra: Fix PLLD mnp table - PLL runs at wrong rate
-> clk: tegra: Fix PLLP rate table - kernel panic when using coreboot
-> clk: tegra: Correct clock number for UARTE - wrong clock when using UARTE
-> clk: tegra: Add missing Tegra20 fuse clks - fuse driver broken
-> 
+What???
 
-Is this ok for you?
+> +	 */
+> +	if (np) {
+> +		if (regulator_name)
+> +			mx3fbi->reg_lcd = regulator_get(NULL, regulator_name);
+> +
+> +		if (IS_ERR(mx3fbi->reg_lcd))
+> +			return PTR_ERR(mx3fbi->reg_lcd);
+> +	} else {
+> +		/* Permit that driver without a regulator in non-dt mode */
+> +		mx3fbi->reg_lcd = regulator_get(dev, "lcd");
+> +	}
 
-Thanks,
-
-Peter.
+Why you want to use an excess "regulator-name" property?
+Just use devm_regulator_get(dev, "lcd") for both dt/non-dt case.
