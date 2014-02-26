@@ -1,45 +1,37 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Wed, 26 Feb 2014 14:12:16 +0900
-Subject: [PATCH] ARM: tegra: add device tree for SHIELD
-In-Reply-To: <530D754A.60700@wwwdotorg.org>
-References: <1393237593-28121-1-git-send-email-acourbot@nvidia.com>
- <530B952D.2000006@wwwdotorg.org> <530BFC58.6020003@nvidia.com>
- <530D1B7A.9070209@wwwdotorg.org> <530D748D.6010802@nvidia.com>
- <530D754A.60700@wwwdotorg.org>
-Message-ID: <530D77B0.8080807@nvidia.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 26 Feb 2014 10:50:43 +0530
+Subject: [PATCH] cpufreq: Set policy to non-NULL only after all hotplug
+ online work is done
+In-Reply-To: <530D06FF.201@codeaurora.org>
+References: <1393225072-3997-1-git-send-email-skannan@codeaurora.org>
+ <530BAA31.4050701@codeaurora.org>
+ <CAKohpo=0CgzjCgKnDxUMcN6-CgbQ2ML=Tx-K8fS7=VJJYOD0eg@mail.gmail.com>
+ <15001517.xLHO8lGdWr@vostro.rjw.lan> <530D06FF.201@codeaurora.org>
+Message-ID: <CAKohpo=iUBBcznKf0YbwNpvHNRuknC1wC0=MOSMrDYSaY2VLJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2014 02:02 PM, Stephen Warren wrote:
-> On 02/25/2014 09:58 PM, Alexandre Courbot wrote:
->> On 02/26/2014 07:38 AM, Stephen Warren wrote:
->>> On 02/24/2014 07:13 PM, Alexandre Courbot wrote:
->>>> On 02/25/2014 03:53 AM, Stephen Warren wrote:
->>>>> On 02/24/2014 03:26 AM, Alexandre Courbot wrote:
->>>>>> Add a device tree for NVIDIA SHIELD. The set of enabled features is
->>>>>> still minimal with no display option (although HDMI should be easy
->>>>>> to get to work) and USB requiring external power.
-> ...
->>>> For the Wifi chip, non-removable would be the correct setting
->>>> hardware-wise, but there is a trap: the chip has its reset line asserted
->>>> at boot-time, and you need to set GPIO 229 to de-assert it. Only after
->>>> that will the device be detected on the SDIO bus. Since it lacks a CD
->>>> line, it must be polled, hence the broken-cd property.
->>>
->>> How does that GPIO get manipulated right now? I assume you must be
->>> manually configuring it via sysfs after boot or something? If so,
->>> perhaps it's best to just leave out the WiFi node until it works
->>> automatically.
->>
->> The GPIO needs to be set from user-space, yes. But if we leave the Wifi
->> node out, I'm concerned that wireless will not be usable at all,
->> wouldn't it?
->
-> True, but if we have no representation of the device in DT that works
-> without manually enabling clocks and/or GPIOs, it's not a
-> complete/accurate representation of the HW, so it doesn't make sense to
-> add it to DT. Yes, I admit that sucks.
+On 26 February 2014 02:41, Saravana Kannan <skannan@codeaurora.org> wrote:
+> On 02/25/2014 05:04 AM, Rafael J. Wysocki wrote:
+>> On Tuesday, February 25, 2014 02:20:57 PM Viresh Kumar wrote:
 
-Well, I can always enable it in my out-of-tree branch until we can push 
-the complete binding in mainline, so I'm ok with taking it out of this 
-patch for now.
+> I think there's been a misunderstanding of what I'm proposing. The reference
+> to policy->clk is only to get rid of the dependency that
+> cpufreq_generic_get() has on the per cpu policy variable being filled. You
+> can do that by just removing calls to get _IF_ clk is filled in.
+
+cpufreq_cpu_get() can be called by other drivers as well, which may not have
+clock interface implemented for them. We can't stop them from calling it.
+
+> I'll look at the patches later today and respond. Although, I would have
+> been nice you had helped me fix any issues with my patch than coming up with
+> new ones. Kinda removes to motivation for submitting patches upstream.
+
+Sorry if I demotivated you at all :)
+
+I just wanted to get to a quick-fix and wasn't interested in getting
+my patch count
+up. Thought that isn't always bad :)
+
+I sent my patches as they were very different then your approach. Obviously, I
+wouldn't have done this otherwise :)
