@@ -1,16 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 26 Feb 2014 17:10:52 +0800
-Subject: [PATCH v3 1/2] ARM: imx6q: Add GPR6 and GPR7 register
- definitions for iomuxc gpr
-In-Reply-To: <1393249910-11723-1-git-send-email-p.zabel@pengutronix.de>
-References: <1393249910-11723-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20140226091050.GB23892@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Feb 2014 10:20:47 +0100
+Subject: [PATCH RESEND] ARM: imx6: build pm-imx6q.c independently of
+ CONFIG_PM
+In-Reply-To: <20140226072833.GA23892@S2101-09.ap.freescale.net>
+References: <1392690905-16839-1-git-send-email-shawn.guo@linaro.org>
+ <201402252046.04144.arnd@arndb.de>
+ <20140226072833.GA23892@S2101-09.ap.freescale.net>
+Message-ID: <5787995.zDVCNExNtr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 24, 2014 at 02:51:49PM +0100, Philipp Zabel wrote:
-> Masks for IPU AXI transaction QoS settings
+On Wednesday 26 February 2014 15:28:35 Shawn Guo wrote:
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> The error is only seen on the linux-next, and partially caused by the
+> resolution for the conflict between this patch and the ones I queued for
+> 3.15.  I'm rebasing my imx-soc-3.15 branch to 3.14-rc4, so that the
+> conflict can be solved on my branch in a cleaner way, which will help
+> fix the error here.  So hopefully, in the next build of linux-next, the
+> error will disappear.
 
-Applied both, thanks.
+Ok, thanks a lot!
+
+	Arnd
