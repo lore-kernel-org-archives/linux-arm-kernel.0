@@ -1,31 +1,77 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 26 Feb 2014 23:04:28 +0300
-Subject: [PATCH 0/5] ARM: davinci: tnetv107x removal
-In-Reply-To: <201402261446.29257.arnd@arndb.de>
-References: <1393418614-3968549-1-git-send-email-arnd@arndb.de>
- <201402261446.29257.arnd@arndb.de>
-Message-ID: <530E48CC.3040304@cogentembedded.com>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Wed, 26 Feb 2014 11:05:09 -0800
+Subject: [PATCH v4 0/2] hibernation support on ARM
+Message-ID: <1393441511-15127-1-git-send-email-sebastian.capella@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Patches adding support for hibernation on ARM
+ - ARM hibernation / suspend-to-disk
+ - Change soft_restart to use non-tracing raw_local_irq_disable
 
-On 02/26/2014 04:46 PM, Arnd Bergmann wrote:
+Patches based on v3.13 tag, verified hibernation on beaglebone black on a
+branch based on 3.13 merged with initial omap support from Russ Dill which
+can be found here (includes v1 patchset):
+http://git.linaro.org/git-ro/people/sebastian.capella/linux.git hibernation_3.13_russMerge
 
->> The five patches are completely independent of one another,
->> and applying them out of order is fine since we just want
->> to remove the code. However, I'm looking for an Ack from
->> Cyril Chemparathy and Sekhar Nori first, to be sure we
->> won't need this code in the future. Kevin Hilman has
->> already mentioned that he sees no reason to keep this
->> code.
+[PATCH v4 1/2] ARM: avoid tracers in soft_restart
+ arch/arm/kernel/process.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Hmm, apparently Cyril is no longer at TI. If anyone has his
-> current email address and thinks he might have an opinion,
-> could you forward the original email?
+ Use raw_local_irq_disable in place of local_irq_disable to avoid
+ infinite abort recursion while tracing. (unchanged since v3)
 
-    Done. Fished his Gmail address from LinkedIn.
+[PATCH v4 2/2] ARM hibernation / suspend-to-disk
+ arch/arm/include/asm/memory.h |    1 +
+ arch/arm/kernel/Makefile      |    1 +
+ arch/arm/kernel/hibernate.c   |  113 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/Kconfig           |    5 ++
+ include/linux/suspend.h       |    2 +
+ 5 files changed, 122 insertions(+)
 
-> 	Arnd
+ Adds support for ARM based hibernation
 
-WBR, Sergei
+
+Additional notes:
+-----------------
+
+There are two checkpatch warnings added by this patch.  These follow
+behavior in existing hibernation implementations on other platforms.
+
+    WARNING: externs should be avoided in .c files
+    #116: FILE: arch/arm/kernel/hibernate.c:26:
+    +extern const void __nosave_begin, __nosave_end;
+
+  This extern is picking up the linker nosave region definitions, only
+  used in hibernate.  Follows same extern line used mips, powerpc, s390,
+  sh, sparc, x86 & unicore32
+
+    WARNING: externs should be avoided in .c files
+    #191: FILE: arch/arm/kernel/hibernate.c:101:
+    +extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
+
+  This extern is used in the arch/arm/ in hibernate, process and bL_switcher
+
+
+Changes in v4:
+--------------
+* updated comment for soft_restart with review feedback
+* dropped freeze_processes patch which was queued separately 
+  to 3.14 by Rafael Wysocki:
+  https://lkml.org/lkml/2014/2/25/683
+
+Changes in v3:
+--------------
+* added comment to use of soft_restart
+* drop irq disable soft_restart patch
+* add patch to avoid tracers in soft_restart by using raw_local_irq_*
+
+Changes in v2:
+--------------
+* Removed unneeded flush_thread, use of __naked and cpu_init.
+* dropped Cyril Chemparathy <cyril@ti.com> from Cc: list as 
+  emails are bouncing.
+
+Thanks,
+
+Sebastian Capella
