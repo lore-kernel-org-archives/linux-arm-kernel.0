@@ -1,68 +1,35 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 26 Feb 2014 11:32:19 +0530
-Subject: [PATCH] cpufreq: Set policy to non-NULL only after all hotplug
- online work is done
-In-Reply-To: <530D47F4.2010204@codeaurora.org>
-References: <1393225072-3997-1-git-send-email-skannan@codeaurora.org>
- <15001517.xLHO8lGdWr@vostro.rjw.lan> <530D06FF.201@codeaurora.org>
- <1789244.B5CzWbcp6h@vostro.rjw.lan>
- <530D47F4.2010204@codeaurora.org>
-Message-ID: <CAKohpo==WVKytPCaMk=O5rGfPNFDAF7ffYo7OE0d3uAPyJfwwA@mail.gmail.com>
+From: mohun106@gmail.com (mohun106 at gmail.com)
+Date: Wed, 26 Feb 2014 11:32:50 +0530
+Subject: [PATCH 0/2] Add support for Cavium Thunder ARMv8 platform 
+Message-ID: <1393394572-6269-1-git-send-email-mohun106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2014 07:18, Saravana Kannan <skannan@codeaurora.org> wrote:
-> On 02/25/2014 02:41 PM, Rafael J. Wysocki wrote:
+From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
 
->> And is "fully initialized" actually well defined?
->
-> The point in add dev/hot plug path after which we will no longer change
-> policy fields without sending further CPUFREQ_UPDATE_POLICY_CPU /
-> CPUFRE_NOTIFY notifiers.
+This patch series adds preliminary support for Cavium's Thunder SoC
+which is based on ARMv8 core.
 
-Okay..
+This patchset depends on
+1) GICv3 driver from Marc Zyngier
+[PATCH 01/18] arm64: initial support for GICv3
+http://www.spinics.net/lists/arm-kernel/msg305027.html
 
-> Pretty much the end of __cpufreq_add_dev() so that it's after:
-> - cpufreq_init_policy()
-> - And the update of userpolicy fields that after thie init call
+2) GICv3 devicetree bindings
+[PATCH 02/18] arm64: GICv3 device tree binding documentation
+http://www.spinics.net/lists/arm-kernel/msg305023.html
 
-No. In that case it can be considered initialized before cpufreq_init_policy().
-As we do send CPUFREQ_NOTIFY after that from cpufreq_init_policy()->
-cpufreq_set_policy().
+3) 48-bit Physical Address support for ARMv8 cores from Radha Mohan
+Chintakuntla
+[PATCH 1/1] arm64: Add support for 48-bit Physical Address
+http://www.spinics.net/lists/arm-kernel/msg311035.html
 
-There are two types of fields within policy, some are very basic: cpu/min/max/
-affected_cpus/related_cpus
+Radha Mohan Chintakuntla (2):
+  arm64: Add Kconfig option for Cavium Thunder SoC Family
+  arm64: Add initial dts for Cavium Thunder SoC
 
-some are advanced: sysfs/governors/..
-
-And as a rule you have to get policy->rwsem lock before accessing policy
-members. We might not have followed it very well for small things like cpu.
-
-And so if you are doing anything over that, please use a lock and that is
-already present in cpufreq_update_policy().
-
-With my latest patchset that I sent yesterday, locking is improved and now
-a policy will be usable only after the rwsem is released. And that should be
-fine. And so making it available in the per-cpu variable after all the necessary
-fields are filled looks fine to me. And so I don't think we need to move it
-after call to cpufreq_init_policy(maybe a better name to this function is
-required)..
-
-> Ok, here's some pseudo code to explain it better:
->
-> Something like, replace all calls to cpufreq_driver->get with
-> __cpufreq_driver_get() with the fn being something like:
->
-> unsigned int __cpufreq_driver_get(cpufreq_policy *policy)
-> {
->   if (policy->clk)
->      return clk_get_rate(policy->clk) / 1000;
->   else
->      return cpufreq_driver->get(policy->cpu);
-
-This part may still use cpufreq_cpu_get().
-
-> }
-
-Drivers are free to have their implementation of ->get() even
-if they have a valid policy->clk field..
+ arch/arm64/Kconfig              |    6 ++
+ arch/arm64/boot/dts/Makefile    |    1 +
+ arch/arm64/boot/dts/thunder.dts |  158 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 165 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/thunder.dts
