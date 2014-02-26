@@ -1,48 +1,46 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 26 Feb 2014 15:03:10 -0800
-Subject: [PATCH 2/4] arm: qcom: Split Qualcomm support into legacy and
- multiplatform
-In-Reply-To: <FF42247A-A4E8-4AA2-9C3B-BEEFC2F61714@codeaurora.org> (Kumar
- Gala's message of "Wed, 26 Feb 2014 11:22:47 -0600")
-References: <1391107002-21470-1-git-send-email-galak@codeaurora.org>
- <1391107002-21470-3-git-send-email-galak@codeaurora.org>
- <7hha7m0x9w.fsf@paris.lan>
- <FF42247A-A4E8-4AA2-9C3B-BEEFC2F61714@codeaurora.org>
-Message-ID: <7hbnxtwk7l.fsf@paris.lan>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 26 Feb 2014 17:08:38 -0600
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <CAFEAcA8u6u8Hh=qn8XE2Evc93_-pkZPSDSShm-eiSn-vcsYgKA@mail.gmail.com>
+References: <20140226183454.GA14639@cbox> <5553754.0b4gMg5OS7@wuerfel>
+ <CAL_Jsq+3jBdca9zVnxHG+7pxy2_316emsP=PB3WkTMQP0JYBYQ@mail.gmail.com>
+ <CAFEAcA8u6u8Hh=qn8XE2Evc93_-pkZPSDSShm-eiSn-vcsYgKA@mail.gmail.com>
+Message-ID: <CAL_JsqJ+mXadxLHqFw6uXvM9=juC-emKT7G-d-_PLYbXNSX7Ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kumar Gala <galak@codeaurora.org> writes:
-
-> On Feb 26, 2014, at 8:22 AM, Kevin Hilman <khilman@linaro.org> wrote:
+On Wed, Feb 26, 2014 at 4:54 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
+> On 26 February 2014 22:49, Rob Herring <robherring2@gmail.com> wrote
+>> The SBSA only spec's a very minimal pl011 subset which is only
+>> suitable for early serial output. Not only is there no DMA, but there
+>> are no interrupts and maybe no input.
 >
->> Kumar Gala <galak@codeaurora.org> writes:
->> 
->>> Introduce a new mach-qcom that will support SoCs that intend to be
->>> multiplatform compatiable while keeping mach-msm to legacy SoC/board
->>> support that will not transition over to multiplatform.
->>> 
->>> As part of this, we move support for MSM8X60, MSM8960 and MSM8974 over
->>> to mach-qcom.
->>> 
->>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
->> 
->> Having a closer look at this after seeing the multi_v7_defconfig change,
->> I have a minor nit on the new ARCH_QCOM name.
->> 
->> For new additions, we've been trying to move towards using SOC_foo
->> instead of ARCH_foo.  Any reason not to do that here also?
->> 
->> Kevin
+> No interrupts on a UART in a VM (especially an emulated one)
+> is a good way to spend all your time bouncing around in I/O
+> emulation of the "hey can we send another byte yet?" register...
 >
-> No reason, just wasn?t aware and no one said anything til now.  
+>> I think it also assumes the uart
+>> is enabled and configured already by firmware. It is all somewhat
+>> pointless because the location is still not known or discoverable by
+>> early code.
+>
+> This sounds like we should specify and implement something
+> so we can provide this information in the device tree. Telling
+> the kernel where the hardware is is exactly what DT is for, right?
 
-Yeah, sorry for not reviewiing sooner.
+Yes, I'm looking into that, but that's not really a concern for this
+doc as early output is a debug feature.
 
-> Hmm, how to handle this now, can we do this as a 3.16 cleanup?
+>> I think the VM image just has to support pl011, virtio-console, and
+>> xen console. Arguably, an 8250 should also be included in interest of
+>> making things just work.
+>
+> What does the 8250 have to recommend it over just providing
+> the PL011?
 
-Yes, we've already merged it, so doing it as a cleanup should be fine.
+As I mentioned, it will just work for anything that expects the serial
+port to be ttyS0 as on x86 rather than ttyAMA0. Really, I'd like to
+see ttyAMA go away, but evidently that's not an easily fixed issue and
+it is an ABI.
 
-Thanks,
-
-Kevin
+Rob
