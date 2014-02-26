@@ -1,30 +1,27 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 26 Feb 2014 08:49:50 -0500
-Subject: [RFC PATCH 1/1] arm64: Add support for 48-bit Physical Address
-In-Reply-To: <1393394310-6138-2-git-send-email-mohun106@gmail.com>
-References: <1393394310-6138-1-git-send-email-mohun106@gmail.com>
- <1393394310-6138-2-git-send-email-mohun106@gmail.com>
-Message-ID: <530DF0FE.3050602@codeaurora.org>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 26 Feb 2014 08:51:08 -0500
+Subject: [PATCH v2 3/3] ahci: st: Add support for ST's SATA IP
+In-Reply-To: <20140225144141.GA26788@htj.dyndns.org>
+References: <1393328481-7251-1-git-send-email-lee.jones@linaro.org>
+ <1393328481-7251-3-git-send-email-lee.jones@linaro.org>
+ <20140225144141.GA26788@htj.dyndns.org>
+Message-ID: <20140226135108.GC17302@htj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Radha,
-
-On 02/26/2014 12:58 AM, mohun106 at gmail.com wrote:
-> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+On Tue, Feb 25, 2014 at 09:41:41AM -0500, Tejun Heo wrote:
+> On Tue, Feb 25, 2014 at 11:41:21AM +0000, Lee Jones wrote:
+> > Cc: Tejun Heo <tj@kernel.org>
+> > Cc: linux-ide at vger.kernel.org
+> > Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> Added support for ARMv8 platforms that have 48-bit physical address
-> implemented. There is no change in the VA bits and levels of
-> translation.
+> Applied to libata/for-3.15 w/ missing "\n" added to dev_err() in
+> st_ahci_suspend().
 
-Is there benefit to using build-time constants for this information? Why not
-look up the physical address range at run time, so that a single kernel binary
-could run on any system?
-
-Thanks,
-Christopher
+Reverted from libata/for-3.15 due to build failure.  Please drop
+ahci_platform_put_resource() calls.  ahci_platform now manages it
+through devres.
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+tejun
