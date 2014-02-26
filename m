@@ -1,105 +1,28 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 26 Feb 2014 10:36:57 +0530
-Subject: [PATCH 1/3] cpufreq: stats: Remove redundant cpufreq_cpu_get()
- call
-In-Reply-To: <1393385915-19138-1-git-send-email-skannan@codeaurora.org>
-References: <1789244.B5CzWbcp6h@vostro.rjw.lan>
- <1393385915-19138-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <CAKohponAnGn-C7-3T6JWZBb0PxtY1pE+o9SAKP-xC6GOrVE02Q@mail.gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 26 Feb 2014 14:24:04 +0900
+Subject: [PATCH 0/3] introduce new config option for samsung common clock
+Message-ID: <1393392247-6247-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2014 09:08, Saravana Kannan <skannan@codeaurora.org> wrote:
-> __cpufreq_stats_create_table always gets pass the valid and real policy
-> struct. So, there's no need to call cpufreq_cpu_get() to get the policy
-> again.
->
-> Change-Id: I0136b3e67018ee3af2335906407f55d8c6219f71
+This patchset introduces a new config option for Samsung
+common clock infrastructure as COMMON_CLK_SAMSUNG. As current
+samsung common clock gets compiled based on PLAT_SAMSUNG, but moving 
+ahead with ARM64 we can not have any more such config options, so 
+better we introduce new COMMON_CLK_SAMSUNG and make it dependent
+on existing ARCH_XXXX which needs SAMSUNG common clock infrastructure, also
+on ARM64.
 
-??
+Pankaj Dubey (3):
+  drivers: clk: add samsung common clock config option
+  ARM: select COMMON_CLK_SAMSUNG for ARCH_EXYNOS and ARCH_S3C64XX
+  ARM: S3C24XX: select COMMON_CLK_SAMSUNG for S3C24XX
 
-> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
-> ---
->
-> Viresh/Rafael,
->
-> These 3 patches is the approximate code I have in mind.
->
-> Approximate because:
-> * I inserted one question as a comment into the code.
-> * If the patch doesn't have any bugs, the plan is to remove
->   cpufreq_generic_get() and references to it.
->
-> This takes care of the "don't advertise before it's ready for use" rule.
->
-> Viresh,
->
-> I think the locking updates needs to be done in addition to this.
->
-> Regards,
-> Saravana
->
->  drivers/cpufreq/cpufreq_stats.c | 12 +-----------
->  1 file changed, 1 insertion(+), 11 deletions(-)
->
-> diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
-> index 5793e14..e4bd27f 100644
-> --- a/drivers/cpufreq/cpufreq_stats.c
-> +++ b/drivers/cpufreq/cpufreq_stats.c
-> @@ -185,7 +185,6 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
->  {
->         unsigned int i, j, count = 0, ret = 0;
->         struct cpufreq_stats *stat;
-> -       struct cpufreq_policy *current_policy;
->         unsigned int alloc_size;
->         unsigned int cpu = policy->cpu;
->         if (per_cpu(cpufreq_stats_table, cpu))
-> @@ -194,13 +193,7 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
->         if ((stat) == NULL)
->                 return -ENOMEM;
->
-> -       current_policy = cpufreq_cpu_get(cpu);
-> -       if (current_policy == NULL) {
-> -               ret = -EINVAL;
-> -               goto error_get_fail;
-> -       }
-> -
-> -       ret = sysfs_create_group(&current_policy->kobj, &stats_attr_group);
-> +       ret = sysfs_create_group(&policy->kobj, &stats_attr_group);
->         if (ret)
->                 goto error_out;
->
-> @@ -243,11 +236,8 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
->         stat->last_time = get_jiffies_64();
->         stat->last_index = freq_table_get_index(stat, policy->cur);
->         spin_unlock(&cpufreq_stats_lock);
-> -       cpufreq_cpu_put(current_policy);
->         return 0;
->  error_out:
-> -       cpufreq_cpu_put(current_policy);
-> -error_get_fail:
->         kfree(stat);
->         per_cpu(cpufreq_stats_table, cpu) = NULL;
->         return ret;
+ arch/arm/Kconfig              |    2 ++
+ arch/arm/mach-s3c24xx/Kconfig |    3 +++
+ drivers/clk/Kconfig           |   10 ++++++++++
+ drivers/clk/Makefile          |    2 +-
+ 4 files changed, 16 insertions(+), 1 deletion(-)
 
-I was damn sure that this wasn't a waste of time. This was some meaningful
-code when I visited it earlier. And we absolutely required a new
-cpufreq_cpu_get()..
-
-Reason: Earlier tables were created for this notifier: CPUFREQ_NOTIFY and
-it used to come with another changed copy of 'policy' and so we were required
-to get the real copy of policy to get to the right kobj.
-
-But recently I have simplified stuff there and these tables are now added with
-CPUFREQ_CREATE_POLICY and so this replication isn't required anymore.
-
-So, Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-While you are at it please get this part into __cpufreq_stats_create_table()
-routine:
-
-table = cpufreq_frequency_get_table(cpu);
-if (!table)
-    return 0;
-
-As it is replicated at two places currently.
+-- 
+1.7.9.5
