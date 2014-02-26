@@ -1,30 +1,51 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 26 Feb 2014 17:04:15 +0100
-Subject: [PATCH] ARM: XEN depends on having a MMU
-In-Reply-To: <alpine.DEB.2.02.1402261445020.31489@kaball.uk.xensource.com>
-References: <1393425046-23317-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <alpine.DEB.2.02.1402261445020.31489@kaball.uk.xensource.com>
-Message-ID: <20140226160415.GK6865@pengutronix.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 26 Feb 2014 17:02:03 +0100
+Subject: [PATCH 00/15] ASoC: fsl-ssi: Driver cleanup
+Message-ID: <1393430538-32333-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stefano,
+Hi,
 
-On Wed, Feb 26, 2014 at 02:45:19PM +0000, Stefano Stabellini wrote:
-> On Wed, 26 Feb 2014, Uwe Kleine-K?nig wrote:
-> > arch/arm/xen/enlighten.c (and maybe others) use MMU-specific functions
-> > like pte_mkspecial which are only available on MMU builds. So let XEN
-> > depend on MMU.
-> > 
-> > Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Who will apply this patch? I expected that you pick it up.
+Here is a series of cleanups for the fsl-ssi driver.
 
-Best regards
-Uwe
+It would be great if someone with PPC hardware and this fsl-ssi unit could
+please test this series. I am not sure if the regmap patch works as expected on
+PPC as well.
+
+I tested this series on imx53 quick starter board and a custom board. Both with
+SSI as I2S slave.
+
+Regards,
+
+Markus
+
+
+Markus Pargmann (15):
+  ASoC: fsl-ssi: Use regmap
+  ASoC: fsl-ssi: Remove fsl_ssi_setup
+  ASoC: fsl-ssi: Move debugging to seperate file
+  ASoC: fsl-ssi: Use dev_name for DAI driver struct
+  ASoC: fsl-ssi: Move imx-specific probe to seperate function
+  ASoC: fsl-ssi: Remove useless DMA code
+  ASoC: fsl-ssi: baud clock error handling
+  ASoC: fsl-ssi: Cleanup probe function
+  ASoC: fsl-ssi: Remove unnecessary variables from ssi_private
+  ASoC: fsl-ssi: reorder and document fsl_ssi_private
+  ASoC: fsl-ssi: Fix register values when disabling
+  ASoC: fsl-ssi: Only enable baudclk when used
+  ASoC: fsl-ssi: Set default dai-fmts
+  ASoC: fsl-ssi: Transmit enable synchronization
+  ASoC: fsl-ssi: Update binding documentation
+
+ .../devicetree/bindings/sound/fsl,ssi.txt          |   21 +-
+ sound/soc/fsl/Kconfig                              |    1 +
+ sound/soc/fsl/Makefile                             |    2 +
+ sound/soc/fsl/fsl_ssi.c                            | 1167 ++++++++------------
+ sound/soc/fsl/fsl_ssi.h                            |  112 +-
+ sound/soc/fsl/fsl_ssi_dbg.c                        |  163 +++
+ 6 files changed, 750 insertions(+), 716 deletions(-)
+ create mode 100644 sound/soc/fsl/fsl_ssi_dbg.c
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.8.5.3
