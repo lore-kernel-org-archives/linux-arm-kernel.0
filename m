@@ -1,36 +1,72 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 26 Feb 2014 13:36:33 -0700
-Subject: [PATCH 0/2] Watchdog on Armada 375 SoC
-In-Reply-To: <1393419047-10071-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1393419047-10071-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20140226203633.GA24656@obsidianresearch.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 26 Feb 2014 12:40:03 -0800
+Subject: [PATCH v3 1/2] CLK: TI: OMAP4/5/DRA7: Remove gpmc_fck from dummy
+ clocks
+In-Reply-To: <1393411089-9550-2-git-send-email-florian.vaussard@epfl.ch>
+References: <1393411089-9550-1-git-send-email-florian.vaussard@epfl.ch>
+ <1393411089-9550-2-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <20140226204003.4353.17772@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 09:50:45AM -0300, Ezequiel Garcia wrote:
- 
-> Here we found both the above RSTOUT:
+Quoting Florian Vaussard (2014-02-26 02:38:08)
+> When arch/arm/mach-omap2/gpmc.c calls clk_get(..., "fck"), it will
+> get a dummy clock and try to use it. As the rate is configured to zero,
+> this will result in several divisions by zero, and misconfigured
+> timings, with devices on the bus being lost in the La La Land.
 > 
-> 1. It has the same dedicated register as A370/XP (0x20704)
-> 2. Also has a bit in the shared RSTOUT register (0x18254)
-
-Unless you know otherwise I think the same risk exists, RSTOUT could
-be (or become) internally asserted when you unmask the bit in the
-control register that drives the pin, which says the watchdog driver
-should control to it.
-
-> A possible solution is to extend the reg property in the watchdog
-> devicetree and allow for a new optional pair of cells to complete
-> the specification of the RSTOUT.
+> It is better to remove gpmc_fck from the dummy clocks, so that gpmc.c
+> can fail gracefully.
 > 
-> 	watchdog-timer at 20300 {
-> 		compatible = "marvell,orion-wdt";
-> 		reg = <0x20300 0x28
-> 		       {shared RSOUT} 0x4
-> 		       0x0 0x0>;
-> 	};
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 
-I wouldn't have the 0x0, if you want to go this way, just make the
-375 compatible string require a 3 entry reg.
+Looks good to me.
 
-Jason
+Regards,
+Mike
+
+> ---
+>  drivers/clk/ti/clk-44xx.c | 1 -
+>  drivers/clk/ti/clk-54xx.c | 1 -
+>  drivers/clk/ti/clk-7xx.c  | 1 -
+>  3 files changed, 3 deletions(-)
+> 
+> diff --git a/drivers/clk/ti/clk-44xx.c b/drivers/clk/ti/clk-44xx.c
+> index ae00218..02517a8 100644
+> --- a/drivers/clk/ti/clk-44xx.c
+> +++ b/drivers/clk/ti/clk-44xx.c
+> @@ -222,7 +222,6 @@ static struct ti_dt_clk omap44xx_clks[] = {
+>         DT_CLK(NULL, "auxclk5_src_ck", "auxclk5_src_ck"),
+>         DT_CLK(NULL, "auxclk5_ck", "auxclk5_ck"),
+>         DT_CLK(NULL, "auxclkreq5_ck", "auxclkreq5_ck"),
+> -       DT_CLK("50000000.gpmc", "fck", "dummy_ck"),
+>         DT_CLK("omap_i2c.1", "ick", "dummy_ck"),
+>         DT_CLK("omap_i2c.2", "ick", "dummy_ck"),
+>         DT_CLK("omap_i2c.3", "ick", "dummy_ck"),
+> diff --git a/drivers/clk/ti/clk-54xx.c b/drivers/clk/ti/clk-54xx.c
+> index 0ef9f58..08f3d1b 100644
+> --- a/drivers/clk/ti/clk-54xx.c
+> +++ b/drivers/clk/ti/clk-54xx.c
+> @@ -182,7 +182,6 @@ static struct ti_dt_clk omap54xx_clks[] = {
+>         DT_CLK(NULL, "auxclk3_src_ck", "auxclk3_src_ck"),
+>         DT_CLK(NULL, "auxclk3_ck", "auxclk3_ck"),
+>         DT_CLK(NULL, "auxclkreq3_ck", "auxclkreq3_ck"),
+> -       DT_CLK(NULL, "gpmc_ck", "dummy_ck"),
+>         DT_CLK("omap_i2c.1", "ick", "dummy_ck"),
+>         DT_CLK("omap_i2c.2", "ick", "dummy_ck"),
+>         DT_CLK("omap_i2c.3", "ick", "dummy_ck"),
+> diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
+> index 9977653..f7e4073 100644
+> --- a/drivers/clk/ti/clk-7xx.c
+> +++ b/drivers/clk/ti/clk-7xx.c
+> @@ -262,7 +262,6 @@ static struct ti_dt_clk dra7xx_clks[] = {
+>         DT_CLK(NULL, "vip1_gclk_mux", "vip1_gclk_mux"),
+>         DT_CLK(NULL, "vip2_gclk_mux", "vip2_gclk_mux"),
+>         DT_CLK(NULL, "vip3_gclk_mux", "vip3_gclk_mux"),
+> -       DT_CLK(NULL, "gpmc_ck", "dummy_ck"),
+>         DT_CLK("omap_i2c.1", "ick", "dummy_ck"),
+>         DT_CLK("omap_i2c.2", "ick", "dummy_ck"),
+>         DT_CLK("omap_i2c.3", "ick", "dummy_ck"),
+> -- 
+> 1.8.1.2
+> 
