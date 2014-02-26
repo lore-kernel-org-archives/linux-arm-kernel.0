@@ -1,43 +1,25 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 26 Feb 2014 11:11:49 +0100
-Subject: [PATCH] ARM: shmobile: Check r8a7791 MD21 at SMP boot
-In-Reply-To: <20140226095916.15676.99394.sendpatchset@w520>
-References: <20140226095916.15676.99394.sendpatchset@w520>
-Message-ID: <CAMuHMdXKdN+LrhhCFKgO4=2ez0qiyc8EhtBLPzrfxmBMLpGX7Q@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 26 Feb 2014 11:12:04 +0100
+Subject: build error on 3.14-rc4 with SPLIT_PTLOCK_CPUS <= NR_CPUS and !MMU
+Message-ID: <20140226101204.GD6865@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+Hello,
 
-On Wed, Feb 26, 2014 at 10:59 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> On r8a7791 the hardware boot mode bit MD21 indicates if hardware
-> debug mode is enabled or not. In case hardware debug mode is enabled
-> print a warning and refrain from booting secondary CPU cores.
->
-> Without this patch Koelsch with SW8-4 set to OFF will hang at SMP boot.
->
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+with the attached config building on v3.14-rc4 fails with 
 
-On Koelsch:
+In file included from arch/arm/kernel/asm-offsets.c:14:0:
+include/linux/mm.h: In function 'pte_lockptr':
+include/linux/mm.h:1392:2: error: implicit declaration of function 'pmd_page' [-Werror=implicit-function-declaration]
+include/linux/mm.h:1392:2: warning: passing argument 1 of 'ptlock_ptr' makes pointer from integer without a cast [enabled by default]
+include/linux/mm.h:1384:27: note: expected 'struct page *' but argument is of type 'int'
 
-Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
+I don't know how to fix that.
 
->  This is a reworked version of the APMU patch previously posted as
->  [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
+Best regards
+Uwe
 
-Your previous version also affected r8a7790/Lager.
-Isn't this check no longer needed there? According to the Lager manual,
-MD21 also enables hardware debug mode, and is also controlled by
-SW8-4. Of course the CPU may behave differently, as the CPU cores
-are different.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
