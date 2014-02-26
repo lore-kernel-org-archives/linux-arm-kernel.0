@@ -1,41 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 26 Feb 2014 15:23:37 +0100
-Subject: [PATCH] ARM: v7m: only call printk with CONFIG_PRINTK=y
-Message-ID: <1393424617-29729-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: mohun106@gmail.com (Radha Mohan)
+Date: Wed, 26 Feb 2014 19:57:12 +0530
+Subject: [RFC PATCH 1/1] arm64: Add support for 48-bit Physical Address
+In-Reply-To: <20140226140821.GD7409@arm.com>
+References: <1393394310-6138-1-git-send-email-mohun106@gmail.com>
+ <1393394310-6138-2-git-send-email-mohun106@gmail.com>
+ <530DF0FE.3050602@codeaurora.org> <20140226140821.GD7409@arm.com>
+Message-ID: <CAC8NTUVWiAUJFda95dQdyaS39jykARggoPy0ggmuxUp=0orUsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise this fails to build (e.g. on efm32_defconfig +
-CONFIG_PRINTK=n) with:
+On Wed, Feb 26, 2014 at 7:38 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Wed, Feb 26, 2014 at 01:49:50PM +0000, Christopher Covington wrote:
+>> On 02/26/2014 12:58 AM, mohun106 at gmail.com wrote:
+>> > From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+>> >
+>> > Added support for ARMv8 platforms that have 48-bit physical address
+>> > implemented. There is no change in the VA bits and levels of
+>> > translation.
+>>
+>> Is there benefit to using build-time constants for this information? Why not
+>> look up the physical address range at run time, so that a single kernel binary
+>> could run on any system?
+>
+> I agree, we don't need a Kconfig option for this, just check the
+> available (intermediate) physical address bits at boot-time
+> (ID_AA64MMFR0_EL1) and program the TCR_ELx registers accordingly.
+>
 
-	arch/arm/kernel/entry-v7m.S:28: undefined reference to `printk'
+OK, I will redo with the proposed changes.
 
-.
+> (for whatever reason, I got the same patches in private and I replied
+> with the same but they haven't been changed before appearing on the
+> list)
+>
+Oops, I did miss that mail.
 
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/kernel/entry-v7m.S | 2 ++
- 1 file changed, 2 insertions(+)
+regards,
+Radha
 
-diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
-index 2260f1855820..89f902cc5bfe 100644
---- a/arch/arm/kernel/entry-v7m.S
-+++ b/arch/arm/kernel/entry-v7m.S
-@@ -22,12 +22,14 @@
- 
- __invalid_entry:
- 	v7m_exception_entry
-+#ifdef CONFIG_PRINTK
- 	adr	r0, strerr
- 	mrs	r1, ipsr
- 	mov	r2, lr
- 	bl	printk
- 	mov	r0, sp
- 	bl	show_regs
-+#endif
- 1:	b	1b
- ENDPROC(__invalid_entry)
- 
--- 
-1.8.5.3
+> --
+> Catalin
