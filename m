@@ -1,37 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Feb 2014 00:38:22 +0900
-Subject: [PATCH 1/3] Documentation:spi:fsl-dspi:add DSPI dma transfer
- support
-In-Reply-To: <20140226141947.GE23892@S2101-09.ap.freescale.net>
-References: <1393311258-14380-1-git-send-email-b44548@freescale.com>
- <20140225090830.GO28555@e106331-lin.cambridge.arm.com>
- <20140226141947.GE23892@S2101-09.ap.freescale.net>
-Message-ID: <20140226153822.GC2394@sirena.org.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 26 Feb 2014 07:39:42 -0800
+Subject: Tegra clockframework fixes for 3.14
+In-Reply-To: <20140226101640.GM19389@tbergstrom-lnx.Nvidia.com>
+References: <20140220172744.GA4378@tbergstrom-lnx.Nvidia.com>
+ <20140224010211.22529.99924@quantum>
+ <20140224134319.GG19389@tbergstrom-lnx.Nvidia.com>
+ <20140226101640.GM19389@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20140226153942.22529.95697@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 10:19:49PM +0800, Shawn Guo wrote:
-> On Tue, Feb 25, 2014 at 09:08:30AM +0000, Mark Rutland wrote:
+Quoting Peter De Schrijver (2014-02-26 02:16:40)
+> Mike,
+> 
+> > On Mon, Feb 24, 2014 at 02:02:11AM +0100, Mike Turquette wrote:
+> > > Quoting Peter De Schrijver (2014-02-20 09:27:44)
+> > > > Hi Mike,
+> > > > 
+> > > > Could you merge these fixes still for 3.14?
+> > > 
+> > > No problem, but can you provide a list of the regressions fixed? I'll
+> > > add those to my merge commit message. No need for you to respin
+> > > anything. Next time if you could submit a signed tag with the
+> > > regressions listed in the message it would be a great help.
+> > > 
+> > 
+> > This fixes the following issues:
+> > 
+> > clk: tegra124: remove gr2d and gr3d clocks - accesses to undefined registers
+> > clk: tegra: Fix vic03 mux index - wrong parent when PLLC3 is selected (because clk_m is actually selected)
+> > clk: tegra: use max divider if divider overflows - make tegra fractional divider match the clk-div.c behaviour
+> > clk: tegra: cclk_lp has a pllx/2 divider - pllx runs at half the programmed rate
+> > clk: tegra: fix sdmmc clks on Tegra1x4 - wrong parent selection
+> > clk: tegra: fix host1x clock on Tegra124 - wrong parent selection
+> > clk: tegra: PLLD2 fixes for hdmi - PLL runs at wrong rate
+> > clk: tegra: Fix PLLD mnp table - PLL runs at wrong rate
+> > clk: tegra: Fix PLLP rate table - kernel panic when using coreboot
+> > clk: tegra: Correct clock number for UARTE - wrong clock when using UARTE
+> > clk: tegra: Add missing Tegra20 fuse clks - fuse driver broken
+> > 
+> 
+> Is this ok for you?
 
-> > > +- use-dma: the bool decide if use dma method in DSPI transfering.
+Yes, it's great. The tegra fixes are already part of the next batch
+towards -rc5.
 
-> > Why can the OS not decide this based on the presence of dmas which it
-> > can use?
+Thanks!
+Mike
 
-> Yes, OS/driver should decide to use DMA or not, but it shouldn't be
-> based on the presence of 'dmas' property.  The DMA is a hardware
-> resource just like IRQ.  It should be just there in client device's node
-> as long as the SoC design assigns the channel to the device.  The device
-> driver should make the decision when DMA should be used, e.g. big amount
-> data transfer, and when PIO should be used, e.g. small data.
-
-Right, that's very common - but that decision is usually taken on a per
-transfer basis so a DT property would seem odd, especially just a simple
-boolean.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140227/898f98b9/attachment.sig>
+> 
+> Thanks,
+> 
+> Peter.
