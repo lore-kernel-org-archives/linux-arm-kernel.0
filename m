@@ -1,106 +1,309 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Feb 2014 16:33:19 +0900
-Subject: [PATCH v3 03/20] ARM: shmobile: r8a7779: Add clock index macros for
- DT sources
+Date: Wed, 26 Feb 2014 16:33:17 +0900
+Subject: [PATCH v3 01/20] clk: shmobile: r8a7779: Add clocks support
 In-Reply-To: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
 References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1393400016-23433-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1393400016-23433-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add macros usable by device tree sources to reference r8a7779 clocks by
-index.
+The R8A7779 SoC has several clocks that are too custom to be supported in a
+generic driver. Those clocks can be divided in two categories:
 
-Based on work for the r8a7791 SoC by Laurent Pinchart.
+- Fixed rate clocks with multiplier and divisor set according to boot
+  mode configuration
+
+- Custom divider clocks with SoC-specific divider values
+
+This driver supports both.
+
+Based on work for R-Car Gen2 SoCs by Laurent Pinchart.
 
 Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
 ---
 v3
 * As suggested by Laurent Pinchart
-  - Consolidate R8A7779_CLK_HSPI{0,1,2} into R8A7779_CLK_HSPI
-  - Correct inverted indexes of R8A7779_CLK_TMU{1,2}
-  - Consolidate R8A7779_CLK_{E,O}HCI{0,1} into R8A7779_CLK_USB{0,1}
-  - Add ethernet, MMC and HSCIF entries
-  - Replace R8A7779_SCIF6 with R8A7779_CLK_SCIF5
+  - Added external clock input
+  - Use PLLA ratio set bu MD11 and MD12
+  - Add _div suffixes of fields of struct cpt_clk_config
+  - Register PLLA as a fixed factor clock
+  - Use sizeof() instead of sizeof
+  - Use num_clks instead of CPG_NUM_CLOCKS in r8a7779_cpg_clocks_init()
 
-* Add R8A7779_CLK_PCIE
-
-v2
-* No change
+  - I kept this as r8a7779 binding rather than moving to a R-Car Gen1
+    binding which could be shared with other SoCs as I do not believe that
+    the SoCs is are sufficiently similar.
 ---
- include/dt-bindings/clock/r8a7779-clock.h | 63 +++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
- create mode 100644 include/dt-bindings/clock/r8a7779-clock.h
+ .../bindings/clock/renesas,r8a7779-cpg-clocks.txt  |  26 +++
+ drivers/clk/shmobile/Makefile                      |   1 +
+ drivers/clk/shmobile/clk-r8a7779.c                 | 191 +++++++++++++++++++++
+ include/linux/clk/shmobile.h                       |   3 +
+ 4 files changed, 221 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt
+ create mode 100644 drivers/clk/shmobile/clk-r8a7779.c
 
-diff --git a/include/dt-bindings/clock/r8a7779-clock.h b/include/dt-bindings/clock/r8a7779-clock.h
+diff --git a/Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt b/Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt
 new file mode 100644
-index 0000000..8ab8007
+index 0000000..1461323
 --- /dev/null
-+++ b/include/dt-bindings/clock/r8a7779-clock.h
-@@ -0,0 +1,63 @@
++++ b/Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt
+@@ -0,0 +1,26 @@
++* Renesas R8A7779 Clock Pulse Generator (CPG)
++
++The CPG generates core clocks for the R8A7779. It includes one PLL and
++and several fixed ratio dividers
++
++Required Properties:
++
++  - compatible: Must be "renesas,r8a7779-cpg-clocks"
++  - reg: Base address and length of the memory resource used by the CPG
++
++  - clocks: Reference to the parent clock
++  - #clock-cells: Must be 1
++  - clock-output-names: The names of the clocks. Supported clocks are "plla",
++    "z", "zs", "s", "s1", "p", "out".
++
++
++Example
++-------
++
++	cpg_clocks: cpg_clocks at ffc80000 {
++		compatible = "renesas,r8a7779-cpg-clocks";
++		reg = <0 0xffc80000 0 0x80>;
++		clocks = <&extal_clk>;
++		#clock-cells = <1>;
++		clock-output-names = "plla", "z", "zs", "s", "s1", "p", "out";
++	};
+diff --git a/drivers/clk/shmobile/Makefile b/drivers/clk/shmobile/Makefile
+index 9ecef14..2121ba0 100644
+--- a/drivers/clk/shmobile/Makefile
++++ b/drivers/clk/shmobile/Makefile
+@@ -1,4 +1,5 @@
+ obj-$(CONFIG_ARCH_EMEV2)		+= clk-emev2.o
++obj-$(CONFIG_ARCH_R8A7779)		+= clk-r8a7779.o
+ obj-$(CONFIG_ARCH_R8A7790)		+= clk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_R8A7791)		+= clk-rcar-gen2.o
+ obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= clk-div6.o
+diff --git a/drivers/clk/shmobile/clk-r8a7779.c b/drivers/clk/shmobile/clk-r8a7779.c
+new file mode 100644
+index 0000000..2ca2d67
+--- /dev/null
++++ b/drivers/clk/shmobile/clk-r8a7779.c
+@@ -0,0 +1,191 @@
 +/*
-+ * Copyright (C) 2013  Horms Solutions Ltd.
++ * r8a7779 Core CPG Clocks
++ *
++ * Copyright (C) 2013, 2014 Horms Solutions Ltd.
 + *
 + * Contact: Simon Horman <horms@verge.net.au>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * the Free Software Foundation; version 2 of the License.
 + */
 +
-+#ifndef __DT_BINDINGS_CLOCK_R8A7779_H__
-+#define __DT_BINDINGS_CLOCK_R8A7779_H__
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/clk/shmobile.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/spinlock.h>
 +
-+/* CPG */
-+#define R8A7779_CLK_PLLA	0
-+#define R8A7779_CLK_Z		1
-+#define R8A7779_CLK_ZS		2
-+#define R8A7779_CLK_S		3
-+#define R8A7779_CLK_S1		4
-+#define R8A7779_CLK_P		5
-+#define R8A7779_CLK_OUT		6
++#include <dt-bindings/clock/r8a7779-clock.h>
 +
-+/* MSTP 0 */
-+#define R8A7779_CLK_HSPI	7
-+#define R8A7779_CLK_TMU2	14
-+#define R8A7779_CLK_TMU1	15
-+#define R8A7779_CLK_TMU0	16
-+#define R8A7779_CLK_HSCIF1	18
-+#define R8A7779_CLK_HSCIF0	19
-+#define R8A7779_CLK_SCIF5	21
-+#define R8A7779_CLK_SCIF4	22
-+#define R8A7779_CLK_SCIF3	23
-+#define R8A7779_CLK_SCIF2	24
-+#define R8A7779_CLK_SCIF1	25
-+#define R8A7779_CLK_SCIF0	26
-+#define R8A7779_CLK_I2C3	27
-+#define R8A7779_CLK_I2C2	28
-+#define R8A7779_CLK_I2C1	29
-+#define R8A7779_CLK_I2C0	30
++#define CPG_NUM_CLOCKS			(R8A7779_CLK_OUT + 1)
 +
-+/* MSTP 1 */
-+#define R8A7779_CLK_USB01	0
-+#define R8A7779_CLK_USB2	1
-+#define R8A7779_CLK_DU		3
-+#define R8A7779_CLK_VIN2	8
-+#define R8A7779_CLK_VIN1	9
-+#define R8A7779_CLK_VIN0	10
-+#define R8A7779_CLK_ETHER	14
-+#define R8A7779_CLK_SATA	15
-+#define R8A7779_CLK_PCIE	16
-+#define R8A7779_CLK_VIN3	20
++struct r8a7779_cpg {
++	struct clk_onecell_data data;
++	spinlock_t lock;
++	void __iomem *reg;
++};
 +
-+/* MSTP 3 */
-+#define R8A7779_CLK_SDHI3	20
-+#define R8A7779_CLK_SDHI2	21
-+#define R8A7779_CLK_SDHI1	22
-+#define R8A7779_CLK_SDHI0	23
-+#define R8A7779_CLK_MMC1	30
-+#define R8A7779_CLK_MMC0	31
++/* -----------------------------------------------------------------------------
++ * CPG Clock Data
++ */
 +
++/*
++ *		MD1 = 1			MD1 = 0
++ *		(PLLA = 1500)		(PLLA = 1600)
++ *		(MHz)			(MHz)
++ *------------------------------------------------+--------------------
++ * clkz		1000   (2/3)		800   (1/2)
++ * clkzs	 250   (1/6)		200   (1/8)
++ * clki		 750   (1/2)		800   (1/2)
++ * clks		 250   (1/6)		200   (1/8)
++ * clks1	 125   (1/12)		100   (1/16)
++ * clks3	 187.5 (1/8)		200   (1/8)
++ * clks4	  93.7 (1/16)		100   (1/16)
++ * clkp		  62.5 (1/24)		 50   (1/32)
++ * clkg		  62.5 (1/24)		 66.6 (1/24)
++ * clkb, CLKOUT
++ * (MD2 = 0)	  62.5 (1/24)		 66.6 (1/24)
++ * (MD2 = 1)	  41.6 (1/36)		 50   (1/32)
++ */
 +
-+#endif /* __DT_BINDINGS_CLOCK_R8A7779_H__ */
++#define CPG_CLK_CONFIG_INDEX(md)	(((md) & (BIT(1)|BIT(2))) >> 1)
++
++struct cpg_clk_config {
++	unsigned int z_mult;
++	unsigned int z_div;
++	unsigned int zs_and_s_div;
++	unsigned int s1_div;
++	unsigned int p_div;
++	unsigned int out_div;
++};
++
++static const struct cpg_clk_config cpg_clk_configs[4] __initconst = {
++	{ 1, 2, 8, 16, 32, 24 },
++	{ 1, 2, 8, 16, 32, 24 },
++	{ 2, 3, 6, 12, 24, 36 },
++	{ 2, 3, 6, 12, 24, 32 },
++};
++
++/*
++ *   MD		PLLA Ratio
++ * 12 11
++ *------------------------
++ * 0  0		x42
++ * 0  1		x48
++ * 1  0		x56
++ * 1  1		x64
++ */
++#define CPG_PLL_CONFIG_INDEX(md)	((((md) & BIT(14)) >> 12) | \
++					 (((md) & BIT(13)) >> 12) | \
++					 (((md) & BIT(19)) >> 19))
++struct cpg_pll_config {
++	unsigned int extal_div;
++	unsigned int pll1_mult;
++	unsigned int pll3_mult;
++};
++
++#define CPG_PLLA_MULT_INDEX(md)	(((md) & (BIT(12)|BIT(11))) >> 11)
++
++static const unsigned int cpg_plla_mult[4] __initconst = { 42, 48, 56, 64 };
++
++/* -----------------------------------------------------------------------------
++ * Initialization
++ */
++
++static u32 cpg_mode __initdata;
++
++static struct clk * __init
++r8a7779_cpg_register_clock(struct device_node *np, struct r8a7779_cpg *cpg,
++			   const struct cpg_clk_config *config,
++			   unsigned int plla_mult, const char *name)
++{
++	const char *parent_name = "plla";
++	unsigned int mult = 1;
++	unsigned int div = 1;
++
++	if (!strcmp(name, "plla")) {
++		parent_name = of_clk_get_parent_name(np, 0);
++		mult = plla_mult;
++	} else if (!strcmp(name, "z")) {
++		div = config->z_div;
++		mult = config->z_mult;
++	} else if (!strcmp(name, "zs") || !strcmp(name, "s")) {
++		div = config->zs_and_s_div;
++	} else if (!strcmp(name, "s1")) {
++		div = config->s1_div;
++	} else if (!strcmp(name, "p")) {
++		div = config->p_div;
++	} else if (!strcmp(name, "out")) {
++		div = config->out_div;
++	}
++
++	return clk_register_fixed_factor(NULL, name, parent_name, 0, mult, div);
++}
++
++static void __init r8a7779_cpg_clocks_init(struct device_node *np)
++{
++	const struct cpg_clk_config *config;
++	struct r8a7779_cpg *cpg;
++	struct clk **clks;
++	unsigned int i, plla_mult;
++	int num_clks;
++
++	num_clks = of_property_count_strings(np, "clock-output-names");
++	if (num_clks < 0) {
++		pr_err("%s: failed to count clocks\n", __func__);
++		return;
++	}
++
++	cpg = kzalloc(sizeof(*cpg), GFP_KERNEL);
++	clks = kzalloc(CPG_NUM_CLOCKS * sizeof(*clks), GFP_KERNEL);
++	if (cpg == NULL || clks == NULL) {
++		/* We're leaking memory on purpose, there's no point in cleaning
++		 * up as the system won't boot anyway.
++		 */
++		pr_err("%s: failed to allocate cpg\n", __func__);
++		return;
++	}
++
++	spin_lock_init(&cpg->lock);
++
++	cpg->data.clks = clks;
++	cpg->data.clk_num = num_clks;
++
++	cpg->reg = of_iomap(np, 0);
++	if (WARN_ON(cpg->reg == NULL))
++		return;
++
++	config = &cpg_clk_configs[CPG_CLK_CONFIG_INDEX(cpg_mode)];
++	plla_mult = cpg_plla_mult[CPG_PLLA_MULT_INDEX(cpg_mode)];
++
++	for (i = 0; i < num_clks; ++i) {
++		const char *name;
++		struct clk *clk;
++
++		of_property_read_string_index(np, "clock-output-names", i,
++					      &name);
++
++		clk = r8a7779_cpg_register_clock(np, cpg, config,
++						 plla_mult, name);
++		if (IS_ERR(clk))
++			pr_err("%s: failed to register %s %s clock (%ld)\n",
++			       __func__, np->name, name, PTR_ERR(clk));
++		else
++			cpg->data.clks[i] = clk;
++	}
++
++	of_clk_add_provider(np, of_clk_src_onecell_get, &cpg->data);
++}
++CLK_OF_DECLARE(r8a7779_cpg_clks, "renesas,r8a7779-cpg-clocks",
++	       r8a7779_cpg_clocks_init);
++
++void __init r8a7779_clocks_init(u32 mode)
++{
++	cpg_mode = mode;
++
++	of_clk_init(NULL);
++}
+diff --git a/include/linux/clk/shmobile.h b/include/linux/clk/shmobile.h
+index f9bf080..7667f49 100644
+--- a/include/linux/clk/shmobile.h
++++ b/include/linux/clk/shmobile.h
+@@ -1,7 +1,9 @@
+ /*
+  * Copyright 2013 Ideas On Board SPRL
++ * Copyright 2013 Horms Solutions Ltd.
+  *
+  * Contact: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
++ * Contact: Simon Horman <horms@verge.net.au>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -14,6 +16,7 @@
+ 
+ #include <linux/types.h>
+ 
++void r8a7779_clocks_init(u32 mode);
+ void rcar_gen2_clocks_init(u32 mode);
+ 
+ #endif
 -- 
 1.8.5.2
