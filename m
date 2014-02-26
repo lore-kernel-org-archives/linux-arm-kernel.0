@@ -1,39 +1,85 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 26 Feb 2014 09:26:39 +0200
-Subject: TWL6040 fails to initialize
-In-Reply-To: <530CB9C6.60806@epfl.ch>
-References: <530C70B3.4010103@epfl.ch> <530CA8DA.8050806@ti.com>
- <530CB9C6.60806@epfl.ch>
-Message-ID: <530D972F.805@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 26 Feb 2014 15:28:35 +0800
+Subject: [PATCH RESEND] ARM: imx6: build pm-imx6q.c independently of
+ CONFIG_PM
+In-Reply-To: <201402252046.04144.arnd@arndb.de>
+References: <1392690905-16839-1-git-send-email-shawn.guo@linaro.org>
+ <201402252046.04144.arnd@arndb.de>
+Message-ID: <20140226072833.GA23892@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2014 05:41 PM, Florian Vaussard wrote:
-> If the power was not enabled at all, I would be unable to read the
-> revision register, no? And delaying the probe by one millisecond would
-> be of no help in this case IMHO.
+On Tue, Feb 25, 2014 at 08:46:03PM +0100, Arnd Bergmann wrote:
+> On Tuesday 18 February 2014, Shawn Guo wrote:
+> > When building a kernel image with only CONFIG_CPU_IDLE but no CONFIG_PM,
+> > we will get the following link error.
+> > 
+> 
+> I seem to need more changes on top of this, to allow building with neither
+> CPU_IDLE nor PM enabled. Can you verify that?
 
-One thing which might cause this is that if the audpwron GPIO is set high
-before the twl6040 module is probing. When I request the GPIO I ask it to be
-set to low. If the line was high before this means we initiate the power off
-sequence.
-Can you try something like this:
+The error is only seen on the linux-next, and partially caused by the
+resolution for the conflict between this patch and the ones I queued for
+3.15.  I'm rebasing my imx-soc-3.15 branch to 3.14-rc4, so that the
+conflict can be solved on my branch in a cleaner way, which will help
+fix the error here.  So hopefully, in the next build of linux-next, the
+error will disappear.
 
-diff --git a/drivers/mfd/twl6040.c b/drivers/mfd/twl6040.c
-index 75316fb33448..d2a0bd1539ae 100644
---- a/drivers/mfd/twl6040.c
-+++ b/drivers/mfd/twl6040.c
-@@ -674,6 +674,9 @@ static int twl6040_probe(struct i2c_client *client,
-                                            GPIOF_OUT_INIT_LOW, "audpwron");
-                if (ret)
-                        goto gpio_err;
-+
-+               /* power-down sequence latency */
-+               usleep_range(500, 700);
-        }
+Shawn
 
-        ret = regmap_add_irq_chip(twl6040->regmap, twl6040->irq, IRQF_ONESHOT,
-
-
--- 
-P?ter
+> 
+> 	Arnd
+> 
+> commit 6a434aea44d8a250f8ee2205be9bc429b140b663
+> Author: Arnd Bergmann <arnd@arndb.de>
+> Date:   Mon Feb 24 22:19:50 2014 +0100
+> 
+>     ARM: imx: more CONFIG_PM fixes
+>     
+>     This lets us build the imx code in more configurations.
+>     
+>     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+> index a3fcd9c..a367675 100644
+> --- a/arch/arm/mach-imx/common.h
+> +++ b/arch/arm/mach-imx/common.h
+> @@ -147,15 +147,13 @@ int imx_cpu_kill(unsigned int cpu);
+>  
+>  void imx6q_pm_init(void);
+>  void imx6q_pm_set_ccm_base(void __iomem *base);
+> -#ifdef CONFIG_PM
+> -void imx6_suspend(void __iomem *ocram_vbase);
+>  void imx6dl_pm_init(void);
+>  void imx6sl_pm_init(void);
+> +#ifdef CONFIG_PM
+> +void imx6_suspend(void __iomem *ocram_vbase);
+>  void imx5_pm_init(void);
+>  #else
+>  static inline void imx6_suspend(void __iomem *ocram_vbase) {}
+> -static inline void imx6dl_pm_init(void) {}
+> -static inline void imx6sl_pm_init(void) {}
+>  static inline void imx5_pm_init(void) {}
+>  #endif
+>  
+> diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
+> index bb69943..5fea999 100644
+> --- a/arch/arm/mach-imx/pm-imx6q.c
+> +++ b/arch/arm/mach-imx/pm-imx6q.c
+> @@ -521,10 +521,12 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
+>  
+>  	WARN_ON(!ccm_base);
+>  
+> -	ret = imx6q_ocram_suspend_init(socdata);
+> -	if (ret)
+> -		pr_warn("%s: failed to initialize ocram suspend %d!\n",
+> -			__func__, ret);
+> +	if (IS_ENABLED(CONFIG_ARM_CPU_SUSPEND)) {
+> +		ret = imx6q_ocram_suspend_init(socdata);
+> +		if (ret)
+> +			pr_warn("%s: failed to initialize ocram suspend %d!\n",
+> +				__func__, ret);
+> +	}
+>  
+>  	/*
+>  	 * This is for SW workaround step #1 of ERR007265, see comments
