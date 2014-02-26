@@ -1,57 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Feb 2014 22:00:04 +0000
-Subject: [PATCH 4/5] mfd: remove obsolete ti-ssp driver
-In-Reply-To: <20140226205703.GA21483@n2100.arm.linux.org.uk>
-References: <1393418614-3968549-1-git-send-email-arnd@arndb.de>
- <1393418614-3968549-5-git-send-email-arnd@arndb.de>
- <20140226125157.GM9195@lee--X1>
- <20140226205703.GA21483@n2100.arm.linux.org.uk>
-Message-ID: <20140226220004.GQ9195@lee--X1>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 26 Feb 2014 14:00:42 -0800
+Subject: arm64 cache maintenance on read only address loops forever
+In-Reply-To: <20140226140301.GB7761@arm.com>
+References: <530D74C2.4000402@codeaurora.org> <20140226140301.GB7761@arm.com>
+Message-ID: <530E640A.6020608@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > The tnetv107x platform is getting removed, so this driver
-> > > is not needed any more.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > > Cc: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  drivers/mfd/Kconfig  |  11 --
-> > >  drivers/mfd/Makefile |   1 -
-> > >  drivers/mfd/ti-ssp.c | 465 ---------------------------------------------------
-> > >  3 files changed, 477 deletions(-)
-> > >  delete mode 100644 drivers/mfd/ti-ssp.c
-> > 
-> > Applied, thanks.
-> 
-> This makes me wonder whether you apply any patch you receive via email,
-> or whether you read the covering email first.
+On 2/26/2014 6:03 AM, Catalin Marinas wrote:
+> On Tue, Feb 25, 2014 at 08:59:46PM -0800, Laura Abbott wrote:
+>> On arm64, set_pte_at currently write protects user ptes that are not
+>> dirty. The expected behavior is that the fault handler will fix this
+>> up on a write to the address. do_page_fault will not mark the fault
+>> as a write though if ESR has the CM (cache maintenance) bit set.
+>> This has the unfortunate side effect that if cache maintenance is
+>> performed on a user address that has not yet been marked as dirty,
+>> handle_mm_fault may return without actually adjusting the pte or
+>> returning an error. This means that the fault will be infinitely
+>> retried.
+>>
+>> Calling cache maintenance on an address that hasn't actually been
+>> written to isn't all that useful but looping forever seems like a
+>> poor result. It seems like the check in do_page_fault is too
+>> restrictive and we need to be able to fault in pages via cache
+>> maintenance.
+>
+> Which kernel are you using? We had a fix in this area, commit
+> db6f41063cbdb58b14846e600e6bc3f4e4c2e888 (arm64: mm: don't treat user
+> cache maintenance faults as writes).
+>
 
-I did (miss-)read the cover letter first.
+I'm using a 3.10 based kernel with stable fixes pulled in. 
+db6f41063cbdb58b14846e600e6bc3f4e4c2e888 is present in the tree and 
+reverting does not make a different.
 
-> Arnd's 0/5 email said:
-> 
-> 	However, I'm looking for an Ack from
-> 	Cyril Chemparathy and Sekhar Nori first, to be sure we
-> 	won't need this code in the future.
+Thanks,
+Laura
 
-I read this to mean "looking for an Ack from Cyril and Sekhar for
-patches which are due to go in via a different tree (ARM-SoC?)".
-
-My apologies for misreading. Patch removed from MFD -next until I get
-a further nod.
-
-> This is exactly the reason why I'd now recommend that if people want to
-> send out patches which they don't intend maintainers to take, that they
-> use "[PATCH RFC" in the subject _and_ they make sure that the patch can't
-> be trivially applied.  That means maintainers have to (a) not notice the
-> RFC in the subject, and _then_ they have to intentionally fix the patch
-> before applying.  Both taken together will be sufficient deterrent for
-> this kind of mistake happening.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
