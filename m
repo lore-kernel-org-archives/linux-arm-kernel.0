@@ -1,72 +1,99 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 26 Feb 2014 12:40:03 -0800
-Subject: [PATCH v3 1/2] CLK: TI: OMAP4/5/DRA7: Remove gpmc_fck from dummy
- clocks
-In-Reply-To: <1393411089-9550-2-git-send-email-florian.vaussard@epfl.ch>
-References: <1393411089-9550-1-git-send-email-florian.vaussard@epfl.ch>
- <1393411089-9550-2-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <20140226204003.4353.17772@quantum>
+From: lho@apm.com (Loc Ho)
+Date: Wed, 26 Feb 2014 12:45:01 -0800
+Subject: [PATCH RESEND v10 3/4] PHY: add APM X-Gene SoC 15Gbps
+ Multi-purpose PHY driver
+In-Reply-To: <530DB713.6000701@ti.com>
+References: <1393308882-3964-1-git-send-email-lho@apm.com>
+ <1393308882-3964-2-git-send-email-lho@apm.com>
+ <1393308882-3964-3-git-send-email-lho@apm.com>
+ <1393308882-3964-4-git-send-email-lho@apm.com>
+ <530DB713.6000701@ti.com>
+Message-ID: <CAPw-ZT=eLbxt3wPL7hrZFtxTP9vGxbRyBY2Yoh77pq9ypphCaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Florian Vaussard (2014-02-26 02:38:08)
-> When arch/arm/mach-omap2/gpmc.c calls clk_get(..., "fck"), it will
-> get a dummy clock and try to use it. As the rate is configured to zero,
-> this will result in several divisions by zero, and misconfigured
-> timings, with devices on the bus being lost in the La La Land.
-> 
-> It is better to remove gpmc_fck from the dummy clocks, so that gpmc.c
-> can fail gracefully.
-> 
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+Hi,
 
-Looks good to me.
+>>
+>> +config PHY_XGENE
+>> +       tristate "APM X-Gene 15Gbps PHY support"
+>> +       depends on ARM64 || COMPILE_TEST
+>> +       select GENERIC_PHY
+>
+>
+> depends on HAS_IOMEM and CONFIG_OF..
 
-Regards,
-Mike
+I will make it depends as "HAS_IOMEM && OF && (ARM64 || COMPILE_TEST)
 
-> ---
->  drivers/clk/ti/clk-44xx.c | 1 -
->  drivers/clk/ti/clk-54xx.c | 1 -
->  drivers/clk/ti/clk-7xx.c  | 1 -
->  3 files changed, 3 deletions(-)
-> 
-> diff --git a/drivers/clk/ti/clk-44xx.c b/drivers/clk/ti/clk-44xx.c
-> index ae00218..02517a8 100644
-> --- a/drivers/clk/ti/clk-44xx.c
-> +++ b/drivers/clk/ti/clk-44xx.c
-> @@ -222,7 +222,6 @@ static struct ti_dt_clk omap44xx_clks[] = {
->         DT_CLK(NULL, "auxclk5_src_ck", "auxclk5_src_ck"),
->         DT_CLK(NULL, "auxclk5_ck", "auxclk5_ck"),
->         DT_CLK(NULL, "auxclkreq5_ck", "auxclkreq5_ck"),
-> -       DT_CLK("50000000.gpmc", "fck", "dummy_ck"),
->         DT_CLK("omap_i2c.1", "ick", "dummy_ck"),
->         DT_CLK("omap_i2c.2", "ick", "dummy_ck"),
->         DT_CLK("omap_i2c.3", "ick", "dummy_ck"),
-> diff --git a/drivers/clk/ti/clk-54xx.c b/drivers/clk/ti/clk-54xx.c
-> index 0ef9f58..08f3d1b 100644
-> --- a/drivers/clk/ti/clk-54xx.c
-> +++ b/drivers/clk/ti/clk-54xx.c
-> @@ -182,7 +182,6 @@ static struct ti_dt_clk omap54xx_clks[] = {
->         DT_CLK(NULL, "auxclk3_src_ck", "auxclk3_src_ck"),
->         DT_CLK(NULL, "auxclk3_ck", "auxclk3_ck"),
->         DT_CLK(NULL, "auxclkreq3_ck", "auxclkreq3_ck"),
-> -       DT_CLK(NULL, "gpmc_ck", "dummy_ck"),
->         DT_CLK("omap_i2c.1", "ick", "dummy_ck"),
->         DT_CLK("omap_i2c.2", "ick", "dummy_ck"),
->         DT_CLK("omap_i2c.3", "ick", "dummy_ck"),
-> diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
-> index 9977653..f7e4073 100644
-> --- a/drivers/clk/ti/clk-7xx.c
-> +++ b/drivers/clk/ti/clk-7xx.c
-> @@ -262,7 +262,6 @@ static struct ti_dt_clk dra7xx_clks[] = {
->         DT_CLK(NULL, "vip1_gclk_mux", "vip1_gclk_mux"),
->         DT_CLK(NULL, "vip2_gclk_mux", "vip2_gclk_mux"),
->         DT_CLK(NULL, "vip3_gclk_mux", "vip3_gclk_mux"),
-> -       DT_CLK(NULL, "gpmc_ck", "dummy_ck"),
->         DT_CLK("omap_i2c.1", "ick", "dummy_ck"),
->         DT_CLK("omap_i2c.2", "ick", "dummy_ck"),
->         DT_CLK("omap_i2c.3", "ick", "dummy_ck"),
-> -- 
-> 1.8.1.2
-> 
+>>
+>> +/* PLL Clock Macro Unit (CMU) CSR accessing from SDS indirectly */
+>> +#define CMU_REG0                       0x00000
+>> +#define  CMU_REG0_PLL_REF_SEL_MASK     0x00002000
+>> +#define  CMU_REG0_PLL_REF_SEL_SET(dst, src)    \
+>> +               (((dst) & ~0x00002000) | (((u32)(src) << 0xd) & 0x00002000))
+>
+>
+> using decimals for shift value would be better. No strong feeling though.
+
+I will change to integer value.
+
+>> +/*
+>> + * For chip earlier than A3 version, enable this flag.
+>> + * To enable, pass boot argument phy_xgene.preA3Chip=1
+>> + */
+>> +static int preA3Chip;
+>> +MODULE_PARM_DESC(preA3Chip, "Enable pre-A3 chip support (1=enable 0=disable)");
+>> +module_param_named(preA3Chip, preA3Chip, int, 0444);
+>
+>
+> Do we need to have module param for this? I mean we can differentiate between
+> different chip versions in dt data only.
+
+This is only required for the short term. Once all the pre-A3 system
+are replaced, there isn't an need for this. For those who still has an
+pre-A3 silicon system, this would provide an short term solution for
+them. DT isn't quite correct here. This is an global thing. I guess I
+can OR all node. If it is still better to put in the DT, let me know
+and I will move it.
+
+>> +
+>> +static void sds_wr(void __iomem *csr_base, u32 indirect_cmd_reg,
+>> +                  u32 indirect_data_reg, u32 addr, u32 data)
+>> +{
+>> +       u32 val;
+>> +       u32 cmd;
+>> +
+>> +       cmd = CFG_IND_WR_CMD_MASK | CFG_IND_CMD_DONE_MASK;
+>> +       cmd = CFG_IND_ADDR_SET(cmd, addr);
+>
+>
+> This looks hacky. If 'CFG_IND_WR_CMD_MASK | CFG_IND_CMD_DONE_MASK' should be set then it should be part of the second argument. From the macro 'CFG_IND_ADDR_SET' the first argument should be more like the current value present in the register right? I feel the macro (CFG_IND_ADDR_SET) is not used in the way it is intended to.
+
+The macro XXX_SET is intended to update an field within the register.
+The update field is returned. The first assignment lines are setting
+another field. Those two lines can be written as:
+
+cmd = 0;
+cmd |= CFG_IND_WR_CMD_MASK;            ==> Set the CMD bit
+cmd |= CFG_IND_CMD_DONE_MASK;        ==> Set the DONE bit
+cmd = CFG_IND_ADDR_SET(cmd, addr);    ===> Set the field ADDR
+(multiple bit) to value from addr
+
+Is this clear?
+
+>> +       ctx->dev = &pdev->dev;
+>> +       platform_set_drvdata(pdev, ctx);
+>> +
+>> +       phy_provider = devm_of_phy_provider_register(ctx->dev,
+>> +                                                    xgene_phy_xlate);
+>> +       if (IS_ERR(phy_provider)) {
+>> +               rc = PTR_ERR(phy_provider);
+>> +               goto error;
+>> +       }
+>
+>
+> phy_provider_register should be the last step in registering the PHY with the framework.
+
+I will move to after devm_phy_create. BTW, other driver is before.
+
+-Loc
