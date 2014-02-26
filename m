@@ -1,47 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Feb 2014 20:57:03 +0000
-Subject: [PATCH 4/5] mfd: remove obsolete ti-ssp driver
-In-Reply-To: <20140226125157.GM9195@lee--X1>
-References: <1393418614-3968549-1-git-send-email-arnd@arndb.de>
- <1393418614-3968549-5-git-send-email-arnd@arndb.de>
- <20140226125157.GM9195@lee--X1>
-Message-ID: <20140226205703.GA21483@n2100.arm.linux.org.uk>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 26 Feb 2014 22:00:25 +0100 (CET)
+Subject: [PATCH RFC 26/46] drivers/base: provide an infrastructure for
+ componentised subsystems
+In-Reply-To: <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
+References: <20140102212528.GD7383@n2100.arm.linux.org.uk>
+ <E1Vypo6-0007FF-Lb@rmk-PC.arm.linux.org.uk>
+Message-ID: <Pine.LNX.4.64.1402262144190.10826@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 12:51:57PM +0000, Lee Jones wrote:
-> > The tnetv107x platform is getting removed, so this driver
-> > is not needed any more.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > Cc: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/mfd/Kconfig  |  11 --
-> >  drivers/mfd/Makefile |   1 -
-> >  drivers/mfd/ti-ssp.c | 465 ---------------------------------------------------
-> >  3 files changed, 477 deletions(-)
-> >  delete mode 100644 drivers/mfd/ti-ssp.c
+Hi Russell
+
+(I suspect this my email will be rejected by ALKML too like other my 
+recent emails, but at least other MLs will pick it up and individual CCs 
+too, so, if replying, maybe it would be good to keep my entire reply, all 
+the more that it's going to be very short)
+
+On Thu, 2 Jan 2014, Russell King wrote:
+
+> Subsystems such as ALSA, DRM and others require a single card-level
+> device structure to represent a subsystem.  However, firmware tends to
+> describe the individual devices and the connections between them.
 > 
-> Applied, thanks.
+> Therefore, we need a way to gather up the individual component devices
+> together, and indicate when we have all the component devices.
+> 
+> We do this in DT by providing a "superdevice" node which specifies
+> the components, eg:
+> 
+> 	imx-drm {
+> 		compatible = "fsl,drm";
+> 		crtcs = <&ipu1>;
+> 		connectors = <&hdmi>;
+> 	};
 
-This makes me wonder whether you apply any patch you receive via email,
-or whether you read the covering email first.
+It is a pity linux-media wasn't CC'ed and apparently V4L developers didn't 
+notice this and other related patches in a "clean up" series, and now this 
+patch is already in the mainline. But at least I'd like to ask whether the 
+bindings, defined in 
+Documentation/devicetree/bindings/media/video-interfaces.txt and 
+implemented in drivers/media/v4l2-core/v4l2-of.c have been considered for 
+this job, and - if so - why have they been found unsuitable? Wouldn't it 
+have been better to use and - if needed - extend them to cover any 
+deficiencies? Even though the implementation is currently located under 
+drivers/media/v4l2-code/ it's pretty generic and should be easily 
+transferable to a more generic location.
 
-Arnd's 0/5 email said:
-
-	However, I'm looking for an Ack from
-	Cyril Chemparathy and Sekhar Nori first, to be sure we
-	won't need this code in the future.
-
-This is exactly the reason why I'd now recommend that if people want to
-send out patches which they don't intend maintainers to take, that they
-use "[PATCH RFC" in the subject _and_ they make sure that the patch can't
-be trivially applied.  That means maintainers have to (a) not notice the
-RFC in the subject, and _then_ they have to intentionally fix the patch
-before applying.  Both taken together will be sufficient deterrent for
-this kind of mistake happening.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
