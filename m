@@ -1,30 +1,31 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 26 Feb 2014 06:22:03 -0800
-Subject: [PATCH 2/4] arm: qcom: Split Qualcomm support into legacy and
- multiplatform
-In-Reply-To: <1391107002-21470-3-git-send-email-galak@codeaurora.org> (Kumar
- Gala's message of "Thu, 30 Jan 2014 12:36:40 -0600")
-References: <1391107002-21470-1-git-send-email-galak@codeaurora.org>
- <1391107002-21470-3-git-send-email-galak@codeaurora.org>
-Message-ID: <7hha7m0x9w.fsf@paris.lan>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 26 Feb 2014 15:30:46 +0100
+Subject: [PATCH] ARM: XEN depends on having a MMU
+Message-ID: <1393425046-23317-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kumar Gala <galak@codeaurora.org> writes:
+arch/arm/xen/enlighten.c (and maybe others) use MMU-specific functions
+like pte_mkspecial which are only available on MMU builds. So let XEN
+depend on MMU.
 
-> Introduce a new mach-qcom that will support SoCs that intend to be
-> multiplatform compatiable while keeping mach-msm to legacy SoC/board
-> support that will not transition over to multiplatform.
->
-> As part of this, we move support for MSM8X60, MSM8960 and MSM8974 over
-> to mach-qcom.
->
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Having a closer look at this after seeing the multi_v7_defconfig change,
-I have a minor nit on the new ARCH_QCOM name.
-
-For new additions, we've been trying to move towards using SOC_foo
-instead of ARCH_foo.  Any reason not to do that here also?
-
-Kevin
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index e25419817791..1eb3a250210a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1903,6 +1903,7 @@ config XEN
+ 	depends on ARM && AEABI && OF
+ 	depends on CPU_V7 && !CPU_V6
+ 	depends on !GENERIC_ATOMIC64
++	depends on MMU
+ 	select ARM_PSCI
+ 	select SWIOTLB_XEN
+ 	select ARCH_DMA_ADDR_T_64BIT
+-- 
+1.8.5.3
