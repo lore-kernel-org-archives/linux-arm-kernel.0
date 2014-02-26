@@ -1,26 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Feb 2014 15:02:50 +0100
-Subject: [PATCH] scripts/link-vmlinux.sh: correct base address for some
- ARM special cases
-In-Reply-To: <20140226135352.GY21483@n2100.arm.linux.org.uk>
-References: <1393413080-26942-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20140226134605.GF6865@pengutronix.de>
- <20140226135352.GY21483@n2100.arm.linux.org.uk>
-Message-ID: <24560058.bYFu9ts53f@wuerfel>
+From: Catalin.Marinas@arm.com (Catalin Marinas)
+Date: Wed, 26 Feb 2014 14:03:01 +0000
+Subject: arm64 cache maintenance on read only address loops forever
+In-Reply-To: <530D74C2.4000402@codeaurora.org>
+References: <530D74C2.4000402@codeaurora.org>
+Message-ID: <20140226140301.GB7761@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 February 2014 13:53:52 Russell King - ARM Linux wrote:
-> It's more to the point.  The first hunk hides the "Memory split" option
-> which is irrelevent on !MMU.  We already know that PAGE_OFFSET should
-> be the same as PHYS_OFFSET for noMMU, so let's make that explicit.
-> Note that it already is by way of the bit in the last hunk - which as
-> a result of this change can now be removed... especially so as we have
-> nothing defining PAGE_OFFSET in arch/arm/*/include...
+On Tue, Feb 25, 2014 at 08:59:46PM -0800, Laura Abbott wrote:
+> On arm64, set_pte_at currently write protects user ptes that are not
+> dirty. The expected behavior is that the fault handler will fix this
+> up on a write to the address. do_page_fault will not mark the fault
+> as a write though if ESR has the CM (cache maintenance) bit set.
+> This has the unfortunate side effect that if cache maintenance is
+> performed on a user address that has not yet been marked as dirty,
+> handle_mm_fault may return without actually adjusting the pte or
+> returning an error. This means that the fault will be infinitely
+> retried.
+> 
+> Calling cache maintenance on an address that hasn't actually been
+> written to isn't all that useful but looping forever seems like a
+> poor result. It seems like the check in do_page_fault is too
+> restrictive and we need to be able to fault in pages via cache
+> maintenance.
 
-Looks good to me as well. I first wasn't sure about what this would do
-for platforms that define their own PLAT_PHYS_OFFSET, but we they are
-broken anyway if you set a DRAM_BASE that is not the same as
-PLAT_PHYS_OFFSET.
+Which kernel are you using? We had a fix in this area, commit
+db6f41063cbdb58b14846e600e6bc3f4e4c2e888 (arm64: mm: don't treat user
+cache maintenance faults as writes).
 
-	Arnd
+-- 
+Catalin
