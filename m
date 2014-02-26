@@ -1,46 +1,41 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 26 Feb 2014 18:23:15 +0300
-Subject: [PATCH v3 07/20] ARM: shmobile: marzen: Reference clocks
-In-Reply-To: <1393400016-23433-8-git-send-email-horms+renesas@verge.net.au>
-References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
- <1393400016-23433-8-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <530E06E3.9070901@cogentembedded.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 26 Feb 2014 15:23:37 +0100
+Subject: [PATCH] ARM: v7m: only call printk with CONFIG_PRINTK=y
+Message-ID: <1393424617-29729-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Otherwise this fails to build (e.g. on efm32_defconfig +
+CONFIG_PRINTK=n) with:
 
-On 02/26/2014 10:33 AM, Simon Horman wrote:
+	arch/arm/kernel/entry-v7m.S:28: undefined reference to `printk'
 
-> Reference clocks using a "clocks" property in all nodes corresponding to
-> devices that require a clock: that is, the lan0 node.
+.
 
-    Simon, "lan0" (should be "ethernet" BTW) is the SMC chip, it can't use 
-Ether clock.
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/kernel/entry-v7m.S | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoCs.
-
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->
-> ---
-> v3
-> * New
-> ---
->   arch/arm/boot/dts/r8a7779-marzen.dts | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
-> index 2c727cd..30f57e9 100644
-> --- a/arch/arm/boot/dts/r8a7779-marzen.dts
-> +++ b/arch/arm/boot/dts/r8a7779-marzen.dts
-> @@ -41,6 +41,7 @@
->   		reg = <0x18000000 0x100>;
->   		pinctrl-0 = <&lan0_pins>;
->   		pinctrl-names = "default";
-> +		clocks = <&mstp1_clks R8A7779_CLK_ETHER>;
->
->   		phy-mode = "mii";
->   		interrupt-parent = <&irqpin0>;
-
-WBR, Sergei
+diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
+index 2260f1855820..89f902cc5bfe 100644
+--- a/arch/arm/kernel/entry-v7m.S
++++ b/arch/arm/kernel/entry-v7m.S
+@@ -22,12 +22,14 @@
+ 
+ __invalid_entry:
+ 	v7m_exception_entry
++#ifdef CONFIG_PRINTK
+ 	adr	r0, strerr
+ 	mrs	r1, ipsr
+ 	mov	r2, lr
+ 	bl	printk
+ 	mov	r0, sp
+ 	bl	show_regs
++#endif
+ 1:	b	1b
+ ENDPROC(__invalid_entry)
+ 
+-- 
+1.8.5.3
