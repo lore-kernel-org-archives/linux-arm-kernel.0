@@ -1,150 +1,69 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Feb 2014 16:33:35 +0900
-Subject: [PATCH v3 19/20] ARM: shmobile: Remove Marzen reference DTS
-In-Reply-To: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
-References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1393400016-23433-20-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 26 Feb 2014 16:57:33 +0900
+Subject: [GIT PULL 0/9] Renesas ARM Based SoC Clock Updates for v3.15
+Message-ID: <cover.1393401266.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the DTS file r8a7790-marzen.dts can be used with
-board-marzen.c and board-marzen-reference.c, proceed with removing
-r8a7790-marzen-reference.dts.
+Hi Olof, Hi Arnd, Hi Kevin,
 
-Based on work for the Koelsch board by Laurent Pinchart.
+please consider these Renesas ARM based SoC clock updates for v3.15.
 
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7779-marzen-reference.dts | 120 -------------------------
- 1 file changed, 120 deletions(-)
- delete mode 100644 arch/arm/boot/dts/r8a7779-marzen-reference.dts
+As requested these have been split out from SoC updates.
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-deleted file mode 100644
-index 76f5eef..0000000
---- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-+++ /dev/null
-@@ -1,120 +0,0 @@
--/*
-- * Reference Device Tree Source for the Marzen board
-- *
-- * Copyright (C) 2013 Renesas Solutions Corp.
-- * Copyright (C) 2013 Simon Horman
-- *
-- * This file is licensed under the terms of the GNU General Public License
-- * version 2.  This program is licensed "as is" without any warranty of any
-- * kind, whether express or implied.
-- */
--
--/dts-v1/;
--#include "r8a7779.dtsi"
--#include <dt-bindings/gpio/gpio.h>
--#include <dt-bindings/interrupt-controller/irq.h>
--
--/ {
--	model = "marzen";
--	compatible = "renesas,marzen-reference", "renesas,r8a7779";
--
--	chosen {
--		bootargs = "console=ttySC2,115200 earlyprintk=sh-sci.2,115200 ignore_loglevel root=/dev/nfs ip=on rw";
--	};
--
--	memory {
--		device_type = "memory";
--		reg = <0x60000000 0x40000000>;
--	};
--
--	fixedregulator3v3: fixedregulator at 0 {
--		compatible = "regulator-fixed";
--		regulator-name = "fixed-3.3V";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--		regulator-boot-on;
--		regulator-always-on;
--	};
--
--	lan0 at 18000000 {
--		compatible = "smsc,lan9220", "smsc,lan9115";
--		reg = <0x18000000 0x100>;
--		pinctrl-0 = <&lan0_pins>;
--		pinctrl-names = "default";
--
--		phy-mode = "mii";
--		interrupt-parent = <&irqpin0>;
--		interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
--		reg-io-width = <4>;
--		vddvario-supply = <&fixedregulator3v3>;
--		vdd33a-supply = <&fixedregulator3v3>;
--	};
--
--	leds {
--		compatible = "gpio-leds";
--		led2 {
--			gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
--		};
--		led3 {
--			gpios = <&gpio4 30 GPIO_ACTIVE_HIGH>;
--		};
--		led4 {
--			gpios = <&gpio4 31 GPIO_ACTIVE_HIGH>;
--		};
--	};
--};
--
--&irqpin0 {
--	status = "okay";
--};
--
--&pfc {
--	pinctrl-0 = <&scif2_pins &scif4_pins>;
--	pinctrl-names = "default";
--
--	lan0_pins: lan0 {
--		intc {
--			renesas,groups = "intc_irq1_b";
--			renesas,function = "intc";
--		};
--		lbsc {
--			renesas,groups = "lbsc_ex_cs0";
--			renesas,function = "lbsc";
--		};
--	};
--
--	scif2_pins: serial2 {
--		renesas,groups = "scif2_data_c";
--		renesas,function = "scif2";
--	};
--
--	scif4_pins: serial4 {
--		renesas,groups = "scif4_data";
--		renesas,function = "scif4";
--	};
--
--	sdhi0_pins: sd0 {
--		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd";
--		renesas,function = "sdhi0";
--	};
--
--	hspi0_pins: hspi0 {
--		renesas,groups = "hspi0";
--		renesas,function = "hspi0";
--	};
--};
--
--&sdhi0 {
--	pinctrl-0 = <&sdhi0_pins>;
--	pinctrl-names = "default";
--
--	vmmc-supply = <&fixedregulator3v3>;
--	bus-width = <4>;
--	status = "okay";
--};
--
--&hspi0 {
--	pinctrl-0 = <&hspi0_pins>;
--	pinctrl-names = "default";
--	status = "okay";
--};
--- 
-1.8.5.2
+This pull request is based on "Renesas ARM based SoC updates for v3.15",
+tagged as tags/renesas-soc-for-v3.15, which you have previously pulled.
+
+
+The following changes since commit 012a7069b5a10a0851584d71a1facdc40a972319:
+
+  ARM: shmobile: r8a7790: Add PCI USB host clock support (2014-02-04 10:25:03 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-clock-for-v3.15
+
+for you to fetch changes up to df55f6685a04a259cf59cd3fde02212b294461cc:
+
+  ARM: shmobile: Remove legacy r8a7790 DT clocks (2014-02-24 08:54:44 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Clock Updates for v3.15
+
+* r7s72100 SoC (RZ/A1H)
+  - Add clock for SH Ethernet
+  - Add RSPI clocks
+
+* r8a7791 (R-Car M2)
+  - Add QSPI and SDHI clocks
+
+* r8a7790 (R-Car H2)
+  - Add audio clock
+  - Remove legacy DT clocks
+  - Correct SYS DMAC clock defines
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      ARM: shmobile: r7s72100 clock: Add RSPI clocks
+      ARM: shmobile: r7s72100 clock: Add RSPI clocks for DT
+      ARM: shmobile: r8a7791 clock: add QSPI clocks
+
+Kuninori Morimoto (2):
+      ARM: shmobile: r8a7778: add audio clock in new style
+      ARM: shmobile: r8a7790: add audio clock
+
+Magnus Damm (2):
+      ARM: shmobile: Add r8a7791 legacy SDHI clocks
+      ARM: shmobile: Remove legacy r8a7790 DT clocks
+
+Simon Horman (2):
+      ARM: shmobile: r7s72100: Add clock for r7s72100-ether
+      ARM: shmobile: r8a7790: Correct SYS DMAC clock defines
+
+ arch/arm/boot/dts/r8a7790.dtsi            | 23 ++++++++++++
+ arch/arm/mach-shmobile/clock-r7s72100.c   | 30 +++++++++++++--
+ arch/arm/mach-shmobile/clock-r8a7778.c    |  4 ++
+ arch/arm/mach-shmobile/clock-r8a7790.c    | 31 ++++++++++------
+ arch/arm/mach-shmobile/clock-r8a7791.c    | 62 ++++++++++++++++++++++++++++++-
+ include/dt-bindings/clock/r8a7790-clock.h |  4 +-
+ 6 files changed, 136 insertions(+), 18 deletions(-)
