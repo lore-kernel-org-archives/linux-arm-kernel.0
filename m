@@ -1,237 +1,74 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Wed, 26 Feb 2014 11:10:57 -0800
-Subject: [PATCH v4 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <1393441857-15472-1-git-send-email-sebastian.capella@linaro.org>
-References: <1393441857-15472-1-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <1393441857-15472-3-git-send-email-sebastian.capella@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 26 Feb 2014 11:12:23 -0800
+Subject: [PATCH] devicetree: bindings: Make msm8974-pinctrl documentation
+ match code
+Message-ID: <1393441943-1689-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russ Dill <Russ.Dill@ti.com>
+The compatible string doesn't have an x in it. Fix it. Also
+remove the "qcom" prefix from pins and functions as this binding
+uses the generic pinctrl bindings for the pins and functions.
 
-Enable hibernation for ARM architectures and provide ARM
-architecture specific calls used during hibernation.
-
-The swsusp hibernation framework depends on the
-platform first having functional suspend/resume.
-
-Then, in order to enable hibernation on a given platform, a
-platform_hibernation_ops structure may need to be registered with
-the system in order to save/restore any SoC-specific / cpu specific
-state needing (re)init over a suspend-to-disk/resume-from-disk cycle.
-
-For example:
-
-     - "secure" SoCs that have different sets of control registers
-       and/or different CR reg access patterns.
-
-     - SoCs with L2 caches as the activation sequence there is
-       SoC-dependent; a full off-on cycle for L2 is not done
-       by the hibernation support code.
-
-     - SoCs requiring steps on wakeup _before_ the "generic" parts
-       done by cpu_suspend / cpu_resume can work correctly.
-
-     - SoCs having persistent state which is maintained during suspend
-       and resume, but will be lost during the power off cycle after
-       suspend-to-disk.
-
-This is a rebase/rework of Frank Hofmann's v5 hibernation patchset.
-
-Cc: Russ Dill <Russ.Dill@ti.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Len Brown <len.brown@intel.com>
-Cc: Pavel Machek <pavel@ucw.cz>
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Jonathan Austin <jonathan.austin@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: "Uwe Kleine-K?nig" <u.kleine-koenig@pengutronix.de>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/include/asm/memory.h |    1 +
- arch/arm/kernel/Makefile      |    1 +
- arch/arm/kernel/hibernate.c   |  113 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mm/Kconfig           |    5 ++
- include/linux/suspend.h       |    2 +
- 5 files changed, 122 insertions(+)
- create mode 100644 arch/arm/kernel/hibernate.c
+ .../devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt   | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 8756e4b..1079ea8 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -291,6 +291,7 @@ static inline void *phys_to_virt(phys_addr_t x)
-  */
- #define __pa(x)			__virt_to_phys((unsigned long)(x))
- #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
-+#define __pa_symbol(x)		__pa(RELOC_HIDE((unsigned long)(x), 0))
- #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
+diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
+index 4c352be5dd61..9fb89e3f61ea 100644
+--- a/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/qcom,msm8974-pinctrl.txt
+@@ -1,7 +1,7 @@
+ Qualcomm MSM8974 TLMM block
  
- extern phys_addr_t (*arch_virt_to_idmap)(unsigned long x);
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index a30fc9b..8afa848 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -39,6 +39,7 @@ obj-$(CONFIG_ARTHUR)		+= arthur.o
- obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
- obj-$(CONFIG_PCI)		+= bios32.o isa.o
- obj-$(CONFIG_ARM_CPU_SUSPEND)	+= sleep.o suspend.o
-+obj-$(CONFIG_HIBERNATION)	+= hibernate.o
- obj-$(CONFIG_SMP)		+= smp.o
- ifdef CONFIG_MMU
- obj-$(CONFIG_SMP)		+= smp_tlb.o
-diff --git a/arch/arm/kernel/hibernate.c b/arch/arm/kernel/hibernate.c
-new file mode 100644
-index 0000000..70e17d2
---- /dev/null
-+++ b/arch/arm/kernel/hibernate.c
-@@ -0,0 +1,113 @@
-+/*
-+ * Hibernation support specific for ARM
-+ *
-+ * Derived from work on ARM hibernation support by:
-+ *
-+ * Ubuntu project, hibernation support for mach-dove
-+ * Copyright (C) 2010 Nokia Corporation (Hiroshi Doyu)
-+ * Copyright (C) 2010 Texas Instruments, Inc. (Teerth Reddy et al.)
-+ *  https://lkml.org/lkml/2010/6/18/4
-+ *  https://lists.linux-foundation.org/pipermail/linux-pm/2010-June/027422.html
-+ *  https://patchwork.kernel.org/patch/96442/
-+ *
-+ * Copyright (C) 2006 Rafael J. Wysocki <rjw@sisk.pl>
-+ *
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
-+
-+#include <linux/mm.h>
-+#include <linux/suspend.h>
-+#include <asm/tlbflush.h>
-+#include <asm/cacheflush.h>
-+#include <asm/system_misc.h>
-+#include <asm/idmap.h>
-+#include <asm/suspend.h>
-+
-+extern const void __nosave_begin, __nosave_end;
-+
-+int pfn_is_nosave(unsigned long pfn)
-+{
-+	unsigned long nosave_begin_pfn =
-+			__pa_symbol(&__nosave_begin) >> PAGE_SHIFT;
-+	unsigned long nosave_end_pfn =
-+			PAGE_ALIGN(__pa_symbol(&__nosave_end)) >> PAGE_SHIFT;
-+
-+	return (pfn >= nosave_begin_pfn) && (pfn < nosave_end_pfn);
-+}
-+
-+void notrace save_processor_state(void)
-+{
-+	WARN_ON(num_online_cpus() != 1);
-+	local_fiq_disable();
-+}
-+
-+void notrace restore_processor_state(void)
-+{
-+	local_fiq_enable();
-+}
-+
-+/*
-+ * Snapshot kernel memory and reset the system.
-+ *
-+ * swsusp_save() is executed in the suspend finisher so that the CPU
-+ * context pointer and memory are part of the saved image, which is
-+ * required by the resume kernel image to restart execution from
-+ * swsusp_arch_suspend().
-+ *
-+ * soft_restart is not technically needed, but is used to get success
-+ * returned from cpu_suspend.
-+ * 
-+ * When soft reboot completes, the hibernation snapshot is written out.
-+ */
-+static int notrace __swsusp_arch_save_image(unsigned long unused)
-+{
-+	int ret;
-+
-+	ret = swsusp_save();
-+	if (ret == 0)
-+		soft_restart(virt_to_phys(cpu_resume));
-+	return ret;
-+}
-+
-+/*
-+ * Save the current CPU state before suspend / poweroff.
-+ */
-+int notrace swsusp_arch_suspend(void)
-+{
-+	return cpu_suspend(0, __swsusp_arch_save_image);
-+}
-+
-+/*
-+ * The framework loads the hibernation image into a linked list anchored
-+ *@restore_pblist, for swsusp_arch_resume() to copy back to the proper
-+ * destinations.
-+ *
-+ * To make this work if resume is triggered from initramfs, the
-+ * pagetables need to be switched to allow writes to kernel mem.
-+ */
-+static void notrace __swsusp_arch_restore_image(void *unused)
-+{
-+	struct pbe *pbe;
-+
-+	cpu_switch_mm(idmap_pgd, &init_mm);
-+	for (pbe = restore_pblist; pbe; pbe = pbe->next)
-+		copy_page(pbe->orig_address, pbe->address);
-+
-+	soft_restart(virt_to_phys(cpu_resume));
-+}
-+
-+static u8 __swsusp_resume_stk[PAGE_SIZE/2] __nosavedata;
-+
-+/*
-+ * Resume from the hibernation image.
-+ * Due to the kernel heap / data restore, stack contents change underneath
-+ * and that would make function calls impossible; switch to a temporary
-+ * stack within the nosave region to avoid that problem.
-+ */
-+int swsusp_arch_resume(void)
-+{
-+	extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-+	call_with_stack(__swsusp_arch_restore_image, 0,
-+		__swsusp_resume_stk + sizeof(__swsusp_resume_stk));
-+	return 0;
-+}
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 1f8fed9..83707702 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -611,6 +611,11 @@ config CPU_USE_DOMAINS
- config IO_36
- 	bool
+ Required properties:
+-- compatible: "qcom,msm8x74-pinctrl"
++- compatible: "qcom,msm8974-pinctrl"
+ - reg: Should be the base address and length of the TLMM block.
+ - interrupts: Should be the parent IRQ of the TLMM block.
+ - interrupt-controller: Marks the device node as an interrupt controller.
+@@ -42,14 +42,14 @@ Non-empty subnodes must specify the 'pins' property.
+ Note that not all properties are valid for all pins.
  
-+config ARCH_HIBERNATION_POSSIBLE
-+	bool
-+	depends on MMU
-+	default y if CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || CPU_XSCALE || CPU_XSC3 || CPU_V6 || CPU_V6K || CPU_V7
-+
- comment "Processor Features"
  
- config ARM_LPAE
-diff --git a/include/linux/suspend.h b/include/linux/suspend.h
-index f73cabf..38bbf95 100644
---- a/include/linux/suspend.h
-+++ b/include/linux/suspend.h
-@@ -320,6 +320,8 @@ extern unsigned long get_safe_page(gfp_t gfp_mask);
- extern void hibernation_set_ops(const struct platform_hibernation_ops *ops);
- extern int hibernate(void);
- extern bool system_entering_hibernation(void);
-+asmlinkage int swsusp_save(void);
-+extern struct pbe *restore_pblist;
- #else /* CONFIG_HIBERNATION */
- static inline void register_nosave_region(unsigned long b, unsigned long e) {}
- static inline void register_nosave_region_late(unsigned long b, unsigned long e) {}
+-Valid values for qcom,pins are:
++Valid values for pins are:
+   gpio0-gpio145
+     Supports mux, bias and drive-strength
+ 
+   sdc1_clk, sdc1_cmd, sdc1_data, sdc2_clk, sdc2_cmd, sdc2_data
+     Supports bias and drive-strength
+ 
+-Valid values for qcom,function are:
++Valid values for function are:
+   blsp_i2c2, blsp_i2c6, blsp_i2c11, blsp_spi1, blsp_uart2, blsp_uart8, slimbus
+ 
+   (Note that this is not yet the complete list of functions)
+@@ -73,18 +73,18 @@ Example:
+ 
+ 		uart2_default: uart2_default {
+ 			mux {
+-				qcom,pins = "gpio4", "gpio5";
+-				qcom,function = "blsp_uart2";
++				pins = "gpio4", "gpio5";
++				function = "blsp_uart2";
+ 			};
+ 
+ 			tx {
+-				qcom,pins = "gpio4";
++				pins = "gpio4";
+ 				drive-strength = <4>;
+ 				bias-disable;
+ 			};
+ 
+ 			rx {
+-				qcom,pins = "gpio5";
++				pins = "gpio5";
+ 				drive-strength = <2>;
+ 				bias-pull-up;
+ 			};
 -- 
-1.7.9.5
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
