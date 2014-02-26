@@ -1,36 +1,69 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 26 Feb 2014 14:02:57 -0700
-Subject: DMABOUNCE in pci-rcar
-In-Reply-To: <5165962.7bqj51B15Z@wuerfel>
-References: <201402241200.21944.arnd@arndb.de>
- <CAErSpo5RV=w+DkgHSZZPOFGiEBBxMSraLV3TepYUZwDJuV+Jzg@mail.gmail.com>
- <5165962.7bqj51B15Z@wuerfel>
-Message-ID: <CAErSpo5uHCOpMGxdbtBwvZEV0jNOBkBch0rG-VVwxdLJgCkUnA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 26 Feb 2014 22:05:17 +0100
+Subject: [PATCH 3/4] ARM: dts: OMAP4: Add IOMMU nodes
+In-Reply-To: <1392315776-33197-4-git-send-email-s-anna@ti.com>
+References: <1392315776-33197-1-git-send-email-s-anna@ti.com>
+ <1392315776-33197-4-git-send-email-s-anna@ti.com>
+Message-ID: <5025565.C2g8cq3k2V@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 12:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 26 February 2014 12:48:17 Bjorn Helgaas wrote:
->> On Mon, Feb 24, 2014 at 4:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > Hi Magnus,
->> >
->> > I noticed during randconfig testing that you enabled DMABOUNCE for the
->> > pci-rcar-gen2 driver as posted in this patch https://lkml.org/lkml/2014/2/5/30
->> >
->> > I didn't see the original post unfortunately, but I fear we have to
->> > revert it and come up with a better solution, ...
->>
->> Sounds like I should drop the following patches from my pci/host-rcar
->> branch for now?
->>
->>   PCI: rcar: Add DMABOUNCE support
->>   PCI: rcar: Enable BOUNCE in case of HIGHMEM
->>   PCI: rcar: Make the Kconfig dependencies more generic
->
-> Sounds good to me. The last patch is actually fine, but you'll have to
-> fix the context to apply it without the other two.
+Hi Suman,
 
-OK, I dropped the DMABOUNCE and BOUNCE patches and force-updated my
-"next" branch.
+Thank you for the patch.
 
-Bjorn
+On Thursday 13 February 2014 12:22:55 Suman Anna wrote:
+> From: Florian Vaussard <florian.vaussard@epfl.ch>
+> 
+> Add the IOMMU nodes for the DSP and IPU subsystems. The external
+> address space for DSP starts at 0x20000000 in OMAP4 compared to
+> 0x11000000 in OMAP3, and the addresses beyond 0xE0000000 are
+> private address space for the Cortex-M3 cores in the IPU subsystem.
+> The MMU within the IPU sub-system also supports a bus error back
+> capability, not available on the DSP MMU.
+> 
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> [s-anna at ti.com: dma-window updates and bus error back addition]
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+>  arch/arm/boot/dts/omap4.dtsi | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+> index d3f8a6e..1885f90 100644
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -461,6 +461,23 @@
+>  			dma-names = "tx", "rx";
+>  		};
+> 
+> +		mmu_dsp: mmu at 4a066000 {
+> +			compatible = "ti,omap4-iommu";
+> +			reg = <0x4a066000 0xff>;
+> +			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+> +			ti,hwmods = "mmu_dsp";
+> +			dma-window = <0x20000000 0xdffff000>;
+> +		};
+> +
+> +		mmu_ipu: mmu at 55082000 {
+> +			compatible = "ti,omap4-iommu";
+> +			reg = <0x55082000 0xff>;
+> +			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+> +			ti,hwmods = "mmu_ipu";
+> +			dma-window = <0 0xdffff000>;
+
+I'm not too familiar with the M3 MPU in the OMAP4, but doesn't its memory map 
+also include other reserved regions, such as 0x55040000- 0x5505ffff to access 
+the ISS ?
+
+> +			ti,iommu-bus-err-back;
+> +		};
+> +
+>  		wdt2: wdt at 4a314000 {
+>  			compatible = "ti,omap4-wdt", "ti,omap3-wdt";
+>  			reg = <0x4a314000 0x80>;
+
+-- 
+Regards,
+
+Laurent Pinchart
