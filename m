@@ -1,205 +1,191 @@
 From: elder@linaro.org (Alex Elder)
-Date: Tue, 25 Feb 2014 18:15:49 -0600
-Subject: [PATCH v2 09/12] clk: bcm281xx: implement prerequisite clocks
+Date: Tue, 25 Feb 2014 18:15:47 -0600
+Subject: [PATCH v2 07/12] clk: bcm281xx: add clock hysteresis support
 In-Reply-To: <1393373752-30875-1-git-send-email-elder@linaro.org>
 References: <1393373752-30875-1-git-send-email-elder@linaro.org>
-Message-ID: <1393373752-30875-10-git-send-email-elder@linaro.org>
+Message-ID: <1393373752-30875-8-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow a clock to specify a "prerequisite" clock.  The prerequisite
-clock must be initialized before the clock that depends on it.  A
-prerequisite clock is defined initially by its name; as that clock
-gets initialized the name gets replaced with a pointer to its clock
-structure pointer.  In order to allow getting a reference to a clock
-by its name we call clkdev_add() for each clock as it gets set up.
-A new clk_lookup structure is added to the kona_clk type for this
-purpose.
-
-Rework the KONA_CLK() macro, and define a new KONA_CLK_PREREQ()
-variant that allows a prerequisite clock to be specified.
-
-There exist clocks that could specify more than one prequisite, but
-almost all clocks only ever use one.  We can add support for more
-than one if we find we need it at some point.
+Add support for clock gate hysteresis control.  For now, if it's
+defined for a clock, it's enabled.
 
 Signed-off-by: Alex Elder <elder@linaro.org>
 ---
- drivers/clk/bcm/clk-kona-setup.c |   16 ++++++++++----
- drivers/clk/bcm/clk-kona.c       |   45 ++++++++++++++++++++++++++++++++++++++
- drivers/clk/bcm/clk-kona.h       |   20 ++++++++++++++---
- 3 files changed, 74 insertions(+), 7 deletions(-)
+ drivers/clk/bcm/clk-kona-setup.c |   30 ++++++++++++++++++++++++++++++
+ drivers/clk/bcm/clk-kona.c       |   33 +++++++++++++++++++++++++++++++++
+ drivers/clk/bcm/clk-kona.h       |   19 +++++++++++++++++++
+ 3 files changed, 82 insertions(+)
 
 diff --git a/drivers/clk/bcm/clk-kona-setup.c b/drivers/clk/bcm/clk-kona-setup.c
-index 757de19..973053b 100644
+index 5a49deb..757de19 100644
 --- a/drivers/clk/bcm/clk-kona-setup.c
 +++ b/drivers/clk/bcm/clk-kona-setup.c
-@@ -685,6 +685,9 @@ peri_clk_setup(struct peri_clk_data *data, struct clk_init_data *init_data)
+@@ -81,6 +81,7 @@ static bool peri_clk_data_offsets_valid(struct kona_clk *bcm_clk)
+ 	struct peri_clk_data *peri;
+ 	struct bcm_clk_policy *policy;
+ 	struct bcm_clk_gate *gate;
++	struct bcm_clk_hyst *hyst;
+ 	struct bcm_clk_div *div;
+ 	struct bcm_clk_sel *sel;
+ 	struct bcm_clk_trig *trig;
+@@ -106,12 +107,25 @@ static bool peri_clk_data_offsets_valid(struct kona_clk *bcm_clk)
+ 	}
  
- static void bcm_clk_teardown(struct kona_clk *bcm_clk)
- {
-+	/* There is no function defined for this (yet) */
-+	/* clkdev_remove(&bcm_clk->cl); */
+ 	gate = &peri->gate;
++	hyst = &peri->hyst;
+ 	if (gate_exists(gate)) {
+ 		if (gate->offset > limit) {
+ 			pr_err("%s: bad gate offset for %s (%u > %u)\n",
+ 				__func__, name, gate->offset, limit);
+ 			return false;
+ 		}
 +
- 	switch (bcm_clk->type) {
- 	case bcm_clk_peri:
- 		peri_clk_teardown(bcm_clk->data, &bcm_clk->init_data);
-@@ -718,6 +721,7 @@ static void kona_clk_teardown(struct clk *clk)
- struct clk *kona_clk_setup(struct kona_clk *bcm_clk)
- {
- 	struct clk_init_data *init_data = &bcm_clk->init_data;
-+	const char *name = init_data->name;
- 	struct clk *clk = NULL;
- 
- 	switch (bcm_clk->type) {
-@@ -727,14 +731,13 @@ struct clk *kona_clk_setup(struct kona_clk *bcm_clk)
- 		break;
- 	default:
- 		pr_err("%s: clock type %d invalid for %s\n", __func__,
--			(int)bcm_clk->type, init_data->name);
-+			(int)bcm_clk->type, name);
- 		return NULL;
++		if (hyst_exists(hyst)) {
++			if (hyst->offset > limit) {
++				pr_err("%s: bad hysteresis offset for %s "
++					"(%u > %u)\n", __func__,
++					name, hyst->offset, limit);
++				return false;
++			}
++		}
++	} else if (hyst_exists(hyst)) {
++		pr_err("%s: hysteresis but no gate for %s\n", __func__, name);
++		return false;
  	}
  
- 	/* Make sure everything makes sense before we set it up */
- 	if (!kona_clk_valid(bcm_clk)) {
--		pr_err("%s: clock data invalid for %s\n", __func__,
--			init_data->name);
-+		pr_err("%s: clock data invalid for %s\n", __func__, name);
- 		goto out_teardown;
- 	}
- 
-@@ -742,11 +745,16 @@ struct clk *kona_clk_setup(struct kona_clk *bcm_clk)
- 	clk = clk_register(NULL, &bcm_clk->hw);
- 	if (IS_ERR(clk)) {
- 		pr_err("%s: error registering clock %s (%ld)\n", __func__,
--			init_data->name, PTR_ERR(clk));
-+			name, PTR_ERR(clk));
- 		goto out_teardown;
- 	}
- 	BUG_ON(!clk);
- 
-+	/*  Make it so we can look the clock up using clk_find() */
-+	bcm_clk->cl.con_id = name;
-+	bcm_clk->cl.clk = clk;
-+	clkdev_add(&bcm_clk->cl);
-+
- 	return clk;
- out_teardown:
- 	bcm_clk_teardown(bcm_clk);
-diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
-index 6caed3b..37f7861 100644
---- a/drivers/clk/bcm/clk-kona.c
-+++ b/drivers/clk/bcm/clk-kona.c
-@@ -1193,6 +1193,48 @@ static bool __peri_clk_init(struct kona_clk *bcm_clk)
+ 	div = &peri->div;
+@@ -261,6 +275,17 @@ static bool gate_valid(struct bcm_clk_gate *gate, const char *field_name,
  	return true;
  }
  
-+static bool __kona_clk_init(struct kona_clk *bcm_clk);
-+static bool __kona_prereq_init(struct kona_clk *bcm_clk)
++static bool hyst_valid(struct bcm_clk_hyst *hyst, const char *clock_name)
 +{
-+	struct clk *clk;
-+	struct clk_hw *hw;
-+	struct kona_clk *prereq;
-+
-+	BUG_ON(clk_is_initialized(bcm_clk));
-+
-+	if (!bcm_clk->prereq)
-+		return true;
-+
-+	clk = clk_get(NULL, bcm_clk->prereq);
-+	if (IS_ERR(clk)) {
-+		pr_err("%s: unable to get prereq clock %s for %s\n",
-+			__func__, bcm_clk->prereq, bcm_clk->init_data.name);
++	if (!bit_posn_valid(hyst->en_bit, "hysteresis enable", clock_name))
 +		return false;
-+	}
-+	hw = __clk_get_hw(clk);
-+	if (!hw) {
-+		pr_err("%s: null hw pointer for clock %s\n", __func__,
-+			bcm_clk->init_data.name);
-+		return false;
-+	}
-+	prereq = to_kona_clk(hw);
-+	if (prereq->ccu != bcm_clk->ccu) {
-+		pr_err("%s: prereq clock %s CCU different for clock %s\n",
-+			__func__, bcm_clk->prereq, bcm_clk->init_data.name);
-+		return false;
-+	}
 +
-+	/* Initialize the prerequisite clock first */
-+	if (!__kona_clk_init(prereq)) {
-+		pr_err("%s: failed to init prereq %s for clock %s\n",
-+			__func__, bcm_clk->prereq, bcm_clk->init_data.name);
++	if (!bit_posn_valid(hyst->val_bit, "hysteresis value", clock_name))
 +		return false;
-+	}
-+	bcm_clk->prereq_clk = clk;
 +
 +	return true;
 +}
 +
- static bool __kona_clk_init(struct kona_clk *bcm_clk)
- {
- 	bool ret = false;
-@@ -1200,6 +1242,9 @@ static bool __kona_clk_init(struct kona_clk *bcm_clk)
- 	if (clk_is_initialized(bcm_clk))
- 		return true;
+ /*
+  * A selector bitfield must be valid.  Its parent_sel array must
+  * also be reasonable for the field.
+@@ -378,6 +403,7 @@ peri_clk_data_valid(struct kona_clk *bcm_clk)
+ 	struct peri_clk_data *peri;
+ 	struct bcm_clk_policy *policy;
+ 	struct bcm_clk_gate *gate;
++	struct bcm_clk_hyst *hyst;
+ 	struct bcm_clk_sel *sel;
+ 	struct bcm_clk_div *div;
+ 	struct bcm_clk_div *pre_div;
+@@ -405,6 +431,10 @@ peri_clk_data_valid(struct kona_clk *bcm_clk)
+ 	if (gate_exists(gate) && !gate_valid(gate, "gate", name))
+ 		return false;
  
-+	if (!__kona_prereq_init(bcm_clk))
++	hyst = &peri->hyst;
++	if (hyst_exists(hyst) && !hyst_valid(hyst, name))
 +		return false;
 +
- 	switch (bcm_clk->type) {
- 	case bcm_clk_peri:
- 		ret = __peri_clk_init(bcm_clk);
+ 	sel = &peri->sel;
+ 	if (selector_exists(sel)) {
+ 		if (!sel_valid(sel, "selector", name))
+diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+index bf9661c..64b6361 100644
+--- a/drivers/clk/bcm/clk-kona.c
++++ b/drivers/clk/bcm/clk-kona.c
+@@ -527,6 +527,35 @@ static int clk_gate(struct ccu_data *ccu, const char *name,
+ 	return -EIO;
+ }
+ 
++/* Hysteresis operations */
++
++/*
++ * If a clock gate requires a turn-off delay it will have
++ * "hysteresis" register bits defined.  The first, if set, enables
++ * the delay; and if enabled, the second bit determines whether the
++ * delay is "low" or "high" (1 means high).  For now, if it's
++ * defined for a clock, we set it.
++ */
++static bool hyst_init(struct ccu_data *ccu, struct bcm_clk_hyst *hyst)
++{
++	u32 offset;
++	u32 reg_val;
++	u32 mask;
++
++	if (!hyst_exists(hyst))
++		return true;
++
++	offset = hyst->offset;
++	mask = (u32)1 << hyst->en_bit;
++	mask |= (u32)1 << hyst->val_bit;
++
++	reg_val = __ccu_read(ccu, offset);
++	reg_val |= mask;
++	__ccu_write(ccu, offset, reg_val);
++
++	return true;
++}
++
+ /* Trigger operations */
+ 
+ /*
+@@ -1129,6 +1158,10 @@ static bool __peri_clk_init(struct kona_clk *bcm_clk)
+ 		pr_err("%s: error initializing gate for %s\n", __func__, name);
+ 		return false;
+ 	}
++	if (!hyst_init(ccu, &peri->hyst)) {
++		pr_err("%s: error initializing hyst for %s\n", __func__, name);
++		return false;
++	}
+ 	if (!div_init(ccu, &peri->gate, &peri->div, &peri->trig)) {
+ 		pr_err("%s: error initializing divider for %s\n", __func__,
+ 			name);
 diff --git a/drivers/clk/bcm/clk-kona.h b/drivers/clk/bcm/clk-kona.h
-index 01fa776..27e0913 100644
+index c390ca4..c6285d2 100644
 --- a/drivers/clk/bcm/clk-kona.h
 +++ b/drivers/clk/bcm/clk-kona.h
-@@ -22,6 +22,8 @@
- #include <linux/device.h>
- #include <linux/of.h>
- #include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/debugfs.h>
+@@ -60,6 +60,8 @@
  
- #define	BILLION		1000000000
+ #define gate_flip_enabled(gate)		FLAG_FLIP(gate, GATE, ENABLED)
  
-@@ -407,6 +409,11 @@ struct kona_clk {
- 	struct ccu_data *ccu;	/* ccu this clock is associated with */
- 	enum bcm_clk_type type;
- 	u32 flags;		/* BCM_CLK_KONA_FLAGS_* below */
-+	struct clk_lookup cl;
-+	union {
-+		const char *prereq;
-+		struct clk *prereq_clk;
-+	};
- 	union {
- 		void *data;
- 		struct peri_clk_data *peri;
-@@ -422,15 +429,22 @@ struct kona_clk {
- #define BCM_CLK_KONA_FLAGS_INITIALIZED	((u32)1 << 0)	/* Clock initialized */
- 
- /* Initialization macro for an entry in a CCU's kona_clks[] array. */
--#define KONA_CLK(_ccu_name, _clk_name, _type)				\
--	{								\
-+#define ___KONA_CLK_COMMON(_ccu_name, _clk_name, _type)			\
- 		.init_data	= {					\
- 			.name = #_clk_name,				\
- 			.ops = &kona_ ## _type ## _clk_ops,		\
- 		},							\
- 		.ccu		= &_ccu_name ## _ccu_data,		\
- 		.type		= bcm_clk_ ## _type,			\
--		.data		= &_clk_name ## _data,			\
-+		.data		= &_clk_name ## _data
-+#define KONA_CLK_PREREQ(_ccu_name, _clk_name, _type, _prereq)		\
-+	{								\
-+		.prereq		= #_prereq,				\
-+		___KONA_CLK_COMMON(_ccu_name, _clk_name, _type),	\
-+	}
-+#define KONA_CLK(_ccu_name, _clk_name, _type)				\
-+	{								\
-+		___KONA_CLK_COMMON(_ccu_name, _clk_name, _type),	\
++#define hyst_exists(hyst)		((hyst)->offset != 0)
++
+ #define divider_exists(div)		FLAG_TEST(div, DIV, EXISTS)
+ #define divider_is_fixed(div)		FLAG_TEST(div, DIV, FIXED)
+ #define divider_has_fraction(div)	(!divider_is_fixed(div) && \
+@@ -205,6 +207,22 @@ struct bcm_clk_gate {
+ 		.flags = FLAG(GATE, HW)|FLAG(GATE, EXISTS),		\
  	}
- #define LAST_KONA_CLK	{ .type = bcm_clk_none }
  
++/* Gate hysteresis for clocks */
++struct bcm_clk_hyst {
++	u32 offset;		/* hyst register offset (normally CLKGATE) */
++	u32 en_bit;		/* bit used to enable hysteresis */
++	u32 val_bit;		/* if enabled: 0 = low delay; 1 = high delay */
++};
++
++/* Hysteresis initialization macro */
++
++#define HYST(_offset, _en_bit, _val_bit)				\
++	{								\
++		.offset = (_offset),					\
++		.en_bit = (_en_bit),					\
++		.val_bit = (_val_bit),					\
++	}
++
+ /*
+  * Each clock can have zero, one, or two dividers which change the
+  * output rate of the clock.  Each divider can be either fixed or
+@@ -372,6 +390,7 @@ struct bcm_clk_trig {
+ struct peri_clk_data {
+ 	struct bcm_clk_policy policy;
+ 	struct bcm_clk_gate gate;
++	struct bcm_clk_hyst hyst;
+ 	struct bcm_clk_trig pre_trig;
+ 	struct bcm_clk_div pre_div;
+ 	struct bcm_clk_trig trig;
 -- 
 1.7.9.5
