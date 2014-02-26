@@ -1,52 +1,74 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 26 Feb 2014 18:18:20 +0000
-Subject: [PATCH 17/18] KVM: ARM: vgic: add the GICv3 backend
-In-Reply-To: <20140225180756.GJ23136@mudshark.cambridge.arm.com>
-References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
- <1391607050-540-18-git-send-email-marc.zyngier@arm.com>
- <20140225180756.GJ23136@mudshark.cambridge.arm.com>
-Message-ID: <530E2FEC.8090205@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 26 Feb 2014 19:21:17 +0100
+Subject: [PATCH] net: phy: add suspend_halted module param
+In-Reply-To: <530D1B7C.2090506@gmail.com>
+References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140224191554.GC29288@lunn.ch> <530D1B7C.2090506@gmail.com>
+Message-ID: <20140226182117.GB14907@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/02/14 18:07, Will Deacon wrote:
-> On Wed, Feb 05, 2014 at 01:30:49PM +0000, Marc Zyngier wrote:
->> Introduce the support code for emulating a GICv2 on top of GICv3
->> hardware.
->>
->> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  include/kvm/arm_vgic.h |  26 ++++++
->>  virt/kvm/arm/vgic-v3.c | 220 +++++++++++++++++++++++++++++++++++++++++++++++++
->>  virt/kvm/arm/vgic.c    |   2 +
->>  3 files changed, 248 insertions(+)
->>  create mode 100644 virt/kvm/arm/vgic-v3.c
->>
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index c95039a..caeb8f4 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -32,6 +32,7 @@
->>  #define VGIC_NR_SHARED_IRQS	(VGIC_NR_IRQS - VGIC_NR_PRIVATE_IRQS)
->>  #define VGIC_MAX_CPUS		KVM_MAX_VCPUS
->>  #define VGIC_MAX_LRS		(1 << 6)
->> +#define VGIC_V3_MAX_LRS		16
+On Tue, Feb 25, 2014 at 11:38:52PM +0100, Sebastian Hesselbarth wrote:
+> On 02/24/2014 08:15 PM, Andrew Lunn wrote:
+> >On Sun, Feb 23, 2014 at 05:58:39PM +0100, Sebastian Hesselbarth wrote:
+> >>commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
+> >>   ("net: phy: resume/suspend PHYs on attach/detach")
+> >>introduced a feature to suspend PHYs when entering halted state.
+> >>
+> >>Unfortunately, not all bootloaders properly power-up PHYs on reset
+> >>and fail to access ethernet because the PHY is still powered down.
+> >>
+> >>Therefore, we add a boolean module parameter suspend_halted with
+> >>default value of true. Disabling that parameter prevents PHYs from
+> >>being suspended when entering halted state.
+> >
+> >Am i doing something silly here?
+> >
+> >root at qnap:/sys/module/libphy/parameters# cat suspend_halted
+> >Y
+> >root at qnap:/sys/module/libphy/parameters# echo N > suspend_halted
+> >root at qnap:/sys/module/libphy/parameters# cat suspend_halted
+> >N
+> >root at qnap:/sys/module/libphy/parameters# reboot
 > 
-> Since we have fewer list registers, doesn't the code in vgic.c need updating
-> to honour the relevant bounds? (e.g. the use of find_first_zero_bit in
-> vgic_queue_irq).
+> Just to be sure, can you ifconfig up the interface before reboot?
+> The PHY could already be powered-down, if the interface is down.
+> 
+> >...
+> >...
+> >
+> >Net:   egiga0 [PRIME]
+> >Hit any key to stop autoboot:  0
+> >Send Cmd : 0x68 to UART1
+> >egiga0 no link
+> >Using egiga0 device
+> >TFTP from server 10.0.0.1; our IP address is 10.0.0.2
+> >Filename 'uImage-qnap'.
+> >Load address: 0x800000
+> >Loading: T T
+> >
+> >Does not seem to work.
+> 
+> I tested the patch on Topkick (w/ 88E1318S, 0x0141 0x0e90) which
+> bootloader is also affected.
+> 
+> Both, libphy.suspend_halted=0 as kernel boot parameter and sysfs
+> procedure above successfully prevent the PHY from being powered
+> down. After reboot, u-boot tftpboot works as expected.
 
-I'm confused. We've always used a variable, as even with GICv2, we
-usually have far less list registers than the maximum (4 vs 64). Looking
-at the code you mention, I see this:
+Hi Sebastian
 
-	/* Try to use another LR for this interrupt */
-	lr = find_first_zero_bit((unsigned long *)vgic_cpu->lr_used,
-			       vgic->nr_lr);
+I tested again, and it seems like i made an error. This patch does
+actually fix the problem.
 
-Am I looking at the wrong place?
+The u-boot on this device is somewhat broken, when it comes to
+networking and tftpboot. It seems like if the auto negotiation is not
+complete before the TFTP starts, it never works. There are no
+retransmits of the RRQ message. If i ^C it and start again, it does
+work.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+As to the comment from davem about not using a kernel parameter. How
+about turning it all around. Put a boolean parameter into DT PHY node
+to indicate when it is safe to power down an idle phy?
+
+   Andrew
