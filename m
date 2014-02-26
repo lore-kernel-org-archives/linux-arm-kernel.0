@@ -1,85 +1,48 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 26 Feb 2014 11:31:45 +0100
-Subject: TWL6040 fails to initialize
-In-Reply-To: <530DC1D3.8040800@ti.com>
-References: <530C70B3.4010103@epfl.ch> <530CA8DA.8050806@ti.com>
- <530CB9C6.60806@epfl.ch> <530D972F.805@ti.com> <530DB97E.80309@epfl.ch>
- <530DC1D3.8040800@ti.com>
-Message-ID: <530DC291.2060708@epfl.ch>
+Date: Wed, 26 Feb 2014 11:38:09 +0100
+Subject: [PATCH v3 2/2] ARM: DTS: OMAP4/5: Use l3_ick for the gpmc node
+In-Reply-To: <1393411089-9550-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1393411089-9550-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1393411089-9550-3-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2014 11:28 AM, Peter Ujfalusi wrote:
-> On 02/26/2014 11:53 AM, Florian Vaussard wrote:
->> On 02/26/2014 08:26 AM, Peter Ujfalusi wrote:
->>> On 02/25/2014 05:41 PM, Florian Vaussard wrote:
->>>> If the power was not enabled at all, I would be unable to read the
->>>> revision register, no? And delaying the probe by one millisecond would
->>>> be of no help in this case IMHO.
->>>
->>> One thing which might cause this is that if the audpwron GPIO is set high
->>> before the twl6040 module is probing. When I request the GPIO I ask it to be
->>> set to low. If the line was high before this means we initiate the power off
->>> sequence.
->>> Can you try something like this:
->>>
->>
->> I statistically checked that the sleep should be placed after the GPIO
->> request, so indeed this seems to be the problem, and your explanation is
->> plausible. Can you send a proper patch?
->>
->> Now, related to this, I managed to found a part of the datasheet on the
->> Great Internet. Looking at the "Power-Up Sequence" section, it is written:
->>
->> - NRESPWRON goes high -> plug detect and GPO are available
->> - V2V1 goes high -> hook-detect available by I2C programming (sleep mode)
->> - AUDPWRON goes high && READYINT -> ready to communicate through I2C and PDM
->>
->> So, although there seems to be some contradictions on when it is
->> possible to access the I2C, shouldn't we enable the AUDPWRON GPIO
->> _before_ making any I2C access?
->>
->> For the twl6040_probe, the following path would seem more correct to me:
->>
->> 1) enable regulators
->> 2) request AUDPWRON
->> 3) twl6040_power(ON) && regcache_cache_only(false)
->> 4) wait for READYINT (or sleep if deterministic)
->> 5) perform all required I2C accesses (read revision, etc.)
->> 6) twl6040_power(OFF) && regcache_cache_only(true)
->>
->> What do you think?
-> 
-> Even when the AUDPWRON signal is low we can access to registers in VIO domain,
-> plug detect and GPO functions. So there's no need to power on the codec just
-> to power it down later.
-> 
+The GPMC clock is derived from l3_ick. The simplest solution is
+to reference directly l3_ick to provide the GPMC fck in order to
+get correct timings. The real management of the clock is left to
+hwmod.
 
-Ok, if it is safe to do so, I am fine with the current probe. I let you
-post a patch to add a delay after requesting the GPIO.
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+---
+ arch/arm/boot/dts/omap4.dtsi | 2 ++
+ arch/arm/boot/dts/omap5.dtsi | 2 ++
+ 2 files changed, 4 insertions(+)
 
-Regards,
-Florian
-
-> 
->> Thanks,
->> Florian
->>
->>> diff --git a/drivers/mfd/twl6040.c b/drivers/mfd/twl6040.c
->>> index 75316fb33448..d2a0bd1539ae 100644
->>> --- a/drivers/mfd/twl6040.c
->>> +++ b/drivers/mfd/twl6040.c
->>> @@ -674,6 +674,9 @@ static int twl6040_probe(struct i2c_client *client,
->>>                                             GPIOF_OUT_INIT_LOW, "audpwron");
->>>                 if (ret)
->>>                         goto gpio_err;
->>> +
->>> +               /* power-down sequence latency */
->>> +               usleep_range(500, 700);
->>>         }
->>>
->>>         ret = regmap_add_irq_chip(twl6040->regmap, twl6040->irq, IRQF_ONESHOT,
->>>
->>>
-> 
-> 
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 756cd34..381c0cc 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -275,6 +275,8 @@
+ 			gpmc,num-waitpins = <4>;
+ 			ti,hwmods = "gpmc";
+ 			ti,no-idle-on-init;
++			clocks = <&l3_div_ck>;
++			clock-names = "fck";
+ 		};
+ 
+ 		uart1: serial at 4806a000 {
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index a72813a..7a16647 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -302,6 +302,8 @@
+ 			gpmc,num-cs = <8>;
+ 			gpmc,num-waitpins = <4>;
+ 			ti,hwmods = "gpmc";
++			clocks = <&l3_iclk_div>;
++			clock-names = "fck";
+ 		};
+ 
+ 		i2c1: i2c at 48070000 {
+-- 
+1.8.1.2
