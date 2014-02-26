@@ -1,72 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Feb 2014 16:57:51 +0900
-Subject: [GIT PULL v2 0/7] Second Round of Renesas ARM Based SoC Updates for
- v3.15
-Message-ID: <cover.1393400446.git.horms+renesas@verge.net.au>
+Date: Wed, 26 Feb 2014 16:57:47 +0900
+Subject: [PATCH 1/7] ARM: shmobile: Use 64-bit dma_addr_t on r8a7790/r8a7791
+In-Reply-To: <cover.1393400446.git.horms+renesas@verge.net.au>
+References: <cover.1393400446.git.horms+renesas@verge.net.au>
+Message-ID: <4a51856b42672cfcb7d6fbab22dcf2caba2be5ab.1393400446.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Magnus Damm <damm@opensource.se>
 
-please consider this second round of Renesas ARM based SoC updates for v3.15.
-As requested I have broken out clock changes into a separate branch which
-I will send a pull-request for separately.
+Some on-chip devices on r8a7790 and r8a7791 can do
+bus mastering and access more than 32-bits of address
+space. Select ARCH_DMA_ADDR_T_64BIT when LPAE is set
+in case of multiplatform and legacy SoC support.
 
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
-
-  Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.15
-
-for you to fetch changes up to c4ca5d80e03559fd95c526ece5ce39fc732a2511:
-
-  ARM: shmobile: Move SYSC base variable to inside ifdefs (2014-02-26 14:53:35 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC Updates for v3.15
-
-* R-Car Gen2 SoCs: r8a7791 (R-Car M2) and r8a7790 (R-Car H2)
-  - Remove __init from rcar_gen2_read_mode_pins()
-
-* r8a7791 (R-Car M2)
-  - Use 64-bit dma_addr_t
-
-* r8a7790 (R-Car H2)
-  - Add CA15-SCU, CA7-SCU
-  - Add SYSC setup code
-  - Use 64-bit dma_addr_t
-
-----------------------------------------------------------------
-Gaku Inami (1):
-      ARM: shmobile: r8a7790 CA7-SCU enablement
-
-Hisashi Nakamura (1):
-      ARM: shmobile: r8a7790 SYSC setup code
-
-Keita Kobayashi (1):
-      ARM: shmobile: r8a7790 CA15-SCU enablement
-
-Magnus Damm (4):
-      ARM: shmobile: Use 64-bit dma_addr_t on r8a7790/r8a7791
-      ARM: shmobile: Break out R-Car SYSC PM code
-      ARM: shmobile: Remove __init from rcar_gen2_read_mode_pins()
-      ARM: shmobile: Move SYSC base variable to inside ifdefs
-
- arch/arm/mach-shmobile/Kconfig                |   3 +
- arch/arm/mach-shmobile/Makefile               |   3 +-
- arch/arm/mach-shmobile/include/mach/pm-rcar.h |  15 +++
- arch/arm/mach-shmobile/include/mach/r8a7779.h |  13 +--
- arch/arm/mach-shmobile/include/mach/r8a7790.h |   1 +
- arch/arm/mach-shmobile/pm-r8a7779.c           | 131 ++----------------------
- arch/arm/mach-shmobile/pm-r8a7790.c           |  45 ++++++++
- arch/arm/mach-shmobile/pm-rcar.c              | 141 ++++++++++++++++++++++++++
- arch/arm/mach-shmobile/setup-rcar-gen2.c      |   2 +-
- arch/arm/mach-shmobile/smp-r8a7779.c          |  17 ++--
- arch/arm/mach-shmobile/smp-r8a7790.c          |  17 ++++
- 11 files changed, 244 insertions(+), 144 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/include/mach/pm-rcar.h
- create mode 100644 arch/arm/mach-shmobile/pm-r8a7790.c
- create mode 100644 arch/arm/mach-shmobile/pm-rcar.c
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 3386406..0272cd7 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -13,6 +13,7 @@ config ARCH_SHMOBILE_MULTI
+ 	select ARM_GIC
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	select MIGHT_HAVE_PCI
++	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 	select NO_IOPORT
+ 	select PINCTRL
+ 	select ARCH_REQUIRE_GPIOLIB
+@@ -123,6 +124,7 @@ config ARCH_R8A7790
+ 	select MIGHT_HAVE_PCI
+ 	select SH_CLK_CPG
+ 	select RENESAS_IRQC
++	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 
+ config ARCH_R8A7791
+ 	bool "R-Car M2 (R8A77910)"
+@@ -132,6 +134,7 @@ config ARCH_R8A7791
+ 	select MIGHT_HAVE_PCI
+ 	select SH_CLK_CPG
+ 	select RENESAS_IRQC
++	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 
+ config ARCH_EMEV2
+ 	bool "Emma Mobile EV2"
+-- 
+1.8.5.2
