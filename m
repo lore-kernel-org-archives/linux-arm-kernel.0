@@ -1,102 +1,40 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 26 Feb 2014 12:01:04 +0000
-Subject: [PATCH v5 2/4] devicetree: bindings: Document Krait CPU/L1 EDAC
-In-Reply-To: <E34E6789-03BC-452C-9053-82CA1D027861@codeaurora.org>
-References: <20140115165623.GJ14405@codeaurora.org>
- <20140116013840.GA674@codeaurora.org>
- <20140116113332.GC25540@e102568-lin.cambridge.arm.com>
- <20140116180505.GA30925@codeaurora.org>
- <20140116183326.GG25540@e102568-lin.cambridge.arm.com>
- <20140116192617.GA13785@codeaurora.org>
- <20140117102109.GA22544@e102568-lin.cambridge.arm.com>
- <20140219002043.GE14769@codeaurora.org>
- <20140225111655.GA6855@e102568-lin.cambridge.arm.com>
- <E34E6789-03BC-452C-9053-82CA1D027861@codeaurora.org>
-Message-ID: <20140226120103.GA25326@e102568-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Feb 2014 12:03:59 +0000
+Subject: [PATCH 2/2] ARM: dts: duovero-parlor: Add HDMI output
+In-Reply-To: <530DCC8A.6060708@ti.com>
+References: <1393261669-32039-1-git-send-email-florian.vaussard@epfl.ch>
+ <20140225123921.GY27282@n2100.arm.linux.org.uk>
+ <20140225134139.GA23898@earth.universe> <2364124.7r818M0xAj@avalon>
+ <20140225205634.GZ27282@n2100.arm.linux.org.uk> <530DCC8A.6060708@ti.com>
+Message-ID: <20140226120359.GA27282@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 08:48:38PM +0000, Kumar Gala wrote:
-> 
-> On Feb 25, 2014, at 5:16 AM, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> 
-> > Hi Stephen,
-> > 
-> > On Wed, Feb 19, 2014 at 12:20:43AM +0000, Stephen Boyd wrote:
-> >> (Sorry, this discussion stalled due to merge window + life events)
-> > 
-> > Sorry for the delay in replying on my side too.
-> > 
-> >> On 01/17, Lorenzo Pieralisi wrote:
-> >>> On Thu, Jan 16, 2014 at 07:26:17PM +0000, Stephen Boyd wrote:
-> >>>> On 01/16, Lorenzo Pieralisi wrote:
-> >>>>> On Thu, Jan 16, 2014 at 06:05:05PM +0000, Stephen Boyd wrote:
-> >>>>>> On 01/16, Lorenzo Pieralisi wrote:
-> >>>>>>> Do we really want to do that ? I am not sure. A cpus node is supposed to
-> >>>>>>> be a container node, we should not define this binding just because we
-> >>>>>>> know the kernel creates a platform device for it then.
-> >>>>>> 
-> >>>>>> This is just copying more of the ePAPR spec into this document.
-> >>>>>> It just so happens that having a compatible field here allows a
-> >>>>>> platform device to be created. I don't see why that's a problem.
-> >>>>> 
-> >>>>> I do not see why you cannot define a node like pmu or arch-timer and stick
-> >>>>> a compatible property in there. cpus node does not represent a device, and
-> >>>>> must not be created as a platform device, that's my opinion.
-> >>>>> 
-> >>>> 
-> >>>> I had what you're suggesting before in the original revision of
-> >>>> this patch. Please take a look at the original patch series[1]. I
-> >>>> suppose it could be tweaked slightly to still have a cache node
-> >>>> for the L2 interrupt and the next-level-cache pointer from the
-> >>>> CPUs.
-> >>> 
-> >>> Ok, sorry, we are running around in circles here, basically you moved
-> >>> the node to cpus according to reviews. I still think that treating cpus
-> >>> as a device is not a great idea, even though I am in the same
-> >>> position with C-states and probably will add C-state tables in the cpus
-> >>> node.
-> >>> 
-> >>> http://comments.gmane.org/gmane.linux.power-management.general/41012
-> >>> 
-> >>> I just would like to see under cpus nodes and properties that apply to
-> >>> all ARM systems, and avoid defining properties (eg interrupts) that
-> >>> have different meanings for different ARM cores.
-> >>> 
-> >>> The question related to why the kernel should create a platform device
-> >>> out of cpus is still open. I really do not want to block your series
-> >>> for these simple issues but we have to make a decision and stick to that,
-> >>> I am fine either way if we have a plan.
-> >>> 
-> >> 
-> >> Do you just want a backup plan in case we don't make a platform
-> >> device out of the cpus node? I believe we can always add code
-> >> somewhere to create a platform device at runtime if we detect the
-> >> cpus node has a compatible string equal to "qcom,krait". We could
-> >> probably change this driver's module_init() to scan the DT for
-> >> such a compatible string and create the platform device right
-> >> there. If we get more than one interrupt in the cpus node we can
-> >> add interrupt-names and then have software look for interrupts by
-> >> name instead of number.
-> > 
-> > As I mentioned, I do not like the idea of adding compatible properties
-> > just to force the kernel to create platform devices out of device tree
-> > nodes. On top of that I would avoid adding a compatible property
-> > to the cpus node (after all properties like enable-method are common for all
-> > cpus but still duplicated), my only concern being backward compatibility
-> > here (ie if we do that for interrupts, we should do that also for other
-> > common cpu nodes properties, otherwise we have different rules for
-> > different properties).
-> > 
-> > I think you can then add interrupts to cpu nodes ("qcom,krait" specific),
-> > and as you mentioned create a platform device for that.
-> > 
-> > Thanks,
-> > Lorenzo
-> 
-> So I agree with the statement about adding compatibles just to create platform devices is wrong.  However its seems perfectly reasonable for a cpu node to have a compatible property.  I don't see why a CPU is any different from any other device described in a DT.
+On Wed, Feb 26, 2014 at 01:14:18PM +0200, Tomi Valkeinen wrote:
+> We have a bunch of panels and encoders used on OMAP boards, and we have
+> separate, omapdss specific, drivers for those. My plan is to continue
+> improving those drivers until they can be platform independent. This
+> would be the Common Display Framework that's been discussed (or a
+> precursor to it).
 
-I was referring to the /cpus node, not to individual cpu nodes, where
-the compatible property is already present now.
+I believe CDF has been knocked on the head.
 
-Lorenzo
+Also - DRM is not going to ever support hotplugging components - this
+was discussed at kernel summit last year and David Airlie was quite
+adamant about that.  So, any "framework" which forces hotplugging of
+components on subsystems isn't going to fly.
+
+This is why we now have the component helpers in the driver model -
+to allow devices to be collected together into one logical subsystem
+group, and bound/unbound as a group.
+
+Remember that "hotplugging" in this context does not mean that the
+user can physically do something with the hardware.  It means that
+they're separate devices which can be probed/removed at will.  Every
+device in Linux can be bound and unbound from its driver at any time
+by userspace, and that is something which is expected to be handled
+gracefully.
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
