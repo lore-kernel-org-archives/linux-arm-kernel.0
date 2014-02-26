@@ -1,46 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Feb 2014 15:31:42 +0000
-Subject: [PATCH 03/18] arm64: boot protocol documentation update for GICv3
-In-Reply-To: <530DFC0C.3040704@arm.com>
-References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
- <1391607050-540-4-git-send-email-marc.zyngier@arm.com>
- <20140225180658.GH23136@mudshark.cambridge.arm.com>
- <530DFC0C.3040704@arm.com>
-Message-ID: <20140226153142.GA12882@mudshark.cambridge.arm.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Wed, 26 Feb 2014 09:33:06 -0600
+Subject: [PATCH 1/3] clk: socfpga: Fix integer overflow in clock
+ calculation
+In-Reply-To: <20140226083730.22529.8405@quantum>
+References: <1392844273-11918-1-git-send-email-dinguyen@altera.com>
+ <20140226083730.22529.8405@quantum>
+Message-ID: <1393428786.5888.1.camel@b13cycling>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 02:37:00PM +0000, Marc Zyngier wrote:
-> On 25/02/14 18:06, Will Deacon wrote:
-> > On Wed, Feb 05, 2014 at 01:30:35PM +0000, Marc Zyngier wrote:
-> >> Linux has some requirements that must be satisfied in order to boot
-> >> on a system built with a GICv3.
-> >>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  Documentation/arm64/booting.txt | 7 +++++++
-> >>  1 file changed, 7 insertions(+)
-> >>
-> >> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> >> index a9691cc..4a02ebd 100644
-> >> --- a/Documentation/arm64/booting.txt
-> >> +++ b/Documentation/arm64/booting.txt
-> >> @@ -131,6 +131,13 @@ Before jumping into the kernel, the following conditions must be met:
-> >>    the kernel image will be entered must be initialised by software at a
-> >>    higher exception level to prevent execution in an UNKNOWN state.
-> >>  
-> >> +  For systems with a GICv3 interrupt controller, it is expected that:
-> >> +  - ID_AA64PFR0_EL1.GIC (bits [27:24]) must have the value 0b0001
+On Wed, 2014-02-26 at 00:37 -0800, Mike Turquette wrote:
+> Quoting dinguyen at altera.com (2014-02-19 13:11:10)
+> > From: Dinh Nguyen <dinguyen@altera.com>
 > > 
-> > Since ID_AA64PFR0_EL1 is read-only at all exception levels, I don't see the
-> > value of this statement.
+> > Use 64-bit integer for calculating clock rate. Also use do_div for the
+> > 64-bit division.
+> > 
+> > Signed-off-by: Graham Moore <grmoore@altera.com>
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 > 
-> Think virtualization. A hypervisor can control reads of ID_AA64PFR0_EL1
-> by setting HCR_EL2.TID3, and report whatever it wants.
+> Changes to the clk driver look good to me.
+> 
 
-Sure, but it seems unreasonable to me that we require a hypervisor to tell a
-guest about GICv3 if the system happens to have one. What if it wants to
-emulate a GICv2? In other words, requiring this in booting.txt seems
-superflous.
+Can you apply the first 2 patches to your tree? I'll send the 3rd dts
+patch through the arm-soc tree.
 
-Will
+Thanks alot...
+Dinh
+> Regards,
+> Mike
+> 
+> > ---
+> >  drivers/clk/socfpga/clk-pll.c |    8 +++++---
+> >  1 file changed, 5 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/clk/socfpga/clk-pll.c b/drivers/clk/socfpga/clk-pll.c
+> > index 362004e..834b6e9 100644
+> > --- a/drivers/clk/socfpga/clk-pll.c
+> > +++ b/drivers/clk/socfpga/clk-pll.c
+> > @@ -44,7 +44,8 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
+> >                                          unsigned long parent_rate)
+> >  {
+> >         struct socfpga_pll *socfpgaclk = to_socfpga_clk(hwclk);
+> > -       unsigned long divf, divq, vco_freq, reg;
+> > +       unsigned long divf, divq, reg;
+> > +       unsigned long long vco_freq;
+> >         unsigned long bypass;
+> >  
+> >         reg = readl(socfpgaclk->hw.reg);
+> > @@ -54,8 +55,9 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
+> >  
+> >         divf = (reg & SOCFPGA_PLL_DIVF_MASK) >> SOCFPGA_PLL_DIVF_SHIFT;
+> >         divq = (reg & SOCFPGA_PLL_DIVQ_MASK) >> SOCFPGA_PLL_DIVQ_SHIFT;
+> > -       vco_freq = parent_rate * (divf + 1);
+> > -       return vco_freq / (1 + divq);
+> > +       vco_freq = (unsigned long long)parent_rate * (divf + 1);
+> > +       do_div(vco_freq, (1 + divq));
+> > +       return (unsigned long)vco_freq;
+> >  }
+> >  
+> >  static struct clk_ops clk_pll_ops = {
+> > -- 
+> > 1.7.9.5
+> > 
