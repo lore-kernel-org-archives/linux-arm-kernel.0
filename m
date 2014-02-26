@@ -1,82 +1,216 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 26 Feb 2014 14:04:39 +0100
-Subject: [GIT PULL] Integrator multiplatform patches, take two
-Message-ID: <CACRpkdbWNNcQCa0XLHo_CPOcjBNAPORhaZ9+ct1QWaLJjFoxMg@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 26 Feb 2014 14:15:14 +0100
+Subject: [PATCH v3 04/20] ARM: shmobile: r8a7779: Add clocks
+In-Reply-To: <1393400016-23433-5-git-send-email-horms+renesas@verge.net.au>
+References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+ <1393400016-23433-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20493371.uo7oml5YRN@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+Hi Simon,
 
-this is anoter package of multiplatform patches for v3.15, clearing the
-view with the final objective in clear sight.
+Thank you for the patch.
 
-I have tested to pull this cleanly on top of your
-integrator/multiplatform-base branch, so it can be pulled on top
-of that.
+On Wednesday 26 February 2014 16:33:20 Simon Horman wrote:
+> Declare all core and MSTP clocks currently used by r8a7779-based boards.
+> 
+> Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoCs.
+> 
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> ---
+> v3
+> * As suggested by Laurent Pinchart
+>   - Add and use extal_clk
+>   - Fix bogus status register use for MSTP clocks
+>   - Fix bogus mstp3_cls to use its own entries rather than
+>     that of mstp1_clks
+> 
+> * Update to use "main" in cpg_clocks as per updated
+>   binding in previous patch
+> * Update for new, consolidated and renamed index macros
+>   - R8A7779_CLK_ETHER
+>   - R8A7779_CLK_HSCIF
+>   - R8A7779_CLK_HSPI
+>   - R8A7779_CLK_MMC0,1
+>   - R8A7779_CLK_PCIE
+>   - R8A7779_CLK_USB01,2
+> ---
+>  arch/arm/boot/dts/r8a7779.dtsi | 129 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 129 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+> index d0561d4..240a03e 100644
+> --- a/arch/arm/boot/dts/r8a7779.dtsi
+> +++ b/arch/arm/boot/dts/r8a7779.dtsi
+> @@ -11,6 +11,7 @@
+> 
+>  /include/ "skeleton.dtsi"
+> 
+> +#include <dt-bindings/clock/r8a7779-clock.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> 
+>  / {
+> @@ -278,4 +279,132 @@
+>  		interrupts = <0 75 IRQ_TYPE_LEVEL_HIGH>;
+>  		status = "disabled";
+>  	};
+> +
+> +	clocks {
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		/* External root clock */
+> +		extal_clk: extal_clk {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			/* This value must be overriden by the board. */
+> +			clock-frequency = <0>;
+> +			clock-output-names = "extal";
+> +		};
+> +
+> +		/* Special CPG clocks */
+> +		cpg_clocks: cpg_clocks at 0xe6150000 {
+> +			compatible = "renesas,r8a7779-cpg-clocks";
+> +			reg = <0 0xe6150000 0 0x1000>;
+> +			clocks = <&extal_clk>;
+> +			#clock-cells = <1>;
+> +			clock-output-names = "plla", "z", "zs", "s",
+> +					     "s1", "p", "out";
+> +		};
+> +
+> +		/* Fixed factor clocks */
+> +		i_clk: i_clk {
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
+> +			#clock-cells = <0>;
+> +			clock-div = <2>;
+> +			clock-mult = <1>;
+> +			clock-output-names = "i";
+> +		};
+> +		s3_clk: s3_clk {
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
+> +			#clock-cells = <0>;
+> +			clock-div = <8>;
+> +			clock-mult = <1>;
+> +			clock-output-names = "s3";
+> +		};
+> +		s4_clk: s4_clk {
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
+> +			#clock-cells = <0>;
+> +			clock-div = <16>;
+> +			clock-mult = <1>;
+> +			clock-output-names = "s4";
+> +		};
+> +		g_clk: g_clk {
+> +			compatible = "fixed-factor-clock";
+> +			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
+> +			#clock-cells = <0>;
+> +			clock-div = <24>;
+> +			clock-mult = <1>;
+> +			clock-output-names = "g";
+> +		};
+> +
+> +		/* Gate clocks */
+> +		mstp0_clks: mstp0_clks {
+> +			compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-
+clocks";
+> +			reg = <0 0xffc80030 0 4>;
+> +			clocks = <&cpg_clocks R8A7779_CLK_P>,
+> <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>;
 
-Two things remain to be solved after this:
+Aren't the HSPI and HSCIF parent clocks clks ? Aren't the SCIF parent clocks 
+clks1 ?
 
-- Handle the CLCD display database and/or convert this to use the
-  device tree somehow.
+> +			#clock-cells = <1>;
+> +			renesas,clock-indices = <
+> +				R8A7779_CLK_HSPI R8A7779_CLK_TMU0 R8A7779_CLK_TMU0
+> +				R8A7779_CLK_TMU0 R8A7779_CLK_SCIF5 R8A7779_CLK_SCIF4
+> +				R8A7779_CLK_SCIF3 R8A7779_CLK_SCIF2 R8A7779_CLK_SCIF1
+> +				R8A7779_CLK_SCIF0 R8A7779_CLK_I2C3 R8A7779_CLK_I2C2
+> +				R8A7779_CLK_I2C1 R8A7779_CLK_I2C0
+> +			>;
+> +			clock-output-names =
+> +				"hspi", "tmu00", "tmu01",
+> +				"tmu02", "scif5", "scif4",
 
-- Handle the <mach/memory.h> bus offset stuff assumed to be there for
-  PCI DMA in an elegant way.
+The clock names should be tmu0, tmu1 and tmu2, not tmu00, tmu01 and tmu02.
 
-So these have to be hashed out next.
+> +				"scif3", "scif2", "scif1",
+> +				"scif0", "i2c3", "i2c2",
+> +				"i2c1", "i2c0";
+> +		};
+> +		mstp1_clks: mstp1_clks {
+> +			compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-
+clocks";
+> +			reg = <0 0xffc80034 0 4>, <0 0xffc80044 0 4>;
+> +			clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks 
+R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>;
 
-After that we can go full multiplatform for the Integrator, clearing the way
-for Versatile and RealView as well.
+Please verify the clock parents here as well.
 
-Please pull this in!
+> +			#clock-cells = <1>;
+> +			renesas,clock-indices = <
+> +				R8A7779_CLK_USB01 R8A7779_CLK_USB01
+> +				R8A7779_CLK_USB2 R8A7779_CLK_USB2
+> +				R8A7779_CLK_DU R8A7779_CLK_VIN2
+> +				R8A7779_CLK_VIN1 R8A7779_CLK_VIN0
+> +				R8A7779_CLK_ETHER R8A7779_CLK_SATA
+> +				R8A7779_CLK_PCIE R8A7779_CLK_VIN3
+> +			>;
+> +			clock-output-names =
+> +				"ehci0", "ohci0",
+> +				"ehci1", "ohci1",
+> +				"du", "vin2",
+> +				"vin1", "vin0",
+> +				"ether", "sata",
+> +				"pcie", "vin3";
+> +		};
+> +		mstp3_clks: mstp3_clks {
+> +			compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-
+clocks";
+> +			reg = <0 0xffc8003c 0 4>;
+> +			clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks 
+R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
+> +				 <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>;
 
-Yours,
-Linus Walleij
+Aren't the MMC and SDHI parent clocks clks4 ?
 
+> +			#clock-cells = <1>;
+> +			renesas,clock-indices = <
+> +				R8A7779_CLK_SDHI3 R8A7779_CLK_SDHI2
+> +				R8A7779_CLK_SDHI1 R8A7779_CLK_SDHI0
+> +				R8A7779_CLK_MMC1 R8A7779_CLK_MMC0
+> +			>;
+> +			clock-output-names =
+> +				"sdhi3", "sdhi2",
+> +				"sdhi1", "sdhi0",
+> +				"mmc1", "mmc0";
+> +		};
+> +	};
+>  };
 
-The following changes since commit 29525484cd2524a31ee0924831ab43b46ea6ebe1:
+-- 
+Regards,
 
-  ARM: integrator: select GPIO block (2014-02-13 11:21:37 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/integrator-for-v3.15-2
-
-for you to fetch changes up to a79528e9d849803457b6235ddb1a1cfd4e11c6cd:
-
-  ARM: integrator: register sched_clock directly (2014-02-26 13:49:07 +0100)
-
-----------------------------------------------------------------
-Integrator multiplatform patches for v3.15, set two:
-
-- Remove all dangling header files in <mach/*> from the global
-  namespace and push them down into the mach-integrator folder.
-
-- Decouple the Integrator from the plat-versatile sched_clock
-  implementation.
-
-----------------------------------------------------------------
-Linus Walleij (5):
-      ARM: integrator: localize the lm.h header
-      ARM: integrator: localize the impd1.h header
-      ARM: integrator: merge platform.h to hardware.h
-      ARM: integrator: localize the hardware.h header
-      ARM: integrator: register sched_clock directly
-
- arch/arm/mach-integrator/core.c                    |   4 +-
- .../{include/mach/platform.h => hardware.h}        | 110 ++++++++-------------
- arch/arm/mach-integrator/impd1.c                   |   4 +-
- .../arm/mach-integrator/{include/mach => }/impd1.h |   4 -
- arch/arm/mach-integrator/include/mach/hardware.h   |  45 ---------
- arch/arm/mach-integrator/integrator_ap.c           |   6 +-
- arch/arm/mach-integrator/integrator_cp.c           |  17 ++--
- arch/arm/mach-integrator/leds.c                    |   4 +-
- arch/arm/mach-integrator/lm.c                      |   2 +-
- arch/arm/mach-integrator/{include/mach => }/lm.h   |   0
- arch/arm/mach-integrator/pci_v3.c                  |   4 +-
- drivers/clk/versatile/clk-impd1.c                  |   6 +-
- 12 files changed, 61 insertions(+), 145 deletions(-)
- rename arch/arm/mach-integrator/{include/mach/platform.h => hardware.h} (81%)
- rename arch/arm/mach-integrator/{include/mach => }/impd1.h (83%)
- delete mode 100644 arch/arm/mach-integrator/include/mach/hardware.h
- rename arch/arm/mach-integrator/{include/mach => }/lm.h (100%)
+Laurent Pinchart
