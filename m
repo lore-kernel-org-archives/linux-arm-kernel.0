@@ -1,200 +1,120 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 26 Feb 2014 11:51:11 -0800
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Feb 2014 20:55:58 +0100
 Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <530E402C.9040502@codeaurora.org>
+In-Reply-To: <20140226183454.GA14639@cbox>
 References: <20140226183454.GA14639@cbox>
- <530E402C.9040502@codeaurora.org>
-Message-ID: <20140226195111.GB16149@cbox>
+Message-ID: <5553754.0b4gMg5OS7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 02:27:40PM -0500, Christopher Covington wrote:
-> Hi Christoffer,
+On Wednesday 26 February 2014 10:34:54 Christoffer Dall wrote:
+> ARM VM System Specification
+> ===========================
 > 
-> On 02/26/2014 01:34 PM, Christoffer Dall wrote:
-> > ARM VM System Specification
-> > ===========================
-> > 
-> > Goal
-> > ----
-> > The goal of this spec is to allow suitably-built OS images to run on
-> > all ARM virtualization solutions, such as KVM or Xen.
+> Goal
+> ----
+> The goal of this spec is to allow suitably-built OS images to run on
+> all ARM virtualization solutions, such as KVM or Xen.
 > 
-> Would you consider including simulators/emulators as well, such as QEMU in TCG
-> mode?
+> Recommendations in this spec are valid for aarch32 and aarch64 alike, and
+> they aim to be hypervisor agnostic.
 > 
+> Note that simply adhering to the SBSA [2] is not a valid approach,
+> for example because the SBSA mandates EL2, which will not be available
+> for VMs.  Further, the SBSA mandates peripherals like the pl011, which
+> may be controversial for some ARM VM implementations to support.
+> This spec also covers the aarch32 execution mode, not covered in the
+> SBSA.
 
-Yes, but I think KVM or Xen is the most common use cases for this, but
-in fact, for KVM, most of the work to support this would be in QEMU
-anyhow and whether you choose to enable KVM or not shouldn't make any
-difference.
+I would prefer if we can stay as close as possible to SBSA for individual
+hardware components, and only stray from it when there is a strong reason.
+pl011-subset doesn't sound like a significant problem to implement,
+especially as SBSA makes the DMA part of that optional. Can you
+elaborate on what hypervisor would have a problem with that?
 
-> > Recommendations in this spec are valid for aarch32 and aarch64 alike, and
-> > they aim to be hypervisor agnostic.
-> > 
-> > Note that simply adhering to the SBSA [2] is not a valid approach,
-> > for example because the SBSA mandates EL2, which will not be available
-> > for VMs.  Further, the SBSA mandates peripherals like the pl011, which
-> > may be controversial for some ARM VM implementations to support.
-> > This spec also covers the aarch32 execution mode, not covered in the
-> > SBSA.
-> > 
-> > 
-> > Image format
-> > ------------
-> > The image format, as presented to the VM, needs to be well-defined in
-> > order for prepared disk images to be bootable across various
-> > virtualization implementations.
-> > 
-> > The raw disk format as presented to the VM must be partitioned with a
-> > GUID Partition Table (GPT).  The bootable software must be placed in the
-> > EFI System Partition (ESP), using the UEFI removable media path, and
-> > must be an EFI application complying to the UEFI Specification 2.4
-> > Revision A [6].
-> > 
-> > The ESP partition's GPT entry's partition type GUID must be
-> > C12A7328-F81F-11D2-BA4B-00A0C93EC93B and the file system must be
-> > formatted as FAT32/vfat as per Section 12.3.1.1 in [6].
-> > 
-> > The removable media path is \EFI\BOOT\BOOTARM.EFI for the aarch32
-> > execution state and is \EFI\BOOT\BOOTAA64.EFI for the aarch64 execution
-> > state.
-> > 
-> > This ensures that tools for both Xen and KVM can load a binary UEFI
-> > firmware which can read and boot the EFI application in the disk image.
-> > 
-> > A typical scenario will be GRUB2 packaged as an EFI application, which
-> > mounts the system boot partition and boots Linux.
-> > 
-> > 
-> > Virtual Firmware
-> > ----------------
-> > The VM system must be able to boot the EFI application in the ESP.  It
-> > is recommended that this is achieved by loading a UEFI binary as the
-> > first software executed by the VM, which then executes the EFI
-> > application.  The UEFI implementation should be compliant with UEFI
-> > Specification 2.4 Revision A [6] or later.
-> > 
-> > This document strongly recommends that the VM implementation supports
-> > persistent environment storage for virtual firmware implementation in
-> > order to ensure probable use cases such as adding additional disk images
-> > to a VM or running installers to perform upgrades.
-> > 
-> > The binary UEFI firmware implementation should not be distributed as
-> > part of the VM image, but is specific to the VM implementation.
+> Hardware Description
+> --------------------
+> The Linux kernel's proper entry point always takes a pointer to an FDT,
+> regardless of the boot mechanism, firmware, and hardware description
+> method.  Even on real hardware which only supports ACPI and UEFI, the kernel
+> entry point will still receive a pointer to a simple FDT, generated by
+> the Linux kernel UEFI stub, containing a pointer to the UEFI system
+> table.  The kernel can then discover ACPI from the system tables.  The
+> presence of ACPI vs. FDT is therefore always itself discoverable,
+> through the FDT.
 > 
-> Can you elaborate on the motivation for requiring that the kernel be stuffed
-> into a disk image and for requiring such a heavyweight bootloader/firmware? By
-> doing so you would seem to exclude those requiring an optimized boot process.
+> Therefore, the VM implementation must provide through its UEFI
+> implementation, either:
 > 
-
-What's the alternative?  Shipping kernels externally and loading them
-externally?  Sure you can do that, but then distros can't upgrade the
-kernel themselves, and you have to come up with a convention for how to
-ship kernels, initrd's etc.
-
-This works well on x86 today and is going to reflect how most people see
-ARM server hardware to behave as well.
-
-> > Hardware Description
-> > --------------------
-> > The Linux kernel's proper entry point always takes a pointer to an FDT,
-> > regardless of the boot mechanism, firmware, and hardware description
-> > method.  Even on real hardware which only supports ACPI and UEFI, the kernel
-> > entry point will still receive a pointer to a simple FDT, generated by
-> > the Linux kernel UEFI stub, containing a pointer to the UEFI system
-> > table.  The kernel can then discover ACPI from the system tables.  The
-> > presence of ACPI vs. FDT is therefore always itself discoverable,
-> > through the FDT.
-> > 
-> > Therefore, the VM implementation must provide through its UEFI
-> > implementation, either:
-> > 
-> >   a complete FDT which describes the entire VM system and will boot
-> >   mainline kernels driven by device tree alone, or
-> > 
-> >   no FDT.  In this case, the VM implementation must provide ACPI, and
-> >   the OS must be able to locate the ACPI root pointer through the UEFI
-> >   system table.
-> > 
-> > For more information about the arm and arm64 boot conventions, see
-> > Documentation/arm/Booting and Documentation/arm64/booting.txt in the
-> > Linux kernel source tree.
-> > 
-> > For more information about UEFI and ACPI booting, see [4] and [5].
-> > 
-> > 
-> > VM Platform
-> > -----------
-> > The specification does not mandate any specific memory map.  The guest
-> > OS must be able to enumerate all processing elements, devices, and
-> > memory through HW description data (FDT, ACPI) or a bus-specific
-> > mechanism such as PCI.
-> > 
-> > The virtual platform must support at least one of the following ARM
-> > execution states:
-> >   (1) aarch32 virtual CPUs on aarch32 physical CPUs
-> >   (2) aarch32 virtual CPUs on aarch64 physical CPUs
-> >   (3) aarch64 virtual CPUs on aarch64 physical CPUs
-> > 
-> > It is recommended to support both (2) and (3) on aarch64 capable
-> > physical systems.
-> > 
-> > The virtual hardware platform must provide a number of mandatory
-> > peripherals:
-> > 
-> >   Serial console:  The platform should provide a console,
-> >   based on an emulated pl011, a virtio-console, or a Xen PV console.
-> > 
-> >   An ARM Generic Interrupt Controller v2 (GICv2) [3] or newer.  GICv2
-> >   limits the the number of virtual CPUs to 8 cores, newer GIC versions
-> >   removes this limitation.
-> > 
-> >   The ARM virtual timer and counter should be available to the VM as
-> >   per the ARM Generic Timers specification in the ARM ARM [1].
-> > 
-> >   A hotpluggable bus to support hotplug of at least block and network
-> >   devices.  Suitable buses include a virtual PCIe bus and the Xen PV
-> >   bus.
+>   a complete FDT which describes the entire VM system and will boot
+>   mainline kernels driven by device tree alone, or
 > 
-> Is VirtIO hotplug capable? Over PCI or MMIO transports or both?
+>   no FDT.  In this case, the VM implementation must provide ACPI, and
+>   the OS must be able to locate the ACPI root pointer through the UEFI
+>   system table.
 > 
-
-VirtIO devices attached on a PCIe bus are hotpluggable, the emulated
-PCIe bus itself would not have anything to do with virtio, except that
-virtio devices can hang off of it.  AFAIU.
-
-> > We make the following recommendations for the guest OS kernel:
-> > 
-> >   The guest OS must include support for GICv2 and any available newer
-> >   version of the GIC architecture to maintain compatibility with older
-> >   VM implementations.
-> > 
-> >   It is strongly recommended to include support for all available
-> >   (block, network, console, balloon) virtio-pci, virtio-mmio, and Xen PV
-> >   drivers in the guest OS kernel or initial ramdisk.
+> For more information about the arm and arm64 boot conventions, see
+> Documentation/arm/Booting and Documentation/arm64/booting.txt in the
+> Linux kernel source tree.
 > 
-> I would love to eventually see some defconfigs for this sort of thing.
-> 
+> For more information about UEFI and ACPI booting, see [4] and [5].
 
-Agreed, I think it's beyond the scope of this spec though.
+What's the point of having ACPI in a virtual machine? You wouldn't
+need to abstract any of the hardware in AML since you already know
+what the virtual hardware is, so I can't see how this would help
+anyone.
 
-> > Other common peripherals for block devices, networking, and more can
-> > (and typically will) be provided, but OS software written and compiled
-> > to run on ARM VMs cannot make any assumptions about which variations
-> > of these should exist or which implementation they use (e.g. VirtIO or
-> > Xen PV).  See "Hardware Description" above.
-> > 
-> > Note that this platform specification is separate from the Linux kernel
-> > concept of mach-virt, which merely specifies a machine model driven
-> > purely from device tree, but does not mandate any peripherals or have any
-> > mention of ACPI.
-> 
-> Well, the commit message for it said it mandated a GIC and architected timers.
-> 
-Haven't we been down that road before?  I think everyone pretty much
-agrees this is the definition of mach-virt today, but if this note
-causes people to start splitting hairs, I can remove the paragraph.
+However, as ACPI will not be supported by arm32, not having the
+complete FDT will prevent you from running a 32-bit guest on
+a 64-bit hypervisor, which I consider an important use case.
 
-Thanks,
--Christoffer
+> VM Platform
+> -----------
+> The specification does not mandate any specific memory map.  The guest
+> OS must be able to enumerate all processing elements, devices, and
+> memory through HW description data (FDT, ACPI) or a bus-specific
+> mechanism such as PCI.
+> 
+> The virtual platform must support at least one of the following ARM
+> execution states:
+>   (1) aarch32 virtual CPUs on aarch32 physical CPUs
+>   (2) aarch32 virtual CPUs on aarch64 physical CPUs
+>   (3) aarch64 virtual CPUs on aarch64 physical CPUs
+> 
+> It is recommended to support both (2) and (3) on aarch64 capable
+> physical systems.
+
+Isn't this more of a CPU capabilities question? Or maybe you
+should just add 'if aarch32 mode supported is supported by
+the host CPU'.
+
+> 
+> The virtual hardware platform must provide a number of mandatory
+> peripherals:
+> 
+>   Serial console:  The platform should provide a console,
+>   based on an emulated pl011, a virtio-console, or a Xen PV console.
+> 
+>   An ARM Generic Interrupt Controller v2 (GICv2) [3] or newer.  GICv2
+>   limits the the number of virtual CPUs to 8 cores, newer GIC versions
+>   removes this limitation.
+> 
+>   The ARM virtual timer and counter should be available to the VM as
+>   per the ARM Generic Timers specification in the ARM ARM [1].
+> 
+>   A hotpluggable bus to support hotplug of at least block and network
+>   devices.  Suitable buses include a virtual PCIe bus and the Xen PV
+>   bus.
+
+I think you should specify exactly what you want PCIe to look like,
+if present. Otherwise you can get wildly incompatible bus discovery.
+
+> Note that this platform specification is separate from the Linux kernel
+> concept of mach-virt, which merely specifies a machine model driven
+> purely from device tree, but does not mandate any peripherals or have any
+> mention of ACPI.
+
+Did you notice we are removing mach-virt now? Probably no point
+mentioning it here.
+
+	Arnd
