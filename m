@@ -1,204 +1,72 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 26 Feb 2014 13:40:48 -0800
-Subject: arm64 cache maintenance on read only address loops forever
-In-Reply-To: <20140226135521.GF8961@mudshark.cambridge.arm.com>
-References: <530D74C2.4000402@codeaurora.org>
- <20140226135521.GF8961@mudshark.cambridge.arm.com>
-Message-ID: <530E5F60.4050701@codeaurora.org>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 26 Feb 2014 21:48:43 +0000
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <5553754.0b4gMg5OS7@wuerfel>
+References: <20140226183454.GA14639@cbox>
+ <5553754.0b4gMg5OS7@wuerfel>
+Message-ID: <20140226214843.GD12169@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/26/2014 5:55 AM, Will Deacon wrote:
-> On Wed, Feb 26, 2014 at 04:59:46AM +0000, Laura Abbott wrote:
->> Hi,
->
-> Hi Laura,
->
->> On arm64, set_pte_at currently write protects user ptes that are not
->> dirty. The expected behavior is that the fault handler will fix this up
->> on a write to the address. do_page_fault will not mark the fault as a
->> write though if ESR has the CM (cache maintenance) bit set. This has the
->> unfortunate side effect that if cache maintenance is performed on a user
->> address that has not yet been marked as dirty, handle_mm_fault may
->> return without actually adjusting the pte or returning an error. This
->> means that the fault will be infinitely retried.
->>
->> Calling cache maintenance on an address that hasn't actually been
->> written to isn't all that useful but looping forever seems like a poor
->> result. It seems like the check in do_page_fault is too restrictive and
->> we need to be able to fault in pages via cache maintenance.
->
-> My understanding is that the EL0 cache maintenance instructions only require
-> read permission (note that DC ZVA is treated like a store and doesn't set
-> ESR.CM), so I'm failing to appreciate the problem here.
->
-> Do you have a small testcase I can play with?
->
+On Wed, Feb 26, 2014 at 08:55:58PM +0100, Arnd Bergmann wrote:
+> On Wednesday 26 February 2014 10:34:54 Christoffer Dall wrote:
+> > ARM VM System Specification
+> > ===========================
+> > 
+> > Goal
+> > ----
+> > The goal of this spec is to allow suitably-built OS images to run on
+> > all ARM virtualization solutions, such as KVM or Xen.
+> > 
+> > Recommendations in this spec are valid for aarch32 and aarch64 alike, and
+> > they aim to be hypervisor agnostic.
+> > 
+> > Note that simply adhering to the SBSA [2] is not a valid approach,
+> > for example because the SBSA mandates EL2, which will not be available
+> > for VMs.  Further, the SBSA mandates peripherals like the pl011, which
+> > may be controversial for some ARM VM implementations to support.
+> > This spec also covers the aarch32 execution mode, not covered in the
+> > SBSA.
+> 
+> I would prefer if we can stay as close as possible to SBSA for individual
+> hardware components, and only stray from it when there is a strong reason.
+> pl011-subset doesn't sound like a significant problem to implement,
+> especially as SBSA makes the DMA part of that optional. Can you
+> elaborate on what hypervisor would have a problem with that?
 
+I believe it comes down to how much extra overhead pl011-access-trap
+would be over virtio-console. If low, then sure.
+(Since there are certain things we cannot provide SBSA-compliant in
+the guest anyway, I wouldn't consider lack of pl011 to be a big issue.)
 
-You probably won't like the test case because it's breaking assumptions 
-pretty badly. This uses 96f083d416c0d01687ed5b37074831f461838455 from
-Catalin's devel branch to call __dma_inv_range on an mmaped user space
-address. I see three possible outcomes:
+> >   no FDT.  In this case, the VM implementation must provide ACPI, and
+> >   the OS must be able to locate the ACPI root pointer through the UEFI
+> >   system table.
+> > 
+> > For more information about the arm and arm64 boot conventions, see
+> > Documentation/arm/Booting and Documentation/arm64/booting.txt in the
+> > Linux kernel source tree.
+> > 
+> > For more information about UEFI and ACPI booting, see [4] and [5].
+> 
+> What's the point of having ACPI in a virtual machine? You wouldn't
+> need to abstract any of the hardware in AML since you already know
+> what the virtual hardware is, so I can't see how this would help
+> anyone.
 
-1) The test while questionable may have some merit and we will be able 
-to flush user space addresses using this API without causing a problem.
+The point is that if we need to share any real hw then we need to use
+whatever the host has.
 
-2) The test is bad. Instead of looping forever we will instead die with 
-a fault.
+> However, as ACPI will not be supported by arm32, not having the
+> complete FDT will prevent you from running a 32-bit guest on
+> a 64-bit hypervisor, which I consider an important use case.
 
-3) The test is really really bad. Looping forever is your punishment.
+In which case we would be making an active call to ban anything other
+than virtio/xen-pv devices for 32-bit guests on hardware without DT.
 
-Thanks,
-Laura
+However, I see the case of a 32-bit guest on 64-bit hypervisor as less
+likely in the server space than in mobile, and ACPI in mobile as
+unlikely, so it may end up not being a big issue.
 
-
-Kernel Module
----
-
-#include <linux/kernel.h>
-#include <linux/debugfs.h>
-#include <linux/fs.h>
-#include <asm/cacheflush.h>
-#include <linux/miscdevice.h>
-#include <linux/slab.h>
-
-#define PAGE_NUM	256
-
-struct these_pages {
-	struct page *pages[PAGE_NUM];
-	unsigned long addr;
-};
-
-static int cache_debug_open(struct inode *inode, struct file *file)
-{
-         int ret = 0;
-         struct these_pages *data;
-	int i;
-
-	data = kmalloc(sizeof(*data), GFP_KERNEL);
-
-	if (!data) {
-		return -ENOMEM;
-	}
-
-	for (i = 0; i < PAGE_NUM; i++) {
-		data->pages[i] = alloc_pages(GFP_KERNEL, 0);
-		if (!data->pages[i]) {
-			return -ENOMEM;
-		}
-	}
-
-         file->private_data = data;
-
-         return ret;
-}
-
-
-static int cache_debug_mmap_internal(struct file *file, struct 
-vm_area_struct *vma)
-{
-         struct these_pages *data;
-	unsigned long addr = vma->vm_start;
-	int i;
-	int ret;
-
-         data = file->private_data;
-	vma->vm_flags |= VM_IO | VM_DONTEXPAND;
-
-	for (i = 0; i < PAGE_NUM; i++, addr += PAGE_SIZE) {
-		ret = vm_insert_page(vma, addr, data->pages[i]);
-		if (ret) {
-			pr_err(">>> fail %lx\n", addr);
-		}
-	}
-	data->addr = vma->vm_start;
-
-	return 0;
-}
-
-static long cache_debug_ioctl(struct file *filp, unsigned int cmd, 
-unsigned long arg)
-{
-	struct these_pages *data = filp->private_data;
-
-	pr_err(">>> start %lx\n", data->addr);
-	__dma_inv_range((void *)data->addr, (void *)data->addr + 
-PAGE_NUM*PAGE_SIZE);
-	pr_err(">>> end");
-
-	return 0;
-}
-
-static const struct file_operations cache_debug_fops = {
-                 .owner = THIS_MODULE,
-                 .open = cache_debug_open,
-		.mmap = cache_debug_mmap_internal,
-		.unlocked_ioctl = cache_debug_ioctl,
-};
-
-static struct miscdevice test_misc = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "test_dev",
-	.fops = &cache_debug_fops,
-};
-
-static int cache_debug_init(void)
-{
-	int ret;
-
-	ret = misc_register(&test_misc);
-	if (ret < 0) {
-		return -EINVAL;
-	}
-
-         return 0;
-}
-module_init(cache_debug_init);
-
-----
-Userspace test
-----
-
-void test_test(void)
-{
-         int fd;
-         void *base;
-
-         fd = open("/dev/test_dev", O_RDWR);
-
-         if (fd < 0) {
-                 printf("nope\n");
-                 exit(1);
-         }
-
-         base = mmap(0, 1024*1024, PROT_READ|PROT_WRITE,
-                     MAP_SHARED, fd, 0);
-
-
-         ioctl(fd, 2345, 234566);
-
-         return;
-}
-
-int main()
-{
-         printf("start\n");
-         test_test();
-         printf("done\n");
-
-         return 0;
-}
-
-> Will
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+/
+    Leif
