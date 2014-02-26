@@ -1,74 +1,51 @@
-From: elder@linaro.org (Alex Elder)
-Date: Tue, 25 Feb 2014 18:15:40 -0600
-Subject: [PATCH v2 00/12] clk: bcm281xx: updates for 3.15
-Message-ID: <1393373752-30875-1-git-send-email-elder@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 26 Feb 2014 01:37:57 +0100
+Subject: [PATCH v3 1/3] Fix hibernation restore hang in freeze_processes
+In-Reply-To: <1393372920-3896-2-git-send-email-sebastian.capella@linaro.org>
+References: <1393372920-3896-1-git-send-email-sebastian.capella@linaro.org>
+ <1393372920-3896-2-git-send-email-sebastian.capella@linaro.org>
+Message-ID: <3879011.h2KX4caCrF@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series includes updates for the bcm281xx clock code for 3.15.
-I had held off posting this until the code on which this is based
-was queued for 3.14, and it now has been:
-    https://github.com/broadcom/mach-bcm/
-    Branch armsoc/for-3.15/drivers
-	clk: bcm281xx: don't disable unused peripheral clocks
-	clk: bcm281xx: add initial clock framework support
-followed by:
-    (same repository)
-    Branch armsoc/for-3.15/dt
-	ARM: dts: bcm281xx: define real clocks
+On Tuesday, February 25, 2014 04:01:58 PM Sebastian Capella wrote:
+> During restore, pm_notifier chain are called with
+> PM_RESTORE_PREPARE.  The firmware_class driver handler
+> fw_pm_notify does not have a handler for this.  As a result,
+> it keeps a reader on the kmod.c umhelper_sem.  During
+> freeze_processes, the call to __usermodehelper_disable tries to
+> take a write lock on this semaphore and hangs waiting.
+> 
+> Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
+> Acked-by: Ming Lei <ming.lei@canonical.com>
+> Cc: Russ Dill <Russ.Dill@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-The patches in this series are available here:
-    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
-    Branch review/bcm-clk-next-v2
+Since this is a -stable candidate patch, I've queued it up as a fix for 3.14.
 
-I've grouped them, and offer a little explanation of each of the
-groups below.
+The other two patches are ARM mostly, so I'd prefer them to be merged through
+the ARM arch tree.  The changes in suspend.h made by [3/3] are fine by me.
 
-Note:  The final (DT) patch *must* be committed last.
+Thanks!
 
-The first version of this series had a patch from the middle of the
-series that shouldn't have been there, and it has been removed in
-this version (that patch affected mach-bcm, not clk).  I also split
-the final patch into two, with the second one isolating the change
-to a device tree file.
+> ---
+>  drivers/base/firmware_class.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/base/firmware_class.c b/drivers/base/firmware_class.c
+> index eb8fb94..e2b51f8 100644
+> --- a/drivers/base/firmware_class.c
+> +++ b/drivers/base/firmware_class.c
+> @@ -1541,6 +1541,7 @@ static int fw_pm_notify(struct notifier_block *notify_block,
+>  	switch (mode) {
+>  	case PM_HIBERNATION_PREPARE:
+>  	case PM_SUSPEND_PREPARE:
+> +	case PM_RESTORE_PREPARE:
+>  		kill_requests_without_uevent();
+>  		device_cache_fw_images();
+>  		break;
+> 
 
-		    					-Alex
-
-Alex Elder (12):
-  clk: bcm281xx: warn if ccu_wait_bit() fails
-  clk: bcm281xx: use init_data.name for clock name
-  clk: bcm281xx: change some symbol names
-       	Three small code improvements.
-
-  clk: bcm281xx: initialize CCU structures statically
-  clk: bcm281xx: define CCU clock data statically
-	Rearrange the way CCUs and the clocks they provide are
-	defined, so that they're defined statically to the extent
-	possible rather than allocating and initializing things at
-	runtime.
-
-  clk: bcm281xx: add clock policy support
-  clk: bcm281xx: add clock hysteresis support
-  clk: bcm281xx: add an initialized flag
-  clk: bcm281xx: implement prerequisite clocks
-  clk: bcm281xx: add bus clock support
-  clk: bcm281xx: define a bus clock
-	Add a few new features, ultimately for the purpose of adding
-	support for another type of Kona clock.  Currently only
-	peripheral clocks are supported; this adds the ability to
-	define and control bus clocks.  In addition, support is
-	added for clocks to identify a prerequisite clock; a clock
-	won't be initialized until after its prerequisite has been.
-
-  ARM: dts: add bus clock bsc3_apb for bcm281xx
-  	Add the new bus clock to the device tree.
-
- arch/arm/boot/dts/bcm11351.dtsi      |    3 +-
- drivers/clk/bcm/clk-bcm281xx.c       |  254 ++++++++++++--------------
- drivers/clk/bcm/clk-kona-setup.c     |  331 +++++++++++++++++++++++++++-------
- drivers/clk/bcm/clk-kona.c           |  331 ++++++++++++++++++++++++++++++++--
- drivers/clk/bcm/clk-kona.h           |  189 ++++++++++++++++---
- include/dt-bindings/clock/bcm281xx.h |    3 +-
- 6 files changed, 872 insertions(+), 239 deletions(-)
 -- 
-1.7.9.5
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
