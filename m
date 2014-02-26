@@ -1,41 +1,165 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 26 Feb 2014 21:44:40 +0800
-Subject: [PATCH 4/4] ARM: imx6: do not call imx6q_suspend_init() with
- !CONFIG_SUSPEND
-In-Reply-To: <1393422280-22283-1-git-send-email-shawn.guo@linaro.org>
-References: <1393422280-22283-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1393422280-22283-4-git-send-email-shawn.guo@linaro.org>
+Date: Wed, 26 Feb 2014 21:44:37 +0800
+Subject: [PATCH 1/4] ARM: imx6: move v7_cpu_resume() into suspend-imx6.S
+Message-ID: <1393422280-22283-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_SUSPEND is not enabled, we should reasonably skip the call
-to imx6q_suspend_init().
+The suspend-imx6.S is introduced recently for suspend low-level assembly
+code.  Since function v7_cpu_resume() is only used by suspend support,
+it makes sense to move the function into suspend-imx6.S, and control the
+build of the file with CONFIG_SUSPEND option.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/pm-imx6q.c |   10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/mach-imx/Makefile       |    5 +++--
+ arch/arm/mach-imx/common.h       |    8 +++++++-
+ arch/arm/mach-imx/headsmp.S      |   36 ------------------------------------
+ arch/arm/mach-imx/suspend-imx6.S |   33 +++++++++++++++++++++++++++++++++
+ 4 files changed, 43 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-index 2473ad4..16f0d24 100644
---- a/arch/arm/mach-imx/pm-imx6q.c
-+++ b/arch/arm/mach-imx/pm-imx6q.c
-@@ -516,10 +516,12 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 979ff84..b4c19cd 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -103,9 +103,10 @@ obj-$(CONFIG_SOC_IMX6Q) += clk-imx6q.o mach-imx6q.o
+ obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
  
- 	WARN_ON(!ccm_base);
+ AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+-obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o suspend-imx6.o
++obj-$(CONFIG_SUSPEND) += suspend-imx6.o
++obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
+ # i.MX6SL reuses i.MX6Q code
+-obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o suspend-imx6.o
++obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o
  
--	ret = imx6q_suspend_init(socdata);
--	if (ret)
--		pr_warn("%s: No DDR LPM support with suspend %d!\n",
--			__func__, ret);
-+	if (IS_ENABLED(CONFIG_SUSPEND)) {
-+		ret = imx6q_suspend_init(socdata);
-+		if (ret)
-+			pr_warn("%s: No DDR LPM support with suspend %d!\n",
-+				__func__, ret);
-+	}
+ # i.MX5 based machines
+ obj-$(CONFIG_MACH_MX51_BABBAGE) += mach-mx51_babbage.o
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 91d69cc..b5241ea 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -116,7 +116,6 @@ void imx_enable_cpu(int cpu, bool enable);
+ void imx_set_cpu_jump(int cpu, void *jump_addr);
+ u32 imx_get_cpu_arg(int cpu);
+ void imx_set_cpu_arg(int cpu, u32 arg);
+-void v7_cpu_resume(void);
+ #ifdef CONFIG_SMP
+ void v7_secondary_startup(void);
+ void imx_scu_map_io(void);
+@@ -145,7 +144,14 @@ void imx6sl_set_wait_clk(bool enter);
+ void imx_cpu_die(unsigned int cpu);
+ int imx_cpu_kill(unsigned int cpu);
  
- 	/*
- 	 * This is for SW workaround step #1 of ERR007265, see comments
++#ifdef CONFIG_SUSPEND
++void v7_cpu_resume(void);
+ void imx6_suspend(void __iomem *ocram_vbase);
++#else
++static inline void v7_cpu_resume(void) {}
++static inline void imx6_suspend(void __iomem *ocram_vbase) {}
++#endif
++
+ void imx6q_pm_init(void);
+ void imx6dl_pm_init(void);
+ void imx6sl_pm_init(void);
+diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
+index 627f16f..e4b9fed 100644
+--- a/arch/arm/mach-imx/headsmp.S
++++ b/arch/arm/mach-imx/headsmp.S
+@@ -12,8 +12,6 @@
+ 
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+-#include <asm/asm-offsets.h>
+-#include <asm/hardware/cache-l2x0.h>
+ 
+ 	.section ".text.head", "ax"
+ 
+@@ -35,37 +33,3 @@ ENTRY(v7_secondary_startup)
+ 	b	secondary_startup
+ ENDPROC(v7_secondary_startup)
+ #endif
+-
+-#ifdef CONFIG_ARM_CPU_SUSPEND
+-/*
+- * The following code must assume it is running from physical address
+- * where absolute virtual addresses to the data section have to be
+- * turned into relative ones.
+- */
+-
+-#ifdef CONFIG_CACHE_L2X0
+-	.macro	pl310_resume
+-	adr	r0, l2x0_saved_regs_offset
+-	ldr	r2, [r0]
+-	add	r2, r2, r0
+-	ldr	r0, [r2, #L2X0_R_PHY_BASE]	@ get physical base of l2x0
+-	ldr	r1, [r2, #L2X0_R_AUX_CTRL]	@ get aux_ctrl value
+-	str	r1, [r0, #L2X0_AUX_CTRL]	@ restore aux_ctrl
+-	mov	r1, #0x1
+-	str	r1, [r0, #L2X0_CTRL]		@ re-enable L2
+-	.endm
+-
+-l2x0_saved_regs_offset:
+-	.word	l2x0_saved_regs - .
+-
+-#else
+-	.macro	pl310_resume
+-	.endm
+-#endif
+-
+-ENTRY(v7_cpu_resume)
+-	bl	v7_invalidate_l1
+-	pl310_resume
+-	b	cpu_resume
+-ENDPROC(v7_cpu_resume)
+-#endif
+diff --git a/arch/arm/mach-imx/suspend-imx6.S b/arch/arm/mach-imx/suspend-imx6.S
+index 81b9d1d..20048ff 100644
+--- a/arch/arm/mach-imx/suspend-imx6.S
++++ b/arch/arm/mach-imx/suspend-imx6.S
+@@ -10,6 +10,7 @@
+  */
+ 
+ #include <linux/linkage.h>
++#include <asm/asm-offsets.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include "hardware.h"
+ 
+@@ -326,3 +327,35 @@ resume:
+ 
+ 	mov	pc, lr
+ ENDPROC(imx6_suspend)
++
++/*
++ * The following code must assume it is running from physical address
++ * where absolute virtual addresses to the data section have to be
++ * turned into relative ones.
++ */
++
++#ifdef CONFIG_CACHE_L2X0
++	.macro	pl310_resume
++	adr	r0, l2x0_saved_regs_offset
++	ldr	r2, [r0]
++	add	r2, r2, r0
++	ldr	r0, [r2, #L2X0_R_PHY_BASE]	@ get physical base of l2x0
++	ldr	r1, [r2, #L2X0_R_AUX_CTRL]	@ get aux_ctrl value
++	str	r1, [r0, #L2X0_AUX_CTRL]	@ restore aux_ctrl
++	mov	r1, #0x1
++	str	r1, [r0, #L2X0_CTRL]		@ re-enable L2
++	.endm
++
++l2x0_saved_regs_offset:
++	.word	l2x0_saved_regs - .
++
++#else
++	.macro	pl310_resume
++	.endm
++#endif
++
++ENTRY(v7_cpu_resume)
++	bl	v7_invalidate_l1
++	pl310_resume
++	b	cpu_resume
++ENDPROC(v7_cpu_resume)
 -- 
 1.7.9.5
