@@ -1,30 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Feb 2014 12:51:57 +0000
-Subject: [PATCH 4/5] mfd: remove obsolete ti-ssp driver
-In-Reply-To: <1393418614-3968549-5-git-send-email-arnd@arndb.de>
-References: <1393418614-3968549-1-git-send-email-arnd@arndb.de>
- <1393418614-3968549-5-git-send-email-arnd@arndb.de>
-Message-ID: <20140226125157.GM9195@lee--X1>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 26 Feb 2014 13:53:55 +0100
+Subject: [PATCH v3 02/20] clk: shmobile: r8a7779: Add MSTP clock support
+In-Reply-To: <1393400016-23433-3-git-send-email-horms+renesas@verge.net.au>
+References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+ <1393400016-23433-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <7743110.khXlAvnSls@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The tnetv107x platform is getting removed, so this driver
-> is not needed any more.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/Kconfig  |  11 --
->  drivers/mfd/Makefile |   1 -
->  drivers/mfd/ti-ssp.c | 465 ---------------------------------------------------
->  3 files changed, 477 deletions(-)
->  delete mode 100644 drivers/mfd/ti-ssp.c
+Hi Simon,
 
-Applied, thanks.
+Thank you for the patch.
+
+On Wednesday 26 February 2014 16:33:18 Simon Horman wrote:
+> Add MSTP clock support for the r8a7779 SoC
+> 
+> The only change required appears to be to note a new
+> compatibility string in the bindings.
+> 
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> 
+> ---
+> v3
+> * As suggested by Laurent Pinchart
+>   - Add entry in numerical order
+> ---
+>  Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git
+> a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt index
+> a6a352c..f3226ac 100644
+> --- a/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> +++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mstp-clocks.txt
+> @@ -10,6 +10,7 @@ index in the group, from 0 to 31.
+>  Required Properties:
+> 
+>    - compatible: Must be one of the following
+> +    - "renesas,r8a7779-mstp-clocks" for R8A7779 (R-Car H1) MSTP gate clocks
+> - "renesas,r8a7790-mstp-clocks" for R8A7790 (R-Car H2) MSTP gate clocks -
+> "renesas,r8a7791-mstp-clocks" for R8A7791 (R-Car M2) MSTP gate clocks -
+> "renesas,cpg-mstp-clock" for generic MSTP gate clocks
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+
+Laurent Pinchart
