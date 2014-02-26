@@ -1,7 +1,7 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Wed, 26 Feb 2014 17:29:50 +0100
+Date: Wed, 26 Feb 2014 17:19:43 +0100
 Subject: [PATCH] ARM: at91: sama5d3: get rid of atmel_tsadcc driver
-Message-ID: <1393432190-8799-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1393431584-27783-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
