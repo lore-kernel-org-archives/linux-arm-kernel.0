@@ -1,20 +1,39 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 26 Feb 2014 11:44:04 +0530
-Subject: [PATCH 3/3] cpufreq: Set policy to non-NULL only after all
- hotplug online work is done
-In-Reply-To: <1393385915-19138-3-git-send-email-skannan@codeaurora.org>
-References: <1789244.B5CzWbcp6h@vostro.rjw.lan>
- <1393385915-19138-3-git-send-email-skannan@codeaurora.org>
-Message-ID: <CAKohpo=bmYX5iHrV7QixN_uFxB2jGDQYBbW23en0ZgeNesX6Aw@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 26 Feb 2014 09:26:39 +0200
+Subject: TWL6040 fails to initialize
+In-Reply-To: <530CB9C6.60806@epfl.ch>
+References: <530C70B3.4010103@epfl.ch> <530CA8DA.8050806@ti.com>
+ <530CB9C6.60806@epfl.ch>
+Message-ID: <530D972F.805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2014 09:08, Saravana Kannan <skannan@codeaurora.org> wrote:
-> The existing code sets the per CPU policy to a non-NULL value before all
-> the steps performed during the hotplug online path is done. Specifically,
-> this is done before the policy min/max, governors, etc are initialized for
-> the policy.  This in turn means that calls to cpufreq_cpu_get() return a
-> non-NULL policy before the policy/CPU is ready to be used.
+On 02/25/2014 05:41 PM, Florian Vaussard wrote:
+> If the power was not enabled at all, I would be unable to read the
+> revision register, no? And delaying the probe by one millisecond would
+> be of no help in this case IMHO.
 
-First two patches are fine but I would still say that take the three patches
-I posted instead of this. Reasoning already given in other mails.
+One thing which might cause this is that if the audpwron GPIO is set high
+before the twl6040 module is probing. When I request the GPIO I ask it to be
+set to low. If the line was high before this means we initiate the power off
+sequence.
+Can you try something like this:
+
+diff --git a/drivers/mfd/twl6040.c b/drivers/mfd/twl6040.c
+index 75316fb33448..d2a0bd1539ae 100644
+--- a/drivers/mfd/twl6040.c
++++ b/drivers/mfd/twl6040.c
+@@ -674,6 +674,9 @@ static int twl6040_probe(struct i2c_client *client,
+                                            GPIOF_OUT_INIT_LOW, "audpwron");
+                if (ret)
+                        goto gpio_err;
++
++               /* power-down sequence latency */
++               usleep_range(500, 700);
+        }
+
+        ret = regmap_add_irq_chip(twl6040->regmap, twl6040->irq, IRQF_ONESHOT,
+
+
+-- 
+P?ter
