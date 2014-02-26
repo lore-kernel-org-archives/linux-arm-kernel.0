@@ -1,25 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Feb 2014 12:24:26 +0000
-Subject: [PATCH] ARM: move __fixup_smp out of init section
-In-Reply-To: <1393352193-31717-1-git-send-email-robherring2@gmail.com>
-References: <1393352193-31717-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20140226122426.GX21483@n2100.arm.linux.org.uk>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Wed, 26 Feb 2014 23:31:36 +1100
+Subject: [PATCH v2 1/1] audit: Add CONFIG_HAVE_ARCH_AUDITSYSCALL
+In-Reply-To: <1393319784-2758-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1391407232-4623-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393319784-2758-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393319784-2758-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1393417896.17341.2.camel@concordia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 12:16:33PM -0600, Rob Herring wrote:
-> From: Rob Herring <robh@kernel.org>
+On Tue, 2014-02-25 at 18:16 +0900, AKASHI Takahiro wrote:
+> Currently AUDITSYSCALL has a long list of architecture depencency:
+>        depends on AUDIT && (X86 || PARISC || PPC || S390 || IA64 || UML ||
+> 		SPARC64 || SUPERH || (ARM && AEABI && !OABI_COMPAT) || ALPHA)
+> The purpose of this patch is to replace it with HAVE_ARCH_AUDITSYSCALL
+> for simplicity.
 > 
-> With large kernel builds such as allyesconfig exceeding maximum relative
-> branch offsets, the init section will be too far away to branch to
-> directly. This causes veneers to be added by the compiler, but veneers
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>
+> diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+> index 957bf34..7b3b8fe 100644
+> --- a/arch/powerpc/Kconfig
+> +++ b/arch/powerpc/Kconfig
+> @@ -141,6 +141,7 @@ config PPC
+>  	select HAVE_DEBUG_STACKOVERFLOW
+>  	select HAVE_IRQ_EXIT_ON_IRQ_STACK
+>  	select ARCH_USE_CMPXCHG_LOCKREF if PPC64
+> +	select HAVE_ARCH_AUDITSYSCALL
+>  
+>  config GENERIC_CSUM
+>  	def_bool CPU_LITTLE_ENDIAN
 
-Don't you mean the linker?  The compiler isn't involved here.  Can
-you show the disassembly of the veneer please?
+Looks good for powerpc.
 
-I'm confused why the linker would add a veneer for this, but not for
-the stuff built by the compiler.
+Acked-by: Michael Ellerman <mpe@ellerman.id.au>
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+cheers
