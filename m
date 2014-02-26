@@ -1,50 +1,56 @@
 From: marc.ceeeee@gmail.com (Marc Carino)
-Date: Wed, 26 Feb 2014 02:29:07 -0800
-Subject: [PATCH v7 4/9] ARM: do CPU-specific init for Broadcom Brahma15 cores
+Date: Wed, 26 Feb 2014 02:29:08 -0800
+Subject: [PATCH v7 5/9] ARM: Enable erratum 798181 for Broadcom Brahma-B15
 In-Reply-To: <1393410552-21497-1-git-send-email-marc.ceeeee@gmail.com>
 References: <1393410552-21497-1-git-send-email-marc.ceeeee@gmail.com>
-Message-ID: <1393410552-21497-5-git-send-email-marc.ceeeee@gmail.com>
+Message-ID: <1393410552-21497-6-git-send-email-marc.ceeeee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Perform any CPU-specific initialization required on the
-Broadcom Brahma-15 core.
+From: Gregory Fong <gregory.0xf0@gmail.com>
 
-Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Broadcom Brahma-B15 (r0p0..r0p2) is also affected by Cortex-A15
+erratum 798181, so enable the workaround for Brahma-B15.
+
+Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+Acked-by: Marc Carino <marc.ceeeee@gmail.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/proc-v7.S |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/kernel/smp_tlb.c |   20 ++++++++++++--------
+ 1 files changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 74f6033..e3da338 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -193,6 +193,7 @@ __v7_cr7mp_setup:
- 	b	1f
- __v7_ca7mp_setup:
- __v7_ca15mp_setup:
-+__v7_b15mp_setup:
- 	mov	r10, #0
- 1:
- #ifdef CONFIG_SMP
-@@ -494,6 +495,16 @@ __v7_ca15mp_proc_info:
- 	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index 95d0636..5518e3f 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -92,15 +92,19 @@ void erratum_a15_798181_init(void)
+ 	unsigned int midr = read_cpuid_id();
+ 	unsigned int revidr = read_cpuid(CPUID_REVIDR);
  
- 	/*
-+	 * Broadcom Corporation Brahma-B15 processor.
-+	 */
-+	.type	__v7_b15mp_proc_info, #object
-+__v7_b15mp_proc_info:
-+	.long	0x420f00f0
-+	.long	0xff0ffff0
-+	__v7_proc __v7_b15mp_setup, hwcaps = HWCAP_IDIV
-+	.size	__v7_b15mp_proc_info, . - __v7_b15mp_proc_info
-+
-+	/*
- 	 * Qualcomm Inc. Krait processors.
- 	 */
- 	.type	__krait_proc_info, #object
+-	/* Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
+-	if ((midr & 0xff0ffff0) != 0x410fc0f0 || midr > 0x413fc0f2 ||
+-	    (revidr & 0x210) == 0x210) {
+-		return;
+-	}
+-	if (revidr & 0x10)
+-		erratum_a15_798181_handler = erratum_a15_798181_partial;
+-	else
++	/* Brahma-B15 r0p0..(not yet fixed) affected
++	 * Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
++	if ((midr & 0xff0ffff0) == 0x420f00f0)
+ 		erratum_a15_798181_handler = erratum_a15_798181_broadcast;
++	else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr <= 0x413fc0f2 &&
++		 (revidr & 0x210) != 0x210) {
++		if (revidr & 0x10)
++			erratum_a15_798181_handler =
++				erratum_a15_798181_partial;
++		else
++			erratum_a15_798181_handler =
++				erratum_a15_798181_broadcast;
++	}
+ }
+ #endif
+ 
 -- 
 1.7.1
