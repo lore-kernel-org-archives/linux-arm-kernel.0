@@ -1,88 +1,90 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 26 Feb 2014 12:40:54 +0100
-Subject: [PATCHv6][ 3/5] video: mx3fb: Introduce regulator support.
-In-Reply-To: <1393410030.488354633@f216.i.mail.ru>
-References: <1393408800-8946-1-git-send-email-denis@eukrea.com>
- <1393408800-8946-3-git-send-email-denis@eukrea.com>
- <1393410030.488354633@f216.i.mail.ru>
-Message-ID: <530DD2C6.1060108@eukrea.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 26 Feb 2014 13:42:50 +0200
+Subject: [PATCH 2/2] ARM: OMAP2+: fix dpll round_rate() to actually round
+In-Reply-To: <alpine.DEB.2.02.1402191928480.8777@utopia.booyaka.com>
+References: <1389944699-27962-1-git-send-email-tomi.valkeinen@ti.com>
+ <1389944699-27962-3-git-send-email-tomi.valkeinen@ti.com>
+ <alpine.DEB.2.02.1402191928480.8777@utopia.booyaka.com>
+Message-ID: <530DD33A.20005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2014 11:20 AM, Alexander Shiyan wrote:
+On 19/02/14 21:49, Paul Walmsley wrote:
+> On Fri, 17 Jan 2014, Tomi Valkeinen wrote:
+> 
+>> omap2_dpll_round_rate() doesn't actually round the given rate, even if
+>> the name and the description so hints. Instead it only tries to find an
+>> exact rate match, or if that fails, return ~0 as an error.
+> 
+> In the past, we had "rate tolerance" code, which allowed the clock code to 
+> return an approximate rate within some margin.  See for example commit 
+> 241d3a8dca239610d3d991bf58d4fe38c2d86fd5 ("OMAP2+: clock: remove the DPLL 
+> rate tolerance code").  The rate tolerance was set at compile-time, but it 
+> was set on a per-PLL basis, which in theory allowed PLLs responsible for 
+> audio, etc. to have a very low rate tolerance, but PLLs that only drove 
+> internal functional blocks to have a high rate tolerance.  
+> 
+> Part of the reason why this was removed is because some of the TI hardware 
+> guys didn't want any PLL rates used that were not explicitly 
+> characterized.
 
- > Why you want to use an excess "regulator-name" property?
-I'll fix that.
+Ok.
 
->> +	/* In dt mode,
->> +	 * using devm_regulator_get would require that the proprety referencing
->> +	 * the regulator phandle has to be inside the mx3fb node.
->
-> What???
-[...]
- > Just use devm_regulator_get(dev, "lcd") for both dt/non-dt case.
+>> What this basically means is that the user of the clock needs to know
+>> what rates the dpll can support, which obviously isn't right.
+> 
+> In principle I agree with you, but I'm not sure that this rate rounding 
+> function is the solution.
+> 
+>> This patch adds a simple method of rounding: during the iteration, the 
+>> code keeps track of the closest rate match. If no exact match is found, 
+>> the closest is returned.
+> 
+> So that's one possible rounding policy; maybe it works fine for a display 
+> interface PLL, at least for some values of "closest rate".  But another 
+> might be "only allow a selection from a set of pre-determined rates 
+> characterized by the silicon validation team".  Or another rounding 
+> function might need to select a more distant rate that minimizes jitter, 
+> EMI, or power consumption.  
+> 
+> Seems to me that there needs to be some way for a clock user to 
+> communicate its requirements along these lines to the clock framework for 
+> use by the rate rounding code.  At the very least, some kind of [min, max] 
+> interval seems appropriate.
+> 
+> Also I've often thought that it would be useful for your purposes to be 
+> able to query a clock to return a list or some other parametric 
+> description of the rates that it can provide.
 
-About the use of devm_regulator_get instead of regulator_get:
+I fully agree with all you said above.
 
-There is a "dma ipu driver" for the mx3* at drivers/dma/ipu/ipu_idmac.c
-This framebuffer driver (mx3fb) uses that "dma ipu driver".
+However, I'm not trying to fix the omap clock framework here =). I just
+want the displays to work properly in mainline kernel.
 
-In non-dt mode("board files"), this framebuffer driver requires some 
-platform data which has resource informations about the ipu.
+So, presuming this was merged, and gets display working, how would it
+affect other users compared to the current state? The patched version
+returns the same rate than before, if an exact match is found. Rounded
+rate is only returned as a last option, instead of an error.
 
-So to get device tree bindings support for the mx3fb driver, at first I 
-exported the "dma ipu driver" as DMA bindings, to be used in the dts, 
-and then made the mx3fb driver use that.
+Do we have drivers that handle that error somehow, and then do something
+(what?) to get some other rate?
 
-The comment[1] to that patchset was to instead have similar bindings 
-that looks like the IPUv3 ones(IPUv3 is a staging drm driver), and not 
-to export the "dma ipu driver" bindings to the dts.
+If the clock path in question also has a divider component after the
+pll, using clk-divider.c (which I guess is used in all/most of the
+DPLLs?), things would go badly wrong if there's an error, as
+clk-divider.c doesn't handle it.
 
-So I made the bindings look like that:
+So I can make no guarantees, but I have a hunch that all current users
+ask for an exact clock, in which case this patch doesn't change their
+behavior, except for display which it fixes.
 
-display0: display at di0 {
-   [...]
-   display-timings {
-     [...]
-   };
-};
+ Tomi
 
-ipu: ipu at 53fc0000 {
-   compatible = "fsl,imx35-ipu";
-   reg = <0x53fc0000 0x4000>;
-   clocks = <&clks 55>;
-   display = <&display0>;
-};
 
-So that is very similar to the imx-drm binding[2].
-
-To achieve that, I've set the .compatible property of the mx3fb driver 
-to "fsl,<chip>-ipu", so it would look like the IPUv3 bindings, and then 
-I handled the "dma ipu driver" registration in a way that doesn't export 
-it to the dts.
-
-The difference is that the imx-drm driver has separate drivers for 
-handling each display type(parallel display, tve, lvds and HDMI) while 
-the mx3fb doesn't.
-
-using devm_regulator_get(NULL, "lcd") would result in a crash, because 
-of devres_add.
-
-using devm_regulator_get(dev, "lcd") would be better but it would 
-instead mean that the regulator handle will have to be a child of the 
-mx3fb's ipu node (ipu at 53fc0000).
-
-That's because devm_regulator_get will end calling of_get_regulator 
-(trough _regulator_get, and regulator_dev_lookup), which will in turn 
-lookup that regulator in the childs of dev->of_node.
-
-That's why I want to pass it a NULL instead of a device struct, and I 
-can't do it in devm_regulator_get because of devres_add, so I ended up 
-using regulator_get directly.
-
-References.
------------
-[1]http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/205846.html
-[2]Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-
-Denis.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140226/dd0551dd/attachment-0001.sig>
