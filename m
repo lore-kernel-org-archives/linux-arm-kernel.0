@@ -1,38 +1,30 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Tue, 25 Feb 2014 16:01:58 -0800
-Subject: [PATCH v3 1/3] Fix hibernation restore hang in freeze_processes
-In-Reply-To: <1393372920-3896-1-git-send-email-sebastian.capella@linaro.org>
-References: <1393372920-3896-1-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <1393372920-3896-2-git-send-email-sebastian.capella@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Feb 2014 00:02:06 +0000
+Subject: SA110 MMU problem, any hints?
+In-Reply-To: <CACRpkdaph0_mnJsDBC7_5+wWm18cygf70GoJ-QR0fPuyN0Xw=A@mail.gmail.com>
+References: <CACRpkdaph0_mnJsDBC7_5+wWm18cygf70GoJ-QR0fPuyN0Xw=A@mail.gmail.com>
+Message-ID: <20140226000206.GT21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During restore, pm_notifier chain are called with
-PM_RESTORE_PREPARE.  The firmware_class driver handler
-fw_pm_notify does not have a handler for this.  As a result,
-it keeps a reader on the kmod.c umhelper_sem.  During
-freeze_processes, the call to __usermodehelper_disable tries to
-take a write lock on this semaphore and hangs waiting.
+On Wed, Feb 26, 2014 at 12:49:40AM +0100, Linus Walleij wrote:
+> Hi Russell,
+> 
+> after doing some painful bringup on a Netwinder
+> machine, I have run into an unspecified MMU bug on the SA110.
+> Basically the kernel bootstrap bugs out before start_kernel()
+> so it's on a very basic level.
+> 
+> If I turn off CONFIG_MMU it actually boots all the way until attempting
+> to mount root, with boot logo, VGA console and everything.
+> 
+> Given  that you made some Footbridge patches recently I guess
+> you have it working? No special tweaks?
 
-Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-Acked-by: Ming Lei <ming.lei@canonical.com>
-Cc: Russ Dill <Russ.Dill@ti.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
- drivers/base/firmware_class.c |    1 +
- 1 file changed, 1 insertion(+)
+3.12 and 3.12.6 runs fine here on two different footbridge platforms.
+I haven't tried it on the netwinder though (they're a little noisy in
+comparison with other stuff.)
 
-diff --git a/drivers/base/firmware_class.c b/drivers/base/firmware_class.c
-index eb8fb94..e2b51f8 100644
---- a/drivers/base/firmware_class.c
-+++ b/drivers/base/firmware_class.c
-@@ -1541,6 +1541,7 @@ static int fw_pm_notify(struct notifier_block *notify_block,
- 	switch (mode) {
- 	case PM_HIBERNATION_PREPARE:
- 	case PM_SUSPEND_PREPARE:
-+	case PM_RESTORE_PREPARE:
- 		kill_requests_without_uevent();
- 		device_cache_fw_images();
- 		break;
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
