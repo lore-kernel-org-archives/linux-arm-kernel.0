@@ -1,146 +1,152 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 26 Feb 2014 23:15:23 +0100 (CET)
-Subject: [PATCH] irq: Consider a negative return value of irq_startup()
- as an error
-In-Reply-To: <1393345719-3707-1-git-send-email-jjhiblot@traphandler.com>
-References: <1393345719-3707-1-git-send-email-jjhiblot@traphandler.com>
-Message-ID: <alpine.DEB.2.02.1402262119560.4174@ionos.tec.linutronix.de>
+From: s-anna@ti.com (Suman Anna)
+Date: Wed, 26 Feb 2014 16:18:21 -0600
+Subject: [PATCHv2 03/16] Documentation: dt: add OMAP iommu bindings
+In-Reply-To: <1825184.Z7lGjn3qsj@avalon>
+References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
+ <8258385.uITvkIdEvn@avalon> <530E4D27.4010205@ti.com>
+ <1825184.Z7lGjn3qsj@avalon>
+Message-ID: <530E682D.9070005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Feb 2014, Jean-Jacques Hiblot wrote:
+Hi Laurent,
 
-> The irq_startup() function returns the return value of the
-> irq_startup callback of the underlying irq_chip. Currently this
-> value only tells if the interrupt is pending, but we can make it
-> also return an error code when it fails.
-> 
-> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
-> ---
-> 
-> Hi Thomas,
-> 
-> This patch updates the semantic of the return value of the irq_startup()
-> callback of an irq_chip : a negative value indicates an error. The purpose is
-> to make __setup_irq() fail if the irq_chip can't startup the interrupt.
+On 02/26/2014 02:36 PM, Laurent Pinchart wrote:
+> Hi Suman,
+>
+> On Wednesday 26 February 2014 14:23:03 Suman Anna wrote:
+>>> On Wednesday 26 February 2014 11:02:24 Suman Anna wrote:
+>>>> On 02/25/2014 08:13 PM, Laurent Pinchart wrote:
+>>>>> On Tuesday 25 February 2014 17:02:35 Suman Anna wrote:
+>>>>>> On 02/25/2014 03:26 PM, Laurent Pinchart wrote:
+>>>>>>> On Thursday 13 February 2014 12:15:34 Suman Anna wrote:
+>>>>>>>> From: Florian Vaussard <florian.vaussard@epfl.ch>
+>>>>>>>>
+>>>>>>>> This patch adds the iommu bindings for all OMAP2+ SoCs. Apart from
+>>>>>>>> the standard bindings used by OMAP peripherals, this patch uses a
+>>>>>>>> 'dma-window' (already used by Tegra SMMU) and adds two OMAP custom
+>>>>>>>> bindings - 'ti,#tlb-entries' and 'ti,iommu-bus-err-back'.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>>>>>>>> [s-anna at ti.com: split bindings document, add dra7 and bus error back]
+>>>>>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>>>>>>>> ---
+>>>>>>>>
+>>>>>>>>   .../devicetree/bindings/iommu/ti,omap-iommu.txt    | 28 ++++++++++++
+>>>>>>>>   1 file changed, 28 insertions(+)
+>>>>>>>>   create mode 100644
+>>>>>>>>   Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+>>>>>>>>
+>>>>>>>> diff --git
+>>>>>>>> a/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+>>>>>>>> b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt new file
+>>>>>>>> mode 100644
+>>>>>>>> index 0000000..116492d
+>>>>>>>> --- /dev/null
+>>>>>>>> +++ b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+>>>>>>>> @@ -0,0 +1,28 @@
+>>>>>>>> +OMAP2+ IOMMU
+>>>>>>>> +
+>>>>>>>> +Required properties:
+>>>>>>>> +- compatible : Should be one of,
+>>>>>>>> +		"ti,omap2-iommu" for OMAP2/OMAP3 IOMMU instances
+>>>>>>>> +		"ti,omap4-iommu" for OMAP4/OMAP5 IOMMU instances
+>>>>>>>> +		"ti,dra7-iommu" for DRA7xx IOMMU instances
+>>>>>>>> +- ti,hwmods  : Name of the hwmod associated with the IOMMU instance
+>>>>>>>> +- reg        : Address space for the configuration registers
+>>>>>>>> +- interrupts : Interrupt specifier for the IOMMU instance
+>>>>>>>> +- dma-window : IOVA start address and length
+>>>>>>>
+>>>>>>> Isn't the dma window more of a system configuration property than a
+>>>>>>> hardware property ? How do you expect it to be set?
+>>>>>>
+>>>>>> We are setting it based on the addressable range for the MMU.
+>>>>>
+>>>>> A quick look at the ISP and IVA IOMMUs in the OMAP3 shows that both
+>>>>> support the full 4GB VA space. Why do you need to restrict it ?
+>>>>
+>>>> I should have rephrased it better when I said addressable range. While
+>>>> the MMUs are capable of programming the full 4GB space, there are some
+>>>> address ranges that are private from the processor view. This window is
+>>>> currently used to set the range for the omap-iovmm driver (which only
+>>>> OMAP3 ISP is using atm), and there is no point in allowing the
+>>>> omap-iovmm driver the full range when the processor could never
+>>>> reach/access those addresses.
+>>>
+>>> But the IOMMU VA space is from a device point of view, not from a CPU
+>>> point of view. Could you point me to where those private ranges are
+>>> documented, in order to understand the problem correctly ?
+>>
+>> Yes, they are indeed from the device perspective. I meant DSP and/or IPU
+>> by processor.
+>>
+>> For example on OMAP3, you can refer to Table 2-9 in section 2.4.5 "DSP
+>> Subsystem Memory Space Mapping" of the OMAP36xx TRM, and the external
+>> addressable range starts from 0x11000000.
+>
+> OK, so it looks more like a property of the IOMMU master than a property of
+> the IOMMU itself. It would be better to express it as such, but I wonder how
+> that could be done, and if it would be worth it in this case.
 
-How does that work?
+This property is currently solely used to configure the range for the 
+omap-iovmm module, which were supplied through platform data in the 
+non-DT case. I am wondering if the way to go here is to use 
+iommu_domain_set_attr() and use the domain geometry values.
 
-    unsigned int    (*irq_startup)(struct irq_data *data);
+regards
+Suman
 
-> I checked in the kernel for drivers impacted by this. It turns out that most
-> of the implementation of irq_startup() return 0. The only drivers that return
-> non-zero values are:
->  * arch/x86/kernel/apic/io_apic.c: returns 1 when an interrupt is pending
->  * drivers/pinctrl/pinctrl-adi2.c: may return -ENODEV.
-
-   which is wrong to begin with.
- 
-> GPIO-based irq_chip could use this feature because an output gpio
-> can't be used as an interrupt, and thus a call to irq_startup() is
-> likely to fail. You can check out
-> http://www.spinics.net/lists/arm-kernel/msg302713.html for a
-> reference.
-
-And that tells me that the design of the gpio stuff is just wrong.
-
-The whole drviers/gpio directory is full of this gpio_lock_as_irq()
-called from the guts of irq_chip callbacks braindamage.
-
-The comment above gpiod_lock_as_irq() is so wrong it's not even funny
-anymore.
-
-"....or in the .irq_enable() from its irq_chip implementation ..."
-
-	void            (*irq_enable)(struct irq_data *data);
-
-So how does that help, if the gpio is not available as irq?
-
-And no, you are not going to cure that design brainfart by adding a
-negative return value to a function returning unsigned int. And I'm
-not going to accept anything which is just a duct tape based
-workaround for a complete braindamaged design.
-
-Lets look at the usage sites:
-
-The following irqchip callback implementations printk some blurb and
-proceed:
-
- sirfsoc_gpio_irq_startup
- nmk_gpio_irq_startup
- msm_gpio_irq_startup
- u300_gpio_irq_enable
- byt_irq_startup
- mcp23s08_irq_startup
- lp_irq_startup
- intel_mid_irq_startup
- em_gio_irq_startup
- bcm_kona_gpio_irq_startup
- adnp_irq_startup
-
-The following functions return an error code from the set_type
-callback:
-
- tegra_gpio_irq_set_type
- gpio_irq_type
-
-The whole idiocy starts with commit d468bf9e, which tells people to
-call this from irq_startup/enable. But it fails to tell, that this is
-pointless because it wont prevent the interrupt from starting up.
-
-So 11 SoC lemmings followed and added this completely pointless
-nonsense to their drivers.
-
-Two lemmings added it to a function which can actually fail. Failure
-as well, because there is no guarantee that this function gets invoked
-before request_irq(). What's worse is that if request_irq() succeeds
-then the following code which tries to set the type fails for no
-obvious reason.
-
-Now at least Jean-Jacques tried to make it actually fail, but that
-turns out to be a failure on its own.
-
-Dammit, I told you folks often enough that workarounds in some
-subsystem do not actually cure a shortcoming in the core code. When
-the core code was written, the GPIO case which might actually fail was
-definitly not thought of. But that's not a reason for adding
-tasteless and useless workarounds to the GPIO subsystem.
-
-Of course you encouraged people to copy that nonsense all over the
-place. All startup functions do the same thing:
-
-    if (gpio_lock_as_irq() < 0)
-       dev_err("BLA");
-    unmask_irq();
-
-Plus the shutdown functions having the gpio_unlock_as_irq() +
-mask_irq() sequence. Sigh.
-
-So the proper solution to the problem if we want to use irq_startup()
-is:
-
-  Change the return value of the irq_startup() callback to int and
-  fixup all existing implementations. This wants to be done with a
-  coccinelle script. If you hurry up, I might squeeze it into 3.14 as
-  there is no risk@all. Otherwise this is going to happen after the
-  3.15 merge window closes.
-
-  After that's done, remove all the copies of startup/shutdown
-  nonsense in drivers/gpio and force all gpio chips to call
-  gpio_set_irq_chip*() instead of irq_set_irq_chip*() and add generic
-  irq_startup/shutdown callbacks which are implemented in the gpiolib
-  core code.
-
-There is a less intrusive alternative solution:
-
-  Mark the interrupt as GPIO based in the core and let the core call
-  conditonally the gpio_[un]lock_as_irq functions.
-
-And no, I'm not going to provide you the proper solution on the silver
-tablet this time. Go and figure it out yourself and if you're
-confident enough that it might be an acceptable solution, post it and
-we'll see.
-
-Thanks,
-
-	tglx
+>
+> As not all masters (the OMAP3 ISP doesn't for instance) have restrictions
+> regarding the VA range they can address, should this property be at least made
+> optional ?
+>
+>>>>>> We are reusing the existing defined property and it allows us to get
+>>>>>> rid of the IOVA start and end addresses defined in the pre-DT OMAP
+>>>>>> iommu platform data.
+>>>>>>
+>>>>>>>> +Optional properties:
+>>>>>>>> +- ti,#tlb-entries : Number of entries in the translation look-aside
+>>>>>>>> buffer. +                    Should be either 8 or 32 (default: 32)
+>>>>>>>> +- ti,iommu-bus-err-back : Indicates the IOMMU instance supports
+>>>>>>>> throwing
+>>>>>>>> +		          back a bus error response on MMU faults.
+>>>>>>>
+>>>>>>> Do these features vary per IOMMU instance or per IOMMU model ? In the
+>>>>>>> latter case they could be inferred from the compatible string by the
+>>>>>>> driver without requiring them to be explicit in DT (whether you want
+>>>>>>> to do so is left to you though).
+>>>>>>
+>>>>>> Well, these are fixed features given an IOMMU instance, like the OMAP3
+>>>>>> ISP is the only one that has 8 TLB entries, all the remaining ones have
+>>>>>> 32, and the IPU iommu instances are the only ones that support the bus
+>>>>>> error response back. I have no preference to any particular way, and
+>>>>>> sure the driver can infer these easily based on unique compatible
+>>>>>> strings per subsystem per SoC. I just happened to go with defining
+>>>>>> compatible strings per SoC, with the optional properties
+>>>>>> differentiating the fixed behavior between different IOMMU instances on
+>>>>>> that SoC. This is where I was looking for some inputs/guidance from the
+>>>>>> DT bindings maintainers on what is the preferred method.
+>>>>>
+>>>>> I think you've made the right choice. I wasn't sure whether those
+>>>>> parameters varied across IOMMU instances of compatible devices (from a
+>>>>> compatible string point of view) or were constant. As they vary they
+>>>>> should be expressed in DT.
+>>>>
+>>>> Yeah, I wasn't sure if these qualify as features (as per
+>>>> Documentation/devicetree/bindings/ABI.txt section II.2).
+>>>>
+>>>> regards
+>>>> Suman
+>>>>
+>>>>>>>> +Example:
+>>>>>>>> +	/* OMAP3 ISP MMU */
+>>>>>>>> +	mmu_isp: mmu at 480bd400 {
+>>>>>>>> +		compatible = "ti,omap2-iommu";
+>>>>>>>> +		reg = <0x480bd400 0x80>;
+>>>>>>>> +		interrupts = <24>;
+>>>>>>>> +		ti,hwmods = "mmu_isp";
+>>>>>>>> +		ti,#tlb-entries = <8>;
+>>>>>>>> +		dma-window = <0 0xfffff000>;
+>>>>>>>> +	};
+>
