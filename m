@@ -1,63 +1,67 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Feb 2014 13:43:32 +0100
-Subject: [PATCH 3/5] spi: remove obsolete spi-ti-ssp driver
+Date: Wed, 26 Feb 2014 13:43:33 +0100
+Subject: [PATCH 4/5] mfd: remove obsolete ti-ssp driver
 In-Reply-To: <1393418614-3968549-1-git-send-email-arnd@arndb.de>
 References: <1393418614-3968549-1-git-send-email-arnd@arndb.de>
-Message-ID: <1393418614-3968549-4-git-send-email-arnd@arndb.de>
+Message-ID: <1393418614-3968549-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The tnetv107x platform is getting removed, so this driver
-will not be needed any more.
+is not needed any more.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: linux-spi at vger.kernel.org
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/spi/Kconfig      |   7 -
- drivers/spi/Makefile     |   1 -
- drivers/spi/spi-ti-ssp.c | 378 -----------------------------------------------
- 3 files changed, 386 deletions(-)
- delete mode 100644 drivers/spi/spi-ti-ssp.c
+ drivers/mfd/Kconfig  |  11 --
+ drivers/mfd/Makefile |   1 -
+ drivers/mfd/ti-ssp.c | 465 ---------------------------------------------------
+ 3 files changed, 477 deletions(-)
+ delete mode 100644 drivers/mfd/ti-ssp.c
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index ba9310b..fc940f1 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -478,13 +478,6 @@ config SPI_TEGRA20_SLINK
- 	help
- 	  SPI driver for Nvidia Tegra20/Tegra30 SLINK Controller interface.
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 49bb445..e0f61e3 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -774,17 +774,6 @@ config MFD_PALMAS
+ 	  If you say yes here you get support for the Palmas
+ 	  series of PMIC chips from Texas Instruments.
  
--config SPI_TI_SSP
--	tristate "TI Sequencer Serial Port - SPI Support"
--	depends on MFD_TI_SSP
--	help
--	  This selects an SPI master implementation using a TI sequencer
--	  serial port.
+-config MFD_TI_SSP
+-	tristate "TI Sequencer Serial Port support"
+-	depends on ARCH_DAVINCI_TNETV107X
+-	select MFD_CORE
+-	---help---
+-	  Say Y here if you want support for the Sequencer Serial Port
+-	  in a Texas Instruments TNETV107X SoC.
 -
- config SPI_TOPCLIFF_PCH
- 	tristate "Intel EG20T PCH/LAPIS Semicon IOH(ML7213/ML7223/ML7831) SPI"
- 	depends on PCI
-diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
-index 95af48d..7da53af 100644
---- a/drivers/spi/Makefile
-+++ b/drivers/spi/Makefile
-@@ -73,7 +73,6 @@ obj-$(CONFIG_SPI_SIRF)		+= spi-sirf.o
- obj-$(CONFIG_SPI_TEGRA114)		+= spi-tegra114.o
- obj-$(CONFIG_SPI_TEGRA20_SFLASH)	+= spi-tegra20-sflash.o
- obj-$(CONFIG_SPI_TEGRA20_SLINK)		+= spi-tegra20-slink.o
--obj-$(CONFIG_SPI_TI_SSP)		+= spi-ti-ssp.o
- obj-$(CONFIG_SPI_TLE62X0)		+= spi-tle62x0.o
- obj-$(CONFIG_SPI_TOPCLIFF_PCH)		+= spi-topcliff-pch.o
- obj-$(CONFIG_SPI_TXX9)			+= spi-txx9.o
-diff --git a/drivers/spi/spi-ti-ssp.c b/drivers/spi/spi-ti-ssp.c
+-	  To compile this driver as a module, choose M here: the
+-	  module will be called ti-ssp.
+-
+ config TPS6105X
+ 	tristate "TI TPS61050/61052 Boost Converters"
+ 	depends on I2C
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index 5aea5ef..40e2a6d 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -21,7 +21,6 @@ obj-$(CONFIG_HTC_I2CPLD)	+= htc-i2cpld.o
+ 
+ obj-$(CONFIG_MFD_DAVINCI_VOICECODEC)	+= davinci_voicecodec.o
+ obj-$(CONFIG_MFD_DM355EVM_MSP)	+= dm355evm_msp.o
+-obj-$(CONFIG_MFD_TI_SSP)	+= ti-ssp.o
+ obj-$(CONFIG_MFD_TI_AM335X_TSCADC)	+= ti_am335x_tscadc.o
+ 
+ obj-$(CONFIG_MFD_STA2X11)	+= sta2x11-mfd.o
+diff --git a/drivers/mfd/ti-ssp.c b/drivers/mfd/ti-ssp.c
 deleted file mode 100644
-index 7d20e12..0000000
---- a/drivers/spi/spi-ti-ssp.c
+index a542457..0000000
+--- a/drivers/mfd/ti-ssp.c
 +++ /dev/null
-@@ -1,378 +0,0 @@
+@@ -1,465 +0,0 @@
 -/*
-- * Sequencer Serial Port (SSP) based SPI master driver
+- * Sequencer Serial Port (SSP) driver for Texas Instruments' SoCs
 - *
 - * Copyright (C) 2010 Texas Instruments Inc
 - *
@@ -76,363 +80,450 @@ index 7d20e12..0000000
 - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
 -
+-#include <linux/errno.h>
 -#include <linux/kernel.h>
--#include <linux/err.h>
--#include <linux/completion.h>
--#include <linux/delay.h>
 -#include <linux/module.h>
+-#include <linux/slab.h>
+-#include <linux/err.h>
+-#include <linux/init.h>
+-#include <linux/wait.h>
+-#include <linux/clk.h>
+-#include <linux/interrupt.h>
+-#include <linux/device.h>
+-#include <linux/spinlock.h>
 -#include <linux/platform_device.h>
--#include <linux/spi/spi.h>
+-#include <linux/delay.h>
+-#include <linux/io.h>
+-#include <linux/sched.h>
+-#include <linux/mfd/core.h>
 -#include <linux/mfd/ti_ssp.h>
 -
--#define MODE_BITS	(SPI_CPHA | SPI_CPOL | SPI_CS_HIGH)
+-/* Register Offsets */
+-#define REG_REV		0x00
+-#define REG_IOSEL_1	0x04
+-#define REG_IOSEL_2	0x08
+-#define REG_PREDIV	0x0c
+-#define REG_INTR_ST	0x10
+-#define REG_INTR_EN	0x14
+-#define REG_TEST_CTRL	0x18
 -
--struct ti_ssp_spi {
--	struct spi_master		*master;
--	struct device			*dev;
--	spinlock_t			lock;
--	struct list_head		msg_queue;
--	struct completion		complete;
--	bool				shutdown;
--	struct workqueue_struct		*workqueue;
--	struct work_struct		work;
--	u8				mode, bpw;
--	int				cs_active;
--	u32				pc_en, pc_dis, pc_wr, pc_rd;
--	void				(*select)(int cs);
+-/* Per port registers */
+-#define PORT_CFG_2	0x00
+-#define PORT_ADDR	0x04
+-#define PORT_DATA	0x08
+-#define PORT_CFG_1	0x0c
+-#define PORT_STATE	0x10
+-
+-#define SSP_PORT_CONFIG_MASK	(SSP_EARLY_DIN | SSP_DELAY_DOUT)
+-#define SSP_PORT_CLKRATE_MASK	0x0f
+-
+-#define SSP_SEQRAM_WR_EN	BIT(4)
+-#define SSP_SEQRAM_RD_EN	BIT(5)
+-#define SSP_START		BIT(15)
+-#define SSP_BUSY		BIT(10)
+-#define SSP_PORT_ASL		BIT(7)
+-#define SSP_PORT_CFO1		BIT(6)
+-
+-#define SSP_PORT_SEQRAM_SIZE	32
+-
+-static const int ssp_port_base[]   = {0x040, 0x080};
+-static const int ssp_port_seqram[] = {0x100, 0x180};
+-
+-struct ti_ssp {
+-	struct resource		*res;
+-	struct device		*dev;
+-	void __iomem		*regs;
+-	spinlock_t		lock;
+-	struct clk		*clk;
+-	int			irq;
+-	wait_queue_head_t	wqh;
+-
+-	/*
+-	 * Some of the iosel2 register bits always read-back as 0, we need to
+-	 * remember these values so that we don't clobber previously set
+-	 * values.
+-	 */
+-	u32			iosel2;
 -};
 -
--static u32 ti_ssp_spi_rx(struct ti_ssp_spi *hw)
+-static inline struct ti_ssp *dev_to_ssp(struct device *dev)
 -{
--	u32 ret;
+-	return dev_get_drvdata(dev->parent);
+-}
 -
--	ti_ssp_run(hw->dev, hw->pc_rd, 0, &ret);
+-static inline int dev_to_port(struct device *dev)
+-{
+-	return to_platform_device(dev)->id;
+-}
+-
+-/* Register Access Helpers, rmw() functions need to run locked */
+-static inline u32 ssp_read(struct ti_ssp *ssp, int reg)
+-{
+-	return __raw_readl(ssp->regs + reg);
+-}
+-
+-static inline void ssp_write(struct ti_ssp *ssp, int reg, u32 val)
+-{
+-	__raw_writel(val, ssp->regs + reg);
+-}
+-
+-static inline void ssp_rmw(struct ti_ssp *ssp, int reg, u32 mask, u32 bits)
+-{
+-	ssp_write(ssp, reg, (ssp_read(ssp, reg) & ~mask) | bits);
+-}
+-
+-static inline u32 ssp_port_read(struct ti_ssp *ssp, int port, int reg)
+-{
+-	return ssp_read(ssp, ssp_port_base[port] + reg);
+-}
+-
+-static inline void ssp_port_write(struct ti_ssp *ssp, int port, int reg,
+-				  u32 val)
+-{
+-	ssp_write(ssp, ssp_port_base[port] + reg, val);
+-}
+-
+-static inline void ssp_port_rmw(struct ti_ssp *ssp, int port, int reg,
+-				u32 mask, u32 bits)
+-{
+-	ssp_rmw(ssp, ssp_port_base[port] + reg, mask, bits);
+-}
+-
+-static inline void ssp_port_clr_bits(struct ti_ssp *ssp, int port, int reg,
+-				     u32 bits)
+-{
+-	ssp_port_rmw(ssp, port, reg, bits, 0);
+-}
+-
+-static inline void ssp_port_set_bits(struct ti_ssp *ssp, int port, int reg,
+-				     u32 bits)
+-{
+-	ssp_port_rmw(ssp, port, reg, 0, bits);
+-}
+-
+-/* Called to setup port clock mode, caller must hold ssp->lock */
+-static int __set_mode(struct ti_ssp *ssp, int port, int mode)
+-{
+-	mode &= SSP_PORT_CONFIG_MASK;
+-	ssp_port_rmw(ssp, port, PORT_CFG_1, SSP_PORT_CONFIG_MASK, mode);
+-
+-	return 0;
+-}
+-
+-int ti_ssp_set_mode(struct device *dev, int mode)
+-{
+-	struct ti_ssp *ssp = dev_to_ssp(dev);
+-	int port = dev_to_port(dev);
+-	int ret;
+-
+-	spin_lock(&ssp->lock);
+-	ret = __set_mode(ssp, port, mode);
+-	spin_unlock(&ssp->lock);
+-
 -	return ret;
 -}
+-EXPORT_SYMBOL(ti_ssp_set_mode);
 -
--static void ti_ssp_spi_tx(struct ti_ssp_spi *hw, u32 data)
+-/* Called to setup iosel2, caller must hold ssp->lock */
+-static void __set_iosel2(struct ti_ssp *ssp, u32 mask, u32 val)
 -{
--	ti_ssp_run(hw->dev, hw->pc_wr, data << (32 - hw->bpw), NULL);
+-	ssp->iosel2 = (ssp->iosel2 & ~mask) | val;
+-	ssp_write(ssp, REG_IOSEL_2, ssp->iosel2);
 -}
 -
--static int ti_ssp_spi_txrx(struct ti_ssp_spi *hw, struct spi_message *msg,
--		       struct spi_transfer *t)
+-/* Called to setup port iosel, caller must hold ssp->lock */
+-static void __set_iosel(struct ti_ssp *ssp, int port, u32 iosel)
 -{
--	int count;
+-	unsigned val, shift = port ? 16 : 0;
 -
--	if (hw->bpw <= 8) {
--		u8		*rx = t->rx_buf;
--		const u8	*tx = t->tx_buf;
+-	/* IOSEL1 gets the least significant 16 bits */
+-	val = ssp_read(ssp, REG_IOSEL_1);
+-	val &= 0xffff << (port ? 0 : 16);
+-	val |= (iosel & 0xffff) << (port ? 16 : 0);
+-	ssp_write(ssp, REG_IOSEL_1, val);
 -
--		for (count = 0; count < t->len; count += 1) {
--			if (t->tx_buf)
--				ti_ssp_spi_tx(hw, *tx++);
--			if (t->rx_buf)
--				*rx++ = ti_ssp_spi_rx(hw);
--		}
--	} else if (hw->bpw <= 16) {
--		u16		*rx = t->rx_buf;
--		const u16	*tx = t->tx_buf;
+-	/* IOSEL2 gets the most significant 16 bits */
+-	val = (iosel >> 16) & 0x7;
+-	__set_iosel2(ssp, 0x7 << shift, val << shift);
+-}
 -
--		for (count = 0; count < t->len; count += 2) {
--			if (t->tx_buf)
--				ti_ssp_spi_tx(hw, *tx++);
--			if (t->rx_buf)
--				*rx++ = ti_ssp_spi_rx(hw);
--		}
--	} else {
--		u32		*rx = t->rx_buf;
--		const u32	*tx = t->tx_buf;
+-int ti_ssp_set_iosel(struct device *dev, u32 iosel)
+-{
+-	struct ti_ssp *ssp = dev_to_ssp(dev);
+-	int port = dev_to_port(dev);
 -
--		for (count = 0; count < t->len; count += 4) {
--			if (t->tx_buf)
--				ti_ssp_spi_tx(hw, *tx++);
--			if (t->rx_buf)
--				*rx++ = ti_ssp_spi_rx(hw);
--		}
+-	spin_lock(&ssp->lock);
+-	__set_iosel(ssp, port, iosel);
+-	spin_unlock(&ssp->lock);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL(ti_ssp_set_iosel);
+-
+-int ti_ssp_load(struct device *dev, int offs, u32* prog, int len)
+-{
+-	struct ti_ssp *ssp = dev_to_ssp(dev);
+-	int port = dev_to_port(dev);
+-	int i;
+-
+-	if (len > SSP_PORT_SEQRAM_SIZE)
+-		return -ENOSPC;
+-
+-	spin_lock(&ssp->lock);
+-
+-	/* Enable SeqRAM access */
+-	ssp_port_set_bits(ssp, port, PORT_CFG_2, SSP_SEQRAM_WR_EN);
+-
+-	/* Copy code */
+-	for (i = 0; i < len; i++) {
+-		__raw_writel(prog[i], ssp->regs + offs + 4*i +
+-			     ssp_port_seqram[port]);
 -	}
 -
--	msg->actual_length += count; /* bytes transferred */
+-	/* Disable SeqRAM access */
+-	ssp_port_clr_bits(ssp, port, PORT_CFG_2, SSP_SEQRAM_WR_EN);
 -
--	dev_dbg(&msg->spi->dev, "xfer %s%s, %d bytes, %d bpw, count %d%s\n",
--		t->tx_buf ? "tx" : "", t->rx_buf ? "rx" : "", t->len,
--		hw->bpw, count, (count < t->len) ? " (under)" : "");
+-	spin_unlock(&ssp->lock);
 -
--	return (count < t->len) ? -EIO : 0; /* left over data */
+-	return 0;
+-}
+-EXPORT_SYMBOL(ti_ssp_load);
+-
+-int ti_ssp_raw_read(struct device *dev)
+-{
+-	struct ti_ssp *ssp = dev_to_ssp(dev);
+-	int port = dev_to_port(dev);
+-	int shift = port ? 27 : 11;
+-
+-	return (ssp_read(ssp, REG_IOSEL_2) >> shift) & 0xf;
+-}
+-EXPORT_SYMBOL(ti_ssp_raw_read);
+-
+-int ti_ssp_raw_write(struct device *dev, u32 val)
+-{
+-	struct ti_ssp *ssp = dev_to_ssp(dev);
+-	int port = dev_to_port(dev), shift;
+-
+-	spin_lock(&ssp->lock);
+-
+-	shift = port ? 22 : 6;
+-	val &= 0xf;
+-	__set_iosel2(ssp, 0xf << shift, val << shift);
+-
+-	spin_unlock(&ssp->lock);
+-
+-	return 0;
+-}
+-EXPORT_SYMBOL(ti_ssp_raw_write);
+-
+-static inline int __xfer_done(struct ti_ssp *ssp, int port)
+-{
+-	return !(ssp_port_read(ssp, port, PORT_CFG_1) & SSP_BUSY);
 -}
 -
--static void ti_ssp_spi_chip_select(struct ti_ssp_spi *hw, int cs_active)
+-int ti_ssp_run(struct device *dev, u32 pc, u32 input, u32 *output)
 -{
--	cs_active = !!cs_active;
--	if (cs_active == hw->cs_active)
--		return;
--	ti_ssp_run(hw->dev, cs_active ? hw->pc_en : hw->pc_dis, 0, NULL);
--	hw->cs_active = cs_active;
--}
+-	struct ti_ssp *ssp = dev_to_ssp(dev);
+-	int port = dev_to_port(dev);
+-	int ret;
 -
--#define __SHIFT_OUT(bits)	(SSP_OPCODE_SHIFT | SSP_OUT_MODE | \
--				 cs_en | clk | SSP_COUNT((bits) * 2 - 1))
--#define __SHIFT_IN(bits)	(SSP_OPCODE_SHIFT | SSP_IN_MODE  | \
--				 cs_en | clk | SSP_COUNT((bits) * 2 - 1))
--
--static int ti_ssp_spi_setup_transfer(struct ti_ssp_spi *hw, u8 bpw, u8 mode)
--{
--	int error, idx = 0;
--	u32 seqram[16];
--	u32 cs_en, cs_dis, clk;
--	u32 topbits, botbits;
--
--	mode &= MODE_BITS;
--	if (mode == hw->mode && bpw == hw->bpw)
--		return 0;
--
--	cs_en  = (mode & SPI_CS_HIGH) ? SSP_CS_HIGH : SSP_CS_LOW;
--	cs_dis = (mode & SPI_CS_HIGH) ? SSP_CS_LOW  : SSP_CS_HIGH;
--	clk    = (mode & SPI_CPOL)    ? SSP_CLK_HIGH : SSP_CLK_LOW;
--
--	/* Construct instructions */
--
--	/* Disable Chip Select */
--	hw->pc_dis = idx;
--	seqram[idx++] = SSP_OPCODE_DIRECT | SSP_OUT_MODE | cs_dis | clk;
--	seqram[idx++] = SSP_OPCODE_STOP   | SSP_OUT_MODE | cs_dis | clk;
--
--	/* Enable Chip Select */
--	hw->pc_en = idx;
--	seqram[idx++] = SSP_OPCODE_DIRECT | SSP_OUT_MODE | cs_en | clk;
--	seqram[idx++] = SSP_OPCODE_STOP   | SSP_OUT_MODE | cs_en | clk;
--
--	/* Reads and writes need to be split for bpw > 16 */
--	topbits = (bpw > 16) ? 16 : bpw;
--	botbits = bpw - topbits;
--
--	/* Write */
--	hw->pc_wr = idx;
--	seqram[idx++] = __SHIFT_OUT(topbits) | SSP_ADDR_REG;
--	if (botbits)
--		seqram[idx++] = __SHIFT_OUT(botbits)  | SSP_DATA_REG;
--	seqram[idx++] = SSP_OPCODE_STOP | SSP_OUT_MODE | cs_en | clk;
--
--	/* Read */
--	hw->pc_rd = idx;
--	if (botbits)
--		seqram[idx++] = __SHIFT_IN(botbits) | SSP_ADDR_REG;
--	seqram[idx++] = __SHIFT_IN(topbits) | SSP_DATA_REG;
--	seqram[idx++] = SSP_OPCODE_STOP | SSP_OUT_MODE | cs_en | clk;
--
--	error = ti_ssp_load(hw->dev, 0, seqram, idx);
--	if (error < 0)
--		return error;
--
--	error = ti_ssp_set_mode(hw->dev, ((mode & SPI_CPHA) ?
--					  0 : SSP_EARLY_DIN));
--	if (error < 0)
--		return error;
--
--	hw->bpw = bpw;
--	hw->mode = mode;
--
--	return error;
--}
--
--static void ti_ssp_spi_work(struct work_struct *work)
--{
--	struct ti_ssp_spi *hw = container_of(work, struct ti_ssp_spi, work);
--
--	spin_lock(&hw->lock);
--
--	 while (!list_empty(&hw->msg_queue)) {
--		struct spi_message	*m;
--		struct spi_device	*spi;
--		struct spi_transfer	*t = NULL;
--		int			status = 0;
--
--		m = container_of(hw->msg_queue.next, struct spi_message,
--				 queue);
--
--		list_del_init(&m->queue);
--
--		spin_unlock(&hw->lock);
--
--		spi = m->spi;
--
--		if (hw->select)
--			hw->select(spi->chip_select);
--
--		list_for_each_entry(t, &m->transfers, transfer_list) {
--			int bpw = spi->bits_per_word;
--			int xfer_status;
--
--			if (t->bits_per_word)
--				bpw = t->bits_per_word;
--
--			if (ti_ssp_spi_setup_transfer(hw, bpw, spi->mode) < 0)
--				break;
--
--			ti_ssp_spi_chip_select(hw, 1);
--
--			xfer_status = ti_ssp_spi_txrx(hw, m, t);
--			if (xfer_status < 0)
--				status = xfer_status;
--
--			if (t->delay_usecs)
--				udelay(t->delay_usecs);
--
--			if (t->cs_change)
--				ti_ssp_spi_chip_select(hw, 0);
--		}
--
--		ti_ssp_spi_chip_select(hw, 0);
--		m->status = status;
--		m->complete(m->context);
--
--		spin_lock(&hw->lock);
--	}
--
--	if (hw->shutdown)
--		complete(&hw->complete);
--
--	spin_unlock(&hw->lock);
--}
--
--static int ti_ssp_spi_transfer(struct spi_device *spi, struct spi_message *m)
--{
--	struct ti_ssp_spi	*hw;
--	struct spi_transfer	*t;
--	int			error = 0;
--
--	m->actual_length = 0;
--	m->status = -EINPROGRESS;
--
--	hw = spi_master_get_devdata(spi->master);
--
--	if (list_empty(&m->transfers) || !m->complete)
+-	if (pc & ~(0x3f))
 -		return -EINVAL;
 -
--	list_for_each_entry(t, &m->transfers, transfer_list) {
--		if (t->len && !(t->rx_buf || t->tx_buf)) {
--			dev_err(&spi->dev, "invalid xfer, no buffer\n");
--			return -EINVAL;
--		}
+-	/* Grab ssp->lock to serialize rmw on ssp registers */
+-	spin_lock(&ssp->lock);
 -
--		if (t->len && t->rx_buf && t->tx_buf) {
--			dev_err(&spi->dev, "invalid xfer, full duplex\n");
--			return -EINVAL;
--		}
+-	ssp_port_write(ssp, port, PORT_ADDR, input >> 16);
+-	ssp_port_write(ssp, port, PORT_DATA, input & 0xffff);
+-	ssp_port_rmw(ssp, port, PORT_CFG_1, 0x3f, pc);
+-
+-	/* grab wait queue head lock to avoid race with the isr */
+-	spin_lock_irq(&ssp->wqh.lock);
+-
+-	/* kick off sequence execution in hardware */
+-	ssp_port_set_bits(ssp, port, PORT_CFG_1, SSP_START);
+-
+-	/* drop ssp lock; no register writes beyond this */
+-	spin_unlock(&ssp->lock);
+-
+-	ret = wait_event_interruptible_locked_irq(ssp->wqh,
+-						  __xfer_done(ssp, port));
+-	spin_unlock_irq(&ssp->wqh.lock);
+-
+-	if (ret < 0)
+-		return ret;
+-
+-	if (output) {
+-		*output = (ssp_port_read(ssp, port, PORT_ADDR) << 16) |
+-			  (ssp_port_read(ssp, port, PORT_DATA) &  0xffff);
 -	}
 -
--	spin_lock(&hw->lock);
--	if (hw->shutdown) {
--		error = -ESHUTDOWN;
--		goto error_unlock;
--	}
--	list_add_tail(&m->queue, &hw->msg_queue);
--	queue_work(hw->workqueue, &hw->work);
--error_unlock:
--	spin_unlock(&hw->lock);
--	return error;
+-	ret = ssp_port_read(ssp, port, PORT_STATE) & 0x3f; /* stop address */
+-
+-	return ret;
+-}
+-EXPORT_SYMBOL(ti_ssp_run);
+-
+-static irqreturn_t ti_ssp_interrupt(int irq, void *dev_data)
+-{
+-	struct ti_ssp *ssp = dev_data;
+-
+-	spin_lock(&ssp->wqh.lock);
+-
+-	ssp_write(ssp, REG_INTR_ST, 0x3);
+-	wake_up_locked(&ssp->wqh);
+-
+-	spin_unlock(&ssp->wqh.lock);
+-
+-	return IRQ_HANDLED;
 -}
 -
--static int ti_ssp_spi_probe(struct platform_device *pdev)
+-static int ti_ssp_probe(struct platform_device *pdev)
 -{
--	const struct ti_ssp_spi_data *pdata;
--	struct ti_ssp_spi *hw;
--	struct spi_master *master;
+-	static struct ti_ssp *ssp;
+-	const struct ti_ssp_data *pdata = dev_get_platdata(&pdev->dev);
+-	int error = 0, prediv = 0xff, id;
+-	unsigned long sysclk;
 -	struct device *dev = &pdev->dev;
--	int error = 0;
+-	struct mfd_cell cells[2];
 -
--	pdata = dev_get_platdata(dev);
--	if (!pdata) {
--		dev_err(dev, "platform data not found\n");
--		return -EINVAL;
--	}
--
--	master = spi_alloc_master(dev, sizeof(struct ti_ssp_spi));
--	if (!master) {
--		dev_err(dev, "cannot allocate SPI master\n");
+-	ssp = kzalloc(sizeof(*ssp), GFP_KERNEL);
+-	if (!ssp) {
+-		dev_err(dev, "cannot allocate device info\n");
 -		return -ENOMEM;
 -	}
 -
--	hw = spi_master_get_devdata(master);
--	platform_set_drvdata(pdev, hw);
+-	ssp->dev = dev;
+-	dev_set_drvdata(dev, ssp);
 -
--	hw->master = master;
--	hw->dev = dev;
--	hw->select = pdata->select;
+-	ssp->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!ssp->res) {
+-		error = -ENODEV;
+-		dev_err(dev, "cannot determine register area\n");
+-		goto error_res;
+-	}
 -
--	spin_lock_init(&hw->lock);
--	init_completion(&hw->complete);
--	INIT_LIST_HEAD(&hw->msg_queue);
--	INIT_WORK(&hw->work, ti_ssp_spi_work);
--
--	hw->workqueue = create_singlethread_workqueue(dev_name(dev));
--	if (!hw->workqueue) {
+-	if (!request_mem_region(ssp->res->start, resource_size(ssp->res),
+-				pdev->name)) {
 -		error = -ENOMEM;
--		dev_err(dev, "work queue creation failed\n");
--		goto error_wq;
+-		dev_err(dev, "cannot claim register memory\n");
+-		goto error_res;
 -	}
 -
--	error = ti_ssp_set_iosel(hw->dev, pdata->iosel);
+-	ssp->regs = ioremap(ssp->res->start, resource_size(ssp->res));
+-	if (!ssp->regs) {
+-		error = -ENOMEM;
+-		dev_err(dev, "cannot map register memory\n");
+-		goto error_map;
+-	}
+-
+-	ssp->clk = clk_get(dev, NULL);
+-	if (IS_ERR(ssp->clk)) {
+-		error = PTR_ERR(ssp->clk);
+-		dev_err(dev, "cannot claim device clock\n");
+-		goto error_clk;
+-	}
+-
+-	ssp->irq = platform_get_irq(pdev, 0);
+-	if (ssp->irq < 0) {
+-		error = -ENODEV;
+-		dev_err(dev, "unknown irq\n");
+-		goto error_irq;
+-	}
+-
+-	error = request_threaded_irq(ssp->irq, NULL, ti_ssp_interrupt, 0,
+-				     dev_name(dev), ssp);
 -	if (error < 0) {
--		dev_err(dev, "io setup failed\n");
--		goto error_iosel;
+-		dev_err(dev, "cannot acquire irq\n");
+-		goto error_irq;
 -	}
 -
--	master->bus_num		= pdev->id;
--	master->num_chipselect	= pdata->num_cs;
--	master->mode_bits	= MODE_BITS;
--	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(1, 32);
--	master->flags		= SPI_MASTER_HALF_DUPLEX;
--	master->transfer	= ti_ssp_spi_transfer;
+-	spin_lock_init(&ssp->lock);
+-	init_waitqueue_head(&ssp->wqh);
 -
--	error = spi_register_master(master);
+-	/* Power on and initialize SSP */
+-	error = clk_enable(ssp->clk);
 -	if (error) {
--		dev_err(dev, "master registration failed\n");
--		goto error_reg;
+-		dev_err(dev, "cannot enable device clock\n");
+-		goto error_enable;
+-	}
+-
+-	/* Reset registers to a sensible known state */
+-	ssp_write(ssp, REG_IOSEL_1, 0);
+-	ssp_write(ssp, REG_IOSEL_2, 0);
+-	ssp_write(ssp, REG_INTR_EN, 0x3);
+-	ssp_write(ssp, REG_INTR_ST, 0x3);
+-	ssp_write(ssp, REG_TEST_CTRL, 0);
+-	ssp_port_write(ssp, 0, PORT_CFG_1, SSP_PORT_ASL);
+-	ssp_port_write(ssp, 1, PORT_CFG_1, SSP_PORT_ASL);
+-	ssp_port_write(ssp, 0, PORT_CFG_2, SSP_PORT_CFO1);
+-	ssp_port_write(ssp, 1, PORT_CFG_2, SSP_PORT_CFO1);
+-
+-	sysclk = clk_get_rate(ssp->clk);
+-	if (pdata && pdata->out_clock)
+-		prediv = (sysclk / pdata->out_clock) - 1;
+-	prediv = clamp(prediv, 0, 0xff);
+-	ssp_rmw(ssp, REG_PREDIV, 0xff, prediv);
+-
+-	memset(cells, 0, sizeof(cells));
+-	for (id = 0; id < 2; id++) {
+-		const struct ti_ssp_dev_data *data = &pdata->dev_data[id];
+-
+-		cells[id].id		= id;
+-		cells[id].name		= data->dev_name;
+-		cells[id].platform_data	= data->pdata;
+-	}
+-
+-	error = mfd_add_devices(dev, 0, cells, 2, NULL, 0, NULL);
+-	if (error < 0) {
+-		dev_err(dev, "cannot add mfd cells\n");
+-		goto error_enable;
 -	}
 -
 -	return 0;
 -
--error_reg:
--error_iosel:
--	destroy_workqueue(hw->workqueue);
--error_wq:
--	spi_master_put(master);
+-error_enable:
+-	free_irq(ssp->irq, ssp);
+-error_irq:
+-	clk_put(ssp->clk);
+-error_clk:
+-	iounmap(ssp->regs);
+-error_map:
+-	release_mem_region(ssp->res->start, resource_size(ssp->res));
+-error_res:
+-	kfree(ssp);
 -	return error;
 -}
 -
--static int ti_ssp_spi_remove(struct platform_device *pdev)
+-static int ti_ssp_remove(struct platform_device *pdev)
 -{
--	struct ti_ssp_spi *hw = platform_get_drvdata(pdev);
--	int error;
+-	struct device *dev = &pdev->dev;
+-	struct ti_ssp *ssp = dev_get_drvdata(dev);
 -
--	hw->shutdown = 1;
--	while (!list_empty(&hw->msg_queue)) {
--		error = wait_for_completion_interruptible(&hw->complete);
--		if (error < 0) {
--			hw->shutdown = 0;
--			return error;
--		}
--	}
--	destroy_workqueue(hw->workqueue);
--	spi_unregister_master(hw->master);
--
+-	mfd_remove_devices(dev);
+-	clk_disable(ssp->clk);
+-	free_irq(ssp->irq, ssp);
+-	clk_put(ssp->clk);
+-	iounmap(ssp->regs);
+-	release_mem_region(ssp->res->start, resource_size(ssp->res));
+-	kfree(ssp);
 -	return 0;
 -}
 -
--static struct platform_driver ti_ssp_spi_driver = {
--	.probe		= ti_ssp_spi_probe,
--	.remove		= ti_ssp_spi_remove,
+-static struct platform_driver ti_ssp_driver = {
+-	.probe		= ti_ssp_probe,
+-	.remove		= ti_ssp_remove,
 -	.driver		= {
--		.name	= "ti-ssp-spi",
+-		.name	= "ti-ssp",
 -		.owner	= THIS_MODULE,
--	},
+-	}
 -};
--module_platform_driver(ti_ssp_spi_driver);
 -
--MODULE_DESCRIPTION("SSP SPI Master");
+-module_platform_driver(ti_ssp_driver);
+-
+-MODULE_DESCRIPTION("Sequencer Serial Port (SSP) Driver");
 -MODULE_AUTHOR("Cyril Chemparathy");
 -MODULE_LICENSE("GPL");
--MODULE_ALIAS("platform:ti-ssp-spi");
+-MODULE_ALIAS("platform:ti-ssp");
 -- 
 1.8.3.2
