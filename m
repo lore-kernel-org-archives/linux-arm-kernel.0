@@ -1,31 +1,22 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 26 Feb 2014 15:30:46 +0100
-Subject: [PATCH] ARM: XEN depends on having a MMU
-Message-ID: <1393425046-23317-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Feb 2014 14:32:14 +0000
+Subject: [PATCH] scripts/link-vmlinux.sh: correct base address for some
+ ARM special cases
+In-Reply-To: <20140226140632.GG6865@pengutronix.de>
+References: <1393413080-26942-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20140226111507.GW21483@n2100.arm.linux.org.uk>
+ <20140226134605.GF6865@pengutronix.de>
+ <20140226135352.GY21483@n2100.arm.linux.org.uk>
+ <20140226140632.GG6865@pengutronix.de>
+Message-ID: <20140226143213.GZ21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/xen/enlighten.c (and maybe others) use MMU-specific functions
-like pte_mkspecial which are only available on MMU builds. So let XEN
-depend on MMU.
+On Wed, Feb 26, 2014 at 03:06:32PM +0100, Uwe Kleine-K?nig wrote:
+> Looks reasonable. Maybe we can also get rid of PLAT_PHYS_OFFSET then.
 
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+I don't think so - try grep.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e25419817791..1eb3a250210a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1903,6 +1903,7 @@ config XEN
- 	depends on ARM && AEABI && OF
- 	depends on CPU_V7 && !CPU_V6
- 	depends on !GENERIC_ATOMIC64
-+	depends on MMU
- 	select ARM_PSCI
- 	select SWIOTLB_XEN
- 	select ARCH_DMA_ADDR_T_64BIT
 -- 
-1.8.5.3
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
