@@ -1,82 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 26 Feb 2014 16:36:04 +0000
-Subject: [PATCH v2 2/2] PCI: imx6: add support for MSI
-In-Reply-To: <1393410438-28205-2-git-send-email-l.stach@pengutronix.de>
-References: <1393410438-28205-1-git-send-email-l.stach@pengutronix.de>
- <1393410438-28205-2-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20140226163604.GG29659@e106331-lin.cambridge.arm.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 26 Feb 2014 20:37:04 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2NCAxLzVdIHR0eS9zZXJpYWw6IEFkZCBHUElPTElCIGhl?=
+ =?UTF-8?B?bHBlcnMgZm9yIGNvbnRyb2xsaW5nIG1vZGVtIGxpbmVz?=
+In-Reply-To: <1393431588-25977-2-git-send-email-richard.genoud@gmail.com>
+References: <1393431588-25977-1-git-send-email-richard.genoud@gmail.com>
+ <1393431588-25977-2-git-send-email-richard.genoud@gmail.com>
+Message-ID: <1393432624.955150590@f282.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 10:27:18AM +0000, Lucas Stach wrote:
-> From: Juergen Beisert <jbe@pengutronix.de>
+Hello Richard.
+
+?????, 26 ??????? 2014, 17:19 +01:00 ?? Richard Genoud <richard.genoud@gmail.com>:
+> This patch add some helpers to control modem lines (CTS/RTS/DSR...) via
+> GPIO.
+> This will be useful for many boards which have a serial controller that
+> only handle CTS/RTS pins (or even just RX/TX).
 > 
-> This patch adds support for Message Signaled Interrupt in the
-> imx6q-pcie driver. It is done in a similar way as for the Exynos
-> PCIe driver (commit f342d940ee0e3a2b5197fd4fbade1cb6bbc960b7),
-> which is also using the Synopsys designware PCIe IP core.
-> 
-> Signed-off-by: Harro Haan <hrhaan@gmail.com>
-> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
-> v2: fix typo MCI->MSI
-> ---
->  drivers/pci/host/pci-imx6.c | 29 +++++++++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
-> 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index ee082509b0ba..344a72184307 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -25,6 +25,7 @@
->  #include <linux/resource.h>
->  #include <linux/signal.h>
->  #include <linux/types.h>
-> +#include <linux/interrupt.h>
->  
->  #include "pcie-designware.h"
->  
-> @@ -329,6 +330,17 @@ static int imx6_pcie_wait_for_link(struct pcie_port *pp)
->  	return 0;
->  }
->  
-> +/* legacy IRQD/MSI interrupt */
-> +static irqreturn_t imx6_pcie_irqd_msi_handler(int irq, void *arg)
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+
+Better, but I found few bugs... :)
+
+...
+> +Modem control lines via GPIO
+> +----------------------------
+> +
+> +Some helpers are provided in order to set/get modem control lines via GPIO.
+> +
+> +mctrl_gpio_init(dev, idx):
+
+I think we should indicate variable types used in these functions.
+
+...
+> +void mctrl_gpio_set(struct mctrl_gpios *gpios, unsigned int mctrl)
 > +{
-> +	struct pcie_port *pp = arg;
+> +	enum mctrl_gpio_idx i;
 > +
-> +	if (IS_ENABLED(CONFIG_PCI_MSI))
-> +		dw_handle_msi_irq(pp);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
->  static int imx6_pcie_start_link(struct pcie_port *pp)
->  {
->  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
-> @@ -403,6 +415,9 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
->  	dw_pcie_setup_rc(pp);
->  
->  	imx6_pcie_start_link(pp);
-> +
-> +	if (IS_ENABLED(CONFIG_PCI_MSI))
-> +		dw_pcie_msi_init(pp);
->  }
->  
->  static void imx6_pcie_reset_phy(struct pcie_port *pp)
-> @@ -498,6 +513,20 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
->  		return -ENODEV;
->  	}
->  
-> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +		pp->msi_irq = platform_get_irq(pdev, 3);
-> +		if (!pp->msi_irq) {
-> +			dev_err(&pdev->dev, "failed to get INTD/MSI\n");
-> +			return -ENODEV;
+> +	if (IS_ERR_OR_NULL(gpios))
+> +		return;
+
+No. IS_ERR_OR_NULL() is not valid here. This is allocated by kzalloc(),
+so you should check valid pointer only, ie (!gpios).
+Same in other places.
+
+
+> +		if (err) {
+> +			dev_err(dev, "Unable to set direction for %s GPIO",
+> +				mctrl_gpios_desc[i].name);
+> +			devm_gpiod_put(dev, gpios->gpio[i]);
+> +			gpios->gpio[i] = NULL;
 > +		}
+> +	}
 
-Doesn't this break existing DTBs?
+Let's use dev_dbg().
 
-Cheers,
-Mark.
+Thanks.
+---
