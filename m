@@ -1,54 +1,41 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 26 Feb 2014 21:44:38 +0800
-Subject: [PATCH 2/4] ARM: imx6: build headsmp.o only on CONFIG_SMP
+Date: Wed, 26 Feb 2014 21:44:40 +0800
+Subject: [PATCH 4/4] ARM: imx6: do not call imx6q_suspend_init() with
+ !CONFIG_SUSPEND
 In-Reply-To: <1393422280-22283-1-git-send-email-shawn.guo@linaro.org>
 References: <1393422280-22283-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1393422280-22283-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1393422280-22283-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With v7_cpu_resume() being moved out of headsmp.S, all the remaining
-code in the file is only needed by CONFIG_SMP build.  So we can control
-the build of headsmp.o with only obj-$(CONFIG_SMP) now.
+When CONFIG_SUSPEND is not enabled, we should reasonably skip the call
+to imx6q_suspend_init().
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/Makefile  |    4 ++--
- arch/arm/mach-imx/headsmp.S |    2 --
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/mach-imx/pm-imx6q.c |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index b4c19cd..9c776a0 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -104,9 +104,9 @@ obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
+diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
+index 2473ad4..16f0d24 100644
+--- a/arch/arm/mach-imx/pm-imx6q.c
++++ b/arch/arm/mach-imx/pm-imx6q.c
+@@ -516,10 +516,12 @@ static void __init imx6_pm_common_init(const struct imx6_pm_socdata
  
- AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
- obj-$(CONFIG_SUSPEND) += suspend-imx6.o
--obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
-+obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o
- # i.MX6SL reuses i.MX6Q code
--obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o
-+obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o
+ 	WARN_ON(!ccm_base);
  
- # i.MX5 based machines
- obj-$(CONFIG_MACH_MX51_BABBAGE) += mach-mx51_babbage.o
-diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
-index e4b9fed..6e1a56d 100644
---- a/arch/arm/mach-imx/headsmp.S
-+++ b/arch/arm/mach-imx/headsmp.S
-@@ -15,7 +15,6 @@
+-	ret = imx6q_suspend_init(socdata);
+-	if (ret)
+-		pr_warn("%s: No DDR LPM support with suspend %d!\n",
+-			__func__, ret);
++	if (IS_ENABLED(CONFIG_SUSPEND)) {
++		ret = imx6q_suspend_init(socdata);
++		if (ret)
++			pr_warn("%s: No DDR LPM support with suspend %d!\n",
++				__func__, ret);
++	}
  
- 	.section ".text.head", "ax"
- 
--#ifdef CONFIG_SMP
- diag_reg_offset:
- 	.word	g_diag_reg - .
- 
-@@ -32,4 +31,3 @@ ENTRY(v7_secondary_startup)
- 	set_diag_reg
- 	b	secondary_startup
- ENDPROC(v7_secondary_startup)
--#endif
+ 	/*
+ 	 * This is for SW workaround step #1 of ERR007265, see comments
 -- 
 1.7.9.5
