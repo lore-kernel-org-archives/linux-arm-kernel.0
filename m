@@ -1,30 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Feb 2014 00:02:06 +0000
-Subject: SA110 MMU problem, any hints?
-In-Reply-To: <CACRpkdaph0_mnJsDBC7_5+wWm18cygf70GoJ-QR0fPuyN0Xw=A@mail.gmail.com>
-References: <CACRpkdaph0_mnJsDBC7_5+wWm18cygf70GoJ-QR0fPuyN0Xw=A@mail.gmail.com>
-Message-ID: <20140226000206.GT21483@n2100.arm.linux.org.uk>
+From: sebastian.capella@linaro.org (Sebastian Capella)
+Date: Tue, 25 Feb 2014 16:01:59 -0800
+Subject: [PATCH v3 2/3] ARM: avoid tracers in soft_restart
+In-Reply-To: <1393372920-3896-1-git-send-email-sebastian.capella@linaro.org>
+References: <1393372920-3896-1-git-send-email-sebastian.capella@linaro.org>
+Message-ID: <1393372920-3896-3-git-send-email-sebastian.capella@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 12:49:40AM +0100, Linus Walleij wrote:
-> Hi Russell,
-> 
-> after doing some painful bringup on a Netwinder
-> machine, I have run into an unspecified MMU bug on the SA110.
-> Basically the kernel bootstrap bugs out before start_kernel()
-> so it's on a very basic level.
-> 
-> If I turn off CONFIG_MMU it actually boots all the way until attempting
-> to mount root, with boot logo, VGA console and everything.
-> 
-> Given  that you made some Footbridge patches recently I guess
-> you have it working? No special tweaks?
+Use of tracers in local_irq_disable is causes abort loops when called
+with irqs disabled using a temporary stack.  Replace local_irq_disable
+with raw_local_irq_disable instead to avoid tracers.
 
-3.12 and 3.12.6 runs fine here on two different footbridge platforms.
-I haven't tried it on the netwinder though (they're a little noisy in
-comparison with other stuff.)
+Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Robin Holt <robin.m.holt@gmail.com>
+---
+ arch/arm/kernel/process.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 92f7b15..f58b723 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -100,7 +100,7 @@ void soft_restart(unsigned long addr)
+ 	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
+ 
+ 	/* Disable interrupts first */
+-	local_irq_disable();
++	raw_local_irq_disable();
+ 	local_fiq_disable();
+ 
+ 	/* Disable the L2 if we're the last man standing. */
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.7.9.5
