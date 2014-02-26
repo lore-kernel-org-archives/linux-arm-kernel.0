@@ -1,92 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 26 Feb 2014 10:05:00 +0000
-Subject: [PATCH] irqchip:gic: change access of gicc_ctrl register to read
- modify write.
-In-Reply-To: <CAL85gmBjdBWv-aMAGQtufmJUSKanzPoXa0QfHo756KM+E0orqA@mail.gmail.com>
-References: <1392761550-11662-1-git-send-email-fkan@apm.com>
- <53048882.9070706@arm.com>
- <CAL85gmBjdBWv-aMAGQtufmJUSKanzPoXa0QfHo756KM+E0orqA@mail.gmail.com>
-Message-ID: <530DBC4C.9050802@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 26 Feb 2014 11:11:49 +0100
+Subject: [PATCH] ARM: shmobile: Check r8a7791 MD21 at SMP boot
+In-Reply-To: <20140226095916.15676.99394.sendpatchset@w520>
+References: <20140226095916.15676.99394.sendpatchset@w520>
+Message-ID: <CAMuHMdXKdN+LrhhCFKgO4=2ez0qiyc8EhtBLPzrfxmBMLpGX7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Fixing tglx's email address so he too can enjoy the fun...]
+Hi Magnus,
 
-On 25/02/14 20:19, Feng Kan wrote:
-> On Wed, Feb 19, 2014 at 2:33 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> Hi Feng,
->>
->> On 18/02/14 22:12, Feng Kan wrote:
->>> This change is made to preserve the GIC v2 releated bits in the
->>> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
->>> The original code only set the enable/disable group bit in this register.
->>> This code will preserve all other bits configured by the bootload except
->>
->> This "all other bits" in itself is a major problem, see below.
->>
->>> the enable/disable bit. The main reason for this change is to allow the
->>> bypass bits specified in the v2 spec to remain untouched by the current
->>> GIC code. In the X-Gene platform, the bypass functionality is not used
->>> and bypass must be disabled at all time.
->>>
->>> Signed-off-by: Vinayak Kale <vkale@apm.com>
->>> Acked-by: Anup Patel <apatel@apm.com>
->>> Signed-off-by: Feng Kan <fkan@apm.com>
->>> ---
->>>  drivers/irqchip/irq-gic.c | 18 +++++++++++++++---
->>>  1 file changed, 15 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>> index 341c601..9adc3e1 100644
->>> --- a/drivers/irqchip/irq-gic.c
->>> +++ b/drivers/irqchip/irq-gic.c
->>> @@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>>       void __iomem *dist_base = gic_data_dist_base(gic);
->>>       void __iomem *base = gic_data_cpu_base(gic);
->>>       unsigned int cpu_mask, cpu = smp_processor_id();
->>> +     unsigned int ctrl_mask;
->>>       int i;
->>>
->>>       /*
->>> @@ -449,13 +450,20 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>>               writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
->>>
->>>       writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
->>> -     writel_relaxed(1, base + GIC_CPU_CTRL);
->>> +
->>> +     ctrl_mask = readl(base + GIC_CPU_CTRL);
->>> +     ctrl_mask |= 0x1;
->>> +     writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
->>
->> So what if the firmware used a different EOImode? We would end up in a
->> situation where we don't deactivate the interrupts anymore. Not good.
-> Is there an case where the EOI mode usage would change on the fly?
-> Bootloader's job would be to setup the bits so the kernel would work properly.
+On Wed, Feb 26, 2014 at 10:59 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> On r8a7791 the hardware boot mode bit MD21 indicates if hardware
+> debug mode is enabled or not. In case hardware debug mode is enabled
+> print a warning and refrain from booting secondary CPU cores.
+>
+> Without this patch Koelsch with SW8-4 set to OFF will hang at SMP boot.
+>
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-If you trust bootloaders to get anything right, you shouldn't ever touch
-the Linux IRQ code.
+On Koelsch:
 
-Since the ancient times, bootloaders have been known to be part of a
-conspiracy aiming to destroy Mankind and rule the Earth. Bootloaders are
-the Orcs of software. It's been scientifically proven that they are
-responsible for climate change. Seen the floods in England? Bootloaders.
-Exploding volcanoes? Bootloaders. The flat tire on your bike?
-Bootloaders. Enough said.
+Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-> Do you have a case in mind that would violate this setup?
+>  This is a reworked version of the APMU patch previously posted as
+>  [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
 
-What if your bootloader is actually a small RT kernel that uses
-interrupt nesting (hence EOImode==1 to be able to split deactivation
-from priority drop)? ECOS/RedBoot anyone?
+Your previous version also affected r8a7790/Lager.
+Isn't this check no longer needed there? According to the Lager manual,
+MD21 also enables hardware debug mode, and is also controlled by
+SW8-4. Of course the CPU may behave differently, as the CPU cores
+are different.
 
-Do you think for a second that this thing will kindly reset EIOmode to
-zero just because it loads a Linux kernel? See the above.
+Gr{oetje,eeting}s,
 
-Remember this code is used on a lot of fairly insane platforms. You
-*must* be extremely conservative in any change you make.
+                        Geert
 
-Thanks,
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
