@@ -1,35 +1,22 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 25 Feb 2014 16:43:26 -0800
-Subject: [PATCH v2] arm: fix memset-related crashes caused by recent GCC
- (4.7.2) optimizations
-In-Reply-To: <513EFE1F.5060807@ahsoftware.de>
-References: <1360587435-28386-1-git-send-email-ivan.djelic@parrot.com>
- <513795C5.4050608@gmail.com> <20130307151755.GB4977@n2100.arm.linux.org.uk>
- <513CBD83.7040909@ahsoftware.de>
- <20130310172854.GH4977@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1303110910540.28820@syhkavp.arg>
- <513EFE1F.5060807@ahsoftware.de>
-Message-ID: <CAGVrzcaAGqWG4-fiVc+YiPms5aqSkoXBMmK4rR=wr9XQJ083jw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 26 Feb 2014 09:48:34 +0900
+Subject: [PATCH 0/4] arm64: Topology
+Message-ID: <1393375718-32458-1-git-send-email-broonie@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013-03-12 3:06 GMT-07:00 Alexander Holler <holler@ahsoftware.de>:
->
-> Tested-by: Alexander Holler
->
-> It works since 2 days on my busy 24/7 armv5-thingy without me having seen an
-> error. A quick test on an armv7-system hasn't revealed any problems too.
+Use the scheduler documented default for unknown CPUs rather than
+assigning them to a cluster.
 
-This is an old thread, but 3.8.13 is still affected, not quite sure if
-there will be a 3.8.14 release, but if there is, we should
-definitively get:
+Mark Brown (4):
+      arm64: topology: Implement basic CPU topology support
+      arm64: topology: Add support for topology DT bindings
+      arm64: topology: Tell the scheduler about the relative power of cores
+      arm64: topology: Provide relative power numbers for cores
 
-ARM: 7668/1: fix memset-related crashes caused by recent GCC (4.7.2)
-optimizations
-ARM: 7670/1: fix the memset fix
-
-included in 3.8.14.
-
-Thanks!
--- 
-Florian
+ arch/arm64/Kconfig                |  24 +++
+ arch/arm64/include/asm/topology.h |  39 ++++
+ arch/arm64/kernel/Makefile        |   1 +
+ arch/arm64/kernel/smp.c           |  11 ++
+ arch/arm64/kernel/topology.c      | 380 ++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 455 insertions(+)
