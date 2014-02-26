@@ -1,57 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Feb 2014 16:01:58 +0000
-Subject: [PATCH 03/18] arm64: boot protocol documentation update for GICv3
-In-Reply-To: <530E0F63.3070007@arm.com>
-References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
- <1391607050-540-4-git-send-email-marc.zyngier@arm.com>
- <20140225180658.GH23136@mudshark.cambridge.arm.com>
- <530DFC0C.3040704@arm.com>
- <20140226153142.GA12882@mudshark.cambridge.arm.com>
- <530E0F63.3070007@arm.com>
-Message-ID: <20140226160157.GD12882@mudshark.cambridge.arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 26 Feb 2014 17:04:15 +0100
+Subject: [PATCH] ARM: XEN depends on having a MMU
+In-Reply-To: <alpine.DEB.2.02.1402261445020.31489@kaball.uk.xensource.com>
+References: <1393425046-23317-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <alpine.DEB.2.02.1402261445020.31489@kaball.uk.xensource.com>
+Message-ID: <20140226160415.GK6865@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 03:59:31PM +0000, Marc Zyngier wrote:
-> On 26/02/14 15:31, Will Deacon wrote:
-> > On Wed, Feb 26, 2014 at 02:37:00PM +0000, Marc Zyngier wrote:
-> >> On 25/02/14 18:06, Will Deacon wrote:
-> >>> On Wed, Feb 05, 2014 at 01:30:35PM +0000, Marc Zyngier wrote:
-> >>>> Linux has some requirements that must be satisfied in order to boot
-> >>>> on a system built with a GICv3.
-> >>>>
-> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>>> ---
-> >>>>  Documentation/arm64/booting.txt | 7 +++++++
-> >>>>  1 file changed, 7 insertions(+)
-> >>>>
-> >>>> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> >>>> index a9691cc..4a02ebd 100644
-> >>>> --- a/Documentation/arm64/booting.txt
-> >>>> +++ b/Documentation/arm64/booting.txt
-> >>>> @@ -131,6 +131,13 @@ Before jumping into the kernel, the following conditions must be met:
-> >>>>    the kernel image will be entered must be initialised by software at a
-> >>>>    higher exception level to prevent execution in an UNKNOWN state.
-> >>>>  
-> >>>> +  For systems with a GICv3 interrupt controller, it is expected that:
-> >>>> +  - ID_AA64PFR0_EL1.GIC (bits [27:24]) must have the value 0b0001
-> >>>
-> >>> Since ID_AA64PFR0_EL1 is read-only at all exception levels, I don't see the
-> >>> value of this statement.
-> >>
-> >> Think virtualization. A hypervisor can control reads of ID_AA64PFR0_EL1
-> >> by setting HCR_EL2.TID3, and report whatever it wants.
+Hello Stefano,
+
+On Wed, Feb 26, 2014 at 02:45:19PM +0000, Stefano Stabellini wrote:
+> On Wed, 26 Feb 2014, Uwe Kleine-K?nig wrote:
+> > arch/arm/xen/enlighten.c (and maybe others) use MMU-specific functions
+> > like pte_mkspecial which are only available on MMU builds. So let XEN
+> > depend on MMU.
 > > 
-> > Sure, but it seems unreasonable to me that we require a hypervisor to tell a
-> > guest about GICv3 if the system happens to have one. What if it wants to
-> > emulate a GICv2? In other words, requiring this in booting.txt seems
-> > superflous.
+> > Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 > 
-> The hypervisor can perfectly mask out the GICv3 feature if it wants to.
-> The point I'm trying to make here is that if a guest is expected to be
-> able to use the GICv3 system registers, then ID_AA64PFR0_EL1 should
-> report so.
+> Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Who will apply this patch? I expected that you pick it up.
 
-Fair enough, but that's not what the text says :)
+Best regards
+Uwe
 
-Will
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
