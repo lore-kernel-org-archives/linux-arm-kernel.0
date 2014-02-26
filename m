@@ -1,38 +1,97 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Feb 2014 16:33:23 +0900
-Subject: [PATCH v3 07/20] ARM: shmobile: marzen: Reference clocks
+Date: Wed, 26 Feb 2014 16:33:25 +0900
+Subject: [PATCH v3 09/20] ARM: shmobile: r8a7779: Add helper to read mode pins
 In-Reply-To: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
 References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1393400016-23433-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1393400016-23433-10-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reference clocks using a "clocks" property in all nodes corresponding to
-devices that require a clock: that is, the lan0 node.
+Add and use helper to read mode pins.
+This will be re-used when moving marzen-reference to
+the common clock framework.
 
-Based on work by Laurent Pinchart for the r8a7790 and r8a7791 SoCs.
-
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
 ---
-v3
-* New
----
- arch/arm/boot/dts/r8a7779-marzen.dts | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-shmobile/clock-r8a7779.c        | 11 ++---------
+ arch/arm/mach-shmobile/include/mach/r8a7779.h |  1 +
+ arch/arm/mach-shmobile/setup-r8a7779.c        | 14 ++++++++++++++
+ 3 files changed, 17 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
-index 2c727cd..30f57e9 100644
---- a/arch/arm/boot/dts/r8a7779-marzen.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen.dts
-@@ -41,6 +41,7 @@
- 		reg = <0x18000000 0x100>;
- 		pinctrl-0 = <&lan0_pins>;
- 		pinctrl-names = "default";
-+		clocks = <&mstp1_clks R8A7779_CLK_ETHER>;
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index 8e403ae..b1a5065 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -25,6 +25,7 @@
+ #include <linux/clkdev.h>
+ #include <mach/clock.h>
+ #include <mach/common.h>
++#include <mach/r8a7779.h>
  
- 		phy-mode = "mii";
- 		interrupt-parent = <&irqpin0>;
+ /*
+  *		MD1 = 1			MD1 = 0
+@@ -52,9 +53,6 @@
+ #define MSTPCR3		IOMEM(0xffc8003c)
+ #define MSTPSR1		IOMEM(0xffc80044)
+ 
+-#define MODEMR		0xffcc0020
+-
+-
+ /* ioremap() through clock mapping mandatory to avoid
+  * collision with ARM coherent DMA virtual memory range.
+  */
+@@ -209,14 +207,9 @@ static struct clk_lookup lookups[] = {
+ 
+ void __init r8a7779_clock_init(void)
+ {
+-	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
+-	u32 mode;
++	u32 mode = r8a7779_read_mode_pins();
+ 	int k, ret = 0;
+ 
+-	BUG_ON(!modemr);
+-	mode = ioread32(modemr);
+-	iounmap(modemr);
+-
+ 	if (mode & MD(1)) {
+ 		plla_clk.rate = 1500000000;
+ 
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+index 88eecea..d5ba2d8 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
+@@ -32,6 +32,7 @@ extern void r8a7779_add_early_devices(void);
+ extern void r8a7779_add_standard_devices(void);
+ extern void r8a7779_add_standard_devices_dt(void);
+ extern void r8a7779_init_late(void);
++extern u32 r8a7779_read_mode_pins(void);
+ extern void r8a7779_clock_init(void);
+ extern void r8a7779_pinmux_init(void);
+ extern void r8a7779_pm_init(void);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index 8e860b3..f6aeb7f 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -802,6 +802,20 @@ void __init r8a7779_add_standard_devices_dt(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
++#define MODEMR		0xffcc0020
++
++u32 __init r8a7779_read_mode_pins(void)
++{
++	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
++	u32 mode;
++
++	BUG_ON(!modemr);
++	mode = ioread32(modemr);
++	iounmap(modemr);
++
++	return mode;
++}
++
+ static const char *r8a7779_compat_dt[] __initdata = {
+ 	"renesas,r8a7779",
+ 	NULL,
 -- 
 1.8.5.2
