@@ -1,97 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Feb 2014 11:25:44 +0000
-Subject: [PATCH v2 1/1] arm64: make a single hook to syscall_trace() for
- all syscall features
-In-Reply-To: <530D4AB3.4000700@linaro.org>
-References: <1391767651-5296-1-git-send-email-takahiro.akashi@linaro.org>
- <1393319683-2707-1-git-send-email-takahiro.akashi@linaro.org>
- <1393319683-2707-2-git-send-email-takahiro.akashi@linaro.org>
- <20140225150007.GB23136@mudshark.cambridge.arm.com>
- <530D4AB3.4000700@linaro.org>
-Message-ID: <20140226112544.GD8961@mudshark.cambridge.arm.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 26 Feb 2014 12:40:54 +0100
+Subject: [PATCHv6][ 3/5] video: mx3fb: Introduce regulator support.
+In-Reply-To: <1393410030.488354633@f216.i.mail.ru>
+References: <1393408800-8946-1-git-send-email-denis@eukrea.com>
+ <1393408800-8946-3-git-send-email-denis@eukrea.com>
+ <1393410030.488354633@f216.i.mail.ru>
+Message-ID: <530DD2C6.1060108@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 02:00:19AM +0000, AKASHI Takahiro wrote:
-> On 02/26/2014 12:00 AM, Will Deacon wrote:
-> > On Tue, Feb 25, 2014 at 09:14:43AM +0000, AKASHI Takahiro wrote:
-> >> Currently syscall_trace() is called only for ptrace.
-> >> With additional TIF_xx flags defined, it is now called in all the cases
-> >> of audit, ftrace and seccomp in addition to ptrace.
-> >>
-> >> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >> Acked-by: Richard Guy Briggs <rgb@redhat.com>
-> >> ---
-> >>   arch/arm64/include/asm/thread_info.h |   13 ++++++++++
-> >>   arch/arm64/kernel/entry.S            |    5 ++--
-> >>   arch/arm64/kernel/ptrace.c           |   45 +++++++++++++++++-----------------
-> >>   3 files changed, 38 insertions(+), 25 deletions(-)
-> 
-> [...]
-> 
-> >> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> >> index 6a8928b..c70133e 100644
-> >> --- a/arch/arm64/kernel/ptrace.c
-> >> +++ b/arch/arm64/kernel/ptrace.c
-> >> @@ -1062,31 +1062,30 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
-> >>   {
-> >>   	unsigned long saved_reg;
-> >>
-> >> -	if (!test_thread_flag(TIF_SYSCALL_TRACE))
-> >> -		return regs->syscallno;
-> >> -
-> >> -	if (is_compat_task()) {
-> >> -		/* AArch32 uses ip (r12) for scratch */
-> >> -		saved_reg = regs->regs[12];
-> >> -		regs->regs[12] = dir;
-> >> -	} else {
-> >> -		/*
-> >> -		 * Save X7. X7 is used to denote syscall entry/exit:
-> >> -		 *   X7 = 0 -> entry, = 1 -> exit
-> >> -		 */
-> >> -		saved_reg = regs->regs[7];
-> >> -		regs->regs[7] = dir;
-> >> -	}
-> >> +	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
-> >> +		if (is_compat_task()) {
-> >> +			/* AArch32 uses ip (r12) for scratch */
-> >> +			saved_reg = regs->regs[12];
-> >> +			regs->regs[12] = dir;
-> >> +		} else {
-> >> +			/*
-> >> +			 * Save X7. X7 is used to denote syscall entry/exit:
-> >> +			 *   X7 = 0 -> entry, = 1 -> exit
-> >> +			 */
-> >> +			saved_reg = regs->regs[7];
-> >> +			regs->regs[7] = dir;
-> >> +		}
-> >>
-> >> -	if (dir)
-> >> -		tracehook_report_syscall_exit(regs, 0);
-> >> -	else if (tracehook_report_syscall_entry(regs))
-> >> -		regs->syscallno = ~0UL;
-> >> +		if (dir)
-> >> +			tracehook_report_syscall_exit(regs, 0);
-> >> +		else if (tracehook_report_syscall_entry(regs))
-> >> +			regs->syscallno = ~0UL;
-> >>
-> >> -	if (is_compat_task())
-> >> -		regs->regs[12] = saved_reg;
-> >> -	else
-> >> -		regs->regs[7] = saved_reg;
-> >> +		if (is_compat_task())
-> >> +			regs->regs[12] = saved_reg;
-> >> +		else
-> >> +			regs->regs[7] = saved_reg;
-> >> +	}
-> >
-> > Aren't these changes (to ptrace.c) just a giant NOP?
-> 
-> Umm, the purpose of this big "if" is to run the code only if TIF_SYSCALL_TRACE is set,
-> and to make it easy to add additional hooks, audit and ftrace, around tracehook_report_*()
-> later on.
+On 02/26/2014 11:20 AM, Alexander Shiyan wrote:
 
-The existing code already checks TIF_SYSCALL_TRACE. I'd rather you added
-this new code when it's actually nedded (e.g. when adding audit on top).
+ > Why you want to use an excess "regulator-name" property?
+I'll fix that.
 
-Will
+>> +	/* In dt mode,
+>> +	 * using devm_regulator_get would require that the proprety referencing
+>> +	 * the regulator phandle has to be inside the mx3fb node.
+>
+> What???
+[...]
+ > Just use devm_regulator_get(dev, "lcd") for both dt/non-dt case.
+
+About the use of devm_regulator_get instead of regulator_get:
+
+There is a "dma ipu driver" for the mx3* at drivers/dma/ipu/ipu_idmac.c
+This framebuffer driver (mx3fb) uses that "dma ipu driver".
+
+In non-dt mode("board files"), this framebuffer driver requires some 
+platform data which has resource informations about the ipu.
+
+So to get device tree bindings support for the mx3fb driver, at first I 
+exported the "dma ipu driver" as DMA bindings, to be used in the dts, 
+and then made the mx3fb driver use that.
+
+The comment[1] to that patchset was to instead have similar bindings 
+that looks like the IPUv3 ones(IPUv3 is a staging drm driver), and not 
+to export the "dma ipu driver" bindings to the dts.
+
+So I made the bindings look like that:
+
+display0: display at di0 {
+   [...]
+   display-timings {
+     [...]
+   };
+};
+
+ipu: ipu at 53fc0000 {
+   compatible = "fsl,imx35-ipu";
+   reg = <0x53fc0000 0x4000>;
+   clocks = <&clks 55>;
+   display = <&display0>;
+};
+
+So that is very similar to the imx-drm binding[2].
+
+To achieve that, I've set the .compatible property of the mx3fb driver 
+to "fsl,<chip>-ipu", so it would look like the IPUv3 bindings, and then 
+I handled the "dma ipu driver" registration in a way that doesn't export 
+it to the dts.
+
+The difference is that the imx-drm driver has separate drivers for 
+handling each display type(parallel display, tve, lvds and HDMI) while 
+the mx3fb doesn't.
+
+using devm_regulator_get(NULL, "lcd") would result in a crash, because 
+of devres_add.
+
+using devm_regulator_get(dev, "lcd") would be better but it would 
+instead mean that the regulator handle will have to be a child of the 
+mx3fb's ipu node (ipu at 53fc0000).
+
+That's because devm_regulator_get will end calling of_get_regulator 
+(trough _regulator_get, and regulator_dev_lookup), which will in turn 
+lookup that regulator in the childs of dev->of_node.
+
+That's why I want to pass it a NULL instead of a device struct, and I 
+can't do it in devm_regulator_get because of devres_add, so I ended up 
+using regulator_get directly.
+
+References.
+-----------
+[1]http://lists.infradead.org/pipermail/linux-arm-kernel/2013-October/205846.html
+[2]Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+
+Denis.
