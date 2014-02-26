@@ -1,71 +1,46 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 25 Feb 2014 18:05:29 -0600
-Subject: [PATCH v2 0/2] ARM: OMAP4: Fix gpmc_fck clock
-In-Reply-To: <530C4FED.80403@epfl.ch>
-References: <1392801305-1698-1-git-send-email-florian.vaussard@epfl.ch>
- <5304DA2C.3030605@ti.com> <53050573.8090506@epfl.ch>
- <20140223212309.22529.75068@quantum> <530ADC39.1010300@epfl.ch>
- <20140225062615.22529.88499@quantum> <530C4FED.80403@epfl.ch>
-Message-ID: <530D2FC9.2010800@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 25 Feb 2014 19:09:40 -0500
+Subject: [PATCH 00/10] pinctrl: mvebu: remove hard-coded addresses from
+ Dove pinctrl
+In-Reply-To: <CACRpkdZ+YGTyDj6i8c198MdRtz3GY-YBmVO9LysPCcmT4EC0cg@mail.gmail.com>
+References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140224181023.GA1010@titan.lakedaemon.net>
+ <CACRpkdZ+YGTyDj6i8c198MdRtz3GY-YBmVO9LysPCcmT4EC0cg@mail.gmail.com>
+Message-ID: <20140226000940.GF1872@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian,
+Linus,
 
-On 02/25/2014 02:10 AM, Florian Vaussard wrote:
-> On 02/25/2014 07:26 AM, Mike Turquette wrote:
->> Quoting Florian Vaussard (2014-02-23 21:44:25)
->>> On 02/23/2014 10:23 PM, Mike Turquette wrote:
->>>> Quoting Florian Vaussard (2014-02-19 11:26:43)
->>>>>
->>>>> On 02/19/2014 05:22 PM, Tero Kristo wrote:
->>>>>> On 02/19/2014 11:15 AM, Florian Vaussard wrote:
->>>>>>> Hello,
->>>>>>>
->>>>>>> Trying to get my SMSC9221 working on OMAP4 with DT,
->>>>>>> I faced a misconfigured gpmc_fck (dummy clock set to 0)
->>>>>>> resulting in serveral division-by-zero, misconfigured
->>>>>>> timings and driver lost in the La La Land.
->>>>>>>
->>>>>>> To solve this, patch 1 removes gpmc_fck from the dummy
->>>>>>> clocks, and patch 2 adds the gpmc_fck DT node and
->>>>>>> reference it from the gpmc node.
->>>>>>>
->>>>>>> Tested on DuoVero/Parlor (OMAP4430) with SMSC9221.
->>>>>>
->>>>>> I can't test GPMC myself, but other than that, this set looks good to go.
->>>>>>
->>>>>
->>>>> Thank you. Would you like more test coverage by other people? I would
->>>>> like to see this in -rc if possible, as it is needed to boot my OMAP4
->>>>> system.
->>>>
->>>> What OMAP4 system is this? Is this a regression for board that already
->>>> has support merged into mainline?
->>>>
->>>
->>> No, it is not yet merged into mainline. I was planning to post the DTS
->>> this week, when most issues are cleared. Looking at the current mainline
->>> boards, no one seems to use the GPMC, so I am just the first one to hit
->>> this issue.
->>
->> OK, well typically the later -rc's are for fixing observed regressions.
->> Since your platform is not yet merged in then it's probably fine to push
->> this for 3.15.
->>
->
-> Fair enough. 3.15 is fine.
->
->> This also gives time to test the fix for other OMAP-ish processors.
->>
->
-> I can do the v3, including OMAP5 and DRA7. But for DRA7, I will need
-> someone with the TRM telling me where is connected gpmc_fclk (Suman?).
+On Tue, Feb 25, 2014 at 10:36:54AM +0100, Linus Walleij wrote:
+> On Mon, Feb 24, 2014 at 7:10 PM, Jason Cooper <jason@lakedaemon.net> wrote:
+> 
+> > Sebastian, Linus,
+> >
+> > I've now created mvebu/pinctrl-dove for this series.  It's based on
+> > v3.14-rc1, and depends on mvebu/pinctrl (which depends on
+> > mvebu/pinctrl-3xx).
+> >
+> > I've kept this series in a separate branch in case we encounter an
+> > unforeseen problem with something in here.  Then this branch can be
+> > dropped, and /pinctrl-3xx and /pinctrl will still make it in.
+> >
+> > So, all patches except 3 and 4 are in mvebu/pinctrl-dove.  3 and 4 are
+> > in mvebu/dt.
+> 
+> OK so what should I be pulling in first now?
 
-For DRA7, GPMC is connected off L3MAIN1_L3_GICLK (compared to 
-L3MAIN2_L3_GICLK on OMAP5), both of which are actually just L3_ICLK.
-This is the l3_iclk_div in both the omap54xx-clocks.dtsi and 
-dra7xx-clocks.dtsi files.
+Sebastian has now re-organized the branches as I asked, and I confirmed
+that the final result is the exact same as mine (diff is null).
 
-regards
-Suman
+Usually when I submit pull requests to arm-soc, they like to see the
+branches.  That way if there is an error in one of them, they just drop
+the one branch and the others remain.
+
+Would you like them the same way?  If so, I'll send the pulls to you
+tomorrow.  Otherwise, I'll wait a few more days to let things shake out
+and then send you one request with the branches merged.
+
+thx,
+
+Jason.
