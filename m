@@ -1,57 +1,45 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 26 Feb 2014 15:30:53 -0800
-Subject: [PATCH] Documentation: clk: Add locking documentation
-In-Reply-To: <20140226222925.GE21483@n2100.arm.linux.org.uk>
-References: <1393451575-23758-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20140226222925.GE21483@n2100.arm.linux.org.uk>
-Message-ID: <20140226233053.12081.45765@quantum>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Feb 2014 23:37:44 +0000
+Subject: [PATCH v4 1/2] ARM: avoid tracers in soft_restart
+In-Reply-To: <1393441857-15472-2-git-send-email-sebastian.capella@linaro.org>
+References: <1393441857-15472-1-git-send-email-sebastian.capella@linaro.org>
+ <1393441857-15472-2-git-send-email-sebastian.capella@linaro.org>
+Message-ID: <20140226233744.GG21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Russell King - ARM Linux (2014-02-26 14:29:26)
-> On Wed, Feb 26, 2014 at 10:52:55PM +0100, Laurent Pinchart wrote:
-> > Briefly documentation the common clock framework locking scheme from a
-> > clock driver point of view.
-> > 
-> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> >  Documentation/clk.txt | 26 ++++++++++++++++++++++++++
-> >  1 file changed, 26 insertions(+)
-> > 
-> > diff --git a/Documentation/clk.txt b/Documentation/clk.txt
-> > index 699ef2a..4bd6fd7 100644
-> > --- a/Documentation/clk.txt
-> > +++ b/Documentation/clk.txt
-> > @@ -255,3 +255,29 @@ are sorted out.
-> >  
-> >  To bypass this disabling, include "clk_ignore_unused" in the bootargs to the
-> >  kernel.
-> > +
-> > +     Part 7 - Locking
-> > +
-> > +The common clock framework uses two global locks. One of them (the enable
-> > +lock) is held across calls to the .enable, .disable and .is_enabled
-> > +operations, while the other (the prepare lock) is held across calls to all other
-> > +operations. This effectively divides operations in two groups from a locking
-> > +perspective.
+On Wed, Feb 26, 2014 at 11:10:56AM -0800, Sebastian Capella wrote:
+> Use of tracers in local_irq_disable is causes recursive aborts when
+> called with irqs disabled and using a temporary stack (hibernation).
+> Replace local_irq_disable with raw_local_irq_disable instead to
+> avoid tracers.
 > 
-> It would be a good idea to mention the types of these locks - the fact
-> that the enable lock is a spinlock, and the prepare lock is a mutex.
-> That's a very important distinction as there's limitations on the
-> contexts that the prepare-lock can be called from.
-
-I agree with Russell and would take it a step further: this
-documentation on locking should reiterate the relationship between
-clk_prepare and clk_enable, namely that clk_prepare MUST be called and
-MUST complete before calling clk_enable.
-
-This contract helps us deal with the difference in lock types and keep
-things sane despite the lack of lock synchronization.
-
-Regards,
-Mike
-
+> Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Robin Holt <robin.m.holt@gmail.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm/kernel/process.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> -- 
-> FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-> improving, and getting towards what was expected from it.
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index 92f7b15..f58b723 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -100,7 +100,7 @@ void soft_restart(unsigned long addr)
+>  	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
+>  
+>  	/* Disable interrupts first */
+> -	local_irq_disable();
+> +	raw_local_irq_disable();
+>  	local_fiq_disable();
+
+Great, I'm happy with this now.  I assume that the plan is to submit this
+to my patch system when everyone's given their fill of acks?
+
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
