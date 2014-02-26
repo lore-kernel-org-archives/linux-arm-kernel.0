@@ -1,62 +1,193 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 26 Feb 2014 13:48:20 +0200
-Subject: [PATCH 2/2] ARM: OMAP2+: fix dpll round_rate() to actually round
-In-Reply-To: <alpine.DEB.2.02.1402201927280.10791@utopia.booyaka.com>
-References: <1389944699-27962-1-git-send-email-tomi.valkeinen@ti.com>
- <1389944699-27962-3-git-send-email-tomi.valkeinen@ti.com>
- <alpine.DEB.2.02.1402191928480.8777@utopia.booyaka.com>
- <alpine.DEB.2.02.1402201927280.10791@utopia.booyaka.com>
-Message-ID: <530DD484.5040703@ti.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 26 Feb 2014 11:51:08 +0000
+Subject: [PATCH v5 01/11] of: document bindings for reserved-memory nodes
+In-Reply-To: <1392985527-6260-2-git-send-email-m.szyprowski@samsung.com>
+References: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com> <
+ 1392985527-6260-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20140226115108.211D2C40A89@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/02/14 21:30, Paul Walmsley wrote:
-> On Wed, 19 Feb 2014, Paul Walmsley wrote:
+On Fri, 21 Feb 2014 13:25:17 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> From: Grant Likely <grant.likely@linaro.org>
 > 
->> On Fri, 17 Jan 2014, Tomi Valkeinen wrote:
->>
->>> This patch adds a simple method of rounding: during the iteration, the 
->>> code keeps track of the closest rate match. If no exact match is found, 
->>> the closest is returned.
->>
->> So that's one possible rounding policy; maybe it works fine for a display 
->> interface PLL, at least for some values of "closest rate".  But another 
->> might be "only allow a selection from a set of pre-determined rates 
->> characterized by the silicon validation team".  Or another rounding 
->> function might need to select a more distant rate that minimizes jitter, 
->> EMI, or power consumption.  
+> Reserved memory nodes allow for the reservation of static (fixed
+> address) regions, or dynamically allocated regions for a specific
+> purpose.
 > 
-> Thought about this some more.  Do you only need this for the DSS PLL, or 
-> do you need it for one of the core OMAP PLLs?
+> Signed-off-by: Grant Likely <grant.likely@linaro.org>
+> [joshc: Based on binding document proposed (in non-patch form) here:
+>  http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
+>  adapted to support #memory-region-cells]
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  .../bindings/reserved-memory/reserved-memory.txt   |  138 ++++++++++++++++++++
+>  1 file changed, 138 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
 > 
-> If the former, then how about modifying your patch to create a separate 
-> round_rate function that's only used for the DSS PLL that implements the 
-> behavior that you want?
+> diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> new file mode 100644
+> index 000000000000..a606ce90c9c4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> @@ -0,0 +1,138 @@
+> +*** Reserved memory regions ***
+> +
+> +Reserved memory is specified as a node under the /reserved-memory node.
+> +The operating system shall exclude reserved memory from normal usage
+> +one can create child nodes describing particular reserved (excluded from
+> +normal use) memory regions. Such memory regions are usually designed for
+> +the special usage by various device drivers.
+> +
+> +Parameters for each memory region can be encoded into the device tree
+> +with the following nodes:
+> +
+> +/reserved-memory node
+> +---------------------
+> +#address-cells, #size-cells (required) - standard definition
+> +    - Should use the same values as the root node
+> +#memory-region-cells (required) - dictates number of cells used in the child
+> +                                  nodes memory-region specifier
+
+I still don't like this portion of the binding. I'm not convinced that
+it is necessary in the majority of cases and it is going to be very
+driver specific. I would rather drop it entirely from the common
+binding. If a specific driver needs to do something like the above then
+it can have a driver specific binding. Otherwise I think the default
+should be a simple phandle with no arguments to a single reserved memory
+node.
+
+Ben, can you weigh in on the current state of this document. I'm mostly
+happy with it aside from my comment above. Do you think this is ready to
+be merged?
+
+> +ranges (required) - standard definition
+> +    - Should be empty
+> +
+> +/reserved-memory/ child nodes
+> +-----------------------------
+> +Each child of the reserved-memory node specifies one or more regions of
+> +reserved memory. Each child node may either use a 'reg' property to
+> +specify a specific range of reserved memory, or a 'size' property with
+> +optional constraints to request a dynamically allocated block of memory.
+> +
+> +Following the generic-names recommended practice, node names should
+> +reflect the purpose of the node (ie. "framebuffer" or "dma-pool"). Unit
+> +address (@<address>) should be appended to the name if the node is a
+> +static allocation.
+> +
+> +Properties:
+> +Requires either a) or b) below.
+> +a) static allocation
+> +   reg (required) - standard definition
+> +b) dynamic allocation
+> +   size (required) - length based on parent's #size-cells
+> +                   - Size in bytes of memory to reserve.
+> +   alignment (optional) - length based on parent's #size-cells
+> +                        - Address boundary for alignment of allocation.
+> +   alloc-ranges (optional) - prop-encoded-array (address, length pairs).
+> +                           - Specifies regions of memory that are
+> +                             acceptable to allocate from.
+> +
+> +If both reg and size are present, then the reg property takes precedence
+> +and size is ignored.
+> +
+> +Additional properties:
+> +compatible (optional) - standard definition
+> +    - may contain the following strings:
+> +        - shared-dma-pool: This indicates a region of memory meant to be
+> +          used as a shared pool of DMA buffers for a set of devices. It can
+> +          be used by an operating system to instanciate the necessary pool
+> +          management subsystem if necessary.
+> +        - vendor specific string in the form <vendor>,[<device>-]<usage>
+
+Add "Use vendor strings to identify regions dedicates for a specific
+vendor device. For example: 'acme,framebuffer'. Platform code can use vendor
+strings to identify device specific regions"
+
+> +no-map (optional) - empty property
+> +    - Indicates the operating system must not create a virtual mapping
+> +      of the region as part of its standard mapping of system memory,
+> +      nor permit speculative access to it under any circumstances other
+> +      than under the control of the device driver using the region.
+> +reusable (optional) - empty property
+> +    - The operating system can use the memory in this region with the
+> +      limitation that the device driver(s) owning the region need to be
+> +      able to reclaim it back. Typically that means that the operating
+> +      system can use that region to store volatile or cached data that
+> +      can be otherwise regenerated or migrated elsewhere.
+> +
+> +Linux implementation note:
+> +- If a "linux,cma-default" property is present, then Linux will use the
+> +  region for the default pool of the contiguous memory allocator.
+> +
+> +Device node references to reserved memory
+> +-----------------------------------------
+> +Regions in the /reserved-memory node may be referenced by other device
+> +nodes by adding a memory-region property to the device node.
+> +
+> +memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
+> +
+> +Example
+> +-------
+> +This example defines 3 contiguous regions are defined for Linux kernel:
+> +one default of all device drivers (named linux,cma at 72000000 and 64MiB in size),
+> +one dedicated to the framebuffer device (named framebuffer at 78000000, 8MiB), and
+> +one for multimedia processing (named multimedia-memory at 77000000, 64MiB).
+> +
+> +/ {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	memory {
+> +		reg = <0x40000000 0x40000000>;
+> +	};
+> +
+> +	reserved-memory {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		/* global autoconfigured region for contiguous allocations */
+> +		linux,cma {
+> +			compatible = "shared-dma-pool";
+> +			reusable;
+> +			#memory-region-cells = <0>;
+> +			size = <0x4000000>;
+> +			alignment = <0x2000>;
+> +			linux,cma-default;
+> +		};
+> +
+> +		display_reserved: framebuffer at 78000000 {
+> +			#memory-region-cells = <0>;
+> +			reg = <0x78000000 0x800000>;
+> +		};
+> +
+> +		multimedia_reserved: multimedia at 77000000 {
+> +			compatible = "acme,multimedia-memory";
+> +			#memory-region-cells = <1>;
+> +			reg = <0x77000000 0x4000000>;
+> +		};
+> +	};
+> +
+> +	/* ... */
+> +
+> +	fb0: video at 12300000 {
+> +		memory-region = <&display_reserved>;
+> +		/* ... */
+> +	};
+> +
+> +	scaler: scaler at 12500000 {
+> +		memory-region = <&multimedia_reserved 0xdeadbeef>;
+> +		/* ... */
+> +	};
+> +
+> +	codec: codec at 12600000 {
+> +		memory-region = <&multimedia_reserved 0xfeebdaed>;
+> +		/* ... */
+> +	};
+> +};
+> -- 
+> 1.7.9.5
 > 
-> That would eliminate any risk of impacting other users on the system.  And 
-> would also allow this change to get into the codebase much faster, since 
-> there's no need for clk API changes, etc.
-
-The DSS internal PLLs are handled by the DSS driver, which does all
-kinds of iteration to find good clocks. This patch is for a dedicated
-display PLL, present on, for example, BeagleBoneBlack.
-
-If you think that's better approach, I can take a look how it can be
-done (I'm not too familiar with the clock framework). Or maybe there's a
-possibility to have a flag of some kind, which allows rounded values to
-be returned? That sounds like an easy addition too.
-
-Note that the same change is needed for DT and non-DT boots. Having
-separate round function would mean create a new clock "driver" (i.e.
-compatibility string), wouldn't it? Adding a flag sounds easier.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140226/75cf370f/attachment.sig>
