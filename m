@@ -1,38 +1,45 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 26 Feb 2014 14:24:06 +0900
-Subject: [PATCH 2/3] ARM: select COMMON_CLK_SAMSUNG for ARCH_EXYNOS and
- ARCH_S3C64XX
-In-Reply-To: <1393392247-6247-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1393392247-6247-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1393392247-6247-3-git-send-email-pankaj.dubey@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 26 Feb 2014 10:41:33 +0530
+Subject: [PATCH 2/3] cpufreq: stats: Fix error handling in
+ __cpufreq_stats_create_table()
+In-Reply-To: <1393385915-19138-2-git-send-email-skannan@codeaurora.org>
+References: <1789244.B5CzWbcp6h@vostro.rjw.lan>
+ <1393385915-19138-2-git-send-email-skannan@codeaurora.org>
+Message-ID: <CAKohpomZ9VnZOdtEr5HCWTOCUQ-49UZXaUW4qKVF7rwFgTUdjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/Kconfig |    2 ++
- 1 file changed, 2 insertions(+)
+On 26 February 2014 09:08, Saravana Kannan <skannan@codeaurora.org> wrote:
+> Remove sysfs group if __cpufreq_stats_create_table() fails after creating
+> one.
+>
+> Change-Id: Icb0b44424cc4eb6c88be255e2839ef51c3f8779c
+> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+> ---
+>  drivers/cpufreq/cpufreq_stats.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
+> index e4bd27f..c52b440 100644
+> --- a/drivers/cpufreq/cpufreq_stats.c
+> +++ b/drivers/cpufreq/cpufreq_stats.c
+> @@ -216,7 +216,7 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
+>         stat->time_in_state = kzalloc(alloc_size, GFP_KERNEL);
+>         if (!stat->time_in_state) {
+>                 ret = -ENOMEM;
+> -               goto error_out;
+> +               goto error_alloc;
+>         }
+>         stat->freq_table = (unsigned int *)(stat->time_in_state + count);
+>
+> @@ -237,6 +237,8 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
+>         stat->last_index = freq_table_get_index(stat, policy->cur);
+>         spin_unlock(&cpufreq_stats_lock);
+>         return 0;
+> +error_alloc:
+> +       sysfs_remove_group(&policy->kobj, &stats_attr_group);
+>  error_out:
+>         kfree(stat);
+>         per_cpu(cpufreq_stats_table, cpu) = NULL;
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e254198..cc8868d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -756,6 +756,7 @@ config ARCH_S3C64XX
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_SAMSUNG_PWM
- 	select COMMON_CLK
-+	select COMMON_CLK_SAMSUNG
- 	select CPU_V6K
- 	select GENERIC_CLOCKEVENTS
- 	select GPIO_SAMSUNG
-@@ -835,6 +836,7 @@ config ARCH_EXYNOS
- 	select ARCH_SPARSEMEM_ENABLE
- 	select ARM_GIC
- 	select COMMON_CLK
-+	select COMMON_CLK_SAMSUNG
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_S3C2410_I2C if I2C
--- 
-1.7.9.5
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
