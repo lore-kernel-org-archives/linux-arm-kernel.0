@@ -1,59 +1,55 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 26 Feb 2014 09:56:24 -0600
-Subject: [PATCH v4 4/6] arm: add early_ioremap support
-In-Reply-To: <1393426760.26583.43.camel@deneb.redhat.com>
-References: <1392238575-10000-1-git-send-email-msalter@redhat.com>
- <1392238575-10000-5-git-send-email-msalter@redhat.com>
- <CAL_JsqLi=GhGy7dNf2BiAGd4EtzfqqYfbo0YhRhyhuwEp0w8HQ@mail.gmail.com>
- <1393426760.26583.43.camel@deneb.redhat.com>
-Message-ID: <CAL_JsqKy3ZFpS_vXGv+wxX60c3=heURamH+gN=zLW9oR2VOkBg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 26 Feb 2014 15:59:31 +0000
+Subject: [PATCH 03/18] arm64: boot protocol documentation update for GICv3
+In-Reply-To: <20140226153142.GA12882@mudshark.cambridge.arm.com>
+References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
+ <1391607050-540-4-git-send-email-marc.zyngier@arm.com>
+ <20140225180658.GH23136@mudshark.cambridge.arm.com>
+ <530DFC0C.3040704@arm.com>
+ <20140226153142.GA12882@mudshark.cambridge.arm.com>
+Message-ID: <530E0F63.3070007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 8:59 AM, Mark Salter <msalter@redhat.com> wrote:
-> On Tue, 2014-02-25 at 23:48 -0600, Rob Herring wrote:
->> > +#define NR_FIX_BTMAPS          32
->> > +#define FIX_BTMAPS_SLOTS       7
->> > +#define TOTAL_FIX_BTMAPS       (NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
->> > +#define FIX_BTMAP_END          FIX_KMAP_BEGIN
->> > +#define FIX_BTMAP_BEGIN                (FIX_BTMAP_END +
->> TOTAL_FIX_BTMAPS - 1)
+On 26/02/14 15:31, Will Deacon wrote:
+> On Wed, Feb 26, 2014 at 02:37:00PM +0000, Marc Zyngier wrote:
+>> On 25/02/14 18:06, Will Deacon wrote:
+>>> On Wed, Feb 05, 2014 at 01:30:35PM +0000, Marc Zyngier wrote:
+>>>> Linux has some requirements that must be satisfied in order to boot
+>>>> on a system built with a GICv3.
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  Documentation/arm64/booting.txt | 7 +++++++
+>>>>  1 file changed, 7 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+>>>> index a9691cc..4a02ebd 100644
+>>>> --- a/Documentation/arm64/booting.txt
+>>>> +++ b/Documentation/arm64/booting.txt
+>>>> @@ -131,6 +131,13 @@ Before jumping into the kernel, the following conditions must be met:
+>>>>    the kernel image will be entered must be initialised by software at a
+>>>>    higher exception level to prevent execution in an UNKNOWN state.
+>>>>  
+>>>> +  For systems with a GICv3 interrupt controller, it is expected that:
+>>>> +  - ID_AA64PFR0_EL1.GIC (bits [27:24]) must have the value 0b0001
+>>>
+>>> Since ID_AA64PFR0_EL1 is read-only at all exception levels, I don't see the
+>>> value of this statement.
 >>
->> Why the different logic from arm64? Specifically, it doesn't make
->> adding a permanent mapping simple.
->
-> I looked at adding support for permanent mappings but it was going to
-> take more time than I had. Also on ARM, we have to deal with kmap's
-> needs as well. Working that out was going to take more time than I
-> had. I think getting the patch in now to support early_ioremap is
-> the way to go. Adding support for permanent mappings can be done
-> later with the early console support for which it is needed.
+>> Think virtualization. A hypervisor can control reads of ID_AA64PFR0_EL1
+>> by setting HCR_EL2.TID3, and report whatever it wants.
+> 
+> Sure, but it seems unreasonable to me that we require a hypervisor to tell a
+> guest about GICv3 if the system happens to have one. What if it wants to
+> emulate a GICv2? In other words, requiring this in booting.txt seems
+> superflous.
 
-I'm not saying that you should add permanent mappings, but just align
-the definitions across arches more. So make arm look something like
-this:
+The hypervisor can perfectly mask out the GICv3 feature if it wants to.
+The point I'm trying to make here is that if a guest is expected to be
+able to use the GICv3 system registers, then ID_AA64PFR0_EL1 should
+report so.
 
-enum fixed_addresses {
-       __end_of_permanent_fixed_addresses,
-
-       /*
-        * Temporary boot-time mappings, used by early_ioremap(),
-        * before ioremap() is functional.
-        */
-#define NR_FIX_BTMAPS          32
-#define FIX_BTMAPS_SLOTS       7
-#define TOTAL_FIX_BTMAPS       (NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
-
-      FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
-       FIX_BTMAP_BEGIN = FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1,
-       __end_of_fixed_addresses
-       FIX_KMAP_BEGIN = FIX_BTMAP_END,
-       FIX_KMAP_END = FIX_BTMAP_BEGIN,
-};
-
-These could then go into the generic header:
-
-#define FIXADDR_SIZE   (__end_of_permanent_fixed_addresses << PAGE_SHIFT)
-#define FIXADDR_START  (FIXADDR_TOP - FIXADDR_SIZE)
-
-Rob
+	M.
+-- 
+Jazz is not dead. It just smells funny...
