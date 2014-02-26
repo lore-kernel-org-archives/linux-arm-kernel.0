@@ -1,83 +1,43 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 26 Feb 2014 15:43:31 -0800
-Subject: [PATCH] ARM: qcom: Enable basic support for Qualcomm platforms in
- multi_v7_defconfig
-References: <1393360445-16923-1-git-send-email-galak@codeaurora.org>
-Message-ID: <7hy50xv3rw.fsf@paris.lan>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Wed, 26 Feb 2014 17:59:59 -0600
+Subject: [PATCH v3 1/9] Input: pmic8xxx-pwrkey - Migrate to regmap APIs
+In-Reply-To: <1393441562-685-2-git-send-email-sboyd@codeaurora.org>
+References: <1393441562-685-1-git-send-email-sboyd@codeaurora.org>
+ <1393441562-685-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140226235959.GD18563@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kumar Gala <galak@codeaurora.org> writes:
-
-> Enable support for the MSM8x60, MSM8960, and MSM8974 SoCs, clocks and
-> serial console as part of the standard multi_v7_defconfig.
->
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+On Wed, Feb 26, 2014 at 11:05:54AM -0800, Stephen Boyd wrote:
+> Use the regmap APIs for this driver instead of custom pm8xxx
+> APIs. This breaks this driver's dependency on the pm8xxx APIs and
+> allows us to easily port it to other bus protocols in the future.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->
-> I leave this to the arm-soc guys to apply because of possible conflicts
-> with other updates to multi_v7_defconfig.
+>  drivers/input/misc/pmic8xxx-pwrkey.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
+> index 0e1a05f95858..cf6125dc3b51 100644
+> --- a/drivers/input/misc/pmic8xxx-pwrkey.c
+> +++ b/drivers/input/misc/pmic8xxx-pwrkey.c
+> @@ -120,6 +120,10 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	}
+>  
+> +	regmap = dev_get_regmap(pdev->dev.parent, NULL);
+> +	if (!regmap)
+> +		return -ENODEV;
+> +
 
-Seem to be a handful of !qcom changes here, probably resulting from a
-run of 'make savedefconfig' without all the new changes in.
+This looks really weird.  A previous version of patch was included in
+v3.14-rc1 (1e63bd9cc4), which already included a very similar hunk...
 
-I've thinned this out to only the qcom changes and applied the following
-to next/boards.  I think it's better to do any 'make savedefconfig'
-cleanups as a separate, cleanup-only patch as needed.
+Maybe the fact that the hunk isn't identical is why a rebase didn't drop
+it (and instead, now if this gets merged, we'll have unnecessary
+duplication).
 
-Kevin
-
-
->From 60476e4ad5a1369467ab8a061ae8ce601478646d Mon Sep 17 00:00:00 2001
-From: Kumar Gala <galak@codeaurora.org>
-Date: Tue, 25 Feb 2014 14:34:05 -0600
-Subject: [PATCH] ARM: qcom: Enable basic support for Qualcomm platforms in
- multi_v7_defconfig
-
-Enable support for the MSM8x60, MSM8960, and MSM8974 SoCs, clocks and
-serial console as part of the standard multi_v7_defconfig.
-
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
-[khilman: removed non-qcom changes]
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 56549f178fe3..64e850d4896c 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -33,6 +33,10 @@ CONFIG_SOC_OMAP5=y
- CONFIG_SOC_AM33XX=y
- CONFIG_SOC_DRA7XX=y
- CONFIG_SOC_AM43XX=y
-+CONFIG_ARCH_QCOM=y
-+CONFIG_ARCH_MSM8X60=y
-+CONFIG_ARCH_MSM8960=y
-+CONFIG_ARCH_MSM8974=y
- CONFIG_ARCH_ROCKCHIP=y
- CONFIG_ARCH_SOCFPGA=y
- CONFIG_PLAT_SPEAR=y
-@@ -148,6 +152,8 @@ CONFIG_SERIAL_SIRFSOC_CONSOLE=y
- CONFIG_SERIAL_TEGRA=y
- CONFIG_SERIAL_IMX=y
- CONFIG_SERIAL_IMX_CONSOLE=y
-+CONFIG_SERIAL_MSM=y
-+CONFIG_SERIAL_MSM_CONSOLE=y
- CONFIG_SERIAL_VT8500=y
- CONFIG_SERIAL_VT8500_CONSOLE=y
- CONFIG_SERIAL_OF_PLATFORM=y
-@@ -298,6 +304,10 @@ CONFIG_MFD_NVEC=y
- CONFIG_KEYBOARD_NVEC=y
- CONFIG_SERIO_NVEC_PS2=y
- CONFIG_NVEC_POWER=y
-+CONFIG_COMMON_CLK_QCOM=y
-+CONFIG_MSM_GCC_8660=y
-+CONFIG_MSM_MMCC_8960=y
-+CONFIG_MSM_MMCC_8974=y
- CONFIG_TEGRA_IOMMU_GART=y
- CONFIG_TEGRA_IOMMU_SMMU=y
- CONFIG_MEMORY=y
 -- 
-1.8.3
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
