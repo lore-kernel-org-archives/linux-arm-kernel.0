@@ -1,67 +1,37 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Wed, 26 Feb 2014 09:33:06 -0600
-Subject: [PATCH 1/3] clk: socfpga: Fix integer overflow in clock
- calculation
-In-Reply-To: <20140226083730.22529.8405@quantum>
-References: <1392844273-11918-1-git-send-email-dinguyen@altera.com>
- <20140226083730.22529.8405@quantum>
-Message-ID: <1393428786.5888.1.camel@b13cycling>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 27 Feb 2014 00:38:22 +0900
+Subject: [PATCH 1/3] Documentation:spi:fsl-dspi:add DSPI dma transfer
+ support
+In-Reply-To: <20140226141947.GE23892@S2101-09.ap.freescale.net>
+References: <1393311258-14380-1-git-send-email-b44548@freescale.com>
+ <20140225090830.GO28555@e106331-lin.cambridge.arm.com>
+ <20140226141947.GE23892@S2101-09.ap.freescale.net>
+Message-ID: <20140226153822.GC2394@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2014-02-26 at 00:37 -0800, Mike Turquette wrote:
-> Quoting dinguyen at altera.com (2014-02-19 13:11:10)
-> > From: Dinh Nguyen <dinguyen@altera.com>
-> > 
-> > Use 64-bit integer for calculating clock rate. Also use do_div for the
-> > 64-bit division.
-> > 
-> > Signed-off-by: Graham Moore <grmoore@altera.com>
-> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> 
-> Changes to the clk driver look good to me.
-> 
+On Wed, Feb 26, 2014 at 10:19:49PM +0800, Shawn Guo wrote:
+> On Tue, Feb 25, 2014 at 09:08:30AM +0000, Mark Rutland wrote:
 
-Can you apply the first 2 patches to your tree? I'll send the 3rd dts
-patch through the arm-soc tree.
+> > > +- use-dma: the bool decide if use dma method in DSPI transfering.
 
-Thanks alot...
-Dinh
-> Regards,
-> Mike
-> 
-> > ---
-> >  drivers/clk/socfpga/clk-pll.c |    8 +++++---
-> >  1 file changed, 5 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/clk/socfpga/clk-pll.c b/drivers/clk/socfpga/clk-pll.c
-> > index 362004e..834b6e9 100644
-> > --- a/drivers/clk/socfpga/clk-pll.c
-> > +++ b/drivers/clk/socfpga/clk-pll.c
-> > @@ -44,7 +44,8 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
-> >                                          unsigned long parent_rate)
-> >  {
-> >         struct socfpga_pll *socfpgaclk = to_socfpga_clk(hwclk);
-> > -       unsigned long divf, divq, vco_freq, reg;
-> > +       unsigned long divf, divq, reg;
-> > +       unsigned long long vco_freq;
-> >         unsigned long bypass;
-> >  
-> >         reg = readl(socfpgaclk->hw.reg);
-> > @@ -54,8 +55,9 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
-> >  
-> >         divf = (reg & SOCFPGA_PLL_DIVF_MASK) >> SOCFPGA_PLL_DIVF_SHIFT;
-> >         divq = (reg & SOCFPGA_PLL_DIVQ_MASK) >> SOCFPGA_PLL_DIVQ_SHIFT;
-> > -       vco_freq = parent_rate * (divf + 1);
-> > -       return vco_freq / (1 + divq);
-> > +       vco_freq = (unsigned long long)parent_rate * (divf + 1);
-> > +       do_div(vco_freq, (1 + divq));
-> > +       return (unsigned long)vco_freq;
-> >  }
-> >  
-> >  static struct clk_ops clk_pll_ops = {
-> > -- 
-> > 1.7.9.5
-> > 
+> > Why can the OS not decide this based on the presence of dmas which it
+> > can use?
+
+> Yes, OS/driver should decide to use DMA or not, but it shouldn't be
+> based on the presence of 'dmas' property.  The DMA is a hardware
+> resource just like IRQ.  It should be just there in client device's node
+> as long as the SoC design assigns the channel to the device.  The device
+> driver should make the decision when DMA should be used, e.g. big amount
+> data transfer, and when PIO should be used, e.g. small data.
+
+Right, that's very common - but that decision is usually taken on a per
+transfer basis so a DT property would seem odd, especially just a simple
+boolean.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140227/898f98b9/attachment.sig>
