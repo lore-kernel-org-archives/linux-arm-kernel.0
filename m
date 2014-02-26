@@ -1,87 +1,172 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 26 Feb 2014 10:30:39 -0800
-Subject: [PATCH] net: phy: add suspend_halted module param
-In-Reply-To: <20140226182117.GB14907@lunn.ch>
-References: <1393174719-20806-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140224191554.GC29288@lunn.ch> <530D1B7C.2090506@gmail.com>
- <20140226182117.GB14907@lunn.ch>
-Message-ID: <CAGVrzcYUfq84ryVET9qNJvyFCnhFdU4c0fOHbNN4eE8_w6qsAQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 26 Feb 2014 10:34:54 -0800
+Subject: [RFC] ARM VM System Sepcification
+Message-ID: <20140226183454.GA14639@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-02-26 10:21 GMT-08:00 Andrew Lunn <andrew@lunn.ch>:
-> On Tue, Feb 25, 2014 at 11:38:52PM +0100, Sebastian Hesselbarth wrote:
->> On 02/24/2014 08:15 PM, Andrew Lunn wrote:
->> >On Sun, Feb 23, 2014 at 05:58:39PM +0100, Sebastian Hesselbarth wrote:
->> >>commit 1211ce53077164e0d34641d0ca5fb4d4a7574498
->> >>   ("net: phy: resume/suspend PHYs on attach/detach")
->> >>introduced a feature to suspend PHYs when entering halted state.
->> >>
->> >>Unfortunately, not all bootloaders properly power-up PHYs on reset
->> >>and fail to access ethernet because the PHY is still powered down.
->> >>
->> >>Therefore, we add a boolean module parameter suspend_halted with
->> >>default value of true. Disabling that parameter prevents PHYs from
->> >>being suspended when entering halted state.
->> >
->> >Am i doing something silly here?
->> >
->> >root at qnap:/sys/module/libphy/parameters# cat suspend_halted
->> >Y
->> >root at qnap:/sys/module/libphy/parameters# echo N > suspend_halted
->> >root at qnap:/sys/module/libphy/parameters# cat suspend_halted
->> >N
->> >root at qnap:/sys/module/libphy/parameters# reboot
->>
->> Just to be sure, can you ifconfig up the interface before reboot?
->> The PHY could already be powered-down, if the interface is down.
->>
->> >...
->> >...
->> >
->> >Net:   egiga0 [PRIME]
->> >Hit any key to stop autoboot:  0
->> >Send Cmd : 0x68 to UART1
->> >egiga0 no link
->> >Using egiga0 device
->> >TFTP from server 10.0.0.1; our IP address is 10.0.0.2
->> >Filename 'uImage-qnap'.
->> >Load address: 0x800000
->> >Loading: T T
->> >
->> >Does not seem to work.
->>
->> I tested the patch on Topkick (w/ 88E1318S, 0x0141 0x0e90) which
->> bootloader is also affected.
->>
->> Both, libphy.suspend_halted=0 as kernel boot parameter and sysfs
->> procedure above successfully prevent the PHY from being powered
->> down. After reboot, u-boot tftpboot works as expected.
->
-> Hi Sebastian
->
-> I tested again, and it seems like i made an error. This patch does
-> actually fix the problem.
->
-> The u-boot on this device is somewhat broken, when it comes to
-> networking and tftpboot. It seems like if the auto negotiation is not
-> complete before the TFTP starts, it never works. There are no
-> retransmits of the RRQ message. If i ^C it and start again, it does
-> work.
+ARM VM System Specification
+===========================
 
-Sounds familiar, I saw that on other platforms as well, but never
-really found the time to get that fix.
+Goal
+----
+The goal of this spec is to allow suitably-built OS images to run on
+all ARM virtualization solutions, such as KVM or Xen.
 
->
-> As to the comment from davem about not using a kernel parameter. How
-> about turning it all around. Put a boolean parameter into DT PHY node
-> to indicate when it is safe to power down an idle phy?
+Recommendations in this spec are valid for aarch32 and aarch64 alike, and
+they aim to be hypervisor agnostic.
 
-Ah ah, nice try, but I do not think this belongs in DT, this is purely
-a software issue here, powering up/down the PHY itself works as
-expected.
+Note that simply adhering to the SBSA [2] is not a valid approach,
+for example because the SBSA mandates EL2, which will not be available
+for VMs.  Further, the SBSA mandates peripherals like the pl011, which
+may be controversial for some ARM VM implementations to support.
+This spec also covers the aarch32 execution mode, not covered in the
+SBSA.
 
-How about we have this knob a sysfs parameter? This should be easy
-enough to tweak at runtime and debug in case thing go wrong.
--- 
-Florian
+
+Image format
+------------
+The image format, as presented to the VM, needs to be well-defined in
+order for prepared disk images to be bootable across various
+virtualization implementations.
+
+The raw disk format as presented to the VM must be partitioned with a
+GUID Partition Table (GPT).  The bootable software must be placed in the
+EFI System Partition (ESP), using the UEFI removable media path, and
+must be an EFI application complying to the UEFI Specification 2.4
+Revision A [6].
+
+The ESP partition's GPT entry's partition type GUID must be
+C12A7328-F81F-11D2-BA4B-00A0C93EC93B and the file system must be
+formatted as FAT32/vfat as per Section 12.3.1.1 in [6].
+
+The removable media path is \EFI\BOOT\BOOTARM.EFI for the aarch32
+execution state and is \EFI\BOOT\BOOTAA64.EFI for the aarch64 execution
+state.
+
+This ensures that tools for both Xen and KVM can load a binary UEFI
+firmware which can read and boot the EFI application in the disk image.
+
+A typical scenario will be GRUB2 packaged as an EFI application, which
+mounts the system boot partition and boots Linux.
+
+
+Virtual Firmware
+----------------
+The VM system must be able to boot the EFI application in the ESP.  It
+is recommended that this is achieved by loading a UEFI binary as the
+first software executed by the VM, which then executes the EFI
+application.  The UEFI implementation should be compliant with UEFI
+Specification 2.4 Revision A [6] or later.
+
+This document strongly recommends that the VM implementation supports
+persistent environment storage for virtual firmware implementation in
+order to ensure probable use cases such as adding additional disk images
+to a VM or running installers to perform upgrades.
+
+The binary UEFI firmware implementation should not be distributed as
+part of the VM image, but is specific to the VM implementation.
+
+
+Hardware Description
+--------------------
+The Linux kernel's proper entry point always takes a pointer to an FDT,
+regardless of the boot mechanism, firmware, and hardware description
+method.  Even on real hardware which only supports ACPI and UEFI, the kernel
+entry point will still receive a pointer to a simple FDT, generated by
+the Linux kernel UEFI stub, containing a pointer to the UEFI system
+table.  The kernel can then discover ACPI from the system tables.  The
+presence of ACPI vs. FDT is therefore always itself discoverable,
+through the FDT.
+
+Therefore, the VM implementation must provide through its UEFI
+implementation, either:
+
+  a complete FDT which describes the entire VM system and will boot
+  mainline kernels driven by device tree alone, or
+
+  no FDT.  In this case, the VM implementation must provide ACPI, and
+  the OS must be able to locate the ACPI root pointer through the UEFI
+  system table.
+
+For more information about the arm and arm64 boot conventions, see
+Documentation/arm/Booting and Documentation/arm64/booting.txt in the
+Linux kernel source tree.
+
+For more information about UEFI and ACPI booting, see [4] and [5].
+
+
+VM Platform
+-----------
+The specification does not mandate any specific memory map.  The guest
+OS must be able to enumerate all processing elements, devices, and
+memory through HW description data (FDT, ACPI) or a bus-specific
+mechanism such as PCI.
+
+The virtual platform must support at least one of the following ARM
+execution states:
+  (1) aarch32 virtual CPUs on aarch32 physical CPUs
+  (2) aarch32 virtual CPUs on aarch64 physical CPUs
+  (3) aarch64 virtual CPUs on aarch64 physical CPUs
+
+It is recommended to support both (2) and (3) on aarch64 capable
+physical systems.
+
+The virtual hardware platform must provide a number of mandatory
+peripherals:
+
+  Serial console:  The platform should provide a console,
+  based on an emulated pl011, a virtio-console, or a Xen PV console.
+
+  An ARM Generic Interrupt Controller v2 (GICv2) [3] or newer.  GICv2
+  limits the the number of virtual CPUs to 8 cores, newer GIC versions
+  removes this limitation.
+
+  The ARM virtual timer and counter should be available to the VM as
+  per the ARM Generic Timers specification in the ARM ARM [1].
+
+  A hotpluggable bus to support hotplug of at least block and network
+  devices.  Suitable buses include a virtual PCIe bus and the Xen PV
+  bus.
+
+
+We make the following recommendations for the guest OS kernel:
+
+  The guest OS must include support for GICv2 and any available newer
+  version of the GIC architecture to maintain compatibility with older
+  VM implementations.
+
+  It is strongly recommended to include support for all available
+  (block, network, console, balloon) virtio-pci, virtio-mmio, and Xen PV
+  drivers in the guest OS kernel or initial ramdisk.
+
+
+Other common peripherals for block devices, networking, and more can
+(and typically will) be provided, but OS software written and compiled
+to run on ARM VMs cannot make any assumptions about which variations
+of these should exist or which implementation they use (e.g. VirtIO or
+Xen PV).  See "Hardware Description" above.
+
+Note that this platform specification is separate from the Linux kernel
+concept of mach-virt, which merely specifies a machine model driven
+purely from device tree, but does not mandate any peripherals or have any
+mention of ACPI.
+
+
+References
+----------
+[1]: The ARM Architecture Reference Manual, ARMv8, Issue A.b
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0487a.b/index.html
+
+[2]: ARM Server Base System Architecture
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0029/index.html
+
+[3]: The ARM Generic Interrupt Controller Architecture Specifications v2.0
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0487a.b/index.html
+
+[4]: http://www.secretlab.ca/archives/27
+
+[5]: https://git.linaro.org/people/leif.lindholm/linux.git/blob/refs/heads/uefi-for-upstream:/Documentation/arm/uefi.txt
+
+[6]: UEFI Specification 2.4 Revision A
+http://www.uefi.org/sites/default/files/resources/2_4_Errata_A.pdf
