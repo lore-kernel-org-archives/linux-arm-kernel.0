@@ -1,63 +1,44 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 26 Feb 2014 11:44:48 +0900
-Subject: [PATCH] clk: samsung: remove parentheses from return statements
-Message-ID: <1393382688-5429-1-git-send-email-pankaj.dubey@samsung.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 25 Feb 2014 19:38:34 -0800
+Subject: [PATCH 2/3] cpufreq: stats: Fix error handling in
+ __cpufreq_stats_create_table()
+In-Reply-To: <1789244.B5CzWbcp6h@vostro.rjw.lan>
+References: <1789244.B5CzWbcp6h@vostro.rjw.lan>
+Message-ID: <1393385915-19138-2-git-send-email-skannan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fixed following checkpatch warning message
-"return is not a function, parentheses are not required"
+Remove sysfs group if __cpufreq_stats_create_table() fails after creating
+one.
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Change-Id: Icb0b44424cc4eb6c88be255e2839ef51c3f8779c
+Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
 ---
- drivers/clk/samsung/clk-pll.c |   14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/cpufreq/cpufreq_stats.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
-index 7fb0a28..32b483f 100644
---- a/drivers/clk/samsung/clk-pll.c
-+++ b/drivers/clk/samsung/clk-pll.c
-@@ -166,7 +166,7 @@ static inline bool samsung_pll35xx_mp_change(
- 	old_mdiv = (pll_con >> PLL35XX_MDIV_SHIFT) & PLL35XX_MDIV_MASK;
- 	old_pdiv = (pll_con >> PLL35XX_PDIV_SHIFT) & PLL35XX_PDIV_MASK;
+diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
+index e4bd27f..c52b440 100644
+--- a/drivers/cpufreq/cpufreq_stats.c
++++ b/drivers/cpufreq/cpufreq_stats.c
+@@ -216,7 +216,7 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
+ 	stat->time_in_state = kzalloc(alloc_size, GFP_KERNEL);
+ 	if (!stat->time_in_state) {
+ 		ret = -ENOMEM;
+-		goto error_out;
++		goto error_alloc;
+ 	}
+ 	stat->freq_table = (unsigned int *)(stat->time_in_state + count);
  
--	return (rate->mdiv != old_mdiv || rate->pdiv != old_pdiv);
-+	return rate->mdiv != old_mdiv || rate->pdiv != old_pdiv;
- }
- 
- static int samsung_pll35xx_set_rate(struct clk_hw *hw, unsigned long drate,
-@@ -274,8 +274,8 @@ static inline bool samsung_pll36xx_mpk_change(
- 	old_pdiv = (pll_con0 >> PLL36XX_PDIV_SHIFT) & PLL36XX_PDIV_MASK;
- 	old_kdiv = (pll_con1 >> PLL36XX_KDIV_SHIFT) & PLL36XX_KDIV_MASK;
- 
--	return (rate->mdiv != old_mdiv || rate->pdiv != old_pdiv ||
--		rate->kdiv != old_kdiv);
-+	return rate->mdiv != old_mdiv || rate->pdiv != old_pdiv ||
-+		rate->kdiv != old_kdiv;
- }
- 
- static int samsung_pll36xx_set_rate(struct clk_hw *hw, unsigned long drate,
-@@ -387,8 +387,8 @@ static bool samsung_pll45xx_mp_change(u32 pll_con0, u32 pll_con1,
- 	old_pdiv = (pll_con0 >> PLL45XX_PDIV_SHIFT) & PLL45XX_PDIV_MASK;
- 	old_afc = (pll_con1 >> PLL45XX_AFC_SHIFT) & PLL45XX_AFC_MASK;
- 
--	return (old_mdiv != rate->mdiv || old_pdiv != rate->pdiv
--		|| old_afc != rate->afc);
-+	return old_mdiv != rate->mdiv || old_pdiv != rate->pdiv
-+		|| old_afc != rate->afc;
- }
- 
- static int samsung_pll45xx_set_rate(struct clk_hw *hw, unsigned long drate,
-@@ -534,8 +534,8 @@ static bool samsung_pll46xx_mpk_change(u32 pll_con0, u32 pll_con1,
- 	old_pdiv = (pll_con0 >> PLL46XX_PDIV_SHIFT) & PLL46XX_PDIV_MASK;
- 	old_kdiv = (pll_con1 >> PLL46XX_KDIV_SHIFT) & PLL46XX_KDIV_MASK;
- 
--	return (old_mdiv != rate->mdiv || old_pdiv != rate->pdiv
--		|| old_kdiv != rate->kdiv);
-+	return old_mdiv != rate->mdiv || old_pdiv != rate->pdiv
-+		|| old_kdiv != rate->kdiv;
- }
- 
- static int samsung_pll46xx_set_rate(struct clk_hw *hw, unsigned long drate,
+@@ -237,6 +237,8 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
+ 	stat->last_index = freq_table_get_index(stat, policy->cur);
+ 	spin_unlock(&cpufreq_stats_lock);
+ 	return 0;
++error_alloc:
++	sysfs_remove_group(&policy->kobj, &stats_attr_group);
+ error_out:
+ 	kfree(stat);
+ 	per_cpu(cpufreq_stats_table, cpu) = NULL;
 -- 
-1.7.9.5
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
