@@ -1,51 +1,70 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 26 Feb 2014 16:49:01 -0600
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <5553754.0b4gMg5OS7@wuerfel>
-References: <20140226183454.GA14639@cbox>
-	<5553754.0b4gMg5OS7@wuerfel>
-Message-ID: <CAL_Jsq+3jBdca9zVnxHG+7pxy2_316emsP=PB3WkTMQP0JYBYQ@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 26 Feb 2014 15:00:42 -0800
+Subject: [PATCH V2 1/8] PM / Runtime: Fetch runtime PM callbacks using a
+ macro
+In-Reply-To: <1393237368-15500-1-git-send-email-ulf.hansson@linaro.org> (Ulf
+ Hansson's message of "Mon, 24 Feb 2014 11:22:48 +0100")
+References: <1393237368-15500-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <7hk3chwkbp.fsf@paris.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 1:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 26 February 2014 10:34:54 Christoffer Dall wrote:
->> ARM VM System Specification
->> ===========================
->>
->> Goal
->> ----
->> The goal of this spec is to allow suitably-built OS images to run on
->> all ARM virtualization solutions, such as KVM or Xen.
->>
->> Recommendations in this spec are valid for aarch32 and aarch64 alike, and
->> they aim to be hypervisor agnostic.
->>
->> Note that simply adhering to the SBSA [2] is not a valid approach,
->> for example because the SBSA mandates EL2, which will not be available
->> for VMs.  Further, the SBSA mandates peripherals like the pl011, which
->> may be controversial for some ARM VM implementations to support.
->> This spec also covers the aarch32 execution mode, not covered in the
->> SBSA.
+Ulf Hansson <ulf.hansson@linaro.org> writes:
+
+> While fetching the proper runtime PM callback, we walk the hierarchy of
+> device's power domains, subsystems and drivers.
 >
-> I would prefer if we can stay as close as possible to SBSA for individual
-> hardware components, and only stray from it when there is a strong reason.
-> pl011-subset doesn't sound like a significant problem to implement,
-> especially as SBSA makes the DMA part of that optional. Can you
-> elaborate on what hypervisor would have a problem with that?
+> This is common for rpm_suspend(), rpm_idle() and rpm_resume(). Let's
+> clean up the code by using a macro that handles this.
+>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>
+> Changes in v2:
+> 	Updated the macro to return a callback instead.
+> 	Suggested by Josh Cartwright.
+>
+> ---
+>  drivers/base/power/runtime.c |   63 ++++++++++++++++--------------------------
+>  1 file changed, 24 insertions(+), 39 deletions(-)
+>
+> diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+> index 72e00e6..cc7d1ed 100644
+> --- a/drivers/base/power/runtime.c
+> +++ b/drivers/base/power/runtime.c
+> @@ -13,6 +13,27 @@
+>  #include <trace/events/rpm.h>
+>  #include "power.h"
+>  
+> +#define RPM_GET_CALLBACK(dev, cb)				\
+> +({								\
+> +	int (*__rpm_cb)(struct device *__d);			\
+> +								\
+> +	if (dev->pm_domain)					\
+> +		__rpm_cb = dev->pm_domain->ops.cb;		\
+> +	else if (dev->type && dev->type->pm)			\
+> +		__rpm_cb = dev->type->pm->cb;			\
+> +	else if (dev->class && dev->class->pm)			\
+> +		__rpm_cb = dev->class->pm->cb;			\
+> +	else if (dev->bus && dev->bus->pm)			\
+> +		__rpm_cb = dev->bus->pm->cb;			\
+> +	else							\
+> +		__rpm_cb = NULL;				\
+> +								\
+> +	if (!__rpm_cb && dev->driver && dev->driver->pm)	\
+> +		__rpm_cb = dev->driver->pm->cb;			\
+> +								\
+> +	__rpm_cb;						\
+> +})
 
-The SBSA only spec's a very minimal pl011 subset which is only
-suitable for early serial output. Not only is there no DMA, but there
-are no interrupts and maybe no input. I think it also assumes the uart
-is enabled and configured already by firmware. It is all somewhat
-pointless because the location is still not known or discoverable by
-early code. Just mandating a real pl011 would have been better, but I
-guess uart IP is value add for some. There is a downside to the pl011
-which is the tty name is different from x86 uarts which gets exposed
-to users and things like libvirt.
+So the main question from v1 remains: why use a macro, and not a function?
 
-I think the VM image just has to support pl011, virtio-console, and
-xen console. Arguably, an 8250 should also be included in interest of
-making things just work.
-
-Rob
+Kevin
