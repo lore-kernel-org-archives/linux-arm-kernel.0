@@ -1,88 +1,32 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 26 Feb 2014 11:27:18 +0100
-Subject: [PATCH v2 2/2] PCI: imx6: add support for MSI
-In-Reply-To: <1393410438-28205-1-git-send-email-l.stach@pengutronix.de>
-References: <1393410438-28205-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1393410438-28205-2-git-send-email-l.stach@pengutronix.de>
+Date: Wed, 26 Feb 2014 11:27:17 +0100
+Subject: [PATCH v2 1/2] ARM: dts: imx6: adjust the interrupt list in order to
+ support MSI
+Message-ID: <1393410438-28205-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Juergen Beisert <jbe@pengutronix.de>
 
-This patch adds support for Message Signaled Interrupt in the
-imx6q-pcie driver. It is done in a similar way as for the Exynos
-PCIe driver (commit f342d940ee0e3a2b5197fd4fbade1cb6bbc960b7),
-which is also using the Synopsys designware PCIe IP core.
-
-Signed-off-by: Harro Haan <hrhaan@gmail.com>
 Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
-v2: fix typo MCI->MSI
----
- drivers/pci/host/pci-imx6.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm/boot/dts/imx6qdl.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index ee082509b0ba..344a72184307 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -25,6 +25,7 @@
- #include <linux/resource.h>
- #include <linux/signal.h>
- #include <linux/types.h>
-+#include <linux/interrupt.h>
- 
- #include "pcie-designware.h"
- 
-@@ -329,6 +330,17 @@ static int imx6_pcie_wait_for_link(struct pcie_port *pp)
- 	return 0;
- }
- 
-+/* legacy IRQD/MSI interrupt */
-+static irqreturn_t imx6_pcie_irqd_msi_handler(int irq, void *arg)
-+{
-+	struct pcie_port *pp = arg;
-+
-+	if (IS_ENABLED(CONFIG_PCI_MSI))
-+		dw_handle_msi_irq(pp);
-+
-+	return IRQ_HANDLED;
-+}
-+
- static int imx6_pcie_start_link(struct pcie_port *pp)
- {
- 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
-@@ -403,6 +415,9 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
- 	dw_pcie_setup_rc(pp);
- 
- 	imx6_pcie_start_link(pp);
-+
-+	if (IS_ENABLED(CONFIG_PCI_MSI))
-+		dw_pcie_msi_init(pp);
- }
- 
- static void imx6_pcie_reset_phy(struct pcie_port *pp)
-@@ -498,6 +513,20 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
- 		return -ENODEV;
- 	}
- 
-+	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-+		pp->msi_irq = platform_get_irq(pdev, 3);
-+		if (!pp->msi_irq) {
-+			dev_err(&pdev->dev, "failed to get INTD/MSI\n");
-+			return -ENODEV;
-+		}
-+
-+		ret = devm_request_irq(&pdev->dev, pp->msi_irq,
-+					imx6_pcie_irqd_msi_handler,
-+					IRQF_SHARED, "mx6-pcie-msi", pp);
-+		if (ret)
-+			dev_err(&pdev->dev, "failed to request INTD/MSI irq\n");
-+	}
-+
- 	pp->root_bus_nr = -1;
- 	pp->ops = &imx6_pcie_host_ops;
- 
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index fb28b2ecb1db..aeccbb114fc5 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -126,7 +126,8 @@
+ 				  0x81000000 0 0          0x01f80000 0 0x00010000 /* downstream I/O */
+ 				  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
+ 			num-lanes = <1>;
+-			interrupts = <0 123 0x04>;
++			/*               inta          intb         intc         intd/msi */
++			interrupts = <0 123 0x04>, <0 122 0x04>, <0 121 0x04>, <0 120 0x04>;
+ 			clocks = <&clks 189>, <&clks 187>, <&clks 206>, <&clks 144>;
+ 			clock-names = "pcie_ref_125m", "sata_ref_100m", "lvds_gate", "pcie_axi";
+ 			status = "disabled";
 -- 
 1.8.5.3
