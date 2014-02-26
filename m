@@ -1,51 +1,59 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 26 Feb 2014 17:02:03 +0100
-Subject: [PATCH 00/15] ASoC: fsl-ssi: Driver cleanup
-Message-ID: <1393430538-32333-1-git-send-email-mpa@pengutronix.de>
+Date: Wed, 26 Feb 2014 17:02:10 +0100
+Subject: [PATCH 07/15] ASoC: fsl-ssi: baud clock error handling
+In-Reply-To: <1393430538-32333-1-git-send-email-mpa@pengutronix.de>
+References: <1393430538-32333-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1393430538-32333-8-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds error handling for baud clock. It checks for PROBE_DEFER
+error codes and handles clk_prepare_enable() errors.
 
-Here is a series of cleanups for the fsl-ssi driver.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ sound/soc/fsl/fsl_ssi.c | 21 +++++++++++++++++----
+ 1 file changed, 17 insertions(+), 4 deletions(-)
 
-It would be great if someone with PPC hardware and this fsl-ssi unit could
-please test this series. I am not sure if the regmap patch works as expected on
-PPC as well.
-
-I tested this series on imx53 quick starter board and a custom board. Both with
-SSI as I2S slave.
-
-Regards,
-
-Markus
-
-
-Markus Pargmann (15):
-  ASoC: fsl-ssi: Use regmap
-  ASoC: fsl-ssi: Remove fsl_ssi_setup
-  ASoC: fsl-ssi: Move debugging to seperate file
-  ASoC: fsl-ssi: Use dev_name for DAI driver struct
-  ASoC: fsl-ssi: Move imx-specific probe to seperate function
-  ASoC: fsl-ssi: Remove useless DMA code
-  ASoC: fsl-ssi: baud clock error handling
-  ASoC: fsl-ssi: Cleanup probe function
-  ASoC: fsl-ssi: Remove unnecessary variables from ssi_private
-  ASoC: fsl-ssi: reorder and document fsl_ssi_private
-  ASoC: fsl-ssi: Fix register values when disabling
-  ASoC: fsl-ssi: Only enable baudclk when used
-  ASoC: fsl-ssi: Set default dai-fmts
-  ASoC: fsl-ssi: Transmit enable synchronization
-  ASoC: fsl-ssi: Update binding documentation
-
- .../devicetree/bindings/sound/fsl,ssi.txt          |   21 +-
- sound/soc/fsl/Kconfig                              |    1 +
- sound/soc/fsl/Makefile                             |    2 +
- sound/soc/fsl/fsl_ssi.c                            | 1167 ++++++++------------
- sound/soc/fsl/fsl_ssi.h                            |  112 +-
- sound/soc/fsl/fsl_ssi_dbg.c                        |  163 +++
- 6 files changed, 750 insertions(+), 716 deletions(-)
- create mode 100644 sound/soc/fsl/fsl_ssi_dbg.c
-
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 43d4342..64d188f 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -995,11 +995,19 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
+ 	 * and, instead, abandon MASTER mode that needs baud clock.
+ 	 */
+ 	ssi_private->baudclk = devm_clk_get(&pdev->dev, "baud");
+-	if (IS_ERR(ssi_private->baudclk))
++	if (IS_ERR(ssi_private->baudclk)) {
++		ret = PTR_ERR(ssi_private->baudclk);
++		if (ret == -EPROBE_DEFER)
++			goto error_baud_clk;
+ 		dev_dbg(&pdev->dev, "could not get baud clock: %ld\n",
+-			 PTR_ERR(ssi_private->baudclk));
+-	else
+-		clk_prepare_enable(ssi_private->baudclk);
++				PTR_ERR(ssi_private->baudclk));
++	} else {
++		ret = clk_prepare_enable(ssi_private->baudclk);
++		if (ret) {
++			dev_err(&pdev->dev, "Failed to enable baud clock\n");
++			goto error_baud_clk;
++		}
++	}
+ 
+ 	/*
+ 	 * We have burstsize be "fifo_depth - 2" to match the SSI
+@@ -1021,6 +1029,11 @@ static int fsl_ssi_imx_probe(struct platform_device *pdev,
+ 	}
+ 
+ 	return 0;
++
++error_baud_clk:
++	clk_disable_unprepare(ssi_private->clk);
++
++	return ret;
+ }
+ 
+ static void fsl_ssi_imx_clean(struct platform_device *pdev,
 -- 
 1.8.5.3
