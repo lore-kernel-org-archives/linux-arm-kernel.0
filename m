@@ -1,76 +1,19 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 26 Feb 2014 12:24:15 -0800
-Subject: [PATCH 1/3] clk: socfpga: Fix integer overflow in clock
- calculation
-In-Reply-To: <1393428786.5888.1.camel@b13cycling>
-References: <1392844273-11918-1-git-send-email-dinguyen@altera.com>
- <20140226083730.22529.8405@quantum> <1393428786.5888.1.camel@b13cycling>
-Message-ID: <20140226202415.4353.59197@quantum>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Wed, 26 Feb 2014 15:32:44 -0500 (EST)
+Subject: [PATCH] arm/arm64: KVM: detect CPU reset on CPU_PM_EXIT
+In-Reply-To: <1393440456-2177-1-git-send-email-marc.zyngier@arm.com>
+References: <1393440456-2177-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <384850181.10216654.1393446764894.JavaMail.zimbra@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Dinh Nguyen (2014-02-26 07:33:06)
-> On Wed, 2014-02-26 at 00:37 -0800, Mike Turquette wrote:
-> > Quoting dinguyen at altera.com (2014-02-19 13:11:10)
-> > > From: Dinh Nguyen <dinguyen@altera.com>
-> > > 
-> > > Use 64-bit integer for calculating clock rate. Also use do_div for the
-> > > 64-bit division.
-> > > 
-> > > Signed-off-by: Graham Moore <grmoore@altera.com>
-> > > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > > Cc: Mike Turquette <mturquette@linaro.org>
-> > > Cc: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > 
-> > Changes to the clk driver look good to me.
-> > 
+> Paulo, Gleb,
 > 
-> Can you apply the first 2 patches to your tree? I'll send the 3rd dts
-> patch through the arm-soc tree.
+> Can you please queue this as a fix for 3.14?
+> 
+> It fixes an issue that has been introduced during the merge window,
+> and it would be good to have it plugged quickly.
 
-Done!
+Ok, I plan to send a pull request on Friday (it should make it in -rc5).
 
-Regards,
-Mike
-
-> 
-> Thanks alot...
-> Dinh
-> > Regards,
-> > Mike
-> > 
-> > > ---
-> > >  drivers/clk/socfpga/clk-pll.c |    8 +++++---
-> > >  1 file changed, 5 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/drivers/clk/socfpga/clk-pll.c b/drivers/clk/socfpga/clk-pll.c
-> > > index 362004e..834b6e9 100644
-> > > --- a/drivers/clk/socfpga/clk-pll.c
-> > > +++ b/drivers/clk/socfpga/clk-pll.c
-> > > @@ -44,7 +44,8 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
-> > >                                          unsigned long parent_rate)
-> > >  {
-> > >         struct socfpga_pll *socfpgaclk = to_socfpga_clk(hwclk);
-> > > -       unsigned long divf, divq, vco_freq, reg;
-> > > +       unsigned long divf, divq, reg;
-> > > +       unsigned long long vco_freq;
-> > >         unsigned long bypass;
-> > >  
-> > >         reg = readl(socfpgaclk->hw.reg);
-> > > @@ -54,8 +55,9 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hwclk,
-> > >  
-> > >         divf = (reg & SOCFPGA_PLL_DIVF_MASK) >> SOCFPGA_PLL_DIVF_SHIFT;
-> > >         divq = (reg & SOCFPGA_PLL_DIVQ_MASK) >> SOCFPGA_PLL_DIVQ_SHIFT;
-> > > -       vco_freq = parent_rate * (divf + 1);
-> > > -       return vco_freq / (1 + divq);
-> > > +       vco_freq = (unsigned long long)parent_rate * (divf + 1);
-> > > +       do_div(vco_freq, (1 + divq));
-> > > +       return (unsigned long)vco_freq;
-> > >  }
-> > >  
-> > >  static struct clk_ops clk_pll_ops = {
-> > > -- 
-> > > 1.7.9.5
-> > > 
-> 
-> 
+Paolo
