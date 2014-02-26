@@ -1,94 +1,34 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 26 Feb 2014 18:00:02 +0100
-Subject: [PATCH] ARM: at91: sama5d3: get rid of atmel_tsadcc driver
-In-Reply-To: <1393432190-8799-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1393432190-8799-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20140226170002.GA20517@piout.net>
+Date: Wed, 26 Feb 2014 18:01:10 +0100
+Subject: [PATCH 3/7] ARM: at91/dt: at91-ariag25: remove useless adc properties
+In-Reply-To: <1393434074-15600-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1393434074-15600-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1393434074-15600-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/02/2014 at 17:29:50 +0100, Ludovic Desroches wrote :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> Touchscreen support for at91_adc has been introduced so we can get rid of
-> atmel_tsadcc.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Remove the properties that are not used anymore by the at91_adc driver.
 
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Also, stop using unit-addresses for the triggers as suggested by Mark
+Rutland in
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/234184.html
 
-> ---
->  arch/arm/boot/dts/sama5d3.dtsi    |   14 +-------------
->  arch/arm/boot/dts/sama5d3xdm.dtsi |    7 +++----
->  2 files changed, 4 insertions(+), 17 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index 3d5faf8..26d7ed5 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -239,7 +239,7 @@
->  			};
->  
->  			adc0: adc at f8018000 {
-> -				compatible = "atmel,at91sam9260-adc";
-> +				compatible = "atmel,at91sam9x5-adc";
->  				reg = <0xf8018000 0x100>;
->  				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
->  				pinctrl-names = "default";
-> @@ -295,18 +295,6 @@
->  				};
->  			};
->  
-> -			tsadcc: tsadcc at f8018000 {
-> -				compatible = "atmel,at91sam9x5-tsadcc";
-> -				reg = <0xf8018000 0x4000>;
-> -				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
-> -				atmel,tsadcc_clock = <300000>;
-> -				atmel,filtering_average = <0x03>;
-> -				atmel,pendet_debounce = <0x08>;
-> -				atmel,pendet_sensitivity = <0x02>;
-> -				atmel,ts_sample_hold_time = <0x0a>;
-> -				status = "disabled";
-> -			};
-> -
->  			i2c2: i2c at f801c000 {
->  				compatible = "atmel,at91sam9x5-i2c";
->  				reg = <0xf801c000 0x4000>;
-> diff --git a/arch/arm/boot/dts/sama5d3xdm.dtsi b/arch/arm/boot/dts/sama5d3xdm.dtsi
-> index f9bdde5..0b8f5d1 100644
-> --- a/arch/arm/boot/dts/sama5d3xdm.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3xdm.dtsi
-> @@ -23,10 +23,9 @@
->  			};
->  
->  			adc0: adc at f8018000 {
-> -				status = "disabled";
-> -			};
-> -
-> -			tsadcc: tsadcc at f8018000 {
-> +				atmel,adc-clock-rate = <1000000>;
-> +				atmel,adc-ts-wires = <4>;
-> +				atmel,adc-ts-pressure-threshold = <10000>;
->  				status = "okay";
->  			};
->  
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91-ariag25.dts | 1 -
+ 1 file changed, 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/at91-ariag25.dts b/arch/arm/boot/dts/at91-ariag25.dts
+index cce45f5177f9..55ab6180e350 100644
+--- a/arch/arm/boot/dts/at91-ariag25.dts
++++ b/arch/arm/boot/dts/at91-ariag25.dts
+@@ -129,7 +129,6 @@
+ 			adc0: adc at f804c000 {
+ 				status = "okay";
+ 				atmel,adc-channels-used = <0xf>;
+-				atmel,adc-num-channels = <4>;
+ 			};
+ 
+ 			dbgu: serial at fffff200 {
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140226/0d60c1dc/attachment.sig>
+1.8.3.2
