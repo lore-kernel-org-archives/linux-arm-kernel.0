@@ -1,88 +1,117 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Feb 2014 16:33:31 +0900
-Subject: [PATCH v3 15/20] ARM: shmobile: marzen-reference: Instantiate clkdevs
- for SCIF and TMU
+Date: Wed, 26 Feb 2014 16:33:29 +0900
+Subject: [PATCH v3 13/20] ARM: shmobile: r8a7779: Initial multiplatform support
 In-Reply-To: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
 References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1393400016-23433-16-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1393400016-23433-14-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the common clock framework is supported, the clock lookup
-entries in clock-r8a7779.c are not registered anymore. Devices must
-instead reference their clocks in the device tree. However, SCIF and CMT
-devices are still instantiated through platform code, and thus need a
-clock lookup entry.
+Add Marzen and r8a7779 to CONFIG_SHMOBILE_MULTI. At this
+point CCF is not yet supported so you cannot run this code
+yet. For CCF support to happen several different components
+are needed, and this is one simple portion that moves us
+forward. Other patches need to build on top of this one.
 
-Retrieve the SCIF and CMT clock entries by name and register clkdevs for
-the corresponding devices. This will be removed when the SCIF and CMT
-devices will be instantiated from the device tree.
+Marzen board support exists in 3 flavours:
+1) SHMOBILE_MULTI, MACH_MARZEN - board-marzen-reference.c (CCF + DT)
+2) SHMOBILE, MACH_MARZEN_REFERENCE - board-marzen-reference.c (DT)
+3) SHMOBILE, MACH_MARZEN - board-marzen.c (legacy C code)
 
-Based on work for the Koelsch board by Laurent Pinchart.
+When CCF is done then 2) will be removed. When 1) includes same features
+as 3) then 3) will be removed.
 
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Based on work for the Koelsch and r8a7791 by Magnus Damm.
+
+Cc: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 ---
 v3
-* Initialise TMU clocks instead of CMT clocks
-  - It is TMU that Marzen uses as a clocksource
-* Refactor clock initialisation hack as per more recent mainline
-  code for Koelsch
-* Use IS_ERR to check the return value of clk_get()
+* Select RENESAS_INTC_IRQPIN
 ---
- arch/arm/mach-shmobile/board-marzen-reference.c | 31 ++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile                      | 3 ++-
+ arch/arm/mach-shmobile/Kconfig                  | 9 +++++++++
+ arch/arm/mach-shmobile/Makefile                 | 1 +
+ arch/arm/mach-shmobile/board-marzen-reference.c | 5 +++++
+ 4 files changed, 17 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 0320303..cac7179 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -263,7 +263,8 @@ dtb-$(CONFIG_ARCH_SHMOBILE_LEGACY) += emev2-kzm9d.dtb \
+ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += emev2-kzm9d.dtb \
+ 	r7s72100-genmai-reference.dtb \
+ 	r8a7791-koelsch.dtb \
+-	r8a7790-lager.dtb
++	r8a7790-lager.dtb \
++	r8a7779-marzen-reference.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += socfpga_arria5_socdk.dtb \
+ 	socfpga_cyclone5_socdk.dtb \
+ 	socfpga_cyclone5_sockit.dtb \
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index d27bff3..8ba4172 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -23,6 +23,10 @@ if ARCH_SHMOBILE_MULTI
+ 
+ comment "Renesas ARM SoCs System Type"
+ 
++config ARCH_R8A7779
++	bool "R-Car H1 (R8A77790)"
++	select RENESAS_INTC_IRQPIN
++
+ config ARCH_EMEV2
+ 	bool "Emma Mobile EV2"
+ 
+@@ -53,6 +57,11 @@ config MACH_LAGER
+ 	depends on ARCH_R8A7790
+ 	select MICREL_PHY if SH_ETH
+ 
++config MACH_MARZEN
++	bool "MARZEN board"
++	depends on ARCH_R8A7779
++	select REGULATOR_FIXED_VOLTAGE if REGULATOR
++
+ comment "Renesas ARM SoCs System Configuration"
+ endif
+ 
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 4caffc9..b02dac5 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -60,6 +60,7 @@ ifdef CONFIG_ARCH_SHMOBILE_MULTI
+ obj-$(CONFIG_MACH_GENMAI)	+= board-genmai-reference.o
+ obj-$(CONFIG_MACH_KOELSCH)	+= board-koelsch-reference.o
+ obj-$(CONFIG_MACH_LAGER)	+= board-lager-reference.o
++obj-$(CONFIG_MACH_MARZEN)	+= board-marzen-reference.o
+ else
+ obj-$(CONFIG_MACH_APE6EVM)	+= board-ape6evm.o
+ obj-$(CONFIG_MACH_APE6EVM_REFERENCE)	+= board-ape6evm-reference.o
 diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
-index e261431..a5974d2 100644
+index c22e5c2..d3e8319 100644
 --- a/arch/arm/mach-shmobile/board-marzen-reference.c
 +++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-@@ -19,7 +19,9 @@
+@@ -19,6 +19,7 @@
   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   */
  
-+#include <linux/clk.h>
- #include <linux/clk/shmobile.h>
-+#include <linux/clkdev.h>
- #include <linux/clocksource.h>
++#include <linux/clk-provider.h>
  #include <linux/of_platform.h>
  #include <mach/r8a7779.h>
-@@ -38,7 +40,34 @@ static void __init marzen_init_timer(void)
+ #include <mach/common.h>
+@@ -28,7 +29,11 @@
  
  static void __init marzen_init(void)
  {
--#ifndef CONFIG_COMMON_CLK
 +#ifdef CONFIG_COMMON_CLK
-+	static const struct clk_name {
-+		const char *clk;
-+		const char *con_id;
-+		const char *dev_id;
-+	} clk_names[] = {
-+		{ "scif0", NULL, "sh-sci.0" },
-+		{ "scif1", NULL, "sh-sci.1" },
-+		{ "scif2", NULL, "sh-sci.2" },
-+		{ "scif3", NULL, "sh-sci.3" },
-+		{ "scif4", NULL, "sh-sci.4" },
-+		{ "scif5", NULL, "sh-sci.5" },
-+		{ "tmu00", NULL, "sh_tmu.0" },
-+		{ "tmu01", NULL, "sh_tmu.1" },
-+		{ "tmu02", NULL, "sh_tmu.2" },
-+	};
-+	struct clk *clk;
-+	unsigned int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(clk_names); ++i) {
-+		clk = clk_get(NULL, clk_names[i].clk);
-+		if (!IS_ERR(clk)) {
-+			clk_register_clkdev(clk, clk_names[i].con_id,
-+					    clk_names[i].dev_id);
-+			clk_put(clk);
-+		}
-+	}
++	of_clk_init(NULL);
 +#else
  	r8a7779_clock_init();
- #endif
++#endif
  	r8a7779_add_standard_devices_dt();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 	r8a7779_init_irq_extpin_dt(1); /* IRQ1 as individual interrupt */
 -- 
 1.8.5.2
