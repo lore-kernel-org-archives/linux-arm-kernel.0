@@ -1,92 +1,231 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 26 Feb 2014 10:59:26 -0800
-Subject: [PATCH v4 8/8] devicetree: bindings: Document PM8921/8058 PMICs
+Date: Wed, 26 Feb 2014 10:59:23 -0800
+Subject: [PATCH v4 5/8] mfd: pm8921: Use ssbi regmap
 In-Reply-To: <1393441166-32692-1-git-send-email-sboyd@codeaurora.org>
 References: <1393441166-32692-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1393441166-32692-9-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1393441166-32692-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PM8921 and PM8058 are PMICs found paired with MSM8960 and MSM8660
-devices respectively. They contain subdevices such as keypads,
-RTC, regulators, clocks, etc.
+Use a regmap so that the pm8xxx read/write APIs can be removed
+once all consumer drivers are converted.
 
-Cc: <devicetree@vger.kernel.org>
+Reviewed-by: Mark Brown <broonie@linaro.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- .../devicetree/bindings/mfd/qcom,pm8xxx.txt        | 63 ++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
+ drivers/mfd/Kconfig       |  1 +
+ drivers/mfd/pm8921-core.c | 66 +++++++++++++++++++++++++++--------------------
+ 2 files changed, 39 insertions(+), 28 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt b/Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
-new file mode 100644
-index 000000000000..e3fe625ffd58
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
-@@ -0,0 +1,63 @@
-+Qualcomm PM8xxx PMIC multi-function devices
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index c9b672c5dfa8..be98d88acfb8 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -477,6 +477,7 @@ config MFD_PM8921_CORE
+ 	select IRQ_DOMAIN
+ 	select MFD_CORE
+ 	select MFD_PM8XXX
++	select REGMAP
+ 	help
+ 	  If you say yes to this option, support will be included for the
+ 	  built-in PM8921 PMIC chip.
+diff --git a/drivers/mfd/pm8921-core.c b/drivers/mfd/pm8921-core.c
+index c25e7dae150b..e9340bd6d1ab 100644
+--- a/drivers/mfd/pm8921-core.c
++++ b/drivers/mfd/pm8921-core.c
+@@ -23,6 +23,7 @@
+ #include <linux/slab.h>
+ #include <linux/err.h>
+ #include <linux/ssbi.h>
++#include <linux/regmap.h>
+ #include <linux/of_platform.h>
+ #include <linux/mfd/core.h>
+ #include <linux/mfd/pm8xxx/core.h>
+@@ -57,6 +58,7 @@
+ 
+ struct pm_irq_chip {
+ 	struct device		*dev;
++	struct regmap		*regmap;
+ 	spinlock_t		pm_irq_lock;
+ 	struct irq_domain	*irqdomain;
+ 	unsigned int		num_irqs;
+@@ -70,29 +72,19 @@ struct pm8921 {
+ 	struct pm_irq_chip		*irq_chip;
+ };
+ 
+-static int pm8xxx_read_root_irq(const struct pm_irq_chip *chip, u8 *rp)
+-{
+-	return pm8xxx_readb(chip->dev, SSBI_REG_ADDR_IRQ_ROOT, rp);
+-}
+-
+-static int pm8xxx_read_master_irq(const struct pm_irq_chip *chip, u8 m, u8 *bp)
+-{
+-	return pm8xxx_readb(chip->dev,
+-			SSBI_REG_ADDR_IRQ_M_STATUS1 + m, bp);
+-}
+-
+-static int pm8xxx_read_block_irq(struct pm_irq_chip *chip, u8 bp, u8 *ip)
++static int pm8xxx_read_block_irq(struct pm_irq_chip *chip, unsigned int bp,
++				 unsigned int *ip)
+ {
+ 	int	rc;
+ 
+ 	spin_lock(&chip->pm_irq_lock);
+-	rc = pm8xxx_writeb(chip->dev, SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
++	rc = regmap_write(chip->regmap, SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
+ 	if (rc) {
+ 		pr_err("Failed Selecting Block %d rc=%d\n", bp, rc);
+ 		goto bail;
+ 	}
+ 
+-	rc = pm8xxx_readb(chip->dev, SSBI_REG_ADDR_IRQ_IT_STATUS, ip);
++	rc = regmap_read(chip->regmap, SSBI_REG_ADDR_IRQ_IT_STATUS, ip);
+ 	if (rc)
+ 		pr_err("Failed Reading Status rc=%d\n", rc);
+ bail:
+@@ -100,19 +92,20 @@ bail:
+ 	return rc;
+ }
+ 
+-static int pm8xxx_config_irq(struct pm_irq_chip *chip, u8 bp, u8 cp)
++static int
++pm8xxx_config_irq(struct pm_irq_chip *chip, unsigned int bp, unsigned int cp)
+ {
+ 	int	rc;
+ 
+ 	spin_lock(&chip->pm_irq_lock);
+-	rc = pm8xxx_writeb(chip->dev, SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
++	rc = regmap_write(chip->regmap, SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
+ 	if (rc) {
+ 		pr_err("Failed Selecting Block %d rc=%d\n", bp, rc);
+ 		goto bail;
+ 	}
+ 
+ 	cp |= PM_IRQF_WRITE;
+-	rc = pm8xxx_writeb(chip->dev, SSBI_REG_ADDR_IRQ_CONFIG, cp);
++	rc = regmap_write(chip->regmap, SSBI_REG_ADDR_IRQ_CONFIG, cp);
+ 	if (rc)
+ 		pr_err("Failed Configuring IRQ rc=%d\n", rc);
+ bail:
+@@ -123,7 +116,7 @@ bail:
+ static int pm8xxx_irq_block_handler(struct pm_irq_chip *chip, int block)
+ {
+ 	int pmirq, irq, i, ret = 0;
+-	u8 bits;
++	unsigned int bits;
+ 
+ 	ret = pm8xxx_read_block_irq(chip, block, &bits);
+ 	if (ret) {
+@@ -148,10 +141,11 @@ static int pm8xxx_irq_block_handler(struct pm_irq_chip *chip, int block)
+ 
+ static int pm8xxx_irq_master_handler(struct pm_irq_chip *chip, int master)
+ {
+-	u8 blockbits;
++	unsigned int blockbits;
+ 	int block_number, i, ret = 0;
+ 
+-	ret = pm8xxx_read_master_irq(chip, master, &blockbits);
++	ret = regmap_read(chip->regmap, SSBI_REG_ADDR_IRQ_M_STATUS1 + master,
++			  &blockbits);
+ 	if (ret) {
+ 		pr_err("Failed to read master %d ret=%d\n", master, ret);
+ 		return ret;
+@@ -173,12 +167,12 @@ static void pm8xxx_irq_handler(unsigned int irq, struct irq_desc *desc)
+ {
+ 	struct pm_irq_chip *chip = irq_desc_get_handler_data(desc);
+ 	struct irq_chip *irq_chip = irq_desc_get_chip(desc);
+-	u8	root;
++	unsigned int root;
+ 	int	i, ret, masters = 0;
+ 
+ 	chained_irq_enter(irq_chip, desc);
+ 
+-	ret = pm8xxx_read_root_irq(chip, &root);
++	ret = regmap_read(chip->regmap, SSBI_REG_ADDR_IRQ_ROOT, &root);
+ 	if (ret) {
+ 		pr_err("Can't read root status ret=%d\n", ret);
+ 		return;
+@@ -283,7 +277,7 @@ static struct irq_chip pm8xxx_irq_chip = {
+ static int pm8xxx_get_irq_stat(struct pm_irq_chip *chip, int irq)
+ {
+ 	int pmirq, rc;
+-	u8  block, bits, bit;
++	unsigned int  block, bits, bit;
+ 	unsigned long flags;
+ 	struct irq_data *irq_data = irq_get_irq_data(irq);
+ 
+@@ -294,14 +288,14 @@ static int pm8xxx_get_irq_stat(struct pm_irq_chip *chip, int irq)
+ 
+ 	spin_lock_irqsave(&chip->pm_irq_lock, flags);
+ 
+-	rc = pm8xxx_writeb(chip->dev, SSBI_REG_ADDR_IRQ_BLK_SEL, block);
++	rc = regmap_write(chip->regmap, SSBI_REG_ADDR_IRQ_BLK_SEL, block);
+ 	if (rc) {
+ 		pr_err("Failed Selecting block irq=%d pmirq=%d blk=%d rc=%d\n",
+ 			irq, pmirq, block, rc);
+ 		goto bail_out;
+ 	}
+ 
+-	rc = pm8xxx_readb(chip->dev, SSBI_REG_ADDR_IRQ_RT_STATUS, &bits);
++	rc = regmap_read(chip->regmap, SSBI_REG_ADDR_IRQ_RT_STATUS, &bits);
+ 	if (rc) {
+ 		pr_err("Failed Configuring irq=%d pmirq=%d blk=%d rc=%d\n",
+ 			irq, pmirq, block, rc);
+@@ -389,11 +383,21 @@ static struct pm8xxx_drvdata pm8921_drvdata = {
+ 	.pmic_read_irq_stat	= pm8921_read_irq_stat,
+ };
+ 
++static const struct regmap_config ssbi_regmap_config = {
++	.reg_bits = 16,
++	.val_bits = 8,
++	.max_register = 0x3ff,
++	.fast_io = true,
++	.reg_read = ssbi_reg_read,
++	.reg_write = ssbi_reg_write
++};
 +
-+PROPERTIES
+ static int pm8921_probe(struct platform_device *pdev)
+ {
+ 	struct pm8921 *pmic;
++	struct regmap *regmap;
+ 	int rc;
+-	u8 val;
++	unsigned int val;
+ 	unsigned int irq;
+ 	u32 rev;
+ 	struct pm_irq_chip *chip;
+@@ -409,8 +413,13 @@ static int pm8921_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	regmap = devm_regmap_init(&pdev->dev, NULL, pdev->dev.parent,
++				  &ssbi_regmap_config);
++	if (IS_ERR(regmap))
++		return PTR_ERR(regmap);
 +
-+- compatible:
-+	Usage: required
-+	Value type: <string>
-+	Definition: must be one of:
-+		    "qcom,pm8058"
-+		    "qcom,pm8921"
-+
-+- #address-cells:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: must be 1
-+
-+- #size-cells:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: must be 0
-+
-+- interrupts:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: specifies the interrupt that indicates a subdevice
-+		    has generated an interrupt (summary interrupt). The
-+		    format of the specifier is defined by the binding document
-+		    describing the node's interrupt parent.
-+
-+- #interrupt-cells:
-+	Usage: required
-+	Value type : <u32>
-+	Definition: must be 2. Specifies the number of cells needed to encode
-+		    an interrupt source. The 1st cell contains the interrupt
-+		    number. The 2nd cell is the trigger type and level flags
-+		    encoded as follows:
-+
-+			1 = low-to-high edge triggered
-+			2 = high-to-low edge triggered
-+			4 = active high level-sensitive
-+			8 = active low level-sensitive
-+
-+- interrupt-controller:
-+	Usage: required
-+	Value type: <empty>
-+	Definition: identifies this node as an interrupt controller
-+
-+EXAMPLE
-+
-+	pmicintc: pmic at 0 {
-+		compatible = "qcom,pm8921";
-+		interrupts = <104 8>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		pwrkey {
-+			compatible = "qcom,pm8921-pwrkey";
-+			interrupt-parent = <&pmicintc>;
-+			interrupts = <50 1>, <51 1>;
-+		};
-+	};
+ 	/* Read PMIC chip revision */
+-	rc = ssbi_read(pdev->dev.parent, REG_HWREV, &val, sizeof(val));
++	rc = regmap_read(regmap, REG_HWREV, &val);
+ 	if (rc) {
+ 		pr_err("Failed to read hw rev reg %d:rc=%d\n", REG_HWREV, rc);
+ 		return rc;
+@@ -419,7 +428,7 @@ static int pm8921_probe(struct platform_device *pdev)
+ 	rev = val;
+ 
+ 	/* Read PMIC chip revision 2 */
+-	rc = ssbi_read(pdev->dev.parent, REG_HWREV_2, &val, sizeof(val));
++	rc = regmap_read(regmap, REG_HWREV_2, &val);
+ 	if (rc) {
+ 		pr_err("Failed to read hw rev 2 reg %d:rc=%d\n",
+ 			REG_HWREV_2, rc);
+@@ -440,6 +449,7 @@ static int pm8921_probe(struct platform_device *pdev)
+ 
+ 	pmic->irq_chip = chip;
+ 	chip->dev = &pdev->dev;
++	chip->regmap = regmap;
+ 	chip->num_irqs = nirqs;
+ 	chip->num_blocks = DIV_ROUND_UP(chip->num_irqs, 8);
+ 	chip->num_masters = DIV_ROUND_UP(chip->num_blocks, 8);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
