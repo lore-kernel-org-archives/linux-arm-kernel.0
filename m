@@ -1,47 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Feb 2014 16:57:51 +0900
-Subject: [PATCH 5/7] ARM: shmobile: r8a7790 CA15-SCU enablement
+Date: Wed, 26 Feb 2014 16:57:52 +0900
+Subject: [PATCH 6/7] ARM: shmobile: Remove __init from
+ rcar_gen2_read_mode_pins()
 In-Reply-To: <cover.1393400446.git.horms+renesas@verge.net.au>
 References: <cover.1393400446.git.horms+renesas@verge.net.au>
-Message-ID: <c2c97ec513b503b9e0d28ffd98d54c9e9bf3ea3e.1393400446.git.horms+renesas@verge.net.au>
+Message-ID: <e7509f6eca10cff3933f8a71f4ca9d8be8447ec3.1393400446.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-Power on CA15 SCU in case of booting from a CA7 core.
+Remove __init from rcar_gen2_read_mode_pins() to allow
+it to be used after boot. For instance the R-Car Gen2
+MD21 check is needed even in the case of CPU Hotplug.
 
-Signed-off-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
-[damm at opensource.se: Converted to use broken out SYSC code]
 Signed-off-by: Magnus Damm <damm@opensource.se>
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-r8a7790.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
-index beb47ae..5910527 100644
---- a/arch/arm/mach-shmobile/smp-r8a7790.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7790.c
-@@ -29,6 +29,11 @@
- #define CA7RESCNT	0x0044
- #define MERAM		0xe8080000
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index 69ccc6c..1060448 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -28,7 +28,7 @@
  
-+static struct rcar_sysc_ch r8a7790_ca15_scu = {
-+	.chan_offs = 0x180, /* PWRSR5 .. PWRER5 */
-+	.isr_bit = 12, /* CA15-SCU */
-+};
-+
- static struct rcar_sysc_ch r8a7790_ca7_scu = {
- 	.chan_offs = 0x100, /* PWRSR3 .. PWRER3 */
- 	.isr_bit = 21, /* CA7-SCU */
-@@ -64,6 +69,7 @@ static void __init r8a7790_smp_prepare_cpus(unsigned int max_cpus)
+ #define MODEMR 0xe6160060
  
- 	/* turn on power to SCU */
- 	r8a7790_pm_init();
-+	rcar_sysc_power_up(&r8a7790_ca15_scu);
- 	rcar_sysc_power_up(&r8a7790_ca7_scu);
- }
- 
+-u32 __init rcar_gen2_read_mode_pins(void)
++u32 rcar_gen2_read_mode_pins(void)
+ {
+ 	void __iomem *modemr = ioremap_nocache(MODEMR, 4);
+ 	u32 mode;
 -- 
 1.8.5.2
