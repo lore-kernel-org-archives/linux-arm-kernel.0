@@ -1,270 +1,55 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Wed, 26 Feb 2014 09:48:35 +0900
+Date: Wed, 26 Feb 2014 09:50:52 +0900
 Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <1393375718-32458-1-git-send-email-broonie@kernel.org>
-References: <1393375718-32458-1-git-send-email-broonie@kernel.org>
-Message-ID: <1393375718-32458-2-git-send-email-broonie@kernel.org>
+In-Reply-To: <20140225165411.GA3883@red-moon>
+References: <1393302345-18253-1-git-send-email-broonie@kernel.org>
+ <1393302345-18253-2-git-send-email-broonie@kernel.org>
+ <20140225165411.GA3883@red-moon>
+Message-ID: <20140226005052.GA31120@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Brown <broonie@linaro.org>
+On Tue, Feb 25, 2014 at 04:54:11PM +0000, Lorenzo Pieralisi wrote:
 
-Add basic CPU topology support to arm64, based on the existing pre-v8
-code and some work done by Mark Hambleton.  This patch does not
-implement any topology discovery support since that should be based on
-information from firmware, it merely implements the scaffolding for
-integration of topology support in the architecture.
+> I have been clobbering the code with some random dts configs, running on
+> top of the patch attached (to make code compliant with default if DT
+> info is missing for some CPUs). Can you give it a go please and run your
+> tests against it (I have just put it together) ? It should simplify things,
+> thoughts ?
 
-No locking of the topology data is done since it is only modified during
-CPU bringup with external serialisation from the SMP code.
+> AFAIK it should be correct, at least the info required by the scheduler
+> is reset to default (include/linux/topology.h) if DT nodes are
+> misconfigured. It applies on top of your series.
 
-The goal is to separate the architecture hookup for providing topology
-information from the DT parsing in order to ease review and avoid
-blocking the architecture code (which will be built on by other work)
-with the DT code review by providing something simple and basic.
+It seems to work fine for me, I'll resend with it squashed in though one
+thing below which concerns me a bit.  
 
-A following patch will implement support for parsing the DT topology
-bindings for ARM, similar patches will be needed for ACPI.
+Can I suggest that given the sort of thing we're looking at here it
+might be easier to apply the code as-is and then do any further work
+incrementally?
 
-Signed-off-by: Mark Brown <broonie@linaro.org>
----
- arch/arm64/Kconfig                | 24 ++++++++++
- arch/arm64/include/asm/topology.h | 39 ++++++++++++++++
- arch/arm64/kernel/Makefile        |  1 +
- arch/arm64/kernel/smp.c           | 11 +++++
- arch/arm64/kernel/topology.c      | 95 +++++++++++++++++++++++++++++++++++++++
- 5 files changed, 170 insertions(+)
- create mode 100644 arch/arm64/include/asm/topology.h
- create mode 100644 arch/arm64/kernel/topology.c
+> If the device tree does not contain topology information for a CPU,
+> kernel code should set-up topology information for the CPU according
+> to the default values defined in Documentation/cputopology.txt.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 27bbcfc..fea7b47 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -164,6 +164,30 @@ config SMP
- 
- 	  If you don't know what to do here, say N.
- 
-+config CPU_TOPOLOGY
-+	bool "Support CPU topology definition"
-+	depends on SMP
-+	default y
-+	help
-+	  Support CPU topology definition, based on configuration
-+	  provided by the firmware.
-+
-+config SCHED_MC
-+	bool "Multi-core scheduler support"
-+	depends on CPU_TOPOLOGY
-+	help
-+	  Multi-core scheduler support improves the CPU scheduler's decision
-+	  making when dealing with multi-core CPU chips at a cost of slightly
-+	  increased overhead in some places. If unsure say N here.
-+
-+config SCHED_SMT
-+	bool "SMT scheduler support"
-+	depends on CPU_TOPOLOGY
-+	help
-+	  Improves the CPU scheduler's decision making when dealing with
-+	  MultiThreading at a cost of slightly increased overhead in some
-+	  places. If unsure say N here.
-+
- config NR_CPUS
- 	int "Maximum number of CPUs (2-32)"
- 	range 2 32
-diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-new file mode 100644
-index 0000000..c8a47e8
---- /dev/null
-+++ b/arch/arm64/include/asm/topology.h
-@@ -0,0 +1,39 @@
-+#ifndef __ASM_TOPOLOGY_H
-+#define __ASM_TOPOLOGY_H
-+
-+#ifdef CONFIG_CPU_TOPOLOGY
-+
-+#include <linux/cpumask.h>
-+
-+struct cpu_topology {
-+	int thread_id;
-+	int core_id;
-+	int cluster_id;
-+	cpumask_t thread_sibling;
-+	cpumask_t core_sibling;
-+};
-+
-+extern struct cpu_topology cpu_topology[NR_CPUS];
-+
-+#define topology_physical_package_id(cpu)	(cpu_topology[cpu].cluster_id)
-+#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
-+#define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
-+#define topology_thread_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
-+
-+#define mc_capable()	(cpu_topology[0].cluster_id != -1)
-+#define smt_capable()	(cpu_topology[0].thread_id != -1)
-+
-+void init_cpu_topology(void);
-+void store_cpu_topology(unsigned int cpuid);
-+const struct cpumask *cpu_coregroup_mask(int cpu);
-+
-+#else
-+
-+static inline void init_cpu_topology(void) { }
-+static inline void store_cpu_topology(unsigned int cpuid) { }
-+
-+#endif
-+
-+#include <asm-generic/topology.h>
-+
-+#endif /* _ASM_ARM_TOPOLOGY_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 2d4554b..252b621 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -20,6 +20,7 @@ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)+= hw_breakpoint.o
- arm64-obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- arm64-obj-$(CONFIG_ARM64_CPU_SUSPEND)	+= sleep.o suspend.o
- arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
-+arm64-obj-$(CONFIG_CPU_TOPOLOGY)	+= topology.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 7cfb92a..9660750 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -114,6 +114,11 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	return ret;
- }
- 
-+static void smp_store_cpu_info(unsigned int cpuid)
-+{
-+	store_cpu_topology(cpuid);
-+}
-+
- /*
-  * This is the secondary CPU boot entry.  We're using this CPUs
-  * idle thread stack, but a set of temporary page tables.
-@@ -152,6 +157,8 @@ asmlinkage void secondary_start_kernel(void)
- 	 */
- 	notify_cpu_starting(cpu);
- 
-+	smp_store_cpu_info(cpu);
-+
- 	/*
- 	 * OK, now it's safe to let the boot CPU continue.  Wait for
- 	 * the CPU migration code to notice that the CPU is online
-@@ -390,6 +397,10 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 	int err;
- 	unsigned int cpu, ncores = num_possible_cpus();
- 
-+	init_cpu_topology();
-+
-+	smp_store_cpu_info(smp_processor_id());
-+
- 	/*
- 	 * are we trying to boot more cores than exist?
- 	 */
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-new file mode 100644
-index 0000000..0d94918
---- /dev/null
-+++ b/arch/arm64/kernel/topology.c
-@@ -0,0 +1,95 @@
-+/*
-+ * arch/arm64/kernel/topology.c
-+ *
-+ * Copyright (C) 2011,2013 Linaro Limited.
-+ *
-+ * Based on the arm32 version written by Vincent Guittot in turn based on
-+ * arch/sh/kernel/topology.c
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+
-+#include <linux/cpu.h>
-+#include <linux/cpumask.h>
-+#include <linux/init.h>
-+#include <linux/percpu.h>
-+#include <linux/node.h>
-+#include <linux/nodemask.h>
-+#include <linux/sched.h>
-+
-+#include <asm/topology.h>
-+
-+/*
-+ * cpu topology table
-+ */
-+struct cpu_topology cpu_topology[NR_CPUS];
-+EXPORT_SYMBOL_GPL(cpu_topology);
-+
-+const struct cpumask *cpu_coregroup_mask(int cpu)
-+{
-+	return &cpu_topology[cpu].core_sibling;
-+}
-+
-+static void update_siblings_masks(unsigned int cpuid)
-+{
-+	struct cpu_topology *cpu_topo, *cpuid_topo = &cpu_topology[cpuid];
-+	int cpu;
-+
-+	if (cpuid_topo->cluster_id == -1) {
-+		/*
-+		 * DT does not contain topology information for this cpu
-+		 * reset it to default behaviour
-+		 */
-+		pr_warn("CPU%u: No topology information configured\n", cpuid);
-+		cpuid_topo->core_id = 0;
-+		cpumask_set_cpu(cpuid, &cpuid_topo->core_sibling);
-+		cpumask_set_cpu(cpuid, &cpuid_topo->thread_sibling);
-+		return;
-+	}
-+
-+	/* update core and thread sibling masks */
-+	for_each_possible_cpu(cpu) {
-+		cpu_topo = &cpu_topology[cpu];
-+
-+		if (cpuid_topo->cluster_id != cpu_topo->cluster_id)
-+			continue;
-+
-+		cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
-+		if (cpu != cpuid)
-+			cpumask_set_cpu(cpu, &cpuid_topo->core_sibling);
-+
-+		if (cpuid_topo->core_id != cpu_topo->core_id)
-+			continue;
-+
-+		cpumask_set_cpu(cpuid, &cpu_topo->thread_sibling);
-+		if (cpu != cpuid)
-+			cpumask_set_cpu(cpu, &cpuid_topo->thread_sibling);
-+	}
-+}
-+
-+void store_cpu_topology(unsigned int cpuid)
-+{
-+	update_siblings_masks(cpuid);
-+}
-+
-+/*
-+ * init_cpu_topology is called at boot when only one cpu is running
-+ * which prevent simultaneous write access to cpu_topology array
-+ */
-+void __init init_cpu_topology(void)
-+{
-+	unsigned int cpu;
-+
-+	/* init core mask and power*/
-+	for_each_possible_cpu(cpu) {
-+		struct cpu_topology *cpu_topo = &cpu_topology[cpu];
-+
-+		cpu_topo->thread_id = -1;
-+		cpu_topo->core_id =  -1;
-+		cpu_topo->cluster_id = -1;
-+		cpumask_clear(&cpu_topo->core_sibling);
-+		cpumask_clear(&cpu_topo->thread_sibling);
-+	}
-+}
--- 
-1.9.0
+> +		pr_warn("CPU%u: No topology information configured\n", cpuid);
+> +		cpuid_topo->core_id = 0;
+
+I know this is what the document says and the scheduler copes but it
+does make me a bit nervous if we end up with only some CPUs in this
+undefined state.  I can't point to any practical problems and it's
+going to be the scheduler's fault if it does but I wouldn't be surprised
+if there were issues in cases where there is partial topology
+information (as opposed to either full topology information or none).
+
+Having said that like I keep saying it seems most sensible to fall back
+to MPIDR if we don't have any better idea; it's guaranteed to be
+available, may well be correct and helps systems that did a good job
+with their hardware.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140226/3ac1e6bb/attachment-0001.sig>
