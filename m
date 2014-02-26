@@ -1,72 +1,106 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Feb 2014 16:33:16 +0900
-Subject: [PATCH v3 00/20] ARM: shmobile: r8a7779, marzen: CCF and multiplatform
-Message-ID: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 26 Feb 2014 16:33:19 +0900
+Subject: [PATCH v3 03/20] ARM: shmobile: r8a7779: Add clock index macros for
+ DT sources
+In-Reply-To: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1393400016-23433-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aim of this series is to add common clock framework and in turn
-multiplatform support to the r8a7779 SoC and marzen-reference.  It
-subsequently removes non-multiplatform support from marzen-reference.
+Add macros usable by device tree sources to reference r8a7779 clocks by
+index.
 
+Based on work for the r8a7791 SoC by Laurent Pinchart.
 
-This is based on work for R-Car Gen2 by Laurent Pinchart and Magnus Damm.
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+v3
+* As suggested by Laurent Pinchart
+  - Consolidate R8A7779_CLK_HSPI{0,1,2} into R8A7779_CLK_HSPI
+  - Correct inverted indexes of R8A7779_CLK_TMU{1,2}
+  - Consolidate R8A7779_CLK_{E,O}HCI{0,1} into R8A7779_CLK_USB{0,1}
+  - Add ethernet, MMC and HSCIF entries
+  - Replace R8A7779_SCIF6 with R8A7779_CLK_SCIF5
 
+* Add R8A7779_CLK_PCIE
 
-This series is based on the renesas-devel-v3.14-rc4-20140225
-tag of my renesas tree.
-
-This series is known not to work when
-booting with SMP enabled and maxcpus not set to 0.
-
-
-Simon Horman (20):
-  clk: shmobile: r8a7779: Add clocks support
-  clk: shmobile: r8a7779: Add MSTP clock support
-  ARM: shmobile: r8a7779: Add clock index macros for DT sources
-  ARM: shmobile: r8a7779: Add clocks
-  ARM: shmobile: Sync Marzen DTS with Marzen reference DTS
-  ARM: shmobile: marzen: Specify external clock frequency in DT
-  ARM: shmobile: marzen: Reference clocks
-  ARM: shmobile: r8a7779: Reference clocks
-  ARM: shmobile: r8a7779: Add helper to read mode pins
-  ARM: shmobile: r8a7779: Move r8a7779_earlytimer_init to
-    clock-r8a7779.c
-  ARM: shmobile: marzen-reference: Move clock and OF device
-    initialisation into board code
-  ARM: shmobile: r8a7779: Do not include sh_clk.h in r8a7779.h
-  ARM: shmobile: r8a7779: Initial multiplatform support
-  ARM: shmobile: marzen-reference: Initialize CPG device
-  ARM: shmobile: marzen-reference: Instantiate clkdevs for SCIF and TMU
-  ARM: shmobile: marzen: Add to shmobile defconfig
-  ARM: shmobile: Remove non-multiplatform Marzen reference support
-  ARM: shmobile: Let Marzen multiplatform boot with Marzen DTB
-  ARM: shmobile: Remove Marzen reference DTS
-  ARM: shmobile: marzen-reference: Remove legacy clock support
-
- .../bindings/clock/renesas,cpg-mstp-clocks.txt     |   1 +
- .../bindings/clock/renesas,r8a7779-cpg-clocks.txt  |  26 +++
- arch/arm/boot/dts/Makefile                         |   4 +-
- arch/arm/boot/dts/r8a7779-marzen-reference.dts     | 120 -------------
- arch/arm/boot/dts/r8a7779-marzen.dts               |  98 +++++++++++
- arch/arm/boot/dts/r8a7779.dtsi                     | 141 +++++++++++++++
- arch/arm/configs/shmobile_defconfig                |   2 +
- arch/arm/mach-shmobile/Kconfig                     |  22 +--
- arch/arm/mach-shmobile/Makefile                    |   2 +-
- arch/arm/mach-shmobile/Makefile.boot               |   1 -
- arch/arm/mach-shmobile/board-marzen-reference.c    |  40 +++++
- arch/arm/mach-shmobile/clock-r8a7779.c             |  22 ++-
- arch/arm/mach-shmobile/include/mach/r8a7779.h      |   2 +-
- arch/arm/mach-shmobile/setup-r8a7779.c             |  28 +--
- drivers/clk/shmobile/Makefile                      |   1 +
- drivers/clk/shmobile/clk-r8a7779.c                 | 191 +++++++++++++++++++++
- include/dt-bindings/clock/r8a7779-clock.h          |  63 +++++++
- include/linux/clk/shmobile.h                       |   3 +
- 18 files changed, 606 insertions(+), 161 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/renesas,r8a7779-cpg-clocks.txt
- delete mode 100644 arch/arm/boot/dts/r8a7779-marzen-reference.dts
- create mode 100644 drivers/clk/shmobile/clk-r8a7779.c
+v2
+* No change
+---
+ include/dt-bindings/clock/r8a7779-clock.h | 63 +++++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
  create mode 100644 include/dt-bindings/clock/r8a7779-clock.h
 
+diff --git a/include/dt-bindings/clock/r8a7779-clock.h b/include/dt-bindings/clock/r8a7779-clock.h
+new file mode 100644
+index 0000000..8ab8007
+--- /dev/null
++++ b/include/dt-bindings/clock/r8a7779-clock.h
+@@ -0,0 +1,63 @@
++/*
++ * Copyright (C) 2013  Horms Solutions Ltd.
++ *
++ * Contact: Simon Horman <horms@verge.net.au>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef __DT_BINDINGS_CLOCK_R8A7779_H__
++#define __DT_BINDINGS_CLOCK_R8A7779_H__
++
++/* CPG */
++#define R8A7779_CLK_PLLA	0
++#define R8A7779_CLK_Z		1
++#define R8A7779_CLK_ZS		2
++#define R8A7779_CLK_S		3
++#define R8A7779_CLK_S1		4
++#define R8A7779_CLK_P		5
++#define R8A7779_CLK_OUT		6
++
++/* MSTP 0 */
++#define R8A7779_CLK_HSPI	7
++#define R8A7779_CLK_TMU2	14
++#define R8A7779_CLK_TMU1	15
++#define R8A7779_CLK_TMU0	16
++#define R8A7779_CLK_HSCIF1	18
++#define R8A7779_CLK_HSCIF0	19
++#define R8A7779_CLK_SCIF5	21
++#define R8A7779_CLK_SCIF4	22
++#define R8A7779_CLK_SCIF3	23
++#define R8A7779_CLK_SCIF2	24
++#define R8A7779_CLK_SCIF1	25
++#define R8A7779_CLK_SCIF0	26
++#define R8A7779_CLK_I2C3	27
++#define R8A7779_CLK_I2C2	28
++#define R8A7779_CLK_I2C1	29
++#define R8A7779_CLK_I2C0	30
++
++/* MSTP 1 */
++#define R8A7779_CLK_USB01	0
++#define R8A7779_CLK_USB2	1
++#define R8A7779_CLK_DU		3
++#define R8A7779_CLK_VIN2	8
++#define R8A7779_CLK_VIN1	9
++#define R8A7779_CLK_VIN0	10
++#define R8A7779_CLK_ETHER	14
++#define R8A7779_CLK_SATA	15
++#define R8A7779_CLK_PCIE	16
++#define R8A7779_CLK_VIN3	20
++
++/* MSTP 3 */
++#define R8A7779_CLK_SDHI3	20
++#define R8A7779_CLK_SDHI2	21
++#define R8A7779_CLK_SDHI1	22
++#define R8A7779_CLK_SDHI0	23
++#define R8A7779_CLK_MMC1	30
++#define R8A7779_CLK_MMC0	31
++
++
++#endif /* __DT_BINDINGS_CLOCK_R8A7779_H__ */
 -- 
 1.8.5.2
