@@ -1,30 +1,31 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 26 Feb 2014 14:15:43 +0900
-Subject: [PATCH] clk: samsung: remove parentheses from return statements
-In-Reply-To: <CAK9yfHyjQmFnJaM0v638X-K+jHveofOkf=2bWQ9-cyQ1y39Hmw@mail.gmail.com>
-References: <1393382688-5429-1-git-send-email-pankaj.dubey@samsung.com>
- <CAK9yfHyjQmFnJaM0v638X-K+jHveofOkf=2bWQ9-cyQ1y39Hmw@mail.gmail.com>
-Message-ID: <530D787F.9080501@samsung.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 25 Feb 2014 20:59:46 -0800
+Subject: arm64 cache maintenance on read only address loops forever
+Message-ID: <530D74C2.4000402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sachin,
+Hi,
 
-On 02/26/2014 01:12 PM, Sachin Kamat wrote:
-> Hi Pankaj,
->
-> On 26 February 2014 08:14, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
->> fixed following checkpatch warning message
->> "return is not a function, parentheses are not required"
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Similar patch has already been submitted:
-> http://comments.gmane.org/gmane.linux.ports.arm.kernel/294530
->
->
-Sorry I missed that.
-Since same change already submitted we can ignore my patch.
+On arm64, set_pte_at currently write protects user ptes that are not 
+dirty. The expected behavior is that the fault handler will fix this up 
+on a write to the address. do_page_fault will not mark the fault as a 
+write though if ESR has the CM (cache maintenance) bit set. This has the 
+unfortunate side effect that if cache maintenance is performed on a user 
+address that has not yet been marked as dirty, handle_mm_fault may 
+return without actually adjusting the pte or returning an error. This 
+means that the fault will be infinitely retried.
+
+Calling cache maintenance on an address that hasn't actually been 
+written to isn't all that useful but looping forever seems like a poor 
+result. It seems like the check in do_page_fault is too restrictive and 
+we need to be able to fault in pages via cache maintenance.
+
+Thoughts?
+
+Thanks,
+Laura
 
 -- 
-Best Regards,
-Pankaj Dubey
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
