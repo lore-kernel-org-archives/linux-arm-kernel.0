@@ -1,51 +1,35 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 26 Feb 2014 01:37:57 +0100
-Subject: [PATCH v3 1/3] Fix hibernation restore hang in freeze_processes
-In-Reply-To: <1393372920-3896-2-git-send-email-sebastian.capella@linaro.org>
-References: <1393372920-3896-1-git-send-email-sebastian.capella@linaro.org>
- <1393372920-3896-2-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <3879011.h2KX4caCrF@vostro.rjw.lan>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 25 Feb 2014 16:43:26 -0800
+Subject: [PATCH v2] arm: fix memset-related crashes caused by recent GCC
+ (4.7.2) optimizations
+In-Reply-To: <513EFE1F.5060807@ahsoftware.de>
+References: <1360587435-28386-1-git-send-email-ivan.djelic@parrot.com>
+ <513795C5.4050608@gmail.com> <20130307151755.GB4977@n2100.arm.linux.org.uk>
+ <513CBD83.7040909@ahsoftware.de>
+ <20130310172854.GH4977@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.03.1303110910540.28820@syhkavp.arg>
+ <513EFE1F.5060807@ahsoftware.de>
+Message-ID: <CAGVrzcaAGqWG4-fiVc+YiPms5aqSkoXBMmK4rR=wr9XQJ083jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 25, 2014 04:01:58 PM Sebastian Capella wrote:
-> During restore, pm_notifier chain are called with
-> PM_RESTORE_PREPARE.  The firmware_class driver handler
-> fw_pm_notify does not have a handler for this.  As a result,
-> it keeps a reader on the kmod.c umhelper_sem.  During
-> freeze_processes, the call to __usermodehelper_disable tries to
-> take a write lock on this semaphore and hangs waiting.
-> 
-> Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-> Acked-by: Ming Lei <ming.lei@canonical.com>
-> Cc: Russ Dill <Russ.Dill@ti.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+2013-03-12 3:06 GMT-07:00 Alexander Holler <holler@ahsoftware.de>:
+>
+> Tested-by: Alexander Holler
+>
+> It works since 2 days on my busy 24/7 armv5-thingy without me having seen an
+> error. A quick test on an armv7-system hasn't revealed any problems too.
 
-Since this is a -stable candidate patch, I've queued it up as a fix for 3.14.
+This is an old thread, but 3.8.13 is still affected, not quite sure if
+there will be a 3.8.14 release, but if there is, we should
+definitively get:
 
-The other two patches are ARM mostly, so I'd prefer them to be merged through
-the ARM arch tree.  The changes in suspend.h made by [3/3] are fine by me.
+ARM: 7668/1: fix memset-related crashes caused by recent GCC (4.7.2)
+optimizations
+ARM: 7670/1: fix the memset fix
+
+included in 3.8.14.
 
 Thanks!
-
-> ---
->  drivers/base/firmware_class.c |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/base/firmware_class.c b/drivers/base/firmware_class.c
-> index eb8fb94..e2b51f8 100644
-> --- a/drivers/base/firmware_class.c
-> +++ b/drivers/base/firmware_class.c
-> @@ -1541,6 +1541,7 @@ static int fw_pm_notify(struct notifier_block *notify_block,
->  	switch (mode) {
->  	case PM_HIBERNATION_PREPARE:
->  	case PM_SUSPEND_PREPARE:
-> +	case PM_RESTORE_PREPARE:
->  		kill_requests_without_uevent();
->  		device_cache_fw_images();
->  		break;
-> 
-
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Florian
