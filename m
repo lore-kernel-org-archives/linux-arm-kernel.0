@@ -1,293 +1,74 @@
 From: elder@linaro.org (Alex Elder)
-Date: Tue, 25 Feb 2014 18:15:50 -0600
-Subject: [PATCH v2 10/12] clk: bcm281xx: add bus clock support
-In-Reply-To: <1393373752-30875-1-git-send-email-elder@linaro.org>
-References: <1393373752-30875-1-git-send-email-elder@linaro.org>
-Message-ID: <1393373752-30875-11-git-send-email-elder@linaro.org>
+Date: Tue, 25 Feb 2014 18:15:40 -0600
+Subject: [PATCH v2 00/12] clk: bcm281xx: updates for 3.15
+Message-ID: <1393373752-30875-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bus clock support.  A bus clock has a subset of the components
-present in a peripheral clock (again, all optional): a gate; CCU
-policy management bits; and if needed, bits to control hysteresis.
+This series includes updates for the bcm281xx clock code for 3.15.
+I had held off posting this until the code on which this is based
+was queued for 3.14, and it now has been:
+    https://github.com/broadcom/mach-bcm/
+    Branch armsoc/for-3.15/drivers
+	clk: bcm281xx: don't disable unused peripheral clocks
+	clk: bcm281xx: add initial clock framework support
+followed by:
+    (same repository)
+    Branch armsoc/for-3.15/dt
+	ARM: dts: bcm281xx: define real clocks
 
-Signed-off-by: Alex Elder <elder@linaro.org>
----
- drivers/clk/bcm/clk-kona-setup.c |   96 ++++++++++++++++++++++++++++++++++++--
- drivers/clk/bcm/clk-kona.c       |   58 +++++++++++++++++++++++
- drivers/clk/bcm/clk-kona.h       |    8 ++++
- 3 files changed, 159 insertions(+), 3 deletions(-)
+The patches in this series are available here:
+    http://git.linaro.org/landing-teams/working/broadcom/kernel.git
+    Branch review/bcm-clk-next-v2
 
-diff --git a/drivers/clk/bcm/clk-kona-setup.c b/drivers/clk/bcm/clk-kona-setup.c
-index 973053b..f8c7954 100644
---- a/drivers/clk/bcm/clk-kona-setup.c
-+++ b/drivers/clk/bcm/clk-kona-setup.c
-@@ -76,6 +76,56 @@ static bool clk_requires_trigger(struct kona_clk *bcm_clk)
- 	return divider_exists(div) && !divider_is_fixed(div);
- }
- 
-+static bool bus_clk_data_offsets_valid(struct kona_clk *bcm_clk)
-+{
-+	struct bus_clk_data *bus;
-+	struct bcm_clk_policy *policy;
-+	struct bcm_clk_gate *gate;
-+	struct bcm_clk_hyst *hyst;
-+	const char *name;
-+	u32 limit;
-+
-+	BUG_ON(bcm_clk->type != bcm_clk_bus);
-+	bus = bcm_clk->bus;
-+	name = bcm_clk->init_data.name;
-+
-+	limit = bcm_clk->ccu->range - sizeof(u32);
-+	limit = round_down(limit, sizeof(u32));
-+
-+	policy = &bus->policy;
-+	if (policy_exists(policy)) {
-+		if (policy->offset > limit) {
-+			pr_err("%s: bad policy offset for %s (%u > %u)\n",
-+				__func__, name, policy->offset, limit);
-+			return false;
-+		}
-+	}
-+
-+	gate = &bus->gate;
-+	hyst = &bus->hyst;
-+	if (gate_exists(gate)) {
-+		if (gate->offset > limit) {
-+			pr_err("%s: bad gate offset for %s (%u > %u)\n",
-+				__func__, name, gate->offset, limit);
-+			return false;
-+		}
-+		if (hyst_exists(hyst)) {
-+			if (hyst->offset > limit) {
-+				pr_err("%s: bad hysteresis offset for %s "
-+					"(%u > %u)\n", __func__,
-+					name, hyst->offset, limit);
-+				return false;
-+			}
-+		}
-+	} else if (hyst_exists(hyst)) {
-+		pr_err("%s: hysteresis but no gate for %s\n", __func__, name);
-+		return false;
-+	}
-+
-+
-+	return true;
-+}
-+
- static bool peri_clk_data_offsets_valid(struct kona_clk *bcm_clk)
- {
- 	struct peri_clk_data *peri;
-@@ -86,15 +136,13 @@ static bool peri_clk_data_offsets_valid(struct kona_clk *bcm_clk)
- 	struct bcm_clk_sel *sel;
- 	struct bcm_clk_trig *trig;
- 	const char *name;
--	u32 range;
- 	u32 limit;
- 
- 	BUG_ON(bcm_clk->type != bcm_clk_peri);
- 	peri = bcm_clk->peri;
- 	name = bcm_clk->init_data.name;
--	range = bcm_clk->ccu->range;
- 
--	limit = range - sizeof(u32);
-+	limit = bcm_clk->ccu->range - sizeof(u32);
- 	limit = round_down(limit, sizeof(u32));
- 
- 	policy = &peri->policy;
-@@ -396,6 +444,23 @@ static bool trig_valid(struct bcm_clk_trig *trig, const char *field_name,
- 	return bit_posn_valid(trig->bit, field_name, clock_name);
- }
- 
-+/* Determine whether the set of bus clock registers are valid. */
-+static bool
-+bus_clk_data_valid(struct kona_clk *bcm_clk)
-+{
-+	struct bcm_clk_gate *gate;
-+
-+	BUG_ON(bcm_clk->type != bcm_clk_bus);
-+	if (!bus_clk_data_offsets_valid(bcm_clk))
-+		return false;
-+
-+	gate = &bcm_clk->bus->gate;
-+	if (!gate_exists(gate))
-+		return true;
-+
-+	return gate_valid(gate, "gate", bcm_clk->init_data.name);
-+}
-+
- /* Determine whether the set of peripheral clock registers are valid. */
- static bool
- peri_clk_data_valid(struct kona_clk *bcm_clk)
-@@ -493,6 +558,10 @@ peri_clk_data_valid(struct kona_clk *bcm_clk)
- static bool kona_clk_valid(struct kona_clk *bcm_clk)
- {
- 	switch (bcm_clk->type) {
-+	case bcm_clk_bus:
-+		if (!bus_clk_data_valid(bcm_clk))
-+			return false;
-+		break;
- 	case bcm_clk_peri:
- 		if (!peri_clk_data_valid(bcm_clk))
- 			return false;
-@@ -663,6 +732,20 @@ static void clk_sel_teardown(struct bcm_clk_sel *sel,
- 	init_data->parent_names = NULL;
- }
- 
-+static void bus_clk_teardown(struct bus_clk_data *data,
-+				struct clk_init_data *init_data)
-+{
-+	/* Nothing to do */
-+}
-+
-+static int
-+bus_clk_setup(struct bus_clk_data *data, struct clk_init_data *init_data)
-+{
-+	init_data->flags = CLK_IGNORE_UNUSED;
-+
-+	return 0;
-+}
-+
- static void peri_clk_teardown(struct peri_clk_data *data,
- 				struct clk_init_data *init_data)
- {
-@@ -689,6 +772,9 @@ static void bcm_clk_teardown(struct kona_clk *bcm_clk)
- 	/* clkdev_remove(&bcm_clk->cl); */
- 
- 	switch (bcm_clk->type) {
-+	case bcm_clk_bus:
-+		bus_clk_teardown(bcm_clk->data, &bcm_clk->init_data);
-+		break;
- 	case bcm_clk_peri:
- 		peri_clk_teardown(bcm_clk->data, &bcm_clk->init_data);
- 		break;
-@@ -725,6 +811,10 @@ struct clk *kona_clk_setup(struct kona_clk *bcm_clk)
- 	struct clk *clk = NULL;
- 
- 	switch (bcm_clk->type) {
-+	case bcm_clk_bus:
-+		if (bus_clk_setup(bcm_clk->data, init_data))
-+			return NULL;
-+		break;
- 	case bcm_clk_peri:
- 		if (peri_clk_setup(bcm_clk->data, init_data))
- 			return NULL;
-diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
-index 37f7861..00db272 100644
---- a/drivers/clk/bcm/clk-kona.c
-+++ b/drivers/clk/bcm/clk-kona.c
-@@ -984,6 +984,36 @@ static int selector_write(struct ccu_data *ccu, struct bcm_clk_gate *gate,
- 
- /* Clock operations */
- 
-+static int kona_bus_clk_enable(struct clk_hw *hw)
-+{
-+	struct kona_clk *bcm_clk = to_kona_clk(hw);
-+	struct bcm_clk_gate *gate = &bcm_clk->bus->gate;
-+
-+	return clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, true);
-+}
-+
-+static void kona_bus_clk_disable(struct clk_hw *hw)
-+{
-+	struct kona_clk *bcm_clk = to_kona_clk(hw);
-+	struct bcm_clk_gate *gate = &bcm_clk->bus->gate;
-+
-+	(void)clk_gate(bcm_clk->ccu, bcm_clk->init_data.name, gate, false);
-+}
-+
-+static int kona_bus_clk_is_enabled(struct clk_hw *hw)
-+{
-+	struct kona_clk *bcm_clk = to_kona_clk(hw);
-+	struct bcm_clk_gate *gate = &bcm_clk->bus->gate;
-+
-+	return is_clk_gate_enabled(bcm_clk->ccu, gate) ? 1 : 0;
-+}
-+
-+struct clk_ops kona_bus_clk_ops = {
-+	.enable = kona_bus_clk_enable,
-+	.disable = kona_bus_clk_disable,
-+	.is_enabled = kona_bus_clk_is_enabled,
-+};
-+
- static int kona_peri_clk_enable(struct clk_hw *hw)
- {
- 	struct kona_clk *bcm_clk = to_kona_clk(hw);
-@@ -1142,6 +1172,31 @@ struct clk_ops kona_peri_clk_ops = {
- 	.set_rate = kona_peri_clk_set_rate,
- };
- 
-+/* Put a bus clock into its initial state */
-+static bool __bus_clk_init(struct kona_clk *bcm_clk)
-+{
-+	struct ccu_data *ccu = bcm_clk->ccu;
-+	struct bus_clk_data *bus = bcm_clk->bus;
-+	const char *name = bcm_clk->init_data.name;
-+
-+	BUG_ON(bcm_clk->type != bcm_clk_bus);
-+
-+	if (!policy_init(ccu, &bus->policy)) {
-+		pr_err("%s: error initializing policy for %s\n",
-+			__func__, name);
-+		return false;
-+	}
-+	if (!gate_init(ccu, &bus->gate)) {
-+		pr_err("%s: error initializing gate for %s\n", __func__, name);
-+		return false;
-+	}
-+	if (!hyst_init(ccu, &bus->hyst)) {
-+		pr_err("%s: error initializing hyst for %s\n", __func__, name);
-+		return false;
-+	}
-+	return true;
-+}
-+
- /* Put a peripheral clock into its initial state */
- static bool __peri_clk_init(struct kona_clk *bcm_clk)
- {
-@@ -1246,6 +1301,9 @@ static bool __kona_clk_init(struct kona_clk *bcm_clk)
- 		return false;
- 
- 	switch (bcm_clk->type) {
-+	case bcm_clk_bus:
-+		ret = __bus_clk_init(bcm_clk);
-+		break;
- 	case bcm_clk_peri:
- 		ret = __peri_clk_init(bcm_clk);
- 		break;
-diff --git a/drivers/clk/bcm/clk-kona.h b/drivers/clk/bcm/clk-kona.h
-index 27e0913..fdb25c6 100644
---- a/drivers/clk/bcm/clk-kona.h
-+++ b/drivers/clk/bcm/clk-kona.h
-@@ -389,6 +389,12 @@ struct bcm_clk_trig {
- 		.flags = FLAG(TRIG, EXISTS),				\
- 	}
- 
-+struct bus_clk_data {
-+	struct bcm_clk_policy policy;
-+	struct bcm_clk_gate gate;
-+	struct bcm_clk_hyst hyst;
-+};
-+
- struct peri_clk_data {
- 	struct bcm_clk_policy policy;
- 	struct bcm_clk_gate gate;
-@@ -416,6 +422,7 @@ struct kona_clk {
- 	};
- 	union {
- 		void *data;
-+		struct bus_clk_data *bus;
- 		struct peri_clk_data *peri;
- 	};
- };
-@@ -520,6 +527,7 @@ struct ccu_data {
- 
- /* Exported globals */
- 
-+extern struct clk_ops kona_bus_clk_ops;
- extern struct clk_ops kona_peri_clk_ops;
- 
- /* Externally visible functions */
+I've grouped them, and offer a little explanation of each of the
+groups below.
+
+Note:  The final (DT) patch *must* be committed last.
+
+The first version of this series had a patch from the middle of the
+series that shouldn't have been there, and it has been removed in
+this version (that patch affected mach-bcm, not clk).  I also split
+the final patch into two, with the second one isolating the change
+to a device tree file.
+
+		    					-Alex
+
+Alex Elder (12):
+  clk: bcm281xx: warn if ccu_wait_bit() fails
+  clk: bcm281xx: use init_data.name for clock name
+  clk: bcm281xx: change some symbol names
+       	Three small code improvements.
+
+  clk: bcm281xx: initialize CCU structures statically
+  clk: bcm281xx: define CCU clock data statically
+	Rearrange the way CCUs and the clocks they provide are
+	defined, so that they're defined statically to the extent
+	possible rather than allocating and initializing things at
+	runtime.
+
+  clk: bcm281xx: add clock policy support
+  clk: bcm281xx: add clock hysteresis support
+  clk: bcm281xx: add an initialized flag
+  clk: bcm281xx: implement prerequisite clocks
+  clk: bcm281xx: add bus clock support
+  clk: bcm281xx: define a bus clock
+	Add a few new features, ultimately for the purpose of adding
+	support for another type of Kona clock.  Currently only
+	peripheral clocks are supported; this adds the ability to
+	define and control bus clocks.  In addition, support is
+	added for clocks to identify a prerequisite clock; a clock
+	won't be initialized until after its prerequisite has been.
+
+  ARM: dts: add bus clock bsc3_apb for bcm281xx
+  	Add the new bus clock to the device tree.
+
+ arch/arm/boot/dts/bcm11351.dtsi      |    3 +-
+ drivers/clk/bcm/clk-bcm281xx.c       |  254 ++++++++++++--------------
+ drivers/clk/bcm/clk-kona-setup.c     |  331 +++++++++++++++++++++++++++-------
+ drivers/clk/bcm/clk-kona.c           |  331 ++++++++++++++++++++++++++++++++--
+ drivers/clk/bcm/clk-kona.h           |  189 ++++++++++++++++---
+ include/dt-bindings/clock/bcm281xx.h |    3 +-
+ 6 files changed, 872 insertions(+), 239 deletions(-)
 -- 
 1.7.9.5
