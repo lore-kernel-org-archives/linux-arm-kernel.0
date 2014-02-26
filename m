@@ -1,23 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 26 Feb 2014 09:05:31 -0800
-Subject: [patch 08/26] arm: Replace various irq_desc accesses
-In-Reply-To: <20140224025539.GE25011@S2101-09.ap.freescale.net>
-References: <20140223212703.511977310@linutronix.de>
- <20140223212737.099151500@linutronix.de>
- <20140224025539.GE25011@S2101-09.ap.freescale.net>
-Message-ID: <20140226170530.GC11654@atomide.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Wed, 26 Feb 2014 11:06:56 -0600
+Subject: [Patch v7 2/2] dmaengine: add Qualcomm BAM dma driver
+In-Reply-To: <530E1BAB.6040609@mm-sol.com>
+References: <1393283500-18599-1-git-send-email-agross@codeaurora.org>
+ <1393283500-18599-3-git-send-email-agross@codeaurora.org>
+ <530E1BAB.6040609@mm-sol.com>
+Message-ID: <20140226170656.GA21772@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shawn Guo <shawn.guo@linaro.org> [140223 18:58]:
-> On Sun, Feb 23, 2014 at 09:40:12PM -0000, Thomas Gleixner wrote:
-> > Use the proper functions. There is no need to fiddle with irq_desc.
-> > 
-> > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> ...
-> >  arch/arm/mach-imx/pm-imx6q.c        |    7 +++----
+On Wed, Feb 26, 2014 at 06:51:55PM +0200, Stanimir Varbanov wrote:
+> > +	/* read revision and configuration information */
+> > +	val = readl_relaxed(bdev->regs + BAM_REVISION) & NUM_EES_MASK;
+> > +
 > 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> The ees shit is not zero and you got wrong ee. Could you add the line
+> below or something similar:
+> 
+> val = (val >> NUM_EES_SHIFT) & NUM_EES_MASK;
+> 
 
-Acked-by: Tony Lindgren <tony@atomide.com> 
+Good catch.  I missed the shift when I reworked and got lucky that the revision
+is in the lower 8 bits and is non-zero.
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
