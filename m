@@ -1,31 +1,123 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Feb 2014 20:57:26 +0100
-Subject: DMABOUNCE in pci-rcar
-In-Reply-To: <CAErSpo5RV=w+DkgHSZZPOFGiEBBxMSraLV3TepYUZwDJuV+Jzg@mail.gmail.com>
-References: <201402241200.21944.arnd@arndb.de>
- <CAErSpo5RV=w+DkgHSZZPOFGiEBBxMSraLV3TepYUZwDJuV+Jzg@mail.gmail.com>
-Message-ID: <5165962.7bqj51B15Z@wuerfel>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 26 Feb 2014 12:04:45 -0800
+Subject: [PATCH 1/3] cpufreq: stats: Remove redundant cpufreq_cpu_get()
+ call
+In-Reply-To: <CAKohponAnGn-C7-3T6JWZBb0PxtY1pE+o9SAKP-xC6GOrVE02Q@mail.gmail.com>
+References: <1789244.B5CzWbcp6h@vostro.rjw.lan>
+ <1393385915-19138-1-git-send-email-skannan@codeaurora.org>
+ <CAKohponAnGn-C7-3T6JWZBb0PxtY1pE+o9SAKP-xC6GOrVE02Q@mail.gmail.com>
+Message-ID: <530E48DD.5090108@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 February 2014 12:48:17 Bjorn Helgaas wrote:
-> On Mon, Feb 24, 2014 at 4:00 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > Hi Magnus,
-> >
-> > I noticed during randconfig testing that you enabled DMABOUNCE for the
-> > pci-rcar-gen2 driver as posted in this patch https://lkml.org/lkml/2014/2/5/30
-> >
-> > I didn't see the original post unfortunately, but I fear we have to
-> > revert it and come up with a better solution, ...
-> 
-> Sounds like I should drop the following patches from my pci/host-rcar
-> branch for now?
-> 
->   PCI: rcar: Add DMABOUNCE support
->   PCI: rcar: Enable BOUNCE in case of HIGHMEM
->   PCI: rcar: Make the Kconfig dependencies more generic
+On 02/25/2014 09:06 PM, Viresh Kumar wrote:
+> On 26 February 2014 09:08, Saravana Kannan <skannan@codeaurora.org> wrote:
+>> __cpufreq_stats_create_table always gets pass the valid and real policy
+>> struct. So, there's no need to call cpufreq_cpu_get() to get the policy
+>> again.
+>>
+>> Change-Id: I0136b3e67018ee3af2335906407f55d8c6219f71
+>
+> ??
+>
+>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+>> ---
+>>
+>> Viresh/Rafael,
+>>
+>> These 3 patches is the approximate code I have in mind.
+>>
+>> Approximate because:
+>> * I inserted one question as a comment into the code.
+>> * If the patch doesn't have any bugs, the plan is to remove
+>>    cpufreq_generic_get() and references to it.
+>>
+>> This takes care of the "don't advertise before it's ready for use" rule.
+>>
+>> Viresh,
+>>
+>> I think the locking updates needs to be done in addition to this.
+>>
+>> Regards,
+>> Saravana
+>>
+>>   drivers/cpufreq/cpufreq_stats.c | 12 +-----------
+>>   1 file changed, 1 insertion(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
+>> index 5793e14..e4bd27f 100644
+>> --- a/drivers/cpufreq/cpufreq_stats.c
+>> +++ b/drivers/cpufreq/cpufreq_stats.c
+>> @@ -185,7 +185,6 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
+>>   {
+>>          unsigned int i, j, count = 0, ret = 0;
+>>          struct cpufreq_stats *stat;
+>> -       struct cpufreq_policy *current_policy;
+>>          unsigned int alloc_size;
+>>          unsigned int cpu = policy->cpu;
+>>          if (per_cpu(cpufreq_stats_table, cpu))
+>> @@ -194,13 +193,7 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
+>>          if ((stat) == NULL)
+>>                  return -ENOMEM;
+>>
+>> -       current_policy = cpufreq_cpu_get(cpu);
+>> -       if (current_policy == NULL) {
+>> -               ret = -EINVAL;
+>> -               goto error_get_fail;
+>> -       }
+>> -
+>> -       ret = sysfs_create_group(&current_policy->kobj, &stats_attr_group);
+>> +       ret = sysfs_create_group(&policy->kobj, &stats_attr_group);
+>>          if (ret)
+>>                  goto error_out;
+>>
+>> @@ -243,11 +236,8 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
+>>          stat->last_time = get_jiffies_64();
+>>          stat->last_index = freq_table_get_index(stat, policy->cur);
+>>          spin_unlock(&cpufreq_stats_lock);
+>> -       cpufreq_cpu_put(current_policy);
+>>          return 0;
+>>   error_out:
+>> -       cpufreq_cpu_put(current_policy);
+>> -error_get_fail:
+>>          kfree(stat);
+>>          per_cpu(cpufreq_stats_table, cpu) = NULL;
+>>          return ret;
+>
+> I was damn sure that this wasn't a waste of time. This was some meaningful
+> code when I visited it earlier. And we absolutely required a new
+> cpufreq_cpu_get()..
+>
+> Reason: Earlier tables were created for this notifier: CPUFREQ_NOTIFY and
+> it used to come with another changed copy of 'policy' and so we were required
+> to get the real copy of policy to get to the right kobj.
+>
+> But recently I have simplified stuff there and these tables are now added with
+> CPUFREQ_CREATE_POLICY and so this replication isn't required anymore.
 
-Sounds good to me. The last patch is actually fine, but you'll have to
-fix the context to apply it without the other two.
+Agreed. I already knew it had a good reason. :) Just that it's not 
+needed anymore.
 
-	Arnd
+> So, Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+Thanks.
+
+>
+> While you are at it please get this part into __cpufreq_stats_create_table()
+> routine:
+>
+> table = cpufreq_frequency_get_table(cpu);
+> if (!table)
+>      return 0;
+>
+> As it is replicated at two places currently.
+>
+
+Doing it as a separate patch since it's technically unrelated to these 
+changes.
+
+-Saravana
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
