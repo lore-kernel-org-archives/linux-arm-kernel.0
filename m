@@ -1,72 +1,53 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 26 Feb 2014 21:48:43 +0000
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <5553754.0b4gMg5OS7@wuerfel>
-References: <20140226183454.GA14639@cbox>
- <5553754.0b4gMg5OS7@wuerfel>
-Message-ID: <20140226214843.GD12169@bivouac.eciton.net>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 26 Feb 2014 22:52:55 +0100
+Subject: [PATCH] Documentation: clk: Add locking documentation
+Message-ID: <1393451575-23758-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 08:55:58PM +0100, Arnd Bergmann wrote:
-> On Wednesday 26 February 2014 10:34:54 Christoffer Dall wrote:
-> > ARM VM System Specification
-> > ===========================
-> > 
-> > Goal
-> > ----
-> > The goal of this spec is to allow suitably-built OS images to run on
-> > all ARM virtualization solutions, such as KVM or Xen.
-> > 
-> > Recommendations in this spec are valid for aarch32 and aarch64 alike, and
-> > they aim to be hypervisor agnostic.
-> > 
-> > Note that simply adhering to the SBSA [2] is not a valid approach,
-> > for example because the SBSA mandates EL2, which will not be available
-> > for VMs.  Further, the SBSA mandates peripherals like the pl011, which
-> > may be controversial for some ARM VM implementations to support.
-> > This spec also covers the aarch32 execution mode, not covered in the
-> > SBSA.
-> 
-> I would prefer if we can stay as close as possible to SBSA for individual
-> hardware components, and only stray from it when there is a strong reason.
-> pl011-subset doesn't sound like a significant problem to implement,
-> especially as SBSA makes the DMA part of that optional. Can you
-> elaborate on what hypervisor would have a problem with that?
+Briefly documentation the common clock framework locking scheme from a
+clock driver point of view.
 
-I believe it comes down to how much extra overhead pl011-access-trap
-would be over virtio-console. If low, then sure.
-(Since there are certain things we cannot provide SBSA-compliant in
-the guest anyway, I wouldn't consider lack of pl011 to be a big issue.)
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ Documentation/clk.txt | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-> >   no FDT.  In this case, the VM implementation must provide ACPI, and
-> >   the OS must be able to locate the ACPI root pointer through the UEFI
-> >   system table.
-> > 
-> > For more information about the arm and arm64 boot conventions, see
-> > Documentation/arm/Booting and Documentation/arm64/booting.txt in the
-> > Linux kernel source tree.
-> > 
-> > For more information about UEFI and ACPI booting, see [4] and [5].
-> 
-> What's the point of having ACPI in a virtual machine? You wouldn't
-> need to abstract any of the hardware in AML since you already know
-> what the virtual hardware is, so I can't see how this would help
-> anyone.
+diff --git a/Documentation/clk.txt b/Documentation/clk.txt
+index 699ef2a..4bd6fd7 100644
+--- a/Documentation/clk.txt
++++ b/Documentation/clk.txt
+@@ -255,3 +255,29 @@ are sorted out.
+ 
+ To bypass this disabling, include "clk_ignore_unused" in the bootargs to the
+ kernel.
++
++	Part 7 - Locking
++
++The common clock framework uses two global locks. One of them (the enable
++lock) is held across calls to the .enable, .disable and .is_enabled
++operations, while the other (the prepare lock) is held across calls to all other
++operations. This effectively divides operations in two groups from a locking
++perspective.
++
++Drivers don't need to manually protect resources shared between the operations
++of one group, regardless of whether those resources are shared by multiple
++clocks or not. However, access to resources that are shared between operations
++of the two groups needs to be protected by the drivers. An example of such a
++resource would be a register that controls both the clock rate and the clock
++enable/disable state.
++
++The clock framework is reentrant, in that a driver is allowed to call clock
++framework functions from within its implementation of clock operations. This
++can for instance cause a .set_rate operation of one clock being called from
++within the .set_rate operation of another clock. This case must be considered
++in the driver implementations, but the code flow is usually controlled by the
++driver in that case.
++
++Note that locking must also be considered when code outside of the common
++clock framework needs to access resources used by the clock operations. This
++is considered out of scope of this document.
+-- 
+Regards,
 
-The point is that if we need to share any real hw then we need to use
-whatever the host has.
-
-> However, as ACPI will not be supported by arm32, not having the
-> complete FDT will prevent you from running a 32-bit guest on
-> a 64-bit hypervisor, which I consider an important use case.
-
-In which case we would be making an active call to ban anything other
-than virtio/xen-pv devices for 32-bit guests on hardware without DT.
-
-However, I see the case of a 32-bit guest on 64-bit hypervisor as less
-likely in the server space than in mobile, and ACPI in mobile as
-unlikely, so it may end up not being a big issue.
-
-/
-    Leif
+Laurent Pinchart
