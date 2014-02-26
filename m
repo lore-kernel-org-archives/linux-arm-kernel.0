@@ -1,72 +1,113 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 26 Feb 2014 10:53:02 +0100
-Subject: TWL6040 fails to initialize
-In-Reply-To: <530D972F.805@ti.com>
-References: <530C70B3.4010103@epfl.ch> <530CA8DA.8050806@ti.com>
- <530CB9C6.60806@epfl.ch> <530D972F.805@ti.com>
-Message-ID: <530DB97E.80309@epfl.ch>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 26 Feb 2014 10:54:35 +0100
+Subject: [PATCH v2 2/5] i2c: mv64xxx: Add support for the Allwinner A31
+ I2C driver
+In-Reply-To: <1389609293-2824-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1389609293-2824-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1389609293-2824-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <530DB9DB.50606@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Maxime,
 
-First, thanks for your help.
+On 13/01/2014 11:34, Maxime Ripard wrote:
+> The Allwinner A31 I2C controller is almost identical to the one used in the
+> other Allwinner SoCs, except for the fact that it needs to clear the interrupt
+> by setting the INT_FLAGS bit in the control register, instead of clearing it.
 
-On 02/26/2014 08:26 AM, Peter Ujfalusi wrote:
-> On 02/25/2014 05:41 PM, Florian Vaussard wrote:
->> If the power was not enabled at all, I would be unable to read the
->> revision register, no? And delaying the probe by one millisecond would
->> be of no help in this case IMHO.
+This patch doesn't apply on v3.14-rc4. Even by reducing the context the part
+on i2c-mv64xxx.txt failed to be applied. I removed this part and I reduced the
+context to one to be able to apply the part in the driver, it allowed me to
+test it on Armada 370, and then you can also add my:
+
+
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+
+Gregory
+
 > 
-> One thing which might cause this is that if the audpwron GPIO is set high
-> before the twl6040 module is probing. When I request the GPIO I ask it to be
-> set to low. If the line was high before this means we initiate the power off
-> sequence.
-> Can you try something like this:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt |  9 ++++++---
+>  drivers/i2c/busses/i2c-mv64xxx.c                      | 10 ++++++++++
+>  2 files changed, 16 insertions(+), 3 deletions(-)
 > 
-
-I statistically checked that the sleep should be placed after the GPIO
-request, so indeed this seems to be the problem, and your explanation is
-plausible. Can you send a proper patch?
-
-Now, related to this, I managed to found a part of the datasheet on the
-Great Internet. Looking at the "Power-Up Sequence" section, it is written:
-
-- NRESPWRON goes high -> plug detect and GPO are available
-- V2V1 goes high -> hook-detect available by I2C programming (sleep mode)
-- AUDPWRON goes high && READYINT -> ready to communicate through I2C and PDM
-
-So, although there seems to be some contradictions on when it is
-possible to access the I2C, shouldn't we enable the AUDPWRON GPIO
-_before_ making any I2C access?
-
-For the twl6040_probe, the following path would seem more correct to me:
-
-1) enable regulators
-2) request AUDPWRON
-3) twl6040_power(ON) && regcache_cache_only(false)
-4) wait for READYINT (or sleep if deterministic)
-5) perform all required I2C accesses (read revision, etc.)
-6) twl6040_power(OFF) && regcache_cache_only(true)
-
-What do you think?
-
-Thanks,
-Florian
-
-> diff --git a/drivers/mfd/twl6040.c b/drivers/mfd/twl6040.c
-> index 75316fb33448..d2a0bd1539ae 100644
-> --- a/drivers/mfd/twl6040.c
-> +++ b/drivers/mfd/twl6040.c
-> @@ -674,6 +674,9 @@ static int twl6040_probe(struct i2c_client *client,
->                                             GPIOF_OUT_INIT_LOW, "audpwron");
->                 if (ret)
->                         goto gpio_err;
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> index 603003a..2763225 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
+> @@ -4,15 +4,18 @@
+>  Required properties :
+>  
+>   - reg             : Offset and length of the register set for the device
+> - - compatible      : Should be "marvell,mv64xxx-i2c" or "allwinner,sun4i-i2c"
+> -                     or "marvell,mv78230-i2c"
+> + - compatible      : Should be "marvell,mv64xxx-i2c", "allwinner,sun4i-i2c",
+> +                     "marvell,mv78230-i2c" or "allwinner,sun6i-a31-i2c"
+>   - interrupts      : The interrupt number
+>  
+>  Optional properties :
+>  
+>   - clock-frequency : Desired I2C bus clock frequency in Hz. If not set the
+>  default frequency is 100kHz
+> - - resets          : phandle to the parent reset controller
 > +
-> +               /* power-down sequence latency */
-> +               usleep_range(500, 700);
->         }
+> + - resets          : phandle to the parent reset controller. Mandatory
+> +                     whenever you're using the "allwinner,sun6i-a31-i2c"
+> +                     compatible.
+>  
+>  Examples:
+>  
+> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+> index 0f6dde5..12ecf4b 100644
+> --- a/drivers/i2c/busses/i2c-mv64xxx.c
+> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+> @@ -151,6 +151,7 @@ struct mv64xxx_i2c_data {
+>  /* 5us delay in order to avoid repeated start timing violation */
+>  	bool			errata_delay;
+>  	struct reset_control	*rstc;
+> +	bool			irq_clear_inverted;
+>  };
+>  
+>  static struct mv64xxx_i2c_regs mv64xxx_i2c_regs_mv64xxx = {
+> @@ -568,6 +569,11 @@ mv64xxx_i2c_intr(int irq, void *dev_id)
+>  		status = readl(drv_data->reg_base + drv_data->reg_offsets.status);
+>  		mv64xxx_i2c_fsm(drv_data, status);
+>  		mv64xxx_i2c_do_action(drv_data);
+> +
+> +		if (drv_data->irq_clear_inverted)
+> +			writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_IFLG,
+> +			       drv_data->reg_base + drv_data->reg_offsets.control);
+> +
+>  		rc = IRQ_HANDLED;
+>  	}
+>  	spin_unlock_irqrestore(&drv_data->lock, flags);
+> @@ -692,6 +698,7 @@ static const struct i2c_algorithm mv64xxx_i2c_algo = {
+>   */
+>  static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
+>  	{ .compatible = "allwinner,sun4i-i2c", .data = &mv64xxx_i2c_regs_sun4i},
+> +	{ .compatible = "allwinner,sun6i-a31-i2c", .data = &mv64xxx_i2c_regs_sun4i},
+>  	{ .compatible = "marvell,mv64xxx-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
+>  	{ .compatible = "marvell,mv78230-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
+>  	{}
+> @@ -795,6 +802,9 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+>  		drv_data->errata_delay = true;
+>  	}
+>  
+> +	if (of_device_is_compatible(np, "allwinner,sun6i-a31-i2c"))
+> +		drv_data->irq_clear_inverted = true;
+> +
+>  out:
+>  	return rc;
+>  #endif
 > 
->         ret = regmap_add_irq_chip(twl6040->regmap, twl6040->irq, IRQF_ONESHOT,
-> 
-> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
