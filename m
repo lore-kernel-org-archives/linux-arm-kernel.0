@@ -1,97 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Feb 2014 16:33:25 +0900
-Subject: [PATCH v3 09/20] ARM: shmobile: r8a7779: Add helper to read mode pins
+Date: Wed, 26 Feb 2014 16:33:27 +0900
+Subject: [PATCH v3 11/20] ARM: shmobile: marzen-reference: Move clock and OF
+ device initialisation into board code
 In-Reply-To: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
 References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1393400016-23433-10-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1393400016-23433-12-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add and use helper to read mode pins.
-This will be re-used when moving marzen-reference to
-the common clock framework.
+Move the clock initialisation and OF device population from
+SoC to board code. This is in keeping with the pattern used by Lager.
+And the clock portion is part of decoupling clock initialisation
+from SoC code in preparation for moving to the common clock framework.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7779.c        | 11 ++---------
- arch/arm/mach-shmobile/include/mach/r8a7779.h |  1 +
- arch/arm/mach-shmobile/setup-r8a7779.c        | 14 ++++++++++++++
- 3 files changed, 17 insertions(+), 9 deletions(-)
+ arch/arm/mach-shmobile/board-marzen-reference.c | 3 +++
+ arch/arm/mach-shmobile/setup-r8a7779.c          | 4 ----
+ 2 files changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index 8e403ae..b1a5065 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -25,6 +25,7 @@
- #include <linux/clkdev.h>
- #include <mach/clock.h>
- #include <mach/common.h>
-+#include <mach/r8a7779.h>
- 
- /*
-  *		MD1 = 1			MD1 = 0
-@@ -52,9 +53,6 @@
- #define MSTPCR3		IOMEM(0xffc8003c)
- #define MSTPSR1		IOMEM(0xffc80044)
- 
--#define MODEMR		0xffcc0020
--
--
- /* ioremap() through clock mapping mandatory to avoid
-  * collision with ARM coherent DMA virtual memory range.
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+index 2773936..c22e5c2 100644
+--- a/arch/arm/mach-shmobile/board-marzen-reference.c
++++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+@@ -19,6 +19,7 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   */
-@@ -209,14 +207,9 @@ static struct clk_lookup lookups[] = {
  
- void __init r8a7779_clock_init(void)
++#include <linux/of_platform.h>
+ #include <mach/r8a7779.h>
+ #include <mach/common.h>
+ #include <mach/irqs.h>
+@@ -27,7 +28,9 @@
+ 
+ static void __init marzen_init(void)
  {
--	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
--	u32 mode;
-+	u32 mode = r8a7779_read_mode_pins();
- 	int k, ret = 0;
- 
--	BUG_ON(!modemr);
--	mode = ioread32(modemr);
--	iounmap(modemr);
--
- 	if (mode & MD(1)) {
- 		plla_clk.rate = 1500000000;
- 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7779.h b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-index 88eecea..d5ba2d8 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7779.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7779.h
-@@ -32,6 +32,7 @@ extern void r8a7779_add_early_devices(void);
- extern void r8a7779_add_standard_devices(void);
- extern void r8a7779_add_standard_devices_dt(void);
- extern void r8a7779_init_late(void);
-+extern u32 r8a7779_read_mode_pins(void);
- extern void r8a7779_clock_init(void);
- extern void r8a7779_pinmux_init(void);
- extern void r8a7779_pm_init(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 8e860b3..f6aeb7f 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -802,6 +802,20 @@ void __init r8a7779_add_standard_devices_dt(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	r8a7779_clock_init();
+ 	r8a7779_add_standard_devices_dt();
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ 	r8a7779_init_irq_extpin_dt(1); /* IRQ1 as individual interrupt */
  }
  
-+#define MODEMR		0xffcc0020
-+
-+u32 __init r8a7779_read_mode_pins(void)
-+{
-+	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
-+	u32 mode;
-+
-+	BUG_ON(!modemr);
-+	mode = ioread32(modemr);
-+	iounmap(modemr);
-+
-+	return mode;
-+}
-+
- static const char *r8a7779_compat_dt[] __initdata = {
- 	"renesas,r8a7779",
- 	NULL,
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index f28b8c7..3471a9b 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -784,12 +784,8 @@ void __init r8a7779_init_delay(void)
+ 
+ void __init r8a7779_add_standard_devices_dt(void)
+ {
+-	/* clocks are setup late during boot in the case of DT */
+-	r8a7779_clock_init();
+-
+ 	platform_add_devices(r8a7779_devices_dt,
+ 			     ARRAY_SIZE(r8a7779_devices_dt));
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+ #define MODEMR		0xffcc0020
 -- 
 1.8.5.2
