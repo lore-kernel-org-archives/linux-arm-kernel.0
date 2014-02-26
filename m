@@ -1,80 +1,45 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 26 Feb 2014 06:11:52 +0100
-Subject: [PATCH v2 0/2] ARM: OMAP4: Fix gpmc_fck clock
-In-Reply-To: <530D2FC9.2010800@ti.com>
-References: <1392801305-1698-1-git-send-email-florian.vaussard@epfl.ch>
- <5304DA2C.3030605@ti.com> <53050573.8090506@epfl.ch>
- <20140223212309.22529.75068@quantum> <530ADC39.1010300@epfl.ch>
- <20140225062615.22529.88499@quantum> <530C4FED.80403@epfl.ch>
- <530D2FC9.2010800@ti.com>
-Message-ID: <530D7798.8020407@epfl.ch>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Wed, 26 Feb 2014 14:12:16 +0900
+Subject: [PATCH] ARM: tegra: add device tree for SHIELD
+In-Reply-To: <530D754A.60700@wwwdotorg.org>
+References: <1393237593-28121-1-git-send-email-acourbot@nvidia.com>
+ <530B952D.2000006@wwwdotorg.org> <530BFC58.6020003@nvidia.com>
+ <530D1B7A.9070209@wwwdotorg.org> <530D748D.6010802@nvidia.com>
+ <530D754A.60700@wwwdotorg.org>
+Message-ID: <530D77B0.8080807@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
-
-On 02/26/2014 01:05 AM, Suman Anna wrote:
-> Florian,
-> 
-> On 02/25/2014 02:10 AM, Florian Vaussard wrote:
->> On 02/25/2014 07:26 AM, Mike Turquette wrote:
->>> Quoting Florian Vaussard (2014-02-23 21:44:25)
->>>> On 02/23/2014 10:23 PM, Mike Turquette wrote:
->>>>> Quoting Florian Vaussard (2014-02-19 11:26:43)
->>>>>>
->>>>>> On 02/19/2014 05:22 PM, Tero Kristo wrote:
->>>>>>> On 02/19/2014 11:15 AM, Florian Vaussard wrote:
->>>>>>>> Hello,
->>>>>>>>
->>>>>>>> Trying to get my SMSC9221 working on OMAP4 with DT,
->>>>>>>> I faced a misconfigured gpmc_fck (dummy clock set to 0)
->>>>>>>> resulting in serveral division-by-zero, misconfigured
->>>>>>>> timings and driver lost in the La La Land.
->>>>>>>>
->>>>>>>> To solve this, patch 1 removes gpmc_fck from the dummy
->>>>>>>> clocks, and patch 2 adds the gpmc_fck DT node and
->>>>>>>> reference it from the gpmc node.
->>>>>>>>
->>>>>>>> Tested on DuoVero/Parlor (OMAP4430) with SMSC9221.
->>>>>>>
->>>>>>> I can't test GPMC myself, but other than that, this set looks
->>>>>>> good to go.
->>>>>>>
->>>>>>
->>>>>> Thank you. Would you like more test coverage by other people? I would
->>>>>> like to see this in -rc if possible, as it is needed to boot my OMAP4
->>>>>> system.
->>>>>
->>>>> What OMAP4 system is this? Is this a regression for board that already
->>>>> has support merged into mainline?
->>>>>
->>>>
->>>> No, it is not yet merged into mainline. I was planning to post the DTS
->>>> this week, when most issues are cleared. Looking at the current
->>>> mainline
->>>> boards, no one seems to use the GPMC, so I am just the first one to hit
->>>> this issue.
+On 02/26/2014 02:02 PM, Stephen Warren wrote:
+> On 02/25/2014 09:58 PM, Alexandre Courbot wrote:
+>> On 02/26/2014 07:38 AM, Stephen Warren wrote:
+>>> On 02/24/2014 07:13 PM, Alexandre Courbot wrote:
+>>>> On 02/25/2014 03:53 AM, Stephen Warren wrote:
+>>>>> On 02/24/2014 03:26 AM, Alexandre Courbot wrote:
+>>>>>> Add a device tree for NVIDIA SHIELD. The set of enabled features is
+>>>>>> still minimal with no display option (although HDMI should be easy
+>>>>>> to get to work) and USB requiring external power.
+> ...
+>>>> For the Wifi chip, non-removable would be the correct setting
+>>>> hardware-wise, but there is a trap: the chip has its reset line asserted
+>>>> at boot-time, and you need to set GPIO 229 to de-assert it. Only after
+>>>> that will the device be detected on the SDIO bus. Since it lacks a CD
+>>>> line, it must be polled, hence the broken-cd property.
 >>>
->>> OK, well typically the later -rc's are for fixing observed regressions.
->>> Since your platform is not yet merged in then it's probably fine to push
->>> this for 3.15.
->>>
+>>> How does that GPIO get manipulated right now? I assume you must be
+>>> manually configuring it via sysfs after boot or something? If so,
+>>> perhaps it's best to just leave out the WiFi node until it works
+>>> automatically.
 >>
->> Fair enough. 3.15 is fine.
->>
->>> This also gives time to test the fix for other OMAP-ish processors.
->>>
->>
->> I can do the v3, including OMAP5 and DRA7. But for DRA7, I will need
->> someone with the TRM telling me where is connected gpmc_fclk (Suman?).
-> 
-> For DRA7, GPMC is connected off L3MAIN1_L3_GICLK (compared to
-> L3MAIN2_L3_GICLK on OMAP5), both of which are actually just L3_ICLK.
-> This is the l3_iclk_div in both the omap54xx-clocks.dtsi and
-> dra7xx-clocks.dtsi files.
-> 
+>> The GPIO needs to be set from user-space, yes. But if we leave the Wifi
+>> node out, I'm concerned that wireless will not be usable at all,
+>> wouldn't it?
+>
+> True, but if we have no representation of the device in DT that works
+> without manually enabling clocks and/or GPIOs, it's not a
+> complete/accurate representation of the HW, so it doesn't make sense to
+> add it to DT. Yes, I admit that sucks.
 
-Thank you very much. So I will send a v3 including this.
-
-Regards,
-Florian
+Well, I can always enable it in my out-of-tree branch until we can push 
+the complete binding in mainline, so I'm ok with taking it out of this 
+patch for now.
