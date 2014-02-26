@@ -1,176 +1,126 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 26 Feb 2014 14:27:40 -0500
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <20140226183454.GA14639@cbox>
-References: <20140226183454.GA14639@cbox>
-Message-ID: <530E402C.9040502@codeaurora.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 26 Feb 2014 20:32:29 +0100
+Subject: [PATCHv2 03/16] Documentation: dt: add OMAP iommu bindings
+In-Reply-To: <530E1E20.9000301@ti.com>
+References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
+ <1552997.8jd4jgn3Ze@avalon> <530E1E20.9000301@ti.com>
+Message-ID: <8258385.uITvkIdEvn@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Hi Suman,
 
-On 02/26/2014 01:34 PM, Christoffer Dall wrote:
-> ARM VM System Specification
-> ===========================
+On Wednesday 26 February 2014 11:02:24 Suman Anna wrote:
+> On 02/25/2014 08:13 PM, Laurent Pinchart wrote:
+> > On Tuesday 25 February 2014 17:02:35 Suman Anna wrote:
+> >> On 02/25/2014 03:26 PM, Laurent Pinchart wrote:
+> >>> On Thursday 13 February 2014 12:15:34 Suman Anna wrote:
+> >>>> From: Florian Vaussard <florian.vaussard@epfl.ch>
+> >>>> 
+> >>>> This patch adds the iommu bindings for all OMAP2+ SoCs. Apart from
+> >>>> the standard bindings used by OMAP peripherals, this patch uses a
+> >>>> 'dma-window' (already used by Tegra SMMU) and adds two OMAP custom
+> >>>> bindings - 'ti,#tlb-entries' and 'ti,iommu-bus-err-back'.
+> >>>> 
+> >>>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> >>>> [s-anna at ti.com: split bindings document, add dra7 and bus error back]
+> >>>> Signed-off-by: Suman Anna <s-anna@ti.com>
+> >>>> ---
+> >>>> 
+> >>>>  .../devicetree/bindings/iommu/ti,omap-iommu.txt    | 28 ++++++++++++++
+> >>>>  1 file changed, 28 insertions(+)
+> >>>>  create mode 100644
+> >>>>  Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+> >>>> 
+> >>>> diff --git a/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+> >>>> b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt new file
+> >>>> mode 100644
+> >>>> index 0000000..116492d
+> >>>> --- /dev/null
+> >>>> +++ b/Documentation/devicetree/bindings/iommu/ti,omap-iommu.txt
+> >>>> @@ -0,0 +1,28 @@
+> >>>> +OMAP2+ IOMMU
+> >>>> +
+> >>>> +Required properties:
+> >>>> +- compatible : Should be one of,
+> >>>> +		"ti,omap2-iommu" for OMAP2/OMAP3 IOMMU instances
+> >>>> +		"ti,omap4-iommu" for OMAP4/OMAP5 IOMMU instances
+> >>>> +		"ti,dra7-iommu" for DRA7xx IOMMU instances
+> >>>> +- ti,hwmods  : Name of the hwmod associated with the IOMMU instance
+> >>>> +- reg        : Address space for the configuration registers
+> >>>> +- interrupts : Interrupt specifier for the IOMMU instance
+> >>>> +- dma-window : IOVA start address and length
+> >>> 
+> >>> Isn't the dma window more of a system configuration property than a
+> >>> hardware property ? How do you expect it to be set?
+> >> 
+> >> We are setting it based on the addressable range for the MMU.
+> > 
+> > A quick look at the ISP and IVA IOMMUs in the OMAP3 shows that both
+> > support the full 4GB VA space. Why do you need to restrict it ?
 > 
-> Goal
-> ----
-> The goal of this spec is to allow suitably-built OS images to run on
-> all ARM virtualization solutions, such as KVM or Xen.
+> I should have rephrased it better when I said addressable range. While
+> the MMUs are capable of programming the full 4GB space, there are some
+> address ranges that are private from the processor view. This window is
+> currently used to set the range for the omap-iovmm driver (which only
+> OMAP3 ISP is using atm), and there is no point in allowing the
+> omap-iovmm driver the full range when the processor could never
+> reach/access those addresses.
 
-Would you consider including simulators/emulators as well, such as QEMU in TCG
-mode?
+But the IOMMU VA space is from a device point of view, not from a CPU point of 
+view. Could you point me to where those private ranges are documented, in 
+order to understand the problem correctly ?
 
-> Recommendations in this spec are valid for aarch32 and aarch64 alike, and
-> they aim to be hypervisor agnostic.
+> >> We are reusing the existing defined property and it allows us to get rid
+> >> of the IOVA start and end addresses defined in the pre-DT OMAP iommu
+> >> platform data.
+> >> 
+> >>>> +Optional properties:
+> >>>> +- ti,#tlb-entries : Number of entries in the translation look-aside
+> >>>> buffer. +                    Should be either 8 or 32 (default: 32)
+> >>>> +- ti,iommu-bus-err-back : Indicates the IOMMU instance supports
+> >>>> throwing
+> >>>> +		          back a bus error response on MMU faults.
+> >>> 
+> >>> Do these features vary per IOMMU instance or per IOMMU model ? In the
+> >>> latter case they could be inferred from the compatible string by the
+> >>> driver without requiring them to be explicit in DT (whether you want to
+> >>> do so is left to you though).
+> >> 
+> >> Well, these are fixed features given an IOMMU instance, like the OMAP3
+> >> ISP is the only one that has 8 TLB entries, all the remaining ones have
+> >> 32, and the IPU iommu instances are the only ones that support the bus
+> >> error response back. I have no preference to any particular way, and
+> >> sure the driver can infer these easily based on unique compatible
+> >> strings per subsystem per SoC. I just happened to go with defining
+> >> compatible strings per SoC, with the optional properties differentiating
+> >> the fixed behavior between different IOMMU instances on that SoC. This
+> >> is where I was looking for some inputs/guidance from the DT bindings
+> >> maintainers on what is the preferred method.
+> > 
+> > I think you've made the right choice. I wasn't sure whether those
+> > parameters varied across IOMMU instances of compatible devices (from a
+> > compatible string point of view) or were constant. As they vary they
+> > should be expressed in DT.
+>
+> Yeah, I wasn't sure if these qualify as features (as per
+> Documentation/devicetree/bindings/ABI.txt section II.2).
 > 
-> Note that simply adhering to the SBSA [2] is not a valid approach,
-> for example because the SBSA mandates EL2, which will not be available
-> for VMs.  Further, the SBSA mandates peripherals like the pl011, which
-> may be controversial for some ARM VM implementations to support.
-> This spec also covers the aarch32 execution mode, not covered in the
-> SBSA.
+> regards
+> Suman
 > 
-> 
-> Image format
-> ------------
-> The image format, as presented to the VM, needs to be well-defined in
-> order for prepared disk images to be bootable across various
-> virtualization implementations.
-> 
-> The raw disk format as presented to the VM must be partitioned with a
-> GUID Partition Table (GPT).  The bootable software must be placed in the
-> EFI System Partition (ESP), using the UEFI removable media path, and
-> must be an EFI application complying to the UEFI Specification 2.4
-> Revision A [6].
-> 
-> The ESP partition's GPT entry's partition type GUID must be
-> C12A7328-F81F-11D2-BA4B-00A0C93EC93B and the file system must be
-> formatted as FAT32/vfat as per Section 12.3.1.1 in [6].
-> 
-> The removable media path is \EFI\BOOT\BOOTARM.EFI for the aarch32
-> execution state and is \EFI\BOOT\BOOTAA64.EFI for the aarch64 execution
-> state.
-> 
-> This ensures that tools for both Xen and KVM can load a binary UEFI
-> firmware which can read and boot the EFI application in the disk image.
-> 
-> A typical scenario will be GRUB2 packaged as an EFI application, which
-> mounts the system boot partition and boots Linux.
-> 
-> 
-> Virtual Firmware
-> ----------------
-> The VM system must be able to boot the EFI application in the ESP.  It
-> is recommended that this is achieved by loading a UEFI binary as the
-> first software executed by the VM, which then executes the EFI
-> application.  The UEFI implementation should be compliant with UEFI
-> Specification 2.4 Revision A [6] or later.
-> 
-> This document strongly recommends that the VM implementation supports
-> persistent environment storage for virtual firmware implementation in
-> order to ensure probable use cases such as adding additional disk images
-> to a VM or running installers to perform upgrades.
-> 
-> The binary UEFI firmware implementation should not be distributed as
-> part of the VM image, but is specific to the VM implementation.
-
-Can you elaborate on the motivation for requiring that the kernel be stuffed
-into a disk image and for requiring such a heavyweight bootloader/firmware? By
-doing so you would seem to exclude those requiring an optimized boot process.
-
-> Hardware Description
-> --------------------
-> The Linux kernel's proper entry point always takes a pointer to an FDT,
-> regardless of the boot mechanism, firmware, and hardware description
-> method.  Even on real hardware which only supports ACPI and UEFI, the kernel
-> entry point will still receive a pointer to a simple FDT, generated by
-> the Linux kernel UEFI stub, containing a pointer to the UEFI system
-> table.  The kernel can then discover ACPI from the system tables.  The
-> presence of ACPI vs. FDT is therefore always itself discoverable,
-> through the FDT.
-> 
-> Therefore, the VM implementation must provide through its UEFI
-> implementation, either:
-> 
->   a complete FDT which describes the entire VM system and will boot
->   mainline kernels driven by device tree alone, or
-> 
->   no FDT.  In this case, the VM implementation must provide ACPI, and
->   the OS must be able to locate the ACPI root pointer through the UEFI
->   system table.
-> 
-> For more information about the arm and arm64 boot conventions, see
-> Documentation/arm/Booting and Documentation/arm64/booting.txt in the
-> Linux kernel source tree.
-> 
-> For more information about UEFI and ACPI booting, see [4] and [5].
-> 
-> 
-> VM Platform
-> -----------
-> The specification does not mandate any specific memory map.  The guest
-> OS must be able to enumerate all processing elements, devices, and
-> memory through HW description data (FDT, ACPI) or a bus-specific
-> mechanism such as PCI.
-> 
-> The virtual platform must support at least one of the following ARM
-> execution states:
->   (1) aarch32 virtual CPUs on aarch32 physical CPUs
->   (2) aarch32 virtual CPUs on aarch64 physical CPUs
->   (3) aarch64 virtual CPUs on aarch64 physical CPUs
-> 
-> It is recommended to support both (2) and (3) on aarch64 capable
-> physical systems.
-> 
-> The virtual hardware platform must provide a number of mandatory
-> peripherals:
-> 
->   Serial console:  The platform should provide a console,
->   based on an emulated pl011, a virtio-console, or a Xen PV console.
-> 
->   An ARM Generic Interrupt Controller v2 (GICv2) [3] or newer.  GICv2
->   limits the the number of virtual CPUs to 8 cores, newer GIC versions
->   removes this limitation.
-> 
->   The ARM virtual timer and counter should be available to the VM as
->   per the ARM Generic Timers specification in the ARM ARM [1].
-> 
->   A hotpluggable bus to support hotplug of at least block and network
->   devices.  Suitable buses include a virtual PCIe bus and the Xen PV
->   bus.
-
-Is VirtIO hotplug capable? Over PCI or MMIO transports or both?
-
-> We make the following recommendations for the guest OS kernel:
-> 
->   The guest OS must include support for GICv2 and any available newer
->   version of the GIC architecture to maintain compatibility with older
->   VM implementations.
-> 
->   It is strongly recommended to include support for all available
->   (block, network, console, balloon) virtio-pci, virtio-mmio, and Xen PV
->   drivers in the guest OS kernel or initial ramdisk.
-
-I would love to eventually see some defconfigs for this sort of thing.
-
-> Other common peripherals for block devices, networking, and more can
-> (and typically will) be provided, but OS software written and compiled
-> to run on ARM VMs cannot make any assumptions about which variations
-> of these should exist or which implementation they use (e.g. VirtIO or
-> Xen PV).  See "Hardware Description" above.
-> 
-> Note that this platform specification is separate from the Linux kernel
-> concept of mach-virt, which merely specifies a machine model driven
-> purely from device tree, but does not mandate any peripherals or have any
-> mention of ACPI.
-
-Well, the commit message for it said it mandated a GIC and architected timers.
-
-Regards,
-Christopher
+> >>>> +Example:
+> >>>> +	/* OMAP3 ISP MMU */
+> >>>> +	mmu_isp: mmu at 480bd400 {
+> >>>> +		compatible = "ti,omap2-iommu";
+> >>>> +		reg = <0x480bd400 0x80>;
+> >>>> +		interrupts = <24>;
+> >>>> +		ti,hwmods = "mmu_isp";
+> >>>> +		ti,#tlb-entries = <8>;
+> >>>> +		dma-window = <0 0xfffff000>;
+> >>>> +	};
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Regards,
+
+Laurent Pinchart
