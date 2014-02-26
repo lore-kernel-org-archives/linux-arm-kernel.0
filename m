@@ -1,107 +1,74 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Wed, 26 Feb 2014 01:59:18 +0000
-Subject: [PATCH v11 00/15] Add power management support for mxs phy
-In-Reply-To: <1393208467-6355-1-git-send-email-peter.chen@freescale.com>
-References: <1393208467-6355-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <8281a0d328fa4a028784316d45c3c0a7@BL2PR03MB226.namprd03.prod.outlook.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 26 Feb 2014 03:05:42 +0100
+Subject: [PATCHv2 02/16] iommu/omap: omap_iommu_attach() should return
+ ENODEV, not NULL
+In-Reply-To: <530D19E3.9030407@ti.com>
+References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
+ <2290716.T9AJoGfoRd@avalon> <530D19E3.9030407@ti.com>
+Message-ID: <18584919.CMGx44dZjC@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-Hi Mark,
+Hi Suman,
 
-If you think the dt binding doc (1/15 and 4/15) are ok to push,
-please ack it. In that case, the driver maintainer can queue 
-the driver patches, thanks.
+On Tuesday 25 February 2014 16:32:03 Suman Anna wrote:
+> On 02/25/2014 03:13 PM, Laurent Pinchart wrote:
+> > On Thursday 13 February 2014 12:15:33 Suman Anna wrote:
+> >> From: Florian Vaussard <florian.vaussard@epfl.ch>
+> >> 
+> >> omap_iommu_attach() returns NULL or ERR_PTR in case of error, but
+> >> omap_iommu_attach_dev() only checks for IS_ERR. Thus a NULL return value
+> >> (in case driver_find_device fails) will cause the kernel to panic when
+> >> omap_iommu_attach_dev() dereferences the pointer.
+> >> 
+> >> In such case, omap_iommu_attach() should return ENODEV, not NULL.
+> >> 
+> >> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> >> Acked-by: Suman Anna <s-anna@ti.com>
+> >> ---
+> >> 
+> >>   drivers/iommu/omap-iommu.c | 4 ++--
+> >>   1 file changed, 2 insertions(+), 2 deletions(-)
+> >> 
+> >> diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
+> >> index fff2ffd..6272c36 100644
+> >> --- a/drivers/iommu/omap-iommu.c
+> >> +++ b/drivers/iommu/omap-iommu.c
+> >> @@ -863,7 +863,7 @@ static int device_match_by_alias(struct device *dev,
+> >> void *data) **/
+> >> 
+> >>   static struct omap_iommu *omap_iommu_attach(const char *name, u32
+> >>   *iopgd)
+> >>   {
+> >> -	int err = -ENOMEM;
+> >> +	int err = -ENODEV;
+> >>   	struct device *dev;
+> >>   	struct omap_iommu *obj;
+> >> 
+> >> @@ -871,7 +871,7 @@ static struct omap_iommu *omap_iommu_attach(const
+> >> char *name, u32 *iopgd)
+> >>   				(void *)name,
+> >>   				device_match_by_alias);
+> >>   	if (!dev)
+> >> -		return NULL;
+> >> +		return ERR_PTR(err);
+> > 
+> > I would return ERR_PTR(-ENODEV) here, and remove the initialization at
+> > declaration of err above.
+> 
+> The initialization at the beginning is also serving one another exit
+> path (a check for try_module_get), where err is not being set. If the
+> initialization is removed, then the err has to be set explicitly at the
+> other place. Let me know if you still want this changed.
 
-Peter
+The return value of iommu_enable() is unconditionally stored in err before the 
+try_module_get() call, so that code patch is buggy anyway and should be fixed. 
+I would still remove the initialization at declaration and assign -ENODEV to 
+err explicitly when try_module_get() fails before the goto err_module.
 
-> The serial adds power management support for MXS PHY, it includes:
-> 
-> - Add one PHY API .set_wakeup, and related API implementation at mxs phy
-> driver
-> - misc changes and bug fixes for mxs phy to support low power mode and
-> wakeup.
-> 
-> It is based on the lastest Greg's usb-next, 3.14-rc3.
-> 
-> Changes for v11:
-> - Change the descrition of adding compatible string, and
->   add mention that "fsl,imx23-usbphy" is still a fallback
->   for other strings. [1/15]
-> 
-> Changes for v10:
-> - Nothing related with function change.
-> - It adds dt maintainers to To list, and cc devicetree at vger.kernel.org,
-> wait dt-maintainer's ack for 1/15, 4/15.
-> - Add last three dts patches for reference which have already at Shawn's
-> tree.
-> 
-> Changes for v9:
-> - Fix the build warning if CONFIG_SUSPEND is not set
-> 
-> Changes for v8:
-> - Shawn has already applied two dts patches, so delete them at
->   v8 version, http://marc.info/?l=linux-arm-kernel&m=138785188404939&w=2
-> - Using of_get_property to avoid imx6 fail at probe when using old DTB
-> [5/12]
-> - Do not consider failure if alias id is not existed, it can avoid fail
->   at probe when using old DTB [8/12]
-> - We don't need more changes for [8/12] change due to we use
->   "mxs_phy->port_id ==" as condition
-> 
-> Changes for v7:
-> - Fixed indentation problem at binding doc [1/14]
-> - s/ganranteed/guaranteed, and add explanation for "auto setting" [3/14]
-> - add static before SIMPLE_DEV_PM_OPS [13/14]
-> - add one patch to change usb device description [7/14]
-> - Delete the .nofity_suspend and .notify_resume due to Felipe
->   does not agree to add them as PHY API, will use other ways to implement
->   them in future.
-> 
-> Changes for v6:
-> - Add description for IC bug fixes logic. [9/15]
-> - Move is_imx6q_phy and is_imx6sl_phy from [9/15] to [14/15]
-> - %s/mxs_phy_clock_switch/mxs_phy_clock_switch_delay to reflect the
-> function meaning more precise [15/15]
-> 
-> Changes for v5:
-> Add Marc and Michael Grzeschik's commnets
-> - typo error at [2/15]
-> - sqhash patches which introducing mxs_phy_disconnect_line and fixed but
-> at this function. [13/15]
-> - Introducing flag MXS_PHY_NEED_IP_FIX who stands for the SoCs who have
-> IC fixes. [2/15, 8/15]
-> - Delete one patch for low speed connection problem at every rare
-> situations due to the root cause has still not found.
-> 
-> Peter Chen (15):
->   usb: doc: phy-mxs: Add more compatible strings
->   usb: phy-mxs: Add platform judgement code
->   usb: phy-mxs: Add auto clock and power setting
->   usb: doc: phy-mxs: update binding for adding anatop phandle
->   usb: phy-mxs: Add anatop regmap
->   usb: phy-mxs: change description of usb device speed
->   usb: phy-mxs: Enable IC fixes for related SoCs
->   usb: phy-mxs: add controller id
->   usb: phy: Add set_wakeup API
->   usb: phy-mxs: Add implementation of set_wakeup
->   usb: phy-mxs: Add system suspend/resume API
->   usb: phy-mxs: Add sync time after controller clear phcd
->   ARM: dts: mxs: add mxs phy controller id
->   ARM: dts: imx6: add anatop phandle for usbphy
->   ARM: dts: imx6: add mxs phy controller id
-> 
->  Documentation/devicetree/bindings/usb/mxs-phy.txt |    8 +-
->  arch/arm/boot/dts/imx23.dtsi                      |    1 +
->  arch/arm/boot/dts/imx28.dtsi                      |    2 +
->  arch/arm/boot/dts/imx6qdl.dtsi                    |    4 +
->  arch/arm/boot/dts/imx6sl.dtsi                     |    4 +
->  drivers/usb/phy/phy-mxs-usb.c                     |  310
-> ++++++++++++++++++++-
->  include/linux/usb/phy.h                           |   16 +
->  7 files changed, 330 insertions(+), 15 deletions(-)
-> 
-> --
-> 1.7.8
-> 
+> >>   	obj = to_iommu(dev);
+
+-- 
+Regards,
+
+Laurent Pinchart
