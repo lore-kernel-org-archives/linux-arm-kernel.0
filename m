@@ -1,33 +1,41 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Feb 2014 13:55:33 +0000
-Subject: [PATCH v2 3/3] ahci: st: Add support for ST's SATA IP
-In-Reply-To: <20140226135108.GC17302@htj.dyndns.org>
-References: <1393328481-7251-1-git-send-email-lee.jones@linaro.org>
- <1393328481-7251-3-git-send-email-lee.jones@linaro.org>
- <20140225144141.GA26788@htj.dyndns.org>
- <20140226135108.GC17302@htj.dyndns.org>
-Message-ID: <20140226135533.GN9195@lee--X1>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 26 Feb 2014 22:01:06 +0800
+Subject: [PATCH v2 1/2] ARM: dts: imx6: adjust the interrupt list in
+ order to support MSI
+In-Reply-To: <1393410438-28205-1-git-send-email-l.stach@pengutronix.de>
+References: <1393410438-28205-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20140226140104.GC23892@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > Cc: Tejun Heo <tj@kernel.org>
-> > > Cc: linux-ide at vger.kernel.org
-> > > Acked-by: Alexandre Torgue <alexandre.torgue@st.com>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > Applied to libata/for-3.15 w/ missing "\n" added to dev_err() in
-> > st_ahci_suspend().
+On Wed, Feb 26, 2014 at 11:27:17AM +0100, Lucas Stach wrote:
+> From: Juergen Beisert <jbe@pengutronix.de>
 > 
-> Reverted from libata/for-3.15 due to build failure.  Please drop
-> ahci_platform_put_resource() calls.  ahci_platform now manages it
-> through devres.
+> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx6qdl.dtsi | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index fb28b2ecb1db..aeccbb114fc5 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -126,7 +126,8 @@
+>  				  0x81000000 0 0          0x01f80000 0 0x00010000 /* downstream I/O */
+>  				  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
+>  			num-lanes = <1>;
+> -			interrupts = <0 123 0x04>;
+> +			/*               inta          intb         intc         intd/msi */
 
-Ah, nice fixup.
+What about replacing the comment with an 'interrupt-names' property?
 
-I'll rebase onto your most recent tree and retest.
+Shawn
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> +			interrupts = <0 123 0x04>, <0 122 0x04>, <0 121 0x04>, <0 120 0x04>;
+>  			clocks = <&clks 189>, <&clks 187>, <&clks 206>, <&clks 144>;
+>  			clock-names = "pcie_ref_125m", "sata_ref_100m", "lvds_gate", "pcie_axi";
+>  			status = "disabled";
+> -- 
+> 1.8.5.3
+> 
