@@ -1,57 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 26 Feb 2014 10:52:07 +0000
-Subject: build error on 3.14-rc4 with SPLIT_PTLOCK_CPUS <= NR_CPUS and !MMU
-In-Reply-To: <20140226101204.GD6865@pengutronix.de>
-References: <20140226101204.GD6865@pengutronix.de>
-Message-ID: <20140226105207.GV21483@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 26 Feb 2014 12:11:20 +0100
+Subject: [PATCH] scripts/link-vmlinux.sh: correct base address for some ARM
+ special cases
+Message-ID: <1393413080-26942-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 11:12:04AM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> with the attached config building on v3.14-rc4 fails with 
-> 
-> In file included from arch/arm/kernel/asm-offsets.c:14:0:
-> include/linux/mm.h: In function 'pte_lockptr':
-> include/linux/mm.h:1392:2: error: implicit declaration of function 'pmd_page' [-Werror=implicit-function-declaration]
-> include/linux/mm.h:1392:2: warning: passing argument 1 of 'ptlock_ptr' makes pointer from integer without a cast [enabled by default]
-> include/linux/mm.h:1384:27: note: expected 'struct page *' but argument is of type 'int'
-> 
-> I don't know how to fix that.
+The toolchain problem described in commit f6537f2f0eba
+(scripts/kallsyms: filter symbols not in kernel address space) makes it
+necessary to filter out some kernel symbols from /proc/kallsyms to make
+perf happy.
 
-This looks like it was caused by:
+For that to work correctly the address used to filter should be just
+below the kernel text segment. Depending on kernel configuration
+CONFIG_PAGE_OFFSET is not the right address to use. See the comments
+introduced by this commit for the glory details.
 
-commit 49076ec2ccaf68610aa03d96bced9a6694b93ca1
-Author: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-Date:   Thu Nov 14 14:31:51 2013 -0800
+Fixes: b9b32bf70f2f (ARM: use linker magic for vectors and vector stubs)
+Cc: stable at vger.kernel.org
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-    mm: dynamically allocate page->ptl if it cannot be embedded to struct page
+note I'm not entirely sure if the diagnose "toolchain problem" is right.
+That's what Arnd suggested in #armlinux. So maybe the commit log wants
+some fixing.
 
-    If split page table lock is in use, we embed the lock into struct page
-    of table's page.  We have to disable split lock, if spinlock_t is too
-    big be to be embedded, like when DEBUG_SPINLOCK or DEBUG_LOCK_ALLOC
-    enabled.
+This is probably stable material as 7122c3e9154b and f6537f2f0eba were
+considered for stable, too. As b9b32bf70f2f has a stable annotation,
+too, maybe older stable kernel also need fixing.
 
-    This patch add support for dynamic allocation of split page table lock
-    if we can't embed it to struct page.
+Other than that I wonder if "--page-offset" is a misnomer. Better use
+"--kernel-start"?  I didn't do this change here because patches for
+stable should be minimal. But maybe it's worth a followup patch?
 
-    page->ptl is unsigned long now and we use it as spinlock_t if
-    sizeof(spinlock_t) <= sizeof(long), otherwise it's pointer to spinlock_t.
+Best regards
+Uwe
 
-    The spinlock_t allocated in pgtable_page_ctor() for PTE table and in
-    pgtable_pmd_page_ctor() for PMD table.  All other helpers converted to
-    support dynamically allocated page->ptl.
+ scripts/link-vmlinux.sh | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
 
-    Signed-off-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-    Reviewed-by: Peter Zijlstra <peterz@infradead.org>
-    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
-    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
-
-which decided to turn macros into inline functions but without /first/
-making sure that the requirements of those inline functions are
-included - that being asm/pgtable.h.
-
+diff --git a/scripts/link-vmlinux.sh b/scripts/link-vmlinux.sh
+index 2dcb37736d84..493b4ccdf5fc 100644
+--- a/scripts/link-vmlinux.sh
++++ b/scripts/link-vmlinux.sh
+@@ -82,8 +82,24 @@ kallsyms()
+ 		kallsymopt="${kallsymopt} --all-symbols"
+ 	fi
+ 
+-	if [ -n "${CONFIG_ARM}" ] && [ -n "${CONFIG_PAGE_OFFSET}" ]; then
+-		kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
++	if [ -n "${CONFIG_ARM}" ]; then
++		# There are some ARM toolchains that generate some internal
++		# symbols that then appear in /proc/kallsyms and these disturbe
++		# perf. So filter out all symbols below PAGE_OFFSET.
++		# ARM is a bit complicated here. The page-offset isn't
++		# completely determined in Kconfig as of 3.14-rc. Without MMU
++		# it's not CONFIG_PAGE_OFFSET that is used but (indirectly)
++		# CONFIG_DRAM_BASE. But for XIP we want the XIP PHYS_ADDR
++		# though.
++		if [ -n "${CONFIG_XIP_PHYS_ADDR}" ]; then
++			page_offset="${CONFIG_XIP_PHYS_ADDR}"
++		elif [ -z "${CONFIG_MMU}" ]; then
++			page_offset="${CONFIG_DRAM_BASE}"
++		else
++			page_offset="$CONFIG_PAGE_OFFSET"
++		fi
++
++		kallsymopt="${kallsymopt} --page-offset=$page_offset"
+ 	fi
+ 
+ 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+1.8.5.3
