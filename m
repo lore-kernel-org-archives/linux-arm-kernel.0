@@ -1,59 +1,103 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Wed, 26 Feb 2014 09:50:55 -0800
-Subject: [PATCH RFC v1 3/3] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140226102427.GA22839@e102568-lin.cambridge.arm.com>
-References: <1392774729-3235-1-git-send-email-sebastian.capella@linaro.org>
- <1392774729-3235-4-git-send-email-sebastian.capella@linaro.org>
- <20140219161254.GB19343@e102568-lin.cambridge.arm.com>
- <20140222103840.GH21483@n2100.arm.linux.org.uk>
- <20140222120910.GA9012@e102568-lin.cambridge.arm.com>
- <20140223200208.12998.47604@capellas-linux>
- <20140225113251.GB6855@e102568-lin.cambridge.arm.com>
- <20140225175531.18229.77850@capellas-linux>
- <20140226102427.GA22839@e102568-lin.cambridge.arm.com>
-Message-ID: <20140226175055.3502.49656@capellas-linux>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 26 Feb 2014 18:51:32 +0100
+Subject: [PATCHv8][ 2/7] staging: imx-drm: Add RGB666 support for parallel
+ display.
+In-Reply-To: <1393437097-25129-1-git-send-email-denis@eukrea.com>
+References: <1393437097-25129-1-git-send-email-denis@eukrea.com>
+Message-ID: <1393437097-25129-2-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lorenzo Pieralisi (2014-02-26 02:24:27)
-> On Tue, Feb 25, 2014 at 05:55:31PM +0000, Sebastian Capella wrote:
-> 
-> Please add:
-> 
-> "swsusp_save() is executed in the suspend finisher so that the CPU context
-> pointer and memory are part of the saved image, which is required by the
-> resume kernel image to restart execution from swsusp_arch_suspend()"
-> 
-> >  * soft_restart is not technically needed, but is used
-> >  * to get success returned from cpu_suspend.
-> >  * After resume, the hibernation snapshot is written out.
-> 
-> "When soft reboot completes, the hibernation snapshot is written out."
-> 
-> Resume is confusing since this code is resuming twice :D on image saving
-> and on kernel image restoration.
+Cc: Eric B?nard <eric@eukrea.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: devel at driverdev.osuosl.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ChangeLog v7->v8:
+- Shrinked even more the Cc list.
 
-Thanks Lorenzo!
+ChangeLog v6->v7:
+- Shrinked even more the Cc list.
 
-Here's what I've got.
+ChangeLog v5->v6:
+- Remove people not concerned by this patch from the Cc list.
 
-/*
- * Snapshot kernel memory and reset the system.
- *
- * swsusp_save() is executed in the suspend finisher so that the CPU
- * context pointer and memory are part of the saved image, which is
- * required by the resume kernel image to restart execution from
- * swsusp_arch_suspend().
- *
- * soft_restart is not technically needed, but is used to get success
- * returned from cpu_suspend.
- * 
- * When soft reboot completes, the hibernation snapshot is
- * written out.
- */
+ChangeLog v3->v5:
+- Use the correct RGB order.
 
-Does this look ok?  I'll prepare a v4 patchset.
+ChangeLog v2->v3:
+- Added some interested people in the Cc list.
+- Removed the commit message long desciption that was just a copy of the short
+  description.
+- Rebased the patch.
+- Fixed a copy-paste error in the ipu_dc_map_clear parameter.
+---
+ .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    2 +-
+ drivers/staging/imx-drm/ipu-v3/ipu-dc.c            |    9 +++++++++
+ drivers/staging/imx-drm/parallel-display.c         |    2 ++
+ 3 files changed, 12 insertions(+), 1 deletion(-)
 
-Thanks!
-
-Sebastian
+diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+index b876d49..2d24425 100644
+--- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
++++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
+@@ -29,7 +29,7 @@ Required properties:
+ - crtc: the crtc this display is connected to, see below
+ Optional properties:
+ - interface_pix_fmt: How this display is connected to the
+-  crtc. Currently supported types: "rgb24", "rgb565", "bgr666"
++  crtc. Currently supported types: "rgb24", "rgb565", "bgr666", "rgb666"
+ - edid: verbatim EDID data block describing attached display.
+ - ddc: phandle describing the i2c bus handling the display data
+   channel
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+index d0e3bc3..617e65b 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-dc.c
+@@ -92,6 +92,7 @@ enum ipu_dc_map {
+ 	IPU_DC_MAP_GBR24, /* TVEv2 */
+ 	IPU_DC_MAP_BGR666,
+ 	IPU_DC_MAP_BGR24,
++	IPU_DC_MAP_RGB666,
+ };
+ 
+ struct ipu_dc {
+@@ -155,6 +156,8 @@ static int ipu_pixfmt_to_map(u32 fmt)
+ 		return IPU_DC_MAP_BGR666;
+ 	case V4L2_PIX_FMT_BGR24:
+ 		return IPU_DC_MAP_BGR24;
++	case V4L2_PIX_FMT_RGB666:
++		return IPU_DC_MAP_RGB666;
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -404,6 +407,12 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 1, 15, 0xff); /* green */
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR24, 0, 23, 0xff); /* blue */
+ 
++	/* rgb666 */
++	ipu_dc_map_clear(priv, IPU_DC_MAP_RGB666);
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 0, 5, 0xfc); /* blue */
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 1, 11, 0xfc); /* green */
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 2, 17, 0xfc); /* red */
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
+index d610f07..12a1b5e 100644
+--- a/drivers/staging/imx-drm/parallel-display.c
++++ b/drivers/staging/imx-drm/parallel-display.c
+@@ -196,6 +196,8 @@ static int imx_pd_bind(struct device *dev, struct device *master, void *data)
+ 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB565;
+ 		else if (!strcmp(fmt, "bgr666"))
+ 			imxpd->interface_pix_fmt = V4L2_PIX_FMT_BGR666;
++		else if (!strcmp(fmt, "rgb666"))
++			imxpd->interface_pix_fmt = V4L2_PIX_FMT_RGB666;
+ 	}
+ 
+ 	imxpd->dev = dev;
+-- 
+1.7.9.5
