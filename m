@@ -1,37 +1,276 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 26 Feb 2014 10:50:43 +0530
-Subject: [PATCH] cpufreq: Set policy to non-NULL only after all hotplug
- online work is done
-In-Reply-To: <530D06FF.201@codeaurora.org>
-References: <1393225072-3997-1-git-send-email-skannan@codeaurora.org>
- <530BAA31.4050701@codeaurora.org>
- <CAKohpo=0CgzjCgKnDxUMcN6-CgbQ2ML=Tx-K8fS7=VJJYOD0eg@mail.gmail.com>
- <15001517.xLHO8lGdWr@vostro.rjw.lan> <530D06FF.201@codeaurora.org>
-Message-ID: <CAKohpo=iUBBcznKf0YbwNpvHNRuknC1wC0=MOSMrDYSaY2VLJQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 25 Feb 2014 23:48:19 -0600
+Subject: [PATCH v4 4/6] arm: add early_ioremap support
+In-Reply-To: <1392238575-10000-5-git-send-email-msalter@redhat.com>
+References: <1392238575-10000-1-git-send-email-msalter@redhat.com>
+ <1392238575-10000-5-git-send-email-msalter@redhat.com>
+Message-ID: <CAL_JsqLi=GhGy7dNf2BiAGd4EtzfqqYfbo0YhRhyhuwEp0w8HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2014 02:41, Saravana Kannan <skannan@codeaurora.org> wrote:
-> On 02/25/2014 05:04 AM, Rafael J. Wysocki wrote:
->> On Tuesday, February 25, 2014 02:20:57 PM Viresh Kumar wrote:
+On Wed, Feb 12, 2014 at 2:56 PM, Mark Salter <msalter@redhat.com> wrote:
+> This patch uses the generic early_ioremap code to implement
+> early_ioremap for ARM. The ARM-specific bits come mostly from
+> an earlier patch from Leif Lindholm <leif.lindholm@linaro.org>
+> here:
 
-> I think there's been a misunderstanding of what I'm proposing. The reference
-> to policy->clk is only to get rid of the dependency that
-> cpufreq_generic_get() has on the per cpu policy variable being filled. You
-> can do that by just removing calls to get _IF_ clk is filled in.
+This doesn't actually work for me. The PTE flags are not correct and
+accesses to a device fault. See below.
 
-cpufreq_cpu_get() can be called by other drivers as well, which may not have
-clock interface implemented for them. We can't stop them from calling it.
+>
+>   https://lkml.org/lkml/2013/10/3/279
+>
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> Tested-by: Leif Lindholm <leif.lindholm@linaro.org>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm/Kconfig              | 10 +++++
+>  arch/arm/include/asm/Kbuild   |  1 +
+>  arch/arm/include/asm/fixmap.h | 20 ++++++++++
+>  arch/arm/include/asm/io.h     |  1 +
+>  arch/arm/kernel/setup.c       |  2 +
+>  arch/arm/mm/Makefile          |  4 ++
+>  arch/arm/mm/early_ioremap.c   | 93 +++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mm/mmu.c             |  2 +
+>  8 files changed, 133 insertions(+)
+>  create mode 100644 arch/arm/mm/early_ioremap.c
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index e254198..7a35ef6 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1874,6 +1874,16 @@ config UACCESS_WITH_MEMCPY
+>           However, if the CPU data cache is using a write-allocate mode,
+>           this option is unlikely to provide any performance gain.
+>
+> +config EARLY_IOREMAP
+> +       bool "Provide early_ioremap() support for kernel initialization"
+> +       select GENERIC_EARLY_IOREMAP
+> +       help
+> +         Provide a mechanism for kernel initialisation code to temporarily
+> +         map, in a highmem-agnostic way, memory pages in before ioremap()
+> +         and friends are available (before paging_init() has run). It uses
+> +         the same virtual memory range as kmap so all early mappings must
+> +         be unmapped before paging_init() is called.
+> +
+>  config SECCOMP
+>         bool
+>         prompt "Enable seccomp to safely compute untrusted bytecode"
+> diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+> index 3278afe..6fcfd7d 100644
+> --- a/arch/arm/include/asm/Kbuild
+> +++ b/arch/arm/include/asm/Kbuild
+> @@ -4,6 +4,7 @@ generic-y += auxvec.h
+>  generic-y += bitsperlong.h
+>  generic-y += cputime.h
+>  generic-y += current.h
+> +generic-y += early_ioremap.h
+>  generic-y += emergency-restart.h
+>  generic-y += errno.h
+>  generic-y += exec.h
+> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+> index 68ea615..ff8fa3e 100644
+> --- a/arch/arm/include/asm/fixmap.h
+> +++ b/arch/arm/include/asm/fixmap.h
+> @@ -21,8 +21,28 @@ enum fixed_addresses {
+>         FIX_KMAP_BEGIN,
+>         FIX_KMAP_END = (FIXADDR_TOP - FIXADDR_START) >> PAGE_SHIFT,
+>         __end_of_fixed_addresses
+> +/*
+> + * 224 temporary boot-time mappings, used by early_ioremap(),
+> + * before ioremap() is functional.
+> + *
+> + * (P)re-using the FIXADDR region, which is used for highmem
+> + * later on, and statically aligned to 1MB.
+> + */
+> +#define NR_FIX_BTMAPS          32
+> +#define FIX_BTMAPS_SLOTS       7
+> +#define TOTAL_FIX_BTMAPS       (NR_FIX_BTMAPS * FIX_BTMAPS_SLOTS)
+> +#define FIX_BTMAP_END          FIX_KMAP_BEGIN
+> +#define FIX_BTMAP_BEGIN                (FIX_BTMAP_END + TOTAL_FIX_BTMAPS - 1)
 
-> I'll look at the patches later today and respond. Although, I would have
-> been nice you had helped me fix any issues with my patch than coming up with
-> new ones. Kinda removes to motivation for submitting patches upstream.
+Why the different logic from arm64? Specifically, it doesn't make
+adding a permanent mapping simple.
 
-Sorry if I demotivated you at all :)
+>  };
+>
+> +#define FIXMAP_PAGE_COMMON (L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN)
+> +
+> +#define FIXMAP_PAGE_NORMAL (FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
+> +#define FIXMAP_PAGE_IO    (FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_NONSHARED)
 
-I just wanted to get to a quick-fix and wasn't interested in getting
-my patch count
-up. Thought that isn't always bad :)
+This should be L_PTE_MT_DEV_SHARED and also needs L_PTE_DIRTY and
+L_PTE_SHARED as we want this to match MT_DEVICE.
 
-I sent my patches as they were very different then your approach. Obviously, I
-wouldn't have done this otherwise :)
+These should also be wrapped with __pgprot().
+
+> +
+> +extern void __early_set_fixmap(enum fixed_addresses idx,
+> +                              phys_addr_t phys, pgprot_t flags);
+> +
+>  #include <asm-generic/fixmap.h>
+>
+>  #endif
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index 8aa4cca..637e0cd 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -28,6 +28,7 @@
+>  #include <asm/byteorder.h>
+>  #include <asm/memory.h>
+>  #include <asm-generic/pci_iomap.h>
+> +#include <asm/early_ioremap.h>
+>  #include <xen/xen.h>
+>
+>  /*
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index b0df976..9c8b751 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/bug.h>
+>  #include <linux/compiler.h>
+>  #include <linux/sort.h>
+> +#include <linux/io.h>
+>
+>  #include <asm/unified.h>
+>  #include <asm/cp15.h>
+> @@ -880,6 +881,7 @@ void __init setup_arch(char **cmdline_p)
+>         const struct machine_desc *mdesc;
+>
+>         setup_processor();
+> +       early_ioremap_init();
+>         mdesc = setup_machine_fdt(__atags_pointer);
+>         if (!mdesc)
+>                 mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
+> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+> index 7f39ce2..501af98 100644
+> --- a/arch/arm/mm/Makefile
+> +++ b/arch/arm/mm/Makefile
+> @@ -12,6 +12,10 @@ ifneq ($(CONFIG_MMU),y)
+>  obj-y                          += nommu.o
+>  endif
+>
+> +ifeq ($(CONFIG_MMU),y)
+> +obj-$(CONFIG_EARLY_IOREMAP)    += early_ioremap.o
+> +endif
+> +
+>  obj-$(CONFIG_ARM_PTDUMP)       += dump.o
+>  obj-$(CONFIG_MODULES)          += proc-syms.o
+>
+> diff --git a/arch/arm/mm/early_ioremap.c b/arch/arm/mm/early_ioremap.c
+> new file mode 100644
+> index 0000000..c3e2bf2
+> --- /dev/null
+> +++ b/arch/arm/mm/early_ioremap.c
+> @@ -0,0 +1,93 @@
+> +/*
+> + * early_ioremap() support for ARM
+> + *
+> + * Based on existing support in arch/x86/mm/ioremap.c
+> + *
+> + * Restrictions: currently only functional before paging_init()
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+
+io.h doesn't appear to be needed.
+
+> +
+> +#include <asm/fixmap.h>
+> +#include <asm/pgalloc.h>
+> +#include <asm/pgtable.h>
+> +#include <asm/tlbflush.h>
+> +
+> +#include <asm/mach/map.h>
+> +
+> +static pte_t bm_pte[PTRS_PER_PTE] __aligned(PTE_HWTABLE_SIZE) __initdata;
+> +
+> +static inline pmd_t * __init early_ioremap_pmd(unsigned long addr)
+> +{
+> +       unsigned int index = pgd_index(addr);
+> +       pgd_t *pgd = cpu_get_pgd() + index;
+> +       pud_t *pud = pud_offset(pgd, addr);
+> +       pmd_t *pmd = pmd_offset(pud, addr);
+> +
+> +       return pmd;
+> +}
+> +
+> +static inline pte_t * __init early_ioremap_pte(unsigned long addr)
+> +{
+> +       return &bm_pte[pte_index(addr)];
+> +}
+> +
+> +void __init early_ioremap_init(void)
+> +{
+> +       pmd_t *pmd;
+> +
+> +       pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
+> +
+> +       pmd_populate_kernel(NULL, pmd, bm_pte);
+> +
+> +       /*
+> +        * Make sure we don't span multiple pmds.
+> +        */
+> +       BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+> +                    != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
+> +
+> +       if (pmd != early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END))) {
+> +               WARN_ON(1);
+> +               pr_warn("pmd %p != %p\n",
+> +                       pmd, early_ioremap_pmd(fix_to_virt(FIX_BTMAP_END)));
+> +               pr_warn("fix_to_virt(FIX_BTMAP_BEGIN): %08lx\n",
+> +                       fix_to_virt(FIX_BTMAP_BEGIN));
+> +               pr_warn("fix_to_virt(FIX_BTMAP_END):   %08lx\n",
+> +                       fix_to_virt(FIX_BTMAP_END));
+> +               pr_warn("FIX_BTMAP_END:       %d\n", FIX_BTMAP_END);
+> +               pr_warn("FIX_BTMAP_BEGIN:     %d\n", FIX_BTMAP_BEGIN);
+> +       }
+> +
+> +       early_ioremap_setup();
+> +}
+> +
+> +void __init __early_set_fixmap(enum fixed_addresses idx,
+> +                              phys_addr_t phys, pgprot_t flags)
+> +{
+> +       unsigned long addr = __fix_to_virt(idx);
+> +       pte_t *pte;
+> +       u64 desc;
+> +
+> +       if (idx > FIX_KMAP_END) {
+> +               BUG();
+> +               return;
+> +       }
+> +       pte = early_ioremap_pte(addr);
+> +
+> +       if (pgprot_val(flags))
+> +               set_pte_at(NULL, 0xfff00000, pte,
+
+Couldn't you use addr here instead of 0xfff00000? It's not really used
+other than a check against TASK_SIZE.
+
+> +                          pfn_pte(phys >> PAGE_SHIFT, flags));
+
+phys_to_pfn(phys)
+
+> +       else
+> +               pte_clear(NULL, addr, pte);
+> +       flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
+> +       desc = *pte;
+> +}
+> +
+> +void __init
+> +early_ioremap_shutdown(void)
+> +{
+> +       pmd_t *pmd;
+> +       pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
+> +       pmd_clear(pmd);
+
+This is redundant with the clearing done in devicemaps_init. Not a big
+deal but this is probably something we don't want with permanent
+mappings. I'm still trying to figure out how to do those. Leaving this
+page table in place doesn't seem to work, so I think we'll have to
+copy mappings to the new page tables.
+
+Rob
