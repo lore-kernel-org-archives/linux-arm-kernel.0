@@ -1,24 +1,38 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 26 Feb 2014 06:44:58 -0800
-Subject: [PATCH 1/5] ARM: davinci: remove tnetv107x support
-In-Reply-To: <1393418614-3968549-2-git-send-email-arnd@arndb.de> (Arnd
- Bergmann's message of "Wed, 26 Feb 2014 13:43:30 +0100")
-References: <1393418614-3968549-1-git-send-email-arnd@arndb.de>
- <1393418614-3968549-2-git-send-email-arnd@arndb.de>
-Message-ID: <7hk3ciylud.fsf@paris.lan>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 26 Feb 2014 14:45:19 +0000
+Subject: [PATCH] ARM: XEN depends on having a MMU
+In-Reply-To: <1393425046-23317-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1393425046-23317-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <alpine.DEB.2.02.1402261445020.31489@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Wed, 26 Feb 2014, Uwe Kleine-K?nig wrote:
+> arch/arm/xen/enlighten.c (and maybe others) use MMU-specific functions
+> like pte_mkspecial which are only available on MMU builds. So let XEN
+> depend on MMU.
+> 
+> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-> The tnetv107x support does not compile, and seems to have been broken
-> for a while with nobody caring to fix it. So far everyone I asked
-> said it's probably dead and completely unused and will never again
-> be needed in a future kernel release, so let's delete it.
->
-> If someone finds a use for this code later and is able to get it
-> to work again, we can always revert the removal.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-Acked-by: Kevin Hilman <khilman@linaro.org>
+
+>  arch/arm/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index e25419817791..1eb3a250210a 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1903,6 +1903,7 @@ config XEN
+>  	depends on ARM && AEABI && OF
+>  	depends on CPU_V7 && !CPU_V6
+>  	depends on !GENERIC_ATOMIC64
+> +	depends on MMU
+>  	select ARM_PSCI
+>  	select SWIOTLB_XEN
+>  	select ARCH_DMA_ADDR_T_64BIT
+> -- 
+> 1.8.5.3
+> 
