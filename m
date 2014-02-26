@@ -1,66 +1,25 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 26 Feb 2014 22:00:36 +0100
-Subject: [PATCH 1/7] Documentation: dt: iio: improve atmel-adc
- documentation
-In-Reply-To: <20140226173904.GG607@lukather>
-References: <1393434074-15600-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20140226173904.GG607@lukather>
-Message-ID: <20140226210035.GD20517@piout.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 26 Feb 2014 21:00:57 +0000
+Subject: [PATCH 2/4] ARM: imx6: build headsmp.o only on CONFIG_SMP
+In-Reply-To: <1393422280-22283-2-git-send-email-shawn.guo@linaro.org>
+References: <1393422280-22283-1-git-send-email-shawn.guo@linaro.org>
+ <1393422280-22283-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20140226210056.GB21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Feb 26, 2014 at 09:44:38PM +0800, Shawn Guo wrote:
+> diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
+> index e4b9fed..6e1a56d 100644
+> --- a/arch/arm/mach-imx/headsmp.S
+> +++ b/arch/arm/mach-imx/headsmp.S
+> @@ -15,7 +15,6 @@
+>  
+>  	.section ".text.head", "ax"
 
-On 26/02/2014 at 18:39:04 +0100, Maxime Ripard wrote :
-> Hi Alexandre,
-> 
-> On Wed, Feb 26, 2014 at 06:01:08PM +0100, Alexandre Belloni wrote:
-> > This corrects the example by removing the unit-address, as suggested by Mark
-> > Rutland in
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/234184.html
-> 
-> I still belive that it's wrong, and Mark haven't answered my comments
-> on his statement.
-> 
-
-After our discussion, I'll go for the other suggestion, I'll add
-#address-cells, #size-cells and a reg for each trigger.
-
-> I'd vote for a status-quo, until he gives an answer backed with
-> references to the ePAPR.
-> 
-> > 
-> > Also, it removes the properties that are not used anymore, to stop propagating
-> > them.
-> > 
-> > Finally, fixes a few typos.
-> 
-> I'm fine with the rest.
-> 
-> Maxime
-> 
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
-
-
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
+While you're here, can you please fix the above section name.  I think
+a .text will do just fine here.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140226/0202b047/attachment.sig>
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
