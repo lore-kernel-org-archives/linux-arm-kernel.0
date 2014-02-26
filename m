@@ -1,127 +1,91 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 26 Feb 2014 17:46:59 +0000
-Subject: [PATCH v4] PCI: ARM: add support for generic PCI host controller
-In-Reply-To: <201402252330.34236.arnd@arndb.de>
-References: <1393268359-17224-1-git-send-email-will.deacon@arm.com>
- <1721648.K4nYY7eS55@wuerfel>
- <20140225180111.GF23136@mudshark.cambridge.arm.com>
- <201402252330.34236.arnd@arndb.de>
-Message-ID: <20140226174659.GF12882@mudshark.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 26 Feb 2014 17:50:04 +0000
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20140226154858.GC10246@arm.com>
+References: <1393302345-18253-1-git-send-email-broonie@kernel.org>
+ <1393302345-18253-2-git-send-email-broonie@kernel.org>
+ <20140225165411.GA3883@red-moon>
+ <20140226005052.GA31120@sirena.org.uk>
+ <20140226123208.GB22839@e102568-lin.cambridge.arm.com>
+ <20140226144610.GA2394@sirena.org.uk>
+ <20140226154858.GC10246@arm.com>
+Message-ID: <20140226175004.GC22839@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Tue, Feb 25, 2014 at 10:30:33PM +0000, Arnd Bergmann wrote:
-> On Tuesday 25 February 2014, Will Deacon wrote:
-> > I need the alignment code so I can handle being passed a CPU physical
-> > address which isn't 64K aligned. In this case, pci_ioremap_io needs a 64K
-> > aligned address so that the __io macro does the right thing.
-> 
-> I still don't see why pci_ioremap_io needs 64K alignment. For all I can tell,
-> it just needs a page-aligned address.
-
-I misread __io as an '|' rather than a '+'. You're right, we just need page
-alignment for the mapping.
-
-> > For example, I can tell kvmtool to place I/O space at CPU physical 0x16000,
-> > bus address 0x6000 (so ports 0x0-0x5fff are unavailable). In that case, I
-> > still need to map those lower ports for the __io macro to offset into the
-> > window correctly.
->  
-> I don't think so. pci_ioremap_io will still try to map 64K of address space,
-> but you can map 0x16000-0x25fff to PCI_IO_VIRT_BASE. The io_offset in
-> that case will be negative (-0x6000).
-
-Yes, and that means that all this rounding is unnecessary; I can just fail
-addresses that aren't page-aligned (which is much more reasonable).
-
-> > 	of_pci_range_to_resource(range, dev->of_node, res);
-> > 	res->start = window + range->pci_addr;
-> > 	res->end = res->start + range->size - 1;
-> > 	*offset = window - range->pci_addr;
-> > 	return 0;
-> > }
-> 
-> The offset is good now, but the start is not: res->start refers to
-> the linux I/O space and should just be 'window' here. Adding up
-> window and pci_addr makes no sense. Think of the case where you
-> have two host bridges, one using bus address 0x0-0xffff and the other
-> one using 0x10000-0x1ffff. You really want the first one to
-> have res->start=0 and the second one res->start=0x10000, and
-> using offset=0. Instead the second one get start=0x20000,
-> which is wrong in both CPU and bus space.
-
-Aha, so res->start is the offset into our virtual I/O space at which the
-window starts? That's what I've been getting wrong -- I thought res->start
-was a PCI bus address for some reason.
-
-> The round_down() also still gets you into trouble here, because you
-> don't adjust the start or the size.
-
-I'll just get rid of the rounding.
-
-> > If I do:
+On Wed, Feb 26, 2014 at 03:48:58PM +0000, Catalin Marinas wrote:
+> On Wed, Feb 26, 2014 at 02:46:10PM +0000, Mark Brown wrote:
+> > On Wed, Feb 26, 2014 at 12:32:08PM +0000, Lorenzo Pieralisi wrote:
+> > > On Wed, Feb 26, 2014 at 12:50:52AM +0000, Mark Brown wrote:
+> > > > Having said that like I keep saying it seems most sensible to fall back
+> > > > to MPIDR if we don't have any better idea; it's guaranteed to be
+> > > > available, may well be correct and helps systems that did a good job
+> > > > with their hardware.
 > > 
-> > 	*offset = window;
+> > > You have a point. Unless someone feels strongly against this, I would
+> > > suggest falling back to MPIDR_EL1 if there is missing or wrong information in
+> > > DT.
 > > 
-> > then things work as expected (this is all referring back to the kvmtool example
-> > I mentioned earlier in this mail).
+> > Catalin seemed very concerned about any use at all of MPIDR, that's why
+> > the code was removed originally.  Catalin?
 > 
-> Yes, but only only because you have two bugs that cancel each other out
-> to some degree. It only works for the first bus though, as explained
-> above: if offset is >0, the Linux I/O port number that gets assigned
-> in the resource is no longer the one that maps to the one in your
-> virtual address space pointing to the right physical address.
+> My concern is that the MPIDR is just considered a unique ID. The ARMv8
+> relaxes the requirement so that it no longer needs to start at 0 and
+> increase monotonically. I checked with the architecture guys here and
+> they still expect the affinity hierarchy to be described by MPIDR but we
+> can have holes in the range for certain levels (i.e. an affinity level
+> may not start at 0 and may not even increase monotonically for
+> subsequent CPUs).
+> 
+> So we can either add a tolerant MPIDR parsing or we simply assume that
+> the topology is _flat_ when DT doesn't provide the information.
 
-Ok, so taking all this on board I end up with the diff below (against v4).
-It seems to work well with my kvmtool setup:
+I think that as far as the topology structures are concerned we can fall
+back to MPIDR_EL1 in case cpu-map is missing or incomplete, since even
+if the affinity levels contain holes or are not sequential that should
+be fine (but see below). After all we have cpu-map to correct things for
+this same reason and that will take precedence over the MPIDR_EL1 anyway.
 
-  pci_bus 0000:00: root bus resource [io  0x0000-0x9fff] (bus address [0x6000-0xffff])
+Macros below are required for the scheduler to work. The ids are arch
+dependent (so generic code cannot rely on them being sequential or
+follow any rule) and if we fall back to MPIDR_EL1 they will get initialized.
 
-Will
+#define topology_physical_package_id(cpu)	(cpu_topology[cpu].socket_id)
+#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
+#define topology_core_cpumask(cpu)	(&cpu_topology[cpu].core_sibling)
+#define topology_thread_cpumask(cpu)	(&cpu_topology[cpu].thread_sibling)
 
---->8
+#define mc_capable()	(cpu_topology[0].socket_id != -1)
+#define smt_capable()	(cpu_topology[0].thread_id != -1)
 
-diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-index 71b0960772ec..b761f3e64a6a 100644
---- a/drivers/pci/host/pci-host-generic.c
-+++ b/drivers/pci/host/pci-host-generic.c
-@@ -133,30 +133,25 @@ static int gen_pci_calc_io_offset(struct device *dev,
- {
-        static atomic_t wins = ATOMIC_INIT(0);
-        int err, idx, max_win;
--       unsigned int io_offset;
-+       unsigned int window;
- 
--       /* Ensure the CPU physical address is aligned to a 64K boundary */
--       range->size += range->cpu_addr & (SZ_64K - 1);
--       range->cpu_addr = round_down(range->cpu_addr, SZ_64K);
--       range->pci_addr = round_down(range->pci_addr, SZ_64K);
--
--       if (range->size > SZ_64K)
--               return -E2BIG;
-+       if (!PAGE_ALIGNED(range->cpu_addr))
-+               return -EINVAL;
- 
--       max_win = IO_SPACE_LIMIT + 1 / SZ_64K;
-+       max_win = (IO_SPACE_LIMIT + 1) / SZ_64K;
-        idx = atomic_inc_return(&wins);
-        if (idx >= max_win)
-                return -ENOSPC;
- 
--       io_offset = (idx - 1) * SZ_64K;
--       err = pci_ioremap_io(io_offset, range->cpu_addr);
-+       window = (idx - 1) * SZ_64K;
-+       err = pci_ioremap_io(window, range->cpu_addr);
-        if (err)
-                return err;
- 
-        of_pci_range_to_resource(range, dev->of_node, res);
--       res->start = io_offset + range->pci_addr;
-+       res->start = window;
-        res->end = res->start + range->size - 1;
--       *offset = io_offset;
-+       *offset = window - range->pci_addr;
-        return 0;
- }
+What would be wrong, is leaving the core_sibling and thread_sibling
+masks empty and this CAN happen even on current arm32 code if the
+cluster id field (ie MPIDR[15:8] for the sake of this discussion) is
+different for different CPUs, and that's a bug that fortunately was
+never hit (it is a totally valid MPIDR layout, a bit weird though).
+
+On an arm32 4 cpus system with MPIDR layout {0x100, 0x200, 0x300, 0x400}
+(which is allowed) the kernel would panic (since the thread_sibling and
+core_sibling masks would end up empty).
+
+So I agree with Catalin, either we allow a fall-back to MPIDR_EL1, with relaxed
+parsing rules (but let's not forget what I wrote above), or we keep the
+current set but with following changes:
+
+- if s topology node for a cpu (or some cpus) is missing or wrong, the whole
+  topology structure should be reverted to default (as in
+  include/linux/topology.h Documentation/cputopology.txt). This solves Mark's
+  concern about having some cpus with missing topology information.
+  NB: My patch does not do that, it resets topology only for the misconfigured
+  cpu.
+
+That's the best we can do. I think that an MPIDR_EL1 fall back mechanism
+should be put in place, as a separate patch or squashed to patch 1.
+
+I would prefer the latter, but if you want to get the infrastructure in
+first I think that's acceptable.
+
+Apologies for all requested changes.
+
+Thanks,
+Lorenzo
