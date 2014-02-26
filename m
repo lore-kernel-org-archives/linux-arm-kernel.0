@@ -1,104 +1,31 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 26 Feb 2014 17:55:49 +0900
-Subject: [PATCH v3 04/20] ARM: shmobile: r8a7779: Add clocks
-In-Reply-To: <CAMuHMdWUWeqhH_OeOOFDhTFAGfa3EtTSfMWEkYUrQNV4OT1DLA@mail.gmail.com>
+Date: Wed, 26 Feb 2014 17:56:45 +0900
+Subject: [PATCH v3 15/20] ARM: shmobile: marzen-reference: Instantiate
+ clkdevs for SCIF and TMU
+In-Reply-To: <CAMuHMdU1OJ8mMfe0-EJJizVXX0V=3YkELcTjfce8bk6qn9jhzA@mail.gmail.com>
 References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
- <1393400016-23433-5-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWUWeqhH_OeOOFDhTFAGfa3EtTSfMWEkYUrQNV4OT1DLA@mail.gmail.com>
-Message-ID: <20140226085548.GA7720@verge.net.au>
+ <1393400016-23433-16-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdU1OJ8mMfe0-EJJizVXX0V=3YkELcTjfce8bk6qn9jhzA@mail.gmail.com>
+Message-ID: <20140226085645.GB7720@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 09:13:47AM +0100, Geert Uytterhoeven wrote:
+On Wed, Feb 26, 2014 at 09:29:52AM +0100, Geert Uytterhoeven wrote:
 > On Wed, Feb 26, 2014 at 8:33 AM, Simon Horman
 > <horms+renesas@verge.net.au> wrote:
-> > +               /* Gate clocks */
-> > +               mstp0_clks: mstp0_clks {
-> > +                       compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-clocks";
-> > +                       reg = <0 0xffc80030 0 4>;
-> > +                       clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +                                <&cpg_clocks R8A7779_CLK_P>;
+> > Now that the common clock framework is supported, the clock lookup
+> > entries in clock-r8a7779.c are not registered anymore. Devices must
+> > instead reference their clocks in the device tree. However, SCIF and CMT
+> > devices are still instantiated through platform code, and thus need a
+> > clock lookup entry.
+> >
+> > Retrieve the SCIF and CMT clock entries by name and register clkdevs for
+> > the corresponding devices. This will be removed when the SCIF and CMT
+> > devices will be instantiated from the device tree.
+> >
+> > Based on work for the Koelsch board by Laurent Pinchart.
 > 
-> Is there any rationale behind the decision to (not) split long lines?
-> The above are really long.
-> 
-> > +                       #clock-cells = <1>;
-> > +                       renesas,clock-indices = <
-> > +                               R8A7779_CLK_HSPI R8A7779_CLK_TMU0 R8A7779_CLK_TMU0
-> > +                               R8A7779_CLK_TMU0 R8A7779_CLK_SCIF5 R8A7779_CLK_SCIF4
-> > +                               R8A7779_CLK_SCIF3 R8A7779_CLK_SCIF2 R8A7779_CLK_SCIF1
-> > +                               R8A7779_CLK_SCIF0 R8A7779_CLK_I2C3 R8A7779_CLK_I2C2
-> > +                               R8A7779_CLK_I2C1 R8A7779_CLK_I2C0
-> 
-> A bit longer than 80 characters (fine for me, though).
-> 
-> > +                       >;
-> > +                       clock-output-names =
-> > +                               "hspi", "tmu00", "tmu01",
-> > +                               "tmu02", "scif5", "scif4",
-> > +                               "scif3", "scif2", "scif1",
-> > +                               "scif0", "i2c3", "i2c2",
-> > +                               "i2c1", "i2c0";
-> 
-> Much shorter than 80 characters (to match the above?).
-> 
-> > +               };
-> > +               mstp1_clks: mstp1_clks {
-> > +                       compatible = "renesas,r8a7779-mstp-clocks", "renesas,cpg-mstp-clocks";
-> > +                       reg = <0 0xffc80034 0 4>, <0 0xffc80044 0 4>;
-> > +                       clocks = <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>,
-> > +                                <&cpg_clocks R8A7779_CLK_P>, <&cpg_clocks R8A7779_CLK_P>;
-> > +                       #clock-cells = <1>;
-> > +                       renesas,clock-indices = <
-> > +                               R8A7779_CLK_USB01 R8A7779_CLK_USB01
-> 
-> Fits in 80 characters.
-> 
-> > +                               R8A7779_CLK_USB2 R8A7779_CLK_USB2
-> > +                               R8A7779_CLK_DU R8A7779_CLK_VIN2
-> > +                               R8A7779_CLK_VIN1 R8A7779_CLK_VIN0
-> > +                               R8A7779_CLK_ETHER R8A7779_CLK_SATA
-> > +                               R8A7779_CLK_PCIE R8A7779_CLK_VIN3
-> > +                       >;
-> > +                       clock-output-names =
-> > +                               "ehci0", "ohci0",
-> > +                               "ehci1", "ohci1",
-> > +                               "du", "vin2",
-> > +                               "vin1", "vin0",
-> > +                               "ether", "sata",
-> > +                               "pcie", "vin3";
-> 
-> Reallt short, could be compacted a lot.
+> Would be nice to do this on top of Magnu's shmobile_clk_workaround().
 
-The rationale to have lines in clocks, renesas,clock-indices and
-clock-output-names corresponding with each other. Which I found
-made it easier out weed out inconsistencies.
-
-But I'm happy to rearrange things as you suggest.
-
-> 
-> > +               };
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Yes, I plan to either do so. Either by updating this
+patch or providing an incremental change.
