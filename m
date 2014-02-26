@@ -1,80 +1,96 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 26 Feb 2014 14:22:16 +0100
-Subject: [PATCH v3 14/20] ARM: shmobile: marzen-reference: Initialize CPG
- device
-In-Reply-To: <1393400016-23433-15-git-send-email-horms+renesas@verge.net.au>
-References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
- <1393400016-23433-15-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1536497.cil0Vak4RG@avalon>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Wed, 26 Feb 2014 14:22:04 +0100
+Subject: [PATCH v4] can: xilinx CAN controller support.
+In-Reply-To: <cd00fb2d-c8a7-423d-8aa0-2b413e9ac101@CO9EHSMHS017.ehs.local>
+References: <74d607e9-ac9c-4a9b-ac49-e84ae49d20c2@TX2EHSMHS031.ehs.local>
+ <530D0A9C.5090402@pengutronix.de>
+ <cd00fb2d-c8a7-423d-8aa0-2b413e9ac101@CO9EHSMHS017.ehs.local>
+Message-ID: <530DEA7C.6010609@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On 02/26/2014 02:07 PM, Appana Durga Kedareswara Rao wrote:
+>> This loop looks broken. Can you explain how it works.
+>>
+>> What it shoud do is:
+>> We have put (priv->tx_head - priv->tx_tail) CAN frames into the FIFO.
+>> This means at maximum there could be this amount of CAN frames which
+>> have been successfully transmitted. For every cycle in this while loop you
+>> should:
+>> a) check if a CAN frame has successfully been transmitted
+>>    (as this CAN core uses a FIFO it should be "oldest")
+>>    A read_reg() of some kind is missing in your loop.
+>> b) if needed, remove this event from the FIFO or
+>>    mark the interrupt as done. Whatever you hardware needs.
+>> c) update your statistics
+>> d) Use can_get_echo_skb to push this frame into the networking stack
+>> e) As a CAN frame has been transmitted successfully, wake the tx_queue.
+>>
+>>> +   while (priv->tx_head - priv->tx_tail > 0) {
+>>> +           if (isr & XCAN_IXR_TXFLL_MASK) {
+>>> +                   priv->write_reg(priv, XCAN_ICR_OFFSET,
+>>> +                                   XCAN_IXR_TXFLL_MASK);
+>>> +                   netif_stop_queue(ndev);
+>>
+>> Why do you stop the queue here? A CAN frame has successfully been
+>> transmitted, there should be room in the FIFO.
+>>
+>>> +                   break;
+>>> +           }
+>>> +           can_get_echo_skb(ndev, priv->tx_tail %
+>>> +                                   priv->xcan_echo_skb_max_tx);
+>>> +           priv->tx_tail++;
+>>> +   }
+>>> +
+> 
+> The below are the bit fields available for the Transmit FIFO.
+> 1) In the ISR(interrupt status register)  Tx Ok interrupt and Tx fifo full interrupt.
+> 2) in the SR(Status Register) Tx fifo full condition.
+> 
+> 
+> I am modifying the entire tx interrupt logic to like below.
+> 
+> static void xcan_tx_interrupt(struct net_device *ndev, u32 isr)
+> {
+>         struct xcan_priv *priv = netdev_priv(ndev);
+>         struct net_device_stats *stats = &ndev->stats;
+> 
+>             while (priv->tx_head - priv->tx_tail > 0) {
+>                 if (isr & XCAN_IXR_TXFLL_MASK) {
+>                         priv->write_reg(priv, XCAN_ICR_OFFSET,
+>                                         XCAN_IXR_TXFLL_MASK);
+>                           break;
+>                 }
+>                 can_get_echo_skb(ndev, priv->tx_tail %
+>                                         priv->xcan_echo_skb_max_tx);
+>                 priv->tx_tail++;
+>          stats->tx_packets++;
+>         netif_wake_queue(ndev);
+>               can_led_event(ndev, CAN_LED_EVENT_TX);
+> 
+>         }
 
-Thank you for the patch.
+You just need to wake the queue once.
 
-On Wednesday 26 February 2014 16:33:30 Simon Horman wrote:
-> On multiplatform kernels clocks are handled by the CCF CPG driver. It
-> must be explicitly initialized by a call to r8a7779_clocks_init() with
-> the value of the boot mode pins.
+> }
 > 
-> Based on similar work for the Koelsch board by Laurent Pinchart.
 > 
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Are you Ok with the above logic?
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+No, how can you tell how many frames have been transmitted?
 
-> ---
->  arch/arm/mach-shmobile/board-marzen-reference.c | 16 ++++++++++++----
->  1 file changed, 12 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c
-> b/arch/arm/mach-shmobile/board-marzen-reference.c index d3e8319..e261431
-> 100644
-> --- a/arch/arm/mach-shmobile/board-marzen-reference.c
-> +++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-> @@ -19,7 +19,8 @@
->   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 
-> USA */
-> 
-> -#include <linux/clk-provider.h>
-> +#include <linux/clk/shmobile.h>
-> +#include <linux/clocksource.h>
->  #include <linux/of_platform.h>
->  #include <mach/r8a7779.h>
->  #include <mach/common.h>
-> @@ -27,11 +28,17 @@
->  #include <asm/irq.h>
->  #include <asm/mach/arch.h>
-> 
-> -static void __init marzen_init(void)
-> +static void __init marzen_init_timer(void)
->  {
->  #ifdef CONFIG_COMMON_CLK
-> -	of_clk_init(NULL);
-> -#else
-> +	r8a7779_clocks_init(r8a7779_read_mode_pins());
-> +#endif
-> +	clocksource_of_init();
-> +}
-> +
-> +static void __init marzen_init(void)
-> +{
-> +#ifndef CONFIG_COMMON_CLK
->  	r8a7779_clock_init();
->  #endif
->  	r8a7779_add_standard_devices_dt();
-> @@ -48,6 +55,7 @@ DT_MACHINE_START(MARZEN, "marzen")
->  	.smp		= smp_ops(r8a7779_smp_ops),
->  	.map_io		= r8a7779_map_io,
->  	.init_early	= r8a7779_init_delay,
-> +	.init_time	= marzen_init_timer,
->  	.nr_irqs	= NR_IRQS_LEGACY,
->  	.init_irq	= r8a7779_init_irq_dt,
->  	.init_machine	= marzen_init,
+Marc
 
 -- 
-Regards,
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Laurent Pinchart
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 242 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140226/561a8b47/attachment.sig>
