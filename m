@@ -1,38 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 26 Feb 2014 16:57:52 +0900
-Subject: [PATCH 6/7] ARM: shmobile: Remove __init from
- rcar_gen2_read_mode_pins()
+Date: Wed, 26 Feb 2014 16:57:53 +0900
+Subject: [PATCH 7/7] ARM: shmobile: Move SYSC base variable to inside ifdefs
 In-Reply-To: <cover.1393400446.git.horms+renesas@verge.net.au>
 References: <cover.1393400446.git.horms+renesas@verge.net.au>
-Message-ID: <e7509f6eca10cff3933f8a71f4ca9d8be8447ec3.1393400446.git.horms+renesas@verge.net.au>
+Message-ID: <c4ca5d80e03559fd95c526ece5ce39fc732a2511.1393400446.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Remove __init from rcar_gen2_read_mode_pins() to allow
-it to be used after boot. For instance the R-Car Gen2
-MD21 check is needed even in the case of CPU Hotplug.
+Move the rcar_sysc_base variable to inside #ifdefs to avoid
+triggering build warnings in case PM or SMP is not selected.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/pm-rcar.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index 69ccc6c..1060448 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -28,7 +28,7 @@
+diff --git a/arch/arm/mach-shmobile/pm-rcar.c b/arch/arm/mach-shmobile/pm-rcar.c
+index 17225db..1f465a1 100644
+--- a/arch/arm/mach-shmobile/pm-rcar.c
++++ b/arch/arm/mach-shmobile/pm-rcar.c
+@@ -15,8 +15,6 @@
+ #include <asm/io.h>
+ #include <mach/pm-rcar.h>
  
- #define MODEMR 0xe6160060
+-static void __iomem *rcar_sysc_base;
+-
+ /* SYSC */
+ #define SYSCSR 0x00
+ #define SYSCISR 0x04
+@@ -35,6 +33,7 @@ static void __iomem *rcar_sysc_base;
  
--u32 __init rcar_gen2_read_mode_pins(void)
-+u32 rcar_gen2_read_mode_pins(void)
- {
- 	void __iomem *modemr = ioremap_nocache(MODEMR, 4);
- 	u32 mode;
+ #if defined(CONFIG_PM) || defined(CONFIG_SMP)
+ 
++static void __iomem *rcar_sysc_base;
+ static DEFINE_SPINLOCK(rcar_sysc_lock); /* SMP CPUs + I/O devices */
+ 
+ static int rcar_sysc_pwr_on_off(struct rcar_sysc_ch *sysc_ch,
 -- 
 1.8.5.2
