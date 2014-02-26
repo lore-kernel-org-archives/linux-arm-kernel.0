@@ -1,63 +1,55 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Wed, 26 Feb 2014 18:51:55 +0200
-Subject: [Patch v7 2/2] dmaengine: add Qualcomm BAM dma driver
-In-Reply-To: <1393283500-18599-3-git-send-email-agross@codeaurora.org>
-References: <1393283500-18599-1-git-send-email-agross@codeaurora.org>
- <1393283500-18599-3-git-send-email-agross@codeaurora.org>
-Message-ID: <530E1BAB.6040609@mm-sol.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 26 Feb 2014 17:57:05 +0100
+Subject: [PATCH v2 1/2] ARM: dts: imx6: adjust the interrupt list in
+ order to support MSI
+In-Reply-To: <20140226163402.GF29659@e106331-lin.cambridge.arm.com>
+References: <1393410438-28205-1-git-send-email-l.stach@pengutronix.de>
+ <20140226163402.GF29659@e106331-lin.cambridge.arm.com>
+Message-ID: <1393433825.4692.2.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
-
-Thanks for the patch.
-
-On 02/25/2014 01:11 AM, Andy Gross wrote:
-> Add the DMA engine driver for the QCOM Bus Access Manager (BAM) DMA controller
-> found in the MSM 8x74 platforms.
+Am Mittwoch, den 26.02.2014, 16:34 +0000 schrieb Mark Rutland:
+> On Wed, Feb 26, 2014 at 10:27:17AM +0000, Lucas Stach wrote:
+> > From: Juergen Beisert <jbe@pengutronix.de>
+> > 
+> > Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> >  arch/arm/boot/dts/imx6qdl.dtsi | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> > index fb28b2ecb1db..aeccbb114fc5 100644
+> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> > @@ -126,7 +126,8 @@
+> >  				  0x81000000 0 0          0x01f80000 0 0x00010000 /* downstream I/O */
+> >  				  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
+> >  			num-lanes = <1>;
+> > -			interrupts = <0 123 0x04>;
+> > +			/*               inta          intb         intc         intd/msi */
+> > +			interrupts = <0 123 0x04>, <0 122 0x04>, <0 121 0x04>, <0 120 0x04>;
 > 
-> Each BAM DMA device is associated with a specific on-chip peripheral.  Each
-> channel provides a uni-directional data transfer engine that is capable of
-> transferring data between the peripheral and system memory (System mode), or
-> between two peripherals (BAM2BAM).
+> This seems to be a "fsl,imx6q-pcie", "snps,dw-pcie" device.
 > 
-> The initial release of this driver only supports slave transfers between
-> peripherals and system memory.
+> In Documentation/devicetree/bindings/pci/designware-pcie.txt I only see 3
+> interrupts listed.
 > 
-> Signed-off-by: Andy Gross <agross@codeaurora.org>
-> ---
->  drivers/dma/Kconfig        |    9 +
->  drivers/dma/Makefile       |    1 +
->  drivers/dma/qcom_bam_dma.c | 1106 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 1116 insertions(+)
->  create mode 100644 drivers/dma/qcom_bam_dma.c
+> The fourth interrupt must be documented.
+> 
+> Do the first three correspond to those in the documentation?
+> 
+Urgh, seems Samsung and FSL do all the glue a lot different. The IRQs
+seem to be different and the same holds true for the clocks.
 
-<snip>
+I think we should split the Documentation here to avoid further
+confusion. Will send a patch.
 
-> +
-> +/**
-> + * bam_init
-> + * @bdev: bam device
-> + *
-> + * Initialization helper for global bam registers
-> + */
-> +static int bam_init(struct bam_device *bdev)
-> +{
-> +	u32 val;
-> +
-> +	/* read revision and configuration information */
-> +	val = readl_relaxed(bdev->regs + BAM_REVISION) & NUM_EES_MASK;
-> +
-
-The ees shit is not zero and you got wrong ee. Could you add the line
-below or something similar:
-
-val = (val >> NUM_EES_SHIFT) & NUM_EES_MASK;
-
-> +	/* check that configured EE is within range */
-> +	if (bdev->ee >= val)
-> +		return -EINVAL;
-> +
-
-regards,
-Stan
+Regards,
+Lucas
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
