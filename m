@@ -1,36 +1,108 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Wed, 26 Feb 2014 09:50:46 -0300
-Subject: [PATCH 1/2] ARM: mvebu: Enable Armada 375 watchdog in the devicetree
-In-Reply-To: <1393419047-10071-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1393419047-10071-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1393419047-10071-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Wed, 26 Feb 2014 09:50:45 -0300
+Subject: [PATCH 0/2] Watchdog on Armada 375 SoC
+Message-ID: <1393419047-10071-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the DT nodes to enable the watchdog support available on
-Armada 375 SoC.
+Now that we have watchdog support on Armada 370/XP SoC, and that the basic
+infrastructure for Armada 375 SoC is in place, we can add watchdog support
+on Armada 375 as well.
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- arch/arm/boot/dts/armada-375.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+However, there's a specificity we need to handle in order to support watchdog,
+related to the RSTOUT. First of all, let's review how we're currently handling
+the RSTOUT in the SoCs supported by the orion-wdt driver.
 
-diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index 3877693f..a2003cb 100644
---- a/arch/arm/boot/dts/armada-375.dtsi
-+++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -320,6 +320,12 @@
- 				clocks = <&coreclk 0>;
- 			};
- 
-+			watchdog at 20300 {
-+				compatible = "marvell,armada-375-wdt", "marvell,armada-370-wdt";
-+				reg = <0x20300 0x34>, <0x20704 0x4>;
-+				clocks = <&coreclk 0>;
-+			};
-+
- 			xor at 60800 {
- 				compatible = "marvell,orion-xor";
- 				reg = <0x60800 0x100
+Kirkwood/Dove
+-------------
+
+Has one bit for watchdog RSTOUT as part of the RSTOUT global register
+that's shared with the system-controller. This could be handled by
+mvebu/system-controller.c but instead it's handled in the driver, in order
+to prevent a spurious wdt trigger.
+
+In this patch [1] we suggested to handle RSTOUT in the system-controller,
+but Jason Gunthorpe explained [2] it could cause a spurious trigger.
+
+Armada 370/XP
+-------------
+
+Has a dedicated watchdog RSTOUT register. This is not shared but used by the
+watchdog driver only, so in this case it's completely natural to deal with it
+in the driver.
+
+For the above reason, we decided to support the watchdog by extending the 'reg'
+property to set the watchdog counter and the RSTOUT register offsets:
+
+	watchdog-timer at 20300 {
+		compatible = "marvell,{soc}-wdt";
+		reg = <0x20300 0x28>, <{RSOUT} 0x4>;
+	};
+
+Armada 375
+----------
+
+Here we found both the above RSTOUT:
+
+1. It has the same dedicated register as A370/XP (0x20704)
+2. Also has a bit in the shared RSTOUT register (0x18254)
+
+Solutions
+---------
+
+1.
+
+A possible solution is to extend the reg property in the watchdog devicetree
+and allow for a new optional pair of cells to complete the specification of the
+RSTOUT.
+
+	watchdog-timer at 20300 {
+		compatible = "marvell,orion-wdt";
+		reg = <0x20300 0x28
+		       {shared RSOUT} 0x4
+		       0x0 0x0>;
+	};
+
+	watchdog-timer at 20300 {
+		compatible = "marvell,armada-370-wdt";
+		reg = <0x20300 0x28
+		       0x0 0x0
+		       {dedicated RSOUT} 0x4>;
+	};
+
+	watchdog-timer at 20300 {
+		compatible = "marvell,armada-375-wdt";
+		reg = <0x20300 0x28>
+		       shared RSTOUT 0x4
+		       {dedicated RSOUT} 0x4>;
+	};
+
+2.
+
+Another solution is to add a per-SoC initialization callback in
+mvebu/system-controller.c and use it to unmask the Armada 375 shared
+RSTOUT watchdog bit, allowing to use the already existent devicetree
+binding.
+
+In this scheme, the watchdog in A375 can be handled by the orion-wdt
+driver, using the "armada-370-wdt" compatible string.
+
+The current patchset goes with the latter, and implements such solution.
+
+Patch 1 adds the devicetree node and depends on the mvebu/dt-3xx branch.
+Patch 2 adds the system-controller RSTOUT unmask and depends on the
+mvebu/soc-3xx branch.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/194958.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/195039.html
+
+Ezequiel Garcia (2):
+  ARM: mvebu: Enable Armada 375 watchdog in the devicetree
+  ARM: mvebu: system-controller: Add A375 initialization
+
+ arch/arm/boot/dts/armada-375.dtsi       |  6 ++++++
+ arch/arm/mach-mvebu/system-controller.c | 30 ++++++++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+)
+
 -- 
 1.8.1.5
