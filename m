@@ -1,70 +1,42 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Wed, 26 Feb 2014 17:19:43 +0100
-Subject: [PATCH] ARM: at91: sama5d3: get rid of atmel_tsadcc driver
-Message-ID: <1393431584-27783-1-git-send-email-ludovic.desroches@atmel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 26 Feb 2014 16:34:03 +0000
+Subject: [PATCH v2 1/2] ARM: dts: imx6: adjust the interrupt list in
+ order to support MSI
+In-Reply-To: <1393410438-28205-1-git-send-email-l.stach@pengutronix.de>
+References: <1393410438-28205-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20140226163402.GF29659@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Wed, Feb 26, 2014 at 10:27:17AM +0000, Lucas Stach wrote:
+> From: Juergen Beisert <jbe@pengutronix.de>
+> 
+> Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx6qdl.dtsi | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index fb28b2ecb1db..aeccbb114fc5 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -126,7 +126,8 @@
+>  				  0x81000000 0 0          0x01f80000 0 0x00010000 /* downstream I/O */
+>  				  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
+>  			num-lanes = <1>;
+> -			interrupts = <0 123 0x04>;
+> +			/*               inta          intb         intc         intd/msi */
+> +			interrupts = <0 123 0x04>, <0 122 0x04>, <0 121 0x04>, <0 120 0x04>;
 
-Touchscreen support for at91_adc has been introduced so we can get rid of
-atmel_tsadcc.
+This seems to be a "fsl,imx6q-pcie", "snps,dw-pcie" device.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- arch/arm/boot/dts/sama5d3.dtsi    |   14 +-------------
- arch/arm/boot/dts/sama5d3xdm.dtsi |    7 +++----
- 2 files changed, 4 insertions(+), 17 deletions(-)
+In Documentation/devicetree/bindings/pci/designware-pcie.txt I only see 3
+interrupts listed.
 
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index 3d5faf8..26d7ed5 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -239,7 +239,7 @@
- 			};
- 
- 			adc0: adc at f8018000 {
--				compatible = "atmel,at91sam9260-adc";
-+				compatible = "atmel,at91sam9x5-adc";
- 				reg = <0xf8018000 0x100>;
- 				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
-@@ -295,18 +295,6 @@
- 				};
- 			};
- 
--			tsadcc: tsadcc at f8018000 {
--				compatible = "atmel,at91sam9x5-tsadcc";
--				reg = <0xf8018000 0x4000>;
--				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
--				atmel,tsadcc_clock = <300000>;
--				atmel,filtering_average = <0x03>;
--				atmel,pendet_debounce = <0x08>;
--				atmel,pendet_sensitivity = <0x02>;
--				atmel,ts_sample_hold_time = <0x0a>;
--				status = "disabled";
--			};
--
- 			i2c2: i2c at f801c000 {
- 				compatible = "atmel,at91sam9x5-i2c";
- 				reg = <0xf801c000 0x4000>;
-diff --git a/arch/arm/boot/dts/sama5d3xdm.dtsi b/arch/arm/boot/dts/sama5d3xdm.dtsi
-index f9bdde5..0b8f5d1 100644
---- a/arch/arm/boot/dts/sama5d3xdm.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xdm.dtsi
-@@ -23,10 +23,9 @@
- 			};
- 
- 			adc0: adc at f8018000 {
--				status = "disabled";
--			};
--
--			tsadcc: tsadcc at f8018000 {
-+				atmel,adc-clock-rate = <1000000>;
-+				atmel,adc-ts-wires = <4>;
-+				atmel,adc-ts-pressure-threshold = <10000>;
- 				status = "okay";
- 			};
- 
--- 
-1.7.9.5
+The fourth interrupt must be documented.
+
+Do the first three correspond to those in the documentation?
+
+Cheers,
+Mark.
