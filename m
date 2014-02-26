@@ -1,193 +1,66 @@
 From: marc.ceeeee@gmail.com (Marc Carino)
-Date: Wed, 26 Feb 2014 02:29:05 -0800
-Subject: [PATCH v7 2/9] power: reset: Add reboot driver for brcmstb
+Date: Wed, 26 Feb 2014 02:29:06 -0800
+Subject: [PATCH v7 3/9] ARM: brcmstb: add debug UART for earlyprintk support
 In-Reply-To: <1393410552-21497-1-git-send-email-marc.ceeeee@gmail.com>
 References: <1393410552-21497-1-git-send-email-marc.ceeeee@gmail.com>
-Message-ID: <1393410552-21497-3-git-send-email-marc.ceeeee@gmail.com>
+Message-ID: <1393410552-21497-4-git-send-email-marc.ceeeee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for reboot functionality on boards with ARM-based
-Broadcom STB chipsets.
+Add the UART definitions needed to support earlyprintk on brcmstb machines.
 
 Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
-Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-Cc: David Woodhouse <dwmw2@infradead.org>
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/mach-bcm/Kconfig            |    1 +
- drivers/power/reset/Kconfig          |   10 +++
- drivers/power/reset/Makefile         |    1 +
- drivers/power/reset/brcmstb-reboot.c |  120 ++++++++++++++++++++++++++++++++++
- 4 files changed, 132 insertions(+), 0 deletions(-)
- create mode 100644 drivers/power/reset/brcmstb-reboot.c
+ arch/arm/Kconfig.debug |   15 ++++++++++++++-
+ 1 files changed, 14 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index f85e7bc..d8f6d7a 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -39,6 +39,7 @@ config ARCH_BRCMSTB
- 	select MIGHT_HAVE_PCI
- 	select HAVE_SMP
- 	select HAVE_ARM_ARCH_TIMER
-+	select POWER_RESET_BRCMSTB
- 	help
- 	  Say Y if you intend to run the kernel on a Broadcom ARM-based STB
- 	  chipset.
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index 6d452a7..c886505 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -12,6 +12,16 @@ config POWER_RESET_AS3722
- 	help
- 	  This driver supports turning off board via a ams AS3722 power-off.
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 0531da8..5d7f76b 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -125,6 +125,17 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on Marvell Berlin SoC based platforms.
  
-+config POWER_RESET_BRCMSTB
-+	bool "Broadcom STB reset driver"
-+	depends on POWER_RESET && ARCH_BRCMSTB
-+	help
-+	  This driver provides restart support for ARM-based Broadcom STB
-+	  boards.
++	config DEBUG_BRCMSTB_UART
++		bool "Use BRCMSTB UART for low-level debug"
++		depends on ARCH_BRCMSTB
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the first serial port on these devices.
 +
-+	  Say Y here if you have an ARM-based Broadcom STB board and you wish
-+	  to have restart support.
++		  If you have a Broadcom STB chip and would like early print
++		  messages to appear over the UART, select this option.
 +
- config POWER_RESET_GPIO
- 	bool "GPIO power-off driver"
- 	depends on OF_GPIO && POWER_RESET
-diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index a5b4a77..72bb94f 100644
---- a/drivers/power/reset/Makefile
-+++ b/drivers/power/reset/Makefile
-@@ -5,3 +5,4 @@ obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
- obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
- obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
- obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
-+obj-$(CONFIG_POWER_RESET_BRCMSTB) += brcmstb-reboot.o
-diff --git a/drivers/power/reset/brcmstb-reboot.c b/drivers/power/reset/brcmstb-reboot.c
-new file mode 100644
-index 0000000..3f23692
---- /dev/null
-+++ b/drivers/power/reset/brcmstb-reboot.c
-@@ -0,0 +1,120 @@
-+/*
-+ * Copyright (C) 2013 Broadcom Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/errno.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/jiffies.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+#include <linux/printk.h>
-+#include <linux/reboot.h>
-+#include <linux/regmap.h>
-+#include <linux/smp.h>
-+#include <linux/mfd/syscon.h>
-+
-+#include <asm/system_misc.h>
-+
-+#define RESET_SOURCE_ENABLE_REG 1
-+#define SW_MASTER_RESET_REG 2
-+
-+static struct regmap *regmap;
-+static u32 rst_src_en;
-+static u32 sw_mstr_rst;
-+
-+static void brcmstb_reboot(enum reboot_mode mode, const char *cmd)
-+{
-+	int rc;
-+	u32 tmp;
-+
-+	rc = regmap_write(regmap, rst_src_en, 1);
-+	if (rc) {
-+		pr_err("failed to write rst_src_en (%d)\n", rc);
-+		return;
-+	}
-+
-+	rc = regmap_read(regmap, rst_src_en, &tmp);
-+	if (rc) {
-+		pr_err("failed to read rst_src_en (%d)\n", rc);
-+		return;
-+	}
-+
-+	rc = regmap_write(regmap, sw_mstr_rst, 1);
-+	if (rc) {
-+		pr_err("failed to write sw_mstr_rst (%d)\n", rc);
-+		return;
-+	}
-+
-+	rc = regmap_read(regmap, sw_mstr_rst, &tmp);
-+	if (rc) {
-+		pr_err("failed to read sw_mstr_rst (%d)\n", rc);
-+		return;
-+	}
-+
-+	while (1)
-+		;
-+}
-+
-+static int brcmstb_reboot_probe(struct platform_device *pdev)
-+{
-+	int rc;
-+	struct device_node *np = pdev->dev.of_node;
-+
-+	regmap = syscon_regmap_lookup_by_phandle(np, "syscon");
-+	if (IS_ERR(regmap)) {
-+		pr_err("failed to get syscon phandle\n");
-+		return -EINVAL;
-+	}
-+
-+	rc = of_property_read_u32_index(np, "syscon", RESET_SOURCE_ENABLE_REG,
-+					&rst_src_en);
-+	if (rc) {
-+		pr_err("can't get rst_src_en offset (%d)\n", rc);
-+		return -EINVAL;
-+	}
-+
-+	rc = of_property_read_u32_index(np, "syscon", SW_MASTER_RESET_REG,
-+					&sw_mstr_rst);
-+	if (rc) {
-+		pr_err("can't get sw_mstr_rst offset (%d)\n", rc);
-+		return -EINVAL;
-+	}
-+
-+	arm_pm_restart = brcmstb_reboot;
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id of_match[] = {
-+	{ .compatible = "brcm,brcmstb-reboot", },
-+	{},
-+};
-+
-+static struct platform_driver brcmstb_reboot_driver = {
-+	.probe = brcmstb_reboot_probe,
-+	.driver = {
-+		.name = "brcmstb-reboot",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match,
-+	},
-+};
-+
-+static int __init brcmstb_reboot_init(void)
-+{
-+	return platform_driver_probe(&brcmstb_reboot_driver,
-+					brcmstb_reboot_probe);
-+}
-+subsys_initcall(brcmstb_reboot_init);
+ 	config DEBUG_CLPS711X_UART1
+ 		bool "Kernel low-level debugging messages via UART1"
+ 		depends on ARCH_CLPS711X
+@@ -1049,6 +1060,7 @@ config DEBUG_UART_PHYS
+ 	default 0xd4018000 if DEBUG_MMP_UART3
+ 	default 0xe0000000 if ARCH_SPEAR13XX
+ 	default 0xf0000be0 if ARCH_EBSA110
++	default 0xf0406b00 if DEBUG_BRCMSTB_UART
+ 	default 0xf1012000 if DEBUG_MVEBU_UART_ALTERNATE
+ 	default 0xf1012000 if ARCH_DOVE || ARCH_KIRKWOOD || ARCH_MV78XX0 || \
+ 				ARCH_ORION5X
+@@ -1083,6 +1095,7 @@ config DEBUG_UART_VIRT
+ 	default 0xf8090000 if DEBUG_VEXPRESS_UART0_RS1
+ 	default 0xfb009000 if DEBUG_REALVIEW_STD_PORT
+ 	default 0xfb10c000 if DEBUG_REALVIEW_PB1176_PORT
++	default 0xfc406b00 if DEBUG_BRCMSTB_UART
+ 	default 0xfd000000 if ARCH_SPEAR3XX || ARCH_SPEAR6XX
+ 	default 0xfd000000 if ARCH_SPEAR13XX
+ 	default 0xfd012000 if ARCH_MV78XX0
+@@ -1136,7 +1149,7 @@ config DEBUG_UART_8250_WORD
+ 		ARCH_KEYSTONE || \
+ 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
+ 		DEBUG_DAVINCI_DA8XX_UART2 || DEBUG_DAVINCI_TNETV107X_UART1 || \
+-		DEBUG_BCM_KONA_UART
++		DEBUG_BCM_KONA_UART || DEBUG_BRCMSTB_UART
+ 
+ config DEBUG_UART_8250_FLOW_CONTROL
+ 	bool "Enable flow control for 8250 UART"
 -- 
 1.7.1
