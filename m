@@ -1,65 +1,109 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 26 Feb 2014 18:01:12 +0100
-Subject: [PATCH 5/7] ARM: at91/dt: at91sam9g45: remove useless adc properties
-In-Reply-To: <1393434074-15600-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1393434074-15600-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1393434074-15600-5-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Wed, 26 Feb 2014 18:01:08 +0100
+Subject: [PATCH 1/7] Documentation: dt: iio: improve atmel-adc documentation
+Message-ID: <1393434074-15600-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the properties that are not used anymore by the at91_adc driver.
-
-Also, stop using unit-addresses for the triggers as suggested by Mark
+This corrects the example by removing the unit-address, as suggested by Mark
 Rutland in
 http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/234184.html
 
+Also, it removes the properties that are not used anymore, to stop propagating
+them.
+
+Finally, fixes a few typos.
+
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9g45.dtsi | 13 ++++---------
- 1 file changed, 4 insertions(+), 9 deletions(-)
+ .../devicetree/bindings/arm/atmel-adc.txt          | 29 +++++++++-------------
+ 1 file changed, 12 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index cbcc058b26b4..715187692577 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -638,34 +638,29 @@
- 				atmel,adc-use-external-triggers;
- 				atmel,adc-channels-used = <0xff>;
- 				atmel,adc-vref = <3300>;
--				atmel,adc-num-channels = <8>;
- 				atmel,adc-startup-time = <40>;
--				atmel,adc-channel-base = <0x30>;
--				atmel,adc-drdy-mask = <0x10000>;
--				atmel,adc-status-register = <0x1c>;
--				atmel,adc-trigger-register = <0x08>;
- 				atmel,adc-res = <8 10>;
- 				atmel,adc-res-names = "lowres", "highres";
- 				atmel,adc-use-res = "highres";
+diff --git a/Documentation/devicetree/bindings/arm/atmel-adc.txt b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+index d1061469f63d..ba3abfad656b 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-adc.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-adc.txt
+@@ -5,31 +5,31 @@ Required properties:
+     <chip> can be "at91sam9260", "at91sam9g45" or "at91sam9x5"
+   - reg: Should contain ADC registers location and length
+   - interrupts: Should contain the IRQ line for the ADC
+-  - atmel,adc-channels-used: Bitmask of the channels muxed and enable for this
++  - atmel,adc-channels-used: Bitmask of the channels muxed and enabled for this
+     device
+   - atmel,adc-startup-time: Startup Time of the ADC in microseconds as
+     defined in the datasheet
+   - atmel,adc-vref: Reference voltage in millivolts for the conversions
+-  - atmel,adc-res: List of resolution in bits supported by the ADC. List size
++  - atmel,adc-res: List of resolutions in bits supported by the ADC. List size
+ 		   must be two at least.
+   - atmel,adc-res-names: Contains one identifier string for each resolution
+ 			 in atmel,adc-res property. "lowres" and "highres"
+ 			 identifiers are required.
  
--				trigger at 0 {
-+				trigger0 {
- 					trigger-name = "external-rising";
- 					trigger-value = <0x1>;
- 					trigger-external;
- 				};
--				trigger at 1 {
-+				trigger1 {
- 					trigger-name = "external-falling";
- 					trigger-value = <0x2>;
- 					trigger-external;
- 				};
+ Optional properties:
+-  - atmel,adc-use-external: Boolean to enable of external triggers
++  - atmel,adc-use-external: Boolean to enable the external triggers
+   - atmel,adc-use-res: String corresponding to an identifier from
+ 		       atmel,adc-res-names property. If not specified, the highest
+ 		       resolution will be used.
+   - atmel,adc-sleep-mode: Boolean to enable sleep mode when no conversion
+   - atmel,adc-sample-hold-time: Sample and Hold Time in microseconds
+-  - atmel,adc-ts-wires: Number of touch screen wires. Should be 4 or 5. If this
+-                        value is set, then adc driver will enable touch screen
++  - atmel,adc-ts-wires: Number of touchscreen wires. Should be 4 or 5. If this
++                        value is set, then the adc driver will enable touchscreen
+                         support.
+-    NOTE: when adc touch screen enabled, the adc hardware trigger will be
+-          disabled. Since touch screen will occupied the trigger register.
++    NOTE: when adc touchscreen is enabled, the adc hardware trigger will be
++          disabled. Since touchscreen will occupy the trigger register.
+   - atmel,adc-ts-pressure-threshold: a pressure threshold for touchscreen. It
+-                                     make touch detect more precision.
++                                     makes touch detection more precise.
+  
+ Optional trigger Nodes:
+   - Required properties:
+@@ -44,37 +44,32 @@ adc0: adc at fffb0000 {
+ 	compatible = "atmel,at91sam9260-adc";
+ 	reg = <0xfffb0000 0x100>;
+ 	interrupts = <20 4>;
+-	atmel,adc-channel-base = <0x30>;
+ 	atmel,adc-channels-used = <0xff>;
+-	atmel,adc-drdy-mask = <0x10000>;
+-	atmel,adc-num-channels = <8>;
+ 	atmel,adc-startup-time = <40>;
+-	atmel,adc-status-register = <0x1c>;
+-	atmel,adc-trigger-register = <0x08>;
+ 	atmel,adc-use-external;
+ 	atmel,adc-vref = <3300>;
+ 	atmel,adc-res = <8 10>;
+ 	atmel,adc-res-names = "lowres", "highres";
+ 	atmel,adc-use-res = "lowres";
  
--				trigger at 2 {
-+				trigger2 {
- 					trigger-name = "external-any";
- 					trigger-value = <0x3>;
- 					trigger-external;
- 				};
+-	trigger at 0 {
++	trigger0 {
+ 		trigger-name = "external-rising";
+ 		trigger-value = <0x1>;
+ 		trigger-external;
+ 	};
+-	trigger at 1 {
++	trigger1 {
+ 		trigger-name = "external-falling";
+ 		trigger-value = <0x2>;
+ 		trigger-external;
+ 	};
  
--				trigger at 3 {
-+				trigger3 {
- 					trigger-name = "continuous";
- 					trigger-value = <0x6>;
- 				};
+-	trigger at 2 {
++	trigger2 {
+ 		trigger-name = "external-any";
+ 		trigger-value = <0x3>;
+ 		trigger-external;
+ 	};
+ 
+-	trigger at 3 {
++	trigger3 {
+ 		trigger-name = "continuous";
+ 		trigger-value = <0x6>;
+ 	};
 -- 
 1.8.3.2
