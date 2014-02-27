@@ -1,55 +1,34 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 27 Feb 2014 11:22:13 +0200
-Subject: Tegra clockframework fixes for 3.14
-In-Reply-To: <20140226153942.22529.95697@quantum>
-References: <20140220172744.GA4378@tbergstrom-lnx.Nvidia.com>
- <20140224010211.22529.99924@quantum>
- <20140224134319.GG19389@tbergstrom-lnx.Nvidia.com>
- <20140226101640.GM19389@tbergstrom-lnx.Nvidia.com>
- <20140226153942.22529.95697@quantum>
-Message-ID: <20140227092213.GP19389@tbergstrom-lnx.Nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 27 Feb 2014 09:35:40 +0000
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <20140226200537.GC16149@cbox>
+References: <20140226183454.GA14639@cbox> <5553754.0b4gMg5OS7@wuerfel>
+ <20140226200537.GC16149@cbox>
+Message-ID: <CAHkRjk57LyJGPZ4UdLVFpLrE2VeaY4doCwKo8UjbpzK52jTbVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 04:39:42PM +0100, Mike Turquette wrote:
-> Quoting Peter De Schrijver (2014-02-26 02:16:40)
-> > Mike,
-> > 
-> > > On Mon, Feb 24, 2014 at 02:02:11AM +0100, Mike Turquette wrote:
-> > > > Quoting Peter De Schrijver (2014-02-20 09:27:44)
-> > > > > Hi Mike,
-> > > > > 
-> > > > > Could you merge these fixes still for 3.14?
-> > > > 
-> > > > No problem, but can you provide a list of the regressions fixed? I'll
-> > > > add those to my merge commit message. No need for you to respin
-> > > > anything. Next time if you could submit a signed tag with the
-> > > > regressions listed in the message it would be a great help.
-> > > > 
-> > > 
-> > > This fixes the following issues:
-> > > 
-> > > clk: tegra124: remove gr2d and gr3d clocks - accesses to undefined registers
-> > > clk: tegra: Fix vic03 mux index - wrong parent when PLLC3 is selected (because clk_m is actually selected)
-> > > clk: tegra: use max divider if divider overflows - make tegra fractional divider match the clk-div.c behaviour
-> > > clk: tegra: cclk_lp has a pllx/2 divider - pllx runs at half the programmed rate
-> > > clk: tegra: fix sdmmc clks on Tegra1x4 - wrong parent selection
-> > > clk: tegra: fix host1x clock on Tegra124 - wrong parent selection
-> > > clk: tegra: PLLD2 fixes for hdmi - PLL runs at wrong rate
-> > > clk: tegra: Fix PLLD mnp table - PLL runs at wrong rate
-> > > clk: tegra: Fix PLLP rate table - kernel panic when using coreboot
-> > > clk: tegra: Correct clock number for UARTE - wrong clock when using UARTE
-> > > clk: tegra: Add missing Tegra20 fuse clks - fuse driver broken
-> > > 
-> > 
-> > Is this ok for you?
-> 
-> Yes, it's great. The tegra fixes are already part of the next batch
-> towards -rc5.
-> 
+On 26 February 2014 20:05, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Wed, Feb 26, 2014 at 08:55:58PM +0100, Arnd Bergmann wrote:
+>> On Wednesday 26 February 2014 10:34:54 Christoffer Dall wrote:
+>> > For more information about UEFI and ACPI booting, see [4] and [5].
+>>
+>> What's the point of having ACPI in a virtual machine? You wouldn't
+>> need to abstract any of the hardware in AML since you already know
+>> what the virtual hardware is, so I can't see how this would help
+>> anyone.
+>
+> The most common response I've been getting so far is that people
+> generally want their VMs to look close to the real thing, but not sure
+> how valid an argument that is.
+>
+> Some people feel strongly about this and seem to think that ARMv8
+> kernels will only work with ACPI in the future...
 
-Ok. Thanks!
+My strong feeling is that AArch64 kernels *may* support ACPI in the future ;).
 
-Cheers,
+On a more serious note, both FDT and ACPI will be first-class citizens
+on AArch64 and I have no intention whatsoever of dropping FDT.
 
-Peter.
+-- 
+Catalin
