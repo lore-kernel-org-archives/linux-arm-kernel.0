@@ -1,23 +1,32 @@
-From: mmayer@broadcom.com (Markus Mayer)
-Date: Thu, 27 Feb 2014 14:11:20 -0800
-Subject: [PATCH] gpio: only enable kona driver on BCM_MOBILE or for compile
- testing
-In-Reply-To: <CACRpkdZg5uoP5LurL5vOPCaKQu2B=neybuo=gwM_JT7UAhRkjg@mail.gmail.com>
-References: <1392990146-18916-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <CACRpkdZg5uoP5LurL5vOPCaKQu2B=neybuo=gwM_JT7UAhRkjg@mail.gmail.com>
-Message-ID: <530FB808.5050802@broadcom.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 27 Feb 2014 14:14:58 -0800
+Subject: [PATCH 3/3] ARM: config: Update msm_defconfig
+In-Reply-To: <1393467394-10907-4-git-send-email-sboyd@codeaurora.org>
+References: <1393467394-10907-1-git-send-email-sboyd@codeaurora.org>
+ <1393467394-10907-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140227221458.GA5334@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-02-27 01:16 AM, Linus Walleij wrote:
-> On Fri, Feb 21, 2014 at 2:42 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
+On Wed, Feb 26, 2014 at 06:16:34PM -0800, Stephen Boyd wrote:
+>Now that DT based platforms are split out of mach-msm into
+>mach-qcom, put back a non-DT based SoC into the msm_defconfig and
+>stop selecting unsupported drivers.
 >
->> This change makes it easier to configure a kernel for a real machine by
->> not showing the option to enable it at all if COMPILE_TEST is off.
->>
->> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->
-> Markus: can you ACK this patch?
+>Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>---
+> arch/arm/configs/msm_defconfig | 25 +++----------------------
+> 1 file changed, 3 insertions(+), 22 deletions(-)
 
-Acked-by: Markus Mayer <mmayer@broadcom.com>
+Acked-by: David Brown <davidb@codeaurora.org>
+
+Kumar, can you just pull this in with the other qcom changes from
+Sephen?
+
+Thanks,
+David
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
