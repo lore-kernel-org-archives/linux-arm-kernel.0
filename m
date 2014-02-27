@@ -1,68 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Feb 2014 21:29:30 +0000
-Subject: [PATCH V2] irqchip:gic: change access of gicc_ctrl register to
- read modify write.
-In-Reply-To: <CAL85gmDk0hxaVbSbqTaVeVFsY4Xt1aKrBx=Pm57g0m0d_Qw-KQ@mail.gmail.com>
- (Feng Kan's message of "Thu, 27 Feb 2014 21:00:07 +0000")
-References: <1393526095-31479-1-git-send-email-fkan@apm.com>
- <87zjlc2xpb.fsf@sofa.wild-wind.fr.eu.org>
- <CAL85gmDk0hxaVbSbqTaVeVFsY4Xt1aKrBx=Pm57g0m0d_Qw-KQ@mail.gmail.com>
-Message-ID: <87wqggmeh1.fsf@sofa.wild-wind.fr.eu.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 27 Feb 2014 22:28:02 +0100
+Subject: [PATCH 1/4] ARM: dove: add system controller node
+In-Reply-To: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1393536486-3827-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27 2014 at  9:00:07 pm GMT, Feng Kan <fkan@apm.com> wrote:
-> On Thu, Feb 27, 2014 at 10:54 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On Thu, Feb 27 2014 at  6:34:55 pm GMT, Feng Kan <fkan@apm.com> wrote:
->>> This change is made to preserve the GIC v2 releated bits in the
->>> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
->>> The original code only set the enable/disable group bit in this register.
->>> This code will preserve the bypass bits configured by the bootload except
->>> the enable/disable bit. The main reason for this change is to allow the
->>> bypass bits specified in the v2 spec to remain untouched by the current
->>> GIC code. In the X-Gene platform, the bypass functionality is not used
->>> and bypass must be disabled at all time.
->>>
->>> Signed-off-by: Vinayak Kale <vkale@apm.com>
->>> Acked-by: Anup Patel <apatel@apm.com>
->>> Signed-off-by: Feng Kan <fkan@apm.com>
->>> ---
->>> V2 Changes:
->>>       - only mask off v2 bypass bits
->>>
->>>  drivers/irqchip/irq-gic.c |   22 +++++++++++++++++++---
->>>  1 files changed, 19 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>> index 341c601..757581b 100644
->>> --- a/drivers/irqchip/irq-gic.c
->>> +++ b/drivers/irqchip/irq-gic.c
->>> @@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>>       void __iomem *dist_base = gic_data_dist_base(gic);
->>>       void __iomem *base = gic_data_cpu_base(gic);
->>>       unsigned int cpu_mask, cpu = smp_processor_id();
->>> +     unsigned int ctrl_mask;
->>>       int i;
->>>
->>>       /*
->>> @@ -449,13 +450,24 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>>               writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
->>>
->>>       writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
->>> -     writel_relaxed(1, base + GIC_CPU_CTRL);
->>> +
->>> +     ctrl_mask = readl(base + GIC_CPU_CTRL);
->>> +     ctrl_mask |= 0x1;
->>> +     writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
->>
->> I think I'm quickly loosing the will to live, or at least to review this
->> patch any further.
-> Hang in there Marc, though I had nothing to do with the flood in England. Maybe
-> I can instill a bit more will for you to live.
+This adds a DT node for the system-controller found on Marvell Dove
+SoCs.
 
-I'll probably survive without your help. In the meantime, if you want
-that patch to make it in the tree, you'd better fix it.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/boot/dts/dove.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-	M.
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 187fd46b7b5e..bd63452b18c0 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -186,6 +186,11 @@
+ 				reg = <0x20000 0x80>, <0x800100 0x8>;
+ 			};
+ 
++			sysc: system-ctrl at 20000 {
++				compatible = "marvell,orion-system-controller";
++				reg = <0x20000 0x110>;
++			};
++
+ 			bridge_intc: bridge-interrupt-ctrl at 20110 {
+ 				compatible = "marvell,orion-bridge-intc";
+ 				interrupt-controller;
 -- 
-AAAFNRAA
+1.8.5.3
