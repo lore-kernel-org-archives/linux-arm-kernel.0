@@ -1,39 +1,46 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 26 Feb 2014 23:06:06 -0500 (EST)
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <CAFEAcA9nq_V4VGG=j6FWFatJBnTuYrU9-9U9eGXcQz0zimrasQ@mail.gmail.com>
-References: <20140226183454.GA14639@cbox> <5553754.0b4gMg5OS7@wuerfel>
- <CAL_Jsq+3jBdca9zVnxHG+7pxy2_316emsP=PB3WkTMQP0JYBYQ@mail.gmail.com>
- <CAFEAcA8u6u8Hh=qn8XE2Evc93_-pkZPSDSShm-eiSn-vcsYgKA@mail.gmail.com>
- <CAL_JsqJ+mXadxLHqFw6uXvM9=juC-emKT7G-d-_PLYbXNSX7Ew@mail.gmail.com>
- <CAFEAcA9nq_V4VGG=j6FWFatJBnTuYrU9-9U9eGXcQz0zimrasQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1402262259290.17677@knanqh.ubzr>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 27 Feb 2014 13:20:21 +0900
+Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
+In-Reply-To: <20140226154858.GC10246@arm.com>
+References: <1393302345-18253-1-git-send-email-broonie@kernel.org>
+ <1393302345-18253-2-git-send-email-broonie@kernel.org>
+ <20140225165411.GA3883@red-moon>
+ <20140226005052.GA31120@sirena.org.uk>
+ <20140226123208.GB22839@e102568-lin.cambridge.arm.com>
+ <20140226144610.GA2394@sirena.org.uk>
+ <20140226154858.GC10246@arm.com>
+Message-ID: <20140227042021.GE9383@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Feb 2014, Peter Maydell wrote:
+On Wed, Feb 26, 2014 at 03:48:58PM +0000, Catalin Marinas wrote:
 
-> On 26 February 2014 23:08, Rob Herring <robherring2@gmail.com> wrote:
-> > On Wed, Feb 26, 2014 at 4:54 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
-> >> What does the 8250 have to recommend it over just providing
-> >> the PL011?
-> >
-> > As I mentioned, it will just work for anything that expects the serial
-> > port to be ttyS0 as on x86 rather than ttyAMA0.
-> 
-> This doesn't seem very compelling to me. Either userspace
-> should just be fixed or the kernel should implement a namespace
-> for serial ports which doesn't randomly change just because the
-> particular h/w driver doing the implementation is different.
-> We shouldn't be papering over other peoples' problems in the VM
-> spec IMHO.
+> My concern is that the MPIDR is just considered a unique ID. The ARMv8
+> relaxes the requirement so that it no longer needs to start at 0 and
+> increase monotonically. I checked with the architecture guys here and
+> they still expect the affinity hierarchy to be described by MPIDR but we
+> can have holes in the range for certain levels (i.e. an affinity level
+> may not start at 0 and may not even increase monotonically for
+> subsequent CPUs).
 
-Indeed.
+I don't think anything has a problem with holes in the number range, the
+only thing I can think of which imposes that requirement is the DT
+binding but obviously that's not relevant if we are using MPIDR.  The
+core topology documentation explicitly says that these are physical IDs
+and entirely up to the architecture/platform.  It'd seem odd given that
+we have hotplug support.
 
-This is already causing us trouble in other contexts.  Please have a 
-look at this patch for a solution:
+What problems do you anticipate?
 
-http://article.gmane.org/gmane.linux.kernel.samsung-soc/27222
+> So we can either add a tolerant MPIDR parsing or we simply assume that
+> the topology is _flat_ when DT doesn't provide the information.
 
-
-Nicolas
+Right, that's what the current code does but I'm not sure it's the best
+option.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140227/02fdbbc0/attachment.sig>
