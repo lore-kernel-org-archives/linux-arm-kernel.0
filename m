@@ -1,102 +1,62 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Wed, 26 Feb 2014 18:09:19 -0600
-Subject: [PATCH v3 2/9] Input: pmic8xxx-keypad - Migrate to devm_* APIs
-In-Reply-To: <1393441562-685-3-git-send-email-sboyd@codeaurora.org>
-References: <1393441562-685-1-git-send-email-sboyd@codeaurora.org>
- <1393441562-685-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140227000919.GE18563@joshc.qualcomm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 26 Feb 2014 16:16:20 -0800
+Subject: [PATCH 3/3] ARM: S3C24XX: select COMMON_CLK_SAMSUNG for S3C24XX
+In-Reply-To: <1393392247-6247-4-git-send-email-pankaj.dubey@samsung.com>
+References: <1393392247-6247-1-git-send-email-pankaj.dubey@samsung.com>
+ <1393392247-6247-4-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20140227001620.12081.28601@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 11:05:55AM -0800, Stephen Boyd wrote:
-> Simplify the error paths and reduce the lines of code in this
-> driver by using the devm_* APIs.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Quoting Pankaj Dubey (2014-02-25 21:24:07)
+> CC: Ben Dooks <ben-linux@fluff.org>
+> CC: Kukjin Kim <kgene.kim@samsung.com>
+> CC: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 > ---
->  drivers/input/keyboard/pmic8xxx-keypad.c | 62 +++++++++-----------------------
->  1 file changed, 17 insertions(+), 45 deletions(-)
+>  arch/arm/mach-s3c24xx/Kconfig |    3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> diff --git a/drivers/input/keyboard/pmic8xxx-keypad.c b/drivers/input/keyboard/pmic8xxx-keypad.c
-> index 2c9f19ac35ea..4e6bfbf94ae4 100644
-> --- a/drivers/input/keyboard/pmic8xxx-keypad.c
-> +++ b/drivers/input/keyboard/pmic8xxx-keypad.c
-[..]
-> @@ -634,7 +629,7 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
->  					kp->keycodes, kp->input);
->  	if (rc) {
->  		dev_err(&pdev->dev, "failed to build keymap\n");
-> -		goto err_get_irq;
-> +		return rc;
->  	}
->  
->  	if (pdata->rep)
-> @@ -650,7 +645,7 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
->  	rc = pmic8xxx_kpd_init(kp);
->  	if (rc < 0) {
->  		dev_err(&pdev->dev, "unable to initialize keypad controller\n");
-> -		goto err_get_irq;
-> +		return rc;
->  	}
->  
->  	rc = pmic8xxx_kp_config_gpio(pdata->cols_gpio_start,
-> @@ -667,24 +662,26 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
->  		goto err_gpio_config;
+> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+> index 80373da..5cf82a1 100644
+> --- a/arch/arm/mach-s3c24xx/Kconfig
+> +++ b/arch/arm/mach-s3c24xx/Kconfig
+> @@ -40,6 +40,7 @@ config CPU_S3C2410
+>  config CPU_S3C2412
+>         bool "SAMSUNG S3C2412"
+>         select COMMON_CLK
+> +       select COMMON_CLK_SAMSUNG
 
-See below.
+I guess this depends on Heiko's "[PATCH 00/12] ARM: S3C24XX: convert
+s3c2410, s3c2440 s3c2442 to common clock framework" series?
 
->  	}
->  
-> -	rc = request_any_context_irq(kp->key_sense_irq, pmic8xxx_kp_irq,
-> -				 IRQF_TRIGGER_RISING, "pmic-keypad", kp);
-> +	rc = devm_request_any_context_irq(&pdev->dev, kp->key_sense_irq,
-> +			pmic8xxx_kp_irq, IRQF_TRIGGER_RISING, "pmic-keypad",
-> +			kp);
->  	if (rc < 0) {
->  		dev_err(&pdev->dev, "failed to request keypad sense irq\n");
-> -		goto err_get_irq;
-> +		return rc;
->  	}
->  
-> -	rc = request_any_context_irq(kp->key_stuck_irq, pmic8xxx_kp_stuck_irq,
-> -				 IRQF_TRIGGER_RISING, "pmic-keypad-stuck", kp);
-> +	rc = devm_request_any_context_irq(&pdev->dev, kp->key_stuck_irq,
-> +			pmic8xxx_kp_stuck_irq, IRQF_TRIGGER_RISING,
-> +			"pmic-keypad-stuck", kp);
->  	if (rc < 0) {
->  		dev_err(&pdev->dev, "failed to request keypad stuck irq\n");
-> -		goto err_req_stuck_irq;
-> +		return rc;
->  	}
->  
->  	rc = pmic8xxx_kp_read_u8(kp, &ctrl_val, KEYP_CTRL);
->  	if (rc < 0) {
->  		dev_err(&pdev->dev, "failed to read KEYP_CTRL register\n");
-> -		goto err_pmic_reg_read;
-> +		return rc;
->  	}
->  
->  	kp->ctrl_reg = ctrl_val;
-> @@ -692,36 +689,12 @@ static int pmic8xxx_kp_probe(struct platform_device *pdev)
->  	rc = input_register_device(kp->input);
->  	if (rc < 0) {
->  		dev_err(&pdev->dev, "unable to register keypad input device\n");
-> -		goto err_pmic_reg_read;
-> +		return rc;
->  	}
->  
->  	device_init_wakeup(&pdev->dev, pdata->wakeup);
->  
->  	return 0;
-> -
-> -err_pmic_reg_read:
-> -	free_irq(kp->key_stuck_irq, kp);
-> -err_req_stuck_irq:
-> -	free_irq(kp->key_sense_irq, kp);
-> -err_gpio_config:
+Regards,
+Mike
 
-You're removing this label, even though it's still used above. :(
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+>         select CPU_ARM926T
+>         select CPU_LLSERIAL_S3C2440
+>         select S3C2412_COMMON_CLK
+> @@ -51,6 +52,7 @@ config CPU_S3C2412
+>  config CPU_S3C2416
+>         bool "SAMSUNG S3C2416/S3C2450"
+>         select COMMON_CLK
+> +       select COMMON_CLK_SAMSUNG
+>         select CPU_ARM926T
+>         select CPU_LLSERIAL_S3C2440
+>         select S3C2416_PM if PM
+> @@ -89,6 +91,7 @@ config CPU_S3C244X
+>  config CPU_S3C2443
+>         bool "SAMSUNG S3C2443"
+>         select COMMON_CLK
+> +       select COMMON_CLK_SAMSUNG
+>         select CPU_ARM920T
+>         select CPU_LLSERIAL_S3C2440
+>         select S3C2443_COMMON_CLK
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
