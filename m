@@ -1,52 +1,28 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Thu, 27 Feb 2014 19:12:59 +0000
-Subject: [PATCH v2 1/4] pci: OF: Fix the conversion of IO ranges into IO
- resources.
-In-Reply-To: <20140227181951.GC24656@obsidianresearch.com>
-References: <1393506402-11474-1-git-send-email-Liviu.Dudau@arm.com>
- <1393506402-11474-2-git-send-email-Liviu.Dudau@arm.com>
- <20140227181951.GC24656@obsidianresearch.com>
-Message-ID: <20140227191259.GA31753@bart.dudau.co.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Feb 2014 20:16:23 +0100
+Subject: [PATCH v8.1 1/6] dt-bindings: sram: describe option to reserve
+ parts of the memory
+In-Reply-To: <2574291.evU61mFTUd@phil>
+References: <21117503.1c6iOkvYSr@phil> <201402251419.31151.arnd@arndb.de>
+ <2574291.evU61mFTUd@phil>
+Message-ID: <201402272016.23521.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 11:19:51AM -0700, Jason Gunthorpe wrote:
-> On Thu, Feb 27, 2014 at 01:06:39PM +0000, Liviu Dudau wrote:
-> > +	if (res->flags & IORESOURCE_IO) {
-> > +		unsigned long port;
-> > +		port = pci_address_to_pio(range->pci_addr);
+On Wednesday 26 February 2014, Heiko St?bner wrote:
+> Some SoCs need parts of their sram for special purposes. So while being part
+> of the peripheral, it should not be part of the genpool controlling the sram.
 > 
-> This looks very suspicious, pci_addr is not unique across all domains,
-> so there is no way to convert from a pci_addr to the virtual IO
-> address without knowing the domain number as well.
+> Therefore add the option to define reserved regions as subnodes of the
+> sram-node similar to defining reserved global memory regions.
 > 
-> I would like to see it be:
->   port = pci_address_to_pio(range->cpu_addr);
+> Originally
+> Suggested-by: Rob Herring <robherring2@gmail.com>
 > 
-> cpu_addr is unique across all domains.
-
-Jason,
-
-First thanks for reviewing the updated series.
-
-We have agreed early on that indeed using range->cpu_addr is the correct aproach
-and me taking the lazy shortcut of using range->pci_addr because of the broken
-default implementation of pci_address_to_pio is wrong. I will fix this for v3.
-
-The outstanding issue is how to fix pci_address_to_pio() as it will not
-for for range->cpu_addr > IO_SPACE_LIMIT (16MB in my case).
-
-Best regards,
-Liviu
-
+> Using subnodes for reserved regions
+> Suggested-by: Grant Likely <grant.likely@linaro.org>
 > 
-> Looking at the microblaze and PPC versions I think the above version
-> is actually correct (assuming io_base_phys is the CPU address of the
-> IO window)
-> 
-> Jason
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
