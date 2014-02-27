@@ -1,47 +1,53 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 27 Feb 2014 19:47:56 +0100
-Subject: [PATCHv2 5/7] ARM: at91/dt: at91sam9g45: remove useless adc properties
+Date: Thu, 27 Feb 2014 19:47:58 +0100
+Subject: [PATCHv2 7/7] ARM: at91/dt: sama5d3: remove useless adc properties
 In-Reply-To: <1393526878-22311-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1393526878-22311-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1393526878-22311-6-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1393526878-22311-8-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the properties that are not used anymore by the at91_adc driver.
+Remove the properties that are not used anymore by the at91_adc driver and fix
+the atmel,adc-use-external-triggers property name.
 
 Also, add #address-cells, #size-cells and a reg for each trigger to comply to
 the ePAPR.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9g45.dtsi | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/sama5d3.dtsi | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index cbcc058b26b4..dc4fb7d99902 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -632,40 +632,41 @@
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index 26d7ed510c96..73ad828296b2 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -239,6 +239,8 @@
  			};
  
- 			adc0: adc at fffb0000 {
+ 			adc0: adc at f8018000 {
 +				#address-cells = <1>;
 +				#size-cells = <0>;
- 				compatible = "atmel,at91sam9260-adc";
- 				reg = <0xfffb0000 0x100>;
- 				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
- 				atmel,adc-use-external-triggers;
- 				atmel,adc-channels-used = <0xff>;
- 				atmel,adc-vref = <3300>;
--				atmel,adc-num-channels = <8>;
+ 				compatible = "atmel,at91sam9x5-adc";
+ 				reg = <0xf8018000 0x100>;
+ 				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
+@@ -261,35 +263,34 @@
+ 				clocks = <&adc_clk>,
+ 					 <&adc_op_clk>;
+ 				clock-names = "adc_clk", "adc_op_clk";
+-				atmel,adc-channel-base = <0x50>;
+ 				atmel,adc-channels-used = <0xfff>;
+-				atmel,adc-drdy-mask = <0x1000000>;
+-				atmel,adc-num-channels = <12>;
  				atmel,adc-startup-time = <40>;
--				atmel,adc-channel-base = <0x30>;
--				atmel,adc-drdy-mask = <0x10000>;
--				atmel,adc-status-register = <0x1c>;
--				atmel,adc-trigger-register = <0x08>;
- 				atmel,adc-res = <8 10>;
+-				atmel,adc-status-register = <0x30>;
+-				atmel,adc-trigger-register = <0xc0>;
+-				atmel,adc-use-external;
++				atmel,adc-use-external-triggers;
+ 				atmel,adc-vref = <3000>;
+ 				atmel,adc-res = <10 12>;
  				atmel,adc-res-names = "lowres", "highres";
- 				atmel,adc-use-res = "highres";
+ 				status = "disabled";
  
  				trigger at 0 {
 +					reg = <0>;
@@ -55,14 +61,12 @@ index cbcc058b26b4..dc4fb7d99902 100644
  					trigger-value = <0x2>;
  					trigger-external;
  				};
- 
  				trigger at 2 {
 +					reg = <2>;
  					trigger-name = "external-any";
  					trigger-value = <0x3>;
  					trigger-external;
  				};
- 
  				trigger at 3 {
 +					reg = <3>;
  					trigger-name = "continuous";
