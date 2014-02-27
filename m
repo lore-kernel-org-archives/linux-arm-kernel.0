@@ -1,111 +1,125 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 27 Feb 2014 10:19:41 +0800
-Subject: [patch 09/26] arm: mmp: Remove pointless fiddling with irq
- internals
-In-Reply-To: <CADApbeiJ2ESEuBxGNXLe+sbKEox02Vr0hhO-rW7dosc_4A+TEQ@mail.gmail.com>
-References: <20140223212703.511977310@linutronix.de>
- <20140223212737.214342433@linutronix.de>
- <20140223231755.GA27579@pengutronix.de>
- <CADApbeiyGoSAF9n5-+Ys1H4VDgN+d727E6ARWFGj4EixqeP79w@mail.gmail.com>
- <CAN1soZy_TfzNigfn4y6kF2qe4K+AQsagd-1KWYrz1VEavMO4bA@mail.gmail.com>
- <alpine.DEB.2.02.1402241227400.21251@ionos.tec.linutronix.de>
- <CADApbeiJ2ESEuBxGNXLe+sbKEox02Vr0hhO-rW7dosc_4A+TEQ@mail.gmail.com>
-Message-ID: <CAN1soZzipHL=0i4gH3B7PwHaOJh6=_uwv5u0e7W2MsvARp_jLA@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 26 Feb 2014 18:25:24 -0800
+Subject: [PATCH 1/8] clk: divider: fix rate calculation for fractional
+ rates
+In-Reply-To: <52FE1DF2.2040707@ti.com>
+References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
+ <1392285846-13199-2-git-send-email-tomi.valkeinen@ti.com>
+ <52FE1DF2.2040707@ti.com>
+Message-ID: <20140227022524.12081.32368@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 9:37 AM, Chao Xie <xiechao.mail@gmail.com> wrote:
-> On Mon, Feb 24, 2014 at 7:31 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
->> On Mon, 24 Feb 2014, Haojian Zhuang wrote:
->>
->>> On Mon, Feb 24, 2014 at 2:07 PM, Chao Xie <xiechao.mail@gmail.com> wrote:
->>> > On Mon, Feb 24, 2014 at 7:17 AM, Uwe Kleine-K?nig
->>> > <u.kleine-koenig@pengutronix.de> wrote:
->>> >> Hi Thomas,
->>> >>
->>> >> On Sun, Feb 23, 2014 at 09:40:13PM -0000, Thomas Gleixner wrote:
->>> >>> The pm-mmp2 and pm-pxa910 power management related irq_set_wake
->>> >>> callbacks fiddle pointlessly with the irq actions for no reason except
->>> >>> for lack of understanding how the wakeup mechanism works.
->>> >>>
->>> >>> On supsend the core disables all interrupts lazily, i.e. it does not
->>> >>> mask them at the irq controller level. So any interrupt which is
->>> >>> firing during supsend will mark the corresponding interrupt line as
->>> >> s/supsend/suspend/ twice
->>> >>> pending. Just before the core powers down it checks whether there are
->>> >>> interrupts pending from interrupt lines which are marked as wakeup
->>> >>> sources and if so it aborts the resume and resends the interrupts.
->>> >> It's the suspend that is aborted, not the resume.
->>> >>
->>> >> Other than that your change looks fine.
->>> >>
->>> > For pxa910 and MMP2, wake up source only wake up the AP subsystem.
->>> > The AP subsystem includes the APMU(AP Power Mangament Unit) and cores.
->>> > Now the core is still powered down. APMU will check the interrupt
->>> > lines, and find
->>> > that there are interrupt pending, it will power on the cores.
->>> > So if the irq is disabled, even wake up source can wake up AP subsystem, but the
->>> > core is still powered down. It will not be powered up by APMU.
->>> >
->>>
->>> Yes, suspend/resume can't work if the above code is removed.
->>>
->>> Interrupt source (logic AND with interrupt mask register) is connected
->>> to MPMU as
->>> wakeup source. If the interrupt is disabled, there's no wakeup source event.
->>>
->>> And APMU is waken up by MPMU.
->>>
->>> So please don't remove the above code. We must keep these interrupt lines active
->>> to wake up the whole system.
->>
->> They are kept active at the interrupt controller level. You just
->> refuse to understand how the internals of the interrupt subsystem
->> work.
->>
-> If no irq_disable callback is hooked, when do irq_disable, it will not
-> actually disable
-> the interrupt, it will depend on next time when the irq happens, the
-> handler will first mask
-> the interrupt as this interrupt never happens.
-> So after system suspended, the interrupt happens, but the device
-> driver will not recieve this interrupt
-> because it is masked.
-> It results in that the device driver miss a important interrupt which
-> related to something need to be
-> handled. If user application for example android has power managment
-> daemon. It will find that nothing
-> to handle, it will make the system enter suspend again.
->
-Let me list the logic to make it easier to understand.
+Quoting Tero Kristo (2014-02-14 05:45:22)
+> On 02/13/2014 12:03 PM, Tomi Valkeinen wrote:
+> > clk-divider.c does not calculate the rates consistently at the moment.
+> >
+> > As an example, on OMAP3 we have a clock divider with a source clock of
+> > 864000000 Hz. With dividers 6, 7 and 8 the theoretical rates are:
+> >
+> > 6: 144000000
+> > 7: 123428571.428571...
+> > 8: 108000000
+> >
+> > Calling clk_round_rate() with the rate in the first column will give the
+> > rate in the second column:
+> >
+> > 144000000 -> 144000000
+> > 143999999 -> 123428571
+> > 123428572 -> 123428571
+> > 123428571 -> 108000000
+> >
+> > Note how clk_round_rate() returns 123428571 for rates from 123428572 to
+> > 143999999, which is mathematically correct, but when clk_round_rate() is
+> > called with 123428571, the returned value is surprisingly 108000000.
+> >
+> > This means that the following code works a bit oddly:
+> >
+> > rate = clk_round_rate(clk, 123428572);
+> > clk_set_rate(clk, rate);
+> >
+> > As clk_set_rate() also does clock rate rounding, the result is that the
+> > clock is set to the rate of 108000000, not 123428571 returned by the
+> > clk_round_rate.
+> >
+> > This patch changes the clk-divider.c to use DIV_ROUND_UP when
+> > calculating the rate. This gives the following behavior which fixes the
+> > inconsistency:
+> >
+> > 144000000 -> 144000000
+> > 143999999 -> 123428572
+> > 123428572 -> 123428572
+> > 123428571 -> 108000000
+> >
+> > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > ---
+> >   drivers/clk/clk-divider.c | 10 +++++-----
+> >   1 file changed, 5 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> > index 5543b7df8e16..ec22112e569f 100644
+> > --- a/drivers/clk/clk-divider.c
+> > +++ b/drivers/clk/clk-divider.c
+> > @@ -24,7 +24,7 @@
+> >    * Traits of this clock:
+> >    * prepare - clk_prepare only ensures that parents are prepared
+> >    * enable - clk_enable only ensures that parents are enabled
+> > - * rate - rate is adjustable.  clk->rate = parent->rate / divisor
+> > + * rate - rate is adjustable.  clk->rate = DIV_ROUND_UP(parent->rate / divisor)
+> >    * parent - fixed parent.  No clk_set_parent support
+> >    */
+> >
+> > @@ -115,7 +115,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
+> >               return parent_rate;
+> >       }
+> >
+> > -     return parent_rate / div;
+> > +     return DIV_ROUND_UP(parent_rate, div);
+> >   }
+> >
+> >   /*
+> > @@ -185,7 +185,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+> >               }
+> >               parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
+> >                               MULT_ROUND_UP(rate, i));
+> > -             now = parent_rate / i;
+> > +             now = DIV_ROUND_UP(parent_rate, i);
+> >               if (now <= rate && now > best) {
+> >                       bestdiv = i;
+> >                       best = now;
+> > @@ -207,7 +207,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
+> >       int div;
+> >       div = clk_divider_bestdiv(hw, rate, prate);
+> >
+> > -     return *prate / div;
+> > +     return DIV_ROUND_UP(*prate, div);
+> >   }
+> >
+> >   static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+> > @@ -218,7 +218,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+> >       unsigned long flags = 0;
+> >       u32 val;
+> >
+> > -     div = parent_rate / rate;
+> > +     div = DIV_ROUND_UP(parent_rate, rate);
+> >       value = _get_val(divider, div);
+> >
+> >       if (value > div_mask(divider))
+> >
+> 
+> Basically the patch looks good to me, but it might be good to have a 
+> testing round of sort with this. It can potentially cause regressions on 
+> multiple boards if the drivers happen to rely on the "broken" clock 
+> rates. Same for patch #2 which is a copy paste of this one, but only 
+> impacts TI boards.
 
-suspend_enter()
-  --> dpm_suspend_end()
-           --> dpm_suspend_noirq()
-                    --> suspend_device_irqs()
-                             --> __disable_irq()
-                                     --> set IRQS_SUSPENDED && call
-irq_disable() if necessary
-  --> syscore_suspend()
-          --> check_wakeup_irqs()
-               If there's no pending irq in suspend process &&
-IRQS_SUSPENDED is set,
-               then mask the irq.
+Agreed. I've taken patches #1 & #2 into clk-next. Let's let them stew in
+-next for a while and see if anyone's board catches on fire.
 
-Yes, we didn't implement disable_irq(). But we must implement mask_irq().
+Regards,
+Mike
 
-So system suspends. Then system will never be waken up by this irq any
-more since
-it's masked.
-
-
->> And even if you would need this flag, then fiddling with the irq desc
->> internals is a big NONO. There is a proper way to hand that in.
->>
->
-> So can you suggest the proper way to handle it? Thanks.
->
->> Thanks,
->>
->>         tglx
->>
+> 
+> -Tero
+> 
