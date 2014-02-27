@@ -1,71 +1,76 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 27 Feb 2014 14:58:20 +0100
-Subject: [PATCH 3/3] ARM: plat-versatile: update defconfigs for Versatile LEDs
-In-Reply-To: <1393509500-26002-1-git-send-email-linus.walleij@linaro.org>
-References: <1393509500-26002-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1393509500-26002-3-git-send-email-linus.walleij@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Feb 2014 14:58:34 +0100
+Subject: [PATCH v2 1/4] pci: OF: Fix the conversion of IO ranges into IO
+ resources.
+In-Reply-To: <CAPcvp5EqcKEWoH_--azp+sMykmEWtY5whHG=c9t3sZVXZyAPUg@mail.gmail.com>
+References: <1393506402-11474-1-git-send-email-Liviu.Dudau@arm.com>
+ <1393506402-11474-2-git-send-email-Liviu.Dudau@arm.com>
+ <CAPcvp5EqcKEWoH_--azp+sMykmEWtY5whHG=c9t3sZVXZyAPUg@mail.gmail.com>
+Message-ID: <23116993.AhiSYlcnvx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we moved the Versatile LEDs to the LEDs subsystem and made
-it a module, the config options are no more default-selected.
-Make sure all users still experience LEDs properly by updating
-all RealView and Versatile defconfigs.
+On Thursday 27 February 2014 13:22:19 Andrew Murray wrote:
+> On 27 February 2014 13:06, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> >
+> > The ranges property for a host bridge controller in DT describes
+> > the mapping between the PCI bus address and the CPU physical address.
+> > The resources framework however expects that the IO resources start
+> > at a pseudo "port" address 0 (zero) and have a maximum size of 64kb.
+> 
+> Is this just in the case of ARM? (I've tried to keep up with the
+> conversation, but apologies if I've misunderstood).
 
-Cc: Bryan Wu <cooloney@gmail.com>
-Cc: Richard Purdie <rpurdie@rpsys.net>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/realview-smp_defconfig | 2 ++
- arch/arm/configs/realview_defconfig     | 2 ++
- arch/arm/configs/versatile_defconfig    | 3 +++
- 3 files changed, 7 insertions(+)
+We are a bit inconsistent on Linux. The limitation cited above is
+indeed something we came up with on ARM to simplify the possible
+cases we have to worry about.
 
-diff --git a/arch/arm/configs/realview-smp_defconfig b/arch/arm/configs/realview-smp_defconfig
-index abe61bf379d2..1da5d9e48224 100644
---- a/arch/arm/configs/realview-smp_defconfig
-+++ b/arch/arm/configs/realview-smp_defconfig
-@@ -76,8 +76,10 @@ CONFIG_MMC=y
- CONFIG_MMC_ARMMMCI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_VERSATILE=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_CPU=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_DS1307=y
- CONFIG_RTC_DRV_PL031=y
-diff --git a/arch/arm/configs/realview_defconfig b/arch/arm/configs/realview_defconfig
-index 7079cbe898a8..d02e9d911bb7 100644
---- a/arch/arm/configs/realview_defconfig
-+++ b/arch/arm/configs/realview_defconfig
-@@ -75,8 +75,10 @@ CONFIG_MMC=y
- CONFIG_MMC_ARMMMCI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_VERSATILE=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_LEDS_TRIGGER_CPU=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_DS1307=y
- CONFIG_RTC_DRV_PL031=y
-diff --git a/arch/arm/configs/versatile_defconfig b/arch/arm/configs/versatile_defconfig
-index 073541a50e23..d52b4ffe2012 100644
---- a/arch/arm/configs/versatile_defconfig
-+++ b/arch/arm/configs/versatile_defconfig
-@@ -61,6 +61,9 @@ CONFIG_SND_ARMAACI=m
- CONFIG_MMC=y
- CONFIG_MMC_ARMMMCI=m
- CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_VERSATILE=y
-+CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_CPU=y
- CONFIG_EXT2_FS=y
--- 
-1.8.5.3
+In theory, each PCI host can have its own 4GB I/O space, but in practice
+limiting to 64KB is the most reasonable way to use it, and that
+still provides plenty of room for I/O registers since most devices
+don't use any, and at most a few bytes of address space.
+
+The limit we enforce on Linux is IO_SPACE_LIMIT, which is sometimes set
+to 0xffffffff, but I think most if not all of those cases are done so
+in error.
+
+> > + * of_pci_range_to_resource - Create a resource from an of_pci_range
+> > + * @range:     the PCI range that describes the resource
+> > + * @np:                device node where the range belongs to
+> > + * @res:       pointer to a valid resource that will be updated to
+> > + *              reflect the values contained in the range.
+> > + * Note that if the range is an IO range, the resource will be converted
+> > + * using pci_address_to_pio() which can fail if it is called to early or
+> > + * if the range cannot be matched to any host bridge IO space.
+> > + */
+> > +void of_pci_range_to_resource(struct of_pci_range *range,
+> > +       struct device_node *np, struct resource *res)
+> > +{
+> > +       res->flags = range->flags;
+> > +       if (res->flags & IORESOURCE_IO) {
+> > +               unsigned long port;
+> > +               port = pci_address_to_pio(range->pci_addr);
+> 
+> Is this likely to break existing users of of_pci_range_to_resource?
+> 
+> For example arch/mips: IO_SPACE_LIMIT defaults to 0xffff and there is
+> no overridden implementation for pci_address_to_pio, therefore this
+> will set res->start to OF_BAD_ADDR whereas previously it would have
+> been the CPU address for I/O (assuming the cpu_addr was previously >
+> 64K).
+
+The function is used on MIPS, Microblaze and ARM at the moment.
+MIPS currently gets it wrong, by calling pci_add_resource_offset
+on the CPU address for IORESOURCE_IO, which is the wrong space.
+Limiting to IO_SPACE_LIMIT will fix it for the first host bridge
+on MIPS, and the second one will still not work, until
+IO_SPACE_LIMIT is fixed.
+
+On ARM, I believe we have a couple of drivers that make the
+same mistake, and others that at the moment override the
+address with range->pci_addr, so they won't change.
+
+Microblaze does 'range.cpu_addr = range.pci_addr;' for the I/O
+space window to fix it up. We should probably take a closer look there.
+
+	Arnd
