@@ -1,43 +1,122 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 27 Feb 2014 16:26:23 +0100
-Subject: [PATCH V2 1/8] PM / Runtime: Fetch runtime PM callbacks using a
- macro
-In-Reply-To: <Pine.LNX.4.44L0.1402271002130.1150-100000@iolanthe.rowland.org>
-References: <CAPDyKFqCHXj-O5EwYLQXpfs5oko=Yfi_ZLmQwKVVW8AjUSUZfQ@mail.gmail.com>
- <Pine.LNX.4.44L0.1402271002130.1150-100000@iolanthe.rowland.org>
-Message-ID: <CAPDyKFrbhmqmu-0uqX_U18nKXuu2z5ueYXqaz4LOHy=ijecs1g@mail.gmail.com>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Thu, 27 Feb 2014 16:24:26 +0100
+Subject: [PATCH v0 13/15] ARM: STi: DT: STiH416: 416 DT Entry for clockgen
+ A9/DDR/GPU
+In-Reply-To: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
+References: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1393514668-17440-14-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 February 2014 16:04, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Thu, 27 Feb 2014, Ulf Hansson wrote:
->
->> > So the main question from v1 remains: why use a macro, and not a function?
->> >
->>
->> I am no big fan of macros, but in this case I thought it make sense.
->> Using _a_ function would not be enough, since we would need three, one
->> for each runtime PM callback (suspend, idle, resume), right?
->>
->> I am happy to change to whatever you guys thinks best, I have no strong opinion.
->
-> A reasonable compromise would be to define the macro, and then use it
-> in those three new functions (and nowhere else).
+Patch adds DT entries for clockgen A9/DDR/GPU
 
-Okay, let me send a v3 that tries this approach then.
+Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
+---
+ arch/arm/boot/dts/stih416-clock.dtsi | 79 ++++++++++++++++++++++++++++++++----
+ 1 file changed, 70 insertions(+), 9 deletions(-)
 
->
-> The existing rpm_idle, rpm_suspend, and rpm_resume routines should then
-> be changed to use the new functions.  And of course, the new functions
-> could be called directly by subsystems or PM domains.
-
-Not sure we should export these functions as a part of this patchset.
-Would it not be preferred, to first see if there are any that needs
-it?
-
-Kind regards
-Ulf Hansson
-
->
-> Alan Stern
->
+diff --git a/arch/arm/boot/dts/stih416-clock.dtsi b/arch/arm/boot/dts/stih416-clock.dtsi
+index 6b2e387..5ff0e6f 100644
+--- a/arch/arm/boot/dts/stih416-clock.dtsi
++++ b/arch/arm/boot/dts/stih416-clock.dtsi
+@@ -26,15 +26,6 @@
+ 		};
+ 
+ 		/*
+-		 * ARM Peripheral clock for timers
+-		 */
+-		arm_periph_clk: arm_periph_clk {
+-			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <600000000>;
+-		};
+-
+-		/*
+ 		 * ClockGenAs on SASG2
+ 		 */
+ 		clockgenA at fee62000 {
+@@ -503,6 +494,44 @@
+ 						/* Remaining outputs unused */
+ 			};
+ 		};
++
++		/*
++		 * A9 PLL.
++		 *
++		 */
++		clockgenA9 {
++			reg = <0xfdde08b0 0x70>;
++
++			CLOCKGEN_A9_PLL: CLOCKGEN_A9_PLL {
++				#clock-cells = <1>;
++				compatible = "st,stih416-plls-c32-a9", "st,clkgen-plls-c32";
++
++				clocks = <&CLK_SYSIN>;
++				clock-output-names = "CLOCKGEN_A9_PLL_ODF";
++			};
++		};
++
++		/*
++		 * ARM CPU related clocks.
++		 */
++		CLK_M_A9: CLK_M_A9 {
++			#clock-cells = <0>;
++			compatible = "st,stih416-clkgen-a9-mux", "st,clkgen-mux";
++			reg = <0xfdde08ac 0x4>;
++			clocks = <&CLOCKGEN_A9_PLL 0>, <&CLOCKGEN_A9_PLL 0>, <&CLK_M_A0_DIV1 2>, <&CLK_M_A9_EXT2F_DIV2>;
++		};
++
++		/*
++		 * ARM Peripheral clock for timers
++		 */
++		arm_periph_clk: CLK_M_A9_PERIPHS {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&CLK_M_A9>;
++			clock-div = <2>;
++			clock-mult = <1>;
++		};
++
+                 /*
+                  * Frequency synthesizers on the SASG2.
+                  *
+@@ -673,5 +702,37 @@
+                                 "CLK_M_XFER_AUX_COMPO", "CLK_M_VSENS",
+                                 "CLK_M_PIX_HDMIRX_0",   "CLK_M_PIX_HDMIRX_1";
+                 };
++
++		/*
++		 * DDR PLL.
++		 *
++		 */
++		clockgenDDR {
++			reg = <0xfdde07d8 0x110>;
++
++			CLOCKGEN_DDR_PLL: CLOCKGEN_DDR_PLL {
++				#clock-cells = <1>;
++				compatible = "st,stih416-plls-c32-ddr", "st,clkgen-plls-c32";
++
++				clocks = <&CLK_SYSIN>;
++				clock-output-names = "CLOCKGEN_DDR0", "CLOCKGEN_DDR1";
++			};
++		};
++
++		/*
++		 * GPU PLL.
++		 *
++		 */
++		clockgenGPU {
++			reg = <0xfd68ff00 0x910>;
++
++			CLOCKGEN_GPU_PLL: CLOCKGEN_GPU_PLL {
++				#clock-cells = <1>;
++				compatible = "st,stih416-gpu-pll-c32", "st,clkgengpu-pll-c32";
++
++				clocks = <&CLK_SYSIN>;
++				clock-output-names = "CLOCKGEN_GPU_PLL";
++			};
++		};
+ 	};
+ };
+-- 
+1.9.0
