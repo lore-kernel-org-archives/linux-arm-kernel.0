@@ -1,51 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Feb 2014 13:59:27 +0100
-Subject: [PATCH 1/4] ARM: imx6: move v7_cpu_resume() into suspend-imx6.S
-In-Reply-To: <1393422280-22283-1-git-send-email-shawn.guo@linaro.org>
-References: <1393422280-22283-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201402271359.28159.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 27 Feb 2014 13:00:21 +0000
+Subject: [RFC PATCH v4 3/8] staging: imx-drm: Document updated imx-drm
+ device tree bindings
+In-Reply-To: <1393506385.4507.49.camel@paszta.hi.pengutronix.de>
+References: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>
+ <1393338203-25051-4-git-send-email-p.zabel@pengutronix.de>
+ <530F1C4C.2010504@ti.com> <1393506385.4507.49.camel@paszta.hi.pengutronix.de>
+Message-ID: <20140227130020.GJ21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 February 2014, Shawn Guo wrote:
-> 
->  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
-> -obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o suspend-imx6.o
-> +obj-$(CONFIG_SUSPEND) += suspend-imx6.o
-> +obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
->  # i.MX6SL reuses i.MX6Q code
-> -obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o suspend-imx6.o
-> +obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o headsmp.o
->  
+On Thu, Feb 27, 2014 at 02:06:25PM +0100, Philipp Zabel wrote:
+> For the i.MX6 display subsystem there is no clear single master device,
+> and the physical configuration changes across the SoC family. The
+> i.MX6Q/i.MX6D SoCs have two separate display controller devices IPU1 and
+> IPU2, with two output ports each.
 
-I noticed a small bug during randconfig testing (starting to like
-my tests more recently):
+Not also forgetting that there's another scenario too: you may wish
+to drive IPU1 and IPU2 as two completely separate display subsystems
+in some hardware, but as a combined display subsystem in others.
 
-You build suspend-imx6.o for all SoCs now when SUSPEND is enabled,
-so this will fail for an ARMv5-only configuration. You probably
-need something like
+Here's another scenario.  You may have these two IPUs on the SoC, but
+there's only one display output.  You want to leave the second IPU
+disabled, as you wouldn't want it to be probed or even exposed to
+userland.
 
+On the face of it, the top-level super-device node doesn't look very
+hardware-y, but it actually is - it's about how a board uses the
+hardware provided.  This is entirely in keeping with the spirit of DT,
+which is to describe what hardware is present and how it's connected
+together, whether it be at the chip or board level.
 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 9c776a0..4dd45db 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -103,10 +103,10 @@ obj-$(CONFIG_SOC_IMX6Q) += clk-imx6q.o mach-imx6q.o
- obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
- 
- AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
--obj-$(CONFIG_SUSPEND) += suspend-imx6.o
--obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o
-+imx6-$(CONFIG_SUSPEND) += suspend-imx6.o
-+obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o $(imx6-y)
- # i.MX6SL reuses i.MX6Q code
--obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o
-+obj-$(CONFIG_SOC_IMX6SL) += pm-imx6q.o $(imx6-y)
- 
- # i.MX5 based machines
- obj-$(CONFIG_MACH_MX51_BABBAGE) += mach-mx51_babbage.o
+If this wasn't the case, we wouldn't even attempt to describe what devices
+we have on which I2C buses - we'd just list the hardware on the board
+without giving any information about how it's wired together.
 
+This is no different - however, it doesn't have (and shouldn't) be
+subsystem specific... but - and this is the challenge we then face - how
+do you decide that on one board with a single zImage kernel, with both
+DRM and fbdev built-in, whether to use the DRM interfaces or the fbdev
+interfaces?  We could have both matching the same compatible string, but
+we'd also need some way to tell each other that they're not allowed to
+bind.
 
+Before anyone argues against "it isn't hardware-y", stop and think.
+What if I design a board with two Epson LCD controllers on board and
+put a muxing arrangement on their output.  Is that one or two devices?
+What if I want them to operate as one combined system?  What if I have
+two different LCD controllers on a board.  How is this any different
+from the two independent IPU hardware blocks integrated inside an iMX6
+SoC with a muxing arrangement on their output?
 
+It's very easy to look at a SoC and make the wrong decision...
 
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
