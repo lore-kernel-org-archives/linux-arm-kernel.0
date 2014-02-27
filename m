@@ -1,28 +1,40 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 27 Feb 2014 10:04:42 -0500 (EST)
-Subject: [PATCH V2 1/8] PM / Runtime: Fetch runtime PM callbacks using
- a macro
-In-Reply-To: <CAPDyKFqCHXj-O5EwYLQXpfs5oko=Yfi_ZLmQwKVVW8AjUSUZfQ@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1402271002130.1150-100000@iolanthe.rowland.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 27 Feb 2014 10:14:47 -0500
+Subject: [PATCH 00/10] pinctrl: mvebu: remove hard-coded addresses from
+ Dove pinctrl
+In-Reply-To: <20140227133831.GA28443@localhost>
+References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140224181023.GA1010@titan.lakedaemon.net>
+ <CACRpkdZ+YGTyDj6i8c198MdRtz3GY-YBmVO9LysPCcmT4EC0cg@mail.gmail.com>
+ <20140225151656.GI1010@titan.lakedaemon.net>
+ <530CB725.5070904@gmail.com>
+ <20140225154347.GJ1010@titan.lakedaemon.net>
+ <530CEDB7.2070103@gmail.com>
+ <20140225200447.GA1872@titan.lakedaemon.net>
+ <20140227133831.GA28443@localhost>
+Message-ID: <20140227151447.GI1872@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Feb 2014, Ulf Hansson wrote:
-
-> > So the main question from v1 remains: why use a macro, and not a function?
-> >
+On Thu, Feb 27, 2014 at 10:38:32AM -0300, Ezequiel Garcia wrote:
+> On Tue, Feb 25, 2014 at 03:04:47PM -0500, Jason Cooper wrote:
+> > On Tue, Feb 25, 2014 at 08:23:35PM +0100, Sebastian Hesselbarth wrote:
+> > > [Cooked down Cc list to relevant people and added Ezequiel who agreed
+> > > to test on Armada 375/38x.]
+> > > 
+> [..]
+> > 
+> > If you can drop the dtsi changes (I have them in mvebu/dt), and fix the
+> > whitespace change, then we can merge them as is.
+> > 
 > 
-> I am no big fan of macros, but in this case I thought it make sense.
-> Using _a_ function would not be enough, since we would need three, one
-> for each runtime PM callback (suspend, idle, resume), right?
+> Tested for-next on Armada 375 and Armada 385 development boards. The
+> pinctrl debugfs looks correct.
 > 
-> I am happy to change to whatever you guys thinks best, I have no strong opinion.
+> I've been using for-next for a couple days now, without issues.
 
-A reasonable compromise would be to define the macro, and then use it 
-in those three new functions (and nowhere else).
+Great!  Thanks, Ezequiel!
 
-The existing rpm_idle, rpm_suspend, and rpm_resume routines should then 
-be changed to use the new functions.  And of course, the new functions 
-could be called directly by subsystems or PM domains.
+thx,
 
-Alan Stern
+Jason.
