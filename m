@@ -1,71 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 27 Feb 2014 12:07:30 +0000
-Subject: [PATCH 01/18] arm64: initial support for GICv3
-In-Reply-To: <530DE3CE.1010002@arm.com>
-References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
- <1391607050-540-2-git-send-email-marc.zyngier@arm.com>
- <20140225180619.GG23136@mudshark.cambridge.arm.com>
- <530DE3CE.1010002@arm.com>
-Message-ID: <20140227120730.GE30003@mudshark.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 27 Feb 2014 13:09:33 +0100
+Subject: [PATCH resend] pwm: Remove obsolete HAVE_PWM Kconfig symbol
+In-Reply-To: <201402252011.01902.arnd@arndb.de>
+References: <1390550056-5924-1-git-send-email-s.hauer@pengutronix.de>
+ <20140210102017.GA20143@ulmo.nvidia.com>
+ <201402252011.01902.arnd@arndb.de>
+Message-ID: <20140227120932.GA21422@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 12:53:34PM +0000, Marc Zyngier wrote:
-> On 25/02/14 18:06, Will Deacon wrote:
-> > Not sure if you care, but readq is a show-stopper if you want to build this
-> > with arch/arm/.
+On Tue, Feb 25, 2014 at 08:11:01PM +0100, Arnd Bergmann wrote:
+> On Monday 10 February 2014, Thierry Reding wrote:
+> > On Fri, Jan 24, 2014 at 08:54:16AM +0100, Sascha Hauer wrote:
 > 
-> I realized that recently. Any reason why we don't have writeq/readq on
-> LPAE-capable stuff (other than the obvious runtime detection madness)?
-
-I'm not sure that you'd be guaranteed single-copy atomicity for such an
-access, which is probably assumed by readq/writeq.
-
-> >> +                       if ((typer >> 32) == aff) {
-> >> +                               gic_data_rdist_rd_base() = ptr;
-> >> +                               pr_info("CPU%d: found redistributor %llx @%p\n",
-> >> +                                       smp_processor_id(),
-> >> +                                       (unsigned long long) mpidr, ptr);
-> >> +                               return 0;
-> >> +                       }
-> >> +
-> >> +                       if (gic_data.redist_stride) {
-> >> +                               ptr += gic_data.redist_stride;
-> >> +                       } else {
-> >> +                               ptr += SZ_64K * 2; /* Skip RD_base + SGI_base */
-> >> +                               if (typer & GICR_TYPER_VLPIS)
-> >> +                                       ptr += SZ_64K * 2; /* Skip VLPI_base + reserved page */
-> >> +                       }
-> >
-> > VLPIS is RES0 in GICv3.
+> > > Thierry as PWM maintainer has agreed to take this patch. Would be nice
+> > > to get some Acks from affected architectures. Russell, Ralf?
+> > 
+> > No replies for over two weeks and this looks simple enough, so I just
+> > went ahead and applied it. Thanks,
 > 
-> Indeed. But we still want this driver to run on GICv4 HW, even if we
-> don't use VLPIs just yet.
+> Am I looking in the wrong place, or have you not pushed this for linux-next yet?
+> I still see all the HAVE_PWM symbols in today's -next.
 
-Ok, just mention that in the commit then.
+I had pushed to the wrong tree. It should be in linux-next as of today.
 
-> >> +static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
-> >> +                           bool force)
-> >> +{
-> >> +       unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
-> >> +       void __iomem *reg;
-> >> +       u64 val;
-> >> +
-> >> +       if (gic_irq(d) < 32)
-> >> +               return -EINVAL;
-> >> +
-> >> +       reg = gic_dist_base(d) + GICD_IROUTER + (gic_irq(d) * 8);
-> >> +       val = gic_mpidr_to_affinity(cpu_logical_map(cpu));
-> >> +
-> >> +       writeq_relaxed(val, reg);
-> >
-> > How do you ensure that the interrupt has actually moved?
-> 
-> There is no way to ensure it actually did (other than reading back from
-> the same register, if that's what you're aiming for?).
-
-I guess it depends how angry Linux will get if the interrupt fires on the
-wrong CPU. If the interrupt is pending when the moving takes place, will it
-be asserted on the new target?
-
-Will
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140227/7266df5f/attachment-0001.sig>
