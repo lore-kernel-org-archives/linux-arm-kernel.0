@@ -1,111 +1,87 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 27 Feb 2014 10:33:38 +0900
-Subject: [PATCH v2 1/1] arm64: make a single hook to syscall_trace() for
- all syscall features
-In-Reply-To: <20140226112544.GD8961@mudshark.cambridge.arm.com>
-References: <1391767651-5296-1-git-send-email-takahiro.akashi@linaro.org>
- <1393319683-2707-1-git-send-email-takahiro.akashi@linaro.org>
- <1393319683-2707-2-git-send-email-takahiro.akashi@linaro.org>
- <20140225150007.GB23136@mudshark.cambridge.arm.com>
- <530D4AB3.4000700@linaro.org>
- <20140226112544.GD8961@mudshark.cambridge.arm.com>
-Message-ID: <530E95F2.5040209@linaro.org>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Thu, 27 Feb 2014 09:37:03 +0800
+Subject: [patch 09/26] arm: mmp: Remove pointless fiddling with irq
+ internals
+In-Reply-To: <alpine.DEB.2.02.1402241227400.21251@ionos.tec.linutronix.de>
+References: <20140223212703.511977310@linutronix.de>
+ <20140223212737.214342433@linutronix.de>
+ <20140223231755.GA27579@pengutronix.de>
+ <CADApbeiyGoSAF9n5-+Ys1H4VDgN+d727E6ARWFGj4EixqeP79w@mail.gmail.com>
+ <CAN1soZy_TfzNigfn4y6kF2qe4K+AQsagd-1KWYrz1VEavMO4bA@mail.gmail.com>
+ <alpine.DEB.2.02.1402241227400.21251@ionos.tec.linutronix.de>
+Message-ID: <CADApbeiJ2ESEuBxGNXLe+sbKEox02Vr0hhO-rW7dosc_4A+TEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2014 08:25 PM, Will Deacon wrote:
-> On Wed, Feb 26, 2014 at 02:00:19AM +0000, AKASHI Takahiro wrote:
->> On 02/26/2014 12:00 AM, Will Deacon wrote:
->>> On Tue, Feb 25, 2014 at 09:14:43AM +0000, AKASHI Takahiro wrote:
->>>> Currently syscall_trace() is called only for ptrace.
->>>> With additional TIF_xx flags defined, it is now called in all the cases
->>>> of audit, ftrace and seccomp in addition to ptrace.
->>>>
->>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>>> Acked-by: Richard Guy Briggs <rgb@redhat.com>
->>>> ---
->>>>    arch/arm64/include/asm/thread_info.h |   13 ++++++++++
->>>>    arch/arm64/kernel/entry.S            |    5 ++--
->>>>    arch/arm64/kernel/ptrace.c           |   45 +++++++++++++++++-----------------
->>>>    3 files changed, 38 insertions(+), 25 deletions(-)
->>
->> [...]
->>
->>>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
->>>> index 6a8928b..c70133e 100644
->>>> --- a/arch/arm64/kernel/ptrace.c
->>>> +++ b/arch/arm64/kernel/ptrace.c
->>>> @@ -1062,31 +1062,30 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
->>>>    {
->>>>    	unsigned long saved_reg;
->>>>
->>>> -	if (!test_thread_flag(TIF_SYSCALL_TRACE))
->>>> -		return regs->syscallno;
->>>> -
->>>> -	if (is_compat_task()) {
->>>> -		/* AArch32 uses ip (r12) for scratch */
->>>> -		saved_reg = regs->regs[12];
->>>> -		regs->regs[12] = dir;
->>>> -	} else {
->>>> -		/*
->>>> -		 * Save X7. X7 is used to denote syscall entry/exit:
->>>> -		 *   X7 = 0 -> entry, = 1 -> exit
->>>> -		 */
->>>> -		saved_reg = regs->regs[7];
->>>> -		regs->regs[7] = dir;
->>>> -	}
->>>> +	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
->>>> +		if (is_compat_task()) {
->>>> +			/* AArch32 uses ip (r12) for scratch */
->>>> +			saved_reg = regs->regs[12];
->>>> +			regs->regs[12] = dir;
->>>> +		} else {
->>>> +			/*
->>>> +			 * Save X7. X7 is used to denote syscall entry/exit:
->>>> +			 *   X7 = 0 -> entry, = 1 -> exit
->>>> +			 */
->>>> +			saved_reg = regs->regs[7];
->>>> +			regs->regs[7] = dir;
->>>> +		}
->>>>
->>>> -	if (dir)
->>>> -		tracehook_report_syscall_exit(regs, 0);
->>>> -	else if (tracehook_report_syscall_entry(regs))
->>>> -		regs->syscallno = ~0UL;
->>>> +		if (dir)
->>>> +			tracehook_report_syscall_exit(regs, 0);
->>>> +		else if (tracehook_report_syscall_entry(regs))
->>>> +			regs->syscallno = ~0UL;
->>>>
->>>> -	if (is_compat_task())
->>>> -		regs->regs[12] = saved_reg;
->>>> -	else
->>>> -		regs->regs[7] = saved_reg;
->>>> +		if (is_compat_task())
->>>> +			regs->regs[12] = saved_reg;
->>>> +		else
->>>> +			regs->regs[7] = saved_reg;
->>>> +	}
->>>
->>> Aren't these changes (to ptrace.c) just a giant NOP?
->>
->> Umm, the purpose of this big "if" is to run the code only if TIF_SYSCALL_TRACE is set,
->> and to make it easy to add additional hooks, audit and ftrace, around tracehook_report_*()
->> later on.
+On Mon, Feb 24, 2014 at 7:31 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Mon, 24 Feb 2014, Haojian Zhuang wrote:
 >
-> The existing code already checks TIF_SYSCALL_TRACE. I'd rather you added
-> this new code when it's actually nedded (e.g. when adding audit on top).
+>> On Mon, Feb 24, 2014 at 2:07 PM, Chao Xie <xiechao.mail@gmail.com> wrote:
+>> > On Mon, Feb 24, 2014 at 7:17 AM, Uwe Kleine-K?nig
+>> > <u.kleine-koenig@pengutronix.de> wrote:
+>> >> Hi Thomas,
+>> >>
+>> >> On Sun, Feb 23, 2014 at 09:40:13PM -0000, Thomas Gleixner wrote:
+>> >>> The pm-mmp2 and pm-pxa910 power management related irq_set_wake
+>> >>> callbacks fiddle pointlessly with the irq actions for no reason except
+>> >>> for lack of understanding how the wakeup mechanism works.
+>> >>>
+>> >>> On supsend the core disables all interrupts lazily, i.e. it does not
+>> >>> mask them at the irq controller level. So any interrupt which is
+>> >>> firing during supsend will mark the corresponding interrupt line as
+>> >> s/supsend/suspend/ twice
+>> >>> pending. Just before the core powers down it checks whether there are
+>> >>> interrupts pending from interrupt lines which are marked as wakeup
+>> >>> sources and if so it aborts the resume and resends the interrupts.
+>> >> It's the suspend that is aborted, not the resume.
+>> >>
+>> >> Other than that your change looks fine.
+>> >>
+>> > For pxa910 and MMP2, wake up source only wake up the AP subsystem.
+>> > The AP subsystem includes the APMU(AP Power Mangament Unit) and cores.
+>> > Now the core is still powered down. APMU will check the interrupt
+>> > lines, and find
+>> > that there are interrupt pending, it will power on the cores.
+>> > So if the irq is disabled, even wake up source can wake up AP subsystem, but the
+>> > core is still powered down. It will not be powered up by APMU.
+>> >
+>>
+>> Yes, suspend/resume can't work if the above code is removed.
+>>
+>> Interrupt source (logic AND with interrupt mask register) is connected
+>> to MPMU as
+>> wakeup source. If the interrupt is disabled, there's no wakeup source event.
+>>
+>> And APMU is waken up by MPMU.
+>>
+>> So please don't remove the above code. We must keep these interrupt lines active
+>> to wake up the whole system.
+>
+> They are kept active at the interrupt controller level. You just
+> refuse to understand how the internals of the interrupt subsystem
+> work.
+>
+If no irq_disable callback is hooked, when do irq_disable, it will not
+actually disable
+the interrupt, it will depend on next time when the irq happens, the
+handler will first mask
+the interrupt as this interrupt never happens.
+So after system suspended, the interrupt happens, but the device
+driver will not recieve this interrupt
+because it is masked.
+It results in that the device driver miss a important interrupt which
+related to something need to be
+handled. If user application for example android has power managment
+daemon. It will find that nothing
+to handle, it will make the system enter suspend again.
 
-* This patch is required only if you really merge my audit and/or ftrace patch.
-* Putting these changes in audit patch would impose an extra (unnecessary) dependency on ftrace patch.
-* Putting them both in audit and ftrace patch would cause a conflict when applying both patches.
+> And even if you would need this flag, then fiddling with the irq desc
+> internals is a big NONO. There is a proper way to hand that in.
+>
 
-Even so, since I don't bother you on this minor issue, I will follow your comment and make changes on:
-* arm64: make a single hook to syscall_trace() for all syscall features
-* arm64: Add audit support
-* arm64: Add ftrace support
+So can you suggest the proper way to handle it? Thanks.
 
--Takahiro AKASHI
-
-> Will
+> Thanks,
+>
+>         tglx
 >
