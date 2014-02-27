@@ -1,52 +1,59 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Thu, 27 Feb 2014 20:34:22 +0100
-Subject: [PATCH v4 3/3] ARM: sun7i/sun6i: irqchip: Update the documentation
+Date: Thu, 27 Feb 2014 20:34:21 +0100
+Subject: [PATCH v4 2/3] ARM: sun7i/sun6i: dts: Add NMI irqchip support
 In-Reply-To: <1393529662-8663-1-git-send-email-carlo@caione.org>
 References: <1393529662-8663-1-git-send-email-carlo@caione.org>
-Message-ID: <1393529662-8663-4-git-send-email-carlo@caione.org>
+Message-ID: <1393529662-8663-3-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added documentation for NMI irqchip.
+This patch adds DTS entries for NMI controller as child of GIC.
 
 Signed-off-by: Carlo Caione <carlo@caione.org>
 ---
- .../allwinner,sun67i-sc-nmi.txt                    | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+ arch/arm/boot/dts/sun6i-a31.dtsi | 9 +++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi | 9 +++++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
-new file mode 100644
-index 0000000..ac31487
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
-@@ -0,0 +1,27 @@
-+Allwinner Sunxi NMI Controller
-+==============================
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 5256ad9..4a5050c 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -190,6 +190,15 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		nmi_intc: sc-nmi-intc at 01f00c0c {
++			compatible = "allwinner,sun6i-a31-sc-nmi";
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			reg = <0x01f00c0c 0x38>;
++			interrupt-parent = <&gic>;
++			interrupts = <0 0 4>;
++		};
 +
-+Required properties:
+ 		pio: pinctrl at 01c20800 {
+ 			compatible = "allwinner,sun6i-a31-pinctrl";
+ 			reg = <0x01c20800 0x400>;
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 4c25f81..f01a23c 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -310,6 +310,15 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		nmi_intc: sc-nmi-intc at 01c00030 {
++			compatible = "allwinner,sun7i-a20-sc-nmi";
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			reg = <0x01c00030 0x0c>;
++			interrupt-parent = <&gic>;
++			interrupts = <0 0 4>;
++		};
 +
-+- compatible : should be "allwinner,sun7i-a20-sc-nmi" or
-+  "allwinner,sun6i-a31-sc-nmi"
-+- reg : Specifies base physical address and size of the registers.
-+- interrupt-controller : Identifies the node as an interrupt controller
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value shall be 2. The first cell is the IRQ number, the
-+  second cell the trigger type.
-+- interrupt-parent: Specifies the parent interrupt controller.
-+- interrupts: Specifies the list of interrupt lines which are handled by
-+  the interrupt controller in the parent controller's notation. This value
-+  shall be the NMI.
-+
-+Example:
-+
-+sc-nmi-intc at 01c00030 {
-+	compatible = "allwinner,sun7i-a20-sc-nmi";
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
-+	reg = <0x01c00030 0x0c>;
-+	interrupt-parent = <&gic>;
-+	interrupts = <0 0 4>;
-+};
+ 		emac: ethernet at 01c0b000 {
+ 			compatible = "allwinner,sun4i-emac";
+ 			reg = <0x01c0b000 0x1000>;
 -- 
 1.8.3.2
