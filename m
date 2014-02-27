@@ -1,61 +1,71 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 27 Feb 2014 02:22:54 +0100
-Subject: [PATCH 0/8] PM / Sleep / Runtime: Fixup some driver's system
- suspend
-In-Reply-To: <7htxblx2eo.fsf@paris.lan>
-References: <1392910280-12891-1-git-send-email-ulf.hansson@linaro.org>
- <7htxblx2eo.fsf@paris.lan>
-Message-ID: <12123949.qNoh3vhWUc@vostro.rjw.lan>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Thu, 27 Feb 2014 10:48:26 +0900
+Subject: [PATCH 3/3] ARM: S3C24XX: select COMMON_CLK_SAMSUNG for S3C24XX
+In-Reply-To: <20140227001620.12081.28601@quantum>
+References: <1393392247-6247-1-git-send-email-pankaj.dubey@samsung.com>
+ <1393392247-6247-4-git-send-email-pankaj.dubey@samsung.com>
+ <20140227001620.12081.28601@quantum>
+Message-ID: <530E996A.9080208@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 26, 2014 08:30:07 AM Kevin Hilman wrote:
-> Ulf Hansson <ulf.hansson@linaro.org> writes:
-> 
-> > Patch 1 -> 2:
-> > These patches provides two new runtime PM helper functions which intend to be
-> > used from system suspend/resume callbacks, to make sure devices are put into low
-> > power state during system suspend and brought back to full power at system
-> > resume.
-> >
-> > The prerequisite is to have all levels of a device's runtime PM callbacks to be
-> > defined through the SET_PM_RUNTIME_PM_OPS macro, which means these are available
-> > for CONFIG_PM.
-> >
-> > By using the new runtime PM helper functions especially the two scenarios below
-> > will be addressed.
-> >
-> > 1) The PM core prevents .runtime_suspend callbacks from being invoked during
-> > system suspend. That means even for a runtime PM centric subsystem and driver,
-> > the device needs to be put into low power state from a system suspend callback.
-> > Otherwise it may very well be left in full power state (runtime resumed) while
-> > the system is suspended. By using the new helper functions, we make sure to walk
-> > the hierarchy of a device's power domain, subsystem and driver.
-> 
-> I thought it was the case that runtime PM was only disabled during the
-> 'late' phase now.  Isn't that enough to allow runtime callbacks in the
-> normal suspend/resume hooks now?   /me looks.
-> 
-> oh, wait.  Ee still have the _get_noresume() in device_prepare().  hmm
-> 
-> Either way, I'm not not a big fan of new functions.  Personally, I think
-> subsystems/busses/pm_domains should be able to opt out of the PM core
-> behavior that blocks runtime PM transitions during system suspend.
-> Something like the (untested) hack below.  That way, we could avoid the
-> need for new helper functions.
+On 02/27/2014 09:16 AM, Mike Turquette wrote:
+> Quoting Pankaj Dubey (2014-02-25 21:24:07)
+>> CC: Ben Dooks <ben-linux@fluff.org>
+>> CC: Kukjin Kim <kgene.kim@samsung.com>
+>> CC: Russell King <linux@arm.linux.org.uk>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>   arch/arm/mach-s3c24xx/Kconfig |    3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
+>> index 80373da..5cf82a1 100644
+>> --- a/arch/arm/mach-s3c24xx/Kconfig
+>> +++ b/arch/arm/mach-s3c24xx/Kconfig
+>> @@ -40,6 +40,7 @@ config CPU_S3C2410
+>>   config CPU_S3C2412
+>>          bool "SAMSUNG S3C2412"
+>>          select COMMON_CLK
+>> +       select COMMON_CLK_SAMSUNG
+> I guess this depends on Heiko's "[PATCH 00/12] ARM: S3C24XX: convert
+> s3c2410, s3c2440 s3c2442 to common clock framework" series?
+>
+> Regards,
+> Mike
 
-And if one of the subsystems in question is the platform bus type, then
-adding the flag doesn't really make sense, because that means that on
-many system it will be set for the majority of devices. :-)
+Yes, this series is based on latest kgene/for-next branch where Heiko's 
+series is merged.
 
-That said I'm tired of this stuff already.  If you really really want to
-remove the bumping up and dropping of the usage counter during system
-suspend/resume by the core, please feel free to submit a patch for that
-and I'll apply it.  However, if it causes any regressions to happen
-anywhere, it will be dropped and we'll never talk about this again.
+>>          select CPU_ARM926T
+>>          select CPU_LLSERIAL_S3C2440
+>>          select S3C2412_COMMON_CLK
+>> @@ -51,6 +52,7 @@ config CPU_S3C2412
+>>   config CPU_S3C2416
+>>          bool "SAMSUNG S3C2416/S3C2450"
+>>          select COMMON_CLK
+>> +       select COMMON_CLK_SAMSUNG
+>>          select CPU_ARM926T
+>>          select CPU_LLSERIAL_S3C2440
+>>          select S3C2416_PM if PM
+>> @@ -89,6 +91,7 @@ config CPU_S3C244X
+>>   config CPU_S3C2443
+>>          bool "SAMSUNG S3C2443"
+>>          select COMMON_CLK
+>> +       select COMMON_CLK_SAMSUNG
+>>          select CPU_ARM920T
+>>          select CPU_LLSERIAL_S3C2440
+>>          select S3C2443_COMMON_CLK
+>> -- 
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Deal? 
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Best Regards,
+Pankaj Dubey
