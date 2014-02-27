@@ -1,68 +1,63 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 27 Feb 2014 12:54:24 -0800
-Subject: [PATCH v1.1/3] ARM: config: Add qcom_defconfig
-In-Reply-To: <530F985E.5030503@codeaurora.org>
-References: <530F985E.5030503@codeaurora.org>
-Message-ID: <1393534464-14620-1-git-send-email-sboyd@codeaurora.org>
+From: fkan@apm.com (Feng Kan)
+Date: Thu, 27 Feb 2014 13:00:07 -0800
+Subject: [PATCH V2] irqchip:gic: change access of gicc_ctrl register to
+ read modify write.
+In-Reply-To: <87zjlc2xpb.fsf@sofa.wild-wind.fr.eu.org>
+References: <1393526095-31479-1-git-send-email-fkan@apm.com>
+ <87zjlc2xpb.fsf@sofa.wild-wind.fr.eu.org>
+Message-ID: <CAL85gmDk0hxaVbSbqTaVeVFsY4Xt1aKrBx=Pm57g0m0d_Qw-KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a defconfig for mach-qcom platforms (copied from msm_defconfig).
-Although these platforms are part of the multi-platform kernel, it's
-useful to have a stripped down version of the defconfig that just
-selects the DT based Qualcomm platforms and drivers.
+On Thu, Feb 27, 2014 at 10:54 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Thu, Feb 27 2014 at  6:34:55 pm GMT, Feng Kan <fkan@apm.com> wrote:
+>> This change is made to preserve the GIC v2 releated bits in the
+>> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
+>> The original code only set the enable/disable group bit in this register.
+>> This code will preserve the bypass bits configured by the bootload except
+>> the enable/disable bit. The main reason for this change is to allow the
+>> bypass bits specified in the v2 spec to remain untouched by the current
+>> GIC code. In the X-Gene platform, the bypass functionality is not used
+>> and bypass must be disabled at all time.
+>>
+>> Signed-off-by: Vinayak Kale <vkale@apm.com>
+>> Acked-by: Anup Patel <apatel@apm.com>
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> ---
+>> V2 Changes:
+>>       - only mask off v2 bypass bits
+>>
+>>  drivers/irqchip/irq-gic.c |   22 +++++++++++++++++++---
+>>  1 files changed, 19 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> index 341c601..757581b 100644
+>> --- a/drivers/irqchip/irq-gic.c
+>> +++ b/drivers/irqchip/irq-gic.c
+>> @@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>>       void __iomem *dist_base = gic_data_dist_base(gic);
+>>       void __iomem *base = gic_data_cpu_base(gic);
+>>       unsigned int cpu_mask, cpu = smp_processor_id();
+>> +     unsigned int ctrl_mask;
+>>       int i;
+>>
+>>       /*
+>> @@ -449,13 +450,24 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>>               writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
+>>
+>>       writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+>> -     writel_relaxed(1, base + GIC_CPU_CTRL);
+>> +
+>> +     ctrl_mask = readl(base + GIC_CPU_CTRL);
+>> +     ctrl_mask |= 0x1;
+>> +     writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
+>
+> I think I'm quickly loosing the will to live, or at least to review this
+> patch any further.
+Hang in there Marc, though I had nothing to do with the flood in England. Maybe
+I can instill a bit more will for you to live.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
-
-Changes since v1:
- * Added CONFIG_DEVTMPFS/DEVTMPFS_MOUNT per Josh
-
- arch/arm/configs/{msm_defconfig => qcom_defconfig} | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
- copy arch/arm/configs/{msm_defconfig => qcom_defconfig} (97%)
-
-diff --git a/arch/arm/configs/msm_defconfig b/arch/arm/configs/qcom_defconfig
-similarity index 97%
-copy from arch/arm/configs/msm_defconfig
-copy to arch/arm/configs/qcom_defconfig
-index c5858b9eb516..5f11d6de9084 100644
---- a/arch/arm/configs/msm_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -17,7 +17,7 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_MODULE_FORCE_UNLOAD=y
- CONFIG_MODVERSIONS=y
- CONFIG_PARTITION_ADVANCED=y
--CONFIG_ARCH_MSM_DT=y
-+CONFIG_ARCH_QCOM=y
- CONFIG_ARCH_MSM8X60=y
- CONFIG_ARCH_MSM8960=y
- CONFIG_ARCH_MSM8974=y
-@@ -27,7 +27,6 @@ CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- CONFIG_HIGHPTE=y
- CONFIG_CLEANCACHE=y
--CONFIG_CC_STACKPROTECTOR=y
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_VFP=y
-@@ -49,6 +48,8 @@ CONFIG_IP_PNP_DHCP=y
- # CONFIG_IPV6 is not set
- CONFIG_CFG80211=y
- CONFIG_RFKILL=y
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_SCSI=y
-@@ -111,7 +112,6 @@ CONFIG_USB_SERIAL=y
- CONFIG_USB_GADGET=y
- CONFIG_USB_GADGET_DEBUG_FILES=y
- CONFIG_USB_GADGET_VBUS_DRAW=500
--CONFIG_NEW_LEDS=y
- CONFIG_RTC_CLASS=y
- CONFIG_STAGING=y
- CONFIG_COMMON_CLK_QCOM=y
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+>
+>         M.
+> --
+> AAAFNRAA
