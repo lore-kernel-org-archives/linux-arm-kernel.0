@@ -1,51 +1,39 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 26 Feb 2014 21:34:37 -0600
-Subject: [GIT PULL] SOCFPGA updates for 3.15
-Message-ID: <1393472077-16220-1-git-send-email-dinguyen@altera.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 26 Feb 2014 23:06:06 -0500 (EST)
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <CAFEAcA9nq_V4VGG=j6FWFatJBnTuYrU9-9U9eGXcQz0zimrasQ@mail.gmail.com>
+References: <20140226183454.GA14639@cbox> <5553754.0b4gMg5OS7@wuerfel>
+ <CAL_Jsq+3jBdca9zVnxHG+7pxy2_316emsP=PB3WkTMQP0JYBYQ@mail.gmail.com>
+ <CAFEAcA8u6u8Hh=qn8XE2Evc93_-pkZPSDSShm-eiSn-vcsYgKA@mail.gmail.com>
+ <CAL_JsqJ+mXadxLHqFw6uXvM9=juC-emKT7G-d-_PLYbXNSX7Ew@mail.gmail.com>
+ <CAFEAcA9nq_V4VGG=j6FWFatJBnTuYrU9-9U9eGXcQz0zimrasQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1402262259290.17677@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin and Olof,
+On Wed, 26 Feb 2014, Peter Maydell wrote:
 
-Please consider pulling in these patches for v3.15.
+> On 26 February 2014 23:08, Rob Herring <robherring2@gmail.com> wrote:
+> > On Wed, Feb 26, 2014 at 4:54 PM, Peter Maydell <peter.maydell@linaro.org> wrote:
+> >> What does the 8250 have to recommend it over just providing
+> >> the PL011?
+> >
+> > As I mentioned, it will just work for anything that expects the serial
+> > port to be ttyS0 as on x86 rather than ttyAMA0.
+> 
+> This doesn't seem very compelling to me. Either userspace
+> should just be fixed or the kernel should implement a namespace
+> for serial ports which doesn't randomly change just because the
+> particular h/w driver doing the implementation is different.
+> We shouldn't be papering over other peoples' problems in the VM
+> spec IMHO.
 
-Thanks,
-Dinh
+Indeed.
 
-The following changes since commit 6d0abeca3242a88cab8232e4acd7e2bf088f3bc2:
+This is already causing us trouble in other contexts.  Please have a 
+look at this patch for a solution:
 
-  Linux 3.14-rc3 (2014-02-16 13:30:25 -0800)
+http://article.gmane.org/gmane.linux.kernel.samsung-soc/27222
 
-are available in the git repository at:
 
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_updates_for_3.15
-
-for you to fetch changes up to 1b60b9fac9c56488f78aa4396301757d37e586e7:
-
-  dts: socfpga: Update clock entry to support multiple parents (2014-02-26 21:12:51 -0600)
-
-----------------------------------------------------------------
-SOCFPGA updates for 3.15:
-*Update SOCFPGA DTS to include ethernet, and clock fixes
-*Add stmmac ethernet glue layer
-*Update socfpga_defconfig to include sd/mmc, and micrel_phy
-
-----------------------------------------------------------------
-Dinh Nguyen (4):
-      net: stmmac: Add SOCFPGA glue driver
-      dts: socfpga: Add DTS entry for adding the stmmac glue layer for stmmac.
-      ARM: socfpga: Update socfpga_defconfig
-      dts: socfpga: Update clock entry to support multiple parents
-
- .../devicetree/bindings/net/socfpga-dwmac.txt      |   35 ++++
- arch/arm/boot/dts/socfpga.dtsi                     |   68 +++++---
- arch/arm/boot/dts/socfpga_arria5_socdk.dts         |   24 +++
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       |   17 ++
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      |   22 ++-
- arch/arm/boot/dts/socfpga_vt.dts                   |    8 +
- arch/arm/configs/socfpga_defconfig                 |    6 +
- drivers/net/ethernet/stmicro/stmmac/Makefile       |    1 +
- .../net/ethernet/stmicro/stmmac/dwmac-socfpga.c    |  183 ++++++++++++++++++++
- 9 files changed, 342 insertions(+), 22 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/socfpga-dwmac.txt
- create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-socfpga.c
+Nicolas
