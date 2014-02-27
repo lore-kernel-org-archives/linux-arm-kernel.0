@@ -1,84 +1,122 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 27 Feb 2014 09:18:34 +0100
-Subject: [PATCH 0/8] PM / Sleep / Runtime: Fixup some driver's system
- suspend
-In-Reply-To: <12123949.qNoh3vhWUc@vostro.rjw.lan>
-References: <1392910280-12891-1-git-send-email-ulf.hansson@linaro.org>
- <7htxblx2eo.fsf@paris.lan> <12123949.qNoh3vhWUc@vostro.rjw.lan>
-Message-ID: <CAPDyKFp_ugRytLGR4fGXvdZEMRohg6uWPykcFJ7Co_wipJujDA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 27 Feb 2014 09:18:58 +0100
+Subject: [PATCH] ARM: i.MX6: clk: Remove usbphy clock hacks
+Message-ID: <1393489138-24406-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 February 2014 02:22, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Wednesday, February 26, 2014 08:30:07 AM Kevin Hilman wrote:
->> Ulf Hansson <ulf.hansson@linaro.org> writes:
->>
->> > Patch 1 -> 2:
->> > These patches provides two new runtime PM helper functions which intend to be
->> > used from system suspend/resume callbacks, to make sure devices are put into low
->> > power state during system suspend and brought back to full power at system
->> > resume.
->> >
->> > The prerequisite is to have all levels of a device's runtime PM callbacks to be
->> > defined through the SET_PM_RUNTIME_PM_OPS macro, which means these are available
->> > for CONFIG_PM.
->> >
->> > By using the new runtime PM helper functions especially the two scenarios below
->> > will be addressed.
->> >
->> > 1) The PM core prevents .runtime_suspend callbacks from being invoked during
->> > system suspend. That means even for a runtime PM centric subsystem and driver,
->> > the device needs to be put into low power state from a system suspend callback.
->> > Otherwise it may very well be left in full power state (runtime resumed) while
->> > the system is suspended. By using the new helper functions, we make sure to walk
->> > the hierarchy of a device's power domain, subsystem and driver.
->>
->> I thought it was the case that runtime PM was only disabled during the
->> 'late' phase now.  Isn't that enough to allow runtime callbacks in the
->> normal suspend/resume hooks now?   /me looks.
->>
->> oh, wait.  Ee still have the _get_noresume() in device_prepare().  hmm
->>
->> Either way, I'm not not a big fan of new functions.  Personally, I think
->> subsystems/busses/pm_domains should be able to opt out of the PM core
->> behavior that blocks runtime PM transitions during system suspend.
->> Something like the (untested) hack below.  That way, we could avoid the
->> need for new helper functions.
->
-> And if one of the subsystems in question is the platform bus type, then
-> adding the flag doesn't really make sense, because that means that on
-> many system it will be set for the majority of devices. :-)
->
-> That said I'm tired of this stuff already.  If you really really want to
-> remove the bumping up and dropping of the usage counter during system
-> suspend/resume by the core, please feel free to submit a patch for that
-> and I'll apply it.  However, if it causes any regressions to happen
-> anywhere, it will be dropped and we'll never talk about this again.
->
-> Deal?
+Recently the chipidea got broken on i.MX6 when the phy_mode property
+is given in the devicetree. Since this commit:
 
-No deal. I prefer the runtime PM helpers, I think that is the right
-approach. I also believe this is what Alan Stern also would prefer,
-right!? So let's convince Kevin instead. :-)
+| commit cd0b42c2a6d2a74244f0053f8960f5dad5842278
+| Author: Chris Ruehl <chris.ruehl@gtsys.com.hk>
+| Date:   Fri Jan 10 13:51:30 2014 +0800
+|
+|     usb: chipidea: put hw_phymode_configure before ci_usb_phy_init
+|
+|     hw_phymode_configure configures the PORTSC registers and allow the
+|     following phy_inits to operate on the right parameters. This fix a problem
+|     where the UPLI (ISP1504) could not be detected, because the Viewport was not
+|     available and read the viewport return 0's only.
+|
+|     Signed-off-by: Chris Ruehl <chris.ruehl@gtsys.com.hk>
+|     Signed-off-by: Peter Chen <peter.chen@freescale.com>
+|     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-Let's just be clear of why I don't think Kevin suggested solution is
-the way to go:
+the portsc register is configured before the phy clock is enabled. The CPU
+immediately hangs once the portsc register is written to with disabled phy
+clocks.
 
-1. The runtime PM sysfs interface. Userspace may prevent
-->runtime_suspend callbacks from being invoked anyway. So, it doesn't
-matter if PM core does it too.
+The following patch added a hack to the i.MX6 clock support. Its purpose
+was to keep the usbphy clock gates enabled:
 
-2. Currently we have CONFIG_PM_RUNTIME and CONFIG_PM_SLEEP. Subsystem
-and driver, must cope with both. I know there were a discussion about
-combining them as one define, but we rejected that - at least for now.
-Anyway, my point is, subsystem/driver must not rely on PM runtime core
-(like pm_runtime_put_sync) from the system suspend callback to put
-their devices into low power state.
+| commit a5120e89e7e187a91852896f586876c7a2030804
+| Author: Peter Chen <peter.chen@freescale.com>
+| Date:   Fri Jan 18 10:38:05 2013 +0800
+|
+|     ARM i.MX6: change mxs usbphy clock usage
+|
+|     This mxs usbphy is only needs to be on after system boots
+|     up, and software never needs to control it anymore.
+|     Meanwhile, usbphy's parent needs to be notified if usb
+|     is suspend or not. So we design below mxs usbphy usage:
+|
+|     - usbphy1_gate and usbphy2_gate:
+|     Their parents are dummy clock, we only needs to enable
+|     it after system boots up.
+|     - usbphy1 and usbphy2
+|     Usage reserved bit for this clock, in that case, the refcount
+|     will be updated, but without hardware changing.
+|
+|     Signed-off-by: Peter Chen <peter.chen@freescale.com>
+|     Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Kind regards
-Uffe
+Now this patch indeed keeps the gates enabled, but it doesn't keep the parents
+enabled, so the whole patch becomes a no-op once the parents get disabled. This
+nowadays happens with more aggressive clock disabling for example in the UART
+driver (which uses the same PLL as usbphy1).
 
->
-> --
-> I speak only for myself.
-> Rafael J. Wysocki, Intel Open Source Technology Center.
+This patch reverts the reserved register bit hackery and instead enables
+the usbphy clocks when support for the mxsphy is enabled.
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+
+The above are my current state of observations. I think I still haven't fully
+understood the purpose of the clock hacks introduced with a5120e89e7e187.
+
+ arch/arm/mach-imx/clk-imx6q.c | 25 ++++++-------------------
+ 1 file changed, 6 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 4d677f4..a26cdcc 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -104,8 +104,8 @@ enum mx6q_clks {
+ 	usdhc4, vdo_axi, vpu_axi, cko1, pll1_sys, pll2_bus, pll3_usb_otg,
+ 	pll4_audio, pll5_video, pll8_mlb, pll7_usb_host, pll6_enet, ssi1_ipg,
+ 	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
+-	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
+-	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow,
++	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate_unused,
++	usbphy2_gate_unused, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow,
+ 	spdif, cko2_sel, cko2_podf, cko2, cko, vdoa, pll4_audio_div,
+ 	lvds1_sel, lvds2_sel, lvds1_gate, lvds2_gate, clk_max
+ };
+@@ -173,21 +173,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	clk[pll6_enet]     = imx_clk_pllv3(IMX_PLLV3_ENET,	"pll6_enet",	"osc", base + 0xe0, 0x3);
+ 	clk[pll7_usb_host] = imx_clk_pllv3(IMX_PLLV3_USB,	"pll7_usb_host","osc", base + 0x20, 0x3);
+ 
+-	/*
+-	 * Bit 20 is the reserved and read-only bit, we do this only for:
+-	 * - Do nothing for usbphy clk_enable/disable
+-	 * - Keep refcount when do usbphy clk_enable/disable, in that case,
+-	 * the clk framework may need to enable/disable usbphy's parent
+-	 */
+-	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 20);
+-	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 20);
+-
+-	/*
+-	 * usbphy*_gate needs to be on after system boots up, and software
+-	 * never needs to control it anymore.
+-	 */
+-	clk[usbphy1_gate] = imx_clk_gate("usbphy1_gate", "dummy", base + 0x10, 6);
+-	clk[usbphy2_gate] = imx_clk_gate("usbphy2_gate", "dummy", base + 0x20, 6);
++	clk[usbphy1] = imx_clk_gate("usbphy1", "pll3_usb_otg", base + 0x10, 6);
++	clk[usbphy2] = imx_clk_gate("usbphy2", "pll7_usb_host", base + 0x20, 6);
+ 
+ 	clk[sata_ref] = imx_clk_fixed_factor("sata_ref", "pll6_enet", 1, 5);
+ 	clk[pcie_ref] = imx_clk_fixed_factor("pcie_ref", "pll6_enet", 1, 4);
+@@ -461,8 +448,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 		clk_prepare_enable(clk[clks_init_on[i]]);
+ 
+ 	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
+-		clk_prepare_enable(clk[usbphy1_gate]);
+-		clk_prepare_enable(clk[usbphy2_gate]);
++		clk_prepare_enable(clk[usbphy1]);
++		clk_prepare_enable(clk[usbphy2]);
+ 	}
+ 
+ 	/*
+-- 
+1.8.5.3
