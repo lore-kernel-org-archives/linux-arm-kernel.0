@@ -1,68 +1,45 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 26 Feb 2014 16:45:13 -0800
-Subject: [PATCH] PM / devfreq: Fix out of bounds access of transition
- table array
-In-Reply-To: <19338058.266151393391521988.JavaMail.weblogic@epml02>
-References: <19338058.266151393391521988.JavaMail.weblogic@epml02>
-Message-ID: <530E8A99.50402@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 26 Feb 2014 16:42:29 -0800
+Subject: [PATCH v2 2/4] clk: at91: propagate rate change on system clks
+In-Reply-To: <1391589458-28018-3-git-send-email-jjhiblot@traphandler.com>
+References: <1391589458-28018-1-git-send-email-jjhiblot@traphandler.com>
+ <1391589458-28018-3-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <20140227004229.12081.25317@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/25/2014 09:12 PM, ??? wrote:
->> On 02/23/2014 11:15 PM, Saravana Kannan wrote:
->>> The previous_freq value for a device could be an invalid frequency that
->>> results in a error value being returned from devfreq_get_freq_level().
->>> Check for an error value before using that to index into the transition
->>> table.
->>>
->>> Not doing this check will result in memory corruption when previous_freq is
->>> not a valid frequency.
->>>
->>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
->>
->> MyungJoo/Kyungmin,
->>
->> Would either of you have some time to respond to this?
->>
->> Thanks,
->> Saravana
+Quoting Jean-Jacques Hiblot (2014-02-05 00:37:36)
+> From: Boris BREZILLON <b.brezillon@overkiz.com>
 > 
-> Dear Saravana,
+> System clks are just gates, and thus do not provide any rate operations.
+> Authorize clk rate change to be propagated to system clk parents.
 > 
->>> +	prev_lev = devfreq_get_freq_level(devfreq, devfreq->previous_freq);
->>> +	if (prev_lev < 0)
->>> +		return 0;
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> ---
+>  drivers/clk/at91/clk-system.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> If devfreq_get_freq_level returned error, please return that error
-> to the caller. You are retuning 0 in that case.
+> diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
+> index 8f7c043..a98557b 100644
+> --- a/drivers/clk/at91/clk-system.c
+> +++ b/drivers/clk/at91/clk-system.c
+> @@ -84,7 +84,8 @@ at91_clk_register_system(struct at91_pmc *pmc, const char *name,
+>          * (see drivers/memory) which would request and enable the ddrck clock.
+>          * When this is done we will be able to remove CLK_IGNORE_UNUSED flag.
+>          */
+> -       init.flags = CLK_IGNORE_UNUSED;
+> +       init.flags = CLK_SET_RATE_GATE | CLK_SET_RATE_PARENT |
+
+Just wanted to do a quick sanity check here. Do you really need
+CLK_SET_RATE_GATE? Otherwise these patches look fine.
+
+Regards,
+Mike
+
+> +                    CLK_IGNORE_UNUSED;
+>  
+>         sys->id = id;
+>         sys->hw.init = &init;
+> -- 
+> 1.8.5.2
 > 
-> Plus, do you think we are going to change profile->freq_table in run-time?
-> (by accidently? or intentionally?)
-
-Hi MyungJoo,
-
-The reason for this fix is that some devices can't reliably detect their
-current frequency. So, we set the initial freq to 0 so that the first
-request from the default governor actually goes through.
-
-If we randomly pick one of the valid frequencies, then the initial
-request could get short circuited by devfreq, cause wrong stats, the
-device itself might short circuit it after comparing it to prev freq, etc.
-
-The reason I intentionally ignored the error was to prevent printing an
-error at boot every time for such devices. I could do better with more
-complicated code, but I couldn't imagine any other case where
-previous_freq could actually end up being an invalid value.
-
-Hold on, I just realized that the stats code is completely wrong! Isn't
-the current code updating the time_in_state[] of the wrong level? It's
-updating the new level's time in state instead of the previous one?
-
-I'll send out a patch that fixes all this with in a couple of days.
-
-Thanks,
-Saravana
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
