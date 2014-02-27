@@ -1,86 +1,97 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 27 Feb 2014 16:45:43 -0500
-Subject: [PATCH 0/4] ARM: dove: move Dove DT to MVEBU
-In-Reply-To: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Thu, 27 Feb 2014 16:47:37 -0500
+Subject: [PATCH 3/4] ARM: mvebu: move DT Dove to MVEBU
+In-Reply-To: <530FB19F.3050209@gmail.com>
 References: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20140227214543.GK1872@titan.lakedaemon.net>
+ <1393536486-3827-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140227214039.GJ1872@titan.lakedaemon.net>
+ <530FB19F.3050209@gmail.com>
+Message-ID: <20140227214737.GL1872@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 10:28:01PM +0100, Sebastian Hesselbarth wrote:
-> Thanks to DT conversion effort, Marvell Dove with DT support is now
-> ready to leave mach-dove and hop into mach-mvebu. As discussed with
-> MVEBU maintainers, we first add dove.c now and keep on migrating
-> it with Armada 3xx SoCs the next cycle.
+On Thu, Feb 27, 2014 at 10:43:59PM +0100, Sebastian Hesselbarth wrote:
+> On 02/27/2014 10:40 PM, Jason Cooper wrote:
+> >On Thu, Feb 27, 2014 at 10:28:04PM +0100, Sebastian Hesselbarth wrote:
+> >>With all the DT support preparation done, we are able to move Dove
+> >>to MVEBU easily. Legacy non-DT mach-dove is left untouched to rot
+> >>for a while before removal. Also, convert SATA PHY Kconfig entry,
+> >>which is DT-only.
+> >>
+> >>Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> >>---
+> >>Cc: Rob Herring <robh+dt@kernel.org>
+> >>Cc: Pawel Moll <pawel.moll@arm.com>
+> >>Cc: Mark Rutland <mark.rutland@arm.com>
+> >>Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> >>Cc: Kumar Gala <galak@codeaurora.org>
+> >>Cc: Russell King <linux@arm.linux.org.uk>
+> >>Cc: Jason Cooper <jason@lakedaemon.net>
+> >>Cc: Andrew Lunn <andrew@lunn.ch>
+> >>Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> >>Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> >>Cc: devicetree at vger.kernel.org
+> >>Cc: linux-arm-kernel at lists.infradead.org
+> >>Cc: linux-kernel at vger.kernel.org
+> >>---
+> >>  arch/arm/boot/dts/Makefile                           | 12 ++++++------
+> >>  arch/arm/mach-dove/Kconfig                           | 12 ------------
+> >>  arch/arm/mach-dove/Makefile                          |  1 -
+> >>  arch/arm/mach-mvebu/Kconfig                          | 12 ++++++++++++
+> >>  arch/arm/mach-mvebu/Makefile                         |  1 +
+> >>  arch/arm/{mach-dove/board-dt.c => mach-mvebu/dove.c} | 20 ++++++++------------
+> >>  drivers/phy/Kconfig                                  |  2 +-
+> >>  7 files changed, 28 insertions(+), 32 deletions(-)
+> >>  rename arch/arm/{mach-dove/board-dt.c => mach-mvebu/dove.c} (61%)
+> >>
+> >>diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >>index 032030361bef..376a2573e500 100644
+> >>--- a/arch/arm/boot/dts/Makefile
+> >>+++ b/arch/arm/boot/dts/Makefile
+> >>@@ -55,11 +55,6 @@ dtb-$(CONFIG_ARCH_BERLIN) += \
+> >>  	berlin2cd-google-chromecast.dtb
+> >>  dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
+> >>  	da850-evm.dtb
+> >>-dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
+> >>-	dove-cubox.dtb \
+> >>-	dove-d2plug.dtb \
+> >>-	dove-d3plug.dtb \
+> >>-	dove-dove-db.dtb
+> >>  dtb-$(CONFIG_ARCH_EFM32) += efm32gg-dk3750.dtb
+> >>  dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+> >>  	exynos4210-smdkv310.dtb \
+> >>@@ -132,7 +127,12 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+> >>  	armada-xp-gp.dtb \
+> >>  	armada-xp-netgear-rn2120.dtb \
+> >>  	armada-xp-matrix.dtb \
+> >>-	armada-xp-openblocks-ax3-4.dtb
+> >>+	armada-xp-openblocks-ax3-4.dtb \
+> >>+	dove-cm-a510.dtb \
+> >>+	dove-cubox.dtb \
+> >>+	dove-d2plug.dtb \
+> >>+	dove-d3plug.dtb \
+> >>+	dove-dove-db.dtb
+> >
+> >This is going to conflict badly with
+> >
+> >   a02dd0271d01 ARM: mvebu: select dtbs from MACH_ARMADA_*
+> >
+> >Perhaps you could mimic what Andrew did in his series:
+> >
+> >dove := dove-cm-a510.dtb \
+> >	dove-cubox.dtb \
+> >	dove-d2plug.dtb \
+> >	dove-d3plug.dtb \
+> >	dove-dove-db.dtb
+> >dtb-$(CONFIG_ARCH_DOVE) += $(dove)
+> >dtb-$(CONFIG_MACH_DOVE) += $(dove)
 > 
-> Patch 1 adds a DT node for the system controller found on Marvell
-> MVEBU SoCs.
-> 
-> Patch 2 copies an approach taken by Andrew Lunn for Kirkwood-to-MVEBU
-> patches, that add MACH_DOVE for Dove in mach-mvebu to distinguish it
-> from ARCH_DOVE in mach-dove, where drivers still support both non-DT
-> and DT.
-> 
-> Patch 3 then moves mach-dove/board-dt.c to mach-mvebu/dove.c with
-> minor cleanups and converts drivers/phy/Kconfig to MACH_DOVE for
-> a DT-only driver.
-> 
-> Patch 4 finally adds MACH_DOVE and some of its drivers to multi_v7
-> defconfig.
-> 
-> The patches are based on v3.14-rc4, recently posted mvebu/pinctrl-cleanup
-> and mvebu/pinctrl-dove branches: v3.14-rc4 is required for a irqchip
-> driver fix when SPARSE_IRQ is set, the pinctrl branches remove hard-coded
-> addresses from Dove's pinctrl driver.
+> Ok, will do - except dtb-$(CONFIG_ARCH_DOVE) above.. there is no
+> DT in ARCH_DOVE after this patch.
 
-If I were to base this series on v3.14-rc1, I would need to pull in
-
-  mvebu/pinctrl-dove (which draws in mvebu/pinctrl-cleanup)
-  mvebu/irqchip-fixes
-
-and that should be all.  iiuc, these are boot-time requirements, not
-build or merge requirements, correct?
+Ok, then there's no need for 'dove :=', just s/ARCH_DOVE/MACH_DOVE/ on
+the original without movement.
 
 thx,
 
 Jason.
-
-> An unstable branch with above dependencies met, is available at
-> 
-> https://github.com/shesselba/linux-dove.git unstable/dove-mvebu-for-3.15_v1
-> 
-> Sebastian Hesselbarth (4):
->   ARM: dove: add system controller node
->   ARM: dove: prepare new Dove DT Kconfig variable
->   ARM: mvebu: move DT Dove to MVEBU
->   ARM: add Marvell Dove and some drivers to multi_v7 defconfig
-> 
->  arch/arm/boot/dts/Makefile                           | 12 ++++++------
->  arch/arm/boot/dts/dove.dtsi                          |  5 +++++
->  arch/arm/configs/multi_v7_defconfig                  |  4 ++++
->  arch/arm/mach-dove/Kconfig                           | 12 ------------
->  arch/arm/mach-dove/Makefile                          |  1 -
->  arch/arm/mach-mvebu/Kconfig                          | 12 ++++++++++++
->  arch/arm/mach-mvebu/Makefile                         |  1 +
->  arch/arm/{mach-dove/board-dt.c => mach-mvebu/dove.c} | 20 ++++++++------------
->  drivers/mmc/host/Kconfig                             |  2 +-
->  drivers/phy/Kconfig                                  |  2 +-
->  drivers/thermal/Kconfig                              |  2 +-
->  drivers/watchdog/Kconfig                             |  2 +-
->  sound/soc/kirkwood/Kconfig                           |  2 +-
->  13 files changed, 41 insertions(+), 36 deletions(-)
->  rename arch/arm/{mach-dove/board-dt.c => mach-mvebu/dove.c} (61%)
-> 
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> -- 
-> 1.8.5.3
-> 
