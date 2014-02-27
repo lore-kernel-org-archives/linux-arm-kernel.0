@@ -1,37 +1,41 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 27 Feb 2014 09:29:31 +0100
-Subject: [PATCH] PM / Sleep: Set pm_generic functions to NULL for
- !CONFIG_PM_SLEEP
-In-Reply-To: <20140219122715.GB32069@amd.pavel.ucw.cz>
-References: <1392811761-28201-1-git-send-email-ulf.hansson@linaro.org>
- <20140219122715.GB32069@amd.pavel.ucw.cz>
-Message-ID: <CAPDyKFrhyBZV6yUogxTQPdFPg=1R3UZ0Yr_VfXrTivMaNeGVEQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 27 Feb 2014 08:33:39 +0000
+Subject: [PATCH v4 1/8] mfd: Move pm8xxx-irq.c contents into only driver
+ that uses it
+In-Reply-To: <1393441166-32692-2-git-send-email-sboyd@codeaurora.org>
+References: <1393441166-32692-1-git-send-email-sboyd@codeaurora.org>
+ <1393441166-32692-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140227083339.GU9195@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 February 2014 13:27, Pavel Machek <pavel@ucw.cz> wrote:
-> On Wed 2014-02-19 13:09:21, Ulf Hansson wrote:
->> Previously only a subset of the functions were defined and set to NULL
->> while !CONFIG_PM_SLEEP. Let's make them all available so they can be
->> used no matter of CONFIG_PM_SLEEP or not.
->>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->
-> Reviewed-by: Pavel Machek <pavel@ucw.cz>
->
+> The pm8xxx-irq.c code is practically mandatory given that the
+> pm8921-core driver will WARN about it missing and the Kconfig
+> marks it as default y when a PM8xxx chips is enabled. The only
+> reason the file was split out was because we planned to support
+> other pm8xxx chips with different pm8xxx-core.c files. Now that
+> we have DT on ARM this isn't necessary because we should be able
+> to support all the ssbi based PM8xxx chips in one driver and one
+> file with no data bloat. Let's move this code into the only
+> driver that uses it right now (pm8921) so that it's always compiled when
+> needed. In the future we can rename pm8921-core.c to something
+> more generic.
+> 
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/mfd/Kconfig            |  10 --
+>  drivers/mfd/Makefile           |   1 -
+>  drivers/mfd/pm8921-core.c      | 348 ++++++++++++++++++++++++++++++++++++++
+>  drivers/mfd/pm8xxx-irq.c       | 371 -----------------------------------------
+>  include/linux/mfd/pm8xxx/irq.h |  23 ---
+>  5 files changed, 348 insertions(+), 405 deletions(-)
+>  delete mode 100644 drivers/mfd/pm8xxx-irq.c
 
-Hi Rafael,
+Applied, thanks.
 
-If you have no concern with this one, I would appreciate if it could
-go in for 3.15.
-
-I have some patches for the amba bus (driver/amba/bus.c) that would
-require these pointers to be available.
-
-Kind regards
-Uffe
-
-> --
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
