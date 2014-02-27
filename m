@@ -1,62 +1,45 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 27 Feb 2014 12:22:06 +0100
-Subject: [PATCHv4 0/9] Device tree support for the at91sam9rlek
-Message-ID: <1393500135-29636-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Thu, 27 Feb 2014 12:22:07 +0100
+Subject: [PATCHv4 1/9] ARM: at91: prepare at91sam9rl DT transition
+In-Reply-To: <1393500135-29636-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1393500135-29636-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1393500135-29636-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds DT support for the at91sam9rl SoC, then the at91sam9rl-ek
-evaluation board.
+Add the new names, coming from DT, for the clock lookups.
 
-While the at91sam9rl dtsi should be almost complete (still missing LCD and
-touchscreen bits). The at91sam9rlek DT now support the following tested
-features:
- - MMC
- - dbgu
- - usart1
- - watchdog
- - nand
- - leds
- - buttons
- - common clock framework
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/at91sam9rl.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Next:
- - spi
- - dataflash
- - i2c
- - lcd
- - touchscreen
- - usb gadget
- - audio
-
-Changes since v3:
- - reordered nand
- - removed ADC and USB gadget definition as they were not working. They will
-   come with another set of patches adding proper support.
-
-Alexandre Belloni (8):
-  ARM: at91: prepare at91sam9rl DT transition
-  ARM: at91: Add at91sam9rl DT SoC support
-  ARM: at91/defconfig: Add the sam9rl to the list of DT-enabled SOCs
-  ARM: at91: dt: sam9rl: Device Tree for the at91sam9rlek
-  ARM: at91: prepare common clk transition for sam9rl SoCs
-  ARM: at91/dt: define at91sam9rl clocks
-  ARM: at91/dt: define main clk frequency of at91sam9rlek
-  ARM: at91: switch sam9rl to common clock framework
-
-Boris BREZILLON (1):
-  ARM: at91: prepare sam9 dt boards transition to common clk
-
- arch/arm/boot/dts/Makefile         |   2 +
- arch/arm/boot/dts/at91sam9rl.dtsi  | 802 +++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9rlek.dts | 157 ++++++++
- arch/arm/configs/at91_dt_defconfig |   1 +
- arch/arm/mach-at91/Kconfig         |   1 -
- arch/arm/mach-at91/at91sam9rl.c    |  22 +-
- arch/arm/mach-at91/board-dt-sam9.c |  11 +-
- 7 files changed, 993 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91sam9rl.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9rlek.dts
-
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index 3651517abedf..d6ee8bb47213 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -196,6 +196,22 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_ID("pioB", &pioB_clk),
+ 	CLKDEV_CON_ID("pioC", &pioC_clk),
+ 	CLKDEV_CON_ID("pioD", &pioD_clk),
++	/* more lookup table for DT entries */
++	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
++	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
++	CLKDEV_CON_DEV_ID("usart", "ffffb400.serial", &usart1_clk),
++	CLKDEV_CON_DEV_ID("usart", "ffffb800.serial", &usart2_clk),
++	CLKDEV_CON_DEV_ID("usart", "ffffbc00.serial", &usart3_clk),
++	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
++	CLKDEV_CON_DEV_ID("t1_clk", "fffa0000.timer", &tc1_clk),
++	CLKDEV_CON_DEV_ID("t2_clk", "fffa0000.timer", &tc2_clk),
++	CLKDEV_CON_DEV_ID("mci_clk", "fffa4000.mmc", &mmc_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffa8000.i2c", &twi0_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffac000.i2c", &twi1_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioA_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
++	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioD_clk),
+ };
+ 
+ static struct clk_lookup usart_clocks_lookups[] = {
 -- 
 1.8.3.2
