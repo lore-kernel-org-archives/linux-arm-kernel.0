@@ -1,138 +1,52 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu, 27 Feb 2014 21:30:28 +0100
-Subject: [PATCH v2 4/8] ARM: dts: omap3-overo: Enable WiFi/BT combo
-In-Reply-To: <1393533032-1619-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1393533032-1619-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1393533032-1619-5-git-send-email-florian.vaussard@epfl.ch>
+Date: Thu, 27 Feb 2014 21:30:24 +0100
+Subject: [PATCH v2 0/8] ARM: dts: Better support for Gumstix Overo
+Message-ID: <1393533032-1619-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MMC2 is used by the on-board WiFi module populated on some boards
-(based on Marvell Libertas 8688 SDIO). The Bluetooth is connected
-to UART2.
+Hello Tony, Benoit,
 
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
----
- arch/arm/boot/dts/omap3-overo-storm-tobi.dts |  8 ++++
- arch/arm/boot/dts/omap3-overo-tobi.dts       |  8 ++++
- arch/arm/boot/dts/omap3-overo.dtsi           | 58 ++++++++++++++++++++++++++++
- 3 files changed, 74 insertions(+)
+This is the second version of my Overo series.
+Compared to the first version [1], I decided to split it into three parts:
 
-diff --git a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
-index 966b5c9..2033b52 100644
---- a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
-+++ b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
-@@ -20,3 +20,11 @@
- 	compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap36xx", "ti,omap3";
- };
- 
-+&omap3_pmx_core2 {
-+	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
-+		pinctrl-single,pins = <
-+			OMAP3630_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
-+		>;
-+	};
-+};
-+
-diff --git a/arch/arm/boot/dts/omap3-overo-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi.dts
-index de5653e..21de31d 100644
---- a/arch/arm/boot/dts/omap3-overo-tobi.dts
-+++ b/arch/arm/boot/dts/omap3-overo-tobi.dts
-@@ -20,3 +20,11 @@
- 	compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap3430", "ti,omap3";
- };
- 
-+&omap3_pmx_core2 {
-+	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
-+		pinctrl-single,pins = <
-+			OMAP3430_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
-+		>;
-+	};
-+};
-+
-diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
-index 018e1e0..9bc2040 100644
---- a/arch/arm/boot/dts/omap3-overo.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo.dtsi
-@@ -29,6 +29,38 @@
- 		ti,mcbsp = <&mcbsp2>;
- 		ti,codec = <&twl_audio>;
- 	};
-+
-+	/* Regulator to trigger the nPoweron signal of the Wifi module */
-+	w3cbw003c_npoweron: regulator-w3cbw003c-npoweron {
-+		compatible = "regulator-fixed";
-+		regulator-name = "regulator-w3cbw003c-npoweron";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio2 22 GPIO_ACTIVE_HIGH>;		/* gpio_54: nPoweron */
-+		enable-active-high;
-+	};
-+
-+	/* Regulator to trigger the nReset signal of the Wifi module */
-+	w3cbw003c_wifi_nreset: regulator-w3cbw003c-wifi-nreset {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&w3cbw003c_pins &w3cbw003c_2_pins>;
-+		compatible = "regulator-fixed";
-+		regulator-name = "regulator-w3cbw003c-wifi-nreset";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio1 16 GPIO_ACTIVE_HIGH>;		/* gpio_16: WiFi nReset */
-+		startup-delay-us = <10000>;
-+	};
-+
-+	/* Regulator to trigger the nReset signal of the Bluetooth module */
-+	w3cbw003c_bt_nreset: regulator-w3cbw003c-bt-nreset {
-+		compatible = "regulator-fixed";
-+		regulator-name = "regulator-w3cbw003c-bt-nreset";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio6 4 GPIO_ACTIVE_HIGH>;		/* gpio_164: BT nReset */
-+		startup-delay-us = <10000>;
-+	};
- };
- 
- &omap3_pmx_core {
-@@ -56,6 +88,25 @@
- 			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat3.sdmmc1_dat3 */
- 		>;
- 	};
-+
-+	mmc2_pins: pinmux_mmc2_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_clk.sdmmc2_clk */
-+			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_cmd.sdmmc2_cmd */
-+			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat0.sdmmc2_dat0 */
-+			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat1.sdmmc2_dat1 */
-+			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat2.sdmmc2_dat2 */
-+			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat3.sdmmc2_dat3 */
-+		>;
-+	};
-+
-+	/* WiFi/BT combo */
-+	w3cbw003c_pins: pinmux_w3cbw003c_pins {
-+		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x20b4, PIN_OUTPUT | MUX_MODE4)		/* gpmc_ncs3.gpio_54 */
-+			OMAP3_CORE1_IOPAD(0x219c, PIN_OUTPUT | MUX_MODE4)		/* uart3_rts_sd.gpio_164 */
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -99,7 +150,14 @@
- 
- /* optional on board WiFi */
- &mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins>;
-+	vmmc-supply = <&w3cbw003c_npoweron>;
-+	vqmmc-supply = <&w3cbw003c_bt_nreset>;
-+	vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
- 	bus-width = <4>;
-+	cap-sdio-irq;
-+	non-removable;
- };
- 
- &twl_gpio {
+1) Extend current support for Overo/Tobi boards (this part)
+2) Add new expansion boards
+3) Add display support based on Tomi's DSS series
+
+I will send 2) and 3) in a couple of days.
+
+Most patches are pretty obvious. Patch 6 adds some specific timings for
+LAN9221 into a generic file. By using shorter timing, it is possible to
+double the Ethernet bandwidth. Thus is may interest people using a similar
+chip.
+
+I tested this series with both the OMAP35xx Overo and the OMAP36xx Overo.
+Wifi is functional, HSUSB works.
+
+Regards,
+
+Florian
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/109589
+
+Florian Vaussard (8):
+  ARM: dts: omap3-tobi: Add missing pinctrl
+  ARM: dts: omap3-overo: Add missing pinctrl
+  ARM: dts: omap3-overo: Use complete poweroff
+  ARM: dts: omap3-overo: Enable WiFi/BT combo
+  ARM: dts: omap3-overo: Add HSUSB PHY
+  ARM: dts: omap: Add common file for SMSC9221
+  ARM: dts: omap3-tobi: Use include file omap-gpmc-smsc9221
+  ARM: dts: omap3-tobi: Add AT24C01 EEPROM
+
+ arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi      |  58 ++++++++++
+ arch/arm/boot/dts/omap3-overo-storm-tobi.dts   |  24 +++++
+ arch/arm/boot/dts/omap3-overo-tobi-common.dtsi |  48 ++++-----
+ arch/arm/boot/dts/omap3-overo-tobi.dts         |  24 +++++
+ arch/arm/boot/dts/omap3-overo.dtsi             | 143 +++++++++++++++++++++++--
+ 5 files changed, 263 insertions(+), 34 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap-gpmc-smsc9221.dtsi
+
 -- 
 1.8.5.3
