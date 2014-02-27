@@ -1,60 +1,35 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 26 Feb 2014 18:02:26 -0800
-Subject: [PATCH] clk:at91: Fix memory leak in of_at91_clk_master_setup()
-In-Reply-To: <52FF9EFC.2060707@overkiz.com>
-References: <1392124507-14463-1-git-send-email-standby24x7@gmail.com>
- <52FA2338.3030707@overkiz.com> <52FF9EFC.2060707@overkiz.com>
-Message-ID: <20140227020226.12081.28850@quantum>
+From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
+Date: Thu, 27 Feb 2014 02:08:45 +0000
+Subject: [PATCH 01/15] ASoC: fsl-ssi: Use regmap
+In-Reply-To: <1393430538-32333-2-git-send-email-mpa@pengutronix.de>
+References: <1393430538-32333-1-git-send-email-mpa@pengutronix.de>
+ <1393430538-32333-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <6dc5873dcdf54e13aecbf7c6be03f8bf@BY2PR03MB505.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Boris BREZILLON (2014-02-15 09:08:12)
-> Hi Mike,
-> 
-> Could you take this patch for the next 3.14 release ?
 
-Taken in for the next batch of fixes.
+> @@ -134,6 +115,15 @@ struct fsl_ssi_rxtx_reg_val {
+>  	struct fsl_ssi_reg_val rx;
+>  	struct fsl_ssi_reg_val tx;
+>  };
+> +static const struct regmap_config fsl_ssi_regconfig = {
+> +	.max_register = CCSR_SSI_SACCDIS,
+> +	.reg_bits = 32,
+> +	.val_bits = 32,
+> +	.reg_stride = 4,
+> +#ifdef PPC
+> +	.val_format_endian = REGMAP_ENDIAN_BIG,
+> +#endif
 
-Regards,
-Mike
+Is this really needed for your PPC platforms?
 
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> On 11/02/2014 14:18, Boris BREZILLON wrote:
-> > On 11/02/2014 14:15, Masanari Iida wrote:
-> >> cppcheck detected following error
-> >> [clk-master.c:245]: (error) Memory leak: characteristics
-> >>
-> >> The original code forgot to free characteristics when
-> >> irq_of_parse_and_map() failed.
-> >>
-> >> Signed-off-by: Masanari Iida <standby24x7@gmail.com>
-> > Acked-by Boris BREZILLON <b.brezillon@overkiz.com>
-> >
-> > Thanks for fixing this.
-> >
-> > Best Regards,
-> >
-> > Boris
-> >> ---
-> >>   drivers/clk/at91/clk-master.c | 2 +-
-> >>   1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/clk/at91/clk-master.c 
-> >> b/drivers/clk/at91/clk-master.c
-> >> index bd313f7..c1af80b 100644
-> >> --- a/drivers/clk/at91/clk-master.c
-> >> +++ b/drivers/clk/at91/clk-master.c
-> >> @@ -242,7 +242,7 @@ of_at91_clk_master_setup(struct device_node *np, 
-> >> struct at91_pmc *pmc,
-> >>         irq = irq_of_parse_and_map(np, 0);
-> >>       if (!irq)
-> >> -        return;
-> >> +        goto out_free_characteristics;
-> >>         clk = at91_clk_register_master(pmc, irq, name, num_parents,
-> >>                          parent_names, layout,
-> >
-> 
+If so, I think this should depend on one specified platform, which
+the CPU is in LE mode while the SSI is in BE mode...
+
+
+Thanks,
+
+--
+Best Regards,
+Xiubo
