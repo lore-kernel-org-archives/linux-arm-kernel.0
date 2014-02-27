@@ -1,42 +1,38 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 27 Feb 2014 12:36:27 -0700
-Subject: [PATCH v2 1/4] pci: OF: Fix the conversion of IO ranges into IO
- resources.
-In-Reply-To: <20140227191259.GA31753@bart.dudau.co.uk>
-References: <1393506402-11474-1-git-send-email-Liviu.Dudau@arm.com>
- <1393506402-11474-2-git-send-email-Liviu.Dudau@arm.com>
- <20140227181951.GC24656@obsidianresearch.com>
- <20140227191259.GA31753@bart.dudau.co.uk>
-Message-ID: <20140227193627.GA7773@obsidianresearch.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 27 Feb 2014 20:34:19 +0100
+Subject: [PATCH v4 0/3] ARM: sun7i/sun6i: irqchip: Irqchip driver for NMI
+Message-ID: <1393529662-8663-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 07:12:59PM +0000, Liviu Dudau wrote:
-> The outstanding issue is how to fix pci_address_to_pio() as it will not
-> for for range->cpu_addr > IO_SPACE_LIMIT (16MB in my case).
+Allwinner A20/A31 SoCs have a special interrupt controller for managing NMI.
+Three register are present to (un)mask, control and acknowledge NMI.
+These two patches add a new irqchip driver in cascade with GIC.
 
-The default actually looks fine to me, it is the correct behavior for
-systems that actually have a dedicated IO space (like x86) where the
-'CPU' value for IO is the exact value used in the IO accessor
-instructions. In this case the IO_SPACE_LIMIT test is appropriate.
+Changes since v1:
+	- added binding document
 
-It also looks correct for architectures that use the CPU MMIO address
-as the IO address directly (where IO_SPACE_LIMIT would be 4G)
+Changes since v2:
+	- fixed trigger type in DTS
+	- new explanations in binding documentation
+	- added support for A31 (sun6i)
 
-Architectures that use the virtual IO window technique will always
-require a custom pci_address_to_pio implementation.
+Changes since v3:
+	- changed compatibles
 
-BTW, something that occured to me after reading the patches:
+Carlo Caione (3):
+  ARM: sun7i/sun6i: irqchip: Add irqchip driver for NMI controller
+  ARM: sun7i/sun6i: dts: Add NMI irqchip support
+  ARM: sun7i/sun6i: irqchip: Update the documentation
 
-For ARM64 you might want to think about doing away with the fixed
-virtual IO window like we see in ARM32. Just use the CPU MMIO address
-directly within the kernel, and implement a ioport_map to setup the MM
-on demand.
+ .../allwinner,sun67i-sc-nmi.txt                    |  27 +++
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |   9 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |   9 +
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-sunxi-nmi.c                    | 228 +++++++++++++++++++++
+ 5 files changed, 274 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+ create mode 100644 drivers/irqchip/irq-sunxi-nmi.c
 
-I think the legacy reasons for having all those layers of translation
-are probably not applicable to ARM64, and it is much simpler without
-the extra translation step....
-
-Arnd, what do you think?
-
-Jason
+-- 
+1.8.3.2
