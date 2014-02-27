@@ -1,91 +1,43 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu, 27 Feb 2014 16:24:15 +0100
-Subject: TWL6040 fails to initialize
-In-Reply-To: <530F29ED.9020706@ti.com>
-References: <530C70B3.4010103@epfl.ch> <530CA8DA.8050806@ti.com>
- <530CB9C6.60806@epfl.ch> <530D972F.805@ti.com> <530DB97E.80309@epfl.ch>
- <530DC1D3.8040800@ti.com> <530DC291.2060708@epfl.ch>
- <530F29ED.9020706@ti.com>
-Message-ID: <530F589F.5060503@epfl.ch>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 27 Feb 2014 16:26:23 +0100
+Subject: [PATCH V2 1/8] PM / Runtime: Fetch runtime PM callbacks using a
+ macro
+In-Reply-To: <Pine.LNX.4.44L0.1402271002130.1150-100000@iolanthe.rowland.org>
+References: <CAPDyKFqCHXj-O5EwYLQXpfs5oko=Yfi_ZLmQwKVVW8AjUSUZfQ@mail.gmail.com>
+ <Pine.LNX.4.44L0.1402271002130.1150-100000@iolanthe.rowland.org>
+Message-ID: <CAPDyKFrbhmqmu-0uqX_U18nKXuu2z5ueYXqaz4LOHy=ijecs1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 02/27/2014 01:05 PM, Peter Ujfalusi wrote:
-> On 02/26/2014 12:31 PM, Florian Vaussard wrote:
->>>> I statistically checked that the sleep should be placed after the GPIO
->>>> request, so indeed this seems to be the problem, and your explanation is
->>>> plausible. Can you send a proper patch?
->>>>
->>>> Now, related to this, I managed to found a part of the datasheet on the
->>>> Great Internet. Looking at the "Power-Up Sequence" section, it is written:
->>>>
->>>> - NRESPWRON goes high -> plug detect and GPO are available
->>>> - V2V1 goes high -> hook-detect available by I2C programming (sleep mode)
->>>> - AUDPWRON goes high && READYINT -> ready to communicate through I2C and PDM
->>>>
->>>> So, although there seems to be some contradictions on when it is
->>>> possible to access the I2C, shouldn't we enable the AUDPWRON GPIO
->>>> _before_ making any I2C access?
->>>>
->>>> For the twl6040_probe, the following path would seem more correct to me:
->>>>
->>>> 1) enable regulators
->>>> 2) request AUDPWRON
->>>> 3) twl6040_power(ON) && regcache_cache_only(false)
->>>> 4) wait for READYINT (or sleep if deterministic)
->>>> 5) perform all required I2C accesses (read revision, etc.)
->>>> 6) twl6040_power(OFF) && regcache_cache_only(true)
->>>>
->>>> What do you think?
->>>
->>> Even when the AUDPWRON signal is low we can access to registers in VIO domain,
->>> plug detect and GPO functions. So there's no need to power on the codec just
->>> to power it down later.
->>>
+On 27 February 2014 16:04, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Thu, 27 Feb 2014, Ulf Hansson wrote:
+>
+>> > So the main question from v1 remains: why use a macro, and not a function?
+>> >
 >>
->> Ok, if it is safe to do so, I am fine with the current probe. I let you
->> post a patch to add a delay after requesting the GPIO.
-> 
-> 
-> There's something else going on on your board.
-> I did some experiments on PandaBoards: in u-boot I set the GPIO127 (audpwron)
-> high and boot the kernel.
-> During the boot I see all sorts of errors, mcpdm fails to reset, i2c timeouts
-> towards twl6040.
-> For this the solution is to read the INTID register just after I request the
-> gpio - to clear any no longer valid interrupts before we request the IRQ. This
-> works fine on my boards.
-> 
+>> I am no big fan of macros, but in this case I thought it make sense.
+>> Using _a_ function would not be enough, since we would need three, one
+>> for each runtime PM callback (suspend, idle, resume), right?
+>>
+>> I am happy to change to whatever you guys thinks best, I have no strong opinion.
+>
+> A reasonable compromise would be to define the macro, and then use it
+> in those three new functions (and nowhere else).
 
-As I said in the other thread, reading INTID is solving the issue, but
-it could be a side effect.
+Okay, let me send a v3 that tries this approach then.
 
-> The issue you have with your board is something totally different.
-> One thing might be that the i2c bus is set to 400KHz while the twl6040 by
-> default is set for normal mode (100KHz). On all of the boards I have access
-> this works fine but there might be some electrical issue on your board which
-> causes i2c to fail.
-> 
+>
+> The existing rpm_idle, rpm_suspend, and rpm_resume routines should then
+> be changed to use the new functions.  And of course, the new functions
+> could be called directly by subsystems or PM domains.
 
-I should probe the I2C bus to dig the issue further, but I don't have
-access to the pins. So apart drilling into the PCB, this will remain a
-kind of mystery.
+Not sure we should export these functions as a part of this patchset.
+Would it not be preferred, to first see if there are any that needs
+it?
 
-Your patches are somehow solving this, so I will stop my investigations
-for now.
+Kind regards
+Ulf Hansson
 
-> There's also another thing I just noticed: the regmap patch
-> regmap_register_patch() when it is applied will not update the regcache by
-> design. I do not like that too much. On the other hand it is handy to set the
-> ACCCTL register as early as possible.
-> 
-> So, I'm not sure about the delay and why it helps on your board.
-> 
-
-Not sure neither.
-
-Thanks for your help on this.
-
-Regards,
-Florian
+>
+> Alan Stern
+>
