@@ -1,55 +1,31 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu, 27 Feb 2014 09:16:39 +0100
-Subject: [PATCH v2 2/4] clk: at91: propagate rate change on system clks
-In-Reply-To: <20140227004229.12081.25317@quantum>
-References: <1391589458-28018-1-git-send-email-jjhiblot@traphandler.com>
- <1391589458-28018-3-git-send-email-jjhiblot@traphandler.com>
- <20140227004229.12081.25317@quantum>
-Message-ID: <530EF467.5000504@overkiz.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 27 Feb 2014 16:39:58 +0800
+Subject: [PATCH] ARM: imx6: drop .text.head section annotation from headsmp.S
+Message-ID: <1393490399-26325-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+The function v7_secondary_startup() works just fine in .text section, so
+there is no need to have .text.head section annotation at all.  Drop it.
 
-On 27/02/2014 01:42, Mike Turquette wrote:
-> Quoting Jean-Jacques Hiblot (2014-02-05 00:37:36)
->> From: Boris BREZILLON <b.brezillon@overkiz.com>
->>
->> System clks are just gates, and thus do not provide any rate operations.
->> Authorize clk rate change to be propagated to system clk parents.
->>
->> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
->> ---
->>   drivers/clk/at91/clk-system.c | 3 ++-
->>   1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
->> index 8f7c043..a98557b 100644
->> --- a/drivers/clk/at91/clk-system.c
->> +++ b/drivers/clk/at91/clk-system.c
->> @@ -84,7 +84,8 @@ at91_clk_register_system(struct at91_pmc *pmc, const char *name,
->>           * (see drivers/memory) which would request and enable the ddrck clock.
->>           * When this is done we will be able to remove CLK_IGNORE_UNUSED flag.
->>           */
->> -       init.flags = CLK_IGNORE_UNUSED;
->> +       init.flags = CLK_SET_RATE_GATE | CLK_SET_RATE_PARENT |
-> Just wanted to do a quick sanity check here. Do you really need
-> CLK_SET_RATE_GATE?
+Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/headsmp.S |    2 --
+ 1 file changed, 2 deletions(-)
 
-After taking a closer look, I'd say I don't need this flag, because it's
-already set on programmable clks, am I right ?
-
-Do you want me to send a new version removing this flag ?
-
-> Otherwise these patches look fine.
->
-> Regards,
-> Mike
->
->> +                    CLK_IGNORE_UNUSED;
->>   
->>          sys->id = id;
->>          sys->hw.init = &init;
->> -- 
->> 1.8.5.2
->>
+diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
+index 6e1a56d..de5047c 100644
+--- a/arch/arm/mach-imx/headsmp.S
++++ b/arch/arm/mach-imx/headsmp.S
+@@ -13,8 +13,6 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ 
+-	.section ".text.head", "ax"
+-
+ diag_reg_offset:
+ 	.word	g_diag_reg - .
+ 
+-- 
+1.7.9.5
