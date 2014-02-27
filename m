@@ -1,95 +1,55 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 27 Feb 2014 16:18:26 +0200
-Subject: [PATCH v9 4/9] mfd: omap-usb-host: Use clock names as per function
- for reference clocks
+Date: Thu, 27 Feb 2014 16:18:27 +0200
+Subject: [PATCH v9 5/9] mfd: omap-usb-host: Update DT clock binding information
 In-Reply-To: <1393510711-4697-1-git-send-email-rogerq@ti.com>
 References: <1393510711-4697-1-git-send-email-rogerq@ti.com>
-Message-ID: <1393510711-4697-5-git-send-email-rogerq@ti.com>
+Message-ID: <1393510711-4697-6-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a meaningful name for the reference clocks so that it indicates the function.
+The omap-usb-host driver expects certained named clocks.
+Add this information to the DT binding document.
 
-Update the OMAP4+ USB Host node as well to be in sync with the changes.
-
-CC: Beno?t Cousson <bcousson@baylibre.com>
 CC: Lee Jones <lee.jones@linaro.org>
 CC: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap4.dtsi |  6 ++++++
- arch/arm/boot/dts/omap5.dtsi |  6 ++++++
- drivers/mfd/omap-usb-host.c  | 12 ++++++------
- 3 files changed, 18 insertions(+), 6 deletions(-)
+ .../devicetree/bindings/mfd/omap-usb-host.txt      | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index d3f8a6e..39a05ce 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -697,6 +697,12 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
-+			clocks = <&init_60m_fclk>,
-+				 <&xclk60mhsp1_ck>,
-+				 <&xclk60mhsp2_ck>;
-+			clock-names = "refclk_60m_int",
-+				      "refclk_60m_ext_p1",
-+				      "refclk_60m_ext_p2";
+diff --git a/Documentation/devicetree/bindings/mfd/omap-usb-host.txt b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
+index b381fa6..4721b2d 100644
+--- a/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
++++ b/Documentation/devicetree/bindings/mfd/omap-usb-host.txt
+@@ -32,6 +32,29 @@ Optional properties:
+ - single-ulpi-bypass: Must be present if the controller contains a single
+   ULPI bypass control bit. e.g. OMAP3 silicon <= ES2.1
  
- 			usbhsohci: ohci at 4a064800 {
- 				compatible = "ti,ohci-omap3", "usb-ohci";
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index a72813a..d4dae48 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -775,6 +775,12 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
-+			clocks = <&l3init_60m_fclk>,
-+				 <&xclk60mhsp1_ck>,
-+				 <&xclk60mhsp2_ck>;
-+			clock-names = "refclk_60m_int",
-+				      "refclk_60m_ext_p1",
-+				      "refclk_60m_ext_p2";
++- clocks: a list of phandles and clock-specifier pairs, one for each entry in
++  clock-names.
++
++- clock-names: should include:
++  For OMAP3
++  * "usbhost_120m_fck" - 120MHz Functional clock.
++
++  For OMAP4+
++  * "refclk_60m_int" - 60MHz internal reference clock for UTMI clock mux
++  * "refclk_60m_ext_p1" - 60MHz external ref. clock for Port 1's UTMI clock mux.
++  * "refclk_60m_ext_p2" - 60MHz external ref. clock for Port 2's UTMI clock mux
++  * "utmi_p1_gfclk" - Port 1 UTMI clock mux.
++  * "utmi_p2_gfclk" - Port 2 UTMI clock mux.
++  * "usb_host_hs_utmi_p1_clk" - Port 1 UTMI clock gate.
++  * "usb_host_hs_utmi_p2_clk" - Port 2 UTMI clock gate.
++  * "usb_host_hs_utmi_p3_clk" - Port 3 UTMI clock gate.
++  * "usb_host_hs_hsic480m_p1_clk" - Port 1 480MHz HSIC clock gate.
++  * "usb_host_hs_hsic480m_p2_clk" - Port 2 480MHz HSIC clock gate.
++  * "usb_host_hs_hsic480m_p3_clk" - Port 3 480MHz HSIC clock gate.
++  * "usb_host_hs_hsic60m_p1_clk" - Port 1 60MHz HSIC clock gate.
++  * "usb_host_hs_hsic60m_p2_clk" - Port 2 60MHz HSIC clock gate.
++  * "usb_host_hs_hsic60m_p3_clk" - Port 3 60MHz HSIC clock gate.
++
+ Required properties if child node exists:
  
- 			usbhsohci: ohci at 4a064800 {
- 				compatible = "ti,ohci-omap3", "usb-ohci";
-diff --git a/drivers/mfd/omap-usb-host.c b/drivers/mfd/omap-usb-host.c
-index 865c276..651e249 100644
---- a/drivers/mfd/omap-usb-host.c
-+++ b/drivers/mfd/omap-usb-host.c
-@@ -718,24 +718,24 @@ static int usbhs_omap_probe(struct platform_device *pdev)
- 		goto err_mem;
- 	}
- 
--	omap->xclk60mhsp1_ck = devm_clk_get(dev, "xclk60mhsp1_ck");
-+	omap->xclk60mhsp1_ck = devm_clk_get(dev, "refclk_60m_ext_p1");
- 	if (IS_ERR(omap->xclk60mhsp1_ck)) {
- 		ret = PTR_ERR(omap->xclk60mhsp1_ck);
--		dev_err(dev, "xclk60mhsp1_ck failed error:%d\n", ret);
-+		dev_err(dev, "refclk_60m_ext_p1 failed error:%d\n", ret);
- 		goto err_mem;
- 	}
- 
--	omap->xclk60mhsp2_ck = devm_clk_get(dev, "xclk60mhsp2_ck");
-+	omap->xclk60mhsp2_ck = devm_clk_get(dev, "refclk_60m_ext_p2");
- 	if (IS_ERR(omap->xclk60mhsp2_ck)) {
- 		ret = PTR_ERR(omap->xclk60mhsp2_ck);
--		dev_err(dev, "xclk60mhsp2_ck failed error:%d\n", ret);
-+		dev_err(dev, "refclk_60m_ext_p2 failed error:%d\n", ret);
- 		goto err_mem;
- 	}
- 
--	omap->init_60m_fclk = devm_clk_get(dev, "init_60m_fclk");
-+	omap->init_60m_fclk = devm_clk_get(dev, "refclk_60m_int");
- 	if (IS_ERR(omap->init_60m_fclk)) {
- 		ret = PTR_ERR(omap->init_60m_fclk);
--		dev_err(dev, "init_60m_fclk failed error:%d\n", ret);
-+		dev_err(dev, "refclk_60m_int failed error:%d\n", ret);
- 		goto err_mem;
- 	}
- 
+ - #address-cells: Must be 1
 -- 
 1.8.3.2
