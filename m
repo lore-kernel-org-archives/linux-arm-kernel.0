@@ -1,27 +1,59 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 27 Feb 2014 16:24:15 +0800
-Subject: [PATCH 2/4] ARM: imx6: build headsmp.o only on CONFIG_SMP
-In-Reply-To: <20140226210056.GB21483@n2100.arm.linux.org.uk>
-References: <1393422280-22283-1-git-send-email-shawn.guo@linaro.org>
- <1393422280-22283-2-git-send-email-shawn.guo@linaro.org>
- <20140226210056.GB21483@n2100.arm.linux.org.uk>
-Message-ID: <20140227082413.GC13537@S2101-09.ap.freescale.net>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu, 27 Feb 2014 09:21:37 +0100
+Subject: [PATCH] clk:at91: Fix memory leak in of_at91_clk_master_setup()
+In-Reply-To: <20140227020226.12081.28850@quantum>
+References: <1392124507-14463-1-git-send-email-standby24x7@gmail.com>
+ <52FA2338.3030707@overkiz.com> <52FF9EFC.2060707@overkiz.com>
+ <20140227020226.12081.28850@quantum>
+Message-ID: <530EF591.5000504@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 09:00:57PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Feb 26, 2014 at 09:44:38PM +0800, Shawn Guo wrote:
-> > diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
-> > index e4b9fed..6e1a56d 100644
-> > --- a/arch/arm/mach-imx/headsmp.S
-> > +++ b/arch/arm/mach-imx/headsmp.S
-> > @@ -15,7 +15,6 @@
-> >  
-> >  	.section ".text.head", "ax"
-> 
-> While you're here, can you please fix the above section name.  I think
-> a .text will do just fine here.
-
-Indeed.  I will post a patch for it shortly.
-
-Shawn
+On 27/02/2014 03:02, Mike Turquette wrote:
+> Quoting Boris BREZILLON (2014-02-15 09:08:12)
+>> Hi Mike,
+>>
+>> Could you take this patch for the next 3.14 release ?
+> Taken in for the next batch of fixes.
+Thanks.
+>
+> Regards,
+> Mike
+>
+>> Best Regards,
+>>
+>> Boris
+>>
+>> On 11/02/2014 14:18, Boris BREZILLON wrote:
+>>> On 11/02/2014 14:15, Masanari Iida wrote:
+>>>> cppcheck detected following error
+>>>> [clk-master.c:245]: (error) Memory leak: characteristics
+>>>>
+>>>> The original code forgot to free characteristics when
+>>>> irq_of_parse_and_map() failed.
+>>>>
+>>>> Signed-off-by: Masanari Iida <standby24x7@gmail.com>
+>>> Acked-by Boris BREZILLON <b.brezillon@overkiz.com>
+>>>
+>>> Thanks for fixing this.
+>>>
+>>> Best Regards,
+>>>
+>>> Boris
+>>>> ---
+>>>>    drivers/clk/at91/clk-master.c | 2 +-
+>>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/clk/at91/clk-master.c
+>>>> b/drivers/clk/at91/clk-master.c
+>>>> index bd313f7..c1af80b 100644
+>>>> --- a/drivers/clk/at91/clk-master.c
+>>>> +++ b/drivers/clk/at91/clk-master.c
+>>>> @@ -242,7 +242,7 @@ of_at91_clk_master_setup(struct device_node *np,
+>>>> struct at91_pmc *pmc,
+>>>>          irq = irq_of_parse_and_map(np, 0);
+>>>>        if (!irq)
+>>>> -        return;
+>>>> +        goto out_free_characteristics;
+>>>>          clk = at91_clk_register_master(pmc, irq, name, num_parents,
+>>>>                           parent_names, layout,
