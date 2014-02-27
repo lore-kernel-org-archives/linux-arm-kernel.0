@@ -1,67 +1,51 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 27 Feb 2014 13:51:20 -0700
-Subject: [PATCH V2 2/3] mfd: palmas: support IRQ inversion at the board level
+Date: Thu, 27 Feb 2014 13:51:21 -0700
+Subject: [PATCH V2 3/3] ARM: tegra: fix Dalmore PMIC IRQ polarity
 In-Reply-To: <1393534281-30759-1-git-send-email-swarren@wwwdotorg.org>
 References: <1393534281-30759-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1393534281-30759-2-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1393534281-30759-3-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Implement the new DT property ti,irq-externally-inverted, and add an
-equivalent platform data field to match. This allows the driver to
-correctly automatically configure the IRQ output polarity when the board
-or SoC contains an inverter between the Palmas IRQ output and IRQ
-controller input.
+The Tegra PMC's resume-from-sleep logic wants an active-low IRQ input
+from the PMIC. However, the PMIC IRQ is also routed to the GIC, which
+only supports active high IRQs (or rising edge). Hence, the signal must
+be inverted in the PMC before being routed to the GIC. This implies that
+the PMC DT property nvidia,invert-interrupt must be set, and it is.
 
+The PMIC's DT interrupts property must represent the IRQ level at the
+GIC, since that is the PMIC's parent IRQ controller. Fix the PMIC's
+interrupts property to correctly describe the GIC input polarity.
+
+However, the PMIC IRQ output's polarity is programmable in HW, and by
+default follows the parent IRQ controller's input polarity. We need to
+have an active-low output due to the inversion inside the Tegra PMC.
+Hence, add the ti,irq-externally-inverted property to the PMIC.
+
+Reported-by: Stefan Agner <stefan@agner.ch>
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 Acked-by: Laxman Dewangan <ldewangan@nvidia.com>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
-v2: Split V1's patch 1/2 into separate patches 1/3 and 2/3.
-
-If this patch (and likely 1/3 too) could be applied to its own branch
-(w/ signed tag) in the MFD tree, that would great; then I can pull patch
-it into the Tegra tree so that I can apply patch 3/3 on top. Thanks.
+v2: No change.
 ---
- drivers/mfd/palmas.c       | 4 ++++
- include/linux/mfd/palmas.h | 1 +
- 2 files changed, 5 insertions(+)
+ arch/arm/boot/dts/tegra114-dalmore.dts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/palmas.c b/drivers/mfd/palmas.c
-index d280d789e55a..f4ea932adf8d 100644
---- a/drivers/mfd/palmas.c
-+++ b/drivers/mfd/palmas.c
-@@ -293,6 +293,8 @@ static int palmas_set_pdata_irq_flag(struct i2c_client *i2c,
- 	}
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index 8de543777882..2977206cafc9 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -893,7 +893,8 @@
+ 		palmas: tps65913 at 58 {
+ 			compatible = "ti,palmas";
+ 			reg = <0x58>;
+-			interrupts = <0 86 IRQ_TYPE_LEVEL_LOW>;
++			interrupts = <0 86 IRQ_TYPE_LEVEL_HIGH>;
++			ti,irq-externally-inverted;
  
- 	pdata->irq_flags = irqd_get_trigger_type(irq_data);
-+	pdata->irq_external_inversion = of_property_read_bool(i2c->dev.of_node,
-+						"ti,irq-externally-inverted");
- 	dev_info(&i2c->dev, "Irq flag is 0x%08x\n", pdata->irq_flags);
- 	return 0;
- }
-@@ -447,6 +449,8 @@ static int palmas_i2c_probe(struct i2c_client *i2c,
- 		reg = PALMAS_POLARITY_CTRL_INT_POLARITY;
- 	else
- 		reg = 0;
-+	if (pdata->irq_external_inversion)
-+		reg ^= PALMAS_POLARITY_CTRL_INT_POLARITY;
- 	ret = palmas_update_bits(palmas, PALMAS_PU_PD_OD_BASE,
- 			PALMAS_POLARITY_CTRL, PALMAS_POLARITY_CTRL_INT_POLARITY,
- 			reg);
-diff --git a/include/linux/mfd/palmas.h b/include/linux/mfd/palmas.h
-index 9974e387e483..2fdf08c50a48 100644
---- a/include/linux/mfd/palmas.h
-+++ b/include/linux/mfd/palmas.h
-@@ -292,6 +292,7 @@ struct palmas_clk_platform_data {
- 
- struct palmas_platform_data {
- 	int irq_flags;
-+	bool irq_external_inversion;
- 	int gpio_base;
- 
- 	/* bit value to be loaded to the POWER_CTRL register */
+ 			#interrupt-cells = <2>;
+ 			interrupt-controller;
 -- 
 1.8.1.5
