@@ -1,75 +1,48 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 27 Feb 2014 15:07:34 -0600
-Subject: [PATCH v2 3/8] ARM: dts: omap3-overo: Use complete poweroff
-In-Reply-To: <530FA497.7000407@epfl.ch>
-References: <1393533032-1619-1-git-send-email-florian.vaussard@epfl.ch>
- <1393533032-1619-4-git-send-email-florian.vaussard@epfl.ch>
- <530FA23E.1040909@ti.com> <530FA497.7000407@epfl.ch>
-Message-ID: <530FA916.8030001@ti.com>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 27 Feb 2014 13:09:57 -0800
+Subject: [PATCH v12 1/4] PHY: Add function set_speed to generic PHY
+ framework
+In-Reply-To: <20140227205039.GE5375@saruman.home>
+References: <1393524848-8207-1-git-send-email-lho@apm.com>
+ <1393524848-8207-2-git-send-email-lho@apm.com>
+ <20140227190102.GB4862@saruman.home>
+ <CAPw-ZT=F07=T0=z=iT=hxJ0+609RBDYRL=MXF5dQoEowLjsRjQ@mail.gmail.com>
+ <20140227205039.GE5375@saruman.home>
+Message-ID: <CAPw-ZT=7cu1NoxrBL48RUJV04ofrnNkF=p=23VFfu8ZZWmkQWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+devicetree list.
+Hi,
 
-On 02/27/2014 02:48 PM, Florian Vaussard wrote:
-> On 02/27/2014 09:38 PM, Nishanth Menon wrote:
->> On 02/27/2014 02:30 PM, Florian Vaussard wrote:
->>> Currently, the TWL4030 PMIC does not completely poweroff the processor.
->>> Commit b0fc1da4d0359d3cce8f12e0f014aed0704ae202 introduced the necessary
->>> binding to do this, so use it.
->>>
->>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->>> ---
->>>  arch/arm/boot/dts/omap3-overo.dtsi | 5 +++++
->>>  1 file changed, 5 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
->>> index aea64c0..018e1e0 100644
->>> --- a/arch/arm/boot/dts/omap3-overo.dtsi
->>> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
->>> @@ -73,6 +73,11 @@
->>>  			codec {
->>>  			};
->>>  		};
->>> +
->>> +		twl_power: power {
->>> +			compatible = "ti,twl4030-power";
->>> +			ti,use_poweroff;
->>> +		};
->>>  	};
->>>  };
->>>  
->>>
->> Urrgh.. this slipped past.. :(
+>> >> This patch adds function set_speed to the generic PHY framework operation
+>> >> structure. This function can be called to instruct the PHY underlying layer
+>> >> at specified lane to configure for specified speed in hertz.
+>> >
+>> > why ? looks like clk_set_rate() is your friend here. Can you be more
+>> > descriptive of the use case ? When will this be used ?
+>> >
 >>
->> ti,system-power-controller is traditionally used for other PMICs from
->> TI to indicate that poweroff functionality will be provided by the
->> PMIC driver. similar approach is taken by Maxim as well.. I know the
->> commit introducing the binding has been around for long, but
->> considering that we do not have a single dts using this yet, should we
->> consider adding "ti,system-power-controller"(as against removing
->> ti,use_poweroff - so that older down stream dtbs still work) and using
->> it in the new code?
->>
-> 
-> It does make sense, so I am not against it. My only concern is that I
-> find the name to be slightly less easy to understand, but I can live
-> with it :-)
-:)
+>> The phy_set_speed is used to configure the operation speed of the PHY
+>> at run-time. The clock interface in general is used to configure the
+>> clock input to the IP. I don't believe they are the same thing. Maybe
+>> it will be clear in my response to your second email
+>
+> The problem with this is that you end up adding SATA-specific details to
+> something which is supposed to be generic.
 
-> 
-> I do not remember if DT maintainers came up with a clear policy to
-> deprecate a binding.
-I dont think we can depreciate a binding [1] - as you mentioned -
-renaming the property is probably what is appropriate, but introducing
-a new one which has the same behavior as the old one does'nt seem
-covered either.. considering potential downstream kernel usage, I'd
-suggest additional property inline with today's convention.
+Setting the operation speed is pretty generic from an interface point
+of view. An generic multi-purpose PHY can support multiple speed. If
+the upper layer wish to operate at an specified speed (say for testing
+purpose and etc), it can be allowed.
 
+> After negoatiation, don't you
+> get any interrupt from your PHY indicating that link speed negotiation
+> is done ? Or is that IRQ only on AHCI IP ?
 
-[1]
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2a9330010bea5982a5c6593824bc036bf62d67b7
+There is NO interrupt from the PHY. The IRQ is assoicated with the
+AHCI IP. With SATA host flow, it starts off with an COMRESET to start
+the link negotiation. At that point, it will poll for completion.
 
--- 
-Regards,
-Nishanth Menon
+Any other concerns?
+
+-Loc
