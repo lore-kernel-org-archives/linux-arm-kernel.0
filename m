@@ -1,168 +1,111 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 26 Feb 2014 18:16:32 -0800
-Subject: [PATCH 1/3] ARM: config: Add qcom_defconfig
-In-Reply-To: <1393467394-10907-1-git-send-email-sboyd@codeaurora.org>
-References: <1393467394-10907-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1393467394-10907-2-git-send-email-sboyd@codeaurora.org>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 27 Feb 2014 10:19:41 +0800
+Subject: [patch 09/26] arm: mmp: Remove pointless fiddling with irq
+ internals
+In-Reply-To: <CADApbeiJ2ESEuBxGNXLe+sbKEox02Vr0hhO-rW7dosc_4A+TEQ@mail.gmail.com>
+References: <20140223212703.511977310@linutronix.de>
+ <20140223212737.214342433@linutronix.de>
+ <20140223231755.GA27579@pengutronix.de>
+ <CADApbeiyGoSAF9n5-+Ys1H4VDgN+d727E6ARWFGj4EixqeP79w@mail.gmail.com>
+ <CAN1soZy_TfzNigfn4y6kF2qe4K+AQsagd-1KWYrz1VEavMO4bA@mail.gmail.com>
+ <alpine.DEB.2.02.1402241227400.21251@ionos.tec.linutronix.de>
+ <CADApbeiJ2ESEuBxGNXLe+sbKEox02Vr0hhO-rW7dosc_4A+TEQ@mail.gmail.com>
+Message-ID: <CAN1soZzipHL=0i4gH3B7PwHaOJh6=_uwv5u0e7W2MsvARp_jLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a defconfig for mach-qcom platforms. Although these platforms
-are part of the multi-platform kernel, it's useful to have a
-stripped down version of the defconfig that just selects the
-Qualcomm based platforms and drivers.
+On Thu, Feb 27, 2014 at 9:37 AM, Chao Xie <xiechao.mail@gmail.com> wrote:
+> On Mon, Feb 24, 2014 at 7:31 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+>> On Mon, 24 Feb 2014, Haojian Zhuang wrote:
+>>
+>>> On Mon, Feb 24, 2014 at 2:07 PM, Chao Xie <xiechao.mail@gmail.com> wrote:
+>>> > On Mon, Feb 24, 2014 at 7:17 AM, Uwe Kleine-K?nig
+>>> > <u.kleine-koenig@pengutronix.de> wrote:
+>>> >> Hi Thomas,
+>>> >>
+>>> >> On Sun, Feb 23, 2014 at 09:40:13PM -0000, Thomas Gleixner wrote:
+>>> >>> The pm-mmp2 and pm-pxa910 power management related irq_set_wake
+>>> >>> callbacks fiddle pointlessly with the irq actions for no reason except
+>>> >>> for lack of understanding how the wakeup mechanism works.
+>>> >>>
+>>> >>> On supsend the core disables all interrupts lazily, i.e. it does not
+>>> >>> mask them at the irq controller level. So any interrupt which is
+>>> >>> firing during supsend will mark the corresponding interrupt line as
+>>> >> s/supsend/suspend/ twice
+>>> >>> pending. Just before the core powers down it checks whether there are
+>>> >>> interrupts pending from interrupt lines which are marked as wakeup
+>>> >>> sources and if so it aborts the resume and resends the interrupts.
+>>> >> It's the suspend that is aborted, not the resume.
+>>> >>
+>>> >> Other than that your change looks fine.
+>>> >>
+>>> > For pxa910 and MMP2, wake up source only wake up the AP subsystem.
+>>> > The AP subsystem includes the APMU(AP Power Mangament Unit) and cores.
+>>> > Now the core is still powered down. APMU will check the interrupt
+>>> > lines, and find
+>>> > that there are interrupt pending, it will power on the cores.
+>>> > So if the irq is disabled, even wake up source can wake up AP subsystem, but the
+>>> > core is still powered down. It will not be powered up by APMU.
+>>> >
+>>>
+>>> Yes, suspend/resume can't work if the above code is removed.
+>>>
+>>> Interrupt source (logic AND with interrupt mask register) is connected
+>>> to MPMU as
+>>> wakeup source. If the interrupt is disabled, there's no wakeup source event.
+>>>
+>>> And APMU is waken up by MPMU.
+>>>
+>>> So please don't remove the above code. We must keep these interrupt lines active
+>>> to wake up the whole system.
+>>
+>> They are kept active at the interrupt controller level. You just
+>> refuse to understand how the internals of the interrupt subsystem
+>> work.
+>>
+> If no irq_disable callback is hooked, when do irq_disable, it will not
+> actually disable
+> the interrupt, it will depend on next time when the irq happens, the
+> handler will first mask
+> the interrupt as this interrupt never happens.
+> So after system suspended, the interrupt happens, but the device
+> driver will not recieve this interrupt
+> because it is masked.
+> It results in that the device driver miss a important interrupt which
+> related to something need to be
+> handled. If user application for example android has power managment
+> daemon. It will find that nothing
+> to handle, it will make the system enter suspend again.
+>
+Let me list the logic to make it easier to understand.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/configs/qcom_defconfig | 139 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 139 insertions(+)
- create mode 100644 arch/arm/configs/qcom_defconfig
+suspend_enter()
+  --> dpm_suspend_end()
+           --> dpm_suspend_noirq()
+                    --> suspend_device_irqs()
+                             --> __disable_irq()
+                                     --> set IRQS_SUSPENDED && call
+irq_disable() if necessary
+  --> syscore_suspend()
+          --> check_wakeup_irqs()
+               If there's no pending irq in suspend process &&
+IRQS_SUSPENDED is set,
+               then mask the irq.
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-new file mode 100644
-index 000000000000..0e85031bf3c5
---- /dev/null
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -0,0 +1,139 @@
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_SYSCTL_SYSCALL=y
-+CONFIG_KALLSYMS_ALL=y
-+CONFIG_EMBEDDED=y
-+# CONFIG_SLUB_DEBUG is not set
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_PROFILING=y
-+CONFIG_OPROFILE=y
-+CONFIG_KPROBES=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_MODULE_FORCE_UNLOAD=y
-+CONFIG_MODVERSIONS=y
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_ARCH_QCOM=y
-+CONFIG_ARCH_MSM8X60=y
-+CONFIG_ARCH_MSM8960=y
-+CONFIG_ARCH_MSM8974=y
-+CONFIG_SMP=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_HIGHMEM=y
-+CONFIG_HIGHPTE=y
-+CONFIG_CLEANCACHE=y
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_ADVANCED_ROUTER=y
-+CONFIG_IP_MULTIPLE_TABLES=y
-+CONFIG_IP_ROUTE_VERBOSE=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_IPV6 is not set
-+CONFIG_CFG80211=y
-+CONFIG_RFKILL=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_SCSI=y
-+CONFIG_SCSI_TGT=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_CHR_DEV_SG=y
-+CONFIG_CHR_DEV_SCH=y
-+CONFIG_SCSI_MULTI_LUN=y
-+CONFIG_SCSI_CONSTANTS=y
-+CONFIG_SCSI_LOGGING=y
-+CONFIG_SCSI_SCAN_ASYNC=y
-+CONFIG_NETDEVICES=y
-+CONFIG_DUMMY=y
-+CONFIG_SLIP=y
-+CONFIG_SLIP_COMPRESSED=y
-+CONFIG_SLIP_MODE_SLIP6=y
-+CONFIG_USB_USBNET=y
-+# CONFIG_USB_NET_AX8817X is not set
-+# CONFIG_USB_NET_ZAURUS is not set
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_KEYBOARD_ATKBD is not set
-+# CONFIG_MOUSE_PS2 is not set
-+CONFIG_INPUT_JOYSTICK=y
-+CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_UINPUT=y
-+CONFIG_SERIO_LIBPS2=y
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_MSM=y
-+CONFIG_SERIAL_MSM_CONSOLE=y
-+CONFIG_HW_RANDOM=y
-+CONFIG_HW_RANDOM_MSM=y
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_SPI=y
-+CONFIG_DEBUG_GPIO=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_POWER_SUPPLY=y
-+CONFIG_POWER_RESET=y
-+CONFIG_POWER_RESET_MSM=y
-+CONFIG_THERMAL=y
-+CONFIG_REGULATOR=y
-+CONFIG_MEDIA_SUPPORT=y
-+CONFIG_FB=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_DYNAMIC_MINORS=y
-+# CONFIG_SND_ARM is not set
-+# CONFIG_SND_SPI is not set
-+# CONFIG_SND_USB is not set
-+CONFIG_SND_SOC=y
-+CONFIG_HID_BATTERY_STRENGTH=y
-+CONFIG_USB=y
-+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-+CONFIG_USB_MON=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_MSM=y
-+CONFIG_USB_ACM=y
-+CONFIG_USB_SERIAL=y
-+CONFIG_USB_GADGET=y
-+CONFIG_USB_GADGET_DEBUG_FILES=y
-+CONFIG_USB_GADGET_VBUS_DRAW=500
-+CONFIG_RTC_CLASS=y
-+CONFIG_STAGING=y
-+CONFIG_COMMON_CLK_QCOM=y
-+CONFIG_MSM_GCC_8660=y
-+CONFIG_MSM_MMCC_8960=y
-+CONFIG_MSM_MMCC_8974=y
-+CONFIG_MSM_IOMMU=y
-+CONFIG_EXT2_FS=y
-+CONFIG_EXT2_FS_XATTR=y
-+CONFIG_EXT3_FS=y
-+# CONFIG_EXT3_DEFAULTS_TO_ORDERED is not set
-+CONFIG_EXT4_FS=y
-+CONFIG_FUSE_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_TMPFS=y
-+CONFIG_NFS_FS=y
-+CONFIG_NFS_V3_ACL=y
-+CONFIG_NFS_V4=y
-+CONFIG_CIFS=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DYNAMIC_DEBUG=y
-+CONFIG_DEBUG_INFO=y
-+CONFIG_MAGIC_SYSRQ=y
-+CONFIG_LOCKUP_DETECTOR=y
-+# CONFIG_DETECT_HUNG_TASK is not set
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_TIMER_STATS=y
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Yes, we didn't implement disable_irq(). But we must implement mask_irq().
+
+So system suspends. Then system will never be waken up by this irq any
+more since
+it's masked.
+
+
+>> And even if you would need this flag, then fiddling with the irq desc
+>> internals is a big NONO. There is a proper way to hand that in.
+>>
+>
+> So can you suggest the proper way to handle it? Thanks.
+>
+>> Thanks,
+>>
+>>         tglx
+>>
