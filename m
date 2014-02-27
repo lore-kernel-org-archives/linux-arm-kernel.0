@@ -1,35 +1,26 @@
-From: Li.Xiubo@freescale.com (Li.Xiubo at freescale.com)
-Date: Thu, 27 Feb 2014 02:08:45 +0000
-Subject: [PATCH 01/15] ASoC: fsl-ssi: Use regmap
-In-Reply-To: <1393430538-32333-2-git-send-email-mpa@pengutronix.de>
-References: <1393430538-32333-1-git-send-email-mpa@pengutronix.de>
- <1393430538-32333-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <6dc5873dcdf54e13aecbf7c6be03f8bf@BY2PR03MB505.namprd03.prod.outlook.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 26 Feb 2014 18:16:31 -0800
+Subject: [PATCH 0/3] Add qcom_defconfig and update msm_defconfig
+Message-ID: <1393467394-10907-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Now that we have mach-qcom, introduce a qcom_defconfig to match and
+update the msm_defconfig to compile a board in mach-msm.
 
-> @@ -134,6 +115,15 @@ struct fsl_ssi_rxtx_reg_val {
->  	struct fsl_ssi_reg_val rx;
->  	struct fsl_ssi_reg_val tx;
->  };
-> +static const struct regmap_config fsl_ssi_regconfig = {
-> +	.max_register = CCSR_SSI_SACCDIS,
-> +	.reg_bits = 32,
-> +	.val_bits = 32,
-> +	.reg_stride = 4,
-> +#ifdef PPC
-> +	.val_format_endian = REGMAP_ENDIAN_BIG,
-> +#endif
+Stephen Boyd (3):
+  ARM: config: Add qcom_defconfig
+  ARM: msm: Silence readb/writeb warnings due to missing IOMEM()
+  ARM: config: Update msm_defconfig
 
-Is this really needed for your PPC platforms?
+ arch/arm/configs/msm_defconfig                     | 25 +++-------------------
+ arch/arm/configs/{msm_defconfig => qcom_defconfig} |  4 +---
+ arch/arm/mach-msm/board-trout-gpio.c               |  2 +-
+ arch/arm/mach-msm/board-trout.c                    |  2 +-
+ arch/arm/mach-msm/board-trout.h                    |  2 +-
+ 5 files changed, 7 insertions(+), 28 deletions(-)
+ copy arch/arm/configs/{msm_defconfig => qcom_defconfig} (97%)
 
-If so, I think this should depend on one specified platform, which
-the CPU is in LE mode while the SSI is in BE mode...
-
-
-Thanks,
-
---
-Best Regards,
-Xiubo
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
