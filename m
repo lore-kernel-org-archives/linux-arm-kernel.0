@@ -1,32 +1,22 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 27 Feb 2014 16:45:10 +0100
-Subject: [PATCH] Doc: USB: gadget: atmel_usba correct atmel,vbus-gpio meaning
-Message-ID: <1393515910-15837-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Thu, 27 Feb 2014 09:46:54 -0600
+Subject: [PATCH 1/3] ARM: config: Add qcom_defconfig
+In-Reply-To: <1393467394-10907-2-git-send-email-sboyd@codeaurora.org>
+References: <1393467394-10907-1-git-send-email-sboyd@codeaurora.org>
+ <1393467394-10907-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140227154654.GB7308@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-atmel,at91sam9rl-udc is a USB gadget, it has now means to control vbus.
-atmel,vbus-gpio is in fact used to detect the presence of vbus.
+On Wed, Feb 26, 2014 at 06:16:32PM -0800, Stephen Boyd wrote:
+> Add a defconfig for mach-qcom platforms. Although these platforms
+> are part of the multi-platform kernel, it's useful to have a
+> stripped down version of the defconfig that just selects the
+> Qualcomm based platforms and drivers.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- Documentation/devicetree/bindings/usb/atmel-usb.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+How minimal are we aiming here?  It might be nice to at least get
+DEVTMPFS/DEVTMPFS_MOUNT=y in here, as I think udev barfs without it.
 
-diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-index 55f51af08bc7..bc2222ca3f2a 100644
---- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-@@ -57,8 +57,8 @@ Required properties:
-  - ep childnode: To specify the number of endpoints and their properties.
- 
- Optional properties:
-- - atmel,vbus-gpio: If present, specifies a gpio that needs to be
--   activated for the bus to be powered.
-+ - atmel,vbus-gpio: If present, specifies a gpio that allows to detect whether
-+   vbus is present (USB is connected).
- 
- Required child node properties:
-  - name: Name of the endpoint.
 -- 
-1.8.3.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
