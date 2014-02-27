@@ -1,42 +1,64 @@
-From: markus.mayer@linaro.org (Markus Mayer)
-Date: Thu, 27 Feb 2014 14:20:17 -0800
-Subject: [PATCH] gpio: only enable kona driver on BCM_MOBILE or for
- compile testing
-In-Reply-To: <1392990146-18916-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1392990146-18916-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAPdLdqkq06AuLr8a8x9aY8BmHHbcNsL5tmQrH4j8bEom_HS-kA@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 27 Feb 2014 23:36:16 +0100
+Subject: [PATCH V2 1/8] PM / Runtime: Fetch runtime PM callbacks using a
+ macro
+In-Reply-To: <Pine.LNX.4.44L0.1402271621430.888-100000@iolanthe.rowland.org>
+References: <CAPDyKFq4X3G1zZay0XG2g-djEvyRdf9s47GDSC5htXZ7c-LdRQ@mail.gmail.com>
+ <Pine.LNX.4.44L0.1402271621430.888-100000@iolanthe.rowland.org>
+Message-ID: <CAPDyKFqPAaHTt1rESG2192sD=nFqDgOQ7vSxopcmAUvGgY6hyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 February 2014 05:42, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello,
+On 27 February 2014 22:25, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Thu, 27 Feb 2014, Ulf Hansson wrote:
 >
-> I'm not sure if and how "Kona" fits into the bcm281xx namespace, but
-> reading through the commit logs of the changes touching
-> drivers/gpio/gpio-bcm-kona.c so far suggests it does. In this case I'd
-> consider it a good idea to mention "bcm281xx" in the help text of
-> GPIO_BCM_KONA.
+>> On 27 February 2014 17:22, Alan Stern <stern@rowland.harvard.edu> wrote:
+>> > On Thu, 27 Feb 2014, Ulf Hansson wrote:
+>> >
+>> >> > A reasonable compromise would be to define the macro, and then use it
+>> >> > in those three new functions (and nowhere else).
+>> >>
+>> >> Okay, let me send a v3 that tries this approach then.
+>> >>
+>> >> >
+>> >> > The existing rpm_idle, rpm_suspend, and rpm_resume routines should then
+>> >> > be changed to use the new functions.  And of course, the new functions
+>> >> > could be called directly by subsystems or PM domains.
+>> >>
+>> >> Not sure we should export these functions as a part of this patchset.
+>> >> Would it not be preferred, to first see if there are any that needs
+>> >> it?
+>> >
+>> > I don't understand.  V2 of the patchset exports
+>> > pm_runtime_force_suspend and pm_runtime_force_resume.  Why wouldn't you
+>> > want to export them in V3?
+>>
+>> There are some confusion here. :-)  pm_runtime_force_suspend|resume()
+>> surely need to be exported, but that's "patch v2 2/8".
+>>
+>> I think we were debating whether this patch "patch v2 1/8" should use
+>> a macro to walk the ladder to fetch the runtime PM callback - or if we
+>> should implement a three c-functions to handle it. I prefer to keep
+>> this patch as is, thus using the macro.
+>
+> But you're going to expand the macro (say, the version that handles
+> runtime_resume callbacks) in two places: rpm_resume and
+> pm_runtime_force_resume.  That's inefficient.  The macro generates
+> fairly complicated code, and so it should be expanded in only one
+> place: a single new function.  The new function can be called by both
+> rpm_resume and pm_runtime_force_resume.
 
-Naming these components has been quite a challenge for our upstreaming
-effort. Some things are not very obvious unless you know he chip or
-were involved in those discussions.
+That's a valid point. Maybe you were trying to tell me this before as
+well, not sure.
 
-"Kona" can be thought of as an architecture or a family of chips.
-bcm281xx is one member of that family. There are others. I submitted
-bcm21664 to arm-linux just a few minutes ago. bcm21664 also uses
-gpio-bcm-kona.c.
+Anyway, l will send a v3 to address your comments.
 
-Mentioning the SoCs in the help text is a good idea, but we'll likely
-have to come up with a central location where all supported members of
-the Kona family are listed, so they aren't scattered all over
-different sub-systems (Kona watchdog, Kona GPIO, Kona timer, etc.) If
-we don't have a central location, we'll be certain to forget updating
-one of the help texts eventually, and it would become inconsistent.
+Kind regards
+Ulf Hansson
 
-Regards,
--Markus
-
--- 
-Markus Mayer
-Broadcom Landing Team
+>
+> In fact, from comparing those two routines, it looks like the new
+> function could include a little more than just the macro expansion.
+>
+> Alan Stern
+>
