@@ -1,132 +1,60 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 27 Feb 2014 10:49:06 +0800
-Subject: [PATCH v3] pwm: add CSR SiRFSoC PWM driver
-In-Reply-To: <lel46f$q2d$1@ger.gmane.org>
-References: <1391855002-26098-1-git-send-email-21cnbao@gmail.com>
- <lel46f$q2d$1@ger.gmane.org>
-Message-ID: <CAGsJ_4xLtXV6WtVhLgzFAaU9oG5UOt+LonFktBipQf_a6Yutng@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 27 Feb 2014 12:33:37 +0900
+Subject: [PATCH] ARM: shmobile: Check r8a7791 MD21 at SMP boot
+In-Reply-To: <CAMuHMdXKdN+LrhhCFKgO4=2ez0qiyc8EhtBLPzrfxmBMLpGX7Q@mail.gmail.com>
+References: <20140226095916.15676.99394.sendpatchset@w520>
+ <CAMuHMdXKdN+LrhhCFKgO4=2ez0qiyc8EhtBLPzrfxmBMLpGX7Q@mail.gmail.com>
+Message-ID: <CANqRtoQbx4LvaFxd_O6Em79QceSadVq93mJhyrDiD370VaXgWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Romain,
+Hi Geert,
 
-2014-02-27 0:19 GMT+08:00 Romain Izard <romain.izard.pro@gmail.com>:
-> Hello Barry,
+On Wed, Feb 26, 2014 at 7:11 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Magnus,
 >
-> On 2014-02-08, Barry Song <21cnbao@gmail.com> wrote:
->> From: Rongjun Ying <Rongjun.ying@csr.com>
+> On Wed, Feb 26, 2014 at 10:59 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>> On r8a7791 the hardware boot mode bit MD21 indicates if hardware
+>> debug mode is enabled or not. In case hardware debug mode is enabled
+>> print a warning and refrain from booting secondary CPU cores.
 >>
->> PWM controller of CSR SiRFSoC can generate 7 independent outputs. Each output
->> duty cycle can be adjusted by setting the corresponding wait & hold registers.
+>> Without this patch Koelsch with SW8-4 set to OFF will hang at SMP boot.
 >>
->> Supports 7 independent channel output: 6 for external(channel0-5) and 1 for
->> internal(channel6).
->>
->> Supports wide frequency range: divide by 2 to 65536*2 of source clock.
->>
->> Signed-off-by: Rongjun Ying <Rongjun.ying@csr.com>
->> Signed-off-by: Huayi Li <Huayi.Li@csr.com>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> ---
->>  -v3:
->>  add "depends on" COMPILE_TEST according to Arnd's feedback;
->>  move the pwm clock source to dts according to Arnd's feedback;
->>  add lost dt-binding document
->>
->>  Documentation/devicetree/bindings/pwm/pwm-sirf.txt |   17 +
->>  arch/arm/boot/dts/atlas6.dtsi                      |    3 +-
->>  arch/arm/boot/dts/prima2.dtsi                      |    3 +-
->>  drivers/pwm/Kconfig                                |    9 +
->>  drivers/pwm/Makefile                               |    1 +
->>  drivers/pwm/pwm-sirf.c                             |  308 ++++++++++++++++++++
->>  6 files changed, 339 insertions(+), 2 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sirf.txt
->>  create mode 100644 drivers/pwm/pwm-sirf.c
->>
->> diff --git a/Documentation/devicetree/bindings/pwm/pwm-sirf.txt b/Documentation/devicetree/bindings/pwm/pwm-sirf.txt
->> new file mode 100644
->> index 0000000..4b10109
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pwm/pwm-sirf.txt
->> @@ -0,0 +1,17 @@
->> +SiRF prima2 & atlas6 PWM drivers
->> +
->> +Required properties:
->> +- compatible: "sirf,prima2-pwm"
->> +- reg: physical base address and length of the controller's registers
->> +- #pwm-cells: should be 2.  The first cell specifies the per-chip index
->> +  of the PWM to use and the second cell is the period in nanoseconds.
->> +- clocks: from common clock binding: the 1st clock is for PWM controller
->> +  the 2nd clock is the source to generate PWM waves
->> +
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
 >
-> Describing the clocks this way seems limiting to me.
+> On Koelsch:
 >
-> Each output of the PWM controller on SiRFatlasVI and SiRFprimaII can
-> independently use one clock among many for signal generation, with
-> three PLLs and two external clock inputs available.
+> Tested-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-yes, that is the hardware spec. and i feel so happy you have read it.
-now i get one more sirfsoc friend.
+Thanks.
 
-32K of RTC is too small to generate a normal PWM signal, PLLs in the
-design can change for DVFS.
-so that means a notifier callback is needed if PLL is changed for
-CPUFreq, this makes SW buggy and complex.
-
-when i reviewed the source codes in our local git,  i decided to move
-to a general and clean SW solution at the first step.
-
+>>  This is a reworked version of the APMU patch previously posted as
+>>  [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
 >
-> If we specify the source clock for the signal generation in the device
-> tree as you do here, we will prevent the use of those different input
-> clocks when incompatible frequencies are required, such as 32,768 Hz on
-> one output line and 44,100 Hz on another one.
+> Your previous version also affected r8a7790/Lager.
+> Isn't this check no longer needed there? According to the Lager manual,
+> MD21 also enables hardware debug mode, and is also controlled by
+> SW8-4. Of course the CPU may behave differently, as the CPU cores
+> are different.
 
-i prefer we use a normal clock source which can provide normal clock
-rates. 26MHz is a suitable one which can provide a big scale.
-even though we can use multiple clock sources, clock sources are the
-knowledge of PWM and should not be visible to pwm clients as you
-mentioned below.
+Yes, you are correct that the previous version of the patch also
+affected Lager. And that both r8a7790 and r8a7791 mention the MD21 bit
+together with JTAG debugging.
 
->
-> As the clock tree for SiRF SoCs is described in the source files in
-> drivers/clk/sirf/*, it does not appear to me that the functional clock
-> needs to be configured in the device tree: the names of available clock
-> sources can be provided statically by the device tree matching table the
-> pwm-sirf.c.  Moreover, this would continue to work with the current
-> (undocumented) bindings for SiRFatlasVI and SiRFprimaII.
+I recently used the patch on Lager and I discovered that I apparently
+had been running with MD21 on my Lager since forever, and surprisingly
+it worked regardless. Since there is no documentation on r8a7790 or
+r8a7791 I simply decided to handle them separately and only enable
+where it is needed.
 
-i don't understand "it does not appear to me that the functional clock
-needs to be configured in the device tree", we are now using the clock
-index in dts.
-the index is mapping with the clock indexes in driver codes as you said.
+I've also been told that it is possible to allow SMP operation
+together with JTAG, apparently some magic with RST is needed. It seems
+that the power domains are treated differently depending on the MD21
+setting. Not sure if this applies to both r8a7790 and r8a7791, but if
+we end up with similar fixes we can consolidate. Until then I think
+dealing with them one by one makes sense.
 
->
-> Alternatively, to keep the configuration in the device tree, all valid
-> inputs for this SoC could be described here, instead of a single one.
->
-> The choice of the clock used for each output can then be selected when
-> configuring an output, with a selection algorithm using the best input for
-> a given period in of_xlate() and config() callbacks.
+Cheers,
 
-this is right in case we don't make clock sources visible to PWM
-clients. but for the moment, current driver have met the requirement
-of PWM clients like LCD and audio codec in our tests.
-so i think if there is some special rate we can not met in the future,
-we have an incremental patch for that.
-we might be able to have a "best-fit" algorithm to figure out
-"best-fit" clock source, even a quick check-up table for these special
-rates since they are few.
-
->
-> --
-> Romain Izard
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--barry
+/ magnus
