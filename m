@@ -1,71 +1,111 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 27 Feb 2014 10:48:26 +0900
-Subject: [PATCH 3/3] ARM: S3C24XX: select COMMON_CLK_SAMSUNG for S3C24XX
-In-Reply-To: <20140227001620.12081.28601@quantum>
-References: <1393392247-6247-1-git-send-email-pankaj.dubey@samsung.com>
- <1393392247-6247-4-git-send-email-pankaj.dubey@samsung.com>
- <20140227001620.12081.28601@quantum>
-Message-ID: <530E996A.9080208@samsung.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 27 Feb 2014 10:33:38 +0900
+Subject: [PATCH v2 1/1] arm64: make a single hook to syscall_trace() for
+ all syscall features
+In-Reply-To: <20140226112544.GD8961@mudshark.cambridge.arm.com>
+References: <1391767651-5296-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393319683-2707-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393319683-2707-2-git-send-email-takahiro.akashi@linaro.org>
+ <20140225150007.GB23136@mudshark.cambridge.arm.com>
+ <530D4AB3.4000700@linaro.org>
+ <20140226112544.GD8961@mudshark.cambridge.arm.com>
+Message-ID: <530E95F2.5040209@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2014 09:16 AM, Mike Turquette wrote:
-> Quoting Pankaj Dubey (2014-02-25 21:24:07)
->> CC: Ben Dooks <ben-linux@fluff.org>
->> CC: Kukjin Kim <kgene.kim@samsung.com>
->> CC: Russell King <linux@arm.linux.org.uk>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   arch/arm/mach-s3c24xx/Kconfig |    3 +++
->>   1 file changed, 3 insertions(+)
+On 02/26/2014 08:25 PM, Will Deacon wrote:
+> On Wed, Feb 26, 2014 at 02:00:19AM +0000, AKASHI Takahiro wrote:
+>> On 02/26/2014 12:00 AM, Will Deacon wrote:
+>>> On Tue, Feb 25, 2014 at 09:14:43AM +0000, AKASHI Takahiro wrote:
+>>>> Currently syscall_trace() is called only for ptrace.
+>>>> With additional TIF_xx flags defined, it is now called in all the cases
+>>>> of audit, ftrace and seccomp in addition to ptrace.
+>>>>
+>>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>>> Acked-by: Richard Guy Briggs <rgb@redhat.com>
+>>>> ---
+>>>>    arch/arm64/include/asm/thread_info.h |   13 ++++++++++
+>>>>    arch/arm64/kernel/entry.S            |    5 ++--
+>>>>    arch/arm64/kernel/ptrace.c           |   45 +++++++++++++++++-----------------
+>>>>    3 files changed, 38 insertions(+), 25 deletions(-)
 >>
->> diff --git a/arch/arm/mach-s3c24xx/Kconfig b/arch/arm/mach-s3c24xx/Kconfig
->> index 80373da..5cf82a1 100644
->> --- a/arch/arm/mach-s3c24xx/Kconfig
->> +++ b/arch/arm/mach-s3c24xx/Kconfig
->> @@ -40,6 +40,7 @@ config CPU_S3C2410
->>   config CPU_S3C2412
->>          bool "SAMSUNG S3C2412"
->>          select COMMON_CLK
->> +       select COMMON_CLK_SAMSUNG
-> I guess this depends on Heiko's "[PATCH 00/12] ARM: S3C24XX: convert
-> s3c2410, s3c2440 s3c2442 to common clock framework" series?
+>> [...]
+>>
+>>>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>>>> index 6a8928b..c70133e 100644
+>>>> --- a/arch/arm64/kernel/ptrace.c
+>>>> +++ b/arch/arm64/kernel/ptrace.c
+>>>> @@ -1062,31 +1062,30 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+>>>>    {
+>>>>    	unsigned long saved_reg;
+>>>>
+>>>> -	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+>>>> -		return regs->syscallno;
+>>>> -
+>>>> -	if (is_compat_task()) {
+>>>> -		/* AArch32 uses ip (r12) for scratch */
+>>>> -		saved_reg = regs->regs[12];
+>>>> -		regs->regs[12] = dir;
+>>>> -	} else {
+>>>> -		/*
+>>>> -		 * Save X7. X7 is used to denote syscall entry/exit:
+>>>> -		 *   X7 = 0 -> entry, = 1 -> exit
+>>>> -		 */
+>>>> -		saved_reg = regs->regs[7];
+>>>> -		regs->regs[7] = dir;
+>>>> -	}
+>>>> +	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
+>>>> +		if (is_compat_task()) {
+>>>> +			/* AArch32 uses ip (r12) for scratch */
+>>>> +			saved_reg = regs->regs[12];
+>>>> +			regs->regs[12] = dir;
+>>>> +		} else {
+>>>> +			/*
+>>>> +			 * Save X7. X7 is used to denote syscall entry/exit:
+>>>> +			 *   X7 = 0 -> entry, = 1 -> exit
+>>>> +			 */
+>>>> +			saved_reg = regs->regs[7];
+>>>> +			regs->regs[7] = dir;
+>>>> +		}
+>>>>
+>>>> -	if (dir)
+>>>> -		tracehook_report_syscall_exit(regs, 0);
+>>>> -	else if (tracehook_report_syscall_entry(regs))
+>>>> -		regs->syscallno = ~0UL;
+>>>> +		if (dir)
+>>>> +			tracehook_report_syscall_exit(regs, 0);
+>>>> +		else if (tracehook_report_syscall_entry(regs))
+>>>> +			regs->syscallno = ~0UL;
+>>>>
+>>>> -	if (is_compat_task())
+>>>> -		regs->regs[12] = saved_reg;
+>>>> -	else
+>>>> -		regs->regs[7] = saved_reg;
+>>>> +		if (is_compat_task())
+>>>> +			regs->regs[12] = saved_reg;
+>>>> +		else
+>>>> +			regs->regs[7] = saved_reg;
+>>>> +	}
+>>>
+>>> Aren't these changes (to ptrace.c) just a giant NOP?
+>>
+>> Umm, the purpose of this big "if" is to run the code only if TIF_SYSCALL_TRACE is set,
+>> and to make it easy to add additional hooks, audit and ftrace, around tracehook_report_*()
+>> later on.
 >
-> Regards,
-> Mike
+> The existing code already checks TIF_SYSCALL_TRACE. I'd rather you added
+> this new code when it's actually nedded (e.g. when adding audit on top).
 
-Yes, this series is based on latest kgene/for-next branch where Heiko's 
-series is merged.
+* This patch is required only if you really merge my audit and/or ftrace patch.
+* Putting these changes in audit patch would impose an extra (unnecessary) dependency on ftrace patch.
+* Putting them both in audit and ftrace patch would cause a conflict when applying both patches.
 
->>          select CPU_ARM926T
->>          select CPU_LLSERIAL_S3C2440
->>          select S3C2412_COMMON_CLK
->> @@ -51,6 +52,7 @@ config CPU_S3C2412
->>   config CPU_S3C2416
->>          bool "SAMSUNG S3C2416/S3C2450"
->>          select COMMON_CLK
->> +       select COMMON_CLK_SAMSUNG
->>          select CPU_ARM926T
->>          select CPU_LLSERIAL_S3C2440
->>          select S3C2416_PM if PM
->> @@ -89,6 +91,7 @@ config CPU_S3C244X
->>   config CPU_S3C2443
->>          bool "SAMSUNG S3C2443"
->>          select COMMON_CLK
->> +       select COMMON_CLK_SAMSUNG
->>          select CPU_ARM920T
->>          select CPU_LLSERIAL_S3C2440
->>          select S3C2443_COMMON_CLK
->> -- 
->> 1.7.9.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Even so, since I don't bother you on this minor issue, I will follow your comment and make changes on:
+* arm64: make a single hook to syscall_trace() for all syscall features
+* arm64: Add audit support
+* arm64: Add ftrace support
 
+-Takahiro AKASHI
 
--- 
-Best Regards,
-Pankaj Dubey
+> Will
+>
