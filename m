@@ -1,137 +1,94 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Thu, 27 Feb 2014 14:54:22 +0800
-Subject: [PATCH] thermal: imx: update formula for thermal sensor
-In-Reply-To: <20140213130252.GB20842@S2101-09.ap.freescale.net>
-References: <1392199595-1054-1-git-send-email-b20788@freescale.com>
- <20140213130252.GB20842@S2101-09.ap.freescale.net>
-Message-ID: <1393484062.2637.15.camel@rzhang1-mobl4>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 27 Feb 2014 07:59:49 +0100
+Subject: [PATCH 3/3] ARM: S3C24XX: select COMMON_CLK_SAMSUNG for S3C24XX
+In-Reply-To: <530E996A.9080208@samsung.com>
+References: <1393392247-6247-1-git-send-email-pankaj.dubey@samsung.com>
+ <20140227001620.12081.28601@quantum> <530E996A.9080208@samsung.com>
+Message-ID: <17644043.UHm3oirvbC@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2014-02-13 at 21:02 +0800, Shawn Guo wrote:
-> Copy LAKML and pengutronix folks in case they have comments.
-> 
-> On Wed, Feb 12, 2014 at 06:06:35PM +0800, Anson Huang wrote:
-> > Thermal sensor used to need two calibration points which are
-> > in fuse map to get a slope for converting thermal sensor's raw
-> > data to real temperature in degree C. Due to the chip calibration
-> > limitation, hardware team provides an universal formula to get
-> > real temperature from internal thermal sensor raw data:
+Am Donnerstag, 27. Februar 2014, 10:48:26 schrieb Pankaj Dubey:
+> On 02/27/2014 09:16 AM, Mike Turquette wrote:
+> > Quoting Pankaj Dubey (2014-02-25 21:24:07)
 > > 
-> > Slope = 0.4297157 - (0.0015976 * 25C fuse);
+> >> CC: Ben Dooks <ben-linux@fluff.org>
+> >> CC: Kukjin Kim <kgene.kim@samsung.com>
+> >> CC: Russell King <linux@arm.linux.org.uk>
+> >> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> >> ---
+> >> 
+> >>   arch/arm/mach-s3c24xx/Kconfig |    3 +++
+> >>   1 file changed, 3 insertions(+)
+> >> 
+> >> diff --git a/arch/arm/mach-s3c24xx/Kconfig
+> >> b/arch/arm/mach-s3c24xx/Kconfig
+> >> index 80373da..5cf82a1 100644
+> >> --- a/arch/arm/mach-s3c24xx/Kconfig
+> >> +++ b/arch/arm/mach-s3c24xx/Kconfig
+> >> @@ -40,6 +40,7 @@ config CPU_S3C2410
+> >> 
+> >>   config CPU_S3C2412
+> >>   
+> >>          bool "SAMSUNG S3C2412"
+> >>          select COMMON_CLK
+> >> 
+> >> +       select COMMON_CLK_SAMSUNG
 > > 
-> > Update the formula, as there will be no hot point calibration
-> > data in fuse map from now on.
+> > I guess this depends on Heiko's "[PATCH 00/12] ARM: S3C24XX: convert
+> > s3c2410, s3c2440 s3c2442 to common clock framework" series?
 > > 
-> > Signed-off-by: Anson Huang <b20788@freescale.com>
+> > Regards,
+> > Mike
 > 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-applied.
+> Yes, this series is based on latest kgene/for-next branch where Heiko's
+> series is merged.
 
-thanks,
-rui
+Just to clarify, converted are the s3c2416/s3c2443 (first series) and s3c2412 
+(second series), because the clockout for s3c2410 etc seems to need a bit more 
+work. I've just moved two comon patches (shared plls and a platform change) 
+from the s3c2410,et-all series into the s3c2412 one.
 
-> > ---
-> >  drivers/thermal/imx_thermal.c |   39 ++++++++++++++++++++++++++-------------
-> >  1 file changed, 26 insertions(+), 13 deletions(-)
-> > 
-> > diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
-> > index 45af765..a99c631 100644
-> > --- a/drivers/thermal/imx_thermal.c
-> > +++ b/drivers/thermal/imx_thermal.c
-> > @@ -62,12 +62,16 @@ enum imx_thermal_trip {
-> >  #define IMX_POLLING_DELAY		2000 /* millisecond */
-> >  #define IMX_PASSIVE_DELAY		1000
-> >  
-> > +#define FACTOR0				10000000
-> > +#define FACTOR1				15976
-> > +#define FACTOR2				4297157
-> > +
-> >  struct imx_thermal_data {
-> >  	struct thermal_zone_device *tz;
-> >  	struct thermal_cooling_device *cdev;
-> >  	enum thermal_device_mode mode;
-> >  	struct regmap *tempmon;
-> > -	int c1, c2; /* See formula in imx_get_sensor_data() */
-> > +	u32 c1, c2; /* See formula in imx_get_sensor_data() */
-> >  	unsigned long temp_passive;
-> >  	unsigned long temp_critical;
-> >  	unsigned long alarm_temp;
-> > @@ -84,7 +88,7 @@ static void imx_set_alarm_temp(struct imx_thermal_data *data,
-> >  	int alarm_value;
-> >  
-> >  	data->alarm_temp = alarm_temp;
-> > -	alarm_value = (alarm_temp - data->c2) / data->c1;
-> > +	alarm_value = (data->c2 - alarm_temp) / data->c1;
-> >  	regmap_write(map, TEMPSENSE0 + REG_CLR, TEMPSENSE0_ALARM_VALUE_MASK);
-> >  	regmap_write(map, TEMPSENSE0 + REG_SET, alarm_value <<
-> >  			TEMPSENSE0_ALARM_VALUE_SHIFT);
-> > @@ -136,7 +140,7 @@ static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
-> >  	n_meas = (val & TEMPSENSE0_TEMP_CNT_MASK) >> TEMPSENSE0_TEMP_CNT_SHIFT;
-> >  
-> >  	/* See imx_get_sensor_data() for formula derivation */
-> > -	*temp = data->c2 + data->c1 * n_meas;
-> > +	*temp = data->c2 - n_meas * data->c1;
-> >  
-> >  	/* Update alarm value to next higher trip point */
-> >  	if (data->alarm_temp == data->temp_passive && *temp >= data->temp_passive)
-> > @@ -305,6 +309,7 @@ static int imx_get_sensor_data(struct platform_device *pdev)
-> >  	int t1, t2, n1, n2;
-> >  	int ret;
-> >  	u32 val;
-> > +	u64 temp64;
-> >  
-> >  	map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-> >  					      "fsl,tempmon-data");
-> > @@ -330,6 +335,8 @@ static int imx_get_sensor_data(struct platform_device *pdev)
-> >  	 *   [31:20] - sensor value @ 25C
-> >  	 *    [19:8] - sensor value of hot
-> >  	 *     [7:0] - hot temperature value
-> > +	 * Use universal formula now and only need sensor value @ 25C
-> > +	 * slope = 0.4297157 - (0.0015976 * 25C fuse)
-> >  	 */
-> >  	n1 = val >> 20;
-> >  	n2 = (val & 0xfff00) >> 8;
-> > @@ -337,20 +344,26 @@ static int imx_get_sensor_data(struct platform_device *pdev)
-> >  	t1 = 25; /* t1 always 25C */
-> >  
-> >  	/*
-> > -	 * Derived from linear interpolation,
-> > -	 * Tmeas = T2 + (Nmeas - N2) * (T1 - T2) / (N1 - N2)
-> > +	 * Derived from linear interpolation:
-> > +	 * slope = 0.4297157 - (0.0015976 * 25C fuse)
-> > +	 * slope = (FACTOR2 - FACTOR1 * n1) / FACTOR0
-> > +	 * (Nmeas - n1) / (Tmeas - t1) = slope
-> >  	 * We want to reduce this down to the minimum computation necessary
-> >  	 * for each temperature read.  Also, we want Tmeas in millicelsius
-> >  	 * and we don't want to lose precision from integer division. So...
-> > -	 * milli_Tmeas = 1000 * T2 + 1000 * (Nmeas - N2) * (T1 - T2) / (N1 - N2)
-> > -	 * Let constant c1 = 1000 * (T1 - T2) / (N1 - N2)
-> > -	 * milli_Tmeas = (1000 * T2) + c1 * (Nmeas - N2)
-> > -	 * milli_Tmeas = (1000 * T2) + (c1 * Nmeas) - (c1 * N2)
-> > -	 * Let constant c2 = (1000 * T2) - (c1 * N2)
-> > -	 * milli_Tmeas = c2 + (c1 * Nmeas)
-> > +	 * Tmeas = (Nmeas - n1) / slope + t1
-> > +	 * milli_Tmeas = 1000 * (Nmeas - n1) / slope + 1000 * t1
-> > +	 * milli_Tmeas = -1000 * (n1 - Nmeas) / slope + 1000 * t1
-> > +	 * Let constant c1 = (-1000 / slope)
-> > +	 * milli_Tmeas = (n1 - Nmeas) * c1 + 1000 * t1
-> > +	 * Let constant c2 = n1 *c1 + 1000 * t1
-> > +	 * milli_Tmeas = c2 - Nmeas * c1
-> >  	 */
-> > -	data->c1 = 1000 * (t1 - t2) / (n1 - n2);
-> > -	data->c2 = 1000 * t2 - data->c1 * n2;
-> > +	temp64 = FACTOR0;
-> > +	temp64 *= 1000;
-> > +	do_div(temp64, FACTOR1 * n1 - FACTOR2);
-> > +	data->c1 = temp64;
-> > +	data->c2 = n1 * data->c1 + 1000 * t1;
-> >  
-> >  	/*
-> >  	 * Set the default passive cooling trip point to 20 ?C below the
-> > -- 
-> > 1.7.9.5
-> > 
-> > 
+Both of these series are merged in kgenes tree as mentioned. And at this point 
+I'm not sure if I will have the time to respin the s3c2410 series for 3.15.
+Which might also be good to let all the other series touching samsung clock 
+code settle.
+
+
+Heiko
+
 > 
+> >>          select CPU_ARM926T
+> >>          select CPU_LLSERIAL_S3C2440
+> >>          select S3C2412_COMMON_CLK
+> >> 
+> >> @@ -51,6 +52,7 @@ config CPU_S3C2412
+> >> 
+> >>   config CPU_S3C2416
+> >>   
+> >>          bool "SAMSUNG S3C2416/S3C2450"
+> >>          select COMMON_CLK
+> >> 
+> >> +       select COMMON_CLK_SAMSUNG
+> >> 
+> >>          select CPU_ARM926T
+> >>          select CPU_LLSERIAL_S3C2440
+> >>          select S3C2416_PM if PM
+> >> 
+> >> @@ -89,6 +91,7 @@ config CPU_S3C244X
+> >> 
+> >>   config CPU_S3C2443
+> >>   
+> >>          bool "SAMSUNG S3C2443"
+> >>          select COMMON_CLK
+> >> 
+> >> +       select COMMON_CLK_SAMSUNG
+> >> 
+> >>          select CPU_ARM920T
+> >>          select CPU_LLSERIAL_S3C2440
+> >>          select S3C2443_COMMON_CLK
+> >> 
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
