@@ -1,43 +1,98 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 27 Feb 2014 08:12:47 -0600
-Subject: [PATCH] ARM: qcom: Enable basic support for Qualcomm platforms in
- multi_v7_defconfig
-In-Reply-To: <7hy50xv3rw.fsf@paris.lan>
-References: <1393360445-16923-1-git-send-email-galak@codeaurora.org>
- <7hy50xv3rw.fsf@paris.lan>
-Message-ID: <0C19AFF2-3CC6-476A-AE82-DBF161971AE2@codeaurora.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 27 Feb 2014 16:18:22 +0200
+Subject: [PATCH v9 0/9] USB Host support for OMAP5 uEVM
+Message-ID: <1393510711-4697-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On Feb 26, 2014, at 5:43 PM, Kevin Hilman <khilman@linaro.org> wrote:
+This patchset brings up USB Host ports and Ethernet port on
+the OMAP5 uEVM board.
 
-> Kumar Gala <galak@codeaurora.org> writes:
-> 
->> Enable support for the MSM8x60, MSM8960, and MSM8974 SoCs, clocks and
->> serial console as part of the standard multi_v7_defconfig.
->> 
->> Signed-off-by: Kumar Gala <galak@codeaurora.org>
->> ---
->> 
->> I leave this to the arm-soc guys to apply because of possible conflicts
->> with other updates to multi_v7_defconfig.
-> 
-> Seem to be a handful of !qcom changes here, probably resulting from a
-> run of 'make savedefconfig' without all the new changes in.
-> 
-> I've thinned this out to only the qcom changes and applied the following
-> to next/boards.  I think it's better to do any 'make savedefconfig'
-> cleanups as a separate, cleanup-only patch as needed.
-> 
-> Kevin
+It also does some cleanup with respect to DT clock binding
+for the mfd/omap-usb-host driver.
 
-I had it as two separate patches in my tree, but merged before sending, wasn?t sure how defconfig updates where desired.  Will do so in the future.
+Please queue these for -next.
 
-Now if you guys can just merge the 'qcom-dt-for-3.15? pull request ;)
+Lee,
 
-- k
+I've folded some platform data dependent patches with mfd patches
+so that they don't break functionality when applied individually.
+You can safely pull in all MFD patches (1 to 6).
+
+Tony & Benoit,
+
+Can you please accept patches 7, 8 and 9?
+
+Thanks.
+
+Tested on:
+ - OMAP5 uEVM
+ - Pandaboard ES Rev. B1
+ - Beagleboard-XM Rev C2 (DT + Legacy)
+ - Beagleboard Rev C4 (DT + Legacy)
+
+Changelog:
+
+v9:
+- Folded dependent platform data patches into MFD patches.
+
+v8:
+- Addressed review comments and split patch
+  "mfd: omap-usb-host: Get clocks based on hardware revision"
+- Removed unnecessary usb host dummy clocks on OMAP3
+- Removed unnecessary clock alias "ehci_logic_fck" for OMAP3
+- Rebased on 3.14-rc3
+
+v7:
+- Rebased on 3.14-rc2
+- Removed incompatible ids from DT files and examples
+
+v6:
+- Initialized clocks to -ENODEV and split patch 3.
+
+v5:
+- Expose all clocks in the DT binding document for mfd:omap-usb-host
+and mfd:omap-usb-tll
+
+v4:
+- Updated DT binding document for clock binding
+
+v3:
+- Rebased on top of 3.13-rc7
+
+cheers,
+-roger
+
+---
+Roger Quadros (9):
+  mfd: omap-usb-host: Get clocks based on hardware revision
+  mfd: omap-usb-host: Always fail on clk_get() error
+  mfd: omap-usb-host: Use proper clock name instead of alias
+  mfd: omap-usb-host: Use clock names as per function for reference
+    clocks
+  mfd: omap-usb-host: Update DT clock binding information
+  mfd: omap-usb-tll: Update DT clock binding information
+  ARM: OMAP2+: Remove legacy_init_ehci_clk()
+  ARM: dts: OMAP2+: Get rid of incompatible ids for USB host nodes
+  usb: omap: dts: Update DT binding example usage
+
+ .../devicetree/bindings/mfd/omap-usb-host.txt      |  23 ++++
+ .../devicetree/bindings/mfd/omap-usb-tll.txt       |  10 ++
+ .../devicetree/bindings/usb/ehci-omap.txt          |   2 +-
+ .../devicetree/bindings/usb/ohci-omap3.txt         |   2 +-
+ arch/arm/boot/dts/omap3.dtsi                       |   4 +-
+ arch/arm/boot/dts/omap4-panda-common.dtsi          |   8 +-
+ arch/arm/boot/dts/omap4.dtsi                       |  10 +-
+ arch/arm/boot/dts/omap5-uevm.dts                   |   8 +-
+ arch/arm/boot/dts/omap5.dtsi                       |  10 +-
+ arch/arm/mach-omap2/cclock3xxx_data.c              |   4 -
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   6 --
+ arch/arm/mach-omap2/pdata-quirks.c                 |  16 ---
+ drivers/clk/ti/clk-3xxx.c                          |   4 -
+ drivers/mfd/omap-usb-host.c                        | 116 ++++++++++++++-------
+ 14 files changed, 135 insertions(+), 88 deletions(-)
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+1.8.3.2
