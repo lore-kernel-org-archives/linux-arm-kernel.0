@@ -1,73 +1,49 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Thu, 27 Feb 2014 13:27:17 +0100
-Subject: [PATCH 1/4] ARM: STi: add stid127 soc support
-In-Reply-To: <530F2E26.1040304@st.com>
-References: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
- <1391093744-19905-2-git-send-email-patrice.chotard@st.com>
- <530F2E26.1040304@st.com>
-Message-ID: <530F2F25.7000801@st.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 27 Feb 2014 12:27:58 +0000
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <CACxGe6tjuytsYAn6Hadf0AK+REzHgRydgbHPafL8+Sdtd_tMUA@mail.gmail.com>
+References: <20140226183454.GA14639@cbox>
+ <CACxGe6tjuytsYAn6Hadf0AK+REzHgRydgbHPafL8+Sdtd_tMUA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1402271216040.31489@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime
+On Wed, 26 Feb 2014, Grant Likely wrote:
+> > VM Platform
+> > -----------
+> > The specification does not mandate any specific memory map. ?The guest
+> > OS must be able to enumerate all processing elements, devices, and
+> > memory through HW description data (FDT, ACPI) or a bus-specific
+> > mechanism such as PCI.
+> >
+> > The virtual platform must support at least one of the following ARM
+> > execution states:
+> > ? (1) aarch32 virtual CPUs on aarch32 physical CPUs
+> > ? (2) aarch32 virtual CPUs on aarch64 physical CPUs
+> > ? (3) aarch64 virtual CPUs on aarch64 physical CPUs
+> >
+> > It is recommended to support both (2) and (3) on aarch64 capable
+> > physical systems.
+> >
+> > The virtual hardware platform must provide a number of mandatory
+> > peripherals:
+> >
+> > ? Serial console: ?The platform should provide a console,
+> > ? based on an emulated pl011, a virtio-console, or a Xen PV console.
+> 
+> For portable disk image, can Xen PV be dropped from the list? pl011 is part of SBSA, and virtio is getting standardised, but Xen PV is
+> implementation specific.
 
-Thanks for reviewing.
-Yes for sure, i will add additional board informations.
+Does an interface need OASIS' rubber stamp to be "standard"?  If so, we
+should also drop FDT from this document. The SBSA has not been published
+by any OASIS-like standardization body either, so maybe we should drop
+the SBSA too.
 
-Patrice
+If it doesn't need OASIS nice logo on the side to be a standard, then
+the Xen PV interfaces are a standard too. Give a look at
+xen/include/public/io, they go as back as 2004, and they have multiple
+different implementations of the frontends and backends in multiple
+operating systems today.
 
-On 02/27/2014 01:23 PM, Maxime Coquelin wrote:
-> Hi Patrice,
->
-> Could you add an overview documentation as it has been done for other 
-> STi platforms?
->
-> See Documentation/arm/sti/stih416-overview.txt
->
-> Thanks,
-> Maxime
->
-> On 01/30/2014 03:55 PM, Patrice CHOTARD wrote:
->> From: Alexandre TORGUE <alexandre.torgue@st.com>
->>
->> This patch adds support to STiD127 SoC.
->> The main adaptation is the L2 cache way size compare to STiH41x SoCs.
->>
->> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
->> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
->> ---
->>   arch/arm/mach-sti/board-dt.c |    6 ++++++
->>   1 file changed, 6 insertions(+)
->>
->> diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
->> index 1217fb5..be018a9 100644
->> --- a/arch/arm/mach-sti/board-dt.c
->> +++ b/arch/arm/mach-sti/board-dt.c
->> @@ -9,6 +9,7 @@
->>
->>   #include <linux/irq.h>
->>   #include <linux/of_platform.h>
->> +#include <linux/of.h>
->>   #include <asm/hardware/cache-l2x0.h>
->>   #include <asm/mach/arch.h>
->>
->> @@ -18,6 +19,10 @@ void __init stih41x_l2x0_init(void)
->>   {
->>       u32 way_size = 0x4;
->>       u32 aux_ctrl;
->> +
->> +    if (of_machine_is_compatible("st,stid127"))
->> +        way_size = 0x3;
->> +
->>       /* may be this can be encoded in macros like BIT*() */
->>       aux_ctrl = (0x1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
->>           (0x1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
->> @@ -36,6 +41,7 @@ static void __init stih41x_machine_init(void)
->>   static const char *stih41x_dt_match[] __initdata = {
->>       "st,stih415",
->>       "st,stih416",
->> +    "st,stid127",
->>       NULL
->>   };
->>
->>
+There is no reason why another hypervisor couldn't implement the same
+interface and in fact I know for a fact that it was considered for KVM.
