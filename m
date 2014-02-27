@@ -1,47 +1,68 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 27 Feb 2014 14:50:39 -0600
-Subject: [PATCH v12 1/4] PHY: Add function set_speed to generic PHY
- framework
-In-Reply-To: <CAPw-ZT=F07=T0=z=iT=hxJ0+609RBDYRL=MXF5dQoEowLjsRjQ@mail.gmail.com>
-References: <1393524848-8207-1-git-send-email-lho@apm.com>
- <1393524848-8207-2-git-send-email-lho@apm.com>
- <20140227190102.GB4862@saruman.home>
- <CAPw-ZT=F07=T0=z=iT=hxJ0+609RBDYRL=MXF5dQoEowLjsRjQ@mail.gmail.com>
-Message-ID: <20140227205039.GE5375@saruman.home>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 27 Feb 2014 12:54:24 -0800
+Subject: [PATCH v1.1/3] ARM: config: Add qcom_defconfig
+In-Reply-To: <530F985E.5030503@codeaurora.org>
+References: <530F985E.5030503@codeaurora.org>
+Message-ID: <1393534464-14620-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add a defconfig for mach-qcom platforms (copied from msm_defconfig).
+Although these platforms are part of the multi-platform kernel, it's
+useful to have a stripped down version of the defconfig that just
+selects the DT based Qualcomm platforms and drivers.
 
-On Thu, Feb 27, 2014 at 11:57:44AM -0800, Loc Ho wrote:
-> > On Thu, Feb 27, 2014 at 11:14:05AM -0700, Loc Ho wrote:
-> >> This patch adds function set_speed to the generic PHY framework operation
-> >> structure. This function can be called to instruct the PHY underlying layer
-> >> at specified lane to configure for specified speed in hertz.
-> >
-> > why ? looks like clk_set_rate() is your friend here. Can you be more
-> > descriptive of the use case ? When will this be used ?
-> >
-> 
-> The phy_set_speed is used to configure the operation speed of the PHY
-> at run-time. The clock interface in general is used to configure the
-> clock input to the IP. I don't believe they are the same thing. Maybe
-> it will be clear in my response to your second email
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-The problem with this is that you end up adding SATA-specific details to
-something which is supposed to be generic. After negoatiation, don't you
-get any interrupt from your PHY indicating that link speed negotiation
-is done ? Or is that IRQ only on AHCI IP ?
+Changes since v1:
+ * Added CONFIG_DEVTMPFS/DEVTMPFS_MOUNT per Josh
 
+ arch/arm/configs/{msm_defconfig => qcom_defconfig} | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+ copy arch/arm/configs/{msm_defconfig => qcom_defconfig} (97%)
 
-cheers
-
+diff --git a/arch/arm/configs/msm_defconfig b/arch/arm/configs/qcom_defconfig
+similarity index 97%
+copy from arch/arm/configs/msm_defconfig
+copy to arch/arm/configs/qcom_defconfig
+index c5858b9eb516..5f11d6de9084 100644
+--- a/arch/arm/configs/msm_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -17,7 +17,7 @@ CONFIG_MODULE_UNLOAD=y
+ CONFIG_MODULE_FORCE_UNLOAD=y
+ CONFIG_MODVERSIONS=y
+ CONFIG_PARTITION_ADVANCED=y
+-CONFIG_ARCH_MSM_DT=y
++CONFIG_ARCH_QCOM=y
+ CONFIG_ARCH_MSM8X60=y
+ CONFIG_ARCH_MSM8960=y
+ CONFIG_ARCH_MSM8974=y
+@@ -27,7 +27,6 @@ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_HIGHPTE=y
+ CONFIG_CLEANCACHE=y
+-CONFIG_CC_STACKPROTECTOR=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_VFP=y
+@@ -49,6 +48,8 @@ CONFIG_IP_PNP_DHCP=y
+ # CONFIG_IPV6 is not set
+ CONFIG_CFG80211=y
+ CONFIG_RFKILL=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_SCSI=y
+@@ -111,7 +112,6 @@ CONFIG_USB_SERIAL=y
+ CONFIG_USB_GADGET=y
+ CONFIG_USB_GADGET_DEBUG_FILES=y
+ CONFIG_USB_GADGET_VBUS_DRAW=500
+-CONFIG_NEW_LEDS=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_STAGING=y
+ CONFIG_COMMON_CLK_QCOM=y
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140227/ce88d27e/attachment.sig>
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
