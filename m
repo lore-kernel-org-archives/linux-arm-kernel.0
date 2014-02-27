@@ -1,50 +1,60 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Wed, 26 Feb 2014 16:18:36 -0800
-Subject: [PATCH v4 1/2] ARM: avoid tracers in soft_restart
-In-Reply-To: <20140226233744.GG21483@n2100.arm.linux.org.uk>
-References: <1393441857-15472-1-git-send-email-sebastian.capella@linaro.org>
- <1393441857-15472-2-git-send-email-sebastian.capella@linaro.org>
- <20140226233744.GG21483@n2100.arm.linux.org.uk>
-Message-ID: <20140227001836.28695.76893@capellas-linux>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 26 Feb 2014 16:20:03 -0800
+Subject: [PATCH v3 1/9] Input: pmic8xxx-pwrkey - Migrate to regmap APIs
+In-Reply-To: <20140227001358.GF18563@joshc.qualcomm.com>
+References: <1393441562-685-1-git-send-email-sboyd@codeaurora.org>
+ <1393441562-685-2-git-send-email-sboyd@codeaurora.org>
+ <20140226235959.GD18563@joshc.qualcomm.com> <530E8154.9060403@codeaurora.org>
+ <20140227001358.GF18563@joshc.qualcomm.com>
+Message-ID: <530E84B3.8020608@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Russell King - ARM Linux (2014-02-26 15:37:44)
-> On Wed, Feb 26, 2014 at 11:10:56AM -0800, Sebastian Capella wrote:
-> > Use of tracers in local_irq_disable is causes recursive aborts when
-> > called with irqs disabled and using a temporary stack (hibernation).
-> > Replace local_irq_disable with raw_local_irq_disable instead to
-> > avoid tracers.
-> > 
-> > Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Andrew Morton <akpm@linux-foundation.org>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Robin Holt <robin.m.holt@gmail.com>
-> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  arch/arm/kernel/process.c |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> > index 92f7b15..f58b723 100644
-> > --- a/arch/arm/kernel/process.c
-> > +++ b/arch/arm/kernel/process.c
-> > @@ -100,7 +100,7 @@ void soft_restart(unsigned long addr)
-> >       u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
-> >  
-> >       /* Disable interrupts first */
-> > -     local_irq_disable();
-> > +     raw_local_irq_disable();
-> >       local_fiq_disable();
-> 
-> Great, I'm happy with this now.  I assume that the plan is to submit this
-> to my patch system when everyone's given their fill of acks?
+On 02/26/14 16:13, Josh Cartwright wrote:
+> On Wed, Feb 26, 2014 at 04:05:40PM -0800, Stephen Boyd wrote:
+>> On 02/26/14 15:59, Josh Cartwright wrote:
+>>> On Wed, Feb 26, 2014 at 11:05:54AM -0800, Stephen Boyd wrote:
+>>>> Use the regmap APIs for this driver instead of custom pm8xxx
+>>>> APIs. This breaks this driver's dependency on the pm8xxx APIs and
+>>>> allows us to easily port it to other bus protocols in the future.
+>>>>
+>>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>>>> ---
+>>>>  drivers/input/misc/pmic8xxx-pwrkey.c | 4 ++++
+>>>>  1 file changed, 4 insertions(+)
+>>>>
+>>>> diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
+>>>> index 0e1a05f95858..cf6125dc3b51 100644
+>>>> --- a/drivers/input/misc/pmic8xxx-pwrkey.c
+>>>> +++ b/drivers/input/misc/pmic8xxx-pwrkey.c
+>>>> @@ -120,6 +120,10 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+>>>>  		return -ENOMEM;
+>>>>  	}
+>>>>  
+>>>> +	regmap = dev_get_regmap(pdev->dev.parent, NULL);
+>>>> +	if (!regmap)
+>>>> +		return -ENODEV;
+>>>> +
+>>> This looks really weird.  A previous version of patch was included in
+>>> v3.14-rc1 (1e63bd9cc4), which already included a very similar hunk...
+>>>
+>>> Maybe the fact that the hunk isn't identical is why a rebase didn't drop
+>>> it (and instead, now if this gets merged, we'll have unnecessary
+>>> duplication).
+>>>
+>> Ah yeah, sorry about that. This patch should just be ignored. I don't
+>> think it affects anything else in the series?
+> Yep, I think this can be safely ignored.
+>
+> However, I think it needs to be made clear that your if "Modernize pm8921
+> with irqdomains, regmap, DT" lands before this patchset, this will start
+> breaking randconfig builds.  It isn't clear to me how this dependency
+> should be handled.
+>
 
-Thanks Russell!
+Hmm? If pm8921 lands before this what build breakage is there? The
+pm8xxx_read/write APIs are still exposed.
 
-I'll look into how to send it to your patch system and wait for people
-to respond.
-
-Sebastian Capella
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
