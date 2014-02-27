@@ -1,63 +1,75 @@
-From: fkan@apm.com (Feng Kan)
-Date: Thu, 27 Feb 2014 13:00:07 -0800
-Subject: [PATCH V2] irqchip:gic: change access of gicc_ctrl register to
- read modify write.
-In-Reply-To: <87zjlc2xpb.fsf@sofa.wild-wind.fr.eu.org>
-References: <1393526095-31479-1-git-send-email-fkan@apm.com>
- <87zjlc2xpb.fsf@sofa.wild-wind.fr.eu.org>
-Message-ID: <CAL85gmDk0hxaVbSbqTaVeVFsY4Xt1aKrBx=Pm57g0m0d_Qw-KQ@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 27 Feb 2014 15:07:34 -0600
+Subject: [PATCH v2 3/8] ARM: dts: omap3-overo: Use complete poweroff
+In-Reply-To: <530FA497.7000407@epfl.ch>
+References: <1393533032-1619-1-git-send-email-florian.vaussard@epfl.ch>
+ <1393533032-1619-4-git-send-email-florian.vaussard@epfl.ch>
+ <530FA23E.1040909@ti.com> <530FA497.7000407@epfl.ch>
+Message-ID: <530FA916.8030001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 10:54 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Thu, Feb 27 2014 at  6:34:55 pm GMT, Feng Kan <fkan@apm.com> wrote:
->> This change is made to preserve the GIC v2 releated bits in the
->> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
->> The original code only set the enable/disable group bit in this register.
->> This code will preserve the bypass bits configured by the bootload except
->> the enable/disable bit. The main reason for this change is to allow the
->> bypass bits specified in the v2 spec to remain untouched by the current
->> GIC code. In the X-Gene platform, the bypass functionality is not used
->> and bypass must be disabled at all time.
->>
->> Signed-off-by: Vinayak Kale <vkale@apm.com>
->> Acked-by: Anup Patel <apatel@apm.com>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> ---
->> V2 Changes:
->>       - only mask off v2 bypass bits
->>
->>  drivers/irqchip/irq-gic.c |   22 +++++++++++++++++++---
->>  1 files changed, 19 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> index 341c601..757581b 100644
->> --- a/drivers/irqchip/irq-gic.c
->> +++ b/drivers/irqchip/irq-gic.c
->> @@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>       void __iomem *dist_base = gic_data_dist_base(gic);
->>       void __iomem *base = gic_data_cpu_base(gic);
->>       unsigned int cpu_mask, cpu = smp_processor_id();
->> +     unsigned int ctrl_mask;
->>       int i;
->>
->>       /*
->> @@ -449,13 +450,24 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>               writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
->>
->>       writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
->> -     writel_relaxed(1, base + GIC_CPU_CTRL);
->> +
->> +     ctrl_mask = readl(base + GIC_CPU_CTRL);
->> +     ctrl_mask |= 0x1;
->> +     writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
->
-> I think I'm quickly loosing the will to live, or at least to review this
-> patch any further.
-Hang in there Marc, though I had nothing to do with the flood in England. Maybe
-I can instill a bit more will for you to live.
++devicetree list.
 
->
->         M.
-> --
-> AAAFNRAA
+On 02/27/2014 02:48 PM, Florian Vaussard wrote:
+> On 02/27/2014 09:38 PM, Nishanth Menon wrote:
+>> On 02/27/2014 02:30 PM, Florian Vaussard wrote:
+>>> Currently, the TWL4030 PMIC does not completely poweroff the processor.
+>>> Commit b0fc1da4d0359d3cce8f12e0f014aed0704ae202 introduced the necessary
+>>> binding to do this, so use it.
+>>>
+>>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+>>> ---
+>>>  arch/arm/boot/dts/omap3-overo.dtsi | 5 +++++
+>>>  1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+>>> index aea64c0..018e1e0 100644
+>>> --- a/arch/arm/boot/dts/omap3-overo.dtsi
+>>> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
+>>> @@ -73,6 +73,11 @@
+>>>  			codec {
+>>>  			};
+>>>  		};
+>>> +
+>>> +		twl_power: power {
+>>> +			compatible = "ti,twl4030-power";
+>>> +			ti,use_poweroff;
+>>> +		};
+>>>  	};
+>>>  };
+>>>  
+>>>
+>> Urrgh.. this slipped past.. :(
+>>
+>> ti,system-power-controller is traditionally used for other PMICs from
+>> TI to indicate that poweroff functionality will be provided by the
+>> PMIC driver. similar approach is taken by Maxim as well.. I know the
+>> commit introducing the binding has been around for long, but
+>> considering that we do not have a single dts using this yet, should we
+>> consider adding "ti,system-power-controller"(as against removing
+>> ti,use_poweroff - so that older down stream dtbs still work) and using
+>> it in the new code?
+>>
+> 
+> It does make sense, so I am not against it. My only concern is that I
+> find the name to be slightly less easy to understand, but I can live
+> with it :-)
+:)
+
+> 
+> I do not remember if DT maintainers came up with a clear policy to
+> deprecate a binding.
+I dont think we can depreciate a binding [1] - as you mentioned -
+renaming the property is probably what is appropriate, but introducing
+a new one which has the same behavior as the old one does'nt seem
+covered either.. considering potential downstream kernel usage, I'd
+suggest additional property inline with today's convention.
+
+
+[1]
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=2a9330010bea5982a5c6593824bc036bf62d67b7
+
+-- 
+Regards,
+Nishanth Menon
