@@ -1,40 +1,62 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Thu, 27 Feb 2014 03:15:27 -0800
-Subject: Tegra baseline test results for v3.14-rc4
-Message-ID: <530F1E4F.8040800@nvidia.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 27 Feb 2014 12:22:06 +0100
+Subject: [PATCHv4 0/9] Device tree support for the at91sam9rlek
+Message-ID: <1393500135-29636-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v3.14-rc4.
-Logs and other details at:
+This series adds DT support for the at91sam9rl SoC, then the at91sam9rl-ek
+evaluation board.
 
-     http://nvt.pwsan.com/pub/linux/testlogs/test_v3.14-rc4/20140227030347/
+While the at91sam9rl dtsi should be almost complete (still missing LCD and
+touchscreen bits). The at91sam9rlek DT now support the following tested
+features:
+ - MMC
+ - dbgu
+ - usart1
+ - watchdog
+ - nand
+ - leds
+ - buttons
+ - common clock framework
 
+Next:
+ - spi
+ - dataflash
+ - i2c
+ - lcd
+ - touchscreen
+ - usb gadget
+ - audio
 
-Test summary
-------------
+Changes since v3:
+ - reordered nand
+ - removed ADC and USB gadget definition as they were not working. They will
+   come with another set of patches adding proper support.
 
-Build: zImage:
-     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+Alexandre Belloni (8):
+  ARM: at91: prepare at91sam9rl DT transition
+  ARM: at91: Add at91sam9rl DT SoC support
+  ARM: at91/defconfig: Add the sam9rl to the list of DT-enabled SOCs
+  ARM: at91: dt: sam9rl: Device Tree for the at91sam9rlek
+  ARM: at91: prepare common clk transition for sam9rl SoCs
+  ARM: at91/dt: define at91sam9rl clocks
+  ARM: at91/dt: define main clk frequency of at91sam9rlek
+  ARM: at91: switch sam9rl to common clock framework
 
-Boot to userspace: multi_v7_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+Boris BREZILLON (1):
+  ARM: at91: prepare sam9 dt boards transition to common clk
 
-Boot to userspace: tegra_defconfig:
-     Pass: ( 2/ 2): tegra114-dalmore-a04, tegra30-beaver
+ arch/arm/boot/dts/Makefile         |   2 +
+ arch/arm/boot/dts/at91sam9rl.dtsi  | 802 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9rlek.dts | 157 ++++++++
+ arch/arm/configs/at91_dt_defconfig |   1 +
+ arch/arm/mach-at91/Kconfig         |   1 -
+ arch/arm/mach-at91/at91sam9rl.c    |  22 +-
+ arch/arm/mach-at91/board-dt-sam9.c |  11 +-
+ 7 files changed, 993 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91sam9rl.dtsi
+ create mode 100644 arch/arm/boot/dts/at91sam9rlek.dts
 
-
-vmlinux object size
-(delta in bytes from test_v3.14-rc3 (6d0abeca3242a88cab8232e4acd7e2bf088f3bc2)):
-    text     data      bss    total  kernel
-   -2489     +280        0    -2209  multi_v7_defconfig
-   -7385     +320        0    -7065  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.14-rc3 (6d0abeca3242a88cab8232e4acd7e2bf088f3bc2))
-     avail    rsrvd     high    freed                board              kconfig                  dtb
-         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        8k      -8k        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        8k      -8k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+-- 
+1.8.3.2
