@@ -1,315 +1,568 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Thu, 27 Feb 2014 16:24:16 +0100
-Subject: [PATCH v0 03/15] drivers: clk: st: Support for VCC-mux and MUX clocks
+Date: Thu, 27 Feb 2014 16:24:27 +0100
+Subject: [PATCH v0 14/15] ARM: STi: DT: STiH415: 415 DT Entry for clockgen
+ A0/1/10/11/12
 In-Reply-To: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
 References: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1393514668-17440-4-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1393514668-17440-15-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch supports the VCC-mux and MUX clocks used by ClockGenC/F
-
-VCC-mux clock : Divider-Multiplexer-Gate inside ClockGenC/F
-It includes support for each channel : 4-parent Multiplexer, Post Divide
-by 1, 2, 4 or 8, Gate to switch OFF the output channel. The clock is
-implemented using generic clocks implemented in the kernel clk_divider, clk_mux,
-clk_gate and clk_composite (to combine all)
-
-MUX clock : 2-parent clock used inside ClockGenC/F. The clock is implemented
-using generic clocks implemented in the kernel clk_mux.
+Patch adds DT entries for clockgen A0/1/10/11/12
 
 Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/clk/st/clkgen-mux.c | 272 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 272 insertions(+)
+ arch/arm/boot/dts/stih415-clks.h     |  11 +
+ arch/arm/boot/dts/stih415-clock.dtsi | 475 ++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/stih415.dtsi       |   6 +-
+ 3 files changed, 484 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/boot/dts/stih415-clks.h
 
-diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
-index 65d702c..7ccff62 100644
---- a/drivers/clk/st/clkgen-mux.c
-+++ b/drivers/clk/st/clkgen-mux.c
-@@ -18,6 +18,7 @@
- #include <linux/clk-provider.h>
+diff --git a/arch/arm/boot/dts/stih415-clks.h b/arch/arm/boot/dts/stih415-clks.h
+new file mode 100644
+index 0000000..341c05b
+--- /dev/null
++++ b/arch/arm/boot/dts/stih415-clks.h
+@@ -0,0 +1,11 @@
++/*
++ * This header provides constants clk index STMicroelectronics
++ * STiH415 SoC.
++ */
++#ifndef _CLK_STIH415
++#define _CLK_STIH415
++
++/* CLOCKGEN A0 */
++#define CLK_S_ICN_REG_0		0
++
++#endif
+diff --git a/arch/arm/boot/dts/stih415-clock.dtsi b/arch/arm/boot/dts/stih415-clock.dtsi
+index 174c799..24a7508 100644
+--- a/arch/arm/boot/dts/stih415-clock.dtsi
++++ b/arch/arm/boot/dts/stih415-clock.dtsi
+@@ -5,8 +5,15 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
++
++#include "stih415-clks.h"
++
+ / {
+ 	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
+ 		/*
+ 		 * Fixed 30MHz oscillator input to SoC
+ 		 */
+@@ -26,13 +33,471 @@
+ 		};
  
- static DEFINE_SPINLOCK(clkgena_divmux_lock);
-+static DEFINE_SPINLOCK(clkgenf_lock);
- 
- static const char ** __init clkgen_mux_get_parents(struct device_node *np,
- 						       int *num_parents)
-@@ -527,3 +528,274 @@ void __init st_of_clkgena_prediv_setup(struct device_node *np)
- 	return;
- }
- CLK_OF_DECLARE(clkgenaprediv, "st,clkgena-prediv", st_of_clkgena_prediv_setup);
+ 		/*
+-		 * Bootloader initialized system infrastructure clock for
+-		 * serial devices.
++		 * ClockGenAs on SASG1
++		 */
++		clockgenA at fee62000 {
++			reg = <0xfee62000 0xb48>;
 +
-+struct clkgen_mux_data {
-+	u32 offset;
-+	u8 shift;
-+	u8 width;
-+	spinlock_t *lock;
-+	unsigned long clk_flags;
-+	u8 mux_flags;
-+};
++			CLK_S_A0_PLL: CLK_S_A0_PLL {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-plls-c65";
 +
-+static struct clkgen_mux_data clkgen_mux_c_vcc_hd_416 = {
-+	.offset = 0,
-+	.shift = 0,
-+	.width = 1,
-+};
++				clocks = <&CLK_SYSIN>;
 +
-+static struct clkgen_mux_data clkgen_mux_f_vcc_fvdp_416 = {
-+	.offset = 0,
-+	.shift = 0,
-+	.width = 1,
-+};
++				clock-output-names = "CLK_S_A0_PLL0_HS",
++						     "CLK_S_A0_PLL0_LS",
++						     "CLK_S_A0_PLL1";
++			};
 +
-+static struct clkgen_mux_data clkgen_mux_f_vcc_hva_416 = {
-+	.offset = 0,
-+	.shift = 0,
-+	.width = 1,
-+};
++			CLK_S_A0_OSC_PREDIV: CLK_S_A0_OSC_PREDIV {
++				#clock-cells = <0>;
++				compatible = "st,clkgena-prediv-c65",
++					     "st,clkgena-prediv";
 +
-+static struct clkgen_mux_data clkgen_mux_f_vcc_hd_416 = {
-+	.offset = 0,
-+	.shift = 16,
-+	.width = 1,
-+	.lock = &clkgenf_lock,
-+};
++				clocks = <&CLK_SYSIN>;
 +
-+static struct clkgen_mux_data clkgen_mux_c_vcc_sd_416 = {
-+	.offset = 0,
-+	.shift = 17,
-+	.width = 1,
-+	.lock = &clkgenf_lock,
-+};
++				clock-output-names = "CLK_S_A0_OSC_PREDIV";
++			};
 +
-+static struct of_device_id mux_of_match[] = {
-+	{
-+		.compatible = "st,stih416-clkgenc-vcc-hd",
-+		.data = &clkgen_mux_c_vcc_hd_416,
-+	},
-+	{
-+		.compatible = "st,stih416-clkgenf-vcc-fvdp",
-+		.data = &clkgen_mux_f_vcc_fvdp_416,
-+	},
-+	{
-+		.compatible = "st,stih416-clkgenf-vcc-hva",
-+		.data = &clkgen_mux_f_vcc_hva_416,
-+	},
-+	{
-+		.compatible = "st,stih416-clkgenf-vcc-hd",
-+		.data = &clkgen_mux_f_vcc_hd_416,
-+	},
-+	{
-+		.compatible = "st,stih416-clkgenf-vcc-sd",
-+		.data = &clkgen_mux_c_vcc_sd_416,
-+	},
-+	{}
-+};
++			CLK_S_A0_HS: CLK_S_A0_HS {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c65-hs",
++					     "st,clkgena-divmux";
 +
-+void __init st_of_clkgen_mux_setup(struct device_node *np)
-+{
-+	const struct of_device_id *match;
-+	struct clk *clk;
-+	void __iomem *reg;
-+	const char **parents;
-+	int num_parents;
-+	struct clkgen_mux_data *data;
++				clocks = <&CLK_S_A0_OSC_PREDIV>,
++					 <&CLK_S_A0_PLL 0>, /* PLL0 HS */
++					 <&CLK_S_A0_PLL 2>; /* PLL1 */
 +
-+	match = of_match_node(mux_of_match, np);
-+	if (!match) {
-+		pr_err("%s: No matching data\n", __func__);
-+		return;
-+	}
++				clock-output-names = "CLK_S_FDMA_0",
++						     "CLK_S_FDMA_1",
++						     ""; /* CLK_S_JIT_SENSE */
++						     /* Fourth output unused */
++			};
 +
-+	data = (struct clkgen_mux_data *)match->data;
++			CLK_S_A0_LS: CLK_S_A0_LS {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c65-ls",
++					     "st,clkgena-divmux";
 +
-+	reg = of_iomap(np, 0);
-+	if (!reg) {
-+		pr_err("%s: Failed to get base address\n", __func__);
-+		return;
-+	}
++				clocks = <&CLK_S_A0_OSC_PREDIV>,
++					 <&CLK_S_A0_PLL 1>, /* PLL0 LS */
++					 <&CLK_S_A0_PLL 2>; /* PLL1 */
 +
-+	parents = clkgen_mux_get_parents(np, &num_parents);
-+	if (IS_ERR(parents)) {
-+		pr_err("%s: Failed to get parents (%ld)\n",
-+				__func__, PTR_ERR(parents));
-+		return;
-+	}
++				clock-output-names = "CLK_S_ICN_REG_0",
++						     "CLK_S_ICN_IF_0",
++						     "CLK_S_ICN_REG_LP_0",
++						     "CLK_S_EMISS",
++						     "CLK_S_ETH1_PHY",
++						     "CLK_S_MII_REF_OUT";
++						 /* Remaining outputs unused */
++			};
++		};
 +
-+	clk = clk_register_mux(NULL, np->name, parents, num_parents,
-+				data->clk_flags | CLK_SET_RATE_PARENT,
-+				reg + data->offset,
-+				data->shift, data->width, data->mux_flags,
-+				data->lock);
-+	if (IS_ERR(clk))
-+		goto err;
++		clockgenA at fee81000 {
++			reg = <0xfee81000 0xb48>;
 +
-+	pr_debug("%s: parent %s rate %u\n",
-+			__clk_get_name(clk),
-+			__clk_get_name(clk_get_parent(clk)),
-+			(unsigned int)clk_get_rate(clk));
++			CLK_S_A1_PLL: CLK_S_A1_PLL {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-plls-c65";
 +
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
++				clocks = <&CLK_SYSIN>;
 +
-+err:
-+	kfree(parents);
++				clock-output-names = "CLK_S_A1_PLL0_HS",
++						     "CLK_S_A1_PLL0_LS",
++						     "CLK_S_A1_PLL1";
++			};
 +
-+	return;
-+}
-+CLK_OF_DECLARE(clkgen_mux, "st,clkgen-mux", st_of_clkgen_mux_setup);
++			CLK_S_A1_OSC_PREDIV: CLK_S_A1_OSC_PREDIV {
++				#clock-cells = <0>;
++				compatible = "st,clkgena-prediv-c65",
++					     "st,clkgena-prediv";
 +
-+#define VCC_MAX_CHANNELS 16
++				clocks = <&CLK_SYSIN>;
 +
-+#define VCC_GATE_OFFSET 0x0
-+#define VCC_MUX_OFFSET 0x4
-+#define VCC_DIV_OFFSET 0x8
++				clock-output-names = "CLK_S_A1_OSC_PREDIV";
++			};
 +
-+struct clkgen_vcc_data {
-+	spinlock_t *lock;
-+	unsigned long clk_flags;
-+};
++			CLK_S_A1_HS: CLK_S_A1_HS {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c65-hs",
++					     "st,clkgena-divmux";
 +
-+static struct clkgen_vcc_data st_clkgenc_vcc_416 = {
-+	.clk_flags = CLK_SET_RATE_PARENT,
-+};
++				clocks = <&CLK_S_A1_OSC_PREDIV>,
++					 <&CLK_S_A1_PLL 0>, /* PLL0 HS */
++					 <&CLK_S_A1_PLL 2>; /* PLL1 */
 +
-+static struct clkgen_vcc_data st_clkgenf_vcc_416 = {
-+	.lock = &clkgenf_lock,
-+};
++				clock-output-names = "", /* Reserved */
++						     "", /* Reserved */
++						     "CLK_S_STAC_PHY",
++						     "CLK_S_VTAC_TX_PHY";
++			};
 +
-+static struct of_device_id vcc_of_match[] = {
-+	{ .compatible = "st,stih416-clkgenc", .data = &st_clkgenc_vcc_416 },
-+	{ .compatible = "st,stih416-clkgenf", .data = &st_clkgenf_vcc_416 },
-+	{}
-+};
++			CLK_S_A1_LS: CLK_S_A1_LS {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c65-ls",
++					     "st,clkgena-divmux";
 +
-+void __init st_of_clkgen_vcc_setup(struct device_node *np)
-+{
-+	const struct of_device_id *match;
-+	void __iomem *reg;
-+	const char **parents;
-+	int num_parents, i;
-+	struct clk_onecell_data *clk_data;
-+	struct clkgen_vcc_data *data;
++				clocks = <&CLK_S_A1_OSC_PREDIV>,
++					 <&CLK_S_A1_PLL 1>, /* PLL0 LS */
++					 <&CLK_S_A1_PLL 2>; /* PLL1 */
 +
-+	match = of_match_node(vcc_of_match, np);
-+	if (WARN_ON(!match))
-+		return;
-+	data = (struct clkgen_vcc_data *)match->data;
-+
-+	reg = of_iomap(np, 0);
-+	if (!reg)
-+		return;
-+
-+	parents = clkgen_mux_get_parents(np, &num_parents);
-+	if (IS_ERR(parents))
-+		return;
-+
-+	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
-+	if (!clk_data)
-+		goto err;
-+
-+	clk_data->clk_num = VCC_MAX_CHANNELS;
-+	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk *),
-+				 GFP_KERNEL);
-+
-+	if (!clk_data->clks)
-+		goto err;
-+
-+	for (i = 0; i < clk_data->clk_num; i++) {
-+		struct clk *clk;
-+		const char *clk_name;
-+		struct clk_gate *gate;
-+		struct clk_divider *div;
-+		struct clk_mux *mux;
-+
-+		if (of_property_read_string_index(np, "clock-output-names",
-+						  i, &clk_name))
-+			break;
++				clock-output-names = "CLK_S_ICN_IF_2",
++						     "CLK_S_CARD_MMC",
++						     "CLK_S_ICN_IF_1",
++						     "CLK_S_GMAC0_PHY",
++						     "CLK_S_NAND_CTRL",
++						     "", /* Reserved */
++						     "CLK_S_MII0_REF_OUT",
++						     ""; /* CLK_S_STAC_SYS */
++						 /* Remaining outputs unused */
++			};
++		};
 +
 +		/*
-+		 * If we read an empty clock name then the output is unused
-+		 */
-+		if (*clk_name == '\0')
-+			continue;
++		 * ClockGenAs on MPE41
+ 		 */
+-		CLKS_ICN_REG_0: CLKS_ICN_REG_0 {
++		clockgenA at fde12000 {
++			reg = <0xfde12000 0xb50>;
 +
-+		gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
-+		if (!gate)
-+			break;
++			CLK_M_A0_PLL0: CLK_M_A0_PLL0 {
++				#clock-cells = <1>;
++				compatible = "st,plls-c32-a1x-0", "st,clkgen-plls-c32";
 +
-+		div = kzalloc(sizeof(struct clk_divider), GFP_KERNEL);
-+		if (!div) {
-+			kfree(gate);
-+			break;
-+		}
++				clocks = <&CLK_SYSIN>;
 +
-+		mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
-+		if (!mux) {
-+			kfree(gate);
-+			kfree(div);
-+			break;
-+		}
++				clock-output-names = "CLK_M_A0_PLL0_PHI0",
++						     "CLK_M_A0_PLL0_PHI1",
++						     "CLK_M_A0_PLL0_PHI2",
++						     "CLK_M_A0_PLL0_PHI3";
++			};
 +
-+		gate->reg = reg + VCC_GATE_OFFSET;
-+		gate->bit_idx = i;
-+		gate->flags = CLK_GATE_SET_TO_DISABLE;
-+		gate->lock = data->lock;
++			CLK_M_A0_PLL1: CLK_M_A0_PLL1 {
++				#clock-cells = <1>;
++				compatible = "st,plls-c32-a1x-1", "st,clkgen-plls-c32";
 +
-+		div->reg = reg + VCC_DIV_OFFSET;
-+		div->shift = 2 * i;
-+		div->width = 2;
-+		div->flags = CLK_DIVIDER_POWER_OF_TWO;
++				clocks = <&CLK_SYSIN>;
 +
-+		mux->reg = reg + VCC_MUX_OFFSET;
-+		mux->shift = 2 * i;
-+		mux->mask = 0x3;
++				clock-output-names = "CLK_M_A0_PLL1_PHI0",
++						     "CLK_M_A0_PLL1_PHI1",
++						     "CLK_M_A0_PLL1_PHI2",
++						     "CLK_M_A0_PLL1_PHI3";
++			};
 +
-+		clk = clk_register_composite(NULL, clk_name, parents,
-+					     num_parents,
-+					     &mux->hw, &clk_mux_ops,
-+					     &div->hw, &clk_divider_ops,
-+					     &gate->hw, &clk_gate_ops,
-+					     data->clk_flags);
-+		if (IS_ERR(clk)) {
-+			kfree(gate);
-+			kfree(div);
-+			kfree(mux);
-+			goto err;
-+		}
++			CLK_M_A0_OSC_PREDIV: CLK_M_A0_OSC_PREDIV {
++				#clock-cells = <0>;
++				compatible = "st,clkgena-prediv-c32",
++					     "st,clkgena-prediv";
 +
-+		pr_debug("%s: parent %s rate %u\n",
-+			__clk_get_name(clk),
-+			__clk_get_name(clk_get_parent(clk)),
-+			(unsigned int)clk_get_rate(clk));
++				clocks = <&CLK_SYSIN>;
 +
-+		clk_data->clks[i] = clk;
-+	}
++				clock-output-names = "CLK_M_A0_OSC_PREDIV";
++			};
 +
-+	kfree(parents);
++			CLK_M_A0_DIV0: CLK_M_A0_DIV0 {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c32-odf0",
++					     "st,clkgena-divmux";
 +
-+	of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
-+	return;
++				clocks = <&CLK_M_A0_OSC_PREDIV>,
++					 <&CLK_M_A0_PLL0 0>, /* PLL0 PHI0 */
++					 <&CLK_M_A0_PLL1 0>; /* PLL1 PHI0 */
 +
-+err:
-+	for (i = 0; i < clk_data->clk_num; i++) {
-+		struct clk_composite *composite;
++				clock-output-names = "CLK_M_APB_PM", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     "CLK_M_PP_DMU_0",
++						     "CLK_M_PP_DMU_1",
++						     "CLK_M_ICM_DISP",
++						     ""; /* Unused */
++			};
 +
-+		if (!clk_data->clks[i])
-+			continue;
++			CLK_M_A0_DIV1: CLK_M_A0_DIV1 {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c32-odf1",
++					     "st,clkgena-divmux";
 +
-+		composite = container_of(__clk_get_hw(clk_data->clks[i]),
-+					 struct clk_composite, hw);
-+		kfree(container_of(composite->gate_hw, struct clk_gate, hw));
-+		kfree(container_of(composite->rate_hw, struct clk_divider, hw));
-+		kfree(container_of(composite->mux_hw, struct clk_mux, hw));
-+	}
++				clocks = <&CLK_M_A0_OSC_PREDIV>,
++					 <&CLK_M_A0_PLL0 1>, /* PLL0 PHI1 */
++					 <&CLK_M_A0_PLL1 1>; /* PLL1 PHI1 */
 +
-+	if (clk_data)
-+		kfree(clk_data->clks);
++				clock-output-names = "", /* Unused */
++						     "", /* Unused */
++						     "CLK_M_A9_EXT2F",
++						     "CLK_M_ST40RT",
++						     "CLK_M_ST231_DMU_0",
++						     "CLK_M_ST231_DMU_1",
++						     "CLK_M_ST231_AUD",
++						     "CLK_M_ST231_GP_0";
++			};
 +
-+	kfree(clk_data);
-+	kfree(parents);
-+}
-+CLK_OF_DECLARE(clkgen_vcc, "st,clkgen-vcc", st_of_clkgen_vcc_setup);
++			CLK_M_A0_DIV2: CLK_M_A0_DIV2 {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c32-odf2",
++					     "st,clkgena-divmux";
++
++				clocks = <&CLK_M_A0_OSC_PREDIV>,
++					 <&CLK_M_A0_PLL0 2>, /* PLL0 PHI2 */
++					 <&CLK_M_A0_PLL1 2>; /* PLL1 PHI2 */
++
++				clock-output-names = "CLK_M_ST231_GP_1",
++						     "CLK_M_ICN_CPU",
++						     "CLK_M_ICN_STAC",
++						     "CLK_M_ICN_DMU_0",
++						     "CLK_M_ICN_DMU_1",
++						     "", /* Unused */
++						     "", /* Unused */
++						     ""; /* Unused */
++			};
++
++			CLK_M_A0_DIV3: CLK_M_A0_DIV3 {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c32-odf3",
++					     "st,clkgena-divmux";
++
++				clocks = <&CLK_M_A0_OSC_PREDIV>,
++					 <&CLK_M_A0_PLL0 3>, /* PLL0 PHI3 */
++					 <&CLK_M_A0_PLL1 3>; /* PLL1 PHI3 */
++
++				clock-output-names = "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     "CLK_M_ICN_ERAM",
++						     "CLK_M_A9_TRACE";
++			};
++		};
++
++		clockgenA at fd6db000 {
++			reg = <0xfd6db000 0xb50>;
++
++			CLK_M_A1_PLL0: CLK_M_A1_PLL0 {
++				#clock-cells = <1>;
++				compatible = "st,plls-c32-a1x-0", "st,clkgen-plls-c32";
++
++				clocks = <&CLK_SYSIN>;
++
++				clock-output-names = "CLK_M_A1_PLL0_PHI0",
++						     "CLK_M_A1_PLL0_PHI1",
++						     "CLK_M_A1_PLL0_PHI2",
++						     "CLK_M_A1_PLL0_PHI3";
++			};
++
++			CLK_M_A1_PLL1: CLK_M_A1_PLL1 {
++				#clock-cells = <1>;
++				compatible = "st,plls-c32-a1x-1", "st,clkgen-plls-c32";
++
++				clocks = <&CLK_SYSIN>;
++
++				clock-output-names = "CLK_M_A1_PLL1_PHI0",
++						     "CLK_M_A1_PLL1_PHI1",
++						     "CLK_M_A1_PLL1_PHI2",
++						     "CLK_M_A1_PLL1_PHI3";
++			};
++
++			CLK_M_A1_OSC_PREDIV: CLK_M_A1_OSC_PREDIV {
++				#clock-cells = <0>;
++				compatible = "st,clkgena-prediv-c32",
++					     "st,clkgena-prediv";
++
++				clocks = <&CLK_SYSIN>;
++
++				clock-output-names = "CLK_M_A1_OSC_PREDIV";
++			};
++
++			CLK_M_A1_DIV0: CLK_M_A1_DIV0 {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c32-odf0",
++					     "st,clkgena-divmux";
++
++				clocks = <&CLK_M_A1_OSC_PREDIV>,
++					 <&CLK_M_A1_PLL0 0>, /* PLL0 PHI0 */
++					 <&CLK_M_A1_PLL1 0>; /* PLL1 PHI0 */
++
++				clock-output-names = "CLK_M_FDMA_12",
++						     "CLK_M_FDMA_10",
++						     "CLK_M_FDMA_11",
++						     "CLK_M_HVA_LMI",
++						     "CLK_M_PROC_SC",
++						     "CLK_M_TP",
++						     "CLK_M_ICN_GPU",
++						     "CLK_M_ICN_VDP_0";
++			};
++
++			CLK_M_A1_DIV1: CLK_M_A1_DIV1 {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c32-odf1",
++					     "st,clkgena-divmux";
++
++				clocks = <&CLK_M_A1_OSC_PREDIV>,
++					 <&CLK_M_A1_PLL0 1>, /* PLL0 PHI1 */
++					 <&CLK_M_A1_PLL1 1>; /* PLL1 PHI1 */
++
++				clock-output-names = "CLK_M_ICN_VDP_1",
++						     "CLK_M_ICN_VDP_2",
++						     "CLK_M_ICN_VDP_3",
++						     "CLK_M_PRV_T1_BUS",
++						     "CLK_M_ICN_VDP_4",
++						     "CLK_M_ICN_REG_10",
++						     "", /* Unused */
++						     ""; /* CLK_M_ICN_ST231 */
++			};
++
++			CLK_M_A1_DIV2: CLK_M_A1_DIV2 {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c32-odf2",
++					     "st,clkgena-divmux";
++
++				clocks = <&CLK_M_A1_OSC_PREDIV>,
++					 <&CLK_M_A1_PLL0 2>, /* PLL0 PHI2 */
++					 <&CLK_M_A1_PLL1 2>; /* PLL1 PHI2 */
++
++				clock-output-names = "CLK_M_FVDP_PROC_ALT",
++						     "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     ""; /* Unused */
++			};
++
++			CLK_M_A1_DIV3: CLK_M_A1_DIV3 {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c32-odf3",
++					     "st,clkgena-divmux";
++
++				clocks = <&CLK_M_A1_OSC_PREDIV>,
++					 <&CLK_M_A1_PLL0 3>, /* PLL0 PHI3 */
++					 <&CLK_M_A1_PLL1 3>; /* PLL1 PHI3 */
++
++				clock-output-names = "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     "", /* Unused */
++						     ""; /* Unused */
++			};
++		};
++
++		CLK_M_A9_EXT2F_DIV2: CLK_M_A9_EXT2F_DIV2S {
+ 			#clock-cells = <0>;
+-			compatible = "fixed-clock";
+-			clock-frequency = <100000000>;
++			compatible = "fixed-factor-clock";
++			clocks = <&CLK_M_A0_DIV1 2>;
++			clock-div = <2>;
++			clock-mult = <1>;
++		};
++
++		clockgenA at fd345000 {
++			reg = <0xfd345000 0xb50>;
++
++			CLK_M_A2_PLL0: CLK_M_A2_PLL0 {
++				#clock-cells = <1>;
++				compatible = "st,plls-c32-a1x-0", "st,clkgen-plls-c32";
++
++				clocks = <&CLK_SYSIN>;
++
++				clock-output-names = "CLK_M_A2_PLL0_PHI0",
++						     "CLK_M_A2_PLL0_PHI1",
++						     "CLK_M_A2_PLL0_PHI2",
++						     "CLK_M_A2_PLL0_PHI3";
++			};
++
++			CLK_M_A2_PLL1: CLK_M_A2_PLL1 {
++				#clock-cells = <1>;
++				compatible = "st,plls-c32-a1x-1", "st,clkgen-plls-c32";
++
++				clocks = <&CLK_SYSIN>;
++
++				clock-output-names = "CLK_M_A2_PLL1_PHI0",
++						     "CLK_M_A2_PLL1_PHI1",
++						     "CLK_M_A2_PLL1_PHI2",
++						     "CLK_M_A2_PLL1_PHI3";
++			};
++
++			CLK_M_A2_OSC_PREDIV: CLK_M_A2_OSC_PREDIV {
++				#clock-cells = <0>;
++				compatible = "st,clkgena-prediv-c32",
++					     "st,clkgena-prediv";
++
++				clocks = <&CLK_SYSIN>;
++
++				clock-output-names = "CLK_M_A2_OSC_PREDIV";
++			};
++
++			CLK_M_A2_DIV0: CLK_M_A2_DIV0 {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c32-odf0",
++					     "st,clkgena-divmux";
++
++				clocks = <&CLK_M_A2_OSC_PREDIV>,
++					 <&CLK_M_A2_PLL0 0>, /* PLL0 PHI0 */
++					 <&CLK_M_A2_PLL1 0>; /* PLL1 PHI0 */
++
++				clock-output-names = "CLK_M_VTAC_MAIN_PHY",
++						     "CLK_M_VTAC_AUX_PHY",
++						     "CLK_M_STAC_PHY",
++						     "CLK_M_STAC_SYS",
++						     "", /* CLK_M_MPESTAC_PG */
++						     "", /* CLK_M_MPESTAC_WC */
++						     "", /* CLK_M_MPEVTACAUX_PG*/
++						     ""; /* CLK_M_MPEVTACMAIN_PG*/
++			};
++
++			CLK_M_A2_DIV1: CLK_M_A2_DIV1 {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c32-odf1",
++					     "st,clkgena-divmux";
++
++				clocks = <&CLK_M_A2_OSC_PREDIV>,
++					 <&CLK_M_A2_PLL0 1>, /* PLL0 PHI1 */
++					 <&CLK_M_A2_PLL1 1>; /* PLL1 PHI1 */
++
++				clock-output-names = "", /* CLK_M_MPEVTACRX0_WC */
++						     "", /* CLK_M_MPEVTACRX1_WC */
++						     "CLK_M_COMPO_MAIN",
++						     "CLK_M_COMPO_AUX",
++						     "CLK_M_BDISP_0",
++						     "CLK_M_BDISP_1",
++						     "CLK_M_ICN_BDISP_0",
++						     "CLK_M_ICN_BDISP_1";
++			};
++
++			CLK_M_A2_DIV2: CLK_M_A2_DIV2 {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c32-odf2",
++					     "st,clkgena-divmux";
++
++				clocks = <&CLK_M_A2_OSC_PREDIV>,
++					 <&CLK_M_A2_PLL0 2>, /* PLL0 PHI2 */
++					 <&CLK_M_A2_PLL1 2>; /* PLL1 PHI2 */
++
++				clock-output-names = "", /* CLK_M_ICN_HQVDP0 */
++						     "", /* CLK_M_ICN_HQVDP1 */
++						     "CLK_M_ICN_COMPO",
++						     "", /* CLK_M_ICN_VDPAUX */
++						     "CLK_M_ICN_TS",
++						     "CLK_M_ICN_REG_LP_10",
++						     "CLK_M_DCEPHY_IMPCTRL",
++						     ""; /* Unused */
++			};
++
++			CLK_M_A2_DIV3: CLK_M_A2_DIV3 {
++				#clock-cells = <1>;
++				compatible = "st,clkgena-divmux-c32-odf3",
++					     "st,clkgena-divmux";
++
++				clocks = <&CLK_M_A2_OSC_PREDIV>,
++					 <&CLK_M_A2_PLL0 3>, /* PLL0 PHI3 */
++					 <&CLK_M_A2_PLL1 3>; /* PLL1 PHI3 */
++
++				clock-output-names = ""; /* Unused */
++						/* Remaining outputs unused */
++			};
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/stih415.dtsi b/arch/arm/boot/dts/stih415.dtsi
+index d9c7dd1..fcda687 100644
+--- a/arch/arm/boot/dts/stih415.dtsi
++++ b/arch/arm/boot/dts/stih415.dtsi
+@@ -71,7 +71,7 @@
+ 			interrupts	= <0 197 0>;
+ 			pinctrl-names 	= "default";
+ 			pinctrl-0 	= <&pinctrl_serial2>;
+-			clocks		= <&CLKS_ICN_REG_0>;
++			clocks		= <&CLK_S_A0_LS CLK_S_ICN_REG_0>;
+ 		};
+ 
+ 		/* SBC comms block ASCs in SASG1 */
+@@ -89,7 +89,7 @@
+ 			compatible	= "st,comms-ssc4-i2c";
+ 			reg		= <0xfed40000 0x110>;
+ 			interrupts	= <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks		= <&CLKS_ICN_REG_0>;
++			clocks		= <&CLK_S_A0_LS CLK_S_ICN_REG_0>;
+ 			clock-names	= "ssc";
+ 			clock-frequency = <400000>;
+ 			pinctrl-names	= "default";
+@@ -102,7 +102,7 @@
+ 			compatible	= "st,comms-ssc4-i2c";
+ 			reg		= <0xfed41000 0x110>;
+ 			interrupts	= <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks		= <&CLKS_ICN_REG_0>;
++			clocks		= <&CLK_S_A0_LS CLK_S_ICN_REG_0>;
+ 			clock-names	= "ssc";
+ 			clock-frequency = <400000>;
+ 			pinctrl-names	= "default";
 -- 
 1.9.0
