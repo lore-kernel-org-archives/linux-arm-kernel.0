@@ -1,67 +1,47 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Thu, 27 Feb 2014 16:24:14 +0100
-Subject: [PATCH v0 01/15] drivers: clk: st: Support for DIVMUX and PreDiv
- Clocks
+Date: Thu, 27 Feb 2014 16:24:15 +0100
+Subject: [PATCH v0 02/15] drivers: clk: st: Support for PLLs inside
+ ClockGenA(s)
 In-Reply-To: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
 References: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1393514668-17440-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1393514668-17440-3-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch supports the DIVMUX and PreDiv clocks used by ClockGenA(s)
+The patch supports the c65/c32 type PLLs used by ClockGenA(s)
 
-DIVMUX clock : Divider-Multiplexer-Gate inside ClockGenA(s)
-It includes support for each channel : 3-parent Multiplexer,
-Divider for each Parent, Gate to switch OFF the output channel. The
-clock is implemented using generic clocks implemented in the kernel
-clk_divider and clk_mux.
+PLL clock : It includes support for all c65/c32 type PLLs
+inside ClockGenA(s) : implemented as Fixed Parent / Fixed Rate clock,
+with clock rate calculated reading H/w settings done at BOOT.
 
-PreDiv clock : Fixed Divider Clock used inside ClockGenA(s) to divide
-the oscillator clock by factor-of-16. The clock is implemented using
-generic clocks implemented in the kernel clk_divider.
+c65 PLLs have 2 outputs : HS and LS
+c32 PLLs have 1-4 outputs : ODFx
 
 Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/clk/Makefile        |   1 +
- drivers/clk/st/Makefile     |   1 +
- drivers/clk/st/clkgen-mux.c | 529 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 531 insertions(+)
- create mode 100644 drivers/clk/st/Makefile
- create mode 100644 drivers/clk/st/clkgen-mux.c
+ drivers/clk/st/Makefile     |   2 +-
+ drivers/clk/st/clkgen-pll.c | 559 ++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/st/clkgen.h     |  48 ++++
+ 3 files changed, 608 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/st/clkgen-pll.c
+ create mode 100644 drivers/clk/st/clkgen.h
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index a367a98..7867c511 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -43,6 +43,7 @@ obj-$(CONFIG_ARCH_SHMOBILE_MULTI)	+= shmobile/
- obj-$(CONFIG_ARCH_SIRF)			+= sirf/
- obj-$(CONFIG_ARCH_SOCFPGA)		+= socfpga/
- obj-$(CONFIG_PLAT_SPEAR)		+= spear/
-+obj-$(CONFIG_ARCH_STI)			+= st/
- obj-$(CONFIG_ARCH_SUNXI)		+= sunxi/
- obj-$(CONFIG_ARCH_TEGRA)		+= tegra/
- obj-$(CONFIG_ARCH_OMAP2PLUS)		+= ti/
 diff --git a/drivers/clk/st/Makefile b/drivers/clk/st/Makefile
-new file mode 100644
-index 0000000..e42b370
---- /dev/null
+index e42b370..b7b10f9 100644
+--- a/drivers/clk/st/Makefile
 +++ b/drivers/clk/st/Makefile
-@@ -0,0 +1 @@
-+obj-y += clkgen-mux.o
-diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
+@@ -1 +1 @@
+-obj-y += clkgen-mux.o
++obj-y += clkgen-mux.o clkgen-pll.o
+diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
 new file mode 100644
-index 0000000..65d702c
+index 0000000..c6b38b0
 --- /dev/null
-+++ b/drivers/clk/st/clkgen-mux.c
-@@ -0,0 +1,529 @@
++++ b/drivers/clk/st/clkgen-pll.c
+@@ -0,0 +1,559 @@
 +/*
-+ * clkgen-mux.c: ST GEN-MUX Clock driver
-+ *
 + * Copyright (C) 2014 STMicroelectronics (R&D) Limited
-+ *
-+ * Authors: Stephen Gallimore <stephen.gallimore@st.com>
-+ *	    Pankaj Dev <pankaj.dev@st.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -70,360 +50,323 @@ index 0000000..65d702c
 + *
 + */
 +
++/*
++ * Authors:
++ * Stephen Gallimore <stephen.gallimore@st.com>,
++ * Pankaj Dev <pankaj.dev@st.com>.
++ */
++
 +#include <linux/slab.h>
 +#include <linux/of_address.h>
 +#include <linux/clk-provider.h>
 +
-+static DEFINE_SPINLOCK(clkgena_divmux_lock);
++#include "clkgen.h"
 +
-+static const char ** __init clkgen_mux_get_parents(struct device_node *np,
-+						       int *num_parents)
-+{
-+	const char **parents;
-+	int nparents, i;
++static DEFINE_SPINLOCK(clkgena_c32_odf_lock);
 +
-+	nparents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
-+	if (WARN_ON(nparents <= 0))
-+		return ERR_PTR(-EINVAL);
++/*
++ * Common PLL configuration register bits for PLL800 and PLL1600 C65
++ */
++#define C65_MDIV_PLL800_MASK	(0xff)
++#define C65_MDIV_PLL1600_MASK	(0x7)
++#define C65_NDIV_MASK		(0xff)
++#define C65_PDIV_MASK		(0x7)
 +
-+	parents = kzalloc(nparents * sizeof(const char *), GFP_KERNEL);
-+	if (!parents)
-+		return ERR_PTR(-ENOMEM);
++/*
++ * PLL configuration register bits for PLL3200 C32
++ */
++#define C32_NDIV_MASK (0xff)
++#define C32_IDF_MASK (0x7)
++#define C32_ODF_MASK (0x3f)
++#define C32_LDF_MASK (0x7f)
 +
-+	for (i = 0; i < nparents; i++)
-+		parents[i] = of_clk_get_parent_name(np, i);
++#define C32_MAX_ODFS (4)
 +
-+	*num_parents = nparents;
-+	return parents;
-+}
++struct clkgen_pll_data {
++	struct clkgen_field pdn_status;
++	struct clkgen_field locked_status;
++	struct clkgen_field mdiv;
++	struct clkgen_field ndiv;
++	struct clkgen_field pdiv;
++	struct clkgen_field idf;
++	struct clkgen_field ldf;
++	unsigned int num_odfs;
++	struct clkgen_field odf[C32_MAX_ODFS];
++	struct clkgen_field odf_gate[C32_MAX_ODFS];
++	const struct clk_ops *ops;
++};
++
++static const struct clk_ops st_pll1600c65_ops;
++static const struct clk_ops st_pll800c65_ops;
++static const struct clk_ops stm_pll3200c32_ops;
++static const struct clk_ops st_pll1200c32_ops;
++
++static struct clkgen_pll_data st_pll1600c65_ax = {
++	.pdn_status	= CLKGEN_FIELD(0x0, 0x1,			19),
++	.locked_status	= CLKGEN_FIELD(0x0, 0x1,			31),
++	.mdiv		= CLKGEN_FIELD(0x0, C65_MDIV_PLL1600_MASK,	0),
++	.ndiv		= CLKGEN_FIELD(0x0, C65_NDIV_MASK,		8),
++	.ops		= &st_pll1600c65_ops
++};
++
++static struct clkgen_pll_data st_pll800c65_ax = {
++	.pdn_status	= CLKGEN_FIELD(0x0,	0x1,			19),
++	.locked_status	= CLKGEN_FIELD(0x0,	0x1,			31),
++	.mdiv		= CLKGEN_FIELD(0x0,	C65_MDIV_PLL800_MASK,	0),
++	.ndiv		= CLKGEN_FIELD(0x0,	C65_NDIV_MASK,		8),
++	.pdiv		= CLKGEN_FIELD(0x0,	C65_PDIV_MASK,		16),
++	.ops		= &st_pll800c65_ops
++};
++
++static struct clkgen_pll_data st_pll3200c32_a1x_0 = {
++	.pdn_status	= CLKGEN_FIELD(0x0,	0x1,			31),
++	.locked_status	= CLKGEN_FIELD(0x4,	0x1,			31),
++	.ndiv		= CLKGEN_FIELD(0x0,	C32_NDIV_MASK,		0x0),
++	.idf		= CLKGEN_FIELD(0x4,	C32_IDF_MASK,		0x0),
++	.num_odfs = 4,
++	.odf =	{	CLKGEN_FIELD(0x54,	C32_ODF_MASK,		4),
++			CLKGEN_FIELD(0x54,	C32_ODF_MASK,		10),
++			CLKGEN_FIELD(0x54,	C32_ODF_MASK,		16),
++			CLKGEN_FIELD(0x54,	C32_ODF_MASK,		22) },
++	.odf_gate = {	CLKGEN_FIELD(0x54,	0x1,			0),
++			CLKGEN_FIELD(0x54,	0x1,			1),
++			CLKGEN_FIELD(0x54,	0x1,			2),
++			CLKGEN_FIELD(0x54,	0x1,			3) },
++	.ops		= &stm_pll3200c32_ops,
++};
++
++static struct clkgen_pll_data st_pll3200c32_a1x_1 = {
++	.pdn_status	= CLKGEN_FIELD(0xC,	0x1,			31),
++	.locked_status	= CLKGEN_FIELD(0x10,	0x1,			31),
++	.ndiv		= CLKGEN_FIELD(0xC,	C32_NDIV_MASK,		0x0),
++	.idf		= CLKGEN_FIELD(0x10,	C32_IDF_MASK,		0x0),
++	.num_odfs = 4,
++	.odf = {	CLKGEN_FIELD(0x58,	C32_ODF_MASK,		4),
++			CLKGEN_FIELD(0x58,	C32_ODF_MASK,		10),
++			CLKGEN_FIELD(0x58,	C32_ODF_MASK,		16),
++			CLKGEN_FIELD(0x58,	C32_ODF_MASK,		22) },
++	.odf_gate = {	CLKGEN_FIELD(0x58,	0x1,			0),
++			CLKGEN_FIELD(0x58,	0x1,			1),
++			CLKGEN_FIELD(0x58,	0x1,			2),
++			CLKGEN_FIELD(0x58,	0x1,			3) },
++	.ops		= &stm_pll3200c32_ops,
++};
 +
 +/**
-+ * DOC: Clock mux with a programmable divider on each of its three inputs.
-+ *      The mux has an input setting which effectively gates its output.
++ * DOC: Clock Generated by PLL, rate set and enabled by bootloader
 + *
 + * Traits of this clock:
 + * prepare - clk_(un)prepare only ensures parent is (un)prepared
-+ * enable - clk_enable and clk_disable are functional & control gating
-+ * rate - set rate is supported
-+ * parent - set/get parent
++ * enable - clk_enable/disable only ensures parent is enabled
++ * rate - rate is fixed. No clk_set_rate support
++ * parent - fixed parent.  No clk_set_parent support
 + */
-+
-+#define NUM_INPUTS 3
-+
-+struct clkgena_divmux {
-+	struct clk_hw hw;
-+	/* Subclassed mux and divider structures */
-+	struct clk_mux mux;
-+	struct clk_divider div[NUM_INPUTS];
-+	/* Enable/running feedback register bits for each input */
-+	void __iomem *feedback_reg[NUM_INPUTS];
-+	int feedback_bit_idx;
-+
-+	u8              muxsel;
-+};
-+
-+#define to_clkgena_divmux(_hw) container_of(_hw, struct clkgena_divmux, hw)
-+
-+struct clkgena_divmux_data {
-+	int num_outputs;
-+	int mux_offset;
-+	int mux_offset2;
-+	int mux_start_bit;
-+	int div_offsets[NUM_INPUTS];
-+	int fb_offsets[NUM_INPUTS];
-+	int fb_start_bit_idx;
-+};
-+
-+#define CKGAX_CLKOPSRC_SWITCH_OFF 0x3
-+
-+static int clkgena_divmux_is_running(struct clkgena_divmux *mux)
-+{
-+	u32 regval = readl(mux->feedback_reg[mux->muxsel]);
-+	u32 running = regval & BIT(mux->feedback_bit_idx);
-+	return !!running;
-+}
-+
-+static int clkgena_divmux_enable(struct clk_hw *hw)
-+{
-+	struct clkgena_divmux *genamux = to_clkgena_divmux(hw);
-+	struct clk_hw *mux_hw = &genamux->mux.hw;
-+	unsigned long timeout;
-+	int ret = 0;
-+
-+	mux_hw->clk = hw->clk;
-+
-+	ret = clk_mux_ops.set_parent(mux_hw, genamux->muxsel);
-+	if (ret)
-+		return ret;
-+
-+	timeout = jiffies + msecs_to_jiffies(10);
-+
-+	while (!clkgena_divmux_is_running(genamux)) {
-+		if (time_after(jiffies, timeout))
-+			return -ETIMEDOUT;
-+		cpu_relax();
-+	}
-+
-+	return 0;
-+}
-+
-+static void clkgena_divmux_disable(struct clk_hw *hw)
-+{
-+	struct clkgena_divmux *genamux = to_clkgena_divmux(hw);
-+	struct clk_hw *mux_hw = &genamux->mux.hw;
-+
-+	mux_hw->clk = hw->clk;
-+
-+	clk_mux_ops.set_parent(mux_hw, CKGAX_CLKOPSRC_SWITCH_OFF);
-+}
-+
-+static int clkgena_divmux_is_enabled(struct clk_hw *hw)
-+{
-+	struct clkgena_divmux *genamux = to_clkgena_divmux(hw);
-+	struct clk_hw *mux_hw = &genamux->mux.hw;
-+
-+	mux_hw->clk = hw->clk;
-+
-+	return (s8)clk_mux_ops.get_parent(mux_hw) > 0;
-+}
-+
-+u8 clkgena_divmux_get_parent(struct clk_hw *hw)
-+{
-+	struct clkgena_divmux *genamux = to_clkgena_divmux(hw);
-+	struct clk_hw *mux_hw = &genamux->mux.hw;
-+
-+	mux_hw->clk = hw->clk;
-+
-+	genamux->muxsel = clk_mux_ops.get_parent(mux_hw);
-+	if ((s8)genamux->muxsel < 0) {
-+		pr_debug("%s: %s: Invalid parent, setting to default.\n",
-+		      __func__, __clk_get_name(hw->clk));
-+		genamux->muxsel = 0;
-+	}
-+
-+	return genamux->muxsel;
-+}
-+
-+static int clkgena_divmux_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct clkgena_divmux *genamux = to_clkgena_divmux(hw);
-+
-+	if (index >= CKGAX_CLKOPSRC_SWITCH_OFF)
-+		return -EINVAL;
-+
-+	genamux->muxsel = index;
-+
-+	/*
-+	 * If the mux is already enabled, call enable directly to set the
-+	 * new mux position and wait for it to start running again. Otherwise
-+	 * do nothing.
-+	 */
-+	if (clkgena_divmux_is_enabled(hw))
-+		clkgena_divmux_enable(hw);
-+
-+	return 0;
-+}
-+
-+unsigned long clkgena_divmux_recalc_rate(struct clk_hw *hw,
-+		unsigned long parent_rate)
-+{
-+	struct clkgena_divmux *genamux = to_clkgena_divmux(hw);
-+	struct clk_hw *div_hw = &genamux->div[genamux->muxsel].hw;
-+
-+	div_hw->clk = hw->clk;
-+
-+	return clk_divider_ops.recalc_rate(div_hw, parent_rate);
-+}
-+
-+static int clkgena_divmux_set_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long parent_rate)
-+{
-+	struct clkgena_divmux *genamux = to_clkgena_divmux(hw);
-+	struct clk_hw *div_hw = &genamux->div[genamux->muxsel].hw;
-+
-+	div_hw->clk = hw->clk;
-+
-+	return clk_divider_ops.set_rate(div_hw, rate, parent_rate);
-+}
-+
-+static long clkgena_divmux_round_rate(struct clk_hw *hw, unsigned long rate,
-+				   unsigned long *prate)
-+{
-+	struct clkgena_divmux *genamux = to_clkgena_divmux(hw);
-+	struct clk_hw *div_hw = &genamux->div[genamux->muxsel].hw;
-+
-+	div_hw->clk = hw->clk;
-+
-+	return clk_divider_ops.round_rate(div_hw, rate, prate);
-+}
-+
-+static const struct clk_ops clkgena_divmux_ops = {
-+	.enable = clkgena_divmux_enable,
-+	.disable = clkgena_divmux_disable,
-+	.is_enabled = clkgena_divmux_is_enabled,
-+	.get_parent = clkgena_divmux_get_parent,
-+	.set_parent = clkgena_divmux_set_parent,
-+	.round_rate = clkgena_divmux_round_rate,
-+	.recalc_rate = clkgena_divmux_recalc_rate,
-+	.set_rate = clkgena_divmux_set_rate,
-+};
 +
 +/**
-+ * clk_register_genamux - register a genamux clock with the clock framework
++ * PLL clock that is integrated in the ClockGenA instances on the STiH415
++ * and STiH416.
++ *
++ * @hw: handle between common and hardware-specific interfaces.
++ * @type: PLL instance type.
++ * @regs_base: base of the PLL configuration register(s).
++ *
 + */
-+struct clk *clk_register_genamux(const char *name,
-+				const char **parent_names, u8 num_parents,
-+				void __iomem *reg,
-+				const struct clkgena_divmux_data *muxdata,
-+				u32 idx)
++struct clkgen_pll {
++	struct clk_hw		hw;
++	struct clkgen_pll_data	*data;
++	void __iomem		*regs_base;
++};
++
++#define to_clkgen_pll(_hw) container_of(_hw, struct clkgen_pll, hw)
++
++static int clkgen_pll_is_locked(struct clk_hw *hw)
 +{
-+	/*
-+	 * Fixed constants across all ClockgenA variants
-+	 */
-+	const int mux_width = 2;
-+	const int divider_width = 5;
-+	struct clkgena_divmux *genamux;
++	struct clkgen_pll *pll = to_clkgen_pll(hw);
++	u32 locked = CLKGEN_READ(pll, locked_status);
++
++	return !!locked;
++}
++
++static int clkgen_pll_is_enabled(struct clk_hw *hw)
++{
++	struct clkgen_pll *pll = to_clkgen_pll(hw);
++	u32 poweroff = CLKGEN_READ(pll, pdn_status);
++	return !poweroff;
++}
++
++unsigned long recalc_stm_pll800c65(struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct clkgen_pll *pll = to_clkgen_pll(hw);
++	unsigned long mdiv, ndiv, pdiv;
++	unsigned long rate;
++	uint64_t res;
++
++	if (!clkgen_pll_is_enabled(hw) || !clkgen_pll_is_locked(hw))
++		return 0;
++
++	pdiv = CLKGEN_READ(pll, pdiv);
++	mdiv = CLKGEN_READ(pll, mdiv);
++	ndiv = CLKGEN_READ(pll, ndiv);
++
++	if (!mdiv)
++		mdiv++; /* mdiv=0 or 1 => MDIV=1 */
++
++	res = (uint64_t)2 * (uint64_t)parent_rate * (uint64_t)ndiv;
++	rate = (unsigned long)div64_u64(res, mdiv * (1 << pdiv));
++
++	pr_debug("%s:%s rate %lu\n", __clk_get_name(hw->clk), __func__, rate);
++
++	return rate;
++
++}
++
++unsigned long recalc_stm_pll1600c65(struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct clkgen_pll *pll = to_clkgen_pll(hw);
++	unsigned long mdiv, ndiv;
++	unsigned long rate;
++
++	if (!clkgen_pll_is_enabled(hw) || !clkgen_pll_is_locked(hw))
++		return 0;
++
++	mdiv = CLKGEN_READ(pll, mdiv);
++	ndiv = CLKGEN_READ(pll, ndiv);
++
++	if (!mdiv)
++		mdiv = 1;
++
++	/* Note: input is divided by 1000 to avoid overflow */
++	rate = ((2 * (parent_rate / 1000) * ndiv) / mdiv) * 1000;
++
++	pr_debug("%s:%s rate %lu\n", __clk_get_name(hw->clk), __func__, rate);
++
++	return rate;
++}
++
++unsigned long recalc_stm_pll3200c32(struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct clkgen_pll *pll = to_clkgen_pll(hw);
++	unsigned long ndiv, idf;
++	unsigned long rate = 0;
++
++	if (!clkgen_pll_is_enabled(hw) || !clkgen_pll_is_locked(hw))
++		return 0;
++
++	ndiv = CLKGEN_READ(pll, ndiv);
++	idf = CLKGEN_READ(pll, idf);
++
++	if (idf)
++		/* Note: input is divided to avoid overflow */
++		rate = ((2 * (parent_rate/1000) * ndiv) / idf) * 1000;
++
++	pr_debug("%s:%s rate %lu\n", __clk_get_name(hw->clk), __func__, rate);
++
++	return rate;
++}
++
++unsigned long recalc_stm_pll1200c32(struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct clkgen_pll *pll = to_clkgen_pll(hw);
++	unsigned long odf, ldf, idf;
++	unsigned long rate;
++
++	if (!clkgen_pll_is_enabled(hw) || !clkgen_pll_is_locked(hw))
++		return 0;
++
++	odf = CLKGEN_READ(pll, odf[0]);
++	ldf = CLKGEN_READ(pll, ldf);
++	idf = CLKGEN_READ(pll, idf);
++
++	if (!idf) /* idf==0 means 1 */
++		idf = 1;
++	if (!odf) /* odf==0 means 1 */
++		odf = 1;
++
++	/* Note: input is divided by 1000 to avoid overflow */
++	rate = (((parent_rate / 1000) * ldf) / (odf * idf)) * 1000;
++
++	pr_debug("%s:%s rate %lu\n", __clk_get_name(hw->clk), __func__, rate);
++
++	return rate;
++}
++
++static const struct clk_ops st_pll1600c65_ops = {
++	.is_enabled	= clkgen_pll_is_enabled,
++	.recalc_rate	= recalc_stm_pll1600c65,
++};
++
++static const struct clk_ops st_pll800c65_ops = {
++	.is_enabled	= clkgen_pll_is_enabled,
++	.recalc_rate	= recalc_stm_pll800c65,
++};
++
++static const struct clk_ops stm_pll3200c32_ops = {
++	.is_enabled	= clkgen_pll_is_enabled,
++	.recalc_rate	= recalc_stm_pll3200c32,
++};
++
++static const struct clk_ops st_pll1200c32_ops = {
++	.is_enabled	= clkgen_pll_is_enabled,
++	.recalc_rate	= recalc_stm_pll1200c32,
++};
++
++static struct clk * __init clkgen_pll_register(const char *parent_name,
++				struct clkgen_pll_data	*pll_data,
++				void __iomem *reg,
++				const char *clk_name)
++{
++	struct clkgen_pll *pll;
 +	struct clk *clk;
 +	struct clk_init_data init;
-+	int i;
 +
-+	genamux = kzalloc(sizeof(*genamux), GFP_KERNEL);
-+	if (!genamux)
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
 +		return ERR_PTR(-ENOMEM);
 +
-+	init.name = name;
-+	init.ops = &clkgena_divmux_ops;
++	init.name = clk_name;
++	init.ops = pll_data->ops;
++
 +	init.flags = CLK_IS_BASIC;
-+	init.parent_names = parent_names;
-+	init.num_parents = num_parents;
++	init.parent_names = &parent_name;
++	init.num_parents  = 1;
 +
-+	genamux->mux.lock  = &clkgena_divmux_lock;
-+	genamux->mux.mask = BIT(mux_width) - 1;
-+	genamux->mux.shift = muxdata->mux_start_bit + (idx * mux_width);
-+	if (genamux->mux.shift > 31) {
-+		/*
-+		 * We have spilled into the second mux register so
-+		 * adjust the register address and the bit shift accordingly
-+		 */
-+		genamux->mux.reg = reg + muxdata->mux_offset2;
-+		genamux->mux.shift -= 32;
-+	} else {
-+		genamux->mux.reg   = reg + muxdata->mux_offset;
-+	}
++	pll->data = pll_data;
++	pll->regs_base = reg;
++	pll->hw.init = &init;
 +
-+	for (i = 0; i < NUM_INPUTS; i++) {
-+		/*
-+		 * Divider config for each input
-+		 */
-+		void __iomem *divbase = reg + muxdata->div_offsets[i];
-+		genamux->div[i].width = divider_width;
-+		genamux->div[i].reg = divbase + (idx * sizeof(u32));
-+
-+		/*
-+		 * Mux enabled/running feedback register for each input.
-+		 */
-+		genamux->feedback_reg[i] = reg + muxdata->fb_offsets[i];
-+	}
-+
-+	genamux->feedback_bit_idx = muxdata->fb_start_bit_idx + idx;
-+	genamux->hw.init = &init;
-+
-+	clk = clk_register(NULL, &genamux->hw);
++	clk = clk_register(NULL, &pll->hw);
 +	if (IS_ERR(clk)) {
-+		kfree(genamux);
-+		goto err;
++		kfree(pll);
++		return clk;
 +	}
 +
 +	pr_debug("%s: parent %s rate %lu\n",
 +			__clk_get_name(clk),
 +			__clk_get_name(clk_get_parent(clk)),
 +			clk_get_rate(clk));
-+err:
++
 +	return clk;
 +}
 +
-+static struct clkgena_divmux_data st_divmux_c65hs = {
-+	.num_outputs = 4,
-+	.mux_offset = 0x14,
-+	.mux_start_bit = 0,
-+	.div_offsets = { 0x800, 0x900, 0xb00 },
-+	.fb_offsets = { 0x18, 0x1c, 0x20 },
-+	.fb_start_bit_idx = 0,
-+};
++static struct clk * __init clkgen_c65_lsdiv_register(const char *parent_name,
++						     const char *clk_name)
++{
++	struct clk *clk;
 +
-+static struct clkgena_divmux_data st_divmux_c65ls = {
-+	.num_outputs = 14,
-+	.mux_offset = 0x14,
-+	.mux_offset2 = 0x24,
-+	.mux_start_bit = 8,
-+	.div_offsets = { 0x810, 0xa10, 0xb10 },
-+	.fb_offsets = { 0x18, 0x1c, 0x20 },
-+	.fb_start_bit_idx = 4,
-+};
++	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0, 1, 2);
++	if (IS_ERR(clk))
++		return clk;
 +
-+static struct clkgena_divmux_data st_divmux_c32odf0 = {
-+	.num_outputs = 8,
-+	.mux_offset = 0x1c,
-+	.mux_start_bit = 0,
-+	.div_offsets = { 0x800, 0x900, 0xa60 },
-+	.fb_offsets = { 0x2c, 0x24, 0x28 },
-+	.fb_start_bit_idx = 0,
-+};
-+
-+static struct clkgena_divmux_data st_divmux_c32odf1 = {
-+	.num_outputs = 8,
-+	.mux_offset = 0x1c,
-+	.mux_start_bit = 16,
-+	.div_offsets = { 0x820, 0x980, 0xa80 },
-+	.fb_offsets = { 0x2c, 0x24, 0x28 },
-+	.fb_start_bit_idx = 8,
-+};
-+
-+static struct clkgena_divmux_data st_divmux_c32odf2 = {
-+	.num_outputs = 8,
-+	.mux_offset = 0x20,
-+	.mux_start_bit = 0,
-+	.div_offsets = { 0x840, 0xa20, 0xb10 },
-+	.fb_offsets = { 0x2c, 0x24, 0x28 },
-+	.fb_start_bit_idx = 16,
-+};
-+
-+static struct clkgena_divmux_data st_divmux_c32odf3 = {
-+	.num_outputs = 8,
-+	.mux_offset = 0x20,
-+	.mux_start_bit = 16,
-+	.div_offsets = { 0x860, 0xa40, 0xb30 },
-+	.fb_offsets = { 0x2c, 0x24, 0x28 },
-+	.fb_start_bit_idx = 24,
-+};
-+
-+static struct of_device_id clkgena_divmux_of_match[] = {
-+	{
-+		.compatible = "st,clkgena-divmux-c65-hs",
-+		.data = &st_divmux_c65hs,
-+	},
-+	{
-+		.compatible = "st,clkgena-divmux-c65-ls",
-+		.data = &st_divmux_c65ls,
-+	},
-+	{
-+		.compatible = "st,clkgena-divmux-c32-odf0",
-+		.data = &st_divmux_c32odf0,
-+	},
-+	{
-+		.compatible = "st,clkgena-divmux-c32-odf1",
-+		.data = &st_divmux_c32odf1,
-+	},
-+	{
-+		.compatible = "st,clkgena-divmux-c32-odf2",
-+		.data = &st_divmux_c32odf2,
-+	},
-+	{
-+		.compatible = "st,clkgena-divmux-c32-odf3",
-+		.data = &st_divmux_c32odf3,
-+	},
-+	{}
-+};
++	pr_debug("%s: parent %s rate %lu\n",
++			__clk_get_name(clk),
++			__clk_get_name(clk_get_parent(clk)),
++			clk_get_rate(clk));
++	return clk;
++}
 +
 +static void __iomem * __init clkgen_get_register_base(
 +				struct device_node *np)
@@ -441,148 +384,274 @@ index 0000000..65d702c
 +	return reg;
 +}
 +
-+void __init st_of_clkgena_divmux_setup(struct device_node *np)
++#define CLKGENAx_PLL0_OFFSET 0x0
++#define CLKGENAx_PLL1_OFFSET 0x4
++
++static void __init clkgena_c65_pll_setup(struct device_node *np)
 +{
-+	const struct of_device_id *match;
-+	const struct clkgena_divmux_data *data;
++	const int num_pll_outputs = 3;
 +	struct clk_onecell_data *clk_data;
++	const char *parent_name;
 +	void __iomem *reg;
-+	const char **parents;
-+	int num_parents = 0, i;
++	const char *clk_name;
 +
-+	match = of_match_node(clkgena_divmux_of_match, np);
-+	if (WARN_ON(!match))
++	parent_name = of_clk_get_parent_name(np, 0);
++	if (!parent_name)
 +		return;
-+
-+	data = (struct clkgena_divmux_data *)match->data;
 +
 +	reg = clkgen_get_register_base(np);
 +	if (!reg)
 +		return;
 +
-+	parents = clkgen_mux_get_parents(np, &num_parents);
-+	if (IS_ERR(parents))
-+		return;
-+
 +	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
 +	if (!clk_data)
-+		goto err;
++		return;
 +
-+	clk_data->clk_num = data->num_outputs;
++	clk_data->clk_num = num_pll_outputs;
 +	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk *),
 +				 GFP_KERNEL);
 +
 +	if (!clk_data->clks)
 +		goto err;
 +
-+	for (i = 0; i < clk_data->clk_num; i++) {
-+		struct clk *clk;
-+		const char *clk_name;
++	if (of_property_read_string_index(np, "clock-output-names",
++					  0, &clk_name))
++		goto err;
 +
-+		if (of_property_read_string_index(np, "clock-output-names",
-+						  i, &clk_name))
-+			break;
++	/*
++	 * PLL0 HS (high speed) output
++	 */
++	clk_data->clks[0] = clkgen_pll_register(parent_name,
++						&st_pll1600c65_ax,
++						reg + CLKGENAx_PLL0_OFFSET,
++						clk_name);
 +
-+		/*
-+		 * If we read an empty clock name then the output is unused
-+		 */
-+		if (*clk_name == '\0')
-+			continue;
++	if (IS_ERR(clk_data->clks[0]))
++		goto err;
 +
-+		clk = clk_register_genamux(clk_name, parents, num_parents,
-+					   reg, data, i);
++	if (of_property_read_string_index(np, "clock-output-names",
++					  1, &clk_name))
++		goto err;
 +
-+		if (IS_ERR(clk))
-+			goto err;
++	/*
++	 * PLL0 LS (low speed) output, which is a fixed divide by 2 of the
++	 * high speed output.
++	 */
++	clk_data->clks[1] = clkgen_c65_lsdiv_register(__clk_get_name
++						      (clk_data->clks[0]),
++						      clk_name);
 +
-+		clk_data->clks[i] = clk;
-+	}
++	if (IS_ERR(clk_data->clks[1]))
++		goto err;
 +
-+	kfree(parents);
++	if (of_property_read_string_index(np, "clock-output-names",
++					  2, &clk_name))
++		goto err;
++
++	/*
++	 * PLL1 output
++	 */
++	clk_data->clks[2] = clkgen_pll_register(parent_name,
++						&st_pll800c65_ax,
++						reg + CLKGENAx_PLL1_OFFSET,
++						clk_name);
++
++	if (IS_ERR(clk_data->clks[2]))
++		goto err;
 +
 +	of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
 +	return;
++
 +err:
-+	if (clk_data)
-+		kfree(clk_data->clks);
-+
++	kfree(clk_data->clks);
 +	kfree(clk_data);
-+	kfree(parents);
 +}
-+CLK_OF_DECLARE(clkgenadivmux, "st,clkgena-divmux", st_of_clkgena_divmux_setup);
++CLK_OF_DECLARE(clkgena_c65_plls,
++	       "st,clkgena-plls-c65", clkgena_c65_pll_setup);
 +
-+struct clkgena_prediv_data {
-+	u32 offset;
-+	u8 shift;
-+	struct clk_div_table *table;
-+};
++static struct clk * __init clkgen_odf_register(const char *parent_name,
++					       void * __iomem reg,
++					       struct clkgen_pll_data *pll_data,
++					       int odf,
++					       spinlock_t *odf_lock,
++					       const char *odf_name)
++{
++	struct clk *clk;
++	unsigned long flags;
++	struct clk_gate *gate;
++	struct clk_divider *div;
 +
-+static struct clk_div_table prediv_table16[] = {
-+	{ .val = 0, .div = 1 },
-+	{ .val = 1, .div = 16 },
-+	{ .div = 0 },
-+};
++	flags = CLK_GET_RATE_NOCACHE | CLK_SET_RATE_GATE;
 +
-+static struct clkgena_prediv_data prediv_c65_data = {
-+	.offset = 0x4c,
-+	.shift = 31,
-+	.table = prediv_table16,
-+};
++	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++	if (!gate)
++		return ERR_PTR(-ENOMEM);
 +
-+static struct clkgena_prediv_data prediv_c32_data = {
-+	.offset = 0x50,
-+	.shift = 1,
-+	.table = prediv_table16,
-+};
++	gate->flags = CLK_GATE_SET_TO_DISABLE;
++	gate->reg = reg + pll_data->odf_gate[odf].offset;
++	gate->bit_idx = pll_data->odf_gate[odf].shift;
++	gate->lock = odf_lock;
 +
-+static struct of_device_id clkgena_prediv_of_match[] = {
-+	{ .compatible = "st,clkgena-prediv-c65", .data = &prediv_c65_data },
-+	{ .compatible = "st,clkgena-prediv-c32", .data = &prediv_c32_data },
++	div = kzalloc(sizeof(*div), GFP_KERNEL);
++	if (!div)
++		return ERR_PTR(-ENOMEM);
++
++	div->flags = CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO;
++	div->reg = reg + pll_data->odf[odf].offset;
++	div->shift = pll_data->odf[odf].shift;
++	div->width = fls(pll_data->odf[odf].mask);
++	div->lock = odf_lock;
++
++	clk = clk_register_composite(NULL, odf_name, &parent_name, 1,
++				     NULL, NULL,
++				     &div->hw, &clk_divider_ops,
++				     &gate->hw, &clk_gate_ops,
++				     flags);
++	if (IS_ERR(clk))
++		return clk;
++
++	pr_debug("%s: parent %s rate %lu\n",
++			__clk_get_name(clk),
++			__clk_get_name(clk_get_parent(clk)),
++			clk_get_rate(clk));
++	return clk;
++}
++
++static struct of_device_id c32_pll_of_match[] = {
++	{
++		.compatible = "st,plls-c32-a1x-0",
++		.data = &st_pll3200c32_a1x_0,
++	},
++	{
++		.compatible = "st,plls-c32-a1x-1",
++		.data = &st_pll3200c32_a1x_1,
++	},
 +	{}
 +};
 +
-+void __init st_of_clkgena_prediv_setup(struct device_node *np)
++static void __init clkgen_c32_pll_setup(struct device_node *np)
 +{
 +	const struct of_device_id *match;
-+	void __iomem *reg;
-+	const char *parent_name, *clk_name;
 +	struct clk *clk;
-+	struct clkgena_prediv_data *data;
++	const char *parent_name, *pll_name;
++	void __iomem *pll_base;
++	int num_odfs, odf;
++	struct clk_onecell_data *clk_data;
++	struct clkgen_pll_data	*data;
 +
-+	match = of_match_node(clkgena_prediv_of_match, np);
++	match = of_match_node(c32_pll_of_match, np);
 +	if (!match) {
 +		pr_err("%s: No matching data\n", __func__);
 +		return;
 +	}
 +
-+	data = (struct clkgena_prediv_data *)match->data;
-+
-+	reg = clkgen_get_register_base(np);
-+	if (!reg)
-+		return;
++	data = (struct clkgen_pll_data *) match->data;
 +
 +	parent_name = of_clk_get_parent_name(np, 0);
 +	if (!parent_name)
 +		return;
 +
-+	if (of_property_read_string_index(np, "clock-output-names",
-+					  0, &clk_name))
++	pll_base = clkgen_get_register_base(np);
++	if (!pll_base)
 +		return;
 +
-+	clk = clk_register_divider_table(NULL, clk_name, parent_name, 0,
-+					 reg + data->offset, data->shift, 1,
-+					 0, data->table, NULL);
++	clk = clkgen_pll_register(parent_name, data, pll_base, np->name);
 +	if (IS_ERR(clk))
 +		return;
 +
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+	pr_debug("%s: parent %s rate %u\n",
-+		__clk_get_name(clk),
-+		__clk_get_name(clk_get_parent(clk)),
-+		(unsigned int)clk_get_rate(clk));
++	pll_name = __clk_get_name(clk);
++
++	num_odfs = data->num_odfs;
++
++	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
++	if (!clk_data)
++		return;
++
++	clk_data->clk_num = num_odfs;
++	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk *),
++				 GFP_KERNEL);
++
++	if (!clk_data->clks)
++		goto err;
++
++	for (odf = 0; odf < num_odfs; odf++) {
++		struct clk *clk;
++		const char *clk_name;
++
++		if (of_property_read_string_index(np, "clock-output-names",
++						  odf, &clk_name))
++			return;
++
++		clk = clkgen_odf_register(pll_name, pll_base, data,
++				odf, &clkgena_c32_odf_lock, clk_name);
++		if (IS_ERR(clk))
++			goto err;
++
++		clk_data->clks[odf] = clk;
++	}
++
++	of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
++	return;
++
++err:
++	kfree(pll_name);
++	kfree(clk_data->clks);
++	kfree(clk_data);
++}
++CLK_OF_DECLARE(clkgen_c32_pll, "st,clkgen-plls-c32", clkgen_c32_pll_setup);
+diff --git a/drivers/clk/st/clkgen.h b/drivers/clk/st/clkgen.h
+new file mode 100644
+index 0000000..35c8632
+--- /dev/null
++++ b/drivers/clk/st/clkgen.h
+@@ -0,0 +1,48 @@
++/************************************************************************
++File  : Clock H/w specific Information
++
++Author: Pankaj Dev <pankaj.dev@st.com>
++
++Copyright (C) 2014 STMicroelectronics
++************************************************************************/
++
++#ifndef __CLKGEN_INFO_H
++#define __CLKGEN_INFO_H
++
++struct clkgen_field {
++	unsigned int offset;
++	unsigned int mask;
++	unsigned int shift;
++};
++
++static inline unsigned long clkgen_read(void __iomem	*base,
++					  struct clkgen_field *field)
++{
++	return (readl(base + field->offset) >> field->shift) & field->mask;
++}
++
++
++static inline void clkgen_write(void __iomem *base, struct clkgen_field *field,
++				  unsigned long val)
++{
++	writel((readl(base + field->offset) &
++	       ~(field->mask << field->shift)) | (val << field->shift),
++	       base + field->offset);
 +
 +	return;
 +}
-+CLK_OF_DECLARE(clkgenaprediv, "st,clkgena-prediv", st_of_clkgena_prediv_setup);
++
++#define CLKGEN_FIELD(_offset, _mask, _shift) {		\
++				.offset	= _offset,	\
++				.mask	= _mask,	\
++				.shift	= _shift,	\
++				}
++
++#define CLKGEN_READ(pll, field) clkgen_read(pll->regs_base, \
++		&pll->data->field)
++
++#define CLKGEN_WRITE(pll, field, val) clkgen_write(pll->regs_base, \
++		&pll->data->field, val)
++
++#endif /*__CLKGEN_INFO_H*/
++
 -- 
 1.9.0
