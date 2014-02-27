@@ -1,40 +1,51 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 27 Feb 2014 10:14:47 -0500
-Subject: [PATCH 00/10] pinctrl: mvebu: remove hard-coded addresses from
- Dove pinctrl
-In-Reply-To: <20140227133831.GA28443@localhost>
-References: <1393231382-11078-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20140224181023.GA1010@titan.lakedaemon.net>
- <CACRpkdZ+YGTyDj6i8c198MdRtz3GY-YBmVO9LysPCcmT4EC0cg@mail.gmail.com>
- <20140225151656.GI1010@titan.lakedaemon.net>
- <530CB725.5070904@gmail.com>
- <20140225154347.GJ1010@titan.lakedaemon.net>
- <530CEDB7.2070103@gmail.com>
- <20140225200447.GA1872@titan.lakedaemon.net>
- <20140227133831.GA28443@localhost>
-Message-ID: <20140227151447.GI1872@titan.lakedaemon.net>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 27 Feb 2014 16:23:32 +0100
+Subject: [PATCH 01/15] ASoC: fsl-ssi: Use regmap
+In-Reply-To: <6dc5873dcdf54e13aecbf7c6be03f8bf@BY2PR03MB505.namprd03.prod.outlook.com>
+References: <1393430538-32333-1-git-send-email-mpa@pengutronix.de>
+ <1393430538-32333-2-git-send-email-mpa@pengutronix.de>
+ <6dc5873dcdf54e13aecbf7c6be03f8bf@BY2PR03MB505.namprd03.prod.outlook.com>
+Message-ID: <20140227152332.GA30791@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 10:38:32AM -0300, Ezequiel Garcia wrote:
-> On Tue, Feb 25, 2014 at 03:04:47PM -0500, Jason Cooper wrote:
-> > On Tue, Feb 25, 2014 at 08:23:35PM +0100, Sebastian Hesselbarth wrote:
-> > > [Cooked down Cc list to relevant people and added Ezequiel who agreed
-> > > to test on Armada 375/38x.]
-> > > 
-> [..]
-> > 
-> > If you can drop the dtsi changes (I have them in mvebu/dt), and fix the
-> > whitespace change, then we can merge them as is.
-> > 
+Hi,
+
+On Thu, Feb 27, 2014 at 02:08:45AM +0000, Li.Xiubo at freescale.com wrote:
 > 
-> Tested for-next on Armada 375 and Armada 385 development boards. The
-> pinctrl debugfs looks correct.
+> > @@ -134,6 +115,15 @@ struct fsl_ssi_rxtx_reg_val {
+> >  	struct fsl_ssi_reg_val rx;
+> >  	struct fsl_ssi_reg_val tx;
+> >  };
+> > +static const struct regmap_config fsl_ssi_regconfig = {
+> > +	.max_register = CCSR_SSI_SACCDIS,
+> > +	.reg_bits = 32,
+> > +	.val_bits = 32,
+> > +	.reg_stride = 4,
+> > +#ifdef PPC
+> > +	.val_format_endian = REGMAP_ENDIAN_BIG,
+> > +#endif
 > 
-> I've been using for-next for a couple days now, without issues.
+> Is this really needed for your PPC platforms?
 
-Great!  Thanks, Ezequiel!
+I don't know if this is necessary. I don't have any PPC hardware where I
+could test this driver. This is just a guess how regmap for this driver
+and PPC should look like based on the previous code. So it would be
+great if anyone could test this regmap config on PPC.
 
-thx,
+Thanks,
 
-Jason.
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140227/d03bbcd4/attachment-0001.sig>
