@@ -1,76 +1,59 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 27 Feb 2014 19:47:58 +0100
-Subject: [PATCHv2 7/7] ARM: at91/dt: sama5d3: remove useless adc properties
-In-Reply-To: <1393526878-22311-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1393526878-22311-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1393526878-22311-8-git-send-email-alexandre.belloni@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 27 Feb 2014 18:54:24 +0000
+Subject: [PATCH V2] irqchip:gic: change access of gicc_ctrl register to
+ read modify write.
+In-Reply-To: <1393526095-31479-1-git-send-email-fkan@apm.com> (Feng Kan's
+ message of "Thu, 27 Feb 2014 18:34:55 +0000")
+References: <1393526095-31479-1-git-send-email-fkan@apm.com>
+Message-ID: <87zjlc2xpb.fsf@sofa.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the properties that are not used anymore by the at91_adc driver and fix
-the atmel,adc-use-external-triggers property name.
+On Thu, Feb 27 2014 at  6:34:55 pm GMT, Feng Kan <fkan@apm.com> wrote:
+> This change is made to preserve the GIC v2 releated bits in the
+> GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
+> The original code only set the enable/disable group bit in this register.
+> This code will preserve the bypass bits configured by the bootload except
+> the enable/disable bit. The main reason for this change is to allow the
+> bypass bits specified in the v2 spec to remain untouched by the current
+> GIC code. In the X-Gene platform, the bypass functionality is not used
+> and bypass must be disabled at all time.
+>
+> Signed-off-by: Vinayak Kale <vkale@apm.com>
+> Acked-by: Anup Patel <apatel@apm.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+> V2 Changes:
+> 	- only mask off v2 bypass bits
+>
+>  drivers/irqchip/irq-gic.c |   22 +++++++++++++++++++---
+>  1 files changed, 19 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 341c601..757581b 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>  	void __iomem *dist_base = gic_data_dist_base(gic);
+>  	void __iomem *base = gic_data_cpu_base(gic);
+>  	unsigned int cpu_mask, cpu = smp_processor_id();
+> +	unsigned int ctrl_mask;
+>  	int i;
+>  
+>  	/*
+> @@ -449,13 +450,24 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>  		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
+>  
+>  	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
+> -	writel_relaxed(1, base + GIC_CPU_CTRL);
+> +
+> +	ctrl_mask = readl(base + GIC_CPU_CTRL);
+> +	ctrl_mask |= 0x1;
+> +	writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
 
-Also, add #address-cells, #size-cells and a reg for each trigger to comply to
-the ePAPR.
+I think I'm quickly loosing the will to live, or at least to review this
+patch any further.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/sama5d3.dtsi | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index 26d7ed510c96..73ad828296b2 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -239,6 +239,8 @@
- 			};
- 
- 			adc0: adc at f8018000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				compatible = "atmel,at91sam9x5-adc";
- 				reg = <0xf8018000 0x100>;
- 				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
-@@ -261,35 +263,34 @@
- 				clocks = <&adc_clk>,
- 					 <&adc_op_clk>;
- 				clock-names = "adc_clk", "adc_op_clk";
--				atmel,adc-channel-base = <0x50>;
- 				atmel,adc-channels-used = <0xfff>;
--				atmel,adc-drdy-mask = <0x1000000>;
--				atmel,adc-num-channels = <12>;
- 				atmel,adc-startup-time = <40>;
--				atmel,adc-status-register = <0x30>;
--				atmel,adc-trigger-register = <0xc0>;
--				atmel,adc-use-external;
-+				atmel,adc-use-external-triggers;
- 				atmel,adc-vref = <3000>;
- 				atmel,adc-res = <10 12>;
- 				atmel,adc-res-names = "lowres", "highres";
- 				status = "disabled";
- 
- 				trigger at 0 {
-+					reg = <0>;
- 					trigger-name = "external-rising";
- 					trigger-value = <0x1>;
- 					trigger-external;
- 				};
- 				trigger at 1 {
-+					reg = <1>;
- 					trigger-name = "external-falling";
- 					trigger-value = <0x2>;
- 					trigger-external;
- 				};
- 				trigger at 2 {
-+					reg = <2>;
- 					trigger-name = "external-any";
- 					trigger-value = <0x3>;
- 					trigger-external;
- 				};
- 				trigger at 3 {
-+					reg = <3>;
- 					trigger-name = "continuous";
- 					trigger-value = <0x6>;
- 				};
+	M.
 -- 
-1.8.3.2
+AAAFNRAA
