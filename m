@@ -1,67 +1,138 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu, 27 Feb 2014 21:30:31 +0100
-Subject: [PATCH v2 7/8] ARM: dts: omap3-tobi: Use include file
- omap-gpmc-smsc9221
+Date: Thu, 27 Feb 2014 21:30:28 +0100
+Subject: [PATCH v2 4/8] ARM: dts: omap3-overo: Enable WiFi/BT combo
 In-Reply-To: <1393533032-1619-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1393533032-1619-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1393533032-1619-8-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1393533032-1619-5-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the timings provided by omap-gpmc-smsc9221. This does not change
-the timings, but it avoids code duplication.
+MMC2 is used by the on-board WiFi module populated on some boards
+(based on Marvell Libertas 8688 SDIO). The Bluetooth is connected
+to UART2.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/boot/dts/omap3-overo-tobi-common.dtsi | 30 +++-----------------------
- 1 file changed, 3 insertions(+), 27 deletions(-)
+ arch/arm/boot/dts/omap3-overo-storm-tobi.dts |  8 ++++
+ arch/arm/boot/dts/omap3-overo-tobi.dts       |  8 ++++
+ arch/arm/boot/dts/omap3-overo.dtsi           | 58 ++++++++++++++++++++++++++++
+ 3 files changed, 74 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-index da7d85b..caddb8c 100644
---- a/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo-tobi-common.dtsi
-@@ -44,39 +44,15 @@
- 	};
+diff --git a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
+index 966b5c9..2033b52 100644
+--- a/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
++++ b/arch/arm/boot/dts/omap3-overo-storm-tobi.dts
+@@ -20,3 +20,11 @@
+ 	compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap36xx", "ti,omap3";
  };
  
-+#include "omap-gpmc-smsc9221.dtsi"
++&omap3_pmx_core2 {
++	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
++		pinctrl-single,pins = <
++			OMAP3630_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
++		>;
++	};
++};
 +
- &gpmc {
- 	ranges = <5 0 0x2c000000 0x1000000>;	/* CS5 */
- 
--	ethernet at 5,0 {
--		compatible = "smsc,lan9221", "smsc,lan9115";
-+	ethernet at gpmc {
- 		reg = <5 0 0xff>;
--		bank-width = <2>;
--
--		gpmc,mux-add-data;
--		gpmc,cs-on-ns = <0>;
--		gpmc,cs-rd-off-ns = <42>;
--		gpmc,cs-wr-off-ns = <36>;
--		gpmc,adv-on-ns = <6>;
--		gpmc,adv-rd-off-ns = <12>;
--		gpmc,adv-wr-off-ns = <12>;
--		gpmc,oe-on-ns = <0>;
--		gpmc,oe-off-ns = <42>;
--		gpmc,we-on-ns = <0>;
--		gpmc,we-off-ns = <36>;
--		gpmc,rd-cycle-ns = <60>;
--		gpmc,wr-cycle-ns = <54>;
--		gpmc,access-ns = <36>;
--		gpmc,page-burst-access-ns = <0>;
--		gpmc,bus-turnaround-ns = <0>;
--		gpmc,cycle2cycle-delay-ns = <0>;
--		gpmc,wr-data-mux-bus-ns = <18>;
--		gpmc,wr-access-ns = <42>;
--		gpmc,cycle2cycle-samecsen;
--		gpmc,cycle2cycle-diffcsen;
--
- 		interrupt-parent = <&gpio6>;
- 		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;	/* GPIO 176 */
--		reg-io-width = <4>;
- 	};
+diff --git a/arch/arm/boot/dts/omap3-overo-tobi.dts b/arch/arm/boot/dts/omap3-overo-tobi.dts
+index de5653e..21de31d 100644
+--- a/arch/arm/boot/dts/omap3-overo-tobi.dts
++++ b/arch/arm/boot/dts/omap3-overo-tobi.dts
+@@ -20,3 +20,11 @@
+ 	compatible = "gumstix,omap3-overo-tobi", "gumstix,omap3-overo", "ti,omap3430", "ti,omap3";
  };
  
++&omap3_pmx_core2 {
++	w3cbw003c_2_pins: pinmux_w3cbw003c_2_pins {
++		pinctrl-single,pins = <
++			OMAP3430_CORE2_IOPAD(0x25e0, PIN_OUTPUT | MUX_MODE4)		/* etk_d2.gpio_16 */
++		>;
++	};
++};
++
+diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+index 018e1e0..9bc2040 100644
+--- a/arch/arm/boot/dts/omap3-overo.dtsi
++++ b/arch/arm/boot/dts/omap3-overo.dtsi
+@@ -29,6 +29,38 @@
+ 		ti,mcbsp = <&mcbsp2>;
+ 		ti,codec = <&twl_audio>;
+ 	};
++
++	/* Regulator to trigger the nPoweron signal of the Wifi module */
++	w3cbw003c_npoweron: regulator-w3cbw003c-npoweron {
++		compatible = "regulator-fixed";
++		regulator-name = "regulator-w3cbw003c-npoweron";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio2 22 GPIO_ACTIVE_HIGH>;		/* gpio_54: nPoweron */
++		enable-active-high;
++	};
++
++	/* Regulator to trigger the nReset signal of the Wifi module */
++	w3cbw003c_wifi_nreset: regulator-w3cbw003c-wifi-nreset {
++		pinctrl-names = "default";
++		pinctrl-0 = <&w3cbw003c_pins &w3cbw003c_2_pins>;
++		compatible = "regulator-fixed";
++		regulator-name = "regulator-w3cbw003c-wifi-nreset";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio1 16 GPIO_ACTIVE_HIGH>;		/* gpio_16: WiFi nReset */
++		startup-delay-us = <10000>;
++	};
++
++	/* Regulator to trigger the nReset signal of the Bluetooth module */
++	w3cbw003c_bt_nreset: regulator-w3cbw003c-bt-nreset {
++		compatible = "regulator-fixed";
++		regulator-name = "regulator-w3cbw003c-bt-nreset";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio6 4 GPIO_ACTIVE_HIGH>;		/* gpio_164: BT nReset */
++		startup-delay-us = <10000>;
++	};
+ };
+ 
+ &omap3_pmx_core {
+@@ -56,6 +88,25 @@
+ 			OMAP3_CORE1_IOPAD(0x214e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc1_dat3.sdmmc1_dat3 */
+ 		>;
+ 	};
++
++	mmc2_pins: pinmux_mmc2_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x2158, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_clk.sdmmc2_clk */
++			OMAP3_CORE1_IOPAD(0x215a, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_cmd.sdmmc2_cmd */
++			OMAP3_CORE1_IOPAD(0x215c, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat0.sdmmc2_dat0 */
++			OMAP3_CORE1_IOPAD(0x215e, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat1.sdmmc2_dat1 */
++			OMAP3_CORE1_IOPAD(0x2160, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat2.sdmmc2_dat2 */
++			OMAP3_CORE1_IOPAD(0x2162, PIN_INPUT_PULLUP | MUX_MODE0)		/* sdmmc2_dat3.sdmmc2_dat3 */
++		>;
++	};
++
++	/* WiFi/BT combo */
++	w3cbw003c_pins: pinmux_w3cbw003c_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x20b4, PIN_OUTPUT | MUX_MODE4)		/* gpmc_ncs3.gpio_54 */
++			OMAP3_CORE1_IOPAD(0x219c, PIN_OUTPUT | MUX_MODE4)		/* uart3_rts_sd.gpio_164 */
++		>;
++	};
+ };
+ 
+ &i2c1 {
+@@ -99,7 +150,14 @@
+ 
+ /* optional on board WiFi */
+ &mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins>;
++	vmmc-supply = <&w3cbw003c_npoweron>;
++	vqmmc-supply = <&w3cbw003c_bt_nreset>;
++	vmmc_aux-supply = <&w3cbw003c_wifi_nreset>;
+ 	bus-width = <4>;
++	cap-sdio-irq;
++	non-removable;
+ };
+ 
+ &twl_gpio {
 -- 
 1.8.5.3
