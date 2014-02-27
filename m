@@ -1,88 +1,44 @@
-From: fkan@apm.com (Feng Kan)
-Date: Thu, 27 Feb 2014 11:34:55 -0700
-Subject: [PATCH V2] irqchip:gic: change access of gicc_ctrl register to read
- modify write.
-Message-ID: <1393526095-31479-1-git-send-email-fkan@apm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 27 Feb 2014 19:47:51 +0100
+Subject: [PATCHv2 0/7] at91_adc: documentation and device tree cleanups
+Message-ID: <1393526878-22311-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change is made to preserve the GIC v2 releated bits in the
-GIC_CPU_CTRL register (also known as the GICC_CTLR register in spec).
-The original code only set the enable/disable group bit in this register.
-This code will preserve the bypass bits configured by the bootload except
-the enable/disable bit. The main reason for this change is to allow the
-bypass bits specified in the v2 spec to remain untouched by the current
-GIC code. In the X-Gene platform, the bypass functionality is not used
-and bypass must be disabled at all time.
+The first patch synchronise the documentation with the actual code and correct
+the example.
 
-Signed-off-by: Vinayak Kale <vkale@apm.com>
-Acked-by: Anup Patel <apatel@apm.com>
-Signed-off-by: Feng Kan <fkan@apm.com>
----
-V2 Changes:
-	- only mask off v2 bypass bits
+The second patch move the documentation to the correct location (under iio/adc)
 
- drivers/irqchip/irq-gic.c |   22 +++++++++++++++++++---
- 1 files changed, 19 insertions(+), 3 deletions(-)
+The remaining patches correct the device trees that are using the adc, mainly
+removing unused properties and making the binding compliant with the ePAPR.
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 341c601..757581b 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -418,6 +418,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 	void __iomem *dist_base = gic_data_dist_base(gic);
- 	void __iomem *base = gic_data_cpu_base(gic);
- 	unsigned int cpu_mask, cpu = smp_processor_id();
-+	unsigned int ctrl_mask;
- 	int i;
- 
- 	/*
-@@ -449,13 +450,24 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
- 
- 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
--	writel_relaxed(1, base + GIC_CPU_CTRL);
-+
-+	ctrl_mask = readl(base + GIC_CPU_CTRL);
-+	ctrl_mask |= 0x1;
-+	writel_relaxed(ctrl_mask, base + GIC_CPU_CTRL);
- }
- 
- void gic_cpu_if_down(void)
- {
-+	unsigned int ctrl_mask;
- 	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
--	writel_relaxed(0, cpu_base + GIC_CPU_CTRL);
-+
-+	ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
-+	/*
-+	 * Disable grp enable bits, leave the bypass bits alone as they
-+	 * may impact correct operation
-+	 */
-+	ctrl_mask &= 0x1e0;
-+	writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
- }
- 
- #ifdef CONFIG_CPU_PM
-@@ -566,6 +578,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
- {
- 	int i;
- 	u32 *ptr;
-+	unsigned int ctrl_mask;
- 	void __iomem *dist_base;
- 	void __iomem *cpu_base;
- 
-@@ -590,7 +603,10 @@ static void gic_cpu_restore(unsigned int gic_nr)
- 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
- 
- 	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
--	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
-+
-+	ctrl_mask = readl(cpu_base + GIC_CPU_CTRL);
-+	ctrl_mask |= 0x1;
-+	writel_relaxed(ctrl_mask, cpu_base + GIC_CPU_CTRL);
- }
- 
- static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
+Changes in v2:
+ - add #address-cells, #size-cells and a reg for each trigger to comply to the
+   ePAPR instead of removing the unit-address.
+ - also correct the atmel,adc-use-external-triggers property name in the
+   documentation and in the device tree that got it wrong.
+
+
+Alexandre Belloni (7):
+  Documentation: dt: iio: improve atmel-adc documentation
+  Documentation: dt: iio: move arm/atmel-adc.txt to iio/adc/at91_adc.txt
+  ARM: at91/dt: at91-ariag25: remove useless adc properties
+  ARM: at91/dt: at91sam9260: remove useless adc properties
+  ARM: at91/dt: at91sam9g45: remove useless adc properties
+  ARM: at91/dt: at91sam9x5: remove useless adc properties
+  ARM: at91/dt: sama5d3: remove useless adc properties
+
+ .../devicetree/bindings/arm/atmel-adc.txt          | 81 ---------------------
+ .../devicetree/bindings/iio/adc/at91_adc.txt       | 82 ++++++++++++++++++++++
+ arch/arm/boot/dts/at91-ariag25.dts                 |  1 -
+ arch/arm/boot/dts/at91sam9260.dtsi                 | 11 +--
+ arch/arm/boot/dts/at91sam9g45.dtsi                 | 11 +--
+ arch/arm/boot/dts/at91sam9x5.dtsi                  | 13 ++--
+ arch/arm/boot/dts/sama5d3.dtsi                     | 13 ++--
+ 7 files changed, 108 insertions(+), 104 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/atmel-adc.txt
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/at91_adc.txt
+
 -- 
-1.7.1
+1.8.3.2
