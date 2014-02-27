@@ -1,48 +1,47 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 27 Feb 2014 13:09:57 -0800
-Subject: [PATCH v12 1/4] PHY: Add function set_speed to generic PHY
- framework
-In-Reply-To: <20140227205039.GE5375@saruman.home>
-References: <1393524848-8207-1-git-send-email-lho@apm.com>
- <1393524848-8207-2-git-send-email-lho@apm.com>
- <20140227190102.GB4862@saruman.home>
- <CAPw-ZT=F07=T0=z=iT=hxJ0+609RBDYRL=MXF5dQoEowLjsRjQ@mail.gmail.com>
- <20140227205039.GE5375@saruman.home>
-Message-ID: <CAPw-ZT=7cu1NoxrBL48RUJV04ofrnNkF=p=23VFfu8ZZWmkQWQ@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 27 Feb 2014 22:13:51 +0100
+Subject: [PATCH V2 1/8] PM / Runtime: Fetch runtime PM callbacks using a
+ macro
+In-Reply-To: <Pine.LNX.4.44L0.1402271120280.888-100000@iolanthe.rowland.org>
+References: <CAPDyKFrbhmqmu-0uqX_U18nKXuu2z5ueYXqaz4LOHy=ijecs1g@mail.gmail.com>
+ <Pine.LNX.4.44L0.1402271120280.888-100000@iolanthe.rowland.org>
+Message-ID: <CAPDyKFq4X3G1zZay0XG2g-djEvyRdf9s47GDSC5htXZ7c-LdRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
->> >> This patch adds function set_speed to the generic PHY framework operation
->> >> structure. This function can be called to instruct the PHY underlying layer
->> >> at specified lane to configure for specified speed in hertz.
->> >
->> > why ? looks like clk_set_rate() is your friend here. Can you be more
->> > descriptive of the use case ? When will this be used ?
->> >
->>
->> The phy_set_speed is used to configure the operation speed of the PHY
->> at run-time. The clock interface in general is used to configure the
->> clock input to the IP. I don't believe they are the same thing. Maybe
->> it will be clear in my response to your second email
+On 27 February 2014 17:22, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Thu, 27 Feb 2014, Ulf Hansson wrote:
 >
-> The problem with this is that you end up adding SATA-specific details to
-> something which is supposed to be generic.
+>> > A reasonable compromise would be to define the macro, and then use it
+>> > in those three new functions (and nowhere else).
+>>
+>> Okay, let me send a v3 that tries this approach then.
+>>
+>> >
+>> > The existing rpm_idle, rpm_suspend, and rpm_resume routines should then
+>> > be changed to use the new functions.  And of course, the new functions
+>> > could be called directly by subsystems or PM domains.
+>>
+>> Not sure we should export these functions as a part of this patchset.
+>> Would it not be preferred, to first see if there are any that needs
+>> it?
+>
+> I don't understand.  V2 of the patchset exports
+> pm_runtime_force_suspend and pm_runtime_force_resume.  Why wouldn't you
+> want to export them in V3?
 
-Setting the operation speed is pretty generic from an interface point
-of view. An generic multi-purpose PHY can support multiple speed. If
-the upper layer wish to operate at an specified speed (say for testing
-purpose and etc), it can be allowed.
+There are some confusion here. :-)  pm_runtime_force_suspend|resume()
+surely need to be exported, but that's "patch v2 2/8".
 
-> After negoatiation, don't you
-> get any interrupt from your PHY indicating that link speed negotiation
-> is done ? Or is that IRQ only on AHCI IP ?
+I think we were debating whether this patch "patch v2 1/8" should use
+a macro to walk the ladder to fetch the runtime PM callback - or if we
+should implement a three c-functions to handle it. I prefer to keep
+this patch as is, thus using the macro.
 
-There is NO interrupt from the PHY. The IRQ is assoicated with the
-AHCI IP. With SATA host flow, it starts off with an COMRESET to start
-the link negotiation. At that point, it will poll for completion.
+Kind regards
+Ulf Hansson
 
-Any other concerns?
 
--Loc
+>
+> Alan Stern
+>
