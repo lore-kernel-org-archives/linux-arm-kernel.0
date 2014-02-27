@@ -1,55 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 27 Feb 2014 12:12:11 +0000
-Subject: [PATCH 17/18] KVM: ARM: vgic: add the GICv3 backend
-In-Reply-To: <530E2FEC.8090205@arm.com>
-References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
- <1391607050-540-18-git-send-email-marc.zyngier@arm.com>
- <20140225180756.GJ23136@mudshark.cambridge.arm.com>
- <530E2FEC.8090205@arm.com>
-Message-ID: <20140227121211.GF30003@mudshark.cambridge.arm.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Thu, 27 Feb 2014 13:23:02 +0100
+Subject: [PATCH 1/4] ARM: STi: add stid127 soc support
+In-Reply-To: <1391093744-19905-2-git-send-email-patrice.chotard@st.com>
+References: <1391093744-19905-1-git-send-email-patrice.chotard@st.com>
+ <1391093744-19905-2-git-send-email-patrice.chotard@st.com>
+Message-ID: <530F2E26.1040304@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 06:18:20PM +0000, Marc Zyngier wrote:
-> On 25/02/14 18:07, Will Deacon wrote:
-> > On Wed, Feb 05, 2014 at 01:30:49PM +0000, Marc Zyngier wrote:
-> >> Introduce the support code for emulating a GICv2 on top of GICv3
-> >> hardware.
-> >>
-> >> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  include/kvm/arm_vgic.h |  26 ++++++
-> >>  virt/kvm/arm/vgic-v3.c | 220 +++++++++++++++++++++++++++++++++++++++++++++++++
-> >>  virt/kvm/arm/vgic.c    |   2 +
-> >>  3 files changed, 248 insertions(+)
-> >>  create mode 100644 virt/kvm/arm/vgic-v3.c
-> >>
-> >> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> >> index c95039a..caeb8f4 100644
-> >> --- a/include/kvm/arm_vgic.h
-> >> +++ b/include/kvm/arm_vgic.h
-> >> @@ -32,6 +32,7 @@
-> >>  #define VGIC_NR_SHARED_IRQS	(VGIC_NR_IRQS - VGIC_NR_PRIVATE_IRQS)
-> >>  #define VGIC_MAX_CPUS		KVM_MAX_VCPUS
-> >>  #define VGIC_MAX_LRS		(1 << 6)
-> >> +#define VGIC_V3_MAX_LRS		16
-> > 
-> > Since we have fewer list registers, doesn't the code in vgic.c need updating
-> > to honour the relevant bounds? (e.g. the use of find_first_zero_bit in
-> > vgic_queue_irq).
-> 
-> I'm confused. We've always used a variable, as even with GICv2, we
-> usually have far less list registers than the maximum (4 vs 64). Looking
-> at the code you mention, I see this:
-> 
-> 	/* Try to use another LR for this interrupt */
-> 	lr = find_first_zero_bit((unsigned long *)vgic_cpu->lr_used,
-> 			       vgic->nr_lr);
-> 
-> Am I looking at the wrong place?
+Hi Patrice,
 
-No, I'm being stupid. I was looking at mainline rather than your GICv3
-branch and thought we were still using VGIC_MAX_LRS.
+Could you add an overview documentation as it has been done for other 
+STi platforms?
 
-Will
+See Documentation/arm/sti/stih416-overview.txt
+
+Thanks,
+Maxime
+
+On 01/30/2014 03:55 PM, Patrice CHOTARD wrote:
+> From: Alexandre TORGUE <alexandre.torgue@st.com>
+>
+> This patch adds support to STiD127 SoC.
+> The main adaptation is the L2 cache way size compare to STiH41x SoCs.
+>
+> Signed-off-by: alexandre torgue <alexandre.torgue@st.com>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> ---
+>   arch/arm/mach-sti/board-dt.c |    6 ++++++
+>   1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+> index 1217fb5..be018a9 100644
+> --- a/arch/arm/mach-sti/board-dt.c
+> +++ b/arch/arm/mach-sti/board-dt.c
+> @@ -9,6 +9,7 @@
+>
+>   #include <linux/irq.h>
+>   #include <linux/of_platform.h>
+> +#include <linux/of.h>
+>   #include <asm/hardware/cache-l2x0.h>
+>   #include <asm/mach/arch.h>
+>
+> @@ -18,6 +19,10 @@ void __init stih41x_l2x0_init(void)
+>   {
+>   	u32 way_size = 0x4;
+>   	u32 aux_ctrl;
+> +
+> +	if (of_machine_is_compatible("st,stid127"))
+> +		way_size = 0x3;
+> +
+>   	/* may be this can be encoded in macros like BIT*() */
+>   	aux_ctrl = (0x1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
+>   		(0x1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
+> @@ -36,6 +41,7 @@ static void __init stih41x_machine_init(void)
+>   static const char *stih41x_dt_match[] __initdata = {
+>   	"st,stih415",
+>   	"st,stih416",
+> +	"st,stid127",
+>   	NULL
+>   };
+>
+>
