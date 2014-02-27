@@ -1,163 +1,195 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Thu, 27 Feb 2014 17:03:47 +0100
-Subject: [PATCH] irq: Consider a negative return value of irq_startup() as
- an error
-In-Reply-To: <alpine.DEB.2.02.1402262119560.4174@ionos.tec.linutronix.de>
-References: <1393345719-3707-1-git-send-email-jjhiblot@traphandler.com>
- <alpine.DEB.2.02.1402262119560.4174@ionos.tec.linutronix.de>
-Message-ID: <CACh+v5Nkuct0J65OHcnSd6Dfq4EyfafY8RpTvdwKXUA7A8_+Xw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Feb 2014 17:06:24 +0100
+Subject: [PATCH v2 3/3] arm64: Add architecture support for PCI
+In-Reply-To: <1393506599-11561-4-git-send-email-Liviu.Dudau@arm.com>
+References: <1393506599-11561-1-git-send-email-Liviu.Dudau@arm.com>
+ <1393506599-11561-4-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <5402126.Dbh9PNPIjR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2014-02-26 23:15 GMT+01:00 Thomas Gleixner <tglx@linutronix.de>:
-> On Tue, 25 Feb 2014, Jean-Jacques Hiblot wrote:
->
->> The irq_startup() function returns the return value of the
->> irq_startup callback of the underlying irq_chip. Currently this
->> value only tells if the interrupt is pending, but we can make it
->> also return an error code when it fails.
->>
->> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
->> ---
->>
->> Hi Thomas,
->>
->> This patch updates the semantic of the return value of the irq_startup()
->> callback of an irq_chip : a negative value indicates an error. The purpose is
->> to make __setup_irq() fail if the irq_chip can't startup the interrupt.
->
-> How does that work?
->
->     unsigned int    (*irq_startup)(struct irq_data *data);
-well .. no excuse sir
->
->> I checked in the kernel for drivers impacted by this. It turns out that most
->> of the implementation of irq_startup() return 0. The only drivers that return
->> non-zero values are:
->>  * arch/x86/kernel/apic/io_apic.c: returns 1 when an interrupt is pending
->>  * drivers/pinctrl/pinctrl-adi2.c: may return -ENODEV.
->
->    which is wrong to begin with.
->
->> GPIO-based irq_chip could use this feature because an output gpio
->> can't be used as an interrupt, and thus a call to irq_startup() is
->> likely to fail. You can check out
->> http://www.spinics.net/lists/arm-kernel/msg302713.html for a
->> reference.
->
-> And that tells me that the design of the gpio stuff is just wrong.
->
-> The whole drviers/gpio directory is full of this gpio_lock_as_irq()
-> called from the guts of irq_chip callbacks braindamage.
->
-> The comment above gpiod_lock_as_irq() is so wrong it's not even funny
-> anymore.
->
-> "....or in the .irq_enable() from its irq_chip implementation ..."
->
->         void            (*irq_enable)(struct irq_data *data);
->
-> So how does that help, if the gpio is not available as irq?
->
-> And no, you are not going to cure that design brainfart by adding a
-> negative return value to a function returning unsigned int. And I'm
-> not going to accept anything which is just a duct tape based
-> workaround for a complete braindamaged design.
->
-> Lets look at the usage sites:
->
-> The following irqchip callback implementations printk some blurb and
-> proceed:
->
->  sirfsoc_gpio_irq_startup
->  nmk_gpio_irq_startup
->  msm_gpio_irq_startup
->  u300_gpio_irq_enable
->  byt_irq_startup
->  mcp23s08_irq_startup
->  lp_irq_startup
->  intel_mid_irq_startup
->  em_gio_irq_startup
->  bcm_kona_gpio_irq_startup
->  adnp_irq_startup
->
-> The following functions return an error code from the set_type
-> callback:
->
->  tegra_gpio_irq_set_type
->  gpio_irq_type
->
-> The whole idiocy starts with commit d468bf9e, which tells people to
-> call this from irq_startup/enable. But it fails to tell, that this is
-> pointless because it wont prevent the interrupt from starting up.
->
->From a GPIO subsystem standpoint, the IRQ lock is sensible because
-using a gpio as an interrupt source, adds some restrictions to its
-usage. Ouput configuration and IRQ configuration are exclusive for
-example.
-That  request_irq() succeeds if a GPIO can't be used as interrupt, is
-however a problem. It can be fixed.
+On Thursday 27 February 2014 13:09:59 Liviu Dudau wrote:
 
+> +/*
+> + * PCI address space differs from physical memory address space
+> + */
+> +#define PCI_DMA_BUS_IS_PHYS	(0)
+> +
+> +extern int isa_dma_bridge_buggy;
 
-> So 11 SoC lemmings followed and added this completely pointless
-> nonsense to their drivers.
->
-> Two lemmings added it to a function which can actually fail. Failure
-> as well, because there is no guarantee that this function gets invoked
-> before request_irq(). What's worse is that if request_irq() succeeds
-> then the following code which tries to set the type fails for no
-> obvious reason.
->
-> Now at least Jean-Jacques tried to make it actually fail, but that
-> turns out to be a failure on its own.
-just to clarify: is the failure the problem with the unsigned or the
-principle of making request_irq fail ?
+I got curious about isa_dma_bridge_buggy: apparently this is a quirk for
+some old x86 bridges. We don't have those on arm64, and we also don't have
+ISA_DMA_API, so just define this to (0).
 
->
-> Dammit, I told you folks often enough that workarounds in some
-> subsystem do not actually cure a shortcoming in the core code. When
-> the core code was written, the GPIO case which might actually fail was
-> definitly not thought of. But that's not a reason for adding
-> tasteless and useless workarounds to the GPIO subsystem.
->
-> Of course you encouraged people to copy that nonsense all over the
-> place. All startup functions do the same thing:
->
->     if (gpio_lock_as_irq() < 0)
->        dev_err("BLA");
->     unmask_irq();
->
-> Plus the shutdown functions having the gpio_unlock_as_irq() +
-> mask_irq() sequence. Sigh.
->
-> So the proper solution to the problem if we want to use irq_startup()
-> is:
->
->   Change the return value of the irq_startup() callback to int and
->   fixup all existing implementations. This wants to be done with a
->   coccinelle script. If you hurry up, I might squeeze it into 3.14 as
->   there is no risk at all. Otherwise this is going to happen after the
->   3.15 merge window closes.
-I'll post a patch doing just this in the next email.
+> +static inline int pci_domain_nr(struct pci_bus *bus)
+> +{
+> +	struct pci_host_bridge *bridge = to_pci_host_bridge(bus->bridge);
+> +
+> +	if (bridge)
+> +		return bridge->domain_nr;
+> +
+> +	return 0;
+> +}
+> +
+> +static inline int pci_proc_domain(struct pci_bus *bus)
+> +{
+> +	return pci_domain_nr(bus);
+> +}
 
-Jean-Jacques
->
->   After that's done, remove all the copies of startup/shutdown
->   nonsense in drivers/gpio and force all gpio chips to call
->   gpio_set_irq_chip*() instead of irq_set_irq_chip*() and add generic
->   irq_startup/shutdown callbacks which are implemented in the gpiolib
->   core code.
->
-> There is a less intrusive alternative solution:
->
->   Mark the interrupt as GPIO based in the core and let the core call
->   conditonally the gpio_[un]lock_as_irq functions.
->
-> And no, I'm not going to provide you the proper solution on the silver
-> tablet this time. Go and figure it out yourself and if you're
-> confident enough that it might be an acceptable solution, post it and
-> we'll see.
->
-> Thanks,
->
->         tglx
+And this one I would change to always return '1': we can deal with
+domain numbers showing up in /procfs for all buses, since there is
+no legacy software to worry about.
+
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> new file mode 100644
+> index 0000000..496df41
+> --- /dev/null
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -0,1 +1,126 @@
+
+Ok, this is nice and short. Let's see if we can reduce it to nothing ;-)
+
+> +/*
+> + * Called after each bus is probed, but before its children are examined
+> + */
+> +void pcibios_fixup_bus(struct pci_bus *bus)
+> +{
+> +	struct pci_dev *dev;
+> +	struct resource *res;
+> +	int i;
+> +
+> +	if (!pci_is_root_bus(bus)) {
+> +		pci_read_bridge_bases(bus);
+> +
+> +		pci_bus_for_each_resource(bus, res, i) {
+> +			if (!res || !res->flags || res->parent)
+> +				continue;
+> +
+> +			/*
+> +			 * If we are going to reassign everything, we can
+> +			 * shrink the P2P resource to have zero size to
+> +			 * save space
+> +			 */
+> +			if (pci_has_flag(PCI_REASSIGN_ALL_RSRC)) {
+> +				res->flags |= IORESOURCE_UNSET;
+> +				res->start = 0;
+> +				res->end = -1;
+> +				continue;
+> +			}
+> +		}
+> +	}
+> +
+> +	list_for_each_entry(dev, &bus->devices, bus_list) {
+> +		/* Ignore fully discovered devices */
+> +		if (dev->is_added)
+> +			continue;
+> +
+> +		set_dev_node(&dev->dev, pcibus_to_node(dev->bus));
+> +
+> +		/* Read default IRQs and fixup if necessary */
+> +		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> +	}
+> +}
+> +EXPORT_SYMBOL(pcibios_fixup_bus);
+
+Shrinking the P2P resources I suppose is optional, but everything
+else is in fact needed for any DT based architecture. Could this
+be turned into a generic helper function in the PCI core that we
+can call from architecture code?
+
+If you name it pci_generic_fixup_bus(), we can add a weak helper
+like:
+
+void __weak pcibios_fixup_bus(struct pci_bus *bus)
+{
+	pci_generic_fixup_bus(bus);
+}
+
+for architectures like arm64 that don't actually need to do anything
+else.
+
+> +/*
+> + * We don't have to worry about legacy ISA devices, so nothing to do here
+> + */
+> +resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+> +				resource_size_t size, resource_size_t align)
+> +{
+> +	return ALIGN(res->start, align);
+> +}
+> +EXPORT_SYMBOL(pcibios_align_resource);
+
+Where did this come from? The most common implementation seems to be
+
+resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+				resource_size_t size, resource_size_t align)
+{
+	return start;
+}
+EXPORT_SYMBOL(pcibios_align_resource);
+
+if you don't have to worry about ISA devices. The ALIGN() part seems to
+be handled by __find_resource() already.
+
+I'd say that should be made the default implementation in the PCI core.
+
+I'm also pretty sure you don't need the EXPORT_SYMBOL, since the PCI
+core cannot be a loadable module (yet).
+
+> +int pcibios_enable_device(struct pci_dev *dev, int mask)
+> +{
+> +	return pci_enable_resources(dev, mask);
+> +}
+> +
+> +void pcibios_fixup_bridge_ranges(struct list_head *resources)
+> +{
+> +}
+
+These are clearly the right implementations, but they should be weak
+functions, too.
+
+> +#define IO_SPACE_PAGES	((IO_SPACE_LIMIT + 1) / PAGE_SIZE)
+> +static DECLARE_BITMAP(pci_iospace, IO_SPACE_PAGES);
+> +
+> +unsigned long pci_ioremap_io(const struct resource *res, phys_addr_t phys_addr)
+> +{
+> +	unsigned long start, len, virt_start;
+> +	int err;
+> +
+> +	if (res->end > IO_SPACE_LIMIT)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * try finding free space for the whole size first,
+> +	 * fall back to 64K if not available
+> +	 */
+> +	len = resource_size(res);
+> +	start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
+> +				res->start / PAGE_SIZE, len / PAGE_SIZE, 0);
+> +	if (start == IO_SPACE_PAGES && len > SZ_64K) {
+> +		len = SZ_64K;
+> +		start = 0;
+> +		start = bitmap_find_next_zero_area(pci_iospace, IO_SPACE_PAGES,
+> +					start, len / PAGE_SIZE, 0);
+> +	}
+> +
+> +	/* no 64K area found */
+> +	if (start == IO_SPACE_PAGES)
+> +		return -ENOMEM;
+> +
+> +	/* ioremap physical aperture to virtual aperture */
+> +	virt_start = start * PAGE_SIZE + (unsigned long)PCI_IOBASE;
+> +	err = ioremap_page_range(virt_start, virt_start + len,
+> +				phys_addr, __pgprot(PROT_DEVICE_nGnRE));
+> +	if (err)
+> +		return err;
+> +
+> +	bitmap_set(pci_iospace, start, len / PAGE_SIZE);
+> +
+> +	/* return io_offset */
+> +	return start * PAGE_SIZE - res->start;
+> +}
+
+Maybe this can become an optional helper function with a separate Kconfig symbol
+to enable it.
+
+	Arnd
