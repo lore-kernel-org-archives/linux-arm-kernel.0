@@ -1,36 +1,28 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Feb 2014 08:33:39 +0000
-Subject: [PATCH v4 1/8] mfd: Move pm8xxx-irq.c contents into only driver
- that uses it
-In-Reply-To: <1393441166-32692-2-git-send-email-sboyd@codeaurora.org>
+Date: Thu, 27 Feb 2014 08:34:38 +0000
+Subject: [PATCH v4 3/8] mfd: pm8921: Migrate to irqdomains
+In-Reply-To: <1393441166-32692-4-git-send-email-sboyd@codeaurora.org>
 References: <1393441166-32692-1-git-send-email-sboyd@codeaurora.org>
- <1393441166-32692-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140227083339.GU9195@lee--X1>
+ <1393441166-32692-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140227083438.GW9195@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The pm8xxx-irq.c code is practically mandatory given that the
-> pm8921-core driver will WARN about it missing and the Kconfig
-> marks it as default y when a PM8xxx chips is enabled. The only
-> reason the file was split out was because we planned to support
-> other pm8xxx chips with different pm8xxx-core.c files. Now that
-> we have DT on ARM this isn't necessary because we should be able
-> to support all the ssbi based PM8xxx chips in one driver and one
-> file with no data bloat. Let's move this code into the only
-> driver that uses it right now (pm8921) so that it's always compiled when
-> needed. In the future we can rename pm8921-core.c to something
-> more generic.
+On Wed, 26 Feb 2014, Stephen Boyd wrote:
+
+> Convert this driver to use irqdomains so that the PMIC's child
+> devices can be converted to devicetree.
 > 
 > Acked-by: Lee Jones <lee.jones@linaro.org>
 > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  drivers/mfd/Kconfig            |  10 --
->  drivers/mfd/Makefile           |   1 -
->  drivers/mfd/pm8921-core.c      | 348 ++++++++++++++++++++++++++++++++++++++
->  drivers/mfd/pm8xxx-irq.c       | 371 -----------------------------------------
->  include/linux/mfd/pm8xxx/irq.h |  23 ---
->  5 files changed, 348 insertions(+), 405 deletions(-)
->  delete mode 100644 drivers/mfd/pm8xxx-irq.c
+>  drivers/mfd/Kconfig               |   1 +
+>  drivers/mfd/pm8921-core.c         | 198 +++++++++++++++-----------------------
+>  include/linux/mfd/pm8xxx/irq.h    |  36 -------
+>  include/linux/mfd/pm8xxx/pm8921.h |  30 ------
+>  4 files changed, 76 insertions(+), 189 deletions(-)
+>  delete mode 100644 include/linux/mfd/pm8xxx/irq.h
+>  delete mode 100644 include/linux/mfd/pm8xxx/pm8921.h
 
 Applied, thanks.
 
