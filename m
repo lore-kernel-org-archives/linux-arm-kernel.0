@@ -1,28 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Feb 2014 20:16:23 +0100
-Subject: [PATCH v8.1 1/6] dt-bindings: sram: describe option to reserve
- parts of the memory
-In-Reply-To: <2574291.evU61mFTUd@phil>
-References: <21117503.1c6iOkvYSr@phil> <201402251419.31151.arnd@arndb.de>
- <2574291.evU61mFTUd@phil>
-Message-ID: <201402272016.23521.arnd@arndb.de>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 27 Feb 2014 20:34:22 +0100
+Subject: [PATCH v4 3/3] ARM: sun7i/sun6i: irqchip: Update the documentation
+In-Reply-To: <1393529662-8663-1-git-send-email-carlo@caione.org>
+References: <1393529662-8663-1-git-send-email-carlo@caione.org>
+Message-ID: <1393529662-8663-4-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 February 2014, Heiko St?bner wrote:
-> Some SoCs need parts of their sram for special purposes. So while being part
-> of the peripheral, it should not be part of the genpool controlling the sram.
-> 
-> Therefore add the option to define reserved regions as subnodes of the
-> sram-node similar to defining reserved global memory regions.
-> 
-> Originally
-> Suggested-by: Rob Herring <robherring2@gmail.com>
-> 
-> Using subnodes for reserved regions
-> Suggested-by: Grant Likely <grant.likely@linaro.org>
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Ulrich Prinz <ulrich.prinz@googlemail.com>
+Added documentation for NMI irqchip.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Carlo Caione <carlo@caione.org>
+---
+ .../allwinner,sun67i-sc-nmi.txt                    | 27 ++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+new file mode 100644
+index 0000000..ac31487
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun67i-sc-nmi.txt
+@@ -0,0 +1,27 @@
++Allwinner Sunxi NMI Controller
++==============================
++
++Required properties:
++
++- compatible : should be "allwinner,sun7i-a20-sc-nmi" or
++  "allwinner,sun6i-a31-sc-nmi"
++- reg : Specifies base physical address and size of the registers.
++- interrupt-controller : Identifies the node as an interrupt controller
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value shall be 2. The first cell is the IRQ number, the
++  second cell the trigger type.
++- interrupt-parent: Specifies the parent interrupt controller.
++- interrupts: Specifies the list of interrupt lines which are handled by
++  the interrupt controller in the parent controller's notation. This value
++  shall be the NMI.
++
++Example:
++
++sc-nmi-intc at 01c00030 {
++	compatible = "allwinner,sun7i-a20-sc-nmi";
++	interrupt-controller;
++	#interrupt-cells = <2>;
++	reg = <0x01c00030 0x0c>;
++	interrupt-parent = <&gic>;
++	interrupts = <0 0 4>;
++};
+-- 
+1.8.3.2
