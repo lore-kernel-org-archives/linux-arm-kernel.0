@@ -1,68 +1,186 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Thu, 27 Feb 2014 16:24:23 +0100
-Subject: [PATCH v0 10/15] clk: st: Adds quadfs clock binding
+Date: Thu, 27 Feb 2014 16:24:18 +0100
+Subject: [PATCH v0 05/15] drivers: clk: st: Support for ClockGenA9/DDR/GPU
 In-Reply-To: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
 References: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1393514668-17440-11-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1393514668-17440-6-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The patch added support for DT registration of ClockGenA9/DDR/GPU
+
+ClockgenA9/DDR : It includes c32 type PLL (also in ClockgenA1x), hence
+only CLK_OF_DECLARE implementation is required.
+
+ClockgenGPU : It includes c65 type PLL (also in ClockgenAx), hence
+only CLK_OF_DECLARE implementation is required.
+
+Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- .../devicetree/bindings/clock/st/st,quadfs.txt     | 45 ++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/st/st,quadfs.txt
+ drivers/clk/st/clkgen-pll.c | 139 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 139 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/st/st,quadfs.txt b/Documentation/devicetree/bindings/clock/st/st,quadfs.txt
-new file mode 100644
-index 0000000..ec86d62
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/st/st,quadfs.txt
-@@ -0,0 +1,45 @@
-+Binding for a type of quad channel digital frequency synthesizer found on
-+certain STMicroelectronics consumer electronics SoC devices.
+diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
+index c6b38b0..bca0a0b 100644
+--- a/drivers/clk/st/clkgen-pll.c
++++ b/drivers/clk/st/clkgen-pll.c
+@@ -110,6 +110,76 @@ static struct clkgen_pll_data st_pll3200c32_a1x_1 = {
+ 	.ops		= &stm_pll3200c32_ops,
+ };
+ 
++/* 415 specific */
++static struct clkgen_pll_data st_pll3200c32_a9_415 = {
++	.pdn_status	= CLKGEN_FIELD(0x0,	0x1,			0),
++	.locked_status	= CLKGEN_FIELD(0x6C,	0x1,			0),
++	.ndiv		= CLKGEN_FIELD(0x0,	C32_NDIV_MASK,		9),
++	.idf		= CLKGEN_FIELD(0x0,	C32_IDF_MASK,		22),
++	.num_odfs = 1,
++	.odf =		{ CLKGEN_FIELD(0x0,	C32_ODF_MASK,		3) },
++	.odf_gate =	{ CLKGEN_FIELD(0x0,	0x1,			28) },
++	.ops		= &stm_pll3200c32_ops,
++};
 +
-+This version contains a programmable PLL which can generate up to 216, 432
-+or 660MHz (from a 30MHz oscillator input) as the input to the digital
-+synthesizers.
++static struct clkgen_pll_data st_pll3200c32_ddr_415 = {
++	.pdn_status	= CLKGEN_FIELD(0x0,	0x1,			0),
++	.locked_status	= CLKGEN_FIELD(0x100,	0x1,			0),
++	.ndiv		= CLKGEN_FIELD(0x8,	C32_NDIV_MASK,		0),
++	.idf		= CLKGEN_FIELD(0x0,	C32_IDF_MASK,		25),
++	.num_odfs = 2,
++	.odf		= { CLKGEN_FIELD(0x8,	C32_ODF_MASK,		8),
++			    CLKGEN_FIELD(0x8,	C32_ODF_MASK,		14) },
++	.odf_gate	= { CLKGEN_FIELD(0x4,	0x1,			28),
++			    CLKGEN_FIELD(0x4,	0x1,			29) },
++	.ops		= &stm_pll3200c32_ops,
++};
 +
-+This binding uses the common clock binding[1].
++static struct clkgen_pll_data st_pll1200c32_gpu_415 = {
++	.pdn_status	= CLKGEN_FIELD(0x144,	0x1,			3),
++	.locked_status	= CLKGEN_FIELD(0x168,	0x1,			0),
++	.ldf		= CLKGEN_FIELD(0x0,	C32_LDF_MASK,		3),
++	.idf		= CLKGEN_FIELD(0x0,	C32_IDF_MASK,		0),
++	.num_odfs = 0,
++	.odf		= { CLKGEN_FIELD(0x0,	C32_ODF_MASK,		10) },
++	.ops		= &st_pll1200c32_ops,
++};
 +
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++/* 416 specific */
++static struct clkgen_pll_data st_pll3200c32_a9_416 = {
++	.pdn_status	= CLKGEN_FIELD(0x0,	0x1,			0),
++	.locked_status	= CLKGEN_FIELD(0x6C,	0x1,			0),
++	.ndiv		= CLKGEN_FIELD(0x8,	C32_NDIV_MASK,		0),
++	.idf		= CLKGEN_FIELD(0x0,	C32_IDF_MASK,		25),
++	.num_odfs = 1,
++	.odf		= { CLKGEN_FIELD(0x8,	C32_ODF_MASK,		8) },
++	.odf_gate	= { CLKGEN_FIELD(0x4,	0x1,			28) },
++	.ops		= &stm_pll3200c32_ops,
++};
 +
-+Required properties:
-+- compatible : shall be:
-+  "st,stih416-quadfs216",	"st,quadfs"
-+  "st,stih416-quadfs432",	"st,quadfs"
-+  "st,stih416-quadfs660-E",	"st,quadfs"
-+  "st,stih416-quadfs660-F",	"st,quadfs"
++static struct clkgen_pll_data st_pll3200c32_ddr_416 = {
++	.pdn_status	= CLKGEN_FIELD(0x0,	0x1,			0),
++	.locked_status	= CLKGEN_FIELD(0x10C,	0x1,			0),
++	.ndiv		= CLKGEN_FIELD(0x8,	C32_NDIV_MASK,		0),
++	.idf		= CLKGEN_FIELD(0x0,	C32_IDF_MASK,		25),
++	.num_odfs = 2,
++	.odf		= { CLKGEN_FIELD(0x8,	C32_ODF_MASK,		8),
++			    CLKGEN_FIELD(0x8,	C32_ODF_MASK,		14) },
++	.odf_gate	= { CLKGEN_FIELD(0x4,	0x1,			28),
++			    CLKGEN_FIELD(0x4,	0x1,			29) },
++	.ops		= &stm_pll3200c32_ops,
++};
 +
-+- #clock-cells : from common clock binding; shall be set to 1.
++static struct clkgen_pll_data st_pll1200c32_gpu_416 = {
++	.pdn_status	= CLKGEN_FIELD(0x8E4,	0x1,			3),
++	.locked_status	= CLKGEN_FIELD(0x90C,	0x1,			0),
++	.ldf		= CLKGEN_FIELD(0x0,	C32_LDF_MASK,		3),
++	.idf		= CLKGEN_FIELD(0x0,	C32_IDF_MASK,		0),
++	.num_odfs = 0,
++	.odf		= { CLKGEN_FIELD(0x0,	C32_ODF_MASK,		10) },
++	.ops		= &st_pll1200c32_ops,
++};
 +
-+- reg : A Base address and length of the register set.
+ /**
+  * DOC: Clock Generated by PLL, rate set and enabled by bootloader
+  *
+@@ -484,6 +554,22 @@ static struct of_device_id c32_pll_of_match[] = {
+ 		.compatible = "st,plls-c32-a1x-1",
+ 		.data = &st_pll3200c32_a1x_1,
+ 	},
++	{
++		.compatible = "st,stih415-plls-c32-a9",
++		.data = &st_pll3200c32_a9_415,
++	},
++	{
++		.compatible = "st,stih415-plls-c32-ddr",
++		.data = &st_pll3200c32_ddr_415,
++	},
++	{
++		.compatible = "st,stih416-plls-c32-a9",
++		.data = &st_pll3200c32_a9_416,
++	},
++	{
++		.compatible = "st,stih416-plls-c32-ddr",
++		.data = &st_pll3200c32_ddr_416,
++	},
+ 	{}
+ };
+ 
+@@ -557,3 +643,56 @@ err:
+ 	kfree(clk_data);
+ }
+ CLK_OF_DECLARE(clkgen_c32_pll, "st,clkgen-plls-c32", clkgen_c32_pll_setup);
 +
-+- clocks : from common clock binding
++static struct of_device_id c32_gpu_pll_of_match[] = {
++	{
++		.compatible = "st,stih415-gpu-pll-c32",
++		.data = &st_pll1200c32_gpu_415,
++	},
++	{
++		.compatible = "st,stih416-gpu-pll-c32",
++		.data = &st_pll1200c32_gpu_416,
++	},
++};
 +
-+- clock-output-names : From common clock binding. The block has 4
-+                       clock outputs but not all of them in a specific instance
-+                       have to be used in the SoC. If a clock name is left as
-+                       an empty string then no clock will be created for the
-+                       output associated with that string index. If fewer than
-+                       4 strings are provided then no clocks will be created
-+                       for the remaining outputs.
++static void __init clkgengpu_c32_pll_setup(struct device_node *np)
++{
++	const struct of_device_id *match;
++	struct clk *clk;
++	const char *parent_name;
++	void __iomem *reg;
++	const char *clk_name;
++	struct clkgen_pll_data	*data;
 +
-+Example:
++	match = of_match_node(c32_gpu_pll_of_match, np);
++	if (!match) {
++		pr_err("%s: No matching data\n", __func__);
++		return;
++	}
 +
-+	CLOCKGEN_E: CLOCKGEN_E {
-+                #clock-cells = <1>;
-+                compatible = "st,stih416-quadfs660-E", "st,quadfs";
-+                reg = <0xfd3208bc 0xB0>;
++	data = (struct clkgen_pll_data *)match->data;
 +
-+                clocks = <&CLK_SYSIN>;
-+                clock-output-names = "CLK_M_PIX_MDTP_0",
-+                                        "CLK_M_PIX_MDTP_1",
-+                                        "CLK_M_PIX_MDTP_2",
-+                                        "CLK_M_MPELPC";
-+        };
++	parent_name = of_clk_get_parent_name(np, 0);
++	if (!parent_name)
++		return;
++
++	reg = clkgen_get_register_base(np);
++	if (!reg)
++		return;
++
++	if (of_property_read_string_index(np, "clock-output-names",
++					  0, &clk_name))
++		return;
++
++	/*
++	 * PLL 1200MHz output
++	 */
++	clk = clkgen_pll_register(parent_name, data, reg, clk_name);
++
++	if (!IS_ERR(clk))
++		of_clk_add_provider(np, of_clk_src_simple_get, clk);
++
++	return;
++}
++CLK_OF_DECLARE(clkgengpu_c32_pll,
++	       "st,clkgengpu-pll-c32", clkgengpu_c32_pll_setup);
 -- 
 1.9.0
