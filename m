@@ -1,31 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Feb 2014 08:38:56 +0000
-Subject: [PATCH v4 8/8] devicetree: bindings: Document PM8921/8058 PMICs
-In-Reply-To: <1393441166-32692-9-git-send-email-sboyd@codeaurora.org>
-References: <1393441166-32692-1-git-send-email-sboyd@codeaurora.org>
- <1393441166-32692-9-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140227083856.GB9195@lee--X1>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu, 27 Feb 2014 09:16:39 +0100
+Subject: [PATCH v2 2/4] clk: at91: propagate rate change on system clks
+In-Reply-To: <20140227004229.12081.25317@quantum>
+References: <1391589458-28018-1-git-send-email-jjhiblot@traphandler.com>
+ <1391589458-28018-3-git-send-email-jjhiblot@traphandler.com>
+ <20140227004229.12081.25317@quantum>
+Message-ID: <530EF467.5000504@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> PM8921 and PM8058 are PMICs found paired with MSM8960 and MSM8660
-> devices respectively. They contain subdevices such as keypads,
-> RTC, regulators, clocks, etc.
-> 
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  .../devicetree/bindings/mfd/qcom,pm8xxx.txt        | 63 ++++++++++++++++++++++
->  1 file changed, 63 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/qcom,pm8xxx.txt
+Hi Mike,
 
-This patch has been on the MLs for some time now and hasn't received
-any feedback from the DT guys.
+On 27/02/2014 01:42, Mike Turquette wrote:
+> Quoting Jean-Jacques Hiblot (2014-02-05 00:37:36)
+>> From: Boris BREZILLON <b.brezillon@overkiz.com>
+>>
+>> System clks are just gates, and thus do not provide any rate operations.
+>> Authorize clk rate change to be propagated to system clk parents.
+>>
+>> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+>> ---
+>>   drivers/clk/at91/clk-system.c | 3 ++-
+>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
+>> index 8f7c043..a98557b 100644
+>> --- a/drivers/clk/at91/clk-system.c
+>> +++ b/drivers/clk/at91/clk-system.c
+>> @@ -84,7 +84,8 @@ at91_clk_register_system(struct at91_pmc *pmc, const char *name,
+>>           * (see drivers/memory) which would request and enable the ddrck clock.
+>>           * When this is done we will be able to remove CLK_IGNORE_UNUSED flag.
+>>           */
+>> -       init.flags = CLK_IGNORE_UNUSED;
+>> +       init.flags = CLK_SET_RATE_GATE | CLK_SET_RATE_PARENT |
+> Just wanted to do a quick sanity check here. Do you really need
+> CLK_SET_RATE_GATE?
 
-Patch looks good (despite the lack IRQ defines), applied.
+After taking a closer look, I'd say I don't need this flag, because it's
+already set on programmable clks, am I right ?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Do you want me to send a new version removing this flag ?
+
+> Otherwise these patches look fine.
+>
+> Regards,
+> Mike
+>
+>> +                    CLK_IGNORE_UNUSED;
+>>   
+>>          sys->id = id;
+>>          sys->hw.init = &init;
+>> -- 
+>> 1.8.5.2
+>>
