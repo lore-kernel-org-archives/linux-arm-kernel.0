@@ -1,125 +1,58 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 26 Feb 2014 18:25:24 -0800
-Subject: [PATCH 1/8] clk: divider: fix rate calculation for fractional
- rates
-In-Reply-To: <52FE1DF2.2040707@ti.com>
-References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
- <1392285846-13199-2-git-send-email-tomi.valkeinen@ti.com>
- <52FE1DF2.2040707@ti.com>
-Message-ID: <20140227022524.12081.32368@quantum>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Wed, 26 Feb 2014 20:31:15 -0600
+Subject: [PATCH v3 1/9] Input: pmic8xxx-pwrkey - Migrate to regmap APIs
+In-Reply-To: <530E8A17.8060603@codeaurora.org>
+References: <1393441562-685-1-git-send-email-sboyd@codeaurora.org>
+ <1393441562-685-2-git-send-email-sboyd@codeaurora.org>
+ <20140226235959.GD18563@joshc.qualcomm.com>
+ <530E8154.9060403@codeaurora.org>
+ <20140227001358.GF18563@joshc.qualcomm.com>
+ <530E84B3.8020608@codeaurora.org>
+ <20140227003009.GG18563@joshc.qualcomm.com>
+ <530E8A17.8060603@codeaurora.org>
+Message-ID: <20140227023115.GA7308@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tero Kristo (2014-02-14 05:45:22)
-> On 02/13/2014 12:03 PM, Tomi Valkeinen wrote:
-> > clk-divider.c does not calculate the rates consistently at the moment.
+On Wed, Feb 26, 2014 at 04:43:03PM -0800, Stephen Boyd wrote:
+> On 02/26/14 16:30, Josh Cartwright wrote:
+> > On Wed, Feb 26, 2014 at 04:20:03PM -0800, Stephen Boyd wrote:
+> >> On 02/26/14 16:13, Josh Cartwright wrote:
+> >>> On Wed, Feb 26, 2014 at 04:05:40PM -0800, Stephen Boyd wrote:
+> >>>> On 02/26/14 15:59, Josh Cartwright wrote:
+> >>> However, I think it needs to be made clear that your if "Modernize pm8921
+> >>> with irqdomains, regmap, DT" lands before this patchset, this will start
+> >>> breaking randconfig builds.  It isn't clear to me how this dependency
+> >>> should be handled.
+> >>>
+> >> Hmm? If pm8921 lands before this what build breakage is there? The
+> >> pm8xxx_read/write APIs are still exposed.
+> > Well, with the pm8921 patchset in place, the keypad driver becomes
+> > selectable, which, when built leads to the error below.  But AFAICT,
+> > this isn't even addressed in this patchset?!
 > >
-> > As an example, on OMAP3 we have a clock divider with a source clock of
-> > 864000000 Hz. With dividers 6, 7 and 8 the theoretical rates are:
+> > drivers/input/keyboard/pmic8xxx-keypad.c:24:35: fatal error: linux/mfd/pm8xxx/gpio.h: No such file or directory
+> >  #include <linux/mfd/pm8xxx/gpio.h>
+> >                                    ^
 > >
-> > 6: 144000000
-> > 7: 123428571.428571...
-> > 8: 108000000
-> >
-> > Calling clk_round_rate() with the rate in the first column will give the
-> > rate in the second column:
-> >
-> > 144000000 -> 144000000
-> > 143999999 -> 123428571
-> > 123428572 -> 123428571
-> > 123428571 -> 108000000
-> >
-> > Note how clk_round_rate() returns 123428571 for rates from 123428572 to
-> > 143999999, which is mathematically correct, but when clk_round_rate() is
-> > called with 123428571, the returned value is surprisingly 108000000.
-> >
-> > This means that the following code works a bit oddly:
-> >
-> > rate = clk_round_rate(clk, 123428572);
-> > clk_set_rate(clk, rate);
-> >
-> > As clk_set_rate() also does clock rate rounding, the result is that the
-> > clock is set to the rate of 108000000, not 123428571 returned by the
-> > clk_round_rate.
-> >
-> > This patch changes the clk-divider.c to use DIV_ROUND_UP when
-> > calculating the rate. This gives the following behavior which fixes the
-> > inconsistency:
-> >
-> > 144000000 -> 144000000
-> > 143999999 -> 123428572
-> > 123428572 -> 123428572
-> > 123428571 -> 108000000
-> >
-> > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > ---
-> >   drivers/clk/clk-divider.c | 10 +++++-----
-> >   1 file changed, 5 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> > index 5543b7df8e16..ec22112e569f 100644
-> > --- a/drivers/clk/clk-divider.c
-> > +++ b/drivers/clk/clk-divider.c
-> > @@ -24,7 +24,7 @@
-> >    * Traits of this clock:
-> >    * prepare - clk_prepare only ensures that parents are prepared
-> >    * enable - clk_enable only ensures that parents are enabled
-> > - * rate - rate is adjustable.  clk->rate = parent->rate / divisor
-> > + * rate - rate is adjustable.  clk->rate = DIV_ROUND_UP(parent->rate / divisor)
-> >    * parent - fixed parent.  No clk_set_parent support
-> >    */
-> >
-> > @@ -115,7 +115,7 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
-> >               return parent_rate;
-> >       }
-> >
-> > -     return parent_rate / div;
-> > +     return DIV_ROUND_UP(parent_rate, div);
-> >   }
-> >
-> >   /*
-> > @@ -185,7 +185,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
-> >               }
-> >               parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
-> >                               MULT_ROUND_UP(rate, i));
-> > -             now = parent_rate / i;
-> > +             now = DIV_ROUND_UP(parent_rate, i);
-> >               if (now <= rate && now > best) {
-> >                       bestdiv = i;
-> >                       best = now;
-> > @@ -207,7 +207,7 @@ static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
-> >       int div;
-> >       div = clk_divider_bestdiv(hw, rate, prate);
-> >
-> > -     return *prate / div;
-> > +     return DIV_ROUND_UP(*prate, div);
-> >   }
-> >
-> >   static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
-> > @@ -218,7 +218,7 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
-> >       unsigned long flags = 0;
-> >       u32 val;
-> >
-> > -     div = parent_rate / rate;
-> > +     div = DIV_ROUND_UP(parent_rate, rate);
-> >       value = _get_val(divider, div);
-> >
-> >       if (value > div_mask(divider))
+> > So, I'm confused...maybe the pm8921 cleanup patchset should be marking
+> > the keypad driver BROKEN?
 > >
 > 
-> Basically the patch looks good to me, but it might be good to have a 
-> testing round of sort with this. It can potentially cause regressions on 
-> multiple boards if the drivers happen to rely on the "broken" clock 
-> rates. Same for patch #2 which is a copy paste of this one, but only 
-> impacts TI boards.
+> Ah, yes probably. I have a patch locally that rips out the gpio stuff
+> because this driver has been uncompilable since it was introduced. I may
+> as well send that along with this series so that people can actually
+> compile this driver. Or like you say, send it along with the removal of
+> the BROKEN in pm8921 Kconfig.
 
-Agreed. I've taken patches #1 & #2 into clk-next. Let's let them stew in
--next for a while and see if anyone's board catches on fire.
+Yeah, I think it should probably land before MFD_PM8XXX's BROKEN
+removal, just to eliminate randconfig breakage noise.  I double-checked,
+and it looks like at least the other drivers that depend on MFD_PM8XXX
+still build (with a couple sparse warnings).
 
-Regards,
-Mike
+Also.....it's driving me nuts that some of the pm8xxx drivers use
+"pm8xxx-foo", and others use "pmic8xxx-foo"...
 
-> 
-> -Tero
-> 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
