@@ -1,55 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Feb 2014 11:56:52 +0000
-Subject: [RFC PATCH v4 3/8] staging: imx-drm: Document updated imx-drm
- device tree bindings
-In-Reply-To: <530F1C4C.2010504@ti.com>
-References: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>
- <1393338203-25051-4-git-send-email-p.zabel@pengutronix.de>
- <530F1C4C.2010504@ti.com>
-Message-ID: <20140227115652.GI21483@n2100.arm.linux.org.uk>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 27 Feb 2014 14:05:01 +0200
+Subject: TWL6040 fails to initialize
+In-Reply-To: <530DC291.2060708@epfl.ch>
+References: <530C70B3.4010103@epfl.ch> <530CA8DA.8050806@ti.com>
+ <530CB9C6.60806@epfl.ch> <530D972F.805@ti.com> <530DB97E.80309@epfl.ch>
+ <530DC1D3.8040800@ti.com> <530DC291.2060708@epfl.ch>
+Message-ID: <530F29ED.9020706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 01:06:52PM +0200, Tomi Valkeinen wrote:
-> On 25/02/14 16:23, Philipp Zabel wrote:
+On 02/26/2014 12:31 PM, Florian Vaussard wrote:
+>>> I statistically checked that the sleep should be placed after the GPIO
+>>> request, so indeed this seems to be the problem, and your explanation is
+>>> plausible. Can you send a proper patch?
+>>>
+>>> Now, related to this, I managed to found a part of the datasheet on the
+>>> Great Internet. Looking at the "Power-Up Sequence" section, it is written:
+>>>
+>>> - NRESPWRON goes high -> plug detect and GPO are available
+>>> - V2V1 goes high -> hook-detect available by I2C programming (sleep mode)
+>>> - AUDPWRON goes high && READYINT -> ready to communicate through I2C and PDM
+>>>
+>>> So, although there seems to be some contradictions on when it is
+>>> possible to access the I2C, shouldn't we enable the AUDPWRON GPIO
+>>> _before_ making any I2C access?
+>>>
+>>> For the twl6040_probe, the following path would seem more correct to me:
+>>>
+>>> 1) enable regulators
+>>> 2) request AUDPWRON
+>>> 3) twl6040_power(ON) && regcache_cache_only(false)
+>>> 4) wait for READYINT (or sleep if deterministic)
+>>> 5) perform all required I2C accesses (read revision, etc.)
+>>> 6) twl6040_power(OFF) && regcache_cache_only(true)
+>>>
+>>> What do you think?
+>>
+>> Even when the AUDPWRON signal is low we can access to registers in VIO domain,
+>> plug detect and GPO functions. So there's no need to power on the codec just
+>> to power it down later.
+>>
 > 
-> > +Freescale i.MX DRM master device
-> > +================================
-> > +
-> > +The freescale i.MX DRM master device is a virtual device needed to list all
-> > +IPU or other display interface nodes that comprise the graphics subsystem.
-> > +
-> > +Required properties:
-> > +- compatible: Should be "fsl,imx-drm"
-> > +- ports: Should contain a list of phandles pointing to display interface ports
-> > +  of IPU devices
-> > +
-> > +example:
-> > +
-> > +imx-drm {
-> > +	compatible = "fsl,imx-drm";
-> > +	ports = <&ipu_di0>;
-> > +};
-> 
-> I'm not a fan of having non-hardware related things in the DT data.
-> Especially if it makes direct references to our SW, in this case DRM.
-> There's no DRM on the board. I wanted to avoid all that with OMAP
-> display bindings.
-> 
-> Is there even need for such a master device? You can find all the
-> connected display devices from any single display device, by just
-> following the endpoint links.
+> Ok, if it is safe to do so, I am fine with the current probe. I let you
+> post a patch to add a delay after requesting the GPIO.
 
-Please read up on what has been discussed over previous years:
 
-http://lists.freedesktop.org/archives/dri-devel/2013-July/041159.html
+There's something else going on on your board.
+I did some experiments on PandaBoards: in u-boot I set the GPIO127 (audpwron)
+high and boot the kernel.
+During the boot I see all sorts of errors, mcpdm fails to reset, i2c timeouts
+towards twl6040.
+For this the solution is to read the INTID register just after I request the
+gpio - to clear any no longer valid interrupts before we request the IRQ. This
+works fine on my boards.
 
-and please, let's not endlessly rehash old discussions because someone
-wasn't involved and has a different opinion, otherwise we're never going
-to get anywhere.
+The issue you have with your board is something totally different.
+One thing might be that the i2c bus is set to 400KHz while the twl6040 by
+default is set for normal mode (100KHz). On all of the boards I have access
+this works fine but there might be some electrical issue on your board which
+causes i2c to fail.
 
-Thanks.
+There's also another thing I just noticed: the regmap patch
+regmap_register_patch() when it is applied will not update the regcache by
+design. I do not like that too much. On the other hand it is handy to set the
+ACCCTL register as early as possible.
+
+So, I'm not sure about the delay and why it helps on your board.
 
 -- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+P?ter
