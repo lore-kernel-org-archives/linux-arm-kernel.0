@@ -1,79 +1,118 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 27 Feb 2014 16:17:49 -0500
-Subject: [PATCH v2 4/7] dma: of: introduce of_dma_is_coherent() helper
+Date: Thu, 27 Feb 2014 16:17:47 -0500
+Subject: [PATCH v2 2/7] ARM: mm: Remove unsed dma_to_virt()
 In-Reply-To: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1393535872-20915-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1393535872-20915-3-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The of_dma_is_coherent() helper parses the given DT device
-node to see if the "dma-coherent" property is supported and
-returns true or false accordingly.
+From: Grygorii Strashko <grygorii.strashko@ti.com>
+
+Remove dma_to_virt() as there are no in-tree users of it.
 
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Olof Johansson <olof@lixom.net>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Greg Ungerer <gerg@uclinux.org>
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- drivers/dma/of-dma.c   |   22 ++++++++++++++++++++++
- include/linux/of_dma.h |    5 +++++
- 2 files changed, 27 insertions(+)
+ arch/arm/include/asm/dma-mapping.h          |   14 +-------------
+ arch/arm/mach-iop13xx/include/mach/memory.h |   11 -----------
+ arch/arm/mach-ks8695/include/mach/memory.h  |    2 --
+ arch/arm/mach-omap1/include/mach/memory.h   |    4 ----
+ 4 files changed, 1 insertion(+), 30 deletions(-)
 
-diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
-index 9b51768..c5958d1 100644
---- a/drivers/dma/of-dma.c
-+++ b/drivers/dma/of-dma.c
-@@ -304,3 +304,25 @@ out:
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(of_dma_get_range);
-+
-+/**
-+ * of_dma_is_coherent - Check if device is coherent
-+ * @np:	device node
-+ *
-+ * It returns true if "dma-coherent" property was found
-+ * for this device in DT.
-+ */
-+bool of_dma_is_coherent(struct device_node *np)
-+{
-+	struct device_node *node = np;
-+
-+	while (node) {
-+		if (of_property_read_bool(node, "dma-coherent")) {
-+			of_node_put(node);
-+			return true;
-+		}
-+		node = of_get_next_parent(node);
-+	}
-+	return false;
-+}
-+EXPORT_SYMBOL_GPL(of_dma_is_coherent);
-diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
-index f04171a..6191f02 100644
---- a/include/linux/of_dma.h
-+++ b/include/linux/of_dma.h
-@@ -44,6 +44,7 @@ extern struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
- 
- extern int of_dma_get_range(struct device_node *np, dma_addr_t *dma_addr,
- 		phys_addr_t *paddr, phys_addr_t *size);
-+extern bool of_dma_is_coherent(struct device_node *np);
- #else
- static inline int of_dma_controller_register(struct device_node *np,
- 		struct dma_chan *(*of_dma_xlate)
-@@ -74,6 +75,10 @@ static inline int of_dma_get_range(struct device_node *np, dma_addr_t *dma_addr,
- {
- 	return -ENODEV;
- }
-+static inline bool of_dma_is_coherent(struct device_node *np)
-+{
-+	return false;
-+}
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index 247ed72..e365158 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -51,7 +51,7 @@ static inline int dma_set_mask(struct device *dev, u64 mask)
  #endif
  
- #endif /* __LINUX_OF_DMA_H */
+ /*
+- * dma_to_pfn/pfn_to_dma/dma_to_virt/virt_to_dma are architecture private
++ * dma_to_pfn/pfn_to_dma/virt_to_dma are architecture private
+  * functions used internally by the DMA-mapping API to provide DMA
+  * addresses. They must not be used by drivers.
+  */
+@@ -70,13 +70,6 @@ static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+ 	return __bus_to_pfn(addr) + dev->archdata.dma_pfn_offset;
+ }
+ 
+-static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+-{
+-	if (!dev)
+-		return NULL;
+-	return (void *)__bus_to_virt(__pfn_to_bus(dma_to_pfn(dev, addr)));
+-}
+-
+ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+ {
+ 	if (!dev)
+@@ -96,11 +89,6 @@ static inline unsigned long dma_to_pfn(struct device *dev, dma_addr_t addr)
+ 	return __arch_dma_to_pfn(dev, addr);
+ }
+ 
+-static inline void *dma_to_virt(struct device *dev, dma_addr_t addr)
+-{
+-	return __arch_dma_to_virt(dev, addr);
+-}
+-
+ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+ {
+ 	return __arch_virt_to_dma(dev, addr);
+diff --git a/arch/arm/mach-iop13xx/include/mach/memory.h b/arch/arm/mach-iop13xx/include/mach/memory.h
+index 7c032d0..1223c85 100644
+--- a/arch/arm/mach-iop13xx/include/mach/memory.h
++++ b/arch/arm/mach-iop13xx/include/mach/memory.h
+@@ -36,17 +36,6 @@ static inline void __iomem *__lbus_to_virt(dma_addr_t x)
+ #define is_lbus_device(dev) 				\
+ 	(dev && strncmp(dev->bus->name, "platform", 8) == 0)
+ 
+-#define __arch_dma_to_virt(dev, addr)					\
+-	({								\
+-		void * __virt;						\
+-		dma_addr_t __dma = addr;				\
+-		if (is_lbus_device(dev) && __is_lbus_dma(__dma))	\
+-			__virt = __lbus_to_virt(__dma);			\
+-		else							\
+-			__virt = (void *)__phys_to_virt(__dma);		\
+-		__virt;							\
+-	})
+-
+ #define __arch_virt_to_dma(dev, addr)					\
+ 	({								\
+ 		void * __virt = addr;					\
+diff --git a/arch/arm/mach-ks8695/include/mach/memory.h b/arch/arm/mach-ks8695/include/mach/memory.h
+index 95e731a..f42477c 100644
+--- a/arch/arm/mach-ks8695/include/mach/memory.h
++++ b/arch/arm/mach-ks8695/include/mach/memory.h
+@@ -31,8 +31,6 @@
+ /* Platform-bus mapping */
+ extern struct bus_type platform_bus_type;
+ #define is_lbus_device(dev)		(dev && dev->bus == &platform_bus_type)
+-#define __arch_dma_to_virt(dev, x)	({ (void *) (is_lbus_device(dev) ? \
+-					__phys_to_virt(x) : __bus_to_virt(x)); })
+ #define __arch_virt_to_dma(dev, x)	({ is_lbus_device(dev) ? \
+ 					(dma_addr_t)__virt_to_phys((unsigned long)x) \
+ 					: (dma_addr_t)__virt_to_bus(x); })
+diff --git a/arch/arm/mach-omap1/include/mach/memory.h b/arch/arm/mach-omap1/include/mach/memory.h
+index 3c25305..73f86db 100644
+--- a/arch/arm/mach-omap1/include/mach/memory.h
++++ b/arch/arm/mach-omap1/include/mach/memory.h
+@@ -43,10 +43,6 @@
+ 	   __phys_to_pfn(__dma);				\
+ 	})
+ 
+-#define __arch_dma_to_virt(dev, addr)	({ (void *) (is_lbus_device(dev) ? \
+-						lbus_to_virt(addr) : \
+-						__phys_to_virt(addr)); })
+-
+ #define __arch_virt_to_dma(dev, addr)	({ unsigned long __addr = (unsigned long)(addr); \
+ 					   (dma_addr_t) (is_lbus_device(dev) ? \
+ 						virt_to_lbus(__addr) : \
 -- 
 1.7.9.5
