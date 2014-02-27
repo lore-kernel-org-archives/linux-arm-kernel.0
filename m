@@ -1,103 +1,121 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Thu, 27 Feb 2014 16:24:28 +0100
-Subject: [PATCH v0 15/15] ARM: STi: DT: STiH415: 415 DT Entry for clockgen A9
+Date: Thu, 27 Feb 2014 16:24:22 +0100
+Subject: [PATCH v0 09/15] clk: st: Adds clockgen-vcc and clockgen-mux clock
+ binding
 In-Reply-To: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
 References: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1393514668-17440-16-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1393514668-17440-10-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch adds DT entries for clockgen A9
-
-Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- arch/arm/boot/dts/stih415-clock.dtsi | 67 +++++++++++++++++++++++++++++++-----
- 1 file changed, 58 insertions(+), 9 deletions(-)
+ .../devicetree/bindings/clock/st/st,clkgen-mux.txt | 36 +++++++++++++++
+ .../devicetree/bindings/clock/st/st,clkgen-vcc.txt | 53 ++++++++++++++++++++++
+ 2 files changed, 89 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-vcc.txt
 
-diff --git a/arch/arm/boot/dts/stih415-clock.dtsi b/arch/arm/boot/dts/stih415-clock.dtsi
-index 24a7508..8563636 100644
---- a/arch/arm/boot/dts/stih415-clock.dtsi
-+++ b/arch/arm/boot/dts/stih415-clock.dtsi
-@@ -24,15 +24,6 @@
- 		};
- 
- 		/*
--		 * ARM Peripheral clock for timers
--		 */
--		arm_periph_clk: arm_periph_clk {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <500000000>;
--		};
--
--		/*
- 		 * ClockGenAs on SASG1
- 		 */
- 		clockgenA at fee62000 {
-@@ -499,5 +490,63 @@
- 						/* Remaining outputs unused */
- 			};
- 		};
+diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+new file mode 100644
+index 0000000..943e080
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+@@ -0,0 +1,36 @@
++Binding for a ST multiplexed clock driver.
 +
-+		/*
-+		 * A9 PLL.
-+		 *
-+		 */
-+		clockgenA9 {
-+			reg = <0xfdde00d8 0x70>;
++This binding supports only simple indexed multiplexers, it does not
++support table based parent index to hardware value translations.
 +
-+			CLOCKGEN_A9_PLL: CLOCKGEN_A9_PLL {
-+				#clock-cells = <1>;
-+				compatible = "st,stih415-plls-c32-a9", "st,clkgen-plls-c32";
++This binding uses the common clock binding[1].
 +
-+				clocks = <&CLK_SYSIN>;
-+				clock-output-names = "CLOCKGEN_A9_PLL_ODF";
-+			};
-+		};
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
 +
-+		/*
-+		 * ARM CPU related clocks.
-+		 */
-+		CLK_M_A9: CLK_M_A9 {
-+			#clock-cells = <0>;
-+			compatible = "st,stih415-clkgen-a9-mux", "st,clkgen-mux";
-+			reg = <0xfdde00d8 0x4>;
-+			clocks = <&CLOCKGEN_A9_PLL 0>, <&CLOCKGEN_A9_PLL 0>, <&CLK_M_A0_DIV1 2>, <&CLK_M_A9_EXT2F_DIV2>;
-+		};
++Required properties:
 +
-+		/*
-+		 * ARM Peripheral clock for timers
-+		 */
-+		arm_periph_clk: CLK_M_A9_PERIPHS {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clocks = <&CLK_M_A9>;
-+			clock-div = <2>;
-+			clock-mult = <1>;
-+		};
++- compatible : shall be:
++	"st,stih416-clkgenc-vcc-hd",	"st,clkgen-mux"
++	"st,stih416-clkgenf-vcc-fvdp",	"st,clkgen-mux"
++	"st,stih416-clkgenf-vcc-hva", 	"st,clkgen-mux"
++	"st,stih416-clkgenf-vcc-hd",	"st,clkgen-mux"
++	"st,stih416-clkgenf-vcc-sd",	"st,clkgen-mux"
++	"st,stih415-clkgen-a9-mux",	"st,clkgen-mux"
++	"st,stih416-clkgen-a9-mux",	"st,clkgen-mux"
 +
-+		CLK_S_USB48: clockgenB0 at 0 {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <48000000>;
-+			clock-output-names = "CLK_S_USB48";
-+		};
 +
-+		CLKS_B_THSENS: clockgenB at 3 {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <996000>;
-+			clock-output-names = "CLKS_B_THSENS";
-+		};
++- #clock-cells : from common clock binding; shall be set to 0.
 +
-+		CLKM_MPETHSENS: clockgenE at 3 {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <996000>;
-+			clock-output-names = "CLKM_MPETHSENS";
-+		};
- 	};
- };
++- reg : A Base address and length of the register set.
++
++- clocks : from common clock binding
++
++Example:
++
++	CLK_M_HVA: CLK_M_HVA {
++		#clock-cells = <0>;
++		compatible = "st,stih416-clkgenf-vcc-hva", "st,clkgen-mux";
++		reg = <0xfd690868 4>;
++
++		clocks = <&CLOCKGEN_F 1>, <&CLK_M_A1_DIV0 3>;
++	};
+diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-vcc.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-vcc.txt
+new file mode 100644
+index 0000000..4e3ff28
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-vcc.txt
+@@ -0,0 +1,53 @@
++Binding for a type of STMicroelectronics clock crossbar (VCC).
++
++The crossbar can take up to 4 input clocks and control up to 16
++output clocks. Not all inputs or outputs have to be in use in a
++particular instantiation. Each output can be individually enabled,
++select any of the input clocks and apply a divide (by 1,2,4 or 8) to
++that selected clock.
++
++This binding uses the common clock binding[1].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++Required properties:
++
++- compatible : shall be:
++	"st,stih416-clkgenc",		"st,vcc"
++	"st,stih416-clkgenf",		"st,vcc"
++
++- #clock-cells : from common clock binding; shall be set to 1.
++
++- reg : A Base address and length of the register set.
++
++- clocks : from common clock binding
++
++- clock-output-names : From common clock binding. The block has 16
++                       clock outputs but not all of them in a specific instance
++                       have to be used in the SoC. If a clock name is left as
++                       an empty string then no clock will be created for the
++                       output associated with that string index. If fewer than
++                       16 strings are provided then no clocks will be created
++                       for the remaining outputs.
++
++Example:
++
++	CLOCKGEN_C_VCC: CLOCKGEN_C_VCC {
++		#clock-cells = <1>;
++		compatible = "st,stih416-clkgenc", "st,clkgen-vcc";
++		reg = <0xfe8308ac 12>;
++
++		clocks = <&CLK_S_VCC_HD>, <&CLOCKGEN_C 1>,
++			<&CLK_S_TMDS_FROMPHY>, <&CLOCKGEN_C 2>;
++
++		clock-output-names  =
++			"CLK_S_PIX_HDMI",  "CLK_S_PIX_DVO",
++			"CLK_S_OUT_DVO",   "CLK_S_PIX_HD",
++			"CLK_S_HDDAC",     "CLK_S_DENC",
++			"CLK_S_SDDAC",     "CLK_S_PIX_MAIN",
++			"CLK_S_PIX_AUX",   "CLK_S_STFE_FRC_0",
++			"CLK_S_REF_MCRU",  "CLK_S_SLAVE_MCRU",
++			"CLK_S_TMDS_HDMI", "CLK_S_HDMI_REJECT_PLL",
++			"CLK_S_THSENS";
++	};
++
 -- 
 1.9.0
