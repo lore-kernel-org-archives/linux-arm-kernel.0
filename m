@@ -1,41 +1,30 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Wed, 26 Feb 2014 18:30:09 -0600
-Subject: [PATCH v3 1/9] Input: pmic8xxx-pwrkey - Migrate to regmap APIs
-In-Reply-To: <530E84B3.8020608@codeaurora.org>
-References: <1393441562-685-1-git-send-email-sboyd@codeaurora.org>
- <1393441562-685-2-git-send-email-sboyd@codeaurora.org>
- <20140226235959.GD18563@joshc.qualcomm.com>
- <530E8154.9060403@codeaurora.org>
- <20140227001358.GF18563@joshc.qualcomm.com>
- <530E84B3.8020608@codeaurora.org>
-Message-ID: <20140227003009.GG18563@joshc.qualcomm.com>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Wed, 26 Feb 2014 16:38:20 -0800
+Subject: [PATCH v7 5/9] ARM: Enable erratum 798181 for Broadcom Brahma-B15
+In-Reply-To: <20140226104702.GA8961@mudshark.cambridge.arm.com>
+References: <1393410552-21497-1-git-send-email-marc.ceeeee@gmail.com>
+ <1393410552-21497-6-git-send-email-marc.ceeeee@gmail.com>
+ <20140226104702.GA8961@mudshark.cambridge.arm.com>
+Message-ID: <CADtm3G7JcO6+Sc6Dsw1swY09F7+-KSXjsQU8CBcH-K6On2aP_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 04:20:03PM -0800, Stephen Boyd wrote:
-> On 02/26/14 16:13, Josh Cartwright wrote:
-> > On Wed, Feb 26, 2014 at 04:05:40PM -0800, Stephen Boyd wrote:
-> >> On 02/26/14 15:59, Josh Cartwright wrote:
-> > However, I think it needs to be made clear that your if "Modernize pm8921
-> > with irqdomains, regmap, DT" lands before this patchset, this will start
-> > breaking randconfig builds.  It isn't clear to me how this dependency
-> > should be handled.
-> >
-> 
-> Hmm? If pm8921 lands before this what build breakage is there? The
-> pm8xxx_read/write APIs are still exposed.
+Hi Will,
 
-Well, with the pm8921 patchset in place, the keypad driver becomes
-selectable, which, when built leads to the error below.  But AFAICT,
-this isn't even addressed in this patchset?!
+On Wed, Feb 26, 2014 at 2:47 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Feb 26, 2014 at 10:29:08AM +0000, Marc Carino wrote:
+>> From: Gregory Fong <gregory.0xf0@gmail.com>
+>>
+>> Broadcom Brahma-B15 (r0p0..r0p2) is also affected by Cortex-A15
+>> erratum 798181, so enable the workaround for Brahma-B15.
+>
+> Really... *exactly* the same erratum? That sounds pretty unlikely, so I'd
+> really like to be sure that the workaround we have indeed solves your
+> problem (issuing a dummy TLBI to 0x0 + dsb, then followed by a dmb + clrex
+> on each core). The point is that the workaround doesn't simply perform
+> non-shareable invalidation on each core using IPIs.
 
-drivers/input/keyboard/pmic8xxx-keypad.c:24:35: fatal error: linux/mfd/pm8xxx/gpio.h: No such file or directory
- #include <linux/mfd/pm8xxx/gpio.h>
-                                   ^
+Yes, it should be the same.  I've sent you more detail off-list.
 
-So, I'm confused...maybe the pm8921 cleanup patchset should be marking
-the keypad driver BROKEN?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Gregory
