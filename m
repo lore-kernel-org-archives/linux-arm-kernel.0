@@ -1,71 +1,71 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 27 Feb 2014 14:05:01 +0200
-Subject: TWL6040 fails to initialize
-In-Reply-To: <530DC291.2060708@epfl.ch>
-References: <530C70B3.4010103@epfl.ch> <530CA8DA.8050806@ti.com>
- <530CB9C6.60806@epfl.ch> <530D972F.805@ti.com> <530DB97E.80309@epfl.ch>
- <530DC1D3.8040800@ti.com> <530DC291.2060708@epfl.ch>
-Message-ID: <530F29ED.9020706@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 27 Feb 2014 12:07:30 +0000
+Subject: [PATCH 01/18] arm64: initial support for GICv3
+In-Reply-To: <530DE3CE.1010002@arm.com>
+References: <1391607050-540-1-git-send-email-marc.zyngier@arm.com>
+ <1391607050-540-2-git-send-email-marc.zyngier@arm.com>
+ <20140225180619.GG23136@mudshark.cambridge.arm.com>
+ <530DE3CE.1010002@arm.com>
+Message-ID: <20140227120730.GE30003@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2014 12:31 PM, Florian Vaussard wrote:
->>> I statistically checked that the sleep should be placed after the GPIO
->>> request, so indeed this seems to be the problem, and your explanation is
->>> plausible. Can you send a proper patch?
->>>
->>> Now, related to this, I managed to found a part of the datasheet on the
->>> Great Internet. Looking at the "Power-Up Sequence" section, it is written:
->>>
->>> - NRESPWRON goes high -> plug detect and GPO are available
->>> - V2V1 goes high -> hook-detect available by I2C programming (sleep mode)
->>> - AUDPWRON goes high && READYINT -> ready to communicate through I2C and PDM
->>>
->>> So, although there seems to be some contradictions on when it is
->>> possible to access the I2C, shouldn't we enable the AUDPWRON GPIO
->>> _before_ making any I2C access?
->>>
->>> For the twl6040_probe, the following path would seem more correct to me:
->>>
->>> 1) enable regulators
->>> 2) request AUDPWRON
->>> 3) twl6040_power(ON) && regcache_cache_only(false)
->>> 4) wait for READYINT (or sleep if deterministic)
->>> 5) perform all required I2C accesses (read revision, etc.)
->>> 6) twl6040_power(OFF) && regcache_cache_only(true)
->>>
->>> What do you think?
->>
->> Even when the AUDPWRON signal is low we can access to registers in VIO domain,
->> plug detect and GPO functions. So there's no need to power on the codec just
->> to power it down later.
->>
+On Wed, Feb 26, 2014 at 12:53:34PM +0000, Marc Zyngier wrote:
+> On 25/02/14 18:06, Will Deacon wrote:
+> > Not sure if you care, but readq is a show-stopper if you want to build this
+> > with arch/arm/.
 > 
-> Ok, if it is safe to do so, I am fine with the current probe. I let you
-> post a patch to add a delay after requesting the GPIO.
+> I realized that recently. Any reason why we don't have writeq/readq on
+> LPAE-capable stuff (other than the obvious runtime detection madness)?
 
+I'm not sure that you'd be guaranteed single-copy atomicity for such an
+access, which is probably assumed by readq/writeq.
 
-There's something else going on on your board.
-I did some experiments on PandaBoards: in u-boot I set the GPIO127 (audpwron)
-high and boot the kernel.
-During the boot I see all sorts of errors, mcpdm fails to reset, i2c timeouts
-towards twl6040.
-For this the solution is to read the INTID register just after I request the
-gpio - to clear any no longer valid interrupts before we request the IRQ. This
-works fine on my boards.
+> >> +                       if ((typer >> 32) == aff) {
+> >> +                               gic_data_rdist_rd_base() = ptr;
+> >> +                               pr_info("CPU%d: found redistributor %llx @%p\n",
+> >> +                                       smp_processor_id(),
+> >> +                                       (unsigned long long) mpidr, ptr);
+> >> +                               return 0;
+> >> +                       }
+> >> +
+> >> +                       if (gic_data.redist_stride) {
+> >> +                               ptr += gic_data.redist_stride;
+> >> +                       } else {
+> >> +                               ptr += SZ_64K * 2; /* Skip RD_base + SGI_base */
+> >> +                               if (typer & GICR_TYPER_VLPIS)
+> >> +                                       ptr += SZ_64K * 2; /* Skip VLPI_base + reserved page */
+> >> +                       }
+> >
+> > VLPIS is RES0 in GICv3.
+> 
+> Indeed. But we still want this driver to run on GICv4 HW, even if we
+> don't use VLPIs just yet.
 
-The issue you have with your board is something totally different.
-One thing might be that the i2c bus is set to 400KHz while the twl6040 by
-default is set for normal mode (100KHz). On all of the boards I have access
-this works fine but there might be some electrical issue on your board which
-causes i2c to fail.
+Ok, just mention that in the commit then.
 
-There's also another thing I just noticed: the regmap patch
-regmap_register_patch() when it is applied will not update the regcache by
-design. I do not like that too much. On the other hand it is handy to set the
-ACCCTL register as early as possible.
+> >> +static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+> >> +                           bool force)
+> >> +{
+> >> +       unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
+> >> +       void __iomem *reg;
+> >> +       u64 val;
+> >> +
+> >> +       if (gic_irq(d) < 32)
+> >> +               return -EINVAL;
+> >> +
+> >> +       reg = gic_dist_base(d) + GICD_IROUTER + (gic_irq(d) * 8);
+> >> +       val = gic_mpidr_to_affinity(cpu_logical_map(cpu));
+> >> +
+> >> +       writeq_relaxed(val, reg);
+> >
+> > How do you ensure that the interrupt has actually moved?
+> 
+> There is no way to ensure it actually did (other than reading back from
+> the same register, if that's what you're aiming for?).
 
-So, I'm not sure about the delay and why it helps on your board.
+I guess it depends how angry Linux will get if the interrupt fires on the
+wrong CPU. If the interrupt is pending when the moving takes place, will it
+be asserted on the new target?
 
--- 
-P?ter
+Will
