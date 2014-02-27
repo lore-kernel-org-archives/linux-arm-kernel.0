@@ -1,117 +1,53 @@
-From: lho@apm.com (Loc Ho)
-Date: Thu, 27 Feb 2014 11:14:08 -0700
-Subject: [PATCH v12 4/4] arm64: Add APM X-Gene SoC 15Gbps Multi-purpose PHY
- DTS entries
-In-Reply-To: <1393524848-8207-4-git-send-email-lho@apm.com>
-References: <1393524848-8207-1-git-send-email-lho@apm.com>
- <1393524848-8207-2-git-send-email-lho@apm.com>
- <1393524848-8207-3-git-send-email-lho@apm.com>
- <1393524848-8207-4-git-send-email-lho@apm.com>
-Message-ID: <1393524848-8207-5-git-send-email-lho@apm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 27 Feb 2014 18:15:44 +0000
+Subject: arm64 cache maintenance on read only address loops forever
+In-Reply-To: <530E5F60.4050701@codeaurora.org>
+References: <530D74C2.4000402@codeaurora.org>
+ <20140226135521.GF8961@mudshark.cambridge.arm.com>
+ <530E5F60.4050701@codeaurora.org>
+Message-ID: <20140227181544.GL30003@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DTS entries for the APM X-Gene SoC 15Gbps Multi-purpose
-PHY driver. The PHY for SATA controller 2 and 3 are enabled by default.
+Hi Laura,
 
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Tuan Phan <tphan@apm.com>
-Signed-off-by: Suman Tripathi <stripathi@apm.com>
----
- arch/arm64/boot/dts/apm-storm.dtsi |   75 ++++++++++++++++++++++++++++++++++++
- 1 files changed, 75 insertions(+), 0 deletions(-)
+On Wed, Feb 26, 2014 at 09:40:48PM +0000, Laura Abbott wrote:
+> On 2/26/2014 5:55 AM, Will Deacon wrote:
+> > On Wed, Feb 26, 2014 at 04:59:46AM +0000, Laura Abbott wrote:
+> >> Calling cache maintenance on an address that hasn't actually been
+> >> written to isn't all that useful but looping forever seems like a poor
+> >> result. It seems like the check in do_page_fault is too restrictive and
+> >> we need to be able to fault in pages via cache maintenance.
+> >
+> > My understanding is that the EL0 cache maintenance instructions only require
+> > read permission (note that DC ZVA is treated like a store and doesn't set
+> > ESR.CM), so I'm failing to appreciate the problem here.
+> >
+> > Do you have a small testcase I can play with?
+> >
+> 
+> 
+> You probably won't like the test case because it's breaking assumptions 
+> pretty badly. This uses 96f083d416c0d01687ed5b37074831f461838455 from
+> Catalin's devel branch to call __dma_inv_range on an mmaped user space
+> address. I see three possible outcomes:
+> 
+> 1) The test while questionable may have some merit and we will be able 
+> to flush user space addresses using this API without causing a problem.
+> 
+> 2) The test is bad. Instead of looping forever we will instead die with 
+> a fault.
+> 
+> 3) The test is really really bad. Looping forever is your punishment.
 
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-index d37d736..c78ddcf 100644
---- a/arch/arm64/boot/dts/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -176,6 +176,51 @@
- 				reg-names = "csr-reg";
- 				clock-output-names = "eth8clk";
- 			};
-+
-+			sataphy1clk: sataphy1clk at 1f21c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f21c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sataphy1clk";
-+				status = "disabled";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x00>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x06>;
-+			};
-+
-+			sataphy2clk: sataphy1clk at 1f22c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f22c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sataphy2clk";
-+				status = "ok";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x3a>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x06>;
-+			};
-+
-+			sataphy3clk: sataphy1clk at 1f23c000 {
-+				compatible = "apm,xgene-device-clock";
-+				#clock-cells = <1>;
-+				clocks = <&socplldiv2 0>;
-+				clock-names = "socplldiv2";
-+				reg = <0x0 0x1f23c000 0x0 0x1000>;
-+				reg-names = "csr-reg";
-+				clock-output-names = "sataphy3clk";
-+				status = "ok";
-+				csr-offset = <0x4>;
-+				csr-mask = <0x3a>;
-+				enable-offset = <0x0>;
-+				enable-mask = <0x06>;
-+			};
- 		};
- 
- 		serial0: serial at 1c020000 {
-@@ -187,5 +232,35 @@
- 			interrupt-parent = <&gic>;
- 			interrupts = <0x0 0x4c 0x4>;
- 		};
-+
-+		phy1: phy at 1f21a000 {
-+			compatible = "apm,xgene-phy";
-+			reg = <0x0 0x1f21a000 0x0 0x100>;
-+			#phy-cells = <1>;
-+			clocks = <&sataphy1clk 0>;
-+			status = "disabled";
-+			apm,tx-boost-gain = <30 30 30 30 30 30>;
-+			apm,tx-eye-tuning = <2 10 10 2 10 10>;
-+		};
-+
-+		phy2: phy at 1f22a000 {
-+			compatible = "apm,xgene-phy";
-+			reg = <0x0 0x1f22a000 0x0 0x100>;
-+			#phy-cells = <1>;
-+			clocks = <&sataphy2clk 0>;
-+			status = "ok";
-+			apm,tx-boost-gain = <30 30 30 30 30 30>;
-+			apm,tx-eye-tuning = <1 10 10 2 10 10>;
-+		};
-+
-+		phy3: phy at 1f23a000 {
-+			compatible = "apm,xgene-phy";
-+			reg = <0x0 0x1f23a000 0x0 0x100>;
-+			#phy-cells = <1>;
-+			clocks = <&sataphy3clk 0>;
-+			status = "ok";
-+			apm,tx-boost-gain = <31 31 31 31 31 31>;
-+			apm,tx-eye-tuning = <2 10 10 2 10 10>;
-+		};
- 	};
- };
--- 
-1.5.5
+Ok, I spent some time getting your test working and, after managing to run
+it, it promptly destroyed the flash on my FPGA. Once I managed to recover
+that, the issue seems to be that __dma_inv_range doesn't have an exception
+table entry for the dc ivac, mainly because it's written to be used only on
+the kernel linear mapping. As such, __do_page_fault won't actually resolve
+anything. If you enabled CONFIG_DEBUG_VM, you'll get a SEGV at the cost of
+searching the tables at fault time.
+
+So yeah, I'd say (2) or (3) depending on your .config ;)
+
+Will
