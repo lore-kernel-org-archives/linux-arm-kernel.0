@@ -1,89 +1,48 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 27 Feb 2014 16:18:30 +0200
-Subject: [PATCH v9 8/9] ARM: dts: OMAP2+: Get rid of incompatible ids for USB
- host nodes
+Date: Thu, 27 Feb 2014 16:18:31 +0200
+Subject: [PATCH v9 9/9] usb: omap: dts: Update DT binding example usage
 In-Reply-To: <1393510711-4697-1-git-send-email-rogerq@ti.com>
 References: <1393510711-4697-1-git-send-email-rogerq@ti.com>
-Message-ID: <1393510711-4697-9-git-send-email-rogerq@ti.com>
+Message-ID: <1393510711-4697-10-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP EHCI and OHCI controllers are not compatible with drivers
-other than "ti,ehci-omap" and "ti,ohci-omap3" respectively, so get
-rid of the incompatible ids.
+Remove non-compatible id from examples.
 
 CC: Alan Stern <stern@rowland.harvard.edu>
 CC: Nishant Menon <nm@ti.com>
 CC: Kevin Hilman <khilman@linaro.org>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap3.dtsi | 4 ++--
- arch/arm/boot/dts/omap4.dtsi | 4 ++--
- arch/arm/boot/dts/omap5.dtsi | 4 ++--
- 3 files changed, 6 insertions(+), 6 deletions(-)
+ Documentation/devicetree/bindings/usb/ehci-omap.txt  | 2 +-
+ Documentation/devicetree/bindings/usb/ohci-omap3.txt | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index a5fc83b..8e7de9e 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -634,14 +634,14 @@
- 			ranges;
+diff --git a/Documentation/devicetree/bindings/usb/ehci-omap.txt b/Documentation/devicetree/bindings/usb/ehci-omap.txt
+index 485a9a1..3dc231c 100644
+--- a/Documentation/devicetree/bindings/usb/ehci-omap.txt
++++ b/Documentation/devicetree/bindings/usb/ehci-omap.txt
+@@ -21,7 +21,7 @@ Documentation/devicetree/bindings/mfd/omap-usb-host.txt
+ Example for OMAP4:
  
- 			usbhsohci: ohci at 48064400 {
--				compatible = "ti,ohci-omap3", "usb-ohci";
-+				compatible = "ti,ohci-omap3";
- 				reg = <0x48064400 0x400>;
- 				interrupt-parent = <&intc>;
- 				interrupts = <76>;
- 			};
+ usbhsehci: ehci at 4a064c00 {
+-	compatible = "ti,ehci-omap", "usb-ehci";
++	compatible = "ti,ehci-omap";
+ 	reg = <0x4a064c00 0x400>;
+ 	interrupts = <0 77 0x4>;
+ };
+diff --git a/Documentation/devicetree/bindings/usb/ohci-omap3.txt b/Documentation/devicetree/bindings/usb/ohci-omap3.txt
+index 14ab428..ce8c47cff 100644
+--- a/Documentation/devicetree/bindings/usb/ohci-omap3.txt
++++ b/Documentation/devicetree/bindings/usb/ohci-omap3.txt
+@@ -9,7 +9,7 @@ Required properties:
+ Example for OMAP4:
  
- 			usbhsehci: ehci at 48064800 {
--				compatible = "ti,ehci-omap", "usb-ehci";
-+				compatible = "ti,ehci-omap";
- 				reg = <0x48064800 0x400>;
- 				interrupt-parent = <&intc>;
- 				interrupts = <77>;
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 39a05ce..ff1b057 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -705,14 +705,14 @@
- 				      "refclk_60m_ext_p2";
- 
- 			usbhsohci: ohci at 4a064800 {
--				compatible = "ti,ohci-omap3", "usb-ohci";
-+				compatible = "ti,ohci-omap3";
- 				reg = <0x4a064800 0x400>;
- 				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
- 			};
- 
- 			usbhsehci: ehci at 4a064c00 {
--				compatible = "ti,ehci-omap", "usb-ehci";
-+				compatible = "ti,ehci-omap";
- 				reg = <0x4a064c00 0x400>;
- 				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index d4dae48..f65aa65 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -783,14 +783,14 @@
- 				      "refclk_60m_ext_p2";
- 
- 			usbhsohci: ohci at 4a064800 {
--				compatible = "ti,ohci-omap3", "usb-ohci";
-+				compatible = "ti,ohci-omap3";
- 				reg = <0x4a064800 0x400>;
- 				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
- 			};
- 
- 			usbhsehci: ehci at 4a064c00 {
--				compatible = "ti,ehci-omap", "usb-ehci";
-+				compatible = "ti,ehci-omap";
- 				reg = <0x4a064c00 0x400>;
- 				interrupt-parent = <&gic>;
- 				interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
+ usbhsohci: ohci at 4a064800 {
+-	compatible = "ti,ohci-omap3", "usb-ohci";
++	compatible = "ti,ohci-omap3";
+ 	reg = <0x4a064800 0x400>;
+ 	interrupts = <0 76 0x4>;
+ };
 -- 
 1.8.3.2
