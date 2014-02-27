@@ -1,59 +1,84 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 27 Feb 2014 09:08:06 +0100
-Subject: [PATCH] ARM: shmobile: Check r8a7791 MD21 at SMP boot
-In-Reply-To: <CANqRtoQbx4LvaFxd_O6Em79QceSadVq93mJhyrDiD370VaXgWg@mail.gmail.com>
-References: <20140226095916.15676.99394.sendpatchset@w520>
- <CAMuHMdXKdN+LrhhCFKgO4=2ez0qiyc8EhtBLPzrfxmBMLpGX7Q@mail.gmail.com>
- <CANqRtoQbx4LvaFxd_O6Em79QceSadVq93mJhyrDiD370VaXgWg@mail.gmail.com>
-Message-ID: <CAMuHMdU9CPsvV-MdO88QG3Xd0QQJxK0w9nH5ky6b+t7_rXsFGw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 27 Feb 2014 09:18:34 +0100
+Subject: [PATCH 0/8] PM / Sleep / Runtime: Fixup some driver's system
+ suspend
+In-Reply-To: <12123949.qNoh3vhWUc@vostro.rjw.lan>
+References: <1392910280-12891-1-git-send-email-ulf.hansson@linaro.org>
+ <7htxblx2eo.fsf@paris.lan> <12123949.qNoh3vhWUc@vostro.rjw.lan>
+Message-ID: <CAPDyKFp_ugRytLGR4fGXvdZEMRohg6uWPykcFJ7Co_wipJujDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
-
-On Thu, Feb 27, 2014 at 4:33 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>>  This is a reworked version of the APMU patch previously posted as
->>>  [PATCH] ARM: shmobile: Check MD21 at SMP boot in case of APMU
+On 27 February 2014 02:22, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Wednesday, February 26, 2014 08:30:07 AM Kevin Hilman wrote:
+>> Ulf Hansson <ulf.hansson@linaro.org> writes:
 >>
->> Your previous version also affected r8a7790/Lager.
->> Isn't this check no longer needed there? According to the Lager manual,
->> MD21 also enables hardware debug mode, and is also controlled by
->> SW8-4. Of course the CPU may behave differently, as the CPU cores
->> are different.
+>> > Patch 1 -> 2:
+>> > These patches provides two new runtime PM helper functions which intend to be
+>> > used from system suspend/resume callbacks, to make sure devices are put into low
+>> > power state during system suspend and brought back to full power at system
+>> > resume.
+>> >
+>> > The prerequisite is to have all levels of a device's runtime PM callbacks to be
+>> > defined through the SET_PM_RUNTIME_PM_OPS macro, which means these are available
+>> > for CONFIG_PM.
+>> >
+>> > By using the new runtime PM helper functions especially the two scenarios below
+>> > will be addressed.
+>> >
+>> > 1) The PM core prevents .runtime_suspend callbacks from being invoked during
+>> > system suspend. That means even for a runtime PM centric subsystem and driver,
+>> > the device needs to be put into low power state from a system suspend callback.
+>> > Otherwise it may very well be left in full power state (runtime resumed) while
+>> > the system is suspended. By using the new helper functions, we make sure to walk
+>> > the hierarchy of a device's power domain, subsystem and driver.
+>>
+>> I thought it was the case that runtime PM was only disabled during the
+>> 'late' phase now.  Isn't that enough to allow runtime callbacks in the
+>> normal suspend/resume hooks now?   /me looks.
+>>
+>> oh, wait.  Ee still have the _get_noresume() in device_prepare().  hmm
+>>
+>> Either way, I'm not not a big fan of new functions.  Personally, I think
+>> subsystems/busses/pm_domains should be able to opt out of the PM core
+>> behavior that blocks runtime PM transitions during system suspend.
+>> Something like the (untested) hack below.  That way, we could avoid the
+>> need for new helper functions.
 >
-> Yes, you are correct that the previous version of the patch also
-> affected Lager. And that both r8a7790 and r8a7791 mention the MD21 bit
-> together with JTAG debugging.
+> And if one of the subsystems in question is the platform bus type, then
+> adding the flag doesn't really make sense, because that means that on
+> many system it will be set for the majority of devices. :-)
 >
-> I recently used the patch on Lager and I discovered that I apparently
-> had been running with MD21 on my Lager since forever, and surprisingly
-> it worked regardless. Since there is no documentation on r8a7790 or
-> r8a7791 I simply decided to handle them separately and only enable
-> where it is needed.
+> That said I'm tired of this stuff already.  If you really really want to
+> remove the bumping up and dropping of the usage counter during system
+> suspend/resume by the core, please feel free to submit a patch for that
+> and I'll apply it.  However, if it causes any regressions to happen
+> anywhere, it will be dropped and we'll never talk about this again.
+>
+> Deal?
 
-You could have been lucky?
+No deal. I prefer the runtime PM helpers, I think that is the right
+approach. I also believe this is what Alan Stern also would prefer,
+right!? So let's convince Kevin instead. :-)
 
-On Koelsch, I only had failures after Real Cold Boot, i.e. on boot up in the
-morning. And not always, so there could be a timing issue involved.
+Let's just be clear of why I don't think Kevin suggested solution is
+the way to go:
 
-> I've also been told that it is possible to allow SMP operation
-> together with JTAG, apparently some magic with RST is needed. It seems
-> that the power domains are treated differently depending on the MD21
-> setting. Not sure if this applies to both r8a7790 and r8a7791, but if
-> we end up with similar fixes we can consolidate. Until then I think
-> dealing with them one by one makes sense.
+1. The runtime PM sysfs interface. Userspace may prevent
+->runtime_suspend callbacks from being invoked anyway. So, it doesn't
+matter if PM core does it too.
 
-Furthermore, I haven't seen any SPI timeouts after I disabled MD21 (holding
-wood, and rabbit legs ;-). So the SMP memory (in)coherency I saw there
-could have been caused by a wobbly SMP setup.
+2. Currently we have CONFIG_PM_RUNTIME and CONFIG_PM_SLEEP. Subsystem
+and driver, must cope with both. I know there were a discussion about
+combining them as one define, but we rejected that - at least for now.
+Anyway, my point is, subsystem/driver must not rely on PM runtime core
+(like pm_runtime_put_sync) from the system suspend callback to put
+their devices into low power state.
 
-Gr{oetje,eeting}s,
+Kind regards
+Uffe
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>
+> --
+> I speak only for myself.
+> Rafael J. Wysocki, Intel Open Source Technology Center.
