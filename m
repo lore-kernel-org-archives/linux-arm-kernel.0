@@ -1,59 +1,37 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu, 27 Feb 2014 09:21:37 +0100
-Subject: [PATCH] clk:at91: Fix memory leak in of_at91_clk_master_setup()
-In-Reply-To: <20140227020226.12081.28850@quantum>
-References: <1392124507-14463-1-git-send-email-standby24x7@gmail.com>
- <52FA2338.3030707@overkiz.com> <52FF9EFC.2060707@overkiz.com>
- <20140227020226.12081.28850@quantum>
-Message-ID: <530EF591.5000504@overkiz.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 27 Feb 2014 09:29:31 +0100
+Subject: [PATCH] PM / Sleep: Set pm_generic functions to NULL for
+ !CONFIG_PM_SLEEP
+In-Reply-To: <20140219122715.GB32069@amd.pavel.ucw.cz>
+References: <1392811761-28201-1-git-send-email-ulf.hansson@linaro.org>
+ <20140219122715.GB32069@amd.pavel.ucw.cz>
+Message-ID: <CAPDyKFrhyBZV6yUogxTQPdFPg=1R3UZ0Yr_VfXrTivMaNeGVEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/02/2014 03:02, Mike Turquette wrote:
-> Quoting Boris BREZILLON (2014-02-15 09:08:12)
->> Hi Mike,
+On 19 February 2014 13:27, Pavel Machek <pavel@ucw.cz> wrote:
+> On Wed 2014-02-19 13:09:21, Ulf Hansson wrote:
+>> Previously only a subset of the functions were defined and set to NULL
+>> while !CONFIG_PM_SLEEP. Let's make them all available so they can be
+>> used no matter of CONFIG_PM_SLEEP or not.
 >>
->> Could you take this patch for the next 3.14 release ?
-> Taken in for the next batch of fixes.
-Thanks.
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 >
-> Regards,
-> Mike
+> Reviewed-by: Pavel Machek <pavel@ucw.cz>
 >
->> Best Regards,
->>
->> Boris
->>
->> On 11/02/2014 14:18, Boris BREZILLON wrote:
->>> On 11/02/2014 14:15, Masanari Iida wrote:
->>>> cppcheck detected following error
->>>> [clk-master.c:245]: (error) Memory leak: characteristics
->>>>
->>>> The original code forgot to free characteristics when
->>>> irq_of_parse_and_map() failed.
->>>>
->>>> Signed-off-by: Masanari Iida <standby24x7@gmail.com>
->>> Acked-by Boris BREZILLON <b.brezillon@overkiz.com>
->>>
->>> Thanks for fixing this.
->>>
->>> Best Regards,
->>>
->>> Boris
->>>> ---
->>>>    drivers/clk/at91/clk-master.c | 2 +-
->>>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/clk/at91/clk-master.c
->>>> b/drivers/clk/at91/clk-master.c
->>>> index bd313f7..c1af80b 100644
->>>> --- a/drivers/clk/at91/clk-master.c
->>>> +++ b/drivers/clk/at91/clk-master.c
->>>> @@ -242,7 +242,7 @@ of_at91_clk_master_setup(struct device_node *np,
->>>> struct at91_pmc *pmc,
->>>>          irq = irq_of_parse_and_map(np, 0);
->>>>        if (!irq)
->>>> -        return;
->>>> +        goto out_free_characteristics;
->>>>          clk = at91_clk_register_master(pmc, irq, name, num_parents,
->>>>                           parent_names, layout,
+
+Hi Rafael,
+
+If you have no concern with this one, I would appreciate if it could
+go in for 3.15.
+
+I have some patches for the amba bus (driver/amba/bus.c) that would
+require these pointers to be available.
+
+Kind regards
+Uffe
+
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
