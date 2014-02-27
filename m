@@ -1,99 +1,43 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 26 Feb 2014 21:00:43 -0800
-Subject: [RFC PATCH 1/6] PM / Voltagedomain: Add generic clk notifier
- handler for regulator based dynamic voltage scaling
-In-Reply-To: <20140227023455.GA15712@kahuna>
-References: <1392755543-28335-1-git-send-email-nm@ti.com>
- <1392755543-28335-2-git-send-email-nm@ti.com>
- <20140225055142.22529.21814@quantum> <530D0394.4020208@ti.com>
- <20140227023455.GA15712@kahuna>
-Message-ID: <20140227050043.12081.54173@quantum>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 27 Feb 2014 11:09:45 +0530
+Subject: [PATCH 3/3] cpufreq: stats: Refactor common code into
+ __cpufreq_stats_create_table()
+In-Reply-To: <1393445858-7062-3-git-send-email-skannan@codeaurora.org>
+References: <1393445858-7062-3-git-send-email-skannan@codeaurora.org>
+Message-ID: <CAKohpo=Xf+5OxjAuYkh_jCJ92MPuutgpHXL8fxOLq_3B18cSEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Nishanth Menon (2014-02-26 18:34:55)
-> +/**
-> + * pm_runtime_get_rate() - Returns the device operational frequency
-> + * @dev:       Device to handle
-> + * @rate:      Returns rate in Hz.
-> + *
-> + * Returns appropriate error value in case of error conditions, else
-> + * returns 0 and rate is updated. The pm_domain logic does all the necessary
-> + * operation (which may consider magic hardware stuff) to provide the rate.
-> + *
-> + * NOTE: the rate returned is a snapshot and in many cases just a bypass
-> + * to clk api to set the rate.
-> + */
-> +int pm_runtime_get_rate(struct device *dev, unsigned long *rate)
-
-Instead of "rate", how about we use "level" and leave it undefined as to
-what that means? It would be equally valid for level to represent a
-clock rate, or an opp from a table of opp's, or a p-state, or some value
-passed to a PM microcontroller.
-
-Code that is tightly coupled to the hardware would simply know what
-value to use with no extra sugar.
-
-Generic code would need to get the various supported "levels" populated
-at run time, but a DT binding could do that, or a query to the ACPI
-tables, or whatever.
-
-> +{
-> +       unsigned long flags;
-> +       int error = -ENOSYS;
+On 27 February 2014 01:47, Saravana Kannan <skannan@codeaurora.org> wrote:
+> cpufreq_frequency_get_table() is called from all callers of
+> __cpufreq_stats_create_table(). So, move it inside.
+>
+> Suggested-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+> ---
+>  drivers/cpufreq/cpufreq_stats.c | 22 +++++++++-------------
+>  1 file changed, 9 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
+> index c52b440..9d9e366 100644
+> --- a/drivers/cpufreq/cpufreq_stats.c
+> +++ b/drivers/cpufreq/cpufreq_stats.c
+> @@ -180,13 +180,18 @@ static void cpufreq_stats_free_table(unsigned int cpu)
+>         cpufreq_cpu_put(policy);
+>  }
+>
+> -static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
+> -               struct cpufreq_frequency_table *table)
+> +static int __cpufreq_stats_create_table(struct cpufreq_policy *policy)
+>  {
+>         unsigned int i, j, count = 0, ret = 0;
+>         struct cpufreq_stats *stat;
+>         unsigned int alloc_size;
+>         unsigned int cpu = policy->cpu;
+> +       struct cpufreq_frequency_table *table;
 > +
-> +       if (!rate || !dev)
-> +               return -EINVAL;
-> +
-> +       spin_lock_irqsave(&dev->power.lock, flags);
-> +       if (!pm_runtime_active(dev)) {
-> +               error = -EINVAL;
-> +               goto out;
-> +       }
-> +
-> +       if (dev->pm_domain && dev->pm_domain->active_ops.get_rate)
-> +               error = dev->pm_domain->active_ops.get_rate(dev, rate);
-> +out:
-> +       spin_unlock_irqrestore(&dev->power.lock, flags);
-> +
-> +       return error;
-> +}
-> +
-> +/**
-> + * pm_runtime_set_rate() - Set a specific rate for the device operation
-> + * @dev:       Device to handle
-> + * @rate:      Rate to set in Hz
-> + *
-> + * Returns appropriate error value in case of error conditions, else
-> + * returns 0. The pm_domain logic does all the necessary operation (which
-> + * may include voltage scale operations or other magic hardware stuff) to
-> + * achieve the operation. It is guarenteed that the requested rate is achieved
-> + * on returning from this function if return value is 0.
-> + */
-> +int pm_runtime_set_rate(struct device *dev, unsigned long rate)
+> +       table = cpufreq_frequency_get_table(policy->cpu);
 
-Additionally I wonder if the function signature should include a way to
-specify the sub-unit of a device that we are operating on? This is a way
-to tackle the issues you raised regarding multiple clocks per device,
-etc. Two approaches come to mind:
+s/policy->cpu/cpu
 
-int pm_runtime_set_rate(struct device *dev, int index,
-				unsigned long rate);
-
-Where index is a sub-unit of struct device *dev. The second approach is
-to create a publicly declared structure representing the sub-unit. Some
-variations on that theme:
-
-int pm_runtime_set_rate(struct perf_domain *perfdm, unsigned long rate);
-
-or,
-
-int pm_runtime_set_rate(struct generic_power_domain *gpd,
-				unsigned long rate);
-
-or whatever that sub-unit looks like. The gpd thing might be a total
-layering violation, I don't know. Or perhaps it's a decent idea but it
-shouldn't be as a PM runtime call. Again, I dunno.
-
-Regards,
-Mike
+Otherwise, Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
