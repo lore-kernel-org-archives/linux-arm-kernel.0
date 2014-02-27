@@ -1,17 +1,61 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 27 Feb 2014 22:28:05 +0100
-Subject: [PATCH 4/4] ARM: add Marvell Dove and some drivers to multi_v7
- defconfig
-In-Reply-To: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1393536486-3827-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Thu, 27 Feb 2014 22:28:01 +0100
+Subject: [PATCH 0/4] ARM: dove: move Dove DT to MVEBU
+Message-ID: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With Marvell Dove now being part of the multi_v7 family, add some Dove
-specific drivers to multi_v7 defconfig.
+Thanks to DT conversion effort, Marvell Dove with DT support is now
+ready to leave mach-dove and hop into mach-mvebu. As discussed with
+MVEBU maintainers, we first add dove.c now and keep on migrating
+it with Armada 3xx SoCs the next cycle.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Patch 1 adds a DT node for the system controller found on Marvell
+MVEBU SoCs.
+
+Patch 2 copies an approach taken by Andrew Lunn for Kirkwood-to-MVEBU
+patches, that add MACH_DOVE for Dove in mach-mvebu to distinguish it
+from ARCH_DOVE in mach-dove, where drivers still support both non-DT
+and DT.
+
+Patch 3 then moves mach-dove/board-dt.c to mach-mvebu/dove.c with
+minor cleanups and converts drivers/phy/Kconfig to MACH_DOVE for
+a DT-only driver.
+
+Patch 4 finally adds MACH_DOVE and some of its drivers to multi_v7
+defconfig.
+
+The patches are based on v3.14-rc4, recently posted mvebu/pinctrl-cleanup
+and mvebu/pinctrl-dove branches: v3.14-rc4 is required for a irqchip
+driver fix when SPARSE_IRQ is set, the pinctrl branches remove hard-coded
+addresses from Dove's pinctrl driver.
+
+An unstable branch with above dependencies met, is available at
+
+https://github.com/shesselba/linux-dove.git unstable/dove-mvebu-for-3.15_v1
+
+Sebastian Hesselbarth (4):
+  ARM: dove: add system controller node
+  ARM: dove: prepare new Dove DT Kconfig variable
+  ARM: mvebu: move DT Dove to MVEBU
+  ARM: add Marvell Dove and some drivers to multi_v7 defconfig
+
+ arch/arm/boot/dts/Makefile                           | 12 ++++++------
+ arch/arm/boot/dts/dove.dtsi                          |  5 +++++
+ arch/arm/configs/multi_v7_defconfig                  |  4 ++++
+ arch/arm/mach-dove/Kconfig                           | 12 ------------
+ arch/arm/mach-dove/Makefile                          |  1 -
+ arch/arm/mach-mvebu/Kconfig                          | 12 ++++++++++++
+ arch/arm/mach-mvebu/Makefile                         |  1 +
+ arch/arm/{mach-dove/board-dt.c => mach-mvebu/dove.c} | 20 ++++++++------------
+ drivers/mmc/host/Kconfig                             |  2 +-
+ drivers/phy/Kconfig                                  |  2 +-
+ drivers/thermal/Kconfig                              |  2 +-
+ drivers/watchdog/Kconfig                             |  2 +-
+ sound/soc/kirkwood/Kconfig                           |  2 +-
+ 13 files changed, 41 insertions(+), 36 deletions(-)
+ rename arch/arm/{mach-dove/board-dt.c => mach-mvebu/dove.c} (61%)
+
 ---
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Olof Johansson <olof@lixom.net>
@@ -22,45 +66,5 @@ Cc: Andrew Lunn <andrew@lunn.ch>
 Cc: Gregory Clement <gregory.clement@free-electrons.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
----
- arch/arm/configs/multi_v7_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index ee6982976d66..a1876b2ed4bd 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -10,6 +10,7 @@ CONFIG_PARTITION_ADVANCED=y
- CONFIG_ARCH_MVEBU=y
- CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_XP=y
-+CONFIG_MACH_DOVE=y
- CONFIG_ARCH_BCM=y
- CONFIG_ARCH_BCM_MOBILE=y
- CONFIG_ARCH_BERLIN=y
-@@ -111,6 +112,7 @@ CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
- CONFIG_SUN4I_EMAC=y
- CONFIG_NET_CALXEDA_XGMAC=y
-+CONFIG_MV643XX_ETH=y
- CONFIG_MVNETA=y
- CONFIG_KS8851=y
- CONFIG_R8169=y
-@@ -187,6 +189,7 @@ CONFIG_POWER_RESET_AS3722=y
- CONFIG_POWER_RESET_GPIO=y
- CONFIG_SENSORS_LM90=y
- CONFIG_THERMAL=y
-+CONFIG_DOVE_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
- CONFIG_MFD_AS3722=y
- CONFIG_MFD_CROS_EC=y
-@@ -253,6 +256,7 @@ CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_MMC_ARMMMCI=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_ESDHC_IMX=y
-+CONFIG_MMC_SDHCI_DOVE=y
- CONFIG_MMC_SDHCI_TEGRA=y
- CONFIG_MMC_SDHCI_SPEAR=y
- CONFIG_MMC_SDHCI_BCM_KONA=y
 -- 
 1.8.5.3
