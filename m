@@ -1,122 +1,172 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Feb 2014 16:36:43 +0000
-Subject: [PATCH v0 12/15] ARM: STi: DT: STiH416: 416 DT Entry for
- clockgen B/C/D/E/F
-In-Reply-To: <1393514668-17440-13-git-send-email-gabriel.fernandez@st.com>
-References: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
- <1393514668-17440-13-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20140227163643.GC24910@lee--X1>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 27 Feb 2014 17:54:48 +0100
+Subject: [RFC PATCH v4 3/8] staging: imx-drm: Document updated imx-drm
+ device tree bindings
+In-Reply-To: <530F43B9.800@ti.com>
+References: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>
+ <1393338203-25051-4-git-send-email-p.zabel@pengutronix.de>
+ <530F1C4C.2010504@ti.com>
+ <1393506385.4507.49.camel@paszta.hi.pengutronix.de>
+ <20140227130020.GJ21483@n2100.arm.linux.org.uk> <530F43B9.800@ti.com>
+Message-ID: <1393520088.4507.92.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Patch adds DT entries for clockgen B/C/D/E/F
+Hi Tomi,
+
+Am Donnerstag, den 27.02.2014, 15:55 +0200 schrieb Tomi Valkeinen:
+> On 27/02/14 15:00, Russell King - ARM Linux wrote:
+> > On Thu, Feb 27, 2014 at 02:06:25PM +0100, Philipp Zabel wrote:
+> >> For the i.MX6 display subsystem there is no clear single master device,
+> >> and the physical configuration changes across the SoC family. The
+> >> i.MX6Q/i.MX6D SoCs have two separate display controller devices IPU1 and
+> >> IPU2, with two output ports each.
+> > 
+> > Not also forgetting that there's another scenario too: you may wish
+> > to drive IPU1 and IPU2 as two completely separate display subsystems
+> > in some hardware, but as a combined display subsystem in others.
+> > 
+> > Here's another scenario.  You may have these two IPUs on the SoC, but
+> > there's only one display output.  You want to leave the second IPU
+> > disabled, as you wouldn't want it to be probed or even exposed to
+> > userland.
 > 
-> Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
-
-You need to add your Signed-off-by too.
-
-> ---
->  arch/arm/boot/dts/stih416-clock.dtsi | 170 +++++++++++++++++++++++++++++++++++
->  1 file changed, 170 insertions(+)
+> I first want to say I don't see anything wrong with such a super node.
+> As you say, it does describe hardware. But I also want to say that I
+> still don't see a need for it. Or, maybe more exactly, I don't see a
+> need for it in general. Maybe there are certain cases where two devices
+> has to be controlled by a master device. Maybe this one is one of those.
 > 
-> diff --git a/arch/arm/boot/dts/stih416-clock.dtsi b/arch/arm/boot/dts/stih416-clock.dtsi
-> index f63b0a1..6b2e387 100644
-> --- a/arch/arm/boot/dts/stih416-clock.dtsi
-> +++ b/arch/arm/boot/dts/stih416-clock.dtsi
-> @@ -503,5 +503,175 @@
->  						/* Remaining outputs unused */
->  			};
->  		};
+> In the imx case, why wouldn't this work, without any master node, with
+> the IPU nodes separate in the DT data:
+> 
+> - One IPU enabled, one disabled: nothing special here, just set the
+> other IPU to status="disabled" in the DT data. The driver for the
+> enabled IPU would register the required DRM entities.
 
-This doesn't look right. Have you indented one tab too far?
+that should work. Let the enabled IPU create the imx-drm platform device
+on probe, parse the device tree and ignore everything only hanging off
+of the disabled IPU.
 
-> +                /*
-> +                 * Frequency synthesizers on the SASG2.
-> +                 *
-> +                 */
+[Reordering a bit...]
+>- Two IPUs in combined mode:
+> 
+> Pick one IPU as the master, and one as slave. Link the IPU nodes in DT
+> data with phandles, say: master=<&ipu1> on the slave IPU and
+> slave=<&ipu0> on the master.
+> 
+> The master one will register the DRM entities, and the slave one will
+> just do what the master says.
 
-Too many *'s
+That might work, too. Just let the each IPU scan the graph and try to
+find the imx-drm master before creating the imx-drm platform device.
+The first IPU fill find no preexisting master and create the imx-drm
+platform device as above, adding the other IPU as well as the other
+components with component_master_add_child. It just has to make sure
+that the other IPU is added to the list before the encoders are.
 
-<snip>
+The second IPU will scan the graph, find a preexisting master for the
+other IPU node, register its component and just wait to be bound by the
+master.
 
-> +                CLK_S_VCC_HD: CLK_S_VCC_HD {
-> +                        #clock-cells = <0>;
-> +                        compatible = "st,stih416-clkgenc-vcc-hd", "st,clkgen-mux";
-> +                        reg = <0xfe8308b8 4>; /* SYSCFG2558 */
+> - Two IPUs as separate units: almost the same as above, but both would
+> independently register the DRM entities.
 
-0x4
+Here the second IPU would not be connected to the first IPU via the
+graph - it would not find a preexisting imx-drm device when scanning its
+graph and create its own imx-drm device just like the first IPU did.
+As a result there are two completely separate DRM devices.
 
-> +                /*
-> +                 * Add a dummy clock for the HDMI PHY for the VCC input mux
-> +                 */
-> +                CLK_S_TMDS_FROMPHY: CLK_S_TMDS_FROMPHY {
-> +                        #clock-cells = <0>;
-> +                        compatible = "fixed-clock";
-> +                        clock-frequency = <0>;
+That being said, this change could be made at any time in the future,
+in a backwards compatible fashion, by just declaring the imx-drm node
+optional and ignoring it if it exists.
 
-What happens when the clock frequency is 0?
-> +                };
-> +
-> +                CLOCKGEN_C_VCC: CLOCKGEN_C_VCC {
-> +                        #clock-cells = <1>;
-> +                        compatible = "st,stih416-clkgenc", "st,clkgen-vcc";
-> +                        reg = <0xfe8308ac 12>; /* SYSCFG2555,2556,2557 */
+> As for the probe time "are we ready yet?" problem, the IPU driver can
+> just delay registering the DRM entities until all the nodes in its graph
+> have been probed. The component helpers can probably be used here.
 
-0x12, or 0x0C, whichever is appropriate.
+This is what is happening right now, except that the two IPUs are not
+obtained from the graph but are given as starting points via the ports
+property in the imx-drm node.
 
-> +                        clocks = <&CLK_S_VCC_HD>, <&CLOCKGEN_C 1>,
-> +                                 <&CLK_S_TMDS_FROMPHY>, <&CLOCKGEN_C 2>;
+> > On the face of it, the top-level super-device node doesn't look very
+> > hardware-y, but it actually is - it's about how a board uses the
+> > hardware provided.  This is entirely in keeping with the spirit of DT,
+> > which is to describe what hardware is present and how it's connected
+> > together, whether it be at the chip or board level.
+> 
+> No disagreement there. I'm mostly put off by the naming. The binding doc
+> says it's a "DRM master device", compatible with "fsl,imx-drm". Now,
+> naming may not be the most important thing in the world, but I'd rather
+> use generic terms, not linux driver stack names.
 
-One per line would probably be better, save confusing them for pairs.
+Did anybody propose such a generic term? How about:
 
-<snip>
+-imx-drm {
+-	compatible = "fsl,imx-drm";
+-	ports = <&ipu1_di0>, <&ipu1_di1>;
+-};
++display-subsystem {
++	compatible = "fsl,imx-display-subsystem";
++	ports = <&ipu1_di0>, <&ipu1_di1>;
++};
 
-> +		/*
-> +		 * Frequency synthesizers on the MPE42
-> +		 */
+> > If this wasn't the case, we wouldn't even attempt to describe what devices
+> > we have on which I2C buses - we'd just list the hardware on the board
+> > without giving any information about how it's wired together.
+> > 
+> > This is no different - however, it doesn't have (and shouldn't) be
+> > subsystem specific... but - and this is the challenge we then face - how
+> > do you decide that on one board with a single zImage kernel, with both
+> > DRM and fbdev built-in, whether to use the DRM interfaces or the fbdev
+> > interfaces?  We could have both matching the same compatible string, but
+> > we'd also need some way to tell each other that they're not allowed to
+> > bind.
+> 
+> Yes, that's an annoying problem, we have that on OMAP. It's a clear sign
+> that our video support is rather messed up.
+> 
+> My opinion is that the fbdev and drm drivers for a single hardware
+> should be exclusive at compile time. We don't allow multiple drivers for
+> single device for other subsystems either, do we? Eventually we should
+> have only one driver for one hardware device.
+> 
+> If that's not possible, then the drivers in question could have an
+> option to enable or disable themselves, passed via the kernel command
+> line, so that the user can select which subsystem to use.
 
-Alignment.
+That is the exact same problem as having multiple drivers that can bind
+to the same device.
 
-<snip>
+> > Before anyone argues against "it isn't hardware-y", stop and think.
+> > What if I design a board with two Epson LCD controllers on board and
+> > put a muxing arrangement on their output.  Is that one or two devices?
+> > What if I want them to operate as one combined system?  What if I have
+> > two different LCD controllers on a board.  How is this any different
+> > from the two independent IPU hardware blocks integrated inside an iMX6
+> > SoC with a muxing arrangement on their output?
+> 
+> Well, generally speaking, I think one option is to treat the two
+> controllers separately and let the userspace handle it. That may or may
+> not be viable, depending on the hardware, but to me it resembles very
+> much a PC with two video cards.
 
-> +                CLOCKGEN_F: CLOCKGEN_F {
-> +                        #clock-cells = <1>;
-> +                        compatible = "st,stih416-quadfs660-F", "st,quadfs";
-> +                        reg = <0xfd320878 0xF0>;
-> +
-> +                        clocks = <&CLK_SYSIN>;
-> +                        clock-output-names = "CLK_M_MAIN_VIDFS",
-> +                                             "CLK_M_HVA_FS",
-> +                                             "CLK_M_FVDP_VCPU",
-> +					     "CLK_M_FVDP_PROC_FS";
+And two graphics cards connected to the same output with a multiplexer
+are a mess. This only works well if it is tightly integrated.
 
-Tabbing. Ensure you're using tabs (and not spaces) everywhere.
+[...]
+> So no, I don't have a problem with master device nodes in DT. I have a
+> problem having pure SW stack nomenclature in the DT data (or even worse,
+> SW stack entities in the DT data), and I have a problem requiring
+> everyone to have a master device node if it's only needed for special cases.
+>
+> And yes, this series is about IMX bindings, not generic ones. And I'm
+> also fine with requiring everyone to have a master device node, if it
+> can be shown that it's the only sensible approach.
 
-<snip>
+For i.MX, for now, let's keep the mandatory imx-drm node. Maybe rename
+it so nobody can say we are leaking linux subsystem names into the
+device tree.
 
-> +                        reg = <0xfd320910 4>; /* SYSCFG8580 */
-
-0x...
-
-Do this for all of the below too.
-
-
-<snip>
-
-> +                        clock-output-names  =
-> +                                "CLK_M_PIX_MAIN_PIPE",  "CLK_M_PIX_AUX_PIPE",
-> +                                "CLK_M_PIX_MAIN_CRU",   "CLK_M_PIX_AUX_CRU",
-> +                                "CLK_M_XFER_BE_COMPO",  "CLK_M_XFER_PIP_COMPO",
-> +                                "CLK_M_XFER_AUX_COMPO", "CLK_M_VSENS",
-> +                                "CLK_M_PIX_HDMIRX_0",   "CLK_M_PIX_HDMIRX_1";
-> +                };
->  	};
->  };
-
-Something strange going on with these.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+regards
+Philipp
