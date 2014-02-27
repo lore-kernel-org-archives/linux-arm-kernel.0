@@ -1,17 +1,15 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 27 Feb 2014 14:58:18 +0100
-Subject: [PATCH 1/3] ARM: plat-versatile: convert LEDs to platform device
-Message-ID: <1393509500-26002-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 27 Feb 2014 14:58:19 +0100
+Subject: [PATCH 2/3] ARM/leds: move ARM Versatile LED driver to leds subsystem
+In-Reply-To: <1393509500-26002-1-git-send-email-linus.walleij@linaro.org>
+References: <1393509500-26002-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1393509500-26002-2-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LEDs were initialized unconditionally with an fs_initcall()
-which doesn't play well with multiplatform. Convert the driver
-to a platform device and convert all boards with these LEDs
-to register a platform device and pass the register as a
-resource instead.
-
-Tested successfully on the Versatile/AB and RealView PB1176.
+Now that we have converted this driver to a real platform device
+module-based thing, we move the driver down into the LEDs
+subsystem and rename the config option to LEDS_VERSATILE.
 
 Cc: Bryan Wu <cooloney@gmail.com>
 Cc: Richard Purdie <rpurdie@rpsys.net>
@@ -19,208 +17,265 @@ Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Pawel Moll <pawel.moll@arm.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-realview/core.c            | 15 ++++++++++
- arch/arm/mach-realview/core.h            |  1 +
- arch/arm/mach-realview/realview_eb.c     |  1 +
- arch/arm/mach-realview/realview_pb1176.c |  1 +
- arch/arm/mach-realview/realview_pb11mp.c |  1 +
- arch/arm/mach-realview/realview_pba8.c   |  1 +
- arch/arm/mach-realview/realview_pbx.c    |  1 +
- arch/arm/mach-versatile/core.c           | 16 +++++++++++
- arch/arm/plat-versatile/leds.c           | 49 ++++++++++++++++++--------------
- 9 files changed, 65 insertions(+), 21 deletions(-)
+Bryan: can you provide an ACK for this patch so I can funnel
+this through the ARM SoC tree?
+---
+ arch/arm/plat-versatile/Kconfig  |   6 ---
+ arch/arm/plat-versatile/Makefile |   1 -
+ arch/arm/plat-versatile/leds.c   | 110 ---------------------------------------
+ drivers/leds/Kconfig             |   8 +++
+ drivers/leds/Makefile            |   1 +
+ drivers/leds/leds-versatile.c    | 110 +++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 119 insertions(+), 117 deletions(-)
+ delete mode 100644 arch/arm/plat-versatile/leds.c
+ create mode 100644 drivers/leds/leds-versatile.c
 
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index 1d5ee5c9a1dc..960b8dd78c44 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -148,6 +148,21 @@ struct platform_device realview_cf_device = {
- 	},
- };
+diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
+index 2c4332b9f948..fce41e93b6a4 100644
+--- a/arch/arm/plat-versatile/Kconfig
++++ b/arch/arm/plat-versatile/Kconfig
+@@ -6,12 +6,6 @@ config PLAT_VERSATILE_CLOCK
+ config PLAT_VERSATILE_CLCD
+ 	bool
  
-+static struct resource realview_leds_resources[] = {
-+	{
-+		.start	= REALVIEW_SYS_BASE + REALVIEW_SYS_LED_OFFSET,
-+		.end	= REALVIEW_SYS_BASE + REALVIEW_SYS_LED_OFFSET + 4,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+struct platform_device realview_leds_device = {
-+	.name		= "versatile-leds",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(realview_leds_resources),
-+	.resource	= realview_leds_resources,
-+};
-+
- static struct resource realview_i2c_resource = {
- 	.start		= REALVIEW_I2C_BASE,
- 	.end		= REALVIEW_I2C_BASE + SZ_4K - 1,
-diff --git a/arch/arm/mach-realview/core.h b/arch/arm/mach-realview/core.h
-index 602ca5ec52c5..13dc830ef469 100644
---- a/arch/arm/mach-realview/core.h
-+++ b/arch/arm/mach-realview/core.h
-@@ -37,6 +37,7 @@ struct machine_desc;
+-config PLAT_VERSATILE_LEDS
+-	def_bool y if NEW_LEDS
+-	depends on ARCH_REALVIEW || ARCH_VERSATILE
+-	select LEDS_CLASS
+-	select LEDS_TRIGGERS
+-
+ config PLAT_VERSATILE_SCHED_CLOCK
+ 	def_bool y
  
- extern struct platform_device realview_flash_device;
- extern struct platform_device realview_cf_device;
-+extern struct platform_device realview_leds_device;
- extern struct platform_device realview_i2c_device;
- extern struct mmci_platform_data realview_mmc0_plat_data;
- extern struct mmci_platform_data realview_mmc1_plat_data;
-diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
-index c85ddb2a0ad0..6bb070e80128 100644
---- a/arch/arm/mach-realview/realview_eb.c
-+++ b/arch/arm/mach-realview/realview_eb.c
-@@ -452,6 +452,7 @@ static void __init realview_eb_init(void)
- 	realview_flash_register(&realview_eb_flash_resource, 1);
- 	platform_device_register(&realview_i2c_device);
- 	platform_device_register(&char_lcd_device);
-+	platform_device_register(&realview_leds_device);
- 	eth_device_register();
- 	realview_usb_register(realview_eb_isp1761_resources);
+diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
+index f88d448b629c..2e0c472958ae 100644
+--- a/arch/arm/plat-versatile/Makefile
++++ b/arch/arm/plat-versatile/Makefile
+@@ -2,6 +2,5 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
  
-diff --git a/arch/arm/mach-realview/realview_pb1176.c b/arch/arm/mach-realview/realview_pb1176.c
-index c5eade76461b..173f2c15de49 100644
---- a/arch/arm/mach-realview/realview_pb1176.c
-+++ b/arch/arm/mach-realview/realview_pb1176.c
-@@ -367,6 +367,7 @@ static void __init realview_pb1176_init(void)
- 	realview_usb_register(realview_pb1176_isp1761_resources);
- 	platform_device_register(&pmu_device);
- 	platform_device_register(&char_lcd_device);
-+	platform_device_register(&realview_leds_device);
- 
- 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
- 		struct amba_device *d = amba_devs[i];
-diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
-index f4b0962578fe..bde7e6b1fd44 100644
---- a/arch/arm/mach-realview/realview_pb11mp.c
-+++ b/arch/arm/mach-realview/realview_pb11mp.c
-@@ -347,6 +347,7 @@ static void __init realview_pb11mp_init(void)
- 	realview_eth_register(NULL, realview_pb11mp_smsc911x_resources);
- 	platform_device_register(&realview_i2c_device);
- 	platform_device_register(&realview_cf_device);
-+	platform_device_register(&realview_leds_device);
- 	realview_usb_register(realview_pb11mp_isp1761_resources);
- 	platform_device_register(&pmu_device);
- 
-diff --git a/arch/arm/mach-realview/realview_pba8.c b/arch/arm/mach-realview/realview_pba8.c
-index 10a3e1d76891..4e57a8599265 100644
---- a/arch/arm/mach-realview/realview_pba8.c
-+++ b/arch/arm/mach-realview/realview_pba8.c
-@@ -289,6 +289,7 @@ static void __init realview_pba8_init(void)
- 	realview_eth_register(NULL, realview_pba8_smsc911x_resources);
- 	platform_device_register(&realview_i2c_device);
- 	platform_device_register(&realview_cf_device);
-+	platform_device_register(&realview_leds_device);
- 	realview_usb_register(realview_pba8_isp1761_resources);
- 	platform_device_register(&pmu_device);
- 
-diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
-index 9d75493e3f0c..72c96caebefa 100644
---- a/arch/arm/mach-realview/realview_pbx.c
-+++ b/arch/arm/mach-realview/realview_pbx.c
-@@ -385,6 +385,7 @@ static void __init realview_pbx_init(void)
- 	realview_eth_register(NULL, realview_pbx_smsc911x_resources);
- 	platform_device_register(&realview_i2c_device);
- 	platform_device_register(&realview_cf_device);
-+	platform_device_register(&realview_leds_device);
- 	realview_usb_register(realview_pbx_isp1761_resources);
- 
- 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index a335126ae18f..b31878570a00 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -310,6 +310,21 @@ static struct platform_device char_lcd_device = {
- 	.resource       =       char_lcd_resources,
- };
- 
-+static struct resource leds_resources[] = {
-+	{
-+		.start	= VERSATILE_SYS_BASE + VERSATILE_SYS_LED_OFFSET,
-+		.end	= VERSATILE_SYS_BASE + VERSATILE_SYS_LED_OFFSET + 4,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device leds_device = {
-+	.name		= "versatile-leds",
-+	.id		= -1,
-+	.num_resources	= ARRAY_SIZE(leds_resources),
-+	.resource	= leds_resources,
-+};
-+
- /*
-  * Clock handling
-  */
-@@ -795,6 +810,7 @@ void __init versatile_init(void)
- 	platform_device_register(&versatile_i2c_device);
- 	platform_device_register(&smc91x_device);
- 	platform_device_register(&char_lcd_device);
-+	platform_device_register(&leds_device);
- 
- 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
- 		struct amba_device *d = amba_devs[i];
+ obj-$(CONFIG_PLAT_VERSATILE_CLOCK) += clock.o
+ obj-$(CONFIG_PLAT_VERSATILE_CLCD) += clcd.o
+-obj-$(CONFIG_PLAT_VERSATILE_LEDS) += leds.o
+ obj-$(CONFIG_PLAT_VERSATILE_SCHED_CLOCK) += sched-clock.o
+ obj-$(CONFIG_SMP) += headsmp.o platsmp.o
 diff --git a/arch/arm/plat-versatile/leds.c b/arch/arm/plat-versatile/leds.c
-index 2018f307f32e..80553022d661 100644
+deleted file mode 100644
+index 80553022d661..000000000000
 --- a/arch/arm/plat-versatile/leds.c
-+++ b/arch/arm/plat-versatile/leds.c
-@@ -7,22 +7,14 @@
-  */
- #include <linux/kernel.h>
- #include <linux/init.h>
++++ /dev/null
+@@ -1,110 +0,0 @@
+-/*
+- * Driver for the 8 user LEDs found on the RealViews and Versatiles
+- * Based on DaVinci's DM365 board code
+- *
+- * License terms: GNU General Public License (GPL) version 2
+- * Author: Linus Walleij <triad@df.lth.se>
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/module.h>
+-#include <linux/io.h>
+-#include <linux/slab.h>
+-#include <linux/leds.h>
+-#include <linux/platform_device.h>
+-
+-struct versatile_led {
+-	void __iomem		*base;
+-	struct led_classdev	cdev;
+-	u8			mask;
+-};
+-
+-/*
+- * The triggers lines up below will only be used if the
+- * LED triggers are compiled in.
+- */
+-static const struct {
+-	const char *name;
+-	const char *trigger;
+-} versatile_leds[] = {
+-	{ "versatile:0", "heartbeat", },
+-	{ "versatile:1", "mmc0", },
+-	{ "versatile:2", "cpu0" },
+-	{ "versatile:3", "cpu1" },
+-	{ "versatile:4", "cpu2" },
+-	{ "versatile:5", "cpu3" },
+-	{ "versatile:6", },
+-	{ "versatile:7", },
+-};
+-
+-static void versatile_led_set(struct led_classdev *cdev,
+-			      enum led_brightness b)
+-{
+-	struct versatile_led *led = container_of(cdev,
+-						 struct versatile_led, cdev);
+-	u32 reg = readl(led->base);
+-
+-	if (b != LED_OFF)
+-		reg |= led->mask;
+-	else
+-		reg &= ~led->mask;
+-	writel(reg, led->base);
+-}
+-
+-static enum led_brightness versatile_led_get(struct led_classdev *cdev)
+-{
+-	struct versatile_led *led = container_of(cdev,
+-						 struct versatile_led, cdev);
+-	u32 reg = readl(led->base);
+-
+-	return (reg & led->mask) ? LED_FULL : LED_OFF;
+-}
+-
+-static int versatile_leds_probe(struct platform_device *dev)
+-{
+-	int i;
+-	struct resource *res;
+-	void __iomem *base;
+-
+-	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
+-	base = devm_ioremap_resource(&dev->dev, res);
+-	if (IS_ERR(base))
+-		return PTR_ERR(base);
+-
+-	/* All off */
+-	writel(0, base);
+-	for (i = 0; i < ARRAY_SIZE(versatile_leds); i++) {
+-		struct versatile_led *led;
+-
+-		led = kzalloc(sizeof(*led), GFP_KERNEL);
+-		if (!led)
+-			break;
+-
+-		led->base = base;
+-		led->cdev.name = versatile_leds[i].name;
+-		led->cdev.brightness_set = versatile_led_set;
+-		led->cdev.brightness_get = versatile_led_get;
+-		led->cdev.default_trigger = versatile_leds[i].trigger;
+-		led->mask = BIT(i);
+-
+-		if (led_classdev_register(NULL, &led->cdev) < 0) {
+-			kfree(led);
+-			break;
+-		}
+-	}
+-
+-	return 0;
+-}
+-
+-static struct platform_driver versatile_leds_driver = {
+-	.driver = {
+-		.name   = "versatile-leds",
+-	},
+-	.probe = versatile_leds_probe,
+-};
+-
+-module_platform_driver(versatile_leds_driver);
+-
+-MODULE_AUTHOR("Linus Walleij <linus.walleij@linaro.org>");
+-MODULE_DESCRIPTION("ARM Versatile LED driver");
+-MODULE_LICENSE("GPL v2");
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index 72156c123033..93235f7378ba 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -487,6 +487,14 @@ config LEDS_BLINKM
+ 	  This option enables support for the BlinkM RGB LED connected
+ 	  through I2C. Say Y to enable support for the BlinkM LED.
+ 
++config LEDS_VERSATILE
++	bool "LED support for the ARM Versatile and RealView"
++	depends on ARCH_REALVIEW || ARCH_VERSATILE
++	depends on LEDS_CLASS
++	help
++	  This option enabled support for the LEDs on the ARM Versatile
++	  and RealView boards. Say Y to enabled these.
++
+ comment "LED Triggers"
+ source "drivers/leds/trigger/Kconfig"
+ 
+diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
+index 3cd76dbd9be2..8b4c956e11ba 100644
+--- a/drivers/leds/Makefile
++++ b/drivers/leds/Makefile
+@@ -54,6 +54,7 @@ obj-$(CONFIG_LEDS_ASIC3)		+= leds-asic3.o
+ obj-$(CONFIG_LEDS_MAX8997)		+= leds-max8997.o
+ obj-$(CONFIG_LEDS_LM355x)		+= leds-lm355x.o
+ obj-$(CONFIG_LEDS_BLINKM)		+= leds-blinkm.o
++obj-$(CONFIG_LEDS_VERSATILE)		+= leds-versatile.o
+ 
+ # LED SPI Drivers
+ obj-$(CONFIG_LEDS_DAC124S085)		+= leds-dac124s085.o
+diff --git a/drivers/leds/leds-versatile.c b/drivers/leds/leds-versatile.c
+new file mode 100644
+index 000000000000..80553022d661
+--- /dev/null
++++ b/drivers/leds/leds-versatile.c
+@@ -0,0 +1,110 @@
++/*
++ * Driver for the 8 user LEDs found on the RealViews and Versatiles
++ * Based on DaVinci's DM365 board code
++ *
++ * License terms: GNU General Public License (GPL) version 2
++ * Author: Linus Walleij <triad@df.lth.se>
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
 +#include <linux/module.h>
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/leds.h>
--
--#include <mach/hardware.h>
--#include <mach/platform.h>
--
--#ifdef VERSATILE_SYS_BASE
--#define LEDREG	(__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_LED_OFFSET)
--#endif
--
--#ifdef REALVIEW_SYS_BASE
--#define LEDREG	(__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_LED_OFFSET)
--#endif
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/leds.h>
 +#include <linux/platform_device.h>
- 
- struct versatile_led {
++
++struct versatile_led {
 +	void __iomem		*base;
- 	struct led_classdev	cdev;
- 	u8			mask;
- };
-@@ -50,30 +42,37 @@ static void versatile_led_set(struct led_classdev *cdev,
- {
- 	struct versatile_led *led = container_of(cdev,
- 						 struct versatile_led, cdev);
--	u32 reg = readl(LEDREG);
++	struct led_classdev	cdev;
++	u8			mask;
++};
++
++/*
++ * The triggers lines up below will only be used if the
++ * LED triggers are compiled in.
++ */
++static const struct {
++	const char *name;
++	const char *trigger;
++} versatile_leds[] = {
++	{ "versatile:0", "heartbeat", },
++	{ "versatile:1", "mmc0", },
++	{ "versatile:2", "cpu0" },
++	{ "versatile:3", "cpu1" },
++	{ "versatile:4", "cpu2" },
++	{ "versatile:5", "cpu3" },
++	{ "versatile:6", },
++	{ "versatile:7", },
++};
++
++static void versatile_led_set(struct led_classdev *cdev,
++			      enum led_brightness b)
++{
++	struct versatile_led *led = container_of(cdev,
++						 struct versatile_led, cdev);
 +	u32 reg = readl(led->base);
- 
- 	if (b != LED_OFF)
- 		reg |= led->mask;
- 	else
- 		reg &= ~led->mask;
--	writel(reg, LEDREG);
++
++	if (b != LED_OFF)
++		reg |= led->mask;
++	else
++		reg &= ~led->mask;
 +	writel(reg, led->base);
- }
- 
- static enum led_brightness versatile_led_get(struct led_classdev *cdev)
- {
- 	struct versatile_led *led = container_of(cdev,
- 						 struct versatile_led, cdev);
--	u32 reg = readl(LEDREG);
++}
++
++static enum led_brightness versatile_led_get(struct led_classdev *cdev)
++{
++	struct versatile_led *led = container_of(cdev,
++						 struct versatile_led, cdev);
 +	u32 reg = readl(led->base);
- 
- 	return (reg & led->mask) ? LED_FULL : LED_OFF;
- }
- 
--static int __init versatile_leds_init(void)
++
++	return (reg & led->mask) ? LED_FULL : LED_OFF;
++}
++
 +static int versatile_leds_probe(struct platform_device *dev)
- {
- 	int i;
++{
++	int i;
 +	struct resource *res;
 +	void __iomem *base;
 +
@@ -228,30 +283,32 @@ index 2018f307f32e..80553022d661 100644
 +	base = devm_ioremap_resource(&dev->dev, res);
 +	if (IS_ERR(base))
 +		return PTR_ERR(base);
- 
- 	/* All off */
--	writel(0, LEDREG);
++
++	/* All off */
 +	writel(0, base);
- 	for (i = 0; i < ARRAY_SIZE(versatile_leds); i++) {
- 		struct versatile_led *led;
- 
-@@ -81,6 +80,7 @@ static int __init versatile_leds_init(void)
- 		if (!led)
- 			break;
- 
++	for (i = 0; i < ARRAY_SIZE(versatile_leds); i++) {
++		struct versatile_led *led;
++
++		led = kzalloc(sizeof(*led), GFP_KERNEL);
++		if (!led)
++			break;
++
 +		led->base = base;
- 		led->cdev.name = versatile_leds[i].name;
- 		led->cdev.brightness_set = versatile_led_set;
- 		led->cdev.brightness_get = versatile_led_get;
-@@ -96,8 +96,15 @@ static int __init versatile_leds_init(void)
- 	return 0;
- }
- 
--/*
-- * Since we may have triggers on any subsystem, defer registration
-- * until after subsystem_init.
-- */
--fs_initcall(versatile_leds_init);
++		led->cdev.name = versatile_leds[i].name;
++		led->cdev.brightness_set = versatile_led_set;
++		led->cdev.brightness_get = versatile_led_get;
++		led->cdev.default_trigger = versatile_leds[i].trigger;
++		led->mask = BIT(i);
++
++		if (led_classdev_register(NULL, &led->cdev) < 0) {
++			kfree(led);
++			break;
++		}
++	}
++
++	return 0;
++}
++
 +static struct platform_driver versatile_leds_driver = {
 +	.driver = {
 +		.name   = "versatile-leds",
