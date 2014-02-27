@@ -1,27 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 27 Feb 2014 08:30:16 +0100
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <20140226222147.GE16149@cbox>
-References: <20140226183454.GA14639@cbox>
- <CABGGisxHOVqLcG7hVAuAzdeic41KWSLLBSjQLSJQcjTXLhNCow@mail.gmail.com>
- <20140226222147.GE16149@cbox>
-Message-ID: <201402270830.16903.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 27 Feb 2014 15:42:50 +0800
+Subject: [PATCH 1/3] Documentation:spi:fsl-dspi:add DSPI dma transfer
+ support
+In-Reply-To: <20140226153822.GC2394@sirena.org.uk>
+References: <1393311258-14380-1-git-send-email-b44548@freescale.com>
+ <20140225090830.GO28555@e106331-lin.cambridge.arm.com>
+ <20140226141947.GE23892@S2101-09.ap.freescale.net>
+ <20140226153822.GC2394@sirena.org.uk>
+Message-ID: <20140227074247.GA13537@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 February 2014, Christoffer Dall wrote:
-> Personally I'm all for simplicity so I don't want to push any agenda for
-> ACPI in VMs.
+On Thu, Feb 27, 2014 at 12:38:22AM +0900, Mark Brown wrote:
+> On Wed, Feb 26, 2014 at 10:19:49PM +0800, Shawn Guo wrote:
+> > On Tue, Feb 25, 2014 at 09:08:30AM +0000, Mark Rutland wrote:
 > 
-> Note that the spec does not mandate the use of ACPI, it just tells you
-> how to do it if you wish to.
+> > > > +- use-dma: the bool decide if use dma method in DSPI transfering.
 > 
-> But, we can change the spec to require full FDT description of the
-> system, unless of course some of the ACPI-in-VM supporters manage to
-> convince the rest.
+> > > Why can the OS not decide this based on the presence of dmas which it
+> > > can use?
+> 
+> > Yes, OS/driver should decide to use DMA or not, but it shouldn't be
+> > based on the presence of 'dmas' property.  The DMA is a hardware
+> > resource just like IRQ.  It should be just there in client device's node
+> > as long as the SoC design assigns the channel to the device.  The device
+> > driver should make the decision when DMA should be used, e.g. big amount
+> > data transfer, and when PIO should be used, e.g. small data.
+> 
+> Right, that's very common - but that decision is usually taken on a per
+> transfer basis so a DT property would seem odd, especially just a simple
+> boolean.
 
-I guess the real question is whether we are interested in running Windows RT
-in VM guests. I don't personally expect MS to come out with a port for
-this spec, no matter what we do, but some of you may have information I don't.
+Yea, I guess we're on the same page - the decision should be made by
+the device driver on its own not the device tree.
 
-	Arnd
+Shawn
