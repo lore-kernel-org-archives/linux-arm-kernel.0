@@ -1,48 +1,83 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 27 Feb 2014 16:18:31 +0200
-Subject: [PATCH v9 9/9] usb: omap: dts: Update DT binding example usage
-In-Reply-To: <1393510711-4697-1-git-send-email-rogerq@ti.com>
-References: <1393510711-4697-1-git-send-email-rogerq@ti.com>
-Message-ID: <1393510711-4697-10-git-send-email-rogerq@ti.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu, 27 Feb 2014 22:24:13 +0800
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <11174980.YJ21cfsHoG@wuerfel>
+References: <20140226183454.GA14639@cbox>
+ <20140226214843.GD12169@bivouac.eciton.net>
+ <alpine.DEB.2.02.1402271229370.31489@kaball.uk.xensource.com>
+ <11174980.YJ21cfsHoG@wuerfel>
+Message-ID: <5AA88E43-1A40-4409-9A56-334988483843@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove non-compatible id from examples.
 
-CC: Alan Stern <stern@rowland.harvard.edu>
-CC: Nishant Menon <nm@ti.com>
-CC: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- Documentation/devicetree/bindings/usb/ehci-omap.txt  | 2 +-
- Documentation/devicetree/bindings/usb/ohci-omap3.txt | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/ehci-omap.txt b/Documentation/devicetree/bindings/usb/ehci-omap.txt
-index 485a9a1..3dc231c 100644
---- a/Documentation/devicetree/bindings/usb/ehci-omap.txt
-+++ b/Documentation/devicetree/bindings/usb/ehci-omap.txt
-@@ -21,7 +21,7 @@ Documentation/devicetree/bindings/mfd/omap-usb-host.txt
- Example for OMAP4:
- 
- usbhsehci: ehci at 4a064c00 {
--	compatible = "ti,ehci-omap", "usb-ehci";
-+	compatible = "ti,ehci-omap";
- 	reg = <0x4a064c00 0x400>;
- 	interrupts = <0 77 0x4>;
- };
-diff --git a/Documentation/devicetree/bindings/usb/ohci-omap3.txt b/Documentation/devicetree/bindings/usb/ohci-omap3.txt
-index 14ab428..ce8c47cff 100644
---- a/Documentation/devicetree/bindings/usb/ohci-omap3.txt
-+++ b/Documentation/devicetree/bindings/usb/ohci-omap3.txt
-@@ -9,7 +9,7 @@ Required properties:
- Example for OMAP4:
- 
- usbhsohci: ohci at 4a064800 {
--	compatible = "ti,ohci-omap3", "usb-ohci";
-+	compatible = "ti,ohci-omap3";
- 	reg = <0x4a064800 0x400>;
- 	interrupts = <0 76 0x4>;
- };
--- 
-1.8.3.2
+> Am 27.02.2014 um 22:00 schrieb Arnd Bergmann <arnd@arndb.de>:
+> 
+>> On Thursday 27 February 2014 12:31:55 Stefano Stabellini wrote:
+>> On Wed, 26 Feb 2014, Leif Lindholm wrote:
+>>>>>  no FDT.  In this case, the VM implementation must provide ACPI, and
+>>>>>  the OS must be able to locate the ACPI root pointer through the UEFI
+>>>>>  system table.
+>>>>> 
+>>>>> For more information about the arm and arm64 boot conventions, see
+>>>>> Documentation/arm/Booting and Documentation/arm64/booting.txt in the
+>>>>> Linux kernel source tree.
+>>>>> 
+>>>>> For more information about UEFI and ACPI booting, see [4] and [5].
+>>>> 
+>>>> What's the point of having ACPI in a virtual machine? You wouldn't
+>>>> need to abstract any of the hardware in AML since you already know
+>>>> what the virtual hardware is, so I can't see how this would help
+>>>> anyone.
+>>> 
+>>> The point is that if we need to share any real hw then we need to use
+>>> whatever the host has.
+> 
+> I would be more comfortable defining in the spec that you cannot share
+> hardware at all. Obviously that
+
+Nonono we want to share hardware.
+
+> doesn't stop anyone from actually
+> sharing hardware with the guest, but at that point it would become
+> noncompliant with this spec, with the consequence that you couldn't
+> expect a compliant guest image to run on that hardware, but that is
+> exactly something we can't guarantee anyway because we don't know
+> what drivers might be needed.
+> 
+> Also, there is no way to generally do this with either FDT or ACPI:
+> In the former case, the hypervisor needs to modify any properties
+> that point to other device nodes so that they point to nodes visible
+> to the guest. That may be possible for simple things like IRQs
+> and reg properties, but as soon as you get into stuff like dmaengine,
+> pinctrl or PHY references, you just can't solve it in a generic way.
+> 
+> For ACPI it's probably worse: any AML methods that the host has
+> are unlikely to work in the guest, and it's impossible to translate
+> them at all.
+> 
+> Obviously things are different for Xen Dom0 where we share *all* devices
+> between host and guest, and we just use the host firmware interfaces.
+> That case again cannot be covered by the generic VM system specification.
+> 
+>> I dislike ACPI as much as the next guy, but unfortunately if the host
+>> only supports ACPI, the Linux driver for a particular device only works
+>> together with ACPI, and you want to assign that device to a VM, then we
+>> might be forced to use ACPI to describe it.
+> 
+> Can anyone think of an example where this would actually work?
+> 
+> The only case I can see where it's possible to share a device with
+> a guest without the hypervisor building up the description is for
+> PCI functions that are passed through with an IOMMU. Those won't
+> need ACPI or DT support however.
+
+If you want to assign a platform device, you need to generate a respective hardware description (fdt/dsdt) chunk in the hypervisor. You can't take the host's description - it's too tightly coupled to the overall host layout.
+
+Imagine you get an AArch64 notebook with Windows on it. You want to run Linux there, so your host needs to understand ACPI. Now you want to run a Windows guest inside a VM, so you need ACPI in there again.
+
+Replace Windows by "Linux with custom drivers" and you're in the same situation even when you neglect Windows. Reality will be that we will have fdt and acpi based systems.
+
+
+Alex
