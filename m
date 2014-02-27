@@ -1,199 +1,315 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Thu, 27 Feb 2014 16:24:25 +0100
-Subject: [PATCH v0 12/15] ARM: STi: DT: STiH416: 416 DT Entry for clockgen
- B/C/D/E/F
+Date: Thu, 27 Feb 2014 16:24:16 +0100
+Subject: [PATCH v0 03/15] drivers: clk: st: Support for VCC-mux and MUX clocks
 In-Reply-To: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
 References: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1393514668-17440-13-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1393514668-17440-4-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch adds DT entries for clockgen B/C/D/E/F
+The patch supports the VCC-mux and MUX clocks used by ClockGenC/F
+
+VCC-mux clock : Divider-Multiplexer-Gate inside ClockGenC/F
+It includes support for each channel : 4-parent Multiplexer, Post Divide
+by 1, 2, 4 or 8, Gate to switch OFF the output channel. The clock is
+implemented using generic clocks implemented in the kernel clk_divider, clk_mux,
+clk_gate and clk_composite (to combine all)
+
+MUX clock : 2-parent clock used inside ClockGenC/F. The clock is implemented
+using generic clocks implemented in the kernel clk_mux.
 
 Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- arch/arm/boot/dts/stih416-clock.dtsi | 170 +++++++++++++++++++++++++++++++++++
- 1 file changed, 170 insertions(+)
+ drivers/clk/st/clkgen-mux.c | 272 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 272 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih416-clock.dtsi b/arch/arm/boot/dts/stih416-clock.dtsi
-index f63b0a1..6b2e387 100644
---- a/arch/arm/boot/dts/stih416-clock.dtsi
-+++ b/arch/arm/boot/dts/stih416-clock.dtsi
-@@ -503,5 +503,175 @@
- 						/* Remaining outputs unused */
- 			};
- 		};
-+                /*
-+                 * Frequency synthesizers on the SASG2.
-+                 *
-+                 */
-+                CLOCKGEN_B0: CLOCKGEN_B0 {
-+                        #clock-cells = <1>;
-+                        compatible = "st,stih416-quadfs216", "st,quadfs";
-+                        reg = <0xfee108b4 0x44>;
+diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
+index 65d702c..7ccff62 100644
+--- a/drivers/clk/st/clkgen-mux.c
++++ b/drivers/clk/st/clkgen-mux.c
+@@ -18,6 +18,7 @@
+ #include <linux/clk-provider.h>
+ 
+ static DEFINE_SPINLOCK(clkgena_divmux_lock);
++static DEFINE_SPINLOCK(clkgenf_lock);
+ 
+ static const char ** __init clkgen_mux_get_parents(struct device_node *np,
+ 						       int *num_parents)
+@@ -527,3 +528,274 @@ void __init st_of_clkgena_prediv_setup(struct device_node *np)
+ 	return;
+ }
+ CLK_OF_DECLARE(clkgenaprediv, "st,clkgena-prediv", st_of_clkgena_prediv_setup);
 +
-+                        clocks = <&CLK_SYSIN>;
-+                        clock-output-names = "CLK_S_USB48",
-+                                             "CLK_S_DSS",
-+                                             "CLK_S_STFE_FRC_2",
-+                                             "CLK_S_THSENS_SCARD";
-+                };
++struct clkgen_mux_data {
++	u32 offset;
++	u8 shift;
++	u8 width;
++	spinlock_t *lock;
++	unsigned long clk_flags;
++	u8 mux_flags;
++};
 +
-+                CLOCKGEN_B1: CLOCKGEN_B1 {
-+                        #clock-cells = <1>;
-+                        compatible = "st,stih416-quadfs216", "st,quadfs";
-+                        reg = <0xfe8308c4 0x44>;
++static struct clkgen_mux_data clkgen_mux_c_vcc_hd_416 = {
++	.offset = 0,
++	.shift = 0,
++	.width = 1,
++};
 +
-+                        clocks = <&CLK_SYSIN>;
-+                        clock-output-names = "CLK_S_PCM_0",
-+                                             "CLK_S_PCM_1",
-+                                             "CLK_S_PCM_2",
-+                                             "CLK_S_PCM_3";
-+                };
++static struct clkgen_mux_data clkgen_mux_f_vcc_fvdp_416 = {
++	.offset = 0,
++	.shift = 0,
++	.width = 1,
++};
 +
-+                CLOCKGEN_C: CLOCKGEN_C {
-+                        #clock-cells = <1>;
-+                        compatible = "st,stih416-quadfs432", "st,quadfs";
-+                        reg = <0xfe8307d0 0x44>;
++static struct clkgen_mux_data clkgen_mux_f_vcc_hva_416 = {
++	.offset = 0,
++	.shift = 0,
++	.width = 1,
++};
 +
-+                        clocks = <&CLK_SYSIN>;
-+                        clock-output-names = "CLK_S_C_FS0_CH0",
-+                                             "CLK_S_C_VCC_SD",
-+                                             "CLK_S_C_FS0_CH2";
-+                };
++static struct clkgen_mux_data clkgen_mux_f_vcc_hd_416 = {
++	.offset = 0,
++	.shift = 16,
++	.width = 1,
++	.lock = &clkgenf_lock,
++};
 +
-+                CLK_S_VCC_HD: CLK_S_VCC_HD {
-+                        #clock-cells = <0>;
-+                        compatible = "st,stih416-clkgenc-vcc-hd", "st,clkgen-mux";
-+                        reg = <0xfe8308b8 4>; /* SYSCFG2558 */
++static struct clkgen_mux_data clkgen_mux_c_vcc_sd_416 = {
++	.offset = 0,
++	.shift = 17,
++	.width = 1,
++	.lock = &clkgenf_lock,
++};
 +
-+                        clocks = <&CLK_SYSIN>, <&CLOCKGEN_C 0>;
-+                };
++static struct of_device_id mux_of_match[] = {
++	{
++		.compatible = "st,stih416-clkgenc-vcc-hd",
++		.data = &clkgen_mux_c_vcc_hd_416,
++	},
++	{
++		.compatible = "st,stih416-clkgenf-vcc-fvdp",
++		.data = &clkgen_mux_f_vcc_fvdp_416,
++	},
++	{
++		.compatible = "st,stih416-clkgenf-vcc-hva",
++		.data = &clkgen_mux_f_vcc_hva_416,
++	},
++	{
++		.compatible = "st,stih416-clkgenf-vcc-hd",
++		.data = &clkgen_mux_f_vcc_hd_416,
++	},
++	{
++		.compatible = "st,stih416-clkgenf-vcc-sd",
++		.data = &clkgen_mux_c_vcc_sd_416,
++	},
++	{}
++};
 +
-+                /*
-+                 * Add a dummy clock for the HDMI PHY for the VCC input mux
-+                 */
-+                CLK_S_TMDS_FROMPHY: CLK_S_TMDS_FROMPHY {
-+                        #clock-cells = <0>;
-+                        compatible = "fixed-clock";
-+                        clock-frequency = <0>;
-+                };
++void __init st_of_clkgen_mux_setup(struct device_node *np)
++{
++	const struct of_device_id *match;
++	struct clk *clk;
++	void __iomem *reg;
++	const char **parents;
++	int num_parents;
++	struct clkgen_mux_data *data;
 +
-+                CLOCKGEN_C_VCC: CLOCKGEN_C_VCC {
-+                        #clock-cells = <1>;
-+                        compatible = "st,stih416-clkgenc", "st,clkgen-vcc";
-+                        reg = <0xfe8308ac 12>; /* SYSCFG2555,2556,2557 */
++	match = of_match_node(mux_of_match, np);
++	if (!match) {
++		pr_err("%s: No matching data\n", __func__);
++		return;
++	}
 +
-+                        clocks = <&CLK_S_VCC_HD>, <&CLOCKGEN_C 1>,
-+                                 <&CLK_S_TMDS_FROMPHY>, <&CLOCKGEN_C 2>;
++	data = (struct clkgen_mux_data *)match->data;
 +
-+                        clock-output-names  =
-+                                "CLK_S_PIX_HDMI",  "CLK_S_PIX_DVO",
-+                                "CLK_S_OUT_DVO",   "CLK_S_PIX_HD",
-+                                "CLK_S_HDDAC",     "CLK_S_DENC",
-+                                "CLK_S_SDDAC",     "CLK_S_PIX_MAIN",
-+                                "CLK_S_PIX_AUX",   "CLK_S_STFE_FRC_0",
-+                                "CLK_S_REF_MCRU",  "CLK_S_SLAVE_MCRU",
-+                                "CLK_S_TMDS_HDMI", "CLK_S_HDMI_REJECT_PLL",
-+                                "CLK_S_THSENS";
-+                };
++	reg = of_iomap(np, 0);
++	if (!reg) {
++		pr_err("%s: Failed to get base address\n", __func__);
++		return;
++	}
 +
-+                CLOCKGEN_D: CLOCKGEN_D {
-+                        #clock-cells = <1>;
-+                        compatible = "st,stih416-quadfs216", "st,quadfs";
-+                        reg = <0xfee107e0 0x44>;
++	parents = clkgen_mux_get_parents(np, &num_parents);
++	if (IS_ERR(parents)) {
++		pr_err("%s: Failed to get parents (%ld)\n",
++				__func__, PTR_ERR(parents));
++		return;
++	}
 +
-+                        clocks = <&CLK_SYSIN>;
-+                        clock-output-names = "CLK_S_CCSC",
-+                                             "CLK_S_STFE_FRC_1",
-+                                             "CLK_S_TSOUT_1",
-+                                             "CLK_S_MCHI";
-+                };
++	clk = clk_register_mux(NULL, np->name, parents, num_parents,
++				data->clk_flags | CLK_SET_RATE_PARENT,
++				reg + data->offset,
++				data->shift, data->width, data->mux_flags,
++				data->lock);
++	if (IS_ERR(clk))
++		goto err;
++
++	pr_debug("%s: parent %s rate %u\n",
++			__clk_get_name(clk),
++			__clk_get_name(clk_get_parent(clk)),
++			(unsigned int)clk_get_rate(clk));
++
++	of_clk_add_provider(np, of_clk_src_simple_get, clk);
++
++err:
++	kfree(parents);
++
++	return;
++}
++CLK_OF_DECLARE(clkgen_mux, "st,clkgen-mux", st_of_clkgen_mux_setup);
++
++#define VCC_MAX_CHANNELS 16
++
++#define VCC_GATE_OFFSET 0x0
++#define VCC_MUX_OFFSET 0x4
++#define VCC_DIV_OFFSET 0x8
++
++struct clkgen_vcc_data {
++	spinlock_t *lock;
++	unsigned long clk_flags;
++};
++
++static struct clkgen_vcc_data st_clkgenc_vcc_416 = {
++	.clk_flags = CLK_SET_RATE_PARENT,
++};
++
++static struct clkgen_vcc_data st_clkgenf_vcc_416 = {
++	.lock = &clkgenf_lock,
++};
++
++static struct of_device_id vcc_of_match[] = {
++	{ .compatible = "st,stih416-clkgenc", .data = &st_clkgenc_vcc_416 },
++	{ .compatible = "st,stih416-clkgenf", .data = &st_clkgenf_vcc_416 },
++	{}
++};
++
++void __init st_of_clkgen_vcc_setup(struct device_node *np)
++{
++	const struct of_device_id *match;
++	void __iomem *reg;
++	const char **parents;
++	int num_parents, i;
++	struct clk_onecell_data *clk_data;
++	struct clkgen_vcc_data *data;
++
++	match = of_match_node(vcc_of_match, np);
++	if (WARN_ON(!match))
++		return;
++	data = (struct clkgen_vcc_data *)match->data;
++
++	reg = of_iomap(np, 0);
++	if (!reg)
++		return;
++
++	parents = clkgen_mux_get_parents(np, &num_parents);
++	if (IS_ERR(parents))
++		return;
++
++	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
++	if (!clk_data)
++		goto err;
++
++	clk_data->clk_num = VCC_MAX_CHANNELS;
++	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk *),
++				 GFP_KERNEL);
++
++	if (!clk_data->clks)
++		goto err;
++
++	for (i = 0; i < clk_data->clk_num; i++) {
++		struct clk *clk;
++		const char *clk_name;
++		struct clk_gate *gate;
++		struct clk_divider *div;
++		struct clk_mux *mux;
++
++		if (of_property_read_string_index(np, "clock-output-names",
++						  i, &clk_name))
++			break;
 +
 +		/*
-+		 * Frequency synthesizers on the MPE42
++		 * If we read an empty clock name then the output is unused
 +		 */
-+                CLOCKGEN_E: CLOCKGEN_E {
-+                        #clock-cells = <1>;
-+                        compatible = "st,stih416-quadfs660-E", "st,quadfs";
-+                        reg = <0xfd3208bc 0xB0>;
++		if (*clk_name == '\0')
++			continue;
 +
-+                        clocks = <&CLK_SYSIN>;
-+                        clock-output-names = "CLK_M_PIX_MDTP_0",
-+                                             "CLK_M_PIX_MDTP_1",
-+                                             "CLK_M_PIX_MDTP_2",
-+                                             "CLK_M_MPELPC";
-+                };
++		gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
++		if (!gate)
++			break;
 +
-+                CLOCKGEN_F: CLOCKGEN_F {
-+                        #clock-cells = <1>;
-+                        compatible = "st,stih416-quadfs660-F", "st,quadfs";
-+                        reg = <0xfd320878 0xF0>;
++		div = kzalloc(sizeof(struct clk_divider), GFP_KERNEL);
++		if (!div) {
++			kfree(gate);
++			break;
++		}
 +
-+                        clocks = <&CLK_SYSIN>;
-+                        clock-output-names = "CLK_M_MAIN_VIDFS",
-+                                             "CLK_M_HVA_FS",
-+                                             "CLK_M_FVDP_VCPU",
-+					     "CLK_M_FVDP_PROC_FS";
-+                };
++		mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
++		if (!mux) {
++			kfree(gate);
++			kfree(div);
++			break;
++		}
 +
-+                CLK_M_FVDP_PROC: CLK_M_FVDP_PROC {
-+                        #clock-cells = <0>;
-+                        compatible = "st,stih416-clkgenf-vcc-fvdp", "st,clkgen-mux";
-+                        reg = <0xfd320910 4>; /* SYSCFG8580 */
++		gate->reg = reg + VCC_GATE_OFFSET;
++		gate->bit_idx = i;
++		gate->flags = CLK_GATE_SET_TO_DISABLE;
++		gate->lock = data->lock;
 +
-+                        clocks = <&CLK_M_A1_DIV2 0>, <&CLOCKGEN_F 3>;
-+                };
++		div->reg = reg + VCC_DIV_OFFSET;
++		div->shift = 2 * i;
++		div->width = 2;
++		div->flags = CLK_DIVIDER_POWER_OF_TWO;
 +
-+                CLK_M_HVA: CLK_M_HVA {
-+                        #clock-cells = <0>;
-+                        compatible = "st,stih416-clkgenf-vcc-hva", "st,clkgen-mux";
-+                        reg = <0xfd690868 4>; /* SYSCFG9538 */
++		mux->reg = reg + VCC_MUX_OFFSET;
++		mux->shift = 2 * i;
++		mux->mask = 0x3;
 +
-+                        clocks = <&CLOCKGEN_F 1>, <&CLK_M_A1_DIV0 3>;
-+                };
++		clk = clk_register_composite(NULL, clk_name, parents,
++					     num_parents,
++					     &mux->hw, &clk_mux_ops,
++					     &div->hw, &clk_divider_ops,
++					     &gate->hw, &clk_gate_ops,
++					     data->clk_flags);
++		if (IS_ERR(clk)) {
++			kfree(gate);
++			kfree(div);
++			kfree(mux);
++			goto err;
++		}
 +
-+                CLK_M_F_VCC_HD: CLK_M_F_VCC_HD {
-+                        #clock-cells = <0>;
-+                        compatible = "st,stih416-clkgenf-vcc-hd", "st,clkgen-mux";
-+                        reg = <0xfd32086c 4>; /* SYSCFG8539 */
++		pr_debug("%s: parent %s rate %u\n",
++			__clk_get_name(clk),
++			__clk_get_name(clk_get_parent(clk)),
++			(unsigned int)clk_get_rate(clk));
 +
-+                        clocks = <&CLOCKGEN_C_VCC 7>, <&CLOCKGEN_F 0>;
-+                };
++		clk_data->clks[i] = clk;
++	}
 +
-+                CLK_M_F_VCC_SD: CLK_M_F_VCC_SD {
-+                        #clock-cells = <0>;
-+                        compatible = "st,stih416-clkgenf-vcc-sd", "st,clkgen-mux";
-+                        reg = <0xfd32086c 4>; /* SYSCFG8539 */
++	kfree(parents);
 +
-+                        clocks = <&CLOCKGEN_C_VCC 8>, <&CLOCKGEN_F 1>;
-+                };
++	of_clk_add_provider(np, of_clk_src_onecell_get, clk_data);
++	return;
 +
-+                /*
-+                 * Add a dummy clock for the HDMIRx external signal clock
-+                 */
-+                CLK_M_PIX_HDMIRX_SAS: CLK_M_PIX_HDMIRX_SAS {
-+                        #clock-cells = <0>;
-+                        compatible = "fixed-clock";
-+                        clock-frequency = <0>;
-+                };
++err:
++	for (i = 0; i < clk_data->clk_num; i++) {
++		struct clk_composite *composite;
 +
-+                CLOCKGEN_F_VCC: CLOCKGEN_F_VCC {
-+                        #clock-cells = <1>;
-+                        compatible = "st,stih416-clkgenf", "st,clkgen-vcc";
-+                        reg = <0xfd32086c 12>; /* SYSCFG8539,8540,8541 */
++		if (!clk_data->clks[i])
++			continue;
 +
-+                        clocks = <&CLK_M_F_VCC_HD>, <&CLK_M_F_VCC_SD>,
-+                                 <&CLOCKGEN_F 0>, <&CLK_M_PIX_HDMIRX_SAS>;
++		composite = container_of(__clk_get_hw(clk_data->clks[i]),
++					 struct clk_composite, hw);
++		kfree(container_of(composite->gate_hw, struct clk_gate, hw));
++		kfree(container_of(composite->rate_hw, struct clk_divider, hw));
++		kfree(container_of(composite->mux_hw, struct clk_mux, hw));
++	}
 +
-+                        clock-output-names  =
-+                                "CLK_M_PIX_MAIN_PIPE",  "CLK_M_PIX_AUX_PIPE",
-+                                "CLK_M_PIX_MAIN_CRU",   "CLK_M_PIX_AUX_CRU",
-+                                "CLK_M_XFER_BE_COMPO",  "CLK_M_XFER_PIP_COMPO",
-+                                "CLK_M_XFER_AUX_COMPO", "CLK_M_VSENS",
-+                                "CLK_M_PIX_HDMIRX_0",   "CLK_M_PIX_HDMIRX_1";
-+                };
- 	};
- };
++	if (clk_data)
++		kfree(clk_data->clks);
++
++	kfree(clk_data);
++	kfree(parents);
++}
++CLK_OF_DECLARE(clkgen_vcc, "st,clkgen-vcc", st_of_clkgen_vcc_setup);
 -- 
 1.9.0
