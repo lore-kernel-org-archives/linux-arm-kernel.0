@@ -1,81 +1,66 @@
-From: graeme@xora.org.uk (Graeme Gregory)
-Date: Thu, 27 Feb 2014 21:02:27 +0000
-Subject: [PATCH V2 1/3] dt: palmas: support IRQ inversion at the board
- level
-In-Reply-To: <1393534281-30759-1-git-send-email-swarren@wwwdotorg.org>
-References: <1393534281-30759-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20140227210227.GE2931@xora-haswell>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 27 Feb 2014 22:28:05 +0100
+Subject: [PATCH 4/4] ARM: add Marvell Dove and some drivers to multi_v7
+ defconfig
+In-Reply-To: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1393536486-3827-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 01:51:19PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Some boards or SoCs have an inverter between the PMIC IRQ output pin and
-> the IRQ controller input signal.
-> 
-> The IRQ specifier in DT is meant to represent the IRQ flags at the input
-> to the IRQ controller.
-> 
-> The Palmas HW's IRQ output has configurable polarity. Software needs to
-> know which polarity to choose for the IRQ output. Software may be tempted
-> to extract the IRQ polarity from the IRQ specifier in order to make this
-> choice.
-> 
-> That approach works fine if the IRQ signal is routed directly from the
-> PMIC to the IRQ controller with no intervening logic. However, if the
-> signal is inverted between the two, this approach gets the wrong answer.
-> 
-> Add an additional optional DT property which indicates that such an
-> inversion occurs. This allows DT to give complete information about the
-> desired IRQ output polarity to software.
-> 
-> An alternative would have been to add a new non-optional DT parameter to
-> indicate the exact desired output polarity. However, this would have been
-> an incompatible change to the DT binding.
-> 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> Acked-by: Laxman Dewangan <ldewangan@nvidia.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> ---
-> v2: Split V1's patch 1/2 into separate patches 1/3 and 2/3.
-> ---
->  Documentation/devicetree/bindings/mfd/palmas.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/palmas.txt b/Documentation/devicetree/bindings/mfd/palmas.txt
-> index e5f0f8303461..76ec509d5f87 100644
-> --- a/Documentation/devicetree/bindings/mfd/palmas.txt
-> +++ b/Documentation/devicetree/bindings/mfd/palmas.txt
-> @@ -18,6 +18,12 @@ Required properties:
->    ti,tps659038
->  and also the generic series names
->    ti,palmas
-> +- interrupts : Should contain a single entry for the IRQ output.
-> +- ti,irq-externally-inverted : If missing, the polarity of the Palmas IRQ
-> +  output should be set to the opposite of the polarity indicated by the IRQ
-> +  specifier in the interrupts property. If absent, the polarity should be
-> +  configured to match. This allows the representation of an inverter between
-> +  the Palmas IRQ output and the interrupt parent's IRQ input.
+With Marvell Dove now being part of the multi_v7 family, add some Dove
+specific drivers to multi_v7 defconfig.
 
-This has got to be the wrong way to do things, all this leads to is every
-device doing this property in its own way and having totally inconsistent
-properties all meaning the same thing.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/configs/multi_v7_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-If there is some other hardware inverting lines then there should be
-a generic binding for this in DT. This is not describing the palmas hardware
-but some external object to the palmas.
-
-Graeme
-
->  - interrupt-controller : palmas has its own internal IRQs
->  - #interrupt-cells : should be set to 2 for IRQ number and flags
->    The first cell is the IRQ number.
-> -- 
-> 1.8.1.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index ee6982976d66..a1876b2ed4bd 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -10,6 +10,7 @@ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_XP=y
++CONFIG_MACH_DOVE=y
+ CONFIG_ARCH_BCM=y
+ CONFIG_ARCH_BCM_MOBILE=y
+ CONFIG_ARCH_BERLIN=y
+@@ -111,6 +112,7 @@ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+ CONFIG_SUN4I_EMAC=y
+ CONFIG_NET_CALXEDA_XGMAC=y
++CONFIG_MV643XX_ETH=y
+ CONFIG_MVNETA=y
+ CONFIG_KS8851=y
+ CONFIG_R8169=y
+@@ -187,6 +189,7 @@ CONFIG_POWER_RESET_AS3722=y
+ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_SENSORS_LM90=y
+ CONFIG_THERMAL=y
++CONFIG_DOVE_THERMAL=y
+ CONFIG_ARMADA_THERMAL=y
+ CONFIG_MFD_AS3722=y
+ CONFIG_MFD_CROS_EC=y
+@@ -253,6 +256,7 @@ CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_ESDHC_IMX=y
++CONFIG_MMC_SDHCI_DOVE=y
+ CONFIG_MMC_SDHCI_TEGRA=y
+ CONFIG_MMC_SDHCI_SPEAR=y
+ CONFIG_MMC_SDHCI_BCM_KONA=y
+-- 
+1.8.5.3
