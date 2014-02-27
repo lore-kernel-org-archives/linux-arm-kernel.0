@@ -1,195 +1,103 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 27 Feb 2014 23:03:33 +0100
-Subject: [PATCH v2 3/4] ARM: mvebu: move DT Dove to MVEBU
-In-Reply-To: <1393536486-3827-4-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1393536486-3827-4-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1393538613-28293-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Thu, 27 Feb 2014 23:05:54 +0100
+Subject: [PATCH 2/4] ARM: dove: prepare new Dove DT Kconfig variable
+In-Reply-To: <20140227215145.GR1484@spo001.leaseweb.com>
+References: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393536486-3827-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140227215145.GR1484@spo001.leaseweb.com>
+Message-ID: <530FB6C2.8080008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With all the DT support preparation done, we are able to move Dove
-to MVEBU easily. Legacy non-DT mach-dove is left untouched to rot
-for a while before removal. Also, convert SATA PHY Kconfig entry,
-which is DT-only.
+On 02/27/2014 10:51 PM, Wim Van Sebroeck wrote:
+> Acked-by me.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Changelog:
-v1->v2:
-- just rename CONFIG_ARCH_DOVE to CONFIG_MACH_DOVE in dts/Makefile
-  (Suggested by Jason Cooper)
+Thanks Wim,
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/Makefile                           |  2 +-
- arch/arm/mach-dove/Kconfig                           | 12 ------------
- arch/arm/mach-dove/Makefile                          |  1 -
- arch/arm/mach-mvebu/Kconfig                          | 12 ++++++++++++
- arch/arm/mach-mvebu/Makefile                         |  1 +
- arch/arm/{mach-dove/board-dt.c => mach-mvebu/dove.c} | 20 ++++++++------------
- drivers/phy/Kconfig                                  |  2 +-
- 7 files changed, 23 insertions(+), 27 deletions(-)
- rename arch/arm/{mach-dove/board-dt.c => mach-mvebu/dove.c} (61%)
+as I forgot to explicitly ask for maintainer Acks: It would be great to
+get Acked-by's from mmc, thermal, and asoc, too.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 032030361bef..21317af7fe48 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -55,7 +55,7 @@ dtb-$(CONFIG_ARCH_BERLIN) += \
- 	berlin2cd-google-chromecast.dtb
- dtb-$(CONFIG_ARCH_DAVINCI) += da850-enbw-cmc.dtb \
- 	da850-evm.dtb
--dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
-+dtb-$(CONFIG_MACH_DOVE) += dove-cm-a510.dtb \
- 	dove-cubox.dtb \
- 	dove-d2plug.dtb \
- 	dove-d3plug.dtb \
-diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
-index 0bc7cdf8cf46..d8c439c89ea9 100644
---- a/arch/arm/mach-dove/Kconfig
-+++ b/arch/arm/mach-dove/Kconfig
-@@ -20,18 +20,6 @@ config MACH_CM_A510
- 	  Say 'Y' here if you want your kernel to support the
- 	  CompuLab CM-A510 Board.
- 
--config MACH_DOVE_DT
--	bool "Marvell Dove Flattened Device Tree"
--	select DOVE_CLK
--	select ORION_IRQCHIP
--	select ORION_TIMER
--	select REGULATOR
--	select REGULATOR_FIXED_VOLTAGE
--	select USE_OF
--	help
--	  Say 'Y' here if you want your kernel to support the
--	  Marvell Dove using flattened device tree.
--
- endmenu
- 
- endif
-diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
-index cbc5c0618788..b608a21919fb 100644
---- a/arch/arm/mach-dove/Makefile
-+++ b/arch/arm/mach-dove/Makefile
-@@ -2,5 +2,4 @@ obj-y				+= common.o
- obj-$(CONFIG_DOVE_LEGACY)	+= irq.o mpp.o
- obj-$(CONFIG_PCI)		+= pcie.o
- obj-$(CONFIG_MACH_DOVE_DB)	+= dove-db-setup.o
--obj-$(CONFIG_MACH_DOVE_DT)	+= board-dt.o
- obj-$(CONFIG_MACH_CM_A510)	+= cm-a510.o
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 5e269d7263ce..966e5c6b9944 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -46,6 +46,18 @@ config MACH_ARMADA_XP
- 	  Say 'Y' here if you want your kernel to support boards based
- 	  on the Marvell Armada XP SoC with device tree.
- 
-+config MACH_DOVE
-+	bool "Marvell Dove boards" if ARCH_MULTI_V7
-+	select CACHE_L2X0
-+	select CPU_PJ4
-+	select DOVE_CLK
-+	select ORION_IRQCHIP
-+	select ORION_TIMER
-+	select PINCTRL_DOVE
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  Marvell Dove using flattened device tree.
-+
- endmenu
- 
- endif
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 878aebe98dcc..dd3e7188f75d 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -5,6 +5,7 @@ AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
- 
- obj-y				 += system-controller.o mvebu-soc-id.o
- obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o
-+obj-$(CONFIG_MACH_DOVE)		 += dove.o
- obj-$(CONFIG_ARCH_MVEBU)	 += coherency.o coherency_ll.o pmsu.o
- obj-$(CONFIG_SMP)                += platsmp.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)        += hotplug.o
-diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-mvebu/dove.c
-similarity index 61%
-rename from arch/arm/mach-dove/board-dt.c
-rename to arch/arm/mach-mvebu/dove.c
-index 49fa9abd09da..5e5a43624237 100644
---- a/arch/arm/mach-dove/board-dt.c
-+++ b/arch/arm/mach-mvebu/dove.c
-@@ -1,5 +1,5 @@
- /*
-- * arch/arm/mach-dove/board-dt.c
-+ * arch/arm/mach-mvebu/dove.c
-  *
-  * Marvell Dove 88AP510 System On Chip FDT Board
-  *
-@@ -9,17 +9,14 @@
-  */
- 
- #include <linux/init.h>
--#include <linux/clk-provider.h>
-+#include <linux/mbus.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
- #include <asm/hardware/cache-tauros2.h>
- #include <asm/mach/arch.h>
--#include <mach/dove.h>
--#include <mach/pm.h>
--#include <plat/common.h>
- #include "common.h"
- 
--static void __init dove_dt_init(void)
-+static void __init dove_init(void)
- {
- 	pr_info("Dove 88AP510 SoC\n");
- 
-@@ -30,14 +27,13 @@ static void __init dove_dt_init(void)
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
--static const char * const dove_dt_board_compat[] = {
-+static const char * const dove_dt_compat[] = {
- 	"marvell,dove",
- 	NULL
- };
- 
--DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
--	.map_io		= dove_map_io,
--	.init_machine	= dove_dt_init,
--	.restart	= dove_restart,
--	.dt_compat	= dove_dt_board_compat,
-+DT_MACHINE_START(DOVE_DT, "Marvell Dove")
-+	.init_machine	= dove_init,
-+	.restart	= mvebu_restart,
-+	.dt_compat	= dove_dt_compat,
- MACHINE_END
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index c7a551c2d5f1..ffd7f07adca3 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -24,7 +24,7 @@ config PHY_EXYNOS_MIPI_VIDEO
- 
- config PHY_MVEBU_SATA
- 	def_bool y
--	depends on ARCH_KIRKWOOD || ARCH_DOVE
-+	depends on ARCH_KIRKWOOD || MACH_DOVE
- 	depends on OF
- 	select GENERIC_PHY
- 
--- 
-1.8.5.3
+Sebastian
+
+>> DT-enabled Dove will move over from ARCH_DOVE in mach-dove to MACH_DOVE in
+>> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+>> DT-only MACH_DOVE to mmc, thermal, wdt, and asoc Kconfigs.
+>>
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> ---
+>> Cc: Chris Ball <chris@printf.net>
+>> Cc: Zhang Rui <rui.zhang@intel.com>
+>> Cc: Eduardo Valentin <eduardo.valentin@ti.com>
+>> Cc: Wim Van Sebroeck <wim@iguana.be>
+>> Cc: Liam Girdwood <lgirdwood@gmail.com>
+>> Cc: Mark Brown <broonie@kernel.org>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Andrew Lunn <andrew@lunn.ch>
+>> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+>> Cc: alsa-devel at alsa-project.org
+>> Cc: linux-watchdog at vger.kernel.org
+>> Cc: linux-pm at vger.kernel.org
+>> Cc: linux-mmc at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> ---
+>>   drivers/mmc/host/Kconfig   | 2 +-
+>>   drivers/thermal/Kconfig    | 2 +-
+>>   drivers/watchdog/Kconfig   | 2 +-
+>>   sound/soc/kirkwood/Kconfig | 2 +-
+>>   4 files changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+>> index 1384f67abe21..a69e48b582e5 100644
+>> --- a/drivers/mmc/host/Kconfig
+>> +++ b/drivers/mmc/host/Kconfig
+>> @@ -168,7 +168,7 @@ config MMC_SDHCI_ESDHC_IMX
+>>
+>>   config MMC_SDHCI_DOVE
+>>   	tristate "SDHCI support on Marvell's Dove SoC"
+>> -	depends on ARCH_DOVE
+>> +	depends on ARCH_DOVE || MACH_DOVE
+>>   	depends on MMC_SDHCI_PLTFM
+>>   	select MMC_SDHCI_IO_ACCESSORS
+>>   	help
+>> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+>> index 35c066489a19..07b5e56e9a97 100644
+>> --- a/drivers/thermal/Kconfig
+>> +++ b/drivers/thermal/Kconfig
+>> @@ -150,7 +150,7 @@ config KIRKWOOD_THERMAL
+>>
+>>   config DOVE_THERMAL
+>>   	tristate "Temperature sensor on Marvell Dove SoCs"
+>> -	depends on ARCH_DOVE
+>> +	depends on ARCH_DOVE || MACH_DOVE
+>>   	depends on OF
+>>   	help
+>>   	  Support for the Dove thermal sensor driver in the Linux thermal
+>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+>> index 79d25894343a..5659c62a175c 100644
+>> --- a/drivers/watchdog/Kconfig
+>> +++ b/drivers/watchdog/Kconfig
+>> @@ -292,7 +292,7 @@ config DAVINCI_WATCHDOG
+>>
+>>   config ORION_WATCHDOG
+>>   	tristate "Orion watchdog"
+>> -	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE
+>> +	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE || MACH_DOVE
+>>   	select WATCHDOG_CORE
+>>   	help
+>>   	  Say Y here if to include support for the watchdog timer
+>> diff --git a/sound/soc/kirkwood/Kconfig b/sound/soc/kirkwood/Kconfig
+>> index 78ed4a42ad21..a1506d57e646 100644
+>> --- a/sound/soc/kirkwood/Kconfig
+>> +++ b/sound/soc/kirkwood/Kconfig
+>> @@ -1,6 +1,6 @@
+>>   config SND_KIRKWOOD_SOC
+>>   	tristate "SoC Audio for the Marvell Kirkwood and Dove chips"
+>> -	depends on ARCH_KIRKWOOD || ARCH_DOVE || COMPILE_TEST
+>> +	depends on ARCH_KIRKWOOD || ARCH_DOVE || MACH_DOVE || COMPILE_TEST
+>>   	help
+>>   	  Say Y or M if you want to add support for codecs attached to
+>>   	  the Kirkwood I2S interface. You will also need to select the
+>> --
+>> 1.8.5.3
+>>
