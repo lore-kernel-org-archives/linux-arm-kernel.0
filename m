@@ -1,53 +1,99 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Feb 2014 13:30:30 +0900
-Subject: [PATCH 1/4] arm64: topology: Implement basic CPU topology support
-In-Reply-To: <20140226175004.GC22839@e102568-lin.cambridge.arm.com>
-References: <1393302345-18253-1-git-send-email-broonie@kernel.org>
- <1393302345-18253-2-git-send-email-broonie@kernel.org>
- <20140225165411.GA3883@red-moon>
- <20140226005052.GA31120@sirena.org.uk>
- <20140226123208.GB22839@e102568-lin.cambridge.arm.com>
- <20140226144610.GA2394@sirena.org.uk>
- <20140226154858.GC10246@arm.com>
- <20140226175004.GC22839@e102568-lin.cambridge.arm.com>
-Message-ID: <20140227043030.GF9383@sirena.org.uk>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 26 Feb 2014 21:00:43 -0800
+Subject: [RFC PATCH 1/6] PM / Voltagedomain: Add generic clk notifier
+ handler for regulator based dynamic voltage scaling
+In-Reply-To: <20140227023455.GA15712@kahuna>
+References: <1392755543-28335-1-git-send-email-nm@ti.com>
+ <1392755543-28335-2-git-send-email-nm@ti.com>
+ <20140225055142.22529.21814@quantum> <530D0394.4020208@ti.com>
+ <20140227023455.GA15712@kahuna>
+Message-ID: <20140227050043.12081.54173@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 05:50:04PM +0000, Lorenzo Pieralisi wrote:
+Quoting Nishanth Menon (2014-02-26 18:34:55)
+> +/**
+> + * pm_runtime_get_rate() - Returns the device operational frequency
+> + * @dev:       Device to handle
+> + * @rate:      Returns rate in Hz.
+> + *
+> + * Returns appropriate error value in case of error conditions, else
+> + * returns 0 and rate is updated. The pm_domain logic does all the necessary
+> + * operation (which may consider magic hardware stuff) to provide the rate.
+> + *
+> + * NOTE: the rate returned is a snapshot and in many cases just a bypass
+> + * to clk api to set the rate.
+> + */
+> +int pm_runtime_get_rate(struct device *dev, unsigned long *rate)
 
-> What would be wrong, is leaving the core_sibling and thread_sibling
-> masks empty and this CAN happen even on current arm32 code if the
-> cluster id field (ie MPIDR[15:8] for the sake of this discussion) is
-> different for different CPUs, and that's a bug that fortunately was
-> never hit (it is a totally valid MPIDR layout, a bit weird though).
+Instead of "rate", how about we use "level" and leave it undefined as to
+what that means? It would be equally valid for level to represent a
+clock rate, or an opp from a table of opp's, or a p-state, or some value
+passed to a PM microcontroller.
 
-This is a good point, I will make sure any MPIDR code handles it (we
-should fix the 32 bit code as well of course, I'll try to look at that
-too).
+Code that is tightly coupled to the hardware would simply know what
+value to use with no extra sugar.
 
-> - if s topology node for a cpu (or some cpus) is missing or wrong, the whole
->   topology structure should be reverted to default (as in
->   include/linux/topology.h Documentation/cputopology.txt). This solves Mark's
->   concern about having some cpus with missing topology information.
->   NB: My patch does not do that, it resets topology only for the misconfigured
->   cpu.
+Generic code would need to get the various supported "levels" populated
+at run time, but a DT binding could do that, or a query to the ACPI
+tables, or whatever.
 
-I would certainly prefer this, I'll do an update (though not today,
-trains again).
+> +{
+> +       unsigned long flags;
+> +       int error = -ENOSYS;
+> +
+> +       if (!rate || !dev)
+> +               return -EINVAL;
+> +
+> +       spin_lock_irqsave(&dev->power.lock, flags);
+> +       if (!pm_runtime_active(dev)) {
+> +               error = -EINVAL;
+> +               goto out;
+> +       }
+> +
+> +       if (dev->pm_domain && dev->pm_domain->active_ops.get_rate)
+> +               error = dev->pm_domain->active_ops.get_rate(dev, rate);
+> +out:
+> +       spin_unlock_irqrestore(&dev->power.lock, flags);
+> +
+> +       return error;
+> +}
+> +
+> +/**
+> + * pm_runtime_set_rate() - Set a specific rate for the device operation
+> + * @dev:       Device to handle
+> + * @rate:      Rate to set in Hz
+> + *
+> + * Returns appropriate error value in case of error conditions, else
+> + * returns 0. The pm_domain logic does all the necessary operation (which
+> + * may include voltage scale operations or other magic hardware stuff) to
+> + * achieve the operation. It is guarenteed that the requested rate is achieved
+> + * on returning from this function if return value is 0.
+> + */
+> +int pm_runtime_set_rate(struct device *dev, unsigned long rate)
 
-> That's the best we can do. I think that an MPIDR_EL1 fall back mechanism
-> should be put in place, as a separate patch or squashed to patch 1.
+Additionally I wonder if the function signature should include a way to
+specify the sub-unit of a device that we are operating on? This is a way
+to tackle the issues you raised regarding multiple clocks per device,
+etc. Two approaches come to mind:
 
-> I would prefer the latter, but if you want to get the infrastructure in
-> first I think that's acceptable.
+int pm_runtime_set_rate(struct device *dev, int index,
+				unsigned long rate);
 
-I'd certainly prefer to get the code merged and work incrementally, it'd
-make life easier to avoid having to manage the rebases.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140227/25c17ebc/attachment.sig>
+Where index is a sub-unit of struct device *dev. The second approach is
+to create a publicly declared structure representing the sub-unit. Some
+variations on that theme:
+
+int pm_runtime_set_rate(struct perf_domain *perfdm, unsigned long rate);
+
+or,
+
+int pm_runtime_set_rate(struct generic_power_domain *gpd,
+				unsigned long rate);
+
+or whatever that sub-unit looks like. The gpd thing might be a total
+layering violation, I don't know. Or perhaps it's a decent idea but it
+shouldn't be as a PM runtime call. Again, I dunno.
+
+Regards,
+Mike
