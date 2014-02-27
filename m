@@ -1,87 +1,137 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 27 Feb 2014 12:17:20 +0530
-Subject: [PATCH RESEND v10 3/4] PHY: add APM X-Gene SoC 15Gbps
- Multi-purpose PHY driver
-In-Reply-To: <CAPw-ZTn=za14-x9fjnDfcY419i5nuFPqsQp_r-75zjyHf11E4w@mail.gmail.com>
-References: <1393308882-3964-1-git-send-email-lho@apm.com>
- <1393308882-3964-2-git-send-email-lho@apm.com>
- <1393308882-3964-3-git-send-email-lho@apm.com>
- <1393308882-3964-4-git-send-email-lho@apm.com> <530DB713.6000701@ti.com>
- <CAPw-ZT=eLbxt3wPL7hrZFtxTP9vGxbRyBY2Yoh77pq9ypphCaw@mail.gmail.com>
- <530ED4EF.1060000@ti.com>
- <CAPw-ZTnLYbUjQTm7QhJO5EMNqN5+dtWndSRUZn_bgMGvmNEu0Q@mail.gmail.com>
- <530EDC65.8060106@ti.com>
- <CAPw-ZTn=za14-x9fjnDfcY419i5nuFPqsQp_r-75zjyHf11E4w@mail.gmail.com>
-Message-ID: <530EDF78.4050408@ti.com>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Thu, 27 Feb 2014 14:54:22 +0800
+Subject: [PATCH] thermal: imx: update formula for thermal sensor
+In-Reply-To: <20140213130252.GB20842@S2101-09.ap.freescale.net>
+References: <1392199595-1054-1-git-send-email-b20788@freescale.com>
+ <20140213130252.GB20842@S2101-09.ap.freescale.net>
+Message-ID: <1393484062.2637.15.camel@rzhang1-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 February 2014 12:11 PM, Loc Ho wrote:
-> Hi,
->
->>>>>>> +
->>>>>>> +static void sds_wr(void __iomem *csr_base, u32 indirect_cmd_reg,
->>>>>>> +                  u32 indirect_data_reg, u32 addr, u32 data)
->>>>>>> +{
->>>>>>> +       u32 val;
->>>>>>> +       u32 cmd;
->>>>>>> +
->>>>>>> +       cmd = CFG_IND_WR_CMD_MASK | CFG_IND_CMD_DONE_MASK;
->>>>>>> +       cmd = CFG_IND_ADDR_SET(cmd, addr);
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> This looks hacky. If 'CFG_IND_WR_CMD_MASK | CFG_IND_CMD_DONE_MASK'
->>>>>> should
->>>>>> be set then it should be part of the second argument. From the macro
->>>>>> 'CFG_IND_ADDR_SET' the first argument should be more like the current
->>>>>> value
->>>>>> present in the register right? I feel the macro (CFG_IND_ADDR_SET) is
->>>>>> not
->>>>>> used in the way it is intended to.
->>>>>
->>>>>
->>>>>
->>>>> The macro XXX_SET is intended to update an field within the register.
->>>>> The update field is returned. The first assignment lines are setting
->>>>> another field. Those two lines can be written as:
->>>>>
->>>>> cmd = 0;
->>>>> cmd |= CFG_IND_WR_CMD_MASK;            ==> Set the CMD bit
->>>>> cmd |= CFG_IND_CMD_DONE_MASK;        ==> Set the DONE bit
->>>>> cmd = CFG_IND_ADDR_SET(cmd, addr);    ===> Set the field ADDR
->>>>
->>>>
->>>>
->>>> #define  CFG_IND_ADDR_SET(dst, src) \
->>>>                   (((dst) & ~0x003ffff0) | (((u32)(src)<<4) & 0x003ffff0))
->>>>
->>>>   From this macro the first argument should be the present value in that
->>>> register. Here you reset the address bits and write the new address bits.
->>>
->>>
->>> Yes.. This is correct. I am clearing x number of bit and then set new
->>> value.
->>>
->>>> IMO the first argument should be the value in 'csr_base +
->>>> indirect_cmd_reg'.
->>>> So it resets the address bits in 'csr_base + indirect_cmd_reg' and write
->>>> down the new address bits.
->>>
->>>
->>> Yes.. The above code does just that. In addition, I am also setting
->>> the bits CFG_IND_WR_CMD_MASK and CFG_IND_CMD_DONE_MASK with the two
->>> previous statement. Think of the code flow as follow:
->>>
->>> val = readl(some void * address); /* read the register */
->>
->>
->> Where are you reading the register in your code (before CFG_IND_ADDR_SET)?
->
-> I am not reading the register as I will be completely setting them.
+On Thu, 2014-02-13 at 21:02 +0800, Shawn Guo wrote:
+> Copy LAKML and pengutronix folks in case they have comments.
+> 
+> On Wed, Feb 12, 2014 at 06:06:35PM +0800, Anson Huang wrote:
+> > Thermal sensor used to need two calibration points which are
+> > in fuse map to get a slope for converting thermal sensor's raw
+> > data to real temperature in degree C. Due to the chip calibration
+> > limitation, hardware team provides an universal formula to get
+> > real temperature from internal thermal sensor raw data:
+> > 
+> > Slope = 0.4297157 - (0.0015976 * 25C fuse);
+> > 
+> > Update the formula, as there will be no hot point calibration
+> > data in fuse map from now on.
+> > 
+> > Signed-off-by: Anson Huang <b20788@freescale.com>
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+applied.
 
-Ok. Never-mind then. Sorry for the noise. You code is fine.
+thanks,
+rui
 
-Thanks
-Kishon
+> > ---
+> >  drivers/thermal/imx_thermal.c |   39 ++++++++++++++++++++++++++-------------
+> >  1 file changed, 26 insertions(+), 13 deletions(-)
+> > 
+> > diff --git a/drivers/thermal/imx_thermal.c b/drivers/thermal/imx_thermal.c
+> > index 45af765..a99c631 100644
+> > --- a/drivers/thermal/imx_thermal.c
+> > +++ b/drivers/thermal/imx_thermal.c
+> > @@ -62,12 +62,16 @@ enum imx_thermal_trip {
+> >  #define IMX_POLLING_DELAY		2000 /* millisecond */
+> >  #define IMX_PASSIVE_DELAY		1000
+> >  
+> > +#define FACTOR0				10000000
+> > +#define FACTOR1				15976
+> > +#define FACTOR2				4297157
+> > +
+> >  struct imx_thermal_data {
+> >  	struct thermal_zone_device *tz;
+> >  	struct thermal_cooling_device *cdev;
+> >  	enum thermal_device_mode mode;
+> >  	struct regmap *tempmon;
+> > -	int c1, c2; /* See formula in imx_get_sensor_data() */
+> > +	u32 c1, c2; /* See formula in imx_get_sensor_data() */
+> >  	unsigned long temp_passive;
+> >  	unsigned long temp_critical;
+> >  	unsigned long alarm_temp;
+> > @@ -84,7 +88,7 @@ static void imx_set_alarm_temp(struct imx_thermal_data *data,
+> >  	int alarm_value;
+> >  
+> >  	data->alarm_temp = alarm_temp;
+> > -	alarm_value = (alarm_temp - data->c2) / data->c1;
+> > +	alarm_value = (data->c2 - alarm_temp) / data->c1;
+> >  	regmap_write(map, TEMPSENSE0 + REG_CLR, TEMPSENSE0_ALARM_VALUE_MASK);
+> >  	regmap_write(map, TEMPSENSE0 + REG_SET, alarm_value <<
+> >  			TEMPSENSE0_ALARM_VALUE_SHIFT);
+> > @@ -136,7 +140,7 @@ static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
+> >  	n_meas = (val & TEMPSENSE0_TEMP_CNT_MASK) >> TEMPSENSE0_TEMP_CNT_SHIFT;
+> >  
+> >  	/* See imx_get_sensor_data() for formula derivation */
+> > -	*temp = data->c2 + data->c1 * n_meas;
+> > +	*temp = data->c2 - n_meas * data->c1;
+> >  
+> >  	/* Update alarm value to next higher trip point */
+> >  	if (data->alarm_temp == data->temp_passive && *temp >= data->temp_passive)
+> > @@ -305,6 +309,7 @@ static int imx_get_sensor_data(struct platform_device *pdev)
+> >  	int t1, t2, n1, n2;
+> >  	int ret;
+> >  	u32 val;
+> > +	u64 temp64;
+> >  
+> >  	map = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+> >  					      "fsl,tempmon-data");
+> > @@ -330,6 +335,8 @@ static int imx_get_sensor_data(struct platform_device *pdev)
+> >  	 *   [31:20] - sensor value @ 25C
+> >  	 *    [19:8] - sensor value of hot
+> >  	 *     [7:0] - hot temperature value
+> > +	 * Use universal formula now and only need sensor value @ 25C
+> > +	 * slope = 0.4297157 - (0.0015976 * 25C fuse)
+> >  	 */
+> >  	n1 = val >> 20;
+> >  	n2 = (val & 0xfff00) >> 8;
+> > @@ -337,20 +344,26 @@ static int imx_get_sensor_data(struct platform_device *pdev)
+> >  	t1 = 25; /* t1 always 25C */
+> >  
+> >  	/*
+> > -	 * Derived from linear interpolation,
+> > -	 * Tmeas = T2 + (Nmeas - N2) * (T1 - T2) / (N1 - N2)
+> > +	 * Derived from linear interpolation:
+> > +	 * slope = 0.4297157 - (0.0015976 * 25C fuse)
+> > +	 * slope = (FACTOR2 - FACTOR1 * n1) / FACTOR0
+> > +	 * (Nmeas - n1) / (Tmeas - t1) = slope
+> >  	 * We want to reduce this down to the minimum computation necessary
+> >  	 * for each temperature read.  Also, we want Tmeas in millicelsius
+> >  	 * and we don't want to lose precision from integer division. So...
+> > -	 * milli_Tmeas = 1000 * T2 + 1000 * (Nmeas - N2) * (T1 - T2) / (N1 - N2)
+> > -	 * Let constant c1 = 1000 * (T1 - T2) / (N1 - N2)
+> > -	 * milli_Tmeas = (1000 * T2) + c1 * (Nmeas - N2)
+> > -	 * milli_Tmeas = (1000 * T2) + (c1 * Nmeas) - (c1 * N2)
+> > -	 * Let constant c2 = (1000 * T2) - (c1 * N2)
+> > -	 * milli_Tmeas = c2 + (c1 * Nmeas)
+> > +	 * Tmeas = (Nmeas - n1) / slope + t1
+> > +	 * milli_Tmeas = 1000 * (Nmeas - n1) / slope + 1000 * t1
+> > +	 * milli_Tmeas = -1000 * (n1 - Nmeas) / slope + 1000 * t1
+> > +	 * Let constant c1 = (-1000 / slope)
+> > +	 * milli_Tmeas = (n1 - Nmeas) * c1 + 1000 * t1
+> > +	 * Let constant c2 = n1 *c1 + 1000 * t1
+> > +	 * milli_Tmeas = c2 - Nmeas * c1
+> >  	 */
+> > -	data->c1 = 1000 * (t1 - t2) / (n1 - n2);
+> > -	data->c2 = 1000 * t2 - data->c1 * n2;
+> > +	temp64 = FACTOR0;
+> > +	temp64 *= 1000;
+> > +	do_div(temp64, FACTOR1 * n1 - FACTOR2);
+> > +	data->c1 = temp64;
+> > +	data->c2 = n1 * data->c1 + 1000 * t1;
+> >  
+> >  	/*
+> >  	 * Set the default passive cooling trip point to 20 ?C below the
+> > -- 
+> > 1.7.9.5
+> > 
+> > 
+> 
