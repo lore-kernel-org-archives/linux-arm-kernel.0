@@ -1,45 +1,31 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 27 Feb 2014 12:22:07 +0100
-Subject: [PATCHv4 1/9] ARM: at91: prepare at91sam9rl DT transition
-In-Reply-To: <1393500135-29636-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1393500135-29636-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1393500135-29636-2-git-send-email-alexandre.belloni@free-electrons.com>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Thu, 27 Feb 2014 13:22:29 +0200
+Subject: [PATCHv3 4/5] net: rfkill: gpio: add ACPI ID for GPS module on Lenovo
+ Miix2
+In-Reply-To: <20140227105520.GB17298@xps8300>
+References: <20140227105520.GB17298@xps8300>
+Message-ID: <1393500149-13526-1-git-send-email-heikki.krogerus@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the new names, coming from DT, for the clock lookups.
+On Lenovo Miix 2 8", BCM4752 is renamed LNV4752.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
 ---
- arch/arm/mach-at91/at91sam9rl.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ net/rfkill/rfkill-gpio.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 3651517abedf..d6ee8bb47213 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -196,6 +196,22 @@ static struct clk_lookup periph_clocks_lookups[] = {
- 	CLKDEV_CON_ID("pioB", &pioB_clk),
- 	CLKDEV_CON_ID("pioC", &pioC_clk),
- 	CLKDEV_CON_ID("pioD", &pioD_clk),
-+	/* more lookup table for DT entries */
-+	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
-+	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-+	CLKDEV_CON_DEV_ID("usart", "ffffb400.serial", &usart1_clk),
-+	CLKDEV_CON_DEV_ID("usart", "ffffb800.serial", &usart2_clk),
-+	CLKDEV_CON_DEV_ID("usart", "ffffbc00.serial", &usart3_clk),
-+	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
-+	CLKDEV_CON_DEV_ID("t1_clk", "fffa0000.timer", &tc1_clk),
-+	CLKDEV_CON_DEV_ID("t2_clk", "fffa0000.timer", &tc2_clk),
-+	CLKDEV_CON_DEV_ID("mci_clk", "fffa4000.mmc", &mmc_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffa8000.i2c", &twi0_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffac000.i2c", &twi1_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioA_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioB_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioC_clk),
-+	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioD_clk),
+diff --git a/net/rfkill/rfkill-gpio.c b/net/rfkill/rfkill-gpio.c
+index ad5e354..ec38884 100644
+--- a/net/rfkill/rfkill-gpio.c
++++ b/net/rfkill/rfkill-gpio.c
+@@ -158,6 +158,7 @@ static int rfkill_gpio_remove(struct platform_device *pdev)
+ 
+ static const struct acpi_device_id rfkill_acpi_match[] = {
+ 	{ "BCM4752", RFKILL_TYPE_GPS },
++	{ "LNV4752", RFKILL_TYPE_GPS },
+ 	{ },
  };
  
- static struct clk_lookup usart_clocks_lookups[] = {
 -- 
-1.8.3.2
+1.9.0
