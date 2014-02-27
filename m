@@ -1,122 +1,68 @@
 From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
-Date: Thu, 27 Feb 2014 16:24:26 +0100
-Subject: [PATCH v0 13/15] ARM: STi: DT: STiH416: 416 DT Entry for clockgen
- A9/DDR/GPU
-In-Reply-To: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
-References: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1393514668-17440-14-git-send-email-gabriel.fernandez@st.com>
+Date: Thu, 27 Feb 2014 16:24:13 +0100
+Subject: [PATCH v0 00/15] clk: st: Add new driver
+Message-ID: <1393514668-17440-1-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch adds DT entries for clockgen A9/DDR/GPU
+The goal of this series is to add Clocks support to ST SoCs.
+The DT definition is added for STiH415 and STiH416 SoCs on
+B2000 and B2020 boards.
 
-Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
----
- arch/arm/boot/dts/stih416-clock.dtsi | 79 ++++++++++++++++++++++++++++++++----
- 1 file changed, 70 insertions(+), 9 deletions(-)
+The series has been tested working on STiH416-B2020 board.
+It applies on top of v3.14-rc3.
 
-diff --git a/arch/arm/boot/dts/stih416-clock.dtsi b/arch/arm/boot/dts/stih416-clock.dtsi
-index 6b2e387..5ff0e6f 100644
---- a/arch/arm/boot/dts/stih416-clock.dtsi
-+++ b/arch/arm/boot/dts/stih416-clock.dtsi
-@@ -26,15 +26,6 @@
- 		};
- 
- 		/*
--		 * ARM Peripheral clock for timers
--		 */
--		arm_periph_clk: arm_periph_clk {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <600000000>;
--		};
--
--		/*
- 		 * ClockGenAs on SASG2
- 		 */
- 		clockgenA at fee62000 {
-@@ -503,6 +494,44 @@
- 						/* Remaining outputs unused */
- 			};
- 		};
-+
-+		/*
-+		 * A9 PLL.
-+		 *
-+		 */
-+		clockgenA9 {
-+			reg = <0xfdde08b0 0x70>;
-+
-+			CLOCKGEN_A9_PLL: CLOCKGEN_A9_PLL {
-+				#clock-cells = <1>;
-+				compatible = "st,stih416-plls-c32-a9", "st,clkgen-plls-c32";
-+
-+				clocks = <&CLK_SYSIN>;
-+				clock-output-names = "CLOCKGEN_A9_PLL_ODF";
-+			};
-+		};
-+
-+		/*
-+		 * ARM CPU related clocks.
-+		 */
-+		CLK_M_A9: CLK_M_A9 {
-+			#clock-cells = <0>;
-+			compatible = "st,stih416-clkgen-a9-mux", "st,clkgen-mux";
-+			reg = <0xfdde08ac 0x4>;
-+			clocks = <&CLOCKGEN_A9_PLL 0>, <&CLOCKGEN_A9_PLL 0>, <&CLK_M_A0_DIV1 2>, <&CLK_M_A9_EXT2F_DIV2>;
-+		};
-+
-+		/*
-+		 * ARM Peripheral clock for timers
-+		 */
-+		arm_periph_clk: CLK_M_A9_PERIPHS {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clocks = <&CLK_M_A9>;
-+			clock-div = <2>;
-+			clock-mult = <1>;
-+		};
-+
-                 /*
-                  * Frequency synthesizers on the SASG2.
-                  *
-@@ -673,5 +702,37 @@
-                                 "CLK_M_XFER_AUX_COMPO", "CLK_M_VSENS",
-                                 "CLK_M_PIX_HDMIRX_0",   "CLK_M_PIX_HDMIRX_1";
-                 };
-+
-+		/*
-+		 * DDR PLL.
-+		 *
-+		 */
-+		clockgenDDR {
-+			reg = <0xfdde07d8 0x110>;
-+
-+			CLOCKGEN_DDR_PLL: CLOCKGEN_DDR_PLL {
-+				#clock-cells = <1>;
-+				compatible = "st,stih416-plls-c32-ddr", "st,clkgen-plls-c32";
-+
-+				clocks = <&CLK_SYSIN>;
-+				clock-output-names = "CLOCKGEN_DDR0", "CLOCKGEN_DDR1";
-+			};
-+		};
-+
-+		/*
-+		 * GPU PLL.
-+		 *
-+		 */
-+		clockgenGPU {
-+			reg = <0xfd68ff00 0x910>;
-+
-+			CLOCKGEN_GPU_PLL: CLOCKGEN_GPU_PLL {
-+				#clock-cells = <1>;
-+				compatible = "st,stih416-gpu-pll-c32", "st,clkgengpu-pll-c32";
-+
-+				clocks = <&CLK_SYSIN>;
-+				clock-output-names = "CLOCKGEN_GPU_PLL";
-+			};
-+		};
- 	};
- };
+Gabriel Fernandez (15):
+  drivers: clk: st: Support for DIVMUX and PreDiv Clocks
+  drivers: clk: st: Support for PLLs inside ClockGenA(s)
+  drivers: clk: st: Support for VCC-mux and MUX clocks
+  drivers: clk: st: Support for QUADFS inside ClockGenB/C/D/E/F
+  drivers: clk: st: Support for ClockGenA9/DDR/GPU
+  drivers: clk: st: Support for A9 MUX clocks
+  clk: st: Adds divmux and prediv clock binding
+  clk: st: Adds clockgen clock binding
+  clk: st: Adds clockgen-vcc and clockgen-mux clock binding
+  clk: st: Adds quadfs clock binding
+  ARM: STi: DT: STiH416: 416 DT Entry for clockgen A0/1/10/11/12
+  ARM: STi: DT: STiH416: 416 DT Entry for clockgen B/C/D/E/F
+  ARM: STi: DT: STiH416: 416 DT Entry for clockgen A9/DDR/GPU
+  ARM: STi: DT: STiH415: 415 DT Entry for clockgen A0/1/10/11/12
+  ARM: STi: DT: STiH415: 415 DT Entry for clockgen A9
+
+ .../bindings/clock/st/st,clkgen-divmux.txt         |   49 +
+ .../devicetree/bindings/clock/st/st,clkgen-mux.txt |   36 +
+ .../devicetree/bindings/clock/st/st,clkgen-pll.txt |   48 +
+ .../bindings/clock/st/st,clkgen-prediv.txt         |   36 +
+ .../devicetree/bindings/clock/st/st,clkgen-vcc.txt |   53 +
+ .../devicetree/bindings/clock/st/st,clkgen.txt     |   83 ++
+ .../devicetree/bindings/clock/st/st,quadfs.txt     |   45 +
+ arch/arm/boot/dts/stih415-clks.h                   |   11 +
+ arch/arm/boot/dts/stih415-clock.dtsi               |  530 +++++++++-
+ arch/arm/boot/dts/stih415.dtsi                     |    6 +-
+ arch/arm/boot/dts/stih416-clks.h                   |   11 +
+ arch/arm/boot/dts/stih416-clock.dtsi               |  717 +++++++++++++-
+ arch/arm/boot/dts/stih416.dtsi                     |    6 +-
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/st/Makefile                            |    1 +
+ drivers/clk/st/clkgen-fsyn.c                       | 1039 ++++++++++++++++++++
+ drivers/clk/st/clkgen-mux.c                        |  820 +++++++++++++++
+ drivers/clk/st/clkgen-pll.c                        |  698 +++++++++++++
+ drivers/clk/st/clkgen.h                            |   48 +
+ 19 files changed, 4214 insertions(+), 24 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-divmux.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-mux.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-prediv.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-vcc.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/st/st,quadfs.txt
+ create mode 100644 arch/arm/boot/dts/stih415-clks.h
+ create mode 100644 arch/arm/boot/dts/stih416-clks.h
+ create mode 100644 drivers/clk/st/Makefile
+ create mode 100644 drivers/clk/st/clkgen-fsyn.c
+ create mode 100644 drivers/clk/st/clkgen-mux.c
+ create mode 100644 drivers/clk/st/clkgen-pll.c
+ create mode 100644 drivers/clk/st/clkgen.h
+
 -- 
 1.9.0
