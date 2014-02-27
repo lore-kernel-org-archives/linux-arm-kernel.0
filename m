@@ -1,28 +1,23 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 27 Feb 2014 08:34:38 +0000
-Subject: [PATCH v4 3/8] mfd: pm8921: Migrate to irqdomains
-In-Reply-To: <1393441166-32692-4-git-send-email-sboyd@codeaurora.org>
+Date: Thu, 27 Feb 2014 08:35:01 +0000
+Subject: [PATCH v4 4/8] mfd: ssbi: Add regmap read/write helpers
+In-Reply-To: <1393441166-32692-5-git-send-email-sboyd@codeaurora.org>
 References: <1393441166-32692-1-git-send-email-sboyd@codeaurora.org>
- <1393441166-32692-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140227083438.GW9195@lee--X1>
+ <1393441166-32692-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140227083501.GX9195@lee--X1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 26 Feb 2014, Stephen Boyd wrote:
 
-> Convert this driver to use irqdomains so that the PMIC's child
-> devices can be converted to devicetree.
+> Add read and write helper functions that the pm8921-core driver
+> can use to read and write ssbi registers via a "no-bus" regmap.
 > 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
+> Cc: Mark Brown <broonie@kernel.org>
 > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  drivers/mfd/Kconfig               |   1 +
->  drivers/mfd/pm8921-core.c         | 198 +++++++++++++++-----------------------
->  include/linux/mfd/pm8xxx/irq.h    |  36 -------
->  include/linux/mfd/pm8xxx/pm8921.h |  30 ------
->  4 files changed, 76 insertions(+), 189 deletions(-)
->  delete mode 100644 include/linux/mfd/pm8xxx/irq.h
->  delete mode 100644 include/linux/mfd/pm8xxx/pm8921.h
+>  include/linux/ssbi.h | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
 
 Applied, thanks.
 
