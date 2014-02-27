@@ -1,157 +1,162 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 27 Feb 2014 08:42:53 -0600
-Subject: [RFC PATCH 1/6] PM / Voltagedomain: Add generic clk notifier
- handler for regulator based dynamic voltage scaling
-In-Reply-To: <20140227050043.12081.54173@quantum>
-References: <1392755543-28335-1-git-send-email-nm@ti.com>
- <1392755543-28335-2-git-send-email-nm@ti.com>
- <20140225055142.22529.21814@quantum> <530D0394.4020208@ti.com>
- <20140227023455.GA15712@kahuna> <20140227050043.12081.54173@quantum>
-Message-ID: <530F4EED.9050207@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 27 Feb 2014 15:47:45 +0100
+Subject: [PATCH] ARM: i.MX6: clk: Remove usbphy clock hacks
+In-Reply-To: <20140227120616.GA27749@shlinux1.ap.freescale.net>
+References: <1393489138-24406-1-git-send-email-s.hauer@pengutronix.de>
+ <20140227120616.GA27749@shlinux1.ap.freescale.net>
+Message-ID: <20140227144744.GN17250@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2014 11:00 PM, Mike Turquette wrote:
-> Quoting Nishanth Menon (2014-02-26 18:34:55)
->> +/**
->> + * pm_runtime_get_rate() - Returns the device operational frequency
->> + * @dev:       Device to handle
->> + * @rate:      Returns rate in Hz.
->> + *
->> + * Returns appropriate error value in case of error conditions, else
->> + * returns 0 and rate is updated. The pm_domain logic does all the necessary
->> + * operation (which may consider magic hardware stuff) to provide the rate.
->> + *
->> + * NOTE: the rate returned is a snapshot and in many cases just a bypass
->> + * to clk api to set the rate.
->> + */
->> +int pm_runtime_get_rate(struct device *dev, unsigned long *rate)
+On Thu, Feb 27, 2014 at 08:06:18PM +0800, Peter Chen wrote:
+> On Thu, Feb 27, 2014 at 09:18:58AM +0100, Sascha Hauer wrote:
+> > Recently the chipidea got broken on i.MX6 when the phy_mode property
+> > is given in the devicetree. Since this commit:
+> > 
+> > | commit cd0b42c2a6d2a74244f0053f8960f5dad5842278
+> > | Author: Chris Ruehl <chris.ruehl@gtsys.com.hk>
+> > | Date:   Fri Jan 10 13:51:30 2014 +0800
+> > |
+> > |     usb: chipidea: put hw_phymode_configure before ci_usb_phy_init
+> > |
+> > |     hw_phymode_configure configures the PORTSC registers and allow the
+> > |     following phy_inits to operate on the right parameters. This fix a problem
+> > |     where the UPLI (ISP1504) could not be detected, because the Viewport was not
+> > |     available and read the viewport return 0's only.
+> > |
+> > |     Signed-off-by: Chris Ruehl <chris.ruehl@gtsys.com.hk>
+> > |     Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > |     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > 
+> > the portsc register is configured before the phy clock is enabled. The CPU
+> > immediately hangs once the portsc register is written to with disabled phy
+> > clocks.
+> > 
+> > The following patch added a hack to the i.MX6 clock support. Its purpose
+> > was to keep the usbphy clock gates enabled:
+> > 
+> > | commit a5120e89e7e187a91852896f586876c7a2030804
+> > | Author: Peter Chen <peter.chen@freescale.com>
+> > | Date:   Fri Jan 18 10:38:05 2013 +0800
+> > |
+> > |     ARM i.MX6: change mxs usbphy clock usage
+> > |
+> > |     This mxs usbphy is only needs to be on after system boots
+> > |     up, and software never needs to control it anymore.
+> > |     Meanwhile, usbphy's parent needs to be notified if usb
+> > |     is suspend or not. So we design below mxs usbphy usage:
+> > |
+> > |     - usbphy1_gate and usbphy2_gate:
+> > |     Their parents are dummy clock, we only needs to enable
+> > |     it after system boots up.
+> > |     - usbphy1 and usbphy2
+> > |     Usage reserved bit for this clock, in that case, the refcount
+> > |     will be updated, but without hardware changing.
+> > |
+> > |     Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > |     Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > 
+> > Now this patch indeed keeps the gates enabled, but it doesn't keep the parents
+> > enabled, so the whole patch becomes a no-op once the parents get disabled. This
+> > nowadays happens with more aggressive clock disabling for example in the UART
+> > driver (which uses the same PLL as usbphy1).
+> > 
+> > This patch reverts the reserved register bit hackery and instead enables
+> > the usbphy clocks when support for the mxsphy is enabled.
 > 
-> Instead of "rate", how about we use "level" and leave it undefined as to
-> what that means? It would be equally valid for level to represent a
-> clock rate, or an opp from a table of opp's, or a p-state, or some value
-> passed to a PM microcontroller.
+> It will cause pll3 is still on when no user has used it.
+> 
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> > 
+> > The above are my current state of observations. I think I still haven't fully
+> > understood the purpose of the clock hacks introduced with a5120e89e7e187.
+> 
+> usbphy1/usbphy2 are used to mark usbphy as pll3/pll7's child, once the
+> usbphy is enabled, the pll should be enabled, if no other user for pll3,
+> the pll3 should still be on since the usbphy is using.
+> 
+> usbphy1_gate/usbphy2_gate are used to control usb gate for pll, due to
+> special requirement from IC guys, these two bits are needed to open
+> before any usb operations, and there two bits are never needed to change
+> on the fly.
 
-IMHO, from a driver which already exists for multiple SoCs/
-architectures, we cannot have variant definitions that a generic
-driver will be unable to depend upon. what should such a driver
-expect? level == rate OR level == index to p-state or magic PM
-controller value?
-
-Today the definitions are very clear to such a driver, pm_runtime APIs
-are used for device specific idle management, but for active
-management, use clk and regulator code as needed - ofcourse, that
-machine specificity triggers the need for the 50 odd cpufreq drivers
-we have today - intent was to be able to abstract it enough for a
-generic logic to exist.
+Can you explain why the gates have to be turned on when the parent PLL
+is disabled?
 
 > 
-> Code that is tightly coupled to the hardware would simply know what
-> value to use with no extra sugar.
-
-agreed on the machine specific implementation, but the logic at driver
-level will then get tied down to machine specific implementation as well
-
+> The reason why we meet such issue?
+> For internal phy(like UTMI), the phy clock is from internal pll,
+> it is on/off on the fly, the access PORTSC.PTS will hang without
+> phy clock. So, usb_phy_init needs to be called before
+> hw_phymode_configure.
 > 
-> Generic code would need to get the various supported "levels" populated
-> at run time, but a DT binding could do that, or a query to the ACPI
-> tables, or whatever.
-
-then we'd also have to introduce a translator API for drivers that
-need frequency -> we go back to the old world of having specific
-functions depending on usage in the frequency world, ACPI world, PM
-controller world.
-
-That completely breaks the concept of having a higher level function,
-right?
-
+> For external PHY (like ulpi), the phy clock is from board, access
+> PORTSC.PTS may not need clock or we need to enhance ulpi driver to
+> support open and close external phy on the fly. It needs to config
+> PORTSC.PTS prior to visit view-port which is needed at its phy_init.
+> So, hw_phymode_configure is needed to be called before usb_phy_init.
 > 
->> +{
->> +       unsigned long flags;
->> +       int error = -ENOSYS;
->> +
->> +       if (!rate || !dev)
->> +               return -EINVAL;
->> +
->> +       spin_lock_irqsave(&dev->power.lock, flags);
->> +       if (!pm_runtime_active(dev)) {
->> +               error = -EINVAL;
->> +               goto out;
->> +       }
->> +
->> +       if (dev->pm_domain && dev->pm_domain->active_ops.get_rate)
->> +               error = dev->pm_domain->active_ops.get_rate(dev, rate);
->> +out:
->> +       spin_unlock_irqrestore(&dev->power.lock, flags);
->> +
->> +       return error;
->> +}
->> +
->> +/**
->> + * pm_runtime_set_rate() - Set a specific rate for the device operation
->> + * @dev:       Device to handle
->> + * @rate:      Rate to set in Hz
->> + *
->> + * Returns appropriate error value in case of error conditions, else
->> + * returns 0. The pm_domain logic does all the necessary operation (which
->> + * may include voltage scale operations or other magic hardware stuff) to
->> + * achieve the operation. It is guarenteed that the requested rate is achieved
->> + * on returning from this function if return value is 0.
->> + */
->> +int pm_runtime_set_rate(struct device *dev, unsigned long rate)
-> 
-> Additionally I wonder if the function signature should include a way to
-> specify the sub-unit of a device that we are operating on? This is a way
-> to tackle the issues you raised regarding multiple clocks per device,
-> etc. Two approaches come to mind:
-> 
-> int pm_runtime_set_rate(struct device *dev, int index,
-> 				unsigned long rate);
-> 
-> Where index is a sub-unit of struct device *dev.
 
-Here the problem is trying to define what that index is. should it be
-clk index? how again would a generic driver be able to consistently
-function? lets, for a moment replace that with a string - "clk_name"
-to uniquely identify the clk -> but then, it still, in concept makes
-it no better than a clk_set_rate since we are uniquely identifying the
-clk to operate upon -> and we can definitely add "magic dvfs" stuff on
-existing clock framework without a need for additional wrappers (which
-what the original $subject series does).
+[...]
 
+> -static void hw_phymode_configure(struct ci_hdrc *ci)
+> +static int ci_usb_phy_init(struct ci_hdrc *ci)
+>  {
+>  	u32 portsc, lpm, sts = 0;
+> +	int ret = -ENODEV;
+>  
+>  	switch (ci->platdata->phy_mode) {
+>  	case USBPHY_INTERFACE_MODE_UTMI:
+> +		ret = usb_phy_init(ci->transceiver);
+> +		if (ret)
+> +			return ret;
+>  		portsc = PORTSC_PTS(PTS_UTMI);
+>  		lpm = DEVLC_PTS(PTS_UTMI);
+>  		break;
+>  	case USBPHY_INTERFACE_MODE_UTMIW:
+> +		ret = usb_phy_init(ci->transceiver);
+> +		if (ret)
+> +			return ret;
+>  		portsc = PORTSC_PTS(PTS_UTMI) | PORTSC_PTW;
+>  		lpm = DEVLC_PTS(PTS_UTMI) | DEVLC_PTW;
+>  		break;
+>  	case USBPHY_INTERFACE_MODE_ULPI:
+>  		portsc = PORTSC_PTS(PTS_ULPI);
+>  		lpm = DEVLC_PTS(PTS_ULPI);
+> +		ret = usb_phy_init(ci->transceiver);
+> +		if (ret)
+> +			return ret;
+>  		break;
+>  	case USBPHY_INTERFACE_MODE_SERIAL:
+>  		portsc = PORTSC_PTS(PTS_SERIAL);
+>  		lpm = DEVLC_PTS(PTS_SERIAL);
+>  		sts = 1;
+> +		ret = usb_phy_init(ci->transceiver);
+> +		if (ret)
+> +			return ret;
+>  		break;
+>  	case USBPHY_INTERFACE_MODE_HSIC:
+> +		ret = usb_phy_init(ci->transceiver);
+> +		if (ret)
+> +			return ret;
+>  		portsc = PORTSC_PTS(PTS_HSIC);
+>  		lpm = DEVLC_PTS(PTS_HSIC);
 
->The second approach is
-> to create a publicly declared structure representing the sub-unit. Some
-> variations on that theme:
-> 
-> int pm_runtime_set_rate(struct perf_domain *perfdm, unsigned long rate);
-> 
-> or,
-> 
-> int pm_runtime_set_rate(struct generic_power_domain *gpd,
-> 				unsigned long rate);
-> 
-> or whatever that sub-unit looks like. The gpd thing might be a total
-> layering violation, I don't know. Or perhaps it's a decent idea but it
-> shouldn't be as a PM runtime call. Again, I dunno.
+It seems you try to adjust the order in which PORTSC is configured and
+the phy is initialized. Instead of ordering the phy setup and register
+writes you just reorder some variable initializations.
 
-Again, we goes back to the same question, right? which clock in a
-power_domain/perf_domain are we intending with the rate? a device
-belongs to a perf domain -> Taking drivers/cpufreq/imx6q-cpufreq.c as
-an example.
-Clocks needed: arm_clk, pll1_sys_clk, pll1_sw_clk, step_clk,
-pll2_pfd2_396m_clk.
-regulators needed: arm_reg, pu_reg, soc_reg.
+We discussed this back and forth here and think that the phy clock
+should be enabled/disabled via runtime pm ops as needed by the chipidea
+driver. Hacking the init order depending on the phy type like you did above
+doesn't sound like a good plan.
 
-The device we want to set a frequency is the ARM processor. by
-describing "perf_domain" or "generic power domain" as a single clock
-entity, we might as well use clk_set_rate instead to be specific,
-instead of writing one wrapper on top of the entire thing.
-
-
-I apologize, more I think in this angle, less I think such a generic
-api seems feasible.
+Sascha
 
 -- 
-Regards,
-Nishanth Menon
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
