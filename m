@@ -1,51 +1,81 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 27 Feb 2014 16:25:50 -0500 (EST)
-Subject: [PATCH V2 1/8] PM / Runtime: Fetch runtime PM callbacks using
- a macro
-In-Reply-To: <CAPDyKFq4X3G1zZay0XG2g-djEvyRdf9s47GDSC5htXZ7c-LdRQ@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1402271621430.888-100000@iolanthe.rowland.org>
+From: graeme@xora.org.uk (Graeme Gregory)
+Date: Thu, 27 Feb 2014 21:02:27 +0000
+Subject: [PATCH V2 1/3] dt: palmas: support IRQ inversion at the board
+ level
+In-Reply-To: <1393534281-30759-1-git-send-email-swarren@wwwdotorg.org>
+References: <1393534281-30759-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20140227210227.GE2931@xora-haswell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Feb 2014, Ulf Hansson wrote:
-
-> On 27 February 2014 17:22, Alan Stern <stern@rowland.harvard.edu> wrote:
-> > On Thu, 27 Feb 2014, Ulf Hansson wrote:
-> >
-> >> > A reasonable compromise would be to define the macro, and then use it
-> >> > in those three new functions (and nowhere else).
-> >>
-> >> Okay, let me send a v3 that tries this approach then.
-> >>
-> >> >
-> >> > The existing rpm_idle, rpm_suspend, and rpm_resume routines should then
-> >> > be changed to use the new functions.  And of course, the new functions
-> >> > could be called directly by subsystems or PM domains.
-> >>
-> >> Not sure we should export these functions as a part of this patchset.
-> >> Would it not be preferred, to first see if there are any that needs
-> >> it?
-> >
-> > I don't understand.  V2 of the patchset exports
-> > pm_runtime_force_suspend and pm_runtime_force_resume.  Why wouldn't you
-> > want to export them in V3?
+On Thu, Feb 27, 2014 at 01:51:19PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> There are some confusion here. :-)  pm_runtime_force_suspend|resume()
-> surely need to be exported, but that's "patch v2 2/8".
+> Some boards or SoCs have an inverter between the PMIC IRQ output pin and
+> the IRQ controller input signal.
 > 
-> I think we were debating whether this patch "patch v2 1/8" should use
-> a macro to walk the ladder to fetch the runtime PM callback - or if we
-> should implement a three c-functions to handle it. I prefer to keep
-> this patch as is, thus using the macro.
+> The IRQ specifier in DT is meant to represent the IRQ flags at the input
+> to the IRQ controller.
+> 
+> The Palmas HW's IRQ output has configurable polarity. Software needs to
+> know which polarity to choose for the IRQ output. Software may be tempted
+> to extract the IRQ polarity from the IRQ specifier in order to make this
+> choice.
+> 
+> That approach works fine if the IRQ signal is routed directly from the
+> PMIC to the IRQ controller with no intervening logic. However, if the
+> signal is inverted between the two, this approach gets the wrong answer.
+> 
+> Add an additional optional DT property which indicates that such an
+> inversion occurs. This allows DT to give complete information about the
+> desired IRQ output polarity to software.
+> 
+> An alternative would have been to add a new non-optional DT parameter to
+> indicate the exact desired output polarity. However, this would have been
+> an incompatible change to the DT binding.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Acked-by: Laxman Dewangan <ldewangan@nvidia.com>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> ---
+> v2: Split V1's patch 1/2 into separate patches 1/3 and 2/3.
+> ---
+>  Documentation/devicetree/bindings/mfd/palmas.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/palmas.txt b/Documentation/devicetree/bindings/mfd/palmas.txt
+> index e5f0f8303461..76ec509d5f87 100644
+> --- a/Documentation/devicetree/bindings/mfd/palmas.txt
+> +++ b/Documentation/devicetree/bindings/mfd/palmas.txt
+> @@ -18,6 +18,12 @@ Required properties:
+>    ti,tps659038
+>  and also the generic series names
+>    ti,palmas
+> +- interrupts : Should contain a single entry for the IRQ output.
+> +- ti,irq-externally-inverted : If missing, the polarity of the Palmas IRQ
+> +  output should be set to the opposite of the polarity indicated by the IRQ
+> +  specifier in the interrupts property. If absent, the polarity should be
+> +  configured to match. This allows the representation of an inverter between
+> +  the Palmas IRQ output and the interrupt parent's IRQ input.
 
-But you're going to expand the macro (say, the version that handles
-runtime_resume callbacks) in two places: rpm_resume and
-pm_runtime_force_resume.  That's inefficient.  The macro generates
-fairly complicated code, and so it should be expanded in only one
-place: a single new function.  The new function can be called by both
-rpm_resume and pm_runtime_force_resume.
+This has got to be the wrong way to do things, all this leads to is every
+device doing this property in its own way and having totally inconsistent
+properties all meaning the same thing.
 
-In fact, from comparing those two routines, it looks like the new
-function could include a little more than just the macro expansion.
+If there is some other hardware inverting lines then there should be
+a generic binding for this in DT. This is not describing the palmas hardware
+but some external object to the palmas.
 
-Alan Stern
+Graeme
+
+>  - interrupt-controller : palmas has its own internal IRQs
+>  - #interrupt-cells : should be set to 2 for IRQ number and flags
+>    The first cell is the IRQ number.
+> -- 
+> 1.8.1.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
