@@ -1,71 +1,42 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 27 Feb 2014 23:18:19 +0100
-Subject: [PATCH v3 3/3] ARM hibernation / suspend-to-disk
-In-Reply-To: <1393372920-3896-4-git-send-email-sebastian.capella@linaro.org>
-References: <1393372920-3896-1-git-send-email-sebastian.capella@linaro.org>
- <1393372920-3896-4-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <20140227221819.GA6910@amd.pavel.ucw.cz>
+From: markus.mayer@linaro.org (Markus Mayer)
+Date: Thu, 27 Feb 2014 14:20:17 -0800
+Subject: [PATCH] gpio: only enable kona driver on BCM_MOBILE or for
+ compile testing
+In-Reply-To: <1392990146-18916-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1392990146-18916-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CAPdLdqkq06AuLr8a8x9aY8BmHHbcNsL5tmQrH4j8bEom_HS-kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-On Tue 2014-02-25 16:02:00, Sebastian Capella wrote:
-> From: Russ Dill <Russ.Dill@ti.com>
-> 
-> Enable hibernation for ARM architectures and provide ARM
-> architecture specific calls used during hibernation.
-> 
-> The swsusp hibernation framework depends on the
-> platform first having functional suspend/resume.
-> 
-> Then, in order to enable hibernation on a given platform, a
-> platform_hibernation_ops structure may need to be registered with
-> the system in order to save/restore any SoC-specific / cpu specific
-> state needing (re)init over a suspend-to-disk/resume-from-disk cycle.
-> 
-> For example:
-> 
->      - "secure" SoCs that have different sets of control registers
->        and/or different CR reg access patterns.
-> 
->      - SoCs with L2 caches as the activation sequence there is
->        SoC-dependent; a full off-on cycle for L2 is not done
->        by the hibernation support code.
-> 
->      - SoCs requiring steps on wakeup _before_ the "generic" parts
->        done by cpu_suspend / cpu_resume can work correctly.
-> 
->      - SoCs having persistent state which is maintained during suspend
->        and resume, but will be lost during the power off cycle after
->        suspend-to-disk.
-> 
-> This is a rebase/rework of Frank Hofmann's v5 hibernation patchset.
-> 
+On 21 February 2014 05:42, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello,
+>
+> I'm not sure if and how "Kona" fits into the bcm281xx namespace, but
+> reading through the commit logs of the changes touching
+> drivers/gpio/gpio-bcm-kona.c so far suggests it does. In this case I'd
+> consider it a good idea to mention "bcm281xx" in the help text of
+> GPIO_BCM_KONA.
 
-> +/*
-> + * Snapshot kernel memory and reset the system.
-> + * soft_restart is not technically needed, but is used
-> + * to get success returned from cpu_suspend.
-> + * After resume, the hibernation snapshot is written out.
-> + */
-> +static int notrace __swsusp_arch_save_image(unsigned long unused)
-> +{
-> +	int ret;
-> +
-> +	ret = swsusp_save();
-> +	if (ret == 0)
-> +		soft_restart(virt_to_phys(cpu_resume));
-> +	return ret;
-> +}
+Naming these components has been quite a challenge for our upstreaming
+effort. Some things are not very obvious unless you know he chip or
+were involved in those discussions.
 
-This is static, so maybe arch_save_image() is better name?
+"Kona" can be thought of as an architecture or a family of chips.
+bcm281xx is one member of that family. There are others. I submitted
+bcm21664 to arm-linux just a few minutes ago. bcm21664 also uses
+gpio-bcm-kona.c.
 
-> +static u8 __swsusp_resume_stk[PAGE_SIZE/2] __nosavedata;
+Mentioning the SoCs in the help text is a good idea, but we'll likely
+have to come up with a central location where all supported members of
+the Kona family are listed, so they aren't scattered all over
+different sub-systems (Kona watchdog, Kona GPIO, Kona timer, etc.) If
+we don't have a central location, we'll be certain to forget updating
+one of the help texts eventually, and it would become inconsistent.
 
-resume_stack?
+Regards,
+-Markus
 
-Thanks,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Markus Mayer
+Broadcom Landing Team
