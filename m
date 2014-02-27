@@ -1,32 +1,71 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 27 Feb 2014 14:14:58 -0800
-Subject: [PATCH 3/3] ARM: config: Update msm_defconfig
-In-Reply-To: <1393467394-10907-4-git-send-email-sboyd@codeaurora.org>
-References: <1393467394-10907-1-git-send-email-sboyd@codeaurora.org>
- <1393467394-10907-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140227221458.GA5334@codeaurora.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 27 Feb 2014 23:18:19 +0100
+Subject: [PATCH v3 3/3] ARM hibernation / suspend-to-disk
+In-Reply-To: <1393372920-3896-4-git-send-email-sebastian.capella@linaro.org>
+References: <1393372920-3896-1-git-send-email-sebastian.capella@linaro.org>
+ <1393372920-3896-4-git-send-email-sebastian.capella@linaro.org>
+Message-ID: <20140227221819.GA6910@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 06:16:34PM -0800, Stephen Boyd wrote:
->Now that DT based platforms are split out of mach-msm into
->mach-qcom, put back a non-DT based SoC into the msm_defconfig and
->stop selecting unsupported drivers.
->
->Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->---
-> arch/arm/configs/msm_defconfig | 25 +++----------------------
-> 1 file changed, 3 insertions(+), 22 deletions(-)
+Hi!
+On Tue 2014-02-25 16:02:00, Sebastian Capella wrote:
+> From: Russ Dill <Russ.Dill@ti.com>
+> 
+> Enable hibernation for ARM architectures and provide ARM
+> architecture specific calls used during hibernation.
+> 
+> The swsusp hibernation framework depends on the
+> platform first having functional suspend/resume.
+> 
+> Then, in order to enable hibernation on a given platform, a
+> platform_hibernation_ops structure may need to be registered with
+> the system in order to save/restore any SoC-specific / cpu specific
+> state needing (re)init over a suspend-to-disk/resume-from-disk cycle.
+> 
+> For example:
+> 
+>      - "secure" SoCs that have different sets of control registers
+>        and/or different CR reg access patterns.
+> 
+>      - SoCs with L2 caches as the activation sequence there is
+>        SoC-dependent; a full off-on cycle for L2 is not done
+>        by the hibernation support code.
+> 
+>      - SoCs requiring steps on wakeup _before_ the "generic" parts
+>        done by cpu_suspend / cpu_resume can work correctly.
+> 
+>      - SoCs having persistent state which is maintained during suspend
+>        and resume, but will be lost during the power off cycle after
+>        suspend-to-disk.
+> 
+> This is a rebase/rework of Frank Hofmann's v5 hibernation patchset.
+> 
 
-Acked-by: David Brown <davidb@codeaurora.org>
+> +/*
+> + * Snapshot kernel memory and reset the system.
+> + * soft_restart is not technically needed, but is used
+> + * to get success returned from cpu_suspend.
+> + * After resume, the hibernation snapshot is written out.
+> + */
+> +static int notrace __swsusp_arch_save_image(unsigned long unused)
+> +{
+> +	int ret;
+> +
+> +	ret = swsusp_save();
+> +	if (ret == 0)
+> +		soft_restart(virt_to_phys(cpu_resume));
+> +	return ret;
+> +}
 
-Kumar, can you just pull this in with the other qcom changes from
-Sephen?
+This is static, so maybe arch_save_image() is better name?
+
+> +static u8 __swsusp_resume_stk[PAGE_SIZE/2] __nosavedata;
+
+resume_stack?
 
 Thanks,
-David
-
+									Pavel
 -- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
