@@ -1,162 +1,226 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 27 Feb 2014 15:47:45 +0100
-Subject: [PATCH] ARM: i.MX6: clk: Remove usbphy clock hacks
-In-Reply-To: <20140227120616.GA27749@shlinux1.ap.freescale.net>
-References: <1393489138-24406-1-git-send-email-s.hauer@pengutronix.de>
- <20140227120616.GA27749@shlinux1.ap.freescale.net>
-Message-ID: <20140227144744.GN17250@pengutronix.de>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 27 Feb 2014 16:01:44 +0100
+Subject: [PATCH v2] dt: platform driver: Fill the resources before probe
+ and defer if needed
+In-Reply-To: <1392988720-20976-1-git-send-email-jjhiblot@traphandler.com>
+References: <20140220153042.DF053C4050F@trevor.secretlab.ca>
+ <1392988720-20976-1-git-send-email-jjhiblot@traphandler.com>
+Message-ID: <20140227150144.GA11192@ldesroches-Latitude-E6320>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 08:06:18PM +0800, Peter Chen wrote:
-> On Thu, Feb 27, 2014 at 09:18:58AM +0100, Sascha Hauer wrote:
-> > Recently the chipidea got broken on i.MX6 when the phy_mode property
-> > is given in the devicetree. Since this commit:
-> > 
-> > | commit cd0b42c2a6d2a74244f0053f8960f5dad5842278
-> > | Author: Chris Ruehl <chris.ruehl@gtsys.com.hk>
-> > | Date:   Fri Jan 10 13:51:30 2014 +0800
-> > |
-> > |     usb: chipidea: put hw_phymode_configure before ci_usb_phy_init
-> > |
-> > |     hw_phymode_configure configures the PORTSC registers and allow the
-> > |     following phy_inits to operate on the right parameters. This fix a problem
-> > |     where the UPLI (ISP1504) could not be detected, because the Viewport was not
-> > |     available and read the viewport return 0's only.
-> > |
-> > |     Signed-off-by: Chris Ruehl <chris.ruehl@gtsys.com.hk>
-> > |     Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > |     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > 
-> > the portsc register is configured before the phy clock is enabled. The CPU
-> > immediately hangs once the portsc register is written to with disabled phy
-> > clocks.
-> > 
-> > The following patch added a hack to the i.MX6 clock support. Its purpose
-> > was to keep the usbphy clock gates enabled:
-> > 
-> > | commit a5120e89e7e187a91852896f586876c7a2030804
-> > | Author: Peter Chen <peter.chen@freescale.com>
-> > | Date:   Fri Jan 18 10:38:05 2013 +0800
-> > |
-> > |     ARM i.MX6: change mxs usbphy clock usage
-> > |
-> > |     This mxs usbphy is only needs to be on after system boots
-> > |     up, and software never needs to control it anymore.
-> > |     Meanwhile, usbphy's parent needs to be notified if usb
-> > |     is suspend or not. So we design below mxs usbphy usage:
-> > |
-> > |     - usbphy1_gate and usbphy2_gate:
-> > |     Their parents are dummy clock, we only needs to enable
-> > |     it after system boots up.
-> > |     - usbphy1 and usbphy2
-> > |     Usage reserved bit for this clock, in that case, the refcount
-> > |     will be updated, but without hardware changing.
-> > |
-> > |     Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > |     Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > 
-> > Now this patch indeed keeps the gates enabled, but it doesn't keep the parents
-> > enabled, so the whole patch becomes a no-op once the parents get disabled. This
-> > nowadays happens with more aggressive clock disabling for example in the UART
-> > driver (which uses the same PLL as usbphy1).
-> > 
-> > This patch reverts the reserved register bit hackery and instead enables
-> > the usbphy clocks when support for the mxsphy is enabled.
+On Fri, Feb 21, 2014 at 02:18:40PM +0100, Jean-Jacques Hiblot wrote:
+> The goal of this patch is to allow drivers to be probed even if at the time of
+> the DT parsing some of their ressources are not available yet.
 > 
-> It will cause pll3 is still on when no user has used it.
+> In the current situation, the resource of a platform device are filled from the
+> DT at the time the device is created (of_device_alloc()). The drawbackof this
+> is that a device sitting close to the top of the DT (ahb for example) but
+> depending on ressources that are initialized later (IRQ domain dynamically
+> created for example)  will fail to probe because the ressources don't exist
+> at this time.
 > 
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> > 
-> > The above are my current state of observations. I think I still haven't fully
-> > understood the purpose of the clock hacks introduced with a5120e89e7e187.
+> This patch fills the resource structure only before the device is probed and
+> will defer the probe if the resource are not available yet.
 > 
-> usbphy1/usbphy2 are used to mark usbphy as pll3/pll7's child, once the
-> usbphy is enabled, the pll should be enabled, if no other user for pll3,
-> the pll3 should still be on since the usbphy is using.
-> 
-> usbphy1_gate/usbphy2_gate are used to control usb gate for pll, due to
-> special requirement from IC guys, these two bits are needed to open
-> before any usb operations, and there two bits are never needed to change
-> on the fly.
+> Signed-off-by: Jean-Jacques Hiblot <jjhiblot@traphandler.com>
+> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Can you explain why the gates have to be turned on when the parent PLL
-is disabled?
+Tested-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-> 
-> The reason why we meet such issue?
-> For internal phy(like UTMI), the phy clock is from internal pll,
-> it is on/off on the fly, the access PORTSC.PTS will hang without
-> phy clock. So, usb_phy_init needs to be called before
-> hw_phymode_configure.
-> 
-> For external PHY (like ulpi), the phy clock is from board, access
-> PORTSC.PTS may not need clock or we need to enhance ulpi driver to
-> support open and close external phy on the fly. It needs to config
-> PORTSC.PTS prior to visit view-port which is needed at its phy_init.
-> So, hw_phymode_configure is needed to be called before usb_phy_init.
-> 
+I wanted to add support for the external ethernet controller on
+at91sam9n12ek board and I was facing an issue because the irq domain
+doesn't exist yet (gpio controller as parent interrupt).
 
-[...]
+This patch solves this trouble.
 
-> -static void hw_phymode_configure(struct ci_hdrc *ci)
-> +static int ci_usb_phy_init(struct ci_hdrc *ci)
->  {
->  	u32 portsc, lpm, sts = 0;
-> +	int ret = -ENODEV;
+> ---
+> 
+> Hi Grant,
+> 
+> I reworked the patch as you proposed. To keep the overhead minimum, nirq and
+> nreg are computed only the first time.
+> In this implementation, only the missing IRQ ressources are re-tried for. It could
+> easily be changed to re-parse all the IRQs though (replace if (!res->flags)
+> with if ((!res->flags) || (res->flags & IORESOURCE_IRQ)).
+> 
+> drivers/base/platform.c     |   5 +++
+>  drivers/of/platform.c       | 100 +++++++++++++++++++++++++++++++++-----------
+>  include/linux/of_platform.h |  10 +++++
+>  3 files changed, 90 insertions(+), 25 deletions(-)
+> 
+> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> index bc78848..cee9b8d 100644
+> --- a/drivers/base/platform.c
+> +++ b/drivers/base/platform.c
+> @@ -481,6 +481,10 @@ static int platform_drv_probe(struct device *_dev)
+>  	struct platform_device *dev = to_platform_device(_dev);
+>  	int ret;
 >  
->  	switch (ci->platdata->phy_mode) {
->  	case USBPHY_INTERFACE_MODE_UTMI:
-> +		ret = usb_phy_init(ci->transceiver);
-> +		if (ret)
-> +			return ret;
->  		portsc = PORTSC_PTS(PTS_UTMI);
->  		lpm = DEVLC_PTS(PTS_UTMI);
->  		break;
->  	case USBPHY_INTERFACE_MODE_UTMIW:
-> +		ret = usb_phy_init(ci->transceiver);
-> +		if (ret)
-> +			return ret;
->  		portsc = PORTSC_PTS(PTS_UTMI) | PORTSC_PTW;
->  		lpm = DEVLC_PTS(PTS_UTMI) | DEVLC_PTW;
->  		break;
->  	case USBPHY_INTERFACE_MODE_ULPI:
->  		portsc = PORTSC_PTS(PTS_ULPI);
->  		lpm = DEVLC_PTS(PTS_ULPI);
-> +		ret = usb_phy_init(ci->transceiver);
-> +		if (ret)
-> +			return ret;
->  		break;
->  	case USBPHY_INTERFACE_MODE_SERIAL:
->  		portsc = PORTSC_PTS(PTS_SERIAL);
->  		lpm = DEVLC_PTS(PTS_SERIAL);
->  		sts = 1;
-> +		ret = usb_phy_init(ci->transceiver);
-> +		if (ret)
-> +			return ret;
->  		break;
->  	case USBPHY_INTERFACE_MODE_HSIC:
-> +		ret = usb_phy_init(ci->transceiver);
-> +		if (ret)
-> +			return ret;
->  		portsc = PORTSC_PTS(PTS_HSIC);
->  		lpm = DEVLC_PTS(PTS_HSIC);
-
-It seems you try to adjust the order in which PORTSC is configured and
-the phy is initialized. Instead of ordering the phy setup and register
-writes you just reorder some variable initializations.
-
-We discussed this back and forth here and think that the phy clock
-should be enabled/disabled via runtime pm ops as needed by the chipidea
-driver. Hacking the init order depending on the phy type like you did above
-doesn't sound like a good plan.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> +	ret = of_platform_device_prepare(dev);
+> +	if (ret)
+> +		goto error;
+> +
+>  	if (ACPI_HANDLE(_dev))
+>  		acpi_dev_pm_attach(_dev, true);
+>  
+> @@ -488,6 +492,7 @@ static int platform_drv_probe(struct device *_dev)
+>  	if (ret && ACPI_HANDLE(_dev))
+>  		acpi_dev_pm_detach(_dev, true);
+>  
+> +error:
+>  	if (drv->prevent_deferred_probe && ret == -EPROBE_DEFER) {
+>  		dev_warn(_dev, "probe deferral not supported\n");
+>  		ret = -ENXIO;
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 404d1da..a4e2602 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -141,36 +141,11 @@ struct platform_device *of_device_alloc(struct device_node *np,
+>  				  struct device *parent)
+>  {
+>  	struct platform_device *dev;
+> -	int rc, i, num_reg = 0, num_irq;
+> -	struct resource *res, temp_res;
+>  
+>  	dev = platform_device_alloc("", -1);
+>  	if (!dev)
+>  		return NULL;
+>  
+> -	/* count the io and irq resources */
+> -	if (of_can_translate_address(np))
+> -		while (of_address_to_resource(np, num_reg, &temp_res) == 0)
+> -			num_reg++;
+> -	num_irq = of_irq_count(np);
+> -
+> -	/* Populate the resource table */
+> -	if (num_irq || num_reg) {
+> -		res = kzalloc(sizeof(*res) * (num_irq + num_reg), GFP_KERNEL);
+> -		if (!res) {
+> -			platform_device_put(dev);
+> -			return NULL;
+> -		}
+> -
+> -		dev->num_resources = num_reg + num_irq;
+> -		dev->resource = res;
+> -		for (i = 0; i < num_reg; i++, res++) {
+> -			rc = of_address_to_resource(np, i, res);
+> -			WARN_ON(rc);
+> -		}
+> -		WARN_ON(of_irq_to_resource_table(np, res, num_irq) != num_irq);
+> -	}
+> -
+>  	dev->dev.of_node = of_node_get(np);
+>  #if defined(CONFIG_MICROBLAZE)
+>  	dev->dev.dma_mask = &dev->archdata.dma_mask;
+> @@ -233,6 +208,81 @@ static struct platform_device *of_platform_device_create_pdata(
+>  	return dev;
+>  }
+>  
+> +static int of_reg_count(struct device_node *np)
+> +{
+> +	int nreg = 0;
+> +	if (of_can_translate_address(np)) {
+> +		struct resource temp_res;
+> +		while (of_address_to_resource(np, nreg, &temp_res) == 0)
+> +			nreg++;
+> +	}
+> +	return nreg;
+> +}
+> +
+> +int of_platform_device_prepare(struct platform_device *dev)
+> +{
+> +	struct device_node *np;
+> +	int i, irq_index;
+> +	struct resource *res;
+> +
+> +	/*
+> +	 * This function applies only devices described in the DT.
+> +	 * Other platform devices have their ressources already populated.
+> +	 */
+> +	np = dev->dev.of_node;
+> +	if (!np)
+> +		return 0;
+> +
+> +	/* Populate the resource table */
+> +	if (!dev->resource) {
+> +		int rc, nreg = 0, nirq;
+> +		/* count the io and irq resources */
+> +		nreg = of_reg_count(np);
+> +		nirq = of_irq_count(np);
+> +
+> +		if (!nirq && !nreg)
+> +			return 0;
+> +
+> +		res = kzalloc(sizeof(*res) * (nirq + nreg), GFP_KERNEL);
+> +		if (!res)
+> +			return -ENOMEM;
+> +
+> +		dev->resource = res;
+> +		dev->num_resources = nreg + nirq;
+> +
+> +		for (i = 0; i < nreg; i++, res++) {
+> +			rc = of_address_to_resource(np, i, res);
+> +			if (WARN_ON(rc)) {
+> +				/* THIS IS BAD; don't try to defer probing */
+> +				dev->num_resources = 0;
+> +				dev->resource = NULL;
+> +				kfree(res);
+> +				return rc;
+> +			}
+> +		}
+> +
+> +		if (!rc && of_irq_to_resource_table(np, res, nirq) != nirq) {
+> +			/* IRQ controller is yet available. defer probing */
+> +			return -EPROBE_DEFER;
+> +		}
+> +
+> +		return 0;
+> +	}
+> +
+> +	/* See which IRQ resources need to be redone */
+> +	irq_index = 0;
+> +	for (i = 0, res = dev->resource; i < dev->num_resources; i++, res++) {
+> +		if (!res->flags) {
+> +			if (!of_irq_to_resource(np, irq_index, res))
+> +				return -EPROBE_DEFER;
+> +			irq_index++;
+> +		} else if (res->flags & IORESOURCE_IRQ)
+> +			irq_index++;
+> +	}
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(of_platform_device_prepare);
+> +
+>  /**
+>   * of_platform_device_create - Alloc, initialize and register an of_device
+>   * @np: pointer to node to create device for
+> diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
+> index 05cb4a9..4e487ff 100644
+> --- a/include/linux/of_platform.h
+> +++ b/include/linux/of_platform.h
+> @@ -53,6 +53,16 @@ struct of_dev_auxdata {
+>  
+>  extern const struct of_device_id of_default_bus_match_table[];
+>  
+> +/* Populate the resource for a platform device */
+> +#ifdef CONFIG_OF
+> +int of_platform_device_prepare(struct platform_device *dev);
+> +#else
+> +static inline int of_platform_device_prepare(
+> +	struct platform_device *dev)
+> +{
+> +	return 0;
+> +}
+> +#endif
+>  /* Platform drivers register/unregister */
+>  extern struct platform_device *of_device_alloc(struct device_node *np,
+>  					 const char *bus_id,
+> -- 
+> 1.9.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
