@@ -1,119 +1,41 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 28 Feb 2014 11:10:52 +0900
-Subject: [PATCH 3/3] PCI: imx6: ventana: fixup for IRQ mismapping
-In-Reply-To: <1393550394-11071-4-git-send-email-tharvey@gateworks.com>
-References: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
- <1393550394-11071-4-git-send-email-tharvey@gateworks.com>
-Message-ID: <000a01cf342a$4e5c3410$eb149c30$%han@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 28 Feb 2014 10:13:02 +0800
+Subject: [PATCH 1/3] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <201402272139.36076.marex@denx.de>
+References: <1393481115-22136-1-git-send-email-yao.yuan@freescale.com>
+ <1393481115-22136-2-git-send-email-yao.yuan@freescale.com>
+ <201402272139.36076.marex@denx.de>
+Message-ID: <20140228021300.GJ13537@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, February 28, 2014 10:20 AM, Tim Harvey wrote:
+On Thu, Feb 27, 2014 at 09:39:35PM +0100, Marek Vasut wrote:
+> > @@ -193,6 +216,7 @@ static const struct imx_i2c_hwdata imx1_i2c_hwdata  = {
+> >  	.ndivs			= ARRAY_SIZE(imx_i2c_clk_div),
+> >  	.i2sr_clr_opcode	= I2SR_CLR_OPCODE_W0C,
+> >  	.i2cr_ien_opcode	= I2CR_IEN_OPCODE_1,
+> > +	.has_dma_support	= false,
+> > 
+> >  };
+> > 
+> > @@ -203,6 +227,7 @@ static const struct imx_i2c_hwdata imx21_i2c_hwdata  =
+> > { .ndivs			= ARRAY_SIZE(imx_i2c_clk_div),
+> >  	.i2sr_clr_opcode	= I2SR_CLR_OPCODE_W0C,
+> >  	.i2cr_ien_opcode	= I2CR_IEN_OPCODE_1,
+> > +	.has_dma_support	= false,
+> > 
+> >  };
+> > 
+> > @@ -213,6 +238,7 @@ static struct imx_i2c_hwdata vf610_i2c_hwdata = {
+> >  	.ndivs			= ARRAY_SIZE(vf610_i2c_clk_div),
+> >  	.i2sr_clr_opcode	= I2SR_CLR_OPCODE_W1C,
+> >  	.i2cr_ien_opcode	= I2CR_IEN_OPCODE_0,
+> > +	.has_dma_support	= true,
 > 
-> The TI XIO2001 PCIe-to-PCI bridge used on Ventana expansion boards
-> has its slot-to-bridge IRQ mapping reversed from the PCI specification:
-> 
->   INTA->INTD
->   INTB->INTC
->   INTC->INTB
->   INTD->INTA
+> So why exactly don't we have a DT prop for determining whether the controller 
+> has DMA support ?
 
-(+cc Marek Vasut, Pratyush Anand, Kishon Vijay Abraham I, Mohit KUMAR DCG)
+Using DMA or PIO is a decision that should be made by driver on its own,
+not device tree.
 
-As I mention earlier, 'i.MX6 PCIe IP' is not a culprit.
-The 'TI XIO2001 PCIe-to-PCI bridge' is the culprit, right?
-
-Then, './drivers/pci/host/pci-imx6.c' is not a good place
-to fix the board problems.
-
-Look at other i.MX6 boards. They don't have the 'TI XIO2001
-PCIe-to-PCI bridge'. Please don't add this board specific 
-code to SoC specific driver code.
-
-Best regards,
-Jingoo Han
-
-> 
-> Implement a custom swizzle function that does a fixup on the interrupt for
-> devices on the first TI XIO2001 bridge in the tree.
-> 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Sean Cross <xobs@kosagi.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> ---
->  drivers/pci/host/pci-imx6.c | 36 ++++++++++++++++++++++++++++++++++++
->  include/linux/pci_ids.h     |  1 +
->  2 files changed, 37 insertions(+)
-> 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index aaa05c8..b171a21 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -493,6 +493,39 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
->  	return 0;
->  }
-> 
-> +/* TI XIO2001 PCIe-to-PCI bridge on GW16082 exp card has IRQs reversed */
-> +u8 ventana_swizzle(struct pci_dev *dev, u8 *pin)
-> +{
-> +	u8 i = 0;
-> +	struct pci_dev *pdev = dev;
-> +
-> +	/* count number of TI XIO2001 bridges on bus */
-> +	while (!pci_is_root_bus(pdev->bus)) {
-> +		if (pdev->bus && pdev->bus->self &&
-> +		    (pdev->bus->self->vendor == PCI_VENDOR_ID_TI) &&
-> +		    (pdev->bus->self->device == PCI_DEVICE_ID_TI_XIO2001)) {
-> +			i++;
-> +		}
-> +		pdev = pdev->bus->self;
-> +	}
-> +	while (!pci_is_root_bus(dev->bus)) {
-> +		/* if we are directly downstream from 1st TI XIO2001 bridge */
-> +		if (dev->bus && dev->bus->self &&
-> +		    (dev->bus->self->vendor == PCI_VENDOR_ID_TI) &&
-> +		    (dev->bus->self->device == PCI_DEVICE_ID_TI_XIO2001)) {
-> +			if (--i == 0) {
-> +				/* swap IRQs and swizzle backwards */
-> +				*pin = (15 - PCI_SLOT(dev->devfn)) + 1;
-> +				dev = dev->bus->self;
-> +				continue;
-> +			}
-> +		}
-> +		*pin = pci_swizzle_interrupt_pin(dev, *pin);
-> +		dev = dev->bus->self;
-> +	}
-> +	return PCI_SLOT(dev->devfn);
-> +}
-> +
->  static int __init imx6_pcie_probe(struct platform_device *pdev)
->  {
->  	struct imx6_pcie *imx6_pcie;
-> @@ -601,6 +634,9 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
->  		return PTR_ERR(imx6_pcie->iomuxc_gpr);
->  	}
-> 
-> +	if (of_machine_is_compatible("gw,ventana"))
-> +		pp->swizzle = ventana_swizzle;
-> +
->  	ret = imx6_add_pcie_port(pp, pdev);
->  	if (ret < 0)
->  		return ret;
-> diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-> index 97fbecd..4ca334f 100644
-> --- a/include/linux/pci_ids.h
-> +++ b/include/linux/pci_ids.h
-> @@ -822,6 +822,7 @@
->  #define PCI_DEVICE_ID_TI_XX12		0x8039
->  #define PCI_DEVICE_ID_TI_XX12_FM	0x803b
->  #define PCI_DEVICE_ID_TI_XIO2000A	0x8231
-> +#define PCI_DEVICE_ID_TI_XIO2001	0x8240
->  #define PCI_DEVICE_ID_TI_1130		0xac12
->  #define PCI_DEVICE_ID_TI_1031		0xac13
->  #define PCI_DEVICE_ID_TI_1131		0xac15
-> --
-> 1.8.3.2
+Shawn
