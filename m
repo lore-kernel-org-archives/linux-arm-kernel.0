@@ -1,61 +1,43 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 28 Feb 2014 14:43:07 -0800
-Subject: [PATCH 5/5] ARM: dts: AM33XX: Add ecap interrupt properties
-In-Reply-To: <1391029199-3670-6-git-send-email-mporter@linaro.org>
-References: <1391029199-3670-1-git-send-email-mporter@linaro.org>
- <1391029199-3670-6-git-send-email-mporter@linaro.org>
-Message-ID: <20140228224307.GP13624@atomide.com>
+Date: Fri, 28 Feb 2014 14:45:05 -0800
+Subject: [PATCH 1/3] arm: dts: am33xx.dtsi: Add node name to rtc device
+ node
+In-Reply-To: <1391602361-2666-1-git-send-email-sr@denx.de>
+References: <1391602361-2666-1-git-send-email-sr@denx.de>
+Message-ID: <20140228224504.GQ13624@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Matt Porter <mporter@linaro.org> [140129 13:02]:
-> Add missing interrupt properties to the ecap0, ecap1, and ecap2
-> nodes.
+* Stefan Roese <sr@denx.de> [140205 04:14]:
+> Making it possible to reference and therefor change (disable) this
+> device node from other dts file which import this dtsi file.
 > 
-> Signed-off-by: Matt Porter <mporter@linaro.org>
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Lukas Stockmann <lukas.stockmann@siemens.com>
+> Cc: Benoit Cousson <bcousson@baylibre.com>
+> Cc: Tony Lindgren <tony@atomide.com>
 
-Thanks taking this patch only into omap-for-v3.15/dt, the rest
-should go via the driver mailing lists.
-
-Regards,
+Thanks applying into omap-for-v3.15/dt.
 
 Tony
 
 > ---
->  arch/arm/boot/dts/am33xx.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  arch/arm/boot/dts/am33xx.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
 > diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 6d95d3d..b4139ba 100644
+> index 6d95d3d..b8daf8c 100644
 > --- a/arch/arm/boot/dts/am33xx.dtsi
 > +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -582,6 +582,8 @@
->  				compatible = "ti,am33xx-ecap";
->  				#pwm-cells = <3>;
->  				reg = <0x48300100 0x80>;
-> +				interrupts = <31>;
-> +				interrupt-names = "ecap0";
->  				ti,hwmods = "ecap0";
->  				status = "disabled";
->  			};
-> @@ -610,6 +612,8 @@
->  				compatible = "ti,am33xx-ecap";
->  				#pwm-cells = <3>;
->  				reg = <0x48302100 0x80>;
-> +				interrupts = <47>;
-> +				interrupt-names = "ecap1";
->  				ti,hwmods = "ecap1";
->  				status = "disabled";
->  			};
-> @@ -638,6 +642,8 @@
->  				compatible = "ti,am33xx-ecap";
->  				#pwm-cells = <3>;
->  				reg = <0x48304100 0x80>;
-> +				interrupts = <61>;
-> +				interrupt-names = "ecap2";
->  				ti,hwmods = "ecap2";
->  				status = "disabled";
->  			};
+> @@ -399,7 +399,7 @@
+>  			ti,timer-pwm;
+>  		};
+>  
+> -		rtc at 44e3e000 {
+> +		rtc: rtc at 44e3e000 {
+>  			compatible = "ti,da830-rtc";
+>  			reg = <0x44e3e000 0x1000>;
+>  			interrupts = <75
 > -- 
-> 1.8.4
+> 1.8.5.3
 > 
