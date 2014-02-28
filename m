@@ -1,66 +1,25 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 28 Feb 2014 10:50:25 +0900
-Subject: [RFC PATCH 0/3] PCI: imx6: fixup for add-in card IRQ mismapping
-In-Reply-To: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
-References: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <000701cf3427$72f1c590$58d550b0$%han@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 28 Feb 2014 10:53:10 +0900
+Subject: [PATCH 2/4] ARM: dove: prepare new Dove DT Kconfig variable
+In-Reply-To: <1393536486-3827-3-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393536486-3827-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20140228015310.GC9383@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, February 28, 2014 10:20 AM, Tim Harvey wrote:
-> 
-> An add-in card used on the Ventana IMX6 SoC based family of boards has a
-> TI XIO2001 PCIe-to-PCI bridge where the INTA/B/C/D mappings between the
-> bridge and the four mini-PCI slots are swapped (INTD/C/B/A).
+On Thu, Feb 27, 2014 at 10:28:03PM +0100, Sebastian Hesselbarth wrote:
+> DT-enabled Dove will move over from ARCH_DOVE in mach-dove to MACH_DOVE in
+> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+> DT-only MACH_DOVE to mmc, thermal, wdt, and asoc Kconfigs.
 
-(+cc Marek Vasut, Pratyush Anand, Kishon Vijay Abraham I, Mohit KUMAR DCG)
-
-This problem happens from the 'Board', not a 'SoC'.
-'TI XIO2001 PCIe-to-PCI bridge' is not a 'SoC'.
-'pci-imx6.c' is the driver for 'IMX6 PCI IP', not for 'IMX6 SoC based
-board'. Isn't it?
-
-Then, the workaround code for board problem should NOT be
-included to './drivers/pci/host/' side.
-
-Also, please add the following members to CC list. They will give
-important comments.
-
-: Marek Vasut, Pratyush Anand, Kishon Vijay Abraham I, Mohit KUMAR DCG
-
-Best regards,
-Jingoo Han
-
-> 
-> This series adds legacy PCI interrupt mapping to support PCI bridges on
-> IMX6 PCIe host controllers, adds the ability to use a host-specific
-> custom swizzle function, then uses that to fix the IRQ mapping.
-> 
-> I'm hoping this is the right way to perform such a workaround - please provide
-> feedback if not.  Patch1 will likely collide with the owrk Lucas is doing
-> with device-tree bindings and MSI support.  I'm happy to re-base if/when
-> needed.
-> 
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Richard Zhu <r65037@freescale.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Sean Cross <xobs@kosagi.com>
-> Cc: Jingoo Han <jg1.han@samsung.com>
-> ---
-> Tim Harvey (3):
->   PCI: designware: add legacy PCI interrupt mapping
->   PCI: designware: add ability for custom swizzle
->   PCI: imx6: ventana: fixup for IRQ mismapping
-> 
->  arch/arm/boot/dts/imx6qdl.dtsi     |  2 +-
->  drivers/pci/host/pci-exynos.c      |  7 ++++--
->  drivers/pci/host/pci-imx6.c        | 47 ++++++++++++++++++++++++++++++++++----
->  drivers/pci/host/pcie-designware.c | 11 ++++++++-
->  drivers/pci/host/pcie-designware.h |  3 ++-
->  include/linux/pci_ids.h            |  1 +
->  6 files changed, 62 insertions(+), 9 deletions(-)
-> 
-> --
-> 1.8.3.2
+I'd be much happier merging this sort of stuff individually through the
+subsystems, we already have an annoying conflict here...  Is there some
+bisection problem with doing that?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/41d4daaa/attachment.sig>
