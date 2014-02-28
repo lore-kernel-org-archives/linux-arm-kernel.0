@@ -1,57 +1,156 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 28 Feb 2014 22:09:28 +0100
-Subject: [PATCH 4/4] ARM: shmobile: r7s72100: use workaround for non DT-clocks
+Date: Fri, 28 Feb 2014 22:09:25 +0100
+Subject: [PATCH 1/4] ARM: r7s72100: add clock nodes to dtsi
 In-Reply-To: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
 References: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1393621768-12568-5-git-send-email-wsa@the-dreams.de>
+Message-ID: <1393621768-12568-2-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wolfram Sang <wsa@sang-engineering.com>
 
-SCIF2 and MTU2 are not yet prepared for DT usage, so use the common
-workaround via clkdev for now.
+Only essential clocks are added for now. Other clocks will be added when
+needed.
 
 Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
 ---
- arch/arm/mach-shmobile/board-genmai-reference.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r7s72100.dtsi            | 78 +++++++++++++++++++++++++++++-
+ include/dt-bindings/clock/r7s72100-clock.h | 25 ++++++++++
+ 2 files changed, 102 insertions(+), 1 deletion(-)
+ create mode 100644 include/dt-bindings/clock/r7s72100-clock.h
 
-diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
-index 7630c10..91dcdd0 100644
---- a/arch/arm/mach-shmobile/board-genmai-reference.c
-+++ b/arch/arm/mach-shmobile/board-genmai-reference.c
-@@ -18,18 +18,29 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index ee70071..f6d4b5d 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -1,13 +1,15 @@
+ /*
+  * Device Tree Source for the r7s72100 SoC
+  *
+- * Copyright (C) 2013 Renesas Solutions Corp.
++ * Copyright (C) 2013-14 Renesas Solutions Corp.
++ * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
+  *
+  * This file is licensed under the terms of the GNU General Public License
+  * version 2.  This program is licensed "as is" without any warranty of any
+  * kind, whether express or implied.
   */
  
--#include <linux/clk-provider.h>
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
-+#include <mach/clock.h>
- #include <mach/common.h>
- #include <mach/r7s72100.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
++#include <dt-bindings/clock/r7s72100-clock.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
  
-+#ifdef CONFIG_COMMON_CLK
-+/*
-+ * This is a really crude hack to provide clkdev support to platform
-+ * devices until they get moved to DT.
-+ */
-+static const struct clk_name clk_names[] = {
-+	{ "mtu2", NULL, "sh_mtu2.0" },
-+	{ "scif2", NULL, "sh-sci.2" },
-+};
-+#endif
+ / {
+@@ -28,6 +30,80 @@
+ 		spi4 = &spi4;
+ 	};
+ 
++	clocks {
++		ranges;
++		#address-cells = <1>;
++		#size-cells = <1>;
 +
- static void __init genmai_add_standard_devices(void)
- {
- #ifdef CONFIG_COMMON_CLK
--	of_clk_init(NULL);
-+	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), true);
- #else
- 	r7s72100_clock_init();
- #endif
++		/* External root clock */
++		extal_clk: extal_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			/* This value must be overriden by the board. */
++			clock-frequency = <0>;
++			clock-output-names = "extal";
++		};
++
++		/* Special CPG clocks */
++		cpg_clocks: cpg_clocks at fcfe0000 {
++			#clock-cells = <1>;
++			compatible = "renesas,r7s72100-cpg-clocks",
++				     "renesas,rz-cpg-clocks";
++			reg = <0xfcfe0000 0x18>;
++			clocks = <&extal_clk>;
++			clock-output-names = "pll", "i", "g";
++		};
++
++		/* Fixed factor clocks */
++		b_clk: b_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks 0>;
++			clock-mult = <1>;
++			clock-div = <3>;
++			clock-output-names = "b";
++		};
++		p1_clk: p1_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks 0>;
++			clock-mult = <1>;
++			clock-div = <6>;
++			clock-output-names = "p1";
++		};
++		p0_clk: p0_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-factor-clock";
++			clocks = <&cpg_clocks 0>;
++			clock-mult = <1>;
++			clock-div = <12>;
++			clock-output-names = "p0";
++		};
++
++		/* MSTP clocks */
++		mstp3_clks: mstp3_clks at fcfe0420 {
++			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0xfcfe0420 4>;
++			clocks = <&p0_clk>;
++			#clock-cells = <1>;
++			renesas,clock-indices = <R7S72100_CLK_MTU2>;
++			clock-output-names = "mtu2";
++		};
++
++		mstp4_clks: mstp4_clks at fcfe0424 {
++			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0xfcfe0424 4>;
++			clocks = <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>,
++				 <&p1_clk>, <&p1_clk>, <&p1_clk>, <&p1_clk>;
++			#clock-cells = <1>;
++			renesas,clock-indices = <
++				R7S72100_CLK_SCIF0 R7S72100_CLK_SCIF1 R7S72100_CLK_SCIF2 R7S72100_CLK_SCIF3
++				R7S72100_CLK_SCIF4 R7S72100_CLK_SCIF5 R7S72100_CLK_SCIF6 R7S72100_CLK_SCIF7
++			>;
++			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4", "scif5", "scif6", "scif7";
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
+new file mode 100644
+index 0000000..eced0a8
+--- /dev/null
++++ b/include/dt-bindings/clock/r7s72100-clock.h
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2014 Wolfram Sang, Sang Engineering <wsa@sang-engineering.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ */
++
++#ifndef __DT_BINDINGS_CLOCK_R7S72100_H__
++#define __DT_BINDINGS_CLOCK_R7S72100_H__
++
++/* MSTP3 */
++#define R7S72100_CLK_MTU2	3
++
++/* MSTP4 */
++#define R7S72100_CLK_SCIF0	7
++#define R7S72100_CLK_SCIF1	6
++#define R7S72100_CLK_SCIF2	5
++#define R7S72100_CLK_SCIF3	4
++#define R7S72100_CLK_SCIF4	3
++#define R7S72100_CLK_SCIF5	2
++#define R7S72100_CLK_SCIF6	1
++#define R7S72100_CLK_SCIF7	0
++
++#endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
 -- 
 1.8.5.1
