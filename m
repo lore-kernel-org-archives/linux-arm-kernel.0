@@ -1,85 +1,63 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 28 Feb 2014 17:03:43 +0100
-Subject: [PATCH v5 1/5] Documentation: Add device tree bindings for Freescale
- i.MX GPC
-In-Reply-To: <1393603427-6199-1-git-send-email-p.zabel@pengutronix.de>
-References: <1393603427-6199-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1393603427-6199-2-git-send-email-p.zabel@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Feb 2014 16:06:12 +0000
+Subject: [PATCH 4/9] Doc/DT: Add DT binding documentation for HDMI
+ Connector
+In-Reply-To: <1393590016-9361-5-git-send-email-tomi.valkeinen@ti.com>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+ <1393590016-9361-5-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <20140228160612.GR21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6 contains a power controller that controls power gating and
-sequencing for the SoC's power domains.
+On Fri, Feb 28, 2014 at 02:20:11PM +0200, Tomi Valkeinen wrote:
+> Add DT binding documentation for HDMI Connector.
+> 
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Reviewed-by: Archit Taneja <archit@ti.com>
+> ---
+>  .../devicetree/bindings/video/hdmi-connector.txt   | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/hdmi-connector.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/video/hdmi-connector.txt b/Documentation/devicetree/bindings/video/hdmi-connector.txt
+> new file mode 100644
+> index 000000000000..5d25f6a432bb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/hdmi-connector.txt
+> @@ -0,0 +1,23 @@
+> +HDMI Connector
+> +==============
+> +
+> +Required properties:
+> +- compatible: "hdmi-connector"
+> +
+> +Optional properties:
+> +- label: a symbolic name for the connector
+> +
+> +Required nodes:
+> +- Video port for HDMI input
+> +
+> +Example
+> +-------
+> +
+> +hdmi0: connector at 1 {
+> +	compatible = "hdmi-connector";
+> +	label = "hdmi";
+> +
+> +	hdmi_connector_in: endpoint {
+> +		remote-endpoint = <&tpd12s015_out>;
+> +	};
+> +};
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
-Changes since v4:
- - Use OF power domain bindings
- - Add reset clocks to be enabled during PU powerup.
----
- .../devicetree/bindings/power/fsl,imx-gpc.txt      | 54 ++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+It seems rather weird to have DVI connectors having an optional I2C
+property, but HDMI (which augments DVI) not having that as at least an
+optional property.
 
-diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-new file mode 100644
-index 0000000..eaa8c93
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-@@ -0,0 +1,54 @@
-+Freescale i.MX General Power Controller
-+=======================================
-+
-+The i.MX6Q General Power Control (GPC) block contains DVFS load tracking
-+counters and Power Gating Control (PGC) for the CPU and PU (GPU/VPU) power
-+domains.
-+
-+Required properties:
-+- compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
-+- reg: should be register base and length as documented in the
-+  datasheet
-+- interrupts: Should contain GPC interrupt request 1
-+- pu-supply: Link to the LDO regulator powering the PU power domain
-+- clocks: Clock phandles to devices in the PU power domain that need
-+	  to be enabled during domain power-up for reset propagation.
-+- #power-domain-cells: Should be 1, see below:
-+
-+The gpc node is a power-controller as documented by the generic power domain
-+bindings in Documentation/devicetree/bindings/power/power_domain.txt.
-+
-+Example:
-+
-+	gpc: gpc at 020dc000 {
-+		compatible = "fsl,imx6q-gpc";
-+		reg = <0x020dc000 0x4000>;
-+		interrupts = <0 89 0x04 0 90 0x04>;
-+		pu-supply = <&reg_pu>;
-+		clocks = <&clks 122>, <&clks 74>, <&clks 121>,
-+			 <&clks 26>, <&clks 143>, <&clks 168>;
-+		#power-domain-cells = <1>;
-+	};
-+
-+
-+Specifying power domain for IP modules
-+======================================
-+
-+IP cores belonging to a power domain should contain a 'power-domain' property
-+that is a phandle pointing to the gpc device node and a DOMAIN_INDEX specifying
-+the power domain the device belongs to.
-+
-+Example of a device that is part of the PU power domain:
-+
-+	vpu: vpu at 02040000 {
-+		reg = <0x02040000 0x3c000>;
-+		/* ... */
-+		power-domain = <&gpc 1>;
-+		/* ... */
-+	};
-+
-+The following DOMAIN_INDEX values are valid for i.MX6Q:
-+ARM_DOMAIN     0
-+PU_DOMAIN      1
-+The following additional DOMAIN_INDEX value is valid for i.MX6SL:
-+DISPLAY_DOMAIN 2
+I can quite well see the iMX HDMI support needing an i2c bus here.
+
+Also, HDMI has two connector standards - type A and type B, much like
+the single vs dual link of DVI.  Again, DRM exposes this to userspace.
+
 -- 
-1.8.5.3
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
