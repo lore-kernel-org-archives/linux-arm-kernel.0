@@ -1,108 +1,81 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 28 Feb 2014 12:27:36 +0100
-Subject: [PATCH 1/3] PCI: designware: add legacy PCI interrupt mapping
-In-Reply-To: <000101cf3452$f203ed60$d60bc820$%han@samsung.com>
-References: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
- <1393550394-11071-2-git-send-email-tharvey@gateworks.com>
- <000901cf3428$ec18acd0$c44a0670$%han@samsung.com>
- <CAJ+vNU2Ea+hHZxcOBXfBEFtryJEzU+axCHRW2rOM8JedWROyTQ@mail.gmail.com>
- <000101cf3452$f203ed60$d60bc820$%han@samsung.com>
-Message-ID: <1393586856.5225.6.camel@weser.hi.pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Feb 2014 12:31:45 +0100
+Subject: [ARM] CNS3xxx: 3 regressions identified in v3.14-rc4+
+In-Reply-To: <m3eh2nqz7n.fsf@t19.piap.pl>
+References: <m3eh2nqz7n.fsf@t19.piap.pl>
+Message-ID: <10801013.Hh6CjhvAyx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 28.02.2014, 16:01 +0900 schrieb Jingoo Han:
-> On Friday, February 28, 2014 1:25 PM, Tim Harvey wrote:
-> > On Thu, Feb 27, 2014 at 6:00 PM, Jingoo Han <jg1.han@samsung.com> wrote:
-> > > On Friday, February 28, 2014 10:20 AM, Tim Harvey wrote:
-> > >>
-> > >> The IMX6 maps INTA/B/C/D to ARM GIC IRQ 155/154/153/152 respectively.
-> > >> This allows a PCIe-to-PCI bridge to function properly.
-> > >>
-> > >> The irq field of the pcie_host struct is expanded to 4 interrupts to
-> > >> allow for INTA/B/C/D and the IMX6 PCIe host driver will populate them
-> > >> all from devicetree.  I'm not clear if the Exynos driver has this
-> > >> capability so it places the same interrupt in all 4 slots.
-> > >
-> > > (+cc Marek Vasut, Pratyush Anand, Kishon Vijay Abraham I, Mohit KUMAR DCG)
-> > >
-> > > In the case of Exynos,
-> > > 'INTA/B/C/D' are mapped to only one interrupt (<0 20 0>).
-> > > Thus, the current code works properly on Exynos platform.
-> > >
-> > > There are three interrupts for Exynos PCIe; INTx, MSI, PHY Link,
-> > > respectively as below.
-> > >
-> > > ./arch/arm/boot/dts/exynos5440.dtsi
-> > >         interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-> > >
-> > > <0 20 0>: PCIe RC0 pulse interrupt,
-> > >              INTA, INTB, INTC and INTD, etc
-> > > <0 21 0>: PCIe RC0 level interrupt,
-> > >              MSI, etc
-> > > <0 22 0>: PCIe RC0 special interrupt,
-> > >              PHY Link related interrupts, etc
-> > >
-> > > Of course, legacy INTx is handled as message only.
-> > >
-> > > Mohit, Kishon,
-> > > How about the other SoCs? INTx is mapped to single interrupt
-> > > such as Exynos, or separate interrupts such as i.MX6?
-> > 
-> > Jingoo,
-> > 
-> > Ok - so at least the I.MX6 and Exynos, which both use the designware
-> > IP need different IRQ mappings.  It seems to me then that the map_irq
-> > should be moved out of drivers/pci/host/pcie-designware.c and into the
-> > SoC specific host controller drivers (pci-imx.c and pci-exynos.c).  If
-> > that becomes the consensus I can submit a patch that does that.
+On Friday 28 February 2014 12:00:12 Krzysztof Ha?asa wrote:
 > 
-> (+CC Arnd Bergmann)
+> PCI hangs system completely while trying to access any PCI MMIO region
+> (plain IO not tested).
 > 
-> If you want to split dw_pcie_map_irq(), the following would be better.
+> The guilty commit is 928bea964827d7824b548c1f8e06eccbbc4d0d7d:
 > 
-> ./drivers/pci/host/pcie-designware.c
-> static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
-> {
-> 	struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
+>     PCI: Delay enabling bridges until they're needed
 > 
-> 	if (pp->ops->writel_rc)
-> 		return pp->ops->map_irq(pp, pin);
-> 	else
-> 		return pp->irq;
-> }
+>     We currently enable PCI bridges after scanning a bus and assigning
+>     resources.  This is often done in arch code.
 > 
-> ./drivers/pci/host/pci-imx6.c
-> static int imx6_pcie_map_irq(struct pcie_port *pp, u8 pin)
-> {
-> 	.....
-> }
+>     This patch changes this so we don't enable a bridge until necessary, i.e.,
+>     until we enable a PCI device behind the bridge.  We do this in the generic
+>     pci_enable_device() path, so this also removes the arch-specific code to
+>     enable bridges.
 > 
-> Also, please add additional 'irq[4]' variable to 'struct imx6_pcie',
-> instead of 'struct pcie_port'. Other SoCs does not use four separate
-> INTx, as far as I know.
+> Reverting changes in arch/arm/kernel/bios32.c, drivers/pci/bus.c and
+> include/linux/pci.h (= essentially adding pci_enable_bridges(bus) in
+> ARM's pci_common_init_dev()) makes it work again.
 > 
-It seems that dw_pcie_map_irq shouldn't even exist and should be
-replaced with of_irq_parse_and_map_pci().
+> Options?
 
-As I understand the Exynos hardware is mapping all legacy PCI IRQs to
-one single GIC IRQ. Now I wonder why you have two different IRQs in your
-DT? See this snippet:
+Hmm, this was in 3.12 already, right?
 
-interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-#interrupt-cells = <1>;
-interrupt-map-mask = <0 0 0 0>;
-interrupt-map = <0x0 0 &gic 53>;
+Can you try adding the code in a host specific callback such as
+hw->add_bus?
 
-The driver uses the second device IRQ to map all PCI IRQs to, which is
-GIC IRQ 21 in this example. Your interrupt-map property in contrary
-indicates that all PCI IRQs should be mapped to GIC IRQ 53.
-What is the right thing to do here?
+> Issue #3 ###################################################
+> 
+> NR_IRQS:16 nr_irqs:96 96
+> 
+> WARNING: at drivers/irqchip/irq-gic.c:952 gic_init_bases+0xe4/0x2b8()
+> Cannot allocate irq_descs @ IRQ16, assuming pre-allocated
+> Backtrace:
+> gic_init_bases    from cns3xxx_init_irq+0x24/0x34
+> cns3xxx_init_irq  from init_IRQ+0x24/0x2c
+> init_IRQ          from start_kernel+0x1a8/0x338
+> start_kernel      from 0x2000806c
+> 
+> I'm having problems understanding how is machine_desc->nr_irqs supposed
+> to work with CONFIG_ARM_GIC and CONFIG_SPARSE_IRQ set.
+> 
+> machine_desc->nr_irqs is set to NR_IRQS_CNS3XXX =
+> IRQ_TC11MP_GIC_START + 64 = 32 + 64 = 96.
+> 
+> At start, machine_desc->nr_irqs are pre-allocated via
+> start_kernel() -> early_irq_init().
+> 
+> Then, gic_init(0, 29, ...) ->  gic_init_bases(0, 29, ...) tries this
+> (and fails):
+> 
+>         /*
+>          * For primary GICs, skip over SGIs.
+>          * For secondary GICs, skip over PPIs, too.
+>          */
+>         irq_start = (effectively) 16;
+> 
+>         irq_base = irq_alloc_descs(irq_start, 16, gic_irqs, numa_node_id());
+>         if (IS_ERR_VALUE(irq_base)) {
+>                 WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
+>                      irq_start);
+> 
+> Does this mean machine_desc->nr_irqs is to be kept at 16
+> (NR_IRQS_LEGACY) or less, so it doesn't conflict with gic_init()?
+> 
+> Or perhaps gic_init() shouldn't warn about this?
 
-Regards,
-Lucas
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I think the problem is that both the board file and the gic code try to
+set up legacy interrupts. Try just removing the 'nr_irqs=' line.
+
+	Arnd
