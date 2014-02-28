@@ -1,91 +1,155 @@
-From: yegorslists@googlemail.com (Yegor Yefremov)
-Date: Fri, 28 Feb 2014 08:26:46 +0100
-Subject: [PATCH v4 0/8] wilink: add device tree support
-In-Reply-To: <1375189476-21557-1-git-send-email-coelho@ti.com>
-References: <1375189476-21557-1-git-send-email-coelho@ti.com>
-Message-ID: <CAGm1_kvdzkvzEEymQ+H0XiKugifHF27KDz3jwX5Frg_U=S7KgA@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 28 Feb 2014 09:36:18 +0200
+Subject: [RFC PATCH v4 3/8] staging: imx-drm: Document updated imx-drm
+ device tree bindings
+In-Reply-To: <1393520088.4507.92.camel@paszta.hi.pengutronix.de>
+References: <1393338203-25051-1-git-send-email-p.zabel@pengutronix.de>	
+ <1393338203-25051-4-git-send-email-p.zabel@pengutronix.de>	
+ <530F1C4C.2010504@ti.com>	
+ <1393506385.4507.49.camel@paszta.hi.pengutronix.de>	
+ <20140227130020.GJ21483@n2100.arm.linux.org.uk> <530F43B9.800@ti.com>
+ <1393520088.4507.92.camel@paszta.hi.pengutronix.de>
+Message-ID: <53103C72.5030509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 30, 2013 at 3:04 PM, Luciano Coelho <coelho@ti.com> wrote:
-> Hi,
->
-> This patch series adds device tree support to the wlcore_sdio driver,
-> which is used by WiLink6, WiLink7 and WiLink8.
->
-> The first patches do some clean-up to make the data needed in the
-> wilink device tree node smaller.  The remaining patches implement the
-> actual device tree node parsing in wlcore_sdio.
->
-> Regarding the XTAL clock issues, for now we don't support XTAL mode
-> with DT, but I have sent a proposal for a small change in the clock
-> framework to support this, but it's still under discussions [1].
->
-> The DTS file changes will be sent separately, since they need to go
-> via different trees.
->
-> A new version of the bindings documentation has been sent [2] and, if
-> no more comments are given to it, I'll apply it via my tree.
->
-> [1] http://news.gmane.org/find-root.php?message_id=1372971912-10877-1-git-send-email-coelho at ti.com
-> [2] http://news.gmane.org/find-root.php?message_id=1375109728-5931-1-git-send-email-coelho at ti.com
->
-> Changes in v4:
->
-> * Rebased on top of 3.11-rc3 (eg. no more changes on the board files
->   that were removed);
->
-> * Use the new irq_get_trigger_type() instead of
->   irqd_get_trigger_type() (thanks Javier);
->
-> * Added some missing const's (thanks Felipe);
->
-> * Reverted Tony's workaround to get WiLink to work on Panda while DT
->   was not supported yet.
->
->
-> Please review.
+On 27/02/14 18:54, Philipp Zabel wrote:
 
-What is the state of the series? Who is now responsible for the
-patches? What issues were still not handled?
+>> - One IPU enabled, one disabled: nothing special here, just set the
+>> other IPU to status="disabled" in the DT data. The driver for the
+>> enabled IPU would register the required DRM entities.
+> 
+> that should work. Let the enabled IPU create the imx-drm platform device
+> on probe, parse the device tree and ignore everything only hanging off
+> of the disabled IPU.
 
-Yegor
+I think you misunderstood me a bit.
 
-> Luciano Coelho (8):
->   wl1251: split wl251 platform data to a separate structure
->   wlcore: set irq_flags in the board files instead of hiding behind a
->     quirk
->   wlcore: remove pwr_in_suspend from platform data
->   wl12xx: use frequency instead of enumerations for pdata clocks
->   wlcore: add initial device tree support to the sdio module
->   wlcore: sdio: add wilink clock providers
->   wlcore: sdio: get clocks from device tree
->   wlcore/wl12xx: check if we got correct clock data from DT
->
->  arch/arm/mach-davinci/board-da850-evm.c        |  11 ++-
->  arch/arm/mach-omap2/board-omap3evm.c           |  22 ++++-
->  arch/arm/mach-omap2/board-omap3pandora.c       |   4 +-
->  arch/arm/mach-omap2/board-rx51-peripherals.c   |   2 +-
->  arch/arm/mach-omap2/board-zoom-peripherals.c   |  33 +++++++-
->  arch/arm/mach-omap2/devices.c                  |  39 ---------
->  drivers/net/wireless/ti/wilink_platform_data.c |  37 ++++++--
->  drivers/net/wireless/ti/wl1251/sdio.c          |  12 +--
->  drivers/net/wireless/ti/wl1251/spi.c           |   2 +-
->  drivers/net/wireless/ti/wl12xx/main.c          |  78 +++++++++++++++--
->  drivers/net/wireless/ti/wl12xx/wl12xx.h        |  28 +++++++
->  drivers/net/wireless/ti/wlcore/debugfs.c       |   2 +-
->  drivers/net/wireless/ti/wlcore/main.c          |  20 ++---
->  drivers/net/wireless/ti/wlcore/sdio.c          | 112 +++++++++++++++++++++++--
->  drivers/net/wireless/ti/wlcore/wlcore.h        |   5 +-
->  drivers/net/wireless/ti/wlcore/wlcore_i.h      |   1 +
->  include/linux/wl12xx.h                         |  52 +++++-------
->  17 files changed, 340 insertions(+), 120 deletions(-)
->
-> --
-> 1.8.3.2
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+What I meant is that there's no need for imx-drm device at all, neither
+in the DT data or in the kernel side.
+
+There'd just be the DT nodes for the IPUs, which would cause the IPU
+platform devices to be created, and a driver for the IPU. So just like
+for any other normal platform device.
+
+In the simplest cases, where only one IPU is enabled, or the IPUs want
+to be considered as totally independent, there'd be nothing special. The
+IPU driver would just register the drm entities.
+
+> [Reordering a bit...]
+>> - Two IPUs in combined mode:
+>>
+>> Pick one IPU as the master, and one as slave. Link the IPU nodes in DT
+>> data with phandles, say: master=<&ipu1> on the slave IPU and
+>> slave=<&ipu0> on the master.
+>>
+>> The master one will register the DRM entities, and the slave one will
+>> just do what the master says.
+> 
+> That might work, too. Just let the each IPU scan the graph and try to
+> find the imx-drm master before creating the imx-drm platform device.
+> The first IPU fill find no preexisting master and create the imx-drm
+> platform device as above, adding the other IPU as well as the other
+> components with component_master_add_child. It just has to make sure
+> that the other IPU is added to the list before the encoders are.
+> 
+> The second IPU will scan the graph, find a preexisting master for the
+> other IPU node, register its component and just wait to be bound by the
+> master.
+
+Here the slave IPU doesn't need to scan the graph at all. It just needs
+to make itself available somehow to the master. Maybe just by exported
+functions, or registering itself somewhere.
+
+Only the master IPU will scan the graph, and as all the entities are
+connected to the same graph, including the slave IPU, the master can
+find all the relevant nodes.
+
+>> - Two IPUs as separate units: almost the same as above, but both would
+>> independently register the DRM entities.
+> 
+> Here the second IPU would not be connected to the first IPU via the
+> graph - it would not find a preexisting imx-drm device when scanning its
+> graph and create its own imx-drm device just like the first IPU did.
+> As a result there are two completely separate DRM devices.
+
+I understood that that would be the idea, two separate, independent DRM
+devices. Like two graphics cards on a PC.
+
+> That being said, this change could be made at any time in the future,
+> in a backwards compatible fashion, by just declaring the imx-drm node
+> optional and ignoring it if it exists.
+
+Yes, I agree.
+
+And I don't even know if the master-slave method I described is valid,
+although I don't see why it would not work. The master
+"display-subsystem" DT node does make sense to me in cases like this,
+where the IPUs need to be driven as a single unit.
+
+> Did anybody propose such a generic term? How about:
+> 
+> -imx-drm {
+> -	compatible = "fsl,imx-drm";
+> -	ports = <&ipu1_di0>, <&ipu1_di1>;
+> -};
+> +display-subsystem {
+> +	compatible = "fsl,imx-display-subsystem";
+> +	ports = <&ipu1_di0>, <&ipu1_di1>;
+> +};
+
+That sounds fine to me.
+
+I wonder how it works if, say, there are 4 IPUs, and you want to run
+them in two pairs. In that case you need two of those display-subsystem
+nodes. But I guess it's just a matter of assigning a number for them
+with 'regs' property, and making sure the driver has nothing that
+prevents multiple instances of it.
+
+>>> If this wasn't the case, we wouldn't even attempt to describe what devices
+>>> we have on which I2C buses - we'd just list the hardware on the board
+>>> without giving any information about how it's wired together.
+>>>
+>>> This is no different - however, it doesn't have (and shouldn't) be
+>>> subsystem specific... but - and this is the challenge we then face - how
+>>> do you decide that on one board with a single zImage kernel, with both
+>>> DRM and fbdev built-in, whether to use the DRM interfaces or the fbdev
+>>> interfaces?  We could have both matching the same compatible string, but
+>>> we'd also need some way to tell each other that they're not allowed to
+>>> bind.
+>>
+>> Yes, that's an annoying problem, we have that on OMAP. It's a clear sign
+>> that our video support is rather messed up.
+>>
+>> My opinion is that the fbdev and drm drivers for a single hardware
+>> should be exclusive at compile time. We don't allow multiple drivers for
+>> single device for other subsystems either, do we? Eventually we should
+>> have only one driver for one hardware device.
+>>
+>> If that's not possible, then the drivers in question could have an
+>> option to enable or disable themselves, passed via the kernel command
+>> line, so that the user can select which subsystem to use.
+> 
+> That is the exact same problem as having multiple drivers that can bind
+> to the same device.
+
+Hmm, sorry? Weren't we just discussing about that problem =). Or maybe I
+missed the original point from Russell, as the problem about DRM and
+fbdev conflicting sounded a bit unrelated.
+
+> For i.MX, for now, let's keep the mandatory imx-drm node. Maybe rename
+> it so nobody can say we are leaking linux subsystem names into the
+> device tree.
+
+Sounds good to me.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/a50d02a3/attachment.sig>
