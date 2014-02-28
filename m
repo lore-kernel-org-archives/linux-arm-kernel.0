@@ -1,35 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Feb 2014 21:03:01 +0100
-Subject: [PATCH 7/7] PCI: designware: split samsung and fsl bindings
-In-Reply-To: <1393608523-17509-8-git-send-email-l.stach@pengutronix.de>
+Date: Fri, 28 Feb 2014 21:04:14 +0100
+Subject: [PATCH 0/7] PCI irq mapping fixes and cleanups
+In-Reply-To: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
 References: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
- <1393608523-17509-8-git-send-email-l.stach@pengutronix.de>
-Message-ID: <201402282103.01897.arnd@arndb.de>
+Message-ID: <201402282104.14295.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 28 February 2014, Lucas Stach wrote:
-> +Required properties:
-> +- compatible: "fsl,imx6q-pcie"
-> +- reg: base addresse and length of the pcie controller
-> +- interrupts: First entry must contain interrupt handle for controller
-> +  INTA output.
+> This series cleans up the PCI irq mapping for all
+> the ARM PCI host drivers, so they handle it in the
+> way defined in the common PCI bindings.
+> 
+> Testing appreciated.
+> 
+> Lucas Stach (7):
+>   ARM: dts: tegra: add PCIe interrupt mapping properties
+>   PCI: tegra: use new OF interrupt mapping when possible
+>   PCI: rcar: use new OF interrupt mapping when possible
+>   ARM: dts: exynos5440: fix PCIe interrupt mapping
+>   ARM: dts: imx6: add PCIe interrupt mapping properties
+>   PCI: designware: use new OF interrupt mapping when possible
+>   PCI: designware: split samsung and fsl bindings
 
-I think this should be documented as "optional" and only for
-backwards compatibility with old kernels.
+Patches 1-6
 
-> +- clocks: Must contain an entry for each entry in clock-names.
-> +       See ../clocks/clock-bindings.txt for details.
-> +- clock-names: Must include the following entries: 
-> +       - "pcie_ref_125m"
-> +       - "sata_ref_100m"
-> +       - "lvds_gate"
-> +       - "pcie_axi"
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-I don't understand why you have completely different clocks here
-from the exynos documentation. The clock names should really be
-the same. Also, why do you have a "sata_ref_100m" clock?
-Is this just driving a device that happens to be on-board
-for a specific machine? Same for the "lvds_gate".
+For the last patch, the clock information looks like it needs to
+be fixed. I realize that you are just documenting what the driver
+is using at the moment, but that is not a proper way of establishing
+a binding.
 
 	Arnd
