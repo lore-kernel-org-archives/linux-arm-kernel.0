@@ -1,33 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Feb 2014 13:27:24 +0100
-Subject: [PATCH 1/3] PCI: designware: add legacy PCI interrupt mapping
-In-Reply-To: <1393589374.5225.9.camel@weser.hi.pengutronix.de>
-References: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
- <5728262.sMhnqxGTXH@wuerfel>
- <1393589374.5225.9.camel@weser.hi.pengutronix.de>
-Message-ID: <6315058.94ydMC9ka8@wuerfel>
+From: luca@coelho.fi (Luca Coelho)
+Date: Fri, 28 Feb 2014 14:29:51 +0200
+Subject: [PATCH v4 0/8] wilink: add device tree support
+In-Reply-To: <CAGm1_kvdzkvzEEymQ+H0XiKugifHF27KDz3jwX5Frg_U=S7KgA@mail.gmail.com>
+References: <1375189476-21557-1-git-send-email-coelho@ti.com>
+ <CAGm1_kvdzkvzEEymQ+H0XiKugifHF27KDz3jwX5Frg_U=S7KgA@mail.gmail.com>
+Message-ID: <1393590591.13669.36.camel@dubbel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 February 2014 13:09:34 Lucas Stach wrote:
-> Am Freitag, den 28.02.2014, 12:37 +0100 schrieb Arnd Bergmann:
-> > On Friday 28 February 2014 12:27:36 Lucas Stach wrote:
-> > The interrupt-map doesn't even look well-formed, since it refers to
-> > a gic that has #interrupt-cells=<3>, but only has one cell with the
-> > value. This clearly cannot work at all. It should probably be
-> > 
-> >       interrupt-map = <0x0 0 &gic GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-> > 
-> > Note that '53' is the IRQ number that is commonly assigned to
-> > SPI interrupt 21, since SPI starts at number 32 on GIC.
-> > 
-> Ah, I see. Thanks for the explanation. So we have a bogus Exynos DT,
-> which will break existing systems once the kernel starts to do the right
-> thing. This is starting to look great. 
- 
-It seems tegra and r-car have the same bug. We can probably fix it
-in a backwards-compatible way by changing the function to call
-the generic helper first and if that fails call printk_once()
-to emit a warning and return the hardwired IRQ number.
+On Fri, 2014-02-28 at 08:26 +0100, Yegor Yefremov wrote:
+> On Tue, Jul 30, 2013 at 3:04 PM, Luciano Coelho <coelho@ti.com> wrote:
+> > Hi,
+> >
+> > This patch series adds device tree support to the wlcore_sdio driver,
+> > which is used by WiLink6, WiLink7 and WiLink8.
+> >
+> > The first patches do some clean-up to make the data needed in the
+> > wilink device tree node smaller.  The remaining patches implement the
+> > actual device tree node parsing in wlcore_sdio.
+> >
+> > Regarding the XTAL clock issues, for now we don't support XTAL mode
+> > with DT, but I have sent a proposal for a small change in the clock
+> > framework to support this, but it's still under discussions [1].
+> >
+> > The DTS file changes will be sent separately, since they need to go
+> > via different trees.
+> >
+> > A new version of the bindings documentation has been sent [2] and, if
+> > no more comments are given to it, I'll apply it via my tree.
+> >
+> > [1] http://news.gmane.org/find-root.php?message_id=1372971912-10877-1-git-send-email-coelho at ti.com
+> > [2] http://news.gmane.org/find-root.php?message_id=1375109728-5931-1-git-send-email-coelho at ti.com
+> >
+> > Changes in v4:
+> >
+> > * Rebased on top of 3.11-rc3 (eg. no more changes on the board files
+> >   that were removed);
+> >
+> > * Use the new irq_get_trigger_type() instead of
+> >   irqd_get_trigger_type() (thanks Javier);
+> >
+> > * Added some missing const's (thanks Felipe);
+> >
+> > * Reverted Tony's workaround to get WiLink to work on Panda while DT
+> >   was not supported yet.
+> >
+> >
+> > Please review.
+> 
+> What is the state of the series? Who is now responsible for the
+> patches? What issues were still not handled?
 
-	Arnd
+There were some comments about this series (or more precisely, the one
+that added the bindings documentation[1]).  Unfortunately, I have left
+TI since and have no time to handle them.  Feel free to pick it up and
+continue from there.
+
+[1] https://lkml.org/lkml/2013/7/30/712
+
+--
+Cheers,
+Luca.
