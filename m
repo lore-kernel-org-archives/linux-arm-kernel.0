@@ -1,70 +1,94 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 28 Feb 2014 16:50:28 +0100
-Subject: [PATCH] usb: gadget: atmel_usba: Fix crashed during stopping
- when DEBUG is enabled
-In-Reply-To: <1393598066-4016-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1393598066-4016-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20140228155027.GC2974@piout.net>
+From: herve.codina@celad.com (Herve Codina)
+Date: Fri, 28 Feb 2014 16:53:44 +0100
+Subject: nand pmecc crash detected
+Message-ID: <5310B108.8040800@celad.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+Hi,
 
-On 28/02/2014 at 15:34:01 +0100, Gregory CLEMENT wrote :
-> The debug trace in the atmel_usba_stop function made the assumption
-> that the driver pointer passed in parameter was not NULL. Since the
-> commit "usb: gadget: udc-core: fix a regression during gadget driver
-> unbinding", it was no more always true. This lead to a kernel crash.
-> 
-> This commit now use the driver pointer stored in udc which fixes this
-> issue.
-> 
-> Since the commit which have triggered this issue was backported to the
-> 3.2 stable branch, then this one should also be backported to the same
-> kernel.
-> 
-> Cc: stable at vger.kernel.org # v3.2+
-> Fixes: 511f3c5326ea (usb: gadget: udc-core: fix a regression during gadget driver unbinding)
-> ---
->  drivers/usb/gadget/atmel_usba_udc.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-> index 52771d4c44bc..167843de2d8a 100644
-> --- a/drivers/usb/gadget/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/atmel_usba_udc.c
-> @@ -1827,12 +1827,12 @@ static int atmel_usba_stop(struct usb_gadget *gadget,
->  	toggle_bias(0);
->  	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
->  
-> -	udc->driver = NULL;
-> -
->  	clk_disable_unprepare(udc->hclk);
->  	clk_disable_unprepare(udc->pclk);
->  
-> -	DBG(DBG_GADGET, "unregistered driver `%s'\n", driver->driver.name);
-> +	DBG(DBG_GADGET, "unregistered driver `%s'\n", udc->driver->driver.name);
-> +
-> +	udc->driver = NULL;
+I am using an sam5d35 and its pmecc nand ecc controller.
 
-Shouldn't we get rid of that assignment as it is done in
-usb_gadget_remove_driver() anyway ?
+In barebox, using similar atmel_nand.c the system crashes.
 
->  
->  	return 0;
->  }
-> -- 
-> 1.8.1.2
-> 
+The problem was a call to chip->ecc.hwctl from nand_write_subpage_hwecc
+(nand_base.c) when we write a sub page.
+
+chip->ecc.hwctl function is not set when we are using PMECC controller.
+
+As a workaround, i set NAND_NO_SUBPAGE_WRITE for PMECC controller in
+order to disable sub page access in nand_write_page.
+
+I think we can have the same problem in Linux. I do not performed
+subpage nand writes from Linux but i made the following patch according
+to my Barebox defect.
+
+Here after are my patches (same modification) for 1st my local Barebox
+and 2nd my local Linux :
+
+---8<-------------------
+>From 757e8dbf141619a55b7a5b1ca11780b2589eacc1 Mon Sep 17 00:00:00 2001
+From: Herve Codina <Herve.CODINA@celad.com>
+Date: Fri, 28 Feb 2014 08:39:08 +0100
+Subject: [PATCH 5/5] Disable Subpage nand write when using Atmel PMECC.
+
+
+Signed-off-by: Herve Codina <Herve.CODINA@celad.com>
+---
+ drivers/mtd/nand/atmel_nand.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 2ff7427..cdbe685 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -837,6 +837,7 @@ static int __init
+atmel_pmecc_nand_init_params(struct device_d *dev,
+ 		return err_no;
+ 	}
+
++	nand_chip->options |= NAND_NO_SUBPAGE_WRITE;
+ 	nand_chip->ecc.read_page = atmel_nand_pmecc_read_page;
+ 	nand_chip->ecc.write_page = atmel_nand_pmecc_write_page;
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/e8149705/attachment.sig>
+1.7.9.5
+
+---8<-------------------
+
+
+---8<-------------------
+>From bd6a9645841d74611a5be44a60c9c41b2bca9c19 Mon Sep 17 00:00:00 2001
+From: Herve Codina <Herve.CODINA@celad.com>
+Date: Fri, 28 Feb 2014 08:28:07 +0100
+Subject: [PATCH 4/4] Disable Subpage nand write when using Atmel PMECC.
+
+
+Signed-off-by: Herve Codina <Herve.CODINA@celad.com>
+---
+ drivers/mtd/nand/atmel_nand.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 5a36a7d..1340a7b 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -1249,6 +1249,7 @@ static int __init
+atmel_pmecc_nand_init_params(struct platform_device *pdev,
+ 		goto err;
+ 	}
+
++	nand_chip->options |= NAND_NO_SUBPAGE_WRITE;
+ 	nand_chip->ecc.read_page = atmel_nand_pmecc_read_page;
+ 	nand_chip->ecc.write_page = atmel_nand_pmecc_write_page;
+
+-- 
+1.7.9.5
+
+---8<-------------------
+
+Can you review/integrate these patches in Barebox / Linux ?
+
+
+Best regards,
+Herv? Codina
