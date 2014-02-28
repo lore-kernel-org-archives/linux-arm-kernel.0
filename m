@@ -1,231 +1,87 @@
-From: maxime.coquelin@st.com (Maxime COQUELIN)
-Date: Fri, 28 Feb 2014 13:17:19 +0100
-Subject: [PATCH 3/5] pinctrl: st: Enhance the controller to manage unavailable
- registers
-In-Reply-To: <1393589841-6634-1-git-send-email-maxime.coquelin@st.com>
-References: <1393589841-6634-1-git-send-email-maxime.coquelin@st.com>
-Message-ID: <1393589841-6634-4-git-send-email-maxime.coquelin@st.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 28 Feb 2014 14:20:07 +0200
+Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
+Message-ID: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+Hi,
 
-This patch adds a new logic inside the st pinctrl to manage
-an unsupported scenario: some sysconfig are not available!
+This series is a re-send of
+http://article.gmane.org/gmane.linux.drivers.devicetree/61739
 
-This is the case of STiH407 where, although documented, the
-following registers from SYSCFG_FLASH have been removed from the SoC.
+I'm cc'ing more people, and I want to clarify the contents of the series:
 
-SYSTEM_CONFIG3040
-   Output Enable pad control for all PIO Alternate Functions
-and
-SYSTEM_ CONFIG3050
-   Pull Up pad control for all PIO Alternate Functions
+While this has been developed for OMAP, only the first patch is about OMAP
+bindings. The rest are generic bindings for video components, which can be used
+on any platform.
 
-Without managing this condition an imprecise external abort
-will be detect.
+The bindings use the V4L2 style video port/endpoint system, described in
+Documentation/devicetree/bindings/media/video-interfaces.txt, to connect the
+components. The same port/endpoint bindings are used by Philipp Zabel in his
+imx-drm patch series.
 
-To do this the patch also reviews the st_parse_syscfgs
-and other routines to manipulate the registers only if
-actually available.
-In any case, for example the st_parse_syscfgs detected
-an error condition but no action was made in the
-st_pctl_probe_dt.
+Shortly about the display components in the series, in the order of probable
+public interest:
 
-Signed-off-by: Maxime Coquelin <maxime.coquelin@st.com>
-Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
----
- drivers/pinctrl/pinctrl-st.c | 121 +++++++++++++++++++++++++++----------------
- 1 file changed, 75 insertions(+), 46 deletions(-)
+* Analog TV, DVI and HDMI Connectors represent a respective connector on the
+  board. They don't do much, but they do mark the end of the video pipeline (from
+  the board's pov), and they should also in the future offer ways to handle
+  things like the +5V pin on DVI and HDMI connector and HPD pin.
+  
+* MIPI DPI panel and MIPI DSI CM panels represent bindings for simple panels
+  using the respective video bus.
+  
+* Sony acx565akm is an SPI controlled panel using flatlink video bus.
+  
+* TFP410 is a DPI to DVI encoder.
+  
+* TPD12S015 is a HDMI companion chip, used on OMAP boards.
 
-diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-index f95eecf..888ee60 100644
---- a/drivers/pinctrl/pinctrl-st.c
-+++ b/drivers/pinctrl/pinctrl-st.c
-@@ -336,6 +336,19 @@ static const struct st_pctl_data  stih416_data = {
- 	.alt = 0, .oe = 40, .pu = 50, .od = 60, .rt = 100,
- };
- 
-+static const struct st_pctl_data  stih407_flashdata = {
-+	.rt_style	= st_retime_style_none,
-+	.input_delays	= stih416_delays,
-+	.ninput_delays	= 14,
-+	.output_delays	= stih416_delays,
-+	.noutput_delays = 14,
-+	.alt = 0,
-+	.oe = -1, /* Not Available */
-+	.pu = -1, /* Not Available */
-+	.od = 60,
-+	.rt = 100,
-+};
-+
- /* Low level functions.. */
- static inline int st_gpio_bank(int gpio)
- {
-@@ -356,25 +369,27 @@ static void st_pinconf_set_config(struct st_pio_control *pc,
- 	unsigned int oe_value, pu_value, od_value;
- 	unsigned long mask = BIT(pin);
- 
--	regmap_field_read(output_enable, &oe_value);
--	regmap_field_read(pull_up, &pu_value);
--	regmap_field_read(open_drain, &od_value);
--
--	/* Clear old values */
--	oe_value &= ~mask;
--	pu_value &= ~mask;
--	od_value &= ~mask;
--
--	if (config & ST_PINCONF_OE)
--		oe_value |= mask;
--	if (config & ST_PINCONF_PU)
--		pu_value |= mask;
--	if (config & ST_PINCONF_OD)
--		od_value |= mask;
--
--	regmap_field_write(output_enable, oe_value);
--	regmap_field_write(pull_up, pu_value);
--	regmap_field_write(open_drain, od_value);
-+	if (output_enable) {
-+		regmap_field_read(output_enable, &oe_value);
-+		oe_value &= ~mask;
-+		if (config & ST_PINCONF_OE)
-+			oe_value |= mask;
-+		regmap_field_write(output_enable, oe_value);
-+	}
-+	if (pull_up) {
-+		regmap_field_read(pull_up, &pu_value);
-+		pu_value &= ~mask;
-+		if (config & ST_PINCONF_PU)
-+			pu_value |= mask;
-+		regmap_field_write(pull_up, pu_value);
-+	}
-+	if (open_drain) {
-+		regmap_field_read(open_drain, &od_value);
-+		od_value &= ~mask;
-+		if (config & ST_PINCONF_OD)
-+			od_value |= mask;
-+		regmap_field_write(open_drain, od_value);
-+	}
- }
- 
- static void st_pctl_set_function(struct st_pio_control *pc,
-@@ -385,6 +400,9 @@ static void st_pctl_set_function(struct st_pio_control *pc,
- 	int pin = st_gpio_pin(pin_id);
- 	int offset = pin * 4;
- 
-+	if (!alt)
-+		return;
-+
- 	regmap_field_read(alt, &val);
- 	val &= ~(0xf << offset);
- 	val |= function << offset;
-@@ -517,22 +535,28 @@ static void st_pinconf_set_retime_dedicated(struct st_pinctrl *info,
- 	regmap_field_write(rt_d->rt[pin], retime_config);
- }
- 
--static void st_pinconf_get_direction(struct st_pio_control *pc,
--	int pin, unsigned long *config)
-+static void st_pinconf_get_direction(struct st_pio_control *pc, int pin,
-+				     unsigned long *config)
- {
- 	unsigned int oe_value, pu_value, od_value;
- 
--	regmap_field_read(pc->oe, &oe_value);
--	regmap_field_read(pc->pu, &pu_value);
--	regmap_field_read(pc->od, &od_value);
-+	if (pc->oe) {
-+		regmap_field_read(pc->oe, &oe_value);
-+		if (oe_value & BIT(pin))
-+			ST_PINCONF_PACK_OE(*config);
-+	}
- 
--	if (oe_value & BIT(pin))
--		ST_PINCONF_PACK_OE(*config);
--	if (pu_value & BIT(pin))
--		ST_PINCONF_PACK_PU(*config);
--	if (od_value & BIT(pin))
--		ST_PINCONF_PACK_OD(*config);
-+	if (pc->pu) {
-+		regmap_field_read(pc->pu, &pu_value);
-+		if (pu_value & BIT(pin))
-+			ST_PINCONF_PACK_PU(*config);
-+	}
- 
-+	if (pc->od) {
-+		regmap_field_read(pc->od, &od_value);
-+		if (od_value & BIT(pin))
-+			ST_PINCONF_PACK_OD(*config);
-+	}
- }
- 
- static int st_pinconf_get_retime_packed(struct st_pinctrl *info,
-@@ -1051,8 +1075,21 @@ static int st_pctl_dt_setup_retime(struct st_pinctrl *info,
- 	return -EINVAL;
- }
- 
--static int st_parse_syscfgs(struct st_pinctrl *info,
--		int bank, struct device_node *np)
-+
-+static struct regmap_field *st_pc_get_value(struct device *dev,
-+					    struct regmap *regmap, int bank,
-+					    int data, int lsb, int msb)
-+{
-+	struct reg_field reg = REG_FIELD((data + bank) * 4, lsb, msb);
-+
-+	if (data < 0)
-+		return NULL;
-+
-+	return devm_regmap_field_alloc(dev, regmap, reg);
-+}
-+
-+static void st_parse_syscfgs(struct st_pinctrl *info, int bank,
-+			     struct device_node *np)
- {
- 	const struct st_pctl_data *data = info->data;
- 	/**
-@@ -1062,29 +1099,21 @@ static int st_parse_syscfgs(struct st_pinctrl *info,
- 	 */
- 	int lsb = (bank%4) * ST_GPIO_PINS_PER_BANK;
- 	int msb = lsb + ST_GPIO_PINS_PER_BANK - 1;
--	struct reg_field alt_reg = REG_FIELD((data->alt + bank) * 4, 0, 31);
--	struct reg_field oe_reg = REG_FIELD((data->oe + bank/4) * 4, lsb, msb);
--	struct reg_field pu_reg = REG_FIELD((data->pu + bank/4) * 4, lsb, msb);
--	struct reg_field od_reg = REG_FIELD((data->od + bank/4) * 4, lsb, msb);
- 	struct st_pio_control *pc = &info->banks[bank].pc;
- 	struct device *dev = info->dev;
- 	struct regmap *regmap  = info->regmap;
- 
--	pc->alt = devm_regmap_field_alloc(dev, regmap, alt_reg);
--	pc->oe = devm_regmap_field_alloc(dev, regmap, oe_reg);
--	pc->pu = devm_regmap_field_alloc(dev, regmap, pu_reg);
--	pc->od = devm_regmap_field_alloc(dev, regmap, od_reg);
--
--	if (IS_ERR(pc->alt) || IS_ERR(pc->oe) ||
--			IS_ERR(pc->pu) || IS_ERR(pc->od))
--		return -EINVAL;
-+	pc->alt = st_pc_get_value(dev, regmap, bank, data->alt, 0, 31);
-+	pc->oe = st_pc_get_value(dev, regmap, bank/4, data->oe, lsb, msb);
-+	pc->pu = st_pc_get_value(dev, regmap, bank/4, data->pu, lsb, msb);
-+	pc->od = st_pc_get_value(dev, regmap, bank/4, data->od, lsb, msb);
- 
- 	/* retime avaiable for all pins by default */
- 	pc->rt_pin_mask = 0xff;
- 	of_property_read_u32(np, "st,retime-pin-mask", &pc->rt_pin_mask);
- 	st_pctl_dt_setup_retime(info, bank, pc);
- 
--	return 0;
-+	return;
- }
- 
- /*
-@@ -1267,7 +1296,7 @@ static struct of_device_id st_pctl_of_match[] = {
- 	{ .compatible = "st,stih407-sbc-pinctrl", .data = &stih416_data},
- 	{ .compatible = "st,stih407-front-pinctrl", .data = &stih416_data},
- 	{ .compatible = "st,stih407-rear-pinctrl", .data = &stih416_data},
--	{ .compatible = "st,stih407-flash-pinctrl", .data = &stih416_data},
-+	{ .compatible = "st,stih407-flash-pinctrl", .data = &stih407_flashdata},
- 	{ /* sentinel */ }
- };
- 
+These patches, on top of the OMAP DSS DT work, can be found from:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/tomba/linux.git work/dss-dt
+
+ Tomi
+
+Tomi Valkeinen (9):
+  Doc/DT: Add OMAP DSS DT Bindings
+  Doc/DT: Add DT binding documentation for Analog TV Connector
+  Doc/DT: Add DT binding documentation for DVI Connector
+  Doc/DT: Add DT binding documentation for HDMI Connector
+  Doc/DT: Add DT binding documentation for MIPI DPI Panel
+  Doc/DT: Add DT binding documentation for MIPI DSI CM Panel
+  Doc/DT: Add DT binding documentation for Sony acx565akm panel
+  Doc/DT: Add DT binding documentation for TFP410 encoder
+  Doc/DT: Add DT binding documentation for tpd12s015 encoder
+
+ .../bindings/video/analog-tv-connector.txt         |  23 +++
+ .../devicetree/bindings/video/dvi-connector.txt    |  26 +++
+ .../devicetree/bindings/video/hdmi-connector.txt   |  23 +++
+ .../devicetree/bindings/video/panel-dpi.txt        |  43 +++++
+ .../devicetree/bindings/video/panel-dsi-cm.txt     |  26 +++
+ .../devicetree/bindings/video/sony,acx565akm.txt   |  28 +++
+ .../devicetree/bindings/video/ti,omap-dss.txt      | 203 +++++++++++++++++++++
+ .../devicetree/bindings/video/ti,omap2-dss.txt     |  54 ++++++
+ .../devicetree/bindings/video/ti,omap3-dss.txt     |  83 +++++++++
+ .../devicetree/bindings/video/ti,omap4-dss.txt     | 111 +++++++++++
+ .../devicetree/bindings/video/ti,tfp410.txt        |  41 +++++
+ .../devicetree/bindings/video/ti,tpd12s015.txt     |  44 +++++
+ .../devicetree/bindings/video/video-ports.txt      |  22 +++
+ 13 files changed, 727 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/analog-tv-connector.txt
+ create mode 100644 Documentation/devicetree/bindings/video/dvi-connector.txt
+ create mode 100644 Documentation/devicetree/bindings/video/hdmi-connector.txt
+ create mode 100644 Documentation/devicetree/bindings/video/panel-dpi.txt
+ create mode 100644 Documentation/devicetree/bindings/video/panel-dsi-cm.txt
+ create mode 100644 Documentation/devicetree/bindings/video/sony,acx565akm.txt
+ create mode 100644 Documentation/devicetree/bindings/video/ti,omap-dss.txt
+ create mode 100644 Documentation/devicetree/bindings/video/ti,omap2-dss.txt
+ create mode 100644 Documentation/devicetree/bindings/video/ti,omap3-dss.txt
+ create mode 100644 Documentation/devicetree/bindings/video/ti,omap4-dss.txt
+ create mode 100644 Documentation/devicetree/bindings/video/ti,tfp410.txt
+ create mode 100644 Documentation/devicetree/bindings/video/ti,tpd12s015.txt
+ create mode 100644 Documentation/devicetree/bindings/video/video-ports.txt
+
 -- 
-1.9.0
+1.8.3.2
