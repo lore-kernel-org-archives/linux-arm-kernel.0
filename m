@@ -1,53 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Feb 2014 16:13:43 +0000
-Subject: [PATCH 9/9] Doc/DT: Add DT binding documentation for tpd12s015
- encoder
-In-Reply-To: <1393590016-9361-10-git-send-email-tomi.valkeinen@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 28 Feb 2014 18:15:05 +0200
+Subject: [PATCH 4/9] Doc/DT: Add DT binding documentation for HDMI
+ Connector
+In-Reply-To: <20140228160612.GR21483@n2100.arm.linux.org.uk>
 References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-10-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <20140228161343.GS21483@n2100.arm.linux.org.uk>
+ <1393590016-9361-5-git-send-email-tomi.valkeinen@ti.com>
+ <20140228160612.GR21483@n2100.arm.linux.org.uk>
+Message-ID: <5310B609.1010105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 02:20:16PM +0200, Tomi Valkeinen wrote:
-> Add DT binding documentation for tpd12s015 encoder
+On 28/02/14 18:06, Russell King - ARM Linux wrote:
+
+>> +hdmi0: connector at 1 {
+>> +	compatible = "hdmi-connector";
+>> +	label = "hdmi";
+>> +
+>> +	hdmi_connector_in: endpoint {
+>> +		remote-endpoint = <&tpd12s015_out>;
+>> +	};
+>> +};
 > 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Reviewed-by: Archit Taneja <archit@ti.com>
-> ---
->  .../devicetree/bindings/video/ti,tpd12s015.txt     | 44 ++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/ti,tpd12s015.txt
+> It seems rather weird to have DVI connectors having an optional I2C
+> property, but HDMI (which augments DVI) not having that as at least an
+> optional property.
+
+I have added only the properties that I have used. I did think about the
+i2c for HDMI also, but thought that I don't use it, and so can't test
+it, and so I could well create a bad binding.
+
+And, as I don't see any issue in adding it later, when someone uses it,
+I decided to leave it out.
+
+> I can quite well see the iMX HDMI support needing an i2c bus here.
 > 
-> diff --git a/Documentation/devicetree/bindings/video/ti,tpd12s015.txt b/Documentation/devicetree/bindings/video/ti,tpd12s015.txt
-> new file mode 100644
-> index 000000000000..26e6d32e3f20
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/ti,tpd12s015.txt
-> @@ -0,0 +1,44 @@
-> +TPD12S015 HDMI level shifter and ESD protection chip
-> +====================================================
-> +
-> +Required properties:
-> +- compatible: "ti,tpd12s015"
-> +
-> +Optional properties:
-> +- gpios: CT CP HPD, LS OE and HPD gpios
+> Also, HDMI has two connector standards - type A and type B, much like
+> the single vs dual link of DVI.  Again, DRM exposes this to userspace.
 
-If this is supposed to give people a clue about what these GPIOs are,
-it completely fails to do this.  CT CP?  HPD is obviously the hotplug
-detect signal, but why are there two - HDMI only has a single detect
-pin on the connector.
+True, but isn't that just a form factor? No functional differences? But
+I agree, we can add the two types here also to the compatible string.
 
-While it makes sense to stick all three into one property, is it
-possible that not all of these may be routed to a GPIO?  If so, how
-do you specify that one (or more) of these does not exist?
+ Tomi
 
-Another issue here is that other HDMI encoders are available - should
-every encoder define its own set of bindings, or should there be a
-base set of bindings which all encoders should conform to - such as
-always having a HDMI output port?
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/28e9e5c9/attachment.sig>
