@@ -1,75 +1,106 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 28 Feb 2014 11:22:59 +0200
-Subject: [PATCH 07/12] CLK: TI: interface: add support for omap2430 specific
- interface clock
+Date: Fri, 28 Feb 2014 11:23:02 +0200
+Subject: [PATCH 10/12] ARM: OMAP2: clock: add DT boot support for cpufreq_ck
 In-Reply-To: <1393579384-23440-1-git-send-email-t-kristo@ti.com>
 References: <1393579384-23440-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1393579384-23440-8-git-send-email-t-kristo@ti.com>
+Message-ID: <1393579384-23440-11-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP2430 I2CHS modules require specific hardware ops to be used, so added
-a new compatible string for this.
+The clock and clkdev for this are added manually.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- .../devicetree/bindings/clock/ti/interface.txt     |    2 ++
- arch/arm/mach-omap2/clock.h                        |    1 -
- drivers/clk/ti/interface.c                         |    7 +++++++
- include/linux/clk/ti.h                             |    1 +
- 4 files changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   46 ++++++++++++++++++++++++++
+ drivers/clk/ti/clk-2xxx.c                    |    2 ++
+ include/linux/clk/ti.h                       |    1 +
+ 3 files changed, 49 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/ti/interface.txt b/Documentation/devicetree/bindings/clock/ti/interface.txt
-index 064e8ca..3111a40 100644
---- a/Documentation/devicetree/bindings/clock/ti/interface.txt
-+++ b/Documentation/devicetree/bindings/clock/ti/interface.txt
-@@ -21,6 +21,8 @@ Required properties:
-   "ti,omap3-dss-interface-clock" - interface clock with DSS specific HW handling
-   "ti,omap3-ssi-interface-clock" - interface clock with SSI specific HW handling
-   "ti,am35xx-interface-clock" - interface clock with AM35xx specific HW handling
-+  "ti,omap2430-interface-clock" - interface clock with OMAP2430 specific HW
-+				  handling
- - #clock-cells : from common clock binding; shall be set to 0
- - clocks : link to phandle of parent clock
- - reg : base address for the control register
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index 7b7a03c..bb67238 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -265,7 +265,6 @@ extern const struct clk_hw_omap_ops clkhwops_omap3430es2_hsotgusb_wait;
- extern const struct clk_hw_omap_ops clkhwops_am35xx_ipss_module_wait;
- extern const struct clk_hw_omap_ops clkhwops_apll54;
- extern const struct clk_hw_omap_ops clkhwops_apll96;
--extern const struct clk_hw_omap_ops clkhwops_omap2430_i2chs_wait;
- 
- /* clksel_rate blocks shared between OMAP44xx and AM33xx */
- extern const struct clksel_rate div_1_0_rates[];
-diff --git a/drivers/clk/ti/interface.c b/drivers/clk/ti/interface.c
-index 320a2b1..4b1c336 100644
---- a/drivers/clk/ti/interface.c
-+++ b/drivers/clk/ti/interface.c
-@@ -123,3 +123,10 @@ static void __init of_ti_am35xx_interface_clk_setup(struct device_node *node)
+diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+index b935ed2..09af46c 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
++++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+@@ -208,3 +208,56 @@ void omap2xxx_clkt_vps_late_init(void)
+ 		clk_put(c);
+ 	}
  }
- CLK_OF_DECLARE(ti_am35xx_interface_clk, "ti,am35xx-interface-clock",
- 	       of_ti_am35xx_interface_clk_setup);
 +
-+static void __init of_ti_omap2430_interface_clk_setup(struct device_node *node)
++#ifdef CONFIG_OF
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++
++static const struct clk_ops virt_prcm_set_ops = {
++	.recalc_rate	= &omap2_table_mpu_recalc,
++	.set_rate	= &omap2_select_table_rate,
++	.round_rate	= &omap2_round_to_table_rate,
++};
++
++/**
++ * omap2xxx_clkt_vps_init - initialize virt_prcm_set clock
++ *
++ * Does a manual init for the virtual prcm DVFS clock for OMAP2. This
++ * function is called only from omap2 DT clock init, as the virtual
++ * node is not modelled in the DT clock data.
++ */
++void omap2xxx_clkt_vps_init(void)
 +{
-+	_of_ti_interface_clk_setup(node, &clkhwops_omap2430_i2chs_wait);
++	struct clk_init_data init = { NULL };
++	struct clk_hw_omap *hw = NULL;
++	struct clk *clk;
++	const char *parent_name = "mpu_ck";
++	struct clk_lookup *lookup = NULL;
++
++	omap2xxx_clkt_vps_late_init();
++	omap2xxx_clkt_vps_check_bootloader_rates();
++
++	hw = kzalloc(sizeof(*hw), GFP_KERNEL);
++	lookup = kzalloc(sizeof(*lookup), GFP_KERNEL);
++	if (!hw || !lookup)
++		goto cleanup;
++	init.name = "virt_prcm_set";
++	init.ops = &virt_prcm_set_ops;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	hw->hw.init = &init;
++
++	clk = clk_register(NULL, &hw->hw);
++
++	lookup->dev_id = NULL;
++	lookup->con_id = "cpufreq_ck";
++	lookup->clk = clk;
++
++	clkdev_add(lookup);
++	return;
++cleanup:
++	kfree(hw);
++	kfree(lookup);
 +}
-+CLK_OF_DECLARE(ti_omap2430_interface_clk, "ti,omap2430-interface-clock",
-+	       of_ti_omap2430_interface_clk_setup);
++#endif
+diff --git a/drivers/clk/ti/clk-2xxx.c b/drivers/clk/ti/clk-2xxx.c
+index f6400fb..c808ab3 100644
+--- a/drivers/clk/ti/clk-2xxx.c
++++ b/drivers/clk/ti/clk-2xxx.c
+@@ -229,6 +229,8 @@ static int __init omap2xxx_dt_clk_init(int soc_type)
+ 	else
+ 		ti_dt_clocks_register(omap2430_clks);
+ 
++	omap2xxx_clkt_vps_init();
++
+ 	omap2_clk_disable_autoidle_all();
+ 
+ 	omap2_clk_enable_init_clocks(enable_init_clks,
 diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index ddac0d0..4a05d97 100644
+index a5aec68..03decc2 100644
 --- a/include/linux/clk/ti.h
 +++ b/include/linux/clk/ti.h
-@@ -308,6 +308,7 @@ static inline void of_ti_clk_deny_autoidle_all(void) { }
- #endif
+@@ -279,6 +279,7 @@ unsigned long omap2_dpllcore_recalc(struct clk_hw *hw,
+ int omap2_reprogram_dpllcore(struct clk_hw *clk, unsigned long rate,
+ 			     unsigned long parent_rate);
+ void omap2xxx_clkt_dpllcore_init(struct clk_hw *hw);
++void omap2xxx_clkt_vps_init(void);
  
- extern const struct clk_hw_omap_ops clkhwops_omap2xxx_dpll;
-+extern const struct clk_hw_omap_ops clkhwops_omap2430_i2chs_wait;
- extern const struct clk_hw_omap_ops clkhwops_omap3_dpll;
- extern const struct clk_hw_omap_ops clkhwops_omap4_dpllmx;
- extern const struct clk_hw_omap_ops clkhwops_wait;
+ void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index);
+ void ti_dt_clocks_register(struct ti_dt_clk *oclks);
 -- 
 1.7.9.5
