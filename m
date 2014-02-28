@@ -1,69 +1,56 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 28 Feb 2014 14:20:12 +0200
-Subject: [PATCH 5/9] Doc/DT: Add DT binding documentation for MIPI DPI Panel
+Date: Fri, 28 Feb 2014 14:20:14 +0200
+Subject: [PATCH 7/9] Doc/DT: Add DT binding documentation for Sony acx565akm
+ panel
 In-Reply-To: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1393590016-9361-6-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1393590016-9361-8-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding documentation for MIPI DPI Panel.
+Add DT binding documentation for Sony acx565akm panel
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Reviewed-by: Sebastian Reichel <sre@debian.org>
 Reviewed-by: Archit Taneja <archit@ti.com>
 ---
- .../devicetree/bindings/video/panel-dpi.txt        | 43 ++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/panel-dpi.txt
+ .../devicetree/bindings/video/sony,acx565akm.txt   | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/sony,acx565akm.txt
 
-diff --git a/Documentation/devicetree/bindings/video/panel-dpi.txt b/Documentation/devicetree/bindings/video/panel-dpi.txt
+diff --git a/Documentation/devicetree/bindings/video/sony,acx565akm.txt b/Documentation/devicetree/bindings/video/sony,acx565akm.txt
 new file mode 100644
-index 000000000000..72636c6f1c67
+index 000000000000..cd9cfdf7e3fe
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/video/panel-dpi.txt
-@@ -0,0 +1,43 @@
-+Generic MIPI DPI Panel
-+======================
++++ b/Documentation/devicetree/bindings/video/sony,acx565akm.txt
+@@ -0,0 +1,28 @@
++Sony ACX565AKM SDI Panel
++========================
 +
 +Required properties:
-+- compatible: "panel-dpi"
++- compatible: "sony,acx565akm"
 +
 +Optional properties:
 +- label: a symbolic name for the panel
-+- gpios: panel enable gpio and backlight enable gpio
++- gpios: panel reset gpio
 +
 +Required nodes:
-+- "panel-timing" containing video timings
-+  (Documentation/devicetree/bindings/video/display-timing.txt)
-+- Video port for DPI input
++- Video port for SDI input
 +
 +Example
 +-------
 +
-+lcd0: display at 0 {
-+        compatible = "samsung,lte430wq-f0c", "panel-dpi";
-+        label = "lcd";
++acx565akm at 2 {
++	compatible = "sony,acx565akm";
++	spi-max-frequency = <6000000>;
++	reg = <2>;
 +
-+        lcd_in: endpoint {
-+                remote-endpoint = <&dpi_out>;
-+        };
++	label = "lcd";
++	gpios = <&gpio3 26 GPIO_ACTIVE_HIGH>; /* 90 */
 +
-+        panel-timing {
-+                clock-frequency = <9200000>;
-+                hactive = <480>;
-+                vactive = <272>;
-+                hfront-porch = <8>;
-+                hback-porch = <4>;
-+                hsync-len = <41>;
-+                vback-porch = <2>;
-+                vfront-porch = <4>;
-+                vsync-len = <10>;
-+
-+                hsync-active = <0>;
-+                vsync-active = <0>;
-+                de-active = <1>;
-+                pixelclk-active = <1>;
-+        };
++	lcd_in: endpoint {
++		remote-endpoint = <&sdi_out>;
++	};
 +};
 -- 
 1.8.3.2
