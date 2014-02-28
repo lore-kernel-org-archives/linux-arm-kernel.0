@@ -1,50 +1,43 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 28 Feb 2014 10:27:45 -0800
-Subject: [PATCH] ARM: qcom: Enable basic support for Qualcomm platforms
- in multi_v7_defconfig
-In-Reply-To: <7hzjlbtc9y.fsf@paris.lan>
-References: <1393360445-16923-1-git-send-email-galak@codeaurora.org>
- <7hy50xv3rw.fsf@paris.lan> <7hzjlbtc9y.fsf@paris.lan>
-Message-ID: <20140228182745.GC2487@codeaurora.org>
+Date: Fri, 28 Feb 2014 10:29:15 -0800
+Subject: [PATCH v4 4/9] Input: pmic8xxx-keypad - Migrate to DT
+In-Reply-To: <20140228034138.GD7308@joshc.qualcomm.com>
+References: <1393552520-9068-1-git-send-email-sboyd@codeaurora.org>
+ <1393552520-9068-5-git-send-email-sboyd@codeaurora.org>
+ <20140228034138.GD7308@joshc.qualcomm.com>
+Message-ID: <20140228182915.GD2487@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28, Kevin Hilman wrote:
-> Hi Kumar,
+On 02/27, Josh Cartwright wrote:
+> Looks good, with the exception of one thing...
 > 
-> Kevin Hilman <khilman@linaro.org> writes:
+> On Thu, Feb 27, 2014 at 05:55:15PM -0800, Stephen Boyd wrote:
+> > The driver is only supported on DT enabled platforms. Convert the
+> > driver to DT so that it can probe properly.
+> > 
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> >  drivers/input/keyboard/pmic8xxx-keypad.c | 150 ++++++++++++++++++-------------
+> > @@ -471,50 +514,27 @@ static void pmic8xxx_kp_close(struct input_dev *dev)
+> >   */
+> >  static int pmic8xxx_kp_probe(struct platform_device *pdev)
+> >  {
+> [..]
+> > -	keymap_data = pdata->keymap_data;
+> > -	if (!keymap_data) {
+> > -		dev_err(&pdev->dev, "no keymap data supplied\n");
+> > -		return -EINVAL;
+> > -	}
+> > +	repeat = !of_property_read_bool(pdev->dev.of_node,
+> > +					"linux,input-no-autorepeat");
+> > +	wakeup = !of_property_read_bool(pdev->dev.of_node,
+> > +					"linux,keypad-wakeup");
 > 
-> > Kumar Gala <galak@codeaurora.org> writes:
-> >
-> >> Enable support for the MSM8x60, MSM8960, and MSM8974 SoCs, clocks and
-> >> serial console as part of the standard multi_v7_defconfig.
-> >>
-> >> Signed-off-by: Kumar Gala <galak@codeaurora.org>
-> >> ---
-> >>
-> >> I leave this to the arm-soc guys to apply because of possible conflicts
-> >> with other updates to multi_v7_defconfig.
-> >
-> > Seem to be a handful of !qcom changes here, probably resulting from a
-> > run of 'make savedefconfig' without all the new changes in.
-> >
-> > I've thinned this out to only the qcom changes and applied the following
-> > to next/boards.  I think it's better to do any 'make savedefconfig'
-> > cleanups as a separate, cleanup-only patch as needed.
-> 
-> Bisecting a new boot failure on u8500/snowball came down to this patch.
-> Simply disabling CONFIG_ARCH_QCOM in mutli_v7_defconfig gets the
-> u8500/snowball booting again, so it looks like there may still be some
-> qcom specifics that are being run on non-qcom platforms with a
-> multi-platform config.
-> 
-> Could you audit for initcalls/drivers being initialized on non-qcom
-> SoCs?
+> I don't think you mean to invert this.
 > 
 
-Can you try disabling CONFIG_ARCH_MSM8X60 and
-CONFIG_ARCH_MSM8960? MY suspicion is the text offset movement is
-causing problems, but I hope I'm wrong.
+Good catch. Thanks.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
