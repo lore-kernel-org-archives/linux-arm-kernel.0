@@ -1,56 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 27 Feb 2014 16:07:15 -0800
-Subject: [GIT PULL] omap fixes for v3.14-rc4
-Message-ID: <20140228000715.GA14514@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 27 Feb 2014 16:09:51 -0800
+Subject: [PATCH v6 2/2] ARM hibernation / suspend-to-disk
+In-Reply-To: <1393545478-14908-3-git-send-email-sebastian.capella@linaro.org>
+References: <1393545478-14908-1-git-send-email-sebastian.capella@linaro.org>
+ <1393545478-14908-3-git-send-email-sebastian.capella@linaro.org>
+Message-ID: <530FD3CF.2040900@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 8842446ac74263f1330f46e11ed649e2b0ed6545:
+On 02/27/14 15:57, Sebastian Capella wrote:
+> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+> index 8756e4b..1079ea8 100644
+> --- a/arch/arm/include/asm/memory.h
+> +++ b/arch/arm/include/asm/memory.h
+> @@ -291,6 +291,7 @@ static inline void *phys_to_virt(phys_addr_t x)
+>   */
+>  #define __pa(x)			__virt_to_phys((unsigned long)(x))
+>  #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+> +#define __pa_symbol(x)		__pa(RELOC_HIDE((unsigned long)(x), 0))
 
-  Documentation: dt: OMAP: Update Overo/Tobi (2014-02-14 08:37:53 -0800)
+Just curious, is there a reason for the RELOC_HIDE() here? Or
+__pa_symbol() for that matter? It looks like only x86 uses this on the
+__nosave_{begin,end} symbol. Maybe it's copy-pasta?
 
-are available in the git repository at:
+I also wonder if anyone has thought about making a __weak
+pfn_is_nosave() function so that architectures don't need to implement
+the same thing every time. Consolidating those shouldn't be part of this
+patch though.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/fixes-rc4
-
-for you to fetch changes up to 4b41636878ee32d4c45a49de7749abca9721bd6a:
-
-  ARM: OMAP3: Fix pinctrl interrupts for core2 (2014-02-27 15:35:48 -0800)
-
-----------------------------------------------------------------
-Fixes for omaps mostly to fix the 3430 display regression,
-and random crashes if booting n900 with device tree and
-thumb mode. Also few other regressions and fixes.
-
-----------------------------------------------------------------
-Illia Smyrnov (1):
-      ARM: OMAP4: hwmod: Fix SOFTRESET logic for OMAP4
-
-Santosh Shilimkar (1):
-      ARM: OMAP: Kill warning in CPUIDLE code with !CONFIG_SMP
-
-Sebastian Reichel (1):
-      ARM: OMAP2+: Add support for thumb mode on DT booted N900
-
-Suman Anna (1):
-      ARM: DRA7: hwmod data: correct the sysc data for spinlock
-
-Tomi Valkeinen (1):
-      ARM: OMAP2+: clock: fix clkoutx2 with CLK_SET_RATE_PARENT
-
-Tony Lindgren (2):
-      Merge tag 'for-v3.14-rc/omap-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.14/fixes
-      ARM: OMAP3: Fix pinctrl interrupts for core2
-
-Vaibhav Bedia (1):
-      ARM: OMAP5: PRM: Fix reboot handling
-
- arch/arm/mach-omap2/cclock3xxx_data.c     |  2 +
- arch/arm/mach-omap2/cpuidle44xx.c         |  8 ++-
- arch/arm/mach-omap2/dpll3xxx.c            | 92 ++++++++++++++++++++++++++-----
- arch/arm/mach-omap2/omap_hwmod.c          | 20 ++++---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  9 ++-
- arch/arm/mach-omap2/pdata-quirks.c        | 21 ++++++-
- arch/arm/mach-omap2/prminst44xx.c         |  4 +-
- include/linux/clk/ti.h                    |  4 ++
- 8 files changed, 125 insertions(+), 35 deletions(-)
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
