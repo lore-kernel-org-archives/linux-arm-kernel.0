@@ -1,59 +1,84 @@
 From: mohit.kumar@st.com (Mohit Kumar)
-Date: Fri, 28 Feb 2014 17:24:55 +0530
-Subject: [PATCH V7 02/10] SPEAr13XX: Fix static mapping table
+Date: Fri, 28 Feb 2014 17:25:02 +0530
+Subject: [PATCH V7 09/10] SPEAr13xx: defconfig: Update
 In-Reply-To: <cover.1393568715.git.mohit.kumar@st.com>
 References: <cover.1393568715.git.mohit.kumar@st.com>
-Message-ID: <4b60227b88963d540d9b3cd7cfada95e2bba21e7.1393568715.git.mohit.kumar@st.com>
+Message-ID: <acfdab3c7c0a0985e89bdc2f78751dab26bb0267.1393568715.git.mohit.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratyush Anand <pratyush.anand@st.com>
+Enable PCIe, EABI, VFP and NFS configs in default configuration file for
+SPEAr13xx.
 
-SPEAr13XX was using virtual address space 0xFE000000 to map physical address
-space 0xB3000000. pci_remap_io uses 0xFEE00000 as virtual address. So
-change 0xFE000000 to 0xF9000000.
-
-Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
 Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Pratyush Anand <pratyush.anand@st.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: spear-devel at list.st.com
-Cc: stable at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/mach-spear/include/mach/spear.h |    4 ++--
- arch/arm/mach-spear/spear13xx.c          |    2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/configs/spear13xx_defconfig |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-spear/include/mach/spear.h b/arch/arm/mach-spear/include/mach/spear.h
-index 5cdc53d..f2d6a01 100644
---- a/arch/arm/mach-spear/include/mach/spear.h
-+++ b/arch/arm/mach-spear/include/mach/spear.h
-@@ -52,10 +52,10 @@
- #ifdef CONFIG_ARCH_SPEAR13XX
- 
- #define PERIP_GRP2_BASE				UL(0xB3000000)
--#define VA_PERIP_GRP2_BASE			IOMEM(0xFE000000)
-+#define VA_PERIP_GRP2_BASE			IOMEM(0xF9000000)
- #define MCIF_SDHCI_BASE				UL(0xB3000000)
- #define SYSRAM0_BASE				UL(0xB3800000)
--#define VA_SYSRAM0_BASE				IOMEM(0xFE800000)
-+#define VA_SYSRAM0_BASE				IOMEM(0xF9800000)
- #define SYS_LOCATION				(VA_SYSRAM0_BASE + 0x600)
- 
- #define PERIP_GRP1_BASE				UL(0xE0000000)
-diff --git a/arch/arm/mach-spear/spear13xx.c b/arch/arm/mach-spear/spear13xx.c
-index 7aa6e8c..89212ff 100644
---- a/arch/arm/mach-spear/spear13xx.c
-+++ b/arch/arm/mach-spear/spear13xx.c
-@@ -52,7 +52,7 @@ void __init spear13xx_l2x0_init(void)
- /*
-  * Following will create 16MB static virtual/physical mappings
-  * PHYSICAL		VIRTUAL
-- * 0xB3000000		0xFE000000
-+ * 0xB3000000		0xF9000000
-  * 0xE0000000		0xFD000000
-  * 0xEC000000		0xFC000000
-  * 0xED000000		0xFB000000
+diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
+index 82eaa55..d271b26 100644
+--- a/arch/arm/configs/spear13xx_defconfig
++++ b/arch/arm/configs/spear13xx_defconfig
+@@ -11,13 +11,24 @@ CONFIG_ARCH_SPEAR13XX=y
+ CONFIG_MACH_SPEAR1310=y
+ CONFIG_MACH_SPEAR1340=y
+ # CONFIG_SWP_EMULATE is not set
++CONFIG_PCI=y
++CONFIG_PCI_MSI=y
++CONFIG_PCIE_SPEAR13XX=y
+ CONFIG_SMP=y
+ # CONFIG_SMP_ON_UP is not set
+ # CONFIG_ARM_CPU_TOPOLOGY is not set
++CONFIG_AEABI=y
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_VFP=y
+ CONFIG_BINFMT_MISC=y
+ CONFIG_NET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_NET_IPIP=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_MTD=y
+ CONFIG_MTD_OF_PARTS=y
+@@ -27,6 +38,7 @@ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_FSMC=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=16384
++CONFIG_BLK_DEV_SD=y
+ CONFIG_ATA=y
+ # CONFIG_SATA_PMP is not set
+ CONFIG_SATA_AHCI_PLATFORM=y
+@@ -66,6 +78,7 @@ CONFIG_USB=y
+ # CONFIG_USB_DEVICE_CLASS is not set
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_STORAGE=y
+ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_SPEAR=y
+@@ -79,11 +92,14 @@ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT3_FS_SECURITY=y
+ CONFIG_AUTOFS4_FS=m
++CONFIG_FUSE_FS=y
+ CONFIG_MSDOS_FS=m
+ CONFIG_VFAT_FS=m
+ CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
+ CONFIG_NLS_DEFAULT="utf8"
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ASCII=m
 -- 
 1.7.0.1
