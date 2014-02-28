@@ -1,39 +1,56 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 28 Feb 2014 14:18:44 +0900
-Subject: [PATCH v5 7/7] arm64: add __ASSEMBLY__ in asm/insn.h
-In-Reply-To: <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1393320196-2942-1-git-send-email-takahiro.akashi@linaro.org>
- <1393564724-3966-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1393564724-3966-8-git-send-email-takahiro.akashi@linaro.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 28 Feb 2014 13:30:48 +0800
+Subject: [PATCH v3] pwm: add CSR SiRFSoC PWM driver
+In-Reply-To: <CAGsJ_4ywPTbUnfVVFFNFMSwG0CGckxKqHZ81rvEDFK-_1H25tA@mail.gmail.com>
+References: <1391855002-26098-1-git-send-email-21cnbao@gmail.com>
+ <lel46f$q2d$1@ger.gmane.org>
+ <CAGsJ_4xLtXV6WtVhLgzFAaU9oG5UOt+LonFktBipQf_a6Yutng@mail.gmail.com>
+ <CAMiSF3CczVV+Ob++_ACcwE+OXvFH8f9v1E=Q1F5x7Zz1BjCCzg@mail.gmail.com>
+ <CAGsJ_4ywPTbUnfVVFFNFMSwG0CGckxKqHZ81rvEDFK-_1H25tA@mail.gmail.com>
+Message-ID: <CAGsJ_4z=udVOMzFK0TrpFHKHZFOPvYYs0DVrT_1j3KUVsOdspw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since insn.h is indirectly included in asm/entry-ftrace.S,
-we need to exclude some declarations by __ASSEMBLY__.
+2014-02-28 11:01 GMT+08:00 Barry Song <21cnbao@gmail.com>:
+> 2014-02-27 18:51 GMT+08:00 Romain Izard <romain.izard.pro@gmail.com>:
+>> 2014-02-27 3:49 GMT+01:00 Barry Song <21cnbao@gmail.com>:
+>>> Hello Romain,
+>>>
+>>> 2014-02-27 0:19 GMT+08:00 Romain Izard <romain.izard.pro@gmail.com>:
+>>>>
+>>>> Describing the clocks this way seems limiting to me.
+>>>>
+>>>> Each output of the PWM controller on SiRFatlasVI and SiRFprimaII can
+>>>> independently use one clock among many for signal generation, with
+>>>> three PLLs and two external clock inputs available.
+>>>
+>>> yes, that is the hardware spec. and i feel so happy you have read it.
+>>> now i get one more sirfsoc friend.
+>>>
+>>> 32K of RTC is too small to generate a normal PWM signal, PLLs in the
+>>> design can change for DVFS.
+>>> so that means a notifier callback is needed if PLL is changed for
+>>> CPUFreq, this makes SW buggy and complex.
+>>>
+>> Well, my specific concern was the use of the bypass mode on the 32kHz
+>> clock. As the PWM driver is also the interface for external clock distribution,
+>> and 32 kHz is a common requirement for external devices, I wish to avoid
+>> compounding error rates. I will get a less precise clock if I divide the 26 MHz
+>> instead.
+>
+> Hi Romain,
+>
+> do you have a real user scenarios for this 32KHz? as the 1st step, i
+> want a clean and general enough pwm driver, if there is any special
+> requirement, i want to execute a "demanding page" when the "page
+> fault" happened as this will make the whole flow more smooth. that
+> means we make it lazy by incremental patches. but if you do want to
+> use it for the moment, it is a "page fault" now. so we can have it
+> immediately and it is better you can help to double-test :-)
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/include/asm/insn.h |    2 ++
- 1 file changed, 2 insertions(+)
+Huayi told me bluetooth/wifi is using 32768. if we bypass rtc
+directly, it is better.
+currently the 26MHz can be divided to 32K, but i agree with you that
+bypassing rtc is better.
 
-diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-index c44ad39..dc1f73b 100644
---- a/arch/arm64/include/asm/insn.h
-+++ b/arch/arm64/include/asm/insn.h
-@@ -21,6 +21,7 @@
- /* A64 instructions are always 32 bits. */
- #define	AARCH64_INSN_SIZE		4
- 
-+#ifndef __ASSEMBLY__
- /*
-  * ARM Architecture Reference Manual for ARMv8 Profile-A, Issue A.a
-  * Section C3.1 "A64 instruction index by encoding":
-@@ -104,5 +105,6 @@ bool aarch64_insn_hotpatch_safe(u32 old_insn, u32 new_insn);
- int aarch64_insn_patch_text_nosync(void *addr, u32 insn);
- int aarch64_insn_patch_text_sync(void *addrs[], u32 insns[], int cnt);
- int aarch64_insn_patch_text(void *addrs[], u32 insns[], int cnt);
-+#endif /* __ASSEMBLY__ */
- 
- #endif	/* __ASM_INSN_H */
--- 
-1.7.9.5
+-barry
