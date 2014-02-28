@@ -1,30 +1,70 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 28 Feb 2014 15:46:12 +0000
-Subject: [PATCH V2 2/3] arm64: mm: Add double logical invert to pte
- accessors
-In-Reply-To: <1393328334-27285-3-git-send-email-steve.capper@linaro.org>
-References: <1393328334-27285-1-git-send-email-steve.capper@linaro.org>
- <1393328334-27285-3-git-send-email-steve.capper@linaro.org>
-Message-ID: <20140228154612.GG13970@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 28 Feb 2014 16:50:28 +0100
+Subject: [PATCH] usb: gadget: atmel_usba: Fix crashed during stopping
+ when DEBUG is enabled
+In-Reply-To: <1393598066-4016-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1393598066-4016-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20140228155027.GC2974@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 25, 2014 at 11:38:53AM +0000, Steve Capper wrote:
-> Page table entries on ARM64 are 64 bits, and some pte functions such as
-> pte_dirty return a bitwise-and of a flag with the pte value. If the
-> flag to be tested resides in the upper 32 bits of the pte, then we run
-> into the danger of the result being dropped if downcast.
-> 
-> For example:
-> 	gather_stats(page, md, pte_dirty(*pte), 1);
-> where pte_dirty(*pte) is downcast to an int.
-> 
-> This patch adds a double logical invert to all the pte_ accessors to
-> ensure predictable downcasting.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+Hi Gregory,
 
-Applied and added cc stable as well. Thanks.
+On 28/02/2014 at 15:34:01 +0100, Gregory CLEMENT wrote :
+> The debug trace in the atmel_usba_stop function made the assumption
+> that the driver pointer passed in parameter was not NULL. Since the
+> commit "usb: gadget: udc-core: fix a regression during gadget driver
+> unbinding", it was no more always true. This lead to a kernel crash.
+> 
+> This commit now use the driver pointer stored in udc which fixes this
+> issue.
+> 
+> Since the commit which have triggered this issue was backported to the
+> 3.2 stable branch, then this one should also be backported to the same
+> kernel.
+> 
+> Cc: stable at vger.kernel.org # v3.2+
+> Fixes: 511f3c5326ea (usb: gadget: udc-core: fix a regression during gadget driver unbinding)
+> ---
+>  drivers/usb/gadget/atmel_usba_udc.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
+> index 52771d4c44bc..167843de2d8a 100644
+> --- a/drivers/usb/gadget/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/atmel_usba_udc.c
+> @@ -1827,12 +1827,12 @@ static int atmel_usba_stop(struct usb_gadget *gadget,
+>  	toggle_bias(0);
+>  	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
+>  
+> -	udc->driver = NULL;
+> -
+>  	clk_disable_unprepare(udc->hclk);
+>  	clk_disable_unprepare(udc->pclk);
+>  
+> -	DBG(DBG_GADGET, "unregistered driver `%s'\n", driver->driver.name);
+> +	DBG(DBG_GADGET, "unregistered driver `%s'\n", udc->driver->driver.name);
+> +
+> +	udc->driver = NULL;
+
+Shouldn't we get rid of that assignment as it is done in
+usb_gadget_remove_driver() anyway ?
+
+>  
+>  	return 0;
+>  }
+> -- 
+> 1.8.1.2
+> 
 
 -- 
-Catalin
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/e8149705/attachment.sig>
