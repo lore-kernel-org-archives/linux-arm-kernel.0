@@ -1,63 +1,90 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Fri, 28 Feb 2014 13:11:29 -0600
-Subject: [PATCH v4 7/9] devicetree: bindings: Document PM8921/8058 keypads
-In-Reply-To: <20140228183708.GF2487@codeaurora.org>
-References: <1393552520-9068-1-git-send-email-sboyd@codeaurora.org>
- <1393552520-9068-8-git-send-email-sboyd@codeaurora.org>
- <20140228135527.GF7308@joshc.qualcomm.com>
- <20140228183708.GF2487@codeaurora.org>
-Message-ID: <20140228191129.GH7308@joshc.qualcomm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 28 Feb 2014 13:14:59 -0600
+Subject: [PATCH 05/12] CLK: TI: APLL: add support for omap2 aplls
+In-Reply-To: <1393579384-23440-6-git-send-email-t-kristo@ti.com>
+References: <1393579384-23440-1-git-send-email-t-kristo@ti.com>
+ <1393579384-23440-6-git-send-email-t-kristo@ti.com>
+Message-ID: <5310E033.3000900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 10:37:08AM -0800, Stephen Boyd wrote:
-> On 02/28, Josh Cartwright wrote:
-> > On Thu, Feb 27, 2014 at 05:55:18PM -0800, Stephen Boyd wrote:
-> > > +
-> > > +EXAMPLE
-> > > +
-> > > +	keypad {
-> > > +		compatible = "qcom,pm8921-keypad";
-> > > +		interrupt-parent = <&pmicintc>;
-> > > +		interrupts = <74 1>, <75 1>;
-> > > +		linux,keymap = <
-> > > +			MATRIX_KEY(0, 0, KEY_VOLUMEUP)
-> > > +			MATRIX_KEY(0, 1, KEY_VOLUMEDOWN)
-> > > +			MATRIX_KEY(0, 2, KEY_CAMERA_FOCUS)
-> > > +			MATRIX_KEY(0, 3, KEY_CAMERA)
-> > > +			>;
-> > > +		keypad,num-rows = <1>;
-> > > +		keypad,num-columns = <5>;
-> > > +		debounce = <15>;
-> > > +		scan-delay = <32>;
-> > > +		row-hold = <91500>;
-> > > +	};
-> >
-> > It odd to me that these newly created bindings don't have 'reg'
-> > properties, even though the device clearly has a register region.
-> >
-> > I suppose it makes sense from a "port over from platform data to DT"
-> > perspective, as these drivers have just assumed the location of their
-> > registers to be fixed; however I suspect things will need to be changed
-> > if/when we hope to share these drivers with pm8841/pm8941 and beyond...
-> >
->
-> Agreed. I would love it if the platform OF code would create
-> IORESOURCE_REG resources for any reg properties that aren't
-> translatable to CPU addresses. That way we don't have to pick out the
-> reg property from DT with special OF code (like you've done in
-> rtc-pm8xxx).
+On 02/28/2014 03:22 AM, Tero Kristo wrote:
+[...]
+> +static void __init of_omap2_apll_setup(struct device_node *node)
+> +{
+> +	struct dpll_data *ad = NULL;
+> +	struct clk_hw_omap *clk_hw = NULL;
+> +	struct clk_init_data *init = NULL;
+> +	struct clk *clk;
+> +	const char *parent_name;
+> +	u32 val;
+> +
+> +	ad = kzalloc(sizeof(*clk_hw), GFP_KERNEL);
+> +	clk_hw = kzalloc(sizeof(*clk_hw), GFP_KERNEL);
+> +	init = kzalloc(sizeof(*init), GFP_KERNEL);
+> +
+> +	if (!ad || !clk_hw || !init)
+> +		goto cleanup;
+> +
+> +	clk_hw->dpll_data = ad;
+> +	clk_hw->hw.init = init;
+> +	init->ops = &omap2_apll_ops;
+> +	init->name = node->name;
+> +	clk_hw->ops = &omap2_apll_hwops;
+> +
+> +	init->num_parents = of_clk_get_parent_count(node);
+> +	if (init->num_parents != 1) {
+> +		pr_err("%s must have one parent\n", node->name);
+> +		goto cleanup;
+> +	}
+> +
+> +	parent_name = of_clk_get_parent_name(node, 0);
+> +	init->parent_names = &parent_name;
+> +
+> +	if (of_property_read_u32(node, "ti,clock-frequency", &val)) {
+> +		pr_err("%s missing clock-frequency\n", node->name);
+> +		goto cleanup;
+> +	}
+> +	clk_hw->fixed_rate = val;
+> +
+> +	if (of_property_read_u32(node, "ti,bit-shift", &val)) {
+> +		pr_err("%s missing bit-shift\n", node->name);
+> +		goto cleanup;
+> +	}
+> +
+> +	clk_hw->enable_bit = val;
+> +	ad->enable_mask = 0x3 << val;
+> +	ad->autoidle_mask = 0x3 << val;
+> +
+> +	if (of_property_read_u32(node, "ti,idlest-shift", &val)) {
+> +		pr_err("%s missing idlest-shift\n", node->name);
+> +		goto cleanup;
+> +	}
+> +
+> +	ad->idlest_mask = 1 << val;
+> +
+> +	ad->control_reg = ti_clk_get_reg_addr(node, 0);
+> +	ad->autoidle_reg = ti_clk_get_reg_addr(node, 1);
+> +	ad->idlest_reg = ti_clk_get_reg_addr(node, 2);
+> +
+> +	if (!ad->control_reg || !ad->autoidle_reg || !ad->idlest_reg)
+> +		goto cleanup;
+> +
+> +	clk = clk_register(NULL, &clk_hw->hw);
+> +	if (!IS_ERR(clk)) {
+> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +		kfree(init);
+> +		return;
+> +	}
+> +cleanup:
+> +	kfree(clk_hw);
+> +	kfree(init);
+kfree(ad)?
 
-Yes, I agree this would be nice.  The rtc-pm8xxx register parsing magic
-is misplaced/ugly.  I'll see about taking a crack at this and seeing
-what it looks like.
-
-> I'll throw the reg property into the binding so that in
-> the future we can support the register moving around (although at the
-> moment the driver will ignore it).
-
-Great, I think this sounds good.
+smatch reported (as part of the kernel_patch_verify_report:
++drivers/clk/ti/apll.c:400 of_omap2_apll_setup() warn: possible memory
+leak of 'ad'
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Nishanth Menon
