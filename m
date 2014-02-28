@@ -1,737 +1,941 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Fri, 28 Feb 2014 15:34:53 -0800
-Subject: [PATCH RFC 1/3] clk: Introduce I2C clock primitives
+Date: Fri, 28 Feb 2014 15:34:55 -0800
+Subject: [PATCH RFC 3/3] clk: Add driver for TI CDCE913
 In-Reply-To: <1393630495-29689-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1393630495-29689-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1393630495-29689-2-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1393630495-29689-4-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add clk-divider and clk-mux primitives for I2C clock devices. They
-are derived from the clk-divider and clk-mux drivers, but use regmap to
-access HW.
+The TI CDCE913 is a clock synthesizer programmalbe via I2C. It features
+one PLL and threy clock outputs that pass through various dividers and
+muxes.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- drivers/clk/Kconfig           |   7 +
- drivers/clk/Makefile          |   5 +
- drivers/clk/clk-i2c-divider.c | 343 ++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/clk-i2c-mux.c     | 173 +++++++++++++++++++++
- drivers/clk/clk-i2c.c         |  22 +++
- include/linux/clk-provider.h  |  95 ++++++++++++
- 6 files changed, 645 insertions(+)
- create mode 100644 drivers/clk/clk-i2c-divider.c
- create mode 100644 drivers/clk/clk-i2c-mux.c
- create mode 100644 drivers/clk/clk-i2c.c
+ .../devicetree/bindings/clock/ti,cdce913.txt       |  32 +
+ drivers/clk/Kconfig                                |   8 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-cdce913.c                          | 841 +++++++++++++++++++++
+ 4 files changed, 882 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti,cdce913.txt
+ create mode 100644 drivers/clk/clk-cdce913.c
 
+diff --git a/Documentation/devicetree/bindings/clock/ti,cdce913.txt b/Documentation/devicetree/bindings/clock/ti,cdce913.txt
+new file mode 100644
+index 000000000000..c50a3bd638cf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/ti,cdce913.txt
+@@ -0,0 +1,32 @@
++Binding for Texas Instruments CDCE(L)913 programmable I2C clock generators.
++
++Reference
++This binding uses the common clock binding[1]. Details about the devices can be
++found in the data sheet[2].
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++[2] CDCE(L)913 Data Sheet: http://www.ti.com/lit/ds/symlink/cdce913.pdf
++
++Required properties:
++ - compatible: One of "ti,cdce913", "ti,cdcel913"
++ - reg: I2C device address.
++ - #clock-cells: From common clock bindings: Shall be 1.
++
++Optional properties:
++ - clock-output-names: From common clock bindings.
++ - clock-frequency: Tuple of requested output frequencies <Y1, Y2, Y3>
++ - ti,s0: State of the S0 config pin. Shall be 0 or 1.
++ - ti,crystal-load-capacity: Value for the internal capacitor. Valid values
++   range from 0 to 20 (inclusive).
++ - ti,input-clock-type: Type of input clock. One of 'xtal, 'VCXO', 'LVCMOS'
++
++Example:
++	cdce913 at 65 {
++	        #clock-cells = <1>;
++	        clocks = <&xtal>;
++		clock-frequency = <25000000>, <50000000>, <100000000>;
++	        compatible = "ti,cdce913";
++	        reg = <0x65>;
++	        ti,s0 = <1>;
++	        ti,input-clock-type = "xtal";
++	};
 diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 7641965d208d..ffad93ff2c9f 100644
+index ffad93ff2c9f..cd24d83d0801 100644
 --- a/drivers/clk/Kconfig
 +++ b/drivers/clk/Kconfig
-@@ -23,6 +23,13 @@ config COMMON_CLK
- menu "Common Clock Framework"
- 	depends on COMMON_CLK
+@@ -71,6 +71,14 @@ config COMMON_CLK_SI570
+ 	  This driver supports Silicon Labs 570/571/598/599 programmable
+ 	  clock generators.
  
-+config COMMON_CLK_I2C
-+	bool "Common clock types on I2C"
++config COMMON_CLK_CDCE913
++	tristate "Clock driver for TI CDCE913"
 +	depends on I2C
 +	select REGMAP_I2C
++	select RATIONAL
 +	---help---
-+	  Support for clock primitives on the I2C bus.
++	  This driver supports TI CDCE 913 programmable clock generators.
 +
- config COMMON_CLK_WM831X
- 	tristate "Clock driver for WM831x/2x PMICs"
- 	depends on MFD_WM831X
+ config COMMON_CLK_S2MPS11
+ 	tristate "Clock driver for S2MPS11 MFD"
+ 	depends on MFD_SEC_CORE
 diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index a367a9831717..c4fb243dd51a 100644
+index c4fb243dd51a..41bae1ab7dfa 100644
 --- a/drivers/clk/Makefile
 +++ b/drivers/clk/Makefile
-@@ -9,6 +9,11 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
- obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
- 
-+# common clock I2C types
-+obj-$(CONFIG_COMMON_CLK_I2C)	+= clk-i2c.o
-+obj-$(CONFIG_COMMON_CLK_I2C)	+= clk-i2c-mux.o
-+obj-$(CONFIG_COMMON_CLK_I2C)	+= clk-i2c-divider.o
-+
- # hardware specific clock types
+@@ -18,6 +18,7 @@ obj-$(CONFIG_COMMON_CLK_I2C)	+= clk-i2c-divider.o
  # please keep this section sorted lexicographically by file/directory path name
  obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN)	+= clk-axi-clkgen.o
-diff --git a/drivers/clk/clk-i2c-divider.c b/drivers/clk/clk-i2c-divider.c
+ obj-$(CONFIG_ARCH_BCM2835)		+= clk-bcm2835.o
++obj-$(CONFIG_COMMON_CLK_CDCE913)	+= clk-cdce913.o
+ obj-$(CONFIG_ARCH_EFM32)		+= clk-efm32gg.o
+ obj-$(CONFIG_ARCH_HIGHBANK)		+= clk-highbank.o
+ obj-$(CONFIG_MACH_LOONGSON1)		+= clk-ls1x.o
+diff --git a/drivers/clk/clk-cdce913.c b/drivers/clk/clk-cdce913.c
 new file mode 100644
-index 000000000000..690eae191072
+index 000000000000..5f0f42cc6abd
 --- /dev/null
-+++ b/drivers/clk/clk-i2c-divider.c
-@@ -0,0 +1,343 @@
++++ b/drivers/clk/clk-cdce913.c
+@@ -0,0 +1,841 @@
 +/*
-+ * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
-+ * Copyright (C) 2011 Richard Zhao, Linaro <richard.zhao@linaro.org>
-+ * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
-+ * Copyright (C) 2014 S?ren Brinkmann, Xilinx Inc. <soren.brinkmann@xilinx.com>
++ * Driver for TI CDCE(L) 913 Programmable VCXO Clock Synthesizer
++ *
++ * Copyright (C) 2013 S?ren Brinkmann <soren.brinkmann@xilinx.com>, Xilinx Inc.
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
 + *
-+ * Adjustable divider clock implementation
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+
 +#include <linux/clk-provider.h>
++#include <linux/delay.h>
++#include <linux/gcd.h>
++#include <linux/i2c.h>
++#include <linux/lcm.h>
 +#include <linux/module.h>
++#include <linux/regmap.h>
 +#include <linux/slab.h>
-+#include <linux/io.h>
-+#include <linux/err.h>
-+#include <linux/string.h>
-+#include <linux/log2.h>
 +
-+/*
-+ * DOC: basic adjustable divider clock that cannot gate
-+ *
-+ * Traits of this clock:
-+ * prepare - clk_prepare only ensures that parents are prepared
-+ * enable - clk_enable only ensures that parents are enabled
-+ * rate - rate is adjustable.  clk->rate = parent->rate / divisor
-+ * parent - fixed parent.  No clk_set_parent support
++#define CDCE913_NUM_OUTPUTS	3
++
++/* CDCE913 registers */
++#define CDCE913_GENERIC_CFG_0	0x80
++#define CDCE913_GENERIC_CFG_1	0x81
++#define CDCE913_GENERIC_CFG_2	0x82
++#define CDCE913_GENERIC_CFG_3	0x83
++#define CDCE913_GENERIC_CFG_4	0x84
++#define CDCE913_GENERIC_CFG_5	0x85
++#define CDCE913_GENERIC_CFG_6	0x86
++
++#define CDCE913_PLL_CFG_0	0x90
++#define CDCE913_PLL_CFG_1	0x91
++#define CDCE913_PLL_CFG_2	0x92
++#define CDCE913_PLL_CFG_3	0x93
++#define CDCE913_PLL_CFG_4	0x94
++#define CDCE913_PLL_CFG_5	0x95
++#define CDCE913_PLL_CFG_6	0x96
++#define CDCE913_PLL_CFG_7	0x97
++#define CDCE913_PLL_CFG_8	0x98
++#define CDCE913_PLL_CFG_9	0x99
++#define CDCE913_PLL_CFG_10	0x9a
++#define CDCE913_PLL_CFG_11	0x9b
++#define CDCE913_PLL_CFG_12	0x9c
++#define CDCE913_PLL_CFG_13	0x9d
++#define CDCE913_PLL_CFG_14	0x9e
++#define CDCE913_PLL_CFG_15	0x9f
++
++/* bitfields */
++#define GENERIC_CFG0_DEVID_SHIFT	7
++#define GENERIC_CFG0_DEVID_MASK		(1 << GENERIC_CFG0_DEVID_SHIFT)
++#define GENERIC_CFG0_REVID_SHIFT	4
++#define GENERIC_CFG0_REVID_MASK		(7 << GENERIC_CFG0_REVID_SHIFT)
++#define GENERIC_CFG0_VENDORID_SHIFT	0
++#define GENERIC_CFG0_VENDORID_MASK	(0xf << GENERIC_CFG0_VENDORID_SHIFT)
++
++#define PLLCFG_N_UPPER_SHIFT	4
++#define PLLCFG_N_LOWER_SHIFT	4
++#define PLLCFG_N_LOWER_MASK	(0xf << PLLCFG_N_LOWER_SHIFT)
++#define PLLCFG_N_MAX		4095
++#define PLLCFG_N_MIN		1
++
++#define PLLCFG_M_MAX		511
++#define PLLCFG_M_MIN		1
++
++#define PLLCFG_R_UPPER_MASK	0xf
++#define PLLCFG_R_LOWER_SHIFT	3
++#define PLLCFG_R_LOWER_MASK	(0x1f << PLLCFG_R_LOWER_SHIFT)
++
++#define PLLCFG_Q_UPPER_MASK	7
++#define PLLCFG_Q_LOWER_SHIFT	5
++#define PLLCFG_Q_LOWER_MASK	(7 << PLLCFG_Q_LOWER_SHIFT)
++
++#define PLLCFG_P_SHIFT		2
++#define PLLCFG_P_MASK		(7 << PLLCFG_P_SHIFT)
++
++#define PDIV1_UPPER_MASK	3
++
++#define XTAL_LOAD_CAP_SHIFT	3
++#define XTAL_LOAD_CAP_MASK	(0x1f << XTAL_LOAD_CAP_SHIFT)
++
++#define CLK_IN_TYPE_SHIFT	2
++#define CLK_IN_TYPE_MASK	(3 << CLK_IN_TYPE_SHIFT)
++
++#define F_VCO_MIN		80000000
++#define F_VCO_MAX		230000000
++
++/**
++ * struct clk_cdce913:
++ * @regmap:	Device's regmap
++ * @i2c_client:	I2C client pointer
++ * @clk_out:	Handles to output clocks
++ * @clk_data:	Onecell data struct
++ * @s0:		State of config pin S0
++ * @fsbit:	State of FS bit
 + */
++struct clk_cdce913 {
++	struct regmap		*regmap;
++	struct i2c_client	*i2c_client;
++	struct clk		*clk_out[CDCE913_NUM_OUTPUTS];
++	struct clk_onecell_data	clk_data;
++	int			s0;
++	int			fsbit;
++};
 +
-+#define to_clk_i2c_divider(_hw) container_of(_hw, struct clk_i2c_divider, hw)
++/**
++ * struct clk_cdce913_pll:
++ * @hw:		Clock handle
++ * @frequency:	PLL frequency
++ * @cdce913:	Pointer to driver struct
++ */
++struct clk_cdce913_pll {
++	struct clk_hw		hw;
++	unsigned long		frequency;
++	struct clk_cdce913	*cdce913;
++};
++#define to_clk_cdce913_pll(_hw)	container_of(_hw, struct clk_cdce913_pll, hw)
 +
-+#define div_mask(d)	((1 << ((d)->width)) - 1)
-+
-+static unsigned int _get_table_maxdiv(const struct clk_div_table *table)
++/* CDCE913 PLL */
++static int cdce913_read_pll_cfg(struct clk_cdce913 *cdce913, unsigned int *N,
++		unsigned int *R, unsigned int *Q, unsigned int *P)
 +{
-+	unsigned int maxdiv = 0;
-+	const struct clk_div_table *clkt;
++	int err, i;
++	unsigned int addr;
++	unsigned int regs[4];
 +
-+	for (clkt = table; clkt->div; clkt++)
-+		if (clkt->div > maxdiv)
-+			maxdiv = clkt->div;
-+	return maxdiv;
-+}
++	if (cdce913->fsbit)
++		addr = CDCE913_PLL_CFG_12;
++	else
++		addr = CDCE913_PLL_CFG_8;
 +
-+static unsigned int _get_maxdiv(struct clk_i2c_divider *divider)
-+{
-+	if (divider->flags & CLK_DIVIDER_ONE_BASED)
-+		return div_mask(divider);
-+	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-+		return 1 << div_mask(divider);
-+	if (divider->table)
-+		return _get_table_maxdiv(divider->table);
-+	return div_mask(divider) + 1;
-+}
++	for (i = 0; i < ARRAY_SIZE(regs); i++) {
++		err = regmap_read(cdce913->regmap, addr + i, &regs[i]);
++		if (err)
++			return err;
++	}
 +
-+static unsigned int _get_table_div(const struct clk_div_table *table,
-+							unsigned int val)
-+{
-+	const struct clk_div_table *clkt;
++	*N = (regs[0] << 4) |
++		((regs[1] & PLLCFG_N_LOWER_MASK) >> PLLCFG_N_LOWER_SHIFT);
++	*R = ((regs[1] & PLLCFG_R_UPPER_MASK) << 5) |
++		((regs[2] & PLLCFG_R_LOWER_MASK) >> PLLCFG_R_LOWER_SHIFT);
++	*Q = ((regs[2] & PLLCFG_Q_UPPER_MASK) << 3) |
++		((regs[3] & PLLCFG_Q_LOWER_MASK) >> PLLCFG_Q_LOWER_SHIFT);
++	*P = (regs[3] & PLLCFG_P_MASK) >> PLLCFG_P_SHIFT;
 +
-+	for (clkt = table; clkt->div; clkt++)
-+		if (clkt->val == val)
-+			return clkt->div;
++	/* TODO make dev_dbg */
++	dev_info(&cdce913->i2c_client->dev, "%s: N=%u, R=%u, Q=%u, P=%u\n",
++			__func__, *N, *R, *Q, *P);
++
 +	return 0;
 +}
 +
-+static unsigned int _get_div(struct clk_i2c_divider *divider, unsigned int val)
-+{
-+	if (divider->flags & CLK_DIVIDER_ONE_BASED)
-+		return val;
-+	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-+		return 1 << val;
-+	if (divider->table)
-+		return _get_table_div(divider->table, val);
-+	return val + 1;
-+}
-+
-+static unsigned int _get_table_val(const struct clk_div_table *table,
-+							unsigned int div)
-+{
-+	const struct clk_div_table *clkt;
-+
-+	for (clkt = table; clkt->div; clkt++)
-+		if (clkt->div == div)
-+			return clkt->val;
-+	return 0;
-+}
-+
-+static unsigned int _get_val(struct clk_i2c_divider *divider, u8 div)
-+{
-+	if (divider->flags & CLK_DIVIDER_ONE_BASED)
-+		return div;
-+	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-+		return __ffs(div);
-+	if (divider->table)
-+		return  _get_table_val(divider->table, div);
-+	return div - 1;
-+}
-+
-+static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
++static unsigned long cdce913_pll_recalc_rate(struct clk_hw *hw,
 +		unsigned long parent_rate)
 +{
-+	struct clk_i2c_divider *divider = to_clk_i2c_divider(hw);
-+	unsigned int div, val;
-+
-+	val = clk_i2c_readb(divider->regmap, divider->reg) >> divider->shift;
-+	val &= div_mask(divider);
-+
-+	div = _get_div(divider, val);
-+	if (!div) {
-+		WARN(!(divider->flags & CLK_DIVIDER_ALLOW_ZERO),
-+			"%s: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not set\n",
-+			__clk_get_name(hw->clk));
-+		return parent_rate;
-+	}
-+
-+	return parent_rate / div;
-+}
-+
-+/*
-+ * The reverse of DIV_ROUND_UP: The maximum number which
-+ * divided by m is r
-+ */
-+#define MULT_ROUND_UP(r, m) ((r) * (m) + (m) - 1)
-+
-+static bool _is_valid_table_div(const struct clk_div_table *table,
-+							 unsigned int div)
-+{
-+	const struct clk_div_table *clkt;
-+
-+	for (clkt = table; clkt->div; clkt++)
-+		if (clkt->div == div)
-+			return true;
-+	return false;
-+}
-+
-+static bool _is_valid_div(struct clk_i2c_divider *divider, unsigned int div)
-+{
-+	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-+		return is_power_of_2(div);
-+	if (divider->table)
-+		return _is_valid_table_div(divider->table, div);
-+	return true;
-+}
-+
-+static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
-+		unsigned long *best_parent_rate)
-+{
-+	struct clk_i2c_divider *divider = to_clk_i2c_divider(hw);
-+	int i, bestdiv = 0;
-+	unsigned long parent_rate, best = 0, now, maxdiv;
-+	unsigned long parent_rate_saved = *best_parent_rate;
-+
-+	if (!rate)
-+		rate = 1;
-+
-+	maxdiv = _get_maxdiv(divider);
-+
-+	if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
-+		parent_rate = *best_parent_rate;
-+		bestdiv = DIV_ROUND_UP(parent_rate, rate);
-+		bestdiv = bestdiv == 0 ? 1 : bestdiv;
-+		bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
-+		return bestdiv;
-+	}
-+
-+	/*
-+	 * The maximum divider we can use without overflowing
-+	 * unsigned long in rate * i below
-+	 */
-+	maxdiv = min(ULONG_MAX / rate, maxdiv);
-+
-+	for (i = 1; i <= maxdiv; i++) {
-+		if (!_is_valid_div(divider, i))
-+			continue;
-+		if (rate * i == parent_rate_saved) {
-+			/*
-+			 * It's the most ideal case if the requested rate can be
-+			 * divided from parent clock without needing to change
-+			 * parent rate, so return the divider immediately.
-+			 */
-+			*best_parent_rate = parent_rate_saved;
-+			return i;
-+		}
-+		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
-+				MULT_ROUND_UP(rate, i));
-+		now = parent_rate / i;
-+		if (now <= rate && now > best) {
-+			bestdiv = i;
-+			best = now;
-+			*best_parent_rate = parent_rate;
-+		}
-+	}
-+
-+	if (!bestdiv) {
-+		bestdiv = _get_maxdiv(divider);
-+		*best_parent_rate = __clk_round_rate(__clk_get_parent(hw->clk), 1);
-+	}
-+
-+	return bestdiv;
-+}
-+
-+static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *prate)
-+{
-+	int div;
-+	div = clk_divider_bestdiv(hw, rate, prate);
-+
-+	return *prate / div;
-+}
-+
-+static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long parent_rate)
-+{
-+	struct clk_i2c_divider *divider = to_clk_i2c_divider(hw);
-+	unsigned int div, value;
-+	unsigned long flags = 0;
-+	u32 val;
-+
-+	div = parent_rate / rate;
-+	value = _get_val(divider, div);
-+
-+	if (value > div_mask(divider))
-+		value = div_mask(divider);
-+
-+	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
-+		val = div_mask(divider) << (divider->shift + 16);
-+	} else {
-+		val = clk_i2c_readb(divider->regmap, divider->reg);
-+		val &= ~(div_mask(divider) << divider->shift);
-+	}
-+	val |= value << divider->shift;
-+	clk_i2c_writeb(val, divider->regmap, divider->reg);
-+
-+	return 0;
-+}
-+
-+const struct clk_ops clk_i2c_divider_ops = {
-+	.recalc_rate = clk_divider_recalc_rate,
-+	.round_rate = clk_divider_round_rate,
-+	.set_rate = clk_divider_set_rate,
-+};
-+EXPORT_SYMBOL_GPL(clk_i2c_divider_ops);
-+
-+static struct clk *_register_divider(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		struct regmap *regmap, unsigned int reg, u8 shift, u8 width,
-+		u8 clk_divider_flags, const struct clk_div_table *table)
-+{
-+	struct clk_i2c_divider *div;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+
-+	if (!dev) {
-+		pr_err("%s: invalid argument \'dev\'(%p)\n", __func__, dev);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	if (clk_divider_flags & CLK_DIVIDER_HIWORD_MASK) {
-+		if (width + shift > 16) {
-+			pr_warn("divider value exceeds LOWORD field\n");
-+			return ERR_PTR(-EINVAL);
-+		}
-+	}
-+
-+	/* allocate the divider */
-+	div = kzalloc(sizeof(*div), GFP_KERNEL);
-+	if (!div) {
-+		pr_err("%s: could not allocate divider clk\n", __func__);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	init.name = name;
-+	init.ops = &clk_i2c_divider_ops;
-+	init.flags = flags | CLK_IS_BASIC;
-+	init.parent_names = (parent_name ? &parent_name: NULL);
-+	init.num_parents = (parent_name ? 1 : 0);
-+
-+	/* struct clk_i2c_divider assignments */
-+	div->regmap = regmap;
-+	div->reg = reg;
-+	div->shift = shift;
-+	div->width = width;
-+	div->flags = clk_divider_flags;
-+	div->hw.init = &init;
-+	div->table = table;
-+
-+	/* register the clock */
-+	clk = devm_clk_register(dev, &div->hw);
-+
-+	if (IS_ERR(clk))
-+		kfree(div);
-+
-+	return clk;
-+}
-+
-+/**
-+ * clk_register_divider - register a divider clock with the clock framework
-+ * @dev: device registering this clock
-+ * @name: name of this clock
-+ * @parent_name: name of clock's parent
-+ * @flags: framework-specific flags
-+ * @regmap: I2C regmap to access device
-+ * @reg: register address to adjust divider
-+ * @shift: number of bits to shift the bitfield
-+ * @width: width of the bitfield
-+ * @clk_divider_flags: divider-specific flags for this clock
-+ */
-+struct clk *clk_i2c_register_divider(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		struct regmap *regmap, unsigned int reg, u8 shift, u8 width,
-+		u8 clk_divider_flags)
-+{
-+	return _register_divider(dev, name, parent_name, flags, regmap, reg,
-+			shift, width, clk_divider_flags, NULL);
-+}
-+EXPORT_SYMBOL_GPL(clk_i2c_register_divider);
-+
-+/**
-+ * clk_register_divider_table - register a table based divider clock with
-+ * the clock framework
-+ * @dev: device registering this clock
-+ * @name: name of this clock
-+ * @parent_name: name of clock's parent
-+ * @flags: framework-specific flags
-+ * @regmap: I2C regmap to access device
-+ * @reg: register address to adjust divider
-+ * @shift: number of bits to shift the bitfield
-+ * @width: width of the bitfield
-+ * @clk_divider_flags: divider-specific flags for this clock
-+ * @table: array of divider/value pairs ending with a div set to 0
-+ */
-+struct clk *clk_i2c_register_divider_table(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		struct regmap *regmap, unsigned int reg, u8 shift, u8 width,
-+		u8 clk_divider_flags, const struct clk_div_table *table)
-+{
-+	return _register_divider(dev, name, parent_name, flags, regmap, reg,
-+			shift, width, clk_divider_flags, table);
-+}
-+EXPORT_SYMBOL_GPL(clk_i2c_register_divider_table);
-diff --git a/drivers/clk/clk-i2c-mux.c b/drivers/clk/clk-i2c-mux.c
-new file mode 100644
-index 000000000000..c5e23c98f964
---- /dev/null
-+++ b/drivers/clk/clk-i2c-mux.c
-@@ -0,0 +1,173 @@
-+/*
-+ * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
-+ * Copyright (C) 2011 Richard Zhao, Linaro <richard.zhao@linaro.org>
-+ * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
-+ * Copyright (C) 2014 S?ren Brinkmann, Xilinx Inc. <soren.brinkmann@xilinx.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Simple multiplexer clock implementation
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/io.h>
-+#include <linux/err.h>
-+
-+/*
-+ * DOC: basic adjustable multiplexer clock that cannot gate
-+ *
-+ * Traits of this clock:
-+ * prepare - clk_prepare only ensures that parents are prepared
-+ * enable - clk_enable only ensures that parents are enabled
-+ * rate - rate is only affected by parent switching.  No clk_set_rate support
-+ * parent - parent is adjustable through clk_set_parent
-+ */
-+
-+#define to_clk_i2c_mux(_hw) container_of(_hw, struct clk_i2c_mux, hw)
-+
-+static u8 clk_mux_get_parent(struct clk_hw *hw)
-+{
-+	struct clk_i2c_mux *mux = to_clk_i2c_mux(hw);
-+	int num_parents = __clk_get_num_parents(hw->clk);
-+	u32 val;
-+
-+	/*
-+	 * FIXME need a mux-specific flag to determine if val is bitwise or numeric
-+	 * e.g. sys_clkin_ck's clksel field is 3 bits wide, but ranges from 0x1
-+	 * to 0x7 (index starts at one)
-+	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
-+	 * val = 0x4 really means "bit 2, index starts at bit 0"
-+	 */
-+	val = clk_i2c_readb(mux->regmap, mux->reg) >> mux->shift;
-+	val &= mux->mask;
-+
-+	if (mux->table) {
-+		int i;
-+
-+		for (i = 0; i < num_parents; i++)
-+			if (mux->table[i] == val)
-+				return i;
-+		return -EINVAL;
-+	}
-+
-+	if (val && (mux->flags & CLK_MUX_INDEX_BIT))
-+		val = ffs(val) - 1;
-+
-+	if (val && (mux->flags & CLK_MUX_INDEX_ONE))
-+		val--;
-+
-+	if (val >= num_parents)
-+		return -EINVAL;
-+
-+	return val;
-+}
-+
-+static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct clk_i2c_mux *mux = to_clk_i2c_mux(hw);
-+	u32 val;
-+
-+	if (mux->table)
-+		index = mux->table[index];
-+
-+	else {
-+		if (mux->flags & CLK_MUX_INDEX_BIT)
-+			index = (1 << ffs(index));
-+
-+		if (mux->flags & CLK_MUX_INDEX_ONE)
-+			index++;
-+	}
-+
-+	if (mux->flags & CLK_MUX_HIWORD_MASK) {
-+		val = mux->mask << (mux->shift + 16);
-+	} else {
-+		val = clk_i2c_readb(mux->regmap, mux->reg);
-+		val &= ~(mux->mask << mux->shift);
-+	}
-+	val |= index << mux->shift;
-+	clk_i2c_writeb(val, mux->regmap, mux->reg);
-+
-+	return 0;
-+}
-+
-+const struct clk_ops clk_i2c_mux_ops = {
-+	.get_parent = clk_mux_get_parent,
-+	.set_parent = clk_mux_set_parent,
-+	.determine_rate = __clk_mux_determine_rate,
-+};
-+EXPORT_SYMBOL_GPL(clk_i2c_mux_ops);
-+
-+const struct clk_ops clk_i2c_mux_ro_ops = {
-+	.get_parent = clk_mux_get_parent,
-+};
-+EXPORT_SYMBOL_GPL(clk_i2c_mux_ro_ops);
-+
-+struct clk *clk_i2c_register_mux_table(struct device *dev, const char *name,
-+		const char **parent_names, u8 num_parents, unsigned long flags,
-+		struct regmap *regmap, unsigned int reg, u8 shift, u32 mask,
-+		u8 clk_mux_flags, u32 *table)
-+{
-+	struct clk_i2c_mux *mux;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+	u8 width = 0;
-+
-+	if (clk_mux_flags & CLK_MUX_HIWORD_MASK) {
-+		width = fls(mask) - ffs(mask) + 1;
-+		if (width + shift > 16) {
-+			pr_err("mux value exceeds LOWORD field\n");
-+			return ERR_PTR(-EINVAL);
-+		}
-+	}
-+
-+	/* allocate the mux */
-+	mux = kzalloc(sizeof(struct clk_i2c_mux), GFP_KERNEL);
-+	if (!mux) {
-+		pr_err("%s: could not allocate mux clk\n", __func__);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	init.name = name;
-+	if (clk_mux_flags & CLK_MUX_READ_ONLY)
-+		init.ops = &clk_i2c_mux_ro_ops;
-+	else
-+		init.ops = &clk_i2c_mux_ops;
-+	init.flags = flags | CLK_IS_BASIC;
-+	init.parent_names = parent_names;
-+	init.num_parents = num_parents;
-+
-+	/* struct clk_i2c_mux assignments */
-+	mux->regmap = regmap;
-+	mux->reg = reg;
-+	mux->shift = shift;
-+	mux->mask = mask;
-+	mux->flags = clk_mux_flags;
-+	mux->table = table;
-+	mux->hw.init = &init;
-+
-+	clk = clk_register(dev, &mux->hw);
-+
-+	if (IS_ERR(clk))
-+		kfree(mux);
-+
-+	return clk;
-+}
-+EXPORT_SYMBOL_GPL(clk_i2c_register_mux_table);
-+
-+struct clk *clk_i2c_register_mux(struct device *dev, const char *name,
-+		const char **parent_names, u8 num_parents, unsigned long flags,
-+		struct regmap *regmap, unsigned int reg, u8 shift, u8 width,
-+		u8 clk_mux_flags)
-+{
-+	u32 mask = BIT(width) - 1;
-+
-+	return clk_i2c_register_mux_table(dev, name, parent_names, num_parents,
-+				      flags, regmap, reg, shift, mask,
-+				      clk_mux_flags, NULL);
-+}
-+EXPORT_SYMBOL_GPL(clk_i2c_register_mux);
-diff --git a/drivers/clk/clk-i2c.c b/drivers/clk/clk-i2c.c
-new file mode 100644
-index 000000000000..cc1f89cbd313
---- /dev/null
-+++ b/drivers/clk/clk-i2c.c
-@@ -0,0 +1,22 @@
-+#include <linux/clk-provider.h>
-+
-+u8 clk_i2c_readb(struct regmap *regmap, unsigned int reg)
-+{
-+	unsigned int val;
-+	int err = regmap_read(regmap, reg, &val);
-+
-+	if (err) {
-+		pr_err("%s: read from device failed\n", __func__);
-+		return 0;
-+	}
-+
-+	return val;
-+}
-+
-+void clk_i2c_writeb(u8 val, struct regmap *regmap,
-+		unsigned int reg)
-+{
-+	int err = regmap_write(regmap, reg, val);
++	int err;
++	u64 rate;
++	unsigned int N, R, Q, P;
++	struct clk_cdce913_pll *pll = to_clk_cdce913_pll(hw);
++	struct clk_cdce913 *cdce913 = pll->cdce913;
++
++	err = cdce913_read_pll_cfg(cdce913, &N, &R, &Q, &P);
 +	if (err)
-+		pr_err("%s: write to device failed\n", __func__);
++		return pll->frequency;
++
++	rate = (N * Q) * (u64)parent_rate;
++	rate = div_u64(rate, N * (1 << P) - R);
++
++	pll->frequency = rate;
++
++	return pll->frequency;
 +}
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 939533da93a7..d86bb6ec4232 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -315,6 +315,46 @@ struct clk_divider {
- 	spinlock_t	*lock;
- };
- 
-+/**
-+ * struct clk_i2c_divider - adjustable divider clock
-+ *
-+ * @hw:		handle between common and hardware-specific interfaces
-+ * @regmap:	Regmap to access device
-+ * @reg:	register containing the divider
-+ * @shift:	shift to the divider bit field
-+ * @width:	width of the divider bit field
-+ * @table:	array of value/divider pairs, last entry should have div = 0
-+ *
-+ * Clock with an adjustable divider affecting its output frequency.  Implements
-+ * .recalc_rate, .set_rate and .round_rate
-+ *
-+ * Flags:
-+ * CLK_DIVIDER_ONE_BASED - by default the divisor is the value read from the
-+ * 	register plus one.  If CLK_DIVIDER_ONE_BASED is set then the divider is
-+ * 	the raw value read from the register, with the value of zero considered
-+ *	invalid, unless CLK_DIVIDER_ALLOW_ZERO is set.
-+ * CLK_DIVIDER_POWER_OF_TWO - clock divisor is 2 raised to the value read from
-+ * 	the hardware register
-+ * CLK_DIVIDER_ALLOW_ZERO - Allow zero divisors.  For dividers which have
-+ *	CLK_DIVIDER_ONE_BASED set, it is possible to end up with a zero divisor.
-+ *	Some hardware implementations gracefully handle this case and allow a
-+ *	zero divisor by not modifying their input clock
-+ *	(divide by one / bypass).
-+ * CLK_DIVIDER_HIWORD_MASK - The divider settings are only in lower 16-bit
-+ *   of this register, and mask of divider bits are in higher 16-bit of this
-+ *   register.  While setting the divider bits, higher 16-bit should also be
-+ *   updated to indicate changing divider bits.
-+ */
-+struct clk_i2c_divider {
-+	struct clk_hw	hw;
-+	struct regmap	*regmap;
-+	unsigned int	reg;
-+	u8		shift;
-+	u8		width;
-+	u8		flags;
-+	const struct clk_div_table	*table;
++
++static int cdce913_pll_calc_divs(unsigned long rate, unsigned long parent_rate,
++		unsigned int *N, int *R, unsigned int *Q, int *P)
++{
++	unsigned int NN, M, div;
++
++	div = gcd(rate, parent_rate);
++
++	*N = rate / div;
++	M = parent_rate / div;
++
++	if (*N > PLLCFG_N_MAX) {
++		div = DIV_ROUND_UP(*N, PLLCFG_N_MAX);
++		*N /= div;
++		M /= div;
++	}
++
++	if (M > PLLCFG_M_MAX) {
++		div = DIV_ROUND_UP(M, PLLCFG_M_MAX);
++		*N /= div;
++		M /= div;
++	}
++
++	if (!*N)
++		*N = PLLCFG_N_MIN;
++	if (!M)
++		M = PLLCFG_M_MIN;
++
++	if (*N < M)
++		return -EINVAL;
++
++	*P = 4 - ilog2(*N / M);
++	if (*P < 0)
++		*P = 0;
++
++	if (*P > 7)
++		return -EINVAL;
++
++	NN = *N * (1 << *P);
++
++	*Q = NN / M;
++	if (*Q < 16 || *Q > 63)
++		return -EINVAL;
++
++	*R = NN - M * *Q;
++	if (*R < 0 || *R > 511)
++		return -EINVAL;
++
++	return 0;
++}
++
++static long cdce913_pll_round_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *parent_rate)
++{
++	u64 rrate;
++	int err, P, R;
++	unsigned int N, Q;
++	struct clk_cdce913_pll *pll = to_clk_cdce913_pll(hw);
++
++	if (rate > F_VCO_MAX)
++		rate = F_VCO_MAX;
++	if (rate < F_VCO_MIN)
++		rate = F_VCO_MIN;
++
++	err = cdce913_pll_calc_divs(rate, *parent_rate, &N, &R, &Q, &P);
++	if (err)
++		return pll->frequency;
++
++	rrate = (N * Q) * (u64)*parent_rate;
++	rrate = div_u64(rrate, N * (1 << P) - R);
++
++	return rrate;
++}
++
++static int cdce913_rate2range(unsigned long fvco)
++{
++	if (fvco < 125000000)
++		return 0;
++
++	if (fvco < 150000000)
++		return 1;
++
++	if (fvco < 175000000)
++		return 2;
++
++	return 3;
++}
++
++static int cdce913_write_pll_cfg(struct clk_cdce913 *cdce913, unsigned int N,
++		unsigned int R, unsigned int Q, unsigned int P,
++		unsigned int range)
++{
++	int err, i;
++	unsigned int addr;
++	unsigned int regs[4];
++
++	if (cdce913->fsbit)
++		addr = CDCE913_PLL_CFG_12;
++	else
++		addr = CDCE913_PLL_CFG_8;
++
++	regs[0] = N >> PLLCFG_N_UPPER_SHIFT;
++
++	regs[1] = (N << PLLCFG_N_LOWER_SHIFT) & PLLCFG_N_LOWER_MASK;
++	regs[1] |= R >> 5;
++
++	regs[2] = (R << PLLCFG_R_LOWER_SHIFT) & PLLCFG_R_LOWER_MASK;
++	regs[2] |= Q >> 3;
++
++	regs[3] = (Q << PLLCFG_Q_LOWER_SHIFT) & PLLCFG_Q_LOWER_MASK;
++	regs[3] |= P << PLLCFG_P_SHIFT;
++	regs[3] |= range;
++
++	/* TODO remove dbg stuff */
++	dev_info(&cdce913->i2c_client->dev, "%s: N=%u, R=%u, Q=%u, P=%u\n",
++			__func__, N, R, Q, P);
++
++	for (i = 0; i < ARRAY_SIZE(regs); i++) {
++		err = regmap_write(cdce913->regmap, addr + i, regs[i]);
++		if (err)
++			return err;
++	}
++
++	/* TODO remove dbg stuff */
++	cdce913_read_pll_cfg(cdce913, &N, &R, &Q, &P);
++
++	return err;
++}
++
++static int cdce913_pll_set_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long parent_rate)
++{
++	int err, P, R;
++	unsigned int N, Q;
++	struct clk_cdce913_pll *pll = to_clk_cdce913_pll(hw);
++	struct clk_cdce913 *cdce913 = pll->cdce913;
++
++	if (rate > F_VCO_MAX || rate < F_VCO_MIN)
++		return -EINVAL;
++
++	err = cdce913_pll_calc_divs(rate, parent_rate, &N, &R, &Q, &P);
++	if (err)
++		return err;
++
++	/* write to HW */
++	return cdce913_write_pll_cfg(cdce913, N, R, Q, P,
++			cdce913_rate2range(rate));
++}
++
++static struct clk_ops cdce913_pll_ops = {
++	.recalc_rate = cdce913_pll_recalc_rate,
++	.round_rate = cdce913_pll_round_rate,
++	.set_rate = cdce913_pll_set_rate,
 +};
 +
- #define CLK_DIVIDER_ONE_BASED		BIT(0)
- #define CLK_DIVIDER_POWER_OF_TWO	BIT(1)
- #define CLK_DIVIDER_ALLOW_ZERO		BIT(2)
-@@ -362,6 +402,37 @@ struct clk_mux {
- 	spinlock_t	*lock;
- };
- 
-+/**
-+ * struct clk_i2c_mux - multiplexer clock
-+ *
-+ * @hw:		handle between common and hardware-specific interfaces
-+ * @regmap:	regmap handle for the device
-+ * @reg:	register controlling multiplexer
-+ * @shift:	shift to multiplexer bit field
-+ * @width:	width of mutliplexer bit field
-+ * @flags:	hardware-specific flags
-+ *
-+ * Clock with multiple selectable parents.  Implements .get_parent, .set_parent
-+ * and .recalc_rate
-+ *
-+ * Flags:
-+ * CLK_MUX_INDEX_ONE - register index starts at 1, not 0
-+ * CLK_MUX_INDEX_BIT - register index is a single bit (power of two)
-+ * CLK_MUX_HIWORD_MASK - The mux settings are only in lower 16-bit of this
-+ *   register, and mask of mux bits are in higher 16-bit of this register.
-+ *   While setting the mux bits, higher 16-bit should also be updated to
-+ *   indicate changing mux bits.
-+ */
-+struct clk_i2c_mux {
-+	struct clk_hw	hw;
-+	struct regmap	*regmap;
-+	unsigned int	reg;
-+	u32		*table;
-+	u32		mask;
-+	u8		shift;
-+	u8		flags;
++static struct clk *clk_register_cdce913_pll(struct clk_cdce913 *cdce913,
++		const char *name, const char *parent)
++{
++	struct clk *clk;
++	const char *pll_name;
++	struct clk_init_data init;
++	struct clk_cdce913_pll *data;
++	const char *parents[] = {parent};
++
++	data = devm_kzalloc(&cdce913->i2c_client->dev, sizeof(*data),
++			GFP_KERNEL);
++	if (!data)
++		return ERR_PTR(-ENOMEM);
++
++	pll_name = kasprintf(GFP_KERNEL, "%s_pll", name);
++	if (!pll_name)
++		return ERR_PTR(-ENOMEM);
++
++	init.ops = &cdce913_pll_ops;
++	init.name = pll_name;
++	init.num_parents = 1;
++	init.parent_names = parents;
++	data->hw.init = &init;
++	data->cdce913 = cdce913;
++
++	clk = devm_clk_register(&cdce913->i2c_client->dev, &data->hw);
++
++	kfree(pll_name);
++
++	return clk;
++}
++
++/* PDIV1 accessors */
++static unsigned int pdiv1_get_div(struct clk_i2c_divider *divider)
++{
++	int err, i;
++	unsigned int regs[2];
++	unsigned int div;
++
++	for (i = 0; i < ARRAY_SIZE(regs); i++) {
++		err = regmap_read(divider->regmap, divider->reg + i, &regs[i]);
++		if (err)
++			break;
++	}
++	if (err) {
++		pr_err("%s: reading from device failed\n", __func__);
++		return 1;
++	}
++
++	div = (regs[0] & PDIV1_UPPER_MASK) << 8;
++	div |= regs[1];
++
++	return div;
++}
++
++static int pdiv1_set_div(unsigned int div, struct clk_i2c_divider *divider)
++{
++	int err, i;
++	unsigned int regs[2];
++
++	for (i = 0; i < ARRAY_SIZE(regs); i++) {
++		err = regmap_read(divider->regmap, divider->reg + i, &regs[i]);
++		if (err)
++			return err;
++	}
++
++	regs[1] = div & 0xff;
++
++	regs[0] &= ~PDIV1_UPPER_MASK;
++	div >>= 8;
++	div &= PDIV1_UPPER_MASK;
++	regs[0] |= div;
++
++	for (i = 0; i < ARRAY_SIZE(regs); i++) {
++		err = regmap_write(divider->regmap, divider->reg + i, regs[i]);
++		if (err)
++			return err;
++	}
++
++	return 0;
++}
++
++/* regmap functions */
++static bool cdce913_regmap_is_volatile(struct device *dev, unsigned int reg)
++{
++	switch (reg) {
++	case CDCE913_GENERIC_CFG_1:
++		return true;
++	default:
++		return false;
++	}
++}
++
++static bool cdce913_regmap_is_writeable(struct device *dev, unsigned int reg)
++{
++	switch (reg) {
++	case CDCE913_GENERIC_CFG_1 ... CDCE913_GENERIC_CFG_6:
++		return true;
++	case CDCE913_PLL_CFG_0 ... CDCE913_PLL_CFG_15:
++		return true;
++	default:
++		return false;
++	}
++}
++
++static struct regmap_config cdce913_regmap_config = {
++	.reg_bits = 8,
++	.val_bits = 8,
++	.cache_type = REGCACHE_RBTREE,
++	.max_register = CDCE913_PLL_CFG_15,
++	.writeable_reg = cdce913_regmap_is_writeable,
++	.volatile_reg = cdce913_regmap_is_volatile,
 +};
 +
- #define CLK_MUX_INDEX_ONE		BIT(0)
- #define CLK_MUX_INDEX_BIT		BIT(1)
- #define CLK_MUX_HIWORD_MASK		BIT(2)
-@@ -570,5 +641,29 @@ static inline void clk_writel(u32 val, u32 __iomem *reg)
- 
- #endif	/* platform dependent I/O accessors */
- 
-+#ifdef CONFIG_COMMON_CLK_I2C
-+#include <linux/regmap.h>
-+u8 clk_i2c_readb(struct regmap *regmap, unsigned int reg);
-+void clk_i2c_writeb(u8 val, struct regmap *regmap, unsigned int reg);
++/**
++ * cdce913_get_part_id() - Read part identification
++ * @cdce913:	Driver data structure
++ * @dev:	Part ID (output)
++ * @rev:	Part revision (output)
++ * @ven:	Vendor ID (output)
++ * Returns 0 on success, or passes on regmap_read() error.
++ */
++static int cdce913_get_part_id(struct clk_cdce913 *cdce913, unsigned int *dev,
++		unsigned int *rev, unsigned int *ven)
++{
++	int err;
++	unsigned int reg;
 +
-+struct clk *clk_i2c_register_mux(struct device *dev, const char *name,
-+		const char **parent_names, u8 num_parents, unsigned long flags,
-+		struct regmap *regmap, unsigned int reg, u8 shift, u8 width,
-+		u8 clk_mux_flags);
++	err = regmap_read(cdce913->regmap, CDCE913_GENERIC_CFG_0, &reg);
++	if (err)
++		return err;
 +
-+struct clk *clk_i2c_register_mux_table(struct device *dev, const char *name,
-+		const char **parent_names, u8 num_parents, unsigned long flags,
-+		struct regmap *regmap, unsigned int reg, u8 shift, u32 mask,
-+		u8 clk_mux_flags, u32 *table);
-+struct clk *clk_i2c_register_divider(struct device *dev, const char *name,
-+                const char *parent_name, unsigned long flags,
-+                struct regmap *regmap, unsigned int reg, u8 shift, u8 width,
-+                u8 clk_divider_flags);
-+struct clk *clk_i2c_register_divider_table(struct device *dev, const char *name, 
-+                const char *parent_name, unsigned long flags,
-+                struct regmap *regmap, unsigned int reg, u8 shift, u8 width,
-+                u8 clk_divider_flags, const struct clk_div_table *table);
-+#endif /* CONFIG_COMMON_CLK_I2C */
++	*rev = (reg & GENERIC_CFG0_REVID_MASK) >> GENERIC_CFG0_DEVID_SHIFT;
++	*ven = (reg & GENERIC_CFG0_VENDORID_MASK) >> GENERIC_CFG0_VENDORID_SHIFT;
++	*dev = (reg & GENERIC_CFG0_DEVID_MASK) >> GENERIC_CFG0_DEVID_SHIFT;
 +
- #endif /* CONFIG_COMMON_CLK */
- #endif /* CLK_PROVIDER_H */
++	return 0;
++}
++
++/**
++ * cdce913_set_clk_in_type() - Set input clock type
++ * @cdce913:		Driver data structure
++ * @clk_in_type:	String describing input clock type
++ *
++ * Set the input clock type according to the provided DT property. Valid types
++ * are 'xtal', 'VCXO', 'LVCMOS'.
++ */
++static void cdce913_set_clk_in_type(struct clk_cdce913 *cdce913,
++		const char *clk_in_type)
++{
++	int err;
++	unsigned int type, reg;
++	/*
++	 * Valid types are xtal, VCXO, LVCMOS, let's do a lazy compare of the
++	 * first letter only and save us all the strcmp overhead
++	 */
++	switch (clk_in_type[0]) {
++	case 'V':
++		type = 1;
++		break;
++	case 'L':
++		type = 2;
++		break;
++	default:
++		type = 0;
++		break;
++	}
++
++	err = regmap_read(cdce913->regmap, CDCE913_GENERIC_CFG_1, &reg);
++	if (err) {
++		dev_err(&cdce913->i2c_client->dev, "read from device failed\n");
++		return;
++	}
++
++	reg &= ~CLK_IN_TYPE_MASK;
++	reg |= type << CLK_IN_TYPE_SHIFT;
++
++	err = regmap_write(cdce913->regmap, CDCE913_GENERIC_CFG_1, reg);
++	if (err) {
++		dev_err(&cdce913->i2c_client->dev, "write to device failed\n");
++		return;
++	}
++}
++
++static void cdce913_init_frequencies(struct device_node *np,
++		struct clk_cdce913 *data, struct clk *pll)
++{
++	int err, i;
++	u32 fout[3];
++	unsigned long fvco;
++	struct device *dev = &data->i2c_client->dev;
++
++	err = of_property_read_u32_array(np, "clock-frequency", fout,
++			ARRAY_SIZE(fout));
++	if (err)
++		return;
++
++	for (i = 0; i < ARRAY_SIZE(fout); i++) {
++		if (fout[i] > F_VCO_MAX) {
++			dev_warn(dev, "requested output frequency '%u' exceeds maximum (%u)\n",
++					fout[i], F_VCO_MAX);
++			fout[i] = F_VCO_MAX;
++		}
++	}
++
++	fvco = lcm(fout[0] / 1000000, fout[1] / 1000000);
++	fvco = lcm(fvco, fout[2] / 1000000);
++	fvco *= 1000000;
++
++	if (fvco > F_VCO_MAX) {
++		dev_warn(dev, "requested VCO frequency '%lu' exceeds maximum (%u)\n",
++				fvco, F_VCO_MAX);
++		fvco = F_VCO_MAX;
++	}
++
++	if (fvco < F_VCO_MIN) {
++		dev_warn(dev, "requested VCO frequency '%lu' below minimum (%u)\n",
++				fvco, F_VCO_MIN);
++		fvco = F_VCO_MIN;
++	}
++
++	err = clk_set_rate(pll, fvco);
++	if (err)
++		return;
++
++	/* TODO dev_dbg */
++	dev_info(dev, "VCO frequency: %lu Hz\n", clk_get_rate(pll));
++
++	for (i = 0; i < ARRAY_SIZE(fout); i++) {
++		if (fout[i])
++			clk_set_rate(data->clk_out[i], fout[i]);
++	}
++}
++
++static int cdce913_probe(struct i2c_client *client,
++		const struct i2c_device_id *id)
++{
++	int err;
++	unsigned int part, revision, vendor, cap;
++	struct clk_cdce913 *data;
++	struct clk *pll, *pll_mux, *y1_mux, *y2_mux, *y3_mux;
++	struct clk *pdiv1, *pdiv2, *pdiv3;
++	const char *pname, *pll_mux_name, *clk_in_type;
++	const char *y1_mux_name, *y2_mux_name, *y3_mux_name;
++	const char *pdiv1_name, *pdiv2_name, *pdiv3_name;
++	const char *pll_mux_parents[2];
++	const char *y1_mux_parents[2], *y2_mux_parents[2], *y3_mux_parents[3];
++	struct device_node *np = client->dev.of_node;
++
++	data = devm_kzalloc(&client->dev, sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	data->i2c_client = client;
++
++	data->regmap = devm_regmap_init_i2c(client, &cdce913_regmap_config);
++	if (IS_ERR(data->regmap)) {
++		dev_err(&client->dev, "failed to allocate register map\n");
++		return PTR_ERR(data->regmap);
++	}
++
++	err = of_property_read_u32(np, "ti,s0", &data->s0);
++	if (err) {
++		dev_warn(&client->dev, "S0 not specified, assuming 1\n");
++		data->s0 = 1;
++	}
++
++	err = regmap_read(data->regmap, CDCE913_PLL_CFG_3, &data->fsbit);
++	if (err) {
++		dev_warn(&client->dev, "unable to read from device\n");
++		return err;
++	}
++	data->fsbit = !!(data->fsbit & (1 << data->s0));
++
++	i2c_set_clientdata(client, data);
++
++	err = cdce913_get_part_id(data, &part, &revision, &vendor);
++	if (err)
++		return err;
++
++	pname = of_clk_get_parent_name(np, 0);
++	if (!pname) {
++		dev_err(&client->dev, "no input clock specified\n");
++		return -ENODEV;
++	}
++
++	/* PLL */
++	pll = clk_register_cdce913_pll(data, np->name, pname);
++	if (IS_ERR(pll)) {
++		dev_err(&client->dev, "clock registration failed\n");
++		return PTR_ERR(pll);
++	}
++
++	/* PLL mux */
++	pll_mux_name = kasprintf(GFP_KERNEL, "%s_pll_mux", np->name);
++	if (!pll_mux_name)
++		return -ENOMEM;
++
++	pll_mux_parents[0] = __clk_get_name(pll);
++	pll_mux_parents[1] = pname;
++	pll_mux = clk_i2c_register_mux(&client->dev, pll_mux_name,
++			pll_mux_parents, 2, CLK_SET_RATE_PARENT, data->regmap,
++			CDCE913_PLL_CFG_4, 7, 1, 0);
++	if (IS_ERR(pll_mux)) {
++		dev_err(&client->dev, "clock registration failed\n");
++		err = PTR_ERR(pll_mux);
++		goto err_pll_mux;
++	}
++
++	/* use PLL */
++	err = clk_set_parent(pll_mux, pll);
++	if (err)
++		dev_warn(&client->dev, "PLL in bypass\n");
++
++	/* Y1 mux */
++	y1_mux_name = kasprintf(GFP_KERNEL, "%s_y1_mux", np->name);
++	if (!y1_mux_name) {
++		err = -ENOMEM;
++		goto err_pll_mux;
++	}
++
++	y1_mux_parents[0] = pname;
++	y1_mux_parents[1] = pll_mux_name;
++	y1_mux = clk_i2c_register_mux(&client->dev, y1_mux_name,
++			y1_mux_parents, 2,
++			CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT,
++			data->regmap, CDCE913_GENERIC_CFG_2, 7, 1, 0);
++	if (IS_ERR(y1_mux)) {
++		dev_err(&client->dev, "clock registration failed\n");
++		err = PTR_ERR(y1_mux);
++		goto err_y1_mux;
++	}
++
++	/* pdiv1 */
++	pdiv1_name = kasprintf(GFP_KERNEL, "%s_pdiv1", np->name);
++	if (!pdiv1_name) {
++		err = -ENOMEM;
++		goto err_y1_mux;
++	}
++
++	pdiv1 = clk_i2c_register_divider(&client->dev, pdiv1_name, y1_mux_name,
++			CLK_SET_RATE_PARENT, data->regmap, CDCE913_GENERIC_CFG_2, 0, 10,
++			CLK_DIVIDER_ONE_BASED, pdiv1_get_div, pdiv1_set_div);
++	if (IS_ERR(pdiv1)) {
++		dev_err(&client->dev, "clock registration failed\n");
++		err = PTR_ERR(pdiv1);
++		goto err_pdiv1;
++	}
++
++	/* pdiv2 */
++	pdiv2_name = kasprintf(GFP_KERNEL, "%s_pdiv2", np->name);
++	if (!pdiv2_name) {
++		err = -ENOMEM;
++		goto err_pdiv1;
++	}
++
++	pdiv2 = clk_i2c_register_divider(&client->dev, pdiv2_name,
++			pll_mux_name, CLK_SET_RATE_PARENT, data->regmap,
++			CDCE913_PLL_CFG_6, 0, 7, CLK_DIVIDER_ONE_BASED, NULL,
++			NULL);
++	if (IS_ERR(pdiv2)) {
++		dev_err(&client->dev, "clock registration failed\n");
++		err = PTR_ERR(pdiv2);
++		goto err_pdiv2;
++	}
++
++	/* pdiv3 */
++	pdiv3_name = kasprintf(GFP_KERNEL, "%s_pdiv3", np->name);
++	if (!pdiv3_name) {
++		err = -ENOMEM;
++		goto err_pdiv2;
++	}
++
++	pdiv3 = clk_i2c_register_divider(&client->dev, pdiv3_name,
++			pll_mux_name, CLK_SET_RATE_PARENT, data->regmap,
++			CDCE913_PLL_CFG_7, 0, 7, CLK_DIVIDER_ONE_BASED, NULL,
++			NULL);
++	if (IS_ERR(pdiv3)) {
++		dev_err(&client->dev, "clock registration failed\n");
++		err = PTR_ERR(pdiv3);
++		goto err_pdiv3;
++	}
++
++	/* Y2 mux */
++	y2_mux_name = kasprintf(GFP_KERNEL, "%s_y2_mux", np->name);
++	if (!y2_mux_name) {
++		err = -ENOMEM;
++		goto err_pdiv3;
++	}
++
++	y2_mux_parents[0] = pdiv1_name;
++	y2_mux_parents[1] = pdiv2_name;
++	y2_mux = clk_i2c_register_mux(&client->dev, y2_mux_name,
++			y2_mux_parents, 2,
++			CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT,
++			data->regmap, CDCE913_PLL_CFG_4, 6, 1, 0);
++	if (IS_ERR(y2_mux)) {
++		dev_err(&client->dev, "clock registration failed\n");
++		err = PTR_ERR(y2_mux);
++		goto err_y2_mux;
++	}
++
++	/* Y3 mux */
++	y3_mux_name = kasprintf(GFP_KERNEL, "%s_y3_mux", np->name);
++	if (!y3_mux_name) {
++		err = -ENOMEM;
++		goto err_y2_mux;
++	}
++
++	y3_mux_parents[0] = pdiv1_name;
++	y3_mux_parents[1] = pdiv2_name;
++	y3_mux_parents[2] = pdiv3_name;
++	y3_mux = clk_i2c_register_mux(&client->dev, y3_mux_name,
++			y3_mux_parents, 3,
++			CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT,
++			data->regmap, CDCE913_PLL_CFG_4, 4, 2, 0);
++	if (IS_ERR(y3_mux)) {
++		dev_err(&client->dev, "clock registration failed\n");
++		err = PTR_ERR(y3_mux);
++		goto err_y3_mux;
++	}
++
++	err = of_property_read_u32(np, "ti,crystal-load-capacity", &cap);
++	if (!err) {
++		if (cap > 20)
++			cap = 20;
++		cap <<= XTAL_LOAD_CAP_SHIFT;
++		err = regmap_write(data->regmap, CDCE913_GENERIC_CFG_5, cap);
++		if (err)
++			dev_warn(&client->dev, "unable to write to device\n");
++	}
++
++	err = of_property_read_string(np, "ti,input-clock-type", &clk_in_type);
++	if (!err)
++		cdce913_set_clk_in_type(data, clk_in_type);
++
++err_y3_mux:
++	kfree(y3_mux_name);
++err_y2_mux:
++	kfree(y2_mux_name);
++err_pdiv3:
++	kfree(pdiv3_name);
++err_pdiv2:
++	kfree(pdiv2_name);
++err_pdiv1:
++	kfree(pdiv1_name);
++err_y1_mux:
++	kfree(y1_mux_name);
++err_pll_mux:
++	kfree(pll_mux_name);
++
++	if (err)
++		return err;
++
++	data->clk_out[0] = pdiv1;
++	data->clk_out[1] = y2_mux;
++	data->clk_out[2] = y3_mux;
++
++	data->clk_data.clks = data->clk_out;
++	data->clk_data.clk_num = ARRAY_SIZE(data->clk_out);
++	err = of_clk_add_provider(np, of_clk_src_onecell_get, &data->clk_data);
++	if (err)
++		goto err_clk_provider;
++
++	cdce913_init_frequencies(np, data, pll);
++
++	dev_info(&client->dev, "%s %u/%u: current frequencies: %lu, %lu, %lu\n",
++			part ? "CDCE913" : "CDCEL913", vendor, revision,
++			clk_get_rate(data->clk_out[0]),
++			clk_get_rate(data->clk_out[1]),
++			clk_get_rate(data->clk_out[2]));
++
++err_clk_provider:
++	return err;
++}
++
++static int cdce913_remove(struct i2c_client *client)
++{
++	of_clk_del_provider(client->dev.of_node);
++	return 0;
++}
++
++static const struct i2c_device_id cdce913_id[] = {
++	{ "cdce913" },
++	{ "cdcel913" },
++	{ }
++};
++MODULE_DEVICE_TABLE(i2c, cdce_id);
++
++static const struct of_device_id clk_cdce913_of_match[] = {
++	{ .compatible = "ti,cdce913" },
++	{ .compatible = "ti,cdcel913" },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, clk_cdce913_of_match);
++
++static struct i2c_driver cdce913_driver = {
++	.driver = {
++		.name = "cdce913",
++		.of_match_table = of_match_ptr(clk_cdce913_of_match),
++	},
++	.probe		= cdce913_probe,
++	.remove		= cdce913_remove,
++	.id_table	= cdce913_id,
++};
++module_i2c_driver(cdce913_driver);
++
++MODULE_AUTHOR("Soeren Brinkmann <soren.brinkmann@xilinx.com");
++MODULE_DESCRIPTION("CDCE913 driver");
++MODULE_LICENSE("GPL");
 -- 
 1.9.0.1.g4196000
