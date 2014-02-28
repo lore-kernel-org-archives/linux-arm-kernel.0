@@ -1,40 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Feb 2014 11:22:26 +0100
-Subject: [PATCH v3 2/3] ARM: dts: imx6: extend PCIe interrupt list for MSI
-In-Reply-To: <1393582776.5219.2.camel@weser.hi.pengutronix.de>
-References: <1393519305-15128-1-git-send-email-l.stach@pengutronix.de>
- <6495086.OFxrshKaiu@wuerfel>
- <1393582776.5219.2.camel@weser.hi.pengutronix.de>
-Message-ID: <59506012.lKQmfIR71j@wuerfel>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 28 Feb 2014 11:27:46 +0100
+Subject: [PATCH] gpio: only enable kona driver on BCM_MOBILE or for
+ compile testing
+In-Reply-To: <CAPdLdqkq06AuLr8a8x9aY8BmHHbcNsL5tmQrH4j8bEom_HS-kA@mail.gmail.com>
+References: <1392990146-18916-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <CAPdLdqkq06AuLr8a8x9aY8BmHHbcNsL5tmQrH4j8bEom_HS-kA@mail.gmail.com>
+Message-ID: <20140228102746.GN6865@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 February 2014 11:19:36 Lucas Stach wrote:
-> Am Donnerstag, den 27.02.2014, 17:44 +0100 schrieb Arnd Bergmann:
-> > On Thursday 27 February 2014 17:41:44 Lucas Stach wrote:
-> > >                         num-lanes = <1>;
-> > > -                       interrupts = <0 123 0x04>;
-> > > +                       interrupt-names = "inta", "intb", "intc", "intd/msi";
-> > > +                       interrupts = <0 123 0x04>, <0 122 0x04>, <0 121 0x04>, <0 120 0x04>;
-> > >                         clocks = <&clks 189>, <&clks 187>, <&clks 206>, <&clks 144>;
-> > > 
-> > 
-> > The standard PCI interrupts should not be listed here, you need to
-> > put them into the "interrupt-map" property so the of_irq_parse_and_map_pci()
-> > function can translate them.
-> > 
-> 
-> So as INTA is already listed and implemented in the driver this way,
-> this means the binding is totally bogus (taking into account that it
-> didn't match the documented designware binding in more places).
-> 
-> I wonder if we should just break the binding to sort things out, given
-> that there are not that many users of imx-pcie yet.
+Hello Markus,
 
-That may be best, yes. If we have to provide backwards compatibility,
-the driver can have a fallback for the case where no interrupt-map
-property is present, but it should not try to handle multiple
-interrupt lines that way, only the trivial case where you have a single
-IntA line for all devices.
+On Thu, Feb 27, 2014 at 02:20:17PM -0800, Markus Mayer wrote:
+> On 21 February 2014 05:42, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > I'm not sure if and how "Kona" fits into the bcm281xx namespace, but
+> > reading through the commit logs of the changes touching
+> > drivers/gpio/gpio-bcm-kona.c so far suggests it does. In this case I'd
+> > consider it a good idea to mention "bcm281xx" in the help text of
+> > GPIO_BCM_KONA.
+> 
+> Naming these components has been quite a challenge for our upstreaming
+> effort. Some things are not very obvious unless you know he chip or
+> were involved in those discussions.
+> 
+> "Kona" can be thought of as an architecture or a family of chips.
+> bcm281xx is one member of that family. There are others. I submitted
+> bcm21664 to arm-linux just a few minutes ago. bcm21664 also uses
+> gpio-bcm-kona.c.
+> 
+> Mentioning the SoCs in the help text is a good idea, but we'll likely
+> have to come up with a central location where all supported members of
+> the Kona family are listed, so they aren't scattered all over
+> different sub-systems (Kona watchdog, Kona GPIO, Kona timer, etc.) If
+> we don't have a central location, we'll be certain to forget updating
+> one of the help texts eventually, and it would become inconsistent.
+Fine for me, but note that this was only a side node and is orthogonal
+to the patch I sent. So if you want to ack it ...
 
-	Arnd
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
