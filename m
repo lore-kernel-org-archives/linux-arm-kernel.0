@@ -1,40 +1,32 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 28 Feb 2014 10:32:37 -0800
-Subject: [PATCH v4 5/9] Input: pmic8xxx-pwrkey - Migrate to DT
-In-Reply-To: <20140228034547.GE7308@joshc.qualcomm.com>
-References: <1393552520-9068-1-git-send-email-sboyd@codeaurora.org>
- <1393552520-9068-6-git-send-email-sboyd@codeaurora.org>
- <20140228034547.GE7308@joshc.qualcomm.com>
-Message-ID: <20140228183237.GE2487@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 28 Feb 2014 10:33:14 -0800
+Subject: [PATCH 00/12] ARM: OMAP2 DT clock conversion
+In-Reply-To: <5310D2FE.5090209@ti.com>
+References: <1393579384-23440-1-git-send-email-t-kristo@ti.com>
+ <5310B271.5040708@ti.com> <20140228180112.GC15399@atomide.com>
+ <5310D2FE.5090209@ti.com>
+Message-ID: <20140228183313.GD15399@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27, Josh Cartwright wrote:
-> On Thu, Feb 27, 2014 at 05:55:16PM -0800, Stephen Boyd wrote:
-> > The driver is only supported on DT enabled platforms. Convert the
-> > driver to DT so that it can probe properly.
-> > 
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
-> > --- a/drivers/input/misc/pmic8xxx-pwrkey.c
-> > +++ b/drivers/input/misc/pmic8xxx-pwrkey.c
-> > @@ -172,7 +178,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
-> >  	}
-> >  
-> >  	platform_set_drvdata(pdev, pwrkey);
-> > -	device_init_wakeup(&pdev->dev, pdata->wakeup);
-> > +	device_init_wakeup(&pdev->dev, 1);
+* Tero Kristo <t-kristo@ti.com> [140228 10:21]:
 > 
-> Is there a particular reason you aren't providing a 'linux,wakeup'
-> property for pwrkey?
-> 
+> Hmm, some clock node is broken, might be missing a name or parent
+> name for some reason. Can you try to boot with DEBUG enabled so you
+> get pr_debug:s out and see which clock is being initialized during
+> the crash?
 
-In all the users of this device I've never seen wakeup set to 0.
-Given that this is a power key it makes sense because this is
-used to wake up a phone from suspend (also see the comment above
-device_init_wakeup() where power buttons are explicitly called
-out).
+...
+[    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: core_d18_ck
+[    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: vlynq_mux_fck
+[    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: vlynq_fck
+[    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+...
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+We really should be registering the clocks lazily as needed BTW. That
+leaves out the dependency to DEBUG_LL for seeing any kind of decent
+error messages during the booting.
+
+Regards,
+
+Tony
