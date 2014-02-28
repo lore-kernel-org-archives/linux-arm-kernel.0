@@ -1,46 +1,61 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 28 Feb 2014 14:49:54 -0600
-Subject: [PATCHv2 4/4] ARM: dts: OMAP5: Add IOMMU nodes
-In-Reply-To: <1393620594-14957-1-git-send-email-s-anna@ti.com>
-References: <1393620594-14957-1-git-send-email-s-anna@ti.com>
-Message-ID: <1393620594-14957-5-git-send-email-s-anna@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Feb 2014 21:08:20 +0000
+Subject: [PATCH v7 08/15] ahci-imx: Port to library-ised ahci_platform
+In-Reply-To: <1393084424-31099-9-git-send-email-hdegoede@redhat.com>
+References: <1393084424-31099-1-git-send-email-hdegoede@redhat.com>
+ <1393084424-31099-9-git-send-email-hdegoede@redhat.com>
+Message-ID: <20140228210820.GZ21483@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IOMMU DT nodes have been added for the DSP and IPU
-subsystems. The MMUs in OMAP5 are identical to those in
-OMAP4, including the bus error back capability on IPU.
+On Sat, Feb 22, 2014 at 04:53:37PM +0100, Hans de Goede wrote:
+> +		/*
+> +		 * set PHY Paremeters, two steps to configure the GPR13,
+> +		 * one write for rest of parameters, mask of first write
+> +		 * is 0x07ffffff, and the other one write for setting
+> +		 * the mpll_clk_en.
+> +		 */
+> +		regmap_update_bits(imxpriv->gpr, IOMUXC_GPR13,
+> +				   IMX6Q_GPR13_SATA_RX_EQ_VAL_MASK |
+> +				   IMX6Q_GPR13_SATA_RX_LOS_LVL_MASK |
+> +				   IMX6Q_GPR13_SATA_RX_DPLL_MODE_MASK |
+> +				   IMX6Q_GPR13_SATA_SPD_MODE_MASK |
+> +				   IMX6Q_GPR13_SATA_MPLL_SS_EN |
+> +				   IMX6Q_GPR13_SATA_TX_ATTEN_MASK |
+> +				   IMX6Q_GPR13_SATA_TX_BOOST_MASK |
+> +				   IMX6Q_GPR13_SATA_TX_LVL_MASK |
+> +				   IMX6Q_GPR13_SATA_MPLL_CLK_EN |
+> +				   IMX6Q_GPR13_SATA_TX_EDGE_RATE,
+> +				   IMX6Q_GPR13_SATA_RX_EQ_VAL_3_0_DB |
+> +				   IMX6Q_GPR13_SATA_RX_LOS_LVL_SATA2M |
+> +				   IMX6Q_GPR13_SATA_RX_DPLL_MODE_2P_4F |
+> +				   IMX6Q_GPR13_SATA_SPD_MODE_3P0G |
+> +				   IMX6Q_GPR13_SATA_MPLL_SS_EN |
+> +				   IMX6Q_GPR13_SATA_TX_ATTEN_9_16 |
+> +				   IMX6Q_GPR13_SATA_TX_BOOST_3_33_DB |
+> +				   IMX6Q_GPR13_SATA_TX_LVL_1_025_V);
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/boot/dts/omap5.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+While I see this, I'll stick an oar in.
 
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index a72813a..42b9a44 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -513,6 +513,21 @@
- 			dma-names = "tx", "rx";
- 		};
- 
-+		mmu_dsp: mmu at 4a066000 {
-+			compatible = "ti,omap4-iommu";
-+			reg = <0x4a066000 0xff>;
-+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+			ti,hwmods = "mmu_dsp";
-+		};
-+
-+		mmu_ipu: mmu at 55082000 {
-+			compatible = "ti,omap4-iommu";
-+			reg = <0x55082000 0xff>;
-+			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
-+			ti,hwmods = "mmu_ipu";
-+			ti,iommu-bus-err-back;
-+		};
-+
- 		keypad: keypad at 4ae1c000 {
- 			compatible = "ti,omap4-keypad";
- 			reg = <0x4ae1c000 0x400>;
+It is totally wrong for this to be hard-coded into the driver - many
+of these should be specified via DT, since they're board specific.
+These are already different from the reset default in this register.
+
+The side effect of this hard coding is that eSATA just doesn't work
+at all on some boards - the board I have requires TX_LVL_1_104V and
+TX_BOOST_0_00_DB.
+
+Hence, I'd ask that while you move stuff like this around, you bear
+in mind that we do need to add additional properties.
+
+I'm in two minds about this - whether to make the existing binding
+with its compatible string always use these settings, and invent a
+new compatible string for one which is fully configurable (as it
+_should_ have been from the very start) or whether to make this
+the default if the various properties aren't specified.
+
+Either way, this driver is electrically unusable as it stands here.
+
 -- 
-1.9.0
+FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
+improving, and getting towards what was expected from it.
