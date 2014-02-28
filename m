@@ -1,133 +1,165 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Feb 2014 11:01:50 +0100
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <CB7DBE07-42BD-4588-AC9E-CB0BF95A811A@suse.de>
-References: <20140226183454.GA14639@cbox> <6039706.L1ZWvgjHF0@wuerfel>
- <CB7DBE07-42BD-4588-AC9E-CB0BF95A811A@suse.de>
-Message-ID: <7825615.Ak6TOGibTE@wuerfel>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 28 Feb 2014 18:07:31 +0800
+Subject: [PATCH v3] pwm: add CSR SiRFSoC PWM driver
+In-Reply-To: <CAMiSF3CN33N867TtjatYx1EwaV5qJY=JYsSrVFpQvC+yS1T5rA@mail.gmail.com>
+References: <1391855002-26098-1-git-send-email-21cnbao@gmail.com>
+ <lel46f$q2d$1@ger.gmane.org>
+ <CAGsJ_4xLtXV6WtVhLgzFAaU9oG5UOt+LonFktBipQf_a6Yutng@mail.gmail.com>
+ <CAMiSF3CczVV+Ob++_ACcwE+OXvFH8f9v1E=Q1F5x7Zz1BjCCzg@mail.gmail.com>
+ <CAGsJ_4ywPTbUnfVVFFNFMSwG0CGckxKqHZ81rvEDFK-_1H25tA@mail.gmail.com>
+ <CAMiSF3CN33N867TtjatYx1EwaV5qJY=JYsSrVFpQvC+yS1T5rA@mail.gmail.com>
+Message-ID: <CAGsJ_4z_48pZcXJXkwyuujoq=cEF3Oov5_GBRtHHOufMdEpRGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 February 2014 08:05:15 Alexander Graf wrote: 
-> > Am 28.02.2014 um 03:56 schrieb Arnd Bergmann <arnd@arndb.de>:
-> >> On Thursday 27 February 2014 22:24:13 Alexander Graf wrote:
+2014-02-28 17:06 GMT+08:00 Romain Izard <romain.izard.pro@gmail.com>:
+> Hello Barry,
 >
-> > When you have that, why do you still care about a
-> > system specification? 
-> 
-> Because I don't want to go back to the system level definition. To me a 
-> peripheral is a peripheral - regardless of whether it is on a platform 
-> bus or a PCI bus. I want to leverage common ground and only add the few 
-> pieces that diverge from it.
+> 2014-02-28 4:01 GMT+01:00 Barry Song <21cnbao@gmail.com>:
+>>
+>> Hi Romain,
+>>
+>> do you have a real user scenarios for this 32KHz? as the 1st step, i
+>> want a clean and general enough pwm driver, if there is any special
+>> requirement, i want to execute a "demanding page" when the "page
+>> fault" happened as this will make the whole flow more smooth. that
+>> means we make it lazy by incremental patches. but if you do want to
+>> use it for the moment, it is a "page fault" now. so we can have it
+>> immediately and it is better you can help to double-test :-)
+>
+> My use case is to connect a Bluetooth module, in fact with a CSR chip.
+> For testing, I will try to see what I can do, as for now my boards are not
+> running with the mainline. But I'm very interested in transitioning on the
+> mainline in due time, so that's the reason I keep an eye on the mailing
+> lists. Conversely, it's not critical at all to get the feature in right now, but
+> it should not be impossible to do so in the future, especially when taking
+> the 'stable interface' aspect of device tree bindings into account.
+>
+>> 2014-02-27 18:51 GMT+08:00 Romain Izard <romain.izard.pro@gmail.com>:
+>>> Perhaps this can be linked with the missing "clock-names" property, as this
+>>> will make it possible to add multiple functional clocks, with "iclk" matching
+>>> the interface clock (i.e. pwmc), and "fclk0", "fclk1", etc. matching
+>>> all supported
+>>> functional clocks.
+>>>
+>>> With only the 26 MHz clock, the node would look like:
+>>>
+>>> pwm: pwm at b0130000 {
+>>>         compatible = "sirf,prima2-pwm";
+>>>         #pwm-cells = <2>;
+>>>         reg = <0xb0130000 0x10000>;
+>>>         clocks = <&clks 21>,  <&clks 1>, <&clks 0>;
+>>>         clock-names = "iclk", "fclk0", "fclk3";
+>>> };
+>>>
+>
+> Aargh. I meant this:
+>
+> pwm: pwm at b0130000 {
+>         compatible = "sirf,prima2-pwm";
+>         #pwm-cells = <2>;
+>         reg = <0xb0130000 0x10000>;
+>         clocks = <&clks 21>,  <&clks 1>;
+>         clock-names = "iclk", "fclk0";
+> };
+>
+>>> The result would look like this with both the 26 MHz and the 32 kHz clocks:
+>>>
+>>> pwm: pwm at b0130000 {
+>>>         compatible = "sirf,prima2-pwm";
+>>>         #pwm-cells = <2>;
+>>>         reg = <0xb0130000 0x10000>;
+>>>         clocks = <&clks 21>,  <&clks 1>, <&clks 0>;
+>>>         clock-names = "iclk", "fclk0", "fclk3";
+>>> };
+>>>
+>>> And with all possible clocks:
+>>>
+>>> pwm: pwm at b0130000 {
+>>>         compatible = "sirf,prima2-pwm";
+>>>         #pwm-cells = <2>;
+>>>         reg = <0xb0130000 0x10000>;
+>>>         clocks = <&clks 21>,  <&clks 1>, <&clks 2>, <&clks 3>, <&clks
+>>> 0>, <&clks 4>;
+>>>         clock-names = "iclk", "fclk0", "fclk1", "fclk2", "fclk3", "fclk4";
+>>> };
+>>>
+>>> The code in the probe function would interpret the clock-name to build
+>>> the clock/index mapping table. This would not change a lot the binding you
+>>> proposed, as you still can describe only one functional clock, but it describes
+>>> which index in the configuration register is linked to the proposed clock.
+>>>
+>>
+>> yes. very clear. the only two things left
+>>
+>> 1.  fclk should be named for pwm not for rtc, osc and pll, so the
+>> names might be ugly by fclk0~N.
+>>
+> For me, it's important to keep the number in the name of the clock as it is
+> the source of the information for binding the device tree clock on one side
+> and the clock source index in the selection register on the other side. If
+> we do not do it this way, we cannot easily handle new clocks in the future
+> in the binding.
+>
+> On the other hand, I strongly dislike the current clock specification
+> as <&clks #x>.
+> It would be probably a good thing to add a header linking the numbers
+> to symbols,
+> and we would then get:
+>
+>         clocks = <&clks SIRFCLK_A6_PWM>,
+>                 <&clks SIRFCLK_A6_OSC>,
+>                 <&clks SIRFCLK_A6_PLL1>,
+>                 <&clks SIRFCLK_A6_PLL2>,
+>                 <&clks SIRFCLK_A6_RTC>,
+>                 <&clks SIRFCLK_16_PLL3>;
+>         clock-names = "iclk", "fclk0", "fclk1", "fclk2", "fclk3", "fclk4";
+>
+> Note that as the binary output of the device tree would not change with this, we
+> do not need to worry about backwards compatibility in this precise case.
 
-You may be missing a lot of the complexity that describing platform devices
-in the general case brings then. To pass through an ethernet controller, you may 
-also need to add (any subset of)
+this pwm controller is prima2-compatible, so it is actually a pwm
+controller highly bound with the special SoC.
+really strange things are we actually care about the clock types. we
+actually can't think fclk0~fclk4 as same things. for pll, i think it
+is buggy to use. for rtc, it only service special target for providing
+bypass 32KHz clock.
 
-* phy device
-* clock controller
-* voltage regulator
-* gpio controller
-* LED controller
-* DMA engine
-* an MSI irqchip
-* IOMMU
+if we look this controller a separate IP, we need to look 5 clock
+source to be coequal. but it is not the real case.
+i think people will hate the things that we have a separate bypass
+mode for fclk3, why it is 3 but not 2, 1, 4 and 5?
 
-Each of the above in turn is shared with other peripherals on the host,
-which brings you to three options:
+that is why i move to a MACRO 26MHz in the original codes as i think
+it is a prima2 controller but not a controller used by prima2 even
+though we always want a IP module to be a IP module suitable for all
+SoCs.
 
-* change the driver to not depend on the above, but instead support an
-  abstract virtualized version of the platform device that doesn't
-  need them.
-* Pass through all devices this one depends on, giving up on guest
-  isolation. This may work for some embedded use cases, but not
-  for running untrusted guests.
-* Implement virtualized versions of the other interfaces and make
-  the hypervisor talk to the real hardware.
+>
+>> 2.  the driver need to manage all of the clocks. yes, it can. but it
+>> might be ugly again. we can either request the clk at the time of pwm
+>> configuration, or get all directy in probe and maintain an array.
+>
+> For me, what is important right now is to get the binding right. If the driver
+> cannot do everything the binding allows, this is not a problem. But we define
+> a binding that cannot easily be expanded, we will have problems when we
+> need the new features.
+>
+>> i am thinking what is the best way for it. if we do that by an
+>> incremental patch, it might be more concentrated and understandable.
 
-I would still argue that each of those approaches is out of scope for
-this specification.
+i think bypass mode for rtc will be included immediately since there
+is a real user.
 
-> > Going back to the previous argument, since the hypervisor has to make up the
-> > description for the platform device itself, it won't matter whether the host
-> > is booted using DT or ACPI: the description that the hypervisor makes up for
-> > the guest has to match what the hypervisor uses to describe the rest of the
-> > guest environment, which is independent of what the host uses.
-> 
-> I agree 100%. This spec should be completely independent of the host.
-> 
-> The reason I brought up the host is that if you want to migrate an OS from
-> physical to virtual, you may need to pass through devices to make this work.
-> If your host driver developers only ever worked with ACPI, there's a good
-> chance the drivers won't work in a pure dt environment.
-> 
-> Brw, the same argument applies the other way around as well. I don't believe
-> we will get around with generating and mandating a single machibe
-> description environment.
+>
+> I'm all for this as well, that why for me the first syntax (corrected
+> up there) should
+> be valid. This way, you do not need to integrate the bypass support in
+> this step,
+> but you can add it later.
+>
+> Best regards,
+> --
+> Romain Izard
 
-I see those two cases as completely distinct. There are good reasons
-for emulating a real machine for running a guest image that expects
-certain hardware, and you can easily do this with qemu. But since you
-are emulating an existing platform and run an existing OS, you don't
-need a VM System Specification, you just do whatever the platform would
-normally do that the guest relies on.
-
-The VM system specification on the other hand should allow you to run
-any OS that is written to support this specification on any hypervisor
-that implements it.
-
-> >> Replace Windows by "Linux with custom drivers" and you're in the same
-> >> situation even when you neglect Windows. Reality will be that we will
-> >> have fdt and acpi based systems.
-> > 
-> > We will however want to boot all sorts of guests in a standardized
-> > virtual environment:
-> > 
-> > * 32 bit Linux (since some distros don't support biarch or multiarch
-> >  on arm64) for running applications that are either binary-only
-> >  or not 64-bit safe.
-> > * 32-bit Android
-> > * big-endian Linux for running applications that are not endian-clean
-> >  (typically network stuff ported from powerpc or mipseb.
-> > * OS/v guests
-> > * NOMMU Linux
-> > * BSD based OSs
-> > * QNX
-> > * random other RTOSs
-> > 
-> > Most of these will not work with ACPI, or at least not in 32-bit mode.
-> > 64-bit Linux will obviously support both DT (always)
-> 
-> Unfortunately not
-> 
-> > and ACPI (optionally),
-> > depending on the platform, but for a specification like this, I think
-> > it's much easier to support fewer options, to make it easier for other
-> > guest OSs to ensure they actually run on any compliant hypervisor.
-> 
-> You're forgetting a few pretty important cases here:
-> 
-> * Enterprise grade Linux distribution that only supports ACPI
-
-You can't actually turn off DT support in the kernel, and I don't think
-there is any point in patching the kernel to remove it. The only sane
-thing the enterprise distros can do is turn on the "SBSA" platform
-that supports all compliant machines running ACPI, but turn off all
-platforms that are not SBSA compliant and boot using DT. With the way
-that the VM spec is written at this point, Linux will still boot on
-these guests, since the hardware support is a subset of SBSA, with the
-addition of a few drivers for hypervisor specific features.
-
-> * Maybe WinRT if we can convince MS to use it
-
-I'd argue that would be unlikely.
-
-> * Non-Linux with x86/ia64 heritage and thus ACPI support
-
-That assumes that x86 ACPI support is anything like ARM64 ACPI
-support, which it really isn't. In particular, you can turn off
-ACPI on any x86 machine and it will still work for the most
-part, while on ARM64 we will need to use ACPI to describe even
-the most basic aspects of the platform.
-
-	Arnd
+-barry
