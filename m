@@ -1,63 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Feb 2014 16:06:12 +0000
-Subject: [PATCH 4/9] Doc/DT: Add DT binding documentation for HDMI
- Connector
-In-Reply-To: <1393590016-9361-5-git-send-email-tomi.valkeinen@ti.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-5-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <20140228160612.GR21483@n2100.arm.linux.org.uk>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 28 Feb 2014 08:06:35 -0800
+Subject: [PATCH v6 0/2] Introduce AEMIF driver for Davinci/Keystone archs
+In-Reply-To: <5310AEA8.1070804@ti.com>
+References: <1393262772-24442-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <5310AEA8.1070804@ti.com>
+Message-ID: <20140228160635.GA6144@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 02:20:11PM +0200, Tomi Valkeinen wrote:
-> Add DT binding documentation for HDMI Connector.
+On Fri, Feb 28, 2014 at 10:43:36AM -0500, Santosh Shilimkar wrote:
+> Greg,
 > 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Reviewed-by: Archit Taneja <archit@ti.com>
-> ---
->  .../devicetree/bindings/video/hdmi-connector.txt   | 23 ++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/hdmi-connector.txt
+> On Monday 24 February 2014 12:26 PM, Ivan Khoronzhuk wrote:
+> > These patches introduce Async External Memory Interface (EMIF16/AEMIF)
+> > controller driver for Davinci/Keystone archs.
+> > 
+> > For more informations see documentation:
+> > Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
+> > OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
+> > Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+> > 
+> [..]
 > 
-> diff --git a/Documentation/devicetree/bindings/video/hdmi-connector.txt b/Documentation/devicetree/bindings/video/hdmi-connector.txt
-> new file mode 100644
-> index 000000000000..5d25f6a432bb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/hdmi-connector.txt
-> @@ -0,0 +1,23 @@
-> +HDMI Connector
-> +==============
-> +
-> +Required properties:
-> +- compatible: "hdmi-connector"
-> +
-> +Optional properties:
-> +- label: a symbolic name for the connector
-> +
-> +Required nodes:
-> +- Video port for HDMI input
-> +
-> +Example
-> +-------
-> +
-> +hdmi0: connector at 1 {
-> +	compatible = "hdmi-connector";
-> +	label = "hdmi";
-> +
-> +	hdmi_connector_in: endpoint {
-> +		remote-endpoint = <&tpd12s015_out>;
-> +	};
-> +};
+> > 
+> > v5..v6:
+> > - memory: ti-aemif: introduce AEMIF driver
+> > - memory: ti-aemif: add bindings for AEMIF driver
+> > 	changed opaque names for cs node properties
+> > 
+> Can you please pick these two patches ? 
 
-It seems rather weird to have DVI connectors having an optional I2C
-property, but HDMI (which augments DVI) not having that as at least an
-optional property.
+Asking for a response with less than a weeks time is really bold:
+  $ ~/bin/mdfrm -c ~/mail/todo/
+  521 messages in /home/gregkh/mail/todo/
 
-I can quite well see the iMX HDMI support needing an i2c bus here.
-
-Also, HDMI has two connector standards - type A and type B, much like
-the single vs dual link of DVI.  Again, DRM exposes this to userspace.
-
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+Give me a chance to catch up please...
