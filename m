@@ -1,39 +1,29 @@
-From: joshc@codeaurora.org (Josh Cartwright)
-Date: Thu, 27 Feb 2014 21:41:38 -0600
-Subject: [PATCH v4 4/9] Input: pmic8xxx-keypad - Migrate to DT
-In-Reply-To: <1393552520-9068-5-git-send-email-sboyd@codeaurora.org>
-References: <1393552520-9068-1-git-send-email-sboyd@codeaurora.org>
- <1393552520-9068-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20140228034138.GD7308@joshc.qualcomm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 28 Feb 2014 09:18:02 +0530
+Subject: [PATCH v3 1/3] cpufreq: stats: Remove redundant cpufreq_cpu_get()
+ call
+In-Reply-To: <1393552716-9754-1-git-send-email-skannan@codeaurora.org>
+References: <1393552716-9754-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <CAKohpomjtE7Rtrs-TgxtSo658+4p0AHLzr9niN1GnkkrDqTxTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks good, with the exception of one thing...
-
-On Thu, Feb 27, 2014 at 05:55:15PM -0800, Stephen Boyd wrote:
-> The driver is only supported on DT enabled platforms. Convert the
-> driver to DT so that it can probe properly.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On 28 February 2014 07:28, Saravana Kannan <skannan@codeaurora.org> wrote:
+> __cpufreq_stats_create_table always gets pass the valid and real policy
+> struct. So, there's no need to call cpufreq_cpu_get() to get the policy
+> again.
+>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
 > ---
->  drivers/input/keyboard/pmic8xxx-keypad.c | 150 ++++++++++++++++++-------------
-> @@ -471,50 +514,27 @@ static void pmic8xxx_kp_close(struct input_dev *dev)
->   */
->  static int pmic8xxx_kp_probe(struct platform_device *pdev)
->  {
-[..]
-> -	keymap_data = pdata->keymap_data;
-> -	if (!keymap_data) {
-> -		dev_err(&pdev->dev, "no keymap data supplied\n");
-> -		return -EINVAL;
-> -	}
-> +	repeat = !of_property_read_bool(pdev->dev.of_node,
-> +					"linux,input-no-autorepeat");
-> +	wakeup = !of_property_read_bool(pdev->dev.of_node,
-> +					"linux,keypad-wakeup");
+>  drivers/cpufreq/cpufreq_stats.c | 12 +-----------
+>  1 file changed, 1 insertion(+), 11 deletions(-)
 
-I don't think you mean to invert this.
+All patches look fine now. Rafael you can queue them up as per your
+convenience.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+@Saravana: Though I am quite sure you still need my patches to get
+your initial issue fixed. So, can you please get them tested as early
+as possible, so that we can get them in for 3.14?
+
+@Srivatsa: Your reviews will also help :)
