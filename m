@@ -1,20 +1,28 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 28 Feb 2014 16:56:28 +0000
-Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
-In-Reply-To: <5310BDE3.60603@ti.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <20140228162752.GU21483@n2100.arm.linux.org.uk> <5310BDE3.60603@ti.com>
-Message-ID: <20140228165628.GX21483@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Feb 2014 16:58:17 +0000
+Subject: [PATCH v2 3/3] arm64: is_compat_task is defined both in
+ asm/compat.h and linux/compat.h
+In-Reply-To: <1393320025-2855-4-git-send-email-takahiro.akashi@linaro.org>
+References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393320025-2855-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393320025-2855-4-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140228165817.GE30996@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 06:48:35PM +0200, Tomi Valkeinen wrote:
-> This is totally unclear to me. How does it become a public standard?
-> What's the forum for this?
+On Tue, Feb 25, 2014 at 09:20:25AM +0000, AKASHI Takahiro wrote:
+> kernel/seccomp.c includes linux/compat.h and, indicrectly, asm/compat.h
+> via asm/syscall.h. Due to the duplicated definitions of is_compat_task,
+> compiling this file will fail in the case of !CONFIG_COMPAT.
+> So this patch
+> 1) removes is_compat_task() definition from asm/compat.h
+> 2) replaces asm/compat.h to linux/compat.h in kernel/*.c
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
 
-Me too.  That's where I'd hope someone on devicetree-discuss will be
-able to help us work out what's the right approach here. :)
+You built this, right? If so,
 
--- 
-FTTC broadband for 0.8mile line: now at 9.7Mbps down 460kbps up... slowly
-improving, and getting towards what was expected from it.
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
