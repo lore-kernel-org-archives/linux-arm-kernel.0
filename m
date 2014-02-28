@@ -1,184 +1,171 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 28 Feb 2014 11:46:12 +0100
-Subject: [PATCH v3] clk: respect the clock dependencies in of_clk_init
-In-Reply-To: <1393265413-16641-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1393265413-16641-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <531068F4.3060903@free-electrons.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 28 Feb 2014 13:49:34 +0200
+Subject: [PATCH v2 5/7] ARM: of: introduce common routine for DMA
+ configuration
+In-Reply-To: <9618080.kpE3Kl6X8p@wuerfel>
+References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
+ <1393535872-20915-6-git-send-email-santosh.shilimkar@ti.com>
+ <9618080.kpE3Kl6X8p@wuerfel>
+Message-ID: <531077CE.5050501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hi Arnd,
 
-On 24/02/2014 19:10, Gregory CLEMENT wrote:
-> Until now the clock providers were initialized in the order found in
-> the device tree. This led to have the dependencies between the clocks
-> not respected: children clocks could be initialized before their
-> parent clocks.
+On 02/28/2014 12:00 PM, Arnd Bergmann wrote:
+> On Thursday 27 February 2014 16:17:50 Santosh Shilimkar wrote:
+>> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+>> index f751714..926b5dd 100644
+>> --- a/arch/arm/kernel/devtree.c
+>> +++ b/arch/arm/kernel/devtree.c
+>> @@ -235,3 +238,61 @@ const struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
+>>   
+>>   	return mdesc;
+>>   }
+>> +
+>> +void arm_dt_dma_configure(struct device *dev)
+>> +{
+>> +	dma_addr_t dma_addr;
+>> +	phys_addr_t paddr, size;
+>> +	dma_addr_t dma_mask;
+>> +	int ret;
+>> +
+>> +	/*
+>> +	 * if dma-ranges property doesn't exist - use 32 bits DMA mask
+>> +	 * by default and don't set skip archdata.dma_pfn_offset
+>> +	 */
+>> +	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+>> +	if (ret == -ENODEV) {
+>> +		dev->coherent_dma_mask = DMA_BIT_MASK(32);
+>> +		if (!dev->dma_mask)
+>> +			dev->dma_mask = &dev->coherent_dma_mask;
+>> +		return;
+>> +	}
 > 
-> Instead of forcing each platform to manage its own initialization order,
-> this patch adds this work inside the framework itself.
-> 
-> Using the data of the device tree the of_clk_init function now delayed
-> the initialization of a clock provider if its parent provider was not
-> ready yet.
-> 
-> The strict dependency check (all parents of a given clk must be
-> initialized) was added by Boris BREZILLON
+> I think this is a reasonable default, but I also want Russell's
+> opinion on this, since I suspect he will argue that we shouldn't
+> default to setting a DMA mask for devices that are not DMA capable.
 
-Are you ok with this version?
-Will you take it for 3.15?
-Or maybe you expected that it will be part of a pull request?
-
-However as it is modifying the core of the framework I thought that you
-would take it and apply yourself.
-
-Thanks,
-
-Gregory
+Just to note, that's current default behavior used in of_platform_device_create_pdata()
 
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
-> Mike,
+> Maybe someone has an idea how we can detect all three important cases:
 > 
-> This patch depend on the patch "clk: return probe defer when DT clock
-> not yet ready": http://article.gmane.org/gmane.linux.kernel/1643466
+> a) A device is marked as DMA capable using a dma-ranges property
+> b) A device is known not to be DMA capable
+> c) we don't have any dma-ranges properties in an old dtb file
+>     but still want 32 bit masks by default.
+
+Yep, This patch set supports [a, c]. But, case be [b] can be patched 
+by arch/mach code using Platform Bus notifier if needed.
+(Platform Bus notifiers will be called after arm_dt_dma_configure is 
+finished).
+
 > 
-> If for any reason you don't want to take it, then I will write a new
-> version closer to the v2 for the parent_ready() function.
+>> +	/* if failed - disable DMA for device */
+>> +	if (ret < 0) {
+>> +		dev_err(dev, "failed to configure DMA\n");
+>> +		return;
+>> +	}
 > 
-> I have taken into account all the remarks from Tomasz.
+> I guess this is also where other platforms (shmobile, highbank, ...)
+> will want the IOMMU detection to happen.
+
+This error path handling - means, DT contains wrong data :)
+
 > 
-> Thanks,
+>> +	/* DMA ranges found. Calculate and set dma_pfn_offset */
+>> +	dev->archdata.dma_pfn_offset = PFN_DOWN(paddr - dma_addr);
+>> +
+>> +	/* Configure DMA mask */
+>> +	dev->dma_mask = kmalloc(sizeof(*dev->dma_mask), GFP_KERNEL);
+>> +	if (!dev->dma_mask)
+>> +		return;
 > 
-> Changelog:
-> v2->v3:
-> 
-> - added the SoB flag of Boris
-> - used of_clk_get(np, i) in the parent_ready() function.
-> - simplified the loops to manage the order dependencies in of_clk_init()
-> 
-> v1 -> v2:
-> Merged the  strict dependency check from Boris.
-> 
-> 
->  drivers/clk/clk.c | 83 ++++++++++++++++++++++++++++++++++++++++++++++++++++---
->  1 file changed, 79 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 32d84e921b23..3a07f8ac2e11 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -2526,24 +2526,99 @@ const char *of_clk_get_parent_name(struct device_node *np, int index)
->  }
->  EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
->  
-> +struct clock_provider {
-> +	of_clk_init_cb_t clk_init_cb;
-> +	struct device_node *np;
-> +	struct list_head node;
-> +};
-> +
-> +static LIST_HEAD(clk_provider_list);
-> +
-> +/*
-> + * This function looks for a parent clock. If there is one, then it
-> + * checks that the provider for this parent clock was initialized, in
-> + * this case the parent clock will be ready.
-> + */
-> +static int parent_ready(struct device_node *np)
-> +{
-> +	int i = 0;
-> +
-> +	while (true) {
-> +		struct clk *clk = of_clk_get(np, i);
-> +
-> +		/* this parent is ready we can check the next one */
-> +		if (!IS_ERR(clk)) {
-> +			clk_put(clk);
-> +			i++;
-> +			continue;
-> +		}
-> +
-> +		/* at least one parent is not ready, we exit now */
-> +		if (PTR_ERR(clk) == -EPROBE_DEFER)
-> +			return 0;
-> +
-> +		/*
-> +		 * Here we make assumption that the device tree is
-> +		 * written correctly. So an error means that there is
-> +		 * no more parent. As we didn't exit yet, then the
-> +		 * previous parent are ready. If there is no clock
-> +		 * parent, no need to wait for them, then we can
-> +		 * consider their absence as being ready
-> +		 */
-> +		return 1;
-> +	}
-> +}
-> +
->  /**
->   * of_clk_init() - Scan and init clock providers from the DT
->   * @matches: array of compatible values and init functions for providers.
->   *
-> - * This function scans the device tree for matching clock providers and
-> - * calls their initialization functions
-> + * This function scans the device tree for matching clock providers
-> + * and calls their initialization functions. It also do it by trying
-> + * to follow the dependencies.
->   */
->  void __init of_clk_init(const struct of_device_id *matches)
->  {
->  	const struct of_device_id *match;
->  	struct device_node *np;
-> +	struct clock_provider *clk_provider, *next;
-> +	bool is_init_done;
-> +	bool force = false;
->  
->  	if (!matches)
->  		matches = &__clk_of_table;
->  
-> +	/* First prepare the list of the clocks providers */
->  	for_each_matching_node_and_match(np, matches, &match) {
-> -		of_clk_init_cb_t clk_init_cb = match->data;
-> -		clk_init_cb(np);
-> +		struct clock_provider *parent =
-> +			kzalloc(sizeof(struct clock_provider),	GFP_KERNEL);
-> +
-> +		parent->clk_init_cb = match->data;
-> +		parent->np = np;
-> +		list_add(&parent->node, &clk_provider_list);
-> +	}
-> +
-> +	while (!list_empty(&clk_provider_list)) {
-> +		is_init_done = false;
-> +		list_for_each_entry_safe(clk_provider, next,
-> +					&clk_provider_list, node) {
-> +			if (force || parent_ready(clk_provider->np)) {
-> +				clk_provider->clk_init_cb(clk_provider->np);
-> +				list_del(&clk_provider->node);
-> +				kfree(clk_provider);
-> +				is_init_done = true;
-> +			}
-> +		}
-> +
-> +		/*
-> +		 * We didn't managed to initialize any of the
-> +		 * remaining providers during the last loop, so now we
-> +		 * initialize all the remaining ones unconditionally
-> +		 * in case the clock parent was not mandatory
-> +		 */
-> +		if (!is_init_done)
-> +			force = true;
-> +
->  	}
->  }
->  #endif
-> 
+> Do we have to worry about freeing this? We could in theory put the
+> mask into pdev_archdata (as on microblaze), or point to
+> coherent_dma_mask (as of_platform_device_create_pdata does).
+> I can't think of a case where the latter won't actually work,
+> since coherent_dma_mask!=*dma_mask doesn't happen on any platform
+> device I have ever seen. coherent_dma_mask was introduced to handle
+> some special requirements of PCI devices on ia64 or parisc.
+
+I've used platform_device_register_full() as ref here. It actually contains
+good comment regarding this mem leak issue:
+/*
+ * This memory isn't freed when the device is put,
+ * I don't have a nice idea for that though.  Conceptually
+ * dma_mask in struct device should not be a pointer.
+ * See http://thread.gmane.org/gmane.linux.kernel.pci/9081
+ */
 
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 
+>> +       dma_mask = dma_addr + size - 1;
+> 
+> I can never remember if this is actually correct, or if it would have to
+> be
+> 
+> 	dma_mask = size - 1;
+> 
+> instead. Russell knows.
+> 
+>> +	ret = arm_dma_set_mask(dev, dma_mask);
+>> +	if (ret < 0) {
+>> +		dev_err(dev, "failed to set DMA mask %#08x\n", dma_mask);
+>> +		kfree(dev->dma_mask);
+>> +		dev->dma_mask = NULL;
+>> +		return;
+>> +	}
+> 
+> Again I'm hoping for Russell to provide the correct answer: Should we
+> set the correct mask initially for the device here, or should we
+> rely on dma_set_mask() to refuse a mask that is larger than we
+> can handle?
+> 
+> For PCI devices, we normally assume that we can always set a 32-bit
+> DMA mask, but drivers can set a smaller mask if the device can
+> support a smaller space than the bus can. In this case, the mask
+> is already the intersection of what the device and all the parent
+> buses support, and I'm not sure how the API describe in
+> Documentation/DMA-API-HOWTO.txt would deal with this.
+
+As mentioned by Santosh in cover letter,
+PCI (and other buses) is problem here as they may have different "dma-ranges"
+prop format (PCI #address-cells = <3>) and need to handled in different way. 
+
+May be, this code can be limited to platform_bus_type devices only somehow.
+
+> 
+>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+>> index 404d1da..97d5533 100644
+>> --- a/drivers/of/platform.c
+>> +++ b/drivers/of/platform.c
+>> @@ -213,10 +213,13 @@ static struct platform_device *of_platform_device_create_pdata(
+>>   
+>>   #if defined(CONFIG_MICROBLAZE)
+>>   	dev->archdata.dma_mask = 0xffffffffUL;
+>> -#endif
+>> +#elif defined(CONFIG_ARM_LPAE)
+
+ops, should be:
+#endif
++#if defined(CONFIG_ARM_LPAE)
+
+>> +	arm_dt_dma_configure(&dev->dev);
+>> +#else
+>>   	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+>>   	if (!dev->dev.dma_mask)
+>>   		dev->dev.dma_mask = &dev->dev.coherent_dma_mask;
+>> +#endif
+> 
+> The dependency on CONFIG_ARM_LPAE is not correct the general case,
+> that would be a special case on keystone. I'd suggest using
+> CONFIG_ARM here, and finding a different way to return false
+> for dma_is_coherent() on keystone with LPAE disabled.
+> 
+
+Thanks, for your comments.
+
+Regards,
+-grygorii
