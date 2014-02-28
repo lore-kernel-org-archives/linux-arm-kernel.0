@@ -1,100 +1,71 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 27 Feb 2014 17:19:54 -0800
-Subject: [PATCH 3/3] PCI: imx6: ventana: fixup for IRQ mismapping
-In-Reply-To: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
-References: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1393550394-11071-4-git-send-email-tharvey@gateworks.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 28 Feb 2014 10:35:12 +0900
+Subject: [PATCH v3 01/20] clk: shmobile: r8a7779: Add clocks support
+In-Reply-To: <CAMuHMdXFVoL4pyygzys4VyYBN42KDPdohVQz6JcZn9WvuEOFEA@mail.gmail.com>
+References: <1393400016-23433-1-git-send-email-horms+renesas@verge.net.au>
+ <1393400016-23433-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdUy6uj5vJ125Edp8g5NNxcWbG5wmD-j_gp=GgzXYAUAEw@mail.gmail.com>
+ <20140226085921.GD7720@verge.net.au>
+ <CAMuHMdXFVoL4pyygzys4VyYBN42KDPdohVQz6JcZn9WvuEOFEA@mail.gmail.com>
+Message-ID: <20140228013512.GD25134@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TI XIO2001 PCIe-to-PCI bridge used on Ventana expansion boards
-has its slot-to-bridge IRQ mapping reversed from the PCI specification:
+On Wed, Feb 26, 2014 at 10:06:06AM +0100, Geert Uytterhoeven wrote:
+> On Wed, Feb 26, 2014 at 9:59 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> > +/*
+> >> > + *             MD1 = 1                 MD1 = 0
+> >> > + *             (PLLA = 1500)           (PLLA = 1600)
+> >> > + *             (MHz)                   (MHz)
+> >> > + *------------------------------------------------+--------------------
+> >> > + * clkz                1000   (2/3)            800   (1/2)
+> >> > + * clkzs        250   (1/6)            200   (1/8)
+> >> > + * clki                 750   (1/2)            800   (1/2)
+> >> > + * clks                 250   (1/6)            200   (1/8)
+> >> > + * clks1        125   (1/12)           100   (1/16)
+> >> > + * clks3        187.5 (1/8)            200   (1/8)
+> >> > + * clks4         93.7 (1/16)           100   (1/16)
+> >> > + * clkp                  62.5 (1/24)            50   (1/32)
+> >> > + * clkg                  62.5 (1/24)            66.6 (1/24)
+> >> > + * clkb, CLKOUT
+> >> > + * (MD2 = 0)     62.5 (1/24)            66.6 (1/24)
+> >> > + * (MD2 = 1)     41.6 (1/36)            50   (1/32)
+> >> > + */
+> >> > +
+> >> > +#define CPG_CLK_CONFIG_INDEX(md)       (((md) & (BIT(1)|BIT(2))) >> 1)
+> >> > +
+> >> > +struct cpg_clk_config {
+> >> > +       unsigned int z_mult;
+> >> > +       unsigned int z_div;
+> >> > +       unsigned int zs_and_s_div;
+> >> > +       unsigned int s1_div;
+> >> > +       unsigned int p_div;
+> >> > +       unsigned int out_div;
+> >> > +};
+> >> > +
+> >> > +static const struct cpg_clk_config cpg_clk_configs[4] __initconst = {
+> >> > +       { 1, 2, 8, 16, 32, 24 },
+> >> > +       { 1, 2, 8, 16, 32, 24 },
+> >> > +       { 2, 3, 6, 12, 24, 36 },
+> >> > +       { 2, 3, 6, 12, 24, 32 },
+> >> > +};
+> >>
+> >> Shouldn't this be
+> >>
+> >> +static const struct cpg_clk_config cpg_clk_configs[4] __initconst = {
+> >> +       { 1, 2, 8, 16, 32, 24 },
+> >> +       { 2, 3, 6, 12, 24, 24 },
+> >> +       { 1, 2, 8, 16, 32, 32 },
+> >> +       { 2, 3, 6, 12, 24, 36 },
+> >> +};
+> >>
+> >> ?
+> >>
+> >> I think you got confused by writing the bitmask as "BIT(1)|BIT(2)" instead
+> >> of "BIT(2)|BIT(1)".
+> >
+> > Probably, thanks for noticing.
+> 
+> Note that I based my review on the table above, not on the actual datasheet.
 
-  INTA->INTD
-  INTB->INTC
-  INTC->INTB
-  INTD->INTA
-
-Implement a custom swizzle function that does a fixup on the interrupt for
-devices on the first TI XIO2001 bridge in the tree.
-
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Richard Zhu <r65037@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Sean Cross <xobs@kosagi.com>
-Cc: Jingoo Han <jg1.han@samsung.com>
----
- drivers/pci/host/pci-imx6.c | 36 ++++++++++++++++++++++++++++++++++++
- include/linux/pci_ids.h     |  1 +
- 2 files changed, 37 insertions(+)
-
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index aaa05c8..b171a21 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -493,6 +493,39 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
- 	return 0;
- }
- 
-+/* TI XIO2001 PCIe-to-PCI bridge on GW16082 exp card has IRQs reversed */
-+u8 ventana_swizzle(struct pci_dev *dev, u8 *pin)
-+{
-+	u8 i = 0;
-+	struct pci_dev *pdev = dev;
-+
-+	/* count number of TI XIO2001 bridges on bus */
-+	while (!pci_is_root_bus(pdev->bus)) {
-+		if (pdev->bus && pdev->bus->self &&
-+		    (pdev->bus->self->vendor == PCI_VENDOR_ID_TI) &&
-+		    (pdev->bus->self->device == PCI_DEVICE_ID_TI_XIO2001)) {
-+			i++;
-+		}
-+		pdev = pdev->bus->self;
-+	}
-+	while (!pci_is_root_bus(dev->bus)) {
-+		/* if we are directly downstream from 1st TI XIO2001 bridge */
-+		if (dev->bus && dev->bus->self &&
-+		    (dev->bus->self->vendor == PCI_VENDOR_ID_TI) &&
-+		    (dev->bus->self->device == PCI_DEVICE_ID_TI_XIO2001)) {
-+			if (--i == 0) {
-+				/* swap IRQs and swizzle backwards */
-+				*pin = (15 - PCI_SLOT(dev->devfn)) + 1;
-+				dev = dev->bus->self;
-+				continue;
-+			}
-+		}
-+		*pin = pci_swizzle_interrupt_pin(dev, *pin);
-+		dev = dev->bus->self;
-+	}
-+	return PCI_SLOT(dev->devfn);
-+}
-+
- static int __init imx6_pcie_probe(struct platform_device *pdev)
- {
- 	struct imx6_pcie *imx6_pcie;
-@@ -601,6 +634,9 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- 		return PTR_ERR(imx6_pcie->iomuxc_gpr);
- 	}
- 
-+	if (of_machine_is_compatible("gw,ventana"))
-+		pp->swizzle = ventana_swizzle;
-+
- 	ret = imx6_add_pcie_port(pp, pdev);
- 	if (ret < 0)
- 		return ret;
-diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
-index 97fbecd..4ca334f 100644
---- a/include/linux/pci_ids.h
-+++ b/include/linux/pci_ids.h
-@@ -822,6 +822,7 @@
- #define PCI_DEVICE_ID_TI_XX12		0x8039
- #define PCI_DEVICE_ID_TI_XX12_FM	0x803b
- #define PCI_DEVICE_ID_TI_XIO2000A	0x8231
-+#define PCI_DEVICE_ID_TI_XIO2001	0x8240
- #define PCI_DEVICE_ID_TI_1130		0xac12
- #define PCI_DEVICE_ID_TI_1031		0xac13
- #define PCI_DEVICE_ID_TI_1131		0xac15
--- 
-1.8.3.2
+Understood. I'll double check the datasheet against my code and your comment.
