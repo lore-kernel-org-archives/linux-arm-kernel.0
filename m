@@ -1,145 +1,133 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
+From: arnd@arndb.de (Arnd Bergmann)
 Date: Fri, 28 Feb 2014 11:01:50 +0100
-Subject: [PATCH v5 01/11] of: document bindings for reserved-memory nodes
-In-Reply-To: <53105CC6.1090902@samsung.com>
-References: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com>
- <1392985527-6260-2-git-send-email-m.szyprowski@samsung.com>
- <20140226115108.211D2C40A89@trevor.secretlab.ca>
- <53105CC6.1090902@samsung.com>
-Message-ID: <53105E8E.1040504@gmail.com>
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <CB7DBE07-42BD-4588-AC9E-CB0BF95A811A@suse.de>
+References: <20140226183454.GA14639@cbox> <6039706.L1ZWvgjHF0@wuerfel>
+ <CB7DBE07-42BD-4588-AC9E-CB0BF95A811A@suse.de>
+Message-ID: <7825615.Ak6TOGibTE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.02.2014 10:54, Marek Szyprowski wrote:
-> Hello,
+On Friday 28 February 2014 08:05:15 Alexander Graf wrote: 
+> > Am 28.02.2014 um 03:56 schrieb Arnd Bergmann <arnd@arndb.de>:
+> >> On Thursday 27 February 2014 22:24:13 Alexander Graf wrote:
 >
-> On 2014-02-26 12:51, Grant Likely wrote:
->> On Fri, 21 Feb 2014 13:25:17 +0100, Marek Szyprowski
->> <m.szyprowski@samsung.com> wrote:
->> > From: Grant Likely <grant.likely@linaro.org>
->> >
->> > Reserved memory nodes allow for the reservation of static (fixed
->> > address) regions, or dynamically allocated regions for a specific
->> > purpose.
->> >
->> > Signed-off-by: Grant Likely <grant.likely@linaro.org>
->> > [joshc: Based on binding document proposed (in non-patch form) here:
->> >
->> http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
->> >  adapted to support #memory-region-cells]
->> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
->> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> > ---
->> >  .../bindings/reserved-memory/reserved-memory.txt   |  138
->> ++++++++++++++++++++
->> >  1 file changed, 138 insertions(+)
->> >  create mode 100644
->> Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
->> >
->> > diff --git
->> a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
->>
->> > new file mode 100644
->> > index 000000000000..a606ce90c9c4
->> > --- /dev/null
->> > +++
->> b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
->> > @@ -0,0 +1,138 @@
->> > +*** Reserved memory regions ***
->> > +
->> > +Reserved memory is specified as a node under the /reserved-memory
->> node.
->> > +The operating system shall exclude reserved memory from normal usage
->> > +one can create child nodes describing particular reserved (excluded
->> from
->> > +normal use) memory regions. Such memory regions are usually
->> designed for
->> > +the special usage by various device drivers.
->> > +
->> > +Parameters for each memory region can be encoded into the device tree
->> > +with the following nodes:
->> > +
->> > +/reserved-memory node
->> > +---------------------
->> > +#address-cells, #size-cells (required) - standard definition
->> > +    - Should use the same values as the root node
->> > +#memory-region-cells (required) - dictates number of cells used in
->> the child
->> > +                                  nodes memory-region specifier
->>
->> I still don't like this portion of the binding. I'm not convinced that
->> it is necessary in the majority of cases and it is going to be very
->> driver specific. I would rather drop it entirely from the common
->> binding. If a specific driver needs to do something like the above then
->> it can have a driver specific binding. Otherwise I think the default
->> should be a simple phandle with no arguments to a single reserved memory
->> node.
->>
->> Ben, can you weigh in on the current state of this document. I'm mostly
->> happy with it aside from my comment above. Do you think this is ready to
->> be merged?
->>
->> > +ranges (required) - standard definition
->> > +    - Should be empty
->> > +
->> > +/reserved-memory/ child nodes
->> > +-----------------------------
->> > +Each child of the reserved-memory node specifies one or more
->> regions of
->> > +reserved memory. Each child node may either use a 'reg' property to
->> > +specify a specific range of reserved memory, or a 'size' property with
->> > +optional constraints to request a dynamically allocated block of
->> memory.
->> > +
->> > +Following the generic-names recommended practice, node names should
->> > +reflect the purpose of the node (ie. "framebuffer" or "dma-pool").
->> Unit
->> > +address (@<address>) should be appended to the name if the node is a
->> > +static allocation.
->> > +
->> > +Properties:
->> > +Requires either a) or b) below.
->> > +a) static allocation
->> > +   reg (required) - standard definition
->> > +b) dynamic allocation
->> > +   size (required) - length based on parent's #size-cells
->> > +                   - Size in bytes of memory to reserve.
->> > +   alignment (optional) - length based on parent's #size-cells
->> > +                        - Address boundary for alignment of
->> allocation.
->> > +   alloc-ranges (optional) - prop-encoded-array (address, length
->> pairs).
->> > +                           - Specifies regions of memory that are
->> > +                             acceptable to allocate from.
->> > +
->> > +If both reg and size are present, then the reg property takes
->> precedence
->> > +and size is ignored.
->> > +
->> > +Additional properties:
->> > +compatible (optional) - standard definition
->> > +    - may contain the following strings:
->> > +        - shared-dma-pool: This indicates a region of memory meant
->> to be
->> > +          used as a shared pool of DMA buffers for a set of
->> devices. It can
->> > +          be used by an operating system to instanciate the
->> necessary pool
->> > +          management subsystem if necessary.
->> > +        - vendor specific string in the form
->> <vendor>,[<device>-]<usage>
->>
->> Add "Use vendor strings to identify regions dedicates for a specific
->> vendor device. For example: 'acme,framebuffer'. Platform code can use
->> vendor
->> strings to identify device specific regions"
->
-> So do you want to completely drop phandle based links between device
-> nodes and
-> memory regions?
+> > When you have that, why do you still care about a
+> > system specification? 
+> 
+> Because I don't want to go back to the system level definition. To me a 
+> peripheral is a peripheral - regardless of whether it is on a platform 
+> bus or a PCI bus. I want to leverage common ground and only add the few 
+> pieces that diverge from it.
 
-Huh? How this would work with regions that have to be used for multiple 
-(but not all - not a default region) devices?
+You may be missing a lot of the complexity that describing platform devices
+in the general case brings then. To pass through an ethernet controller, you may 
+also need to add (any subset of)
 
-Best regards,
-Tomasz
+* phy device
+* clock controller
+* voltage regulator
+* gpio controller
+* LED controller
+* DMA engine
+* an MSI irqchip
+* IOMMU
+
+Each of the above in turn is shared with other peripherals on the host,
+which brings you to three options:
+
+* change the driver to not depend on the above, but instead support an
+  abstract virtualized version of the platform device that doesn't
+  need them.
+* Pass through all devices this one depends on, giving up on guest
+  isolation. This may work for some embedded use cases, but not
+  for running untrusted guests.
+* Implement virtualized versions of the other interfaces and make
+  the hypervisor talk to the real hardware.
+
+I would still argue that each of those approaches is out of scope for
+this specification.
+
+> > Going back to the previous argument, since the hypervisor has to make up the
+> > description for the platform device itself, it won't matter whether the host
+> > is booted using DT or ACPI: the description that the hypervisor makes up for
+> > the guest has to match what the hypervisor uses to describe the rest of the
+> > guest environment, which is independent of what the host uses.
+> 
+> I agree 100%. This spec should be completely independent of the host.
+> 
+> The reason I brought up the host is that if you want to migrate an OS from
+> physical to virtual, you may need to pass through devices to make this work.
+> If your host driver developers only ever worked with ACPI, there's a good
+> chance the drivers won't work in a pure dt environment.
+> 
+> Brw, the same argument applies the other way around as well. I don't believe
+> we will get around with generating and mandating a single machibe
+> description environment.
+
+I see those two cases as completely distinct. There are good reasons
+for emulating a real machine for running a guest image that expects
+certain hardware, and you can easily do this with qemu. But since you
+are emulating an existing platform and run an existing OS, you don't
+need a VM System Specification, you just do whatever the platform would
+normally do that the guest relies on.
+
+The VM system specification on the other hand should allow you to run
+any OS that is written to support this specification on any hypervisor
+that implements it.
+
+> >> Replace Windows by "Linux with custom drivers" and you're in the same
+> >> situation even when you neglect Windows. Reality will be that we will
+> >> have fdt and acpi based systems.
+> > 
+> > We will however want to boot all sorts of guests in a standardized
+> > virtual environment:
+> > 
+> > * 32 bit Linux (since some distros don't support biarch or multiarch
+> >  on arm64) for running applications that are either binary-only
+> >  or not 64-bit safe.
+> > * 32-bit Android
+> > * big-endian Linux for running applications that are not endian-clean
+> >  (typically network stuff ported from powerpc or mipseb.
+> > * OS/v guests
+> > * NOMMU Linux
+> > * BSD based OSs
+> > * QNX
+> > * random other RTOSs
+> > 
+> > Most of these will not work with ACPI, or at least not in 32-bit mode.
+> > 64-bit Linux will obviously support both DT (always)
+> 
+> Unfortunately not
+> 
+> > and ACPI (optionally),
+> > depending on the platform, but for a specification like this, I think
+> > it's much easier to support fewer options, to make it easier for other
+> > guest OSs to ensure they actually run on any compliant hypervisor.
+> 
+> You're forgetting a few pretty important cases here:
+> 
+> * Enterprise grade Linux distribution that only supports ACPI
+
+You can't actually turn off DT support in the kernel, and I don't think
+there is any point in patching the kernel to remove it. The only sane
+thing the enterprise distros can do is turn on the "SBSA" platform
+that supports all compliant machines running ACPI, but turn off all
+platforms that are not SBSA compliant and boot using DT. With the way
+that the VM spec is written at this point, Linux will still boot on
+these guests, since the hardware support is a subset of SBSA, with the
+addition of a few drivers for hypervisor specific features.
+
+> * Maybe WinRT if we can convince MS to use it
+
+I'd argue that would be unlikely.
+
+> * Non-Linux with x86/ia64 heritage and thus ACPI support
+
+That assumes that x86 ACPI support is anything like ARM64 ACPI
+support, which it really isn't. In particular, you can turn off
+ACPI on any x86 machine and it will still work for the most
+part, while on ARM64 we will need to use ACPI to describe even
+the most basic aspects of the platform.
+
+	Arnd
