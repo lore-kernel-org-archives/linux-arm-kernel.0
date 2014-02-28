@@ -1,51 +1,65 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 28 Feb 2014 12:09:26 -0300
-Subject: [PATCH 0/2] Watchdog on Armada 375 SoC
-In-Reply-To: <20140226203633.GA24656@obsidianresearch.com>
-References: <1393419047-10071-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20140226203633.GA24656@obsidianresearch.com>
-Message-ID: <20140228150925.GC24805@localhost>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 28 Feb 2014 09:14:19 -0600
+Subject: [PATCH v2 4/7] dma: of: introduce of_dma_is_coherent() helper
+In-Reply-To: <10040083.PbPEQQPCjl@wuerfel>
+References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
+ <1393535872-20915-5-git-send-email-santosh.shilimkar@ti.com>
+ <10040083.PbPEQQPCjl@wuerfel>
+Message-ID: <CAL_JsqL6-hoD4F7+adPhsOJXeM5f+wpEuBWg_6AWqj3k2v0NEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 01:36:33PM -0700, Jason Gunthorpe wrote:
-> On Wed, Feb 26, 2014 at 09:50:45AM -0300, Ezequiel Garcia wrote:
->  
-> > Here we found both the above RSTOUT:
-> > 
-> > 1. It has the same dedicated register as A370/XP (0x20704)
-> > 2. Also has a bit in the shared RSTOUT register (0x18254)
-> 
-> Unless you know otherwise I think the same risk exists, RSTOUT could
-> be (or become) internally asserted when you unmask the bit in the
-> control register that drives the pin, which says the watchdog driver
-> should control to it.
-> 
+On Fri, Feb 28, 2014 at 3:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 27 February 2014 16:17:49 Santosh Shilimkar wrote:
+>> +
+>> +/**
+>> + * of_dma_is_coherent - Check if device is coherent
+>> + * @np:        device node
+>> + *
+>> + * It returns true if "dma-coherent" property was found
+>> + * for this device in DT.
+>> + */
+>> +bool of_dma_is_coherent(struct device_node *np)
+>> +{
+>> +       struct device_node *node = np;
+>> +
+>> +       while (node) {
+>> +               if (of_property_read_bool(node, "dma-coherent")) {
+>> +                       of_node_put(node);
+>> +                       return true;
+>> +               }
+>> +               node = of_get_next_parent(node);
+>> +       }
+>> +       return false;
+>> +}
+>> +EXPORT_SYMBOL_GPL(of_dma_is_coherent);
+>>
+>
+> This won't work on architectures that are always coherent and
+> did not need 'dma-coherent' properties before, such as IBM
+> Power servers.
+>
+> That said, I think the property makes sense, and we already have
+> platforms using it (highbank is the one I'm aware of).
+>
+> We probably need ways to override this function in both ways:
+> "always coherent" (powerpc, x86), and "never coherent" (keystone
+> without LPAE) from platform code, and it would be nice to put
+> either option into DT in a global location as well. We may have
+> to go through a few iterations of this patch to get the best
+> algorithm, but I think the interface is good at least.
 
-I guess it's also possible to have the system-controller ensure the
-watchdog is fully stopped, before unmasking the shared RSTOUT.
+I know Will D was not a fan of this property. Primarily I believe
+because you may need to describe more than just a boolean in more
+complex bus topologies.
 
-However, it seems it would be too ugly and hackish.
+Effectively, highbank is always coherent. It was only PCI that is
+non-coherent, but I can safely say PCI will never be enabled at this
+point. There are no designs with PCI beyond 1 or 2 validation boards
+(total boards, not designs), and getting PCI to work was quite hacky
+due to only a 1MB window. The other masters are programmable, but only
+the coherent path is used as the non-coherent path actually has some
+issues. I had expected the opposite believing the ACP port would
+actually have issues which is also why I made it configurable.
 
-> > 
-> > 	watchdog-timer at 20300 {
-> > 		compatible = "marvell,orion-wdt";
-> > 		reg = <0x20300 0x28
-> > 		       {shared RSOUT} 0x4
-> > 		       0x0 0x0>;
-> > 	};
-> 
-> I wouldn't have the 0x0, if you want to go this way, just make the
-> 375 compatible string require a 3 entry reg.
-> 
-
-Yes, this sounds like the right thing to do. It means we need to also
-have per-SoC hooks for stop() and is_enabled(), but it's the price to
-pay for changing the register semantic: the shared RSTOUT has unmask/mask
-semantics on A375, while it's enable/disable on Kirkwood and friends.
-
-Let me cook a new patch.
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Rob
