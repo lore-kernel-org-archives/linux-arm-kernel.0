@@ -1,40 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 28 Feb 2014 15:34:02 -0800
-Subject: [PATCH V2 4/4] ARM: OMAP2+: AM43x: Use gptimer as clocksource
-In-Reply-To: <530B4391.2050205@ti.com>
-References: <1391768486-2134-1-git-send-email-lokeshvutla@ti.com>
- <1391768486-2134-5-git-send-email-lokeshvutla@ti.com>
- <20140213231919.GO28216@atomide.com> <52FDD7D5.30508@ti.com>
- <530B4391.2050205@ti.com>
-Message-ID: <20140228233402.GY13624@atomide.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Fri, 28 Feb 2014 15:34:52 -0800
+Subject: [PATCH RFC 0/3] clk: CCF clock primitives + custom IO accessors
+Message-ID: <1393630495-29689-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lokesh Vutla <lokeshvutla@ti.com> [140224 05:08]:
-> Hi Tony,
-> On Friday 14 February 2014 02:16 PM, Rajendra Nayak wrote:
-> > On Friday 14 February 2014 04:49 AM, Tony Lindgren wrote:
-> >> * Lokesh Vutla <lokeshvutla@ti.com> [140207 02:24]:
-> >>> From: Rajendra Nayak <rnayak@ti.com>
-> >>>
-> >>> The SyncTimer in AM43x is clocked using the following two sources:
-> >>> 1) An inaccuarte 32k clock (CLK_32KHZ) derived from PER DPLL, causing system
-> >>>    time to go slowly (~10% deviation).
-> >>> 2) external 32KHz RTC clock, which may not always be available on board like
-> >>>    in the case of ePOS EVM
-> >>>
-> >>> Use gptimer as clocksource instead, as is done in the case of AM335x
-> >>> (which does not have a SyncTimer). With this, system time keeping works
-> >>> accurately.
-> >>
-> >> Hmm doesn't this also mean that PM for any deeper idle states won't
-> >> work properly?
-> > 
-> > Thats true. This would mean we cannot put the peripheral/core domain down
-> > in idle. Suspend however can still work if suspend/resume callbacks are added
-> > to the clockevent and clocksource code to shut the non-wakeup domain timer.
-> This is a platform level limitation that only MPU domain can be put down in idle, just like AM335x.
+Hi,
 
-OK applying all four into omap-for-v3.15/soc thanks.
+I recently ran into a problem which seems to become common. I was trying
+to write a driver for the TI CDCE913, a programmable clock synthesizer
+on the I2C bus. Internally that device consists of a PLL and a bunch of
+muxes, gates and dividers that eventually end up in three clock outputs.
+Looking at that device, it seems rather easy to model it with the
+available clock primitives, the problem though is, the clock
+primitives assume accesses via memory mapped IO.
 
-Tony
+To overcome a similar problem the PPC folks introduced the
+clk_(read|write)l wrappers, which seems to go into the right direction,
+but that also only allows per ARCH overrides. I.e. wouldn't allow
+mixing of MMIO clocks and clocks using I2C via regmap or similar.
+
+So, the first thing I did, was essentially duplicating the clock
+primitives I need and simply replacing the readl/writel with
+regmap_read/write. So there is a lot of code duplication to use all the
+fancy features the clk-mux and clk-div primitives provide, just to
+replace the IO access.
+
+In the next step, I encountered a divider clock whose divider is stored
+in 2 I2C registers. So now, the simple IO access replacement doesn't
+work anymore either since this clock needs 2 registers to be read and
+then shifting around the bitfields accordingly.
+
+Does anybody have a good idea how we could avoid all this code
+duplication while enabling usage of the clock primitives with different
+IO accessors?
+Especially the divider and mux primitive have a lot of code that would
+be painful to maintain twice.
+
+	Thanks,
+	S?ren
+
+Soren Brinkmann (3):
+  clk: Introduce I2C clock primitives
+  clk/i2c-div: Allow custom divider accessors
+  clk: Add driver for TI CDCE913
+
+ .../devicetree/bindings/clock/ti,cdce913.txt       |  32 +
+ drivers/clk/Kconfig                                |  15 +
+ drivers/clk/Makefile                               |   6 +
+ drivers/clk/clk-cdce913.c                          | 841 +++++++++++++++++++++
+ drivers/clk/clk-i2c-divider.c                      | 375 +++++++++
+ drivers/clk/clk-i2c-mux.c                          | 173 +++++
+ drivers/clk/clk-i2c.c                              |  22 +
+ include/linux/clk-provider.h                       | 104 +++
+ 8 files changed, 1568 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti,cdce913.txt
+ create mode 100644 drivers/clk/clk-cdce913.c
+ create mode 100644 drivers/clk/clk-i2c-divider.c
+ create mode 100644 drivers/clk/clk-i2c-mux.c
+ create mode 100644 drivers/clk/clk-i2c.c
+
+-- 
+1.9.0.1.g4196000
