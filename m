@@ -1,21 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 28 Feb 2014 10:10:07 +0800
-Subject: [PATCH 1/3] PCI: designware: add legacy PCI interrupt mapping
-In-Reply-To: <1393550394-11071-2-git-send-email-tharvey@gateworks.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 28 Feb 2014 11:10:52 +0900
+Subject: [PATCH 3/3] PCI: imx6: ventana: fixup for IRQ mismapping
+In-Reply-To: <1393550394-11071-4-git-send-email-tharvey@gateworks.com>
 References: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
- <1393550394-11071-2-git-send-email-tharvey@gateworks.com>
-Message-ID: <20140228021005.GI13537@S2101-09.ap.freescale.net>
+ <1393550394-11071-4-git-send-email-tharvey@gateworks.com>
+Message-ID: <000a01cf342a$4e5c3410$eb149c30$%han@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 05:19:52PM -0800, Tim Harvey wrote:
-> The IMX6 maps INTA/B/C/D to ARM GIC IRQ 155/154/153/152 respectively.
-> This allows a PCIe-to-PCI bridge to function properly.
+On Friday, February 28, 2014 10:20 AM, Tim Harvey wrote:
 > 
-> The irq field of the pcie_host struct is expanded to 4 interrupts to
-> allow for INTA/B/C/D and the IMX6 PCIe host driver will populate them
-> all from devicetree.  I'm not clear if the Exynos driver has this
-> capability so it places the same interrupt in all 4 slots.
+> The TI XIO2001 PCIe-to-PCI bridge used on Ventana expansion boards
+> has its slot-to-bridge IRQ mapping reversed from the PCI specification:
+> 
+>   INTA->INTD
+>   INTB->INTC
+>   INTC->INTB
+>   INTD->INTA
+
+(+cc Marek Vasut, Pratyush Anand, Kishon Vijay Abraham I, Mohit KUMAR DCG)
+
+As I mention earlier, 'i.MX6 PCIe IP' is not a culprit.
+The 'TI XIO2001 PCIe-to-PCI bridge' is the culprit, right?
+
+Then, './drivers/pci/host/pci-imx6.c' is not a good place
+to fix the board problems.
+
+Look at other i.MX6 boards. They don't have the 'TI XIO2001
+PCIe-to-PCI bridge'. Please don't add this board specific 
+code to SoC specific driver code.
+
+Best regards,
+Jingoo Han
+
+> 
+> Implement a custom swizzle function that does a fixup on the interrupt for
+> devices on the first TI XIO2001 bridge in the tree.
 > 
 > Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 > Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -25,11 +45,75 @@ On Thu, Feb 27, 2014 at 05:19:52PM -0800, Tim Harvey wrote:
 > Cc: Sean Cross <xobs@kosagi.com>
 > Cc: Jingoo Han <jg1.han@samsung.com>
 > ---
->  arch/arm/boot/dts/imx6qdl.dtsi     |  2 +-
-
-This change should be in a separate patch that goes to IMX tree.  And
-please be aware of Arnd's comment [1] there.
-
-Shawn
-
-[1] http://www.spinics.net/lists/arm-kernel/msg311615.html
+>  drivers/pci/host/pci-imx6.c | 36 ++++++++++++++++++++++++++++++++++++
+>  include/linux/pci_ids.h     |  1 +
+>  2 files changed, 37 insertions(+)
+> 
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index aaa05c8..b171a21 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -493,6 +493,39 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
+>  	return 0;
+>  }
+> 
+> +/* TI XIO2001 PCIe-to-PCI bridge on GW16082 exp card has IRQs reversed */
+> +u8 ventana_swizzle(struct pci_dev *dev, u8 *pin)
+> +{
+> +	u8 i = 0;
+> +	struct pci_dev *pdev = dev;
+> +
+> +	/* count number of TI XIO2001 bridges on bus */
+> +	while (!pci_is_root_bus(pdev->bus)) {
+> +		if (pdev->bus && pdev->bus->self &&
+> +		    (pdev->bus->self->vendor == PCI_VENDOR_ID_TI) &&
+> +		    (pdev->bus->self->device == PCI_DEVICE_ID_TI_XIO2001)) {
+> +			i++;
+> +		}
+> +		pdev = pdev->bus->self;
+> +	}
+> +	while (!pci_is_root_bus(dev->bus)) {
+> +		/* if we are directly downstream from 1st TI XIO2001 bridge */
+> +		if (dev->bus && dev->bus->self &&
+> +		    (dev->bus->self->vendor == PCI_VENDOR_ID_TI) &&
+> +		    (dev->bus->self->device == PCI_DEVICE_ID_TI_XIO2001)) {
+> +			if (--i == 0) {
+> +				/* swap IRQs and swizzle backwards */
+> +				*pin = (15 - PCI_SLOT(dev->devfn)) + 1;
+> +				dev = dev->bus->self;
+> +				continue;
+> +			}
+> +		}
+> +		*pin = pci_swizzle_interrupt_pin(dev, *pin);
+> +		dev = dev->bus->self;
+> +	}
+> +	return PCI_SLOT(dev->devfn);
+> +}
+> +
+>  static int __init imx6_pcie_probe(struct platform_device *pdev)
+>  {
+>  	struct imx6_pcie *imx6_pcie;
+> @@ -601,6 +634,9 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+>  		return PTR_ERR(imx6_pcie->iomuxc_gpr);
+>  	}
+> 
+> +	if (of_machine_is_compatible("gw,ventana"))
+> +		pp->swizzle = ventana_swizzle;
+> +
+>  	ret = imx6_add_pcie_port(pp, pdev);
+>  	if (ret < 0)
+>  		return ret;
+> diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+> index 97fbecd..4ca334f 100644
+> --- a/include/linux/pci_ids.h
+> +++ b/include/linux/pci_ids.h
+> @@ -822,6 +822,7 @@
+>  #define PCI_DEVICE_ID_TI_XX12		0x8039
+>  #define PCI_DEVICE_ID_TI_XX12_FM	0x803b
+>  #define PCI_DEVICE_ID_TI_XIO2000A	0x8231
+> +#define PCI_DEVICE_ID_TI_XIO2001	0x8240
+>  #define PCI_DEVICE_ID_TI_1130		0xac12
+>  #define PCI_DEVICE_ID_TI_1031		0xac13
+>  #define PCI_DEVICE_ID_TI_1131		0xac15
+> --
+> 1.8.3.2
