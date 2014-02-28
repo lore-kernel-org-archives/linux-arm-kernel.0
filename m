@@ -1,19 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Feb 2014 17:37:36 +0100
-Subject: [PATCH v2 RESEND 1/3] ARM: clps711x: Add CLPS711X irqchip driver
-In-Reply-To: <1391328466-30873-1-git-send-email-shc_work@mail.ru>
-References: <1391328466-30873-1-git-send-email-shc_work@mail.ru>
-Message-ID: <201402281737.37345.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Feb 2014 16:38:37 +0000
+Subject: [PATCH 1/2] iommu/arm-smmu: Replace list walk with platform
+ driver data
+In-Reply-To: <1393601830-4677-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1393601830-4677-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1393601830-4677-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20140228163837.GC30996@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 02 February 2014, Alexander Shiyan wrote:
-> This adds the irqchip driver for Cirrus Logic CLPS711X series SoCs.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+Hi Laurent,
 
-Applied all three patches on next/soc branch now.
+On Fri, Feb 28, 2014 at 03:37:09PM +0000, Laurent Pinchart wrote:
+> Instead of walking the list of registered SMMU devices at remove time to
+> locate the device being removed, set platform driver data at probe time
+> to point to the SMMU and retrieve the pointer at remove time.
 
-Sorry it took this long.
+What does this gain us other than a slight code shrinkage? If we could get
+rid of the arm_smmu_devices list, then I'd be more excited by this change!
 
-	Arnd
+Will
