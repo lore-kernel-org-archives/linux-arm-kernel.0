@@ -1,88 +1,51 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Fri, 28 Feb 2014 12:15:57 -0800
-Subject: [PATCH v6 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140228095022.GA25090@e102568-lin.cambridge.arm.com>
-References: <1393545478-14908-1-git-send-email-sebastian.capella@linaro.org>
- <1393545478-14908-3-git-send-email-sebastian.capella@linaro.org>
- <20140228095022.GA25090@e102568-lin.cambridge.arm.com>
-Message-ID: <20140228201557.29118.62126@capellas-linux>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Feb 2014 21:15:55 +0100
+Subject: [PATCH v2 1/9] ARM: centralize common multi-platform kconfig
+ options
+In-Reply-To: <CAGa+x84M++1vetN1fQJYVCc9fBL5HQWc4WJ_6y9Nmst0XHXK8w@mail.gmail.com>
+References: <1392153119-23248-1-git-send-email-robherring2@gmail.com>
+ <1392153119-23248-2-git-send-email-robherring2@gmail.com>
+ <CAGa+x84M++1vetN1fQJYVCc9fBL5HQWc4WJ_6y9Nmst0XHXK8w@mail.gmail.com>
+Message-ID: <201402282115.55948.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, I appear to be having problems with my emails where list emails are
-bouncing back to me.  I'm working on correcting this now.
-
-Quoting Lorenzo Pieralisi (2014-02-28 01:50:22)
-> On Thu, Feb 27, 2014 at 11:57:58PM +0000, Sebastian Capella wrote:
+On Friday 28 February 2014, Kevin Hilman wrote:
+> On Tue, Feb 11, 2014 at 1:11 PM, Rob Herring <robherring2@gmail.com> wrote:
+> > From: Rob Herring <robh@kernel.org>
+> >
+> > Multi-platform requires various kconfig options to be selected, so
+> > platforms don't need to select them individually.
+> >
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Russell King <linux@arm.linux.org.uk>
 > 
-> [...]
+> FYI... this recently hit arm-soc/for-next and according to my bisect,
+> is the cause for two new boot failures[1] for sunxi_defconfig on
+> cubieboard and cubie2.  The previous build/boot passed on both
+> boards[2].   Interestingly, both boards boot fine with
+> multi_v7_defconfig though.
 > 
-> > diff --git a/arch/arm/kernel/hibernate.c b/arch/arm/kernel/hibernate.c
-> > new file mode 100644
-> > index 0000000..a41e0e3
-> > --- /dev/null
-> > +++ b/arch/arm/kernel/hibernate.c
-...
-> > +#include <linux/suspend.h>
-> > +#include <asm/tlbflush.h>
-> > +#include <asm/cacheflush.h>
+> There's zero console output on the boards, and I haven't dug further
+> since I still have to pack for a trip tomorrow.
 > 
-> You can drop tlbflush.h and cacheflush.h, they do not seem to be needed.
-
-Done! Thanks!
-
-> > +
-> > +/*
-> > + * The framework loads the hibernation image into a linked list anchored
-> > + * at restore_pblist, for swsusp_arch_resume() to copy back to the proper
-> > + * destinations.
-> > + *
-> > + * To make this work if resume is triggered from initramfs, the
-> > + * pagetables need to be switched to allow writes to kernel mem.
-> > + */
+> Kevin
 > 
-> Comment above needs updating. We are switching page tables to a set of
-> page tables that are certain to live at the same location in the older
-> kernel, that's the only reason, as we discussed. soft_restart will make
-> sure (again) to switch to 1:1 page tables so that we can call cpu_resume
-> with the MMU off.
+> [1] http://lists.linaro.org/pipermail/kernel-build-reports/2014-February/002615.html
+> [2] http://lists.linaro.org/pipermail/kernel-build-reports/2014-February/002613.html
 
-How does this look?
+I suspect we want this one:
 
-The framework loads as much of the hibernation image to final physical
-pages as possible.  Any pages that were in use, will need to be restored
-prior to the soft_restart.  The pages to restore are maintained in
-the list anchored at restore_pblist.  At this point, we can swap the
-pages to their final location.  We must switch the mapping to 1:1 to
-ensure that when we overwrite the page table physical pages we're using
-a known physical location (idmap_pgd) with known contents.
-
-> > +/*
-> > + * Resume from the hibernation image.
-> > + * Due to the kernel heap / data restore, stack contents change underneath
-> > + * and that would make function calls impossible; switch to a temporary
-> > + * stack within the nosave region to avoid that problem.
-> > + */
-> > +int swsusp_arch_resume(void)
-> > +{
-> > +     extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-> > +     call_with_stack(arch_restore_image, 0,
-> > +             resume_stack + sizeof(resume_stack));
-> 
-> This does not guarantee your stack is 8-byte aligned, that's not AAPCS
-> compliant and might buy you trouble.
-> 
-> Either you align the stack or you align the pointer you are passing.
-> 
-> Please have a look at kernel/process.c
-
-I've added this for now, do you see any issues?
-
--static u8 resume_stack[PAGE_SIZE/2] __nosavedata;
-+static u64 resume_stack[PAGE_SIZE/2/sizeof(u64)] __nosavedata;
--               resume_stack + sizeof(resume_stack));
-+               resume_stack + ARRAY_SIZE(resume_stack));
-
-Thanks Lorenzo!
-
-Sebastian
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 7d1588e..cf35d18 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -304,6 +304,7 @@ config ARCH_MULTIPLATFORM
+ 	bool "Allow multiple platforms to be selected"
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select AUTO_ZRELADDR
++	select CLKSRC_OF
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+ 	select MULTI_IRQ_HANDLER
