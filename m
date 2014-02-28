@@ -1,67 +1,52 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Fri, 28 Feb 2014 14:16:35 -0300
-Subject: [PATCH v2 2/5] clk: sun6i: Reparent AHB clock on PLL6
-In-Reply-To: <1393605440-14643-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1393605440-14643-1-git-send-email-maxime.ripard@free-electrons.com>
- <1393605440-14643-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <5310C473.7030304@elopez.com.ar>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Feb 2014 17:20:06 +0000
+Subject: [PATCH v2 2/3] arm64: Add seccomp support
+In-Reply-To: <1393320025-2855-3-git-send-email-takahiro.akashi@linaro.org>
+References: <1391767892-5395-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393320025-2855-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393320025-2855-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140228172006.GF30996@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Tue, Feb 25, 2014 at 09:20:24AM +0000, AKASHI Takahiro wrote:
+> secure_computing() should always be called first in syscall_trace(), and
+> if it returns non-zero, we should stop further handling. Then that system
+> call may eventually fail, be trapped or the process itself be killed
+> depending on loaded rules.
 
-El 28/02/14 13:37, Maxime Ripard escribi?:
-> In order for the DMA controller to work for SDRAM to devices transfers, the AHB
-> clock should be reparented on the PLL6.
->
-> Force that parenting in the clock driver.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->   drivers/clk/sunxi/clk-sunxi.c | 18 +++++++++++++++++-
->   1 file changed, 17 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index f6f61cc..a5c5882 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -1286,7 +1286,7 @@ static void __init of_sunxi_table_clock_setup(const struct of_device_id *clk_mat
->    */
->   static void __init sunxi_clock_protect(void)
->   {
-> -	struct clk *clk;
-> +	struct clk *clk, *parent;
->
->   	/* memory bus clock - sun5i+ */
->   	clk = clk_get(NULL, "mbus");
-> @@ -1307,6 +1307,22 @@ static void __init sunxi_clock_protect(void)
->   	if (!IS_ERR(clk))
->   		clk_prepare_enable(clk);
->
-> +	clk = clk_get(NULL, "ahb1_mux");
-> +	if (IS_ERR(clk)) {
-> +		pr_err("Couldn't get AHB1 Mux\n");
-> +		return;
-> +	}
-> +
-> +	parent = clk_get(NULL, "pll6");
-> +	if (IS_ERR(clk)) {
-> +		pr_err("Couldn't get PLL6\n");
-> +		return;
-> +	}
+[...]
 
-Remember this runs on every sunxi, but this bit of magic is sun6i only. 
-We'll get bogus messages on the other platforms if this goes as is. You 
-could do something like the following:
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index d4ce70e..f2a74bc 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -20,12 +20,14 @@
+>   */
+>  
+>  #include <linux/audit.h>
+> +#include <linux/errno.h>
+>  #include <linux/kernel.h>
+>  #include <linux/sched.h>
+>  #include <linux/mm.h>
+>  #include <linux/smp.h>
+>  #include <linux/ptrace.h>
+>  #include <linux/user.h>
+> +#include <linux/seccomp.h>
+>  #include <linux/security.h>
+>  #include <linux/init.h>
+>  #include <linux/signal.h>
+> @@ -1064,6 +1066,10 @@ asmlinkage int syscall_trace(int dir, struct pt_regs *regs)
+>  {
+>  	unsigned long saved_reg;
+>  
+> +	if (!dir && secure_computing((int)regs->syscallno))
 
- > +	clk = clk_get(NULL, "ahb1_mux");
- > +	parent = clk_get(NULL, "pll6");
- > +	if (!IS_ERR(clk) && !IS_ERR(parent))
- > +		clk_set_parent(...)
+Why do you need this cast to (int)? Also, it's probably better to check for
+-1 explicitly here.
 
-If these things become more common, we may need to consider a 
-per-platform fixup function or something.
+I'm slightly surprised that we do the secure computing check first. Doesn't
+this allow a debugger to change the syscall to something else after we've
+decided that it's ok?
 
-Cheers,
-
-Emilio
+Will
