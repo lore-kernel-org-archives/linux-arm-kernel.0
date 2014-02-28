@@ -1,79 +1,44 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 28 Feb 2014 17:18:07 +0100
-Subject: [PATCH] usb: gadget: atmel_usba: Fix crashed during stopping
- when DEBUG is enabled
-In-Reply-To: <20140228155027.GC2974@piout.net>
-References: <1393598066-4016-1-git-send-email-gregory.clement@free-electrons.com>
- <20140228155027.GC2974@piout.net>
-Message-ID: <5310B6BF.10604@free-electrons.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 28 Feb 2014 11:18:11 -0500
+Subject: [PATCH v6 0/2] Introduce AEMIF driver for Davinci/Keystone archs
+In-Reply-To: <20140228160635.GA6144@kroah.com>
+References: <1393262772-24442-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <5310AEA8.1070804@ti.com> <20140228160635.GA6144@kroah.com>
+Message-ID: <5310B6C3.1020501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/2014 16:50, Alexandre Belloni wrote:
-> Hi Gregory,
+On Friday 28 February 2014 11:06 AM, Greg KH wrote:
+> On Fri, Feb 28, 2014 at 10:43:36AM -0500, Santosh Shilimkar wrote:
+>> Greg,
+>>
+>> On Monday 24 February 2014 12:26 PM, Ivan Khoronzhuk wrote:
+>>> These patches introduce Async External Memory Interface (EMIF16/AEMIF)
+>>> controller driver for Davinci/Keystone archs.
+>>>
+>>> For more informations see documentation:
+>>> Davinci DM646x - http://www.ti.com/lit/ug/sprueq7c/sprueq7c.pdf
+>>> OMAP-L138 - http://www.ti.com/lit/ug/spruh77a/spruh77a.pdf
+>>> Kestone - http://www.ti.com/lit/ug/sprugz3a/sprugz3a.pdf
+>>>
+>> [..]
+>>
+>>>
+>>> v5..v6:
+>>> - memory: ti-aemif: introduce AEMIF driver
+>>> - memory: ti-aemif: add bindings for AEMIF driver
+>>> 	changed opaque names for cs node properties
+>>>
+>> Can you please pick these two patches ? 
 > 
-> On 28/02/2014 at 15:34:01 +0100, Gregory CLEMENT wrote :
->> The debug trace in the atmel_usba_stop function made the assumption
->> that the driver pointer passed in parameter was not NULL. Since the
->> commit "usb: gadget: udc-core: fix a regression during gadget driver
->> unbinding", it was no more always true. This lead to a kernel crash.
->>
->> This commit now use the driver pointer stored in udc which fixes this
->> issue.
->>
->> Since the commit which have triggered this issue was backported to the
->> 3.2 stable branch, then this one should also be backported to the same
->> kernel.
->>
->> Cc: stable at vger.kernel.org # v3.2+
->> Fixes: 511f3c5326ea (usb: gadget: udc-core: fix a regression during gadget driver unbinding)
->> ---
->>  drivers/usb/gadget/atmel_usba_udc.c | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
->> index 52771d4c44bc..167843de2d8a 100644
->> --- a/drivers/usb/gadget/atmel_usba_udc.c
->> +++ b/drivers/usb/gadget/atmel_usba_udc.c
->> @@ -1827,12 +1827,12 @@ static int atmel_usba_stop(struct usb_gadget *gadget,
->>  	toggle_bias(0);
->>  	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
->>  
->> -	udc->driver = NULL;
->> -
->>  	clk_disable_unprepare(udc->hclk);
->>  	clk_disable_unprepare(udc->pclk);
->>  
->> -	DBG(DBG_GADGET, "unregistered driver `%s'\n", driver->driver.name);
->> +	DBG(DBG_GADGET, "unregistered driver `%s'\n", udc->driver->driver.name);
->> +
->> +	udc->driver = NULL;
+> Asking for a response with less than a weeks time is really bold:
+>   $ ~/bin/mdfrm -c ~/mail/todo/
+>   521 messages in /home/gregkh/mail/todo/
 > 
-> Shouldn't we get rid of that assignment as it is done in
-> usb_gadget_remove_driver() anyway ?
-
-usb_gadget_remove_driver() is not the only function to use it.
-usb_udc_softconn_store() can call it too and doesn't have any
-debug message.
-
-
-Thanks,
-
-Gregory
-
-
+> Give me a chance to catch up please...
 > 
->>  
->>  	return 0;
->>  }
->> -- 
->> 1.8.1.2
->>
-> 
+Sorry for that. This version was just minor update from previous
+version and hence asked it. 
 
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Santosh
