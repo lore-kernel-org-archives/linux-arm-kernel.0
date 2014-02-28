@@ -1,116 +1,69 @@
 From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Fri, 28 Feb 2014 13:08:21 +0000
-Subject: [PATCH v3 4/5] pci: Introduce a domain number for pci_host_bridge.
-In-Reply-To: <1393592902-24750-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1393592902-24750-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1393592902-24750-5-git-send-email-Liviu.Dudau@arm.com>
+Date: Fri, 28 Feb 2014 13:08:32 +0000
+Subject: [PATCH v3 2/3] arm64: Extend the PCI I/O space to 16MB
+In-Reply-To: <1393592913-24796-1-git-send-email-Liviu.Dudau@arm.com>
+References: <1393592913-24796-1-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <1393592913-24796-3-git-send-email-Liviu.Dudau@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it easier to discover the domain number of a bus by storing
-the number in pci_host_bridge for the root bus. Several architectures
-have their own way of storing this information, so it makes sense
-to try to unify the code. While at this, add a new function that
-creates a root bus in a given domain and make pci_create_root_bus()
-a wrapper around this function.
+From: Catalin Marinas <catalin.marinas@arm.com>
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+The patch moves the PCI I/O space (currently at 64K) before the
+earlyprintk mapping and extends it to 16MB.
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 78ccba0..1b2f45c 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1714,8 +1714,9 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
- {
- }
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+
+diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
+index 5e054bf..85e24c4 100644
+--- a/Documentation/arm64/memory.txt
++++ b/Documentation/arm64/memory.txt
+@@ -35,11 +35,13 @@ ffffffbc00000000	ffffffbdffffffff	   8GB		vmemmap
  
--struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
--		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-+struct pci_bus *pci_create_root_bus_in_domain(struct device *parent,
-+		int domain, int bus, struct pci_ops *ops, void *sysdata,
-+		struct list_head *resources)
- {
- 	int error;
- 	struct pci_host_bridge *bridge;
-@@ -1732,6 +1733,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ ffffffbe00000000	ffffffbffbbfffff	  ~8GB		[guard, future vmmemap]
  
- 	bridge->dev.parent = parent;
- 	bridge->dev.release = pci_release_host_bridge_dev;
-+	bridge->domain_nr = domain;
- 	error = pcibios_root_bridge_prepare(bridge);
- 	if (error) {
- 		kfree(bridge);
-@@ -1745,7 +1747,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 	b->sysdata = sysdata;
- 	b->ops = ops;
- 	b->number = b->busn_res.start = bus;
--	b2 = pci_find_bus(pci_domain_nr(b), bus);
-+	b2 = pci_find_bus(bridge->domain_nr, bus);
- 	if (b2) {
- 		/* If we already got to this bus through a different bridge, ignore it */
- 		dev_dbg(&b2->dev, "bus already known\n");
-@@ -1753,7 +1755,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 	}
- 
- 	bridge->bus = b;
--	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
-+	dev_set_name(&bridge->dev, "pci%04x:%02x", bridge->domain_nr, bus);
- 	error = device_register(&bridge->dev);
- 	if (error) {
- 		put_device(&bridge->dev);
-@@ -1768,7 +1770,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 
- 	b->dev.class = &pcibus_class;
- 	b->dev.parent = b->bridge;
--	dev_set_name(&b->dev, "%04x:%02x", pci_domain_nr(b), bus);
-+	dev_set_name(&b->dev, "%04x:%02x", bridge->domain_nr, bus);
- 	error = device_register(&b->dev);
- 	if (error)
- 		goto class_dev_reg_err;
-@@ -1821,6 +1823,22 @@ err_out:
- 	return NULL;
- }
- 
-+struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
-+		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-+{
-+	int domain_nr;
-+	struct pci_bus *b = pci_alloc_bus();
-+	if (!b)
-+		return NULL;
+-ffffffbffbc00000	ffffffbffbdfffff	   2MB		earlyprintk device
++ffffffbffa000000	ffffffbffaffffff	  16MB		PCI I/O space
 +
-+	b->sysdata = sysdata;
-+	domain_nr = pci_domain_nr(b);
-+	kfree(b);
++ffffffbffb000000	ffffffbffbbfffff	  12MB		[guard]
+ 
+-ffffffbffbe00000	ffffffbffbe0ffff	  64KB		PCI I/O space
++ffffffbffbc00000	ffffffbffbdfffff	   2MB		earlyprintk device
+ 
+-ffffffbffbe10000	ffffffbcffffffff	  ~2MB		[guard]
++ffffffbffbe00000	ffffffbffbffffff	   2MB		[guard]
+ 
+ ffffffbffc000000	ffffffbfffffffff	  64MB		modules
+ 
+@@ -60,11 +62,13 @@ fffffdfc00000000	fffffdfdffffffff	   8GB		vmemmap
+ 
+ fffffdfe00000000	fffffdfffbbfffff	  ~8GB		[guard, future vmmemap]
+ 
+-fffffdfffbc00000	fffffdfffbdfffff	   2MB		earlyprintk device
++fffffdfffa000000	fffffdfffaffffff	  16MB		PCI I/O space
 +
-+	return pci_create_root_bus_in_domain(parent, domain_nr, bus,
-+				ops, sysdata, resources);
-+}
-+
- int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
++fffffdfffb000000	fffffdfffbbfffff	  12MB		[guard]
+ 
+-fffffdfffbe00000	fffffdfffbe0ffff	  64KB		PCI I/O space
++fffffdfffbc00000	fffffdfffbdfffff	   2MB		earlyprintk device
+ 
+-fffffdfffbe10000	fffffdfffbffffff	  ~2MB		[guard]
++fffffdfffbe00000	fffffdfffbffffff	   2MB		[guard]
+ 
+ fffffdfffc000000	fffffdffffffffff	  64MB		modules
+ 
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 4cc813e..7846a6b 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -121,7 +121,7 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+  *  I/O port access primitives.
+  */
+ #define IO_SPACE_LIMIT		0xffff
+-#define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_2M))
++#define PCI_IOBASE		((void __iomem *)(MODULES_VADDR - SZ_32M))
+ 
+ static inline u8 inb(unsigned long addr)
  {
- 	struct resource *res = &b->busn_res;
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 33aa2ca..1eed009 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -394,6 +394,7 @@ struct pci_host_bridge_window {
- struct pci_host_bridge {
- 	struct device dev;
- 	struct pci_bus *bus;		/* root bus */
-+	int domain_nr;
- 	struct list_head windows;	/* pci_host_bridge_windows */
- 	void (*release_fn)(struct pci_host_bridge *);
- 	void *release_data;
-@@ -747,6 +748,9 @@ struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
- struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 				    struct pci_ops *ops, void *sysdata,
- 				    struct list_head *resources);
-+struct pci_bus *pci_create_root_bus_in_domain(struct device *parent,
-+			int domain, int bus, struct pci_ops *ops,
-+			void *sysdata, struct list_head *resources);
- int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
- int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
- void pci_bus_release_busn_res(struct pci_bus *b);
 -- 
 1.9.0
