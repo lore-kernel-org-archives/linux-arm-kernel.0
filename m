@@ -1,84 +1,23 @@
-From: mohit.kumar@st.com (Mohit Kumar)
-Date: Fri, 28 Feb 2014 17:25:02 +0530
-Subject: [PATCH V7 09/10] SPEAr13xx: defconfig: Update
-In-Reply-To: <cover.1393568715.git.mohit.kumar@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Feb 2014 12:58:13 +0100
+Subject: [PATCH V7 07/10] SPEAr13XX: dts: Add PCIe node information
+In-Reply-To: <b02c2cf599817a852e0cdb2e24e76e74da02637d.1393568715.git.mohit.kumar@st.com>
 References: <cover.1393568715.git.mohit.kumar@st.com>
-Message-ID: <acfdab3c7c0a0985e89bdc2f78751dab26bb0267.1393568715.git.mohit.kumar@st.com>
+ <b02c2cf599817a852e0cdb2e24e76e74da02637d.1393568715.git.mohit.kumar@st.com>
+Message-ID: <7430033.eK9aHCDe8b@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable PCIe, EABI, VFP and NFS configs in default configuration file for
-SPEAr13xx.
+On Friday 28 February 2014 17:25:00 Mohit Kumar wrote:
+> +                       interrupts = <0 68 0x4>;
+> +                       interrupt-map-mask = <0 0 0 0>;
+> +                       interrupt-map = <0x0 0 &gic 68>;
+> 
 
-Signed-off-by: Mohit Kumar <mohit.kumar@st.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Pratyush Anand <pratyush.anand@st.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: spear-devel at list.st.com
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/configs/spear13xx_defconfig |   16 ++++++++++++++++
- 1 files changed, 16 insertions(+), 0 deletions(-)
+>From the discussion we just had on the imx version of this driver, I suspect
+what you want instead is to drop the interrupts property and fix the interrupt
+map to be
 
-diff --git a/arch/arm/configs/spear13xx_defconfig b/arch/arm/configs/spear13xx_defconfig
-index 82eaa55..d271b26 100644
---- a/arch/arm/configs/spear13xx_defconfig
-+++ b/arch/arm/configs/spear13xx_defconfig
-@@ -11,13 +11,24 @@ CONFIG_ARCH_SPEAR13XX=y
- CONFIG_MACH_SPEAR1310=y
- CONFIG_MACH_SPEAR1340=y
- # CONFIG_SWP_EMULATE is not set
-+CONFIG_PCI=y
-+CONFIG_PCI_MSI=y
-+CONFIG_PCIE_SPEAR13XX=y
- CONFIG_SMP=y
- # CONFIG_SMP_ON_UP is not set
- # CONFIG_ARM_CPU_TOPOLOGY is not set
-+CONFIG_AEABI=y
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_VFP=y
- CONFIG_BINFMT_MISC=y
- CONFIG_NET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+CONFIG_IP_PNP_BOOTP=y
-+CONFIG_NET_IPIP=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
- CONFIG_MTD_OF_PARTS=y
-@@ -27,6 +38,7 @@ CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_FSMC=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=16384
-+CONFIG_BLK_DEV_SD=y
- CONFIG_ATA=y
- # CONFIG_SATA_PMP is not set
- CONFIG_SATA_AHCI_PLATFORM=y
-@@ -66,6 +78,7 @@ CONFIG_USB=y
- # CONFIG_USB_DEVICE_CLASS is not set
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_STORAGE=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_SPEAR=y
-@@ -79,11 +92,14 @@ CONFIG_EXT2_FS_SECURITY=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT3_FS_SECURITY=y
- CONFIG_AUTOFS4_FS=m
-+CONFIG_FUSE_FS=y
- CONFIG_MSDOS_FS=m
- CONFIG_VFAT_FS=m
- CONFIG_FAT_DEFAULT_IOCHARSET="ascii"
- CONFIG_TMPFS=y
- CONFIG_JFFS2_FS=y
-+CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
- CONFIG_NLS_DEFAULT="utf8"
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=m
--- 
-1.7.0.1
+interrupt-map = <0x0 0 &gic 0 68 0x4>;
+
+	Arnd
