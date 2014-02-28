@@ -1,76 +1,171 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 28 Feb 2014 14:40:36 +0100
-Subject: [PATCH 5/9] Doc/DT: Add DT binding documentation for MIPI DPI
- Panel
-In-Reply-To: <1393590016-9361-6-git-send-email-tomi.valkeinen@ti.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-6-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1393594836.3802.32.camel@paszta.hi.pengutronix.de>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 28 Feb 2014 14:42:46 +0100
+Subject: [PATCH v6 01/11] of: document bindings for reserved-memory nodes
+In-Reply-To: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com>
+References: <1393594976-16728-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1393594976-16728-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 28.02.2014, 14:20 +0200 schrieb Tomi Valkeinen:
-> Add DT binding documentation for MIPI DPI Panel.
-> 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Reviewed-by: Archit Taneja <archit@ti.com>
-> ---
->  .../devicetree/bindings/video/panel-dpi.txt        | 43 ++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/panel-dpi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/video/panel-dpi.txt b/Documentation/devicetree/bindings/video/panel-dpi.txt
-> new file mode 100644
-> index 000000000000..72636c6f1c67
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/panel-dpi.txt
-> @@ -0,0 +1,43 @@
-> +Generic MIPI DPI Panel
-> +======================
-> +
-> +Required properties:
-> +- compatible: "panel-dpi"
-> +
-> +Optional properties:
-> +- label: a symbolic name for the panel
-> +- gpios: panel enable gpio and backlight enable gpio
-> +
-> +Required nodes:
-> +- "panel-timing" containing video timings
-> +  (Documentation/devicetree/bindings/video/display-timing.txt)
-> +- Video port for DPI input
+From: Grant Likely <grant.likely@linaro.org>
 
-I don't see anything MIPI specific here. Couldn't this be added to the
-existing simple-panel binding?
+Reserved memory nodes allow for the reservation of static (fixed
+address) regions, or dynamically allocated regions for a specific
+purpose.
 
-> +Example
-> +-------
-> +
-> +lcd0: display at 0 {
-> +        compatible = "samsung,lte430wq-f0c", "panel-dpi";
-> +        label = "lcd";
-> +
-> +        lcd_in: endpoint {
-> +                remote-endpoint = <&dpi_out>;
-> +        };
-> +
-> +        panel-timing {
-> +                clock-frequency = <9200000>;
-> +                hactive = <480>;
-> +                vactive = <272>;
-> +                hfront-porch = <8>;
-> +                hback-porch = <4>;
-> +                hsync-len = <41>;
-> +                vback-porch = <2>;
-> +                vfront-porch = <4>;
-> +                vsync-len = <10>;
-> +
-> +                hsync-active = <0>;
-> +                vsync-active = <0>;
-> +                de-active = <1>;
-> +                pixelclk-active = <1>;
-> +        };
-> +};
+Signed-off-by: Grant Likely <grant.likely@linaro.org>
+[joshc: Based on binding document proposed (in non-patch form) here:
+ http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
+ adapted to support #memory-region-cells]
+Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+[mszyprow: removed #memory-region-cells property]
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ .../bindings/reserved-memory/reserved-memory.txt   |  136 ++++++++++++++++++++
+ 1 file changed, 136 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
 
-regards
-Philipp
+diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+new file mode 100644
+index 000000000000..8b0d747a38e7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+@@ -0,0 +1,136 @@
++*** Reserved memory regions ***
++
++Reserved memory is specified as a node under the /reserved-memory node.
++The operating system shall exclude reserved memory from normal usage
++one can create child nodes describing particular reserved (excluded from
++normal use) memory regions. Such memory regions are usually designed for
++the special usage by various device drivers.
++
++Parameters for each memory region can be encoded into the device tree
++with the following nodes:
++
++/reserved-memory node
++---------------------
++#address-cells, #size-cells (required) - standard definition
++    - Should use the same values as the root node
++ranges (required) - standard definition
++    - Should be empty
++
++/reserved-memory/ child nodes
++-----------------------------
++Each child of the reserved-memory node specifies one or more regions of
++reserved memory. Each child node may either use a 'reg' property to
++specify a specific range of reserved memory, or a 'size' property with
++optional constraints to request a dynamically allocated block of memory.
++
++Following the generic-names recommended practice, node names should
++reflect the purpose of the node (ie. "framebuffer" or "dma-pool"). Unit
++address (@<address>) should be appended to the name if the node is a
++static allocation.
++
++Properties:
++Requires either a) or b) below.
++a) static allocation
++   reg (required) - standard definition
++b) dynamic allocation
++   size (required) - length based on parent's #size-cells
++                   - Size in bytes of memory to reserve.
++   alignment (optional) - length based on parent's #size-cells
++                        - Address boundary for alignment of allocation.
++   alloc-ranges (optional) - prop-encoded-array (address, length pairs).
++                           - Specifies regions of memory that are
++                             acceptable to allocate from.
++
++If both reg and size are present, then the reg property takes precedence
++and size is ignored.
++
++Additional properties:
++compatible (optional) - standard definition
++    - may contain the following strings:
++        - shared-dma-pool: This indicates a region of memory meant to be
++          used as a shared pool of DMA buffers for a set of devices. It can
++          be used by an operating system to instanciate the necessary pool
++          management subsystem if necessary.
++        - vendor specific string in the form <vendor>,[<device>-]<usage>
++no-map (optional) - empty property
++    - Indicates the operating system must not create a virtual mapping
++      of the region as part of its standard mapping of system memory,
++      nor permit speculative access to it under any circumstances other
++      than under the control of the device driver using the region.
++reusable (optional) - empty property
++    - The operating system can use the memory in this region with the
++      limitation that the device driver(s) owning the region need to be
++      able to reclaim it back. Typically that means that the operating
++      system can use that region to store volatile or cached data that
++      can be otherwise regenerated or migrated elsewhere.
++
++Linux implementation note:
++- If a "linux,cma-default" property is present, then Linux will use the
++  region for the default pool of the contiguous memory allocator.
++
++Device node references to reserved memory
++-----------------------------------------
++Regions in the /reserved-memory node may be referenced by other device
++nodes by adding a memory-region property to the device node.
++
++memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
++
++Example
++-------
++This example defines 3 contiguous regions are defined for Linux kernel:
++one default of all device drivers (named linux,cma at 72000000 and 64MiB in size),
++one dedicated to the framebuffer device (named framebuffer at 78000000, 8MiB), and
++one for multimedia processing (named multimedia-memory at 77000000, 64MiB).
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	memory {
++		reg = <0x40000000 0x40000000>;
++	};
++
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		/* global autoconfigured region for contiguous allocations */
++		linux,cma {
++			compatible = "shared-dma-pool";
++			reusable;
++			#memory-region-cells = <0>;
++			size = <0x4000000>;
++			alignment = <0x2000>;
++			linux,cma-default;
++		};
++
++		display_reserved: framebuffer at 78000000 {
++			#memory-region-cells = <0>;
++			reg = <0x78000000 0x800000>;
++		};
++
++		multimedia_reserved: multimedia at 77000000 {
++			compatible = "acme,multimedia-memory";
++			#memory-region-cells = <1>;
++			reg = <0x77000000 0x4000000>;
++		};
++	};
++
++	/* ... */
++
++	fb0: video at 12300000 {
++		memory-region = <&display_reserved>;
++		/* ... */
++	};
++
++	scaler: scaler at 12500000 {
++		memory-region = <&multimedia_reserved 0xdeadbeef>;
++		/* ... */
++	};
++
++	codec: codec at 12600000 {
++		memory-region = <&multimedia_reserved 0xfeebdaed>;
++		/* ... */
++	};
++};
+-- 
+1.7.9.5
