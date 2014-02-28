@@ -1,65 +1,63 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 28 Feb 2014 14:42:33 -0600
-Subject: [PATCHv3 02/13] iommu/omap: fix error return paths in
- omap_iommu_attach()
+Date: Fri, 28 Feb 2014 14:42:34 -0600
+Subject: [PATCHv3 03/13] iommu/omap: allow enable/disable even without pdata
 In-Reply-To: <1393620164-14633-1-git-send-email-s-anna@ti.com>
 References: <1393620164-14633-1-git-send-email-s-anna@ti.com>
-Message-ID: <1393620164-14633-3-git-send-email-s-anna@ti.com>
+Message-ID: <1393620164-14633-4-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are couple of issues with the error return paths in
-omap_iommu_attach():
-1. omap_iommu_attach() returns NULL or ERR_PTR in case of error,
-   but omap_iommu_attach_dev() only checks for IS_ERR. Thus a NULL
-   return value (in case driver_find_device fails) will cause the
-   kernel to panic when omap_iommu_attach_dev() dereferences the
-   pointer.
-2. A try_module_get() failure returns a valid success value as
-   returned from iommu_enable().
+From: Florian Vaussard <florian.vaussard@epfl.ch>
 
-Both the above issues have been fixed up to return the proper
-ERR_PTR.
+When booting with a devicetree, no platform data is provided.
+Do not prematurely exit iommu_enable() and iommu_disable() in
+such a case.
+
+Note: As OMAP do not yet has a proper reset controller driver,
+IOMMUs requiring a reset signal should use pdata-quirks as a
+transitional solution.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 Signed-off-by: Suman Anna <s-anna@ti.com>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/iommu/omap-iommu.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/iommu/omap-iommu.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-index fff2ffd..647e4ba 100644
+index 647e4ba..217952b 100644
 --- a/drivers/iommu/omap-iommu.c
 +++ b/drivers/iommu/omap-iommu.c
-@@ -863,7 +863,7 @@ static int device_match_by_alias(struct device *dev, void *data)
-  **/
- static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
- {
--	int err = -ENOMEM;
-+	int err;
- 	struct device *dev;
- 	struct omap_iommu *obj;
+@@ -146,13 +146,10 @@ static int iommu_enable(struct omap_iommu *obj)
+ 	struct platform_device *pdev = to_platform_device(obj->dev);
+ 	struct iommu_platform_data *pdata = pdev->dev.platform_data;
  
-@@ -871,7 +871,7 @@ static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
- 				(void *)name,
- 				device_match_by_alias);
- 	if (!dev)
--		return NULL;
-+		return ERR_PTR(-ENODEV);
+-	if (!pdata)
+-		return -EINVAL;
+-
+ 	if (!arch_iommu)
+ 		return -ENODEV;
  
- 	obj = to_iommu(dev);
+-	if (pdata->deassert_reset) {
++	if (pdata && pdata->deassert_reset) {
+ 		err = pdata->deassert_reset(pdev, pdata->reset_name);
+ 		if (err) {
+ 			dev_err(obj->dev, "deassert_reset failed: %d\n", err);
+@@ -172,14 +169,11 @@ static void iommu_disable(struct omap_iommu *obj)
+ 	struct platform_device *pdev = to_platform_device(obj->dev);
+ 	struct iommu_platform_data *pdata = pdev->dev.platform_data;
  
-@@ -890,8 +890,10 @@ static struct omap_iommu *omap_iommu_attach(const char *name, u32 *iopgd)
- 		goto err_enable;
- 	flush_iotlb_all(obj);
+-	if (!pdata)
+-		return;
+-
+ 	arch_iommu->disable(obj);
  
--	if (!try_module_get(obj->owner))
-+	if (!try_module_get(obj->owner)) {
-+		err = -ENODEV;
- 		goto err_module;
-+	}
+ 	pm_runtime_put_sync(obj->dev);
  
- 	spin_unlock(&obj->iommu_lock);
+-	if (pdata->assert_reset)
++	if (pdata && pdata->assert_reset)
+ 		pdata->assert_reset(pdev, pdata->reset_name);
+ }
  
 -- 
 1.9.0
