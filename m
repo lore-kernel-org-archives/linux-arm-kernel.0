@@ -1,66 +1,133 @@
-From: sre@ring0.de (Sebastian Reichel)
-Date: Fri, 28 Feb 2014 17:25:05 +0100
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 28 Feb 2014 17:25:17 +0100
 Subject: [PATCH 3/9] Doc/DT: Add DT binding documentation for DVI Connector
-In-Reply-To: <5310B567.7040605@ti.com>
+In-Reply-To: <20140228155937.GQ21483@n2100.arm.linux.org.uk>
 References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
  <1393590016-9361-4-git-send-email-tomi.valkeinen@ti.com>
  <20140228155937.GQ21483@n2100.arm.linux.org.uk>
- <5310B567.7040605@ti.com>
-Message-ID: <20140228162504.GB29034@earth.universe>
+Message-ID: <1393604717.3802.61.camel@paszta.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 06:12:23PM +0200, Tomi Valkeinen wrote:
-> On 28/02/14 17:59, Russell King - ARM Linux wrote:
-> 
-> >> +dvi0: connector at 0 {
-> >> +	compatible = "dvi-connector";
-> >> +	label = "dvi";
-> >> +
-> >> +	i2c-bus = <&i2c3>;
-> >> +
-> >> +	dvi_connector_in: endpoint {
-> >> +		remote-endpoint = <&tfp410_out>;
-> >> +	};
-> >> +};
+Am Freitag, den 28.02.2014, 15:59 +0000 schrieb Russell King - ARM
+Linux:
+> On Fri, Feb 28, 2014 at 02:20:10PM +0200, Tomi Valkeinen wrote:
+> > Add DT binding documentation for DVI Connector.
 > > 
-> > This looks far too simplistic.  There are different classes of DVI
-> > connector - there is:
+> > Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > Reviewed-by: Archit Taneja <archit@ti.com>
+> > ---
+> >  .../devicetree/bindings/video/dvi-connector.txt    | 26 ++++++++++++++++++++++
+> >  1 file changed, 26 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/video/dvi-connector.txt
 > > 
-> > DVI A - analogue only
-> > DVI D - digital only (single and dual link)
-> > DVI I - both (single and dual digital link)
-> > 
-> > DRM at least makes a distinction between these three classes, and this
-> > disctinction is part of the user API.  How would a display system know
-> > which kind of DVI connector is wired up on the board from this DT
-> > description?
+> > diff --git a/Documentation/devicetree/bindings/video/dvi-connector.txt b/Documentation/devicetree/bindings/video/dvi-connector.txt
+> > new file mode 100644
+> > index 000000000000..6a0aff866c78
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/video/dvi-connector.txt
+> > @@ -0,0 +1,26 @@
+> > +DVI Connector
+> > +==============
+> > +
+> > +Required properties:
+> > +- compatible: "dvi-connector"
+> > +
+> > +Optional properties:
+> > +- label: a symbolic name for the connector
+> > +- i2c-bus: phandle to the i2c bus that is connected to DVI DDC
+> > +
+> > +Required nodes:
+> > +- Video port for DVI input
+> > +
+> > +Example
+> > +-------
+> > +
+> > +dvi0: connector at 0 {
+> > +	compatible = "dvi-connector";
+> > +	label = "dvi";
+> > +
+> > +	i2c-bus = <&i2c3>;
+> > +
+> > +	dvi_connector_in: endpoint {
+> > +		remote-endpoint = <&tfp410_out>;
+> > +	};
+> > +};
 > 
-> Yes, I think that's a valid change. But do we also need to specify
-> single/dual link, in addition to the three types?
+> This looks far too simplistic.  There are different classes of DVI
+> connector - there is:
 > 
-> I guess the compatible string is the easiest way for differentation, at
-> least for the three main types, i.e. "dvi-d-connector" etc.
+> DVI A - analogue only
+> DVI D - digital only (single and dual link)
+> DVI I - both (single and dual digital link)
 > 
-> "dvi-d-1l-connector" and "dvi-d-2l-connector" for the single/dual link?
-> That looks a bit funny.
+> DRM at least makes a distinction between these three classes, and this
+> disctinction is part of the user API.  How would a display system know
+> which kind of DVI connector is wired up on the board from this DT
+> description?
 
-maybe like this:
+Maybe this could be inferred from the sources connected to it. For
+example a i.MX5 board with the SoC internal TV Encoder and an external
+SiI902x HDMI encoder connected to the same DVI I connector:
 
-Required Properties:
- - compatible: should contain one of the following:
-  * "dvi-d-connector"
-  * "dvi-a-connector"
-  * "dvi-i-connector"
+ipu {
+	port at 2 {
+		ipu_di0_disp0: endpoint {
+			remote-endpoint = <&sii902x_in>;
+		};
+	};
+	port at 3 {
+		ipu_di1_tve: endpoint {
+			remote-endpoint = <&tve_in>;
+		};
+	};
+};
 
-Optional Properties:
- - dual-link: Should be set for dual-link capable connectors
+&sii902x {
+	compatible = "si,sii9022";
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/91551572/attachment.sig>
+	port at 0 {
+		sii902x_in: endpoint {
+			remote-endpoint = <&ipu_di0>;
+		};
+	};
+	port at 1 {
+		sii902x_out: endpoint {
+			remote-endpoint = <&dvi_d_in>;
+		};
+	};
+};
+
+&tve {
+	compatible = "fsl,imx53-tve";
+	port at 0 {
+		tve_in: endpoint {
+			remote-endpoint = <&ipu_di1>;
+		};
+	};
+	port at 1 {
+		tve_out: endpoint {
+			remote-endpoint = <&dvi_a_in>;
+		};
+	};
+};
+
+dvi-connector {
+	compatible = "dvi-connector";
+	ddc-i2c-bus = <&i2c3>;
+
+	port {
+		dvi_d_in: endpoint at 0 {
+			remote-endpoint = <&sii902x_out>;
+		};
+		dvi_a_in: endpoint at 1 {
+			remote-endpoint = <&tve_out>;
+		};
+	};
+};
+
+It should be possible to let the connector know that those two endpoints
+are connected to a TMDS source and to a VGA source, respectively.
+
+regards
+Philipp
