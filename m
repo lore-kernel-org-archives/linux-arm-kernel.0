@@ -1,38 +1,83 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 28 Feb 2014 14:14:25 +0900
-Subject: [PATCH v3 2/2] arm64: Add regs_return_value() in syscall.h
-In-Reply-To: <1393564465-3862-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1393319683-2707-1-git-send-email-takahiro.akashi@linaro.org>
- <1393564465-3862-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1393564465-3862-3-git-send-email-takahiro.akashi@linaro.org>
+Date: Fri, 28 Feb 2014 14:17:13 +0900
+Subject: [PATCH v6 0/2] arm64: Add audit support
+In-Reply-To: <1393319934-2810-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1393319934-2810-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1393564635-3921-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This macro, regs_return_value, is used mainly for audit to record system
-call's results, but may also be used in test_kprobes.c.
+This patchset adds system call audit support on arm64.
+Both 32-bit (AUDIT_ARCH_ARM) and 64-bit tasks (AUDIT_ARCH_AARCH64)
+are supported. Since arm64 has the exact same set of system calls
+on LE and BE, we don't care about endianness (or more specifically
+__AUDIT_ARCH_64BIT bit in AUDIT_ARCH_*).
 
-Acked-by Will Deacon <will.deacon@arm.com>
-Acked-by: Richard Guy Briggs <rgb@redhat.com>
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/include/asm/ptrace.h |    5 +++++
- 1 file changed, 5 insertions(+)
+There are some prerequisites for this patch to work correctly:
+* "audit: Add CONFIG_HAVE_ARCH_AUDITSYSCALL" patch
+* "generic compat system call audit support" patch
+* "__NR_* definitions for compat syscalls" patch from Catalin
+* "make a single hook to syscall_trace() for all syscall features" patch
+* "arm64: Add regs_return_value() in syscall.h" patch
+* userspace audit tool (v2.3.2 + my patch for arm64)
 
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 0e7fa49..5800ec1 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -134,6 +134,11 @@ struct pt_regs {
- #define user_stack_pointer(regs) \
- 	((regs)->sp)
- 
-+static inline unsigned long regs_return_value(struct pt_regs *regs)
-+{
-+	return regs->regs[0];
-+}
-+
- /*
-  * Are the current registers suitable for user mode? (used to maintain
-  * security in signal handlers)
+Please review them as well for better understandings.
+
+This code was tested on both 32-bit and 64-bit LE userland 
+in the following two ways:
+1) basic operations with auditctl/autrace
+  # auditctl -a exit,always -S openat -F path=/etc/inittab
+  # auditctl -a exit,always -F dir=/tmp -F perm=rw
+  # auditctl -a task,always
+  # autrace /bin/ls
+    by comparing output from autrace with one from strace
+
+2) audit-test-code (+ my workarounds for arm/arm64)
+  by running "audit-tool", "filter" and "syscalls" test categories.
+
+Changes v1 -> v2:
+* Modified to utilize "generic compat system call audit" [3/6, 4/6, 5/6]
+  Please note that a required header, unistd_32.h, is automatically
+  generated from unistd32.h.
+* Refer to regs->orig_x0 instead of regs->x0 as the first argument of
+  system call in audit_syscall_entry() [6/6]
+* Include "Add regs_return_value() in syscall.h" patch [2/6],
+  which was not intentionally included in v1 because it could be added
+  by "kprobes support".
+
+Changes v2 -> v3:
+* Remove asm/audit.h.
+  See "generic compat syscall audit support" patch v4
+* Remove endianness dependency, ie. AUDIT_ARCH_ARMEB/AARCH64EB.
+* Remove kernel/syscalls/Makefile which was used to create unistd32.h.
+  See Catalin's "Add __NR_* definitions for compat syscalls" patch
+
+Changes v3 -> v4:
+* Modified to sync with the patch, "make a single hook to syscall_trace()
+  for all syscall features"
+* aligned with "audit: Add CONFIG_HAVE_ARCH_AUDITSYSCALL" patch
+
+Changes v4 -> v5:
+* rebased to 3.14-rcX
+* added a guard against TIF_SYSCALL_AUDIT [3/3]
+* aligned with the change in "arm64: make a single hook to syscall_trace()
+  for all syscall features" v2 [3/3]
+
+Changes v5 -> v6:
+* removed and put "arm64: Add regs_return_value() in syscall.h" patch into
+  a separate set
+* aligned with the change in "arm64: make a single hook to syscall_trace()
+  for all syscall features" v3 [1/2]
+
+AKASHI Takahiro (2):
+  arm64: Add audit support
+  arm64: audit: Add audit hook in ptrace/syscall_trace
+
+ arch/arm64/Kconfig               |    1 +
+ arch/arm64/include/asm/syscall.h |   15 +++++++++++
+ arch/arm64/kernel/ptrace.c       |   54 ++++++++++++++++++++++----------------
+ include/uapi/linux/audit.h       |    1 +
+ 4 files changed, 49 insertions(+), 22 deletions(-)
+
 -- 
 1.7.9.5
