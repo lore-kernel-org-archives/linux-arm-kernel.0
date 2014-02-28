@@ -1,151 +1,208 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 28 Feb 2014 09:50:22 +0000
-Subject: [PATCH v6 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <1393545478-14908-3-git-send-email-sebastian.capella@linaro.org>
-References: <1393545478-14908-1-git-send-email-sebastian.capella@linaro.org>
- <1393545478-14908-3-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <20140228095022.GA25090@e102568-lin.cambridge.arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 28 Feb 2014 10:54:14 +0100
+Subject: [PATCH v5 01/11] of: document bindings for reserved-memory nodes
+In-Reply-To: <20140226115108.211D2C40A89@trevor.secretlab.ca>
+References: <1392985527-6260-1-git-send-email-m.szyprowski@samsung.com>
+ <1392985527-6260-2-git-send-email-m.szyprowski@samsung.com>
+ <20140226115108.211D2C40A89@trevor.secretlab.ca>
+Message-ID: <53105CC6.1090902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 27, 2014 at 11:57:58PM +0000, Sebastian Capella wrote:
+Hello,
 
-[...]
+On 2014-02-26 12:51, Grant Likely wrote:
+> On Fri, 21 Feb 2014 13:25:17 +0100, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> > From: Grant Likely <grant.likely@linaro.org>
+> >
+> > Reserved memory nodes allow for the reservation of static (fixed
+> > address) regions, or dynamically allocated regions for a specific
+> > purpose.
+> >
+> > Signed-off-by: Grant Likely <grant.likely@linaro.org>
+> > [joshc: Based on binding document proposed (in non-patch form) here:
+> >  http://lkml.kernel.org/g/20131030134702.19B57C402A0 at trevor.secretlab.ca
+> >  adapted to support #memory-region-cells]
+> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > ---
+> >  .../bindings/reserved-memory/reserved-memory.txt   |  138 ++++++++++++++++++++
+> >  1 file changed, 138 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> > new file mode 100644
+> > index 000000000000..a606ce90c9c4
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> > @@ -0,0 +1,138 @@
+> > +*** Reserved memory regions ***
+> > +
+> > +Reserved memory is specified as a node under the /reserved-memory node.
+> > +The operating system shall exclude reserved memory from normal usage
+> > +one can create child nodes describing particular reserved (excluded from
+> > +normal use) memory regions. Such memory regions are usually designed for
+> > +the special usage by various device drivers.
+> > +
+> > +Parameters for each memory region can be encoded into the device tree
+> > +with the following nodes:
+> > +
+> > +/reserved-memory node
+> > +---------------------
+> > +#address-cells, #size-cells (required) - standard definition
+> > +    - Should use the same values as the root node
+> > +#memory-region-cells (required) - dictates number of cells used in the child
+> > +                                  nodes memory-region specifier
+>
+> I still don't like this portion of the binding. I'm not convinced that
+> it is necessary in the majority of cases and it is going to be very
+> driver specific. I would rather drop it entirely from the common
+> binding. If a specific driver needs to do something like the above then
+> it can have a driver specific binding. Otherwise I think the default
+> should be a simple phandle with no arguments to a single reserved memory
+> node.
+>
+> Ben, can you weigh in on the current state of this document. I'm mostly
+> happy with it aside from my comment above. Do you think this is ready to
+> be merged?
+>
+> > +ranges (required) - standard definition
+> > +    - Should be empty
+> > +
+> > +/reserved-memory/ child nodes
+> > +-----------------------------
+> > +Each child of the reserved-memory node specifies one or more regions of
+> > +reserved memory. Each child node may either use a 'reg' property to
+> > +specify a specific range of reserved memory, or a 'size' property with
+> > +optional constraints to request a dynamically allocated block of memory.
+> > +
+> > +Following the generic-names recommended practice, node names should
+> > +reflect the purpose of the node (ie. "framebuffer" or "dma-pool"). Unit
+> > +address (@<address>) should be appended to the name if the node is a
+> > +static allocation.
+> > +
+> > +Properties:
+> > +Requires either a) or b) below.
+> > +a) static allocation
+> > +   reg (required) - standard definition
+> > +b) dynamic allocation
+> > +   size (required) - length based on parent's #size-cells
+> > +                   - Size in bytes of memory to reserve.
+> > +   alignment (optional) - length based on parent's #size-cells
+> > +                        - Address boundary for alignment of allocation.
+> > +   alloc-ranges (optional) - prop-encoded-array (address, length pairs).
+> > +                           - Specifies regions of memory that are
+> > +                             acceptable to allocate from.
+> > +
+> > +If both reg and size are present, then the reg property takes precedence
+> > +and size is ignored.
+> > +
+> > +Additional properties:
+> > +compatible (optional) - standard definition
+> > +    - may contain the following strings:
+> > +        - shared-dma-pool: This indicates a region of memory meant to be
+> > +          used as a shared pool of DMA buffers for a set of devices. It can
+> > +          be used by an operating system to instanciate the necessary pool
+> > +          management subsystem if necessary.
+> > +        - vendor specific string in the form <vendor>,[<device>-]<usage>
+>
+> Add "Use vendor strings to identify regions dedicates for a specific
+> vendor device. For example: 'acme,framebuffer'. Platform code can use vendor
+> strings to identify device specific regions"
 
-> diff --git a/arch/arm/kernel/hibernate.c b/arch/arm/kernel/hibernate.c
-> new file mode 100644
-> index 0000000..a41e0e3
-> --- /dev/null
-> +++ b/arch/arm/kernel/hibernate.c
-> @@ -0,0 +1,113 @@
-> +/*
-> + * Hibernation support specific for ARM
-> + *
-> + * Derived from work on ARM hibernation support by:
-> + *
-> + * Ubuntu project, hibernation support for mach-dove
-> + * Copyright (C) 2010 Nokia Corporation (Hiroshi Doyu)
-> + * Copyright (C) 2010 Texas Instruments, Inc. (Teerth Reddy et al.)
-> + *  https://lkml.org/lkml/2010/6/18/4
-> + *  https://lists.linux-foundation.org/pipermail/linux-pm/2010-June/027422.html
-> + *  https://patchwork.kernel.org/patch/96442/
-> + *
-> + * Copyright (C) 2006 Rafael J. Wysocki <rjw@sisk.pl>
-> + *
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +
-> +#include <linux/mm.h>
-> +#include <linux/suspend.h>
-> +#include <asm/tlbflush.h>
-> +#include <asm/cacheflush.h>
+So do you want to completely drop phandle based links between device 
+nodes and
+memory regions?
 
-You can drop tlbflush.h and cacheflush.h, they do not seem to be needed.
+> > +no-map (optional) - empty property
+> > +    - Indicates the operating system must not create a virtual mapping
+> > +      of the region as part of its standard mapping of system memory,
+> > +      nor permit speculative access to it under any circumstances other
+> > +      than under the control of the device driver using the region.
+> > +reusable (optional) - empty property
+> > +    - The operating system can use the memory in this region with the
+> > +      limitation that the device driver(s) owning the region need to be
+> > +      able to reclaim it back. Typically that means that the operating
+> > +      system can use that region to store volatile or cached data that
+> > +      can be otherwise regenerated or migrated elsewhere.
+> > +
+> > +Linux implementation note:
+> > +- If a "linux,cma-default" property is present, then Linux will use the
+> > +  region for the default pool of the contiguous memory allocator.
+> > +
+> > +Device node references to reserved memory
+> > +-----------------------------------------
+> > +Regions in the /reserved-memory node may be referenced by other device
+> > +nodes by adding a memory-region property to the device node.
+> > +
+> > +memory-region (optional) - phandle, specifier pairs to children of /reserved-memory
+> > +
+> > +Example
+> > +-------
+> > +This example defines 3 contiguous regions are defined for Linux kernel:
+> > +one default of all device drivers (named linux,cma at 72000000 and 64MiB in size),
+> > +one dedicated to the framebuffer device (named framebuffer at 78000000, 8MiB), and
+> > +one for multimedia processing (named multimedia-memory at 77000000, 64MiB).
+> > +
+> > +/ {
+> > +	#address-cells = <1>;
+> > +	#size-cells = <1>;
+> > +
+> > +	memory {
+> > +		reg = <0x40000000 0x40000000>;
+> > +	};
+> > +
+> > +	reserved-memory {
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		ranges;
+> > +
+> > +		/* global autoconfigured region for contiguous allocations */
+> > +		linux,cma {
+> > +			compatible = "shared-dma-pool";
+> > +			reusable;
+> > +			#memory-region-cells = <0>;
+> > +			size = <0x4000000>;
+> > +			alignment = <0x2000>;
+> > +			linux,cma-default;
+> > +		};
+> > +
+> > +		display_reserved: framebuffer at 78000000 {
+> > +			#memory-region-cells = <0>;
+> > +			reg = <0x78000000 0x800000>;
+> > +		};
+> > +
+> > +		multimedia_reserved: multimedia at 77000000 {
+> > +			compatible = "acme,multimedia-memory";
+> > +			#memory-region-cells = <1>;
+> > +			reg = <0x77000000 0x4000000>;
+> > +		};
+> > +	};
+> > +
+> > +	/* ... */
+> > +
+> > +	fb0: video at 12300000 {
+> > +		memory-region = <&display_reserved>;
+> > +		/* ... */
+> > +	};
+> > +
+> > +	scaler: scaler at 12500000 {
+> > +		memory-region = <&multimedia_reserved 0xdeadbeef>;
+> > +		/* ... */
+> > +	};
+> > +
+> > +	codec: codec at 12600000 {
+> > +		memory-region = <&multimedia_reserved 0xfeebdaed>;
+> > +		/* ... */
+> > +	};
+> > +};
+> > --
+> > 1.7.9.5
+> >
+>
+>
 
-> +#include <asm/system_misc.h>
-> +#include <asm/idmap.h>
-> +#include <asm/suspend.h>
-> +
-> +extern const void __nosave_begin, __nosave_end;
-> +
-> +int pfn_is_nosave(unsigned long pfn)
-> +{
-> +	unsigned long nosave_begin_pfn =
-> +			__pa_symbol(&__nosave_begin) >> PAGE_SHIFT;
-> +	unsigned long nosave_end_pfn =
-> +			PAGE_ALIGN(__pa_symbol(&__nosave_end)) >> PAGE_SHIFT;
-> +
-> +	return (pfn >= nosave_begin_pfn) && (pfn < nosave_end_pfn);
-> +}
-> +
-> +void notrace save_processor_state(void)
-> +{
-> +	WARN_ON(num_online_cpus() != 1);
-> +	local_fiq_disable();
-> +}
-> +
-> +void notrace restore_processor_state(void)
-> +{
-> +	local_fiq_enable();
-> +}
-> +
-> +/*
-> + * Snapshot kernel memory and reset the system.
-> + *
-> + * swsusp_save() is executed in the suspend finisher so that the CPU
-> + * context pointer and memory are part of the saved image, which is
-> + * required by the resume kernel image to restart execution from
-> + * swsusp_arch_suspend().
-> + *
-> + * soft_restart is not technically needed, but is used to get success
-> + * returned from cpu_suspend.
-> + *
-> + * When soft reboot completes, the hibernation snapshot is written out.
-> + */
-> +static int notrace arch_save_image(unsigned long unused)
-> +{
-> +	int ret;
-> +
-> +	ret = swsusp_save();
-> +	if (ret == 0)
-> +		soft_restart(virt_to_phys(cpu_resume));
-> +	return ret;
-> +}
-> +
-> +/*
-> + * Save the current CPU state before suspend / poweroff.
-> + */
-> +int notrace swsusp_arch_suspend(void)
-> +{
-> +	return cpu_suspend(0, arch_save_image);
-> +}
-> +
-> +/*
-> + * The framework loads the hibernation image into a linked list anchored
-> + * at restore_pblist, for swsusp_arch_resume() to copy back to the proper
-> + * destinations.
-> + *
-> + * To make this work if resume is triggered from initramfs, the
-> + * pagetables need to be switched to allow writes to kernel mem.
-> + */
-
-Comment above needs updating. We are switching page tables to a set of
-page tables that are certain to live at the same location in the older
-kernel, that's the only reason, as we discussed. soft_restart will make
-sure (again) to switch to 1:1 page tables so that we can call cpu_resume
-with the MMU off.
-
-> +static void notrace arch_restore_image(void *unused)
-> +{
-> +	struct pbe *pbe;
-> +
-> +	cpu_switch_mm(idmap_pgd, &init_mm);
-> +	for (pbe = restore_pblist; pbe; pbe = pbe->next)
-> +		copy_page(pbe->orig_address, pbe->address);
-> +
-> +	soft_restart(virt_to_phys(cpu_resume));
-> +}
-> +
-> +static u8 resume_stack[PAGE_SIZE/2] __nosavedata;
-> +
-> +/*
-> + * Resume from the hibernation image.
-> + * Due to the kernel heap / data restore, stack contents change underneath
-> + * and that would make function calls impossible; switch to a temporary
-> + * stack within the nosave region to avoid that problem.
-> + */
-> +int swsusp_arch_resume(void)
-> +{
-> +	extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-> +	call_with_stack(arch_restore_image, 0,
-> +		resume_stack + sizeof(resume_stack));
-
-This does not guarantee your stack is 8-byte aligned, that's not AAPCS
-compliant and might buy you trouble.
-
-Either you align the stack or you align the pointer you are passing.
-
-Please have a look at kernel/process.c
-
-Thanks,
-Lorenzo
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
