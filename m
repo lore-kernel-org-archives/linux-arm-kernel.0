@@ -1,46 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 28 Feb 2014 13:36:30 -0800
-Subject: [PATCH V5 2/4] DRIVERS: IRQCHIP: CROSSBAR: Add support for
- Crossbar IP
-In-Reply-To: <52F24683.9060200@ti.com>
-References: <1386066445-28245-1-git-send-email-r.sricharan@ti.com>
- <1386066445-28245-3-git-send-email-r.sricharan@ti.com>
- <52D7B2CA.8080902@ti.com> <52EF7D85.5070705@ti.com>
- <alpine.DEB.2.02.1402041713470.24986@ionos.tec.linutronix.de>
- <52F23887.9060209@ti.com> <52F24683.9060200@ti.com>
-Message-ID: <20140228213629.GB13624@atomide.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 28 Feb 2014 22:43:09 +0100
+Subject: [PATCH 14/28] Remove MACH_SMDKC210
+In-Reply-To: <20140212160431.GB28112@sirena.org.uk>
+References: <1391971686-9517-1-git-send-email-richard@nod.at>
+ <1391971686-9517-15-git-send-email-richard@nod.at>
+ <20140210114154.GQ1757@sirena.org.uk> <1392039072.3585.15.camel@x220>
+ <20140210141255.GI1757@sirena.org.uk> <1392046242.3585.41.camel@x220>
+ <20140210163621.GA13533@sirena.org.uk> <1392070159.27939.34.camel@x220>
+ <20140212160431.GB28112@sirena.org.uk>
+Message-ID: <1393623789.4052.17.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sricharan R <r.sricharan@ti.com> [140205 06:13]:
-> Tony,
+On Wed, 2014-02-12 at 16:04 +0000, Mark Brown wrote:
+> On Mon, Feb 10, 2014 at 11:09:19PM +0100, Paul Bolle wrote:
+> > See, if you scan v3.10:arch/arm/mach-exynos/mach-smdkv310.c you'll
+> > notice the string "smdk-audio". If you grep that string you get a few
+> > hits. But none in v3.10:sound/soc/samsung/smdk_wm9713.c. And if you scan
+> > v3.10:sound/soc/samsung/smdk_wm9713.c for strings you'll find stuff like
+> > "wm9713-hifi",  "wm9713-codec", and "soc-audio". But these don't show up
+> > in v3.10:arch/arm/mach-exynos/mach-smdkv310.c. So it's not obvious how
+> > these two files relate.
 > 
-> On Wednesday 05 February 2014 06:41 PM, Sricharan R wrote:
-> > On Tuesday 04 February 2014 09:44 PM, Thomas Gleixner wrote:
-> >> On Mon, 3 Feb 2014, Sricharan R wrote:
-> >>>> I already have your reviewed-by tag for the first patch in this series.
-> >>>>
-> >>>> Kevin was pointing out that irqchip maintainer tag is needed for this patch as well
-> >>>> to be merged. We are planning to take this series through arm-soc tree.
-> >>>>
-> >>>> Can i please have your tag for this patch as well ?
-> >>
-> >> Acked-by-me
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> >> the body of a message to majordomo at vger.kernel.org
-> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
-> > Thanks Thomas.
-> > 
-> > Kevin,
-> >     I will re-send a branch based on rc1 for this.
-> > 
+> > And I'm left wondering why SND_SOC_SAMSUNG_SMDK_WM9713 actually depends
+> > on (among other symbols) MACH_SMDKV310 and MACH_SMDKC210 in v3.10.
 > 
-> I have pushed a branch based on mainline,
->    git://github.com/Sricharanti/sricharan.git
->    branch: crossbar_3.14_rc1
+> The hardware is physically present on those boards but must be selected
+> with DIP switches, the device registration needs to be changed in the
+> kernel when that happens (as the DT must be when it is in use).
 
-OK pulling into omap-for-v3.15/crossbar thanks.
+In v3.14-rc4 these two symbols suddenly got removed, see commit
+eaff64705dd5 ("ASoC: samsung: Remove invalid dependencies"). It does
+exactly what I proposed last year, see
+https://lkml.org/lkml/2013/7/14/27 . (That link currently shows a rather
+empty page; is lkml.org having problems again?)
 
-Tony
+That commit is fine with me, of course. I now see no reason to continue
+my, rather slowly progressing, search for the problem that you wanted to
+get properly fixed. I suppose another commit already fixed it.
+
+Thanks,
+
+
+Paul Bolle
