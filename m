@@ -1,47 +1,34 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Fri, 28 Feb 2014 20:07:40 +0200
-Subject: [PATCH 0/5] Introduce keystone reset driver
-Message-ID: <1393610865-23630-1-git-send-email-ivan.khoronzhuk@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 28 Feb 2014 19:12:20 +0100
+Subject: [PATCH 2/4] ARM: dove: prepare new Dove DT Kconfig variable
+In-Reply-To: <20140228163448.GM1872@titan.lakedaemon.net>
+References: <1393536486-3827-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1393536486-3827-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20140228015310.GC9383@sirena.org.uk>
+ <20140228163448.GM1872@titan.lakedaemon.net>
+Message-ID: <5310D184.3050905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches introduce keystone reset driver.
+On 02/28/2014 05:34 PM, Jason Cooper wrote:
+> On Fri, Feb 28, 2014 at 10:53:10AM +0900, Mark Brown wrote:
+>> On Thu, Feb 27, 2014 at 10:28:03PM +0100, Sebastian Hesselbarth wrote:
+>>> DT-enabled Dove will move over from ARCH_DOVE in mach-dove to MACH_DOVE in
+>>> mach-mvebu. As non-DT ARCH_DOVE will stay to rot for a while, add a new
+>>> DT-only MACH_DOVE to mmc, thermal, wdt, and asoc Kconfigs.
+>>
+>> I'd be much happier merging this sort of stuff individually through the
+>> subsystems, we already have an annoying conflict here...  Is there some
+>> bisection problem with doing that?
+>
+> shouldn't be.  Since these changes || the old with the new config
+> symbols.
+>
+> Sebastian, can you split this up into individual patches?
 
-The keystone SoC can be rebooted in several ways. By external reset
-pin, by soft and by watchdogs. This driver allows software reset or reset
-by one of the watchdogs. Also added opportunity to set soft/hard reset type.
+Sure, I'll send them in-reply-to this mail soon. I'll also add the SATA
+PHY Kconfig in a bisectable way, i.e. add MACH_DOVE and for now ignore
+that the driver is DT-only. We plan to remove mach-dove in one or two
+cycles anyway, it will go with it then.
 
-Based on v3.14-rc4
-
-CC: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-CC: David Woodhouse <dwmw2@infradead.org>
-CC: Grant Likely <grant.likely@linaro.org>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Pawel Moll <pawel.moll@arm.com>
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-CC: Kumar Gala <galak@codeaurora.org>
-CC: Rob Landley <rob@landley.net>
-CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
-CC: Russell King <linux@arm.linux.org.uk>
-
-Ivan Khoronzhuk (5):
-  Power: reset: keystone-reset: introduce keystone reset driver
-  Power: reset: add bindings for keystone reset driver
-  ARM: keystone: remove redundant reset stuff
-  ARM: dts: keystone: update reset node to work with reset driver
-  ARM: keystone: enable reset driver support
-
- .../bindings/power/reset/keystone-reset.txt        |  59 +++++++
- arch/arm/boot/dts/keystone.dtsi                    |   4 +-
- arch/arm/configs/keystone_defconfig                |   3 +
- arch/arm/mach-keystone/keystone.c                  |  35 -----
- drivers/power/reset/Kconfig                        |   7 +
- drivers/power/reset/Makefile                       |   1 +
- drivers/power/reset/keystone-reset.c               | 171 +++++++++++++++++++++
- 7 files changed, 244 insertions(+), 36 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/power/reset/keystone-reset.txt
- create mode 100644 drivers/power/reset/keystone-reset.c
-
--- 
-1.8.3.2
+Sebastian
