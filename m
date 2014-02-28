@@ -1,83 +1,51 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 28 Feb 2014 20:27:03 +0200
-Subject: [PATCH v3 1/2] CLK: TI: OMAP4/5/DRA7: Remove gpmc_fck from dummy
- clocks
-In-Reply-To: <20140228172836.GB15399@atomide.com>
-References: <1393411089-9550-1-git-send-email-florian.vaussard@epfl.ch>
- <1393411089-9550-2-git-send-email-florian.vaussard@epfl.ch>
- <20140226204003.4353.17772@quantum> <20140228172836.GB15399@atomide.com>
-Message-ID: <5310D4F7.7090508@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 28 Feb 2014 10:27:45 -0800
+Subject: [PATCH] ARM: qcom: Enable basic support for Qualcomm platforms
+ in multi_v7_defconfig
+In-Reply-To: <7hzjlbtc9y.fsf@paris.lan>
+References: <1393360445-16923-1-git-send-email-galak@codeaurora.org>
+ <7hy50xv3rw.fsf@paris.lan> <7hzjlbtc9y.fsf@paris.lan>
+Message-ID: <20140228182745.GC2487@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2014 07:28 PM, Tony Lindgren wrote:
-> * Mike Turquette <mturquette@linaro.org> [140226 12:43]:
->> Quoting Florian Vaussard (2014-02-26 02:38:08)
->>> When arch/arm/mach-omap2/gpmc.c calls clk_get(..., "fck"), it will
->>> get a dummy clock and try to use it. As the rate is configured to zero,
->>> this will result in several divisions by zero, and misconfigured
->>> timings, with devices on the bus being lost in the La La Land.
->>>
->>> It is better to remove gpmc_fck from the dummy clocks, so that gpmc.c
->>> can fail gracefully.
->>>
->>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->>
->> Looks good to me.
->
-> Can that be upgraded to an ack then?
+On 02/28, Kevin Hilman wrote:
+> Hi Kumar,
+> 
+> Kevin Hilman <khilman@linaro.org> writes:
+> 
+> > Kumar Gala <galak@codeaurora.org> writes:
+> >
+> >> Enable support for the MSM8x60, MSM8960, and MSM8974 SoCs, clocks and
+> >> serial console as part of the standard multi_v7_defconfig.
+> >>
+> >> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> >> ---
+> >>
+> >> I leave this to the arm-soc guys to apply because of possible conflicts
+> >> with other updates to multi_v7_defconfig.
+> >
+> > Seem to be a handful of !qcom changes here, probably resulting from a
+> > run of 'make savedefconfig' without all the new changes in.
+> >
+> > I've thinned this out to only the qcom changes and applied the following
+> > to next/boards.  I think it's better to do any 'make savedefconfig'
+> > cleanups as a separate, cleanup-only patch as needed.
+> 
+> Bisecting a new boot failure on u8500/snowball came down to this patch.
+> Simply disabling CONFIG_ARCH_QCOM in mutli_v7_defconfig gets the
+> u8500/snowball booting again, so it looks like there may still be some
+> qcom specifics that are being run on non-qcom platforms with a
+> multi-platform config.
+> 
+> Could you audit for initcalls/drivers being initialized on non-qcom
+> SoCs?
+> 
 
-Looks good to me also.
+Can you try disabling CONFIG_ARCH_MSM8X60 and
+CONFIG_ARCH_MSM8960? MY suspicion is the text offset movement is
+causing problems, but I hope I'm wrong.
 
-Acked-by: Tero Kristo <t-kristo@ti.com>
-
->
-> Regards,
->
-> Tony
->
->>> ---
->>>   drivers/clk/ti/clk-44xx.c | 1 -
->>>   drivers/clk/ti/clk-54xx.c | 1 -
->>>   drivers/clk/ti/clk-7xx.c  | 1 -
->>>   3 files changed, 3 deletions(-)
->>>
->>> diff --git a/drivers/clk/ti/clk-44xx.c b/drivers/clk/ti/clk-44xx.c
->>> index ae00218..02517a8 100644
->>> --- a/drivers/clk/ti/clk-44xx.c
->>> +++ b/drivers/clk/ti/clk-44xx.c
->>> @@ -222,7 +222,6 @@ static struct ti_dt_clk omap44xx_clks[] = {
->>>          DT_CLK(NULL, "auxclk5_src_ck", "auxclk5_src_ck"),
->>>          DT_CLK(NULL, "auxclk5_ck", "auxclk5_ck"),
->>>          DT_CLK(NULL, "auxclkreq5_ck", "auxclkreq5_ck"),
->>> -       DT_CLK("50000000.gpmc", "fck", "dummy_ck"),
->>>          DT_CLK("omap_i2c.1", "ick", "dummy_ck"),
->>>          DT_CLK("omap_i2c.2", "ick", "dummy_ck"),
->>>          DT_CLK("omap_i2c.3", "ick", "dummy_ck"),
->>> diff --git a/drivers/clk/ti/clk-54xx.c b/drivers/clk/ti/clk-54xx.c
->>> index 0ef9f58..08f3d1b 100644
->>> --- a/drivers/clk/ti/clk-54xx.c
->>> +++ b/drivers/clk/ti/clk-54xx.c
->>> @@ -182,7 +182,6 @@ static struct ti_dt_clk omap54xx_clks[] = {
->>>          DT_CLK(NULL, "auxclk3_src_ck", "auxclk3_src_ck"),
->>>          DT_CLK(NULL, "auxclk3_ck", "auxclk3_ck"),
->>>          DT_CLK(NULL, "auxclkreq3_ck", "auxclkreq3_ck"),
->>> -       DT_CLK(NULL, "gpmc_ck", "dummy_ck"),
->>>          DT_CLK("omap_i2c.1", "ick", "dummy_ck"),
->>>          DT_CLK("omap_i2c.2", "ick", "dummy_ck"),
->>>          DT_CLK("omap_i2c.3", "ick", "dummy_ck"),
->>> diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
->>> index 9977653..f7e4073 100644
->>> --- a/drivers/clk/ti/clk-7xx.c
->>> +++ b/drivers/clk/ti/clk-7xx.c
->>> @@ -262,7 +262,6 @@ static struct ti_dt_clk dra7xx_clks[] = {
->>>          DT_CLK(NULL, "vip1_gclk_mux", "vip1_gclk_mux"),
->>>          DT_CLK(NULL, "vip2_gclk_mux", "vip2_gclk_mux"),
->>>          DT_CLK(NULL, "vip3_gclk_mux", "vip3_gclk_mux"),
->>> -       DT_CLK(NULL, "gpmc_ck", "dummy_ck"),
->>>          DT_CLK("omap_i2c.1", "ick", "dummy_ck"),
->>>          DT_CLK("omap_i2c.2", "ick", "dummy_ck"),
->>>          DT_CLK("omap_i2c.3", "ick", "dummy_ck"),
->>> --
->>> 1.8.1.2
->>>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
