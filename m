@@ -1,47 +1,41 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 28 Feb 2014 18:28:39 +0100
-Subject: [PATCH 3/7] PCI: rcar: use new OF interrupt mapping when possible
+Date: Fri, 28 Feb 2014 18:28:38 +0100
+Subject: [PATCH 2/7] PCI: tegra: use new OF interrupt mapping when possible
 In-Reply-To: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
 References: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1393608523-17509-4-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1393608523-17509-3-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This is the recommended method of doing the IRQ
-mapping. Still fall back to the old method in order
-to not break the just submitted board files.
+mapping. For old devicetrees we fall back to the
+previous practice.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/pci/host/pci-rcar-gen2.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ drivers/pci/host/pci-tegra.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
-index ceec147baec3..3aa0c6311a42 100644
---- a/drivers/pci/host/pci-rcar-gen2.c
-+++ b/drivers/pci/host/pci-rcar-gen2.c
-@@ -15,6 +15,7 @@
- #include <linux/io.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/of_pci.h>
- #include <linux/pci.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
-@@ -160,8 +161,13 @@ static int __init rcar_pci_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index 330f7e3a32dd..083cf37ca047 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -639,10 +639,15 @@ static int tegra_pcie_setup(int nr, struct pci_sys_data *sys)
+ static int tegra_pcie_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
  {
- 	struct pci_sys_data *sys = dev->bus->sysdata;
- 	struct rcar_pci_priv *priv = sys->private_data;
+ 	struct tegra_pcie *pcie = sys_to_pcie(pdev->bus->sysdata);
 +	int irq;
-+
-+	irq = of_irq_parse_and_map_pci(dev, slot, pin);
-+	if (!irq)
-+		irq = priv->irq;
  
--	return priv->irq;
+ 	tegra_cpuidle_pcie_irqs_in_use();
+ 
+-	return pcie->irq;
++	irq = of_irq_parse_and_map_pci(pdev, slot, pin);
++	if (!irq)
++		irq = pcie->irq;
++
 +	return irq;
  }
  
- /* PCI host controller setup */
+ static void tegra_pcie_add_bus(struct pci_bus *bus)
 -- 
 1.8.5.3
