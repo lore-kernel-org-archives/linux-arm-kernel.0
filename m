@@ -1,49 +1,41 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 28 Feb 2014 13:57:36 +0100
-Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
-In-Reply-To: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <531087C0.1090501@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 28 Feb 2014 14:01:47 +0100
+Subject: [PATCH] ARM: ux500: skip GIC CPU and dist address checks
+Message-ID: <1393592507-2466-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/14 13:20, Tomi Valkeinen wrote:
-> This series is a re-send of
-> http://article.gmane.org/gmane.linux.drivers.devicetree/61739
->
-...
-> Shortly about the display components in the series, in the order of probable
-> public interest:
->
-> * Analog TV, DVI and HDMI Connectors represent a respective connector on the
->    board. They don't do much, but they do mark the end of the video pipeline (from
->    the board's pov), and they should also in the future offer ways to handle
->    things like the +5V pin on DVI and HDMI connector and HPD pin.
->
-> * MIPI DPI panel and MIPI DSI CM panels represent bindings for simple panels
->    using the respective video bus.
->
-> * Sony acx565akm is an SPI controlled panel using flatlink video bus.
->
-> * TFP410 is a DPI to DVI encoder.
->
-> * TPD12S015 is a HDMI companion chip, used on OMAP boards.
+The Ux500 is initializing its IRQs from the device tree and
+does not need to figure out any static base addresses anymore,
+this is just dead code so delete it.
 
-Tomi,
+Cc: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/cpu.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-Out of curiosity, will there be DT nodes for pull-up resistors soon,
-too? ;)
-
-Honestly, TPD12S015 is a level shifter, there is nothing in it that
-would justify a DT node nor a driver.
-
-Above you already note, that connector nodes should offer HPD in the
-future, but I guess the binding should represent that now already.
-I will be a DT stub anyway, the corresponding video sink driver will
-have to look it up.
-
-Looking through the bindings for DVI and HDMI, I guess HPD gpio is
-better kept in those nodes. From the relevant (DT) properties DVI and
-HDMI connectors are in no way different.
-
-Sebastian
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index d11ac4bf336c..db16b5a04ad5 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -52,17 +52,7 @@ void ux500_restart(enum reboot_mode mode, const char *cmd)
+ */
+ void __init ux500_init_irq(void)
+ {
+-	void __iomem *dist_base;
+-	void __iomem *cpu_base;
+-
+ 	gic_arch_extn.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
+-
+-	if (cpu_is_u8500_family() || cpu_is_ux540_family()) {
+-		dist_base = __io_address(U8500_GIC_DIST_BASE);
+-		cpu_base = __io_address(U8500_GIC_CPU_BASE);
+-	} else
+-		ux500_unknown_soc();
+-
+ 	irqchip_init();
+ 
+ 	/*
+-- 
+1.8.5.3
