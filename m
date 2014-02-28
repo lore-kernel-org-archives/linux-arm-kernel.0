@@ -1,78 +1,39 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 27 Feb 2014 19:38:57 -0800
-Subject: [PATCH] PM / devfreq: Rewrite devfreq_update_status() to fix multiple
- bugs
-Message-ID: <1393558737-24037-1-git-send-email-skannan@codeaurora.org>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Thu, 27 Feb 2014 21:41:38 -0600
+Subject: [PATCH v4 4/9] Input: pmic8xxx-keypad - Migrate to DT
+In-Reply-To: <1393552520-9068-5-git-send-email-sboyd@codeaurora.org>
+References: <1393552520-9068-1-git-send-email-sboyd@codeaurora.org>
+ <1393552520-9068-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140228034138.GD7308@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current devfreq_update_status() has the following bugs:
-- If previous frequency doesn't have a valid level, it does an out of bounds
-  access into the trans_table and causes memory corruption.
-- When the new frequency doesn't have a valid level, the time spent in the
-  new frequency is counted towards the next valid frequency switch instead of
-  being ignored.
-- The time spent on the previous frequency is added to the new frequency's
-  stats instead of the previous frequency's stats.
+Looks good, with the exception of one thing...
 
-This patch fixes all of this.
+On Thu, Feb 27, 2014 at 05:55:15PM -0800, Stephen Boyd wrote:
+> The driver is only supported on DT enabled platforms. Convert the
+> driver to DT so that it can probe properly.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/input/keyboard/pmic8xxx-keypad.c | 150 ++++++++++++++++++-------------
+> @@ -471,50 +514,27 @@ static void pmic8xxx_kp_close(struct input_dev *dev)
+>   */
+>  static int pmic8xxx_kp_probe(struct platform_device *pdev)
+>  {
+[..]
+> -	keymap_data = pdata->keymap_data;
+> -	if (!keymap_data) {
+> -		dev_err(&pdev->dev, "no keymap data supplied\n");
+> -		return -EINVAL;
+> -	}
+> +	repeat = !of_property_read_bool(pdev->dev.of_node,
+> +					"linux,input-no-autorepeat");
+> +	wakeup = !of_property_read_bool(pdev->dev.of_node,
+> +					"linux,keypad-wakeup");
 
-Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
----
- drivers/devfreq/devfreq.c | 31 ++++++++++++++++++++-----------
- 1 file changed, 20 insertions(+), 11 deletions(-)
+I don't think you mean to invert this.
 
-diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
-index a0b2f7e..2042ec3 100644
---- a/drivers/devfreq/devfreq.c
-+++ b/drivers/devfreq/devfreq.c
-@@ -91,26 +91,35 @@ static int devfreq_get_freq_level(struct devfreq *devfreq, unsigned long freq)
-  */
- static int devfreq_update_status(struct devfreq *devfreq, unsigned long freq)
- {
--	int lev, prev_lev;
-+	int lev, prev_lev, ret = 0;
- 	unsigned long cur_time;
- 
--	lev = devfreq_get_freq_level(devfreq, freq);
--	if (lev < 0)
--		return lev;
--
- 	cur_time = jiffies;
--	devfreq->time_in_state[lev] +=
-+
-+	prev_lev = devfreq_get_freq_level(devfreq, devfreq->previous_freq);
-+	if (prev_lev < 0) {
-+		ret = prev_lev;
-+		goto out;
-+	}
-+
-+	devfreq->time_in_state[prev_lev] +=
- 			 cur_time - devfreq->last_stat_updated;
--	if (freq != devfreq->previous_freq) {
--		prev_lev = devfreq_get_freq_level(devfreq,
--						devfreq->previous_freq);
-+
-+	lev = devfreq_get_freq_level(devfreq, freq);
-+	if (lev < 0) {
-+		ret = lev;
-+		goto out;
-+	}
-+
-+	if (lev != prev_lev) {
- 		devfreq->trans_table[(prev_lev *
- 				devfreq->profile->max_state) + lev]++;
- 		devfreq->total_trans++;
- 	}
--	devfreq->last_stat_updated = cur_time;
- 
--	return 0;
-+out:
-+	devfreq->last_stat_updated = cur_time;
-+	return ret;
- }
- 
- /**
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
 hosted by The Linux Foundation
