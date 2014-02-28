@@ -1,237 +1,97 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Thu, 27 Feb 2014 15:57:58 -0800
-Subject: [PATCH v6 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <1393545478-14908-1-git-send-email-sebastian.capella@linaro.org>
-References: <1393545478-14908-1-git-send-email-sebastian.capella@linaro.org>
-Message-ID: <1393545478-14908-3-git-send-email-sebastian.capella@linaro.org>
+From: agraf@suse.de (Alexander Graf)
+Date: Fri, 28 Feb 2014 08:05:15 +0800
+Subject: [RFC] ARM VM System Sepcification
+In-Reply-To: <6039706.L1ZWvgjHF0@wuerfel>
+References: <20140226183454.GA14639@cbox> <11174980.YJ21cfsHoG@wuerfel>
+ <5AA88E43-1A40-4409-9A56-334988483843@suse.de> <6039706.L1ZWvgjHF0@wuerfel>
+Message-ID: <CB7DBE07-42BD-4588-AC9E-CB0BF95A811A@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russ Dill <Russ.Dill@ti.com>
 
-Enable hibernation for ARM architectures and provide ARM
-architecture specific calls used during hibernation.
 
-The swsusp hibernation framework depends on the
-platform first having functional suspend/resume.
+> Am 28.02.2014 um 03:56 schrieb Arnd Bergmann <arnd@arndb.de>:
+> 
+>> On Thursday 27 February 2014 22:24:13 Alexander Graf wrote:
+>> 
+>> If you want to assign a platform device, you need to generate a respective
+>> hardware description (fdt/dsdt) chunk in the hypervisor. You can't take
+>> the host's description - it's too tightly coupled to the overall host layout.
+> 
+> But at that point, you need hardware specific drivers in both the hypervisor
+> and in the guest OS.
 
-Then, in order to enable hibernation on a given platform, a
-platform_hibernation_ops structure may need to be registered with
-the system in order to save/restore any SoC-specific / cpu specific
-state needing (re)init over a suspend-to-disk/resume-from-disk cycle.
+In our case, you need hardware specific drivers in QEMU and the guest, correct.
 
-For example:
+> When you have that, why do you still care about a
+> system specification? 
 
-     - "secure" SoCs that have different sets of control registers
-       and/or different CR reg access patterns.
+Because I don't want to go back to the system level definition. To me a peripheral is a peripheral - regardless of whether it is on a platform bus or a PCI bus. I want to leverage common ground and only add the few pieces that diverge from it.
 
-     - SoCs with L2 caches as the activation sequence there is
-       SoC-dependent; a full off-on cycle for L2 is not done
-       by the hibernation support code.
+> 
+> Going back to the previous argument, since the hypervisor has to make up the
+> description for the platform device itself, it won't matter whether the host
+> is booted using DT or ACPI: the description that the hypervisor makes up for
+> the guest has to match what the hypervisor uses to describe the rest of the
+> guest environment, which is independent of what the host uses.
 
-     - SoCs requiring steps on wakeup _before_ the "generic" parts
-       done by cpu_suspend / cpu_resume can work correctly.
+I agree 100%. This spec should be completely independent of the host.
 
-     - SoCs having persistent state which is maintained during suspend
-       and resume, but will be lost during the power off cycle after
-       suspend-to-disk.
+The reason I brought up the host is that if you want to migrate an OS from physical to virtual, you may need to pass through devices to make this work. If your host driver developers only ever worked with ACPI, there's a good chance the drivers won't work in a pure dt environment.
 
-This is a rebase/rework of Frank Hofmann's v5 hibernation patchset.
+Brw, the same argument applies the other way around as well. I don't believe we will get around with generating and mandating a single machibe description environment.
 
-Acked-by: Russ Dill <Russ.Dill@ti.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Signed-off-by: Sebastian Capella <sebastian.capella@linaro.org>
-Acked-by: Pavel Machek <pavel@ucw.cz>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Len Brown <len.brown@intel.com>
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Jonathan Austin <jonathan.austin@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: "Uwe Kleine-K?nig" <u.kleine-koenig@pengutronix.de>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm/include/asm/memory.h |    1 +
- arch/arm/kernel/Makefile      |    1 +
- arch/arm/kernel/hibernate.c   |  113 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mm/Kconfig           |    5 ++
- include/linux/suspend.h       |    2 +
- 5 files changed, 122 insertions(+)
- create mode 100644 arch/arm/kernel/hibernate.c
+> 
+>> Imagine you get an AArch64 notebook with Windows on it. You want to run
+>> Linux there, so your host needs to understand ACPI. Now you want to run
+>> a Windows guest inside a VM, so you need ACPI in there again.
+> 
+> And you think that Windows is going to support a VM system specification
+> we are writing here? Booting Windows RT in a virtual machine is certainly
+> an interesting use case, but I think we will have to emulate a platform
+> that WinRT supports then, rather than expect it to run on ours.
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 8756e4b..1079ea8 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -291,6 +291,7 @@ static inline void *phys_to_virt(phys_addr_t x)
-  */
- #define __pa(x)			__virt_to_phys((unsigned long)(x))
- #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
-+#define __pa_symbol(x)		__pa(RELOC_HIDE((unsigned long)(x), 0))
- #define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
- 
- extern phys_addr_t (*arch_virt_to_idmap)(unsigned long x);
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index a30fc9b..8afa848 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -39,6 +39,7 @@ obj-$(CONFIG_ARTHUR)		+= arthur.o
- obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
- obj-$(CONFIG_PCI)		+= bios32.o isa.o
- obj-$(CONFIG_ARM_CPU_SUSPEND)	+= sleep.o suspend.o
-+obj-$(CONFIG_HIBERNATION)	+= hibernate.o
- obj-$(CONFIG_SMP)		+= smp.o
- ifdef CONFIG_MMU
- obj-$(CONFIG_SMP)		+= smp_tlb.o
-diff --git a/arch/arm/kernel/hibernate.c b/arch/arm/kernel/hibernate.c
-new file mode 100644
-index 0000000..a41e0e3
---- /dev/null
-+++ b/arch/arm/kernel/hibernate.c
-@@ -0,0 +1,113 @@
-+/*
-+ * Hibernation support specific for ARM
-+ *
-+ * Derived from work on ARM hibernation support by:
-+ *
-+ * Ubuntu project, hibernation support for mach-dove
-+ * Copyright (C) 2010 Nokia Corporation (Hiroshi Doyu)
-+ * Copyright (C) 2010 Texas Instruments, Inc. (Teerth Reddy et al.)
-+ *  https://lkml.org/lkml/2010/6/18/4
-+ *  https://lists.linux-foundation.org/pipermail/linux-pm/2010-June/027422.html
-+ *  https://patchwork.kernel.org/patch/96442/
-+ *
-+ * Copyright (C) 2006 Rafael J. Wysocki <rjw@sisk.pl>
-+ *
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
-+
-+#include <linux/mm.h>
-+#include <linux/suspend.h>
-+#include <asm/tlbflush.h>
-+#include <asm/cacheflush.h>
-+#include <asm/system_misc.h>
-+#include <asm/idmap.h>
-+#include <asm/suspend.h>
-+
-+extern const void __nosave_begin, __nosave_end;
-+
-+int pfn_is_nosave(unsigned long pfn)
-+{
-+	unsigned long nosave_begin_pfn =
-+			__pa_symbol(&__nosave_begin) >> PAGE_SHIFT;
-+	unsigned long nosave_end_pfn =
-+			PAGE_ALIGN(__pa_symbol(&__nosave_end)) >> PAGE_SHIFT;
-+
-+	return (pfn >= nosave_begin_pfn) && (pfn < nosave_end_pfn);
-+}
-+
-+void notrace save_processor_state(void)
-+{
-+	WARN_ON(num_online_cpus() != 1);
-+	local_fiq_disable();
-+}
-+
-+void notrace restore_processor_state(void)
-+{
-+	local_fiq_enable();
-+}
-+
-+/*
-+ * Snapshot kernel memory and reset the system.
-+ *
-+ * swsusp_save() is executed in the suspend finisher so that the CPU
-+ * context pointer and memory are part of the saved image, which is
-+ * required by the resume kernel image to restart execution from
-+ * swsusp_arch_suspend().
-+ *
-+ * soft_restart is not technically needed, but is used to get success
-+ * returned from cpu_suspend.
-+ *
-+ * When soft reboot completes, the hibernation snapshot is written out.
-+ */
-+static int notrace arch_save_image(unsigned long unused)
-+{
-+	int ret;
-+
-+	ret = swsusp_save();
-+	if (ret == 0)
-+		soft_restart(virt_to_phys(cpu_resume));
-+	return ret;
-+}
-+
-+/*
-+ * Save the current CPU state before suspend / poweroff.
-+ */
-+int notrace swsusp_arch_suspend(void)
-+{
-+	return cpu_suspend(0, arch_save_image);
-+}
-+
-+/*
-+ * The framework loads the hibernation image into a linked list anchored
-+ *@restore_pblist, for swsusp_arch_resume() to copy back to the proper
-+ * destinations.
-+ *
-+ * To make this work if resume is triggered from initramfs, the
-+ * pagetables need to be switched to allow writes to kernel mem.
-+ */
-+static void notrace arch_restore_image(void *unused)
-+{
-+	struct pbe *pbe;
-+
-+	cpu_switch_mm(idmap_pgd, &init_mm);
-+	for (pbe = restore_pblist; pbe; pbe = pbe->next)
-+		copy_page(pbe->orig_address, pbe->address);
-+
-+	soft_restart(virt_to_phys(cpu_resume));
-+}
-+
-+static u8 resume_stack[PAGE_SIZE/2] __nosavedata;
-+
-+/*
-+ * Resume from the hibernation image.
-+ * Due to the kernel heap / data restore, stack contents change underneath
-+ * and that would make function calls impossible; switch to a temporary
-+ * stack within the nosave region to avoid that problem.
-+ */
-+int swsusp_arch_resume(void)
-+{
-+	extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-+	call_with_stack(arch_restore_image, 0,
-+		resume_stack + sizeof(resume_stack));
-+	return 0;
-+}
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 1f8fed9..83707702 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -611,6 +611,11 @@ config CPU_USE_DOMAINS
- config IO_36
- 	bool
- 
-+config ARCH_HIBERNATION_POSSIBLE
-+	bool
-+	depends on MMU
-+	default y if CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || CPU_XSCALE || CPU_XSC3 || CPU_V6 || CPU_V6K || CPU_V7
-+
- comment "Processor Features"
- 
- config ARM_LPAE
-diff --git a/include/linux/suspend.h b/include/linux/suspend.h
-index f73cabf..38bbf95 100644
---- a/include/linux/suspend.h
-+++ b/include/linux/suspend.h
-@@ -320,6 +320,8 @@ extern unsigned long get_safe_page(gfp_t gfp_mask);
- extern void hibernation_set_ops(const struct platform_hibernation_ops *ops);
- extern int hibernate(void);
- extern bool system_entering_hibernation(void);
-+asmlinkage int swsusp_save(void);
-+extern struct pbe *restore_pblist;
- #else /* CONFIG_HIBERNATION */
- static inline void register_nosave_region(unsigned long b, unsigned long e) {}
- static inline void register_nosave_region_late(unsigned long b, unsigned long e) {}
--- 
-1.7.9.5
+Point taken :). Though it is a real shame we are in that situation in tge first place. X86 makes life a lot easier here.
+
+> 
+>> Replace Windows by "Linux with custom drivers" and you're in the same
+>> situation even when you neglect Windows. Reality will be that we will
+>> have fdt and acpi based systems.
+> 
+> We will however want to boot all sorts of guests in a standardized
+> virtual environment:
+> 
+> * 32 bit Linux (since some distros don't support biarch or multiarch
+>  on arm64) for running applications that are either binary-only
+>  or not 64-bit safe.
+> * 32-bit Android
+> * big-endian Linux for running applications that are not endian-clean
+>  (typically network stuff ported from powerpc or mipseb.
+> * OS/v guests
+> * NOMMU Linux
+> * BSD based OSs
+> * QNX
+> * random other RTOSs
+> 
+> Most of these will not work with ACPI, or at least not in 32-bit mode.
+> 64-bit Linux will obviously support both DT (always)
+
+Unfortunately not
+
+> and ACPI (optionally),
+> depending on the platform, but for a specification like this, I think
+> it's much easier to support fewer options, to make it easier for other
+> guest OSs to ensure they actually run on any compliant hypervisor.
+
+You're forgetting a few pretty important cases here:
+
+* Enterprise grade Linux distribution that only supports ACPI
+* Maybe WinRT if we can convince MS to use it
+* Non-Linux with x86/ia64 heritage and thus ACPI support
+
+If we want to run those, we need to expose ACPI tables.
+
+Again, I think the only reasonable thing to do is to implement and expose both. That situation sucks, but we got into it ourselves ;).
+
+
+Alex
