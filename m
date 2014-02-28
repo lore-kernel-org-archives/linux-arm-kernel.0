@@ -1,64 +1,103 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 28 Feb 2014 14:56:48 +0100
-Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
-In-Reply-To: <1393595264.3802.39.camel@paszta.hi.pengutronix.de>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <531087C0.1090501@gmail.com>
- <1393595264.3802.39.camel@paszta.hi.pengutronix.de>
-Message-ID: <531095A0.5040307@gmail.com>
+From: joshc@codeaurora.org (Josh Cartwright)
+Date: Fri, 28 Feb 2014 07:55:27 -0600
+Subject: [PATCH v4 7/9] devicetree: bindings: Document PM8921/8058 keypads
+In-Reply-To: <1393552520-9068-8-git-send-email-sboyd@codeaurora.org>
+References: <1393552520-9068-1-git-send-email-sboyd@codeaurora.org>
+ <1393552520-9068-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20140228135527.GF7308@joshc.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/14 14:47, Philipp Zabel wrote:
-> Am Freitag, den 28.02.2014, 13:57 +0100 schrieb Sebastian Hesselbarth:
->> On 02/28/14 13:20, Tomi Valkeinen wrote:
->>> This series is a re-send of
->>> http://article.gmane.org/gmane.linux.drivers.devicetree/61739
->>>
->> ...
->>> Shortly about the display components in the series, in the order of probable
->>> public interest:
->>>
->>> * Analog TV, DVI and HDMI Connectors represent a respective connector on the
->>>     board. They don't do much, but they do mark the end of the video pipeline (from
->>>     the board's pov), and they should also in the future offer ways to handle
->>>     things like the +5V pin on DVI and HDMI connector and HPD pin.
->>>
->>> * MIPI DPI panel and MIPI DSI CM panels represent bindings for simple panels
->>>     using the respective video bus.
->>>
->>> * Sony acx565akm is an SPI controlled panel using flatlink video bus.
->>>
->>> * TFP410 is a DPI to DVI encoder.
->>>
->>> * TPD12S015 is a HDMI companion chip, used on OMAP boards.
->>
->> Tomi,
->>
->> Out of curiosity, will there be DT nodes for pull-up resistors soon,
->> too? ;)
->>
->> Honestly, TPD12S015 is a level shifter, there is nothing in it that
->> would justify a DT node nor a driver.
->>
->> Above you already note, that connector nodes should offer HPD in the
->> future, but I guess the binding should represent that now already.
->> I will be a DT stub anyway, the corresponding video sink driver will
->> have to look it up.
->>
->> Looking through the bindings for DVI and HDMI, I guess HPD gpio is
->> better kept in those nodes. From the relevant (DT) properties DVI and
->> HDMI connectors are in no way different.
->
-> I like the idea of adding actual connector nodes to the board device
-> trees. A TV encoder driver for example could this way detect from the
-> device tree whether it is connected to a VGA, Composite, or S-Video
-> connector (or maybe to both Composite and S-Video connectors at the same
-> time).
+On Thu, Feb 27, 2014 at 05:55:18PM -0800, Stephen Boyd wrote:
+> Document the keypad device found on PM8921 and PM8058 PMICs.
+[..]
+> +++ b/Documentation/devicetree/bindings/input/qcom,pm8xxx-keypad.txt
+> @@ -0,0 +1,72 @@
+> +Qualcomm PM8xxx PMIC Keypad
+> +
+> +PROPERTIES
+> +
+> +- compatible:
+> +	Usage: required
+> +	Value type: <string>
+> +	Definition: must be one of:
+> +		    "qcom,pm8058-keypad"
+> +		    "qcom,pm8921-keypad"
+> +- interrupts:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: the first interrupt specifies the key sense interrupt
+> +		    and the second interrupt specifies the key stuck interrupt.
+> +		    The format of the specifier is defined by the binding
+> +		    document describing the node's interrupt parent.
+> +
+> +- linux,keymap:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: the linux keymap. More information can be found in
+> +		    input/matrix-keymap.txt.
+> +
+> +- keypad,num-rows:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: number of rows in the keymap. More information can be found
+> +		    in input/matrix-keymap.txt.
+> +
+> +- keypad,num-columns:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: number of columns in the keymap. More information can be
+> +		    found in input/matrix-keymap.txt.
+> +
+> +- debounce:
+> +	Usage: optional
+> +	Value type: <u32>
+> +	Definition: time in microseconds that key must be pressed or release
+> +		    for key sense interrupt to trigger.
+> +
+> +- scan-delay:
+> +	Usage: optional
+> +	Value type: <u32>
+> +	Definition: time in microseconds to pause between successive scans
+> +		    of the matrix array.
+> +
+> +- row-hold:
+> +	Usage: optional
+> +	Value type: <u32>
+> +	Definition: time in nanoseconds to pause between scans of each row in
+> +		    the matrix array.
 
-I agree that different connectors help providing a better
-user-experienced view of board layout. But I doubt that besides the
-differentiation (HDMI, DVI, VGA, SVideo, ...) and the endpoint there
-should be anything more in that node.
+- linux,wakeup?
+- linux,no-auto-repeat?
 
-Sebastian
+> +
+> +EXAMPLE
+> +
+> +	keypad {
+> +		compatible = "qcom,pm8921-keypad";
+> +		interrupt-parent = <&pmicintc>;
+> +		interrupts = <74 1>, <75 1>;
+> +		linux,keymap = <
+> +			MATRIX_KEY(0, 0, KEY_VOLUMEUP)
+> +			MATRIX_KEY(0, 1, KEY_VOLUMEDOWN)
+> +			MATRIX_KEY(0, 2, KEY_CAMERA_FOCUS)
+> +			MATRIX_KEY(0, 3, KEY_CAMERA)
+> +			>;
+> +		keypad,num-rows = <1>;
+> +		keypad,num-columns = <5>;
+> +		debounce = <15>;
+> +		scan-delay = <32>;
+> +		row-hold = <91500>;
+> +	};
+
+It odd to me that these newly created bindings don't have 'reg'
+properties, even though the device clearly has a register region.
+
+I suppose it makes sense from a "port over from platform data to DT"
+perspective, as these drivers have just assumed the location of their
+registers to be fixed; however I suspect things will need to be changed
+if/when we hope to share these drivers with pm8841/pm8941 and beyond...
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
