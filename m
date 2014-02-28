@@ -1,69 +1,75 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 28 Feb 2014 15:14:04 +0200
-Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
-In-Reply-To: <531087C0.1090501@gmail.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <531087C0.1090501@gmail.com>
-Message-ID: <53108B9C.5000006@ti.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 28 Feb 2014 14:15:27 +0100
+Subject: [PATCH v4] can: xilinx CAN controller support.
+In-Reply-To: <4902b8d8-139a-4fd0-9e6e-a30ce7e6683b@CH1EHSMHS019.ehs.local>
+References: <74d607e9-ac9c-4a9b-ac49-e84ae49d20c2@TX2EHSMHS031.ehs.local>
+ <530D0A9C.5090402@pengutronix.de>
+ <cd00fb2d-c8a7-423d-8aa0-2b413e9ac101@CO9EHSMHS017.ehs.local>
+ <530DEA7C.6010609@pengutronix.de>
+ <678ca296-8687-4e7c-9014-ae69d886a068@CO9EHSMHS014.ehs.local>
+ <530E0B92.5010903@pengutronix.de>
+ <2e3bfd38-37d5-4102-af79-821196c6c732@CH1EHSMHS006.ehs.local>
+ <53104995.4010305@pengutronix.de>
+ <48409965-e214-43b7-8b6a-08bf075707e1@CO9EHSMHS001.ehs.local>
+ <53108798.7090902@pengutronix.de>
+ <4902b8d8-139a-4fd0-9e6e-a30ce7e6683b@CH1EHSMHS019.ehs.local>
+Message-ID: <53108BEF.1020308@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/14 14:57, Sebastian Hesselbarth wrote:
+On 02/28/2014 02:07 PM, Appana Durga Kedareswara Rao wrote:
+>>>> What happens if the interrupt handler is delayed? For example in a RT
+>>>> enabled system the interrupt handler runs as a thread. There might be
+>>>> other threads with higher priority. The hardware will probably send
+>>>> all CAN frames in the FIFO, so you want to reduce the overhead and
+>>>> loop in the tx complete handler.
+>>>>
+>>> Yes I agree with your comment.
+>>> It will be good to have a loop in the Tx interrupt handler I am
+>>> modifying the Tx interrupt handler like below.
+>>>
+>>> static void xcan_tx_interrupt(struct net_device *ndev, u32 isr) {
+>>>         struct xcan_priv *priv = netdev_priv(ndev);
+>>>         struct net_device_stats *stats = &ndev->stats;
+>>>
+>>>         while (priv->tx_head - priv->tx_tail > 0) {
+>>>                 if (!(isr & XCAN_IXR_TXOK_MASK)) {
+>>>                         break;
+>>>                 }
+>>>                 can_get_echo_skb(ndev, priv->tx_tail %
+>>>                                         priv->xcan_echo_skb_max_tx);
+>>>                 priv->tx_tail++;
+>>>                 stats->tx_packets++;
+>>>                 can_led_event(ndev, CAN_LED_EVENT_TX);
 
-> Out of curiosity, will there be DT nodes for pull-up resistors soon,
-> too? ;)
+Probably first clear the interrupt, because you've just handled it, then
+check if it's still present. The question is, do you have to clear the
+IRQ for each transmitted frame, or does one clean of the interrupt clear
+the bit for more then one transmitted frame?
 
-If they don't work automatically, yes, we need DT nodes and drivers for
-them.
+>>>                 isr = priv->read_reg(priv, XCAN_ISR_OFFSET);
+>             --> clear Tx OK interrupt.
 
-> Honestly, TPD12S015 is a level shifter, there is nothing in it that
-> would justify a DT node nor a driver.
+> 
+>>>         }
+>>>         netif_wake_queue(ndev);
+>>> }
+>>>
+>>> Are you Ok with this?
 
-TPD requires a power. Who turns that on? It also has two GPIOs, LS_OE
-and CT_CP_HPD, which need to be controlled based on what the user wants
-and the state of the HPD line. Who controls those?
+Were getting there :)
 
-> Above you already note, that connector nodes should offer HPD in the
-> future, but I guess the binding should represent that now already.
-
-I think it can be added when somebody uses it. I don't see why that
-would cause trouble later to those that don't use it.
-
-> I will be a DT stub anyway, the corresponding video sink driver will
-> have to look it up.
-
-I'm not sure what you mean with that. Yes, it's not the most complex DT
-nodes out there.
-
-> Looking through the bindings for DVI and HDMI, I guess HPD gpio is
-> better kept in those nodes. From the relevant (DT) properties DVI and
-> HDMI connectors are in no way different.
-
-Well, I think the HPD gpio should be where it's most logical to have it.
-
-I mean, you could have a setup where you have the SoC HDMI encoder and
-and the HDMI connector, and the HPD pin goes directly to the HDMI
-encoder, which has HW support for it. In that case, the HDMI encoder
-node should contain the HPD, and the HDMI encoder should handle it.
-
-Or, your HDMI encoder could not have any kind of support for HPD. In
-that case you could have the HDMI connector driver handle the hotplug
-event. You could of course make the HDMI encoder driver handle the HPD
-gpio, but I usually try to have the driver handle the hardware device in
-question.
-
-In OMAP's case, we have the TPD chip between the HDMI encoder and the
-connector, and the logical place to handle HPD GPIO in that case is the
-TPD driver, as that's where the HPD is connected to and the TPD needs to
-be configured according to the state of the HPD.
-
- Tomi
-
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 901 bytes
+Size: 242 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/60e99aeb/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/6a02cf77/attachment-0001.sig>
