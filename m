@@ -1,26 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Feb 2014 16:26:24 +0100
-Subject: [GIT PULL] qcom DT changes for v3.15
-In-Reply-To: <alpine.DEB.2.00.1402201104120.12882@galak-ubuntu.qualcomm.com>
-References: <alpine.DEB.2.00.1402201104120.12882@galak-ubuntu.qualcomm.com>
-Message-ID: <201402281626.25267.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 28 Feb 2014 15:27:10 +0000
+Subject: [PATCH v2 2/3] arm64: Extend the PCI I/O space to 16MB
+In-Reply-To: <1393506599-11561-3-git-send-email-Liviu.Dudau@arm.com>
+References: <1393506599-11561-1-git-send-email-Liviu.Dudau@arm.com>
+ <1393506599-11561-3-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20140228152710.GC13970@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 February 2014, Kumar Gala wrote:
-> The following changes since commit cf1e8f0cd665e2a9966d2bee4e11ecc0938ff166:
+On Thu, Feb 27, 2014 at 01:09:58PM +0000, Liviu Dudau wrote:
+> From: Catalin Marinas <catalin.marinas@arm.com>
 > 
->    ARM: qcom: Rename various msm prefixed functions to qcom (2014-02-06 16:20:41 -0600)
+> The patch moves the PCI I/O space (currently at 64K) before the
+> earlyprintk mapping and extends it to 16MB.
 > 
-> are available in the git repository at:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-dt-for-3.15
-> 
-> for you to fetch changes up to 5a229c2a59e5d42a7d670f4639aaedb272146ef1:
-> 
->    ARM: dts: qcom-msm8960-cdp: Add RNG device tree node (2014-02-20 10:02:22 -0600)
-> 
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Merged into next/dt
+I'll push this into mainline for 3.15, no need to carry it.
 
-	Arnd
+-- 
+Catalin
