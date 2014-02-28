@@ -1,66 +1,43 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 27 Feb 2014 19:27:03 -0500
-Subject: [PATCH] dma: of: Move the functions under CONFIG_OF_DMA instead
- of CONFIG_OF
-In-Reply-To: <1393546850-13907-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1393546850-13907-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <530FD7D7.9000104@ti.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 27 Feb 2014 17:19:51 -0800
+Subject: [RFC PATCH 0/3] PCI: imx6: fixup for add-in card IRQ mismapping
+Message-ID: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 27 February 2014 07:20 PM, Santosh Shilimkar wrote:
-> The of-dma.c is compiled out with !CONFIG_OF_DMA but the functions in
-> the header are kept under CONFIG_OF. Move them under CONFIG_OF_DMA
-> to avoid build errors with CONFIG_OFF && !CONFIG_OF_DMA
-> 
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  include/linux/of_dma.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
-> index 0322363..3d2beab 100644
-> --- a/include/linux/of_dma.h
-> +++ b/include/linux/of_dma.h
-> @@ -31,7 +31,7 @@ struct of_dma_filter_info {
->  	dma_filter_fn	filter_fn;
->  };
->  
-> -#ifdef CONFIG_OF
-> +#ifdef CONFIG_OF_DMA
-Sorry.. Typo here.. Should have been CONFIG_DMA_OF
+An add-in card used on the Ventana IMX6 SoC based family of boards has a
+TI XIO2001 PCIe-to-PCI bridge where the INTA/B/C/D mappings between the
+bridge and the four mini-PCI slots are swapped (INTD/C/B/A).
 
->From 31242461b6ba5e8c0c5ee26e394fa4cab61e3aa1 Mon Sep 17 00:00:00 2001
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Date: Thu, 27 Feb 2014 19:13:36 -0500
-Subject: [PATCH] dma: of: Move the functions under CONFIG_DMA_OF instead of
- CONFIG_OF
+This series adds legacy PCI interrupt mapping to support PCI bridges on
+IMX6 PCIe host controllers, adds the ability to use a host-specific
+custom swizzle function, then uses that to fix the IRQ mapping.
 
-The of-dma.c is compiled out with !CONFIG_DMA_OF but the functions in
-the header are kept under CONFIG_OF. Move them under CONFIG_OF_DMA
-to avoid build errors with CONFIG_OFF && !CONFIG_DMA_OF
+I'm hoping this is the right way to perform such a workaround - please provide
+feedback if not.  Patch1 will likely collide with the owrk Lucas is doing
+with device-tree bindings and MSI support.  I'm happy to re-base if/when
+needed.
 
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Richard Zhu <r65037@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Sean Cross <xobs@kosagi.com>
+Cc: Jingoo Han <jg1.han@samsung.com>
 ---
- include/linux/of_dma.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Tim Harvey (3):
+  PCI: designware: add legacy PCI interrupt mapping
+  PCI: designware: add ability for custom swizzle
+  PCI: imx6: ventana: fixup for IRQ mismapping
 
-diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
-index 0322363..0ea24f4 100644
---- a/include/linux/of_dma.h
-+++ b/include/linux/of_dma.h
-@@ -31,7 +31,7 @@ struct of_dma_filter_info {
- 	dma_filter_fn	filter_fn;
- };
- 
--#ifdef CONFIG_OF
-+#ifdef CONFIG_DMA_OF
- extern int of_dma_controller_register(struct device_node *np,
- 		struct dma_chan *(*of_dma_xlate)
- 		(struct of_phandle_args *, struct of_dma *),
+ arch/arm/boot/dts/imx6qdl.dtsi     |  2 +-
+ drivers/pci/host/pci-exynos.c      |  7 ++++--
+ drivers/pci/host/pci-imx6.c        | 47 ++++++++++++++++++++++++++++++++++----
+ drivers/pci/host/pcie-designware.c | 11 ++++++++-
+ drivers/pci/host/pcie-designware.h |  3 ++-
+ include/linux/pci_ids.h            |  1 +
+ 6 files changed, 62 insertions(+), 9 deletions(-)
+
 -- 
-1.7.9.5
+1.8.3.2
