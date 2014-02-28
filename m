@@ -1,28 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Feb 2014 16:21:14 +0000
-Subject: [PATCH 3/5] documentation/iommu: update description of ARM
- System MMU binding
-In-Reply-To: <CAOZdJXUfAygZqw9s5qOECLjyo=B0VaD29iesbWzDeMbbyVTgqg@mail.gmail.com>
-References: <1393002992-24561-1-git-send-email-will.deacon@arm.com>
- <1393002992-24561-4-git-send-email-will.deacon@arm.com>
- <CAOZdJXUfAygZqw9s5qOECLjyo=B0VaD29iesbWzDeMbbyVTgqg@mail.gmail.com>
-Message-ID: <20140228162114.GA30996@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Feb 2014 17:22:59 +0100
+Subject: [GIT PULL] kconfig clean-up and mach-virt removal for 3.15
+In-Reply-To: <CAL_Jsq+vd6XAgj6FawKX4p8Yx0R308mxMxVfzgtNgcBTecx-kg@mail.gmail.com>
+References: <CAL_Jsq+vd6XAgj6FawKX4p8Yx0R308mxMxVfzgtNgcBTecx-kg@mail.gmail.com>
+Message-ID: <201402281723.00308.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 04:17:43PM +0000, Timur Tabi wrote:
-> On Fri, Feb 21, 2014 at 11:16 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >
-> > +- calxeda,smmu-secure-config-access : Enable proper handling of buggy
-> > +                  implementations that always use secure access to
-> > +                  SMMU configuration registers. In this case non-secure
-> > +                 aliases of secure registers have to be used during
-> > +                 SMMU configuration.
-> 
-> I'm confused.  Why does this property have a "calxeda" prefix?  How is
-> it a Calxeda-specific property?
+On Thursday 20 February 2014, Rob Herring wrote:
+-------------------------------------------
+> - Remove common kconfig options required by multi-platform builds out
+> of individual platforms as they are redundant.
+> - Make SMP, CACHE_L2X0 and GPIO config options user visible on
+> multi-platform builds as most platforms enable these options and all
+> platforms can run with them enabled.
+> - Make multi-platform v6 default to more optimal v6k rather than v6
+> - Remove the last bit of mach-virt and convert it to just a kconfig
+> option.
 
-Because they wired up their SMMU backwards. It's basically an
-implementation-specific erratum workaround.
+Merged into next/cleanup. Very much appreciated changes!
 
-Will
+Thanks,
+
+	Arnd
