@@ -1,94 +1,97 @@
-From: sebastian.capella@linaro.org (Sebastian Capella)
-Date: Fri, 28 Feb 2014 15:38:54 -0800
-Subject: [PATCH v6 2/2] ARM hibernation / suspend-to-disk
-In-Reply-To: <20140228224933.GA11040@e102568-lin.cambridge.arm.com>
-References: <1393545478-14908-1-git-send-email-sebastian.capella@linaro.org>
- <1393545478-14908-3-git-send-email-sebastian.capella@linaro.org>
- <20140228095022.GA25090@e102568-lin.cambridge.arm.com>
- <20140228201557.29118.62126@capellas-linux>
- <20140228224933.GA11040@e102568-lin.cambridge.arm.com>
-Message-ID: <53111e0f.a50a430a.6ef6.ffff99ae@mx.google.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 28 Feb 2014 15:41:58 -0800
+Subject: [GIT PULL] ARM: OMAP2+: PRCM/hwmod/clock non-regression fixes
+ and optimizations for v3.15
+In-Reply-To: <alpine.DEB.2.02.1402282039400.453@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1402282039400.453@utopia.booyaka.com>
+Message-ID: <20140228234158.GA13624@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lorenzo Pieralisi (2014-02-28 14:49:33)
-> On Fri, Feb 28, 2014 at 08:15:57PM +0000, Sebastian Capella wrote:
+* Paul Walmsley <paul@pwsan.com> [140228 12:44]:
+> Hi Tony,
 > 
-> [...]
+> The following changes since commit 38dbfb59d1175ef458d006556061adeaa8751b72:
 > 
-> > > > +
-> > > > +/*
-> > > > + * The framework loads the hibernation image into a linked list anchored
-> > > > + * at restore_pblist, for swsusp_arch_resume() to copy back to the proper
-> > > > + * destinations.
-> > > > + *
-> > > > + * To make this work if resume is triggered from initramfs, the
-> > > > + * pagetables need to be switched to allow writes to kernel mem.
-> > > > + */
-> > > 
-> > > Comment above needs updating. We are switching page tables to a set of
-> > > page tables that are certain to live at the same location in the older
-> > > kernel, that's the only reason, as we discussed. soft_restart will make
-> > > sure (again) to switch to 1:1 page tables so that we can call cpu_resume
-> > > with the MMU off.
-> > 
-> > How does this look?
-> > 
-> > The framework loads as much of the hibernation image to final physical
-> > pages as possible.  Any pages that were in use, will need to be restored
-> > prior to the soft_restart.  The pages to restore are maintained in
-> > the list anchored at restore_pblist.  At this point, we can swap the
-> > pages to their final location.  We must switch the mapping to 1:1 to
-> > ensure that when we overwrite the page table physical pages we're using
-> > a known physical location (idmap_pgd) with known contents.
+>   Linus 3.14-rc1 (2014-02-02 16:42:13 -0800)
 > 
-> It is ok, a tad too verbose. All I care about is a comment describing
-> what's really needed, the existing one was confusing and wrong.
-
-Maybe more like: 
-
-Restore physical pages that were in use while loading hibernation image.
-Use idmap_pgd so our page tables use the same physical address as the
-hibernation image.  Will be overwriten with the same contents.
-
-> > > > +/*
-> > > > + * Resume from the hibernation image.
-> > > > + * Due to the kernel heap / data restore, stack contents change underneath
-> > > > + * and that would make function calls impossible; switch to a temporary
-> > > > + * stack within the nosave region to avoid that problem.
-> > > > + */
-> > > > +int swsusp_arch_resume(void)
-> > > > +{
-> > > > +     extern void call_with_stack(void (*fn)(void *), void *arg, void *sp);
-> > > > +     call_with_stack(arch_restore_image, 0,
-> > > > +             resume_stack + sizeof(resume_stack));
-> > > 
-> > > This does not guarantee your stack is 8-byte aligned, that's not AAPCS
-> > > compliant and might buy you trouble.
-> > > 
-> > > Either you align the stack or you align the pointer you are passing.
-> > > 
-> > > Please have a look at kernel/process.c
-> > 
-> > I've added this for now, do you see any issues?
-> > 
-> > -static u8 resume_stack[PAGE_SIZE/2] __nosavedata;
-> > +static u64 resume_stack[PAGE_SIZE/2/sizeof(u64)] __nosavedata;
-> > -               resume_stack + sizeof(resume_stack));
-> > +               resume_stack + ARRAY_SIZE(resume_stack));
+> are available in the git repository at:
 > 
-> I do not see why the stack depends on the PAGE_SIZE. I would be surprised
-> if you need more than a few bytes (given that soft_restart switches stack
-> again...), go through it with a debugger, it is easy to check the stack
-> usage and allow for some extra buffer (but half a page is not needed).
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v3.15/omap-hwmod-clk-prcm-a
+> 
+> for you to fetch changes up to 110e884d829448e24959f424b31be5bc75bcca6e:
+> 
+>   ARM: OMAP3+: DPLL: stop reparenting to same parent if already done (2014-02-28 12:43:47 -0700)
+> 
+> ----------------------------------------------------------------
+> Some low-level optimizations and fixes that don't belong in an -rc
+> series for various OMAP-family chips, targeted for v3.15.
+> 
+> Basic build, boot, and PM test logs are available here:
+> 
+> http://www.pwsan.com/omap/testlogs/prcm-a-for-v3.15/20140228124518/
 
-I assuming this is becase the no-save region is one page anyway (we skip
-restoring the no-save region physical page).  So maybe 1/2 is a way to
-leave some room for whatever else may need to be here, but in any case
-the 4k is used for nosave.  I think you're right that it can be much less.
+Thanks pulling into omap-for-v3.15/prcm.
 
-I'll check into this...
-
-Thanks!
-
-Sebastian
+Tony
+ 
+> ----------------------------------------------------------------
+> Dave Gerlach (1):
+>       ARM: OMAP2+: clockdomain: Reintroduce SW_SLEEP Support
+> 
+> Lokesh Vutla (1):
+>       ARM: OMAP2+: AM43xx: implement support for machine restart
+> 
+> Nishanth Menon (1):
+>       ARM: OMAP3+: DPLL: stop reparenting to same parent if already done
+> 
+> Suman Anna (1):
+>       ARM: AM43x: hwmod data: register spinlock OCP interface
+> 
+> Tomi Valkeinen (1):
+>       ARM: OMAP2+: clock: fix rate prints
+> 
+>  arch/arm/mach-omap2/Makefile               |  1 +
+>  arch/arm/mach-omap2/board-generic.c        |  1 +
+>  arch/arm/mach-omap2/clkt_dpll.c            |  6 +++---
+>  arch/arm/mach-omap2/cminst44xx.c           | 18 ++++++++++++++++--
+>  arch/arm/mach-omap2/dpll3xxx.c             |  2 +-
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c |  1 +
+>  arch/arm/mach-omap2/prminst44xx.c          |  3 +++
+>  7 files changed, 26 insertions(+), 6 deletions(-)
+> 
+> 
+> vmlinux object size
+> (delta in bytes from test_v3.14-rc1 (38dbfb59d1175ef458d006556061adeaa8751b72)):
+>    text     data      bss    total  kernel
+>       0       -8        0       -8  omap1_defconfig
+>       0        0        0        0  omap1_defconfig_1510innovator_only
+>       0        0        0        0  omap1_defconfig_5912osk_only
+> 
+> vmlinux object size
+> (delta in bytes from test_v3.14-rc1 (38dbfb59d1175ef458d006556061adeaa8751b72)):
+>    text     data      bss    total  kernel
+> +8791542  +826036  +291072  +9908650  multi_v7_defconfig
+>    +116        0        0     +116  omap2plus_defconfig
+>       0        0        0        0  omap2plus_defconfig_2430sdp_only
+>       0        0        0        0  omap2plus_defconfig_am33xx_only
+>    +148        0        0     +148  omap2plus_defconfig_am43xx_only
+>    +116        0        0     +116  omap2plus_defconfig_cpupm
+>    +116        0        0     +116  omap2plus_defconfig_dra7xx_only
+>       0        0        0        0  omap2plus_defconfig_n800_multi_omap2xxx
+>       0        0        0        0  omap2plus_defconfig_n800_only_a
+>     +52        0        0      +52  omap2plus_defconfig_no_pm
+>    +116        0        0     +116  omap2plus_defconfig_omap2_4_only
+>     +52        0        0      +52  omap2plus_defconfig_omap3_4_only
+>     +52        0        0      +52  omap2plus_defconfig_omap5_only
+>     +32        0        0      +32  rmk_omap3430_ldp_allnoconfig
+>     +32        0        0      +32  rmk_omap3430_ldp_oldconfig
+>    +100        0      -16      +84  rmk_omap4430_sdp_allnoconfig
+>     +96        0        0      +96  rmk_omap4430_sdp_oldconfig
+> 
+> Boot-time memory difference
+> (delta in bytes from test_v3.14-rc1 (38dbfb59d1175ef458d006556061adeaa8751b72))
+>   avail  rsrvd   high  freed  board          kconfig
+> (no differences)
+> 
+> 
