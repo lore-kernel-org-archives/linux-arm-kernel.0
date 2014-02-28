@@ -1,50 +1,30 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 28 Feb 2014 10:03:10 -0500
-Subject: [PATCH] dma: of: Move the functions under CONFIG_OF_DMA instead
- of CONFIG_OF
-In-Reply-To: <5615884.O4eVkOuQqe@wuerfel>
-References: <1393546850-13907-1-git-send-email-santosh.shilimkar@ti.com>
- <6287295.Q1WPJPjeZV@wuerfel> <53109C1B.2030606@ti.com>
- <5615884.O4eVkOuQqe@wuerfel>
-Message-ID: <5310A52E.90908@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Feb 2014 16:03:58 +0100
+Subject: [GIT PULL] omap fixes for v3.14-rc4
+In-Reply-To: <20140228000715.GA14514@atomide.com>
+References: <20140228000715.GA14514@atomide.com>
+Message-ID: <201402281603.58489.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 February 2014 09:47 AM, Arnd Bergmann wrote:
-> On Friday 28 February 2014 09:24:27 Santosh Shilimkar wrote:
->> So for ARM 'allnoconfig' build we have CONFIG_OF enabled but
->> CONFIG_DMA_OF disabled. With that the of-dma.c gets compiled
->> out leaving the functions from of-dma.h undefined. I noticed
->> this while adding couple of exports in of_dma.h
+On Friday 28 February 2014, Tony Lindgren wrote:
+> The following changes since commit 8842446ac74263f1330f46e11ed649e2b0ed6545:
 > 
-> Looking at current linux-next, I find
+>   Documentation: dt: OMAP: Update Overo/Tobi (2014-02-14 08:37:53 -0800)
 > 
-> Kconfig:
+> are available in the git repository at:
 > 
-> menuconfig DMADEVICES
->         bool "DMA Engine support"
-> ...
-> if DMADEVICES
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.14/fixes-rc4
 > 
-> config DMA_OF
->         def_bool y
->         depends on OF
+> for you to fetch changes up to 4b41636878ee32d4c45a49de7749abca9721bd6a:
 > 
-> endif
+>   ARM: OMAP3: Fix pinctrl interrupts for core2 (2014-02-27 15:35:48 -0800)
 > 
-> This means that DMA_OF is disabled in 'allnoconfig' since DMADEVICES
-> is also disabled, as you say. The Makefile looks like
-> 
-> obj-$(CONFIG_DMA_OF) += of-dma.o
-> 
-> As of 5fa422c922c25 "dmaengine: move drivers/of/dma.c -> drivers/dma/of-dma.c"
-> 
-> which seems to solve the problem already.
-> 
->> I am not sure but we added couple of functions for dma-ranges
->> and dma-coherent which gets called from generic code.
-> 
-> These functions have nothing to do with the dmaengine code though,
-> they should be in a different file.
-> 
-Any suggestion on different file ?
+> ----------------------------------------------------------------
+> Fixes for omaps mostly to fix the 3430 display regression,
+> and random crashes if booting n900 with device tree and
+> thumb mode. Also few other regressions and fixes.
+
+Pulled into fixes, thanks!
+
+	Arnd
