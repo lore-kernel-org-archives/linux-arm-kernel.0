@@ -1,43 +1,39 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 28 Feb 2014 10:29:15 -0800
-Subject: [PATCH v4 4/9] Input: pmic8xxx-keypad - Migrate to DT
-In-Reply-To: <20140228034138.GD7308@joshc.qualcomm.com>
+Date: Fri, 28 Feb 2014 10:32:37 -0800
+Subject: [PATCH v4 5/9] Input: pmic8xxx-pwrkey - Migrate to DT
+In-Reply-To: <20140228034547.GE7308@joshc.qualcomm.com>
 References: <1393552520-9068-1-git-send-email-sboyd@codeaurora.org>
- <1393552520-9068-5-git-send-email-sboyd@codeaurora.org>
- <20140228034138.GD7308@joshc.qualcomm.com>
-Message-ID: <20140228182915.GD2487@codeaurora.org>
+ <1393552520-9068-6-git-send-email-sboyd@codeaurora.org>
+ <20140228034547.GE7308@joshc.qualcomm.com>
+Message-ID: <20140228183237.GE2487@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 02/27, Josh Cartwright wrote:
-> Looks good, with the exception of one thing...
-> 
-> On Thu, Feb 27, 2014 at 05:55:15PM -0800, Stephen Boyd wrote:
+> On Thu, Feb 27, 2014 at 05:55:16PM -0800, Stephen Boyd wrote:
 > > The driver is only supported on DT enabled platforms. Convert the
 > > driver to DT so that it can probe properly.
 > > 
 > > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > > ---
-> >  drivers/input/keyboard/pmic8xxx-keypad.c | 150 ++++++++++++++++++-------------
-> > @@ -471,50 +514,27 @@ static void pmic8xxx_kp_close(struct input_dev *dev)
-> >   */
-> >  static int pmic8xxx_kp_probe(struct platform_device *pdev)
-> >  {
-> [..]
-> > -	keymap_data = pdata->keymap_data;
-> > -	if (!keymap_data) {
-> > -		dev_err(&pdev->dev, "no keymap data supplied\n");
-> > -		return -EINVAL;
-> > -	}
-> > +	repeat = !of_property_read_bool(pdev->dev.of_node,
-> > +					"linux,input-no-autorepeat");
-> > +	wakeup = !of_property_read_bool(pdev->dev.of_node,
-> > +					"linux,keypad-wakeup");
+> > --- a/drivers/input/misc/pmic8xxx-pwrkey.c
+> > +++ b/drivers/input/misc/pmic8xxx-pwrkey.c
+> > @@ -172,7 +178,7 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+> >  	}
+> >  
+> >  	platform_set_drvdata(pdev, pwrkey);
+> > -	device_init_wakeup(&pdev->dev, pdata->wakeup);
+> > +	device_init_wakeup(&pdev->dev, 1);
 > 
-> I don't think you mean to invert this.
+> Is there a particular reason you aren't providing a 'linux,wakeup'
+> property for pwrkey?
 > 
 
-Good catch. Thanks.
+In all the users of this device I've never seen wakeup set to 0.
+Given that this is a power key it makes sense because this is
+used to wake up a phone from suspend (also see the comment above
+device_init_wakeup() where power buttons are explicitly called
+out).
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
