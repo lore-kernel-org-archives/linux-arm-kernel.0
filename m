@@ -1,46 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Feb 2014 16:39:28 +0000
-Subject: [PATCH 2/2] iommu/arm-smmu: Return 0 on unmap failure
-In-Reply-To: <1393601830-4677-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1393601830-4677-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1393601830-4677-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20140228163927.GD30996@mudshark.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 28 Feb 2014 17:37:17 +0100
+Subject: [PATCH v2 2/5] clk: sun6i: Reparent AHB clock on PLL6
+In-Reply-To: <1393605440-14643-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1393605440-14643-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1393605440-14643-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 03:37:10PM +0000, Laurent Pinchart wrote:
-> The IOMMU core expects the unmap operation to return the number of bytes
-> that have been unmapped or 0 on failure, a negative return value being
-> treated like a number of bytes.
+In order for the DMA controller to work for SDRAM to devices transfers, the AHB
+clock should be reparented on the PLL6.
 
-Makes sense, thanks. It's a pity we can't propagate the error code.
+Force that parenting in the clock driver.
 
-Will
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clk/sunxi/clk-sunxi.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  drivers/iommu/arm-smmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index c33a310..e7528f0 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1464,7 +1464,7 @@ static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
->  
->  	ret = arm_smmu_handle_mapping(smmu_domain, iova, 0, size, 0);
->  	arm_smmu_tlb_inv_context(&smmu_domain->root_cfg);
-> -	return ret ? ret : size;
-> +	return ret ? 0 : size;
->  }
->  
->  static phys_addr_t arm_smmu_iova_to_phys(struct iommu_domain *domain,
-> -- 
-> 1.8.3.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index f6f61cc..a5c5882 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -1286,7 +1286,7 @@ static void __init of_sunxi_table_clock_setup(const struct of_device_id *clk_mat
+  */
+ static void __init sunxi_clock_protect(void)
+ {
+-	struct clk *clk;
++	struct clk *clk, *parent;
+ 
+ 	/* memory bus clock - sun5i+ */
+ 	clk = clk_get(NULL, "mbus");
+@@ -1307,6 +1307,22 @@ static void __init sunxi_clock_protect(void)
+ 	if (!IS_ERR(clk))
+ 		clk_prepare_enable(clk);
+ 
++	clk = clk_get(NULL, "ahb1_mux");
++	if (IS_ERR(clk)) {
++		pr_err("Couldn't get AHB1 Mux\n");
++		return;
++	}
++
++	parent = clk_get(NULL, "pll6");
++	if (IS_ERR(clk)) {
++		pr_err("Couldn't get PLL6\n");
++		return;
++	}
++
++	clk_set_parent(clk, parent);
++
++	clk_put(clk);
++	clk_put(parent);
+ }
+ 
+ static void __init sunxi_init_clocks(void)
+-- 
+1.9.0
