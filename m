@@ -1,48 +1,64 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 28 Feb 2014 14:53:49 +0100
-Subject: [PATCH 1/3] PCI: designware: add legacy PCI interrupt mapping
-In-Reply-To: <6315058.94ydMC9ka8@wuerfel>
-References: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
- <5728262.sMhnqxGTXH@wuerfel>
- <1393589374.5225.9.camel@weser.hi.pengutronix.de>
- <6315058.94ydMC9ka8@wuerfel>
-Message-ID: <1393595629.5225.12.camel@weser.hi.pengutronix.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 28 Feb 2014 14:56:48 +0100
+Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
+In-Reply-To: <1393595264.3802.39.camel@paszta.hi.pengutronix.de>
+References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
+ <531087C0.1090501@gmail.com>
+ <1393595264.3802.39.camel@paszta.hi.pengutronix.de>
+Message-ID: <531095A0.5040307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 28.02.2014, 13:27 +0100 schrieb Arnd Bergmann:
-> On Friday 28 February 2014 13:09:34 Lucas Stach wrote:
-> > Am Freitag, den 28.02.2014, 12:37 +0100 schrieb Arnd Bergmann:
-> > > On Friday 28 February 2014 12:27:36 Lucas Stach wrote:
-> > > The interrupt-map doesn't even look well-formed, since it refers to
-> > > a gic that has #interrupt-cells=<3>, but only has one cell with the
-> > > value. This clearly cannot work at all. It should probably be
-> > > 
-> > >       interrupt-map = <0x0 0 &gic GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-> > > 
-> > > Note that '53' is the IRQ number that is commonly assigned to
-> > > SPI interrupt 21, since SPI starts at number 32 on GIC.
-> > > 
-> > Ah, I see. Thanks for the explanation. So we have a bogus Exynos DT,
-> > which will break existing systems once the kernel starts to do the right
-> > thing. This is starting to look great. 
->  
-> It seems tegra and r-car have the same bug. We can probably fix it
-> in a backwards-compatible way by changing the function to call
-> the generic helper first and if that fails call printk_once()
-> to emit a warning and return the hardwired IRQ number.
-> 
+On 02/28/14 14:47, Philipp Zabel wrote:
+> Am Freitag, den 28.02.2014, 13:57 +0100 schrieb Sebastian Hesselbarth:
+>> On 02/28/14 13:20, Tomi Valkeinen wrote:
+>>> This series is a re-send of
+>>> http://article.gmane.org/gmane.linux.drivers.devicetree/61739
+>>>
+>> ...
+>>> Shortly about the display components in the series, in the order of probable
+>>> public interest:
+>>>
+>>> * Analog TV, DVI and HDMI Connectors represent a respective connector on the
+>>>     board. They don't do much, but they do mark the end of the video pipeline (from
+>>>     the board's pov), and they should also in the future offer ways to handle
+>>>     things like the +5V pin on DVI and HDMI connector and HPD pin.
+>>>
+>>> * MIPI DPI panel and MIPI DSI CM panels represent bindings for simple panels
+>>>     using the respective video bus.
+>>>
+>>> * Sony acx565akm is an SPI controlled panel using flatlink video bus.
+>>>
+>>> * TFP410 is a DPI to DVI encoder.
+>>>
+>>> * TPD12S015 is a HDMI companion chip, used on OMAP boards.
+>>
+>> Tomi,
+>>
+>> Out of curiosity, will there be DT nodes for pull-up resistors soon,
+>> too? ;)
+>>
+>> Honestly, TPD12S015 is a level shifter, there is nothing in it that
+>> would justify a DT node nor a driver.
+>>
+>> Above you already note, that connector nodes should offer HPD in the
+>> future, but I guess the binding should represent that now already.
+>> I will be a DT stub anyway, the corresponding video sink driver will
+>> have to look it up.
+>>
+>> Looking through the bindings for DVI and HDMI, I guess HPD gpio is
+>> better kept in those nodes. From the relevant (DT) properties DVI and
+>> HDMI connectors are in no way different.
+>
+> I like the idea of adding actual connector nodes to the board device
+> trees. A TV encoder driver for example could this way detect from the
+> device tree whether it is connected to a VGA, Composite, or S-Video
+> connector (or maybe to both Composite and S-Video connectors at the same
+> time).
 
-Yes, seems like the way to go. I'll prepare some patches for that. It
-seems of_irq_parse_and_map_pci() already emits an error message if it
-can't find a valid mapping. This should be enough to get people to fix
-their DTs.
+I agree that different connectors help providing a better
+user-experienced view of board layout. But I doubt that besides the
+differentiation (HDMI, DVI, VGA, SVideo, ...) and the endpoint there
+should be anything more in that node.
 
-Regards,
-Lucas 
-
--- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sebastian
