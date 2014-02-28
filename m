@@ -1,87 +1,94 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 28 Feb 2014 15:58:00 +0800
-Subject: [PATCH v5 4/8 fix] Documentation: add the document for the SPI NOR
- framework
-In-Reply-To: <1393238262-8622-5-git-send-email-b32955@freescale.com>
-References: <1393238262-8622-5-git-send-email-b32955@freescale.com>
-Message-ID: <1393574280-17302-1-git-send-email-b32955@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Feb 2014 09:46:39 +0100
+Subject: [PATCH v2 4/4] pci: Add support for creating a generic
+ host_bridge from device tree
+In-Reply-To: <1393543924.14012.56.camel@pasglop>
+References: <1393506402-11474-1-git-send-email-Liviu.Dudau@arm.com>
+ <18746655.qWHLpMg2Yy@wuerfel> <1393543924.14012.56.camel@pasglop>
+Message-ID: <41426943.fCMrEO9t9X@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the document for the SPI NOR framework.
+On Friday 28 February 2014 10:32:04 Benjamin Herrenschmidt wrote:
+> On Thu, 2014-02-27 at 14:38 +0100, Arnd Bergmann wrote:
+> > On Thursday 27 February 2014 13:06:42 Liviu Dudau wrote:
+> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > 
+> > Please add Benjamin Herrenschmidt to Cc here, I think it would be helpful
+> > to get his input so we can make this work on powerpc as well.
+> 
+> Tricky... We would need hooks which would turn the whole thing into a
+> pile of spaghetti. I think we should stick to using the range helpers
+> (Andrew latest patch), which makes the powerpc code a lot smaller,
+> and leave it at that.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
-fix a typo
----
- Documentation/mtd/spi-nor.txt |   59 +++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 59 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/mtd/spi-nor.txt
+We can certainly do both: small helpers that let you shrink the powerpc
+code, and a generic implementation that can be shared by some of the
+other architectures that you don't use. The PCI core already uses
+a number of 'weak' functions here, and we can expand on that.
 
-diff --git a/Documentation/mtd/spi-nor.txt b/Documentation/mtd/spi-nor.txt
-new file mode 100644
-index 0000000..294d5b0
---- /dev/null
-+++ b/Documentation/mtd/spi-nor.txt
-@@ -0,0 +1,59 @@
-+                          SPI NOR framework
-+               ============================================
-+
-+Part I - why we need this framework?
-+-------------------------------------
-+
-+The SPI bus controller only deals with the byte stream.
-+Some controller does not works like a SPI bus controller, it works
-+like a SPI NOR controller instead, such as the Freescale's QuadSPI controller.
-+
-+The Freescale's QuadSPI controller should know the NOR commands to
-+find the right LUT sequence. Unfortunately, the old code can not meet
-+this requirement.
-+
-+Part II - How does the framework work?
-+-------------------------------------
-+
-+This framework just adds a new layer between the MTD and the SPI bus driver.
-+With this new layer, the SPI NOR controller driver does not depend on the
-+m25p80 code anymore.
-+
-+   Before this framework, the layer is like:
-+
-+                   MTD
-+         ------------------------
-+                  m25p80
-+         ------------------------
-+	       SPI bus driver
-+         ------------------------
-+	        SPI NOR chip
-+
-+   After this framework, the layer is like:
-+                   MTD
-+         ------------------------
-+              SPI NOR framework
-+         ------------------------
-+                  m25p80
-+         ------------------------
-+	       SPI bus driver
-+         ------------------------
-+	       SPI NOR chip
-+
-+  With the SPI NOR controller driver(Freescale QuadSPI), it looks like:
-+                   MTD
-+         ------------------------
-+              SPI NOR framework
-+         ------------------------
-+                fsl-quadSPI
-+         ------------------------
-+	       SPI NOR chip
-+
-+Part III - How can the drivers use the framework
-+-------------------------------------
-+
-+The main API is the spi_nor_scan(). Before you call the hook, you should
-+initialize the necessary fields for spi_nor{}.
-+Please see the drivers/mtd/spi-nor/spi-nor.c for detail.
-+Please also reference to the fsl-quadspi.c when you want to write a new driver
-+for a SPI NOR controller.
--- 
-1.7.2.rc3
+ > > +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
+> > > +		if (!res) {
+> > > +			err = -ENOMEM;
+> > > +			goto bridge_ranges_nomem;
+> > > +		}
+> > > +
+> > > +		of_pci_range_to_resource(&range, dev, res);
+> > > +
+> > > +		if (resource_type(res) == IORESOURCE_IO)
+> > > +			*io_base = range.cpu_addr;
+> 
+> You don't care about the size of the IO space ?
+
+We probably should. The ARM code currently assumes that each I/O
+space is 64KB, but for a generic implementation we probably want
+to handle both smaller and larger windows. I suggested not supporting
+more than 1MB though, which is the maximum that I can see a reason
+for, i.e. the pci-mvebu fake host bridge that has to combine
+multiple per-port HW I/O spaces into one logical space.
+
+> > > +		pci_add_resource_offset(resources, res,
+> > > +				res->start - range.pci_addr);
+> > > +	}
+> > 
+> > This is not the correct resource for I/O space at all. Please talk
+> > to Will, I've been over this with him in detail and he probably
+> > understands it now. I assume you are both working in the same
+> > building.
+> 
+> Yes, the IO offsets work differently on powerpc as well
+
+As I noticed later, the first patch in the series actually changes
+the range_to_resource parser to return the logical start here, which
+would make the offset correct even on powerpc, but unfortunately
+I think that cannot work.
+
+> > > +struct pci_host_bridge *
+> > > +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops, void *host_data)
+> > > +{
+> > > +	int err, domain, busno;
+> > > +	struct resource bus_range;
+> > > +	struct pci_bus *root_bus;
+> > > +	struct pci_host_bridge *bridge;
+> > > +	resource_size_t io_base;
+> > > +	LIST_HEAD(res);
+> > > +
+> > > +	domain = of_alias_get_id(parent->of_node, "pci-domain");
+> > > +	if (domain == -ENODEV)
+> > > +		domain = domain_nr++;
+> > >
+> We probably want some uniqueness testing here.
+
+I thought this at first too, but as Liviu mentioned, this does
+get caught later when trying to create the root bus with
+a conflicting number.
+
+What the above code cannot do is to put multiple host bridges
+into the same domain, using distinct bus ranges. This is an
+intentional simplification over what some architectures currently
+do, and we could not see a reason why you would still need
+to put multiple host bridges into one domain in 2014.
+
+x86 with ACPI does it, but they won't call of_create_pci_host_bridge.
+
+	Arnd
