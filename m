@@ -1,38 +1,48 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 28 Feb 2014 14:45:56 +0000
-Subject: [PATCH v6 07/14] ARM: Remove use of struct kprobe from generic
- probes code
-In-Reply-To: <1393596692.3601.37.camel@linaro1.home>
-References: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
- <1392017945-4507-8-git-send-email-dave.long@linaro.org>
- <20140228101226.GO21483@n2100.arm.linux.org.uk>
- <1393596692.3601.37.camel@linaro1.home>
-Message-ID: <1393598756.3601.44.camel@linaro1.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Feb 2014 15:47:34 +0100
+Subject: [PATCH] dma: of: Move the functions under CONFIG_OF_DMA instead
+ of CONFIG_OF
+In-Reply-To: <53109C1B.2030606@ti.com>
+References: <1393546850-13907-1-git-send-email-santosh.shilimkar@ti.com>
+ <6287295.Q1WPJPjeZV@wuerfel> <53109C1B.2030606@ti.com>
+Message-ID: <5615884.O4eVkOuQqe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2014-02-28 at 14:11 +0000, Jon Medhurst (Tixy) wrote:
-> On Fri, 2014-02-28 at 10:12 +0000, Russell King - ARM Linux wrote:
-> > On Mon, Feb 10, 2014 at 02:38:58AM -0500, David Long wrote:
-> > > diff --git a/arch/arm/kernel/probes.c b/arch/arm/kernel/probes.c
-> > > index 7cd1763..179deac 100644
-> > > --- a/arch/arm/kernel/probes.c
-> > > +++ b/arch/arm/kernel/probes.c
-> > > @@ -12,11 +12,9 @@
-> > >   */
-> > >  
-> > >  #include <linux/kernel.h>
-> > > -#include <linux/kprobes.h>
-> > >  #include <asm/system_info.h>
-> > 
-> > How well has this code been tested?
-> 
-> From the error below I assume only when __LINUX_ARM_ARCH__ >= 7
-> 
-> I have v5 and v6 hardware
+On Friday 28 February 2014 09:24:27 Santosh Shilimkar wrote:
+> So for ARM 'allnoconfig' build we have CONFIG_OF enabled but
+> CONFIG_DMA_OF disabled. With that the of-dma.c gets compiled
+> out leaving the functions from of-dma.h undefined. I noticed
+> this while adding couple of exports in of_dma.h
 
-Actually, I don't have any v6 hardware, for some strange reason I
-thought a cortex A8 was v6.
+Looking at current linux-next, I find
 
--- 
-Tixy
+Kconfig:
+
+menuconfig DMADEVICES
+        bool "DMA Engine support"
+...
+if DMADEVICES
+
+config DMA_OF
+        def_bool y
+        depends on OF
+
+endif
+
+This means that DMA_OF is disabled in 'allnoconfig' since DMADEVICES
+is also disabled, as you say. The Makefile looks like
+
+obj-$(CONFIG_DMA_OF) += of-dma.o
+
+As of 5fa422c922c25 "dmaengine: move drivers/of/dma.c -> drivers/dma/of-dma.c"
+
+which seems to solve the problem already.
+
+> I am not sure but we added couple of functions for dma-ranges
+> and dma-coherent which gets called from generic code.
+
+These functions have nothing to do with the dmaengine code though,
+they should be in a different file.
+
+	Arnd
