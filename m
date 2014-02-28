@@ -1,82 +1,43 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Fri, 28 Feb 2014 15:19:43 +0100
-Subject: change kmalloc into vmalloc for large memory allocations
-In-Reply-To: <35FD53F367049845BC99AC72306C23D102844605F38C@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D102844605F38C@CNBJMBX05.corpusers.net>
-Message-ID: <s5hlhwvb9q8.wl%tiwai@suse.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 28 Feb 2014 09:24:27 -0500
+Subject: [PATCH] dma: of: Move the functions under CONFIG_OF_DMA instead
+ of CONFIG_OF
+In-Reply-To: <6287295.Q1WPJPjeZV@wuerfel>
+References: <1393546850-13907-1-git-send-email-santosh.shilimkar@ti.com>
+ <530FD7D7.9000104@ti.com> <6287295.Q1WPJPjeZV@wuerfel>
+Message-ID: <53109C1B.2030606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Fri, 28 Feb 2014 16:15:23 +0800,
-Wang, Yalin wrote:
+On Friday 28 February 2014 04:23 AM, Arnd Bergmann wrote:
+> On Thursday 27 February 2014 19:27:03 Santosh Shilimkar wrote:
+>>
+>> The of-dma.c is compiled out with !CONFIG_DMA_OF but the functions in
+>> the header are kept under CONFIG_OF. Move them under CONFIG_OF_DMA
+>> to avoid build errors with CONFIG_OFF && !CONFIG_DMA_OF
+>>
+>> Cc: Grant Likely <grant.likely@linaro.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > 
-> Hi 
+> Sorry, but what is the problem you are seeing with this?
 > 
+> CONFIG_DMA_OF is defined as 'OF && DMAENGINE', and this code
+> should only be called from drivers that depend on DMAENGINE.
 > 
-> I find there is some drivers use kmalloc to allocate large 
-> Memorys during module_init,  some can be changed to use vmalloc
-> To save some low mem, I add log in kernel to track ,
-> And list them here:
+> I'm not saying your patch is wrong, but you shouldn't need it
+> unless you do something very odd.
 > 
-> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/drivers/usb/gadget/f_mass_storage.c?h=master#n2724
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/sound/soc/soc-core.c?h=master#n3772
+So for ARM 'allnoconfig' build we have CONFIG_OF enabled but
+CONFIG_DMA_OF disabled. With that the of-dma.c gets compiled
+out leaving the functions from of-dma.h undefined. I noticed
+this while adding couple of exports in of_dma.h
 
-At least the ASoC runtime case doesn't use the allocated memory as
-buffer, and they are allocated only once per device, thus it shouldn't
-be the problem you stated.  If it really consumes so much memory, we
-need to rethink, instead of allocating an array but allocate each
-object, for example.
+I am not sure but we added couple of functions for dma-ranges
+and dma-coherent which gets called from generic code.
 
+In any case, the patch makes sense since the header and Makefile
+are not consistent.
 
-thanks,
-
-Takashi
-
-
-> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/net/netfilter/nf_conntrack_ftp.c?h=master#n603
-> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/net/netfilter/nf_conntrack_h323_main.c?h=master#n1849
-> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/net/netfilter/nf_conntrack_irc.c?h=master#n247
-> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/net/netfilter/nf_conntrack_sane.c?h=master#n195
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/tree/drivers/input/evdev.c?h=master#n403
-> 
-> 
-> they allocate large memory from 10k~64K , 
-> this will use lots of low mem, instead if we use 
-> vmalloc for these drivers , it will be good for some devices
-> like smart phone, we often encounter some errors like kmalloc failed 
-> because there is not enough low mem , especially when the device has physical 
-> memory less than 1GB .
-> 
-> 
-> could this module change the memory allocation into vmalloc ?
-> 
-> I was thinking that if we can introduce a helper function in kmalloc.h like this :
-> 
-> Kmalloc(size, flags)
-> {
-> 	If (size > PAGE_SIZE && flags&CAN_USE_VMALLOC_FLAG)
-> 		return vmalloc(size);
-> 	Else
-> 		return real_kmalloc(size);
-> }
-> 
-> Kfree(ptr)
-> {
-> 	If (is_vmalloc_addr(ptr))
-> 		Vfree(ptr);
-> 	Else
-> 		Kfree(ptr);
-> }
-> 
-> 
-> But we need add some flags to ensure always use kmalloc for
-> Some special use (dma etc..)
-> 
-> How do you think of it ?
-> 
-> Thanks
-> 
-> 
-> 
+Regards,
+Santosh
