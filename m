@@ -1,43 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 28 Feb 2014 17:37:15 +0100
-Subject: [PATCH v2 0/5] Add support for the Allwinner A31 DMA Controller
-Message-ID: <1393605440-14643-1-git-send-email-maxime.ripard@free-electrons.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Fri, 28 Feb 2014 20:45:15 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MiBSRVNFTkQgMS8zXSBBUk06IGNscHM3MTF4OiBBZGQg?=
+ =?UTF-8?B?Q0xQUzcxMVggaXJxY2hpcCBkcml2ZXI=?=
+In-Reply-To: <201402281737.37345.arnd@arndb.de>
+References: <1391328466-30873-1-git-send-email-shc_work@mail.ru>
+ <201402281737.37345.arnd@arndb.de>
+Message-ID: <1393605915.948850229@f12.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+???????, 28 ??????? 2014, 17:37 +01:00 ?? Arnd Bergmann <arnd@arndb.de>:
+> On Sunday 02 February 2014, Alexander Shiyan wrote:
+> > This adds the irqchip driver for Cirrus Logic CLPS711X series SoCs.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> 
+> Applied all three patches on next/soc branch now.
+> 
+> Sorry it took this long.
 
-This patchset adds support for the DMA controller found in the
-Allwinner A31 and A23 SoCs.
+Oh my god, I did not hope :) Thanks.
 
-This has been tested using the newly introduced SPI driver on an A31
-EVK. Support for DMA-driven SPI transfers will be the subject of
-another patch serie.
+I think now more on the issue raised by you in the name of the compatible
+string in a thread about the PWM driver ... I'll respond in the that thread,
+please, if possible, do not lost it.
 
-Thanks,
-Maxime
-
-Changes from v1:
-  - Removed the clk_put call in the clocks protecting patches
-  - Minor fixes here and there as suggested by Andy Shevchenko: switch
-    to dmam_pool_create, switch to dev_dbg instead of pr_debug, etc.
-
-Maxime Ripard (5):
-  clk: sun6i: Protect CPU clock
-  clk: sun6i: Reparent AHB clock on PLL6
-  clk: sun6i: Protect SDRAM gating bit
-  DMA: sun6i: Add driver for the Allwinner A31 DMA controller
-  ARM: sun6i: dt: Add A31 DMA controller to DTSI
-
- .../devicetree/bindings/dma/sun6i-dma.txt          |  45 +
- arch/arm/boot/dts/sun6i-a31.dtsi                   |  29 +
- drivers/clk/sunxi/clk-sunxi.c                      |  29 +-
- drivers/dma/Kconfig                                |   8 +
- drivers/dma/Makefile                               |   1 +
- drivers/dma/sun6i-dma.c                            | 959 +++++++++++++++++++++
- 6 files changed, 1070 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/dma/sun6i-dma.txt
- create mode 100644 drivers/dma/sun6i-dma.c
-
--- 
-1.9.0
+Thanks again.
+---
