@@ -1,46 +1,58 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 28 Feb 2014 17:03:46 +0100
-Subject: [PATCH v5 4/5] ARM: dts: imx6sl: Add power-domain information to gpc
- node
-In-Reply-To: <1393603427-6199-1-git-send-email-p.zabel@pengutronix.de>
-References: <1393603427-6199-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <1393603427-6199-5-git-send-email-p.zabel@pengutronix.de>
+Date: Fri, 28 Feb 2014 17:03:42 +0100
+Subject: [PATCH v5 0/5] i.MX6 PU power domain support
+Message-ID: <1393603427-6199-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PGC that is part of GPC controls isolation and power sequencing of the
-power domains. The PU power domain will be handled by the generic pm domain
-framework. It needs a phandle to the PU regulator to turn off power when
-the domain is disabled and a list of clocks to be enabled during powerup
-for reset propagation.
+The i.MX6Q can gate off the CPU and PU (GPU/VPU) power domains using the
+Power Gating Controller (PGC) in the GPC register space. The CPU power
+domain is already handled by wait state code, but the PU power domain can
+be controlled using the generic power domain framework and power off the PU
+supply regulator if all devices in the power domain are (runtime) suspended.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
+This patchset adds a GPC platform device initialized at subsys_initcall time
+(after anatop regulators) that binds to the gpc device tree node and sets up
+the PU power domain. The GPC node becomes a power-controller as defined by
+Tomasz' OF power domain bindings. This series depends on his patch
+    "base: power: Add generic OF-based power domain look-up"
+
+Using the power-domain bindings allows to use indexed power domains inside the
+gpc node. This allows to use phandles with an index cell to select the power
+domains, similarly to the reset lines provided by the SRC.
+
+I have tested this on i.MX6S and noticed hangs if the GPU is not clocked during
+domain powerup. As a consequence, the domain driver no longer collects the
+reset clocks from drivers in the domain (as the GPU driver might not be
+enabled, or even in mainline...), but is provided with the necessary clocks
+directly from the device tree. This also allowed to get rid of the bus
+notifier.
+
+Finally, the device specific timing data has been dropped for now, since the
+current generic OF power domain code doesn't support it yet.
+
 Changes since v4:
  - Use OF power domain bindings
- - Added reset clocks
----
- arch/arm/boot/dts/imx6sl.dtsi | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ - Provide reset clocks directly via device tree
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 28558f1..0e61262 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -529,9 +529,13 @@
- 			};
- 
- 			gpc: gpc at 020dc000 {
--				compatible = "fsl,imx6sl-gpc", "fsl,imx6q-gpc";
-+				compatible = "fsl,imx6sl-gpc";
- 				reg = <0x020dc000 0x4000>;
- 				interrupts = <0 89 0x04>;
-+				pu-supply = <&reg_pu>;
-+				clocks = <&clks IMX6SL_CLK_GPU2D_OVG>,
-+					 <&clks IMX6SL_CLK_GPU2D_PODF>;
-+				#power-domain-cells = <1>;
- 			};
- 
- 			gpr: iomuxc-gpr at 020e0000 {
+regards
+Philipp
+
+Philipp Zabel (5):
+  Documentation: Add device tree bindings for Freescale i.MX GPC
+  ARM: imx6: gpc: Add PU power domain for GPU/VPU
+  ARM: dts: imx6qdl: Add power-domain information to gpc node
+  ARM: dts: imx6sl: Add power-domain information to gpc node
+  ARM: dts: imx6qdl: Allow disabling the PU regulator, add a enable ramp
+    delay
+
+ .../devicetree/bindings/power/fsl,imx-gpc.txt      |  54 ++++++
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   7 +-
+ arch/arm/boot/dts/imx6sl.dtsi                      |   6 +-
+ arch/arm/mach-imx/Kconfig                          |   2 +
+ arch/arm/mach-imx/gpc.c                            | 182 +++++++++++++++++++++
+ 5 files changed, 249 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+
 -- 
 1.8.5.3
