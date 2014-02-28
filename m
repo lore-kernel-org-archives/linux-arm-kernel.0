@@ -1,66 +1,121 @@
-From: mohit.kumar@st.com (Mohit Kumar)
-Date: Fri, 28 Feb 2014 17:24:54 +0530
-Subject: [PATCH V7 01/10] clk: SPEAr13XX: Fix pcie clock name
-In-Reply-To: <cover.1393568715.git.mohit.kumar@st.com>
-References: <cover.1393568715.git.mohit.kumar@st.com>
-Message-ID: <60f333b653aa66d76cdeb3fc2274947e0332d380.1393568715.git.mohit.kumar@st.com>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 28 Feb 2014 12:58:41 +0100
+Subject: [PATCH] ARM: dts: imx: Add alias for ethernet controller
+Message-ID: <1393588721-8598-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratyush Anand <pratyush.anand@st.com>
+Add alias for FEC ethernet on i.MX to allow bootloaders (like U-Boot)
+patch-in the MAC address for FEC using this alias.
 
-Follow dt clock naming convention for PCIe clocks.
-
-Signed-off-by: Pratyush Anand <pratyush.anand@st.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Mohit Kumar <mohit.kumar@st.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: spear-devel at list.st.com
-Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 ---
- drivers/clk/spear/spear1310_clock.c |    6 +++---
- drivers/clk/spear/spear1340_clock.c |    2 +-
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/imx25.dtsi   | 1 +
+ arch/arm/boot/dts/imx27.dtsi   | 1 +
+ arch/arm/boot/dts/imx35.dtsi   | 1 +
+ arch/arm/boot/dts/imx50.dtsi   | 1 +
+ arch/arm/boot/dts/imx51.dtsi   | 1 +
+ arch/arm/boot/dts/imx53.dtsi   | 1 +
+ arch/arm/boot/dts/imx6qdl.dtsi | 1 +
+ arch/arm/boot/dts/imx6sl.dtsi  | 1 +
+ 8 files changed, 8 insertions(+)
 
-diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
-index 65894f7..4daa597 100644
---- a/drivers/clk/spear/spear1310_clock.c
-+++ b/drivers/clk/spear/spear1310_clock.c
-@@ -742,19 +742,19 @@ void __init spear1310_clk_init(void __iomem *misc_base, void __iomem *ras_base)
- 	clk = clk_register_gate(NULL, "pcie_sata_0_clk", "ahb_clk", 0,
- 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_0_CLK_ENB,
- 			0, &_lock);
--	clk_register_clkdev(clk, NULL, "dw_pcie.0");
-+	clk_register_clkdev(clk, NULL, "b1000000.pcie");
- 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index 32f760e..77bb743 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -14,6 +14,7 @@
  
- 	clk = clk_register_gate(NULL, "pcie_sata_1_clk", "ahb_clk", 0,
- 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_1_CLK_ENB,
- 			0, &_lock);
--	clk_register_clkdev(clk, NULL, "dw_pcie.1");
-+	clk_register_clkdev(clk, NULL, "b1800000.pcie");
- 	clk_register_clkdev(clk, NULL, "b1800000.ahci");
+ / {
+ 	aliases {
++		ethernet0 = &fec;
+ 		gpio0 = &gpio1;
+ 		gpio1 = &gpio2;
+ 		gpio2 = &gpio3;
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index 6279e0b..83a8247 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -16,6 +16,7 @@
  
- 	clk = clk_register_gate(NULL, "pcie_sata_2_clk", "ahb_clk", 0,
- 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_PCIE_SATA_2_CLK_ENB,
- 			0, &_lock);
--	clk_register_clkdev(clk, NULL, "dw_pcie.2");
-+	clk_register_clkdev(clk, NULL, "b4000000.pcie");
- 	clk_register_clkdev(clk, NULL, "b4000000.ahci");
+ / {
+ 	aliases {
++		ethernet0 = &fec;
+ 		gpio0 = &gpio1;
+ 		gpio1 = &gpio2;
+ 		gpio2 = &gpio3;
+diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
+index 88b218f..e59ccb4 100644
+--- a/arch/arm/boot/dts/imx35.dtsi
++++ b/arch/arm/boot/dts/imx35.dtsi
+@@ -13,6 +13,7 @@
  
- 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
-diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
-index fe835c1..5a5c664 100644
---- a/drivers/clk/spear/spear1340_clock.c
-+++ b/drivers/clk/spear/spear1340_clock.c
-@@ -839,7 +839,7 @@ void __init spear1340_clk_init(void __iomem *misc_base)
- 	clk = clk_register_gate(NULL, "pcie_sata_clk", "ahb_clk", 0,
- 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_PCIE_SATA_CLK_ENB,
- 			0, &_lock);
--	clk_register_clkdev(clk, NULL, "dw_pcie");
-+	clk_register_clkdev(clk, NULL, "b1000000.pcie");
- 	clk_register_clkdev(clk, NULL, "b1000000.ahci");
+ / {
+ 	aliases {
++		ethernet0 = &fec;
+ 		gpio0 = &gpio1;
+ 		gpio1 = &gpio2;
+ 		gpio2 = &gpio3;
+diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
+index 0c75fe3..c249064 100644
+--- a/arch/arm/boot/dts/imx50.dtsi
++++ b/arch/arm/boot/dts/imx50.dtsi
+@@ -17,6 +17,7 @@
  
- 	clk = clk_register_gate(NULL, "sysram0_clk", "ahb_clk", 0,
+ / {
+ 	aliases {
++		ethernet0 = &fec;
+ 		gpio0 = &gpio1;
+ 		gpio1 = &gpio2;
+ 		gpio2 = &gpio3;
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index e4b07d1..e508e6f 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -19,6 +19,7 @@
+ 
+ / {
+ 	aliases {
++		ethernet0 = &fec;
+ 		gpio0 = &gpio1;
+ 		gpio1 = &gpio2;
+ 		gpio2 = &gpio3;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 80615df..5f382ea 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -18,6 +18,7 @@
+ 
+ / {
+ 	aliases {
++		ethernet0 = &fec;
+ 		gpio0 = &gpio1;
+ 		gpio1 = &gpio2;
+ 		gpio2 = &gpio3;
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index a2d5c49..d63df59 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -14,6 +14,7 @@
+ 
+ / {
+ 	aliases {
++		ethernet0 = &fec;
+ 		can0 = &can1;
+ 		can1 = &can2;
+ 		gpio0 = &gpio1;
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 3cb4941..6477447 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -14,6 +14,7 @@
+ 
+ / {
+ 	aliases {
++		ethernet0 = &fec;
+ 		gpio0 = &gpio1;
+ 		gpio1 = &gpio2;
+ 		gpio2 = &gpio3;
 -- 
-1.7.0.1
+1.8.5.2
