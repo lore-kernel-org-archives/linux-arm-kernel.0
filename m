@@ -1,30 +1,26 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 28 Feb 2014 14:49:53 -0600
-Subject: [PATCHv2 3/4] ARM: dts: OMAP4: Add IOMMU nodes
+Date: Fri, 28 Feb 2014 14:49:54 -0600
+Subject: [PATCHv2 4/4] ARM: dts: OMAP5: Add IOMMU nodes
 In-Reply-To: <1393620594-14957-1-git-send-email-s-anna@ti.com>
 References: <1393620594-14957-1-git-send-email-s-anna@ti.com>
-Message-ID: <1393620594-14957-4-git-send-email-s-anna@ti.com>
+Message-ID: <1393620594-14957-5-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Vaussard <florian.vaussard@epfl.ch>
+The IOMMU DT nodes have been added for the DSP and IPU
+subsystems. The MMUs in OMAP5 are identical to those in
+OMAP4, including the bus error back capability on IPU.
 
-Add the IOMMU nodes for the DSP and IPU subsystems. The MMU
-within the IPU sub-system also supports a bus error back
-capability, not available on the DSP MMU.
-
-Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-[s-anna at ti.com: IPU bus error back addition]
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/boot/dts/omap4.dtsi | 15 +++++++++++++++
+ arch/arm/boot/dts/omap5.dtsi | 15 +++++++++++++++
  1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index d3f8a6e..ab7be95 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -461,6 +461,21 @@
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index a72813a..42b9a44 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -513,6 +513,21 @@
  			dma-names = "tx", "rx";
  		};
  
@@ -43,8 +39,8 @@ index d3f8a6e..ab7be95 100644
 +			ti,iommu-bus-err-back;
 +		};
 +
- 		wdt2: wdt at 4a314000 {
- 			compatible = "ti,omap4-wdt", "ti,omap3-wdt";
- 			reg = <0x4a314000 0x80>;
+ 		keypad: keypad at 4ae1c000 {
+ 			compatible = "ti,omap4-keypad";
+ 			reg = <0x4ae1c000 0x400>;
 -- 
 1.9.0
