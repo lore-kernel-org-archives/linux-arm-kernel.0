@@ -1,14 +1,22 @@
 From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 27 Feb 2014 17:19:53 -0800
-Subject: [PATCH 2/3] PCI: designware: add ability for custom swizzle
+Date: Thu, 27 Feb 2014 17:19:54 -0800
+Subject: [PATCH 3/3] PCI: imx6: ventana: fixup for IRQ mismapping
 In-Reply-To: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
 References: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1393550394-11071-3-git-send-email-tharvey@gateworks.com>
+Message-ID: <1393550394-11071-4-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the ability for a platform driver to provide a host-specific
-swizzle function.
+The TI XIO2001 PCIe-to-PCI bridge used on Ventana expansion boards
+has its slot-to-bridge IRQ mapping reversed from the PCI specification:
+
+  INTA->INTD
+  INTB->INTC
+  INTC->INTB
+  INTD->INTA
+
+Implement a custom swizzle function that does a fixup on the interrupt for
+devices on the first TI XIO2001 bridge in the tree.
 
 Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
@@ -18,35 +26,75 @@ Cc: Lucas Stach <l.stach@pengutronix.de>
 Cc: Sean Cross <xobs@kosagi.com>
 Cc: Jingoo Han <jg1.han@samsung.com>
 ---
- drivers/pci/host/pcie-designware.c | 3 +++
- drivers/pci/host/pcie-designware.h | 1 +
- 2 files changed, 4 insertions(+)
+ drivers/pci/host/pci-imx6.c | 36 ++++++++++++++++++++++++++++++++++++
+ include/linux/pci_ids.h     |  1 +
+ 2 files changed, 37 insertions(+)
 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 5808177..a143f2a 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -480,6 +480,9 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
- 	if (pp->ops->host_init)
- 		pp->ops->host_init(pp);
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index aaa05c8..b171a21 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -493,6 +493,39 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
+ 	return 0;
+ }
  
-+	if (pp->swizzle)
-+		dw_pci.swizzle = pp->swizzle;
++/* TI XIO2001 PCIe-to-PCI bridge on GW16082 exp card has IRQs reversed */
++u8 ventana_swizzle(struct pci_dev *dev, u8 *pin)
++{
++	u8 i = 0;
++	struct pci_dev *pdev = dev;
 +
- 	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
++	/* count number of TI XIO2001 bridges on bus */
++	while (!pci_is_root_bus(pdev->bus)) {
++		if (pdev->bus && pdev->bus->self &&
++		    (pdev->bus->self->vendor == PCI_VENDOR_ID_TI) &&
++		    (pdev->bus->self->device == PCI_DEVICE_ID_TI_XIO2001)) {
++			i++;
++		}
++		pdev = pdev->bus->self;
++	}
++	while (!pci_is_root_bus(dev->bus)) {
++		/* if we are directly downstream from 1st TI XIO2001 bridge */
++		if (dev->bus && dev->bus->self &&
++		    (dev->bus->self->vendor == PCI_VENDOR_ID_TI) &&
++		    (dev->bus->self->device == PCI_DEVICE_ID_TI_XIO2001)) {
++			if (--i == 0) {
++				/* swap IRQs and swizzle backwards */
++				*pin = (15 - PCI_SLOT(dev->devfn)) + 1;
++				dev = dev->bus->self;
++				continue;
++			}
++		}
++		*pin = pci_swizzle_interrupt_pin(dev, *pin);
++		dev = dev->bus->self;
++	}
++	return PCI_SLOT(dev->devfn);
++}
++
+ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct imx6_pcie *imx6_pcie;
+@@ -601,6 +634,9 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 		return PTR_ERR(imx6_pcie->iomuxc_gpr);
+ 	}
  
- 	/* program correct class for RC */
-diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index 5c596c0..8631d56 100644
---- a/drivers/pci/host/pcie-designware.h
-+++ b/drivers/pci/host/pcie-designware.h
-@@ -53,6 +53,7 @@ struct pcie_port {
- 	struct irq_domain	*irq_domain;
- 	unsigned long		msi_data;
- 	DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
-+	u8			(*swizzle)(struct pci_dev *, u8 *);
- };
- 
- struct pcie_host_ops {
++	if (of_machine_is_compatible("gw,ventana"))
++		pp->swizzle = ventana_swizzle;
++
+ 	ret = imx6_add_pcie_port(pp, pdev);
+ 	if (ret < 0)
+ 		return ret;
+diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+index 97fbecd..4ca334f 100644
+--- a/include/linux/pci_ids.h
++++ b/include/linux/pci_ids.h
+@@ -822,6 +822,7 @@
+ #define PCI_DEVICE_ID_TI_XX12		0x8039
+ #define PCI_DEVICE_ID_TI_XX12_FM	0x803b
+ #define PCI_DEVICE_ID_TI_XIO2000A	0x8231
++#define PCI_DEVICE_ID_TI_XIO2001	0x8240
+ #define PCI_DEVICE_ID_TI_1130		0xac12
+ #define PCI_DEVICE_ID_TI_1031		0xac13
+ #define PCI_DEVICE_ID_TI_1131		0xac15
 -- 
 1.8.3.2
