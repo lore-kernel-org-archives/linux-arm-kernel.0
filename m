@@ -1,102 +1,48 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 28 Feb 2014 14:51:22 +0100
-Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
-In-Reply-To: <53108B9C.5000006@ti.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <531087C0.1090501@gmail.com> <53108B9C.5000006@ti.com>
-Message-ID: <5310945A.9040106@gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 28 Feb 2014 14:53:49 +0100
+Subject: [PATCH 1/3] PCI: designware: add legacy PCI interrupt mapping
+In-Reply-To: <6315058.94ydMC9ka8@wuerfel>
+References: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
+ <5728262.sMhnqxGTXH@wuerfel>
+ <1393589374.5225.9.camel@weser.hi.pengutronix.de>
+ <6315058.94ydMC9ka8@wuerfel>
+Message-ID: <1393595629.5225.12.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/14 14:14, Tomi Valkeinen wrote:
-> On 28/02/14 14:57, Sebastian Hesselbarth wrote:
->
->> Out of curiosity, will there be DT nodes for pull-up resistors soon,
->> too? ;)
->
-> If they don't work automatically, yes, we need DT nodes and drivers for
-> them.
->
->> Honestly, TPD12S015 is a level shifter, there is nothing in it that
->> would justify a DT node nor a driver.
->
-> TPD requires a power. Who turns that on? It also has two GPIOs, LS_OE
-> and CT_CP_HPD, which need to be controlled based on what the user wants
-> and the state of the HPD line. Who controls those?
+Am Freitag, den 28.02.2014, 13:27 +0100 schrieb Arnd Bergmann:
+> On Friday 28 February 2014 13:09:34 Lucas Stach wrote:
+> > Am Freitag, den 28.02.2014, 12:37 +0100 schrieb Arnd Bergmann:
+> > > On Friday 28 February 2014 12:27:36 Lucas Stach wrote:
+> > > The interrupt-map doesn't even look well-formed, since it refers to
+> > > a gic that has #interrupt-cells=<3>, but only has one cell with the
+> > > value. This clearly cannot work at all. It should probably be
+> > > 
+> > >       interrupt-map = <0x0 0 &gic GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+> > > 
+> > > Note that '53' is the IRQ number that is commonly assigned to
+> > > SPI interrupt 21, since SPI starts at number 32 on GIC.
+> > > 
+> > Ah, I see. Thanks for the explanation. So we have a bogus Exynos DT,
+> > which will break existing systems once the kernel starts to do the right
+> > thing. This is starting to look great. 
+>  
+> It seems tegra and r-car have the same bug. We can probably fix it
+> in a backwards-compatible way by changing the function to call
+> the generic helper first and if that fails call printk_once()
+> to emit a warning and return the hardwired IRQ number.
+> 
 
-Strictly speaking TPD12S015 has _no_ GPIO but only buffers. It
-translates one voltage to another. The controlling instance is
-your "video card" that is really interested in the actual state
-of HPD signal.
+Yes, seems like the way to go. I'll prepare some patches for that. It
+seems of_irq_parse_and_map_pci() already emits an error message if it
+can't find a valid mapping. This should be enough to get people to fix
+their DTs.
 
-Also the same for power, TPD12S015 doesn't decide to be powered up
-or down but the "video card" does. We have GPIO regulators that
-deal with that situation already.
+Regards,
+Lucas 
 
-Consider the same board but replace TPD12S015 with another level-
-shifter, you still want OMAP video driver work with that out-of-the-box,
-don't you? Fact is, OMAP IP requires GPIOs to sense HPD status hence
-that GPIO is a property of the corresponding OMAP node. How level-
-translation happens is irrelevant here.
-
->> Above you already note, that connector nodes should offer HPD in the
->> future, but I guess the binding should represent that now already.
->
-> I think it can be added when somebody uses it. I don't see why that
-> would cause trouble later to those that don't use it.
-
-Thinking about it again, HPD gpio shouldn't be a property of the
-connector at all but again the controlling instance. The connector
-cannot deal with the information provided by HPD nor can it determine
-if anyone is listening to HPD events.
-
->> I will be a DT stub anyway, the corresponding video sink driver will
->> have to look it up.
->
-> I'm not sure what you mean with that. Yes, it's not the most complex DT
-> nodes out there.
- >
->> Looking through the bindings for DVI and HDMI, I guess HPD gpio is
->> better kept in those nodes. From the relevant (DT) properties DVI and
->> HDMI connectors are in no way different.
->
-> Well, I think the HPD gpio should be where it's most logical to have it.
-
-Right, but this is usually the controlling instance and not the
-consuming one. E.g. to detect presence of an MMC card by GPIO, you'd
-put that into the MMC _controller_ not any card node.
-
-> I mean, you could have a setup where you have the SoC HDMI encoder and
-> and the HDMI connector, and the HPD pin goes directly to the HDMI
-> encoder, which has HW support for it. In that case, the HDMI encoder
-> node should contain the HPD, and the HDMI encoder should handle it.
-
-I wonder, if in case of an dedicated HPD pin, you would ever expose that
-in DT.
-
-> Or, your HDMI encoder could not have any kind of support for HPD. In
-> that case you could have the HDMI connector driver handle the hotplug
-> event. You could of course make the HDMI encoder driver handle the HPD
-> gpio, but I usually try to have the driver handle the hardware device in
-> question.
-
-Having a driver for a dumb connector seems to be a little exaggerated.
-Consider your generic HDMI connector "driver" connected to dedicated HPD
-case above. It is pretty useless then. OTOH video controllers with 
-dedicated HPD know very well they can control HPD themselves, video 
-controllers without dedicated HPD also know very well that they need
-GPIO for it.
-
-> In OMAP's case, we have the TPD chip between the HDMI encoder and the
-> connector, and the logical place to handle HPD GPIO in that case is the
-> TPD driver, as that's where the HPD is connected to and the TPD needs to
-> be configured according to the state of the HPD.
-
-Is it really the logical place to handle HPD? I'd have put it into the
-HDMI encoder because it's the unit most interested in the state of HPD.
-
-Please, don't get me wrong, I like all this to be baked into a binding -
-just wondering if a level-shifter driver plus corresponding DT node
-is too much detail in here.
-
-Sebastian
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
