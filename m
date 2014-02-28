@@ -1,42 +1,43 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 28 Feb 2014 14:49:50 -0600
-Subject: [PATCHv2 0/4] OMAP IOMMU DTS nodes
-Message-ID: <1393620594-14957-1-git-send-email-s-anna@ti.com>
+Date: Fri, 28 Feb 2014 14:49:52 -0600
+Subject: [PATCHv2 2/4] ARM: dts: OMAP3: Add IVA IOMMU node
+In-Reply-To: <1393620594-14957-1-git-send-email-s-anna@ti.com>
+References: <1393620594-14957-1-git-send-email-s-anna@ti.com>
+Message-ID: <1393620594-14957-3-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Florian Vaussard <florian.vaussard@epfl.ch>
 
-This is an updated series of the OMAP IOMMU DTS nodes
-for OMAP3, OMAP4 and OMAP5. The main change is the removal
-of the dma-window property from all the IOMMU DT nodes, as
-per the discussion on the bindings posted previously [1].
+Add the DT node for the IOMMU within the DSP subsystem. The entry
+is disabled to keep in line with the hwmod usage as intended by
+the deprecated CONFIG_OMAP_IOMMU_IVA2 flag.
 
-This series goes along with the v3 version of the driver
-DT adaptation series [2]. The DTS patches are updated
-as per the new bindings document patch [3].
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+[s-anna at ti.com: split the entry and disable the node]
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/boot/dts/omap3.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-[1] http://marc.info/?l=linux-omap&m=139345649217892&w=2
-[2] http://marc.info/?l=linux-omap&m=139362022805667&w=2
-[3] http://marc.info/?l=linux-omap&m=139362026905683&w=2
-
-v1:
-DTS patches as per v2 series of driver DT adaptation
-series.
-http://marc.info/?l=linux-omap&m=139231582217147&w=2
-
-Florian Vaussard (3):
-  ARM: dts: OMAP3: Update ISP IOMMU node
-  ARM: dts: OMAP3: Add IVA IOMMU node
-  ARM: dts: OMAP4: Add IOMMU nodes
-
-Suman Anna (1):
-  ARM: dts: OMAP5: Add IOMMU nodes
-
- arch/arm/boot/dts/omap3.dtsi | 15 ++++++++++++---
- arch/arm/boot/dts/omap4.dtsi | 15 +++++++++++++++
- arch/arm/boot/dts/omap5.dtsi | 15 +++++++++++++++
- 3 files changed, 42 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index f7a47e3..9574a9e 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -418,6 +418,14 @@
+ 			ti,#tlb-entries = <8>;
+ 		};
+ 
++		mmu_iva: mmu at 5d000000 {
++			compatible = "ti,omap2-iommu";
++			reg = <0x5d000000 0x80>;
++			interrupts = <28>;
++			ti,hwmods = "mmu_iva";
++			status = "disabled";
++		};
++
+ 		wdt2: wdt at 48314000 {
+ 			compatible = "ti,omap3-wdt";
+ 			reg = <0x48314000 0x80>;
 -- 
 1.9.0
