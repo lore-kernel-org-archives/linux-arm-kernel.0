@@ -1,94 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Feb 2014 09:46:39 +0100
-Subject: [PATCH v2 4/4] pci: Add support for creating a generic
- host_bridge from device tree
-In-Reply-To: <1393543924.14012.56.camel@pasglop>
-References: <1393506402-11474-1-git-send-email-Liviu.Dudau@arm.com>
- <18746655.qWHLpMg2Yy@wuerfel> <1393543924.14012.56.camel@pasglop>
-Message-ID: <41426943.fCMrEO9t9X@wuerfel>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 28 Feb 2014 10:49:26 +0200
+Subject: [PATCH 1/8] clk: divider: fix rate calculation for fractional
+ rates
+In-Reply-To: <20140227022524.12081.32368@quantum>
+References: <1392285846-13199-1-git-send-email-tomi.valkeinen@ti.com>
+ <1392285846-13199-2-git-send-email-tomi.valkeinen@ti.com>
+ <52FE1DF2.2040707@ti.com> <20140227022524.12081.32368@quantum>
+Message-ID: <53104D96.5040704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 February 2014 10:32:04 Benjamin Herrenschmidt wrote:
-> On Thu, 2014-02-27 at 14:38 +0100, Arnd Bergmann wrote:
-> > On Thursday 27 February 2014 13:06:42 Liviu Dudau wrote:
-> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > 
-> > Please add Benjamin Herrenschmidt to Cc here, I think it would be helpful
-> > to get his input so we can make this work on powerpc as well.
+On 27/02/14 04:25, Mike Turquette wrote:
+
+>> Basically the patch looks good to me, but it might be good to have a 
+>> testing round of sort with this. It can potentially cause regressions on 
+>> multiple boards if the drivers happen to rely on the "broken" clock 
+>> rates. Same for patch #2 which is a copy paste of this one, but only 
+>> impacts TI boards.
 > 
-> Tricky... We would need hooks which would turn the whole thing into a
-> pile of spaghetti. I think we should stick to using the range helpers
-> (Andrew latest patch), which makes the powerpc code a lot smaller,
-> and leave it at that.
+> Agreed. I've taken patches #1 & #2 into clk-next. Let's let them stew in
+> -next for a while and see if anyone's board catches on fire.
 
-We can certainly do both: small helpers that let you shrink the powerpc
-code, and a generic implementation that can be shared by some of the
-other architectures that you don't use. The PCI core already uses
-a number of 'weak' functions here, and we can expand on that.
+Thanks. I understand there's a possibility this could break some other
+driver. I still wish we could get this to 3.14, as this would fix OMAP
+display subsystem.
 
- > > +		res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-> > > +		if (!res) {
-> > > +			err = -ENOMEM;
-> > > +			goto bridge_ranges_nomem;
-> > > +		}
-> > > +
-> > > +		of_pci_range_to_resource(&range, dev, res);
-> > > +
-> > > +		if (resource_type(res) == IORESOURCE_IO)
-> > > +			*io_base = range.cpu_addr;
-> 
-> You don't care about the size of the IO space ?
+ Tomi
 
-We probably should. The ARM code currently assumes that each I/O
-space is 64KB, but for a generic implementation we probably want
-to handle both smaller and larger windows. I suggested not supporting
-more than 1MB though, which is the maximum that I can see a reason
-for, i.e. the pci-mvebu fake host bridge that has to combine
-multiple per-port HW I/O spaces into one logical space.
 
-> > > +		pci_add_resource_offset(resources, res,
-> > > +				res->start - range.pci_addr);
-> > > +	}
-> > 
-> > This is not the correct resource for I/O space at all. Please talk
-> > to Will, I've been over this with him in detail and he probably
-> > understands it now. I assume you are both working in the same
-> > building.
-> 
-> Yes, the IO offsets work differently on powerpc as well
-
-As I noticed later, the first patch in the series actually changes
-the range_to_resource parser to return the logical start here, which
-would make the offset correct even on powerpc, but unfortunately
-I think that cannot work.
-
-> > > +struct pci_host_bridge *
-> > > +of_create_pci_host_bridge(struct device *parent, struct pci_ops *ops, void *host_data)
-> > > +{
-> > > +	int err, domain, busno;
-> > > +	struct resource bus_range;
-> > > +	struct pci_bus *root_bus;
-> > > +	struct pci_host_bridge *bridge;
-> > > +	resource_size_t io_base;
-> > > +	LIST_HEAD(res);
-> > > +
-> > > +	domain = of_alias_get_id(parent->of_node, "pci-domain");
-> > > +	if (domain == -ENODEV)
-> > > +		domain = domain_nr++;
-> > >
-> We probably want some uniqueness testing here.
-
-I thought this at first too, but as Liviu mentioned, this does
-get caught later when trying to create the root bus with
-a conflicting number.
-
-What the above code cannot do is to put multiple host bridges
-into the same domain, using distinct bus ranges. This is an
-intentional simplification over what some architectures currently
-do, and we could not see a reason why you would still need
-to put multiple host bridges into one domain in 2014.
-
-x86 with ACPI does it, but they won't call of_create_pci_host_bridge.
-
-	Arnd
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/ffb9e296/attachment.sig>
