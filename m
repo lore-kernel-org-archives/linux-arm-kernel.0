@@ -1,170 +1,173 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 28 Feb 2014 13:21:05 +0900
-Subject: [GIT PULL 00/21] Renesas ARM based SoC Board Updates for v3.15
-In-Reply-To: <201402251704.54970.arnd@arndb.de>
-References: <cover.1391665225.git.horms+renesas@verge.net.au>
- <20140220082316.GE19089@quad.lixom.net>
- <CANqRtoQj8CNn=pNP5HkVbaSSc=PbZEoOD3wGa9sXF9nXraTVeQ@mail.gmail.com>
- <201402251704.54970.arnd@arndb.de>
-Message-ID: <CANqRtoQyX6o=mO0wG8skqVVPPfFC6vZHGwdqoz6zjbODA9nwHA@mail.gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 27 Feb 2014 20:24:40 -0800
+Subject: [PATCH 1/3] PCI: designware: add legacy PCI interrupt mapping
+In-Reply-To: <000901cf3428$ec18acd0$c44a0670$%han@samsung.com>
+References: <1393550394-11071-1-git-send-email-tharvey@gateworks.com>
+ <1393550394-11071-2-git-send-email-tharvey@gateworks.com>
+ <000901cf3428$ec18acd0$c44a0670$%han@samsung.com>
+Message-ID: <CAJ+vNU2Ea+hHZxcOBXfBEFtryJEzU+axCHRW2rOM8JedWROyTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 26, 2014 at 1:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 25 February 2014, Magnus Damm wrote:
->> On Thu, Feb 20, 2014 at 5:23 PM, Olof Johansson <olof@lixom.net> wrote:
->> > On Thu, Feb 06, 2014 at 03:17:08PM +0900, Simon Horman wrote:
->> Thanks for your email. I agree that the number of board file commits
->> is definitely larger than zero so some clarification is in order.
+On Thu, Feb 27, 2014 at 6:00 PM, Jingoo Han <jg1.han@samsung.com> wrote:
+> On Friday, February 28, 2014 10:20 AM, Tim Harvey wrote:
 >>
->> As you probably recall, we earlier agreed on not adding any new board
->> files. That part is clear I believe so I will skip that.
+>> The IMX6 maps INTA/B/C/D to ARM GIC IRQ 155/154/153/152 respectively.
+>> This allows a PCIe-to-PCI bridge to function properly.
 >>
->> Regarding the legacy board code, we have quite ok hardware support
->> coverage as it is now, but some devices drivers are of course still
->> under development. This means that in some cases integration is on
->> going or has not happened yet. You may see those kind of changes as
->> significant commits in the pull requests for board support.
+>> The irq field of the pcie_host struct is expanded to 4 interrupts to
+>> allow for INTA/B/C/D and the IMX6 PCIe host driver will populate them
+>> all from devicetree.  I'm not clear if the Exynos driver has this
+>> capability so it places the same interrupt in all 4 slots.
 >
-> [adding Ben Dooks, since he was complaining about this as well]
+> (+cc Marek Vasut, Pratyush Anand, Kishon Vijay Abraham I, Mohit KUMAR DCG)
 >
-> My feeling is that we should adjust the strategy for shmobile. We've
-> had good success with the dual strategy of keeping board support
-> separate for DT-enabled and ATAGS-only boards in the sense that
-> we did not have to coordinate updates for bindings between subsystem
-> and architecture git trees, which has always been source for
-> problems on other platforms.
-
-Hi Arnd,
-
-You're right that many of our boot loaders only provide us with ATAG
-information. In the kernel we have long since made use of appended DTB
-to handle those cases. The last bit of code that depended on ATAGS and
-mach-type being passed from the boot loader was removed in the
-following patch:
-
-[PATCH] ARM: shmobile: Update romImage to relocate appended DTB
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/boot/compressed/head-shmobile.S?id=2c408d149299e99c89fc4be80fb4fe00a7016f02
-
-> However, the price for this seems to be that it's still not possible
-> to get a properly working system without a board file, and my feeling
-> is that it's taking too long to get there. In particular, we now see
-> new drivers getting added (I noticed VIN, which Ben mentioned before)
-> that start out with just platform_device support but no DT support.
-> This is bad, because it means DT users are always behind.
-
->From my side it is possible to boot working systems with DT only
-(without a board file) for a wide range of SoCs and boards. Actually,
-for KZM9D we have no board code - instead there is only Multiplatform
-DT. Any left over C board code for KZM9D and the legacy EMEV2SoC code
-is removed in:
-
-[PATCH 00/03] ARM: shmobile: Clean up the EMEV2 and KZM9D code base
-http://www.spinics.net/lists/arm-kernel/msg307379.html
-
-To be clear, I believe all our boards can boot without a board file.
-The only exception is sh7372 and Mackerel which will be phased out.
-
-Please note that device support may however be limited with DT. This
-since several device drivers are under constant development to be able
-to support the latest hardware features. And the hardware is being
-updated quite regularly, so it seems to me that our only choice is to
-keep on updating software support.
-
->> In the Legacy Lager/Koelsch board code the following devices are
->> supported as platform devices:
->>
->> ETHER, SCIF, DU, I2C, SATA*, USB*, MSIOF*, SDHI*, QSPI*, MMCIF,
->> Audio*, VIN*, Thermal, IRQC, PFC, CMT
->>
->> * Platform device support under development in v3.15-pre
->>
->> In the Multiplatform DT for Lager/Koelsch the following devices have DT support:
->>
->> ETHER, SCIF**, I2C, SATA, MSIOF, SDHI, QSPI, MMCIF, Thermal, IRQC, PFC, CMT**
->>
->> ** Driver DT binding development on-going but integration not finalized
->>
->> In Multiplatform DT for Lager/Koelsch the following devices lack DT bindings:
->>
->> DU (drm/kms)
->> USB (host/function/phy)
->> Audio (alsa-soc + dmac)
->> VIN (v4l2 + camera sensor)
+> In the case of Exynos,
+> 'INTA/B/C/D' are mapped to only one interrupt (<0 20 0>).
+> Thus, the current code works properly on Exynos platform.
 >
-> Ok, thanks for the list.
+> There are three interrupts for Exynos PCIe; INTx, MSI, PHY Link,
+> respectively as below.
 >
->> Our plan is to migrate over to the DT Multiplatform code base as soon
->> as ever possible, but at the same time we do not want to commit long
->> term support of potentially premature DT bindings. Our short term
->> solution to that is to use platform devices for a limited number of
->> devices together with DT Multiplatform.
->>
->> If you would like use to adjust our way forwards please let me know!
+> ./arch/arm/boot/dts/exynos5440.dtsi
+>         interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
 >
-> I think you should try to close the gap between ATAGS and DT now and
-> stop the dual strategy. You seem to have come far enough with the
-> basic infrastructure (clock, pinctrl, irq, timer, ...) that all the
-> devices missing DT support now are on-chip peripherals. If this is the
-> case, it should be possible to use auxdata registration in the
-> per-soc files to connect the platform data to the remaining devices
-> that are lacking DT bindings. This means we have to be more careful
-> with the dependencies when a driver gains a DT binding, but at least
-> we can enforce that any driver in the future only gets merged with
-> a proper DT binding as we do for other subarchitectures, and you don't
-> have to implement probing twice for each new driver.
+> <0 20 0>: PCIe RC0 pulse interrupt,
+>              INTA, INTB, INTC and INTD, etc
+> <0 21 0>: PCIe RC0 level interrupt,
+>              MSI, etc
+> <0 22 0>: PCIe RC0 special interrupt,
+>              PHY Link related interrupts, etc
+>
+> Of course, legacy INTx is handled as message only.
+>
+> Mohit, Kishon,
+> How about the other SoCs? INTx is mapped to single interrupt
+> such as Exynos, or separate interrupts such as i.MX6?
 
-I agree about closing the gap and using DT as much as ever possible.
-Perhaps we need to discuss a bit more about how to proceed.
+Jingoo,
 
-In my mind this all boils down to two separate issues:
-
-1) How to close the gap:
-
-Our current plan is to copy the left over non-DT devices from legacy
-board code to our DT board support. This can be done with or without
-AUXDATA, exactly how to do it is a separate (but perhaps important?)
-issue. When the DT board support is in OK state then we remove the
-legacy board code. How long time that takes depends on the level of
-board support. For the boards and devices I listed above I believe it
-can be done in less than a week. If you want us to do this differently
-then please advice us about your preference.
-
-Regarding AUXDATA, it seems mainly useful for simple devices that have
-no dependencies on other parts of the system. Our remaining portion of
-non-DT device drivers are however all relatively complex devices with
-many dependencies and sometimes odd topology. On such device drivers
-our prototyping showed that AUXDATA mainly came with drawbacks of
-having to commit to bindings prematurely but we could not really see
-any upside. We would like to hear more from you how you think we
-should proceed.
-
-
-2) How to handle continuous driver development and integration
-
-As you have seen, most of our simple device drivers have already been
-successfully converted to DT. What remains are more complex devices.
-
-Since we do upstream first we rely on being able to develop device
-driver code incrementally over several kernel releases. To allow early
-use, development and testing we also integrate the device drivers
-continuously. We have been doing this for many years now and it seems
-to work really well for us. That device drivers are reused and
-improved over several years is quite common.
-
-So far we have been developing basic support via platform device
-interfaces and directly exposed that to our users via board code
-written in C. Over time we start feeling confident that we have good
-enough support level and understanding of the hardware for a
-particular driver. When that point has been reached then we define
-bindings to enable DT support. From there we probably keep on
-iterating even more. This is what we currently do.
-
-In mach-shmobile you see a lot of board changes coming from us when we
-are performing continuous driver integration. I would like to ask you
-for advice if you can recommend us any other development model that
-may fit better with the ARM SoC way of doing things.
+Ok - so at least the I.MX6 and Exynos, which both use the designware
+IP need different IRQ mappings.  It seems to me then that the map_irq
+should be moved out of drivers/pci/host/pcie-designware.c and into the
+SoC specific host controller drivers (pci-imx.c and pci-exynos.c).  If
+that becomes the consensus I can submit a patch that does that.
 
 Thanks,
 
-/ magnus
+Tim
+
+>
+> Best regards,
+> Jingoo Han
+>
+>>
+>> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> Cc: Richard Zhu <r65037@freescale.com>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Cc: Lucas Stach <l.stach@pengutronix.de>
+>> Cc: Sean Cross <xobs@kosagi.com>
+>> Cc: Jingoo Han <jg1.han@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/imx6qdl.dtsi     |  2 +-
+>>  drivers/pci/host/pci-exynos.c      |  7 +++++--
+>>  drivers/pci/host/pci-imx6.c        | 11 +++++++----
+>>  drivers/pci/host/pcie-designware.c |  8 +++++++-
+>>  drivers/pci/host/pcie-designware.h |  2 +-
+>>  5 files changed, 21 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+>> index eed6897..fad8d90 100644
+>> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+>> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+>> @@ -126,7 +126,7 @@
+>>                                 0x81000000 0 0          0x01f80000 0 0x00010000 /* downstream I/O */
+>>                                 0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable
+>> memory */
+>>                       num-lanes = <1>;
+>> -                     interrupts = <0 123 0x04>;
+>> +                     interrupts = <0 123 0x04>, <0 122 0x04>, <0 121 0x04>, <0 120 0x04>;
+>>                       clocks = <&clks 189>, <&clks 187>, <&clks 206>, <&clks 144>;
+>>                       clock-names = "pcie_ref_125m", "sata_ref_100m", "lvds_gate", "pcie_axi";
+>>                       status = "disabled";
+>> diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
+>> index 3de6bfb..d85dcb0 100644
+>> --- a/drivers/pci/host/pci-exynos.c
+>> +++ b/drivers/pci/host/pci-exynos.c
+>> @@ -515,11 +515,14 @@ static int add_pcie_port(struct pcie_port *pp, struct platform_device *pdev)
+>>  {
+>>       int ret;
+>>
+>> -     pp->irq = platform_get_irq(pdev, 1);
+>> -     if (!pp->irq) {
+>> +     pp->irq[0] = platform_get_irq(pdev, 1);
+>> +     if (!pp->irq[0]) {
+>>               dev_err(&pdev->dev, "failed to get irq\n");
+>>               return -ENODEV;
+>>       }
+>> +     pp->irq[1] = pp->irq[0];
+>> +     pp->irq[2] = pp->irq[0];
+>> +     pp->irq[3] = pp->irq[0];
+>>       ret = devm_request_irq(&pdev->dev, pp->irq, exynos_pcie_irq_handler,
+>>                               IRQF_SHARED, "exynos-pcie", pp);
+>>       if (ret) {
+>> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+>> index e8663a8..aaa05c8 100644
+>> --- a/drivers/pci/host/pci-imx6.c
+>> +++ b/drivers/pci/host/pci-imx6.c
+>> @@ -470,11 +470,14 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
+>>                       struct platform_device *pdev)
+>>  {
+>>       int ret;
+>> +     int i;
+>>
+>> -     pp->irq = platform_get_irq(pdev, 0);
+>> -     if (!pp->irq) {
+>> -             dev_err(&pdev->dev, "failed to get irq\n");
+>> -             return -ENODEV;
+>> +     for (i = 0; i < 4; i++) {
+>> +             pp->irq[i] = platform_get_irq(pdev, i);
+>> +             if (!pp->irq[i]) {
+>> +                     dev_err(&pdev->dev, "failed to get irq%d\n", i);
+>> +                     return -ENODEV;
+>> +             }
+>>       }
+>>
+>>       pp->root_bus_nr = -1;
+>> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+>> index 17ce88f..5808177 100644
+>> --- a/drivers/pci/host/pcie-designware.c
+>> +++ b/drivers/pci/host/pcie-designware.c
+>> @@ -738,8 +738,14 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+>>  static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+>>  {
+>>       struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
+>> +     int irq = -1;
+>>
+>> -     return pp->irq;
+>> +     if (pin > 0 && pin < 5)
+>> +             irq = pp->irq[pin - 1];
+>> +     dev_info(&dev->dev, "map_irq: %04x:%04x slot%d pin%d irq%d\n",
+>> +             dev->vendor, dev->device, slot, pin, irq);
+>> +
+>> +     return irq;
+>>  }
+>>
+>>  static void dw_pcie_add_bus(struct pci_bus *bus)
+>> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+>> index 3063b35..5c596c0 100644
+>> --- a/drivers/pci/host/pcie-designware.h
+>> +++ b/drivers/pci/host/pcie-designware.h
+>> @@ -46,7 +46,7 @@ struct pcie_port {
+>>       struct resource         io;
+>>       struct resource         mem;
+>>       struct pcie_port_info   config;
+>> -     int                     irq;
+>> +     int                     irq[4];
+>>       u32                     lanes;
+>>       struct pcie_host_ops    *ops;
+>>       int                     msi_irq;
+>> --
+>> 1.8.3.2
+>
