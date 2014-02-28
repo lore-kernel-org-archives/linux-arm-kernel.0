@@ -1,81 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Feb 2014 12:31:45 +0100
-Subject: [ARM] CNS3xxx: 3 regressions identified in v3.14-rc4+
-In-Reply-To: <m3eh2nqz7n.fsf@t19.piap.pl>
-References: <m3eh2nqz7n.fsf@t19.piap.pl>
-Message-ID: <10801013.Hh6CjhvAyx@wuerfel>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Fri, 28 Feb 2014 11:36:01 +0000
+Subject: [PATCH 1/3] i2c: add DMA support for freescale i2c driver
+In-Reply-To: <201402281004.10238.marex@denx.de>
+References: <1393481115-22136-1-git-send-email-yao.yuan@freescale.com>
+ <201402272139.36076.marex@denx.de>
+ <3f58a8abdda74100b4f7b14d0c31c90e@BL2PR03MB338.namprd03.prod.outlook.com>
+ <201402281004.10238.marex@denx.de>
+Message-ID: <3d65fc9a0c5444b485c93de4087634e0@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 February 2014 12:00:12 Krzysztof Ha?asa wrote:
+Hi Marek,
+> On Friday, February 28, 2014 at 06:19:18 AM, Yao Yuan wrote:
 > 
-> PCI hangs system completely while trying to access any PCI MMIO region
-> (plain IO not tested).
+> [...]
 > 
-> The guilty commit is 928bea964827d7824b548c1f8e06eccbbc4d0d7d:
+> > > > @@ -213,6 +238,7 @@ static struct imx_i2c_hwdata vf610_i2c_hwdata
+> > > > = {
+> > > >
+> > > >  	.ndivs			= ARRAY_SIZE(vf610_i2c_clk_div),
+> > > >  	.i2sr_clr_opcode	= I2SR_CLR_OPCODE_W1C,
+> > > >  	.i2cr_ien_opcode	= I2CR_IEN_OPCODE_0,
+> > > >
+> > > > +	.has_dma_support	= true,
+> > >
+> > > So why exactly don't we have a DT prop for determining whether the
+> > > controller has DMA support ?
+> > >
+> > > What about the other controllers, do they not support DMA for some
+> > > specific reason? Please elaborate on that, thank you !
+> >
+> > Sorry for my fault. I will modify it.
 > 
->     PCI: Delay enabling bridges until they're needed
+> I would prefer if you could explain why other controllers do have DMA
+> disabled even if the hardware does support the DMA operation.
 > 
->     We currently enable PCI bridges after scanning a bus and assigning
->     resources.  This is often done in arch code.
-> 
->     This patch changes this so we don't enable a bridge until necessary, i.e.,
->     until we enable a PCI device behind the bridge.  We do this in the generic
->     pci_enable_device() path, so this also removes the arch-specific code to
->     enable bridges.
-> 
-> Reverting changes in arch/arm/kernel/bios32.c, drivers/pci/bus.c and
-> include/linux/pci.h (= essentially adding pci_enable_bridges(bus) in
-> ARM's pci_common_init_dev()) makes it work again.
-> 
-> Options?
 
-Hmm, this was in 3.12 already, right?
+Well, Because of the I2C in I.MX hardware don't support the DMA operation. 
+But here I also think has_dma_support isn't necessary.
 
-Can you try adding the code in a host specific callback such as
-hw->add_bus?
+> > > Also, can the DMA not do full-duplex operation ? What I see here is
+> > > just
+> > > half- duplex operations , one for RX and the other one for TX .
+> >
+> > Yes, here have two dma channels, one for RX and the other one for TX.
+> > When we request the channel we should determine it for TX or RX.
+> 
+> Sorry, I don't quite understand this. If you have two DMA channels, can
+> you not use them both to do full-duplex SPI transfer ?
+> 
 
-> Issue #3 ###################################################
-> 
-> NR_IRQS:16 nr_irqs:96 96
-> 
-> WARNING: at drivers/irqchip/irq-gic.c:952 gic_init_bases+0xe4/0x2b8()
-> Cannot allocate irq_descs @ IRQ16, assuming pre-allocated
-> Backtrace:
-> gic_init_bases    from cns3xxx_init_irq+0x24/0x34
-> cns3xxx_init_irq  from init_IRQ+0x24/0x2c
-> init_IRQ          from start_kernel+0x1a8/0x338
-> start_kernel      from 0x2000806c
-> 
-> I'm having problems understanding how is machine_desc->nr_irqs supposed
-> to work with CONFIG_ARM_GIC and CONFIG_SPARSE_IRQ set.
-> 
-> machine_desc->nr_irqs is set to NR_IRQS_CNS3XXX =
-> IRQ_TC11MP_GIC_START + 64 = 32 + 64 = 96.
-> 
-> At start, machine_desc->nr_irqs are pre-allocated via
-> start_kernel() -> early_irq_init().
-> 
-> Then, gic_init(0, 29, ...) ->  gic_init_bases(0, 29, ...) tries this
-> (and fails):
-> 
->         /*
->          * For primary GICs, skip over SGIs.
->          * For secondary GICs, skip over PPIs, too.
->          */
->         irq_start = (effectively) 16;
-> 
->         irq_base = irq_alloc_descs(irq_start, 16, gic_irqs, numa_node_id());
->         if (IS_ERR_VALUE(irq_base)) {
->                 WARN(1, "Cannot allocate irq_descs @ IRQ%d, assuming pre-allocated\n",
->                      irq_start);
-> 
-> Does this mean machine_desc->nr_irqs is to be kept at 16
-> (NR_IRQS_LEGACY) or less, so it doesn't conflict with gic_init()?
-> 
-> Or perhaps gic_init() shouldn't warn about this?
-
-I think the problem is that both the board file and the gic code try to
-set up legacy interrupts. Try just removing the 'nr_irqs=' line.
-
-	Arnd
+Sorry, There are also hard for me. I don't understand what is full-duplex for dma? 
+A DMA engine can only read or write at the same time. And a dma channel request for only DMA_MEM_TO_DEV or DMA_DEV_TO_MEM almost.
+Also i2c is a half-duplex bus.
