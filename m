@@ -1,32 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 28 Feb 2014 10:33:14 -0800
-Subject: [PATCH 00/12] ARM: OMAP2 DT clock conversion
-In-Reply-To: <5310D2FE.5090209@ti.com>
-References: <1393579384-23440-1-git-send-email-t-kristo@ti.com>
- <5310B271.5040708@ti.com> <20140228180112.GC15399@atomide.com>
- <5310D2FE.5090209@ti.com>
-Message-ID: <20140228183313.GD15399@atomide.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 28 Feb 2014 10:37:08 -0800
+Subject: [PATCH v4 7/9] devicetree: bindings: Document PM8921/8058 keypads
+In-Reply-To: <20140228135527.GF7308@joshc.qualcomm.com>
+References: <1393552520-9068-1-git-send-email-sboyd@codeaurora.org>
+ <1393552520-9068-8-git-send-email-sboyd@codeaurora.org>
+ <20140228135527.GF7308@joshc.qualcomm.com>
+Message-ID: <20140228183708.GF2487@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [140228 10:21]:
+On 02/28, Josh Cartwright wrote:
+> On Thu, Feb 27, 2014 at 05:55:18PM -0800, Stephen Boyd wrote:
 > 
-> Hmm, some clock node is broken, might be missing a name or parent
-> name for some reason. Can you try to boot with DEBUG enabled so you
-> get pr_debug:s out and see which clock is being initialized during
-> the crash?
+> - linux,wakeup?
+> - linux,no-auto-repeat?
 
-...
-[    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: core_d18_ck
-[    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: vlynq_mux_fck
-[    0.000000] ti_dt_clk_init_provider: ti_dt_clk_init_provider: initializing: vlynq_fck
-[    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 00000000
-...
+Added.
 
-We really should be registering the clocks lazily as needed BTW. That
-leaves out the dependency to DEBUG_LL for seeing any kind of decent
-error messages during the booting.
+> 
+> > +
+> > +EXAMPLE
+> > +
+> > +	keypad {
+> > +		compatible = "qcom,pm8921-keypad";
+> > +		interrupt-parent = <&pmicintc>;
+> > +		interrupts = <74 1>, <75 1>;
+> > +		linux,keymap = <
+> > +			MATRIX_KEY(0, 0, KEY_VOLUMEUP)
+> > +			MATRIX_KEY(0, 1, KEY_VOLUMEDOWN)
+> > +			MATRIX_KEY(0, 2, KEY_CAMERA_FOCUS)
+> > +			MATRIX_KEY(0, 3, KEY_CAMERA)
+> > +			>;
+> > +		keypad,num-rows = <1>;
+> > +		keypad,num-columns = <5>;
+> > +		debounce = <15>;
+> > +		scan-delay = <32>;
+> > +		row-hold = <91500>;
+> > +	};
+> 
+> It odd to me that these newly created bindings don't have 'reg'
+> properties, even though the device clearly has a register region.
+> 
+> I suppose it makes sense from a "port over from platform data to DT"
+> perspective, as these drivers have just assumed the location of their
+> registers to be fixed; however I suspect things will need to be changed
+> if/when we hope to share these drivers with pm8841/pm8941 and beyond...
+> 
 
-Regards,
+Agreed. I would love it if the platform OF code would create
+IORESOURCE_REG resources for any reg properties that aren't
+translatable to CPU addresses. That way we don't have to pick out
+the reg property from DT with special OF code (like you've done
+in rtc-pm8xxx). I'll throw the reg property into the binding so
+that in the future we can support the register moving around
+(although at the moment the driver will ignore it).
 
-Tony
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
