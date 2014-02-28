@@ -1,40 +1,57 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 28 Feb 2014 22:09:24 +0100
-Subject: [PATCH 0/4] CCF support for Renesas r7s72100
-Message-ID: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
+Date: Fri, 28 Feb 2014 22:09:28 +0100
+Subject: [PATCH 4/4] ARM: shmobile: r7s72100: use workaround for non DT-clocks
+In-Reply-To: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
+References: <1393621768-12568-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <1393621768-12568-5-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series moves the r7s72100 platfrom from the legacy clock implementation to
-the common clock framework. Only the essential clocks are added in this series,
-and other clocks will be added incrementally once the basic stuff is accepted.
+From: Wolfram Sang <wsa@sang-engineering.com>
 
-This series has been tested with the renesas-devel-v3.14-rc4-20140227 tag. It
-has a build dependency [1] because it uses the clkdev workaround. If you want
-to boot into a console, you also have a runtime dependency [2]. A git branch
-can be found here:
+SCIF2 and MTU2 are not yet prepared for DT usage, so use the common
+workaround via clkdev for now.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/r7s-ccf
+Signed-off-by: Wolfram Sang <wsa@sang-engineering.com>
+---
+ arch/arm/mach-shmobile/board-genmai-reference.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-[1] http://www.spinics.net/lists/arm-kernel/msg310279.html (ARM: shmobile: Introduce shmobile_clk_workaround())
-[2] http://lkml.org/lkml/2014/2/20/205 ([PATCH V7 0/3] clocksource: Consolidate SH and ARM mach-shmobile Kconfig bits)
-
-
-Wolfram Sang (4):
-  ARM: r7s72100: add clock nodes to dtsi
-  ARM: r7s72100: genmai: populate extal clock node
-  clk: shmobile: add CPG driver for rz-platforms
-  ARM: shmobile: r7s72100: use workaround for non DT-clocks
-
- arch/arm/boot/dts/r7s72100-genmai-reference.dts |   4 +
- arch/arm/boot/dts/r7s72100.dtsi                 |  78 ++++++++++++++++-
- arch/arm/mach-shmobile/board-genmai-reference.c |  15 +++-
- drivers/clk/shmobile/Makefile                   |   1 +
- drivers/clk/shmobile/clk-rz.c                   | 112 ++++++++++++++++++++++++
- include/dt-bindings/clock/r7s72100-clock.h      |  25 ++++++
- 6 files changed, 232 insertions(+), 3 deletions(-)
- create mode 100644 drivers/clk/shmobile/clk-rz.c
- create mode 100644 include/dt-bindings/clock/r7s72100-clock.h
-
+diff --git a/arch/arm/mach-shmobile/board-genmai-reference.c b/arch/arm/mach-shmobile/board-genmai-reference.c
+index 7630c10..91dcdd0 100644
+--- a/arch/arm/mach-shmobile/board-genmai-reference.c
++++ b/arch/arm/mach-shmobile/board-genmai-reference.c
+@@ -18,18 +18,29 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
+-#include <linux/clk-provider.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
++#include <mach/clock.h>
+ #include <mach/common.h>
+ #include <mach/r7s72100.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ 
++#ifdef CONFIG_COMMON_CLK
++/*
++ * This is a really crude hack to provide clkdev support to platform
++ * devices until they get moved to DT.
++ */
++static const struct clk_name clk_names[] = {
++	{ "mtu2", NULL, "sh_mtu2.0" },
++	{ "scif2", NULL, "sh-sci.2" },
++};
++#endif
++
+ static void __init genmai_add_standard_devices(void)
+ {
+ #ifdef CONFIG_COMMON_CLK
+-	of_clk_init(NULL);
++	shmobile_clk_workaround(clk_names, ARRAY_SIZE(clk_names), true);
+ #else
+ 	r7s72100_clock_init();
+ #endif
 -- 
 1.8.5.1
