@@ -1,28 +1,21 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Feb 2014 16:15:59 +0000
-Subject: [PATCH v6 2/2] arm64: audit: Add audit hook in
- ptrace/syscall_trace
-In-Reply-To: <1393564635-3921-3-git-send-email-takahiro.akashi@linaro.org>
-References: <1393319934-2810-1-git-send-email-takahiro.akashi@linaro.org>
- <1393564635-3921-1-git-send-email-takahiro.akashi@linaro.org>
- <1393564635-3921-3-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20140228161558.GE29546@mudshark.cambridge.arm.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 28 Feb 2014 10:17:43 -0600
+Subject: [PATCH 3/5] documentation/iommu: update description of ARM System
+ MMU binding
+In-Reply-To: <1393002992-24561-4-git-send-email-will.deacon@arm.com>
+References: <1393002992-24561-1-git-send-email-will.deacon@arm.com>
+ <1393002992-24561-4-git-send-email-will.deacon@arm.com>
+Message-ID: <CAOZdJXUfAygZqw9s5qOECLjyo=B0VaD29iesbWzDeMbbyVTgqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 28, 2014 at 05:17:15AM +0000, AKASHI Takahiro wrote:
-> This patch adds auditing functions on entry to or exit from
-> every system call invocation.
-> 
-> Acked-by: Richard Guy Briggs <rgb@redhat.com>
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
->  arch/arm64/kernel/ptrace.c |   54 ++++++++++++++++++++++++++------------------
->  1 file changed, 32 insertions(+), 22 deletions(-)
+On Fri, Feb 21, 2014 at 11:16 AM, Will Deacon <will.deacon@arm.com> wrote:
+>
+> +- calxeda,smmu-secure-config-access : Enable proper handling of buggy
+> +                  implementations that always use secure access to
+> +                  SMMU configuration registers. In this case non-secure
+> +                 aliases of secure registers have to be used during
+> +                 SMMU configuration.
 
-I think you need to do something like I did for arch/arm/, where we have
-separate trace functions for entry/exit to make sure that we invoke the
-various helpers in the correct order (for example, you want to invoke all
-the debug stuff *first* on entry, but *last* on exit).
-
-Will
+I'm confused.  Why does this property have a "calxeda" prefix?  How is
+it a Calxeda-specific property?
