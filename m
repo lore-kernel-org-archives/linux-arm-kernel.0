@@ -1,36 +1,45 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 27 Feb 2014 18:22:37 -0600
-Subject: [PATCH 3/3] ARM: config: Update msm_defconfig
-In-Reply-To: <20140227221458.GA5334@codeaurora.org>
-References: <1393467394-10907-1-git-send-email-sboyd@codeaurora.org>
- <1393467394-10907-4-git-send-email-sboyd@codeaurora.org>
- <20140227221458.GA5334@codeaurora.org>
-Message-ID: <318973D9-95B5-4D53-B774-D4239FD9AECB@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 27 Feb 2014 16:25:03 -0800
+Subject: [PATCHv2 14/16] ARM: OMAP3: hwmod data: cleanup data for IOMMUs
+In-Reply-To: <530F0255.0@epfl.ch>
+References: <1392315347-32967-1-git-send-email-s-anna@ti.com>
+ <1392315347-32967-15-git-send-email-s-anna@ti.com>
+ <20140226171824.GH11654@atomide.com> <530E2B67.9050300@ti.com>
+ <530F0255.0@epfl.ch>
+Message-ID: <20140228002502.GB14514@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Feb 27, 2014, at 4:14 PM, David Brown <davidb@codeaurora.org> wrote:
-
-> On Wed, Feb 26, 2014 at 06:16:34PM -0800, Stephen Boyd wrote:
->> Now that DT based platforms are split out of mach-msm into
->> mach-qcom, put back a non-DT based SoC into the msm_defconfig and
->> stop selecting unsupported drivers.
->> 
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->> arch/arm/configs/msm_defconfig | 25 +++----------------------
->> 1 file changed, 3 insertions(+), 22 deletions(-)
+* Florian Vaussard <florian.vaussard@epfl.ch> [140227 01:19]:
+> Hi,
 > 
-> Acked-by: David Brown <davidb@codeaurora.org>
+> On 02/26/2014 06:59 PM, Suman Anna wrote:
+> > Tony,
+> > 
+> > On 02/26/2014 11:18 AM, Tony Lindgren wrote:
+> >> * Suman Anna <s-anna@ti.com> [140213 10:19]:
+> >>> From: Florian Vaussard <florian.vaussard@epfl.ch>
+> >>>
+> >>> The irq numbers, ocp address space and device attribute data
+> >>> have all been cleaned up for OMAP3 IOMMUs. All this data is
+> >>> populated via the corresponding dt node.
+> >>>
+> >>> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> >>> Signed-off-by: Suman Anna <s-anna@ti.com>
+> >>
+> >> This will need to wait until we've made omap3 to be DT only
+> >> as this will break idling of things for the legacy booting.
+> >>
+> > 
+> > OK, will drop this and I will adjust Patch 9 to support the legacy boot
+> > for OMAP3 ISP.
+> > 
 > 
-> Kumar, can you just pull this in with the other qcom changes from
-> Sephen?
+> BTW, Tony do you have a new window for omap3 to be DT onyl?
 
-sure
+I think a good point would be when we have DSS working with DT,
+and have a .dts file for the Pandora board.
 
-- k
+Regards,
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Tony
