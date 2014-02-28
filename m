@@ -1,235 +1,53 @@
 From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Fri, 28 Feb 2014 20:07:41 +0200
-Subject: [PATCH 1/5] Power: reset: keystone-reset: introduce keystone reset
+Date: Fri, 28 Feb 2014 20:07:44 +0200
+Subject: [PATCH 4/5] ARM: dts: keystone: update reset node to work with reset
  driver
 In-Reply-To: <1393610865-23630-1-git-send-email-ivan.khoronzhuk@ti.com>
 References: <1393610865-23630-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <1393610865-23630-2-git-send-email-ivan.khoronzhuk@ti.com>
+Message-ID: <1393610865-23630-5-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The keystone SoC can be rebooted in several ways. By external reset
-pin, by soft and by watchdogs. To allow keystone SoC reset if
-watchdog is triggered we have to enable it in reset mux configuration
-register regarding of watchdog configuration. Also we need to set
-soft/hard reset we are going to use.
+The reset controller registers are part of the PLL Controller MMRs.
+According to TRM there are the following registers:
+RSTYPE, RSCTRL, RSCFG and RSISO. Currently declared only one of them,
+but that is not enough to correctly setup reset properties, so add
+whole range of pll registers - pllregs.
 
-So add keystone reset driver to handle all this stuff.
+Also add range for reset multiplex registers for SoC on the device.
+These registers are located in Bootcfg memory space and needed
+to setup behaviour after appropriate watchdog is triggered.
+
+Add "ti,wdt_list" option to declare what watchdog are used to reboot
+the SoC.
 
 Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
 ---
 
-CC: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-CC: David Woodhouse <dwmw2@infradead.org>
-CC: Grant Likely <grant.likely@linaro.org>
 CC: Rob Herring <robh+dt@kernel.org>
+CC: Pawel Moll <pawel.moll@arm.com>
+CC: Mark Rutland <mark.rutland@arm.com>
+CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
+CC: Kumar Gala <galak@codeaurora.org>
+CC: Russell King <linux@arm.linux.org.uk>
 
- drivers/power/reset/Kconfig          |   7 ++
- drivers/power/reset/Makefile         |   1 +
- drivers/power/reset/keystone-reset.c | 171 +++++++++++++++++++++++++++++++++++
- 3 files changed, 179 insertions(+)
- create mode 100644 drivers/power/reset/keystone-reset.c
+ arch/arm/boot/dts/keystone.dtsi | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
-index 6d452a7..9082a72 100644
---- a/drivers/power/reset/Kconfig
-+++ b/drivers/power/reset/Kconfig
-@@ -57,3 +57,10 @@ config POWER_RESET_XGENE
- 	depends on POWER_RESET
- 	help
- 	  Reboot support for the APM SoC X-Gene Eval boards.
-+
-+config POWER_RESET_KEYSTONE
-+	bool "Keystone reset driver"
-+	depends on ARCH_KEYSTONE
-+	help
-+	  Reboot support for the KEYSTONE SoCs.
-+
-diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
-index a5b4a77..802a420 100644
---- a/drivers/power/reset/Makefile
-+++ b/drivers/power/reset/Makefile
-@@ -5,3 +5,4 @@ obj-$(CONFIG_POWER_RESET_QNAP) += qnap-poweroff.o
- obj-$(CONFIG_POWER_RESET_RESTART) += restart-poweroff.o
- obj-$(CONFIG_POWER_RESET_VEXPRESS) += vexpress-poweroff.o
- obj-$(CONFIG_POWER_RESET_XGENE) += xgene-reboot.o
-+obj-$(CONFIG_POWER_RESET_KEYSTONE) += keystone-reset.o
-diff --git a/drivers/power/reset/keystone-reset.c b/drivers/power/reset/keystone-reset.c
-new file mode 100644
-index 0000000..73f6e7a
---- /dev/null
-+++ b/drivers/power/reset/keystone-reset.c
-@@ -0,0 +1,171 @@
-+/*
-+ * TI keystone reboot driver
-+ *
-+ * Copyright (C) 2014 Texas Instruments Incorporated. http://www.ti.com/
-+ *
-+ * Author: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/reboot.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <asm/system_misc.h>
-+
-+#define RSCTRL_KEY_MASK			0xffff0000
-+#define RSCTRL_KEY			0x5a69
-+#define RSCTRL_RESET			BIT(16)
-+
-+#define RSCFG_RSTYPE_SOFT		0x300f
-+#define RSCFG_RSTYPE_HARD		0x0
-+
-+#define RSTYPE_RG			0x0
-+#define RSCTRL_RG			0x4
-+#define RSCFG_RG			0x8
-+#define RSISO_RG			0xc
-+
-+#define RSMUX_OMODE_MASK		0xe
-+#define RSMUX_OMODE_RESET_SOC		0xa
-+#define RSMUX_OMODE_RESET_OFF		0x0
-+#define RSMUX_LOCK_MASK			0x1
-+#define RSMUX_LOCK_SET			0x1
-+
-+#define WDT_MUX_NUMBER			0x4
-+
-+static void __iomem *rspll_base;
-+
-+/**
-+ * rsctrl_enable_rspll_write - enable access to RSCTRL, RSCFG
-+ * To be able to access to RSCTRL, RSCFG registers
-+ * we has to write a key before
-+ */
-+static void rsctrl_enable_rspll_write(void)
-+{
-+	void __iomem *rstctrl_rg;
-+	u32 val;
-+
-+	rstctrl_rg = rspll_base + RSCTRL_RG;
-+	val = readl(rstctrl_rg);
-+	val &= RSCTRL_KEY_MASK;
-+	val |= RSCTRL_KEY;
-+	writel(val, rstctrl_rg);
-+}
-+
-+static void rsctrl_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	u32 val;
-+	void __iomem *rstctrl;
-+
-+	/* enable write access to RSTCTRL */
-+	rsctrl_enable_rspll_write();
-+
-+	/* reset the SOC */
-+	rstctrl = rspll_base + RSCTRL_RG;
-+	val = readl(rstctrl);
-+	val &= ~RSCTRL_RESET;
-+	writel(val, rstctrl);
-+}
-+
-+static struct of_device_id rsctrl_of_match[] = {
-+	{.compatible = "ti,keystone-reset", },
-+	{},
-+};
-+
-+static int rsctrl_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	void __iomem *rsmux_base;
-+	void __iomem *rg;
-+	struct resource *res;
-+	u32 val;
-+	int ret;
-+	int i;
-+
-+	if (!np)
-+		return -ENODEV;
-+
-+	i = of_property_match_string(np, "reg-names", "pllregs");
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, i);
-+	rspll_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(rspll_base))
-+		return PTR_ERR(rspll_base);
-+
-+	i = of_property_match_string(np, "reg-names", "muxregs");
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, i);
-+	rsmux_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(rsmux_base))
-+		return PTR_ERR(rsmux_base);
-+
-+	/* set soft/hard reset */
-+	val = of_property_read_bool(np, "ti,soft-reset");
-+	val = val ? RSCFG_RSTYPE_SOFT : RSCFG_RSTYPE_HARD;
-+
-+	rsctrl_enable_rspll_write();
-+	writel(val, rspll_base + RSCFG_RG);
-+
-+	arm_pm_restart = rsctrl_restart;
-+
-+	/* disable reset isolation for all module clocks */
-+	writel(0, rspll_base + RSISO_RG);
-+
-+	/* enable reset for watchdogs from list */
-+	for (i = 0; i < WDT_MUX_NUMBER; i++) {
-+		ret = of_property_read_u32_index(np, "ti,wdt_list", i, &val);
-+		if (ret == -EOVERFLOW && !i) {
-+			dev_err(dev, "ti,wdt_list property has to contain at"
-+				"least one entry\n");
-+			return -EINVAL;
-+		} else if (ret) {
-+			break;
-+		}
-+
-+		if (val >= WDT_MUX_NUMBER) {
-+			dev_err(dev, "ti,wdt_list property can contain"
-+				"only numbers < 4\n");
-+			return -EINVAL;
-+		}
-+
-+		rg = rsmux_base + val*4;
-+
-+		val = readl_relaxed(rg);
-+		val &= ~RSMUX_OMODE_MASK;
-+		val |= RSMUX_OMODE_RESET_SOC | RSMUX_LOCK_SET;
-+		writel(val, rg);
-+	}
-+
-+	/* disable reset for watchdogs from not list */
-+	for (i = 0; i < WDT_MUX_NUMBER; i++) {
-+		rg = rsmux_base + i*4;
-+
-+		val = readl_relaxed(rg);
-+		if (!(val & RSMUX_LOCK_MASK)) {
-+			val &= ~RSMUX_OMODE_MASK;
-+			val |= RSMUX_OMODE_RESET_OFF | RSMUX_LOCK_SET;
-+			writel(val, rg);
-+		}
-+	}
-+
-+	devm_iounmap(dev, rsmux_base);
-+	return 0;
-+}
-+
-+static struct platform_driver rsctrl_driver = {
-+	.probe = rsctrl_probe,
-+	.driver = {
-+		.owner = THIS_MODULE,
-+		.name = KBUILD_MODNAME,
-+		.of_match_table = rsctrl_of_match,
-+	},
-+};
-+module_platform_driver(rsctrl_driver);
-+
-+MODULE_AUTHOR("Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>");
-+MODULE_DESCRIPTION("Texas Instruments keystone reset driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:" KBUILD_MODNAME);
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index 3a83ffe..7092208 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -99,7 +99,9 @@
+ 
+ 		rstctrl: reset-controller {
+ 			compatible = "ti,keystone-reset";
+-			reg = <0x023100e8 4>;	/* pll reset control reg */
++			reg = <0x23100e4 0x10>, <0x2620328 0x10>;
++			reg-names = "pllregs", "muxregs";
++			ti,wdt_list = <0>;
+ 		};
+ 
+ 		/include/ "keystone-clocks.dtsi"
 -- 
 1.8.3.2
