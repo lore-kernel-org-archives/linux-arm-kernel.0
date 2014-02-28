@@ -1,41 +1,40 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 28 Feb 2014 18:28:38 +0100
-Subject: [PATCH 2/7] PCI: tegra: use new OF interrupt mapping when possible
+Date: Fri, 28 Feb 2014 18:28:40 +0100
+Subject: [PATCH 4/7] ARM: dts: exynos5440: fix PCIe interrupt mapping
 In-Reply-To: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
 References: <1393608523-17509-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1393608523-17509-3-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1393608523-17509-5-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the recommended method of doing the IRQ
-mapping. For old devicetrees we fall back to the
-previous practice.
+So it actually works.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/pci/host/pci-tegra.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5440.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index 330f7e3a32dd..083cf37ca047 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -639,10 +639,15 @@ static int tegra_pcie_setup(int nr, struct pci_sys_data *sys)
- static int tegra_pcie_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
- {
- 	struct tegra_pcie *pcie = sys_to_pcie(pdev->bus->sysdata);
-+	int irq;
- 
- 	tegra_cpuidle_pcie_irqs_in_use();
- 
--	return pcie->irq;
-+	irq = of_irq_parse_and_map_pci(pdev, slot, pin);
-+	if (!irq)
-+		irq = pcie->irq;
-+
-+	return irq;
- }
- 
- static void tegra_pcie_add_bus(struct pci_bus *bus)
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index 02a0a1226cef..65d425d9ec27 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -274,7 +274,7 @@
+ 			  0x82000000 0 0x40011000 0x40011000 0 0x1ffef000>; /* non-prefetchable memory */
+ 		#interrupt-cells = <1>;
+ 		interrupt-map-mask = <0 0 0 0>;
+-		interrupt-map = <0x0 0 &gic 53>;
++		interrupt-map = <0 0 0 0 &gic GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+ 		num-lanes = <4>;
+ 		status = "disabled";
+ 	};
+@@ -295,7 +295,7 @@
+ 			  0x82000000 0 0x60011000 0x60011000 0 0x1ffef000>; /* non-prefetchable memory */
+ 		#interrupt-cells = <1>;
+ 		interrupt-map-mask = <0 0 0 0>;
+-		interrupt-map = <0x0 0 &gic 56>;
++		interrupt-map = <0 0 0 0 &gic GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+ 		num-lanes = <4>;
+ 		status = "disabled";
+ 	};
 -- 
 1.8.5.3
