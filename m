@@ -1,87 +1,59 @@
 From: skannan@codeaurora.org (Saravana Kannan)
-Date: Thu, 27 Feb 2014 17:58:36 -0800
-Subject: [PATCH v3 3/3] cpufreq: stats: Refactor common code into
- __cpufreq_stats_create_table()
-Message-ID: <1393552716-9754-3-git-send-email-skannan@codeaurora.org>
+Date: Thu, 27 Feb 2014 17:58:34 -0800
+Subject: [PATCH v3 1/3] cpufreq: stats: Remove redundant cpufreq_cpu_get() call
+Message-ID: <1393552716-9754-1-git-send-email-skannan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpufreq_frequency_get_table() is called from all callers of
-__cpufreq_stats_create_table(). So, move it inside.
+__cpufreq_stats_create_table always gets pass the valid and real policy
+struct. So, there's no need to call cpufreq_cpu_get() to get the policy
+again.
 
-Suggested-by: Viresh Kumar <viresh.kumar@linaro.org>
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
 ---
- drivers/cpufreq/cpufreq_stats.c | 22 +++++++++-------------
- 1 file changed, 9 insertions(+), 13 deletions(-)
+ drivers/cpufreq/cpufreq_stats.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
 diff --git a/drivers/cpufreq/cpufreq_stats.c b/drivers/cpufreq/cpufreq_stats.c
-index c52b440..eb214d8 100644
+index 5793e14..e4bd27f 100644
 --- a/drivers/cpufreq/cpufreq_stats.c
 +++ b/drivers/cpufreq/cpufreq_stats.c
-@@ -180,13 +180,18 @@ static void cpufreq_stats_free_table(unsigned int cpu)
- 	cpufreq_cpu_put(policy);
- }
- 
--static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
--		struct cpufreq_frequency_table *table)
-+static int __cpufreq_stats_create_table(struct cpufreq_policy *policy)
+@@ -185,7 +185,6 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
  {
  	unsigned int i, j, count = 0, ret = 0;
  	struct cpufreq_stats *stat;
+-	struct cpufreq_policy *current_policy;
  	unsigned int alloc_size;
  	unsigned int cpu = policy->cpu;
-+	struct cpufreq_frequency_table *table;
-+
-+	table = cpufreq_frequency_get_table(cpu);
-+	if (unlikely(!table))
-+		return 0;
-+
  	if (per_cpu(cpufreq_stats_table, cpu))
- 		return -EBUSY;
- 	stat = kzalloc(sizeof(*stat), GFP_KERNEL);
-@@ -248,7 +253,6 @@ error_out:
- static void cpufreq_stats_create_table(unsigned int cpu)
- {
- 	struct cpufreq_policy *policy;
--	struct cpufreq_frequency_table *table;
+@@ -194,13 +193,7 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
+ 	if ((stat) == NULL)
+ 		return -ENOMEM;
  
- 	/*
- 	 * "likely(!policy)" because normally cpufreq_stats will be registered
-@@ -258,9 +262,7 @@ static void cpufreq_stats_create_table(unsigned int cpu)
- 	if (likely(!policy))
- 		return;
- 
--	table = cpufreq_frequency_get_table(policy->cpu);
--	if (likely(table))
--		__cpufreq_stats_create_table(policy, table);
-+	__cpufreq_stats_create_table(policy);
- 
- 	cpufreq_cpu_put(policy);
- }
-@@ -283,20 +285,14 @@ static int cpufreq_stat_notifier_policy(struct notifier_block *nb,
- {
- 	int ret = 0;
- 	struct cpufreq_policy *policy = data;
--	struct cpufreq_frequency_table *table;
--	unsigned int cpu = policy->cpu;
- 
- 	if (val == CPUFREQ_UPDATE_POLICY_CPU) {
- 		cpufreq_stats_update_policy_cpu(policy);
- 		return 0;
- 	}
- 
--	table = cpufreq_frequency_get_table(cpu);
--	if (!table)
--		return 0;
+-	current_policy = cpufreq_cpu_get(cpu);
+-	if (current_policy == NULL) {
+-		ret = -EINVAL;
+-		goto error_get_fail;
+-	}
 -
- 	if (val == CPUFREQ_CREATE_POLICY)
--		ret = __cpufreq_stats_create_table(policy, table);
-+		ret = __cpufreq_stats_create_table(policy);
- 	else if (val == CPUFREQ_REMOVE_POLICY)
- 		__cpufreq_stats_free_table(policy);
+-	ret = sysfs_create_group(&current_policy->kobj, &stats_attr_group);
++	ret = sysfs_create_group(&policy->kobj, &stats_attr_group);
+ 	if (ret)
+ 		goto error_out;
  
+@@ -243,11 +236,8 @@ static int __cpufreq_stats_create_table(struct cpufreq_policy *policy,
+ 	stat->last_time = get_jiffies_64();
+ 	stat->last_index = freq_table_get_index(stat, policy->cur);
+ 	spin_unlock(&cpufreq_stats_lock);
+-	cpufreq_cpu_put(current_policy);
+ 	return 0;
+ error_out:
+-	cpufreq_cpu_put(current_policy);
+-error_get_fail:
+ 	kfree(stat);
+ 	per_cpu(cpufreq_stats_table, cpu) = NULL;
+ 	return ret;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
