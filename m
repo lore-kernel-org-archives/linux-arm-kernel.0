@@ -1,93 +1,41 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 28 Feb 2014 08:18:07 +0100
-Subject: [GIT PULL] Xilinx Zynq changes for v3.15
-In-Reply-To: <53061EBA.1080002@monstr.eu>
-References: <53061EBA.1080002@monstr.eu>
-Message-ID: <5310382F.5060700@monstr.eu>
+From: yegorslists@googlemail.com (yegorslists at googlemail.com)
+Date: Fri, 28 Feb 2014 08:19:04 +0100
+Subject: [PATCH] ARM: dts: am335x-evmsk: enable USB1
+Message-ID: <1393571944-10438-1-git-send-email-yegorslists@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2014 04:26 PM, Michal Simek wrote:
-> Hi,
-> 
-> please pull these changes to your arm-soc tree. This branch is based
-> on zynq/dt branch from the second pull request.
-> I have kept OCM patch in this branch because it depends on slcr changes
-> done here. If you want to send another pull request just for this OCM
-> patch based on this branch, please let me know.
-> 
-> Thanks,
-> Michal
-> 
-> The following changes since commit 3795e91d2abb25164dda5687ca680a7ab940c447:
-> 
->   arm: dt: zynq: Add fclk-enable property to clkc node (2014-02-03 17:00:24 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git-dev/group/ssw/linux-xlnx.git tags/zynq-cleanup-for-3.15
-> 
-> for you to fetch changes up to e9aa3e3a5bb2d64515648537100e5cf9b863e01a:
-> 
->   ARM: zynq: Add support for SOC_BUS (2014-02-20 16:08:47 +0100)
-> 
-> ----------------------------------------------------------------
-> arm: Xilinx Zynq cleanup patches for v3.15
-> 
-> - Redesign SLCR initialization to enable
->   driver developing which targets SLCR space
-> - Add OCM driver
-> - Add SOC_BUS support
-> 
-> ----------------------------------------------------------------
-> Michal Simek (8):
->       ARM: zynq: Split slcr in two parts
->       ARM: zynq: Map I/O memory on clkc init
->       ARM: zynq: Add and use zynq_slcr_read/write() helper functions
->       ARM: zynq: Introduce zynq_slcr_unlock()
->       ARM: zynq: Add OCM driver
->       ARM: zynq: Move of_clk_init from clock driver
->       ARM: zynq: Add waituart implementation
->       ARM: zynq: Add support for SOC_BUS
-> 
-> Steffen Trumtrar (3):
->       ARM: zynq: Move clock_init from slcr to common
->       ARM: zynq: Hang iomapped slcr address on device_node
->       ARM: zynq: Make zynq_slcr_base static
-> 
->  Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt |  17 +++++
->  Documentation/devicetree/bindings/clock/zynq-7000.txt        |   4 +-
->  arch/arm/boot/dts/zynq-7000.dtsi                             |  56 +++++++++------
->  arch/arm/include/debug/zynq.S                                |   3 +
->  arch/arm/mach-zynq/Kconfig                                   |   3 +
->  arch/arm/mach-zynq/Makefile                                  |   2 +-
->  arch/arm/mach-zynq/common.c                                  |  80 ++++++++++++++++++++-
->  arch/arm/mach-zynq/common.h                                  |   4 +-
->  arch/arm/mach-zynq/slcr.c                                    | 138 ++++++++++++++++++++++++++++++++----
->  arch/arm/mach-zynq/zynq_ocm.c                                | 243 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/zynq/clkc.c                                      |  89 ++++++++++++++++--------
->  include/linux/clk/zynq.h                                     |   2 +-
->  12 files changed, 570 insertions(+), 71 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/zynq/xlnx,zynq-ocm.txt
->  create mode 100644 arch/arm/mach-zynq/zynq_ocm.c
+From: Yegor Yefremov <yegorslists@googlemail.com>
 
-Any update on this one?
+Enable second USB channel and set it into 'host' mode.
 
-Thanks,
-Michal
+Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+---
+ arch/arm/boot/dts/am335x-evmsk.dts |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index 486880b..40a66bd 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -342,9 +342,18 @@
+ 		status = "okay";
+ 	};
+ 
++	usb-phy at 47401b00 {
++		status = "okay";
++	};
++
+ 	usb at 47401000 {
+ 		status = "okay";
+ 	};
++
++	usb at 47401800 {
++		status = "okay";
++		dr_mode = "host";
++	};
+ };
+ 
+ &epwmss2 {
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/b49a82b9/attachment-0001.sig>
+1.7.7
