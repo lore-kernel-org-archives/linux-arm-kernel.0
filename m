@@ -1,60 +1,62 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 28 Feb 2014 14:47:44 +0100
-Subject: [PATCH 0/9] Doc/DT: DT bindings for various display components
-In-Reply-To: <531087C0.1090501@gmail.com>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <531087C0.1090501@gmail.com>
-Message-ID: <1393595264.3802.39.camel@paszta.hi.pengutronix.de>
+From: elder@linaro.org (Alex Elder)
+Date: Fri, 28 Feb 2014 07:49:26 -0600
+Subject: [PATCH 0/5] clk: bcm21664: add common clock support
+Message-ID: <1393595371-3789-1-git-send-email-elder@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This is series has two parts.  The first two patches are changes
+to the existing Broadcom Kona family clock code to prepare for the
+addition of support for another SoC bcm21664.
 
-Am Freitag, den 28.02.2014, 13:57 +0100 schrieb Sebastian Hesselbarth:
-> On 02/28/14 13:20, Tomi Valkeinen wrote:
-> > This series is a re-send of
-> > http://article.gmane.org/gmane.linux.drivers.devicetree/61739
-> >
-> ...
-> > Shortly about the display components in the series, in the order of probable
-> > public interest:
-> >
-> > * Analog TV, DVI and HDMI Connectors represent a respective connector on the
-> >    board. They don't do much, but they do mark the end of the video pipeline (from
-> >    the board's pov), and they should also in the future offer ways to handle
-> >    things like the +5V pin on DVI and HDMI connector and HPD pin.
-> >
-> > * MIPI DPI panel and MIPI DSI CM panels represent bindings for simple panels
-> >    using the respective video bus.
-> >
-> > * Sony acx565akm is an SPI controlled panel using flatlink video bus.
-> >
-> > * TFP410 is a DPI to DVI encoder.
-> >
-> > * TPD12S015 is a HDMI companion chip, used on OMAP boards.
-> 
-> Tomi,
-> 
-> Out of curiosity, will there be DT nodes for pull-up resistors soon,
-> too? ;)
->
-> Honestly, TPD12S015 is a level shifter, there is nothing in it that
-> would justify a DT node nor a driver.
-> 
-> Above you already note, that connector nodes should offer HPD in the
-> future, but I guess the binding should represent that now already.
-> I will be a DT stub anyway, the corresponding video sink driver will
-> have to look it up.
-> 
-> Looking through the bindings for DVI and HDMI, I guess HPD gpio is
-> better kept in those nodes. From the relevant (DT) properties DVI and
-> HDMI connectors are in no way different.
+The remaining three define the binding and code for bcm21664, and
+replace the use of "fake" clocks in the device tree with the real
+ones.  This ends up being a fairly straightforward definition of
+the clocks on this SoC; the rest of the clock code is shared with
+other SoCs that use the Kona style clock system.
 
-I like the idea of adding actual connector nodes to the board device
-trees. A TV encoder driver for example could this way detect from the
-device tree whether it is connected to a VGA, Composite, or S-Video
-connector (or maybe to both Composite and S-Video connectors at the same
-time).
+This series depends on a number of other things that are
+currently queued for Linux 3.15 or have already been sent
+out for review:
+    - Clock support for bcm281xx (code and DT file, queued for 3.15)
+        https://github.com/broadcom/mach-bcm/
+	    armsoc/for-3.15/drivers
+	    armsoc/for-3.15/dt
+    - Additional fixes and features for bcm281xx (out for review)
+	https://lkml.org/lkml/2014/2/25/614
+    - Initial BCM21664 support (from Markus Mayer, out for review)
+	https://lkml.org/lkml/2014/2/27/615
+This prerequisite code appears in the branch (below) as merges from
+other publicly-available git branches.
 
-regards
-Philipp
+This code is available in the "review/bcm21664-clock" branch of
+the git repository here:
+    http://git.linaro.org/git/landing-teams/working/broadcom/kernel.git
+
+
+					-Alex
+
+Alex Elder (5):
+  clk: bcm281xx: move compatible string definitions
+  ARM: dts: revise kona clock binding document
+    Cleanup and prepare existing code for addition of new SoC.
+
+  ARM: dts: define clock binding for bcm21664
+  clk: bcm21664: use common clock framework
+  ARM: dts: use real clocks for bcm21664
+    Add support for the bcm21664 SoC.
+
+ .../devicetree/bindings/clock/bcm-kona-clock.txt   |  116 +++++---
+ arch/arm/boot/dts/bcm21664.dtsi                    |  190 ++++++++-----
+ drivers/clk/bcm/Kconfig                            |    2 +-
+ drivers/clk/bcm/Makefile                           |    1 +
+ drivers/clk/bcm/clk-bcm21664.c                     |  290 ++++++++++++++++++++
+ drivers/clk/bcm/clk-bcm281xx.c                     |   12 -
+ include/dt-bindings/clock/bcm21664.h               |   62 +++++
+ include/dt-bindings/clock/bcm281xx.h               |   12 +
+ 8 files changed, 565 insertions(+), 120 deletions(-)
+ create mode 100644 drivers/clk/bcm/clk-bcm21664.c
+ create mode 100644 include/dt-bindings/clock/bcm21664.h
+
+-- 
+1.7.9.5
