@@ -1,21 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Feb 2014 16:31:05 +0100
-Subject: [PATCH v2 5/7] ARM: of: introduce common routine for DMA
- configuration
-In-Reply-To: <5310A5F1.9070901@ti.com>
-References: <1393535872-20915-1-git-send-email-santosh.shilimkar@ti.com>
- <9618080.kpE3Kl6X8p@wuerfel> <5310A5F1.9070901@ti.com>
-Message-ID: <11548178.4dQyMzBAP8@wuerfel>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 28 Feb 2014 16:37:08 +0100
+Subject: [PATCH 0/2] ARM SMMU fixes
+Message-ID: <1393601830-4677-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 28 February 2014 10:06:25 Santosh Shilimkar wrote:
-> I made that LPAE specific assuming the 32 machines anyway are
-> happy with default as they are today. We can keep CONFIG_ARM
-> and handle the special case in machine platform notifier.
+Hello Will,
 
-I think all other machines that support LPAE can also run with
-LPAE disabled and still use coherent DMA, they may just not
-support all the available RAM.
+I've studied your arm-smmu driver as a base to write a Renesas IOMMU driver
+and found two small issues. Here are patches to fix them. Please bear with me
+if my understanding was incorrect and the patches wrong :-)
 
-	Arnd
+Laurent Pinchart (2):
+  iommu/arm-smmu: Replace list walk with platform driver data
+  iommu/arm-smmu: Return 0 on unmap failure
+
+ drivers/iommu/arm-smmu.c | 17 +++++------------
+ 1 file changed, 5 insertions(+), 12 deletions(-)
+
+-- 
+Regards,
+
+Laurent Pinchart
