@@ -1,53 +1,28 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 28 Feb 2014 18:15:05 +0200
-Subject: [PATCH 4/9] Doc/DT: Add DT binding documentation for HDMI
- Connector
-In-Reply-To: <20140228160612.GR21483@n2100.arm.linux.org.uk>
-References: <1393590016-9361-1-git-send-email-tomi.valkeinen@ti.com>
- <1393590016-9361-5-git-send-email-tomi.valkeinen@ti.com>
- <20140228160612.GR21483@n2100.arm.linux.org.uk>
-Message-ID: <5310B609.1010105@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Feb 2014 16:15:59 +0000
+Subject: [PATCH v6 2/2] arm64: audit: Add audit hook in
+ ptrace/syscall_trace
+In-Reply-To: <1393564635-3921-3-git-send-email-takahiro.akashi@linaro.org>
+References: <1393319934-2810-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393564635-3921-1-git-send-email-takahiro.akashi@linaro.org>
+ <1393564635-3921-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20140228161558.GE29546@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/14 18:06, Russell King - ARM Linux wrote:
-
->> +hdmi0: connector at 1 {
->> +	compatible = "hdmi-connector";
->> +	label = "hdmi";
->> +
->> +	hdmi_connector_in: endpoint {
->> +		remote-endpoint = <&tpd12s015_out>;
->> +	};
->> +};
+On Fri, Feb 28, 2014 at 05:17:15AM +0000, AKASHI Takahiro wrote:
+> This patch adds auditing functions on entry to or exit from
+> every system call invocation.
 > 
-> It seems rather weird to have DVI connectors having an optional I2C
-> property, but HDMI (which augments DVI) not having that as at least an
-> optional property.
+> Acked-by: Richard Guy Briggs <rgb@redhat.com>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm64/kernel/ptrace.c |   54 ++++++++++++++++++++++++++------------------
+>  1 file changed, 32 insertions(+), 22 deletions(-)
 
-I have added only the properties that I have used. I did think about the
-i2c for HDMI also, but thought that I don't use it, and so can't test
-it, and so I could well create a bad binding.
+I think you need to do something like I did for arch/arm/, where we have
+separate trace functions for entry/exit to make sure that we invoke the
+various helpers in the correct order (for example, you want to invoke all
+the debug stuff *first* on entry, but *last* on exit).
 
-And, as I don't see any issue in adding it later, when someone uses it,
-I decided to leave it out.
-
-> I can quite well see the iMX HDMI support needing an i2c bus here.
-> 
-> Also, HDMI has two connector standards - type A and type B, much like
-> the single vs dual link of DVI.  Again, DRM exposes this to userspace.
-
-True, but isn't that just a form factor? No functional differences? But
-I agree, we can add the two types here also to the compatible string.
-
- Tomi
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20140228/28e9e5c9/attachment.sig>
+Will
