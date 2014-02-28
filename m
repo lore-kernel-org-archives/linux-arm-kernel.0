@@ -1,62 +1,79 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 28 Feb 2014 18:30:31 +0100
-Subject: [PATCH 1/3] ARM: dts: imx6: extend PCIe interrupt list for MSI
+Date: Fri, 28 Feb 2014 18:30:33 +0100
+Subject: [PATCH 3/3] PCI: imx6: add support for MSI
 In-Reply-To: <1393608633-18321-1-git-send-email-l.stach@pengutronix.de>
 References: <1393608633-18321-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1393608633-18321-2-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1393608633-18321-4-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Optional IRQ necessary for handling MSI.
+This patch adds support for Message Signaled Interrupts in the
+imx6-pcie driver.
 
+Signed-off-by: Harro Haan <hrhaan@gmail.com>
 Signed-off-by: Juergen Beisert <jbe@pengutronix.de>
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt | 9 ++++++++-
- arch/arm/boot/dts/imx6qdl.dtsi                           | 4 +++-
- 2 files changed, 11 insertions(+), 2 deletions(-)
+ drivers/pci/host/pci-imx6.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-index 93fbfd62f13c..0515183a6d96 100644
---- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-@@ -17,6 +17,11 @@ Required properties:
- 	- "pcie_axi"
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index e8663a8c3406..e038d47f1b01 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -25,6 +25,7 @@
+ #include <linux/resource.h>
+ #include <linux/signal.h>
+ #include <linux/types.h>
++#include <linux/interrupt.h>
  
- Optional properties:
-+- interrupts: Must contain an entry for each entry in the
-+  interrupt-names property.
-+- interrupt-names: May include the following entries:
-+	- "inta"
-+	- "msi" if not present the driver won't be able to handle MSI
- - power-on-gpio: gpio pin number of power-enable signal
- - wake-up-gpio:  gpio pin number of incoming wakeup signal
- - disable-gpio:  gpio pin number of outgoing rfkill/endpoint disable signal
-@@ -34,7 +39,9 @@ Example:
- 			  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>;
- 		num-lanes = <1>;
+ #include "pcie-designware.h"
  
--		interrupts = <0 123 0x04>;
-+		interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-+		             <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "inta", "msi";
+@@ -329,6 +330,13 @@ static int imx6_pcie_wait_for_link(struct pcie_port *pp)
+ 	return 0;
+ }
  
- 		#interrupt-cells = <1>;
- 		interrupt-map-mask = <0 0 0 0x7>;
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index db3339e7d3a2..a3a3acd90964 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -129,7 +129,9 @@
- 				  0x82000000 0 0x01000000 0x01000000 0 0x00f00000>; /* non-prefetchable memory */
- 			num-lanes = <1>;
++static irqreturn_t imx6_pcie_msi_handler(int irq, void *arg)
++{
++	struct pcie_port *pp = arg;
++
++	return dw_handle_msi_irq(pp);
++}
++
+ static int imx6_pcie_start_link(struct pcie_port *pp)
+ {
+ 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+@@ -403,6 +411,9 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+ 	dw_pcie_setup_rc(pp);
  
--			interrupts = <0 123 0x04>;
-+			interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "inta", "msi";
+ 	imx6_pcie_start_link(pp);
++
++	if (IS_ENABLED(CONFIG_PCI_MSI) && (pp->msi_irq > 0))
++		dw_pcie_msi_init(pp);
+ }
  
- 			#interrupt-cells = <1>;
- 			interrupt-map-mask = <0 0 0 0x7>;
+ static void imx6_pcie_reset_phy(struct pcie_port *pp)
+@@ -477,6 +488,21 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
+ 		return -ENODEV;
+ 	}
+ 
++	if (IS_ENABLED(CONFIG_PCI_MSI)) {
++		pp->msi_irq = platform_get_irq_byname(pdev, "msi");
++		if (pp->msi_irq < 0) {
++			dev_info(&pdev->dev, "failed to get MSI irq, host will not support MSI\n");
++		} else {
++			ret = devm_request_irq(&pdev->dev, pp->msi_irq,
++			                       imx6_pcie_msi_handler,
++			                       IRQF_SHARED, "mx6-pcie-msi", pp);
++			if (ret) {
++				dev_err(&pdev->dev, "failed to request MSI irq\n");
++				return -ENODEV;
++			}
++		}
++	}
++
+ 	pp->root_bus_nr = -1;
+ 	pp->ops = &imx6_pcie_host_ops;
+ 
 -- 
 1.8.5.3
