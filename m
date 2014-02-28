@@ -1,47 +1,38 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 28 Feb 2014 14:44:48 +0000
-Subject: [RFC] ARM VM System Sepcification
-In-Reply-To: <CB7DBE07-42BD-4588-AC9E-CB0BF95A811A@suse.de>
-References: <20140226183454.GA14639@cbox> <11174980.YJ21cfsHoG@wuerfel>
- <5AA88E43-1A40-4409-9A56-334988483843@suse.de> <6039706.L1ZWvgjHF0@wuerfel>
- <CB7DBE07-42BD-4588-AC9E-CB0BF95A811A@suse.de>
-Message-ID: <alpine.DEB.2.02.1402281436290.31489@kaball.uk.xensource.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 28 Feb 2014 14:45:56 +0000
+Subject: [PATCH v6 07/14] ARM: Remove use of struct kprobe from generic
+ probes code
+In-Reply-To: <1393596692.3601.37.camel@linaro1.home>
+References: <1392017945-4507-1-git-send-email-dave.long@linaro.org>
+ <1392017945-4507-8-git-send-email-dave.long@linaro.org>
+ <20140228101226.GO21483@n2100.arm.linux.org.uk>
+ <1393596692.3601.37.camel@linaro1.home>
+Message-ID: <1393598756.3601.44.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Feb 2014, Alexander Graf wrote:
-> > We will however want to boot all sorts of guests in a standardized
-> > virtual environment:
+On Fri, 2014-02-28 at 14:11 +0000, Jon Medhurst (Tixy) wrote:
+> On Fri, 2014-02-28 at 10:12 +0000, Russell King - ARM Linux wrote:
+> > On Mon, Feb 10, 2014 at 02:38:58AM -0500, David Long wrote:
+> > > diff --git a/arch/arm/kernel/probes.c b/arch/arm/kernel/probes.c
+> > > index 7cd1763..179deac 100644
+> > > --- a/arch/arm/kernel/probes.c
+> > > +++ b/arch/arm/kernel/probes.c
+> > > @@ -12,11 +12,9 @@
+> > >   */
+> > >  
+> > >  #include <linux/kernel.h>
+> > > -#include <linux/kprobes.h>
+> > >  #include <asm/system_info.h>
 > > 
-> > * 32 bit Linux (since some distros don't support biarch or multiarch
-> >  on arm64) for running applications that are either binary-only
-> >  or not 64-bit safe.
-> > * 32-bit Android
-> > * big-endian Linux for running applications that are not endian-clean
-> >  (typically network stuff ported from powerpc or mipseb.
-> > * OS/v guests
-> > * NOMMU Linux
-> > * BSD based OSs
-> > * QNX
-> > * random other RTOSs
-
-8<---
-
-> * Enterprise grade Linux distribution that only supports ACPI
-> * Maybe WinRT if we can convince MS to use it
-> * Non-Linux with x86/ia64 heritage and thus ACPI support
+> > How well has this code been tested?
 > 
-> If we want to run those, we need to expose ACPI tables.
+> From the error below I assume only when __LINUX_ARM_ARCH__ >= 7
 > 
-> Again, I think the only reasonable thing to do is to implement and expose both. That situation sucks, but we got into it ourselves ;).
+> I have v5 and v6 hardware
 
-I think we should have a clear idea on the purpose of this doc: is it a
-spec that we expect Linux and other guest OSes to comply to if they want
-to run on KVM/Xen? Or is it a document that describes the state of the
-world at the beginning of 2014?
+Actually, I don't have any v6 hardware, for some strange reason I
+thought a cortex A8 was v6.
 
-If it is a spec, then we should simply ignore non-collaborative vendors
-and their products. If we know in advance that they are not going to
-comply to the spec, what's the point of trying to accommodate them here?
-We can always carry our workarounds and hacks in the hypervisor if we
-want to run their products as guests.
+-- 
+Tixy
