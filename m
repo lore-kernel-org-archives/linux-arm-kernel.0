@@ -1,34 +1,36 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 27 Feb 2014 19:20:50 -0500
-Subject: [PATCH] dma: of: Move the functions under CONFIG_OF_DMA instead of
- CONFIG_OF
-Message-ID: <1393546850-13907-1-git-send-email-santosh.shilimkar@ti.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 27 Feb 2014 18:22:37 -0600
+Subject: [PATCH 3/3] ARM: config: Update msm_defconfig
+In-Reply-To: <20140227221458.GA5334@codeaurora.org>
+References: <1393467394-10907-1-git-send-email-sboyd@codeaurora.org>
+ <1393467394-10907-4-git-send-email-sboyd@codeaurora.org>
+ <20140227221458.GA5334@codeaurora.org>
+Message-ID: <318973D9-95B5-4D53-B774-D4239FD9AECB@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The of-dma.c is compiled out with !CONFIG_OF_DMA but the functions in
-the header are kept under CONFIG_OF. Move them under CONFIG_OF_DMA
-to avoid build errors with CONFIG_OFF && !CONFIG_OF_DMA
 
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- include/linux/of_dma.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Feb 27, 2014, at 4:14 PM, David Brown <davidb@codeaurora.org> wrote:
 
-diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
-index 0322363..3d2beab 100644
---- a/include/linux/of_dma.h
-+++ b/include/linux/of_dma.h
-@@ -31,7 +31,7 @@ struct of_dma_filter_info {
- 	dma_filter_fn	filter_fn;
- };
- 
--#ifdef CONFIG_OF
-+#ifdef CONFIG_OF_DMA
- extern int of_dma_controller_register(struct device_node *np,
- 		struct dma_chan *(*of_dma_xlate)
- 		(struct of_phandle_args *, struct of_dma *),
+> On Wed, Feb 26, 2014 at 06:16:34PM -0800, Stephen Boyd wrote:
+>> Now that DT based platforms are split out of mach-msm into
+>> mach-qcom, put back a non-DT based SoC into the msm_defconfig and
+>> stop selecting unsupported drivers.
+>> 
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>> arch/arm/configs/msm_defconfig | 25 +++----------------------
+>> 1 file changed, 3 insertions(+), 22 deletions(-)
+> 
+> Acked-by: David Brown <davidb@codeaurora.org>
+> 
+> Kumar, can you just pull this in with the other qcom changes from
+> Sephen?
+
+sure
+
+- k
+
 -- 
-1.7.9.5
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
