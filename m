@@ -1,61 +1,228 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 28 Feb 2014 13:40:56 +0100
-Subject: [PATCH v2] Documentation: clk: Add locking documentation
-Message-ID: <1393591256-6932-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Fri, 28 Feb 2014 12:44:54 +0000
+Subject: [PATCH v4] can: xilinx CAN controller support.
+In-Reply-To: <53104995.4010305@pengutronix.de>
+References: <74d607e9-ac9c-4a9b-ac49-e84ae49d20c2@TX2EHSMHS031.ehs.local>
+ <530D0A9C.5090402@pengutronix.de>
+ <cd00fb2d-c8a7-423d-8aa0-2b413e9ac101@CO9EHSMHS017.ehs.local>
+ <530DEA7C.6010609@pengutronix.de>
+ <678ca296-8687-4e7c-9014-ae69d886a068@CO9EHSMHS014.ehs.local>
+ <530E0B92.5010903@pengutronix.de>
+ <2e3bfd38-37d5-4102-af79-821196c6c732@CH1EHSMHS006.ehs.local>
+ <53104995.4010305@pengutronix.de>
+Message-ID: <48409965-e214-43b7-8b6a-08bf075707e1@CO9EHSMHS001.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Briefly documentation the common clock framework locking scheme from a
-clock driver point of view.
+Hi Marc,
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- Documentation/clk.txt | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
 
-diff --git a/Documentation/clk.txt b/Documentation/clk.txt
-index 699ef2a..c9c399a 100644
---- a/Documentation/clk.txt
-+++ b/Documentation/clk.txt
-@@ -255,3 +255,37 @@ are sorted out.
- 
- To bypass this disabling, include "clk_ignore_unused" in the bootargs to the
- kernel.
-+
-+	Part 7 - Locking
-+
-+The common clock framework uses two global locks, the prepare lock and the
-+enable lock.
-+
-+The enable lock is a spinlock and is held across calls to the .enable,
-+.disable and .is_enabled operations. Those operations are thus not allowed to
-+sleep, and calls to the clk_enable(), clk_disable() and clk_is_enabled() API
-+functions are allowed in atomic context.
-+
-+The prepare lock is a mutex and is held across calls to all other operations.
-+All those operations are allowed to sleep, and calls to the corresponding API
-+functions are not allowed in atomic context.
-+
-+This effectively divides operations in two groups from a locking perspective.
-+
-+Drivers don't need to manually protect resources shared between the operations
-+of one group, regardless of whether those resources are shared by multiple
-+clocks or not. However, access to resources that are shared between operations
-+of the two groups needs to be protected by the drivers. An example of such a
-+resource would be a register that controls both the clock rate and the clock
-+enable/disable state.
-+
-+The clock framework is reentrant, in that a driver is allowed to call clock
-+framework functions from within its implementation of clock operations. This
-+can for instance cause a .set_rate operation of one clock being called from
-+within the .set_rate operation of another clock. This case must be considered
-+in the driver implementations, but the code flow is usually controlled by the
-+driver in that case.
-+
-+Note that locking must also be considered when code outside of the common
-+clock framework needs to access resources used by the clock operations. This
-+is considered out of scope of this document.
--- 
+> -----Original Message-----
+> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
+> Sent: Friday, February 28, 2014 2:02 PM
+> To: Appana Durga Kedareswara Rao; wg at grandegger.com; Michal Simek;
+> grant.likely at linaro.org; robh+dt at kernel.org; linux-can at vger.kernel.org
+> Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; devicetree at vger.kernel.org
+> Subject: Re: [PATCH v4] can: xilinx CAN controller support.
+>
+> On 02/28/2014 06:50 AM, Appana Durga Kedareswara Rao wrote:
+> > Hi Marc,
+> >
+> >
+> >> -----Original Message-----
+> >> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
+> >> Sent: Wednesday, February 26, 2014 9:13 PM
+> >> To: Appana Durga Kedareswara Rao; wg at grandegger.com; Michal Simek;
+> >> grant.likely at linaro.org; robh+dt at kernel.org;
+> >> linux-can at vger.kernel.org
+> >> Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> >> linux- kernel at vger.kernel.org; devicetree at vger.kernel.org
+> >> Subject: Re: [PATCH v4] can: xilinx CAN controller support.
+> >>
+> >> On 02/26/2014 03:46 PM, Appana Durga Kedareswara Rao wrote:
+> >>> Hi Marc,
+> >>>
+> >>>
+> >>>> -----Original Message-----
+> >>>> From: Marc Kleine-Budde [mailto:mkl at pengutronix.de]
+> >>>> Sent: Wednesday, February 26, 2014 6:52 PM
+> >>>> To: Appana Durga Kedareswara Rao; wg at grandegger.com; Michal
+> Simek;
+> >>>> grant.likely at linaro.org; robh+dt at kernel.org;
+> >>>> linux-can at vger.kernel.org
+> >>>> Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> >>>> linux- kernel at vger.kernel.org; devicetree at vger.kernel.org
+> >>>> Subject: Re: [PATCH v4] can: xilinx CAN controller support.
+> >>>>
+> >>>> On 02/26/2014 02:07 PM, Appana Durga Kedareswara Rao wrote:
+> >>>>>> This loop looks broken. Can you explain how it works.
+> >>>>>>
+> >>>>>> What it shoud do is:
+> >>>>>> We have put (priv->tx_head - priv->tx_tail) CAN frames into the
+> FIFO.
+> >>>>>> This means at maximum there could be this amount of CAN frames
+> >>>>>> which have been successfully transmitted. For every cycle in this
+> >>>>>> while loop you
+> >>>>>> should:
+> >>>>>> a) check if a CAN frame has successfully been transmitted
+> >>>>>>    (as this CAN core uses a FIFO it should be "oldest")
+> >>>>>>    A read_reg() of some kind is missing in your loop.
+> >>>>>> b) if needed, remove this event from the FIFO or
+> >>>>>>    mark the interrupt as done. Whatever you hardware needs.
+> >>>>>> c) update your statistics
+> >>>>>> d) Use can_get_echo_skb to push this frame into the networking
+> >>>>>> stack
+> >>>>>> e) As a CAN frame has been transmitted successfully, wake the
+> >> tx_queue.
+> >>>>>>
+> >>>>>>> +   while (priv->tx_head - priv->tx_tail > 0) {
+> >>>>>>> +           if (isr & XCAN_IXR_TXFLL_MASK) {
+> >>>>>>> +                   priv->write_reg(priv, XCAN_ICR_OFFSET,
+> >>>>>>> +                                   XCAN_IXR_TXFLL_MASK);
+> >>>>>>> +                   netif_stop_queue(ndev);
+> >>>>>>
+> >>>>>> Why do you stop the queue here? A CAN frame has successfully
+> been
+> >>>>>> transmitted, there should be room in the FIFO.
+> >>>>>>
+> >>>>>>> +                   break;
+> >>>>>>> +           }
+> >>>>>>> +           can_get_echo_skb(ndev, priv->tx_tail %
+> >>>>>>> +                                   priv->xcan_echo_skb_max_tx);
+> >>>>>>> +           priv->tx_tail++;
+> >>>>>>> +   }
+> >>>>>>> +
+> >>>>>
+> >>>>> The below are the bit fields available for the Transmit FIFO.
+> >>>>> 1) In the ISR(interrupt status register)  Tx Ok interrupt and Tx
+> >>>>> fifo full
+> >>>> interrupt.
+> >>>>> 2) in the SR(Status Register) Tx fifo full condition.
+> >>>>>
+> >>>>>
+> >>>>> I am modifying the entire tx interrupt logic to like below.
+> >>>>>
+> >>>>> static void xcan_tx_interrupt(struct net_device *ndev, u32 isr) {
+> >>>>>         struct xcan_priv *priv = netdev_priv(ndev);
+> >>>>>         struct net_device_stats *stats = &ndev->stats;
+> >>>>>
+> >>>>>             while (priv->tx_head - priv->tx_tail > 0) {
+> >>>>>                 if (isr & XCAN_IXR_TXFLL_MASK) {
+> >>>>>                         priv->write_reg(priv, XCAN_ICR_OFFSET,
+> >>>>>                                         XCAN_IXR_TXFLL_MASK);
+> >>>>>                           break;
+> >>>>>                 }
+> >>>>>                 can_get_echo_skb(ndev, priv->tx_tail %
+> >>>>>                                         priv->xcan_echo_skb_max_tx);
+> >>>>>                 priv->tx_tail++;
+> >>>>>          stats->tx_packets++;
+> >>>>>         netif_wake_queue(ndev);
+> >>>>>               can_led_event(ndev, CAN_LED_EVENT_TX);
+> >>>>>
+> >>>>>         }
+> >>>>
+> >>>> You just need to wake the queue once.
+> >>>
+> >>> Ok
+> >>>>
+> >>>>> }
+> >>>>>
+> >>>>>
+> >>>>> Are you Ok with the above logic?
+> >>>>
+> >>>> No, how can you tell how many frames have been transmitted?
+> >>>
+> >>> There is no register to read how many can frames are transmitted.
+> >>> The only way to know Is by reading this parameter
+> >>> (stats->tx_packets++;) through ip command
+> >>
+> >> stats->tx_packets is calculated in the above loop and the loop is
+> >> broken. Let me illustrate the problem:
+> >>
+> >> - xmit is called 10 times in a row
+> >> - this means you have 10 CAN frames in the TX FIFO
+> >> - a single CAN frame gets transmitted
+> >> - you get an interrupt
+> >> - you enter the above routine and loop 10 times and echo the CAN frame
+> >>   back into the stack
+> >>
+> >> Now every application sees 10 transmitted packages, but there is only
+> >> one transmitted. Every time you loop you have to check if the CAN
+> >> frame has already been transmitted or not. Is that possible with the
+> hardware?
+> >
+> >         The only way to know whether the TX packet is transmitted
+> successfully or not is by using the Tx Ok interrupt from the ISR.
+> > This interrupt will come for every Tx Packet.
+> > So I am thinking of there is no loop required in the TX interrupt routine. As
+> it is called for each and every packet.
+>
+> What happens if the interrupt handler is delayed? For example in a RT
+> enabled system the interrupt handler runs as a thread. There might be other
+> threads with higher priority. The hardware will probably send all CAN
+> frames in the FIFO, so you want to reduce the overhead and loop in the tx
+> complete handler.
+>
+Yes I agree with your comment.
+It will be good to have a loop in the Tx interrupt handler
+I am modifying the Tx interrupt handler like below.
+
+static void xcan_tx_interrupt(struct net_device *ndev, u32 isr)
+{
+        struct xcan_priv *priv = netdev_priv(ndev);
+        struct net_device_stats *stats = &ndev->stats;
+
+        while (priv->tx_head - priv->tx_tail > 0) {
+                if (!(isr & XCAN_IXR_TXOK_MASK)) {
+                        break;
+                }
+                can_get_echo_skb(ndev, priv->tx_tail %
+                                        priv->xcan_echo_skb_max_tx);
+                priv->tx_tail++;
+                stats->tx_packets++;
+                can_led_event(ndev, CAN_LED_EVENT_TX);
+                isr = priv->read_reg(priv, XCAN_ISR_OFFSET);
+        }
+        netif_wake_queue(ndev);
+}
+
+Are you Ok with this?
+
+> >
+> > static void xcan_tx_interrupt(struct net_device *ndev, u32 isr) {
+> >         struct xcan_priv *priv = netdev_priv(ndev);
+> >         struct net_device_stats *stats = &ndev->stats;
+> >
+> >
+> >         can_get_echo_skb(ndev, priv->tx_tail %
+> >                                 priv->xcan_echo_skb_max_tx);
+> >         priv->tx_tail++;
+> >         stats->tx_packets++;
+> >         can_led_event(ndev, CAN_LED_EVENT_TX);
+> >         netif_wake_queue(ndev);
+> > }
+> >
+> > If you want me to put some locks for this Will put some spin_locks in the
+> _xmit and in the tx interrupt routine (for the tx_head and tx_tail).
+>
+> There is no need for locking regarding tx_{head,tail}. As the tx complete
+> handler only increments tx_tail and the xmit routine increments tx_head.
+>
+
+Ok
+
 Regards,
+Kedar.
 
-Laurent Pinchart
+> Marc
+>
+> --
+> Pengutronix e.K.                  | Marc Kleine-Budde           |
+> Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+> Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+> Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
